@@ -1,0 +1,59 @@
+# Recepción de equipos, numeración y encabezado
+
+Implementado sobre Python/SQLite y el esquema existente. Las migraciones 002–004 son aditivas, crean respaldos antes de ejecutarse y conservan cuentas, relaciones y códigos anteriores. Reiniciar después de migrar. No sobrescribir `var` ni `.env` al actualizar.
+
+## Formulario y permisos
+
+Asistente de cuatro pasos: cliente, ubicación, equipo y confirmación. Valida antes de avanzar; conserva datos al regresar y pide confirmación antes de descartarlos. Administración y técnicos autenticados pueden recibir equipos. La edición de clientes/equipos, estados y configuración conserva los permisos administrativos anteriores.
+
+Se guardan los datos completos de recepción y una copia histórica inmutable por orden. Cambiar posteriormente los datos del cliente/equipo no cambia el comprobante de recepción. Las órdenes anteriores conservan la información disponible en el momento de migrar; no se inventan datos que no existían.
+
+El catálogo inicial contiene las 52 marcas de computadoras recibidas en el pedido y 24 marcas de impresoras. Se filtra por categoría y permite escribir una nueva; el servidor la incorpora al guardar, sin duplicar por mayúsculas/minúsculas. Todas las categorías de equipos anteriores siguen siendo compatibles.
+
+## Ubicación: fuente oficial
+
+Fuente: INEC, **Códigos DPA 2026**, descargado el 2026-10-09 de:
+https://aplicaciones2.ecuadorencifras.gob.ec/SIN/descargas/cdpa2026.xlsx
+
+El archivo derivado `local/data/inec-2026.json` registra versión, URL, fecha de consulta y SHA256 del original. Contiene **24 provincias, 222 cantones, 1.317 entradas parroquiales** (incluye cabeceras, parroquias urbanas y rurales) y **222 cabeceras cantonales** como sugerencias separadas de localidad. La tabla parroquial incluye tanto los códigos DPA_PARROQ como DPA_PARURB, conservando su clase y relaciones. Los datos se importan en tablas SQLite con claves y relaciones.
+
+Provincia, cantón y parroquia se buscan y seleccionan de listas dependientes. Las cabeceras están identificadas por el código parroquial 50; un cantón nunca se convierte automáticamente en ciudad. En parroquias urbanas se sugiere su cabecera. En ubicaciones sin localidad en la fuente se permite texto manual, que se conserva. El backend rechaza combinaciones incompatibles; guarda por separado códigos/nombres, localidad, calles, número y referencia. La fuente no pretende enumerar todos los barrios y recintos del país.
+
+## Identificación
+
+Cédula y RUC se guardan como texto. Se valida longitud, dígitos ASCII, código provincial, estructura, establecimiento y dígito verificador según cédula/persona natural, sociedad privada o entidad pública. El control tiene tipo, contador y estados visuales; valida al completar o al salir, y también en el servidor. No hay consulta automática al Registro Civil ni al SRI; el indicador significa solamente **formato y algoritmo correctos**.
+
+Precisión: el SRI indica que existen RUC emitidos para sociedades y extranjeros que no responden a un algoritmo específico. La comprobación tradicional implementada por pedido no acredita emisión/actividad y puede rechazar esas excepciones. Validarlas requiere un procedimiento o integración autorizada, no asumir que cualquier número de 13 dígitos es válido.
+Fuente: https://www.sri.gob.ec/facturacion-electronica
+
+## Numeración y QR
+
+Los nuevos códigos usan `PCD-AAAAMMDD-0001`. Fecha/hora se toman del servidor con `ZoneInfo('America/Guayaquil')`; se guardan ISO 8601 con microsegundos y offset, fecha de numeración y consecutivo diario. `BEGIN IMMEDIATE` y las restricciones UNIQUE protegen los registros concurrentes. Cada día empieza en 0001; después de 9999 continúa en 10000. La secuencia persiste y no disminuye ni se elimina. No se recuperan números por anular/eliminar órdenes. Los códigos anteriores `OP-…` y `ORDE:…` se conservan.
+
+Un identificador de envío evita duplicados al reintentar la misma recepción. Los códigos, fecha de numeración, consecutivo y URL de QR quedan protegidos contra cambios; modificar la fecha de recepción no renumera la orden.
+
+Configurar `PUBLIC_APP_URL` con el origen HTTPS real **antes de registrar órdenes destinadas a uso real**. Se usa por defecto el dominio que ya figuraba en la documentación, `https://ordenes-pro.ecuadorpcdoctor.com`. El QR guarda `/orders/<código>`; no contiene identificación ni contacto. La ruta exige acceso para consultar detalles, PNG y PDF. Vincular por código evita que la reutilización de un ID SQLite tras eliminar un registro conduzca a otra orden. La URL queda almacenada y no cambia si después se modifica la configuración.
+
+La instalación local en HTTP no publica automáticamente la aplicación en ese dominio. La consulta desde teléfonos mediante el QR requiere HTTPS público con esta versión desplegada. No se ha realizado una publicación remota.
+
+El comprobante ofrece consultar, imprimir desde el navegador y descargar PDF/QR PNG. El PDF se genera en el servidor, con QR vectorial y ajuste/paginación para textos extensos. Los datos de identificación y ubicación están disponibles solo tras autenticación.
+
+## Encabezado, hora y clima
+
+Se conserva el logo y la paleta azul oscuro. Navegación con SVG Lucide, buscador, reloj, clima, cuenta y rol. El reloj muestra segundos y `a.m.`/`p.m.`, usa Ecuador y se sincroniza con el servidor. La hora no depende de la zona configurada en el navegador.
+
+El clima usa la API real **MET Norway Locationforecast**, con atribución, iconos por condición/día/noche y caché de diez minutos. Es un pronóstico cercano a la hora actual, no una observación de estación. La consulta solo envía coordenadas del establecimiento, nunca datos del cliente. Hay timeout y estado «Clima no disponible» ante fallos. El header mide 76 px: logo original con 48 px de contenido visible, título de 21 px, subtítulo de 11 px, navegación de 13 px con iconos de 18 px y botones de 40 px. En anchos menores de 1800 px la navegación usa un desplegable. Hasta 1150 px el reloj y clima pasan a la zona secundaria del menú; hasta 860 px también se traslada allí el buscador. En teléfonos se mantienen logo, título, cuenta y botón de menú; desde 380 px hay además un acceso directo al buscador. El menú incluye siempre el buscador en teléfonos, también en 320 px. La cuenta dispone de cierre de sesión y conserva los permisos existentes. Los desplegables cierran al pulsar Escape o fuera de ellos; los iconos y estados respetan movimiento reducido. Configurar WEATHER_CITY, WEATHER_LATITUDE, WEATHER_LONGITUDE y WEATHER_CONTACT; por defecto se utiliza Otavalo. No requiere API key.
+
+Fuentes: https://api.met.no/doc/locationforecast/HowTO y https://api.met.no/
+
+## Producción y dependencias
+
+El aviso de evaluación se oculta únicamente si APP_ENV=production, PRODUCTION_ENABLED=true, APP_URL es HTTPS y SESSION_SECURE=true. El cambio no certifica ni despliega el hosting. La instalación local continúa identificada como evaluación.
+
+Dependencias portables incluidas en `local/vendor`: Segno 1.6.6 (QR) y pydyf 0.11.0 (PDF), con licencias. Métricas Helvetica derivadas de ReportLab 4.4.5 y licencia en `local/data`. Iconos Lucide 0.468.0 y licencia en `local/static`. No se necesita Node, Chromium o pip para ejecutar el sistema; Chromium/Poppler/zbarimg se utilizaron exclusivamente para QA.
+
+## Verificación
+
+`python -m unittest discover -s tests -v` desde `local`, y `node --check static/app.js`.
+
+Pruebas específicas: cédula/RUC, backend, persistencia de campos, jerarquía INEC, localidad manual, historial, medianoche de Ecuador, secuencia diaria, concurrencia con dos técnicos, reintentos, eliminación sin reutilización de códigos, inmutabilidad, consulta privada, PDF y recuperación de órdenes anteriores. Weather: datos reales consultados y pruebas de caché, estados meteorológicos y fallo de conexión. Revisión visual en Chromium, PDF renderizado con Poppler y lectura independiente del QR con zbarimg. Resultados y capturas en `revision`.

@@ -1,0 +1,196 @@
+{
+  "passed": true,
+  "sizes": [],
+  "wizardSizes": [
+    {
+      "width": 1440,
+      "height": 900,
+      "dialog": {
+        "x": 315,
+        "y": 104.453125,
+        "width": 810,
+        "height": 691.09375,
+        "top": 104.453125,
+        "right": 1125,
+        "bottom": 795.546875,
+        "left": 315
+      },
+      "footer": {
+        "x": 316,
+        "y": 673.953125,
+        "width": 808,
+        "height": 120.59375,
+        "top": 673.953125,
+        "right": 1124,
+        "bottom": 794.546875,
+        "left": 316
+      },
+      "overflow": false,
+      "columns": 2
+    },
+    {
+      "width": 1366,
+      "height": 768,
+      "dialog": {
+        "x": 278,
+        "y": 46.078125,
+        "width": 810,
+        "height": 675.828125,
+        "top": 46.078125,
+        "right": 1088,
+        "bottom": 721.90625,
+        "left": 278
+      },
+      "footer": {
+        "x": 279,
+        "y": 602.3125,
+        "width": 808,
+        "height": 120.59375,
+        "top": 602.3125,
+        "right": 1087,
+        "bottom": 722.90625,
+        "left": 279
+      },
+      "overflow": false,
+      "columns": 2
+    },
+    {
+      "width": 768,
+      "height": 1024,
+      "dialog": {
+        "x": 16,
+        "y": 166.453125,
+        "width": 736,
+        "height": 691.09375,
+        "top": 166.453125,
+        "right": 752,
+        "bottom": 857.546875,
+        "left": 16
+      },
+      "footer": {
+        "x": 17,
+        "y": 735.953125,
+        "width": 734,
+        "height": 120.59375,
+        "top": 735.953125,
+        "right": 751,
+        "bottom": 856.546875,
+        "left": 17
+      },
+      "overflow": false,
+      "columns": 2
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "dialog": {
+        "x": 10,
+        "y": 42.203125,
+        "width": 370,
+        "height": 759.59375,
+        "top": 42.203125,
+        "right": 380,
+        "bottom": 801.796875,
+        "left": 10
+      },
+      "footer": {
+        "x": 11,
+        "y": 684.203125,
+        "width": 368,
+        "height": 118.59375,
+        "top": 684.203125,
+        "right": 379,
+        "bottom": 802.796875,
+        "left": 11
+      },
+      "overflow": false,
+      "columns": 1
+    },
+    {
+      "width": 320,
+      "height": 740,
+      "dialog": {
+        "x": 10,
+        "y": 37,
+        "width": 300,
+        "height": 666,
+        "top": 37,
+        "right": 310,
+        "bottom": 703,
+        "left": 10
+      },
+      "footer": {
+        "x": 11,
+        "y": 585.40625,
+        "width": 298,
+        "height": 118.59375,
+        "top": 585.40625,
+        "right": 309,
+        "bottom": 704,
+        "left": 11
+      },
+      "overflow": false,
+      "columns": 1
+    },
+    {
+      "width": 844,
+      "height": 390,
+      "dialog": {
+        "x": 17,
+        "y": 23.40625,
+        "width": 810,
+        "height": 343.1875,
+        "top": 23.40625,
+        "right": 827,
+        "bottom": 366.59375,
+        "left": 17
+      },
+      "footer": {
+        "x": 18,
+        "y": 267.90625,
+        "width": 808,
+        "height": 114.59375,
+        "top": 267.90625,
+        "right": 826,
+        "bottom": 382.5,
+        "left": 18
+      },
+      "overflow": false,
+      "columns": 2
+    }
+  ],
+  "consoleErrors": [],
+  "code": "PCD-20261009-0001",
+  "qrUrl": "https://ordenes-pro.ecuadorpcdoctor.com/orders/PCD-20261009-0001",
+  "createdSyntheticOrders": 1,
+  "checks": [
+    "clock-seconds-ecuador-am-pm",
+    "weather-responsive",
+    "four-steps",
+    "validation-before-next",
+    "identification-type-counter",
+    "geographic-dependencies",
+    "manual-locality",
+    "catalog-brands",
+    "preserve-input-on-back",
+    "dirty-close-confirmation",
+    "save-daily-code",
+    "receipt-qr-pdf",
+    "print-css",
+    "code-deep-link-inline",
+    "reload-after-save-no-modal",
+    "reload-deep-link-no-modal",
+    "explicit-receipt-only",
+    "save-error-no-modal",
+    "terms-publication-and-acceptance",
+    "thermal-pdf",
+    "reduced-motion",
+    "catalog-404-retry",
+    "geo-404-retry",
+    "independent-step-navigation",
+    "preserve-input-on-retry",
+    "login-deep-link-no-modal",
+    "module-navigation-closes-modal",
+    "public-conditions-print-visible"
+  ]
+}

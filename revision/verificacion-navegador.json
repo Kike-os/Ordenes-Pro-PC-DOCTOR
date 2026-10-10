@@ -1,0 +1,53 @@
+{
+  "sizes": [
+    {
+      "width": 2560,
+      "columns": 3,
+      "overflow": false
+    },
+    {
+      "width": 1920,
+      "columns": 3,
+      "overflow": false
+    },
+    {
+      "width": 1440,
+      "columns": 3,
+      "overflow": false
+    },
+    {
+      "width": 1024,
+      "columns": 3,
+      "overflow": false
+    },
+    {
+      "width": 768,
+      "columns": 2,
+      "overflow": false
+    },
+    {
+      "width": 390,
+      "columns": 1,
+      "overflow": false
+    },
+    {
+      "width": 320,
+      "columns": 1,
+      "overflow": false
+    }
+  ],
+  "javascriptErrors": 0,
+  "checks": [
+    "inicio de sesión",
+    "logo original centrado",
+    "nueva orden",
+    "crear y editar cliente",
+    "registrar equipo",
+    "actualizar estado",
+    "búsqueda global",
+    "reportes reales",
+    "guardar perfil",
+    "movimiento reducido",
+    "cerrar sesión"
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "backup_created": true,
+  "tables": {
+    "clients": 1,
+    "devices": 1,
+    "orders": 1
+  },
+  "orphan_devices": 0,
+  "orphan_orders": 0,
+  "foreign_key_errors": 0
+}

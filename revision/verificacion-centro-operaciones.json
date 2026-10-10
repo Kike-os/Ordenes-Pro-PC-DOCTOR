@@ -1,0 +1,15 @@
+{
+  "clientOnlyCreatesNoOrder": true,
+  "orderWizard": true,
+  "maintenance": true,
+  "viewports": [
+    1440,
+    1366,
+    768,
+    390,
+    320
+  ],
+  "search": true,
+  "reloadNoModal": true,
+  "errors": []
+}

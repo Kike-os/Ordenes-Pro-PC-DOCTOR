@@ -1,0 +1,54 @@
+DEBUG: argv[0]="cupsfilter"
+DEBUG: argv[1]="1"
+DEBUG: argv[2]="admin-red"
+DEBUG: argv[3]="ticket-pcdoctor-vista-previa.pdf"
+DEBUG: argv[4]="1"
+DEBUG: argv[5]="fit-to-page=false media=RP80x2000 PageSize=RP80x2000 print-scaling=none"
+DEBUG: argv[6]="output/pdf/ticket-pcdoctor-vista-previa.pdf"
+DEBUG: envp[0]="CONTENT_TYPE=application/pdf"
+DEBUG: envp[1]="CUPS_DATADIR=/usr/share/cups"
+DEBUG: envp[2]=""
+DEBUG: envp[3]="CUPS_SERVERBIN=/usr/lib/cups"
+DEBUG: envp[4]="CUPS_SERVERROOT=/etc/cups"
+DEBUG: envp[5]="LANG=C.UTF8"
+DEBUG: envp[6]="PATH=/usr/lib/cups/filter:/usr/bin:/usr/bin:/bin:/usr/bin"
+DEBUG: envp[7]="PPD=/home/admin-red/Work/ordenes-pro/tmp/pdfs/epson-installed.ppd"
+DEBUG: envp[8]="PRINTER_INFO=cupsfilter"
+DEBUG: envp[9]="PRINTER_LOCATION=Unknown"
+DEBUG: envp[10]="PRINTER=cupsfilter"
+DEBUG: envp[11]="USER=admin-red"
+DEBUG: envp[12]="CHARSET=utf-8"
+DEBUG: envp[13]="FINAL_CONTENT_TYPE=application/vnd.cups-pdf"
+INFO: universal (PID 10) started.
+DEBUG: ppdFilterLoadPPD: Color profile qualifier determined from job and PPD data '..203x203dpi'
+DEBUG: ppdFilterLoadPPD: No ICC profiles specified in PPD
+DEBUG: ppdFilterLoadPPD: Searching for profile "203x203dpi/-"...
+ERROR: ppdFilterLoadPPD: Last filter could not get determined, page logging by the PDF filter turned off.
+DEBUG: ppdFilterLoadPPD: Last filter determined by the PPD: None; Final data MIME type: application/vnd.cups-pdf => PDF filter will not log pages in page_log.
+DEBUG: ppdFilterUniversal: "*cupsFilter(2): ..." lines in the PPD file:
+DEBUG: ppdFilterUniversal:    application/vnd.cups-raw application/octet-stream 0 -
+DEBUG: ppdFilterUniversal:    application/vnd.cups-raster 0 rastertotmtr
+DEBUG: ppdFilterUniversal: PPD uses "*cupsFilter: ..." lines, so we always convert to format given by FINAL_CONTENT_TYPE
+DEBUG: ppdFilterUniversal: Converting from application/pdf to application/vnd.cups-pdf
+DEBUG: cfFilterUniversal: Converting from application/pdf to application/vnd.cups-pdf
+DEBUG: cfFilterUniversal: Final output format for job: application/vnd.cups-pdf
+DEBUG: cfFilterUniversal: Adding pdftopdf to chain
+INFO: cfFilterChain: Running filter: pdftopdf
+INFO: cfFilterChain: pdftopdf (PID 11) started.
+DEBUG: page 1: Contains annotations
+DEBUG: page_dict_cb(dict=0x5e7436f72430, key="Font", outpage=0x5e7436f75680), type=5
+DEBUG: Opening field stream 1/1... with obj number 7
+Key 'N' not found.
+ERROR: missing required flags
+DEBUG: special case ignore annotation with no appearance
+DEBUG: Opening content stream 1/1...
+DEBUG: Opened stream 1, resmap[0]=(nil)
+DEBUG: page_dict_cb(dict=0x5e7436f76b00, key="ColorSpace", outpage=0x7ffeb70d7580), type=5
+DEBUG: page_dict_cb(dict=0x5e7436f76b00, key="Font", outpage=0x7ffeb70d7580), type=5
+DEBUG: page_dict_cb(dict=0x5e7436f76b00, key="XObject", outpage=0x7ffeb70d7580), type=5
+DEBUG: iwidth=204.293, iheight=5669.29, cwidth=204.293, cheight=5669.29, rotate=false
+DEBUG: Opening content stream 1/1...
+DEBUG: Opened stream 1, resmap[0]=(nil)
+DEBUG: cfFilterChain: pdftopdf completed with status 0.
+INFO: cfFilterChain: pdftopdf (PID 11) exited with no errors.
+INFO: universal (PID 10) exited with no errors.

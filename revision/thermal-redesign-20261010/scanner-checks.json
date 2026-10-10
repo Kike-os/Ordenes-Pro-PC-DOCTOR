@@ -1,0 +1,10 @@
+{
+  "pdf_203dpi": {
+    "qr_matches": true,
+    "barcode_matches": true
+  },
+  "epson_raster_203dpi": {
+    "qr_matches": true,
+    "barcode_matches": true
+  }
+}

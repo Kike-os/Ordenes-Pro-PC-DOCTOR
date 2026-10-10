@@ -1,0 +1,65 @@
+{
+  "sizes": [
+    {
+      "width": 2560,
+      "height": 1440,
+      "cardWidth": 410,
+      "cardHeight": 586.03125,
+      "overflow": false
+    },
+    {
+      "width": 1920,
+      "height": 1080,
+      "cardWidth": 410,
+      "cardHeight": 586.03125,
+      "overflow": false
+    },
+    {
+      "width": 1440,
+      "height": 900,
+      "cardWidth": 410,
+      "cardHeight": 586.03125,
+      "overflow": false
+    },
+    {
+      "width": 1366,
+      "height": 768,
+      "cardWidth": 410,
+      "cardHeight": 586.03125,
+      "overflow": false
+    },
+    {
+      "width": 768,
+      "height": 1024,
+      "cardWidth": 410,
+      "cardHeight": 586.03125,
+      "overflow": false
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "cardWidth": 358,
+      "cardHeight": 577.671875,
+      "overflow": false
+    },
+    {
+      "width": 320,
+      "height": 568,
+      "cardWidth": 288,
+      "cardHeight": 538.859375,
+      "overflow": false
+    }
+  ],
+  "javascriptErrors": 0,
+  "checks": [
+    "centrado y ancho máximo 410px",
+    "logo original",
+    "mostrar y ocultar contraseña",
+    "error de acceso e icono conservado",
+    "inicio de sesión",
+    "recordarme con cookie persistente HttpOnly",
+    "cerrar sesión",
+    "enlace de recuperación",
+    "movimiento reducido"
+  ]
+}

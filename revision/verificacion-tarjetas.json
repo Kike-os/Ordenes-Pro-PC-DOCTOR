@@ -1,0 +1,34 @@
+{
+  "passed": true,
+  "results": [
+    {
+      "width": 1440,
+      "overflow": false,
+      "actions": 6,
+      "thermal": "/api/orders/1/thermal.pdf",
+      "modal": false
+    },
+    {
+      "width": 768,
+      "overflow": false,
+      "actions": 6,
+      "thermal": "/api/orders/1/thermal.pdf",
+      "modal": false
+    },
+    {
+      "width": 390,
+      "overflow": false,
+      "actions": 6,
+      "thermal": "/api/orders/1/thermal.pdf",
+      "modal": false
+    },
+    {
+      "width": 320,
+      "overflow": false,
+      "actions": 6,
+      "thermal": "/api/orders/1/thermal.pdf",
+      "modal": false
+    }
+  ],
+  "consoleErrors": []
+}

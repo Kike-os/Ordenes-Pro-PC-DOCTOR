@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#060d19"><title>Órdenes de Reparación | PC-DOCTOR S.A.</title><link rel="icon" href="/static/logo-original.png"><link rel="stylesheet" href="/static/app.css"><script defer src="/static/form-validation.js"></script><script defer src="/static/app.js"></script></head>
+<body data-page="dashboard"><a class="skip-link" href="#main">Ir al contenido</a><div class="technology-background"><svg class="circuit-board" viewBox="0 0 1440 900" fill="none" aria-hidden="true" preserveAspectRatio="xMidYMid slice"><g class="traces"><path d="M0 130H140L210 200H350L420 270V410H510"/><path d="M0 175H120L180 235H290L370 315V500H470"/><path d="M0 660H180L250 590H360V460H445"/><path d="M0 710H130L230 610H320V540"/><path d="M1440 130H1300L1230 200H1090L1020 270V410H930"/><path d="M1440 175H1320L1260 235H1150L1070 315V500H970"/><path d="M1440 660H1260L1190 590H1080V460H995"/><path d="M1440 710H1310L1210 610H1120V540"/><path d="M180 0V90L270 180H410"/><path d="M1260 0V90L1170 180H1030"/><path d="M100 900V810L220 690H390"/><path d="M1340 900V810L1220 690H1050"/></g><g class="pulses"><path class="pulse pulse-0" d="M0 130H140L210 200H350L420 270V410H510"/><path class="pulse pulse-1" d="M0 175H120L180 235H290L370 315V500H470"/><path class="pulse pulse-2" d="M0 660H180L250 590H360V460H445"/><path class="pulse pulse-0" d="M0 710H130L230 610H320V540"/><path class="pulse pulse-1" d="M1440 130H1300L1230 200H1090L1020 270V410H930"/><path class="pulse pulse-2" d="M1440 175H1320L1260 235H1150L1070 315V500H970"/><path class="pulse pulse-0" d="M1440 660H1260L1190 590H1080V460H995"/><path class="pulse pulse-1" d="M1440 710H1310L1210 610H1120V540"/></g><g class="board-chip" transform="translate(130 340)"><rect width="90" height="90" rx="7"/><rect x="14" y="14" width="62" height="62" rx="3"/><path d="M17 -12v12M17 90v12M-12 17h12M90 17h12"/><path d="M31 -12v12M31 90v12M-12 31h12M90 31h12"/><path d="M45 -12v12M45 90v12M-12 45h12M90 45h12"/><path d="M59 -12v12M59 90v12M-12 59h12M90 59h12"/><path d="M73 -12v12M73 90v12M-12 73h12M90 73h12"/></g><g class="board-chip" transform="translate(1200 340)"><rect width="90" height="90" rx="7"/><rect x="14" y="14" width="62" height="62" rx="3"/><path d="M17 -12v12M17 90v12M-12 17h12M90 17h12"/><path d="M31 -12v12M31 90v12M-12 31h12M90 31h12"/><path d="M45 -12v12M45 90v12M-12 45h12M90 45h12"/><path d="M59 -12v12M59 90v12M-12 59h12M90 59h12"/><path d="M73 -12v12M73 90v12M-12 73h12M90 73h12"/></g><g class="board-chip" transform="translate(260 740)"><rect width="90" height="90" rx="7"/><rect x="14" y="14" width="62" height="62" rx="3"/><path d="M17 -12v12M17 90v12M-12 17h12M90 17h12"/><path d="M31 -12v12M31 90v12M-12 31h12M90 31h12"/><path d="M45 -12v12M45 90v12M-12 45h12M90 45h12"/><path d="M59 -12v12M59 90v12M-12 59h12M90 59h12"/><path d="M73 -12v12M73 90v12M-12 73h12M90 73h12"/></g><g class="board-chip" transform="translate(1080 740)"><rect width="90" height="90" rx="7"/><rect x="14" y="14" width="62" height="62" rx="3"/><path d="M17 -12v12M17 90v12M-12 17h12M90 17h12"/><path d="M31 -12v12M31 90v12M-12 31h12M90 31h12"/><path d="M45 -12v12M45 90v12M-12 45h12M90 45h12"/><path d="M59 -12v12M59 90v12M-12 59h12M90 59h12"/><path d="M73 -12v12M73 90v12M-12 73h12M90 73h12"/></g></svg></div>
+<header class="command-bar premium-header"><a class="nav-brand" href="#home" aria-label="Órdenes Pro | PC-DOCTOR S.A. — Inicio"><span class="header-logo"><img src="/static/logo-original.png" alt="PC-DOCTOR" width="2826" height="2049"></span><span class="brand-lockup"><strong>Órdenes <em>Pro</em></strong><small>PC-DOCTOR S.A.<span class="brand-description"> <span aria-hidden="true">|</span> Gestión técnica</span></small></span></a>
+<div class="header-navigation"><button id="header-menu-toggle" class="header-control" type="button" aria-expanded="false" aria-controls="header-drawer" aria-label="Abrir navegación principal"><svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg><span>Menú</span></button><div id="header-drawer" class="header-drawer"><div id="header-search-slot"></div><nav aria-label="Navegación principal"><a href="#home" data-nav="home"><svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8" />
+  <path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+</svg>
+<span>Inicio</span></a><a href="#orders" data-nav="orders"><svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <rect width="8" height="4" x="8" y="2" rx="1" ry="1" />
+  <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+  <path d="M12 11h4" />
+  <path d="M12 16h4" />
+  <path d="M8 11h.01" />
+  <path d="M8 16h.01" />
+</svg>
+<span>Órdenes</span></a><a href="#clients" data-nav="clients"><svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <path d="M18 21a8 8 0 0 0-16 0" />
+  <circle cx="10" cy="8" r="5" />
+  <path d="M22 20c0-3.37-2-6.5-4-8a5 5 0 0 0-.45-8.3" />
+</svg>
+<span>Clientes</span></a><a href="#devices" data-nav="devices"><svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <path d="M20 16V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v9m16 0H4m16 0 1.28 2.55a1 1 0 0 1-.9 1.45H3.62a1 1 0 0 1-.9-1.45L4 16" />
+</svg>
+<span>Equipos</span></a><a href="#reports" data-nav="reports"><svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <line x1="18" x2="18" y1="20" y2="10" />
+  <line x1="12" x2="12" y1="20" y2="4" />
+  <line x1="6" x2="6" y1="20" y2="14" />
+</svg>
+<span>Reportes</span></a><a href="#settings" data-nav="settings"><svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <path d="M20 7h-9" />
+  <path d="M14 17H5" />
+  <circle cx="17" cy="17" r="3" />
+  <circle cx="7" cy="7" r="3" />
+</svg>
+<span>Configuración</span></a><a href="#appointments" data-nav="appointments"><svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18M9 16l2 2 4-4"/></svg><span>Citas</span></a><details id="assistance-menu" class="assistance-menu" hidden><summary>Asistencia<svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary><div class="assistance-links"><a href="#live" data-nav="live" hidden><svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 14v-3a9 9 0 0 1 18 0v3"/><path d="M5 14h2v6H5a2 2 0 0 1-2-2v-2a2 2 0 0 1 2-2ZM19 14h-2v6h2a2 2 0 0 0 2-2v-2a2 2 0 0 0-2-2Z"/></svg><span>Atención en vivo</span></a><a href="#adi" data-nav="adi" hidden><svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v3m0 12v3M3 12h3m12 0h3M5.6 5.6l2.1 2.1m8.6 8.6 2.1 2.1m0-12.8-2.1 2.1m-8.6 8.6-2.1 2.1"/><circle cx="12" cy="12" r="4"/></svg><span>Adi administrativa</span></a></div></details></nav><div id="header-status-slot"></div></div></div><div class="header-utilities"><button id="header-search-toggle" class="header-control" type="button" aria-label="Abrir buscador de órdenes" aria-controls="global-search"><svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg></button><form id="global-search" role="search"><label class="sr-only" for="search">Buscar órdenes</label><svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <circle cx="11" cy="11" r="8" />
+  <path d="m21 21-4.3-4.3" />
+</svg>
+<input id="search" name="q" type="search" placeholder="Buscar orden..." maxlength="150"><button type="submit" aria-label="Buscar órdenes">↵</button></form>
+<div id="header-status" class="header-status"><div class="header-clock" aria-label="Hora actual de Ecuador"><svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <circle cx="12" cy="12" r="10" />
+  <polyline points="12 6 12 12 16.5 12" />
+</svg>
+<div><time id="live-clock" aria-live="off">--:--:--</time><small>Ecuador · UTC−05</small></div></div>
+<div id="header-weather" class="header-weather" title="Pronóstico de MET Norway para la hora actual"><span id="weather-icon"><svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <path d="m2 2 20 20" />
+  <path d="M5.782 5.782A7 7 0 0 0 9 19h8.5a4.5 4.5 0 0 0 1.307-.193" />
+  <path d="M21.532 16.5A4.5 4.5 0 0 0 17.5 10h-1.79A7.008 7.008 0 0 0 10 5.07" />
+</svg>
+</span><div><strong id="weather-temperature">Clima no disponible</strong><span id="weather-condition"></span><small><span id="weather-city">Otavalo, EC</span><a href="https://api.met.no/" target="_blank" rel="noopener noreferrer" aria-label="Fuente meteorológica: MET Norway">MET Norway</a></small></div></div>
+</div><div class="user-area"><button id="account-toggle" class="account-toggle" type="button" aria-label="Abrir menú de cuenta" aria-expanded="false" aria-controls="account-panel"><span class="avatar" aria-hidden="true">PC</span><span class="account-label"><strong id="user-name">Cargando…</strong><span id="user-role"></span></span><svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button><div id="account-panel" class="account-panel" hidden><strong id="account-name"></strong><small id="account-role"></small><button id="logout" class="logout-button" title="Cerrar sesión" aria-label="Cerrar sesión"><svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+  <polyline points="16 17 21 12 16 7" />
+  <line x1="21" x2="9" y1="12" y2="12" />
+</svg>
+<span>Cerrar sesión</span></button></div></div></div></header>
+<main id="main" class="control-center"><p id="dashboard-message" class="message" role="status"></p>
+<section id="view-home" class="view operations-home">
+<header class="operations-heading"><div><span class="operations-kicker">PC-DOCTOR S.A. · GESTIÓN TÉCNICA</span><h1>Centro de operaciones</h1><p>Gestión, seguimiento y control de servicios técnicos</p></div><div class="operations-heading-tools"><time id="today"></time><div class="operations-actions"><button id="quick-client" class="secondary" type="button">Registrar cliente</button><button id="quick-order" class="primary" type="button">Nueva orden</button><button id="quick-appointment" class="secondary" type="button">Agendar cita</button></div></div></header>
+<div id="operations-states" class="operations-states" aria-label="Estados del taller"></div>
+<div class="operations-columns">
+<div class="operations-column operations-primary">
+<section class="operations-panel attention-panel" aria-labelledby="attention-title"><header><h2 id="attention-title">Órdenes que requieren atención</h2><a href="#orders?active=1">Ver órdenes</a></header><div id="operations-attention" aria-live="polite"></div></section>
+<section id="operations-deliveries-panel" class="operations-panel" aria-labelledby="deliveries-title"><header><h2 id="deliveries-title">Próximas entregas</h2><a href="#orders?active=1">Ver órdenes</a></header><div id="operations-deliveries"></div></section>
+<section class="operations-panel maintenance-panel" aria-labelledby="maintenance-title"><header><h2 id="maintenance-title">Próximos mantenimientos</h2><a href="#maintenance">Abrir agenda</a></header><div id="operations-maintenance"></div></section>
+</div>
+<aside class="operations-column operations-sidebar" aria-label="Actividad, citas y asistencia">
+<section class="operations-panel activity-panel" aria-labelledby="activity-title"><header><h2 id="activity-title">Actividad reciente</h2><a href="#activity">Ver más</a></header><div id="operations-activity"></div></section>
+<section class="operations-panel appointments-panel" aria-labelledby="appointments-title"><header><h2 id="appointments-title">Citas de hoy</h2><a href="#appointments">Ver agenda</a></header><div id="home-appointments" aria-live="polite"></div></section>
+<section id="home-live-panel" class="operations-panel assistance-panel" aria-labelledby="assistance-title"><header><h2 id="assistance-title">Atención pendiente</h2><a id="home-live-link" href="#live">Abrir atención</a></header><div id="home-live-pending"></div></section>
+</aside></div></section>
+<section id="view-module" class="view" hidden><a class="back-link" href="#home">← Volver al inicio</a><header class="module-heading"><div><span class="eyebrow">ESPACIO DE TRABAJO / PC-DOCTOR S.A.</span><h1 id="module-title" tabindex="-1"></h1><p id="module-description"></p></div><button id="module-add" class="primary" hidden>Agregar</button></header><div id="module-content"></div></section>
+<footer class="system-footer"><span>PC-DOCTOR S.A. <span class="footer-divider">/</span> Precisión en cada reparación.</span><span><span class="status-dot"></span>{{environment_label}}</span></footer></main>
+<section class="adi-widget" id="adi-widget"><button id="adi-toggle" class="adi-toggle" type="button" aria-expanded="false" aria-controls="adi-panel">Hablar con Adi</button><div class="adi-panel" id="adi-panel" hidden><header><strong>Adi</strong><span>Asistente virtual · PC-DOCTOR S.A.</span><button id="adi-close" type="button" aria-label="Cerrar chat">×</button></header><div id="adi-messages" class="adi-messages" aria-live="polite"><p class="adi-welcome">Hola, soy Adi, la asistente virtual de PC-DOCTOR S.A. Puedo orientarte sobre servicios, citas y seguimiento.</p></div><form id="adi-form"><label class="sr-only" for="adi-input">Escribe un mensaje</label><input id="adi-input" maxlength="3000" placeholder="Escribe tu consulta…" required><button type="submit">Enviar</button></form><button id="adi-human" class="adi-human" type="button">Solicitar un asesor</button></div></section>
+<dialog id="order-dialog" class="reception-dialog wizard-dialog" aria-labelledby="order-title" aria-describedby="order-subtitle"><form id="order-form" novalidate>
+<header class="reception-header"><div class="reception-heading"><span class="eyebrow">RECEPCIÓN DE EQUIPOS</span><h2 id="order-title">Nueva orden de reparación</h2><p id="order-subtitle">PC-DOCTOR S.A. | Servicio Técnico Especializado</p></div><button type="button" id="close-dialog" class="icon-button" aria-label="Cerrar formulario"><svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <path d="M18 6 6 18" />
+  <path d="m6 6 12 12" />
+</svg>
+</button></header>
+<nav class="wizard-nav" aria-label="Pasos de recepción"><ol><li><button type="button" data-goto-step="0" aria-current="step"><span class="step-number">1</span><span>Cliente</span></button></li><li><button type="button" data-goto-step="1" disabled><span class="step-number">2</span><span>Ubicación</span></button></li><li><button type="button" data-goto-step="2" disabled><span class="step-number">3</span><span>Equipo</span></button></li><li><button type="button" data-goto-step="3" disabled><span class="step-number">4</span><span>Confirmación</span></button></li></ol></nav>
+<div class="reception-scroll"><p class="wizard-required">Los campos con <span class="required-mark">*</span> son obligatorios</p>{{evaluation_notice}}<section class="wizard-panel" data-step="0" aria-labelledby="wizard-heading-0" ><h3 id="wizard-heading-0" tabindex="-1">Datos del cliente</h3><p class="wizard-description">Identificación y contacto del propietario o razón social.</p><div class="reception-grid"><div class="reception-field full"><label for="order-client"><svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <circle cx="12" cy="8" r="5" />
+  <path d="M20 21a8 8 0 0 0-16 0" />
+</svg>
+<span>Nombres y apellidos <span class="required-mark" aria-hidden="true">*</span></span></label><input name="client" id="order-client" autocomplete="name" aria-describedby="error-client" required="" type="text" maxlength="150"><small class="field-error" id="error-client" aria-live="polite"></small></div><div class="reception-field "><label for="order-document_type"><svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <path d="M16 10h2" />
+  <path d="M16 14h2" />
+  <path d="M6.17 15a3 3 0 0 1 5.66 0" />
+  <circle cx="9" cy="11" r="2" />
+  <rect x="2" y="5" width="20" height="14" rx="2" />
+</svg>
+<span>Tipo de identificación <span class="required-mark" aria-hidden="true">*</span></span></label><select name="document_type" id="order-document_type" aria-describedby="error-document_type" required=""><option value="cedula">Cédula ecuatoriana</option><option value="ruc">RUC ecuatoriano</option></select><small class="field-error" id="error-document_type" aria-live="polite"></small></div><div class="reception-field "><label for="order-identification"><svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <path d="M16 10h2" />
+  <path d="M16 14h2" />
+  <path d="M6.17 15a3 3 0 0 1 5.66 0" />
+  <circle cx="9" cy="11" r="2" />
+  <rect x="2" y="5" width="20" height="14" rx="2" />
+</svg>
+<span>Número de identificación <span class="required-mark" aria-hidden="true">*</span></span></label><input name="identification" id="order-identification" aria-describedby="error-identification document-feedback document-count" maxlength="10" inputmode="numeric" pattern="[0-9]{10}" placeholder="10 dígitos" required="" type="text"><div class="document-status"><small id="document-feedback" role="status"></small><small id="document-count">0/10</small></div><small class="field-error" id="error-identification" aria-live="polite"></small></div><div class="reception-field full"><label for="order-trade_name"><svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z" />
+  <path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2" />
+  <path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2" />
+  <path d="M10 6h4" />
+  <path d="M10 10h4" />
+  <path d="M10 14h4" />
+  <path d="M10 18h4" />
+</svg>
+<span>Nombre comercial </span></label><input name="trade_name" id="order-trade_name" autocomplete="organization" aria-describedby="error-trade_name" type="text" maxlength="150"><small class="field-error" id="error-trade_name" aria-live="polite"></small></div><div class="reception-field "><label for="order-phone"><svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+</svg>
+<span>Teléfono / WhatsApp <span class="required-mark" aria-hidden="true">*</span></span></label><input name="phone" id="order-phone" type="tel" autocomplete="tel" maxlength="30" placeholder="+593 99 123 4567" aria-describedby="error-phone" required=""><small class="field-error" id="error-phone" aria-live="polite"></small></div><div class="reception-field "><label for="order-email"><svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <rect width="20" height="16" x="2" y="4" rx="2" />
+  <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+</svg>
+<span>Correo electrónico </span></label><input name="email" id="order-email" type="email" autocomplete="email" maxlength="254" placeholder="nombre@ejemplo.com" aria-describedby="error-email"><small class="field-error" id="error-email" aria-live="polite"></small></div></div></section><section class="wizard-panel" data-step="1" aria-labelledby="wizard-heading-1" hidden><h3 id="wizard-heading-1" tabindex="-1">Ubicación del cliente</h3><p class="wizard-description">Selecciona la ubicación y completa la dirección.</p><div class="reception-grid"><div class="reception-field "><label for="order-province"><svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <path d="M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0z" />
+  <path d="M15 5.764v15" />
+  <path d="M9 3.236v15" />
+</svg>
+<span>Provincia <span class="required-mark" aria-hidden="true">*</span></span></label><input name="province" id="order-province" list="geo-provinces" autocomplete="off" placeholder="Busca y selecciona…" aria-describedby="error-province" required="" type="text" maxlength="150"><small class="field-error" id="error-province" aria-live="polite"></small><div class="operation-status" id="geo-status-provinces" role="status" aria-live="polite"></div></div><datalist id="geo-provinces"></datalist><input type="hidden" name="province_code" id="order-province_code"><div class="reception-field "><label for="order-canton"><svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z" />
+  <path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2" />
+  <path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2" />
+  <path d="M10 6h4" />
+  <path d="M10 10h4" />
+  <path d="M10 14h4" />
+  <path d="M10 18h4" />
+</svg>
+<span>Cantón <span class="required-mark" aria-hidden="true">*</span></span></label><input name="canton" id="order-canton" list="geo-cantons" autocomplete="off" placeholder="Busca y selecciona…" disabled="" aria-describedby="error-canton" required="" type="text" maxlength="150"><small class="field-error" id="error-canton" aria-live="polite"></small><div class="operation-status" id="geo-status-cantons" role="status" aria-live="polite"></div></div><datalist id="geo-cantons"></datalist><input type="hidden" name="canton_code" id="order-canton_code"><div class="reception-field "><label for="order-parish"><svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" />
+  <circle cx="12" cy="10" r="3" />
+</svg>
+<span>Parroquia <span class="required-mark" aria-hidden="true">*</span></span></label><input name="parish" id="order-parish" list="geo-parishes" autocomplete="off" placeholder="Busca y selecciona…" disabled="" aria-describedby="error-parish" required="" type="text" maxlength="150"><small class="field-error" id="error-parish" aria-live="polite"></small><div class="operation-status" id="geo-status-parishes" role="status" aria-live="polite"></div></div><datalist id="geo-parishes"></datalist><input type="hidden" name="parish_code" id="order-parish_code"><div class="reception-field "><label for="order-city"><svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <path d="M18 8c0 3.613-3.869 7.429-5.393 8.795a1 1 0 0 1-1.214 0C9.87 15.429 6 11.613 6 8a6 6 0 0 1 12 0" />
+  <circle cx="12" cy="8" r="2" />
+  <path d="M8.714 14h-3.71a1 1 0 0 0-.948.683l-2.004 6A1 1 0 0 0 3 22h18a1 1 0 0 0 .948-1.316l-2-6a1 1 0 0 0-.949-.684h-3.712" />
+</svg>
+<span>Ciudad o localidad <span class="required-mark" aria-hidden="true">*</span></span></label><input name="city" id="order-city" list="geo-localities" maxlength="100" placeholder="Selecciona o escribe una localidad" disabled="" aria-describedby="error-city" required="" type="text"><small class="field-error" id="error-city" aria-live="polite"></small><div class="operation-status" id="geo-status-localities" role="status" aria-live="polite"></div></div><div class="reception-field "><label for="order-main_street"><svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" />
+  <circle cx="12" cy="10" r="3" />
+</svg>
+<span>Calle principal <span class="required-mark" aria-hidden="true">*</span></span></label><input name="main_street" id="order-main_street" maxlength="250" autocomplete="address-line1" aria-describedby="error-main_street" required="" type="text"><small class="field-error" id="error-main_street" aria-live="polite"></small></div><div class="reception-field "><label for="order-secondary_street"><svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" />
+  <circle cx="12" cy="10" r="3" />
+</svg>
+<span>Calle secundaria </span></label><input name="secondary_street" id="order-secondary_street" maxlength="250" autocomplete="address-line2" aria-describedby="error-secondary_street" type="text"><small class="field-error" id="error-secondary_street" aria-live="polite"></small></div><div class="reception-field "><label for="order-building_number"><svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z" />
+  <path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2" />
+  <path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2" />
+  <path d="M10 6h4" />
+  <path d="M10 10h4" />
+  <path d="M10 14h4" />
+  <path d="M10 18h4" />
+</svg>
+<span>Número de inmueble </span></label><input name="building_number" id="order-building_number" maxlength="30" placeholder="Ej. N12-45 / S/N" aria-describedby="error-building_number" type="text"><small class="field-error" id="error-building_number" aria-live="polite"></small></div><div class="reception-field "><label for="order-location_reference"><svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <path d="M18 8c0 3.613-3.869 7.429-5.393 8.795a1 1 0 0 1-1.214 0C9.87 15.429 6 11.613 6 8a6 6 0 0 1 12 0" />
+  <circle cx="12" cy="8" r="2" />
+  <path d="M8.714 14h-3.71a1 1 0 0 0-.948.683l-2.004 6A1 1 0 0 0 3 22h18a1 1 0 0 0 .948-1.316l-2-6a1 1 0 0 0-.949-.684h-3.712" />
+</svg>
+<span>Referencia de ubicación </span></label><input name="location_reference" id="order-location_reference" maxlength="500" placeholder="Edificio, sector o punto de referencia" aria-describedby="error-location_reference" type="text"><small class="field-error" id="error-location_reference" aria-live="polite"></small></div><datalist id="geo-localities"></datalist><input type="hidden" name="locality_code" id="order-locality_code"><p class="geo-source full" id="geo-source"></p></div></section><section class="wizard-panel" data-step="2" aria-labelledby="wizard-heading-2" hidden><h3 id="wizard-heading-2" tabindex="-1">Información del equipo</h3><p class="wizard-description">Registra el equipo, su condición y la falla reportada.</p><p class="catalog-loading operation-status" id="catalog-status" role="status" aria-live="polite"></p><div class="reception-grid"><div class="reception-field "><label for="order-type"><svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <path d="M20 16V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v9m16 0H4m16 0 1.28 2.55a1 1 0 0 1-.9 1.45H3.62a1 1 0 0 1-.9-1.45L4 16" />
+</svg>
+<span>Tipo de equipo <span class="required-mark" aria-hidden="true">*</span></span></label><select name="type" id="order-type" aria-describedby="error-type" required=""><option value="">Selecciona una opción</option></select><small class="field-error" id="error-type" aria-live="polite"></small></div><div class="reception-field "><label for="order-brand"><svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z" />
+  <circle cx="7.5" cy="7.5" r=".5" fill="currentColor" />
+</svg>
+<span>Marca </span></label><input name="brand" id="order-brand" list="brand-options" autocomplete="off" placeholder="Busca o escribe una marca" aria-describedby="error-brand" type="text" maxlength="150"><small class="field-error" id="error-brand" aria-live="polite"></small></div><div class="reception-field "><label for="order-model"><svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <rect width="14" height="8" x="5" y="2" rx="2" />
+  <rect width="20" height="8" x="2" y="14" rx="2" />
+  <path d="M6 18h2" />
+  <path d="M12 18h6" />
+</svg>
+<span>Modelo </span></label><input name="model" id="order-model" placeholder="Ej. ThinkPad T14" aria-describedby="error-model" type="text" maxlength="150"><small class="field-error" id="error-model" aria-live="polite"></small></div><div class="reception-field "><label for="order-serial"><svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <path d="M3 7V5a2 2 0 0 1 2-2h2" />
+  <path d="M17 3h2a2 2 0 0 1 2 2v2" />
+  <path d="M21 17v2a2 2 0 0 1-2 2h-2" />
+  <path d="M7 21H5a2 2 0 0 1-2-2v-2" />
+  <path d="M7 12h10" />
+</svg>
+<span>Número de serie </span></label><input name="serial" id="order-serial" pattern="[A-Za-z0-9-]+" placeholder="Letras, números y guiones" aria-describedby="error-serial" type="text" maxlength="150"><small class="field-error" id="error-serial" aria-live="polite"></small></div><div class="reception-field "><label for="order-color"><svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <circle cx="13.5" cy="6.5" r=".5" fill="currentColor" />
+  <circle cx="17.5" cy="10.5" r=".5" fill="currentColor" />
+  <circle cx="8.5" cy="7.5" r=".5" fill="currentColor" />
+  <circle cx="6.5" cy="12.5" r=".5" fill="currentColor" />
+  <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z" />
+</svg>
+<span>Color del equipo </span></label><input name="color" id="order-color" maxlength="100" aria-describedby="error-color" type="text"><small class="field-error" id="error-color" aria-live="polite"></small></div><div class="reception-field "><label for="order-accessories"><svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <path d="m16 16 2 2 4-4" />
+  <path d="M21 10V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l2-1.14" />
+  <path d="m7.5 4.27 9 5.15" />
+  <polyline points="3.29 7 12 12 20.71 7" />
+  <line x1="12" x2="12" y1="22" y2="12" />
+</svg>
+<span>Accesorios recibidos </span></label><input name="accessories" id="order-accessories" maxlength="2000" placeholder="Cargador, cable, mouse…" aria-describedby="error-accessories" type="text"><small class="field-error" id="error-accessories" aria-live="polite"></small></div><div class="reception-field "><label for="order-physical_condition"><svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <rect width="8" height="4" x="8" y="2" rx="1" ry="1" />
+  <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+  <path d="m9 14 2 2 4-4" />
+</svg>
+<span>Estado físico al ingreso <span class="required-mark" aria-hidden="true">*</span></span></label><textarea name="physical_condition" id="order-physical_condition" rows="2" maxlength="2000" aria-describedby="error-physical_condition" required=""></textarea><small class="field-error" id="error-physical_condition" aria-live="polite"></small></div><div class="reception-field "><label for="order-problem"><svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+</svg>
+<span>Falla reportada por el cliente <span class="required-mark" aria-hidden="true">*</span></span></label><textarea name="problem" id="order-problem" rows="2" maxlength="2000" aria-describedby="error-problem" required=""></textarea><small class="field-error" id="error-problem" aria-live="polite"></small></div><div class="reception-field full"><label for="order-technician_notes"><svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <path d="M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4" />
+  <path d="M2 6h4" />
+  <path d="M2 10h4" />
+  <path d="M2 14h4" />
+  <path d="M2 18h4" />
+  <path d="M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z" />
+</svg>
+<span>Observaciones del técnico </span></label><textarea name="technician_notes" id="order-technician_notes" rows="2" maxlength="2000" aria-describedby="error-technician_notes"></textarea><small class="field-error" id="error-technician_notes" aria-live="polite"></small></div><datalist id="brand-options"></datalist><p class="brand-help full">Selecciona una marca o escribe una nueva; se añadirá al catálogo al guardar.</p></div></section><section class="wizard-panel" data-step="3" aria-labelledby="wizard-heading-3" hidden><h3 id="wizard-heading-3" tabindex="-1">Confirmación de la orden</h3><p class="wizard-description">Revisa los datos antes de registrar la recepción.</p><div class="reception-grid"><div id="order-summary"></div><div class="order-auto-note"><svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <rect width="5" height="5" x="3" y="3" rx="1" />
+  <rect width="5" height="5" x="16" y="3" rx="1" />
+  <rect width="5" height="5" x="3" y="16" rx="1" />
+  <path d="M21 16h-3a2 2 0 0 0-2 2v3" />
+  <path d="M21 21v.01" />
+  <path d="M12 7v3a2 2 0 0 1-2 2H7" />
+  <path d="M3 12h.01" />
+  <path d="M12 3h.01" />
+  <path d="M12 16v.01" />
+  <path d="M16 12h1" />
+  <path d="M21 12v.01" />
+  <path d="M12 21v-1" />
+</svg>
+<p><strong>Número de orden y QR automáticos</strong><span>Se generan al guardar, con la fecha y hora del servidor en Ecuador.</span></p></div></div><section class="order-terms" aria-labelledby="order-terms-title"><h4 id="order-terms-title">Condiciones de recepción y servicio</h4><div id="terms-document-info"></div><div id="terms-status" class="operation-status" role="status" aria-live="polite"></div><input type="hidden" id="order-terms_document_id" name="terms_document_id"><label id="terms-acceptance" class="terms-approval" hidden><input type="checkbox" id="order-terms_accept" name="terms_accept" aria-describedby="error-terms_accept"><span>El cliente ha leído las condiciones de esta versión y confirma su aceptación en este dispositivo.</span></label><small id="error-terms_accept" class="field-error" aria-live="polite"></small></section></section></div>
+<footer class="reception-footer"><p class="message" role="alert"></p><div class="reception-actions wizard-actions"><button type="button" id="wizard-back" class="secondary" disabled>Anterior</button><span id="wizard-progress" class="sr-only" role="status">Paso 1 de 4</span><button type="button" id="wizard-next" class="primary">Siguiente <svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <path d="M5 12h14" />
+  <path d="m12 5 7 7-7 7" />
+</svg>
+</button><button class="primary submit" hidden disabled><svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <path d="M20 6 9 17l-5-5" />
+</svg>
+ Guardar orden</button></div></footer>
+</form></dialog>
+<dialog id="receipt-dialog" class="receipt-dialog" aria-labelledby="receipt-title"><header class="dialog-heading"><div><span class="eyebrow">RECEPCIÓN REGISTRADA</span><h2 id="receipt-title">Orden de reparación</h2></div><button type="button" data-close="receipt-dialog" class="icon-button" aria-label="Cerrar comprobante"><svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <path d="M18 6 6 18" />
+  <path d="m6 6 12 12" />
+</svg>
+</button></header><div id="receipt-content"></div></dialog>
+<dialog id="record-dialog"><form id="record-form"><header class="dialog-heading"><h2 id="record-title">Registro</h2><button type="button" class="icon-button" data-close="record-dialog" aria-label="Cerrar">×</button></header><div id="record-fields" class="form-grid"></div><p class="message" role="status"></p><button class="primary submit">Guardar cambios</button></form></dialog>
+</body></html>

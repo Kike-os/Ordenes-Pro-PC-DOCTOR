@@ -1,0 +1,2 @@
+# Argon2id para nuevas contraseñas y actualización al autenticar hashes scrypt.
+argon2-cffi>=23.1.0,<26

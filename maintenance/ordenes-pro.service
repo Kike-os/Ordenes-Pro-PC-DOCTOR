@@ -1,0 +1,15 @@
+[Unit]
+Description=Sitio local de órdenes PC-DOCTOR
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+WorkingDirectory=/home/admin-red/Work/ordenes-pro/local
+ExecStart=/usr/bin/python /home/admin-red/Work/ordenes-pro/local/app.py serve
+Environment=PYTHONUNBUFFERED=1
+Restart=always
+RestartSec=5
+UMask=0077
+
+[Install]
+WantedBy=default.target

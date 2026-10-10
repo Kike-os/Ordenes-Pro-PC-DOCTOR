@@ -1,0 +1,281 @@
+{
+  "checks": [
+    {
+      "closeVisible": true,
+      "footerVisible": true,
+      "height": 937,
+      "label": "orders-1920",
+      "modal": "",
+      "modalInView": true,
+      "modalOverflow": false,
+      "openCount": 0,
+      "overflow": false,
+      "width": 1920
+    },
+    {
+      "label": "menu-1920",
+      "width": 1920,
+      "inView": true,
+      "items": [
+        "Editar",
+        "Cambiar estado",
+        "Ver historial",
+        "Reimprimir comprobante",
+        "Compartir",
+        "Etiqueta de servicio",
+        "Duplicar orden"
+      ],
+      "overflow": false,
+      "actions": [
+        "Ver orden",
+        "Imprimir ticket",
+        "Más acciones"
+      ],
+      "activeCount": 1,
+      "controlsWithinWidth": true,
+      "filterCards": 1,
+      "header": "Orden",
+      "rowSelects": 0,
+      "searchCount": 1
+    },
+    {
+      "closeVisible": true,
+      "footerVisible": true,
+      "height": 857,
+      "label": "orders-1440",
+      "modal": "",
+      "modalInView": true,
+      "modalOverflow": false,
+      "openCount": 0,
+      "overflow": false,
+      "width": 1440
+    },
+    {
+      "label": "menu-1440",
+      "width": 1440,
+      "inView": true,
+      "items": [
+        "Editar",
+        "Cambiar estado",
+        "Ver historial",
+        "Reimprimir comprobante",
+        "Compartir",
+        "Etiqueta de servicio",
+        "Duplicar orden"
+      ],
+      "overflow": false,
+      "actions": [
+        "Ver orden",
+        "Imprimir ticket",
+        "Más acciones"
+      ],
+      "activeCount": 1,
+      "controlsWithinWidth": true,
+      "filterCards": 1,
+      "header": "Orden",
+      "rowSelects": 0,
+      "searchCount": 1
+    },
+    {
+      "closeVisible": true,
+      "footerVisible": true,
+      "height": 757,
+      "label": "orders-1366",
+      "modal": "",
+      "modalInView": true,
+      "modalOverflow": false,
+      "openCount": 0,
+      "overflow": false,
+      "width": 1366
+    },
+    {
+      "label": "menu-1366",
+      "width": 1366,
+      "inView": true,
+      "items": [
+        "Editar",
+        "Cambiar estado",
+        "Ver historial",
+        "Reimprimir comprobante",
+        "Compartir",
+        "Etiqueta de servicio",
+        "Duplicar orden"
+      ],
+      "overflow": false,
+      "actions": [
+        "Ver orden",
+        "Imprimir ticket",
+        "Más acciones"
+      ],
+      "activeCount": 1,
+      "controlsWithinWidth": true,
+      "filterCards": 1,
+      "header": "Orden",
+      "rowSelects": 0,
+      "searchCount": 1
+    },
+    {
+      "closeVisible": true,
+      "footerVisible": true,
+      "height": 757,
+      "label": "orders-1024",
+      "modal": "",
+      "modalInView": true,
+      "modalOverflow": false,
+      "openCount": 0,
+      "overflow": false,
+      "width": 1024
+    },
+    {
+      "label": "menu-1024",
+      "width": 1024,
+      "inView": true,
+      "items": [
+        "Editar",
+        "Cambiar estado",
+        "Ver historial",
+        "Reimprimir comprobante",
+        "Compartir",
+        "Etiqueta de servicio",
+        "Duplicar orden"
+      ],
+      "overflow": false,
+      "actions": [
+        "Ver orden",
+        "Imprimir ticket",
+        "Más acciones"
+      ],
+      "activeCount": 1,
+      "controlsWithinWidth": true,
+      "filterCards": 1,
+      "header": "Orden",
+      "rowSelects": 0,
+      "searchCount": 1
+    },
+    {
+      "closeVisible": true,
+      "footerVisible": true,
+      "height": 881,
+      "label": "orders-768",
+      "modal": "",
+      "modalInView": true,
+      "modalOverflow": false,
+      "openCount": 0,
+      "overflow": false,
+      "width": 768
+    },
+    {
+      "label": "menu-768",
+      "width": 768,
+      "inView": true,
+      "items": [
+        "Editar",
+        "Cambiar estado",
+        "Ver historial",
+        "Reimprimir comprobante",
+        "Compartir",
+        "Etiqueta de servicio",
+        "Duplicar orden"
+      ],
+      "overflow": false,
+      "actions": [
+        "Ver orden",
+        "Imprimir ticket",
+        "Más acciones"
+      ],
+      "activeCount": 1,
+      "controlsWithinWidth": true,
+      "filterCards": 1,
+      "header": "Orden",
+      "rowSelects": 0,
+      "searchCount": 1
+    },
+    {
+      "closeVisible": true,
+      "footerVisible": true,
+      "height": 701,
+      "label": "orders-390",
+      "modal": "",
+      "modalInView": true,
+      "modalOverflow": false,
+      "openCount": 0,
+      "overflow": false,
+      "width": 390
+    },
+    {
+      "label": "menu-390",
+      "width": 390,
+      "inView": true,
+      "items": [
+        "Editar",
+        "Cambiar estado",
+        "Ver historial",
+        "Reimprimir comprobante",
+        "Compartir",
+        "Etiqueta de servicio",
+        "Duplicar orden"
+      ],
+      "overflow": false,
+      "actions": [
+        "Ver orden",
+        "Imprimir ticket",
+        "Más acciones"
+      ],
+      "activeCount": 1,
+      "controlsWithinWidth": true,
+      "filterCards": 1,
+      "header": "Orden",
+      "rowSelects": 0,
+      "searchCount": 1
+    },
+    {
+      "closeVisible": true,
+      "footerVisible": true,
+      "height": 597,
+      "label": "orders-320",
+      "modal": "",
+      "modalInView": true,
+      "modalOverflow": false,
+      "openCount": 0,
+      "overflow": false,
+      "width": 320
+    },
+    {
+      "label": "menu-320",
+      "width": 320,
+      "inView": true,
+      "items": [
+        "Editar",
+        "Cambiar estado",
+        "Ver historial",
+        "Reimprimir comprobante",
+        "Compartir",
+        "Etiqueta de servicio",
+        "Duplicar orden"
+      ],
+      "overflow": false,
+      "actions": [
+        "Ver orden",
+        "Imprimir ticket",
+        "Más acciones"
+      ],
+      "activeCount": 1,
+      "controlsWithinWidth": true,
+      "filterCards": 1,
+      "header": "Orden",
+      "rowSelects": 0,
+      "searchCount": 1
+    }
+  ],
+  "functional": [
+    "pagination",
+    "status_filter",
+    "clear_keeps_search",
+    "active_filter",
+    "saved_status",
+    "history_focus",
+    "scanned_code",
+    "client_layout_preserved"
+  ],
+  "logs": []
+}

@@ -1,0 +1,187 @@
+{
+  "passed": true,
+  "sizes": [],
+  "wizardSizes": [
+    {
+      "width": 1440,
+      "height": 900,
+      "dialog": {
+        "x": 315,
+        "y": 121.5,
+        "width": 810,
+        "height": 657,
+        "top": 121.5,
+        "right": 1125,
+        "bottom": 778.5,
+        "left": 315
+      },
+      "footer": {
+        "x": 316,
+        "y": 710.5,
+        "width": 808,
+        "height": 67,
+        "top": 710.5,
+        "right": 1124,
+        "bottom": 777.5,
+        "left": 316
+      },
+      "overflow": false,
+      "columns": 2
+    },
+    {
+      "width": 1366,
+      "height": 768,
+      "dialog": {
+        "x": 278,
+        "y": 55.5,
+        "width": 810,
+        "height": 657,
+        "top": 55.5,
+        "right": 1088,
+        "bottom": 712.5,
+        "left": 278
+      },
+      "footer": {
+        "x": 279,
+        "y": 644.5,
+        "width": 808,
+        "height": 67,
+        "top": 644.5,
+        "right": 1087,
+        "bottom": 711.5,
+        "left": 279
+      },
+      "overflow": false,
+      "columns": 2
+    },
+    {
+      "width": 768,
+      "height": 1024,
+      "dialog": {
+        "x": 16,
+        "y": 183.5,
+        "width": 736,
+        "height": 657,
+        "top": 183.5,
+        "right": 752,
+        "bottom": 840.5,
+        "left": 16
+      },
+      "footer": {
+        "x": 17,
+        "y": 772.5,
+        "width": 734,
+        "height": 67,
+        "top": 772.5,
+        "right": 751,
+        "bottom": 839.5,
+        "left": 17
+      },
+      "overflow": false,
+      "columns": 2
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "dialog": {
+        "x": 10,
+        "y": 42.203125,
+        "width": 370,
+        "height": 759.59375,
+        "top": 42.203125,
+        "right": 380,
+        "bottom": 801.796875,
+        "left": 10
+      },
+      "footer": {
+        "x": 11,
+        "y": 737.796875,
+        "width": 368,
+        "height": 65,
+        "top": 737.796875,
+        "right": 379,
+        "bottom": 802.796875,
+        "left": 11
+      },
+      "overflow": false,
+      "columns": 1
+    },
+    {
+      "width": 320,
+      "height": 740,
+      "dialog": {
+        "x": 10,
+        "y": 37,
+        "width": 300,
+        "height": 666,
+        "top": 37,
+        "right": 310,
+        "bottom": 703,
+        "left": 10
+      },
+      "footer": {
+        "x": 11,
+        "y": 639,
+        "width": 298,
+        "height": 65,
+        "top": 639,
+        "right": 309,
+        "bottom": 704,
+        "left": 11
+      },
+      "overflow": false,
+      "columns": 1
+    },
+    {
+      "width": 844,
+      "height": 390,
+      "dialog": {
+        "x": 17,
+        "y": 23.40625,
+        "width": 810,
+        "height": 343.1875,
+        "top": 23.40625,
+        "right": 827,
+        "bottom": 366.59375,
+        "left": 17
+      },
+      "footer": {
+        "x": 18,
+        "y": 306.59375,
+        "width": 808,
+        "height": 61,
+        "top": 306.59375,
+        "right": 826,
+        "bottom": 367.59375,
+        "left": 18
+      },
+      "overflow": false,
+      "columns": 2
+    }
+  ],
+  "consoleErrors": [],
+  "code": "PCD-20261009-0001",
+  "qrUrl": "https://ordenes-pro.ecuadorpcdoctor.com/orders/PCD-20261009-0001",
+  "createdSyntheticOrders": 1,
+  "checks": [
+    "clock-seconds-ecuador-am-pm",
+    "weather-responsive",
+    "four-steps",
+    "validation-before-next",
+    "identification-type-counter",
+    "geographic-dependencies",
+    "manual-locality",
+    "catalog-brands",
+    "preserve-input-on-back",
+    "dirty-close-confirmation",
+    "save-daily-code",
+    "receipt-qr-pdf",
+    "print-css",
+    "code-deep-link",
+    "reduced-motion",
+    "catalog-404-retry",
+    "geo-404-retry",
+    "independent-step-navigation",
+    "preserve-input-on-retry"
+  ]
+}

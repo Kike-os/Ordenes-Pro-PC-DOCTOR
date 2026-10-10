@@ -1,0 +1,178 @@
+{
+  "passed": true,
+  "sizes": [
+    {
+      "width": 1920,
+      "scroll": 1905,
+      "height": 76,
+      "titleSize": "21px",
+      "logoHeight": 48,
+      "overflow": [],
+      "searchVisible": true,
+      "weatherVisible": true
+    },
+    {
+      "width": 1800,
+      "scroll": 1785,
+      "height": 76,
+      "titleSize": "21px",
+      "logoHeight": 48,
+      "overflow": [],
+      "searchVisible": true,
+      "weatherVisible": true
+    },
+    {
+      "width": 1799,
+      "scroll": 1784,
+      "height": 76,
+      "titleSize": "21px",
+      "logoHeight": 48,
+      "overflow": [],
+      "searchVisible": true,
+      "weatherVisible": true
+    },
+    {
+      "width": 1600,
+      "scroll": 1585,
+      "height": 76,
+      "titleSize": "21px",
+      "logoHeight": 48,
+      "overflow": [],
+      "searchVisible": true,
+      "weatherVisible": true
+    },
+    {
+      "width": 1440,
+      "scroll": 1425,
+      "height": 76,
+      "titleSize": "21px",
+      "logoHeight": 48,
+      "overflow": [],
+      "searchVisible": true,
+      "weatherVisible": true
+    },
+    {
+      "width": 1366,
+      "scroll": 1351,
+      "height": 76,
+      "titleSize": "21px",
+      "logoHeight": 48,
+      "overflow": [],
+      "searchVisible": true,
+      "weatherVisible": true
+    },
+    {
+      "width": 1280,
+      "scroll": 1265,
+      "height": 76,
+      "titleSize": "21px",
+      "logoHeight": 48,
+      "overflow": [],
+      "searchVisible": true,
+      "weatherVisible": true
+    },
+    {
+      "width": 1151,
+      "scroll": 1136,
+      "height": 76,
+      "titleSize": "21px",
+      "logoHeight": 48,
+      "overflow": [],
+      "searchVisible": true,
+      "weatherVisible": true
+    },
+    {
+      "width": 1150,
+      "scroll": 1135,
+      "height": 76,
+      "titleSize": "21px",
+      "logoHeight": 48,
+      "overflow": [],
+      "searchVisible": true,
+      "weatherVisible": false
+    },
+    {
+      "width": 1024,
+      "scroll": 1009,
+      "height": 76,
+      "titleSize": "21px",
+      "logoHeight": 48,
+      "overflow": [],
+      "searchVisible": true,
+      "weatherVisible": false
+    },
+    {
+      "width": 900,
+      "scroll": 885,
+      "height": 76,
+      "titleSize": "21px",
+      "logoHeight": 48,
+      "overflow": [],
+      "searchVisible": true,
+      "weatherVisible": false
+    },
+    {
+      "width": 860,
+      "scroll": 860,
+      "height": 76,
+      "titleSize": "21px",
+      "logoHeight": 48,
+      "overflow": [],
+      "searchVisible": false,
+      "weatherVisible": false
+    },
+    {
+      "width": 768,
+      "scroll": 768,
+      "height": 76,
+      "titleSize": "21px",
+      "logoHeight": 48,
+      "overflow": [],
+      "searchVisible": false,
+      "weatherVisible": false
+    },
+    {
+      "width": 390,
+      "scroll": 390,
+      "height": 76,
+      "titleSize": "21px",
+      "logoHeight": 48,
+      "overflow": [],
+      "searchVisible": false,
+      "weatherVisible": false
+    },
+    {
+      "width": 375,
+      "scroll": 375,
+      "height": 76,
+      "titleSize": "21px",
+      "logoHeight": 48,
+      "overflow": [],
+      "searchVisible": false,
+      "weatherVisible": false
+    },
+    {
+      "width": 320,
+      "scroll": 320,
+      "height": 76,
+      "titleSize": "21px",
+      "logoHeight": 48,
+      "overflow": [],
+      "searchVisible": false,
+      "weatherVisible": false
+    }
+  ],
+  "consoleErrors": [],
+  "checks": [
+    "76px-header",
+    "48px-visible-original-logo",
+    "21px-title",
+    "responsive-navigation",
+    "mobile-search",
+    "account-and-escape",
+    "ecuador-clock-seconds",
+    "weather-night-and-failure",
+    "met-attribution",
+    "reduced-motion"
+  ]
+}

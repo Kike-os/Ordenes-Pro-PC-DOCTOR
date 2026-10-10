@@ -1,0 +1,96 @@
+{
+  "passed": true,
+  "checks": [
+    {
+      "width": 1440,
+      "dashboard": {
+        "order": [
+          "clients",
+          "new",
+          "orders",
+          "devices",
+          "reports",
+          "settings"
+        ],
+        "columns": 3,
+        "overflow": false
+      },
+      "detailNoModal": true
+    },
+    {
+      "width": 1366,
+      "dashboard": {
+        "order": [
+          "clients",
+          "new",
+          "orders",
+          "devices",
+          "reports",
+          "settings"
+        ],
+        "columns": 3,
+        "overflow": false
+      },
+      "detailNoModal": true
+    },
+    {
+      "width": 768,
+      "dashboard": {
+        "order": [
+          "clients",
+          "new",
+          "orders",
+          "devices",
+          "reports",
+          "settings"
+        ],
+        "columns": 2,
+        "overflow": false
+      },
+      "detailNoModal": true
+    },
+    {
+      "width": 390,
+      "dashboard": {
+        "order": [
+          "clients",
+          "new",
+          "orders",
+          "devices",
+          "reports",
+          "settings"
+        ],
+        "columns": 1,
+        "overflow": false
+      },
+      "detailNoModal": true
+    },
+    {
+      "width": 320,
+      "dashboard": {
+        "order": [
+          "clients",
+          "new",
+          "orders",
+          "devices",
+          "reports",
+          "settings"
+        ],
+        "columns": 1,
+        "overflow": false
+      },
+      "detailNoModal": true
+    }
+  ],
+  "tests": [
+    "edit-order",
+    "budget-lines-total-3034",
+    "follow-up-timeline",
+    "filters",
+    "quick-status",
+    "reload-no-modal",
+    "duplicate-draft-only",
+    "documents-authenticated"
+  ],
+  "consoleErrors": []
+}

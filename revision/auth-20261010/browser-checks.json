@@ -1,0 +1,169 @@
+[
+  {
+    "card": 410,
+    "inputs": [
+      {
+        "id": "login",
+        "label": true
+      },
+      {
+        "id": "password",
+        "label": true
+      },
+      {
+        "id": "",
+        "label": true
+      }
+    ],
+    "logo": 2826,
+    "overflow": false,
+    "page": "login",
+    "unresolved": false,
+    "width": 1440
+  },
+  {
+    "card": 410,
+    "inputs": [
+      {
+        "id": "email",
+        "label": true
+      }
+    ],
+    "logo": 2826,
+    "overflow": false,
+    "page": "forgot",
+    "unresolved": false,
+    "width": 1440
+  },
+  {
+    "card": 410,
+    "inputs": [
+      {
+        "id": "password",
+        "label": true
+      },
+      {
+        "id": "repeat",
+        "label": true
+      }
+    ],
+    "logo": 2826,
+    "overflow": false,
+    "page": "reset",
+    "unresolved": false,
+    "width": 1440
+  },
+  {
+    "card": 358,
+    "inputs": [
+      {
+        "id": "login",
+        "label": true
+      },
+      {
+        "id": "password",
+        "label": true
+      },
+      {
+        "id": "",
+        "label": true
+      }
+    ],
+    "logo": 2826,
+    "overflow": false,
+    "page": "login",
+    "unresolved": false,
+    "width": 390
+  },
+  {
+    "card": 358,
+    "inputs": [
+      {
+        "id": "email",
+        "label": true
+      }
+    ],
+    "logo": 2826,
+    "overflow": false,
+    "page": "forgot",
+    "unresolved": false,
+    "width": 390
+  },
+  {
+    "card": 358,
+    "inputs": [
+      {
+        "id": "password",
+        "label": true
+      },
+      {
+        "id": "repeat",
+        "label": true
+      }
+    ],
+    "logo": 2826,
+    "overflow": false,
+    "page": "reset",
+    "unresolved": false,
+    "width": 390
+  },
+  {
+    "card": 273,
+    "inputs": [
+      {
+        "id": "login",
+        "label": true
+      },
+      {
+        "id": "password",
+        "label": true
+      },
+      {
+        "id": "",
+        "label": true
+      }
+    ],
+    "logo": 2826,
+    "overflow": false,
+    "page": "login",
+    "unresolved": false,
+    "width": 320
+  },
+  {
+    "card": 288,
+    "inputs": [
+      {
+        "id": "email",
+        "label": true
+      }
+    ],
+    "logo": 2826,
+    "overflow": false,
+    "page": "forgot",
+    "unresolved": false,
+    "width": 320
+  },
+  {
+    "card": 273,
+    "inputs": [
+      {
+        "id": "password",
+        "label": true
+      },
+      {
+        "id": "repeat",
+        "label": true
+      }
+    ],
+    "logo": 2826,
+    "overflow": false,
+    "page": "reset",
+    "unresolved": false,
+    "width": 320
+  },
+  {
+    "emptyLogin": "true",
+    "emptyPassword": "true",
+    "focus": "login"
+  }
+]

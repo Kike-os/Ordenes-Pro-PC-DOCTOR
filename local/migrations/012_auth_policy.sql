@@ -1,0 +1,1 @@
+CREATE TABLE auth_policy (key TEXT PRIMARY KEY, value INTEGER NOT NULL);

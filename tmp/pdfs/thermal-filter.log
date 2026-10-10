@@ -1,0 +1,14 @@
+PAGE: 1 1
+DEBUG: cupsBytesPerLine = 72
+DEBUG: cupsBitsPerPixel = 1
+DEBUG: cupsBitsPerColor = 1
+DEBUG:       cupsHeight = 15984
+DEBUG:        cupsWidth = 576
+DEBUG:       p_printerName = /usr/lib/cups/filter/rastertotmtr
+DEBUG:        v_motionUnit = 203
+DEBUG:        h_motionUnit = 203
+DEBUG:      paperReduction = 2
+DEBUG:       buzzerControl = 0
+DEBUG:       drawerControl = 0
+DEBUG:          cutControl = 1
+DEBUG:        maxBandLines = 256
