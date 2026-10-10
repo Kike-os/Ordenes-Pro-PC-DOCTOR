@@ -8,14 +8,14 @@ from http import HTTPStatus
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import app
+import app as core
 
-app.load_env()
+core.load_env()
 os.environ.setdefault('APP_URL', 'https://ordenes-pro.ecuadorpcdoctor.com')
 os.environ.setdefault('SESSION_SECURE', 'true')
 
 
-class WSGIHandler(app.Handler):
+class WSGIHandler(core.Handler):
     def reply(self, status, body, content_type='application/json; charset=utf-8', cookie=None):
         if isinstance(body, dict):
             body = json.dumps(body, ensure_ascii=False).encode('utf-8')
@@ -61,3 +61,7 @@ def application(environ, start_response):
         handler.reply(500, {'error': 'No se pudo completar la operación.'})
     start_response(handler.response_status, handler.response_headers)
     return [b'' if method == 'HEAD' else handler.response_body]
+
+
+# Vercel busca una aplicación invocable llamada app; Passenger usa application.
+app = application

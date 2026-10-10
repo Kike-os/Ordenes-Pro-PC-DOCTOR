@@ -24,7 +24,7 @@ class WSGITests(unittest.TestCase):
         result = {}
         def start(status, headers, exc_info=None):
             result.update(status=status, headers=dict(headers))
-        response = validator(passenger_wsgi.application)(env, start)
+        response = validator(passenger_wsgi.app)(env, start)
         try:
             result['body'] = b''.join(response)
         finally:
