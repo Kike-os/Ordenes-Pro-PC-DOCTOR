@@ -7,7 +7,7 @@ Versión local de evaluación. No se ha publicado en Tecnoweb ni se ha confirmad
 En una terminal:
 
 ```bash
-bash /home/admin-red/Work/ordenes-pro/iniciar-local.sh
+bash /home/admin-red/Work/Ordenes-Pro-PC-DOCTOR/iniciar-local.sh
 ```
 
 En la primera ejecución solicita tus datos y una contraseña de al menos 12 caracteres sin mostrarla. No hay credenciales predeterminadas ni registro público. En las siguientes ejecuciones conserva la cuenta y los registros existentes.
@@ -19,7 +19,7 @@ Abre **http://127.0.0.1:8010** en el navegador del mismo equipo. Conserva la ter
 Detén el servidor anterior con Ctrl+C y ejecuta en Omarchy:
 
 ```bash
-bash /home/admin-red/Work/ordenes-pro/iniciar-red-local.sh
+bash /home/admin-red/Work/Ordenes-Pro-PC-DOCTOR/iniciar-red-local.sh
 ```
 
 El script detecta direcciones privadas activas de Omarchy y selecciona la única disponible o solicita elegir entre las interfaces reales. Escucha solo en esa IP y configura el origen permitido para las solicitudes y recuperación. En ambos equipos abre exactamente la URL que muestre; no copies una IP de ejemplo. Los equipos deben compartir una red que permita comunicación entre ellos. Usa únicamente datos ficticios: esta evaluación LAN utiliza HTTP. No exponer el puerto al internet ni al router. No se modifican reglas de firewall.
@@ -66,7 +66,7 @@ Sin SMTP configurado no se enviarán enlaces; la respuesta pública sigue siendo
 ## Pruebas
 
 ```bash
-cd /home/admin-red/Work/ordenes-pro/local
+cd /home/admin-red/Work/Ordenes-Pro-PC-DOCTOR/local
 python -m unittest discover -s tests -v
 node --check static/app.js
 ```
@@ -100,9 +100,3 @@ Con el servicio activo, no ejecutar los scripts de inicio manual en el mismo pue
 Acceso y recuperación unificados, políticas administrativas, notificación de cambios y verificación antibots adaptativa configurable. Ver [controles, pruebas y pendientes de producción](docs/ACCESO-SEGURO.md). Capturas de escritorio y móvil en `revision/auth-20261010/`. La revisión pasó 64 pruebas; SMTP real, claves Turnstile y HTTPS del hosting requieren validación externa.
 
 Ticket térmico, autorizaciones técnicas e impresión Epson de red: [guía y verificación](docs/TICKET-TERMICO.md).
-# Ordenes-Pro
-# Ordenes-Pro
-# Ordenes-Pro
-# Ordenes-Pro
-# Ordenes-Pro
-# Ordenes-Pro
