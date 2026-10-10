@@ -100,3 +100,4 @@ Con el servicio activo, no ejecutar los scripts de inicio manual en el mismo pue
 Acceso y recuperación unificados, políticas administrativas, notificación de cambios y verificación antibots adaptativa configurable. Ver [controles, pruebas y pendientes de producción](docs/ACCESO-SEGURO.md). Capturas de escritorio y móvil en `revision/auth-20261010/`. La revisión pasó 64 pruebas; SMTP real, claves Turnstile y HTTPS del hosting requieren validación externa.
 
 Ticket térmico, autorizaciones técnicas e impresión Epson de red: [guía y verificación](docs/TICKET-TERMICO.md).
+# Ordenes-Pro-PC-DOCTOR
