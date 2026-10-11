@@ -4,6 +4,18 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.35 — 2026-10-11 18:22 (UTC-05:00)
+
+Órdenes sin condiciones publicadas y vinculación automática de la orden en Mail Pro
+
+### Nuevas funcionalidades
+
+- Mail Pro: al elegir al cliente como destinatario se vincula sola su orden en curso; con varias se elige en un selector y las entregadas nunca se proponen. El servidor valida la orden antes de enviar
+
+### Errores corregidos
+
+- Nueva orden: la falta de condiciones del servicio publicadas ya no impide finalizar; el paso Confirmación lo informa como «Sin condiciones activas» y la orden se registra sin aceptación
+
 ## v1.5.34 — 2026-10-11 18:12 (UTC-05:00)
 
 Citas para hoy desde el taller y cita automática del mantenimiento al entregar

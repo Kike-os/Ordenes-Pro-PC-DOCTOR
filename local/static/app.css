@@ -3254,3 +3254,22 @@ button.live-appointment .agenda-badge{font-size:10.5px}
 .upcoming-state[data-state=pending]{border-color:#7a6230;color:#f0d28a}.upcoming-state[data-state=confirmed]{border-color:#2f7a55;color:#8fe0b4}.upcoming-state[data-state=completed]{border-color:#2f7a6c;color:#7fdcc6}
 @media(max-width:860px){.upcoming-tags{justify-content:flex-start;margin-top:0}.upcoming-meter{width:90px}}
 @media(max-width:860px){.upcoming-side{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;min-width:0}.upcoming-tags{flex-wrap:wrap}}
+/* Mail Pro · campo Orden con vinculación automática (sin cambiar el tamaño de la ventana) */
+body[data-page=dashboard] .mail-composer label.mail-order>span{display:inline-flex;align-items:center;gap:5px}
+body[data-page=dashboard] .mail-composer label.mail-order>span svg{width:13px;height:13px;flex:none;color:#7fb0f5}
+.mail-composer .mail-order-box{display:flex;align-items:center;gap:8px;min-width:0}
+.mail-composer .mail-order-box>input,.mail-composer .mail-order-box>select{flex:1 1 150px;min-width:0}
+.mail-composer .mail-order-box>input[hidden],.mail-composer .mail-order-box>select[hidden]{display:none}
+.mail-composer .mail-order-hint{flex:0 1 auto;max-width:58%;padding:2px 9px;border:1px solid #2a4063;border-radius:999px;font-size:11px;font-weight:600;color:#9bb0cf;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mail-composer .mail-order-hint[hidden]{display:none}
+.mail-composer .mail-order-hint[data-state=auto]{border-color:#2f7a55;background:#12301f;color:#8fe0b4}
+.mail-composer .mail-order-hint[data-state=choice]{border-color:#7a6230;background:#2b230f;color:#f0d28a}
+@media(max-width:520px){.mail-composer .mail-order-box{flex-wrap:wrap}.mail-composer .mail-order-hint{max-width:100%}}
+/* Nueva orden · Confirmación: condiciones sin publicar como estado informativo, no como error */
+#order-form .order-terms .terms-empty{display:flex;align-items:flex-start;gap:12px;padding:12px 14px;border:1px solid #2a4268;border-radius:12px;background:linear-gradient(180deg,#0f1f38,#0c192d)}
+#order-form .order-terms .terms-empty-icon{display:grid;place-items:center;flex:none;width:32px;height:32px;border-radius:10px;border:1px solid #2f5d8f;background:#4d8df01f;color:#9cc4ff}
+#order-form .order-terms .terms-empty-icon svg{width:17px;height:17px}
+#order-form .order-terms .terms-empty strong{display:block;font-size:13px;color:#f2f6ff}
+#order-form .order-terms .terms-empty p{margin:2px 0 0;font-size:12.5px;line-height:1.5;color:#b5c5de}
+#order-form .order-terms .terms-empty[data-state=required]{border-color:#7a6230;background:linear-gradient(180deg,#2b230f,#1f1a0d)}
+#order-form .order-terms .terms-empty[data-state=required] .terms-empty-icon{border-color:#7a6230;background:#e5c0641f;color:#f0d28a}

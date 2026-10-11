@@ -260,6 +260,20 @@ def adi_public_state(conv):
     return 'closed' if mode=='closed' else ('advisor' if conv['assigned_to'] else 'waiting') if mode=='human' else 'adi'
 
 
+def terms_required():
+    """Exigir condiciones publicadas para registrar órdenes es una decisión expresa de la instalación (REQUIRE_SERVICE_TERMS=true)."""
+    return os.environ.get('REQUIRE_SERVICE_TERMS','').strip().lower() in ('1','true','si','sí','yes')
+def mail_order_candidates(c,addresses):
+    """Órdenes no entregadas del único cliente al que corresponden todos los destinatarios; sin relación inequívoca no propone nada."""
+    found=set()
+    for address in dict.fromkeys(addresses[:20]):
+        owners=[r['id'] for r in c.execute("SELECT id FROM clients WHERE email!='' AND lower(email)=?",(address,))]
+        if len(owners)!=1:return {'client':None,'orders':[],'reason':'unknown' if not owners else 'ambiguous'}
+        found.add(owners[0])
+    if len(found)!=1:return {'client':None,'orders':[],'reason':'none' if not found else 'several'}
+    client=c.execute('SELECT id,name FROM clients WHERE id=?',(found.pop(),)).fetchone()
+    orders=[dict(r) for r in c.execute("SELECT o.id,o.code,o.status,COALESCE(NULLIF(d.kind,''),d.category) type,d.brand,d.model FROM orders o JOIN devices d ON d.id=o.device_id WHERE d.client_id=? AND o.status!='entregado' ORDER BY o.id DESC LIMIT 20",(client['id'],))]
+    return {'client':dict(client),'orders':orders,'reason':''}
 def mail_allowed(user):
     # El buzón compartido es de administración; los técnicos solo acceden si el servidor lo habilita.
     try:
@@ -669,7 +683,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(200,draft)
             if path == '/api/conditions/current':
                 active=service_terms.current(c,reception_now())
-                return self.reply(200,{'terms':({**service_terms.metadata(active),'full_text':active['full_text']} if active else None),'required':True})
+                return self.reply(200,{'terms':({**service_terms.metadata(active),'full_text':active['full_text']} if active else None),'required':terms_required()})
             if path == '/api/conditions':
                 if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede consultar el historial de publicación.'})
                 rows=c.execute('SELECT * FROM service_terms ORDER BY effective_date DESC,published_at DESC').fetchall()
@@ -719,6 +733,12 @@ class Handler(BaseHTTPRequestHandler):
                 term=parse_qs(urlsplit(self.path).query).get('q',[''])[0][:150]
                 rows=[dict(r) for r in c.execute("SELECT id,name,identification,document_type,phone,phone_secondary,email,trade_name,city,needs_review FROM clients WHERE instr(lower(name||' '||COALESCE(identification,'')||' '||COALESCE(phone,'')||' '||phone_secondary||' '||COALESCE(email,'')||' '||trade_name),lower(?))>0 ORDER BY name COLLATE NOCASE LIMIT 20",(term.strip(),))] if term.strip() else []
                 return self.reply(200,{'rows':rows})
+            if path == '/api/mail/order-link':
+                # Orden activa del destinatario: el cliente se identifica por la coincidencia exacta y única de su correo, nunca por nombre.
+                if not mail_allowed(user):return self.reply(403,{'error':'No tienes acceso al correo o todavía no está configurado en el servidor.'})
+                if limited(c,'mail-order-link:'+str(user['id']),limit=240,window=300):return self.reply(429,{'error':'Demasiadas consultas seguidas. Espera un momento.'})
+                addresses=[a.strip().lower() for a in re.split(r'[,;\s]+',parse_qs(urlsplit(self.path).query).get('to',[''])[0][:2000]) if a.strip()]
+                return self.reply(200,mail_order_candidates(c,addresses))
             if path == '/api/mail/contacts':
                 # Sugerencias de destinatarios: solo nombre, correo y nombre comercial de clientes reales; búsqueda acotada en el servidor.
                 if not mail_allowed(user):return self.reply(403,{'error':'No tienes acceso al correo o todavía no está configurado en el servidor.'})
@@ -1305,7 +1325,11 @@ class Handler(BaseHTTPRequestHandler):
                             order=None;code=str(data.get('order_code','')).strip().upper()
                             if code:
                                 order=c.execute('SELECT id,code FROM orders WHERE code=?',(code,)).fetchone()
-                                if not order:return self.reply(404,{'error':'No existe una orden con ese número.'})
+                                if not order:return self.reply(404,{'error':'No existe una orden con ese número.','fields':{'order_code':'No existe una orden con ese número.'}})
+                                # La vinculación se valida aquí, no en el navegador: orden en curso y de un cliente que recibe el mensaje.
+                                owner=c.execute('SELECT o.status,lower(cl.email) email FROM orders o JOIN devices d ON d.id=o.device_id JOIN clients cl ON cl.id=d.client_id WHERE o.id=?',(order['id'],)).fetchone()
+                                problem='La orden '+order['code']+' ya fue entregada: no se vincula a mensajes nuevos. Deja el campo Orden vacío.' if owner['status']=='entregado' else 'La orden '+order['code']+' no pertenece a ningún destinatario de este mensaje.' if not owner['email'] or owner['email'] not in {a.lower() for a in recipients} else ''
+                                if problem and not draft:return self.reply(400,{'error':problem,'fields':{'order_code':problem}})
                             now=reception_now().isoformat(timespec='seconds')
                             if draft:
                                 client=mail_pro.open_imap();folders=mail_pro.list_folders(client);target=mail_pro.by_role(folders,'drafts')
@@ -1769,8 +1793,9 @@ class Handler(BaseHTTPRequestHandler):
                             return self.reply(200, {'ok':True,'id':previous['id'],'code':previous['code']})
                     received=reception_now()
                     terms=service_terms.current(c,received)
-                    if not terms:
-                        return self.reply(503,{'error':'Publica las condiciones aprobadas y vigentes antes de registrar recepciones.','fields':{'terms_accept':'No hay condiciones vigentes configuradas.'}})
+                    # Sin condiciones publicadas la orden se registra sin aceptación (no se inventa ninguna). Solo bloquea si la instalación lo exige expresamente.
+                    if not terms and terms_required():
+                        return self.reply(503,{'error':'Publica las condiciones aprobadas y vigentes antes de registrar recepciones.','fields':{'terms_accept':'Esta instalación exige condiciones publicadas y todavía no hay ninguna vigente.'}})
                     if terms:
                         if str(data.get('terms_document_id',''))!=terms['id']:
                             return self.reply(409,{'error':'Las condiciones vigentes han cambiado. Revísalas y registra nuevamente la aceptación.','fields':{'terms_accept':'La versión debe revisarse nuevamente.'}})

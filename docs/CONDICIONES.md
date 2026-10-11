@@ -8,7 +8,7 @@ En Configuración, un administrador introduce versión única, fecha de vigencia
 
 La aceptación aparece en el último paso de recepción. El servidor exige una confirmación booleana de la versión vigente, registra fecha y hora de Ecuador, usuario responsable, nombre del aceptante y un identificador de evento. Se conserva la versión y su SHA-256. Es una confirmación en pantalla registrada por el técnico, no una firma electrónica certificada ni una comprobación de identidad del cliente.
 
-Con producción habilitada, no se registran órdenes sin condiciones vigentes. En evaluación, `REQUIRE_SERVICE_TERMS=true` permite exigirlas también. Sin condiciones en evaluación se informa de su ausencia y no se fabrica una aceptación. Las órdenes anteriores mantienen sus datos y no reciben aceptaciones retroactivas.
+Desde la 1.5.35, por decisión de administración (11/10/2026), la falta de condiciones publicadas **no bloquea** el registro de órdenes: el paso Confirmación muestra «Sin condiciones activas», la orden se guarda con su número y QR y no se fabrica ninguna aceptación (los campos de aceptación quedan vacíos aunque el navegador envíe otra cosa). Cuando hay una versión vigente, la aceptación sigue siendo obligatoria. Para volver a exigir condiciones publicadas antes de registrar, definir `REQUIRE_SERVICE_TERMS=true` en el servidor. Las órdenes anteriores mantienen sus datos y no reciben aceptaciones retroactivas.
 
 ## Consulta y documentos
 

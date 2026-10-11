@@ -77,6 +77,45 @@ class MailProTests(unittest.TestCase):
 class MailRouteTests(test_app.SecurityTests):
     KEY='clave-de-solicitud-0001'
 
+    def test_compose_links_only_the_recipients_orders_in_progress(self):
+        cookie,csrf=self.login();ids={}
+        for n,(serial,key) in enumerate((('LNK-1','a'),('LNK-2','b'),('LNK-3','c'))):
+            ids[key]=self.request('/api/orders',self.order_data({'serial':serial,'brand':'HP','model':'Equipo '+key,'request_key':'mail-link-order-000'+str(n)}),cookie=cookie,csrf=csrf)['body']
+        with app.connect() as c:
+            owner=c.execute('SELECT d.client_id FROM orders o JOIN devices d ON d.id=o.device_id WHERE o.id=?',(ids['a']['id'],)).fetchone()[0]
+            c.execute("UPDATE clients SET email='uno@example.invalid' WHERE id=?",(owner,))
+            other=c.execute("INSERT INTO clients(name,email,phone,identification) VALUES ('Otro Cliente','dos@example.invalid','0990000001','')").lastrowid
+            c.execute("INSERT INTO clients(name,email,phone,identification) VALUES ('Duplicado A','mismo@example.invalid','0990000002','')");c.execute("INSERT INTO clients(name,email,phone,identification) VALUES ('Duplicado B','mismo@example.invalid','0990000003','')")
+        status=lambda key,value:self.request('/api/order-status',{'id':str(ids[key]['id']),'status':value},cookie=cookie,csrf=csrf)
+        link=lambda to:self.request('/api/mail/order-link?to='+to,cookie=cookie)['body']
+        send=lambda to,code,key,**extra:self.request('/api/mail/send',dict({'to':to,'cc':'','subject':'Asunto','body':'Texto','attachments':'[]','order_code':code,'request_key':key},**extra),cookie=cookie,csrf=csrf)
+        with patch.dict(app.os.environ,ENV):
+            self.assertEqual(self.request('/api/mail/order-link?to=uno@example.invalid')['status'],401)
+            # Varias en curso: se ofrecen todas, ninguna se elige sola. Con una sola entregada deja de ofrecerse.
+            self.assertEqual([o['code'] for o in link('uno@example.invalid')['orders']],[ids['c']['code'],ids['b']['code'],ids['a']['code']])
+            status('b','entregado');status('c','entregado')
+            one=link('UNO@example.invalid');self.assertEqual(([o['code'] for o in one['orders']],one['client']['id'],one['orders'][0]['status']),([ids['a']['code']],owner,'pendiente'))
+            # Cliente sin órdenes, correo desconocido, correo repetido en dos fichas y destinatarios de clientes distintos: sin vinculación.
+            self.assertEqual((link('dos@example.invalid')['orders'],link('dos@example.invalid')['client']['id']),([],other))
+            self.assertEqual([link(to)['reason'] for to in ('nadie@example.invalid','mismo@example.invalid','uno@example.invalid,dos@example.invalid','uno@example.invalid,nadie@example.invalid')],['unknown','ambiguous','several','unknown'])
+            sent=[]
+            with patch.object(mail_pro,'deliver',side_effect=lambda config,message,recipients:sent.append(recipients)),patch.object(mail_pro,'open_imap',side_effect=mail_pro.MailError('red','sin red')):
+                # El servidor rechaza una orden entregada, la de otro cliente y una inexistente, aunque el navegador las envíe.
+                delivered=send('uno@example.invalid',ids['b']['code'],'mail-link-send-00001');self.assertEqual((delivered['status'],'ya fue entregada' in delivered['body']['error']),(400,True))
+                foreign=send('dos@example.invalid',ids['a']['code'],'mail-link-send-00002');self.assertEqual((foreign['status'],'no pertenece' in foreign['body']['error']),(400,True))
+                self.assertEqual(send('uno@example.invalid','PCD-00000000-9999','mail-link-send-00003')['status'],404)
+                self.assertEqual(sent,[])
+                # Orden en curso del destinatario: se envía y queda en las comunicaciones de esa orden. Sin orden también se envía.
+                self.assertEqual(send('uno@example.invalid',ids['a']['code'],'mail-link-send-00004')['status'],201)
+                self.assertEqual(send('uno@example.invalid','','mail-link-send-00005')['status'],201)
+                self.assertEqual(len(sent),2)
+            # Si el servidor de correo rechaza el envío no queda ningún vínculo.
+            with patch.object(mail_pro,'deliver',side_effect=mail_pro.MailError('red','sin conexión')),patch.object(mail_pro,'open_imap',side_effect=mail_pro.MailError('red','sin red')):
+                self.assertEqual(send('uno@example.invalid',ids['a']['code'],'mail-link-send-00006')['status'],502)
+        with app.connect() as c:
+            self.assertEqual([(r['order_id'],r['correspondent'],r['direction']) for r in c.execute('SELECT order_id,correspondent,direction FROM mail_links')],[(ids['a']['id'],'uno@example.invalid','out')])
+        with patch.dict(app.os.environ,ENV):self.assertEqual([m['subject'] for m in self.request('/api/orders/%d'%ids['a']['id'],cookie=cookie)['body']['order']['mail']],['Asunto'])
+
     def test_mail_routes_require_permission_and_send_is_not_duplicated(self):
         cookie,csrf=self.login()
         with app.connect() as c:

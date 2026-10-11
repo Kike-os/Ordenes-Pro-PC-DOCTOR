@@ -71,8 +71,19 @@ class ServiceTermsTests(unittest.TestCase):
             with self.assertRaises(sqlite3.IntegrityError):c.execute('UPDATE orders SET terms_accepted_at=? WHERE id=?',('2099-01-01',oid))
 
     def test_no_retroactive_acceptance_and_no_unconfigured_production(self):
-        cookie,csrf=self.login();result=self.request('/api/orders',self.order_data(),cookie=cookie,csrf=csrf)
-        self.assertEqual(result['status'],503)
+        cookie,csrf=self.login()
+        # Con la exigencia activada y sin condiciones publicadas, no se registra.
+        with patch.dict(app.os.environ,{'REQUIRE_SERVICE_TERMS':'true'}):
+            self.assertTrue(self.request('/api/conditions/current',cookie=cookie)['body']['required'])
+            self.assertEqual(self.request('/api/orders',self.order_data({'request_key':'terms-required-order-0001'}),cookie=cookie,csrf=csrf)['status'],503)
+        # Sin exigencia: la orden se registra con su número y QR, y no se fabrica ninguna aceptación (ni aunque el navegador la envíe).
+        current=self.request('/api/conditions/current',cookie=cookie)['body'];self.assertEqual((current['terms'],current['required']),(None,False))
+        result=self.request('/api/orders',self.order_data({'terms_accept':True,'terms_document_id':'inventado','request_key':'terms-free-order-000001'}),cookie=cookie,csrf=csrf)
+        self.assertEqual(result['status'],201)
+        free=self.request('/api/orders/'+str(result['body']['id']),cookie=cookie)['body']['order']
+        self.assertEqual((free['terms'],free['terms_acceptance_id'],free['code']==result['body']['code'],bool(free['qr_url'])),(None,None,True,True))
+        # Sus documentos se generan igual, sin texto ni evidencia de condiciones.
+        for doc in ('/api/orders/%d/thermal.pdf','/api/orders/%d/tracking-qr.png'):self.assertEqual(self.request(doc%result['body']['id'],cookie=cookie)['status'],200)
         with app.connect() as c:
             did=c.execute("INSERT INTO devices(client_id,type,category) VALUES (1,'portatil','portatil')").lastrowid
             oid=c.execute("INSERT INTO orders(device_id,status,problem,created_by,created_at,code,received_at) VALUES (?,'pendiente','Histórica',?,0,'OP-00001','2020-01-01T10:00:00-05:00')",(did,self.uid)).lastrowid

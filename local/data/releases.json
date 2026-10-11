@@ -8,6 +8,24 @@
   },
   "releases": [
     {
+      "version": "1.5.35",
+      "date": "2026-10-11T18:22:39-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Órdenes sin condiciones publicadas y vinculación automática de la orden en Mail Pro",
+      "changes": {
+        "features": [
+          "Mail Pro: al elegir al cliente como destinatario se vincula sola su orden en curso; con varias se elige en un selector y las entregadas nunca se proponen. El servidor valida la orden antes de enviar"
+        ],
+        "improvements": [],
+        "fixes": [
+          "Nueva orden: la falta de condiciones del servicio publicadas ya no impide finalizar; el paso Confirmación lo informa como «Sin condiciones activas» y la orden se registra sin aceptación"
+        ],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.34",
       "date": "2026-10-11T18:12:29-05:00",
       "type": "patch",
