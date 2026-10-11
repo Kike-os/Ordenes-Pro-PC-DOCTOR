@@ -32,7 +32,8 @@ SUMMARY=(
 
 
 COPIES={'cliente':('COPIA CLIENTE',),'taller':('COPIA TALLER',),'ambas':('COPIA CLIENTE','COPIA TALLER')}
-LOGO_DOTS=304  # 38 mm a 203 dpi: un píxel del logo por punto de impresora.
+LOGO_MM=26  # Ancho impreso del logo.
+LOGO_PX=416  # Dos píxeles por punto de impresora para conservar el detalle del original.
 
 
 def render_thermal(order,copy='cliente'):
@@ -40,9 +41,10 @@ def render_thermal(order,copy='cliente'):
     fonts={}
     for key,name in [('F1','Helvetica'),('F2','Helvetica-Bold')]:
         font=pydyf.Dictionary({'Type':'/Font','Subtype':'/Type1','BaseFont':'/'+name,'Encoding':'/WinAnsiEncoding'});pdf.add_object(font);fonts[key]=font.reference
-    # Logo original en un bit, sin redibujarlo: negro puro para la cabeza térmica.
-    logo_w,logo_h,_,_,mono=logo_pixels(LOGO_DOTS)
-    logo=pydyf.Stream([mono],extra={'Type':'/XObject','Subtype':'/Image','Width':logo_w,'Height':logo_h,'ColorSpace':'/DeviceGray','BitsPerComponent':1,'Interpolate':'false'},compress=True);pdf.add_object(logo)
+    # Logo original sin retocar: sus mismos trazos y tonos en escala de grises sobre blanco (la impresora térmica los tramará).
+    logo_w,logo_h,rgb,alpha,_=logo_pixels(LOGO_PX)
+    gray=bytes(min(255,round((.2126*rgb[i*3]+.7152*rgb[i*3+1]+.0722*rgb[i*3+2])*a/255+255-a)) for i,a in enumerate(alpha))
+    logo=pydyf.Stream([gray],extra={'Type':'/XObject','Subtype':'/Image','Width':logo_w,'Height':logo_h,'ColorSpace':'/DeviceGray','BitsPerComponent':8,'Interpolate':'true'},compress=True);pdf.add_object(logo)
     resources=pydyf.Dictionary({'Font':pydyf.Dictionary(fonts),'XObject':pydyf.Dictionary({'Logo':logo.reference})})
     def text_width(text,size,bold=False):return sum(WIDTHS.get(c,556) for c in text)*size/1000*(1.06 if bold else 1)
     def wrap(value,size,bold):
@@ -59,7 +61,8 @@ def render_thermal(order,copy='cliente'):
         return lines
     # El enlace público solo se anuncia si la orden tiene un seguimiento activo; si no, el QR conserva el `qr_url` de uso interno.
     tracking=order.get('tracking_url') or ''
-    matrix=list(segno.make_qr(tracking or order['qr_url'],error='m').matrix)
+    # El QR lleva integrado el número de la orden como fragmento: lo muestra el lector y no viaja al servidor.
+    matrix=list(segno.make_qr((tracking+'#'+order['code']) if tracking else order['qr_url'],error='m').matrix)
     qr_unit=next((n*DOT for n in (5,4,3) if (len(matrix)+8)*n*DOT<=W-2*M),None)
     if qr_unit is None:raise ValueError('El QR excede el ancho imprimible.')
     qr_size=(len(matrix)+8)*qr_unit
@@ -83,13 +86,16 @@ def render_thermal(order,copy='cliente'):
             nonlocal y
             y+=30;ops.append(('line',y,W*.14,W*.86));y+=4;block(label,8,center=True,gap=4)
         # 1–2. Logo original y datos del taller.
-        logo_width=LOGO_DOTS*DOT;logo_height=logo_width*logo_h/logo_w;ops.append(('logo',y,logo_width,logo_height));y+=logo_height+5
+        logo_width=LOGO_MM*72/25.4;logo_height=logo_width*logo_h/logo_w;ops.append(('logo',y,logo_width,logo_height));y+=logo_height+5
         block(company['name'],9,True,1,True);block(company['specialty'],8,gap=2,center=True)
         block('WhatsApp: '+company['whatsapp'],8,gap=1,center=True);block(company['website'],8,gap=5,center=True)
         block('COMPROBANTE DE RECEPCIÓN',9,True,2,True);block(copy_label,8,True,5,True)
         if order.get('preview'):block('VISTA PREVIA · DATOS FICTICIOS',8,True,5,True)
-        # 3–4. Número de orden destacado, fecha y hora.
-        block(order['code'],14,True,5,True)
+        # 3. Número de orden destacado y, justo debajo, el QR de esa orden.
+        block(order['code'],14,True,3,True)
+        ops.append(('qr',y,qr_size,qr_unit,matrix));y+=qr_size+3
+        block('Escanea para consultar tu reparación' if tracking else 'Uso interno: escanear con sesión autorizada.',9 if tracking else 8,bool(tracking),6,True)
+        # 4. Fecha y hora.
         pair('Fecha y hora',received.strftime('%d/%m/%Y %H:%M:%S')+' · Ecuador')
         pair('Estado',order['status_label'])
         # 5–9. Cliente, equipo, accesorios, estado físico y falla informada.
@@ -99,11 +105,6 @@ def render_thermal(order,copy='cliente'):
         section('EQUIPO');pair('Tipo',DEVICE_TYPES.get(order['type'],order['type']))
         pair('Marca / modelo',' '.join(filter(None,[order.get('brand'),order.get('model')])));pair('Serie',order.get('serial'))
         pair('Accesorios recibidos',order.get('accessories'));pair('Estado físico',order.get('physical_condition'));pair('Falla informada por el cliente',order['problem'])
-        # 10. QR centrado: debajo de los datos técnicos y antes de las condiciones.
-        section('SEGUIMIENTO DE LA REPARACIÓN' if tracking else 'LOCALIZACIÓN DE LA ORDEN')
-        ops.append(('qr',y,qr_size,qr_unit,matrix));y+=qr_size+4
-        block('Escanea para consultar tu reparación' if tracking else 'Uso interno: escanear con sesión autorizada.',9 if tracking else 8,bool(tracking),2,True)
-        block('Orden '+order['code'],9,True,3,True)
         # 11. Autorización y condiciones: mismos textos y evidencia registrada, sin añadir consentimientos.
         section('AUTORIZACIÓN DE ACCESO TÉCNICO')
         block('Acceso técnico: '+({'authorized':'AUTORIZADO','denied':'NO AUTORIZADO'}[access['decision']] if access else 'No consta autorización'),9,True,4)

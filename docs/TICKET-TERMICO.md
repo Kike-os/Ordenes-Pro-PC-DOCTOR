@@ -83,3 +83,8 @@ La Epson no respondió en su conexión configurada. No se envió un trabajo fís
 **Copias:** `thermal.pdf?copy=cliente|taller|ambas`. «Ambas» genera un PDF de dos páginas; la impresión directa envía dos trabajos de una página, cada uno con su corte.
 
 **Verificado sin imprimir:** ZBar lee el QR y el Code 128 desde el PDF rasterizado a 203 dpi, con y sin enlace público. **Pendiente real:** impresión física en la Epson TM-m30II y lectura del QR desde teléfonos.
+
+### Ajuste posterior del mismo día
+
+- El logo se imprime a 26 mm y en escala de grises a partir del archivo original (sus mismos trazos y tonos), no como silueta en un bit. La impresora térmica lo trama al imprimir; ese resultado en papel está pendiente de comprobar.
+- El QR va justo debajo del número de orden. Con enlace público codifica `…/s/<token>#<número de orden>`: el número queda integrado en el código, lo muestra el lector y no se envía al servidor.

@@ -4,6 +4,20 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.20 — 2026-10-11 14:10 (UTC-05:00)
+
+Enterprise Status Pro, corrección de botones de la nueva orden y ajustes del ticket
+
+### Mejoras realizadas
+
+- Seguimiento de Órdenes con Enterprise Status Pro: un color e icono por estado real, pulso del icono principal al llegar un movimiento nuevo e indicador de sincronización con retraso y error
+- Ticket térmico: logo original más pequeño en escala de grises y QR con el número de orden integrado justo debajo del número
+
+### Errores corregidos
+
+- Ficha de cliente abierta desde la orden: «Anterior» vuelve a la orden conservando lo escrito, y «Cambios sin guardar» solo aparece con cambios reales
+- Nueva orden: tras guardar ya no queda cargado el cliente anterior ni se reactivan botones que debían seguir bloqueados después de un error
+
 ## v1.5.19 — 2026-10-11 13:58 (UTC-05:00)
 
 Identificación de equipos con consulta asistida por fabricante y procedencia de los datos

@@ -2886,3 +2886,18 @@ body[data-page=dashboard] .toast.toast-release .toast-body p{font-size:12px;colo
 #order-dialog.wizard-dialog{max-height:85dvh}#order-dialog.wizard-dialog form{max-height:85dvh}
 .serial-official select{flex:1 1 180px;min-width:0;max-width:260px;height:34px;min-height:34px;margin:0;padding:0 10px;font-size:12px}
 .serial-official .secondary[hidden]{display:none}
+
+/* Enterprise Status Pro (Seguimiento de Órdenes): solo color, sombra y animación; ninguna medida cambia. */
+.tracking-pro .tracking-open,.tracking-pro .tracking-item[data-tone] .tracking-open{transition:background .2s,border-color .2s,box-shadow .2s}
+.tracking-pro .tracking-open:hover,.tracking-pro .tracking-open:focus-visible{transform:none;border-color:color-mix(in srgb,var(--tk) 45%,#1e3252);border-left-color:var(--tk);background:linear-gradient(180deg,#11233f,#0d1c32);box-shadow:0 0 0 1px color-mix(in srgb,var(--tk) 18%,transparent),0 0 18px color-mix(in srgb,var(--tk) 14%,transparent)}
+.tracking-pro .tracking-open .track-icon,.tracking-pro .tracking-item[data-tone] .track-icon{transition:color .2s,background .2s,border-color .2s,box-shadow .2s}
+.tracking-pro .tracking-item.track-new{animation:es-fade .22s ease-out}
+.tracking-pro .tracking-item.track-new .tracking-open{animation:es-card-glow 1.4s ease-out 1}
+.tracking-pro .panel-icon.tracking-pulse{animation:es-pulse .8s ease-out 1}
+.tracking-status[data-state=late]{color:#f1cf95}.tracking-status[data-state=late]::before{background:#E7AE58}
+.tracking-status:not([data-state])::before{background:#93A9C4}
+.tracking-status[data-state=ok]::before{background:#59C785}.tracking-status[data-state=error]::before{background:#EA7884}
+@keyframes es-fade{from{opacity:0}to{opacity:1}}
+@keyframes es-card-glow{0%{box-shadow:0 0 0 1px color-mix(in srgb,var(--tk) 55%,transparent),0 0 22px color-mix(in srgb,var(--tk) 40%,transparent)}100%{box-shadow:0 0 0 1px transparent,0 0 0 transparent}}
+@keyframes es-pulse{0%{transform:scale(1);box-shadow:0 0 0 0 #4d8df099}45%{transform:scale(1.04);box-shadow:0 0 0 6px #4d8df02e,0 0 16px #4d8df066}100%{transform:scale(1);box-shadow:0 0 0 10px #4d8df000}}
+@media(prefers-reduced-motion:reduce){.tracking-pro .tracking-item.track-new,.tracking-pro .tracking-item.track-new .tracking-open,.tracking-pro .panel-icon.tracking-pulse{animation:none}.tracking-pro .tracking-open,.tracking-pro .tracking-open .track-icon{transition:none}}

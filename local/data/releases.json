@@ -8,6 +8,26 @@
   },
   "releases": [
     {
+      "version": "1.5.20",
+      "date": "2026-10-11T14:10:40-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Enterprise Status Pro, corrección de botones de la nueva orden y ajustes del ticket",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Seguimiento de Órdenes con Enterprise Status Pro: un color e icono por estado real, pulso del icono principal al llegar un movimiento nuevo e indicador de sincronización con retraso y error",
+          "Ticket térmico: logo original más pequeño en escala de grises y QR con el número de orden integrado justo debajo del número"
+        ],
+        "fixes": [
+          "Ficha de cliente abierta desde la orden: «Anterior» vuelve a la orden conservando lo escrito, y «Cambios sin guardar» solo aparece con cambios reales",
+          "Nueva orden: tras guardar ya no queda cargado el cliente anterior ni se reactivan botones que debían seguir bloqueados después de un error"
+        ],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.19",
       "date": "2026-10-11T13:58:05-05:00",
       "type": "patch",

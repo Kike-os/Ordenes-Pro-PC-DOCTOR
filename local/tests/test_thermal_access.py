@@ -66,7 +66,7 @@ class ThermalAccessTests(unittest.TestCase):
         cookie,csrf,data,oid=self.create(request_key='thermal-reprint-request-00001')
         original=self.request('/api/orders/'+str(oid),cookie=cookie)['body']['order']
         for i in range(2):
-            r=self.request('/api/orders/'+str(oid)+'/thermal.pdf',cookie=cookie);self.assertEqual(r['status'],200);self.assertTrue(r['body'].startswith(b'%PDF'));self.assertEqual(r['body'].count(b'/Subtype /Image'),1);self.assertIn(b'/BitsPerComponent 1',r['body'])
+            r=self.request('/api/orders/'+str(oid)+'/thermal.pdf',cookie=cookie);self.assertEqual(r['status'],200);self.assertTrue(r['body'].startswith(b'%PDF'));self.assertEqual(r['body'].count(b'/Subtype /Image'),1);self.assertIn(b'/ColorSpace /DeviceGray',r['body'])
         with app.connect() as c:
             self.assertEqual(c.execute('select count(*) from orders').fetchone()[0],1);self.assertEqual(c.execute('select count(*) from order_access_consents').fetchone()[0],1)
         self.assertEqual(self.request('/api/orders/'+str(oid)+'/thermal.pdf')['status'],401)
