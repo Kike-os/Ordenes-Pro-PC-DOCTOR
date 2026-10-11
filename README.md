@@ -75,6 +75,8 @@ Las pruebas usan bases temporales y datos ficticios, y prueban los manejadores H
 
 ## Despliegue en Vercel
 
+Para publicar cambios: `bash publicar.sh "descripción del cambio"`. Ejecuta las pruebas, crea el commit y lo sube a GitHub; Vercel despliega automáticamente cada subida a `main`.
+
 Vercel no conserva el archivo SQLite; allí la aplicación usa una base libSQL/Turso mediante `local/remote_db.py`. Seguir [despliegue en Vercel](docs/VERCEL.md).
 
 ## Adaptación para cPanel Python

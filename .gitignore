@@ -12,3 +12,7 @@ local/passenger_wsgi.py
 local/public/
 local/tmp/
 local/stderr.log
+# Habilidades de agentes instaladas por la integración de Turso.
+.agents/
+.claude/skills/
+skills-lock.json
