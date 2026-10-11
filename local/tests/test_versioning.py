@@ -10,6 +10,7 @@ from unittest.mock import patch
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 import test_app
 import app
+app.os.environ.setdefault('UPDATE_REGISTRY_URL','off')  # Las pruebas no consultan el registro publicado.
 import versioning
 
 
@@ -126,6 +127,15 @@ class VersionCheckTests(test_app.SecurityTests):
         with patch.object(versioning,'check',return_value=dict(found,update_available=False,pending=[])):
             self.request('/api/system/check',{},cookie=cookie,csrf=csrf)
         self.assertFalse([item for item in self.request('/api/notifications',cookie=cookie)['body']['items'] if item['key'].startswith('update:')])
+
+    def test_official_registry_is_the_default_and_can_be_turned_off(self):
+        env=dict(app.os.environ);env.pop('UPDATE_REGISTRY_URL',None)
+        with patch.dict(app.os.environ,env,clear=True):
+            self.assertEqual(versioning.registry_url(),versioning.OFFICIAL_REGISTRY)
+            self.assertTrue(versioning.OFFICIAL_REGISTRY.startswith('https://'))
+        for value in ('','off','OFF','false'):
+            with patch.dict(app.os.environ,{'UPDATE_REGISTRY_URL':value}):self.assertEqual(versioning.registry_url(),'')
+        with patch.dict(app.os.environ,{'UPDATE_REGISTRY_URL':'https://example.invalid/r.json'}):self.assertEqual(versioning.registry_url(),'https://example.invalid/r.json')
 
     def test_check_fails_closed_when_published_registry_is_unusable(self):
         cookie,csrf=self.login()

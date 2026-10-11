@@ -17,6 +17,8 @@
  async function send(text){if(busy||!text)return;busy=true;const submit=form.querySelector('button');submit.disabled=true;quick.hidden=true;if(mode==='adi')setTyping(true);try{const data=await request('/api/public/adi/message',{message:text});input.value='';setTyping(false);draw(data.messages);setMode(data.mode);document.dispatchEvent(new CustomEvent('adi:sent'));}catch(error){setTyping(false);note(error.message);}finally{busy=false;submit.disabled=false;input.focus();}}
  function setOpen(open,focus=true){panel.hidden=!open;toggle.setAttribute('aria-expanded',String(open));root.classList.toggle('adi-open',open);if(open){dot.hidden=true;poll();if(focus)input.focus();}else if(focus)toggle.focus();}
  toggle.addEventListener('click',()=>setOpen(panel.hidden));
+ // El lanzador se presenta unos segundos con su nombre y después se recoge a un botón compacto para no tapar el contenido.
+ root.classList.add('adi-intro');const settle=()=>{root.classList.remove('adi-intro');removeEventListener('scroll',settle,true);};setTimeout(settle,3800);addEventListener('scroll',settle,{capture:true,passive:true,once:true});
  $('adi-close').addEventListener('click',()=>setOpen(false));
  document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!panel.hidden&&!document.querySelector('dialog[open]')){event.stopPropagation();setOpen(false);}},true);
  form.addEventListener('submit',event=>{event.preventDefault();send(input.value.trim());});

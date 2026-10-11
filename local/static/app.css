@@ -1733,3 +1733,76 @@ body[data-page=dashboard] .mail-back{background:#13223b;border:1px solid #304564
 @media(prefers-reduced-motion:reduce){.release-chip,.release-chip .release-dot{transition:none}.release-chip[data-state=working] .release-icon,.release-chip.release-pulse,.release-chip.release-pulse .release-dot,.release-panel{animation:none}}
 /* Acceso: misma etiqueta con el punto a la derecha. */
 .release-tag{gap:7px}
+/* Adi: en pantallas amplias el lanzador se recoge a un botón compacto y se despliega al pasar el cursor o enfocarlo. */
+@media(min-width:861px){
+ .adi-widget{animation:adi-in .35s cubic-bezier(.2,.8,.2,1) both}
+ .adi-widget .adi-toggle{gap:0;min-height:50px;padding:6px;border-radius:17px;box-shadow:0 10px 28px #02071480;transition:border-color .2s,background .2s,transform .2s,box-shadow .2s,padding .28s cubic-bezier(.3,.7,.3,1)}
+ .adi-widget .adi-toggle-text{max-width:0;opacity:0;margin:0;overflow:hidden;white-space:nowrap;transition:max-width .28s cubic-bezier(.3,.7,.3,1),opacity .18s ease,margin .28s cubic-bezier(.3,.7,.3,1)}
+ .adi-widget .adi-toggle:hover,.adi-widget .adi-toggle:focus-visible,.adi-widget.adi-intro .adi-toggle,.adi-widget.adi-open .adi-toggle{padding-right:14px}
+ .adi-widget .adi-toggle:hover .adi-toggle-text,.adi-widget .adi-toggle:focus-visible .adi-toggle-text,.adi-widget.adi-intro .adi-toggle-text,.adi-widget.adi-open .adi-toggle-text{max-width:150px;opacity:1;margin-left:10px;transition-delay:0s,.06s,0s}
+ .adi-widget .adi-toggle:hover{box-shadow:0 14px 34px #020714a6,0 0 0 4px #4087ef1f}
+ .adi-widget .adi-panel{bottom:62px}
+ /* Espacio libre al final para que el último contenido pueda desplazarse por encima del botón. */
+ body[data-page=dashboard] .control-center{padding-bottom:76px}
+ body[data-page=appointments] .appointment-public-main{padding-bottom:96px}
+}
+@keyframes adi-in{from{opacity:0;transform:translateY(12px) scale(.96)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){.adi-widget{animation:none}.adi-widget .adi-toggle,.adi-widget .adi-toggle-text{transition:none}}
+/* Adi administrativa: indicadores en vivo y conversación. */
+.adi-console{display:grid;grid-template-columns:minmax(260px,340px) minmax(0,1fr);gap:16px;align-items:start;max-width:1180px}
+.adi-live{padding:18px}
+.adi-live>header{display:flex;align-items:center;gap:8px;margin-bottom:14px}
+.adi-live h2{margin:0 auto 0 0;font-size:15px;color:#eef3ff}
+.adi-live small{font-size:11px;color:#8fa5c4}
+.adi-live-dot{width:8px;height:8px;border-radius:50%;background:#52637a}
+.adi-live-dot[data-state=ok]{background:#3fbf8a;box-shadow:0 0 0 3px #3fbf8a26}
+.adi-live-dot[data-state=off]{background:#e5484d}
+.adi-live-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.adi-tile{display:grid;gap:2px;padding:10px 12px;border:1px solid #223450;border-left:3px solid #2f4a73;border-radius:10px;background:#0b1626;color:inherit;text-decoration:none;transition:background .2s,border-color .2s,transform .2s}
+.adi-tile:hover{background:#12213a;text-decoration:none;transform:translateY(-1px)}
+.adi-tile:focus-visible{outline:2px solid #8bb8ff;outline-offset:2px}
+.adi-tile strong{font-size:20px;line-height:1.1;color:#eef3ff;font-variant-numeric:tabular-nums}
+.adi-tile span{font-size:11.5px;color:#9bb0cf}
+.adi-tile[data-tone=ok]{border-left-color:#3fbf8a}.adi-tile[data-tone=warn]{border-left-color:#f3c677}.adi-tile[data-tone=bad]{border-left-color:#e5484d}
+.adi-next{grid-column:1/-1;margin:4px 0 0;padding:9px 12px;border-radius:9px;background:#12233d;color:#c4ddff;font-size:12.5px}
+.adi-chat{display:flex;flex-direction:column;padding:0;overflow:hidden;height:min(640px,calc(100dvh - 300px));min-height:440px}
+.adi-chat>header{display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid #223450}
+.adi-chat .adi-avatar{display:grid;place-items:center;flex:0 0 40px;width:40px;height:40px;border-radius:12px;background:linear-gradient(140deg,#2f6fd0,#1b3f7c);color:#fff}
+.adi-chat .adi-glyph{width:21px;height:21px}
+.adi-chat>header>div{margin-right:auto;min-width:0}
+.adi-chat>header h2{margin:0;font-size:16px;color:#eef3ff}
+.adi-chat>header p{margin:2px 0 0;font-size:12px;color:#8fa5c4}
+.adi-log{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:10px;padding:16px 18px;background:#0a1322;scrollbar-width:thin}
+.adi-bubble{max-width:82%;padding:10px 13px;border:1px solid #263a57;border-radius:14px;font-size:13.5px;line-height:1.55;animation:system-in .22s ease-out;overflow-wrap:anywhere}
+.adi-bubble p{margin:0}
+.adi-from{align-self:flex-start;border-bottom-left-radius:5px;background:#122036;color:#dbe8fb}
+.adi-me{align-self:flex-end;border-color:#3a6fc0;border-bottom-right-radius:5px;background:#1d4f96;color:#fff}
+.adi-bubble time{display:block;margin-top:4px;font-size:10px;color:#8198ba;text-align:right}
+.adi-me time{color:#c9dcf8}
+.adi-links{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px}
+.adi-links a{padding:4px 11px;border:1px solid #34507d;border-radius:999px;background:#13223b;color:#c4ddff;font-size:12px;text-decoration:none;transition:background .2s,border-color .2s}
+.adi-links a:hover{background:#18335a;border-color:#69a7ff;text-decoration:none}
+.adi-chat .adi-typing{display:flex;gap:5px;align-items:center;padding:13px 14px}
+.adi-chips{display:flex;gap:7px;padding:10px 18px 0;overflow-x:auto;background:#0a1322;scrollbar-width:none}
+.adi-chip{flex:0 0 auto;padding:6px 12px;border:1px solid #34507d;border-radius:999px;background:#12233d;color:#c4ddff;font-size:12px;cursor:pointer;white-space:nowrap;transition:background .2s,border-color .2s}
+.adi-chip:hover{background:#18335a;border-color:#69a7ff}
+.adi-ask{display:flex;gap:8px;padding:12px 18px 16px;background:#0a1322}
+body[data-page=dashboard] .adi-ask input{flex:1;min-width:0;height:44px;min-height:44px;margin:0;border-radius:12px;font-size:14px}
+.adi-ask button{min-height:44px;padding:0 18px;border-radius:12px}
+@media(max-width:900px){.adi-console{grid-template-columns:1fr}.adi-live-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.adi-chat{height:560px}}
+@media(max-width:520px){.adi-live-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.adi-bubble{max-width:92%}.adi-chat>header{padding:12px 14px}.adi-log{padding:12px 14px}.adi-chips{padding:10px 14px 0}.adi-ask{padding:10px 14px 14px}}
+@media(prefers-reduced-motion:reduce){.adi-bubble{animation:none}.adi-tile,.adi-chip,.adi-links a{transition:none}.adi-tile:hover{transform:none}}
+/* Release: etiqueta secundaria, brillo y barrido de luz al detectar una versión nueva (dos ciclos y queda estático). */
+.release-chip{overflow:hidden;isolation:isolate}
+.release-extra{padding:2px 8px;border-radius:999px;background:#f3c6771f;border:1px solid #a9792a;color:#fbe6b8;font-family:Inter,Segoe UI,Arial,sans-serif;font-size:10.5px;font-weight:650;letter-spacing:0;white-space:nowrap;animation:release-fade .28s ease-out}
+.release-chip[data-state=pending]{border-color:#a9792a;background:linear-gradient(180deg,#22231f,#161b22);box-shadow:inset 0 1px #ffffff0a,0 0 14px #f3c67726}
+.release-chip.release-pulse::after{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(105deg,transparent 35%,#ffe9b84d 50%,transparent 65%);transform:translateX(-120%);animation:release-shimmer 1.1s ease-in-out 2}
+@keyframes release-shimmer{to{transform:translateX(120%)}}
+@keyframes release-fade{from{opacity:0;transform:translateX(-4px)}to{opacity:1;transform:none}}
+@media(max-width:1380px) and (min-width:1000px){.release-extra{display:none}}
+@media(prefers-reduced-motion:reduce){.release-chip.release-pulse::after,.release-extra{animation:none}.release-chip.release-pulse::after{display:none}}
+/* Acceso: un único indicador de carga en el botón, con arco fino y barrido de luz mientras se procesa. */
+body:is([data-page=login],.auth-page) form[aria-busy=true] .submit{position:relative;overflow:hidden;gap:10px;opacity:1;background:linear-gradient(110deg,#1f4f9c,#2f6cc4)}
+body:is([data-page=login],.auth-page) form[aria-busy=true] .submit::before{width:16px;height:16px;margin-right:0;border:2px solid #ffffff38;border-top-color:#fff;border-right-color:#fff;border-radius:50%;animation:auth-spin .75s cubic-bezier(.5,.15,.5,.85) infinite}
+body:is([data-page=login],.auth-page) form[aria-busy=true] .submit::after{content:"";position:absolute;inset:0;background:linear-gradient(105deg,transparent 30%,#ffffff24 50%,transparent 70%);transform:translateX(-120%);animation:release-shimmer 1.4s ease-in-out infinite}
+@media(prefers-reduced-motion:reduce){body:is([data-page=login],.auth-page) form[aria-busy=true] .submit::after{display:none}body:is([data-page=login],.auth-page) form[aria-busy=true] .submit::before{animation:none}}

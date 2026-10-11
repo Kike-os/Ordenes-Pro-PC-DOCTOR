@@ -496,7 +496,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(200,{'rows':rows,'view':view,'date':day.isoformat(),'settings':appointments.settings(c) if user['role']=='administrador' else None})
             if path == '/api/adi/admin':
                 if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede usar la asistente administrativa.'})
-                return self.reply(200,{'enabled':bool(os.getenv('OPENAI_API_KEY')),'message':'Adi responde consultas operativas desde datos autorizados.'})
+                return self.reply(200,{'enabled':bool(os.getenv('OPENAI_API_KEY')),'message':'Adi responde consultas operativas desde datos autorizados.','live':adi.snapshot(c,reception_now())})
             if path == '/api/adi/live':
                 if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
                 rows=[dict(r) for r in c.execute("SELECT v.id,v.mode,v.updated_at,(SELECT content FROM adi_messages m WHERE m.conversation_id=v.id AND m.visibility='public' ORDER BY m.id DESC LIMIT 1) last_message,(SELECT author FROM adi_messages m WHERE m.conversation_id=v.id AND m.visibility='public' ORDER BY m.id DESC LIMIT 1) last_author FROM adi_conversations v WHERE v.mode!='closed' ORDER BY v.updated_at DESC LIMIT 100")]
@@ -1146,11 +1146,9 @@ class Handler(BaseHTTPRequestHandler):
                     if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede usar la asistente administrativa.'})
                     prompt=str(data.get('message','')).strip()
                     if not prompt or len(prompt)>2000:return self.reply(400,{'error':'Escribe una consulta de hasta 2000 caracteres.'})
-                    answer=adi.admin_answer(c,prompt)
-                    if not answer and any(k in prompt.casefold() for k in ('redact','notificación','notificacion')):answer=adi.ask(prompt,admin=True)
-                    answer=answer or 'Puedo consultar órdenes en espera, respuestas pendientes, presupuestos, citas, historial y mantenimientos. Para otros datos, revisa el módulo correspondiente.'
+                    result=adi.admin_reply(c,prompt,reception_now());answer=result['answer']
                     c.execute('INSERT INTO adi_actions(user_id,action,created_at,details) VALUES (?,?,?,?)',(user['id'],'admin_query',appointments.stamp(appointments.now()),prompt[:500]))
-                    return self.reply(200,{'answer':answer,'ai_enabled':bool(os.getenv('OPENAI_API_KEY'))})
+                    return self.reply(200,{'answer':answer,'links':result.get('links',[]),'source':result.get('source','datos'),'live':adi.snapshot(c,reception_now()),'ai_enabled':bool(os.getenv('OPENAI_API_KEY'))})
                 live_action=re.fullmatch(r'/api/adi/live/([0-9]+)',path)
                 if live_action:
                     if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})

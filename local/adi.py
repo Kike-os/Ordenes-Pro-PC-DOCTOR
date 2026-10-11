@@ -43,6 +43,77 @@ def admin_answer(c,text):
   return 'Puedo ayudarte a redactar un mensaje. Incluye únicamente el estado o el dato ya confirmado que deseas comunicar; revisa el texto antes de enviarlo.'
  return None
 
+def snapshot(c,now):
+ """Indicadores del taller en este momento; todo sale de la base, sin estimaciones."""
+ from datetime import timedelta
+ today=now.date().isoformat()
+ count=lambda sql,*args:c.execute(sql,args).fetchone()[0]
+ start=appointments.stamp(appointments.datetime.combine(now.date(),appointments.time.min,appointments.TZ));end=appointments.stamp(appointments.datetime.combine(now.date()+timedelta(days=1),appointments.time.min,appointments.TZ))
+ statuses={r['status']:r['total'] for r in c.execute('SELECT status,COUNT(*) total FROM orders GROUP BY status')}
+ upcoming=c.execute("SELECT customer_name,starts_at FROM appointments WHERE starts_at>=? AND starts_at<? AND status IN ('solicitada','confirmada','reprogramada') ORDER BY starts_at LIMIT 1",(appointments.stamp(now),end)).fetchone()
+ return {'updated_at':now.isoformat(timespec='seconds'),'statuses':{code:statuses.get(code,0) for code in order_workspace.STATUSES},'active':sum(total for code,total in statuses.items() if code!='entregado'),
+  'overdue':count("SELECT COUNT(*) FROM orders WHERE estimated_delivery!='' AND estimated_delivery<? AND status!='entregado'",today),
+  'received_today':count("SELECT COUNT(*) FROM orders WHERE substr(received_at,1,10)=?",today),'delivered_today':count("SELECT COUNT(*) FROM orders WHERE substr(COALESCE(delivered_at,''),1,10)=?",today),
+  'appointments_today':count("SELECT COUNT(*) FROM appointments WHERE starts_at>=? AND starts_at<? AND status IN ('solicitada','confirmada','reprogramada')",start,end),
+  'next_appointment':(upcoming['starts_at'][11:16]+' · '+upcoming['customer_name']) if upcoming else '',
+  'appointments_requested':count("SELECT COUNT(*) FROM appointments WHERE status='solicitada' AND starts_at>=?",appointments.stamp(now)),
+  'clients':count('SELECT COUNT(*) FROM clients'),'clients_review':count('SELECT COUNT(*) FROM clients WHERE needs_review=1'),
+  'chats_waiting':count("SELECT COUNT(*) FROM adi_conversations WHERE mode='human'"),'accounts_pending':count("SELECT COUNT(*) FROM users WHERE approval='pending'")}
+
+def order_rows(c,where,args=(),limit=8):
+ return c.execute("SELECT o.id,o.code,cl.name,d.brand,d.model,s.label status,o.estimated_delivery FROM orders o JOIN devices d ON d.id=o.device_id JOIN clients cl ON cl.id=d.client_id JOIN statuses s ON s.code=o.status WHERE "+where+" ORDER BY o.id DESC LIMIT ?",(*args,limit)).fetchall()
+
+def order_line(r):return f"{r['code']} · {r['name']} · {' '.join(x for x in (r['brand'],r['model']) if x) or 'equipo sin especificar'}"
+
+def admin_reply(c,text,now):
+ """Respuesta administrativa con enlaces a los módulos. Solo lectura: nunca ejecuta cambios."""
+ q=plain(text);live=snapshot(c,now);today=now.date().isoformat();link=lambda label,href:{'label':label,'href':href}
+ has=lambda *keys:any(k in q for k in keys)
+ match=re.search(r'PCD-\d{8}-\d{4,}',text,re.I)
+ if match and not has('historial'):
+  row=c.execute("SELECT o.id,o.code,s.label status,cl.name,d.brand,d.model,o.estimated_delivery,o.priority FROM orders o JOIN devices d ON d.id=o.device_id JOIN clients cl ON cl.id=d.client_id JOIN statuses s ON s.code=o.status WHERE o.code=?",(match[0].upper(),)).fetchone()
+  if not row:return {'answer':'No existe una orden con el número '+match[0].upper()+'.','links':[link('Ver órdenes','#orders')]}
+  return {'answer':f"{row['code']} está en «{row['status']}». Cliente: {row['name']}. Equipo: {' '.join(x for x in (row['brand'],row['model']) if x) or 'sin especificar'}. Entrega estimada: {row['estimated_delivery'] or 'sin definir'}.",'links':[link('Abrir la orden','#orders?id='+str(row['id']))]}
+ if has('resumen','como va','como esta el taller','estado del taller','que hay hoy','panorama') or q in ('hoy','dia'):
+  s=live['statuses'];parts=[f"{live['active']} órdenes activas ({s['pendiente']} en espera, {s['reparacion']} en proceso, {s['esperando_cliente']+s['presupuesto']} esperando al cliente, {s['listo']+s['espera_entrega']} listas para entregar)",f"{live['received_today']} recibidas y {live['delivered_today']} entregadas hoy",f"{live['overdue']} con entrega vencida",f"{live['appointments_today']} citas para hoy"+(' (próxima: '+live['next_appointment']+')' if live['next_appointment'] else '')]
+  if live['appointments_requested']:parts.append(f"{live['appointments_requested']} citas por confirmar")
+  if live['chats_waiting']:parts.append(f"{live['chats_waiting']} conversaciones esperando a un asesor")
+  if live['accounts_pending']:parts.append(f"{live['accounts_pending']} solicitudes de cuenta por revisar")
+  return {'answer':'Resumen del taller: '+'; '.join(parts)+'.','links':[link('Centro de operaciones','#home'),link('Órdenes activas','#orders?active=1')]}
+ if has('vencid','atrasad','retras','fuera de plazo'):
+  rows=order_rows(c,"o.estimated_delivery!='' AND o.estimated_delivery<? AND o.status!='entregado'",(today,))
+  return {'answer':(f"Hay {live['overdue']} orden(es) con entrega vencida: "+'; '.join(order_line(r)+' (prevista '+r['estimated_delivery']+')' for r in rows)+'.') if rows else 'No hay órdenes con la entrega vencida.','links':[link('Órdenes activas','#orders?active=1')]}
+ if has('procesando','en proceso','en reparacion','reparando'):
+  rows=order_rows(c,"o.status='reparacion'")
+  return {'answer':(f"Hay {live['statuses']['reparacion']} orden(es) en proceso: "+'; '.join(order_line(r) for r in rows)+'.') if rows else 'No hay órdenes en proceso.','links':[link('Ver en proceso','#orders?status=reparacion')]}
+ if has('entregad') and has('hoy'):
+  return {'answer':f"Hoy se han entregado {live['delivered_today']} equipo(s) y se han recibido {live['received_today']}.",'links':[link('Órdenes entregadas','#orders?status=entregado')]}
+ if has('recibid','ingresad','ingresaron','entraron') and has('hoy'):
+  rows=order_rows(c,"substr(o.received_at,1,10)=?",(today,))
+  return {'answer':(f"Hoy se recibieron {live['received_today']} orden(es): "+'; '.join(order_line(r) for r in rows)+'.') if rows else 'Hoy todavía no se ha recibido ningún equipo.','links':[link('Ver órdenes','#orders')]}
+ if has('cliente') and has('cuant','total','numero'):
+  return {'answer':f"Hay {live['clients']} clientes registrados; {live['clients_review']} tienen la ficha por completar.",'links':[link('Clientes','#clients'),link('Fichas por completar','#clients?filter=review')]}
+ found=re.search(r'(?:cliente|buscar?|ordenes de)\s+(?:a\s+|de\s+|llamad[oa]\s+)?([a-z0-9ñ@. ]{3,60})$',q)
+ if found and not has('cuant'):
+  term=found[1].strip()
+  rows=c.execute("SELECT c.id,c.name,c.phone,(SELECT COUNT(*) FROM orders o JOIN devices d ON d.id=o.device_id WHERE d.client_id=c.id) orders FROM clients c WHERE instr(lower(c.name||' '||c.identification||' '||COALESCE(c.phone,'')||' '||COALESCE(c.email,'')||' '||c.trade_name),?)>0 ORDER BY c.name LIMIT 6",(term,)).fetchall()
+  if rows:return {'answer':f"Encontré {len(rows)}{' o más' if len(rows)==6 else ''} cliente(s) para «{term}»: "+'; '.join(f"{r['name']} ({r['orders']} órdenes)" for r in rows)+'.','links':[link(r['name'][:40],'#clients?id='+str(r['id'])) for r in rows[:4]]}
+  return {'answer':f"No encontré clientes que coincidan con «{term}».",'links':[link('Clientes','#clients')]}
+ if has('solicitud') and has('cuenta','acceso','usuario'):
+  return {'answer':f"Hay {live['accounts_pending']} solicitud(es) de cuenta por revisar.",'links':[link('Usuarios y permisos','#settings?tab=users')]}
+ if has('conversacion','chat','asesor'):
+  return {'answer':f"Hay {live['chats_waiting']} conversación(es) esperando a un asesor.",'links':[link('Atención en vivo','#live')]}
+ factual=admin_answer(c,text)
+ if factual:
+  links=[link('Agenda de citas','#appointments')] if 'cita' in q else [link('Mantenimientos','#maintenance')] if 'mantenimiento' in q else [link('Órdenes','#orders?active=1')]
+  return {'answer':factual,'links':links}
+ if has('cuantas ordenes','total de ordenes','ordenes activas','ordenes hay'):
+  return {'answer':f"Hay {live['active']} órdenes activas y {live['statuses']['entregado']} entregadas en total.",'links':[link('Órdenes activas','#orders?active=1')]}
+ if has('redact','notificacion','mensaje para','correo para'):
+  drafted=ask(text,admin=True)
+  if drafted:return {'answer':drafted,'links':[],'source':'ia'}
+ return {'answer':'Puedo responder con datos reales del sistema sobre: resumen del taller, órdenes en espera, en proceso, vencidas, listas para entregar o por número (PCD-…), presupuestos, recibidas o entregadas hoy, citas de hoy o mañana, mantenimientos, clientes y solicitudes de cuenta. No ejecuto cambios: esos se hacen en cada módulo.','links':[],'source':'guia'}
+
 def ask(text,admin=False,context=None):
  api_key=os.getenv('OPENAI_API_KEY','').strip()
  if not api_key:return None

@@ -4,6 +4,23 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.0 — 2026-10-11 02:50 (UTC-05:00)
+
+Adi administrativa en vivo, indicador Release conectado al registro oficial, botón de Adi compacto y corrección del indicador de carga del acceso.
+
+### Nuevas funcionalidades
+
+- Adi administrativa con indicadores del taller en vivo, conversación con historial, consultas sugeridas y enlaces a cada módulo.
+
+### Mejoras realizadas
+
+- El botón de Adi se recoge a un tamaño compacto y se despliega al acercar el cursor, para no tapar el contenido.
+- Indicador «Release» conectado al registro oficial de versiones, con etiqueta de actualización disponible, brillo y barrido de luz al detectarla.
+
+### Errores corregidos
+
+- El botón de iniciar sesión mostraba dos indicadores de carga a la vez; ahora muestra uno solo.
+
 ## v1.4.1 — 2026-10-11 02:15 (UTC-05:00)
 
 Etiqueta Smart Release en el encabezado y en el acceso.

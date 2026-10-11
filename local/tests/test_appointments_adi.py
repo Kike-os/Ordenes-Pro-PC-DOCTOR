@@ -73,6 +73,22 @@ class AppointmentAndAdiTests(unittest.TestCase):
  def test_admin_answers_are_database_backed(self):
   with app.connect() as c:
    answer=adi.admin_answer(c,'¿Cuántas órdenes tengo en espera?');self.assertIn('0 orden',answer)
+ def test_admin_console_snapshot_and_replies_use_real_data(self):
+  now=appointments.now()
+  with app.connect() as c:
+   live=adi.snapshot(c,now)
+   self.assertEqual((live['active'],live['overdue'],live['clients']),(0,0,0))
+   self.assertEqual(set(live['statuses']),set(app.order_workspace.STATUSES))
+   summary=adi.admin_reply(c,'Resumen del taller',now)
+   self.assertIn('0 órdenes activas',summary['answer']);self.assertTrue(summary['links'])
+   self.assertIn('No hay órdenes con la entrega vencida',adi.admin_reply(c,'¿Qué órdenes están vencidas?',now)['answer'])
+   self.assertIn('No existe una orden',adi.admin_reply(c,'estado de PCD-20260101-0001',now)['answer'])
+   self.assertIn('0 clientes registrados',adi.admin_reply(c,'¿Cuántos clientes hay?',now)['answer'])
+   self.assertIn('0 orden',adi.admin_reply(c,'¿Cuántas órdenes tengo en espera?',now)['answer'])
+   guide=adi.admin_reply(c,'bórrame todas las órdenes',now)
+   self.assertEqual(guide.get('source'),'guia');self.assertIn('No ejecuto cambios',guide['answer'])
+   self.assertEqual(c.execute('SELECT COUNT(*) FROM orders').fetchone()[0],0)
+
  def test_confirmation_notification_requires_consent_and_is_recorded_after_send(self):
   payload=self.data(self.day(),communications_consent=True);result=self.post('/api/public/appointments',payload);self.assertEqual(result['status'],201)
   with app.connect() as c:self.assertEqual(c.execute('SELECT result FROM appointment_notifications').fetchone()[0],'pending')

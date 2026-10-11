@@ -105,12 +105,24 @@ def save(registry, path=None):
     Path(path or REGISTRY).write_text(json.dumps({'unreleased': registry['unreleased'], 'releases': registry['releases']}, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
 
 
+OFFICIAL_REGISTRY = 'https://raw.githubusercontent.com/Kike-os/Ordenes-Pro-PC-DOCTOR/main/local/data/releases.json'
+
+
+def registry_url():
+    """Registro publicado de versiones. Sin configurar se usa el oficial; vacío u «off» limita la comparación a esta instalación."""
+    value = os.environ.get('UPDATE_REGISTRY_URL')
+    if value is None:
+        return OFFICIAL_REGISTRY
+    value = value.strip()
+    return '' if value.lower() in ('', 'off', 'no', 'false', '0') else value
+
+
 def overview(registry=None):
     """Datos para el módulo «Sistema y actualizaciones»."""
     registry = registry or load()
     releases = registry['releases']
     return {'product': PRODUCT, 'installed': releases[0] if releases else None, 'releases': releases,
-            'categories': CATEGORIES, 'types': TYPES, 'remote_configured': bool(os.getenv('UPDATE_REGISTRY_URL'))}
+            'categories': CATEGORIES, 'types': TYPES, 'remote_configured': bool(registry_url())}
 
 
 def fetch_published(url):
@@ -133,7 +145,7 @@ def check(registry=None, now=None):
     """Compara la versión instalada con el registro publicado. Nunca descarga ni instala nada."""
     registry = registry or load()
     installed = registry['releases'][0] if registry['releases'] else None
-    url = os.getenv('UPDATE_REGISTRY_URL', '').strip()
+    url = registry_url()
     published = fetch_published(url) if url else registry
     latest = published['releases'][0] if published['releases'] else None
     current = parse(installed['version']) if installed else (0, 0, 0)

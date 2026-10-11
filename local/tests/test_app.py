@@ -10,6 +10,7 @@ from unittest.mock import patch
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 import app
+app.os.environ.setdefault('UPDATE_REGISTRY_URL','off')  # Las pruebas no consultan el registro publicado.
 app.os.environ.setdefault('LOGIN_CAPTCHA','off')  # Las pruebas inician sesión sin verificación salvo que la activen.
 
 

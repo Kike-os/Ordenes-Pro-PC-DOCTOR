@@ -8,6 +8,27 @@
   },
   "releases": [
     {
+      "version": "1.5.0",
+      "date": "2026-10-11T02:50:43-05:00",
+      "type": "minor",
+      "status": "publicada",
+      "summary": "Adi administrativa en vivo, indicador Release conectado al registro oficial, botón de Adi compacto y corrección del indicador de carga del acceso.",
+      "changes": {
+        "features": [
+          "Adi administrativa con indicadores del taller en vivo, conversación con historial, consultas sugeridas y enlaces a cada módulo."
+        ],
+        "improvements": [
+          "El botón de Adi se recoge a un tamaño compacto y se despliega al acercar el cursor, para no tapar el contenido.",
+          "Indicador «Release» conectado al registro oficial de versiones, con etiqueta de actualización disponible, brillo y barrido de luz al detectarla."
+        ],
+        "fixes": [
+          "El botón de iniciar sesión mostraba dos indicadores de carga a la vez; ahora muestra uno solo."
+        ],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.4.1",
       "date": "2026-10-11T02:15:52-05:00",
       "type": "patch",
