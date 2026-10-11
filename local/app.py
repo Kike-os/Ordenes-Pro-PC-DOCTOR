@@ -455,7 +455,10 @@ class Handler(BaseHTTPRequestHandler):
                 for key,value in (('company',company['name']),('whatsapp',company['whatsapp']),('support_email',company['support_email'])):content=content.replace('{{'+key+'}}',html.escape(value,quote=True))
                 return self.reply(200,content,'text/html; charset=utf-8')
             if path == '/api/public/appointments/services':
-                return self.reply(200, {'services':appointments.services(c),'device_types':DEVICE_TYPES,'timezone':'America/Guayaquil'})
+                # Catálogo público para la reserva: servicios, tipos de equipo y marcas con su logotipo local. Sin datos de clientes.
+                brand_files={f.stem:f.name for f in sorted((ROOT / 'static' / 'brands').glob('*')) if f.suffix in ('.svg','.png') and re.fullmatch(r'[a-z0-9]+(?:-[a-z0-9]+)*', f.stem)}
+                brand_names=sorted({r['name'] for r in c.execute('SELECT name FROM brands')},key=str.lower)
+                return self.reply(200, {'services':appointments.services(c),'device_types':DEVICE_TYPES,'timezone':'America/Guayaquil','brands':brand_names,'brand_logos':brand_files})
             if path == '/api/public/appointments/availability':
                 query=parse_qs(urlsplit(self.path).query)
                 try: rows=appointments.available_slots(c,query.get('date',[''])[0],query.get('service',[''])[0])

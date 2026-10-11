@@ -8,6 +8,26 @@
   },
   "releases": [
     {
+      "version": "1.5.30",
+      "date": "2026-10-11T17:29:35-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Correcciones de Nueva Cita y de la validación de órdenes; reserva pública por pasos",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Reserva pública de citas en cuatro pasos con acciones siempre visibles, marcas con logotipo y confirmación al salir con datos escritos",
+          "Tipos de equipo «All-in-One» y «Mini PC»; títulos «Detalle de la Orden» y «Agregar seguimiento técnico» con contador; botón de cerrar con realce rojo; prueba de conexión de Adi en Configuración"
+        ],
+        "fixes": [
+          "Nueva Cita: casilla de autorización de tamaño normal, errores bajo cada campo con foco en el primero, encabezado y pie fijos, y tipo de equipo separado de la marca con su logotipo",
+          "Nueva orden: al finalizar o avanzar se indica el paso, el campo y el motivo exactos en lugar de «Revisa los campos señalados»"
+        ],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.29",
       "date": "2026-10-11T15:40:21-05:00",
       "type": "patch",

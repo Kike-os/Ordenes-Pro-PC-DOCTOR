@@ -55,7 +55,7 @@ class WSGITests(unittest.TestCase):
             data=json.loads(response['body'])
             if size is not None:self.assertEqual(len(data['rows']),size)
             if path=='/api/reception-options':
-                self.assertEqual(len(data['device_types']),10)
+                self.assertEqual(len(data['device_types']),12)
                 self.assertGreater(len(data['brands']),70)
             else:self.assertIsInstance(data['rows'],list)
         # POST through Passenger with the same CSRF and session protection.

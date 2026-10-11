@@ -92,7 +92,7 @@ class ReceptionTests(unittest.TestCase):
         options=self.request('/api/reception-options',cookie=cookie)['body']
         self.assertEqual(len(self.request('/api/geo/provinces',cookie=cookie)['body']['rows']),24)
         self.assertEqual(options['geo_metadata']['version'],'2026')
-        self.assertEqual(len(options['device_types']),10)
+        self.assertEqual(len(options['device_types']),12)
         self.assertIn({'name':'TUXEDO Computers','category':'computer'},options['brands'])
         self.assertIn({'name':'Epson','category':'printer'},options['brands'])
         self.request('/api/orders',self.order_data({'brand':'Nueva Marca','type':'impresora'}),cookie=cookie,csrf=csrf)

@@ -4,6 +4,20 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.30 — 2026-10-11 17:29 (UTC-05:00)
+
+Correcciones de Nueva Cita y de la validación de órdenes; reserva pública por pasos
+
+### Mejoras realizadas
+
+- Reserva pública de citas en cuatro pasos con acciones siempre visibles, marcas con logotipo y confirmación al salir con datos escritos
+- Tipos de equipo «All-in-One» y «Mini PC»; títulos «Detalle de la Orden» y «Agregar seguimiento técnico» con contador; botón de cerrar con realce rojo; prueba de conexión de Adi en Configuración
+
+### Errores corregidos
+
+- Nueva Cita: casilla de autorización de tamaño normal, errores bajo cada campo con foco en el primero, encabezado y pie fijos, y tipo de equipo separado de la marca con su logotipo
+- Nueva orden: al finalizar o avanzar se indica el paso, el campo y el motivo exactos en lugar de «Revisa los campos señalados»
+
 ## v1.5.29 — 2026-10-11 15:40 (UTC-05:00)
 
 Próximos Mantenimientos automáticos al entregar

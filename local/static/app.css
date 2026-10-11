@@ -3121,3 +3121,59 @@ body[data-page=dashboard] .agenda-booking-grid input:not([type=checkbox]),body[d
 @media(max-width:860px){.upcoming-card{grid-template-columns:36px minmax(0,1fr);gap:8px 12px}.upcoming-side{grid-column:2;justify-items:start;text-align:left;grid-auto-flow:column;gap:10px;align-items:center}.upcoming-actions{grid-column:1/-1;justify-content:flex-start}.upcoming-body span,.upcoming-body small{white-space:normal}}
 @media(prefers-reduced-motion:reduce){.upcoming-card{transition:none}}
 @media(max-width:560px){.upcoming .agenda-bar input[type=search]{flex-basis:100%;max-width:none;margin:0}.upcoming .agenda-bar .agenda-views{flex-wrap:wrap}.upcoming .agenda-bar .secondary{flex:1 1 100%}}
+
+/* Nueva Cita (interna): ventana compacta con encabezado y pie fijos, errores por campo y casilla de tamaño normal. */
+.booking-dialog{width:min(760px,calc(100% - 24px));max-width:760px;max-height:85dvh;padding:0;overflow:hidden}
+.booking-dialog[open]{display:flex;flex-direction:column;animation:confirm-mac-in .2s ease-out}
+.booking-head{display:flex;align-items:center;gap:12px;flex:0 0 auto;padding:14px 18px;border-bottom:1px solid #1e3252;background:#0d1b2e}
+.booking-mark{display:grid;place-items:center;flex:0 0 38px;width:38px;height:38px;border-radius:11px;border:1px solid #3d74c7;background:linear-gradient(180deg,#17355f,#102443);color:#7fbcff}.booking-mark .system-icon{width:19px;height:19px}
+.booking-head>div{margin-right:auto;min-width:0}.booking-head h2{margin:0;font-size:17px;color:#f6f9ff}.booking-head p{margin:1px 0 0;font-size:12px;color:#8fa5c4}
+.booking-dialog .agenda-booking{display:flex;flex-direction:column;flex:1 1 auto;min-height:0;gap:0}
+.booking-scroll{flex:1 1 auto;min-height:0;overflow-y:auto;display:grid;align-content:start;gap:12px;padding:14px 18px;scrollbar-width:thin}
+.booking-foot{display:flex;align-items:center;gap:10px;flex:0 0 auto;padding:12px 18px;border-top:1px solid #1e3252;background:#0d1b2e}
+.booking-foot .message{flex:1 1 auto;min-width:0;margin:0;font-size:12px;color:#f3c677;text-align:right}.booking-foot button{flex:0 0 auto;margin:0;padding:9px 16px;font-size:13px}
+.booking-label{font-size:11px;color:#92a9ca}
+.booking-error{display:block;min-height:0;margin-top:3px;font-size:11.5px;color:#ff9ea2}.booking-error:empty{display:none}
+.agenda-booking-grid [aria-invalid=true]{border-color:#E17B88!important;box-shadow:0 0 0 2px #E17B8833}
+.booking-consent{display:flex;align-items:flex-start;gap:9px;font-size:12.5px!important;line-height:1.4;color:#cfdcf0!important;cursor:pointer}
+body[data-page=dashboard] .booking-consent input[type=checkbox]{flex:0 0 18px;width:18px;min-width:18px;max-width:18px;height:18px;min-height:18px;margin:1px 0 0;padding:0;border-radius:4px;accent-color:#4d8df0;box-shadow:none}
+.booking-consent input[type=checkbox]:focus-visible{outline:2px solid #8bb8ff;outline-offset:2px}
+.booking-brand-card{padding:8px 10px}.booking-brand-card .brand-logo{width:52px;height:52px}.booking-brand-card.brand-card{grid-template-columns:52px minmax(0,1fr)}
+@media(max-width:560px){.booking-foot{flex-wrap:wrap}.booking-foot .message{order:-1;flex-basis:100%;text-align:left}.booking-foot button{flex:1 1 0}}
+@media(prefers-reduced-motion:reduce){.booking-dialog[open]{animation:none}}
+
+/* Reserva pública por pasos (Smart Booking): barra de etapas, panel por paso y acciones siempre visibles. */
+body[data-page=appointments] .booking-steps{list-style:none;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:14px 0 8px;padding:0}
+body[data-page=appointments] .booking-steps button{--st:#788CA5;display:flex;align-items:center;gap:9px;width:100%;margin:0;padding:7px 8px;border:0;border-radius:10px;background:transparent;color:#a9b9cf;font-size:12.5px;font-weight:600;text-align:left;cursor:pointer;transition:background .2s,color .2s}
+body[data-page=appointments] .booking-steps button:disabled{cursor:default;opacity:.85}
+body[data-page=appointments] .booking-steps button[data-state=done]{--st:#4BD3A4;color:#bfeedd}
+body[data-page=appointments] .booking-steps button[data-state=current]{--st:#65ACF4;color:#fff;background:#16304f}
+body[data-page=appointments] .booking-steps button[data-state=error]{--st:#E17B88;color:#f6c6cc}
+.booking-step-icon{display:grid;place-items:center;flex:0 0 32px;width:32px;height:32px;border-radius:50%;border:1.5px solid color-mix(in srgb,var(--st) 70%,transparent);background:color-mix(in srgb,var(--st) 16%,#0d1b2e);color:var(--st);transition:background .22s,border-color .22s,color .22s}
+.booking-step-icon svg{width:16px;height:16px}
+.booking-track{height:3px;margin-bottom:16px;border-radius:999px;background:#17263f;overflow:hidden}.booking-track i{display:block;width:0;height:100%;border-radius:999px;background:linear-gradient(90deg,#4BD3A4,#65ACF4);transition:width .22s ease-out}
+.booking-track[hidden],.booking-steps[hidden]{display:none!important}
+.booking-panel{animation:oh-fade .2s ease-out}.booking-panel[hidden]{display:none}
+.booking-title{margin:0 0 12px;font-size:17px;color:#f2f6ff}.booking-title:focus{outline:none}
+.booking-brand{position:relative}
+.booking-brand-list{position:absolute;left:0;right:0;top:100%;z-index:5;display:grid;gap:2px;margin-top:4px;padding:5px;max-height:230px;overflow:auto;border:1px solid #2f4664;border-radius:10px;background:#0b1626;box-shadow:0 14px 34px #020714b3}
+.booking-brand-list[hidden]{display:none}
+.booking-brand-option{display:flex;align-items:center;gap:10px;padding:6px 8px;border-radius:8px;font-size:13px;color:#e3edff;cursor:pointer;transition:background .18s}
+.booking-brand-option:hover,.booking-brand-option[aria-selected=true]{background:#14294a}
+.booking-brand-mini.brand-logo{flex:0 0 30px;width:30px;height:30px;padding:4px;border-radius:7px}.booking-brand-mini.brand-logo[data-kind=generic]{padding:0}.booking-brand-mini .system-icon{width:16px;height:16px}
+body[data-page=appointments] .brand-card{margin-top:2px}
+.booking-summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 18px;margin:0 0 14px;padding:12px 14px;border:1px solid #1e3252;border-radius:11px;background:#0b1626}
+.booking-summary dt{font-size:11px;color:#8fa5c4}.booking-summary dd{margin:1px 0 0;font-size:13px;color:#e3edff;overflow-wrap:anywhere}
+.booking-actions{position:sticky;bottom:0;z-index:4;display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:16px -6px -6px;padding:12px 6px;border-top:1px solid #1e3252;background:#0b1526f7}
+.booking-actions .appointment-message{flex:1 1 100%;margin:0;min-height:0;font-size:12.5px}.booking-actions .appointment-message:empty{display:none}
+.booking-spacer{flex:1 1 auto}.booking-actions button{margin:0;min-height:42px;padding:0 18px;font-size:13.5px}.booking-actions .appointment-submit{min-width:0;width:auto;margin:0}.booking-actions button[hidden]{display:none}
+@media(max-width:640px){body[data-page=appointments] .booking-steps{gap:2px}body[data-page=appointments] .booking-steps button{flex-direction:column;gap:4px;padding:6px 2px;font-size:10.5px;text-align:center}.booking-step-icon{flex-basis:30px;width:30px;height:30px}.booking-summary{grid-template-columns:1fr}.booking-actions button{flex:1 1 0;padding:0 10px}.booking-spacer{display:none}}
+@media(prefers-reduced-motion:reduce){.booking-panel{animation:none}.booking-track i,.booking-step-icon,body[data-page=appointments] .booking-steps button{transition:none}}
+
+/* Ventanas: botón de cerrar con realce rojo suave y encabezado de «Agregar seguimiento técnico». */
+dialog .icon-button{transition:background .2s,border-color .2s,color .2s}
+dialog .icon-button:hover{background:#E986931f;border-color:#E9869380;color:#E98693;transform:none}
+dialog .icon-button:focus-visible{outline:2px solid #8bb8ff;outline-offset:2px}
+.followup-head{display:flex;align-items:center;gap:12px}.followup-head h2{margin:0}.followup-head p{margin:1px 0 0;font-size:12px;color:#8fa5c4}
+.followup-count{display:block;margin-top:4px;font-size:11px;color:#8fa5c4;text-align:right;font-variant-numeric:tabular-nums}
+@media(prefers-reduced-motion:reduce){dialog .icon-button{transition:none}}
