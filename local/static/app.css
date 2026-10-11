@@ -2530,3 +2530,29 @@ body[data-page=dashboard] .track-tools input{height:38px;min-height:38px;margin:
 @media(min-width:1181px){.mail-shell.mail-v2{grid-template-columns:222px clamp(360px,33vw,480px) minmax(0,1fr)}.mail-shell.mail-v2[data-side=collapsed]{grid-template-columns:60px clamp(360px,33vw,480px) minmax(0,1fr)}}
 .mail-v2 .mail-row{padding:10px 12px 10px 10px}
 .mail-v2 .mail-row-top strong{font-size:13.5px}.mail-v2 .mail-row-bottom>span{font-size:13px}
+/* Estado de guardado de la ficha de cliente. */
+.save-state{display:flex;align-items:center;gap:7px;margin:0 0 8px;font-size:12.5px;font-weight:600;color:#9bb0cf}
+.save-state:empty{display:none}
+.save-state .system-icon{width:16px;height:16px}
+.save-state[data-state=saving]{color:#9bbef5}.save-state[data-state=saving] .system-icon{animation:ai-spin .9s linear infinite}
+.save-state[data-state=saved]{color:#5fd6a3}.save-state[data-state=error]{color:#ff9ea2}.save-state[data-state=dirty]{color:#f3c677}
+@media(prefers-reduced-motion:reduce){.save-state[data-state=saving] .system-icon{animation:none}}
+/* Auto Update Safe: aviso en el indicador Release y panel de la actualización de la interfaz. */
+.release-chip.release-shine::after{content:"";position:absolute;inset:-1px;border-radius:inherit;border:1px solid #f3c677;opacity:0;pointer-events:none;animation:release-shine 1.2s ease-out 1}
+@keyframes release-shine{0%{opacity:0;clip-path:inset(0 100% 0 0)}35%{opacity:1}100%{opacity:0;clip-path:inset(0 0 0 0)}}
+.release-chip .release-extra{font-variant-numeric:tabular-nums;white-space:nowrap}
+.release-auto{display:grid;gap:8px;margin-bottom:10px;padding:10px 12px;border:1px solid #5c4a22;border-radius:11px;background:#1c1810;animation:system-in .22s ease-out}
+.release-auto>strong{font-size:13px;color:#f3d48f}
+.release-auto dl{margin:0;display:grid;gap:4px}.release-auto dl>div{display:flex;justify-content:space-between;gap:12px}
+.release-auto dt{font-size:11.5px;color:#a9a08a}.release-auto dd{margin:0;font-size:12px;font-weight:600;color:#f2ead8;text-align:right}
+.release-auto-time{font-variant-numeric:tabular-nums}
+.release-auto ul{margin:0;padding-left:16px;display:grid;gap:3px;font-size:11.5px;line-height:1.4;color:#d9cfb8}
+.release-auto .release-actions{margin-top:2px}
+@media(prefers-reduced-motion:reduce){.release-chip.release-shine::after,.release-auto{animation:none}}
+/* Insignia «NEW» sobre el estado del sistema actualizado, con brillo de una sola pasada. */
+[data-state] > .system-new,.system-new{position:absolute;top:-13px;left:0;overflow:hidden;padding:2px 9px;border:1px solid #3fbf8a;border-radius:999px;background:linear-gradient(135deg,#0f3a2c,#12533d);color:#bff3dc;font-size:10px;font-weight:800;letter-spacing:1.4px;line-height:1.3;box-shadow:0 0 0 0 #3fbf8a66;animation:new-pop .5s cubic-bezier(.2,.9,.3,1.3) both,new-glow 1.6s ease-out .3s 2}
+.system-new::after{content:"";position:absolute;inset:0;background:linear-gradient(100deg,transparent 25%,#ffffffa6 50%,transparent 75%);transform:translateX(-130%);animation:meter-shine 1.1s ease-out .45s 2}
+*:has(> .system-new){position:relative}
+@keyframes new-pop{from{opacity:0;transform:translateY(6px) scale(.7)}to{opacity:1;transform:none}}
+@keyframes new-glow{0%{box-shadow:0 0 0 0 #3fbf8a80}100%{box-shadow:0 0 0 9px #3fbf8a00}}
+@media(prefers-reduced-motion:reduce){.system-new,.system-new::after{animation:none}}

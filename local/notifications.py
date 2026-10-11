@@ -172,6 +172,18 @@ def build(c, user, now, mail_access=False):
             items.append({'key': 'appointment:' + str(row['id']), 'kind': 'info', 'icon': 'calendar', 'title': 'Nueva cita reservada · ' + row['public_code'],
                           'detail': row['customer_name'] + ' · ' + row['starts_at'][:16].replace('T', ' '), 'at': row['created_at'], 'href': '#appointments', 'group': 'event'})
     if admin:
+        # Protección de datos: dónde se guarda la información y si los respaldos de la base central están al día.
+        import remote_db
+        if not remote_db.configured():
+            items.append({'key': 'storage:local', 'kind': 'warning', 'icon': 'status', 'title': 'Esta instalación usa una base de datos local', 'detail': 'Lo que registres aquí queda solo en este equipo, no en la base central en la nube.', 'at': stamp, 'href': '#system', 'group': 'alert'})
+        else:
+            try:
+                last = _state(c, 'cloud_backup')
+                age = (now - appointments.datetime.fromisoformat(last['at'])).total_seconds() if last and last.get('ok') else None
+                if age is None or age > 48 * 3600:
+                    items.append({'key': 'backup:late:' + today, 'kind': 'warning', 'icon': 'status', 'title': 'Respaldo de la base central atrasado', 'detail': ('El último respaldo correcto es del ' + last['at'][:10] + '.') if last and last.get('ok') else 'Todavía no se registra ningún respaldo correcto.', 'at': stamp, 'href': '#system', 'group': 'alert'})
+            except Exception:
+                pass
         chats = c.execute("SELECT COALESCE(SUM(last_seen_admin='' AND EXISTS(SELECT 1 FROM adi_messages m WHERE m.conversation_id=ac.id AND m.author='client')),0) FROM adi_conversations ac").fetchone()[0]
         alert('chats', chats, 'support', 'info', plural(chats, 'conversación nueva', 'conversaciones nuevas'), 'Clientes que esperan atención en vivo.', '#live')
         waiting = c.execute("SELECT COUNT(*) FROM adi_conversations WHERE mode='human' AND assigned_to IS NULL").fetchone()[0]

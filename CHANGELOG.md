@@ -4,6 +4,23 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.7 — 2026-10-11 10:26 (UTC-05:00)
+
+Protección de datos con respaldo diario de la base central y actualización automática segura de las sesiones abiertas.
+
+### Nuevas funcionalidades
+
+- Actualización automática segura: la sesión abierta detecta la versión nueva, muestra una cuenta regresiva de cinco minutos en el indicador Release y se recarga sola solo si no hay trabajo sin guardar; se puede actualizar ahora o posponer.
+
+### Mejoras realizadas
+
+- Ficha de cliente con estado de guardado real (Guardando, Guardado en la nube, Error, Cambios sin guardar) y aviso cuando la instalación usa una base local.
+- Centro de Actualizaciones: «Tu sistema está actualizado · Versión: X» con insignia NEW.
+
+### Actualizaciones de seguridad
+
+- Respaldo diario y verificado de la base de datos central, con restauración de prueba y aviso a administración si los respaldos se atrasan.
+
 ## v1.5.6 — 2026-10-11 10:12 (UTC-05:00)
 
 Barra de selección de correo con Eliminar siempre visible y aviso para recargar tras una actualización.

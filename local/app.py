@@ -544,7 +544,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(200,{'conversation':safe_conv,'messages':rows})
             if path == '/api/me':
                 prefs=c.execute('SELECT value FROM system_state WHERE key=?',('mail_prefs:'+str(user['id']),)).fetchone() if mail_allowed(user) else None
-                return self.reply(200, {'user':dict(user,mail=mail_allowed(user),mail_prefs=json.loads(prefs['value']) if prefs else None,mail_signature=mail_signature_card(c) if mail_allowed(user) else None),'server_time':time.time()})
+                return self.reply(200, {'user':dict(user,mail=mail_allowed(user),mail_prefs=json.loads(prefs['value']) if prefs else None,mail_signature=mail_signature_card(c) if mail_allowed(user) else None,storage='cloud' if remote_db.configured() else 'local'),'server_time':time.time()})
             if path == '/api/weather':
                 return self.reply(200, current_weather())
             if path == '/api/time':
@@ -736,6 +736,13 @@ class Handler(BaseHTTPRequestHandler):
                 if path=='/api/orders':page=min(page,max(1,(total+49)//50))
                 rows = [dict(r) for r in c.execute('SELECT '+columns+' FROM '+source+condition+' ORDER BY '+ordering+' LIMIT 50 OFFSET ?', (*args,(page-1)*50))]
                 return self.reply(200, {'rows':rows,'total':total,'page':page,'pages':max(1,(total+49)//50)})
+            if path == '/api/version':
+                # Versión que ejecuta realmente este servidor (la del código desplegado), para que las pestañas abiertas detecten cuándo deben recargarse.
+                try:
+                    latest=versioning.load()['releases'][0];changes=[text for group in ('features','improvements','fixes','security','performance') for text in latest.get('changes',{}).get(group,[])]
+                    return self.reply(200,{'version':latest['version'],'date':latest.get('date',''),'summary':latest.get('summary',''),'highlights':[text[:180] for text in changes[:3]],'more':max(0,len(changes)-3)})
+                except Exception:
+                    return self.reply(503,{'error':'No se pudo leer la versión instalada.'})
             if path == '/api/system':
                 try:return self.reply(200, versioning.overview())
                 except versioning.RegistryError as error:return self.reply(500,{'error':str(error)})

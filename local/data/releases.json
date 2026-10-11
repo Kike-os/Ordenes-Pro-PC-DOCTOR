@@ -8,6 +8,27 @@
   },
   "releases": [
     {
+      "version": "1.5.7",
+      "date": "2026-10-11T10:26:15-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Protección de datos con respaldo diario de la base central y actualización automática segura de las sesiones abiertas.",
+      "changes": {
+        "features": [
+          "Actualización automática segura: la sesión abierta detecta la versión nueva, muestra una cuenta regresiva de cinco minutos en el indicador Release y se recarga sola solo si no hay trabajo sin guardar; se puede actualizar ahora o posponer."
+        ],
+        "improvements": [
+          "Ficha de cliente con estado de guardado real (Guardando, Guardado en la nube, Error, Cambios sin guardar) y aviso cuando la instalación usa una base local.",
+          "Centro de Actualizaciones: «Tu sistema está actualizado · Versión: X» con insignia NEW."
+        ],
+        "fixes": [],
+        "security": [
+          "Respaldo diario y verificado de la base de datos central, con restauración de prueba y aviso a administración si los respaldos se atrasan."
+        ],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.6",
       "date": "2026-10-11T10:12:27-05:00",
       "type": "patch",

@@ -1,0 +1,9 @@
+[Unit]
+Description=Respaldo diario de la base de datos central de Órdenes Pro
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/admin-red/Work/Ordenes-Pro-PC-DOCTOR
+Environment=PATH=/home/admin-red/.local/share/mise/installs/node/26.10.0/bin:/usr/local/bin:/usr/bin
+ExecStart=/home/admin-red/.local/share/mise/installs/node/26.10.0/bin/vercel env run -e production -- /usr/bin/python maintenance/backup-cloud.py
