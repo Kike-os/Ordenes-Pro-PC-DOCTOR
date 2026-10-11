@@ -264,6 +264,12 @@ class MailRouteTests(test_app.SecurityTests):
                 self.request('/api/mail/send',dict(base,request_key='clave-de-firma-000002',signature=False),cookie=cookie,csrf=csrf)
             self.assertIn('Técnica ficticia',sent[0].get_body(('html',)).get_content());self.assertEqual(sent[1].get_content_type(),'text/plain')
             self.assertEqual(self.request('/api/mail/signature',{'restore':True},cookie=cookie,csrf=csrf)['body']['card']['name'],'Enrique Martínez Gómez')
+            loaded=self.request('/api/mail/signature',cookie=cookie)['body']['card'];self.assertEqual((loaded['on_forward'],loaded['email']),(True,'buzon@example.invalid'))
+        self.assertEqual(self.request('/api/mail/signature')['status'],401)
+        # El borrador guarda la preferencia de firma sin incluir la firma: al recuperarlo no puede duplicarse.
+        draft,_=mail_pro.build_message({'username':'buzon@example.invalid'},{'to':'','subject':'Pendiente','body':'Texto','draft':True,'signature_pref':False},'')
+        self.assertEqual((draft['X-OrdenesPro-Signature'],'-- ' in draft.get_content()),('off',False))
+        self.assertIsNone(mail_pro.build_message({'username':'buzon@example.invalid'},{'to':'a@example.invalid','subject':'x','body':'y','signature_pref':True},'')[0]['X-OrdenesPro-Signature'])
 
     def test_replaced_draft_is_removed_only_when_it_is_a_draft(self):
         class Box:

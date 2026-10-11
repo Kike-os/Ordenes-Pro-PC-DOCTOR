@@ -571,7 +571,8 @@ def read_message(client, folder, uid, mark_seen=True):
         client.uid('STORE', str(int(uid)), '+FLAGS', '(\\Seen)')
     return {'uid': int(uid), 'folder': folder, 'subject': header_text(message['subject'])[:300] or '(sin asunto)', 'from': people(message, 'from')[:1], 'to': people(message, 'to')[:30], 'cc': people(message, 'cc')[:30], 'reply_to': people(message, 'reply-to')[:1],
             'date': date_iso(message), 'message_id': header_text(message['message-id'])[:300], 'references': header_text(message['references'])[:2000], 'text': plain[:400_000], 'html': safe, 'blocked_images': blocked, 'attachments': attachments,
-            'flagged': '\\flagged' in flags, 'seen': True if mark_seen else '\\seen' in flags, 'draft': '\\draft' in flags}
+            'flagged': '\\flagged' in flags, 'seen': True if mark_seen else '\\seen' in flags, 'draft': '\\draft' in flags,
+            'signature_pref': {'on': True, 'off': False}.get(header_text(message['x-ordenespro-signature']).lower())}
 
 
 def attachment(client, folder, uid, index):
@@ -611,7 +612,7 @@ def rich_html(body, signature='', wrap=True):
 
 
 SIGNATURE_FIELDS = ('name', 'role', 'unit', 'phone', 'email', 'web', 'address')
-SIGNATURE_DEFAULTS = {'enabled': True, 'on_new': True, 'on_reply': True, 'name': 'Enrique Martínez Gómez', 'role': 'SOPORTECNICO', 'unit': 'Matriz | PC-DOCTOR',
+SIGNATURE_DEFAULTS = {'enabled': True, 'on_new': True, 'on_reply': True, 'on_forward': True, 'name': 'Enrique Martínez Gómez', 'role': 'SOPORTECNICO', 'unit': 'Matriz | PC-DOCTOR',
                       'phone': '+593 987460591', 'email': '', 'web': 'www.ecuadorpcdoctor.com', 'address': 'Calle Bolívar, Juan Montalvo'}
 SIGNATURE_LOGO = Path(__file__).resolve().parent / 'static' / 'logo-firma.png'
 QUOTE_START = re.compile(r'\n+(?=El [^\n]{0,200} escribió:\n|-{5,} Mensaje reenviado -{5,})')
@@ -620,7 +621,7 @@ QUOTE_START = re.compile(r'\n+(?=El [^\n]{0,200} escribió:\n|-{5,} Mensaje reen
 def clean_signature(raw, account=''):
     """Datos de la firma validados: solo texto corto en cada campo; el HTML siempre lo genera el servidor."""
     raw = raw if isinstance(raw, dict) else {}
-    result = {key: raw.get(key, SIGNATURE_DEFAULTS[key]) is True if key in raw else SIGNATURE_DEFAULTS[key] for key in ('enabled', 'on_new', 'on_reply')}
+    result = {key: raw.get(key, SIGNATURE_DEFAULTS[key]) is True if key in raw else SIGNATURE_DEFAULTS[key] for key in ('enabled', 'on_new', 'on_reply', 'on_forward')}
     for key in SIGNATURE_FIELDS:
         value = re.sub(r'\s+', ' ', re.sub(r'[\r\n\t<>]+', ' ', str(raw.get(key, SIGNATURE_DEFAULTS[key]) if key in raw else SIGNATURE_DEFAULTS[key]))).strip()[:120]
         result[key] = value
@@ -650,13 +651,14 @@ def signature_html(sign, logo_src):
     contact = (row('&#128222;', 'Teléfono', sign['phone'], phone_href) + row('&#9993;&#65039;', 'Correo', sign['email'], 'mailto:' + sign['email'])
                + row('&#127760;', 'Sitio web', sign['web'], web_href) + row('&#128205;', 'Dirección', sign['address']))
     return ('<table role="presentation" cellpadding="0" cellspacing="0" border="0" bgcolor="#2b2d31" style="background-color:#2b2d31;border-collapse:collapse;border-bottom:3px solid #e03a3e;">'
-            '<tr><td valign="middle" align="center" style="padding:16px 18px;">'
-            '<img src="' + esc(logo_src) + '" width="132" alt="PC-DOCTOR S.A." style="display:block;width:132px;height:auto;border:0;margin:0 auto 8px;color:#ffffff;font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:bold;">'
-            '<div style="' + font + 'font-size:15px;line-height:20px;font-weight:bold;color:#ffffff;white-space:nowrap;">' + esc(sign['name']) + '</div>'
-            + ('<div style="' + font + 'font-size:12px;line-height:17px;font-weight:bold;letter-spacing:1px;color:#e03a3e;">' + esc(sign['role']) + '</div>' if sign['role'] else '')
-            + ('<div style="' + font + 'font-size:12px;line-height:17px;color:#d5d7db;">' + esc(sign['unit']) + '</div>' if sign['unit'] else '')
+            '<tr><td valign="middle" align="center" style="padding:14px 6px 14px 16px;">'
+            '<img src="' + esc(logo_src) + '" width="120" alt="PC-DOCTOR S.A." style="display:block;width:120px;height:auto;border:0;color:#ffffff;font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:bold;"></td>'
+            '<td valign="middle" style="padding:14px 18px 14px 10px;">'
+            '<div style="' + font + 'font-size:16px;line-height:21px;font-weight:bold;color:#ffffff;white-space:nowrap;">' + esc(sign['name']) + '</div>'
+            + ('<div style="' + font + 'font-size:12px;line-height:17px;font-weight:bold;letter-spacing:1px;color:#e03a3e;white-space:nowrap;">' + esc(sign['role']) + '</div>' if sign['role'] else '')
+            + ('<div style="' + font + 'font-size:12px;line-height:17px;color:#d5d7db;white-space:nowrap;">' + esc(sign['unit']) + '</div>' if sign['unit'] else '')
             + '</td><td width="2" bgcolor="#e03a3e" style="background-color:#e03a3e;font-size:0;line-height:0;width:2px;">&nbsp;</td>'
-            '<td valign="middle" style="padding:16px 20px;"><table role="presentation" cellpadding="0" cellspacing="0" border="0">' + contact + '</table></td></tr></table>')
+            '<td valign="middle" style="padding:14px 18px;"><table role="presentation" cellpadding="0" cellspacing="0" border="0">' + contact + '</table></td></tr></table>')
 
 
 def build_message(config, data, signature=''):
@@ -680,6 +682,9 @@ def build_message(config, data, signature=''):
     message['Subject'] = subject or '(sin asunto)'
     message['Date'] = formatdate(localtime=True)
     message['Message-ID'] = make_msgid(domain=config['username'].split('@')[-1])
+    if data.get('draft') and data.get('signature_pref') in (True, False):
+        # El borrador recuerda si debe llevar firma; la firma en sí se añade una sola vez, al enviar.
+        message['X-OrdenesPro-Signature'] = 'on' if data['signature_pref'] else 'off'
     reply = re.sub(r'[\r\n]+', ' ', str(data.get('in_reply_to', ''))).strip()[:300]
     if re.fullmatch(r'<[^<>\s]+>', reply):
         message['In-Reply-To'] = reply

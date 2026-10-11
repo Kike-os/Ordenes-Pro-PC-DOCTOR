@@ -4,6 +4,18 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.4 — 2026-10-11 09:31 (UTC-05:00)
+
+Firma corporativa visible en el redactor de correo, editor con formato y vista previa del mensaje.
+
+### Mejoras realizadas
+
+- Mail Pro: redactor con formato real (negrita, cursiva y listas), vista previa del correo completo y firma en tres columnas: logo original, nombre y cargo, y datos de contacto; preferencias separadas para mensajes nuevos, respuestas y reenvíos.
+
+### Errores corregidos
+
+- Mail Pro: la firma corporativa aparece siempre al abrir «Nuevo mensaje», Responder y Reenviar (se carga desde el servidor al abrir el redactor) y los borradores recuerdan si llevan firma sin duplicarla.
+
 ## v1.5.3 — 2026-10-11 09:21 (UTC-05:00)
 
 Nueva orden de recepción técnica con fotos de evidencia, firma corporativa de correo, avisos flotantes bajo la campana y tarjeta «Capacidad del Buzón».

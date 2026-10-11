@@ -2334,3 +2334,31 @@ body[data-page=dashboard] .toast-body p{font-size:12.5px;line-height:1.4;color:#
 @media(prefers-reduced-motion:reduce){.mail-meter i{transition:none}}
 .mail-sign-left strong,.mail-sign-right p span{white-space:nowrap}.mail-sign-right i{flex-basis:18px;font-size:12px}
 @media(max-width:560px){.mail-sign-right p span{white-space:normal}}
+/* Redactor de correo: editor con formato, firma en tres columnas y vista previa. */
+.mail-sign-card{align-items:stretch}
+.mail-sign-logo{display:grid;place-items:center;padding:14px 6px 14px 16px}
+.mail-sign-logo img{display:block;width:120px;height:auto;color:#fff;font:700 14px Arial,sans-serif}
+.mail-sign-who{display:grid;align-content:center;gap:1px;padding:14px 18px 14px 10px}
+.mail-sign-who strong{font-size:16px;line-height:21px;color:#fff;white-space:nowrap}
+.mail-sign-who .mail-sign-role,.mail-sign-who .mail-sign-unit{white-space:nowrap}
+.mail-sign-right{padding:14px 18px}
+body[data-page=dashboard] .mail-editor{min-height:190px;max-height:42dvh;overflow-y:auto;padding:12px 14px;border:1px solid #304566;border-radius:10px;background:#081424;color:#eaf2ff;font-size:14px;line-height:1.55;overflow-wrap:anywhere;outline:none;scrollbar-width:thin;transition:border-color .2s,box-shadow .2s}
+.mail-editor:focus{border-color:#5b9bff;box-shadow:0 0 0 3px #3b82f626}
+.mail-editor[data-empty=true]::before{content:attr(data-placeholder);color:#7d91af;pointer-events:none;float:left;height:0}
+.mail-editor ul{margin:4px 0;padding-left:22px}.mail-editor div{min-height:1.55em}
+.mail-format{flex-wrap:wrap}.mail-format-space{flex:1}
+.mail-preview-open{font-weight:600!important;font-style:normal!important}
+.mail-composer .mail-sign-box{padding-top:10px;border-top:1px dashed #2a4063;overflow-x:auto}.mail-composer .mail-sign-box[hidden]{display:none}
+.mail-composer.mail-composer-wide .mail-editor{max-height:none;min-height:260px}
+.mail-composer.mail-composer-wide form{grid-template-rows:none}
+body[data-page=dashboard] dialog.mail-preview{width:min(760px,calc(100vw - 20px))}
+.mail-preview-meta{margin:0;padding:10px 20px;font-size:12px;color:#8fa5c4;overflow-wrap:anywhere}
+.mail-preview-page{margin:0 20px 18px;padding:18px;border-radius:10px;background:#fff;color:#222;font:14px/1.5 Arial,Helvetica,sans-serif;overflow-x:auto;max-height:60dvh;overflow-y:auto}
+.mail-preview-page ul{margin:4px 0;padding-left:22px}.mail-preview-text div{min-height:1.5em}
+.mail-preview-page .mail-sign-card{margin-top:14px}
+.mail-preview-page blockquote{margin:14px 0 0;padding-left:12px;border-left:3px solid #c9ccd1;color:#555}
+@media(max-width:620px){.mail-sign-card{flex-wrap:wrap}.mail-sign-card>b{flex:0 0 100%;height:2px}.mail-sign-who strong,.mail-sign-right p span{white-space:normal}}
+body[data-page=dashboard] .mail-composer label.mail-sign-toggle{display:flex;grid-template-columns:none;align-items:center;gap:8px;margin:0 0 8px;font-size:13px;font-weight:500;color:#dbe8fb}
+.mail-composer .dialog-heading h2{flex:1;margin-right:0}.mail-composer .dialog-heading .mail-composer-expand{margin:0 8px 0 0}
+body[data-page=dashboard] .mail-composer .mail-editor{min-height:140px}
+body[data-page=dashboard] .mail-composer label{gap:8px}body[data-page=dashboard] .mail-composer :is(input:not([type=file]):not([type=checkbox]),select){height:36px;min-height:36px}.mail-composer form{gap:8px}

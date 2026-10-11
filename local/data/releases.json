@@ -8,6 +8,24 @@
   },
   "releases": [
     {
+      "version": "1.5.4",
+      "date": "2026-10-11T09:31:49-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Firma corporativa visible en el redactor de correo, editor con formato y vista previa del mensaje.",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Mail Pro: redactor con formato real (negrita, cursiva y listas), vista previa del correo completo y firma en tres columnas: logo original, nombre y cargo, y datos de contacto; preferencias separadas para mensajes nuevos, respuestas y reenvíos."
+        ],
+        "fixes": [
+          "Mail Pro: la firma corporativa aparece siempre al abrir «Nuevo mensaje», Responder y Reenviar (se carga desde el servidor al abrir el redactor) y los borradores recuerdan si llevan firma sin duplicarla."
+        ],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.3",
       "date": "2026-10-11T09:21:10-05:00",
       "type": "patch",

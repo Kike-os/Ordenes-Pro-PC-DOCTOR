@@ -738,6 +738,8 @@ class Handler(BaseHTTPRequestHandler):
                     except mail_pro.MailError as error:return self.reply(502,{'error':str(error),'kind':error.kind})
                     if not state:return self.reply(502,{'error':'El servidor de correo no informó la bandeja de entrada.'})
                     return self.reply(200,{'unread':state.get('unread',0),'checked':state.get('checked',''),'quota':state.get('quota'),'events':notifications.mail_events(c)[-5:]})
+                if path=='/api/mail/signature':
+                    return self.reply(200,{'card':mail_signature_card(c)})
                 if path=='/api/mail/storage':
                     # Independiente de la lectura y el envío: si falla, el resto del correo sigue funcionando.
                     if arg('now')=='1' and limited(c,'mail-storage:'+str(user['id']),limit=30,window=300):return self.reply(429,{'error':'Espera un momento antes de volver a actualizar el almacenamiento.'})
@@ -1112,7 +1114,7 @@ class Handler(BaseHTTPRequestHandler):
                             except ValueError:files=None
                             if not isinstance(files,list) or len(files)>10 or any(not isinstance(item,dict) for item in files):return self.reply(400,{'error':'Adjuntos no válidos.'})
                             config=mail_pro.settings()
-                            message,recipients=mail_pro.build_message(config,{**{k:data.get(k,'') for k in ('to','cc','bcc','subject','body','in_reply_to','references')},'rich':data.get('rich') is True,'from_name':corporate.settings()['name'],'attachments':files,'draft':draft},(mail_signature_card(c) if data.get('signature') is True and mail_signature_card(c)['enabled'] else '') if 'signature' in data else mail_signature(c))
+                            message,recipients=mail_pro.build_message(config,{**{k:data.get(k,'') for k in ('to','cc','bcc','subject','body','in_reply_to','references')},'rich':data.get('rich') is True,'from_name':corporate.settings()['name'],'attachments':files,'draft':draft,'signature_pref':data.get('signature_pref')},(mail_signature_card(c) if data.get('signature') is True and not draft and mail_signature_card(c)['enabled'] else '') if 'signature' in data else mail_signature(c))
                             order=None;code=str(data.get('order_code','')).strip().upper()
                             if code:
                                 order=c.execute('SELECT id,code FROM orders WHERE code=?',(code,)).fetchone()
