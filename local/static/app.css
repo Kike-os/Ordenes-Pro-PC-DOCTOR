@@ -2971,3 +2971,15 @@ body[data-page=dashboard] .toast.toast-release .toast-body p{font-size:12px;colo
 .operations-heading-tools #today strong{font-weight:700;color:#f2f6ff}
 .operations-heading-tools #today strong::after{content:"";display:inline-block;width:1px;height:11px;margin-left:8px;background:#496A91;opacity:.7;vertical-align:-1px}
 @media(max-width:380px){.operations-heading-tools #today{font-size:11.5px!important;padding:5px 11px;gap:6px}}
+
+/* Campana de notificaciones al extremo derecho de la barra, con microanimaciones discretas. */
+.premium-header .user-area .notify-toggle{border-radius:11px;transition:background .2s,border-color .2s,color .2s,box-shadow .2s,transform .12s}
+.premium-header .user-area .notify-toggle:hover{background:#13253d;border-color:#3d5f8f;color:#dbe8ff;box-shadow:0 0 0 3px #4d8df014;transform:none}
+.premium-header .user-area .notify-toggle:hover .icon{animation:bell-swing .6s ease-in-out 1;transform-origin:50% 12%}
+.premium-header .user-area .notify-toggle:active{transform:scale(.95)}
+.premium-header .user-area .notify-toggle:focus-visible{outline:2px solid #8bb8ff;outline-offset:2px}
+.premium-header .user-area .notify-toggle[aria-expanded=true]{box-shadow:0 0 0 3px #4d8df022,0 0 16px #3b82f62e}
+.premium-header .user-area .notify-toggle .notify-badge{top:-4px;right:-4px;min-width:16px;height:16px;padding:0 4px;font-size:9.5px;border-width:2px;background:linear-gradient(180deg,#f0626b,#d93d48);box-shadow:0 0 0 0 #e5484d00;transition:transform .2s,box-shadow .2s}
+.premium-header .user-area .notify-toggle:hover .notify-badge{transform:scale(1.06);box-shadow:0 0 10px #e5484d66}
+@keyframes bell-swing{0%,100%{transform:rotate(0)}25%{transform:rotate(-13deg)}55%{transform:rotate(9deg)}80%{transform:rotate(-4deg)}}
+@media(prefers-reduced-motion:reduce){.premium-header .user-area .notify-toggle,.premium-header .user-area .notify-toggle .notify-badge{transition:none}.premium-header .user-area .notify-toggle:hover .icon{animation:none}.premium-header .user-area .notify-toggle:active{transform:none}}

@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.26 — 2026-10-11 14:59 (UTC-05:00)
+
+Campana de notificaciones al extremo derecho
+
+### Mejoras realizadas
+
+- Barra superior: la campana de notificaciones pasa al extremo derecho, con una insignia más discreta y microanimaciones al pasar el cursor
+
 ## v1.5.25 — 2026-10-11 14:54 (UTC-05:00)
 
 Fecha del día más legible en el inicio
