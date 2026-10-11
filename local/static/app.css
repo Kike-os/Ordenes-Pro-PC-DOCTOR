@@ -2955,3 +2955,12 @@ body[data-page=dashboard] .toast.toast-release .toast-body p{font-size:12px;colo
 
 /* Seguimiento de Órdenes: separación entre el título y el subtítulo. */
 .tracking-pro>header .activity-sub{margin-top:7px}
+
+/* Barra superior: separadores verticales de 1 px en el espacio libre entre Release, buscador y reloj. No ocupan sitio. */
+@media(min-width:1000px){
+.premium-header #global-search::before,.premium-header #global-search::after{content:"";position:absolute;top:9px;bottom:9px;width:1px;background:#496A91;opacity:.5;pointer-events:none}
+.premium-header #global-search::before{left:-8px}
+.premium-header #global-search::after{right:-7px}
+.premium-header #global-search.order-search-wide::after{display:none}
+}
+@media(min-width:1000px) and (max-width:1199px){.premium-header #global-search::before{left:-6px}.premium-header #global-search::after{right:-6px}}

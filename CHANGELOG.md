@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.24 — 2026-10-11 14:50 (UTC-05:00)
+
+Separadores finos en la barra superior
+
+### Mejoras realizadas
+
+- Barra superior: separadores finos entre Release, el buscador y el reloj, sin mover ningún componente
+
 ## v1.5.23 — 2026-10-11 14:46 (UTC-05:00)
 
 Nuevos tipos de equipo Notebook y Consolas, y Portátil (Laptop)
