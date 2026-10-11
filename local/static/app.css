@@ -557,3 +557,10 @@ body[data-page=dashboard] .orders-action-menu[hidden]{display:none!important}
 @media(max-width:650px){#view-module.orders-list-view>.module-heading{flex-wrap:wrap;gap:14px}.orders-results .order-table tbody{grid-template-columns:1fr}.orders-results .order-table td{font-size:13px!important}.orders-filter-card{padding:14px}.orders-filter-footer{flex-wrap:wrap}.orders-filter-actions{margin-left:auto}.orders-results-heading{padding:13px 14px}.orders-results-heading small{font-size:11px}.orders-results .orders-pagination{justify-content:space-between;gap:8px;padding:12px}.orders-pagination span{font-size:12px;white-space:nowrap}.orders-pagination button{padding:8px 10px}.orders-list-view .orders-search input{font-size:16px}.orders-filter-card input,.orders-filter-card select{font-size:16px!important}}
 @media(max-width:420px){.orders-filter-card .order-filters{grid-template-columns:1fr}.orders-filter-footer{gap:14px}.orders-filter-actions{width:100%;margin:0}.orders-filter-actions button{flex:1}.orders-list-view .orders-search button{padding:10px 15px}.orders-results .order-row-actions>button,.orders-results .order-row-actions>a{padding:7px 8px!important;font-size:11px!important}.orders-results-heading{align-items:flex-start;flex-direction:column;gap:5px}}
 @media(prefers-reduced-motion:reduce){.orders-menu-item{transition:none}}
+/* Correcciones de revisión visual: condiciones públicas, citas públicas, configuración y clima del encabezado. */
+@media screen{html:has(>body[data-page=conditions]){background:#060d19}body[data-page=conditions]{min-height:100svh;display:flow-root}}
+body[data-page=appointments] .appointment-public-header>.secondary{background:#13223b;border-color:#304564;color:#a8c6f2;flex-shrink:0}
+body[data-page=appointments] .appointment-public-header>.secondary:hover{background:#1d3455}
+body[data-page=dashboard] .settings-panel button+h2{margin-top:26px}
+.premium-header .header-weather{width:auto;max-width:210px}
+.premium-header .header-weather small{flex-wrap:nowrap;white-space:nowrap}
