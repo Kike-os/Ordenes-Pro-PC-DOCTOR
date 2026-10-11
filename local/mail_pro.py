@@ -811,20 +811,20 @@ def signature_html(sign, logo_src):
     def row(icon, label, value, href=''):
         if not value:
             return ''
-        text = '<a href="' + esc(href) + '" style="color:#ffffff;text-decoration:none;">' + esc(value) + '</a>' if href else esc(value)
+        text = '<a href="' + esc(href) + '" style="color:#1f2937;text-decoration:none;">' + esc(value) + '</a>' if href else esc(value)
         return ('<tr><td width="22" valign="top" style="padding:3px 7px 3px 0;' + font + 'font-size:12px;line-height:18px;color:#e03a3e;" title="' + esc(label) + '">' + icon + '</td>'
-                '<td valign="top" style="padding:3px 0;' + font + 'font-size:13px;line-height:18px;color:#ffffff;white-space:nowrap;">' + text + '</td></tr>')
+                '<td valign="top" style="padding:3px 0;' + font + 'font-size:13px;line-height:18px;color:#1f2937;white-space:nowrap;">' + text + '</td></tr>')
     phone_href = 'tel:' + re.sub(r'[^0-9+]', '', sign['phone'])
     web_href = sign['web'] if re.match(r'https?://', sign['web'], re.I) else 'https://' + sign['web']
     contact = (row('&#128222;', 'Teléfono', sign['phone'], phone_href) + row('&#9993;&#65039;', 'Correo', sign['email'], 'mailto:' + sign['email'])
                + row('&#127760;', 'Sitio web', sign['web'], web_href) + row('&#128205;', 'Dirección', sign['address']))
-    return ('<table role="presentation" cellpadding="0" cellspacing="0" border="0" bgcolor="#2b2d31" style="background-color:#2b2d31;border-collapse:collapse;border-bottom:3px solid #e03a3e;">'
+    return ('<table role="presentation" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="background-color:#ffffff;border-collapse:collapse;border:1px solid #e2e6ee;border-bottom:3px solid #e03a3e;">'
             '<tr><td valign="middle" align="center" style="padding:14px 6px 14px 16px;">'
-            '<img src="' + esc(logo_src) + '" width="120" alt="PC-DOCTOR S.A." style="display:block;width:120px;height:auto;border:0;color:#ffffff;font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:bold;"></td>'
+            '<img src="' + esc(logo_src) + '" width="120" alt="PC-DOCTOR S.A." style="display:block;width:120px;height:auto;border:0;color:#1f2937;font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:bold;"></td>'
             '<td valign="middle" style="padding:14px 18px 14px 10px;">'
-            '<div style="' + font + 'font-size:16px;line-height:21px;font-weight:bold;color:#ffffff;white-space:nowrap;">' + esc(sign['name']) + '</div>'
+            '<div style="' + font + 'font-size:16px;line-height:21px;font-weight:bold;color:#1f2937;white-space:nowrap;">' + esc(sign['name']) + '</div>'
             + ('<div style="' + font + 'font-size:12px;line-height:17px;font-weight:bold;letter-spacing:1px;color:#e03a3e;white-space:nowrap;">' + esc(sign['role']) + '</div>' if sign['role'] else '')
-            + ('<div style="' + font + 'font-size:12px;line-height:17px;color:#d5d7db;white-space:nowrap;">' + esc(sign['unit']) + '</div>' if sign['unit'] else '')
+            + ('<div style="' + font + 'font-size:12px;line-height:17px;color:#5b6677;white-space:nowrap;">' + esc(sign['unit']) + '</div>' if sign['unit'] else '')
             + '</td><td width="2" bgcolor="#e03a3e" style="background-color:#e03a3e;font-size:0;line-height:0;width:2px;">&nbsp;</td>'
             '<td valign="middle" style="padding:14px 18px;"><table role="presentation" cellpadding="0" cellspacing="0" border="0">' + contact + '</table></td></tr></table>')
 

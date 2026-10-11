@@ -4,6 +4,18 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.33 — 2026-10-11 17:56 (UTC-05:00)
+
+QR del seguimiento para el cliente y firma de correo con fondo claro
+
+### Mejoras realizadas
+
+- Firma corporativa de Mail Pro con fondo claro, tanto en la vista previa como en el correo enviado
+
+### Errores corregidos
+
+- Seguimiento para el cliente: ahora muestra el código QR real del enlace, con descarga, reintento y avisos compactos
+
 ## v1.5.32 — 2026-10-11 17:51 (UTC-05:00)
 
 Correos de citas al momento, Citas de Hoy en vivo y campana con aviso

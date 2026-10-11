@@ -241,7 +241,7 @@ class MailRouteTests(test_app.SecurityTests):
         self.assertLess(plain.index('Texto **importante**'),plain.index('-- \nPersona'));self.assertLess(plain.index('Tel.: +593 99 000 0000'),plain.index('escribió:'))
         self.assertEqual(plain.count('-- \n'),1);self.assertEqual(page.count('alt="PC-DOCTOR S.A."'),1)
         self.assertLess(page.index('<strong>importante</strong>'),page.index('<table'));self.assertLess(page.index('</table></td></tr></table>'),page.index('<blockquote'))
-        for expected in ('href="tel:+593990000000"','href="mailto:buzon@example.invalid"','href="https://example.invalid"','bgcolor="#2b2d31"','border-bottom:3px solid #e03a3e','src="cid:'):
+        for expected in ('href="tel:+593990000000"','href="mailto:buzon@example.invalid"','href="https://example.invalid"','bgcolor="#ffffff"','border-bottom:3px solid #e03a3e','src="cid:'):
             self.assertIn(expected,page)
         self.assertNotIn('<script',page);self.assertNotIn('<b>',page.split('<table')[1].split('Persona')[1][:40])
         # Estructura MIME: alternativa texto/HTML, con el logo como parte relacionada (CID) y sin rutas locales.
@@ -251,7 +251,7 @@ class MailRouteTests(test_app.SecurityTests):
         # Lectura: la firma se conserva (estilos validados e imagen incrustada servida por la aplicación) y lo peligroso se descarta.
         safe,blocked=mail_pro.sanitize_html(page+'<img src="https://rastreo.example.invalid/x.gif"><p style="position:fixed;background:url(x);color:#333" onclick="x()">t</p><img src="cid:otro">',{logo['Content-ID'][1:-1]:3})
         self.assertIn('<img data-part="3" alt="PC-DOCTOR S.A." width="120">',safe);self.assertEqual(blocked,2)
-        self.assertIn('background-color:#2b2d31',safe);self.assertIn('border-bottom:3px solid #e03a3e',safe);self.assertIn('href="tel:+593990000000"',safe)
+        self.assertIn('background-color:#ffffff',safe);self.assertIn('border-bottom:3px solid #e03a3e',safe);self.assertIn('href="tel:+593990000000"',safe)
         for bad in ('style=','onclick','position','url(','<script','src='):self.assertNotIn(bad,safe)
         self.assertIn('data-s="color:#333"',safe)
         with_file,_=mail_pro.build_message({'username':'buzon@example.invalid'},{'to':'a@example.invalid','subject':'Firma','body':'Hola','attachments':[{'name':'a.txt','type':'text/plain','data':'aG9sYQ=='}]},card)

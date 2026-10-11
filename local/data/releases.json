@@ -8,6 +8,24 @@
   },
   "releases": [
     {
+      "version": "1.5.33",
+      "date": "2026-10-11T17:56:18-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "QR del seguimiento para el cliente y firma de correo con fondo claro",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Firma corporativa de Mail Pro con fondo claro, tanto en la vista previa como en el correo enviado"
+        ],
+        "fixes": [
+          "Seguimiento para el cliente: ahora muestra el código QR real del enlace, con descarga, reintento y avisos compactos"
+        ],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.32",
       "date": "2026-10-11T17:51:56-05:00",
       "type": "patch",

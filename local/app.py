@@ -742,12 +742,18 @@ class Handler(BaseHTTPRequestHandler):
                 if not row:
                     return self.reply(404, {'error':'Foto no disponible.'})
                 return self.reply(200, base64.b64decode(row['data']), 'image/jpeg')
-            detail = re.fullmatch(r'/api/orders/([0-9]+)(?:/(qr\.(svg|png)|receipt\.pdf|thermal\.pdf|service\.pdf|label\.pdf))?', path)
+            detail = re.fullmatch(r'/api/orders/([0-9]+)(?:/(qr\.(svg|png)|tracking-qr\.png|receipt\.pdf|thermal\.pdf|service\.pdf|label\.pdf))?', path)
             if detail:
                 row = c.execute('SELECT o.*,COALESCE(NULLIF(d.kind,\'\'),d.category) type,d.brand,d.model,d.serial,d.color,c.id client_id,c.name client,c.identification,c.phone,c.email,c.province,c.city,c.address,c.location_reference,s.label status_label FROM orders o JOIN devices d ON d.id=o.device_id JOIN clients c ON c.id=d.client_id JOIN statuses s ON s.code=o.status WHERE o.id=?',(int(detail[1]),)).fetchone()
                 if not row:
                     return self.reply(404, {'error':'Orden no disponible.'})
                 code = row['code'] or 'OP-'+str(row['id']).zfill(5)
+                if detail[2]=='tracking-qr.png':
+                    # QR del enlace público de seguimiento vigente: el mismo enlace que se copia y que imprime el ticket.
+                    import order_tracking
+                    link=order_tracking.active(c,row['id'])
+                    if not link['active']:return self.reply(404,{'error':'La orden no tiene un enlace de seguimiento activo.'})
+                    return self.reply(200, qr_image(link['url']+'#'+code,'png'), 'image/png')
                 if detail[3]:
                     return self.reply(200, qr_image(row['qr_url'],detail[3]), 'image/svg+xml' if detail[3]=='svg' else 'image/png')
                 if detail[2] in ('receipt.pdf','thermal.pdf','service.pdf','label.pdf'):

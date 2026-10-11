@@ -3207,3 +3207,28 @@ button.live-appointment .agenda-badge{font-size:10.5px}
 @keyframes bell-halo{0%{box-shadow:0 0 0 0 #4d8df000}30%{box-shadow:0 0 0 4px #4d8df033,0 0 18px #3b82f666}100%{box-shadow:0 0 0 8px #4d8df000,0 0 0 #3b82f600}}
 .appointments-panel .panel-icon.tracking-pulse{animation:es-pulse .8s ease-out 1}
 @media(prefers-reduced-motion:reduce){.premium-header .user-area .notify-toggle.notify-ring,.premium-header .user-area .notify-toggle.notify-ring .icon,.appointments-panel .panel-icon.tracking-pulse{animation:none}}
+
+/* Mail Pro: la firma corporativa se previsualiza sobre fondo claro, igual que llega al destinatario. */
+.mail-sign-card{background:#ffffff;border:1px solid #e2e6ee;border-bottom:3px solid #e03a3e;border-radius:8px;color:#1f2937;overflow:hidden}
+.mail-sign-left{padding:14px 18px}.mail-sign-left strong{color:#1f2937}.mail-sign-unit{color:#5b6677}
+.mail-sign-right{padding:14px 20px}.mail-sign-right p{color:#1f2937}
+.mail-sign-box{overflow-x:auto;scrollbar-width:thin}
+@media(max-width:560px){.mail-sign-card{flex-direction:column;width:100%}.mail-sign-card>b{flex:0 0 2px;height:2px;width:auto}}
+
+/* Seguimiento para el cliente: datos del enlace y código QR real. */
+.tracking-link-head{display:flex;align-items:center;gap:12px;margin-bottom:12px}.tracking-link-head h2{margin:0}.tracking-link-head p{margin:1px 0 0;font-size:12px;color:#8fa5c4}
+.tracking-link-grid{display:grid;grid-template-columns:minmax(0,1fr) 188px;gap:14px;align-items:start}
+.tracking-link-info{display:grid;gap:10px;min-width:0}
+.tracking-link-facts{display:grid;gap:7px;margin:0}.tracking-link-facts dt{font-size:11px;color:#8fa5c4}.tracking-link-facts dd{margin:1px 0 0;font-size:12.5px;color:#e3edff;overflow-wrap:anywhere}
+.order-tracking-link .order-tracking-actions button,.order-tracking-link .order-tracking-actions a{display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 12px;font-size:12px;text-decoration:none;transition:background .2s,border-color .2s,color .2s}
+.order-tracking-link .order-tracking-actions .system-icon{width:14px;height:14px}
+.tracking-renew{border-color:#4b3f8f!important;color:#cfc7ff!important}.tracking-renew:hover{background:#221c4a!important;transform:none}
+.tracking-revoke{border-color:#6d3a44!important;color:#f0a3ab!important}.tracking-revoke:hover{background:#3a1a22!important;transform:none}
+.tracking-link-qr{display:grid;justify-items:center;gap:7px;padding:12px;border:1px solid #2a4063;border-radius:12px;background:#0b1626;text-align:center;transition:box-shadow .3s,border-color .3s}
+.tracking-link-qr img{display:block;width:148px;height:148px;padding:6px;border-radius:8px;background:#fff;animation:oh-fade .22s ease-out}
+.tracking-link-qr small{font-size:11px;line-height:1.4;color:#9bb0cf}.tracking-link-label{font-weight:650;color:#cfdcf0!important}
+.tracking-link-qr[data-state=ready]{border-color:#2f5d8f;box-shadow:0 0 18px #3b82f61f}
+.tracking-link-qr[data-state=off],.tracking-link-qr[data-state=error]{padding:22px 12px;color:#7f93b1}.tracking-link-qr[data-state=off] .system-icon,.tracking-link-qr[data-state=error] .system-icon{width:30px;height:30px}
+.tracking-link-qr[data-state=error]{color:#f0a3ab}
+@media(max-width:1180px){.tracking-link-grid{grid-template-columns:1fr}.tracking-link-qr{justify-self:start}}
+@media(prefers-reduced-motion:reduce){.tracking-link-qr,.tracking-link-qr img{animation:none;transition:none}}
