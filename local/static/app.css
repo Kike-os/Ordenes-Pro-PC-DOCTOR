@@ -2857,3 +2857,27 @@ body[data-page=dashboard] .toast.toast-release .toast-body p{font-size:12px;colo
 .serial-official{display:grid;gap:4px;margin-top:4px}.serial-official small{font-size:11.5px;color:#9bb0cf}
 .serial-official .secondary{padding:6px 12px;font-size:12px;text-decoration:none}
 .serial-official .serial-official-match{border-color:#4d8df0;color:#fff}
+
+/* Smart Progress Stepper Pro: color por estado real de cada paso; misma posición y cinco pasos. */
+#order-dialog .wizard-nav button[data-state]{--st:#788CA5;gap:9px;color:#a9b9cf;opacity:1;transition:background .22s,color .22s}
+#order-dialog .wizard-nav button[data-state] span:last-child{font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#order-dialog .wizard-nav button[data-state=done]{--st:#4BD3A4;color:#bfeedd}
+#order-dialog .wizard-nav button[data-state=current]{--st:#65ACF4;color:#fff;background:#16304f}
+#order-dialog .wizard-nav button[data-state=incomplete]{--st:#E4AD58;color:#f3d6a4}
+#order-dialog .wizard-nav button[data-state=error]{--st:#E17B88;color:#f6c6cc}
+#order-dialog .wizard-nav button[data-state=error][aria-current=step],#order-dialog .wizard-nav button[data-state=incomplete][aria-current=step]{background:#16304f}
+#order-dialog .wizard-nav button[data-state=pending]:disabled{opacity:.7}
+#order-dialog .wizard-nav button[data-state] .step-number{flex:0 0 32px;width:32px;height:32px;font-size:0;border:1.5px solid color-mix(in srgb,var(--st) 70%,transparent);background:color-mix(in srgb,var(--st) 16%,#0d1b2e);color:var(--st);transition:background .22s,border-color .22s,color .22s,box-shadow .22s}
+#order-dialog .wizard-nav button[data-state] .step-number::after{content:none}
+#order-dialog .wizard-nav button[data-state] .step-number .system-icon{width:16px;height:16px}
+#order-dialog .wizard-nav button[data-state=done] .step-number{background:color-mix(in srgb,#4BD3A4 26%,#0d1b2e)}
+#order-dialog .wizard-nav button[data-state=done] .step-number .system-icon{stroke-width:2.4;animation:step-check .22s ease-out}
+#order-dialog .wizard-nav button[data-state=current] .step-number{animation:step-glow .7s ease-out 1}
+#order-dialog .wizard-track i{background:linear-gradient(90deg,#4BD3A4,#65ACF4)}
+@keyframes step-glow{0%{box-shadow:0 0 0 0 #65ACF4aa}100%{box-shadow:0 0 0 9px #65ACF400}}
+@keyframes step-check{from{opacity:0;transform:scale(.6)}to{opacity:1;transform:none}}
+@media(max-width:700px){#order-dialog .wizard-nav button[data-state]{gap:4px}#order-dialog .wizard-nav button[data-state] .step-number{flex-basis:30px;width:30px;height:30px}#order-dialog .wizard-nav button[data-state] span:last-child{font-size:10px;max-width:100%}}
+@media(prefers-reduced-motion:reduce){#order-dialog .wizard-nav button[data-state],#order-dialog .wizard-nav button[data-state] .step-number{transition:none}#order-dialog .wizard-nav button[data-state=current] .step-number,#order-dialog .wizard-nav button[data-state=done] .step-number .system-icon{animation:none}}
+@media(max-width:360px){#order-dialog .wizard-nav button[data-state] span:last-child{font-size:9px;letter-spacing:-.3px}}
+#order-dialog .wizard-nav button[data-state=pending]:disabled{opacity:.88}
+@media(max-width:360px){body[data-page=dashboard] #order-dialog .wizard-nav{padding-left:6px;padding-right:6px}body[data-page=dashboard] #order-dialog .wizard-nav ol{gap:2px}#order-dialog .wizard-nav button[data-state]{padding-left:0;padding-right:0}#order-dialog .wizard-nav button[data-state] span:last-child{font-size:8.8px;letter-spacing:-.35px}#order-dialog .wizard-track{left:6px;right:6px}}

@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.18 — 2026-10-11 13:47 (UTC-05:00)
+
+Smart Progress Stepper en la nueva orden de recepción
+
+### Mejoras realizadas
+
+- Barra de pasos de la nueva orden: cada paso cambia de color según la validación real (completado, actual, incompleto, error o pendiente), con iconos y línea de avance por etapas validadas
+
 ## v1.5.17 — 2026-10-11 13:39 (UTC-05:00)
 
 Verificación de la serie en la página oficial del fabricante

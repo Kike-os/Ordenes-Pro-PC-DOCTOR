@@ -8,6 +8,22 @@
   },
   "releases": [
     {
+      "version": "1.5.18",
+      "date": "2026-10-11T13:47:42-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Smart Progress Stepper en la nueva orden de recepción",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Barra de pasos de la nueva orden: cada paso cambia de color según la validación real (completado, actual, incompleto, error o pendiente), con iconos y línea de avance por etapas validadas"
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.17",
       "date": "2026-10-11T13:39:01-05:00",
       "type": "patch",
