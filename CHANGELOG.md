@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.14 — 2026-10-11 13:09 (UTC-05:00)
+
+Ficha del equipo con logotipo de la marca en la recepción
+
+### Nuevas funcionalidades
+
+- Ficha del equipo en la recepción con el logotipo de la marca (70 × 70 px) e icono genérico cuando no hay archivo
+
 ## v1.5.13 — 2026-10-11 13:04 (UTC-05:00)
 
 Historial de la Orden compacto, seguimiento con textos claros e identificación de equipos por número de serie

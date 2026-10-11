@@ -633,6 +633,19 @@ class SecurityTests(unittest.TestCase):
         self.assertEqual(self.request('/api/devices/identify?serial=SN-ABC12',cookie=cookie)['body']['matches'],[])
         for bad in ('abc','%27%20OR%201%3D1','serie%25'):self.assertEqual(self.request('/api/devices/identify?serial='+bad,cookie=cookie)['status'],400)
 
+    def test_brand_logo_files_are_listed_and_served(self):
+        cookie,csrf=self.login()
+        folder=app.ROOT/'static'/'brands';svg=folder/'zz-prueba.svg';png=folder/'zz-prueba.png'
+        try:
+            svg.write_text('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"/>');png.write_bytes(b'\x89PNG prueba')
+            self.assertEqual(self.request('/api/reception-options',cookie=cookie)['body']['brand_logos']['zz-prueba'],'zz-prueba.svg')
+            self.assertEqual(self.request('/static/brands/zz-prueba.svg')['status'],200)
+            self.assertEqual(self.request('/static/brands/zz-prueba.png')['status'],200)
+        finally:
+            svg.unlink(missing_ok=True);png.unlink(missing_ok=True)
+        self.assertNotIn('zz-prueba',self.request('/api/reception-options',cookie=cookie)['body']['brand_logos'])
+        for missing in ('/static/brands/zz-prueba.svg','/static/brands/..%2Fapp.svg','/static/brands/README.md','/static/brands/Dell.svg'):self.assertIn(self.request(missing)['status'],(401,404))
+
     def test_order_status_updates_active_filter_and_report(self):
         cookie,csrf=self.login()
         order=self.request('/api/orders',self.order_data({'client':'Prueba','problem':'Prueba'}),cookie=cookie,csrf=csrf)['body']['id']

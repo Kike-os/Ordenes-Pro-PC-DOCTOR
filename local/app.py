@@ -424,6 +424,13 @@ class Handler(BaseHTTPRequestHandler):
         files = {'/static/label.css':'label.css','/static/app.css':'app.css','/static/app.js':'app.js','/static/form-validation.js':'form-validation.js','/static/appointments.js':'appointments.js','/static/adi-widget.js':'adi-widget.js','/static/logo-original.png':'logo-original.png',
                  '/favicon.ico':'favicon.ico','/static/favicon.ico':'favicon.ico','/static/favicon-16.png':'favicon-16.png','/static/favicon-32.png':'favicon-32.png','/static/logo-firma.png':'logo-firma.png','/static/favicon-48.png':'favicon-48.png',
                  '/apple-touch-icon.png':'apple-touch-icon.png','/apple-touch-icon-precomposed.png':'apple-touch-icon.png','/static/apple-touch-icon.png':'apple-touch-icon.png'}
+        # Logotipos de marcas: solo nombres simples dentro de static/brands; si el archivo no existe la interfaz usa un icono genérico.
+        brand_logo = re.fullmatch(r'/static/brands/([a-z0-9]+(?:-[a-z0-9]+)*)\.(svg|png)', path)
+        if brand_logo:
+            file = ROOT / 'static' / 'brands' / (brand_logo[1][:60] + '.' + brand_logo[2])
+            if not file.is_file():
+                return self.reply(404, {'error':'Archivo no disponible.'})
+            return self.reply(200, file.read_bytes(), 'image/svg+xml' if brand_logo[2] == 'svg' else 'image/png')
         if path in files:
             file = ROOT / 'static' / files[path]
             if not file.is_file():
@@ -569,7 +576,9 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(200,monochrome_png(),'image/png')
             if path == '/api/reception-options':
                 brands = [dict(r) for r in c.execute('SELECT name,category FROM brands ORDER BY name COLLATE NOCASE')]
-                return self.reply(200, {'geo_metadata':GEO_METADATA,'device_types':DEVICE_TYPES,'brands':brands})
+                # SVG primero: al ordenar por nombre, «marca.png» queda antes y «marca.svg» lo reemplaza.
+                logos = {f.stem:f.name for f in sorted((ROOT / 'static' / 'brands').glob('*')) if f.suffix in ('.svg','.png') and re.fullmatch(r'[a-z0-9]+(?:-[a-z0-9]+)*', f.stem)}
+                return self.reply(200, {'geo_metadata':GEO_METADATA,'device_types':DEVICE_TYPES,'brands':brands,'brand_logos':logos})
             if path.startswith('/api/geo/'):
                 query=parse_qs(urlsplit(self.path).query)
                 get=lambda key:query.get(key,[''])[0][:150]

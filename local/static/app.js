@@ -899,8 +899,22 @@ function initSerialRecognition(){
  input.addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();lookup();}});
  form.addEventListener('reset',()=>{clearTimeout(timer);seq++;box.hidden=true;});
 }
+// Ficha del equipo con el logotipo de la marca. El logo es solo visual: sale de static/brands según la marca escrita
+// o confirmada; si no hay archivo (o falla al cargar) se muestra un icono genérico. Marca y modelo se guardan del formulario.
+function brandSlug(name){const slug=String(name||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');return({'hewlett-packard':'hp','hp-inc':'hp','asustek':'asus','mac':'apple','macbook':'apple'})[slug]||slug;}
+function paintBrandCard(){
+ const card=$('brand-card');if(!card)return;const form=$('order-form'),brand=form.elements.brand.value.trim(),model=form.elements.model.value.trim(),type=form.elements.type.value,serial=form.elements.serial.value.trim(),slug=brandSlug(brand),file=receptionOptions?.brand_logos?.[slug]||'',box=card.querySelector('.brand-logo');
+ card.hidden=!(brand||model||serial);card.querySelector('.brand-name').textContent=brand||'Marca sin indicar';card.querySelector('.brand-model').textContent=model||'Modelo sin indicar';card.querySelector('.brand-meta').textContent=[receptionOptions?.device_types?.[type],serial?'Serie '+serial.toUpperCase():''].filter(Boolean).join(' · ');
+ if(box.dataset.logo===file+'|'+(type==='impresora'))return;box.dataset.logo=file+'|'+(type==='impresora');
+ const generic=()=>{box.dataset.kind='generic';box.replaceChildren(systemIcon(type==='impresora'?'M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2 M6 9V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v6 M7 14h10a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1z':'M18 5a2 2 0 0 1 2 2v8.526a2 2 0 0 0 .212.897l1.068 2.127a1 1 0 0 1-.9 1.45H3.62a1 1 0 0 1-.9-1.45l1.068-2.127A2 2 0 0 0 4 15.526V7a2 2 0 0 1 2-2z M20.054 15.987H3.946'));};
+ if(!file)return generic();const image=new Image();image.alt='Logotipo de '+brand;image.decoding='async';image.onerror=()=>{if(box.contains(image))generic();};image.src='/static/brands/'+file;box.dataset.kind='logo';box.replaceChildren(image);
+}
+function initBrandCard(){
+ const form=$('order-form'),serial=$('order-serial');if(!serial||$('brand-card'))return;const card=el('div',undefined,'brand-card full'),box=el('div',undefined,'brand-logo'),body=el('div',undefined,'brand-body');card.id='brand-card';card.hidden=true;card.setAttribute('aria-label','Equipo identificado');body.append(el('strong','','brand-name'),el('span','','brand-model'),el('small','','brand-meta'));card.append(box,body);serial.closest('.reception-field').after(card);
+ for(const name of ['type','brand','model','serial'])for(const kind of ['input','change'])form.elements[name].addEventListener(kind,paintBrandCard);form.addEventListener('reset',()=>setTimeout(paintBrandCard));
+}
 function initOrderEnhancements(){
- initSerialRecognition();
+ initSerialRecognition();initBrandCard();
  const form=$('order-form'),dialog=$('order-dialog'),header=dialog.querySelector('.reception-header'),heading=header.querySelector('.reception-heading');
  $('order-title').textContent='Nueva orden de recepción técnica';$('order-subtitle').textContent='Registro de cliente, equipo, evidencia y diagnóstico inicial.';heading.querySelector('.eyebrow')?.remove();
  const mark=el('span',undefined,'reception-mark');mark.append(systemIcon(receptionIcons.order));header.prepend(mark);
@@ -1033,7 +1047,7 @@ const geoFields=['province','canton','parish'];
 function displayCode(row){return row.code||'OP-'+String(row.id).padStart(5,'0');}
 function populateSelect(select,entries,placeholder){select.replaceChildren();const blank=el('option',placeholder);blank.value='';select.append(blank);for(const [value,label] of entries){const option=el('option',label);option.value=value;select.append(option);}}
 async function loadReceptionOptions(){if(receptionLoading)return receptionLoading;receptionLoading=api('/api/reception-options').then(data=>{receptionOptions=data;return data;}).catch(error=>{receptionLoading=null;throw error;});return receptionLoading;}
-function updateBrands(){if(!receptionOptions)return;const type=$('order-type').value;const category=type==='impresora'?'printer':type==='otro'?'other':'computer';const list=$('brand-options');list.replaceChildren();[...new Set(receptionOptions.brands.filter(b=>type==='otro'||b.category===category).map(b=>b.name))].sort((a,b)=>a.localeCompare(b,'es')).forEach(name=>{const o=el('option');o.value=name;list.append(o);});}
+function updateBrands(){if(!receptionOptions)return;const type=$('order-type').value;const category=type==='impresora'?'printer':type==='otro'?'other':'computer';const list=$('brand-options');list.replaceChildren();[...new Set(receptionOptions.brands.filter(b=>type==='otro'||b.category===category).map(b=>b.name))].sort((a,b)=>a.localeCompare(b,'es')).forEach(name=>{const o=el('option');o.value=name;list.append(o);});paintBrandCard();}
 function setOrderErrors(errors={}){const form=$('order-form');form.querySelectorAll('.field-error').forEach(node=>node.textContent='');form.querySelectorAll('[aria-invalid]').forEach(node=>node.removeAttribute('aria-invalid'));for(const[key,text]of Object.entries(errors)){const field=key==='client_id'?$('order-client-search'):form.querySelector('[name="'+key+'"]');const error=$('error-'+key);if(field&&error){field.setAttribute('aria-invalid','true');error.textContent=text;}}const first=form.querySelector('[aria-invalid=true]');if(first){const panel=first.closest('[data-step]');if(panel&&+panel.dataset.step!==wizardStep)showWizardStep(+panel.dataset.step,false);first.focus();}}
 
 
