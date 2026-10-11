@@ -1184,7 +1184,7 @@ class Handler(BaseHTTPRequestHandler):
                             try:mail_pro.deliver(config,message,recipients)
                             except mail_pro.MailError as error:
                                 c.execute("UPDATE mail_outbox SET status='failed',updated_at=? WHERE request_key=?",(now,key));c.commit()
-                                return self.reply(400 if error.kind=='configuracion' else 502,{'error':'No se envió el mensaje. '+str(error),'kind':error.kind})
+                                return self.reply(400 if error.kind in ('configuracion','destinatario') else 502,{'error':'No se envió el mensaje. '+str(error),'kind':error.kind,'fields':{'to':str(error)} if error.kind=='destinatario' else None})
                             # Aceptado por el servidor SMTP: recién ahora se considera enviado.
                             c.execute("UPDATE mail_outbox SET status='sent',updated_at=? WHERE request_key=?",(now,key))
                             if order:c.execute('INSERT OR IGNORE INTO mail_links(message_id,folder,uid,order_id,subject,correspondent,direction,sent_at,created_by,created_at) VALUES (?,?,0,?,?,?,?,?,?,?)',(message['Message-ID'],'',order['id'],str(message['Subject']),recipients[0],'out',now,user['id'],now))

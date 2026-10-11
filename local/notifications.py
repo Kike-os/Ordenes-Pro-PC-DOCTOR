@@ -55,8 +55,23 @@ def mail_status(c, now, max_age=60):
         top, last = inbox['uidnext'] - 1, (cached or {}).get('last_uid')
         if last is not None and (cached or {}).get('uidvalidity') == inbox['uidvalidity'] and top > last:
             events, known = mail_events(c), {(item['uidvalidity'], item['uid']) for item in mail_events(c)}
-            for row in reversed(mail_pro.newer(client, last)):
-                if row['seen'] or (inbox['uidvalidity'], row['uid']) in known:
+            fresh = mail_pro.newer(client, last)
+            # Informes de entrega (devoluciones y retrasos): se analizan por su estructura y se registran una sola vez.
+            reports = [row['uid'] for row in fresh if row.get('report')]
+            if reports:
+                bounces, seen_bounces = _state(c, 'mail_bounces') or [], {(item['uidvalidity'], item['uid']) for item in (_state(c, 'mail_bounces') or [])}
+                for bounce in mail_pro.find_bounces(client, reports):
+                    if (inbox['uidvalidity'], bounce['uid']) in seen_bounces:
+                        continue
+                    try:
+                        sent = c.execute("SELECT 1 FROM mail_outbox WHERE message_id=? AND status='sent'", (bounce['original_id'],)).fetchone() if bounce['original_id'] else None
+                    except Exception:
+                        sent = None
+                    bounces.append({'uidvalidity': inbox['uidvalidity'], 'uid': bounce['uid'], 'recipient': bounce['recipient'], 'permanent': bounce['permanent'], 'action': bounce['action'], 'status': bounce['status'],
+                                    'reason': bounce['reason'], 'matched': bool(sent), 'at': now.isoformat(timespec='seconds')})
+                _save(c, 'mail_bounces', bounces[-30:])
+            for row in reversed(fresh):
+                if row['seen'] or row.get('report') or (inbox['uidvalidity'], row['uid']) in known:
                     continue
                 sender = (row['from'] or [{}])[0]
                 events.append({'uidvalidity': inbox['uidvalidity'], 'uid': row['uid'], 'from': (sender.get('name') or sender.get('address') or 'Remitente desconocido')[:120],
@@ -204,6 +219,10 @@ def build(c, user, now, mail_access=False):
                 free = max(0, quota['limit'] - quota['used'])
                 items.append({'key': 'mailquota:' + ('90' if level >= 90 else '75'), 'kind': 'warning', 'icon': 'message', 'title': 'Buzón de correo al ' + str(level) + ' % de su capacidad',
                               'detail': 'Quedan ' + (str(round(free / 1048576)) + ' MB' if free >= 1048576 else str(round(free / 1024)) + ' KB') + ' disponibles. No se elimina ningún correo automáticamente.', 'at': state['checked'], 'href': '#mail', 'group': 'alert'})
+            for bounce in (_state(c, 'mail_bounces') or [])[-8:]:
+                items.append({'key': 'mail:bounce:' + str(bounce['uidvalidity']) + ':' + str(bounce['uid']), 'kind': 'error' if bounce['permanent'] else 'warning', 'icon': 'message',
+                              'title': ('Correo devuelto · ' if bounce['permanent'] else 'Entrega retrasada · ') + bounce['recipient'], 'detail': bounce['reason'] + (' (' + bounce['status'] + ')' if bounce['status'] else '') + ('' if bounce['matched'] else ' No se pudo relacionar con un envío de esta aplicación.'),
+                              'at': bounce['at'], 'href': '#mail?folder=INBOX&uid=' + str(bounce['uid']), 'group': 'event', 'bounce': True})
             for event in mail_events(c)[-10:]:
                 items.append({'key': 'mail:new:' + str(event['uidvalidity']) + ':' + str(event['uid']), 'kind': 'info', 'icon': 'message', 'title': 'Correo nuevo · ' + event['from'], 'detail': event['subject'],
                               'at': event['at'], 'href': '#mail?folder=INBOX&uid=' + str(event['uid']), 'group': 'event', 'mail': True})

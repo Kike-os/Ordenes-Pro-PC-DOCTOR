@@ -323,6 +323,36 @@ class MailRouteTests(test_app.SecurityTests):
             self.assertEqual([r['name'] for r in find('ventas@')],['Empresa Demo S.A.']);self.assertEqual([r['name'] for r in find('comercial')],['Empresa Demo S.A.'])
             self.assertEqual(set(find('demo')[0]),{'id','name','email','trade_name'})
 
+    def test_bounces_are_recognised_by_structure_and_smtp_rejections_are_classified(self):
+        import email,smtplib
+        from email import policy
+        def dsn(action,status,recipient='cliente@example.invalid',original='<envio-1@example.invalid>',diagnostic='smtp; 550 5.1.1 User unknown'):
+            raw=('From: Mail Delivery System <MAILER-DAEMON@example.invalid>\r\nTo: buzon@example.invalid\r\nSubject: Aviso\r\nMIME-Version: 1.0\r\nContent-Type: multipart/report; report-type=delivery-status; boundary="b1"\r\n\r\n'
+                 '--b1\r\nContent-Type: text/plain\r\n\r\nNo se pudo entregar.\r\n--b1\r\nContent-Type: message/delivery-status\r\n\r\nReporting-MTA: dns; mx.example.invalid\r\n\r\n'
+                 'Final-Recipient: rfc822; '+recipient+'\r\nAction: '+action+'\r\nStatus: '+status+'\r\nDiagnostic-Code: '+diagnostic+'\r\n\r\n--b1\r\nContent-Type: message/rfc822\r\n\r\n'
+                 'Message-ID: '+original+'\r\nSubject: Presupuesto\r\n\r\nTexto\r\n--b1--\r\n')
+            return email.message_from_string(raw,policy=policy.default)
+        failed=mail_pro.parse_bounce(dsn('failed','5.1.1'))
+        self.assertEqual((failed['recipient'],failed['permanent'],failed['status'],failed['original_id'],failed['reason']),('cliente@example.invalid',True,'5.1.1','<envio-1@example.invalid>','La dirección no existe en el servidor de destino.'))
+        delayed=mail_pro.parse_bounce(dsn('delayed','4.4.1',diagnostic='smtp; 451 timeout'))
+        self.assertEqual((delayed['permanent'],delayed['action']),(False,'delayed'))
+        # Un asunto alarmante sin informe real, una entrega correcta o datos incoherentes no se tratan como devolución.
+        plain=email.message_from_string('Subject: Mail Delivery Failed\r\nContent-Type: text/plain\r\n\r\nfallo',policy=policy.default)
+        self.assertIsNone(mail_pro.parse_bounce(plain));self.assertIsNone(mail_pro.parse_bounce(dsn('delivered','2.0.0')));self.assertIsNone(mail_pro.parse_bounce(dsn('failed','no-es-estado')));self.assertIsNone(mail_pro.parse_bounce(dsn('failed','5.1.1',recipient='sin arroba')))
+        kinds=lambda error:mail_pro.classify(error,'smtp.example.invalid',465)
+        with patch('builtins.print'):
+            self.assertEqual(kinds(smtplib.SMTPRecipientsRefused({'x@example.invalid':(550,b'no such user')})).kind,'destinatario')
+            self.assertEqual(kinds(smtplib.SMTPRecipientsRefused({'x@example.invalid':(451,b'try later')})).kind,'temporal')
+            self.assertEqual(kinds(smtplib.SMTPDataError(552,b'too big')).kind,'rechazo');self.assertEqual(kinds(smtplib.SMTPDataError(421,b'busy')).kind,'temporal')
+        self.assertEqual(kinds(smtplib.SMTPAuthenticationError(535,b'bad')).kind,'credenciales')
+        self.assertNotIn('no such user',str(kinds(smtplib.SMTPRecipientsRefused({'x@example.invalid':(550,b'no such user')}))))
+        cookie,csrf=self.login()
+        with patch.dict(app.os.environ,ENV),patch.object(mail_pro,'open_imap',side_effect=mail_pro.MailError('red','sin red')),patch('builtins.print'):
+            with patch.object(mail_pro,'deliver',side_effect=kinds(smtplib.SMTPRecipientsRefused({'x@example.invalid':(550,b'no')}))):
+                refused=self.request('/api/mail/send',{'to':'x@example.invalid','cc':'','subject':'s','body':'b','attachments':'[]','order_code':'','request_key':'clave-de-rechazo-00001'},cookie=cookie,csrf=csrf)
+            self.assertEqual((refused['status'],refused['body']['kind'],'to' in refused['body']['fields']),(400,'destinatario',True))
+            with app.connect() as c:self.assertEqual(c.execute("SELECT status FROM mail_outbox WHERE request_key='clave-de-rechazo-00001'").fetchone()[0],'failed')
+
     def test_replaced_draft_is_removed_only_when_it_is_a_draft(self):
         class Box:
             def __init__(self,flags):self.flags=flags;self.calls=[]

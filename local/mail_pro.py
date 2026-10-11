@@ -77,6 +77,19 @@ def classify(error, host, port):
         return MailError('red', f'{host}:{port} rechazó la conexión: no hay un servicio de correo en ese puerto.')
     if isinstance(error, (imaplib.IMAP4.error, smtplib.SMTPAuthenticationError)):
         return MailError('credenciales', 'El servidor rechazó el usuario o la contraseña.')
+    if isinstance(error, smtplib.SMTPRecipientsRefused):
+        codes = sorted({int(value[0]) for value in error.recipients.values() if isinstance(value, tuple)})
+        print('mail-smtp destinatario rechazado codigos=' + ','.join(str(code) for code in codes), flush=True)
+        names = ', '.join(list(error.recipients)[:5])
+        if codes and all(400 <= code < 500 for code in codes):
+            return MailError('temporal', 'El servidor no pudo aceptar por ahora a: ' + names + ' (error temporal ' + str(codes[0]) + '). Inténtalo de nuevo en unos minutos.')
+        return MailError('destinatario', 'El servidor rechazó a: ' + names + (' (código ' + str(codes[0]) + ')' if codes else '') + '. Revisa que la dirección esté bien escrita.')
+    if isinstance(error, (smtplib.SMTPSenderRefused, smtplib.SMTPDataError, smtplib.SMTPResponseException)):
+        code = int(getattr(error, 'smtp_code', 0) or 0)
+        print('mail-smtp respuesta codigo=' + str(code), flush=True)
+        if 400 <= code < 500:
+            return MailError('temporal', 'El servidor de correo no pudo aceptar el mensaje por ahora (error temporal ' + str(code) + '). Inténtalo de nuevo en unos minutos.')
+        return MailError('rechazo', 'El servidor de correo rechazó el mensaje' + (' (código ' + str(code) + ')' if code else '') + '.')
     if isinstance(error, (smtplib.SMTPException, OSError)):
         return MailError('servidor', f'El servidor de correo {host}:{port} devolvió un error: {type(error).__name__}.')
     return MailError('servidor', f'Fallo inesperado con {host}:{port}: {type(error).__name__}.')
@@ -391,6 +404,56 @@ def date_iso(message):
         return ''
 
 
+def parse_bounce(message):
+    """Informe de entrega (DSN, RFC 3464) de un mensaje `multipart/report`. None si no es un informe fiable.
+
+    Devuelve destinatario, acción (failed/delayed), estado, diagnóstico y el Message-ID del envío original cuando el
+    informe lo incluye. No se guía por el asunto: solo por la estructura del informe.
+    """
+    if message.get_content_type() != 'multipart/report' or str(message.get_param('report-type') or '').lower() != 'delivery-status':
+        return None
+    status = next((part for part in message.walk() if part.get_content_type() == 'message/delivery-status'), None)
+    if status is None:
+        return None
+    payload = status.get_payload()
+    blocks = [block for block in payload if hasattr(block, 'get')] if isinstance(payload, list) else []
+    if not blocks:
+        text = status.get_payload(decode=True) or b''
+        blocks = [email.message_from_bytes(chunk, policy=policy.default) for chunk in re.split(rb'\r?\n\r?\n', text) if chunk.strip()]
+    report = next((block for block in blocks if block.get('Final-Recipient') or block.get('Original-Recipient')), None)
+    if report is None:
+        return None
+    recipient = header_text(str(report.get('Final-Recipient') or report.get('Original-Recipient')).split(';', 1)[-1])[:254]
+    action = header_text(report.get('Action')).lower()
+    code = header_text(report.get('Status'))[:20]
+    if action not in ('failed', 'delayed') or not re.fullmatch(r'[245]\.\d{1,3}\.\d{1,3}', code) or not re.fullmatch(r'[^\s@<>]+@[^\s@<>]+', recipient):
+        return None
+    original = ''
+    for part in message.walk():
+        if part.get_content_type() in ('message/rfc822', 'text/rfc822-headers'):
+            inner = part.get_payload()
+            source = inner[0] if isinstance(inner, list) and inner else email.message_from_string(str(part.get_payload(decode=True).decode('utf-8', 'replace') if part.get_content_type() == 'text/rfc822-headers' else ''), policy=policy.default)
+            original = header_text(source.get('Message-ID'))[:300]
+    diagnostic = header_text(str(report.get('Diagnostic-Code') or '').split(';', 1)[-1])[:240]
+    reasons = {'5.1.1': 'La dirección no existe en el servidor de destino.', '5.1.2': 'El dominio del destinatario no existe.', '5.1.10': 'La dirección no existe en el servidor de destino.', '5.2.2': 'El buzón del destinatario está lleno.', '5.2.1': 'El buzón del destinatario está desactivado.', '5.7.1': 'El servidor de destino rechazó el mensaje por sus políticas.', '4.4.1': 'No se pudo contactar al servidor de destino; se seguirá intentando.', '4.4.7': 'La entrega se retrasó demasiado.', '4.2.2': 'El buzón del destinatario está lleno; se seguirá intentando.'}
+    return {'recipient': recipient, 'action': action, 'permanent': action == 'failed' and code.startswith('5'), 'status': code, 'diagnostic': diagnostic, 'original_id': original,
+            'reason': reasons.get(code) or ('El servidor de destino no aceptó el mensaje.' if action == 'failed' else 'La entrega está retrasada; el servidor seguirá intentándolo.')}
+
+
+def find_bounces(client, uids):
+    """Revisa en la bandeja de entrada los UID indicados y devuelve los que son informes de entrega válidos."""
+    found = []
+    for uid in list(uids)[:10]:
+        try:
+            message, _ = fetch_message(client, 'INBOX', uid)
+            report = parse_bounce(message)
+            if report:
+                found.append(dict(report, uid=int(uid)))
+        except MailError:
+            continue
+    return found
+
+
 def quota_detail(client):
     """Uso y cuota reales según la extensión QUOTA de IMAP: (datos | None, motivo técnico cuando no hay datos)."""
     try:
@@ -529,7 +592,7 @@ def add_previews(client, rows, parts):
 def summaries(client, uids, previews=True):
     if not uids:
         return []
-    code, data = client.uid('FETCH', ','.join(str(uid) for uid in uids), '(UID FLAGS RFC822.SIZE BODYSTRUCTURE BODY.PEEK[HEADER.FIELDS (FROM TO CC SUBJECT DATE MESSAGE-ID)])')
+    code, data = client.uid('FETCH', ','.join(str(uid) for uid in uids), '(UID FLAGS RFC822.SIZE BODYSTRUCTURE BODY.PEEK[HEADER.FIELDS (FROM TO CC SUBJECT DATE MESSAGE-ID CONTENT-TYPE)])')
     if code != 'OK':
         raise MailError('servidor', 'No se pudieron leer los mensajes.')
     rows, parts, index = {}, {}, 0
@@ -545,7 +608,8 @@ def summaries(client, uids, previews=True):
                 size = re.search(r'RFC822\.SIZE (\d+)', text)
                 rows[int(uid[1])] = {'uid': int(uid[1]), 'subject': header_text(message['subject'])[:300] or '(sin asunto)', 'from': people(message, 'from')[:1], 'to': people(message, 'to')[:6], 'date': date_iso(message),
                                      'message_id': header_text(message['message-id'])[:300], 'seen': '\\seen' in flags, 'flagged': '\\flagged' in flags, 'answered': '\\answered' in flags, 'draft': '\\draft' in flags,
-                                     'size': int(size[1]) if size else 0, 'attachments': bool(re.search(r'"attachment"|"filename"|"name" "[^"]+\.(pdf|docx?|xlsx?|zip|rar|jpe?g|png)"', text, re.I)), 'preview': ''}
+                                     'size': int(size[1]) if size else 0, 'attachments': bool(re.search(r'"attachment"|"filename"|"name" "[^"]+\.(pdf|docx?|xlsx?|zip|rar|jpe?g|png)"', text, re.I)), 'preview': '',
+                                     'report': message.get_content_type() == 'multipart/report' and str(message.get_param('report-type') or '').lower() == 'delivery-status'}
                 parts[int(uid[1])] = _first_text(text)
         index += 1
     ordered = [rows[uid] for uid in uids if uid in rows]
@@ -835,7 +899,7 @@ def deliver(config, message, recipients):
         client.login(config['username'], config['password'])
         refused = client.send_message(message, from_addr=config['username'], to_addrs=recipients)
         if refused:
-            raise MailError('servidor', 'El servidor no aceptó a: ' + ', '.join(list(refused)[:5]))
+            raise smtplib.SMTPRecipientsRefused(refused)
     except Exception as error:
         raise classify(error, config['smtp_host'], config['smtp_port']) from None
     finally:

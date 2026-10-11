@@ -2556,3 +2556,76 @@ body[data-page=dashboard] .track-tools input{height:38px;min-height:38px;margin:
 @keyframes new-pop{from{opacity:0;transform:translateY(6px) scale(.7)}to{opacity:1;transform:none}}
 @keyframes new-glow{0%{box-shadow:0 0 0 0 #3fbf8a80}100%{box-shadow:0 0 0 9px #3fbf8a00}}
 @media(prefers-reduced-motion:reduce){.system-new,.system-new::after{animation:none}}
+/* Smart Notification Center — Compact Premium: mini panel translúcido por categorías. */
+body[data-page=dashboard] #notify-panel{width:min(318px,calc(100vw - 24px))!important;max-height:min(340px,calc(100dvh - var(--toast-top,64px) - 12px))!important;border-radius:12px!important;display:flex;flex-direction:column}
+body[data-page=dashboard] #notify-panel[hidden]{display:none}
+body[data-page=dashboard] #notify-panel>header{padding:10px 10px 8px 12px;gap:8px;border-bottom:1px solid #223450}
+body[data-page=dashboard] #notify-panel .notify-head-icon{display:none}
+body[data-page=dashboard] #notify-panel>header>div{display:flex;align-items:center;gap:8px;margin-right:auto}
+body[data-page=dashboard] #notify-panel>header strong{font-size:13.5px}
+#notify-summary{padding:1px 8px;border-radius:999px;background:#13233d;color:#9bb0cf;font-size:11px!important;font-weight:600;white-space:nowrap}
+#notify-summary[data-count]:not([data-count="0"]){background:#255eb2;color:#fff}
+body[data-page=dashboard] #notify-panel .notify-tool{flex:0 0 28px;width:28px;height:28px;border-radius:8px}
+body[data-page=dashboard] #notify-panel .notify-list{padding:6px!important;display:grid;gap:3px;align-content:start}
+body[data-page=dashboard] #notify-panel>footer{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 10px;border-top:1px solid #223450}
+body[data-page=dashboard] #notify-panel>footer a{font-size:12px;font-weight:600;color:#9bbef5}
+body[data-page=dashboard] #notify-panel>footer button{padding:3px 8px;border:0;background:transparent;color:#8fa5c4;font-size:11.5px;cursor:pointer}
+body[data-page=dashboard] #notify-panel>footer button[hidden]{display:none}
+.nc-group{border:1px solid transparent;border-radius:10px;transition:background .2s,border-color .2s}
+.nc-group[data-open=true]{background:#0d1a2e;border-color:#223450}
+.nc-head{display:grid;grid-template-columns:28px minmax(0,1fr) auto auto;align-items:center;gap:8px;width:100%;padding:7px 8px;border:0;border-radius:10px;background:transparent;color:inherit;text-align:left;cursor:pointer;transition:background .2s}
+.nc-head:hover{background:#12213a;transform:none}.nc-head:focus-visible,.nc-item:focus-visible,.notices-open:focus-visible{outline:2px solid #8bb8ff;outline-offset:1px}
+.nc-icon{display:grid;place-items:center;width:28px;height:28px;border-radius:8px;background:#13233d;color:#8bb8ff}
+.nc-icon .system-icon{width:16px;height:16px}
+[data-cat=mail] .nc-icon{color:#8bb8ff}[data-cat=chat] .nc-icon{background:#0f2a26;color:#5fd6a3}[data-cat=orders] .nc-icon{background:#2a2212;color:#f3c677}[data-cat=system] .nc-icon{background:#1d1a3a;color:#b3a6ff}[data-cat=alerts] .nc-icon{background:#2a1418;color:#ff8f93}
+.nc-text{display:grid;min-width:0}.nc-text strong{font-size:12.5px;font-weight:650;color:#eef3ff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nc-text small{font-size:11.5px;color:#8fa5c4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nc-head time,.nc-item time{font-size:10.5px;color:#7f93b1;white-space:nowrap}
+.nc-dot{width:7px;height:7px;border-radius:50%;background:#4d9bff}
+.nc-items{display:none;gap:1px;padding:0 6px 6px 44px}.nc-group[data-open=true] .nc-items{display:grid;animation:system-in .18s ease-out}
+.nc-item{display:flex;align-items:baseline;justify-content:space-between;gap:8px;width:100%;padding:4px 6px;border:0;border-radius:7px;background:transparent;color:#b4c5de;font-size:11.5px;text-align:left;cursor:pointer}
+.nc-item:hover{background:#16294a;transform:none}.nc-item span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.nc-item[data-unread=true]{color:#eef3ff;font-weight:600}
+.nc-more{margin:0;padding:3px 8px;font-size:11px;color:#7f93b1}
+.nc-new{animation:track-in .24s ease-out}.nc-new .nc-icon{animation:toast-icon .7s ease-out 1}
+.notify-badge.nc-pulse{animation:notify-pulse .8s ease-out 1}
+.notices{max-width:900px}.notices-tools{display:grid;grid-template-columns:minmax(0,1fr) 150px auto auto;align-items:center;gap:8px;margin-bottom:10px}
+body[data-page=dashboard] .notices-tools input:not([type=checkbox]){height:38px;min-height:38px;margin:0;font-size:13px}
+body[data-page=dashboard] .notices-only{display:flex;align-items:center;gap:6px;margin:0;font-size:12.5px;font-weight:500;color:#b9cce6;white-space:nowrap}.notices-only input{width:15px;height:15px;margin:0;accent-color:#4d8df0}
+.notices-list{display:grid;gap:4px}
+.notices-row{display:grid;grid-template-columns:28px minmax(0,1fr) auto auto;align-items:center;gap:10px;padding:6px 10px;border:1px solid #1b2b44;border-radius:10px;background:#0b1626}
+.notices-row[data-unread=true]{border-color:#2f5d8f;background:#0f1d33}
+.notices-open{display:grid;min-width:0;padding:2px 0;border:0;background:transparent;color:inherit;text-align:left;cursor:pointer}.notices-open:hover{transform:none}
+.notices-open strong{font-size:13px;color:#eef3ff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.notices-open small{font-size:12px;color:#8fa5c4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.notices-row time{font-size:11px;color:#7f93b1;white-space:nowrap}
+@media(max-width:700px){.notices-tools{grid-template-columns:1fr 1fr}.notices-tools input[type=search]{grid-column:1/-1}.notices-row{grid-template-columns:28px minmax(0,1fr) auto}.notices-row time{display:none}}
+@media(prefers-reduced-motion:reduce){.nc-new,.nc-new .nc-icon,.nc-group[data-open=true] .nc-items,.notify-badge.nc-pulse{animation:none}}
+/* Enterprise Update Status: tarjeta compacta, estados claros y efectos solo cuando hay algo que atender. */
+.system-module .system-checker{padding:18px 20px!important;display:grid;gap:12px}
+.system-checker-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.system-checker-head h2{margin:0 0 2px;font-size:16.5px;letter-spacing:-.2px}
+.system-check-headline{position:static;display:flex;align-items:center;gap:10px;margin:0;padding:10px 12px;border:1px solid #223450;border-radius:11px;background:#0b1626;font-size:13.5px;font-weight:600;color:#dbe8fb;line-height:1.35;transition:border-color .25s,background .25s,color .25s;animation:system-in .22s ease-out}
+.system-check-headline>.system-icon{flex:0 0 20px;width:20px;height:20px;transition:color .25s}
+.system-check-headline>span{min-width:0;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+.system-check-headline[data-state=ok]{border-color:#1f5b46;background:#0f2a22;color:#bfeeda}.system-check-headline[data-state=ok]>.system-icon{color:#5fd6a3}
+.system-check-headline[data-state=pending]{border-color:#5c4a22;background:#1c1810;color:#f3d48f;box-shadow:0 0 0 0 #f3c67755;animation:update-glow 1.4s ease-out 1}.system-check-headline[data-state=pending]>.system-icon{color:#f3c677}
+.system-check-headline[data-state=error]{border-color:#6d2a30;background:#2a1418;color:#ffc2c5}.system-check-headline[data-state=error]>.system-icon{color:#ff8f93}
+.system-check-headline.is-spinning>.system-icon{animation:ai-spin 1s linear infinite;color:#8bb8ff}
+@keyframes update-glow{0%{box-shadow:0 0 0 0 #f3c67766}100%{box-shadow:0 0 0 10px #f3c67700}}
+.system-new{display:none!important}
+.system-actions{display:flex;flex-wrap:wrap;gap:8px}
+.system-actions button{position:relative;display:inline-flex;align-items:center;gap:8px;min-height:38px;padding:8px 14px;font-size:13px}
+.system-news{margin-left:4px;padding:1px 7px;border-radius:999px;background:#255eb2;color:#fff;font-size:10px;font-weight:700;letter-spacing:.3px;animation:new-pop .4s ease-out both}
+@media(max-width:520px){.system-checker-head{flex-direction:column}.system-actions button{flex:1 1 100%;justify-content:center}}
+@media(prefers-reduced-motion:reduce){.system-check-headline,.system-check-headline.is-spinning>.system-icon,.system-news{animation:none}}
+/* Smart Selection Premium: selector general, contador compacto y acciones en una sola fila de altura fija (la lista no se desplaza). */
+.mail-bulk{flex-wrap:nowrap;height:48px;min-height:48px;padding:0 12px;gap:10px;overflow:visible}
+.mail-bulk .mail-check{flex:0 0 17px;width:17px;height:17px}
+.mail-bulk-label{display:inline-flex;align-items:center;gap:6px;flex:0 0 auto;margin-right:0;padding:4px 2px;border:1px solid transparent;border-radius:999px;font-size:12.5px;font-weight:600;color:#9bb0cf;white-space:nowrap;transition:background .2s,border-color .2s,color .2s,padding .2s}
+.mail-bulk[data-active=true] .mail-bulk-label{padding:4px 11px 4px 9px;border-color:#2f5d8f;background:#14294a;color:#dbe8fb}
+.mail-bulk-label .system-icon{width:14px;height:14px;color:#69a7ff}
+.mail-bulk-label.mail-count-change span{animation:count-change .2s ease-out}
+@keyframes count-change{from{opacity:.3;transform:translateY(-4px)}to{opacity:1;transform:none}}
+.mail-bulk .mail-bulk-clear{display:none!important}
+.mail-bulk-actions{flex:1 1 auto;justify-content:flex-end;min-width:0;padding-top:0}
+.mail-bulk-more{margin-left:0}
+@media(prefers-reduced-motion:reduce){.mail-bulk-label.mail-count-change span{animation:none}}

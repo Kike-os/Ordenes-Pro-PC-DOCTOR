@@ -4,6 +4,21 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.8 — 2026-10-11 10:36 (UTC-05:00)
+
+Correos devueltos, Centro de Notificaciones compacto por categorías, Estado de actualizaciones y selector múltiple de correo.
+
+### Nuevas funcionalidades
+
+- Mail Pro: detección de correos devueltos y entregas retrasadas analizando los informes de entrega (DSN), con aviso del destinatario afectado y registro único.
+
+### Mejoras realizadas
+
+- Mail Pro: los rechazos del servidor de envío se distinguen (destinatario rechazado, error temporal, rechazo del mensaje) y el envío correcto se informa como «Envío aceptado por el servidor».
+- Centro de Notificaciones compacto (Smart Notification Center): mini panel translúcido agrupado por categorías y nueva página «Actividad y notificaciones» con búsqueda, filtros y marcado como leído.
+- Tarjeta «Estado de actualizaciones» rediseñada y sincronizada con el indicador Release, con la cuenta regresiva de recarga segura; «Novedades» solo aparece mientras no se haya consultado el historial.
+- Mail Pro: selector múltiple compacto con contador y acciones en una fila de altura fija; la lista ya no se desplaza al seleccionar.
+
 ## v1.5.7 — 2026-10-11 10:26 (UTC-05:00)
 
 Protección de datos con respaldo diario de la base central y actualización automática segura de las sesiones abiertas.
