@@ -2,6 +2,7 @@
 import os
 import sys
 from pathlib import Path
+from urllib.parse import parse_qsl, urlencode
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / 'local'))
 
@@ -19,4 +20,10 @@ def app(environ, start_response):
     client = environ.get('HTTP_X_REAL_IP') or environ.get('HTTP_X_FORWARDED_FOR', '').split(',')[0].strip()
     if client:
         environ['REMOTE_ADDR'] = client
+    # La reescritura de vercel.json sustituye la ruta por /api/index y entrega la original en __path.
+    query = parse_qsl(environ.get('QUERY_STRING', ''), keep_blank_values=True)
+    routed = [value for key, value in query if key == '__path']
+    if routed:
+        environ['PATH_INFO'] = '/' + routed[0].lstrip('/')
+        environ['QUERY_STRING'] = urlencode([(key, value) for key, value in query if key != '__path'])
     return application(environ, start_response)
