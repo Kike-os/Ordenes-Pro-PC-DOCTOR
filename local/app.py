@@ -670,7 +670,7 @@ class Handler(BaseHTTPRequestHandler):
                 prefs=c.execute('SELECT value FROM system_state WHERE key=?',('mail_prefs:'+str(user['id']),)).fetchone() if mail_allowed(user) else None
                 return self.reply(200, {'user':dict(user,mail=mail_allowed(user),mail_prefs=json.loads(prefs['value']) if prefs else None,mail_signature=mail_signature_card(c) if mail_allowed(user) else None,storage='cloud' if remote_db.configured() else 'local'),'server_time':time.time()})
             if path == '/api/weather':
-                return self.reply(200, current_weather())
+                return self.reply(200, current_weather(force=parse_qs(urlsplit(self.path).query).get('fresh',[''])[0]=='1'))
             if path == '/api/time':
                 return self.reply(200, {'server_time':time.time(),'timezone':'America/Guayaquil'})
             if path == '/api/thermal-printer':return self.reply(200,thermal_printing.capability())

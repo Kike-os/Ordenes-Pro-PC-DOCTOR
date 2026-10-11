@@ -4,6 +4,20 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.37 — 2026-10-11 18:47 (UTC-05:00)
+
+Citas de Hoy compacto y sincronizado, clima con actualización manual y avisos de cambio
+
+### Mejoras realizadas
+
+- Citas de Hoy: estado vacío compacto en una fila con la próxima cita, máximo tres citas con «Ver todas» y actualización cada 15 segundos, al volver a la ventana y al recuperar conexión
+- Clima: hora de la última consulta, botón «Actualizar ahora», actualización al recuperar conexión y aviso discreto cuando cambia la condición o la temperatura varía 4 °C o más
+- Nueva Cita: texto de la casilla de avisos con nota secundaria y botón de cierre con respuesta roja
+
+### Errores corregidos
+
+- Inicio: «Agendar cita» abre el formulario interno (que permite agendar para hoy) en lugar de la página pública, que solo acepta fechas desde mañana
+
 ## v1.5.36 — 2026-10-11 18:34 (UTC-05:00)
 
 Acciones por cita en la Agenda: editar, cancelar y eliminar con auditoría

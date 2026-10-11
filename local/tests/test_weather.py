@@ -18,8 +18,11 @@ class WeatherTests(unittest.TestCase):
         payload={'properties':{'meta':{'updated_at':now},'timeseries':[{'time':now,'data':{'instant':{'details':{'air_temperature':17.4,'wind_speed':2}},'next_1_hours':{'summary':{'symbol_code':'rain'}}}}]}}
         with patch.object(weather,'urlopen',return_value=io.BytesIO(json.dumps(payload).encode())) as fetch:
             first=weather.current_weather();second=weather.current_weather()
+            # La actualización manual tampoco repite la consulta al proveedor dentro del mismo minuto.
+            forced=weather.current_weather(force=True);self.assertIs(forced,first);self.assertTrue(first['checked_at']);self.assertEqual(fetch.call_count,1)
+            weather._CACHE['asked_at']-=weather.FORCE_GAP+1;weather.urlopen.return_value=io.BytesIO(json.dumps(payload).encode());weather.current_weather(force=True);self.assertEqual(fetch.call_count,2)
             self.assertTrue(first['available']);self.assertEqual(first['icon'],'cloud-rain')
-            self.assertEqual(first,second);self.assertEqual(fetch.call_count,1)
+            self.assertEqual(first,second)
             self.assertIn('OrdenesPro',fetch.call_args.args[0].headers['User-agent'])
         weather._CACHE.update(key=None,expires=0,data=None)
         with patch.object(weather,'urlopen',side_effect=OSError('Sin conexión')):

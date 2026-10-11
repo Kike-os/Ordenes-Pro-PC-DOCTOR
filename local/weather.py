@@ -9,7 +9,8 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 _LOCK=threading.Lock()
-_CACHE={'key':None,'expires':0,'data':None,'good':None,'good_at':0}
+_CACHE={'key':None,'expires':0,'data':None,'good':None,'good_at':0,'asked_at':0}
+FORCE_GAP=60  # una actualización manual no consulta al proveedor más de una vez por minuto
 SHORT={'Parcialmente nublado':'Algo nublado','Nieve / aguanieve':'Nieve'}
 
 
@@ -33,7 +34,7 @@ def describe(symbol,wind):
     return 'Clima no disponible','cloud-off'
 
 
-def current_weather():
+def current_weather(force=False):
     city=os.getenv('WEATHER_CITY','Otavalo, EC')[:80]
     try:
         lat=float(os.getenv('WEATHER_LATITUDE','0.2346'))
@@ -43,7 +44,8 @@ def current_weather():
         return {'available':False,'city':city,'label':'Clima no disponible','icon':'cloud-off'}
     key=(city,lat,lon)
     with _LOCK:
-        if _CACHE['key']==key and _CACHE['expires']>time.monotonic():return _CACHE['data']
+        if _CACHE['key']==key and _CACHE['data'] and (_CACHE['expires']>time.monotonic() if not force else time.monotonic()-_CACHE['asked_at']<FORCE_GAP):return _CACHE['data']
+        _CACHE['asked_at']=time.monotonic()
         result={'available':False,'city':city,'label':'Clima no disponible','icon':'cloud-off'}
         ttl=60
         try:
@@ -69,7 +71,7 @@ def current_weather():
             if icon=='cloud-off':raise ValueError()
             result.update(available=True,temperature=round(temperature),label=label,short=SHORT.get(label,label),icon=icon,
                 source='MET Norway',source_url='https://api.met.no/',valid_at=row['time'],
-                updated_at=payload['properties']['meta']['updated_at'],forecast=True,stale=False)
+                updated_at=payload['properties']['meta']['updated_at'],forecast=True,stale=False,checked_at=now.isoformat(timespec='seconds'))
             # Datos adicionales solo cuando el proveedor los entrega; nunca se rellenan con valores supuestos.
             humidity=instant.get('relative_humidity');rain=period.get('details',{}).get('precipitation_amount') if 'next_1_hours' in data else None
             if isinstance(humidity,(int,float)) and 0<=humidity<=100:
