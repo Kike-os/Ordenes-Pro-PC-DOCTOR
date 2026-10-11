@@ -317,7 +317,7 @@ class SecurityTests(unittest.TestCase):
         import versioning
         current=versioning.load()['releases'][0]['version']
         page=self.request('/login')['body']
-        self.assertIn('Release '+current+'</span>',page);self.assertNotIn('has-update',page);self.assertNotIn('{{',page)
+        self.assertIn('Release '+current+'<span class="release-dot"',page);self.assertNotIn('has-update',page);self.assertNotIn('{{',page)
         with app.connect() as c:c.execute("INSERT INTO system_state VALUES ('available_update',?)",(json.dumps({'version':'99.0.0','date':'2026-01-02T10:00:00-05:00','summary':''}),))
         waiting=self.request('/login')['body']
         self.assertIn('class="login-version has-update"',waiting);self.assertIn('Actualización disponible · v99.0.0',waiting)

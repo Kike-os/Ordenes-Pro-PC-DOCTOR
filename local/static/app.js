@@ -211,7 +211,7 @@ function identity(){ $('user-name').textContent=currentUser.name;$('user-role').
 function routeState(){const [name,query='']=location.hash.slice(1).split('?');return {name:moduleInfo[name]?name:'home',params:new URLSearchParams(query)};}
 function go(name,params=new URLSearchParams()){if(location.pathname!=='/')history.replaceState(null,'','/'+location.hash);location.hash=name+(params.size?'?'+params.toString():'');}
 async function dashboard(){
- const {user,server_time}=await api('/api/me');currentUser=user;csrf=user.csrf;identity();initHeaderNavigation();initHeader(server_time);initNotifications();setTimeout(()=>runSystemCheck(false),1500);
+ const {user,server_time}=await api('/api/me');currentUser=user;csrf=user.csrf;identity();initHeaderNavigation();initHeader(server_time);initNotifications();initReleaseChip();setTimeout(()=>runSystemCheck(false),1500);
  $('today').textContent=new Intl.DateTimeFormat('es-EC',{timeZone:'America/Guayaquil',weekday:'long',day:'numeric',month:'long',year:'numeric'}).format(new Date());
  document.querySelectorAll('[data-module]').forEach(card=>{const name=card.dataset.module;if(name==='settings'&&!admin()){card.disabled=true;card.querySelector('.card-description').textContent='Disponible para administradores.';}card.addEventListener('click',()=>name==='new'?showOrder():go(name,name==='orders'?new URLSearchParams({active:'1'}):undefined));});
  document.querySelector('[data-nav=settings]').setAttribute('aria-disabled',String(!admin()));
@@ -323,6 +323,34 @@ function runSystemCheck(force=false,announce=true){
   .catch(error=>{Object.assign(systemCheck,{state:'error',error:error.message});if(force&&announce)toast('No fue posible comprobar las actualizaciones.','error');return null;})
   .finally(()=>{systemCheck.running=null;document.dispatchEvent(new CustomEvent('systemcheck'));});
  return systemCheck.running;
+}
+// Etiqueta «Release» del encabezado: refleja la comprobación real de versiones y abre un panel compacto con el detalle.
+function initReleaseChip(){
+ const chip=$('release-chip');if(!chip)return;const installed=chip.querySelector('.release-label').textContent.replace('Release ','').trim(),icon=chip.querySelector('.release-icon'),layers=icon.innerHTML,sync='<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>';
+ const panel=el('div',undefined,'release-panel');panel.id='release-panel';panel.hidden=true;panel.setAttribute('role','dialog');panel.setAttribute('aria-label','Estado de la versión');document.body.append(panel);
+ const wide=matchMedia('(min-width: 1000px)'),placeChip=()=>{if(wide.matches)document.querySelector('.header-utilities').prepend(chip);else $('header-drawer').append(chip);if(!panel.hidden)setOpen(false);};wide.addEventListener('change',placeChip);placeChip();
+ let open=false,announced='';
+ const labels={idle:'Sin comprobar',working:'Comprobando…',ok:'Actualizado',pending:'Nueva versión disponible',error:'Error de comprobación'};
+ const visual=()=>systemCheck.state==='working'?'working':systemCheck.state==='error'?'error':systemCheck.state==='done'?(systemCheck.info.update_available?'pending':'ok'):'idle';
+ function place(){const rect=chip.getBoundingClientRect(),width=Math.min(300,innerWidth-20);panel.style.width=width+'px';panel.style.left=Math.max(10,Math.min(rect.left,innerWidth-width-10))+'px';panel.style.top=Math.round(rect.bottom+8)+'px';}
+ function paintPanel(){
+  const state=visual(),info=systemCheck.info,head=el('div',undefined,'release-panel-head'),title=el('strong','Órdenes Pro'),status=el('span',labels[state],'release-status');status.dataset.state=state;head.append(title,status);
+  const list=el('dl');for(const[label,value]of [['Versión instalada','Release '+installed],['Versión publicada',info?.latest?'Release '+info.latest.version:state==='working'?'Consultando…':'Sin comprobar'],['Última comprobación',systemCheck.lastSuccess?formatOrderDate(systemCheck.lastSuccess):'Aún no realizada']]){const row=el('div');row.append(el('dt',label),el('dd',value));list.append(row);}
+  const note=el('p',state==='pending'?(info.latest.summary||'Hay una versión posterior a la instalada.'):state==='error'?'No fue posible comprobar las actualizaciones. '+systemCheck.error:state==='ok'?'Tu sistema está actualizado.':state==='working'?'Buscando actualizaciones…':'La comprobación se ejecuta al iniciar sesión.','release-note');
+  const actions=el('div',undefined,'release-actions'),news=button('Ver novedades',()=>{setOpen(false);go('system');},'primary'),again=button(state==='error'?'Reintentar':'Comprobar ahora',()=>runSystemCheck(true,false));again.disabled=state==='working';actions.append(news,again);panel.replaceChildren(head,list,note,actions);
+ }
+ function paint(){
+  const state=visual();chip.dataset.state=state;icon.innerHTML=state==='working'?sync:layers;chip.setAttribute('aria-label','Release '+installed+'. '+labels[state]+'. Ver el estado de la versión');chip.title=labels[state];
+  // El pulso se reproduce un par de ciclos al detectar una versión nueva y no vuelve a repetirse para esa versión.
+  if(state==='pending'&&announced!==systemCheck.info.latest.version){announced=systemCheck.info.latest.version;chip.classList.remove('release-pulse');void chip.offsetWidth;chip.classList.add('release-pulse');}
+  if(state!=='pending')chip.classList.remove('release-pulse');if(open)paintPanel();
+ }
+ function setOpen(value,focus=false){open=value;panel.hidden=!value;chip.setAttribute('aria-expanded',String(value));if(value){paintPanel();place();panel.querySelector('button').focus({preventScroll:true});}else if(focus)chip.focus();}
+ chip.addEventListener('click',()=>setOpen(!open));chip.addEventListener('animationend',()=>chip.classList.remove('release-pulse'));
+ document.addEventListener('click',event=>{if(open&&event.isTrusted&&!event.target.closest('#release-panel,#release-chip'))setOpen(false);});
+ document.addEventListener('keydown',event=>{if(event.key==='Escape'&&open){event.preventDefault();event.stopPropagation();setOpen(false,true);}},true);
+ addEventListener('resize',()=>{if(open)place();});addEventListener('hashchange',()=>{if(open)setOpen(false);});
+ document.addEventListener('systemcheck',paint);paint();
 }
 function renderSystem(data){
  const root=$('module-content');root.replaceChildren();const wrap=el('div',undefined,'system-module'),installed=data.installed;

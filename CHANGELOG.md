@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.4.1 — 2026-10-11 02:15 (UTC-05:00)
+
+Etiqueta Smart Release en el encabezado y en el acceso.
+
+### Mejoras realizadas
+
+- Etiqueta «Release» en el encabezado con estado de actualización, aviso de versión nueva y panel con la versión instalada y la publicada.
+
 ## v1.4.0 — 2026-10-11 01:55 (UTC-05:00)
 
 PC-DOCTOR Mail Pro, Centro de Configuración y Administración, gestión de cuentas y sesiones, e indicador de versión «Release».
