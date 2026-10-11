@@ -585,7 +585,8 @@ class Handler(BaseHTTPRequestHandler):
                 brands = [dict(r) for r in c.execute('SELECT name,category FROM brands ORDER BY name COLLATE NOCASE')]
                 # SVG primero: al ordenar por nombre, «marca.png» queda antes y «marca.svg» lo reemplaza.
                 logos = {f.stem:f.name for f in sorted((ROOT / 'static' / 'brands').glob('*')) if f.suffix in ('.svg','.png') and re.fullmatch(r'[a-z0-9]+(?:-[a-z0-9]+)*', f.stem)}
-                return self.reply(200, {'geo_metadata':GEO_METADATA,'device_types':DEVICE_TYPES,'brands':brands,'brand_logos':logos})
+                import device_brands,device_manufacturers
+                return self.reply(200, {'geo_metadata':GEO_METADATA,'device_types':DEVICE_TYPES,'brands':brands,'brand_logos':logos,'manufacturers':device_brands.catalog(device_manufacturers.configured())})
             if path.startswith('/api/geo/'):
                 query=parse_qs(urlsplit(self.path).query)
                 get=lambda key:query.get(key,[''])[0][:150]
@@ -705,7 +706,8 @@ class Handler(BaseHTTPRequestHandler):
             if path == '/api/devices/identify':
                 if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
                 import device_lookup
-                status,payload=device_lookup.identify(c,parse_qs(urlsplit(self.path).query).get('serial',[''])[0][:200])
+                lookup_query=parse_qs(urlsplit(self.path).query)
+                status,payload=device_lookup.identify(c,lookup_query.get('serial',[''])[0][:200],lookup_query.get('brand',[''])[0][:80],lambda:not limited(c,'device-external:'+str(user['id']),limit=40,window=3600))
                 return self.reply(status,payload)
             if path in ('/api/orders', '/api/clients', '/api/devices'):
                 query = parse_qs(urlsplit(self.path).query)
@@ -1608,8 +1610,12 @@ class Handler(BaseHTTPRequestHandler):
                     client_id=selected['id']
                     tracking,tracking_errors=order_workspace.validate(c,dict(data,problem=fields['problem'],status='pendiente',assigned_to=str(data.get('assigned_to') or user['id']),internal_notes=data.get('additional_notes',''),findings=data.get('initial_diagnosis','')))
                     if tracking_errors:return self.reply(400,{'error':'Revisa los datos de recepción.','fields':tracking_errors})
-                    device_id = c.execute('INSERT INTO devices(client_id,type,category,brand,model,serial,color) VALUES (?,?,?,?,?,?,?)',
-                        (client_id,legacy_type(fields['type']),fields['type'],fields['brand'],fields['model'],fields['serial'],fields['color'])).lastrowid
+                    import device_lookup
+                    # Sin duplicados: si este cliente ya tiene registrado exactamente el mismo equipo (misma serie, tipo, marca, modelo y color), se reutiliza.
+                    same=c.execute("SELECT id FROM devices WHERE client_id=? AND category=? AND COALESCE(brand,'')=? AND COALESCE(model,'')=? AND COALESCE(color,'')=? AND COALESCE(serial,'')!='' AND upper(replace(serial,' ',''))=? ORDER BY id LIMIT 1",
+                        (client_id,fields['type'],fields['brand'],fields['model'],fields['color'],device_lookup.normalize(fields['serial']))).fetchone() if fields['serial'] else None
+                    device_id = same['id'] if same else c.execute('INSERT INTO devices(client_id,type,category,brand,model,serial,color,identity_source) VALUES (?,?,?,?,?,?,?,?)',
+                        (client_id,legacy_type(fields['type']),fields['type'],fields['brand'],fields['model'],fields['serial'],fields['color'],device_lookup.source(data.get('identity_source')) or ('manual' if fields['brand'] or fields['model'] else ''))).lastrowid
                     remember_brand(c,fields['brand'],fields['type'])
                     number_date = received.strftime('%Y%m%d')
                     c.execute('INSERT INTO daily_order_sequences(reception_date,value) VALUES (?,1) ON CONFLICT(reception_date) DO UPDATE SET value=value+1',(number_date,))

@@ -2881,3 +2881,8 @@ body[data-page=dashboard] .toast.toast-release .toast-body p{font-size:12px;colo
 @media(max-width:360px){#order-dialog .wizard-nav button[data-state] span:last-child{font-size:9px;letter-spacing:-.3px}}
 #order-dialog .wizard-nav button[data-state=pending]:disabled{opacity:.88}
 @media(max-width:360px){body[data-page=dashboard] #order-dialog .wizard-nav{padding-left:6px;padding-right:6px}body[data-page=dashboard] #order-dialog .wizard-nav ol{gap:2px}#order-dialog .wizard-nav button[data-state]{padding-left:0;padding-right:0}#order-dialog .wizard-nav button[data-state] span:last-child{font-size:8.8px;letter-spacing:-.35px}#order-dialog .wizard-track{left:6px;right:6px}}
+
+/* Nueva orden: altura máxima de 85dvh con encabezado y pie visibles; consulta asistida del fabricante. */
+#order-dialog.wizard-dialog{max-height:85dvh}#order-dialog.wizard-dialog form{max-height:85dvh}
+.serial-official select{flex:1 1 180px;min-width:0;max-width:260px;height:34px;min-height:34px;margin:0;padding:0 10px;font-size:12px}
+.serial-official .secondary[hidden]{display:none}

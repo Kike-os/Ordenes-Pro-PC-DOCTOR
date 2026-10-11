@@ -623,7 +623,7 @@ class SecurityTests(unittest.TestCase):
         cookie,csrf=self.login()
         self.assertEqual(self.request('/api/devices/identify?serial=SN-ABC123')['status'],401)
         empty=self.request('/api/devices/identify?serial=SN-ABC123',cookie=cookie)
-        self.assertEqual((empty['status'],empty['body']['matches'],empty['body']['manufacturer']),(200,[],{'available':False,'message':'Identificación automática no disponible'}))
+        self.assertEqual((empty['status'],empty['body']['matches'],empty['body']['manufacturer']),(200,[],{'available':False,'state':'unavailable','brand':'','message':'Identificación automática no disponible','result':None}))
         first=self.request('/api/orders',self.order_data({'client':'Prueba','problem':'Prueba','brand':'Lenovo','model':'ThinkPad T14','serial':'SN-ABC123'}),cookie=cookie,csrf=csrf)['body']['id']
         found=self.request('/api/devices/identify?serial=%20sn-abc123%20',cookie=cookie)['body']
         self.assertEqual(found['serial'],'SN-ABC123')
@@ -632,6 +632,51 @@ class SecurityTests(unittest.TestCase):
         self.assertEqual((match['brand'],match['model'],match['orders'],match['last_order']['id'],match['last_order']['status']),('Lenovo','ThinkPad T14',1,first,'En espera'))
         self.assertEqual(self.request('/api/devices/identify?serial=SN-ABC12',cookie=cookie)['body']['matches'],[])
         for bad in ('abc','%27%20OR%201%3D1','serie%25'):self.assertEqual(self.request('/api/devices/identify?serial='+bad,cookie=cookie)['status'],400)
+
+    def test_manufacturer_lookup_only_with_official_credentials(self):
+        import device_manufacturers as makers
+        from unittest.mock import patch
+        cookie,csrf=self.login();url='/api/devices/identify?serial=ABC1234&brand=Dell'
+        catalog={m['slug']:m for m in self.request('/api/reception-options',cookie=cookie)['body']['manufacturers']}
+        self.assertEqual(set(catalog),{'hp','dell','lenovo','acer','asus','apple','msi','samsung','huawei','epson'})
+        self.assertFalse(any(m['automatic'] for m in catalog.values()))
+        # Sin credenciales no se hace ninguna consulta externa.
+        with patch.object(makers,'_request',side_effect=AssertionError('no debe consultar')):
+            self.assertEqual(self.request(url,cookie=cookie)['body']['manufacturer']['state'],'unavailable')
+        calls=[]
+        def fake(address,data=None,headers=None):
+            calls.append(address)
+            return {'access_token':'token-de-prueba','expires_in':3600} if address.endswith('/token') else [{'serviceTag':'ABC1234','productLineDescription':'LATITUDE 5420','invalid':False}]
+        with patch.dict(app.os.environ,{'DELL_API_CLIENT_ID':'id-de-prueba','DELL_API_CLIENT_SECRET':'secreto-de-prueba'}):
+            makers._tokens.clear()
+            with patch.object(makers,'_request',side_effect=fake):
+                found=self.request(url,cookie=cookie)['body']['manufacturer']
+                self.assertEqual((found['state'],found['result']),('found',{'brand':'Dell','model':'LATITUDE 5420','type':'','source':'fabricante:dell'}))
+                self.assertNotIn('secreto-de-prueba',json.dumps(found));self.assertTrue(all('dell.com' in c for c in calls))
+                # Otra marca o una serie que no es Service Tag no se envían a Dell.
+                before=len(calls)
+                self.assertEqual(self.request('/api/devices/identify?serial=ABC1234&brand=Lenovo',cookie=cookie)['body']['manufacturer']['state'],'unavailable')
+                self.assertEqual(self.request('/api/devices/identify?serial=SERIE-MUY-LARGA-123&brand=Dell',cookie=cookie)['body']['manufacturer']['state'],'not_found')
+                self.assertEqual(len(calls),before)
+            with patch.object(makers,'_request',side_effect=makers.ProviderError('conexion','x')):
+                makers._tokens.clear();failed=self.request(url,cookie=cookie)
+                self.assertEqual((failed['status'],failed['body']['manufacturer']['state']),(200,'error'))
+            # El historial propio tiene prioridad: una serie ya registrada no sale del sistema.
+            self.request('/api/orders',self.order_data({'client':'Prueba','problem':'Prueba','brand':'Dell','model':'Latitude 5420','serial':'ABC1234','identity_source':'fabricante:dell'}),cookie=cookie,csrf=csrf)
+            with patch.object(makers,'_request',side_effect=AssertionError('no debe consultar')):
+                known=self.request(url,cookie=cookie)['body'];self.assertEqual((len(known['matches']),known['manufacturer']['state']),(1,'unavailable'))
+        makers._tokens.clear()
+
+    def test_device_source_is_saved_and_same_device_is_not_duplicated(self):
+        cookie,csrf=self.login();base={'client':'Prueba','problem':'Prueba','brand':'HP','model':'ProBook 440','serial':'5CD-1234'}
+        first=self.request('/api/orders',self.order_data(dict(base,identity_source='historial',request_key='device-source-request-0001')),cookie=cookie,csrf=csrf)['body']['id']
+        second=self.request('/api/orders',self.order_data(dict(base,serial='5cd-1234',identity_source='<script>',request_key='device-source-request-0002')),cookie=cookie,csrf=csrf)['body']['id']
+        third=self.request('/api/orders',self.order_data(dict(base,model='ProBook 450',identity_source='otra cosa',request_key='device-source-request-0003')),cookie=cookie,csrf=csrf)['body']['id']
+        self.assertEqual(len({first,second,third}),3)
+        with app.connect() as c:
+            rows=c.execute('SELECT d.id,d.model,d.identity_source,(SELECT COUNT(*) FROM orders o WHERE o.device_id=d.id) n FROM devices d ORDER BY d.id').fetchall()
+            self.assertEqual([(r['model'],r['identity_source'],r['n']) for r in rows],[('ProBook 440','historial',2),('ProBook 450','manual',1)])
+            self.assertEqual(c.execute('SELECT COUNT(*) FROM orders').fetchone()[0],3)
 
     def test_brand_logo_files_are_listed_and_served(self):
         cookie,csrf=self.login()

@@ -8,6 +8,24 @@
   },
   "releases": [
     {
+      "version": "1.5.19",
+      "date": "2026-10-11T13:58:05-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Identificación de equipos con consulta asistida por fabricante y procedencia de los datos",
+      "changes": {
+        "features": [
+          "Capa de adaptadores oficiales por fabricante; adaptador de Dell TechDirect listo para activarse con credenciales propias"
+        ],
+        "improvements": [
+          "Identificación de equipos: catálogo de 10 fabricantes con consulta manual asistida en su portal oficial, procedencia de marca y modelo guardada y equipos sin duplicar"
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.18",
       "date": "2026-10-11T13:47:42-05:00",
       "type": "patch",

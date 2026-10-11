@@ -1,0 +1,1 @@
+ALTER TABLE devices ADD COLUMN identity_source TEXT NOT NULL DEFAULT '';

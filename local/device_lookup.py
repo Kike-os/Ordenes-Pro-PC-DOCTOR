@@ -1,14 +1,15 @@
 """Identificación de equipos por número de serie.
 
-Primero se consulta el historial propio de Órdenes Pro. La consulta a fabricantes solo se hace con un servicio
-oficial configurado; mientras no exista ninguno, se informa «no disponible» y nunca se deduce un modelo a partir
-del formato de la serie.
+Primero se consulta el historial propio de Órdenes Pro. La consulta a fabricantes solo se hace con un adaptador
+oficial configurado (device_manufacturers); sin él se informa «no disponible» y nunca se deduce un modelo a partir
+del formato de la serie. El catálogo de marcas y portales está en device_brands.
 """
 import re
 
+import device_brands
+import device_manufacturers
+
 SERIAL=re.compile(r'[A-Z0-9-]{4,150}')
-# Adaptadores oficiales por fabricante. Vacío hasta contar con credenciales autorizadas de cada programa.
-MANUFACTURERS={}
 
 
 def normalize(value):
@@ -31,9 +32,29 @@ def internal(c,serial):
     return list(found.values())[:5]
 
 
-def identify(c,value):
+def identify(c,value,brand='',allow_external=lambda:True):
+    """Primero el historial propio; después, solo un adaptador oficial configurado para la marca indicada."""
     serial=normalize(value)
     if not SERIAL.fullmatch(serial):return 400,{'error':'Indica un número de serie de 4 a 150 caracteres: letras, números y guiones.'}
     matches=internal(c,serial)
-    # Sin adaptador oficial no se envía la serie a ningún servicio externo.
-    return 200,{'serial':serial,'matches':matches,'manufacturer':{'available':bool(MANUFACTURERS),'message':'' if MANUFACTURERS else 'Identificación automática no disponible'}}
+    maker=device_brands.find(brand)
+    state={'available':False,'state':'unavailable','brand':maker['slug'] if maker else '','message':'Identificación automática no disponible','result':None}
+    # La serie solo sale del sistema si no está en el historial, la marca tiene un servicio oficial configurado y no se superó el límite.
+    if not matches and maker and maker['slug'] in device_manufacturers.configured():
+        state['available']=True
+        if not allow_external():state.update(state='limited',message='Se alcanzó el límite de consultas al fabricante. Intenta más tarde o continúa manualmente.')
+        else:
+            try:
+                found=device_manufacturers.lookup(maker['slug'],serial)
+                if found:state.update(state='found',message='Identificado por el servicio oficial de '+maker['name'],result=dict(found,source='fabricante:'+maker['slug']))
+                else:state.update(state='not_found',message=maker['name']+' no reconoce esta serie.')
+            except device_manufacturers.ProviderError as error:
+                print('device-lookup',maker['slug'],error.kind,flush=True)
+                state.update(state='error',message='El servicio de '+maker['name']+' no está disponible ahora. Continúa con el ingreso manual.')
+    return 200,{'serial':serial,'matches':matches,'manufacturer':state}
+
+
+def source(value):
+    """Procedencia válida de la marca y el modelo confirmados por el técnico."""
+    value=str(value or '')
+    return value if value in ('manual','historial') or re.fullmatch(r'fabricante:[a-z0-9-]{1,30}',value) else ''

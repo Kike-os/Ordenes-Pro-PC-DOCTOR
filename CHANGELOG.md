@@ -4,6 +4,18 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.19 — 2026-10-11 13:58 (UTC-05:00)
+
+Identificación de equipos con consulta asistida por fabricante y procedencia de los datos
+
+### Nuevas funcionalidades
+
+- Capa de adaptadores oficiales por fabricante; adaptador de Dell TechDirect listo para activarse con credenciales propias
+
+### Mejoras realizadas
+
+- Identificación de equipos: catálogo de 10 fabricantes con consulta manual asistida en su portal oficial, procedencia de marca y modelo guardada y equipos sin duplicar
+
 ## v1.5.18 — 2026-10-11 13:47 (UTC-05:00)
 
 Smart Progress Stepper en la nueva orden de recepción
