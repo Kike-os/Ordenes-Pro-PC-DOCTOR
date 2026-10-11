@@ -1,0 +1,15 @@
+# Solo se despliegan api/ y el código de local/; nunca datos, respaldos ni material de revisión.
+/revision
+/tmp
+/output
+/docs
+/maintenance
+/Ordenes-Pro-PC-DOCTOR
+/local/var
+/local/tests
+/local/.env
+*.zip
+*.sqlite3
+*.sqlite3-*
+*.sh
+__pycache__

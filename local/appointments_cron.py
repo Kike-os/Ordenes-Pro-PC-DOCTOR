@@ -2,7 +2,7 @@
 import os,sqlite3,time,smtplib,ssl
 from email.message import EmailMessage
 from pathlib import Path
-import appointments
+import appointments,remote_db
 ROOT=Path(__file__).resolve().parent
 DB=Path(os.getenv('APP_DB',ROOT/'var'/'ordenes.sqlite3'))
 
@@ -25,7 +25,9 @@ def send(row,event):
   smtp.send_message(message)
 
 def run():
- conn=sqlite3.connect(DB,timeout=20);conn.row_factory=sqlite3.Row;conn.execute('PRAGMA foreign_keys=ON');now=appointments.now();now_s=appointments.stamp(now)
+ if remote_db.configured():conn=remote_db.connect()
+ else:conn=sqlite3.connect(DB,timeout=20);conn.row_factory=sqlite3.Row;conn.execute('PRAGMA foreign_keys=ON')
+ now=appointments.now();now_s=appointments.stamp(now)
  try:
   conn.execute('BEGIN IMMEDIATE')
   conn.execute("UPDATE appointment_notifications SET result='pending' WHERE result='sending' AND created_at<?",(appointments.stamp(now-appointments.timedelta(minutes=15)),))

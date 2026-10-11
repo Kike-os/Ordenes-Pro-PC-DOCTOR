@@ -30,6 +30,7 @@ from urllib.request import Request, urlopen
 from urllib.error import URLError
 from reception import (valid_ecuador_phone, DEVICE_TYPES, validate_order, order_code, legacy_type, remember_brand, qr_image, production_enabled, reception_now, order_url, public_base_url)
 
+import remote_db
 import service_terms
 import technical_access
 import thermal_printing
@@ -67,6 +68,8 @@ class Connection(sqlite3.Connection):
 
 
 def connect():
+    if remote_db.configured():
+        return remote_db.connect()
     c = sqlite3.connect(DB, timeout=10, factory=Connection)
     c.row_factory = sqlite3.Row
     c.execute('PRAGMA foreign_keys=ON')
@@ -74,18 +77,22 @@ def connect():
 
 
 def migrate():
+    remote = remote_db.configured()
     DATA.mkdir(mode=0o700, parents=True, exist_ok=True)
     with connect() as c:
         c.execute('CREATE TABLE IF NOT EXISTS migrations (name TEXT PRIMARY KEY)')
         for p in sorted((ROOT / 'migrations').glob('*.sql')):
             if not c.execute('SELECT 1 FROM migrations WHERE name=?', (p.name,)).fetchone():
-                if DB.exists() and c.execute('SELECT COUNT(*) FROM migrations').fetchone()[0]:
+                if (remote or DB.exists()) and c.execute('SELECT COUNT(*) FROM migrations').fetchone()[0]:
                     backup = DATA / f'backup-{time.time_ns()}.sqlite3'
-                    target = sqlite3.connect(backup)
-                    try:
-                        c.backup(target)
-                    finally:
-                        target.close()
+                    if remote:
+                        remote_db.backup(c, backup)
+                    else:
+                        target = sqlite3.connect(backup)
+                        try:
+                            c.backup(target)
+                        finally:
+                            target.close()
                     backup.chmod(0o600)
                 name = p.name.replace("'", "''")
                 c.executescript('BEGIN IMMEDIATE;\n' + p.read_text() + f"\nINSERT INTO migrations VALUES ('{name}');\nCOMMIT;")
@@ -97,7 +104,8 @@ def migrate():
             c.execute('UPDATE orders SET reception_snapshot=? WHERE id=?',(json.dumps(snapshot,ensure_ascii=False),oid))
         for order in c.execute("SELECT id,code FROM orders WHERE qr_url=''").fetchall():
             c.execute('UPDATE orders SET qr_url=? WHERE id=?',(order_url(order['code']),order['id']))
-    DB.chmod(0o600)
+    if not remote:
+        DB.chmod(0o600)
 
 
 def password_hash(password):

@@ -73,6 +73,10 @@ node --check static/app.js
 
 Las pruebas usan bases temporales y datos ficticios, y prueban los manejadores HTTP sin necesitar sockets. Una ejecución satisfactoria no sustituye la revisión visual en el navegador ni la prueba de SMTP real.
 
+## Despliegue en Vercel
+
+Vercel no conserva el archivo SQLite; allí la aplicación usa una base libSQL/Turso mediante `local/remote_db.py`. Seguir [despliegue en Vercel](docs/VERCEL.md).
+
 ## Adaptación para cPanel Python
 
 Se preparó `local/passenger_wsgi.py` para Python 3.11/Passenger y un paquete sin datos ni secretos. Seguir [instalación cPanel](docs/CPANEL.md). Requiere migración y creación del administrador desde la terminal del hosting, configuración HTTPS y prueba remota; todavía no se ha publicado.
