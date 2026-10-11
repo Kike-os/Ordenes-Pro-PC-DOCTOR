@@ -515,6 +515,25 @@ class Handler(BaseHTTPRequestHandler):
                 return self.page('reset.html')
             if not user:
                 return self.reply(401, {'error':'Inicia sesión para continuar.'})
+            agenda_item=re.fullmatch(r'/api/appointments/([0-9]+)',path)
+            if agenda_item:
+                if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
+                found=appointments.detail(c,int(agenda_item[1]))
+                return self.reply(200,{'appointment':found}) if found else self.reply(404,{'error':'Cita no disponible.'})
+            if path == '/api/agenda':
+                # Agenda de Mantenimientos de Clientes: citas (misma tabla que la reserva en línea) y mantenimientos preventivos.
+                if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
+                query=parse_qs(urlsplit(self.path).query);today=appointments.now().date()
+                try:
+                    first=appointments.date.fromisoformat(query.get('from',[''])[0]) if query.get('from',[''])[0] else today-appointments.timedelta(days=7)
+                    last=appointments.date.fromisoformat(query.get('to',[''])[0]) if query.get('to',[''])[0] else today+appointments.timedelta(days=60)
+                except ValueError:return self.reply(400,{'error':'Fecha no válida.'})
+                if last<first or (last-first).days>190:return self.reply(400,{'error':'El período admite hasta 190 días.'})
+                rows,summary=appointments.agenda(c,appointments.stamp(appointments.datetime.combine(first,appointments.time.min,appointments.TZ)),appointments.stamp(appointments.datetime.combine(last+appointments.timedelta(days=1),appointments.time.min,appointments.TZ)))
+                preventive=maintenance.rows(c)
+                summary['preventive']=sum(1 for r in preventive if r['state']=='scheduled' and r['due_date']>=today.isoformat())
+                summary['overdue']=sum(1 for r in preventive if r['state']=='scheduled' and r['due_date']<today.isoformat())
+                return self.reply(200,{'appointments':rows,'maintenance':preventive,'summary':summary,'today':today.isoformat(),'from':first.isoformat(),'to':last.isoformat(),'statuses':appointments.STATUSES,'services':appointments.services(c),'device_types':DEVICE_TYPES,'confirmation':appointments.confirmation_mode(c),'settings':appointments.settings(c) if user['role']=='administrador' else None})
             if path == '/api/appointments':
                 if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
                 query=parse_qs(urlsplit(self.path).query);view=query.get('view',['day'])[0];raw=query.get('date',[''])[0]
@@ -907,7 +926,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(400, {'error':'Solicitud inválida.'})
             data = json.loads(self.rfile.read(length))
             appointment_config_post=path=='/api/appointments/config'
-            if not isinstance(data, dict) or any(not isinstance(v,(str,bool)) and not (workspace_post and ((k=='lines' and isinstance(v,list)) or (k=='revision' and type(v) is int))) and not (appointment_config_post and ((k in ('hours','services','staff_hours') and isinstance(v,list)) or (k=='holiday' and isinstance(v,dict)))) for k,v in data.items()):
+            if not isinstance(data, dict) or any(not isinstance(v,(str,bool)) and not (workspace_post and ((k=='lines' and isinstance(v,list)) or (k=='revision' and type(v) is int))) and not (appointment_config_post and ((k in ('hours','services','staff_hours') and isinstance(v,list)) or (k in ('holiday','new_service') and isinstance(v,dict)))) for k,v in data.items()):
                 return self.reply(400, {'error':'Datos inválidos.'})
             path = urlsplit(self.path).path
             with connect() as c:
@@ -1321,7 +1340,13 @@ class Handler(BaseHTTPRequestHandler):
                     elif action in ('confirmada','presente','completada','no_asistio','cancelada'):
                         if action not in appointments.STATUSES:return self.reply(400,{'error':'Estado de cita inválido.'})
                         if row['status'] in ('cancelada','completada','no_asistio') and action not in ('confirmada',):return self.reply(409,{'error':'La cita ya está cerrada.'})
+                        if action==row['status']:return self.reply(200,{'ok':True})
+                        # Al confirmar una solicitud se comprueba otra vez que el espacio siga libre en el servidor.
+                        if action=='confirmada' and row['status'] in ('solicitada','cancelada','no_asistio') and not appointments.technicians(c,appointments.datetime.fromisoformat(row['starts_at']),row['duration_minutes'],exclude=row['id']):return self.reply(409,{'error':'Ese espacio ya no está disponible. Reprograma la cita.'})
                         c.execute('UPDATE appointments SET status=?,updated_at=? WHERE id=?',(action,now,row['id']))
+                        # El cliente recibe el aviso solo cuando la cita queda efectivamente confirmada o cancelada.
+                        if action=='confirmada' and row['status']=='solicitada':appointments.queue_notice(c,row,'confirmation')
+                        if action=='cancelada':appointments.queue_notice(c,row,'cancelled')
                         c.execute('INSERT INTO appointment_events(appointment_id,actor_id,event,old_start,new_start,old_status,new_status,created_at) VALUES (?,?,?,?,?,?,?,?)',(row['id'],user['id'],'status',row['starts_at'],row['starts_at'],row['status'],action,now));status=200;payload={'ok':True}
                     else:return self.reply(400,{'error':'Acción de cita inválida.'})
                     if status==200:audit(c,user['id'],'appointment_'+str(action),row['id'])

@@ -5,7 +5,12 @@ from zoneinfo import ZoneInfo
 import hashlib,secrets,re
 import reception
 TZ=ZoneInfo('America/Guayaquil')
-STATUSES={'solicitada':'Solicitada','confirmada':'Confirmada','reprogramada':'Reprogramada','cancelada':'Cancelada','presente':'Cliente presente','completada':'Atención completada','no_asistio':'No asistió'}
+STATUSES={'solicitada':'Pendiente de confirmación','confirmada':'Confirmada','reprogramada':'Reprogramada','cancelada':'Cancelada','presente':'En atención','completada':'Completada','no_asistio':'No asistió'}
+# Las reservas en línea verifican la disponibilidad en el servidor. «auto» las deja confirmadas al instante (comportamiento
+# original); «manual» las deja pendientes hasta que el taller las confirme. Se guarda en system_state.
+def confirmation_mode(c):
+ row=c.execute("SELECT value FROM system_state WHERE key='appointments_confirmation'").fetchone()
+ return 'manual' if row and row['value']=='manual' else 'auto'
 
 def now():return datetime.now(TZ)
 def stamp(value):return value.astimezone(TZ).isoformat(timespec='seconds')
@@ -15,7 +20,7 @@ def ensure_staff_hours(c,technician_id):
  for weekday in range(7):
   end='13:00' if weekday==5 else '17:00';enabled=0 if weekday==6 else 1
   c.execute('INSERT OR IGNORE INTO appointment_staff_hours(technician_id,weekday,start_time,end_time,enabled) VALUES (?,?,?,?,?)',(technician_id,weekday,'09:00',end,enabled))
-def settings(c):return {'hours':[dict(r) for r in c.execute('SELECT * FROM appointment_hours ORDER BY weekday')],'staff_hours':[dict(r) for r in c.execute('SELECT h.*,u.name technician FROM appointment_staff_hours h JOIN users u ON u.id=h.technician_id ORDER BY u.name,h.weekday')],'holidays':[dict(r) for r in c.execute('SELECT * FROM appointment_holidays ORDER BY day')],'services':[dict(r) for r in c.execute('SELECT code,label,duration_minutes,active FROM appointment_services ORDER BY label')]}
+def settings(c):return {'confirmation':confirmation_mode(c),'hours':[dict(r) for r in c.execute('SELECT * FROM appointment_hours ORDER BY weekday')],'staff_hours':[dict(r) for r in c.execute('SELECT h.*,u.name technician FROM appointment_staff_hours h JOIN users u ON u.id=h.technician_id ORDER BY u.name,h.weekday')],'holidays':[dict(r) for r in c.execute('SELECT * FROM appointment_holidays ORDER BY day')],'services':[dict(r) for r in c.execute('SELECT code,label,duration_minutes,active FROM appointment_services ORDER BY label')]}
 def update_settings(c,data):
  try:
   for item in data.get('hours',[]):
@@ -30,6 +35,18 @@ def update_settings(c,data):
    code=str(item.get('code',''));duration=int(item.get('duration_minutes',0));active=1 if item.get('active') else 0
    if not c.execute('SELECT 1 FROM appointment_services WHERE code=?',(code,)).fetchone() or duration not in range(15,241,15):return 400,{'error':'Duración de servicio inválida; usa intervalos de 15 minutos.'}
    c.execute('UPDATE appointment_services SET duration_minutes=?,active=? WHERE code=?',(duration,active,code))
+  if data.get('confirmation') in ('auto','manual'):
+   c.execute("INSERT INTO system_state(key,value) VALUES ('appointments_confirmation',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",(data['confirmation'],))
+  # Servicios administrables: renombrar los existentes y añadir nuevos (código interno generado).
+  for item in data.get('services',[]):
+   label=str(item.get('label','')).strip()
+   if label and 3<=len(label)<=80:c.execute('UPDATE appointment_services SET label=? WHERE code=?',(label,str(item.get('code',''))))
+  created=data.get('new_service')
+  if created:
+   label=str(created.get('label','')).strip();duration=int(created.get('duration_minutes',0))
+   if not 3<=len(label)<=80 or duration not in range(15,241,15):return 400,{'error':'El servicio necesita un nombre de 3 a 80 caracteres y una duración en intervalos de 15 minutos.'}
+   if c.execute('SELECT 1 FROM appointment_services WHERE lower(label)=lower(?)',(label,)).fetchone():return 400,{'error':'Ya existe un servicio con ese nombre.'}
+   c.execute('INSERT INTO appointment_services(code,label,duration_minutes,active) VALUES (?,?,?,1)',('svc_'+secrets.token_hex(4),label,duration))
   holiday=data.get('holiday')
   if holiday:
    day=date.fromisoformat(str(holiday.get('day','')));label=str(holiday.get('label','')).strip()[:100]
@@ -129,10 +146,11 @@ def create(c,data,user=None):
  if not client:client_id=c.execute('INSERT INTO clients(name,email,phone,identification) VALUES (?,?,?,?)',(fields['name'],fields['email'],fields['phone'],fields['identification'])).lastrowid
  else:client_id=client['id']
  token=secrets.token_urlsafe(32);created=stamp(now());public='CIT-'+now().strftime('%Y%m%d')+'-'+secrets.token_hex(3).upper()
- cursor=c.execute("INSERT INTO appointments(public_code,manage_token_hash,client_id,technician_id,customer_name,identification,phone,email,device_type,brand,model,service_code,description,notes,starts_at,duration_minutes,status,privacy_consent,communications_consent,created_at,updated_at,request_key) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, 'confirmada',1,?,?,?,?)",(public,token_hash(token),client_id,technician,fields['name'],fields['identification'],fields['phone'],fields['email'],fields['device_type'],fields['brand'],fields['model'],fields['service'],fields['description'],fields['notes'],stamp(start),duration,int(data.get('communications_consent') is True),created,created,key or None))
- aid=cursor.lastrowid;c.execute("INSERT INTO appointment_events(appointment_id,actor_id,event,new_start,new_status,created_at) VALUES (?,?,?,?,?,?)",(aid,user['id'] if user else None,'created',stamp(start),'confirmada',created))
- if fields['email'] and data.get('communications_consent') is True:c.execute("INSERT OR IGNORE INTO appointment_notifications(appointment_id,generation,event,channel,result,created_at) VALUES (?,1,'confirmation','email','pending',?)",(aid,created))
- return 201,{'id':aid,'code':public,'manage_token':token,'starts_at':stamp(start),'status':'confirmada','duration_minutes':duration}
+ initial='confirmada' if user or confirmation_mode(c)=='auto' else 'solicitada'
+ cursor=c.execute("INSERT INTO appointments(public_code,manage_token_hash,client_id,technician_id,customer_name,identification,phone,email,device_type,brand,model,service_code,description,notes,starts_at,duration_minutes,status,privacy_consent,communications_consent,created_at,updated_at,request_key) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?,?,?)",(public,token_hash(token),client_id,technician,fields['name'],fields['identification'],fields['phone'],fields['email'],fields['device_type'],fields['brand'],fields['model'],fields['service'],fields['description'],fields['notes'],stamp(start),duration,initial,int(data.get('communications_consent') is True),created,created,key or None))
+ aid=cursor.lastrowid;c.execute("INSERT INTO appointment_events(appointment_id,actor_id,event,new_start,new_status,created_at) VALUES (?,?,?,?,?,?)",(aid,user['id'] if user else None,'created',stamp(start),initial,created))
+ if initial=='confirmada' and fields['email'] and data.get('communications_consent') is True:c.execute("INSERT OR IGNORE INTO appointment_notifications(appointment_id,generation,event,channel,result,created_at) VALUES (?,1,'confirmation','email','pending',?)",(aid,created))
+ return 201,{'id':aid,'code':public,'manage_token':token,'starts_at':stamp(start),'status':initial,'duration_minutes':duration}
 def reschedule(c,row,start,user):
  duration=row['duration_minutes'];staff=technicians(c,start,duration,exclude=row['id'])
  if not staff:return 409,{'error':'Ese espacio no está disponible.'}
@@ -143,3 +161,28 @@ def reschedule(c,row,start,user):
  return {'ok':True,'starts_at':stamp(start)}
 def admin_rows(c,start,end):
  return [dict(r) for r in c.execute("SELECT a.*,s.label service_label,u.name technician FROM appointments a JOIN appointment_services s ON s.code=a.service_code LEFT JOIN users u ON u.id=a.technician_id WHERE a.starts_at>=? AND a.starts_at<? ORDER BY a.starts_at,a.id",(start,end))]
+
+def queue_notice(c,row,event,generation=None):
+ """Encola un correo al cliente (confirmación o cancelación) solo si dejó correo y autorizó comunicaciones."""
+ if row['email'] and row['communications_consent']:c.execute("INSERT OR IGNORE INTO appointment_notifications(appointment_id,generation,event,channel,result,created_at) VALUES (?,?,?,'email','pending',?)",(row['id'],generation or row['generation'],event,stamp(now())))
+def detail(c,aid):
+ """Cita con su servicio, técnico, cliente vinculado e historial de modificaciones."""
+ row=c.execute("SELECT a.*,s.label service_label,u.name technician FROM appointments a JOIN appointment_services s ON s.code=a.service_code LEFT JOIN users u ON u.id=a.technician_id WHERE a.id=?",(aid,)).fetchone()
+ if not row:return None
+ data=dict(row);data.pop('manage_token_hash',None);data.pop('request_key',None)
+ data['events']=[dict(r) for r in c.execute("SELECT e.id,e.event,e.old_start,e.new_start,e.old_status,e.new_status,e.created_at,e.detail,u.name actor FROM appointment_events e LEFT JOIN users u ON u.id=e.actor_id WHERE e.appointment_id=? ORDER BY e.id DESC",(aid,))]
+ data['notices']=[dict(r) for r in c.execute("SELECT event,channel,result,created_at,completed_at FROM appointment_notifications WHERE appointment_id=? ORDER BY id DESC",(aid,))]
+ order=c.execute('SELECT id,code FROM orders WHERE id=?',(row['converted_order_id'],)).fetchone() if row['converted_order_id'] else None
+ data['order']=dict(order) if order else None
+ return data
+def agenda(c,start,end):
+ """Fuente única de la Agenda de Mantenimientos de Clientes: citas del período y su resumen."""
+ rows=admin_rows(c,start,end)
+ for row in rows:row.pop('manage_token_hash',None);row.pop('request_key',None)
+ today=now().date();day_start=stamp(datetime.combine(today,time.min,TZ));day_end=stamp(datetime.combine(today+timedelta(days=1),time.min,TZ));current=stamp(now())
+ count=lambda sql,*args:c.execute(sql,args).fetchone()[0]
+ summary={'today':count("SELECT COUNT(*) FROM appointments WHERE starts_at>=? AND starts_at<? AND status NOT IN ('cancelada','no_asistio')",day_start,day_end),
+  'pending':count("SELECT COUNT(*) FROM appointments WHERE status='solicitada' AND starts_at>=?",current),
+  'confirmed':count("SELECT COUNT(*) FROM appointments WHERE status IN ('confirmada','reprogramada') AND starts_at>=?",current),
+  'attending':count("SELECT COUNT(*) FROM appointments WHERE status='presente'")}
+ return rows,summary

@@ -4,6 +4,20 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.27 — 2026-10-11 15:20 (UTC-05:00)
+
+Agenda de Mantenimientos de Clientes y confirmación de cierre renovada
+
+### Nuevas funcionalidades
+
+- Agenda de Mantenimientos de Clientes: una sola vista para citas en línea y mantenimientos preventivos, con resumen, lista, día, semana y mes, filtros, detalle de la cita e historial de cambios
+- Citas en línea: confirmación automática o manual configurable, servicios administrables, «Mantenimiento correctivo», notificación «Ver cita» y aviso por correo al taller
+
+### Mejoras realizadas
+
+- Confirmación propia al cerrar una orden o ficha con cambios sin guardar, con «Seguir editando», «Guardar borrador y cerrar» y «Descartar y cerrar», y aviso del navegador al recargar
+- Identificación por serie: mensaje neutro «Equipo nuevo en tu taller» cuando la serie aún no está registrada
+
 ## v1.5.26 — 2026-10-11 14:59 (UTC-05:00)
 
 Campana de notificaciones al extremo derecho

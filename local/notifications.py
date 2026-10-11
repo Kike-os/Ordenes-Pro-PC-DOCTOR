@@ -180,12 +180,17 @@ def build(c, user, now, mail_access=False):
         start = appointments.stamp(appointments.datetime.combine(now.date(), appointments.time.min, appointments.TZ))
         end = appointments.stamp(appointments.datetime.combine(now.date() + appointments.timedelta(days=1), appointments.time.min, appointments.TZ))
         todays = count("SELECT COUNT(*) FROM appointments WHERE starts_at>=? AND starts_at<? AND status IN ('solicitada','confirmada','reprogramada')", start, end)
-        alert('today', todays, 'calendar', 'info', plural(todays, 'cita programada para hoy', 'citas programadas para hoy'), 'Revisa la agenda del día.', '#appointments')
+        alert('today', todays, 'calendar', 'info', plural(todays, 'cita programada para hoy', 'citas programadas para hoy'), 'Revisa la agenda del día.', '#maintenance')
         requested = count("SELECT COUNT(*) FROM appointments WHERE status='solicitada' AND starts_at>=?", appointments.stamp(now))
-        alert('requested', requested, 'calendar', 'warning', plural(requested, 'cita por confirmar', 'citas por confirmar'), 'Solicitudes recibidas desde la agenda en línea.', '#appointments')
-        for row in c.execute("SELECT id,public_code,customer_name,starts_at,created_at FROM appointments WHERE status IN ('solicitada','confirmada') ORDER BY id DESC LIMIT 5"):
-            items.append({'key': 'appointment:' + str(row['id']), 'kind': 'info', 'icon': 'calendar', 'title': 'Nueva cita reservada · ' + row['public_code'],
-                          'detail': row['customer_name'] + ' · ' + row['starts_at'][:16].replace('T', ' '), 'at': row['created_at'], 'href': '#appointments', 'group': 'event'})
+        alert('requested', requested, 'calendar', 'warning', plural(requested, 'cita por confirmar', 'citas por confirmar'), 'Solicitudes recibidas desde la agenda en línea.', '#maintenance?estado=solicitada')
+        # Una notificación por cita (clave única por id): cliente, servicio, fecha y hora, con acceso directo a la cita.
+        for row in c.execute("SELECT a.id,a.public_code,a.customer_name,a.starts_at,a.created_at,a.status,s.label service FROM appointments a JOIN appointment_services s ON s.code=a.service_code WHERE a.status IN ('solicitada','confirmada') ORDER BY a.id DESC LIMIT 8"):
+            when = appointments.datetime.fromisoformat(row['starts_at']).astimezone(appointments.TZ).strftime('%d/%m/%Y %H:%M')
+            pending = row['status'] == 'solicitada'
+            items.append({'key': 'appointment:' + str(row['id']), 'kind': 'warning' if pending else 'info', 'icon': 'calendar',
+                          'title': ('Solicitud de cita por confirmar · ' if pending else 'Nueva cita reservada · ') + row['public_code'],
+                          'detail': row['customer_name'] + ' · ' + row['service'] + ' · ' + when, 'at': row['created_at'],
+                          'href': '#maintenance?appointment=' + str(row['id']), 'action': 'Ver cita', 'group': 'event'})
     if admin:
         # Protección de datos: dónde se guarda la información y si los respaldos de la base central están al día.
         import remote_db

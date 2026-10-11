@@ -1,0 +1,99 @@
+"""Flujo completo: reserva en línea → Agenda de Mantenimientos de Clientes → notificación → confirmación del taller."""
+import unittest
+from datetime import timedelta
+import test_app
+import app,appointments
+app.os.environ.setdefault('LOGIN_CAPTCHA','off')
+
+
+class AgendaTests(unittest.TestCase):
+    setUpClass=classmethod(test_app.SecurityTests.setUpClass.__func__)
+    setUp=test_app.SecurityTests.setUp
+    tearDown=test_app.SecurityTests.tearDown
+    login=test_app.SecurityTests.login
+    request=test_app.SecurityTests.request
+    order_data=test_app.SecurityTests.order_data
+
+    def day(self):
+        day=appointments.now().date()+timedelta(days=1)
+        while day.weekday()>=5:day+=timedelta(days=1)
+        return day.isoformat()
+
+    def booking(self,time,**extra):
+        return dict({'name':'Cliente De Agenda','identification':'','phone':'0991234567','email':'agenda@example.invalid','device_type':'consola','brand':'Sony','model':'PS5','service':'mantenimiento',
+                     'description':'Limpieza interna y cambio de pasta térmica','date':self.day(),'time':time,'notes':'','privacy_consent':True,'communications_consent':True,'request_key':'agenda-request-'+time.replace(':','')+'-0001'},**extra)
+
+    def test_online_booking_reaches_agenda_notifications_and_staff_confirmation(self):
+        cookie,csrf=self.login()
+        catalog=self.request('/api/public/appointments/services')['body']
+        self.assertIn('correctivo',{s['code'] for s in catalog['services']});self.assertIn('consola',catalog['device_types'])
+        slots=self.request('/api/public/appointments/availability?date=%s&service=mantenimiento'%self.day())['body']['slots']
+        self.assertTrue(slots);first_slot=slots[0]['time']
+        # Modo original: disponibilidad verificada en el servidor y confirmación automática.
+        auto=self.request('/api/public/appointments',self.booking(first_slot))
+        self.assertEqual((auto['status'],auto['body']['status']),(201,'confirmada'))
+        self.assertEqual(self.request('/api/public/appointments',self.booking(first_slot,request_key='agenda-request-otro-000001'))['status'],409)
+        # Modo manual: la solicitud queda pendiente y el cliente no recibe confirmación todavía.
+        self.assertEqual(self.request('/api/appointments/config',{'confirmation':'manual'},cookie=cookie,csrf=csrf)['status'],200)
+        free=[s['time'] for s in self.request('/api/public/appointments/availability?date=%s&service=correctivo'%self.day())['body']['slots']]
+        self.assertNotIn(first_slot,free)
+        pending=self.request('/api/public/appointments',self.booking(free[-1],service='correctivo',device_type='portatil',brand='HP',model=''))
+        self.assertEqual((pending['status'],pending['body']['status']),(201,'solicitada'));aid=pending['body']['id']
+        with app.connect() as c:
+            self.assertEqual(c.execute("SELECT COUNT(*) FROM appointment_notifications WHERE appointment_id=?",(aid,)).fetchone()[0],0)
+            self.assertEqual(c.execute("SELECT COUNT(*) FROM orders").fetchone()[0],0)
+        # Agenda administrativa: misma fuente de datos, solo para personal.
+        self.assertEqual(self.request('/api/agenda')['status'],401)
+        agenda=self.request('/api/agenda',cookie=cookie)['body']
+        self.assertEqual({a['status'] for a in agenda['appointments']},{'confirmada','solicitada'})
+        self.assertEqual((agenda['summary']['pending'],agenda['summary']['confirmed'],agenda['confirmation']),(1,1,'manual'))
+        row=next(a for a in agenda['appointments'] if a['id']==aid)
+        self.assertEqual((row['service_label'],row['device_type'],row['brand'],row['customer_name']),('Mantenimiento correctivo','portatil','HP','Cliente De Agenda'))
+        self.assertNotIn('manage_token_hash',row);self.assertTrue(row['client_id'])
+        self.assertEqual(self.request('/api/agenda?from=2026-01-01&to=2027-12-31',cookie=cookie)['status'],400)
+        # Notificación persistente y sin duplicados, con acceso directo a la cita.
+        for _ in range(2):items=[i for i in self.request('/api/notifications',cookie=cookie)['body']['items'] if i['key']=='appointment:%d'%aid]
+        self.assertEqual(len(items),1)
+        self.assertEqual((items[0]['href'],items[0]['title'].split(' · ')[0]),('#maintenance?appointment=%d'%aid,'Solicitud de cita por confirmar'))
+        self.assertIn('Cliente De Agenda · Mantenimiento correctivo · ',items[0]['detail'])
+        # El taller confirma: cambia el estado, queda en el historial y se encola el aviso al cliente.
+        self.assertEqual(self.request('/api/appointments/%d'%aid,{'action':'confirmada'},cookie=cookie)['status'],403)
+        self.assertEqual(self.request('/api/appointments/%d'%aid,{'action':'confirmada'},cookie=cookie,csrf=csrf)['status'],200)
+        self.assertEqual(self.request('/api/appointments/%d'%aid,{'action':'confirmada'},cookie=cookie,csrf=csrf)['status'],200)
+        detail=self.request('/api/appointments/%d'%aid,cookie=cookie)['body']['appointment']
+        self.assertEqual((detail['status'],[(e['event'],e['old_status'],e['new_status'],bool(e['actor'])) for e in detail['events']]),('confirmada',[('status','solicitada','confirmada',True),('created','','solicitada',False)]))
+        self.assertEqual([(n['event'],n['result']) for n in detail['notices']],[('confirmation','pending')])
+        self.assertEqual(self.request('/api/appointments/999999',cookie=cookie)['status'],404)
+        # Cancelar libera el espacio y avisa al cliente.
+        self.assertEqual(self.request('/api/appointments/%d'%aid,{'action':'cancelada'},cookie=cookie,csrf=csrf)['status'],200)
+        self.assertIn(free[-1],[s['time'] for s in self.request('/api/public/appointments/availability?date=%s&service=correctivo'%self.day())['body']['slots']])
+        self.assertEqual(sorted(n['event'] for n in self.request('/api/appointments/%d'%aid,cookie=cookie)['body']['appointment']['notices']),['cancelled','confirmation'])
+
+    def test_workshop_is_emailed_once_per_new_online_request(self):
+        from unittest.mock import patch
+        import appointments_cron
+        with patch.object(appointments_cron,'DB',app.DB),patch.object(appointments_cron,'send'),patch.object(appointments_cron,'send_staff') as staff:
+            appointments_cron.run();self.assertEqual(staff.call_count,0)
+            slot=self.request('/api/public/appointments/availability?date=%s&service=mantenimiento'%self.day())['body']['slots'][0]['time']
+            code=self.request('/api/public/appointments',self.booking(slot))['body']['code']
+            appointments_cron.run();appointments_cron.run()
+            self.assertEqual(staff.call_count,1);self.assertEqual(staff.call_args[0][0]['public_code'],code)
+        # Si el correo falla, se reintenta en la siguiente pasada y la reserva no se ve afectada.
+        slot2=self.request('/api/public/appointments/availability?date=%s&service=mantenimiento'%self.day())['body']['slots'][0]['time']
+        self.assertEqual(self.request('/api/public/appointments',self.booking(slot2,request_key='agenda-request-fallo-00001'))['status'],201)
+        with patch.object(appointments_cron,'DB',app.DB),patch.object(appointments_cron,'send'),patch.object(appointments_cron,'send_staff',side_effect=RuntimeError('SMTP no configurado')) as failing:
+            appointments_cron.run();self.assertEqual(failing.call_count,1)
+        with patch.object(appointments_cron,'DB',app.DB),patch.object(appointments_cron,'send'),patch.object(appointments_cron,'send_staff') as retry:
+            appointments_cron.run();self.assertEqual(retry.call_count,1)
+
+    def test_services_are_managed_from_configuration(self):
+        cookie,csrf=self.login();url='/api/appointments/config'
+        created=self.request(url,{'new_service':{'label':'Mantenimiento de consola','duration_minutes':60}},cookie=cookie,csrf=csrf)
+        self.assertEqual(created['status'],200)
+        services={s['label']:s for s in created['body']['settings']['services']};self.assertEqual(services['Mantenimiento de consola']['duration_minutes'],60)
+        self.assertEqual(self.request(url,{'new_service':{'label':'mantenimiento de consola','duration_minutes':60}},cookie=cookie,csrf=csrf)['status'],400)
+        self.assertEqual(self.request(url,{'new_service':{'label':'X','duration_minutes':50}},cookie=cookie,csrf=csrf)['status'],400)
+        code=services['Mantenimiento de consola']['code']
+        renamed=self.request(url,{'services':[{'code':code,'label':'Mantenimiento de consolas','duration_minutes':75,'active':True}]},cookie=cookie,csrf=csrf)['body']['settings']['services']
+        self.assertEqual(next(s for s in renamed if s['code']==code)['label'],'Mantenimiento de consolas')
+        self.assertIn('Mantenimiento de consolas',{s['label'] for s in self.request('/api/public/appointments/services')['body']['services']})

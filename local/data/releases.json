@@ -8,6 +8,26 @@
   },
   "releases": [
     {
+      "version": "1.5.27",
+      "date": "2026-10-11T15:20:32-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Agenda de Mantenimientos de Clientes y confirmación de cierre renovada",
+      "changes": {
+        "features": [
+          "Agenda de Mantenimientos de Clientes: una sola vista para citas en línea y mantenimientos preventivos, con resumen, lista, día, semana y mes, filtros, detalle de la cita e historial de cambios",
+          "Citas en línea: confirmación automática o manual configurable, servicios administrables, «Mantenimiento correctivo», notificación «Ver cita» y aviso por correo al taller"
+        ],
+        "improvements": [
+          "Confirmación propia al cerrar una orden o ficha con cambios sin guardar, con «Seguir editando», «Guardar borrador y cerrar» y «Descartar y cerrar», y aviso del navegador al recargar",
+          "Identificación por serie: mensaje neutro «Equipo nuevo en tu taller» cuando la serie aún no está registrada"
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.26",
       "date": "2026-10-11T14:59:03-05:00",
       "type": "patch",

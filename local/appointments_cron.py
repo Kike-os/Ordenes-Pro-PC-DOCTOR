@@ -24,6 +24,33 @@ def send(row,event):
   if os.getenv('SMTP_USER'):smtp.login(os.environ['SMTP_USER'],os.getenv('SMTP_PASSWORD',''))
   smtp.send_message(message)
 
+def send_staff(row):
+ """Aviso al taller de una cita nueva. Solo datos de la cita; se envía al buzón del taller, no al cliente."""
+ host=os.getenv('SMTP_HOST');sender=os.getenv('SMTP_FROM');target=os.getenv('APPOINTMENTS_NOTIFY_TO') or sender
+ if not host or not sender or not target:raise RuntimeError('SMTP no configurado')
+ start=appointments.datetime.fromisoformat(row['starts_at']).astimezone(appointments.TZ)
+ message=EmailMessage();message['From']=sender;message['To']=target;message['Subject']=f"Nueva cita {'por confirmar' if row['status']=='solicitada' else 'reservada'} · {row['public_code']}"
+ message.set_content(f"Se registró una cita desde la agenda en línea.\n\nCódigo: {row['public_code']}\nEstado: {appointments.STATUSES.get(row['status'],row['status'])}\nCliente: {row['customer_name']}\nServicio: {row['service_label']}\nFecha: {start.strftime('%d/%m/%Y')} {start.strftime('%H:%M')} (hora de Ecuador)\nEquipo: {row['device_type']} · {row['brand']} {row['model']}\n\nRevísala en Órdenes Pro → Agenda de Mantenimientos de Clientes.\n")
+ port=int(os.getenv('SMTP_PORT','587'))
+ with smtplib.SMTP(host,port,timeout=20) as smtp:
+  smtp.starttls(context=ssl.create_default_context())
+  if os.getenv('SMTP_USER'):smtp.login(os.environ['SMTP_USER'],os.getenv('SMTP_PASSWORD',''))
+  smtp.send_message(message)
+
+def notify_staff(conn):
+ """Un correo por cita nueva, sin repetir: el último id avisado queda en system_state."""
+ state=conn.execute("SELECT value FROM system_state WHERE key='appointments_staff_notified'").fetchone();last=int(state['value']) if state and str(state['value']).isdigit() else None
+ if last is None:
+  # Primera ejecución: no se avisan las citas antiguas.
+  newest=conn.execute('SELECT COALESCE(MAX(id),0) FROM appointments').fetchone()[0];conn.execute("INSERT INTO system_state(key,value) VALUES ('appointments_staff_notified',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",(str(newest),));conn.commit();return 0
+ sent=0
+ for row in conn.execute("SELECT a.*,s.label service_label FROM appointments a JOIN appointment_services s ON s.code=a.service_code WHERE a.id>? ORDER BY a.id LIMIT 20",(last,)).fetchall():
+  try:send_staff(row)
+  except Exception as error:
+   print('citas: aviso al taller no enviado:',str(error)[:120]);break
+  conn.execute("UPDATE system_state SET value=? WHERE key='appointments_staff_notified'",(str(row['id']),));conn.commit();sent+=1
+ return sent
+
 def run():
  if remote_db.configured():conn=remote_db.connect()
  else:conn=sqlite3.connect(DB,timeout=20);conn.row_factory=sqlite3.Row;conn.execute('PRAGMA foreign_keys=ON')
@@ -47,6 +74,7 @@ def run():
    except Exception as error:
     conn.execute("UPDATE appointment_notifications SET result='failed',completed_at=?,detail=? WHERE id=?",(appointments.stamp(appointments.now()),str(error)[:300],row['id']));failed+=1
    conn.commit()
-  print(f"citas: enviados={sent}; fallidos={failed}; hora={now_s}")
+  staff=notify_staff(conn)
+  print(f"citas: enviados={sent}; fallidos={failed}; avisos al taller={staff}; hora={now_s}")
  finally:conn.close()
 if __name__=='__main__':load_env();run()
