@@ -2,6 +2,7 @@ import unittest
 from datetime import date,datetime
 from unittest.mock import patch,MagicMock
 import test_app,app,maintenance,maintenance_cron,client_registry
+app.os.environ.setdefault('LOGIN_CAPTCHA','off')  # Las pruebas inician sesión sin verificación salvo que la activen.
 
 class OperationsTests(unittest.TestCase):
     setUpClass=classmethod(test_app.SecurityTests.setUpClass.__func__)

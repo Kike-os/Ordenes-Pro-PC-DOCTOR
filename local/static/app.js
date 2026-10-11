@@ -45,8 +45,45 @@ document.querySelectorAll('.access-card input[required]').forEach(input=>{
 });
 // Aviso de Bloq Mayús en el acceso; solo informa, no modifica lo escrito.
 {const password=document.querySelector('body[data-page=login] #password'),caps=document.getElementById('caps-hint');if(password&&caps){const update=event=>{if(typeof event.getModifierState==='function')caps.textContent=event.getModifierState('CapsLock')?'Bloq Mayús está activado.':'';};password.addEventListener('keydown',update);password.addEventListener('keyup',update);password.addEventListener('blur',()=>{caps.textContent='';});}}
+// Verificación local «No soy un robot»: prueba de trabajo SHA-256 emitida y comprobada por el servidor, sin servicios externos.
+const SHA_K=new Uint32Array([0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2]);
+function sha256Word(text){
+ const bytes=new TextEncoder().encode(text),total=((bytes.length+72)>>6)<<6,data=new Uint8Array(total),view=new DataView(data.buffer);data.set(bytes);data[bytes.length]=0x80;view.setUint32(total-4,bytes.length*8);
+ const h=new Uint32Array([0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19]),w=new Uint32Array(64);
+ for(let offset=0;offset<total;offset+=64){
+  for(let i=0;i<16;i++)w[i]=view.getUint32(offset+i*4);
+  for(let i=16;i<64;i++){const x=w[i-15],y=w[i-2];w[i]=w[i-16]+((x>>>7|x<<25)^(x>>>18|x<<14)^(x>>>3))+w[i-7]+((y>>>17|y<<15)^(y>>>19|y<<13)^(y>>>10));}
+  let [a,b,c,d,e,f,g,k]=h;
+  for(let i=0;i<64;i++){const t1=(k+((e>>>6|e<<26)^(e>>>11|e<<21)^(e>>>25|e<<7))+((e&f)^(~e&g))+SHA_K[i]+w[i])>>>0,t2=(((a>>>2|a<<30)^(a>>>13|a<<19)^(a>>>22|a<<10))+((a&b)^(a&c)^(b&c)))>>>0;k=g;g=f;f=e;e=(d+t1)>>>0;d=c;c=b;b=a;a=(t1+t2)>>>0;}
+  h[0]+=a;h[1]+=b;h[2]+=c;h[3]+=d;h[4]+=e;h[5]+=f;h[6]+=g;h[7]+=k;
+ }
+ return h[0];
+}
+function localCaptcha(form){
+ let container=form.querySelector('.auth-bot');if(container?.resetCaptcha){container.resetCaptcha();return;}
+ container=document.createElement('div');container.className='auth-bot local-captcha';form.querySelector('.submit').before(container);
+ const box=document.createElement('button'),mark=document.createElement('span'),label=document.createElement('span'),note=document.createElement('small');
+ box.type='button';box.className='captcha-check';box.setAttribute('role','checkbox');mark.className='captcha-mark';mark.setAttribute('aria-hidden','true');label.className='captcha-label';note.textContent='Verificación de seguridad · PC-DOCTOR';box.append(mark,label);container.append(box,note);
+ let run=0,timer;
+ const state=(name,text,checked)=>{box.dataset.state=name;box.setAttribute('aria-checked',String(checked));box.setAttribute('aria-busy',String(name==='working'));label.textContent=text;};
+ const reset=()=>{run++;clearTimeout(timer);delete form.dataset.botToken;state('idle','No soy un robot',false);};
+ container.resetCaptcha=reset;reset();
+ box.addEventListener('click',async()=>{
+  if(box.dataset.state!=='idle')return;
+  const current=++run;state('working','Verificando…',false);
+  try{
+   const challenge=await api('/api/captcha',{}),shift=32-challenge.bits;let counter=0;
+   for(;;){
+    if(current!==run)return;
+    for(let i=0;i<4000;i++,counter++){if(sha256Word(challenge.nonce+':'+counter)>>>shift===0){form.dataset.botToken='local:'+challenge.nonce+':'+counter;state('done','Verificado',true);message(form,'');timer=setTimeout(reset,Math.max(30,challenge.seconds-20)*1000);return;}}
+    await new Promise(resolve=>setTimeout(resolve));
+   }
+  }catch(error){if(current===run){reset();message(form,error.message);}}
+ });
+}
 let botScript;
 async function showBot(form,sitekey){
+ if(form.dataset.captcha==='local'){localCaptcha(form);return;}
  let container=form.querySelector('.auth-bot');if(!container){container=document.createElement('div');container.className='auth-bot';form.querySelector('.submit').before(container);}
  if(container.dataset.widget){window.turnstile?.reset(container.dataset.widget);return;}
  container.replaceChildren();const target=document.createElement('div');container.append(target);
@@ -56,9 +93,9 @@ async function showBot(form,sitekey){
  container.dataset.widget=window.turnstile.render(target,{sitekey,action:document.body.dataset.page,theme:'dark',size:container.clientWidth<300?'compact':'flexible',callback:token=>{form.dataset.botToken=token;},'expired-callback':()=>{delete form.dataset.botToken;},'error-callback':()=>{delete form.dataset.botToken;message(form,'La verificación no está disponible. Espera o recupera tu contraseña.');}});
  }catch(error){message(form,error.message+' Espera e inténtalo más tarde.');}
 }
-async function accessApi(form,path,data){data.bot_token=form.dataset.botToken||'';try{return await api(path,data);}finally{delete form.dataset.botToken;const widget=form.querySelector('.auth-bot')?.dataset.widget;if(widget)window.turnstile?.reset(widget);}}
-formAction('login-form',async(form,data)=>{data.login=data.login.trim();data.remember=form.elements.remember.checked;if(form.dataset.sitekey&&!form.dataset.botToken)throw new Error('Completa la verificación de seguridad para iniciar sesión.');const password=form.elements.password;if(password.type!=='password'){password.type='password';passwordEye(form.querySelector('.reveal'),false);}try{await accessApi(form,'/api/login',data);}catch(error){password.focus();password.select();throw error;}location.assign(/^\/orders\/[^/]{1,80}$/.test(location.pathname)?location.pathname:'/');});
-{const form=document.getElementById('login-form');if(form?.dataset.sitekey)showBot(form,form.dataset.sitekey);}
+async function accessApi(form,path,data){data.bot_token=form.dataset.botToken||'';try{return await api(path,data);}finally{delete form.dataset.botToken;const bot=form.querySelector('.auth-bot'),widget=bot?.dataset.widget;if(widget)window.turnstile?.reset(widget);bot?.resetCaptcha?.();}}
+formAction('login-form',async(form,data)=>{data.login=data.login.trim();data.remember=form.elements.remember.checked;if(form.dataset.captcha==='local'&&!form.dataset.botToken)throw new Error('Marca «No soy un robot» para iniciar sesión.');if(form.dataset.sitekey&&!form.dataset.botToken)throw new Error('Completa la verificación de seguridad para iniciar sesión.');const password=form.elements.password;if(password.type!=='password'){password.type='password';passwordEye(form.querySelector('.reveal'),false);}try{await accessApi(form,'/api/login',data);}catch(error){password.focus();password.select();throw error;}location.assign(/^\/orders\/[^/]{1,80}$/.test(location.pathname)?location.pathname:'/');});
+{const form=document.getElementById('login-form');if(form?.dataset.sitekey||form?.dataset.captcha==='local')showBot(form,form.dataset.sitekey);}
 formAction('forgot-form',async(form,data)=>{data.email=data.email.trim();const result=await accessApi(form,'/api/forgot',data);message(form,result.message,true);});
 formAction('reset-form',async(form,data)=>{data.token=new URLSearchParams(location.search).get('token')||'';await api('/api/reset',data);form.reset();form.querySelectorAll('input,.submit').forEach(control=>control.hidden=true);form.querySelectorAll('label,.password-wrap,meter,.login-field-hint').forEach(control=>control.hidden=true);message(form,'Tu contraseña se ha actualizado correctamente',true);history.replaceState(null,'','/reset');});
 

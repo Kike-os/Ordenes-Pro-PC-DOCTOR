@@ -20,6 +20,8 @@ Acceso, solicitud de recuperación y nueva contraseña comparten logo original, 
 
 ## Antibots
 
+Sin claves de Turnstile, el inicio de sesión muestra la verificación local «No soy un robot»: el servidor emite un reto de un solo uso (cinco minutos) que el navegador resuelve con una prueba de trabajo SHA-256 y que el backend comprueba antes de evaluar las credenciales. No usa servicios externos ni requiere cuentas. Eleva el coste de los intentos automatizados, pero no equivale a un servicio antibots gestionado; los límites y bloqueos por intentos siguen siendo la protección principal. LOGIN_CAPTCHA=off la desactiva.
+
 Configurar TURNSTILE_SITE_KEY y TURNSTILE_SECRET_KEY en el servidor. Con ambas claves, el inicio de sesión muestra la verificación Turnstile desde el primer intento y cada acceso exige token; con TURNSTILE_LOGIN_MODE=adaptive solo se exige tras dos fallos de IP. El token es verificado exclusivamente en el backend contra Siteverify, con comprobación de hostname y acción. También protege solicitudes reiteradas de recuperación. Las claves privadas nunca llegan al cliente. Sin ambas claves, los límites siguen activos y Configuración informa que antibots está pendiente. Ante fallos se ofrece esperar o recuperar contraseña; no hay bypass de límites.
 
 Referencias: [Cloudflare, validación del token](https://developers.cloudflare.com/turnstile/get-started/server-side-validation/) y [OWASP, autenticación y restricciones](https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html).

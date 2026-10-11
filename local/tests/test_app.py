@@ -10,6 +10,7 @@ from unittest.mock import patch
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 import app
+app.os.environ.setdefault('LOGIN_CAPTCHA','off')  # Las pruebas inician sesión sin verificación salvo que la activen.
 
 
 class SecurityTests(unittest.TestCase):
@@ -268,6 +269,32 @@ class SecurityTests(unittest.TestCase):
                 self.assertEqual(self.request('/api/login',{'login':'demo','password':'contraseña-segura-de-prueba','bot_token':'valid'})['status'],200)
             with patch.dict(app.os.environ,{'TURNSTILE_LOGIN_MODE':'adaptive'}):
                 self.assertIn('data-sitekey=""',self.request('/login')['body'])
+
+    def test_local_captcha_is_single_use_and_verified_on_server(self):
+        import hashlib
+        good={'login':'demo','password':'contraseña-segura-de-prueba'}
+        self.assertIn('data-captcha=""',self.request('/login')['body'])
+        self.assertEqual(self.request('/api/captcha',{})['status'],404)
+        with patch.dict(app.os.environ,{'LOGIN_CAPTCHA':'on'}),patch.object(app,'CAPTCHA_BITS',8):
+            self.assertIn('data-captcha="local"',self.request('/login')['body'])
+            for token in ('','local:'+'x'*32+':1'):
+                result=self.request('/api/login',dict(good,bot_token=token))
+                self.assertEqual(result['status'],403)
+                self.assertTrue(result['body']['challenge'])
+            challenge=self.request('/api/captcha',{})['body']
+            self.assertEqual(challenge['bits'],8)
+            work=lambda n:hashlib.sha256((challenge['nonce']+':'+str(n)).encode()).digest()[0]
+            solved=next(n for n in range(100000) if work(n)==0)
+            unsolved=next(n for n in range(100000) if work(n)!=0)
+            token='local:'+challenge['nonce']+':'+str(solved)
+            self.assertEqual(self.request('/api/login',dict(good,bot_token=token))['status'],200)
+            self.assertEqual(self.request('/api/login',dict(good,bot_token=token))['status'],403)
+            other=self.request('/api/captcha',{})['body']
+            self.assertEqual(self.request('/api/login',dict(good,bot_token='local:'+other['nonce']+':'+str(unsolved)))['status'],403)
+            with app.connect() as c:
+                self.assertEqual(c.execute("SELECT COUNT(*) FROM attempts WHERE bucket LIKE 'login-%'").fetchone()[0],0)
+        with patch.dict(app.os.environ,{'LOGIN_CAPTCHA':'on','TURNSTILE_SITE_KEY':'public-key','TURNSTILE_SECRET_KEY':'private-key'}):
+            self.assertIn('data-captcha="turnstile"',self.request('/login')['body'])
 
     def test_server_validation_and_https_cookie(self):
         for data in ({'login':'','password':'x'},{'login':'bad@','password':'x'},{'login':'demo','password':''}):

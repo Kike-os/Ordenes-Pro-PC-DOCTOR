@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 
 import test_app
 import app
+app.os.environ.setdefault('LOGIN_CAPTCHA','off')  # Las pruebas inician sesión sin verificación salvo que la activen.
 import reception
 
 

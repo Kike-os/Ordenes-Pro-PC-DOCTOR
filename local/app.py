@@ -186,6 +186,36 @@ def bot_always():
     return bool(os.getenv('TURNSTILE_SITE_KEY') and os.getenv('TURNSTILE_SECRET_KEY')) and os.getenv('TURNSTILE_LOGIN_MODE','always').strip().lower()!='adaptive'
 
 
+CAPTCHA_BITS = 16
+CAPTCHA_SECONDS = 300
+
+
+def captcha_mode():
+    # Turnstile si hay claves; si no, verificación local «No soy un robot» salvo LOGIN_CAPTCHA=off.
+    if os.getenv('TURNSTILE_SITE_KEY') and os.getenv('TURNSTILE_SECRET_KEY'):
+        return 'turnstile' if bot_always() else ''
+    return '' if os.getenv('LOGIN_CAPTCHA','on').strip().lower() in ('off','false','0','no') else 'local'
+
+
+def new_captcha(c):
+    nonce=secrets.token_urlsafe(24)
+    c.execute('INSERT INTO attempts VALUES (?,0,?)',('captcha:'+digest(nonce),int(time.time())+CAPTCHA_SECONDS))
+    return {'nonce':nonce,'bits':CAPTCHA_BITS,'seconds':CAPTCHA_SECONDS}
+
+
+def verify_captcha(c, token):
+    # Reto de un solo uso emitido por este servidor y resuelto con prueba de trabajo SHA-256.
+    match=re.fullmatch(r'local:([A-Za-z0-9_-]{20,64}):([0-9]{1,12})',token or '')
+    if not match:
+        return False
+    bucket='captcha:'+digest(match[1])
+    if not c.execute('SELECT 1 FROM attempts WHERE bucket=? AND expires>?',(bucket,int(time.time()))).fetchone():
+        return False
+    c.execute('DELETE FROM attempts WHERE bucket=?',(bucket,))
+    word=int.from_bytes(hashlib.sha256((match[1]+':'+match[2]).encode()).digest()[:4],'big')
+    return word>>(32-CAPTCHA_BITS)==0
+
+
 def bot_required(c, ip_key):
     row=c.execute('SELECT count FROM attempts WHERE bucket=? AND expires>?',(ip_key,int(time.time()))).fetchone()
     return bool(os.getenv('TURNSTILE_SITE_KEY') and os.getenv('TURNSTILE_SECRET_KEY') and row and row[0]>=2)
@@ -305,7 +335,7 @@ class Handler(BaseHTTPRequestHandler):
         notice = '' if production_enabled() else '<p class="evaluation-notice">Esta versión es de evaluación. Utiliza únicamente datos ficticios.</p>'
         with connect() as c:minimum=auth_policy(c)['password_min']
         content = content.replace('{{password_min}}',str(minimum)).replace('{{access_environment}}','ACCESO SEGURO' if production_enabled() else 'ENTORNO LOCAL')
-        content = content.replace('{{turnstile_sitekey}}',html.escape(os.getenv('TURNSTILE_SITE_KEY',''),quote=True) if bot_always() else '')
+        content = content.replace('{{turnstile_sitekey}}',html.escape(os.getenv('TURNSTILE_SITE_KEY',''),quote=True) if bot_always() else '').replace('{{captcha_mode}}',captcha_mode())
         content = content.replace('{{evaluation_notice}}', notice).replace('{{environment_label}}', 'Servicio técnico' if production_enabled() else 'Evaluación local · Usa datos ficticios')
         self.reply(200, content, 'text/html; charset=utf-8')
 
@@ -674,6 +704,11 @@ class Handler(BaseHTTPRequestHandler):
                     if not conv:return self.reply(404,{'error':'Inicia una conversación con Adi primero.'})
                     now=appointments.stamp(appointments.now());c.execute("UPDATE adi_conversations SET mode='human',updated_at=? WHERE id=?",(now,conv['id']));c.execute("INSERT INTO adi_messages(conversation_id,author,content,created_at) VALUES (?,'client','El cliente solicita atención humana.',?)",(conv['id'],now))
                     return self.reply(200,{'ok':True,'mode':'human'})
+                if path == '/api/captcha':
+                    if captcha_mode()!='local':return self.reply(404,{'error':'Verificación no disponible.'})
+                    if limited(c,'captcha-ip:'+digest(self.client_address[0]),limit=40,window=600):
+                        return self.reply(429,{'error':'Demasiadas verificaciones. Espera unos minutos e inténtalo de nuevo.'})
+                    return self.reply(200,new_captcha(c))
                 if path == '/api/login':
                     login, password = str(data.get('login','')).strip(), str(data.get('password',''))
                     if not login or not password or len(login)>254 or len(password)>256 or ('@' in login and not re.fullmatch(r'[^\s@]+@[^\s@]+\.[^\s@]+',login)):
@@ -684,6 +719,8 @@ class Handler(BaseHTTPRequestHandler):
                         auth_event(c,account_hash,ip_hash,'limited')
                         audit(c,None,'login_rate_limited')
                         return self.reply(429, {'error':'Por seguridad, el acceso está temporalmente limitado. Inténtalo más tarde o recupera tu contraseña.'})
+                    if captcha_mode()=='local' and not verify_captcha(c,str(data.get('bot_token',''))):
+                        return self.reply(403,{'error':'Marca «No soy un robot» para iniciar sesión.','challenge':True})
                     if (bot_always() or bot_required(c,ip_key)) and not verify_bot(str(data.get('bot_token','')),'login'):
                         return self.reply(403,{'error':'Completa la verificación de seguridad. Si falla, puedes esperar o recuperar tu contraseña.','challenge':True,'sitekey':os.getenv('TURNSTILE_SITE_KEY')})
                     row = c.execute('SELECT * FROM users WHERE (username=? OR email=?) AND active=1', (login,login)).fetchone()

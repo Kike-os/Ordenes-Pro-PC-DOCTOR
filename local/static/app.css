@@ -568,3 +568,17 @@ body[data-page=dashboard] .settings-panel button+h2{margin-top:26px}
 body:is([data-page=login],.auth-page) .message:not(:empty){padding:9px 12px;border:1px solid #ff9aab45;border-radius:8px;background:#ff5f7a12}
 body:is([data-page=login],.auth-page) .message.success:not(:empty){border-color:#87d6b245;background:#3fbf8a12}
 body[data-page=login] .login-field-hint.caps-hint{color:#f3c677}
+/* Acceso: verificación local «No soy un robot». */
+.auth-bot.local-captcha{margin:0 0 14px;overflow:visible}
+.local-captcha .captcha-check{display:flex;align-items:center;gap:12px;width:100%;min-height:54px;padding:10px 14px;border:1px solid #38527b;border-radius:10px;background:#0b1626;color:#e3edff;font:inherit;font-size:14px;font-weight:600;text-align:left;cursor:pointer;transition:border-color .2s,background .2s}
+.local-captcha .captcha-check:hover{border-color:#5b8fd8;background:#0f1d33}
+.local-captcha .captcha-check:focus-visible{outline:2px solid #8bb8ff;outline-offset:2px}
+.local-captcha .captcha-mark{position:relative;flex:0 0 26px;width:26px;height:26px;border:2px solid #6f8fbd;border-radius:7px;background:#07101d;transition:border-color .2s,background .2s}
+.local-captcha .captcha-check[data-state=working]{cursor:progress}
+.local-captcha .captcha-check[data-state=working] .captcha-mark{border-color:#2b4168;border-top-color:#8bb8ff;border-radius:50%;animation:captcha-spin .8s linear infinite}
+.local-captcha .captcha-check[data-state=done]{border-color:#3f9f78;cursor:default}
+.local-captcha .captcha-check[data-state=done] .captcha-mark{border-color:#3fbf8a;background:#1f8f65}
+.local-captcha .captcha-check[data-state=done] .captcha-mark::after{content:"";position:absolute;left:7px;top:2px;width:6px;height:12px;border:solid #fff;border-width:0 2.5px 2.5px 0;transform:rotate(45deg)}
+.local-captcha small{display:block;margin-top:6px;font-size:10px;letter-spacing:.3px;color:#7d95b8}
+@keyframes captcha-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.local-captcha .captcha-check,.local-captcha .captcha-mark{transition:none}.local-captcha .captcha-check[data-state=working] .captcha-mark{animation:none}}
