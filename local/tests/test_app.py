@@ -357,6 +357,22 @@ class SecurityTests(unittest.TestCase):
         self.assertEqual(granted['status'],200)
         tech=granted['cookie'].split(';')[0];tech_csrf=self.request('/api/me',cookie=tech)['body']['user']['csrf']
         self.assertEqual(self.request('/api/users/approval',{'id':'1','action':'approve','role':'administrador'},cookie=tech,csrf=tech_csrf)['status'],403)
+        # Una solicitud rechazada sigue visible, puede aprobarse y puede volver a enviarse.
+        other=dict(data,username='otra.solicitud',email='otra@example.invalid')
+        self.request('/api/register',other)
+        with app.connect() as c:oid=c.execute("SELECT id FROM users WHERE username='otra.solicitud'").fetchone()[0]
+        self.assertEqual(self.request('/api/users/approval',{'id':str(oid),'action':'reject','role':'tecnico'},cookie=cookie,csrf=csrf)['status'],200)
+        listed=self.request('/api/settings',cookie=cookie)['body']['requests']
+        self.assertEqual([(r['username'],r['approval']) for r in listed],[('otra.solicitud','rejected')])
+        self.assertEqual(self.request('/api/users/approval',{'id':str(oid),'action':'reject','role':'tecnico'},cookie=cookie,csrf=csrf)['status'],400)
+        self.assertEqual(self.request('/api/register',dict(other,phone='0987654321',password='otra-clave-nueva',repeat='otra-clave-nueva'))['status'],201)
+        with app.connect() as c:
+            again=c.execute('SELECT approval,active,phone FROM users WHERE id=?',(oid,)).fetchone()
+            self.assertEqual(tuple(again),('pending',0,'0987654321'))
+            c.execute("UPDATE users SET approval='rejected' WHERE id=?",(oid,))
+        self.assertEqual(self.request('/api/users/approval',{'id':str(oid),'action':'approve','role':'tecnico'},cookie=cookie,csrf=csrf)['status'],200)
+        self.assertEqual(self.request('/api/login',{'login':'otra.solicitud','password':'otra-clave-nueva'})['status'],200)
+        with app.connect() as c:c.execute("DELETE FROM attempts WHERE bucket LIKE 'register-ip:%'")
         with patch.dict(app.os.environ,{'LOGIN_CAPTCHA':'on'}):
             self.assertEqual(self.request('/api/register',dict(data,username='sin.captcha',email='sc@example.invalid'))['status'],403)
         with patch.dict(app.os.environ,{'REGISTRATION':'off'}):

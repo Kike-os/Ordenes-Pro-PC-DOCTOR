@@ -1516,3 +1516,6 @@ body.notify-docked .toast-region{right:400px}
 .system-history>h2{scroll-margin-top:20px}
 #system-history{scroll-margin-top:20px}
 @media(max-width:520px){.system-checker-head{flex-wrap:wrap}}
+.account-request[data-state=rejected]{border-style:dashed;background:#0a1322}
+.account-request[data-state=rejected] strong{color:#b8c9e4}
+body[data-page=dashboard] .settings-panel .account-declined-note{color:#f3c677}

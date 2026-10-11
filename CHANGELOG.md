@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.3.1 — 2026-10-11 01:14 (UTC-05:00)
+
+Corrige la gestión de solicitudes de cuenta rechazadas.
+
+### Errores corregidos
+
+- Las solicitudes de cuenta rechazadas siguen visibles en Configuración, pueden aprobarse y la persona puede volver a enviarlas.
+
 ## v1.3.0 — 2026-10-11 01:00 (UTC-05:00)
 
 Gestión de clientes con importación, solicitud de cuentas, notificaciones por usuario, inicio de sesión rediseñado y Centro de Actualizaciones con comprobación automática.

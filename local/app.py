@@ -661,7 +661,7 @@ class Handler(BaseHTTPRequestHandler):
             if path == '/api/settings':
                 if user['role'] != 'administrador':
                     return self.reply(403, {'error':'Solo administración puede acceder a la configuración.'})
-                return self.reply(200, {'profile':{k:user[k] for k in ('name','username','email','role')},'accounts':[dict(r) for r in c.execute("SELECT name,username,role,active FROM users WHERE approval='approved' ORDER BY id")],'requests':[dict(r) for r in c.execute("SELECT id,name,username,email,phone,identification,job_title,requested_at FROM users WHERE approval='pending' ORDER BY id")],'smtp_configured':bool(os.getenv('SMTP_HOST')),'openai_configured':bool(os.getenv('OPENAI_API_KEY')),'login_lockout_seconds':auth_policy(c)['lockout_seconds'],'auth_policy':auth_policy(c),'antibot_configured':bool(os.getenv('TURNSTILE_SITE_KEY') and os.getenv('TURNSTILE_SECRET_KEY')),'origin':os.getenv('APP_URL','http://127.0.0.1:8010')})
+                return self.reply(200, {'profile':{k:user[k] for k in ('name','username','email','role')},'accounts':[dict(r) for r in c.execute("SELECT name,username,role,active FROM users WHERE approval='approved' ORDER BY id")],'requests':[dict(r) for r in c.execute("SELECT id,name,username,email,phone,identification,job_title,requested_at,approval FROM users WHERE approval IN ('pending','rejected') ORDER BY approval,id DESC")],'smtp_configured':bool(os.getenv('SMTP_HOST')),'openai_configured':bool(os.getenv('OPENAI_API_KEY')),'login_lockout_seconds':auth_policy(c)['lockout_seconds'],'auth_policy':auth_policy(c),'antibot_configured':bool(os.getenv('TURNSTILE_SITE_KEY') and os.getenv('TURNSTILE_SECRET_KEY')),'origin':os.getenv('APP_URL','http://127.0.0.1:8010')})
             if path == '/api/notifications':
                 return self.reply(200,notifications.build(c,user,reception_now()))
             if path in ('/api/dashboard','/api/activity','/api/maintenance'):
@@ -856,7 +856,12 @@ class Handler(BaseHTTPRequestHandler):
                     if errors:return self.reply(400,{'error':'Revisa los campos señalados.','fields':errors})
                     # Respuesta idéntica exista o no la cuenta: no se revela qué usuarios o correos están registrados.
                     hashed=password_hash(password)
-                    if not c.execute('SELECT 1 FROM users WHERE username=? OR email=?',(values['username'],values['email'])).fetchone():
+                    matches=c.execute('SELECT id,approval FROM users WHERE username=? OR email=?',(values['username'],values['email'])).fetchall()
+                    if len(matches)==1 and matches[0]['approval']=='rejected':
+                        # Una solicitud rechazada puede volver a enviarse: se actualiza y queda de nuevo pendiente de revisión.
+                        c.execute("UPDATE users SET username=?,email=?,name=?,password_hash=?,phone=?,identification=?,job_title=?,approval='pending',active=0,requested_at=?,reviewed_by=NULL,reviewed_at=NULL WHERE id=?",(values['username'],values['email'],values['name'],hashed,values['phone'],values['identification'],values['job_title'],int(time.time()),matches[0]['id']))
+                        audit(c,None,'account_requested',matches[0]['id'])
+                    elif not matches:
                         uid=c.execute("INSERT INTO users(username,email,name,password_hash,role,active,created_at,phone,identification,job_title,approval,requested_at) VALUES (?,?,?,?,'tecnico',0,?,?,?,?,'pending',?)",(values['username'],values['email'],values['name'],hashed,int(time.time()),values['phone'],values['identification'],values['job_title'],int(time.time()))).lastrowid
                         audit(c,None,'account_requested',uid)
                     return self.reply(201,{'ok':True,'message':'Solicitud recibida. Un administrador la revisará; podrás iniciar sesión cuando sea aprobada.'})
@@ -931,8 +936,8 @@ class Handler(BaseHTTPRequestHandler):
                 if path=='/api/users/approval':
                     if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede revisar solicitudes.'})
                     action=str(data.get('action',''));role=str(data.get('role','tecnico'));target=str(data.get('id',''))
-                    row=c.execute("SELECT id FROM users WHERE id=? AND approval='pending'",(target,)).fetchone() if target.isdigit() else None
-                    if not row or action not in ('approve','reject') or role not in ('administrador','tecnico'):return self.reply(400,{'error':'Solicitud no disponible.'})
+                    row=c.execute("SELECT id,approval FROM users WHERE id=? AND approval IN ('pending','rejected')",(target,)).fetchone() if target.isdigit() else None
+                    if not row or action not in ('approve','reject') or role not in ('administrador','tecnico') or (action=='reject' and row['approval']!='pending'):return self.reply(400,{'error':'Solicitud no disponible.'})
                     if action=='approve':
                         c.execute("UPDATE users SET active=1,approval='approved',role=?,reviewed_by=?,reviewed_at=? WHERE id=?",(role,user['id'],int(time.time()),row['id']));appointments.ensure_staff_hours(c,row['id'])
                     else:c.execute("UPDATE users SET active=0,approval='rejected',reviewed_by=?,reviewed_at=? WHERE id=?",(user['id'],int(time.time()),row['id']))
