@@ -2516,3 +2516,17 @@ body[data-page=dashboard] .track-tools input{height:38px;min-height:38px;margin:
 #module-content>.track{max-width:860px}
 @media(max-width:640px){.track-tools{grid-template-columns:1fr 1fr}.track-tools input[type=search]{grid-column:1/-1}}
 @media(prefers-reduced-motion:reduce){.track-new,.track-new .track-icon{animation:none}}
+/* Barra de selección: «Eliminar» destacado al inicio; si falta espacio, el resto queda en iconos con su nombre al pasar el cursor. */
+.mail-bulk{padding:8px 12px;gap:8px}
+.mail-bulk-label{font-size:13px}
+.mail-bulk-actions{gap:6px;padding-top:2px}
+.mail-bulk-button{min-height:34px;padding:6px 11px;font-size:12.5px;border-radius:9px}
+.mail-bulk-button .system-icon{width:15px;height:15px}
+.mail-bulk-button[data-kind=danger]{background:#2a1418;border-color:#7a3340;color:#ffc2c5;font-weight:650}
+.mail-bulk-icons .mail-bulk-button:not([data-kind=danger]):not(.mail-bulk-more){width:36px;padding:0;justify-content:center}
+.mail-bulk-icons .mail-bulk-button:not([data-kind=danger]):not(.mail-bulk-more) span{display:none}
+.mail-bulk-more{margin-left:auto}
+@media(hover:none),(max-width:860px){.mail-bulk-icons .mail-bulk-button:not([data-kind=danger]):not(.mail-bulk-more) span{display:none}}
+@media(min-width:1181px){.mail-shell.mail-v2{grid-template-columns:222px clamp(360px,33vw,480px) minmax(0,1fr)}.mail-shell.mail-v2[data-side=collapsed]{grid-template-columns:60px clamp(360px,33vw,480px) minmax(0,1fr)}}
+.mail-v2 .mail-row{padding:10px 12px 10px 10px}
+.mail-v2 .mail-row-top strong{font-size:13.5px}.mail-v2 .mail-row-bottom>span{font-size:13px}

@@ -4,6 +4,15 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.6 — 2026-10-11 10:12 (UTC-05:00)
+
+Barra de selección de correo con Eliminar siempre visible y aviso para recargar tras una actualización.
+
+### Mejoras realizadas
+
+- Mail Pro: barra de selección con «Eliminar» siempre visible al inicio y el resto de acciones en iconos compactos cuando falta espacio; lista de correos más ancha.
+- Si la página quedó abierta con una versión anterior, aparece un aviso para recargar y usar la versión nueva.
+
 ## v1.5.5 — 2026-10-11 10:04 (UTC-05:00)
 
 Bandeja de correo estilo Outlook, destinatarios desde Clientes, Centro de Notificaciones flotante y Seguimiento de órdenes.

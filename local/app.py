@@ -749,7 +749,11 @@ class Handler(BaseHTTPRequestHandler):
                 activity=[{'label':labels[r['action']],'at':r['created_at']} for r in c.execute('SELECT action,created_at FROM audit WHERE user_id=? AND action IN ('+','.join('?' for _ in labels)+') ORDER BY id DESC LIMIT 12',(user['id'],*labels))]
                 return self.reply(200, {'profile':{k:user[k] for k in ('name','username','email','role')},'me':user['id'],'active_sessions':c.execute('SELECT COUNT(*) FROM sessions WHERE user_id=? AND expires>?',(user['id'],int(time.time()))).fetchone()[0],'security_activity':activity,'registration_enabled':registration_enabled(),'captcha_mode':captcha_mode(),'mail':mail_pro.status(),'mail_signature':mail_signature(c),'mail_signature_card':mail_signature_card(c) if mail_pro.configured() else None,'accounts':[dict(r) for r in c.execute("SELECT u.id,u.name,u.username,u.email,u.role,u.active,(SELECT MAX(a.created_at) FROM audit a WHERE a.user_id=u.id AND a.action='login') last_login,(SELECT COUNT(*) FROM sessions s WHERE s.user_id=u.id AND s.expires>?) sessions FROM users u WHERE u.approval='approved' ORDER BY u.id",(int(time.time()),))],'requests':[dict(r) for r in c.execute("SELECT id,name,username,email,phone,identification,job_title,requested_at,approval FROM users WHERE approval IN ('pending','rejected') ORDER BY approval,id DESC")],'smtp_configured':bool(os.getenv('SMTP_HOST')),'openai_configured':bool(os.getenv('OPENAI_API_KEY')),'login_lockout_seconds':auth_policy(c)['lockout_seconds'],'auth_policy':auth_policy(c),'antibot_configured':bool(os.getenv('TURNSTILE_SITE_KEY') and os.getenv('TURNSTILE_SECRET_KEY')),'origin':os.getenv('APP_URL','http://127.0.0.1:8010')})
             if path == '/api/notifications':
-                return self.reply(200,notifications.build(c,user,reception_now(),mail_allowed(user)))
+                result=notifications.build(c,user,reception_now(),mail_allowed(user))
+                # Versión que ejecuta el servidor: permite avisar a una pestaña que quedó abierta con una versión anterior.
+                try:result['app_version']=versioning.load()['releases'][0]['version']
+                except Exception:pass
+                return self.reply(200,result)
             if path.startswith('/api/mail/'):
                 if not mail_allowed(user):return self.reply(403,{'error':'No tienes acceso al correo o todavía no está configurado en el servidor.'})
                 query=parse_qs(urlsplit(self.path).query);arg=lambda name:query.get(name,[''])[0]
