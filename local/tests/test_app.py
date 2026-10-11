@@ -217,7 +217,7 @@ class SecurityTests(unittest.TestCase):
         cookie,csrf=self.login()
         policy={'lockout_seconds':'1200','session_hours':'2','remember_days':'7','password_min':'16'}
         self.assertEqual(self.request('/api/auth/policy',policy,cookie=cookie)['status'],403)
-        self.assertEqual(self.request('/api/auth/policy',dict(policy,password_min='8'),cookie=cookie,csrf=csrf)['status'],400)
+        self.assertEqual(self.request('/api/auth/policy',dict(policy,password_min='5'),cookie=cookie,csrf=csrf)['status'],400)
         self.assertEqual(self.request('/api/auth/policy',policy,cookie=cookie,csrf=csrf)['status'],200)
         result=self.request('/api/login',{'login':'demo','password':'contraseña-segura-de-prueba','remember':True},cookie=cookie)
         self.assertIn('Max-Age=604800',result['cookie'])
@@ -245,7 +245,7 @@ class SecurityTests(unittest.TestCase):
         self.assertEqual(self.request('/api/login',{'login':'demo','password':body['password']})['status'],200)
 
     def test_antibot_is_adaptive_and_verified_on_server(self):
-        with patch.dict(app.os.environ,{'TURNSTILE_SITE_KEY':'public-key','TURNSTILE_SECRET_KEY':'private-key'}):
+        with patch.dict(app.os.environ,{'TURNSTILE_SITE_KEY':'public-key','TURNSTILE_SECRET_KEY':'private-key','TURNSTILE_LOGIN_MODE':'adaptive'}):
             for _ in range(2):self.assertEqual(self.request('/api/login',{'login':'demo','password':'wrong'})['status'],401)
             with patch.object(app,'verify_bot',return_value=False) as verify:
                 result=self.request('/api/login',{'login':'demo','password':'contraseña-segura-de-prueba','bot_token':'forged'})
@@ -254,6 +254,20 @@ class SecurityTests(unittest.TestCase):
                 verify.assert_called_once_with('forged','login')
             with patch.object(app,'verify_bot',return_value=True):
                 self.assertEqual(self.request('/api/login',{'login':'demo','password':'contraseña-segura-de-prueba','bot_token':'valid'})['status'],200)
+
+    def test_antibot_is_required_on_every_login_when_configured(self):
+        self.assertIn('data-sitekey=""',self.request('/login')['body'])
+        with patch.dict(app.os.environ,{'TURNSTILE_SITE_KEY':'public-key','TURNSTILE_SECRET_KEY':'private-key'}):
+            self.assertIn('data-sitekey="public-key"',self.request('/login')['body'])
+            with patch.object(app,'verify_bot',return_value=False) as verify:
+                result=self.request('/api/login',{'login':'demo','password':'contraseña-segura-de-prueba'})
+                self.assertEqual(result['status'],403)
+                self.assertTrue(result['body']['challenge'])
+                verify.assert_called_once_with('','login')
+            with patch.object(app,'verify_bot',return_value=True):
+                self.assertEqual(self.request('/api/login',{'login':'demo','password':'contraseña-segura-de-prueba','bot_token':'valid'})['status'],200)
+            with patch.dict(app.os.environ,{'TURNSTILE_LOGIN_MODE':'adaptive'}):
+                self.assertIn('data-sitekey=""',self.request('/login')['body'])
 
     def test_server_validation_and_https_cookie(self):
         for data in ({'login':'','password':'x'},{'login':'bad@','password':'x'},{'login':'demo','password':''}):

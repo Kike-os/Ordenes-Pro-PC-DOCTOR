@@ -10,7 +10,7 @@ En una terminal:
 bash /home/admin-red/Work/Ordenes-Pro-PC-DOCTOR/iniciar-local.sh
 ```
 
-En la primera ejecución solicita tus datos y una contraseña de al menos 12 caracteres sin mostrarla. No hay credenciales predeterminadas ni registro público. En las siguientes ejecuciones conserva la cuenta y los registros existentes.
+En la primera ejecución solicita tus datos y una contraseña de al menos 6 caracteres sin mostrarla. No hay credenciales predeterminadas ni registro público. En las siguientes ejecuciones conserva la cuenta y los registros existentes.
 
 Abre **http://127.0.0.1:8010** en el navegador del mismo equipo. Conserva la terminal abierta. Detén el servidor con Ctrl+C. Por defecto escucha únicamente en 127.0.0.1 y no es un servidor de producción.
 

@@ -564,3 +564,7 @@ body[data-page=appointments] .appointment-public-header>.secondary:hover{backgro
 body[data-page=dashboard] .settings-panel button+h2{margin-top:26px}
 .premium-header .header-weather{width:auto;max-width:210px}
 .premium-header .header-weather small{flex-wrap:nowrap;white-space:nowrap}
+/* Acceso: mensaje del formulario destacado y aviso de Bloq Mayús. */
+body:is([data-page=login],.auth-page) .message:not(:empty){padding:9px 12px;border:1px solid #ff9aab45;border-radius:8px;background:#ff5f7a12}
+body:is([data-page=login],.auth-page) .message.success:not(:empty){border-color:#87d6b245;background:#3fbf8a12}
+body[data-page=login] .login-field-hint.caps-hint{color:#f3c677}

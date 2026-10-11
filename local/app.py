@@ -164,7 +164,7 @@ def limit_reached(c,bucket):
     return bool(row and row[0]>=5)
 
 def auth_policy(c):
-    defaults = {'lockout_seconds': login_lockout_window(), 'session_hours': 8, 'remember_days': 30, 'password_min': 12}
+    defaults = {'lockout_seconds': login_lockout_window(), 'session_hours': 8, 'remember_days': 30, 'password_min': 6}
     defaults.update({r['key']: r['value'] for r in c.execute('SELECT key,value FROM auth_policy')})
     return defaults
 
@@ -179,6 +179,11 @@ def verify_bot(token, action):
         return result.get('success') is True and result.get('hostname')==urlsplit(os.getenv('APP_URL','')).hostname and result.get('action')==action
     except (OSError, URLError, ValueError):
         return False
+
+
+def bot_always():
+    # Con las claves configuradas, el acceso exige verificación en cada intento salvo TURNSTILE_LOGIN_MODE=adaptive.
+    return bool(os.getenv('TURNSTILE_SITE_KEY') and os.getenv('TURNSTILE_SECRET_KEY')) and os.getenv('TURNSTILE_LOGIN_MODE','always').strip().lower()!='adaptive'
 
 
 def bot_required(c, ip_key):
@@ -300,6 +305,7 @@ class Handler(BaseHTTPRequestHandler):
         notice = '' if production_enabled() else '<p class="evaluation-notice">Esta versión es de evaluación. Utiliza únicamente datos ficticios.</p>'
         with connect() as c:minimum=auth_policy(c)['password_min']
         content = content.replace('{{password_min}}',str(minimum)).replace('{{access_environment}}','ACCESO SEGURO' if production_enabled() else 'ENTORNO LOCAL')
+        content = content.replace('{{turnstile_sitekey}}',html.escape(os.getenv('TURNSTILE_SITE_KEY',''),quote=True) if bot_always() else '')
         content = content.replace('{{evaluation_notice}}', notice).replace('{{environment_label}}', 'Servicio técnico' if production_enabled() else 'Evaluación local · Usa datos ficticios')
         self.reply(200, content, 'text/html; charset=utf-8')
 
@@ -678,7 +684,7 @@ class Handler(BaseHTTPRequestHandler):
                         auth_event(c,account_hash,ip_hash,'limited')
                         audit(c,None,'login_rate_limited')
                         return self.reply(429, {'error':'Por seguridad, el acceso está temporalmente limitado. Inténtalo más tarde o recupera tu contraseña.'})
-                    if bot_required(c,ip_key) and not verify_bot(str(data.get('bot_token','')),'login'):
+                    if (bot_always() or bot_required(c,ip_key)) and not verify_bot(str(data.get('bot_token','')),'login'):
                         return self.reply(403,{'error':'Completa la verificación de seguridad. Si falla, puedes esperar o recuperar tu contraseña.','challenge':True,'sitekey':os.getenv('TURNSTILE_SITE_KEY')})
                     row = c.execute('SELECT * FROM users WHERE (username=? OR email=?) AND active=1', (login,login)).fetchone()
                     valid = password_ok(password, row['password_hash'] if row else DUMMY_HASH)
@@ -751,7 +757,7 @@ class Handler(BaseHTTPRequestHandler):
                     return self.reply(403, {'error':'La sesión de seguridad no es válida. Recarga la página.'})
                 if path=='/api/auth/policy':
                     if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede configurar la seguridad.'})
-                    bounds={'lockout_seconds':(900,86400),'session_hours':(1,8),'remember_days':(1,30),'password_min':(12,128)}
+                    bounds={'lockout_seconds':(900,86400),'session_hours':(1,8),'remember_days':(1,30),'password_min':(6,128)}
                     try:
                         values={key:int(data[key]) for key in bounds}
                         if any(not low<=values[key]<=high for key,(low,high) in bounds.items()):raise ValueError()
@@ -1034,9 +1040,9 @@ def main():
         name = input('Nombre: ').strip()
         username = input('Usuario: ').strip()
         email = input('Correo: ').strip()
-        password = getpass.getpass('Contraseña (mínimo 12 caracteres): ')
+        password = getpass.getpass('Contraseña (mínimo 6 caracteres): ')
         repeat = getpass.getpass('Repetir contraseña: ')
-        if not name or not re.fullmatch(r'[a-zA-Z0-9_.-]{3,50}', username) or not re.fullmatch(r'[^\s@]+@[^\s@]+\.[^\s@]+',email) or not 12<=len(password)<=256 or password != repeat:
+        if not name or not re.fullmatch(r'[a-zA-Z0-9_.-]{3,50}', username) or not re.fullmatch(r'[^\s@]+@[^\s@]+\.[^\s@]+',email) or not 6<=len(password)<=256 or password != repeat:
             raise SystemExit('Datos inválidos o contraseñas diferentes; no se creó la cuenta.')
         with connect() as c:
             c.execute('BEGIN IMMEDIATE')
