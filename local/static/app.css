@@ -2901,3 +2901,13 @@ body[data-page=dashboard] .toast.toast-release .toast-body p{font-size:12px;colo
 @keyframes es-card-glow{0%{box-shadow:0 0 0 1px color-mix(in srgb,var(--tk) 55%,transparent),0 0 22px color-mix(in srgb,var(--tk) 40%,transparent)}100%{box-shadow:0 0 0 1px transparent,0 0 0 transparent}}
 @keyframes es-pulse{0%{transform:scale(1);box-shadow:0 0 0 0 #4d8df099}45%{transform:scale(1.04);box-shadow:0 0 0 6px #4d8df02e,0 0 16px #4d8df066}100%{transform:scale(1);box-shadow:0 0 0 10px #4d8df000}}
 @media(prefers-reduced-motion:reduce){.tracking-pro .tracking-item.track-new,.tracking-pro .tracking-item.track-new .tracking-open,.tracking-pro .panel-icon.tracking-pulse{animation:none}.tracking-pro .tracking-open,.tracking-pro .tracking-open .track-icon{transition:none}}
+
+/* Identificación de equipos: estados breves, importación desde el propio equipo y ficha con origen e identificación. */
+.serial-row .serial-read{padding:0 12px}
+.serial-import{display:grid;gap:6px;margin-top:4px}
+.serial-import textarea{width:100%;min-height:74px;max-height:160px;margin:0;padding:8px 10px;font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;resize:vertical;box-sizing:border-box}
+.serial-import-note{font-size:11.5px;color:#9bb0cf;overflow-wrap:anywhere}.serial-import-note:empty{display:none}
+.serial-official .serial-actions{margin-top:2px}.serial-official select{max-width:170px}
+.brand-card[data-identification=Confirmada] .brand-meta{color:#8fe0b9}.brand-card[data-identification=Pendiente] .brand-meta{color:#f1cf95}
+.brand-logo[data-kind=logo]{background:#fff}
+@media(max-width:560px){.serial-row .serial-read span,.serial-scan span{display:none}.serial-row .serial-read{padding:0 11px}}

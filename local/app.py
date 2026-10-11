@@ -1500,6 +1500,15 @@ class Handler(BaseHTTPRequestHandler):
                             entity_id = c.execute('INSERT INTO '+table+'('+','.join(keys)+') VALUES ('+','.join('?' for _ in keys)+')',values).lastrowid
                         audit(c,user['id'],table+'_saved',int(entity_id))
                     return self.reply(200, {'ok':True})
+                if path=='/api/devices/hardware':
+                    # Interpreta el informe de hardware pegado por el técnico; no ejecuta nada ni consulta servicios.
+                    if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
+                    import device_hardware
+                    report=str(data.get('text',''))
+                    if not report.strip() or len(report)>device_hardware.LIMIT:return self.reply(400,{'error':'Pega el resultado del comando (hasta 8000 caracteres).'})
+                    parsed=device_hardware.parse(report)
+                    if not parsed['recognized']:return self.reply(422,{'error':'No se reconoció fabricante, modelo ni serie en ese texto. Revisa que sea la salida completa del comando.'})
+                    return self.reply(200,parsed)
                 tracking_route=re.fullmatch(r'/api/orders/([0-9]+)/tracking',path)
                 if tracking_route:
                     import order_tracking
@@ -1614,8 +1623,10 @@ class Handler(BaseHTTPRequestHandler):
                     # Sin duplicados: si este cliente ya tiene registrado exactamente el mismo equipo (misma serie, tipo, marca, modelo y color), se reutiliza.
                     same=c.execute("SELECT id FROM devices WHERE client_id=? AND category=? AND COALESCE(brand,'')=? AND COALESCE(model,'')=? AND COALESCE(color,'')=? AND COALESCE(serial,'')!='' AND upper(replace(serial,' ',''))=? ORDER BY id LIMIT 1",
                         (client_id,fields['type'],fields['brand'],fields['model'],fields['color'],device_lookup.normalize(fields['serial']))).fetchone() if fields['serial'] else None
-                    device_id = same['id'] if same else c.execute('INSERT INTO devices(client_id,type,category,brand,model,serial,color,identity_source) VALUES (?,?,?,?,?,?,?,?)',
-                        (client_id,legacy_type(fields['type']),fields['type'],fields['brand'],fields['model'],fields['serial'],fields['color'],device_lookup.source(data.get('identity_source')) or ('manual' if fields['brand'] or fields['model'] else ''))).lastrowid
+                    identified=bool(fields['brand'] or fields['model'])
+                    # La identificación queda vinculada al equipo con quién la confirmó y cuándo; las órdenes anteriores no se tocan.
+                    device_id = same['id'] if same else c.execute('INSERT INTO devices(client_id,type,category,brand,model,serial,color,identity_source,identity_confirmed_by,identity_confirmed_at) VALUES (?,?,?,?,?,?,?,?,?,?)',
+                        (client_id,legacy_type(fields['type']),fields['type'],fields['brand'],fields['model'],fields['serial'],fields['color'],(device_lookup.source(data.get('identity_source')) or 'manual') if identified else '',user['id'] if identified else None,received.isoformat(timespec='seconds') if identified else '')).lastrowid
                     remember_brand(c,fields['brand'],fields['type'])
                     number_date = received.strftime('%Y%m%d')
                     c.execute('INSERT INTO daily_order_sequences(reception_date,value) VALUES (?,1) ON CONFLICT(reception_date) DO UPDATE SET value=value+1',(number_date,))

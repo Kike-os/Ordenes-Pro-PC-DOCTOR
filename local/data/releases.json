@@ -8,6 +8,24 @@
   },
   "releases": [
     {
+      "version": "1.5.21",
+      "date": "2026-10-11T14:24:09-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Lectura de datos desde el propio equipo y ficha de identificación con origen",
+      "changes": {
+        "features": [
+          "Leer del equipo: importa fabricante, modelo, serie, procesador, memoria y disco desde el propio equipo, para cualquier marca y sin servicios externos"
+        ],
+        "improvements": [
+          "Identificación de equipos: mensajes breves, ficha con origen e identificación, quién confirmó cada equipo, aviso de series con marcas distintas y logotipos en su color corporativo"
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.20",
       "date": "2026-10-11T14:10:40-05:00",
       "type": "patch",

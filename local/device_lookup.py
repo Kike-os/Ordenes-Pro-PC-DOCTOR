@@ -19,13 +19,14 @@ def normalize(value):
 def internal(c,serial):
     """Equipos ya ingresados con esa serie, agrupados por cliente, marca y modelo."""
     rows=c.execute("""SELECT d.id device_id,COALESCE(NULLIF(d.category,''),d.type) type,COALESCE(d.brand,'') brand,COALESCE(d.model,'') model,d.serial,COALESCE(d.color,'') color,d.client_id,cl.name client,
-        o.id order_id,o.code order_code,o.created_at,s.label status
-        FROM devices d JOIN clients cl ON cl.id=d.client_id LEFT JOIN orders o ON o.device_id=d.id LEFT JOIN statuses s ON s.code=o.status
+        d.identity_source,d.identity_confirmed_at,u.name confirmed_by,o.id order_id,o.code order_code,o.created_at,s.label status
+        FROM devices d JOIN clients cl ON cl.id=d.client_id LEFT JOIN users u ON u.id=d.identity_confirmed_by LEFT JOIN orders o ON o.device_id=d.id LEFT JOIN statuses s ON s.code=o.status
         WHERE upper(replace(COALESCE(d.serial,''),' ',''))=? ORDER BY d.id DESC,o.id DESC LIMIT 200""",(serial,)).fetchall()
     found={}
     for r in rows:
         key=(r['client_id'],r['type'],r['brand'].strip().lower(),r['model'].strip().lower())
-        item=found.setdefault(key,{'type':r['type'],'brand':r['brand'],'model':r['model'],'serial':r['serial'],'color':r['color'],'client_id':r['client_id'],'client':r['client'],'orders':0,'last_order':None})
+        item=found.setdefault(key,{'type':r['type'],'brand':r['brand'],'model':r['model'],'serial':r['serial'],'color':r['color'],'client_id':r['client_id'],'client':r['client'],'orders':0,'last_order':None,
+            'identity_source':r['identity_source'] or '','confirmed_by':r['confirmed_by'] or '','confirmed_at':r['identity_confirmed_at'] or ''})
         if r['order_id'] is None:continue
         item['orders']+=1
         if item['last_order'] is None:item['last_order']={'id':r['order_id'],'code':r['order_code'] or 'OP-%05d'%r['order_id'],'created_at':r['created_at'],'status':r['status']}
@@ -51,10 +52,12 @@ def identify(c,value,brand='',allow_external=lambda:True):
             except device_manufacturers.ProviderError as error:
                 print('device-lookup',maker['slug'],error.kind,flush=True)
                 state.update(state='error',message='El servicio de '+maker['name']+' no está disponible ahora. Continúa con el ingreso manual.')
-    return 200,{'serial':serial,'matches':matches,'manufacturer':state}
+    # Conflicto: la misma serie figura con marcas distintas en el historial; el técnico debe verificar el equipo.
+    brands={device_brands.slug(m['brand']) for m in matches if m['brand'].strip()}
+    return 200,{'serial':serial,'matches':matches,'conflict':len(brands)>1,'manufacturer':state}
 
 
 def source(value):
     """Procedencia válida de la marca y el modelo confirmados por el técnico."""
     value=str(value or '')
-    return value if value in ('manual','historial') or re.fullmatch(r'fabricante:[a-z0-9-]{1,30}',value) else ''
+    return value if value in ('manual','historial','equipo') or re.fullmatch(r'fabricante:[a-z0-9-]{1,30}',value) else ''

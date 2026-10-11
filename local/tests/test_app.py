@@ -678,6 +678,32 @@ class SecurityTests(unittest.TestCase):
             self.assertEqual([(r['model'],r['identity_source'],r['n']) for r in rows],[('ProBook 440','historial',2),('ProBook 450','manual',1)])
             self.assertEqual(c.execute('SELECT COUNT(*) FROM orders').fetchone()[0],3)
 
+    def test_hardware_report_identifies_device_without_external_services(self):
+        cookie,csrf=self.login();url='/api/devices/hardware'
+        self.assertEqual(self.request(url,{'text':'Vendor : HP'},cookie=cookie)['status'],403)
+        report='Vendor            : HP\nName              : HP ProBook 440 G8 Notebook PC\nIdentifyingNumber : 5cd1234abc\n\nName : 11th Gen Intel(R) Core(TM) i5-1135G7\nRAM_GB : 16\n'
+        found=self.request(url,{'text':report},cookie=cookie,csrf=csrf)
+        self.assertEqual((found['status'],found['body']['brand'],found['body']['model'],found['body']['serial'],found['body']['ram'],found['body']['brand_slug']),(200,'HP','ProBook 440 G8 Notebook PC','5CD1234ABC','16 GB','hp'))
+        self.assertIn('i5-1135G7',found['body']['cpu'])
+        lenovo=self.request(url,{'text':'IdentifyingNumber=PF3ABCDE\nName=20W0S0AB00\nVendor=LENOVO\nVersion=ThinkPad T14 Gen 2i\n'},cookie=cookie,csrf=csrf)['body']
+        self.assertEqual((lenovo['brand'],lenovo['model']),('Lenovo','ThinkPad T14 Gen 2i (20W0S0AB00)'))
+        table=self.request(url,{'text':'IdentifyingNumber  Name            Vendor     Version\nABC1234            Latitude 5420   Dell Inc.  \n'},cookie=cookie,csrf=csrf)['body']
+        self.assertEqual((table['brand'],table['model'],table['serial']),('Dell','Latitude 5420','ABC1234'))
+        # Valores de relleno del fabricante de la placa o texto sin datos: no se inventa nada.
+        for text in ('Vendor : To Be Filled By O.E.M.\nName : System Product Name\nIdentifyingNumber : Default string\n','hola mundo'):self.assertEqual(self.request(url,{'text':text},cookie=cookie,csrf=csrf)['status'],422)
+        self.assertEqual(self.request(url,{'text':''},cookie=cookie,csrf=csrf)['status'],400)
+
+    def test_confirmed_identity_is_reused_and_brand_conflicts_are_flagged(self):
+        cookie,csrf=self.login();base={'client':'Prueba','problem':'Prueba','serial':'SN-CONF-1'}
+        self.request('/api/orders',self.order_data(dict(base,brand='HP',model='ProBook 440 G8',identity_source='equipo',request_key='identity-confirm-request-01')),cookie=cookie,csrf=csrf)
+        known=self.request('/api/devices/identify?serial=sn-conf-1',cookie=cookie)['body']
+        match=known['matches'][0]
+        self.assertEqual((known['conflict'],match['brand'],match['model'],match['identity_source'],bool(match['confirmed_by']),bool(match['confirmed_at'])),(False,'HP','ProBook 440 G8','equipo',True,True))
+        self.request('/api/orders',self.order_data(dict(base,brand='Dell',model='Latitude 5420',request_key='identity-confirm-request-02')),cookie=cookie,csrf=csrf)
+        clash=self.request('/api/devices/identify?serial=SN-CONF-1',cookie=cookie)['body']
+        self.assertEqual((clash['conflict'],sorted(m['brand'] for m in clash['matches'])),(True,['Dell','HP']))
+        with app.connect() as c:self.assertEqual(c.execute("SELECT COUNT(*) FROM devices WHERE identity_confirmed_by IS NOT NULL AND identity_confirmed_at!=''").fetchone()[0],2)
+
     def test_brand_logo_files_are_listed_and_served(self):
         cookie,csrf=self.login()
         folder=app.ROOT/'static'/'brands';svg=folder/'zz-prueba.svg';png=folder/'zz-prueba.png'

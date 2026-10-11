@@ -7,7 +7,9 @@ Si falta, se muestra un icono genérico; la marca y el modelo se guardan igual, 
 
 Los SVG de esta carpeta provienen de Simple Icons 13.21.0 (https://simpleicons.org, archivos con licencia CC0): son la marca
 en un solo color, sin modificar. Las marcas registradas pertenecen a sus titulares y aquí solo identifican el equipo recibido.
-Se pueden reemplazar por el archivo del portal de marca de cada fabricante usando el mismo nombre.
+Cada uno se muestra en el color corporativo que Simple Icons registra para la marca (atributo `fill`); el trazo no se modificó.
+Apple, ASUS, Honor, Razer y Sony quedan en negro. Para usar el logotipo corporativo completo de un fabricante, descárgalo de su
+portal de marca y guárdalo aquí con el mismo nombre.
 
 Sin archivo todavía (muestran el icono genérico): Brother, Canon, Xerox, Gigabyte, Ricoh, Lexmark y el resto de marcas.
 

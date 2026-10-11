@@ -4,6 +4,18 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.21 — 2026-10-11 14:24 (UTC-05:00)
+
+Lectura de datos desde el propio equipo y ficha de identificación con origen
+
+### Nuevas funcionalidades
+
+- Leer del equipo: importa fabricante, modelo, serie, procesador, memoria y disco desde el propio equipo, para cualquier marca y sin servicios externos
+
+### Mejoras realizadas
+
+- Identificación de equipos: mensajes breves, ficha con origen e identificación, quién confirmó cada equipo, aviso de series con marcas distintas y logotipos en su color corporativo
+
 ## v1.5.20 — 2026-10-11 14:10 (UTC-05:00)
 
 Enterprise Status Pro, corrección de botones de la nueva orden y ajustes del ticket
