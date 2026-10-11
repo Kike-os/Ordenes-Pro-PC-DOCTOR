@@ -12,9 +12,10 @@ if production:
     os.environ.setdefault('APP_URL', 'https://' + production)
     os.environ.setdefault('PUBLIC_APP_URL', 'https://' + production)
 
-from passenger_wsgi import application  # noqa: E402
+import passenger_wsgi  # noqa: E402
 
 
+# Único nombre exportado: Vercel también acepta «application» y lo usaría sin este ajuste de ruta.
 def app(environ, start_response):
     # Vercel sobrescribe estas cabeceras con la IP real; sin esto todos los límites por IP compartirían la del proxy.
     client = environ.get('HTTP_X_REAL_IP') or environ.get('HTTP_X_FORWARDED_FOR', '').split(',')[0].strip()
@@ -26,4 +27,4 @@ def app(environ, start_response):
     if routed:
         environ['PATH_INFO'] = '/' + routed[0].lstrip('/')
         environ['QUERY_STRING'] = urlencode([(key, value) for key, value in query if key != '__path'])
-    return application(environ, start_response)
+    return passenger_wsgi.application(environ, start_response)
