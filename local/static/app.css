@@ -2750,3 +2750,20 @@ body[data-page=dashboard] .activity-bar input{height:38px;min-height:38px;margin
 @keyframes tracking-new{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 @keyframes tracking-glow{0%{box-shadow:0 0 0 0 var(--tk)}100%{box-shadow:0 0 0 10px transparent}}
 @media(prefers-reduced-motion:reduce){.tracking-pro .tracking-open,.tracking-pro .tracking-open .track-icon{transition:none}.tracking-pro .tracking-open:hover,.tracking-pro .tracking-open:focus-visible{transform:none}.tracking-pro .tracking-item.track-new,.tracking-pro .tracking-item.track-new .track-icon{animation:none}}
+/* Glass Glow Update: aviso de estado de actualización con brillo según el estado. */
+body[data-page=dashboard] .toast.toast-release{--glow:#3b82f6;border-color:color-mix(in srgb,var(--glow) 55%,#1e3252);box-shadow:0 14px 34px #02071480,0 0 0 1px color-mix(in srgb,var(--glow) 22%,transparent),0 0 20px color-mix(in srgb,var(--glow) 22%,transparent)}
+body[data-page=dashboard] .toast.toast-release::before{border-color:var(--glow)}
+body[data-page=dashboard] .toast.toast-release[data-release=done]{--glow:#3fbf8a}
+body[data-page=dashboard] .toast.toast-release[data-release=checking],body[data-page=dashboard] .toast.toast-release[data-release=updating]{--glow:#38bdf8}
+body[data-page=dashboard] .toast.toast-release[data-release=error]{--glow:#f87171}
+body[data-page=dashboard] .toast.toast-release .toast-icon{background:color-mix(in srgb,var(--glow) 18%,#0b1626);color:color-mix(in srgb,var(--glow) 75%,#fff)}
+body[data-page=dashboard] .toast.toast-release[data-release=new] .toast-icon{animation:toast-icon .8s ease-out 2}
+body[data-page=dashboard] .toast.toast-release:is([data-release=checking],[data-release=updating]) .toast-icon .system-icon{animation:ai-spin 1s linear infinite}
+body[data-page=dashboard] .toast.toast-release .toast-bar{background:var(--glow);height:2px}
+.toast-shimmer{position:absolute;left:0;right:0;bottom:0;height:2px;overflow:hidden;background:color-mix(in srgb,var(--glow) 25%,transparent)}
+.toast-shimmer::after{content:"";position:absolute;inset:0;width:40%;background:linear-gradient(90deg,transparent,var(--glow),transparent);animation:toast-shimmer 1.2s ease-in-out infinite}
+@keyframes toast-shimmer{from{transform:translateX(-110%)}to{transform:translateX(270%)}}
+@media(prefers-reduced-motion:reduce){body[data-page=dashboard] .toast.toast-release .toast-icon,body[data-page=dashboard] .toast.toast-release .toast-icon .system-icon,.toast-shimmer::after{animation:none}}
+body[data-page=dashboard] .toast.toast-release{padding:9px 8px 10px 10px;border-radius:12px}
+body[data-page=dashboard] .toast.toast-release .toast-body{gap:2px}
+body[data-page=dashboard] .toast.toast-release .toast-body p{font-size:12px;color:#c2d3ec}

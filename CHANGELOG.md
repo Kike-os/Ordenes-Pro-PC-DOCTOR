@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.12 — 2026-10-11 12:49 (UTC-05:00)
+
+Avisos de actualización Glass Glow.
+
+### Mejoras realizadas
+
+- Avisos de actualización estilo Glass Glow: toast fino con icono y brillo según el estado (comprobando, actualizado, nueva versión, actualizando y error), con Reintentar, Actualizar ahora y Posponer.
+
 ## v1.5.11 — 2026-10-11 12:43 (UTC-05:00)
 
 Seguimiento de órdenes con colores por estado y microanimaciones.

@@ -8,6 +8,22 @@
   },
   "releases": [
     {
+      "version": "1.5.12",
+      "date": "2026-10-11T12:49:57-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Avisos de actualización Glass Glow.",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Avisos de actualización estilo Glass Glow: toast fino con icono y brillo según el estado (comprobando, actualizado, nueva versión, actualizando y error), con Reintentar, Actualizar ahora y Posponer."
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.11",
       "date": "2026-10-11T12:43:05-05:00",
       "type": "patch",
