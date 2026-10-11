@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.15 — 2026-10-11 13:21 (UTC-05:00)
+
+Logotipos de marcas en la ficha del equipo
+
+### Mejoras realizadas
+
+- Logotipos de 21 marcas en la ficha del equipo de la recepción (Dell, HP, Lenovo, ASUS, Acer, Apple, Epson y otras)
+
 ## v1.5.14 — 2026-10-11 13:09 (UTC-05:00)
 
 Ficha del equipo con logotipo de la marca en la recepción

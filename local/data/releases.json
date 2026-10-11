@@ -8,6 +8,22 @@
   },
   "releases": [
     {
+      "version": "1.5.15",
+      "date": "2026-10-11T13:21:38-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Logotipos de marcas en la ficha del equipo",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Logotipos de 21 marcas en la ficha del equipo de la recepción (Dell, HP, Lenovo, ASUS, Acer, Apple, Epson y otras)"
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.14",
       "date": "2026-10-11T13:09:18-05:00",
       "type": "patch",

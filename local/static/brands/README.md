@@ -3,6 +3,14 @@
 La ficha del equipo en **Nueva orden → Equipo** muestra aquí el logotipo de la marca cuando existe el archivo.
 Si falta, se muestra un icono genérico; la marca y el modelo se guardan igual, porque no dependen del logo.
 
+## Archivos incluidos
+
+Los SVG de esta carpeta provienen de Simple Icons 13.21.0 (https://simpleicons.org, archivos con licencia CC0): son la marca
+en un solo color, sin modificar. Las marcas registradas pertenecen a sus titulares y aquí solo identifican el equipo recibido.
+Se pueden reemplazar por el archivo del portal de marca de cada fabricante usando el mismo nombre.
+
+Sin archivo todavía (muestran el icono genérico): Brother, Canon, Xerox, Gigabyte, Ricoh, Lexmark y el resto de marcas.
+
 ## Cómo añadir un logotipo
 
 1. Descargar el archivo **oficial** desde el portal de marca o de prensa del fabricante y revisar sus condiciones de uso.
