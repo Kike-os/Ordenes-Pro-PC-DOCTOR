@@ -42,6 +42,7 @@ import client_registry
 import maintenance
 import appointments
 import adi
+import versioning
 from weather import current_weather
 from geography import initialize_catalog, search as search_geography, METADATA as GEO_METADATA
 
@@ -571,6 +572,9 @@ class Handler(BaseHTTPRequestHandler):
                 if path=='/api/orders':page=min(page,max(1,(total+49)//50))
                 rows = [dict(r) for r in c.execute('SELECT '+columns+' FROM '+source+condition+' ORDER BY '+ordering+' LIMIT 50 OFFSET ?', (*args,(page-1)*50))]
                 return self.reply(200, {'rows':rows,'total':total,'page':page,'pages':max(1,(total+49)//50)})
+            if path == '/api/system':
+                try:return self.reply(200, versioning.overview())
+                except versioning.RegistryError as error:return self.reply(500,{'error':str(error)})
             if path == '/api/reports':
                 counts = [dict(r) for r in c.execute("SELECT s.code,s.label,COUNT(o.id) total FROM statuses s LEFT JOIN orders o ON o.status=s.code GROUP BY s.code ORDER BY CASE s.code WHEN 'pendiente' THEN 1 WHEN 'reparacion' THEN 2 WHEN 'esperando_cliente' THEN 3 WHEN 'presupuesto' THEN 4 WHEN 'espera_entrega' THEN 5 WHEN 'listo' THEN 6 ELSE 7 END")]
                 return self.reply(200, {'statuses':counts,'clients':c.execute('SELECT COUNT(*) FROM clients').fetchone()[0],'devices':c.execute('SELECT COUNT(*) FROM devices').fetchone()[0]})
@@ -802,6 +806,10 @@ class Handler(BaseHTTPRequestHandler):
                     for key,value in values.items():c.execute('INSERT INTO auth_policy VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value',(key,value))
                     audit(c,user['id'],'auth_policy_updated')
                     return self.reply(200,{'ok':True})
+                if path=='/api/system/check':
+                    # Solo consulta y compara; no descarga, instala ni modifica archivos.
+                    try:return self.reply(200,versioning.check())
+                    except versioning.RegistryError as error:return self.reply(503,{'error':str(error)})
                 if path=='/api/sessions/revoke':
                     c.execute('DELETE FROM sessions WHERE user_id=?',(user['id'],));audit(c,user['id'],'sessions_revoked')
                     return self.reply(200,{'ok':True,'message':'Se cerraron las sesiones activas.'},cookie=self.cookie('',0))

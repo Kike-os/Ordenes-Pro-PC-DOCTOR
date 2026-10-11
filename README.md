@@ -63,6 +63,10 @@ Copia `local/.env.example` a `local/.env` y configura SMTP_HOST, SMTP_PORT, SMTP
 
 Sin SMTP configurado no se enviarán enlaces; la respuesta pública sigue siendo genérica para no revelar cuentas. Los fallos se registran como eventos sin secretos. No se envían correos durante las pruebas.
 
+## Versiones
+
+La versión instalada, el historial y el registro de cambios están en **Sistema → Sistema y actualizaciones**. El número de versión se administra con `python local/versioning.py` y queda en `CHANGELOG.md`: [guía de versiones](docs/VERSIONES.md).
+
 ## Pruebas
 
 ```bash
