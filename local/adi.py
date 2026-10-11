@@ -79,7 +79,7 @@ def admin_reply(c,text,now):
   if live['appointments_requested']:parts.append(f"{live['appointments_requested']} citas por confirmar")
   if live['chats_waiting']:parts.append(f"{live['chats_waiting']} conversaciones esperando a un asesor")
   if live['accounts_pending']:parts.append(f"{live['accounts_pending']} solicitudes de cuenta por revisar")
-  return {'answer':'Resumen del taller: '+'; '.join(parts)+'.','links':[link('Centro de operaciones','#home'),link('Órdenes activas','#orders?active=1')]}
+  return {'answer':'Resumen del taller: '+'; '.join(parts)+'.','links':[link('Centro de Operaciones','#home'),link('Órdenes activas','#orders?active=1')]}
  if has('vencid','atrasad','retras','fuera de plazo'):
   rows=order_rows(c,"o.estimated_delivery!='' AND o.estimated_delivery<? AND o.status!='entregado'",(today,))
   return {'answer':(f"Hay {live['overdue']} orden(es) con entrega vencida: "+'; '.join(order_line(r)+' (prevista '+r['estimated_delivery']+')' for r in rows)+'.') if rows else 'No hay órdenes con la entrega vencida.','links':[link('Órdenes activas','#orders?active=1')]}

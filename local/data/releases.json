@@ -8,6 +8,22 @@
   },
   "releases": [
     {
+      "version": "1.5.10",
+      "date": "2026-10-11T12:39:59-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Corrección del título «Centro de Operaciones».",
+      "changes": {
+        "features": [],
+        "improvements": [],
+        "fixes": [
+          "El título del inicio ahora se escribe «Centro de Operaciones»."
+        ],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.9",
       "date": "2026-10-11T12:27:41-05:00",
       "type": "patch",

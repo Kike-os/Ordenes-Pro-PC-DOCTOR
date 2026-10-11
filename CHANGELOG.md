@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.10 — 2026-10-11 12:39 (UTC-05:00)
+
+Corrección del título «Centro de Operaciones».
+
+### Errores corregidos
+
+- El título del inicio ahora se escribe «Centro de Operaciones».
+
 ## v1.5.9 — 2026-10-11 12:27 (UTC-05:00)
 
 Centro de Actividad, seguimiento de órdenes bajo los indicadores y aviso de versión rediseñado.
