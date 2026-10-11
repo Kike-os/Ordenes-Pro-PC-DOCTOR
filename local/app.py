@@ -268,6 +268,65 @@ def mail_allowed(user):
     return ready and (user['role']=='administrador' or (user['role']=='tecnico' and os.getenv('MAIL_ALLOW_TECHNICIANS','').lower() in ('1','true','yes')))
 
 
+def order_document(c,oid):
+    """Datos completos de una orden para sus documentos (misma composición que usan los PDF del detalle)."""
+    row=c.execute('SELECT o.*,COALESCE(NULLIF(d.kind,\'\'),d.category) type,d.brand,d.model,d.serial,d.color,c.id client_id,c.name client,c.identification,c.phone,c.email,c.province,c.city,c.address,c.location_reference,s.label status_label FROM orders o JOIN devices d ON d.id=o.device_id JOIN clients c ON c.id=d.client_id JOIN statuses s ON s.code=o.status WHERE o.id=?',(oid,)).fetchone()
+    if not row:return None
+    order=dict(row);order['current_problem']=row['problem']
+    if row['reception_snapshot']:order.update(json.loads(row['reception_snapshot']))
+    order['code']=row['code'] or 'OP-'+str(row['id']).zfill(5);order['email']=row['email'] or ''
+    service_terms.attach(c,order);technical_access.attach(c,order);order_workspace.attach(c,order)
+    return order
+
+
+def receipt_mail_status(c,oid):
+    rows=[dict(r) for r in c.execute('SELECT m.mode,m.recipient,m.result,m.detail,m.created_at,u.name actor FROM order_receipt_mail m LEFT JOIN users u ON u.id=m.actor_id WHERE m.order_id=? ORDER BY m.id DESC LIMIT 8',(oid,))]
+    auto=c.execute("SELECT value FROM system_state WHERE key='receipt_mail_auto'").fetchone()
+    return {'history':rows,'sent':any(r['result']=='sent' for r in rows),'auto':not (auto and auto['value']=='off'),'configured':mail_pro.configured()}
+
+
+def send_receipt_mail(c,oid,user,mode):
+    """Envía por SMTP el comprobante A4 (con las Políticas de Reparaciones) al correo del cliente y registra el resultado.
+
+    «sent» significa que el servidor de correo aceptó el mensaje, no que el cliente lo haya recibido o leído.
+    """
+    import repair_policies
+    from receipt_pdf import render_receipt
+    order=order_document(c,oid)
+    if not order:return 404,{'error':'Orden no disponible.'}
+    now=reception_now().isoformat(timespec='seconds');policies=repair_policies.load()
+    def log(result,detail='',recipient='',sha=''):
+        c.execute('INSERT INTO order_receipt_mail(order_id,mode,recipient,result,detail,document_sha256,policies_version,actor_id,created_at) VALUES (?,?,?,?,?,?,?,?,?)',(oid,mode,recipient,result,detail[:300],sha,policies['version'],user['id'],now))
+    # El envío automático ocurre una sola vez por orden; los reenvíos son siempre una acción expresa del personal.
+    if mode=='auto':
+        state=receipt_mail_status(c,oid)
+        if not state['auto']:return 200,{'result':'disabled','message':'El envío automático del comprobante está desactivado.'}
+        if state['history']:return 200,{'result':'already','message':'El comprobante de esta orden ya fue gestionado.'}
+    email=(order.get('email') or '').strip()
+    if not email or not re.fullmatch(r'[^\s@<>]+@[^\s@<>.]+(?:\.[^\s@<>.]+)+',email):
+        log('no_email');return 200,{'result':'no_email','message':'Pendiente de envío — Sin correo electrónico. Puedes descargar o imprimir el comprobante.'}
+    try:ready=mail_pro.configured()
+    except mail_pro.MailError:ready=False
+    if not ready:
+        log('not_configured','',email);return 200,{'result':'not_configured','message':'El correo del sistema no está configurado: el comprobante no se envió.'}
+    pdf=render_receipt(order);sha=hashlib.sha256(pdf).hexdigest()
+    body=('Estimado/a '+order['client']+':\n\nLe confirmamos que su equipo ha sido registrado correctamente en nuestro sistema de servicio técnico.\n\n'
+          'Adjuntamos el comprobante de recepción correspondiente a la orden '+order['code']+', que incluye la información registrada del equipo y nuestras Políticas de Reparaciones.\n\n'
+          'Le recomendamos conservar este documento para futuras consultas.\n\nAtentamente,\n\nServicio Técnico\nPC-DOCTOR S.A.')
+    try:
+        config=mail_pro.settings();card=mail_signature_card(c)
+        message,recipients=mail_pro.build_message(config,{'to':email,'subject':'Confirmación de recepción — Orden '+order['code']+' | PC-DOCTOR S.A.','body':body,'from_name':corporate.settings()['name'],
+            'attachments':[{'name':'Comprobante-'+order['code']+'.pdf','type':'application/pdf','data':base64.b64encode(pdf).decode()}]},card if card.get('enabled') else '')
+        mail_pro.deliver(config,message,recipients)
+    except mail_pro.MailError as error:
+        print('receipt-mail',error.kind,flush=True);log('failed',str(error),email,sha)
+        return 200,{'result':'failed','message':'La orden está guardada, pero el correo no se pudo enviar: '+str(error)}
+    log('sent','El servidor de correo aceptó el mensaje.',email,sha)
+    order_workspace.event(c,oid,user['id'],reception_now(),'follow_up','Comprobante de recepción enviado por correo a '+email+'.')
+    audit(c,user['id'],'receipt_mail_sent',oid)
+    return 200,{'result':'sent','recipient':email,'message':'Comprobante enviado a '+email+'. El servidor de correo aceptó el mensaje.'}
+
+
 def mail_signature_card(c):
     # Firma corporativa del buzón remitente: datos validados; el HTML siempre lo compone el servidor.
     account=mail_pro.settings()['username'];row=c.execute('SELECT value FROM system_state WHERE key=?',('mail_signature_card:'+account,)).fetchone()
@@ -553,7 +612,8 @@ class Handler(BaseHTTPRequestHandler):
                 if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
                 import adi_ai
                 usage=c.execute("SELECT COUNT(*) n FROM adi_actions WHERE action='writing_improve' AND created_at>=?",(reception_now().date().isoformat(),)).fetchone()['n']
-                return self.reply(200,{'writing':adi_ai.status(c),'today':usage,'channels':{'mail':mail_allowed(user),'web_chat':True,'whatsapp':False}})
+                auto_receipt=c.execute("SELECT value FROM system_state WHERE key='receipt_mail_auto'").fetchone()
+                return self.reply(200,{'writing':adi_ai.status(c),'today':usage,'channels':{'mail':mail_allowed(user),'web_chat':True,'whatsapp':False},'receipt_mail_auto':not (auto_receipt and auto_receipt['value']=='off')})
             if path == '/api/adi/admin':
                 if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede usar la asistente administrativa.'})
                 return self.reply(200,{'enabled':bool(os.getenv('OPENAI_API_KEY')),'message':'Adi responde consultas operativas desde datos autorizados.','live':adi.snapshot(c,reception_now())})
@@ -719,6 +779,7 @@ class Handler(BaseHTTPRequestHandler):
                 result = dict(row)
                 import order_tracking
                 result['tracking']=order_tracking.active(c,row['id'])
+                result['receipt_mail']=receipt_mail_status(c,row['id'])
                 result.pop('request_key', None)
                 if result['reception_snapshot']:
                     result.update(json.loads(result['reception_snapshot']))
@@ -1567,6 +1628,19 @@ class Handler(BaseHTTPRequestHandler):
                     # Registro de uso: quién, qué tipo de mejora y consumo. No se guarda el texto.
                     c.execute('INSERT INTO adi_actions(user_id,action,created_at,details) VALUES (?,?,?,?)',(user['id'],'writing_improve',reception_now().isoformat(timespec='seconds'),json.dumps({'mode':mode,'field':field,'model':result['model'],'tokens_in':result['tokens_in'],'tokens_out':result['tokens_out'],'missing':len(result['missing'])})))
                     return self.reply(200,{'suggestion':result['suggestion'],'missing':result['missing'],'changed':result['changed']})
+                receipt_route=re.fullmatch(r'/api/orders/([0-9]+)/receipt-mail',path)
+                if receipt_route or path=='/api/receipt-mail/settings':
+                    if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
+                    if not receipt_route:
+                        if user['role']!='administrador' or data.get('auto') not in (True,False):return self.reply(403 if user['role']!='administrador' else 400,{'error':'No se pudo cambiar la configuración.'})
+                        c.execute("INSERT INTO system_state(key,value) VALUES ('receipt_mail_auto',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",('on' if data['auto'] else 'off',))
+                        audit(c,user['id'],'receipt_mail_auto_'+('on' if data['auto'] else 'off'));return self.reply(200,{'ok':True,'auto':data['auto']})
+                    mode=str(data.get('mode',''))
+                    if mode not in ('auto','manual'):return self.reply(400,{'error':'Modo de envío inválido.'})
+                    if mode=='manual' and limited(c,'receipt-mail:'+str(user['id']),limit=30,window=3600):return self.reply(429,{'error':'Alcanzaste el límite de reenvíos por hora.'})
+                    status,payload=send_receipt_mail(c,int(receipt_route[1]),user,mode)
+                    if status==200:payload['receipt_mail']=receipt_mail_status(c,int(receipt_route[1]))
+                    return self.reply(status,payload)
                 tracking_route=re.fullmatch(r'/api/orders/([0-9]+)/tracking',path)
                 if tracking_route:
                     import order_tracking

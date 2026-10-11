@@ -1,0 +1,24 @@
+# Comprobante de recepción con Políticas de Reparaciones y envío por correo — 11/10/2026
+
+## Documento
+
+El comprobante A4 existente (`local/receipt_pdf.py`: logo original, datos de la orden, cliente, equipo, condiciones de recepción, QR) incorpora al final una página propia con las **Políticas de Reparaciones**.
+
+- El texto vive en `local/data/repair-policies.json`, literal, tal como lo entregó PC-DOCTOR S.A. el 11/10/2026, incluida la cláusula 5.2 «Muestras claras de intento de desarme del producto.». No se resume ni se reescribe. Cambiarlo exige una versión nueva aprobada por la empresa.
+- Cada documento indica la versión de las políticas y su huella SHA-256.
+- Incluir las políticas en el comprobante **no registra aceptación** del cliente. La aceptación sigue dependiendo de las condiciones publicadas por administración (ver `CONDICIONES.md`) o de la firma electrónica cuando exista.
+- Revisión jurídica pendiente, sin alterar el texto: la cláusula 2 (retener o rematar el producto a los 3 meses) debería validarse con asesoría legal antes de aplicarse.
+
+## Envío
+
+- Al guardar una orden, la interfaz pide al servidor el envío automático (`POST /api/orders/<id>/receipt-mail`, modo `auto`). El servidor genera el PDF, lo adjunta y lo envía por el SMTP de Mail Pro con la firma corporativa.
+- Asunto: «Confirmación de recepción — Orden [NÚMERO] | PC-DOCTOR S.A.».
+- Un envío automático por orden; los reenvíos son una acción expresa desde el detalle de la orden (límite de 30 por usuario y hora).
+- Sin correo del cliente: «Pendiente de envío — Sin correo electrónico». Sin correo del sistema: no se envía. Si SMTP falla, la orden queda guardada y el error registrado.
+- «Enviado» significa que el servidor de correo aceptó el mensaje; no acredita lectura ni recepción.
+- Cada intento queda en `order_receipt_mail` (migración 027): modo, destinatario, resultado, detalle, huella del PDF, versión de las políticas, usuario y fecha. El envío correcto también se anota en el historial de la orden.
+- Se desactiva en Configuración → «Comprobante de recepción por correo».
+
+## Pendiente
+
+Prueba de envío real a un buzón de prueba (en las pruebas automáticas el SMTP está simulado) y almacenamiento del PDF como archivo: hoy se regenera a partir de los datos de la orden y se conserva su huella.

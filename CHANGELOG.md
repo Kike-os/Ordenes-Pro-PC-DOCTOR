@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.31 — 2026-10-11 17:37 (UTC-05:00)
+
+Comprobante con Políticas de Reparaciones y envío por correo
+
+### Nuevas funcionalidades
+
+- Comprobante de recepción A4 con las Políticas de Reparaciones completas y envío automático por correo al registrar la orden, con registro de cada intento y reenvío desde el detalle
+
 ## v1.5.30 — 2026-10-11 17:29 (UTC-05:00)
 
 Correcciones de Nueva Cita y de la validación de órdenes; reserva pública por pasos

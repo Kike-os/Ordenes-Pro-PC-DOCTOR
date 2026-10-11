@@ -1,6 +1,7 @@
 """Comprobante A4 con QR vectorial; biblioteca PDF portable, sin procesos externos."""
 from datetime import datetime
 import io
+import re
 import json
 from pathlib import Path
 import sys
@@ -203,4 +204,16 @@ def render_receipt(order):
             if y+100>H-100:new_page()
             section('Condiciones de servicio')
             item('Historial','Esta recepción no tiene condiciones ni aceptación registradas. No se ha atribuido una aceptación retroactiva.')
+    if not order.get('_service'):
+        # Políticas de Reparaciones: texto oficial literal en página propia. Acompañan al comprobante; no acreditan aceptación.
+        from repair_policies import load as load_policies
+        policies=load_policies();new_page();section(policies['title'])
+        for paragraph in policies['paragraphs']:
+            heading=bool(re.match(r'^(\d+\.|\d+ -)\s',paragraph)) and len(paragraph)<60
+            lines=wrapped(paragraph,W-94,9.5 if heading else 9)
+            if y+len(lines)*13+8>H-100:new_page()
+            for content in lines:text(content,47,y,9.5 if heading else 9,TEXT,heading);y+=13
+            y+=7
+        if y+30>H-100:new_page()
+        text('Versión del documento: '+policies['version']+' · Integridad SHA-256: '+policies['sha256'][:32]+'…',47,y+4,7,MUTED)
     output=io.BytesIO();pdf.write(output);return output.getvalue()
