@@ -421,7 +421,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         path = urlsplit(self.path).path
-        files = {'/static/label.css':'label.css','/static/app.css':'app.css','/static/app.js':'app.js','/static/form-validation.js':'form-validation.js','/static/appointments.js':'appointments.js','/static/adi-widget.js':'adi-widget.js','/static/logo-original.png':'logo-original.png',
+        files = {'/static/label.css':'label.css','/static/tracking.css':'tracking.css','/static/app.css':'app.css','/static/app.js':'app.js','/static/form-validation.js':'form-validation.js','/static/appointments.js':'appointments.js','/static/adi-widget.js':'adi-widget.js','/static/logo-original.png':'logo-original.png',
                  '/favicon.ico':'favicon.ico','/static/favicon.ico':'favicon.ico','/static/favicon-16.png':'favicon-16.png','/static/favicon-32.png':'favicon-32.png','/static/logo-firma.png':'logo-firma.png','/static/favicon-48.png':'favicon-48.png',
                  '/apple-touch-icon.png':'apple-touch-icon.png','/apple-touch-icon-precomposed.png':'apple-touch-icon.png','/static/apple-touch-icon.png':'apple-touch-icon.png'}
         # Logotipos de marcas: solo nombres simples dentro de static/brands; si el archivo no existe la interfaz usa un icono genérico.
@@ -487,6 +487,13 @@ class Handler(BaseHTTPRequestHandler):
                 token=preference[1]
                 body='<!doctype html><html lang="es"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Preferencias de recordatorios</title><h1>PC-DOCTOR S.A.</h1><p>Puede dejar de recibir recordatorios de mantenimiento. Esta acción no modifica su reparación.</p><form method="post" action="/maintenance-preferences/'+token+'"><button type="submit">Dejar de recibir recordatorios</button></form></html>'
                 return self.reply(200,body,'text/html; charset=utf-8')
+            # Seguimiento público por enlace aleatorio: respuesta idéntica para enlaces inexistentes o revocados.
+            tracking_page=re.fullmatch(r'/s/([A-Za-z0-9_-]{1,64})',path)
+            if tracking_page:
+                import order_tracking
+                if limited(c,'tracking-ip:'+digest(self.client_address[0]),40,300):return self.reply(429,{'error':'Demasiadas consultas. Intenta más tarde.'})
+                found=order_tracking.lookup(c,tracking_page[1])
+                return self.reply(200 if found else 404,order_tracking.public_page(found) if found else order_tracking.missing_page(),'text/html; charset=utf-8')
             if path == '/conditions':
                 active=service_terms.current(c,reception_now())
                 if not active:return self.reply(404,{'error':'Las condiciones vigentes aún no han sido publicadas.'})
@@ -674,9 +681,15 @@ class Handler(BaseHTTPRequestHandler):
                         return self.reply(200,render_service(pdf_order),'application/pdf')
                     if detail[2]=='thermal.pdf':
                         from thermal_pdf import render_thermal
-                        return self.reply(200,render_thermal(pdf_order),'application/pdf')
+                        import order_tracking
+                        copy=parse_qs(urlsplit(self.path).query).get('copy',['cliente'])[0]
+                        if copy not in ('cliente','taller','ambas'):return self.reply(400,{'error':'Copia inválida.'})
+                        pdf_order['tracking_url']=order_tracking.active(c,row['id'])['url']
+                        return self.reply(200,render_thermal(pdf_order,copy),'application/pdf')
                     return self.reply(200, render_receipt(pdf_order), 'application/pdf')
                 result = dict(row)
+                import order_tracking
+                result['tracking']=order_tracking.active(c,row['id'])
                 result.pop('request_key', None)
                 if result['reception_snapshot']:
                     result.update(json.loads(result['reception_snapshot']))
@@ -1485,6 +1498,16 @@ class Handler(BaseHTTPRequestHandler):
                             entity_id = c.execute('INSERT INTO '+table+'('+','.join(keys)+') VALUES ('+','.join('?' for _ in keys)+')',values).lastrowid
                         audit(c,user['id'],table+'_saved',int(entity_id))
                     return self.reply(200, {'ok':True})
+                tracking_route=re.fullmatch(r'/api/orders/([0-9]+)/tracking',path)
+                if tracking_route:
+                    import order_tracking
+                    oid=int(tracking_route[1]);action=str(data.get('action',''))
+                    if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
+                    if action not in ('create','revoke'):return self.reply(400,{'error':'Acción inválida.'})
+                    if not c.execute('SELECT 1 FROM orders WHERE id=?',(oid,)).fetchone():return self.reply(404,{'error':'Orden no disponible.'})
+                    if action=='create':order_tracking.create(c,oid,user['id'],reception_now());audit(c,user['id'],'order_tracking_link_created',oid)
+                    else:order_tracking.revoke(c,oid,user['id'],reception_now());audit(c,user['id'],'order_tracking_link_revoked',oid)
+                    return self.reply(200,{'ok':True,'tracking':order_tracking.active(c,oid)})
                 print_match=re.fullmatch(r'/api/orders/([0-9]+)/thermal-print',path)
                 if print_match:
                     oid=int(print_match[1]);key=str(data.get('request_key',''))
@@ -1502,19 +1525,27 @@ class Handler(BaseHTTPRequestHandler):
                     if row['reception_snapshot']:order.update(json.loads(row['reception_snapshot']))
                     service_terms.attach(c,order);technical_access.attach(c,order)
                     from thermal_pdf import render_thermal
-                    pdf=render_thermal(order)
+                    import order_tracking
+                    copy=str(data.get('copy') or 'cliente')
+                    if copy not in ('cliente','taller','ambas'):return self.reply(400,{'error':'Copia inválida.'})
+                    order['tracking_url']=order_tracking.active(c,oid)['url']
+                    # Cada copia es un ticket de una página: «ambas» envía dos trabajos con corte propio.
+                    pdfs=[render_thermal(order,one) for one in (('cliente','taller') if copy=='ambas' else (copy,))]
                     c.execute("INSERT INTO thermal_print_jobs(request_key,order_id,actor_id,state,created_at) VALUES (?,?,?,'pending',?)",(key,oid,user['id'],reception_now().isoformat()))
                     c.commit() # Reserva persistente antes de enviar: no reimprimir automáticamente si se pierde la respuesta.
                     try:
                         with tempfile.TemporaryDirectory(prefix='pcdoctor-ticket-') as folder:
-                            path_pdf=Path(folder)/'ticket.pdf';path_pdf.write_bytes(pdf)
-                            reference=thermal_printing.send(path_pdf,config['queue'],thermal_printing.inspect_pdf(path_pdf))
+                            references=[]
+                            for number,pdf in enumerate(pdfs):
+                                path_pdf=Path(folder)/('ticket-%d.pdf'%number);path_pdf.write_bytes(pdf)
+                                references.append(str(thermal_printing.send(path_pdf,config['queue'],thermal_printing.inspect_pdf(path_pdf)) or ''))
+                            reference=', '.join(filter(None,references)) or None
                         c.execute("UPDATE thermal_print_jobs SET state='submitted',spool_reference=? WHERE request_key=?",(reference,key))
                         audit(c,user['id'],'thermal_print_submitted',oid);c.commit()
                     except (OSError,ValueError,subprocess.SubprocessError):
                         c.execute("UPDATE thermal_print_jobs SET state='uncertain' WHERE request_key=?",(key,));audit(c,user['id'],'thermal_print_unconfirmed',oid);c.commit()
                         return self.reply(503,{'error':'No se pudo confirmar el envío a la Epson. Comprueba conexión y cola antes de volver a imprimir.'})
-                    return self.reply(200,{'ok':True,'message':'Trabajo enviado a la cola Epson. Verifica la salida física.'})
+                    return self.reply(200,{'ok':True,'message':('Dos copias enviadas' if len(pdfs)==2 else 'Trabajo enviado')+' a la cola Epson. Verifica la salida física.'})
                 consent_match=re.fullmatch(r'/api/orders/([0-9]+)/authorizations',path)
                 if consent_match:
                     oid=int(consent_match[1]);order=c.execute('SELECT o.*,cl.name client FROM orders o JOIN devices d ON d.id=o.device_id JOIN clients cl ON cl.id=d.client_id WHERE o.id=?',(oid,)).fetchone()
@@ -1587,6 +1618,8 @@ class Handler(BaseHTTPRequestHandler):
                     oid = c.execute("INSERT INTO orders(device_id,status,problem,created_by,created_at,accessories,physical_condition,technician_notes,code,request_key,received_at,number_date,daily_sequence) VALUES (?,'pendiente',?,?,?,?,?,?,?,?,?,?,?)",
                         (device_id,fields['problem'],user['id'],int(received.timestamp()),fields['accessories'],fields['physical_condition'],fields['technician_notes'],code,request_key,received.isoformat(timespec='microseconds'),number_date,sequence)).lastrowid
                     c.execute('UPDATE orders SET qr_url=? WHERE id=?',(order_url(code),oid))
+                    import order_tracking
+                    order_tracking.create(c,oid,user['id'],received)
                     c.execute('UPDATE orders SET reception_snapshot=? WHERE id=?',(json.dumps(fields,ensure_ascii=False),oid))
                     if terms:
                         c.execute('UPDATE orders SET terms_document_id=?,terms_acceptance_id=?,terms_accepted_at=?,terms_mechanism=?,terms_acceptor=?,terms_actor_id=? WHERE id=?',

@@ -1,0 +1,21 @@
+/* Página pública de seguimiento de una orden (enlace del ticket). */
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:#060d1a;color:#e3edff;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;line-height:1.5}
+.tracking-page{max-width:520px;margin:0 auto;padding:24px 16px 40px}
+.tracking-page header{text-align:center;margin-bottom:18px}
+.tracking-page header img{max-width:150px;height:auto}
+.tracking-page header p{margin:6px 0 0;font-size:13px;color:#8fa5c4}
+.tracking-card{padding:20px;border:1px solid #1e3252;border-radius:14px;background:linear-gradient(180deg,#0d1b30,#0a1627)}
+.tracking-card small{font-size:11px;letter-spacing:1.2px;color:#8fa5c4}
+.tracking-card h1{margin:2px 0 10px;font-size:22px;color:#fff;overflow-wrap:anywhere}
+.tracking-card p{margin:0;color:#b4c5de}
+.tracking-state{display:inline-block;padding:6px 14px;border:1px solid #2f5d8f;border-radius:999px;background:#4d8df01f;color:#fff!important;font-weight:700}
+.tracking-state[data-status=entregado],.tracking-state[data-status=listo],.tracking-state[data-status=espera_entrega]{border-color:#1f5b46;background:#3fbf8a26}
+.tracking-steps{list-style:none;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin:18px 0;padding:0;text-align:center;font-size:11.5px;color:#8198ba}
+.tracking-steps span{display:block;height:6px;margin-bottom:6px;border-radius:999px;background:#1e3050}
+.tracking-steps li[data-state=done]{color:#8fe0b9}.tracking-steps li[data-state=done] span{background:#3fbf8a}
+.tracking-steps li[data-state=current]{color:#fff;font-weight:700}.tracking-steps li[data-state=current] span{background:#4d8df0}
+.tracking-card dl{display:grid;gap:10px;margin:0}
+.tracking-card dt{font-size:11.5px;color:#8fa5c4}.tracking-card dd{margin:0;font-size:15px;color:#f2f6ff;overflow-wrap:anywhere}
+.tracking-page footer{margin-top:18px;text-align:center;font-size:13px;color:#a9bcd8}
+.tracking-page footer p{margin:4px 0}.tracking-note{font-size:11.5px;color:#7f93b1}

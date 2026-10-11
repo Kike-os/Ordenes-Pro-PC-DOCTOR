@@ -8,6 +8,24 @@
   },
   "releases": [
     {
+      "version": "1.5.16",
+      "date": "2026-10-11T13:29:57-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Ticket térmico con QR de seguimiento, logo y copias; página pública de consulta de la reparación",
+      "changes": {
+        "features": [
+          "Seguimiento público de la reparación por código QR: enlace aleatorio por orden, sin datos personales y revocable"
+        ],
+        "improvements": [
+          "Ticket térmico con logo original, QR de seguimiento centrado, firma y constancia de recepción, y copias cliente, taller o ambas"
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.15",
       "date": "2026-10-11T13:21:38-05:00",
       "type": "patch",

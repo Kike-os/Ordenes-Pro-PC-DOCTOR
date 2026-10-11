@@ -66,13 +66,40 @@ class ThermalAccessTests(unittest.TestCase):
         cookie,csrf,data,oid=self.create(request_key='thermal-reprint-request-00001')
         original=self.request('/api/orders/'+str(oid),cookie=cookie)['body']['order']
         for i in range(2):
-            r=self.request('/api/orders/'+str(oid)+'/thermal.pdf',cookie=cookie);self.assertEqual(r['status'],200);self.assertTrue(r['body'].startswith(b'%PDF'));self.assertNotIn(b'/XObject',r['body'])
+            r=self.request('/api/orders/'+str(oid)+'/thermal.pdf',cookie=cookie);self.assertEqual(r['status'],200);self.assertTrue(r['body'].startswith(b'%PDF'));self.assertEqual(r['body'].count(b'/Subtype /Image'),1);self.assertIn(b'/BitsPerComponent 1',r['body'])
         with app.connect() as c:
             self.assertEqual(c.execute('select count(*) from orders').fetchone()[0],1);self.assertEqual(c.execute('select count(*) from order_access_consents').fetchone()[0],1)
         self.assertEqual(self.request('/api/orders/'+str(oid)+'/thermal.pdf')['status'],401)
         self.assertEqual(self.request('/api/order-by-code/'+original['code'],cookie=cookie)['body']['id'],oid)
         self.assertEqual(self.request('/api/orders',data,cookie=cookie,csrf=csrf)['body']['id'],oid)
         self.assertEqual(self.request('/api/orders/'+str(oid),cookie=cookie)['body']['order']['qr_url'],original['qr_url'])
+
+    def test_public_tracking_link_is_random_limited_and_revocable(self):
+        cookie,csrf,data,oid=self.create(request_key='thermal-tracking-request-0001',serial='SERIE-PRIVADA-1')
+        order=self.request('/api/orders/'+str(oid),cookie=cookie)['body']['order'];link=order['tracking']['url']
+        self.assertRegex(link,r'^https://[^/]+/s/[A-Za-z0-9_-]{22}$');self.assertNotIn(order['code'],link)
+        path=link[link.index('/s/'):]
+        page=self.request(path);self.assertEqual(page['status'],200)
+        self.assertIn(order['code'],page['body']);self.assertIn('En espera',page['body'])
+        # La página pública no expone datos personales ni técnicos reservados.
+        for private in (data['client'],data.get('phone',''),data.get('identification',''),data['problem'],'SERIE-PRIVADA-1'):
+            if private:self.assertNotIn(private,page['body'])
+        self.assertEqual(self.request('/s/'+'A'*22)['status'],404)
+        self.assertEqual(self.request('/s/x')['status'],404)
+        for copy,pages in (('cliente',1),('taller',1),('ambas',2)):
+            r=self.request('/api/orders/%d/thermal.pdf?copy=%s'%(oid,copy),cookie=cookie);self.assertEqual(r['status'],200);self.assertEqual(r['body'].count(b'/Type /Page/'),pages)
+        self.assertEqual(self.request('/api/orders/%d/thermal.pdf?copy=otra'%oid,cookie=cookie)['status'],400)
+        url='/api/orders/%d/tracking'%oid
+        self.assertEqual(self.request(url,{'action':'revoke'},cookie=cookie)['status'],403)
+        self.assertEqual(self.request(url,{'action':'borrar'},cookie=cookie,csrf=csrf)['status'],400)
+        revoked=self.request(url,{'action':'revoke'},cookie=cookie,csrf=csrf);self.assertEqual((revoked['status'],revoked['body']['tracking']['active']),(200,False))
+        self.assertEqual(self.request(path)['status'],404)
+        self.assertEqual(self.request('/api/orders/%d/thermal.pdf'%oid,cookie=cookie)['status'],200)
+        renewed=self.request(url,{'action':'create'},cookie=cookie,csrf=csrf)['body']['tracking']
+        self.assertTrue(renewed['active']);self.assertNotEqual(renewed['url'],link)
+        self.assertEqual(self.request(path)['status'],404);self.assertEqual(self.request(renewed['url'][renewed['url'].index('/s/'):])['status'],200)
+        self.assertEqual(self.request('/api/orders/'+str(oid),cookie=cookie)['body']['order']['qr_url'],order['qr_url'])
+        with app.connect() as c:self.assertEqual(c.execute('select count(*) from order_tracking_links').fetchone()[0],2)
 
     def test_code128_checksum_and_printable_width(self):
         for value in ['PCD-20261009-0001','OP-00001','PCD-20261009-12345']:

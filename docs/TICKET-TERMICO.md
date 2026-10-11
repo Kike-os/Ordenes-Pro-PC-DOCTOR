@@ -67,3 +67,19 @@ La Epson no respondió en su conexión configurada. No se envió un trabajo fís
 ## Archivos principales
 
 `local/thermal_pdf.py`, `local/code128.py`, `local/technical_access.py`, `local/thermal_printing.py`, `local/app.py`, `local/migrations/013_technical_access.sql`, `local/static/app.js`, `local/static/app.css`, `local/data/thermal-printer.json`, `local/data/service-terms-draft.json`, `maintenance/print-thermal.py`, `local/tests/test_thermal_access.py` y ajustes de fixtures/regresión en `test_app.py`, `test_reception.py` y `test_service_terms.py`.
+
+## Actualización 11/10/2026 — Ticket con logo, QR de seguimiento y copias
+
+**Orden del ticket:** logo original en un bit (38 mm, un píxel por punto de impresora), datos del taller, título y copia, número destacado, fecha y hora, cliente, equipo (marca, modelo, serie, accesorios, estado físico y falla informada), QR centrado, autorización y condiciones (mismos textos y evidencia que antes), firma y constancia de recepción, Code 128 y agradecimiento. Sigue siendo blanco y negro, 72 mm útiles y una página de altura variable por copia.
+
+**QR:** módulos de 5 puntos a 203 dpi con zona de silencio de 4 módulos y corrección de errores M. Con el enlace actual mide 28 mm de lado incluida la zona de silencio (símbolo de 23 mm). Si no cabe, baja a 4 o 3 puntos por módulo.
+
+**Seguimiento público (`/s/<token>`):** cada orden nueva recibe un enlace con 128 bits aleatorios (tabla `order_tracking_links`, migración `021_order_tracking.sql`). El enlace no contiene el número de orden ni datos del cliente. La página muestra solo número de orden, estado, tipo/marca/modelo del equipo y fechas de recepción y última actualización; no muestra nombre, identificación, teléfono, serie, falla, notas ni importes. Lleva `noindex`, `no-referrer`, `no-store` y límite de consultas por IP. Un enlace inexistente o desactivado responde con la misma página genérica.
+
+**Revocación:** en el detalle de la orden, «Seguimiento para el cliente» permite copiar el enlace, desactivarlo o generar uno nuevo (el anterior queda revocado). Ambas acciones exigen sesión de administración o técnico, CSRF y quedan en auditoría.
+
+**Órdenes sin enlace activo** (anteriores a esta versión o con el enlace desactivado): el ticket imprime el `qr_url` histórico sin cambios con la leyenda «Uso interno: escanear con sesión autorizada» y no anuncia consulta en línea. El `qr_url` guardado de cada orden no se modifica.
+
+**Copias:** `thermal.pdf?copy=cliente|taller|ambas`. «Ambas» genera un PDF de dos páginas; la impresión directa envía dos trabajos de una página, cada uno con su corte.
+
+**Verificado sin imprimir:** ZBar lee el QR y el Code 128 desde el PDF rasterizado a 203 dpi, con y sin enlace público. **Pendiente real:** impresión física en la Epson TM-m30II y lectura del QR desde teléfonos.

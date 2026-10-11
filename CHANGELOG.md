@@ -4,6 +4,18 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.16 — 2026-10-11 13:29 (UTC-05:00)
+
+Ticket térmico con QR de seguimiento, logo y copias; página pública de consulta de la reparación
+
+### Nuevas funcionalidades
+
+- Seguimiento público de la reparación por código QR: enlace aleatorio por orden, sin datos personales y revocable
+
+### Mejoras realizadas
+
+- Ticket térmico con logo original, QR de seguimiento centrado, firma y constancia de recepción, y copias cliente, taller o ambas
+
 ## v1.5.15 — 2026-10-11 13:21 (UTC-05:00)
 
 Logotipos de marcas en la ficha del equipo

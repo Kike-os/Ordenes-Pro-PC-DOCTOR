@@ -2844,3 +2844,12 @@ body[data-page=dashboard] .toast.toast-release .toast-body p{font-size:12px;colo
 .brand-meta{font-size:11.5px;color:#9bb0cf;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}.brand-meta:empty{display:none}
 @keyframes brand-in{from{opacity:0}to{opacity:1}}
 @media(prefers-reduced-motion:reduce){.brand-logo img,.brand-logo .system-icon{animation:none}}
+
+/* Detalle de la orden: enlace público de seguimiento. */
+.order-tracking-link small{display:block;margin:4px 0 10px;font-size:11.5px;line-height:1.45;color:#9bb0cf}
+.order-tracking-state{display:inline-flex;align-items:center;gap:7px;margin:0;font-size:13px;font-weight:650;color:#e3edff}
+.order-tracking-state::before{content:"";width:8px;height:8px;border-radius:50%;background:#93a7c4}
+.order-tracking-state[data-active=true]::before{background:#3fbf8a}
+.order-tracking-actions{display:flex;flex-wrap:wrap;gap:8px}
+.order-tracking-actions .secondary{padding:7px 12px;font-size:12px;text-decoration:none}
+.order-tracking-link .message:empty{display:none}
