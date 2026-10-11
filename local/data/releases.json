@@ -8,6 +8,28 @@
   },
   "releases": [
     {
+      "version": "1.4.0",
+      "date": "2026-10-11T01:55:47-05:00",
+      "type": "minor",
+      "status": "publicada",
+      "summary": "PC-DOCTOR Mail Pro, Centro de Configuración y Administración, gestión de cuentas y sesiones, e indicador de versión «Release».",
+      "changes": {
+        "features": [
+          "Centro de Configuración y Administración con navegación por categorías: perfil, seguridad y sesiones, usuarios y permisos, servicios, políticas, condiciones y estado.",
+          "Cambio de contraseña desde Configuración, cierre de las demás sesiones y activación, desactivación y cambio de rol de las cuentas del equipo.",
+          "Herramienta de pruebas de conexión IMAP y SMTP para PC-DOCTOR Mail Pro (fase 1).",
+          "PC-DOCTOR Mail Pro: correo empresarial integrado con carpetas, lectura segura, redacción, respuestas, reenvío, adjuntos, borradores, búsqueda y vínculo con clientes y órdenes.",
+          "Aviso de correos sin leer en el Centro de Notificaciones y sección de correo en Configuración con pruebas de conexión y firma."
+        ],
+        "improvements": [
+          "Indicador de versión del acceso con etiqueta «Release» y aviso cuando hay una actualización pendiente."
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.3.1",
       "date": "2026-10-11T01:14:18-05:00",
       "type": "patch",

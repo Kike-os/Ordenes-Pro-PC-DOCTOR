@@ -46,6 +46,7 @@ import appointments
 import adi
 import versioning
 import notifications
+import mail_pro
 from weather import current_weather
 from geography import initialize_catalog, search as search_geography, METADATA as GEO_METADATA
 
@@ -248,6 +249,20 @@ def verify_captcha(c, token):
     return word>>(32-CAPTCHA_BITS)==0
 
 
+def mail_allowed(user):
+    # El buzón compartido es de administración; los técnicos solo acceden si el servidor lo habilita.
+    try:
+        ready=mail_pro.configured()
+    except mail_pro.MailError:
+        return False
+    return ready and (user['role']=='administrador' or (user['role']=='tecnico' and os.getenv('MAIL_ALLOW_TECHNICIANS','').lower() in ('1','true','yes')))
+
+
+def mail_signature(c):
+    row=c.execute("SELECT value FROM system_state WHERE key='mail_signature'").fetchone()
+    return row['value'] if row else corporate.settings()['name']+'\n'+corporate.settings()['specialty']+'\nWhatsApp '+corporate.settings()['whatsapp']
+
+
 def registration_enabled():
     return os.getenv('REGISTRATION','on').strip().lower() not in ('off','false','0','no')
 
@@ -375,6 +390,13 @@ class Handler(BaseHTTPRequestHandler):
         content = content.replace('{{register_captcha}}','local' if captcha_mode()=='local' else '').replace('{{register_hidden}}','' if registration_enabled() else ' hidden')
         try:installed=versioning.load()['releases'][0]['version']
         except (versioning.RegistryError,IndexError):installed='—'
+        pending=''
+        try:
+            with connect() as c:row=c.execute("SELECT value FROM system_state WHERE key='available_update'").fetchone()
+            if row and installed!='—' and versioning.parse(json.loads(row['value'])['version'])>versioning.parse(installed):pending=json.loads(row['value'])['version']
+        except (sqlite3.Error,ValueError,KeyError,versioning.RegistryError):pending=''
+        # Con una versión posterior detectada, el indicador lo señala antes de iniciar sesión.
+        content = content.replace('{{release_class}}',' has-update' if pending else '').replace('{{release_aria}}',', actualización disponible '+html.escape(pending) if pending else '').replace('{{release_note}}','<span class="release-pending">Actualización disponible · v'+html.escape(pending)+'</span>' if pending else '')
         content = content.replace('{{app_version}}',html.escape(installed))
         content = content.replace('{{evaluation_notice}}', notice).replace('{{environment_label}}', 'Servicio técnico' if production_enabled() else 'Evaluación local · Usa datos ficticios')
         self.reply(200, content, 'text/html; charset=utf-8')
@@ -490,7 +512,7 @@ class Handler(BaseHTTPRequestHandler):
                 safe_conv={k:conv[k] for k in ('id','mode','assigned_to','created_at','updated_at')}
                 return self.reply(200,{'conversation':safe_conv,'messages':rows})
             if path == '/api/me':
-                return self.reply(200, {'user':dict(user),'server_time':time.time()})
+                return self.reply(200, {'user':dict(user,mail=mail_allowed(user)),'server_time':time.time()})
             if path == '/api/weather':
                 return self.reply(200, current_weather())
             if path == '/api/time':
@@ -595,6 +617,7 @@ class Handler(BaseHTTPRequestHandler):
                 technical_access.attach(c,result)
                 order_workspace.attach(c,result)
                 result['current_problem']=row['problem']
+                result['mail']=[dict(r) for r in c.execute('SELECT id,subject,correspondent,direction,sent_at,folder,uid FROM mail_links WHERE order_id=? ORDER BY id DESC LIMIT 30',(result['id'],))] if mail_allowed(user) else None
                 return self.reply(200, {'order':result})
             if path in ('/api/orders', '/api/clients', '/api/devices'):
                 query = parse_qs(urlsplit(self.path).query)
@@ -661,9 +684,45 @@ class Handler(BaseHTTPRequestHandler):
             if path == '/api/settings':
                 if user['role'] != 'administrador':
                     return self.reply(403, {'error':'Solo administración puede acceder a la configuración.'})
-                return self.reply(200, {'profile':{k:user[k] for k in ('name','username','email','role')},'accounts':[dict(r) for r in c.execute("SELECT name,username,role,active FROM users WHERE approval='approved' ORDER BY id")],'requests':[dict(r) for r in c.execute("SELECT id,name,username,email,phone,identification,job_title,requested_at,approval FROM users WHERE approval IN ('pending','rejected') ORDER BY approval,id DESC")],'smtp_configured':bool(os.getenv('SMTP_HOST')),'openai_configured':bool(os.getenv('OPENAI_API_KEY')),'login_lockout_seconds':auth_policy(c)['lockout_seconds'],'auth_policy':auth_policy(c),'antibot_configured':bool(os.getenv('TURNSTILE_SITE_KEY') and os.getenv('TURNSTILE_SECRET_KEY')),'origin':os.getenv('APP_URL','http://127.0.0.1:8010')})
+                labels={'login':'Inicio de sesión','logout':'Cierre de sesión','sessions_revoked':'Cierre de todas las sesiones','other_sessions_revoked':'Cierre de otras sesiones','password_changed':'Cambio de contraseña','password_reset':'Contraseña restablecida','profile_updated':'Perfil actualizado','auth_policy_updated':'Políticas de acceso actualizadas','account_approved':'Cuenta aprobada','account_rejected':'Solicitud rechazada','account_updated':'Cuenta del equipo modificada','clients_exported':'Exportación de clientes','clients_imported':'Importación de clientes'}
+                activity=[{'label':labels[r['action']],'at':r['created_at']} for r in c.execute('SELECT action,created_at FROM audit WHERE user_id=? AND action IN ('+','.join('?' for _ in labels)+') ORDER BY id DESC LIMIT 12',(user['id'],*labels))]
+                return self.reply(200, {'profile':{k:user[k] for k in ('name','username','email','role')},'me':user['id'],'active_sessions':c.execute('SELECT COUNT(*) FROM sessions WHERE user_id=? AND expires>?',(user['id'],int(time.time()))).fetchone()[0],'security_activity':activity,'registration_enabled':registration_enabled(),'captcha_mode':captcha_mode(),'mail':mail_pro.status(),'mail_signature':mail_signature(c),'accounts':[dict(r) for r in c.execute("SELECT u.id,u.name,u.username,u.email,u.role,u.active,(SELECT MAX(a.created_at) FROM audit a WHERE a.user_id=u.id AND a.action='login') last_login,(SELECT COUNT(*) FROM sessions s WHERE s.user_id=u.id AND s.expires>?) sessions FROM users u WHERE u.approval='approved' ORDER BY u.id",(int(time.time()),))],'requests':[dict(r) for r in c.execute("SELECT id,name,username,email,phone,identification,job_title,requested_at,approval FROM users WHERE approval IN ('pending','rejected') ORDER BY approval,id DESC")],'smtp_configured':bool(os.getenv('SMTP_HOST')),'openai_configured':bool(os.getenv('OPENAI_API_KEY')),'login_lockout_seconds':auth_policy(c)['lockout_seconds'],'auth_policy':auth_policy(c),'antibot_configured':bool(os.getenv('TURNSTILE_SITE_KEY') and os.getenv('TURNSTILE_SECRET_KEY')),'origin':os.getenv('APP_URL','http://127.0.0.1:8010')})
             if path == '/api/notifications':
-                return self.reply(200,notifications.build(c,user,reception_now()))
+                return self.reply(200,notifications.build(c,user,reception_now(),mail_allowed(user)))
+            if path.startswith('/api/mail/'):
+                if not mail_allowed(user):return self.reply(403,{'error':'No tienes acceso al correo o todavía no está configurado en el servidor.'})
+                query=parse_qs(urlsplit(self.path).query);arg=lambda name:query.get(name,[''])[0]
+                client=None
+                try:
+                    client=mail_pro.open_imap()
+                    if path=='/api/mail/overview':
+                        return self.reply(200,{'account':mail_pro.settings()['username'],'folders':mail_pro.overview(client),'signature':mail_signature(c),'page_size':mail_pro.PAGE})
+                    folder,_=mail_pro.resolve(client,arg('folder') or 'INBOX')
+                    if path=='/api/mail/messages':
+                        try:page=max(1,int(arg('page') or '1'))
+                        except ValueError:return self.reply(400,{'error':'Página inválida.'})
+                        uids=mail_pro.search(client,folder['id'],arg('q'),arg('flagged')=='1')
+                        rows=mail_pro.summaries(client,uids[(page-1)*mail_pro.PAGE:page*mail_pro.PAGE])
+                        return self.reply(200,{'rows':rows,'total':len(uids),'page':page,'pages':max(1,(len(uids)+mail_pro.PAGE-1)//mail_pro.PAGE),'folder':folder})
+                    if not arg('uid').isdigit():return self.reply(400,{'error':'Mensaje no válido.'})
+                    if path=='/api/mail/message':
+                        message=mail_pro.read_message(client,folder['id'],int(arg('uid')))
+                        sender=(message['from'] or [{}])[0].get('address','') if folder['role']!='sent' else (message['to'] or [{}])[0].get('address','')
+                        known=c.execute("SELECT id,name FROM clients WHERE email!='' AND lower(email)=lower(?) ORDER BY id LIMIT 1",(sender,)).fetchone() if sender else None
+                        message['client']=dict(known) if known else None
+                        message['links']=[dict(r) for r in c.execute('SELECT l.id,o.id order_id,o.code FROM mail_links l JOIN orders o ON o.id=l.order_id WHERE l.message_id=? ORDER BY l.id',(message['message_id'],))] if message['message_id'] else []
+                        return self.reply(200,{'message':message})
+                    if path=='/api/mail/attachment':
+                        if not arg('part').isdigit():return self.reply(400,{'error':'Adjunto no válido.'})
+                        name,content=mail_pro.attachment(client,folder['id'],int(arg('uid')),int(arg('part')))
+                        audit(c,user['id'],'mail_attachment_downloaded');c.commit()
+                        # Siempre como descarga binaria: el navegador nunca interpreta el adjunto.
+                        return self.reply(200,content,'application/octet-stream')
+                    return self.reply(404,{'error':'Recurso no disponible.'})
+                except mail_pro.MailError as error:
+                    return self.reply(400 if error.kind=='configuracion' else 502,{'error':str(error),'kind':error.kind})
+                finally:
+                    if client is not None:mail_pro.close_imap(client)
             if path in ('/api/dashboard','/api/activity','/api/maintenance'):
                 now=reception_now();today=now.date().isoformat()
                 if path=='/api/maintenance':return self.reply(200,{'rows':maintenance.rows(c),'today':today,'profiles':{k:v[0] for k,v in maintenance.PROFILES.items()}})
@@ -715,7 +774,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(403, {'error':'Solicitud no autorizada.'})
             path = urlsplit(self.path).path
             workspace_post=bool(re.fullmatch(r'/api/orders/[0-9]+/workspace',path))
-            max_body=9000000 if path in ('/api/clients/import/preview','/api/clients/import/commit') else 100000 if path=='/api/conditions' else (65536 if workspace_post else 16384)
+            max_body=9000000 if path in ('/api/clients/import/preview','/api/clients/import/commit') else 6000000 if path in ('/api/mail/send','/api/mail/draft') else 100000 if path=='/api/conditions' else (65536 if workspace_post else 16384)
             length = int(self.headers.get('Content-Length', '0'))
             if length <= 0 or length > max_body:
                 return self.reply(400, {'error':'Solicitud inválida.'})
@@ -929,10 +988,89 @@ class Handler(BaseHTTPRequestHandler):
                         else:c.execute("DELETE FROM system_state WHERE key='available_update'")
                         return self.reply(200,outcome)
                     except versioning.RegistryError as error:return self.reply(503,{'error':str(error)})
+                if path.startswith('/api/mail/'):
+                    if path=='/api/mail/test':
+                        if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede probar la conexión.'})
+                        try:steps=mail_pro.test_smtp() if data.get('kind')=='smtp' else mail_pro.test_imap()
+                        except mail_pro.MailError as error:return self.reply(200,{'ok':False,'kind':error.kind,'error':str(error),'steps':getattr(error,'steps',[])})
+                        return self.reply(200,{'ok':True,'steps':steps})
+                    if not mail_allowed(user):return self.reply(403,{'error':'No tienes acceso al correo o todavía no está configurado en el servidor.'})
+                    if path=='/api/mail/signature':
+                        if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede cambiar la firma.'})
+                        text=str(data.get('signature','')).strip()
+                        if len(text)>2000:return self.reply(400,{'error':'La firma admite hasta 2000 caracteres.'})
+                        c.execute("INSERT INTO system_state VALUES ('mail_signature',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",(text,))
+                        audit(c,user['id'],'mail_signature_updated')
+                        return self.reply(200,{'ok':True})
+                    client=None
+                    try:
+                        if path in ('/api/mail/flag','/api/mail/link'):
+                            if not str(data.get('uid','')).isdigit():return self.reply(400,{'error':'Mensaje no válido.'})
+                            client=mail_pro.open_imap();folder,_=mail_pro.resolve(client,str(data.get('folder','')));uid=int(data['uid'])
+                            if path=='/api/mail/flag':
+                                mail_pro.set_flag(client,folder['id'],uid,str(data.get('action','')))
+                                return self.reply(200,{'ok':True})
+                            if data.get('remove'):
+                                c.execute('DELETE FROM mail_links WHERE id=?',(str(data.get('remove')),));audit(c,user['id'],'mail_unlinked')
+                                return self.reply(200,{'ok':True})
+                            order=c.execute('SELECT id,code FROM orders WHERE code=?',(str(data.get('order_code','')).strip().upper(),)).fetchone()
+                            if not order:return self.reply(404,{'error':'No existe una orden con ese número.','fields':{'order_code':'Revisa el número de orden.'}})
+                            row=mail_pro.summaries(client,[uid]) if mail_pro.search(client,folder['id']) is not None else []
+                            if not row or not row[0]['message_id']:return self.reply(404,{'error':'El mensaje ya no está disponible.'})
+                            outgoing=folder['role'] in ('sent','drafts');who=(row[0]['to'] if outgoing else row[0]['from']) or [{}]
+                            c.execute('INSERT OR IGNORE INTO mail_links(message_id,folder,uid,order_id,subject,correspondent,direction,sent_at,created_by,created_at) VALUES (?,?,?,?,?,?,?,?,?,?)',(row[0]['message_id'],folder['id'],uid,order['id'],row[0]['subject'],who[0].get('address',''),'out' if outgoing else 'in',row[0]['date'],user['id'],reception_now().isoformat(timespec='seconds')))
+                            audit(c,user['id'],'mail_linked',order['id'])
+                            return self.reply(200,{'ok':True,'order_id':order['id'],'code':order['code']})
+                        if path in ('/api/mail/send','/api/mail/draft'):
+                            draft=path.endswith('draft');key=str(data.get('request_key','')).strip()
+                            if not re.fullmatch(r'[A-Za-z0-9_-]{16,80}',key):return self.reply(400,{'error':'Recarga el redactor e inténtalo de nuevo.'})
+                            try:files=json.loads(str(data.get('attachments') or '[]'))
+                            except ValueError:files=None
+                            if not isinstance(files,list) or len(files)>10 or any(not isinstance(item,dict) for item in files):return self.reply(400,{'error':'Adjuntos no válidos.'})
+                            config=mail_pro.settings()
+                            message,recipients=mail_pro.build_message(config,{**{k:data.get(k,'') for k in ('to','cc','subject','body','in_reply_to','references')},'from_name':corporate.settings()['name'],'attachments':files,'draft':draft},mail_signature(c))
+                            order=None;code=str(data.get('order_code','')).strip().upper()
+                            if code:
+                                order=c.execute('SELECT id,code FROM orders WHERE code=?',(code,)).fetchone()
+                                if not order:return self.reply(404,{'error':'No existe una orden con ese número.'})
+                            now=reception_now().isoformat(timespec='seconds')
+                            if draft:
+                                client=mail_pro.open_imap();folders=mail_pro.list_folders(client);target=mail_pro.by_role(folders,'drafts')
+                                if not target or not mail_pro.store(client,target,message,'(\\Draft \\Seen)'):return self.reply(502,{'error':'No se pudo guardar el borrador en el servidor de correo.'})
+                                audit(c,user['id'],'mail_draft_saved')
+                                return self.reply(201,{'ok':True,'draft':True})
+                            previous=c.execute('SELECT status FROM mail_outbox WHERE request_key=?',(key,)).fetchone()
+                            if previous and previous['status']=='sent':return self.reply(200,{'ok':True,'duplicate':True})
+                            if previous and previous['status']=='sending':return self.reply(409,{'error':'Este mensaje ya se está enviando.'})
+                            if limited(c,'mail-send:'+str(user['id']),limit=40,window=3600):return self.reply(429,{'error':'Alcanzaste el límite de envíos por hora. Inténtalo más tarde.'})
+                            c.execute("INSERT INTO mail_outbox(request_key,user_id,status,message_id,created_at,updated_at) VALUES (?,?,'sending',?,?,?) ON CONFLICT(request_key) DO UPDATE SET status='sending',updated_at=excluded.updated_at",(key,user['id'],message['Message-ID'],now,now))
+                            c.commit()
+                            try:mail_pro.deliver(config,message,recipients)
+                            except mail_pro.MailError as error:
+                                c.execute("UPDATE mail_outbox SET status='failed',updated_at=? WHERE request_key=?",(now,key));c.commit()
+                                return self.reply(400 if error.kind=='configuracion' else 502,{'error':'No se envió el mensaje. '+str(error),'kind':error.kind})
+                            # Aceptado por el servidor SMTP: recién ahora se considera enviado.
+                            c.execute("UPDATE mail_outbox SET status='sent',updated_at=? WHERE request_key=?",(now,key))
+                            if order:c.execute('INSERT OR IGNORE INTO mail_links(message_id,folder,uid,order_id,subject,correspondent,direction,sent_at,created_by,created_at) VALUES (?,?,0,?,?,?,?,?,?,?)',(message['Message-ID'],'',order['id'],str(message['Subject']),recipients[0],'out',now,user['id'],now))
+                            audit(c,user['id'],'mail_sent',order['id'] if order else None);c.commit()
+                            saved=False
+                            try:
+                                client=mail_pro.open_imap();folders=mail_pro.list_folders(client);sent=mail_pro.by_role(folders,'sent')
+                                saved=bool(sent and mail_pro.store(client,sent,message,'(\\Seen)'))
+                                source=str(data.get('reply_folder',''));uid=str(data.get('reply_uid',''))
+                                if source and uid.isdigit() and any(f['id']==source for f in folders):
+                                    client.select(mail_pro.quoted(source),readonly=False);client.uid('STORE',uid,'+FLAGS','(\\Answered)')
+                            except Exception:saved=False
+                            return self.reply(201,{'ok':True,'saved_in_sent':saved,'linked':order['code'] if order else ''})
+                        return self.reply(404,{'error':'Recurso no disponible.'})
+                    except mail_pro.MailError as error:
+                        return self.reply(400 if error.kind=='configuracion' else 502,{'error':str(error),'kind':error.kind})
+                    finally:
+                        if client is not None:mail_pro.close_imap(client)
                 if path=='/api/notifications/read':
                     keys=None if data.get('all') is True else [key for key in str(data.get('keys','')).split(',') if key][:60]
                     notifications.mark(c,user,keys,reception_now())
-                    return self.reply(200,notifications.build(c,user,reception_now()))
+                    return self.reply(200,notifications.build(c,user,reception_now(),mail_allowed(user)))
                 if path=='/api/users/approval':
                     if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede revisar solicitudes.'})
                     action=str(data.get('action',''));role=str(data.get('role','tecnico'));target=str(data.get('id',''))
@@ -942,6 +1080,41 @@ class Handler(BaseHTTPRequestHandler):
                         c.execute("UPDATE users SET active=1,approval='approved',role=?,reviewed_by=?,reviewed_at=? WHERE id=?",(role,user['id'],int(time.time()),row['id']));appointments.ensure_staff_hours(c,row['id'])
                     else:c.execute("UPDATE users SET active=0,approval='rejected',reviewed_by=?,reviewed_at=? WHERE id=?",(user['id'],int(time.time()),row['id']))
                     audit(c,user['id'],'account_approved' if action=='approve' else 'account_rejected',row['id'])
+                    return self.reply(200,{'ok':True})
+                if path=='/api/sessions/revoke-others':
+                    removed=c.execute('DELETE FROM sessions WHERE user_id=? AND token_hash!=?',(user['id'],digest(token))).rowcount
+                    audit(c,user['id'],'other_sessions_revoked')
+                    return self.reply(200,{'ok':True,'closed':max(0,removed)})
+                if path=='/api/account/password':
+                    if limited(c,'password-change:'+str(user['id']),limit=6,window=900):return self.reply(429,{'error':'Demasiados intentos. Inténtalo más tarde.'})
+                    current=str(data.get('current',''));password=str(data.get('password',''));minimum=auth_policy(c)['password_min']
+                    stored=c.execute('SELECT password_hash,email FROM users WHERE id=?',(user['id'],)).fetchone()
+                    if not password_ok(current,stored['password_hash']):return self.reply(400,{'error':'Revisa los campos señalados.','fields':{'current':'La contraseña actual no es correcta.'}})
+                    if not minimum<=len(password)<=256:return self.reply(400,{'error':'Revisa los campos señalados.','fields':{'password':f'Usa una contraseña de {minimum} a 256 caracteres.'}})
+                    if password!=str(data.get('repeat','')):return self.reply(400,{'error':'Revisa los campos señalados.','fields':{'repeat':'Las contraseñas no coinciden.'}})
+                    if password==current:return self.reply(400,{'error':'Revisa los campos señalados.','fields':{'password':'Elige una contraseña distinta de la actual.'}})
+                    common_file=os.getenv('PASSWORD_BLOCKLIST_FILE','')
+                    if common_file and password.casefold() in {line.strip().casefold() for line in Path(common_file).read_text().splitlines()}:return self.reply(400,{'error':'Revisa los campos señalados.','fields':{'password':'Esta contraseña es demasiado común.'}})
+                    c.execute('UPDATE users SET password_hash=? WHERE id=?',(password_hash(password),user['id']))
+                    # La sesión actual se conserva; las demás quedan invalidadas en el servidor.
+                    c.execute('DELETE FROM sessions WHERE user_id=? AND token_hash!=?',(user['id'],digest(token)));c.execute('DELETE FROM reset_tokens WHERE user_id=?',(user['id'],))
+                    c.execute("DELETE FROM attempts WHERE bucket=?",('password-change:'+str(user['id']),))
+                    audit(c,user['id'],'password_changed');c.commit()
+                    dispatch_security_job(lambda:deliver_change_notice(stored['email'],user['id']))
+                    return self.reply(200,{'ok':True})
+                if path=='/api/users/manage':
+                    if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede gestionar cuentas.'})
+                    target=str(data.get('id',''));action=str(data.get('action',''));role=str(data.get('role',''))
+                    row=c.execute("SELECT id,role,active FROM users WHERE id=? AND approval='approved'",(target,)).fetchone() if target.isdigit() else None
+                    if not row or action not in ('activate','deactivate','role') or (action=='role' and role not in ('administrador','tecnico')):return self.reply(400,{'error':'Operación no disponible.'})
+                    if row['id']==user['id']:return self.reply(400,{'error':'No puedes cambiar tu propia cuenta desde aquí.'})
+                    admins=c.execute("SELECT COUNT(*) FROM users WHERE role='administrador' AND active=1 AND approval='approved'").fetchone()[0]
+                    if row['role']=='administrador' and row['active'] and admins<=1 and (action=='deactivate' or (action=='role' and role!='administrador')):return self.reply(400,{'error':'Debe quedar al menos un administrador activo.'})
+                    if action=='role':c.execute('UPDATE users SET role=? WHERE id=?',(role,row['id']))
+                    else:c.execute('UPDATE users SET active=? WHERE id=?',(1 if action=='activate' else 0,row['id']))
+                    # Un cambio de rol o una desactivación cierra las sesiones abiertas de esa cuenta.
+                    if action!='activate':c.execute('DELETE FROM sessions WHERE user_id=?',(row['id'],))
+                    audit(c,user['id'],'account_updated',row['id'])
                     return self.reply(200,{'ok':True})
                 if path=='/api/sessions/revoke':
                     c.execute('DELETE FROM sessions WHERE user_id=?',(user['id'],));audit(c,user['id'],'sessions_revoked')

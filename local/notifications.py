@@ -3,6 +3,7 @@ import json
 import re
 import appointments
 import versioning
+import mail_pro
 
 KEY = re.compile(r'[a-z]+:[A-Za-z0-9_.:\-]{1,80}')
 EVENTS = {'created': ('order', 'info', 'Nueva orden registrada'), 'status': ('status', 'info', 'Cambio de estado'),
@@ -13,7 +14,28 @@ def plural(count, one, many):
     return ('1 ' + one) if count == 1 else (str(count) + ' ' + many)
 
 
-def build(c, user, now):
+def mail_status(c, now, max_age=180):
+    """No leídos de la bandeja de entrada; se consulta al servidor de correo como mucho cada tres minutos."""
+    row = c.execute("SELECT value FROM system_state WHERE key='mail_inbox'").fetchone()
+    cached = json.loads(row['value']) if row else None
+    if cached and now.timestamp() - cached.get('ts', 0) < max_age:
+        return cached
+    client = mail_pro.open_imap()
+    try:
+        inbox = next((item for item in mail_pro.overview(client) if item['role'] == 'inbox'), None)
+    finally:
+        mail_pro.close_imap(client)
+    if not inbox:
+        return None
+    state = {'unread': inbox['unread'], 'uidnext': inbox['uidnext'], 'account': mail_pro.settings()['username'], 'checked': now.isoformat(timespec='seconds'), 'ts': now.timestamp()}
+    try:
+        c.execute("INSERT INTO system_state VALUES ('mail_inbox',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", (json.dumps(state),))
+    except Exception:
+        pass
+    return state
+
+
+def build(c, user, now, mail_access=False):
     """Lista ordenada de la más reciente a la más antigua. Solo incluye lo que este usuario puede ver."""
     today = now.date().isoformat()
     stamp = now.isoformat(timespec='seconds')
@@ -60,7 +82,15 @@ def build(c, user, now):
         chats = c.execute("SELECT COALESCE(SUM(last_seen_admin='' AND EXISTS(SELECT 1 FROM adi_messages m WHERE m.conversation_id=ac.id AND m.author='client')),0) FROM adi_conversations ac").fetchone()[0]
         alert('chats', chats, 'support', 'info', plural(chats, 'conversación nueva', 'conversaciones nuevas'), 'Clientes que esperan atención en vivo.', '#live')
         accounts = c.execute("SELECT COUNT(*) FROM users WHERE approval='pending'").fetchone()[0]
-        alert('accounts', accounts, 'client', 'warning', plural(accounts, 'solicitud de cuenta por revisar', 'solicitudes de cuenta por revisar'), 'Aprueba o rechaza el acceso en Configuración.', '#settings')
+        alert('accounts', accounts, 'client', 'warning', plural(accounts, 'solicitud de cuenta por revisar', 'solicitudes de cuenta por revisar'), 'Aprueba o rechaza el acceso en Configuración.', '#settings?tab=users')
+    if mail_access:
+        try:
+            state = mail_status(c, now)
+            if state and state['unread']:
+                items.append({'key': 'mail:' + str(state['uidnext']) + ':' + str(state['unread']), 'kind': 'info', 'icon': 'message', 'title': plural(state['unread'], 'correo sin leer', 'correos sin leer'),
+                              'detail': 'Bandeja de entrada de ' + state['account'] + '.', 'at': state['checked'], 'href': '#mail', 'group': 'alert'})
+        except Exception:
+            pass
     if staff:
         for row in c.execute('SELECT h.id,h.order_id,h.event,h.status_label,h.comment,h.occurred_at,o.code,u.name actor FROM order_history h JOIN orders o ON o.id=h.order_id LEFT JOIN users u ON u.id=h.actor_id WHERE h.actor_id IS NULL OR h.actor_id!=? ORDER BY h.id DESC LIMIT 25', (user['id'],)):
             icon, kind, label = EVENTS.get(row['event'], ('note', 'info', 'Seguimiento'))
@@ -79,7 +109,7 @@ def build(c, user, now):
 
 def mark(c, user, keys, now):
     """Marca como leídas solo claves que hoy pertenecen a las notificaciones de este usuario."""
-    valid = {item['key'] for item in build(c, user, now)['items']}
+    valid = {item['key'] for item in build(c, user, now, True)['items']}
     chosen = valid if keys is None else {key for key in keys if KEY.fullmatch(key) and key in valid}
     for key in chosen:
         c.execute('INSERT OR IGNORE INTO notification_reads(user_id,key,read_at) VALUES (?,?,?)', (user['id'], key, now.isoformat(timespec='seconds')))

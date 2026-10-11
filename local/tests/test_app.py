@@ -316,7 +316,13 @@ class SecurityTests(unittest.TestCase):
         self.assertIn('href="/privacidad"',self.request('/citas')['body'])
         import versioning
         current=versioning.load()['releases'][0]['version']
-        self.assertIn('Órdenes Pro · v'+current,self.request('/login')['body'])
+        page=self.request('/login')['body']
+        self.assertIn('Release '+current+'</span>',page);self.assertNotIn('has-update',page);self.assertNotIn('{{',page)
+        with app.connect() as c:c.execute("INSERT INTO system_state VALUES ('available_update',?)",(json.dumps({'version':'99.0.0','date':'2026-01-02T10:00:00-05:00','summary':''}),))
+        waiting=self.request('/login')['body']
+        self.assertIn('class="login-version has-update"',waiting);self.assertIn('Actualización disponible · v99.0.0',waiting)
+        with app.connect() as c:c.execute("UPDATE system_state SET value=? WHERE key='available_update'",(json.dumps({'version':'0.0.1','date':'','summary':''}),))
+        self.assertNotIn('has-update',self.request('/login')['body'])
         news=self.request('/novedades')
         self.assertEqual(news['status'],200)
         self.assertIn('<span>v'+current+'</span><em>Última versión</em>',news['body'])
@@ -409,6 +415,43 @@ class SecurityTests(unittest.TestCase):
         self.assertEqual(self.request('/api/notifications',cookie=cookie)['body']['unread'],after['unread'])
         self.assertEqual(self.request('/api/notifications',cookie=tech)['body']['unread'],theirs['unread'])
         self.assertEqual(self.request('/api/notifications/read',{'all':True},cookie=cookie,csrf=csrf)['body']['unread'],0)
+
+    def test_password_change_other_sessions_and_account_management(self):
+        cookie,csrf=self.login()
+        second=self.request('/api/login',{'login':'demo','password':'contraseña-segura-de-prueba'})['cookie'].split(';')[0]
+        settings=self.request('/api/settings',cookie=cookie)['body']
+        self.assertEqual((settings['active_sessions'],settings['accounts'][0]['sessions']),(2,2))
+        self.assertTrue(settings['accounts'][0]['last_login'])
+        self.assertIn('Inicio de sesión',[item['label'] for item in settings['security_activity']])
+        self.assertEqual(self.request('/api/sessions/revoke-others',{},cookie=cookie)['status'],403)
+        self.assertEqual(self.request('/api/sessions/revoke-others',{},cookie=cookie,csrf=csrf)['body']['closed'],1)
+        self.assertEqual(self.request('/api/me',cookie=second)['status'],401)
+        self.assertEqual(self.request('/api/me',cookie=cookie)['status'],200)
+        second=self.request('/api/login',{'login':'demo','password':'contraseña-segura-de-prueba'})['cookie'].split(';')[0]
+        change=lambda **values:self.request('/api/account/password',{'current':'contraseña-segura-de-prueba','password':'nueva-clave-ficticia','repeat':'nueva-clave-ficticia',**values},cookie=cookie,csrf=csrf)
+        self.assertEqual(change(current='incorrecta')['body']['fields'],{'current':'La contraseña actual no es correcta.'})
+        self.assertIn('repeat',change(repeat='otra')['body']['fields'])
+        self.assertIn('password',change(password='abc',repeat='abc')['body']['fields'])
+        self.assertEqual(change()['status'],200)
+        self.assertEqual(self.request('/api/me',cookie=second)['status'],401)
+        self.assertEqual(self.request('/api/me',cookie=cookie)['status'],200)
+        self.assertEqual(self.request('/api/login',{'login':'demo','password':'contraseña-segura-de-prueba'})['status'],401)
+        self.assertEqual(self.request('/api/login',{'login':'demo','password':'nueva-clave-ficticia'})['status'],200)
+        with app.connect() as c:
+            other=c.execute("INSERT INTO users(username,email,name,password_hash,role,created_at) VALUES ('tecnico','tec@example.invalid','Técnico de prueba',?,'tecnico',1)",(self.hash,)).lastrowid
+            me=c.execute("SELECT id FROM users WHERE username='demo'").fetchone()[0]
+        tech=self.request('/api/login',{'login':'tecnico','password':'contraseña-segura-de-prueba'})['cookie'].split(';')[0]
+        tech_csrf=self.request('/api/me',cookie=tech)['body']['user']['csrf']
+        manage=lambda who,token,**values:self.request('/api/users/manage',values,cookie=who,csrf=token)
+        self.assertEqual(manage(tech,tech_csrf,id=str(me),action='deactivate')['status'],403)
+        self.assertEqual(manage(cookie,csrf,id=str(me),action='deactivate')['status'],400)
+        self.assertEqual(manage(cookie,csrf,id=str(other),action='role',role='otro')['status'],400)
+        self.assertEqual(manage(cookie,csrf,id=str(other),action='deactivate')['status'],200)
+        self.assertEqual(self.request('/api/me',cookie=tech)['status'],401)
+        self.assertEqual(self.request('/api/login',{'login':'tecnico','password':'contraseña-segura-de-prueba'})['status'],401)
+        self.assertEqual(manage(cookie,csrf,id=str(other),action='activate')['status'],200)
+        self.assertEqual(manage(cookie,csrf,id=str(other),action='role',role='administrador')['status'],200)
+        with app.connect() as c:self.assertEqual(tuple(c.execute('SELECT role,active FROM users WHERE id=?',(other,)).fetchone()),('administrador',1))
 
     def test_server_validation_and_https_cookie(self):
         for data in ({'login':'','password':'x'},{'login':'bad@','password':'x'},{'login':'demo','password':''}):

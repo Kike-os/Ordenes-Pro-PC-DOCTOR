@@ -4,6 +4,22 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.4.0 — 2026-10-11 01:55 (UTC-05:00)
+
+PC-DOCTOR Mail Pro, Centro de Configuración y Administración, gestión de cuentas y sesiones, e indicador de versión «Release».
+
+### Nuevas funcionalidades
+
+- Centro de Configuración y Administración con navegación por categorías: perfil, seguridad y sesiones, usuarios y permisos, servicios, políticas, condiciones y estado.
+- Cambio de contraseña desde Configuración, cierre de las demás sesiones y activación, desactivación y cambio de rol de las cuentas del equipo.
+- Herramienta de pruebas de conexión IMAP y SMTP para PC-DOCTOR Mail Pro (fase 1).
+- PC-DOCTOR Mail Pro: correo empresarial integrado con carpetas, lectura segura, redacción, respuestas, reenvío, adjuntos, borradores, búsqueda y vínculo con clientes y órdenes.
+- Aviso de correos sin leer en el Centro de Notificaciones y sección de correo en Configuración con pruebas de conexión y firma.
+
+### Mejoras realizadas
+
+- Indicador de versión del acceso con etiqueta «Release» y aviso cuando hay una actualización pendiente.
+
 ## v1.3.1 — 2026-10-11 01:14 (UTC-05:00)
 
 Corrige la gestión de solicitudes de cuenta rechazadas.
