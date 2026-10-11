@@ -342,7 +342,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         path = urlsplit(self.path).path
-        files = {'/static/label.css':'label.css','/static/app.css':'app.css','/static/app.js':'app.js','/static/form-validation.js':'form-validation.js','/static/appointments.js':'appointments.js','/static/logo-original.png':'logo-original.png',
+        files = {'/static/label.css':'label.css','/static/app.css':'app.css','/static/app.js':'app.js','/static/form-validation.js':'form-validation.js','/static/appointments.js':'appointments.js','/static/adi-widget.js':'adi-widget.js','/static/logo-original.png':'logo-original.png',
                  '/favicon.ico':'favicon.ico','/static/favicon.ico':'favicon.ico','/static/favicon-16.png':'favicon-16.png','/static/favicon-32.png':'favicon-32.png','/static/favicon-48.png':'favicon-48.png',
                  '/apple-touch-icon.png':'apple-touch-icon.png','/apple-touch-icon-precomposed.png':'apple-touch-icon.png','/static/apple-touch-icon.png':'apple-touch-icon.png'}
         if path in files:
@@ -354,6 +354,10 @@ class Handler(BaseHTTPRequestHandler):
         with connect() as c:
             if path == '/citas':
                 return self.page('appointments.html')
+            if path == '/privacidad':
+                company=corporate.settings();content=(ROOT/'templates'/'privacy.html').read_text()
+                for key,value in (('company',company['name']),('whatsapp',company['whatsapp']),('support_email',company['support_email'])):content=content.replace('{{'+key+'}}',html.escape(value,quote=True))
+                return self.reply(200,content,'text/html; charset=utf-8')
             if path == '/api/public/appointments/services':
                 return self.reply(200, {'services':appointments.services(c),'device_types':DEVICE_TYPES,'timezone':'America/Guayaquil'})
             if path == '/api/public/appointments/availability':
@@ -601,7 +605,7 @@ class Handler(BaseHTTPRequestHandler):
                 assistance=None
                 if user['role']=='administrador':
                     assistance=dict(c.execute("SELECT COALESCE(SUM(last_seen_admin='' AND EXISTS(SELECT 1 FROM adi_messages m WHERE m.conversation_id=ac.id AND m.author='client' AND m.visibility='public')),0) new_conversations,COALESCE(SUM(mode='human' AND (SELECT m.author FROM adi_messages m WHERE m.conversation_id=ac.id AND m.visibility='public' ORDER BY m.id DESC LIMIT 1)='client'),0) waiting,COALESCE(SUM(mode='human'),0) transferred FROM adi_conversations ac WHERE mode!='closed'").fetchone())
-                return self.reply(200,{'counts':counts,'attention':attention,'activity':activity,'maintenance':scheduled,'deliveries':deliveries,'today':today,'appointments':today_appointments,'pending_chats':pending_chats,'assistance':assistance})
+                return self.reply(200,{'counts':counts,'attention':attention,'activity':activity,'maintenance':scheduled,'deliveries':deliveries,'today':today,'appointments':today_appointments,'pending_chats':pending_chats,'assistance':assistance,'upcoming_appointments':c.execute("SELECT COUNT(*) FROM appointments WHERE status IN ('solicitada','confirmada','reprogramada') AND starts_at>=?",(appointments.stamp(now),)).fetchone()[0] if user['role'] in ('administrador','tecnico') else 0,'pending_appointments':c.execute("SELECT COUNT(*) FROM appointments WHERE status='solicitada' AND starts_at>=?",(appointments.stamp(now),)).fetchone()[0] if user['role'] in ('administrador','tecnico') else 0})
             search_route=path=='/api/search'
             if search_route:
                 term=parse_qs(urlsplit(self.path).query).get('q',[''])[0].strip()[:150]
@@ -641,7 +645,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(400, {'error':'Solicitud inválida.'})
             data = json.loads(self.rfile.read(length))
             appointment_config_post=path=='/api/appointments/config'
-            if not isinstance(data, dict) or any(not isinstance(v,(str,bool)) and not (workspace_post and ((k=='lines' and isinstance(v,list)) or (k=='revision' and type(v) is int))) and not (appointment_config_post and ((k in ('hours','services') and isinstance(v,list)) or (k=='holiday' and isinstance(v,dict)))) for k,v in data.items()):
+            if not isinstance(data, dict) or any(not isinstance(v,(str,bool)) and not (workspace_post and ((k=='lines' and isinstance(v,list)) or (k=='revision' and type(v) is int))) and not (appointment_config_post and ((k in ('hours','services','staff_hours') and isinstance(v,list)) or (k=='holiday' and isinstance(v,dict)))) for k,v in data.items()):
                 return self.reply(400, {'error':'Datos inválidos.'})
             path = urlsplit(self.path).path
             with connect() as c:

@@ -8,6 +8,36 @@
   },
   "releases": [
     {
+      "version": "1.2.0",
+      "date": "2026-10-10T23:54:27-05:00",
+      "type": "minor",
+      "status": "publicada",
+      "summary": "Notificaciones del sistema, Adi renovada, reserva de citas rediseñada, Centro de operaciones reorganizado y aviso de privacidad.",
+      "changes": {
+        "features": [
+          "Notificaciones del sistema: campana en el encabezado con lo que requiere atención y la actividad reciente, y avisos emergentes al completar acciones o cuando otra persona registra cambios.",
+          "Notificaciones del sistema en un panel lateral: lo que requiere atención, la actividad reciente y las novedades de versión, con sonido opcional, contador en la pestaña y avisos emergentes.",
+          "Aviso al personal cuando entra una cita nueva desde la agenda en línea.",
+          "Aviso de privacidad publicado en /privacidad y enlazado desde la reserva de citas."
+        ],
+        "improvements": [
+          "Sistema y actualizaciones rediseñado, con barra de comprobación por etapas y textos más legibles.",
+          "Adi con chat rediseñado, respuestas rápidas, indicador de escritura, aviso de mensajes y respuestas basadas en los horarios, servicios y contacto configurados.",
+          "Reserva pública de citas con nuevo título, pasos, secciones numeradas y confirmación con el código de la cita.",
+          "Agenda de citas interna con barra de navegación y configuración ordenada por secciones.",
+          "Historial de versiones con resumen de cambios por versión y botón para expandir todo.",
+          "Centro de operaciones reorganizado: citas de hoy arriba, entregas junto a mantenimientos, indicadores compactos e iconos más acordes a cada estado.",
+          "Indicadores del Centro de operaciones con un color propio por estado."
+        ],
+        "fixes": [
+          "La configuración de la agenda de citas ya se guarda; antes el servidor la rechazaba.",
+          "Los servicios de la agenda muestran su estado activo real en la configuración."
+        ],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.1.0",
       "date": "2026-10-10T22:05:55-05:00",
       "type": "minor",

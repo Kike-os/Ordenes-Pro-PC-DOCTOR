@@ -303,6 +303,17 @@ class SecurityTests(unittest.TestCase):
             handler.do_GET()
             self.assertEqual((sent['status'],sent['type']),(200,kind),path)
             self.assertTrue(sent['body'].startswith(magic),path)
+        handler=object.__new__(app.Handler);handler.path='/static/adi-widget.js';handler.headers=Message();sent={}
+        handler.reply=lambda status,body,content_type=None,cookie=None:sent.update(status=status,type=content_type)
+        handler.do_GET()
+        self.assertEqual((sent['status'],sent['type']),(200,'text/javascript; charset=utf-8'))
+        self.assertIn('src="/static/adi-widget.js"',self.request('/citas')['body'])
+        notice=self.request('/privacidad')
+        self.assertEqual(notice['status'],200)
+        self.assertIn('<h1>Aviso de privacidad</h1>',notice['body'])
+        self.assertIn(app.corporate.settings()['support_email'],notice['body'])
+        self.assertNotIn('{{',notice['body'])
+        self.assertIn('href="/privacidad"',self.request('/citas')['body'])
         for page in ('/login','/forgot','/citas'):
             body=self.request(page)['body']
             self.assertIn('href="/favicon.ico?v=2"',body)

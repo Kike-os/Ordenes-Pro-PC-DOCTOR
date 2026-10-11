@@ -38,10 +38,38 @@ class AppointmentAndAdiTests(unittest.TestCase):
    self.assertEqual(appointments.available_slots(c,day.isoformat(),'diagnostico'),[])
    status,result=appointments.update_settings(c,{'services':[{'code':'diagnostico','duration_minutes':45,'active':True}]});self.assertEqual(status,200)
    self.assertEqual(appointments.services(c)[0]['duration_minutes'],45)
+ def test_agenda_configuration_saves_hours_staff_and_keeps_services_active(self):
+  with app.connect() as c:
+   app.appointments.ensure_staff_hours(c,self.tech);cfg=appointments.settings(c)
+   self.assertTrue(cfg['services'] and all(item['active']==1 for item in cfg['services']))
+  with patch.object(app.Handler,'session',lambda handler,c:({'id':self.admin,'username':'admin','name':'Admin','email':'a@example.invalid','role':'administrador','csrf':'token'},'t')):
+   payload={'hours':[dict(h,enabled=bool(h['enabled']),end_time='14:00' if h['weekday']==5 else h['end_time']) for h in cfg['hours']],'staff_hours':[dict(technician_id=h['technician_id'],weekday=h['weekday'],start_time=h['start_time'],end_time=h['end_time'],enabled=bool(h['enabled'])) for h in cfg['staff_hours']],'services':[dict(code=s['code'],duration_minutes=s['duration_minutes'],active=bool(s['active'])) for s in cfg['services']]}
+   self.assertTrue(payload['staff_hours'])
+   result=self.post('/api/appointments/config',payload,csrf='token')
+   self.assertEqual(result['status'],200,result)
+  with app.connect() as c:
+   after=appointments.settings(c)
+   self.assertEqual(next(h for h in after['hours'] if h['weekday']==5)['end_time'],'14:00')
+   self.assertEqual(len(appointments.services(c)),len(cfg['services']))
+
  def test_chat_uses_http_only_identity_and_never_exposes_conversation_hash(self):
   result=self.post('/api/public/adi/message',{'message':'¿Qué servicios ofrecen?'});self.assertEqual(result['status'],201);self.assertIn('HttpOnly',result['cookie']);self.assertNotIn('token_hash',json.dumps(result['body']))
   cookie=result['cookie'].split(';')[0];h=object.__new__(app.Handler);h.path='/api/public/adi/messages?after=0';h.client_address=('127.0.0.1',1);h.headers=Message();h.headers['Cookie']=cookie;out={};h.reply=lambda status,body,*a,**k:out.update(status=status,body=body);h.do_GET();self.assertEqual(len(out['body']['messages']),2)
   with app.connect() as c:self.assertEqual(c.execute("SELECT mode FROM adi_conversations").fetchone()[0],'adi')
+ def test_adi_fallback_uses_configured_data_and_never_invents_prices(self):
+  with patch.dict(app.os.environ,{'OPENAI_API_KEY':''}),app.connect() as c:
+   hours=adi.reply(c,'¿Cuál es el horario de atención?')
+   self.assertIn(adi.schedule_text(appointments.settings(c)['hours']),hours)
+   price=adi.reply(c,'¿Cuánto cuesta formatear mi laptop?')
+   self.assertIn('revisión técnica',price);self.assertNotRegex(price,r'\$|\bUSD\b|[0-9]+ ?d[oó]lares')
+   self.assertIn('/citas',adi.reply(c,'Quiero agendar una cita'))
+   self.assertIn('Solicitar un asesor',adi.reply(c,'quiero hablar con una persona'))
+   self.assertIn('número de orden',adi.reply(c,'¿cómo va mi equipo? estado de mi orden'))
+   self.assertIn('No encuentro una orden',adi.reply(c,'orden PCD-20260101-0001 cédula 0100000017'))
+   self.assertIn(app.corporate.settings()['whatsapp'],adi.reply(c,'¿Dónde están ubicados?'))
+   self.assertNotIn('Horario de atención',adi.reply(c,'ahora necesito una opcion'))
+  self.assertEqual(adi.schedule_text([{'weekday':0,'start_time':'09:00','end_time':'17:00','enabled':1},{'weekday':1,'start_time':'09:00','end_time':'17:00','enabled':1},{'weekday':2,'start_time':'09:00','end_time':'13:00','enabled':1},{'weekday':3,'start_time':'09:00','end_time':'13:00','enabled':0}]),'lunes a martes de 09:00 a 17:00; miércoles de 09:00 a 13:00')
+
  def test_admin_answers_are_database_backed(self):
   with app.connect() as c:
    answer=adi.admin_answer(c,'¿Cuántas órdenes tengo en espera?');self.assertIn('0 orden',answer)

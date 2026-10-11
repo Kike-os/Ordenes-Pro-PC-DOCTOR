@@ -4,6 +4,32 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.2.0 — 2026-10-10 23:54 (UTC-05:00)
+
+Notificaciones del sistema, Adi renovada, reserva de citas rediseñada, Centro de operaciones reorganizado y aviso de privacidad.
+
+### Nuevas funcionalidades
+
+- Notificaciones del sistema: campana en el encabezado con lo que requiere atención y la actividad reciente, y avisos emergentes al completar acciones o cuando otra persona registra cambios.
+- Notificaciones del sistema en un panel lateral: lo que requiere atención, la actividad reciente y las novedades de versión, con sonido opcional, contador en la pestaña y avisos emergentes.
+- Aviso al personal cuando entra una cita nueva desde la agenda en línea.
+- Aviso de privacidad publicado en /privacidad y enlazado desde la reserva de citas.
+
+### Mejoras realizadas
+
+- Sistema y actualizaciones rediseñado, con barra de comprobación por etapas y textos más legibles.
+- Adi con chat rediseñado, respuestas rápidas, indicador de escritura, aviso de mensajes y respuestas basadas en los horarios, servicios y contacto configurados.
+- Reserva pública de citas con nuevo título, pasos, secciones numeradas y confirmación con el código de la cita.
+- Agenda de citas interna con barra de navegación y configuración ordenada por secciones.
+- Historial de versiones con resumen de cambios por versión y botón para expandir todo.
+- Centro de operaciones reorganizado: citas de hoy arriba, entregas junto a mantenimientos, indicadores compactos e iconos más acordes a cada estado.
+- Indicadores del Centro de operaciones con un color propio por estado.
+
+### Errores corregidos
+
+- La configuración de la agenda de citas ya se guarda; antes el servidor la rechazaba.
+- Los servicios de la agenda muestran su estado activo real en la configuración.
+
 ## v1.1.0 — 2026-10-10 22:05 (UTC-05:00)
 
 Mejoras de presentación en el Centro de operaciones, el detalle de la orden, los formularios de clientes y órdenes, el encabezado y el icono de la pestaña.

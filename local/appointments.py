@@ -15,7 +15,7 @@ def ensure_staff_hours(c,technician_id):
  for weekday in range(7):
   end='13:00' if weekday==5 else '17:00';enabled=0 if weekday==6 else 1
   c.execute('INSERT OR IGNORE INTO appointment_staff_hours(technician_id,weekday,start_time,end_time,enabled) VALUES (?,?,?,?,?)',(technician_id,weekday,'09:00',end,enabled))
-def settings(c):return {'hours':[dict(r) for r in c.execute('SELECT * FROM appointment_hours ORDER BY weekday')],'staff_hours':[dict(r) for r in c.execute('SELECT h.*,u.name technician FROM appointment_staff_hours h JOIN users u ON u.id=h.technician_id ORDER BY u.name,h.weekday')],'holidays':[dict(r) for r in c.execute('SELECT * FROM appointment_holidays ORDER BY day')],'services':services(c)}
+def settings(c):return {'hours':[dict(r) for r in c.execute('SELECT * FROM appointment_hours ORDER BY weekday')],'staff_hours':[dict(r) for r in c.execute('SELECT h.*,u.name technician FROM appointment_staff_hours h JOIN users u ON u.id=h.technician_id ORDER BY u.name,h.weekday')],'holidays':[dict(r) for r in c.execute('SELECT * FROM appointment_holidays ORDER BY day')],'services':[dict(r) for r in c.execute('SELECT code,label,duration_minutes,active FROM appointment_services ORDER BY label')]}
 def update_settings(c,data):
  try:
   for item in data.get('hours',[]):

@@ -65,16 +65,57 @@ def reply(c,text,admin=False,context=None):
   if factual:return factual
  answer=ask(text,admin,context)
  if answer:return answer
- q=text.casefold()
- if any(k in q for k in ('servicio','reparación','reparacion','diagnóstico','diagnostico','bios','impresora')):
-  return 'PC-DOCTOR S.A. ofrece diagnóstico y reparación de portátiles, computadoras e impresoras, mantenimiento preventivo, programación de BIOS y reparación electrónica. Puedes solicitar una cita en /citas.'
- if any(k in q for k in ('horario','atención','atencion','contacto','whatsapp')):
-  cfg=appointments.settings(c);hours=[h for h in cfg['hours'] if h['enabled']]
-  return 'La agenda de citas muestra los horarios disponibles y está configurada en hora de Ecuador. WhatsApp: +593 98 746 0591. Sitio: https://ordenes-pro.ecuadorpcdoctor.com/.'
- if 'estado' in q or 'orden' in q:
+ return fallback(c,text)
+
+DAYS=('lunes','martes','miércoles','jueves','viernes','sábado','domingo')
+
+def plain(text):
+ import unicodedata
+ return ''.join(ch for ch in unicodedata.normalize('NFD',text.casefold()) if not unicodedata.combining(ch))
+
+def schedule_text(hours):
+ """Agrupa días consecutivos con el mismo horario configurado en la agenda."""
+ groups=[]
+ for item in sorted((h for h in hours if h['enabled']),key=lambda h:h['weekday']):
+  span=(item['start_time'],item['end_time'])
+  if groups and groups[-1][2]==span and groups[-1][1]==item['weekday']-1:groups[-1][1]=item['weekday']
+  else:groups.append([item['weekday'],item['weekday'],span])
+ return '; '.join((DAYS[a] if a==b else DAYS[a]+' a '+DAYS[b])+' de '+span[0]+' a '+span[1] for a,b,span in groups)
+
+def fallback(c,text):
+ """Respuestas sin IA externa: solo datos configurados en el sistema, sin precios, diagnósticos ni plazos inventados."""
+ import corporate
+ q=plain(text);words=set(re.findall(r'[a-z0-9]+',q));company=corporate.settings();cfg=appointments.settings(c)
+ has=lambda *keys:any(k in q for k in keys)
+ if 'estado' in q or 'orden' in q or 'pcd-' in q or has('mi equipo','mi reparacion','seguimiento'):
   match=re.search(r'(PCD-\d{8}-\d{4,}).*?(\d{10}|\d{13})',text,re.I)
   if match:
    row=order_status(c,match[1].upper(),match[2])
    if row:return f"Tu orden {row['code']} está en estado «{row['status']}». Equipo: {row['brand'] or ''} {row['model'] or ''}. Para más información, solicita atención del taller."
-  return 'Para consultar una reparación, comparte el número de orden y confirma la identificación asociada. No encuentro información privada sin ambos datos.'
- return 'Soy Adi, asistente virtual de PC-DOCTOR S.A. Puedo orientarte sobre servicios, citas y seguimiento. Para una evaluación o presupuesto, el equipo técnico debe revisar el caso.'
+   return 'No encuentro una orden con ese número y esa identificación. Revisa ambos datos tal como constan en tu comprobante o solicita un asesor.'
+  return 'Para consultar una reparación, escribe en un solo mensaje el número de orden (por ejemplo PCD-20260101-0001) y la cédula o RUC registrados. No muestro información privada sin ambos datos.'
+ if has('cita','agendar','agenda','reservar','reserva','turno'):
+  return 'Puedes reservar tu cita en línea en /citas: elige el servicio, la fecha y una hora disponible. Recibirás un código para consultar, reprogramar o cancelar la cita.'
+ if has('precio','costo','cuanto cuesta','cuanto vale','cuanto sale','cotiza','presupuesto','tarifa') or words&{'valor','vale','cobran'}:
+  return 'El valor depende de la revisión técnica del equipo, por eso no puedo darte un precio por este medio. Puedes agendar un diagnóstico en /citas o pedir que un asesor te contacte con el botón «Solicitar un asesor».'
+ if has('garantia'):
+  return 'Las condiciones de garantía dependen del servicio realizado y constan en las condiciones de tu orden. Un asesor puede confirmarte tu caso: usa «Solicitar un asesor».'
+ if has('horario','abren','abierto','atienden') or words&{'hora','horas'}:
+  schedule=schedule_text(cfg['hours'])
+  return ('Horario de atención de la agenda (hora de Ecuador): '+schedule+'.' if schedule else 'Por ahora no hay horarios de agenda habilitados.')+' Puedes ver las horas libres al reservar en /citas.'
+ if has('contacto','whatsapp','telefono','llamar','correo','email','escribir'):
+  return 'Puedes escribirnos por WhatsApp al '+company['whatsapp']+' o al correo '+company['support_email']+'. También puedo pasarte con un asesor en este chat.'
+ if has('donde','direccion','ubicacion','ubicados','llegar') or words&{'local'}:
+  return 'Para confirmar la dirección y cómo llegar, escríbenos por WhatsApp al '+company['whatsapp']+' o solicita un asesor en este chat.'
+ if has('asesor','humano','persona','tecnico','alguien','operador'):
+  return 'Con gusto. Pulsa «Solicitar un asesor» y una persona del equipo continuará la conversación en este mismo chat.'
+ if has('servicio','reparacion','reparar','arreglar','diagnostico','mantenimiento','bios','impresora','laptop','portatil','computadora','formatear','virus','pantalla','lento','no enciende','no prende') or words&{'pc'}:
+  services=', '.join(item['label'].lower() for item in cfg['services'] if item.get('active',1))
+  return company['name']+' ofrece diagnóstico y reparación de portátiles, computadoras e impresoras, mantenimiento preventivo, programación de BIOS y reparación electrónica.'+(' En la agenda puedes reservar: '+services+'.' if services else '')+' El diagnóstico exacto requiere revisar el equipo; reserva en /citas.'
+ if words&{'gracias','agradezco','genial','perfecto','excelente'}:
+  return 'Con gusto. Si necesitas algo más, aquí estoy.'
+ if words&{'adios','chao','chau'} or has('hasta luego','nos vemos'):
+  return company['thanks']+' Que tengas un buen día.'
+ if words&{'hola','buenas','buenos','saludos','hey','ola'}:
+  return 'Hola, soy Adi, asistente virtual de '+company['name']+' Puedo ayudarte con servicios, citas, horarios, contacto y el estado de tu orden. ¿Qué necesitas?'
+ return 'Soy Adi, asistente virtual de '+company['name']+' Puedo orientarte sobre servicios, citas, horarios, contacto y el estado de tu orden. Para una evaluación o presupuesto, el equipo técnico debe revisar el caso; si lo prefieres, solicita un asesor.'
