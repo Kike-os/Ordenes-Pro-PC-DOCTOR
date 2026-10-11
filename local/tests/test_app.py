@@ -600,6 +600,39 @@ class SecurityTests(unittest.TestCase):
         self.assertEqual(self.request('/api/clients?page=bad',cookie=cookie)['status'],400)
         self.assertEqual(self.request('/api/reports',cookie=cookie)['body']['clients'],55)
 
+    def test_order_history_records_real_transitions(self):
+        cookie,csrf=self.login()
+        order=self.request('/api/orders',self.order_data({'client':'Prueba','problem':'Prueba'}),cookie=cookie,csrf=csrf)['body']['id']
+        post=lambda status,**extra:self.request('/api/order-status',dict({'id':str(order),'status':status},**extra),cookie=cookie,csrf=csrf)['status']
+        self.assertEqual(post('reparacion'),200)
+        self.assertEqual(post('reparacion'),200)
+        self.assertEqual(post('reparacion',comment='Se limpió el ventilador.'),200)
+        self.assertEqual(post('espera_entrega'),200)
+        rows=self.request('/api/activity?order=%d'%order,cookie=cookie)['body']['rows']
+        self.assertEqual([(r['event'],r['previous_label'],r['status_label']) for r in rows],[('status','Procesando','En espera de entrega'),('follow_up','Procesando','Procesando'),('status','En espera','Procesando'),('created',None,'En espera')])
+        self.assertEqual(rows[0]['comment'],'Estado cambiado de «Procesando» a «En espera de entrega».')
+        self.assertEqual(rows[1]['comment'],'Se limpió el ventilador.')
+        detail=self.request('/api/orders/%d'%order,cookie=cookie)['body']['order']
+        self.assertEqual([r['id'] for r in detail['history']],[r['id'] for r in rows])
+        self.assertEqual(detail['history'][0]['previous_label'],'Procesando')
+        self.assertEqual(self.request('/api/activity?recent=1',cookie=cookie)['body']['rows'][0]['previous_label'],'Procesando')
+        self.assertEqual(self.request('/api/activity?order=x',cookie=cookie)['status'],400)
+        self.assertEqual(self.request('/api/activity?order=%d'%order)['status'],401)
+
+    def test_device_identified_by_serial_from_own_history(self):
+        cookie,csrf=self.login()
+        self.assertEqual(self.request('/api/devices/identify?serial=SN-ABC123')['status'],401)
+        empty=self.request('/api/devices/identify?serial=SN-ABC123',cookie=cookie)
+        self.assertEqual((empty['status'],empty['body']['matches'],empty['body']['manufacturer']),(200,[],{'available':False,'message':'Identificación automática no disponible'}))
+        first=self.request('/api/orders',self.order_data({'client':'Prueba','problem':'Prueba','brand':'Lenovo','model':'ThinkPad T14','serial':'SN-ABC123'}),cookie=cookie,csrf=csrf)['body']['id']
+        found=self.request('/api/devices/identify?serial=%20sn-abc123%20',cookie=cookie)['body']
+        self.assertEqual(found['serial'],'SN-ABC123')
+        self.assertEqual(len(found['matches']),1)
+        match=found['matches'][0]
+        self.assertEqual((match['brand'],match['model'],match['orders'],match['last_order']['id'],match['last_order']['status']),('Lenovo','ThinkPad T14',1,first,'En espera'))
+        self.assertEqual(self.request('/api/devices/identify?serial=SN-ABC12',cookie=cookie)['body']['matches'],[])
+        for bad in ('abc','%27%20OR%201%3D1','serie%25'):self.assertEqual(self.request('/api/devices/identify?serial='+bad,cookie=cookie)['status'],400)
+
     def test_order_status_updates_active_filter_and_report(self):
         cookie,csrf=self.login()
         order=self.request('/api/orders',self.order_data({'client':'Prueba','problem':'Prueba'}),cookie=cookie,csrf=csrf)['body']['id']

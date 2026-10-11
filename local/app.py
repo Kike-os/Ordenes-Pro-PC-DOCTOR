@@ -680,6 +680,11 @@ class Handler(BaseHTTPRequestHandler):
                 result['photos']=[dict(r) for r in c.execute('SELECT id,is_main,position,size,created_at FROM order_photos WHERE order_id=? ORDER BY is_main DESC,position,id',(result['id'],))]
                 result['mail']=[dict(r) for r in c.execute('SELECT id,subject,correspondent,direction,sent_at,folder,uid FROM mail_links WHERE order_id=? ORDER BY id DESC LIMIT 30',(result['id'],))] if mail_allowed(user) else None
                 return self.reply(200, {'order':result})
+            if path == '/api/devices/identify':
+                if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
+                import device_lookup
+                status,payload=device_lookup.identify(c,parse_qs(urlsplit(self.path).query).get('serial',[''])[0][:200])
+                return self.reply(status,payload)
             if path in ('/api/orders', '/api/clients', '/api/devices'):
                 query = parse_qs(urlsplit(self.path).query)
                 term = query.get('q', [''])[0][:150]
@@ -817,8 +822,12 @@ class Handler(BaseHTTPRequestHandler):
             if path in ('/api/dashboard','/api/activity','/api/maintenance'):
                 now=reception_now();today=now.date().isoformat()
                 if path=='/api/maintenance':return self.reply(200,{'rows':maintenance.rows(c),'today':today,'profiles':{k:v[0] for k,v in maintenance.PROFILES.items()}})
-                # El estado anterior sale del propio historial de la orden; si no hay registro previo, queda vacío (no se inventa).
-                activity=[dict(r) for r in c.execute("SELECT h.*,o.code,u.name actor,(SELECT p.status_label FROM order_history p WHERE p.order_id=h.order_id AND p.id<h.id AND p.event IN ('status','created') AND p.status_label!='' ORDER BY p.id DESC LIMIT 1) previous_label FROM order_history h JOIN orders o ON o.id=h.order_id LEFT JOIN users u ON u.id=h.actor_id ORDER BY h.id DESC LIMIT ?", (12 if path!='/api/activity' or parse_qs(urlsplit(self.path).query).get('recent',[''])[0]=='1' else 300,))]
+                activity_query=parse_qs(urlsplit(self.path).query) if path=='/api/activity' else {}
+                # Historial de una sola orden: la misma fuente que el seguimiento del inicio.
+                if activity_query.get('order',[''])[0]:
+                    if not activity_query['order'][0].isdigit():return self.reply(400,{'error':'Orden inválida.'})
+                    return self.reply(200,{'rows':order_workspace.history(c,int(activity_query['order'][0]))})
+                activity=order_workspace.history(c,limit=12 if path!='/api/activity' or activity_query.get('recent',[''])[0]=='1' else 300)
                 if path=='/api/activity':return self.reply(200,{'rows':activity})
                 counts={r['code']:r['total'] for r in c.execute('SELECT s.code,COUNT(o.id) total FROM statuses s LEFT JOIN orders o ON o.status=s.code GROUP BY s.code')}
                 source='orders o JOIN devices d ON d.id=o.device_id JOIN clients c ON c.id=d.client_id JOIN statuses s ON s.code=o.status'
@@ -1435,7 +1444,8 @@ class Handler(BaseHTTPRequestHandler):
                         old=c.execute('SELECT status FROM orders WHERE id=?',(oid,)).fetchone()[0]
                         c.execute('UPDATE orders SET status=?,updated_at=?,revision=revision+1 WHERE id=?', (status,now.isoformat(timespec='microseconds'),oid))
                         maintenance.transition(c,int(oid),old,status,now)
-                        order_workspace.event(c,int(oid),user['id'],now,'status',comment or 'Estado actualizado.')
+                        # Sin cambio real ni comentario no hay nada que auditar; con cambio, el registro nombra la transición.
+                        if old!=status or comment:order_workspace.event(c,int(oid),user['id'],now,'status' if old!=status else 'follow_up',comment or order_workspace.transition_comment(old,status))
                         audit(c,user['id'],'order_status_updated',int(oid))
                     else:
                         table = 'clients' if path == '/api/clients' else 'devices'

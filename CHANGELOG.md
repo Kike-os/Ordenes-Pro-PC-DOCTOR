@@ -4,6 +4,23 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.13 — 2026-10-11 13:04 (UTC-05:00)
+
+Historial de la Orden compacto, seguimiento con textos claros e identificación de equipos por número de serie
+
+### Nuevas funcionalidades
+
+- Identificación inteligente por número de serie en la recepción: reconoce equipos que ya ingresaron al taller y completa marca, modelo y tipo tras confirmar
+
+### Mejoras realizadas
+
+- Historial de la Orden: panel compacto con últimos eventos, ver todos, filtros, detalle expandible y actualización automática
+- Seguimiento de Órdenes: cada tarjeta muestra el estado nuevo como título y el estado anterior como detalle
+
+### Errores corregidos
+
+- El historial registra de forma explícita cada cambio de estado, también los hechos al editar la orden, y ya no guarda eventos vacíos «Estado actualizado»
+
 ## v1.5.12 — 2026-10-11 12:49 (UTC-05:00)
 
 Avisos de actualización Glass Glow.

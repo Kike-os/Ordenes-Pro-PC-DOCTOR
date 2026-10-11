@@ -11,10 +11,24 @@ def event(c,oid,actor,now,kind,comment=''):
     c.execute('INSERT INTO order_history(order_id,actor_id,occurred_at,event,status_label,comment) VALUES (?,?,?,?,?,?)',(oid,actor,now.isoformat(timespec='microseconds'),kind,label,comment))
 
 
+# El historial solo guarda el estado vigente de cada evento. El estado anterior se lee del evento previo de la misma
+# orden; si no existe, queda vacío y la interfaz no muestra ninguna transición (no se inventa).
+HISTORY_SQL="""SELECT h.*,o.code,u.name actor,(SELECT p.status_label FROM order_history p WHERE p.order_id=h.order_id AND p.id<h.id AND p.status_label!='' ORDER BY p.id DESC LIMIT 1) previous_label FROM order_history h JOIN orders o ON o.id=h.order_id LEFT JOIN users u ON u.id=h.actor_id"""
+
+
+def history(c,oid=None,limit=300):
+    if oid is None:return [dict(r) for r in c.execute(HISTORY_SQL+' ORDER BY h.id DESC LIMIT ?',(limit,))]
+    return [dict(r) for r in c.execute(HISTORY_SQL+' WHERE h.order_id=? ORDER BY h.id DESC',(oid,))]
+
+
+def transition_comment(old,new):
+    return 'Estado cambiado de «%s» a «%s».'%(STATUSES.get(old,old),STATUSES.get(new,new))
+
+
 def attach(c,order):
     actor=c.execute('SELECT name FROM users WHERE id=?',(order['assigned_to'],)).fetchone()
     order['responsible']=actor['name'] if actor else 'Sin asignar'
-    order['history']=[dict(r) for r in c.execute('SELECT h.*,u.name actor FROM order_history h LEFT JOIN users u ON u.id=h.actor_id WHERE h.order_id=? ORDER BY h.id DESC',(order['id'],))]
+    order['history']=history(c,order['id'])
     row=c.execute('SELECT * FROM order_budget WHERE order_id=?',(order['id'],)).fetchone()
     order['budget']={k+'_cents':row[k+'_cents'] if row else 0 for k in BUDGET_KEYS}
     order['budget']['total_cents']=sum(order['budget'].values())
@@ -76,5 +90,7 @@ def save(c,oid,data,user,now):
     if 'lines' in fields:
         c.execute('DELETE FROM order_budget_lines WHERE order_id=?',(oid,))
         c.executemany('INSERT INTO order_budget_lines(order_id,category,description,amount_cents) VALUES (?,?,?,?)',[(oid,*line) for line in fields['lines']])
-    event(c,oid,user['id'],now,'updated',fields['comment'] or 'Seguimiento técnico actualizado.')
+    # Si la edición cambió el estado, el registro lo dice de forma explícita para que sirva como auditoría.
+    changed=row['status']!=fields['status']
+    event(c,oid,user['id'],now,'status' if changed else 'updated',fields['comment'] or (transition_comment(row['status'],fields['status']) if changed else 'Seguimiento técnico actualizado.'))
     return 200,{'ok':True}
