@@ -283,7 +283,9 @@ function routeState(){const [name,query='']=location.hash.slice(1).split('?');re
 function go(name,params=new URLSearchParams()){if(location.pathname!=='/')history.replaceState(null,'','/'+location.hash);location.hash=name+(params.size?'?'+params.toString():'');}
 async function dashboard(){
  const {user,server_time}=await api('/api/me');currentUser=user;csrf=user.csrf;identity();initHeaderNavigation();initHeader(server_time);initNotifications();initReleaseChip();initAutoUpdate();setTimeout(()=>runSystemCheck(false),1500);
- $('today').textContent=new Intl.DateTimeFormat('es-EC',{timeZone:'America/Guayaquil',weekday:'long',day:'numeric',month:'long',year:'numeric'}).format(new Date());
+ {// Fecha del día: día de la semana destacado y fecha en minúsculas correctas («11 de octubre de 2026»).
+  const now=new Date(),zone={timeZone:'America/Guayaquil'},weekday=new Intl.DateTimeFormat('es-EC',{...zone,weekday:'long'}).format(now),date=new Intl.DateTimeFormat('es-EC',{...zone,day:'numeric',month:'long',year:'numeric'}).format(now),today=$('today');
+  today.dateTime=new Intl.DateTimeFormat('en-CA',zone).format(now);today.replaceChildren(systemIcon('M8 2v4 M16 2v4 M3 10h18 M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z'),el('strong',weekday.charAt(0).toUpperCase()+weekday.slice(1)),el('span',date));today.setAttribute('aria-label','Hoy es '+weekday+', '+date);}
  document.querySelectorAll('[data-module]').forEach(card=>{const name=card.dataset.module;if(name==='settings'&&!admin()){card.disabled=true;card.querySelector('.card-description').textContent='Disponible para administradores.';}card.addEventListener('click',()=>name==='new'?showOrder():go(name,name==='orders'?new URLSearchParams({active:'1'}):undefined));});
  document.querySelector('[data-nav=settings]').setAttribute('aria-disabled',String(!admin()));
  prepareClientRegistry();initOrderEnhancements();initReception();initOperationSearch();

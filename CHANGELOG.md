@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.25 — 2026-10-11 14:54 (UTC-05:00)
+
+Fecha del día más legible en el inicio
+
+### Mejoras realizadas
+
+- Inicio: la fecha del día se muestra como etiqueta legible con icono de calendario y el día de la semana destacado
+
 ## v1.5.24 — 2026-10-11 14:50 (UTC-05:00)
 
 Separadores finos en la barra superior

@@ -2964,3 +2964,10 @@ body[data-page=dashboard] .toast.toast-release .toast-body p{font-size:12px;colo
 .premium-header #global-search.order-search-wide::after{display:none}
 }
 @media(min-width:1000px) and (max-width:1199px){.premium-header #global-search::before{left:-6px}.premium-header #global-search::after{right:-6px}}
+
+/* Inicio: fecha del día como etiqueta legible con icono de calendario. */
+.operations-heading-tools #today{display:inline-flex;align-items:center;gap:8px;max-width:none;margin-bottom:10px;padding:6px 13px;border:1px solid #2a4063;border-radius:999px;background:linear-gradient(180deg,#10213a,#0c1a2e);color:#c3d3ea;font-size:12.5px!important;line-height:1.2;letter-spacing:.1px;text-transform:none;white-space:nowrap}
+.operations-heading-tools #today .system-icon{width:15px;height:15px;color:#7fbcff;flex:0 0 auto}
+.operations-heading-tools #today strong{font-weight:700;color:#f2f6ff}
+.operations-heading-tools #today strong::after{content:"";display:inline-block;width:1px;height:11px;margin-left:8px;background:#496A91;opacity:.7;vertical-align:-1px}
+@media(max-width:380px){.operations-heading-tools #today{font-size:11.5px!important;padding:5px 11px;gap:6px}}
