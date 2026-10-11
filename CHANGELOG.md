@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.17 — 2026-10-11 13:39 (UTC-05:00)
+
+Verificación de la serie en la página oficial del fabricante
+
+### Mejoras realizadas
+
+- Identificación por serie: cuando el equipo no está en el historial, explica el motivo y ofrece la página oficial de Dell, Lenovo, HP, Apple y ASUS para verificar la serie
+
 ## v1.5.16 — 2026-10-11 13:29 (UTC-05:00)
 
 Ticket térmico con QR de seguimiento, logo y copias; página pública de consulta de la reparación

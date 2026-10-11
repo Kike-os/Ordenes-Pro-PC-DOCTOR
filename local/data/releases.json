@@ -8,6 +8,22 @@
   },
   "releases": [
     {
+      "version": "1.5.17",
+      "date": "2026-10-11T13:39:01-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Verificación de la serie en la página oficial del fabricante",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Identificación por serie: cuando el equipo no está en el historial, explica el motivo y ofrece la página oficial de Dell, Lenovo, HP, Apple y ASUS para verificar la serie"
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.16",
       "date": "2026-10-11T13:29:57-05:00",
       "type": "patch",
