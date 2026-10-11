@@ -7,3 +7,8 @@ local/var/
 *.key
 .vercel
 .env*
+# Generados por Setup Python App de cPanel dentro de la raíz de la aplicación.
+local/passenger_wsgi.py
+local/public/
+local/tmp/
+local/stderr.log

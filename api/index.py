@@ -12,7 +12,7 @@ if production:
     os.environ.setdefault('APP_URL', 'https://' + production)
     os.environ.setdefault('PUBLIC_APP_URL', 'https://' + production)
 
-import passenger_wsgi  # noqa: E402
+import wsgi_app  # noqa: E402
 
 
 # Único nombre exportado: Vercel también acepta «application» y lo usaría sin este ajuste de ruta.
@@ -27,4 +27,4 @@ def app(environ, start_response):
     if routed:
         environ['PATH_INFO'] = '/' + routed[0].lstrip('/')
         environ['QUERY_STRING'] = urlencode([(key, value) for key, value in query if key != '__path'])
-    return passenger_wsgi.application(environ, start_response)
+    return wsgi_app.application(environ, start_response)

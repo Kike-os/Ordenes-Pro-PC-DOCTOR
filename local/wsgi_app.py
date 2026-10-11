@@ -1,4 +1,8 @@
-"""Entrada WSGI para Passenger/cPanel, sin iniciar un servidor local."""
+"""Entrada WSGI para Passenger/cPanel, sin iniciar un servidor local.
+
+No debe llamarse passenger_wsgi.py: Setup Python App de cPanel genera ese archivo como cargador
+del archivo de inicio y, si coinciden los nombres, lo sobrescribe y se carga a sí mismo.
+"""
 import json
 import logging
 import os

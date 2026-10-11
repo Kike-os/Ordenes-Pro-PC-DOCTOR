@@ -79,7 +79,7 @@ Vercel no conserva el archivo SQLite; allí la aplicación usa una base libSQL/T
 
 ## Adaptación para cPanel Python
 
-Se preparó `local/passenger_wsgi.py` para Python 3.11/Passenger y un paquete sin datos ni secretos. Seguir [instalación cPanel](docs/CPANEL.md). Requiere migración y creación del administrador desde la terminal del hosting, configuración HTTPS y prueba remota; todavía no se ha publicado.
+Se preparó `local/wsgi_app.py` para Python 3.11/Passenger y un paquete sin datos ni secretos. Seguir [instalación cPanel](docs/CPANEL.md). Requiere migración y creación del administrador desde la terminal del hosting, configuración HTTPS y prueba remota; todavía no se ha publicado.
 
 - Agenda pública `/citas`, disponibilidad por técnico, estados independientes, reprogramación/cancelación con token privado, conversión explícita a orden y recordatorios de correo por cron cuando hay consentimiento y SMTP. Reservar una cita no crea una orden.
 - Chat de texto Adi para clientes y panel de atención humana por consultas periódicas. La API de OpenAI es opcional y solo se usa desde el servidor; el panel administrativo responde consultas con datos SQL reales definidos. No hay envío integrado de WhatsApp ni voz activada.

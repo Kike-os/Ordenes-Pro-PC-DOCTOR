@@ -4,7 +4,7 @@ Vercel no conserva archivos entre ejecuciones, por lo que `local/var/ordenes.sql
 
 ## Piezas
 
-- `api/index.py`: entrada de Vercel; envuelve `application` de `local/passenger_wsgi.py` y toma la IP del cliente de las cabeceras que fija Vercel para los límites por IP. No migra ni crea cuentas.
+- `api/index.py`: entrada de Vercel; envuelve `application` de `local/wsgi_app.py` y toma la IP del cliente de las cabeceras que fija Vercel para los límites por IP. No migra ni crea cuentas.
 - `vercel.json`: envía todas las rutas a esa función y le pasa la ruta original en `__path`, porque Vercel la sustituye por `/api/index`. `requirements.txt` (raíz) repite `local/requirements.txt`.
 - `.vercelignore`: excluye `revision/`, `docs/`, `tmp/`, pruebas, `local/var/`, `.env`, respaldos y paquetes.
 - `local/remote_db.py`: cliente HTTP (Hrana) con la interfaz de `sqlite3` que usa la aplicación. `app.connect()` lo elige cuando existe `TURSO_DATABASE_URL`.

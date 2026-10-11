@@ -5,7 +5,7 @@ from wsgiref.util import setup_testing_defaults
 from wsgiref.validate import validator
 
 import test_app
-import passenger_wsgi
+import wsgi_app
 
 
 class WSGITests(unittest.TestCase):
@@ -24,7 +24,7 @@ class WSGITests(unittest.TestCase):
         result = {}
         def start(status, headers, exc_info=None):
             result.update(status=status, headers=dict(headers))
-        response = validator(passenger_wsgi.app)(env, start)
+        response = validator(wsgi_app.app)(env, start)
         try:
             result['body'] = b''.join(response)
         finally:
@@ -70,7 +70,7 @@ class WSGITests(unittest.TestCase):
                    CONTENT_TYPE='application/json',CONTENT_LENGTH=str(len(raw)),
                    **{'wsgi.input':io.BytesIO(raw)})
         result={}
-        response=passenger_wsgi.application(env,lambda status,headers:result.update(status=status))
+        response=wsgi_app.application(env,lambda status,headers:result.update(status=status))
         order=json.loads(b''.join(response));self.assertTrue(result['status'].startswith('201'),order)
         self.assertRegex(order['code'],r'^PCD-[0-9]{8}-0001$')
         for suffix in ['', '/qr.png','/receipt.pdf']:
