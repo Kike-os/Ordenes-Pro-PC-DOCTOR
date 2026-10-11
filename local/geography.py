@@ -13,6 +13,12 @@ LOCALITIES = {r['code']:r for r in CATALOG['localities']}
 
 def initialize_catalog(c):
     if c.execute('SELECT 1 FROM geo_catalog WHERE version=?',(METADATA['version'],)).fetchone():
+        # Misma versión del catálogo: solo se alinean nombres corregidos (mayúscula inicial), nunca códigos ni relaciones.
+        for table,rows in [('geo_provinces',PROVINCES),('geo_cantons',CANTONS),('geo_parishes',PARISHES),('geo_localities',LOCALITIES)]:
+            for row in c.execute('SELECT code,name FROM '+table).fetchall():
+                current=rows.get(row['code'])
+                if current and current['name']!=row['name']:
+                    c.execute('UPDATE '+table+' SET name=? WHERE code=?',(current['name'],row['code']))
         return
     for table,rows,keys in [
         ('geo_provinces',PROVINCES.values(),('code','name')),

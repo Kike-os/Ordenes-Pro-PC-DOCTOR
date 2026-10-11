@@ -342,12 +342,14 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         path = urlsplit(self.path).path
-        files = {'/static/label.css':'label.css','/static/app.css':'app.css','/static/app.js':'app.js','/static/form-validation.js':'form-validation.js','/static/appointments.js':'appointments.js','/static/logo-original.png':'logo-original.png'}
+        files = {'/static/label.css':'label.css','/static/app.css':'app.css','/static/app.js':'app.js','/static/form-validation.js':'form-validation.js','/static/appointments.js':'appointments.js','/static/logo-original.png':'logo-original.png',
+                 '/favicon.ico':'favicon.ico','/static/favicon.ico':'favicon.ico','/static/favicon-16.png':'favicon-16.png','/static/favicon-32.png':'favicon-32.png','/static/favicon-48.png':'favicon-48.png',
+                 '/apple-touch-icon.png':'apple-touch-icon.png','/apple-touch-icon-precomposed.png':'apple-touch-icon.png','/static/apple-touch-icon.png':'apple-touch-icon.png'}
         if path in files:
             file = ROOT / 'static' / files[path]
             if not file.is_file():
                 return self.reply(404, {'error':'Archivo no disponible.'})
-            content_type = 'image/png' if file.suffix == '.png' else ('text/css; charset=utf-8' if file.suffix == '.css' else 'text/javascript; charset=utf-8')
+            content_type = 'image/png' if file.suffix == '.png' else 'image/x-icon' if file.suffix == '.ico' else ('text/css; charset=utf-8' if file.suffix == '.css' else 'text/javascript; charset=utf-8')
             return self.reply(200, file.read_bytes(), content_type)
         with connect() as c:
             if path == '/citas':

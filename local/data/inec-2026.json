@@ -34,7 +34,7 @@
     },
     {
       "code": "07",
-      "name": "el Oro"
+      "name": "El Oro"
     },
     {
       "code": "08",
@@ -54,7 +54,7 @@
     },
     {
       "code": "12",
-      "name": "los Ríos"
+      "name": "Los Ríos"
     },
     {
       "code": "13",
@@ -163,7 +163,7 @@
     },
     {
       "code": "0112",
-      "name": "el Pan",
+      "name": "El Pan",
       "province_code": "01"
     },
     {
@@ -213,7 +213,7 @@
     },
     {
       "code": "0207",
-      "name": "las Naves",
+      "name": "Las Naves",
       "province_code": "02"
     },
     {
@@ -233,12 +233,12 @@
     },
     {
       "code": "0304",
-      "name": "la Troncal",
+      "name": "La Troncal",
       "province_code": "03"
     },
     {
       "code": "0305",
-      "name": "el Tambo",
+      "name": "El Tambo",
       "province_code": "03"
     },
     {
@@ -288,7 +288,7 @@
     },
     {
       "code": "0502",
-      "name": "la Maná",
+      "name": "La Maná",
       "province_code": "05"
     },
     {
@@ -393,7 +393,7 @@
     },
     {
       "code": "0706",
-      "name": "el Guabo",
+      "name": "El Guabo",
       "province_code": "07"
     },
     {
@@ -433,7 +433,7 @@
     },
     {
       "code": "0714",
-      "name": "las Lajas",
+      "name": "Las Lajas",
       "province_code": "07"
     },
     {
@@ -508,12 +508,12 @@
     },
     {
       "code": "0908",
-      "name": "el Empalme",
+      "name": "El Empalme",
       "province_code": "09"
     },
     {
       "code": "0909",
-      "name": "el Triunfo",
+      "name": "El Triunfo",
       "province_code": "09"
     },
     {
@@ -788,7 +788,7 @@
     },
     {
       "code": "1304",
-      "name": "el Carmen",
+      "name": "El Carmen",
       "province_code": "13"
     },
     {
@@ -958,7 +958,7 @@
     },
     {
       "code": "1504",
-      "name": "el Chaco",
+      "name": "El Chaco",
       "province_code": "15"
     },
     {
@@ -1103,7 +1103,7 @@
     },
     {
       "code": "1906",
-      "name": "el Pangui",
+      "name": "El Pangui",
       "province_code": "19"
     },
     {
@@ -1183,7 +1183,7 @@
     },
     {
       "code": "2203",
-      "name": "la Joya de los Sachas",
+      "name": "La Joya de los Sachas",
       "province_code": "22"
     },
     {
@@ -1198,7 +1198,7 @@
     },
     {
       "code": "2302",
-      "name": "la Concordia",
+      "name": "La Concordia",
       "province_code": "23"
     },
     {
@@ -1208,7 +1208,7 @@
     },
     {
       "code": "2402",
-      "name": "la Libertad",
+      "name": "La Libertad",
       "province_code": "24"
     },
     {
@@ -1241,21 +1241,21 @@
     },
     {
       "code": "010103",
-      "name": "el Batán",
+      "name": "El Batán",
       "canton_code": "0101",
       "kind": "urbana",
       "locality_code": "010150"
     },
     {
       "code": "010104",
-      "name": "el Sagrario",
+      "name": "El Sagrario",
       "canton_code": "0101",
       "kind": "urbana",
       "locality_code": "010150"
     },
     {
       "code": "010105",
-      "name": "el Vecino",
+      "name": "El Vecino",
       "canton_code": "0101",
       "kind": "urbana",
       "locality_code": "010150"
@@ -1486,7 +1486,7 @@
     },
     {
       "code": "010251",
-      "name": "la Asunción",
+      "name": "La Asunción",
       "canton_code": "0102",
       "kind": "rural",
       "locality_code": ""
@@ -1577,14 +1577,14 @@
     },
     {
       "code": "010452",
-      "name": "el Progreso",
+      "name": "El Progreso",
       "canton_code": "0104",
       "kind": "rural",
       "locality_code": ""
     },
     {
       "code": "010453",
-      "name": "las Nieves",
+      "name": "Las Nieves",
       "canton_code": "0104",
       "kind": "rural",
       "locality_code": ""
@@ -1612,7 +1612,7 @@
     },
     {
       "code": "010554",
-      "name": "el Cabo",
+      "name": "El Cabo",
       "canton_code": "0105",
       "kind": "rural",
       "locality_code": ""
@@ -1689,7 +1689,7 @@
     },
     {
       "code": "010852",
-      "name": "el Carmen de Pijilí",
+      "name": "El Carmen de Pijilí",
       "canton_code": "0108",
       "kind": "rural",
       "locality_code": ""
@@ -1787,7 +1787,7 @@
     },
     {
       "code": "011152",
-      "name": "la Unión",
+      "name": "La Unión",
       "canton_code": "0111",
       "kind": "rural",
       "locality_code": ""
@@ -1808,7 +1808,7 @@
     },
     {
       "code": "011250",
-      "name": "el Pan",
+      "name": "El Pan",
       "canton_code": "0112",
       "kind": "cabecera",
       "locality_code": "011250"
@@ -1969,7 +1969,7 @@
     },
     {
       "code": "020353",
-      "name": "la Magdalena",
+      "name": "La Magdalena",
       "canton_code": "0203",
       "kind": "rural",
       "locality_code": ""
@@ -2053,21 +2053,21 @@
     },
     {
       "code": "020750",
-      "name": "las Naves",
+      "name": "Las Naves",
       "canton_code": "0207",
       "kind": "cabecera",
       "locality_code": "020750"
     },
     {
       "code": "020701",
-      "name": "las Mercedes",
+      "name": "Las Mercedes",
       "canton_code": "0207",
       "kind": "urbana",
       "locality_code": "020750"
     },
     {
       "code": "020702",
-      "name": "las Naves",
+      "name": "Las Naves",
       "canton_code": "0207",
       "kind": "urbana",
       "locality_code": "020750"
@@ -2284,7 +2284,7 @@
     },
     {
       "code": "030450",
-      "name": "la Troncal",
+      "name": "La Troncal",
       "canton_code": "0304",
       "kind": "cabecera",
       "locality_code": "030450"
@@ -2305,7 +2305,7 @@
     },
     {
       "code": "030550",
-      "name": "el Tambo",
+      "name": "El Tambo",
       "canton_code": "0305",
       "kind": "cabecera",
       "locality_code": "030550"
@@ -2354,7 +2354,7 @@
     },
     {
       "code": "040151",
-      "name": "el Carmelo",
+      "name": "El Carmelo",
       "canton_code": "0401",
       "kind": "rural",
       "locality_code": ""
@@ -2403,7 +2403,7 @@
     },
     {
       "code": "040159",
-      "name": "el Chical",
+      "name": "El Chical",
       "canton_code": "0401",
       "kind": "rural",
       "locality_code": ""
@@ -2431,7 +2431,7 @@
     },
     {
       "code": "040252",
-      "name": "los Andes",
+      "name": "Los Andes",
       "canton_code": "0402",
       "kind": "rural",
       "locality_code": ""
@@ -2459,14 +2459,14 @@
     },
     {
       "code": "040350",
-      "name": "el Ángel",
+      "name": "El Ángel",
       "canton_code": "0403",
       "kind": "cabecera",
       "locality_code": "040350"
     },
     {
       "code": "040301",
-      "name": "el Ángel",
+      "name": "El Ángel",
       "canton_code": "0403",
       "kind": "urbana",
       "locality_code": "040350"
@@ -2480,14 +2480,14 @@
     },
     {
       "code": "040351",
-      "name": "el Goaltal",
+      "name": "El Goaltal",
       "canton_code": "0403",
       "kind": "rural",
       "locality_code": ""
     },
     {
       "code": "040352",
-      "name": "la Libertad",
+      "name": "La Libertad",
       "canton_code": "0403",
       "kind": "rural",
       "locality_code": ""
@@ -2571,7 +2571,7 @@
     },
     {
       "code": "040554",
-      "name": "la Paz",
+      "name": "La Paz",
       "canton_code": "0405",
       "kind": "rural",
       "locality_code": ""
@@ -2627,7 +2627,7 @@
     },
     {
       "code": "050104",
-      "name": "la Matriz",
+      "name": "La Matriz",
       "canton_code": "0501",
       "kind": "urbana",
       "locality_code": "050150"
@@ -2711,28 +2711,28 @@
     },
     {
       "code": "050250",
-      "name": "la Maná",
+      "name": "La Maná",
       "canton_code": "0502",
       "kind": "cabecera",
       "locality_code": "050250"
     },
     {
       "code": "050201",
-      "name": "el Carmen",
+      "name": "El Carmen",
       "canton_code": "0502",
       "kind": "urbana",
       "locality_code": "050250"
     },
     {
       "code": "050202",
-      "name": "la Maná ",
+      "name": "La Maná ",
       "canton_code": "0502",
       "kind": "urbana",
       "locality_code": "050250"
     },
     {
       "code": "050203",
-      "name": "el Triunfo",
+      "name": "El Triunfo",
       "canton_code": "0502",
       "kind": "urbana",
       "locality_code": "050250"
@@ -2753,7 +2753,7 @@
     },
     {
       "code": "050350",
-      "name": "el Corazón",
+      "name": "El Corazón",
       "canton_code": "0503",
       "kind": "cabecera",
       "locality_code": "050350"
@@ -2802,7 +2802,7 @@
     },
     {
       "code": "050455",
-      "name": "la Victoria",
+      "name": "La Victoria",
       "canton_code": "0504",
       "kind": "rural",
       "locality_code": ""
@@ -2921,7 +2921,7 @@
     },
     {
       "code": "050753",
-      "name": "las Pampas",
+      "name": "Las Pampas",
       "canton_code": "0507",
       "kind": "rural",
       "locality_code": ""
@@ -3243,14 +3243,14 @@
     },
     {
       "code": "060701",
-      "name": "el Rosario",
+      "name": "El Rosario",
       "canton_code": "0607",
       "kind": "urbana",
       "locality_code": "060750"
     },
     {
       "code": "060702",
-      "name": "la Matriz",
+      "name": "La Matriz",
       "canton_code": "0607",
       "kind": "urbana",
       "locality_code": "060750"
@@ -3271,7 +3271,7 @@
     },
     {
       "code": "060753",
-      "name": "la Providencia",
+      "name": "La Providencia",
       "canton_code": "0607",
       "kind": "rural",
       "locality_code": ""
@@ -3334,7 +3334,7 @@
     },
     {
       "code": "060951",
-      "name": "el Altar",
+      "name": "El Altar",
       "canton_code": "0609",
       "kind": "rural",
       "locality_code": ""
@@ -3362,7 +3362,7 @@
     },
     {
       "code": "060955",
-      "name": "la Candelaria",
+      "name": "La Candelaria",
       "canton_code": "0609",
       "kind": "rural",
       "locality_code": ""
@@ -3390,7 +3390,7 @@
     },
     {
       "code": "070101",
-      "name": "la Providencia",
+      "name": "La Providencia",
       "canton_code": "0701",
       "kind": "urbana",
       "locality_code": "070150"
@@ -3418,14 +3418,14 @@
     },
     {
       "code": "070105",
-      "name": "el Cambio",
+      "name": "El Cambio",
       "canton_code": "0701",
       "kind": "urbana",
       "locality_code": "070150"
     },
     {
       "code": "070152",
-      "name": "el Retiro",
+      "name": "El Retiro",
       "canton_code": "0701",
       "kind": "rural",
       "locality_code": ""
@@ -3460,7 +3460,7 @@
     },
     {
       "code": "070256",
-      "name": "la Cuca",
+      "name": "La Cuca",
       "canton_code": "0702",
       "kind": "rural",
       "locality_code": ""
@@ -3530,7 +3530,7 @@
     },
     {
       "code": "070650",
-      "name": "el Guabo",
+      "name": "El Guabo",
       "canton_code": "0706",
       "kind": "cabecera",
       "locality_code": "070650"
@@ -3544,7 +3544,7 @@
     },
     {
       "code": "070652",
-      "name": "la Iberia",
+      "name": "La Iberia",
       "canton_code": "0706",
       "kind": "rural",
       "locality_code": ""
@@ -3579,7 +3579,7 @@
     },
     {
       "code": "070702",
-      "name": "el Paraíso",
+      "name": "El Paraíso",
       "canton_code": "0707",
       "kind": "urbana",
       "locality_code": "070750"
@@ -3614,7 +3614,7 @@
     },
     {
       "code": "070851",
-      "name": "el Ingenio",
+      "name": "El Ingenio",
       "canton_code": "0708",
       "kind": "rural",
       "locality_code": ""
@@ -3670,7 +3670,7 @@
     },
     {
       "code": "070953",
-      "name": "la Peaña",
+      "name": "La Peaña",
       "canton_code": "0709",
       "kind": "rural",
       "locality_code": ""
@@ -3705,14 +3705,14 @@
     },
     {
       "code": "071001",
-      "name": "la Matriz",
+      "name": "La Matriz",
       "canton_code": "0710",
       "kind": "urbana",
       "locality_code": "071050"
     },
     {
       "code": "071002",
-      "name": "la Susaya",
+      "name": "La Susaya",
       "canton_code": "0710",
       "kind": "urbana",
       "locality_code": "071050"
@@ -3733,7 +3733,7 @@
     },
     {
       "code": "071052",
-      "name": "la Bocana",
+      "name": "La Bocana",
       "canton_code": "0710",
       "kind": "rural",
       "locality_code": ""
@@ -3852,7 +3852,7 @@
     },
     {
       "code": "071253",
-      "name": "la Avanzada",
+      "name": "La Avanzada",
       "canton_code": "0712",
       "kind": "rural",
       "locality_code": ""
@@ -3957,14 +3957,14 @@
     },
     {
       "code": "071450",
-      "name": "la Victoria",
+      "name": "La Victoria",
       "canton_code": "0714",
       "kind": "cabecera",
       "locality_code": "071450"
     },
     {
       "code": "071401",
-      "name": "la Victoria",
+      "name": "La Victoria",
       "canton_code": "0714",
       "kind": "urbana",
       "locality_code": "071450"
@@ -3985,14 +3985,14 @@
     },
     {
       "code": "071451",
-      "name": "la Libertad",
+      "name": "La Libertad",
       "canton_code": "0714",
       "kind": "rural",
       "locality_code": ""
     },
     {
       "code": "071452",
-      "name": "el Paraíso",
+      "name": "El Paraíso",
       "canton_code": "0714",
       "kind": "rural",
       "locality_code": ""
@@ -4132,7 +4132,7 @@
     },
     {
       "code": "080254",
-      "name": "la Tola",
+      "name": "La Tola",
       "canton_code": "0802",
       "kind": "rural",
       "locality_code": ""
@@ -4314,7 +4314,7 @@
     },
     {
       "code": "080455",
-      "name": "la Unión",
+      "name": "La Unión",
       "canton_code": "0804",
       "kind": "rural",
       "locality_code": ""
@@ -4419,7 +4419,7 @@
     },
     {
       "code": "080651",
-      "name": "la Unión",
+      "name": "La Unión",
       "canton_code": "0806",
       "kind": "rural",
       "locality_code": ""
@@ -4685,7 +4685,7 @@
     },
     {
       "code": "090602",
-      "name": "la Aurora (Satélite)",
+      "name": "La Aurora (Satélite)",
       "canton_code": "0906",
       "kind": "urbana",
       "locality_code": "090650"
@@ -4755,7 +4755,7 @@
     },
     {
       "code": "090656",
-      "name": "los Lojas",
+      "name": "Los Lojas",
       "canton_code": "0906",
       "kind": "rural",
       "locality_code": ""
@@ -4776,7 +4776,7 @@
     },
     {
       "code": "090702",
-      "name": "el Recreo",
+      "name": "El Recreo",
       "canton_code": "0907",
       "kind": "urbana",
       "locality_code": "090750"
@@ -4804,14 +4804,14 @@
     },
     {
       "code": "090852",
-      "name": "el Rosario",
+      "name": "El Rosario",
       "canton_code": "0908",
       "kind": "rural",
       "locality_code": ""
     },
     {
       "code": "090950",
-      "name": "el Triunfo",
+      "name": "El Triunfo",
       "canton_code": "0909",
       "kind": "cabecera",
       "locality_code": "090950"
@@ -4881,7 +4881,7 @@
     },
     {
       "code": "091009",
-      "name": "las Piñas",
+      "name": "Las Piñas",
       "canton_code": "0910",
       "kind": "urbana",
       "locality_code": "091050"
@@ -4993,7 +4993,7 @@
     },
     {
       "code": "091602",
-      "name": "la Puntilla (Satélite)",
+      "name": "La Puntilla (Satélite)",
       "canton_code": "0916",
       "kind": "urbana",
       "locality_code": "091650"
@@ -5014,7 +5014,7 @@
     },
     {
       "code": "091950",
-      "name": "el Salitre",
+      "name": "El Salitre",
       "canton_code": "0919",
       "kind": "cabecera",
       "locality_code": "091950"
@@ -5063,7 +5063,7 @@
     },
     {
       "code": "091952",
-      "name": "la Victoria",
+      "name": "La Victoria",
       "canton_code": "0919",
       "kind": "rural",
       "locality_code": ""
@@ -5196,7 +5196,7 @@
     },
     {
       "code": "100105",
-      "name": "la Dolorosa del Priorato",
+      "name": "La Dolorosa del Priorato",
       "canton_code": "1001",
       "kind": "urbana",
       "locality_code": "100150"
@@ -5217,14 +5217,14 @@
     },
     {
       "code": "100153",
-      "name": "la Carolina",
+      "name": "La Carolina",
       "canton_code": "1001",
       "kind": "rural",
       "locality_code": ""
     },
     {
       "code": "100154",
-      "name": "la Esperanza",
+      "name": "La Esperanza",
       "canton_code": "1001",
       "kind": "rural",
       "locality_code": ""
@@ -5504,7 +5504,7 @@
     },
     {
       "code": "100652",
-      "name": "la Merced de Buenos Aires",
+      "name": "La Merced de Buenos Aires",
       "canton_code": "1006",
       "kind": "rural",
       "locality_code": ""
@@ -5539,7 +5539,7 @@
     },
     {
       "code": "110101",
-      "name": "el Sagrario",
+      "name": "El Sagrario",
       "canton_code": "1101",
       "kind": "urbana",
       "locality_code": "110150"
@@ -5595,7 +5595,7 @@
     },
     {
       "code": "110153",
-      "name": "el Cisne",
+      "name": "El Cisne",
       "canton_code": "1101",
       "kind": "rural",
       "locality_code": ""
@@ -5707,7 +5707,7 @@
     },
     {
       "code": "110252",
-      "name": "el Lucero",
+      "name": "El Lucero",
       "canton_code": "1102",
       "kind": "rural",
       "locality_code": ""
@@ -5749,7 +5749,7 @@
     },
     {
       "code": "110351",
-      "name": "el Tambo",
+      "name": "El Tambo",
       "canton_code": "1103",
       "kind": "rural",
       "locality_code": ""
@@ -5826,7 +5826,7 @@
     },
     {
       "code": "110552",
-      "name": "el Rosario",
+      "name": "El Rosario",
       "canton_code": "1105",
       "kind": "rural",
       "locality_code": ""
@@ -5882,14 +5882,14 @@
     },
     {
       "code": "110655",
-      "name": "el Ingenio",
+      "name": "El Ingenio",
       "canton_code": "1106",
       "kind": "rural",
       "locality_code": ""
     },
     {
       "code": "110656",
-      "name": "el Airo",
+      "name": "El Airo",
       "canton_code": "1106",
       "kind": "rural",
       "locality_code": ""
@@ -5959,7 +5959,7 @@
     },
     {
       "code": "110852",
-      "name": "la Victoria",
+      "name": "La Victoria",
       "canton_code": "1108",
       "kind": "rural",
       "locality_code": ""
@@ -6057,14 +6057,14 @@
     },
     {
       "code": "111052",
-      "name": "el Arenal",
+      "name": "El Arenal",
       "canton_code": "1110",
       "kind": "rural",
       "locality_code": ""
     },
     {
       "code": "111053",
-      "name": "el Limo",
+      "name": "El Limo",
       "canton_code": "1110",
       "kind": "rural",
       "locality_code": ""
@@ -6092,14 +6092,14 @@
     },
     {
       "code": "111151",
-      "name": "el Paraíso de Celen",
+      "name": "El Paraíso de Celen",
       "canton_code": "1111",
       "kind": "rural",
       "locality_code": ""
     },
     {
       "code": "111152",
-      "name": "el Tablón",
+      "name": "El Tablón",
       "canton_code": "1111",
       "kind": "rural",
       "locality_code": ""
@@ -6288,7 +6288,7 @@
     },
     {
       "code": "111651",
-      "name": "la Tingue",
+      "name": "La Tingue",
       "canton_code": "1116",
       "kind": "rural",
       "locality_code": ""
@@ -6323,7 +6323,7 @@
     },
     {
       "code": "120104",
-      "name": "el Salto",
+      "name": "El Salto",
       "canton_code": "1201",
       "kind": "urbana",
       "locality_code": "120150"
@@ -6351,7 +6351,7 @@
     },
     {
       "code": "120155",
-      "name": "la Unión",
+      "name": "La Unión",
       "canton_code": "1201",
       "kind": "rural",
       "locality_code": ""
@@ -6386,7 +6386,7 @@
     },
     {
       "code": "120351",
-      "name": "la Esmeralda",
+      "name": "La Esmeralda",
       "canton_code": "1203",
       "kind": "rural",
       "locality_code": ""
@@ -6491,7 +6491,7 @@
     },
     {
       "code": "120555",
-      "name": "la Esperanza",
+      "name": "La Esperanza",
       "canton_code": "1205",
       "kind": "rural",
       "locality_code": ""
@@ -6547,7 +6547,7 @@
     },
     {
       "code": "120754",
-      "name": "los Ángeles",
+      "name": "Los Ángeles",
       "canton_code": "1207",
       "kind": "rural",
       "locality_code": ""
@@ -6645,14 +6645,14 @@
     },
     {
       "code": "121102",
-      "name": "la Unión",
+      "name": "La Unión",
       "canton_code": "1211",
       "kind": "urbana",
       "locality_code": "121150"
     },
     {
       "code": "121103",
-      "name": "la Nueva Unión",
+      "name": "La Nueva Unión",
       "canton_code": "1211",
       "kind": "urbana",
       "locality_code": "121150"
@@ -6883,14 +6883,14 @@
     },
     {
       "code": "130450",
-      "name": "el Carmen",
+      "name": "El Carmen",
       "canton_code": "1304",
       "kind": "cabecera",
       "locality_code": "130450"
     },
     {
       "code": "130401",
-      "name": "el Carmen",
+      "name": "El Carmen",
       "canton_code": "1304",
       "kind": "urbana",
       "locality_code": "130450"
@@ -6925,7 +6925,7 @@
     },
     {
       "code": "130454",
-      "name": "el Paraíso la 14",
+      "name": "El Paraíso la 14",
       "canton_code": "1304",
       "kind": "rural",
       "locality_code": ""
@@ -6988,7 +6988,7 @@
     },
     {
       "code": "130652",
-      "name": "el Anegado",
+      "name": "El Anegado",
       "canton_code": "1306",
       "kind": "rural",
       "locality_code": ""
@@ -7002,7 +7002,7 @@
     },
     {
       "code": "130654",
-      "name": "la Unión",
+      "name": "La Unión",
       "canton_code": "1306",
       "kind": "rural",
       "locality_code": ""
@@ -7044,7 +7044,7 @@
     },
     {
       "code": "130801",
-      "name": "los Esteros",
+      "name": "Los Esteros",
       "canton_code": "1308",
       "kind": "urbana",
       "locality_code": "130850"
@@ -7121,7 +7121,7 @@
     },
     {
       "code": "130903",
-      "name": "el Colorado",
+      "name": "El Colorado",
       "canton_code": "1309",
       "kind": "urbana",
       "locality_code": "130950"
@@ -7149,7 +7149,7 @@
     },
     {
       "code": "130952",
-      "name": "la Pila",
+      "name": "La Pila",
       "canton_code": "1309",
       "kind": "rural",
       "locality_code": ""
@@ -7261,7 +7261,7 @@
     },
     {
       "code": "131353",
-      "name": "la Unión",
+      "name": "La Unión",
       "canton_code": "1313",
       "kind": "rural",
       "locality_code": ""
@@ -7555,7 +7555,7 @@
     },
     {
       "code": "140255",
-      "name": "el Rosario",
+      "name": "El Rosario",
       "canton_code": "1402",
       "kind": "rural",
       "locality_code": ""
@@ -7576,7 +7576,7 @@
     },
     {
       "code": "140258",
-      "name": "el Ideal",
+      "name": "El Ideal",
       "canton_code": "1402",
       "kind": "rural",
       "locality_code": ""
@@ -7954,7 +7954,7 @@
     },
     {
       "code": "150450",
-      "name": "el Chaco",
+      "name": "El Chaco",
       "canton_code": "1504",
       "kind": "cabecera",
       "locality_code": "150450"
@@ -8136,7 +8136,7 @@
     },
     {
       "code": "160166",
-      "name": "el Triunfo",
+      "name": "El Triunfo",
       "canton_code": "1601",
       "kind": "rural",
       "locality_code": ""
@@ -8269,7 +8269,7 @@
     },
     {
       "code": "170110",
-      "name": "el Condado",
+      "name": "El Condado",
       "canton_code": "1701",
       "kind": "urbana",
       "locality_code": "170150"
@@ -8311,49 +8311,49 @@
     },
     {
       "code": "170116",
-      "name": "la Argelia",
+      "name": "La Argelia",
       "canton_code": "1701",
       "kind": "urbana",
       "locality_code": "170150"
     },
     {
       "code": "170117",
-      "name": "la Concepción",
+      "name": "La Concepción",
       "canton_code": "1701",
       "kind": "urbana",
       "locality_code": "170150"
     },
     {
       "code": "170118",
-      "name": "la Ecuatoriana",
+      "name": "La Ecuatoriana",
       "canton_code": "1701",
       "kind": "urbana",
       "locality_code": "170150"
     },
     {
       "code": "170119",
-      "name": "la Ferroviaria",
+      "name": "La Ferroviaria",
       "canton_code": "1701",
       "kind": "urbana",
       "locality_code": "170150"
     },
     {
       "code": "170120",
-      "name": "la Libertad",
+      "name": "La Libertad",
       "canton_code": "1701",
       "kind": "urbana",
       "locality_code": "170150"
     },
     {
       "code": "170121",
-      "name": "la Magdalena",
+      "name": "La Magdalena",
       "canton_code": "1701",
       "kind": "urbana",
       "locality_code": "170150"
     },
     {
       "code": "170122",
-      "name": "la Mena",
+      "name": "La Mena",
       "canton_code": "1701",
       "kind": "urbana",
       "locality_code": "170150"
@@ -8493,7 +8493,7 @@
     },
     {
       "code": "170160",
-      "name": "el Quinche",
+      "name": "El Quinche",
       "canton_code": "1701",
       "kind": "rural",
       "locality_code": ""
@@ -8521,7 +8521,7 @@
     },
     {
       "code": "170164",
-      "name": "la Merced",
+      "name": "La Merced",
       "canton_code": "1701",
       "kind": "rural",
       "locality_code": ""
@@ -8745,7 +8745,7 @@
     },
     {
       "code": "170354",
-      "name": "el Chaupi",
+      "name": "El Chaupi",
       "canton_code": "1703",
       "kind": "rural",
       "locality_code": ""
@@ -8780,7 +8780,7 @@
     },
     {
       "code": "170451",
-      "name": "la Esperanza",
+      "name": "La Esperanza",
       "canton_code": "1704",
       "kind": "rural",
       "locality_code": ""
@@ -8920,14 +8920,14 @@
     },
     {
       "code": "180105",
-      "name": "la Merced",
+      "name": "La Merced",
       "canton_code": "1801",
       "kind": "urbana",
       "locality_code": "180150"
     },
     {
       "code": "180106",
-      "name": "la Península",
+      "name": "La Península",
       "canton_code": "1801",
       "kind": "urbana",
       "locality_code": "180150"
@@ -9144,14 +9144,14 @@
     },
     {
       "code": "180551",
-      "name": "el Triunfo",
+      "name": "El Triunfo",
       "canton_code": "1805",
       "kind": "rural",
       "locality_code": ""
     },
     {
       "code": "180552",
-      "name": "los Andes",
+      "name": "Los Andes",
       "canton_code": "1805",
       "kind": "rural",
       "locality_code": ""
@@ -9235,7 +9235,7 @@
     },
     {
       "code": "180755",
-      "name": "el Rosario",
+      "name": "El Rosario",
       "canton_code": "1807",
       "kind": "rural",
       "locality_code": ""
@@ -9354,7 +9354,7 @@
     },
     {
       "code": "190101",
-      "name": "el Limón",
+      "name": "El Limón",
       "canton_code": "1901",
       "kind": "urbana",
       "locality_code": "190150"
@@ -9424,14 +9424,14 @@
     },
     {
       "code": "190252",
-      "name": "el Chorro",
+      "name": "El Chorro",
       "canton_code": "1902",
       "kind": "rural",
       "locality_code": ""
     },
     {
       "code": "190254",
-      "name": "la Chonta",
+      "name": "La Chonta",
       "canton_code": "1902",
       "kind": "rural",
       "locality_code": ""
@@ -9487,7 +9487,7 @@
     },
     {
       "code": "190451",
-      "name": "la Paz",
+      "name": "La Paz",
       "canton_code": "1904",
       "kind": "rural",
       "locality_code": ""
@@ -9515,21 +9515,21 @@
     },
     {
       "code": "190553",
-      "name": "los Encuentros",
+      "name": "Los Encuentros",
       "canton_code": "1905",
       "kind": "rural",
       "locality_code": ""
     },
     {
       "code": "190650",
-      "name": "el Pangui",
+      "name": "El Pangui",
       "canton_code": "1906",
       "kind": "cabecera",
       "locality_code": "190650"
     },
     {
       "code": "190651",
-      "name": "el Guisme",
+      "name": "El Guisme",
       "canton_code": "1906",
       "kind": "rural",
       "locality_code": ""
@@ -9578,7 +9578,7 @@
     },
     {
       "code": "190851",
-      "name": "el Porvenir del Carmen",
+      "name": "El Porvenir del Carmen",
       "canton_code": "1908",
       "kind": "rural",
       "locality_code": ""
@@ -9599,7 +9599,7 @@
     },
     {
       "code": "190854",
-      "name": "la Canela",
+      "name": "La Canela",
       "canton_code": "1908",
       "kind": "rural",
       "locality_code": ""
@@ -9634,7 +9634,7 @@
     },
     {
       "code": "200151",
-      "name": "el Progreso",
+      "name": "El Progreso",
       "canton_code": "2001",
       "kind": "rural",
       "locality_code": ""
@@ -9704,7 +9704,7 @@
     },
     {
       "code": "210155",
-      "name": "el Eno",
+      "name": "El Eno",
       "canton_code": "2101",
       "kind": "rural",
       "locality_code": ""
@@ -9746,7 +9746,7 @@
     },
     {
       "code": "210251",
-      "name": "el Reventador",
+      "name": "El Reventador",
       "canton_code": "2102",
       "kind": "rural",
       "locality_code": ""
@@ -9851,35 +9851,35 @@
     },
     {
       "code": "210456",
-      "name": "la Magdalena",
+      "name": "La Magdalena",
       "canton_code": "2104",
       "kind": "rural",
       "locality_code": ""
     },
     {
       "code": "210457",
-      "name": "la Primavera",
+      "name": "La Primavera",
       "canton_code": "2104",
       "kind": "rural",
       "locality_code": ""
     },
     {
       "code": "210550",
-      "name": "la Bonita",
+      "name": "La Bonita",
       "canton_code": "2105",
       "kind": "cabecera",
       "locality_code": "210550"
     },
     {
       "code": "210551",
-      "name": "el Playón de San Francisco",
+      "name": "El Playón de San Francisco",
       "canton_code": "2105",
       "kind": "rural",
       "locality_code": ""
     },
     {
       "code": "210552",
-      "name": "la Sofía",
+      "name": "La Sofía",
       "canton_code": "2105",
       "kind": "rural",
       "locality_code": ""
@@ -9900,7 +9900,7 @@
     },
     {
       "code": "210650",
-      "name": "el Dorado de Cascales",
+      "name": "El Dorado de Cascales",
       "canton_code": "2106",
       "kind": "cabecera",
       "locality_code": "210650"
@@ -9949,7 +9949,7 @@
     },
     {
       "code": "220150",
-      "name": "el Coca (Puerto Francisco de Orellana)",
+      "name": "El Coca (Puerto Francisco de Orellana)",
       "canton_code": "2201",
       "kind": "cabecera",
       "locality_code": "220150"
@@ -9977,14 +9977,14 @@
     },
     {
       "code": "220154",
-      "name": "el Dorado",
+      "name": "El Dorado",
       "canton_code": "2201",
       "kind": "rural",
       "locality_code": ""
     },
     {
       "code": "220155",
-      "name": "el Edén",
+      "name": "El Edén",
       "canton_code": "2201",
       "kind": "rural",
       "locality_code": ""
@@ -10005,7 +10005,7 @@
     },
     {
       "code": "220158",
-      "name": "la Belleza",
+      "name": "La Belleza",
       "canton_code": "2201",
       "kind": "rural",
       "locality_code": ""
@@ -10082,7 +10082,7 @@
     },
     {
       "code": "220350",
-      "name": "la Joya de los Sachas",
+      "name": "La Joya de los Sachas",
       "canton_code": "2203",
       "kind": "cabecera",
       "locality_code": "220350"
@@ -10278,7 +10278,7 @@
     },
     {
       "code": "230156",
-      "name": "el Esfuerzo",
+      "name": "El Esfuerzo",
       "canton_code": "2301",
       "kind": "rural",
       "locality_code": ""
@@ -10292,7 +10292,7 @@
     },
     {
       "code": "230250",
-      "name": "la Concordia",
+      "name": "La Concordia",
       "canton_code": "2302",
       "kind": "cabecera",
       "locality_code": "230250"
@@ -10306,7 +10306,7 @@
     },
     {
       "code": "230252",
-      "name": "la Villegas",
+      "name": "La Villegas",
       "canton_code": "2302",
       "kind": "rural",
       "locality_code": ""
@@ -10383,7 +10383,7 @@
     },
     {
       "code": "240250",
-      "name": "la Libertad",
+      "name": "La Libertad",
       "canton_code": "2402",
       "kind": "cabecera",
       "locality_code": "240250"
@@ -10507,7 +10507,7 @@
     },
     {
       "code": "011250",
-      "name": "el Pan",
+      "name": "El Pan",
       "canton_code": "0112",
       "kind": "cabecera cantonal"
     },
@@ -10567,7 +10567,7 @@
     },
     {
       "code": "020750",
-      "name": "las Naves",
+      "name": "Las Naves",
       "canton_code": "0207",
       "kind": "cabecera cantonal"
     },
@@ -10591,13 +10591,13 @@
     },
     {
       "code": "030450",
-      "name": "la Troncal",
+      "name": "La Troncal",
       "canton_code": "0304",
       "kind": "cabecera cantonal"
     },
     {
       "code": "030550",
-      "name": "el Tambo",
+      "name": "El Tambo",
       "canton_code": "0305",
       "kind": "cabecera cantonal"
     },
@@ -10627,7 +10627,7 @@
     },
     {
       "code": "040350",
-      "name": "el Ángel",
+      "name": "El Ángel",
       "canton_code": "0403",
       "kind": "cabecera cantonal"
     },
@@ -10657,13 +10657,13 @@
     },
     {
       "code": "050250",
-      "name": "la Maná",
+      "name": "La Maná",
       "canton_code": "0502",
       "kind": "cabecera cantonal"
     },
     {
       "code": "050350",
-      "name": "el Corazón",
+      "name": "El Corazón",
       "canton_code": "0503",
       "kind": "cabecera cantonal"
     },
@@ -10783,7 +10783,7 @@
     },
     {
       "code": "070650",
-      "name": "el Guabo",
+      "name": "El Guabo",
       "canton_code": "0706",
       "kind": "cabecera cantonal"
     },
@@ -10831,7 +10831,7 @@
     },
     {
       "code": "071450",
-      "name": "la Victoria",
+      "name": "La Victoria",
       "canton_code": "0714",
       "kind": "cabecera cantonal"
     },
@@ -10927,7 +10927,7 @@
     },
     {
       "code": "090950",
-      "name": "el Triunfo",
+      "name": "El Triunfo",
       "canton_code": "0909",
       "kind": "cabecera cantonal"
     },
@@ -10975,7 +10975,7 @@
     },
     {
       "code": "091950",
-      "name": "el Salitre",
+      "name": "El Salitre",
       "canton_code": "0919",
       "kind": "cabecera cantonal"
     },
@@ -11257,7 +11257,7 @@
     },
     {
       "code": "130450",
-      "name": "el Carmen",
+      "name": "El Carmen",
       "canton_code": "1304",
       "kind": "cabecera cantonal"
     },
@@ -11461,7 +11461,7 @@
     },
     {
       "code": "150450",
-      "name": "el Chaco",
+      "name": "El Chaco",
       "canton_code": "1504",
       "kind": "cabecera cantonal"
     },
@@ -11635,7 +11635,7 @@
     },
     {
       "code": "190650",
-      "name": "el Pangui",
+      "name": "El Pangui",
       "canton_code": "1906",
       "kind": "cabecera cantonal"
     },
@@ -11701,13 +11701,13 @@
     },
     {
       "code": "210550",
-      "name": "la Bonita",
+      "name": "La Bonita",
       "canton_code": "2105",
       "kind": "cabecera cantonal"
     },
     {
       "code": "210650",
-      "name": "el Dorado de Cascales",
+      "name": "El Dorado de Cascales",
       "canton_code": "2106",
       "kind": "cabecera cantonal"
     },
@@ -11719,7 +11719,7 @@
     },
     {
       "code": "220150",
-      "name": "el Coca (Puerto Francisco de Orellana)",
+      "name": "El Coca (Puerto Francisco de Orellana)",
       "canton_code": "2201",
       "kind": "cabecera cantonal"
     },
@@ -11731,7 +11731,7 @@
     },
     {
       "code": "220350",
-      "name": "la Joya de los Sachas",
+      "name": "La Joya de los Sachas",
       "canton_code": "2203",
       "kind": "cabecera cantonal"
     },
@@ -11749,7 +11749,7 @@
     },
     {
       "code": "230250",
-      "name": "la Concordia",
+      "name": "La Concordia",
       "canton_code": "2302",
       "kind": "cabecera cantonal"
     },
@@ -11761,7 +11761,7 @@
     },
     {
       "code": "240250",
-      "name": "la Libertad",
+      "name": "La Libertad",
       "canton_code": "2402",
       "kind": "cabecera cantonal"
     },

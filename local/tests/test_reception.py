@@ -156,6 +156,21 @@ class ReceptionTests(unittest.TestCase):
         self.assertTrue(all(r['status']==201 for r in results),results)
         self.assertEqual({r['body']['code'] for r in results},{f'PCD-20261009-{i:04d}' for i in range(1,13)})
 
+    def test_catalog_names_are_capitalized_and_existing_mirror_is_aligned(self):
+        import geography
+        for rows in (geography.PROVINCES,geography.CANTONS,geography.PARISHES,geography.LOCALITIES):
+            self.assertFalse([r['name'] for r in rows.values() if r['name'][:1].islower()])
+        self.assertEqual(geography.PROVINCES['07']['name'],'El Oro')
+        self.assertEqual(geography.PROVINCES['12']['name'],'Los Ríos')
+        with app.connect() as c:
+            c.execute("UPDATE geo_provinces SET name='el Oro' WHERE code='07'")
+            c.execute("UPDATE geo_cantons SET name='la Troncal' WHERE name='La Troncal'")
+        app.migrate()
+        with app.connect() as c:
+            self.assertEqual(c.execute("SELECT name FROM geo_provinces WHERE code='07'").fetchone()[0],'El Oro')
+            self.assertEqual(c.execute("SELECT COUNT(*) FROM geo_cantons WHERE name='la Troncal'").fetchone()[0],0)
+            self.assertEqual(c.execute('SELECT COUNT(*) FROM geo_provinces').fetchone()[0],24)
+
     def test_geographic_hierarchy_manual_locality_and_snapshots(self):
         cookie,csrf=self.login()
         import geography

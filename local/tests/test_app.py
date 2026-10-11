@@ -296,6 +296,19 @@ class SecurityTests(unittest.TestCase):
         with patch.dict(app.os.environ,{'LOGIN_CAPTCHA':'on','TURNSTILE_SITE_KEY':'public-key','TURNSTILE_SECRET_KEY':'private-key'}):
             self.assertIn('data-captcha="turnstile"',self.request('/login')['body'])
 
+    def test_favicon_files_are_public_and_linked(self):
+        for path,kind,magic in (('/favicon.ico','image/x-icon',b'\x00\x00\x01\x00'),('/static/favicon-16.png','image/png',b'\x89PNG'),('/static/favicon-32.png','image/png',b'\x89PNG'),('/static/favicon-48.png','image/png',b'\x89PNG'),('/static/apple-touch-icon.png','image/png',b'\x89PNG'),('/apple-touch-icon.png','image/png',b'\x89PNG')):
+            handler=object.__new__(app.Handler);handler.path=path+'?v=2';handler.headers=Message();sent={}
+            handler.reply=lambda status,body,content_type=None,cookie=None:sent.update(status=status,body=body,type=content_type)
+            handler.do_GET()
+            self.assertEqual((sent['status'],sent['type']),(200,kind),path)
+            self.assertTrue(sent['body'].startswith(magic),path)
+        for page in ('/login','/forgot','/citas'):
+            body=self.request(page)['body']
+            self.assertIn('href="/favicon.ico?v=2"',body)
+            self.assertIn('rel="apple-touch-icon"',body)
+        self.assertIn('<title>Órdenes Pro | PC-DOCTOR S.A.</title>',self.request('/login')['body'])
+
     def test_server_validation_and_https_cookie(self):
         for data in ({'login':'','password':'x'},{'login':'bad@','password':'x'},{'login':'demo','password':''}):
             self.assertEqual(self.request('/api/login',data)['status'],400)

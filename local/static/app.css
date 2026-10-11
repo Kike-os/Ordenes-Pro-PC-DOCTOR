@@ -643,3 +643,84 @@ body[data-page=login] .login-field-hint.caps-hint{color:#f3c677}
 @media(max-width:520px){.system-card,.system-history{padding:18px}.system-version{font-size:34px}.system-actions button{flex:1 1 100%;justify-content:center}.system-timeline{padding-left:18px}.system-release::before{left:-25px}.system-release summary{padding:12px 14px}.system-changes{padding:0 12px 12px}.system-module .system-release-summary{padding:0 14px 10px}}
 @media(max-width:360px){.system-facts{grid-template-columns:1fr}}
 @media(prefers-reduced-motion:reduce){.system-card,.system-result-box{animation:none}.system-release summary::after{transition:none}}
+/* Centro de operaciones: indicadores, títulos de panel, acciones de fila y actividad. */
+body[data-page=dashboard] .operation-indicator{grid-template-columns:auto 1fr;align-items:center;gap:10px 12px}
+body[data-page=dashboard] .operation-indicator .indicator-icon{grid-column:auto;display:grid;place-items:center;width:38px;height:38px;min-height:0;border-radius:10px;border:1px solid color-mix(in srgb,currentColor 35%,transparent);background:color-mix(in srgb,currentColor 13%,transparent)}
+body[data-page=dashboard] .operation-indicator .indicator-icon .icon{width:20px;height:20px}
+body[data-page=dashboard] .operation-indicator strong{font-size:26px}
+body[data-page=dashboard] .operations-panel>header h2{display:flex;align-items:center;gap:10px;min-width:0}
+.operations-panel .panel-icon{display:grid;place-items:center;flex:0 0 30px;width:30px;height:30px;border-radius:8px;border:1px solid #2f4a73;background:#12233d;color:#8bb8ff}
+.operations-panel .panel-icon .icon{width:16px;height:16px}
+.attention-panel .panel-icon{border-color:#6b5730;background:#2a2312;color:#f3c677}
+.operations-table .row-action{display:inline-flex;align-items:center;gap:6px;min-height:30px;margin:2px 6px 2px 0;padding:5px 10px;border:1px solid #304564;border-radius:8px;background:#13223b;color:#a8c6f2;font-size:11px;font-weight:600;line-height:1.2;text-decoration:none;cursor:pointer;transition:background .2s,border-color .2s}
+.operations-table .row-action:hover{background:#1d3455;border-color:#4b75b3}
+.operations-table .row-action:focus-visible{outline:2px solid #8bb8ff;outline-offset:2px}
+.operations-table .row-action .icon{width:14px;height:14px;flex-shrink:0}
+.operation-timeline li{gap:12px;align-items:flex-start}
+.operation-timeline .timeline-icon{display:grid;place-items:center;flex:0 0 32px;width:32px;height:32px;border-radius:9px;border:1px solid #2f4a73;background:#12233d;color:#8bb8ff}
+.operation-timeline .timeline-icon .icon{flex:none;width:16px;height:16px;margin:0}
+.operation-timeline li[data-event=created] .timeline-icon{border-color:#2d6b55;background:#0f2a23;color:#7fd8ad}
+.operation-timeline li[data-event=maintenance] .timeline-icon{border-color:#5a4a86;background:#211a38;color:#c5a8f5}
+.operation-timeline li[data-event=note] .timeline-icon{border-color:#6b5730;background:#2a2312;color:#f3c677}
+.operation-timeline .timeline-content{flex:1;min-width:0}
+.operation-timeline .timeline-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.operation-timeline .timeline-kind{font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:#8198ba}
+.operation-timeline time{font-size:11px;color:#8198ba;white-space:nowrap}
+.operation-timeline .timeline-content p{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 8px;margin:3px 0;font-size:12px;line-height:1.5;color:#c2d3ec}
+.operation-timeline .timeline-content p .text-action{padding:0;font-size:12px;font-weight:650;color:#e3edff}
+/* Formularios de recepción y clientes: opciones de autorización y casillas. */
+body[data-page=dashboard] :is(.wizard-dialog,.workspace-editor) input:is([type=checkbox],[type=radio]){accent-color:#3b82f6;cursor:pointer}
+body[data-page=dashboard] :is(.wizard-dialog,.workspace-editor) input:is([type=checkbox],[type=radio]):disabled{cursor:not-allowed;opacity:.5}
+.technical-access-fields .access-options label{padding:10px 12px;border:1px solid #263a57;border-radius:10px;background:#0b1626;cursor:pointer;transition:border-color .2s,background .2s}
+.technical-access-fields .access-options label:hover{border-color:#3d5f93}
+.technical-access-fields .access-options label:has(input:checked){border-color:#4b82d6;background:#12233d}
+.technical-access-fields .access-options label:has(input:disabled){cursor:not-allowed;opacity:.6}
+.technical-access-fields .access-options label:has(input:focus-visible){outline:2px solid #8bb8ff;outline-offset:2px}
+.technical-access-fields .access-confirm{padding:10px 12px;border:1px dashed #34507d;border-radius:10px;cursor:pointer}
+#client-form .message .text-action{color:#a8caff;text-decoration:underline;font-size:inherit;padding:0}
+@media(prefers-reduced-motion:reduce){.operations-table .row-action,.technical-access-fields .access-options label{transition:none}}
+.operations-table .row-action.icon-only{width:30px;padding:0;justify-content:center;margin-right:0}
+.operations-table td[data-label="Acción pendiente"]{white-space:nowrap}
+.operations-table td[data-label="Acción pendiente"] small{white-space:normal}
+#order-form .wizard-panel[data-step="0"]>button.secondary{margin-top:12px}
+/* Estados de las órdenes: etiqueta con indicador y avance por fases en el detalle. */
+body[data-page=dashboard] .status-label{display:inline-flex;align-items:center;gap:7px;padding:5px 11px 5px 9px;border-radius:14px;font-weight:600;text-align:left;letter-spacing:.1px}
+body[data-page=dashboard] .status-label::before{content:"";flex:0 0 7px;width:7px;height:7px;border-radius:50%;background:currentColor;box-shadow:0 0 0 3px color-mix(in srgb,currentColor 20%,transparent)}
+.workspace-header .workspace-state{display:grid;justify-items:end;gap:8px;flex-shrink:0}
+.workspace-header .workspace-state .status-label{font-size:13px;padding:8px 14px 8px 12px;max-width:none}
+.order-progress{list-style:none;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0;margin:14px 0 0;padding:16px 18px;border:1px solid #253b5c;border-radius:12px;background:#0c1729}
+.order-progress li{position:relative;display:grid;justify-items:center;gap:7px;text-align:center;min-width:0}
+.order-progress li::before{content:"";position:absolute;top:13px;right:50%;width:100%;height:2px;background:#263a57}
+.order-progress li:first-child::before{display:none}
+.order-progress li[data-state=done]::before,.order-progress li[data-state=current]::before{background:#3f9f78}
+.order-progress .progress-dot{position:relative;z-index:1;display:grid;place-items:center;width:28px;height:28px;border-radius:50%;border:2px solid #34507d;background:#0d192c;color:#8198ba;font-size:11px;font-weight:700}
+.order-progress li[data-state=done] .progress-dot{border-color:#3fbf8a;background:#1f8f65}
+.order-progress li[data-state=done] .progress-dot::after{content:"";width:5px;height:10px;margin-top:-2px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg)}
+.order-progress li[data-state=current] .progress-dot{border-color:#8bb8ff;background:#2868c5;color:#fff;box-shadow:0 0 0 4px #2868c540}
+.order-progress .progress-label{font-size:11px;font-weight:600;color:#8198ba;line-height:1.3;overflow-wrap:anywhere}
+.order-progress li[data-state=done] .progress-label{color:#8fe0b9}
+.order-progress li[data-state=current] .progress-label{color:#e3edff}
+.workspace-status-change{display:grid;gap:7px;margin-top:16px;font-size:11px;color:#92a9ca}
+.workspace-status-change select{margin-top:0}
+.order-timeline li .status-label{margin-bottom:6px}
+.order-timeline li small{display:block}
+@media(max-width:650px){.workspace-header .workspace-state{justify-items:start}.order-progress{padding:14px 8px}.order-progress .progress-label{font-size:10px}}
+.workspace-actions .order-document-action>.icon{width:16px;height:16px;flex-shrink:0}
+@media(max-width:650px){.workspace-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.workspace-actions>*{width:100%;margin:0;justify-content:flex-start;text-align:left;white-space:normal;line-height:1.3}}
+@media(max-width:340px){.workspace-actions{grid-template-columns:1fr}}
+/* Encabezado: presentación del logotipo original, título y subtítulo. */
+.premium-header .nav-brand{gap:14px;align-items:center;border-radius:10px;outline-offset:6px;text-decoration:none}
+.premium-header .nav-brand:focus-visible{outline:2px solid #8bb8ff}
+.premium-header .header-logo{--logo-h:52px;width:calc(var(--logo-h)*1.3031);height:var(--logo-h);flex:0 0 calc(var(--logo-h)*1.3031)}
+.premium-header .header-logo img{width:calc(var(--logo-h)*1.7629);height:calc(var(--logo-h)*1.2781);left:calc(var(--logo-h)*-.1996);top:calc(var(--logo-h)*-.0842);transition:filter .2s ease}
+.premium-header .brand-lockup{display:flex;flex-direction:column;justify-content:center;gap:3px;padding-left:14px;border-left:1px solid #26405f;min-height:40px}
+.premium-header .brand-lockup strong{font-family:Inter,"Segoe UI",system-ui,Arial,sans-serif;font-size:20px;line-height:1.15;font-weight:700;letter-spacing:-.3px;color:#eef4ff;transition:color .2s ease}
+.premium-header .brand-lockup em{font-weight:700;color:#8ab8ff;transition:color .2s ease}
+.premium-header .brand-lockup small{margin-top:0;font-size:12px;line-height:1.3;font-weight:500;letter-spacing:.5px;color:#9ab2d6}
+.premium-header .nav-brand:hover .header-logo img{filter:brightness(1.1) drop-shadow(0 0 6px #4388ee40)}
+.premium-header .nav-brand:hover .brand-lockup strong{color:#fff}
+.premium-header .nav-brand:hover .brand-lockup em{color:#a8caff}
+@media(min-width:1000px) and (max-width:1199px){.premium-header .nav-brand{gap:12px}.premium-header .brand-lockup{padding-left:12px}}
+@media(max-width:860px){.premium-header .nav-brand{gap:11px}.premium-header .header-logo{--logo-h:46px}.premium-header .brand-lockup{padding-left:11px;min-height:36px}.premium-header .brand-lockup strong{font-size:19px}.premium-header .brand-lockup small{font-size:11.5px}}
+@media(max-width:379px){.premium-header .nav-brand{gap:8px}.premium-header .header-logo{--logo-h:40px}.premium-header .brand-lockup{padding-left:8px;min-height:32px;gap:2px}.premium-header .brand-lockup strong{font-size:17px}.premium-header .brand-lockup small{font-size:11px;letter-spacing:.3px}}
+@media(prefers-reduced-motion:reduce){.premium-header .header-logo img,.premium-header .brand-lockup strong,.premium-header .brand-lockup em{transition:none}}
