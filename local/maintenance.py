@@ -23,7 +23,7 @@ def transition(c,oid,old,new,now):
         c.execute("UPDATE maintenance SET state='cancelled',generation=generation+1,updated_at=? WHERE order_id=?",(stamp,oid))
 
 def rows(c):
-    return [dict(r) for r in c.execute("SELECT m.*,o.code,o.qr_url,c.name client,c.phone,c.email,d.category type,d.brand,d.model,d.serial,COALESCE((SELECT result FROM maintenance_notifications n WHERE n.maintenance_id=m.id AND n.generation=m.generation AND n.channel='email'),'Sin enviar') reminder FROM maintenance m JOIN orders o ON o.id=m.order_id JOIN devices d ON d.id=o.device_id JOIN clients c ON c.id=d.client_id ORDER BY m.due_date,m.id")]
+    return [dict(r) for r in c.execute("SELECT m.*,o.code,o.qr_url,c.name client,c.phone,c.email,COALESCE(NULLIF(d.kind,''),d.category) type,d.brand,d.model,d.serial,COALESCE((SELECT result FROM maintenance_notifications n WHERE n.maintenance_id=m.id AND n.generation=m.generation AND n.channel='email'),'Sin enviar') reminder FROM maintenance m JOIN orders o ON o.id=m.order_id JOIN devices d ON d.id=o.device_id JOIN clients c ON c.id=d.client_id ORDER BY m.due_date,m.id")]
 
 def due(c,now):
     stamp=now.astimezone(ZONE).isoformat();today=now.astimezone(ZONE).date().isoformat()

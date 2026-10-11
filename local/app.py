@@ -29,7 +29,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlsplit, unquote, urlencode
 from urllib.request import Request, urlopen
 from urllib.error import URLError
-from reception import (valid_ecuador_phone, DEVICE_TYPES, validate_order, order_code, legacy_type, remember_brand, qr_image, production_enabled, reception_now, order_url, public_base_url)
+from reception import (stored_category, valid_ecuador_phone, DEVICE_TYPES, validate_order, order_code, legacy_type, remember_brand, qr_image, production_enabled, reception_now, order_url, public_base_url)
 
 import remote_db
 import reception
@@ -131,7 +131,7 @@ def migrate():
                 name = p.name.replace("'", "''")
                 c.executescript('BEGIN IMMEDIATE;\n' + p.read_text() + f"\nINSERT INTO migrations VALUES ('{name}');\nCOMMIT;")
         initialize_catalog(c)
-        snapshot_rows = c.execute("SELECT o.id,c.name client,c.identification,c.document_type,c.trade_name,c.phone,c.email,c.province,c.province_code,c.canton,c.canton_code,c.parish,c.parish_code,c.city,c.locality_code,c.address,c.main_street,c.secondary_street,c.building_number,c.location_reference,c.geo_version,d.category type,d.brand,d.model,d.serial,d.color,o.accessories,o.physical_condition,o.problem,o.technician_notes FROM orders o JOIN devices d ON d.id=o.device_id JOIN clients c ON c.id=d.client_id WHERE o.reception_snapshot='' ").fetchall()
+        snapshot_rows = c.execute("SELECT o.id,c.name client,c.identification,c.document_type,c.trade_name,c.phone,c.email,c.province,c.province_code,c.canton,c.canton_code,c.parish,c.parish_code,c.city,c.locality_code,c.address,c.main_street,c.secondary_street,c.building_number,c.location_reference,c.geo_version,COALESCE(NULLIF(d.kind,''),d.category) type,d.brand,d.model,d.serial,d.color,o.accessories,o.physical_condition,o.problem,o.technician_notes FROM orders o JOIN devices d ON d.id=o.device_id JOIN clients c ON c.id=d.client_id WHERE o.reception_snapshot='' ").fetchall()
         for order in snapshot_rows:
             snapshot=dict(order)
             oid=snapshot.pop('id')
@@ -605,7 +605,7 @@ class Handler(BaseHTTPRequestHandler):
                 row=c.execute('SELECT * FROM clients WHERE id=?',(int(client_detail[1]),)).fetchone()
                 if not row:return self.reply(404,{'error':'Cliente no disponible.'})
                 devices=[dict(r) for r in c.execute('SELECT * FROM devices WHERE client_id=?',(row['id'],))]
-                orders=[dict(r) for r in c.execute("SELECT o.id,o.code,o.created_at,o.received_at,o.status status_code,s.label status,o.problem,o.findings,o.recommendations,o.delivered_at,d.category type,d.brand,d.model,d.serial,COALESCE((SELECT labor_cents+parts_cents+services_cents+digital_cents FROM order_budget b WHERE b.order_id=o.id),0) total_cents FROM orders o JOIN devices d ON d.id=o.device_id JOIN statuses s ON s.code=o.status WHERE d.client_id=? ORDER BY o.id DESC",(row['id'],))]
+                orders=[dict(r) for r in c.execute("SELECT o.id,o.code,o.created_at,o.received_at,o.status status_code,s.label status,o.problem,o.findings,o.recommendations,o.delivered_at,COALESCE(NULLIF(d.kind,''),d.category) type,d.brand,d.model,d.serial,COALESCE((SELECT labor_cents+parts_cents+services_cents+digital_cents FROM order_budget b WHERE b.order_id=o.id),0) total_cents FROM orders o JOIN devices d ON d.id=o.device_id JOIN statuses s ON s.code=o.status WHERE d.client_id=? ORDER BY o.id DESC",(row['id'],))]
                 batch=c.execute('SELECT filename,created_at FROM client_import_batches WHERE id=?',(row['import_batch_id'],)).fetchone() if row['import_batch_id'] else None
                 return self.reply(200,{'client':client_registry.profile(row),'devices':devices,'orders':orders,'imported':dict(batch) if batch else None,'can_edit':user['role']=='administrador' or bool(row['needs_review'])})
             if path in ('/api/clients/export.csv','/api/clients/import-report.csv'):
@@ -655,7 +655,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(200, base64.b64decode(row['data']), 'image/jpeg')
             detail = re.fullmatch(r'/api/orders/([0-9]+)(?:/(qr\.(svg|png)|receipt\.pdf|thermal\.pdf|service\.pdf|label\.pdf))?', path)
             if detail:
-                row = c.execute('SELECT o.*,d.category type,d.brand,d.model,d.serial,d.color,c.id client_id,c.name client,c.identification,c.phone,c.email,c.province,c.city,c.address,c.location_reference,s.label status_label FROM orders o JOIN devices d ON d.id=o.device_id JOIN clients c ON c.id=d.client_id JOIN statuses s ON s.code=o.status WHERE o.id=?',(int(detail[1]),)).fetchone()
+                row = c.execute('SELECT o.*,COALESCE(NULLIF(d.kind,\'\'),d.category) type,d.brand,d.model,d.serial,d.color,c.id client_id,c.name client,c.identification,c.phone,c.email,c.province,c.city,c.address,c.location_reference,s.label status_label FROM orders o JOIN devices d ON d.id=o.device_id JOIN clients c ON c.id=d.client_id JOIN statuses s ON s.code=o.status WHERE o.id=?',(int(detail[1]),)).fetchone()
                 if not row:
                     return self.reply(404, {'error':'Orden no disponible.'})
                 code = row['code'] or 'OP-'+str(row['id']).zfill(5)
@@ -718,7 +718,7 @@ class Handler(BaseHTTPRequestHandler):
                     return self.reply(400, {'error':'Página inválida.'})
                 if path == '/api/orders':
                     source = 'orders o JOIN devices d ON d.id=o.device_id JOIN clients c ON c.id=d.client_id JOIN statuses s ON s.code=o.status'
-                    columns = "o.id,o.code,o.created_at,o.problem,o.status status_code,s.label status,d.category type,d.brand,d.model,c.name client,o.priority,o.estimated_delivery,COALESCE((SELECT name FROM users WHERE id=o.assigned_to),'Sin asignar') responsible"
+                    columns = "o.id,o.code,o.created_at,o.problem,o.status status_code,s.label status,COALESCE(NULLIF(d.kind,''),d.category) type,d.brand,d.model,c.name client,o.priority,o.estimated_delivery,COALESCE((SELECT name FROM users WHERE id=o.assigned_to),'Sin asignar') responsible"
                     search = "COALESCE(o.code,'OP-'||printf('%05d',o.id))||' '||CAST(o.id AS TEXT)||' '||c.name||' '||COALESCE(c.identification,'')||' '||COALESCE(c.phone,'')||' '||COALESCE(c.trade_name,'')||' '||COALESCE(d.category,'')||' '||COALESCE(d.brand,'')||' '||COALESCE(d.model,'')||' '||COALESCE(d.serial,'')||' '||o.problem||' '||s.label"
                     active = query.get('active', [''])[0] == '1'
                     where = ' AND o.status != \'entregado\'' if active else ''
@@ -738,7 +738,7 @@ class Handler(BaseHTTPRequestHandler):
                         where+=' AND c.client_type=?';client_kind=kind
                 else:
                     source = 'devices d JOIN clients c ON c.id=d.client_id'
-                    columns = 'd.id,d.client_id,c.name client,d.category type,d.brand,d.model,d.serial'
+                    columns = 'd.id,d.client_id,c.name client,COALESCE(NULLIF(d.kind,\'\'),d.category) type,d.brand,d.model,d.serial'
                     search = "c.name||' '||COALESCE(d.brand,'')||' '||COALESCE(d.model,'')||' '||COALESCE(d.serial,'')"
                     where, ordering = '', 'd.id DESC'
                 args=[term]
@@ -1489,9 +1489,9 @@ class Handler(BaseHTTPRequestHandler):
                         if table == 'devices':
                             if values[4] and not re.fullmatch(r'[A-Za-z0-9-]+',values[4]):return self.reply(400,{'error':'La serie admite letras, números y guiones.','fields':{'serial':'Utiliza letras, números y guiones.'}})
                             category = values[1]
-                            keys = (*keys, 'category')
+                            keys = (*keys, 'category', 'kind')
                             values[1] = legacy_type(category)
-                            values.append(category)
+                            values.extend((stored_category(category), category))
                             remember_brand(c,values[2],category)
                         entity_id = str(data.get('id',''))
                         if entity_id:
@@ -1523,7 +1523,7 @@ class Handler(BaseHTTPRequestHandler):
                         return self.reply(409,{'error':'Comprueba la cola antes de volver a imprimir; este envío está pendiente o no pudo confirmarse.'})
                     config=thermal_printing.capability()
                     if not config.get('available'):return self.reply(503,{'error':'La cola Epson local no está disponible en este servidor. Descarga el PDF para imprimirlo desde el taller.'})
-                    row=c.execute('SELECT o.*,d.category type,d.brand,d.model,d.serial,c.name client,c.identification,c.document_type,c.phone,s.label status_label FROM orders o JOIN devices d ON d.id=o.device_id JOIN clients c ON c.id=d.client_id JOIN statuses s ON s.code=o.status WHERE o.id=?',(oid,)).fetchone()
+                    row=c.execute('SELECT o.*,COALESCE(NULLIF(d.kind,\'\'),d.category) type,d.brand,d.model,d.serial,c.name client,c.identification,c.document_type,c.phone,s.label status_label FROM orders o JOIN devices d ON d.id=o.device_id JOIN clients c ON c.id=d.client_id JOIN statuses s ON s.code=o.status WHERE o.id=?',(oid,)).fetchone()
                     if not row:return self.reply(404,{'error':'Orden no disponible.'})
                     order=dict(row)
                     if row['reception_snapshot']:order.update(json.loads(row['reception_snapshot']))
@@ -1614,12 +1614,12 @@ class Handler(BaseHTTPRequestHandler):
                     if tracking_errors:return self.reply(400,{'error':'Revisa los datos de recepción.','fields':tracking_errors})
                     import device_lookup
                     # Sin duplicados: si este cliente ya tiene registrado exactamente el mismo equipo (misma serie, tipo, marca, modelo y color), se reutiliza.
-                    same=c.execute("SELECT id FROM devices WHERE client_id=? AND category=? AND COALESCE(brand,'')=? AND COALESCE(model,'')=? AND COALESCE(color,'')=? AND COALESCE(serial,'')!='' AND upper(replace(serial,' ',''))=? ORDER BY id LIMIT 1",
+                    same=c.execute("SELECT id FROM devices WHERE client_id=? AND COALESCE(NULLIF(kind,''),category)=? AND COALESCE(brand,'')=? AND COALESCE(model,'')=? AND COALESCE(color,'')=? AND COALESCE(serial,'')!='' AND upper(replace(serial,' ',''))=? ORDER BY id LIMIT 1",
                         (client_id,fields['type'],fields['brand'],fields['model'],fields['color'],device_lookup.normalize(fields['serial']))).fetchone() if fields['serial'] else None
                     identified=bool(fields['brand'] or fields['model'])
                     # La identificación queda vinculada al equipo con quién la confirmó y cuándo; las órdenes anteriores no se tocan.
-                    device_id = same['id'] if same else c.execute('INSERT INTO devices(client_id,type,category,brand,model,serial,color,identity_source,identity_confirmed_by,identity_confirmed_at) VALUES (?,?,?,?,?,?,?,?,?,?)',
-                        (client_id,legacy_type(fields['type']),fields['type'],fields['brand'],fields['model'],fields['serial'],fields['color'],(device_lookup.source(data.get('identity_source')) or 'manual') if identified else '',user['id'] if identified else None,received.isoformat(timespec='seconds') if identified else '')).lastrowid
+                    device_id = same['id'] if same else c.execute('INSERT INTO devices(client_id,type,category,kind,brand,model,serial,color,identity_source,identity_confirmed_by,identity_confirmed_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
+                        (client_id,legacy_type(fields['type']),stored_category(fields['type']),fields['type'],fields['brand'],fields['model'],fields['serial'],fields['color'],(device_lookup.source(data.get('identity_source')) or 'manual') if identified else '',user['id'] if identified else None,received.isoformat(timespec='seconds') if identified else '')).lastrowid
                     remember_brand(c,fields['brand'],fields['type'])
                     number_date = received.strftime('%Y%m%d')
                     c.execute('INSERT INTO daily_order_sequences(reception_date,value) VALUES (?,1) ON CONFLICT(reception_date) DO UPDATE SET value=value+1',(number_date,))

@@ -2952,3 +2952,6 @@ body[data-page=dashboard] .toast.toast-release .toast-body p{font-size:12px;colo
 .tracking-pro .tracking-open .track-icon,.tracking-pro .tracking-item[data-tone] .track-icon{border-color:color-mix(in srgb,var(--tk) 60%,transparent);background:color-mix(in srgb,var(--tk) 18%,#0d1b30);color:var(--tk);box-shadow:0 0 10px color-mix(in srgb,var(--tk) 22%,transparent)}
 .tracking-pro .tracking-text{color:color-mix(in srgb,var(--tk) 28%,#ffffff)}
 .serial-actions a.secondary{padding:7px 12px;font-size:12px;text-decoration:none}
+
+/* Seguimiento de Órdenes: separación entre el título y el subtítulo. */
+.tracking-pro>header .activity-sub{margin-top:7px}

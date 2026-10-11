@@ -39,7 +39,7 @@ def revoke(c,oid,actor,now):
 
 def lookup(c,token):
     if not TOKEN.fullmatch(token or ''):return None
-    row=c.execute("""SELECT o.code,o.id,o.status,s.label status_label,o.received_at,o.created_at,o.updated_at,d.category,d.type,d.brand,d.model
+    row=c.execute("""SELECT o.code,o.id,o.status,s.label status_label,o.received_at,o.created_at,o.updated_at,COALESCE(NULLIF(d.kind,''),d.category) category,d.type,d.brand,d.model
         FROM order_tracking_links t JOIN orders o ON o.id=t.order_id JOIN devices d ON d.id=o.device_id JOIN statuses s ON s.code=o.status
         WHERE t.token=? AND t.revoked_at=''""",(token,)).fetchone()
     if not row:return None

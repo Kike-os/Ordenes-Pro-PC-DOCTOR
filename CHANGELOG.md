@@ -4,6 +4,15 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.23 — 2026-10-11 14:46 (UTC-05:00)
+
+Nuevos tipos de equipo Notebook y Consolas, y Portátil (Laptop)
+
+### Mejoras realizadas
+
+- Tipos de equipo: «Portátil (Laptop)» sustituye a «Computadora portátil» y se añaden «Notebook» y «Consolas»
+- Seguimiento de Órdenes: más separación entre el título y el subtítulo
+
 ## v1.5.22 — 2026-10-11 14:36 (UTC-05:00)
 
 Buscador de órdenes renovado, identificación automática sin pasos manuales y seguimiento con más contraste

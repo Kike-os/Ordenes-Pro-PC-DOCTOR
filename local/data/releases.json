@@ -8,6 +8,23 @@
   },
   "releases": [
     {
+      "version": "1.5.23",
+      "date": "2026-10-11T14:46:38-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Nuevos tipos de equipo Notebook y Consolas, y Portátil (Laptop)",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Tipos de equipo: «Portátil (Laptop)» sustituye a «Computadora portátil» y se añaden «Notebook» y «Consolas»",
+          "Seguimiento de Órdenes: más separación entre el título y el subtítulo"
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.22",
       "date": "2026-10-11T14:36:04-05:00",
       "type": "patch",

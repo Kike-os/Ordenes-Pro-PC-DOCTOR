@@ -18,7 +18,7 @@ def normalize(value):
 
 def internal(c,serial):
     """Equipos ya ingresados con esa serie, agrupados por cliente, marca y modelo."""
-    rows=c.execute("""SELECT d.id device_id,COALESCE(NULLIF(d.category,''),d.type) type,COALESCE(d.brand,'') brand,COALESCE(d.model,'') model,d.serial,COALESCE(d.color,'') color,d.client_id,cl.name client,
+    rows=c.execute("""SELECT d.id device_id,COALESCE(NULLIF(d.kind,''),NULLIF(d.category,''),d.type) type,COALESCE(d.brand,'') brand,COALESCE(d.model,'') model,d.serial,COALESCE(d.color,'') color,d.client_id,cl.name client,
         d.identity_source,d.identity_confirmed_at,u.name confirmed_by,o.id order_id,o.code order_code,o.created_at,s.label status
         FROM devices d JOIN clients cl ON cl.id=d.client_id LEFT JOIN users u ON u.id=d.identity_confirmed_by LEFT JOIN orders o ON o.device_id=d.id LEFT JOIN statuses s ON s.code=o.status
         WHERE upper(replace(COALESCE(d.serial,''),' ',''))=? ORDER BY d.id DESC,o.id DESC LIMIT 200""",(serial,)).fetchall()

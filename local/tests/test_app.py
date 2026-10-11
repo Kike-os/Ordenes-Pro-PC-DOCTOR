@@ -705,6 +705,27 @@ class SecurityTests(unittest.TestCase):
         self.assertEqual(self.request('/api/search?q=a',cookie=cookie)['body']['rows'],[])
         self.assertEqual(self.request('/api/search?q=lenovo')['status'],401)
 
+    def test_new_device_types_are_saved_listed_and_printed(self):
+        cookie,csrf=self.login()
+        types=self.request('/api/reception-options',cookie=cookie)['body']['device_types']
+        self.assertEqual((types['portatil'],types['notebook'],types['consola']),('Portátil (Laptop)','Notebook','Consolas'))
+        self.assertEqual(list(types)[:2],['portatil','notebook'])
+        ids={}
+        for n,kind in enumerate(('notebook','consola','portatil')):
+            ids[kind]=self.request('/api/orders',self.order_data({'client':'Prueba','problem':'Prueba','type':kind,'brand':'Sony' if kind=='consola' else 'HP','model':'Modelo %d'%n,'serial':'KIND-%d'%n,'request_key':'device-kind-request-%04d'%n}),cookie=cookie,csrf=csrf)
+            self.assertEqual(ids[kind]['status'],201,ids[kind])
+        with app.connect() as c:
+            self.assertEqual([(r['category'],r['kind'],r['type']) for r in c.execute('SELECT category,kind,type FROM devices ORDER BY id')],[('portatil','notebook','portatil'),('otro','consola','escritorio'),('portatil','portatil','portatil')])
+        listed={r['id']:r['type'] for r in self.request('/api/orders',cookie=cookie)['body']['rows']}
+        self.assertEqual([listed[ids[k]['body']['id']] for k in ('notebook','consola','portatil')],['notebook','consola','portatil'])
+        for kind in ('notebook','consola'):
+            oid=ids[kind]['body']['id']
+            self.assertEqual(self.request('/api/orders/%d'%oid,cookie=cookie)['body']['order']['type'],kind)
+            for doc in ('receipt.pdf','thermal.pdf','label.pdf','service.pdf'):self.assertEqual(self.request('/api/orders/%d/%s'%(oid,doc),cookie=cookie)['status'],200,doc)
+        self.assertEqual(self.request('/api/devices/identify?serial=KIND-1',cookie=cookie)['body']['matches'][0]['type'],'consola')
+        self.assertEqual({r['type'] for r in self.request('/api/devices',cookie=cookie)['body']['rows']},{'notebook','consola','portatil'})
+        self.assertEqual(self.request('/api/orders',self.order_data({'client':'Prueba','problem':'Prueba','type':'tablet','request_key':'device-kind-request-9999'}),cookie=cookie,csrf=csrf)['status'],400)
+
     def test_brand_logo_files_are_listed_and_served(self):
         cookie,csrf=self.login()
         folder=app.ROOT/'static'/'brands';svg=folder/'zz-prueba.svg';png=folder/'zz-prueba.png'
