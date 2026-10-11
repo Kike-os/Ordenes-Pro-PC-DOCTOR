@@ -113,6 +113,20 @@ class VersionCheckTests(test_app.SecurityTests):
         self.assertFalse(same['update_available'])
         self.assertEqual(files,sorted(p.name for p in versioning.ROOT.iterdir()))
 
+    def test_available_update_reaches_notification_center_until_installed(self):
+        cookie,csrf=self.login()
+        newer=dict(release('99.0.0','major',features=['Función ficticia.']),summary='Versión ficticia posterior.')
+        found={'installed':versioning.load()['releases'][0],'latest':newer,'update_available':True,'pending':[newer],'source':'remote','checked_at':'2026-01-02T10:00:00-05:00','message':'','can_update':False,'update_note':''}
+        with patch.object(versioning,'check',return_value=found):
+            self.assertEqual(self.request('/api/system/check',{},cookie=cookie,csrf=csrf)['status'],200)
+        items=self.request('/api/notifications',cookie=cookie)['body']['items']
+        update=[item for item in items if item['key']=='update:99.0.0']
+        self.assertEqual(len(update),1)
+        self.assertEqual((update[0]['title'],update[0]['href'],update[0]['read']),('Nueva actualización disponible: v99.0.0','#system',False))
+        with patch.object(versioning,'check',return_value=dict(found,update_available=False,pending=[])):
+            self.request('/api/system/check',{},cookie=cookie,csrf=csrf)
+        self.assertFalse([item for item in self.request('/api/notifications',cookie=cookie)['body']['items'] if item['key'].startswith('update:')])
+
     def test_check_fails_closed_when_published_registry_is_unusable(self):
         cookie,csrf=self.login()
         with patch.dict(app.os.environ,{'UPDATE_REGISTRY_URL':'http://example.invalid/releases.json'}):

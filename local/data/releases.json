@@ -8,6 +8,36 @@
   },
   "releases": [
     {
+      "version": "1.3.0",
+      "date": "2026-10-11T01:00:10-05:00",
+      "type": "minor",
+      "status": "publicada",
+      "summary": "Gestión de clientes con importación, solicitud de cuentas, notificaciones por usuario, inicio de sesión rediseñado y Centro de Actualizaciones con comprobación automática.",
+      "changes": {
+        "features": [
+          "Gestión de clientes: importación desde Excel o CSV con vista previa, detección de duplicados, copia de seguridad e informe; exportación; filtros; ficha con historial técnico y observaciones.",
+          "Solicitud de cuenta desde la pantalla de acceso, con aprobación obligatoria de administración.",
+          "Notificaciones con historial por usuario guardado en el servidor, menú bajo la campana y avisos emergentes con cola, barra de tiempo y pausa al pasar el cursor.",
+          "Historial público de novedades en /novedades y versión del sistema visible en el inicio de sesión.",
+          "Comprobación automática de nuevas versiones al iniciar sesión, una vez por sesión y sin bloquear la carga."
+        ],
+        "improvements": [
+          "Inicio de sesión rediseñado: tarjeta compacta, encabezado jerárquico, campos y botón uniformes e indicador de carga.",
+          "Verificación «No soy un robot» con nueva presentación y barra de progreso.",
+          "Búsqueda de clientes en la orden por correo y teléfono secundario, con navegación por teclado y aviso de fichas por completar.",
+          "Centro de actualizaciones rediseñado: versión actual destacada, comprobación con estados reales e historial más legible.",
+          "Iconografía unificada con trazos Lucide en la navegación y el centro de actualizaciones.",
+          "Historial de versiones como acordeón compacto con despliegue animado y marca de «Versión actual».",
+          "Centro de notificaciones como panel lateral con recientes y anteriores; la actualización detectada queda registrada hasta instalarse."
+        ],
+        "fixes": [
+          "El aviso de campo obligatorio del inicio de sesión ya no aparece antes de intentar enviar el formulario."
+        ],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.2.0",
       "date": "2026-10-10T23:54:27-05:00",
       "type": "minor",

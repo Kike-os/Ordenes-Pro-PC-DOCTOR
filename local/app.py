@@ -31,6 +31,7 @@ from urllib.error import URLError
 from reception import (valid_ecuador_phone, DEVICE_TYPES, validate_order, order_code, legacy_type, remember_brand, qr_image, production_enabled, reception_now, order_url, public_base_url)
 
 import remote_db
+import reception
 import service_terms
 import technical_access
 import thermal_printing
@@ -39,10 +40,12 @@ import subprocess
 import order_workspace
 import corporate
 import client_registry
+import client_import
 import maintenance
 import appointments
 import adi
 import versioning
+import notifications
 from weather import current_weather
 from geography import initialize_catalog, search as search_geography, METADATA as GEO_METADATA
 
@@ -75,6 +78,34 @@ def connect():
     c.row_factory = sqlite3.Row
     c.execute('PRAGMA foreign_keys=ON')
     return c
+
+
+def make_backup():
+    """Copia completa de la base antes de un cambio masivo. Devuelve el nombre del archivo o falla sin modificar nada."""
+    DATA.mkdir(mode=0o700, parents=True, exist_ok=True)
+    backup = DATA / f'backup-{time.time_ns()}.sqlite3'
+    try:
+        if remote_db.configured():
+            with remote_db.connect() as source:
+                remote_db.backup(source, backup)
+        else:
+            source = sqlite3.connect(DB, timeout=10)
+            target = sqlite3.connect(backup)
+            try:
+                source.backup(target)
+            finally:
+                target.close()
+                source.close()
+        backup.chmod(0o600)
+        check = sqlite3.connect(backup)
+        try:
+            if check.execute('PRAGMA integrity_check').fetchone()[0] != 'ok':
+                raise OSError('integridad')
+        finally:
+            check.close()
+    except (OSError, sqlite3.Error, ValueError):
+        raise client_import.ImportError_('No se pudo crear la copia de seguridad; no se importó nada. En el hosting sin disco persistente, importa desde el equipo de administración.')
+    return backup.name
 
 
 def migrate():
@@ -217,6 +248,10 @@ def verify_captcha(c, token):
     return word>>(32-CAPTCHA_BITS)==0
 
 
+def registration_enabled():
+    return os.getenv('REGISTRATION','on').strip().lower() not in ('off','false','0','no')
+
+
 def bot_required(c, ip_key):
     row=c.execute('SELECT count FROM attempts WHERE bucket=? AND expires>?',(ip_key,int(time.time()))).fetchone()
     return bool(os.getenv('TURNSTILE_SITE_KEY') and os.getenv('TURNSTILE_SECRET_KEY') and row and row[0]>=2)
@@ -337,6 +372,10 @@ class Handler(BaseHTTPRequestHandler):
         with connect() as c:minimum=auth_policy(c)['password_min']
         content = content.replace('{{password_min}}',str(minimum)).replace('{{access_environment}}','ACCESO SEGURO' if production_enabled() else 'ENTORNO LOCAL')
         content = content.replace('{{turnstile_sitekey}}',html.escape(os.getenv('TURNSTILE_SITE_KEY',''),quote=True) if bot_always() else '').replace('{{captcha_mode}}',captcha_mode())
+        content = content.replace('{{register_captcha}}','local' if captcha_mode()=='local' else '').replace('{{register_hidden}}','' if registration_enabled() else ' hidden')
+        try:installed=versioning.load()['releases'][0]['version']
+        except (versioning.RegistryError,IndexError):installed='—'
+        content = content.replace('{{app_version}}',html.escape(installed))
         content = content.replace('{{evaluation_notice}}', notice).replace('{{environment_label}}', 'Servicio técnico' if production_enabled() else 'Evaluación local · Usa datos ficticios')
         self.reply(200, content, 'text/html; charset=utf-8')
 
@@ -354,6 +393,16 @@ class Handler(BaseHTTPRequestHandler):
         with connect() as c:
             if path == '/citas':
                 return self.page('appointments.html')
+            if path == '/novedades':
+                # Historial público: solo el registro de versiones ya publicado; sin datos internos ni de clientes.
+                try:registry=versioning.load()
+                except versioning.RegistryError:return self.reply(404,{'error':'Historial no disponible.'})
+                parts=[]
+                for index,release in enumerate(registry['releases']):
+                    groups=''.join('<h3>'+html.escape(title)+'</h3><ul>'+''.join('<li>'+html.escape(item)+'</li>' for item in release['changes'][key])+'</ul>' for key,title in versioning.CATEGORIES.items() if release['changes'][key])
+                    parts.append('<section><h2><span>v'+html.escape(release['version'])+'</span>'+('<em>Última versión</em>' if index==0 else '')+'<small>'+html.escape(release['date'][:10])+'</small></h2>'+('<p>'+html.escape(release['summary'])+'</p>' if release['summary'] else '')+groups+'</section>')
+                page='<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#060d19"><title>Novedades | Órdenes Pro</title><link rel="icon" href="/favicon.ico?v=2" sizes="48x48"><link rel="icon" type="image/png" sizes="16x16" href="/static/favicon-16.png?v=2"><link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32.png?v=2"><link rel="icon" type="image/png" sizes="48x48" href="/static/favicon-48.png?v=2"><link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png?v=2"><link rel="stylesheet" href="/static/app.css"></head><body data-page="conditions"><main class="conditions-document privacy-document changelog-document"><header><img src="/static/logo-original.png" alt="Logotipo oficial PC-DOCTOR" width="2826" height="2049"><div><span class="eyebrow">ÓRDENES PRO · PC-DOCTOR S.A.</span><h1>Novedades del sistema</h1></div></header><p class="conditions-version">Historial de versiones publicadas</p>'+''.join(parts)+'<footer><p><a href="/">Volver al inicio de sesión</a></p></footer></main></body></html>'
+                return self.reply(200,page,'text/html; charset=utf-8')
             if path == '/privacidad':
                 company=corporate.settings();content=(ROOT/'templates'/'privacy.html').read_text()
                 for key,value in (('company',company['name']),('whatsapp',company['whatsapp']),('support_email',company['support_email'])):content=content.replace('{{'+key+'}}',html.escape(value,quote=True))
@@ -405,6 +454,9 @@ class Handler(BaseHTTPRequestHandler):
                 return self.page('dashboard.html' if user else 'login.html')
             if path == '/forgot':
                 return self.page('forgot.html')
+            if path == '/registro':
+                if not registration_enabled():return self.reply(404,{'error':'El registro de cuentas no está habilitado.'})
+                return self.page('register.html')
             if path == '/reset':
                 return self.page('reset.html')
             if not user:
@@ -482,11 +534,23 @@ class Handler(BaseHTTPRequestHandler):
                 row=c.execute('SELECT * FROM clients WHERE id=?',(int(client_detail[1]),)).fetchone()
                 if not row:return self.reply(404,{'error':'Cliente no disponible.'})
                 devices=[dict(r) for r in c.execute('SELECT * FROM devices WHERE client_id=?',(row['id'],))]
-                orders=[dict(r) for r in c.execute('SELECT o.id,o.code,o.created_at,s.label status FROM orders o JOIN devices d ON d.id=o.device_id JOIN statuses s ON s.code=o.status WHERE d.client_id=? ORDER BY o.id DESC',(row['id'],))]
-                return self.reply(200,{'client':client_registry.profile(row),'devices':devices,'orders':orders})
+                orders=[dict(r) for r in c.execute("SELECT o.id,o.code,o.created_at,o.received_at,o.status status_code,s.label status,o.problem,o.findings,o.recommendations,o.delivered_at,d.category type,d.brand,d.model,d.serial,COALESCE((SELECT labor_cents+parts_cents+services_cents+digital_cents FROM order_budget b WHERE b.order_id=o.id),0) total_cents FROM orders o JOIN devices d ON d.id=o.device_id JOIN statuses s ON s.code=o.status WHERE d.client_id=? ORDER BY o.id DESC",(row['id'],))]
+                batch=c.execute('SELECT filename,created_at FROM client_import_batches WHERE id=?',(row['import_batch_id'],)).fetchone() if row['import_batch_id'] else None
+                return self.reply(200,{'client':client_registry.profile(row),'devices':devices,'orders':orders,'imported':dict(batch) if batch else None,'can_edit':user['role']=='administrador' or bool(row['needs_review'])})
+            if path in ('/api/clients/export.csv','/api/clients/import-report.csv'):
+                if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede exportar clientes.'})
+                if path=='/api/clients/export.csv':
+                    audit(c,user['id'],'clients_exported');c.commit()
+                    return self.reply(200,client_import.export_csv(c),'text/csv; charset=utf-8')
+                batch=parse_qs(urlsplit(self.path).query).get('batch',[''])[0]
+                if not batch.isdigit() or not c.execute('SELECT 1 FROM client_import_batches WHERE id=?',(batch,)).fetchone():return self.reply(404,{'error':'Importación no disponible.'})
+                return self.reply(200,client_import.report_csv(c,int(batch)),'text/csv; charset=utf-8')
+            if path == '/api/clients/imports':
+                if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede consultar importaciones.'})
+                return self.reply(200,{'rows':[dict(r) for r in c.execute('SELECT b.id,b.filename,b.created_at,b.total,b.imported,b.merged,b.duplicates,b.skipped,b.errors,u.name actor FROM client_import_batches b LEFT JOIN users u ON u.id=b.actor_id ORDER BY b.id DESC LIMIT 20')]})
             if path == '/api/client-search':
                 term=parse_qs(urlsplit(self.path).query).get('q',[''])[0][:150]
-                rows=[dict(r) for r in c.execute("SELECT id,name,identification,document_type,phone,trade_name FROM clients WHERE instr(lower(name||' '||COALESCE(identification,'')||' '||COALESCE(phone,'')||' '||trade_name),lower(?))>0 ORDER BY name LIMIT 20",(term,))]
+                rows=[dict(r) for r in c.execute("SELECT id,name,identification,document_type,phone,phone_secondary,email,trade_name,city,needs_review FROM clients WHERE instr(lower(name||' '||COALESCE(identification,'')||' '||COALESCE(phone,'')||' '||phone_secondary||' '||COALESCE(email,'')||' '||trade_name),lower(?))>0 ORDER BY name COLLATE NOCASE LIMIT 20",(term.strip(),))] if term.strip() else []
                 return self.reply(200,{'rows':rows})
             if path == '/api/order-options':
                 return self.reply(200, {'statuses':order_workspace.STATUSES,'users':[dict(r) for r in c.execute('SELECT id,name FROM users WHERE active=1 ORDER BY name')]})
@@ -547,15 +611,25 @@ class Handler(BaseHTTPRequestHandler):
                     where = ' AND o.status != \'entregado\'' if active else ''
                     ordering = 'o.id DESC'
                 elif path == '/api/clients':
-                    source, columns = 'clients c', 'c.id,c.name,c.phone,c.email,c.identification,c.document_type,c.trade_name'
-                    search = "c.name||' '||COALESCE(c.phone,'')||' '||COALESCE(c.email,'')||' '||c.identification||' '||c.trade_name"
-                    where, ordering = '', 'c.id DESC'
+                    source, columns = 'clients c', "c.id,c.name,c.phone,c.phone_secondary,c.email,c.identification,c.document_type,c.trade_name,c.client_type,c.city,c.canton,c.needs_review,c.import_batch_id,(SELECT COUNT(*) FROM orders o JOIN devices d ON d.id=o.device_id WHERE d.client_id=c.id) orders"
+                    search = "c.name||' '||COALESCE(c.phone,'')||' '||c.phone_secondary||' '||COALESCE(c.email,'')||' '||c.identification||' '||c.trade_name||' '||c.city"
+                    where, ordering = '', 'c.name COLLATE NOCASE' if query.get('sort',[''])[0]=='name' else 'c.id DESC'
+                    conditions={'review':'c.needs_review=1','complete':'c.needs_review=0','imported':'c.import_batch_id IS NOT NULL','orders':'EXISTS(SELECT 1 FROM devices d JOIN orders o ON o.device_id=d.id WHERE d.client_id=c.id)','no_id':"c.identification=''"}
+                    chosen=query.get('filter',[''])[0]
+                    if chosen:
+                        if chosen not in conditions:return self.reply(400,{'error':'Filtro inválido.'})
+                        where+=' AND '+conditions[chosen]
+                    kind=query.get('type',[''])[0]
+                    if kind:
+                        if kind not in ('natural','empresa'):return self.reply(400,{'error':'Filtro inválido.'})
+                        where+=' AND c.client_type=?';client_kind=kind
                 else:
                     source = 'devices d JOIN clients c ON c.id=d.client_id'
                     columns = 'd.id,d.client_id,c.name client,d.category type,d.brand,d.model,d.serial'
                     search = "c.name||' '||COALESCE(d.brand,'')||' '||COALESCE(d.model,'')||' '||COALESCE(d.serial,'')"
                     where, ordering = '', 'd.id DESC'
                 args=[term]
+                if path == '/api/clients' and query.get('type',[''])[0]:args.append(query['type'][0])
                 if path == '/api/orders':
                     status=query.get('status',[''])[0]
                     if status:
@@ -587,7 +661,9 @@ class Handler(BaseHTTPRequestHandler):
             if path == '/api/settings':
                 if user['role'] != 'administrador':
                     return self.reply(403, {'error':'Solo administración puede acceder a la configuración.'})
-                return self.reply(200, {'profile':{k:user[k] for k in ('name','username','email','role')},'accounts':[dict(r) for r in c.execute('SELECT name,username,role,active FROM users ORDER BY id')],'smtp_configured':bool(os.getenv('SMTP_HOST')),'openai_configured':bool(os.getenv('OPENAI_API_KEY')),'login_lockout_seconds':auth_policy(c)['lockout_seconds'],'auth_policy':auth_policy(c),'antibot_configured':bool(os.getenv('TURNSTILE_SITE_KEY') and os.getenv('TURNSTILE_SECRET_KEY')),'origin':os.getenv('APP_URL','http://127.0.0.1:8010')})
+                return self.reply(200, {'profile':{k:user[k] for k in ('name','username','email','role')},'accounts':[dict(r) for r in c.execute("SELECT name,username,role,active FROM users WHERE approval='approved' ORDER BY id")],'requests':[dict(r) for r in c.execute("SELECT id,name,username,email,phone,identification,job_title,requested_at FROM users WHERE approval='pending' ORDER BY id")],'smtp_configured':bool(os.getenv('SMTP_HOST')),'openai_configured':bool(os.getenv('OPENAI_API_KEY')),'login_lockout_seconds':auth_policy(c)['lockout_seconds'],'auth_policy':auth_policy(c),'antibot_configured':bool(os.getenv('TURNSTILE_SITE_KEY') and os.getenv('TURNSTILE_SECRET_KEY')),'origin':os.getenv('APP_URL','http://127.0.0.1:8010')})
+            if path == '/api/notifications':
+                return self.reply(200,notifications.build(c,user,reception_now()))
             if path in ('/api/dashboard','/api/activity','/api/maintenance'):
                 now=reception_now();today=now.date().isoformat()
                 if path=='/api/maintenance':return self.reply(200,{'rows':maintenance.rows(c),'today':today,'profiles':{k:v[0] for k,v in maintenance.PROFILES.items()}})
@@ -605,7 +681,7 @@ class Handler(BaseHTTPRequestHandler):
                 assistance=None
                 if user['role']=='administrador':
                     assistance=dict(c.execute("SELECT COALESCE(SUM(last_seen_admin='' AND EXISTS(SELECT 1 FROM adi_messages m WHERE m.conversation_id=ac.id AND m.author='client' AND m.visibility='public')),0) new_conversations,COALESCE(SUM(mode='human' AND (SELECT m.author FROM adi_messages m WHERE m.conversation_id=ac.id AND m.visibility='public' ORDER BY m.id DESC LIMIT 1)='client'),0) waiting,COALESCE(SUM(mode='human'),0) transferred FROM adi_conversations ac WHERE mode!='closed'").fetchone())
-                return self.reply(200,{'counts':counts,'attention':attention,'activity':activity,'maintenance':scheduled,'deliveries':deliveries,'today':today,'appointments':today_appointments,'pending_chats':pending_chats,'assistance':assistance,'upcoming_appointments':c.execute("SELECT COUNT(*) FROM appointments WHERE status IN ('solicitada','confirmada','reprogramada') AND starts_at>=?",(appointments.stamp(now),)).fetchone()[0] if user['role'] in ('administrador','tecnico') else 0,'pending_appointments':c.execute("SELECT COUNT(*) FROM appointments WHERE status='solicitada' AND starts_at>=?",(appointments.stamp(now),)).fetchone()[0] if user['role'] in ('administrador','tecnico') else 0})
+                return self.reply(200,{'counts':counts,'attention':attention,'activity':activity,'maintenance':scheduled,'deliveries':deliveries,'today':today,'appointments':today_appointments,'pending_chats':pending_chats,'assistance':assistance,'upcoming_appointments':c.execute("SELECT COUNT(*) FROM appointments WHERE status IN ('solicitada','confirmada','reprogramada') AND starts_at>=?",(appointments.stamp(now),)).fetchone()[0] if user['role'] in ('administrador','tecnico') else 0,'pending_accounts':c.execute("SELECT COUNT(*) FROM users WHERE approval='pending'").fetchone()[0] if user['role']=='administrador' else 0,'pending_appointments':c.execute("SELECT COUNT(*) FROM appointments WHERE status='solicitada' AND starts_at>=?",(appointments.stamp(now),)).fetchone()[0] if user['role'] in ('administrador','tecnico') else 0})
             search_route=path=='/api/search'
             if search_route:
                 term=parse_qs(urlsplit(self.path).query).get('q',[''])[0].strip()[:150]
@@ -639,7 +715,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(403, {'error':'Solicitud no autorizada.'})
             path = urlsplit(self.path).path
             workspace_post=bool(re.fullmatch(r'/api/orders/[0-9]+/workspace',path))
-            max_body=100000 if path=='/api/conditions' else (65536 if workspace_post else 16384)
+            max_body=9000000 if path in ('/api/clients/import/preview','/api/clients/import/commit') else 100000 if path=='/api/conditions' else (65536 if workspace_post else 16384)
             length = int(self.headers.get('Content-Length', '0'))
             if length <= 0 or length > max_body:
                 return self.reply(400, {'error':'Solicitud inválida.'})
@@ -757,6 +833,33 @@ class Handler(BaseHTTPRequestHandler):
                     c.execute('DELETE FROM attempts WHERE bucket=?',(user_key,))
                     audit(c, row['id'], 'login')
                     return self.reply(200, {'ok':True}, cookie=self.cookie(token, age if remember else None))
+                if path == '/api/register':
+                    # Alta pública de solicitudes: la cuenta queda inactiva hasta que administración la apruebe.
+                    if not registration_enabled():return self.reply(404,{'error':'El registro de cuentas no está habilitado.'})
+                    if limited(c,'register-ip:'+digest(self.client_address[0]),limit=5,window=3600):
+                        return self.reply(429,{'error':'Demasiadas solicitudes. Inténtalo más tarde.'})
+                    token=str(data.get('bot_token',''))
+                    if (captcha_mode()=='local' and not verify_captcha(c,token)) or (captcha_mode()=='turnstile' and not verify_bot(token,'register')):
+                        return self.reply(403,{'error':'Completa la verificación de seguridad para enviar la solicitud.','challenge':True,'sitekey':os.getenv('TURNSTILE_SITE_KEY')})
+                    values={key:str(data.get(key,'')).strip() for key in ('name','username','email','phone','identification','job_title')}
+                    password=str(data.get('password',''));minimum=auth_policy(c)['password_min'];errors={}
+                    if not values['name'] or len(values['name'])>150:errors['name']='Escribe tus nombres y apellidos.'
+                    if not re.fullmatch(r'[a-zA-Z0-9_.-]{3,50}',values['username']):errors['username']='Usa de 3 a 50 letras, números, punto, guion o guion bajo.'
+                    if len(values['email'])>254 or not re.fullmatch(r'[^\s@]+@[^\s@]+\.[^\s@]+',values['email']):errors['email']='Introduce un correo electrónico válido.'
+                    if not valid_ecuador_phone(values['phone']):errors['phone']='Ingresa un móvil 09…, fijo con código de área o +593….'
+                    if values['identification'] and (len(values['identification'])!=10 or reception.document_error(values['identification'])):errors['identification']='La cédula no es válida.'
+                    if len(values['job_title'])>100:errors['job_title']='Usa hasta 100 caracteres.'
+                    if not minimum<=len(password)<=256:errors['password']=f'Usa una contraseña de {minimum} a 256 caracteres.'
+                    elif password!=str(data.get('repeat','')):errors['repeat']='Las contraseñas no coinciden.'
+                    common_file=os.getenv('PASSWORD_BLOCKLIST_FILE','')
+                    if 'password' not in errors and common_file and password.casefold() in {line.strip().casefold() for line in Path(common_file).read_text().splitlines()}:errors['password']='Esta contraseña es demasiado común.'
+                    if errors:return self.reply(400,{'error':'Revisa los campos señalados.','fields':errors})
+                    # Respuesta idéntica exista o no la cuenta: no se revela qué usuarios o correos están registrados.
+                    hashed=password_hash(password)
+                    if not c.execute('SELECT 1 FROM users WHERE username=? OR email=?',(values['username'],values['email'])).fetchone():
+                        uid=c.execute("INSERT INTO users(username,email,name,password_hash,role,active,created_at,phone,identification,job_title,approval,requested_at) VALUES (?,?,?,?,'tecnico',0,?,?,?,?,'pending',?)",(values['username'],values['email'],values['name'],hashed,int(time.time()),values['phone'],values['identification'],values['job_title'],int(time.time()))).lastrowid
+                        audit(c,None,'account_requested',uid)
+                    return self.reply(201,{'ok':True,'message':'Solicitud recibida. Un administrador la revisará; podrás iniciar sesión cuando sea aprobada.'})
                 if path == '/api/forgot':
                     email = str(data.get('email','')).strip()
                     if len(email)>254 or not re.fullmatch(r'[^\s@]+@[^\s@]+\.[^\s@]+',email):
@@ -814,8 +917,27 @@ class Handler(BaseHTTPRequestHandler):
                     return self.reply(200,{'ok':True})
                 if path=='/api/system/check':
                     # Solo consulta y compara; no descarga, instala ni modifica archivos.
-                    try:return self.reply(200,versioning.check())
+                    try:
+                        outcome=versioning.check()
+                        # Se recuerda la versión posterior detectada para mostrarla en el centro de notificaciones hasta que se instale.
+                        if outcome['update_available']:c.execute("INSERT INTO system_state VALUES ('available_update',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",(json.dumps({k:outcome['latest'][k] for k in ('version','date','summary')},ensure_ascii=False),))
+                        else:c.execute("DELETE FROM system_state WHERE key='available_update'")
+                        return self.reply(200,outcome)
                     except versioning.RegistryError as error:return self.reply(503,{'error':str(error)})
+                if path=='/api/notifications/read':
+                    keys=None if data.get('all') is True else [key for key in str(data.get('keys','')).split(',') if key][:60]
+                    notifications.mark(c,user,keys,reception_now())
+                    return self.reply(200,notifications.build(c,user,reception_now()))
+                if path=='/api/users/approval':
+                    if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede revisar solicitudes.'})
+                    action=str(data.get('action',''));role=str(data.get('role','tecnico'));target=str(data.get('id',''))
+                    row=c.execute("SELECT id FROM users WHERE id=? AND approval='pending'",(target,)).fetchone() if target.isdigit() else None
+                    if not row or action not in ('approve','reject') or role not in ('administrador','tecnico'):return self.reply(400,{'error':'Solicitud no disponible.'})
+                    if action=='approve':
+                        c.execute("UPDATE users SET active=1,approval='approved',role=?,reviewed_by=?,reviewed_at=? WHERE id=?",(role,user['id'],int(time.time()),row['id']));appointments.ensure_staff_hours(c,row['id'])
+                    else:c.execute("UPDATE users SET active=0,approval='rejected',reviewed_by=?,reviewed_at=? WHERE id=?",(user['id'],int(time.time()),row['id']))
+                    audit(c,user['id'],'account_approved' if action=='approve' else 'account_rejected',row['id'])
+                    return self.reply(200,{'ok':True})
                 if path=='/api/sessions/revoke':
                     c.execute('DELETE FROM sessions WHERE user_id=?',(user['id'],));audit(c,user['id'],'sessions_revoked')
                     return self.reply(200,{'ok':True,'message':'Se cerraron las sesiones activas.'},cookie=self.cookie('',0))
@@ -876,6 +998,19 @@ class Handler(BaseHTTPRequestHandler):
                     status,payload=maintenance.update(c,int(maintenance_route[1]),data,user,reception_now())
                     if status==200:audit(c,user['id'],'maintenance_updated',int(maintenance_route[1]))
                     return self.reply(status,payload)
+                if path in ('/api/clients/import/preview','/api/clients/import/commit'):
+                    if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede importar clientes.'})
+                    try:
+                        raw=base64.b64decode(str(data.get('content','')),validate=True);filename=str(data.get('filename',''))[:200]
+                        if path.endswith('preview'):
+                            return self.reply(200,client_import.summary(client_import.analyze(c,raw,filename)))
+                        merge=[value for value in str(data.get('merge','')).split(',') if value.strip().isdigit()]
+                        result=client_import.commit(c,raw,filename,str(data.get('sha256','')),merge,user['id'],reception_now().isoformat(timespec='seconds'),make_backup)
+                    except (client_import.ImportError_,ValueError) as error:
+                        c.rollback()
+                        return self.reply(400,{'error':str(error) if isinstance(error,client_import.ImportError_) else 'El archivo no se pudo leer.'})
+                    audit(c,user['id'],'clients_imported',result['batch'])
+                    return self.reply(201,result)
                 if path == '/api/client-registry':
                     if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
                     status,payload=client_registry.save(c,data,user)
@@ -1010,6 +1145,7 @@ class Handler(BaseHTTPRequestHandler):
                     client_id=str(data.get('client_id',''))
                     selected=c.execute('SELECT * FROM clients WHERE id=?',(client_id,)).fetchone() if client_id.isdigit() else None
                     if not selected:return self.reply(400,{'error':'Selecciona un cliente registrado.','fields':{'client_id':'Busca y selecciona un cliente válido.'}})
+                    if selected['needs_review']:return self.reply(409,{'error':'La ficha de este cliente está incompleta. Complétala antes de crear la orden.','fields':{'client_id':'Completa la ficha del cliente para continuar.'},'incomplete_client':selected['id']})
                     appointment_id=str(data.get('appointment_id',''));linked_appointment=None
                     if appointment_id:
                         if not appointment_id.isdigit():return self.reply(400,{'error':'La cita vinculada no es válida.'})

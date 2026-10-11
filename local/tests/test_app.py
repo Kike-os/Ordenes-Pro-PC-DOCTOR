@@ -314,11 +314,85 @@ class SecurityTests(unittest.TestCase):
         self.assertIn(app.corporate.settings()['support_email'],notice['body'])
         self.assertNotIn('{{',notice['body'])
         self.assertIn('href="/privacidad"',self.request('/citas')['body'])
+        import versioning
+        current=versioning.load()['releases'][0]['version']
+        self.assertIn('Órdenes Pro · v'+current,self.request('/login')['body'])
+        news=self.request('/novedades')
+        self.assertEqual(news['status'],200)
+        self.assertIn('<span>v'+current+'</span><em>Última versión</em>',news['body'])
         for page in ('/login','/forgot','/citas'):
             body=self.request(page)['body']
             self.assertIn('href="/favicon.ico?v=2"',body)
             self.assertIn('rel="apple-touch-icon"',body)
         self.assertIn('<title>Órdenes Pro | PC-DOCTOR S.A.</title>',self.request('/login')['body'])
+
+    def test_registration_creates_pending_account_that_admin_must_approve(self):
+        data={'name':'Persona Solicitante','username':'nueva.persona','email':'nueva@example.invalid','phone':'0991234567','identification':'','job_title':'Técnico de prueba','password':'clave-de-prueba','repeat':'clave-de-prueba'}
+        self.assertIn('href="/registro"',self.request('/login')['body'])
+        self.assertIn('id="register-form"',self.request('/registro')['body'])
+        bad=self.request('/api/register',dict(data,username='a b',phone='123',repeat='otra'))
+        self.assertEqual(bad['status'],400)
+        self.assertEqual(set(bad['body']['fields']),{'username','phone','repeat'})
+        first=self.request('/api/register',data)
+        self.assertEqual(first['status'],201)
+        # Mismo mensaje para un usuario o correo ya registrado: no se revela su existencia ni se duplica.
+        again=self.request('/api/register',dict(data,email='demo@example.invalid',username='otra.persona'))
+        self.assertEqual((again['status'],again['body']),(201,first['body']))
+        with app.connect() as c:
+            row=c.execute("SELECT * FROM users WHERE username='nueva.persona'").fetchone()
+            self.assertEqual((row['active'],row['approval'],row['role'],row['phone']),(0,'pending','tecnico','0991234567'))
+            self.assertNotIn('clave-de-prueba',row['password_hash'])
+            self.assertEqual(c.execute("SELECT COUNT(*) FROM users WHERE username='otra.persona'").fetchone()[0],0)
+        login={'login':'nueva.persona','password':'clave-de-prueba'}
+        self.assertEqual(self.request('/api/login',login)['status'],401)
+        cookie,csrf=self.login()
+        settings=self.request('/api/settings',cookie=cookie)['body']
+        self.assertEqual([r['username'] for r in settings['requests']],['nueva.persona'])
+        self.assertNotIn('nueva.persona',[a['username'] for a in settings['accounts']])
+        self.assertNotIn('password_hash',settings['requests'][0])
+        self.assertEqual(self.request('/api/users/approval',{'id':str(row['id']),'action':'approve','role':'tecnico'},cookie=cookie)['status'],403)
+        self.assertEqual(self.request('/api/users/approval',{'id':str(row['id']),'action':'approve','role':'tecnico'},cookie=cookie,csrf=csrf)['status'],200)
+        self.assertEqual(self.request('/api/users/approval',{'id':str(row['id']),'action':'approve','role':'tecnico'},cookie=cookie,csrf=csrf)['status'],400)
+        granted=self.request('/api/login',login)
+        self.assertEqual(granted['status'],200)
+        tech=granted['cookie'].split(';')[0];tech_csrf=self.request('/api/me',cookie=tech)['body']['user']['csrf']
+        self.assertEqual(self.request('/api/users/approval',{'id':'1','action':'approve','role':'administrador'},cookie=tech,csrf=tech_csrf)['status'],403)
+        with patch.dict(app.os.environ,{'LOGIN_CAPTCHA':'on'}):
+            self.assertEqual(self.request('/api/register',dict(data,username='sin.captcha',email='sc@example.invalid'))['status'],403)
+        with patch.dict(app.os.environ,{'REGISTRATION':'off'}):
+            self.assertEqual(self.request('/registro')['status'],404)
+            self.assertEqual(self.request('/api/register',data)['status'],404)
+            self.assertIn('class="register-link" hidden',self.request('/login')['body'])
+
+    def test_notifications_are_per_user_and_read_state_persists(self):
+        self.assertEqual(self.request('/api/notifications')['status'],401)
+        cookie,csrf=self.login()
+        with app.connect() as c:
+            other=c.execute("INSERT INTO users(username,email,name,password_hash,role,created_at) VALUES ('tecnico','tec@example.invalid','Técnico de prueba',?,'tecnico',1)",(self.hash,)).lastrowid
+        tech=self.request('/api/login',{'login':'tecnico','password':'contraseña-segura-de-prueba'})['cookie'].split(';')[0]
+        tech_csrf=self.request('/api/me',cookie=tech)['body']['user']['csrf']
+        created=self.request('/api/orders',self.order_data({'request_key':'notification-request-key-0001'}),cookie=tech,csrf=tech_csrf)
+        self.assertEqual(created['status'],201,created)
+        mine=self.request('/api/notifications',cookie=cookie)['body']
+        events=[item for item in mine['items'] if item['key'].startswith('event:')]
+        self.assertEqual(len(events),1)
+        self.assertIn('Nueva orden registrada',events[0]['title'])
+        self.assertEqual(events[0]['href'],'#orders?id='+str(created['body']['id']))
+        self.assertTrue(any(item['key'].startswith('version:') for item in mine['items']))
+        self.assertEqual(mine['unread'],len(mine['items']))
+        # Quien hizo el cambio no recibe su propio evento.
+        theirs=self.request('/api/notifications',cookie=tech)['body']
+        self.assertFalse([item for item in theirs['items'] if item['key'].startswith('event:')])
+        self.assertEqual(self.request('/api/notifications/read',{'keys':events[0]['key']},cookie=cookie)['status'],403)
+        after=self.request('/api/notifications/read',{'keys':events[0]['key']+',event:999999,otra cosa'},cookie=cookie,csrf=csrf)['body']
+        self.assertEqual(after['unread'],mine['unread']-1)
+        self.assertTrue(next(item for item in after['items'] if item['key']==events[0]['key'])['read'])
+        with app.connect() as c:
+            self.assertEqual([tuple(r) for r in c.execute('SELECT user_id,key FROM notification_reads')],[(self.uid if isinstance(self.uid,int) else 1,events[0]['key'])])
+        # La lectura es de cada usuario y sobrevive a una recarga.
+        self.assertEqual(self.request('/api/notifications',cookie=cookie)['body']['unread'],after['unread'])
+        self.assertEqual(self.request('/api/notifications',cookie=tech)['body']['unread'],theirs['unread'])
+        self.assertEqual(self.request('/api/notifications/read',{'all':True},cookie=cookie,csrf=csrf)['body']['unread'],0)
 
     def test_server_validation_and_https_cookie(self):
         for data in ({'login':'','password':'x'},{'login':'bad@','password':'x'},{'login':'demo','password':''}):

@@ -4,6 +4,32 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.3.0 — 2026-10-11 01:00 (UTC-05:00)
+
+Gestión de clientes con importación, solicitud de cuentas, notificaciones por usuario, inicio de sesión rediseñado y Centro de Actualizaciones con comprobación automática.
+
+### Nuevas funcionalidades
+
+- Gestión de clientes: importación desde Excel o CSV con vista previa, detección de duplicados, copia de seguridad e informe; exportación; filtros; ficha con historial técnico y observaciones.
+- Solicitud de cuenta desde la pantalla de acceso, con aprobación obligatoria de administración.
+- Notificaciones con historial por usuario guardado en el servidor, menú bajo la campana y avisos emergentes con cola, barra de tiempo y pausa al pasar el cursor.
+- Historial público de novedades en /novedades y versión del sistema visible en el inicio de sesión.
+- Comprobación automática de nuevas versiones al iniciar sesión, una vez por sesión y sin bloquear la carga.
+
+### Mejoras realizadas
+
+- Inicio de sesión rediseñado: tarjeta compacta, encabezado jerárquico, campos y botón uniformes e indicador de carga.
+- Verificación «No soy un robot» con nueva presentación y barra de progreso.
+- Búsqueda de clientes en la orden por correo y teléfono secundario, con navegación por teclado y aviso de fichas por completar.
+- Centro de actualizaciones rediseñado: versión actual destacada, comprobación con estados reales e historial más legible.
+- Iconografía unificada con trazos Lucide en la navegación y el centro de actualizaciones.
+- Historial de versiones como acordeón compacto con despliegue animado y marca de «Versión actual».
+- Centro de notificaciones como panel lateral con recientes y anteriores; la actualización detectada queda registrada hasta instalarse.
+
+### Errores corregidos
+
+- El aviso de campo obligatorio del inicio de sesión ya no aparece antes de intentar enviar el formulario.
+
 ## v1.2.0 — 2026-10-10 23:54 (UTC-05:00)
 
 Notificaciones del sistema, Adi renovada, reserva de citas rediseñada, Centro de operaciones reorganizado y aviso de privacidad.

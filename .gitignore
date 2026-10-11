@@ -16,3 +16,8 @@ local/stderr.log
 .agents/
 .claude/skills/
 skills-lock.json
+# Archivos de clientes para importar o exportados: nunca al repositorio.
+*.xls
+*.xlsx
+clientes*.csv
+informe-importacion*.csv
