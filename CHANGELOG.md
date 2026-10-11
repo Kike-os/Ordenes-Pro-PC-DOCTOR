@@ -4,6 +4,22 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.36 — 2026-10-11 18:34 (UTC-05:00)
+
+Acciones por cita en la Agenda: editar, cancelar y eliminar con auditoría
+
+### Nuevas funcionalidades
+
+- Agenda: cada cita tiene acciones para ver, editar, reprogramar, cancelar y eliminar. Eliminar (solo administración) retira la cita de la agenda activa y conserva su registro de auditoría
+
+### Mejoras realizadas
+
+- Agenda: confirmación propia al cancelar o eliminar una cita en lugar de la ventana del navegador; las citas canceladas se muestran en rojo
+
+### Errores corregidos
+
+- Agenda: la lista ya incluye las citas de mantenimiento programadas a seis meses
+
 ## v1.5.35 — 2026-10-11 18:22 (UTC-05:00)
 
 Órdenes sin condiciones publicadas y vinculación automática de la orden en Mail Pro

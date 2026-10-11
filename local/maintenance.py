@@ -20,6 +20,8 @@ def transition(c,oid,old,new,now):
         category=c.execute('SELECT d.category FROM orders o JOIN devices d ON d.id=o.device_id WHERE o.id=?',(oid,)).fetchone()[0]
         c.execute('UPDATE orders SET delivered_at=? WHERE id=?',(stamp,oid))
         c.execute("INSERT INTO maintenance(order_id,delivered_at,due_date,profile,updated_at,unsubscribe_token) VALUES (?,?,?,?,?,?) ON CONFLICT(order_id) DO UPDATE SET delivered_at=excluded.delivered_at,due_date=excluded.due_date,state='scheduled',generation=maintenance.generation+1,updated_at=excluded.updated_at",(oid,stamp,six_months(now.astimezone(ZONE).date()).isoformat(),'gaming' if category=='gaming' else 'office' if category=='portatil' else 'general',stamp,secrets.token_urlsafe(32)))
+        # Una entrega nueva es un hecho nuevo: se levanta la exclusión que dejó una cita eliminada.
+        c.execute('UPDATE maintenance SET auto_appointment_blocked=0 WHERE order_id=?',(oid,))
         row=c.execute('SELECT id,due_date FROM maintenance WHERE order_id=?',(oid,)).fetchone()
         return {'id':row['id'],'due_date':row['due_date']}
     elif old=='entregado':
@@ -112,5 +114,6 @@ def link_appointment(c,mid,aid,user,now):
 def appointment_changed(c,aid,status,now):
     """Mantiene la previsión coherente con su cita: cancelada o no asistida vuelve a programada; completada la cierra."""
     stamp=now.astimezone(ZONE).isoformat()
-    if status in ('cancelada','no_asistio'):c.execute("UPDATE maintenance SET state='scheduled',appointment_id=NULL,updated_at=? WHERE appointment_id=? AND state='appointment'",(stamp,aid))
+    # La previsión se conserva; la cita cancelada no se regenera sola (se puede agendar otra a mano).
+    if status in ('cancelada','no_asistio'):c.execute("UPDATE maintenance SET state='scheduled',appointment_id=NULL,auto_appointment_blocked=1,updated_at=? WHERE appointment_id=? AND state='appointment'",(stamp,aid))
     elif status=='completada':c.execute("UPDATE maintenance SET state='completed',updated_at=? WHERE appointment_id=? AND state='appointment'",(stamp,aid))

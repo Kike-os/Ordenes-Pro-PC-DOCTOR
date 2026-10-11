@@ -3273,3 +3273,28 @@ body[data-page=dashboard] .mail-composer label.mail-order>span svg{width:13px;he
 #order-form .order-terms .terms-empty p{margin:2px 0 0;font-size:12.5px;line-height:1.5;color:#b5c5de}
 #order-form .order-terms .terms-empty[data-state=required]{border-color:#7a6230;background:linear-gradient(180deg,#2b230f,#1f1a0d)}
 #order-form .order-terms .terms-empty[data-state=required] .terms-empty-icon{border-color:#7a6230;background:#e5c0641f;color:#f0d28a}
+/* Agenda · acciones por cita (ver, editar, reprogramar, cancelar, eliminar) */
+.agenda-row .agenda-act{position:relative;display:flex;align-items:center;justify-content:flex-end;gap:4px}
+.agenda-act-menu{display:inline-flex;align-items:center;gap:4px}
+.agenda-act button.agenda-icon{display:inline-grid;place-items:center;width:30px;height:30px;margin:0;padding:0;border:1px solid #24395b;border-radius:9px;background:#0d1b30;color:#a9c8f7;cursor:pointer;transition:background .2s,border-color .2s,color .2s}
+.agenda-act button.agenda-icon svg{width:15px;height:15px}
+.agenda-act button.agenda-icon:hover{background:#15294a;border-color:#3b5d8f;color:#fff;transform:none}
+.agenda-act button.agenda-icon:focus-visible{outline:2px solid #8bb8ff;outline-offset:2px}
+.agenda-act button.agenda-icon-danger{border-color:#5a2f39;color:#f0a3ab}.agenda-act button.agenda-icon-danger:hover{background:#3a1a22;border-color:#8a4450;color:#ffd0d4}
+.agenda-icon-label{display:none}.agenda-act button.agenda-icon-more{display:none}
+.agenda-row.agenda-row-leaving{opacity:0;transform:translateX(8px);transition:opacity .2s,transform .2s}
+.agenda-card.agenda-card-flash{animation:agenda-card-flash .9s ease-out 1}
+@keyframes agenda-card-flash{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--ag) 60%,transparent)}100%{box-shadow:0 0 0 10px transparent}}
+.agenda-edit{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 12px}.agenda-edit label:nth-of-type(n+7),.agenda-edit>p,.agenda-edit>.agenda-actions{grid-column:1/-1}.agenda-edit .agenda-actions{justify-content:flex-end}.agenda-edit textarea{resize:vertical;min-height:0}
+@media(max-width:1180px){.agenda-act button.agenda-icon-more{display:inline-grid}.agenda-act-menu{display:none;position:absolute;right:0;top:calc(100% + 6px);z-index:30;flex-direction:column;align-items:stretch;gap:2px;min-width:176px;padding:6px;border:1px solid #2f4a75;border-radius:12px;background:#0c192d;box-shadow:0 14px 34px #020714cc}
+ .agenda-act[data-open=true] .agenda-act-menu{display:flex;animation:agenda-menu-in .18s ease-out}
+ .agenda-act-menu button.agenda-icon{display:flex;align-items:center;justify-content:flex-start;gap:9px;width:100%;height:34px;padding:0 10px;border-color:transparent;background:transparent}
+ .agenda-act-menu .agenda-icon-label{display:inline;font-size:12.5px;font-weight:600}}
+@keyframes agenda-menu-in{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+@media(max-width:520px){.agenda-edit{grid-template-columns:1fr}}
+@media(prefers-reduced-motion:reduce){.agenda-act button.agenda-icon,.agenda-row.agenda-row-leaving{transition:none}.agenda-card.agenda-card-flash,.agenda-act[data-open=true] .agenda-act-menu{animation:none}}
+/* Confirmación destructiva (cancelar o eliminar cita): icono rojo suave; citas canceladas en rojo */
+.confirm-mac.confirm-mac-danger .confirm-mac-icon{border-color:#E77B8866;background:#E77B881f;color:#E77B88}
+.agenda-row[data-status=cancelada]{box-shadow:inset 3px 0 0 #E77B88;background:linear-gradient(90deg,#e77b8814,transparent 45%)}
+.agenda-row[data-status=cancelada] .agenda-who b,.agenda-row[data-status=cancelada] .agenda-when b{color:#f3b3ba}
+.agenda-row[data-status=cancelada] .agenda-who b{text-decoration:line-through;text-decoration-color:#e77b8899}

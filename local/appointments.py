@@ -86,7 +86,7 @@ def technicians(c,start,duration,exclude=None):
   args=[person['id'],end_s,start_s]
   ignore=' AND id!=?' if exclude else ''
   if exclude:args.append(exclude)
-  clash=c.execute("SELECT 1 FROM appointments WHERE technician_id=? AND status NOT IN ('cancelada','completada','no_asistio') AND datetime(starts_at)<datetime(?) AND datetime(starts_at,'+'||duration_minutes||' minutes')>datetime(?)"+ignore,args).fetchone()
+  clash=c.execute("SELECT 1 FROM appointments WHERE deleted_at IS NULL AND technician_id=? AND status NOT IN ('cancelada','completada','no_asistio') AND datetime(starts_at)<datetime(?) AND datetime(starts_at,'+'||duration_minutes||' minutes')>datetime(?)"+ignore,args).fetchone()
   if not clash and slot_open(c,start,duration):available.append(person['id'])
  return available
 def available_slots(c,day_text,service_code,staff=False):
@@ -138,7 +138,7 @@ def lookup_client(c,identification,phone,email):
  return None
 def create(c,data,user=None):
  key=str(data.get('request_key','')).strip()
- if key and c.execute('SELECT 1 FROM appointments WHERE request_key=?',(key,)).fetchone():return 409,{'error':'Esta solicitud ya fue registrada.'}
+ if key and c.execute('SELECT 1 FROM appointments WHERE deleted_at IS NULL AND request_key=?',(key,)).fetchone():return 409,{'error':'Esta solicitud ya fue registrada.'}
  fields,errors,start=validate_booking(data,c)
  if errors:return 400,{'error':'Revisa los datos de la cita.','fields':errors}
  duration=c.execute('SELECT duration_minutes FROM appointment_services WHERE code=?',(fields['service'],)).fetchone()['duration_minutes']
@@ -164,13 +164,39 @@ def reschedule(c,row,start,user):
  c.execute('INSERT INTO appointment_events(appointment_id,actor_id,event,old_start,new_start,old_status,new_status,created_at) VALUES (?,?,?,?,?,?,?,?)',(row['id'],user['id'] if user else None,'rescheduled',old,stamp(start),oldstatus,'reprogramada',created))
  if row['email'] and row['communications_consent']:c.execute("INSERT OR IGNORE INTO appointment_notifications(appointment_id,generation,event,channel,result,created_at) VALUES (?,?,'rescheduled','email','pending',?)",(row['id'],generation,created))
  return {'ok':True,'starts_at':stamp(start)}
+EDITABLE=('name','phone','email','device_type','brand','model','description','notes')
+def edit(c,row,data,user):
+ """Corrige los datos de contacto, equipo y descripción de una cita; fecha y estado se cambian con sus propias acciones."""
+ fields={k:str(data.get(k,'')).strip() for k in EDITABLE};errors={}
+ if len(fields['name'])<2 or len(fields['name'])>150:errors['name']='Indica el nombre completo (2 a 150 caracteres).'
+ if not valid_ecuador_phone(fields['phone']):errors['phone']='Ingresa un número de teléfono válido.'
+ if fields['email'] and (len(fields['email'])>254 or not re.fullmatch(r'[^\s@<>]+@[^\s@<>.]+(?:\.[^\s@<>.]+)+',fields['email'])):errors['email']='Ingresa un correo electrónico válido.'
+ if fields['device_type'] not in reception.DEVICE_TYPES:errors['device_type']='Selecciona el tipo de equipo.'
+ if len(fields['description'])<3 or len(fields['description'])>1000:errors['description']='Describe brevemente la falla (3 a 1000 caracteres).'
+ if len(fields['brand'])>100 or len(fields['model'])>100 or len(fields['notes'])>1000:errors['notes']='Revisa la longitud de marca, modelo u observaciones.'
+ if errors:return 400,{'error':'Revisa los datos de la cita.','fields':errors}
+ columns={'name':'customer_name'};changed=[k for k in EDITABLE if fields[k]!=(row[columns.get(k,k)] or '')]
+ if not changed:return 200,{'ok':True,'changed':[]}
+ created=stamp(now());c.execute('UPDATE appointments SET customer_name=?,phone=?,email=?,device_type=?,brand=?,model=?,description=?,notes=?,updated_at=? WHERE id=?',(*(fields[k] for k in EDITABLE),created,row['id']))
+ labels={'name':'nombre','phone':'teléfono','email':'correo','device_type':'tipo de equipo','brand':'marca','model':'modelo','description':'descripción','notes':'observaciones'}
+ c.execute("INSERT INTO appointment_events(appointment_id,actor_id,event,old_start,new_start,old_status,new_status,created_at,detail) VALUES (?,?,'edited',?,?,?,?,?,?)",(row['id'],user['id'],row['starts_at'],row['starts_at'],row['status'],row['status'],created,'Datos modificados: '+', '.join(labels[k] for k in changed)))
+ return 200,{'ok':True,'changed':changed}
+def remove(c,row,user,reason):
+ """Eliminación lógica: la cita sale de la agenda activa y libera su horario; la fila, su historial y la orden o el mantenimiento de origen se conservan."""
+ created=stamp(now());reason=str(reason or '').strip()[:300]
+ c.execute('UPDATE appointments SET deleted_at=?,deleted_by=?,delete_reason=?,updated_at=? WHERE id=? AND deleted_at IS NULL',(created,user['id'],reason,created,row['id']))
+ c.execute("INSERT INTO appointment_events(appointment_id,actor_id,event,old_start,new_start,old_status,new_status,created_at,detail) VALUES (?,?,'deleted',?,?,?,?,?,?)",(row['id'],user['id'],row['starts_at'],row['starts_at'],row['status'],row['status'],created,reason))
+ # Si era la cita de un mantenimiento, la previsión queda «programado» y marcada para que no se regenere sola.
+ linked=c.execute('SELECT id FROM maintenance WHERE appointment_id=?',(row['id'],)).fetchone()
+ if linked:c.execute("UPDATE maintenance SET appointment_id=NULL,state=CASE WHEN state='appointment' THEN 'scheduled' ELSE state END,auto_appointment_blocked=1,updated_at=? WHERE id=?",(now().isoformat(),linked['id']))
+ return {'ok':True,'maintenance_id':linked['id'] if linked else None}
 def create_for_maintenance(c,mid,user=None):
  """Cita automática del mantenimiento preventivo: se propone para la fecha prevista (o el primer día laborable con horario libre) y queda pendiente de confirmación.
  No duplica: si la previsión ya tiene una cita activa devuelve esa. Sin teléfono del cliente o sin horarios en 45 días no se crea."""
  row=c.execute("SELECT m.*,o.code,cl.id client_id,cl.name client,cl.phone,cl.email,cl.identification,COALESCE(NULLIF(d.kind,''),d.category) kind,d.brand,d.model FROM maintenance m JOIN orders o ON o.id=m.order_id JOIN devices d ON d.id=o.device_id JOIN clients cl ON cl.id=d.client_id WHERE m.id=?",(mid,)).fetchone()
- if not row or row['state'] not in ('scheduled','appointment'):return None
+ if not row or row['state'] not in ('scheduled','appointment') or row['auto_appointment_blocked']:return None
  if row['appointment_id']:
-  current=c.execute("SELECT id,public_code,starts_at,status FROM appointments WHERE id=? AND status NOT IN ('cancelada','no_asistio','completada')",(row['appointment_id'],)).fetchone()
+  current=c.execute("SELECT id,public_code,starts_at,status FROM appointments WHERE deleted_at IS NULL AND id=? AND status NOT IN ('cancelada','no_asistio','completada')",(row['appointment_id'],)).fetchone()
   if current:return dict(current)
  phone=re.sub(r'\s+','',row['phone'] or '')
  if not 7<=len(phone)<=30 or len(row['client'] or '')<2:return None
@@ -194,20 +220,22 @@ def create_for_maintenance(c,mid,user=None):
  c.execute("UPDATE maintenance SET appointment_id=?,state='appointment',updated_at=? WHERE id=?",(aid,now().isoformat(),mid))
  return {'id':aid,'public_code':public,'starts_at':stamp(start),'status':'solicitada'}
 def admin_rows(c,start,end):
- return [dict(r) for r in c.execute("SELECT a.*,s.label service_label,u.name technician FROM appointments a JOIN appointment_services s ON s.code=a.service_code LEFT JOIN users u ON u.id=a.technician_id WHERE a.starts_at>=? AND a.starts_at<? ORDER BY a.starts_at,a.id",(start,end))]
+ return [dict(r) for r in c.execute("SELECT a.*,s.label service_label,u.name technician FROM appointments a JOIN appointment_services s ON s.code=a.service_code LEFT JOIN users u ON u.id=a.technician_id WHERE a.deleted_at IS NULL AND a.starts_at>=? AND a.starts_at<? ORDER BY a.starts_at,a.id",(start,end))]
 
 def queue_notice(c,row,event,generation=None):
  """Encola un correo al cliente (confirmación o cancelación) solo si dejó correo y autorizó comunicaciones."""
  if row['email'] and row['communications_consent']:c.execute("INSERT OR IGNORE INTO appointment_notifications(appointment_id,generation,event,channel,result,created_at) VALUES (?,?,?,'email','pending',?)",(row['id'],generation or row['generation'],event,stamp(now())))
 def detail(c,aid):
  """Cita con su servicio, técnico, cliente vinculado e historial de modificaciones."""
- row=c.execute("SELECT a.*,s.label service_label,u.name technician FROM appointments a JOIN appointment_services s ON s.code=a.service_code LEFT JOIN users u ON u.id=a.technician_id WHERE a.id=?",(aid,)).fetchone()
+ row=c.execute("SELECT a.*,s.label service_label,u.name technician FROM appointments a JOIN appointment_services s ON s.code=a.service_code LEFT JOIN users u ON u.id=a.technician_id WHERE a.id=? AND a.deleted_at IS NULL",(aid,)).fetchone()
  if not row:return None
  data=dict(row);data.pop('manage_token_hash',None);data.pop('request_key',None)
  data['events']=[dict(r) for r in c.execute("SELECT e.id,e.event,e.old_start,e.new_start,e.old_status,e.new_status,e.created_at,e.detail,u.name actor FROM appointment_events e LEFT JOIN users u ON u.id=e.actor_id WHERE e.appointment_id=? ORDER BY e.id DESC",(aid,))]
  data['notices']=[dict(r) for r in c.execute("SELECT event,channel,result,created_at,completed_at FROM appointment_notifications WHERE appointment_id=? ORDER BY id DESC",(aid,))]
  order=c.execute('SELECT id,code FROM orders WHERE id=?',(row['converted_order_id'],)).fetchone() if row['converted_order_id'] else None
  data['order']=dict(order) if order else None
+ source=c.execute('SELECT m.id,m.due_date,o.id order_id,o.code FROM maintenance m JOIN orders o ON o.id=m.order_id WHERE m.appointment_id=?',(aid,)).fetchone()
+ data['maintenance']=dict(source) if source else None
  import appointment_mail
  data['mails']=appointment_mail.history(c,aid)
  return data
@@ -217,8 +245,8 @@ def agenda(c,start,end):
  for row in rows:row.pop('manage_token_hash',None);row.pop('request_key',None)
  today=now().date();day_start=stamp(datetime.combine(today,time.min,TZ));day_end=stamp(datetime.combine(today+timedelta(days=1),time.min,TZ));current=stamp(now())
  count=lambda sql,*args:c.execute(sql,args).fetchone()[0]
- summary={'today':count("SELECT COUNT(*) FROM appointments WHERE starts_at>=? AND starts_at<? AND status NOT IN ('cancelada','no_asistio')",day_start,day_end),
-  'pending':count("SELECT COUNT(*) FROM appointments WHERE status='solicitada' AND starts_at>=?",current),
-  'confirmed':count("SELECT COUNT(*) FROM appointments WHERE status IN ('confirmada','reprogramada') AND starts_at>=?",current),
-  'attending':count("SELECT COUNT(*) FROM appointments WHERE status='presente'")}
+ summary={'today':count("SELECT COUNT(*) FROM appointments WHERE deleted_at IS NULL AND starts_at>=? AND starts_at<? AND status NOT IN ('cancelada','no_asistio')",day_start,day_end),
+  'pending':count("SELECT COUNT(*) FROM appointments WHERE deleted_at IS NULL AND status='solicitada' AND starts_at>=?",current),
+  'confirmed':count("SELECT COUNT(*) FROM appointments WHERE deleted_at IS NULL AND status IN ('confirmada','reprogramada') AND starts_at>=?",current),
+  'attending':count("SELECT COUNT(*) FROM appointments WHERE deleted_at IS NULL AND status='presente'")}
  return rows,summary

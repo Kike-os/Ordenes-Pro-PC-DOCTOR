@@ -159,6 +159,49 @@ class AgendaTests(unittest.TestCase):
         history=[h['comment'] for h in self.request('/api/orders/%d'%oid,cookie=cookie)['body']['order']['history']]
         self.assertEqual((history.count('Cita de mantenimiento preventivo registrada.'),sum(h.startswith('Cita de mantenimiento preventivo generada automáticamente') for h in history)),(1,2))
 
+    def test_edit_cancel_and_logical_delete_keep_orders_and_maintenance(self):
+        import maintenance
+        cookie,csrf=self.login();act=lambda aid,**data:self.request('/api/appointments/%d'%aid,data,cookie=cookie,csrf=csrf)
+        slots=[s['time'] for s in self.request('/api/public/appointments/availability?date=%s&service=mantenimiento'%self.day())['body']['slots']]
+        normal=self.request('/api/appointments/new',self.booking(slots[0],email='',request_key='agenda-delete-appt-0001'),cookie=cookie,csrf=csrf)['body']
+        # Editar: valida en el servidor, guarda y deja constancia de qué cambió.
+        self.assertEqual(act(normal['id'],action='edit',name='X',phone='123',email='',device_type='consola',brand='',model='',description='ok',notes='')['status'],400)
+        edited=act(normal['id'],action='edit',name='Cliente Corregido',phone='0991234567',email='',device_type='consola',brand='Sony',model='PS5 Slim',description='Limpieza interna y cambio de pasta térmica',notes='Trae el control')
+        self.assertEqual((edited['status'],sorted(edited['body']['changed'])),(200,['model','name','notes']))
+        detail=self.request('/api/appointments/%d'%normal['id'],cookie=cookie)['body']['appointment']
+        self.assertEqual((detail['customer_name'],detail['model'],detail['events'][0]['event'],detail['events'][0]['detail']),('Cliente Corregido','PS5 Slim','edited','Datos modificados: nombre, modelo, observaciones'))
+        # Cancelar conserva la cita visible como cancelada y libera el horario.
+        self.assertEqual(act(normal['id'],action='cancelada')['status'],200)
+        agenda=lambda:self.request('/api/agenda',cookie=cookie)['body']
+        self.assertEqual([(a['id'],a['status']) for a in agenda()['appointments']],[(normal['id'],'cancelada')])
+        # Eliminar: solo administración; la cita sale de la agenda, del detalle y de los avisos, pero la fila queda con su auditoría.
+        with app.connect() as c:c.execute("UPDATE users SET role='tecnico' WHERE id=?",(self.uid,))
+        self.assertEqual(act(normal['id'],action='delete')['status'],403)
+        with app.connect() as c:c.execute("UPDATE users SET role='administrador' WHERE id=?",(self.uid,))
+        self.assertEqual(act(normal['id'],action='delete',reason='Registrada por error')['status'],200)
+        self.assertEqual((agenda()['appointments'],self.request('/api/appointments/%d'%normal['id'],cookie=cookie)['status'],act(normal['id'],action='delete')['status']),([],404,404))
+        with app.connect() as c:
+            kept=c.execute('SELECT status,deleted_by,delete_reason,deleted_at IS NOT NULL gone FROM appointments WHERE id=?',(normal['id'],)).fetchone()
+            self.assertEqual((kept['status'],kept['deleted_by'],kept['delete_reason'],kept['gone']),('cancelada',self.uid,'Registrada por error',1))
+            self.assertEqual(c.execute("SELECT detail FROM appointment_events WHERE appointment_id=? AND event='deleted'",(normal['id'],)).fetchone()[0],'Registrada por error')
+            self.assertEqual(c.execute("SELECT COUNT(*) FROM audit WHERE action='appointment_delete'").fetchone()[0],1)
+        # Cita automática de un mantenimiento: al eliminarla se conservan la orden y la previsión, el horario queda libre y no se regenera sola.
+        oid=self.request('/api/orders',self.order_data({'serial':'DEL-0001','request_key':'agenda-delete-order-0001'}),cookie=cookie,csrf=csrf)['body']['id']
+        auto=self.request('/api/order-status',{'id':str(oid),'status':'entregado'},cookie=cookie,csrf=csrf)['body']['maintenance']
+        detail=self.request('/api/appointments/%d'%auto['appointment']['id'],cookie=cookie)['body']['appointment']
+        self.assertEqual((detail['maintenance']['id'],detail['maintenance']['order_id']),(auto['id'],oid))
+        gone=act(auto['appointment']['id'],action='delete');self.assertEqual((gone['status'],gone['body']['maintenance_id']),(200,auto['id']))
+        row=self.request('/api/maintenance',cookie=cookie)['body']['rows'][0]
+        self.assertEqual((row['state'],row['appointment_id'],row['auto_appointment_blocked'],row['due_date']),('scheduled',None,1,auto['due_date']))
+        with app.connect() as c:
+            self.assertIsNone(appointments.create_for_maintenance(c,auto['id'],None))
+            self.assertEqual((c.execute('SELECT status FROM orders WHERE id=?',(oid,)).fetchone()[0],c.execute('SELECT COUNT(*) FROM appointments').fetchone()[0],c.execute('SELECT COUNT(*) FROM appointments WHERE deleted_at IS NULL').fetchone()[0]),('entregado',2,0))
+            start=appointments.datetime.fromisoformat(auto['appointment']['starts_at']);self.assertTrue(appointments.technicians(c,start,90))
+        self.assertEqual([n for n in self.request('/api/notifications',cookie=cookie)['body']['items'] if n['key'].startswith('appointment:')],[])
+        # El personal puede volver a agendarla a mano; una entrega nueva levanta la exclusión.
+        self.request('/api/order-status',{'id':str(oid),'status':'listo'},cookie=cookie,csrf=csrf)
+        self.assertIn('appointment',self.request('/api/order-status',{'id':str(oid),'status':'entregado'},cookie=cookie,csrf=csrf)['body']['maintenance'])
+
     def test_staff_can_book_today_while_public_booking_starts_tomorrow(self):
         cookie,csrf=self.login();today=appointments.now().date()
         with app.connect() as c:c.execute("UPDATE appointment_hours SET start_time='00:00',end_time='23:59',enabled=1 WHERE weekday=?",(today.weekday(),))

@@ -50,13 +50,13 @@ def snapshot(c,now):
  count=lambda sql,*args:c.execute(sql,args).fetchone()[0]
  start=appointments.stamp(appointments.datetime.combine(now.date(),appointments.time.min,appointments.TZ));end=appointments.stamp(appointments.datetime.combine(now.date()+timedelta(days=1),appointments.time.min,appointments.TZ))
  statuses={r['status']:r['total'] for r in c.execute('SELECT status,COUNT(*) total FROM orders GROUP BY status')}
- upcoming=c.execute("SELECT customer_name,starts_at FROM appointments WHERE starts_at>=? AND starts_at<? AND status IN ('solicitada','confirmada','reprogramada') ORDER BY starts_at LIMIT 1",(appointments.stamp(now),end)).fetchone()
+ upcoming=c.execute("SELECT customer_name,starts_at FROM appointments WHERE deleted_at IS NULL AND starts_at>=? AND starts_at<? AND status IN ('solicitada','confirmada','reprogramada') ORDER BY starts_at LIMIT 1",(appointments.stamp(now),end)).fetchone()
  return {'updated_at':now.isoformat(timespec='seconds'),'statuses':{code:statuses.get(code,0) for code in order_workspace.STATUSES},'active':sum(total for code,total in statuses.items() if code!='entregado'),
   'overdue':count("SELECT COUNT(*) FROM orders WHERE estimated_delivery!='' AND estimated_delivery<? AND status!='entregado'",today),
   'received_today':count("SELECT COUNT(*) FROM orders WHERE substr(received_at,1,10)=?",today),'delivered_today':count("SELECT COUNT(*) FROM orders WHERE substr(COALESCE(delivered_at,''),1,10)=?",today),
-  'appointments_today':count("SELECT COUNT(*) FROM appointments WHERE starts_at>=? AND starts_at<? AND status IN ('solicitada','confirmada','reprogramada')",start,end),
+  'appointments_today':count("SELECT COUNT(*) FROM appointments WHERE deleted_at IS NULL AND starts_at>=? AND starts_at<? AND status IN ('solicitada','confirmada','reprogramada')",start,end),
   'next_appointment':(upcoming['starts_at'][11:16]+' · '+upcoming['customer_name']) if upcoming else '',
-  'appointments_requested':count("SELECT COUNT(*) FROM appointments WHERE status='solicitada' AND starts_at>=?",appointments.stamp(now)),
+  'appointments_requested':count("SELECT COUNT(*) FROM appointments WHERE deleted_at IS NULL AND status='solicitada' AND starts_at>=?",appointments.stamp(now)),
   'clients':count('SELECT COUNT(*) FROM clients'),'clients_review':count('SELECT COUNT(*) FROM clients WHERE needs_review=1'),
   'chats_waiting':count("SELECT COUNT(*) FROM adi_conversations WHERE mode='human'"),'accounts_pending':count("SELECT COUNT(*) FROM users WHERE approval='pending'")}
 

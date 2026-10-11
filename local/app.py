@@ -540,7 +540,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(200,{'slots':[{'time':r['time']} for r in rows]})
             if path == '/api/public/appointments/manage':
                 query=parse_qs(urlsplit(self.path).query);code=query.get('code',[''])[0][:40];token=query.get('token',[''])[0]
-                row=c.execute('SELECT id,public_code,customer_name,device_type,brand,model,service_code,starts_at,status,generation,manage_token_hash FROM appointments WHERE public_code=?',(code,)).fetchone()
+                row=c.execute('SELECT id,public_code,customer_name,device_type,brand,model,service_code,starts_at,status,generation,manage_token_hash FROM appointments WHERE deleted_at IS NULL AND public_code=?',(code,)).fetchone()
                 if not row or not secrets.compare_digest(row['manage_token_hash'],appointments.token_hash(token)):
                     return self.reply(404,{'error':'No encontramos una cita válida con ese enlace.'})
                 result=dict(row);result.pop('manage_token_hash');return self.reply(200,{'appointment':result})
@@ -612,7 +612,7 @@ class Handler(BaseHTTPRequestHandler):
                     first=appointments.date.fromisoformat(query.get('from',[''])[0]) if query.get('from',[''])[0] else today-appointments.timedelta(days=7)
                     last=appointments.date.fromisoformat(query.get('to',[''])[0]) if query.get('to',[''])[0] else today+appointments.timedelta(days=60)
                 except ValueError:return self.reply(400,{'error':'Fecha no válida.'})
-                if last<first or (last-first).days>190:return self.reply(400,{'error':'El período admite hasta 190 días.'})
+                if last<first or (last-first).days>400:return self.reply(400,{'error':'El período admite hasta 400 días.'})
                 rows,summary=appointments.agenda(c,appointments.stamp(appointments.datetime.combine(first,appointments.time.min,appointments.TZ)),appointments.stamp(appointments.datetime.combine(last+appointments.timedelta(days=1),appointments.time.min,appointments.TZ)))
                 preventive=maintenance.rows(c)
                 summary['preventive']=sum(1 for r in preventive if r['state']=='scheduled' and r['due_date']>=today.isoformat())
@@ -988,7 +988,7 @@ class Handler(BaseHTTPRequestHandler):
                 assistance=None
                 if user['role']=='administrador':
                     assistance=dict(c.execute("SELECT COALESCE(SUM(last_seen_admin='' AND EXISTS(SELECT 1 FROM adi_messages m WHERE m.conversation_id=ac.id AND m.author='client' AND m.visibility='public')),0) new_conversations,COALESCE(SUM(mode='human' AND (SELECT m.author FROM adi_messages m WHERE m.conversation_id=ac.id AND m.visibility='public' ORDER BY m.id DESC LIMIT 1)='client'),0) waiting,COALESCE(SUM(mode='human'),0) transferred FROM adi_conversations ac WHERE mode!='closed'").fetchone())
-                return self.reply(200,{'counts':counts,'attention':attention,'activity':activity,'maintenance':scheduled,'deliveries':deliveries,'today':today,'appointments':today_appointments,'pending_chats':pending_chats,'assistance':assistance,'upcoming_appointments':c.execute("SELECT COUNT(*) FROM appointments WHERE status IN ('solicitada','confirmada','reprogramada') AND starts_at>=?",(appointments.stamp(now),)).fetchone()[0] if user['role'] in ('administrador','tecnico') else 0,'pending_accounts':c.execute("SELECT COUNT(*) FROM users WHERE approval='pending'").fetchone()[0] if user['role']=='administrador' else 0,'pending_appointments':c.execute("SELECT COUNT(*) FROM appointments WHERE status='solicitada' AND starts_at>=?",(appointments.stamp(now),)).fetchone()[0] if user['role'] in ('administrador','tecnico') else 0})
+                return self.reply(200,{'counts':counts,'attention':attention,'activity':activity,'maintenance':scheduled,'deliveries':deliveries,'today':today,'appointments':today_appointments,'pending_chats':pending_chats,'assistance':assistance,'upcoming_appointments':c.execute("SELECT COUNT(*) FROM appointments WHERE deleted_at IS NULL AND status IN ('solicitada','confirmada','reprogramada') AND starts_at>=?",(appointments.stamp(now),)).fetchone()[0] if user['role'] in ('administrador','tecnico') else 0,'pending_accounts':c.execute("SELECT COUNT(*) FROM users WHERE approval='pending'").fetchone()[0] if user['role']=='administrador' else 0,'pending_appointments':c.execute("SELECT COUNT(*) FROM appointments WHERE deleted_at IS NULL AND status='solicitada' AND starts_at>=?",(appointments.stamp(now),)).fetchone()[0] if user['role'] in ('administrador','tecnico') else 0})
             search_route=path=='/api/search'
             if search_route:
                 term=parse_qs(urlsplit(self.path).query).get('q',[''])[0].strip()[:150]
@@ -1039,7 +1039,7 @@ class Handler(BaseHTTPRequestHandler):
                     if limited(c,'appointment-ip:'+digest(self.client_address[0]),12,900):return self.reply(429,{'error':'Demasiadas solicitudes. Intenta más tarde.'})
                     key=str(data.get('request_key','')).strip()
                     if not re.fullmatch(r'[A-Za-z0-9_-]{20,100}',key):return self.reply(400,{'error':'Actualiza el formulario e inténtalo nuevamente.'})
-                    previous=c.execute('SELECT id,public_code,starts_at,status FROM appointments WHERE request_key=?',(key,)).fetchone()
+                    previous=c.execute('SELECT id,public_code,starts_at,status FROM appointments WHERE deleted_at IS NULL AND request_key=?',(key,)).fetchone()
                     if previous:return self.reply(200,{'ok':True,'id':previous['id'],'code':previous['public_code'],'starts_at':previous['starts_at'],'status':previous['status'],'duplicate':True})
                     data['request_key']=key
                     status,payload=appointments.create(c,data)
@@ -1050,7 +1050,7 @@ class Handler(BaseHTTPRequestHandler):
                     return self.reply(status,payload)
                 if path == '/api/public/appointments/manage':
                     code=str(data.get('code',''))[:40];token=str(data.get('token',''))
-                    row=c.execute('SELECT * FROM appointments WHERE public_code=?',(code,)).fetchone()
+                    row=c.execute('SELECT * FROM appointments WHERE deleted_at IS NULL AND public_code=?',(code,)).fetchone()
                     if not row or not secrets.compare_digest(row['manage_token_hash'],appointments.token_hash(token)):return self.reply(404,{'error':'No encontramos una cita válida con ese enlace.'})
                     if data.get('action')=='cancel':
                         if row['status'] in ('cancelada','completada','no_asistio'):return self.reply(409,{'error':'La cita ya no se puede cancelar desde este enlace.'})
@@ -1449,7 +1449,7 @@ class Handler(BaseHTTPRequestHandler):
                     return self.reply(status,payload)
                 if appointment_route:
                     if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
-                    row=c.execute('SELECT * FROM appointments WHERE id=?',(int(appointment_route[1]),)).fetchone()
+                    row=c.execute('SELECT * FROM appointments WHERE deleted_at IS NULL AND id=?',(int(appointment_route[1]),)).fetchone()
                     if not row:return self.reply(404,{'error':'Cita no disponible.'})
                     action=data.get('action');now=appointments.stamp(appointments.now())
                     if action=='resend_mail':
@@ -1458,7 +1458,13 @@ class Handler(BaseHTTPRequestHandler):
                         if not kind:return self.reply(409,{'error':'Esta cita no tiene un aviso pendiente para su estado actual.'})
                         if limited(c,'appointment-mail:'+str(user['id']),limit=30,window=3600):return self.reply(429,{'error':'Alcanzaste el límite de reenvíos por hora.'})
                         return self.reply(200,{'ok':True,'mail':appointment_mail.send(c,row['id'],kind,force=True)})
-                    if action=='reschedule':
+                    if action=='edit':
+                        status,payload=appointments.edit(c,row,data,user)
+                    elif action=='delete':
+                        # Eliminar es una decisión de administración; la cita se conserva en la base con su auditoría.
+                        if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede eliminar citas.'})
+                        payload=appointments.remove(c,row,user,data.get('reason'));status=200
+                    elif action=='reschedule':
                         try:start=appointments.parse_start(str(data.get('starts_at','')))
                         except ValueError as error:return self.reply(400,{'error':str(error)})
                         result=appointments.reschedule(c,row,start,user);status=200 if result.get('ok') else 409;payload=result
@@ -1771,7 +1777,7 @@ class Handler(BaseHTTPRequestHandler):
                     appointment_id=str(data.get('appointment_id',''));linked_appointment=None
                     if appointment_id:
                         if not appointment_id.isdigit():return self.reply(400,{'error':'La cita vinculada no es válida.'})
-                        linked_appointment=c.execute('SELECT * FROM appointments WHERE id=?',(int(appointment_id),)).fetchone()
+                        linked_appointment=c.execute('SELECT * FROM appointments WHERE deleted_at IS NULL AND id=?',(int(appointment_id),)).fetchone()
                         if not linked_appointment:return self.reply(404,{'error':'La cita vinculada ya no está disponible.'})
                         if linked_appointment['converted_order_id']:return self.reply(409,{'error':'Esta cita ya fue convertida en una orden.'})
                         if linked_appointment['client_id']!=selected['id']:return self.reply(409,{'error':'La cita no corresponde al cliente seleccionado.'})

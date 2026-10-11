@@ -8,6 +8,26 @@
   },
   "releases": [
     {
+      "version": "1.5.36",
+      "date": "2026-10-11T18:34:17-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Acciones por cita en la Agenda: editar, cancelar y eliminar con auditoría",
+      "changes": {
+        "features": [
+          "Agenda: cada cita tiene acciones para ver, editar, reprogramar, cancelar y eliminar. Eliminar (solo administración) retira la cita de la agenda activa y conserva su registro de auditoría"
+        ],
+        "improvements": [
+          "Agenda: confirmación propia al cancelar o eliminar una cita en lugar de la ventana del navegador; las citas canceladas se muestran en rojo"
+        ],
+        "fixes": [
+          "Agenda: la lista ya incluye las citas de mantenimiento programadas a seis meses"
+        ],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.35",
       "date": "2026-10-11T18:22:39-05:00",
       "type": "patch",
