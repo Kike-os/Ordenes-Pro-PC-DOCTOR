@@ -197,30 +197,58 @@ ALLOWED = {'p', 'br', 'div', 'span', 'b', 'strong', 'i', 'em', 'u', 'ul', 'ol', 
 DROPPED = {'script', 'style', 'head', 'title', 'iframe', 'object', 'embed', 'form', 'svg', 'math', 'template', 'noscript'}
 
 
-class _Sanitizer(HTMLParser):
-    """Lista blanca estricta: sin estilos, sin atributos (salvo enlaces http/https/mailto) y sin recursos remotos."""
+SAFE_STYLES = {'color', 'background-color', 'font-weight', 'font-style', 'font-size', 'text-align', 'vertical-align', 'white-space', 'line-height', 'letter-spacing', 'text-decoration', 'width', 'max-width',
+               'padding', 'padding-top', 'padding-right', 'padding-bottom', 'padding-left', 'border', 'border-top', 'border-right', 'border-bottom', 'border-left', 'border-collapse'}
 
-    def __init__(self):
+
+def safe_style(attrs):
+    """Estilos de presentación inofensivos (colores, bordes, tamaños). Nada que cargue recursos, posicione u oculte contenido."""
+    values = dict(attrs)
+    rules = [item.split(':', 1) for item in str(values.get('style') or '').split(';') if ':' in item]
+    if re.fullmatch(r'#[0-9a-fA-F]{3,8}', str(values.get('bgcolor') or '').strip()):
+        rules.append(['background-color', values['bgcolor']])
+    kept = []
+    for prop, value in rules[:24]:
+        prop, value = prop.strip().lower(), value.strip()
+        if prop not in SAFE_STYLES or len(value) > 60 or not re.fullmatch(r'[#a-zA-Z0-9 .,%()-]+', value) or re.search(r'(?i)url|expression|var\(|calc\(', value):
+            continue
+        if prop == 'font-size' and not re.fullmatch(r'(9|1[0-9]|2[0-8])(\.\d)?px', value):
+            continue
+        if prop in ('width', 'max-width') and not re.fullmatch(r'\d{1,4}(px|%)', value):
+            continue
+        kept.append(prop + ':' + value)
+    return ' data-s="' + html_lib.escape(';'.join(kept), quote=True) + '"' if kept else ''
+
+
+class _Sanitizer(HTMLParser):
+    """Lista blanca estricta: sin scripts ni recursos remotos; solo estilos de presentación validados, enlaces http/https/mailto e imágenes incrustadas en el propio mensaje."""
+
+    def __init__(self, cids=None):
         super().__init__(convert_charrefs=True)
-        self.out, self.skip, self.blocked = [], 0, 0
+        self.out, self.skip, self.blocked, self.cids = [], 0, 0, cids or {}
 
     def handle_starttag(self, tag, attrs):
         if tag in DROPPED:
             self.skip += 1
         elif self.skip:
             return
+        elif tag == 'img' and str(dict(attrs).get('src') or '').lower().startswith('cid:') and str(dict(attrs).get('src'))[4:].strip() in self.cids:
+            # Imagen que viaja dentro del mensaje (logo de una firma, por ejemplo): se muestra desde el propio servidor de la aplicación.
+            values = dict(attrs)
+            width = str(values.get('width') or '')
+            self.out.append('<img data-part="' + str(self.cids[str(values['src'])[4:].strip()]) + '" alt="' + html_lib.escape(str(values.get('alt') or '')[:120], quote=True) + '"' + (' width="' + width + '"' if re.fullmatch(r'\d{1,3}', width) else '') + '>')
         elif tag == 'img':
             self.blocked += 1
             alt = dict(attrs).get('alt') or ''
             self.out.append('<span class="mail-blocked">[imagen bloqueada' + (': ' + html_lib.escape(alt[:80]) if alt else '') + ']</span>')
         elif tag == 'a':
             href = (dict(attrs).get('href') or '').strip()
-            if re.match(r'(?i)^(https?://|mailto:)[^\s"<>]+$', href) and len(href) < 2000:
-                self.out.append('<a href="' + html_lib.escape(href, quote=True) + '" target="_blank" rel="noopener noreferrer nofollow">')
+            if re.match(r'(?i)^(https?://|mailto:|tel:)[^\s"<>]+$', href) and len(href) < 2000:
+                self.out.append('<a href="' + html_lib.escape(href, quote=True) + '" target="_blank" rel="noopener noreferrer nofollow"' + safe_style(attrs) + '>')
             else:
                 self.out.append('<a>')
         elif tag in ALLOWED:
-            self.out.append('<' + tag + '>')
+            self.out.append('<' + tag + safe_style(attrs) + '>')
 
     def handle_startendtag(self, tag, attrs):
         self.handle_starttag(tag, attrs)
@@ -238,8 +266,8 @@ class _Sanitizer(HTMLParser):
             self.out.append(html_lib.escape(data))
 
 
-def sanitize_html(source):
-    parser = _Sanitizer()
+def sanitize_html(source, cids=None):
+    parser = _Sanitizer(cids)
     try:
         parser.feed(source[:600_000])
         parser.close()
@@ -425,6 +453,8 @@ def search(client, folder, query='', flagged=False, unread=False):
     code, data = client.select(quoted(folder), readonly=True)
     if code != 'OK':
         raise MailError('servidor', 'No se pudo abrir la carpeta.')
+    validity = client.response('UIDVALIDITY')[1]
+    search.uidvalidity = int(validity[0]) if validity and validity[0] else 0
     criteria = (['FLAGGED'] if flagged else []) + (['UNSEEN'] if unread else [])
     query = query.strip()[:120]
     if query:
@@ -563,7 +593,8 @@ def read_message(client, folder, uid, mark_seen=True):
             plain = content
         elif kind == 'text/html' and not rich:
             rich = content
-    safe, blocked = sanitize_html(rich) if rich else ('', 0)
+    cids = {str(part['content-id']).strip().strip('<>'): index for index, part in enumerate(message.walk()) if not part.is_multipart() and part['content-id'] and part.get_content_type() in INLINE_IMAGES}
+    safe, blocked = sanitize_html(rich, cids) if rich else ('', 0)
     if not plain and rich:
         plain = re.sub(r'\n{3,}', '\n\n', html_lib.unescape(re.sub(r'<[^>]+>', '', re.sub(r'(?i)<(br|/p|/div|/tr|/li)[^>]*>', '\n', re.sub(r'(?is)<(script|style|head).*?</\1>', '', rich))))).strip()
     if mark_seen and '\\seen' not in flags:
@@ -573,6 +604,20 @@ def read_message(client, folder, uid, mark_seen=True):
             'date': date_iso(message), 'message_id': header_text(message['message-id'])[:300], 'references': header_text(message['references'])[:2000], 'text': plain[:400_000], 'html': safe, 'blocked_images': blocked, 'attachments': attachments,
             'flagged': '\\flagged' in flags, 'seen': True if mark_seen else '\\seen' in flags, 'draft': '\\draft' in flags,
             'signature_pref': {'on': True, 'off': False}.get(header_text(message['x-ordenespro-signature']).lower())}
+
+
+INLINE_IMAGES = {'image/png': b'\x89PNG\r\n\x1a\n', 'image/jpeg': b'\xff\xd8\xff', 'image/gif': b'GIF8', 'image/webp': b'RIFF'}
+
+
+def inline_image(client, folder, uid, index):
+    """Imagen incrustada del propio mensaje, solo si es realmente una imagen del tipo que declara."""
+    message, _ = fetch_message(client, folder, uid)
+    for position, part in enumerate(message.walk()):
+        if position == int(index) and not part.is_multipart():
+            kind, content = part.get_content_type(), part.get_payload(decode=True) or b''
+            if kind in INLINE_IMAGES and content.startswith(INLINE_IMAGES[kind]) and len(content) <= 3_000_000:
+                return kind, content
+    raise MailError('servidor', 'Imagen no disponible.')
 
 
 def attachment(client, folder, uid, index):
@@ -590,6 +635,65 @@ def set_flag(client, folder, uid, action):
     code, _ = client.select(quoted(folder), readonly=False)
     if code != 'OK' or client.uid('STORE', str(int(uid)), *change)[0] != 'OK':
         raise MailError('servidor', 'No se pudo actualizar el mensaje.')
+
+
+def batch(client, folder, uids, action, target='', uidvalidity=None):
+    """Acción real sobre varios mensajes (por UID) de una carpeta. Devuelve cuántos mensajes se procesaron.
+
+    Marcar usa los indicadores IMAP; archivar, eliminar, restaurar y mover trasladan el mensaje a otra carpeta real.
+    «Eliminar» siempre mueve a la Papelera del servidor: si no existe, se rechaza en lugar de borrar definitivamente.
+    """
+    uids = sorted({int(uid) for uid in uids})[:200]
+    if not uids:
+        raise MailError('configuracion', 'Selecciona al menos un mensaje.')
+    source, folders = resolve(client, folder)
+    code, _ = client.select(quoted(source['id']), readonly=False)
+    if code != 'OK':
+        raise MailError('servidor', 'No se pudo abrir la carpeta.')
+    current = client.response('UIDVALIDITY')[1]
+    current = int(current[0]) if current and current[0] else None
+    if uidvalidity and current and int(uidvalidity) != current:
+        # La carpeta cambió de identidad en el servidor: los UID que conoce el navegador ya no son fiables.
+        raise MailError('configuracion', 'La carpeta cambió en el servidor. Actualiza la lista e inténtalo de nuevo.')
+    code, found = client.uid('SEARCH', 'UID', ','.join(str(uid) for uid in uids))
+    present = sorted(int(value) for value in (found[0] or b'').split()) if code == 'OK' else []
+    present = [uid for uid in present if uid in uids]
+    if not present:
+        raise MailError('servidor', 'Los mensajes seleccionados ya no están en esta carpeta.')
+    group = ','.join(str(uid) for uid in present)
+    flags = {'seen': ('+FLAGS', '(\\Seen)'), 'unseen': ('-FLAGS', '(\\Seen)'), 'star': ('+FLAGS', '(\\Flagged)'), 'unstar': ('-FLAGS', '(\\Flagged)')}
+    if action in flags:
+        if client.uid('STORE', group, *flags[action])[0] != 'OK':
+            raise MailError('servidor', 'El servidor no pudo actualizar los mensajes.')
+        return len(present)
+    uidplus = any(b'UIDPLUS' in (item if isinstance(item, bytes) else str(item).encode()) for item in client.capabilities)
+    if action == 'purge':
+        if source['role'] != 'trash':
+            raise MailError('configuracion', 'Solo se elimina definitivamente desde la Papelera.')
+        if not uidplus:
+            raise MailError('servidor', 'El servidor no permite eliminar mensajes concretos de forma segura.')
+        if client.uid('STORE', group, '+FLAGS', '(\\Deleted)')[0] != 'OK' or client.uid('EXPUNGE', group)[0] != 'OK':
+            raise MailError('servidor', 'El servidor no pudo eliminar los mensajes.')
+        return len(present)
+    destination = {'archive': by_role(folders, 'archive'), 'trash': by_role(folders, 'trash'), 'restore': by_role(folders, 'inbox'), 'move': target if any(item['id'] == target for item in folders) else None}.get(action)
+    if action not in ('archive', 'trash', 'restore', 'move'):
+        raise MailError('configuracion', 'Acción no válida.')
+    if not destination:
+        raise MailError('configuracion', {'archive': 'El servidor no tiene una carpeta de Archivo identificada.', 'trash': 'El servidor no tiene una Papelera identificada: no se eliminó nada.'}.get(action, 'Carpeta de destino no disponible.'))
+    if destination == source['id']:
+        raise MailError('configuracion', 'Los mensajes ya están en esa carpeta.')
+    if any(b'MOVE' in (item if isinstance(item, bytes) else str(item).encode()).split() for item in client.capabilities):
+        if client.uid('MOVE', group, quoted(destination))[0] != 'OK':
+            raise MailError('servidor', 'El servidor no pudo mover los mensajes.')
+        return len(present)
+    # Sin MOVE: copiar, comprobar y solo entonces retirar exactamente esos UID del origen (requiere UIDPLUS).
+    if not uidplus:
+        raise MailError('servidor', 'El servidor no permite mover mensajes de forma segura.')
+    if client.uid('COPY', group, quoted(destination))[0] != 'OK':
+        raise MailError('servidor', 'El servidor no pudo copiar los mensajes al destino.')
+    if client.uid('STORE', group, '+FLAGS', '(\\Deleted)')[0] != 'OK' or client.uid('EXPUNGE', group)[0] != 'OK':
+        raise MailError('servidor', 'Los mensajes se copiaron al destino, pero no se pudieron retirar del origen.')
+    return len(present)
 
 
 def rich_html(body, signature='', wrap=True):

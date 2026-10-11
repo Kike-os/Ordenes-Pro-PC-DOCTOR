@@ -4,6 +4,27 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.5 — 2026-10-11 10:04 (UTC-05:00)
+
+Bandeja de correo estilo Outlook, destinatarios desde Clientes, Centro de Notificaciones flotante y Seguimiento de órdenes.
+
+### Nuevas funcionalidades
+
+- Mail Pro: bandeja estilo Outlook con casillas, selección múltiple, acciones rápidas por mensaje y barra contextual (Leídos, No leídos, Archivar, Mover, Eliminar y menú «Más»), con operaciones reales en el servidor de correo.
+- Mail Pro: «Eliminar» mueve a la Papelera con opción «Deshacer»; desde la Papelera se puede restaurar o eliminar definitivamente con confirmación.
+- Mail Pro: destinatarios con sugerencias de la base de Clientes, etiquetas, contactos frecuentes y libreta de contactos en Para, CC y CCO.
+- Seguimiento de órdenes: línea de tiempo compacta con iconos por proceso, filtros y un historial completo con búsqueda y fechas.
+
+### Mejoras realizadas
+
+- Centro de Notificaciones flotante bajo la campana y avisos más compactos (Micro Notification Premium); ya no cambia el ancho de la página.
+- Mail Pro: indicador de conexión real (Conectado, Sincronizando, Reconectando, Sin conexión, Error de autenticación) con reintentos progresivos.
+
+### Errores corregidos
+
+- Mail Pro: la firma corporativa y su logo se ven al leer los correos recibidos; los mensajes HTML se muestran con sus colores sobre fondo claro.
+- Mail Pro: el error «Recurso no disponible» al eliminar se debía a un servidor sin reiniciar tras actualizar; ahora el mensaje explica la causa.
+
 ## v1.5.4 — 2026-10-11 09:31 (UTC-05:00)
 
 Firma corporativa visible en el redactor de correo, editor con formato y vista previa del mensaje.

@@ -1,6 +1,7 @@
 """Evaluación local de ÓRDENES PRO. Loopback por defecto; LAN mediante configuración explícita."""
 import argparse
 import base64
+import unicodedata
 import getpass
 import hashlib
 import hmac
@@ -605,6 +606,27 @@ class Handler(BaseHTTPRequestHandler):
                 term=parse_qs(urlsplit(self.path).query).get('q',[''])[0][:150]
                 rows=[dict(r) for r in c.execute("SELECT id,name,identification,document_type,phone,phone_secondary,email,trade_name,city,needs_review FROM clients WHERE instr(lower(name||' '||COALESCE(identification,'')||' '||COALESCE(phone,'')||' '||phone_secondary||' '||COALESCE(email,'')||' '||trade_name),lower(?))>0 ORDER BY name COLLATE NOCASE LIMIT 20",(term.strip(),))] if term.strip() else []
                 return self.reply(200,{'rows':rows})
+            if path == '/api/mail/contacts':
+                # Sugerencias de destinatarios: solo nombre, correo y nombre comercial de clientes reales; búsqueda acotada en el servidor.
+                if not mail_allowed(user):return self.reply(403,{'error':'No tienes acceso al correo o todavía no está configurado en el servidor.'})
+                if limited(c,'mail-contacts:'+str(user['id']),limit=240,window=300):return self.reply(429,{'error':'Demasiadas búsquedas seguidas. Espera un momento.'})
+                term=parse_qs(urlsplit(self.path).query).get('q',[''])[0][:80].strip()
+                if parse_qs(urlsplit(self.path).query).get('recent',[''])[0]=='1':
+                    # Contactos frecuentes del propio usuario: destinatarios de sus últimos envíos.
+                    saved=c.execute('SELECT value FROM system_state WHERE key=?',('mail_recent:'+str(user['id']),)).fetchone()
+                    try:recent=json.loads(saved['value']) if saved else []
+                    except ValueError:recent=[]
+                    return self.reply(200,{'rows':recent[:6],'recent':True})
+                if len(term)<2:return self.reply(200,{'rows':[]})
+                plain=lambda text:''.join(ch for ch in unicodedata.normalize('NFD',str(text or '').lower()) if unicodedata.category(ch)!='Mn')
+                term=plain(term);matches=[]
+                for row in c.execute("SELECT id,name,email,trade_name,identification FROM clients ORDER BY name COLLATE NOCASE"):
+                    name,mail,trade=plain(row['name']),plain(row['email']),plain(row['trade_name'])
+                    if term in name or term in mail or term in trade or (term.isdigit() and len(term)>=4 and term in str(row['identification'] or '')):
+                        rank=0 if name.startswith(term) or mail.startswith(term) else 1 if any(part.startswith(term) for part in name.split()) else 2
+                        matches.append((0 if row['email'] else 1,rank,name,{'id':row['id'],'name':row['name'],'email':row['email'] or '','trade_name':row['trade_name'] or ''}))
+                matches.sort(key=lambda item:item[:3])
+                return self.reply(200,{'rows':[item[3] for item in matches[:8]],'more':len(matches)>8})
             if path == '/api/order-options':
                 return self.reply(200, {'statuses':order_workspace.STATUSES,'users':[dict(r) for r in c.execute('SELECT id,name FROM users WHERE active=1 ORDER BY name')]})
             photo = re.fullmatch(r'/api/order-photo/([0-9]+)', path)
@@ -758,7 +780,7 @@ class Handler(BaseHTTPRequestHandler):
                             # IMAP no busca por adjuntos: se revisa la estructura de los 300 mensajes más recientes del resultado.
                             uids=[row['uid'] for row in mail_pro.summaries(client,uids[:300],previews=False) if row['attachments']]
                         rows=mail_pro.summaries(client,uids[(page-1)*mail_pro.PAGE:page*mail_pro.PAGE])
-                        return self.reply(200,{'rows':rows,'total':len(uids),'page':page,'pages':max(1,(len(uids)+mail_pro.PAGE-1)//mail_pro.PAGE),'folder':folder})
+                        return self.reply(200,{'rows':rows,'total':len(uids),'page':page,'pages':max(1,(len(uids)+mail_pro.PAGE-1)//mail_pro.PAGE),'folder':folder,'uidvalidity':getattr(mail_pro.search,'uidvalidity',0)})
                     if not arg('uid').isdigit():return self.reply(400,{'error':'Mensaje no válido.'})
                     if path=='/api/mail/message':
                         message=mail_pro.read_message(client,folder['id'],int(arg('uid')))
@@ -769,6 +791,9 @@ class Handler(BaseHTTPRequestHandler):
                         return self.reply(200,{'message':message})
                     if path=='/api/mail/attachment':
                         if not arg('part').isdigit():return self.reply(400,{'error':'Adjunto no válido.'})
+                        if arg('inline')=='1':
+                            kind,content=mail_pro.inline_image(client,folder['id'],int(arg('uid')),int(arg('part')))
+                            return self.reply(200,content,kind)
                         name,content=mail_pro.attachment(client,folder['id'],int(arg('uid')),int(arg('part')))
                         audit(c,user['id'],'mail_attachment_downloaded');c.commit()
                         # Siempre como descarga binaria: el navegador nunca interpreta el adjunto.
@@ -781,7 +806,7 @@ class Handler(BaseHTTPRequestHandler):
             if path in ('/api/dashboard','/api/activity','/api/maintenance'):
                 now=reception_now();today=now.date().isoformat()
                 if path=='/api/maintenance':return self.reply(200,{'rows':maintenance.rows(c),'today':today,'profiles':{k:v[0] for k,v in maintenance.PROFILES.items()}})
-                activity=[dict(r) for r in c.execute('SELECT h.*,o.code,u.name actor FROM order_history h JOIN orders o ON o.id=h.order_id LEFT JOIN users u ON u.id=h.actor_id ORDER BY h.id DESC LIMIT ?', (50 if path=='/api/activity' else 5,))]
+                activity=[dict(r) for r in c.execute('SELECT h.*,o.code,u.name actor FROM order_history h JOIN orders o ON o.id=h.order_id LEFT JOIN users u ON u.id=h.actor_id ORDER BY h.id DESC LIMIT ?', (300 if path=='/api/activity' else 12,))]
                 if path=='/api/activity':return self.reply(200,{'rows':activity})
                 counts={r['code']:r['total'] for r in c.execute('SELECT s.code,COUNT(o.id) total FROM statuses s LEFT JOIN orders o ON o.status=s.code GROUP BY s.code')}
                 source='orders o JOIN devices d ON d.id=o.device_id JOIN clients c ON c.id=d.client_id JOIN statuses s ON s.code=o.status'
@@ -1090,6 +1115,16 @@ class Handler(BaseHTTPRequestHandler):
                         return self.reply(200,{'ok':True})
                     client=None
                     try:
+                        if path=='/api/mail/batch':
+                            # Acciones sobre mensajes seleccionados: indicadores y movimientos reales en el servidor IMAP.
+                            uids=[int(v) for v in str(data.get('uids','')).split(',') if v.strip().isdigit()]
+                            if not uids or len(uids)>200:return self.reply(400,{'error':'Selecciona entre 1 y 200 mensajes.'})
+                            action=str(data.get('action',''))
+                            if action=='purge' and data.get('confirm') is not True:return self.reply(400,{'error':'Confirma la eliminación definitiva.'})
+                            client=mail_pro.open_imap()
+                            done=mail_pro.batch(client,str(data.get('folder','')),uids,action,str(data.get('target','')),str(data.get('uidvalidity','')) if str(data.get('uidvalidity','')).isdigit() else None)
+                            audit(c,user['id'],'mail_'+action if action in ('archive','trash','restore','move','purge') else 'mail_flags')
+                            return self.reply(200,{'ok':True,'done':done})
                         if path in ('/api/mail/flag','/api/mail/link'):
                             if not str(data.get('uid','')).isdigit():return self.reply(400,{'error':'Mensaje no válido.'})
                             client=mail_pro.open_imap();folder,_=mail_pro.resolve(client,str(data.get('folder','')));uid=int(data['uid'])
@@ -1142,7 +1177,17 @@ class Handler(BaseHTTPRequestHandler):
                             # Aceptado por el servidor SMTP: recién ahora se considera enviado.
                             c.execute("UPDATE mail_outbox SET status='sent',updated_at=? WHERE request_key=?",(now,key))
                             if order:c.execute('INSERT OR IGNORE INTO mail_links(message_id,folder,uid,order_id,subject,correspondent,direction,sent_at,created_by,created_at) VALUES (?,?,0,?,?,?,?,?,?,?)',(message['Message-ID'],'',order['id'],str(message['Subject']),recipients[0],'out',now,user['id'],now))
-                            audit(c,user['id'],'mail_sent',order['id'] if order else None);c.commit()
+                            audit(c,user['id'],'mail_sent',order['id'] if order else None)
+                            try:
+                                # Contactos frecuentes: se recuerdan los últimos destinatarios de este usuario (nombre del cliente si existe).
+                                saved=c.execute('SELECT value FROM system_state WHERE key=?',('mail_recent:'+str(user['id']),)).fetchone();recent=json.loads(saved['value']) if saved else []
+                                for address in recipients:
+                                    known=c.execute("SELECT id,name,trade_name FROM clients WHERE email!='' AND lower(email)=lower(?) ORDER BY id LIMIT 1",(address,)).fetchone()
+                                    recent=[item for item in recent if item.get('email','').lower()!=address.lower()]
+                                    recent.insert(0,{'id':known['id'] if known else None,'name':known['name'] if known else address,'email':address,'trade_name':(known['trade_name'] or '') if known else ''})
+                                c.execute("INSERT INTO system_state VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",('mail_recent:'+str(user['id']),json.dumps(recent[:12])))
+                            except Exception:pass
+                            c.commit()
                             saved=False
                             try:
                                 client=mail_pro.open_imap();folders=mail_pro.list_folders(client);sent=mail_pro.by_role(folders,'sent')
@@ -1154,7 +1199,7 @@ class Handler(BaseHTTPRequestHandler):
                                     client.select(mail_pro.quoted(source),readonly=False);client.uid('STORE',uid,'+FLAGS','(\\Answered)')
                             except Exception:saved=False
                             return self.reply(201,{'ok':True,'saved_in_sent':saved,'linked':order['code'] if order else ''})
-                        return self.reply(404,{'error':'Recurso no disponible.'})
+                        return self.reply(404,{'error':'El servidor no reconoce esta operación de correo. Si la aplicación se actualizó hace poco, recarga la página; si continúa, hay que reiniciar el servicio.'})
                     except mail_pro.MailError as error:
                         return self.reply(400 if error.kind=='configuracion' else 502,{'error':str(error),'kind':error.kind})
                     finally:

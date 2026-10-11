@@ -248,6 +248,12 @@ class MailRouteTests(test_app.SecurityTests):
         html_part=message.get_payload()[1];self.assertEqual((message.get_content_type(),html_part.get_content_type()),('multipart/alternative','multipart/related'))
         logo=html_part.get_payload()[1];self.assertEqual((logo.get_content_type(),logo.get_content_disposition()),('image/png','inline'))
         self.assertIn(logo['Content-ID'][1:-1],page);self.assertNotIn('/home/',message.as_string())
+        # Lectura: la firma se conserva (estilos validados e imagen incrustada servida por la aplicación) y lo peligroso se descarta.
+        safe,blocked=mail_pro.sanitize_html(page+'<img src="https://rastreo.example.invalid/x.gif"><p style="position:fixed;background:url(x);color:#333" onclick="x()">t</p><img src="cid:otro">',{logo['Content-ID'][1:-1]:3})
+        self.assertIn('<img data-part="3" alt="PC-DOCTOR S.A." width="120">',safe);self.assertEqual(blocked,2)
+        self.assertIn('background-color:#2b2d31',safe);self.assertIn('border-bottom:3px solid #e03a3e',safe);self.assertIn('href="tel:+593990000000"',safe)
+        for bad in ('style=','onclick','position','url(','<script','src='):self.assertNotIn(bad,safe)
+        self.assertIn('data-s="color:#333"',safe)
         with_file,_=mail_pro.build_message({'username':'buzon@example.invalid'},{'to':'a@example.invalid','subject':'Firma','body':'Hola','attachments':[{'name':'a.txt','type':'text/plain','data':'aG9sYQ=='}]},card)
         self.assertEqual(with_file.get_content_type(),'multipart/mixed')
         none,_=mail_pro.build_message({'username':'buzon@example.invalid'},{'to':'a@example.invalid','subject':'Sin firma','body':'Hola'},'')
@@ -270,6 +276,52 @@ class MailRouteTests(test_app.SecurityTests):
         draft,_=mail_pro.build_message({'username':'buzon@example.invalid'},{'to':'','subject':'Pendiente','body':'Texto','draft':True,'signature_pref':False},'')
         self.assertEqual((draft['X-OrdenesPro-Signature'],'-- ' in draft.get_content()),('off',False))
         self.assertIsNone(mail_pro.build_message({'username':'buzon@example.invalid'},{'to':'a@example.invalid','subject':'x','body':'y','signature_pref':True},'')[0]['X-OrdenesPro-Signature'])
+
+    def test_batch_actions_use_real_imap_operations_and_never_delete_silently(self):
+        class Box:
+            def __init__(self,caps=(b'IMAP4REV1',b'MOVE',b'UIDPLUS'),folders=None):
+                self.capabilities=caps;self.calls=[];self.folders=folders or [b'(\\HasNoChildren) "." INBOX',b'(\\HasNoChildren \\Trash) "." INBOX.Trash',b'(\\HasNoChildren \\Archive) "." INBOX.Archive']
+            def list(self):return 'OK',self.folders
+            def select(self,name,readonly=True):self.calls.append(('select',name,readonly));return 'OK',[b'3']
+            def response(self,name):return name,[b'77']
+            def uid(self,command,*args):
+                self.calls.append((command,)+args)
+                return ('OK',[b'4 5']) if command=='SEARCH' else ('OK',[b''])
+        box=Box();self.assertEqual(mail_pro.batch(box,'INBOX',[5,4,9],'seen',uidvalidity='77'),2)
+        self.assertIn(('STORE','4,5','+FLAGS','(\\Seen)'),box.calls);self.assertIn(('select','"INBOX"',False),box.calls)
+        box=Box();mail_pro.batch(box,'INBOX',[4,5],'trash');self.assertIn(('MOVE','4,5','"INBOX.Trash"'),box.calls);self.assertFalse([c for c in box.calls if c[0]=='EXPUNGE'])
+        box=Box();mail_pro.batch(box,'INBOX',[4],'archive');self.assertIn(('MOVE','4','"INBOX.Archive"'),box.calls)
+        box=Box();mail_pro.batch(box,'INBOX.Trash',[4],'restore');self.assertIn(('MOVE','4','"INBOX"'),box.calls)
+        # Sin MOVE: copia, marca y retira solo esos UID; sin UIDPLUS no se arriesga a vaciar la carpeta.
+        box=Box(caps=(b'IMAP4REV1',b'UIDPLUS'));mail_pro.batch(box,'INBOX',[4,5],'trash')
+        self.assertEqual([c[0] for c in box.calls if c[0] in ('COPY','STORE','EXPUNGE')],['COPY','STORE','EXPUNGE']);self.assertIn(('EXPUNGE','4,5'),box.calls)
+        for caps,folders,action,folder in [((b'IMAP4REV1',),None,'trash','INBOX'),((b'MOVE',),[b'(\\HasNoChildren) "." INBOX'],'trash','INBOX'),((b'MOVE',b'UIDPLUS'),None,'purge','INBOX'),((b'MOVE',),None,'borrar','INBOX'),((b'MOVE',),None,'move','INBOX')]:
+            failing=Box(caps=caps,folders=folders)
+            with self.assertRaises(mail_pro.MailError):mail_pro.batch(failing,folder,[4],action,'carpeta-inexistente')
+            self.assertFalse([c for c in failing.calls if c[0] in ('EXPUNGE','MOVE','COPY')])
+        with self.assertRaises(mail_pro.MailError):mail_pro.batch(Box(),'INBOX',[4],'seen',uidvalidity='12')
+        box=Box();mail_pro.batch(box,'INBOX.Trash',[4],'purge');self.assertIn(('EXPUNGE','4'),box.calls)
+        cookie,csrf=self.login()
+        with patch.dict(app.os.environ,ENV),patch.object(mail_pro,'open_imap',side_effect=lambda *a,**k:Box()):
+            self.assertEqual(self.request('/api/mail/batch',{'folder':'INBOX','uids':'4,5','action':'unseen'},cookie=cookie)['status'],403)
+            self.assertEqual(self.request('/api/mail/batch',{'folder':'INBOX','uids':'4,5','action':'unseen'},cookie=cookie,csrf=csrf)['body']['done'],2)
+            self.assertEqual(self.request('/api/mail/batch',{'folder':'INBOX.Trash','uids':'4','action':'purge'},cookie=cookie,csrf=csrf)['status'],400)
+            self.assertEqual(self.request('/api/mail/batch',{'folder':'INBOX','uids':'','action':'seen'},cookie=cookie,csrf=csrf)['status'],400)
+
+    def test_recipient_suggestions_come_from_clients_with_permission(self):
+        cookie,csrf=self.login()
+        with app.connect() as c:
+            for name,mail,trade,doc in [('María Peñafiel Ávila','maria@example.invalid','Taller Ávila','0100000017'),('Mario Sánchez','','',''),('Empresa Demo S.A.','ventas@example.invalid','Demo Comercial','1790000000001')]:
+                c.execute("INSERT INTO clients(name,email,trade_name,identification,phone,created_at) VALUES (?,?,?,?,?,1)",(name,mail,trade,doc,'0990000000'))
+        self.assertEqual(self.request('/api/mail/contacts?q=mar')['status'],401)
+        with patch.dict(app.os.environ,{k:'' for k in ENV}):self.assertEqual(self.request('/api/mail/contacts?q=mar',cookie=cookie)['status'],403)
+        with patch.dict(app.os.environ,ENV):
+            find=lambda q:self.request('/api/mail/contacts?q='+q,cookie=cookie)['body']['rows']
+            self.assertEqual(find('m'),[])
+            self.assertEqual([(r['name'],r['email']) for r in find('mar')],[('María Peñafiel Ávila','maria@example.invalid'),('Mario Sánchez','')])
+            self.assertEqual([r['name'] for r in find('PENAFIEL')],['María Peñafiel Ávila']);self.assertEqual([r['name'] for r in find('avila')],['María Peñafiel Ávila'])
+            self.assertEqual([r['name'] for r in find('ventas@')],['Empresa Demo S.A.']);self.assertEqual([r['name'] for r in find('comercial')],['Empresa Demo S.A.'])
+            self.assertEqual(set(find('demo')[0]),{'id','name','email','trade_name'})
 
     def test_replaced_draft_is_removed_only_when_it_is_a_draft(self):
         class Box:
