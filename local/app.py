@@ -719,6 +719,11 @@ class Handler(BaseHTTPRequestHandler):
                     except mail_pro.MailError as error:return self.reply(502,{'error':str(error),'kind':error.kind})
                     if not state:return self.reply(502,{'error':'El servidor de correo no informó la bandeja de entrada.'})
                     return self.reply(200,{'unread':state.get('unread',0),'checked':state.get('checked',''),'quota':state.get('quota'),'events':notifications.mail_events(c)[-5:]})
+                if path=='/api/mail/storage':
+                    # Independiente de la lectura y el envío: si falla, el resto del correo sigue funcionando.
+                    if arg('now')=='1' and limited(c,'mail-storage:'+str(user['id']),limit=30,window=300):return self.reply(429,{'error':'Espera un momento antes de volver a actualizar el almacenamiento.'})
+                    storage=notifications.mail_storage(c,reception_now(),0 if arg('now')=='1' else 60)
+                    return self.reply(200,{key:storage.get(key) for key in ('state','used','limit','source','checked','stale','detail','cpanel','failed')})
                 try:
                     client=mail_pro.open_imap()
                     if path=='/api/mail/overview':
@@ -1025,6 +1030,10 @@ class Handler(BaseHTTPRequestHandler):
                 if path.startswith('/api/mail/'):
                     if path=='/api/mail/test':
                         if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede probar la conexión.'})
+                        if data.get('kind')=='cpanel':
+                            import cpanel
+                            ok,steps,problem,kind=cpanel.diagnose(mail_pro.settings()['username'])
+                            return self.reply(200,{'ok':ok,'steps':steps,'error':problem,'kind':kind})
                         try:steps=mail_pro.test_smtp() if data.get('kind')=='smtp' else mail_pro.test_imap()
                         except mail_pro.MailError as error:return self.reply(200,{'ok':False,'kind':error.kind,'error':str(error),'steps':getattr(error,'steps',[])})
                         return self.reply(200,{'ok':True,'steps':steps})
@@ -1080,7 +1089,11 @@ class Handler(BaseHTTPRequestHandler):
                             now=reception_now().isoformat(timespec='seconds')
                             if draft:
                                 client=mail_pro.open_imap();folders=mail_pro.list_folders(client);target=mail_pro.by_role(folders,'drafts')
-                                if not target or not mail_pro.store(client,target,message,'(\\Draft \\Seen)'):return self.reply(502,{'error':'No se pudo guardar el borrador en el servidor de correo.'})
+                                if not target or not mail_pro.store(client,target,message,'(\\Draft \\Seen)'):
+                                    print('mail-draft no guardado',flush=True);return self.reply(502,{'error':'No se pudo guardar el borrador en el servidor de correo.'})
+                                # El borrador que se estaba editando se reemplaza por la versión nueva: no quedan duplicados.
+                                old=str(data.get('draft_uid',''))
+                                if old.isdigit() and str(data.get('draft_folder',''))==target:mail_pro.remove_draft(client,target,int(old))
                                 audit(c,user['id'],'mail_draft_saved')
                                 return self.reply(201,{'ok':True,'draft':True})
                             previous=c.execute('SELECT status FROM mail_outbox WHERE request_key=?',(key,)).fetchone()
@@ -1101,6 +1114,8 @@ class Handler(BaseHTTPRequestHandler):
                             try:
                                 client=mail_pro.open_imap();folders=mail_pro.list_folders(client);sent=mail_pro.by_role(folders,'sent')
                                 saved=bool(sent and mail_pro.store(client,sent,message,'(\\Seen)'))
+                                old=str(data.get('draft_uid',''));drafts=mail_pro.by_role(folders,'drafts')
+                                if old.isdigit() and drafts and str(data.get('draft_folder',''))==drafts:mail_pro.remove_draft(client,drafts,int(old))  # Borrador ya enviado.
                                 source=str(data.get('reply_folder',''));uid=str(data.get('reply_uid',''))
                                 if source and uid.isdigit() and any(f['id']==source for f in folders):
                                     client.select(mail_pro.quoted(source),readonly=False);client.uid('STORE',uid,'+FLAGS','(\\Answered)')

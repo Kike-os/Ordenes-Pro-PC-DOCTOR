@@ -4,6 +4,20 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.2 — 2026-10-11 08:43 (UTC-05:00)
+
+Mail Pro con almacenamiento en tiempo real, diagnóstico de sonido y borradores sin duplicados.
+
+### Nuevas funcionalidades
+
+- Mail Pro: almacenamiento del buzón siempre al día (cada minuto y al sincronizar), con botón «Actualizar almacenamiento», fuente del dato y conexión opcional a cPanel UAPI de solo lectura.
+- Mail Pro: prueba de sonido y notificaciones con diagnóstico del reproductor, aviso en pantalla y aviso de escritorio.
+
+### Errores corregidos
+
+- Mail Pro: al cambiar la cuota del buzón el indicador podía seguir mostrando el valor anterior; ahora explica el motivo técnico cuando no hay datos.
+- Mail Pro: reabrir un borrador y guardarlo o enviarlo ya no deja copias duplicadas en Borradores.
+
 ## v1.5.1 — 2026-10-11 08:22 (UTC-05:00)
 
 Adi AI rediseñada, chat flotante compacto con atención real de asesores, Mail Pro con avisos de correo nuevo y almacenamiento real, y reloj y clima renovados.

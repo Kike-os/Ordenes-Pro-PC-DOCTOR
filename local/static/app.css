@@ -2178,3 +2178,9 @@ button.header-weather:hover,button.header-weather[aria-expanded=true]{background
 .popover-action{justify-self:start;min-height:34px;padding:6px 12px;font-size:12px}
 .mail-format{display:flex;align-items:center;gap:6px}.mail-format-button{min-width:34px;min-height:32px;padding:4px 10px;border:1px solid #2a4063;border-radius:8px;background:#0b1626;color:#c4ddff;font-size:12.5px;font-weight:700;cursor:pointer}.mail-format-button:nth-child(2){font-style:italic}.mail-format-button:hover{background:#13233d;border-color:#4b75b3;transform:none}.mail-format small{margin-left:6px;font-size:11px;color:#7f93b1}
 .mail-composer.mail-composer-wide form{grid-template-rows:repeat(6,auto) minmax(200px,1fr)}
+.mail-v2 .mail-storage header strong{margin-right:auto}.mail-v2 .mail-storage-refresh{flex:0 0 24px;width:24px;height:24px;border-radius:7px}.mail-v2 .mail-storage-refresh .system-icon{width:13px!important;height:13px!important;flex:none!important}
+.mail-v2 .mail-storage-stale{color:#f3d48f!important}
+.mail-v2[data-side=collapsed] .mail-storage-refresh{display:none}
+@media(max-width:1180px){.mail-v2 .mail-storage-refresh{display:none}}
+.mail-pref-tests{display:flex;flex-wrap:wrap;gap:8px}.mail-pref-tests button{min-height:36px;padding:6px 12px;font-size:12.5px}
+.mail-diagnostic{list-style:none;margin:0;padding:0;display:grid;gap:4px;font-size:12px;line-height:1.45;color:#b9cce6}.mail-diagnostic:empty{display:none}.mail-diagnostic-fail{color:#ffb3b6}

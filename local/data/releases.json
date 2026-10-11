@@ -8,6 +8,26 @@
   },
   "releases": [
     {
+      "version": "1.5.2",
+      "date": "2026-10-11T08:43:05-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Mail Pro con almacenamiento en tiempo real, diagnóstico de sonido y borradores sin duplicados.",
+      "changes": {
+        "features": [
+          "Mail Pro: almacenamiento del buzón siempre al día (cada minuto y al sincronizar), con botón «Actualizar almacenamiento», fuente del dato y conexión opcional a cPanel UAPI de solo lectura.",
+          "Mail Pro: prueba de sonido y notificaciones con diagnóstico del reproductor, aviso en pantalla y aviso de escritorio."
+        ],
+        "improvements": [],
+        "fixes": [
+          "Mail Pro: al cambiar la cuota del buzón el indicador podía seguir mostrando el valor anterior; ahora explica el motivo técnico cuando no hay datos.",
+          "Mail Pro: reabrir un borrador y guardarlo o enviarlo ya no deja copias duplicadas en Borradores."
+        ],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.1",
       "date": "2026-10-11T08:22:08-05:00",
       "type": "patch",

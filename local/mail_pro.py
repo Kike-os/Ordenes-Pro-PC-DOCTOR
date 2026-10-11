@@ -362,18 +362,49 @@ def date_iso(message):
         return ''
 
 
-def quota(client):
-    """Uso y cuota reales del buzón según el servidor (extensión QUOTA de IMAP). None si el servidor no lo informa."""
+def quota_detail(client):
+    """Uso y cuota reales según la extensión QUOTA de IMAP: (datos | None, motivo técnico cuando no hay datos)."""
     try:
         code, data = client.getquotaroot('INBOX')
-    except Exception:
-        return None
-    text = b' '.join(part for group in (data or []) for part in (group or []) if isinstance(part, bytes)).decode('ascii', 'replace')
+    except Exception as error:
+        return None, 'El servidor IMAP rechazó GETQUOTAROOT (' + type(error).__name__ + ').'
+    parts = [part for group in (data or []) for part in (group or []) if isinstance(part, bytes)]
+    # Algunos servidores entregan la respuesta QUOTA fuera del resultado del comando: se revisa también lo pendiente.
+    for extra in (getattr(client, 'untagged_responses', {}) or {}).get('QUOTA', []):
+        if isinstance(extra, bytes):
+            parts.append(extra)
+    text = b' '.join(parts).decode('ascii', 'replace')
     found = re.search(r'STORAGE (\d+) (\d+)', text)
-    if code != 'OK' or not found:
-        return None
+    if code != 'OK':
+        return None, 'El servidor IMAP respondió ' + str(code) + ' a GETQUOTAROOT.'
+    if not found:
+        return None, 'El servidor IMAP no devolvió el recurso STORAGE (' + ('respuesta vacía' if not text.strip() else 'sin cuota de almacenamiento') + ').'
     # El servidor informa en KiB; un límite 0 significa que no hay cuota configurada.
-    return {'used': int(found[1]) * 1024, 'limit': int(found[2]) * 1024 or None}
+    return {'used': int(found[1]) * 1024, 'limit': int(found[2]) * 1024 or None}, ''
+
+
+def quota(client):
+    return quota_detail(client)[0]
+
+
+def remove_draft(client, folder, uid):
+    """Elimina un borrador que acaba de ser reemplazado o enviado. Solo actúa sobre mensajes marcados como borrador."""
+    code, _ = client.select(quoted(folder), readonly=False)
+    if code != 'OK':
+        return False
+    code, data = client.uid('FETCH', str(int(uid)), '(FLAGS)')
+    flags = b' '.join(part if isinstance(part, bytes) else part[0] for part in (data or []) if part).lower()
+    if code != 'OK' or b'\\draft' not in flags:
+        return False
+    if client.uid('STORE', str(int(uid)), '+FLAGS', '(\\Deleted)')[0] != 'OK':
+        return False
+    try:
+        # UID EXPUNGE borra únicamente ese mensaje; sin esa extensión se usa EXPUNGE sobre la carpeta de borradores.
+        if client.uid('EXPUNGE', str(int(uid)))[0] != 'OK':
+            client.expunge()
+    except Exception:
+        client.expunge()
+    return True
 
 
 def newer(client, last_uid, limit=20):

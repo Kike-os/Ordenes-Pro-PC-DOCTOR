@@ -62,3 +62,22 @@ No probado: recepción desde un dominio externo (depende del MX), entrega a un d
 - **Almacenamiento**: uso y cuota reales informados por el servidor mediante la extensión QUOTA de IMAP. Sin cuota configurada se muestra «Sin límite configurado»; si el servidor no informa, «Información no disponible». Al llegar al 75 % y al 90 % se genera un aviso. Nunca se eliminan correos automáticamente.
 - **Carpetas**: si el servidor tiene dos carpetas con la misma función (por ejemplo `INBOX.spam`, marcada como oficial, e `INBOX.Junk`), se muestran las dos; la adicional conserva su nombre real. No se fusionan ni se mueven mensajes.
 - **Pendiente**: consulta por UAPI de cPanel (`Email::get_disk_usage`), que requiere un token de API creado por la administración del hosting; sincronización por Cron; formato enriquecido en el redactor.
+
+## Almacenamiento del buzón: fuentes y diagnóstico
+
+El indicador usa únicamente datos reales, en este orden:
+
+1. **cPanel UAPI** `Email::list_pops_with_disk` (solo lectura, HTTPS por el puerto 2083 con certificado verificado), si existen `CPANEL_HOST`, `CPANEL_USER` y `CPANEL_TOKEN` en el servidor. `CPANEL_USER` es el usuario propietario de cPanel, no la cuenta de correo, y nunca se usa la contraseña del buzón.
+2. **Servidor de correo** (extensión QUOTA de IMAP), que informa el uso y la cuota de la misma cuenta.
+
+Se consulta al abrir Mail Pro, cada minuto, al sincronizar y con el botón «Actualizar almacenamiento». El servidor guarda la lectura un minuto para no repetir consultas. Si todo falla, se muestra la última lectura válida de las últimas 24 horas marcada como desactualizada, o el motivo técnico concreto (sin configurar, red, certificado, token rechazado, sin permiso, dominio sin cuentas, cuenta de otro usuario de cPanel, respuesta no reconocida).
+
+Para activar cPanel: cPanel → Seguridad → **Administrar tokens de API** → crear un token; guardar `CPANEL_HOST` (por ejemplo `mail.ecuadorpcdoctor.com`), `CPANEL_USER` y `CPANEL_TOKEN` en `local/.env` y en las variables de Vercel; comprobar en Configuración → Correo y servicios → **Probar almacenamiento (cPanel)**.
+
+## Borradores
+
+Se guardan en la carpeta de borradores del servidor (IMAP). Al reabrir un borrador y guardarlo de nuevo, o al enviarlo, la versión anterior se reemplaza: solo se elimina un mensaje que el servidor tiene marcado como borrador, nunca otro correo.
+
+## Prueba manual de sonido y navegadores
+
+En Correo → Preferencias → «Prueba de sonido y notificaciones»: «Probar sonido» debe mostrar «Motor de audio: en marcha» y «Reproductor invocado»; si no se oye, revisar el volumen del equipo y el silencio de la pestaña. «Probar aviso de escritorio» pide el permiso del navegador la primera vez. Repetir en Chrome, Firefox y Edge.

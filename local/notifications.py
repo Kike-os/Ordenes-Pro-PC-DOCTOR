@@ -70,6 +70,57 @@ def mail_status(c, now, max_age=60):
     return state
 
 
+def mail_storage(c, now, max_age=60):
+    """Almacenamiento real del buzón: cPanel UAPI si está configurado y, si no, la cuota que informa el servidor IMAP.
+
+    Devuelve siempre un estado explicado (ok, ilimitado, permisos, error) y conserva la última lectura válida, marcada
+    como desactualizada, cuando la consulta falla. Nunca calcula ni estima valores.
+    """
+    import cpanel
+    cached = _state(c, 'mail_storage')
+    if cached and now.timestamp() - cached.get('ts', 0) < max_age:
+        return cached
+    address, notes, usage, source = mail_pro.settings()['username'], [], None, ''
+    cpanel_state = 'sin_configurar'
+    if cpanel.configured():
+        try:
+            usage, source, cpanel_state = cpanel.mailbox_usage(address), 'cPanel (UAPI)', 'ok'
+        except cpanel.CpanelError as error:
+            cpanel_state = error.kind
+            notes.append('cPanel: ' + str(error))
+            print('mail-storage uapi ' + error.kind, flush=True)
+    if usage is None:
+        try:
+            client = mail_pro.open_imap()
+            try:
+                usage, reason = mail_pro.quota_detail(client)
+            finally:
+                mail_pro.close_imap(client)
+            if usage is None:
+                notes.append('IMAP: ' + reason)
+                print('mail-storage imap sin datos: ' + reason, flush=True)
+            else:
+                source = 'servidor de correo (IMAP QUOTA)'
+        except mail_pro.MailError as error:
+            notes.append('IMAP: ' + str(error))
+            print('mail-storage imap ' + error.kind, flush=True)
+    stamp = now.isoformat(timespec='seconds')
+    if usage is not None:
+        result = {'state': 'ok' if usage['limit'] else 'unlimited', 'used': usage['used'], 'limit': usage['limit'], 'source': source, 'checked': stamp, 'ts': now.timestamp(), 'stale': False,
+                  'cpanel': cpanel_state, 'detail': ' '.join(notes), 'good': {'used': usage['used'], 'limit': usage['limit'], 'source': source, 'checked': stamp, 'ts': now.timestamp()}}
+    else:
+        good = (cached or {}).get('good')
+        state = 'permisos' if cpanel_state in ('autenticacion', 'permisos') else 'error'
+        if good and now.timestamp() - good.get('ts', 0) < 86400:
+            # Última lectura válida de las últimas 24 horas, identificada como desactualizada.
+            result = {'state': 'ok' if good['limit'] else 'unlimited', 'used': good['used'], 'limit': good['limit'], 'source': good['source'], 'checked': good['checked'], 'ts': now.timestamp(), 'stale': True,
+                      'cpanel': cpanel_state, 'detail': ' '.join(notes), 'good': good, 'failed': state}
+        else:
+            result = {'state': state, 'used': None, 'limit': None, 'source': '', 'checked': stamp, 'ts': now.timestamp(), 'stale': False, 'cpanel': cpanel_state, 'detail': ' '.join(notes) or 'No hay una fuente de almacenamiento disponible.', 'good': None}
+    _save(c, 'mail_storage', result)
+    return result
+
+
 def quota_level(quota):
     """Porcentaje de ocupación real; None cuando no hay cuota configurada o el servidor no la informa."""
     if not quota or not quota.get('limit'):
@@ -134,9 +185,11 @@ def build(c, user, now, mail_access=False):
                 # Resumen silencioso: el aviso sonoro y emergente corresponde a cada correo nuevo, no al contador.
                 items.append({'key': 'mail:' + str(state['uidnext']) + ':' + str(state['unread']), 'kind': 'info', 'icon': 'message', 'title': plural(state['unread'], 'correo sin leer', 'correos sin leer'),
                               'detail': 'Bandeja de entrada de ' + state['account'] + '.', 'at': state['checked'], 'href': '#mail', 'group': 'alert', 'quiet': True})
-            level = quota_level((state or {}).get('quota'))
+            storage = _state(c, 'mail_storage') or {}
+            quota = {'used': storage['used'], 'limit': storage['limit']} if storage.get('used') is not None and not storage.get('stale') else (state or {}).get('quota')
+            level = quota_level(quota)
             if level is not None and level >= 75:
-                free = max(0, state['quota']['limit'] - state['quota']['used'])
+                free = max(0, quota['limit'] - quota['used'])
                 items.append({'key': 'mailquota:' + ('90' if level >= 90 else '75'), 'kind': 'warning', 'icon': 'message', 'title': 'Buzón de correo al ' + str(level) + ' % de su capacidad',
                               'detail': 'Quedan ' + (str(round(free / 1048576)) + ' MB' if free >= 1048576 else str(round(free / 1024)) + ' KB') + ' disponibles. No se elimina ningún correo automáticamente.', 'at': state['checked'], 'href': '#mail', 'group': 'alert'})
             for event in mail_events(c)[-10:]:

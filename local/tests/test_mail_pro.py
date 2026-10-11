@@ -176,6 +176,76 @@ class MailRouteTests(test_app.SecurityTests):
         self.assertNotIn('<script>',page);self.assertIn('&lt;script&gt;',page);self.assertIn('**cliente**',rich.get_body(('plain',)).get_content())
 
 
+    def test_cpanel_storage_is_read_only_classified_and_cached(self):
+        import cpanel,notifications,io,json as js
+        from datetime import datetime,timedelta
+        from urllib.error import HTTPError,URLError
+        env={'CPANEL_HOST':'cpanel.example.invalid','CPANEL_USER':'propietario','CPANEL_TOKEN':'TOKENFICTICIO1234567890ABCD'}
+        self.assertFalse(cpanel.configured({}));self.assertNotIn('TOKENFICTICIO',repr(cpanel.status(env)))
+        with self.assertRaises(cpanel.CpanelError) as missing:cpanel.mailbox_usage('buzon@example.invalid',{})
+        self.assertEqual(missing.exception.kind,'sin_configurar')
+        with self.assertRaises(cpanel.CpanelError) as plain:cpanel.mailbox_usage('buzon@example.invalid',dict(env,CPANEL_PORT='2082'))
+        self.assertEqual(plain.exception.kind,'sin_configurar')
+        seen=[]
+        def answer(body,code=200):
+            def run(request,timeout=None,context=None):
+                seen.append(request)
+                if code!=200:raise HTTPError(request.full_url,code,'x',{},None)
+                return io.BytesIO(body if isinstance(body,bytes) else js.dumps(body).encode())
+            return run
+        rows=[{'email':'otro@example.invalid','_diskused':'5','_diskquota':'10'},{'email':'buzon@example.invalid','_diskused':'2097152.00','_diskquota':'1073741824','diskquota':'1024'}]
+        with patch.object(cpanel,'urlopen',side_effect=answer({'status':1,'data':rows})):
+            self.assertEqual(cpanel.mailbox_usage('Buzon@Example.invalid',env),{'used':2097152,'limit':1073741824})
+        request=seen[-1];self.assertTrue(request.full_url.startswith('https://cpanel.example.invalid:2083/execute/Email/list_pops_with_disk?domain=example.invalid'))
+        self.assertEqual((request.get_method(),request.headers['Authorization']),('GET','cpanel propietario:TOKENFICTICIO1234567890ABCD'))
+        with patch.object(cpanel,'urlopen',side_effect=answer({'status':1,'data':[dict(rows[1],_diskquota='0',diskquota='unlimited')]})):
+            self.assertEqual(cpanel.mailbox_usage('buzon@example.invalid',env)['limit'],None)
+        for body,code,kind in [(b'<html>login</html>',200,'autenticacion'),({},401,'autenticacion'),({'status':0,'errors':['You do not have access to the feature']},200,'permisos'),({'status':1,'data':[]},200,'vacio'),({'status':1,'data':[rows[0]]},200,'no_encontrada'),({'status':1,'data':[dict(rows[1],_diskused='abc')]},200,'respuesta')]:
+            with patch.object(cpanel,'urlopen',side_effect=answer(body,code)),self.assertRaises(cpanel.CpanelError) as failed:cpanel.mailbox_usage('buzon@example.invalid',env)
+            self.assertEqual(failed.exception.kind,kind);self.assertNotIn('TOKENFICTICIO',str(failed.exception))
+        with patch.object(cpanel,'urlopen',side_effect=URLError('sin red')),self.assertRaises(cpanel.CpanelError) as offline:cpanel.mailbox_usage('buzon@example.invalid',env)
+        self.assertEqual(offline.exception.kind,'red')
+        # Estado para la interfaz: cPanel primero, IMAP como respaldo, lectura anterior marcada como desactualizada si todo falla.
+        cookie,csrf=self.login();start=datetime(2026,1,2,10,0,tzinfo=app.appointments.TZ);box=FakeInbox([1])
+        with patch.dict(app.os.environ,dict(ENV,**env)),patch.object(mail_pro,'open_imap',side_effect=lambda *a,**k:box):
+            with app.connect() as c:
+                with patch.object(cpanel,'urlopen',side_effect=answer({'status':1,'data':rows})) as calls:
+                    first=notifications.mail_storage(c,start);again=notifications.mail_storage(c,start+timedelta(seconds=30))
+                    self.assertEqual((first['state'],first['used'],first['limit'],first['source'],first['stale'],calls.call_count),('ok',2097152,1073741824,'cPanel (UAPI)',False,1));self.assertEqual(again,first)
+                with patch.object(cpanel,'urlopen',side_effect=answer({},403)):
+                    fallback=notifications.mail_storage(c,start+timedelta(seconds=400))
+                    self.assertEqual((fallback['state'],fallback['used'],fallback['source'],fallback['cpanel']),('ok',800*1024,'servidor de correo (IMAP QUOTA)','autenticacion'));self.assertIn('cPanel rechazó el token',fallback['detail'])
+                    box.quota_line=b''
+                    stale=notifications.mail_storage(c,start+timedelta(seconds=800))
+                    self.assertEqual((stale['stale'],stale['used'],stale['failed']),(True,800*1024,'permisos'));self.assertIn('STORAGE',stale['detail'])
+                    c.execute("DELETE FROM system_state WHERE key='mail_storage'")
+                    denied=notifications.mail_storage(c,start+timedelta(seconds=1200))
+                    self.assertEqual((denied['state'],denied['used']),('permisos',None))
+            with patch.object(cpanel,'urlopen',side_effect=answer({},403)):body=self.request('/api/mail/storage',cookie=cookie)['body']
+            self.assertEqual(body['state'],'permisos');self.assertNotIn('TOKENFICTICIO',repr(body));self.assertNotIn('good',body)
+            with patch.object(cpanel,'urlopen',side_effect=answer({'status':1,'data':rows})):
+                test=self.request('/api/mail/test',{'kind':'cpanel'},cookie=cookie,csrf=csrf)['body']
+            self.assertTrue(test['ok']);self.assertNotIn('TOKENFICTICIO',repr(test))
+        with patch.dict(app.os.environ,ENV),patch.object(mail_pro,'open_imap',side_effect=lambda *a,**k:FakeInbox([1])):
+            with app.connect() as c:c.execute("DELETE FROM system_state WHERE key='mail_storage'")
+            only_imap=self.request('/api/mail/storage?now=1',cookie=cookie)['body']
+            self.assertEqual((only_imap['state'],only_imap['cpanel'],only_imap['source']),('ok','sin_configurar','servidor de correo (IMAP QUOTA)'))
+        self.assertEqual(self.request('/api/mail/storage')['status'],401)
+
+    def test_replaced_draft_is_removed_only_when_it_is_a_draft(self):
+        class Box:
+            def __init__(self,flags):self.flags=flags;self.calls=[]
+            def select(self,name,readonly=True):self.calls.append(('select',name,readonly));return 'OK',[b'1']
+            def uid(self,command,*args):
+                self.calls.append((command,)+args)
+                return ('OK',[('7 (UID 7 FLAGS (%s))'%self.flags).encode()]) if command=='FETCH' else ('OK',[b''])
+            def expunge(self):self.calls.append(('expunge',))
+        draft=Box('\\Draft \\Seen');self.assertTrue(mail_pro.remove_draft(draft,'INBOX.Drafts',7))
+        self.assertIn(('STORE','7','+FLAGS','(\\Deleted)'),draft.calls);self.assertIn(('EXPUNGE','7'),draft.calls);self.assertNotIn(('expunge',),draft.calls)
+        normal=Box('\\Seen');self.assertFalse(mail_pro.remove_draft(normal,'INBOX',7))
+        self.assertFalse([call for call in normal.calls if call[0] in ('STORE','EXPUNGE','expunge')])
+
+
 class FakeInbox:
     """Servidor IMAP ficticio y mínimo: bandeja con UID crecientes, cuota y dos carpetas de correo no deseado."""
     def __init__(self,uids):self.uids=list(uids);self.seen=set();self.quota_line=b'"User quota" (STORAGE 800 1000)'
