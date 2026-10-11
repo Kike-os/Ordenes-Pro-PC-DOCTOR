@@ -180,9 +180,9 @@ def build(c, user, now, mail_access=False):
         start = appointments.stamp(appointments.datetime.combine(now.date(), appointments.time.min, appointments.TZ))
         end = appointments.stamp(appointments.datetime.combine(now.date() + appointments.timedelta(days=1), appointments.time.min, appointments.TZ))
         todays = count("SELECT COUNT(*) FROM appointments WHERE starts_at>=? AND starts_at<? AND status IN ('solicitada','confirmada','reprogramada')", start, end)
-        alert('today', todays, 'calendar', 'info', plural(todays, 'cita programada para hoy', 'citas programadas para hoy'), 'Revisa la agenda del día.', '#maintenance')
+        alert('today', todays, 'calendar', 'info', plural(todays, 'cita programada para hoy', 'citas programadas para hoy'), 'Revisa la agenda del día.', '#appointments')
         requested = count("SELECT COUNT(*) FROM appointments WHERE status='solicitada' AND starts_at>=?", appointments.stamp(now))
-        alert('requested', requested, 'calendar', 'warning', plural(requested, 'cita por confirmar', 'citas por confirmar'), 'Solicitudes recibidas desde la agenda en línea.', '#maintenance?estado=solicitada')
+        alert('requested', requested, 'calendar', 'warning', plural(requested, 'cita por confirmar', 'citas por confirmar'), 'Solicitudes recibidas desde la agenda en línea.', '#appointments?estado=solicitada')
         # Una notificación por cita (clave única por id): cliente, servicio, fecha y hora, con acceso directo a la cita.
         for row in c.execute("SELECT a.id,a.public_code,a.customer_name,a.starts_at,a.created_at,a.status,s.label service FROM appointments a JOIN appointment_services s ON s.code=a.service_code WHERE a.status IN ('solicitada','confirmada') ORDER BY a.id DESC LIMIT 8"):
             when = appointments.datetime.fromisoformat(row['starts_at']).astimezone(appointments.TZ).strftime('%d/%m/%Y %H:%M')
@@ -190,7 +190,21 @@ def build(c, user, now, mail_access=False):
             items.append({'key': 'appointment:' + str(row['id']), 'kind': 'warning' if pending else 'info', 'icon': 'calendar',
                           'title': ('Solicitud de cita por confirmar · ' if pending else 'Nueva cita reservada · ') + row['public_code'],
                           'detail': row['customer_name'] + ' · ' + row['service'] + ' · ' + when, 'at': row['created_at'],
-                          'href': '#maintenance?appointment=' + str(row['id']), 'action': 'Ver cita', 'group': 'event'})
+                          'href': '#appointments?appointment=' + str(row['id']), 'action': 'Ver cita', 'group': 'event'})
+        # Mantenimientos preventivos: aviso de creación al entregar y recordatorios internos a 30, 15, 7 y 0 días.
+        # Cada clave incluye mantenimiento, generación y umbral: se muestra una sola vez por plazo.
+        for row in c.execute("SELECT m.id,m.order_id,m.generation,m.due_date,m.delivered_at,m.state,o.code,cl.name client,d.brand,d.model FROM maintenance m JOIN orders o ON o.id=m.order_id JOIN devices d ON d.id=o.device_id JOIN clients cl ON cl.id=d.client_id WHERE m.state='scheduled' ORDER BY m.due_date LIMIT 60"):
+            device = ' '.join(x for x in (row['brand'], row['model']) if x) or 'equipo'
+            days = (appointments.date.fromisoformat(row['due_date']) - now.date()).days
+            delivered = appointments.datetime.fromisoformat(row['delivered_at'])
+            if (now - delivered).total_seconds() < 172800:
+                items.append({'key': 'maintenance:new:%d:%d' % (row['id'], row['generation']), 'kind': 'success', 'icon': 'maintenance', 'title': 'Próximo mantenimiento programado · ' + row['code'],
+                              'detail': row['client'] + ' · ' + device + ' · previsto para ' + appointments.date.fromisoformat(row['due_date']).strftime('%d/%m/%Y'), 'at': row['delivered_at'], 'href': '#maintenance?order=' + str(row['order_id']), 'action': 'Ver mantenimiento', 'group': 'event'})
+            threshold = next((limit for limit in (0, 7, 15, 30) if days <= limit), None)
+            if threshold is not None and days >= -60:
+                label = {0: 'Mantenimiento preventivo para hoy' if days == 0 else 'Mantenimiento preventivo vencido', 7: 'Mantenimiento preventivo en 7 días o menos', 15: 'Mantenimiento preventivo en 15 días o menos', 30: 'Mantenimiento preventivo en 30 días o menos'}[threshold]
+                items.append({'key': 'maintenance:due:%d:%d:%d' % (row['id'], row['generation'], threshold), 'kind': 'warning' if threshold <= 7 else 'info', 'icon': 'maintenance', 'title': label + ' · ' + row['code'],
+                              'detail': row['client'] + ' · ' + device + ' · ' + appointments.date.fromisoformat(row['due_date']).strftime('%d/%m/%Y'), 'at': stamp, 'href': '#maintenance', 'action': 'Ver mantenimiento', 'group': 'event'})
     if admin:
         # Protección de datos: dónde se guarda la información y si los respaldos de la base central están al día.
         import remote_db

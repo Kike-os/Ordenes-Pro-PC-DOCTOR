@@ -38,3 +38,14 @@ Los envía `local/appointments_cron.py` (cron del servidor) y requieren `SMTP_HO
 - `GET /api/appointments/<id>` (personal): cita con historial y avisos.
 - `POST /api/appointments/<id>`: `confirmada`, `presente`, `completada`, `no_asistio`, `cancelada`, `reschedule`.
 - `POST /api/appointments/config` (administración): horarios, servicios, modo de confirmación y días no laborables.
+
+## Próximos Mantenimientos (previsión automática a seis meses)
+
+- Al cambiar una orden a **Entregado**, el servidor crea en la misma transacción la previsión para seis meses calendario después (31/08 → 28/02; 15/10 → 15/04). Una sola por orden (`maintenance.order_id` es único): guardar otra vez, repetir la solicitud o recargar no duplica.
+- «Listo para entregar» no crea nada. Si la entrega se revierte, la previsión queda cancelada con su historial; si se vuelve a entregar, se reactiva el mismo registro.
+- La respuesta del cambio de estado trae la previsión, y la interfaz avisa «Próximo mantenimiento programado» solo tras esa confirmación. La ventana «Próximos Mantenimientos» consulta cada 30 s, así que una entrega hecha en otra sesión aparece sin recargar.
+- **No se crea una cita ni se bloquea ningún horario automáticamente.** La previsión aparece también en la Agenda de Mantenimientos de Clientes como «Preventivo · pendiente de confirmación», sin horario asignado. Es el único registro: no hay una segunda fila en otra tabla.
+- **Agendar cita** (desde la previsión) abre la reserva con cliente y equipo cargados y los horarios realmente disponibles. Al guardarla queda vinculada (`maintenance.appointment_id`, migración 026) y la previsión pasa a «Con cita». Cancelar esa cita la devuelve a «Programado»; completarla la cierra.
+- Filtros: «Todos los programados», «Próximos 30 días», «Vencidos», «Con cita», «Realizados». Una fecha a seis meses no aparece en «Próximos 30 días».
+- Avisos internos, una sola vez por plazo: al crearse y al faltar 30, 15, 7 y 0 días.
+- Pendiente: recalcular la previsión al corregir una fecha de entrega, el enlace para que el cliente confirme por sí mismo y el envío automático de invitaciones.

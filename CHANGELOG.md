@@ -4,6 +4,18 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.29 — 2026-10-11 15:40 (UTC-05:00)
+
+Próximos Mantenimientos automáticos al entregar
+
+### Nuevas funcionalidades
+
+- Próximos Mantenimientos: al entregar una orden se crea al instante la previsión a seis meses, con aviso, filtros, datos completos y «Agendar cita» vinculada a la agenda
+
+### Mejoras realizadas
+
+- Avisos internos de mantenimiento preventivo a 30, 15, 7 y 0 días, una sola vez por plazo
+
 ## v1.5.28 — 2026-10-11 15:30 (UTC-05:00)
 
 Adi para redacción y citas con clientes de la base de datos

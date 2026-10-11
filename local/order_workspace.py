@@ -84,7 +84,7 @@ def save(c,oid,data,user,now):
     keys=('problem','status','priority','assigned_to','estimated_delivery','internal_notes','recommendations','findings')
     c.execute('UPDATE orders SET '+','.join(k+'=?' for k in keys)+',updated_at=?,revision=revision+1 WHERE id=?',(*(fields[k] for k in keys),now.isoformat(timespec='microseconds'),oid))
     from maintenance import transition
-    transition(c,oid,row['status'],fields['status'],now)
+    planned=transition(c,oid,row['status'],fields['status'],now)
     columns=','.join(k+'_cents' for k in BUDGET_KEYS)
     c.execute('INSERT INTO order_budget(order_id,'+columns+') VALUES (?,?,?,?,?) ON CONFLICT(order_id) DO UPDATE SET '+','.join(k+'_cents=excluded.'+k+'_cents' for k in BUDGET_KEYS),(oid,*(fields[k+'_cents'] for k in BUDGET_KEYS)))
     if 'lines' in fields:

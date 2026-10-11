@@ -13,17 +13,22 @@ def six_months(day):
     month=day.month+6;year=day.year+(month-1)//12;month=(month-1)%12+1
     return date(year,month,min(day.day,calendar.monthrange(year,month)[1]))
 def transition(c,oid,old,new,now):
-    if old==new:return
+    """Al confirmarse la entrega crea (una sola vez por orden) la previsión a seis meses calendario. Devuelve la previsión creada."""
+    if old==new:return None
     stamp=now.astimezone(ZONE).isoformat(timespec='microseconds')
     if new=='entregado':
         category=c.execute('SELECT d.category FROM orders o JOIN devices d ON d.id=o.device_id WHERE o.id=?',(oid,)).fetchone()[0]
         c.execute('UPDATE orders SET delivered_at=? WHERE id=?',(stamp,oid))
         c.execute("INSERT INTO maintenance(order_id,delivered_at,due_date,profile,updated_at,unsubscribe_token) VALUES (?,?,?,?,?,?) ON CONFLICT(order_id) DO UPDATE SET delivered_at=excluded.delivered_at,due_date=excluded.due_date,state='scheduled',generation=maintenance.generation+1,updated_at=excluded.updated_at",(oid,stamp,six_months(now.astimezone(ZONE).date()).isoformat(),'gaming' if category=='gaming' else 'office' if category=='portatil' else 'general',stamp,secrets.token_urlsafe(32)))
+        row=c.execute('SELECT id,due_date FROM maintenance WHERE order_id=?',(oid,)).fetchone()
+        return {'id':row['id'],'due_date':row['due_date']}
     elif old=='entregado':
+        # La entrega se revirtió: la previsión queda cancelada con su historial, no se borra.
         c.execute("UPDATE maintenance SET state='cancelled',generation=generation+1,updated_at=? WHERE order_id=?",(stamp,oid))
+    return None
 
 def rows(c):
-    return [dict(r) for r in c.execute("SELECT m.*,o.code,o.qr_url,c.name client,c.phone,c.email,COALESCE(NULLIF(d.kind,''),d.category) type,d.brand,d.model,d.serial,COALESCE((SELECT result FROM maintenance_notifications n WHERE n.maintenance_id=m.id AND n.generation=m.generation AND n.channel='email'),'Sin enviar') reminder FROM maintenance m JOIN orders o ON o.id=m.order_id JOIN devices d ON d.id=o.device_id JOIN clients c ON c.id=d.client_id ORDER BY m.due_date,m.id")]
+    return [dict(r) for r in c.execute("SELECT m.*,o.code,o.qr_url,c.id client_id,d.id device_id,c.name client,c.phone,c.email,COALESCE(NULLIF(d.kind,''),d.category) type,d.brand,d.model,d.serial,(SELECT a.starts_at FROM appointments a WHERE a.id=m.appointment_id) appointment_start,(SELECT a.status FROM appointments a WHERE a.id=m.appointment_id) appointment_status,(SELECT a.public_code FROM appointments a WHERE a.id=m.appointment_id) appointment_code,COALESCE((SELECT result FROM maintenance_notifications n WHERE n.maintenance_id=m.id AND n.generation=m.generation AND n.channel='email'),'Sin enviar') reminder FROM maintenance m JOIN orders o ON o.id=m.order_id JOIN devices d ON d.id=o.device_id JOIN clients c ON c.id=d.client_id ORDER BY m.due_date,m.id")]
 
 def due(c,now):
     stamp=now.astimezone(ZONE).isoformat();today=now.astimezone(ZONE).date().isoformat()
@@ -72,3 +77,20 @@ def card(row,thermal=False):
         for line in lines:doc.text(line,left,y,size,bold);y+=size*1.4
         y+=5
     return doc.finish()
+
+
+def link_appointment(c,mid,aid,user,now):
+    """Vincula la cita real que el cliente aceptó con su previsión; la previsión pasa a «con cita»."""
+    row=c.execute("SELECT * FROM maintenance WHERE id=? AND state IN ('scheduled','appointment')",(mid,)).fetchone()
+    if not row:return False
+    c.execute("UPDATE maintenance SET appointment_id=?,state='appointment',updated_at=? WHERE id=?",(aid,now.astimezone(ZONE).isoformat(),mid))
+    from order_workspace import event
+    event(c,row['order_id'],user['id'],now,'maintenance','Cita de mantenimiento preventivo registrada.')
+    return True
+
+
+def appointment_changed(c,aid,status,now):
+    """Mantiene la previsión coherente con su cita: cancelada o no asistida vuelve a programada; completada la cierra."""
+    stamp=now.astimezone(ZONE).isoformat()
+    if status in ('cancelada','no_asistio'):c.execute("UPDATE maintenance SET state='scheduled',appointment_id=NULL,updated_at=? WHERE appointment_id=? AND state='appointment'",(stamp,aid))
+    elif status=='completada':c.execute("UPDATE maintenance SET state='completed',updated_at=? WHERE appointment_id=? AND state='appointment'",(stamp,aid))

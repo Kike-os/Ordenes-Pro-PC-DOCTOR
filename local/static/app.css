@@ -3105,3 +3105,19 @@ body[data-page=dashboard] .agenda-booking-grid input:not([type=checkbox]),body[d
 .agenda-booking .message:empty{display:none}.agenda-booking .agenda-actions{align-items:center}
 .adi-settings{display:grid;gap:8px;margin-top:16px;padding:14px 16px;border:1px solid #2c3a6b;border-left:3px solid #9a8cf0;border-radius:12px;background:#0b1626}.adi-settings h3{margin:0;font-size:14px;color:#eef3ff}
 @media(max-width:560px){.agenda-booking-grid{grid-template-columns:1fr}}
+
+/* Próximos Mantenimientos: previsiones a seis meses generadas al entregar. */
+.upcoming .agenda-bar input[type=search]{flex:1 1 220px;min-width:0;max-width:340px;height:34px;min-height:34px;margin:0 auto 0 0;padding:0 10px;font-size:12.5px}
+.upcoming .agenda-bar .secondary{height:34px;padding:0 12px;font-size:12.5px}
+.upcoming-list{display:grid;gap:8px}
+.upcoming-card{--ag:#67ACFA;display:grid;grid-template-columns:36px minmax(0,1fr) auto auto;align-items:center;gap:12px;padding:10px 14px;border:1px solid #1e3252;border-left:3px solid var(--ag);border-radius:11px;background:linear-gradient(90deg,color-mix(in srgb,var(--ag) 8%,#0d1b30),#0b1728 50%);transition:background .2s,border-color .2s,box-shadow .2s}
+.upcoming-card:hover{border-color:color-mix(in srgb,var(--ag) 35%,#1e3252);border-left-color:var(--ag);box-shadow:0 6px 18px #02071455}
+.upcoming-card .track-icon{width:36px;height:36px;border-color:color-mix(in srgb,var(--ag) 55%,transparent);background:color-mix(in srgb,var(--ag) 16%,#0d1b30);color:var(--ag)}.upcoming-card .track-icon .icon{width:17px;height:17px}
+.upcoming-body{display:grid;gap:1px;min-width:0}.upcoming-body strong{font-size:13.5px;color:#f2f6ff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.upcoming-body span{font-size:12.5px;color:#cfdcf0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.upcoming-body small{font-size:11.5px;color:#8fa5c4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.upcoming-side{display:grid;gap:2px;justify-items:end;text-align:right}.upcoming-side b{font-size:13px;color:#f2f6ff;white-space:nowrap}.upcoming-side small{font-size:11.5px;color:#9bb0cf;white-space:nowrap}
+.upcoming-actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.upcoming-actions button{padding:5px 11px;border:1px solid #2a4063;border-radius:999px;background:transparent;color:#a9c8f7;font-size:11.5px;font-weight:600;cursor:pointer;white-space:nowrap;transition:background .2s,border-color .2s,color .2s}
+.upcoming-actions button:hover{background:#12213a;border-color:#3b5d8f;color:#fff;transform:none}.upcoming-actions .primary-action{border-color:#3d74c7;background:#1b3f7c;color:#fff}
+@media(max-width:860px){.upcoming-card{grid-template-columns:36px minmax(0,1fr);gap:8px 12px}.upcoming-side{grid-column:2;justify-items:start;text-align:left;grid-auto-flow:column;gap:10px;align-items:center}.upcoming-actions{grid-column:1/-1;justify-content:flex-start}.upcoming-body span,.upcoming-body small{white-space:normal}}
+@media(prefers-reduced-motion:reduce){.upcoming-card{transition:none}}
+@media(max-width:560px){.upcoming .agenda-bar input[type=search]{flex-basis:100%;max-width:none;margin:0}.upcoming .agenda-bar .agenda-views{flex-wrap:wrap}.upcoming .agenda-bar .secondary{flex:1 1 100%}}

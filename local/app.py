@@ -1334,6 +1334,7 @@ class Handler(BaseHTTPRequestHandler):
                     status,payload=appointments.create(c,dict(data,privacy_consent=True,communications_consent=data.get('communications_consent') is True),user)
                     if status==201:
                         payload.pop('manage_token',None);audit(c,user['id'],'appointment_created',payload['id'])
+                        if str(data.get('maintenance_id','')).isdigit():payload['maintenance_linked']=maintenance.link_appointment(c,int(data['maintenance_id']),payload['id'],user,reception_now())
                     return self.reply(status,payload)
                 appointment_route=re.fullmatch(r'/api/appointments/([0-9]+)',path)
                 if path=='/api/appointments/config':
@@ -1360,6 +1361,7 @@ class Handler(BaseHTTPRequestHandler):
                         # El cliente recibe el aviso solo cuando la cita queda efectivamente confirmada o cancelada.
                         if action=='confirmada' and row['status']=='solicitada':appointments.queue_notice(c,row,'confirmation')
                         if action=='cancelada':appointments.queue_notice(c,row,'cancelled')
+                        maintenance.appointment_changed(c,row['id'],action,reception_now())
                         c.execute('INSERT INTO appointment_events(appointment_id,actor_id,event,old_start,new_start,old_status,new_status,created_at) VALUES (?,?,?,?,?,?,?,?)',(row['id'],user['id'],'status',row['starts_at'],row['starts_at'],row['status'],action,now));status=200;payload={'ok':True}
                     else:return self.reply(400,{'error':'Acción de cita inválida.'})
                     if status==200:audit(c,user['id'],'appointment_'+str(action),row['id'])
@@ -1507,10 +1509,12 @@ class Handler(BaseHTTPRequestHandler):
                         now=reception_now()
                         old=c.execute('SELECT status FROM orders WHERE id=?',(oid,)).fetchone()[0]
                         c.execute('UPDATE orders SET status=?,updated_at=?,revision=revision+1 WHERE id=?', (status,now.isoformat(timespec='microseconds'),oid))
-                        maintenance.transition(c,int(oid),old,status,now)
+                        planned=maintenance.transition(c,int(oid),old,status,now)
                         # Sin cambio real ni comentario no hay nada que auditar; con cambio, el registro nombra la transición.
                         if old!=status or comment:order_workspace.event(c,int(oid),user['id'],now,'status' if old!=status else 'follow_up',comment or order_workspace.transition_comment(old,status))
                         audit(c,user['id'],'order_status_updated',int(oid))
+                        # La previsión de mantenimiento creada por la entrega viaja en la respuesta para avisar al instante.
+                        if planned:return self.reply(200,{'ok':True,'maintenance':planned})
                     else:
                         table = 'clients' if path == '/api/clients' else 'devices'
                         keys = ('name','phone','email') if table == 'clients' else ('client_id','type','brand','model','serial')
