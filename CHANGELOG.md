@@ -4,6 +4,21 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.3 — 2026-10-11 09:21 (UTC-05:00)
+
+Nueva orden de recepción técnica con fotos de evidencia, firma corporativa de correo, avisos flotantes bajo la campana y tarjeta «Capacidad del Buzón».
+
+### Nuevas funcionalidades
+
+- Nueva orden de recepción técnica: asistente de cinco pasos con inspección inicial y accesorios por casillas, fotos del equipo como evidencia (arrastrar, cámara, ordenar, foto principal), borrador y resumen con edición por sección.
+- Las órdenes muestran sus fotos de recepción en el detalle, con ampliación y opción de añadir más.
+- Mail Pro: firma corporativa con el logo original, insertada automáticamente en correos nuevos, respuestas y reenvíos, configurable en «Firmas de correo».
+
+### Mejoras realizadas
+
+- Avisos flotantes bajo la campana con efecto translúcido, animación suave y pausa al pasar el cursor; no desplazan el contenido.
+- Mail Pro: tarjeta «Capacidad del Buzón» con barra de color según la ocupación real, estado, detalle y efecto al recibir una medición nueva.
+
 ## v1.5.2 — 2026-10-11 08:43 (UTC-05:00)
 
 Mail Pro con almacenamiento en tiempo real, diagnóstico de sonido y borradores sin duplicados.

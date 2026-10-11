@@ -180,6 +180,7 @@ import base64
 import email
 import html as html_lib
 import quopri
+from pathlib import Path
 import re
 import time
 from email import policy
@@ -590,7 +591,7 @@ def set_flag(client, folder, uid, action):
         raise MailError('servidor', 'No se pudo actualizar el mensaje.')
 
 
-def rich_html(body, signature=''):
+def rich_html(body, signature='', wrap=True):
     lines, out, listing = html_lib.escape(body, quote=False).split('\n'), [], False
     for line in lines:
         line = re.sub(r'\*\*(\S(?:.*?\S)?)\*\*', r'<strong>\1</strong>', line)
@@ -605,7 +606,57 @@ def rich_html(body, signature=''):
     if listing:
         out.append('</ul>')
     foot = '<p style="color:#555">-- <br>' + html_lib.escape(signature, quote=False).replace('\n', '<br>') + '</p>' if signature else ''
-    return '<div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.5">' + '\n'.join(out) + foot + '</div>'
+    inner = '\n'.join(out) + foot
+    return '<div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.5">' + inner + '</div>' if wrap else inner
+
+
+SIGNATURE_FIELDS = ('name', 'role', 'unit', 'phone', 'email', 'web', 'address')
+SIGNATURE_DEFAULTS = {'enabled': True, 'on_new': True, 'on_reply': True, 'name': 'Enrique Martínez Gómez', 'role': 'SOPORTECNICO', 'unit': 'Matriz | PC-DOCTOR',
+                      'phone': '+593 987460591', 'email': '', 'web': 'www.ecuadorpcdoctor.com', 'address': 'Calle Bolívar, Juan Montalvo'}
+SIGNATURE_LOGO = Path(__file__).resolve().parent / 'static' / 'logo-firma.png'
+QUOTE_START = re.compile(r'\n+(?=El [^\n]{0,200} escribió:\n|-{5,} Mensaje reenviado -{5,})')
+
+
+def clean_signature(raw, account=''):
+    """Datos de la firma validados: solo texto corto en cada campo; el HTML siempre lo genera el servidor."""
+    raw = raw if isinstance(raw, dict) else {}
+    result = {key: raw.get(key, SIGNATURE_DEFAULTS[key]) is True if key in raw else SIGNATURE_DEFAULTS[key] for key in ('enabled', 'on_new', 'on_reply')}
+    for key in SIGNATURE_FIELDS:
+        value = re.sub(r'\s+', ' ', re.sub(r'[\r\n\t<>]+', ' ', str(raw.get(key, SIGNATURE_DEFAULTS[key]) if key in raw else SIGNATURE_DEFAULTS[key]))).strip()[:120]
+        result[key] = value
+    if not result['email']:
+        result['email'] = account
+    return result
+
+
+def signature_text(sign):
+    lines = [sign['name'], ' · '.join(item for item in (sign['role'], sign['unit']) if item)]
+    lines += [label + ': ' + sign[key] for key, label in (('phone', 'Tel.'), ('email', 'Correo'), ('web', 'Web'), ('address', 'Dirección')) if sign[key]]
+    return '\n'.join(line for line in lines if line)
+
+
+def signature_html(sign, logo_src):
+    """Firma corporativa en tablas y estilos en línea, compatible con Gmail, Outlook, Thunderbird, Apple Mail y webmail."""
+    esc = lambda value: html_lib.escape(str(value), quote=True)
+    font = "font-family:Arial,Helvetica,sans-serif;"
+    def row(icon, label, value, href=''):
+        if not value:
+            return ''
+        text = '<a href="' + esc(href) + '" style="color:#ffffff;text-decoration:none;">' + esc(value) + '</a>' if href else esc(value)
+        return ('<tr><td width="22" valign="top" style="padding:3px 7px 3px 0;' + font + 'font-size:12px;line-height:18px;color:#e03a3e;" title="' + esc(label) + '">' + icon + '</td>'
+                '<td valign="top" style="padding:3px 0;' + font + 'font-size:13px;line-height:18px;color:#ffffff;white-space:nowrap;">' + text + '</td></tr>')
+    phone_href = 'tel:' + re.sub(r'[^0-9+]', '', sign['phone'])
+    web_href = sign['web'] if re.match(r'https?://', sign['web'], re.I) else 'https://' + sign['web']
+    contact = (row('&#128222;', 'Teléfono', sign['phone'], phone_href) + row('&#9993;&#65039;', 'Correo', sign['email'], 'mailto:' + sign['email'])
+               + row('&#127760;', 'Sitio web', sign['web'], web_href) + row('&#128205;', 'Dirección', sign['address']))
+    return ('<table role="presentation" cellpadding="0" cellspacing="0" border="0" bgcolor="#2b2d31" style="background-color:#2b2d31;border-collapse:collapse;border-bottom:3px solid #e03a3e;">'
+            '<tr><td valign="middle" align="center" style="padding:16px 18px;">'
+            '<img src="' + esc(logo_src) + '" width="132" alt="PC-DOCTOR S.A." style="display:block;width:132px;height:auto;border:0;margin:0 auto 8px;color:#ffffff;font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:bold;">'
+            '<div style="' + font + 'font-size:15px;line-height:20px;font-weight:bold;color:#ffffff;white-space:nowrap;">' + esc(sign['name']) + '</div>'
+            + ('<div style="' + font + 'font-size:12px;line-height:17px;font-weight:bold;letter-spacing:1px;color:#e03a3e;">' + esc(sign['role']) + '</div>' if sign['role'] else '')
+            + ('<div style="' + font + 'font-size:12px;line-height:17px;color:#d5d7db;">' + esc(sign['unit']) + '</div>' if sign['unit'] else '')
+            + '</td><td width="2" bgcolor="#e03a3e" style="background-color:#e03a3e;font-size:0;line-height:0;width:2px;">&nbsp;</td>'
+            '<td valign="middle" style="padding:16px 20px;"><table role="presentation" cellpadding="0" cellspacing="0" border="0">' + contact + '</table></td></tr></table>')
 
 
 def build_message(config, data, signature=''):
@@ -634,11 +685,21 @@ def build_message(config, data, signature=''):
         message['In-Reply-To'] = reply
         refs = [item for item in re.findall(r'<[^<>\s]+>', str(data.get('references', '')))[-20:] if item != reply]
         message['References'] = ' '.join(refs + [reply])
-    signature = str(signature or '').strip()[:2000]
-    message.set_content(body.rstrip() + ('\n\n-- \n' + signature if signature else '') + '\n')
-    if data.get('rich'):
-        # Formato básico: el texto se escapa por completo y solo después se convierten las marcas propias (**negrita**, _cursiva_, listas con «- »).
-        message.add_alternative(rich_html(body.rstrip(), signature), subtype='html')
+    # La firma va después del texto escrito y antes del historial citado (respuestas y reenvíos).
+    sign = signature if isinstance(signature, dict) else None
+    plain_sign = signature_text(sign) if sign else str(signature or '').strip()[:2000]
+    cut = QUOTE_START.search(body) if (sign or plain_sign) else None
+    head, tail = (body[:cut.start()], body[cut.start():]) if cut else (body, '')
+    message.set_content(head.rstrip() + ('\n\n-- \n' + plain_sign if plain_sign else '') + (tail.rstrip() if tail else '') + '\n')
+    if sign or data.get('rich'):
+        # Versión HTML: el texto se escapa por completo; solo se convierten las marcas propias y se añade la firma generada por el servidor.
+        cid = make_msgid(domain=config['username'].split('@')[-1])
+        logo = SIGNATURE_LOGO.read_bytes() if sign and SIGNATURE_LOGO.exists() else None
+        block = '<br>' + signature_html(sign, 'cid:' + cid[1:-1] if logo else 'https://ordenes-pro.ecuadorpcdoctor.com/static/logo-firma.png') if sign else ''
+        quoted = '<blockquote style="margin:14px 0 0;padding-left:12px;border-left:3px solid #c9ccd1;color:#555555;">' + rich_html(tail.strip(), '', wrap=False) + '</blockquote>' if tail.strip() else ''
+        message.add_alternative('<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;color:#222222;">' + rich_html(head.rstrip(), '' if sign else plain_sign, wrap=False) + block + quoted + '</div>', subtype='html')
+        if logo:
+            message.get_payload()[1].add_related(logo, 'image', 'png', cid=cid, disposition='inline')
     total = 0
     for item in data.get('attachments') or []:
         try:

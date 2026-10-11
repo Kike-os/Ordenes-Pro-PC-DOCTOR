@@ -8,6 +8,27 @@
   },
   "releases": [
     {
+      "version": "1.5.3",
+      "date": "2026-10-11T09:21:10-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Nueva orden de recepción técnica con fotos de evidencia, firma corporativa de correo, avisos flotantes bajo la campana y tarjeta «Capacidad del Buzón».",
+      "changes": {
+        "features": [
+          "Nueva orden de recepción técnica: asistente de cinco pasos con inspección inicial y accesorios por casillas, fotos del equipo como evidencia (arrastrar, cámara, ordenar, foto principal), borrador y resumen con edición por sección.",
+          "Las órdenes muestran sus fotos de recepción en el detalle, con ampliación y opción de añadir más.",
+          "Mail Pro: firma corporativa con el logo original, insertada automáticamente en correos nuevos, respuestas y reenvíos, configurable en «Firmas de correo»."
+        ],
+        "improvements": [
+          "Avisos flotantes bajo la campana con efecto translúcido, animación suave y pausa al pasar el cursor; no desplazan el contenido.",
+          "Mail Pro: tarjeta «Capacidad del Buzón» con barra de color según la ocupación real, estado, detalle y efecto al recibir una medición nueva."
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.2",
       "date": "2026-10-11T08:43:05-05:00",
       "type": "patch",

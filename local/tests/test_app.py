@@ -454,6 +454,32 @@ class SecurityTests(unittest.TestCase):
         self.assertEqual(manage(cookie,csrf,id=str(other),action='role',role='administrador')['status'],200)
         with app.connect() as c:self.assertEqual(tuple(c.execute('SELECT role,active FROM users WHERE id=?',(other,)).fetchone()),('administrador',1))
 
+    def test_order_photos_require_session_are_validated_and_limited(self):
+        import base64
+        cookie,csrf=self.login()
+        created=self.request('/api/orders',self.order_data(),cookie=cookie,csrf=csrf);self.assertEqual(created['status'],201);oid=created['body']['id']
+        jpeg=b'\xff\xd8\xff\xe0'+b'x'*400+b'\xff\xd9';body={'data':base64.b64encode(jpeg).decode(),'position':'0','main':True}
+        self.assertEqual(self.request(f'/api/orders/{oid}/photos',body)['status'],401)
+        self.assertEqual(self.request(f'/api/orders/{oid}/photos',body,cookie=cookie)['status'],403)
+        first=self.request(f'/api/orders/{oid}/photos',body,cookie=cookie,csrf=csrf);self.assertEqual(first['status'],201)
+        second=self.request(f'/api/orders/{oid}/photos',dict(body,position='1',main=False),cookie=cookie,csrf=csrf)['body']['id']
+        # Solo JPEG real: se rechazan otros contenidos aunque lleguen como «foto».
+        for bad in (b'<svg onload=alert(1)>'+b'x'*300,b'\x89PNG\r\n\x1a\n'+b'x'*300,b'\xff\xd8\xff'+b'x'*10):
+            self.assertEqual(self.request(f'/api/orders/{oid}/photos',dict(body,data=base64.b64encode(bad).decode()),cookie=cookie,csrf=csrf)['status'],400)
+        self.assertEqual(self.request(f'/api/orders/{oid}/photos',dict(body,data='no-es-base64!'),cookie=cookie,csrf=csrf)['status'],400)
+        self.assertEqual(self.request('/api/orders/999999/photos',body,cookie=cookie,csrf=csrf)['status'],404)
+        photos=self.request(f'/api/orders/{oid}',cookie=cookie)['body']['order']['photos']
+        self.assertEqual([(p['id'],p['is_main']) for p in photos],[(first['body']['id'],1),(second,0)])
+        self.assertEqual(self.request(f'/api/order-photo/{second}')['status'],401)
+        image=self.request(f'/api/order-photo/{second}',cookie=cookie);self.assertEqual(image['body'],jpeg)
+        # Cambiar la principal y eliminar; el número de orden y sus datos no cambian.
+        self.assertEqual(self.request(f'/api/orders/{oid}/photos',{'action':'main','photo_id':str(second)},cookie=cookie,csrf=csrf)['status'],200)
+        self.assertEqual(self.request(f'/api/orders/{oid}/photos',{'action':'delete','photo_id':str(first['body']['id'])},cookie=cookie,csrf=csrf)['status'],200)
+        after=self.request(f'/api/orders/{oid}',cookie=cookie)['body']['order']
+        self.assertEqual(([(p['id'],p['is_main']) for p in after['photos']],after['code']),([(second,1)],created['body']['code']))
+        for i in range(app.ORDER_PHOTO_LIMIT-1):self.assertEqual(self.request(f'/api/orders/{oid}/photos',dict(body,main=False),cookie=cookie,csrf=csrf)['status'],201)
+        self.assertEqual(self.request(f'/api/orders/{oid}/photos',dict(body,main=False),cookie=cookie,csrf=csrf)['status'],409)
+
     def test_public_chat_reports_real_advisor_state(self):
         first=self.request('/api/public/adi/message',{'message':'Hola, tengo una consulta ficticia'})
         self.assertEqual((first['status'],first['body']['state']),(201,'adi'))

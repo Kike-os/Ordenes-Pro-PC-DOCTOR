@@ -232,6 +232,39 @@ class MailRouteTests(test_app.SecurityTests):
             self.assertEqual((only_imap['state'],only_imap['cpanel'],only_imap['source']),('ok','sin_configurar','servidor de correo (IMAP QUOTA)'))
         self.assertEqual(self.request('/api/mail/storage')['status'],401)
 
+    def test_corporate_signature_is_generated_safely_and_placed_before_the_quote(self):
+        card=mail_pro.clean_signature({'name':'Persona <b>ficticia</b>\nX','role':'SOPORTE','phone':'+593 99 000 0000','web':'example.invalid','address':'Calle ficticia','enabled':True,'on_new':True,'on_reply':False,'html':'<script>'},'buzon@example.invalid')
+        self.assertEqual((card['name'],card['email'],card['on_reply'],'html' in card),('Persona b ficticia /b X','buzon@example.invalid',False,False))
+        body='Texto **importante**\n\n\nEl 1 ene 2026, Cliente escribió:\n> mensaje anterior'
+        message,_=mail_pro.build_message({'username':'buzon@example.invalid'},{'to':'a@example.invalid','subject':'Firma','body':body},card)
+        plain=message.get_body(('plain',)).get_content();page=message.get_body(('html',)).get_content()
+        self.assertLess(plain.index('Texto **importante**'),plain.index('-- \nPersona'));self.assertLess(plain.index('Tel.: +593 99 000 0000'),plain.index('escribió:'))
+        self.assertEqual(plain.count('-- \n'),1);self.assertEqual(page.count('alt="PC-DOCTOR S.A."'),1)
+        self.assertLess(page.index('<strong>importante</strong>'),page.index('<table'));self.assertLess(page.index('</table></td></tr></table>'),page.index('<blockquote'))
+        for expected in ('href="tel:+593990000000"','href="mailto:buzon@example.invalid"','href="https://example.invalid"','bgcolor="#2b2d31"','border-bottom:3px solid #e03a3e','src="cid:'):
+            self.assertIn(expected,page)
+        self.assertNotIn('<script',page);self.assertNotIn('<b>',page.split('<table')[1].split('Persona')[1][:40])
+        # Estructura MIME: alternativa texto/HTML, con el logo como parte relacionada (CID) y sin rutas locales.
+        html_part=message.get_payload()[1];self.assertEqual((message.get_content_type(),html_part.get_content_type()),('multipart/alternative','multipart/related'))
+        logo=html_part.get_payload()[1];self.assertEqual((logo.get_content_type(),logo.get_content_disposition()),('image/png','inline'))
+        self.assertIn(logo['Content-ID'][1:-1],page);self.assertNotIn('/home/',message.as_string())
+        with_file,_=mail_pro.build_message({'username':'buzon@example.invalid'},{'to':'a@example.invalid','subject':'Firma','body':'Hola','attachments':[{'name':'a.txt','type':'text/plain','data':'aG9sYQ=='}]},card)
+        self.assertEqual(with_file.get_content_type(),'multipart/mixed')
+        none,_=mail_pro.build_message({'username':'buzon@example.invalid'},{'to':'a@example.invalid','subject':'Sin firma','body':'Hola'},'')
+        self.assertEqual((none.get_content_type(),'-- ' in none.get_content()),('text/plain',False))
+        cookie,csrf=self.login()
+        with patch.dict(app.os.environ,ENV):
+            self.assertEqual(self.request('/api/settings',cookie=cookie)['body']['mail_signature_card']['name'],'Enrique Martínez Gómez')
+            saved=self.request('/api/mail/signature',{'card':'{"name":"Técnica ficticia","role":"TALLER","enabled":true,"on_new":true,"on_reply":true}'},cookie=cookie,csrf=csrf)['body']['card']
+            self.assertEqual((saved['name'],saved['role'],saved['email']),('Técnica ficticia','TALLER','buzon@example.invalid'))
+            sent=[]
+            with patch.object(mail_pro,'deliver',side_effect=lambda config,message,recipients:sent.append(message)),patch.object(mail_pro,'open_imap',side_effect=mail_pro.MailError('red','sin red')):
+                base={'to':'cliente@example.invalid','cc':'','subject':'Con firma','body':'Hola','attachments':'[]','order_code':''}
+                self.request('/api/mail/send',dict(base,request_key='clave-de-firma-000001',signature=True),cookie=cookie,csrf=csrf)
+                self.request('/api/mail/send',dict(base,request_key='clave-de-firma-000002',signature=False),cookie=cookie,csrf=csrf)
+            self.assertIn('Técnica ficticia',sent[0].get_body(('html',)).get_content());self.assertEqual(sent[1].get_content_type(),'text/plain')
+            self.assertEqual(self.request('/api/mail/signature',{'restore':True},cookie=cookie,csrf=csrf)['body']['card']['name'],'Enrique Martínez Gómez')
+
     def test_replaced_draft_is_removed_only_when_it_is_a_draft(self):
         class Box:
             def __init__(self,flags):self.flags=flags;self.calls=[]

@@ -81,3 +81,7 @@ Se guardan en la carpeta de borradores del servidor (IMAP). Al reabrir un borrad
 ## Prueba manual de sonido y navegadores
 
 En Correo → Preferencias → «Prueba de sonido y notificaciones»: «Probar sonido» debe mostrar «Motor de audio: en marcha» y «Reproductor invocado»; si no se oye, revisar el volumen del equipo y el silencio de la pestaña. «Probar aviso de escritorio» pide el permiso del navegador la primera vez. Repetir en Chrome, Firefox y Edge.
+
+## Firma corporativa
+
+Configuración → Correo y servicios → **Firmas de correo**: nombre, cargo, descripción, teléfono, correo, web y dirección del buzón remitente, con vista previa, activación y aplicación a correos nuevos y a respuestas o reenvíos. El HTML de la firma lo compone siempre el servidor a partir de esos datos (tablas y estilos en línea, sin JavaScript); no se acepta HTML libre. El logo es una copia reducida del original (`local/static/logo-firma.png`), incrustada en cada mensaje como imagen relacionada (CID), por lo que no depende de una URL externa. Los mensajes con firma salen como `multipart/alternative` (texto y HTML). En respuestas y reenvíos la firma queda después del texto escrito y antes del mensaje citado. En el redactor se puede desmarcar «Incluir la firma corporativa» para ese envío.

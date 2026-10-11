@@ -249,6 +249,9 @@ def verify_captcha(c, token):
     return word>>(32-CAPTCHA_BITS)==0
 
 
+ORDER_PHOTO_LIMIT=8
+
+
 def adi_public_state(conv):
     # Estado que ve el cliente: solo se informa «asesor conectado» cuando un usuario real tomó la conversación.
     mode=conv['mode'] if conv else 'adi'
@@ -262,6 +265,14 @@ def mail_allowed(user):
     except mail_pro.MailError:
         return False
     return ready and (user['role']=='administrador' or (user['role']=='tecnico' and os.getenv('MAIL_ALLOW_TECHNICIANS','').lower() in ('1','true','yes')))
+
+
+def mail_signature_card(c):
+    # Firma corporativa del buzón remitente: datos validados; el HTML siempre lo compone el servidor.
+    account=mail_pro.settings()['username'];row=c.execute('SELECT value FROM system_state WHERE key=?',('mail_signature_card:'+account,)).fetchone()
+    try:raw=json.loads(row['value']) if row else {}
+    except ValueError:raw={}
+    return mail_pro.clean_signature(raw,account)
 
 
 def mail_signature(c):
@@ -410,7 +421,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         path = urlsplit(self.path).path
         files = {'/static/label.css':'label.css','/static/app.css':'app.css','/static/app.js':'app.js','/static/form-validation.js':'form-validation.js','/static/appointments.js':'appointments.js','/static/adi-widget.js':'adi-widget.js','/static/logo-original.png':'logo-original.png',
-                 '/favicon.ico':'favicon.ico','/static/favicon.ico':'favicon.ico','/static/favicon-16.png':'favicon-16.png','/static/favicon-32.png':'favicon-32.png','/static/favicon-48.png':'favicon-48.png',
+                 '/favicon.ico':'favicon.ico','/static/favicon.ico':'favicon.ico','/static/favicon-16.png':'favicon-16.png','/static/favicon-32.png':'favicon-32.png','/static/logo-firma.png':'logo-firma.png','/static/favicon-48.png':'favicon-48.png',
                  '/apple-touch-icon.png':'apple-touch-icon.png','/apple-touch-icon-precomposed.png':'apple-touch-icon.png','/static/apple-touch-icon.png':'apple-touch-icon.png'}
         if path in files:
             file = ROOT / 'static' / files[path]
@@ -532,7 +543,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(200,{'conversation':safe_conv,'messages':rows})
             if path == '/api/me':
                 prefs=c.execute('SELECT value FROM system_state WHERE key=?',('mail_prefs:'+str(user['id']),)).fetchone() if mail_allowed(user) else None
-                return self.reply(200, {'user':dict(user,mail=mail_allowed(user),mail_prefs=json.loads(prefs['value']) if prefs else None),'server_time':time.time()})
+                return self.reply(200, {'user':dict(user,mail=mail_allowed(user),mail_prefs=json.loads(prefs['value']) if prefs else None,mail_signature=mail_signature_card(c) if mail_allowed(user) else None),'server_time':time.time()})
             if path == '/api/weather':
                 return self.reply(200, current_weather())
             if path == '/api/time':
@@ -596,6 +607,13 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(200,{'rows':rows})
             if path == '/api/order-options':
                 return self.reply(200, {'statuses':order_workspace.STATUSES,'users':[dict(r) for r in c.execute('SELECT id,name FROM users WHERE active=1 ORDER BY name')]})
+            photo = re.fullmatch(r'/api/order-photo/([0-9]+)', path)
+            if photo:
+                # Evidencia de recepción: solo con sesión; se entrega como imagen JPEG ya validada al guardarla.
+                row = c.execute('SELECT data FROM order_photos WHERE id=?', (int(photo[1]),)).fetchone()
+                if not row:
+                    return self.reply(404, {'error':'Foto no disponible.'})
+                return self.reply(200, base64.b64decode(row['data']), 'image/jpeg')
             detail = re.fullmatch(r'/api/orders/([0-9]+)(?:/(qr\.(svg|png)|receipt\.pdf|thermal\.pdf|service\.pdf|label\.pdf))?', path)
             if detail:
                 row = c.execute('SELECT o.*,d.category type,d.brand,d.model,d.serial,d.color,c.id client_id,c.name client,c.identification,c.phone,c.email,c.province,c.city,c.address,c.location_reference,s.label status_label FROM orders o JOIN devices d ON d.id=o.device_id JOIN clients c ON c.id=d.client_id JOIN statuses s ON s.code=o.status WHERE o.id=?',(int(detail[1]),)).fetchone()
@@ -637,6 +655,7 @@ class Handler(BaseHTTPRequestHandler):
                 technical_access.attach(c,result)
                 order_workspace.attach(c,result)
                 result['current_problem']=row['problem']
+                result['photos']=[dict(r) for r in c.execute('SELECT id,is_main,position,size,created_at FROM order_photos WHERE order_id=? ORDER BY is_main DESC,position,id',(result['id'],))]
                 result['mail']=[dict(r) for r in c.execute('SELECT id,subject,correspondent,direction,sent_at,folder,uid FROM mail_links WHERE order_id=? ORDER BY id DESC LIMIT 30',(result['id'],))] if mail_allowed(user) else None
                 return self.reply(200, {'order':result})
             if path in ('/api/orders', '/api/clients', '/api/devices'):
@@ -706,7 +725,7 @@ class Handler(BaseHTTPRequestHandler):
                     return self.reply(403, {'error':'Solo administración puede acceder a la configuración.'})
                 labels={'login':'Inicio de sesión','logout':'Cierre de sesión','sessions_revoked':'Cierre de todas las sesiones','other_sessions_revoked':'Cierre de otras sesiones','password_changed':'Cambio de contraseña','password_reset':'Contraseña restablecida','profile_updated':'Perfil actualizado','auth_policy_updated':'Políticas de acceso actualizadas','account_approved':'Cuenta aprobada','account_rejected':'Solicitud rechazada','account_updated':'Cuenta del equipo modificada','clients_exported':'Exportación de clientes','clients_imported':'Importación de clientes'}
                 activity=[{'label':labels[r['action']],'at':r['created_at']} for r in c.execute('SELECT action,created_at FROM audit WHERE user_id=? AND action IN ('+','.join('?' for _ in labels)+') ORDER BY id DESC LIMIT 12',(user['id'],*labels))]
-                return self.reply(200, {'profile':{k:user[k] for k in ('name','username','email','role')},'me':user['id'],'active_sessions':c.execute('SELECT COUNT(*) FROM sessions WHERE user_id=? AND expires>?',(user['id'],int(time.time()))).fetchone()[0],'security_activity':activity,'registration_enabled':registration_enabled(),'captcha_mode':captcha_mode(),'mail':mail_pro.status(),'mail_signature':mail_signature(c),'accounts':[dict(r) for r in c.execute("SELECT u.id,u.name,u.username,u.email,u.role,u.active,(SELECT MAX(a.created_at) FROM audit a WHERE a.user_id=u.id AND a.action='login') last_login,(SELECT COUNT(*) FROM sessions s WHERE s.user_id=u.id AND s.expires>?) sessions FROM users u WHERE u.approval='approved' ORDER BY u.id",(int(time.time()),))],'requests':[dict(r) for r in c.execute("SELECT id,name,username,email,phone,identification,job_title,requested_at,approval FROM users WHERE approval IN ('pending','rejected') ORDER BY approval,id DESC")],'smtp_configured':bool(os.getenv('SMTP_HOST')),'openai_configured':bool(os.getenv('OPENAI_API_KEY')),'login_lockout_seconds':auth_policy(c)['lockout_seconds'],'auth_policy':auth_policy(c),'antibot_configured':bool(os.getenv('TURNSTILE_SITE_KEY') and os.getenv('TURNSTILE_SECRET_KEY')),'origin':os.getenv('APP_URL','http://127.0.0.1:8010')})
+                return self.reply(200, {'profile':{k:user[k] for k in ('name','username','email','role')},'me':user['id'],'active_sessions':c.execute('SELECT COUNT(*) FROM sessions WHERE user_id=? AND expires>?',(user['id'],int(time.time()))).fetchone()[0],'security_activity':activity,'registration_enabled':registration_enabled(),'captcha_mode':captcha_mode(),'mail':mail_pro.status(),'mail_signature':mail_signature(c),'mail_signature_card':mail_signature_card(c) if mail_pro.configured() else None,'accounts':[dict(r) for r in c.execute("SELECT u.id,u.name,u.username,u.email,u.role,u.active,(SELECT MAX(a.created_at) FROM audit a WHERE a.user_id=u.id AND a.action='login') last_login,(SELECT COUNT(*) FROM sessions s WHERE s.user_id=u.id AND s.expires>?) sessions FROM users u WHERE u.approval='approved' ORDER BY u.id",(int(time.time()),))],'requests':[dict(r) for r in c.execute("SELECT id,name,username,email,phone,identification,job_title,requested_at,approval FROM users WHERE approval IN ('pending','rejected') ORDER BY approval,id DESC")],'smtp_configured':bool(os.getenv('SMTP_HOST')),'openai_configured':bool(os.getenv('OPENAI_API_KEY')),'login_lockout_seconds':auth_policy(c)['lockout_seconds'],'auth_policy':auth_policy(c),'antibot_configured':bool(os.getenv('TURNSTILE_SITE_KEY') and os.getenv('TURNSTILE_SECRET_KEY')),'origin':os.getenv('APP_URL','http://127.0.0.1:8010')})
             if path == '/api/notifications':
                 return self.reply(200,notifications.build(c,user,reception_now(),mail_allowed(user)))
             if path.startswith('/api/mail/'):
@@ -727,7 +746,7 @@ class Handler(BaseHTTPRequestHandler):
                 try:
                     client=mail_pro.open_imap()
                     if path=='/api/mail/overview':
-                        return self.reply(200,{'account':mail_pro.settings()['username'],'folders':mail_pro.overview(client),'quota':mail_pro.quota(client),'checked':reception_now().isoformat(timespec='seconds'),'signature':mail_signature(c),'page_size':mail_pro.PAGE})
+                        return self.reply(200,{'account':mail_pro.settings()['username'],'folders':mail_pro.overview(client),'quota':mail_pro.quota(client),'checked':reception_now().isoformat(timespec='seconds'),'signature':mail_signature(c),'signature_card':mail_signature_card(c),'page_size':mail_pro.PAGE})
                     folder,_=mail_pro.resolve(client,arg('folder') or 'INBOX')
                     if path=='/api/mail/messages':
                         try:page=max(1,int(arg('page') or '1'))
@@ -808,7 +827,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(403, {'error':'Solicitud no autorizada.'})
             path = urlsplit(self.path).path
             workspace_post=bool(re.fullmatch(r'/api/orders/[0-9]+/workspace',path))
-            max_body=9000000 if path in ('/api/clients/import/preview','/api/clients/import/commit') else 6000000 if path in ('/api/mail/send','/api/mail/draft') else 100000 if path=='/api/conditions' else (65536 if workspace_post else 16384)
+            max_body=9000000 if path in ('/api/clients/import/preview','/api/clients/import/commit') else 6000000 if path in ('/api/mail/send','/api/mail/draft') else 100000 if path=='/api/conditions' else 900000 if re.fullmatch(r'/api/orders/[0-9]+/photos',path) else (65536 if workspace_post else 16384)
             length = int(self.headers.get('Content-Length', '0'))
             if length <= 0 or length > max_body:
                 return self.reply(400, {'error':'Solicitud inválida.'})
@@ -1050,6 +1069,18 @@ class Handler(BaseHTTPRequestHandler):
                         return self.reply(200,{'ok':True,'prefs':clean})
                     if path=='/api/mail/signature':
                         if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede cambiar la firma.'})
+                        if data.get('restore') is True or 'card' in data:
+                            key='mail_signature_card:'+mail_pro.settings()['username']
+                            if data.get('restore') is True:c.execute('DELETE FROM system_state WHERE key=?',(key,))
+                            else:
+                                try:raw=json.loads(str(data.get('card')))
+                                except ValueError:return self.reply(400,{'error':'Firma no válida.'})
+                                if not isinstance(raw,dict):return self.reply(400,{'error':'Firma no válida.'})
+                                card=mail_pro.clean_signature(raw,mail_pro.settings()['username'])
+                                if not card['name']:return self.reply(400,{'error':'Indica el nombre que aparece en la firma.','fields':{'name':'Completa este campo.'}})
+                                c.execute("INSERT INTO system_state VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",(key,json.dumps(card)))
+                            audit(c,user['id'],'mail_signature_updated')
+                            return self.reply(200,{'ok':True,'card':mail_signature_card(c)})
                         text=str(data.get('signature','')).strip()
                         if len(text)>2000:return self.reply(400,{'error':'La firma admite hasta 2000 caracteres.'})
                         c.execute("INSERT INTO system_state VALUES ('mail_signature',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",(text,))
@@ -1081,7 +1112,7 @@ class Handler(BaseHTTPRequestHandler):
                             except ValueError:files=None
                             if not isinstance(files,list) or len(files)>10 or any(not isinstance(item,dict) for item in files):return self.reply(400,{'error':'Adjuntos no válidos.'})
                             config=mail_pro.settings()
-                            message,recipients=mail_pro.build_message(config,{**{k:data.get(k,'') for k in ('to','cc','bcc','subject','body','in_reply_to','references')},'rich':data.get('rich') is True,'from_name':corporate.settings()['name'],'attachments':files,'draft':draft},mail_signature(c))
+                            message,recipients=mail_pro.build_message(config,{**{k:data.get(k,'') for k in ('to','cc','bcc','subject','body','in_reply_to','references')},'rich':data.get('rich') is True,'from_name':corporate.settings()['name'],'attachments':files,'draft':draft},(mail_signature_card(c) if data.get('signature') is True and mail_signature_card(c)['enabled'] else '') if 'signature' in data else mail_signature(c))
                             order=None;code=str(data.get('order_code','')).strip().upper()
                             if code:
                                 order=c.execute('SELECT id,code FROM orders WHERE code=?',(code,)).fetchone()
@@ -1273,6 +1304,34 @@ class Handler(BaseHTTPRequestHandler):
                     status,payload=client_registry.save(c,data,user)
                     if status in (200,201):audit(c,user['id'],'client_registry_saved',payload['id'])
                     return self.reply(status,payload)
+                photo_route=re.fullmatch(r'/api/orders/([0-9]+)/photos',path)
+                if photo_route:
+                    oid=int(photo_route[1])
+                    if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
+                    if not c.execute('SELECT 1 FROM orders WHERE id=?',(oid,)).fetchone():return self.reply(404,{'error':'Orden no disponible.'})
+                    action=str(data.get('action','add'))
+                    if action in ('delete','main'):
+                        if not str(data.get('photo_id','')).isdigit():return self.reply(400,{'error':'Foto no válida.'})
+                        target=c.execute('SELECT id FROM order_photos WHERE id=? AND order_id=?',(int(data['photo_id']),oid)).fetchone()
+                        if not target:return self.reply(404,{'error':'Foto no disponible.'})
+                        if action=='delete':
+                            if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede eliminar evidencia de una orden.'})
+                            c.execute('DELETE FROM order_photos WHERE id=?',(target['id'],));audit(c,user['id'],'order_photo_deleted',oid)
+                        else:
+                            c.execute('UPDATE order_photos SET is_main=(id=?) WHERE order_id=?',(target['id'],oid));audit(c,user['id'],'order_photo_main',oid)
+                        return self.reply(200,{'ok':True})
+                    if c.execute('SELECT COUNT(*) FROM order_photos WHERE order_id=?',(oid,)).fetchone()[0]>=ORDER_PHOTO_LIMIT:return self.reply(409,{'error':'La orden ya tiene el máximo de '+str(ORDER_PHOTO_LIMIT)+' fotos.'})
+                    try:content=base64.b64decode(str(data.get('data','')),validate=True)
+                    except Exception:return self.reply(400,{'error':'La foto no se pudo leer.'})
+                    # Solo JPEG real (cabecera y cierre), del tamaño que produce la reducción en el navegador.
+                    if not (content[:3]==b'\xff\xd8\xff' and content[-2:]==b'\xff\xd9') or not 200<=len(content)<=600000:return self.reply(400,{'error':'Formato de foto no admitido o tamaño excesivo.'})
+                    try:position=max(0,min(99,int(str(data.get('position','0')))))
+                    except ValueError:position=0
+                    main=data.get('main') is True
+                    if main:c.execute('UPDATE order_photos SET is_main=0 WHERE order_id=?',(oid,))
+                    pid=c.execute('INSERT INTO order_photos(order_id,position,is_main,mime,size,data,created_by,created_at) VALUES (?,?,?,?,?,?,?,?)',(oid,position,1 if main else 0,'image/jpeg',len(content),base64.b64encode(content).decode('ascii'),user['id'],reception_now().isoformat(timespec='seconds'))).lastrowid
+                    audit(c,user['id'],'order_photo_added',oid)
+                    return self.reply(201,{'ok':True,'id':pid})
                 follow_route=re.fullmatch(r'/api/orders/([0-9]+)/follow-up',path)
                 if follow_route:
                     oid=int(follow_route[1]);comment=str(data.get('comment','')).strip()

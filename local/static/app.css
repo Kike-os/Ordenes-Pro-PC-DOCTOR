@@ -2184,3 +2184,153 @@ button.header-weather:hover,button.header-weather[aria-expanded=true]{background
 @media(max-width:1180px){.mail-v2 .mail-storage-refresh{display:none}}
 .mail-pref-tests{display:flex;flex-wrap:wrap;gap:8px}.mail-pref-tests button{min-height:36px;padding:6px 12px;font-size:12.5px}
 .mail-diagnostic{list-style:none;margin:0;padding:0;display:grid;gap:4px;font-size:12px;line-height:1.45;color:#b9cce6}.mail-diagnostic:empty{display:none}.mail-diagnostic-fail{color:#ffb3b6}
+/* Nueva orden de recepción técnica: encabezado, progreso, casillas, fotos de evidencia y resumen. */
+#order-dialog.wizard-dialog{width:min(920px,calc(100% - 24px));max-width:920px;max-height:min(92dvh,900px)}
+#order-dialog.wizard-dialog form{max-height:min(92dvh,900px)}
+#order-dialog .reception-header{align-items:center;gap:12px}
+#order-dialog .reception-mark{display:grid;place-items:center;flex:0 0 42px;width:42px;height:42px;border:1px solid #34507d;border-radius:12px;background:linear-gradient(140deg,#2f6fd0,#1b3f7c);color:#fff}
+#order-dialog .reception-mark .system-icon{width:21px;height:21px}
+#order-dialog .reception-heading{margin-right:auto;min-width:0}
+body[data-page=dashboard] #order-dialog .reception-header h2{font-size:18.5px;letter-spacing:-.2px;margin:0 0 2px}
+#order-dialog .reception-draft{display:inline-flex;align-items:center;gap:7px;flex:0 0 auto;min-height:36px;padding:6px 12px;font-size:12.5px;white-space:nowrap}
+#order-dialog .reception-draft .system-icon{width:15px;height:15px}
+#order-dialog .wizard-nav{position:relative;padding-bottom:14px!important}
+#order-dialog .wizard-nav ol{grid-template-columns:repeat(5,minmax(0,1fr))}
+#order-dialog .wizard-nav button{transition:background .2s,color .2s,border-color .2s}
+#order-dialog .wizard-nav button:not(:disabled):hover{background:#12233d;transform:none}
+#order-dialog .wizard-nav .step-number{transition:background .22s,border-color .22s,color .22s}
+#order-dialog .wizard-nav .step-completed .step-number{font-size:0;background:#1f6f52;border-color:#3fbf8a;color:#fff}
+#order-dialog .wizard-nav .step-completed .step-number::after{content:"✓";font-size:13px;font-weight:700}
+#order-dialog .wizard-track{position:absolute;left:20px;right:20px;bottom:6px;height:3px;border-radius:999px;background:#17263f;overflow:hidden}
+#order-dialog .wizard-track i{display:block;height:100%;width:0;border-radius:999px;background:linear-gradient(90deg,#3b82f6,#69a7ff);transition:width .25s ease-out}
+#order-dialog .wizard-panel:not([hidden]){animation:system-in .22s ease-out}
+#order-dialog .order-draft-notice{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 12px;padding:10px 12px;border:1px solid #34507d;border-radius:11px;background:#12233d;color:#c4ddff;font-size:12.5px}
+#order-dialog .order-draft-notice[hidden]{display:none}
+#order-dialog .order-draft-notice span{margin-right:auto}
+#order-dialog .order-draft-notice button{min-height:32px;padding:5px 12px;font-size:12px}
+#order-dialog .chip-help{grid-column:1/-1;margin:0 0 2px;font-size:12px;color:#8fa5c4}
+#order-dialog .chip-group{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:7px;margin:0 0 6px}
+body[data-page=dashboard] #order-dialog .check-chip{display:inline-flex;align-items:center;gap:7px;margin:0;padding:7px 12px;border:1px solid #2a4063;border-radius:999px;background:#0b1626;color:#b9cce6;font-size:12.5px;font-weight:500;line-height:1.2;cursor:pointer;transition:background .2s,border-color .2s,color .2s}
+#order-dialog .check-chip:hover{border-color:#4b75b3;background:#101e34}
+#order-dialog .check-chip input{position:absolute;opacity:0;width:1px;height:1px;margin:0}
+#order-dialog .check-chip span::before{content:"✓";display:inline-grid;place-items:center;width:14px;height:14px;margin-right:7px;border:1.5px solid #4b6690;border-radius:4px;vertical-align:-2px;font-size:10px;font-weight:800;line-height:1;color:transparent;transition:background .2s,border-color .2s}
+#order-dialog .check-chip:has(input:checked){border-color:#4d8df0;background:#17366a;color:#fff}
+#order-dialog .check-chip:has(input:checked) span::before{border-color:#8bb8ff;background:#4d8df0;color:#fff}
+#order-dialog .check-chip:has(input:focus-visible){outline:2px solid #8bb8ff;outline-offset:2px}
+body[data-page=dashboard] #order-dialog .chip-other{display:grid;gap:5px;margin:4px 0 0}
+#order-dialog .photo-drop{display:grid;justify-items:center;gap:6px;padding:22px 16px;border:1.5px dashed #34507d;border-radius:14px;background:#0b1626;text-align:center;transition:border-color .2s,background .2s}
+#order-dialog .photo-drop.dragging{border-color:#69a7ff;background:#12233d}
+#order-dialog .photo-drop[data-full=true]{opacity:.6}
+#order-dialog .photo-drop-icon{display:grid;place-items:center;width:44px;height:44px;border-radius:13px;background:#13233d;color:#8bb8ff}
+#order-dialog .photo-drop-icon .system-icon{width:23px;height:23px}
+#order-dialog .photo-drop strong{font-size:14px;color:#eef3ff}
+#order-dialog .photo-drop small{font-size:12px;color:#8fa5c4}
+#order-dialog .photo-drop-actions{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-top:6px}
+#order-dialog .photo-drop-actions button{display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:8px 14px;font-size:13px}
+#order-dialog .photo-drop-actions .system-icon{width:16px;height:16px}
+#order-dialog .photo-bar{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px;margin:14px 0 8px}
+#order-dialog .photo-bar strong{font-size:13.5px;color:#eef3ff}
+#order-dialog .photo-bar small{font-size:11.5px;color:#8fa5c4}
+#order-dialog .photo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+#order-dialog .photo-tile{position:relative;margin:0;border:1px solid #263a57;border-radius:12px;background:#0a1322;overflow:hidden;animation:system-in .22s ease-out;transition:border-color .2s,transform .2s,opacity .2s}
+#order-dialog .photo-tile[data-main=true]{border-color:#4d8df0;box-shadow:0 0 0 2px #3b82f633}
+#order-dialog .photo-tile.dragging{opacity:.45}
+#order-dialog .photo-tile.drop-target{border-color:#69a7ff;transform:scale(1.02)}
+#order-dialog .photo-thumb{display:block;width:100%;height:112px;object-fit:cover;background:#060d19}
+.photo-badge{position:absolute;top:6px;left:6px;padding:2px 8px;border-radius:999px;background:#255eb2;color:#fff;font-size:10.5px;font-weight:700}
+#order-dialog .photo-order{position:absolute;top:6px;right:6px;display:grid;place-items:center;min-width:22px;height:22px;padding:0 6px;border-radius:999px;background:#06101fcc;color:#dbe8fb;font-size:11px;font-weight:700}
+#order-dialog .photo-tile figcaption{display:flex;justify-content:space-between;gap:2px;padding:5px}
+#order-dialog .photo-tool{display:grid;place-items:center;flex:1 1 0;min-width:0;height:32px;padding:0;border:1px solid transparent;border-radius:8px;background:transparent;color:#9bb0cf}
+#order-dialog .photo-tool:hover:not(:disabled){background:#13233d;border-color:#34507d;color:#eef3ff;transform:none}
+#order-dialog .photo-tool:focus-visible{outline:2px solid #8bb8ff;outline-offset:1px}
+#order-dialog .photo-tool:disabled{opacity:.3;cursor:default}
+#order-dialog .photo-tool[aria-pressed=true]{color:#f3c677}
+#order-dialog .photo-tool .system-icon{width:15px;height:15px}
+#order-dialog .photo-loading{display:grid;place-items:center;min-height:150px;color:#8fa5c4;font-size:12px;background:linear-gradient(100deg,#0a1322 30%,#12213a 50%,#0a1322 70%);background-size:220% 100%;animation:photo-wait 1.2s linear infinite}
+@keyframes photo-wait{to{background-position:-120% 0}}
+#order-dialog .order-upload{margin:0 0 8px;font-size:12.5px;color:#9bbef5}#order-dialog .order-upload:empty{display:none}
+#order-dialog .order-review{grid-column:1/-1;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+#order-dialog .review-card{min-width:0;padding:12px 14px;border:1px solid #223450;border-radius:12px;background:#0b1626}
+#order-dialog .review-card:nth-of-type(3),#order-dialog .review-card:nth-of-type(4){grid-column:1/-1}
+#order-dialog .review-card header{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px}
+#order-dialog .review-card h4{margin:0;font-size:13px;letter-spacing:.3px;text-transform:uppercase;color:#8fb4ee}
+#order-dialog .review-edit{display:inline-flex;align-items:center;gap:5px;padding:3px 8px;font-size:12px;color:#9bbef5}
+#order-dialog .review-edit .system-icon{width:13px;height:13px}
+#order-dialog .review-card dl{display:grid;gap:5px;margin:0}
+#order-dialog .review-card dl>div{display:grid;grid-template-columns:minmax(110px,34%) minmax(0,1fr);gap:10px}
+#order-dialog .review-card dt{font-size:12px;color:#8fa5c4}
+#order-dialog .review-card dd{margin:0;font-size:13px;color:#e3edff;overflow-wrap:anywhere;white-space:pre-line}
+#order-dialog .review-photos{display:flex;gap:8px;margin-top:10px;overflow-x:auto;scrollbar-width:thin}
+#order-dialog .review-photos canvas{flex:0 0 auto;width:86px;height:64px;object-fit:cover;border:1px solid #263a57;border-radius:8px}
+#order-dialog .review-photos canvas[data-main=true]{border-color:#4d8df0}
+#order-dialog .review-ready{grid-column:1/-1;display:flex;align-items:center;gap:8px;margin:0;padding:9px 12px;border:1px solid #1f5b46;border-radius:11px;background:#0f2a22;color:#bfeeda;font-size:12.5px}
+#order-dialog .review-ready .system-icon{flex:0 0 16px;width:16px;height:16px}
+.order-photo-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;margin-bottom:10px}
+.order-photo-item{position:relative;padding:0;border:1px solid #263a57;border-radius:10px;background:#0a1322;overflow:hidden;cursor:pointer}
+.order-photo-item:hover{border-color:#69a7ff;transform:none}
+.order-photo-item img{display:block;width:100%;height:92px;object-fit:cover}
+.order-photo-add{display:inline-flex;align-items:center;gap:8px}.order-photo-add .system-icon{width:15px;height:15px}
+body[data-page=dashboard] dialog.photo-viewer{width:min(900px,calc(100vw - 20px))}
+.photo-viewer img{display:block;max-width:100%;max-height:70dvh;margin:0 auto;border-radius:8px}
+.photo-viewer-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px;padding:12px 0 0}
+@media(max-width:700px){#order-dialog .order-review{grid-template-columns:1fr}#order-dialog .reception-draft span{display:none}#order-dialog .reception-draft{padding:6px 9px}#order-dialog .reception-mark{flex-basis:36px;width:36px;height:36px}#order-dialog .photo-grid{grid-template-columns:repeat(2,minmax(0,1fr))}#order-dialog .review-card dl>div{grid-template-columns:1fr;gap:1px}#order-dialog .wizard-track{left:12px;right:12px}body[data-page=dashboard] #order-dialog .reception-header p{display:none}}
+@media(prefers-reduced-motion:reduce){#order-dialog .photo-loading,#order-dialog .wizard-panel,#order-dialog .photo-tile{animation:none}#order-dialog .wizard-track i{transition:none}}
+/* Firma corporativa de correo: vista previa en el redactor y en Configuración (mismas proporciones que el HTML enviado). */
+.mail-sign-card{display:flex;align-items:stretch;width:fit-content;max-width:100%;background:#2b2d31;border-bottom:3px solid #e03a3e;color:#fff;font-family:Arial,Helvetica,sans-serif}
+.mail-sign-card[hidden]{display:none}
+.mail-sign-left{display:grid;justify-items:center;align-content:center;gap:1px;padding:16px 18px;text-align:center}
+.mail-sign-left img{display:block;width:132px;height:auto;margin-bottom:7px}
+.mail-sign-left strong{font-size:15px;line-height:20px;color:#fff}
+.mail-sign-role{font-size:12px;line-height:17px;font-weight:700;letter-spacing:1px;color:#e03a3e}
+.mail-sign-unit{font-size:12px;line-height:17px;color:#d5d7db}
+.mail-sign-card>b{flex:0 0 2px;background:#e03a3e}
+.mail-sign-right{display:grid;align-content:center;gap:6px;padding:16px 20px;min-width:0}
+.mail-sign-right p{display:flex;gap:8px;margin:0;font-size:13px;line-height:18px;color:#fff;overflow-wrap:anywhere}
+.mail-sign-right i{flex:0 0 16px;font-style:normal;color:#e03a3e}
+.mail-sign-box{display:grid;gap:8px}.mail-sign-box:empty{display:none}
+body[data-page=dashboard] .mail-sign-toggle{display:flex;grid-template-columns:none;align-items:center;gap:8px;margin:0;font-size:13px;font-weight:500;color:#dbe8fb;cursor:pointer}
+.mail-sign-toggle input{flex:0 0 16px;width:16px;height:16px;min-height:0!important;margin:0!important;accent-color:#4d8df0}
+.mail-sign-form h3{margin:0;font-size:15px;color:#eef3ff}
+.mail-sign-toggles{display:flex;flex-wrap:wrap;gap:8px 18px}
+.mail-sign-preview{padding:14px;border:1px solid #223450;border-radius:11px;background:#f4f5f7;overflow-x:auto}
+.mail-sign-preview[data-off=true]{opacity:.45}
+@media(max-width:560px){.mail-sign-card{flex-direction:column}.mail-sign-card>b{flex-basis:2px;height:2px}.mail-sign-left{padding:14px}.mail-sign-right{padding:14px}}
+/* Smart Floating Notifications — Glass Premium: avisos bajo la campana, translúcidos y sin mover el contenido. */
+body[data-page=dashboard] .toast-region{top:var(--toast-top,84px);right:var(--toast-right,20px);bottom:auto;left:auto;z-index:58;display:flex;flex-direction:column;gap:8px;width:min(322px,calc(100vw - 24px))}
+body.notify-docked .toast-region{right:max(var(--toast-right,20px),400px)}
+body[data-page=dashboard] .toast{padding:11px 10px 13px 12px;gap:10px;border:1px solid #3b63a0a6;border-left-width:1px;border-radius:14px;background:#0c1a2fee;box-shadow:0 14px 36px #02071480,inset 0 1px 0 #ffffff12;animation:toast-drop .26s cubic-bezier(.2,.8,.3,1) both}
+@supports ((backdrop-filter:blur(12px)) or (-webkit-backdrop-filter:blur(12px))){body[data-page=dashboard] .toast{background:#0c1a2fe6;-webkit-backdrop-filter:blur(12px) saturate(1.15);backdrop-filter:blur(12px) saturate(1.15)}}
+body[data-page=dashboard] .toast::before{content:"";position:absolute;inset:-1px;border-radius:inherit;border:1px solid #69a7ff;opacity:0;pointer-events:none;animation:toast-rim .9s ease-out 1}
+body[data-page=dashboard] .toast .toast-icon{animation:toast-icon .7s ease-out 1}
+body[data-page=dashboard] .toast.leaving{animation:toast-rise .24s ease-in both}
+body[data-page=dashboard] .toast-body strong{font-size:12.5px}
+body[data-page=dashboard] .toast-body p{font-size:12.5px;line-height:1.4;color:#d6e3f7}
+@keyframes toast-drop{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
+@keyframes toast-rise{to{opacity:0;transform:translateY(-6px)}}
+@keyframes toast-rim{0%{opacity:.9;box-shadow:0 0 0 0 #69a7ff66}100%{opacity:0;box-shadow:0 0 0 6px #69a7ff00}}
+@keyframes toast-icon{0%{box-shadow:0 0 0 0 #69a7ff80}100%{box-shadow:0 0 0 9px #69a7ff00}}
+@media(max-width:999px){body[data-page=dashboard] .toast-region{top:var(--toast-top,84px);bottom:auto;left:auto;right:max(12px,var(--toast-right,12px));width:min(322px,calc(100vw - 24px))}}
+@media(prefers-reduced-motion:reduce){body[data-page=dashboard] .toast,body[data-page=dashboard] .toast.leaving,body[data-page=dashboard] .toast::before,body[data-page=dashboard] .toast .toast-icon{animation:none}}
+/* Storage Monitor de Mail Pro: barra con color según la ocupación real y acceso desde el encabezado. */
+.mail-meter{height:7px;border-radius:999px;background:#17263f;overflow:hidden}
+.mail-meter i{display:block;height:100%;border-radius:999px;background:#3fbf8a;transition:width .5s cubic-bezier(.2,.7,.3,1),background-color .4s}
+.mail-meter[data-level=mid] i{background:#3b82f6}.mail-meter[data-level=warn] i{background:#e0b354}.mail-meter[data-level=high] i{background:#e5584d}
+.mail-v2 .mail-storage-state{color:#9bb0cf!important}
+.mail-v2 .mail-storage[data-level=warn] .mail-storage-state{color:#f3d48f!important}.mail-v2 .mail-storage[data-level=high] .mail-storage-state{color:#ffb3b6!important}
+.mail-v2 .mail-storage{position:relative;overflow:hidden;transition:border-color .3s,box-shadow .3s}
+.mail-v2 .mail-storage:hover{border-color:#34507d;box-shadow:0 0 0 3px #3b82f614}
+.mail-v2 .mail-storage header .system-icon{transition:color .3s}
+.mail-v2 .mail-storage[data-level=ok] header>.system-icon{color:#5fd6a3}.mail-v2 .mail-storage[data-level=warn] header>.system-icon{color:#f3c677}.mail-v2 .mail-storage[data-level=high] header>.system-icon{color:#ff8f93}
+.mail-meter{position:relative}
+.mail-meter i{position:relative;overflow:hidden}
+.mail-v2 .mail-storage-fresh .mail-meter i::after{content:"";position:absolute;inset:0;background:linear-gradient(100deg,transparent 20%,#ffffff8c 50%,transparent 80%);transform:translateX(-120%);animation:meter-shine .9s ease-out 1}
+.mail-v2 .mail-storage-fresh{animation:storage-fresh .9s ease-out 1}
+@keyframes meter-shine{to{transform:translateX(120%)}}
+@keyframes storage-fresh{0%{box-shadow:0 0 0 0 #69a7ff66}100%{box-shadow:0 0 0 8px #69a7ff00}}
+.mail-v2 .mail-storage-more{justify-self:start;padding:0;font-size:11.5px;color:#9bbef5}
+.mail-v2[data-side=collapsed] .mail-storage-more{display:none}
+@media(max-width:1180px){.mail-v2 .mail-storage-more{display:none}}
+@media(prefers-reduced-motion:reduce){.mail-v2 .mail-storage-fresh,.mail-v2 .mail-storage-fresh .mail-meter i::after{animation:none}}
+@media(prefers-reduced-motion:reduce){.mail-meter i{transition:none}}
+.mail-sign-left strong,.mail-sign-right p span{white-space:nowrap}.mail-sign-right i{flex-basis:18px;font-size:12px}
+@media(max-width:560px){.mail-sign-right p span{white-space:normal}}
