@@ -179,6 +179,7 @@ def test_smtp(env=None, send_to=''):
 import base64
 import email
 import html as html_lib
+import quopri
 import re
 import time
 from email import policy
@@ -302,13 +303,18 @@ def list_folders(client):
         leaf = re.split(r'[./]', name)[-1].lower()
         role = 'inbox' if name.upper() == 'INBOX' else 'sent' if '\\sent' in flags or leaf in ('sent', 'enviados', 'sent items', 'sent messages') else 'drafts' if '\\drafts' in flags or leaf in ('drafts', 'borradores') \
             else 'trash' if '\\trash' in flags or leaf in ('trash', 'papelera', 'deleted items') else 'junk' if '\\junk' in flags or leaf in ('junk', 'spam') else 'archive' if '\\archive' in flags or leaf in ('archive', 'archivo') else 'other'
-        folders.append({'id': name, 'role': role})
+        folders.append({'id': name, 'role': role, 'special': ('\\' + {'junk': 'junk', 'sent': 'sent', 'drafts': 'drafts', 'trash': 'trash', 'archive': 'archive'}.get(role, '-')) in flags})
     order = ['inbox', 'sent', 'drafts', 'archive', 'junk', 'trash', 'other']
-    folders.sort(key=lambda item: (order.index(item['role']), item['id'].lower()))
+    # Entre carpetas con la misma función, primero la que el servidor marca como oficial (atributo SPECIAL-USE).
+    folders.sort(key=lambda item: (order.index(item['role']), not item['special'], item['id'].lower()))
     seen = set()
     for item in folders:
         # Si el servidor tiene dos carpetas con la misma función (Junk y spam), solo la primera recibe el nombre estándar.
-        item['label'] = ROLES[item['role']] if item['role'] in ROLES and item['role'] not in seen else re.split(r'[./]', item['id'])[-1]
+        leaf = re.split(r'[./]', item['id'])[-1]
+        first = item['role'] in ROLES and item['role'] not in seen
+        # Dos carpetas reales con la misma función (p. ej. Junk y spam) no se fusionan: la adicional conserva su nombre real en el servidor.
+        item['label'] = ROLES[item['role']] if first else leaf
+        item['duplicate'] = item['role'] in ROLES and not first
         seen.add(item['role'])
     return folders
 
@@ -333,9 +339,9 @@ def by_role(folders, role):
 def overview(client):
     folders = list_folders(client)
     for item in folders:
-        code, data = client.status(quoted(item['id']), '(MESSAGES UNSEEN UIDNEXT)')
+        code, data = client.status(quoted(item['id']), '(MESSAGES UNSEEN UIDNEXT UIDVALIDITY)')
         text = (data[0] or b'').decode('ascii', 'replace') if code == 'OK' and data else ''
-        for key, field in (('total', 'MESSAGES'), ('unread', 'UNSEEN'), ('uidnext', 'UIDNEXT')):
+        for key, field in (('total', 'MESSAGES'), ('unread', 'UNSEEN'), ('uidnext', 'UIDNEXT'), ('uidvalidity', 'UIDVALIDITY')):
             found = re.search(field + r' (\d+)', text)
             item[key] = int(found[1]) if found else 0
     return folders
@@ -356,11 +362,38 @@ def date_iso(message):
         return ''
 
 
-def search(client, folder, query='', flagged=False):
+def quota(client):
+    """Uso y cuota reales del buzón según el servidor (extensión QUOTA de IMAP). None si el servidor no lo informa."""
+    try:
+        code, data = client.getquotaroot('INBOX')
+    except Exception:
+        return None
+    text = b' '.join(part for group in (data or []) for part in (group or []) if isinstance(part, bytes)).decode('ascii', 'replace')
+    found = re.search(r'STORAGE (\d+) (\d+)', text)
+    if code != 'OK' or not found:
+        return None
+    # El servidor informa en KiB; un límite 0 significa que no hay cuota configurada.
+    return {'used': int(found[1]) * 1024, 'limit': int(found[2]) * 1024 or None}
+
+
+def newer(client, last_uid, limit=20):
+    """Mensajes de la bandeja de entrada con UID posterior a `last_uid` (identificador persistente de IMAP)."""
+    code, data = client.select('INBOX', readonly=True)
+    if code != 'OK':
+        raise MailError('servidor', 'No se pudo abrir la bandeja de entrada.')
+    code, found = client.uid('SEARCH', 'UID', str(int(last_uid) + 1) + ':*')
+    if code != 'OK':
+        return []
+    # «n:*» siempre devuelve al menos el último mensaje: se descartan los que no son posteriores.
+    uids = sorted((int(value) for value in (found[0] or b'').split() if int(value) > int(last_uid)), reverse=True)[:limit]
+    return summaries(client, uids, previews=False)
+
+
+def search(client, folder, query='', flagged=False, unread=False):
     code, data = client.select(quoted(folder), readonly=True)
     if code != 'OK':
         raise MailError('servidor', 'No se pudo abrir la carpeta.')
-    criteria = ['FLAGGED'] if flagged else []
+    criteria = (['FLAGGED'] if flagged else []) + (['UNSEEN'] if unread else [])
     query = query.strip()[:120]
     if query:
         # El texto de búsqueda viaja como literal: no puede alterar el comando IMAP.
@@ -373,13 +406,71 @@ def search(client, folder, query='', flagged=False):
     return sorted((int(value) for value in (found[0] or b'').split()), reverse=True)
 
 
-def summaries(client, uids):
+def _first_text(structure):
+    """Primera parte de texto del mensaje según BODYSTRUCTURE: (sección, subtipo, juego de caracteres, codificación)."""
+    start = structure.find('BODYSTRUCTURE ')
+    if start < 0:
+        return None
+    body = structure[start + 14:]
+    depth = len(body) - len(body.lstrip('('))
+    found = re.match(r'\(*"text" "(plain|html)" (?:\(([^)]*)\)|NIL) (?:"[^"]*"|NIL) (?:"[^"]*"|NIL) "([^"]+)"', body, re.I)
+    if not found:
+        return None
+    charset = re.search(r'"charset" "([^"]+)"', found[2] or '', re.I)
+    return '1' + '.1' * max(0, depth - 2), found[1].lower(), charset[1] if charset else 'utf-8', found[3].lower()
+
+
+def _preview(raw, subtype, charset, encoding):
+    try:
+        if encoding == 'base64':
+            raw = re.sub(rb'[^A-Za-z0-9+/=]', b'', raw)
+            raw = base64.b64decode(raw[:len(raw) // 4 * 4])
+        elif encoding == 'quoted-printable':
+            raw = quopri.decodestring(raw)
+        try:
+            text = raw.decode(charset, 'replace')
+        except LookupError:
+            text = raw.decode('utf-8', 'replace')
+        if subtype == 'html':
+            text = re.sub(r'(?is)<(style|script|head|title)\b.*?(</\1>|$)', ' ', text)
+            text = html_lib.unescape(re.sub(r'(?s)<[^>]*(>|$)', ' ', text))
+        return re.sub(r'\s+', ' ', text.replace('\ufffd', '')).strip()[:160]
+    except Exception:
+        return ''
+
+
+def add_previews(client, rows, parts):
+    """Primeras líneas de cada mensaje, sin marcarlo como leído. Si algo falla, la lista se muestra sin vista previa."""
+    groups = {}
+    for row in rows:
+        if parts.get(row['uid']):
+            groups.setdefault(parts[row['uid']][0], []).append(row)
+    for section, group in groups.items():
+        try:
+            code, data = client.uid('FETCH', ','.join(str(row['uid']) for row in group), '(UID BODY.PEEK[' + section + ']<0.1500>)')
+            if code != 'OK':
+                continue
+            index = 0
+            while index < len(data):
+                part = data[index]
+                if isinstance(part, tuple):
+                    meta = part[0] + b' ' + (data[index + 1] if index + 1 < len(data) and isinstance(data[index + 1], bytes) else b'')
+                    uid = re.search(rb'UID (\d+)', meta)
+                    row = next((row for row in group if uid and row['uid'] == int(uid[1])), None)
+                    if row:
+                        row['preview'] = _preview(part[1], *parts[row['uid']][1:])
+                index += 1
+        except Exception:
+            continue
+
+
+def summaries(client, uids, previews=True):
     if not uids:
         return []
     code, data = client.uid('FETCH', ','.join(str(uid) for uid in uids), '(UID FLAGS RFC822.SIZE BODYSTRUCTURE BODY.PEEK[HEADER.FIELDS (FROM TO CC SUBJECT DATE MESSAGE-ID)])')
     if code != 'OK':
         raise MailError('servidor', 'No se pudieron leer los mensajes.')
-    rows, index = {}, 0
+    rows, parts, index = {}, {}, 0
     while index < len(data):
         part = data[index]
         if isinstance(part, tuple):
@@ -392,9 +483,13 @@ def summaries(client, uids):
                 size = re.search(r'RFC822\.SIZE (\d+)', text)
                 rows[int(uid[1])] = {'uid': int(uid[1]), 'subject': header_text(message['subject'])[:300] or '(sin asunto)', 'from': people(message, 'from')[:1], 'to': people(message, 'to')[:6], 'date': date_iso(message),
                                      'message_id': header_text(message['message-id'])[:300], 'seen': '\\seen' in flags, 'flagged': '\\flagged' in flags, 'answered': '\\answered' in flags, 'draft': '\\draft' in flags,
-                                     'size': int(size[1]) if size else 0, 'attachments': bool(re.search(r'"attachment"|"filename"|"name" "[^"]+\.(pdf|docx?|xlsx?|zip|rar|jpe?g|png)"', text, re.I))}
+                                     'size': int(size[1]) if size else 0, 'attachments': bool(re.search(r'"attachment"|"filename"|"name" "[^"]+\.(pdf|docx?|xlsx?|zip|rar|jpe?g|png)"', text, re.I)), 'preview': ''}
+                parts[int(uid[1])] = _first_text(text)
         index += 1
-    return [rows[uid] for uid in uids if uid in rows]
+    ordered = [rows[uid] for uid in uids if uid in rows]
+    if previews:
+        add_previews(client, ordered, parts)
+    return ordered
 
 
 def fetch_message(client, folder, uid):
@@ -464,12 +559,30 @@ def set_flag(client, folder, uid, action):
         raise MailError('servidor', 'No se pudo actualizar el mensaje.')
 
 
+def rich_html(body, signature=''):
+    lines, out, listing = html_lib.escape(body, quote=False).split('\n'), [], False
+    for line in lines:
+        line = re.sub(r'\*\*(\S(?:.*?\S)?)\*\*', r'<strong>\1</strong>', line)
+        line = re.sub(r'(?<![\w/])_(\S(?:.*?\S)?)_(?!\w)', r'<em>\1</em>', line)
+        item = re.match(r'\s*- (.+)', line)
+        if item and not listing:
+            out.append('<ul>')
+        if not item and listing:
+            out.append('</ul>')
+        listing = bool(item)
+        out.append('<li>' + item[1] + '</li>' if item else (line + '<br>' if line.strip() else '<br>'))
+    if listing:
+        out.append('</ul>')
+    foot = '<p style="color:#555">-- <br>' + html_lib.escape(signature, quote=False).replace('\n', '<br>') + '</p>' if signature else ''
+    return '<div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.5">' + '\n'.join(out) + foot + '</div>'
+
+
 def build_message(config, data, signature=''):
     """Mensaje MIME válido. `data`: to, cc, subject, body, in_reply_to, references, attachments[{name,type,data(base64)}]."""
-    to, cc = clean_addresses(data.get('to')), clean_addresses(data.get('cc'))
+    to, cc, bcc = clean_addresses(data.get('to')), clean_addresses(data.get('cc')), clean_addresses(data.get('bcc'))
     if not to and not data.get('draft'):
         raise MailError('configuracion', 'Indica al menos un destinatario.')
-    if len(to) + len(cc) > MAX_RECIPIENTS:
+    if len(to) + len(cc) + len(bcc) > MAX_RECIPIENTS:
         raise MailError('configuracion', 'Demasiados destinatarios: máximo ' + str(MAX_RECIPIENTS) + '.')
     subject = re.sub(r'[\r\n]+', ' ', str(data.get('subject', ''))).strip()[:300]
     body = str(data.get('body', ''))[:200_000]
@@ -492,6 +605,9 @@ def build_message(config, data, signature=''):
         message['References'] = ' '.join(refs + [reply])
     signature = str(signature or '').strip()[:2000]
     message.set_content(body.rstrip() + ('\n\n-- \n' + signature if signature else '') + '\n')
+    if data.get('rich'):
+        # Formato básico: el texto se escapa por completo y solo después se convierten las marcas propias (**negrita**, _cursiva_, listas con «- »).
+        message.add_alternative(rich_html(body.rstrip(), signature), subtype='html')
     total = 0
     for item in data.get('attachments') or []:
         try:
@@ -506,7 +622,8 @@ def build_message(config, data, signature=''):
         if not re.fullmatch(r'[a-z0-9.+-]+', main or '') or not re.fullmatch(r'[a-zA-Z0-9.+-]+', sub or ''):
             main, sub = 'application', 'octet-stream'
         message.add_attachment(content, maintype=main, subtype=sub, filename=safe_filename(item.get('name')))
-    return message, to + cc
+    # Los destinatarios en copia oculta reciben el mensaje pero nunca figuran en sus cabeceras.
+    return message, to + cc + [address for address in bcc if address not in to + cc]
 
 
 def deliver(config, message, recipients):

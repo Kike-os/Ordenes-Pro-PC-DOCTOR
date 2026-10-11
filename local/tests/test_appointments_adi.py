@@ -93,7 +93,7 @@ class AppointmentAndAdiTests(unittest.TestCase):
   payload=self.data(self.day(),communications_consent=True);result=self.post('/api/public/appointments',payload);self.assertEqual(result['status'],201)
   with app.connect() as c:self.assertEqual(c.execute('SELECT result FROM appointment_notifications').fetchone()[0],'pending')
   with patch.object(appointments_cron,'DB',Path(self.temp.name)/'test.sqlite3'),patch.dict(app.os.environ,{'SMTP_HOST':'smtp.example.invalid','SMTP_FROM':'service@example.invalid'}),patch.object(appointments_cron,'send') as sender:
-   appointments_cron.run();sender.assert_called_once()
+   appointments_cron.run();self.assertEqual([call.args[1] for call in sender.call_args_list if call.args[1]=='confirmation'],['confirmation'])  # Según la hora, la cita puede caer además en la ventana del recordatorio de 24 h.
   with app.connect() as c:self.assertEqual(c.execute('SELECT result FROM appointment_notifications').fetchone()[0],'sent')
  def test_login_lockout_stops_at_five_and_does_not_extend_block(self):
   key='login-user:'+app.digest('persona');

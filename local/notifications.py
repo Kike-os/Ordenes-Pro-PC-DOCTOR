@@ -14,25 +14,67 @@ def plural(count, one, many):
     return ('1 ' + one) if count == 1 else (str(count) + ' ' + many)
 
 
-def mail_status(c, now, max_age=180):
-    """No leídos de la bandeja de entrada; se consulta al servidor de correo como mucho cada tres minutos."""
-    row = c.execute("SELECT value FROM system_state WHERE key='mail_inbox'").fetchone()
-    cached = json.loads(row['value']) if row else None
-    if cached and now.timestamp() - cached.get('ts', 0) < max_age:
-        return cached
-    client = mail_pro.open_imap()
+def _state(c, key):
+    row = c.execute("SELECT value FROM system_state WHERE key=?", (key,)).fetchone()
     try:
-        inbox = next((item for item in mail_pro.overview(client) if item['role'] == 'inbox'), None)
-    finally:
-        mail_pro.close_imap(client)
-    if not inbox:
+        return json.loads(row['value']) if row else None
+    except ValueError:
         return None
-    state = {'unread': inbox['unread'], 'uidnext': inbox['uidnext'], 'account': mail_pro.settings()['username'], 'checked': now.isoformat(timespec='seconds'), 'ts': now.timestamp()}
+
+
+def _save(c, key, value):
     try:
-        c.execute("INSERT INTO system_state VALUES ('mail_inbox',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", (json.dumps(state),))
+        c.execute("INSERT INTO system_state VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", (key, json.dumps(value)))
     except Exception:
         pass
+
+
+def mail_events(c):
+    return _state(c, 'mail_events') or []
+
+
+def mail_status(c, now, max_age=60):
+    """Estado de la bandeja de entrada (no leídos, cuota y correos nuevos); consulta al servidor como mucho una vez por minuto.
+
+    Los correos nuevos se reconocen por su UID de IMAP, que es persistente: la primera consulta solo fija el punto de
+    partida y no anuncia los mensajes que ya existían, y un mismo mensaje nunca se registra dos veces.
+    """
+    cached = _state(c, 'mail_inbox')
+    if cached and now.timestamp() - cached.get('ts', 0) < max_age:
+        return cached
+    try:
+        client = mail_pro.open_imap()
+    except mail_pro.MailError as error:
+        # Se anota el fallo para no reintentar la conexión en cada consulta de notificaciones.
+        _save(c, 'mail_inbox', dict(cached or {}, ts=now.timestamp(), error=str(error)))
+        raise
+    try:
+        inbox = next((item for item in mail_pro.overview(client) if item['role'] == 'inbox'), None)
+        if not inbox:
+            return None
+        top, last = inbox['uidnext'] - 1, (cached or {}).get('last_uid')
+        if last is not None and (cached or {}).get('uidvalidity') == inbox['uidvalidity'] and top > last:
+            events, known = mail_events(c), {(item['uidvalidity'], item['uid']) for item in mail_events(c)}
+            for row in reversed(mail_pro.newer(client, last)):
+                if row['seen'] or (inbox['uidvalidity'], row['uid']) in known:
+                    continue
+                sender = (row['from'] or [{}])[0]
+                events.append({'uidvalidity': inbox['uidvalidity'], 'uid': row['uid'], 'from': (sender.get('name') or sender.get('address') or 'Remitente desconocido')[:120],
+                               'subject': row['subject'][:200], 'date': row['date'], 'at': now.isoformat(timespec='seconds')})
+            _save(c, 'mail_events', events[-30:])
+        state = {'unread': inbox['unread'], 'total': inbox['total'], 'uidnext': inbox['uidnext'], 'uidvalidity': inbox['uidvalidity'], 'last_uid': top, 'quota': mail_pro.quota(client),
+                 'account': mail_pro.settings()['username'], 'checked': now.isoformat(timespec='seconds'), 'ts': now.timestamp()}
+    finally:
+        mail_pro.close_imap(client)
+    _save(c, 'mail_inbox', state)
     return state
+
+
+def quota_level(quota):
+    """Porcentaje de ocupación real; None cuando no hay cuota configurada o el servidor no la informa."""
+    if not quota or not quota.get('limit'):
+        return None
+    return min(100, round(quota['used'] * 100 / quota['limit']))
 
 
 def build(c, user, now, mail_access=False):
@@ -81,14 +123,25 @@ def build(c, user, now, mail_access=False):
     if admin:
         chats = c.execute("SELECT COALESCE(SUM(last_seen_admin='' AND EXISTS(SELECT 1 FROM adi_messages m WHERE m.conversation_id=ac.id AND m.author='client')),0) FROM adi_conversations ac").fetchone()[0]
         alert('chats', chats, 'support', 'info', plural(chats, 'conversación nueva', 'conversaciones nuevas'), 'Clientes que esperan atención en vivo.', '#live')
+        waiting = c.execute("SELECT COUNT(*) FROM adi_conversations WHERE mode='human' AND assigned_to IS NULL").fetchone()[0]
+        alert('advisor', waiting, 'support', 'warning', plural(waiting, 'cliente espera a un asesor', 'clientes esperan a un asesor'), 'Solicitaron atención humana en el chat.', '#live')
         accounts = c.execute("SELECT COUNT(*) FROM users WHERE approval='pending'").fetchone()[0]
         alert('accounts', accounts, 'client', 'warning', plural(accounts, 'solicitud de cuenta por revisar', 'solicitudes de cuenta por revisar'), 'Aprueba o rechaza el acceso en Configuración.', '#settings?tab=users')
     if mail_access:
         try:
             state = mail_status(c, now)
-            if state and state['unread']:
+            if state and state.get('unread'):
+                # Resumen silencioso: el aviso sonoro y emergente corresponde a cada correo nuevo, no al contador.
                 items.append({'key': 'mail:' + str(state['uidnext']) + ':' + str(state['unread']), 'kind': 'info', 'icon': 'message', 'title': plural(state['unread'], 'correo sin leer', 'correos sin leer'),
-                              'detail': 'Bandeja de entrada de ' + state['account'] + '.', 'at': state['checked'], 'href': '#mail', 'group': 'alert'})
+                              'detail': 'Bandeja de entrada de ' + state['account'] + '.', 'at': state['checked'], 'href': '#mail', 'group': 'alert', 'quiet': True})
+            level = quota_level((state or {}).get('quota'))
+            if level is not None and level >= 75:
+                free = max(0, state['quota']['limit'] - state['quota']['used'])
+                items.append({'key': 'mailquota:' + ('90' if level >= 90 else '75'), 'kind': 'warning', 'icon': 'message', 'title': 'Buzón de correo al ' + str(level) + ' % de su capacidad',
+                              'detail': 'Quedan ' + (str(round(free / 1048576)) + ' MB' if free >= 1048576 else str(round(free / 1024)) + ' KB') + ' disponibles. No se elimina ningún correo automáticamente.', 'at': state['checked'], 'href': '#mail', 'group': 'alert'})
+            for event in mail_events(c)[-10:]:
+                items.append({'key': 'mail:new:' + str(event['uidvalidity']) + ':' + str(event['uid']), 'kind': 'info', 'icon': 'message', 'title': 'Correo nuevo · ' + event['from'], 'detail': event['subject'],
+                              'at': event['at'], 'href': '#mail?folder=INBOX&uid=' + str(event['uid']), 'group': 'event', 'mail': True})
         except Exception:
             pass
     if staff:

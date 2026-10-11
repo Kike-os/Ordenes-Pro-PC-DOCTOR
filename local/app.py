@@ -249,6 +249,12 @@ def verify_captcha(c, token):
     return word>>(32-CAPTCHA_BITS)==0
 
 
+def adi_public_state(conv):
+    # Estado que ve el cliente: solo se informa «asesor conectado» cuando un usuario real tomó la conversación.
+    mode=conv['mode'] if conv else 'adi'
+    return 'closed' if mode=='closed' else ('advisor' if conv['assigned_to'] else 'waiting') if mode=='human' else 'adi'
+
+
 def mail_allowed(user):
     # El buzón compartido es de administración; los técnicos solo acceden si el servidor lo habilita.
     try:
@@ -447,14 +453,14 @@ class Handler(BaseHTTPRequestHandler):
                 try:cookies.load(self.headers.get('Cookie',''))
                 except Exception:pass
                 token=cookies['pcdoctor_adi'].value if 'pcdoctor_adi' in cookies else ''
-                conv=c.execute('SELECT id,mode FROM adi_conversations WHERE token_hash=?',(digest(token),)).fetchone()
-                if not conv:return self.reply(200,{'messages':[],'mode':'adi'})
+                conv=c.execute('SELECT id,mode,assigned_to FROM adi_conversations WHERE token_hash=?',(digest(token),)).fetchone()
+                if not conv:return self.reply(200,{'messages':[],'mode':'adi','state':'adi'})
                 after=parse_qs(urlsplit(self.path).query).get('after',['0'])[0]
                 try:after=max(0,int(after))
                 except ValueError:after=0
                 rows=[dict(r) for r in c.execute("SELECT id,author,content,created_at FROM adi_messages WHERE conversation_id=? AND visibility='public' AND id>? ORDER BY id LIMIT 100",(conv['id'],after))]
                 c.execute('UPDATE adi_conversations SET last_seen_client=? WHERE id=?',(appointments.stamp(appointments.now()),conv['id']))
-                return self.reply(200,{'messages':rows,'mode':conv['mode']})
+                return self.reply(200,{'messages':rows,'mode':conv['mode'],'state':adi_public_state(conv)})
             preference=re.fullmatch(r'/maintenance-preferences/([A-Za-z0-9_-]{40,60})',path)
             if preference:
                 row=c.execute('SELECT consent FROM maintenance WHERE unsubscribe_token=?',(preference[1],)).fetchone()
@@ -497,6 +503,19 @@ class Handler(BaseHTTPRequestHandler):
             if path == '/api/adi/admin':
                 if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede usar la asistente administrativa.'})
                 return self.reply(200,{'enabled':bool(os.getenv('OPENAI_API_KEY')),'message':'Adi responde consultas operativas desde datos autorizados.','live':adi.snapshot(c,reception_now())})
+            adi_conversation=re.fullmatch(r'/api/adi/conversations(?:/([0-9]+))?',path)
+            if adi_conversation:
+                if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede usar la asistente administrativa.'})
+                if adi_conversation[1]:
+                    # Cada conversación solo es visible para quien la creó.
+                    row=c.execute('SELECT id,title,created_at,updated_at FROM adi_admin_conversations WHERE id=? AND user_id=?',(int(adi_conversation[1]),user['id'])).fetchone()
+                    if not row:return self.reply(404,{'error':'Conversación no disponible.'})
+                    messages=[{'id':m['id'],'role':m['role'],'content':m['content'],'links':json.loads(m['links'] or '[]'),'created_at':m['created_at']} for m in c.execute('SELECT * FROM adi_admin_messages WHERE conversation_id=? ORDER BY id',(row['id'],))]
+                    return self.reply(200,{'conversation':dict(row),'messages':messages})
+                term=parse_qs(urlsplit(self.path).query).get('q',[''])[0].strip()[:100]
+                if term:rows=c.execute("SELECT DISTINCT v.id,v.title,v.updated_at FROM adi_admin_conversations v LEFT JOIN adi_admin_messages m ON m.conversation_id=v.id WHERE v.user_id=? AND (instr(lower(v.title),lower(?))>0 OR instr(lower(m.content),lower(?))>0) ORDER BY v.updated_at DESC LIMIT 40",(user['id'],term,term))
+                else:rows=c.execute('SELECT id,title,updated_at FROM adi_admin_conversations WHERE user_id=? ORDER BY updated_at DESC LIMIT 40',(user['id'],))
+                return self.reply(200,{'rows':[dict(r) for r in rows]})
             if path == '/api/adi/live':
                 if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
                 rows=[dict(r) for r in c.execute("SELECT v.id,v.mode,v.updated_at,(SELECT content FROM adi_messages m WHERE m.conversation_id=v.id AND m.visibility='public' ORDER BY m.id DESC LIMIT 1) last_message,(SELECT author FROM adi_messages m WHERE m.conversation_id=v.id AND m.visibility='public' ORDER BY m.id DESC LIMIT 1) last_author FROM adi_conversations v WHERE v.mode!='closed' ORDER BY v.updated_at DESC LIMIT 100")]
@@ -512,7 +531,8 @@ class Handler(BaseHTTPRequestHandler):
                 safe_conv={k:conv[k] for k in ('id','mode','assigned_to','created_at','updated_at')}
                 return self.reply(200,{'conversation':safe_conv,'messages':rows})
             if path == '/api/me':
-                return self.reply(200, {'user':dict(user,mail=mail_allowed(user)),'server_time':time.time()})
+                prefs=c.execute('SELECT value FROM system_state WHERE key=?',('mail_prefs:'+str(user['id']),)).fetchone() if mail_allowed(user) else None
+                return self.reply(200, {'user':dict(user,mail=mail_allowed(user),mail_prefs=json.loads(prefs['value']) if prefs else None),'server_time':time.time()})
             if path == '/api/weather':
                 return self.reply(200, current_weather())
             if path == '/api/time':
@@ -693,15 +713,24 @@ class Handler(BaseHTTPRequestHandler):
                 if not mail_allowed(user):return self.reply(403,{'error':'No tienes acceso al correo o todavía no está configurado en el servidor.'})
                 query=parse_qs(urlsplit(self.path).query);arg=lambda name:query.get(name,[''])[0]
                 client=None
+                if path=='/api/mail/check':
+                    # Consulta ligera para la interfaz: no leídos, cuota y correos nuevos registrados. «now=1» fuerza la sincronización.
+                    try:state=notifications.mail_status(c,reception_now(),0 if arg('now')=='1' else 30)
+                    except mail_pro.MailError as error:return self.reply(502,{'error':str(error),'kind':error.kind})
+                    if not state:return self.reply(502,{'error':'El servidor de correo no informó la bandeja de entrada.'})
+                    return self.reply(200,{'unread':state.get('unread',0),'checked':state.get('checked',''),'quota':state.get('quota'),'events':notifications.mail_events(c)[-5:]})
                 try:
                     client=mail_pro.open_imap()
                     if path=='/api/mail/overview':
-                        return self.reply(200,{'account':mail_pro.settings()['username'],'folders':mail_pro.overview(client),'signature':mail_signature(c),'page_size':mail_pro.PAGE})
+                        return self.reply(200,{'account':mail_pro.settings()['username'],'folders':mail_pro.overview(client),'quota':mail_pro.quota(client),'checked':reception_now().isoformat(timespec='seconds'),'signature':mail_signature(c),'page_size':mail_pro.PAGE})
                     folder,_=mail_pro.resolve(client,arg('folder') or 'INBOX')
                     if path=='/api/mail/messages':
                         try:page=max(1,int(arg('page') or '1'))
                         except ValueError:return self.reply(400,{'error':'Página inválida.'})
-                        uids=mail_pro.search(client,folder['id'],arg('q'),arg('flagged')=='1')
+                        uids=mail_pro.search(client,folder['id'],arg('q'),arg('flagged')=='1',arg('unread')=='1')
+                        if arg('attach')=='1':
+                            # IMAP no busca por adjuntos: se revisa la estructura de los 300 mensajes más recientes del resultado.
+                            uids=[row['uid'] for row in mail_pro.summaries(client,uids[:300],previews=False) if row['attachments']]
                         rows=mail_pro.summaries(client,uids[(page-1)*mail_pro.PAGE:page*mail_pro.PAGE])
                         return self.reply(200,{'rows':rows,'total':len(uids),'page':page,'pages':max(1,(len(uids)+mail_pro.PAGE-1)//mail_pro.PAGE),'folder':folder})
                     if not arg('uid').isdigit():return self.reply(400,{'error':'Mensaje no válido.'})
@@ -828,8 +857,12 @@ class Handler(BaseHTTPRequestHandler):
                         new_token=secrets.token_urlsafe(32);now=appointments.stamp(appointments.now())
                         cid=c.execute("INSERT INTO adi_conversations(token_hash,mode,created_at,updated_at) VALUES (?,'adi',?,?)",(digest(new_token),now,now)).lastrowid
                         conv=c.execute('SELECT * FROM adi_conversations WHERE id=?',(cid,)).fetchone()
-                    now=appointments.stamp(appointments.now());c.execute("INSERT INTO adi_messages(conversation_id,author,content,created_at) VALUES (?,'client',?,?)",(conv['id'],text,now))
-                    answer='Un asesor de PC-DOCTOR S.A. revisará tu solicitud.' if conv['mode']=='human' else None
+                    now=appointments.stamp(appointments.now())
+                    if conv['mode']=='closed':
+                        # Una conversación finalizada se reanuda con Adi cuando el cliente vuelve a escribir; el historial se conserva.
+                        c.execute("UPDATE adi_conversations SET mode='adi',assigned_to=NULL,updated_at=? WHERE id=?",(now,conv['id']));conv=c.execute('SELECT * FROM adi_conversations WHERE id=?',(conv['id'],)).fetchone()
+                    c.execute("INSERT INTO adi_messages(conversation_id,author,content,created_at) VALUES (?,'client',?,?)",(conv['id'],text,now))
+                    answer='Un asesor de PC-DOCTOR S.A. revisará tu solicitud.' if conv['mode']=='human' and not conv['assigned_to'] else None  # Con un asesor conectado, Adi no interviene.
                     context=None
                     match=re.search(r'(PCD-\d{8}-\d{4,}).*?(\d{10}|\d{13})',text,re.I)
                     if match and conv['mode']=='adi':
@@ -838,17 +871,18 @@ class Handler(BaseHTTPRequestHandler):
                     if answer is None and conv['mode']=='adi':answer=adi.reply(c,text,context=context)
                     if answer:
                         c.execute("INSERT INTO adi_messages(conversation_id,author,content,created_at) VALUES (?,'adi',?,?)",(conv['id'],answer,now));c.execute('UPDATE adi_conversations SET updated_at=? WHERE id=?',(now,conv['id']))
-                    response={'ok':True,'conversation_id':conv['id'],'mode':conv['mode'],'messages':[dict(r) for r in c.execute("SELECT id,author,content,created_at FROM adi_messages WHERE conversation_id=? AND id>(SELECT COALESCE(MAX(id),0)-2 FROM adi_messages WHERE conversation_id=?) ORDER BY id",(conv['id'],conv['id']))]}
-                    cookie='pcdoctor_adi='+new_token+'; Path=/; HttpOnly; SameSite=Strict'+('; Secure' if os.getenv('SESSION_SECURE','false').lower()=='true' else '') if new_token else None
+                    response={'ok':True,'conversation_id':conv['id'],'mode':conv['mode'],'state':adi_public_state(conv),'messages':[dict(r) for r in c.execute("SELECT id,author,content,created_at FROM adi_messages WHERE conversation_id=? AND id>(SELECT COALESCE(MAX(id),0)-2 FROM adi_messages WHERE conversation_id=?) ORDER BY id",(conv['id'],conv['id']))]}
+                    cookie='pcdoctor_adi='+new_token+'; Path=/; Max-Age=2592000; HttpOnly; SameSite=Strict'+('; Secure' if os.getenv('SESSION_SECURE','false').lower()=='true' else '') if new_token else None
                     return self.reply(201,response,cookie=cookie)
                 if path == '/api/public/adi/human':
                     cookies=SimpleCookie()
                     try:cookies.load(self.headers.get('Cookie',''))
                     except Exception:pass
-                    token=cookies['pcdoctor_adi'].value if 'pcdoctor_adi' in cookies else '';conv=c.execute('SELECT id,mode FROM adi_conversations WHERE token_hash=?',(digest(token),)).fetchone() if token else None
+                    token=cookies['pcdoctor_adi'].value if 'pcdoctor_adi' in cookies else '';conv=c.execute('SELECT id,mode,assigned_to FROM adi_conversations WHERE token_hash=?',(digest(token),)).fetchone() if token else None
                     if not conv:return self.reply(404,{'error':'Inicia una conversación con Adi primero.'})
-                    now=appointments.stamp(appointments.now());c.execute("UPDATE adi_conversations SET mode='human',updated_at=? WHERE id=?",(now,conv['id']));c.execute("INSERT INTO adi_messages(conversation_id,author,content,created_at) VALUES (?,'client','El cliente solicita atención humana.',?)",(conv['id'],now))
-                    return self.reply(200,{'ok':True,'mode':'human'})
+                    if conv['mode']=='human':return self.reply(200,{'ok':True,'mode':'human','state':adi_public_state(conv)})  # Ya solicitada: no se duplica el registro.
+                    now=appointments.stamp(appointments.now());c.execute("UPDATE adi_conversations SET mode='human',assigned_to=NULL,updated_at=? WHERE id=?",(now,conv['id']));c.execute("INSERT INTO adi_messages(conversation_id,author,content,created_at) VALUES (?,'client','El cliente solicita atención humana.',?)",(conv['id'],now))
+                    return self.reply(200,{'ok':True,'mode':'human','state':'waiting'})
                 if path == '/api/captcha':
                     if captcha_mode()!='local':return self.reply(404,{'error':'Verificación no disponible.'})
                     if limited(c,'captcha-ip:'+digest(self.client_address[0]),limit=40,window=600):
@@ -995,6 +1029,16 @@ class Handler(BaseHTTPRequestHandler):
                         except mail_pro.MailError as error:return self.reply(200,{'ok':False,'kind':error.kind,'error':str(error),'steps':getattr(error,'steps',[])})
                         return self.reply(200,{'ok':True,'steps':steps})
                     if not mail_allowed(user):return self.reply(403,{'error':'No tienes acceso al correo o todavía no está configurado en el servidor.'})
+                    if path=='/api/mail/prefs':
+                        # Preferencias de avisos del propio usuario: solo interruptores y volumen, con valores validados.
+                        try:raw=json.loads(str(data.get('prefs') or '{}'))
+                        except ValueError:raw=None
+                        if not isinstance(raw,dict):return self.reply(400,{'error':'Preferencias no válidas.'})
+                        clean={key:raw.get(key) is True for key in ('received','sent','error','mute','popups','desktop')}
+                        try:clean['volume']=max(0.0,min(1.0,float(raw.get('volume',0.6))))
+                        except (TypeError,ValueError):clean['volume']=0.6
+                        c.execute("INSERT INTO system_state VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",('mail_prefs:'+str(user['id']),json.dumps(clean)))
+                        return self.reply(200,{'ok':True,'prefs':clean})
                     if path=='/api/mail/signature':
                         if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede cambiar la firma.'})
                         text=str(data.get('signature','')).strip()
@@ -1028,7 +1072,7 @@ class Handler(BaseHTTPRequestHandler):
                             except ValueError:files=None
                             if not isinstance(files,list) or len(files)>10 or any(not isinstance(item,dict) for item in files):return self.reply(400,{'error':'Adjuntos no válidos.'})
                             config=mail_pro.settings()
-                            message,recipients=mail_pro.build_message(config,{**{k:data.get(k,'') for k in ('to','cc','subject','body','in_reply_to','references')},'from_name':corporate.settings()['name'],'attachments':files,'draft':draft},mail_signature(c))
+                            message,recipients=mail_pro.build_message(config,{**{k:data.get(k,'') for k in ('to','cc','bcc','subject','body','in_reply_to','references')},'rich':data.get('rich') is True,'from_name':corporate.settings()['name'],'attachments':files,'draft':draft},mail_signature(c))
                             order=None;code=str(data.get('order_code','')).strip().upper()
                             if code:
                                 order=c.execute('SELECT id,code FROM orders WHERE code=?',(code,)).fetchone()
@@ -1142,13 +1186,35 @@ class Handler(BaseHTTPRequestHandler):
                     else:return self.reply(400,{'error':'Acción de cita inválida.'})
                     if status==200:audit(c,user['id'],'appointment_'+str(action),row['id'])
                     return self.reply(status,payload)
+                adi_manage=re.fullmatch(r'/api/adi/conversations/([0-9]+)',path)
+                if adi_manage:
+                    if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede usar la asistente administrativa.'})
+                    row=c.execute('SELECT id FROM adi_admin_conversations WHERE id=? AND user_id=?',(int(adi_manage[1]),user['id'])).fetchone()
+                    if not row:return self.reply(404,{'error':'Conversación no disponible.'})
+                    if data.get('action')=='delete':
+                        c.execute('DELETE FROM adi_admin_messages WHERE conversation_id=?',(row['id'],));c.execute('DELETE FROM adi_admin_conversations WHERE id=?',(row['id'],))
+                        audit(c,user['id'],'adi_conversation_deleted')
+                        return self.reply(200,{'ok':True})
+                    title=re.sub(r'\s+',' ',str(data.get('title',''))).strip()
+                    if data.get('action')!='rename' or not title or len(title)>80:return self.reply(400,{'error':'Escribe un nombre de hasta 80 caracteres.'})
+                    c.execute('UPDATE adi_admin_conversations SET title=? WHERE id=?',(title,row['id']))
+                    return self.reply(200,{'ok':True,'title':title})
                 if path == '/api/adi/admin':
                     if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede usar la asistente administrativa.'})
                     prompt=str(data.get('message','')).strip()
                     if not prompt or len(prompt)>2000:return self.reply(400,{'error':'Escribe una consulta de hasta 2000 caracteres.'})
                     result=adi.admin_reply(c,prompt,reception_now());answer=result['answer']
                     c.execute('INSERT INTO adi_actions(user_id,action,created_at,details) VALUES (?,?,?,?)',(user['id'],'admin_query',appointments.stamp(appointments.now()),prompt[:500]))
-                    return self.reply(200,{'answer':answer,'links':result.get('links',[]),'source':result.get('source','datos'),'live':adi.snapshot(c,reception_now()),'ai_enabled':bool(os.getenv('OPENAI_API_KEY'))})
+                    stamp=reception_now().isoformat(timespec='seconds');chosen=str(data.get('conversation_id',''))
+                    conversation=c.execute('SELECT id,title FROM adi_admin_conversations WHERE id=? AND user_id=?',(chosen,user['id'])).fetchone() if chosen.isdigit() else None
+                    if chosen and not conversation:return self.reply(404,{'error':'Conversación no disponible.'})
+                    if not conversation:
+                        title=re.sub(r'\s+',' ',prompt)[:60]
+                        conversation={'id':c.execute('INSERT INTO adi_admin_conversations(user_id,title,created_at,updated_at) VALUES (?,?,?,?)',(user['id'],title,stamp,stamp)).lastrowid,'title':title}
+                    c.execute("INSERT INTO adi_admin_messages(conversation_id,role,content,created_at) VALUES (?,'user',?,?)",(conversation['id'],prompt,stamp))
+                    c.execute("INSERT INTO adi_admin_messages(conversation_id,role,content,links,created_at) VALUES (?,'adi',?,?,?)",(conversation['id'],answer,json.dumps(result.get('links',[]),ensure_ascii=False),stamp))
+                    c.execute('UPDATE adi_admin_conversations SET updated_at=? WHERE id=?',(stamp,conversation['id']))
+                    return self.reply(200,{'answer':answer,'links':result.get('links',[]),'source':result.get('source','datos'),'live':adi.snapshot(c,reception_now()),'ai_enabled':bool(os.getenv('OPENAI_API_KEY')),'conversation':{'id':conversation['id'],'title':conversation['title']},'created_at':stamp})
                 live_action=re.fullmatch(r'/api/adi/live/([0-9]+)',path)
                 if live_action:
                     if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})

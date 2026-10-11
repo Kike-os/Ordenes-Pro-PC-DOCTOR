@@ -9,13 +9,21 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 _LOCK=threading.Lock()
-_CACHE={'key':None,'expires':0,'data':None}
+_CACHE={'key':None,'expires':0,'data':None,'good':None,'good_at':0}
+SHORT={'Parcialmente nublado':'Algo nublado','Nieve / aguanieve':'Nieve'}
+
+
+def feels_like(temperature,humidity,wind):
+    """Sensación térmica estimada (temperatura aparente de Steadman) a partir de temperatura, humedad y viento reales."""
+    vapour=humidity/100*6.105*math.exp(17.27*temperature/(237.7+temperature))
+    return round(temperature+0.33*vapour-0.70*wind-4.0)
 
 
 def describe(symbol,wind):
     night=symbol.endswith('_night')
     if 'thunder' in symbol:return 'Tormenta','cloud-lightning'
     if 'snow' in symbol or 'sleet' in symbol:return 'Nieve / aguanieve','cloud-snow'
+    if 'lightrain' in symbol:return 'Llovizna','cloud-drizzle'
     if 'rain' in symbol:return 'Lluvioso','cloud-rain'
     if 'fog' in symbol:return 'Niebla','cloud-fog'
     if wind>=10:return 'Viento','wind'
@@ -59,11 +67,20 @@ def current_weather():
             symbol=period.get('summary',{}).get('symbol_code','')
             label,icon=describe(symbol,wind)
             if icon=='cloud-off':raise ValueError()
-            result.update(available=True,temperature=round(temperature),label=label,icon=icon,
+            result.update(available=True,temperature=round(temperature),label=label,short=SHORT.get(label,label),icon=icon,
                 source='MET Norway',source_url='https://api.met.no/',valid_at=row['time'],
-                updated_at=payload['properties']['meta']['updated_at'],forecast=True)
+                updated_at=payload['properties']['meta']['updated_at'],forecast=True,stale=False)
+            # Datos adicionales solo cuando el proveedor los entrega; nunca se rellenan con valores supuestos.
+            humidity=instant.get('relative_humidity');rain=period.get('details',{}).get('precipitation_amount') if 'next_1_hours' in data else None
+            if isinstance(humidity,(int,float)) and 0<=humidity<=100:
+                result.update(humidity=round(humidity))
+                if 'wind_speed' in instant:result.update(feels_like=feels_like(temperature,humidity,wind))
+            if 'wind_speed' in instant and 0<=wind<=120:result.update(wind_kmh=round(wind*3.6))
+            if isinstance(rain,(int,float)) and 0<=rain<=500:result.update(precipitation_mm=round(rain,1))
             ttl=600
+            _CACHE.update(good=result,good_at=time.monotonic())
         except (OSError,ValueError,TypeError,KeyError,IndexError):
-            pass
+            # Sin conexión con el proveedor: se conserva la última lectura válida hasta dos horas, marcada como desactualizada.
+            if _CACHE['good'] and _CACHE['key']==key and time.monotonic()-_CACHE['good_at']<7200:result=dict(_CACHE['good'],stale=True)
         _CACHE.update(key=key,expires=time.monotonic()+ttl,data=result)
         return result

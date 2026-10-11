@@ -53,3 +53,12 @@ python mail_pro.py test-smtp --enviar-a destino@autorizado --confirmar
 Conexión y autenticación IMAP y SMTP; listado de 7 carpetas; lectura de un mensaje existente con 4 adjuntos e imagen remota bloqueada; envío de un mensaje con adjunto a la propia cuenta, recibido en la bandeja y con copia en Enviados; descarga del adjunto; respuesta con cita y cabeceras de hilo; destacado; búsqueda; borrador; vínculo con una orden.
 
 No probado: recepción desde un dominio externo (depende del MX), entrega a un destinatario externo, y el funcionamiento desde Vercel con sesión iniciada.
+
+## Avisos de correo nuevo, cuota y preferencias (v2)
+
+- **Detección**: el servidor consulta la bandeja de entrada por IMAP como mucho una vez por minuto y reconoce los mensajes nuevos por su UID (identificador persistente). La primera consulta solo fija el punto de partida: no anuncia el correo que ya existía. Cada mensaje se registra una sola vez en `system_state` (`mail_inbox`, `mail_events`), sin migraciones.
+- **Avisos**: cada correo nuevo aparece en el Centro de Notificaciones y, si la persona lo permite, como aviso emergente con remitente, asunto, hora y «Ver correo». Solo los reciben quienes tienen acceso al buzón.
+- **Sonidos**: desactivados al inicio. Se configuran en Correo → Preferencias (recibido, enviado, error, volumen, silenciar, probar). El timbre incluido es propio de Órdenes Pro; el audio original de Windows XP no se distribuye. Quien tenga una copia con licencia puede cargarla como archivo propio (WAV, MP3 u OGG de hasta 400 KB), que se guarda solo en su navegador.
+- **Almacenamiento**: uso y cuota reales informados por el servidor mediante la extensión QUOTA de IMAP. Sin cuota configurada se muestra «Sin límite configurado»; si el servidor no informa, «Información no disponible». Al llegar al 75 % y al 90 % se genera un aviso. Nunca se eliminan correos automáticamente.
+- **Carpetas**: si el servidor tiene dos carpetas con la misma función (por ejemplo `INBOX.spam`, marcada como oficial, e `INBOX.Junk`), se muestran las dos; la adicional conserva su nombre real. No se fusionan ni se mueven mensajes.
+- **Pendiente**: consulta por UAPI de cPanel (`Email::get_disk_usage`), que requiere un token de API creado por la administración del hosting; sincronización por Cron; formato enriquecido en el redactor.

@@ -120,6 +120,81 @@ class MailRouteTests(test_app.SecurityTests):
             self.assertEqual(self.request('/api/settings',cookie=cookie)['body']['mail_signature'],'Firma de prueba')
 
 
+    def test_new_mail_is_detected_once_and_history_is_not_announced(self):
+        import notifications
+        from datetime import datetime,timedelta
+        cookie,csrf=self.login();box=FakeInbox([3,4]);start=datetime(2026,1,2,10,0,tzinfo=app.appointments.TZ)
+        with patch.dict(app.os.environ,ENV),patch.object(mail_pro,'open_imap',side_effect=lambda *a,**k:box):
+            with app.connect() as c:
+                # Primera sincronización: fija el punto de partida y no anuncia el correo que ya existía.
+                first=notifications.mail_status(c,start)
+                self.assertEqual((first['last_uid'],first['unread'],notifications.mail_events(c)),(4,2,[]))
+                self.assertEqual(first['quota'],{'used':800*1024,'limit':1000*1024})
+                box.uids+=[5,6];box.seen.add(6)
+                # Dentro del minuto se usa la copia guardada; después se consulta y solo se registra el mensaje sin leer.
+                self.assertEqual(notifications.mail_status(c,start+timedelta(seconds=20))['last_uid'],4)
+                notifications.mail_status(c,start+timedelta(seconds=90))
+                self.assertEqual([(e['uid'],e['from'],e['subject']) for e in notifications.mail_events(c)],[(5,'Cliente ficticio','Consulta 5')])
+                notifications.mail_status(c,start+timedelta(seconds=200));notifications.mail_status(c,start+timedelta(seconds=400))
+                self.assertEqual(len(notifications.mail_events(c)),1)
+            items=self.request('/api/notifications',cookie=cookie)['body']['items']
+            new=[item for item in items if item['key'].startswith('mail:new:')]
+            self.assertEqual([(item['title'],item['detail'],item['href']) for item in new],[('Correo nuevo · Cliente ficticio','Consulta 5','#mail?folder=INBOX&uid=5')])
+            self.assertTrue([item for item in items if item['key']=='mailquota:75' and '80 %' in item['title']])
+            self.assertTrue(all(item.get('quiet') for item in items if item['key'].startswith('mail:') and not item['key'].startswith('mail:new:')))
+            self.assertEqual(self.request('/api/mail/prefs',{'prefs':'{"received":true,"volume":7,"otro":"x"}'},cookie=cookie)['status'],403)
+            saved=self.request('/api/mail/prefs',{'prefs':'{"received":true,"volume":7,"otro":"x"}'},cookie=cookie,csrf=csrf)['body']['prefs']
+            self.assertEqual((saved['received'],saved['sent'],saved['volume'],'otro' in saved),(True,False,1.0,False))
+            self.assertEqual(self.request('/api/me',cookie=cookie)['body']['user']['mail_prefs'],saved)
+            check=self.request('/api/mail/check',cookie=cookie)['body']
+            self.assertEqual((check['unread'],[e['uid'] for e in check['events']]),(3,[5]))
+        # Quien no tiene acceso al correo no recibe remitentes ni asuntos.
+        with patch.dict(app.os.environ,{k:'' for k in ENV}):
+            self.assertFalse([item for item in self.request('/api/notifications',cookie=cookie)['body']['items'] if item['key'].startswith('mail')])
+            self.assertEqual(self.request('/api/mail/check',cookie=cookie)['status'],403)
+
+    def test_previews_folders_quota_and_blind_copies(self):
+        self.assertEqual(mail_pro._first_text('1 (UID 5 BODYSTRUCTURE ("text" "plain" ("charset" "utf-8") NIL NIL "quoted-printable" 20 1)')[0],'1')
+        self.assertEqual(mail_pro._first_text('1 (BODYSTRUCTURE ((("text" "html" ("charset" "iso-8859-1") NIL NIL "base64" 20 1)("text" "plain" NIL NIL NIL "7bit" 1 1) "alternative")("application" "pdf" NIL NIL NIL "base64" 9) "mixed")'),('1.1','html','iso-8859-1','base64'))
+        self.assertIsNone(mail_pro._first_text('1 (BODYSTRUCTURE ("application" "pdf" NIL NIL NIL "base64" 9))'))
+        self.assertEqual(mail_pro._preview(b'Se=C3=B1or cliente:=\r\n su equipo est=C3=A1 listo','plain','utf-8','quoted-printable'),'Señor cliente: su equipo está listo')
+        self.assertEqual(mail_pro._preview(mail_pro.base64.b64encode('<style>p{color:red}</style><p>Hola &amp; gracias</p><img src="x'.encode()),'html','utf-8','base64'),'Hola & gracias')
+        self.assertEqual(mail_pro._preview(b'\xff\xfe','plain','juego-inexistente','7bit'),'')
+        box=FakeInbox([1])
+        self.assertEqual([(f['id'],f['label'],f['duplicate']) for f in mail_pro.list_folders(box) if f['role']=='junk'],[('INBOX.Junk','Spam',False),('INBOX.spam','spam',True)])
+        self.assertEqual(mail_pro.quota(box),{'used':800*1024,'limit':1000*1024})
+        box.quota_line=b'"User quota" (STORAGE 50 0)';self.assertEqual(mail_pro.quota(box),{'used':50*1024,'limit':None})
+        box.quota_line=b'';self.assertIsNone(mail_pro.quota(box))
+        import notifications
+        self.assertEqual((notifications.quota_level({'used':95,'limit':100}),notifications.quota_level({'used':5,'limit':None}),notifications.quota_level(None)),(95,None,None))
+        message,recipients=mail_pro.build_message({'username':'taller@example.invalid'},{'to':'a@example.invalid','cc':'b@example.invalid','bcc':'c@example.invalid, a@example.invalid','subject':'Prueba','body':'Texto'})
+        self.assertEqual(recipients,['a@example.invalid','b@example.invalid','c@example.invalid'])
+        self.assertNotIn('c@example.invalid',message.as_string())
+        rich,_=mail_pro.build_message({'username':'taller@example.invalid'},{'to':'a@example.invalid','subject':'Formato','body':'Hola **cliente** <script>x</script>\n- uno\n- dos\n_gracias_','rich':True},'Firma')
+        page=rich.get_body(('html',)).get_content()
+        self.assertIn('<strong>cliente</strong>',page);self.assertIn('<ul>\n<li>uno</li>\n<li>dos</li>\n</ul>',page);self.assertIn('<em>gracias</em>',page)
+        self.assertNotIn('<script>',page);self.assertIn('&lt;script&gt;',page);self.assertIn('**cliente**',rich.get_body(('plain',)).get_content())
+
+
+class FakeInbox:
+    """Servidor IMAP ficticio y mínimo: bandeja con UID crecientes, cuota y dos carpetas de correo no deseado."""
+    def __init__(self,uids):self.uids=list(uids);self.seen=set();self.quota_line=b'"User quota" (STORAGE 800 1000)'
+    def list(self):return 'OK',[b'(\\HasNoChildren) "." INBOX',b'(\\HasNoChildren \\Junk) "." INBOX.Junk',b'(\\HasNoChildren) "." INBOX.spam']
+    def status(self,name,fields):
+        inbox=name.strip('"')=='INBOX';unread=len([u for u in self.uids if u not in self.seen]) if inbox else 0
+        return 'OK',[('%s (MESSAGES %d UNSEEN %d UIDNEXT %d UIDVALIDITY 77)'%(name,len(self.uids) if inbox else 0,unread,max(self.uids)+1 if inbox else 1)).encode()]
+    def select(self,name,readonly=True):return 'OK',[b'1']
+    def getquotaroot(self,name):return 'OK',[[b'INBOX "User quota"'],[self.quota_line]]
+    def logout(self):pass
+    def uid(self,command,*args):
+        if command=='SEARCH':return 'OK',[' '.join(str(u) for u in self.uids if u>=int(args[-1].split(':')[0]) or u==max(self.uids)).encode()]
+        data=[]
+        for u in (int(x) for x in args[0].split(',')):
+            flags='\\Seen' if u in self.seen else ''
+            data+=[(('%d (UID %d FLAGS (%s) RFC822.SIZE 900 BODYSTRUCTURE ("text" "plain" NIL NIL NIL "7bit" 5 1) BODY[HEADER.FIELDS (FROM)] {60}'%(u,u,flags)).encode(),('From: Cliente ficticio <cliente@example.invalid>\r\nSubject: Consulta %d\r\nDate: Fri, 02 Jan 2026 10:00:00 -0500\r\n\r\n'%u).encode()),b')']
+        return 'OK',data
+
+
 for name in [name for name in dir(test_app.SecurityTests) if name.startswith('test_')]:
     setattr(MailRouteTests,name,None)
 del test_app

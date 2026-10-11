@@ -4,6 +4,31 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.1 — 2026-10-11 08:22 (UTC-05:00)
+
+Adi AI rediseñada, chat flotante compacto con atención real de asesores, Mail Pro con avisos de correo nuevo y almacenamiento real, y reloj y clima renovados.
+
+### Nuevas funcionalidades
+
+- Adi AI — Centro de Inteligencia Administrativa: nuevo diseño con estado operativo del taller, conversaciones guardadas por usuario (abrir, buscar, renombrar y eliminar) e indicador de actividad según el estado real de cada consulta.
+- Adi AI: sonidos configurables, lectura de respuestas por voz del navegador y dictado opcional con revisión antes de enviar.
+- PC-DOCTOR Mail Pro: aviso automático de correo nuevo (emergente, campana y Centro de Notificaciones) sin duplicados, con sonidos configurables y notificación de escritorio opcional.
+- Mail Pro: almacenamiento real del buzón informado por el servidor, con alertas al 75 % y 90 %; filtros No leídos, Destacados y Con adjuntos; vista previa de cada mensaje; copia oculta (CCO) y redactor ampliable.
+
+### Mejoras realizadas
+
+- Adi AI: el chat se ajusta a la altura real del navegador y el editor de mensajes es de varias líneas, crece hasta 220 px, envía con Enter y conserva el texto si falla la conexión.
+- Chat flotante de Adi rediseñado: ventana compacta, encabezado «Adi · Atención PC-DOCTOR», minimizar y cerrar, editor que crece, contador de mensajes sin leer, sonidos opcionales y repliegue automático ante diálogos, menús y notificaciones.
+- Mail Pro rediseñado: tres paneles ajustados a la pantalla, carpetas plegables con iconos unificados, barra de acciones en el lector, sincronización manual y automática con estado visible.
+- Reloj y clima del encabezado rediseñados: segundos en vivo con dígitos estables, panel con la fecha completa, iconos del clima animados según la condición real y panel de detalle con sensación térmica, humedad, viento y lluvia prevista.
+- Mail Pro: formato básico en el redactor (negrita, cursiva y listas) y preferencias de avisos guardadas en la cuenta.
+- El chat de Adi conserva la conversación del cliente durante 30 días en su navegador.
+
+### Errores corregidos
+
+- El chat de Adi muestra el estado real de la atención (Adi, esperando asesor, asesor conectado, finalizada), no duplica solicitudes de asesor y avisa a administración cuando un cliente espera.
+- El clima ya no recorta el texto de la condición y, si el proveedor no responde, conserva la última lectura válida marcada como desactualizada.
+
 ## v1.5.0 — 2026-10-11 02:50 (UTC-05:00)
 
 Adi administrativa en vivo, indicador Release conectado al registro oficial, botón de Adi compacto y corrección del indicador de carga del acceso.

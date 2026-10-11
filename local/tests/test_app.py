@@ -454,6 +454,64 @@ class SecurityTests(unittest.TestCase):
         self.assertEqual(manage(cookie,csrf,id=str(other),action='role',role='administrador')['status'],200)
         with app.connect() as c:self.assertEqual(tuple(c.execute('SELECT role,active FROM users WHERE id=?',(other,)).fetchone()),('administrador',1))
 
+    def test_public_chat_reports_real_advisor_state(self):
+        first=self.request('/api/public/adi/message',{'message':'Hola, tengo una consulta ficticia'})
+        self.assertEqual((first['status'],first['body']['state']),(201,'adi'))
+        chat=first['cookie'].split(';')[0];cid=first['body']['conversation_id']
+        self.assertEqual(self.request('/api/public/adi/messages',cookie=chat)['body']['state'],'adi')
+        # Solicitar asesor: queda en espera y no se duplica el registro al repetir.
+        self.assertEqual(self.request('/api/public/adi/human',{},cookie=chat)['body']['state'],'waiting')
+        self.assertEqual(self.request('/api/public/adi/human',{},cookie=chat)['body']['state'],'waiting')
+        with app.connect() as c:self.assertEqual(c.execute("SELECT COUNT(*) FROM adi_messages WHERE conversation_id=? AND content='El cliente solicita atención humana.'",(cid,)).fetchone()[0],1)
+        cookie,csrf=self.login()
+        titles=[item['title'] for item in self.request('/api/notifications',cookie=cookie)['body']['items']]
+        self.assertIn('1 cliente espera a un asesor',titles)
+        self.assertEqual(self.request('/api/public/adi/messages',cookie=chat)['body']['state'],'waiting')
+        # Solo cuando un usuario real responde se informa «asesor conectado».
+        self.assertEqual(self.request(f'/api/adi/live/{cid}',{'action':'reply','message':'Hola, soy un asesor ficticio.'},cookie=cookie,csrf=csrf)['status'],200)
+        seen=self.request('/api/public/adi/messages?after=0',cookie=chat)['body']
+        self.assertEqual(seen['state'],'advisor')
+        self.assertEqual(seen['messages'][-1]['author'],'operator')
+        follow=self.request('/api/public/adi/message',{'message':'Gracias, sigo aquí'},cookie=chat)['body']
+        self.assertEqual((follow['state'],follow['messages'][-1]['author']),('advisor','client'))
+        self.assertNotIn('1 cliente espera a un asesor',[item['title'] for item in self.request('/api/notifications',cookie=cookie)['body']['items']])
+        # Finalizada: se informa y, si el cliente vuelve a escribir, continúa con Adi conservando el historial.
+        self.request(f'/api/adi/live/{cid}',{'action':'close'},cookie=cookie,csrf=csrf)
+        self.assertEqual(self.request('/api/public/adi/messages',cookie=chat)['body']['state'],'closed')
+        again=self.request('/api/public/adi/message',{'message':'¿Cuál es el horario?'},cookie=chat)
+        self.assertEqual((again['body']['state'],again['body']['conversation_id'],again['body']['messages'][-1]['author']),('adi',cid,'adi'))
+        self.assertGreaterEqual(len(self.request('/api/public/adi/messages?after=0',cookie=chat)['body']['messages']),6)
+
+    def test_adi_conversations_are_saved_per_user(self):
+        cookie,csrf=self.login()
+        with app.connect() as c:
+            c.execute("INSERT INTO users(username,email,name,password_hash,role,created_at) VALUES ('otra','otra@example.invalid','Otra administradora',?,'administrador',1)",(self.hash,))
+            c.execute("INSERT INTO users(username,email,name,password_hash,role,created_at) VALUES ('tecnico','tec@example.invalid','Técnico de prueba',?,'tecnico',1)",(self.hash,))
+        session=lambda name:(lambda ck:(ck,self.request('/api/me',cookie=ck)['body']['user']['csrf']))(self.request('/api/login',{'login':name,'password':'contraseña-segura-de-prueba'})['cookie'].split(';')[0])
+        other,other_csrf=session('otra');tech,tech_csrf=session('tecnico')
+        first=self.request('/api/adi/admin',{'message':'Resumen del taller'},cookie=cookie,csrf=csrf)
+        self.assertEqual(first['status'],200);cid=first['body']['conversation']['id']
+        self.assertEqual(first['body']['conversation']['title'],'Resumen del taller')
+        second=self.request('/api/adi/admin',{'message':'¿Qué órdenes están vencidas?','conversation_id':str(cid)},cookie=cookie,csrf=csrf)
+        self.assertEqual(second['body']['conversation']['id'],cid)
+        saved=self.request('/api/adi/conversations/'+str(cid),cookie=cookie)['body']
+        self.assertEqual([m['role'] for m in saved['messages']],['user','adi','user','adi'])
+        self.assertTrue(saved['messages'][1]['links'])
+        self.assertEqual([r['id'] for r in self.request('/api/adi/conversations',cookie=cookie)['body']['rows']],[cid])
+        self.assertEqual(len(self.request('/api/adi/conversations?q=vencidas',cookie=cookie)['body']['rows']),1)
+        self.assertEqual(self.request('/api/adi/conversations?q=zzzz',cookie=cookie)['body']['rows'],[])
+        # Otra persona no ve, continúa, renombra ni borra la conversación; un técnico no accede al módulo.
+        self.assertEqual(self.request('/api/adi/conversations',cookie=other)['body']['rows'],[])
+        self.assertEqual(self.request('/api/adi/conversations/'+str(cid),cookie=other)['status'],404)
+        self.assertEqual(self.request('/api/adi/admin',{'message':'hola','conversation_id':str(cid)},cookie=other,csrf=other_csrf)['status'],404)
+        self.assertEqual(self.request('/api/adi/conversations/'+str(cid),{'action':'delete'},cookie=other,csrf=other_csrf)['status'],404)
+        self.assertEqual(self.request('/api/adi/conversations',cookie=tech)['status'],403)
+        self.assertEqual(self.request('/api/adi/conversations/'+str(cid),{'action':'rename','title':'Revisión diaria'},cookie=cookie)['status'],403)
+        self.assertEqual(self.request('/api/adi/conversations/'+str(cid),{'action':'rename','title':'Revisión diaria'},cookie=cookie,csrf=csrf)['body']['title'],'Revisión diaria')
+        self.assertEqual(self.request('/api/adi/conversations/'+str(cid),{'action':'rename','title':''},cookie=cookie,csrf=csrf)['status'],400)
+        self.assertEqual(self.request('/api/adi/conversations/'+str(cid),{'action':'delete'},cookie=cookie,csrf=csrf)['status'],200)
+        with app.connect() as c:self.assertEqual(c.execute('SELECT COUNT(*) FROM adi_admin_messages').fetchone()[0],0)
+
     def test_server_validation_and_https_cookie(self):
         for data in ({'login':'','password':'x'},{'login':'bad@','password':'x'},{'login':'demo','password':''}):
             self.assertEqual(self.request('/api/login',data)['status'],400)
