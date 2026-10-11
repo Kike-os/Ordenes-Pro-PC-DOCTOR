@@ -4,6 +4,19 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.22 — 2026-10-11 14:36 (UTC-05:00)
+
+Buscador de órdenes renovado, identificación automática sin pasos manuales y seguimiento con más contraste
+
+### Mejoras realizadas
+
+- Buscador de órdenes del encabezado: muestra completo el número de orden, lupa y limpiar como botones reales, resultados con cliente, equipo y estado, y navegación con teclado
+- Seguimiento de Órdenes: icono principal iluminado, acento de color por proceso en cada tarjeta e iconos de «Procesando» y «En espera de entrega» actualizados
+
+### Errores corregidos
+
+- Se retira «Leer del equipo» de la recepción: la identificación queda automática por número de serie, con acceso a la orden anterior del equipo y a quién confirmó sus datos
+
 ## v1.5.21 — 2026-10-11 14:24 (UTC-05:00)
 
 Lectura de datos desde el propio equipo y ficha de identificación con origen

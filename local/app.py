@@ -870,8 +870,10 @@ class Handler(BaseHTTPRequestHandler):
             if search_route:
                 term=parse_qs(urlsplit(self.path).query).get('q',[''])[0].strip()[:150]
                 if len(term)<2:return self.reply(200,{'rows':[]})
-                rows=[dict(r) for r in c.execute("SELECT o.id,o.code,c.name client,d.brand,d.model,d.serial,s.label status FROM orders o JOIN devices d ON d.id=o.device_id JOIN clients c ON c.id=d.client_id JOIN statuses s ON s.code=o.status WHERE instr(lower(COALESCE(o.code,'')||' '||c.name||' '||COALESCE(c.identification,'')||' '||COALESCE(c.phone,'')||' '||d.brand||' '||d.model||' '||d.serial),lower(?))>0 ORDER BY o.id DESC LIMIT 10",(term,))]
-                return self.reply(200,{'rows':rows})
+                source="FROM orders o JOIN devices d ON d.id=o.device_id JOIN clients c ON c.id=d.client_id JOIN statuses s ON s.code=o.status WHERE instr(lower(COALESCE(o.code,'')||' '||c.name||' '||COALESCE(c.identification,'')||' '||COALESCE(c.phone,'')||' '||COALESCE(d.brand,'')||' '||COALESCE(d.model,'')||' '||COALESCE(d.serial,'')),lower(?))>0"
+                # Vista rápida del buscador: los 8 más recientes (el código exacto primero) y el total real para la búsqueda completa.
+                rows=[dict(r) for r in c.execute("SELECT o.id,COALESCE(o.code,'OP-'||printf('%05d',o.id)) code,c.name client,d.brand,d.model,d.serial,o.status status_code,s.label status "+source+" ORDER BY lower(COALESCE(o.code,''))=lower(?) DESC,o.id DESC LIMIT 8",(term,term))]
+                return self.reply(200,{'rows':rows,'total':c.execute('SELECT COUNT(*) '+source,(term,)).fetchone()[0]})
             maintenance_pdf=re.fullmatch(r'/api/maintenance/([0-9]+)/(card|thermal)\.pdf',path)
             if maintenance_pdf:
                 row=next((r for r in maintenance.rows(c) if r['id']==int(maintenance_pdf[1])),None)
@@ -1500,15 +1502,6 @@ class Handler(BaseHTTPRequestHandler):
                             entity_id = c.execute('INSERT INTO '+table+'('+','.join(keys)+') VALUES ('+','.join('?' for _ in keys)+')',values).lastrowid
                         audit(c,user['id'],table+'_saved',int(entity_id))
                     return self.reply(200, {'ok':True})
-                if path=='/api/devices/hardware':
-                    # Interpreta el informe de hardware pegado por el técnico; no ejecuta nada ni consulta servicios.
-                    if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
-                    import device_hardware
-                    report=str(data.get('text',''))
-                    if not report.strip() or len(report)>device_hardware.LIMIT:return self.reply(400,{'error':'Pega el resultado del comando (hasta 8000 caracteres).'})
-                    parsed=device_hardware.parse(report)
-                    if not parsed['recognized']:return self.reply(422,{'error':'No se reconoció fabricante, modelo ni serie en ese texto. Revisa que sea la salida completa del comando.'})
-                    return self.reply(200,parsed)
                 tracking_route=re.fullmatch(r'/api/orders/([0-9]+)/tracking',path)
                 if tracking_route:
                     import order_tracking

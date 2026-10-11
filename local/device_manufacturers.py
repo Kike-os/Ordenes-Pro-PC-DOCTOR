@@ -52,7 +52,10 @@ def dell_lookup(serial):
     data=_request('https://'+host+'/PROD/sbil/eapi/v5/asset-entitlements?servicetags='+urllib.parse.quote(serial),headers={'Authorization':'Bearer '+cached[0]})
     item=next((row for row in data if isinstance(row,dict)),None) if isinstance(data,list) else None
     if not item or item.get('invalid') or not str(item.get('productLineDescription') or '').strip():return None
-    return {'brand':'Dell','model':str(item['productLineDescription']).strip()[:150],'type':''}
+    # Datos de fábrica: solo los que la respuesta traiga; describen el equipo al salir de fábrica, no su estado actual.
+    factory={label:str(item[key]).strip()[:80] for key,label in (('productFamily','Familia'),('productCode','Código de producto'),('systemDescription','Descripción')) if str(item.get(key) or '').strip()}
+    if str(item.get('shipDate') or '')[:10]:factory['Fecha de envío']=str(item['shipDate'])[:10]
+    return {'brand':'Dell','model':str(item['productLineDescription']).strip()[:150],'type':'','factory':factory}
 
 
 ADAPTERS={'dell':(dell_configured,dell_lookup)}

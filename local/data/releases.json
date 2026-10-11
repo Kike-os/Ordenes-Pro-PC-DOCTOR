@@ -8,6 +8,25 @@
   },
   "releases": [
     {
+      "version": "1.5.22",
+      "date": "2026-10-11T14:36:04-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Buscador de órdenes renovado, identificación automática sin pasos manuales y seguimiento con más contraste",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Buscador de órdenes del encabezado: muestra completo el número de orden, lupa y limpiar como botones reales, resultados con cliente, equipo y estado, y navegación con teclado",
+          "Seguimiento de Órdenes: icono principal iluminado, acento de color por proceso en cada tarjeta e iconos de «Procesando» y «En espera de entrega» actualizados"
+        ],
+        "fixes": [
+          "Se retira «Leer del equipo» de la recepción: la identificación queda automática por número de serie, con acceso a la orden anterior del equipo y a quién confirmó sus datos"
+        ],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.21",
       "date": "2026-10-11T14:24:09-05:00",
       "type": "patch",

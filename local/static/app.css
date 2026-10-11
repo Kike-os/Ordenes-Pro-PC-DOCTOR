@@ -2902,12 +2902,53 @@ body[data-page=dashboard] .toast.toast-release .toast-body p{font-size:12px;colo
 @keyframes es-pulse{0%{transform:scale(1);box-shadow:0 0 0 0 #4d8df099}45%{transform:scale(1.04);box-shadow:0 0 0 6px #4d8df02e,0 0 16px #4d8df066}100%{transform:scale(1);box-shadow:0 0 0 10px #4d8df000}}
 @media(prefers-reduced-motion:reduce){.tracking-pro .tracking-item.track-new,.tracking-pro .tracking-item.track-new .tracking-open,.tracking-pro .panel-icon.tracking-pulse{animation:none}.tracking-pro .tracking-open,.tracking-pro .tracking-open .track-icon{transition:none}}
 
-/* Identificación de equipos: estados breves, importación desde el propio equipo y ficha con origen e identificación. */
-.serial-row .serial-read{padding:0 12px}
-.serial-import{display:grid;gap:6px;margin-top:4px}
-.serial-import textarea{width:100%;min-height:74px;max-height:160px;margin:0;padding:8px 10px;font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;resize:vertical;box-sizing:border-box}
-.serial-import-note{font-size:11.5px;color:#9bb0cf;overflow-wrap:anywhere}.serial-import-note:empty{display:none}
+/* Identificación de equipos: estados breves y ficha con origen e identificación. */
 .serial-official .serial-actions{margin-top:2px}.serial-official select{max-width:170px}
 .brand-card[data-identification=Confirmada] .brand-meta{color:#8fe0b9}.brand-card[data-identification=Pendiente] .brand-meta{color:#f1cf95}
 .brand-logo[data-kind=logo]{background:#fff}
-@media(max-width:560px){.serial-row .serial-read span,.serial-scan span{display:none}.serial-row .serial-read{padding:0 11px}}
+
+/* Smart Order Search Pro: buscador de órdenes del encabezado (combobox) y su panel de resultados. */
+.premium-header #global-search{gap:2px;padding:0 4px;border-color:#2f4664;transition:border-color .18s,box-shadow .18s,width .18s,flex-basis .18s,margin-right .18s}
+.premium-header #global-search:focus-within{border-color:#70a8f5;box-shadow:0 0 0 3px #4b8deb24}
+.premium-header #global-search.order-search-wide{position:relative;z-index:3;background:#0e1b2d}
+.premium-header #global-search .search-button{display:grid;place-items:center;flex:0 0 30px;width:30px;min-width:30px;height:30px;padding:0;margin:0;border:0;border-radius:7px;background:transparent;color:#8fa6cb;cursor:pointer;transition:background .18s,color .18s}
+.premium-header #global-search .search-button:hover{background:#17304f;color:#dbe8ff;transform:none}
+.premium-header #global-search .search-button:focus-visible{outline:2px solid #8bb8ff;outline-offset:1px}
+.premium-header #global-search .search-button[hidden]{display:none}
+.premium-header #global-search .search-button .field-icon{width:17px;height:17px}
+.premium-header #global-search input{flex:1 1 auto;min-width:0;padding:0 4px;font-size:13px;font-variant-numeric:tabular-nums;color:#e6eeff;text-overflow:ellipsis}
+.premium-header #global-search input:focus{text-overflow:clip}
+.order-search-panel{position:fixed;z-index:60;display:flex;flex-direction:column;box-sizing:border-box;padding:6px;border:1px solid #2f4664;border-radius:12px;background:#0b1626;box-shadow:0 16px 40px #020714b3;color:#e3edff;animation:order-search-in .2s ease-out}
+.order-search-panel[hidden]{display:none}
+.order-search-list{display:grid;gap:2px;max-height:300px;overflow-y:auto;scrollbar-width:thin}
+.order-search-option{display:grid;grid-template-columns:32px minmax(0,1fr) 20px;align-items:center;gap:10px;padding:8px 10px;border-radius:9px;cursor:pointer;transition:background .18s}
+.order-search-option[aria-selected=true]{background:#14294a;box-shadow:inset 2px 0 0 #65acf4}
+.order-search-mark{display:grid;place-items:center;width:32px;height:32px;border-radius:9px;border:1px solid #2f4a73;background:#12233d;color:#8bb8ff}
+.order-search-icon{width:16px;height:16px}
+.order-search-body{display:grid;gap:1px;min-width:0}
+.order-search-head{display:flex;align-items:center;gap:8px;min-width:0}
+.order-search-head strong{font-size:13px;font-weight:700;color:#f2f6ff;white-space:nowrap;font-variant-numeric:tabular-nums}
+.order-search-head .status-label{min-width:0;margin:0;padding:1px 8px;font-size:10.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.order-search-client{font-size:12.5px;color:#cfdcf0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.order-search-body small{font-size:11.5px;color:#8fa5c4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.order-search-open{color:#5f7696;transition:color .18s}.order-search-option[aria-selected=true] .order-search-open{color:#9bbef5}
+.order-search-foot{display:flex;align-items:center;gap:10px;margin-top:6px;padding:7px 8px 2px;border-top:1px solid #1e3252;font-size:11.5px;color:#8fa5c4}
+.order-search-hint{display:inline-flex;align-items:center;gap:5px;margin-right:auto;color:#6f84a3;white-space:nowrap;overflow:hidden}
+.order-search-hint .order-search-icon{width:13px;height:13px;flex:0 0 auto}
+.order-search-more{flex:0 0 auto;padding:4px 10px;border:1px solid #2a4063;border-radius:999px;background:transparent;color:#a9c8f7;font-size:11.5px;font-weight:600;cursor:pointer;transition:background .18s,border-color .18s,color .18s}
+.order-search-more:hover{background:#12213a;border-color:#3b5d8f;color:#fff;transform:none}
+.order-search-note{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0;padding:12px 10px;font-size:12.5px;color:#a9bcd8}
+.order-search-note[data-kind=error]{color:#ffb3b6}
+.order-search-note[data-kind=loading] .order-search-icon{animation:serial-spin .9s linear infinite}
+@keyframes order-search-in{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+@media(max-width:520px){.order-search-hint{display:none}.order-search-foot>span:first-child{margin-right:auto}}
+@media(prefers-reduced-motion:reduce){.order-search-panel,.order-search-note[data-kind=loading] .order-search-icon{animation:none}.premium-header #global-search,.premium-header #global-search .search-button,.order-search-option{transition:none}}
+
+/* Enterprise Status Pro — refuerzo visible: encabezado y acento por proceso. Solo color, borde y sombra. */
+.tracking-pro .panel-icon{border-color:#3d74c7;background:linear-gradient(180deg,#17355f,#102443);color:#7fbcff;box-shadow:0 0 0 3px #4d8df014,0 0 14px #3b82f633;transition:box-shadow .2s,border-color .2s,color .2s}
+.tracking-pro>header h2{color:#f6f9ff}
+.tracking-pro .tracking-open,.tracking-pro .tracking-item[data-tone] .tracking-open{border-color:color-mix(in srgb,var(--tk) 22%,#1e3252);border-left-color:var(--tk);background:linear-gradient(90deg,color-mix(in srgb,var(--tk) 11%,#0d1b30),#0b1728 46%)}
+.tracking-pro .tracking-open:hover,.tracking-pro .tracking-open:focus-visible{background:linear-gradient(90deg,color-mix(in srgb,var(--tk) 17%,#10223d),#0d1c32 52%)}
+.tracking-pro .tracking-open .track-icon,.tracking-pro .tracking-item[data-tone] .track-icon{border-color:color-mix(in srgb,var(--tk) 60%,transparent);background:color-mix(in srgb,var(--tk) 18%,#0d1b30);color:var(--tk);box-shadow:0 0 10px color-mix(in srgb,var(--tk) 22%,transparent)}
+.tracking-pro .tracking-text{color:color-mix(in srgb,var(--tk) 28%,#ffffff)}
+.serial-actions a.secondary{padding:7px 12px;font-size:12px;text-decoration:none}

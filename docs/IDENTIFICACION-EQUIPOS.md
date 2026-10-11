@@ -51,14 +51,14 @@ Después hay que probarla con un Service Tag propio del taller antes de darla po
 
 Al registrar una orden, si el cliente ya tiene exactamente el mismo equipo (serie, tipo, marca, modelo y color), se reutiliza su registro en lugar de duplicarlo. Las órdenes y equipos anteriores no se modifican.
 
-## Actualización — lectura desde el propio equipo, confirmación y conflictos
+## Actualización — confirmación, conflictos y ficha del equipo
 
 **Por qué una serie HP nueva no se identifica sola:** no hay ningún servicio de fabricante conectado. El único proveedor automático activo es el historial interno. Para HP el siguiente paso es solicitar la Product Warranty API en https://developers.hp.com (cuenta de desarrollador, solicitud de credenciales y aprobación de HP) y, con el acceso, escribir y probar su adaptador.
 
-**Leer del equipo (cualquier marca, si enciende):** el botón «Leer del equipo» muestra un comando de PowerShell. El técnico lo ejecuta en el equipo recibido y pega el resultado; `local/device_hardware.py` interpreta fabricante, modelo, serie, procesador, memoria y disco. También acepta la salida de `systeminfo`, `wmic csproduct`, `dmidecode` y `system_profiler`. No se ejecuta nada en el servidor ni se consulta ningún servicio. Los valores de relleno («To Be Filled By O.E.M.», «System Product Name»…) se descartan. Procedencia guardada: `equipo`. El comando aún no se ha probado en un equipo Windows real; el analizador se probó con salidas de ejemplo de cada herramienta.
+**Lectura desde el propio equipo:** se publicó en la 1.5.21 y se retiró en la versión siguiente a pedido del taller. No queda ningún botón, panel ni ruta de esa función.
 
 **Aprendizaje del historial:** al registrar la orden, el equipo guarda quién confirmó la marca y el modelo y cuándo (`identity_confirmed_by`, `identity_confirmed_at`, migración 023). La siguiente recepción de la misma serie los propone con su procedencia. Las órdenes y equipos anteriores no se modifican.
 
 **Conflictos:** si una serie figura en el historial con marcas distintas, la búsqueda lo avisa y no elige ninguna por su cuenta.
 
-**Ficha del equipo:** marca y modelo, tipo y serie, origen (Historial interno, Fabricante oficial, Leído del equipo o Selección manual) e identificación (Confirmada, Pendiente o No disponible).
+**Ficha del equipo:** marca y modelo, tipo y serie, origen (Historial interno, Fabricante oficial o Selección manual) e identificación (Confirmada, Pendiente o No disponible).

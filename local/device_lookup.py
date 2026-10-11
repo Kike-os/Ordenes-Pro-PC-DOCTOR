@@ -60,4 +60,4 @@ def identify(c,value,brand='',allow_external=lambda:True):
 def source(value):
     """Procedencia válida de la marca y el modelo confirmados por el técnico."""
     value=str(value or '')
-    return value if value in ('manual','historial','equipo') or re.fullmatch(r'fabricante:[a-z0-9-]{1,30}',value) else ''
+    return value if value in ('manual','historial') or re.fullmatch(r'fabricante:[a-z0-9-]{1,30}',value) else ''
