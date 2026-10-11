@@ -4,6 +4,15 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.28 — 2026-10-11 15:30 (UTC-05:00)
+
+Adi para redacción y citas con clientes de la base de datos
+
+### Nuevas funcionalidades
+
+- Adi — asistencia de redacción: botón «Mejorar con Adi» en los campos de las órdenes con vista previa, cambios resaltados, aplicar, regenerar y cancelar (requiere configurar la clave del proveedor de IA)
+- Agenda: «Nueva cita» registra la reserva eligiendo al cliente desde la base de datos, con horarios realmente disponibles
+
 ## v1.5.27 — 2026-10-11 15:20 (UTC-05:00)
 
 Agenda de Mantenimientos de Clientes y confirmación de cierre renovada

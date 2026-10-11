@@ -142,7 +142,10 @@ def create(c,data,user=None):
  duration=c.execute('SELECT duration_minutes FROM appointment_services WHERE code=?',(fields['service'],)).fetchone()['duration_minutes']
  staff=technicians(c,start,duration)
  if not staff:return 409,{'error':'Ese espacio acaba de ocuparse. Elige otro horario.'}
- technician=staff[0];client=lookup_client(c,fields['identification'],fields['phone'],fields['email'])
+ technician=staff[0];chosen=str(data.get('client_id','')) if user else ''
+ client=c.execute('SELECT * FROM clients WHERE id=?',(int(chosen),)).fetchone() if chosen.isdigit() else None
+ if chosen and not client:return 404,{'error':'El cliente seleccionado ya no está disponible.'}
+ if not client:client=lookup_client(c,fields['identification'],fields['phone'],fields['email'])
  if not client:client_id=c.execute('INSERT INTO clients(name,email,phone,identification) VALUES (?,?,?,?)',(fields['name'],fields['email'],fields['phone'],fields['identification'])).lastrowid
  else:client_id=client['id']
  token=secrets.token_urlsafe(32);created=stamp(now());public='CIT-'+now().strftime('%Y%m%d')+'-'+secrets.token_hex(3).upper()

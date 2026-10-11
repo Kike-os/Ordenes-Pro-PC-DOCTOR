@@ -545,6 +545,12 @@ class Handler(BaseHTTPRequestHandler):
                 else:return self.reply(400,{'error':'Vista de agenda inválida.'})
                 rows=appointments.admin_rows(c,appointments.stamp(start),appointments.stamp(end))
                 return self.reply(200,{'rows':rows,'view':view,'date':day.isoformat(),'settings':appointments.settings(c) if user['role']=='administrador' else None})
+            if path == '/api/adi/status':
+                # Estado real de Adi para la redacción y los canales; no expone claves.
+                if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
+                import adi_ai
+                usage=c.execute("SELECT COUNT(*) n FROM adi_actions WHERE action='writing_improve' AND created_at>=?",(reception_now().date().isoformat(),)).fetchone()['n']
+                return self.reply(200,{'writing':adi_ai.status(c),'today':usage,'channels':{'mail':mail_allowed(user),'web_chat':True,'whatsapp':False}})
             if path == '/api/adi/admin':
                 if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede usar la asistente administrativa.'})
                 return self.reply(200,{'enabled':bool(os.getenv('OPENAI_API_KEY')),'message':'Adi responde consultas operativas desde datos autorizados.','live':adi.snapshot(c,reception_now())})
@@ -1322,6 +1328,13 @@ class Handler(BaseHTTPRequestHandler):
                 if path=='/api/sessions/revoke':
                     c.execute('DELETE FROM sessions WHERE user_id=?',(user['id'],));audit(c,user['id'],'sessions_revoked')
                     return self.reply(200,{'ok':True,'message':'Se cerraron las sesiones activas.'},cookie=self.cookie('',0))
+                if path=='/api/appointments/new':
+                    # Cita registrada por el personal: mismas validaciones y disponibilidad que la reserva en línea.
+                    if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
+                    status,payload=appointments.create(c,dict(data,privacy_consent=True,communications_consent=data.get('communications_consent') is True),user)
+                    if status==201:
+                        payload.pop('manage_token',None);audit(c,user['id'],'appointment_created',payload['id'])
+                    return self.reply(status,payload)
                 appointment_route=re.fullmatch(r'/api/appointments/([0-9]+)',path)
                 if path=='/api/appointments/config':
                     if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede configurar la agenda.'})
@@ -1527,6 +1540,26 @@ class Handler(BaseHTTPRequestHandler):
                             entity_id = c.execute('INSERT INTO '+table+'('+','.join(keys)+') VALUES ('+','.join('?' for _ in keys)+')',values).lastrowid
                         audit(c,user['id'],table+'_saved',int(entity_id))
                     return self.reply(200, {'ok':True})
+                if path in ('/api/adi/write','/api/adi/settings'):
+                    import adi_ai
+                    if path=='/api/adi/settings':
+                        if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede cambiar esta configuración.'})
+                        if data.get('writing') not in (True,False):return self.reply(400,{'error':'Valor inválido.'})
+                        c.execute("INSERT INTO system_state(key,value) VALUES ('adi_writing',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",('on' if data['writing'] else 'off',))
+                        audit(c,user['id'],'adi_writing_'+('enabled' if data['writing'] else 'disabled'))
+                        return self.reply(200,{'ok':True,'writing':adi_ai.status(c)})
+                    if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
+                    if not adi_ai.enabled(c):return self.reply(403,{'error':'La redacción con Adi está desactivada en Configuración.'})
+                    if not adi_ai.provider():return self.reply(503,{'error':'Adi todavía no tiene un proveedor de IA configurado en el servidor.','kind':'configuracion'})
+                    if limited(c,'adi-write:'+str(user['id']),limit=60,window=3600):return self.reply(429,{'error':'Alcanzaste el límite de mejoras por hora. Intenta más tarde.'})
+                    mode=str(data.get('mode',''));field=str(data.get('field',''))[:40]
+                    try:result=adi_ai.improve(data.get('text',''),mode,field)
+                    except adi_ai.AdiError as error:
+                        print('adi-write',error.kind,flush=True)
+                        return self.reply(error.status,{'error':str(error),'kind':error.kind})
+                    # Registro de uso: quién, qué tipo de mejora y consumo. No se guarda el texto.
+                    c.execute('INSERT INTO adi_actions(user_id,action,created_at,details) VALUES (?,?,?,?)',(user['id'],'writing_improve',reception_now().isoformat(timespec='seconds'),json.dumps({'mode':mode,'field':field,'model':result['model'],'tokens_in':result['tokens_in'],'tokens_out':result['tokens_out'],'missing':len(result['missing'])})))
+                    return self.reply(200,{'suggestion':result['suggestion'],'missing':result['missing'],'changed':result['changed']})
                 tracking_route=re.fullmatch(r'/api/orders/([0-9]+)/tracking',path)
                 if tracking_route:
                     import order_tracking

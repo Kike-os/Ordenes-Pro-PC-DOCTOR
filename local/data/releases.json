@@ -8,6 +8,23 @@
   },
   "releases": [
     {
+      "version": "1.5.28",
+      "date": "2026-10-11T15:30:31-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Adi para redacción y citas con clientes de la base de datos",
+      "changes": {
+        "features": [
+          "Adi — asistencia de redacción: botón «Mejorar con Adi» en los campos de las órdenes con vista previa, cambios resaltados, aplicar, regenerar y cancelar (requiere configurar la clave del proveedor de IA)",
+          "Agenda: «Nueva cita» registra la reserva eligiendo al cliente desde la base de datos, con horarios realmente disponibles"
+        ],
+        "improvements": [],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.27",
       "date": "2026-10-11T15:20:32-05:00",
       "type": "patch",

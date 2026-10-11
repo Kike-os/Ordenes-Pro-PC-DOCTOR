@@ -86,6 +86,27 @@ class AgendaTests(unittest.TestCase):
         with patch.object(appointments_cron,'DB',app.DB),patch.object(appointments_cron,'send'),patch.object(appointments_cron,'send_staff') as retry:
             appointments_cron.run();self.assertEqual(retry.call_count,1)
 
+    def test_staff_books_for_a_client_chosen_from_the_database(self):
+        cookie,csrf=self.login()
+        import client_registry
+        self.request('/api/orders',self.order_data({'client':'Cliente De Base','problem':'Prueba','request_key':'agenda-staff-order-000001'}),cookie=cookie,csrf=csrf)
+        found=self.request('/api/clients?q=Cliente%20De%20Base',cookie=cookie)['body']['rows'][0]
+        slot=self.request('/api/public/appointments/availability?date=%s&service=mantenimiento'%self.day())['body']['slots'][0]['time']
+        data=self.booking(slot,client_id=str(found['id']),name=found['name'],phone=found['phone'],email='',request_key='agenda-staff-request-0001')
+        self.assertEqual(self.request('/api/appointments/new',data,cookie=cookie)['status'],403)
+        with app.connect() as c:before=c.execute('SELECT COUNT(*) FROM clients').fetchone()[0]
+        created=self.request('/api/appointments/new',data,cookie=cookie,csrf=csrf)
+        self.assertEqual((created['status'],created['body']['status']),(201,'confirmada'));self.assertNotIn('manage_token',created['body'])
+        with app.connect() as c:
+            row=c.execute('SELECT client_id,customer_name FROM appointments WHERE id=?',(created['body']['id'],)).fetchone()
+            self.assertEqual((row['client_id'],c.execute('SELECT COUNT(*) FROM clients').fetchone()[0]),(found['id'],before))
+        self.assertEqual(self.request('/api/appointments/new',dict(data,request_key='agenda-staff-request-0002'),cookie=cookie,csrf=csrf)['status'],409)
+        self.assertEqual(self.request('/api/appointments/new',dict(data,client_id='999999',time=slot,request_key='agenda-staff-request-0003'),cookie=cookie,csrf=csrf)['status'] in (404,409),True)
+        # La página pública no acepta elegir un cliente por id.
+        other=self.request('/api/public/appointments/availability?date=%s&service=mantenimiento'%self.day())['body']['slots'][0]['time']
+        public=self.request('/api/public/appointments',self.booking(other,client_id=str(found['id']),name='Otra Persona',phone='0987654321',email='otra@example.invalid',request_key='agenda-public-request-01'))
+        with app.connect() as c:self.assertNotEqual(c.execute('SELECT client_id FROM appointments WHERE id=?',(public['body']['id'],)).fetchone()[0],found['id'])
+
     def test_services_are_managed_from_configuration(self):
         cookie,csrf=self.login();url='/api/appointments/config'
         created=self.request(url,{'new_service':{'label':'Mantenimiento de consola','duration_minutes':60}},cookie=cookie,csrf=csrf)
