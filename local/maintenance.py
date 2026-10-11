@@ -24,10 +24,29 @@ def transition(c,oid,old,new,now):
         return {'id':row['id'],'due_date':row['due_date']}
     elif old=='entregado':
         # La entrega se revirtió: la previsión queda cancelada con su historial, no se borra.
-        c.execute("UPDATE maintenance SET state='cancelled',generation=generation+1,updated_at=? WHERE order_id=?",(stamp,oid))
+        # Su cita automática, si aún no se atendió, se cancela con registro en el historial de la cita.
+        linked=c.execute("SELECT a.id,a.status,a.starts_at FROM maintenance m JOIN appointments a ON a.id=m.appointment_id WHERE m.order_id=? AND a.status IN ('solicitada','confirmada','reprogramada')",(oid,)).fetchone()
+        if linked:
+            c.execute("UPDATE appointments SET status='cancelada',updated_at=? WHERE id=?",(stamp,linked['id']))
+            c.execute("INSERT INTO appointment_events(appointment_id,event,old_start,old_status,new_status,created_at,detail) VALUES (?,'cancelled',?,?,'cancelada',?,'La entrega de la orden fue reabierta')",(linked['id'],linked['starts_at'],linked['status'],stamp))
+        c.execute("UPDATE maintenance SET state='cancelled',appointment_id=NULL,generation=generation+1,updated_at=? WHERE order_id=?",(stamp,oid))
     return None
 
-def rows(c):
+def proximity(days):
+    """Nivel de cercanía de la fecha prevista; es independiente del estado operativo del mantenimiento."""
+    return 'overdue' if days<0 else 'today' if days==0 else 'week' if days<=7 else 'fortnight' if days<=15 else 'month' if days<=30 else 'quarter' if days<=90 else 'far'
+def rows(c,today=None):
+    """Previsiones con sus días restantes, nivel de proximidad y avance (entrega → fecha prevista) calculados en America/Guayaquil."""
+    today=today or datetime.now(ZONE).date();out=[]
+    for row in _rows(c):
+        try:
+            due=date.fromisoformat(row['due_date']);start=datetime.fromisoformat(row['delivered_at']).astimezone(ZONE).date()
+            span=(due-start).days;row['days_left']=(due-today).days;row['proximity']=proximity(row['days_left'])
+            row['progress']=100 if span<=0 else max(0,min(100,round((today-start).days*100/span)))
+        except (ValueError,TypeError):row['days_left']=None;row['proximity']='unknown';row['progress']=None
+        out.append(row)
+    return out
+def _rows(c):
     return [dict(r) for r in c.execute("SELECT m.*,o.code,o.qr_url,c.id client_id,d.id device_id,c.name client,c.phone,c.email,COALESCE(NULLIF(d.kind,''),d.category) type,d.brand,d.model,d.serial,(SELECT a.starts_at FROM appointments a WHERE a.id=m.appointment_id) appointment_start,(SELECT a.status FROM appointments a WHERE a.id=m.appointment_id) appointment_status,(SELECT a.public_code FROM appointments a WHERE a.id=m.appointment_id) appointment_code,COALESCE((SELECT result FROM maintenance_notifications n WHERE n.maintenance_id=m.id AND n.generation=m.generation AND n.channel='email'),'Sin enviar') reminder FROM maintenance m JOIN orders o ON o.id=m.order_id JOIN devices d ON d.id=o.device_id JOIN clients c ON c.id=d.client_id ORDER BY m.due_date,m.id")]
 
 def due(c,now):
@@ -45,7 +64,8 @@ def update(c,mid,data,user,now):
         except (ValueError,KeyError):return 400,{'error':'Indica una fecha válida.'}
         profile=data.get('profile',row['profile'])
         if profile not in PROFILES:return 400,{'error':'Selecciona un perfil válido.'}
-        c.execute("UPDATE maintenance SET due_date=?,profile=?,state='scheduled',generation=generation+1,updated_at=? WHERE id=?",(day.isoformat(),profile,stamp,mid))
+        # Si ya tiene una cita vinculada conserva el estado «con cita»; la cita se reprograma desde la agenda.
+        c.execute("UPDATE maintenance SET due_date=?,profile=?,state=CASE WHEN appointment_id IS NOT NULL THEN 'appointment' ELSE 'scheduled' END,generation=generation+1,updated_at=? WHERE id=?",(day.isoformat(),profile,stamp,mid))
     elif action in ('completed','appointment'):
         if row['state']=='cancelled':return 409,{'error':'La entrega fue reabierta. Confirma una nueva entrega antes de programar.'}
         c.execute('UPDATE maintenance SET state=?,updated_at=? WHERE id=?',(action,stamp,mid))

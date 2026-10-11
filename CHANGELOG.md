@@ -4,6 +4,23 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.34 — 2026-10-11 18:12 (UTC-05:00)
+
+Citas para hoy desde el taller y cita automática del mantenimiento al entregar
+
+### Nuevas funcionalidades
+
+- Al entregar una orden se crea automáticamente la cita del mantenimiento preventivo, pendiente de confirmación, vinculada a la orden, el cliente y el equipo; en día no laborable se propone el siguiente día con horario
+
+### Mejoras realizadas
+
+- Citas de Hoy: estado vacío con la próxima cita y accesos a Nueva cita y Ver agenda; el panel se pone al día con la agenda completa al cargar
+- Próximos Mantenimientos: colores según la cercanía de la fecha, barra de avance, estado operativo separado y botón Ver cita cuando ya existe la cita
+
+### Errores corregidos
+
+- Citas de Hoy: el personal ya puede registrar y reprogramar citas para el mismo día; antes el formulario interno solo aceptaba fechas desde mañana y ninguna cita nueva podía aparecer en el panel
+
 ## v1.5.33 — 2026-10-11 17:56 (UTC-05:00)
 
 QR del seguimiento para el cliente y firma de correo con fondo claro

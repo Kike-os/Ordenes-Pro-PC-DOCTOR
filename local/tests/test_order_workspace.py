@@ -33,7 +33,7 @@ class WorkspaceTests(unittest.TestCase):
             r=self.request('/api/order-status',{'id':str(oid),'status':state,'comment':'Prueba de '+label},cookie=cookie,csrf=csrf)
             self.assertEqual(r['status'],200,r)
         order=self.request('/api/orders/'+str(oid),cookie=cookie)['body']['order']
-        self.assertEqual(len(order['history']),8)
+        self.assertEqual(len(order['history']),9)  # incluye la cita de mantenimiento generada al entregar
         self.assertEqual(order['history'][0]['actor_id'],self.uid)
         for query,total in [('status=entregado',1),('active=1',0),('from=2026-10-09&to=2026-10-09',1),('from=2026-10-10',0),('client=NO-EXISTE',0),('equipment=NO-EXISTE',0)]:
             self.assertEqual(self.request('/api/orders?'+query,cookie=cookie)['body']['total'],total)

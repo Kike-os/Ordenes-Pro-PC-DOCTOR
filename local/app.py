@@ -583,6 +583,13 @@ class Handler(BaseHTTPRequestHandler):
                 if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
                 found=appointments.detail(c,int(agenda_item[1]))
                 return self.reply(200,{'appointment':found}) if found else self.reply(404,{'error':'Cita no disponible.'})
+            if path == '/api/appointments/availability':
+                # Horarios para el personal: incluye el día de hoy (la reserva pública empieza mañana).
+                if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
+                query=parse_qs(urlsplit(self.path).query)
+                try: rows=appointments.available_slots(c,query.get('date',[''])[0],query.get('service',[''])[0],staff=True)
+                except ValueError as error:return self.reply(400,{'error':str(error)})
+                return self.reply(200,{'slots':[{'time':r['time']} for r in rows]})
             if path == '/api/agenda':
                 # Agenda de Mantenimientos de Clientes: citas (misma tabla que la reserva en línea) y mantenimientos preventivos.
                 if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
@@ -1593,6 +1600,10 @@ class Handler(BaseHTTPRequestHandler):
                         old=c.execute('SELECT status FROM orders WHERE id=?',(oid,)).fetchone()[0]
                         c.execute('UPDATE orders SET status=?,updated_at=?,revision=revision+1 WHERE id=?', (status,now.isoformat(timespec='microseconds'),oid))
                         planned=maintenance.transition(c,int(oid),old,status,now)
+                        # La entrega crea también la cita futura del mantenimiento (pendiente de confirmación), sin pasos manuales.
+                        if planned:
+                            booked=appointments.create_for_maintenance(c,planned['id'],user)
+                            if booked:planned['appointment']=booked;order_workspace.event(c,int(oid),user['id'],now,'maintenance','Cita de mantenimiento preventivo generada automáticamente ('+booked['public_code']+').')
                         # Sin cambio real ni comentario no hay nada que auditar; con cambio, el registro nombra la transición.
                         if old!=status or comment:order_workspace.event(c,int(oid),user['id'],now,'status' if old!=status else 'follow_up',comment or order_workspace.transition_comment(old,status))
                         audit(c,user['id'],'order_status_updated',int(oid))

@@ -123,23 +123,33 @@ class AgendaTests(unittest.TestCase):
         self.assertNotIn('maintenance',post('entregado')['body'])
         rows=self.request('/api/maintenance',cookie=cookie)['body']['rows']
         self.assertEqual(len(rows),1);row=rows[0]
-        self.assertEqual((row['order_id'],row['client'],row['brand'],row['serial'],row['state'],row['due_date'],bool(row['client_id']),bool(row['device_id']),row['appointment_start']),(oid,'Cliente De Entrega','HP','ENT-0001','scheduled',due,True,True,None))
-        # No se crea ninguna cita ni se bloquea ningún horario automáticamente.
-        with app.connect() as c:self.assertEqual(c.execute('SELECT COUNT(*) FROM appointments').fetchone()[0],0)
-        agenda=self.request('/api/agenda',cookie=cookie)['body']
-        self.assertEqual(([m['id'] for m in agenda['maintenance']],agenda['summary']['preventive']),([row['id']],1))
-        notes=[i for i in self.request('/api/notifications',cookie=cookie)['body']['items'] if i['key'].startswith('maintenance:')]
-        self.assertEqual([(n['title'].split(' · ')[0],n['href']) for n in notes],[('Próximo mantenimiento programado','#maintenance?order=%d'%oid)])
-        # Revertir la entrega cancela la previsión sin borrarla; volver a entregar la reactiva en el mismo registro.
+        self.assertEqual((row['order_id'],row['client'],row['brand'],row['serial'],row['due_date'],bool(row['client_id']),bool(row['device_id'])),(oid,'Cliente De Entrega','HP','ENT-0001',due,True,True))
+        self.assertEqual((row['proximity'],row['progress'],row['days_left']>150),('far',0,True))
+        # La entrega crea sola la cita del mantenimiento: una, pendiente de confirmación, en día laborable desde la fecha prevista y vinculada.
+        auto=delivered['body']['maintenance']['appointment']
+        with app.connect() as c:
+            saved=[dict(r) for r in c.execute('SELECT * FROM appointments')];hours=c.execute('SELECT * FROM appointment_hours WHERE weekday=?',(date.fromisoformat(auto['starts_at'][:10]).weekday(),)).fetchone()
+        self.assertEqual(len(saved),1);appt=saved[0]
+        self.assertEqual((appt['id'],appt['status'],appt['service_code'],appt['client_id'],appt['customer_name'],appt['communications_consent'],appt['starts_at'][11:16]),(auto['id'],'solicitada','mantenimiento',row['client_id'],'Cliente De Entrega',0,hours['start_time']))
+        self.assertTrue(hours['enabled'] and due<=appt['starts_at'][:10]<=(date.fromisoformat(due)+timedelta(days=4)).isoformat())
+        self.assertEqual((row['state'],row['appointment_id'],row['appointment_status'],row['appointment_code'],row['due_date']),('appointment',auto['id'],'solicitada',auto['public_code'],due))
+        far=self.request('/api/agenda?from=%s&to=%s'%(appt['starts_at'][:10],appt['starts_at'][:10]),cookie=cookie)['body']
+        self.assertEqual([a['public_code'] for a in far['appointments']],[auto['public_code']])
+        notes=[i for i in self.request('/api/notifications',cookie=cookie)['body']['items'] if i['key'].startswith(('maintenance:','appointment:'))]
+        self.assertEqual(sorted(n['title'].split(' · ')[0] for n in notes),['Próximo mantenimiento programado','Solicitud de cita por confirmar'])
+        # Revertir la entrega cancela la previsión y su cita automática sin borrarlas; volver a entregar reactiva el registro con una cita nueva.
         post('listo');self.assertEqual(self.request('/api/maintenance',cookie=cookie)['body']['rows'][0]['state'],'cancelled')
-        self.assertIn('maintenance',post('entregado')['body'])
-        with app.connect() as c:self.assertEqual(c.execute('SELECT COUNT(*),MAX(generation) FROM maintenance').fetchone()[0],1)
-        # El cliente acepta: la cita real se reserva con disponibilidad verificada y queda vinculada a la previsión.
-        slot=self.request('/api/public/appointments/availability?date=%s&service=mantenimiento'%self.day())['body']['slots'][0]['time']
-        created=self.request('/api/appointments/new',self.booking(slot,client_id=str(row['client_id']),name=row['client'],phone=row['phone'],email='',device_type='portatil',brand='HP',model='ProBook',maintenance_id=str(row['id']),request_key='maintenance-flow-appt-00001'),cookie=cookie,csrf=csrf)
-        self.assertEqual((created['status'],created['body']['maintenance_linked']),(201,True))
+        second=post('entregado')['body']['maintenance']['appointment']
+        with app.connect() as c:
+            self.assertEqual(c.execute('SELECT COUNT(*) FROM maintenance').fetchone()[0],1)
+            self.assertEqual([(r['id'],r['status']) for r in c.execute('SELECT id,status FROM appointments ORDER BY id')],[(auto['id'],'cancelada'),(second['id'],'solicitada')])
+        # El taller confirma la cita propuesta: no se envía correo (no hay consentimiento registrado) y la previsión sigue vinculada.
+        confirmed=self.request('/api/appointments/%d'%second['id'],{'action':'confirmada'},cookie=cookie,csrf=csrf)
+        self.assertEqual(confirmed['status'],200)
         linked=self.request('/api/maintenance',cookie=cookie)['body']['rows'][0]
-        self.assertEqual((linked['state'],linked['appointment_status'],linked['appointment_code']),('appointment','confirmada',created['body']['code']))
+        self.assertEqual((linked['state'],linked['appointment_status'],linked['appointment_code']),('appointment','confirmada',second['public_code']))
+        created={'body':{'id':second['id']}}
+        slot=self.request('/api/public/appointments/availability?date=%s&service=mantenimiento'%self.day())['body']['slots'][0]['time']
         # Cancelar la cita devuelve la previsión a «programado»; completar otra la cierra.
         self.request('/api/appointments/%d'%created['body']['id'],{'action':'cancelada'},cookie=cookie,csrf=csrf)
         self.assertEqual((lambda r:(r['state'],r['appointment_start']))(self.request('/api/maintenance',cookie=cookie)['body']['rows'][0]),('scheduled',None))
@@ -147,7 +157,23 @@ class AgendaTests(unittest.TestCase):
         for action in ('presente','completada'):self.request('/api/appointments/%d'%again['id'],{'action':action},cookie=cookie,csrf=csrf)
         self.assertEqual(self.request('/api/maintenance',cookie=cookie)['body']['rows'][0]['state'],'completed')
         history=[h['comment'] for h in self.request('/api/orders/%d'%oid,cookie=cookie)['body']['order']['history']]
-        self.assertEqual(history.count('Cita de mantenimiento preventivo registrada.'),2)
+        self.assertEqual((history.count('Cita de mantenimiento preventivo registrada.'),sum(h.startswith('Cita de mantenimiento preventivo generada automáticamente') for h in history)),(1,2))
+
+    def test_staff_can_book_today_while_public_booking_starts_tomorrow(self):
+        cookie,csrf=self.login();today=appointments.now().date()
+        with app.connect() as c:c.execute("UPDATE appointment_hours SET start_time='00:00',end_time='23:59',enabled=1 WHERE weekday=?",(today.weekday(),))
+        public=self.request('/api/public/appointments/availability?date=%s&service=diagnostico'%today.isoformat())
+        self.assertEqual(public['status'],400)
+        staff=self.request('/api/appointments/availability?date=%s&service=diagnostico'%today.isoformat(),cookie=cookie)
+        self.assertEqual(staff['status'],200)
+        limit=(appointments.now()+timedelta(minutes=10)).strftime('%H:%M')
+        self.assertTrue(all(s['time']>limit for s in staff['body']['slots']))
+        self.assertEqual(self.request('/api/appointments/availability?date=%s&service=diagnostico'%today.isoformat())['status'],401)
+        if staff['body']['slots']:
+            made=self.request('/api/appointments/new',self.booking(staff['body']['slots'][0]['time'],date=today.isoformat(),service='diagnostico',email='',request_key='same-day-booking-00001'),cookie=cookie,csrf=csrf)
+            self.assertEqual(made['status'],201)
+            todays=self.request('/api/agenda?from=%s&to=%s'%(today.isoformat(),today.isoformat()),cookie=cookie)['body']
+            self.assertEqual(([a['public_code'] for a in todays['appointments']],todays['summary']['today']),([made['body']['code']],1))
 
     def test_client_is_emailed_with_saved_data_once_per_event(self):
         from unittest.mock import patch

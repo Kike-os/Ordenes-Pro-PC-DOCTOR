@@ -193,7 +193,7 @@ def build(c, user, now, mail_access=False):
                           'href': '#appointments?appointment=' + str(row['id']), 'action': 'Ver cita', 'sound': True, 'group': 'event'})
         # Mantenimientos preventivos: aviso de creación al entregar y recordatorios internos a 30, 15, 7 y 0 días.
         # Cada clave incluye mantenimiento, generación y umbral: se muestra una sola vez por plazo.
-        for row in c.execute("SELECT m.id,m.order_id,m.generation,m.due_date,m.delivered_at,m.state,o.code,cl.name client,d.brand,d.model FROM maintenance m JOIN orders o ON o.id=m.order_id JOIN devices d ON d.id=o.device_id JOIN clients cl ON cl.id=d.client_id WHERE m.state='scheduled' ORDER BY m.due_date LIMIT 60"):
+        for row in c.execute("SELECT m.id,m.order_id,m.generation,m.due_date,m.delivered_at,m.state,o.code,cl.name client,d.brand,d.model FROM maintenance m JOIN orders o ON o.id=m.order_id JOIN devices d ON d.id=o.device_id JOIN clients cl ON cl.id=d.client_id WHERE m.state IN ('scheduled','appointment') ORDER BY m.due_date LIMIT 60"):
             device = ' '.join(x for x in (row['brand'], row['model']) if x) or 'equipo'
             days = (appointments.date.fromisoformat(row['due_date']) - now.date()).days
             delivered = appointments.datetime.fromisoformat(row['delivered_at'])

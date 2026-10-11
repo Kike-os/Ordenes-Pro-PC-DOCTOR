@@ -59,3 +59,16 @@ Los avisos al cliente ya no dependen de la tarea programada: `local/appointment_
 - Si SMTP falla, la cita queda guardada y el detalle ofrece «Reintentar el envío». «Enviado» significa aceptado por el servidor de correo.
 - El panel «Citas de Hoy» del inicio se sincroniza por consulta cada 30 s (no hay conexión persistente) y muestra solo las citas activas de la fecha actual; una cita para otro día genera notificación pero no entra en ese panel.
 - Pendiente: comprobante PDF de la cita y revisión visual del correo en Gmail y Outlook con un buzón de prueba.
+
+## Cita automática del mantenimiento preventivo (1.5.34)
+
+Al confirmar la entrega de una orden se crea la previsión a seis meses **y su cita**, sin pasos manuales:
+
+- Estado inicial: «Pendiente de confirmación». No se envía ningún correo al cliente ni se registra consentimiento de comunicaciones.
+- Fecha propuesta: la fecha prevista del mantenimiento; si ese día no se atiende o no tiene horarios, el primer día laborable con espacio (hasta 45 días después). La fecha prevista del mantenimiento no cambia.
+- Hora propuesta: el primer horario libre del día según la configuración de la agenda; nunca la hora de la entrega.
+- No duplica: una previsión con cita activa conserva esa cita. Revertir la entrega cancela la previsión y su cita (quedan en el historial); volver a entregar genera una cita nueva.
+- Sin teléfono válido del cliente no se puede crear la cita: la previsión queda «Programado» con el botón «Agendar cita».
+- En Próximos Mantenimientos la tarjeta muestra «Ver cita» cuando hay cita vinculada. El color sigue la cercanía de la fecha (calculada en el servidor, America/Guayaquil) y es independiente del estado operativo.
+
+El personal puede registrar y reprogramar citas para **hoy** (`/api/appointments/availability`, solo horarios que empiezan dentro de más de 10 minutos). La reserva pública sigue empezando mañana.

@@ -89,18 +89,20 @@ def technicians(c,start,duration,exclude=None):
   clash=c.execute("SELECT 1 FROM appointments WHERE technician_id=? AND status NOT IN ('cancelada','completada','no_asistio') AND datetime(starts_at)<datetime(?) AND datetime(starts_at,'+'||duration_minutes||' minutes')>datetime(?)"+ignore,args).fetchone()
   if not clash and slot_open(c,start,duration):available.append(person['id'])
  return available
-def available_slots(c,day_text,service_code):
+def available_slots(c,day_text,service_code,staff=False):
+ # La reserva pública empieza mañana; el personal también puede registrar citas para hoy en los horarios que aún no pasan.
  try:day=date.fromisoformat(day_text)
  except (ValueError,TypeError):raise ValueError('Fecha no válida.')
- if day.isoformat()!=day_text or not now().date()<day<=now().date()+timedelta(days=90):raise ValueError('Elige una fecha entre mañana y los próximos 90 días.')
+ first=now().date() if staff else now().date()+timedelta(days=1)
+ if day.isoformat()!=day_text or not first<=day<=now().date()+timedelta(days=90):raise ValueError('Elige una fecha entre hoy y los próximos 90 días.' if staff else 'Elige una fecha entre mañana y los próximos 90 días.')
  service=c.execute('SELECT * FROM appointment_services WHERE code=? AND active=1',(service_code,)).fetchone()
  if not service:raise ValueError('Selecciona un servicio disponible.')
  hours=c.execute('SELECT * FROM appointment_hours WHERE weekday=?',(day.weekday(),)).fetchone()
  if not hours or not hours['enabled'] or c.execute('SELECT 1 FROM appointment_holidays WHERE day=?',(day.isoformat(),)).fetchone():return []
  cursor=datetime.combine(day,time.fromisoformat(hours['start_time']),TZ);finish=datetime.combine(day,time.fromisoformat(hours['end_time']),TZ);out=[]
  while cursor+timedelta(minutes=service['duration_minutes'])<=finish:
-  staff=technicians(c,cursor,service['duration_minutes'])
-  if staff:out.append({'time':cursor.strftime('%H:%M'),'technician_id':staff[0]})
+  free=technicians(c,cursor,service['duration_minutes']) if cursor>now()+timedelta(minutes=10) else []
+  if free:out.append({'time':cursor.strftime('%H:%M'),'technician_id':free[0]})
   cursor+=timedelta(minutes=30)
  return out
 def validate_booking(data,c):
@@ -162,6 +164,35 @@ def reschedule(c,row,start,user):
  c.execute('INSERT INTO appointment_events(appointment_id,actor_id,event,old_start,new_start,old_status,new_status,created_at) VALUES (?,?,?,?,?,?,?,?)',(row['id'],user['id'] if user else None,'rescheduled',old,stamp(start),oldstatus,'reprogramada',created))
  if row['email'] and row['communications_consent']:c.execute("INSERT OR IGNORE INTO appointment_notifications(appointment_id,generation,event,channel,result,created_at) VALUES (?,?,'rescheduled','email','pending',?)",(row['id'],generation,created))
  return {'ok':True,'starts_at':stamp(start)}
+def create_for_maintenance(c,mid,user=None):
+ """Cita automática del mantenimiento preventivo: se propone para la fecha prevista (o el primer día laborable con horario libre) y queda pendiente de confirmación.
+ No duplica: si la previsión ya tiene una cita activa devuelve esa. Sin teléfono del cliente o sin horarios en 45 días no se crea."""
+ row=c.execute("SELECT m.*,o.code,cl.id client_id,cl.name client,cl.phone,cl.email,cl.identification,COALESCE(NULLIF(d.kind,''),d.category) kind,d.brand,d.model FROM maintenance m JOIN orders o ON o.id=m.order_id JOIN devices d ON d.id=o.device_id JOIN clients cl ON cl.id=d.client_id WHERE m.id=?",(mid,)).fetchone()
+ if not row or row['state'] not in ('scheduled','appointment'):return None
+ if row['appointment_id']:
+  current=c.execute("SELECT id,public_code,starts_at,status FROM appointments WHERE id=? AND status NOT IN ('cancelada','no_asistio','completada')",(row['appointment_id'],)).fetchone()
+  if current:return dict(current)
+ phone=re.sub(r'\s+','',row['phone'] or '')
+ if not 7<=len(phone)<=30 or len(row['client'] or '')<2:return None
+ service=c.execute("SELECT * FROM appointment_services WHERE code='mantenimiento'").fetchone()
+ if not service:return None
+ day=max(date.fromisoformat(row['due_date']),now().date()+timedelta(days=1));start=technician=None
+ for _ in range(45):
+  hours=c.execute('SELECT * FROM appointment_hours WHERE weekday=?',(day.weekday(),)).fetchone()
+  if hours and hours['enabled'] and not c.execute('SELECT 1 FROM appointment_holidays WHERE day=?',(day.isoformat(),)).fetchone():
+   cursor=datetime.combine(day,time.fromisoformat(hours['start_time']),TZ);finish=datetime.combine(day,time.fromisoformat(hours['end_time']),TZ)
+   while cursor+timedelta(minutes=service['duration_minutes'])<=finish and start is None:
+    free=technicians(c,cursor,service['duration_minutes'])
+    if free:start=cursor;technician=free[0]
+    cursor+=timedelta(minutes=30)
+  if start:break
+  day+=timedelta(days=1)
+ if not start:return None
+ created=stamp(now());public='CIT-'+now().strftime('%Y%m%d')+'-'+secrets.token_hex(3).upper();kind=row['kind'] if row['kind'] in reception.DEVICE_TYPES else 'otro'
+ aid=c.execute("INSERT INTO appointments(public_code,manage_token_hash,client_id,technician_id,customer_name,identification,phone,email,device_type,brand,model,service_code,description,notes,starts_at,duration_minutes,status,privacy_consent,communications_consent,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'solicitada',1,0,?,?)",(public,token_hash(secrets.token_urlsafe(32)),row['client_id'],technician,row['client'],row['identification'] or '',phone,row['email'] or '',kind,row['brand'] or '',row['model'] or '','mantenimiento','Mantenimiento preventivo programado automáticamente tras la entrega de la orden '+row['code']+'.','Cita generada por el sistema. Fecha y hora propuestas: confirmar con el cliente.',stamp(start),service['duration_minutes'],created,created)).lastrowid
+ c.execute("INSERT INTO appointment_events(appointment_id,actor_id,event,new_start,new_status,created_at,detail) VALUES (?,?,?,?,?,?,?)",(aid,user['id'] if user else None,'created',stamp(start),'solicitada',created,'Generada automáticamente al entregar la orden '+row['code']))
+ c.execute("UPDATE maintenance SET appointment_id=?,state='appointment',updated_at=? WHERE id=?",(aid,now().isoformat(),mid))
+ return {'id':aid,'public_code':public,'starts_at':stamp(start),'status':'solicitada'}
 def admin_rows(c,start,end):
  return [dict(r) for r in c.execute("SELECT a.*,s.label service_label,u.name technician FROM appointments a JOIN appointment_services s ON s.code=a.service_code LEFT JOIN users u ON u.id=a.technician_id WHERE a.starts_at>=? AND a.starts_at<? ORDER BY a.starts_at,a.id",(start,end))]
 

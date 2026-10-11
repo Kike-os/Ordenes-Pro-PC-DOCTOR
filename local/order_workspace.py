@@ -85,6 +85,11 @@ def save(c,oid,data,user,now):
     c.execute('UPDATE orders SET '+','.join(k+'=?' for k in keys)+',updated_at=?,revision=revision+1 WHERE id=?',(*(fields[k] for k in keys),now.isoformat(timespec='microseconds'),oid))
     from maintenance import transition
     planned=transition(c,oid,row['status'],fields['status'],now)
+    if planned:
+        # Misma automatización que el cambio rápido de estado: la entrega deja creada la cita del mantenimiento.
+        import appointments
+        booked=appointments.create_for_maintenance(c,planned['id'],user)
+        if booked:event(c,oid,user['id'],now,'maintenance','Cita de mantenimiento preventivo generada automáticamente ('+booked['public_code']+').')
     columns=','.join(k+'_cents' for k in BUDGET_KEYS)
     c.execute('INSERT INTO order_budget(order_id,'+columns+') VALUES (?,?,?,?,?) ON CONFLICT(order_id) DO UPDATE SET '+','.join(k+'_cents=excluded.'+k+'_cents' for k in BUDGET_KEYS),(oid,*(fields[k+'_cents'] for k in BUDGET_KEYS)))
     if 'lines' in fields:

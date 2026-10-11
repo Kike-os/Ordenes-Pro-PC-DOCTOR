@@ -8,6 +8,27 @@
   },
   "releases": [
     {
+      "version": "1.5.34",
+      "date": "2026-10-11T18:12:29-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Citas para hoy desde el taller y cita automática del mantenimiento al entregar",
+      "changes": {
+        "features": [
+          "Al entregar una orden se crea automáticamente la cita del mantenimiento preventivo, pendiente de confirmación, vinculada a la orden, el cliente y el equipo; en día no laborable se propone el siguiente día con horario"
+        ],
+        "improvements": [
+          "Citas de Hoy: estado vacío con la próxima cita y accesos a Nueva cita y Ver agenda; el panel se pone al día con la agenda completa al cargar",
+          "Próximos Mantenimientos: colores según la cercanía de la fecha, barra de avance, estado operativo separado y botón Ver cita cuando ya existe la cita"
+        ],
+        "fixes": [
+          "Citas de Hoy: el personal ya puede registrar y reprogramar citas para el mismo día; antes el formulario interno solo aceptaba fechas desde mañana y ninguna cita nueva podía aparecer en el panel"
+        ],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.33",
       "date": "2026-10-11T17:56:18-05:00",
       "type": "patch",
