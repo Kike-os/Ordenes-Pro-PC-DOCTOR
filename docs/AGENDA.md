@@ -49,3 +49,13 @@ Los envía `local/appointments_cron.py` (cron del servidor) y requieren `SMTP_HO
 - Filtros: «Todos los programados», «Próximos 30 días», «Vencidos», «Con cita», «Realizados». Una fecha a seis meses no aparece en «Próximos 30 días».
 - Avisos internos, una sola vez por plazo: al crearse y al faltar 30, 15, 7 y 0 días.
 - Pendiente: recalcular la previsión al corregir una fecha de entrega, el enlace para que el cliente confirme por sí mismo y el envío automático de invitaciones.
+
+## Correos de citas al momento (actualización)
+
+Los avisos al cliente ya no dependen de la tarea programada: `local/appointment_mail.py` los envía en el mismo momento por el SMTP de Mail Pro, con los datos guardados en el servidor y una plantilla HTML clara (logo, código destacado, fecha y hora de Ecuador, equipo, servicio y estado).
+
+- Tipos: «Solicitud de cita recibida» (pendiente), «Cita técnica confirmada», «Cita técnica reprogramada» y «Cita técnica cancelada». Nunca se envía una confirmación mientras la cita esté pendiente.
+- Se envía solo si el cliente dejó un correo válido y autorizó comunicaciones. Un envío por tipo y versión de la cita (tabla `appointment_mail`, migración 028); el código de la cita no cambia al reprogramar.
+- Si SMTP falla, la cita queda guardada y el detalle ofrece «Reintentar el envío». «Enviado» significa aceptado por el servidor de correo.
+- El panel «Citas de Hoy» del inicio se sincroniza por consulta cada 30 s (no hay conexión persistente) y muestra solo las citas activas de la fecha actual; una cita para otro día genera notificación pero no entra en ese panel.
+- Pendiente: comprobante PDF de la cita y revisión visual del correo en Gmail y Outlook con un buzón de prueba.

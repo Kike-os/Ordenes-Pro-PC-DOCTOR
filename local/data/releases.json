@@ -8,6 +8,27 @@
   },
   "releases": [
     {
+      "version": "1.5.32",
+      "date": "2026-10-11T17:51:56-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Correos de citas al momento, Citas de Hoy en vivo y campana con aviso",
+      "changes": {
+        "features": [
+          "Correos de citas al momento por Mail Pro: solicitud recibida, confirmación, reprogramación y cancelación, con plantilla HTML, registro y reintento"
+        ],
+        "improvements": [
+          "Citas de Hoy: filas compactas con estado, contador, sincronización cada 30 segundos y apertura del detalle real",
+          "Campana de notificaciones: oscila una vez con halo azul al llegar un aviso nuevo; el contador no se mueve"
+        ],
+        "fixes": [
+          "Las pruebas automáticas ya no cargan el archivo de credenciales real"
+        ],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.31",
       "date": "2026-10-11T17:37:26-05:00",
       "type": "patch",

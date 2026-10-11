@@ -26,7 +26,7 @@ class SecurityTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.paths = patch.multiple(app, DATA=Path(self.temp.name), DB=Path(self.temp.name)/'test.sqlite3')
         self.paths.start()
-        self.env = patch.dict(app.os.environ, {'APP_URL':'http://127.0.0.1:8010','SESSION_SECURE':'false'})
+        self.env = patch.dict(app.os.environ, {'APP_URL':'http://127.0.0.1:8010','SESSION_SECURE':'false','MAIL_IMAP_HOST':'','MAIL_SMTP_HOST':'','MAIL_USERNAME':'','MAIL_PASSWORD':'','SMTP_HOST':'','SMTP_FROM':'','ANTHROPIC_API_KEY':'','OPENAI_API_KEY':''})
         self.env.start()
         app.migrate()
         with app.connect() as c:

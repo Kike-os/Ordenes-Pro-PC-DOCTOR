@@ -4,6 +4,23 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.32 — 2026-10-11 17:51 (UTC-05:00)
+
+Correos de citas al momento, Citas de Hoy en vivo y campana con aviso
+
+### Nuevas funcionalidades
+
+- Correos de citas al momento por Mail Pro: solicitud recibida, confirmación, reprogramación y cancelación, con plantilla HTML, registro y reintento
+
+### Mejoras realizadas
+
+- Citas de Hoy: filas compactas con estado, contador, sincronización cada 30 segundos y apertura del detalle real
+- Campana de notificaciones: oscila una vez con halo azul al llegar un aviso nuevo; el contador no se mueve
+
+### Errores corregidos
+
+- Las pruebas automáticas ya no cargan el archivo de credenciales real
+
 ## v1.5.31 — 2026-10-11 17:37 (UTC-05:00)
 
 Comprobante con Políticas de Reparaciones y envío por correo

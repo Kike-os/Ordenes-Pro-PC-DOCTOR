@@ -177,6 +177,8 @@ def detail(c,aid):
  data['notices']=[dict(r) for r in c.execute("SELECT event,channel,result,created_at,completed_at FROM appointment_notifications WHERE appointment_id=? ORDER BY id DESC",(aid,))]
  order=c.execute('SELECT id,code FROM orders WHERE id=?',(row['converted_order_id'],)).fetchone() if row['converted_order_id'] else None
  data['order']=dict(order) if order else None
+ import appointment_mail
+ data['mails']=appointment_mail.history(c,aid)
  return data
 def agenda(c,start,end):
  """Fuente única de la Agenda de Mantenimientos de Clientes: citas del período y su resumen."""

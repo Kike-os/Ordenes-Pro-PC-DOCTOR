@@ -188,9 +188,9 @@ def build(c, user, now, mail_access=False):
             when = appointments.datetime.fromisoformat(row['starts_at']).astimezone(appointments.TZ).strftime('%d/%m/%Y %H:%M')
             pending = row['status'] == 'solicitada'
             items.append({'key': 'appointment:' + str(row['id']), 'kind': 'warning' if pending else 'info', 'icon': 'calendar',
-                          'title': ('Solicitud de cita por confirmar · ' if pending else 'Nueva cita reservada · ') + row['public_code'],
+                          'title': ('Solicitud de cita por confirmar · ' if pending else 'Nueva cita registrada · ') + row['public_code'],
                           'detail': row['customer_name'] + ' · ' + row['service'] + ' · ' + when, 'at': row['created_at'],
-                          'href': '#appointments?appointment=' + str(row['id']), 'action': 'Ver cita', 'group': 'event'})
+                          'href': '#appointments?appointment=' + str(row['id']), 'action': 'Ver cita', 'sound': True, 'group': 'event'})
         # Mantenimientos preventivos: aviso de creación al entregar y recordatorios internos a 30, 15, 7 y 0 días.
         # Cada clave incluye mantenimiento, generación y umbral: se muestra una sola vez por plazo.
         for row in c.execute("SELECT m.id,m.order_id,m.generation,m.due_date,m.delivered_at,m.state,o.code,cl.name client,d.brand,d.model FROM maintenance m JOIN orders o ON o.id=m.order_id JOIN devices d ON d.id=o.device_id JOIN clients cl ON cl.id=d.client_id WHERE m.state='scheduled' ORDER BY m.due_date LIMIT 60"):

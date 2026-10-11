@@ -4,8 +4,13 @@ import unittest
 from wsgiref.util import setup_testing_defaults
 from wsgiref.validate import validator
 
+from unittest.mock import patch
+
 import test_app
-import wsgi_app
+import app
+# wsgi_app carga local/.env al importarse. En las pruebas no debe entrar ninguna credencial real (correo, IA…).
+with patch.object(app,'load_env'):
+    import wsgi_app
 
 
 class WSGITests(unittest.TestCase):

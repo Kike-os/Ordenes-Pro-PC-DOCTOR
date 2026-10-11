@@ -9,7 +9,7 @@ app.os.environ.setdefault('LOGIN_CAPTCHA','off')  # Las pruebas inician sesión 
 
 class AppointmentAndAdiTests(unittest.TestCase):
  def setUp(self):
-  self.temp=tempfile.TemporaryDirectory();self.paths=patch.multiple(app,DATA=Path(self.temp.name),DB=Path(self.temp.name)/'test.sqlite3');self.paths.start();self.env=patch.dict(app.os.environ,{'APP_URL':'http://127.0.0.1:8010','SESSION_SECURE':'false'});self.env.start();app.migrate()
+  self.temp=tempfile.TemporaryDirectory();self.paths=patch.multiple(app,DATA=Path(self.temp.name),DB=Path(self.temp.name)/'test.sqlite3');self.paths.start();self.env=patch.dict(app.os.environ,{'APP_URL':'http://127.0.0.1:8010','SESSION_SECURE':'false','MAIL_IMAP_HOST':'','MAIL_SMTP_HOST':'','MAIL_USERNAME':'','MAIL_PASSWORD':'','SMTP_HOST':'','SMTP_FROM':''});self.env.start();app.migrate()
   with app.connect() as c:
    self.admin=c.execute('INSERT INTO users(username,email,name,password_hash,role,created_at) VALUES (?,?,?,?,?,?)',('admin','a@example.invalid','Admin','hash','administrador',1)).lastrowid
    self.tech=c.execute('INSERT INTO users(username,email,name,password_hash,role,created_at) VALUES (?,?,?,?,?,?)',('tech','t@example.invalid','Tech','hash','tecnico',1)).lastrowid

@@ -149,6 +149,45 @@ class AgendaTests(unittest.TestCase):
         history=[h['comment'] for h in self.request('/api/orders/%d'%oid,cookie=cookie)['body']['order']['history']]
         self.assertEqual(history.count('Cita de mantenimiento preventivo registrada.'),2)
 
+    def test_client_is_emailed_with_saved_data_once_per_event(self):
+        from unittest.mock import patch
+        import mail_pro
+        cookie,csrf=self.login();sent=[]
+        config={'imap_host':'i','imap_port':993,'smtp_host':'s','smtp_port':465,'username':'taller@example.invalid','password':'x'}
+        with patch.object(mail_pro,'configured',return_value=True),patch.object(mail_pro,'settings',return_value=config),patch.object(mail_pro,'deliver',side_effect=lambda cfg,message,to:sent.append((message,to))):
+            self.request('/api/appointments/config',{'confirmation':'manual'},cookie=cookie,csrf=csrf)
+            slots=[s['time'] for s in self.request('/api/public/appointments/availability?date=%s&service=mantenimiento'%self.day())['body']['slots']]
+            pending=self.request('/api/public/appointments',self.booking(slots[0]))['body']
+            self.assertEqual((pending['status'],pending['mail'],len(sent)),('solicitada','sent',1))
+            message,to=sent[0];self.assertEqual(to,['agenda@example.invalid'])
+            self.assertEqual(message['Subject'],'Solicitud de cita recibida — '+pending['code']+' | PC-DOCTOR S.A.')
+            plain=message.get_body(preferencelist=('plain',)).get_content();page=message.get_body(preferencelist=('html',)).get_content()
+            for expected in ('pendiente de confirmación',pending['code'],'Cliente De Agenda','Consolas · Sony · PS5','Mantenimiento preventivo',slots[0]+' (hora de Ecuador)'):self.assertIn(expected,plain)
+            self.assertNotIn('confirmada para',plain);self.assertIn('cid:logo-pcdoctor',page);self.assertIn(pending['code'],page)
+            # El taller confirma: ahora sí sale la confirmación, una sola vez.
+            self.request('/api/appointments/%d'%pending['id'],{'action':'confirmada'},cookie=cookie,csrf=csrf)
+            self.request('/api/appointments/%d'%pending['id'],{'action':'confirmada'},cookie=cookie,csrf=csrf)
+            self.assertEqual([m['Subject'].split(' — ')[0] for m,_ in sent],['Solicitud de cita recibida','Cita técnica confirmada'])
+            self.assertIn('está confirmada para',sent[1][0].get_body(preferencelist=('plain',)).get_content())
+            # Reprogramar conserva el código y avisa con la nueva hora; cancelar avisa y libera.
+            moved=self.request('/api/appointments/%d'%pending['id'],{'action':'reschedule','starts_at':self.day()+'T'+slots[-1]+':00-05:00'},cookie=cookie,csrf=csrf)
+            self.assertEqual((moved['status'],moved['body']['mail']),(200,'sent'))
+            self.assertIn(slots[-1]+' (hora de Ecuador)',sent[2][0].get_body(preferencelist=('plain',)).get_content());self.assertIn(pending['code'],sent[2][0]['Subject'])
+            self.request('/api/appointments/%d'%pending['id'],{'action':'cancelada'},cookie=cookie,csrf=csrf)
+            self.assertEqual([m['Subject'].split(' — ')[0] for m,_ in sent],['Solicitud de cita recibida','Cita técnica confirmada','Cita técnica reprogramada','Cita técnica cancelada'])
+            detail=self.request('/api/appointments/%d'%pending['id'],cookie=cookie)['body']['appointment']
+            self.assertEqual([(m['kind'],m['result']) for m in detail['mails']],[('cancelled','sent'),('rescheduled','sent'),('confirmation','sent'),('request','sent')])
+            # Sin autorización o sin correo no se envía nada; un fallo de SMTP no pierde la cita y se puede reintentar.
+            quiet=self.request('/api/public/appointments',self.booking(slots[3],communications_consent=False,request_key='agenda-request-sinaviso-01'))['body']
+            nomail=self.request('/api/public/appointments',self.booking(slots[6],email='',request_key='agenda-request-sincorreo-1'))['body']
+            self.assertEqual((quiet['mail'],nomail['mail'],len(sent)),('no_consent','no_email',4))
+            with patch.object(mail_pro,'deliver',side_effect=mail_pro.MailError('conexion','sin conexión')):
+                failed=self.request('/api/public/appointments',self.booking(slots[9],request_key='agenda-request-fallo-smtp1'))
+            self.assertEqual((failed['status'],failed['body']['mail']),(201,'failed'))
+            self.assertEqual(self.request('/api/appointments/%d'%failed['body']['id'],{'action':'resend_mail'},cookie=cookie,csrf=csrf)['body']['mail'],'sent')
+            self.assertEqual(self.request('/api/appointments/%d'%failed['body']['id'],{'action':'resend_mail'},cookie=cookie,csrf=csrf)['body']['mail'],'sent')
+            self.assertEqual(len(sent),5)
+
     def test_services_are_managed_from_configuration(self):
         cookie,csrf=self.login();url='/api/appointments/config'
         created=self.request(url,{'new_service':{'label':'Mantenimiento de consola','duration_minutes':60}},cookie=cookie,csrf=csrf)

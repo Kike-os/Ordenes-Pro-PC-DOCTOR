@@ -44,6 +44,7 @@ import client_registry
 import client_import
 import maintenance
 import appointments
+import appointment_mail
 import adi
 import versioning
 import notifications
@@ -1010,8 +1011,8 @@ class Handler(BaseHTTPRequestHandler):
                     data['request_key']=key
                     status,payload=appointments.create(c,data)
                     if status==201:
-                        if payload.get('email'):
-                            pass
+                        # Correo al cliente con los datos guardados: solicitud recibida o cita confirmada, según el estado real.
+                        payload['mail']=appointment_mail.send(c,payload['id'],appointment_mail.kind_for(payload['status']))
                         return self.reply(status,payload)
                     return self.reply(status,payload)
                 if path == '/api/public/appointments/manage':
@@ -1023,12 +1024,14 @@ class Handler(BaseHTTPRequestHandler):
                         now=appointments.stamp(appointments.now());c.execute("UPDATE appointments SET status='cancelada',updated_at=? WHERE id=?",(now,row['id']))
                         c.execute("INSERT INTO appointment_events(appointment_id,event,old_start,old_status,new_status,created_at) VALUES (?,'cancelled',?,?,?,?)",(row['id'],row['starts_at'],row['status'],'cancelada',now))
                         if row['email'] and row['communications_consent']:c.execute("INSERT OR IGNORE INTO appointment_notifications(appointment_id,generation,event,channel,result,created_at) VALUES (?,?,'cancelled','email','pending',?)",(row['id'],row['generation'],now))
-                        return self.reply(200,{'ok':True,'status':'cancelada'})
+                        appointment_mail.send(c,row['id'],'cancelled');return self.reply(200,{'ok':True,'status':'cancelada'})
                     if data.get('action')=='reschedule':
                         if row['status'] in ('cancelada','completada','no_asistio'):return self.reply(409,{'error':'La cita ya está cerrada y no se puede reprogramar desde este enlace.'})
                         try:start=appointments.parse_start(str(data.get('starts_at','')))
                         except ValueError as error:return self.reply(400,{'error':str(error)})
-                        result=appointments.reschedule(c,row,start,None);return self.reply(200 if result.get('ok') else 409,result)
+                        result=appointments.reschedule(c,row,start,None)
+                        if result.get('ok'):appointment_mail.send(c,row['id'],'rescheduled')
+                        return self.reply(200 if result.get('ok') else 409,result)
                     return self.reply(400,{'error':'Acción de cita inválida.'})
                 if path == '/api/public/adi/message':
                     if limited(c,'adi-ip:'+digest(self.client_address[0]),30,300):return self.reply(429,{'error':'Espera un momento antes de enviar otro mensaje.'})
@@ -1398,6 +1401,7 @@ class Handler(BaseHTTPRequestHandler):
                     status,payload=appointments.create(c,dict(data,privacy_consent=True,communications_consent=data.get('communications_consent') is True),user)
                     if status==201:
                         payload.pop('manage_token',None);audit(c,user['id'],'appointment_created',payload['id'])
+                        payload['mail']=appointment_mail.send(c,payload['id'],appointment_mail.kind_for(payload['status']))
                         if str(data.get('maintenance_id','')).isdigit():payload['maintenance_linked']=maintenance.link_appointment(c,int(data['maintenance_id']),payload['id'],user,reception_now())
                     return self.reply(status,payload)
                 appointment_route=re.fullmatch(r'/api/appointments/([0-9]+)',path)
@@ -1411,10 +1415,17 @@ class Handler(BaseHTTPRequestHandler):
                     row=c.execute('SELECT * FROM appointments WHERE id=?',(int(appointment_route[1]),)).fetchone()
                     if not row:return self.reply(404,{'error':'Cita no disponible.'})
                     action=data.get('action');now=appointments.stamp(appointments.now())
+                    if action=='resend_mail':
+                        # Reintento expreso del último aviso que corresponde al estado actual de la cita.
+                        kind=appointment_mail.kind_for(row['status'])
+                        if not kind:return self.reply(409,{'error':'Esta cita no tiene un aviso pendiente para su estado actual.'})
+                        if limited(c,'appointment-mail:'+str(user['id']),limit=30,window=3600):return self.reply(429,{'error':'Alcanzaste el límite de reenvíos por hora.'})
+                        return self.reply(200,{'ok':True,'mail':appointment_mail.send(c,row['id'],kind,force=True)})
                     if action=='reschedule':
                         try:start=appointments.parse_start(str(data.get('starts_at','')))
                         except ValueError as error:return self.reply(400,{'error':str(error)})
                         result=appointments.reschedule(c,row,start,user);status=200 if result.get('ok') else 409;payload=result
+                        if status==200:payload['mail']=appointment_mail.send(c,row['id'],'rescheduled')
                     elif action in ('confirmada','presente','completada','no_asistio','cancelada'):
                         if action not in appointments.STATUSES:return self.reply(400,{'error':'Estado de cita inválido.'})
                         if row['status'] in ('cancelada','completada','no_asistio') and action not in ('confirmada',):return self.reply(409,{'error':'La cita ya está cerrada.'})
@@ -1426,6 +1437,8 @@ class Handler(BaseHTTPRequestHandler):
                         if action=='confirmada' and row['status']=='solicitada':appointments.queue_notice(c,row,'confirmation')
                         if action=='cancelada':appointments.queue_notice(c,row,'cancelled')
                         maintenance.appointment_changed(c,row['id'],action,reception_now())
+                        if action=='confirmada' and row['status']=='solicitada':payload_mail=appointment_mail.send(c,row['id'],'confirmation')
+                        elif action=='cancelada':payload_mail=appointment_mail.send(c,row['id'],'cancelled')
                         c.execute('INSERT INTO appointment_events(appointment_id,actor_id,event,old_start,new_start,old_status,new_status,created_at) VALUES (?,?,?,?,?,?,?,?)',(row['id'],user['id'],'status',row['starts_at'],row['starts_at'],row['status'],action,now));status=200;payload={'ok':True}
                     else:return self.reply(400,{'error':'Acción de cita inválida.'})
                     if status==200:audit(c,user['id'],'appointment_'+str(action),row['id'])
