@@ -8,6 +8,26 @@
   },
   "releases": [
     {
+      "version": "1.5.9",
+      "date": "2026-10-11T12:27:41-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Centro de Actividad, seguimiento de órdenes bajo los indicadores y aviso de versión rediseñado.",
+      "changes": {
+        "features": [
+          "Centro de Actividad: página nueva con resumen por categoría, pestañas, búsqueda, fecha, filas compactas y panel de detalles; los riesgos de infraestructura permanecen visibles hasta resolverse."
+        ],
+        "improvements": [
+          "Seguimiento de órdenes reubicado bajo los indicadores: tres últimos movimientos en horizontal, con el cambio real de estado («de X a Y»), responsable y actualización automática.",
+          "Aviso de versión nueva rediseñado (Smart Release): «Nueva versión disponible · Release X · Lista para cargar», con Actualizar ahora, Posponer y contador.",
+          "Indicador Release con icono dinámico por estado: capas, sincronización, flecha de versión nueva, visto de completada y alerta de error."
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.8",
       "date": "2026-10-11T10:36:23-05:00",
       "type": "patch",

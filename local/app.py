@@ -817,7 +817,8 @@ class Handler(BaseHTTPRequestHandler):
             if path in ('/api/dashboard','/api/activity','/api/maintenance'):
                 now=reception_now();today=now.date().isoformat()
                 if path=='/api/maintenance':return self.reply(200,{'rows':maintenance.rows(c),'today':today,'profiles':{k:v[0] for k,v in maintenance.PROFILES.items()}})
-                activity=[dict(r) for r in c.execute('SELECT h.*,o.code,u.name actor FROM order_history h JOIN orders o ON o.id=h.order_id LEFT JOIN users u ON u.id=h.actor_id ORDER BY h.id DESC LIMIT ?', (300 if path=='/api/activity' else 12,))]
+                # El estado anterior sale del propio historial de la orden; si no hay registro previo, queda vacío (no se inventa).
+                activity=[dict(r) for r in c.execute("SELECT h.*,o.code,u.name actor,(SELECT p.status_label FROM order_history p WHERE p.order_id=h.order_id AND p.id<h.id AND p.event IN ('status','created') AND p.status_label!='' ORDER BY p.id DESC LIMIT 1) previous_label FROM order_history h JOIN orders o ON o.id=h.order_id LEFT JOIN users u ON u.id=h.actor_id ORDER BY h.id DESC LIMIT ?", (12 if path!='/api/activity' or parse_qs(urlsplit(self.path).query).get('recent',[''])[0]=='1' else 300,))]
                 if path=='/api/activity':return self.reply(200,{'rows':activity})
                 counts={r['code']:r['total'] for r in c.execute('SELECT s.code,COUNT(o.id) total FROM statuses s LEFT JOIN orders o ON o.status=s.code GROUP BY s.code')}
                 source='orders o JOIN devices d ON d.id=o.device_id JOIN clients c ON c.id=d.client_id JOIN statuses s ON s.code=o.status'

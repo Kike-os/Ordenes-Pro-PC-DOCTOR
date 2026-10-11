@@ -39,6 +39,7 @@
 <section id="view-home" class="view operations-home">
 <header class="operations-heading"><div><span class="operations-kicker">PC-DOCTOR S.A. · GESTIÓN TÉCNICA</span><h1>Centro de operaciones</h1><p>Gestión, seguimiento y control de servicios técnicos</p></div><div class="operations-heading-tools"><time id="today"></time><div class="operations-actions"><button id="quick-client" class="secondary" type="button">Registrar cliente</button><button id="quick-order" class="primary" type="button">Nueva orden</button><button id="quick-appointment" class="secondary" type="button">Agendar cita</button></div></div></header>
 <div id="operations-states" class="operations-states" aria-label="Estados del taller"></div>
+<section class="operations-panel activity-panel tracking-pro" aria-labelledby="activity-title"><header><div><h2 id="activity-title">Seguimiento de órdenes</h2><p class="activity-sub">Últimos movimientos de las órdenes de reparación</p></div><span id="tracking-status" class="tracking-status" role="status"></span><a href="#activity">Ver historial</a></header><div id="operations-activity"></div></section>
 <div class="operations-columns">
 <div class="operations-column operations-primary">
 <section class="operations-panel attention-panel" aria-labelledby="attention-title"><header><h2 id="attention-title">Órdenes que requieren atención</h2><a href="#orders?active=1">Ver órdenes</a></header><div id="operations-attention" aria-live="polite"></div></section>
@@ -48,7 +49,7 @@
 <aside class="operations-column operations-sidebar" aria-label="Actividad, citas y asistencia">
 <section class="operations-panel appointments-panel" aria-labelledby="appointments-title"><header><h2 id="appointments-title">Citas de hoy</h2><a href="#appointments">Ver agenda</a></header><div id="home-appointments" aria-live="polite"></div></section>
 <section id="home-live-panel" class="operations-panel assistance-panel" aria-labelledby="assistance-title"><header><h2 id="assistance-title">Atención pendiente</h2><a id="home-live-link" href="#live">Abrir atención</a></header><div id="home-live-pending"></div></section>
-<section class="operations-panel activity-panel" aria-labelledby="activity-title"><header><div><h2 id="activity-title">Seguimiento de órdenes</h2><p class="activity-sub">Actividad y movimientos recientes del taller</p></div><a href="#activity">Ver más</a></header><div id="operations-activity"></div></section>
+
 </aside></div></section>
 <section id="view-module" class="view" hidden><a class="back-link" href="#home">← Volver al inicio</a><header class="module-heading"><div><span class="eyebrow">ESPACIO DE TRABAJO / PC-DOCTOR S.A.</span><h1 id="module-title" tabindex="-1"></h1><p id="module-description"></p></div><button id="module-add" class="primary" hidden>Agregar</button></header><div id="module-content"></div></section>
 <footer class="system-footer"><span>PC-DOCTOR S.A. <span class="footer-divider">/</span> Precisión en cada reparación.</span><span><span class="status-dot"></span>{{environment_label}}</span></footer></main>

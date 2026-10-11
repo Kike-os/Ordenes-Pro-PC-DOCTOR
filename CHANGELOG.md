@@ -4,6 +4,20 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.9 — 2026-10-11 12:27 (UTC-05:00)
+
+Centro de Actividad, seguimiento de órdenes bajo los indicadores y aviso de versión rediseñado.
+
+### Nuevas funcionalidades
+
+- Centro de Actividad: página nueva con resumen por categoría, pestañas, búsqueda, fecha, filas compactas y panel de detalles; los riesgos de infraestructura permanecen visibles hasta resolverse.
+
+### Mejoras realizadas
+
+- Seguimiento de órdenes reubicado bajo los indicadores: tres últimos movimientos en horizontal, con el cambio real de estado («de X a Y»), responsable y actualización automática.
+- Aviso de versión nueva rediseñado (Smart Release): «Nueva versión disponible · Release X · Lista para cargar», con Actualizar ahora, Posponer y contador.
+- Indicador Release con icono dinámico por estado: capas, sincronización, flecha de versión nueva, visto de completada y alerta de error.
+
 ## v1.5.8 — 2026-10-11 10:36 (UTC-05:00)
 
 Correos devueltos, Centro de Notificaciones compacto por categorías, Estado de actualizaciones y selector múltiple de correo.
