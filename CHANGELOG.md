@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.11 — 2026-10-11 12:43 (UTC-05:00)
+
+Seguimiento de órdenes con colores por estado y microanimaciones.
+
+### Mejoras realizadas
+
+- Seguimiento de órdenes con paleta por estado (línea lateral de color), iconos por actividad y efectos discretos al pasar el cursor y al registrarse un movimiento; misma posición y medidas.
+
 ## v1.5.10 — 2026-10-11 12:39 (UTC-05:00)
 
 Corrección del título «Centro de Operaciones».

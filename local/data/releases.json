@@ -8,6 +8,22 @@
   },
   "releases": [
     {
+      "version": "1.5.11",
+      "date": "2026-10-11T12:43:05-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Seguimiento de órdenes con colores por estado y microanimaciones.",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Seguimiento de órdenes con paleta por estado (línea lateral de color), iconos por actividad y efectos discretos al pasar el cursor y al registrarse un movimiento; misma posición y medidas."
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.10",
       "date": "2026-10-11T12:39:59-05:00",
       "type": "patch",
