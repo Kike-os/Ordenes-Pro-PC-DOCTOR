@@ -8,6 +8,26 @@
   },
   "releases": [
     {
+      "version": "1.5.46",
+      "date": "2026-10-11T22:24:23-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Adi lee la clave de OpenAI y el comprobante se envía desde el servidor",
+      "changes": {
+        "features": [
+          "Configuración: «Notificaciones automáticas por correo» con correo de prueba al buzón del sistema e historial de envíos con sus errores"
+        ],
+        "improvements": [
+          "Comprobante por correo: el servidor lo envía al guardar la orden, con el nuevo asunto y texto, y el PDF incluye las autorizaciones registradas"
+        ],
+        "fixes": [
+          "Adi: la clave de OpenAI se había guardado en el servidor con el nombre OPEN_API_KEY y no se leía; ahora se acepta también ese nombre"
+        ],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.45",
       "date": "2026-10-11T20:05:59-05:00",
       "type": "patch",

@@ -33,9 +33,14 @@ class AdiError(Exception):
         super().__init__(message);self.kind=kind;self.status=status
 
 
+def openai_key():
+    """Clave de OpenAI del servidor. Se acepta también OPEN_API_KEY, un nombre mal escrito frecuente al crear la variable."""
+    return os.getenv('OPENAI_API_KEY','').strip() or os.getenv('OPEN_API_KEY','').strip()
+
+
 def provider():
     if os.getenv('ANTHROPIC_API_KEY','').strip():return 'anthropic'
-    if os.getenv('OPENAI_API_KEY','').strip():return 'openai'
+    if openai_key():return 'openai'
     return ''
 
 
@@ -77,7 +82,7 @@ def _complete(system,user):
         text=''.join(part.get('text','') for part in data.get('content',[]) if isinstance(part,dict) and part.get('type')=='text');usage=data.get('usage') or {}
         return text.strip(),int(usage.get('input_tokens') or 0),int(usage.get('output_tokens') or 0)
     if name=='openai':
-        data=_post('https://api.openai.com/v1/responses',{'model':model(),'instructions':system,'input':user,'max_output_tokens':1500},{'Authorization':'Bearer '+os.environ['OPENAI_API_KEY'].strip()})
+        data=_post('https://api.openai.com/v1/responses',{'model':model(),'instructions':system,'input':user,'max_output_tokens':1500},{'Authorization':'Bearer '+openai_key()})
         parts=[part.get('text','') for item in data.get('output',[]) if item.get('type')=='message' for part in item.get('content',[]) if part.get('type')=='output_text'];usage=data.get('usage') or {}
         return ' '.join(parts).strip(),int(usage.get('input_tokens') or 0),int(usage.get('output_tokens') or 0)
     raise AdiError('configuracion','Adi no tiene un proveedor de IA configurado en el servidor.',503)

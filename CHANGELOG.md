@@ -4,6 +4,22 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.46 — 2026-10-11 22:24 (UTC-05:00)
+
+Adi lee la clave de OpenAI y el comprobante se envía desde el servidor
+
+### Nuevas funcionalidades
+
+- Configuración: «Notificaciones automáticas por correo» con correo de prueba al buzón del sistema e historial de envíos con sus errores
+
+### Mejoras realizadas
+
+- Comprobante por correo: el servidor lo envía al guardar la orden, con el nuevo asunto y texto, y el PDF incluye las autorizaciones registradas
+
+### Errores corregidos
+
+- Adi: la clave de OpenAI se había guardado en el servidor con el nombre OPEN_API_KEY y no se leía; ahora se acepta también ese nombre
+
 ## v1.5.45 — 2026-10-11 20:05 (UTC-05:00)
 
 Centro de Atención en Tiempo Real

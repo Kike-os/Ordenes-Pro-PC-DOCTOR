@@ -42,17 +42,17 @@ class ReceiptMailTests(unittest.TestCase):
             self.assertEqual((first['result'],first['recipient'],len(sent)),('sent','cliente@example.invalid',1))
             message,recipients=sent[0];self.assertEqual(recipients,['cliente@example.invalid'])
             code=self.request('/api/orders/%d'%oid,cookie=cookie)['body']['order']['code']
-            self.assertEqual(message['Subject'],'Confirmación de recepción — Orden '+code+' | PC-DOCTOR S.A.')
+            self.assertEqual(message['Subject'],'Confirmación de recepción de equipo | Orden N.º '+code)
             attachment=[part for part in message.iter_attachments()]
             self.assertEqual([(a.get_filename(),a.get_content_type()) for a in attachment],[('Comprobante-'+code+'.pdf','application/pdf')])
             self.assertTrue(attachment[0].get_payload(decode=True).startswith(b'%PDF'))
             body=message.get_body(preferencelist=('plain',)).get_content()
-            self.assertIn('Estimado/a Cliente Con Correo:',body);self.assertIn('nuestras Políticas de Reparaciones',body)
+            self.assertIn('Estimado/a Cliente Con Correo:',body);self.assertIn('su orden de reparación N.º '+code,body);self.assertIn('Departamento de Servicio Técnico',body)
             # Fallo de SMTP: se registra y la orden no se pierde ni se duplica.
             with patch.object(mail_pro,'deliver',side_effect=mail_pro.MailError('conexion','sin conexión')):
                 self.assertEqual(self.request(url,{'mode':'manual'},cookie=cookie,csrf=csrf)['body']['result'],'failed')
         detail=self.request('/api/orders/%d'%oid,cookie=cookie)['body']['order']
-        self.assertEqual([(r['mode'],r['result']) for r in detail['receipt_mail']['history']],[('manual','failed'),('manual','sent'),('manual','not_configured')])
+        self.assertEqual([(r['mode'],r['result']) for r in detail['receipt_mail']['history']],[('manual','failed'),('manual','sent'),('manual','not_configured'),('auto','not_configured')])
         self.assertTrue(detail['receipt_mail']['sent']);self.assertIn('Comprobante de recepción enviado por correo a cliente@example.invalid.',[h['comment'] for h in detail['history']])
         with app.connect() as c:
             self.assertEqual(c.execute('SELECT COUNT(*) FROM orders').fetchone()[0],1)
@@ -62,13 +62,32 @@ class ReceiptMailTests(unittest.TestCase):
     def test_auto_send_respects_missing_email_and_the_switch(self):
         cookie,csrf=self.login();calls=[]
         with patch.object(mail_pro,'configured',return_value=True),patch.object(mail_pro,'settings',return_value=CONFIG),patch.object(mail_pro,'deliver',side_effect=lambda *a:calls.append(a)):
-            no_mail=self.request('/api/orders',self.order_data({'client':'Cliente Sin Correo','email':'','problem':'Prueba','request_key':'receipt-mail-order-00002'}),cookie=cookie,csrf=csrf)['body']['id']
-            self.assertEqual(self.request('/api/orders/%d/receipt-mail'%no_mail,{'mode':'auto'},cookie=cookie,csrf=csrf)['body']['result'],'no_email')
+            # El servidor intenta el envío al guardar la orden y devuelve su resultado; repetirlo no duplica nada.
+            created=self.request('/api/orders',self.order_data({'client':'Cliente Sin Correo','email':'','problem':'Prueba','request_key':'receipt-mail-order-00002'}),cookie=cookie,csrf=csrf);no_mail=created['body']['id']
+            self.assertEqual((created['status'],created['body']['receipt_mail']['result']),(201,'no_email'))
+            self.assertEqual(self.request('/api/orders/%d/receipt-mail'%no_mail,{'mode':'auto'},cookie=cookie,csrf=csrf)['body']['result'],'already')
             self.assertEqual(self.request('/api/receipt-mail/settings',{'auto':False},cookie=cookie,csrf=csrf)['status'],200)
-            off=self.request('/api/orders',self.order_data({'client':'Cliente Dos','email':'dos@example.invalid','identification':'0100000025','problem':'Prueba','request_key':'receipt-mail-order-00003'}),cookie=cookie,csrf=csrf)['body']['id']
+            made=self.request('/api/orders',self.order_data({'client':'Cliente Dos','email':'dos@example.invalid','identification':'0100000025','problem':'Prueba','request_key':'receipt-mail-order-00003'}),cookie=cookie,csrf=csrf)['body'];off=made['id']
+            self.assertEqual(made['receipt_mail']['result'],'disabled')
             self.assertEqual(self.request('/api/orders/%d/receipt-mail'%off,{'mode':'auto'},cookie=cookie,csrf=csrf)['body']['result'],'disabled')
             self.request('/api/receipt-mail/settings',{'auto':True},cookie=cookie,csrf=csrf)
             self.assertEqual(self.request('/api/orders/%d/receipt-mail'%off,{'mode':'auto'},cookie=cookie,csrf=csrf)['body']['result'],'sent')
             self.assertEqual(self.request('/api/orders/%d/receipt-mail'%off,{'mode':'auto'},cookie=cookie,csrf=csrf)['body']['result'],'already')
         self.assertEqual(len(calls),1)
+        # Con el envío activo y correo válido, guardar la orden ya envía el comprobante: un solo mensaje, y si el correo falla la orden queda guardada.
+        with patch.object(mail_pro,'configured',return_value=True),patch.object(mail_pro,'settings',return_value=CONFIG),patch.object(mail_pro,'deliver',side_effect=lambda *a:calls.append(a)):
+            auto=self.request('/api/orders',self.order_data({'client':'Cliente Tres','email':'tres@example.invalid','identification':'0100000033','problem':'Prueba','request_key':'receipt-mail-order-00004'}),cookie=cookie,csrf=csrf)['body']
+            self.assertEqual((auto['receipt_mail']['result'],auto['receipt_mail']['recipient'],len(calls)),('sent','tres@example.invalid',2))
+            self.assertEqual(self.request('/api/orders/%d/receipt-mail'%auto['id'],{'mode':'auto'},cookie=cookie,csrf=csrf)['body']['result'],'already')
+        with patch.object(mail_pro,'configured',return_value=True),patch.object(mail_pro,'settings',return_value=CONFIG),patch.object(mail_pro,'deliver',side_effect=mail_pro.MailError('conexion','sin conexión')):
+            broken=self.request('/api/orders',self.order_data({'client':'Cliente Cuatro','email':'cuatro@example.invalid','identification':'0100000041','problem':'Prueba','request_key':'receipt-mail-order-00005'}),cookie=cookie,csrf=csrf)
+            self.assertEqual((broken['status'],broken['body']['receipt_mail']['result']),(201,'failed'))
+            self.assertEqual(self.request('/api/orders/%d'%broken['body']['id'],cookie=cookie)['body']['order']['receipt_mail']['history'][0]['result'],'failed')
+        # Prueba de configuración: va al buzón del sistema; historial solo para administración.
+        with patch.object(mail_pro,'configured',return_value=True),patch.object(mail_pro,'settings',return_value=CONFIG),patch.object(mail_pro,'deliver',side_effect=lambda config,message,recipients:calls.append(recipients)):
+            probe=self.request('/api/receipt-mail/settings',{'action':'test'},cookie=cookie,csrf=csrf)['body']
+            self.assertEqual((probe['result'],calls[-1]),('sent',[CONFIG['username']]))
+            log=self.request('/api/receipt-mail/history',cookie=cookie)['body']
+            self.assertEqual((log['sender'],[r['result'] for r in log['rows']][:2]),(CONFIG['username'],['failed','sent']))
+        self.assertEqual(self.request('/api/receipt-mail/history')['status'],401)
         self.assertEqual(self.request('/api/orders/999999/receipt-mail',{'mode':'manual'},cookie=cookie,csrf=csrf)['status'],404)

@@ -3570,3 +3570,6 @@ body[data-page=dashboard] .live-compose textarea{flex:1 1 auto;min-height:44px;m
 @media(max-width:760px){.live-console{grid-template-columns:1fr}.live-side{max-height:260px}.live-bubble{max-width:92%}.live-pro .live-bar .tracking-status{margin-left:0;flex-basis:100%}.live-compose button span{display:none}}
 @media(prefers-reduced-motion:reduce){.live-pro button.live-card{transition:none}.live-bubble.live-enter,.live-pro button.live-card.live-enter{animation:none}}
 .live-pro .live-mentioned button{margin:0;padding:4px 10px;border:1px solid #2a5aa8;border-radius:999px;background:#0e2242;color:#cfe2ff;font-size:11.5px;font-weight:600;cursor:pointer}.live-pro .live-mentioned button:hover{background:#15294a;color:#fff;transform:none}
+/* Configuración · notificaciones automáticas por correo */
+.receipt-mail-tools{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.receipt-mail-tools button{margin:0;min-height:34px;padding:6px 12px;font-size:12.5px}.receipt-mail-tools button[data-loading=true]{opacity:.7;cursor:progress}
+.receipt-mail-log{margin-top:10px}.receipt-mail-log[hidden]{display:none}.receipt-mail-log li[data-result=failed] strong{color:#ffb3ba}.receipt-mail-log li[data-result=sent] strong{color:#8fe0b4}

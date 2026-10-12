@@ -327,12 +327,13 @@ def send_receipt_mail(c,oid,user,mode):
     if not ready:
         log('not_configured','',email);return 200,{'result':'not_configured','message':'El correo del sistema no está configurado: el comprobante no se envió.'}
     pdf=render_receipt(order);sha=hashlib.sha256(pdf).hexdigest()
-    body=('Estimado/a '+order['client']+':\n\nLe confirmamos que su equipo ha sido registrado correctamente en nuestro sistema de servicio técnico.\n\n'
-          'Adjuntamos el comprobante de recepción correspondiente a la orden '+order['code']+', que incluye la información registrada del equipo y nuestras Políticas de Reparaciones.\n\n'
-          'Le recomendamos conservar este documento para futuras consultas.\n\nAtentamente,\n\nServicio Técnico\nPC-DOCTOR S.A.')
+    body=('Estimado/a '+order['client']+':\n\nLe confirmamos que su equipo ha sido recibido correctamente en nuestro centro de servicio técnico PC-DOCTOR S.A.\n\n'
+          'Adjuntamos el comprobante de recepción correspondiente a su orden de reparación N.º '+order['code']+'.\n\n'
+          'En este documento podrá consultar la información registrada del equipo, el servicio solicitado y las condiciones de recepción.\n\n'
+          'Gracias por confiar en nuestro servicio técnico.\n\nAtentamente,\n\nDepartamento de Servicio Técnico\nPC-DOCTOR S.A.\nwww.ecuadorpcdoctor.com')
     try:
         config=mail_pro.settings();card=mail_signature_card(c)
-        message,recipients=mail_pro.build_message(config,{'to':email,'subject':'Confirmación de recepción — Orden '+order['code']+' | PC-DOCTOR S.A.','body':body,'from_name':corporate.settings()['name'],
+        message,recipients=mail_pro.build_message(config,{'to':email,'subject':'Confirmación de recepción de equipo | Orden N.º '+order['code'],'body':body,'from_name':corporate.settings()['name'],
             'attachments':[{'name':'Comprobante-'+order['code']+'.pdf','type':'application/pdf','data':base64.b64encode(pdf).decode()}]},card if card.get('enabled') else '')
         mail_pro.deliver(config,message,recipients)
     except mail_pro.MailError as error:
@@ -640,7 +641,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(200,{'writing':adi_ai.status(c),'today':usage,'channels':{'mail':mail_allowed(user),'web_chat':True,'whatsapp':False},'receipt_mail_auto':not (auto_receipt and auto_receipt['value']=='off')})
             if path == '/api/adi/admin':
                 if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede usar la asistente administrativa.'})
-                return self.reply(200,{'enabled':bool(os.getenv('OPENAI_API_KEY')),'message':'Adi responde consultas operativas desde datos autorizados.','live':adi.snapshot(c,reception_now())})
+                return self.reply(200,{'enabled':bool(adi_ai.openai_key()),'message':'Adi responde consultas operativas desde datos autorizados.','live':adi.snapshot(c,reception_now())})
             adi_conversation=re.fullmatch(r'/api/adi/conversations(?:/([0-9]+))?',path)
             if adi_conversation:
                 if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede usar la asistente administrativa.'})
@@ -668,6 +669,13 @@ class Handler(BaseHTTPRequestHandler):
             if path == '/api/me':
                 prefs=c.execute('SELECT value FROM system_state WHERE key=?',('mail_prefs:'+str(user['id']),)).fetchone() if mail_allowed(user) else None
                 return self.reply(200, {'user':dict(user,mail=mail_allowed(user),mail_prefs=json.loads(prefs['value']) if prefs else None,mail_signature=mail_signature_card(c) if mail_allowed(user) else None,storage='cloud' if remote_db.configured() else 'local'),'server_time':time.time()})
+            if path == '/api/receipt-mail/history':
+                # Últimos envíos de comprobantes (todas las órdenes), para revisar resultados y errores.
+                if user['role']!='administrador':return self.reply(403,{'error':'Acceso no permitido.'})
+                rows=[dict(r) for r in c.execute('SELECT m.order_id,o.code,m.mode,m.recipient,m.result,m.detail,m.created_at,u.name actor FROM order_receipt_mail m JOIN orders o ON o.id=m.order_id LEFT JOIN users u ON u.id=m.actor_id ORDER BY m.id DESC LIMIT 30')]
+                try:sender=mail_pro.settings()['username'] if mail_pro.configured() else ''
+                except mail_pro.MailError:sender=''
+                return self.reply(200,{'rows':rows,'sender':sender,'configured':bool(sender)})
             if path == '/api/order-draft':
                 # Borrador de Nueva orden del propio usuario.
                 return self.reply(200,{'draft':order_drafts.read(c,user)})
@@ -1695,6 +1703,17 @@ class Handler(BaseHTTPRequestHandler):
                 receipt_route=re.fullmatch(r'/api/orders/([0-9]+)/receipt-mail',path)
                 if receipt_route or path=='/api/receipt-mail/settings':
                     if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
+                    if not receipt_route and data.get('action')=='test':
+                        # Correo de prueba: va al propio buzón del sistema, nunca a un cliente.
+                        if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede enviar la prueba.'})
+                        if limited(c,'receipt-mail-test:'+str(user['id']),limit=6,window=3600):return self.reply(429,{'error':'Alcanzaste el límite de pruebas por hora.'})
+                        try:
+                            if not mail_pro.configured():return self.reply(200,{'result':'not_configured','message':'El correo del sistema no está configurado en el servidor.'})
+                            config=mail_pro.settings();message,recipients=mail_pro.build_message(config,{'to':config['username'],'subject':'Prueba de notificaciones automáticas | Órdenes Pro','body':'Este es un correo de prueba enviado desde Configuración → Notificaciones automáticas por correo.\n\nSi lo recibes en el buzón del sistema, el envío de comprobantes está operativo.','from_name':corporate.settings()['name']},'')
+                            mail_pro.deliver(config,message,recipients)
+                        except mail_pro.MailError as error:
+                            audit(c,user['id'],'receipt_mail_test_failed');return self.reply(200,{'result':'failed','message':'La prueba no se envió: '+str(error)})
+                        audit(c,user['id'],'receipt_mail_test_sent');return self.reply(200,{'result':'sent','recipient':config['username'],'message':'Prueba enviada a '+config['username']+'. El servidor de correo aceptó el mensaje.'})
                     if not receipt_route:
                         if user['role']!='administrador' or data.get('auto') not in (True,False):return self.reply(403 if user['role']!='administrador' else 400,{'error':'No se pudo cambiar la configuración.'})
                         c.execute("INSERT INTO system_state(key,value) VALUES ('receipt_mail_auto',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",('on' if data['auto'] else 'off',))
@@ -1848,7 +1867,11 @@ class Handler(BaseHTTPRequestHandler):
                         if c.execute('SELECT changes()').fetchone()[0]!=1:return self.reply(409,{'error':'La cita ya fue convertida en otra orden.'})
                         c.execute("INSERT INTO appointment_events(appointment_id,actor_id,event,new_status,created_at,detail) VALUES (?,?,'converted','completada',?,?)",(linked_appointment['id'],user['id'],received.isoformat(timespec='microseconds'),'Orden '+code))
                     audit(c, user['id'], 'order_created', oid)
-                    return self.reply(201, {'ok':True,'id':oid,'code':code})
+                    # La orden queda guardada antes de intentar el correo: si el envío falla, la orden permanece y se puede reenviar.
+                    c.commit();receipt=None
+                    try:receipt=send_receipt_mail(c,oid,user,'auto')[1]
+                    except Exception as error:print('receipt-mail auto',type(error).__name__,flush=True)
+                    return self.reply(201, {'ok':True,'id':oid,'code':code,'receipt_mail':receipt})
             return self.reply(404, {'error':'Recurso no disponible.'})
         except (ValueError, json.JSONDecodeError):
             self.reply(400, {'error':'Solicitud inválida.'})

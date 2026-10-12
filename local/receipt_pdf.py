@@ -157,6 +157,18 @@ def render_receipt(order):
     section('Motivo de ingreso')
     item('Problema reportado por el cliente',order['problem'])
     if order.get('customer_notes'):item('Observaciones autorizadas de recepción',order['customer_notes'])
+    # Autorizaciones registradas en la recepción: lo que consta, sin atribuir decisiones que no se tomaron.
+    access=order.get('access_authorization');risk=order.get('destructive_authorization')
+    if access or risk:
+        section('Autorizaciones registradas')
+        if access:
+            scopes={'operating_system':'acceso al sistema operativo','signed_in_tests':'pruebas con sesión iniciada','specific_files':'acceso a archivos autorizados','backup':'respaldo de información'}
+            granted=[label for key,label in scopes.items() if access['permissions'].get(key)]
+            item('Acceso técnico',('AUTORIZADO: '+'; '.join(granted) if access['decision']=='authorized' else 'NO AUTORIZADO')+'.')
+            if access.get('justification'):item('Archivos y finalidad',access['justification'])
+        if risk:
+            item('Operaciones que modifican o eliminan datos','AUTORIZACIÓN ESPECÍFICA REGISTRADA.' if risk['decision']=='authorized' else 'NO AUTORIZADAS.')
+            if risk['decision']=='authorized' and risk.get('justification'):item('Alcance autorizado',risk['justification'])
     if order.get('_service') and order.get('technician_notes'):item('Observaciones internas de recepción',order['technician_notes'])
     if order.get('_service'):
         section('Seguimiento técnico interno')

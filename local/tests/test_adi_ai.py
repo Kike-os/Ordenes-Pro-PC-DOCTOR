@@ -65,3 +65,9 @@ class AdiWritingTests(unittest.TestCase):
             self.assertEqual(self.request('/api/adi/settings',{'writing':True},cookie=cookie,csrf=csrf)['status'],200)
         with patch.dict(app.os.environ,{'ANTHROPIC_API_KEY':'','OPENAI_API_KEY':'k2'}),patch.object(adi_ai,'_post',return_value={'output':[{'type':'message','content':[{'type':'output_text','text':GOOD}]}],'usage':{'input_tokens':5,'output_tokens':6}}) as post:
             self.assertEqual(self.request('/api/adi/write',data,cookie=cookie,csrf=csrf)['body']['suggestion'],GOOD);self.assertEqual(post.call_args[0][0],'https://api.openai.com/v1/responses')
+
+    def test_misnamed_openai_variable_is_accepted(self):
+        with patch.dict(app.os.environ,{'ANTHROPIC_API_KEY':'','OPENAI_API_KEY':'','OPEN_API_KEY':'clave-mal-nombrada'}):
+            self.assertEqual((adi_ai.provider(),adi_ai.openai_key()),('openai','clave-mal-nombrada'))
+        with patch.dict(app.os.environ,{'ANTHROPIC_API_KEY':'','OPENAI_API_KEY':'','OPEN_API_KEY':''}):
+            self.assertEqual(adi_ai.provider(),'')

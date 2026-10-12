@@ -28,3 +28,6 @@ Fase 2: Mail Pro y mensajes a clientes. Fase 3: respuestas sugeridas con base de
 ## Archivos
 
 `local/adi_ai.py`, rutas `/api/adi/status`, `/api/adi/write`, `/api/adi/settings` en `local/app.py`, `attachAdi` en `local/static/app.js`, pruebas en `local/tests/test_adi_ai.py`.
+
+
+Desde la 1.5.46 el servidor acepta también la variable `OPEN_API_KEY` (nombre mal escrito frecuente) como clave de OpenAI. El nombre correcto sigue siendo `OPENAI_API_KEY`.

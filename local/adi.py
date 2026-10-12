@@ -115,7 +115,8 @@ def admin_reply(c,text,now):
  return {'answer':'Puedo responder con datos reales del sistema sobre: resumen del taller, órdenes en espera, en proceso, vencidas, listas para entregar o por número (PCD-…), presupuestos, recibidas o entregadas hoy, citas de hoy o mañana, mantenimientos, clientes y solicitudes de cuenta. No ejecuto cambios: esos se hacen en cada módulo.','links':[],'source':'guia'}
 
 def ask(text,admin=False,context=None):
- api_key=os.getenv('OPENAI_API_KEY','').strip()
+ import adi_ai
+ api_key=adi_ai.openai_key()
  if not api_key:return None
  payload={'model':os.getenv('OPENAI_MODEL','gpt-4.1-mini'),'instructions':SYSTEM_ADMIN if admin else SYSTEM_PUBLIC,'input':text[:3000],'max_output_tokens':350}
  if context:payload['instructions']+=' Contexto validado del sistema: '+str(context)[:3500]
