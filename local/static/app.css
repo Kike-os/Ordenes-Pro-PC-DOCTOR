@@ -4264,3 +4264,9 @@ body[data-page=dashboard] button[aria-label^="Cerrar"]:not(#logout):not(.primary
 #adi-widget.adi-v2 .adi-start:hover,#adi-widget.adi-v2 .adi-start:focus-visible{background:#4a2040;border-color:#ffb3d4;outline:0}
 #adi-widget.adi-v2 .adi-voice-sample{display:block;width:100%;margin:6px 0 0;padding:7px 10px;border:1px solid #ff9ecb66;border-radius:8px;background:#3a1b33;color:#ffd3e6;font-size:12px;text-align:center;cursor:pointer}
 #adi-widget.adi-v2 .adi-voice-sample:hover{background:#4a2040}
+/* ADI: velocidad de voz y control para interrumpirla. */
+#adi-widget.adi-v2 .adi-voice-speed input[type=range]{width:100%;margin:4px 0 0;padding:0;accent-color:#ff9ecb}
+#adi-widget.adi-v2 .adi-voice-speed b{font-weight:600;color:#ffd3e6}
+#adi-widget.adi-v2 .adi-voice[data-speaking=true]{color:#ffb3d4;animation:adi-voice-live 1s ease-in-out infinite}
+@keyframes adi-voice-live{50%{opacity:.55}}
+@media(prefers-reduced-motion:reduce){#adi-widget.adi-v2 .adi-voice[data-speaking=true]{animation:none}}

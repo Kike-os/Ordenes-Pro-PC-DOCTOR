@@ -4,6 +4,22 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.97 — 2026-10-12 14:04 (UTC-05:00)
+
+Voz de ADI: velocidad, pronunciación del nombre y fluidez
+
+### Nuevas funcionalidades
+
+- Mientras ADI habla, el botón de voz la interrumpe; nueva frase de muestra de voz y preferencia por voz femenina también en el asistente interno.
+
+### Mejoras realizadas
+
+- Voz de ADI más fluida: velocidad inicial de 1,12× ajustable desde su menú, lectura por frases que empieza en cuanto llega la respuesta y sin pausas por símbolos.
+
+### Errores corregidos
+
+- ADI pronuncia «PC-DOCTOR S.A.» como «Pe ce dóctor, ese a» sin leer guiones; el nombre oficial no cambia en pantalla, documentos ni registros.
+
 ## v1.5.96 — 2026-10-12 13:59 (UTC-05:00)
 
 Esfera rosa de ADI con estados reales y muestra de voz

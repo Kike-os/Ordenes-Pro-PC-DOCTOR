@@ -8,6 +8,26 @@
   },
   "releases": [
     {
+      "version": "1.5.97",
+      "date": "2026-10-12T14:04:50-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Voz de ADI: velocidad, pronunciación del nombre y fluidez",
+      "changes": {
+        "features": [
+          "Mientras ADI habla, el botón de voz la interrumpe; nueva frase de muestra de voz y preferencia por voz femenina también en el asistente interno."
+        ],
+        "improvements": [
+          "Voz de ADI más fluida: velocidad inicial de 1,12× ajustable desde su menú, lectura por frases que empieza en cuanto llega la respuesta y sin pausas por símbolos."
+        ],
+        "fixes": [
+          "ADI pronuncia «PC-DOCTOR S.A.» como «Pe ce dóctor, ese a» sin leer guiones; el nombre oficial no cambia en pantalla, documentos ni registros."
+        ],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.96",
       "date": "2026-10-12T13:59:04-05:00",
       "type": "patch",

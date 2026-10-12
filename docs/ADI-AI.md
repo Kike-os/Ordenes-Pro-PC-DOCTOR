@@ -105,3 +105,13 @@ Sustituye a la propuesta con «Aceptar / Descartar» de la 1.5.60, a petición d
 - Estados ligados a señales reales: **disponible** (respiración), **escuchando** (anillos mientras el reconocimiento de voz está activo, más intensos cuando el navegador detecta voz: `speechstart`/`speechend`), **procesando** (ondas rápidas mientras hay una petición en curso), **hablando** (pulso mientras la síntesis de voz reproduce) y **error** (aro rojo discreto junto al mensaje en el chat).
 - Voz: se elige una voz femenina en español del dispositivo, con preferencia por la colombiana; depende de las voces instaladas en cada equipo o teléfono. En el menú «⋯» se puede elegir la voz y pulsar «Escuchar muestra de voz». Saludo de muestra: «Bienvenido a Órdenes Pro. Soy Adi, tu asistente virtual. ¿En qué puedo ayudarte?». La voz nunca se reproduce sola.
 - Ventana: detalles rosados, «Comenzar conversación» mientras no hay mensajes, minimizar y cerrar; el historial se conserva.
+
+## Voz de ADI: motor, velocidad y pronunciación
+
+- **Motor**: la síntesis de voz del navegador (Web Speech API). No se usa ningún servicio de voz en la nube; la voz, su acento y su naturalidad dependen de las voces instaladas en cada equipo o teléfono. Se elige una femenina en español, con preferencia por la colombiana.
+- **Velocidad**: 1,12× por defecto, ajustable de 0,80× a 1,50× en el menú «⋯» del chat (y en los ajustes de voz del asistente interno). Se guarda en el navegador.
+- **Pronunciación**: el texto que se lee pasa por una representación fonética independiente: «PC-DOCTOR S.A.» se pronuncia «Pe ce dóctor, ese a», «ADI» como «Adi» y los números de orden como «orden N». Lo visible, los documentos y los registros conservan el nombre oficial.
+- **Fluidez**: la respuesta se lee en cuanto llega con el envío del mensaje (sin una segunda consulta previa) y por frases, de modo que la voz empieza de inmediato y los navegadores no cortan respuestas largas. Se eliminan símbolos que generan pausas.
+- **Una sola voz a la vez**: cada lectura cancela la anterior. Mientras ADI habla, el botón de voz la interrumpe sin desactivar la lectura.
+- **Muestra**: «Escuchar muestra de voz» lee «Hola, bienvenido a PC-DOCTOR S.A. Soy ADI, tu asistente virtual de Órdenes Pro. Estoy aquí para ayudarte con tus órdenes de reparación, citas técnicas y consultas.»
+- **Límites del motor**: no hay audio progresivo del proveedor de IA (la respuesta de texto llega completa, no en flujo) ni control fino de entonación; una voz idéntica en todos los dispositivos requeriría un servicio de voz externo.
