@@ -320,12 +320,18 @@ class SecurityTests(unittest.TestCase):
         import versioning
         current=versioning.load()['releases'][0]['version']
         page=self.request('/login')['body']
-        self.assertIn('Release '+current+'<span class="release-dot"',page);self.assertNotIn('has-update',page);self.assertNotIn('{{',page)
-        with app.connect() as c:c.execute("INSERT INTO system_state VALUES ('available_update',?)",(json.dumps({'version':'99.0.0','date':'2026-01-02T10:00:00-05:00','summary':''}),))
-        waiting=self.request('/login')['body']
-        self.assertIn('class="login-version has-update"',waiting);self.assertIn('Actualización disponible · v99.0.0',waiting)
-        with app.connect() as c:c.execute("UPDATE system_state SET value=? WHERE key='available_update'",(json.dumps({'version':'0.0.1','date':'','summary':''}),))
-        self.assertNotIn('has-update',self.request('/login')['body'])
+        self.assertIn('Versión del sistema',page);self.assertIn('<strong>v'+current+'</strong>',page);self.assertIn('data-state="checking"',page);self.assertNotIn('Release',page);self.assertNotIn('{{',page)
+        # El estado no viene escrito en la página: lo da el servidor al comprobar la versión desplegada contra el registro publicado.
+        with patch.object(versioning,'registry_url',return_value=''):
+            status=self.request('/api/public/version')['body']
+        self.assertEqual((status['version'],status['state'],status['latest']),(current,'updated',current));self.assertTrue(status['notes'])
+        newer={'unreleased':{},'releases':[dict(versioning.load()['releases'][0],version='99.0.0',type='minor')]+versioning.load()['releases']}
+        with patch.object(versioning,'registry_url',return_value='https://example.invalid/r.json'),patch.object(versioning,'fetch_published',return_value=newer):
+            self.assertEqual(self.request('/api/public/version')['body']['state'],'updated')  # dentro de los 20 minutos se usa la comprobación guardada
+            found=self.request('/api/public/version?refresh=1')['body']
+        self.assertEqual((found['state'],found['latest'],found['version']),('important','99.0.0',current))
+        with patch.object(versioning,'registry_url',return_value='https://example.invalid/r.json'),patch.object(versioning,'fetch_published',side_effect=versioning.RegistryError('x')):
+            self.assertEqual(self.request('/api/public/version?refresh=1')['body']['state'],'error')
         news=self.request('/novedades')
         self.assertEqual(news['status'],200)
         self.assertIn('<span>v'+current+'</span><em>Última versión</em>',news['body'])

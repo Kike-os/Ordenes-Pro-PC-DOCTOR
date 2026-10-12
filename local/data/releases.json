@@ -8,6 +8,26 @@
   },
   "releases": [
     {
+      "version": "1.5.106",
+      "date": "2026-10-12T17:56:25-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Acceso rediseñado y «Versión del sistema» con comprobación real",
+      "changes": {
+        "features": [
+          "«Versión del sistema» sustituye a «Release»: versión instalada, fecha de publicación y estado comprobado en el servidor (actualizado, actualización disponible o importante, error con reintento, o recarga necesaria).",
+          "Ventana «Ver novedades» con las notas de la versión por categorías, compatibilidad y acceso al historial de versiones."
+        ],
+        "improvements": [
+          "Pantalla de acceso con nuevas proporciones: tarjeta de 440 px, logo de 105 px, título de 26 px, campos y botón de 48 px y menos espacios vacíos.",
+          "Se retiró la casilla «Auto» de la ventana de nueva orden."
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.105",
       "date": "2026-10-12T17:49:12-05:00",
       "type": "patch",

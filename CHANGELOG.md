@@ -4,6 +4,20 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.106 — 2026-10-12 17:56 (UTC-05:00)
+
+Acceso rediseñado y «Versión del sistema» con comprobación real
+
+### Nuevas funcionalidades
+
+- «Versión del sistema» sustituye a «Release»: versión instalada, fecha de publicación y estado comprobado en el servidor (actualizado, actualización disponible o importante, error con reintento, o recarga necesaria).
+- Ventana «Ver novedades» con las notas de la versión por categorías, compatibilidad y acceso al historial de versiones.
+
+### Mejoras realizadas
+
+- Pantalla de acceso con nuevas proporciones: tarjeta de 440 px, logo de 105 px, título de 26 px, campos y botón de 48 px y menos espacios vacíos.
+- Se retiró la casilla «Auto» de la ventana de nueva orden.
+
 ## v1.5.105 — 2026-10-12 17:49 (UTC-05:00)
 
 Esfera viva y ventana premium de ADI

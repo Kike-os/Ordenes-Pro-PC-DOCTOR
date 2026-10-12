@@ -710,6 +710,9 @@ class Handler(BaseHTTPRequestHandler):
         # Con una versión posterior detectada, el indicador lo señala antes de iniciar sesión.
         content = content.replace('{{release_class}}',' has-update' if pending else '').replace('{{release_aria}}',', actualización disponible '+html.escape(pending) if pending else '').replace('{{release_note}}','<span class="release-pending">Actualización disponible · v'+html.escape(pending)+'</span>' if pending else '')
         content = content.replace('{{app_version}}',html.escape(installed))
+        try:published=versioning.load()['releases'][0]['date'][:10];published='/'.join(reversed(published.split('-')))
+        except (versioning.RegistryError,IndexError,KeyError):published=''
+        content = content.replace('{{app_date}}',html.escape(published))
         content = content.replace('{{evaluation_notice}}', notice).replace('{{environment_label}}', 'Servicio técnico' if production_enabled() else 'Evaluación local · Usa datos ficticios')
         self.reply(200, content, 'text/html; charset=utf-8')
 
@@ -748,6 +751,28 @@ class Handler(BaseHTTPRequestHandler):
                 company=corporate.settings();content=(ROOT/'templates'/'privacy.html').read_text()
                 for key,value in (('company',company['name']),('whatsapp',company['whatsapp']),('support_email',company['support_email'])):content=content.replace('{{'+key+'}}',html.escape(value,quote=True))
                 return self.reply(200,content,'text/html; charset=utf-8')
+            if path == '/api/public/version':
+                # Estado real de la versión, sin sesión: la instalada (la del código desplegado) frente al registro publicado. Solo expone notas ya públicas.
+                # La comprobación se guarda 20 minutos para no consultar el registro en cada visita; «refresh=1» la repite (con límite).
+                try:registry=versioning.load();installed=registry['releases'][0]
+                except (versioning.RegistryError,IndexError):return self.reply(503,{'error':'No se pudo leer la versión instalada.'})
+                now=reception_now();cached=None;refresh=parse_qs(urlsplit(self.path).query).get('refresh',[''])[0]=='1'
+                try:
+                    row=c.execute("SELECT value FROM system_state WHERE key='public_version_check'").fetchone();cached=json.loads(row['value']) if row else None
+                except (ValueError,TypeError):cached=None
+                fresh=cached and cached.get('installed')==installed['version'] and cached.get('at','')>(now-appointments.timedelta(minutes=20)).isoformat(timespec='seconds')
+                if refresh and limited(c,'version-check:'+digest(self.client_address[0]),6,300):refresh=False
+                if not fresh or refresh:
+                    try:
+                        found=versioning.check(registry,now);pending=found['pending']
+                        important=any(item['type'] in ('major','minor') or item['changes'].get('security') for item in pending)
+                        cached={'installed':installed['version'],'at':now.isoformat(timespec='seconds'),'state':('important' if important else 'available') if pending else 'updated','latest':found['latest']['version'] if found['latest'] else installed['version'],'pending':len(pending),'source':found['source']}
+                    except versioning.RegistryError:
+                        cached={'installed':installed['version'],'at':now.isoformat(timespec='seconds'),'state':'error','latest':'','pending':0,'source':'remote'}
+                    c.execute("INSERT INTO system_state(key,value) VALUES ('public_version_check',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",(json.dumps(cached),));c.commit()
+                notes=[{'key':key,'title':title,'items':installed['changes'].get(key,[])} for key,title in versioning.CATEGORIES.items() if installed['changes'].get(key)]
+                return self.reply(200,{'version':installed['version'],'date':installed['date'],'type':versioning.TYPES.get(installed['type'],installed['type']),'summary':installed.get('summary',''),'notes':notes,
+                                       'state':cached['state'],'latest':cached['latest'],'pending':cached['pending'],'checked_at':cached['at'],'source':cached['source'],'history':len(registry['releases'])})
             if path == '/api/cron/reminders':
                 # Con CRON_SECRET definido solo responde a la llamada autenticada de la plataforma. No envía nada si los avisos están apagados.
                 expected=os.getenv('CRON_SECRET','')

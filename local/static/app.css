@@ -4480,3 +4480,83 @@ body[data-page=dashboard] button[aria-label^="Cerrar"]:not(#logout):not(.primary
 #adi-widget.adi-v2 .adi-panel>header{gap:4px}
 #adi-widget.adi-v2.adi-gl .adi-orb-label{font-weight:700;font-size:15px;opacity:1;text-shadow:0 1px 2px #4a0f38e6,0 0 6px #7a1f5acc,0 0 14px #ffe3f0a6}
 @media(max-width:860px){#adi-widget.adi-v2.adi-gl .adi-orb-label{font-size:13px}}
+/* Acceso: proporciones definitivas. Tarjeta de 440 px, relleno de 30 px, logo de 105 px, título de 26 px, campos y botón de 48 px, ritmo de 16-18 px
+   y radio de 16 px. Altura automática (unos 620 px en escritorio); en pantallas pequeñas se desplaza en vertical, nunca en horizontal. */
+body[data-page=login] .access-shell{grid-template-columns:minmax(0,440px);padding:24px 16px;place-items:center;align-content:center;overflow-x:hidden}
+body[data-page=login] .access-card{width:min(440px,100%);max-width:440px;padding:30px 30px 0;border-radius:16px;display:flex;flex-direction:column}
+body[data-page=login] .brand{margin:0 0 18px;text-align:center}
+body[data-page=login] .brand .original-logo{width:105px;height:auto;max-height:none;margin:0 auto 12px;display:block}
+body[data-page=login] .brand h1{margin:0;font-size:26px;line-height:1.2;font-weight:700;letter-spacing:-.3px}
+body[data-page=login] .brand .brand-company{margin:6px 0 0;font-size:12px;letter-spacing:.18em}
+body[data-page=login] .brand .brand-tagline{margin:4px 0 0;font-size:13px}
+body[data-page=login] #login-form{display:grid;gap:0;margin:0}
+body[data-page=login] #login-form>label{margin:0 0 7px;font-size:13px;font-weight:600;color:#c9d8ee}
+body[data-page=login] #login-form .login-input{margin:0 0 16px}
+body[data-page=login] .login-input input{height:48px;min-height:48px;border-radius:12px;font-size:14.5px}
+body[data-page=login] .login-input input:focus{border-color:#69a7ff;box-shadow:0 0 0 3px #4087ef2e,0 0 22px #4087ef1a}
+body[data-page=login] #login-form .login-field-hint:empty{display:none}
+body[data-page=login] #login-form .form-options{margin:0 0 16px}
+body[data-page=login] #login-form .message:empty{display:none}
+body[data-page=login] #login-form .message{margin:0 0 12px}
+body[data-page=login] .primary.submit{height:48px;min-height:48px;border-radius:12px;font-size:15px}
+@media(max-width:480px){body[data-page=login] .access-shell{padding:16px 12px;place-items:start center;align-content:start}body[data-page=login] .access-card{padding:26px 22px 0}body[data-page=login] .brand .original-logo{width:96px}body[data-page=login] .brand h1{font-size:24px}}
+@media(max-height:700px){body[data-page=login] .access-shell{place-items:start center;align-content:start}}
+/* Versión del sistema: pie compacto de la tarjeta, con el estado real de la comprobación. */
+.system-version{margin:20px -30px 0;padding:14px 20px 14px;border-top:1px solid #22344f;border-radius:0 0 16px 16px;background:#0a1525;display:grid;gap:10px}
+@media(max-width:480px){.system-version{margin:18px -22px 0;padding:13px 16px}}
+.system-version-main{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 12px;align-items:center}
+.system-version-icon{grid-row:span 2;display:grid;place-items:center;width:38px;height:38px;border:1px solid #2c4468;border-radius:11px;background:#10203a;color:#8bb8ff}
+.system-version-icon .icon{width:19px;height:19px}
+.system-version-text{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 9px;min-width:0}
+.system-version-text small{flex-basis:100%;font-size:10.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#8198ba}
+.system-version-text strong{font:700 15px/1.2 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#eef3ff}
+.system-version-date{font-size:11.5px;color:#8fa5c4}
+.system-version-status{grid-column:2;display:flex;align-items:center;gap:8px;margin:0;font-size:12.5px;line-height:1.4;color:#c5d5ee;min-width:0}
+.system-version-dot{flex:none;width:8px;height:8px;border-radius:50%;background:#7b8798}
+.system-version[data-state=checking] .system-version-dot{width:11px;height:11px;border:2px solid #34507d;border-top-color:#8bb8ff;background:transparent;animation:system-version-spin .8s linear infinite}
+.system-version[data-state=updated] .system-version-dot{background:#3ddc97;box-shadow:0 0 0 3px #3ddc9722}
+.system-version[data-state=updated] .system-version-label{color:#a8ecd0}
+.system-version[data-state=available] .system-version-dot{background:#69a7ff;box-shadow:0 0 0 3px #69a7ff2e;animation:system-version-pulse 1.8s ease-in-out infinite}
+.system-version[data-state=available] .system-version-label{color:#bcd8ff}
+.system-version[data-state=available] .system-version-icon{border-color:#69a7ff;box-shadow:0 0 14px #4087ef40}
+.system-version[data-state=important] .system-version-dot{background:#f3c677;box-shadow:0 0 0 3px #f3c6772e}
+.system-version[data-state=important] .system-version-label{color:#f7dca3;font-weight:700}
+.system-version[data-state=important] .system-version-icon{border-color:#b58a3a;color:#f3c677}
+.system-version[data-state=error] .system-version-dot{background:#f0a35e}
+.system-version[data-state=error] .system-version-label{color:#f1cfa6}
+@keyframes system-version-spin{to{transform:rotate(360deg)}}
+@keyframes system-version-pulse{50%{box-shadow:0 0 0 6px #69a7ff00}}
+.system-version-actions{display:flex;flex-wrap:wrap;gap:4px 6px;margin-left:50px}
+.system-version-link{margin:0;padding:5px 9px;border:1px solid transparent;border-radius:8px;background:transparent;color:#9cc0ff;font-size:12px;font-weight:600;line-height:1.3;text-decoration:none;cursor:pointer;transition:background .15s,border-color .15s,color .15s}
+.system-version-link:hover,.system-version-link:focus-visible{background:#132746;border-color:#34507d;color:#fff;outline:0}
+.system-version-link[hidden]{display:none}
+#system-version-news{border-color:#2c4468;background:#10203a}
+@media(prefers-reduced-motion:reduce){.system-version-dot{animation:none!important}}
+/* Ventana de novedades */
+.version-news{width:min(560px,calc(100vw - 24px));max-height:min(86dvh,720px);padding:0;border:1px solid #2c405c;border-radius:16px;background:#0b1526;color:#dbe8fb;box-shadow:0 30px 80px #020714cc;overflow:hidden}
+.version-news[open]{display:flex;flex-direction:column;animation:version-news-in .2s ease-out}
+.version-news::backdrop{background:#030812cc;backdrop-filter:blur(3px)}
+@keyframes version-news-in{from{opacity:0;transform:translateY(10px)}}
+.version-news>header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:18px 20px 14px;border-bottom:1px solid #22344f;background:linear-gradient(180deg,#132139,#0d182c)}
+.version-news>header small{font-size:10.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#8bb8ff}
+.version-news>header h2{margin:4px 0 2px;font-size:20px;line-height:1.25;color:#fff}
+.version-news>header p{margin:0;font-size:12.5px;color:#9db1cf}
+.version-news-close{flex:none;display:grid;place-items:center;width:34px;height:34px;margin:0;padding:0;border:1px solid #2c405c;border-radius:10px;background:#101d33;color:#c5d5ee;cursor:pointer}
+.version-news-close:hover,.version-news-close:focus-visible{border-color:#d05663;background:#32141a;color:#ffd0d3;outline:0}
+.version-news svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.version-news-body{flex:1 1 auto;min-height:0;overflow-y:auto;padding:16px 20px;display:grid;gap:14px;scrollbar-width:thin}
+.version-news-summary{margin:0;font-size:14px;line-height:1.55;color:#e5edf9}
+.version-news-body section{padding:12px 14px;border:1px solid #22344f;border-radius:12px;background:#0d1a2e}
+.version-news-body h3{display:flex;align-items:center;gap:8px;margin:0 0 8px;font-size:13px;color:#eef3ff}
+.version-news-body section[data-kind=features] h3{color:#9cc0ff}.version-news-body section[data-kind=improvements] h3{color:#8ff0bd}.version-news-body section[data-kind=fixes] h3{color:#f3d48f}.version-news-body section[data-kind=security] h3{color:#ffb1b8}.version-news-body section[data-kind=performance] h3{color:#d9b8ff}
+.version-news-body ul{margin:0;padding-left:18px;display:grid;gap:6px}
+.version-news-body li,.version-news-body section p{margin:0;font-size:13px;line-height:1.55;color:#c5d5ee}
+.version-news>footer{display:flex;flex-wrap:wrap;justify-content:space-between;gap:10px;padding:14px 20px;border-top:1px solid #22344f;background:#0a1525}
+.version-news>footer .secondary,.version-news>footer .primary{width:auto;margin:0;min-height:40px;padding:9px 16px;font-size:13px;text-decoration:none;display:inline-flex;align-items:center}
+@media(prefers-reduced-motion:reduce){.version-news[open]{animation:none}}
+/* ADI acoplada junto al acceso (solo al abrirla la persona): medidas para la tarjeta de 440 px y la ventana de 410 px. */
+@media(min-width:1100px) and (min-height:600px){
+ body[data-page=login] #adi-widget.adi-docked .adi-panel{right:max(24px,calc(50vw - 449px));width:410px}
+ body[data-page=login]:has(#adi-widget.adi-docked.adi-open) .access-shell{padding-right:474px}
+}
+.system-version,.system-version *{letter-spacing:normal}.system-version-text small{letter-spacing:.14em}.system-version-text strong{letter-spacing:.02em}
