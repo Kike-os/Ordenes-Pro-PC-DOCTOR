@@ -8,6 +8,24 @@
   },
   "releases": [
     {
+      "version": "1.5.51",
+      "date": "2026-10-11T22:54:14-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Rediseño completo de Detalle de la Orden",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Detalle de la Orden: secciones compactas y uniformes con icono, datos vacíos atenuados, Seguimiento y Presupuesto en filas etiqueta–valor y acciones de documentos más ordenadas"
+        ],
+        "fixes": [
+          "Detalle de la Orden: el estado del comprobante por correo aparecía duplicado; el historial de envíos queda plegado. En móvil las secciones y los filtros del historial ya no se salen del ancho"
+        ],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.50",
       "date": "2026-10-11T22:49:46-05:00",
       "type": "patch",

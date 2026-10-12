@@ -4,6 +4,18 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.51 — 2026-10-11 22:54 (UTC-05:00)
+
+Rediseño completo de Detalle de la Orden
+
+### Mejoras realizadas
+
+- Detalle de la Orden: secciones compactas y uniformes con icono, datos vacíos atenuados, Seguimiento y Presupuesto en filas etiqueta–valor y acciones de documentos más ordenadas
+
+### Errores corregidos
+
+- Detalle de la Orden: el estado del comprobante por correo aparecía duplicado; el historial de envíos queda plegado. En móvil las secciones y los filtros del historial ya no se salen del ancho
+
 ## v1.5.50 — 2026-10-11 22:49 (UTC-05:00)
 
 Corrección ortográfica automática de Adi y estrellita animada
