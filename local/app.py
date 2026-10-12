@@ -1703,15 +1703,18 @@ class Handler(BaseHTTPRequestHandler):
                     if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
                     if not adi_ai.enabled(c):return self.reply(403,{'error':'La redacción con Adi está desactivada en Configuración.'})
                     if not adi_ai.provider():return self.reply(503,{'error':'Adi todavía no tiene un proveedor de IA configurado en el servidor.','kind':'configuracion'})
-                    if limited(c,'adi-write:'+str(user['id']),limit=60,window=3600):return self.reply(429,{'error':'Alcanzaste el límite de mejoras por hora. Intenta más tarde.'})
-                    mode=str(data.get('mode',''));field=str(data.get('field',''))[:40]
+                    # La corrección automática es siempre ortográfica, con su propio límite de uso; las mejoras pedidas a mano tienen el suyo.
+                    auto=data.get('auto') is True
+                    if limited(c,('adi-auto:' if auto else 'adi-write:')+str(user['id']),limit=240 if auto else 60,window=3600):return self.reply(429,{'error':'Alcanzaste el límite de mejoras por hora. Intenta más tarde.','kind':'limite'})
+                    mode='ortografia' if auto else str(data.get('mode',''));field=str(data.get('field',''))[:40]
+                    if auto and len(str(data.get('text','')))>1500:return self.reply(400,{'error':'Texto demasiado largo para la corrección automática.'})
                     try:result=adi_ai.improve(data.get('text',''),mode,field)
                     except adi_ai.AdiError as error:
                         print('adi-write',error.kind,flush=True)
                         return self.reply(error.status,{'error':str(error),'kind':error.kind})
                     # Registro de uso: quién, qué tipo de mejora y consumo. No se guarda el texto.
-                    c.execute('INSERT INTO adi_actions(user_id,action,created_at,details) VALUES (?,?,?,?)',(user['id'],'writing_improve',reception_now().isoformat(timespec='seconds'),json.dumps({'mode':mode,'field':field,'model':result['model'],'tokens_in':result['tokens_in'],'tokens_out':result['tokens_out'],'missing':len(result['missing'])})))
-                    return self.reply(200,{'suggestion':result['suggestion'],'missing':result['missing'],'changed':result['changed']})
+                    c.execute('INSERT INTO adi_actions(user_id,action,created_at,details) VALUES (?,?,?,?)',(user['id'],'writing_improve',reception_now().isoformat(timespec='seconds'),json.dumps({'mode':mode,'auto':auto,'field':field,'model':result['model'],'tokens_in':result['tokens_in'],'tokens_out':result['tokens_out'],'missing':len(result['missing'])})))
+                    return self.reply(200,{'suggestion':result['suggestion'],'missing':result['missing'],'changed':result['changed'],'simple':result['changed'] and adi_ai.is_simple(str(data.get('text','')).strip(),result['suggestion'])})
                 receipt_route=re.fullmatch(r'/api/orders/([0-9]+)/receipt-mail',path)
                 if receipt_route or path=='/api/receipt-mail/settings':
                     if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})

@@ -36,7 +36,7 @@ class AdiWritingTests(unittest.TestCase):
             self.assertNotIn('clave-secreta-de-prueba',json.dumps(status))
             self.assertEqual(self.request('/api/adi/write',{'text':ORIGINAL,'mode':'tecnica','field':'problem'},cookie=cookie)['status'],403)
             done=self.request('/api/adi/write',{'text':ORIGINAL,'mode':'tecnica','field':'problem'},cookie=cookie,csrf=csrf)
-            self.assertEqual((done['status'],done['body']),(200,{'suggestion':GOOD,'missing':[],'changed':True}))
+            self.assertEqual((done['status'],done['body']),(200,{'suggestion':GOOD,'missing':[],'changed':True,'simple':False}))
             url,payload,headers=sent[0]
             self.assertEqual(url,'https://api.anthropic.com/v1/messages');self.assertEqual(headers['x-api-key'],'clave-secreta-de-prueba')
             # Solo viaja el párrafo y el nombre del campo, envuelto como dato.
@@ -71,3 +71,19 @@ class AdiWritingTests(unittest.TestCase):
             self.assertEqual((adi_ai.provider(),adi_ai.openai_key()),('openai','clave-mal-nombrada'))
         with patch.dict(app.os.environ,{'ANTHROPIC_API_KEY':'','OPENAI_API_KEY':'','OPEN_API_KEY':''}):
             self.assertEqual(adi_ai.provider(),'')
+
+    def test_automatic_correction_only_applies_simple_spelling_fixes(self):
+        self.assertTrue(adi_ai.is_simple('hola coimo su equipo esta dañado','Hola, cómo su equipo está dañado.'))
+        self.assertTrue(adi_ai.is_simple('el eqipo no ensiende','El equipo no enciende'))
+        # Reescrituras, palabras sustituidas o datos técnicos alterados requieren aprobación.
+        for original,suggestion in (('se reviso la laptop presenta falla en disco','Se realizó la revisión técnica del equipo portátil.'),('no da video','no da audio'),('serie ABC123 con 512 GB','Serie ABC124 con 512 GB'),('cambio de pasta','cambio de pasta térmica')):
+            self.assertFalse(adi_ai.is_simple(original,suggestion))
+        cookie,csrf=self.login()
+        with patch.dict(app.os.environ,{'ANTHROPIC_API_KEY':'','OPENAI_API_KEY':'k'}),patch.object(adi_ai,'_complete',side_effect=[('El equipo no enciende.',5,5),('Se realizó la revisión técnica del equipo.',5,5)]) as call:
+            auto=self.request('/api/adi/write',{'text':'el eqipo no ensiende','mode':'tecnica','field':'problem','auto':True},cookie=cookie,csrf=csrf)['body']
+            self.assertEqual((auto['suggestion'],auto['simple'],auto['changed']),('El equipo no enciende.',True,True))
+            # La corrección automática es siempre ortográfica, aunque el navegador pida otro modo.
+            self.assertIn('Corrige únicamente ortografía',call.call_args_list[0].args[1])
+            manual=self.request('/api/adi/write',{'text':'se reviso el equipo','mode':'tecnica','field':'findings'},cookie=cookie,csrf=csrf)['body']
+            self.assertEqual(manual['simple'],False)
+            self.assertEqual(self.request('/api/adi/write',{'text':'x'*1600,'mode':'ortografia','auto':True},cookie=cookie,csrf=csrf)['status'],400)

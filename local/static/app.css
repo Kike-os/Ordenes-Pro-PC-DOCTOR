@@ -3640,3 +3640,18 @@ body[data-page=dashboard] .delivery-filters :is(select,input){width:auto;min-wid
 #view-module:has(>#module-content>.workspace-header) .workspace-header{padding:18px 22px}
 @media(max-width:560px){#view-module:has(>#module-content>.workspace-header)>.module-heading h1{font-size:20px}#view-module:has(>#module-content>.workspace-header) .workspace-header{padding:14px 16px}}
 @media(prefers-reduced-motion:reduce){#view-module:has(>#module-content>.workspace-header)>.back-link{transition:none}}
+/* Estrellita del corrector: reposo discreto, puntas iluminadas al analizar, destello al terminar y aviso breve «Texto mejorado» */
+.adi-bar{align-items:center;gap:8px}
+.adi-button .system-icon{transition:color .25s,filter .25s,transform .25s}
+.adi-bar[data-star=work] .adi-button{border-color:#8f9bff;color:#fff}
+.adi-bar[data-star=work] .adi-button .system-icon{color:#e9e3ff;animation:adi-star-work 1.3s ease-in-out infinite}
+@keyframes adi-star-work{0%,100%{filter:drop-shadow(0 0 0 #b9a8ff00);transform:scale(1) rotate(0)}50%{filter:drop-shadow(0 0 5px #cdbfff) drop-shadow(0 0 9px #8f9bffb3);transform:scale(1.14) rotate(8deg)}}
+.adi-bar[data-star=done] .adi-button .system-icon{color:#fff;animation:adi-star-done .7s ease-out 1}
+@keyframes adi-star-done{0%{filter:drop-shadow(0 0 0 #fff0);transform:scale(1)}35%{filter:drop-shadow(0 0 8px #fff) drop-shadow(0 0 14px #b9a8ff);transform:scale(1.4) rotate(18deg)}100%{filter:drop-shadow(0 0 0 #fff0);transform:scale(1)}}
+.adi-bar[data-star=hint] .adi-button{border-color:#EABC6C;color:#fff3d6}.adi-bar[data-star=hint] .adi-button .system-icon{color:#EABC6C}
+.adi-bar[data-star=hint] .adi-button::after{content:"";width:7px;height:7px;border-radius:50%;background:#EABC6C;box-shadow:0 0 0 3px #eabc6c33}
+.adi-bar button.adi-done{margin:0;padding:3px 10px;border:1px solid #2f7a55;border-radius:999px;background:#12301f;color:#8fe0b4;font-size:11px;font-weight:650;cursor:pointer;animation:live-enter .2s ease-out 1}
+.adi-bar button.adi-done[hidden]{display:none}.adi-bar button.adi-done:hover{background:#17402a;color:#c8f5dc;transform:none}
+.adi-assist label.adi-auto{display:flex;align-items:center;gap:8px;margin:0;font-size:11.5px;font-weight:500;color:#a9bcd8;cursor:pointer}
+body[data-page=dashboard] .adi-assist label.adi-auto input{width:15px;height:15px;min-height:0;margin:0;padding:0;accent-color:#7f8fe0}
+@media(prefers-reduced-motion:reduce){.adi-button .system-icon{transition:none}.adi-bar[data-star=work] .adi-button .system-icon,.adi-bar[data-star=done] .adi-button .system-icon,.adi-bar button.adi-done{animation:none}.adi-bar[data-star=work] .adi-button .system-icon{filter:drop-shadow(0 0 4px #cdbfff)}}

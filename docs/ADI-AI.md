@@ -38,3 +38,14 @@ Desde la 1.5.46 el servidor acepta también la variable `OPEN_API_KEY` (nombre m
 - `initAdiEverywhere()` observa la página y añade el botón compacto «Adi» a cada área de texto visible, sin tocar cada módulo. Se excluyen el chat de Adi, la respuesta del Centro de Atención, campos de solo lectura y cualquier elemento con `data-no-adi`.
 - Panel: encabezado «Asistente ADI», cuadrícula de herramientas, «Aplicar mejora» con indicador de proceso, vista previa con cambios resaltados y «Aceptar cambio», «Regenerar» o «Descartar». El texto original no cambia hasta aceptar; hay «Deshacer».
 - Toda consulta pasa por `/api/adi/write` con sesión y CSRF; la clave vive solo en el servidor. Si el proveedor falla se muestra el error real y el texto no se modifica.
+
+## Corrección automática (1.5.50)
+
+- Dos segundos después de dejar de escribir en un área de texto, Adi revisa la ortografía (`/api/adi/write` con `auto: true`; el servidor fuerza el modo «Corregir ortografía»).
+- Se aplica sola únicamente una corrección **simple** (`adi_ai.is_simple`): las mismas palabras en el mismo orden, con tildes, mayúsculas, puntuación o una o dos letras corregidas, y sin alterar datos técnicos. El cursor no se mueve y aparece «Texto mejorado · Deshacer».
+- Si la propuesta añade, quita o sustituye palabras, no se aplica: la estrellita queda en ámbar y al pulsarla se abre la vista previa para aceptar o descartar.
+- Ahorro de consultas: no se envía si el texto no cambió desde la última revisión, si tiene menos de 12 caracteres o más de 1500, ni mientras el panel está abierto. Límite propio de 240 por usuario y hora.
+- Una respuesta que llega después de que el texto cambió se descarta.
+- No actúa sobre las descripciones de autorizaciones del cliente (allí Adi solo trabaja a petición) ni sobre campos que no son áreas de texto (contraseñas, identificadores, cantidades, precios, códigos).
+- Se desactiva desde el propio panel de Adi («Corregir la ortografía automáticamente…»); es una preferencia de cada navegador.
+- La redacción profesional (técnica, para el cliente, etc.) nunca es automática: siempre pasa por la vista previa.

@@ -8,6 +8,26 @@
   },
   "releases": [
     {
+      "version": "1.5.50",
+      "date": "2026-10-11T22:49:46-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Corrección ortográfica automática de Adi y estrellita animada",
+      "changes": {
+        "features": [
+          "Adi: corrección ortográfica automática dos segundos después de dejar de escribir; aplica solo las correcciones simples sin mover el cursor y deja como sugerencia por aprobar lo que cambie el sentido"
+        ],
+        "improvements": [
+          "Adi: la estrellita se ilumina mientras analiza, destella al terminar y muestra «Texto mejorado» con opción de deshacer; más contextos de redacción (citas, mensajes, correo, garantía, servicios)"
+        ],
+        "fixes": [],
+        "security": [
+          "Adi: una respuesta antigua nunca sobrescribe texto nuevo; la corrección automática tiene su propio límite de uso y no actúa sobre las autorizaciones del cliente"
+        ],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.49",
       "date": "2026-10-11T22:39:54-05:00",
       "type": "patch",

@@ -4,6 +4,22 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.50 — 2026-10-11 22:49 (UTC-05:00)
+
+Corrección ortográfica automática de Adi y estrellita animada
+
+### Nuevas funcionalidades
+
+- Adi: corrección ortográfica automática dos segundos después de dejar de escribir; aplica solo las correcciones simples sin mover el cursor y deja como sugerencia por aprobar lo que cambie el sentido
+
+### Mejoras realizadas
+
+- Adi: la estrellita se ilumina mientras analiza, destella al terminar y muestra «Texto mejorado» con opción de deshacer; más contextos de redacción (citas, mensajes, correo, garantía, servicios)
+
+### Actualizaciones de seguridad
+
+- Adi: una respuesta antigua nunca sobrescribe texto nuevo; la corrección automática tiene su propio límite de uso y no actúa sobre las autorizaciones del cliente
+
 ## v1.5.49 — 2026-10-11 22:39 (UTC-05:00)
 
 Detalle de la Orden: recuadro del título corregido y cabecera compacta
