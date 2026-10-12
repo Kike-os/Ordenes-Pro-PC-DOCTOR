@@ -1,7 +1,7 @@
 """Recordatorios de mantenimiento preventivo por correo y respuesta del cliente desde un enlace seguro.
 
-Solo se envían a clientes con consentimiento aceptado y correo válido, una vez por etapa (30, 15, 7, 3 y 0 días antes de
-la fecha recomendada). Están apagados hasta que administración los activa. «sent» significa que el servidor de correo aceptó
+Se envían a los clientes con correo válido, salvo a quienes rechazaron o se dieron de baja, una vez por etapa (30, 15, 7, 3
+y 0 días antes de la fecha recomendada). Cada correo incluye el enlace para dejar de recibirlos. Están apagados hasta que administración los activa. «sent» significa que el servidor de correo aceptó
 el mensaje. La página del cliente no muestra datos personales: solo el equipo, la fecha y la cita propuesta."""
 import html
 import re
@@ -38,7 +38,7 @@ def pending(c, today):
     out = []
     for row in maintenance.rows(c, today):
         stage = stage_for(row.get('days_left'))
-        if stage is None or row['state'] not in ('scheduled', 'appointment') or row['consent'] != 'accepted' or not MAIL.fullmatch((row.get('email') or '').strip()):
+        if stage is None or row['state'] not in ('scheduled', 'appointment') or row['consent'] == 'declined' or not MAIL.fullmatch((row.get('email') or '').strip()):
             continue
         if c.execute('SELECT 1 FROM maintenance_reminders WHERE maintenance_id=? AND generation=? AND stage=?', (row['id'], row['generation'], stage)).fetchone():
             continue

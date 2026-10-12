@@ -24,7 +24,7 @@ class MaintenanceReminderTests(unittest.TestCase):
         raw=urlencode(fields).encode();handler.headers['Content-Length']=str(len(raw));handler.rfile=io.BytesIO(raw);result={}
         handler.reply=lambda status,body,content_type=None,cookie=None,filename=None:result.update(status=status,body=body);handler.do_POST();return result
 
-    def delivered(self,cookie,csrf,days,consent='accepted',email='cliente@example.invalid'):
+    def delivered(self,cookie,csrf,days,consent='unknown',email='cliente@example.invalid'):
         """Orden entregada con su mantenimiento previsto a «days» días (datos ficticios)."""
         oid=self.request('/api/orders',self.order_data({'email':email,'brand':'HP','model':'ProBook','request_key':'maint-reminder-%06d'%abs(hash((days,consent,email))%999999)}),cookie=cookie,csrf=csrf)['body']['id']
         self.assertEqual(self.request('/api/order-status',{'id':str(oid),'status':'entregado'},cookie=cookie,csrf=csrf)['status'],200)
@@ -57,6 +57,17 @@ class MaintenanceReminderTests(unittest.TestCase):
             self.assertEqual(self.request('/api/maintenance/reminders',{'action':'run'},cookie=cookie,csrf=csrf)['body']['summary']['sent'],1);self.assertEqual(len(sent),2)
         with app.connect() as c:self.assertEqual([r[0] for r in c.execute('SELECT stage FROM maintenance_reminders WHERE maintenance_id=? ORDER BY id',(mid,))],[7,3])
         self.assertEqual(self.request('/api/maintenance/reminders',{'enabled':True})['status'],401)
+
+    def test_everyone_with_mail_except_those_who_declined(self):
+        cookie,csrf=self.login();sent=[]
+        _,asked,_=self.delivered(cookie,csrf,30,consent='unknown');_,yes,_=self.delivered(cookie,csrf,15,consent='accepted');_,no,_=self.delivered(cookie,csrf,7,consent='declined')
+        with app.connect() as c:
+            c.execute("UPDATE clients SET email='todos@example.invalid'")
+            names=sorted(row['id'] for row,_ in maintenance_reminders.pending(c,app.reception_now().date()))
+        # Sin decisión registrada y con aceptación reciben el aviso; quien rechazó o se dio de baja, no.
+        self.assertEqual(names,sorted([asked,yes]));self.assertNotIn(no,names)
+        with app.connect() as c:
+            c.execute("UPDATE clients SET email=''");self.assertEqual(maintenance_reminders.pending(c,app.reception_now().date()),[])
 
     def test_client_page_confirm_reschedule_and_decline(self):
         cookie,csrf=self.login();oid,mid,token=self.delivered(cookie,csrf,15)

@@ -90,8 +90,8 @@ El módulo se titula «Agenda de citas». El encabezado muestra el resumen del p
 ## Recordatorios de mantenimiento con enlace seguro (1.5.84)
 
 - **Etapas:** un correo cuando faltan 30, 15, 7, 3 y 0 días para la fecha recomendada (`local/maintenance_reminders.py`, migración 034). Cada etapa se envía una sola vez por previsión; reprogramar la fecha reinicia las etapas.
-- **A quién:** solo a clientes con consentimiento «aceptado» y correo válido. Sin consentimiento no se envía nada.
-- **Apagados por defecto.** Administración los activa en Próximos Mantenimientos; al activarlos se avisa de que son correos reales. «Enviar pendientes ahora» los envía en el momento.
+- **A quién (desde la 1.5.85, decisión de administración del 12/10/2026):** a todos los clientes con correo válido, salvo a quienes rechazaron o se dieron de baja. Cada correo lleva el enlace para dejar de recibirlos. Conviene recoger esta comunicación en las condiciones del servicio antes de publicarlas.
+- **Apagados por defecto.** Administración los activa en Próximos Mantenimientos; al activarlos se avisa de que son correos reales y de cuántos hay por enviar. «Enviar pendientes ahora» los envía en el momento.
 - **Envío periódico:** no hay tarea programada en Vercel. Mientras estén activos, el servidor envía tandas de hasta tres recordatorios, como mucho cada diez minutos y solo entre las 08:00 y las 19:00 (Ecuador), cuando alguien del personal tiene abierto el panel de inicio. Un día sin nadie conectado no envía; al siguiente acceso se pone al día.
 - **Enlace del cliente** (`/mantenimiento/<enlace>`): muestra el equipo, la fecha recomendada y la cita propuesta, sin datos personales, y permite confirmar la fecha, pedir otro horario (con una nota) o dejar de recibir recordatorios.
 - **Respuestas:** no modifican la agenda por sí solas. Aparecen en Próximos Mantenimientos y en el Centro de Actividad para que el personal coordine la cita y las marque como atendidas; quedan en el historial de la orden. Darse de baja retira el consentimiento.
