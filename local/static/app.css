@@ -4021,3 +4021,10 @@ dialog.mail-composer[open]>form{grid-auto-rows:max-content;align-content:start;o
 @media(max-width:900px){.activity-card{grid-template-columns:36px minmax(0,1fr)}.activity-card em{grid-column:2;grid-row:auto;justify-self:start;padding:0;border:0}.activity-card .nc-icon{width:36px;height:36px}}
 @media(max-width:560px){.activity-row{grid-template-columns:32px minmax(0,1fr) auto auto;gap:8px 10px;padding:9px}.activity-row .nc-icon{width:32px;height:32px}.activity-row time{grid-column:2;grid-row:2;justify-self:start}.activity-open small{white-space:normal}}
 @media(prefers-reduced-motion:reduce){.activity-card,.activity-row,.activity-card .nc-icon{animation:none!important}.activity-card:hover{transform:none}.activity-readall:active{transform:none}}
+/* Enlace «Volver» de todos los módulos: botón compacto con flecha dibujada, mismo tema */
+body[data-page=dashboard] #view-module>.back-link{display:inline-flex;align-items:center;gap:8px;width:auto;margin:14px 0 0;padding:6px 13px 6px 11px;border:1px solid #2a4063;border-radius:999px;background:#0d1b30;color:#cfe2ff;font-size:12.5px;font-weight:600;line-height:1.2;text-decoration:none;transition:background-color .18s,border-color .18s,color .18s}
+body[data-page=dashboard] #view-module>.back-link::before{content:"";flex:none;width:6px;height:6px;margin-left:3px;border-left:1.8px solid currentColor;border-bottom:1.8px solid currentColor;transform:rotate(45deg);transition:transform .18s}
+body[data-page=dashboard] #view-module>.back-link:hover{background:#15294a;border-color:#3b5d8f;color:#fff}
+body[data-page=dashboard] #view-module>.back-link:hover::before{transform:translateX(-2px) rotate(45deg)}
+body[data-page=dashboard] #view-module>.back-link:focus-visible{outline:2px solid #8bb8ff;outline-offset:2px}
+@media(prefers-reduced-motion:reduce){body[data-page=dashboard] #view-module>.back-link,body[data-page=dashboard] #view-module>.back-link::before{transition:none}body[data-page=dashboard] #view-module>.back-link:hover::before{transform:rotate(45deg)}}

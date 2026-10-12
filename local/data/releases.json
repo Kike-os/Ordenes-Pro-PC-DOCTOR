@@ -8,6 +8,22 @@
   },
   "releases": [
     {
+      "version": "1.5.77",
+      "date": "2026-10-12T07:40:25-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Botón Volver unificado",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "El enlace «Volver» de todos los módulos es ahora un botón compacto con flecha, coherente con el tema"
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.76",
       "date": "2026-10-12T07:32:38-05:00",
       "type": "patch",

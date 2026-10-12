@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.77 — 2026-10-12 07:40 (UTC-05:00)
+
+Botón Volver unificado
+
+### Mejoras realizadas
+
+- El enlace «Volver» de todos los módulos es ahora un botón compacto con flecha, coherente con el tema
+
 ## v1.5.76 — 2026-10-12 07:32 (UTC-05:00)
 
 Centro de Actividad pulido
