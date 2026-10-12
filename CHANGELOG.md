@@ -4,6 +4,19 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.96 — 2026-10-12 13:59 (UTC-05:00)
+
+Esfera rosa de ADI con estados reales y muestra de voz
+
+### Nuevas funcionalidades
+
+- Voz de ADI: botón «Escuchar muestra de voz» y nuevo saludo «Bienvenido a Órdenes Pro. Soy Adi, tu asistente virtual. ¿En qué puedo ayudarte?».
+
+### Mejoras realizadas
+
+- ADI estrena esfera rosa pastel: circular, con degradado, brillo, ondas de energía interiores y respiración suave; la ventana de conversación incorpora detalles rosados y el botón «Comenzar conversación».
+- Estados de la esfera ligados a señales reales: escuchando (reacciona cuando el micrófono detecta voz), procesando, hablando y error.
+
 ## v1.5.95 — 2026-10-12 13:54 (UTC-05:00)
 
 Título «Agendamiento de Citas Técnicas» en la agenda pública

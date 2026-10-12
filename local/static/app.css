@@ -4225,3 +4225,42 @@ body[data-page=dashboard] button[aria-label^="Cerrar"]:not(#logout):not(.primary
  body[data-page=login]:has(#adi-widget.adi-docked.adi-open) .access-shell{padding-right:444px}
  body[data-page=login] #adi-widget.adi-docked .adi-quick{flex-wrap:wrap;overflow:visible}
 }
+/* ADI: esfera rosa pastel. Solo cambia el aspecto del asistente; el resto de la plataforma conserva su identidad. */
+#adi-widget.adi-v2{--adi-rose:#ff9ecb;--adi-rose-soft:#ffd3e6;--adi-rose-deep:#e0569a}
+#adi-widget.adi-v2 .adi-toggle{box-shadow:0 10px 26px #02071499,0 0 0 1px #ffc2dc59,0 0 22px #ff8fc266}
+#adi-widget.adi-v2 .adi-toggle:hover,#adi-widget.adi-v2 .adi-toggle:focus-visible{box-shadow:0 12px 30px #020714b3,0 0 0 1px #ffd3e680,0 0 0 6px #ff9ecb2e,0 0 32px #ff8fc299}
+#adi-widget.adi-v2 .adi-toggle:focus-visible{outline:2px solid #ffd3e6;outline-offset:4px}
+#adi-widget.adi-v2 .adi-orb{background:radial-gradient(circle at 70% 78%,#d9a6ffb3 0,#d9a6ff00 52%),radial-gradient(circle at 24% 74%,#ffc9a8a6 0,#ffc9a800 50%),radial-gradient(circle at 50% 36%,#ffe9f3 0,#ffbfdb 34%,#f78fc0 64%,#cf5f9b 88%,#a8457f 100%);box-shadow:inset 0 -8px 14px #7a2a5a99,inset 0 3px 8px #ffffff73}
+#adi-widget.adi-v2 .adi-orb-swirl{background:conic-gradient(from 0deg,#fff0 0deg,#ffffffb3 50deg,#ff9ecb00 120deg,#ffc4e0b3 200deg,#e9a6ff00 260deg,#ffd9ec99 320deg,#fff0 360deg);opacity:.8}
+#adi-widget.adi-v2 .adi-orb-shine{background:radial-gradient(ellipse 42% 26% at 34% 22%,#ffffffeb 0,#ffffff59 45%,#ffffff00 100%),radial-gradient(ellipse 30% 14% at 62% 84%,#ffe1ef73 0,#ffe1ef00 100%);box-shadow:inset 0 0 0 1px #ffe3ef73}
+#adi-widget.adi-v2 .adi-orb::after{background:radial-gradient(circle,#fff 0,#ffe0ee 35%,#ffb3d400 72%)}
+/* Ondas de energía en el interior: anillos suaves que nacen del centro. Se aceleran cuando ADI procesa de verdad. */
+#adi-widget.adi-v2 .adi-orb::before{content:"";position:absolute;inset:0;border-radius:50%;background:repeating-radial-gradient(circle at 50% 50%,#ffffff00 0,#ffffff00 5px,#ffffff38 6px,#ffffff00 8px);mix-blend-mode:soft-light;animation:adi-orb-waves 6s ease-in-out infinite}
+@keyframes adi-orb-waves{0%{transform:scale(.55);opacity:0}35%{opacity:.9}100%{transform:scale(1.35);opacity:0}}
+#adi-widget.adi-v2.adi-busy .adi-orb::before{animation-duration:1.5s}
+#adi-widget.adi-v2[data-voice=speaking] .adi-orb::before{animation-duration:.9s}
+#adi-widget.adi-v2:is([data-state=closed],[data-state=offline]) .adi-orb::before{animation-play-state:paused;opacity:0}
+@keyframes adi-orb-breathe{0%,100%{box-shadow:0 10px 26px #02071499,0 0 0 1px #ffc2dc40,0 0 16px #ff8fc24d;transform:scale(1)}50%{box-shadow:0 10px 26px #02071499,0 0 0 1px #ffd3e680,0 0 32px #ff9ecb99;transform:scale(1.035)}}
+@keyframes adi-orb-busy{0%,100%{box-shadow:0 10px 26px #02071499,0 0 0 1px #ffc2dc40,0 0 0 0 #ff9ecb73}50%{box-shadow:0 10px 26px #02071499,0 0 0 1px #ffd3e680,0 0 0 9px #ff9ecb00,0 0 28px #ff8fc2b3}}
+@keyframes adi-orb-ping{0%{box-shadow:0 10px 26px #02071499,0 0 0 0 #ffb3d4b3}100%{box-shadow:0 10px 26px #02071499,0 0 0 14px #ffb3d400}}
+@keyframes adi-orb-listen{0%{box-shadow:0 10px 26px #02071499,0 0 0 0 #ffb3d4b3,0 0 0 0 #ffb3d459}100%{box-shadow:0 10px 26px #02071499,0 0 0 9px #ffb3d400,0 0 0 18px #ffb3d400}}
+@keyframes adi-orb-speak{0%,100%{box-shadow:0 10px 26px #02071499,0 0 0 2px #ff9ecb66,0 0 18px #ff8fc259;transform:scale(1)}50%{box-shadow:0 10px 26px #02071499,0 0 0 6px #ff9ecb26,0 0 30px #ff8fc2a6;transform:scale(1.04)}}
+/* Escuchando: cuando el navegador detecta voz por el micrófono, las ondas se intensifican. */
+#adi-widget.adi-v2[data-voice=listening][data-heard=true] .adi-toggle{animation:adi-orb-heard .55s ease-out infinite}
+@keyframes adi-orb-heard{0%{box-shadow:0 10px 26px #02071499,0 0 0 0 #ffd3e6e6,0 0 0 0 #ff9ecb99,0 0 26px #ff8fc2b3}100%{box-shadow:0 10px 26px #02071499,0 0 0 12px #ffd3e600,0 0 0 24px #ff9ecb00,0 0 26px #ff8fc2b3}}
+#adi-widget.adi-v2[data-voice=listening][data-heard=true] .adi-orb::before{animation-duration:.6s}
+@media(prefers-reduced-motion:reduce){#adi-widget.adi-v2 .adi-orb::before{animation:none;opacity:0}#adi-widget.adi-v2[data-voice=listening] .adi-toggle{box-shadow:0 0 0 3px #ffb3d4}#adi-widget.adi-v2[data-voice=speaking] .adi-toggle{box-shadow:0 0 0 3px #ff9ecb}}
+/* Ventana de conversación: detalles rosados sobre el tema oscuro de la plataforma. */
+#adi-widget.adi-v2 .adi-panel{border-color:#5a3a5c;box-shadow:0 20px 54px #020714b3,0 0 0 1px #ff9ecb1f}
+#adi-widget.adi-v2 .adi-panel>header{box-shadow:inset 0 -2px 0 -1px #ff9ecb80}
+#adi-widget.adi-v2 .adi-panel>header .adi-avatar{background:radial-gradient(circle at 50% 34%,#ffe3ef 0,#ffb3d4 40%,#e0569a 100%);color:#5a1d42;border-radius:50%;box-shadow:inset 0 1px #ffffff80,0 0 12px #ff8fc259}
+#adi-widget.adi-v2 .adi-message.adi .adi-author{color:#ffb3d4}
+#adi-widget.adi-v2 #adi-form .adi-mic:hover{border-color:#ff9ecb;color:#fff}
+#adi-widget.adi-v2 #adi-form .adi-mic[aria-pressed=true]{border-color:#ffb3d4;background:#4a1f3c;color:#ffe3ef}
+#adi-widget.adi-v2 #adi-form .adi-mic:focus-visible,#adi-widget.adi-v2 .adi-voice:focus-visible{outline-color:#ffb3d4}
+#adi-widget.adi-v2 #adi-input:focus-visible{border-color:#ff9ecb;box-shadow:0 0 0 3px #ff9ecb2e;outline:0}
+#adi-widget.adi-v2 .adi-voice[aria-pressed=true]{color:#ffb3d4}
+#adi-widget.adi-v2 .adi-start{display:inline-flex;align-self:flex-start;margin:2px 0 6px;padding:7px 14px;border:1px solid #ff9ecb80;border-radius:999px;background:#3a1b33;color:#ffd3e6;font-size:12.5px;font-weight:600;cursor:pointer;transition:background .2s,border-color .2s}
+#adi-widget.adi-v2 .adi-start:hover,#adi-widget.adi-v2 .adi-start:focus-visible{background:#4a2040;border-color:#ffb3d4;outline:0}
+#adi-widget.adi-v2 .adi-voice-sample{display:block;width:100%;margin:6px 0 0;padding:7px 10px;border:1px solid #ff9ecb66;border-radius:8px;background:#3a1b33;color:#ffd3e6;font-size:12px;text-align:center;cursor:pointer}
+#adi-widget.adi-v2 .adi-voice-sample:hover{background:#4a2040}

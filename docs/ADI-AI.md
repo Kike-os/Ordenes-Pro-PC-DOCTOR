@@ -98,3 +98,10 @@ Sustituye a la propuesta con «Aceptar / Descartar» de la 1.5.60, a petición d
 **Corrección:** se confirma la transacción antes de llamar a la IA o al servidor de correo. Prueba `test_adi_lock.py`: con el código anterior la base queda bloqueada mientras la IA «piensa»; con la corrección, otra escritura entra de inmediato.
 
 **Protecciones añadidas:** un vigilante apaga el indicador a los 26 s pase lo que pase y ofrece reintentar; el estado «ADI revisando…» ya no puede quedarse encendido si el texto cambia sin aviso del navegador; cada paso del flujo manual se anota (sin el texto del usuario) en el registro y en la tabla `client_diagnostics` (migración 036, 14 días), para poder investigarlo aunque el registro de Vercel haya caducado.
+
+## Esfera flotante de ADI (aspecto)
+
+- Esfera circular rosa pastel con degradado, brillo y ondas de energía interiores; respira suavemente en reposo. Solo cambia el aspecto de ADI: el resto de la plataforma conserva su identidad.
+- Estados ligados a señales reales: **disponible** (respiración), **escuchando** (anillos mientras el reconocimiento de voz está activo, más intensos cuando el navegador detecta voz: `speechstart`/`speechend`), **procesando** (ondas rápidas mientras hay una petición en curso), **hablando** (pulso mientras la síntesis de voz reproduce) y **error** (aro rojo discreto junto al mensaje en el chat).
+- Voz: se elige una voz femenina en español del dispositivo, con preferencia por la colombiana; depende de las voces instaladas en cada equipo o teléfono. En el menú «⋯» se puede elegir la voz y pulsar «Escuchar muestra de voz». Saludo de muestra: «Bienvenido a Órdenes Pro. Soy Adi, tu asistente virtual. ¿En qué puedo ayudarte?». La voz nunca se reproduce sola.
+- Ventana: detalles rosados, «Comenzar conversación» mientras no hay mensajes, minimizar y cerrar; el historial se conserva.
