@@ -1,4 +1,4 @@
-"""Centro de Atención en Tiempo Real: conversaciones del chat público atendidas por Adi o por el personal."""
+"""Centro de Atención en Tiempo Real: conversaciones del chat público atendidas por ADI o por el personal."""
 import re
 ORDER_CODE=re.compile(r'\bPCD-\d{8}-\d{4}\b',re.I)
 LIST_SQL="""SELECT v.id,v.mode,v.assigned_to,v.created_at,v.updated_at,v.last_seen_admin,v.client_id,v.order_id,u.name operator,cl.name client,o.code order_code,

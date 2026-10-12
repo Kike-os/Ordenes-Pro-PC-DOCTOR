@@ -283,7 +283,7 @@ class LiveSupportTests(unittest.TestCase):
         order=self.request('/api/orders',self.order_data({'serial':'LIVE-0001','request_key':'live-support-order-0001'}),cookie=cookie,csrf=csrf)['body']
         with app.connect() as c:
             cid=c.execute("INSERT INTO adi_conversations(token_hash,mode,created_at,updated_at) VALUES ('ficticio','adi','2026-01-01T10:00:00-05:00','2026-01-01T10:00:00-05:00')").lastrowid
-            for author,text in (('client','Hola, quiero saber de mi orden %s'%order['code']),('adi','Soy Adi, con gusto le ayudo.'),('client','También PCD-00000000-9999')):
+            for author,text in (('client','Hola, quiero saber de mi orden %s'%order['code']),('adi','Soy ADI, con gusto le ayudo.'),('client','También PCD-00000000-9999')):
                 c.execute("INSERT INTO adi_messages(conversation_id,author,content,created_at) VALUES (?,?,?,'2026-01-01T10:01:00-05:00')",(cid,author,text))
         self.assertEqual(self.request('/api/adi/live')['status'],401)
         row=self.request('/api/adi/live',cookie=cookie)['body']['rows'][0]
@@ -298,7 +298,7 @@ class LiveSupportTests(unittest.TestCase):
         self.assertEqual(act(cid,action='link',order_code=order['code'].lower())['status'],200)
         linked=self.request('/api/adi/live/%d'%cid,cookie=cookie)['body']
         self.assertEqual((linked['order']['code'],linked['client']['name'],linked['mentioned'],linked['conversation']['order_code']),(order['code'],'Cliente ficticio',[],order['code']))
-        # Tomar, responder, reactivar a Adi, cerrar y reabrir: cada cambio queda en el registro de acciones.
+        # Tomar, responder, reactivar a ADI, cerrar y reabrir: cada cambio queda en el registro de acciones.
         self.assertEqual(act(cid,action='takeover')['status'],200)
         self.assertEqual(act(cid,action='reply',message='Hola, soy un asesor ficticio.')['status'],200)
         taken=self.request('/api/adi/live/%d'%cid,cookie=cookie)['body']

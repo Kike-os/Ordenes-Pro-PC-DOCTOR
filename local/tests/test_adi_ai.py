@@ -1,4 +1,4 @@
-"""Adi — asistencia de redacción: proveedor simulado, protección de datos técnicos, permisos, límites y registro de uso."""
+"""ADI — asistencia de redacción: proveedor simulado, protección de datos técnicos, permisos, límites y registro de uso."""
 import json,unittest
 from unittest.mock import patch
 import test_app

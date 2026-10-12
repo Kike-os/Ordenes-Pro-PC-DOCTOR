@@ -4,6 +4,18 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.56 — 2026-10-11 23:34 (UTC-05:00)
+
+Voz de ADI: escucha y responde hablando
+
+### Nuevas funcionalidades
+
+- ADI habla: micrófono para dictar la pregunta y respuesta leída con voz femenina en español, con interruptor de voz y la esfera animada mientras escucha, procesa y habla
+
+### Mejoras realizadas
+
+- El nombre del asistente se muestra siempre como «ADI»; mensajes claros si el micrófono está bloqueado, no hay micrófono o el navegador no admite dictado
+
 ## v1.5.55 — 2026-10-11 23:27 (UTC-05:00)
 
 Indicador de estado en la vista previa del ticket

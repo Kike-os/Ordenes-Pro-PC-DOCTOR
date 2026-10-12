@@ -633,7 +633,7 @@ class Handler(BaseHTTPRequestHandler):
                 rows=appointments.admin_rows(c,appointments.stamp(start),appointments.stamp(end))
                 return self.reply(200,{'rows':rows,'view':view,'date':day.isoformat(),'settings':appointments.settings(c) if user['role']=='administrador' else None})
             if path == '/api/adi/status':
-                # Estado real de Adi para la redacción y los canales; no expone claves.
+                # Estado real de ADI para la redacción y los canales; no expone claves.
                 if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
                 import adi_ai
                 usage=c.execute("SELECT COUNT(*) n FROM adi_actions WHERE action='writing_improve' AND created_at>=?",(reception_now().date().isoformat(),)).fetchone()['n']
@@ -641,7 +641,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(200,{'writing':adi_ai.status(c),'today':usage,'channels':{'mail':mail_allowed(user),'web_chat':True,'whatsapp':False},'receipt_mail_auto':not (auto_receipt and auto_receipt['value']=='off')})
             if path == '/api/adi/admin':
                 if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede usar la asistente administrativa.'})
-                return self.reply(200,{'enabled':bool(adi_ai.openai_key()),'message':'Adi responde consultas operativas desde datos autorizados.','live':adi.snapshot(c,reception_now())})
+                return self.reply(200,{'enabled':bool(adi_ai.openai_key()),'message':'ADI responde consultas operativas desde datos autorizados.','live':adi.snapshot(c,reception_now())})
             adi_conversation=re.fullmatch(r'/api/adi/conversations(?:/([0-9]+))?',path)
             if adi_conversation:
                 if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede usar la asistente administrativa.'})
@@ -1104,10 +1104,10 @@ class Handler(BaseHTTPRequestHandler):
                         conv=c.execute('SELECT * FROM adi_conversations WHERE id=?',(cid,)).fetchone()
                     now=appointments.stamp(appointments.now())
                     if conv['mode']=='closed':
-                        # Una conversación finalizada se reanuda con Adi cuando el cliente vuelve a escribir; el historial se conserva.
+                        # Una conversación finalizada se reanuda con ADI cuando el cliente vuelve a escribir; el historial se conserva.
                         c.execute("UPDATE adi_conversations SET mode='adi',assigned_to=NULL,updated_at=? WHERE id=?",(now,conv['id']));conv=c.execute('SELECT * FROM adi_conversations WHERE id=?',(conv['id'],)).fetchone()
                     c.execute("INSERT INTO adi_messages(conversation_id,author,content,created_at) VALUES (?,'client',?,?)",(conv['id'],text,now))
-                    answer='Un asesor de PC-DOCTOR S.A. revisará tu solicitud.' if conv['mode']=='human' and not conv['assigned_to'] else None  # Con un asesor conectado, Adi no interviene.
+                    answer='Un asesor de PC-DOCTOR S.A. revisará tu solicitud.' if conv['mode']=='human' and not conv['assigned_to'] else None  # Con un asesor conectado, ADI no interviene.
                     context=None
                     match=re.search(r'(PCD-\d{8}-\d{4,}).*?(\d{10}|\d{13})',text,re.I)
                     if match and conv['mode']=='adi':
@@ -1124,7 +1124,7 @@ class Handler(BaseHTTPRequestHandler):
                     try:cookies.load(self.headers.get('Cookie',''))
                     except Exception:pass
                     token=cookies['pcdoctor_adi'].value if 'pcdoctor_adi' in cookies else '';conv=c.execute('SELECT id,mode,assigned_to FROM adi_conversations WHERE token_hash=?',(digest(token),)).fetchone() if token else None
-                    if not conv:return self.reply(404,{'error':'Inicia una conversación con Adi primero.'})
+                    if not conv:return self.reply(404,{'error':'Inicia una conversación con ADI primero.'})
                     if conv['mode']=='human':return self.reply(200,{'ok':True,'mode':'human','state':adi_public_state(conv)})  # Ya solicitada: no se duplica el registro.
                     now=appointments.stamp(appointments.now());c.execute("UPDATE adi_conversations SET mode='human',assigned_to=NULL,updated_at=? WHERE id=?",(now,conv['id']));c.execute("INSERT INTO adi_messages(conversation_id,author,content,created_at) VALUES (?,'client','El cliente solicita atención humana.',?)",(conv['id'],now))
                     return self.reply(200,{'ok':True,'mode':'human','state':'waiting'})
@@ -1705,8 +1705,8 @@ class Handler(BaseHTTPRequestHandler):
                         audit(c,user['id'],'adi_writing_'+('enabled' if data['writing'] else 'disabled'))
                         return self.reply(200,{'ok':True,'writing':adi_ai.status(c)})
                     if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
-                    if not adi_ai.enabled(c):return self.reply(403,{'error':'La redacción con Adi está desactivada en Configuración.'})
-                    if not adi_ai.provider():return self.reply(503,{'error':'Adi todavía no tiene un proveedor de IA configurado en el servidor.','kind':'configuracion'})
+                    if not adi_ai.enabled(c):return self.reply(403,{'error':'La redacción con ADI está desactivada en Configuración.'})
+                    if not adi_ai.provider():return self.reply(503,{'error':'ADI todavía no tiene un proveedor de IA configurado en el servidor.','kind':'configuracion'})
                     # La corrección automática es siempre ortográfica, con su propio límite de uso; las mejoras pedidas a mano tienen el suyo.
                     auto=data.get('auto') is True
                     if limited(c,('adi-auto:' if auto else 'adi-write:')+str(user['id']),limit=240 if auto else 60,window=3600):return self.reply(429,{'error':'Alcanzaste el límite de mejoras por hora. Intenta más tarde.','kind':'limite'})

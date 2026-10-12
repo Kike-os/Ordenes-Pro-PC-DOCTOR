@@ -1,12 +1,12 @@
-"""Respuestas acotadas de Adi. La IA nunca recibe permisos para ejecutar escrituras."""
+"""Respuestas acotadas de ADI. La IA nunca recibe permisos para ejecutar escrituras."""
 import json,os,re,urllib.request,urllib.error
 import appointments,order_workspace,maintenance
 
-SYSTEM_PUBLIC=("Eres Adi, asistente virtual de PC-DOCTOR S.A. Habla español con tono amable y profesional. "
+SYSTEM_PUBLIC=("Eres ADI, asistente virtual de PC-DOCTOR S.A. Habla español con tono amable y profesional. "
 "Identifícate como asistente virtual cuando sea pertinente. No afirmes ser humana. "
 "No inventes diagnósticos, precios, garantías, fechas de entrega ni avances. Para esos asuntos solicita revisión del taller. "
 "No solicites contraseñas ni números completos de tarjetas. Reserva citas mediante el enlace del sistema.")
-SYSTEM_ADMIN=("Eres Adi, asistente administrativa de PC-DOCTOR S.A. Responde en español de forma clara. "
+SYSTEM_ADMIN=("Eres ADI, asistente administrativa de PC-DOCTOR S.A. Responde en español de forma clara. "
 "Usa solamente los datos reales que aparecen en el contexto. No ejecutes cambios, envíos ni escrituras. "
 "Para una modificación indica que debe confirmarla y ejecutarla un usuario autorizado.")
 
@@ -189,5 +189,5 @@ def fallback(c,text):
  if words&{'adios','chao','chau'} or has('hasta luego','nos vemos'):
   return company['thanks']+' Que tengas un buen día.'
  if words&{'hola','buenas','buenos','saludos','hey','ola'}:
-  return 'Hola, soy Adi, asistente virtual de '+company['name']+' Puedo ayudarte con servicios, citas, horarios, contacto y el estado de tu orden. ¿Qué necesitas?'
- return 'Soy Adi, asistente virtual de '+company['name']+' Puedo orientarte sobre servicios, citas, horarios, contacto y el estado de tu orden. Para una evaluación o presupuesto, el equipo técnico debe revisar el caso; si lo prefieres, solicita un asesor.'
+  return 'Hola, soy ADI, asistente virtual de '+company['name']+' Puedo ayudarte con servicios, citas, horarios, contacto y el estado de tu orden. ¿Qué necesitas?'
+ return 'Soy ADI, asistente virtual de '+company['name']+' Puedo orientarte sobre servicios, citas, horarios, contacto y el estado de tu orden. Para una evaluación o presupuesto, el equipo técnico debe revisar el caso; si lo prefieres, solicita un asesor.'

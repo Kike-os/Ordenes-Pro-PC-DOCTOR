@@ -57,3 +57,13 @@ Desde la 1.5.46 el servidor acepta también la variable `OPEN_API_KEY` (nombre m
 - El estado de Adi se consulta una vez por página (antes, una vez por cada campo de texto).
 - El panel va en el flujo del formulario (antes heredaba la posición absoluta y el alto fijo del chat flotante) y mide 380 px de ancho con desplazamiento interno.
 - Diagnóstico: los errores de JavaScript y los inicios y fallos de las consultas a Adi se anotan en el registro del servidor (`client-log`), con tipo, mensaje y duración, nunca con el texto escrito.
+
+## Voz de ADI en el asistente flotante (1.5.56)
+
+- **Entrada:** botón de micrófono junto al campo de mensaje. Usa el reconocimiento de voz del navegador (`SpeechRecognition`, disponible en Chrome, Edge y Safari; no en Firefox) en español (`es-EC`). El audio lo procesa el navegador; al servidor llega solo el texto reconocido, como un mensaje escrito.
+- **Salida:** las respuestas de ADI y del asesor se leen con la síntesis de voz del dispositivo, eligiendo una voz femenina en español cuando existe (Sabina, Helena, Paulina, Dalia, Elena…). La calidad y el timbre dependen de las voces instaladas en cada equipo.
+- Interruptor de voz en el encabezado del chat (preferencia de cada navegador). Hablar por el micrófono la activa la primera vez.
+- Estados reales en la esfera: escuchando (anillos cian), procesando (pulsos) y hablando (onda violeta).
+- Mensajes claros si el micrófono está bloqueado, no hay micrófono, no se escuchó nada, falla la red o el navegador no admite dictado.
+- El nombre del asistente se muestra siempre como «ADI».
+- Requiere HTTPS (producción lo cumple) y el permiso de micrófono del navegador.

@@ -8,6 +8,24 @@
   },
   "releases": [
     {
+      "version": "1.5.56",
+      "date": "2026-10-11T23:34:06-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Voz de ADI: escucha y responde hablando",
+      "changes": {
+        "features": [
+          "ADI habla: micrófono para dictar la pregunta y respuesta leída con voz femenina en español, con interruptor de voz y la esfera animada mientras escucha, procesa y habla"
+        ],
+        "improvements": [
+          "El nombre del asistente se muestra siempre como «ADI»; mensajes claros si el micrófono está bloqueado, no hay micrófono o el navegador no admite dictado"
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.55",
       "date": "2026-10-11T23:27:47-05:00",
       "type": "patch",

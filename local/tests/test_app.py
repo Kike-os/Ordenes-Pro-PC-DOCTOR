@@ -502,7 +502,7 @@ class SecurityTests(unittest.TestCase):
         follow=self.request('/api/public/adi/message',{'message':'Gracias, sigo aquí'},cookie=chat)['body']
         self.assertEqual((follow['state'],follow['messages'][-1]['author']),('advisor','client'))
         self.assertNotIn('1 cliente espera a un asesor',[item['title'] for item in self.request('/api/notifications',cookie=cookie)['body']['items']])
-        # Finalizada: se informa y, si el cliente vuelve a escribir, continúa con Adi conservando el historial.
+        # Finalizada: se informa y, si el cliente vuelve a escribir, continúa con ADI conservando el historial.
         self.request(f'/api/adi/live/{cid}',{'action':'close'},cookie=cookie,csrf=csrf)
         self.assertEqual(self.request('/api/public/adi/messages',cookie=chat)['body']['state'],'closed')
         again=self.request('/api/public/adi/message',{'message':'¿Cuál es el horario?'},cookie=chat)
