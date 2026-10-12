@@ -347,6 +347,47 @@ def send_receipt_mail(c,oid,user,mode):
     return 200,{'result':'sent','recipient':email,'message':'Comprobante enviado a '+email+'. El servidor de correo aceptó el mensaje.'}
 
 
+def authorization_mail_status(c,oid):
+    row=c.execute('SELECT recipient,result,detail,created_at FROM order_authorization_mail WHERE order_id=? ORDER BY id DESC LIMIT 1',(oid,)).fetchone()
+    return dict(row) if row else None
+
+
+def send_authorization_mail(c,oid,user):
+    """Avisa al correo administrativo del sistema de la autorización recién registrada y deja constancia del resultado.
+
+    Un aviso por decisión registrada: si ya se envió el de esta decisión no se repite. «sent» significa que el servidor de
+    correo aceptó el mensaje. Nunca interrumpe el registro de la orden.
+    """
+    order=order_document(c,oid)
+    if not order:return None
+    technical_access.attach(c,order);consent=order.get('access_revision') or 0
+    if not consent:return None
+    if c.execute("SELECT 1 FROM order_authorization_mail WHERE order_id=? AND consent_id=? AND result='sent'",(oid,consent)).fetchone():return {'result':'already'}
+    now=reception_now()
+    def log(result,detail='',recipient=''):
+        c.execute('INSERT INTO order_authorization_mail(order_id,consent_id,recipient,result,detail,actor_id,created_at) VALUES (?,?,?,?,?,?,?)',(oid,consent,recipient,result,detail[:300],user['id'],now.isoformat(timespec='seconds')))
+    try:ready=mail_pro.configured()
+    except mail_pro.MailError:ready=False
+    if not ready:
+        log('not_configured');return {'result':'not_configured'}
+    proof=order.get('access_authorization') or order.get('destructive_authorization');rows=technical_access.summary(order.get('access_authorization'),order.get('destructive_authorization'))
+    device=' '.join(part for part in (DEVICE_TYPES.get(order.get('type'),order.get('type') or ''),order.get('brand') or '',order.get('model') or '') if part) or 'Equipo sin especificar'
+    when=appointments.datetime.fromisoformat(proof['recorded_at']).astimezone(reception.ECUADOR_TZ).strftime('%d/%m/%Y %H:%M') if proof else now.strftime('%d/%m/%Y %H:%M')
+    states={state for _,state,_ in rows};overall='Con operaciones NO AUTORIZADAS' if 'denied' in states else 'Autorizado' if states=={'authorized'} else 'Autorizado parcialmente (hay apartados pendientes)' if 'authorized' in states else 'Pendiente'
+    body='\n'.join(['PC-DOCTOR S.A. — Autorización registrada','','Orden: '+order['code'],'Cliente: '+order['client'],'Equipo: '+device+(' · Serie '+order['serial'] if order.get('serial') else ''),'Estado: '+overall,'Fecha: '+when+' (Ecuador)','Registrada por: '+((proof or {}).get('operator') or user.get('name') or 'Personal del taller'),'']
+        +[title+': '+technical_access.STATE_LABELS[state]+'\n  '+detail for title,state,detail in rows]
+        +['','La decisión fue expresada por el cliente y registrada en pantalla por el personal en recepción; no es una firma del cliente.','','Consultar la autorización (requiere iniciar sesión en Órdenes Pro):',public_base_url().rstrip('/')+'/#orders?id='+str(oid)])
+    try:
+        config=mail_pro.settings();recipient=config['username']
+        message,recipients=mail_pro.build_message(config,{'to':recipient,'subject':'PC-DOCTOR S.A. | Autorización registrada — Orden N.º '+order['code'],'body':body,'from_name':corporate.settings()['name']},'')
+        mail_pro.deliver(config,message,recipients)
+    except mail_pro.MailError as error:
+        print('authorization-mail',error.kind,flush=True);log('failed',str(error));return {'result':'failed','message':str(error)}
+    log('sent','El servidor de correo aceptó el mensaje.',recipient)
+    order_workspace.event(c,oid,user['id'],now,'follow_up','Aviso de autorización enviado al correo administrativo.')
+    return {'result':'sent','recipient':recipient}
+
+
 def mail_signature_card(c):
     # Firma corporativa del buzón remitente: datos validados; el HTML siempre lo compone el servidor.
     account=mail_pro.settings()['username'];row=c.execute('SELECT value FROM system_state WHERE key=?',('mail_signature_card:'+account,)).fetchone()
@@ -840,6 +881,7 @@ class Handler(BaseHTTPRequestHandler):
                 import order_tracking
                 result['tracking']=order_tracking.active(c,row['id'])
                 result['receipt_mail']=receipt_mail_status(c,row['id'])
+                result['authorization_mail']=authorization_mail_status(c,row['id'])
                 result.pop('request_key', None)
                 if result['reception_snapshot']:
                     result.update(json.loads(result['reception_snapshot']))
@@ -1819,7 +1861,11 @@ class Handler(BaseHTTPRequestHandler):
                         audit(c,user['id'],'service_terms_accepted_later',oid)
                     technical_access.record(c,oid,user,now,order['client'],access,key)
                     audit(c,user['id'],'technical_access_recorded',oid)
-                    return self.reply(201,{'ok':True})
+                    # La decisión queda guardada antes de intentar el aviso: un fallo del correo no la afecta.
+                    c.commit();notice=None
+                    try:notice=send_authorization_mail(c,oid,user)
+                    except Exception as error:print('authorization-mail',type(error).__name__,flush=True)
+                    return self.reply(201,{'ok':True,'authorization_mail':notice})
                 if path == '/api/orders':
                     client_id=str(data.get('client_id',''))
                     selected=c.execute('SELECT * FROM clients WHERE id=?',(client_id,)).fetchone() if client_id.isdigit() else None
@@ -1899,7 +1945,10 @@ class Handler(BaseHTTPRequestHandler):
                     c.commit();receipt=None
                     try:receipt=send_receipt_mail(c,oid,user,'auto')[1]
                     except Exception as error:print('receipt-mail auto',type(error).__name__,flush=True)
-                    return self.reply(201, {'ok':True,'id':oid,'code':code,'receipt_mail':receipt})
+                    notice=None
+                    try:c.commit();notice=send_authorization_mail(c,oid,user)
+                    except Exception as error:print('authorization-mail',type(error).__name__,flush=True)
+                    return self.reply(201, {'ok':True,'id':oid,'code':code,'receipt_mail':receipt,'authorization_mail':notice})
             return self.reply(404, {'error':'Recurso no disponible.'})
         except (ValueError, json.JSONDecodeError):
             self.reply(400, {'error':'Solicitud inválida.'})

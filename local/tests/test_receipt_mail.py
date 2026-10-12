@@ -61,7 +61,7 @@ class ReceiptMailTests(unittest.TestCase):
 
     def test_auto_send_respects_missing_email_and_the_switch(self):
         cookie,csrf=self.login();calls=[]
-        with patch.object(mail_pro,'configured',return_value=True),patch.object(mail_pro,'settings',return_value=CONFIG),patch.object(mail_pro,'deliver',side_effect=lambda *a:calls.append(a)):
+        with patch.object(mail_pro,'configured',return_value=True),patch.object(mail_pro,'settings',return_value=CONFIG),patch.object(mail_pro,'deliver',side_effect=lambda *a:calls.append(a) if 'Autorización registrada' not in str(a[1]['Subject']) else None):
             # El servidor intenta el envío al guardar la orden y devuelve su resultado; repetirlo no duplica nada.
             created=self.request('/api/orders',self.order_data({'client':'Cliente Sin Correo','email':'','problem':'Prueba','request_key':'receipt-mail-order-00002'}),cookie=cookie,csrf=csrf);no_mail=created['body']['id']
             self.assertEqual((created['status'],created['body']['receipt_mail']['result']),(201,'no_email'))
@@ -75,7 +75,7 @@ class ReceiptMailTests(unittest.TestCase):
             self.assertEqual(self.request('/api/orders/%d/receipt-mail'%off,{'mode':'auto'},cookie=cookie,csrf=csrf)['body']['result'],'already')
         self.assertEqual(len(calls),1)
         # Con el envío activo y correo válido, guardar la orden ya envía el comprobante: un solo mensaje, y si el correo falla la orden queda guardada.
-        with patch.object(mail_pro,'configured',return_value=True),patch.object(mail_pro,'settings',return_value=CONFIG),patch.object(mail_pro,'deliver',side_effect=lambda *a:calls.append(a)):
+        with patch.object(mail_pro,'configured',return_value=True),patch.object(mail_pro,'settings',return_value=CONFIG),patch.object(mail_pro,'deliver',side_effect=lambda *a:calls.append(a) if 'Autorización registrada' not in str(a[1]['Subject']) else None):
             auto=self.request('/api/orders',self.order_data({'client':'Cliente Tres','email':'tres@example.invalid','identification':'0100000033','problem':'Prueba','request_key':'receipt-mail-order-00004'}),cookie=cookie,csrf=csrf)['body']
             self.assertEqual((auto['receipt_mail']['result'],auto['receipt_mail']['recipient'],len(calls)),('sent','tres@example.invalid',2))
             self.assertEqual(self.request('/api/orders/%d/receipt-mail'%auto['id'],{'mode':'auto'},cookie=cookie,csrf=csrf)['body']['result'],'already')

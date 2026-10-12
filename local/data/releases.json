@@ -8,6 +8,22 @@
   },
   "releases": [
     {
+      "version": "1.5.70",
+      "date": "2026-10-12T06:59:36-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Aviso de autorizaciones al correo administrativo",
+      "changes": {
+        "features": [
+          "Aviso automático al correo administrativo cada vez que se registra una autorización, con el estado real de cada apartado y enlace a la orden; sin duplicados y con constancia del resultado"
+        ],
+        "improvements": [],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.69",
       "date": "2026-10-12T06:52:29-05:00",
       "type": "patch",

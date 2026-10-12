@@ -36,3 +36,13 @@ Prueba de envío real a un buzón de prueba (en las pruebas automáticas el SMTP
 
 - El ticket se descarga como `CÓDIGO-TICKET.pdf` y el comprobante como `CÓDIGO-COMPROBANTE-DE-RECEPCION.pdf` (cabecera `Content-Disposition`, vista previa y adjunto del correo).
 - El comprobante A4 se compone en dos páginas: datos, autorizaciones y constancia de recepción en la primera; condiciones aceptadas (solo si existen) y Políticas de Reparaciones en dos columnas en la segunda. El texto de las políticas es literal; si no cabe se reduce el cuerpo a 7,5 pt antes de abrir otra página.
+
+## Aviso de autorizaciones al correo administrativo (1.5.70)
+
+Cada vez que se registra una autorización (al crear la orden o al registrar una nueva decisión) el servidor envía un aviso al buzón del sistema (`MAIL_USERNAME`) con el número de orden, cliente, equipo, el estado real de los tres apartados (autorizado, no autorizado o pendiente), el alcance o detalle registrado, la fecha y quién lo registró, y el enlace a la orden en Órdenes Pro (requiere iniciar sesión).
+
+- Un aviso por decisión: no se repite para la misma decisión (`order_authorization_mail`, migración 032).
+- Se guarda el resultado: enviado (el servidor de correo aceptó el mensaje), fallido con su motivo, o no enviado por falta de configuración. Se ve en el detalle de la orden.
+- Nunca bloquea: la orden y la decisión quedan guardadas antes de intentar el envío.
+- La decisión la registra el personal en recepción; el aviso lo indica y no la presenta como firma del cliente. No se inventa un motivo de rechazo: solo se incluye el detalle que se haya escrito.
+- WhatsApp no está incluido: el envío automático requiere la API de WhatsApp Business de Meta y plantillas aprobadas.

@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.70 — 2026-10-12 06:59 (UTC-05:00)
+
+Aviso de autorizaciones al correo administrativo
+
+### Nuevas funcionalidades
+
+- Aviso automático al correo administrativo cada vez que se registra una autorización, con el estado real de cada apartado y enlace a la orden; sin duplicados y con constancia del resultado
+
 ## v1.5.69 — 2026-10-12 06:52 (UTC-05:00)
 
 Corrección del movimiento y la eliminación de correos

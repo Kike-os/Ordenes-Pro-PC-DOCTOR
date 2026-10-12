@@ -64,3 +64,25 @@ def attach(c,order):
     order['access_history']=rows
     order['access_revision']=rows[-1]['id'] if rows else 0
     return order
+
+
+STATE_LABELS={'authorized':'AUTORIZADO','denied':'NO AUTORIZADO','pending':'PENDIENTE'}
+
+
+def summary(access,risk):
+    """Estado real de los tres apartados (sistema, archivos, operaciones de riesgo). Lo no decidido es «pending», nunca un rechazo."""
+    permissions=(access or {}).get('permissions') or {};decision=(access or {}).get('decision')
+    def scoped(keys,none):
+        granted=[label for key,label in keys if permissions.get(key)]
+        if decision=='denied':return 'denied','El cliente no autorizó el acceso técnico.'
+        if decision=='authorized' and granted:return 'authorized','Alcance autorizado: '+'; '.join(granted)+'.'
+        return 'pending',none
+    rows=[('Acceso al sistema operativo',)+scoped((('operating_system','ingreso al sistema operativo'),('signed_in_tests','pruebas de funcionamiento con sesión iniciada')),'Sin autorización registrada para ingresar al sistema operativo.')]
+    state,detail=scoped((('specific_files','acceso a archivos específicamente autorizados'),('backup','respaldo de información')),'Sin autorización registrada para revisar archivos ni realizar respaldos.')
+    if decision=='authorized' and permissions.get('files_decision')=='denied':state,detail='denied','El cliente rechazó expresamente el acceso a sus archivos personales y la realización de respaldos.'
+    elif state=='authorized' and access.get('justification'):detail+=' '+access['justification']
+    rows.append(('Acceso a archivos personales y respaldos',state,detail))
+    if not risk:rows.append(('Formateo, reinstalación y eliminación de datos','pending','No se solicitó autorización para modificar o eliminar datos.'))
+    elif risk['decision']=='authorized':rows.append(('Formateo, reinstalación y eliminación de datos','authorized',('Autorización específica del cliente. '+(risk.get('justification') or '')).strip()))
+    else:rows.append(('Formateo, reinstalación y eliminación de datos','denied','El cliente rechazó cualquier modificación o eliminación de datos.'))
+    return rows
