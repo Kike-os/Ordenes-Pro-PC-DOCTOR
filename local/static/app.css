@@ -4083,3 +4083,5 @@ body[data-page=dashboard] .orders-action-menu{width:min(250px,calc(100vw - 20px)
 .orders-results .order-table-wrap,.orders-results .orders-empty{transition:opacity .18s ease}
 @media(prefers-reduced-motion:reduce){.orders-filter-basic .orders-active-toggle,.orders-results .order-table-wrap,.orders-results .orders-empty{transition:none}}
 @media(max-width:520px){.orders-results .orders-pagination{flex-wrap:wrap;justify-content:center}.orders-results .orders-pagination .orders-pagination-total{text-align:center;margin:0}.orders-results .orders-pagination button{padding:0 9px}}
+/* «Próximo mantenimiento» antes de la entrega: atenuado pero pulsable, con explicación */
+.order-document-action.is-pending{opacity:.72;cursor:help}.order-document-action.is-pending:hover{opacity:1}

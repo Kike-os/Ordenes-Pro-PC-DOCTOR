@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.80 — 2026-10-12 08:08 (UTC-05:00)
+
+Botón Próximo mantenimiento
+
+### Errores corregidos
+
+- El botón «Próximo mantenimiento» del detalle de la orden ya no queda con aspecto de carga antes de la entrega: siempre responde y explica cuándo se programa
+
 ## v1.5.79 — 2026-10-12 07:59 (UTC-05:00)
 
 Módulo Órdenes: búsqueda, filtros y acciones
