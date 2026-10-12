@@ -4,6 +4,15 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.62 — 2026-10-12 00:23 (UTC-05:00)
+
+Bandeja de conversaciones del Centro de Atención
+
+### Mejoras realizadas
+
+- Centro de Atención como bandeja: búsqueda, filtros con contador, orden vinculada con su estado y mensajes sin leer destacados
+- Sin conversación abierta se muestra un resumen de atención en lugar de paneles vacíos; aviso cuando escribe un cliente que espera a un asesor
+
 ## v1.5.61 — 2026-10-12 00:16 (UTC-05:00)
 
 Buscador global tolerante a errores, con sugerencias y resaltado
