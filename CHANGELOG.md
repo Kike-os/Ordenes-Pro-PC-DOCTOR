@@ -4,6 +4,18 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.83 — 2026-10-12 08:29 (UTC-05:00)
+
+Adjuntos del correo mejorados
+
+### Mejoras realizadas
+
+- Mail Pro: adjuntos con barra de capacidad, lista con quitar, arrastrar y soltar y compresión ZIP opcional en el navegador
+
+### Errores corregidos
+
+- Mail Pro: los borradores ya conservan sus adjuntos, y el límite pasa a 3,1 MB, que es lo que admite realmente la infraestructura (3,5 MB podía fallar)
+
 ## v1.5.82 — 2026-10-12 08:23 (UTC-05:00)
 
 Autorización digital del cliente por enlace seguro

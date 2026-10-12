@@ -8,6 +8,24 @@
   },
   "releases": [
     {
+      "version": "1.5.83",
+      "date": "2026-10-12T08:29:57-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Adjuntos del correo mejorados",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Mail Pro: adjuntos con barra de capacidad, lista con quitar, arrastrar y soltar y compresión ZIP opcional en el navegador"
+        ],
+        "fixes": [
+          "Mail Pro: los borradores ya conservan sus adjuntos, y el límite pasa a 3,1 MB, que es lo que admite realmente la infraestructura (3,5 MB podía fallar)"
+        ],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.82",
       "date": "2026-10-12T08:23:17-05:00",
       "type": "patch",

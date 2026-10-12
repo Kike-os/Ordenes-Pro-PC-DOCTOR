@@ -4106,3 +4106,18 @@ body[data-page=dashboard] .orders-action-menu{width:min(250px,calc(100vw - 20px)
 .client-auth-link{display:grid;gap:6px;padding:9px;border:1px solid #2f5a9c;border-radius:10px;background:#0f2038}.client-auth-link input{width:100%;margin:0;font-size:12px}
 .client-auth-auto{display:flex!important;align-items:flex-start;gap:8px;margin:2px 0 0;font-size:12.5px;color:#cfdcf0}.client-auth-auto input{flex:none;width:16px;height:16px;min-height:0;margin:2px 0 0}
 .client-auth-note{color:#8fa2bd;font-size:11.5px;line-height:1.45}
+/* Mail Pro · adjuntos: capacidad, lista con quitar, arrastrar y soltar y ZIP opcional */
+.mail-composer .mail-attach{display:grid;gap:8px;padding:10px 12px;border:1px dashed #33507c;border-radius:11px;background:#0b1626;transition:border-color .18s,background-color .18s}
+.mail-composer .mail-attach[data-drop=true]{border-color:#5d95e6;background:#10213b}
+.mail-composer .mail-attach>header{display:flex;align-items:center;gap:8px;font-size:12.5px;color:#dbe8fb}.mail-composer .mail-attach>header .system-icon{width:15px;height:15px;color:#9bbef5}
+.mail-composer .mail-attach-use{margin-left:auto;font-size:12px;color:#9bb0cf;font-variant-numeric:tabular-nums}
+.mail-composer .mail-attach-meter{height:6px;border-radius:999px;background:#16263f;overflow:hidden}.mail-composer .mail-attach-meter i{display:block;height:100%;border-radius:999px;background:#4d8df0;transition:width .25s ease,background-color .25s}
+.mail-composer .mail-attach-meter[data-level=near] i{background:#EABC6C}.mail-composer .mail-attach-meter[data-level=full] i{background:#e05662}
+.mail-composer .mail-attach-list{display:grid;gap:5px;margin:0;padding:0;list-style:none}.mail-composer .mail-attach-list[hidden]{display:none}
+.mail-composer .mail-attach-list li{display:grid;grid-template-columns:18px minmax(0,1fr) 28px;align-items:center;gap:9px;padding:6px 6px 6px 9px;border:1px solid #1e3252;border-radius:9px;background:#0a1322;animation:live-enter .18s ease-out 1}
+.mail-composer .mail-attach-list li>.system-icon{width:17px;height:17px;color:#9bbef5}.mail-composer .mail-attach-list span{display:grid;min-width:0}
+.mail-composer .mail-attach-list b{font-size:12.5px;font-weight:600;color:#eef3ff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.mail-composer .mail-attach-list small{font-size:11px;color:#8fa5c4}
+.mail-composer button.mail-attach-remove{display:grid;place-items:center;width:28px;height:28px;min-height:0;margin:0;padding:0;border:0;border-radius:7px;background:transparent;color:#9bb0cf}.mail-composer button.mail-attach-remove:hover{background:#2a1218;color:#ffb1b8;transform:none}.mail-attach-remove .system-icon{width:14px;height:14px}
+.mail-composer .mail-attach-note{margin:0;font-size:11.5px;line-height:1.45;color:#8fa5c4}.mail-composer .mail-attach-note[data-kind=error]{color:#ffb9bf}
+.mail-composer .mail-attach-actions{display:flex;flex-wrap:wrap;gap:8px}.mail-composer .mail-attach-actions button{display:inline-flex;align-items:center;gap:7px;height:32px;min-height:0;margin:0;padding:0 12px;font-size:12px}.mail-composer .mail-attach-actions button[hidden]{display:none}.mail-attach-actions .system-icon{width:14px;height:14px}
+@media(prefers-reduced-motion:reduce){.mail-composer .mail-attach,.mail-composer .mail-attach-meter i,.mail-composer .mail-attach-list li{transition:none;animation:none}}

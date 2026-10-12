@@ -23,7 +23,7 @@ cPanel muestra `ordenes-pro.ecuadorpcdoctor.com` como servidor, pero ese nombre 
 - Carpetas reales del buzón, con contador de no leídos y vista «Destacados».
 - Lista paginada, búsqueda en la carpeta, lectura con HTML saneado (lista blanca, sin estilos ni scripts) e **imágenes remotas bloqueadas**.
 - Adjuntos: descarga autenticada, siempre como archivo binario.
-- Redactar, responder, responder a todos y reenviar, con `Message-ID`, `In-Reply-To` y `References`; hasta 3,5 MB de adjuntos y 20 destinatarios.
+- Redactar, responder, responder a todos y reenviar, con `Message-ID`, `In-Reply-To` y `References`; hasta 3,1 MB de adjuntos (límite real de la infraestructura; desde la 1.5.83 también se guardan en los borradores) y 20 destinatarios.
 - Un mensaje solo se da por enviado cuando el servidor SMTP lo acepta; después se guarda copia en Enviados. Una clave por redacción evita envíos duplicados y permite reintentar un fallo. Límite de 40 envíos por hora y usuario.
 - Borradores guardados en la carpeta de borradores del servidor.
 - Estado de lectura y destacado sincronizados con el servidor.
@@ -99,3 +99,11 @@ Dovecot/cPanel solo anuncian `MOVE` y `UIDPLUS` después de autenticar. Las vers
 Con `MOVE` se usa `UID MOVE`. Sin `MOVE` pero con `UIDPLUS` se copia, y solo si la copia termina bien se retiran exactamente esos UID del origen. Sin ninguna de las dos no se mueve nada y se avisa de que el original permanece en su carpeta.
 
 La eliminación definitiva (solo desde la Papelera) usa un modal propio: no se cierra ni anuncia éxito hasta que el servidor responde, y un fallo se muestra dentro del modal conservando el mensaje. El mensaje abierto tiene botón «Eliminar» (a la Papelera, con Deshacer) y, en la Papelera, «Restaurar» y «Eliminar definitivamente».
+
+## Adjuntos del redactor (1.5.83)
+
+- Lista propia de archivos con icono, formato y tamaño; se quitan uno a uno. Selección múltiple y arrastrar y soltar.
+- Barra de capacidad «Archivos adjuntos — X de 3,1 MB» con estados: disponible, cerca del límite (80 %), límite alcanzado y archivo demasiado grande. Un archivo que no cabe no se añade y se explica el motivo.
+- **Límite real: 3,1 MB por mensaje.** Vercel no admite peticiones de más de 4,5 MB y los adjuntos viajan en Base64 (un tercio más grandes). El límite anterior de 3,5 MB podía fallar en producción. Para llegar a 25 MB haría falta un almacenamiento externo de archivos.
+- «Comprimir en ZIP» (en el navegador, sin bibliotecas ni servicios externos): reúne los archivos en `adjuntos-PC-DOCTOR.zip`, comprime solo lo que no viene ya comprimido (no toca JPEG, PDF, ZIP, etc.) y muestra el tamaño original y el final. No reduce calidad ni altera el contenido. No genera RAR (formato propietario).
+- Los adjuntos se guardan con el borrador en el servidor de correo y se recuperan al reabrirlo.

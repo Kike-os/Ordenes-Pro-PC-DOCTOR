@@ -202,7 +202,8 @@ from html.parser import HTMLParser
 
 PAGE = 25
 MAX_MESSAGE = 15_000_000
-MAX_ATTACHMENTS = 3_500_000
+# La petición completa (adjuntos en Base64 más el mensaje) no puede superar los 4,5 MB que admite Vercel.
+MAX_ATTACHMENTS = 3_200_000
 MAX_RECIPIENTS = 20
 ROLES = {'inbox': 'Bandeja de entrada', 'starred': 'Destacados', 'sent': 'Enviados', 'drafts': 'Borradores', 'junk': 'Spam', 'trash': 'Papelera', 'archive': 'Archivo'}
 ADDRESS = re.compile(r'[^\s@<>"(),;:\\]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}')
@@ -902,7 +903,7 @@ def build_message(config, data, signature=''):
             raise MailError('configuracion', 'Un adjunto no se pudo leer.')
         total += len(content)
         if total > MAX_ATTACHMENTS:
-            raise MailError('configuracion', 'Los adjuntos superan el máximo de 3,5 MB por mensaje.')
+            raise MailError('configuracion', 'Los adjuntos superan el máximo de 3,1 MB por mensaje.')
         kind = str(item.get('type') or 'application/octet-stream')
         main, _, sub = kind.partition('/')
         if not re.fullmatch(r'[a-z0-9.+-]+', main or '') or not re.fullmatch(r'[a-zA-Z0-9.+-]+', sub or ''):
