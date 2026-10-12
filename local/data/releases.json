@@ -8,6 +8,22 @@
   },
   "releases": [
     {
+      "version": "1.5.71",
+      "date": "2026-10-12T07:04:09-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Distribución compacta del módulo Correo",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Mail Pro más compacto y legible con el mismo tema: todas las carpetas visibles sin desplazamiento, capacidad del buzón en una línea y más mensajes a la vista en escritorio y móvil"
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.70",
       "date": "2026-10-12T06:59:36-05:00",
       "type": "patch",

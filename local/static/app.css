@@ -3898,3 +3898,25 @@ body[data-page=dashboard] .status-label.status-icon::before{content:none}
 .mail-delete-confirm button:disabled{opacity:.65;cursor:progress}
 .mail-delete-confirm p.mail-delete-error{margin:-8px 0 14px;padding:8px 10px;border:1px solid #8a4450;border-radius:9px;background:#2b1219;color:#ffd0d4;font-size:12.5px;text-align:left}.mail-delete-confirm p.mail-delete-error[hidden]{display:none}
 @media(max-width:360px){.mail-delete-confirm .confirm-mac-actions{grid-template-columns:1fr}}
+/* Mail Pro: distribución más compacta y legible (mismo tema y colores) */
+@media(min-width:1181px){
+ .mail-v2:not([data-side=collapsed]) .mail-side{gap:7px;padding:9px}
+ .mail-v2:not([data-side=collapsed]) .mail-account{padding:6px 9px}
+ .mail-v2:not([data-side=collapsed]) .mail-folder{min-height:32px;padding:5px 9px}
+ .mail-v2:not([data-side=collapsed]) .mail-folders{scrollbar-width:none}
+ /* Capacidad del buzón: una línea, la barra y el detalle a demanda; el texto largo solo aparece cuando hay algo que atender. */
+ .mail-v2:not([data-side=collapsed]) .mail-storage{gap:4px;padding:8px 10px}
+ .mail-v2:not([data-side=collapsed]) .mail-storage:not([data-level=warn]):not([data-level=high])>small{display:none}
+ .mail-v2:not([data-side=collapsed]) .mail-storage-main{font-size:12px}
+}
+.mail-v2 .mail-row{transition:background-color .16s ease,box-shadow .16s ease}
+.mail-v2 .mail-scroll{overflow-wrap:anywhere}
+@media(max-width:860px){
+ /* En pantallas pequeñas el módulo crece con su contenido: la lista y el mensaje ocupan la altura útil en lugar de unas pocas líneas. */
+ .mail-shell.mail-v2,.mail-shell.mail-v2[data-side=collapsed]{height:auto}
+ .mail-v2[data-view=list] .mail-list-pane{flex:0 0 auto}
+ .mail-v2[data-view=list] .mail-list{min-height:min(52vh,460px);max-height:none}
+ .mail-v2[data-view=reader] .mail-reader{flex:0 0 auto;min-height:72vh}
+ .mail-v2 .mail-side{scrollbar-width:none}
+}
+@media(prefers-reduced-motion:reduce){.mail-v2 .mail-row{transition:none}}

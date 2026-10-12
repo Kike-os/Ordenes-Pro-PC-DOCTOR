@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.71 — 2026-10-12 07:04 (UTC-05:00)
+
+Distribución compacta del módulo Correo
+
+### Mejoras realizadas
+
+- Mail Pro más compacto y legible con el mismo tema: todas las carpetas visibles sin desplazamiento, capacidad del buzón en una línea y más mensajes a la vista en escritorio y móvil
+
 ## v1.5.70 — 2026-10-12 06:59 (UTC-05:00)
 
 Aviso de autorizaciones al correo administrativo

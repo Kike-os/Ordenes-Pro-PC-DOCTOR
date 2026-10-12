@@ -691,7 +691,7 @@ async function renderMail(){
  const empty=(node,icon,title,text)=>{const box=el('div',undefined,'mail-empty');box.append(systemIcon(icon),el('strong',title),el('p',text));node.replaceChildren(box);};
  const emptyReader=()=>empty(reader,mailIcons.mailOpen,'Selecciona un mensaje','Elige un correo de la lista para leerlo aquí.');
  const folderOf=()=>data.folders.find(folder=>folder.id===state.folder),bumpUnread=delta=>{const folder=folderOf();if(folder){folder.unread=Math.max(0,folder.unread+delta);paintFolders();}};
- paintSide();paintFolders();paintFilters();paintStorage();paintSync();emptyReader();fitToViewport(shell,'--mail-h',350);loadStorage();const storageTimer=setInterval(()=>{if(!shell.isConnected){clearInterval(storageTimer);return;}if(!document.hidden)loadStorage();},60000);
+ paintSide();paintFolders();paintFilters();paintStorage();paintSync();emptyReader();fitToViewport(shell,'--mail-h',540);loadStorage();const storageTimer=setInterval(()=>{if(!shell.isConnected){clearInterval(storageTimer);return;}if(!document.hidden)loadStorage();},60000);
  async function open(uid,focus=true){
   state.uid=String(uid);remember();shell.dataset.view='reader';reader.replaceChildren(el('p','Abriendo mensaje…','empty-module'));list.querySelectorAll('.mail-row').forEach(row=>row.setAttribute('aria-current',row.dataset.uid===String(uid)?'true':'false'));
   const closeReader=()=>{state.uid='';remember();shell.dataset.view='list';list.querySelectorAll('.mail-row').forEach(row=>row.setAttribute('aria-current','false'));emptyReader();};
