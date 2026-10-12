@@ -4028,3 +4028,58 @@ body[data-page=dashboard] #view-module>.back-link:hover{background:#15294a;borde
 body[data-page=dashboard] #view-module>.back-link:hover::before{transform:translateX(-2px) rotate(45deg)}
 body[data-page=dashboard] #view-module>.back-link:focus-visible{outline:2px solid #8bb8ff;outline-offset:2px}
 @media(prefers-reduced-motion:reduce){body[data-page=dashboard] #view-module>.back-link,body[data-page=dashboard] #view-module>.back-link::before{transition:none}body[data-page=dashboard] #view-module>.back-link:hover::before{transform:rotate(45deg)}}
+/* Órdenes: buscador con lupa y limpiar, filtros en una fila con avanzados desplegables, filtros activos y paginación compacta */
+.orders-list-view .orders-search{max-width:860px;margin-bottom:12px}
+.orders-list-view .orders-search-box{position:relative;display:flex;align-items:center;flex:1;min-width:0}
+.orders-list-view .orders-search-box>.system-icon{position:absolute;left:13px;width:17px;height:17px;color:#7f93b1;pointer-events:none}
+.orders-list-view .orders-search .orders-search-box input{width:100%;padding-left:40px;padding-right:40px}
+.orders-list-view .orders-search input[type=search]::-webkit-search-cancel-button{display:none}
+.orders-list-view .orders-search button.orders-search-clear{position:absolute;right:7px;display:grid;place-items:center;width:30px;min-height:0;height:30px;margin:0;padding:0;border:0;border-radius:8px;background:transparent;color:#9bb0cf}
+.orders-list-view .orders-search button.orders-search-clear:hover,.orders-list-view .orders-search button.orders-search-clear:focus-visible{background:#16294a;color:#fff;transform:none}
+.orders-list-view .orders-search button.orders-search-clear[hidden]{display:none}.orders-search-clear .system-icon{width:15px;height:15px}
+.orders-filter-card{display:grid;gap:8px}.orders-filter-card>h2{margin:0;font-size:12px;letter-spacing:.05em;text-transform:uppercase;color:#8fa2bd}
+.orders-filter-card .order-filters{display:grid!important;grid-template-columns:1fr!important;gap:10px!important}
+.orders-filter-basic{display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px 14px;min-width:0}.orders-filter-basic>label:first-child{flex:0 1 260px;min-width:180px;margin:0}
+.orders-filter-basic .orders-active-toggle{display:flex!important;align-items:center;gap:8px;height:40px;margin:0;font-size:13px;white-space:nowrap}
+.orders-filter-basic .orders-filter-more{display:inline-flex;align-items:center;gap:7px;height:40px;margin:0;padding:0 13px;font-size:12.5px}.orders-filter-more .system-icon{width:15px;height:15px}
+.orders-filter-basic .orders-filter-more[aria-expanded=true]{border-color:#3b74c4;background:#12284a;color:#fff}
+.orders-filter-basic .orders-filter-actions{display:flex;gap:8px;margin-left:auto}.orders-filter-basic .orders-filter-actions button{height:40px;margin:0}
+.orders-filter-advanced{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px 12px;padding-top:10px;border-top:1px dashed #253b5c}.orders-filter-advanced[hidden]{display:none}.orders-filter-advanced label{margin:0}
+.orders-filter-chips{display:flex;flex-wrap:wrap;gap:6px}
+button.orders-filter-chip{display:inline-flex;align-items:center;gap:6px;margin:0;padding:4px 8px 4px 11px;border:1px solid #2f5a9c;border-radius:999px;background:#12284a;color:#dbe8fb;font-size:12px;font-weight:600}
+button.orders-filter-chip:hover{border-color:#5d95e6;background:#16305a;transform:none}.orders-filter-chip .system-icon{width:12px;height:12px}
+.orders-results[data-loading=true] .order-table-wrap,.orders-results[data-loading=true] .orders-empty{opacity:.55;transition:opacity .15s}
+.orders-results .orders-pagination{padding:9px 14px;gap:8px;align-items:center}
+.orders-results .orders-pagination .orders-pagination-total{margin-right:auto;color:#8fa2bd;font-size:12px}
+.orders-results .orders-pagination button{display:inline-flex;align-items:center;gap:5px;height:32px;min-height:0;margin:0;padding:0 11px;font-size:12px}.orders-pagination button .system-icon{width:14px;height:14px}
+.orders-results .orders-pagination button:disabled{opacity:.45;cursor:not-allowed}
+.orders-results .orders-pagination>span{padding:0 6px;font-size:12.5px;color:#cfdcf0;white-space:nowrap}
+/* Brillo del estado tras un cambio guardado: Glow + Fade de unos 0,6 s. */
+.status-label.status-changed{animation-duration:.65s}
+@media(max-width:900px){.orders-filter-advanced{grid-template-columns:repeat(2,minmax(0,1fr))}.orders-filter-basic .orders-filter-actions{margin-left:0;flex:1 1 100%}.orders-filter-basic .orders-filter-actions button{flex:1}}
+@media(max-width:520px){.orders-filter-advanced{grid-template-columns:1fr}.orders-filter-basic>label:first-child{flex:1 1 100%}.orders-results .orders-pagination .orders-pagination-total{flex:1 1 100%}}
+/* Órdenes: acciones en una fila compacta (Ver orden, Ticket, tres puntos) y menú agrupado */
+.orders-results .order-row-actions{display:flex;flex-wrap:nowrap;align-items:center;gap:6px}
+.orders-results .order-row-actions>button.order-view-action,.orders-results .order-row-actions .order-document-action{display:inline-flex;align-items:center;gap:6px;height:32px;min-height:32px;margin:0;padding:0 11px;border-radius:9px;font-size:12px;font-weight:650;white-space:nowrap}
+.orders-results .order-row-actions svg{flex:none;width:15px;height:15px}
+.orders-results .order-row-actions>.orders-more-trigger{display:grid;place-items:center;flex:none;width:32px;height:32px;min-height:32px;margin:0;padding:0;border-radius:9px}
+.orders-results .order-row-actions>.orders-more-trigger:hover,.orders-results .order-row-actions>.orders-more-trigger[aria-expanded=true]{border-color:#3b74c4;background:#12284a;color:#fff;transform:none}
+.orders-results .order-row-actions :is(button,a):focus-visible{outline:2px solid #8bb8ff;outline-offset:2px}
+.orders-results .order-table th:nth-child(1){width:24%}.orders-results .order-table th:nth-child(2){width:17%}.orders-results .order-table th:nth-child(3){width:17%}.orders-results .order-table th:nth-child(4){width:15%}.orders-results .order-table th:nth-child(5){width:12%}.orders-results .order-table th:last-child{width:252px}
+.orders-results .order-table td{vertical-align:middle}.orders-results .order-table td:nth-child(2){font-weight:600;color:#e5edf9}
+body[data-page=dashboard] .orders-action-menu{width:min(250px,calc(100vw - 20px));padding:6px;border-radius:12px;gap:1px;scrollbar-width:thin;animation:orders-menu-in .14s ease-out}
+.orders-action-menu[data-side=up]{animation-name:orders-menu-up}
+.orders-action-menu .orders-menu-group{padding:6px 10px 3px;font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#7f93b1}
+.orders-action-menu .orders-menu-rule{width:auto;height:1px;margin:5px 6px;border:0;background:#22385a}
+.orders-action-menu .orders-menu-item{min-height:34px;padding:7px 10px;border-radius:8px;font-size:13px}.orders-action-menu .orders-menu-item svg{flex:none;width:15px;height:15px;color:#9bbef5}
+@keyframes orders-menu-in{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+@keyframes orders-menu-up{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+@media(max-width:1100px){.orders-results .order-row-actions{flex-wrap:wrap}.orders-results .order-row-actions>button.order-view-action{flex:1 1 auto;justify-content:center}}
+@media(prefers-reduced-motion:reduce){body[data-page=dashboard] .orders-action-menu{animation:none}}
+/* «Solo activas»: casilla alineada y estado visible cuando está aplicada */
+.orders-filter-basic .orders-active-toggle{padding:0 12px;border:1px solid #253b5c;border-radius:10px;background:#0b1626;cursor:pointer;transition:border-color .18s,background-color .18s,color .18s}
+.orders-filter-basic .orders-active-toggle input{width:16px;height:16px;min-height:0;margin:0;accent-color:#4d8df0}
+.orders-filter-basic .orders-active-toggle:has(input:checked){border-color:#3b74c4;background:#12284a;color:#fff}
+.orders-results .order-table-wrap,.orders-results .orders-empty{transition:opacity .18s ease}
+@media(prefers-reduced-motion:reduce){.orders-filter-basic .orders-active-toggle,.orders-results .order-table-wrap,.orders-results .orders-empty{transition:none}}
+@media(max-width:520px){.orders-results .orders-pagination{flex-wrap:wrap;justify-content:center}.orders-results .orders-pagination .orders-pagination-total{text-align:center;margin:0}.orders-results .orders-pagination button{padding:0 9px}}

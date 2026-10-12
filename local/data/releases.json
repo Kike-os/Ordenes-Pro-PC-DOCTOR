@@ -8,6 +8,25 @@
   },
   "releases": [
     {
+      "version": "1.5.79",
+      "date": "2026-10-12T07:59:30-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Módulo Órdenes: búsqueda, filtros y acciones",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Órdenes: buscador mientras se escribe (con lupa y limpiar) que actualiza solo los resultados; filtros en una fila con avanzados desplegables y filtros activos retirables",
+          "Órdenes: acciones compactas (Ver orden, Ticket y menú de tres puntos agrupado que se abre hacia donde hay espacio), columnas ajustadas y paginación compacta"
+        ],
+        "fixes": [
+          "Órdenes: «Solo activas» filtra al instante al marcar o desmarcar, combinado con los demás filtros"
+        ],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.78",
       "date": "2026-10-12T07:47:29-05:00",
       "type": "patch",

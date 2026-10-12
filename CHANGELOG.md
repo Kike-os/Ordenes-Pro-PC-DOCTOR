@@ -4,6 +4,19 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.79 — 2026-10-12 07:59 (UTC-05:00)
+
+Módulo Órdenes: búsqueda, filtros y acciones
+
+### Mejoras realizadas
+
+- Órdenes: buscador mientras se escribe (con lupa y limpiar) que actualiza solo los resultados; filtros en una fila con avanzados desplegables y filtros activos retirables
+- Órdenes: acciones compactas (Ver orden, Ticket y menú de tres puntos agrupado que se abre hacia donde hay espacio), columnas ajustadas y paginación compacta
+
+### Errores corregidos
+
+- Órdenes: «Solo activas» filtra al instante al marcar o desmarcar, combinado con los demás filtros
+
 ## v1.5.78 — 2026-10-12 07:47 (UTC-05:00)
 
 Documento de condiciones rediseñado
