@@ -8,6 +8,26 @@
   },
   "releases": [
     {
+      "version": "1.5.43",
+      "date": "2026-10-11T19:48:03-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Autorizaciones de operaciones de riesgo rediseñadas y visibles en el detalle de la orden",
+      "changes": {
+        "features": [
+          "Orden: el detalle muestra las autorizaciones registradas en la recepción, las operaciones autorizadas una a una y el historial de decisiones"
+        ],
+        "improvements": [
+          "Recepción: la autorización para operaciones que modifican o eliminan datos se elige en tres tarjetas, con operaciones individuales con icono, unidad afectada (tipo, capacidad, partición y descripción) y aceptación expresa propia"
+        ],
+        "fixes": [],
+        "security": [
+          "Recepción: cada operación de riesgo se guarda por separado y el servidor rechaza operaciones marcadas sin autorización específica o sin aceptación del cliente"
+        ],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.42",
       "date": "2026-10-11T19:40:28-05:00",
       "type": "patch",

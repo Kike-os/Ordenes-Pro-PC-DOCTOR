@@ -26,7 +26,7 @@ class ThermalAccessTests(unittest.TestCase):
         cookie,csrf=self.login();data=self.order_data();data.pop('technical_access')
         result=self.request('/api/orders',data,cookie=cookie,csrf=csrf)
         self.assertEqual(result['status'],400);self.assertIn('technical_access',result['body']['fields'])
-        for changes,field in [({'technical_access':'authorized'},'technical_access'),({'access_confirmed':False},'access_confirmed'),({'access_operating_system':True},'technical_access'),({'technical_access':'authorized','access_specific_files':True},'access_detail'),({'technical_access':'authorized','access_specific_files':True,'access_detail':'Sí'},'access_detail'),({'destructive_action':'authorized','destructive_confirmed':True,'destructive_detail':'Sí'},'destructive_detail'),({'destructive_action':'authorized'},'destructive_detail'),({'destructive_action':'authorized','destructive_detail':'Formatear el disco'},'destructive_confirmed'),({'destructive_action':'authorized','destructive_confirmed':True},'destructive_detail')]:
+        for changes,field in [({'technical_access':'authorized'},'technical_access'),({'access_confirmed':False},'access_confirmed'),({'access_operating_system':True},'technical_access'),({'technical_access':'authorized','access_specific_files':True},'access_detail'),({'technical_access':'authorized','access_specific_files':True,'access_detail':'Sí'},'access_detail'),({'destructive_action':'authorized','destructive_confirmed':True,'destructive_detail':'Sí'},'destructive_detail'),({'destructive_action':'denied','risk_format':True},'destructive_action'),({'destructive_action':'authorized','destructive_confirmed':True,'destructive_detail':'Unidad: SSD, 512 GB. Partición del sistema','risk_format':False},'destructive_action'),({'destructive_action':'authorized'},'destructive_detail'),({'destructive_action':'authorized','destructive_detail':'Formatear el disco'},'destructive_confirmed'),({'destructive_action':'authorized','destructive_confirmed':True},'destructive_detail')]:
             r=self.request('/api/orders',{**self.order_data(),**changes},cookie=cookie,csrf=csrf)
             self.assertEqual(r['status'],400,r);self.assertIn(field,r['body']['fields'])
         with app.connect() as c:self.assertEqual(c.execute('select count(*) from orders').fetchone()[0],0)
@@ -45,11 +45,13 @@ class ThermalAccessTests(unittest.TestCase):
         self.assertEqual(self.request('/api/orders/'+str(oid)+'/authorizations',payload,cookie=cookie)['status'],403)
 
     def test_additional_destructive_permission_is_independent(self):
-        cookie,csrf,_,oid=self.create(destructive_action='authorized',destructive_confirmed=True,destructive_detail='Reinstalar sistema; eliminar partición acordada.')
+        cookie,csrf,_,oid=self.create(destructive_action='authorized',destructive_confirmed=True,risk_format=True,risk_reinstall=True,risk_erase=False,destructive_detail='Reinstalar sistema; eliminar partición acordada.')
         order=self.request('/api/orders/'+str(oid),cookie=cookie)['body']['order']
         self.assertEqual(order['access_authorization']['decision'],'denied')
         self.assertEqual(order['destructive_authorization']['decision'],'authorized')
         self.assertEqual(len(order['access_history']),2)
+        # Cada operación queda guardada por separado; las no marcadas no se interpretan como autorizadas.
+        self.assertEqual({k:order['destructive_authorization']['permissions'][k] for k in ('reinstall','format','erase','factory_reset')},{'reinstall':True,'format':True,'erase':False,'factory_reset':False})
 
     def test_historical_record_truth_and_later_acceptance(self):
         cookie,csrf=self.login()

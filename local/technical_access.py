@@ -6,6 +6,9 @@ EXPLANATION='El acceso técnico puede comprender el ingreso al sistema operativo
 SCOPES={'operating_system':'Acceso al sistema operativo','signed_in_tests':'Pruebas con sesión iniciada','specific_files':'Acceso a archivos específicos','backup':'Respaldo de información'}
 
 
+RISK=('reinstall','format','erase','factory_reset')
+
+
 def weak(text):
     """Una descripción útil nombra archivos, datos u operaciones: «sí», «ok» o una sola palabra no bastan."""
     return len(text)<15 or len(text.split())<3
@@ -31,11 +34,16 @@ def validate(data):
     if destructive=='authorized':
         if weak(destructive_detail):errors['destructive_detail']='Describe qué operación se hará y qué información se verá afectada.'
         if data.get('destructive_confirmed') is not True:errors['destructive_confirmed']='Marca la confirmación del cliente para esta operación; sin ella no se puede registrar la autorización.'
-    return {'decision':decision,'permissions':permissions,'justification':detail,'destructive':destructive,'destructive_detail':destructive_detail},errors
+    # Cada operación de riesgo es un dato propio. Sin autorización específica ninguna puede quedar marcada.
+    risk={key:data.get('risk_'+key) is True for key in RISK};declared=any('risk_'+key in data for key in RISK)
+    if any(data.get('risk_'+key) not in (None,True,False) for key in RISK):errors['destructive_action']='Las operaciones deben ser opciones explícitas.'
+    elif destructive!='authorized' and any(risk.values()):errors['destructive_action']='Sin autorización específica no puede quedar marcada ninguna operación.'
+    elif destructive=='authorized' and declared and not any(risk.values()):errors['destructive_action']='Marca qué operación autoriza el cliente.'
+    return {'decision':decision,'permissions':permissions,'justification':detail,'destructive':destructive,'destructive_detail':destructive_detail,'risk':risk},errors
 
 
 def record(c,oid,user,now,acceptor,values,key):
-    for action,decision,permissions,detail in [('technical',values['decision'],values['permissions'],values['justification']),('destructive',values['destructive'],{'reinstall_or_erase':values['destructive']=='authorized'},values['destructive_detail'])]:
+    for action,decision,permissions,detail in [('technical',values['decision'],values['permissions'],values['justification']),('destructive',values['destructive'],{'reinstall_or_erase':values['destructive']=='authorized',**{key:bool(on) and values['destructive']=='authorized' for key,on in values.get('risk',{}).items()}},values['destructive_detail'])]:
         if decision=='not_requested':continue
         c.execute('INSERT INTO order_access_consents(order_id,action,decision,permissions,justification,acceptor,recorded_at,actor_id,request_key) VALUES (?,?,?,?,?,?,?,?,?)',(oid,action,decision,json.dumps(permissions,sort_keys=True),detail,acceptor,now.isoformat(timespec='microseconds'),user['id'],key))
 

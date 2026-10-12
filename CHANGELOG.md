@@ -4,6 +4,22 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.43 — 2026-10-11 19:48 (UTC-05:00)
+
+Autorizaciones de operaciones de riesgo rediseñadas y visibles en el detalle de la orden
+
+### Nuevas funcionalidades
+
+- Orden: el detalle muestra las autorizaciones registradas en la recepción, las operaciones autorizadas una a una y el historial de decisiones
+
+### Mejoras realizadas
+
+- Recepción: la autorización para operaciones que modifican o eliminan datos se elige en tres tarjetas, con operaciones individuales con icono, unidad afectada (tipo, capacidad, partición y descripción) y aceptación expresa propia
+
+### Actualizaciones de seguridad
+
+- Recepción: cada operación de riesgo se guarda por separado y el servidor rechaza operaciones marcadas sin autorización específica o sin aceptación del cliente
+
 ## v1.5.42 — 2026-10-11 19:40 (UTC-05:00)
 
 Borradores de Nueva orden en el servidor

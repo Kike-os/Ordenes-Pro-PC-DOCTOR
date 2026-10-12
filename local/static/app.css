@@ -3463,3 +3463,31 @@ body[data-page=dashboard] #order-dialog .reception-auto input{width:15px;height:
 @media(max-width:700px){#order-dialog .reception-auto span{display:none}#order-dialog .reception-draft[data-state=error] span,#order-dialog .reception-draft[data-state=saved] span,#order-dialog .reception-draft[data-state=saving] span{display:none}}
 @media(max-width:560px){#order-dialog .order-draft-notice{flex-wrap:wrap}#order-dialog .order-draft-notice .draft-actions{flex:1 1 100%}#order-dialog .order-draft-notice .draft-actions button{flex:1}#order-dialog .order-draft-notice .draft-text small{white-space:normal}}
 @media(prefers-reduced-motion:reduce){#order-dialog .reception-draft{transition:none}#order-dialog .reception-draft[data-state=saving] .system-icon,#order-dialog .order-draft-notice{animation:none}}
+/* Recepción · operaciones que modifican o eliminan datos: tarjetas de decisión, operaciones con icono y unidad afectada */
+.access-pro .access-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.access-pro label.access-card,.access-pro label.access-op{position:relative;display:flex;align-items:flex-start;gap:9px;margin:0;padding:9px 10px;border:1px solid #223a5e;border-radius:10px;background:#0d1b30;color:#dbe8fb;cursor:pointer;transition:border-color .2s,background .2s,box-shadow .2s}
+.access-pro label.access-card>svg,.access-pro label.access-op>svg{flex:none;width:18px;height:18px;margin-top:1px;color:#8fb6ee}
+.access-pro label.access-card input{position:absolute;opacity:0;width:1px;height:1px;margin:0}
+.access-pro .access-card-text{display:grid;gap:2px;min-width:0}.access-pro .access-card-text b{font-size:12.5px;font-weight:650;color:#f2f6ff}.access-pro .access-card-text small{font-size:11px;line-height:1.4;color:#9bb0cf}
+.access-pro label.access-card>i{flex:none;width:15px;height:15px;margin:1px 0 0 auto;border:1.5px solid #3b5d8f;border-radius:50%}
+.access-pro label.access-card:hover,.access-pro label.access-op:hover{border-color:#3b5d8f}
+.access-pro label.access-card:has(input:checked){border-color:#3f7fd6;background:#12294b;box-shadow:0 0 0 1px #3f7fd655}
+.access-pro label.access-card:has(input:checked)>i{border-color:#6fa8ff;background:radial-gradient(circle,#6fa8ff 0 45%,transparent 50%)}
+.access-pro label.access-card:has(input:focus-visible){outline:2px solid #8bb8ff;outline-offset:2px}
+.access-pro label.access-card[data-value=authorized]:has(input:checked){border-color:#b9606c;background:#2b1219;box-shadow:0 0 0 1px #b9606c55}.access-pro label.access-card[data-value=authorized]:has(input:checked)>svg{color:#ffb3ba}
+.access-pro label.access-card[data-value=denied]:has(input:checked)>svg{color:#8fe0b4}
+.access-pro .access-ops{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 8px}.access-pro .access-ops[hidden],.access-pro .access-unit[hidden],.access-pro .access-consent[hidden]{display:none}
+.access-pro label.access-op:has(input:disabled){opacity:.45;cursor:not-allowed}.access-pro label.access-op:has(input:checked){border-color:#b9606c;background:#2b1219}
+.access-pro .access-unit{display:grid;gap:8px;padding-top:4px}
+.access-pro .access-unit-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,.8fr) minmax(0,1.2fr);gap:8px}
+.access-pro label.access-mini{display:grid;gap:4px;margin:0;font-size:11.5px;font-weight:600;color:#b5c5de}
+body[data-page=dashboard] .access-pro label.access-mini :is(input,select){height:36px;min-height:36px;margin:0;font-size:13px}
+.access-pro .access-consent{display:grid;gap:6px}
+@media(max-width:760px){.access-pro .access-cards{grid-template-columns:1fr}.access-pro .access-unit-row{grid-template-columns:1fr 1fr}.access-pro .access-unit-row label:last-child{grid-column:1/-1}}
+@media(max-width:560px){.access-pro .access-ops{grid-template-columns:1fr}}
+@media(prefers-reduced-motion:reduce){.access-pro label.access-card,.access-pro label.access-op{transition:none}}
+/* Detalle de la orden · autorizaciones registradas */
+#module-content .terms-evidence{margin-top:14px;padding:12px 14px;border:1px solid #223450;border-radius:12px;background:#0b1626}
+#module-content .terms-evidence h3{margin:0 0 8px;font-size:13px;color:#eef3ff}
+#module-content .terms-evidence p{margin:0 0 5px;font-size:12px;line-height:1.5;color:#c5d5ee;overflow-wrap:anywhere}
+#module-content .terms-evidence details{margin-top:6px;font-size:12px;color:#a9bbd6}#module-content .terms-evidence summary{cursor:pointer;font-weight:600}
