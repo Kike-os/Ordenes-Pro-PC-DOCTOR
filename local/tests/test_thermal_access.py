@@ -26,7 +26,7 @@ class ThermalAccessTests(unittest.TestCase):
         cookie,csrf=self.login();data=self.order_data();data.pop('technical_access')
         result=self.request('/api/orders',data,cookie=cookie,csrf=csrf)
         self.assertEqual(result['status'],400);self.assertIn('technical_access',result['body']['fields'])
-        for changes,field in [({'technical_access':'authorized'},'technical_access'),({'access_confirmed':False},'access_confirmed'),({'access_operating_system':True},'technical_access'),({'technical_access':'authorized','access_specific_files':True},'access_detail'),({'destructive_action':'authorized'},'destructive_action')]:
+        for changes,field in [({'technical_access':'authorized'},'technical_access'),({'access_confirmed':False},'access_confirmed'),({'access_operating_system':True},'technical_access'),({'technical_access':'authorized','access_specific_files':True},'access_detail'),({'technical_access':'authorized','access_specific_files':True,'access_detail':'Sí'},'access_detail'),({'destructive_action':'authorized','destructive_confirmed':True,'destructive_detail':'Sí'},'destructive_detail'),({'destructive_action':'authorized'},'destructive_detail'),({'destructive_action':'authorized','destructive_detail':'Formatear el disco'},'destructive_confirmed'),({'destructive_action':'authorized','destructive_confirmed':True},'destructive_detail')]:
             r=self.request('/api/orders',{**self.order_data(),**changes},cookie=cookie,csrf=csrf)
             self.assertEqual(r['status'],400,r);self.assertIn(field,r['body']['fields'])
         with app.connect() as c:self.assertEqual(c.execute('select count(*) from orders').fetchone()[0],0)

@@ -8,6 +8,26 @@
   },
   "releases": [
     {
+      "version": "1.5.41",
+      "date": "2026-10-11T19:30:40-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Recepción: autorización de acceso técnico rediseñada y avisos claros",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Recepción: autorización de acceso en grupos compactos, alcance sin casillas premarcadas, campo de archivos solo cuando aplica y operaciones de riesgo (reinstalar, formatear, eliminar, restaurar) en un bloque aparte con confirmación propia"
+        ],
+        "fixes": [
+          "Recepción: el aviso «destructive_action: Registra alcance y confirmación independiente» mostraba un nombre interno; ahora cada requisito se indica junto a su campo con un texto claro"
+        ],
+        "security": [
+          "Recepción: el servidor rechaza descripciones vacías o de una palabra («Sí») para archivos autorizados y operaciones de riesgo"
+        ],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.40",
       "date": "2026-10-11T19:24:15-05:00",
       "type": "patch",

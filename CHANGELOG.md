@@ -4,6 +4,22 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.41 — 2026-10-11 19:30 (UTC-05:00)
+
+Recepción: autorización de acceso técnico rediseñada y avisos claros
+
+### Mejoras realizadas
+
+- Recepción: autorización de acceso en grupos compactos, alcance sin casillas premarcadas, campo de archivos solo cuando aplica y operaciones de riesgo (reinstalar, formatear, eliminar, restaurar) en un bloque aparte con confirmación propia
+
+### Errores corregidos
+
+- Recepción: el aviso «destructive_action: Registra alcance y confirmación independiente» mostraba un nombre interno; ahora cada requisito se indica junto a su campo con un texto claro
+
+### Actualizaciones de seguridad
+
+- Recepción: el servidor rechaza descripciones vacías o de una palabra («Sí») para archivos autorizados y operaciones de riesgo
+
 ## v1.5.40 — 2026-10-11 19:24 (UTC-05:00)
 
 Agenda de citas con el nuevo diseño

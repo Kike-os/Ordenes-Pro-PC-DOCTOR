@@ -6,6 +6,11 @@ EXPLANATION='El acceso técnico puede comprender el ingreso al sistema operativo
 SCOPES={'operating_system':'Acceso al sistema operativo','signed_in_tests':'Pruebas con sesión iniciada','specific_files':'Acceso a archivos específicos','backup':'Respaldo de información'}
 
 
+def weak(text):
+    """Una descripción útil nombra archivos, datos u operaciones: «sí», «ok» o una sola palabra no bastan."""
+    return len(text)<15 or len(text.split())<3
+
+
 def validate(data):
     errors={};decision=data.get('technical_access')
     if decision not in ('authorized','denied'):errors['technical_access']='Selecciona expresamente si el cliente autoriza o no el acceso técnico.'
@@ -17,12 +22,15 @@ def validate(data):
     if len(detail)>1000:errors['access_detail']='Usa hasta 1000 caracteres.'
     if decision=='denied' and any(permissions.values()):errors['technical_access']='Sin acceso autorizado no pueden habilitarse permisos de acceso.'
     if decision=='authorized' and not any(permissions.values()):errors['technical_access']='Selecciona al menos una operación autorizada.'
-    if (permissions['specific_files'] or permissions['backup']) and not detail:errors['access_detail']='Identifica archivos o datos y la justificación técnica, sin incluir claves.'
+    if (permissions['specific_files'] or permissions['backup']) and weak(detail):errors['access_detail']='Describe qué carpetas, archivos o datos se pueden revisar y con qué finalidad, sin incluir claves.'
     destructive=data.get('destructive_action','not_requested')
     if destructive not in ('not_requested','authorized','denied'):errors['destructive_action']='Selecciona una decisión válida para reinstalación o eliminación.'
     destructive_detail=str(data.get('destructive_detail','')).strip()
     if len(destructive_detail)>1000:errors['destructive_detail']='Usa hasta 1000 caracteres.'
-    if destructive=='authorized' and (data.get('destructive_confirmed') is not True or not destructive_detail):errors['destructive_action']='La autorización adicional necesita alcance y confirmación independiente del cliente.'
+    # Operación irreversible: se exige describirla y una confirmación independiente del cliente; cada falta se informa en su propio campo.
+    if destructive=='authorized':
+        if weak(destructive_detail):errors['destructive_detail']='Describe qué operación se hará y qué información se verá afectada.'
+        if data.get('destructive_confirmed') is not True:errors['destructive_confirmed']='Marca la confirmación del cliente para esta operación; sin ella no se puede registrar la autorización.'
     return {'decision':decision,'permissions':permissions,'justification':detail,'destructive':destructive,'destructive_detail':destructive_detail},errors
 
 

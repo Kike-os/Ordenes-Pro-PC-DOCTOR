@@ -3409,3 +3409,36 @@ body[data-page=dashboard] .agenda-pro .agenda-search input{flex:1;min-width:0;he
  .agenda-pro .agenda-row{grid-template-columns:minmax(0,1fr) auto;gap:8px 10px;padding:12px}.agenda-pro .agenda-row .agenda-device,.agenda-pro .agenda-row .agenda-service{grid-column:1/-1}.agenda-pro .agenda-row .agenda-when{grid-column:1/-1}.agenda-pro .agenda-filters{grid-template-columns:repeat(2,minmax(0,1fr))}.agenda-pro .agenda-cell-text b,.agenda-pro .agenda-cell-text small{white-space:normal}}
 @media(prefers-reduced-motion:reduce){.agenda-pro button.agenda-stat,.agenda-pro button.agenda-pill{transition:none}}
 .agenda-pro .agenda-row>.agenda-cell-pro{justify-content:flex-start;justify-self:stretch;text-align:left}
+/* Recepción · autorización de acceso técnico: grupos compactos y bloque de riesgo separado */
+.technical-access-fields.access-pro{gap:10px;margin-top:14px;padding:14px;border-radius:12px}
+.technical-access-fields.access-pro>legend{font-size:13px;letter-spacing:.01em}
+.technical-access-fields.access-pro>p.small{font-size:12px;line-height:1.5;color:#a9bbd6}
+.access-pro .access-group{display:grid;gap:8px;padding:11px 12px;border:1px solid #223450;border-radius:10px;background:#0b1626}
+.access-pro .access-group-title{font-size:12.5px;font-weight:650;color:#eef3ff}
+.access-pro .access-group-hint{font-size:11.5px;line-height:1.45;color:#9bb0cf;margin:0}
+.access-pro .access-options{display:grid;gap:6px 10px;margin:0}
+.access-pro .access-choice{grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}.access-pro .access-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.access-pro .access-options label,.access-pro label.access-confirm{display:flex;align-items:flex-start;gap:9px;min-height:36px;margin:0;padding:8px 10px;border:1px solid #223a5e;border-radius:9px;background:#0d1b30;font-size:12.5px;font-weight:500;line-height:1.4;color:#dbe8fb;cursor:pointer;transition:border-color .2s,background .2s}
+.access-pro .access-options label:hover,.access-pro label.access-confirm:hover{border-color:#3b5d8f}
+.access-pro .access-options label:has(input:checked),.access-pro label.access-confirm:has(input:checked){border-color:#3f7fd6;background:#12294b}
+.access-pro .access-options label:has(input:disabled){opacity:.5;cursor:not-allowed}
+body[data-page=dashboard] .access-pro input[type=checkbox],body[data-page=dashboard] .access-pro input[type=radio]{flex:none;width:17px;height:17px;min-height:0;margin:1px 0 0;padding:0;accent-color:#3f7fd6}
+.access-pro label.access-detail{display:grid;gap:5px;margin:0;font-size:12.5px;font-weight:600;color:#dbe8fb}.access-pro label.access-detail[hidden],.access-pro label.access-confirm[hidden]{display:none}
+body[data-page=dashboard] .access-pro label.access-detail textarea{min-height:58px;margin:0;font-size:13px;resize:vertical}
+.access-pro .access-counter{justify-self:end;font-size:11px;color:#8fa5c4;font-variant-numeric:tabular-nums}
+.access-pro .access-risk{border-color:#6d3a44;background:linear-gradient(180deg,#1f1218,#0f1626)}.access-pro .access-risk .access-group-title{color:#ffc9ce}
+.access-pro label.access-risk-confirm{border-color:#8a4450;background:#2b1219;color:#ffd9dc}
+.access-pro .field-error:empty{display:none}.access-pro .field-error{margin:-2px 0 0}
+@media(max-width:560px){.access-pro .access-grid{grid-template-columns:1fr}}
+@media(prefers-reduced-motion:reduce){.access-pro .access-options label,.access-pro label.access-confirm{transition:none}}
+/* Aviso del formulario de orden: compacto, con icono y sin ocupar todo el ancho */
+#order-form .message:not(:empty){display:inline-flex;align-items:flex-start;gap:8px;max-width:min(100%,620px);padding:8px 12px;border:1px solid #7a6230;border-radius:10px;background:#2b230f;color:#f6dfa6;font-size:12.5px;line-height:1.45;text-align:left;animation:live-enter .2s ease-out 1}
+#order-form .message:not(:empty)::before{content:"!";flex:none;display:grid;place-items:center;width:16px;height:16px;margin-top:1px;border:1.5px solid currentColor;border-radius:50%;font-size:10.5px;font-weight:800;line-height:1}
+@media(prefers-reduced-motion:reduce){#order-form .message:not(:empty){animation:none}}
+/* Detalle de cita: descripciones largas recogidas a cuatro líneas */
+.agenda-facts .agenda-fact-long{grid-column:1/-1}
+.agenda-facts dd.agenda-clamp{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:4;line-clamp:4;overflow:hidden}
+.agenda-facts dd{overflow-wrap:anywhere;white-space:pre-line}
+.agenda-facts button.agenda-clamp-toggle{justify-self:start;margin:4px 0 0;padding:0;border:0;background:none;color:#8bb8ff;font-size:12px;font-weight:600;cursor:pointer}
+.agenda-facts button.agenda-clamp-toggle:hover{background:none;color:#cfe2ff;text-decoration:underline;transform:none}
+.agenda-facts button.agenda-clamp-toggle:focus-visible{outline:2px solid #8bb8ff;outline-offset:2px;border-radius:4px}
