@@ -4152,3 +4152,16 @@ dialog.profile-photo{width:min(380px,calc(100vw - 24px))}
 .avatar[data-photo=true]>img{object-fit:contain}
 .avatar.profile-photo-preview[data-photo=true]{padding:6px;border-color:#6fa8ff;background:radial-gradient(circle at 35% 28%,#ffffff 0,#eaf1fc 55%,#c7d8f1 100%)}
 @media(prefers-reduced-motion:reduce){.premium-header .user-area .avatar[data-photo=true]{transition:none}}
+/* Inicio · Centro de Seguimiento Técnico: título con subtítulo alineado bajo el texto */
+body[data-page=dashboard] .attention-panel>header{align-items:center}
+.attention-panel .attention-heading{display:grid;gap:3px;flex:1 1 260px;min-width:0}
+.attention-panel .attention-heading h2{margin:0}
+.attention-panel .attention-heading .panel-sub{margin:0;padding-left:42px;font-size:12.5px;line-height:1.4;color:#8fa5c4}
+.attention-panel .panel-icon{border-color:#2f5d8f;background:#12284a;color:#8fc4ff}
+.attention-panel .panel-icon .system-icon{width:17px;height:17px}
+@media(max-width:600px){.attention-panel .attention-heading .panel-sub{padding-left:0}}
+/* Botones de cierre (X) de ventanas, avisos y paneles: mismo efecto rojo al pasar, enfocar y pulsar, estén donde estén */
+body[data-page=dashboard] button[aria-label^="Cerrar"]:not(#logout):not(.primary):not(.secondary),body[data-page=dashboard] button.live-back{transition:background-color .18s ease,border-color .18s ease,color .18s ease,box-shadow .18s ease,transform .12s ease}
+body[data-page=dashboard] button[aria-label^="Cerrar"]:not(#logout):not(.primary):not(.secondary):is(:hover,:focus-visible){background:#e0566226;border-color:#e05662b3;color:#ff9aa2;box-shadow:0 0 0 3px #e0566222;transform:none}
+body[data-page=dashboard] button[aria-label^="Cerrar"]:not(#logout):not(.primary):not(.secondary):active{background:#e0566259;border-color:#ff6b78;color:#fff;box-shadow:0 0 0 4px #e0566240,0 0 16px #e0566280;transform:scale(.92)}
+@media(prefers-reduced-motion:reduce){body[data-page=dashboard] button[aria-label^="Cerrar"]{transition:none!important}body[data-page=dashboard] button[aria-label^="Cerrar"]:active{transform:none!important}}

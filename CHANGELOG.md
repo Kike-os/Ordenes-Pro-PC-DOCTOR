@@ -4,6 +4,15 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.91 — 2026-10-12 13:19 (UTC-05:00)
+
+Centro de Seguimiento Técnico y efecto rojo al cerrar
+
+### Mejoras realizadas
+
+- El panel del inicio pasa a llamarse «Centro de Seguimiento Técnico», con subtítulo e icono de seguimiento
+- Todos los botones de cierre (X) de ventanas, avisos y paneles muestran el mismo efecto rojo al pasar el cursor y al pulsarlos
+
 ## v1.5.90 — 2026-10-12 13:14 (UTC-05:00)
 
 Corrección del bloqueo de Aplicar mejora en ADI

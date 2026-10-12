@@ -8,6 +8,23 @@
   },
   "releases": [
     {
+      "version": "1.5.91",
+      "date": "2026-10-12T13:19:59-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Centro de Seguimiento Técnico y efecto rojo al cerrar",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "El panel del inicio pasa a llamarse «Centro de Seguimiento Técnico», con subtítulo e icono de seguimiento",
+          "Todos los botones de cierre (X) de ventanas, avisos y paneles muestran el mismo efecto rojo al pasar el cursor y al pulsarlos"
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.90",
       "date": "2026-10-12T13:14:51-05:00",
       "type": "patch",
