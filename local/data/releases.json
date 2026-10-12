@@ -8,6 +8,22 @@
   },
   "releases": [
     {
+      "version": "1.5.55",
+      "date": "2026-10-11T23:27:47-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Indicador de estado en la vista previa del ticket",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Vista previa de documentos: la franja roja se sustituye por un indicador azul con brillo mientras se genera y verde con visto y «Ticket listo» al terminar; ámbar si falla"
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.54",
       "date": "2026-10-11T23:23:21-05:00",
       "type": "patch",

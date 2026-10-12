@@ -3702,3 +3702,14 @@ body[data-page=dashboard] .adi-assist label.adi-auto input{width:15px;height:15p
 .adi-panel.adi-assist,body[data-page=dashboard] .adi-panel.adi-assist{position:static;right:auto;bottom:auto;height:auto;display:grid;overflow-x:hidden;overflow-y:auto;max-height:min(70vh,460px)}
 body[data-page=dashboard] .adi-assist header.adi-assist-head{display:flex;flex-direction:row;align-items:center;gap:10px;margin:0;padding:0;border:0;background:none;min-height:0}
 body[data-page=dashboard] .adi-assist header.adi-assist-head>div{display:grid;gap:1px;flex:1 1 auto;min-width:0;margin:0}
+/* Vista previa de documentos · indicador de estado (sustituye a la franja roja) */
+.receipt-dialog .document-status{display:inline-flex;align-items:center;gap:8px;width:fit-content;max-width:100%;margin:10px 0;padding:6px 14px 6px 10px;border:1px solid #2f6fd0;border-radius:999px;background:#102a55;color:#cfe2ff;font-size:12.5px;font-weight:650;line-height:1.35;transition:background .25s,border-color .25s,color .25s,box-shadow .25s}
+.receipt-dialog .document-status svg{flex:none;width:16px;height:16px}
+.receipt-dialog .document-status[data-state=loading]{animation:doc-status-glow 1.5s ease-in-out infinite}
+.receipt-dialog .document-status[data-state=loading] svg{animation:draft-spin .9s linear infinite}
+@keyframes doc-status-glow{0%,100%{box-shadow:0 0 0 0 #4d8df000,0 0 10px #4d8df033}50%{box-shadow:0 0 0 4px #4d8df026,0 0 18px #4d8df073}}
+.receipt-dialog .document-status[data-state=ready]{border-color:#2f9a6a;background:#0f3323;color:#9df0c2;box-shadow:0 0 14px #2fbf7a33;animation:doc-status-ready .45s ease-out 1}
+@keyframes doc-status-ready{0%{transform:scale(.94);opacity:.6}60%{transform:scale(1.04)}100%{transform:none;opacity:1}}
+.receipt-dialog .document-status[data-state=info]{border-color:#2a4063;background:#0f1d33;color:#cfdcf0}
+.receipt-dialog .document-status[data-state=error]{border-color:#8a6a30;background:#2b230f;color:#f6dfa6;border-radius:12px}
+@media(prefers-reduced-motion:reduce){.receipt-dialog .document-status{transition:none}.receipt-dialog .document-status[data-state=loading],.receipt-dialog .document-status[data-state=loading] svg,.receipt-dialog .document-status[data-state=ready]{animation:none}}

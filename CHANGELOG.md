@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.55 — 2026-10-11 23:27 (UTC-05:00)
+
+Indicador de estado en la vista previa del ticket
+
+### Mejoras realizadas
+
+- Vista previa de documentos: la franja roja se sustituye por un indicador azul con brillo mientras se genera y verde con visto y «Ticket listo» al terminar; ámbar si falla
+
 ## v1.5.54 — 2026-10-11 23:23 (UTC-05:00)
 
 Ticket térmico compacto
