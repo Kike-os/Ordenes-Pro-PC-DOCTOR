@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.87 — 2026-10-12 09:05 (UTC-05:00)
+
+ADI en el chat de atención
+
+### Mejoras realizadas
+
+- ADI corrige también la ortografía de las respuestas en el chat de atención en vivo, sin enviar nada por sí sola
+
 ## v1.5.86 — 2026-10-12 09:00 (UTC-05:00)
 
 Foto de perfil

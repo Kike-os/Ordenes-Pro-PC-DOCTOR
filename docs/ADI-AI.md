@@ -87,6 +87,6 @@ Sustituye a la propuesta con «Aceptar / Descartar» de la 1.5.60, a petición d
 - El cursor vuelve a la misma palabra en la que estaba. «Deshacer» recupera el texto anterior mientras no se haya seguido escribiendo.
 - Si se escribe durante la revisión, la petición se cancela y su respuesta se descarta. No se repite la consulta de un texto ya revisado.
 - Si la respuesta alterase cifras, códigos, series u otros datos protegidos, no se aplica nada.
-- Funciona en todas las áreas de texto libre (componente global). No actúa en los textos de autorización del cliente, en el chat de atención en vivo ni en correos que citan a otra persona; en el editor de correo se aplica al salir del campo. Los campos estructurados (serie, identificación, teléfono, correo, contraseñas) no son áreas de texto y nunca se envían.
+- Funciona en todas las áreas de texto libre (componente global). No actúa en los textos de autorización del cliente ni en correos que citan a otra persona (desde la 1.5.87 sí corrige la respuesta del chat de atención en vivo, sin enviar nada por sí sola); en el editor de correo se aplica al salir del campo. Los campos estructurados (serie, identificación, teléfono, correo, contraseñas) no son áreas de texto y nunca se envían.
 - Se activa o desactiva con «Corrección ortográfica automática» en el panel de ADI; se recuerda en ese navegador.
 - Mejorar redacción, simplificar y las demás herramientas siguen mostrando la vista previa y pidiendo aceptación.

@@ -4141,3 +4141,7 @@ dialog.profile-photo{width:min(380px,calc(100vw - 24px))}
 .profile-photo-note{margin:0;font-size:12px;line-height:1.45;color:#9bb0cf}.profile-photo-note[data-kind=error]{color:#ffb9bf}
 .profile-photo-actions{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;width:100%}.profile-photo-actions button{flex:1 1 auto;min-height:38px;margin:0}
 .profile-photo-actions button:disabled{opacity:.5;cursor:not-allowed}
+/* ADI en la respuesta del chat de atención: su barra queda bajo el campo, sin mover el botón de enviar */
+.live-pro .live-main>.adi-bar{flex:0 0 auto;margin:0;padding:0 12px 8px;justify-content:flex-end}
+.live-pro .live-main>.adi-panel.adi-assist{flex:0 0 auto;margin:0 12px 10px;max-height:46%;overflow-y:auto}
+.live-pro .live-main>.live-compose[hidden]~.adi-bar,.live-pro .live-main>.live-compose[hidden]~.adi-panel{display:none}
