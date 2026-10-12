@@ -8,6 +8,22 @@
   },
   "releases": [
     {
+      "version": "1.5.81",
+      "date": "2026-10-12T08:12:59-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Estados visibles en la esfera de ADI",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Esfera de ADI: respiración luminosa en reposo, destello al procesar y al responder, y estado de error propio, además de escuchando y hablando"
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.80",
       "date": "2026-10-12T08:08:49-05:00",
       "type": "patch",

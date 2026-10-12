@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.81 — 2026-10-12 08:12 (UTC-05:00)
+
+Estados visibles en la esfera de ADI
+
+### Mejoras realizadas
+
+- Esfera de ADI: respiración luminosa en reposo, destello al procesar y al responder, y estado de error propio, además de escuchando y hablando
+
 ## v1.5.80 — 2026-10-12 08:08 (UTC-05:00)
 
 Botón Próximo mantenimiento

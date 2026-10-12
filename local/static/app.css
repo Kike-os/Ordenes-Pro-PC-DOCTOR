@@ -4085,3 +4085,15 @@ body[data-page=dashboard] .orders-action-menu{width:min(250px,calc(100vw - 20px)
 @media(max-width:520px){.orders-results .orders-pagination{flex-wrap:wrap;justify-content:center}.orders-results .orders-pagination .orders-pagination-total{text-align:center;margin:0}.orders-results .orders-pagination button{padding:0 9px}}
 /* «Próximo mantenimiento» antes de la entrega: atenuado pero pulsable, con explicación */
 .order-document-action.is-pending{opacity:.72;cursor:help}.order-document-action.is-pending:hover{opacity:1}
+/* ADI · esfera: respiración luminosa en reposo, destello al procesar y al responder, y estado de error propio (mismos colores) */
+#adi-widget.adi-v2:not(.adi-busy):not(.adi-open):not([data-voice]):not([data-orb]):not([data-state=closed]):not([data-state=offline]) .adi-toggle{animation:adi-orb-breathe 4.6s ease-in-out infinite}
+@keyframes adi-orb-breathe{0%,100%{box-shadow:0 10px 26px #02071499,0 0 0 1px #8fb8ff40,0 0 16px #4d7cff40}50%{box-shadow:0 10px 26px #02071499,0 0 0 1px #a9cbff73,0 0 30px #5b9cff8c}}
+#adi-widget.adi-v2 .adi-orb-shine::after{content:"";position:absolute;inset:0;border-radius:50%;background:linear-gradient(115deg,transparent 38%,#ffffffb3 50%,transparent 62%);transform:translateX(-120%);opacity:0}
+#adi-widget.adi-v2.adi-busy .adi-orb-shine::after{opacity:1;animation:adi-orb-sweep 1.6s ease-in-out infinite}
+#adi-widget.adi-v2.adi-replied .adi-orb-shine::after{opacity:1;animation:adi-orb-sweep .9s ease-out 1}
+#adi-widget.adi-v2.adi-replied .adi-toggle{animation:adi-orb-ping .9s ease-out 1}
+@keyframes adi-orb-sweep{from{transform:translateX(-120%)}to{transform:translateX(120%)}}
+#adi-widget.adi-v2[data-orb=error] .adi-toggle{animation:adi-orb-error .5s ease-out 2;box-shadow:0 10px 26px #02071499,0 0 0 2px #ff7a86cc,0 0 22px #ff5a6a73}
+#adi-widget.adi-v2[data-orb=error] .adi-orb{filter:saturate(.55) hue-rotate(-38deg)}
+@keyframes adi-orb-error{0%,100%{transform:translateX(0)}30%{transform:translateX(-3px)}70%{transform:translateX(3px)}}
+@media(prefers-reduced-motion:reduce){#adi-widget.adi-v2 .adi-toggle,#adi-widget.adi-v2 .adi-orb-shine::after{animation:none!important}}

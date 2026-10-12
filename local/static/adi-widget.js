@@ -31,8 +31,8 @@
  const grow=()=>{input.style.height='auto';const full=input.scrollHeight+2;input.style.height=Math.min(full,112)+'px';input.style.overflowY=full>112?'auto':'hidden';};
  async function send(text){text=text.trim();if(busy||!text)return;busy=true;root.classList.add('adi-busy');submit.disabled=true;submit.dataset.busy='true';quick.hidden=true;list.querySelector('.adi-note-error')?.remove();const draft=input.value;input.value='';grow();
   const pending=el('p',undefined,'adi-message client adi-pending');pending.append(el('span',text,'adi-text'),el('time','Enviando…'));place(pending);bottom();if(state==='adi'||state==='closed'){transient='consulting';setTyping(true);}paint();
-  try{await request('/api/public/adi/message',{message:text});pending.remove();setTyping(false);transient='';await poll();paint();document.dispatchEvent(new CustomEvent('adi:sent'));}
-  catch(error){pending.remove();setTyping(false);transient='';paint();if(!input.value.trim()){input.value=draft.trim()?draft:text;grow();}if(!started)quick.hidden=false;note(error.message,'error');sound('error');}
+  try{delete root.dataset.orb;await request('/api/public/adi/message',{message:text});pending.remove();setTyping(false);transient='';await poll();paint();root.classList.remove('adi-replied');void root.offsetWidth;root.classList.add('adi-replied');setTimeout(()=>root.classList.remove('adi-replied'),1100);document.dispatchEvent(new CustomEvent('adi:sent'));}
+  catch(error){pending.remove();setTyping(false);transient='';paint();root.dataset.orb='error';clearTimeout(root.orbTimer);root.orbTimer=setTimeout(()=>{delete root.dataset.orb;},6000);if(!input.value.trim()){input.value=draft.trim()?draft:text;grow();}if(!started)quick.hidden=false;note(error.message,'error');sound('error');}
   finally{busy=false;root.classList.remove('adi-busy');submit.disabled=false;delete submit.dataset.busy;if(!panel.hidden)input.focus();}}
  // ── Voz de ADI ─────────────────────────────────────────────────────────────────────────────────────────────
  // Entrada: reconocimiento de voz del navegador (Chrome, Edge, Safari). Salida: síntesis de voz del dispositivo con una voz femenina en español
