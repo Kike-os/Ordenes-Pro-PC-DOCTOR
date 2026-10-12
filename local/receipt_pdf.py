@@ -191,6 +191,7 @@ def render_receipt(order):
             return 'pending',none
         authorization('Acceso al sistema operativo',*scoped((('operating_system','ingreso al sistema operativo'),('signed_in_tests','pruebas de funcionamiento con sesión iniciada')),'Sin autorización registrada para ingresar al sistema operativo.'))
         state,detail=scoped((('specific_files','acceso a archivos específicamente autorizados'),('backup','respaldo de información')),'Sin autorización registrada para revisar archivos ni realizar respaldos.')
+        if decision=='authorized' and permissions.get('files_decision')=='denied':state,detail='denied','El cliente rechazó expresamente el acceso a sus archivos personales y la realización de respaldos.'
         if state=='authorized' and access.get('justification'):detail+=' '+access['justification']
         authorization('Acceso a archivos personales y respaldos',state,detail)
         if not risk:authorization('Formateo, reinstalación y eliminación de datos','pending','No se solicitó autorización para modificar o eliminar datos.')

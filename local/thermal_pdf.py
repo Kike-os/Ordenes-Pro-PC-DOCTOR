@@ -141,6 +141,7 @@ def render_thermal(order,copy='cliente'):
         if access:
             granted=[label for key,label in SCOPES.items() if access['permissions'].get(key)]
             if granted:paragraph('Alcance autorizado: '+'. '.join(granted)+'.',8.5)
+            if access['decision']=='authorized' and access['permissions'].get('files_decision')=='denied':block('Archivos y respaldos: NO AUTORIZADO',8,True,2)
             block('Decisión registrada: '+datetime.fromisoformat(access['recorded_at']).astimezone(ECUADOR_TZ).strftime('%d/%m/%Y %H:%M:%S'),7.5,gap=0)
             block('Responsable: '+access['operator'],7.5,gap=2)
         block('Reinstalar / formatear / eliminar: '+({'authorized':'AUTORIZACIÓN ADICIONAL REGISTRADA','denied':'NO AUTORIZADO'}[destructive['decision']] if destructive else 'Sin autorización adicional'),8,True,2)

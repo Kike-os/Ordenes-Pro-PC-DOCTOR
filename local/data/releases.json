@@ -8,6 +8,22 @@
   },
   "releases": [
     {
+      "version": "1.5.67",
+      "date": "2026-10-12T06:37:14-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Decisión propia para archivos y respaldos",
+      "changes": {
+        "features": [
+          "Archivos y respaldos tienen su propia decisión en recepción: autorizado, no autorizado (rechazo expreso) o pendiente; se refleja en la confirmación, el detalle, el comprobante A4 y el ticket"
+        ],
+        "improvements": [],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.66",
       "date": "2026-10-12T00:42:36-05:00",
       "type": "patch",

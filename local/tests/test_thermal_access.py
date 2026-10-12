@@ -31,6 +31,27 @@ class ThermalAccessTests(unittest.TestCase):
             self.assertEqual(r['status'],400,r);self.assertIn(field,r['body']['fields'])
         with app.connect() as c:self.assertEqual(c.execute('select count(*) from orders').fetchone()[0],0)
 
+    def test_files_decision_is_independent_explicit_and_never_assumed(self):
+        cookie,csrf=self.login()
+        # Combinaciones incoherentes: se rechazan sin crear la orden.
+        for changes in [{'files_access':'quizás'},{'technical_access':'denied','files_access':'authorized'},{'technical_access':'authorized','access_operating_system':True,'files_access':'authorized'},
+                        {'technical_access':'authorized','access_operating_system':True,'files_access':'denied','access_backup':True,'access_detail':'Respaldar la carpeta Documentos del cliente.'}]:
+            r=self.request('/api/orders',{**self.order_data(),**changes},cookie=cookie,csrf=csrf)
+            self.assertEqual(r['status'],400,changes);self.assertIn('files_access',r['body']['fields'],changes)
+        with app.connect() as c:self.assertEqual(c.execute('select count(*) from orders').fetchone()[0],0)
+        # Rechazo expreso: queda registrado como tal y aparece en los documentos.
+        denied=self.request('/api/orders',self.order_data({'technical_access':'authorized','access_operating_system':True,'files_access':'denied','request_key':'files-decision-denied-0001'}),cookie=cookie,csrf=csrf)
+        self.assertEqual(denied['status'],201,denied);order=self.request('/api/orders/%d'%denied['body']['id'],cookie=cookie)['body']['order'];p=order['access_authorization']['permissions']
+        self.assertEqual((p['files_decision'],p['operating_system'],p['specific_files'],p['backup']),('denied',True,False,False))
+        self.assertEqual(self.request('/api/orders/%d/receipt.pdf'%denied['body']['id'],cookie=cookie)['status'],200)
+        self.assertEqual(self.request('/api/orders/%d/thermal.pdf'%denied['body']['id'],cookie=cookie)['status'],200)
+        # Autorización expresa con alcance, y ausencia de decisión: nunca se guarda un rechazo que no se expresó.
+        granted=self.request('/api/orders',self.order_data({'technical_access':'authorized','access_operating_system':True,'files_access':'authorized','access_backup':True,'access_detail':'Respaldar la carpeta Documentos del cliente.','request_key':'files-decision-granted-001'}),cookie=cookie,csrf=csrf)
+        self.assertEqual(granted['status'],201,granted)
+        self.assertEqual(self.request('/api/orders/%d'%granted['body']['id'],cookie=cookie)['body']['order']['access_authorization']['permissions']['files_decision'],'authorized')
+        silent=self.request('/api/orders',self.order_data({'technical_access':'authorized','access_operating_system':True,'request_key':'files-decision-pending-001'}),cookie=cookie,csrf=csrf)
+        self.assertNotIn('files_decision',self.request('/api/orders/%d'%silent['body']['id'],cookie=cookie)['body']['order']['access_authorization']['permissions'])
+
     def test_access_evidence_and_destructive_separation(self):
         cookie,csrf,_,oid=self.create(technical_access='authorized',access_operating_system=True,access_signed_in_tests=True)
         order=self.request('/api/orders/'+str(oid),cookie=cookie)['body']['order'];a=order['access_authorization']

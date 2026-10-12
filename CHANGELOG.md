@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.67 — 2026-10-12 06:37 (UTC-05:00)
+
+Decisión propia para archivos y respaldos
+
+### Nuevas funcionalidades
+
+- Archivos y respaldos tienen su propia decisión en recepción: autorizado, no autorizado (rechazo expreso) o pendiente; se refleja en la confirmación, el detalle, el comprobante A4 y el ticket
+
 ## v1.5.66 — 2026-10-12 00:42 (UTC-05:00)
 
 Diagnóstico de ADI en el registro del servidor

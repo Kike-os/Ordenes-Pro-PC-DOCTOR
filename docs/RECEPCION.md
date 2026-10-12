@@ -68,4 +68,12 @@ La sección «Autorización de acceso y tratamiento de datos» se presenta en tr
 
 Los campos enviados y guardados no cambian (`technical_access`, `access_*`, `destructive_action`, `risk_*`); solo cambia la presentación. Nada viene marcado y las opciones de alcance aparecen al autorizar. El comprobante A4 incluye «Autorizaciones del cliente» con los mismos tres estados en indicadores estáticos (relleno oscuro, contorno o gris con su texto), legibles en blanco y negro, y la fecha, hora y responsable del registro.
 
-Límite conocido: el modelo guarda una sola decisión de acceso técnico. Autorizar el sistema operativo y rechazar expresamente los archivos se registra como archivos «PENDIENTE» (sin autorización), no como rechazo; distinguirlo requiere un campo nuevo.
+### Decisión propia de archivos y respaldos (1.5.67)
+
+El apartado 2 tiene su propia decisión opcional (`files_access`): «Autorizo el acceso a archivos o respaldos» o «No autorizo…». Ninguna viene marcada y «Quitar decisión» la devuelve a pendiente.
+
+- Autorizado: exige marcar archivos específicos, respaldo o ambos, y describir el alcance.
+- No autorizado: rechazo expreso; no puede quedar marcada ninguna operación de archivos. Aparece como «NO AUTORIZADO» en la confirmación, el detalle de la orden, el comprobante A4 y el ticket.
+- Sin elegir: pendiente; no se guarda ni autorización ni rechazo.
+
+Se guarda dentro del registro inmutable de la decisión de acceso (`permissions.files_decision`), sin migración. Las órdenes anteriores no se modifican: al no tener ese dato siguen mostrándose como pendientes, nunca como rechazo.

@@ -26,6 +26,12 @@ def validate(data):
     if decision=='denied' and any(permissions.values()):errors['technical_access']='Sin acceso autorizado no pueden habilitarse permisos de acceso.'
     if decision=='authorized' and not any(permissions.values()):errors['technical_access']='Selecciona al menos una operación autorizada.'
     if (permissions['specific_files'] or permissions['backup']) and weak(detail):errors['access_detail']='Describe qué carpetas, archivos o datos se pueden revisar y con qué finalidad, sin incluir claves.'
+    # Archivos y respaldos: decisión propia y opcional. Sin dato no consta ni autorización ni rechazo; el rechazo expreso se guarda como tal.
+    files=data.get('files_access') or ''
+    if files not in ('','authorized','denied'):errors['files_access']='Selecciona una decisión válida para archivos y respaldos.'
+    elif files=='denied' and (permissions['specific_files'] or permissions['backup']):errors['files_access']='Si el cliente no autoriza archivos ni respaldos, no puede quedar marcada ninguna de esas operaciones.'
+    elif files=='authorized' and decision!='authorized':errors['files_access']='El acceso a archivos requiere que el cliente autorice el acceso técnico.'
+    elif files=='authorized' and not (permissions['specific_files'] or permissions['backup']):errors['files_access']='Marca qué autoriza el cliente: archivos específicos, respaldo o ambos.'
     destructive=data.get('destructive_action','not_requested')
     if destructive not in ('not_requested','authorized','denied'):errors['destructive_action']='Selecciona una decisión válida para reinstalación o eliminación.'
     destructive_detail=str(data.get('destructive_detail','')).strip()
@@ -39,11 +45,11 @@ def validate(data):
     if any(data.get('risk_'+key) not in (None,True,False) for key in RISK):errors['destructive_action']='Las operaciones deben ser opciones explícitas.'
     elif destructive!='authorized' and any(risk.values()):errors['destructive_action']='Sin autorización específica no puede quedar marcada ninguna operación.'
     elif destructive=='authorized' and declared and not any(risk.values()):errors['destructive_action']='Marca qué operación autoriza el cliente.'
-    return {'decision':decision,'permissions':permissions,'justification':detail,'destructive':destructive,'destructive_detail':destructive_detail,'risk':risk},errors
+    return {'decision':decision,'permissions':permissions,'files':files if files in ('authorized','denied') else '','justification':detail,'destructive':destructive,'destructive_detail':destructive_detail,'risk':risk},errors
 
 
 def record(c,oid,user,now,acceptor,values,key):
-    for action,decision,permissions,detail in [('technical',values['decision'],values['permissions'],values['justification']),('destructive',values['destructive'],{'reinstall_or_erase':values['destructive']=='authorized',**{key:bool(on) and values['destructive']=='authorized' for key,on in values.get('risk',{}).items()}},values['destructive_detail'])]:
+    for action,decision,permissions,detail in [('technical',values['decision'],{**values['permissions'],**({'files_decision':values['files']} if values.get('files') else {})},values['justification']),('destructive',values['destructive'],{'reinstall_or_erase':values['destructive']=='authorized',**{key:bool(on) and values['destructive']=='authorized' for key,on in values.get('risk',{}).items()}},values['destructive_detail'])]:
         if decision=='not_requested':continue
         c.execute('INSERT INTO order_access_consents(order_id,action,decision,permissions,justification,acceptor,recorded_at,actor_id,request_key) VALUES (?,?,?,?,?,?,?,?,?)',(oid,action,decision,json.dumps(permissions,sort_keys=True),detail,acceptor,now.isoformat(timespec='microseconds'),user['id'],key))
 
