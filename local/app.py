@@ -335,7 +335,7 @@ def send_receipt_mail(c,oid,user,mode):
           'Gracias por confiar en nuestro servicio técnico.\n\nAtentamente,\n\nDepartamento de Servicio Técnico\nPC-DOCTOR S.A.\nwww.ecuadorpcdoctor.com')
     try:
         config=mail_pro.settings();card=mail_signature_card(c)
-        message,recipients=mail_pro.build_message(config,{'to':email,'subject':'Confirmación de recepción de equipo | Orden N.º '+order['code'],'body':body,'from_name':corporate.settings()['name'],
+        message,recipients=mail_pro.build_message(config,{'to':email,'subject':'PC-DOCTOR S.A. | Confirmación de recepción — Orden N.º '+order['code'],'body':body,'from_name':corporate.settings()['name'],
             'attachments':[{'name':order['code']+'-COMPROBANTE-DE-RECEPCION.pdf','type':'application/pdf','data':base64.b64encode(pdf).decode()}]},card if card.get('enabled') else '')
         mail_pro.deliver(config,message,recipients)
     except mail_pro.MailError as error:
@@ -777,6 +777,15 @@ class Handler(BaseHTTPRequestHandler):
                 if not row:
                     return self.reply(404, {'error':'Orden no disponible.'})
                 return self.reply(200, {'id':row['id']})
+            device_detail=re.fullmatch(r'/api/devices/([0-9]+)',path)
+            if device_detail:
+                # Ficha del equipo con su historial técnico: todas las órdenes del dispositivo, de la más reciente a la más antigua. Solo lectura.
+                device=c.execute("SELECT d.id,d.client_id,COALESCE(NULLIF(d.kind,''),d.category) type,d.brand,d.model,d.serial,d.color,c.name client,c.phone,c.identification FROM devices d JOIN clients c ON c.id=d.client_id WHERE d.id=?",(int(device_detail[1]),)).fetchone()
+                if not device:return self.reply(404,{'error':'Equipo no disponible.'})
+                device=dict(device)
+                history=[dict(r) for r in c.execute("SELECT o.id,COALESCE(o.code,'OP-'||printf('%05d',o.id)) code,o.created_at,o.received_at,o.delivered_at,o.status status_code,s.label status,o.problem,o.findings,o.recommendations,COALESCE((SELECT name FROM users WHERE id=o.assigned_to),'Sin asignar') responsible FROM orders o JOIN statuses s ON s.code=o.status WHERE o.device_id=? ORDER BY o.id DESC LIMIT 200",(device['id'],))]
+                same=[dict(r) for r in c.execute("SELECT x.id,x.brand,x.model,x.serial,cl.name client,(SELECT COUNT(*) FROM orders o WHERE o.device_id=x.id) orders FROM devices x JOIN clients cl ON cl.id=x.client_id WHERE x.id!=? AND ?!='' AND lower(TRIM(COALESCE(x.serial,'')))=lower(?) ORDER BY x.id LIMIT 20",(device['id'],(device['serial'] or '').strip(),(device['serial'] or '').strip()))]
+                return self.reply(200,{'device':device,'history':history,'duplicates':same,'summary':{'orders':len(history),'delivered':sum(1 for h in history if h['status_code']=='entregado'),'open':sum(1 for h in history if h['status_code']!='entregado'),'first':history[-1]['created_at'] if history else None,'last':history[0]['created_at'] if history else None}})
             client_detail=re.fullmatch(r'/api/clients/([0-9]+)',path)
             if client_detail:
                 row=c.execute('SELECT * FROM clients WHERE id=?',(int(client_detail[1]),)).fetchone()
@@ -929,11 +938,18 @@ class Handler(BaseHTTPRequestHandler):
                         where+=' AND c.client_type=?';client_kind=kind
                 else:
                     source = 'devices d JOIN clients c ON c.id=d.client_id'
-                    columns = 'd.id,d.client_id,c.name client,COALESCE(NULLIF(d.kind,\'\'),d.category) type,d.brand,d.model,d.serial'
-                    search = "c.name||' '||COALESCE(d.brand,'')||' '||COALESCE(d.model,'')||' '||COALESCE(d.serial,'')"
+                    duplicate_sql="(SELECT COUNT(*) FROM devices x WHERE x.id!=d.id AND TRIM(COALESCE(d.serial,''))!='' AND lower(TRIM(COALESCE(x.serial,'')))=lower(TRIM(d.serial)))"
+                    columns = "d.id,d.client_id,c.name client,COALESCE(NULLIF(d.kind,''),d.category) type,d.brand,d.model,d.serial,d.color,(SELECT COUNT(*) FROM orders o WHERE o.device_id=d.id) orders,(SELECT o.status FROM orders o WHERE o.device_id=d.id ORDER BY o.id DESC LIMIT 1) last_status,(SELECT o.created_at FROM orders o WHERE o.device_id=d.id ORDER BY o.id DESC LIMIT 1) last_at,"+duplicate_sql+" duplicates"
+                    search = "c.name||' '||COALESCE(c.identification,'')||' '||COALESCE(d.brand,'')||' '||COALESCE(d.model,'')||' '||COALESCE(d.serial,'')"
                     where, ordering = '', 'd.id DESC'
+                    device_kind=query.get('type',[''])[0]
+                    if device_kind:
+                        if device_kind not in DEVICE_TYPES:return self.reply(400,{'error':'Tipo de equipo inválido.'})
+                        where+=" AND COALESCE(NULLIF(d.kind,''),d.category)=?"
+                    if query.get('duplicates',[''])[0]=='1':where+=' AND '+duplicate_sql+'>0'
                 args=[term]
                 if path == '/api/clients' and query.get('type',[''])[0]:args.append(query['type'][0])
+                if path == '/api/devices' and query.get('type',[''])[0]:args.append(query['type'][0])
                 if path == '/api/orders':
                     status=query.get('status',[''])[0]
                     if status:

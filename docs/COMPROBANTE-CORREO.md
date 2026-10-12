@@ -26,7 +26,7 @@ Prueba de envío real a un buzón de prueba (en las pruebas automáticas el SMTP
 ## Cambios de la 1.5.46
 
 - El envío automático lo hace el **servidor** al guardar la orden (ya no depende de una segunda petición del navegador). La orden se confirma en la base antes de intentar el correo: si el envío falla, la orden permanece y se reenvía desde su detalle.
-- Asunto: «Confirmación de recepción de equipo | Orden N.º [NÚMERO]». Texto y firma según lo indicado por PC-DOCTOR S.A. el 11/10/2026.
+- Asunto: «PC-DOCTOR S.A. | Confirmación de recepción — Orden N.º [NÚMERO]» (desde la 1.5.72). Texto y firma según lo indicado por PC-DOCTOR S.A. el 11/10/2026.
 - El PDF incluye la sección «Autorizaciones registradas» (acceso técnico y operaciones que modifican o eliminan datos) cuando constan en la orden.
 - Configuración → «Notificaciones automáticas por correo»: interruptor, «Enviar correo de prueba» (al propio buzón del sistema, nunca a un cliente) e historial de los últimos 30 envíos con sus errores.
 - Estados: Pendiente de envío, En proceso, Enviado al servidor de correo, Error de envío. No existe «Entregado»: el SMTP del buzón no informa la entrega; los rebotes se ven en Mail Pro.

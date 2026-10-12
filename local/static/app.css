@@ -3920,3 +3920,38 @@ body[data-page=dashboard] .status-label.status-icon::before{content:none}
  .mail-v2 .mail-side{scrollbar-width:none}
 }
 @media(prefers-reduced-motion:reduce){.mail-v2 .mail-row{transition:none}}
+/* Equipos: registro con iconos por tipo, series repetidas e historial técnico */
+.devices-pro{display:grid;gap:12px;min-width:0}
+.devices-pro .devices-tools{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;margin:0}
+.devices-pro .devices-tools input[type=search]{flex:1 1 240px;min-width:0;max-width:420px;height:38px;margin:0}
+.devices-pro .devices-tools select{width:auto;max-width:220px;height:38px;margin:0}
+.devices-pro .devices-tools button{height:38px;margin:0}
+.devices-pro .devices-dup{display:inline-flex;align-items:center;gap:7px;margin:0;font-size:12.5px;color:#b8c8de}.devices-pro .devices-dup input{margin:0}
+.devices-pro .devices-tools .result-count{margin-left:auto}
+.devices-pro .devices-panel{padding:0;overflow:hidden}.devices-pro .devices-clear{margin:0 auto 18px;display:block}
+.devices-pro .devices-list{display:grid}
+.devices-pro .device-row{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) auto;align-items:center;gap:12px;padding:10px 14px;border-top:1px solid #1b2b44;min-width:0;transition:background-color .18s ease}
+.devices-pro .device-row:first-child{border-top:0}.devices-pro .device-row:hover{background:#0f1d33}
+.devices-pro .device-identity{display:flex;align-items:center;gap:10px;min-width:0}.devices-pro .device-identity>div{display:grid;min-width:0}
+.devices-pro .device-identity strong{font-size:13.5px;color:#f2f6ff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.devices-pro .device-row small{font-size:11.5px;color:#8fa5c4}
+.devices-pro .device-serial,.devices-pro .device-owner{display:grid;gap:1px;min-width:0;justify-items:start}
+.devices-pro .device-serial span{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;color:#dbe6f7;overflow-wrap:anywhere}
+.devices-pro .device-dup{padding:1px 8px;border:1px solid #7a6230;border-radius:999px;background:#2b230f;color:#f3d48f;font-size:10.5px;font-weight:700}
+.devices-pro .device-owner button{padding:0;margin:0;font-size:13px;text-align:left;overflow-wrap:anywhere}
+.devices-pro .device-stats{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;min-width:0}.devices-pro .device-count{font-size:12.5px;font-weight:650;color:#cfdcf0;white-space:nowrap}
+.devices-pro .device-actions{display:flex;gap:6px;justify-content:flex-end}.devices-pro .device-actions button{display:inline-flex;align-items:center;gap:6px;height:32px;margin:0;padding:0 11px;font-size:12px;white-space:nowrap}.devices-pro .device-history svg{width:14px;height:14px}
+dialog.device-card{width:min(720px,calc(100vw - 24px))}
+.device-card .device-card-body{display:grid;gap:12px;min-width:0}
+.device-card .device-card-head{display:flex;align-items:center;gap:12px}.device-card .device-card-head>div{display:grid}.device-card .device-card-head strong{font-size:16px;color:#f4f8ff}.device-card .device-card-head small{font-size:12px;color:#9bb0cf}
+.device-card .device-facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:0}.device-card .device-facts>div{padding:8px 10px;border:1px solid #1e3050;border-radius:10px;background:#0b1626;min-width:0}
+.device-card .device-facts dt{font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:#8fa2bd}.device-card .device-facts dd{margin:2px 0 0;font-size:13px;color:#eef3ff;overflow-wrap:anywhere}
+.device-card .device-dups{display:grid;gap:4px;justify-items:start;padding:9px 11px;border:1px solid #7a6230;border-radius:10px;background:#2b230f;color:#f6dfa6;font-size:12.5px}.device-card .device-dups button{padding:0;margin:0;text-align:left;color:#ffe9b0}.device-card .device-dups small{color:#d9c48c}
+.device-card h3{margin:2px 0 0;font-size:13px;color:#cfdcf0}
+.device-card .device-timeline{display:grid;gap:8px;margin:0;padding:0;list-style:none;max-height:46vh;overflow-y:auto;scrollbar-width:thin}
+.device-card .device-timeline li{display:grid;gap:4px;padding:10px 12px;border:1px solid #1c2e4a;border-left:3px solid #3b74c4;border-radius:10px;background:#0a1322}
+.device-card .device-entry-top{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px}.device-card .device-entry-top time{margin-left:auto;font-size:11.5px;color:#8fa2bd}
+.device-card .device-timeline p{margin:0;font-size:12.5px;line-height:1.45;color:#cfdcf0;overflow-wrap:anywhere}.device-card .device-timeline p b{color:#9bb0cf;font-weight:600}
+.device-card .device-entry-foot{font-size:11.5px;color:#8fa2bd}
+@media(max-width:1000px){.devices-pro .device-row{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px 12px}.devices-pro .device-identity{grid-column:1/-1}.devices-pro .device-actions{grid-column:1/-1;justify-content:flex-start}}
+@media(max-width:520px){.devices-pro .device-row{grid-template-columns:1fr}.devices-pro .devices-tools select,.devices-pro .devices-tools input[type=search]{flex:1 1 100%;max-width:none;width:100%}.devices-pro .devices-tools .result-count{margin-left:0}.device-card .device-facts{grid-template-columns:repeat(2,minmax(0,1fr))}.devices-pro .device-actions button{flex:1;justify-content:center}}
+@media(prefers-reduced-motion:reduce){.devices-pro .device-row{transition:none}}

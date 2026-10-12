@@ -42,7 +42,7 @@ class ReceiptMailTests(unittest.TestCase):
             self.assertEqual((first['result'],first['recipient'],len(sent)),('sent','cliente@example.invalid',1))
             message,recipients=sent[0];self.assertEqual(recipients,['cliente@example.invalid'])
             code=self.request('/api/orders/%d'%oid,cookie=cookie)['body']['order']['code']
-            self.assertEqual(message['Subject'],'Confirmación de recepción de equipo | Orden N.º '+code)
+            self.assertEqual(message['Subject'],'PC-DOCTOR S.A. | Confirmación de recepción — Orden N.º '+code)
             attachment=[part for part in message.iter_attachments()]
             self.assertEqual([(a.get_filename(),a.get_content_type()) for a in attachment],[(code+'-COMPROBANTE-DE-RECEPCION.pdf','application/pdf')])
             self.assertTrue(attachment[0].get_payload(decode=True).startswith(b'%PDF'))

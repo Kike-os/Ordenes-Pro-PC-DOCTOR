@@ -350,6 +350,7 @@ async function renderRoute(){
 function renderList(name,data,params){
  if(name==='orders'){renderOrdersList(data,params);return;}
  if(name==='clients'){renderClientsList(data,params);return;}
+ if(name==='devices'){renderDevicesList(data,params);return;}
  const content=$('module-content');content.replaceChildren();const tools=el('div',undefined,'module-tools');const form=el('form');form.setAttribute('role','search');
  const search=el('input');search.type='search';search.maxLength=150;search.value=params.get('q')||'';search.placeholder=name==='orders'?'Orden, cliente o equipo…':name==='clients'?'Nombre, teléfono o correo…':'Cliente, equipo o serie…';search.setAttribute('aria-label','Buscar en '+moduleInfo[name][0]);
  const submit=el('button','Buscar','secondary');submit.type='submit';form.append(search,submit);form.onsubmit=e=>{e.preventDefault();const next=new URLSearchParams(params);next.set('q',search.value.trim());next.delete('page');go(name,next);};tools.append(form);
@@ -368,6 +369,43 @@ function renderList(name,data,params){
  }
  const pager=el('div',undefined,'pager');const prev=button('← Anterior',()=>page(-1));const next=button('Siguiente →',()=>page(1));prev.disabled=data.page<=1;next.disabled=data.page>=data.pages;pager.append(prev,el('span',`Página ${data.page} de ${data.pages}`),next);content.append(pager);
  function page(offset){const nextParams=new URLSearchParams(params);nextParams.set('page',String(data.page+offset));go(name,nextParams);}
+}
+// Equipos: registro por dispositivo con icono según su tipo, órdenes acumuladas, último estado y series repetidas.
+// «Historial técnico» abre la ficha con todas las reparaciones del equipo. Todo es de solo lectura salvo «Editar» (administración).
+function renderDevicesList(data,params){
+ const content=$('module-content'),wrap=el('div',undefined,'devices-pro');content.replaceChildren(wrap);const types=receptionOptions?.device_types||{},typeName=code=>types[code]||({portatil:'Computadora portátil',escritorio:'PC de escritorio'}[code]||code||'Sin tipo');
+ $('module-add').hidden=!admin();$('module-add').textContent='+ Registrar equipo';$('module-add').onclick=()=>openRecord('devices').catch(e=>notify(e.message));
+ const apply=change=>{const next=new URLSearchParams(params);next.delete('page');change(next);go('devices',next);};
+ const tools=el('form',undefined,'devices-tools'),search=el('input'),kind=el('select'),dup=el('label',undefined,'devices-dup'),dupBox=el('input'),submit=el('button','Buscar','secondary');tools.setAttribute('role','search');search.type='search';search.maxLength=150;search.value=params.get('q')||'';search.placeholder='Serie, cliente, marca o modelo…';search.setAttribute('aria-label','Buscar equipos por serie, cliente, marca o modelo');
+ kind.setAttribute('aria-label','Tipo de equipo');kind.add(new Option('Todos los tipos',''));for(const[code,label]of Object.entries(types))kind.add(new Option(label,code));kind.value=params.get('type')||'';kind.onchange=()=>apply(next=>{if(kind.value)next.set('type',kind.value);else next.delete('type');next.set('q',search.value.trim());});
+ dupBox.type='checkbox';dupBox.checked=params.get('duplicates')==='1';dupBox.onchange=()=>apply(next=>{if(dupBox.checked)next.set('duplicates','1');else next.delete('duplicates');});dup.append(dupBox,el('span','Solo series repetidas'));submit.type='submit';tools.onsubmit=event=>{event.preventDefault();apply(next=>next.set('q',search.value.trim()));};
+ tools.append(search,kind,submit,dup,el('span',data.total+(data.total===1?' equipo':' equipos'),'result-count'));wrap.append(tools);
+ const panel=el('div',undefined,'data-panel devices-panel');wrap.append(panel);
+ if(!data.rows.length){const filtered=['q','type','duplicates'].some(key=>params.get(key));const empty=el('p',filtered?'Ningún equipo coincide con la búsqueda o los filtros.':'Aún no hay equipos registrados. Se crean al registrar una orden de recepción.','empty-module');panel.append(empty);if(filtered)panel.append(button('Quitar filtros',()=>go('devices',new URLSearchParams()),'secondary devices-clear'));}
+ else{const list=el('div',undefined,'devices-list');list.setAttribute('role','list');
+  for(const row of data.rows){const item=el('article',undefined,'device-row'),identity=el('div',undefined,'device-identity'),text=el('div'),serial=el('div',undefined,'device-serial'),owner=el('div',undefined,'device-owner'),stats=el('div',undefined,'device-stats'),actions=el('div',undefined,'device-actions');item.setAttribute('role','listitem');
+   text.append(el('strong',[row.brand,row.model].filter(Boolean).join(' ')||'Equipo sin especificar'),el('small',typeName(row.type)+(row.color?' · '+row.color:'')));identity.append(deviceIcon(row.type),text);
+   serial.append(el('small','Serie'),el('span',row.serial||'Sin serie'));if(row.duplicates){const chip=el('b','Serie repetida','device-dup');chip.title='Hay '+row.duplicates+(row.duplicates===1?' equipo más':' equipos más')+' con este número de serie. Revisa el historial técnico.';serial.append(chip);}
+   const clientLink=button(row.client,()=>showClientDetail(row.client_id),'text-action');owner.append(el('small','Cliente'),clientLink);
+   const count=el('span',row.orders+(row.orders===1?' orden':' órdenes'),'device-count');stats.append(count);if(row.last_status)stats.append(orderBadge(row.last_status));else stats.append(el('small','Sin órdenes','device-none'));
+   const history=button('',()=>showDeviceHistory(row.id),'secondary device-history');history.append(systemIcon('M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8 M3 3v5h5 M12 7v5l4 2'),el('span','Historial técnico'));actions.append(history);if(admin())actions.append(button('Editar',()=>openRecord('devices',row).catch(e=>notify(e.message)),'secondary'));
+   item.append(identity,serial,owner,stats,actions);list.append(item);}
+  panel.append(list);}
+ const pager=el('div',undefined,'pager'),move=delta=>{const next=new URLSearchParams(params);next.set('page',String(data.page+delta));go('devices',next);},prev=button('← Anterior',()=>move(-1)),next=button('Siguiente →',()=>move(1));prev.disabled=data.page<=1;next.disabled=data.page>=data.pages;pager.append(prev,el('span','Página '+data.page+' de '+data.pages),next);if(data.pages>1)wrap.append(pager);
+}
+async function showDeviceHistory(id){
+ const dialog=smallDialog('Historial técnico del equipo');dialog.classList.add('device-card');const body=el('div',undefined,'device-card-body');body.append(el('p','Cargando historial…','empty-module'));dialog.append(body);
+ let data;try{data=await api('/api/devices/'+id);}catch(error){body.replaceChildren(el('p',error.message,'empty-module'));return;}if(!dialog.isConnected)return;
+ const d=data.device,types=receptionOptions?.device_types||{},head=el('header',undefined,'device-card-head'),title=el('div'),facts=el('dl',undefined,'device-facts'),fact=(label,value)=>{const box=el('div');box.append(el('dt',label),el('dd',value));facts.append(box);};
+ title.append(el('strong',[d.brand,d.model].filter(Boolean).join(' ')||'Equipo sin especificar'),el('small',(types[d.type]||d.type||'Sin tipo')+(d.color?' · '+d.color:'')));head.append(deviceIcon(d.type),title);
+ fact('Número de serie',d.serial||'Sin serie');fact('Cliente',d.client);fact('Órdenes registradas',String(data.summary.orders));fact('Entregadas',String(data.summary.delivered));fact('En curso',String(data.summary.open));fact('Primera recepción',data.summary.first?formatOrderDate(data.summary.first*1000):'—');
+ body.replaceChildren(head,facts);
+ if(data.duplicates.length){const warn=el('div',undefined,'device-dups');warn.append(el('strong','Este número de serie también figura en:'));for(const other of data.duplicates){const line=button('',()=>{dialog.close();showDeviceHistory(other.id);},'text-action');line.append(el('span',([other.brand,other.model].filter(Boolean).join(' ')||'Equipo')+' · '+other.client+' · '+other.orders+(other.orders===1?' orden':' órdenes')));warn.append(line);}warn.append(el('small','No se fusionan automáticamente: comprueba con el cliente si se trata del mismo equipo.'));body.append(warn);}
+ body.append(el('h3','Reparaciones y servicios ('+data.history.length+')'));
+ if(!data.history.length)body.append(el('p','Este equipo todavía no tiene órdenes registradas.','empty-module'));
+ else{const timeline=el('ol',undefined,'device-timeline');for(const entry of data.history){const item=el('li'),top=el('div',undefined,'device-entry-top'),open=button(entry.code,()=>{dialog.close();go('orders',new URLSearchParams({id:String(entry.id)}));},'order-code-link');top.append(open,orderBadge(entry.status_code,entry.status),el('time',formatOrderDate(entry.created_at*1000)));item.append(top);
+   const note=(label,value)=>{if(!value)return;const line=el('p');line.append(el('b',label+': '),value);item.append(line);};note('Falla reportada',entry.problem);note('Hallazgos',entry.findings);note('Recomendaciones',entry.recommendations);
+   item.append(el('small','Responsable: '+entry.responsible+(entry.delivered_at&&entry.status_code==='entregado'?' · Entregado el '+formatOrderDate(entry.delivered_at):''),'device-entry-foot'));timeline.append(item);}body.append(timeline);}
 }
 function field(parent,label,name,value='',options={}){const wrapper=el('label',label);const input=el(options.select?'select':options.textarea?'textarea':'input');input.name=name;if(!options.select){if(!options.textarea)input.type=options.type||'text';input.maxLength=options.maxLength||150;}for(const key of ['min','max'])if(options[key]!==undefined)input[key]=options[key];input.required=!!options.required;input.value=value||'';wrapper.append(input);parent.append(wrapper);return input;}
 async function openRecord(name,row={}){

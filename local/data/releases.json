@@ -8,6 +8,25 @@
   },
   "releases": [
     {
+      "version": "1.5.72",
+      "date": "2026-10-12T07:11:46-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Equipos con historial técnico",
+      "changes": {
+        "features": [
+          "Equipos: registro con icono por tipo, órdenes acumuladas y último estado, buscador por serie, cliente, marca o modelo, filtros y botón «Historial técnico» con todas las reparaciones del equipo"
+        ],
+        "improvements": [
+          "Equipos: aviso de números de serie repetidos entre equipos, sin fusionar ni borrar nada",
+          "Nuevo asunto del correo de recepción: «PC-DOCTOR S.A. | Confirmación de recepción — Orden N.º …»"
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.71",
       "date": "2026-10-12T07:04:09-05:00",
       "type": "patch",

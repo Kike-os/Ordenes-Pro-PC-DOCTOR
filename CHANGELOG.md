@@ -4,6 +4,19 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.72 — 2026-10-12 07:11 (UTC-05:00)
+
+Equipos con historial técnico
+
+### Nuevas funcionalidades
+
+- Equipos: registro con icono por tipo, órdenes acumuladas y último estado, buscador por serie, cliente, marca o modelo, filtros y botón «Historial técnico» con todas las reparaciones del equipo
+
+### Mejoras realizadas
+
+- Equipos: aviso de números de serie repetidos entre equipos, sin fusionar ni borrar nada
+- Nuevo asunto del correo de recepción: «PC-DOCTOR S.A. | Confirmación de recepción — Orden N.º …»
+
 ## v1.5.71 — 2026-10-12 07:04 (UTC-05:00)
 
 Distribución compacta del módulo Correo
