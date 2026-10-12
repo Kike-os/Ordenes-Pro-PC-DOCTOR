@@ -682,7 +682,7 @@ def read_message(client, folder, uid, mark_seen=True):
     if mark_seen and '\\seen' not in flags:
         client.select(quoted(folder), readonly=False)
         client.uid('STORE', str(int(uid)), '+FLAGS', '(\\Seen)')
-    return {'uid': int(uid), 'folder': folder, 'subject': header_text(message['subject'])[:300] or '(sin asunto)', 'from': people(message, 'from')[:1], 'to': people(message, 'to')[:30], 'cc': people(message, 'cc')[:30], 'reply_to': people(message, 'reply-to')[:1],
+    return {'uid': int(uid), 'folder': folder, 'subject': header_text(message['subject'])[:300] or '(sin asunto)', 'from': people(message, 'from')[:1], 'to': people(message, 'to')[:30], 'cc': people(message, 'cc')[:30], 'bcc': people(message, 'bcc')[:30], 'reply_to': people(message, 'reply-to')[:1],
             'date': date_iso(message), 'message_id': header_text(message['message-id'])[:300], 'references': header_text(message['references'])[:2000], 'text': plain[:400_000], 'html': safe, 'blocked_images': blocked, 'attachments': attachments,
             'flagged': '\\flagged' in flags, 'seen': True if mark_seen else '\\seen' in flags, 'draft': '\\draft' in flags,
             'signature_pref': {'on': True, 'off': False}.get(header_text(message['x-ordenespro-signature']).lower())}
@@ -865,6 +865,9 @@ def build_message(config, data, signature=''):
         message['To'] = ', '.join(to)
     if cc:
         message['Cc'] = ', '.join(cc)
+    if bcc and data.get('draft'):
+        # Solo en borradores: la copia oculta se conserva para cuando se reabra. Al enviar nunca figura en las cabeceras.
+        message['Bcc'] = ', '.join(bcc)
     message['Subject'] = subject or '(sin asunto)'
     message['Date'] = formatdate(localtime=True)
     message['Message-ID'] = make_msgid(domain=config['username'].split('@')[-1])

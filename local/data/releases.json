@@ -8,6 +8,24 @@
   },
   "releases": [
     {
+      "version": "1.5.75",
+      "date": "2026-10-12T07:28:50-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Ventana Nuevo mensaje reorganizada",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Mail Pro · Nuevo mensaje: CC y CCO en una fila, asunto destacado, barra de formato unida al editor con ADI integrada, firma y adjuntos compactos y botones Enviar siempre visibles"
+        ],
+        "fixes": [
+          "Mail Pro: la copia oculta (CCO) ya se conserva al guardar un borrador y reabrirlo"
+        ],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.74",
       "date": "2026-10-12T07:19:35-05:00",
       "type": "patch",

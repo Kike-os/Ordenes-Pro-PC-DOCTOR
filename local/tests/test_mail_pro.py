@@ -422,6 +422,14 @@ class MailRouteTests(test_app.SecurityTests):
             self.assertIn('permanece en su carpeta',str(raised.exception));self.assertFalse([c for c in box.calls if c in forbidden])
         box=Box((b'MOVE',b'UIDPLUS'),None);self.assertEqual(mail_pro.batch(box,'INBOX',[4],'move','INBOX.spam'),1);self.assertIn('MOVE',box.calls)
 
+    def test_bcc_is_kept_in_drafts_and_never_exposed_when_sending(self):
+        config={'imap_host':'mail.example.invalid','imap_port':993,'smtp_host':'mail.example.invalid','smtp_port':465,'username':'buzon@example.invalid','password':'x'}
+        data={'to':'uno@example.invalid','cc':'dos@example.invalid','bcc':'oculta@example.invalid','subject':'Prueba','body':'Texto de prueba'}
+        sent,recipients=mail_pro.build_message(config,dict(data),'')
+        self.assertIsNone(sent['Bcc']);self.assertEqual(recipients,['uno@example.invalid','dos@example.invalid','oculta@example.invalid'])
+        draft,_=mail_pro.build_message(config,dict(data,draft=True),'')
+        self.assertEqual(draft['Bcc'],'oculta@example.invalid')
+
     def test_replaced_draft_is_removed_only_when_it_is_a_draft(self):
         class Box:
             def __init__(self,flags):self.flags=flags;self.calls=[]

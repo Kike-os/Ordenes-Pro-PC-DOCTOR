@@ -3960,3 +3960,36 @@ dialog.device-card{width:min(720px,calc(100vw - 24px))}
 @keyframes adi-fixed-glow{0%{box-shadow:0 0 0 0 #5cc8ff00;background-position:120% 0}25%{box-shadow:0 0 0 1px #5cc8ffb3,0 0 18px 2px #5cc8ff55}100%{box-shadow:0 0 0 0 #5cc8ff00;background-position:-60% 0}}
 .adi-bar[data-star=done] .adi-button .system-icon{filter:drop-shadow(0 0 5px #7fd4ff)}
 @media(prefers-reduced-motion:reduce){.adi-fixed{animation:none;background-image:none!important}.adi-bar[data-star=done] .adi-button .system-icon{filter:none}}
+/* Mail Pro · Nuevo mensaje: misma apariencia, mejor estructura (campos compactos, editor protagonista, firma y adjuntos discretos, acciones siempre visibles) */
+dialog.mail-composer form{gap:8px;padding:14px 20px 0}
+body[data-page=dashboard] .mail-composer input[name=subject]{font-size:14.5px;font-weight:600;color:#f4f8ff}
+.mail-composer .mail-format{gap:4px;margin-bottom:-8px;padding:5px 6px;border:1px solid #304566;border-bottom-color:#1e3050;border-radius:10px 10px 0 0;background:#0b1626}
+.mail-composer .mail-format .mail-format-button{min-height:28px;padding:3px 9px;border-color:transparent;background:transparent}
+.mail-composer .mail-format .mail-format-button:hover,.mail-composer .mail-format .mail-format-button:focus-visible{border-color:#2f4a73;background:#12233d}
+.mail-composer .mail-format .mail-preview-open{border-color:#2a4063}
+.mail-composer .mail-format .adi-bar.mail-format-adi{margin:0;flex:0 1 auto;min-width:0}
+body[data-page=dashboard] .mail-composer .mail-editor{min-height:clamp(200px,34dvh,380px);border-radius:0 0 10px 10px}
+.mail-composer .mail-sign-box{gap:6px;padding-top:8px;border-top:1px dashed #263c5e}
+.mail-composer .mail-sign-box .mail-sign-card{zoom:.62}
+body[data-page=dashboard] .mail-composer input[type=file]{padding:6px;font-size:12px;color:#9bb0cf}
+.mail-composer input[type=file]::file-selector-button{margin-right:10px;padding:6px 12px;border:1px solid #2f4a73;border-radius:8px;background:#12233d;color:#dbe8fb;font:inherit;font-weight:600;cursor:pointer}
+.mail-composer input[type=file]::file-selector-button:hover{border-color:#3b74c4;background:#16305a}
+.mail-composer .mail-composer-actions{position:sticky;bottom:0;z-index:2;margin:4px -20px 0;padding:10px 20px 12px;border-top:1px solid #1e3050;background:#0c1a2e}
+.mail-composer .dialog-heading .mail-composer-expand,.mail-composer .dialog-heading .icon-button{transition:border-color .16s,background-color .16s}
+@media(min-width:761px){
+ .mail-composer form{grid-template-columns:repeat(2,minmax(0,1fr));column-gap:14px}
+ .mail-composer form>*{grid-column:1/-1}
+ .mail-composer form>.rcpt-field:nth-of-type(2){grid-column:1}
+ .mail-composer form>.rcpt-field:nth-of-type(3){grid-column:2;grid-template-columns:44px minmax(0,1fr)}
+ .mail-composer.mail-composer-wide form{grid-template-rows:none;grid-auto-rows:min-content;height:auto}
+ body[data-page=dashboard] .mail-composer.mail-composer-wide .mail-editor{min-height:calc(100dvh - 470px);max-height:none}
+}
+@media(max-width:760px){dialog.mail-composer form{padding:12px 14px 0}.mail-composer .mail-composer-actions{margin:4px -14px 0;padding:10px 14px 12px;gap:6px}.mail-composer .mail-composer-actions button{flex:1 1 calc(50% - 6px);min-height:40px}body[data-page=dashboard] .mail-composer .mail-editor{min-height:200px}}
+/* El pie con Enviar queda siempre a la vista: la ventana es una columna y solo el formulario se desplaza. */
+body[data-page=dashboard] dialog.mail-composer[open]{display:flex;flex-direction:column;overflow:hidden}
+dialog.mail-composer[open]>.dialog-heading{flex:0 0 auto}
+dialog.mail-composer[open]>form{flex:1 1 auto;min-height:0;height:auto;scrollbar-width:thin;scrollbar-color:#2a4063 transparent}
+body[data-page=dashboard] .mail-composer .mail-editor{min-height:clamp(180px,28dvh,320px)}
+/* Las filas del formulario conservan su alto natural aunque la ventana limite la altura (se desplaza el formulario, no se aplasta la firma). */
+dialog.mail-composer[open]>form{grid-auto-rows:max-content;align-content:start;overflow-x:hidden}
+@media(max-width:760px){.mail-composer .mail-sign-box .mail-sign-card{zoom:.7;max-width:100%}.mail-composer .mail-sign-box .mail-sign-card :is(p,span,strong){white-space:normal;overflow-wrap:anywhere}}

@@ -4,6 +4,18 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.75 — 2026-10-12 07:28 (UTC-05:00)
+
+Ventana Nuevo mensaje reorganizada
+
+### Mejoras realizadas
+
+- Mail Pro · Nuevo mensaje: CC y CCO en una fila, asunto destacado, barra de formato unida al editor con ADI integrada, firma y adjuntos compactos y botones Enviar siempre visibles
+
+### Errores corregidos
+
+- Mail Pro: la copia oculta (CCO) ya se conserva al guardar un borrador y reabrirlo
+
 ## v1.5.74 — 2026-10-12 07:19 (UTC-05:00)
 
 Destello al corregir con ADI
