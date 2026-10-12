@@ -85,6 +85,10 @@ class ServiceTermsTests(unittest.TestCase):
         self.assertEqual(result['status'],201)
         free=self.request('/api/orders/'+str(result['body']['id']),cookie=cookie)['body']['order']
         self.assertEqual((free['terms'],free['terms_acceptance_id'],free['code']==result['body']['code'],bool(free['qr_url'])),(None,None,True,True))
+        # Al publicarse después una versión oficial, la orden la ofrece para consulta pero sigue sin aceptación atribuida.
+        self.assertIsNone(free['terms_current']);self.publish(cookie,csrf,version='TEST-POST')
+        later=self.request('/api/orders/'+str(result['body']['id']),cookie=cookie)['body']['order']
+        self.assertEqual((later['terms'],later['terms_acceptance_id'],later['terms_current']['version']),(None,None,'TEST-POST'))
         # Sus documentos se generan igual, sin texto ni evidencia de condiciones.
         for doc in ('/api/orders/%d/thermal.pdf','/api/orders/%d/tracking-qr.png'):self.assertEqual(self.request(doc%result['body']['id'],cookie=cookie)['status'],200)
         with app.connect() as c:

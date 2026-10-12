@@ -4,6 +4,18 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.102 — 2026-10-12 17:27 (UTC-05:00)
+
+Condiciones oficiales vigentes en el detalle de la orden
+
+### Mejoras realizadas
+
+- Condiciones del servicio: publicada la versión oficial 2026.10.1 (vigente desde el 12/10/2026). Las órdenes sin aceptación registrada enlazan a la versión vigente en lugar del borrador, sin atribuirles aceptación.
+
+### Actualizaciones de seguridad
+
+- El proceso programado de avisos solo responde a la llamada autenticada de la plataforma.
+
 ## v1.5.101 — 2026-10-12 14:31 (UTC-05:00)
 
 Correo de verificación corporativo, recuperación fiable en Vercel y permanencia vencida

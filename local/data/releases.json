@@ -8,6 +8,24 @@
   },
   "releases": [
     {
+      "version": "1.5.102",
+      "date": "2026-10-12T17:27:33-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Condiciones oficiales vigentes en el detalle de la orden",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Condiciones del servicio: publicada la versión oficial 2026.10.1 (vigente desde el 12/10/2026). Las órdenes sin aceptación registrada enlazan a la versión vigente en lugar del borrador, sin atribuirles aceptación."
+        ],
+        "fixes": [],
+        "security": [
+          "El proceso programado de avisos solo responde a la llamada autenticada de la plataforma."
+        ],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.101",
       "date": "2026-10-12T14:31:01-05:00",
       "type": "patch",

@@ -1080,6 +1080,8 @@ class Handler(BaseHTTPRequestHandler):
                 technical_access.attach(c,result)
                 order_workspace.attach(c,result)
                 result['current_problem']=row['problem']
+                # Versión oficial vigente, para consultarla desde órdenes sin aceptación registrada (no implica que esta orden la haya aceptado).
+                active_terms=service_terms.current(c,reception_now());result['terms_current']=service_terms.metadata(active_terms) if active_terms else None
                 result['photos']=[dict(r) for r in c.execute('SELECT id,is_main,position,size,created_at FROM order_photos WHERE order_id=? ORDER BY is_main DESC,position,id',(result['id'],))]
                 result['mail']=[dict(r) for r in c.execute('SELECT id,subject,correspondent,direction,sent_at,folder,uid FROM mail_links WHERE order_id=? ORDER BY id DESC LIMIT 30',(result['id'],))] if mail_allowed(user) else None
                 return self.reply(200, {'order':result})
