@@ -4,6 +4,18 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.68 — 2026-10-12 06:46 (UTC-05:00)
+
+Eliminar correos desde el mensaje abierto
+
+### Mejoras realizadas
+
+- Mail Pro: la eliminación definitiva se confirma con el diálogo del sistema y la barra del mensaje se acomoda en móvil
+
+### Errores corregidos
+
+- Mail Pro: el mensaje abierto ya tiene botón Eliminar (envía a la Papelera, con Deshacer); en la Papelera permite restaurar o eliminar definitivamente
+
 ## v1.5.67 — 2026-10-12 06:37 (UTC-05:00)
 
 Decisión propia para archivos y respaldos

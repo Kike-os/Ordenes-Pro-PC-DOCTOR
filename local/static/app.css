@@ -3885,3 +3885,6 @@ body[data-page=dashboard] .status-label.status-icon::before{content:none}
 @media(prefers-reduced-motion:reduce){.orders-results .order-table tbody tr{transition:none}}
 @media(max-width:1100px){.orders-results .order-table tbody{gap:10px;padding:10px}.orders-results .order-table tr{padding:11px 12px}.orders-results .order-table td{grid-template-columns:96px minmax(0,1fr);gap:8px;padding:4px 0!important;line-height:1.4}.orders-results .order-table td.order-identity{display:flex!important;align-items:center;gap:10px;padding-bottom:8px!important}.orders-results .order-table td.order-identity small{margin-top:2px}.orders-results .order-table td .status-label{justify-self:start}.orders-results .order-row-actions{padding-top:9px;margin-top:6px}}
 .access-pro .access-part .access-choice[hidden],.access-pro .access-clear[hidden]{display:none}.access-pro button.access-clear{justify-self:start;margin:0;padding:0;font-size:11.5px}
+/* Mail Pro: eliminar desde el mensaje abierto */
+.mail-v2 button.mail-tool.mail-danger{color:#ff9aa2}.mail-v2 button.mail-tool.mail-danger:hover,.mail-v2 button.mail-tool.mail-danger:focus-visible{border-color:#b84a55;background:#2a1218;color:#ffd0d4}
+@media(max-width:860px){.mail-v2 .mail-bar{flex-wrap:wrap;row-gap:6px}.mail-v2 .mail-bar .mail-bar-space{flex:1 1 0;min-width:0}}
