@@ -83,7 +83,7 @@ def build(c, filters):
         row['type_label'] = DEVICE_TYPES.get(row['type'], '')
         row['stages'] = stages(row['status_code'], seen.get(row['id'], set()), statuses, bool(row['received_at'] or row['created_at']))
     people = [{'id': row['id'], 'name': row['name']} for row in c.execute("SELECT id,name FROM users WHERE approval='approved' AND active=1 ORDER BY name COLLATE NOCASE")]
-    return {'counters': counters, 'total_orders': sum(totals.values()), 'rows': rows, 'total': total, 'page': page, 'pages': pages, 'page_size': PAGE,
+    return {'counters': counters, 'status_totals': totals, 'total_orders': sum(totals.values()), 'rows': rows, 'total': total, 'page': page, 'pages': pages, 'page_size': PAGE,
             'filters': {key: filters[key] for key in ('q', 'status', 'technician', 'from', 'to')},
             'options': {'statuses': [{'code': code, 'label': label} for code, label in statuses.items()], 'technicians': people}}
 

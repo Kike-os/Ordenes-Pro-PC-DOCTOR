@@ -8,6 +8,23 @@
   },
   "releases": [
     {
+      "version": "1.5.109",
+      "date": "2026-10-12T18:21:14-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Seguimiento de Órdenes en tabla compacta con filtro desde las tarjetas de estado",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Seguimiento de Órdenes como tabla compacta: una fila por orden, búsqueda siempre visible, filtros avanzados desplegables con etiquetas retirables e historial bajo cada fila; en teléfonos cada fila se muestra como ficha.",
+          "Las seis tarjetas de estado del inicio filtran la tabla de seguimiento y actualizan sus totales con cada sincronización; se eliminaron los contadores duplicados."
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.108",
       "date": "2026-10-12T18:14:47-05:00",
       "type": "patch",

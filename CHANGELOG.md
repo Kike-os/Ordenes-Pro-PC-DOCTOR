@@ -4,6 +4,15 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.109 — 2026-10-12 18:21 (UTC-05:00)
+
+Seguimiento de Órdenes en tabla compacta con filtro desde las tarjetas de estado
+
+### Mejoras realizadas
+
+- Seguimiento de Órdenes como tabla compacta: una fila por orden, búsqueda siempre visible, filtros avanzados desplegables con etiquetas retirables e historial bajo cada fila; en teléfonos cada fila se muestra como ficha.
+- Las seis tarjetas de estado del inicio filtran la tabla de seguimiento y actualizan sus totales con cada sincronización; se eliminaron los contadores duplicados.
+
 ## v1.5.108 — 2026-10-12 18:14 (UTC-05:00)
 
 Gestión documental de las Condiciones y rótulo del inicio
