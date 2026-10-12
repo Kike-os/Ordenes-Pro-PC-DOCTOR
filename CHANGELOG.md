@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.63 — 2026-10-12 00:26 (UTC-05:00)
+
+Iluminación suave al cambiar el estado de una orden
+
+### Mejoras realizadas
+
+- Al cambiar el estado de una orden, su etiqueta se ilumina suavemente una vez (respeta movimiento reducido)
+
 ## v1.5.62 — 2026-10-12 00:23 (UTC-05:00)
 
 Bandeja de conversaciones del Centro de Atención

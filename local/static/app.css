@@ -3854,3 +3854,7 @@ body[data-page=dashboard] .adi-assist header.adi-assist-head>div{display:grid;ga
 .live-pro button.live-back{display:grid;place-items:center;flex:none;width:32px;height:32px;margin:0;padding:0;border:1px solid #263c5e;border-radius:9px;background:transparent;color:#b8c8de}.live-pro button.live-back svg{width:16px;height:16px}.live-pro button.live-back:hover{transform:none;border-color:#3b74c4;color:#fff}
 @media(max-width:1180px){.live-pro[data-selected=false] .live-console{grid-template-columns:300px minmax(0,1fr)}.live-pro .live-tiles{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:760px){.live-pro[data-selected=false] .live-console{grid-template-columns:1fr}.live-pro[data-selected=false] .live-side{max-height:none;order:2}.live-pro[data-selected=false] .live-main{min-height:0}.live-pro[data-selected=true] .live-side{display:none}.live-pro button.live-queue-row{grid-template-columns:minmax(0,1fr) auto}.live-pro .live-queue-row time{display:none}}
+/* Órdenes: iluminación suave de la etiqueta cuando su estado acaba de cambiar (una sola vez, sin parpadeo) */
+.status-label.status-changed{animation:status-glow 1.8s cubic-bezier(.22,.61,.36,1) 1}
+@keyframes status-glow{0%{box-shadow:0 0 0 0 color-mix(in srgb,currentColor 0%,transparent);filter:brightness(1)}22%{box-shadow:0 0 16px 3px color-mix(in srgb,currentColor 45%,transparent);filter:brightness(1.28)}100%{box-shadow:0 0 0 0 color-mix(in srgb,currentColor 0%,transparent);filter:brightness(1)}}
+@media(prefers-reduced-motion:reduce){.status-label.status-changed{animation:none}}

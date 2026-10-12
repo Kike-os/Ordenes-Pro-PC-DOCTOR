@@ -8,6 +8,22 @@
   },
   "releases": [
     {
+      "version": "1.5.63",
+      "date": "2026-10-12T00:26:34-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Iluminación suave al cambiar el estado de una orden",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Al cambiar el estado de una orden, su etiqueta se ilumina suavemente una vez (respeta movimiento reducido)"
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.62",
       "date": "2026-10-12T00:23:59-05:00",
       "type": "patch",
