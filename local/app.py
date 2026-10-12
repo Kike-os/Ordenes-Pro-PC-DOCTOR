@@ -1326,6 +1326,16 @@ class Handler(BaseHTTPRequestHandler):
                     return self.reply(400 if error.kind=='configuracion' else 502,{'error':str(error),'kind':error.kind})
                 finally:
                     if client is not None:mail_pro.close_imap(client)
+            if path == '/api/tracking':
+                # Seguimiento de Órdenes: una tarjeta por orden con su último movimiento; solo lectura, para cualquier usuario con sesión.
+                import tracking_board
+                try:return self.reply(200,dict(tracking_board.build(c,tracking_board.parse(parse_qs(urlsplit(self.path).query))),server_time=reception_now().isoformat(timespec='seconds')))
+                except tracking_board.TrackingError as error:return self.reply(400,{'error':str(error)})
+            tracking_history=re.fullmatch(r'/api/tracking/([0-9]+)',path)
+            if tracking_history:
+                import tracking_board
+                if not c.execute('SELECT 1 FROM orders WHERE id=?',(int(tracking_history[1]),)).fetchone():return self.reply(404,{'error':'Orden no disponible.'})
+                return self.reply(200,{'rows':tracking_board.history(c,int(tracking_history[1]))})
             if path in ('/api/dashboard','/api/activity','/api/maintenance'):
                 now=reception_now();today=now.date().isoformat()
                 if path=='/api/maintenance':

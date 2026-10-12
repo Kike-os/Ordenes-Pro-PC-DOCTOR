@@ -8,6 +8,24 @@
   },
   "releases": [
     {
+      "version": "1.5.107",
+      "date": "2026-10-12T18:03:00-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Seguimiento de Órdenes agrupado por orden",
+      "changes": {
+        "features": [
+          "Seguimiento de Órdenes con contadores reales por estado, línea de etapas basada en el historial, buscador, filtros por estado, técnico y fecha, historial desplegable, paginación y sincronización periódica con aviso de cambios de estado."
+        ],
+        "improvements": [
+          "Seguimiento de Órdenes rediseñado: una tarjeta por orden con su último movimiento (sin órdenes repetidas), cliente, equipo, estado, técnico responsable, fecha y hora exactas, tiempo transcurrido y prioridad."
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.106",
       "date": "2026-10-12T17:56:25-05:00",
       "type": "patch",

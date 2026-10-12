@@ -1864,7 +1864,7 @@ async function refresh(){
  const data=await api('/api/dashboard');const states=$('operations-states');states.replaceChildren();
  for(const[code,icon]of [['pendiente','waiting'],['reparacion','work'],['esperando_cliente','message'],['presupuesto','quote'],['listo','ready'],['entregado','delivered']]){
  const item=button('',()=>go('orders',new URLSearchParams({status:code})),'operation-indicator status-'+code);item.setAttribute('aria-label',statusNames[code]+': '+String(data.counts[code]||0)+'. Ver órdenes');const chip=el('span',undefined,'indicator-icon');chip.append(operationIcon(icon));item.append(chip,el('strong',String(data.counts[code]||0)),el('span',statusNames[code],'indicator-label'));states.append(item);}
- renderAttention(data.attention,data.today);renderTracking(data.activity);renderMaintenanceRows($('operations-maintenance'),data.maintenance,data.today,true);
+ renderAttention(data.attention,data.today);renderTracking();renderMaintenanceRows($('operations-maintenance'),data.maintenance,data.today,true);
  renderHomeDeliveries(data.deliveries);renderHomeAppointments(data.appointments||[],data.today);renderHomeAssistance(data.assistance);
  // La carga inicial solo trae las citas de hoy; la agenda completa añade la próxima cita y deja el panel al día.
  if(['administrador','tecnico'].includes(currentUser.role))refreshHomeAppointments();
@@ -1980,21 +1980,71 @@ function activityInfo(row){const kind=activityKind(row),comment=historyComment(r
  else if(row.event==='follow_up')detail='Observación técnica registrada.';
  else detail='Datos de seguimiento de la orden actualizados.';
  return{kind,title:kind.label,detail,comment,actor:row.actor||(row.event==='migration'?'Migración del sistema':row.event==='maintenance'?'Sistema':'Sin responsable registrado')};}
-// Seguimiento de órdenes en el inicio: los tres últimos movimientos en horizontal, con actualización automática cada 45 s.
-let trackingTimer=null,trackingStamp=0;
-function renderTracking(rows){
- const root=$('operations-activity'),status=$('tracking-status');if(!root)return;rows=[...new Map(rows.map(row=>[row.id,row])).values()];root.replaceChildren();const list=el('ol',undefined,'tracking-feed');
- if(!rows.length)root.append(el('p','Todavía no hay movimientos registrados.','track-note'));
- for(const row of rows.slice(0,3)){const kind=activityKind(row),item=el('li',undefined,'tracking-item'),open=button('',()=>go('orders',new URLSearchParams({id:row.order_id})),'tracking-open'),icon=el('span',undefined,'track-icon'),body=el('span',undefined,'tracking-body'),when=el('time',relativeTime(row.occurred_at)||formatOrderDate(row.occurred_at));
-  item.dataset.tone=kind.tone;applyLook(item,icon,row);if(!activityFirst&&!activitySeen.has(row.id))item.classList.add('track-new');when.dateTime=new Date(row.occurred_at).toISOString();when.title=formatOrderDate(row.occurred_at);
-  const info=activityInfo(row),head=el('span',undefined,'tracking-head');head.append(el('strong',row.code),when);const title=el('span',info.title,'tracking-text'),detail=el('span',info.detail,'tracking-detail');title.title=info.title;detail.title=info.detail;body.append(head,title,detail,el('small',info.actor));open.append(icon,body);open.setAttribute('aria-label','Orden '+row.code+'. '+info.title+'. '+info.detail+'. '+info.actor+'. '+formatOrderDate(row.occurred_at)+'. Abrir la orden');open.title='Abrir la orden '+row.code;item.append(open);list.append(item);}
- if(rows.length)root.append(list);
- // Electric Pulse: una sola secuencia en el icono principal cuando llega un movimiento con identificador nuevo.
- if(!activityFirst&&rows.slice(0,3).some(row=>!activitySeen.has(row.id))){const mark=document.querySelector('.tracking-pro .panel-icon');if(mark){mark.classList.remove('tracking-pulse');void mark.offsetWidth;mark.classList.add('tracking-pulse');mark.addEventListener('animationend',()=>mark.classList.remove('tracking-pulse'),{once:true});}}
- rows.forEach(row=>activitySeen.add(row.id));activityFirst=false;trackingStamp=Date.now();
- const paintStatus=(error,late)=>{if(!status)return;status.dataset.state=error?'error':late?'late':'ok';if(late)return;status.textContent=error?'Sin conexión · se reintentará':'Actualización automática · '+new Intl.DateTimeFormat('es-EC',{timeZone:'America/Guayaquil',hour:'2-digit',minute:'2-digit'}).format(new Date(trackingStamp+clockOffset));};paintStatus(false);
- // Consulta periódica mientras el inicio está a la vista; los movimientos se identifican por su id para no repetirlos.
- clearInterval(trackingTimer);trackingTimer=setInterval(async()=>{if(currentModule!=='home'){clearInterval(trackingTimer);return;}if(document.hidden)return;if(Date.now()-trackingStamp>100000)paintStatus(false,true);try{const fresh=await api('/api/activity?recent=1');if(fresh.rows[0]?.id!==rows[0]?.id||fresh.rows.length!==rows.length)renderTracking(fresh.rows);else{trackingStamp=Date.now();paintStatus(false);}}catch{paintStatus(true);}},45000);
+// Seguimiento de Órdenes (inicio): una tarjeta por orden con su último movimiento, contadores reales, etapas con evidencia, búsqueda, filtros,
+// historial desplegable y actualización periódica. Los datos salen de /api/tracking; el indicador «En vivo» solo aparece si la última consulta funcionó.
+let trackingTimer=null,trackingStamp=0,trackingView=null;
+function renderTracking(){
+ const root=$('operations-activity'),status=$('tracking-status');if(!root)return;
+ const view=trackingView={q:'',status:'',technician:'',from:'',to:'',page:1,open:new Set(),known:new Map(),first:true,data:null,token:0};
+ root.replaceChildren();root.className='tracking-board';
+ const counters=el('div',undefined,'tracking-counters'),tools=el('form',undefined,'tracking-tools'),list=el('ol',undefined,'tracking-cards'),foot=el('div',undefined,'tracking-foot');counters.setAttribute('aria-label','Órdenes por estado');tools.setAttribute('role','search');tools.noValidate=true;
+ const search=el('input');search.type='search';search.placeholder='Buscar por orden, cliente o equipo';search.setAttribute('aria-label','Buscar en el seguimiento');search.maxLength=80;
+ const pick=(label,name)=>{const node=el('select');node.name=name;node.setAttribute('aria-label',label);return node;},statePick=pick('Filtrar por estado','status'),techPick=pick('Filtrar por técnico','technician');
+ const dateField=(label,name)=>{const wrap=el('label',undefined,'tracking-date'),node=el('input');node.type='date';node.name=name;wrap.append(el('span',label),node);return [wrap,node];},[fromWrap,fromNode]=dateField('Desde','from'),[toWrap,toNode]=dateField('Hasta','to');
+ const clear=button('Limpiar',()=>{search.value='';statePick.value='';techPick.value='';fromNode.value='';toNode.value='';Object.assign(view,{q:'',status:'',technician:'',from:'',to:'',page:1});load();},'secondary tracking-clear');
+ tools.append(search,statePick,techPick,fromWrap,toWrap,clear);root.append(counters,tools,list,foot);
+ const apply=()=>{Object.assign(view,{q:search.value.trim(),status:statePick.value,technician:techPick.value,from:fromNode.value,to:toNode.value,page:1});load();};
+ let typing=null;search.addEventListener('input',()=>{clearTimeout(typing);typing=setTimeout(apply,320);});tools.addEventListener('submit',event=>{event.preventDefault();clearTimeout(typing);apply();});for(const node of [statePick,techPick,fromNode,toNode])node.addEventListener('change',apply);
+ const clock=value=>new Intl.DateTimeFormat('es-EC',{timeZone:'America/Guayaquil',hour:'2-digit',minute:'2-digit'}).format(value);
+ const paintStatus=state=>{if(!status)return;status.dataset.state=state;status.replaceChildren();if(state==='ok'){status.append(el('i'),document.createTextNode('En vivo · sincronizado '+clock(new Date(trackingStamp+clockOffset))));}else status.textContent=state==='loading'?'Sincronizando…':'Sin conexión · último dato '+(trackingStamp?clock(new Date(trackingStamp+clockOffset)):'no disponible');};
+ const fill=(node,first,items,value)=>{const before=value??node.value;node.replaceChildren(new Option(first,''));for(const[code,label]of items)node.add(new Option(label,code));node.value=before;};
+ async function history(row,holder,toggle){holder.replaceChildren(el('p','Cargando historial…','tracking-note'));try{const data=await api('/api/tracking/'+row.id),steps=el('ol',undefined,'tracking-history');
+   for(const event of data.rows){const info=activityInfo(event),item=el('li'),icon=el('span',undefined,'track-icon'),body=el('div');applyLook(item,icon,event);body.append(el('strong',info.title),el('span',info.detail));if(info.comment)body.append(el('q',info.comment));body.append(el('small',info.actor+' · '+formatOrderDate(event.occurred_at)));item.append(icon,body);steps.append(item);}
+   holder.replaceChildren(data.rows.length?steps:el('p','Esta orden todavía no tiene movimientos registrados.','tracking-note'));}catch(error){holder.replaceChildren(el('p',error.message,'tracking-note'));}}
+ function card(row){
+  const item=el('li',undefined,'tracking-card'),event=row.event_id?{id:row.event_id,event:row.event,comment:row.comment,status_label:row.status_label,previous_label:row.previous_label,actor:row.actor,occurred_at:row.occurred_at,order_id:row.id,code:row.code}:null;item.dataset.order=row.id;
+  const head=el('div',undefined,'tracking-card-head'),who=el('div',undefined,'tracking-card-id'),code=button(row.code,()=>go('orders',new URLSearchParams({id:String(row.id)})),'order-code-link');code.title='Abrir la orden '+row.code;
+  who.append(code,el('span',row.client,'tracking-client'),el('small',[row.type_label,row.brand,row.model].filter(Boolean).join(' ')||'Equipo sin especificar'));
+  const badge=orderBadge(row.status_code,row.status,row.id);if(statusGlyphs[row.status_code]){badge.classList.add('status-icon');badge.prepend(systemIcon(statusGlyphs[row.status_code]));}
+  head.append(deviceIcon(row.type),who,badge);item.append(head);
+  // Etapas: solo se marcan como completadas las que constan en el historial.
+  const steps=el('ol',undefined,'tracking-stages');steps.setAttribute('aria-label','Etapas de la orden');for(const stage of row.stages){const step=el('li',stage.label);step.dataset.state=stage.state;step.title={done:'Completada (consta en el historial)',current:'Etapa actual',pending:'Pendiente',unrecorded:'Sin registro en el historial'}[stage.state];if(stage.state==='current')step.setAttribute('aria-current','step');steps.append(step);}item.append(steps);
+  const last=el('div',undefined,'tracking-last');
+  if(event){const info=activityInfo(event),icon=el('span',undefined,'track-icon'),body=el('div'),when=el('time',formatOrderDate(row.occurred_at));applyLook(last,icon,event);when.dateTime=new Date(row.occurred_at).toISOString();body.append(el('strong',info.title),el('span',info.detail));if(info.comment)body.append(el('q',info.comment));const meta=el('small');meta.append(when,document.createTextNode(' · '+(relativeTime(row.occurred_at)||'')));body.append(meta);last.append(icon,body);}
+  else last.append(el('p','Sin movimientos registrados todavía.','tracking-note'));
+  item.append(last);
+  const facts=el('dl',undefined,'tracking-facts'),fact=(label,value)=>{if(!value)return;const pair=el('div');pair.append(el('dt',label),el('dd',value));facts.append(pair);};
+  fact('Técnico responsable',row.responsible||'Sin asignar');fact('Última actividad por',event&&event.actor?event.actor:'');fact('Prioridad',({baja:'Baja',alta:'Alta',urgente:'Urgente'})[row.priority]||'');if(row.priority==='urgente'||row.priority==='alta')item.dataset.priority=row.priority;item.append(facts);
+  const actions=el('div',undefined,'tracking-actions'),holder=el('div',undefined,'tracking-history-wrap');holder.hidden=true;holder.id='tracking-history-'+row.id;
+  const toggle=button('',()=>{const opening=holder.hidden;holder.hidden=!opening;toggle.setAttribute('aria-expanded',String(opening));toggle.lastChild.textContent=opening?'Ocultar historial':'Historial ('+row.events+')';if(opening){view.open.add(row.id);history(row,holder,toggle);}else view.open.delete(row.id);},'secondary');toggle.append(systemIcon('M12 6v6l4 2 M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z'),el('span','Historial ('+row.events+')'));toggle.setAttribute('aria-expanded','false');toggle.setAttribute('aria-controls',holder.id);toggle.disabled=!row.events;
+  const detail=button('',()=>go('orders',new URLSearchParams({id:String(row.id)})),'primary');detail.append(systemIcon('M2.06 12.35a1 1 0 0 1 0-.7 10.75 10.75 0 0 1 19.88 0 1 1 0 0 1 0 .7 10.75 10.75 0 0 1-19.88 0 M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z'),el('span','Ver detalles'));detail.setAttribute('aria-label','Ver detalles de la orden '+row.code);
+  actions.append(detail,toggle);item.append(actions,holder);
+  if(view.open.has(row.id)){holder.hidden=false;toggle.setAttribute('aria-expanded','true');toggle.lastChild.textContent='Ocultar historial';history(row,holder,toggle);}
+  return item;}
+ function paint(data){
+  view.data=data;counters.replaceChildren();
+  for(const counter of data.counters){const node=counter.status?button('',()=>{statePick.value=view.status===counter.status?'':counter.status;apply();},'tracking-counter'):el('div',undefined,'tracking-counter');node.dataset.kind=counter.key;if(counter.status&&view.status===counter.status)node.setAttribute('aria-pressed','true');else if(counter.status)node.setAttribute('aria-pressed','false');node.append(el('strong',String(counter.total)),el('span',counter.label));counters.append(node);}
+  fill(statePick,'Todos los estados',data.options.statuses.map(item=>[item.code,item.label]),view.status);fill(techPick,'Todos los técnicos',[...data.options.technicians.map(item=>[String(item.id),item.name]),['none','Sin asignar']],view.technician);
+  clear.hidden=!(view.q||view.status||view.technician||view.from||view.to);
+  list.replaceChildren();
+  if(!data.rows.length)list.append(el('li',data.total_orders?'Ninguna orden coincide con la búsqueda o los filtros.':'Todavía no hay órdenes registradas.','tracking-empty'));
+  for(const row of data.rows){const node=card(row),before=view.known.get(row.id);
+   // Movimiento nuevo desde la última sincronización: animación discreta; si además cambió el estado, se avisa.
+   if(!view.first&&(!before||before.event!==row.event_id)){node.classList.add('track-new');if(before&&before.status!==row.status_code){noteStatus(row.id,row.status_code);toast('La orden '+row.code+' pasó a «'+row.status+'».','info',{label:'Ver orden',run:()=>go('orders',new URLSearchParams({id:String(row.id)}))},{title:'Cambio de estado',id:'tracking-'+row.id});}}
+   view.known.set(row.id,{event:row.event_id,status:row.status_code});list.append(node);}
+  view.first=false;foot.replaceChildren();
+  const summary=el('p',data.total?('Mostrando '+((data.page-1)*data.page_size+1)+'–'+Math.min(data.total,data.page*data.page_size)+' de '+data.total+(data.total===1?' orden':' órdenes')):'0 órdenes','tracking-count');foot.append(summary);
+  if(data.pages>1){const nav=el('div',undefined,'tracking-pages'),prev=button('Anterior',()=>{view.page=data.page-1;load();},'secondary'),next=button('Siguiente',()=>{view.page=data.page+1;load();},'secondary');prev.disabled=data.page<=1;next.disabled=data.page>=data.pages;nav.append(prev,el('span','Página '+data.page+' de '+data.pages),next);foot.append(nav);}}
+ const query=()=>{const next=new URLSearchParams();for(const key of ['q','status','technician','from','to'])if(view[key])next.set(key,view[key]);next.set('page',String(view.page));return '/api/tracking?'+next.toString();};
+ async function load(quiet){const token=++view.token;if(!quiet){paintStatus('loading');root.dataset.loading='true';}
+  try{const data=await api(query());if(token!==view.token||trackingView!==view||!root.isConnected)return;trackingStamp=Date.now();view.page=data.page;
+   const signature=JSON.stringify([data.counters.map(c=>c.total),data.rows.map(r=>[r.id,r.event_id,r.status_code,r.responsible,r.priority]),data.total,data.page]);
+   if(!quiet||signature!==view.signature)paint(data);view.signature=signature;paintStatus('ok');}
+  catch(error){if(token!==view.token)return;paintStatus('error');if(!view.data){list.replaceChildren(el('li',error.message,'tracking-empty'));}}
+  finally{if(token===view.token)delete root.dataset.loading;}}
+ // Consulta periódica y ligera mientras el inicio está a la vista (se detiene al salir o con la pestaña oculta).
+ clearInterval(trackingTimer);trackingTimer=setInterval(()=>{if(currentModule!=='home'||trackingView!==view||!root.isConnected){clearInterval(trackingTimer);return;}if(document.hidden)return;load(true);},30000);
+ load();
 }
 function renderActivityRows(root,rows,options={}){
  root.replaceChildren();const wrap=el('div',undefined,'track'+(options.compact?' track-compact':''));root.append(wrap);const state={filter:'all',q:'',from:'',to:'',limit:30};

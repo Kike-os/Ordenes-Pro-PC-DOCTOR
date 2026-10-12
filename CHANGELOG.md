@@ -4,6 +4,18 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.107 — 2026-10-12 18:03 (UTC-05:00)
+
+Seguimiento de Órdenes agrupado por orden
+
+### Nuevas funcionalidades
+
+- Seguimiento de Órdenes con contadores reales por estado, línea de etapas basada en el historial, buscador, filtros por estado, técnico y fecha, historial desplegable, paginación y sincronización periódica con aviso de cambios de estado.
+
+### Mejoras realizadas
+
+- Seguimiento de Órdenes rediseñado: una tarjeta por orden con su último movimiento (sin órdenes repetidas), cliente, equipo, estado, técnico responsable, fecha y hora exactas, tiempo transcurrido y prioridad.
+
 ## v1.5.106 — 2026-10-12 17:56 (UTC-05:00)
 
 Acceso rediseñado y «Versión del sistema» con comprobación real

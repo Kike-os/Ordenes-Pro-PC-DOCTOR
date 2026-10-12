@@ -1,0 +1,51 @@
+"""Seguimiento de Órdenes agrupado por orden: sin duplicados, contadores reales y etapas con evidencia."""
+import unittest
+import test_app
+import app,tracking_board
+app.os.environ.setdefault('LOGIN_CAPTCHA','off')
+
+
+class TrackingBoardTests(unittest.TestCase):
+    setUpClass=classmethod(test_app.SecurityTests.setUpClass.__func__);setUp=test_app.SecurityTests.setUp;tearDown=test_app.SecurityTests.tearDown;request=test_app.SecurityTests.request;login=test_app.SecurityTests.login;order_data=test_app.SecurityTests.order_data
+
+    def order(self,cookie,csrf,key,**extra):
+        return self.request('/api/orders',self.order_data(dict({'email':key+'@example.invalid','brand':'HP','model':'Modelo '+key,'request_key':'tracking-order-'+key.rjust(6,'0')},**extra)),cookie=cookie,csrf=csrf)['body']['id']
+
+    def test_one_card_per_order_with_counters_stages_and_history(self):
+        self.assertEqual(self.request('/api/tracking')['status'],401)
+        cookie,csrf=self.login();a=self.order(cookie,csrf,'a');b=self.order(cookie,csrf,'b',brand='Lenovo');quiet=self.order(cookie,csrf,'c')
+        status=lambda oid,value,comment='':self.request('/api/order-status',{'id':str(oid),'status':value,'comment':comment},cookie=cookie,csrf=csrf)
+        for value in ('reparacion','esperando_cliente','reparacion','listo'):status(a,value)
+        status(b,'entregado','Entrega directa')
+        with app.connect() as c:before=c.execute('SELECT COUNT(*) FROM order_history').fetchone()[0]
+        board=self.request('/api/tracking',cookie=cookie)['body']
+        # Una sola tarjeta por orden, primero la de actividad más reciente; cada una con su último movimiento real.
+        self.assertEqual([row['id'] for row in board['rows']],[b,a,quiet]);self.assertEqual(board['total'],3)
+        first=board['rows'][1];self.assertEqual((first['status_code'],first['status_label'],first['previous_label'],first['client'],first['brand']),('listo','Listo para entregar','Procesando','Cliente ficticio','HP'))
+        self.assertGreaterEqual(first['events'],5);self.assertTrue(first['actor'])
+        # Contadores calculados con los registros reales.
+        self.assertEqual({item['key']:item['total'] for item in board['counters']},{'pending':1,'process':0,'waiting':0,'ready':1,'done':1})
+        # Etapas: la orden A pasó por «En proceso» (hay evidencia); la B saltó directo a Entregado, así que las intermedias quedan sin registro, no completadas.
+        self.assertEqual([stage['state'] for stage in first['stages']],['done','done','current','pending'])
+        self.assertEqual([stage['state'] for stage in board['rows'][0]['stages']],['done','unrecorded','unrecorded','current'])
+        self.assertEqual([stage['state'] for stage in board['rows'][2]['stages']],['current','pending','pending','pending'])
+        # Historial completo y cronológico al expandir; no se pierde ningún evento ni se modifica la base.
+        full=self.request('/api/tracking/'+str(a),cookie=cookie)['body']['rows']
+        self.assertEqual(len(full),first['events']);self.assertEqual([row['id'] for row in full],sorted(row['id'] for row in full))
+        self.assertEqual(self.request('/api/tracking/999999',cookie=cookie)['status'],404)
+        with app.connect() as c:self.assertEqual(c.execute('SELECT COUNT(*) FROM order_history').fetchone()[0],before)
+
+    def test_search_filters_and_pagination(self):
+        cookie,csrf=self.login();ids=[self.order(cookie,csrf,'p%02d'%index,brand='Dell' if index%2 else 'Asus') for index in range(10)]
+        self.request('/api/order-status',{'id':str(ids[0]),'status':'reparacion'},cookie=cookie,csrf=csrf)
+        get=lambda query:self.request('/api/tracking?'+query,cookie=cookie)
+        page=get('page=1')['body'];self.assertEqual((page['total'],page['pages'],len(page['rows']),page['rows'][0]['id']),(10,2,tracking_board.PAGE,ids[0]))
+        second=get('page=2')['body'];self.assertEqual(len(second['rows']),2);self.assertFalse({row['id'] for row in page['rows']}&{row['id'] for row in second['rows']})
+        self.assertEqual(get('q=dell')['body']['total'],5);self.assertEqual(get('q=Modelo%20p03')['body']['total'],1)
+        self.assertEqual([row['id'] for row in get('status=reparacion')['body']['rows']],[ids[0]])
+        self.assertEqual(get('technician=none')['body']['total']+get('technician=%d'%self.uid)['body']['total'],10)
+        today=app.reception_now().date().isoformat();self.assertEqual(get('from='+today+'&to='+today)['body']['total'],10);self.assertEqual(get('to=2020-01-01')['body']['total'],0)
+        for bad in ('status=inventado','from=ayer','from=2026-02-01&to=2026-01-01','technician=x','page=x'):self.assertEqual(get(bad)['status'],400,bad)
+
+
+if __name__=='__main__':unittest.main()
