@@ -4130,3 +4130,14 @@ body[data-page=dashboard] .orders-action-menu{width:min(250px,calc(100vw - 20px)
 .maint-answers{display:grid;gap:6px;padding-top:9px;border-top:1px dashed #253b5c}.maint-answers>strong{font-size:12px;color:#cfdcf0}
 .maint-answer{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:8px 10px;border:1px solid #1c2e4a;border-left:3px solid #4d8df0;border-radius:10px;background:#0a1322}.maint-answer[data-action=confirm]{border-left-color:#3fbf8a}.maint-answer[data-action=reschedule]{border-left-color:#EABC6C}.maint-answer[data-action=decline]{border-left-color:#e05662}
 .maint-answer>span{display:grid;flex:1;min-width:0}.maint-answer b{font-size:12.5px;color:#f2f6ff}.maint-answer small{font-size:11.5px;color:#8fa5c4;overflow-wrap:anywhere}.maint-answer button.secondary{height:30px;min-height:0;margin:0;padding:0 11px;font-size:12px}
+/* Foto de perfil: avatar con imagen, entrada en el menú de cuenta y ventana para cambiarla */
+.avatar[data-photo=true]{padding:0;overflow:hidden}.avatar>img,.avatar>canvas{display:block;width:100%;height:100%;border-radius:inherit;object-fit:cover}
+.account-panel button.account-photo{display:flex;align-items:center;gap:8px;width:100%;margin:8px 0 6px;padding:8px 10px;border:1px solid #2a4063;border-radius:9px;background:transparent;color:#cfe2ff;font-size:12.5px;font-weight:600;text-align:left}
+.account-panel button.account-photo:hover,.account-panel button.account-photo:focus-visible{border-color:#3b74c4;background:#12284a;color:#fff;transform:none}.account-photo .system-icon{width:15px;height:15px}
+dialog.profile-photo{width:min(380px,calc(100vw - 24px))}
+.profile-photo-body{display:grid;justify-items:center;gap:10px;text-align:center}
+.profile-photo-body>strong{font-size:14px;color:#f2f6ff;overflow-wrap:anywhere}
+.avatar.profile-photo-preview{display:grid;place-items:center;width:128px;height:128px;border-radius:50%;border:2px solid #3b567b;background:#1b2c47;color:#b5d1ff;font-size:38px;font-weight:700}
+.profile-photo-note{margin:0;font-size:12px;line-height:1.45;color:#9bb0cf}.profile-photo-note[data-kind=error]{color:#ffb9bf}
+.profile-photo-actions{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;width:100%}.profile-photo-actions button{flex:1 1 auto;min-height:38px;margin:0}
+.profile-photo-actions button:disabled{opacity:.5;cursor:not-allowed}

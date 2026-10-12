@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.86 — 2026-10-12 09:00 (UTC-05:00)
+
+Foto de perfil
+
+### Nuevas funcionalidades
+
+- Foto de perfil: cada persona puede poner, cambiar o quitar la suya desde el menú de su cuenta; se muestra en el encabezado
+
 ## v1.5.85 — 2026-10-12 08:52 (UTC-05:00)
 
 Recordatorios de mantenimiento para todos los clientes con correo

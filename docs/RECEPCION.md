@@ -77,3 +77,7 @@ El apartado 2 tiene su propia decisión opcional (`files_access`): «Autorizo el
 - Sin elegir: pendiente; no se guarda ni autorización ni rechazo.
 
 Se guarda dentro del registro inmutable de la decisión de acceso (`permissions.files_decision`), sin migración. Las órdenes anteriores no se modifican: al no tener ese dato siguen mostrándose como pendientes, nunca como rechazo.
+
+## Foto de perfil (1.5.86)
+
+Cada persona del equipo puede poner, cambiar o quitar su foto desde el menú de su cuenta (arriba a la derecha → «Foto de perfil»). El navegador la recorta en cuadrado a 256 × 256 px; el servidor comprueba por su cabecera que sea un PNG, JPG o WebP real, con un máximo de 300 KB, y la guarda en la base (migración 035). Solo se sirve a sesiones iniciadas (`/api/users/<id>/photo`). Sin foto se muestran las iniciales.

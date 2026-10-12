@@ -388,6 +388,22 @@ def send_authorization_mail(c,oid,user):
     return {'result':'sent','recipient':recipient}
 
 
+PROFILE_PHOTO_LIMIT=300000
+
+
+def image_kind(content):
+    """Tipo real de una imagen según su cabecera (no según lo que diga el navegador). Solo PNG, JPEG y WebP."""
+    if content[:8]==b'\x89PNG\r\n\x1a\n':return 'image/png'
+    if content[:3]==b'\xff\xd8\xff' and content[-2:]==b'\xff\xd9':return 'image/jpeg'
+    if content[:4]==b'RIFF' and content[8:12]==b'WEBP':return 'image/webp'
+    return None
+
+
+def profile_photo_stamp(c,uid):
+    row=c.execute('SELECT updated_at FROM user_photos WHERE user_id=?',(uid,)).fetchone()
+    return row['updated_at'] if row else ''
+
+
 def maintenance_deliver(recipient,subject,body):
     """Envío de un recordatorio de mantenimiento por el correo del sistema; lanza MailError si el servidor no lo acepta."""
     config=mail_pro.settings()
@@ -803,7 +819,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(200,live_support.detail(c,conv,after,appointments.stamp(appointments.now())))
             if path == '/api/me':
                 prefs=c.execute('SELECT value FROM system_state WHERE key=?',('mail_prefs:'+str(user['id']),)).fetchone() if mail_allowed(user) else None
-                return self.reply(200, {'user':dict(user,mail=mail_allowed(user),mail_prefs=json.loads(prefs['value']) if prefs else None,mail_signature=mail_signature_card(c) if mail_allowed(user) else None,storage='cloud' if remote_db.configured() else 'local'),'server_time':time.time()})
+                return self.reply(200, {'user':dict(user,photo=profile_photo_stamp(c,user['id']),mail=mail_allowed(user),mail_prefs=json.loads(prefs['value']) if prefs else None,mail_signature=mail_signature_card(c) if mail_allowed(user) else None,storage='cloud' if remote_db.configured() else 'local'),'server_time':time.time()})
             if path == '/api/deliveries':
                 # Próximas Entregas: solo equipos terminados (listos o en espera de retiro) y entregas recientes; nunca órdenes en reparación.
                 if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
@@ -867,6 +883,12 @@ class Handler(BaseHTTPRequestHandler):
                 if not row:
                     return self.reply(404, {'error':'Orden no disponible.'})
                 return self.reply(200, {'id':row['id']})
+            photo_view=re.fullmatch(r'/api/users/([0-9]+)/photo',path)
+            if photo_view:
+                # Foto de perfil de una cuenta del equipo: solo para sesiones iniciadas.
+                picture=c.execute('SELECT mime,data FROM user_photos WHERE user_id=?',(int(photo_view[1]),)).fetchone()
+                if not picture:return self.reply(404,{'error':'Sin foto de perfil.'})
+                return self.reply(200,base64.b64decode(picture['data']),picture['mime'])
             staff_authorization=re.fullmatch(r'/api/orders/([0-9]+)/client-authorization\.pdf',path)
             if staff_authorization:
                 import client_authorization
@@ -1265,7 +1287,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(403, {'error':'Solicitud no autorizada.'})
             path = urlsplit(self.path).path
             workspace_post=bool(re.fullmatch(r'/api/orders/[0-9]+/workspace',path))
-            max_body=9000000 if path in ('/api/clients/import/preview','/api/clients/import/commit') else 6000000 if path in ('/api/mail/send','/api/mail/draft') else 100000 if path in ('/api/conditions','/api/order-draft') else 900000 if re.fullmatch(r'/api/orders/[0-9]+/photos',path) else (65536 if workspace_post else 16384)
+            max_body=9000000 if path in ('/api/clients/import/preview','/api/clients/import/commit') else 6000000 if path in ('/api/mail/send','/api/mail/draft') else 100000 if path in ('/api/conditions','/api/order-draft') else 900000 if re.fullmatch(r'/api/orders/[0-9]+/photos',path) or path=='/api/profile/photo' else (65536 if workspace_post else 16384)
             length = int(self.headers.get('Content-Length', '0'))
             if length <= 0 or length > max_body:
                 return self.reply(400, {'error':'Solicitud inválida.'})
@@ -2029,6 +2051,20 @@ class Handler(BaseHTTPRequestHandler):
                         c.execute("UPDATE thermal_print_jobs SET state='uncertain' WHERE request_key=?",(key,));audit(c,user['id'],'thermal_print_unconfirmed',oid);c.commit()
                         return self.reply(503,{'error':'No se pudo confirmar el envío a la Epson. Comprueba conexión y cola antes de volver a imprimir.'})
                     return self.reply(200,{'ok':True,'message':('Dos copias enviadas' if len(pdfs)==2 else 'Trabajo enviado')+' a la cola Epson. Verifica la salida física.'})
+                if path=='/api/profile/photo':
+                    # Cada persona gestiona únicamente su propia foto.
+                    if data.get('action')=='delete':
+                        c.execute('DELETE FROM user_photos WHERE user_id=?',(user['id'],));audit(c,user['id'],'profile_photo_removed')
+                        return self.reply(200,{'ok':True,'photo':''})
+                    try:content=base64.b64decode(str(data.get('data','')),validate=True)
+                    except Exception:return self.reply(400,{'error':'La imagen no se pudo leer.'})
+                    kind=image_kind(content)
+                    if not kind:return self.reply(400,{'error':'Usa una imagen PNG, JPG o WebP.'})
+                    if not 200<=len(content)<=PROFILE_PHOTO_LIMIT:return self.reply(400,{'error':'La imagen es demasiado grande. El máximo es 300 KB.'})
+                    stamp=reception_now().isoformat(timespec='seconds')
+                    c.execute('INSERT INTO user_photos(user_id,mime,size,data,updated_at) VALUES (?,?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET mime=excluded.mime,size=excluded.size,data=excluded.data,updated_at=excluded.updated_at',(user['id'],kind,len(content),base64.b64encode(content).decode(),stamp))
+                    audit(c,user['id'],'profile_photo_updated')
+                    return self.reply(200,{'ok':True,'photo':stamp})
                 client_route=re.fullmatch(r'/api/orders/([0-9]+)/client-authorization',path)
                 if client_route or path=='/api/client-authorization/settings':
                     if not client_route:
