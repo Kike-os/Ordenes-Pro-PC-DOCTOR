@@ -31,3 +31,10 @@ Fase 2: Mail Pro y mensajes a clientes. Fase 3: respuestas sugeridas con base de
 
 
 Desde la 1.5.46 el servidor acepta también la variable `OPEN_API_KEY` (nombre mal escrito frecuente) como clave de OpenAI. El nombre correcto sigue siendo `OPENAI_API_KEY`.
+
+## Asistente ADI en todo el sistema (1.5.48)
+
+- `attachAdi(area, campo, opciones)` es el componente único. Con un `<textarea>` basta; para otros editores se pasan `get`, `set` y `anchor` (así funciona en el cuerpo del correo de Mail Pro).
+- `initAdiEverywhere()` observa la página y añade el botón compacto «Adi» a cada área de texto visible, sin tocar cada módulo. Se excluyen el chat de Adi, la respuesta del Centro de Atención, campos de solo lectura y cualquier elemento con `data-no-adi`.
+- Panel: encabezado «Asistente ADI», cuadrícula de herramientas, «Aplicar mejora» con indicador de proceso, vista previa con cambios resaltados y «Aceptar cambio», «Regenerar» o «Descartar». El texto original no cambia hasta aceptar; hay «Deshacer».
+- Toda consulta pasa por `/api/adi/write` con sesión y CSRF; la clave vive solo en el servidor. Si el proveedor falla se muestra el error real y el texto no se modifica.

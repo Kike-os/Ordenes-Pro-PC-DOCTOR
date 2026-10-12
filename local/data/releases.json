@@ -8,6 +8,24 @@
   },
   "releases": [
     {
+      "version": "1.5.48",
+      "date": "2026-10-11T22:36:28-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Asistente ADI rediseñado y disponible en todos los campos de texto",
+      "changes": {
+        "features": [
+          "Adi en todo el sistema: cada área de texto (órdenes, citas, WhatsApp, autorizaciones, correo de Mail Pro y demás) tiene su botón para corregir o mejorar el texto"
+        ],
+        "improvements": [
+          "Adi: nuevo panel «Asistente ADI» con herramientas en cuadrícula, «Aplicar mejora» con indicador de proceso, vista previa con cambios resaltados y opciones para aceptar, regenerar o descartar"
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.47",
       "date": "2026-10-11T22:30:06-05:00",
       "type": "patch",

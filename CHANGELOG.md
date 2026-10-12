@@ -4,6 +4,18 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.48 — 2026-10-11 22:36 (UTC-05:00)
+
+Asistente ADI rediseñado y disponible en todos los campos de texto
+
+### Nuevas funcionalidades
+
+- Adi en todo el sistema: cada área de texto (órdenes, citas, WhatsApp, autorizaciones, correo de Mail Pro y demás) tiene su botón para corregir o mejorar el texto
+
+### Mejoras realizadas
+
+- Adi: nuevo panel «Asistente ADI» con herramientas en cuadrícula, «Aplicar mejora» con indicador de proceso, vista previa con cambios resaltados y opciones para aceptar, regenerar o descartar
+
 ## v1.5.47 — 2026-10-11 22:30 (UTC-05:00)
 
 Módulo Próximas Entregas
