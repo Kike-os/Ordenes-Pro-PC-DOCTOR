@@ -1,4 +1,5 @@
 import io
+import re
 from urllib.parse import quote
 import json
 import sys
@@ -334,59 +335,57 @@ class SecurityTests(unittest.TestCase):
             self.assertIn('rel="apple-touch-icon"',body)
         self.assertIn('<title>Órdenes Pro | PC-DOCTOR S.A.</title>',self.request('/login')['body'])
 
-    def test_registration_creates_pending_account_that_admin_must_approve(self):
+    def test_public_registration_is_closed_and_only_admin_creates_accounts(self):
         data={'name':'Persona Solicitante','username':'nueva.persona','email':'nueva@example.invalid','phone':'0991234567','identification':'','job_title':'Técnico de prueba','password':'clave-de-prueba','repeat':'clave-de-prueba'}
-        self.assertIn('href="/registro"',self.request('/login')['body'])
-        self.assertIn('id="register-form"',self.request('/registro')['body'])
-        bad=self.request('/api/register',dict(data,username='a b',phone='123',repeat='otra'))
-        self.assertEqual(bad['status'],400)
-        self.assertEqual(set(bad['body']['fields']),{'username','phone','repeat'})
-        first=self.request('/api/register',data)
-        self.assertEqual(first['status'],201)
-        # Mismo mensaje para un usuario o correo ya registrado: no se revela su existencia ni se duplica.
-        again=self.request('/api/register',dict(data,email='demo@example.invalid',username='otra.persona'))
-        self.assertEqual((again['status'],again['body']),(201,first['body']))
-        with app.connect() as c:
-            row=c.execute("SELECT * FROM users WHERE username='nueva.persona'").fetchone()
-            self.assertEqual((row['active'],row['approval'],row['role'],row['phone']),(0,'pending','tecnico','0991234567'))
-            self.assertNotIn('clave-de-prueba',row['password_hash'])
-            self.assertEqual(c.execute("SELECT COUNT(*) FROM users WHERE username='otra.persona'").fetchone()[0],0)
-        login={'login':'nueva.persona','password':'clave-de-prueba'}
-        self.assertEqual(self.request('/api/login',login)['status'],401)
+        # Sin registro público: ni enlace en el acceso, ni página, ni alta por la API.
+        page=self.request('/login')['body'];self.assertNotIn('/registro',page);self.assertNotIn('Solicitar acceso',page)
+        self.assertEqual(self.request('/registro')['status'],404)
+        self.assertEqual(self.request('/api/register',data)['status'],404)
+        with app.connect() as c:self.assertEqual(c.execute("SELECT COUNT(*) FROM users WHERE username='nueva.persona'").fetchone()[0],0)
+        new={'name':'Persona Nueva','email':'nueva@example.invalid','username':'','role':'tecnico'}
+        self.assertEqual(self.request('/api/users/create',new)['status'],401)
         cookie,csrf=self.login()
-        settings=self.request('/api/settings',cookie=cookie)['body']
-        self.assertEqual([r['username'] for r in settings['requests']],['nueva.persona'])
-        self.assertNotIn('nueva.persona',[a['username'] for a in settings['accounts']])
-        self.assertNotIn('password_hash',settings['requests'][0])
-        self.assertEqual(self.request('/api/users/approval',{'id':str(row['id']),'action':'approve','role':'tecnico'},cookie=cookie)['status'],403)
-        self.assertEqual(self.request('/api/users/approval',{'id':str(row['id']),'action':'approve','role':'tecnico'},cookie=cookie,csrf=csrf)['status'],200)
-        self.assertEqual(self.request('/api/users/approval',{'id':str(row['id']),'action':'approve','role':'tecnico'},cookie=cookie,csrf=csrf)['status'],400)
-        granted=self.request('/api/login',login)
-        self.assertEqual(granted['status'],200)
-        tech=granted['cookie'].split(';')[0];tech_csrf=self.request('/api/me',cookie=tech)['body']['user']['csrf']
-        self.assertEqual(self.request('/api/users/approval',{'id':'1','action':'approve','role':'administrador'},cookie=tech,csrf=tech_csrf)['status'],403)
-        # Una solicitud rechazada sigue visible, puede aprobarse y puede volver a enviarse.
-        other=dict(data,username='otra.solicitud',email='otra@example.invalid')
-        self.request('/api/register',other)
-        with app.connect() as c:oid=c.execute("SELECT id FROM users WHERE username='otra.solicitud'").fetchone()[0]
-        self.assertEqual(self.request('/api/users/approval',{'id':str(oid),'action':'reject','role':'tecnico'},cookie=cookie,csrf=csrf)['status'],200)
-        listed=self.request('/api/settings',cookie=cookie)['body']['requests']
-        self.assertEqual([(r['username'],r['approval']) for r in listed],[('otra.solicitud','rejected')])
-        self.assertEqual(self.request('/api/users/approval',{'id':str(oid),'action':'reject','role':'tecnico'},cookie=cookie,csrf=csrf)['status'],400)
-        self.assertEqual(self.request('/api/register',dict(other,phone='0987654321',password='otra-clave-nueva',repeat='otra-clave-nueva'))['status'],201)
+        self.assertEqual(self.request('/api/users/create',new,cookie=cookie)['status'],403)
+        self.assertIn('settings?tab=users',self.request('/registro',cookie=cookie)['body'])
+        bad=self.request('/api/users/create',{'name':'x','email':'sin-arroba','username':'a b','role':'jefe'},cookie=cookie,csrf=csrf)
+        self.assertEqual((bad['status'],set(bad['body']['fields'])),(400,{'name','email','username','role'}))
+        sent=[]
+        with patch.object(app,'security_mail_ready',return_value='mail'),patch.object(app,'send_security_mail',side_effect=lambda *mail:sent.append(mail)):
+            made=self.request('/api/users/create',new,cookie=cookie,csrf=csrf)
+        self.assertEqual((made['status'],made['body']['mail'],made['body']['link'],made['body']['username']),(201,'sent','','nueva'))
+        # El correo lleva solo el enlace temporal: ninguna contraseña. La cuenta queda aprobada y activa, con una clave que nadie conoce.
+        self.assertEqual(sent[0][0],'nueva@example.invalid');link=re.search(r'http\S+/reset\?token=\S+',sent[0][2])[0];token=link.split('token=')[1]
+        self.assertEqual(len(re.findall(r'token=',sent[0][2])),1);self.assertIn('Establecer mi contraseña',sent[0][3])
+        uid=made['body']['id']
         with app.connect() as c:
-            again=c.execute('SELECT approval,active,phone FROM users WHERE id=?',(oid,)).fetchone()
-            self.assertEqual(tuple(again),('pending',0,'0987654321'))
-            c.execute("UPDATE users SET approval='rejected' WHERE id=?",(oid,))
-        self.assertEqual(self.request('/api/users/approval',{'id':str(oid),'action':'approve','role':'tecnico'},cookie=cookie,csrf=csrf)['status'],200)
-        self.assertEqual(self.request('/api/login',{'login':'otra.solicitud','password':'otra-clave-nueva'})['status'],200)
-        with app.connect() as c:c.execute("DELETE FROM attempts WHERE bucket LIKE 'register-ip:%'")
-        with patch.dict(app.os.environ,{'LOGIN_CAPTCHA':'on'}):
-            self.assertEqual(self.request('/api/register',dict(data,username='sin.captcha',email='sc@example.invalid'))['status'],403)
-        with patch.dict(app.os.environ,{'REGISTRATION':'off'}):
-            self.assertEqual(self.request('/registro')['status'],404)
-            self.assertEqual(self.request('/api/register',data)['status'],404)
-            self.assertIn('class="register-link" hidden',self.request('/login')['body'])
+            row=c.execute('SELECT * FROM users WHERE id=?',(uid,)).fetchone()
+            self.assertEqual((row['active'],row['approval'],row['role'],row['name']),(1,'approved','tecnico','Persona Nueva'))
+            self.assertEqual({r[0] for r in c.execute("SELECT action FROM audit WHERE entity_id=?",(uid,))},{'account_created','account_invitation_sent'})
+            self.assertGreater(c.execute('SELECT expires FROM reset_tokens WHERE user_id=?',(uid,)).fetchone()[0],time.time()+71*3600)
+        self.assertEqual(self.request('/api/users/create',new,cookie=cookie,csrf=csrf)['body']['fields'],{'email':'Ya existe una cuenta con ese correo.'})
+        self.assertIn('nueva',[a['username'] for a in self.request('/api/settings',cookie=cookie)['body']['accounts']])
+        # La persona establece su propia contraseña con el enlace (un solo uso) y la activación queda registrada.
+        self.assertEqual(self.request('/api/login',{'login':'nueva','password':'clave-elegida-por-mi'})['status'],401)
+        self.assertEqual(self.request('/api/reset',{'token':token,'password':'clave-elegida-por-mi','repeat':'clave-elegida-por-mi'})['status'],200)
+        self.assertEqual(self.request('/api/reset',{'token':token,'password':'otra-clave-distinta','repeat':'otra-clave-distinta'})['status'],400)
+        with app.connect() as c:self.assertEqual(c.execute("SELECT COUNT(*) FROM audit WHERE action='account_activated' AND entity_id=?",(uid,)).fetchone()[0],1)
+        granted=self.request('/api/login',{'login':'nueva','password':'clave-elegida-por-mi'});self.assertEqual(granted['status'],200)
+        # Un técnico no puede crear cuentas, restablecer accesos ni abrir /registro.
+        tech=granted['cookie'].split(';')[0];tech_csrf=self.request('/api/me',cookie=tech)['body']['user']['csrf']
+        self.assertEqual(self.request('/api/users/create',dict(new,email='otra@example.invalid'),cookie=tech,csrf=tech_csrf)['status'],403)
+        self.assertEqual(self.request('/api/users/access',{'id':str(self.uid)},cookie=tech,csrf=tech_csrf)['status'],403)
+        self.assertEqual(self.request('/registro',cookie=tech)['status'],404)
+        with app.connect() as c:self.assertEqual(c.execute("SELECT COUNT(*) FROM users WHERE email='otra@example.invalid'").fetchone()[0],0)
+        # Restablecer acceso: sin correo disponible, el enlace se entrega una vez a administración; el anterior queda sustituido.
+        with patch.object(app,'security_mail_ready',return_value=''):
+            reset=self.request('/api/users/access',{'id':str(uid)},cookie=cookie,csrf=csrf)['body']
+        self.assertEqual(reset['mail'],'unavailable');self.assertIn('/reset?token=',reset['link'])
+        self.assertEqual(self.request('/api/users/access',{'id':str(self.uid)},cookie=cookie,csrf=csrf)['status'],400)
+        with app.connect() as c:self.assertEqual(c.execute("SELECT COUNT(*) FROM audit WHERE action='account_access_reset' AND entity_id=?",(uid,)).fetchone()[0],1)
+        # Las solicitudes antiguas siguen pudiendo aprobarse o rechazarse.
+        with app.connect() as c:old=c.execute("INSERT INTO users(username,email,name,password_hash,role,active,created_at,approval,requested_at) VALUES ('antigua','antigua@example.invalid','Solicitud Antigua','x','tecnico',0,0,'pending',0)").lastrowid
+        self.assertEqual([r['username'] for r in self.request('/api/settings',cookie=cookie)['body']['requests']],['antigua'])
+        self.assertEqual(self.request('/api/users/approval',{'id':str(old),'action':'approve','role':'tecnico'},cookie=cookie,csrf=csrf)['status'],200)
 
     def test_notifications_are_per_user_and_read_state_persists(self):
         self.assertEqual(self.request('/api/notifications')['status'],401)

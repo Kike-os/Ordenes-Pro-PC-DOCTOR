@@ -112,14 +112,14 @@ void main(){
    const sinceBeat=(now-(state.beatAt||0))/1000,envelope=state.speaking?Math.max(.35,Math.exp(-sinceBeat*5.5)):0;ease('speak',envelope,16);
    const sincePress=(now-(state.pressAt||-1e9))/1000,press=sincePress<1.2?Math.exp(-sincePress*5.2)*Math.cos(sincePress*17):0;
    resize();gl.clear(gl.COLOR_BUFFER_BIT);gl.useProgram(program);
-   gl.uniform2f(uniforms.uRes,canvas.width,canvas.height);gl.uniform1f(uniforms.uTime,still.matches?12:(now-started)/1000);
+   gl.uniform2f(uniforms.uRes,canvas.width,canvas.height);gl.uniform1f(uniforms.uTime,(still.matches||state.still)?12:(now-started)/1000);
    gl.uniform1f(uniforms.uLevel,smooth.level);gl.uniform1f(uniforms.uBusy,smooth.busy);gl.uniform1f(uniforms.uSpeak,smooth.speak);gl.uniform1f(uniforms.uDim,smooth.dim);gl.uniform1f(uniforms.uPress,press);gl.uniform1f(uniforms.uSteps,steps);
    gl.drawArrays(gl.TRIANGLE_STRIP,0,4);}
   function loop(now){
    frame=0;if(!alive)return;
    const state=read(),active=state.busy||state.speaking||state.listening||(now-(state.pressAt||-1e9))<1300;
    // Con «movimiento reducido» apenas se redibuja; en reposo se limita a unos 30 cuadros por segundo para ahorrar batería y sube al reaccionar.
-   const gap=still.matches?(active?120:600):(active?0:30);
+   const gap=(still.matches||state.still)?(active?120:600):(active?0:30);
    if(now-lastDraw>=gap){const before=performance.now();draw(now);lastDraw=now;
     const cost=performance.now()-before;slow=cost>9?slow+1:Math.max(0,slow-1);if(slow>40&&(steps>5||quality>.6)){steps=Math.max(5,steps-2);quality=Math.max(.6,quality-.15);slow=0;}}
    schedule();}

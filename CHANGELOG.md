@@ -4,6 +4,26 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.104 — 2026-10-12 17:42 (UTC-05:00)
+
+Registro público cerrado, cuentas por administración y ADI en espera
+
+### Nuevas funcionalidades
+
+- Gestión de Usuarios y Accesos: crear cuentas con invitación por correo y enlace temporal de un solo uso para que cada persona establezca su contraseña, restablecer accesos y registro de creación y activación en la auditoría.
+
+### Mejoras realizadas
+
+- ADI: nueva preferencia «Animaciones de la esfera»; se retira «Abrir el chat al entrar».
+
+### Errores corregidos
+
+- ADI permanece en espera al abrir, recargar o cambiar de sección: no se abre, no habla ni activa el micrófono por sí sola.
+
+### Actualizaciones de seguridad
+
+- Se retiró el registro público de cuentas: desaparecen el enlace «Solicitar acceso», la página pública /registro y el alta por la API. Solo administración crea cuentas, con permisos comprobados en el servidor.
+
 ## v1.5.103 — 2026-10-12 17:36 (UTC-05:00)
 
 Esfera 3D de ADI en WebGL y título «Órdenes de Reparación»

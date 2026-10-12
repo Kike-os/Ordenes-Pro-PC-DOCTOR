@@ -4415,3 +4415,14 @@ body[data-page=dashboard] button[aria-label^="Cerrar"]:not(#logout):not(.primary
  body[data-page=login] #adi-widget.adi-v2 .adi-panel{top:58px;bottom:auto;max-height:calc(100dvh - 84px)}
  body[data-page=login] #adi-widget.adi-v2.adi-gl .adi-orb-label,body[data-page=login] #adi-widget.adi-v2 .adi-orb-label{font-size:11.5px}
 }
+/* Gestión de Usuarios y Accesos: creación de cuentas y enlaces de acceso. */
+.user-create-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 14px;align-items:end;max-width:760px}
+.user-create-form .message{grid-column:1/-1;margin:0;min-height:18px}
+.user-create-form button[type=submit]{justify-self:start;min-height:42px}
+.user-access-link{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;margin-top:12px;padding:12px;border:1px solid #7a6230;border-radius:10px;background:#2b230f}
+.user-access-link small{grid-column:1/-1;font-size:12px;line-height:1.5;color:#f3d48f}
+.user-access-link input{margin:0;font-size:12px}
+.user-row-actions{flex-wrap:wrap;gap:6px}
+@media(max-width:640px){.user-create-form{grid-template-columns:1fr}.user-access-link{grid-template-columns:1fr}}
+/* ADI con las animaciones desactivadas por preferencia: esfera quieta, sin respiración ni destellos. */
+#adi-widget.adi-v2.adi-still :is(.adi-toggle,.adi-orb,.adi-orb-swirl,.adi-orb-shine,.adi-halo,.adi-level),#adi-widget.adi-v2.adi-still .adi-orb::before,#adi-widget.adi-v2.adi-still .adi-orb::after{animation:none!important}

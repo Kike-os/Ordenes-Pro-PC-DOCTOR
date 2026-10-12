@@ -510,7 +510,54 @@ def mail_signature(c):
 
 
 def registration_enabled():
-    return os.getenv('REGISTRATION','on').strip().lower() not in ('off','false','0','no')
+    """El alta pública de cuentas se retiró (12/10/2026): las cuentas las crea administración desde Gestión de Usuarios y Accesos."""
+    return False
+
+
+INVITE_HOURS=72
+
+
+def access_link(c,uid,hours=INVITE_HOURS):
+    """Enlace temporal de un solo uso para que la persona establezca su propia contraseña. Sustituye a cualquier enlace anterior."""
+    base=os.getenv('APP_URL','http://127.0.0.1:8010').rstrip('/')
+    if urlsplit(base).scheme!='https' and urlsplit(base).hostname not in ('127.0.0.1','localhost'):raise RuntimeError('La invitación requiere HTTPS')
+    token=secrets.token_urlsafe(32)
+    c.execute('DELETE FROM reset_tokens WHERE user_id=?',(uid,))
+    c.execute('INSERT INTO reset_tokens VALUES (?,?,?)',(digest(token),uid,int(time.time())+hours*3600))
+    return base+'/reset?token='+token
+
+
+def send_access_mail(email,name,url,invite=True,hours=INVITE_HOURS):
+    """Correo de invitación o de restablecimiento de acceso. Nunca incluye contraseñas: solo el enlace temporal."""
+    company=corporate.settings();e=html.escape
+    title='Activa tu cuenta de Órdenes Pro' if invite else 'Restablece tu acceso a Órdenes Pro'
+    lead=('Administración de '+company['name']+' creó una cuenta para ti en Órdenes Pro.' if invite else 'Administración de '+company['name']+' generó un enlace para que restablezcas tu acceso a Órdenes Pro.')
+    text='\n'.join([company['name'],'',title,'','Hola, '+name+':',lead,'','Establece tu contraseña desde este enlace:',url,'','El enlace caduca en %d horas y solo puede usarse una vez. Nadie conoce tu contraseña: la eliges tú.'%hours,'Si no esperabas este mensaje, ignóralo.','',company['name'],company['website']])
+    font="font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif"
+    import verification_mail
+    markup=('<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"></head><body style="margin:0;padding:0;background-color:#eef2f8">'
+            '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#eef2f8"><tr><td align="center" style="padding:28px 12px">'
+            '<table role="presentation" width="560" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:560px;background-color:#ffffff;border:1px solid #d9e2ef;border-radius:14px">'
+            '<tr><td align="center" style="padding:26px 24px 14px"><img src="'+e(verification_mail.logo_url())+'" width="132" alt="PC-DOCTOR S.A." style="display:block;border:0;width:132px;height:auto">'
+            '<div style="'+font+';font-size:18px;line-height:24px;font-weight:700;color:#143f77;padding-top:10px">'+e(company['name'])+'</div></td></tr>'
+            '<tr><td style="padding:0 24px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td height="3" bgcolor="#143f77" style="height:3px;line-height:3px;font-size:0">&nbsp;</td><td width="64" height="3" bgcolor="#d94049" style="width:64px;height:3px;line-height:3px;font-size:0">&nbsp;</td></tr></table></td></tr>'
+            '<tr><td align="center" style="padding:26px 28px 6px"><h1 style="margin:0;'+font+';font-size:22px;line-height:30px;color:#102744">'+e(title)+'</h1>'
+            '<p style="margin:12px 0 0;'+font+';font-size:15px;line-height:23px;color:#33435a">Hola, '+e(name)+'.<br>'+e(lead)+'</p></td></tr>'
+            '<tr><td align="center" style="padding:20px 28px 8px"><a href="'+e(url)+'" style="display:inline-block;background-color:#2359ac;color:#ffffff;'+font+';font-size:15px;font-weight:700;text-decoration:none;padding:13px 26px;border-radius:10px">Establecer mi contraseña</a></td></tr>'
+            '<tr><td align="center" style="padding:8px 28px 4px;'+font+';font-size:13px;line-height:21px;color:#4a5a70">El enlace caduca en <strong style="color:#102744">%d horas</strong> y solo puede usarse una vez.<br>Nadie conoce tu contraseña: la eliges tú.</td></tr>'%hours+
+            '<tr><td style="padding:16px 28px 6px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#fff7f7" style="border-left:3px solid #d94049"><tr><td style="padding:11px 14px;'+font+';font-size:13px;line-height:20px;color:#4a5a70">Si no esperabas este mensaje, ignóralo. Si el botón no funciona, copia este enlace en tu navegador:<br><span style="word-break:break-all;color:#2359ac">'+e(url)+'</span></td></tr></table></td></tr>'
+            '<tr><td align="center" style="padding:20px 28px 24px;border-top:1px solid #e3e9f1;'+font+';font-size:12px;line-height:19px;color:#68768a"><strong style="color:#143f77">'+e(company['name'])+'</strong><br>'+e(re.sub(r'^https?://|/$','',company['website']))+'<br>Mensaje automático de seguridad de Órdenes Pro.</td></tr>'
+            '</table></td></tr></table></body></html>')
+    send_security_mail(email,('Activa tu cuenta' if invite else 'Restablece tu acceso')+' | '+company['name'],text,markup)
+
+
+def deliver_access(c,uid,email,name,invite):
+    """Genera el enlace y lo envía. Devuelve (resultado, enlace): el enlace solo se entrega a administración cuando el correo no pudo salir."""
+    url=access_link(c,uid);c.commit()
+    if not security_mail_ready():return 'unavailable',url
+    try:send_access_mail(email,name,url,invite)
+    except (OSError,RuntimeError,smtplib.SMTPException,mail_pro.MailError):return 'failed',url
+    return 'sent',''
 
 
 def bot_required(c, ip_key):
@@ -791,8 +838,8 @@ class Handler(BaseHTTPRequestHandler):
             if path == '/forgot':
                 return self.page('forgot.html')
             if path == '/registro':
-                if not registration_enabled():return self.reply(404,{'error':'El registro de cuentas no está habilitado.'})
-                return self.page('register.html')
+                if not user or user['role']!='administrador':return self.reply(404,{'error':'Página no disponible.'})
+                return self.reply(200,'<!doctype html><html lang="es"><head><meta charset="utf-8"><meta http-equiv="refresh" content="0;url=/#settings?tab=users"><title>Gestión de Usuarios y Accesos</title></head><body><p><a href="/#settings?tab=users">Ir a Gestión de Usuarios y Accesos</a></p></body></html>','text/html; charset=utf-8')
             if path == '/reset':
                 return self.page('reset.html')
             if not user:
@@ -1519,37 +1566,9 @@ class Handler(BaseHTTPRequestHandler):
                     audit(c, row['id'], 'login')
                     return self.reply(200, {'ok':True}, cookie=self.cookie(token, age if remember else None))
                 if path == '/api/register':
-                    # Alta pública de solicitudes: la cuenta queda inactiva hasta que administración la apruebe.
-                    if not registration_enabled():return self.reply(404,{'error':'El registro de cuentas no está habilitado.'})
-                    if limited(c,'register-ip:'+digest(self.client_address[0]),limit=5,window=3600):
-                        return self.reply(429,{'error':'Demasiadas solicitudes. Inténtalo más tarde.'})
-                    token=str(data.get('bot_token',''))
-                    if (captcha_mode()=='local' and not verify_captcha(c,token)) or (captcha_mode()=='turnstile' and not verify_bot(token,'register')):
-                        return self.reply(403,{'error':'Completa la verificación de seguridad para enviar la solicitud.','challenge':True,'sitekey':os.getenv('TURNSTILE_SITE_KEY')})
-                    values={key:str(data.get(key,'')).strip() for key in ('name','username','email','phone','identification','job_title')}
-                    password=str(data.get('password',''));minimum=auth_policy(c)['password_min'];errors={}
-                    if not values['name'] or len(values['name'])>150:errors['name']='Escribe tus nombres y apellidos.'
-                    if not re.fullmatch(r'[a-zA-Z0-9_.-]{3,50}',values['username']):errors['username']='Usa de 3 a 50 letras, números, punto, guion o guion bajo.'
-                    if len(values['email'])>254 or not re.fullmatch(r'[^\s@]+@[^\s@]+\.[^\s@]+',values['email']):errors['email']='Introduce un correo electrónico válido.'
-                    if not valid_ecuador_phone(values['phone']):errors['phone']='Ingresa un móvil 09…, fijo con código de área o +593….'
-                    if values['identification'] and (len(values['identification'])!=10 or reception.document_error(values['identification'])):errors['identification']='La cédula no es válida.'
-                    if len(values['job_title'])>100:errors['job_title']='Usa hasta 100 caracteres.'
-                    if not minimum<=len(password)<=256:errors['password']=f'Usa una contraseña de {minimum} a 256 caracteres.'
-                    elif password!=str(data.get('repeat','')):errors['repeat']='Las contraseñas no coinciden.'
-                    common_file=os.getenv('PASSWORD_BLOCKLIST_FILE','')
-                    if 'password' not in errors and common_file and password.casefold() in {line.strip().casefold() for line in Path(common_file).read_text().splitlines()}:errors['password']='Esta contraseña es demasiado común.'
-                    if errors:return self.reply(400,{'error':'Revisa los campos señalados.','fields':errors})
-                    # Respuesta idéntica exista o no la cuenta: no se revela qué usuarios o correos están registrados.
-                    hashed=password_hash(password)
-                    matches=c.execute('SELECT id,approval FROM users WHERE username=? OR email=?',(values['username'],values['email'])).fetchall()
-                    if len(matches)==1 and matches[0]['approval']=='rejected':
-                        # Una solicitud rechazada puede volver a enviarse: se actualiza y queda de nuevo pendiente de revisión.
-                        c.execute("UPDATE users SET username=?,email=?,name=?,password_hash=?,phone=?,identification=?,job_title=?,approval='pending',active=0,requested_at=?,reviewed_by=NULL,reviewed_at=NULL WHERE id=?",(values['username'],values['email'],values['name'],hashed,values['phone'],values['identification'],values['job_title'],int(time.time()),matches[0]['id']))
-                        audit(c,None,'account_requested',matches[0]['id'])
-                    elif not matches:
-                        uid=c.execute("INSERT INTO users(username,email,name,password_hash,role,active,created_at,phone,identification,job_title,approval,requested_at) VALUES (?,?,?,?,'tecnico',0,?,?,?,?,'pending',?)",(values['username'],values['email'],values['name'],hashed,int(time.time()),values['phone'],values['identification'],values['job_title'],int(time.time()))).lastrowid
-                        audit(c,None,'account_requested',uid)
-                    return self.reply(201,{'ok':True,'message':'Solicitud recibida. Un administrador la revisará; podrás iniciar sesión cuando sea aprobada.'})
+                    # El alta pública se retiró: las cuentas se crean en /api/users/create, solo por administración.
+                    audit(c,None,'public_registration_blocked')
+                    return self.reply(404,{'error':'El registro de cuentas no está disponible.'})
                 if path == '/api/forgot':
                     email = str(data.get('email','')).strip()
                     if len(email)>254 or not re.fullmatch(r'[^\s@]+@[^\s@]+\.[^\s@]+',email):
@@ -1590,6 +1609,7 @@ class Handler(BaseHTTPRequestHandler):
                     c.execute('DELETE FROM sessions WHERE user_id=?', (row['user_id'],))
                     c.execute('DELETE FROM attempts WHERE bucket IN (?,?)',('login-user:'+digest(row['email'].casefold()),'login-user:'+digest(c.execute('SELECT username FROM users WHERE id=?',(row['user_id'],)).fetchone()[0].casefold())))
                     audit(c, row['user_id'], 'password_reset')
+                    if c.execute("SELECT 1 FROM audit WHERE action='account_created' AND entity_id=?",(row['user_id'],)).fetchone() and not c.execute("SELECT 1 FROM audit WHERE action='account_activated' AND entity_id=?",(row['user_id'],)).fetchone():audit(c,None,'account_activated',row['user_id'])
                     c.commit()
                     dispatch_security_job(lambda:deliver_change_notice(row['email'],row['user_id']))
                     return self.reply(200, {'ok':True})
@@ -1789,6 +1809,40 @@ class Handler(BaseHTTPRequestHandler):
                     audit(c,user['id'],'password_changed');c.commit()
                     dispatch_security_job(lambda:deliver_change_notice(stored['email'],user['id']))
                     return self.reply(200,{'ok':True})
+                if path=='/api/users/create':
+                    if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede crear cuentas.'})
+                    if limited(c,'user-create:'+str(user['id']),limit=20,window=3600):return self.reply(429,{'error':'Demasiadas cuentas creadas en poco tiempo. Inténtalo más tarde.'})
+                    name=re.sub(r'\s+',' ',str(data.get('name',''))).strip();email=str(data.get('email','')).strip();username=str(data.get('username','')).strip();role=str(data.get('role','tecnico'));errors={}
+                    if not 3<=len(name)<=150:errors['name']='Escribe los nombres y apellidos.'
+                    if len(email)>254 or not re.fullmatch(r'[^\s@]+@[^\s@]+\.[^\s@]+',email):errors['email']='Introduce un correo electrónico válido.'
+                    if username and not re.fullmatch(r'[a-zA-Z0-9_.-]{3,50}',username):errors['username']='Usa de 3 a 50 letras, números, punto, guion o guion bajo.'
+                    if role not in ('administrador','tecnico'):errors['role']='Elige un rol válido.'
+                    if not errors and c.execute('SELECT 1 FROM users WHERE lower(email)=lower(?)',(email,)).fetchone():errors['email']='Ya existe una cuenta con ese correo.'
+                    if not errors and username and c.execute('SELECT 1 FROM users WHERE lower(username)=lower(?)',(username,)).fetchone():errors['username']='Ese nombre de usuario ya está en uso.'
+                    if errors:return self.reply(400,{'error':'Revisa los campos señalados.','fields':errors})
+                    if not username:
+                        # Usuario derivado del correo; si ya existe se le añade un número.
+                        stem=(re.sub(r'[^a-zA-Z0-9_.-]','',email.split('@')[0])[:44] or 'usuario').ljust(3,'0');username=stem;number=1
+                        while c.execute('SELECT 1 FROM users WHERE lower(username)=lower(?)',(username,)).fetchone():number+=1;username=stem+str(number)
+                    # Contraseña inicial aleatoria que nadie conoce: la persona elige la suya desde el enlace de invitación.
+                    now_ts=int(time.time())
+                    uid=c.execute("INSERT INTO users(username,email,name,password_hash,role,active,created_at,approval,requested_at,reviewed_by,reviewed_at) VALUES (?,?,?,?,?,1,?,'approved',?,?,?)",(username,email,name,password_hash(secrets.token_urlsafe(48)),role,now_ts,now_ts,user['id'],now_ts)).lastrowid
+                    appointments.ensure_staff_hours(c,uid);audit(c,user['id'],'account_created',uid)
+                    try:result,link=deliver_access(c,uid,email,name,True)
+                    except RuntimeError:result,link='unavailable',''
+                    with connect() as log:audit(log,user['id'],'account_invitation_'+result,uid)
+                    return self.reply(201,{'ok':True,'id':uid,'username':username,'mail':result,'link':link,'hours':INVITE_HOURS})
+                if path=='/api/users/access':
+                    # Restablecer el acceso de una cuenta: enlace temporal nuevo; la contraseña anterior deja de servir cuando la persona elige otra.
+                    if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede restablecer accesos.'})
+                    if limited(c,'user-access:'+str(user['id']),limit=20,window=3600):return self.reply(429,{'error':'Demasiados enlaces generados. Inténtalo más tarde.'})
+                    target=str(data.get('id',''));row=c.execute("SELECT id,email,name,active FROM users WHERE id=? AND approval='approved'",(target,)).fetchone() if target.isdigit() else None
+                    if not row or not row['active']:return self.reply(400,{'error':'La cuenta no está disponible o está desactivada.'})
+                    if row['id']==user['id']:return self.reply(400,{'error':'Para tu propia cuenta usa «Cambiar contraseña».'})
+                    audit(c,user['id'],'account_access_reset',row['id'])
+                    try:result,link=deliver_access(c,row['id'],row['email'],row['name'],False)
+                    except RuntimeError:result,link='unavailable',''
+                    return self.reply(200,{'ok':True,'mail':result,'link':link,'hours':INVITE_HOURS})
                 if path=='/api/users/manage':
                     if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede gestionar cuentas.'})
                     target=str(data.get('id',''));action=str(data.get('action',''));role=str(data.get('role',''))

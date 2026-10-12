@@ -1,20 +1,21 @@
 'use strict';
 // Chat flotante de ADI: asistente virtual y relevo real a un asesor. Compartido por el panel y la agenda de citas.
 (()=>{
- const root=document.getElementById('adi-widget');if(!root)return;
+ const root=document.getElementById('adi-widget');if(!root||root.dataset.ready)return;root.dataset.ready='true';
  const $=id=>document.getElementById(id),toggle=$('adi-toggle'),panel=$('adi-panel'),list=$('adi-messages'),form=$('adi-form'),input=$('adi-input'),submit=form.querySelector('button'),human=$('adi-human'),status=$('adi-status'),quick=$('adi-quick'),badge=$('adi-unread'),more=$('adi-more'),menu=$('adi-menu');
  const dashboard=document.body.dataset.page==='dashboard',prefsKey='ordenes-pro:adi-chat';
  {const orb=toggle.querySelector('.adi-orb');if(orb&&!orb.querySelector('.adi-orb-label')){const label=document.createElement('b');label.className='adi-orb-label';label.textContent='ADI';orb.append(label);for(const name of ['adi-level','adi-halo']){const piece=document.createElement('i');piece.className=name;piece.setAttribute('aria-hidden','true');toggle.prepend(piece);}}
   // Equipos modestos: menos efectos (sin desenfoques ni ondas interiores) para que la esfera no reste fluidez.
   if((navigator.hardwareConcurrency&&navigator.hardwareConcurrency<=2)||(navigator.deviceMemory&&navigator.deviceMemory<=2))root.classList.add('adi-lite');}
  let lastId=0,busy=false,state='adi',transient='',started=false,loaded=false,typing=null,unread=0,lastDay='',failures=0,autoHidden=false,closing=null;
- let prefs={sound:true,restore:false};try{prefs=Object.assign(prefs,JSON.parse(localStorage.getItem(prefsKey)||'{}'));}catch{}const savePrefs=()=>{try{localStorage.setItem(prefsKey,JSON.stringify(prefs));}catch{}};
+ let prefs={sound:true,motion:true};try{prefs=Object.assign(prefs,JSON.parse(localStorage.getItem(prefsKey)||'{}'));}catch{}// Solo se guardan preferencias (sonido, voz elegida, velocidad, animaciones). Nunca el estado de la conversación, la escucha ni la voz en curso.
+ delete prefs.restore;const savePrefs=()=>{try{localStorage.setItem(prefsKey,JSON.stringify(prefs));}catch{}};
  const el=(tag,text,className)=>{const node=document.createElement(tag);if(text!==undefined)node.textContent=text;if(className)node.className=className;return node;};
  async function request(path,data){let response;try{response=await fetch(path,{method:data===undefined?'GET':'POST',credentials:'same-origin',headers:data===undefined?{}:{'Content-Type':'application/json'},body:data===undefined?undefined:JSON.stringify(data)});}catch{throw new Error('Sin conexión. Tu mensaje sigue en el editor.');}let result;try{result=await response.json();}catch{throw new Error('No se pudo conectar con ADI. Inténtalo de nuevo.');}if(!response.ok)throw new Error(result.error||'No se pudo enviar el mensaje.');return result;}
  // Tonos breves generados en el navegador; solo suenan si la persona ya interactuó con la página y no los desactivó.
 // Esfera 3D (WebGL): lee el estado real del asistente en cada cuadro. Si el navegador no ofrece WebGL queda la esfera CSS como alternativa ligera.
  const orbState={level:0,busy:false,speaking:false,listening:false,dim:false,beatAt:0,pressAt:-1e9};let orb3d=null;
- const readOrb=()=>{orbState.busy=root.classList.contains('adi-busy');orbState.speaking=root.dataset.voice==='speaking';orbState.listening=root.dataset.voice==='listening';orbState.dim=root.dataset.state==='offline'||root.dataset.state==='closed'||root.dataset.orb==='error';
+ const readOrb=()=>{orbState.busy=root.classList.contains('adi-busy');orbState.speaking=root.dataset.voice==='speaking';orbState.listening=root.dataset.voice==='listening';orbState.still=prefs.motion===false;orbState.dim=root.dataset.state==='offline'||root.dataset.state==='closed'||root.dataset.orb==='error';
   // Sin medidor de volumen (teléfonos), el núcleo responde al inicio y fin de voz que informa el reconocimiento.
   if(!root.dataset.meter)orbState.level=orbState.listening?(root.dataset.heard?.55:.12):0;return orbState;};
  const mountOrb=()=>{const host=toggle.querySelector('.adi-orb');if(!host||!window.AdiOrb||orb3d)return;try{orb3d=window.AdiOrb.mount(host,readOrb);}catch{orb3d=null;}if(orb3d){root.classList.add('adi-gl');root.adiOrb=orb3d;}};
@@ -123,8 +124,10 @@
  // Cerrar también descarta el borrador sin enviar; minimizar lo conserva. La conversación guardada no se pierde en ningún caso.
  $('adi-close').addEventListener('click',()=>{input.value='';sound('close');setOpen(false);});
  more.addEventListener('click',()=>setMenu(menu.hidden));
- const sounds=$('adi-sound'),restore=$('adi-restore');sounds.checked=prefs.sound;restore.checked=prefs.restore;
- sounds.addEventListener('change',()=>{prefs.sound=sounds.checked;savePrefs();if(prefs.sound)sound('message');});restore.addEventListener('change',()=>{prefs.restore=restore.checked;savePrefs();});
+ const sounds=$('adi-sound'),restore=$('adi-restore');sounds.checked=prefs.sound;
+ // La antigua opción «Abrir el chat al entrar» pasa a ser la preferencia de animaciones de la esfera.
+ restore.checked=prefs.motion!==false;restore.nextElementSibling.textContent='Animaciones de la esfera';const applyMotion=()=>{root.classList.toggle('adi-still',prefs.motion===false);};applyMotion();
+ sounds.addEventListener('change',()=>{prefs.sound=sounds.checked;savePrefs();if(prefs.sound)sound('message');});restore.addEventListener('change',()=>{prefs.motion=restore.checked;savePrefs();applyMotion();});
  document.addEventListener('keydown',event=>{if(event.key!=='Escape'||!isOpen()||document.querySelector('dialog[open]'))return;
   // Dentro de la consulta de reparación, Escape la cancela sin cerrar el chat.
   if(check?.isConnected&&check.contains(event.target)){event.stopPropagation();check.querySelector('.adi-check-cancel').click();return;}
@@ -136,7 +139,7 @@
  // Capas prioritarias (diálogos, notificaciones, menús): si se abren sobre el chat, este se minimiza y vuelve al cerrarlas.
  const layers='dialog[open],#notify-panel,#account-panel,#assistance-menu';
  let lastBox=null;const blocked=box=>{if(!box?.width)return false;for(const node of document.querySelectorAll(layers)){if(node.hidden||root.contains(node))continue;if(node.matches('dialog[open]'))return true;const other=node.getBoundingClientRect();if(Math.min(other.right,box.right)-Math.max(other.left,box.left)>16&&Math.min(other.bottom,box.bottom)-Math.max(other.top,box.top)>16)return true;}return false;};
- let layerTimer;new MutationObserver(()=>{clearTimeout(layerTimer);layerTimer=setTimeout(()=>{if(isOpen()){const box=panel.getBoundingClientRect();if(blocked(box)){setOpen(false,false);autoHidden=true;lastBox=box;}}else if(autoHidden&&!blocked(lastBox))setOpen(true,false);},140);}).observe(document.body,{subtree:true,attributes:true,attributeFilter:['hidden','open'],childList:true});
+ let layerTimer;new MutationObserver(()=>{clearTimeout(layerTimer);layerTimer=setTimeout(()=>{if(isOpen()){const box=panel.getBoundingClientRect();if(blocked(box)){setOpen(false,false);autoHidden=true;lastBox=box;}}},140);}).observe(document.body,{subtree:true,attributes:true,attributeFilter:['hidden','open'],childList:true});
  // «Comenzar conversación»: visible solo mientras no hay mensajes; lleva al campo de escritura.
  {const welcome=list.querySelector('.adi-welcome');if(welcome){const begin=el('button','Comenzar conversación','adi-start');begin.type='button';begin.addEventListener('click',()=>{input.focus();});welcome.after(begin);}}
  input.addEventListener('input',grow);
@@ -168,5 +171,5 @@
  const docked=document.body.dataset.page==='login'&&matchMedia('(min-width:1100px) and (min-height:600px)').matches;if(docked){root.classList.add('adi-docked');
   // El panel acoplado copia la posición vertical y el alto de la tarjeta de acceso, para que formen un conjunto.
   const card=document.querySelector('.access-card'),align=()=>{const active=matchMedia('(min-width:1100px) and (min-height:600px)').matches,box=card?.getBoundingClientRect();if(!active||!box?.height){panel.style.top=panel.style.bottom=panel.style.height='';return;}const height=Math.min(Math.max(box.height,500),innerHeight-32);panel.style.top=Math.max(16,Math.min(box.top,innerHeight-height-16))+'px';panel.style.bottom='auto';panel.style.height=height+'px';};align();addEventListener('resize',align);addEventListener('load',align);setTimeout(align,700);setTimeout(align,2500);if(card&&'ResizeObserver' in window)new ResizeObserver(align).observe(card);}
- paint();poll().then(()=>{if(docked||(prefs.restore&&started))setOpen(true,false);});
+ paint();poll();
 })();

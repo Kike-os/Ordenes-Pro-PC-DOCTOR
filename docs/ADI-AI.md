@@ -155,3 +155,7 @@ Halo rosado difuminado que respira con la esfera, cristal con reflejos superior 
 4. **Procesamiento**: enviar un mensaje; mientras llega la respuesta las partículas se concentran.
 5. **Habla**: activar la voz (altavoz) y enviar un mensaje; durante la lectura salen ondas del centro. El botón cuadrado la detiene.
 6. **Sin conexión**: desconectar la red unos segundos con el chat abierto.
+
+## ADI siempre en espera al cargar (1.5.104)
+
+Al abrir, recargar o cambiar de sección, ADI no se abre, no habla, no suena y no enciende el micrófono: solo se muestra la esfera. Se retiraron la apertura automática junto al acceso, la opción «Abrir el chat al entrar» y la reapertura automática tras cerrarse un diálogo. Solo se guardan preferencias (efectos de sonido, voz y velocidad, animaciones de la esfera), nunca el estado de la conversación, la escucha o la voz. Hay una sola instancia por página y cerrar o minimizar detiene la voz y el micrófono.

@@ -8,6 +8,28 @@
   },
   "releases": [
     {
+      "version": "1.5.104",
+      "date": "2026-10-12T17:42:31-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Registro público cerrado, cuentas por administración y ADI en espera",
+      "changes": {
+        "features": [
+          "Gestión de Usuarios y Accesos: crear cuentas con invitación por correo y enlace temporal de un solo uso para que cada persona establezca su contraseña, restablecer accesos y registro de creación y activación en la auditoría."
+        ],
+        "improvements": [
+          "ADI: nueva preferencia «Animaciones de la esfera»; se retira «Abrir el chat al entrar»."
+        ],
+        "fixes": [
+          "ADI permanece en espera al abrir, recargar o cambiar de sección: no se abre, no habla ni activa el micrófono por sí sola."
+        ],
+        "security": [
+          "Se retiró el registro público de cuentas: desaparecen el enlace «Solicitar acceso», la página pública /registro y el alta por la API. Solo administración crea cuentas, con permisos comprobados en el servidor."
+        ],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.103",
       "date": "2026-10-12T17:36:10-05:00",
       "type": "patch",
