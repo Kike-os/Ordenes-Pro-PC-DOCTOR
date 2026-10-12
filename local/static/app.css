@@ -4097,3 +4097,12 @@ body[data-page=dashboard] .orders-action-menu{width:min(250px,calc(100vw - 20px)
 #adi-widget.adi-v2[data-orb=error] .adi-orb{filter:saturate(.55) hue-rotate(-38deg)}
 @keyframes adi-orb-error{0%,100%{transform:translateX(0)}30%{transform:translateX(-3px)}70%{transform:translateX(3px)}}
 @media(prefers-reduced-motion:reduce){#adi-widget.adi-v2 .adi-toggle,#adi-widget.adi-v2 .adi-orb-shine::after{animation:none!important}}
+/* Detalle de la orden: autorización digital del cliente */
+#module-content .client-auth{display:grid;gap:7px}#module-content .client-auth p{margin:0}
+.client-auth-state{display:inline-block;padding:3px 10px;border:1px solid #3a4a63;border-radius:999px;background:#141d2c;color:#a7b4c8;font-size:11px;font-weight:800;letter-spacing:.04em}
+.client-auth-state[data-status=signed]{border-color:#35b47a;background:#0f2f22;color:#8ff0bd}.client-auth-state[data-status=rejected],.client-auth-state[data-status=locked]{border-color:#d05663;background:#32141a;color:#ffb1b8}.client-auth-state[data-status=pending]{border-color:#7a6230;background:#2b230f;color:#f3d48f}
+.client-auth-list{display:grid;gap:4px;margin:0;padding:0;list-style:none}.client-auth-list li{display:flex;justify-content:space-between;gap:10px;font-size:12.5px;color:#cfdcf0}
+.client-auth-list b{font-size:11px;white-space:nowrap}.client-auth-list b[data-value=authorized]{color:#8ff0bd}.client-auth-list b[data-value=denied]{color:#ffb1b8}
+.client-auth-link{display:grid;gap:6px;padding:9px;border:1px solid #2f5a9c;border-radius:10px;background:#0f2038}.client-auth-link input{width:100%;margin:0;font-size:12px}
+.client-auth-auto{display:flex!important;align-items:flex-start;gap:8px;margin:2px 0 0;font-size:12.5px;color:#cfdcf0}.client-auth-auto input{flex:none;width:16px;height:16px;min-height:0;margin:2px 0 0}
+.client-auth-note{color:#8fa2bd;font-size:11.5px;line-height:1.45}

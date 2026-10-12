@@ -8,6 +8,24 @@
   },
   "releases": [
     {
+      "version": "1.5.82",
+      "date": "2026-10-12T08:23:17-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Autorización digital del cliente por enlace seguro",
+      "changes": {
+        "features": [
+          "Autorización digital del cliente por enlace seguro: identificación enmascarada, últimos cuatro dígitos, código temporal por correo, aceptar o rechazar cada autorización, comprobante PDF con huella y aviso al correo administrativo"
+        ],
+        "improvements": [
+          "El envío automático del enlace al registrar una orden viene apagado y solo administración puede activarlo"
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.81",
       "date": "2026-10-12T08:12:59-05:00",
       "type": "patch",

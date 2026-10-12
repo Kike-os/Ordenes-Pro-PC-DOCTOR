@@ -388,6 +388,41 @@ def send_authorization_mail(c,oid,user):
     return {'result':'sent','recipient':recipient}
 
 
+def client_authorization_auto(c):
+    row=c.execute("SELECT value FROM system_state WHERE key='client_authorization_auto'").fetchone()
+    return bool(row and row['value']=='on')
+
+
+def send_client_authorization(c,oid,user):
+    """Crea el enlace de autorización del cliente y lo envía a su correo con un código QR. Devuelve el resultado para el personal.
+
+    El enlace solo se entrega aquí: en la base queda únicamente su huella. Un fallo del correo no borra el enlace creado."""
+    import client_authorization
+    order=order_document(c,oid)
+    if not order:return 404,{'error':'Orden no disponible.'}
+    try:ready=mail_pro.configured()
+    except mail_pro.MailError:ready=False
+    if not ready:return 409,{'error':'El correo del sistema no está configurado: no se puede enviar el enlace al cliente.'}
+    now=reception_now()
+    try:token=client_authorization.create(c,order,user,now)
+    except client_authorization.AuthorizationError as error:return 400,{'error':str(error)}
+    url=client_authorization.link(token);c.commit()
+    body=('Estimado/a '+order['client']+':\n\nPara continuar con el servicio de su equipo (orden N.º '+order['code']+') necesitamos su autorización.\n\n'
+          'Abra este enlace seguro y siga los pasos. Se le pedirán los últimos cuatro dígitos de su identificación y un código que enviaremos a este mismo correo:\n\n'+url+'\n\n'
+          'También puede escanear el código QR adjunto. El enlace es personal y caduca en '+str(client_authorization.EXPIRES_DAYS)+' días. Si usted no solicitó este servicio, ignore este mensaje.\n\n'
+          'Atentamente,\n\nDepartamento de Servicio Técnico\nPC-DOCTOR S.A.')
+    try:
+        config=mail_pro.settings();card=mail_signature_card(c)
+        message,recipients=mail_pro.build_message(config,{'to':order['email'],'subject':'PC-DOCTOR S.A. | Autorización de servicio — Orden N.º '+order['code'],'body':body,'from_name':corporate.settings()['name'],
+            'attachments':[{'name':order['code']+'-QR-AUTORIZACION.png','type':'image/png','data':base64.b64encode(qr_image(url,'png')).decode()}]},card if card.get('enabled') else '')
+        mail_pro.deliver(config,message,recipients);result='sent'
+    except mail_pro.MailError as error:
+        print('client-authorization-mail',error.kind,flush=True);result='failed: '+str(error)[:200]
+    c.execute('UPDATE client_authorizations SET mail_result=? WHERE token_hash=?',(result,client_authorization.digest(token)))
+    if result=='sent':order_workspace.event(c,oid,user['id'] if user else None,now,'follow_up','Enlace de autorización enviado al correo del cliente.')
+    return 200,{'result':'sent' if result=='sent' else 'failed','message':'Enlace enviado al correo del cliente.' if result=='sent' else 'El enlace se creó, pero el correo no se pudo enviar: '+result[8:],'url':url,'authorization':client_authorization.summary(c,oid)}
+
+
 def content_disposition(filename):
     """Nombre de descarga: versión ASCII para cualquier navegador y, si tiene espacios o tildes, el nombre exacto en UTF-8 (RFC 5987)."""
     import unicodedata
@@ -622,6 +657,18 @@ class Handler(BaseHTTPRequestHandler):
                 token=preference[1]
                 body='<!doctype html><html lang="es"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Preferencias de recordatorios</title><h1>PC-DOCTOR S.A.</h1><p>Puede dejar de recibir recordatorios de mantenimiento. Esta acción no modifica su reparación.</p><form method="post" action="/maintenance-preferences/'+token+'"><button type="submit">Dejar de recibir recordatorios</button></form></html>'
                 return self.reply(200,body,'text/html; charset=utf-8')
+            # Autorización electrónica del cliente por enlace aleatorio. La respuesta es idéntica para enlaces inexistentes.
+            authorize_page=re.fullmatch(r'/autorizar/([A-Za-z0-9_-]{20,80})(/comprobante\.pdf)?',path)
+            if authorize_page:
+                import client_authorization
+                if limited(c,'cauth-ip:'+digest(self.client_address[0]),60,300):return self.reply(429,{'error':'Demasiadas consultas. Intenta más tarde.'})
+                found=client_authorization.lookup(c,authorize_page[1],reception_now())
+                if not found:return self.reply(404,client_authorization.missing_page(),'text/html; charset=utf-8')
+                document=order_document(c,found['order_id'])
+                if authorize_page[2]:
+                    if found['status'] not in ('signed','rejected'):return self.reply(404,client_authorization.missing_page(),'text/html; charset=utf-8')
+                    return self.reply(200,client_authorization.render_pdf(found),'application/pdf',filename=document['code']+'-AUTORIZACION.pdf')
+                return self.reply(200,client_authorization.start_page(c,authorize_page[1],found,document),'text/html; charset=utf-8')
             # Seguimiento público por enlace aleatorio: respuesta idéntica para enlaces inexistentes o revocados.
             tracking_page=re.fullmatch(r'/s/([A-Za-z0-9_-]{1,64})',path)
             if tracking_page:
@@ -794,6 +841,12 @@ class Handler(BaseHTTPRequestHandler):
                 if not row:
                     return self.reply(404, {'error':'Orden no disponible.'})
                 return self.reply(200, {'id':row['id']})
+            staff_authorization=re.fullmatch(r'/api/orders/([0-9]+)/client-authorization\.pdf',path)
+            if staff_authorization:
+                import client_authorization
+                signed=c.execute("SELECT a.*,COALESCE(o.code,'OP-'||printf('%05d',o.id)) code FROM client_authorizations a JOIN orders o ON o.id=a.order_id WHERE a.order_id=? AND a.status IN ('signed','rejected') ORDER BY a.id DESC LIMIT 1",(int(staff_authorization[1]),)).fetchone()
+                if not signed:return self.reply(404,{'error':'Esta orden no tiene una autorización firmada por el cliente.'})
+                return self.reply(200,client_authorization.render_pdf(dict(signed)),'application/pdf',filename=signed['code']+'-AUTORIZACION.pdf')
             device_detail=re.fullmatch(r'/api/devices/([0-9]+)',path)
             if device_detail:
                 # Ficha del equipo con su historial técnico: todas las órdenes del dispositivo, de la más reciente a la más antigua. Solo lectura.
@@ -908,6 +961,8 @@ class Handler(BaseHTTPRequestHandler):
                 result['tracking']=order_tracking.active(c,row['id'])
                 result['receipt_mail']=receipt_mail_status(c,row['id'])
                 result['authorization_mail']=authorization_mail_status(c,row['id'])
+                import client_authorization
+                result['client_authorization']=client_authorization.summary(c,row['id']);result['client_authorization_auto']=client_authorization_auto(c)
                 result.pop('request_key', None)
                 if result['reception_snapshot']:
                     result.update(json.loads(result['reception_snapshot']))
@@ -1112,6 +1167,43 @@ class Handler(BaseHTTPRequestHandler):
         return self.reply(404, {'error':'Recurso no disponible.'})
 
     def do_POST(self):
+        authorize_post=re.fullmatch(r'/autorizar/([A-Za-z0-9_-]{20,80})',urlsplit(self.path).path)
+        if authorize_post:
+            import client_authorization
+            try:length=int(self.headers.get('Content-Length','0') or 0)
+            except ValueError:length=0
+            if length<=0 or length>20000:return self.reply(400,{'error':'Solicitud inválida.'})
+            form={key:values[0] for key,values in parse_qs(self.rfile.read(length).decode('utf-8','replace'),keep_blank_values=True).items()}
+            token=authorize_post[1]
+            with connect() as c:
+                if limited(c,'cauth-post:'+digest(token),40,900) or limited(c,'cauth-ip:'+digest(self.client_address[0]),60,300):return self.reply(429,{'error':'Demasiados intentos. Intenta más tarde.'})
+                now=reception_now();found=client_authorization.lookup(c,token,now)
+                if not found:return self.reply(404,client_authorization.missing_page(),'text/html; charset=utf-8')
+                document=order_document(c,found['order_id']);active=service_terms.current(c,now);terms=dict(active) if active else None
+                def send_code(recipient,code):
+                    # El código queda guardado antes de enviarlo; se envía solo al correo registrado en la orden.
+                    c.commit();config=mail_pro.settings()
+                    message,recipients=mail_pro.build_message(config,{'to':recipient,'subject':'PC-DOCTOR S.A. | Código de verificación — Orden N.º '+document['code'],'body':'Su código de verificación es: '+code+'\n\nCaduca en '+str(client_authorization.CODE_MINUTES)+' minutos. Si usted no lo solicitó, ignore este mensaje y no comparta el código.\n\nPC-DOCTOR S.A.','from_name':corporate.settings()['name']},'')
+                    mail_pro.deliver(config,message,recipients)
+                forwarded=(self.headers.get('X-Forwarded-For') or '').split(',')[0].strip()
+                page,signed=client_authorization.handle(c,token,found,document,form,now,{'ip':(forwarded or self.client_address[0])[:60],'agent':(self.headers.get('User-Agent') or '')[:160]},send_code,terms)
+                if signed:
+                    state=client_authorization.summary(c,found['order_id']);decisions=state['evidence']['decisions']
+                    order_workspace.event(c,found['order_id'],None,now,'follow_up','Autorización electrónica del cliente registrada: '+('servicio autorizado' if decisions['service']=='authorized' else 'servicio NO autorizado')+'.')
+                    c.commit();notice='not_configured'
+                    try:
+                        if mail_pro.configured():
+                            labels=dict((key,title) for key,title,_ in client_authorization.ITEMS);config=mail_pro.settings()
+                            body='\n'.join(['PC-DOCTOR S.A. — Autorización del cliente recibida','','Orden: '+document['code'],'Cliente: '+document['client'],'Equipo: '+' '.join(part for part in (document.get('brand') or '',document.get('model') or '') if part),'Estado: '+state['status_label'],'Fecha: '+now.strftime('%d/%m/%Y %H:%M')+' (Ecuador)','']
+                                +[labels[key]+': '+('AUTORIZADO' if value=='authorized' else 'NO AUTORIZADO') for key,value in client_authorization.ordered(decisions)]
+                                +(['','Observaciones del cliente: '+state['evidence']['comment']] if state['evidence'].get('comment') else [])
+                                +['','Condiciones: '+(state['evidence']['terms']['title']+', versión '+state['evidence']['terms']['version'] if state['evidence'].get('terms') else 'sin condiciones publicadas en la fecha de la firma'),'Huella de la evidencia: '+state['evidence_hash'],'','Consultar la autorización (requiere iniciar sesión en Órdenes Pro):',public_base_url().rstrip('/')+'/#orders?id='+str(found['order_id'])])
+                            message,recipients=mail_pro.build_message(config,{'to':config['username'],'subject':'PC-DOCTOR S.A. | Autorización del cliente — Orden N.º '+document['code'],'body':body,'from_name':corporate.settings()['name']},'')
+                            mail_pro.deliver(config,message,recipients);notice='sent'
+                    except Exception as error:
+                        print('client-authorization-notice',type(error).__name__,flush=True);notice='failed'
+                    c.execute('UPDATE client_authorizations SET notice_result=? WHERE id=?',(notice,found['id']))
+                return self.reply(200,page,'text/html; charset=utf-8')
         preference=re.fullmatch(r'/maintenance-preferences/([A-Za-z0-9_-]{40,60})',urlsplit(self.path).path)
         if preference:
             with connect() as c:
@@ -1875,6 +1967,20 @@ class Handler(BaseHTTPRequestHandler):
                         c.execute("UPDATE thermal_print_jobs SET state='uncertain' WHERE request_key=?",(key,));audit(c,user['id'],'thermal_print_unconfirmed',oid);c.commit()
                         return self.reply(503,{'error':'No se pudo confirmar el envío a la Epson. Comprueba conexión y cola antes de volver a imprimir.'})
                     return self.reply(200,{'ok':True,'message':('Dos copias enviadas' if len(pdfs)==2 else 'Trabajo enviado')+' a la cola Epson. Verifica la salida física.'})
+                client_route=re.fullmatch(r'/api/orders/([0-9]+)/client-authorization',path)
+                if client_route or path=='/api/client-authorization/settings':
+                    if not client_route:
+                        if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede cambiar este ajuste.'})
+                        if data.get('auto') not in (True,False):return self.reply(400,{'error':'Valor inválido.'})
+                        c.execute("INSERT INTO system_state(key,value) VALUES ('client_authorization_auto',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",('on' if data['auto'] else 'off',))
+                        audit(c,user['id'],'client_authorization_auto_'+('on' if data['auto'] else 'off'))
+                        return self.reply(200,{'ok':True,'auto':data['auto']})
+                    if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
+                    if data.get('action')!='send':return self.reply(400,{'error':'Acción inválida.'})
+                    if limited(c,'cauth-send:'+str(user['id']),limit=30,window=3600):return self.reply(429,{'error':'Alcanzaste el límite de envíos por hora.'})
+                    status,payload=send_client_authorization(c,int(client_route[1]),user)
+                    if status==200:audit(c,user['id'],'client_authorization_sent',int(client_route[1]))
+                    return self.reply(status,payload)
                 consent_match=re.fullmatch(r'/api/orders/([0-9]+)/authorizations',path)
                 if consent_match:
                     oid=int(consent_match[1]);order=c.execute('SELECT o.*,cl.name client FROM orders o JOIN devices d ON d.id=o.device_id JOIN clients cl ON cl.id=d.client_id WHERE o.id=?',(oid,)).fetchone()
@@ -1981,7 +2087,11 @@ class Handler(BaseHTTPRequestHandler):
                     notice=None
                     try:c.commit();notice=send_authorization_mail(c,oid,user)
                     except Exception as error:print('authorization-mail',type(error).__name__,flush=True)
-                    return self.reply(201, {'ok':True,'id':oid,'code':code,'receipt_mail':receipt,'authorization_mail':notice})
+                    client_link=None
+                    try:
+                        if client_authorization_auto(c):client_link=send_client_authorization(c,oid,user)[1];client_link.pop('url',None)
+                    except Exception as error:print('client-authorization auto',type(error).__name__,flush=True)
+                    return self.reply(201, {'ok':True,'id':oid,'code':code,'receipt_mail':receipt,'authorization_mail':notice,'client_authorization':client_link})
             return self.reply(404, {'error':'Recurso no disponible.'})
         except (ValueError, json.JSONDecodeError):
             self.reply(400, {'error':'Solicitud inválida.'})

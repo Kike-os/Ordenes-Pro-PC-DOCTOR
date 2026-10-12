@@ -19,3 +19,33 @@ body{margin:0;min-height:100vh;background:#060d1a;color:#e3edff;font-family:syst
 .tracking-card dt{font-size:11.5px;color:#8fa5c4}.tracking-card dd{margin:0;font-size:15px;color:#f2f6ff;overflow-wrap:anywhere}
 .tracking-page footer{margin-top:18px;text-align:center;font-size:13px;color:#a9bcd8}
 .tracking-page footer p{margin:4px 0}.tracking-note{font-size:11.5px;color:#7f93b1}
+/* Autorización electrónica del cliente (enlace seguro): formularios en tres pasos con el mismo tema. */
+.auth-card{display:grid;gap:14px}
+.auth-card dl{margin-top:4px}
+.auth-form{display:grid;gap:10px;margin:0}
+.auth-step{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#8fb8ff!important}
+.auth-form label{font-size:13.5px;color:#dbe8fb}
+.auth-form input:not([type=checkbox]):not([type=radio]),.auth-form textarea{width:100%;padding:12px 13px;border:1px solid #2f4a73;border-radius:10px;background:#081424;color:#fff;font:inherit;font-size:16px}
+.auth-form input[name=last4],.auth-form input[name=code]{max-width:220px;font-size:22px;letter-spacing:.3em;text-align:center;font-variant-numeric:tabular-nums}
+.auth-form input:focus,.auth-form textarea:focus{outline:2px solid #8bb8ff;outline-offset:2px}
+.auth-form button{padding:13px 16px;border:1px solid #3b74c4;border-radius:11px;background:linear-gradient(180deg,#2f6fd0,#2358ab);color:#fff;font:inherit;font-weight:700;cursor:pointer}
+.auth-form button:hover{background:linear-gradient(180deg,#3a7be0,#2a63bd)}
+.auth-form button:focus-visible{outline:2px solid #cfe2ff;outline-offset:3px}
+.auth-form button.auth-secondary{border-color:#2f4a73;background:transparent;color:#b4c5de;font-weight:600}
+.auth-again{margin-top:-2px}
+.auth-mask{font-size:18px;letter-spacing:.12em;color:#fff}
+.auth-hint{font-size:12.5px!important;color:#8fa5c4!important}
+.auth-alert{margin:0;padding:10px 12px;border:1px solid #8a4450;border-radius:10px;background:#2b1219;color:#ffd0d4!important;font-size:13.5px}
+.auth-item,.auth-terms{margin:0;padding:12px 13px;border:1px solid #223a5e;border-radius:12px;background:#0a1525;min-width:0}
+.auth-item legend,.auth-terms legend{padding:0 6px;font-size:14px;font-weight:700;color:#f2f6ff}
+.auth-item p{margin:0 0 10px;font-size:13px}
+.auth-options{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.auth-options label,.auth-check{display:flex;align-items:flex-start;gap:9px;padding:10px 11px;border:1px solid #223a5e;border-radius:10px;background:#0c1a2e;cursor:pointer}
+.auth-options label:has(input[value=authorized]:checked){border-color:#2f9e6b;background:#0f2a22;color:#8ff0bd}
+.auth-options label:has(input[value=denied]:checked){border-color:#b84a55;background:#2a1218;color:#ffb1b8}
+.auth-options input,.auth-check input{flex:none;width:18px;height:18px;margin:2px 0 0;accent-color:#4d8df0}
+.auth-terms-text{max-height:240px;overflow-y:auto;margin-bottom:10px;padding:10px 12px;border:1px solid #1e3252;border-radius:10px;background:#081424;font-size:13px}
+.auth-terms-text p{margin:0 0 9px;color:#cfdcf0}
+.auth-authorized{color:#8ff0bd!important;font-weight:700}.auth-denied{color:#ffb1b8!important;font-weight:700}
+.auth-link{display:inline-block;padding:11px 15px;border:1px solid #3b74c4;border-radius:11px;background:#12284a;color:#fff;font-weight:700;text-decoration:none}
+@media(max-width:380px){.auth-options{grid-template-columns:1fr}}

@@ -4,6 +4,18 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.82 — 2026-10-12 08:23 (UTC-05:00)
+
+Autorización digital del cliente por enlace seguro
+
+### Nuevas funcionalidades
+
+- Autorización digital del cliente por enlace seguro: identificación enmascarada, últimos cuatro dígitos, código temporal por correo, aceptar o rechazar cada autorización, comprobante PDF con huella y aviso al correo administrativo
+
+### Mejoras realizadas
+
+- El envío automático del enlace al registrar una orden viene apagado y solo administración puede activarlo
+
 ## v1.5.81 — 2026-10-12 08:12 (UTC-05:00)
 
 Estados visibles en la esfera de ADI
