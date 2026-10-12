@@ -172,11 +172,16 @@ def build(c, user, now, mail_access=False):
     if staff:
         count = lambda sql, *args: c.execute(sql, args).fetchone()[0]
         alert('overdue', count("SELECT COUNT(*) FROM orders WHERE estimated_delivery!='' AND estimated_delivery<? AND status!='entregado'", today), 'alert', 'warning',
-              plural(count("SELECT COUNT(*) FROM orders WHERE estimated_delivery!='' AND estimated_delivery<? AND status!='entregado'", today), 'orden con entrega vencida', 'órdenes con entrega vencida'), 'La fecha estimada de entrega ya pasó.', '#orders?active=1')
+              plural(count("SELECT COUNT(*) FROM orders WHERE estimated_delivery!='' AND estimated_delivery<? AND status!='entregado'", today), 'orden con entrega vencida', 'órdenes con entrega vencida'), 'La fecha estimada de entrega ya pasó.', '#deliveries?estado=overdue')
         waiting = count("SELECT COUNT(*) FROM orders WHERE status IN ('esperando_cliente','presupuesto')")
         alert('waiting', waiting, 'message', 'warning', plural(waiting, 'orden espera respuesta o aprobación', 'órdenes esperan respuesta o aprobación'), 'Pendientes de la decisión del cliente.', '#orders?active=1')
         ready = count("SELECT COUNT(*) FROM orders WHERE status IN ('listo','espera_entrega')")
-        alert('ready', ready, 'ready', 'warning', plural(ready, 'equipo pendiente de entrega', 'equipos pendientes de entrega'), 'Coordina el retiro o la entrega.', '#orders?active=1')
+        # Un aviso por equipo que acaba de quedar listo (últimas 48 h); la clave incluye el cambio para no repetirse.
+        for row in c.execute("SELECT o.id,o.code,o.updated_at,cl.name client,d.brand,d.model FROM orders o JOIN devices d ON d.id=o.device_id JOIN clients cl ON cl.id=d.client_id WHERE o.status='listo' ORDER BY o.updated_at DESC LIMIT 12"):
+            try:fresh=(now-appointments.datetime.fromisoformat(row['updated_at'])).total_seconds()<172800
+            except (ValueError,TypeError):fresh=False
+            if fresh:items.append({'key':'ready:order:%d:%s'%(row['id'],row['updated_at'][:19]),'kind':'success','icon':'ready','title':'Equipo listo para entregar · '+row['code'],'detail':row['client']+' · '+(' '.join(x for x in (row['brand'],row['model']) if x) or 'equipo'),'at':row['updated_at'],'href':'#deliveries','action':'Ver entregas','sound':True,'group':'event'})
+        alert('ready', ready, 'ready', 'warning', plural(ready, 'equipo pendiente de entrega', 'equipos pendientes de entrega'), 'Coordina el retiro o la entrega.', '#deliveries')
         start = appointments.stamp(appointments.datetime.combine(now.date(), appointments.time.min, appointments.TZ))
         end = appointments.stamp(appointments.datetime.combine(now.date() + appointments.timedelta(days=1), appointments.time.min, appointments.TZ))
         todays = count("SELECT COUNT(*) FROM appointments WHERE deleted_at IS NULL AND starts_at>=? AND starts_at<? AND status IN ('solicitada','confirmada','reprogramada')", start, end)

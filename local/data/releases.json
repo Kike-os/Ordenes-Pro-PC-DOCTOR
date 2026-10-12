@@ -8,6 +8,23 @@
   },
   "releases": [
     {
+      "version": "1.5.47",
+      "date": "2026-10-11T22:30:06-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Módulo Próximas Entregas",
+      "changes": {
+        "features": [
+          "Próximas Entregas: módulo propio solo con equipos terminados, resumen por estado de entrega, filtros (estado, técnico, fechas, búsqueda), tarjetas con acciones rápidas y paginación",
+          "Entregas: «Entregar equipo» con confirmación, contacto por WhatsApp, ticket y comprobante desde la tarjeta; aviso interno cuando un equipo queda listo para entregar"
+        ],
+        "improvements": [],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.46",
       "date": "2026-10-11T22:24:23-05:00",
       "type": "patch",

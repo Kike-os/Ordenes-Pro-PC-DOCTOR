@@ -3573,3 +3573,29 @@ body[data-page=dashboard] .live-compose textarea{flex:1 1 auto;min-height:44px;m
 /* Configuración · notificaciones automáticas por correo */
 .receipt-mail-tools{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.receipt-mail-tools button{margin:0;min-height:34px;padding:6px 12px;font-size:12.5px}.receipt-mail-tools button[data-loading=true]{opacity:.7;cursor:progress}
 .receipt-mail-log{margin-top:10px}.receipt-mail-log[hidden]{display:none}.receipt-mail-log li[data-result=failed] strong{color:#ffb3ba}.receipt-mail-log li[data-result=sent] strong{color:#8fe0b4}
+/* ===== Próximas Entregas ===== */
+.delivery-pro .agenda-sub{align-items:center}.delivery-pro .agenda-sub .agenda-period{margin-right:0}
+.delivery-filters{display:flex;gap:8px;flex-wrap:wrap;margin-right:auto}
+body[data-page=dashboard] .delivery-filters :is(select,input){width:auto;min-width:150px;height:34px;min-height:34px;margin:0;font-size:12.5px}.delivery-filters button{height:34px;margin:0;padding:0 12px;font-size:12px}
+.delivery-list{display:grid;gap:8px}
+.delivery-card{--ag:#54CDA4;display:grid;grid-template-columns:42px minmax(0,1.6fr) minmax(190px,auto) auto;align-items:center;gap:14px;padding:12px 14px;border:1px solid #1e3252;border-left:3px solid var(--ag);border-radius:13px;background:linear-gradient(90deg,color-mix(in srgb,var(--ag) 7%,#0d1b30),#0b1728 55%);transition:transform .2s,border-color .2s,box-shadow .2s}
+.delivery-card:hover{transform:translateY(-1px);border-color:color-mix(in srgb,var(--ag) 40%,#1e3252);border-left-color:var(--ag);box-shadow:0 8px 20px #02071466}
+.delivery-icon{display:grid;place-items:center;width:42px;height:42px;border-radius:12px;border:1px solid color-mix(in srgb,var(--ag) 55%,transparent);background:color-mix(in srgb,var(--ag) 15%,#0d1b30);color:var(--ag)}.delivery-icon svg{width:20px;height:20px}
+.delivery-body{display:grid;gap:2px;min-width:0}.delivery-body strong{font-size:14px;color:#f2f6ff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.delivery-body span{font-size:12.5px;color:#cfdcf0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.delivery-body small{font-size:11.5px;color:#8fa5c4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.delivery-when{display:grid;gap:3px;justify-items:end;text-align:right}.delivery-when b{font-size:13px;color:#f2f6ff;white-space:nowrap}.delivery-when small{font-size:11.5px;color:#9bb0cf;white-space:nowrap}.delivery-when small:empty{display:none}
+.delivery-pro .delivery-actions{gap:6px}.delivery-pro .delivery-actions button.delivery-give{height:36px;margin:0;padding:0 14px;border-radius:10px;font-size:12.5px;white-space:nowrap}
+.delivery-pro .delivery-actions button.agenda-icon{width:36px;height:36px;border-radius:10px;border-color:#2a5aa8;background:#0e2242}
+.delivery-pro .delivery-actions button.agenda-icon-more{display:inline-grid}
+.delivery-pro .delivery-actions .agenda-act-menu{display:none;position:absolute;right:0;top:calc(100% + 6px);z-index:30;flex-direction:column;align-items:stretch;gap:2px;min-width:190px;padding:6px;border:1px solid #2f4a75;border-radius:12px;background:#0c192d;box-shadow:0 14px 34px #020714cc}
+.delivery-pro .delivery-actions[data-open=true] .agenda-act-menu{display:flex;animation:agenda-menu-in .18s ease-out}
+.delivery-pro .delivery-actions .agenda-act-menu button.agenda-icon{display:flex;align-items:center;justify-content:flex-start;gap:9px;width:100%;height:34px;padding:0 10px;border-color:transparent;background:transparent}
+.delivery-pro .delivery-actions .agenda-act-menu .agenda-icon-label{display:inline;font-size:12.5px;font-weight:600}
+/* Pendiente de retiro: pulso suave del distintivo; vencida: borde de alerta. Sin efectos continuos fuera de estos dos estados. */
+.delivery-card[data-delivery=pickup] .agenda-badge{animation:delivery-pulse 2.6s ease-in-out infinite}
+@keyframes delivery-pulse{0%,100%{box-shadow:0 0 0 0 color-mix(in srgb,var(--ag) 0%,transparent)}50%{box-shadow:0 0 0 4px color-mix(in srgb,var(--ag) 22%,transparent)}}
+.delivery-card[data-delivery=overdue]{border-color:#7a3a45;box-shadow:inset 0 0 0 1px #e77b8826}
+.delivery-card[data-delivery=delivered]{opacity:.82}
+.delivery-pager{display:flex;align-items:center;justify-content:center;gap:12px;font-size:12.5px;color:#a9bbd6}.delivery-pager:empty{display:none}.delivery-pager button{margin:0;min-height:34px;padding:5px 14px;font-size:12.5px}
+@media(max-width:980px){.delivery-card{grid-template-columns:42px minmax(0,1fr);gap:8px 12px}.delivery-when{grid-column:2;justify-items:start;text-align:left;grid-auto-flow:column;align-items:center;gap:10px;justify-content:start;flex-wrap:wrap}.delivery-pro .delivery-actions{grid-column:1/-1;justify-content:flex-start}.delivery-body span,.delivery-body small{white-space:normal}}
+@media(max-width:560px){.delivery-when{display:flex}.delivery-filters{flex:1 1 100%}body[data-page=dashboard] .delivery-filters :is(select,input){flex:1 1 130px;min-width:0}}
+@media(prefers-reduced-motion:reduce){.delivery-card{transition:none}.delivery-card:hover{transform:none}.delivery-card[data-delivery=pickup] .agenda-badge{animation:none}}

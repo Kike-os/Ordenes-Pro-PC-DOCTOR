@@ -4,6 +4,15 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.47 — 2026-10-11 22:30 (UTC-05:00)
+
+Módulo Próximas Entregas
+
+### Nuevas funcionalidades
+
+- Próximas Entregas: módulo propio solo con equipos terminados, resumen por estado de entrega, filtros (estado, técnico, fechas, búsqueda), tarjetas con acciones rápidas y paginación
+- Entregas: «Entregar equipo» con confirmación, contacto por WhatsApp, ticket y comprobante desde la tarjeta; aviso interno cuando un equipo queda listo para entregar
+
 ## v1.5.46 — 2026-10-11 22:24 (UTC-05:00)
 
 Adi lee la clave de OpenAI y el comprobante se envía desde el servidor

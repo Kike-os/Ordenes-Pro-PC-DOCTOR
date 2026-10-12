@@ -669,6 +669,18 @@ class Handler(BaseHTTPRequestHandler):
             if path == '/api/me':
                 prefs=c.execute('SELECT value FROM system_state WHERE key=?',('mail_prefs:'+str(user['id']),)).fetchone() if mail_allowed(user) else None
                 return self.reply(200, {'user':dict(user,mail=mail_allowed(user),mail_prefs=json.loads(prefs['value']) if prefs else None,mail_signature=mail_signature_card(c) if mail_allowed(user) else None,storage='cloud' if remote_db.configured() else 'local'),'server_time':time.time()})
+            if path == '/api/deliveries':
+                # Próximas Entregas: solo equipos terminados (listos o en espera de retiro) y entregas recientes; nunca órdenes en reparación.
+                if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
+                today=reception_now().date();since=(today-appointments.timedelta(days=30)).isoformat()
+                rows=[dict(r) for r in c.execute("SELECT o.id,o.code,o.status,o.estimated_delivery,o.updated_at,o.delivered_at,o.assigned_to,COALESCE((SELECT name FROM users WHERE id=o.assigned_to),'Sin asignar') responsible,cl.id client_id,cl.name client,cl.phone,cl.email,COALESCE(NULLIF(d.kind,''),d.category) type,d.brand,d.model,d.serial,(SELECT e.comment FROM order_history e WHERE e.order_id=o.id AND e.comment!='' ORDER BY e.id DESC LIMIT 1) note FROM orders o JOIN devices d ON d.id=o.device_id JOIN clients cl ON cl.id=d.client_id WHERE o.status IN ('listo','espera_entrega') OR (o.status='entregado' AND o.delivered_at>=?) ORDER BY CASE o.status WHEN 'entregado' THEN 1 ELSE 0 END,CASE WHEN o.estimated_delivery='' THEN 1 ELSE 0 END,o.estimated_delivery,o.id LIMIT 400",(since,))]
+                for row in rows:
+                    due=row['estimated_delivery'] or '';since_ready=row['updated_at'][:10] if row['status']!='entregado' else ''
+                    row['waiting_days']=(today-appointments.date.fromisoformat(since_ready)).days if since_ready else None
+                    # Estado de entrega derivado de datos reales: estado de la orden y fecha estimada.
+                    row['delivery']='delivered' if row['status']=='entregado' else 'overdue' if due and due<today.isoformat() else 'pickup' if row['status']=='espera_entrega' else 'scheduled' if due>today.isoformat() else 'ready'
+                    row['today']=row['status']!='entregado' and due==today.isoformat()
+                return self.reply(200,{'rows':rows,'today':today.isoformat()})
             if path == '/api/receipt-mail/history':
                 # Últimos envíos de comprobantes (todas las órdenes), para revisar resultados y errores.
                 if user['role']!='administrador':return self.reply(403,{'error':'Acceso no permitido.'})

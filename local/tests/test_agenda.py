@@ -310,3 +310,28 @@ class LiveSupportTests(unittest.TestCase):
         final=self.request('/api/adi/live/%d'%cid,cookie=cookie)['body']
         self.assertEqual((final['conversation']['mode'],final['client'],final['order'],[a['action'] for a in final['actions']][:3]),('human',None,None,['conversation_link','conversation_reopen','conversation_close']))
         with app.connect() as c:self.assertEqual(c.execute('SELECT COUNT(*) FROM adi_messages WHERE conversation_id=?',(cid,)).fetchone()[0],4)
+
+
+class DeliveriesTests(unittest.TestCase):
+    setUpClass=classmethod(test_app.SecurityTests.setUpClass.__func__)
+    setUp=test_app.SecurityTests.setUp
+    tearDown=test_app.SecurityTests.tearDown
+    login=test_app.SecurityTests.login
+    request=test_app.SecurityTests.request
+    order_data=test_app.SecurityTests.order_data
+
+    def test_only_finished_orders_with_delivery_state_and_ready_notice(self):
+        cookie,csrf=self.login();today=appointments.now().date();ids={}
+        plan={'reparando':('reparacion',''),'lista':('listo',''),'retiro':('espera_entrega',''),'programada':('listo',(today+timedelta(days=2)).isoformat()),'vencida':('listo',(today-timedelta(days=3)).isoformat()),'hoy':('espera_entrega',today.isoformat()),'entregada':('entregado','')}
+        for n,(name,(status,due)) in enumerate(plan.items()):
+            oid=self.request('/api/orders',self.order_data({'serial':'ENT-%d'%n,'model':name,'request_key':'deliveries-order-%05d'%n}),cookie=cookie,csrf=csrf)['body']['id'];ids[name]=oid
+            self.request('/api/order-status',{'id':str(oid),'status':status},cookie=cookie,csrf=csrf)
+            if due:
+                with app.connect() as c:c.execute('UPDATE orders SET estimated_delivery=? WHERE id=?',(due,oid))
+        self.assertEqual(self.request('/api/deliveries')['status'],401)
+        rows={r['model']:r for r in self.request('/api/deliveries',cookie=cookie)['body']['rows']}
+        # Las órdenes en reparación no aparecen; cada una de las demás lleva su estado de entrega real.
+        self.assertEqual({k:v['delivery'] for k,v in rows.items()},{'lista':'ready','retiro':'pickup','programada':'scheduled','vencida':'overdue','hoy':'pickup','entregada':'delivered'})
+        self.assertEqual(([k for k,v in rows.items() if v['today']],rows['lista']['waiting_days'],rows['entregada']['waiting_days'],rows['lista']['responsible'],bool(rows['lista']['client'])),(['hoy'],0,None,'Persona de prueba',True))
+        notes=[i for i in self.request('/api/notifications',cookie=cookie)['body']['items'] if i['key'].startswith('ready:order:')]
+        self.assertEqual((sorted(n['title'].split(' · ')[0] for n in notes),{n['href'] for n in notes},len(notes)),(['Equipo listo para entregar']*3,{'#deliveries'},3))
