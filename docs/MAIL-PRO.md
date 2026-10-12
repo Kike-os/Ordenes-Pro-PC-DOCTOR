@@ -91,3 +91,11 @@ Configuración → Correo y servicios → **Firmas de correo**: nombre, cargo, d
 - **Al enviar**: «Envío aceptado por el servidor» significa solo que el servidor SMTP lo aceptó, no que llegó al buzón del destinatario. Los rechazos se distinguen: credenciales, destinatario rechazado (5xx), error temporal (4xx) y rechazo del mensaje. El código de respuesta se anota en el registro del servidor, sin datos personales.
 - **Devoluciones (DSN)**: al sincronizar, los mensajes nuevos con estructura `multipart/report; report-type=delivery-status` se analizan (`message/delivery-status`): destinatario, acción (fallo o retraso), estado y diagnóstico. No se usa el asunto. Si el informe trae el `Message-ID` original y coincide con un envío de la aplicación, se indica la relación; si no, se avisa de que no pudo relacionarse. Cada informe se registra una sola vez y genera un aviso («Correo devuelto» o «Entrega retrasada»). Nunca se reenvía nada automáticamente.
 - **Pendiente**: comprobación DNS/MX del dominio antes de enviar, estado de entrega visible en cada mensaje de Enviados, e indicador de devolución en la ficha del cliente.
+
+## Capacidades IMAP tras el inicio de sesión (1.5.69)
+
+Dovecot/cPanel solo anuncian `MOVE` y `UIDPLUS` después de autenticar. Las versiones de Python anteriores a 3.14 (la de Vercel) conservan la lista previa al login, por lo que en producción el sistema rechazaba mover, archivar y eliminar con «El servidor no permite mover mensajes de forma segura». `open_imap()` pide ahora las capacidades explícitamente tras iniciar sesión (`refresh_capabilities`); si la consulta falla conserva la lista anterior.
+
+Con `MOVE` se usa `UID MOVE`. Sin `MOVE` pero con `UIDPLUS` se copia, y solo si la copia termina bien se retiran exactamente esos UID del origen. Sin ninguna de las dos no se mueve nada y se avisa de que el original permanece en su carpeta.
+
+La eliminación definitiva (solo desde la Papelera) usa un modal propio: no se cierra ni anuncia éxito hasta que el servidor responde, y un fallo se muestra dentro del modal conservando el mensaje. El mensaje abierto tiene botón «Eliminar» (a la Papelera, con Deshacer) y, en la Papelera, «Restaurar» y «Eliminar definitivamente».

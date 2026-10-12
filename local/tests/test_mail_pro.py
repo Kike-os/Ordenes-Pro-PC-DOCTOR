@@ -392,6 +392,36 @@ class MailRouteTests(test_app.SecurityTests):
             self.assertEqual((refused['status'],refused['body']['kind'],'to' in refused['body']['fields']),(400,'destinatario',True))
             with app.connect() as c:self.assertEqual(c.execute("SELECT status FROM mail_outbox WHERE request_key='clave-de-rechazo-00001'").fetchone()[0],'failed')
 
+    def test_capabilities_are_read_after_login_and_failed_moves_keep_the_original(self):
+        # Dovecot/cPanel anuncian MOVE y UIDPLUS solo tras iniciar sesión; los Python anteriores a 3.14 no vuelven a leerlas.
+        class Old:
+            def __init__(self,*a,**k):self.capabilities=('IMAP4REV1','SASL-IR','AUTH=PLAIN');self.logged=False
+            def login(self,user,password):self.logged=True;return 'OK',[b'Logged in']
+            def capability(self):return 'OK',[b'IMAP4rev1 MOVE UIDPLUS SPECIAL-USE' if self.logged else b'IMAP4rev1 SASL-IR']
+        config={'imap_host':'mail.example.invalid','imap_port':993,'smtp_host':'mail.example.invalid','smtp_port':465,'username':'buzon@example.invalid','password':'secreto-ficticio-123'}
+        with patch.object(mail_pro.imaplib,'IMAP4_SSL',Old),patch.object(mail_pro,'require',lambda config:None):
+            client=mail_pro.open_imap(config)
+        self.assertIn('MOVE',client.capabilities);self.assertIn('UIDPLUS',client.capabilities)
+        # Si la consulta falla, se conserva la lista previa: nunca se inventan capacidades.
+        class Broken(Old):
+            def capability(self):raise OSError('sin respuesta')
+        with patch.object(mail_pro.imaplib,'IMAP4_SSL',Broken),patch.object(mail_pro,'require',lambda config:None):
+            self.assertEqual(mail_pro.open_imap(config).capabilities,('IMAP4REV1','SASL-IR','AUTH=PLAIN'))
+        class Box:
+            def __init__(self,caps,fail):self.capabilities=caps;self.fail=fail;self.calls=[]
+            def list(self):return 'OK',[b'(\\HasNoChildren) "." INBOX',b'(\\HasNoChildren \\Trash) "." INBOX.Trash',b'(\\HasNoChildren \\Junk) "." INBOX.spam']
+            def select(self,name,readonly=True):return 'OK',[b'3']
+            def response(self,name):return name,[b'77']
+            def uid(self,command,*args):
+                self.calls.append(command)
+                return ('OK',[b'4']) if command=='SEARCH' else ('NO' if command==self.fail else 'OK',[b''])
+        # Falla MOVE: no se copia ni se borra nada. Falla COPY: no se marca ni se retira el original.
+        for caps,fail,forbidden in [((b'MOVE',b'UIDPLUS'),'MOVE',('COPY','STORE','EXPUNGE')),((b'UIDPLUS',),'COPY',('STORE','EXPUNGE'))]:
+            box=Box(caps,fail)
+            with self.assertRaises(mail_pro.MailError) as raised:mail_pro.batch(box,'INBOX',[4],'trash')
+            self.assertIn('permanece en su carpeta',str(raised.exception));self.assertFalse([c for c in box.calls if c in forbidden])
+        box=Box((b'MOVE',b'UIDPLUS'),None);self.assertEqual(mail_pro.batch(box,'INBOX',[4],'move','INBOX.spam'),1);self.assertIn('MOVE',box.calls)
+
     def test_replaced_draft_is_removed_only_when_it_is_a_draft(self):
         class Box:
             def __init__(self,flags):self.flags=flags;self.calls=[]

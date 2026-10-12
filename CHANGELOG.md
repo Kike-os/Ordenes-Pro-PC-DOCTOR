@@ -4,6 +4,18 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.69 — 2026-10-12 06:52 (UTC-05:00)
+
+Corrección del movimiento y la eliminación de correos
+
+### Mejoras realizadas
+
+- Mail Pro: modal propio «Confirmar eliminación de mensaje» que espera la respuesta del servidor, y avisos claros cuando un mensaje no se puede mover
+
+### Errores corregidos
+
+- Mail Pro: mover, archivar, enviar a Spam o a la Papelera y eliminar vuelven a funcionar en producción (el sistema no leía las capacidades del servidor tras iniciar sesión)
+
 ## v1.5.68 — 2026-10-12 06:46 (UTC-05:00)
 
 Eliminar correos desde el mensaje abierto

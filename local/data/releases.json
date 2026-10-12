@@ -8,6 +8,24 @@
   },
   "releases": [
     {
+      "version": "1.5.69",
+      "date": "2026-10-12T06:52:29-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Corrección del movimiento y la eliminación de correos",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Mail Pro: modal propio «Confirmar eliminación de mensaje» que espera la respuesta del servidor, y avisos claros cuando un mensaje no se puede mover"
+        ],
+        "fixes": [
+          "Mail Pro: mover, archivar, enviar a Spam o a la Papelera y eliminar vuelven a funcionar en producción (el sistema no leía las capacidades del servidor tras iniciar sesión)"
+        ],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.68",
       "date": "2026-10-12T06:46:38-05:00",
       "type": "patch",

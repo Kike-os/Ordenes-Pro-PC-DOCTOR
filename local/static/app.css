@@ -3888,3 +3888,13 @@ body[data-page=dashboard] .status-label.status-icon::before{content:none}
 /* Mail Pro: eliminar desde el mensaje abierto */
 .mail-v2 button.mail-tool.mail-danger{color:#ff9aa2}.mail-v2 button.mail-tool.mail-danger:hover,.mail-v2 button.mail-tool.mail-danger:focus-visible{border-color:#b84a55;background:#2a1218;color:#ffd0d4}
 @media(max-width:860px){.mail-v2 .mail-bar{flex-wrap:wrap;row-gap:6px}.mail-v2 .mail-bar .mail-bar-space{flex:1 1 0;min-width:0}}
+/* Mail Pro: confirmación de eliminación definitiva */
+.mail-delete-confirm .confirm-mac-icon{border-color:#e0566266;background:#e056621f;color:#ff8f98}
+.mail-delete-confirm .confirm-mac-actions{grid-template-columns:1fr 1fr}
+.mail-delete-confirm .confirm-mac-actions button{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:42px}
+.mail-delete-confirm button.mail-delete-go{border:1px solid #d04553;background:linear-gradient(180deg,#d4444f,#b5303d);color:#fff}
+.mail-delete-confirm button.mail-delete-go:hover:not(:disabled){background:linear-gradient(180deg,#e04f5b,#c23846);transform:none}
+.mail-delete-confirm button.mail-delete-go .system-icon{width:16px;height:16px}
+.mail-delete-confirm button:disabled{opacity:.65;cursor:progress}
+.mail-delete-confirm p.mail-delete-error{margin:-8px 0 14px;padding:8px 10px;border:1px solid #8a4450;border-radius:9px;background:#2b1219;color:#ffd0d4;font-size:12.5px;text-align:left}.mail-delete-confirm p.mail-delete-error[hidden]{display:none}
+@media(max-width:360px){.mail-delete-confirm .confirm-mac-actions{grid-template-columns:1fr}}

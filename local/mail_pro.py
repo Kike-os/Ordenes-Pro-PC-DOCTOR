@@ -312,12 +312,30 @@ def safe_filename(name):
     return (name or 'adjunto')[:120]
 
 
+def refresh_capabilities(client):
+    """Capacidades reales de la sesión ya autenticada.
+
+    Muchos servidores (Dovecot, cPanel) solo anuncian MOVE y UIDPLUS después de iniciar sesión, y las versiones de
+    Python anteriores a 3.14 conservan la lista previa al inicio de sesión. Sin esta consulta el sistema creería que el
+    servidor no sabe mover mensajes. Si la consulta falla se conserva la lista anterior: nunca se inventan capacidades.
+    """
+    try:
+        code, data = client.capability()
+        if code == 'OK' and data and data[-1]:
+            names = tuple(str(data[-1], 'ascii', 'replace').upper().split())
+            if names:
+                client.capabilities = names
+    except Exception:
+        pass
+
+
 def open_imap(config=None):
     config = config or settings()
     require(config)
     try:
         client = imaplib.IMAP4_SSL(config['imap_host'], config['imap_port'], ssl_context=context(), timeout=TIMEOUT)
         client.login(config['username'], config['password'])
+        refresh_capabilities(client)
         return client
     except Exception as error:
         raise classify(error, config['imap_host'], config['imap_port']) from None
@@ -735,9 +753,9 @@ def batch(client, folder, uids, action, target='', uidvalidity=None):
         if source['role'] != 'trash':
             raise MailError('configuracion', 'Solo se elimina definitivamente desde la Papelera.')
         if not uidplus:
-            raise MailError('servidor', 'El servidor no permite eliminar mensajes concretos de forma segura.')
+            raise MailError('servidor', 'El servidor de correo no ofrece una forma segura de eliminar mensajes concretos. El mensaje se conserva en la Papelera.')
         if client.uid('STORE', group, '+FLAGS', '(\\Deleted)')[0] != 'OK' or client.uid('EXPUNGE', group)[0] != 'OK':
-            raise MailError('servidor', 'El servidor no pudo eliminar los mensajes.')
+            raise MailError('servidor', 'No fue posible eliminar el mensaje. Se conserva en la Papelera.')
         return len(present)
     destination = {'archive': by_role(folders, 'archive'), 'trash': by_role(folders, 'trash'), 'restore': by_role(folders, 'inbox'), 'move': target if any(item['id'] == target for item in folders) else None}.get(action)
     if action not in ('archive', 'trash', 'restore', 'move'):
@@ -748,13 +766,13 @@ def batch(client, folder, uids, action, target='', uidvalidity=None):
         raise MailError('configuracion', 'Los mensajes ya están en esa carpeta.')
     if any(b'MOVE' in (item if isinstance(item, bytes) else str(item).encode()).split() for item in client.capabilities):
         if client.uid('MOVE', group, quoted(destination))[0] != 'OK':
-            raise MailError('servidor', 'El servidor no pudo mover los mensajes.')
+            raise MailError('servidor', 'No fue posible mover el mensaje. El correo original permanece en su carpeta.')
         return len(present)
     # Sin MOVE: copiar, comprobar y solo entonces retirar exactamente esos UID del origen (requiere UIDPLUS).
     if not uidplus:
-        raise MailError('servidor', 'El servidor no permite mover mensajes de forma segura.')
+        raise MailError('servidor', 'El servidor de correo no ofrece una forma segura de mover mensajes. El correo original permanece en su carpeta.')
     if client.uid('COPY', group, quoted(destination))[0] != 'OK':
-        raise MailError('servidor', 'El servidor no pudo copiar los mensajes al destino.')
+        raise MailError('servidor', 'No fue posible copiar el mensaje a la carpeta de destino. El correo original permanece en su carpeta.')
     if client.uid('STORE', group, '+FLAGS', '(\\Deleted)')[0] != 'OK' or client.uid('EXPUNGE', group)[0] != 'OK':
         raise MailError('servidor', 'Los mensajes se copiaron al destino, pero no se pudieron retirar del origen.')
     return len(present)
