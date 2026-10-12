@@ -37,6 +37,7 @@ import service_terms
 import order_drafts
 import live_support
 import reports
+import order_search
 import technical_access
 import thermal_printing
 import tempfile
@@ -1025,10 +1026,8 @@ class Handler(BaseHTTPRequestHandler):
             if search_route:
                 term=parse_qs(urlsplit(self.path).query).get('q',[''])[0].strip()[:150]
                 if len(term)<2:return self.reply(200,{'rows':[]})
-                source="FROM orders o JOIN devices d ON d.id=o.device_id JOIN clients c ON c.id=d.client_id JOIN statuses s ON s.code=o.status WHERE instr(lower(COALESCE(o.code,'')||' '||c.name||' '||COALESCE(c.identification,'')||' '||COALESCE(c.phone,'')||' '||COALESCE(d.brand,'')||' '||COALESCE(d.model,'')||' '||COALESCE(d.serial,'')),lower(?))>0"
-                # Vista rápida del buscador: los 8 más recientes (el código exacto primero) y el total real para la búsqueda completa.
-                rows=[dict(r) for r in c.execute("SELECT o.id,COALESCE(o.code,'OP-'||printf('%05d',o.id)) code,c.name client,d.brand,d.model,d.serial,o.status status_code,s.label status "+source+" ORDER BY lower(COALESCE(o.code,''))=lower(?) DESC,o.id DESC LIMIT 8",(term,term))]
-                return self.reply(200,{'rows':rows,'total':c.execute('SELECT COUNT(*) '+source,(term,)).fetchone()[0]})
+                # Vista rápida del buscador: hasta 8 órdenes (el código exacto primero), sin distinguir tildes y tolerando errores de escritura.
+                return self.reply(200,order_search.find(c,term))
             maintenance_pdf=re.fullmatch(r'/api/maintenance/([0-9]+)/(card|thermal)\.pdf',path)
             if maintenance_pdf:
                 row=next((r for r in maintenance.rows(c) if r['id']==int(maintenance_pdf[1])),None)

@@ -4,6 +4,15 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.61 — 2026-10-12 00:16 (UTC-05:00)
+
+Buscador global tolerante a errores, con sugerencias y resaltado
+
+### Mejoras realizadas
+
+- Buscador global: resultados al instante por cliente, marca, modelo, serie y número de orden, sin distinguir tildes y con varias palabras en cualquier orden
+- El buscador tolera errores de escritura, sugiere «¿Quisiste decir…?» y resalta el texto encontrado
+
 ## v1.5.60 — 2026-10-12 00:11 (UTC-05:00)
 
 ADI propone las correcciones de ortografía de forma visible

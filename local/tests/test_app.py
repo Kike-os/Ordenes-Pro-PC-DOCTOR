@@ -702,6 +702,15 @@ class SecurityTests(unittest.TestCase):
         partial=self.request('/api/search?q='+codes[0][:12],cookie=cookie)['body'];self.assertEqual(partial['total'],10)
         for term,expected in (('SRCH-0007',1),('thinkpad t3',1),('srch-',10),('no-existe-xyz',0),("' OR 1=1",0)):
             found=self.request('/api/search?q='+quote(term),cookie=cookie)['body'];self.assertEqual((found['total'],len(found['rows'])),(expected,min(expected,8)),term)
+        # Tolerancia a errores de escritura, tildes y varias palabras en cualquier orden; los números no se aproximan.
+        typo=self.request('/api/search?q=lenvo',cookie=cookie)['body']
+        self.assertEqual((typo['total'],typo['fuzzy'],typo['suggestion'],typo['rows'][0]['hits']),(10,True,'Lenovo',['Lenovo']))
+        self.assertEqual(self.request('/api/search?q='+quote('thinkpd t3'),cookie=cookie)['body']['suggestion'],'ThinkPad t3')
+        self.assertEqual(self.request('/api/search?q='+quote('T4 prueba lenovo'),cookie=cookie)['body']['total'],1)
+        self.assertEqual(self.request('/api/search?q='+quote('prúeba LENOVÓ'),cookie=cookie)['body']['total'],10)
+        self.assertEqual(self.request('/api/search?q=SRCH-0017',cookie=cookie)['body']['total'],0)
+        self.assertEqual(self.request('/api/search?q=099123456X',cookie=cookie)['body']['total'],0)
+        self.assertNotIn('identification',typo['rows'][0]);self.assertNotIn('phone',typo['rows'][0])
         self.assertEqual(self.request('/api/search?q=a',cookie=cookie)['body']['rows'],[])
         self.assertEqual(self.request('/api/search?q=lenovo')['status'],401)
 
