@@ -4,6 +4,18 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.90 — 2026-10-12 13:14 (UTC-05:00)
+
+Corrección del bloqueo de Aplicar mejora en ADI
+
+### Mejoras realizadas
+
+- ADI: un vigilante impide que el indicador gire sin fin y los pasos del asistente quedan registrados para diagnóstico, sin guardar el texto escrito
+
+### Errores corregidos
+
+- ADI: «Aplicar mejora» ya no queda esperando detrás de la revisión automática; la base de datos se libera antes de llamar a la IA (también en el chat público y en el correo), con lo que tampoco se frenan otros guardados
+
 ## v1.5.89 — 2026-10-12 09:18 (UTC-05:00)
 
 Avatar con logo más legible

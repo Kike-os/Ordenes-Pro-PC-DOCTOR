@@ -90,3 +90,11 @@ Sustituye a la propuesta con «Aceptar / Descartar» de la 1.5.60, a petición d
 - Funciona en todas las áreas de texto libre (componente global). No actúa en los textos de autorización del cliente ni en correos que citan a otra persona (desde la 1.5.87 sí corrige la respuesta del chat de atención en vivo, sin enviar nada por sí sola); en el editor de correo se aplica al salir del campo. Los campos estructurados (serie, identificación, teléfono, correo, contraseñas) no son áreas de texto y nunca se envían.
 - Se activa o desactiva con «Corrección ortográfica automática» en el panel de ADI; se recuerda en ese navegador.
 - Mejorar redacción, simplificar y las demás herramientas siguen mostrando la vista previa y pidiendo aceptación.
+
+## Bloqueo de «Aplicar mejora» (1.5.90)
+
+**Causa encontrada y reproducida:** toda petición que escribe abre una transacción exclusiva en la base. La de ADI (`/api/adi/write`) anotaba el límite de uso y, sin cerrar la transacción, esperaba la respuesta de OpenAI. Mientras tanto ninguna otra escritura podía avanzar: ni otra petición de ADI del mismo usuario (la revisión automática arranca 1,5 s después de escribir, así que casi siempre había una en curso al pulsar «Aplicar mejora»), ni guardar un seguimiento, ni cambiar un estado. Lo mismo ocurría con el chat público de ADI y con las operaciones de correo.
+
+**Corrección:** se confirma la transacción antes de llamar a la IA o al servidor de correo. Prueba `test_adi_lock.py`: con el código anterior la base queda bloqueada mientras la IA «piensa»; con la corrección, otra escritura entra de inmediato.
+
+**Protecciones añadidas:** un vigilante apaga el indicador a los 26 s pase lo que pase y ofrece reintentar; el estado «ADI revisando…» ya no puede quedarse encendido si el texto cambia sin aviso del navegador; cada paso del flujo manual se anota (sin el texto del usuario) en el registro y en la tabla `client_diagnostics` (migración 036, 14 días), para poder investigarlo aunque el registro de Vercel haya caducado.

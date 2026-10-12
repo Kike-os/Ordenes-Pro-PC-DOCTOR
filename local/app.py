@@ -1369,7 +1369,9 @@ class Handler(BaseHTTPRequestHandler):
                     if match and conv['mode']=='adi':
                         found=adi.order_status(c,match[1].upper(),match[2]);context={'orden':found} if found else None
                         if found:answer=f"Tu orden {found['code']} está en estado «{found['status']}». Equipo: {found['brand'] or ''} {found['model'] or ''}. Para más información, puedo solicitar atención del taller."
-                    if answer is None and conv['mode']=='adi':answer=adi.reply(c,text,context=context)
+                    if answer is None and conv['mode']=='adi':
+                        # El mensaje del cliente queda guardado antes de consultar a la IA, para no retener la base durante la espera.
+                        c.commit();answer=adi.reply(c,text,context=context)
                     if answer:
                         c.execute("INSERT INTO adi_messages(conversation_id,author,content,created_at) VALUES (?,'adi',?,?)",(conv['id'],answer,now));c.execute('UPDATE adi_conversations SET updated_at=? WHERE id=?',(now,conv['id']))
                     response={'ok':True,'conversation_id':conv['id'],'mode':conv['mode'],'state':adi_public_state(conv),'messages':[dict(r) for r in c.execute("SELECT id,author,content,created_at FROM adi_messages WHERE conversation_id=? AND id>(SELECT COALESCE(MAX(id),0)-2 FROM adi_messages WHERE conversation_id=?) ORDER BY id",(conv['id'],conv['id']))]}
@@ -1563,6 +1565,8 @@ class Handler(BaseHTTPRequestHandler):
                         c.execute("INSERT INTO system_state VALUES ('mail_signature',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",(text,))
                         audit(c,user['id'],'mail_signature_updated')
                         return self.reply(200,{'ok':True})
+                    # Las operaciones de correo esperan a un servidor externo (IMAP/SMTP): se libera antes la base para no bloquear otros guardados.
+                    c.commit()
                     client=None
                     try:
                         if path=='/api/mail/batch':
@@ -1712,7 +1716,15 @@ class Handler(BaseHTTPRequestHandler):
                     return self.reply(200,{'ok':True,'message':'Se cerraron las sesiones activas.'},cookie=self.cookie('',0))
                 if path=='/api/client-log':
                     # Registro de diagnóstico del navegador: tipo y mensaje del fallo, nunca el texto que escribe el usuario.
-                    if not limited(c,'client-log:'+str(user['id']),limit=120,window=3600):print('client-log','user=%d'%user['id'],re.sub(r'[^\w .:@/()·+#=,-]','?',str(data.get('kind',''))[:40]),'|',re.sub(r'[\r\n]+',' ',str(data.get('message',''))[:300]),'|',str(data.get('where',''))[:60],flush=True)
+                    # Además del registro del servidor (que caduca pronto) se guarda en la base durante 14 días para poder investigarlo después.
+                    if not limited(c,'client-log:'+str(user['id']),limit=240,window=3600):
+                        kind=re.sub(r'[^\w .:@/()·+#=,-]','?',str(data.get('kind',''))[:40]);message=re.sub(r'[\r\n]+',' ',str(data.get('message',''))[:300]);place=str(data.get('where',''))[:60]
+                        print('client-log','user=%d'%user['id'],kind,'|',message,'|',place,flush=True)
+                        try:
+                            now=reception_now()
+                            c.execute('INSERT INTO client_diagnostics(user_id,kind,message,place,created_at) VALUES (?,?,?,?,?)',(user['id'],kind,message,place,now.isoformat(timespec='seconds')))
+                            c.execute('DELETE FROM client_diagnostics WHERE created_at<?',((now-appointments.timedelta(days=14)).isoformat(timespec='seconds'),))
+                        except Exception as error:print('client-diagnostics',type(error).__name__,flush=True)
                     return self.reply(200,{'ok':True})
                 if path=='/api/order-draft':
                     if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
@@ -1987,6 +1999,9 @@ class Handler(BaseHTTPRequestHandler):
                     if limited(c,('adi-auto:' if auto else 'adi-write:')+str(user['id']),limit=240 if auto else 60,window=3600):return self.reply(429,{'error':'Alcanzaste el límite de mejoras por hora. Intenta más tarde.','kind':'limite'})
                     mode='ortografia' if auto else str(data.get('mode',''));field=str(data.get('field',''))[:40]
                     if auto and len(str(data.get('text','')))>1500:return self.reply(400,{'error':'Texto demasiado largo para la corrección automática.'})
+                    # La llamada a la IA puede tardar varios segundos: se cierra antes la transacción para no bloquear otros guardados
+                    # (ni otra petición de ADI del mismo usuario) mientras se espera la respuesta.
+                    c.commit()
                     try:result=adi_ai.improve(data.get('text',''),mode,field)
                     except adi_ai.AdiError as error:
                         print('adi-write',error.kind,flush=True)
@@ -2015,6 +2030,7 @@ class Handler(BaseHTTPRequestHandler):
                     mode=str(data.get('mode',''))
                     if mode not in ('auto','manual'):return self.reply(400,{'error':'Modo de envío inválido.'})
                     if mode=='manual' and limited(c,'receipt-mail:'+str(user['id']),limit=30,window=3600):return self.reply(429,{'error':'Alcanzaste el límite de reenvíos por hora.'})
+                    c.commit()  # El envío espera al servidor de correo: no se retiene la base mientras tanto.
                     status,payload=send_receipt_mail(c,int(receipt_route[1]),user,mode)
                     if status==200:payload['receipt_mail']=receipt_mail_status(c,int(receipt_route[1]))
                     return self.reply(status,payload)

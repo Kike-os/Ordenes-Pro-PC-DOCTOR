@@ -8,6 +8,24 @@
   },
   "releases": [
     {
+      "version": "1.5.90",
+      "date": "2026-10-12T13:14:51-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Corrección del bloqueo de Aplicar mejora en ADI",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "ADI: un vigilante impide que el indicador gire sin fin y los pasos del asistente quedan registrados para diagnóstico, sin guardar el texto escrito"
+        ],
+        "fixes": [
+          "ADI: «Aplicar mejora» ya no queda esperando detrás de la revisión automática; la base de datos se libera antes de llamar a la IA (también en el chat público y en el correo), con lo que tampoco se frenan otros guardados"
+        ],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.89",
       "date": "2026-10-12T09:18:23-05:00",
       "type": "patch",
