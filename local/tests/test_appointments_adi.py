@@ -63,7 +63,7 @@ class AppointmentAndAdiTests(unittest.TestCase):
    price=adi.reply(c,'¿Cuánto cuesta formatear mi laptop?')
    self.assertIn('revisión técnica',price);self.assertNotRegex(price,r'\$|\bUSD\b|[0-9]+ ?d[oó]lares')
    self.assertIn('/citas',adi.reply(c,'Quiero agendar una cita'))
-   self.assertIn('Solicitar un asesor',adi.reply(c,'quiero hablar con una persona'))
+   self.assertIn('Contactar soporte técnico',adi.reply(c,'quiero hablar con una persona'))
    self.assertIn('número de orden',adi.reply(c,'¿cómo va mi equipo? estado de mi orden'))
    self.assertIn('código temporal',adi.reply(c,'orden PCD-20260101-0001 cédula 0100000017'))
    self.assertIn(app.corporate.settings()['whatsapp'],adi.reply(c,'¿Dónde están ubicados?'))

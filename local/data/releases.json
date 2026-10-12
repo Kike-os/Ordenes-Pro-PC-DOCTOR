@@ -8,6 +8,24 @@
   },
   "releases": [
     {
+      "version": "1.5.105",
+      "date": "2026-10-12T17:49:12-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Esfera viva y ventana premium de ADI",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Esfera de ADI con más vida: filamentos de energía, núcleo que cambia de forma, ondas en la superficie, respiración asimétrica, levitación leve, onda al toque y reacción suave al cursor.",
+          "Ventana de ADI rediseñada: 410 px, esfera 3D en el encabezado, mensajes a 14 px con burbujas diferenciadas, botón para copiar respuestas, indicador «ADI está procesando tu consulta…», aviso de desconexión con «Reintentar» y controles reorganizados.",
+          "«Solicitar un asesor» pasa a llamarse «Contactar soporte técnico»; la conversación ya no salta mientras se relee."
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.104",
       "date": "2026-10-12T17:42:31-05:00",
       "type": "patch",

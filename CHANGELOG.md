@@ -4,6 +4,16 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.105 — 2026-10-12 17:49 (UTC-05:00)
+
+Esfera viva y ventana premium de ADI
+
+### Mejoras realizadas
+
+- Esfera de ADI con más vida: filamentos de energía, núcleo que cambia de forma, ondas en la superficie, respiración asimétrica, levitación leve, onda al toque y reacción suave al cursor.
+- Ventana de ADI rediseñada: 410 px, esfera 3D en el encabezado, mensajes a 14 px con burbujas diferenciadas, botón para copiar respuestas, indicador «ADI está procesando tu consulta…», aviso de desconexión con «Reintentar» y controles reorganizados.
+- «Solicitar un asesor» pasa a llamarse «Contactar soporte técnico»; la conversación ya no salta mientras se relee.
+
 ## v1.5.104 — 2026-10-12 17:42 (UTC-05:00)
 
 Registro público cerrado, cuentas por administración y ADI en espera

@@ -166,9 +166,9 @@ def fallback(c,text):
  if has('cita','agendar','agenda','reservar','reserva','turno'):
   return 'Puedes reservar tu cita en línea en /citas: elige el servicio, la fecha y una hora disponible. Recibirás un código para consultar, reprogramar o cancelar la cita.'
  if has('precio','costo','cuanto cuesta','cuanto vale','cuanto sale','cotiza','presupuesto','tarifa') or words&{'valor','vale','cobran'}:
-  return 'El valor depende de la revisión técnica del equipo, por eso no puedo darte un precio por este medio. Puedes agendar un diagnóstico en /citas o pedir que un asesor te contacte con el botón «Solicitar un asesor».'
+  return 'El valor depende de la revisión técnica del equipo, por eso no puedo darte un precio por este medio. Puedes agendar un diagnóstico en /citas o pedir que un asesor te contacte con el botón «Contactar soporte técnico».'
  if has('garantia'):
-  return 'Las condiciones de garantía dependen del servicio realizado y constan en las condiciones de tu orden. Un asesor puede confirmarte tu caso: usa «Solicitar un asesor».'
+  return 'Las condiciones de garantía dependen del servicio realizado y constan en las condiciones de tu orden. Un asesor puede confirmarte tu caso: usa «Contactar soporte técnico».'
  if has('horario','abren','abierto','atienden') or words&{'hora','horas'}:
   schedule=schedule_text(cfg['hours'])
   return ('Horario de atención de la agenda (hora de Ecuador): '+schedule+'.' if schedule else 'Por ahora no hay horarios de agenda habilitados.')+' Puedes ver las horas libres al reservar en /citas.'
@@ -177,7 +177,7 @@ def fallback(c,text):
  if has('donde','direccion','ubicacion','ubicados','llegar') or words&{'local'}:
   return 'Para confirmar la dirección y cómo llegar, escríbenos por WhatsApp al '+company['whatsapp']+' o solicita un asesor en este chat.'
  if has('asesor','humano','persona','tecnico','alguien','operador'):
-  return 'Con gusto. Pulsa «Solicitar un asesor» y una persona del equipo continuará la conversación en este mismo chat.'
+  return 'Con gusto. Pulsa «Contactar soporte técnico» y una persona del equipo continuará la conversación en este mismo chat.'
  if has('servicio','reparacion','reparar','arreglar','diagnostico','mantenimiento','bios','impresora','laptop','portatil','computadora','formatear','virus','pantalla','lento','no enciende','no prende') or words&{'pc'}:
   services=', '.join(item['label'].lower() for item in cfg['services'] if item.get('active',1))
   return company['name']+' ofrece diagnóstico y reparación de portátiles, computadoras e impresoras, mantenimiento preventivo, programación de BIOS y reparación electrónica.'+(' En la agenda puedes reservar: '+services+'.' if services else '')+' El diagnóstico exacto requiere revisar el equipo; reserva en /citas.'

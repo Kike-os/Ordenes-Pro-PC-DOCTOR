@@ -159,3 +159,13 @@ Halo rosado difuminado que respira con la esfera, cristal con reflejos superior 
 ## ADI siempre en espera al cargar (1.5.104)
 
 Al abrir, recargar o cambiar de sección, ADI no se abre, no habla, no suena y no enciende el micrófono: solo se muestra la esfera. Se retiraron la apertura automática junto al acceso, la opción «Abrir el chat al entrar» y la reapertura automática tras cerrarse un diálogo. Solo se guardan preferencias (efectos de sonido, voz y velocidad, animaciones de la esfera), nunca el estado de la conversación, la escucha o la voz. Hay una sola instancia por página y cerrar o minimizar detiene la voz y el micrófono.
+
+## Esfera viva y ventana premium (1.5.105)
+
+- **Sombreador ampliado** (`adi-orb.js`): filamentos de energía (crestas de ruido deformado que circulan y cambian de dirección con giros de frecuencias que no coinciden), núcleo cuya forma varía con la dirección, ondas que perturban la normal de la superficie y, con ella, los reflejos; respiración asimétrica con dos ritmos, levitación mínima, onda expansiva al toque, resplandor moderado y reacción suave al cursor en escritorio (luz, reflejos y centro del núcleo). Sigue siendo un sombreador propio sin dependencias; Three.js y sus materiales físicos no se incorporaron por peso y por la política de guiones propios, y el proyecto no usa React.
+- **Tamaño**: 68 px en escritorio y 56 px en móvil.
+- **Ventana**: 410 px de ancho y hasta 580 px de alto; encabezado «ADI · Asistente Inteligente» con una esfera 3D pequeña que solo existe mientras la ventana está abierta; estado real bajo el título; mensajes a 14 px con burbujas distintas para la persona y para ADI; hora con fecha completa al pasar el cursor; botón para copiar cada respuesta; «ADI está procesando tu consulta…» mientras hay una petición; aviso de desconexión con «Reintentar».
+- **Desplazamiento**: baja al último mensaje solo si la persona ya estaba al final o acaba de enviar.
+- **Controles**: campo adaptable (Enter envía, Mayús+Enter añade línea), detener voz (visible solo mientras habla), micrófono y enviar.
+- **«Contactar soporte técnico»** sustituye a «Solicitar un asesor» y usa el mismo relevo real al Centro de Atención.
+- **Límite que se mantiene**: el audio de la voz del navegador no puede analizarse; al hablar, la esfera sigue los eventos de palabra del motor, no la amplitud real.
