@@ -88,3 +88,17 @@ La Epson no respondió en su conexión configurada. No se envió un trabajo fís
 
 - El logo se imprime a 26 mm y en escala de grises a partir del archivo original (sus mismos trazos y tonos), no como silueta en un bit. La impresora térmica lo trama al imprimir; ese resultado en papel está pendiente de comprobar.
 - El QR va justo debajo del número de orden. Con enlace público codifica `…/s/<token>#<número de orden>`: el número queda integrado en el código, lo muestra el lector y no se envía al servidor.
+
+## Ticket compacto (1.5.54, 11/10/2026)
+
+Mismo contenido y mismos textos de condiciones y autorizaciones; cambia solo la composición:
+
+- Franja de título en negativo («COMPROBANTE DE RECEPCIÓN» y la copia), número de orden a 15 pt.
+- QR a la izquierda con fecha, estado y su leyenda a la derecha (antes iban uno debajo de otro).
+- Cliente y equipo en dos columnas: etiqueta en negrita en una columna fija de 70 pt y valor alineado.
+- Párrafos justificados al ancho útil (198,4 pt); las líneas con demasiado hueco se dejan alineadas a la izquierda.
+- Resumen de condiciones a 8 pt; las dos firmas comparten renglón; Code 128 de 13 mm de alto (antes 17), con los mismos dos puntos por módulo.
+- QR y código de barras alineados a la rejilla de 203 dpi.
+- La muestra pasó de 442 mm a 354 mm de largo (una página).
+
+Comprobado: ZBar decodifica el QR y el Code 128 desde el PDF rasterizado a 203 dpi; el ráster Epson (`rastertotmtr`) se genera con un único corte; se envió una copia real con datos ficticios a `Epson_Red_192_168_128_45` (trabajo 9) y la cola la aceptó. La revisión del papel impreso queda a cargo del taller.

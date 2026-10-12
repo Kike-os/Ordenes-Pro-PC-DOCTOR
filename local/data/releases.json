@@ -8,6 +8,22 @@
   },
   "releases": [
     {
+      "version": "1.5.54",
+      "date": "2026-10-11T23:23:21-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Ticket térmico compacto",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Ticket térmico más compacto y moderno: franja de título, QR junto a la fecha y el estado, cliente y equipo en columnas alineadas, párrafos justificados y firmas en un mismo renglón; un 20 % más corto con el mismo contenido"
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.53",
       "date": "2026-10-11T23:17:01-05:00",
       "type": "patch",

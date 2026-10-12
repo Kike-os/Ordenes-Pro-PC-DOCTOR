@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.54 — 2026-10-11 23:23 (UTC-05:00)
+
+Ticket térmico compacto
+
+### Mejoras realizadas
+
+- Ticket térmico más compacto y moderno: franja de título, QR junto a la fecha y el estado, cliente y equipo en columnas alineadas, párrafos justificados y firmas en un mismo renglón; un 20 % más corto con el mismo contenido
+
 ## v1.5.53 — 2026-10-11 23:17 (UTC-05:00)
 
 Avisos emergentes menos intrusivos

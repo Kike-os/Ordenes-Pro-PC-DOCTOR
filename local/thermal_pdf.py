@@ -34,6 +34,7 @@ SUMMARY=(
 COPIES={'cliente':('COPIA CLIENTE',),'taller':('COPIA TALLER',),'ambas':('COPIA CLIENTE','COPIA TALLER')}
 LOGO_MM=26  # Ancho impreso del logo.
 LOGO_PX=416  # Dos píxeles por punto de impresora para conservar el detalle del original.
+BAR_HEIGHT=13*72/25.4  # Alto del Code 128: 13 mm, suficiente para el lector y más corto que antes.
 
 
 def render_thermal(order,copy='cliente'):
@@ -72,92 +73,140 @@ def render_thermal(order,copy='cliente'):
     access=order.get('access_authorization');destructive=order.get('destructive_authorization');terms=order.get('terms')
     link=terms['url'] if terms else company['website'].rstrip('/')+'/conditions'
 
+    INNER=W-2*M
+    def snap(value):
+        """Posición alineada a la rejilla de puntos de la impresora: QR y código de barras salen con bordes nítidos."""
+        return round(value/DOT)*DOT
+    def wrap_to(value,size,bold,width):
+        lines=[]
+        for paragraph in str(value).splitlines() or ['']:
+            current=''
+            for word in paragraph.split(' '):
+                trial=(current+' '+word).strip() if current else word
+                if current and text_width(trial,size,bold)>width:lines.append((current,False));current=word
+                else:current=trial
+                # Una palabra más ancha que la línea (un enlace, por ejemplo) se parte por caracteres.
+                while text_width(current,size,bold)>width:
+                    cut=len(current)
+                    while cut>1 and text_width(current[:cut],size,bold)>width:cut-=1
+                    lines.append((current[:cut],False));current=current[cut:]
+            lines.append((current,True))
+        return lines
+
     def compose(copy_label):
-        ops=[];y=10;link_box=[0,0]
-        def block(value,size=9,bold=False,gap=3,center=False):
+        ops=[];y=6;link_box=[0,0]
+        def block(value,size=9,bold=False,gap=3,center=False,x=M,width=None,justify=False,lead=1.25):
             nonlocal y
-            for line in wrap(value,size,bold):ops.append(('text',line,y,size,bold,center));y+=size*1.3
+            width=INNER-(x-M) if width is None else width
+            for line,last in wrap_to(value,size,bold,width):
+                ops.append(('text',line,y,size,bold,center,x,width,justify and not last and ' ' in line));y+=size*lead
             y+=gap
         def section(title):
             nonlocal y
-            y+=3;ops.append(('rule',y));y+=7;block(title,9,True,4)
-        def pair(label,value):block(label+': '+str(value or 'No registrado'))
-        def signature(label):
+            y+=2;ops.append(('rule',y));y+=5;block(title,8.5,True,3)
+        def pair(label,value,column=70):
+            """Etiqueta en negrita en una columna fija y valor alineado a su derecha: todas las filas comparten el mismo margen."""
             nonlocal y
-            y+=30;ops.append(('line',y,W*.14,W*.86));y+=4;block(label,8,center=True,gap=4)
+            start=y;block(label,8,True,0,width=column-4,lead=1.25);label_end=y;y=start
+            block(str(value or 'No registrado'),9,False,0,x=M+column,lead=1.2);y=max(y,label_end)+2.5
+        def paragraph(value,size=8,gap=2.5):block(value,size,gap=gap,justify=True,lead=1.22)
         # 1–2. Logo original y datos del taller.
-        logo_width=LOGO_MM*72/25.4;logo_height=logo_width*logo_h/logo_w;ops.append(('logo',y,logo_width,logo_height));y+=logo_height+5
-        block(company['name'],9,True,1,True);block(company['specialty'],8,gap=2,center=True)
-        block('WhatsApp: '+company['whatsapp'],8,gap=1,center=True);block(company['website'],8,gap=5,center=True)
-        block('COMPROBANTE DE RECEPCIÓN',9,True,2,True);block(copy_label,8,True,5,True)
-        if order.get('preview'):block('VISTA PREVIA · DATOS FICTICIOS',8,True,5,True)
-        # 3. Número de orden destacado y, justo debajo, el QR de esa orden.
-        block(order['code'],14,True,3,True)
-        ops.append(('qr',y,qr_size,qr_unit,matrix));y+=qr_size+3
-        block('Escanea para consultar tu reparación' if tracking else 'Uso interno: escanear con sesión autorizada.',9 if tracking else 8,bool(tracking),6,True)
-        # 4. Fecha y hora.
-        pair('Fecha y hora',received.strftime('%d/%m/%Y %H:%M:%S')+' · Ecuador')
-        pair('Estado',order['status_label'])
+        logo_width=LOGO_MM*72/25.4;logo_height=logo_width*logo_h/logo_w;ops.append(('logo',y,logo_width,logo_height));y+=logo_height+3
+        block(company['name'],10,True,0,True);block(company['specialty'],8,gap=0,center=True)
+        block('WhatsApp: '+company['whatsapp'],8,gap=0,center=True);block(company['website'],7.5,gap=4,center=True)
+        # Franja de título en negativo: identifica el documento y la copia de un vistazo.
+        band=25 if not order.get('preview') else 35;ops.append(('band',y,band));y+=4
+        block('COMPROBANTE DE RECEPCIÓN',9.5,True,0,True);ops[-1]=ops[-1]+('white',);block(copy_label,7.5,True,0,True);ops[-1]=ops[-1]+('white',)
+        if order.get('preview'):block('VISTA PREVIA · DATOS FICTICIOS',7.5,True,0,True);ops[-1]=ops[-1]+('white',)
+        y+=7
+        # 3. Número de orden destacado.
+        block(order['code'],15,True,4,True)
+        # 4. QR de la orden a la izquierda; fecha, estado y uso del código a su derecha.
+        qr_top=y;ops.append(('qr',y,qr_size,qr_unit,matrix,snap(M)));side=M+qr_size+5;side_width=W-M-side;y+=4*qr_unit
+        for label,value in (('FECHA Y HORA',received.strftime('%d/%m/%Y %H:%M:%S')),('ESTADO',order['status_label'])):
+            block(label,6.5,True,0,x=side,width=side_width);block(value,9,False,3,x=side,width=side_width,lead=1.15)
+        block('Escanea el código para consultar tu reparación.' if tracking else 'Uso interno: escanear con sesión autorizada.',7.5,bool(tracking),0,x=side,width=side_width,lead=1.2)
+        y=max(y,qr_top+qr_size)+3
         # 5–9. Cliente, equipo, accesorios, estado físico y falla informada.
         section('CLIENTE');pair('Nombre',order['client'])
         pair({'ruc':'RUC','pasaporte':'Pasaporte'}.get(order.get('document_type'),'Identificación'),order.get('identification'))
         pair('Teléfono',order.get('phone'))
         section('EQUIPO');pair('Tipo',DEVICE_TYPES.get(order['type'],order['type']))
         pair('Marca / modelo',' '.join(filter(None,[order.get('brand'),order.get('model')])));pair('Serie',order.get('serial'))
-        pair('Accesorios recibidos',order.get('accessories'));pair('Estado físico',order.get('physical_condition'));pair('Falla informada por el cliente',order['problem'])
+        pair('Accesorios recibidos',order.get('accessories'));pair('Estado físico',order.get('physical_condition'))
+        block('Falla informada por el cliente:',8,True,1);paragraph(str(order['problem'] or 'No registrado'),9,3)
         # 11. Autorización y condiciones: mismos textos y evidencia registrada, sin añadir consentimientos.
         section('AUTORIZACIÓN DE ACCESO TÉCNICO')
-        block('Acceso técnico: '+({'authorized':'AUTORIZADO','denied':'NO AUTORIZADO'}[access['decision']] if access else 'No consta autorización'),9,True,4)
+        block('Acceso técnico: '+({'authorized':'AUTORIZADO','denied':'NO AUTORIZADO'}[access['decision']] if access else 'No consta autorización'),9,True,2)
         if access:
             granted=[label for key,label in SCOPES.items() if access['permissions'].get(key)]
-            if granted:block('Alcance autorizado: '+'. '.join(granted)+'.',9)
-            block('Decisión registrada: '+datetime.fromisoformat(access['recorded_at']).astimezone(ECUADOR_TZ).strftime('%d/%m/%Y %H:%M:%S'),8)
-            block('Responsable: '+access['operator'],8)
-        block('Reinstalar / formatear / eliminar: '+({'authorized':'AUTORIZACIÓN ADICIONAL REGISTRADA','denied':'NO AUTORIZADO'}[destructive['decision']] if destructive else 'Sin autorización adicional'),8,True)
-        block('El diagnóstico no autoriza revisar datos privados ni borrar información fuera del alcance expresamente acordado.',8)
+            if granted:paragraph('Alcance autorizado: '+'. '.join(granted)+'.',8.5)
+            block('Decisión registrada: '+datetime.fromisoformat(access['recorded_at']).astimezone(ECUADOR_TZ).strftime('%d/%m/%Y %H:%M:%S'),7.5,gap=0)
+            block('Responsable: '+access['operator'],7.5,gap=2)
+        block('Reinstalar / formatear / eliminar: '+({'authorized':'AUTORIZACIÓN ADICIONAL REGISTRADA','denied':'NO AUTORIZADO'}[destructive['decision']] if destructive else 'Sin autorización adicional'),8,True,2)
+        paragraph('El diagnóstico no autoriza revisar datos privados ni borrar información fuera del alcance expresamente acordado.',7.5)
         section('CONDICIONES DEL SERVICIO · RESUMEN')
-        if terms:block('Versión aceptada: '+terms['version'],8,True)
-        else:block('Orden histórica: no consta aceptación de condiciones. Este resumen informa; no acredita consentimiento.',9,True,5)
-        for n,paragraph in enumerate(SUMMARY,1):block(str(n)+'. '+paragraph,9,gap=3)
+        if terms:block('Versión aceptada: '+terms['version'],8,True,2)
+        else:paragraph('Orden histórica: no consta aceptación de condiciones. Este resumen informa; no acredita consentimiento.',8,3);ops[-1]=ops[-1]
+        for n,text in enumerate(SUMMARY,1):paragraph(str(n)+'. '+text,8,2)
         if terms:
-            block('Aceptación registrada: '+datetime.fromisoformat(order['terms_accepted_at']).astimezone(ECUADOR_TZ).strftime('%d/%m/%Y %H:%M:%S'),8)
-            block('La versión completa aceptada se conserva sin cambios. Consulta:',8)
-        else:block('Condiciones vigentes para consulta; requieren aceptación expresa:',8)
-        link_box[0]=y;block(link,8,gap=5);link_box[1]=y
-        # 12. Firma y constancia de recepción.
+            block('Aceptación registrada: '+datetime.fromisoformat(order['terms_accepted_at']).astimezone(ECUADOR_TZ).strftime('%d/%m/%Y %H:%M:%S'),7.5,gap=1)
+            block('La versión completa aceptada se conserva sin cambios. Consulta:',7.5,gap=1)
+        else:block('Condiciones vigentes para consulta; requieren aceptación expresa:',7.5,gap=1)
+        link_box[0]=y;block(link,7.5,gap=3);link_box[1]=y
+        # 12. Firma y constancia de recepción: las dos firmas comparten renglón.
         section('FIRMA Y CONSTANCIA DE RECEPCIÓN')
-        block(company['name']+' deja constancia de haber recibido el equipo descrito en este comprobante el '+received.strftime('%d/%m/%Y')+' a las '+received.strftime('%H:%M')+'.',8,gap=0)
-        signature('Firma del cliente');signature('Recibido por '+company['name'])
+        paragraph(company['name']+' deja constancia de haber recibido el equipo descrito en este comprobante el '+received.strftime('%d/%m/%Y')+' a las '+received.strftime('%H:%M')+'.',8,0)
+        y+=30;half=(INNER-8)/2
+        for index,label in enumerate(('Firma del cliente','Recibido por '+company['name'])):
+            left=M+index*(half+8);ops.append(('line',y,left,left+half))
+            lines=wrap_to(label,7.5,False,half)
+            for row,(line,_) in enumerate(lines):ops.append(('text',line,y+3+row*9,7.5,False,False,left+(half-text_width(line,7.5))/2,half,False))
+        y+=3+9*max(len(wrap_to(label,7.5,False,half)) for label in ('Firma del cliente','Recibido por '+company['name']))+4
         # Code 128 para localizar la orden en el taller.
-        y+=4;ops.append(('rule',y));y+=8
-        ops.append(('barcode',y,bars,unit,total));y+=17*72/25.4+8
-        block(order['code'],10,True,6,True)
-        block(company['thanks'],9,True,3,True);block(company['support_email'],8,center=True)
-        return ops,y+10,link_box
+        ops.append(('rule',y));y+=6
+        ops.append(('barcode',y,bars,unit,total));y+=BAR_HEIGHT+5
+        block(order['code'],10,True,4,True)
+        block(company['thanks'],8.5,True,1,True);block(company['support_email'],7.5,center=True,gap=0)
+        return ops,y+8,link_box
 
     for copy_label in COPIES[copy]:
         ops,height,link_box=compose(copy_label)
         stream=pydyf.Stream(compress=True);pdf.add_object(stream);stream.set_color_rgb(0,0,0)
+        def draw(value,x,top,size,bold):
+            stream.begin_text();stream.set_font_size('F2' if bold else 'F1',size);stream.set_text_matrix(1,0,0,1,x,height-top-size);stream.show_text_string(value.encode('cp1252','replace'));stream.end_text()
         for op in ops:
             if op[0]=='text':
-                _,value,top,size,bold,center=op;x=(W-text_width(value,size))/2 if center else M
-                stream.begin_text();stream.set_font_size('F2' if bold else 'F1',size);stream.set_text_matrix(1,0,0,1,x,height-top-size);stream.show_text_string(value.encode('cp1252','replace'));stream.end_text()
+                _,value,top,size,bold,center,x,width,justify=op[:9];white=len(op)>9
+                if white:stream.set_color_rgb(1,1,1)
+                if center:draw(value,(W-text_width(value,size,bold))/2,top,size,bold)
+                elif justify:
+                    # Justificado: el espacio sobrante de la línea se reparte entre sus palabras.
+                    words=value.split(' ');spare=(width-sum(text_width(word,size,bold) for word in words))/(len(words)-1)
+                    if spare>size*.9:draw(value,x,top,size,bold)
+                    else:
+                        cursor=x
+                        for word in words:draw(word,cursor,top,size,bold);cursor+=text_width(word,size,bold)+spare
+                else:draw(value,x,top,size,bold)
+                if white:stream.set_color_rgb(0,0,0)
+            elif op[0]=='band':
+                stream.rectangle(M,height-op[1]-op[2],INNER,op[2]);stream.fill()
             elif op[0]=='rule':
-                stream.set_line_width(.35);stream.move_to(M,height-op[1]);stream.line_to(W-M,height-op[1]);stream.stroke()
+                stream.set_line_width(.5);stream.move_to(M,height-op[1]);stream.line_to(W-M,height-op[1]);stream.stroke()
             elif op[0]=='line':
                 stream.set_line_width(.6);stream.move_to(op[2],height-op[1]);stream.line_to(op[3],height-op[1]);stream.stroke()
             elif op[0]=='logo':
                 _,top,width,tall=op;stream.push_state();stream.set_matrix(width,0,0,tall,(W-width)/2,height-top-tall);stream.draw_x_object('Logo');stream.pop_state()
             elif op[0]=='qr':
-                _,top,size,qunit,cells=op;left=(W-size)/2
+                _,top,size,qunit,cells,left=op
                 for row,values in enumerate(cells):
                     for col,dark in enumerate(values):
                         if dark:stream.rectangle(left+(col+4)*qunit,height-top-(row+5)*qunit,qunit,qunit)
                 stream.fill()
             elif op[0]=='barcode':
-                _,top,widths,bunit,span=op;left=(W-span)/2+10*bunit
+                _,top,widths,bunit,span=op;left=snap((W-span)/2)+10*bunit
                 for i,width in enumerate(widths):
-                    if i%2==0:stream.rectangle(left,height-top-17*72/25.4,width*bunit,17*72/25.4)
+                    if i%2==0:stream.rectangle(left,height-top-BAR_HEIGHT,width*bunit,BAR_HEIGHT)
                     left+=width*bunit
                 stream.fill()
         annotation=pydyf.Dictionary({'Type':'/Annot','Subtype':'/Link','Rect':pydyf.Array([M,height-link_box[1],W-M,height-link_box[0]]),'Border':pydyf.Array([0,0,0]),'A':pydyf.Dictionary({'S':'/URI','URI':pydyf.String(link)})});pdf.add_object(annotation)
