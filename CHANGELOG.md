@@ -4,6 +4,19 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.98 — 2026-10-12 14:09 (UTC-05:00)
+
+Esfera premium de ADI con anillo, letras y estados reales
+
+### Nuevas funcionalidades
+
+- Ventana «ADI · Asistente Inteligente» con botón para detener la voz mientras ADI habla.
+
+### Mejoras realizadas
+
+- Esfera premium de ADI: cristal rosa con reflejos, letras «ADI» centradas, anillo exterior luminoso de giro lento y tamaño adaptado (62 px en escritorio, 54 px en móvil).
+- Animaciones ligadas al estado real: anillos que siguen el volumen del micrófono en computadoras, partículas al procesar, latido por palabra al hablar y esfera apagada sin indicador verde cuando no hay conexión.
+
 ## v1.5.97 — 2026-10-12 14:04 (UTC-05:00)
 
 Voz de ADI: velocidad, pronunciación del nombre y fluidez

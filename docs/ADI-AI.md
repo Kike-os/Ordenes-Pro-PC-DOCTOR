@@ -115,3 +115,13 @@ Sustituye a la propuesta con «Aceptar / Descartar» de la 1.5.60, a petición d
 - **Una sola voz a la vez**: cada lectura cancela la anterior. Mientras ADI habla, el botón de voz la interrumpe sin desactivar la lectura.
 - **Muestra**: «Escuchar muestra de voz» lee «Hola, bienvenido a PC-DOCTOR S.A. Soy ADI, tu asistente virtual de Órdenes Pro. Estoy aquí para ayudarte con tus órdenes de reparación, citas técnicas y consultas.»
 - **Límites del motor**: no hay audio progresivo del proveedor de IA (la respuesta de texto llega completa, no en flujo) ni control fino de entonación; una voz idéntica en todos los dispositivos requeriría un servicio de voz externo.
+
+## Esfera premium (1.5.98)
+
+- Esfera de cristal rosa (rosa pastel, perlado y fucsia suave) con reflejos, las letras «ADI» centradas y un anillo exterior luminoso de giro lento. 62 px en escritorio y 54 px en móvil; toda en CSS, sin imágenes.
+- **Escuchando**: en computadoras, un analizador de audio mide el volumen real del micrófono mientras el reconocimiento escucha y los anillos crecen con él (`--adi-level`). En teléfonos no se abre un segundo uso del micrófono, porque interrumpe el reconocimiento de voz: allí los anillos responden al inicio y fin de voz que informa el navegador.
+- **Procesando**: partículas en órbita y anillo más rápido mientras hay una petición en curso.
+- **Hablando**: pulso continuo y un latido por cada palabra que informa el motor de voz (`boundary`), cuando el motor lo admite.
+- **Desconectada**: sin indicador verde, esfera apagada y sin movimiento. El indicador refleja el estado real de la conexión con el servidor.
+- Ventana «ADI · Asistente Inteligente» con botón propio para detener la voz, visible solo mientras ADI habla.
+- En equipos modestos (2 núcleos o 2 GB) y con «movimiento reducido» se desactivan desenfoques, ondas y giros.

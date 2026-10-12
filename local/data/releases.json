@@ -8,6 +8,25 @@
   },
   "releases": [
     {
+      "version": "1.5.98",
+      "date": "2026-10-12T14:09:49-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Esfera premium de ADI con anillo, letras y estados reales",
+      "changes": {
+        "features": [
+          "Ventana «ADI · Asistente Inteligente» con botón para detener la voz mientras ADI habla."
+        ],
+        "improvements": [
+          "Esfera premium de ADI: cristal rosa con reflejos, letras «ADI» centradas, anillo exterior luminoso de giro lento y tamaño adaptado (62 px en escritorio, 54 px en móvil).",
+          "Animaciones ligadas al estado real: anillos que siguen el volumen del micrófono en computadoras, partículas al procesar, latido por palabra al hablar y esfera apagada sin indicador verde cuando no hay conexión."
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.97",
       "date": "2026-10-12T14:04:50-05:00",
       "type": "patch",

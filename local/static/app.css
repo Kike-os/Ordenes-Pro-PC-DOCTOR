@@ -4270,3 +4270,36 @@ body[data-page=dashboard] button[aria-label^="Cerrar"]:not(#logout):not(.primary
 #adi-widget.adi-v2 .adi-voice[data-speaking=true]{color:#ffb3d4;animation:adi-voice-live 1s ease-in-out infinite}
 @keyframes adi-voice-live{50%{opacity:.55}}
 @media(prefers-reduced-motion:reduce){#adi-widget.adi-v2 .adi-voice[data-speaking=true]{animation:none}}
+/* ADI premium: esfera de cristal rosa con letras, anillo exterior lento, anillos de nivel reales y partículas al procesar. */
+#adi-widget.adi-v2 .adi-toggle{width:62px;height:62px;min-height:62px;isolation:isolate}
+@media(max-width:860px){#adi-widget.adi-v2 .adi-toggle,body[data-page=dashboard] #adi-widget.adi-v2 .adi-toggle{width:54px;height:54px;min-height:54px}}
+#adi-widget.adi-v2 .adi-orb{background:radial-gradient(circle at 72% 80%,#c77dffb0 0,#c77dff00 50%),radial-gradient(circle at 22% 78%,#ff6fb5a8 0,#ff6fb500 52%),radial-gradient(circle at 46% 30%,#fff3f8 0,#ffd0e4 26%,#ff9fcb 54%,#ee6aa9 78%,#b9407f 100%);box-shadow:inset 0 -10px 16px #7a1f5599,inset 0 4px 10px #ffffff8c,inset 0 0 0 1px #ffe6f199}
+#adi-widget.adi-v2 .adi-orb-shine{background:radial-gradient(ellipse 46% 24% at 36% 18%,#fffffff2 0,#ffffff66 48%,#ffffff00 100%),radial-gradient(ellipse 34% 12% at 60% 88%,#ffe1ef80 0,#ffe1ef00 100%),linear-gradient(160deg,#ffffff2e 0,#ffffff00 42%)}
+#adi-widget.adi-v2 .adi-orb::after{width:26px;height:26px;margin:-13px 0 0 -13px;background:radial-gradient(circle,#ffffff8c 0,#ffd9ea40 45%,#ffb3d400 75%);opacity:.6}
+#adi-widget.adi-v2 .adi-orb-label{position:absolute;inset:0;z-index:2;display:grid;place-items:center;font:700 15px/1 Inter,"Segoe UI",system-ui,sans-serif;letter-spacing:.14em;text-indent:.14em;color:#fff;text-shadow:0 1px 2px #8a2a6399,0 0 10px #ffffffb3;pointer-events:none}
+@media(max-width:860px){#adi-widget.adi-v2 .adi-orb-label{font-size:13px}}
+/* Anillo exterior luminoso con giro lento. */
+#adi-widget.adi-v2 .adi-ring{position:absolute;inset:-5px;z-index:-1;border-radius:50%;background:conic-gradient(from 0deg,#ff9ecb00 0deg,#ffd3e6e6 70deg,#ff7fbd99 130deg,#ff9ecb00 200deg,#d9a6ffb3 280deg,#ff9ecb00 360deg);-webkit-mask:radial-gradient(farthest-side,#0000 calc(100% - 2.5px),#000 calc(100% - 2px));mask:radial-gradient(farthest-side,#0000 calc(100% - 2.5px),#000 calc(100% - 2px));animation:adi-orb-turn 16s linear infinite;will-change:transform}
+/* Anillos de nivel: su tamaño sigue el volumen real del micrófono (--adi-level, de 0 a 1) cuando el equipo permite medirlo. */
+#adi-widget.adi-v2 .adi-level{position:absolute;inset:-6px;z-index:-2;border-radius:50%;border:2px solid #ffc2dc;opacity:0;transform:scale(1);transition:transform .09s linear,opacity .2s ease;will-change:transform,opacity;pointer-events:none}
+#adi-widget.adi-v2[data-voice=listening][data-meter=true] .adi-level{opacity:calc(.25 + var(--adi-level,0)*.75);transform:scale(calc(1.04 + var(--adi-level,0)*.42));box-shadow:0 0 0 calc(var(--adi-level,0)*7px) #ff9ecb40,0 0 calc(10px + var(--adi-level,0)*22px) #ff8fc299}
+#adi-widget.adi-v2[data-voice=listening][data-meter=true] .adi-toggle{animation:none;box-shadow:0 10px 26px #02071499,0 0 0 1px #ffd3e680,0 0 22px #ff8fc280}
+/* Hablando: un latido por cada palabra que informa el motor de voz. */
+#adi-widget.adi-v2.adi-beat[data-voice=speaking] .adi-level{animation:adi-orb-beat .32s ease-out 1}
+@keyframes adi-orb-beat{0%{opacity:.9;transform:scale(1.02)}100%{opacity:0;transform:scale(1.36)}}
+/* Procesando: partículas en órbita mientras hay una petición en curso. */
+#adi-widget.adi-v2 .adi-particles{position:absolute;inset:-9px;z-index:-1;border-radius:50%;opacity:0;transition:opacity .25s ease;background:radial-gradient(circle 2.2px at 50% 2.5px,#fff 0,#ffd3e6 60%,#ffd3e600 100%),radial-gradient(circle 1.8px at 93% 62%,#ffe3ef 0,#ffb3d400 100%),radial-gradient(circle 1.6px at 12% 70%,#f2c4ff 0,#d9a6ff00 100%);pointer-events:none}
+#adi-widget.adi-v2.adi-busy .adi-particles{opacity:1;animation:adi-orb-turn 1.8s linear infinite}
+#adi-widget.adi-v2.adi-busy .adi-ring{animation-duration:3.5s}
+/* Desconectada o conversación cerrada: sin indicador verde y esfera apagada, sin movimiento. */
+#adi-widget.adi-v2:is([data-state=offline]) .adi-online{display:none}
+#adi-widget.adi-v2:is([data-state=closed],[data-state=offline]) .adi-ring{animation-play-state:paused;opacity:.35}
+#adi-widget.adi-v2:is([data-state=closed],[data-state=offline]) .adi-orb{filter:saturate(.3) brightness(.72)}
+/* Equipos modestos y movimiento reducido: sin desenfoques, ondas ni giros. */
+#adi-widget.adi-v2.adi-lite .adi-orb-swirl,#adi-widget.adi-v2.adi-lite .adi-orb::before{display:none}
+#adi-widget.adi-v2.adi-lite .adi-ring{animation-duration:28s}
+@media(prefers-reduced-motion:reduce){#adi-widget.adi-v2 .adi-ring,#adi-widget.adi-v2 .adi-particles,#adi-widget.adi-v2.adi-busy .adi-particles,#adi-widget.adi-v2.adi-beat .adi-level{animation:none!important}#adi-widget.adi-v2 .adi-level{transition:none}}
+/* Ventana: botón para detener la voz, visible solo mientras ADI habla. */
+#adi-widget.adi-v2 .adi-stop{color:#ffb3d4}
+#adi-widget.adi-v2 .adi-stop svg{width:15px;height:15px;fill:currentColor}
+#adi-widget.adi-v2 .adi-stop[hidden]{display:none}
