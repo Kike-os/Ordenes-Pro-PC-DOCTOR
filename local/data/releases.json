@@ -8,6 +8,24 @@
   },
   "releases": [
     {
+      "version": "1.5.38",
+      "date": "2026-10-11T19:04:29-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Citas de Hoy con carrusel, distintivo Nuevo y cancelaciones en rojo",
+      "changes": {
+        "features": [
+          "Citas de Hoy: con más de tres citas rota grupos de tres cada 8 segundos en orden cronológico, con controles para avanzar y retroceder e indicador de página; se pausa con el cursor, el foco, un diálogo abierto o la pestaña inactiva"
+        ],
+        "improvements": [
+          "Citas de Hoy: distintivo «Nuevo» durante un minuto para las citas recién registradas, y las canceladas se muestran en rojo unos segundos antes de retirarse de la lista"
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.37",
       "date": "2026-10-11T18:47:03-05:00",
       "type": "patch",

@@ -4,6 +4,18 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.38 — 2026-10-11 19:04 (UTC-05:00)
+
+Citas de Hoy con carrusel, distintivo Nuevo y cancelaciones en rojo
+
+### Nuevas funcionalidades
+
+- Citas de Hoy: con más de tres citas rota grupos de tres cada 8 segundos en orden cronológico, con controles para avanzar y retroceder e indicador de página; se pausa con el cursor, el foco, un diálogo abierto o la pestaña inactiva
+
+### Mejoras realizadas
+
+- Citas de Hoy: distintivo «Nuevo» durante un minuto para las citas recién registradas, y las canceladas se muestran en rojo unos segundos antes de retirarse de la lista
+
 ## v1.5.37 — 2026-10-11 18:47 (UTC-05:00)
 
 Citas de Hoy compacto y sincronizado, clima con actualización manual y avisos de cambio

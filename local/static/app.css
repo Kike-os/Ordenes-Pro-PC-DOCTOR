@@ -3196,7 +3196,7 @@ button.live-appointment:focus-visible{outline:2px solid #8bb8ff;outline-offset:2
 button.live-appointment>time{padding:0;font-size:14px;font-weight:700;color:#f2f6ff;font-variant-numeric:tabular-nums}
 .live-appointment-info{display:grid;gap:1px;min-width:0}.live-appointment-info strong{font-size:12.5px;color:#eef3ff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.live-appointment-info small{font-size:11.5px;color:#9bb0cf;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 button.live-appointment .agenda-badge{font-size:10.5px}
-@media(max-width:420px){button.live-appointment{grid-template-columns:48px minmax(0,1fr)}button.live-appointment .agenda-badge{grid-column:2;justify-self:start}}
+@media(max-width:420px){button.live-appointment{grid-template-columns:48px minmax(0,1fr)}button.live-appointment .live-tags{grid-column:2;justify-self:start}}
 @media(prefers-reduced-motion:reduce){button.live-appointment,.appointments-panel .panel-icon{transition:none}}
 
 /* Smart Bell Shake: al llegar una notificación nueva la campana oscila una vez (±10°) con halo azul; el contador no se mueve. */
@@ -3244,11 +3244,6 @@ button.live-appointment .agenda-badge{font-size:10.5px}
 .appointments-panel button.live-next:hover{background:none;color:#e6eeff;text-decoration:underline;transform:none}
 .appointments-panel button.live-next:focus-visible{outline:2px solid #8bb8ff;outline-offset:2px;border-radius:4px}
 .appointments-panel button.live-empty-new{flex:none;margin:0;min-height:30px;padding:4px 12px;font-size:12px}
-.appointments-panel #home-appointments .live-extra{display:none}
-.appointments-panel #home-appointments[data-all=true]{max-height:236px;overflow-y:auto;padding-right:4px}
-.appointments-panel #home-appointments[data-all=true] .live-extra{display:grid}
-.appointments-panel button.live-more{display:block;width:100%;margin:2px 0 0;padding:5px;border:1px dashed #2a4268;border-radius:9px;background:transparent;color:#a9c8f7;font-size:12px;font-weight:600;cursor:pointer}
-.appointments-panel button.live-more:hover{background:#10223d;color:#fff;transform:none}
 @media(max-width:420px){.appointments-panel .live-empty{flex-wrap:wrap}.appointments-panel button.live-next{white-space:normal}}
 /* Nueva Cita: botón X con respuesta roja al señalarlo o pulsarlo; casilla con texto secundario */
 .booking-dialog .icon-button{transition:background .2s,border-color .2s,color .2s}
@@ -3307,3 +3302,24 @@ body[data-page=dashboard] .mail-composer label.mail-order>span svg{width:13px;he
 .agenda-row[data-status=cancelada]{box-shadow:inset 3px 0 0 #E77B88;background:linear-gradient(90deg,#e77b8814,transparent 45%)}
 .agenda-row[data-status=cancelada] .agenda-who b,.agenda-row[data-status=cancelada] .agenda-when b{color:#f3b3ba}
 .agenda-row[data-status=cancelada] .agenda-who b{text-decoration:line-through;text-decoration-color:#e77b8899}
+
+/* Citas de Hoy · carrusel de tres en tres, distintivo «Nuevo» y cancelaciones recientes */
+.appointments-panel button.live-appointment[hidden]{display:none}
+.appointments-panel .live-tags{display:inline-flex;align-items:center;gap:6px;min-width:0}
+.appointments-panel .live-new{padding:2px 7px;border:1px solid #70B8FF80;border-radius:999px;background:#70B8FF24;color:#cfe6ff;font-size:10px;font-weight:700;letter-spacing:.02em;white-space:nowrap}
+.appointments-panel button.live-appointment.live-enter{animation:live-enter .23s ease-out 1,live-glow 1.4s ease-out .23s 1}
+.appointments-panel button.live-appointment.live-page-in{animation:live-page .22s ease-out 1}
+@keyframes live-enter{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:none}}
+@keyframes live-glow{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--ag) 70%,transparent)}100%{box-shadow:0 0 0 7px transparent}}
+@keyframes live-page{from{opacity:0;transform:translateX(10px)}to{opacity:1;transform:none}}
+.appointments-panel button.live-appointment.live-cancelled .live-appointment-info strong{color:#f6b8be;text-decoration:line-through;text-decoration-color:#f0808999}
+.appointments-panel button.live-appointment.live-cancelled>time{color:#f6b8be}
+.appointments-panel .live-cancelled-badge{display:inline-flex;align-items:center;gap:4px}.appointments-panel .live-cancelled-badge svg{width:12px;height:12px;flex:none}
+.appointments-panel .live-pager{display:flex;align-items:center;gap:8px;margin-top:2px;min-height:26px}
+.appointments-panel button.live-pager-button{display:inline-grid;place-items:center;width:26px;height:26px;margin:0;padding:0;border:1px solid #24395b;border-radius:8px;background:#0d1b30;color:#a9c8f7;cursor:pointer;transition:background .2s,border-color .2s,color .2s}
+.appointments-panel button.live-pager-button svg{width:14px;height:14px}
+.appointments-panel button.live-pager-button:hover{background:#15294a;border-color:#3b5d8f;color:#fff;transform:none}
+.appointments-panel button.live-pager-button:focus-visible{outline:2px solid #8bb8ff;outline-offset:2px}
+.appointments-panel .live-pager-label{min-width:34px;text-align:center;font-size:11.5px;font-weight:700;color:#dbe8fb;font-variant-numeric:tabular-nums}
+.appointments-panel .live-pager-total{margin-left:auto;font-size:11.5px;color:#9bb0cf}
+@media(prefers-reduced-motion:reduce){.appointments-panel button.live-appointment.live-enter,.appointments-panel button.live-appointment.live-page-in{animation:none}.appointments-panel button.live-pager-button{transition:none}}
