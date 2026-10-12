@@ -4196,3 +4196,11 @@ body[data-page=dashboard] button[aria-label^="Cerrar"]:not(#logout):not(.primary
 #module-content .order-stay-facts dd{margin:0;color:#e5edf9;text-align:right;overflow-wrap:anywhere}
 #module-content .order-stay-note{display:block;font-size:11px;line-height:1.5;color:#91a1bb}
 .stay-settings{display:grid;gap:10px}.stay-settings .dialog-actions{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:10px;margin-top:4px}
+#module-content .order-stay-log,.stay-mail-list{list-style:none;margin:0;padding:0;display:grid;gap:4px;font-size:12px;line-height:1.5;color:#c5d5ee}
+#module-content .order-stay-log li{display:flex;justify-content:space-between;gap:10px}
+#module-content .order-stay-log b{font-weight:600;color:#8ff0bd;white-space:nowrap}#module-content .order-stay-log b[data-result=failed]{color:#ffb1b8}#module-content .order-stay-log b[data-result=processing]{color:#f3d48f}
+.stay-mail{display:grid;gap:8px;margin-top:14px;padding-top:14px;border-top:1px solid #253b5c}
+.stay-mail h3{margin:0;font-size:13px;color:#eef3ff}.stay-mail h4{margin:4px 0 0;font-size:12px;color:#92a9ca}.stay-mail p{margin:0;font-size:12px;line-height:1.5;color:#c5d5ee}
+.stay-mail-toggle{display:flex;align-items:center;gap:9px;font-size:13px;font-weight:600;color:#e5edf9;cursor:pointer}.stay-mail-toggle input{width:auto;margin:0}
+.stay-mail-list li{overflow-wrap:anywhere}.stay-mail-count{color:#f3d48f!important}
+.maintenance-dialog .stay-intro{margin:0 0 12px;font-size:13px;line-height:1.5;color:#c5d5ee}

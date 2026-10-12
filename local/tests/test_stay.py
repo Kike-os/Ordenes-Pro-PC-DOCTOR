@@ -85,3 +85,58 @@ class StayRoutesTest(unittest.TestCase):
 
 
 if __name__=='__main__':unittest.main()
+
+
+class StayRemindersTest(unittest.TestCase):
+    """Avisos por correo (SMTP simulado: no se envía nada real)."""
+    setUpClass=classmethod(test_app.SecurityTests.setUpClass.__func__);setUp=test_app.SecurityTests.setUp;tearDown=test_app.SecurityTests.tearDown;request=test_app.SecurityTests.request;login=test_app.SecurityTests.login;order_data=test_app.SecurityTests.order_data
+    age=StayRoutesTest.age;order=StayRoutesTest.order
+
+    def run_now(self,sent,fail=False):
+        import stay_reminders
+        def deliver(recipient,subject,body):
+            if fail:raise RuntimeError('servidor no disponible')
+            sent.append((recipient,subject,body));return '<prueba-%d@example.invalid>'%len(sent)
+        with app.connect() as c:return stay_reminders.run(c,app.reception_now(),deliver,limit=10)
+
+    def test_one_notice_per_stage_and_none_after_delivery(self):
+        import stay_reminders
+        cookie,csrf=self.login();a=self.order(cookie,csrf,'r1');b=self.order(cookie,csrf,'r2');young=self.order(cookie,csrf,'r3');self.age(a,61);self.age(b,130);self.age(young,20)
+        with app.connect() as c:
+            # Apagados por defecto: el envío periódico no hace nada y nada queda registrado.
+            self.assertFalse(stay.settings(c)['mail']);app.stay_reminders_tick(c,app.reception_now().replace(hour=10))
+            self.assertEqual(c.execute('SELECT COUNT(*) FROM stay_reminders').fetchone()[0],0)
+            pending={item['id']:stage for item,info,stage in stay_reminders.pending(c,app.reception_now(),stay.settings(c))}
+        self.assertEqual(pending,{a:60,b:90})
+        sent=[];self.assertEqual(self.run_now(sent),{'sent':2,'failed':0,'left':0})
+        self.assertIn('Aviso de permanencia',sent[0][1]);self.assertIn('ha cumplido el plazo de permanencia de 90 días',sent[1][2]);self.assertNotIn('cumplido',sent[0][2])
+        for text in ('remat','recicl','desech','multa','cargo','sanci','abandon'):self.assertNotIn(text,(sent[0][2]+sent[1][2]).lower())
+        # Sin cambios no se repite; al alcanzar la etapa siguiente se envía una sola vez.
+        self.assertEqual(self.run_now(sent)['sent'],0);self.age(a,76);self.assertEqual(self.run_now(sent)['sent'],1);self.assertEqual(self.run_now(sent)['sent'],0)
+        detail=self.request('/api/orders/'+str(a),cookie=cookie)['body']['order']
+        self.assertEqual([(item['stage'],item['result'],bool(item['message_id'])) for item in detail['stay_reminders']],[(60,'sent',True),(75,'sent',True)])
+        with app.connect() as c:self.assertEqual(c.execute("SELECT COUNT(*) FROM order_history WHERE order_id=? AND comment LIKE 'Aviso de permanencia enviado%'",(a,)).fetchone()[0],2)
+        # Entregada la orden, se suspenden los avisos aunque siga pasando el tiempo.
+        self.request('/api/order-status',{'id':str(a),'status':'entregado'},cookie=cookie,csrf=csrf);self.age(a,95)
+        self.assertEqual(self.run_now(sent)['sent'],0)
+        with app.connect() as c:self.assertEqual(c.execute('SELECT status FROM orders WHERE id=?',(b,)).fetchone()[0],'pendiente')
+        # Sin correo válido no hay aviso.
+        with app.connect() as c:
+            c.execute("UPDATE clients SET email='sin-correo'");c.execute('DELETE FROM stay_reminders')
+            self.assertEqual(stay_reminders.pending(c,app.reception_now(),stay.settings(c)),[])
+
+    def test_failure_is_logged_and_routes_are_administrative(self):
+        cookie,csrf=self.login();a=self.order(cookie,csrf,'r4');self.age(a,88)
+        self.assertEqual(self.run_now([],fail=True),{'sent':0,'failed':1,'left':0})
+        with app.connect() as c:self.assertEqual(tuple(c.execute('SELECT stage,result,message_id FROM stay_reminders WHERE order_id=?',(a,)).fetchone()),(85,'failed',''))
+        state=self.request('/api/stay/reminders',cookie=cookie)['body']['reminders']
+        self.assertEqual((state['enabled'],state['days'],state['pending_total'],state['recent'][0]['result']),(False,[60,75,85,90],0,'failed'))
+        self.assertEqual(self.request('/api/stay/reminders',{'action':'run'},cookie=cookie,csrf=csrf)['status'],409)
+        self.assertTrue(self.request('/api/stay/reminders',{'enabled':True},cookie=cookie,csrf=csrf)['body']['reminders']['enabled'])
+        # Cambiar el plazo conserva la decisión sobre los avisos.
+        self.request('/api/stay/settings',{'limit':'100','notice':'60','near':'75'},cookie=cookie,csrf=csrf)
+        with app.connect() as c:
+            self.assertEqual((stay.settings(c)['mail'],stay.settings(c)['mail_days']),(True,[60,75,95,100]))
+            c.execute("UPDATE users SET role='tecnico'")
+        self.assertEqual(self.request('/api/stay/reminders',cookie=cookie)['status'],403)
+        self.assertEqual(self.request('/api/stay/reminders',{'enabled':False},cookie=cookie,csrf=csrf)['status'],403)

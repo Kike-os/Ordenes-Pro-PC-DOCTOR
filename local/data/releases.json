@@ -8,6 +8,23 @@
   },
   "releases": [
     {
+      "version": "1.5.93",
+      "date": "2026-10-12T13:37:36-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Avisos de permanencia por correo, apagados por defecto",
+      "changes": {
+        "features": [
+          "Avisos de permanencia por correo al cliente (a los 60, 75, 85 y 90 días del ingreso), apagados hasta que administración los activa; antes de activarlos se ve a qué órdenes llegarían.",
+          "Registro de cada aviso de permanencia (etapa, destinatario, resultado e identificador del mensaje) en la orden y en su historial; sin repeticiones y suspendidos al entregar el equipo."
+        ],
+        "improvements": [],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.92",
       "date": "2026-10-12T13:32:28-05:00",
       "type": "patch",

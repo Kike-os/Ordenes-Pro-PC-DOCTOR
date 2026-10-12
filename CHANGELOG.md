@@ -4,6 +4,15 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.93 — 2026-10-12 13:37 (UTC-05:00)
+
+Avisos de permanencia por correo, apagados por defecto
+
+### Nuevas funcionalidades
+
+- Avisos de permanencia por correo al cliente (a los 60, 75, 85 y 90 días del ingreso), apagados hasta que administración los activa; antes de activarlos se ve a qué órdenes llegarían.
+- Registro de cada aviso de permanencia (etapa, destinatario, resultado e identificador del mensaje) en la orden y en su historial; sin repeticiones y suspendidos al entregar el equipo.
+
 ## v1.5.92 — 2026-10-12 13:32 (UTC-05:00)
 
 Permanencia en taller y control de retiro: columna, detalle, alerta e informe

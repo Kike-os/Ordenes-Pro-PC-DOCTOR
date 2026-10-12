@@ -424,6 +424,26 @@ def maintenance_reminders_tick(c,now):
     except Exception as error:print('maintenance-reminders',type(error).__name__,flush=True)
 
 
+def stay_deliver(recipient,subject,body):
+    """Envío de un aviso de permanencia por el correo del sistema; devuelve el Message-ID aceptado por el servidor."""
+    config=mail_pro.settings()
+    message,recipients=mail_pro.build_message(config,{'to':recipient,'subject':subject,'body':body,'from_name':corporate.settings()['name']},'')
+    mail_pro.deliver(config,message,recipients)
+    return str(message['Message-ID'] or '')
+
+
+def stay_reminders_tick(c,now):
+    """Avisos de permanencia sin tarea programada: como mucho cada diez minutos, en horario diurno y por tandas pequeñas."""
+    import stay_reminders
+    if not stay.settings(c)['mail'] or not 8<=now.hour<19:return
+    last=c.execute("SELECT value FROM system_state WHERE key='stay_reminders_tick'").fetchone()
+    if last and last['value']>(now-appointments.timedelta(minutes=10)).isoformat(timespec='seconds'):return
+    c.execute("INSERT INTO system_state(key,value) VALUES ('stay_reminders_tick',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",(now.isoformat(timespec='seconds'),));c.commit()
+    try:
+        if mail_pro.configured():stay_reminders.run(c,now,stay_deliver)
+    except Exception as error:print('stay-reminders',type(error).__name__,flush=True)
+
+
 def client_authorization_auto(c):
     row=c.execute("SELECT value FROM system_state WHERE key='client_authorization_auto'").fetchone()
     return bool(row and row['value']=='on')
@@ -1034,6 +1054,8 @@ class Handler(BaseHTTPRequestHandler):
                 import client_authorization
                 result['client_authorization']=client_authorization.summary(c,row['id']);result['client_authorization_auto']=client_authorization_auto(c)
                 result['stay']=stay.compute(dict(result,status_code=result['status']),reception_now(),stay.settings(c));result['stay_settings']=stay.settings(c);result['stay_delivery']=stay.delivery(c,row['id']) if result['status']=='entregado' else None
+                import stay_reminders
+                result['stay_reminders']=stay_reminders.for_order(c,row['id'])
                 result.pop('request_key', None)
                 if result['reception_snapshot']:
                     result.update(json.loads(result['reception_snapshot']))
@@ -1129,6 +1151,10 @@ class Handler(BaseHTTPRequestHandler):
             if path == '/api/system':
                 try:return self.reply(200, versioning.overview())
                 except versioning.RegistryError as error:return self.reply(500,{'error':str(error)})
+            if path == '/api/stay/reminders':
+                if user['role']!='administrador':return self.reply(403,{'error':'Acceso no permitido.'})
+                import stay_reminders
+                return self.reply(200,{'reminders':stay_reminders.status(c,reception_now()),'settings':stay.settings(c)})
             if path == '/api/reports':
                 counts = [dict(r) for r in c.execute("SELECT s.code,s.label,COUNT(o.id) total FROM statuses s LEFT JOIN orders o ON o.status=s.code GROUP BY s.code ORDER BY CASE s.code WHEN 'pendiente' THEN 1 WHEN 'reparacion' THEN 2 WHEN 'esperando_cliente' THEN 3 WHEN 'presupuesto' THEN 4 WHEN 'espera_entrega' THEN 5 WHEN 'listo' THEN 6 ELSE 7 END")]
                 # Centro de Control Técnico: indicadores calculados con las órdenes reales; «group» devuelve las órdenes de un segmento.
@@ -1209,7 +1235,7 @@ class Handler(BaseHTTPRequestHandler):
                 if path=='/api/maintenance':
                     import maintenance_reminders
                     return self.reply(200,{'rows':maintenance.rows(c),'today':today,'profiles':{k:v[0] for k,v in maintenance.PROFILES.items()},'reminders':maintenance_reminders.status(c,now.date())})
-                if path=='/api/dashboard':maintenance_reminders_tick(c,now)
+                if path=='/api/dashboard':maintenance_reminders_tick(c,now);stay_reminders_tick(c,now)
                 activity_query=parse_qs(urlsplit(self.path).query) if path=='/api/activity' else {}
                 # Historial de una sola orden: la misma fuente que el seguimiento del inicio.
                 if activity_query.get('order',[''])[0]:
@@ -2118,6 +2144,23 @@ class Handler(BaseHTTPRequestHandler):
                     if problem:return self.reply(400,{'error':problem})
                     stay.save(c,values);audit(c,user['id'],'stay_settings_updated')
                     return self.reply(200,{'ok':True,'settings':values})
+                if path=='/api/stay/reminders':
+                    # Avisos de permanencia por correo: activarlos o enviarlos es una decisión de administración.
+                    if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede gestionar los avisos de permanencia.'})
+                    import stay_reminders
+                    now=reception_now()
+                    if data.get('enabled') in (True,False):
+                        values=dict(stay.settings(c),mail=data['enabled']);stay.save(c,values);audit(c,user['id'],'stay_reminders_'+('on' if data['enabled'] else 'off'))
+                    elif data.get('action')=='run':
+                        if not stay.settings(c)['mail']:return self.reply(409,{'error':'Activa primero los avisos de permanencia.'})
+                        try:ready=mail_pro.configured()
+                        except mail_pro.MailError:ready=False
+                        if not ready:return self.reply(409,{'error':'El correo del sistema no está configurado.'})
+                        if limited(c,'stay-run:'+str(user['id']),limit=12,window=3600):return self.reply(429,{'error':'Espera antes de volver a enviar.'})
+                        summary=stay_reminders.run(c,now,stay_deliver);audit(c,user['id'],'stay_reminders_run')
+                        return self.reply(200,{'ok':True,'summary':summary,'reminders':stay_reminders.status(c,now)})
+                    else:return self.reply(400,{'error':'Acción no disponible.'})
+                    return self.reply(200,{'ok':True,'reminders':stay_reminders.status(c,now)})
                 client_route=re.fullmatch(r'/api/orders/([0-9]+)/client-authorization',path)
                 if client_route or path=='/api/client-authorization/settings':
                     if not client_route:
