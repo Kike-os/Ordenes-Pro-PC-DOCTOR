@@ -1484,6 +1484,8 @@ function initHeaderNavigation(){
 function initHeader(serverTime){adoptMailPrefs();if(serverTime)clockOffset=serverTime*1000-Date.now();tickClock();clockInterval=setInterval(tickClock,1000);synchronizeClock();refreshWeather();initHeaderPopovers();weatherInterval=setInterval(()=>{synchronizeClock();refreshWeather();},600000);setInterval(refreshWeather,60000);document.addEventListener('visibilitychange',()=>{if(!document.hidden){tickClock();synchronizeClock();refreshWeather();}});addEventListener('online',()=>{weatherNextAttempt=0;refreshWeather();if(currentModule==='home')refreshHomeAppointments();});addEventListener('focus',()=>{if(currentModule==='home'&&!document.querySelector('dialog[open]'))refreshHomeAppointments();});const media=matchMedia('(min-width: 1151px)');media.addEventListener('change',()=>refreshWeather());}
 
 if(document.body.dataset.page==='dashboard')dashboard().catch(error=>notify(error.message));
+// Acceso: ADI se carga después, cuando el navegador está libre, para no retrasar el formulario de inicio de sesión.
+if(document.body.dataset.page==='login'&&document.getElementById('adi-widget')){const loadAdi=()=>{const script=document.createElement('script');script.src='/static/adi-widget.js';document.head.append(script);};'requestIdleCallback' in window?requestIdleCallback(loadAdi,{timeout:2500}):setTimeout(loadAdi,600);}
 
 function orderActionIcon(kind){
  const paths={print:'M6 9V3h12v6 M6 18H4V9h16v9h-2 M6 14h12v7H6z M17 12h1',document:'M14 2H6v20h12V6z M14 2v5h5 M9 12h6 M9 16h6',tag:'M3 3h8l10 10-8 8L3 11z M7 7h.01',download:'M12 3v12 M7 10l5 5 5-5 M5 17v4h14v-4',edit:'M4 16 16 4l4 4L8 20H4z M14 6l4 4',service:'M9 4H5v18h14V4h-4 M9 2h6v5H9z M8 12h8 M8 16h6',share:'M5 12a7 7 0 1 1 3 6l-5 2 2-5 M9 8c0 4 3 7 6 7'};

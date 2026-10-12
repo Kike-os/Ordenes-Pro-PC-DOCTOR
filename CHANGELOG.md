@@ -4,6 +4,22 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.94 — 2026-10-12 13:48 (UTC-05:00)
+
+ADI en la pantalla de inicio de sesión y consulta de reparación con código temporal
+
+### Nuevas funcionalidades
+
+- ADI en la pantalla de inicio de sesión: acoplada a la derecha del acceso en escritorio y como orbe flotante en móvil, con acciones rápidas para agendar cita, consultar una reparación, conocer los servicios y hablar con un asesor.
+
+### Actualizaciones de seguridad
+
+- Consultar una reparación desde ADI exige un código temporal de 6 dígitos enviado al correo registrado en la orden: conocer el número de orden ya no basta, y la respuesta no revela si la orden existe.
+
+### Optimización del rendimiento
+
+- ADI se carga después del formulario de acceso y no consulta al servidor mientras no haya conversación.
+
 ## v1.5.93 — 2026-10-12 13:37 (UTC-05:00)
 
 Avisos de permanencia por correo, apagados por defecto

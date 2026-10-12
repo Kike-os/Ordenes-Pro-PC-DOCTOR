@@ -10,6 +10,8 @@ SYSTEM_ADMIN=("Eres ADI, asistente administrativa de PC-DOCTOR S.A. Responde en 
 "Usa solamente los datos reales que aparecen en el contexto. No ejecutes cambios, envíos ni escrituras. "
 "Para una modificación indica que debe confirmarla y ejecutarla un usuario autorizado.")
 
+ORDER_CHECK_HINT='Para proteger tus datos, el estado de una reparación se consulta con un código temporal: pulsa «Consultar reparación», escribe tu número de orden y te enviaremos el código al correo registrado en ella.'
+
 def order_status(c,code,identification):
  row=c.execute("SELECT o.code,s.label status,d.brand,d.model FROM orders o JOIN statuses s ON s.code=o.status JOIN devices d ON d.id=o.device_id JOIN clients cl ON cl.id=d.client_id WHERE o.code=? AND cl.identification=?",(code,identification)).fetchone()
  return dict(row) if row else None
@@ -160,12 +162,7 @@ def fallback(c,text):
  q=plain(text);words=set(re.findall(r'[a-z0-9]+',q));company=corporate.settings();cfg=appointments.settings(c)
  has=lambda *keys:any(k in q for k in keys)
  if 'estado' in q or 'orden' in q or 'pcd-' in q or has('mi equipo','mi reparacion','seguimiento'):
-  match=re.search(r'(PCD-\d{8}-\d{4,}).*?(\d{10}|\d{13})',text,re.I)
-  if match:
-   row=order_status(c,match[1].upper(),match[2])
-   if row:return f"Tu orden {row['code']} está en estado «{row['status']}». Equipo: {row['brand'] or ''} {row['model'] or ''}. Para más información, solicita atención del taller."
-   return 'No encuentro una orden con ese número y esa identificación. Revisa ambos datos tal como constan en tu comprobante o solicita un asesor.'
-  return 'Para consultar una reparación, escribe en un solo mensaje el número de orden (por ejemplo PCD-20260101-0001) y la cédula o RUC registrados. No muestro información privada sin ambos datos.'
+  return ORDER_CHECK_HINT
  if has('cita','agendar','agenda','reservar','reserva','turno'):
   return 'Puedes reservar tu cita en línea en /citas: elige el servicio, la fecha y una hora disponible. Recibirás un código para consultar, reprogramar o cancelar la cita.'
  if has('precio','costo','cuanto cuesta','cuanto vale','cuanto sale','cotiza','presupuesto','tarifa') or words&{'valor','vale','cobran'}:

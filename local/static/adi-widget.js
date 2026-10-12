@@ -78,7 +78,11 @@
  more.addEventListener('click',()=>setMenu(menu.hidden));
  const sounds=$('adi-sound'),restore=$('adi-restore');sounds.checked=prefs.sound;restore.checked=prefs.restore;
  sounds.addEventListener('change',()=>{prefs.sound=sounds.checked;savePrefs();if(prefs.sound)sound('message');});restore.addEventListener('change',()=>{prefs.restore=restore.checked;savePrefs();});
- document.addEventListener('keydown',event=>{if(event.key!=='Escape'||!isOpen()||document.querySelector('dialog[open]'))return;event.stopPropagation();if(!menu.hidden){setMenu(false);more.focus();}else setOpen(false);},true);
+ document.addEventListener('keydown',event=>{if(event.key!=='Escape'||!isOpen()||document.querySelector('dialog[open]'))return;
+  // Dentro de la consulta de reparación, Escape la cancela sin cerrar el chat.
+  if(check?.isConnected&&check.contains(event.target)){event.stopPropagation();check.querySelector('.adi-check-cancel').click();return;}
+  // Acoplado junto al acceso, Escape solo actúa cuando el foco está dentro del chat: no debe cerrarlo mientras se escribe la contraseña.
+  if(root.classList.contains('adi-docked')&&!root.contains(document.activeElement))return;event.stopPropagation();if(!menu.hidden){setMenu(false);more.focus();}else setOpen(false);},true);
  document.addEventListener('pointerdown',event=>{if(root.contains(event.target))return void(!menu.hidden&&!menu.contains(event.target)&&!more.contains(event.target)&&setMenu(false));
   // En el panel de trabajo el chat se recoge al usar el resto de la pantalla, para no tapar actividad, menús ni tablas.
   if(dashboard&&isOpen())setOpen(false,false);},true);
@@ -89,11 +93,31 @@
  input.addEventListener('input',grow);
  input.addEventListener('keydown',event=>{if(event.key!=='Enter'||event.shiftKey||event.isComposing||event.keyCode===229)return;event.preventDefault();form.requestSubmit();});
  form.addEventListener('submit',event=>{event.preventDefault();send(input.value);});
- quick.addEventListener('click',event=>{const option=event.target.closest('button');if(option)send(option.dataset.message);});
+ quick.addEventListener('click',event=>{const option=event.target.closest('button');if(!option)return;if(option.dataset.href)location.href=option.dataset.href;else if(option.dataset.action==='order')orderCheck();else if(option.dataset.action==='human')human.click();else send(option.dataset.message);});
+ // Consulta de reparación: conocer el número de orden no basta. El servidor envía un código temporal al correo registrado en la
+ // orden y solo con ese código muestra el estado. El reto vive en la memoria de esta página; no se guarda en el navegador.
+ let check=null;
+ function orderCheck(){
+  if(check?.isConnected){check.querySelector('input')?.focus();return;}
+  const card=el('div',undefined,'adi-check'),title=el('strong','Consultar reparación'),help=el('p','Escribe el número de orden de tu comprobante. Enviaremos un código de verificación al correo registrado en la orden.'),field=el('input'),go=el('button','Enviar código'),cancel=el('button','Cancelar','adi-check-cancel'),message=el('p',undefined,'adi-check-message'),row=el('div',undefined,'adi-check-actions');
+  let token='';card.setAttribute('role','group');card.setAttribute('aria-label','Consultar reparación');field.type='text';field.maxLength=24;field.autocomplete='off';field.spellcheck=false;field.placeholder='PCD-20260101-0001';field.setAttribute('aria-label','Número de orden');go.type=cancel.type='button';message.setAttribute('role','status');row.append(go,cancel);card.append(title,help,field,message,row);
+  cancel.addEventListener('click',()=>{card.remove();check=null;input.focus();});
+  const run=async()=>{const value=field.value.trim();if(go.disabled)return;if(!value){message.textContent=token?'Escribe el código de 6 dígitos.':'Escribe el número de orden.';field.focus();return;}go.disabled=true;message.textContent=token?'Verificando…':'Enviando el código…';
+   try{if(!token){const result=await request('/api/public/adi/order/request',{order:value});token=result.token;help.textContent=result.message;field.value='';field.maxLength=6;field.inputMode='numeric';field.autocomplete='one-time-code';field.placeholder='Código de 6 dígitos';field.setAttribute('aria-label','Código de verificación');go.textContent='Verificar código';message.textContent='';field.focus();}
+    else{const order=(await request('/api/public/adi/order/verify',{token,code:value})).order;card.remove();check=null;const bubble=el('p',undefined,'adi-message adi adi-order-result'),body=el('span',undefined,'adi-text');bubble.append(el('span','ADI','adi-author'));
+     rich(body,'Orden '+order.code+' · Estado: '+order.status+'.'+(order.device?'\nEquipo: '+order.device+'.':'')+(order.received?'\nIngreso: '+order.received+'.':'')+(order.estimated?'\nEntrega estimada: '+order.estimated+'.':'')+(order.tracking_url?'\nSeguimiento completo: '+order.tracking_url:''));bubble.append(body,el('time',clock(new Date())));place(bubble);bottom();sound('message');if(prefs.voice)speak('Tu orden está en estado '+order.status+'.');input.focus();}}
+   catch(error){message.textContent=error.message;sound('error');field.select();}finally{go.disabled=false;}};
+  go.addEventListener('click',run);field.addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();run();}});
+  check=card;quick.hidden=true;place(card);bottom();field.focus();}
+ // La consulta queda siempre a mano bajo el chat, también cuando ya hay conversación (no en el panel interno del personal).
+ if(!dashboard){const lookup=el('button','Consultar reparación','adi-human adi-order-open');lookup.type='button';lookup.addEventListener('click',()=>{if(!isOpen())setOpen(true,false);orderCheck();});const foot=el('div',undefined,'adi-foot');human.replaceWith(foot);foot.append(human,lookup);}
  human.addEventListener('click',async()=>{if(busy||state==='waiting'||state==='advisor')return;transient='requesting';paint();try{if(!started)await request('/api/public/adi/message',{message:'Hola, necesito hablar con un asesor.'});const result=await request('/api/public/adi/human',{});transient='';await poll();setState(result.state||'waiting');note('Solicitud registrada. Te avisaremos aquí cuando un asesor tome la conversación.');document.dispatchEvent(new CustomEvent('adi:sent'));}catch(error){transient='';paint();note(error.message,'error');sound('error');}});
  // Abierto: consulta frecuente. Minimizado: solo si ya existe conversación, para avisar de respuestas del asesor.
- setInterval(()=>{if(!document.hidden&&isOpen())poll();},2500);
+ setInterval(()=>{if(!document.hidden&&isOpen()&&(started||dashboard))poll();},2500);
  setInterval(()=>{if(!document.hidden&&!isOpen()&&started)poll();},12000);
  // Al entrar permanece minimizado, salvo que la persona haya elegido «Abrir el chat al entrar» y exista una conversación.
- paint();poll().then(()=>{if(prefs.restore&&started)setOpen(true,false);});
+ const docked=document.body.dataset.page==='login'&&matchMedia('(min-width:1100px) and (min-height:600px)').matches;if(docked){root.classList.add('adi-docked');
+  // El panel acoplado copia la posición vertical y el alto de la tarjeta de acceso, para que formen un conjunto.
+  const card=document.querySelector('.access-card'),align=()=>{const active=matchMedia('(min-width:1100px) and (min-height:600px)').matches,box=card?.getBoundingClientRect();if(!active||!box?.height){panel.style.top=panel.style.bottom=panel.style.height='';return;}const height=Math.min(Math.max(box.height,500),innerHeight-32);panel.style.top=Math.max(16,Math.min(box.top,innerHeight-height-16))+'px';panel.style.bottom='auto';panel.style.height=height+'px';};align();addEventListener('resize',align);addEventListener('load',align);setTimeout(align,700);setTimeout(align,2500);if(card&&'ResizeObserver' in window)new ResizeObserver(align).observe(card);}
+ paint();poll().then(()=>{if(docked||(prefs.restore&&started))setOpen(true,false);});
 })();

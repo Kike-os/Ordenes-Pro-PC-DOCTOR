@@ -8,6 +8,26 @@
   },
   "releases": [
     {
+      "version": "1.5.94",
+      "date": "2026-10-12T13:48:35-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "ADI en la pantalla de inicio de sesión y consulta de reparación con código temporal",
+      "changes": {
+        "features": [
+          "ADI en la pantalla de inicio de sesión: acoplada a la derecha del acceso en escritorio y como orbe flotante en móvil, con acciones rápidas para agendar cita, consultar una reparación, conocer los servicios y hablar con un asesor."
+        ],
+        "improvements": [],
+        "fixes": [],
+        "security": [
+          "Consultar una reparación desde ADI exige un código temporal de 6 dígitos enviado al correo registrado en la orden: conocer el número de orden ya no basta, y la respuesta no revela si la orden existe."
+        ],
+        "performance": [
+          "ADI se carga después del formulario de acceso y no consulta al servidor mientras no haya conversación."
+        ]
+      }
+    },
+    {
       "version": "1.5.93",
       "date": "2026-10-12T13:37:36-05:00",
       "type": "patch",

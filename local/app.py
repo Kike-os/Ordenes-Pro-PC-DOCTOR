@@ -1382,6 +1382,30 @@ class Handler(BaseHTTPRequestHandler):
                         if result.get('ok'):appointment_mail.send(c,row['id'],'rescheduled')
                         return self.reply(200 if result.get('ok') else 409,result)
                     return self.reply(400,{'error':'Acción de cita inválida.'})
+                if path == '/api/public/adi/order/request':
+                    # Consulta de reparación: el código viaja solo al correo registrado. La respuesta no revela si la orden existe.
+                    import order_check
+                    ip=digest(self.client_address[0]);wanted=str(data.get('order','')).strip()[:40]
+                    if not wanted:return self.reply(400,{'error':'Escribe el número de orden que consta en tu comprobante.'})
+                    if limited(c,'order-check-ip:'+ip,5,600) or limited(c,'order-check-order:'+digest(wanted.upper()),3,1800):return self.reply(429,{'error':'Demasiadas solicitudes de código. Espera unos minutos e inténtalo de nuevo.'})
+                    try:ready=mail_pro.configured()
+                    except mail_pro.MailError:ready=False
+                    if not ready:return self.reply(503,{'error':'La consulta en línea no está disponible en este momento. Puedes solicitar un asesor.'})
+                    token,mail=order_check.start(c,wanted,reception_now())
+                    # El envío espera al servidor de correo: el reto se confirma antes para no retener la base.
+                    c.commit()
+                    if mail:
+                        try:stay_deliver(*mail)
+                        except Exception as error:print('order-check-mail',type(error).__name__,flush=True)
+                    else:time.sleep(1.2)
+                    return self.reply(200,{'ok':True,'token':token,'message':order_check.NOTICE,'minutes':order_check.CODE_MINUTES})
+                if path == '/api/public/adi/order/verify':
+                    import order_check
+                    if limited(c,'order-verify-ip:'+digest(self.client_address[0]),15,600):return self.reply(429,{'error':'Demasiados intentos. Espera unos minutos e inténtalo de nuevo.'})
+                    found=order_check.verify(c,str(data.get('token','')),str(data.get('code','')).strip(),reception_now())
+                    if not found:return self.reply(400,{'error':'El código no es correcto o ya caducó. Revisa el correo o solicita uno nuevo.'})
+                    audit(c,None,'order_checked_by_client',found.pop('id'))
+                    return self.reply(200,{'ok':True,'order':found})
                 if path == '/api/public/adi/message':
                     if limited(c,'adi-ip:'+digest(self.client_address[0]),30,300):return self.reply(429,{'error':'Espera un momento antes de enviar otro mensaje.'})
                     text=str(data.get('message','')).strip()
@@ -1403,10 +1427,8 @@ class Handler(BaseHTTPRequestHandler):
                     c.execute("INSERT INTO adi_messages(conversation_id,author,content,created_at) VALUES (?,'client',?,?)",(conv['id'],text,now))
                     answer='Un asesor de PC-DOCTOR S.A. revisará tu solicitud.' if conv['mode']=='human' and not conv['assigned_to'] else None  # Con un asesor conectado, ADI no interviene.
                     context=None
-                    match=re.search(r'(PCD-\d{8}-\d{4,}).*?(\d{10}|\d{13})',text,re.I)
-                    if match and conv['mode']=='adi':
-                        found=adi.order_status(c,match[1].upper(),match[2]);context={'orden':found} if found else None
-                        if found:answer=f"Tu orden {found['code']} está en estado «{found['status']}». Equipo: {found['brand'] or ''} {found['model'] or ''}. Para más información, puedo solicitar atención del taller."
+                    # El estado de una orden no se entrega por el chat: exige el código temporal enviado al correo registrado.
+                    if conv['mode']=='adi' and re.search(r'PCD-\d{8}-\d{3,}',text,re.I):answer=adi.ORDER_CHECK_HINT
                     if answer is None and conv['mode']=='adi':
                         # El mensaje del cliente queda guardado antes de consultar a la IA, para no retener la base durante la espera.
                         c.commit();answer=adi.reply(c,text,context=context)

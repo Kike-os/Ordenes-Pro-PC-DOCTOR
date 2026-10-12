@@ -16,3 +16,20 @@ Consola de tres paneles (1.5.45) sobre las conversaciones reales del chat públi
 - Sin conversación abierta ya no hay paneles vacíos: el panel central muestra el resumen de atención (contadores y «Requieren tu atención», de la que más espera a la más reciente) y el panel de contexto se oculta. La flecha del encabezado de la conversación vuelve al resumen.
 - Aviso emergente cuando escribe un cliente que espera a un asesor o una conversación que atiendes tú. Las conversaciones que resuelve ADI no interrumpen.
 - La actualización sigue siendo por consulta cada 3 s (no es un canal en vivo).
+
+## ADI en la pantalla de inicio de sesión
+
+- En escritorio (desde 1100 px de ancho) ADI aparece acoplada a la derecha de la tarjeta de acceso, abierta y alineada con ella; en pantallas menores queda como orbe flotante. El formulario de inicio de sesión no cambia y conserva el foco.
+- Se carga después del formulario (cuando el navegador está libre) y no consulta al servidor mientras no exista una conversación.
+- Acciones rápidas: «Agendar cita» (abre la agenda real en `/citas`), «Consultar reparación», «Servicios técnicos» y «Hablar con un asesor» (relevo real al Centro de Atención).
+- La voz es opcional y nunca se reproduce sola. Las claves de IA permanecen en el servidor.
+
+### Consultar reparación (código temporal)
+
+Conocer el número de orden no basta para ver datos:
+
+1. El visitante escribe el número de orden (`POST /api/public/adi/order/request`).
+2. Si la orden existe y tiene un correo válido, el sistema envía a ese correo un código de 6 dígitos que caduca en 10 minutos. La respuesta en pantalla es siempre la misma, exista o no la orden, y no muestra el correo.
+3. Con el código (`POST /api/public/adi/order/verify`) se muestran solo el estado, el equipo, la fecha de ingreso, la entrega estimada y el enlace de seguimiento vigente. Ningún dato personal.
+
+Protecciones: código de un solo uso, cinco intentos por código, cinco solicitudes por dirección cada 10 minutos y tres por orden cada 30; cada consulta verificada queda en la auditoría (`order_checked_by_client`). El chat ya no entrega el estado a partir del número de orden y la cédula: remite a esta verificación. Tabla `order_checks` (migración 038).

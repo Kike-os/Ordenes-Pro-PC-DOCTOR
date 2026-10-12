@@ -65,7 +65,7 @@ class AppointmentAndAdiTests(unittest.TestCase):
    self.assertIn('/citas',adi.reply(c,'Quiero agendar una cita'))
    self.assertIn('Solicitar un asesor',adi.reply(c,'quiero hablar con una persona'))
    self.assertIn('número de orden',adi.reply(c,'¿cómo va mi equipo? estado de mi orden'))
-   self.assertIn('No encuentro una orden',adi.reply(c,'orden PCD-20260101-0001 cédula 0100000017'))
+   self.assertIn('código temporal',adi.reply(c,'orden PCD-20260101-0001 cédula 0100000017'))
    self.assertIn(app.corporate.settings()['whatsapp'],adi.reply(c,'¿Dónde están ubicados?'))
    self.assertNotIn('Horario de atención',adi.reply(c,'ahora necesito una opcion'))
   self.assertEqual(adi.schedule_text([{'weekday':0,'start_time':'09:00','end_time':'17:00','enabled':1},{'weekday':1,'start_time':'09:00','end_time':'17:00','enabled':1},{'weekday':2,'start_time':'09:00','end_time':'13:00','enabled':1},{'weekday':3,'start_time':'09:00','end_time':'13:00','enabled':0}]),'lunes a martes de 09:00 a 17:00; miércoles de 09:00 a 13:00')
