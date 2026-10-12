@@ -4,6 +4,19 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.39 — 2026-10-11 19:09 (UTC-05:00)
+
+Alineación del Centro de Operaciones y nuevo panel Atenciones pendientes
+
+### Mejoras realizadas
+
+- Centro de Operaciones: en monitores anchos el contenido se alinea con el borde izquierdo de la barra superior en lugar de quedar centrado; las tarjetas conservan su tamaño
+- Inicio: «Atenciones pendientes» con subtítulo, contadores por color que abren el panel, indicador cuando hay clientes esperando y estado vacío
+
+### Errores corregidos
+
+- Inicio: el resumen de mantenimientos decía «Cita confirmada» para citas aún por confirmar
+
 ## v1.5.38 — 2026-10-11 19:04 (UTC-05:00)
 
 Citas de Hoy con carrusel, distintivo Nuevo y cancelaciones en rojo

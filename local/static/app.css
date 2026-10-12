@@ -3323,3 +3323,25 @@ body[data-page=dashboard] .mail-composer label.mail-order>span svg{width:13px;he
 .appointments-panel .live-pager-label{min-width:34px;text-align:center;font-size:11.5px;font-weight:700;color:#dbe8fb;font-variant-numeric:tabular-nums}
 .appointments-panel .live-pager-total{margin-left:auto;font-size:11.5px;color:#9bb0cf}
 @media(prefers-reduced-motion:reduce){.appointments-panel button.live-appointment.live-enter,.appointments-panel button.live-appointment.live-page-in{animation:none}.appointments-panel button.live-pager-button{transition:none}}
+/* Centro de Operaciones · en monitores anchos el contenido se alinea con el borde izquierdo de la barra superior en lugar de centrarse */
+@media(min-width:1505px){body[data-page=dashboard] #main:has(>#view-home:not([hidden])){margin-left:0;margin-right:auto}}
+/* Atenciones pendientes · panel compacto con contadores semánticos */
+.assistance-panel>.assistance-sub{margin:-4px 0 12px;font-size:11.5px;line-height:1.45;color:#a9bbd6}
+.assistance-panel .assistance-dot{width:8px;height:8px;margin-left:8px;border-radius:50%;background:#5BC5E8;box-shadow:0 0 0 3px #5bc5e826}.assistance-panel .assistance-dot[hidden]{display:none}
+.assistance-panel .assistance-dot[data-tone=waiting]{background:#EABC6C;box-shadow:0 0 0 3px #eabc6c26}
+.assistance-panel .assistance-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:0 0 12px}
+.assistance-panel button.assistance-stat{--ag:#5BC5E8;display:grid;gap:4px;align-content:start;justify-items:start;min-width:0;margin:0;padding:10px 12px;border:1px solid #223450;border-top:2px solid color-mix(in srgb,var(--ag) 55%,#223450);border-radius:10px;background:linear-gradient(180deg,color-mix(in srgb,var(--ag) 7%,#0b1626),#0b1626);color:inherit;text-align:left;cursor:pointer;transition:border-color .2s,box-shadow .2s,background .2s}
+.assistance-panel button.assistance-stat strong{font-size:24px;line-height:1;font-weight:700;color:#8fa5c4;font-variant-numeric:tabular-nums}
+.assistance-panel button.assistance-stat[data-active=true] strong{color:var(--ag)}
+.assistance-panel button.assistance-stat span{font-size:11px;line-height:1.35;color:#b5c5de}
+.assistance-panel button.assistance-stat:hover{border-color:color-mix(in srgb,var(--ag) 60%,#223450);box-shadow:0 0 0 3px color-mix(in srgb,var(--ag) 14%,transparent);transform:none}
+.assistance-panel button.assistance-stat:focus-visible{outline:2px solid #8bb8ff;outline-offset:2px}
+.assistance-panel button.assistance-stat[data-priority=true]{border-color:color-mix(in srgb,var(--ag) 55%,#223450);background:linear-gradient(180deg,color-mix(in srgb,var(--ag) 13%,#0b1626),#0b1626)}
+.assistance-panel button.assistance-stat.assistance-stat-flash{animation:agenda-card-flash .9s ease-out 1}
+.assistance-panel button.assistance-open{display:inline-flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:38px;font-size:12.5px;transition:background .2s,box-shadow .2s}
+.assistance-panel button.assistance-open svg{width:15px;height:15px}
+.assistance-panel .assistance-empty{display:flex;align-items:center;gap:10px;margin:0 0 12px;padding:10px 12px;border:1px solid #223450;border-radius:10px;background:#0b1626}
+.assistance-panel .assistance-empty-icon{display:grid;place-items:center;flex:none;width:32px;height:32px;border-radius:10px;border:1px solid #2f7a63;background:linear-gradient(180deg,#143a33,#0f2a26);color:#63CFAC}.assistance-panel .assistance-empty-icon svg{width:17px;height:17px}
+.assistance-panel .assistance-empty strong{display:block;font-size:13px;color:#f2f6ff}.assistance-panel .assistance-empty small{display:block;font-size:11.5px;line-height:1.45;color:#a9bbd6}
+@media(max-width:340px){.assistance-panel .assistance-stats{grid-template-columns:1fr}.assistance-panel button.assistance-stat{grid-template-columns:auto 1fr;align-items:center;gap:10px}}
+@media(prefers-reduced-motion:reduce){.assistance-panel button.assistance-stat,.assistance-panel button.assistance-open{transition:none}.assistance-panel button.assistance-stat.assistance-stat-flash{animation:none}}

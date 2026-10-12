@@ -8,6 +8,25 @@
   },
   "releases": [
     {
+      "version": "1.5.39",
+      "date": "2026-10-11T19:09:59-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Alineación del Centro de Operaciones y nuevo panel Atenciones pendientes",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Centro de Operaciones: en monitores anchos el contenido se alinea con el borde izquierdo de la barra superior en lugar de quedar centrado; las tarjetas conservan su tamaño",
+          "Inicio: «Atenciones pendientes» con subtítulo, contadores por color que abren el panel, indicador cuando hay clientes esperando y estado vacío"
+        ],
+        "fixes": [
+          "Inicio: el resumen de mantenimientos decía «Cita confirmada» para citas aún por confirmar"
+        ],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.38",
       "date": "2026-10-11T19:04:29-05:00",
       "type": "patch",
