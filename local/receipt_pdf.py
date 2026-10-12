@@ -78,9 +78,9 @@ def render_receipt(order):
             text('de su reparación',left+5,top+size+19,7,BLUE,True)
             annotation=pydyf.Dictionary({'Type':'/Annot','Subtype':'/Link','Rect':pydyf.Array([left,H-top-size,left+size,H-top]),'Border':pydyf.Array([0,0,0]),'A':pydyf.Dictionary({'S':'/URI','URI':pydyf.String(order['qr_url'])})})
             pdf.add_object(annotation);page['Annots']=pydyf.Array([annotation.reference])
-            y=239
+            y=224
         else:
-            text(order['code']+'  |  Continuación',36,105,10,BLUE,True);y=138
+            text(order['code']+'  |  Continuación',36,100,10,BLUE,True);y=124
         line(H-85)
         text(company['commitment'],36,H-76,7,MUTED)
         text(company['thanks'],36,H-63,8,BLUE,True)
@@ -106,32 +106,33 @@ def render_receipt(order):
 
     def section(title):
         nonlocal y
-        if y+53>H-100:new_page()
-        rect(36,y,W-72,24,PANEL);text(title.upper(),47,y+6,9,BLUE,True);y+=30
+        # Un título de sección nunca queda solo al pie de la página.
+        if y+78>H-100:new_page()
+        y+=3;rect(36,y,W-72,19,PANEL);rect(36,y,3,19,(.15,.40,.76));text(title.upper(),47,y+5,8.5,BLUE,True);y+=25
 
     def item(label,value):
         nonlocal y
-        lines=wrapped(value,W-94)
-        height=14+len(lines)*14+6
+        lines=wrapped(value,W-94,9.5)
+        height=11+len(lines)*12.5+4
         if height<=H-238 and y+height>H-100:new_page()
-        elif y+38>H-100:new_page()
-        text(label,47,y,8,MUTED,True);y+=14
+        elif y+34>H-100:new_page()
+        text(label,47,y,7.5,MUTED,True);y+=11
         for content in lines:
-            if y+17>H-100:new_page();text(label+' (continuación)',47,y,8,MUTED,True);y+=16
-            text(content,47,y,10,TEXT);y+=14
-        y+=6
+            if y+15>H-100:new_page();text(label+' (continuación)',47,y,7.5,MUTED,True);y+=13
+            text(content,47,y,9.5,TEXT);y+=12.5
+        y+=4
 
     def pair(left_label,left_value,right_label,right_value):
         nonlocal y
         width=(W-114)/2
-        left=wrapped(left_value,width);right=wrapped(right_value,width)
-        height=14+max(len(left),len(right))*14+6
+        left=wrapped(left_value,width,9.5);right=wrapped(right_value,width,9.5)
+        height=11+max(len(left),len(right))*12.5+4
         if height>H-238:
             item(left_label,left_value);item(right_label,right_value);return
         if y+height>H-100:new_page()
         for x,label,lines in [(47,left_label,left),(W/2+10,right_label,right)]:
-            text(label,x,y,8,MUTED,True)
-            for index,value in enumerate(lines):text(value,x,y+14+index*14,10,TEXT)
+            text(label,x,y,7.5,MUTED,True)
+            for index,value in enumerate(lines):text(value,x,y+11+index*12.5,9.5,TEXT)
         y+=height
 
     def coded(name,code):
@@ -169,6 +170,14 @@ def render_receipt(order):
         if risk:
             item('Operaciones que modifican o eliminan datos','AUTORIZACIÓN ESPECÍFICA REGISTRADA.' if risk['decision']=='authorized' else 'NO AUTORIZADAS.')
             if risk['decision']=='authorized' and risk.get('justification'):item('Alcance autorizado',risk['justification'])
+    if not order.get('_service'):
+        # Constancia de recepción con los dos espacios de firma en un mismo renglón.
+        if y+78>H-100:new_page()
+        section('Constancia de recepción')
+        y+=30;half=(W-72-40)/2
+        for index,label in enumerate(('Firma del cliente','Recibido por '+company['name'])):
+            left=47+index*(half+18);rect(left,y,half,.6,(.16,.25,.36));text(label,left,y+5,7.5,MUTED,True)
+        y+=24
     if order.get('_service') and order.get('technician_notes'):item('Observaciones internas de recepción',order['technician_notes'])
     if order.get('_service'):
         section('Seguimiento técnico interno')
@@ -191,18 +200,14 @@ def render_receipt(order):
         section('Resumen de condiciones del servicio')
         item('Versión / Vigencia',terms['version']+' / '+terms['effective_date'])
         for number,paragraph in numbered_paragraphs(terms['compact_text']):item(str(number)+'.',paragraph)
-        item('Condiciones completas',terms['url'])
-        if y+120>H-100:new_page()
+        if y+110>H-100:new_page()
         section('Aceptación de condiciones')
-        item('Versión / Vigencia',terms['version']+' / '+terms['effective_date'])
-        item('Aceptación del cliente',order['terms_acceptor'])
         accepted=datetime.fromisoformat(order['terms_accepted_at']).astimezone(ECUADOR_TZ)
-        item('Fecha, hora y mecanismo',accepted.strftime('%d/%m/%Y %H:%M:%S')+' Ecuador | '+order['terms_mechanism_label'])
-        item('Registro / Usuario responsable',order['terms_acceptance_id']+' / '+order['terms_operator'])
+        pair('Aceptación del cliente',order['terms_acceptor'],'Fecha y hora',accepted.strftime('%d/%m/%Y %H:%M:%S')+' Ecuador')
+        pair('Mecanismo',order['terms_mechanism_label'],'Registro / Usuario responsable',order['terms_acceptance_id']+' / '+order['terms_operator'])
         item('Consulta segura de esta versión',terms['url'])
         item('Integridad SHA-256',terms['content_hash'])
         section(terms['title'])
-        item('Versión / Vigencia',terms['version']+' / '+terms['effective_date'])
         for number,paragraph in numbered_paragraphs(terms['full_text']):
             lines=wrapped(str(number)+'. '+paragraph,W-94,9)
             height=len(lines)*13+12
@@ -219,13 +224,32 @@ def render_receipt(order):
     if not order.get('_service'):
         # Políticas de Reparaciones: texto oficial literal en página propia. Acompañan al comprobante; no acreditan aceptación.
         from repair_policies import load as load_policies
-        policies=load_policies();new_page();section(policies['title'])
+        policies=load_policies()
+        if y+170>H-100:new_page()
+        section(policies['title'])
+        # Texto oficial literal, compuesto en dos columnas para aprovechar la página.
+        gap=18;column=(W-72-gap-11)/2;col=0;top=y;bottom=H-100;tallest=y
+        def advance():
+            nonlocal col,top,y,tallest
+            tallest=max(tallest,y)
+            if col==0:col=1;y=top
+            else:new_page();section(policies['title']+' (continuación)');col=0;top=y;tallest=y
+        is_heading=lambda paragraph:bool(re.match(r'^(\d+\.|\d+ -)\s',paragraph)) and len(paragraph)<60
+        # Si el texto no cabe en las dos columnas restantes, se compone algo más ajustado antes de abrir otra página.
+        body,lead=8,10.5
+        needed=sum(len(wrapped(paragraph,column,body))*lead+5 for paragraph in policies['paragraphs'])
+        if needed>2*(bottom-top)-70 and needed*.92<=2*(bottom-top)-40:body,lead=7.5,9.6
         for paragraph in policies['paragraphs']:
-            heading=bool(re.match(r'^(\d+\.|\d+ -)\s',paragraph)) and len(paragraph)<60
-            lines=wrapped(paragraph,W-94,9.5 if heading else 9)
-            if y+len(lines)*13+8>H-100:new_page()
-            for content in lines:text(content,47,y,9.5 if heading else 9,TEXT,heading);y+=13
-            y+=7
-        if y+30>H-100:new_page()
-        text('Versión del documento: '+policies['version']+' · Integridad SHA-256: '+policies['sha256'][:32]+'…',47,y+4,7,MUTED)
+            heading=is_heading(paragraph)
+            size=body+.5 if heading else body;lines=wrapped(paragraph,column,size)
+            # Un título no se queda solo al pie de la columna.
+            if y+(len(lines)*lead+(46 if heading else 0))>bottom and y>top:advance()
+            for content in lines:
+                if y+lead>bottom:advance()
+                text(content,47+col*(column+gap),y,size,TEXT,heading);y+=lead
+            y+=5
+        y=max(tallest,y)
+        # La línea de versión cabe en el margen previo al pie; no justifica una página adicional.
+        if y+14>H-78:new_page()
+        text('Versión del documento: '+policies['version']+' · Integridad SHA-256: '+policies['sha256'][:32]+'…',47,y+2,7,MUTED)
     output=io.BytesIO();pdf.write(output);return output.getvalue()

@@ -4,6 +4,7 @@ No debe llamarse passenger_wsgi.py: Setup Python App de cPanel genera ese archiv
 del archivo de inicio y, si coinciden los nombres, lo sobrescribe y se carga a sí mismo.
 """
 import json
+import re
 import logging
 import os
 import sys
@@ -20,7 +21,7 @@ os.environ.setdefault('SESSION_SECURE', 'true')
 
 
 class WSGIHandler(core.Handler):
-    def reply(self, status, body, content_type='application/json; charset=utf-8', cookie=None):
+    def reply(self, status, body, content_type='application/json; charset=utf-8', cookie=None, filename=None):
         if isinstance(body, dict):
             body = json.dumps(body, ensure_ascii=False).encode('utf-8')
         elif isinstance(body, str):
@@ -32,6 +33,9 @@ class WSGIHandler(core.Handler):
             ('Referrer-Policy', 'no-referrer'),
             ('Content-Security-Policy', "default-src 'self'; frame-src 'self' blob: https://challenges.cloudflare.com; script-src 'self' https://challenges.cloudflare.com; style-src 'self'; img-src 'self'; connect-src 'self' https://challenges.cloudflare.com; frame-ancestors 'none'; form-action 'self'; base-uri 'none'"),
         ]
+        # Mismo criterio que el servidor local: los documentos de la orden se guardan con su número real.
+        if filename:
+            self.response_headers.append(('Content-Disposition', 'inline; filename="' + re.sub(r'[^A-Za-z0-9._-]', '-', filename) + '"'))
         if cookie:
             self.response_headers.append(('Set-Cookie', cookie))
         self.response_body = body

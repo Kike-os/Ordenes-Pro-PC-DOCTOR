@@ -334,7 +334,7 @@ def send_receipt_mail(c,oid,user,mode):
     try:
         config=mail_pro.settings();card=mail_signature_card(c)
         message,recipients=mail_pro.build_message(config,{'to':email,'subject':'Confirmación de recepción de equipo | Orden N.º '+order['code'],'body':body,'from_name':corporate.settings()['name'],
-            'attachments':[{'name':'Comprobante-'+order['code']+'.pdf','type':'application/pdf','data':base64.b64encode(pdf).decode()}]},card if card.get('enabled') else '')
+            'attachments':[{'name':order['code']+'-COMPROBANTE-DE-RECEPCION.pdf','type':'application/pdf','data':base64.b64encode(pdf).decode()}]},card if card.get('enabled') else '')
         mail_pro.deliver(config,message,recipients)
     except mail_pro.MailError as error:
         print('receipt-mail',error.kind,flush=True);log('failed',str(error),email,sha)
@@ -441,13 +441,15 @@ class Handler(BaseHTTPRequestHandler):
         # No registrar URL de recuperación, contraseñas, tokens ni datos personales.
         pass
 
-    def reply(self, status, body, content_type='application/json; charset=utf-8', cookie=None):
+    def reply(self, status, body, content_type='application/json; charset=utf-8', cookie=None, filename=None):
         if isinstance(body, dict):
             body = json.dumps(body, ensure_ascii=False).encode()
         elif isinstance(body, str):
             body = body.encode()
         self.send_response(status)
         self.send_header('Content-Type', content_type)
+        # Nombre con el número real de la orden cuando el documento se guarda o descarga desde el navegador.
+        if filename:self.send_header('Content-Disposition','inline; filename="'+re.sub(r'[^A-Za-z0-9._-]','-',filename)+'"')
         self.send_header('Content-Length', str(len(body)))
         self.send_header('Cache-Control', 'no-store')
         self.send_header('X-Content-Type-Options', 'nosniff')
@@ -830,8 +832,8 @@ class Handler(BaseHTTPRequestHandler):
                         copy=parse_qs(urlsplit(self.path).query).get('copy',['cliente'])[0]
                         if copy not in ('cliente','taller','ambas'):return self.reply(400,{'error':'Copia inválida.'})
                         pdf_order['tracking_url']=order_tracking.active(c,row['id'])['url']
-                        return self.reply(200,render_thermal(pdf_order,copy),'application/pdf')
-                    return self.reply(200, render_receipt(pdf_order), 'application/pdf')
+                        return self.reply(200,render_thermal(pdf_order,copy),'application/pdf',filename=code+'-TICKET.pdf')
+                    return self.reply(200, render_receipt(pdf_order), 'application/pdf',filename=code+'-COMPROBANTE-DE-RECEPCION.pdf')
                 result = dict(row)
                 import order_tracking
                 result['tracking']=order_tracking.active(c,row['id'])

@@ -81,4 +81,7 @@ class WSGITests(unittest.TestCase):
         for suffix in ['', '/qr.png','/receipt.pdf']:
             response=self.call_wsgi('/api/orders/'+str(order['id'])+suffix,cookie=cookie)
             self.assertTrue(response['status'].startswith('200'),response)
+        # El adaptador que usa la nube también entrega el nombre del archivo con el número de la orden.
+        self.assertEqual(self.call_wsgi('/api/orders/'+str(order['id'])+'/receipt.pdf',cookie=cookie)['headers'].get('Content-Disposition'),'inline; filename="'+order['code']+'-COMPROBANTE-DE-RECEPCION.pdf"')
+        self.assertEqual(self.call_wsgi('/api/orders/'+str(order['id'])+'/thermal.pdf',cookie=cookie)['headers'].get('Content-Disposition'),'inline; filename="'+order['code']+'-TICKET.pdf"')
         self.assertTrue(self.call_wsgi('/api/order-by-code/'+order['code'],cookie=cookie)['status'].startswith('200'))

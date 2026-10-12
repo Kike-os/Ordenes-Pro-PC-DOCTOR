@@ -53,7 +53,7 @@ class SecurityTests(unittest.TestCase):
         handler.headers['Content-Length']=str(len(raw))
         handler.rfile=io.BytesIO(raw)
         result={}
-        def reply(status,body,content_type=None,cookie=None):
+        def reply(status,body,content_type=None,cookie=None,filename=None):
             result.update(status=status,body=body,cookie=cookie)
         handler.reply=reply
         if body is None:

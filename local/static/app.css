@@ -3755,3 +3755,9 @@ body[data-page=dashboard] .adi-assist header.adi-assist-head>div{display:grid;ga
 .premium-header nav a[aria-current=page] .field-icon{color:#bfe0ff;filter:drop-shadow(0 0 6px #5b9cffb3)}
 @media(max-width:600px){.order-table td.order-identity{display:flex}}
 @media(prefers-reduced-motion:reduce){.device-icon,.premium-header nav a .field-icon{transition:none}.device-icon-swap{animation:none}.premium-header nav a:hover .field-icon{transform:none}}
+/* ADI · selector de voz en el menú de opciones */
+#adi-widget.adi-v2 .adi-menu label.adi-voice-pick{display:grid;gap:4px;align-items:stretch;padding:8px 9px;cursor:default}
+#adi-widget.adi-v2 .adi-menu label.adi-voice-pick:hover{background:none}
+#adi-widget.adi-v2 .adi-menu label.adi-voice-pick[hidden]{display:none}
+#adi-widget.adi-v2 .adi-menu label.adi-voice-pick span{font-size:11px;font-weight:600;color:#9bb0cf}
+#adi-widget.adi-v2 .adi-menu label.adi-voice-pick select{width:100%;height:32px;min-height:32px;margin:0;padding:0 8px;border:1px solid #2a4063;border-radius:8px;background:#0d1b30;color:#eef3ff;font-size:12px}

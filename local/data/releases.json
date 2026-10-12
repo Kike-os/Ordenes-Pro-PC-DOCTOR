@@ -8,6 +8,25 @@
   },
   "releases": [
     {
+      "version": "1.5.58",
+      "date": "2026-10-11T23:53:03-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Comprobante A4 en dos páginas, nombres de PDF y voz de ADI",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Comprobante A4 rediseñado en dos páginas, con constancia de recepción y Políticas de Reparaciones en dos columnas (texto literal)",
+          "Los PDF se descargan con nombre automático: CÓDIGO-TICKET.pdf y CÓDIGO-COMPROBANTE-DE-RECEPCION.pdf",
+          "ADI elige una voz femenina en español (preferencia por acento colombiano) y permite escoger la voz desde su menú",
+          "El módulo de reportes se titula CENTRO DE CONTROL TÉCNICO"
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.57",
       "date": "2026-10-11T23:37:24-05:00",
       "type": "patch",

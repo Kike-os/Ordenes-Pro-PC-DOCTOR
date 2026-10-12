@@ -4,6 +4,17 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.58 — 2026-10-11 23:53 (UTC-05:00)
+
+Comprobante A4 en dos páginas, nombres de PDF y voz de ADI
+
+### Mejoras realizadas
+
+- Comprobante A4 rediseñado en dos páginas, con constancia de recepción y Políticas de Reparaciones en dos columnas (texto literal)
+- Los PDF se descargan con nombre automático: CÓDIGO-TICKET.pdf y CÓDIGO-COMPROBANTE-DE-RECEPCION.pdf
+- ADI elige una voz femenina en español (preferencia por acento colombiano) y permite escoger la voz desde su menú
+- El módulo de reportes se titula CENTRO DE CONTROL TÉCNICO
+
 ## v1.5.57 — 2026-10-11 23:37 (UTC-05:00)
 
 Iconos por tipo de equipo y por módulo

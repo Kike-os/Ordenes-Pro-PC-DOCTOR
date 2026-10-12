@@ -31,3 +31,8 @@ Prueba de envío real a un buzón de prueba (en las pruebas automáticas el SMTP
 - Configuración → «Notificaciones automáticas por correo»: interruptor, «Enviar correo de prueba» (al propio buzón del sistema, nunca a un cliente) e historial de los últimos 30 envíos con sus errores.
 - Estados: Pendiente de envío, En proceso, Enviado al servidor de correo, Error de envío. No existe «Entregado»: el SMTP del buzón no informa la entrega; los rebotes se ven en Mail Pro.
 - Reintentos: un envío automático por orden; los siguientes son reenvíos expresos (30 por usuario y hora).
+
+## Nombres de archivo y formato A4 (1.5.58)
+
+- El ticket se descarga como `CÓDIGO-TICKET.pdf` y el comprobante como `CÓDIGO-COMPROBANTE-DE-RECEPCION.pdf` (cabecera `Content-Disposition`, vista previa y adjunto del correo).
+- El comprobante A4 se compone en dos páginas: datos, autorizaciones y constancia de recepción en la primera; condiciones aceptadas (solo si existen) y Políticas de Reparaciones en dos columnas en la segunda. El texto de las políticas es literal; si no cabe se reduce el cuerpo a 7,5 pt antes de abrir otra página.

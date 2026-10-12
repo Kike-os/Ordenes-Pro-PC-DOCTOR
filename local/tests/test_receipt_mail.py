@@ -44,7 +44,7 @@ class ReceiptMailTests(unittest.TestCase):
             code=self.request('/api/orders/%d'%oid,cookie=cookie)['body']['order']['code']
             self.assertEqual(message['Subject'],'Confirmación de recepción de equipo | Orden N.º '+code)
             attachment=[part for part in message.iter_attachments()]
-            self.assertEqual([(a.get_filename(),a.get_content_type()) for a in attachment],[('Comprobante-'+code+'.pdf','application/pdf')])
+            self.assertEqual([(a.get_filename(),a.get_content_type()) for a in attachment],[(code+'-COMPROBANTE-DE-RECEPCION.pdf','application/pdf')])
             self.assertTrue(attachment[0].get_payload(decode=True).startswith(b'%PDF'))
             body=message.get_body(preferencelist=('plain',)).get_content()
             self.assertIn('Estimado/a Cliente Con Correo:',body);self.assertIn('su orden de reparación N.º '+code,body);self.assertIn('Departamento de Servicio Técnico',body)
