@@ -8,6 +8,22 @@
   },
   "releases": [
     {
+      "version": "1.5.89",
+      "date": "2026-10-12T09:18:23-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Avatar con logo más legible",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "El avatar con foto o logo luce un aro luminoso y fondo claro circular, para que un logo se lea bien sin cambiar de tamaño"
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.88",
       "date": "2026-10-12T09:14:00-05:00",
       "type": "patch",

@@ -4146,3 +4146,9 @@ dialog.profile-photo{width:min(380px,calc(100vw - 24px))}
 .live-pro .live-main>.adi-panel.adi-assist{flex:0 0 auto;margin:0 12px 10px;max-height:46%;overflow-y:auto}
 .live-pro .live-main>.live-compose[hidden]~.adi-bar,.live-pro .live-main>.live-compose[hidden]~.adi-panel{display:none}
 .device-icon[data-device=tablet],.device-icon[data-device=phone]{color:#f0a8d8;border-color:#7a3f68}.device-icon[data-device=router]{color:#9fe3a6;border-color:#2f7a55}.device-icon[data-device=server]{color:#8fd3ff;border-color:#2f5d8f}
+/* Avatar con foto o logo: aro luminoso y fondo claro circular para que un logo se lea bien a tamaño pequeño (mismo tamaño) */
+.premium-header .user-area .avatar[data-photo=true]{padding:1.5px;border:1.5px solid #6fa8ff;background:radial-gradient(circle at 35% 28%,#ffffff 0,#eaf1fc 55%,#c7d8f1 100%);box-shadow:0 0 0 2px #0b1626,0 0 0 3px #4d8df04d,0 0 12px #4d8df073;transition:box-shadow .2s ease,border-color .2s ease}
+.premium-header .account-toggle:hover .avatar[data-photo=true],.premium-header .account-toggle:focus-visible .avatar[data-photo=true]{border-color:#a9cbff;box-shadow:0 0 0 2px #0b1626,0 0 0 3px #6fa8ff73,0 0 16px #5b9cffa6}
+.avatar[data-photo=true]>img{object-fit:contain}
+.avatar.profile-photo-preview[data-photo=true]{padding:6px;border-color:#6fa8ff;background:radial-gradient(circle at 35% 28%,#ffffff 0,#eaf1fc 55%,#c7d8f1 100%)}
+@media(prefers-reduced-motion:reduce){.premium-header .user-area .avatar[data-photo=true]{transition:none}}

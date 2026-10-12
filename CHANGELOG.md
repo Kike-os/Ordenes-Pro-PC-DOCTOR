@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.89 — 2026-10-12 09:18 (UTC-05:00)
+
+Avatar con logo más legible
+
+### Mejoras realizadas
+
+- El avatar con foto o logo luce un aro luminoso y fondo claro circular, para que un logo se lea bien sin cambiar de tamaño
+
 ## v1.5.88 — 2026-10-12 09:14 (UTC-05:00)
 
 Correo de recuperación y nuevos tipos de equipo
