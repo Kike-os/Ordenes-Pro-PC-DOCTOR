@@ -49,3 +49,11 @@ Desde la 1.5.46 el servidor acepta también la variable `OPEN_API_KEY` (nombre m
 - No actúa sobre las descripciones de autorizaciones del cliente (allí Adi solo trabaja a petición) ni sobre campos que no son áreas de texto (contraseñas, identificadores, cantidades, precios, códigos).
 - Se desactiva desde el propio panel de Adi («Corregir la ortografía automáticamente…»); es una preferencia de cada navegador.
 - La redacción profesional (técnica, para el cliente, etc.) nunca es automática: siempre pasa por la vista previa.
+
+## Robustez de «Aplicar mejora» (1.5.52)
+
+- La petición a Adi tiene un tiempo límite de 20 s en el navegador (15 s la automática) y 17 s en el servidor: el botón nunca queda esperando sin fin. Al agotarse se muestra el motivo y «Reintentar»; con errores de autenticación, configuración, saldo o límite no se ofrece reintentar.
+- Un solo envío por pulsación; al pedir una mejora a mano se anula la corrección automática en curso y su respuesta se descarta.
+- El estado de Adi se consulta una vez por página (antes, una vez por cada campo de texto).
+- El panel va en el flujo del formulario (antes heredaba la posición absoluta y el alto fijo del chat flotante) y mide 380 px de ancho con desplazamiento interno.
+- Diagnóstico: los errores de JavaScript y los inicios y fallos de las consultas a Adi se anotan en el registro del servidor (`client-log`), con tipo, mensaje y duración, nunca con el texto escrito.

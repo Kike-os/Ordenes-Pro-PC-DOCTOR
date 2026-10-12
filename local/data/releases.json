@@ -8,6 +8,25 @@
   },
   "releases": [
     {
+      "version": "1.5.52",
+      "date": "2026-10-11T23:12:21-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Adi: «Aplicar mejora» con tiempo límite y panel compacto dentro del formulario",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Adi: la corrección automática y la mejora manual ya no se pisan, el estado se consulta una vez por página y los fallos del navegador quedan en el registro del servidor para diagnosticarlos"
+        ],
+        "fixes": [
+          "Adi: «Aplicar mejora» ya no puede quedarse cargando sin fin: tiempo límite de 20 segundos, un solo envío por pulsación, mensaje de error con reintento y el texto original siempre intacto",
+          "Adi: el panel de redacción heredaba la posición y el alto fijo del chat flotante, se montaba sobre la ventana y recortaba su contenido; ahora va dentro del formulario, mide 380 px y tiene desplazamiento interno"
+        ],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.51",
       "date": "2026-10-11T22:54:14-05:00",
       "type": "patch",

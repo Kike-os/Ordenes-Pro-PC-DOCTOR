@@ -8,7 +8,7 @@
 import json,os,re,urllib.error,urllib.request
 
 LIMIT=4000
-TIMEOUT=25
+TIMEOUT=17  # menor que el límite del navegador (20 s) y que el de la función en Vercel
 MODES={
  'ortografia':('Corregir ortografía','Corrige únicamente ortografía, tildes, puntuación y mayúsculas. No cambies palabras, orden ni estilo.'),
  'redaccion':('Mejorar redacción','Mejora la claridad y la gramática manteniendo el mismo contenido, extensión parecida y tono neutro.'),

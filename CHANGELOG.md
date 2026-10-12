@@ -4,6 +4,19 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.52 — 2026-10-11 23:12 (UTC-05:00)
+
+Adi: «Aplicar mejora» con tiempo límite y panel compacto dentro del formulario
+
+### Mejoras realizadas
+
+- Adi: la corrección automática y la mejora manual ya no se pisan, el estado se consulta una vez por página y los fallos del navegador quedan en el registro del servidor para diagnosticarlos
+
+### Errores corregidos
+
+- Adi: «Aplicar mejora» ya no puede quedarse cargando sin fin: tiempo límite de 20 segundos, un solo envío por pulsación, mensaje de error con reintento y el texto original siempre intacto
+- Adi: el panel de redacción heredaba la posición y el alto fijo del chat flotante, se montaba sobre la ventana y recortaba su contenido; ahora va dentro del formulario, mide 380 px y tiene desplazamiento interno
+
 ## v1.5.51 — 2026-10-11 22:54 (UTC-05:00)
 
 Rediseño completo de Detalle de la Orden

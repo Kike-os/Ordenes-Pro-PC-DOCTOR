@@ -1454,6 +1454,10 @@ class Handler(BaseHTTPRequestHandler):
                 if path=='/api/sessions/revoke':
                     c.execute('DELETE FROM sessions WHERE user_id=?',(user['id'],));audit(c,user['id'],'sessions_revoked')
                     return self.reply(200,{'ok':True,'message':'Se cerraron las sesiones activas.'},cookie=self.cookie('',0))
+                if path=='/api/client-log':
+                    # Registro de diagnóstico del navegador: tipo y mensaje del fallo, nunca el texto que escribe el usuario.
+                    if not limited(c,'client-log:'+str(user['id']),limit=120,window=3600):print('client-log','user=%d'%user['id'],re.sub(r'[^\w .:@/()·+#=,-]','?',str(data.get('kind',''))[:40]),'|',re.sub(r'[\r\n]+',' ',str(data.get('message',''))[:300]),'|',str(data.get('where',''))[:60],flush=True)
+                    return self.reply(200,{'ok':True})
                 if path=='/api/order-draft':
                     if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
                     if data.get('action')=='discard':

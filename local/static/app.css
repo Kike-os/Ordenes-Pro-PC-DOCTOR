@@ -3686,3 +3686,19 @@ body[data-page=dashboard] .adi-assist label.adi-auto input{width:15px;height:15p
 #module-content:has(>.workspace-header) :is(.workspace-main,.workspace-side){grid-template-columns:minmax(0,1fr);min-width:0}
 #module-content:has(>.workspace-header) .workspace-section{min-width:0}
 #module-content:has(>.workspace-header) .order-history .track-filters{flex-wrap:wrap}
+/* Asistente ADI · ventana más pequeña: 380 px, herramientas en dos columnas y desplazamiento interno en textos largos */
+.adi-panel.adi-assist{width:min(100%,380px);gap:8px;padding:10px;border-radius:12px;max-height:min(70vh,460px);overflow-y:auto;scrollbar-width:thin;scrollbar-color:#2a4063 transparent}
+.adi-assist-icon{width:28px;height:28px;border-radius:9px}.adi-assist-head strong{font-size:13px}.adi-assist-head small{font-size:11px}
+.adi-tools{grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+.adi-assist button.adi-tool{min-height:34px;padding:5px 8px;font-size:11.5px;border-radius:9px}.adi-assist button.adi-tool svg{width:14px;height:14px}
+.adi-assist .adi-note,.adi-assist label.adi-auto{font-size:11.5px}
+.adi-assist .adi-actions{position:sticky;bottom:-10px;margin:0 -10px -10px;padding:8px 10px;background:linear-gradient(180deg,#0b152800,#0b1528 30%)}
+.adi-assist .adi-actions button{min-height:32px;padding:5px 12px;font-size:12px}
+.adi-assist .adi-suggestion{max-height:150px;padding:8px 10px;font-size:12.5px}
+.adi-assist .adi-original div{max-height:110px;overflow-y:auto}
+@media(max-width:520px){.adi-panel.adi-assist{width:auto;max-height:65vh}}
+.adi-panel.adi-assist{align-self:start;height:auto;align-content:start}
+/* El panel de redacción no es el chat flotante: va en el flujo del formulario, con alto según su contenido y sin recortar nada */
+.adi-panel.adi-assist,body[data-page=dashboard] .adi-panel.adi-assist{position:static;right:auto;bottom:auto;height:auto;display:grid;overflow-x:hidden;overflow-y:auto;max-height:min(70vh,460px)}
+body[data-page=dashboard] .adi-assist header.adi-assist-head{display:flex;flex-direction:row;align-items:center;gap:10px;margin:0;padding:0;border:0;background:none;min-height:0}
+body[data-page=dashboard] .adi-assist header.adi-assist-head>div{display:grid;gap:1px;flex:1 1 auto;min-width:0;margin:0}
