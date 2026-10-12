@@ -751,6 +751,10 @@ class Handler(BaseHTTPRequestHandler):
                 company=corporate.settings();content=(ROOT/'templates'/'privacy.html').read_text()
                 for key,value in (('company',company['name']),('whatsapp',company['whatsapp']),('support_email',company['support_email'])):content=content.replace('{{'+key+'}}',html.escape(value,quote=True))
                 return self.reply(200,content,'text/html; charset=utf-8')
+            if path == '/api/public/hours':
+                # Horarios vigentes para las páginas públicas: los mismos que usa ADI.
+                import business_hours
+                return self.reply(200,business_hours.public(c,reception_now()))
             if path == '/api/public/version':
                 # Estado real de la versión, sin sesión: la instalada (la del código desplegado) frente al registro publicado. Solo expone notas ya públicas.
                 # La comprobación se guarda 20 minutos para no consultar el registro en cada visita; «refresh=1» la repite (con límite).
@@ -1256,6 +1260,10 @@ class Handler(BaseHTTPRequestHandler):
             if path == '/api/system':
                 try:return self.reply(200, versioning.overview())
                 except versioning.RegistryError as error:return self.reply(500,{'error':str(error)})
+            if path == '/api/business-hours':
+                import business_hours
+                config=business_hours.get(c)
+                return self.reply(200,{'config':config,'defaults':business_hours.DEFAULTS,'summary':business_hours.public(c,reception_now()),'agenda':adi.schedule_text(appointments.settings(c)['hours']),'can_edit':user['role']=='administrador'})
             if path == '/api/stay/reminders':
                 if user['role']!='administrador':return self.reply(403,{'error':'Acceso no permitido.'})
                 import stay_reminders
@@ -1464,7 +1472,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(400, {'error':'Solicitud inválida.'})
             data = json.loads(self.rfile.read(length))
             appointment_config_post=path=='/api/appointments/config'
-            if not isinstance(data, dict) or any(not isinstance(v,(str,bool)) and not (workspace_post and ((k=='lines' and isinstance(v,list)) or (k=='revision' and type(v) is int))) and not (appointment_config_post and ((k in ('hours','services','staff_hours') and isinstance(v,list)) or (k in ('holiday','new_service') and isinstance(v,dict)))) for k,v in data.items()):
+            if not isinstance(data, dict) or any(not isinstance(v,(str,bool)) and not (workspace_post and ((k=='lines' and isinstance(v,list)) or (k=='revision' and type(v) is int))) and not (appointment_config_post and ((k in ('hours','services','staff_hours') and isinstance(v,list)) or (k in ('holiday','new_service') and isinstance(v,dict)))) and not (path=='/api/business-hours' and k in ('hours','closures') and isinstance(v,list)) for k,v in data.items()):
                 return self.reply(400, {'error':'Datos inválidos.'})
             path = urlsplit(self.path).path
             with connect() as c:
@@ -2305,6 +2313,14 @@ class Handler(BaseHTTPRequestHandler):
                     c.execute('INSERT INTO user_photos(user_id,mime,size,data,updated_at) VALUES (?,?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET mime=excluded.mime,size=excluded.size,data=excluded.data,updated_at=excluded.updated_at',(user['id'],kind,len(content),base64.b64encode(content).decode(),stamp))
                     audit(c,user['id'],'profile_photo_updated')
                     return self.reply(200,{'ok':True,'photo':stamp})
+                if path=='/api/business-hours':
+                    if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede cambiar los horarios.'})
+                    import business_hours
+                    values,problem=business_hours.validate(data)
+                    if problem:return self.reply(400,{'error':problem})
+                    # Cambiar el horario no modifica ninguna cita existente: solo la información que se muestra y la que usa ADI.
+                    business_hours.save(c,values);audit(c,user['id'],'business_hours_updated')
+                    return self.reply(200,{'ok':True,'config':values,'summary':business_hours.public(c,reception_now())})
                 if path=='/api/stay/settings':
                     if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede cambiar el plazo de permanencia.'})
                     values,problem=stay.validate(data,stay.settings(c))

@@ -4,6 +4,19 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.112 — 2026-10-12 18:49 (UTC-05:00)
+
+Horarios centralizados y ADI con horarios vigentes
+
+### Nuevas funcionalidades
+
+- Horarios centralizados: Configuración → Horarios y Disponibilidad con la atención presencial oficial (lunes a viernes 7:45 a. m.–8:30 p. m., sábado 9:00 a. m.–9:00 p. m., domingo 10:00 a. m.–5:00 p. m.), atención virtual 24/7, mensaje fuera de horario y cierres extraordinarios.
+
+### Mejoras realizadas
+
+- ADI responde los horarios con los datos vigentes del sistema: distingue atención presencial, citas y atención virtual, y dice si el taller está abierto ahora (hora de Ecuador).
+- La página de citas muestra el horario presencial, el estado actual y la atención virtual.
+
 ## v1.5.111 — 2026-10-12 18:43 (UTC-05:00)
 
 Auditoría del asistente de redacción de ADI

@@ -133,10 +133,30 @@ def ask(text,admin=False,context=None):
   return answer[:2500] or None
  except (OSError,ValueError,KeyError,urllib.error.URLError):return None
 
+def hours_facts(c,now=None):
+ """Horarios vigentes leídos del sistema en cada consulta: atención presencial (y si está abierta ahora), franjas de la agenda de citas y atención virtual."""
+ import business_hours
+ from reception import ECUADOR_TZ
+ from datetime import datetime
+ info=business_hours.public(c,now or datetime.now(ECUADOR_TZ));agenda=schedule_text(appointments.settings(c)['hours'])
+ return {'zona_horaria':'America/Guayaquil (Ecuador)','hoy':info['today'],'hora_actual':info['now'],'atencion_presencial':info['presencial'] or 'sin horario presencial configurado','estado_presencial_ahora':info['status']['label'],
+         'cierres_extraordinarios':[item['date']+(' ('+item['note']+')' if item['note'] else '') for item in info['closures']],'citas':('Las citas se reservan en /citas según la disponibilidad real de la agenda: '+agenda) if agenda else 'Por ahora no hay franjas de citas habilitadas',
+         'atencion_virtual':info['virtual_message'] or 'No disponible','asesores_humanos':'Los asesores responden en el horario de atención presencial; fuera de ese horario la solicitud queda registrada.'}
+
+def hours_answer(c,now=None):
+ """Respuesta breve sobre horarios, sin IA: distingue atención presencial, citas y atención virtual."""
+ facts=hours_facts(c,now);lines=['Atención presencial (hora de Ecuador): '+facts['atencion_presencial']+'. '+facts['estado_presencial_ahora']+'.',facts['citas']+'.']
+ if facts['atencion_virtual']!='No disponible':lines.append(facts['atencion_virtual'])
+ return ' '.join(lines)
+
 def reply(c,text,admin=False,context=None):
  if admin:
   factual=admin_answer(c,text)
   if factual:return factual
+ # Los horarios vigentes viajan siempre como contexto validado: ADI no usa horarios escritos de memoria.
+ if not admin:
+  try:context=dict(context or {},horarios_vigentes=hours_facts(c))
+  except Exception:pass
  answer=ask(text,admin,context)
  if answer:return answer
  return fallback(c,text)
@@ -170,8 +190,7 @@ def fallback(c,text):
  if has('garantia'):
   return 'Las condiciones de garantía dependen del servicio realizado y constan en las condiciones de tu orden. Un asesor puede confirmarte tu caso: usa «Contactar soporte técnico».'
  if has('horario','abren','abierto','atienden') or words&{'hora','horas'}:
-  schedule=schedule_text(cfg['hours'])
-  return ('Horario de atención de la agenda (hora de Ecuador): '+schedule+'.' if schedule else 'Por ahora no hay horarios de agenda habilitados.')+' Puedes ver las horas libres al reservar en /citas.'
+  return hours_answer(c)
  if has('contacto','whatsapp','telefono','llamar','correo','email','escribir'):
   return 'Puedes escribirnos por WhatsApp al '+company['whatsapp']+' o al correo '+company['support_email']+'. También puedo pasarte con un asesor en este chat.'
  if has('donde','direccion','ubicacion','ubicados','llegar') or words&{'local'}:
