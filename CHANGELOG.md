@@ -4,6 +4,18 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.100 — 2026-10-12 14:22 (UTC-05:00)
+
+Esfera de cristal realista y efectos de sonido de ADI
+
+### Nuevas funcionalidades
+
+- Efectos de sonido de ADI: tono de cristal ascendente con destello al abrir, descendente al cerrar, señal al activar el micrófono y aviso de respuesta; se activan o desactivan en «Efectos de sonido» y nunca suenan solos ni sobre la voz.
+
+### Mejoras realizadas
+
+- Esfera de ADI con material de cristal realista: volumen, bordes sombreados, neblina luminosa interior, reflejos de superficie, filo fino y sombra de apoyo; el texto «ADI» queda integrado dentro del cristal.
+
 ## v1.5.99 — 2026-10-12 14:16 (UTC-05:00)
 
 Esfera de ADI con más brillo, halo, cristal y anillos

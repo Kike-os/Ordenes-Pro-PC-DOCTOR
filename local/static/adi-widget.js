@@ -12,7 +12,19 @@
  const el=(tag,text,className)=>{const node=document.createElement(tag);if(text!==undefined)node.textContent=text;if(className)node.className=className;return node;};
  async function request(path,data){let response;try{response=await fetch(path,{method:data===undefined?'GET':'POST',credentials:'same-origin',headers:data===undefined?{}:{'Content-Type':'application/json'},body:data===undefined?undefined:JSON.stringify(data)});}catch{throw new Error('Sin conexión. Tu mensaje sigue en el editor.');}let result;try{result=await response.json();}catch{throw new Error('No se pudo conectar con ADI. Inténtalo de nuevo.');}if(!response.ok)throw new Error(result.error||'No se pudo enviar el mensaje.');return result;}
  // Tonos breves generados en el navegador; solo suenan si la persona ya interactuó con la página y no los desactivó.
- let audio=null;const sound=type=>{if(!prefs.sound||!navigator.userActivation?.hasBeenActive)return;try{audio=audio||new (window.AudioContext||window.webkitAudioContext)();if(audio.state==='suspended')audio.resume();const now=audio.currentTime,notes={message:[[880,0,.12]],advisor:[[660,0,.14],[880,.11,.2]],error:[[196,0,.2]]}[type];for(const[frequency,at,length]of notes){const osc=audio.createOscillator(),gain=audio.createGain();osc.type=type==='error'?'triangle':'sine';osc.frequency.value=frequency;gain.gain.setValueAtTime(.0001,now+at);gain.gain.linearRampToValueAtTime(.07,now+at+.015);gain.gain.exponentialRampToValueAtTime(.0001,now+at+length);osc.connect(gain);gain.connect(audio.destination);osc.start(now+at);osc.stop(now+at+length+.03);}}catch{}};
+ // Efectos generados con Web Audio (sin archivos): tonos de cristal breves y suaves. Solo suenan tras una interacción real de la persona,
+ // nunca al cargar la página; uno a la vez (el nuevo apaga al anterior) y callan mientras ADI habla para no pisar su voz.
+ let audio=null,playing=null,touched=false;for(const kind of ['pointerdown','keydown','touchstart'])addEventListener(kind,()=>{touched=true;},{capture:true,passive:true});
+ const tones={open:[[784,1175,0,.42,.05,'sine'],[1568,2349,.03,.38,.022,'sine'],[2349,3136,.08,.3,.01,'triangle']],close:[[1175,698,0,.3,.04,'sine'],[2349,1397,.02,.24,.014,'sine']],listen:[[988,1047,0,.16,.035,'sine'],[1976,2093,.01,.12,.012,'sine']],
+  message:[[1047,1047,0,.14,.035,'sine'],[1568,1568,.09,.2,.028,'sine']],advisor:[[660,660,0,.14,.04,'sine'],[880,880,.11,.22,.04,'sine']],error:[[233,196,0,.24,.05,'triangle']]};
+ const sound=type=>{if(!prefs.sound||!tones[type]||!(touched||navigator.userActivation?.hasBeenActive))return;if(type!=='error'&&'speechSynthesis' in window&&speechSynthesis.speaking)return;
+  try{const Context=window.AudioContext||window.webkitAudioContext;if(!Context)return;audio=audio||new Context();if(audio.state==='suspended')audio.resume().catch(()=>{});const now=audio.currentTime;
+   if(playing){try{playing.gain.cancelScheduledValues(now);playing.gain.setTargetAtTime(.0001,now,.015);}catch{}}
+   const master=audio.createGain();master.gain.value=1;master.connect(audio.destination);playing=master;
+   for(const[from,to,at,length,level,shape]of tones[type]){const osc=audio.createOscillator(),gain=audio.createGain();osc.type=shape;osc.frequency.setValueAtTime(from,now+at);if(to!==from)osc.frequency.exponentialRampToValueAtTime(to,now+at+length*.85);
+    gain.gain.setValueAtTime(.0001,now+at);gain.gain.linearRampToValueAtTime(level,now+at+.02);gain.gain.exponentialRampToValueAtTime(.0001,now+at+length);osc.connect(gain);gain.connect(master);osc.start(now+at);osc.stop(now+at+length+.04);}}catch{}};
+ // Destello al tocar la esfera: el halo se expande una vez, a la par del sonido.
+ const flash=()=>{root.classList.remove('adi-flash');void root.offsetWidth;root.classList.add('adi-flash');setTimeout(()=>root.classList.remove('adi-flash'),650);};
  // Enlaces seguros: solo direcciones https y la ruta interna de citas se convierten en vínculos.
  function rich(node,text){let last=0;for(const match of text.matchAll(/https:\/\/[^\s<>"']+[^\s<>"'.,;:!?)]|\/citas\b/g)){node.append(text.slice(last,match.index));const link=el('a',match[0]==='/citas'?'la agenda de citas':match[0]);link.href=match[0];if(match[0]!=='/citas'){link.target='_blank';link.rel='noopener noreferrer';}node.append(link);last=match.index+match[0].length;}node.append(text.slice(last));}
  const zone={timeZone:'America/Guayaquil'},clock=date=>new Intl.DateTimeFormat('es-EC',{...zone,hour:'2-digit',minute:'2-digit'}).format(date),dayKey=date=>new Intl.DateTimeFormat('en-CA',{...zone,year:'numeric',month:'2-digit',day:'2-digit'}).format(date);
@@ -34,7 +46,7 @@
  const grow=()=>{input.style.height='auto';const full=input.scrollHeight+2;input.style.height=Math.min(full,112)+'px';input.style.overflowY=full>112?'auto':'hidden';};
  async function send(text){text=text.trim();if(busy||!text)return;busy=true;root.classList.add('adi-busy');submit.disabled=true;submit.dataset.busy='true';quick.hidden=true;list.querySelector('.adi-note-error')?.remove();const draft=input.value;input.value='';grow();
   const pending=el('p',undefined,'adi-message client adi-pending');pending.append(el('span',text,'adi-text'),el('time','Enviando…'));place(pending);bottom();if(state==='adi'||state==='closed'){transient='consulting';setTyping(true);}paint();
-  try{delete root.dataset.orb;const sent=await request('/api/public/adi/message',{message:text});pending.remove();setTyping(false);transient='';const replies=freshReplies(sent.messages);draw(sent.messages);spoken=Math.max(spoken,lastId);loaded=true;if(replies.length&&prefs.voice&&!panel.hidden)speak(replies.join(' '));if(sent.state)setState(sent.state);paint();poll();root.classList.remove('adi-replied');void root.offsetWidth;root.classList.add('adi-replied');setTimeout(()=>root.classList.remove('adi-replied'),1100);document.dispatchEvent(new CustomEvent('adi:sent'));}
+  try{delete root.dataset.orb;const sent=await request('/api/public/adi/message',{message:text});pending.remove();setTyping(false);transient='';const replies=freshReplies(sent.messages);draw(sent.messages);spoken=Math.max(spoken,lastId);loaded=true;if(replies.length&&prefs.voice&&!panel.hidden)speak(replies.join(' '));else if(replies.length)sound('message');if(sent.state)setState(sent.state);paint();poll();root.classList.remove('adi-replied');void root.offsetWidth;root.classList.add('adi-replied');setTimeout(()=>root.classList.remove('adi-replied'),1100);document.dispatchEvent(new CustomEvent('adi:sent'));}
   catch(error){pending.remove();setTyping(false);transient='';paint();root.dataset.orb='error';clearTimeout(root.orbTimer);root.orbTimer=setTimeout(()=>{delete root.dataset.orb;},6000);if(!input.value.trim()){input.value=draft.trim()?draft:text;grow();}if(!started)quick.hidden=false;note(error.message,'error');sound('error');}
   finally{busy=false;root.classList.remove('adi-busy');submit.disabled=false;delete submit.dataset.busy;if(!panel.hidden)input.focus();}}
  // ── Voz de ADI ─────────────────────────────────────────────────────────────────────────────────────────────
@@ -80,7 +92,7 @@
  const stopMeter=()=>{meter?.stop();meter=null;};
  function listen(){if(recognizer){recognizer.stop();return;}if(!Recognition){note('Este navegador no permite hablar con ADI. Usa Chrome, Edge o Safari, o escribe tu mensaje.','error');return;}if(busy)return;hush();
   let heard='',failed=false;recognizer=new Recognition();recognizer.lang='es-EC';recognizer.interimResults=true;recognizer.continuous=false;recognizer.maxAlternatives=1;
-  recognizer.onstart=()=>{voiceState('listening');startMeter();status.textContent='ADI te está escuchando…';list.querySelector('.adi-note-error')?.remove();};
+  recognizer.onstart=()=>{voiceState('listening');sound('listen');startMeter();status.textContent='ADI te está escuchando…';list.querySelector('.adi-note-error')?.remove();};
   recognizer.onresult=event=>{let text='';for(const result of event.results)text+=result[0].transcript;heard=text.trim();input.value=heard;grow();};
   recognizer.onspeechstart=()=>{root.dataset.heard='true';};recognizer.onspeechend=()=>{delete root.dataset.heard;};
   recognizer.onerror=event=>{failed=true;const message=micErrors[event.error]??'No se pudo usar el micrófono ('+event.error+').';if(message)note(message,'error');};
@@ -99,10 +111,10 @@
  function setOpen(open,focus=true){clearTimeout(closing);if(!open){setMenu(false);hush();recognizer?.abort();}if(open){panel.hidden=false;panel.classList.remove('adi-leaving');autoHidden=false;unread=0;showBadge();root.classList.remove('adi-pulse');poll();bottom();grow();if(focus)input.focus();}else if(!panel.hidden){panel.classList.add('adi-leaving');const done=()=>{panel.hidden=true;panel.classList.remove('adi-leaving');};matchMedia('(prefers-reduced-motion:reduce)').matches?done():closing=setTimeout(done,180);if(focus)toggle.focus();}
   toggle.setAttribute('aria-expanded',String(open));root.classList.toggle('adi-open',open);}
  const isOpen=()=>root.classList.contains('adi-open');
- toggle.addEventListener('click',()=>setOpen(!isOpen()));
- $('adi-minimize').addEventListener('click',()=>setOpen(false));
+ toggle.addEventListener('click',()=>{const opening=!isOpen();flash();sound(opening?'open':'close');setOpen(opening);});
+ $('adi-minimize').addEventListener('click',()=>{sound('close');setOpen(false);});
  // Cerrar también descarta el borrador sin enviar; minimizar lo conserva. La conversación guardada no se pierde en ningún caso.
- $('adi-close').addEventListener('click',()=>{input.value='';setOpen(false);});
+ $('adi-close').addEventListener('click',()=>{input.value='';sound('close');setOpen(false);});
  more.addEventListener('click',()=>setMenu(menu.hidden));
  const sounds=$('adi-sound'),restore=$('adi-restore');sounds.checked=prefs.sound;restore.checked=prefs.restore;
  sounds.addEventListener('change',()=>{prefs.sound=sounds.checked;savePrefs();if(prefs.sound)sound('message');});restore.addEventListener('change',()=>{prefs.restore=restore.checked;savePrefs();});

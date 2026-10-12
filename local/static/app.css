@@ -4337,3 +4337,47 @@ body[data-page=dashboard] button[aria-label^="Cerrar"]:not(#logout):not(.primary
 #adi-widget.adi-v2:is([data-state=closed],[data-state=offline]) :is(.adi-halo,.adi-sparks){animation-play-state:paused;opacity:.2}
 #adi-widget.adi-v2.adi-lite .adi-halo{filter:none;animation:none;opacity:.6}#adi-widget.adi-v2.adi-lite :is(.adi-sparks,.adi-ring-outer){display:none}#adi-widget.adi-v2.adi-lite .adi-ring{filter:none}
 @media(prefers-reduced-motion:reduce){#adi-widget.adi-v2 :is(.adi-halo,.adi-sparks,.adi-ring-outer){animation:none!important;transition:none}}
+/* ADI: esfera de cristal realista. Luz principal arriba a la izquierda; cuerpo translúcido con bordes más oscuros (efecto Fresnel), núcleo de
+   neblina luminosa, cáustica en la parte inferior (la luz que atraviesa el vidrio), brillo especular curvo, filo fino y sombra de apoyo. */
+#adi-widget.adi-v2 .adi-orb{background:
+ radial-gradient(circle at 50% 50%,#0000 56%,#7a1f5a59 80%,#3d0b3099 96%,#2a0722b3 100%),
+ radial-gradient(ellipse 62% 30% at 55% 88%,#fff1f8f2 0,#ffc4e2a6 38%,#ff9fd000 76%),
+ radial-gradient(circle at 54% 60%,#ffe3f1cc 0,#ffb1d880 26%,#ff8fc600 56%),
+ radial-gradient(circle at 80% 58%,#c993ff8c 0,#c993ff00 34%),
+ radial-gradient(circle at 16% 66%,#ff6fb373 0,#ff6fb300 36%),
+ radial-gradient(circle at 36% 24%,#ffdcec 0,#ffa9d2 26%,#f070b0 56%,#b83a85 80%,#7c2059 100%);
+ box-shadow:inset 0 0 0 .75px #ffffffa6,inset 0 1.5px 2px #ffffffcc,inset 0 -9px 14px #5a124399,inset 7px 0 12px -8px #ffffff66,inset -6px -5px 10px -6px #ffd3e699}
+/* Reflejos de superficie: mancha principal curva, punto secundario nítido, brillo tenue de contraluz en el borde inferior derecho. */
+#adi-widget.adi-v2 .adi-orb-shine{z-index:3;transform:rotate(-24deg);background:
+ radial-gradient(ellipse 30% 15% at 40% 13%,#ffffff 0,#ffffffd9 30%,#ffffff40 62%,#ffffff00 100%),
+ radial-gradient(ellipse 46% 26% at 42% 17%,#ffffff59 0,#ffffff00 100%),
+ radial-gradient(circle 2.2px at 17% 40%,#ffffffe6 0,#ffffff00 100%),
+ radial-gradient(ellipse 30% 8% at 66% 93%,#ffffff8c 0,#ffffff00 100%);
+ box-shadow:inset -2px -3px 5px -3px #ffffffb3;animation:adi-shine-drift 9s ease-in-out infinite}
+@keyframes adi-shine-drift{0%,100%{transform:rotate(-24deg) translate(0,0)}50%{transform:rotate(-21deg) translate(.6px,.4px)}}
+/* Energía interior: neblina que gira muy despacio bajo la superficie y núcleo tenue. */
+#adi-widget.adi-v2 .adi-orb-swirl{inset:-10%;opacity:.5;filter:blur(5px);mix-blend-mode:soft-light;animation-duration:30s}
+#adi-widget.adi-v2 .adi-orb::after{width:30px;height:30px;margin:-12px 0 0 -14px;background:radial-gradient(circle,#ffffff80 0,#ffd9ea4d 40%,#ffb3d400 72%);opacity:.7;filter:blur(1.5px)}
+#adi-widget.adi-v2 .adi-orb::before{opacity:.5;mix-blend-mode:overlay}
+/* Texto dentro del cristal: queda bajo los reflejos de superficie, con sombra interior suave. */
+#adi-widget.adi-v2 .adi-orb-label{z-index:1;font-weight:600;color:#fffafd;opacity:.96;text-shadow:0 1px 1.5px #6b1650d9,0 0 5px #a8367d99,0 0 12px #ffe3f08c}
+/* Sombra de apoyo y luz ambiental contenida: objeto físico, sin neón excesivo. */
+#adi-widget.adi-v2 .adi-toggle{box-shadow:0 14px 18px -8px #000000b3,0 6px 10px -4px #5a124380,0 0 0 .75px #ffe3ef59,0 0 16px #ff8fc266,0 0 34px #ff6fb533}
+@keyframes adi-orb-breathe{0%,100%{box-shadow:0 14px 18px -8px #000000b3,0 6px 10px -4px #5a124380,0 0 0 .75px #ffe3ef4d,0 0 14px #ff8fc259,0 0 30px #ff6fb526;transform:scale(1)}50%{box-shadow:0 15px 20px -8px #000000b3,0 6px 10px -4px #5a124380,0 0 0 .75px #ffeef680,0 0 22px #ff9ecb99,0 0 44px #ff6fb54d;transform:scale(1.025)}}
+#adi-widget.adi-v2 .adi-halo{inset:-14px;background:radial-gradient(circle,#ff8fc280 0,#ff7fbd40 40%,#e98bff1a 58%,#ff8fc200 72%);filter:blur(8px)}
+@keyframes adi-halo-breathe{0%,100%{opacity:.5;transform:scale(.95)}50%{opacity:.82;transform:scale(1.04)}}
+#adi-widget.adi-v2 .adi-ring{filter:none;opacity:.75}
+#adi-widget.adi-v2 .adi-ring-outer{opacity:.32}
+#adi-widget.adi-v2 .adi-sparks{opacity:.7}
+#adi-widget.adi-v2.adi-busy .adi-orb-swirl{animation-duration:7s;opacity:.75}
+#adi-widget.adi-v2[data-voice=speaking] .adi-orb::after{animation-duration:.9s}
+/* Indicador: asentado sobre el borde de la esfera, con filo y brillo propios. */
+#adi-widget.adi-v2 .adi-toggle .adi-online{right:1px;bottom:1px;width:13px;height:13px;border:2px solid #0a0f1e;background:radial-gradient(circle at 34% 28%,#c9ffe6 0,#4fe0a6 34%,#22b783 78%,#168a63 100%);box-shadow:0 0 0 .75px #7af0c066,0 1px 3px #000000a6,0 0 7px #34d39999}
+@media(prefers-reduced-motion:reduce){#adi-widget.adi-v2 .adi-orb-shine{animation:none}}
+#adi-widget.adi-v2.adi-lite .adi-orb-shine{animation:none}
+/* ADI: destello al tocar la esfera, sincronizado con el efecto de sonido. */
+#adi-widget.adi-v2.adi-flash .adi-halo{animation:adi-halo-flash .6s ease-out 1}
+#adi-widget.adi-v2.adi-flash .adi-orb{animation:adi-orb-flash .6s ease-out 1}
+@keyframes adi-halo-flash{0%{opacity:.6;transform:scale(1)}35%{opacity:1;transform:scale(1.32)}100%{opacity:.6;transform:scale(1)}}
+@keyframes adi-orb-flash{0%,100%{filter:brightness(1)}30%{filter:brightness(1.22) saturate(1.1)}}
+@media(prefers-reduced-motion:reduce){#adi-widget.adi-v2.adi-flash :is(.adi-halo,.adi-orb){animation:none!important}}

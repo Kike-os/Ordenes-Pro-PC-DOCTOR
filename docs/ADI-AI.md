@@ -129,3 +129,9 @@ Sustituye a la propuesta con «Aceptar / Descartar» de la 1.5.60, a petición d
 ### Brillo y profundidad (1.5.99)
 
 Halo rosado difuminado que respira con la esfera, cristal con reflejos superior e inferior y canto de luz, dos anillos finos que giran en sentidos opuestos, puntos de energía en órbita lenta, texto «ADI» con resplandor leve e indicador verde con borde oscuro. Al escuchar, el brillo acompaña al volumen medido; al hablar, el halo pulsa. Todo en CSS; en equipos modestos y con movimiento reducido se desactivan halo animado, anillo exterior y puntos.
+
+### Cristal realista y efectos de sonido (1.5.100)
+
+- **Material**: luz principal arriba a la izquierda, bordes más oscuros (efecto Fresnel), neblina luminosa interior, cáustica clara en la parte inferior, brillo especular curvo con un punto secundario, filo fino y sombra de apoyo bajo la esfera. El texto «ADI» queda bajo los reflejos, dentro del cristal. Todo en CSS.
+- **Sonidos** (Web Audio, sin archivos ni licencias): al abrir, tono de cristal ascendente (≈0,4 s) con destello y expansión del halo; al cerrar o minimizar, tono descendente breve; al activar el micrófono, señal suave; respuesta lista, señal delicada solo si la voz no va a leerla; error, tono grave. Procesar no suena.
+- **Reglas**: se activan o desactivan con «Efectos de sonido» en el menú «⋯» (guardado en el navegador); volumen bajo; un efecto a la vez (el nuevo apaga al anterior); callan mientras ADI habla; el audio solo se inicia tras una interacción real y nunca al cargar la página. Si el navegador no ofrece Web Audio, simplemente no suenan.
