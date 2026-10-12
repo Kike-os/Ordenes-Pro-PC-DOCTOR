@@ -4,6 +4,19 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.103 — 2026-10-12 17:36 (UTC-05:00)
+
+Esfera 3D de ADI en WebGL y título «Órdenes de Reparación»
+
+### Nuevas funcionalidades
+
+- Esfera de ADI en 3D real (WebGL): cristal rosado con reflejos de entorno, refracción, núcleo de energía y partículas interiores, con giro propio y reacción a cada estado (toque, escucha, procesamiento, habla y desconexión).
+
+### Mejoras realizadas
+
+- ADI sin anillos decorativos, con un indicador de conexión pequeño y discreto; alternativa ligera automática cuando el equipo no tiene aceleración gráfica; en teléfonos la esfera del acceso ya no tapa el botón «Iniciar sesión».
+- El módulo pasa a titularse «Órdenes de Reparación».
+
 ## v1.5.102 — 2026-10-12 17:27 (UTC-05:00)
 
 Condiciones oficiales vigentes en el detalle de la orden

@@ -4,7 +4,7 @@
  const root=document.getElementById('adi-widget');if(!root)return;
  const $=id=>document.getElementById(id),toggle=$('adi-toggle'),panel=$('adi-panel'),list=$('adi-messages'),form=$('adi-form'),input=$('adi-input'),submit=form.querySelector('button'),human=$('adi-human'),status=$('adi-status'),quick=$('adi-quick'),badge=$('adi-unread'),more=$('adi-more'),menu=$('adi-menu');
  const dashboard=document.body.dataset.page==='dashboard',prefsKey='ordenes-pro:adi-chat';
- {const orb=toggle.querySelector('.adi-orb');if(orb&&!orb.querySelector('.adi-orb-label')){const label=document.createElement('b');label.className='adi-orb-label';label.textContent='ADI';orb.append(label);for(const name of ['adi-ring','adi-ring adi-ring-outer','adi-level','adi-particles','adi-sparks','adi-halo']){const piece=document.createElement('i');piece.className=name;piece.setAttribute('aria-hidden','true');toggle.prepend(piece);}}
+ {const orb=toggle.querySelector('.adi-orb');if(orb&&!orb.querySelector('.adi-orb-label')){const label=document.createElement('b');label.className='adi-orb-label';label.textContent='ADI';orb.append(label);for(const name of ['adi-level','adi-halo']){const piece=document.createElement('i');piece.className=name;piece.setAttribute('aria-hidden','true');toggle.prepend(piece);}}
   // Equipos modestos: menos efectos (sin desenfoques ni ondas interiores) para que la esfera no reste fluidez.
   if((navigator.hardwareConcurrency&&navigator.hardwareConcurrency<=2)||(navigator.deviceMemory&&navigator.deviceMemory<=2))root.classList.add('adi-lite');}
  let lastId=0,busy=false,state='adi',transient='',started=false,loaded=false,typing=null,unread=0,lastDay='',failures=0,autoHidden=false,closing=null;
@@ -12,6 +12,13 @@
  const el=(tag,text,className)=>{const node=document.createElement(tag);if(text!==undefined)node.textContent=text;if(className)node.className=className;return node;};
  async function request(path,data){let response;try{response=await fetch(path,{method:data===undefined?'GET':'POST',credentials:'same-origin',headers:data===undefined?{}:{'Content-Type':'application/json'},body:data===undefined?undefined:JSON.stringify(data)});}catch{throw new Error('Sin conexión. Tu mensaje sigue en el editor.');}let result;try{result=await response.json();}catch{throw new Error('No se pudo conectar con ADI. Inténtalo de nuevo.');}if(!response.ok)throw new Error(result.error||'No se pudo enviar el mensaje.');return result;}
  // Tonos breves generados en el navegador; solo suenan si la persona ya interactuó con la página y no los desactivó.
+// Esfera 3D (WebGL): lee el estado real del asistente en cada cuadro. Si el navegador no ofrece WebGL queda la esfera CSS como alternativa ligera.
+ const orbState={level:0,busy:false,speaking:false,listening:false,dim:false,beatAt:0,pressAt:-1e9};let orb3d=null;
+ const readOrb=()=>{orbState.busy=root.classList.contains('adi-busy');orbState.speaking=root.dataset.voice==='speaking';orbState.listening=root.dataset.voice==='listening';orbState.dim=root.dataset.state==='offline'||root.dataset.state==='closed'||root.dataset.orb==='error';
+  // Sin medidor de volumen (teléfonos), el núcleo responde al inicio y fin de voz que informa el reconocimiento.
+  if(!root.dataset.meter)orbState.level=orbState.listening?(root.dataset.heard?.55:.12):0;return orbState;};
+ const mountOrb=()=>{const host=toggle.querySelector('.adi-orb');if(!host||!window.AdiOrb||orb3d)return;try{orb3d=window.AdiOrb.mount(host,readOrb);}catch{orb3d=null;}if(orb3d){root.classList.add('adi-gl');root.adiOrb=orb3d;}};
+ {const load=()=>{if(window.AdiOrb)return mountOrb();const script=document.createElement('script');script.src='/static/adi-orb.js';script.onload=mountOrb;document.head.append(script);};'requestIdleCallback' in window?requestIdleCallback(load,{timeout:1500}):setTimeout(load,300);}
  // Efectos generados con Web Audio (sin archivos): tonos de cristal breves y suaves. Solo suenan tras una interacción real de la persona,
  // nunca al cargar la página; uno a la vez (el nuevo apaga al anterior) y callan mientras ADI habla para no pisar su voz.
  let audio=null,playing=null,touched=false;for(const kind of ['pointerdown','keydown','touchstart'])addEventListener(kind,()=>{touched=true;},{capture:true,passive:true});
@@ -24,7 +31,7 @@
    for(const[from,to,at,length,level,shape]of tones[type]){const osc=audio.createOscillator(),gain=audio.createGain();osc.type=shape;osc.frequency.setValueAtTime(from,now+at);if(to!==from)osc.frequency.exponentialRampToValueAtTime(to,now+at+length*.85);
     gain.gain.setValueAtTime(.0001,now+at);gain.gain.linearRampToValueAtTime(level,now+at+.02);gain.gain.exponentialRampToValueAtTime(.0001,now+at+length);osc.connect(gain);gain.connect(master);osc.start(now+at);osc.stop(now+at+length+.04);}}catch{}};
  // Destello al tocar la esfera: el halo se expande una vez, a la par del sonido.
- const flash=()=>{root.classList.remove('adi-flash');void root.offsetWidth;root.classList.add('adi-flash');setTimeout(()=>root.classList.remove('adi-flash'),650);};
+ const flash=()=>{orbState.pressAt=performance.now();root.classList.remove('adi-flash');void root.offsetWidth;root.classList.add('adi-flash');setTimeout(()=>root.classList.remove('adi-flash'),650);};
  // Enlaces seguros: solo direcciones https y la ruta interna de citas se convierten en vínculos.
  function rich(node,text){let last=0;for(const match of text.matchAll(/https:\/\/[^\s<>"']+[^\s<>"'.,;:!?)]|\/citas\b/g)){node.append(text.slice(last,match.index));const link=el('a',match[0]==='/citas'?'la agenda de citas':match[0]);link.href=match[0];if(match[0]!=='/citas'){link.target='_blank';link.rel='noopener noreferrer';}node.append(link);last=match.index+match[0].length;}node.append(text.slice(last));}
  const zone={timeZone:'America/Guayaquil'},clock=date=>new Intl.DateTimeFormat('es-EC',{...zone,hour:'2-digit',minute:'2-digit'}).format(date),dayKey=date=>new Intl.DateTimeFormat('en-CA',{...zone,year:'numeric',month:'2-digit',day:'2-digit'}).format(date);
@@ -34,7 +41,7 @@
  function setTyping(on){typing?.remove();typing=null;if(on){typing=el('p',undefined,'adi-message adi adi-typing');typing.setAttribute('aria-label','ADI está preparando la respuesta');typing.append(el('span'),el('span'),el('span'));list.append(typing);bottom();}}
  // Estado real de la conversación: el servidor informa «asesor conectado» únicamente cuando una persona la tomó.
  const labels={adi:'ADI disponible',consulting:'Consultando con ADI…',requesting:'Solicitando un asesor…',waiting:'Esperando a un asesor',advisor:'Asesor conectado',closed:'Conversación finalizada',offline:'Sin conexión. Reintentando…'};
- function paint(){const shown=failures>=3?'offline':transient||state;root.dataset.state=shown;status.textContent=labels[shown];human.hidden=state==='advisor';human.disabled=state==='waiting'||transient==='requesting';human.textContent=state==='waiting'?'Solicitud enviada: esperando a un asesor':transient==='requesting'?'Solicitando…':'Solicitar un asesor';}
+ function paint(){const shown=failures>=3?'offline':transient||state;root.dataset.state=shown;status.textContent=labels[shown];toggle.title=/^ADI/.test(labels[shown])?labels[shown]:'ADI · '+labels[shown];human.hidden=state==='advisor';human.disabled=state==='waiting'||transient==='requesting';human.textContent=state==='waiting'?'Solicitud enviada: esperando a un asesor':transient==='requesting'?'Solicitando…':'Solicitar un asesor';}
  function setState(value){if(!labels[value]||value===state){paint();return;}const before=state;state=value;paint();if(!loaded)return;if(value==='advisor'){note('Un asesor se unió a la conversación.');sound('advisor');}else if(value==='closed')note('El asesor finalizó la conversación. Si escribes de nuevo, ADI continuará atendiéndote.');else if(value==='adi'&&before==='advisor')note('ADI continúa con la conversación.');}
  function showBadge(){badge.hidden=!unread;badge.textContent=unread>9?'9+':String(unread||'');toggle.setAttribute('aria-label',unread?'Abrir asistente ADI: '+unread+(unread===1?' mensaje nuevo':' mensajes nuevos'):'Abrir asistente ADI');}
  function draw(items){let incoming=0;for(const item of items||[]){if(item.id<=lastId)continue;const date=new Date(item.created_at),valid=!Number.isNaN(date.getTime());if(valid&&dayKey(date)!==lastDay){lastDay=dayKey(date);place(el('p',dayLabel(date),'adi-day'));}
@@ -78,16 +85,16 @@
  function hush(){speech++;root.classList.remove('adi-beat');if(canSpeak)speechSynthesis.cancel();if(root.dataset.voice==='speaking')voiceState('');}
  function speak(text,force){if(!canSpeak||(!prefs.voice&&!force)||!text)return;hush();const turn=speech,voice=pickVoice(),parts=speechParts(speechText(text));if(!parts.length)return;
   parts.forEach((part,index)=>{const say=new SpeechSynthesisUtterance(part);say.lang=voice?.lang||'es-CO';if(voice)say.voice=voice;say.rate=rate();say.pitch=1.06;say.volume=1;
-   if(!index)say.onstart=()=>{if(turn===speech)voiceState('speaking');};
+   if(!index)say.onstart=()=>{if(turn===speech){orbState.beatAt=performance.now();voiceState('speaking');}};
    if(index===parts.length-1)say.onend=()=>{if(turn===speech&&root.dataset.voice==='speaking')voiceState('');};
-   say.onboundary=()=>{if(turn!==speech)return;root.classList.remove('adi-beat');void root.offsetWidth;root.classList.add('adi-beat');};
+   say.onboundary=()=>{if(turn!==speech)return;orbState.beatAt=performance.now();root.classList.remove('adi-beat');void root.offsetWidth;root.classList.add('adi-beat');};
    say.onerror=()=>{if(turn===speech&&root.dataset.voice==='speaking')voiceState('');};speechSynthesis.speak(say);});}
  const micErrors={'not-allowed':'El micrófono está bloqueado. Permite su uso en el candado de la barra de direcciones y vuelve a intentarlo.','service-not-allowed':'El micrófono está bloqueado. Permite su uso en el candado de la barra de direcciones y vuelve a intentarlo.','audio-capture':'No se encontró ningún micrófono conectado.','no-speech':'No escuché nada. Pulsa el micrófono y habla de nuevo.',network:'No hay conexión para el reconocimiento de voz. Revisa tu internet.',aborted:''};
  let meter=null;const phone=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
  async function startMeter(){if(phone||meter||!navigator.mediaDevices?.getUserMedia||!(window.AudioContext||window.webkitAudioContext))return;
   try{const stream=await navigator.mediaDevices.getUserMedia({audio:true});if(root.dataset.voice!=='listening'){stream.getTracks().forEach(track=>track.stop());return;}
    const context=new (window.AudioContext||window.webkitAudioContext)(),analyser=context.createAnalyser();analyser.fftSize=256;context.createMediaStreamSource(stream).connect(analyser);const data=new Uint8Array(analyser.fftSize);let frame=0,smooth=0;
-   const tick=()=>{analyser.getByteTimeDomainData(data);let sum=0;for(const value of data){const d=(value-128)/128;sum+=d*d;}smooth=smooth*.7+Math.min(1,Math.sqrt(sum/data.length)*5)*.3;root.style.setProperty('--adi-level',smooth.toFixed(3));frame=requestAnimationFrame(tick);};
+   const tick=()=>{analyser.getByteTimeDomainData(data);let sum=0;for(const value of data){const d=(value-128)/128;sum+=d*d;}smooth=smooth*.7+Math.min(1,Math.sqrt(sum/data.length)*5)*.3;orbState.level=smooth;root.style.setProperty('--adi-level',smooth.toFixed(3));frame=requestAnimationFrame(tick);};
    meter={stop(){cancelAnimationFrame(frame);stream.getTracks().forEach(track=>track.stop());context.close().catch(()=>{});root.style.removeProperty('--adi-level');delete root.dataset.meter;}};root.dataset.meter='true';tick();}catch{}}
  const stopMeter=()=>{meter?.stop();meter=null;};
  function listen(){if(recognizer){recognizer.stop();return;}if(!Recognition){note('Este navegador no permite hablar con ADI. Usa Chrome, Edge o Safari, o escribe tu mensaje.','error');return;}if(busy)return;hush();

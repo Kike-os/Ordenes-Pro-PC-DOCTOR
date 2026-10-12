@@ -4387,3 +4387,31 @@ body[data-page=dashboard] button[aria-label^="Cerrar"]:not(#logout):not(.primary
 @media(max-width:1180px){.control-pro .control-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:720px){.control-pro .control-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .control-pro .control-kpi[data-kpi=stay_overdue] strong{color:#ffb1b8}
+/* ADI 3D: con WebGL activo, un lienzo dibuja la esfera de cristal completa (interior, reflejos y halo). Las capas CSS quedan como alternativa
+   ligera cuando el navegador no ofrece WebGL. Sin anillos ni bordes planos. */
+#adi-widget.adi-v2 .adi-orb-gl{position:absolute;inset:-34%;width:168%;height:168%;z-index:0;pointer-events:none;display:block}
+#adi-widget.adi-v2.adi-gl .adi-orb{overflow:visible;background:none;box-shadow:none;filter:none!important;animation:none!important}
+#adi-widget.adi-v2.adi-gl :is(.adi-orb-swirl,.adi-orb-shine,.adi-halo,.adi-level){display:none}
+#adi-widget.adi-v2.adi-gl .adi-orb::before,#adi-widget.adi-v2.adi-gl .adi-orb::after{display:none}
+#adi-widget.adi-v2.adi-gl .adi-toggle,#adi-widget.adi-v2.adi-gl .adi-toggle:hover,#adi-widget.adi-v2.adi-gl .adi-toggle:focus-visible{animation:none!important;background:transparent;box-shadow:0 16px 18px -12px #000000a6}
+#adi-widget.adi-v2.adi-gl .adi-toggle:hover{transform:scale(1.04)}
+#adi-widget.adi-v2.adi-gl .adi-toggle:focus-visible{outline:2px solid #ffd3e6;outline-offset:6px}
+/* Letras dentro del cristal: finas y translúcidas para no tapar la profundidad. */
+#adi-widget.adi-v2.adi-gl .adi-orb-label{z-index:1;font-weight:600;font-size:14px;letter-spacing:.2em;text-indent:.2em;color:#fff;opacity:.9;text-shadow:0 1px 2px #5a1243cc,0 0 9px #ffe3f099;mix-blend-mode:normal}
+@media(max-width:860px){#adi-widget.adi-v2.adi-gl .adi-orb-label{font-size:12.5px}}
+/* Alternativa sin WebGL: sin anillos decorativos. */
+#adi-widget.adi-v2 :is(.adi-ring,.adi-sparks,.adi-particles){display:none}
+/* Indicador de conexión: pequeño y discreto, con el estado real (disponible, esperando asesor, asesor conectado, finalizada, sin conexión). */
+#adi-widget.adi-v2 .adi-toggle .adi-online{display:block;right:3px;bottom:3px;width:9px;height:9px;border:1.5px solid #0a0f1e;background:#3ddc97;box-shadow:0 0 0 .75px #7af0c059,0 0 6px #34d39980;z-index:3}
+#adi-widget.adi-v2:is([data-state=waiting],[data-state=requesting]) .adi-toggle .adi-online{background:#f3c677;box-shadow:0 0 6px #f3c67780}
+#adi-widget.adi-v2[data-state=advisor] .adi-toggle .adi-online{background:#69a7ff;box-shadow:0 0 6px #69a7ff80}
+#adi-widget.adi-v2[data-state=closed] .adi-toggle .adi-online{background:#7b8798;box-shadow:none}
+#adi-widget.adi-v2[data-state=offline] .adi-toggle .adi-online{display:block;background:transparent;border-color:#ff8a94;box-shadow:none}
+#adi-widget.adi-v2[data-orb=error] .adi-toggle .adi-online{background:#ff6b78;box-shadow:0 0 6px #ff6b7899}
+/* Acceso en teléfonos: la esfera sube a la esquina superior derecha para no tapar el botón «Iniciar sesión» ni los enlaces; el chat se abre hacia abajo. */
+@media(max-width:480px){
+ body[data-page=login] #adi-widget.adi-v2{top:max(10px,env(safe-area-inset-top));bottom:auto;right:max(10px,env(safe-area-inset-right))}
+ body[data-page=login] #adi-widget.adi-v2 .adi-toggle{width:48px;height:48px;min-height:48px}
+ body[data-page=login] #adi-widget.adi-v2 .adi-panel{top:58px;bottom:auto;max-height:calc(100dvh - 84px)}
+ body[data-page=login] #adi-widget.adi-v2.adi-gl .adi-orb-label,body[data-page=login] #adi-widget.adi-v2 .adi-orb-label{font-size:11.5px}
+}

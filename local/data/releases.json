@@ -8,6 +8,25 @@
   },
   "releases": [
     {
+      "version": "1.5.103",
+      "date": "2026-10-12T17:36:10-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Esfera 3D de ADI en WebGL y título «Órdenes de Reparación»",
+      "changes": {
+        "features": [
+          "Esfera de ADI en 3D real (WebGL): cristal rosado con reflejos de entorno, refracción, núcleo de energía y partículas interiores, con giro propio y reacción a cada estado (toque, escucha, procesamiento, habla y desconexión)."
+        ],
+        "improvements": [
+          "ADI sin anillos decorativos, con un indicador de conexión pequeño y discreto; alternativa ligera automática cuando el equipo no tiene aceleración gráfica; en teléfonos la esfera del acceso ya no tapa el botón «Iniciar sesión».",
+          "El módulo pasa a titularse «Órdenes de Reparación»."
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.102",
       "date": "2026-10-12T17:27:33-05:00",
       "type": "patch",

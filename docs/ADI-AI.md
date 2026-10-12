@@ -135,3 +135,23 @@ Halo rosado difuminado que respira con la esfera, cristal con reflejos superior 
 - **Material**: luz principal arriba a la izquierda, bordes más oscuros (efecto Fresnel), neblina luminosa interior, cáustica clara en la parte inferior, brillo especular curvo con un punto secundario, filo fino y sombra de apoyo bajo la esfera. El texto «ADI» queda bajo los reflejos, dentro del cristal. Todo en CSS.
 - **Sonidos** (Web Audio, sin archivos ni licencias): al abrir, tono de cristal ascendente (≈0,4 s) con destello y expansión del halo; al cerrar o minimizar, tono descendente breve; al activar el micrófono, señal suave; respuesta lista, señal delicada solo si la voz no va a leerla; error, tono grave. Procesar no suena.
 - **Reglas**: se activan o desactivan con «Efectos de sonido» en el menú «⋯» (guardado en el navegador); volumen bajo; un efecto a la vez (el nuevo apaga al anterior); callan mientras ADI habla; el audio solo se inicia tras una interacción real y nunca al cargar la página. Si el navegador no ofrece Web Audio, simplemente no suenan.
+
+## Esfera 3D en WebGL (1.5.103)
+
+- **Motor**: `local/static/adi-orb.js`, un sombreador WebGL propio sin dependencias. Cada píxel traza un rayo contra una esfera de cristal: normal, reflejo de un entorno de estudio que gira despacio, efecto Fresnel, dos brillos especulares, cáustica y refracción; dentro, el rayo recorre una nube de energía con giro propio, un núcleo y cinco partículas en órbita. Se eligió un sombreador propio en lugar de Three.js porque esa biblioteca pesa cientos de KB para un elemento de 62 px y la política de seguridad solo admite guiones propios.
+- **Estados reales**: en espera (giro lento y respiración); al tocarla (rebote elástico del radio y destello, con el sonido); escuchando (el núcleo vibra con el volumen medido del micrófono en computadoras; en teléfonos, con el inicio y fin de voz que informa el navegador); procesando (las partículas aceleran y se concentran en el centro); hablando (ondas desde el centro y deformación suave, con una envolvente que sube en cada palabra que informa el motor de voz); sin conexión o error (esfera atenuada y desaturada, indicador hueco o rojo).
+- **Límite conocido**: el audio de la síntesis de voz del navegador no se puede analizar, así que al hablar no hay análisis de amplitud real: la animación sigue los eventos de palabra del motor.
+- **Indicador de conexión**: punto pequeño (9 px) con el estado real; el título de la esfera dice el estado.
+- **Rendimiento**: lienzo de 1,68 veces la esfera, hasta el doble de densidad de píxeles; menos resolución y pasos en teléfonos y equipos modestos, y reducción automática si el dibujo va lento; unos 30 cuadros por segundo en reposo y más al reaccionar; se detiene con la pestaña oculta; con «movimiento reducido» apenas se redibuja.
+- **Alternativa**: sin WebGL, o con dibujo por software, queda la esfera CSS (sin anillos decorativos). `localStorage['ordenes-pro:adi-3d']` admite `on` (forzar) y `off` (desactivar) para diagnóstico.
+- **Recursos**: al salir de la página se cancela el dibujo y se liberan programa, búfer y contexto; el medidor del micrófono cierra su pista y su contexto de audio al terminar de escuchar.
+- **Acceso en teléfonos**: la esfera se coloca arriba a la derecha para no tapar el botón «Iniciar sesión».
+
+### Cómo comprobar cada estado
+
+1. **Espera**: abrir cualquier página con ADI y observar el giro interior.
+2. **Toque**: pulsar la esfera (rebote, destello y sonido si «Efectos de sonido» está activo).
+3. **Escucha**: abrir el chat y pulsar el micrófono; hablar y ver vibrar el núcleo.
+4. **Procesamiento**: enviar un mensaje; mientras llega la respuesta las partículas se concentran.
+5. **Habla**: activar la voz (altavoz) y enviar un mensaje; durante la lectura salen ondas del centro. El botón cuadrado la detiene.
+6. **Sin conexión**: desconectar la red unos segundos con el chat abierto.
