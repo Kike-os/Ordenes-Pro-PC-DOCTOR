@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.40 — 2026-10-11 19:24 (UTC-05:00)
+
+Agenda de citas con el nuevo diseño
+
+### Mejoras realizadas
+
+- Agenda de citas: nuevo encabezado con resumen y «Nueva cita», filtros rápidos en píldoras con contador, buscador y filas con avatar, iconos de equipo y servicio, día de la semana y acciones destacadas
+
 ## v1.5.39 — 2026-10-11 19:09 (UTC-05:00)
 
 Alineación del Centro de Operaciones y nuevo panel Atenciones pendientes

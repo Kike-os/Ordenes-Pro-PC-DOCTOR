@@ -82,3 +82,7 @@ Cada cita de la lista tiene Ver, Editar, Reprogramar, Cancelar y Eliminar (en pa
 - **Eliminar** (`action: delete`, solo administración): eliminación lógica. La fila se conserva con `deleted_at`, `deleted_by` y `delete_reason`, más un evento `deleted` y el registro de auditoría; deja de aparecer en agenda, Citas de Hoy, avisos, búsquedas y recordatorios, y libera su horario. No existe borrado físico desde la aplicación.
 - Si la cita cancelada o eliminada era la de un mantenimiento preventivo, ni la orden ni la previsión se tocan: la previsión vuelve a «Programado» y queda marcada (`auto_appointment_blocked`) para que no se regenere sola. Se puede agendar otra a mano; una entrega nueva de la orden levanta la marca.
 - Las confirmaciones usan el diálogo propio (foco inicial en «Conservar cita», Escape conserva); ya no se usa la ventana nativa del navegador en la agenda.
+
+## Presentación «Agenda de citas» (1.5.40)
+
+El módulo se titula «Agenda de citas». El encabezado muestra el resumen del período cargado (total de citas, confirmadas, nuevas y preventivos) y «Nueva cita». Los filtros rápidos son píldoras con contador (Todos, Confirmadas, Nuevas, Por confirmar, Preventivos, Canceladas); estado, tipo de equipo, servicio y fechas siguen disponibles tras el botón «Filtros». Resumen y contadores se calculan sobre las mismas filas reales de la lista. Las vistas Día, Semana y Mes y todas las acciones por cita se conservan.

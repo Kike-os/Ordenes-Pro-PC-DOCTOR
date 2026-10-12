@@ -8,6 +8,22 @@
   },
   "releases": [
     {
+      "version": "1.5.40",
+      "date": "2026-10-11T19:24:15-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Agenda de citas con el nuevo diseño",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Agenda de citas: nuevo encabezado con resumen y «Nueva cita», filtros rápidos en píldoras con contador, buscador y filas con avatar, iconos de equipo y servicio, día de la semana y acciones destacadas"
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.39",
       "date": "2026-10-11T19:09:59-05:00",
       "type": "patch",
