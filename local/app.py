@@ -772,7 +772,9 @@ class Handler(BaseHTTPRequestHandler):
                     c.execute("INSERT INTO system_state(key,value) VALUES ('public_version_check',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",(json.dumps(cached),));c.commit()
                 notes=[{'key':key,'title':title,'items':installed['changes'].get(key,[])} for key,title in versioning.CATEGORIES.items() if installed['changes'].get(key)]
                 return self.reply(200,{'version':installed['version'],'date':installed['date'],'type':versioning.TYPES.get(installed['type'],installed['type']),'summary':installed.get('summary',''),'notes':notes,
-                                       'state':cached['state'],'latest':cached['latest'],'pending':cached['pending'],'checked_at':cached['at'],'source':cached['source'],'history':len(registry['releases'])})
+                                       'state':cached['state'],'latest':cached['latest'],'pending':cached['pending'],'checked_at':cached['at'],'source':cached['source'],'history':len(registry['releases']),
+                                       # Identificador del despliegue en ejecución (lo define la plataforma al compilar); no es un secreto.
+                                       'build':(os.getenv('VERCEL_GIT_COMMIT_SHA','') or 'local')[:7],'deployment':(os.getenv('VERCEL_DEPLOYMENT_ID','') or '')[-8:],'server_time':now.isoformat(timespec='seconds')})
             if path == '/api/cron/reminders':
                 # Con CRON_SECRET definido solo responde a la llamada autenticada de la plataforma. No envía nada si los avisos están apagados.
                 expected=os.getenv('CRON_SECRET','')

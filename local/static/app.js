@@ -1541,17 +1541,23 @@ if(document.body.dataset.page==='dashboard')dashboard().catch(error=>notify(erro
 // muestra «Sistema actualizado» sin esa comprobación. Si el servidor ya ejecuta otra versión que la de esta página, se pide recargar.
 {const box=document.getElementById('system-version');if(box){
  const label=box.querySelector('.system-version-label'),retry=document.getElementById('system-version-retry'),reload=document.getElementById('system-version-reload'),news=document.getElementById('system-version-news');let info=null;
- const paintVersion=(state,text)=>{box.dataset.state=state;label.textContent=text;retry.hidden=state!=='error';};
+ const paintVersion=(state,text)=>{box.dataset.state=state;label.textContent=text;retry.hidden=state!=='error';if(state==='checking'||state==='error'||state==='updated'){delete box.dataset.tag;reload.hidden=true;}};
  const day=value=>{const date=new Date(value);return Number.isNaN(date.getTime())?'':new Intl.DateTimeFormat('es-EC',{timeZone:'America/Guayaquil',day:'2-digit',month:'long',year:'numeric'}).format(date);};
  const hour=value=>{const date=new Date(value);return Number.isNaN(date.getTime())?'':new Intl.DateTimeFormat('es-EC',{timeZone:'America/Guayaquil',hour:'2-digit',minute:'2-digit'}).format(date);};
  async function checkVersion(force){paintVersion('checking','Comprobando actualizaciones…');
   try{const response=await fetch('/api/public/version'+(force?'?refresh=1':''),{cache:'no-store',credentials:'same-origin'});if(!response.ok)throw new Error();info=await response.json();
    // La página puede venir de la caché del navegador: si el servidor ya ejecuta otra versión, esta pantalla está desactualizada.
-   if(info.version!==box.dataset.version){paintVersion('available','Nueva versión v'+info.version+' desplegada · recarga la página');reload.hidden=false;return;}
-   const when=hour(info.checked_at);
+   if(info.version!==box.dataset.version){
+    // Esta pantalla viene de una versión anterior. Si nadie ha escrito en el formulario se carga la nueva sola, una única vez por versión
+    // (la marca de sesión impide cualquier bucle de recargas); si hay algo escrito, se avisa y se deja el botón.
+    const typed=[...document.querySelectorAll('#login-form input:not([type=checkbox])')].some(node=>node.value),busy=document.getElementById('login-form')?.getAttribute('aria-busy')==='true';let tried='';try{tried=sessionStorage.getItem('ordenes-pro:acceso-recarga')||'';}catch{}
+    if(!typed&&!busy&&!document.querySelector('dialog[open]')&&tried!==info.version){try{sessionStorage.setItem('ordenes-pro:acceso-recarga',info.version);}catch{}paintVersion('checking','Cargando la versión v'+info.version+'…');setTimeout(()=>location.reload(),900);return;}
+    paintVersion('available','Nueva versión v'+info.version+' lista · recarga para usarla');box.dataset.tag='Nueva versión';reload.hidden=false;return;}
+   reload.hidden=true;delete box.dataset.tag;
+   const when=hour(info.checked_at);label.title='Última comprobación: '+day(info.checked_at)+', '+when+(info.build?' · compilación '+info.build:'');
    if(info.state==='updated')paintVersion('updated','Sistema actualizado'+(when?' · comprobado a las '+when:''));
-   else if(info.state==='important')paintVersion('important','Actualización importante disponible: v'+info.latest);
-   else if(info.state==='available')paintVersion('available','Actualización disponible: v'+info.latest);
+   else if(info.state==='important'){paintVersion('important','Actualización importante en publicación: v'+info.latest);box.dataset.tag='Importante';}
+   else if(info.state==='available'){paintVersion('available','Nueva versión en publicación: v'+info.latest);box.dataset.tag='Nueva versión';}
    else paintVersion('error','No se pudo comprobar si hay actualizaciones');}
   catch{paintVersion('error','No se pudo comprobar si hay actualizaciones');}}
  retry.addEventListener('click',()=>checkVersion(true));reload.addEventListener('click',()=>location.reload());
@@ -1567,7 +1573,10 @@ if(document.body.dataset.page==='dashboard')dashboard().catch(error=>notify(erro
   const compat=make('section');compat.dataset.kind='compat';const compatTitle=make('h3');compatTitle.append(icon('M2 3h20v14H2z M8 21h8 M12 17v4'),document.createTextNode('Compatibilidad'));compat.append(compatTitle,make('p','Funciona en las versiones actuales de Chrome, Edge, Firefox y Safari, en computadoras y teléfonos. No requiere instalación: basta con recargar la página.'));body.append(compat);dialog.append(body);
   const foot=make('footer'),older=make('a','Ver versiones anteriores ('+Math.max(0,info.history-1)+')','secondary');older.href='/novedades';const done=make('button','Cerrar','primary');done.type='button';done.addEventListener('click',()=>dialog.close());foot.append(older,done);dialog.append(foot);
   dialog.addEventListener('close',()=>{dialog.remove();news.focus();});dialog.addEventListener('click',event=>{if(event.target===dialog)dialog.close();});document.body.append(dialog);dialog.showModal();});
- checkVersion(false);}}
+ checkVersion(false);
+ // Mientras la pantalla siga abierta se vuelve a comprobar cada cinco minutos y al regresar a la pestaña (como mucho una vez por minuto).
+ let lastCheck=Date.now();const again=()=>{if(document.hidden||Date.now()-lastCheck<60000||document.querySelector('dialog.version-news'))return;lastCheck=Date.now();checkVersion(false);};
+ setInterval(again,300000);document.addEventListener('visibilitychange',again);addEventListener('online',again);}}
 // Acceso: ADI se carga después, cuando el navegador está libre, para no retrasar el formulario de inicio de sesión.
 if(document.body.dataset.page==='login'&&document.getElementById('adi-widget')){const loadAdi=()=>{const script=document.createElement('script');script.src='/static/adi-widget.js';document.head.append(script);};'requestIdleCallback' in window?requestIdleCallback(loadAdi,{timeout:2500}):setTimeout(loadAdi,600);}
 

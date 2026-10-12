@@ -8,6 +8,24 @@
   },
   "releases": [
     {
+      "version": "1.5.110",
+      "date": "2026-10-12T18:25:09-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Actualizaciones automáticas en la pantalla de acceso",
+      "changes": {
+        "features": [
+          "La pantalla de acceso detecta sola las versiones nuevas: comprueba al abrir, cada cinco minutos y al volver a la pestaña; carga la versión nueva automáticamente si el formulario está vacío (una sola vez, sin bucles) o muestra «Nueva versión» con el botón para recargar."
+        ],
+        "improvements": [
+          "El manifiesto de versión incluye el identificador de compilación del despliegue y la hora real de la última comprobación."
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.109",
       "date": "2026-10-12T18:21:14-05:00",
       "type": "patch",

@@ -4,6 +4,18 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.110 — 2026-10-12 18:25 (UTC-05:00)
+
+Actualizaciones automáticas en la pantalla de acceso
+
+### Nuevas funcionalidades
+
+- La pantalla de acceso detecta sola las versiones nuevas: comprueba al abrir, cada cinco minutos y al volver a la pestaña; carga la versión nueva automáticamente si el formulario está vacío (una sola vez, sin bucles) o muestra «Nueva versión» con el botón para recargar.
+
+### Mejoras realizadas
+
+- El manifiesto de versión incluye el identificador de compilación del despliegue y la hora real de la última comprobación.
+
 ## v1.5.109 — 2026-10-12 18:21 (UTC-05:00)
 
 Seguimiento de Órdenes en tabla compacta con filtro desde las tarjetas de estado
