@@ -8,6 +8,24 @@
   },
   "releases": [
     {
+      "version": "1.5.84",
+      "date": "2026-10-12T08:41:13-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Recordatorios de mantenimiento con enlace seguro",
+      "changes": {
+        "features": [
+          "Recordatorios de mantenimiento por correo a 30, 15, 7, 3 y 0 días, con enlace seguro para que el cliente confirme la fecha, pida otro horario o deje de recibirlos"
+        ],
+        "improvements": [
+          "Las respuestas de los clientes sobre su mantenimiento aparecen en Próximos Mantenimientos y en el Centro de Actividad; los recordatorios vienen apagados y solo se envían con consentimiento"
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.83",
       "date": "2026-10-12T08:29:57-05:00",
       "type": "patch",

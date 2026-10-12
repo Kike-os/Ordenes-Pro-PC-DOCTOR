@@ -227,6 +227,11 @@ def build(c, user, now, mail_access=False):
         alert('chats', chats, 'support', 'info', plural(chats, 'conversación nueva', 'conversaciones nuevas'), 'Clientes que esperan atención en vivo.', '#live')
         waiting = c.execute("SELECT COUNT(*) FROM adi_conversations WHERE mode='human' AND assigned_to IS NULL").fetchone()[0]
         alert('advisor', waiting, 'support', 'warning', plural(waiting, 'cliente espera a un asesor', 'clientes esperan a un asesor'), 'Solicitaron atención humana en el chat.', '#live')
+        try:
+            answers = c.execute("SELECT COUNT(*) FROM maintenance_responses WHERE handled_at=''").fetchone()[0]
+            alert('maintenance-answers', answers, 'support', 'info', plural(answers, 'respuesta de cliente sobre su mantenimiento', 'respuestas de clientes sobre su mantenimiento'), 'Confirmaciones o cambios de horario recibidos por enlace seguro.', '#maintenance')
+        except Exception:
+            pass
         accounts = c.execute("SELECT COUNT(*) FROM users WHERE approval='pending'").fetchone()[0]
         alert('accounts', accounts, 'client', 'warning', plural(accounts, 'solicitud de cuenta por revisar', 'solicitudes de cuenta por revisar'), 'Aprueba o rechaza el acceso en Configuración.', '#settings?tab=users')
     if mail_access:

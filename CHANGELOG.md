@@ -4,6 +4,18 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.84 — 2026-10-12 08:41 (UTC-05:00)
+
+Recordatorios de mantenimiento con enlace seguro
+
+### Nuevas funcionalidades
+
+- Recordatorios de mantenimiento por correo a 30, 15, 7, 3 y 0 días, con enlace seguro para que el cliente confirme la fecha, pida otro horario o deje de recibirlos
+
+### Mejoras realizadas
+
+- Las respuestas de los clientes sobre su mantenimiento aparecen en Próximos Mantenimientos y en el Centro de Actividad; los recordatorios vienen apagados y solo se envían con consentimiento
+
 ## v1.5.83 — 2026-10-12 08:29 (UTC-05:00)
 
 Adjuntos del correo mejorados

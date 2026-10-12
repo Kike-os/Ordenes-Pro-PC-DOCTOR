@@ -86,3 +86,13 @@ Cada cita de la lista tiene Ver, Editar, Reprogramar, Cancelar y Eliminar (en pa
 ## Presentación «Agenda de citas» (1.5.40)
 
 El módulo se titula «Agenda de citas». El encabezado muestra el resumen del período cargado (total de citas, confirmadas, nuevas y preventivos) y «Nueva cita». Los filtros rápidos son píldoras con contador (Todos, Confirmadas, Nuevas, Por confirmar, Preventivos, Canceladas); estado, tipo de equipo, servicio y fechas siguen disponibles tras el botón «Filtros». Resumen y contadores se calculan sobre las mismas filas reales de la lista. Las vistas Día, Semana y Mes y todas las acciones por cita se conservan.
+
+## Recordatorios de mantenimiento con enlace seguro (1.5.84)
+
+- **Etapas:** un correo cuando faltan 30, 15, 7, 3 y 0 días para la fecha recomendada (`local/maintenance_reminders.py`, migración 034). Cada etapa se envía una sola vez por previsión; reprogramar la fecha reinicia las etapas.
+- **A quién:** solo a clientes con consentimiento «aceptado» y correo válido. Sin consentimiento no se envía nada.
+- **Apagados por defecto.** Administración los activa en Próximos Mantenimientos; al activarlos se avisa de que son correos reales. «Enviar pendientes ahora» los envía en el momento.
+- **Envío periódico:** no hay tarea programada en Vercel. Mientras estén activos, el servidor envía tandas de hasta tres recordatorios, como mucho cada diez minutos y solo entre las 08:00 y las 19:00 (Ecuador), cuando alguien del personal tiene abierto el panel de inicio. Un día sin nadie conectado no envía; al siguiente acceso se pone al día.
+- **Enlace del cliente** (`/mantenimiento/<enlace>`): muestra el equipo, la fecha recomendada y la cita propuesta, sin datos personales, y permite confirmar la fecha, pedir otro horario (con una nota) o dejar de recibir recordatorios.
+- **Respuestas:** no modifican la agenda por sí solas. Aparecen en Próximos Mantenimientos y en el Centro de Actividad para que el personal coordine la cita y las marque como atendidas; quedan en el historial de la orden. Darse de baja retira el consentimiento.
+- «Enviado» significa que el servidor de correo aceptó el mensaje, no que el cliente lo haya leído.

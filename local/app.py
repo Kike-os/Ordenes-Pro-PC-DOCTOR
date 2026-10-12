@@ -388,6 +388,25 @@ def send_authorization_mail(c,oid,user):
     return {'result':'sent','recipient':recipient}
 
 
+def maintenance_deliver(recipient,subject,body):
+    """Envío de un recordatorio de mantenimiento por el correo del sistema; lanza MailError si el servidor no lo acepta."""
+    config=mail_pro.settings()
+    message,recipients=mail_pro.build_message(config,{'to':recipient,'subject':subject,'body':body,'from_name':corporate.settings()['name']},'')
+    mail_pro.deliver(config,message,recipients)
+
+
+def maintenance_reminders_tick(c,now):
+    """Envío periódico sin tarea programada: como mucho cada diez minutos, en horario diurno y por tandas pequeñas."""
+    import maintenance_reminders
+    if not maintenance_reminders.enabled(c) or not 8<=now.hour<19:return
+    last=c.execute("SELECT value FROM system_state WHERE key='maintenance_reminders_tick'").fetchone()
+    if last and last['value']>(now-appointments.timedelta(minutes=10)).isoformat(timespec='seconds'):return
+    c.execute("INSERT INTO system_state(key,value) VALUES ('maintenance_reminders_tick',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",(now.isoformat(timespec='seconds'),));c.commit()
+    try:
+        if mail_pro.configured():maintenance_reminders.run(c,now,maintenance_deliver)
+    except Exception as error:print('maintenance-reminders',type(error).__name__,flush=True)
+
+
 def client_authorization_auto(c):
     row=c.execute("SELECT value FROM system_state WHERE key='client_authorization_auto'").fetchone()
     return bool(row and row['value']=='on')
@@ -657,6 +676,13 @@ class Handler(BaseHTTPRequestHandler):
                 token=preference[1]
                 body='<!doctype html><html lang="es"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Preferencias de recordatorios</title><h1>PC-DOCTOR S.A.</h1><p>Puede dejar de recibir recordatorios de mantenimiento. Esta acción no modifica su reparación.</p><form method="post" action="/maintenance-preferences/'+token+'"><button type="submit">Dejar de recibir recordatorios</button></form></html>'
                 return self.reply(200,body,'text/html; charset=utf-8')
+            maintenance_page=re.fullmatch(r'/mantenimiento/([A-Za-z0-9_-]{40,60})',path)
+            if maintenance_page:
+                # Página del cliente para su mantenimiento preventivo: confirmar la fecha, pedir otro horario o dejar de recibir avisos.
+                import maintenance_reminders
+                if limited(c,'maint-ip:'+digest(self.client_address[0]),60,300):return self.reply(429,{'error':'Demasiadas consultas. Intenta más tarde.'})
+                found=maintenance_reminders.lookup(c,maintenance_page[1])
+                return self.reply(200 if found else 404,maintenance_reminders.page(found,maintenance_page[1]) if found else maintenance_reminders.missing_page(),'text/html; charset=utf-8')
             # Autorización electrónica del cliente por enlace aleatorio. La respuesta es idéntica para enlaces inexistentes.
             authorize_page=re.fullmatch(r'/autorizar/([A-Za-z0-9_-]{20,80})(/comprobante\.pdf)?',path)
             if authorize_page:
@@ -1131,7 +1157,10 @@ class Handler(BaseHTTPRequestHandler):
                     if client is not None:mail_pro.close_imap(client)
             if path in ('/api/dashboard','/api/activity','/api/maintenance'):
                 now=reception_now();today=now.date().isoformat()
-                if path=='/api/maintenance':return self.reply(200,{'rows':maintenance.rows(c),'today':today,'profiles':{k:v[0] for k,v in maintenance.PROFILES.items()}})
+                if path=='/api/maintenance':
+                    import maintenance_reminders
+                    return self.reply(200,{'rows':maintenance.rows(c),'today':today,'profiles':{k:v[0] for k,v in maintenance.PROFILES.items()},'reminders':maintenance_reminders.status(c,now.date())})
+                if path=='/api/dashboard':maintenance_reminders_tick(c,now)
                 activity_query=parse_qs(urlsplit(self.path).query) if path=='/api/activity' else {}
                 # Historial de una sola orden: la misma fuente que el seguimiento del inicio.
                 if activity_query.get('order',[''])[0]:
@@ -1167,6 +1196,20 @@ class Handler(BaseHTTPRequestHandler):
         return self.reply(404, {'error':'Recurso no disponible.'})
 
     def do_POST(self):
+        maintenance_post=re.fullmatch(r'/mantenimiento/([A-Za-z0-9_-]{40,60})',urlsplit(self.path).path)
+        if maintenance_post:
+            import maintenance_reminders
+            try:length=int(self.headers.get('Content-Length','0') or 0)
+            except ValueError:length=0
+            if length<=0 or length>4000:return self.reply(400,{'error':'Solicitud inválida.'})
+            form={key:values[0] for key,values in parse_qs(self.rfile.read(length).decode('utf-8','replace'),keep_blank_values=True).items()}
+            with connect() as c:
+                if limited(c,'maint-post:'+digest(maintenance_post[1]),20,900):return self.reply(429,{'error':'Demasiados intentos. Intenta más tarde.'})
+                found=maintenance_reminders.lookup(c,maintenance_post[1])
+                if not found:return self.reply(404,maintenance_reminders.missing_page(),'text/html; charset=utf-8')
+                notice=maintenance_reminders.respond(c,found,form.get('action',''),form.get('note',''),reception_now())
+                if notice is None:return self.reply(400,maintenance_reminders.page(found,maintenance_post[1],error='Elija una de las opciones.'),'text/html; charset=utf-8')
+                return self.reply(200,maintenance_reminders.page(found,maintenance_post[1],notice=notice),'text/html; charset=utf-8')
         authorize_post=re.fullmatch(r'/autorizar/([A-Za-z0-9_-]{20,80})',urlsplit(self.path).path)
         if authorize_post:
             import client_authorization
@@ -1738,6 +1781,25 @@ class Handler(BaseHTTPRequestHandler):
                     c.execute('DELETE FROM sessions WHERE token_hash=?', (digest(token),))
                     audit(c, user['id'], 'logout')
                     return self.reply(200, {'ok':True}, cookie=self.cookie('',0))
+                if path=='/api/maintenance/reminders':
+                    import maintenance_reminders
+                    if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede gestionar los recordatorios.'})
+                    now=reception_now()
+                    if data.get('enabled') in (True,False):
+                        c.execute("INSERT INTO system_state(key,value) VALUES ('maintenance_reminders',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",('on' if data['enabled'] else 'off',))
+                        audit(c,user['id'],'maintenance_reminders_'+('on' if data['enabled'] else 'off'))
+                    elif data.get('action')=='run':
+                        if not maintenance_reminders.enabled(c):return self.reply(409,{'error':'Activa primero los recordatorios automáticos.'})
+                        try:ready=mail_pro.configured()
+                        except mail_pro.MailError:ready=False
+                        if not ready:return self.reply(409,{'error':'El correo del sistema no está configurado.'})
+                        if limited(c,'maint-run:'+str(user['id']),limit=12,window=3600):return self.reply(429,{'error':'Espera antes de volver a enviar.'})
+                        summary=maintenance_reminders.run(c,now,maintenance_deliver);audit(c,user['id'],'maintenance_reminders_run')
+                        return self.reply(200,{'ok':True,'summary':summary,'reminders':maintenance_reminders.status(c,now.date())})
+                    elif data.get('action')=='handled' and str(data.get('id','')).isdigit():
+                        c.execute("UPDATE maintenance_responses SET handled_at=?,handled_by=? WHERE id=? AND handled_at=''",(now.isoformat(timespec='seconds'),user['id'],int(data['id'])))
+                    else:return self.reply(400,{'error':'Acción no disponible.'})
+                    return self.reply(200,{'ok':True,'reminders':maintenance_reminders.status(c,now.date())})
                 maintenance_route=re.fullmatch(r'/api/maintenance/([0-9]+)',path)
                 if maintenance_route:
                     if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede modificar la agenda.'})
