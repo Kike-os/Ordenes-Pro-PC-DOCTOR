@@ -78,3 +78,15 @@ Sustituye al comportamiento de la 1.5.50, que aplicaba sola las correcciones sim
 - No se repite la consulta para un texto ya revisado, aceptado o descartado.
 - Si la revisión falla se indica el motivo junto al botón y el texto queda como estaba.
 - Abrir «Mejorar con ADI» retira la propuesta automática; «Cancelar» y la X del asistente solo cierran el asistente.
+
+## Corrección ortográfica automática sin ventanas (1.5.73)
+
+Sustituye a la propuesta con «Aceptar / Descartar» de la 1.5.60, a petición de PC-DOCTOR S.A.
+
+- 1,5 s después de dejar de escribir se revisa la ortografía (tildes, puntuación, errores básicos) y la corrección se aplica sola. Indicador: «ADI revisando…», «Ortografía corregida · Deshacer» o «No se pudo revisar el texto».
+- El cursor vuelve a la misma palabra en la que estaba. «Deshacer» recupera el texto anterior mientras no se haya seguido escribiendo.
+- Si se escribe durante la revisión, la petición se cancela y su respuesta se descarta. No se repite la consulta de un texto ya revisado.
+- Si la respuesta alterase cifras, códigos, series u otros datos protegidos, no se aplica nada.
+- Funciona en todas las áreas de texto libre (componente global). No actúa en los textos de autorización del cliente, en el chat de atención en vivo ni en correos que citan a otra persona; en el editor de correo se aplica al salir del campo. Los campos estructurados (serie, identificación, teléfono, correo, contraseñas) no son áreas de texto y nunca se envían.
+- Se activa o desactiva con «Corrección ortográfica automática» en el panel de ADI; se recuerda en ese navegador.
+- Mejorar redacción, simplificar y las demás herramientas siguen mostrando la vista previa y pidiendo aceptación.

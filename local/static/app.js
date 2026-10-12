@@ -884,7 +884,8 @@ function openMailComposer(initial={}){
  const body=el('textarea');body.name='body';body.hidden=true;body.maxLength=200000;const editor=el('div',undefined,'mail-editor');editor.contentEditable='true';editor.setAttribute('role','textbox');editor.setAttribute('aria-multiline','true');editor.setAttribute('aria-label','Mensaje');editor.dataset.placeholder='Escribe tu mensaje…';editor.spellcheck=true;
  const sync=()=>{body.value=mailEditorText(editor).slice(0,200000);editor.dataset.empty=String(!body.value.trim());},setBody=text=>{mailEditorFill(editor,text);sync();};setBody(initial.body||'');
  // ADI también en el cuerpo del correo: lee y escribe el texto del editor; nunca envía nada por sí sola.
- setTimeout(()=>attachAdi(null,'',{anchor:editor,get:()=>body.value,set:value=>setBody(value),focus:()=>editor.focus(),compact:true}),0);
+ // Si el correo incluye texto citado de otra persona, la corrección automática no actúa (solo la manual, con vista previa).
+ setTimeout(()=>attachAdi(null,'',{anchor:editor,get:()=>body.value,set:value=>setBody(value),focus:()=>editor.focus(),compact:true,noAuto:()=>/(^|\n)>/.test(body.value)}),0);
  editor.addEventListener('input',sync);editor.addEventListener('paste',event=>{event.preventDefault();const text=(event.clipboardData||window.clipboardData).getData('text/plain');document.execCommand('insertText',false,text);});editor.addEventListener('drop',event=>event.preventDefault());
  editor.addEventListener('keydown',event=>{if((event.ctrlKey||event.metaKey)&&!event.altKey){const key=event.key.toLowerCase();if(key==='b'||key==='i'){event.preventDefault();document.execCommand(key==='b'?'bold':'italic');sync();}}});
  if(initial.order||initial.order_code){const pick=el('select');pick.setAttribute('aria-label','Plantilla de servicio técnico');pick.add(new Option('Usar una plantilla…',''));mailTemplates.forEach(([name],index)=>pick.add(new Option(name,String(index))));pick.onchange=()=>{if(pick.value==='')return;if(body.value.trim()&&!confirm('¿Reemplazar el texto escrito por la plantilla?')){pick.value='';return;}setBody(mailTemplates[+pick.value][1].replace('{orden}',order.value||initial.order_code||''));pick.value='';};form.append(pick);}
@@ -1936,7 +1937,7 @@ async function attachAdi(area,field,custom={}){const mark=custom.anchor||area;if
  function menu(note){const empty=!get().trim(),grid=el('div',undefined,'adi-tools'),foot=el('div',undefined,'adi-actions'),apply=button('',()=>run(chosen),'primary adi-apply'),hint=el('p',note||(empty?'Escribe primero el texto que quieres mejorar.':'Elige una herramienta y pulsa «Aplicar mejora». Verás el resultado antes de cambiar tu texto.'),'adi-note');delete panel.dataset.state;grid.setAttribute('role','radiogroup');grid.setAttribute('aria-label','Herramienta de ADI');
   for(const mode of status.modes){const tool=button('',()=>{chosen=mode.code;grid.querySelectorAll('.adi-tool').forEach(node=>node.setAttribute('aria-checked',String(node.dataset.mode===chosen)));apply.disabled=empty;},'adi-tool');tool.dataset.mode=mode.code;tool.setAttribute('role','radio');tool.setAttribute('aria-checked',String(mode.code===chosen));tool.append(systemIcon(adiToolIcons[mode.code]||adiSpark),el('span',mode.label));grid.append(tool);}
   apply.append(systemIcon(adiSpark),el('span','Aplicar mejora'));apply.disabled=empty||!chosen;foot.append(button('Cancelar',()=>{close();focus();},'secondary'),apply);
-  const auto=el('label',undefined,'adi-auto'),autoBox=el('input');autoBox.type='checkbox';autoBox.checked=adiAutoOn();autoBox.onchange=()=>{try{localStorage.setItem('ordenes-pro:adi-auto',autoBox.checked?'1':'0');}catch{}adiAutoBlocked=false;};auto.append(autoBox,el('span','Corregir la ortografía automáticamente al dejar de escribir'));shell(hint,grid,auto,foot);}
+  const auto=el('label',undefined,'adi-auto'),autoBox=el('input');autoBox.type='checkbox';autoBox.checked=adiAutoOn();autoBox.onchange=()=>{try{localStorage.setItem('ordenes-pro:adi-auto',autoBox.checked?'1':'0');}catch{}adiAutoBlocked=false;};auto.append(autoBox,el('span','Corrección ortográfica automática'));auto.title='Corrige sola la ortografía 1,5 segundos después de dejar de escribir. Se guarda en este navegador.';shell(hint,grid,auto,foot);}
  function present(original,data,mode){
    const result=el('div',undefined,'adi-result'),suggestion=el('div',undefined,'adi-suggestion'),diff=data.changed?adiDiff(original,data.suggestion):null;suggestion.setAttribute('aria-label','Texto sugerido por ADI');suggestion.tabIndex=0;if(diff)suggestion.append(diff);else suggestion.textContent=data.suggestion;
    const before=el('details',undefined,'adi-original');before.append(el('summary','Ver texto original'),el('div',original));result.append(el('small',data.changed?'Resultado de ADI (cambios resaltados). Revísalo antes de aceptarlo.':'ADI no encontró nada que cambiar.','adi-label'),suggestion,before);
@@ -1950,28 +1951,35 @@ async function attachAdi(area,field,custom={}){const mark=custom.anchor||area;if
    if(![401,403,429].includes(error.status)&&!['configuracion','credenciales','cuota','limite'].includes(error.kind))actions.append(button('Reintentar',()=>{menu();run(mode);},'primary'));shell(el('p','ADI no pudo procesar el texto: '+error.message+' Tu texto no se modificó.','adi-warn'),actions);}
   finally{busy=false;}}
  panel.addEventListener('keydown',event=>{if(event.key==='Escape'){event.stopPropagation();event.preventDefault();close();focus();}});area?.addEventListener('keydown',event=>{if(event.key==='Escape'&&!panel.hidden){event.stopPropagation();close();}});
- // Corrección automática: 1,5 segundos después de dejar de escribir se revisa la ortografía y, si hay cambios, se PROPONEN bajo el campo
- // (Aceptar o Descartar). Nunca se sobrescribe el texto sin aprobación y una respuesta antigua jamás pisa texto nuevo.
- const source=area||custom.anchor,done=el('button','','adi-done'),note=el('span','','adi-status'),offer=el('div',undefined,'adi-offer');done.type='button';done.hidden=true;note.setAttribute('role','status');offer.hidden=true;offer.setAttribute('role','group');offer.setAttribute('aria-label','Corrección sugerida por ADI');bar.prepend(note,done);bar.after(offer);let timer,seq=0,checked='',pending=null,applying=false,flight=null;
- const star=state=>{bar.dataset.star=state;if(state==='hint'){open.title='ADI sugiere cambios en este texto';}else if(status.configured)open.title='Corregir o mejorar este texto con ADI';};
+ // Corrección ortográfica automática: 1,5 segundos después de dejar de escribir se revisa el texto y la corrección se aplica sola,
+ // sin ventanas. Un indicador discreto informa del estado y «Deshacer» recupera el texto anterior. Una respuesta antigua nunca pisa
+ // texto nuevo, y si la corrección alterase cifras, códigos o series no se aplica. Las mejoras de redacción siguen pidiendo aceptación.
+ const source=area||custom.anchor,done=el('button','','adi-done'),note=el('span','','adi-status');done.type='button';done.hidden=true;note.setAttribute('role','status');bar.prepend(note,done);let timer,seq=0,checked='',applying=false,flight=null,deferred=null;
+ const star=state=>{bar.dataset.star=state;};
  const say=(text,kind,ms)=>{note.textContent=text||'';note.dataset.kind=kind||'';clearTimeout(note.timer);if(text&&ms)note.timer=setTimeout(()=>{note.textContent='';},ms);};
- const flash=(text,undo)=>{done.textContent=text;done.hidden=false;done.onclick=undo?()=>{undo();done.hidden=true;}:null;done.title=undo?'Deshacer la corrección':'';clearTimeout(done.timer);done.timer=setTimeout(()=>{done.hidden=true;},undo?8000:2600);};
- const dropOffer=()=>{pending=null;offer.hidden=true;offer.replaceChildren();};
- function acceptOffer(){const keep=pending;if(!keep)return;clientLog('adi-propuesta','aceptada');dropOffer();star('idle');const text=keep.original;if(get()!==text)return;const lead=text.match(/^\s*/)[0],tail=text.match(/\s*$/)[0],next=lead+keep.data.suggestion+tail;
-  applying=true;set(next);applying=false;checked=keep.data.suggestion.trim();focus();if(area)area.setSelectionRange(next.length,next.length);star('done');setTimeout(()=>{if(bar.dataset.star==='done')star('idle');},900);flash('Corrección aplicada · Deshacer',()=>{applying=true;set(text);applying=false;checked=text.trim();});}
- function showOffer(text,data){pending={original:text,data};const body=el('div',undefined,'adi-offer-text'),actions=el('div',undefined,'adi-offer-actions'),diff=adiDiff(text.trim(),data.suggestion);body.append(diff||data.suggestion);
-  actions.append(button('Descartar',()=>{checked=text.trim();dropOffer();star('idle');},'secondary adi-offer-no'),button('Aceptar corrección',acceptOffer,'primary adi-offer-yes'));offer.replaceChildren(el('small','ADI sugiere esta corrección (cambios resaltados)','adi-label'),body);
-  if(data.missing&&data.missing.length)offer.append(el('p','Atención: no conserva exactamente estos datos del original: '+data.missing.join(', ')+'.','adi-warn'));offer.append(actions);offer.hidden=false;star('hint');clientLog('adi-propuesta','mostrada');}
+ const flash=(text,undo)=>{done.textContent=text;done.hidden=false;done.onclick=undo?()=>{undo();done.hidden=true;}:null;done.title=undo?'Deshacer la última corrección':'';clearTimeout(done.timer);done.timer=setTimeout(()=>{done.hidden=true;},undo?10000:2600);};
+ function applyFix(text,data){const lead=text.match(/^\s*/)[0],tail=text.match(/\s*$/)[0],next=lead+data.suggestion+tail,focused=area&&document.activeElement===area;let from=0,to=0;
+  if(focused){// El cursor se conserva: lo escrito antes de él no se mueve y lo de después se desplaza con el cambio de longitud.
+   // Una corrección ortográfica conserva las palabras: el cursor vuelve a la misma palabra y a la misma distancia de su inicio (o a su final).
+   const pieces=value=>value.match(/\s+|\S+/g)||[],before=pieces(text),after=pieces(next);let same=0;const limit=Math.min(text.length,next.length);while(same<limit&&text[same]===next[same])same++;const shift=next.length-text.length;
+   const move=pos=>{if(pos>=text.length)return next.length;if(before.length===after.length){let a=0,b=0;for(let i=0;i<before.length;i++){const end=a+before[i].length;if(pos<=end)return b+(pos===end?after[i].length:Math.min(pos-a,after[i].length));a=end;b+=after[i].length;}}return pos<=same?pos:Math.max(same,Math.min(next.length,pos+shift));};from=move(area.selectionStart);to=move(area.selectionEnd);}
+  applying=true;try{set(next);}finally{applying=false;}checked=data.suggestion.trim();if(focused){try{area.setSelectionRange(from,to);}catch{}}
+  star('done');setTimeout(()=>{if(bar.dataset.star==='done')star('idle');},900);say('');clientLog('adi-correccion','aplicada');
+  flash('Ortografía corregida · Deshacer',()=>{if(get()!==next){say('El texto cambió: ya no se puede deshacer esa corrección.','ok',4000);return;}applying=true;try{set(text);}finally{applying=false;}checked=text.trim();if(area){area.focus();area.setSelectionRange(text.length,text.length);}});}
  async function autoCheck(){const text=get(),trimmed=text.trim();if(!adiAutoOn()||!status.configured||adiAutoBlocked||busy||!panel.hidden||applying||trimmed===checked||trimmed.length<12||trimmed.length>1500||!/[a-záéíóúñ]{3}/i.test(trimmed)||!source.isConnected)return;
-  const mine=++seq,handle=flight={};star('work');say('Analizando texto…','work');
-  try{const data=await adiRequest({text:trimmed,mode:'ortografia',field:String(field||''),auto:true},15000,handle);if(mine!==seq||get()!==text)return;checked=trimmed;
-   if(!data.changed){star('idle');say('Ortografía revisada: sin cambios','ok',3000);return;}
-   say('');showOffer(text,data);}
-  catch(error){if(mine!==seq||error.cancelled)return;star('idle');say('ADI no pudo revisar el texto: '+error.message+' Tu texto no se modificó.','error',9000);if(error.status===429||error.status===403||error.status===503)adiAutoBlocked=true;}
+  const mine=++seq,handle=flight={};star('work');say('ADI revisando…','work');
+  try{const data=await adiRequest({text:trimmed,mode:'ortografia',field:String(field||''),auto:true},15000,handle);if(mine!==seq||get()!==text)return;checked=trimmed;star('idle');
+   if(!data.changed){say('Ortografía revisada','ok',2500);return;}
+   // Una «corrección» que cambia cifras, códigos o series no es ortografía: no se toca el texto.
+   if(data.missing&&data.missing.length){say('Sin cambios: la corrección habría alterado datos técnicos.','ok',5000);return;}
+   // En editores que no son un área de texto simple no se mueve nada mientras se escribe en ellos: se aplica al salir del campo.
+   if(!area&&custom.anchor.contains(document.activeElement)){deferred={text,data};say('Corrección lista: se aplicará al salir del campo.','ok',6000);return;}
+   applyFix(text,data);}
+  catch(error){if(mine!==seq||error.cancelled)return;star('idle');say('No se pudo revisar el texto'+(error.message?': '+error.message:'.'),'error',9000);if(error.status===429||error.status===403||error.status===503)adiAutoBlocked=true;}
   finally{if(flight===handle)flight=null;}}
- const adiCancelAuto=()=>{seq++;clearTimeout(timer);flight?.abort?.();flight=null;dropOffer();say('');if(bar.dataset.star==='work'||bar.dataset.star==='hint')star('idle');};
- source.addEventListener('input',()=>{if(applying)return;adiCancelAuto();if(custom.noAuto||area?.closest('.technical-access-fields'))return;timer=setTimeout(autoCheck,1500);});
- // Al abrir el asistente se descarta la propuesta automática pendiente: no conviven dos vistas previas del mismo texto.
+ const adiCancelAuto=()=>{seq++;clearTimeout(timer);flight?.abort?.();flight=null;deferred=null;say('');if(bar.dataset.star==='work')star('idle');};
+ source.addEventListener('input',()=>{if(applying)return;done.hidden=true;adiCancelAuto();if((typeof custom.noAuto==='function'?custom.noAuto():custom.noAuto)||area?.closest('.technical-access-fields'))return;timer=setTimeout(autoCheck,1500);});
+ if(!area)custom.anchor.addEventListener('focusout',()=>setTimeout(()=>{const keep=deferred;deferred=null;if(keep&&!custom.anchor.contains(document.activeElement)&&get()===keep.text)applyFix(keep.text,keep.data);},0));
  const openPanel=toggle;toggle=function(){if(panel.hidden)adiCancelAuto();openPanel();};star('idle');
 }
 // Preferencia de este navegador: la corrección automática se puede desactivar desde el propio panel de ADI.

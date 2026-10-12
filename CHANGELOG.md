@@ -4,6 +4,15 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.73 — 2026-10-12 07:17 (UTC-05:00)
+
+Corrección ortográfica automática de ADI sin ventanas
+
+### Mejoras realizadas
+
+- ADI corrige la ortografía sola 1,5 s después de dejar de escribir, sin ventana de confirmación, conservando el cursor y con «Deshacer»
+- ADI no aplica correcciones que alterarían cifras, códigos o series, y no actúa sobre texto citado en los correos
+
 ## v1.5.72 — 2026-10-12 07:11 (UTC-05:00)
 
 Equipos con historial técnico

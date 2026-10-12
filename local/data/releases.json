@@ -8,6 +8,23 @@
   },
   "releases": [
     {
+      "version": "1.5.73",
+      "date": "2026-10-12T07:17:17-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Corrección ortográfica automática de ADI sin ventanas",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "ADI corrige la ortografía sola 1,5 s después de dejar de escribir, sin ventana de confirmación, conservando el cursor y con «Deshacer»",
+          "ADI no aplica correcciones que alterarían cifras, códigos o series, y no actúa sobre texto citado en los correos"
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.72",
       "date": "2026-10-12T07:11:46-05:00",
       "type": "patch",
