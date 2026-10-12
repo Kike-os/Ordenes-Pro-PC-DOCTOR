@@ -4,6 +4,23 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.111 — 2026-10-12 18:43 (UTC-05:00)
+
+Auditoría del asistente de redacción de ADI
+
+### Mejoras realizadas
+
+- Asistente de redacción de ADI más compacto: usa el ancho del campo, muestra las herramientas en hasta cuatro columnas y la vista previa ofrece «Aplicar cambios», «Regenerar» y «Cancelar».
+- El editor de «Nuevo mensaje» empieza más bajo y crece con el texto.
+
+### Errores corregidos
+
+- En «Nuevo mensaje», el panel de ADI ya no queda tapado por la barra de acciones: la casilla y los botones se ven completos en escritorio y móvil.
+
+### Actualizaciones de seguridad
+
+- ADI ya no corrige automáticamente el texto legal de las condiciones: allí solo actúa a petición y con vista previa.
+
 ## v1.5.110 — 2026-10-12 18:25 (UTC-05:00)
 
 Actualizaciones automáticas en la pantalla de acceso

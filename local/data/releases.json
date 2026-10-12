@@ -8,6 +8,27 @@
   },
   "releases": [
     {
+      "version": "1.5.111",
+      "date": "2026-10-12T18:43:24-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Auditoría del asistente de redacción de ADI",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Asistente de redacción de ADI más compacto: usa el ancho del campo, muestra las herramientas en hasta cuatro columnas y la vista previa ofrece «Aplicar cambios», «Regenerar» y «Cancelar».",
+          "El editor de «Nuevo mensaje» empieza más bajo y crece con el texto."
+        ],
+        "fixes": [
+          "En «Nuevo mensaje», el panel de ADI ya no queda tapado por la barra de acciones: la casilla y los botones se ven completos en escritorio y móvil."
+        ],
+        "security": [
+          "ADI ya no corrige automáticamente el texto legal de las condiciones: allí solo actúa a petición y con vista previa."
+        ],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.110",
       "date": "2026-10-12T18:25:09-05:00",
       "type": "patch",

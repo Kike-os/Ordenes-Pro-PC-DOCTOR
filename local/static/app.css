@@ -4748,3 +4748,22 @@ button.tracking-counter[aria-pressed=true]{background:#132746;border-color:#69a7
 .system-version[data-state=important][data-tag]::before{background:#2b230f;border-color:#b58a3a;color:#f7dca3}
 @keyframes system-version-tag{50%{box-shadow:0 0 0 4px #69a7ff26}}
 @media(prefers-reduced-motion:reduce){.system-version[data-tag]::before{animation:none}}
+/* Asistente ADI (redacción): panel compacto que usa el ancho del campo, con las herramientas en varias columnas y un pie en una sola fila. */
+.adi-panel.adi-assist,body[data-page=dashboard] .adi-panel.adi-assist{justify-self:stretch;width:100%;max-width:680px;margin:6px 0 0 auto;gap:8px;padding:10px 12px;max-height:min(72vh,480px);scroll-margin:12px}
+.adi-assist .adi-assist-head small{display:none}
+.adi-assist .adi-tools{grid-template-columns:repeat(auto-fit,minmax(158px,1fr));gap:6px}
+.adi-assist button.adi-tool{min-height:36px;padding:6px 10px;font-size:12px;line-height:1.25}
+.adi-assist .adi-foot{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 14px;position:sticky;bottom:-10px;margin:0 -12px -10px;padding:8px 12px;background:linear-gradient(180deg,#0b152800,#0b1528 35%)}
+.adi-assist .adi-foot .adi-auto{margin:0;font-size:12px}.adi-assist .adi-foot .adi-auto[hidden]{display:none}
+.adi-assist .adi-foot .adi-actions{position:static;margin:0 0 0 auto;padding:0;background:none}
+.adi-assist .adi-actions button{min-height:34px}
+.adi-assist .adi-suggestion{max-height:min(34vh,220px)}
+@media(max-width:560px){.adi-assist .adi-tools{grid-template-columns:1fr 1fr}.adi-assist .adi-foot .adi-actions{width:100%;margin:0}.adi-assist .adi-foot .adi-actions button{flex:1 1 0}}
+@media(max-width:360px){.adi-assist .adi-tools{grid-template-columns:1fr}}
+/* «Nuevo mensaje»: el panel no queda bajo la barra fija de acciones y el editor empieza más bajo y crece con el texto (una sola barra de desplazamiento). */
+.mail-composer .adi-panel.adi-assist{max-width:none;margin-left:0;scroll-margin-bottom:96px}
+@media(max-width:760px){.mail-composer .adi-panel.adi-assist{scroll-margin-bottom:140px}}
+body[data-page=dashboard] .mail-composer .mail-editor{min-height:132px;max-height:none;overflow:visible}
+dialog.mail-composer[open]>form{scroll-padding-bottom:96px}
+@media(max-width:760px){.mail-composer .adi-panel.adi-assist{scroll-margin-bottom:170px}dialog.mail-composer[open]>form{scroll-padding-bottom:130px}}
+.adi-assist .adi-foot .adi-auto{display:inline-flex;align-items:center;gap:8px;width:auto;color:#c5d5ee}.adi-assist .adi-foot .adi-auto input{width:auto;margin:0;flex:none}.adi-assist .adi-foot .adi-auto span{flex:0 1 auto}

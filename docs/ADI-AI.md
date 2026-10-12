@@ -169,3 +169,19 @@ Al abrir, recargar o cambiar de sección, ADI no se abre, no habla, no suena y n
 - **Controles**: campo adaptable (Enter envía, Mayús+Enter añade línea), detener voz (visible solo mientras habla), micrófono y enviar.
 - **«Contactar soporte técnico»** sustituye a «Solicitar un asesor» y usa el mismo relevo real al Centro de Atención.
 - **Límite que se mantiene**: el audio de la voz del navegador no puede analizarse; al hablar, la esfera sigue los eventos de palabra del motor, no la amplitud real.
+
+## Auditoría del asistente de redacción (1.5.111)
+
+**Arquitectura.** Hay un único componente, `attachAdi`, y `initAdiEverywhere` lo engancha a cualquier área de texto que aparezca en el panel. El correo usa el mismo componente con su editor propio. Toda petición va a `/api/adi/write` en el servidor; la clave del proveedor nunca llega al navegador.
+
+**Ventanas revisadas** (con una IA simulada en base temporal, en 1440 y 390 px): nueva orden (estado físico, falla reportada, diagnóstico inicial, observaciones, notas técnicas, detalle de acceso y de operaciones sobre datos), seguimiento, edición de la orden (falla, notas internas, hallazgos, recomendaciones, comentario), mensaje por WhatsApp, nueva cita, condiciones (texto completo y compacto) y «Nuevo mensaje» de correo. En las 16 áreas funcionaron las cinco herramientas, la vista previa, «Aplicar cambios» y la conservación de series y mediciones.
+
+**Errores encontrados y corregidos.**
+- En «Nuevo mensaje» la parte inferior del panel (la casilla de corrección automática y los botones) quedaba tapada por la barra fija «Descartar · Guardar borrador · Enviar». Ahora el panel se coloca por encima de esa barra, en escritorio y en móvil.
+- El panel tenía un ancho fijo de 380 px y unos 310 px de alto. Ahora usa el ancho del campo (hasta 680 px), con las herramientas en hasta cuatro columnas (dos en móvil) y unos 233 px de alto.
+- El editor del correo empezaba con 212 px de alto; ahora empieza en 132 px y crece con el texto, con una sola barra de desplazamiento.
+- La corrección ortográfica automática podía actuar sobre el **texto legal de las condiciones**. Ahora en ese editor ADI solo trabaja a petición y con vista previa.
+
+**Flujo.** Elegir herramienta → «Generar mejora» (indicador de proceso; no admite solicitudes duplicadas) → vista previa con los cambios resaltados → «Aplicar cambios», «Regenerar» o «Cancelar». El texto solo cambia al aplicar; si la persona siguió escribiendo, la respuesta antigua se descarta. Los fallos se muestran como fallos, con «Reintentar» cuando tiene sentido.
+
+**No verificado aquí.** Las respuestas reales del proveedor de IA en producción (no hay clave en el equipo de desarrollo); en producción consta una corrección automática correcta registrada. La respuesta ante el límite de 60 mejoras por hora sí se observó y se muestra como error.
