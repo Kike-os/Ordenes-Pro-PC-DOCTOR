@@ -8,6 +8,22 @@
   },
   "releases": [
     {
+      "version": "1.5.95",
+      "date": "2026-10-12T13:54:34-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Título «Agendamiento de Citas Técnicas» en la agenda pública",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "La agenda pública de citas pasa a titularse «Agendamiento de Citas Técnicas» (título de la página y de la pestaña)."
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.94",
       "date": "2026-10-12T13:48:35-05:00",
       "type": "patch",

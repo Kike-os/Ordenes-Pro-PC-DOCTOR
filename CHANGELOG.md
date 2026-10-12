@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.95 — 2026-10-12 13:54 (UTC-05:00)
+
+Título «Agendamiento de Citas Técnicas» en la agenda pública
+
+### Mejoras realizadas
+
+- La agenda pública de citas pasa a titularse «Agendamiento de Citas Técnicas» (título de la página y de la pestaña).
+
 ## v1.5.94 — 2026-10-12 13:48 (UTC-05:00)
 
 ADI en la pantalla de inicio de sesión y consulta de reparación con código temporal
