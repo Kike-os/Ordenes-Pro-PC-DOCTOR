@@ -342,7 +342,7 @@ async function renderRoute(){
  if(name==='mail'){if(!currentUser.mail){$('module-content').replaceChildren(el('p','El correo no está configurado en el servidor o tu cuenta no tiene acceso.','empty-module'));return;}await renderMail();return;}
  if(name==='system'){const data=await api('/api/system');if(version===requestVersion)renderSystem(data);return;}
  if(name==='orders'&&params.get('id')){await showOrderDetail(params.get('id'));if(params.get('section')==='history'){const history=$('order-history');history?.focus();history?.scrollIntoView({block:'start'});}return;}
- if(name==='reports'){const data=await api('/api/reports');if(version===requestVersion)renderReports(data);}
+ if(name==='reports'){await renderReports();}
  else if(name==='settings'){const data=await api('/api/settings');if(version===requestVersion){renderSettings(data);renderAdiWritingSettings($('module-content'));}}
  else{if(name==='devices')await loadReceptionOptions();const data=await api('/api/'+name+'?'+params.toString());if(version===requestVersion)renderList(name,data,params);}
  }catch(e){if(version===requestVersion){$('module-content').replaceChildren(el('p',e.message,'empty-module'));notify(e.message);}}
@@ -1051,10 +1051,87 @@ function orderPhotoSection(order){
  if(photos.length<ORDER_PHOTO_MAX){const input=el('input');input.type='file';input.accept='image/jpeg,image/png,image/webp';input.multiple=true;input.hidden=true;const add=button('',()=>input.click(),'secondary order-photo-add');add.append(systemIcon(receptionIcons.upload),el('span','Añadir fotos'));input.addEventListener('change',async()=>{const files=[...input.files].slice(0,ORDER_PHOTO_MAX-photos.length);input.value='';if(!files.length)return;add.disabled=true;const ready=[];for(const file of files){try{ready.push(await orderPhotoFromFile(file));}catch(error){toast(error.message,'error');}}if(ready.length){if(!photos.length)ready[0].main=true;const failed=await uploadOrderPhotos(order.id,ready.map((photo,index)=>Object.assign(photo,{main:photo.main})),index=>{add.lastChild.textContent='Subiendo '+(index+1)+' de '+ready.length+'…';});toast(failed?failed+' foto(s) no se pudieron subir.':'Fotos añadidas a la orden.',failed?'warning':'success');}add.disabled=false;renderRoute();});section.append(input,add);}
  return section;
 }
-function renderReports(data){
- const root=$('module-content');root.replaceChildren();const total=data.statuses.reduce((a,s)=>a+s.total,0);const stats=el('div',undefined,'report-grid');for(const [label,value]of [['Órdenes registradas',total],['Clientes registrados',data.clients],['Equipos registrados',data.devices]]){const card=el('article',undefined,'report-stat');card.append(el('span',label),el('strong',String(value)));stats.append(card);}root.append(stats);
- const panel=el('section',undefined,'data-panel report-status');panel.append(el('h2','Distribución por estado'));for(const s of data.statuses){const row=el('div',undefined,'report-row');const track=el('div',undefined,'report-track');const progress=el('progress');progress.max=total||1;progress.value=s.total;progress.setAttribute('aria-label',s.label+': '+s.total+' de '+total);track.append(progress);row.append(el('span',s.label),track,el('strong',String(s.total)));panel.append(row);}if(!total)panel.append(el('p','Los indicadores se actualizarán al registrar la primera orden.','small'));root.append(panel);
- const exportButton=button('Descargar resumen CSV',()=>{const lines=[['Estado','Órdenes'],...data.statuses.map(s=>[s.label,s.total]),['Total',total],['Clientes',data.clients],['Equipos',data.devices]];const blob=new Blob(['\uFEFF'+lines.map(r=>r.join(';')).join('\r\n')],{type:'text/csv;charset=utf-8'});const url=URL.createObjectURL(blob);const a=el('a');a.href=url;a.download='pc-doctor-resumen.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);});const tools=el('div',undefined,'module-tools');tools.append(exportButton);root.append(tools);
+// Centro de Control Técnico: gráficos calculados en el servidor con las órdenes reales. Se actualiza por consulta periódica (no es un canal en vivo).
+const reportColors={pendiente:'#f2b84b',reparacion:'#4aa3ff',esperando_cliente:'#c58bff',presupuesto:'#ff8f5a',espera_entrega:'#36c9c0',listo:'#4fd68a',entregado:'#7f8ea8'};
+const reportState={filters:{period:'day',from:'',to:'',status:'',type:'',technician:''},drill:null,timer:null,charts:{},library:null};
+const REPORT_REFRESH=20000;
+function reportQuery(extra){const query=new URLSearchParams();for(const[key,value]of Object.entries({...reportState.filters,...(extra||{})}))if(value)query.set(key,value);return '/api/reports?'+query.toString();}
+function loadChartLibrary(){if(!reportState.library)reportState.library=new Promise(resolve=>{if(window.echarts)return resolve(true);const script=document.createElement('script');script.src='/static/echarts.min.js';script.onload=()=>resolve(Boolean(window.echarts));script.onerror=()=>{reportState.library=null;resolve(false);};document.head.append(script);});return reportState.library;}
+async function renderReports(){
+ const root=$('module-content'),state=reportState;clearInterval(state.timer);for(const chart of Object.values(state.charts))chart.dispose();state.charts={};state.drill=null;
+ const wrap=el('div',undefined,'control-pro');root.replaceChildren(wrap);const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;let latest=null,busy=false;
+ // Filtros
+ const bar=el('section',undefined,'control-filters');bar.setAttribute('aria-label','Filtros del tablero');const periods=el('div',undefined,'control-periods');periods.setAttribute('role','group');periods.setAttribute('aria-label','Agrupar por periodo');
+ for(const[key,label]of [['day','Diario'],['week','Semanal'],['month','Mensual'],['year','Anual']]){const b=button(label,()=>{state.filters.period=key;state.filters.from='';state.filters.to='';load(false);});b.dataset.period=key;periods.append(b);}
+ const control=(label,node)=>{const box=el('label',undefined,'control-field');box.append(el('span',label),node);return box;},dateInput=name=>{const input=el('input');input.type='date';input.addEventListener('change',()=>{if(!input.value)return;state.filters.from=fromInput.value;state.filters.to=toInput.value;load(false);});return input;},pick=name=>{const select=el('select');select.addEventListener('change',()=>{state.filters[name]=select.value;load(false);});return select;};
+ const fromInput=dateInput('from'),toInput=dateInput('to'),statusPick=pick('status'),typePick=pick('type'),techPick=pick('technician');
+ const reset=button('Restablecer',()=>{state.filters={period:'day',from:'',to:'',status:'',type:'',technician:''};closeDrill();load(false);},'control-reset');
+ const conn=el('p',undefined,'control-conn');conn.setAttribute('role','status');const dot=el('span',undefined,'control-dot'),connText=el('span','Cargando indicadores…');conn.append(dot,connText);
+ bar.append(periods,control('Desde',fromInput),control('Hasta',toInput),control('Estado',statusPick),control('Tipo de equipo',typePick),control('Técnico',techPick),reset,conn);wrap.append(bar);
+ const setConn=(ok,text)=>{conn.dataset.state=ok?'ok':'error';connText.textContent=text;};
+ // Indicadores
+ const kpiBox=el('div',undefined,'control-kpis');wrap.append(kpiBox);const kpiNodes={};
+ for(const[key,label,hint]of [['received','Órdenes recibidas','en el rango'],['delivered','Órdenes entregadas','en el rango'],['active','Órdenes activas','ahora'],['ready','Listas para entregar','ahora'],['overdue','Entrega vencida','ahora'],['average_days','Tiempo promedio','recepción a entrega']]){const card=key==='average_days'?el('article',undefined,'control-kpi'):button('',()=>openDrill('kpi',key,label),'control-kpi');card.dataset.kpi=key;const value=el('strong','—');card.append(el('span',label),value,el('small',hint));kpiNodes[key]=value;kpiBox.append(card);}
+ // Tarjetas de gráficos
+ const grid=el('div',undefined,'control-grid');wrap.append(grid);const cards={};
+ const card=(key,title,lead,wide)=>{const box=el('article',undefined,'control-card'+(wide?' is-wide':'')),head=el('header'),plot=el('div',undefined,'control-chart'),empty=el('p','Sin órdenes para los filtros seleccionados.','control-empty');head.append(el('h2',title),el('p',lead));plot.setAttribute('role','img');empty.hidden=true;box.append(head,plot,empty);grid.append(box);cards[key]={box,plot,empty,title};return cards[key];};
+ const donut=card('status','Distribución por estado','Órdenes recibidas en el rango, según su estado actual');const center=el('div',undefined,'control-total'),ring=el('div',undefined,'control-ring');donut.plot.replaceWith(ring);ring.append(donut.plot,center);const statusList=el('div',undefined,'control-legend');donut.box.append(statusList);
+ card('periods','Órdenes por periodo','Recibidas y entregadas en cada periodo',true);card('open','Evolución de órdenes abiertas','Órdenes sin entregar al cierre de cada periodo',true);card('technicians','Productividad por técnico','Órdenes activas y entregadas en el rango');card('types','Tipos de equipo','Órdenes recibidas en el rango');
+ // Detalle de un segmento
+ const drill=el('section',undefined,'control-drill data-panel');drill.hidden=true;drill.tabIndex=-1;wrap.append(drill);
+ function closeDrill(){state.drill=null;drill.hidden=true;drill.replaceChildren();}
+ async function openDrill(group,value,label,silent){state.drill={group,value,label};let data;try{data=await api(reportQuery({group,value}));}catch(error){if(!silent){drill.hidden=false;drill.replaceChildren(el('p',error.message,'control-empty'));}return;}
+  if(!wrap.isConnected||!state.drill||state.drill.group!==group||state.drill.value!==value)return;const head=el('header'),close=button('Cerrar',closeDrill,'control-reset'),list=el('ul',undefined,'control-orders');head.append(el('h2','Órdenes: '+label),el('span',data.total+(data.total===1?' orden':' órdenes'),'control-count'),close);
+  for(const order of data.rows){const item=el('li'),link=el('a'),badge=el('span',order.status,'control-badge');link.href='#orders?id='+order.id;badge.style.setProperty('--tone',reportColors[order.status_code]||'#7f8ea8');const main=el('span',undefined,'control-order-main');main.append(deviceIcon(order.type),el('strong',order.code),el('span',order.client));link.append(main,el('span',order.device,'control-order-device'),el('span',order.responsible,'control-order-tech'),badge);item.append(link);list.append(item);}
+  drill.replaceChildren(head,data.rows.length?list:el('p','No hay órdenes en este segmento.','control-empty'));if(data.total>data.rows.length)drill.append(el('p','Se muestran las '+data.rows.length+' más recientes.','small'));drill.hidden=false;if(!silent){drill.focus({preventScroll:true});drill.scrollIntoView({block:'nearest',behavior:reduce?'auto':'smooth'});}}
+ const foot=el('div',undefined,'module-tools control-foot'),totals=el('p','','small');foot.append(totals,button('Descargar resumen CSV',()=>{if(!latest)return;const b=latest.board,lines=[['Centro de Control Técnico',b.filters.from+' a '+b.filters.to],['Estado','Órdenes'],...b.statuses.map(s=>[s.label,s.total]),['Recibidas',b.kpis.received],['Entregadas',b.kpis.delivered],['Activas',b.kpis.active],['Listas para entregar',b.kpis.ready],['Entrega vencida',b.kpis.overdue],['Clientes',latest.clients],['Equipos',latest.devices]];const blob=new Blob(['﻿'+lines.map(r=>r.join(';')).join('\r\n')],{type:'text/csv;charset=utf-8'});const url=URL.createObjectURL(blob);const a=el('a');a.href=url;a.download='pc-doctor-resumen.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}));wrap.append(foot);
+ // Gráficos
+ const ink='#c9d6ea',soft='#8fa2bd',rule='#1d2c44',axis={axisLine:{lineStyle:{color:'#2a3b55'}},axisTick:{show:false},axisLabel:{color:soft,fontSize:11},splitLine:{lineStyle:{color:rule}}},tip={trigger:'axis',renderMode:'richText',backgroundColor:'#0b1728',borderColor:'#2a3b55',textStyle:{color:ink,fontSize:12},axisPointer:{type:'shadow'}},legend={bottom:0,textStyle:{color:soft,fontSize:11},itemWidth:12,itemHeight:8};
+ const chart=key=>{if(!state.charts[key]){state.charts[key]=window.echarts.init(cards[key].plot);new ResizeObserver(()=>state.charts[key]?.resize()).observe(cards[key].plot);}return state.charts[key];};
+ const show=(key,has,label)=>{cards[key].empty.hidden=has;cards[key].plot.classList.toggle('is-empty',!has);cards[key].plot.setAttribute('aria-label',label);};
+ function paintCharts(board){
+  const total=board.statuses.reduce((sum,s)=>sum+s.total,0),p=board.periods,anim=!reduce;
+  show('status',total>0,'Distribución por estado: '+board.statuses.map(s=>s.label+' '+s.total).join(', '));
+  chart('status').setOption({animation:anim,tooltip:{...tip,trigger:'item',formatter:'{b}: {c} ({d}%)'},series:[{type:'pie',radius:['58%','84%'],avoidLabelOverlap:false,label:{show:false},emphasis:{scale:true,scaleSize:5},itemStyle:{borderColor:'#0b1524',borderWidth:2},data:board.statuses.filter(s=>s.total).map(s=>({name:s.label,value:s.total,code:s.code,itemStyle:{color:reportColors[s.code]}}))}]});
+  const dense=p.labels.length>16;
+  show('periods',p.received.some(Boolean)||p.delivered.some(Boolean),'Órdenes por periodo: '+p.received.reduce((a,b)=>a+b,0)+' recibidas y '+p.delivered.reduce((a,b)=>a+b,0)+' entregadas');
+  chart('periods').setOption({animation:anim,tooltip:tip,legend,grid:{left:34,right:12,top:14,bottom:dense?74:52},xAxis:{type:'category',data:p.labels,...axis,axisLabel:{...axis.axisLabel,hideOverlap:true,rotate:dense?45:0}},yAxis:{type:'value',minInterval:1,...axis},series:[{name:'Recibidas',type:'bar',data:p.received,barMaxWidth:22,itemStyle:{color:'#4aa3ff',borderRadius:[4,4,0,0]}},{name:'Entregadas',type:'bar',data:p.delivered,barMaxWidth:22,itemStyle:{color:'#4fd68a',borderRadius:[4,4,0,0]}}]});
+  show('open',p.open.some(Boolean),'Evolución de órdenes abiertas por periodo');
+  chart('open').setOption({animation:anim,tooltip:{...tip,axisPointer:{type:'line'}},grid:{left:34,right:12,top:14,bottom:dense?48:28},xAxis:{type:'category',boundaryGap:false,data:p.labels,...axis,axisLabel:{...axis.axisLabel,hideOverlap:true,rotate:dense?45:0}},yAxis:{type:'value',minInterval:1,...axis},series:[{name:'Órdenes abiertas',type:'line',smooth:.25,showSymbol:p.labels.length<40,symbolSize:6,data:p.open,lineStyle:{color:'#36c9c0',width:2},itemStyle:{color:'#36c9c0'},areaStyle:{color:'rgba(54,201,192,.18)'}}]});
+  const tech=[...board.technicians].reverse();
+  show('technicians',tech.length>0,'Productividad por técnico: '+board.technicians.map(t=>t.name+' '+t.active+' activas y '+t.delivered+' entregadas').join(', '));
+  chart('technicians').setOption({animation:anim,tooltip:tip,legend,grid:{left:8,right:18,top:10,bottom:44,containLabel:true},xAxis:{type:'value',minInterval:1,...axis},yAxis:{type:'category',data:tech.map(t=>t.name),...axis,axisLabel:{...axis.axisLabel,width:110,overflow:'truncate'}},series:[{name:'Activas',type:'bar',stack:'t',data:tech.map(t=>t.active),barMaxWidth:18,itemStyle:{color:'#4aa3ff'}},{name:'Entregadas',type:'bar',stack:'t',data:tech.map(t=>t.delivered),barMaxWidth:18,itemStyle:{color:'#4fd68a',borderRadius:[0,4,4,0]}}]});
+  const kinds=[...board.types].reverse();
+  show('types',kinds.length>0,'Tipos de equipo: '+board.types.map(t=>t.label+' '+t.total).join(', '));
+  chart('types').setOption({animation:anim,tooltip:tip,grid:{left:8,right:18,top:10,bottom:10,containLabel:true},xAxis:{type:'value',minInterval:1,...axis},yAxis:{type:'category',data:kinds.map(t=>t.label),...axis,axisLabel:{...axis.axisLabel,width:120,overflow:'truncate'}},series:[{name:'Órdenes',type:'bar',data:kinds.map(t=>t.total),barMaxWidth:18,itemStyle:{color:'#c58bff',borderRadius:[0,4,4,0]}}]});
+  if(!wrap.dataset.bound){wrap.dataset.bound='1';
+   state.charts.status.on('click',e=>openDrill('status',e.data.code,e.name));
+   state.charts.periods.on('click',e=>{const b=latest.board.periods;openDrill(e.seriesName==='Recibidas'?'received':'delivered',b.keys[e.dataIndex],e.seriesName+' · '+b.labels[e.dataIndex]);});
+   state.charts.technicians.on('click',e=>{const list=[...latest.board.technicians].reverse(),person=list[e.dataIndex];if(person)openDrill('technician',String(person.id),person.name);});
+   state.charts.types.on('click',e=>{const list=[...latest.board.types].reverse(),kind=list[e.dataIndex];if(kind)openDrill('type',kind.code||'',kind.label);});}
+ }
+ function paint(data){
+  const board=data.board,f=board.filters,k=board.kpis;latest=data;state.filters.period=f.period;
+  periods.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.period===f.period)));
+  if(document.activeElement!==fromInput)fromInput.value=f.from;if(document.activeElement!==toInput)toInput.value=f.to;fromInput.max=toInput.value;toInput.min=fromInput.value;
+  const fill=(select,all,options,value)=>{if(document.activeElement===select)return;select.replaceChildren();for(const[code,label]of [['',all],...options]){const option=el('option',label);option.value=code;select.append(option);}select.value=value||'';};
+  fill(statusPick,'Todos los estados',board.options.statuses.map(s=>[s.code,s.label]),f.status);fill(typePick,'Todos los tipos',Object.entries(board.options.types),f.type);fill(techPick,'Todos los técnicos',[...board.options.technicians.map(t=>[String(t.id),t.name]),['none','Sin asignar']],f.technician);
+  for(const key of ['received','delivered','active','ready','overdue'])kpiNodes[key].textContent=String(k[key]);
+  kpiNodes.average_days.textContent=k.average_days===null?'—':String(k.average_days).replace('.',',')+' d';kpiNodes.average_days.parentElement.querySelector('small').textContent=k.average_sample?'recepción a entrega · '+k.average_sample+(k.average_sample===1?' orden':' órdenes'):'sin entregas en el rango';
+  kpiBox.querySelector('[data-kpi=overdue]').dataset.alert=String(k.overdue>0);
+  const total=board.statuses.reduce((sum,s)=>sum+s.total,0);center.replaceChildren(el('strong',String(total)),el('span',total===1?'orden':'órdenes'));
+  statusList.replaceChildren();for(const s of board.statuses){const row=button('',()=>openDrill('status',s.code,s.label),'control-legend-row');const mark=el('i');mark.style.background=reportColors[s.code]||'#7f8ea8';row.append(mark,el('span',s.label),el('strong',String(s.total)));row.disabled=!s.total;statusList.append(row);}
+  totals.textContent='Clientes registrados: '+data.clients+' · Equipos registrados: '+data.devices;
+  if(window.echarts)paintCharts(board);
+ }
+ const stamp=()=>new Date().toLocaleTimeString('es-EC',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
+ async function load(silent){if(busy)return;busy=true;if(!silent)wrap.dataset.loading='true';
+  try{const data=await api(reportQuery());if(!wrap.isConnected)return;paint(data);setConn(true,'Actualizado a las '+stamp()+' · se consulta cada '+REPORT_REFRESH/1000+' s');if(state.drill)openDrill(state.drill.group,state.drill.value,state.drill.label,true);}
+  catch(error){if(wrap.isConnected)setConn(false,latest?'Sin conexión con el servidor. Se muestran los últimos datos; reintentando…':error.message);}
+  finally{busy=false;delete wrap.dataset.loading;}}
+ const ready=await loadChartLibrary();if(!wrap.isConnected)return;if(!ready){wrap.dataset.nocharts='true';for(const item of Object.values(cards)){item.empty.textContent='No se pudo cargar el componente de gráficos. Los indicadores y los listados siguen disponibles.';item.empty.hidden=false;item.plot.hidden=true;}}
+ await load(false);
+ state.timer=setInterval(()=>{if(!wrap.isConnected){clearInterval(state.timer);for(const item of Object.values(state.charts))item.dispose();state.charts={};return;}if(!document.hidden)load(true);},REPORT_REFRESH);
 }
 function renderSettings(data){
  const root=$('module-content');root.replaceChildren();const params=routeState().params,shell=el('div',undefined,'config-shell'),nav=el('nav',undefined,'config-nav'),panes=el('div',undefined,'config-panes');nav.setAttribute('aria-label','Categorías de configuración');

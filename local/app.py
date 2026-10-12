@@ -36,6 +36,7 @@ import reception
 import service_terms
 import order_drafts
 import live_support
+import reports
 import technical_access
 import thermal_printing
 import tempfile
@@ -500,7 +501,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         path = urlsplit(self.path).path
-        files = {'/static/label.css':'label.css','/static/tracking.css':'tracking.css','/static/app.css':'app.css','/static/app.js':'app.js','/static/form-validation.js':'form-validation.js','/static/appointments.js':'appointments.js','/static/adi-widget.js':'adi-widget.js','/static/logo-original.png':'logo-original.png',
+        files = {'/static/label.css':'label.css','/static/tracking.css':'tracking.css','/static/app.css':'app.css','/static/app.js':'app.js','/static/form-validation.js':'form-validation.js','/static/appointments.js':'appointments.js','/static/adi-widget.js':'adi-widget.js','/static/echarts.min.js':'echarts.min.js','/static/logo-original.png':'logo-original.png',
                  '/favicon.ico':'favicon.ico','/static/favicon.ico':'favicon.ico','/static/favicon-16.png':'favicon-16.png','/static/favicon-32.png':'favicon-32.png','/static/logo-firma.png':'logo-firma.png','/static/favicon-48.png':'favicon-48.png',
                  '/apple-touch-icon.png':'apple-touch-icon.png','/apple-touch-icon-precomposed.png':'apple-touch-icon.png','/static/apple-touch-icon.png':'apple-touch-icon.png'}
         # Logotipos de marcas: solo nombres simples dentro de static/brands; si el archivo no existe la interfaz usa un icono genérico.
@@ -924,7 +925,14 @@ class Handler(BaseHTTPRequestHandler):
                 except versioning.RegistryError as error:return self.reply(500,{'error':str(error)})
             if path == '/api/reports':
                 counts = [dict(r) for r in c.execute("SELECT s.code,s.label,COUNT(o.id) total FROM statuses s LEFT JOIN orders o ON o.status=s.code GROUP BY s.code ORDER BY CASE s.code WHEN 'pendiente' THEN 1 WHEN 'reparacion' THEN 2 WHEN 'esperando_cliente' THEN 3 WHEN 'presupuesto' THEN 4 WHEN 'espera_entrega' THEN 5 WHEN 'listo' THEN 6 ELSE 7 END")]
-                return self.reply(200, {'statuses':counts,'clients':c.execute('SELECT COUNT(*) FROM clients').fetchone()[0],'devices':c.execute('SELECT COUNT(*) FROM devices').fetchone()[0]})
+                # Centro de Control Técnico: indicadores calculados con las órdenes reales; «group» devuelve las órdenes de un segmento.
+                report_query=parse_qs(urlsplit(self.path).query);today=reception_now().date()
+                try:
+                    report_filters=reports.parse_filters(report_query,today)
+                    if report_query.get('group'):return self.reply(200,reports.rows(c,report_filters,today,report_query['group'][0],report_query.get('value',[''])[0]))
+                    board=reports.build(c,report_filters,today)
+                except reports.ReportError as error:return self.reply(400,{'error':str(error)})
+                return self.reply(200, {'board':board,'statuses':counts,'clients':c.execute('SELECT COUNT(*) FROM clients').fetchone()[0],'devices':c.execute('SELECT COUNT(*) FROM devices').fetchone()[0]})
             if path == '/api/settings':
                 if user['role'] != 'administrador':
                     return self.reply(403, {'error':'Solo administración puede acceder a la configuración.'})

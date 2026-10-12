@@ -4,6 +4,19 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.59 — 2026-10-12 00:03 (UTC-05:00)
+
+Centro de Control Técnico con gráficos y filtros
+
+### Nuevas funcionalidades
+
+- Centro de Control Técnico con gráficos reales: dona por estado, órdenes por periodo, evolución de órdenes abiertas, productividad por técnico y tipos de equipo
+- Filtros por periodo, fechas, estado, tipo de equipo y técnico; al pulsar un indicador o segmento se listan sus órdenes
+
+### Mejoras realizadas
+
+- El tablero se actualiza solo cada 20 segundos e indica la última consulta o la falta de conexión
+
 ## v1.5.58 — 2026-10-11 23:53 (UTC-05:00)
 
 Comprobante A4 en dos páginas, nombres de PDF y voz de ADI
