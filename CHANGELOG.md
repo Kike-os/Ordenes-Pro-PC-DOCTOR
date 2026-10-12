@@ -4,6 +4,19 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.45 — 2026-10-11 20:05 (UTC-05:00)
+
+Centro de Atención en Tiempo Real
+
+### Nuevas funcionalidades
+
+- Centro de Atención en Tiempo Real: consola de tres paneles con lista de conversaciones y estados reales, conversación con burbujas por autor y panel con el cliente y la orden vinculados
+- Atención: vincular una conversación a una orden y su cliente (se sugiere la orden que el cliente menciona), reabrir conversaciones cerradas, pestaña de cerradas e indicador de conexión
+
+### Mejoras realizadas
+
+- Atención: mensajes sin leer, avisos de conversación nueva, acciones con confirmación y textos «Cliente», «Adi» y «Asesor» en lugar de identificadores internos
+
 ## v1.5.44 — 2026-10-11 19:58 (UTC-05:00)
 
 Esfera de Adi y mensajes de WhatsApp con número validado

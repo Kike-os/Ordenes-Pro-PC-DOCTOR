@@ -35,6 +35,7 @@ import remote_db
 import reception
 import service_terms
 import order_drafts
+import live_support
 import technical_access
 import thermal_printing
 import tempfile
@@ -655,8 +656,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(200,{'rows':[dict(r) for r in rows]})
             if path == '/api/adi/live':
                 if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
-                rows=[dict(r) for r in c.execute("SELECT v.id,v.mode,v.updated_at,(SELECT content FROM adi_messages m WHERE m.conversation_id=v.id AND m.visibility='public' ORDER BY m.id DESC LIMIT 1) last_message,(SELECT author FROM adi_messages m WHERE m.conversation_id=v.id AND m.visibility='public' ORDER BY m.id DESC LIMIT 1) last_author FROM adi_conversations v WHERE v.mode!='closed' ORDER BY v.updated_at DESC LIMIT 100")]
-                return self.reply(200,{'rows':rows})
+                return self.reply(200,{'rows':live_support.rows(c,parse_qs(urlsplit(self.path).query).get('scope',['active'])[0]),'server_time':appointments.stamp(appointments.now())})
             live_match=re.fullmatch(r'/api/adi/live/([0-9]+)',path)
             if live_match:
                 if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
@@ -664,9 +664,7 @@ class Handler(BaseHTTPRequestHandler):
                 if not conv:return self.reply(404,{'error':'Conversación no disponible.'})
                 try:after=max(0,int(parse_qs(urlsplit(self.path).query).get('after',['0'])[0]))
                 except ValueError:after=0
-                rows=[dict(r) for r in c.execute('SELECT id,author,visibility,content,created_at FROM adi_messages WHERE conversation_id=? AND id>? ORDER BY id',(conv['id'],after))]
-                safe_conv={k:conv[k] for k in ('id','mode','assigned_to','created_at','updated_at')}
-                return self.reply(200,{'conversation':safe_conv,'messages':rows})
+                return self.reply(200,live_support.detail(c,conv,after,appointments.stamp(appointments.now())))
             if path == '/api/me':
                 prefs=c.execute('SELECT value FROM system_state WHERE key=?',('mail_prefs:'+str(user['id']),)).fetchone() if mail_allowed(user) else None
                 return self.reply(200, {'user':dict(user,mail=mail_allowed(user),mail_prefs=json.loads(prefs['value']) if prefs else None,mail_signature=mail_signature_card(c) if mail_allowed(user) else None,storage='cloud' if remote_db.configured() else 'local'),'server_time':time.time()})
@@ -1533,16 +1531,9 @@ class Handler(BaseHTTPRequestHandler):
                     if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
                     conv=c.execute('SELECT * FROM adi_conversations WHERE id=?',(int(live_action[1]),)).fetchone()
                     if not conv:return self.reply(404,{'error':'Conversación no disponible.'})
-                    action=data.get('action');now=appointments.stamp(appointments.now())
-                    if action=='reply':
-                        content=str(data.get('message','')).strip()
-                        if not content or len(content)>3000:return self.reply(400,{'error':'Escribe una respuesta de hasta 3000 caracteres.'})
-                        c.execute("INSERT INTO adi_messages(conversation_id,author,author_id,content,created_at) VALUES (?,'operator',?,?,?)",(conv['id'],user['id'],content,now));c.execute("UPDATE adi_conversations SET mode='human',assigned_to=?,updated_at=? WHERE id=?",(user['id'],now,conv['id']))
-                    elif action in ('takeover','resume','close'):
-                        mode={'takeover':'human','resume':'adi','close':'closed'}[action];c.execute('UPDATE adi_conversations SET mode=?,assigned_to=?,updated_at=? WHERE id=?',(mode,user['id'] if mode=='human' else None,now,conv['id']))
-                        c.execute('INSERT INTO adi_actions(conversation_id,user_id,action,created_at) VALUES (?,?,?,?)',(conv['id'],user['id'],'conversation_'+action,now))
-                    else:return self.reply(400,{'error':'Acción de conversación inválida.'})
-                    audit(c,user['id'],'adi_conversation_'+action,conv['id']);return self.reply(200,{'ok':True})
+                    status,payload=live_support.act(c,conv,user,data,appointments.stamp(appointments.now()))
+                    if status==200:audit(c,user['id'],'adi_conversation_'+str(data.get('action')),conv['id'])
+                    return self.reply(status,payload)
                 if path == '/api/logout':
                     c.execute('DELETE FROM sessions WHERE token_hash=?', (digest(token),))
                     audit(c, user['id'], 'logout')

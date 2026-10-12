@@ -268,3 +268,45 @@ class AgendaTests(unittest.TestCase):
         renamed=self.request(url,{'services':[{'code':code,'label':'Mantenimiento de consolas','duration_minutes':75,'active':True}]},cookie=cookie,csrf=csrf)['body']['settings']['services']
         self.assertEqual(next(s for s in renamed if s['code']==code)['label'],'Mantenimiento de consolas')
         self.assertIn('Mantenimiento de consolas',{s['label'] for s in self.request('/api/public/appointments/services')['body']['services']})
+
+
+class LiveSupportTests(unittest.TestCase):
+    setUpClass=classmethod(test_app.SecurityTests.setUpClass.__func__)
+    setUp=test_app.SecurityTests.setUp
+    tearDown=test_app.SecurityTests.tearDown
+    login=test_app.SecurityTests.login
+    request=test_app.SecurityTests.request
+    order_data=test_app.SecurityTests.order_data
+
+    def test_console_states_links_and_reopening(self):
+        cookie,csrf=self.login();act=lambda cid,**data:self.request('/api/adi/live/%d'%cid,data,cookie=cookie,csrf=csrf)
+        order=self.request('/api/orders',self.order_data({'serial':'LIVE-0001','request_key':'live-support-order-0001'}),cookie=cookie,csrf=csrf)['body']
+        with app.connect() as c:
+            cid=c.execute("INSERT INTO adi_conversations(token_hash,mode,created_at,updated_at) VALUES ('ficticio','adi','2026-01-01T10:00:00-05:00','2026-01-01T10:00:00-05:00')").lastrowid
+            for author,text in (('client','Hola, quiero saber de mi orden %s'%order['code']),('adi','Soy Adi, con gusto le ayudo.'),('client','También PCD-00000000-9999')):
+                c.execute("INSERT INTO adi_messages(conversation_id,author,content,created_at) VALUES (?,?,?,'2026-01-01T10:01:00-05:00')",(cid,author,text))
+        self.assertEqual(self.request('/api/adi/live')['status'],401)
+        row=self.request('/api/adi/live',cookie=cookie)['body']['rows'][0]
+        self.assertEqual((row['id'],row['mode'],row['unread'],row['total'],row['last_author'],row['last_seen_admin'],row['client'],row['order_code']),(cid,'adi',2,3,'client','',None,None))
+        # Abrirla la marca como vista; el número de orden real se sugiere, el inexistente no, y nada se vincula solo.
+        detail=self.request('/api/adi/live/%d'%cid,cookie=cookie)['body']
+        self.assertEqual(([m['author'] for m in detail['messages']],detail['mentioned'],detail['client'],detail['order']),(['client','adi','client'],[order['code']],None,None))
+        self.assertEqual(self.request('/api/adi/live',cookie=cookie)['body']['rows'][0]['unread'],0)
+        self.assertEqual(self.request('/api/adi/live/%d?after=%d'%(cid,detail['messages'][-1]['id']),cookie=cookie)['body']['messages'],[])
+        # Vincular por número de orden trae también a su cliente; una orden inexistente se rechaza.
+        self.assertEqual(act(cid,action='link',order_code='PCD-00000000-9999')['status'],404)
+        self.assertEqual(act(cid,action='link',order_code=order['code'].lower())['status'],200)
+        linked=self.request('/api/adi/live/%d'%cid,cookie=cookie)['body']
+        self.assertEqual((linked['order']['code'],linked['client']['name'],linked['mentioned'],linked['conversation']['order_code']),(order['code'],'Cliente ficticio',[],order['code']))
+        # Tomar, responder, reactivar a Adi, cerrar y reabrir: cada cambio queda en el registro de acciones.
+        self.assertEqual(act(cid,action='takeover')['status'],200)
+        self.assertEqual(act(cid,action='reply',message='Hola, soy un asesor ficticio.')['status'],200)
+        taken=self.request('/api/adi/live/%d'%cid,cookie=cookie)['body']
+        self.assertEqual((taken['conversation']['mode'],taken['conversation']['assigned_to'],taken['messages'][-1]['author'],taken['messages'][-1]['operator']),('human',self.uid,'operator','Persona de prueba'))
+        self.assertEqual((act(cid,action='resume')['status'],act(cid,action='close')['status']),(200,200))
+        self.assertEqual((act(cid,action='reply',message='x')['status'],act(cid,action='takeover')['status']),(409,409))
+        self.assertEqual(([r['id'] for r in self.request('/api/adi/live',cookie=cookie)['body']['rows']],[r['id'] for r in self.request('/api/adi/live?scope=closed',cookie=cookie)['body']['rows']]),([],[cid]))
+        self.assertEqual((act(cid,action='reopen')['status'],act(cid,action='reopen')['status'],act(cid,action='link',clear=True)['status']),(200,409,200))
+        final=self.request('/api/adi/live/%d'%cid,cookie=cookie)['body']
+        self.assertEqual((final['conversation']['mode'],final['client'],final['order'],[a['action'] for a in final['actions']][:3]),('human',None,None,['conversation_link','conversation_reopen','conversation_close']))
+        with app.connect() as c:self.assertEqual(c.execute('SELECT COUNT(*) FROM adi_messages WHERE conversation_id=?',(cid,)).fetchone()[0],4)

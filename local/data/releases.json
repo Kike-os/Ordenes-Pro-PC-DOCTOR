@@ -8,6 +8,25 @@
   },
   "releases": [
     {
+      "version": "1.5.45",
+      "date": "2026-10-11T20:05:59-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Centro de Atención en Tiempo Real",
+      "changes": {
+        "features": [
+          "Centro de Atención en Tiempo Real: consola de tres paneles con lista de conversaciones y estados reales, conversación con burbujas por autor y panel con el cliente y la orden vinculados",
+          "Atención: vincular una conversación a una orden y su cliente (se sugiere la orden que el cliente menciona), reabrir conversaciones cerradas, pestaña de cerradas e indicador de conexión"
+        ],
+        "improvements": [
+          "Atención: mensajes sin leer, avisos de conversación nueva, acciones con confirmación y textos «Cliente», «Adi» y «Asesor» en lugar de identificadores internos"
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.44",
       "date": "2026-10-11T19:58:12-05:00",
       "type": "patch",
