@@ -38,6 +38,7 @@ import order_drafts
 import live_support
 import reports
 import order_search
+import stay
 import technical_access
 import thermal_printing
 import tempfile
@@ -978,7 +979,7 @@ class Handler(BaseHTTPRequestHandler):
                 if not row:
                     return self.reply(404, {'error':'Foto no disponible.'})
                 return self.reply(200, base64.b64decode(row['data']), 'image/jpeg')
-            detail = re.fullmatch(r'/api/orders/([0-9]+)(?:/(qr\.(svg|png)|tracking-qr\.png|receipt\.pdf|thermal\.pdf|service\.pdf|label\.pdf))?', path)
+            detail = re.fullmatch(r'/api/orders/([0-9]+)(?:/(qr\.(svg|png)|tracking-qr\.png|receipt\.pdf|thermal\.pdf|service\.pdf|label\.pdf|stay\.pdf))?', path)
             if detail:
                 row = c.execute('SELECT o.*,COALESCE(NULLIF(d.kind,\'\'),d.category) type,d.brand,d.model,d.serial,d.color,c.id client_id,c.name client,c.identification,c.phone,c.email,c.province,c.city,c.address,c.location_reference,s.label status_label FROM orders o JOIN devices d ON d.id=o.device_id JOIN clients c ON c.id=d.client_id JOIN statuses s ON s.code=o.status WHERE o.id=?',(int(detail[1]),)).fetchone()
                 if not row:
@@ -992,6 +993,12 @@ class Handler(BaseHTTPRequestHandler):
                     return self.reply(200, qr_image(link['url']+'#'+code,'png'), 'image/png')
                 if detail[3]:
                     return self.reply(200, qr_image(row['qr_url'],detail[3]), 'image/svg+xml' if detail[3]=='svg' else 'image/png')
+                if detail[2]=='stay.pdf':
+                    # Informe de permanencia: fechas registradas de ingreso y entrega frente al plazo vigente.
+                    import stay_pdf
+                    info=stay.compute(dict(row,status_code=row['status']),reception_now(),stay.settings(c))
+                    if not info:return self.reply(404,{'error':'La orden no tiene fecha de ingreso registrada.'})
+                    return self.reply(200,stay_pdf.render(dict(row,code=code),info,stay.delivery(c,row['id']),reception_now()),'application/pdf',filename=code+'-PERMANENCIA.pdf')
                 if detail[2] in ('receipt.pdf','thermal.pdf','service.pdf','label.pdf'):
                     from receipt_pdf import render_receipt
                     pdf_order=dict(row)
@@ -1026,6 +1033,7 @@ class Handler(BaseHTTPRequestHandler):
                 result['authorization_mail']=authorization_mail_status(c,row['id'])
                 import client_authorization
                 result['client_authorization']=client_authorization.summary(c,row['id']);result['client_authorization_auto']=client_authorization_auto(c)
+                result['stay']=stay.compute(dict(result,status_code=result['status']),reception_now(),stay.settings(c));result['stay_settings']=stay.settings(c);result['stay_delivery']=stay.delivery(c,row['id']) if result['status']=='entregado' else None
                 result.pop('request_key', None)
                 if result['reception_snapshot']:
                     result.update(json.loads(result['reception_snapshot']))
@@ -1053,7 +1061,7 @@ class Handler(BaseHTTPRequestHandler):
                     return self.reply(400, {'error':'Página inválida.'})
                 if path == '/api/orders':
                     source = 'orders o JOIN devices d ON d.id=o.device_id JOIN clients c ON c.id=d.client_id JOIN statuses s ON s.code=o.status'
-                    columns = "o.id,o.code,o.created_at,o.problem,o.status status_code,s.label status,COALESCE(NULLIF(d.kind,''),d.category) type,d.brand,d.model,c.name client,o.priority,o.estimated_delivery,COALESCE((SELECT name FROM users WHERE id=o.assigned_to),'Sin asignar') responsible"
+                    columns = "o.id,o.code,o.created_at,o.received_at,o.delivered_at,o.problem,o.status status_code,s.label status,COALESCE(NULLIF(d.kind,''),d.category) type,d.brand,d.model,c.name client,o.priority,o.estimated_delivery,COALESCE((SELECT name FROM users WHERE id=o.assigned_to),'Sin asignar') responsible"
                     search = "COALESCE(o.code,'OP-'||printf('%05d',o.id))||' '||CAST(o.id AS TEXT)||' '||c.name||' '||COALESCE(c.identification,'')||' '||COALESCE(c.phone,'')||' '||COALESCE(c.trade_name,'')||' '||COALESCE(d.category,'')||' '||COALESCE(d.brand,'')||' '||COALESCE(d.model,'')||' '||COALESCE(d.serial,'')||' '||o.problem||' '||s.label"
                     active = query.get('active', [''])[0] == '1'
                     where = ' AND o.status != \'entregado\'' if active else ''
@@ -1106,6 +1114,10 @@ class Handler(BaseHTTPRequestHandler):
                 total = c.execute('SELECT COUNT(*) FROM '+source+condition, args).fetchone()[0]
                 if path=='/api/orders':page=min(page,max(1,(total+49)//50))
                 rows = [dict(r) for r in c.execute('SELECT '+columns+' FROM '+source+condition+' ORDER BY '+ordering+' LIMIT 50 OFFSET ?', (*args,(page-1)*50))]
+                if path == '/api/orders':
+                    # Permanencia en taller: calculada en el servidor con las fechas guardadas de ingreso y entrega.
+                    stay_config=stay.settings(c);stay_now=reception_now()
+                    for item in rows:item['stay']=stay.compute(item,stay_now,stay_config)
                 return self.reply(200, {'rows':rows,'total':total,'page':page,'pages':max(1,(total+49)//50)})
             if path == '/api/version':
                 # Versión que ejecuta realmente este servidor (la del código desplegado), para que las pestañas abiertas detecten cuándo deben recargarse.
@@ -1943,6 +1955,9 @@ class Handler(BaseHTTPRequestHandler):
                         if len(comment)>2000:return self.reply(400,{'error':'El comentario admite hasta 2000 caracteres.'})
                         now=reception_now()
                         old=c.execute('SELECT status FROM orders WHERE id=?',(oid,)).fetchone()[0]
+                        # Revertir una entrega reabre el contador de permanencia: solo administración, y queda auditado.
+                        reverted=old=='entregado' and status!='entregado'
+                        if reverted and user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede revertir una entrega registrada.'})
                         c.execute('UPDATE orders SET status=?,updated_at=?,revision=revision+1 WHERE id=?', (status,now.isoformat(timespec='microseconds'),oid))
                         planned=maintenance.transition(c,int(oid),old,status,now)
                         # La entrega crea también la cita futura del mantenimiento (pendiente de confirmación), sin pasos manuales.
@@ -1952,6 +1967,7 @@ class Handler(BaseHTTPRequestHandler):
                         # Sin cambio real ni comentario no hay nada que auditar; con cambio, el registro nombra la transición.
                         if old!=status or comment:order_workspace.event(c,int(oid),user['id'],now,'status' if old!=status else 'follow_up',comment or order_workspace.transition_comment(old,status))
                         audit(c,user['id'],'order_status_updated',int(oid))
+                        if reverted:audit(c,user['id'],'delivery_reverted',int(oid))
                         # La previsión de mantenimiento creada por la entrega viaja en la respuesta para avisar al instante.
                         if planned:return self.reply(200,{'ok':True,'maintenance':planned})
                     else:
@@ -2096,6 +2112,12 @@ class Handler(BaseHTTPRequestHandler):
                     c.execute('INSERT INTO user_photos(user_id,mime,size,data,updated_at) VALUES (?,?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET mime=excluded.mime,size=excluded.size,data=excluded.data,updated_at=excluded.updated_at',(user['id'],kind,len(content),base64.b64encode(content).decode(),stamp))
                     audit(c,user['id'],'profile_photo_updated')
                     return self.reply(200,{'ok':True,'photo':stamp})
+                if path=='/api/stay/settings':
+                    if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede cambiar el plazo de permanencia.'})
+                    values,problem=stay.validate(data,stay.settings(c))
+                    if problem:return self.reply(400,{'error':problem})
+                    stay.save(c,values);audit(c,user['id'],'stay_settings_updated')
+                    return self.reply(200,{'ok':True,'settings':values})
                 client_route=re.fullmatch(r'/api/orders/([0-9]+)/client-authorization',path)
                 if client_route or path=='/api/client-authorization/settings':
                     if not client_route:

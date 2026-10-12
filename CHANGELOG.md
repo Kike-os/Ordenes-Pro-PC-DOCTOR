@@ -4,6 +4,20 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.92 — 2026-10-12 13:32 (UTC-05:00)
+
+Permanencia en taller y control de retiro: columna, detalle, alerta e informe
+
+### Nuevas funcionalidades
+
+- Permanencia en taller: nueva columna en Órdenes con días transcurridos y restantes, barra de avance y nivel (dentro del plazo, recordatorio preventivo, próximo al vencimiento, plazo vencido) frente a un plazo administrativo de 90 días configurable.
+- Detalle de la orden con tarjeta de permanencia (ingreso, plazo, tiempo total, días sobre el plazo y quién registró la entrega) e informe de permanencia en PDF.
+- Centro de Actividad avisa cuando hay equipos sin retirar que superaron el plazo. El estado de la orden nunca cambia por sí solo.
+
+### Actualizaciones de seguridad
+
+- Revertir una entrega registrada queda reservado a administración y se audita.
+
 ## v1.5.91 — 2026-10-12 13:19 (UTC-05:00)
 
 Centro de Seguimiento Técnico y efecto rojo al cerrar

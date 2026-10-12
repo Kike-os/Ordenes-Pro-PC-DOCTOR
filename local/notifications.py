@@ -228,6 +228,12 @@ def build(c, user, now, mail_access=False):
         waiting = c.execute("SELECT COUNT(*) FROM adi_conversations WHERE mode='human' AND assigned_to IS NULL").fetchone()[0]
         alert('advisor', waiting, 'support', 'warning', plural(waiting, 'cliente espera a un asesor', 'clientes esperan a un asesor'), 'Solicitaron atención humana en el chat.', '#live')
         try:
+            import stay
+            late = stay.overdue(c, now, stay.settings(c))
+            alert('stay-overdue', len(late), 'order', 'warning', plural(len(late), 'equipo superó el plazo de permanencia', 'equipos superaron el plazo de permanencia'), 'Revisa las órdenes sin retirar: ' + ', '.join(item['code'] for item in late[:4]) + ('…' if len(late) > 4 else '') + '.', '#orders?active=1')
+        except Exception:
+            pass
+        try:
             answers = c.execute("SELECT COUNT(*) FROM maintenance_responses WHERE handled_at=''").fetchone()[0]
             alert('maintenance-answers', answers, 'support', 'info', plural(answers, 'respuesta de cliente sobre su mantenimiento', 'respuestas de clientes sobre su mantenimiento'), 'Confirmaciones o cambios de horario recibidos por enlace seguro.', '#maintenance')
         except Exception:

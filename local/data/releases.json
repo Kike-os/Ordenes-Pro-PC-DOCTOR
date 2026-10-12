@@ -8,6 +8,26 @@
   },
   "releases": [
     {
+      "version": "1.5.92",
+      "date": "2026-10-12T13:32:28-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Permanencia en taller y control de retiro: columna, detalle, alerta e informe",
+      "changes": {
+        "features": [
+          "Permanencia en taller: nueva columna en Órdenes con días transcurridos y restantes, barra de avance y nivel (dentro del plazo, recordatorio preventivo, próximo al vencimiento, plazo vencido) frente a un plazo administrativo de 90 días configurable.",
+          "Detalle de la orden con tarjeta de permanencia (ingreso, plazo, tiempo total, días sobre el plazo y quién registró la entrega) e informe de permanencia en PDF.",
+          "Centro de Actividad avisa cuando hay equipos sin retirar que superaron el plazo. El estado de la orden nunca cambia por sí solo."
+        ],
+        "improvements": [],
+        "fixes": [],
+        "security": [
+          "Revertir una entrega registrada queda reservado a administración y se audita."
+        ],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.91",
       "date": "2026-10-12T13:19:59-05:00",
       "type": "patch",
