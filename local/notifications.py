@@ -228,6 +228,14 @@ def build(c, user, now, mail_access=False):
         waiting = c.execute("SELECT COUNT(*) FROM adi_conversations WHERE mode='human' AND assigned_to IS NULL").fetchone()[0]
         alert('advisor', waiting, 'support', 'warning', plural(waiting, 'cliente espera a un asesor', 'clientes esperan a un asesor'), 'Solicitaron atención humana en el chat.', '#live')
         try:
+            # Borrador de condiciones pendiente de aprobación: solo lo ve administración, que es quien publica.
+            if user['role'] == 'administrador':
+                pending = c.execute('SELECT updated_at FROM service_terms_draft WHERE id=1').fetchone()
+                if pending:
+                    items.append({'key': 'alert:terms-draft:' + pending['updated_at'], 'kind': 'warning', 'icon': 'doc', 'title': 'Borrador de condiciones pendiente de aprobación', 'detail': 'Revisa los cambios frente a la versión vigente y decide si se publican.', 'at': pending['updated_at'], 'href': '#settings?tab=terms', 'group': 'alert'})
+        except Exception:
+            pass
+        try:
             import stay
             late = stay.overdue(c, now, stay.settings(c))
             alert('stay-overdue', len(late), 'order', 'warning', plural(len(late), 'equipo superó el plazo de permanencia', 'equipos superaron el plazo de permanencia'), 'Revisa las órdenes sin retirar: ' + ', '.join(item['code'] for item in late[:4]) + ('…' if len(late) > 4 else '') + '.', '#orders?stay=overdue')

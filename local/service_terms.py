@@ -89,3 +89,86 @@ def required():
     import os
     from reception import production_enabled
     return production_enabled() or os.getenv('REQUIRE_SERVICE_TERMS','').lower() in ('1','true','yes')
+
+
+# --- Gestión documental: numeración automática, borrador pendiente y comparación entre versiones ---------------------------------------
+
+def next_version(c,today):
+    """Siguiente número AAAA.M.N: continúa la serie del mes en curso o empieza en 1 al cambiar de mes. Nunca reutiliza un número."""
+    prefix='%d.%d.'%(today.year,today.month);highest=0
+    for row in c.execute('SELECT version FROM service_terms'):
+        match=re.fullmatch(re.escape(prefix)+r'(\d+)',row['version'])
+        if match:highest=max(highest,int(match[1]))
+    return prefix+str(highest+1)
+
+
+def _words(old,new):
+    """Diferencia palabra a palabra de un párrafo modificado: lista de (tipo, texto)."""
+    import difflib
+    a,b=re.findall(r'\s+|[^\s]+',old),re.findall(r'\s+|[^\s]+',new);out=[]
+    for tag,i1,i2,j1,j2 in difflib.SequenceMatcher(None,a,b,autojunk=False).get_opcodes():
+        if tag in ('equal',):out.append(('same',''.join(a[i1:i2])))
+        if tag in ('delete','replace'):out.append(('removed',''.join(a[i1:i2])))
+        if tag in ('insert','replace'):out.append(('added',''.join(b[j1:j2])))
+    return out
+
+
+def compare(old_text,new_text):
+    """Compara dos textos por párrafos. Devuelve los bloques en orden y el recuento de añadidos, retirados y modificados."""
+    import difflib
+    a,b=paragraphs(old_text or ''),paragraphs(new_text or '');blocks=[];stats={'added':0,'removed':0,'changed':0}
+    for tag,i1,i2,j1,j2 in difflib.SequenceMatcher(None,a,b,autojunk=False).get_opcodes():
+        if tag=='equal':blocks+=[{'kind':'same','text':text} for text in a[i1:i2]]
+        elif tag=='delete':blocks+=[{'kind':'removed','text':text} for text in a[i1:i2]];stats['removed']+=i2-i1
+        elif tag=='insert':blocks+=[{'kind':'added','text':text} for text in b[j1:j2]];stats['added']+=j2-j1
+        else:
+            pairs=min(i2-i1,j2-j1)
+            for k in range(pairs):blocks.append({'kind':'changed','text':b[j1+k],'before':a[i1+k],'words':_words(a[i1+k],b[j1+k])});stats['changed']+=1
+            blocks+=[{'kind':'removed','text':text} for text in a[i1+pairs:i2]];stats['removed']+=i2-i1-pairs
+            blocks+=[{'kind':'added','text':text} for text in b[j1+pairs:j2]];stats['added']+=j2-j1-pairs
+    return {'blocks':blocks,'stats':stats,'identical':not any(stats.values())}
+
+
+def draft(c):
+    row=c.execute('SELECT d.*,COALESCE(u.name,\'\') author FROM service_terms_draft d LEFT JOIN users u ON u.id=d.updated_by WHERE d.id=1').fetchone()
+    return dict(row) if row else None
+
+
+def save_draft(c,data,user,now):
+    """Guarda el borrador de trabajo. No publica nada: queda pendiente de la aprobación de administración."""
+    fields,errors=validate_publication(dict(data,version='borrador',effective_date=now.date().isoformat(),approved=True))
+    errors={key:value for key,value in errors.items() if key in ('full_text','compact_text')}
+    note=str(data.get('note','')).strip()[:500]
+    if errors:return errors
+    c.execute('INSERT INTO service_terms_draft(id,full_text,compact_text,note,updated_by,updated_at) VALUES (1,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET full_text=excluded.full_text,compact_text=excluded.compact_text,note=excluded.note,updated_by=excluded.updated_by,updated_at=excluded.updated_at',
+              (fields['full_text'],fields['compact_text'],note,user['id'],now.isoformat(timespec='seconds')))
+    return {}
+
+
+def publish_next(c,data,user,now):
+    """Publica con numeración automática cuando no se indica versión, registra los cambios frente a la versión vigente y retira el borrador."""
+    previous=current(c,now) or c.execute('SELECT * FROM service_terms ORDER BY published_at DESC LIMIT 1').fetchone()
+    payload=dict(data);automatic=not str(payload.get('version','')).strip()
+    if automatic:payload['version']=next_version(c,now.date())
+    if not str(payload.get('effective_date','')).strip():payload['effective_date']=now.date().isoformat()
+    # Con numeración automática, un texto idéntico al vigente no genera una versión nueva (no habría nada que aprobar).
+    if automatic and previous and str(payload.get('full_text','')).strip().replace('\r\n','\n')==previous['full_text'] and str(payload.get('compact_text','')).strip().replace('\r\n','\n')==previous['compact_text']:
+        return None,{'full_text':'El texto es idéntico al de la versión vigente: no hay cambios que publicar.'}
+    tid,errors=publish(c,payload,user,now)
+    if errors:return None,errors
+    stats=compare(previous['full_text'] if previous else '',payload['full_text'])['stats']
+    c.execute('INSERT INTO service_terms_changes(terms_id,previous_id,note,added,removed,changed,created_at) VALUES (?,?,?,?,?,?,?)',
+              (tid,previous['id'] if previous else None,str(data.get('note','')).strip()[:500],stats['added'],stats['removed'],stats['changed'],now.isoformat(timespec='seconds')))
+    c.execute('DELETE FROM service_terms_draft')
+    return tid,{}
+
+
+def overview(c,now):
+    """Datos del módulo de administración: versión vigente, siguiente número, borrador pendiente e historial con sus cambios."""
+    active=current(c,now);rows=[]
+    for row in c.execute("SELECT t.*,COALESCE(u.name,'') publisher,ch.previous_id,ch.note,ch.added,ch.removed,ch.changed FROM service_terms t LEFT JOIN users u ON u.id=t.published_by LEFT JOIN service_terms_changes ch ON ch.terms_id=t.id ORDER BY t.published_at DESC"):
+        item=metadata(row);item.update(publisher=row['publisher'],previous_id=row['previous_id'],note=row['note'] or '',changes=None if row['added'] is None else {'added':row['added'],'removed':row['removed'],'changed':row['changed']},
+                                       current=bool(active and row['id']==active['id']),scheduled=row['effective_date']>now.date().isoformat());rows.append(item)
+    pending=draft(c)
+    return {'rows':rows,'current':({**metadata(active),'full_text':active['full_text'],'compact_text':active['compact_text']} if active else None),'next_version':next_version(c,now.date()),'today':now.date().isoformat(),
+            'draft':({**pending,'diff':compare(active['full_text'] if active else '',pending['full_text']),'compact_changed':bool(active) and pending['compact_text']!=active['compact_text']} if pending else None)}

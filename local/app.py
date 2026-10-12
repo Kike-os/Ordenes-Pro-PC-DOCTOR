@@ -982,8 +982,15 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(200,{'terms':({**service_terms.metadata(active),'full_text':active['full_text']} if active else None),'required':terms_required()})
             if path == '/api/conditions':
                 if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede consultar el historial de publicación.'})
-                rows=c.execute('SELECT * FROM service_terms ORDER BY effective_date DESC,published_at DESC').fetchall()
-                return self.reply(200,{'rows':[service_terms.metadata(r) for r in rows]})
+                return self.reply(200,service_terms.overview(c,reception_now()))
+            terms_compare=re.fullmatch(r'/api/conditions/compare/([0-9a-f]{32})',path)
+            if terms_compare:
+                # Diferencias de una versión publicada frente a la inmediatamente anterior.
+                if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede comparar versiones.'})
+                row=c.execute('SELECT * FROM service_terms WHERE id=?',(terms_compare[1],)).fetchone()
+                if not row:return self.reply(404,{'error':'Versión no disponible.'})
+                older=c.execute('SELECT * FROM service_terms WHERE published_at<? ORDER BY published_at DESC LIMIT 1',(row['published_at'],)).fetchone()
+                return self.reply(200,{'version':row['version'],'previous':older['version'] if older else '','diff':service_terms.compare(older['full_text'] if older else '',row['full_text'])})
             if path == '/api/document-logo.png':
                 from document_logo import monochrome_png
                 return self.reply(200,monochrome_png(),'image/png')
@@ -1449,7 +1456,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(403, {'error':'Solicitud no autorizada.'})
             path = urlsplit(self.path).path
             workspace_post=bool(re.fullmatch(r'/api/orders/[0-9]+/workspace',path))
-            max_body=9000000 if path in ('/api/clients/import/preview','/api/clients/import/commit') else 6000000 if path in ('/api/mail/send','/api/mail/draft') else 100000 if path in ('/api/conditions','/api/order-draft') else 900000 if re.fullmatch(r'/api/orders/[0-9]+/photos',path) or path=='/api/profile/photo' else (65536 if workspace_post else 16384)
+            max_body=9000000 if path in ('/api/clients/import/preview','/api/clients/import/commit') else 6000000 if path in ('/api/mail/send','/api/mail/draft') else 100000 if path in ('/api/conditions','/api/order-draft','/api/conditions/draft','/api/conditions/compare') else 900000 if re.fullmatch(r'/api/orders/[0-9]+/photos',path) or path=='/api/profile/photo' else (65536 if workspace_post else 16384)
             length = int(self.headers.get('Content-Length', '0'))
             if length <= 0 or length > max_body:
                 return self.reply(400, {'error':'Solicitud inválida.'})
@@ -2100,10 +2107,25 @@ class Handler(BaseHTTPRequestHandler):
                     return self.reply(status,payload)
                 if path == '/api/conditions':
                     if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede publicar condiciones.'})
-                    tid,errors=service_terms.publish(c,data,user,reception_now())
-                    if errors:return self.reply(400,{'error':'Revisa los datos de publicación.','fields':errors})
+                    # Sin número de versión se asigna el siguiente de la serie; la aprobación expresa sigue siendo obligatoria.
+                    tid,errors=service_terms.publish_next(c,data,user,reception_now())
+                    if errors:return self.reply(400,{'error':next(iter(errors.values())) if len(errors)==1 else 'Revisa los datos de publicación.','fields':errors})
                     audit(c,user['id'],'service_terms_published')
-                    return self.reply(201,{'ok':True,'id':tid})
+                    return self.reply(201,{'ok':True,'id':tid,'version':c.execute('SELECT version FROM service_terms WHERE id=?',(tid,)).fetchone()[0]})
+                if path in ('/api/conditions/draft','/api/conditions/draft/discard','/api/conditions/compare'):
+                    # Borrador de trabajo y comparación con la versión vigente. Guardar un borrador nunca publica nada.
+                    if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
+                    now=reception_now();active=service_terms.current(c,now)
+                    if path.endswith('/compare'):
+                        return self.reply(200,{'diff':service_terms.compare(active['full_text'] if active else '',str(data.get('full_text',''))),'compact_changed':bool(active) and str(data.get('compact_text','')).strip().replace('\r\n','\n')!=active['compact_text'],'current':active['version'] if active else ''})
+                    if path.endswith('/discard'):
+                        if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede descartar el borrador.'})
+                        c.execute('DELETE FROM service_terms_draft');audit(c,user['id'],'service_terms_draft_discarded')
+                        return self.reply(200,{'ok':True})
+                    errors=service_terms.save_draft(c,data,user,now)
+                    if errors:return self.reply(400,{'error':next(iter(errors.values())),'fields':errors})
+                    audit(c,user['id'],'service_terms_draft_saved')
+                    return self.reply(200,{'ok':True})
                 if path in ('/api/clients', '/api/devices', '/api/order-status', '/api/settings'):
                     if user['role'] != 'administrador':
                         return self.reply(403, {'error':'Solo administración puede realizar esta operación.'})

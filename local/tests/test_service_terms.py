@@ -108,3 +108,54 @@ class ServiceTermsTests(unittest.TestCase):
         self.assertIn('full_text',errors)
         _,errors=service_terms.validate_publication({'version':'TEST-1','effective_date':'fecha incorrecta','full_text':'Prueba','compact_text':'Prueba','approved':False})
         self.assertIn('approved',errors);self.assertIn('effective_date',errors)
+
+
+class TermsWorkflowTests(unittest.TestCase):
+    """Numeración automática, borrador pendiente, comparación e historial de cambios."""
+    setUpClass=classmethod(test_app.SecurityTests.setUpClass.__func__);setUp=test_app.SecurityTests.setUp;tearDown=test_app.SecurityTests.tearDown;request=test_app.SecurityTests.request;login=test_app.SecurityTests.login;order_data=test_app.SecurityTests.order_data
+
+    FULL='1. Diagnóstico\nRevisiones acordadas con el cliente.\n\n2. Garantía\nNoventa días sobre el servicio realizado.\n\n3. Entrega\nEl cliente verifica el equipo al retirarlo.'
+    COMPACT='1. Diagnóstico acordado.\n\n2. Garantía de noventa días.'
+
+    def test_automatic_numbering_draft_diff_and_history(self):
+        cookie,csrf=self.login();now=app.reception_now();prefix='%d.%d.'%(now.year,now.month)
+        post=lambda path,body:self.request(path,body,cookie=cookie,csrf=csrf)
+        # Sin aprobación expresa no se publica, aunque el número sea automático.
+        self.assertEqual(post('/api/conditions',{'full_text':self.FULL,'compact_text':self.COMPACT})['status'],400)
+        first=post('/api/conditions',{'full_text':self.FULL,'compact_text':self.COMPACT,'approved':True})
+        self.assertEqual((first['status'],first['body']['version']),(201,prefix+'1'))
+        # Mismo texto: no hay nada que publicar.
+        self.assertEqual(post('/api/conditions',{'full_text':self.FULL,'compact_text':self.COMPACT,'approved':True})['status'],400)
+        changed=self.FULL.replace('Noventa días','Ciento veinte días')+'\n\n4. Almacenamiento\nSe informará cualquier cargo antes de aplicarlo.'
+        # Guardar un borrador no publica nada; queda pendiente y se avisa a administración.
+        self.assertEqual(post('/api/conditions/draft',{'full_text':changed,'compact_text':self.COMPACT,'note':'Amplía la garantía'})['status'],200)
+        view=self.request('/api/conditions',cookie=cookie)['body']
+        self.assertEqual((view['current']['version'],view['next_version'],len(view['rows'])),(prefix+'1',prefix+'2',2))  # la base de pruebas trae además una versión de ejemplo
+        self.assertEqual((view['draft']['note'],view['draft']['diff']['stats'],view['draft']['compact_changed']),('Amplía la garantía',{'added':1,'removed':0,'changed':1},False))
+        block=[item for item in view['draft']['diff']['blocks'] if item['kind']=='changed'][0]
+        self.assertIn(('removed','Noventa'),[tuple(word) for word in block['words']]);self.assertIn('Ciento',''.join(text for kind,text in block['words'] if kind=='added'))
+        alerts=[item for item in self.request('/api/notifications',cookie=cookie)['body']['items'] if item['key'].startswith('alert:terms-draft')]
+        self.assertEqual((len(alerts),alerts[0]['href']),(1,'#settings?tab=terms'))
+        live=post('/api/conditions/compare',{'full_text':self.FULL+'\n\n9. Nuevo\nTexto.','compact_text':'otro'})['body']
+        self.assertEqual((live['diff']['stats']['added'],live['compact_changed'],live['current']),(1,True,prefix+'1'))
+        # Una orden registrada ahora queda ligada a la versión vigente; publicar después no la altera.
+        oid=post('/api/orders',self.order_data({'request_key':'terms-flow-order-0001','terms_accept':True,'terms_document_id':view['current']['id']}))['body']['id']
+        second=post('/api/conditions',{'full_text':changed,'compact_text':self.COMPACT,'approved':True,'note':'Amplía la garantía'})
+        self.assertEqual((second['status'],second['body']['version']),(201,prefix+'2'))
+        after=self.request('/api/conditions',cookie=cookie)['body']
+        self.assertIsNone(after['draft']);self.assertEqual([row['version'] for row in after['rows']],[prefix+'2',prefix+'1','FIXTURE-ONLY']);self.assertEqual(after['next_version'],prefix+'3')
+        newest=after['rows'][0];self.assertEqual((newest['changes'],newest['note'],newest['current'],bool(newest['publisher'])),({'added':1,'removed':0,'changed':1},'Amplía la garantía',True,True))
+        self.assertFalse([item for item in self.request('/api/notifications',cookie=cookie)['body']['items'] if item['key'].startswith('alert:terms-draft')])
+        order=self.request('/api/orders/'+str(oid),cookie=cookie)['body']['order']
+        self.assertEqual((order['terms']['version'],order['terms_current']['version']),(prefix+'1',prefix+'2'))
+        diff=self.request('/api/conditions/compare/'+newest['id'],cookie=cookie)['body']
+        self.assertEqual((diff['version'],diff['previous'],diff['diff']['stats']['changed']),(prefix+'2',prefix+'1',1))
+        with app.connect() as c:
+            self.assertEqual(c.execute('SELECT COUNT(*) FROM service_terms').fetchone()[0],3)
+            self.assertEqual(c.execute("SELECT full_text FROM service_terms WHERE version=?",(prefix+'1',)).fetchone()[0],self.FULL)
+            c.execute("UPDATE users SET role='tecnico'")
+        # Un técnico puede preparar un borrador, pero no publicar, descartar ni ver el historial de publicación.
+        self.assertEqual(post('/api/conditions/draft',{'full_text':changed+'\n\n5. Otro\nTexto.','compact_text':self.COMPACT})['status'],200)
+        self.assertEqual(post('/api/conditions',{'full_text':changed+'\n\n5. Otro\nTexto.','compact_text':self.COMPACT,'approved':True})['status'],403)
+        self.assertEqual(post('/api/conditions/draft/discard',{'ok':True})['status'],403);self.assertEqual(self.request('/api/conditions',cookie=cookie)['status'],403)
+        with app.connect() as c:self.assertEqual(c.execute('SELECT COUNT(*) FROM service_terms').fetchone()[0],3)

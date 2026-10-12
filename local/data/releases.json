@@ -8,6 +8,25 @@
   },
   "releases": [
     {
+      "version": "1.5.108",
+      "date": "2026-10-12T18:14:47-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Gestión documental de las Condiciones y rótulo del inicio",
+      "changes": {
+        "features": [
+          "Condiciones del servicio con gestión documental: numeración automática de versiones, borrador pendiente de aprobación con aviso a administración, comparación resaltada con la versión vigente e historial con responsable, motivo y cambios de cada versión."
+        ],
+        "improvements": [
+          "Rótulo del inicio renovado: «PC-DOCTOR S.A. — Plataforma de Gestión Técnica».",
+          "El Seguimiento de Órdenes del inicio ya no repite los contadores que muestran las tarjetas de estado."
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.107",
       "date": "2026-10-12T18:03:00-05:00",
       "type": "patch",

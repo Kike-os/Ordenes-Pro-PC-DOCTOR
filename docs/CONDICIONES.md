@@ -37,3 +37,15 @@ Actualización 10/10/2026: el ticket, el consentimiento técnico independiente y
 - **Aprobación y versiones:** se mantiene el procedimiento de Configuración → Condiciones del servicio (versión única, fecha de vigencia, confirmación de aprobación, versiones inmutables e historial). Publicar exige una decisión administrativa real; nada se publica automáticamente.
 - **Preparado para firma digital:** el cierre del documento indica la referencia y la huella SHA-256 del texto; cada aceptación se registra en la orden vinculada a esa versión exacta. El PDF no contiene firmas ni consentimientos, y no se atribuyen aceptaciones a órdenes anteriores.
 - **Detalle de la orden:** el enlace abre el PDF de la versión aceptada por esa orden o, si no hay ninguna, el borrador rotulado como tal. El botón pasa a llamarse «Compartir condiciones del servicio» y comparte ese mismo archivo (el comprobante se sigue compartiendo desde «Compartir» en el listado y desde su vista previa).
+
+## Gestión documental automatizada (1.5.108)
+
+Configuración → Condiciones del servicio.
+
+- **Versión vigente**: indicador con número, fecha de vigencia, huella y PDF oficial. La inicial es la **2026.10.1**.
+- **Borrador de trabajo** (uno solo): se guarda con «Guardar borrador» sin publicar nada. Mientras exista, administración ve el aviso «Borrador de condiciones pendiente de aprobación» en el Centro de Actividad. Un técnico puede preparar el borrador; solo administración publica o lo descarta.
+- **Comparación automática**: «Comparar con la versión vigente» resalta párrafos añadidos, retirados y modificados (estos últimos, palabra a palabra) e indica si cambia el texto compacto del ticket.
+- **Publicación**: exige la casilla de aprobación y una confirmación. El número se asigna solo (`AAAA.M.N`: continúa la serie del mes o empieza en 1 al cambiar de mes; nunca se reutiliza). Un texto idéntico al vigente no genera versión. Nada se publica automáticamente.
+- **Historial**: cada versión guarda fecha y hora, responsable, motivo y recuento de párrafos cambiados (tabla `service_terms_changes`); «Ver cambios» muestra sus diferencias frente a la anterior. Las versiones publicadas siguen siendo inmutables.
+- **Órdenes**: cada orden nueva queda ligada a la versión vigente en el momento de la aceptación, con fecha, hora, responsable y evidencia; publicar después no altera las órdenes anteriores, y sus PDF y tickets siguen usando su versión.
+- **Rutas**: `GET /api/conditions` (resumen, solo administración), `POST /api/conditions` (publicar), `POST /api/conditions/draft`, `/draft/discard`, `/compare` y `GET /api/conditions/compare/<id>`. Migración 039.

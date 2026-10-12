@@ -4,6 +4,19 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.108 — 2026-10-12 18:14 (UTC-05:00)
+
+Gestión documental de las Condiciones y rótulo del inicio
+
+### Nuevas funcionalidades
+
+- Condiciones del servicio con gestión documental: numeración automática de versiones, borrador pendiente de aprobación con aviso a administración, comparación resaltada con la versión vigente e historial con responsable, motivo y cambios de cada versión.
+
+### Mejoras realizadas
+
+- Rótulo del inicio renovado: «PC-DOCTOR S.A. — Plataforma de Gestión Técnica».
+- El Seguimiento de Órdenes del inicio ya no repite los contadores que muestran las tarjetas de estado.
+
 ## v1.5.107 — 2026-10-12 18:03 (UTC-05:00)
 
 Seguimiento de Órdenes agrupado por orden
