@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.53 — 2026-10-11 23:17 (UTC-05:00)
+
+Avisos emergentes menos intrusivos
+
+### Mejoras realizadas
+
+- Notificaciones: como mucho dos avisos emergentes a la vez y varias novedades juntas se resumen en un solo aviso que abre el panel, para no tapar el encabezado ni los botones
+
 ## v1.5.52 — 2026-10-11 23:12 (UTC-05:00)
 
 Adi: «Aplicar mejora» con tiempo límite y panel compacto dentro del formulario

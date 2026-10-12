@@ -8,6 +8,22 @@
   },
   "releases": [
     {
+      "version": "1.5.53",
+      "date": "2026-10-11T23:17:01-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Avisos emergentes menos intrusivos",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Notificaciones: como mucho dos avisos emergentes a la vez y varias novedades juntas se resumen en un solo aviso que abre el panel, para no tapar el encabezado ni los botones"
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.52",
       "date": "2026-10-11T23:12:21-05:00",
       "type": "patch",
