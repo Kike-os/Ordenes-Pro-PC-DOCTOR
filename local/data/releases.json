@@ -8,6 +8,22 @@
   },
   "releases": [
     {
+      "version": "1.5.66",
+      "date": "2026-10-12T00:42:36-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Diagnóstico de ADI en el registro del servidor",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Diagnóstico de ADI: el registro del servidor anota cada revisión completada, la propuesta mostrada y su aceptación (sin el texto del usuario)"
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.65",
       "date": "2026-10-12T00:38:57-05:00",
       "type": "patch",

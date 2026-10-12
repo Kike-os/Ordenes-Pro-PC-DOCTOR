@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.66 — 2026-10-12 00:42 (UTC-05:00)
+
+Diagnóstico de ADI en el registro del servidor
+
+### Mejoras realizadas
+
+- Diagnóstico de ADI: el registro del servidor anota cada revisión completada, la propuesta mostrada y su aceptación (sin el texto del usuario)
+
 ## v1.5.65 — 2026-10-12 00:38 (UTC-05:00)
 
 Listado de órdenes compacto con iconos de estado
