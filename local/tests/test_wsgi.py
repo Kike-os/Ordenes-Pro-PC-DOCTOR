@@ -84,4 +84,5 @@ class WSGITests(unittest.TestCase):
         # El adaptador que usa la nube también entrega el nombre del archivo con el número de la orden.
         self.assertEqual(self.call_wsgi('/api/orders/'+str(order['id'])+'/receipt.pdf',cookie=cookie)['headers'].get('Content-Disposition'),'inline; filename="'+order['code']+'-COMPROBANTE-DE-RECEPCION.pdf"')
         self.assertEqual(self.call_wsgi('/api/orders/'+str(order['id'])+'/thermal.pdf',cookie=cookie)['headers'].get('Content-Disposition'),'inline; filename="'+order['code']+'-TICKET.pdf"')
+        draft=self.call_wsgi('/api/conditions/draft.pdf',cookie=cookie);self.assertTrue(draft['status'].startswith('200'),draft['status']);self.assertEqual(draft['headers'].get('Content-Disposition'),'inline; filename="BORRADOR---CONDICIONES-DE-RECEPCION-Y-SERVICIOS.pdf"; filename*=UTF-8\'\'BORRADOR%20-%20CONDICIONES%20DE%20RECEPCI%C3%93N%20Y%20SERVICIOS.pdf')
         self.assertTrue(self.call_wsgi('/api/order-by-code/'+order['code'],cookie=cookie)['status'].startswith('200'))

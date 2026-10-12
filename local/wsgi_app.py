@@ -35,7 +35,7 @@ class WSGIHandler(core.Handler):
         ]
         # Mismo criterio que el servidor local: los documentos de la orden se guardan con su número real.
         if filename:
-            self.response_headers.append(('Content-Disposition', 'inline; filename="' + re.sub(r'[^A-Za-z0-9._-]', '-', filename) + '"'))
+            self.response_headers.append(('Content-Disposition', core.content_disposition(filename)))
         if cookie:
             self.response_headers.append(('Set-Cookie', cookie))
         self.response_body = body

@@ -7,7 +7,7 @@ import re
 import secrets
 from reception import public_base_url
 
-TITLE='Condiciones Generales de Recepción y Servicio Técnico'
+TITLE='Condiciones de Recepción y Servicios'
 MECHANISM='checkbox_presencial'
 MECHANISM_LABEL='Confirmación en pantalla registrada por el técnico'
 
@@ -62,6 +62,7 @@ def metadata(row):
     data={key:row[key] for key in ('id','version','effective_date','title','content_hash','published_at')}
     data['url']=public_base_url()+'/conditions/'+row['id']
     data['local_url']='/conditions/'+row['id']
+    data['pdf_url']='/conditions/'+row['id']+'.pdf'
     return data
 
 

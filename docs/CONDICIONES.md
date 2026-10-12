@@ -27,3 +27,13 @@ Para un comprobante real aprobado, pueden seleccionarse por trabajo `PageSize=RP
 La migración `005_service_terms.sql` añade tablas, columnas e índices sin borrar registros, con respaldo previo mediante el migrador existente. Incluir `service_terms.py`, `document_logo.py`, `thermal_pdf.py`, `receipt_pdf.py`, estáticos y plantillas actualizados. Reiniciar los procesos Python/Passenger después de actualizar. El ZIP no contiene la base de datos, archivos `.env` ni credenciales.
 
 Actualización 10/10/2026: el ticket, el consentimiento técnico independiente y la ruta de impresión nativa se documentan en [TICKET-TERMICO.md](TICKET-TERMICO.md). El PPD instalado representa el área útil de 72 mm como tamaño de página para el rollo de 80 mm; la nueva ruta evita el retorno a A4 observado en tamaños personalizados.
+
+## Documento «CONDICIONES DE RECEPCIÓN Y SERVICIOS» (1.5.78)
+
+- **Título oficial:** «CONDICIONES DE RECEPCIÓN Y SERVICIOS». Las versiones que se publiquen a partir de ahora llevan el título «Condiciones de Recepción y Servicios»; las ya publicadas conservan el suyo (cada versión guarda su propio título).
+- **PDF A4 en una página:** logotipo y «Servicio Técnico Especializado», título centrado, los ocho apartados con encabezado numerado, cierre «Aceptación y versión» y pie compacto con el contacto oficial. Legible en blanco y negro.
+- **Borrador:** recuadro «BORRADOR PARA REVISIÓN · SIN VIGENCIA CONTRACTUAL» y nombre de archivo `BORRADOR - CONDICIONES DE RECEPCIÓN Y SERVICIOS.pdf` (`/api/conditions/draft.pdf`, requiere sesión). El texto del borrador no se ha modificado.
+- **Versión publicada:** `/conditions/<identificador>.pdf` (público, sin datos personales), con versión y fecha de vigencia, y nombre `CONDICIONES DE RECEPCIÓN Y SERVICIOS.pdf`. La ruta HTML `/conditions/<identificador>` sigue igual.
+- **Aprobación y versiones:** se mantiene el procedimiento de Configuración → Condiciones del servicio (versión única, fecha de vigencia, confirmación de aprobación, versiones inmutables e historial). Publicar exige una decisión administrativa real; nada se publica automáticamente.
+- **Preparado para firma digital:** el cierre del documento indica la referencia y la huella SHA-256 del texto; cada aceptación se registra en la orden vinculada a esa versión exacta. El PDF no contiene firmas ni consentimientos, y no se atribuyen aceptaciones a órdenes anteriores.
+- **Detalle de la orden:** el enlace abre el PDF de la versión aceptada por esa orden o, si no hay ninguna, el borrador rotulado como tal. El botón pasa a llamarse «Compartir condiciones del servicio» y comparte ese mismo archivo (el comprobante se sigue compartiendo desde «Compartir» en el listado y desde su vista previa).

@@ -4,6 +4,19 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.78 — 2026-10-12 07:47 (UTC-05:00)
+
+Documento de condiciones rediseñado
+
+### Nuevas funcionalidades
+
+- PDF oficial de cada versión publicada de las condiciones y nombres de archivo correctos (definitivo y borrador)
+
+### Mejoras realizadas
+
+- Documento «CONDICIONES DE RECEPCIÓN Y SERVICIOS» rediseñado en una página A4, con apartados numerados, aviso de borrador y cierre con versión y huella
+- El botón del detalle de la orden pasa a ser «Compartir condiciones del servicio» y comparte el archivo que corresponde
+
 ## v1.5.77 — 2026-10-12 07:40 (UTC-05:00)
 
 Botón Volver unificado

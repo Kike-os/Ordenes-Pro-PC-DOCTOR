@@ -388,6 +388,16 @@ def send_authorization_mail(c,oid,user):
     return {'result':'sent','recipient':recipient}
 
 
+def content_disposition(filename):
+    """Nombre de descarga: versión ASCII para cualquier navegador y, si tiene espacios o tildes, el nombre exacto en UTF-8 (RFC 5987)."""
+    import unicodedata
+    from urllib.parse import quote
+    plain=''.join(ch for ch in unicodedata.normalize('NFD',filename) if not unicodedata.combining(ch));safe=re.sub(r'[^A-Za-z0-9._-]','-',plain)
+    header='inline; filename="'+safe+'"'
+    if safe!=filename:header+="; filename*=UTF-8''"+quote(filename,safe='')
+    return header
+
+
 def mail_signature_card(c):
     # Firma corporativa del buzón remitente: datos validados; el HTML siempre lo compone el servidor.
     account=mail_pro.settings()['username'];row=c.execute('SELECT value FROM system_state WHERE key=?',('mail_signature_card:'+account,)).fetchone()
@@ -492,7 +502,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(status)
         self.send_header('Content-Type', content_type)
         # Nombre con el número real de la orden cuando el documento se guarda o descarga desde el navegador.
-        if filename:self.send_header('Content-Disposition','inline; filename="'+re.sub(r'[^A-Za-z0-9._-]','-',filename)+'"')
+        if filename:self.send_header('Content-Disposition',content_disposition(filename))
         self.send_header('Content-Length', str(len(body)))
         self.send_header('Cache-Control', 'no-store')
         self.send_header('X-Content-Type-Options', 'nosniff')
@@ -623,6 +633,13 @@ class Handler(BaseHTTPRequestHandler):
                 active=service_terms.current(c,reception_now())
                 if not active:return self.reply(404,{'error':'Las condiciones vigentes aún no han sido publicadas.'})
                 return self.reply(200,service_terms.public_page(active),'text/html; charset=utf-8')
+            terms_pdf=re.fullmatch(r'/conditions/([a-f0-9]{32})\.pdf',path)
+            if terms_pdf:
+                # PDF oficial de una versión publicada: mismo contenido público que la página, sin datos personales.
+                row=c.execute('SELECT * FROM service_terms WHERE id=?',(terms_pdf[1],)).fetchone()
+                if not row:return self.reply(404,{'error':'Versión de condiciones no disponible.'})
+                import conditions_pdf
+                return self.reply(200,conditions_pdf.render_conditions(dict(row)),'application/pdf',filename=conditions_pdf.FILE_NAME)
             public_terms=re.fullmatch(r'/conditions/([a-f0-9]{32})',path)
             if public_terms:
                 row=c.execute('SELECT * FROM service_terms WHERE id=?',(public_terms[1],)).fetchone()
@@ -745,8 +762,8 @@ class Handler(BaseHTTPRequestHandler):
             if path in ('/api/conditions/draft','/api/conditions/draft.pdf'):
                 draft=corporate.terms_draft()
                 if path.endswith('.pdf'):
-                    from conditions_pdf import render_conditions
-                    return self.reply(200,render_conditions(draft),'application/pdf')
+                    import conditions_pdf
+                    return self.reply(200,conditions_pdf.render_conditions(draft),'application/pdf',filename=conditions_pdf.DRAFT_FILE_NAME)
                 return self.reply(200,draft)
             if path == '/api/conditions/current':
                 active=service_terms.current(c,reception_now())

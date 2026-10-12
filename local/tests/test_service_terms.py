@@ -50,6 +50,9 @@ class ServiceTermsTests(unittest.TestCase):
     def test_public_version_has_no_customer_data_and_is_immutable(self):
         cookie,csrf=self.login();tid=self.publish(cookie,csrf)
         result=self.request('/conditions/'+tid)
+        # PDF oficial de la versión publicada y PDF del borrador: mismo contenido público, sin sesión para el oficial.
+        official=self.request('/conditions/'+tid+'.pdf');self.assertEqual(official['status'],200);self.assertTrue(official['body'].startswith(b'%PDF'))
+        self.assertEqual(self.request('/conditions/'+'0'*32+'.pdf')['status'],404)
         self.assertEqual(result['status'],200);self.assertNotIn('<script>',result['body']);self.assertIn('&lt;script&gt;',result['body'])
         self.assertNotIn('0100000017',result['body']);self.assertNotIn('Cliente ficticio',result['body'])
         with app.connect() as c:
