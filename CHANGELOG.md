@@ -4,6 +4,18 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.57 — 2026-10-11 23:37 (UTC-05:00)
+
+Iconos por tipo de equipo y por módulo
+
+### Nuevas funcionalidades
+
+- Iconos por tipo de equipo: portátil, portátil gaming, escritorio, todo en uno, mini PC, impresora, consola y equipo genérico, asignados según el tipo guardado y visibles en el listado, el detalle y la recepción
+
+### Mejoras realizadas
+
+- Cada módulo tiene su propio icono junto al título; el menú resalta el módulo activo e ilumina el icono al pasar el cursor
+
 ## v1.5.56 — 2026-10-11 23:34 (UTC-05:00)
 
 Voz de ADI: escucha y responde hablando

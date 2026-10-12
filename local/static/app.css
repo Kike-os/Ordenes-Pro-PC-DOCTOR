@@ -3731,3 +3731,27 @@ body[data-page=dashboard] .adi-assist header.adi-assist-head>div{display:grid;ga
 #adi-widget.adi-v2[data-voice=speaking] .adi-orb::after{animation-duration:.9s}
 @keyframes adi-orb-speak{0%,100%{box-shadow:0 10px 26px #02071499,0 0 0 2px #c38bff66,0 0 18px #b77bff59;transform:scale(1)}50%{box-shadow:0 10px 26px #02071499,0 0 0 6px #c38bff26,0 0 30px #b77bffa6;transform:scale(1.04)}}
 @media(prefers-reduced-motion:reduce){#adi-widget.adi-v2 #adi-form .adi-mic[aria-pressed=true],#adi-widget.adi-v2[data-voice=listening] .adi-toggle,#adi-widget.adi-v2[data-voice=speaking] .adi-toggle{animation:none}#adi-widget.adi-v2[data-voice=listening] .adi-toggle{box-shadow:0 0 0 3px #5ee7ff}#adi-widget.adi-v2[data-voice=speaking] .adi-toggle{box-shadow:0 0 0 3px #c38bff}}
+/* ===== Iconos por tipo de equipo y por módulo ===== */
+.device-icon{display:inline-grid;place-items:center;flex:none;width:34px;height:34px;border:1px solid #2a4a78;border-radius:10px;background:linear-gradient(180deg,#132a4d,#0e1f3a);color:#8fc0ff;transition:border-color .2s,box-shadow .2s,color .2s}
+.device-icon svg{width:18px;height:18px}
+.device-icon[data-device=printer]{color:#7fdcc6;border-color:#2f7a6c}.device-icon[data-device=gamepad]{color:#c3b8ff;border-color:#4a3f8a}.device-icon[data-device=gaming]{color:#ffc978;border-color:#7a6230}
+.device-icon[data-device=desktop],.device-icon[data-device=monitor]{color:#8fd3ff;border-color:#2f5d8f}.device-icon[data-device=mini]{color:#9fe3a6;border-color:#2f7a55}.device-icon[data-device=generic]{color:#b5c5de;border-color:#3a4f70}
+.device-icon-lg{width:46px;height:46px;border-radius:13px}.device-icon-lg svg{width:24px;height:24px}
+.order-table td.order-identity{display:flex;align-items:center;gap:10px}.order-identity-text{display:grid;gap:2px;min-width:0}
+.order-table tr:hover .device-icon{border-color:#4d8df0;box-shadow:0 0 0 3px #4d8df01f;color:#d6e8ff}
+#module-content .workspace-header{display:flex;align-items:center;gap:16px}#module-content .workspace-header>.device-icon{flex:none}#module-content .workspace-header>.workspace-state{margin-left:auto}
+.has-device-preview{position:relative}.device-type-preview{position:absolute;right:36px;bottom:5px;pointer-events:none}.device-type-preview[hidden]{display:none}
+.device-type-preview .device-icon{width:30px;height:30px;border-radius:9px}.device-icon-swap{animation:device-swap .24s ease-out 1}
+@keyframes device-swap{from{opacity:0;transform:scale(.7) rotate(-8deg)}to{opacity:1;transform:none}}
+#module-title .module-title-icon{color:#9cc4ff;border-color:#2f5d8f;background:linear-gradient(180deg,#143568,#0e2347);box-shadow:0 0 0 3px #2f6fd014}
+#module-title .module-title-icon[data-module=deliveries]{color:#8fe0b4;border-color:#2f7a55;background:linear-gradient(180deg,#123a2a,#0d2a1f)}
+#module-title .module-title-icon[data-module=maintenance]{color:#f0d28a;border-color:#7a6230;background:linear-gradient(180deg,#33290f,#241d0c)}
+#module-title .module-title-icon[data-module=live]{color:#c3b8ff;border-color:#4a3f8a;background:linear-gradient(180deg,#221f4d,#181638)}
+#module-title .module-title-icon[data-module=clients]{color:#8fd3ff}
+#module-title .module-title-icon[data-module=reports]{color:#7fdcc6;border-color:#2f7a6c;background:linear-gradient(180deg,#113732,#0c2925)}
+/* Menú principal: iluminación suave al pasar el cursor y módulo activo resaltado */
+.premium-header nav a .field-icon{transition:color .2s,filter .2s,transform .2s}
+.premium-header nav a:hover .field-icon{color:#cfe2ff;filter:drop-shadow(0 0 5px #6fa8ff99);transform:translateY(-1px)}
+.premium-header nav a[aria-current=page] .field-icon{color:#bfe0ff;filter:drop-shadow(0 0 6px #5b9cffb3)}
+@media(max-width:600px){.order-table td.order-identity{display:flex}}
+@media(prefers-reduced-motion:reduce){.device-icon,.premium-header nav a .field-icon{transition:none}.device-icon-swap{animation:none}.premium-header nav a:hover .field-icon{transform:none}}

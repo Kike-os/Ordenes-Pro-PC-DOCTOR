@@ -8,6 +8,24 @@
   },
   "releases": [
     {
+      "version": "1.5.57",
+      "date": "2026-10-11T23:37:24-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Iconos por tipo de equipo y por módulo",
+      "changes": {
+        "features": [
+          "Iconos por tipo de equipo: portátil, portátil gaming, escritorio, todo en uno, mini PC, impresora, consola y equipo genérico, asignados según el tipo guardado y visibles en el listado, el detalle y la recepción"
+        ],
+        "improvements": [
+          "Cada módulo tiene su propio icono junto al título; el menú resalta el módulo activo e ilumina el icono al pasar el cursor"
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.56",
       "date": "2026-10-11T23:34:06-05:00",
       "type": "patch",
