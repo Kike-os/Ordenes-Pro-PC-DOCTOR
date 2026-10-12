@@ -4,6 +4,18 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.49 — 2026-10-11 22:39 (UTC-05:00)
+
+Detalle de la Orden: recuadro del título corregido y cabecera compacta
+
+### Mejoras realizadas
+
+- Detalle de la Orden: cabecera más compacta, con «Volver a órdenes» como botón y título y subtítulo en un bloque corto
+
+### Errores corregidos
+
+- Detalle de la Orden: al recargar la página con el teclado aparecía un recuadro blanco alrededor del título; era el contorno de foco del encabezado y ya no se dibuja
+
 ## v1.5.48 — 2026-10-11 22:36 (UTC-05:00)
 
 Asistente ADI rediseñado y disponible en todos los campos de texto

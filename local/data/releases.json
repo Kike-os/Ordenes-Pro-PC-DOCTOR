@@ -8,6 +8,24 @@
   },
   "releases": [
     {
+      "version": "1.5.49",
+      "date": "2026-10-11T22:39:54-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Detalle de la Orden: recuadro del título corregido y cabecera compacta",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Detalle de la Orden: cabecera más compacta, con «Volver a órdenes» como botón y título y subtítulo en un bloque corto"
+        ],
+        "fixes": [
+          "Detalle de la Orden: al recargar la página con el teclado aparecía un recuadro blanco alrededor del título; era el contorno de foco del encabezado y ya no se dibuja"
+        ],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.48",
       "date": "2026-10-11T22:36:28-05:00",
       "type": "patch",

@@ -3627,3 +3627,16 @@ body[data-page=dashboard] .delivery-filters :is(select,input){width:auto;min-wid
 @media(prefers-reduced-motion:reduce){.adi-assist button.adi-tool,.adi-assist button.adi-assist-close{transition:none}.adi-assist button.adi-apply[data-loading=true] svg{animation:none}}
 .adi-panel.adi-assist{box-sizing:border-box;max-width:100%;min-width:0}.adi-tools{min-width:0}.adi-assist button.adi-tool{min-width:0}.adi-assist button.adi-tool span{min-width:0;overflow-wrap:anywhere}
 @media(max-width:520px){.adi-panel.adi-assist{width:auto;margin:6px 0 0;justify-self:stretch}}
+/* Título de módulo: recibe el foco por programa (accesibilidad) pero no es un control; no debe dibujar contorno al recargar con el teclado */
+#module-title:focus,#module-title:focus-visible{outline:none;box-shadow:none}
+/* Detalle de la Orden · cabecera compacta: «Volver» como botón, título y subtítulo en un bloque corto */
+#view-module:has(>#module-content>.workspace-header)>.back-link{display:inline-flex;align-items:center;gap:6px;margin:14px 0 0;padding:6px 12px;border:1px solid #2a4063;border-radius:999px;background:#0d1b30;color:#cfe2ff;font-size:12.5px;font-weight:600;text-decoration:none;transition:background .2s,border-color .2s,color .2s}
+#view-module:has(>#module-content>.workspace-header)>.back-link:hover{background:#15294a;border-color:#3b5d8f;color:#fff}
+#view-module:has(>#module-content>.workspace-header)>.back-link:focus-visible{outline:2px solid #8bb8ff;outline-offset:2px}
+#view-module:has(>#module-content>.workspace-header)>.module-heading{padding:12px 0 14px}
+#view-module:has(>#module-content>.workspace-header)>.module-heading .eyebrow{display:none}
+#view-module:has(>#module-content>.workspace-header)>.module-heading h1{margin:0 0 4px;font-size:clamp(21px,2vw,26px);line-height:1.2;letter-spacing:-.01em}
+#view-module:has(>#module-content>.workspace-header)>.module-heading p{margin:0;font-size:12.5px;line-height:1.5;color:#9fb3d1}
+#view-module:has(>#module-content>.workspace-header) .workspace-header{padding:18px 22px}
+@media(max-width:560px){#view-module:has(>#module-content>.workspace-header)>.module-heading h1{font-size:20px}#view-module:has(>#module-content>.workspace-header) .workspace-header{padding:14px 16px}}
+@media(prefers-reduced-motion:reduce){#view-module:has(>#module-content>.workspace-header)>.back-link{transition:none}}
