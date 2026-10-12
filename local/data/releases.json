@@ -8,6 +8,26 @@
   },
   "releases": [
     {
+      "version": "1.5.44",
+      "date": "2026-10-11T19:58:12-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Esfera de Adi y mensajes de WhatsApp con número validado",
+      "changes": {
+        "features": [
+          "Orden: «Mensaje por WhatsApp» con siete mensajes preparados (recepción, diagnóstico, presupuesto, autorización, listo para retirar, recordatorio de pago y seguimiento) que se abren en WhatsApp para revisarlos y enviarlos"
+        ],
+        "improvements": [
+          "Adi: el botón flotante es ahora una esfera holográfica circular, con brillo suave, halo al señalarla y pulsos de luz solo mientras procesa una consulta real"
+        ],
+        "fixes": [
+          "WhatsApp: el número se normaliza siempre al formato internacional sin duplicar el 593 (09…, +593…, 00593…, con espacios o guiones) y se avisa si falta, está incompleto o es un fijo, en lugar de abrir un enlace inválido"
+        ],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.43",
       "date": "2026-10-11T19:48:03-05:00",
       "type": "patch",

@@ -3491,3 +3491,31 @@ body[data-page=dashboard] .access-pro label.access-mini :is(input,select){height
 #module-content .terms-evidence h3{margin:0 0 8px;font-size:13px;color:#eef3ff}
 #module-content .terms-evidence p{margin:0 0 5px;font-size:12px;line-height:1.5;color:#c5d5ee;overflow-wrap:anywhere}
 #module-content .terms-evidence details{margin-top:6px;font-size:12px;color:#a9bbd6}#module-content .terms-evidence summary{cursor:pointer;font-weight:600}
+/* ===== Adi · esfera holográfica (dibujada con CSS, sin imágenes externas) ===== */
+#adi-widget.adi-v2 .adi-toggle{width:56px;height:56px;min-height:56px;padding:0;border:0;border-radius:50%;background:transparent;overflow:visible;box-shadow:0 10px 26px #02071499,0 0 0 1px #8fb8ff40,0 0 22px #4d7cff59;transition:transform .2s ease,box-shadow .2s ease}
+#adi-widget.adi-v2 .adi-toggle:hover,#adi-widget.adi-v2 .adi-toggle:focus-visible{border:0;transform:scale(1.05);box-shadow:0 12px 30px #020714b3,0 0 0 1px #a9cbff66,0 0 0 6px #5b9cff26,0 0 30px #5b8cff8c}
+#adi-widget.adi-v2 .adi-toggle:focus-visible{outline:2px solid #cfe2ff;outline-offset:4px}
+#adi-widget.adi-v2 .adi-toggle:active{transform:scale(.98)}
+#adi-widget.adi-v2 .adi-orb{position:absolute;inset:0;border-radius:50%;overflow:hidden;background:radial-gradient(circle at 68% 76%,#b77bffd9 0,#b77bff00 52%),radial-gradient(circle at 24% 74%,#22d3eeb3 0,#22d3ee00 50%),radial-gradient(circle at 50% 38%,#4f8dff 0,#2a4fd0 42%,#16226e 72%,#0a1238 100%);box-shadow:inset 0 -8px 14px #05092bcc,inset 0 3px 8px #ffffff40}
+#adi-widget.adi-v2 .adi-orb-swirl{position:absolute;inset:-18%;border-radius:50%;background:conic-gradient(from 0deg,#5ee7ff00 0deg,#5ee7ffb3 55deg,#8f6bff00 120deg,#c38bffa6 200deg,#3d7dff00 260deg,#6fd3ff99 320deg,#5ee7ff00 360deg);filter:blur(6px);mix-blend-mode:screen;opacity:.85;animation:adi-orb-turn 22s linear infinite}
+#adi-widget.adi-v2 .adi-orb-shine{position:absolute;inset:0;border-radius:50%;background:radial-gradient(ellipse 42% 26% at 34% 22%,#ffffffe6 0,#ffffff59 45%,#ffffff00 100%),radial-gradient(ellipse 30% 14% at 62% 84%,#bfe9ff66 0,#bfe9ff00 100%);box-shadow:inset 0 0 0 1px #d6e8ff59}
+#adi-widget.adi-v2 .adi-orb::after{content:"";position:absolute;left:50%;top:50%;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;background:radial-gradient(circle,#ffffff 0,#bfe3ff 35%,#7fb5ff00 72%);opacity:.9;animation:adi-orb-core 5.5s ease-in-out infinite}
+@keyframes adi-orb-turn{to{transform:rotate(360deg)}}
+@keyframes adi-orb-core{0%,100%{transform:scale(.85);opacity:.7}50%{transform:scale(1.12);opacity:1}}
+/* Procesando: pulsos de luz solo mientras hay una consulta real en curso */
+#adi-widget.adi-v2.adi-busy .adi-toggle{animation:adi-orb-busy 1.15s ease-in-out infinite}
+#adi-widget.adi-v2.adi-busy .adi-orb-swirl{animation-duration:5s}
+@keyframes adi-orb-busy{0%,100%{box-shadow:0 10px 26px #02071499,0 0 0 1px #8fb8ff40,0 0 0 0 #6fb1ff73}50%{box-shadow:0 10px 26px #02071499,0 0 0 1px #a9cbff80,0 0 0 9px #6fb1ff00,0 0 28px #6fa8ffb3}}
+#adi-widget.adi-v2.adi-pulse .adi-toggle{animation:adi-orb-ping .8s ease-out 2}
+@keyframes adi-orb-ping{0%{box-shadow:0 10px 26px #02071499,0 0 0 0 #8fd0ffb3}100%{box-shadow:0 10px 26px #02071499,0 0 0 14px #8fd0ff00}}
+#adi-widget.adi-v2.adi-open .adi-toggle{box-shadow:0 10px 26px #02071499,0 0 0 2px #a9cbff8c,0 0 26px #5b8cff80}
+#adi-widget.adi-v2 .adi-toggle .adi-online{right:1px;bottom:1px;z-index:2}
+#adi-widget.adi-v2 .adi-unread{top:-4px;right:-4px;z-index:2}
+/* Estado sin conexión o cerrado: la esfera se apaga, no aparenta estar activa */
+#adi-widget.adi-v2:is([data-state=closed],[data-state=offline]) .adi-orb{filter:saturate(.35) brightness(.8)}
+#adi-widget.adi-v2:is([data-state=closed],[data-state=offline]) .adi-orb-swirl,#adi-widget.adi-v2:is([data-state=closed],[data-state=offline]) .adi-orb::after{animation-play-state:paused}
+@media(max-width:860px){body[data-page=dashboard] #adi-widget.adi-v2 .adi-toggle{width:50px;height:50px;min-height:50px}}
+@media(prefers-reduced-motion:reduce){#adi-widget.adi-v2 .adi-toggle,#adi-widget.adi-v2 .adi-orb-swirl,#adi-widget.adi-v2 .adi-orb::after,#adi-widget.adi-v2.adi-busy .adi-toggle,#adi-widget.adi-v2.adi-pulse .adi-toggle{animation:none;transition:none}#adi-widget.adi-v2 .adi-toggle:hover{transform:none}}
+/* WhatsApp desde la orden */
+#module-content button.order-whatsapp{display:inline-flex;align-items:center;justify-content:center;gap:8px;width:100%;margin-top:10px}#module-content button.order-whatsapp svg{width:16px;height:16px}
+.whatsapp-form{display:grid;gap:10px}.whatsapp-form .agenda-hint[data-state=error]{color:#f6dfa6}.whatsapp-form .agenda-actions{justify-content:flex-end}

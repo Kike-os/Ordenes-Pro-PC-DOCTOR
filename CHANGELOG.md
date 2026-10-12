@@ -4,6 +4,22 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.44 — 2026-10-11 19:58 (UTC-05:00)
+
+Esfera de Adi y mensajes de WhatsApp con número validado
+
+### Nuevas funcionalidades
+
+- Orden: «Mensaje por WhatsApp» con siete mensajes preparados (recepción, diagnóstico, presupuesto, autorización, listo para retirar, recordatorio de pago y seguimiento) que se abren en WhatsApp para revisarlos y enviarlos
+
+### Mejoras realizadas
+
+- Adi: el botón flotante es ahora una esfera holográfica circular, con brillo suave, halo al señalarla y pulsos de luz solo mientras procesa una consulta real
+
+### Errores corregidos
+
+- WhatsApp: el número se normaliza siempre al formato internacional sin duplicar el 593 (09…, +593…, 00593…, con espacios o guiones) y se avisa si falta, está incompleto o es un fijo, en lugar de abrir un enlace inválido
+
 ## v1.5.43 — 2026-10-11 19:48 (UTC-05:00)
 
 Autorizaciones de operaciones de riesgo rediseñadas y visibles en el detalle de la orden
