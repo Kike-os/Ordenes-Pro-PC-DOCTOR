@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.65 — 2026-10-12 00:38 (UTC-05:00)
+
+Listado de órdenes compacto con iconos de estado
+
+### Mejoras realizadas
+
+- Listado de órdenes más compacto en escritorio, tableta y móvil, con icono propio para cada estado (mismos nombres y colores)
+
 ## v1.5.64 — 2026-10-12 00:33 (UTC-05:00)
 
 Autorizaciones con estado visible en recepción y en el comprobante A4

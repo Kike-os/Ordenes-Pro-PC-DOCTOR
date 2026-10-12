@@ -3872,3 +3872,15 @@ body[data-page=dashboard] .adi-assist header.adi-assist-head>div{display:grid;ga
 .access-pro .access-part .access-grid[hidden]{display:none}
 @media(max-width:520px){.access-pro .access-part>header{flex-wrap:wrap}.access-pro .access-part>header>div{flex-basis:calc(100% - 40px)}.access-pro .access-state{margin-left:34px}}
 @media(prefers-reduced-motion:reduce){.access-pro .access-part,.access-pro .access-state{transition:none}}
+/* Órdenes de reparación: listado más compacto y estados con icono (mismos colores y nombres) */
+body[data-page=dashboard] .status-label.status-icon::before{content:none}
+.status-label.status-icon{gap:6px}.status-label.status-icon>svg{flex:none;width:13px;height:13px}
+.orders-filter-card{padding:12px 14px;margin-bottom:12px}
+.orders-results .order-table th{padding:9px 12px}
+.orders-results .order-table td{padding:9px 12px;line-height:1.4}
+.orders-results .order-table tbody tr{transition:background-color .18s ease}
+.orders-results .order-table tbody tr:hover{background:#0f1d33}
+.orders-results .order-row-actions{gap:6px}
+.orders-results .order-row-actions>button,.orders-results .order-row-actions .order-document-action,.orders-results .order-row-actions .orders-more-trigger{min-height:32px;height:32px;padding-top:0;padding-bottom:0;font-size:12px}
+@media(prefers-reduced-motion:reduce){.orders-results .order-table tbody tr{transition:none}}
+@media(max-width:1100px){.orders-results .order-table tbody{gap:10px;padding:10px}.orders-results .order-table tr{padding:11px 12px}.orders-results .order-table td{grid-template-columns:96px minmax(0,1fr);gap:8px;padding:4px 0!important;line-height:1.4}.orders-results .order-table td.order-identity{display:flex!important;align-items:center;gap:10px;padding-bottom:8px!important}.orders-results .order-table td.order-identity small{margin-top:2px}.orders-results .order-table td .status-label{justify-self:start}.orders-results .order-row-actions{padding-top:9px;margin-top:6px}}

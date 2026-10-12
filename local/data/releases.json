@@ -8,6 +8,22 @@
   },
   "releases": [
     {
+      "version": "1.5.65",
+      "date": "2026-10-12T00:38:57-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Listado de órdenes compacto con iconos de estado",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Listado de órdenes más compacto en escritorio, tableta y móvil, con icono propio para cada estado (mismos nombres y colores)"
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.64",
       "date": "2026-10-12T00:33:35-05:00",
       "type": "patch",
