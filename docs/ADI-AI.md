@@ -67,3 +67,14 @@ Desde la 1.5.46 el servidor acepta también la variable `OPEN_API_KEY` (nombre m
 - Mensajes claros si el micrófono está bloqueado, no hay micrófono, no se escuchó nada, falla la red o el navegador no admite dictado.
 - El nombre del asistente se muestra siempre como «ADI».
 - Requiere HTTPS (producción lo cumple) y el permiso de micrófono del navegador.
+
+## Corrección automática como propuesta (1.5.60)
+
+Sustituye al comportamiento de la 1.5.50, que aplicaba sola las correcciones simples.
+
+- 1,5 s después de dejar de escribir, ADI revisa la ortografía del campo y muestra «Analizando texto…».
+- Si hay cambios, aparece bajo el campo la propuesta con las palabras cambiadas resaltadas y los botones «Aceptar corrección» y «Descartar». El texto del campo no se toca hasta aceptar; después se puede deshacer.
+- Si se sigue escribiendo, la revisión en curso se cancela y la propuesta anterior se retira: una respuesta antigua nunca pisa texto nuevo.
+- No se repite la consulta para un texto ya revisado, aceptado o descartado.
+- Si la revisión falla se indica el motivo junto al botón y el texto queda como estaba.
+- Abrir «Mejorar con ADI» retira la propuesta automática; «Cancelar» y la X del asistente solo cierran el asistente.

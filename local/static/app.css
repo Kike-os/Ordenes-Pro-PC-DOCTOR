@@ -3814,3 +3814,13 @@ body[data-page=dashboard] .adi-assist header.adi-assist-head>div{display:grid;ga
 @media(max-width:720px){.control-pro .control-card,.control-pro .control-card.is-wide,.control-pro .control-card:first-child,.control-pro .control-card:nth-child(4),.control-pro .control-card:nth-child(5){grid-column:span 6}.control-pro .control-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.control-pro .control-periods{width:100%}.control-pro .control-periods button{flex:1;padding:0 4px}.control-pro .control-field{flex:1 1 130px}.control-pro .control-field input,.control-pro .control-field select{width:100%;max-width:none}
 .control-pro .control-orders a{grid-template-columns:minmax(0,1fr) auto;gap:4px 10px}.control-pro .control-order-device,.control-pro .control-order-tech{grid-column:1}.control-pro .control-badge{grid-column:2;grid-row:1}.control-pro .control-chart{height:220px}}
 @media(prefers-reduced-motion:reduce){.control-pro *{transition:none!important}}
+/* ADI: estado de la revisión automática y propuesta de corrección bajo el campo */
+.adi-bar .adi-status{min-width:0;font-size:11px;color:#9fb0d0;text-align:right}.adi-bar .adi-status:empty{display:none}
+.adi-bar .adi-status[data-kind=work]{color:#c9c2ff}.adi-bar .adi-status[data-kind=ok]{color:#8fe0b4}.adi-bar .adi-status[data-kind=error]{color:#ffb9bf}
+.adi-offer{display:grid;gap:7px;margin-top:6px;padding:9px 11px;border:1px solid #6b5a2c;border-radius:10px;background:#141a2c;text-align:left;animation:live-enter .2s ease-out 1}.adi-offer[hidden]{display:none}
+.adi-offer .adi-label{color:#EABC6C;font-weight:650}
+.adi-offer .adi-offer-text{font-weight:400;max-height:130px;overflow-y:auto;font-size:13px;line-height:1.5;color:#eef3ff;white-space:pre-wrap;overflow-wrap:anywhere}
+.adi-offer .adi-offer-text mark{padding:0 2px;border-radius:3px;background:#3b3f9a;color:#fff}
+.adi-offer .adi-offer-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px}
+.adi-offer .adi-offer-actions button{width:auto;min-height:0;height:30px;margin:0;padding:0 12px;border-radius:8px;font-size:12px}
+@media(prefers-reduced-motion:reduce){.adi-offer{animation:none}}

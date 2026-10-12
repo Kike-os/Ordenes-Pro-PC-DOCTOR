@@ -4,6 +4,18 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.60 — 2026-10-12 00:11 (UTC-05:00)
+
+ADI propone las correcciones de ortografía de forma visible
+
+### Mejoras realizadas
+
+- ADI cancela la revisión en curso si sigues escribiendo, no repite consultas del mismo texto y explica el motivo cuando una revisión falla
+
+### Errores corregidos
+
+- La corrección automática de ADI ahora se ve: avisa «Analizando texto…» y propone la corrección bajo el campo con Aceptar y Descartar, 1,5 s después de dejar de escribir
+
 ## v1.5.59 — 2026-10-12 00:03 (UTC-05:00)
 
 Centro de Control Técnico con gráficos y filtros

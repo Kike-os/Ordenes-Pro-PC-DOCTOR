@@ -8,6 +8,24 @@
   },
   "releases": [
     {
+      "version": "1.5.60",
+      "date": "2026-10-12T00:11:06-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "ADI propone las correcciones de ortografía de forma visible",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "ADI cancela la revisión en curso si sigues escribiendo, no repite consultas del mismo texto y explica el motivo cuando una revisión falla"
+        ],
+        "fixes": [
+          "La corrección automática de ADI ahora se ve: avisa «Analizando texto…» y propone la corrección bajo el campo con Aceptar y Descartar, 1,5 s después de dejar de escribir"
+        ],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.59",
       "date": "2026-10-12T00:03:55-05:00",
       "type": "patch",
