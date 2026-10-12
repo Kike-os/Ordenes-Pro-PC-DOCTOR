@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.74 — 2026-10-12 07:19 (UTC-05:00)
+
+Destello al corregir con ADI
+
+### Mejoras realizadas
+
+- Destello azul celeste breve sobre el campo cuando ADI aplica una corrección ortográfica (respeta movimiento reducido)
+
 ## v1.5.73 — 2026-10-12 07:17 (UTC-05:00)
 
 Corrección ortográfica automática de ADI sin ventanas

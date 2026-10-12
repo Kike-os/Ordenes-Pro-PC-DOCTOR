@@ -8,6 +8,22 @@
   },
   "releases": [
     {
+      "version": "1.5.74",
+      "date": "2026-10-12T07:19:35-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Destello al corregir con ADI",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Destello azul celeste breve sobre el campo cuando ADI aplica una corrección ortográfica (respeta movimiento reducido)"
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.73",
       "date": "2026-10-12T07:17:17-05:00",
       "type": "patch",

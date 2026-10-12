@@ -3955,3 +3955,8 @@ dialog.device-card{width:min(720px,calc(100vw - 24px))}
 @media(max-width:1000px){.devices-pro .device-row{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px 12px}.devices-pro .device-identity{grid-column:1/-1}.devices-pro .device-actions{grid-column:1/-1;justify-content:flex-start}}
 @media(max-width:520px){.devices-pro .device-row{grid-template-columns:1fr}.devices-pro .devices-tools select,.devices-pro .devices-tools input[type=search]{flex:1 1 100%;max-width:none;width:100%}.devices-pro .devices-tools .result-count{margin-left:0}.device-card .device-facts{grid-template-columns:repeat(2,minmax(0,1fr))}.devices-pro .device-actions button{flex:1;justify-content:center}}
 @media(prefers-reduced-motion:reduce){.devices-pro .device-row{transition:none}}
+/* ADI: destello azul celeste (glow + shimmer) cuando se aplica una corrección ortográfica real. Una sola pasada de 0,7 s. */
+.adi-fixed{animation:adi-fixed-glow .7s ease-out 1;background-image:linear-gradient(110deg,transparent 38%,#7fd4ff1f 50%,transparent 62%)!important;background-repeat:no-repeat!important;background-size:240% 100%!important}
+@keyframes adi-fixed-glow{0%{box-shadow:0 0 0 0 #5cc8ff00;background-position:120% 0}25%{box-shadow:0 0 0 1px #5cc8ffb3,0 0 18px 2px #5cc8ff55}100%{box-shadow:0 0 0 0 #5cc8ff00;background-position:-60% 0}}
+.adi-bar[data-star=done] .adi-button .system-icon{filter:drop-shadow(0 0 5px #7fd4ff)}
+@media(prefers-reduced-motion:reduce){.adi-fixed{animation:none;background-image:none!important}.adi-bar[data-star=done] .adi-button .system-icon{filter:none}}
