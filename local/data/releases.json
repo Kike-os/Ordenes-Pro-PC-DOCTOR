@@ -8,6 +8,22 @@
   },
   "releases": [
     {
+      "version": "1.5.99",
+      "date": "2026-10-12T14:16:04-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Esfera de ADI con más brillo, halo, cristal y anillos",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Esfera de ADI más luminosa: halo rosado difuminado, cristal con reflejos y más profundidad, dos anillos finos, puntos de energía en órbita, texto «ADI» más nítido e indicador verde con borde oscuro y resplandor."
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.98",
       "date": "2026-10-12T14:09:49-05:00",
       "type": "patch",

@@ -125,3 +125,7 @@ Sustituye a la propuesta con «Aceptar / Descartar» de la 1.5.60, a petición d
 - **Desconectada**: sin indicador verde, esfera apagada y sin movimiento. El indicador refleja el estado real de la conexión con el servidor.
 - Ventana «ADI · Asistente Inteligente» con botón propio para detener la voz, visible solo mientras ADI habla.
 - En equipos modestos (2 núcleos o 2 GB) y con «movimiento reducido» se desactivan desenfoques, ondas y giros.
+
+### Brillo y profundidad (1.5.99)
+
+Halo rosado difuminado que respira con la esfera, cristal con reflejos superior e inferior y canto de luz, dos anillos finos que giran en sentidos opuestos, puntos de energía en órbita lenta, texto «ADI» con resplandor leve e indicador verde con borde oscuro. Al escuchar, el brillo acompaña al volumen medido; al hablar, el halo pulsa. Todo en CSS; en equipos modestos y con movimiento reducido se desactivan halo animado, anillo exterior y puntos.

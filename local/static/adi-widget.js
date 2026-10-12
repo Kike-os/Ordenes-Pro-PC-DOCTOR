@@ -4,7 +4,7 @@
  const root=document.getElementById('adi-widget');if(!root)return;
  const $=id=>document.getElementById(id),toggle=$('adi-toggle'),panel=$('adi-panel'),list=$('adi-messages'),form=$('adi-form'),input=$('adi-input'),submit=form.querySelector('button'),human=$('adi-human'),status=$('adi-status'),quick=$('adi-quick'),badge=$('adi-unread'),more=$('adi-more'),menu=$('adi-menu');
  const dashboard=document.body.dataset.page==='dashboard',prefsKey='ordenes-pro:adi-chat';
- {const orb=toggle.querySelector('.adi-orb');if(orb&&!orb.querySelector('.adi-orb-label')){const label=document.createElement('b');label.className='adi-orb-label';label.textContent='ADI';orb.append(label);for(const name of ['adi-ring','adi-level','adi-particles']){const piece=document.createElement('i');piece.className=name;piece.setAttribute('aria-hidden','true');toggle.prepend(piece);}}
+ {const orb=toggle.querySelector('.adi-orb');if(orb&&!orb.querySelector('.adi-orb-label')){const label=document.createElement('b');label.className='adi-orb-label';label.textContent='ADI';orb.append(label);for(const name of ['adi-ring','adi-ring adi-ring-outer','adi-level','adi-particles','adi-sparks','adi-halo']){const piece=document.createElement('i');piece.className=name;piece.setAttribute('aria-hidden','true');toggle.prepend(piece);}}
   // Equipos modestos: menos efectos (sin desenfoques ni ondas interiores) para que la esfera no reste fluidez.
   if((navigator.hardwareConcurrency&&navigator.hardwareConcurrency<=2)||(navigator.deviceMemory&&navigator.deviceMemory<=2))root.classList.add('adi-lite');}
  let lastId=0,busy=false,state='adi',transient='',started=false,loaded=false,typing=null,unread=0,lastDay='',failures=0,autoHidden=false,closing=null;

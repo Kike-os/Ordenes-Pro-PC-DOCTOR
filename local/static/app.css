@@ -4303,3 +4303,37 @@ body[data-page=dashboard] button[aria-label^="Cerrar"]:not(#logout):not(.primary
 #adi-widget.adi-v2 .adi-stop{color:#ffb3d4}
 #adi-widget.adi-v2 .adi-stop svg{width:15px;height:15px;fill:currentColor}
 #adi-widget.adi-v2 .adi-stop[hidden]{display:none}
+/* ADI: más brillo y profundidad. Halo rosado difuminado, cristal con reflejos arriba y abajo, dos anillos finos y puntos de energía en órbita lenta. */
+#adi-widget.adi-v2 .adi-halo{position:absolute;inset:-16px;z-index:-4;border-radius:50%;background:radial-gradient(circle,#ff8fc2a6 0,#ff7fbd59 38%,#e98bff26 58%,#ff8fc200 72%);filter:blur(7px);opacity:.75;pointer-events:none;animation:adi-halo-breathe 4.6s ease-in-out infinite;will-change:opacity,transform}
+@keyframes adi-halo-breathe{0%,100%{opacity:.55;transform:scale(.94)}50%{opacity:.95;transform:scale(1.06)}}
+#adi-widget.adi-v2 .adi-toggle{box-shadow:0 10px 26px #02071499,0 0 0 1px #ffd3e673,0 0 18px #ff8fc299,0 0 42px #ff6fb540}
+@keyframes adi-orb-breathe{0%,100%{box-shadow:0 10px 26px #02071499,0 0 0 1px #ffd3e659,0 0 16px #ff8fc280,0 0 36px #ff6fb533;transform:scale(1)}50%{box-shadow:0 10px 26px #02071499,0 0 0 1px #ffe3efa6,0 0 26px #ff9ecbcc,0 0 54px #ff6fb566;transform:scale(1.035)}}
+/* Cristal: núcleo luminoso, cuerpo rosa perlado, borde fucsia profundo; reflejo superior marcado, reflejo inferior suave y canto de luz. */
+#adi-widget.adi-v2 .adi-orb{background:radial-gradient(circle at 74% 82%,#c77dffb8 0,#c77dff00 48%),radial-gradient(circle at 20% 80%,#ff5fadb0 0,#ff5fad00 50%),radial-gradient(circle at 50% 112%,#ffe6f2d9 0,#ffe6f200 42%),radial-gradient(circle at 44% 20%,#ffffff 0,#ffe0ed 12%,#ffb3d6 34%,#fb86bf 58%,#e45a9f 80%,#a43273 100%);box-shadow:inset 0 -12px 18px #7a1f5580,inset 0 5px 12px #ffffffa6,inset 0 0 0 1px #fff0f6b3,inset 0 0 14px #ffffff40}
+#adi-widget.adi-v2 .adi-orb-shine{background:radial-gradient(ellipse 50% 22% at 38% 15%,#ffffff 0,#ffffff80 46%,#ffffff00 100%),radial-gradient(ellipse 16% 9% at 70% 26%,#ffffffcc 0,#ffffff00 100%),radial-gradient(ellipse 42% 13% at 56% 90%,#fff0f799 0,#fff0f700 100%),linear-gradient(165deg,#ffffff38 0,#ffffff00 44%);box-shadow:inset 0 0 0 1px #ffeef699}
+#adi-widget.adi-v2 .adi-orb-swirl{opacity:.7}
+/* Texto: limpio y nítido, con resplandor leve. */
+#adi-widget.adi-v2 .adi-orb-label{font:600 15px/1 Inter,"Segoe UI",system-ui,sans-serif;letter-spacing:.18em;text-indent:.18em;color:#fff;text-shadow:0 1px 2px #8f2866d9,0 0 6px #b23b82a6,0 0 12px #ffffffb3,0 0 20px #ffc2dc99;-webkit-font-smoothing:antialiased}
+@media(max-width:860px){#adi-widget.adi-v2 .adi-orb-label{font-size:13px}}
+/* Anillos: uno fino junto a la esfera y otro exterior más tenue, en sentidos opuestos. */
+#adi-widget.adi-v2 .adi-ring{inset:-5px;background:conic-gradient(from 0deg,#ff9ecb00 0deg,#ffffffe6 60deg,#ff7fbdb3 120deg,#ff9ecb00 190deg,#e2a8ffcc 270deg,#ff9ecb00 360deg);-webkit-mask:radial-gradient(farthest-side,#0000 calc(100% - 2px),#000 calc(100% - 1.5px));mask:radial-gradient(farthest-side,#0000 calc(100% - 2px),#000 calc(100% - 1.5px));filter:drop-shadow(0 0 3px #ff9ecb)}
+#adi-widget.adi-v2 .adi-ring-outer{inset:-11px;opacity:.6;background:conic-gradient(from 180deg,#ff9ecb00 0deg,#ffd3e6b3 40deg,#ff9ecb00 110deg,#ff9ecb00 200deg,#ff8fc299 250deg,#ff9ecb00 320deg);-webkit-mask:radial-gradient(farthest-side,#0000 calc(100% - 1.2px),#000 calc(100% - 1px));mask:radial-gradient(farthest-side,#0000 calc(100% - 1.2px),#000 calc(100% - 1px));animation:adi-orb-turn 26s linear infinite reverse;filter:none}
+/* Puntos de energía en órbita lenta (reposo). Al procesar los releva el giro rápido de partículas. */
+#adi-widget.adi-v2 .adi-sparks{position:absolute;inset:-11px;z-index:-1;border-radius:50%;pointer-events:none;opacity:.9;background:radial-gradient(circle 1.6px at 50% 1.6px,#fff 0,#ffd3e6 55%,#ffd3e600 100%),radial-gradient(circle 1.2px at 8% 64%,#ffe3ef 0,#ffb3d400 100%),radial-gradient(circle 1.3px at 90% 74%,#f2c4ff 0,#d9a6ff00 100%);animation:adi-orb-turn 20s linear infinite;will-change:transform}
+#adi-widget.adi-v2.adi-busy .adi-sparks{opacity:0}
+/* Escuchando: el brillo acompaña levemente al volumen real. */
+#adi-widget.adi-v2[data-voice=listening] .adi-halo{animation:none;opacity:calc(.7 + var(--adi-level,.2)*.3);transform:scale(calc(1 + var(--adi-level,0)*.16));transition:transform .1s linear,opacity .1s linear}
+#adi-widget.adi-v2[data-voice=listening][data-meter=true] .adi-orb{filter:brightness(calc(1.02 + var(--adi-level,0)*.18))}
+/* Procesando: movimiento interno delicado. Hablando: pulso elegante del halo, con un latido por palabra. */
+#adi-widget.adi-v2.adi-busy .adi-halo{animation-duration:1.8s}
+#adi-widget.adi-v2[data-voice=speaking] .adi-halo{animation:adi-halo-speak 1s ease-in-out infinite}
+@keyframes adi-halo-speak{0%,100%{opacity:.7;transform:scale(1)}50%{opacity:1;transform:scale(1.12)}}
+/* Indicador de disponibilidad: limpio, con borde oscuro y resplandor suave. */
+#adi-widget.adi-v2 .adi-toggle .adi-online{right:0;bottom:0;width:13px;height:13px;border:2.5px solid #0a1020;background:radial-gradient(circle at 35% 30%,#8ff5c4 0,#34d399 55%,#1fae7c 100%);box-shadow:0 0 0 1px #34d39959,0 0 8px #34d399b3}
+#adi-widget.adi-v2:is([data-state=waiting],[data-state=requesting]) .adi-toggle .adi-online{background:#f3c677;box-shadow:0 0 0 1px #f3c67759,0 0 8px #f3c677b3}
+#adi-widget.adi-v2[data-state=advisor] .adi-toggle .adi-online{background:#69a7ff;box-shadow:0 0 0 1px #69a7ff59,0 0 8px #69a7ffb3}
+#adi-widget.adi-v2[data-state=closed] .adi-toggle .adi-online{background:#7b8798;box-shadow:none}
+/* Sin conexión, equipos modestos y movimiento reducido. */
+#adi-widget.adi-v2:is([data-state=closed],[data-state=offline]) :is(.adi-halo,.adi-sparks){animation-play-state:paused;opacity:.2}
+#adi-widget.adi-v2.adi-lite .adi-halo{filter:none;animation:none;opacity:.6}#adi-widget.adi-v2.adi-lite :is(.adi-sparks,.adi-ring-outer){display:none}#adi-widget.adi-v2.adi-lite .adi-ring{filter:none}
+@media(prefers-reduced-motion:reduce){#adi-widget.adi-v2 :is(.adi-halo,.adi-sparks,.adi-ring-outer){animation:none!important;transition:none}}

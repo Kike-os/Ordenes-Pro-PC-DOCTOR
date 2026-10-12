@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.99 — 2026-10-12 14:16 (UTC-05:00)
+
+Esfera de ADI con más brillo, halo, cristal y anillos
+
+### Mejoras realizadas
+
+- Esfera de ADI más luminosa: halo rosado difuminado, cristal con reflejos y más profundidad, dos anillos finos, puntos de energía en órbita, texto «ADI» más nítido e indicador verde con borde oscuro y resplandor.
+
 ## v1.5.98 — 2026-10-12 14:09 (UTC-05:00)
 
 Esfera premium de ADI con anillo, letras y estados reales
