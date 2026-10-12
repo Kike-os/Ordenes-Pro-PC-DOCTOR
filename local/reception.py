@@ -16,10 +16,11 @@ from geography import validate_location
 
 DEVICE_TYPES = {'portatil':'Portátil (Laptop)','notebook':'Notebook','gaming':'Portátil Gaming',
     'impresora':'Impresora','escritorio':'PC de escritorio','mini_pc':'Mini PC','aio':'All-in-One','aio_hp':'All-in-One HP',
-    'aio_lenovo':'All-in-One Lenovo','aio_dell':'All-in-One Dell','consola':'Consolas','otro':'Otro equipo'}
+    'aio_lenovo':'All-in-One Lenovo','aio_dell':'All-in-One Dell','consola':'Consolas',
+    'tablet':'Tablet','celular':'Celular','router':'Router / equipo de red','servidor':'Servidor','otro':'Otro equipo'}
 # La columna devices.category tiene una lista cerrada (CHECK) anterior a estos tipos: los nuevos se guardan en
 # devices.kind y en category queda su equivalente admitido. El tipo real se lee con COALESCE(NULLIF(d.kind,''),d.category).
-STORED_CATEGORY = {'notebook':'portatil','consola':'otro','aio':'escritorio','mini_pc':'escritorio'}
+STORED_CATEGORY = {'notebook':'portatil','consola':'otro','aio':'escritorio','mini_pc':'escritorio','tablet':'otro','celular':'otro','router':'otro','servidor':'escritorio'}
 LIMITS = {'document_type':10,'trade_name':150,'province_code':2,'canton':100,'canton_code':4,'parish':150,'parish_code':6,'locality_code':6,'main_street':250,'secondary_street':250,'building_number':30,'geo_version':10,'client':150,'identification':30,'phone':30,'email':254,'province':80,'city':100,
     'address':500,'location_reference':500,'type':30,'brand':150,'model':150,'serial':150,
     'color':100,'accessories':2000,'physical_condition':2000,'problem':2000,'technician_notes':2000}

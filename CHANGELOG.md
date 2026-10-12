@@ -4,6 +4,18 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.88 — 2026-10-12 09:14 (UTC-05:00)
+
+Correo de recuperación y nuevos tipos de equipo
+
+### Nuevas funcionalidades
+
+- Nuevos tipos de equipo con icono propio: Tablet, Celular, Router / equipo de red y Servidor
+
+### Errores corregidos
+
+- El correo de recuperación de contraseña usa el correo del sistema cuando no hay un SMTP propio; en Configuración deja de aparecer como pendiente
+
 ## v1.5.87 — 2026-10-12 09:05 (UTC-05:00)
 
 ADI en el chat de atención

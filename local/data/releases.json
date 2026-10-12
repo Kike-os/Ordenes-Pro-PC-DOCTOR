@@ -8,6 +8,24 @@
   },
   "releases": [
     {
+      "version": "1.5.88",
+      "date": "2026-10-12T09:14:00-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Correo de recuperación y nuevos tipos de equipo",
+      "changes": {
+        "features": [
+          "Nuevos tipos de equipo con icono propio: Tablet, Celular, Router / equipo de red y Servidor"
+        ],
+        "improvements": [],
+        "fixes": [
+          "El correo de recuperación de contraseña usa el correo del sistema cuando no hay un SMTP propio; en Configuración deja de aparecer como pendiente"
+        ],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.87",
       "date": "2026-10-12T09:05:04-05:00",
       "type": "patch",

@@ -535,9 +535,24 @@ def deliver_change_notice(email, uid):
     with connect() as c:audit(c,uid,result)
 
 
+def security_mail_ready():
+    """El correo de seguridad (recuperación de contraseña, avisos de cuenta) puede salir por SMTP_* o, si no está definido, por el correo del sistema (MAIL_*)."""
+    if all(os.getenv(name) for name in ('SMTP_HOST','SMTP_FROM','SMTP_USER','SMTP_PASSWORD')):return 'smtp'
+    try:return 'mail' if mail_pro.configured() else ''
+    except mail_pro.MailError:return ''
+
+
 def send_security_mail(email, subject, text, markup=None):
+    route=security_mail_ready()
+    if route=='mail':
+        # Mismo buzón que usa Mail Pro: evita depender de una segunda configuración de correo.
+        config=mail_pro.settings()
+        message,recipients=mail_pro.build_message(config,{'to':email,'subject':subject,'body':text,'from_name':corporate.settings()['name']},'')
+        try:mail_pro.deliver(config,message,recipients)
+        except mail_pro.MailError as error:raise RuntimeError('No se pudo enviar el correo de seguridad: '+str(error))
+        return
     host, sender = os.getenv('SMTP_HOST'), os.getenv('SMTP_FROM')
-    if not host or not sender or not os.getenv('SMTP_USER') or not os.getenv('SMTP_PASSWORD'):
+    if route!='smtp':
         raise RuntimeError('SMTP autenticado no configurado')
     msg=EmailMessage()
     msg['Subject'], msg['From'], msg['To']=subject,sender,email
@@ -1117,7 +1132,7 @@ class Handler(BaseHTTPRequestHandler):
                     return self.reply(403, {'error':'Solo administración puede acceder a la configuración.'})
                 labels={'login':'Inicio de sesión','logout':'Cierre de sesión','sessions_revoked':'Cierre de todas las sesiones','other_sessions_revoked':'Cierre de otras sesiones','password_changed':'Cambio de contraseña','password_reset':'Contraseña restablecida','profile_updated':'Perfil actualizado','auth_policy_updated':'Políticas de acceso actualizadas','account_approved':'Cuenta aprobada','account_rejected':'Solicitud rechazada','account_updated':'Cuenta del equipo modificada','clients_exported':'Exportación de clientes','clients_imported':'Importación de clientes'}
                 activity=[{'label':labels[r['action']],'at':r['created_at']} for r in c.execute('SELECT action,created_at FROM audit WHERE user_id=? AND action IN ('+','.join('?' for _ in labels)+') ORDER BY id DESC LIMIT 12',(user['id'],*labels))]
-                return self.reply(200, {'profile':{k:user[k] for k in ('name','username','email','role')},'me':user['id'],'active_sessions':c.execute('SELECT COUNT(*) FROM sessions WHERE user_id=? AND expires>?',(user['id'],int(time.time()))).fetchone()[0],'security_activity':activity,'registration_enabled':registration_enabled(),'captcha_mode':captcha_mode(),'mail':mail_pro.status(),'mail_signature':mail_signature(c),'mail_signature_card':mail_signature_card(c) if mail_pro.configured() else None,'accounts':[dict(r) for r in c.execute("SELECT u.id,u.name,u.username,u.email,u.role,u.active,(SELECT MAX(a.created_at) FROM audit a WHERE a.user_id=u.id AND a.action='login') last_login,(SELECT COUNT(*) FROM sessions s WHERE s.user_id=u.id AND s.expires>?) sessions FROM users u WHERE u.approval='approved' ORDER BY u.id",(int(time.time()),))],'requests':[dict(r) for r in c.execute("SELECT id,name,username,email,phone,identification,job_title,requested_at,approval FROM users WHERE approval IN ('pending','rejected') ORDER BY approval,id DESC")],'smtp_configured':bool(os.getenv('SMTP_HOST')),'openai_configured':bool(os.getenv('OPENAI_API_KEY')),'login_lockout_seconds':auth_policy(c)['lockout_seconds'],'auth_policy':auth_policy(c),'antibot_configured':bool(os.getenv('TURNSTILE_SITE_KEY') and os.getenv('TURNSTILE_SECRET_KEY')),'origin':os.getenv('APP_URL','http://127.0.0.1:8010')})
+                return self.reply(200, {'profile':{k:user[k] for k in ('name','username','email','role')},'me':user['id'],'active_sessions':c.execute('SELECT COUNT(*) FROM sessions WHERE user_id=? AND expires>?',(user['id'],int(time.time()))).fetchone()[0],'security_activity':activity,'registration_enabled':registration_enabled(),'captcha_mode':captcha_mode(),'mail':mail_pro.status(),'mail_signature':mail_signature(c),'mail_signature_card':mail_signature_card(c) if mail_pro.configured() else None,'accounts':[dict(r) for r in c.execute("SELECT u.id,u.name,u.username,u.email,u.role,u.active,(SELECT MAX(a.created_at) FROM audit a WHERE a.user_id=u.id AND a.action='login') last_login,(SELECT COUNT(*) FROM sessions s WHERE s.user_id=u.id AND s.expires>?) sessions FROM users u WHERE u.approval='approved' ORDER BY u.id",(int(time.time()),))],'requests':[dict(r) for r in c.execute("SELECT id,name,username,email,phone,identification,job_title,requested_at,approval FROM users WHERE approval IN ('pending','rejected') ORDER BY approval,id DESC")],'smtp_configured':bool(security_mail_ready()),'smtp_route':security_mail_ready(),'openai_configured':bool(os.getenv('OPENAI_API_KEY')),'login_lockout_seconds':auth_policy(c)['lockout_seconds'],'auth_policy':auth_policy(c),'antibot_configured':bool(os.getenv('TURNSTILE_SITE_KEY') and os.getenv('TURNSTILE_SECRET_KEY')),'origin':os.getenv('APP_URL','http://127.0.0.1:8010')})
             if path == '/api/notifications':
                 result=notifications.build(c,user,reception_now(),mail_allowed(user))
                 # Versión que ejecuta el servidor: permite avisar a una pestaña que quedó abierta con una versión anterior.

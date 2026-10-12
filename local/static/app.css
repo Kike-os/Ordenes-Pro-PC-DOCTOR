@@ -4145,3 +4145,4 @@ dialog.profile-photo{width:min(380px,calc(100vw - 24px))}
 .live-pro .live-main>.adi-bar{flex:0 0 auto;margin:0;padding:0 12px 8px;justify-content:flex-end}
 .live-pro .live-main>.adi-panel.adi-assist{flex:0 0 auto;margin:0 12px 10px;max-height:46%;overflow-y:auto}
 .live-pro .live-main>.live-compose[hidden]~.adi-bar,.live-pro .live-main>.live-compose[hidden]~.adi-panel{display:none}
+.device-icon[data-device=tablet],.device-icon[data-device=phone]{color:#f0a8d8;border-color:#7a3f68}.device-icon[data-device=router]{color:#9fe3a6;border-color:#2f7a55}.device-icon[data-device=server]{color:#8fd3ff;border-color:#2f5d8f}

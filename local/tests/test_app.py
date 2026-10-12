@@ -714,6 +714,15 @@ class SecurityTests(unittest.TestCase):
         self.assertEqual(self.request('/api/search?q=a',cookie=cookie)['body']['rows'],[])
         self.assertEqual(self.request('/api/search?q=lenovo')['status'],401)
 
+    def test_tablet_phone_router_and_server_types(self):
+        cookie,csrf=self.login()
+        types=self.request('/api/reception-options',cookie=cookie)['body']['device_types']
+        self.assertEqual((types['tablet'],types['celular'],types['router'],types['servidor']),('Tablet','Celular','Router / equipo de red','Servidor'))
+        for n,kind in enumerate(('tablet','celular','router','servidor')):
+            made=self.request('/api/orders',self.order_data({'type':kind,'brand':'Marca','model':'Modelo %d'%n,'serial':'NEWTYPE-%d'%n,'request_key':'new-device-type-%06d'%n}),cookie=cookie,csrf=csrf)
+            self.assertEqual(made['status'],201,made);self.assertEqual(self.request('/api/orders/%d'%made['body']['id'],cookie=cookie)['body']['order']['type'],kind)
+            for suffix in ('/receipt.pdf','/thermal.pdf'):self.assertEqual(self.request('/api/orders/%d%s'%(made['body']['id'],suffix),cookie=cookie)['status'],200)
+
     def test_new_device_types_are_saved_listed_and_printed(self):
         cookie,csrf=self.login()
         types=self.request('/api/reception-options',cookie=cookie)['body']['device_types']
@@ -733,7 +742,7 @@ class SecurityTests(unittest.TestCase):
             for doc in ('receipt.pdf','thermal.pdf','label.pdf','service.pdf'):self.assertEqual(self.request('/api/orders/%d/%s'%(oid,doc),cookie=cookie)['status'],200,doc)
         self.assertEqual(self.request('/api/devices/identify?serial=KIND-1',cookie=cookie)['body']['matches'][0]['type'],'consola')
         self.assertEqual({r['type'] for r in self.request('/api/devices',cookie=cookie)['body']['rows']},{'notebook','consola','portatil'})
-        self.assertEqual(self.request('/api/orders',self.order_data({'client':'Prueba','problem':'Prueba','type':'tablet','request_key':'device-kind-request-9999'}),cookie=cookie,csrf=csrf)['status'],400)
+        self.assertEqual(self.request('/api/orders',self.order_data({'client':'Prueba','problem':'Prueba','type':'televisor','request_key':'device-kind-request-9999'}),cookie=cookie,csrf=csrf)['status'],400)
 
     def test_brand_logo_files_are_listed_and_served(self):
         cookie,csrf=self.login()

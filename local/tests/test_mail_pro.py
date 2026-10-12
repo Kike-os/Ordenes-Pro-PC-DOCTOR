@@ -422,6 +422,19 @@ class MailRouteTests(test_app.SecurityTests):
             self.assertIn('permanece en su carpeta',str(raised.exception));self.assertFalse([c for c in box.calls if c in forbidden])
         box=Box((b'MOVE',b'UIDPLUS'),None);self.assertEqual(mail_pro.batch(box,'INBOX',[4],'move','INBOX.spam'),1);self.assertIn('MOVE',box.calls)
 
+    def test_security_mail_falls_back_to_the_system_mailbox(self):
+        # Sin SMTP_* propio, la recuperación de contraseña sale por el correo del sistema (MAIL_*); sin ninguno, queda pendiente.
+        clean={name:'' for name in ('SMTP_HOST','SMTP_FROM','SMTP_USER','SMTP_PASSWORD')};sent=[]
+        with patch.dict(app.os.environ,clean),patch.object(mail_pro,'configured',return_value=False):
+            self.assertEqual(app.security_mail_ready(),'')
+            with self.assertRaises(RuntimeError):app.send_security_mail('persona@example.invalid','Asunto','Texto')
+        with patch.dict(app.os.environ,dict(clean,**ENV)),patch.object(mail_pro,'deliver',side_effect=lambda config,message,recipients:sent.append((message,recipients))):
+            self.assertEqual(app.security_mail_ready(),'mail');app.send_security_mail('persona@example.invalid','Restablecer contraseña','Enlace de prueba')
+        self.assertEqual(sent[0][1],['persona@example.invalid']);self.assertEqual(str(sent[0][0]['Subject']),'Restablecer contraseña')
+        cookie,_=self.login()
+        with patch.dict(app.os.environ,dict(clean,**ENV)):state=self.request('/api/settings',cookie=cookie)['body']
+        self.assertEqual((state['smtp_configured'],state['smtp_route']),(True,'mail'))
+
     def test_bcc_is_kept_in_drafts_and_never_exposed_when_sending(self):
         config={'imap_host':'mail.example.invalid','imap_port':993,'smtp_host':'mail.example.invalid','smtp_port':465,'username':'buzon@example.invalid','password':'x'}
         data={'to':'uno@example.invalid','cc':'dos@example.invalid','bcc':'oculta@example.invalid','subject':'Prueba','body':'Texto de prueba'}
