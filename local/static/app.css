@@ -3858,3 +3858,17 @@ body[data-page=dashboard] .adi-assist header.adi-assist-head>div{display:grid;ga
 .status-label.status-changed{animation:status-glow 1.8s cubic-bezier(.22,.61,.36,1) 1}
 @keyframes status-glow{0%{box-shadow:0 0 0 0 color-mix(in srgb,currentColor 0%,transparent);filter:brightness(1)}22%{box-shadow:0 0 16px 3px color-mix(in srgb,currentColor 45%,transparent);filter:brightness(1.28)}100%{box-shadow:0 0 0 0 color-mix(in srgb,currentColor 0%,transparent);filter:brightness(1)}}
 @media(prefers-reduced-motion:reduce){.status-label.status-changed{animation:none}}
+/* Autorizaciones en tres apartados con estado: AUTORIZADO (verde), NO AUTORIZADO (rojo), PENDIENTE (gris) */
+.access-pro .access-part{display:grid;gap:8px;min-width:0;padding:11px 12px;border:1px solid #2a3a55;border-radius:12px;background:#0b1626;transition:border-color .4s ease,box-shadow .4s ease,background-color .4s ease}
+.access-pro .access-part>header{display:flex;align-items:center;gap:10px;min-width:0}
+.access-pro .access-part>header>div{display:grid;gap:1px;flex:1 1 auto;min-width:0}.access-pro .access-part>header strong{font-size:13px;color:#eef3ff}.access-pro .access-part>header small{font-size:11.5px;line-height:1.4;color:#9bb0cf}
+.access-pro .access-part-number{display:grid;place-items:center;flex:none;width:24px;height:24px;border-radius:8px;border:1px solid #2f4a73;background:#12233d;color:#bcd2f3;font-size:12px}
+.access-pro .access-state{display:inline-flex;align-items:center;gap:5px;flex:none;padding:4px 10px;border:1px solid #3a4a63;border-radius:999px;background:#141d2c;color:#a7b4c8;font-size:10.5px;font-weight:800;letter-spacing:.05em;white-space:nowrap;transition:color .4s ease,background-color .4s ease,border-color .4s ease,box-shadow .4s ease}
+.access-pro .access-state svg{width:13px;height:13px}
+.access-pro .access-part[data-state=authorized]{border-color:#2f9e6b;background:#0b1a1c;box-shadow:0 0 0 1px #2f9e6b33,0 0 18px #2fd08a24}
+.access-pro .access-part[data-state=authorized] .access-state{border-color:#35b47a;background:#0f2f22;color:#8ff0bd;box-shadow:0 0 10px #2fd08a40}
+.access-pro .access-part[data-state=denied]{border-color:#b84a55;background:#1a1016;box-shadow:0 0 0 1px #b84a5533,0 0 14px #ff5a6a1c}
+.access-pro .access-part[data-state=denied] .access-state{border-color:#d05663;background:#32141a;color:#ffb1b8;box-shadow:0 0 8px #ff5a6a33}
+.access-pro .access-part .access-grid[hidden]{display:none}
+@media(max-width:520px){.access-pro .access-part>header{flex-wrap:wrap}.access-pro .access-part>header>div{flex-basis:calc(100% - 40px)}.access-pro .access-state{margin-left:34px}}
+@media(prefers-reduced-motion:reduce){.access-pro .access-part,.access-pro .access-state{transition:none}}

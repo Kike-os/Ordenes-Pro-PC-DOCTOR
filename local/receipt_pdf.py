@@ -158,18 +158,50 @@ def render_receipt(order):
     section('Motivo de ingreso')
     item('Problema reportado por el cliente',order['problem'])
     if order.get('customer_notes'):item('Observaciones autorizadas de recepción',order['customer_notes'])
-    # Autorizaciones registradas en la recepción: lo que consta, sin atribuir decisiones que no se tomaron.
+    # Autorizaciones del cliente: estado real de cada una. Lo que no se decidió figura como PENDIENTE, nunca como aceptación ni rechazo.
     access=order.get('access_authorization');risk=order.get('destructive_authorization')
     if access or risk:
-        section('Autorizaciones registradas')
-        if access:
-            scopes={'operating_system':'acceso al sistema operativo','signed_in_tests':'pruebas con sesión iniciada','specific_files':'acceso a archivos autorizados','backup':'respaldo de información'}
-            granted=[label for key,label in scopes.items() if access['permissions'].get(key)]
-            item('Acceso técnico',('AUTORIZADO: '+'; '.join(granted) if access['decision']=='authorized' else 'NO AUTORIZADO')+'.')
-            if access.get('justification'):item('Archivos y finalidad',access['justification'])
-        if risk:
-            item('Operaciones que modifican o eliminan datos','AUTORIZACIÓN ESPECÍFICA REGISTRADA.' if risk['decision']=='authorized' else 'NO AUTORIZADAS.')
-            if risk['decision']=='authorized' and risk.get('justification'):item('Alcance autorizado',risk['justification'])
+        section('Autorizaciones del cliente')
+        GREEN,RED,GREY=(.05,.40,.25),(.70,.12,.16),(.42,.46,.52)
+
+        def authorization(title,state,detail):
+            """Indicador estático legible también en blanco y negro: relleno oscuro (autorizado), contorno (no autorizado) o gris claro (pendiente)."""
+            nonlocal y
+            lines=wrapped(detail,W-72-150,8.5);height=max(22,14+len(lines)*10.5)+5
+            if y+height>H-100:new_page()
+            label={'authorized':'AUTORIZADO','denied':'NO AUTORIZADO','pending':'PENDIENTE'}[state];left,top,bw,bh=47,y,112,17
+            if state=='authorized':rect(left,top,bw,bh,GREEN);ink=(1,1,1)
+            elif state=='denied':rect(left,top,bw,bh,RED);rect(left+1.3,top+1.3,bw-2.6,bh-2.6,(1,1,1));ink=RED
+            else:rect(left,top,bw,bh,(.90,.92,.94));ink=GREY
+            # Icono vectorial: visto, aspa o guion.
+            stream.set_color_rgb(*ink,stroke=True);stream.set_line_width(1.5);cx,cy=left+11,H-top-bh/2
+            if state=='authorized':stream.move_to(cx-4,cy);stream.line_to(cx-1.2,cy-3);stream.line_to(cx+4.2,cy+3.4)
+            elif state=='denied':stream.move_to(cx-3.4,cy-3.4);stream.line_to(cx+3.4,cy+3.4);stream.move_to(cx-3.4,cy+3.4);stream.line_to(cx+3.4,cy-3.4)
+            else:stream.move_to(cx-3.6,cy);stream.line_to(cx+3.6,cy)
+            stream.stroke();text(label,left+20,top+4.6,7.6,ink,True)
+            text(title,left+bw+11,top,9.5,TEXT,True)
+            for index,content in enumerate(lines):text(content,left+bw+11,top+12.5+index*10.5,8.5,MUTED)
+            y+=height
+
+        permissions=(access or {}).get('permissions') or {};decision=(access or {}).get('decision')
+        def scoped(keys,none):
+            granted=[label for key,label in keys if permissions.get(key)]
+            if decision=='denied':return 'denied','El cliente no autorizó el acceso técnico.'
+            if decision=='authorized' and granted:return 'authorized','Alcance autorizado: '+'; '.join(granted)+'.'
+            return 'pending',none
+        authorization('Acceso al sistema operativo',*scoped((('operating_system','ingreso al sistema operativo'),('signed_in_tests','pruebas de funcionamiento con sesión iniciada')),'Sin autorización registrada para ingresar al sistema operativo.'))
+        state,detail=scoped((('specific_files','acceso a archivos específicamente autorizados'),('backup','respaldo de información')),'Sin autorización registrada para revisar archivos ni realizar respaldos.')
+        if state=='authorized' and access.get('justification'):detail+=' '+access['justification']
+        authorization('Acceso a archivos personales y respaldos',state,detail)
+        if not risk:authorization('Formateo, reinstalación y eliminación de datos','pending','No se solicitó autorización para modificar o eliminar datos.')
+        elif risk['decision']=='authorized':authorization('Formateo, reinstalación y eliminación de datos','authorized','Autorización específica del cliente. '+(risk.get('justification') or ''))
+        else:authorization('Formateo, reinstalación y eliminación de datos','denied','El cliente rechazó cualquier modificación o eliminación de datos.')
+        proof=access or risk
+        when=datetime.fromisoformat(proof['recorded_at']).astimezone(ECUADOR_TZ).strftime('%d/%m/%Y %H:%M:%S')
+        for content in wrapped('Decisiones expresadas por '+(proof.get('acceptor') or 'el cliente')+' y registradas el '+when+' (Ecuador) por '+(proof.get('operator') or 'el personal')+'. Confirmación en pantalla ante el técnico; no constituye una firma.',W-94,7.5):
+            if y+10>H-100:new_page()
+            text(content,47,y,7.5,MUTED);y+=9.5
+        y+=4
     if not order.get('_service'):
         # Constancia de recepción con los dos espacios de firma en un mismo renglón.
         if y+78>H-100:new_page()
@@ -235,10 +267,22 @@ def render_receipt(order):
             if col==0:col=1;y=top
             else:new_page();section(policies['title']+' (continuación)');col=0;top=y;tallest=y
         is_heading=lambda paragraph:bool(re.match(r'^(\d+\.|\d+ -)\s',paragraph)) and len(paragraph)<60
-        # Si el texto no cabe en las dos columnas restantes, se compone algo más ajustado antes de abrir otra página.
-        body,lead=8,10.5
-        needed=sum(len(wrapped(paragraph,column,body))*lead+5 for paragraph in policies['paragraphs'])
-        if needed>2*(bottom-top)-70 and needed*.92<=2*(bottom-top)-40:body,lead=7.5,9.6
+        # Si el texto no cabe en las dos columnas restantes se compone más ajustado (hasta 7,2 pt) antes de abrir otra página.
+        def fits(size,leading):
+            column_index,cursor=0,top
+            for paragraph in policies['paragraphs']:
+                head=is_heading(paragraph);count=len(wrapped(paragraph,column,size+.5 if head else size))
+                if cursor+(count*leading+(46 if head else 0))>bottom and cursor>top:
+                    if column_index:return False
+                    column_index,cursor=1,top
+                for _ in range(count):
+                    if cursor+leading>bottom:
+                        if column_index:return False
+                        column_index,cursor=1,top
+                    cursor+=leading
+                cursor+=5
+            return True
+        body,lead=next((pair for pair in ((8,10.5),(7.6,9.9),(7.2,9.3)) if fits(*pair)),(8,10.5))
         for paragraph in policies['paragraphs']:
             heading=is_heading(paragraph)
             size=body+.5 if heading else body;lines=wrapped(paragraph,column,size)

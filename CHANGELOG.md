@@ -4,6 +4,15 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.64 — 2026-10-12 00:33 (UTC-05:00)
+
+Autorizaciones con estado visible en recepción y en el comprobante A4
+
+### Mejoras realizadas
+
+- Autorizaciones de recepción en tres apartados con estado visible: AUTORIZADO (verde), NO AUTORIZADO (rojo) y PENDIENTE (gris), sin cambiar lo que se guarda
+- El comprobante A4 incluye «Autorizaciones del cliente» con indicadores estáticos legibles en blanco y negro, fecha, hora y responsable
+
 ## v1.5.63 — 2026-10-12 00:26 (UTC-05:00)
 
 Iluminación suave al cambiar el estado de una orden

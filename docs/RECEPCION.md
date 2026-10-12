@@ -57,3 +57,15 @@ Dependencias portables incluidas en `local/vendor`: Segno 1.6.6 (QR) y pydyf 0.1
 `python -m unittest discover -s tests -v` desde `local`, y `node --check static/app.js`.
 
 Pruebas específicas: cédula/RUC, backend, persistencia de campos, jerarquía INEC, localidad manual, historial, medianoche de Ecuador, secuencia diaria, concurrencia con dos técnicos, reintentos, eliminación sin reutilización de códigos, inmutabilidad, consulta privada, PDF y recuperación de órdenes anteriores. Weather: datos reales consultados y pruebas de caché, estados meteorológicos y fallo de conexión. Revisión visual en Chromium, PDF renderizado con Poppler y lectura independiente del QR con zbarimg. Resultados y capturas en `revision`.
+
+## Autorizaciones en tres apartados con estado (1.5.64)
+
+La sección «Autorización de acceso y tratamiento de datos» se presenta en tres apartados: 1) acceso al sistema operativo, 2) acceso a archivos personales y respaldos, 3) formateo, reinstalación y eliminación de datos. Cada uno muestra su estado real:
+
+- **AUTORIZADO** (verde, con visto): el cliente autorizó y hay alcance marcado.
+- **NO AUTORIZADO** (rojo): el cliente rechazó expresamente (acceso técnico denegado u operaciones de riesgo rechazadas).
+- **PENDIENTE** (gris): no consta decisión; no se interpreta como aceptación ni como rechazo.
+
+Los campos enviados y guardados no cambian (`technical_access`, `access_*`, `destructive_action`, `risk_*`); solo cambia la presentación. Nada viene marcado y las opciones de alcance aparecen al autorizar. El comprobante A4 incluye «Autorizaciones del cliente» con los mismos tres estados en indicadores estáticos (relleno oscuro, contorno o gris con su texto), legibles en blanco y negro, y la fecha, hora y responsable del registro.
+
+Límite conocido: el modelo guarda una sola decisión de acceso técnico. Autorizar el sistema operativo y rechazar expresamente los archivos se registra como archivos «PENDIENTE» (sin autorización), no como rechazo; distinguirlo requiere un campo nuevo.

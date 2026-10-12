@@ -8,6 +8,23 @@
   },
   "releases": [
     {
+      "version": "1.5.64",
+      "date": "2026-10-12T00:33:35-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Autorizaciones con estado visible en recepción y en el comprobante A4",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Autorizaciones de recepción en tres apartados con estado visible: AUTORIZADO (verde), NO AUTORIZADO (rojo) y PENDIENTE (gris), sin cambiar lo que se guarda",
+          "El comprobante A4 incluye «Autorizaciones del cliente» con indicadores estáticos legibles en blanco y negro, fecha, hora y responsable"
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.63",
       "date": "2026-10-12T00:26:34-05:00",
       "type": "patch",
