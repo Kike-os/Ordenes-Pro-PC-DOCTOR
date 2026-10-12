@@ -34,6 +34,7 @@ from reception import (stored_category, valid_ecuador_phone, DEVICE_TYPES, valid
 import remote_db
 import reception
 import service_terms
+import order_drafts
 import technical_access
 import thermal_printing
 import tempfile
@@ -669,6 +670,9 @@ class Handler(BaseHTTPRequestHandler):
             if path == '/api/me':
                 prefs=c.execute('SELECT value FROM system_state WHERE key=?',('mail_prefs:'+str(user['id']),)).fetchone() if mail_allowed(user) else None
                 return self.reply(200, {'user':dict(user,mail=mail_allowed(user),mail_prefs=json.loads(prefs['value']) if prefs else None,mail_signature=mail_signature_card(c) if mail_allowed(user) else None,storage='cloud' if remote_db.configured() else 'local'),'server_time':time.time()})
+            if path == '/api/order-draft':
+                # Borrador de Nueva orden del propio usuario.
+                return self.reply(200,{'draft':order_drafts.read(c,user)})
             if path == '/api/weather':
                 return self.reply(200, current_weather(force=parse_qs(urlsplit(self.path).query).get('fresh',[''])[0]=='1'))
             if path == '/api/time':
@@ -1024,7 +1028,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(403, {'error':'Solicitud no autorizada.'})
             path = urlsplit(self.path).path
             workspace_post=bool(re.fullmatch(r'/api/orders/[0-9]+/workspace',path))
-            max_body=9000000 if path in ('/api/clients/import/preview','/api/clients/import/commit') else 6000000 if path in ('/api/mail/send','/api/mail/draft') else 100000 if path=='/api/conditions' else 900000 if re.fullmatch(r'/api/orders/[0-9]+/photos',path) else (65536 if workspace_post else 16384)
+            max_body=9000000 if path in ('/api/clients/import/preview','/api/clients/import/commit') else 6000000 if path in ('/api/mail/send','/api/mail/draft') else 100000 if path in ('/api/conditions','/api/order-draft') else 900000 if re.fullmatch(r'/api/orders/[0-9]+/photos',path) else (65536 if workspace_post else 16384)
             length = int(self.headers.get('Content-Length', '0'))
             if length <= 0 or length > max_body:
                 return self.reply(400, {'error':'Solicitud inválida.'})
@@ -1432,6 +1436,15 @@ class Handler(BaseHTTPRequestHandler):
                 if path=='/api/sessions/revoke':
                     c.execute('DELETE FROM sessions WHERE user_id=?',(user['id'],));audit(c,user['id'],'sessions_revoked')
                     return self.reply(200,{'ok':True,'message':'Se cerraron las sesiones activas.'},cookie=self.cookie('',0))
+                if path=='/api/order-draft':
+                    if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
+                    if data.get('action')=='discard':
+                        gone=order_drafts.discard(c,user,reception_now())
+                        if gone:audit(c,user['id'],'order_draft_discarded')
+                        return self.reply(200,{'ok':True,'discarded':gone})
+                    if limited(c,'order-draft:'+str(user['id']),limit=240,window=3600):return self.reply(429,{'error':'Demasiados guardados seguidos. Espera un momento.'})
+                    status,payload=order_drafts.save(c,user,data.get('data'),data.get('revision',''),data.get('force') is True,reception_now())
+                    return self.reply(status,payload)
                 if path=='/api/appointments/new':
                     # Cita registrada por el personal: mismas validaciones y disponibilidad que la reserva en línea.
                     if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})

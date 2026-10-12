@@ -3442,3 +3442,24 @@ body[data-page=dashboard] .access-pro label.access-detail textarea{min-height:58
 .agenda-facts button.agenda-clamp-toggle{justify-self:start;margin:4px 0 0;padding:0;border:0;background:none;color:#8bb8ff;font-size:12px;font-weight:600;cursor:pointer}
 .agenda-facts button.agenda-clamp-toggle:hover{background:none;color:#cfe2ff;text-decoration:underline;transform:none}
 .agenda-facts button.agenda-clamp-toggle:focus-visible{outline:2px solid #8bb8ff;outline-offset:2px;border-radius:4px}
+/* Nueva orden · Guardar borrador: estados reales del botón, autoguardado y tarjeta «Borrador disponible» */
+#order-dialog .reception-draft{position:relative;transition:background .2s,border-color .2s,color .2s}
+#order-dialog .reception-draft[data-state=dirty]{border-color:#7a6230;color:#f6dfa6}
+#order-dialog .reception-draft[data-state=dirty]::after{content:"";position:absolute;top:-3px;right:-3px;width:9px;height:9px;border-radius:50%;background:#EABC6C;box-shadow:0 0 0 2px #0d1a2e}
+#order-dialog .reception-draft[data-state=saving]{opacity:.85;cursor:progress}
+#order-dialog .reception-draft[data-state=saving] .system-icon{animation:draft-spin .8s linear infinite}
+#order-dialog .reception-draft[data-state=saved]{border-color:#2f7a55;background:#12301f;color:#8fe0b4}
+#order-dialog .reception-draft[data-state=error]{border-color:#8a4450;background:#2b1219;color:#ffb3ba}
+@keyframes draft-spin{to{transform:rotate(360deg)}}
+#order-dialog .reception-auto{display:inline-flex;align-items:center;gap:6px;flex:none;margin:0;font-size:11.5px;font-weight:600;color:#9bb0cf;cursor:pointer;white-space:nowrap}
+body[data-page=dashboard] #order-dialog .reception-auto input{width:15px;height:15px;min-height:0;margin:0;padding:0;accent-color:#3f7fd6}
+#order-dialog .order-draft-notice{display:flex;flex-wrap:nowrap;align-items:center;gap:12px;padding:10px 12px;border-color:#2f5d8f;background:linear-gradient(180deg,#10233f,#0d1b30);animation:live-enter .2s ease-out 1}
+#order-dialog .order-draft-notice .draft-icon{display:grid;place-items:center;flex:none;width:34px;height:34px;border:1px solid #2f5d8f;border-radius:10px;background:#4d8df01f;color:#9cc4ff}
+#order-dialog .order-draft-notice .draft-icon svg{width:17px;height:17px}
+#order-dialog .order-draft-notice .draft-text{display:grid;gap:1px;flex:1 1 auto;min-width:0;margin:0}
+#order-dialog .order-draft-notice .draft-text strong{font-size:13px;color:#f2f6ff}
+#order-dialog .order-draft-notice .draft-text small{font-size:11.5px;color:#a9bbd6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#order-dialog .order-draft-notice .draft-actions{display:flex;gap:8px;flex:none}
+@media(max-width:700px){#order-dialog .reception-auto span{display:none}#order-dialog .reception-draft[data-state=error] span,#order-dialog .reception-draft[data-state=saved] span,#order-dialog .reception-draft[data-state=saving] span{display:none}}
+@media(max-width:560px){#order-dialog .order-draft-notice{flex-wrap:wrap}#order-dialog .order-draft-notice .draft-actions{flex:1 1 100%}#order-dialog .order-draft-notice .draft-actions button{flex:1}#order-dialog .order-draft-notice .draft-text small{white-space:normal}}
+@media(prefers-reduced-motion:reduce){#order-dialog .reception-draft{transition:none}#order-dialog .reception-draft[data-state=saving] .system-icon,#order-dialog .order-draft-notice{animation:none}}

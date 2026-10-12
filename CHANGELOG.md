@@ -4,6 +4,22 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.42 — 2026-10-11 19:40 (UTC-05:00)
+
+Borradores de Nueva orden en el servidor
+
+### Nuevas funcionalidades
+
+- Nueva orden: los borradores se guardan en el servidor, con las autorizaciones de acceso y el paso donde quedaste; el botón muestra cambios pendientes, guardando, guardado o error, y hay guardado automático opcional
+
+### Mejoras realizadas
+
+- Nueva orden: tarjeta «Borrador disponible» con fecha y resumen, confirmación propia para descartar y aviso antes de reemplazar lo ya escrito o un borrador más reciente de otra sesión
+
+### Errores corregidos
+
+- Nueva orden: el formulario vacío se consideraba con cambios sin guardar por una opción marcada por defecto
+
 ## v1.5.41 — 2026-10-11 19:30 (UTC-05:00)
 
 Recepción: autorización de acceso técnico rediseñada y avisos claros
