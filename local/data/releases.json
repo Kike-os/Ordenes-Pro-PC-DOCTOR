@@ -8,6 +8,22 @@
   },
   "releases": [
     {
+      "version": "1.5.76",
+      "date": "2026-10-12T07:32:38-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Centro de Actividad pulido",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Centro de Actividad con más jerarquía y aire: tarjetas de resumen más claras, secciones separadas, elementos sin leer destacados, ancho completo y microanimaciones suaves (mismo tema)"
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.75",
       "date": "2026-10-12T07:28:50-05:00",
       "type": "patch",

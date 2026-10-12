@@ -3993,3 +3993,31 @@ body[data-page=dashboard] .mail-composer .mail-editor{min-height:clamp(180px,28d
 /* Las filas del formulario conservan su alto natural aunque la ventana limite la altura (se desplaza el formulario, no se aplasta la firma). */
 dialog.mail-composer[open]>form{grid-auto-rows:max-content;align-content:start;overflow-x:hidden}
 @media(max-width:760px){.mail-composer .mail-sign-box .mail-sign-card{zoom:.7;max-width:100%}.mail-composer .mail-sign-box .mail-sign-card :is(p,span,strong){white-space:normal;overflow-wrap:anywhere}}
+/* Centro de Actividad: más jerarquía, aire y microinteracciones con el mismo tema */
+.activity{max-width:1376px;gap:14px}
+.activity-cards{gap:12px}
+.activity-card{grid-template-columns:40px minmax(0,1fr) auto;gap:2px 12px;padding:14px 16px;border-radius:14px;transition:border-color .2s,background .2s,box-shadow .2s,transform .2s;animation:activity-in .34s ease-out both}
+.activity-card:nth-child(2){animation-delay:.04s}.activity-card:nth-child(3){animation-delay:.08s}.activity-card:nth-child(4){animation-delay:.12s}
+.activity-card:hover{transform:translateY(-1px);box-shadow:0 10px 24px #0207145c}
+.activity-card .nc-icon{width:40px;height:40px;border-radius:12px}.activity-card .nc-icon svg{width:19px;height:19px}
+.activity-card strong{font-size:24px;line-height:1.05;font-variant-numeric:tabular-nums}.activity-card small{font-size:12.5px;color:#b8c8de}
+.activity-card em{grid-column:3;grid-row:1/span 2;align-self:center;padding:3px 9px;border:1px solid #223450;border-radius:999px;font-size:10.5px;color:#8fa5c4;white-space:nowrap}
+/* Pulso breve (tres veces, no continuo) en el icono de las categorías con algo sin leer. */
+.activity-card:not([aria-label*=": 0 sin leer"]) .nc-icon{animation:activity-pulse 2.2s ease-in-out 3}
+.activity-bar{gap:10px}.activity-bar input,.activity-bar select{height:40px;margin:0}
+.activity-tabs{padding:4px;border-radius:12px}.activity-tab{padding:7px 12px;border-radius:9px}.activity-tab:hover{background:#12233d;color:#e5edf9;transform:none}
+.activity-readall{min-height:40px;padding:8px 14px;border-radius:11px;transition:border-color .2s,background .2s,transform .12s}.activity-readall:not(:disabled):active{transform:scale(.97)}
+.activity-group{display:flex;align-items:center;gap:12px;margin:14px 2px 4px;color:#8fa2bd}.activity-group::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,#263c5e,transparent)}
+.activity-row{grid-template-columns:36px minmax(0,1fr) auto auto auto;gap:12px;min-height:62px;padding:9px 10px 9px 12px;border-radius:12px;transition:background .2s,border-color .2s,box-shadow .2s,opacity .3s;animation:activity-in .3s ease-out both}
+.activity-row:nth-of-type(2){animation-delay:.03s}.activity-row:nth-of-type(3){animation-delay:.06s}.activity-row:nth-of-type(4){animation-delay:.09s}.activity-row:nth-of-type(5){animation-delay:.12s}.activity-row:nth-of-type(n+6){animation-delay:.15s}
+.activity-row .nc-icon{width:36px;height:36px;border-radius:11px}
+.activity-row:hover{border-color:#34507d;box-shadow:0 6px 18px #02071447}
+.activity-row[data-unread=true]{background:#0d1b31}
+.activity-row[data-unread=false] .activity-open strong{font-weight:500;color:#c3d1e6}
+.activity-open{gap:2px}.activity-open strong{font-size:14px}.activity-open small{font-size:12.5px;color:#9fb2cf;line-height:1.4}
+.activity-row time{font-size:11.5px;color:#8fa2bd}
+@keyframes activity-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@keyframes activity-pulse{0%,100%{box-shadow:0 0 0 0 transparent}50%{box-shadow:0 0 0 4px color-mix(in srgb,currentColor 22%,transparent),0 0 14px color-mix(in srgb,currentColor 35%,transparent)}}
+@media(max-width:900px){.activity-card{grid-template-columns:36px minmax(0,1fr)}.activity-card em{grid-column:2;grid-row:auto;justify-self:start;padding:0;border:0}.activity-card .nc-icon{width:36px;height:36px}}
+@media(max-width:560px){.activity-row{grid-template-columns:32px minmax(0,1fr) auto auto;gap:8px 10px;padding:9px}.activity-row .nc-icon{width:32px;height:32px}.activity-row time{grid-column:2;grid-row:2;justify-self:start}.activity-open small{white-space:normal}}
+@media(prefers-reduced-motion:reduce){.activity-card,.activity-row,.activity-card .nc-icon{animation:none!important}.activity-card:hover{transform:none}.activity-readall:active{transform:none}}
