@@ -8,6 +8,29 @@
   },
   "releases": [
     {
+      "version": "1.5.101",
+      "date": "2026-10-12T14:31:01-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Correo de verificación corporativo, recuperación fiable en Vercel y permanencia vencida",
+      "changes": {
+        "features": [
+          "Órdenes: filtro «Plazo de permanencia vencido», enlazado desde la alerta; Centro de Control Técnico: indicador «Permanencia vencida».",
+          "Proceso programado diario para los avisos de mantenimiento y de permanencia (no envía nada mientras estén apagados)."
+        ],
+        "improvements": [
+          "Correos con código de verificación con plantilla corporativa: logo, título «Verifica tu correo electrónico», código destacado, validez real, aviso de seguridad y versión en texto plano; asunto «Tu código de verificación | PC-DOCTOR S.A.» y remitente «PC-DOCTOR S.A. · Seguridad»."
+        ],
+        "fixes": [
+          "El correo de recuperación de contraseña y el aviso de cambio se envían de verdad en Vercel: la función espera al envío antes de responder."
+        ],
+        "security": [
+          "Cada envío de código queda auditado (enviado o fallido) sin guardar el código."
+        ],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.100",
       "date": "2026-10-12T14:22:27-05:00",
       "type": "patch",

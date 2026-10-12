@@ -4381,3 +4381,9 @@ body[data-page=dashboard] button[aria-label^="Cerrar"]:not(#logout):not(.primary
 @keyframes adi-halo-flash{0%{opacity:.6;transform:scale(1)}35%{opacity:1;transform:scale(1.32)}100%{opacity:.6;transform:scale(1)}}
 @keyframes adi-orb-flash{0%,100%{filter:brightness(1)}30%{filter:brightness(1.22) saturate(1.1)}}
 @media(prefers-reduced-motion:reduce){#adi-widget.adi-v2.adi-flash :is(.adi-halo,.adi-orb){animation:none!important}}
+/* Centro de Control Técnico: siete indicadores (se añade «Permanencia vencida»). */
+.control-pro .control-kpis{grid-template-columns:repeat(7,minmax(0,1fr))}
+@media(max-width:1380px){.control-pro .control-kpis{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media(max-width:1180px){.control-pro .control-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:720px){.control-pro .control-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.control-pro .control-kpi[data-kpi=stay_overdue] strong{color:#ffb1b8}

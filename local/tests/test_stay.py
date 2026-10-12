@@ -59,6 +59,10 @@ class StayRoutesTest(unittest.TestCase):
         self.assertEqual(len(alerts),1);self.assertIn('1 equipo superó',alerts[0]['title'])
         report=self.request('/api/orders/'+str(old)+'/stay.pdf',cookie=cookie)
         self.assertEqual(report['status'],200);self.assertTrue(report['body'].startswith(b'%PDF'))
+        # El filtro «plazo vencido» devuelve solo las órdenes sin entregar que superaron el plazo; la alerta enlaza a ese filtro.
+        late=self.request('/api/orders?page=1&stay=overdue',cookie=cookie)['body']
+        self.assertEqual(([row['id'] for row in late['rows']],late['total'],alerts[0]['href']),([old],1,'#orders?stay=overdue'))
+        self.assertEqual(self.request('/api/orders?page=1&stay=otro',cookie=cookie)['status'],400)
         # Superar el plazo no cambia el estado de la orden.
         with app.connect() as c:self.assertEqual(c.execute('SELECT status FROM orders WHERE id=?',(old,)).fetchone()[0],detail['status'])
         # La entrega detiene el contador, registra quién entregó y retira la alerta.
@@ -140,3 +144,17 @@ class StayRemindersTest(unittest.TestCase):
             c.execute("UPDATE users SET role='tecnico'")
         self.assertEqual(self.request('/api/stay/reminders',cookie=cookie)['status'],403)
         self.assertEqual(self.request('/api/stay/reminders',{'enabled':False},cookie=cookie,csrf=csrf)['status'],403)
+
+
+class StayCronTest(unittest.TestCase):
+    setUpClass=classmethod(test_app.SecurityTests.setUpClass.__func__);setUp=test_app.SecurityTests.setUp;tearDown=test_app.SecurityTests.tearDown;request=test_app.SecurityTests.request
+
+    def test_cron_runs_ticks_and_honours_the_secret(self):
+        from unittest.mock import patch
+        with patch.object(app,'maintenance_reminders_tick') as first,patch.object(app,'stay_reminders_tick') as second:
+            self.assertEqual(self.request('/api/cron/reminders')['status'],200);self.assertEqual((first.call_count,second.call_count),(1,1))
+            with patch.dict(app.os.environ,{'CRON_SECRET':'clave-ficticia-de-prueba'}):
+                self.assertEqual(self.request('/api/cron/reminders')['status'],404);self.assertEqual(first.call_count,1)
+        # Con los avisos apagados (por defecto) la llamada no registra ni envía nada.
+        self.assertEqual(self.request('/api/cron/reminders')['status'],200)
+        with app.connect() as c:self.assertEqual(c.execute('SELECT COUNT(*) FROM stay_reminders').fetchone()[0],0)

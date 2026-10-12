@@ -4,6 +4,27 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.101 — 2026-10-12 14:31 (UTC-05:00)
+
+Correo de verificación corporativo, recuperación fiable en Vercel y permanencia vencida
+
+### Nuevas funcionalidades
+
+- Órdenes: filtro «Plazo de permanencia vencido», enlazado desde la alerta; Centro de Control Técnico: indicador «Permanencia vencida».
+- Proceso programado diario para los avisos de mantenimiento y de permanencia (no envía nada mientras estén apagados).
+
+### Mejoras realizadas
+
+- Correos con código de verificación con plantilla corporativa: logo, título «Verifica tu correo electrónico», código destacado, validez real, aviso de seguridad y versión en texto plano; asunto «Tu código de verificación | PC-DOCTOR S.A.» y remitente «PC-DOCTOR S.A. · Seguridad».
+
+### Errores corregidos
+
+- El correo de recuperación de contraseña y el aviso de cambio se envían de verdad en Vercel: la función espera al envío antes de responder.
+
+### Actualizaciones de seguridad
+
+- Cada envío de código queda auditado (enviado o fallido) sin guardar el código.
+
 ## v1.5.100 — 2026-10-12 14:22 (UTC-05:00)
 
 Esfera de cristal realista y efectos de sonido de ADI

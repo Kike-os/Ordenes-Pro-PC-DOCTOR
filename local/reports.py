@@ -102,6 +102,20 @@ def _orders(c):
     return result
 
 
+def _stay_overdue(c, orders):
+    """Órdenes sin entregar que superaron el plazo de permanencia vigente."""
+    import stay
+    config, now = stay.settings(c), datetime.now(ECUADOR_TZ)
+    late = []
+    for order in orders:
+        if order['status'] == 'entregado':
+            continue
+        info = stay.compute(dict(order, status_code=order['status']), now, config)
+        if info and info['level'] == 'overdue':
+            late.append(order)
+    return late
+
+
 def build(c, filters, today):
     statuses = {row['code']: row['label'] for row in c.execute('SELECT code,label FROM statuses')}
     people = {row['id']: row['name'] for row in c.execute("SELECT id,name FROM users WHERE approval='approved'")}
@@ -132,7 +146,7 @@ def build(c, filters, today):
     overdue = [order for order in active if (_day(order['estimated_delivery']) or today) < today]
     kpis = {'received': len(received), 'delivered': len(delivered), 'active': len(active),
             'ready': sum(1 for order in active if order['status'] in ('listo', 'espera_entrega')),
-            'overdue': len(overdue), 'average_days': round(sum(spans) / len(spans), 1) if spans else None, 'average_sample': len(spans)}
+            'overdue': len(overdue), 'stay_overdue': len(_stay_overdue(c, active)), 'average_days': round(sum(spans) / len(spans), 1) if spans else None, 'average_sample': len(spans)}
 
     # Distribución por estado de las órdenes recibidas en el rango (sin aplicar el filtro de estado, para poder compararlos).
     base = [order for order in every if matches(order, skip=('status',)) and in_range(order['received'])]
@@ -227,6 +241,8 @@ def rows(c, filters, today, group, value):
             chosen = [order for order in base if order['status'] in ('listo', 'espera_entrega')]
         elif value == 'overdue':
             chosen = [order for order in base if order['status'] != 'entregado' and (_day(order['estimated_delivery']) or today) < today]
+        elif value == 'stay_overdue':
+            chosen = _stay_overdue(c, base)
         else:
             raise ReportError('Indicador inválido.')
     else:

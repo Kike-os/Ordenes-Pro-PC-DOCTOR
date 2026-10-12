@@ -1,4 +1,19 @@
 {
-  "rewrites": [{ "source": "/(.*)", "destination": "/api/index?__path=/$1" }],
-  "functions": { "api/index.py": { "maxDuration": 30 } }
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/api/index?__path=/$1"
+    }
+  ],
+  "functions": {
+    "api/index.py": {
+      "maxDuration": 30
+    }
+  },
+  "crons": [
+    {
+      "path": "/api/cron/reminders",
+      "schedule": "0 14 * * *"
+    }
+  ]
 }

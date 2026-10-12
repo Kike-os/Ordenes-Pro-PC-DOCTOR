@@ -432,6 +432,13 @@ def stay_deliver(recipient,subject,body):
     return str(message['Message-ID'] or '')
 
 
+def send_verification_code(recipient,code,minutes,where,context=''):
+    """Correo corporativo con un código de un solo uso, por el buzón del sistema. Lanza MailError si el servidor no lo acepta."""
+    import verification_mail
+    config=mail_pro.settings()
+    mail_pro.deliver(config,verification_mail.build(config,recipient,code,minutes,where,context),[recipient])
+
+
 def stay_reminders_tick(c,now):
     """Avisos de permanencia sin tarea programada: como mucho cada diez minutos, en horario diurno y por tandas pequeñas."""
     import stay_reminders
@@ -534,7 +541,9 @@ def make_session(c, user_id, remember=False):
 
 def dispatch_security_job(job):
     # SMTP nunca forma parte del tiempo de respuesta público: evita enumeración por latencia.
-    threading.Thread(target=job,daemon=True,name='security-mail').start()
+    thread=threading.Thread(target=job,daemon=True,name='security-mail');thread.start()
+    # En funciones sin servidor el proceso se congela al responder y el hilo no llega a enviar: allí se espera al envío.
+    if os.getenv('VERCEL'):thread.join(15)
 
 
 def deliver_reset(email, token, uid):
@@ -692,6 +701,12 @@ class Handler(BaseHTTPRequestHandler):
                 company=corporate.settings();content=(ROOT/'templates'/'privacy.html').read_text()
                 for key,value in (('company',company['name']),('whatsapp',company['whatsapp']),('support_email',company['support_email'])):content=content.replace('{{'+key+'}}',html.escape(value,quote=True))
                 return self.reply(200,content,'text/html; charset=utf-8')
+            if path == '/api/cron/reminders':
+                # Con CRON_SECRET definido solo responde a la llamada autenticada de la plataforma. No envía nada si los avisos están apagados.
+                expected=os.getenv('CRON_SECRET','')
+                if expected and not hmac.compare_digest(self.headers.get('Authorization',''),'Bearer '+expected):return self.reply(404,{'error':'No encontrado.'})
+                now=reception_now();maintenance_reminders_tick(c,now);stay_reminders_tick(c,now)
+                return self.reply(200,{'ok':True})
             if path == '/api/public/appointments/services':
                 # Catálogo público para la reserva: servicios, tipos de equipo y marcas con su logotipo local. Sin datos de clientes.
                 brand_files={f.stem:f.name for f in sorted((ROOT / 'static' / 'brands').glob('*')) if f.suffix in ('.svg','.png') and re.fullmatch(r'[a-z0-9]+(?:-[a-z0-9]+)*', f.stem)}
@@ -1087,6 +1102,12 @@ class Handler(BaseHTTPRequestHandler):
                     search = "COALESCE(o.code,'OP-'||printf('%05d',o.id))||' '||CAST(o.id AS TEXT)||' '||c.name||' '||COALESCE(c.identification,'')||' '||COALESCE(c.phone,'')||' '||COALESCE(c.trade_name,'')||' '||COALESCE(d.category,'')||' '||COALESCE(d.brand,'')||' '||COALESCE(d.model,'')||' '||COALESCE(d.serial,'')||' '||o.problem||' '||s.label"
                     active = query.get('active', [''])[0] == '1'
                     where = ' AND o.status != \'entregado\'' if active else ''
+                    stay_filter = query.get('stay', [''])[0]
+                    if stay_filter:
+                        if stay_filter!='overdue':return self.reply(400,{'error':'Filtro inválido.'})
+                        limit_moment=reception_now()-appointments.timedelta(days=stay.settings(c)['limit'])
+                        where += " AND o.status != 'entregado' AND ((COALESCE(o.received_at,'')!='' AND o.received_at<=?) OR (COALESCE(o.received_at,'')='' AND o.created_at<=?))"
+                        stay_args=(limit_moment.isoformat(timespec='microseconds'),int(limit_moment.timestamp()))
                     ordering = 'o.id DESC'
                 elif path == '/api/clients':
                     source, columns = 'clients c', "c.id,c.name,c.phone,c.phone_secondary,c.email,c.identification,c.document_type,c.trade_name,c.client_type,c.city,c.canton,c.needs_review,c.import_batch_id,(SELECT COUNT(*) FROM orders o JOIN devices d ON d.id=o.device_id WHERE d.client_id=c.id) orders"
@@ -1116,6 +1137,7 @@ class Handler(BaseHTTPRequestHandler):
                 if path == '/api/clients' and query.get('type',[''])[0]:args.append(query['type'][0])
                 if path == '/api/devices' and query.get('type',[''])[0]:args.append(query['type'][0])
                 if path == '/api/orders':
+                    if query.get('stay',[''])[0]:args.extend(stay_args)
                     status=query.get('status',[''])[0]
                     if status:
                         if status not in order_workspace.STATUSES:return self.reply(400,{'error':'Estado inválido.'})
@@ -1300,9 +1322,12 @@ class Handler(BaseHTTPRequestHandler):
                 document=order_document(c,found['order_id']);active=service_terms.current(c,now);terms=dict(active) if active else None
                 def send_code(recipient,code):
                     # El código queda guardado antes de enviarlo; se envía solo al correo registrado en la orden.
-                    c.commit();config=mail_pro.settings()
-                    message,recipients=mail_pro.build_message(config,{'to':recipient,'subject':'PC-DOCTOR S.A. | Código de verificación — Orden N.º '+document['code'],'body':'Su código de verificación es: '+code+'\n\nCaduca en '+str(client_authorization.CODE_MINUTES)+' minutos. Si usted no lo solicitó, ignore este mensaje y no comparta el código.\n\nPC-DOCTOR S.A.','from_name':corporate.settings()['name']},'')
-                    mail_pro.deliver(config,message,recipients)
+                    c.commit()
+                    try:send_verification_code(recipient,code,client_authorization.CODE_MINUTES,'en la página de autorización de tu orden','Autorización de la orden N.º '+document['code'])
+                    except Exception:
+                        with connect() as log:audit(log,None,'verification_code_failed',found['order_id'])
+                        raise
+                    with connect() as log:audit(log,None,'verification_code_sent',found['order_id'])
                 forwarded=(self.headers.get('X-Forwarded-For') or '').split(',')[0].strip()
                 page,signed=client_authorization.handle(c,token,found,document,form,now,{'ip':(forwarded or self.client_address[0])[:60],'agent':(self.headers.get('User-Agent') or '')[:160]},send_code,terms)
                 if signed:
@@ -1395,8 +1420,10 @@ class Handler(BaseHTTPRequestHandler):
                     # El envío espera al servidor de correo: el reto se confirma antes para no retener la base.
                     c.commit()
                     if mail:
-                        try:stay_deliver(*mail)
-                        except Exception as error:print('order-check-mail',type(error).__name__,flush=True)
+                        # Se registra el envío o el fallo, nunca el código.
+                        try:send_verification_code(mail['email'],mail['code'],order_check.CODE_MINUTES,'en el chat de ADI donde lo solicitaste','Consulta de la orden N.º '+mail['order']);outcome='verification_code_sent'
+                        except Exception as error:print('order-check-mail',type(error).__name__,flush=True);outcome='verification_code_failed'
+                        audit(c,None,outcome,mail['order_id'])
                     else:time.sleep(1.2)
                     return self.reply(200,{'ok':True,'token':token,'message':order_check.NOTICE,'minutes':order_check.CODE_MINUTES})
                 if path == '/api/public/adi/order/verify':
@@ -1536,6 +1563,9 @@ class Handler(BaseHTTPRequestHandler):
                         c.execute('INSERT INTO reset_tokens VALUES (?,?,?)', (digest(token),row['id'],int(time.time())+1200))
                         c.commit()
                         dispatch_security_job(lambda:deliver_reset(row['email'],token,row['id']))
+                    elif os.getenv('VERCEL'):
+                        # Misma espera aproximada cuando no hay nada que enviar: la latencia no revela si la cuenta existe.
+                        c.commit();time.sleep(1.3+secrets.randbelow(900)/1000)
                     return self.reply(200, {'ok':True,'message':'Si el correo está asociado a una cuenta, recibirás las instrucciones para restablecer tu contraseña.'})
                 if path == '/api/reset':
                     if limited(c, 'reset-use:'+digest(self.client_address[0]), 10):

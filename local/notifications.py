@@ -230,7 +230,7 @@ def build(c, user, now, mail_access=False):
         try:
             import stay
             late = stay.overdue(c, now, stay.settings(c))
-            alert('stay-overdue', len(late), 'order', 'warning', plural(len(late), 'equipo superó el plazo de permanencia', 'equipos superaron el plazo de permanencia'), 'Revisa las órdenes sin retirar: ' + ', '.join(item['code'] for item in late[:4]) + ('…' if len(late) > 4 else '') + '.', '#orders?active=1')
+            alert('stay-overdue', len(late), 'order', 'warning', plural(len(late), 'equipo superó el plazo de permanencia', 'equipos superaron el plazo de permanencia'), 'Revisa las órdenes sin retirar: ' + ', '.join(item['code'] for item in late[:4]) + ('…' if len(late) > 4 else '') + '.', '#orders?stay=overdue')
         except Exception:
             pass
         try:

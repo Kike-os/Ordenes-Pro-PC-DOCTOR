@@ -22,7 +22,7 @@ def _hash(*parts):
 
 
 def start(c, order_code, now):
-    """Crea el reto y devuelve (token, correo pendiente o None). El token se entrega siempre, exista o no la orden."""
+    """Crea el reto y devuelve (token, datos del correo pendiente o None). El token se entrega siempre, exista o no la orden."""
     c.execute('DELETE FROM order_checks WHERE expires_at<?', ((now - timedelta(days=1)).isoformat(timespec='seconds'),))
     token, code = secrets.token_urlsafe(24), '%06d' % secrets.randbelow(1000000)
     wanted = re.sub(r'\s+', '', str(order_code or '')).upper()
@@ -33,10 +33,7 @@ def start(c, order_code, now):
               (_hash(token), row['id'] if real else None, _hash(token, code) if real else '', (now + timedelta(minutes=CODE_MINUTES)).isoformat(timespec='seconds'), now.isoformat(timespec='seconds')))
     if not real:
         return token, None
-    body = '\n'.join(['Estimado/a ' + row['name'] + ':', '', 'Su código para consultar el estado de la orden ' + row['code'] + ' es:', '', '    ' + code, '',
-                      'Caduca en %d minutos y solo puede usarse una vez. Si usted no solicitó esta consulta, ignore este mensaje: nadie verá los datos de su orden sin el código.' % CODE_MINUTES,
-                      '', 'Atentamente,', '', 'Departamento de Servicio Técnico', 'PC-DOCTOR S.A.'])
-    return token, (email, 'PC-DOCTOR S.A. | Código de verificación para consultar su orden', body)
+    return token, {'email': email, 'code': code, 'order': row['code'], 'order_id': row['id']}
 
 
 def verify(c, token, code, now):

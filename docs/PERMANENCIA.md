@@ -40,3 +40,9 @@ Administración puede cambiar el plazo (15 a 730 días) y los dos tramos previos
 - El texto es informativo: recuerda desde cuándo está el equipo e invita a coordinar el retiro. No anuncia cargos, sanciones ni decisiones sobre el equipo.
 - Cada envío queda en la tabla `stay_reminders` (orden, etapa, destinatario, resultado, identificador del mensaje y fecha), en el historial de la orden y en la tarjeta de permanencia del detalle.
 - Envío: al cargar el inicio, como mucho cada diez minutos, entre las 08:00 y las 19:00, en tandas de tres (`stay_reminders_tick`), o con «Enviar avisos pendientes ahora».
+
+## Filtro, indicador y proceso programado
+
+- **Órdenes**: `#orders?stay=overdue` muestra solo las órdenes sin entregar que superaron el plazo (etiqueta «Plazo de permanencia vencido»); la alerta del Centro de Actividad enlaza a ese filtro.
+- **Centro de Control Técnico**: indicador «Permanencia vencida» con su detalle de órdenes.
+- **Proceso programado**: Vercel llama una vez al día (09:00 de Ecuador) a `/api/cron/reminders`, que ejecuta el mismo envío periódico de avisos de mantenimiento y de permanencia. No envía nada mientras estén apagados. Si se define `CRON_SECRET` en Vercel, solo responde a la llamada autenticada de la plataforma.
