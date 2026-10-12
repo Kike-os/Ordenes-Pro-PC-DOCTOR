@@ -1,6 +1,6 @@
 # Condiciones y presentación documental
 
-Implementación local, 09/10/2026. No se han recibido ni publicado condiciones oficiales. Los ejemplos de `revision/*condiciones-prueba*` contienen exclusivamente textos ficticios y no deben entregarse a clientes.
+Implementación local, 09/10/2026. **Versión oficial vigente: 2026.10.1, desde el 12/10/2026**, publicada en producción por decisión expresa de administración (Enrique Carlos Martínez Gómez) con el texto de ocho cláusulas del borrador revisado y su resumen para el ticket. Las órdenes anteriores no tienen aceptación registrada y no se les atribuye ninguna; la aceptación se registra en cada orden nueva. Para cambiar el texto se publica una versión nueva (las publicadas son inmutables). Los ejemplos de `revision/*condiciones-prueba*` contienen exclusivamente textos ficticios y no deben entregarse a clientes.
 
 ## Publicación
 
