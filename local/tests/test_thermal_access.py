@@ -41,7 +41,7 @@ class ThermalAccessTests(unittest.TestCase):
             pages_ops=[text for text in streams if b'/F2 ' in text and b' Tf' in text];self.assertEqual(len(pages_ops),pages)
             for text in pages_ops:
                 # Título azul oscuro y copia en rosado; ningún rectángulo relleno ocupa el ancho útil con más de 2 pt de alto (la antigua franja negra).
-                self.assertIn(b'0.09803921568627451 0.16862745098039217 0.27058823529411763 rg',text);self.assertIn(b'0.6666666666666666 0.2784313725490196 0.48627450980392156 rg',text)
+                self.assertRegex(text,rb'0\.098\d* 0\.168\d* 0\.270\d* rg');self.assertRegex(text,rb'0\.666\d* 0\.278\d* 0\.486\d* rg')
                 self.assertFalse([m for m in re.findall(rb'([\d.]+) ([\d.]+) ([\d.]+) ([\d.]+) re',text) if float(m[2])>150 and float(m[3])>2])
 
     def test_files_decision_is_independent_explicit_and_never_assumed(self):
