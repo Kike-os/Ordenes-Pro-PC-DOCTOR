@@ -190,3 +190,15 @@ En el detalle de la orden, el panel **«Presupuestos del equipo»** agrupa todas
 - **Historial de actividad**: plegado al abrir, con contador y línea de tiempo (icono y color por tipo de movimiento, fecha y hora, responsable, número de presupuesto y descripción). Es de solo lectura; el detalle largo se despliega bajo demanda y un movimiento recién registrado se destaca una vez.
 
 En «Gestión técnica del equipo», «Últimas modificaciones» pasó a ser **«Actividad reciente»** con la misma línea de tiempo: tres movimientos a la vista y «Ver historial completo».
+
+## Estructura de la ventana Presupuesto
+
+**Causa de los desbordamientos.** El modal completo era el contenedor con desplazamiento (`.maintenance-dialog{overflow:auto}`): el título no tenía zona propia, las partidas pasaban por debajo de él al desplazar y los botones de guardado quedaban al final del contenido, fuera de la vista.
+
+**Corrección.** El modal es ahora una columna de tres zonas: encabezado fijo con fondo opaco (título, número, estado y selector de versión), cuerpo con desplazamiento propio (`flex:1; min-height:0; overflow-y:auto`) y pie fijo con las acciones, que respeta el área segura inferior del dispositivo. La altura se limita a la pantalla disponible.
+
+- Cada partida muestra sus campos con etiqueta visible: clasificación, descripción, categoría, cantidad, precio unitario, IVA y total.
+- Los errores aparecen junto al campo: se marca el control, se explica debajo («Ingresa una descripción para la partida 2 antes de guardar el presupuesto») y el cuerpo se desplaza hasta él. No se borra nada y no se crea el presupuesto.
+- El resumen usa «Subtotal gravado», «Subtotal tarifa 0 %», «IVA» y «Total cotizado»; los cálculos no cambiaron.
+
+Comprobado con 0, 1, 5 y 12 partidas, descripciones largas y errores, en 1920×1080, 1440×900, 1366×768, 1366×560, 1024×768, 768×1024, 390×844, 390×560 y 320×640.

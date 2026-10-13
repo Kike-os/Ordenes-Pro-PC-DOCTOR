@@ -5865,3 +5865,44 @@ textarea.adi-suggestion-edit{width:100%;min-height:96px;resize:vertical;font:inh
 .equip-budget{box-shadow:inset 3px 0 0 #3fbfb0,inset 0 1px 0 #ff9ecb1f}
 @media(max-width:900px){.equip-budget-values{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:420px){.budget-quote-grid{grid-template-columns:1fr}.budget-card-actions .budget-delete{margin-left:0}.budget-quote-card .budget-card-actions :is(button,a){flex:1 1 130px}}
+/* ===== Ventana Presupuesto: encabezado fijo, cuerpo desplazable y pie fijo (antes todo el modal se desplazaba y las partidas pasaban bajo el título) ===== */
+body[data-page=dashboard] dialog.quote-dialog{padding:0;overflow:hidden;max-height:min(92dvh,calc(100dvh - 24px));border-color:#304969}
+body[data-page=dashboard] dialog.quote-dialog[open]{display:flex;flex-direction:column}
+dialog.quote-dialog>.dialog-heading{flex:none;margin:0;padding:14px 18px 8px;background:#0b1626;position:relative;z-index:2}
+dialog.quote-dialog>.quote-editor-head{flex:none;padding:0 18px 12px;background:#0b1626;border-bottom:1px solid #1f3554;position:relative;z-index:2}
+dialog.quote-dialog>.quote-editor{flex:1 1 auto;min-height:0;margin:0;padding:14px 18px;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;scroll-padding:12px;align-content:start}
+dialog.quote-dialog>.quote-foot{flex:none;display:grid;gap:8px;padding:10px 18px max(12px,env(safe-area-inset-bottom));background:#0b1626;border-top:1px solid #1f3554;box-shadow:0 -8px 18px #02071480;position:relative;z-index:2}
+dialog.quote-dialog>.quote-foot:empty{display:none}
+.quote-foot .message{margin:0;font-size:12.5px}.quote-foot .message:empty{display:none}.quote-foot .message:not(:empty){padding:7px 10px;border-radius:9px;background:#3a1a22;color:#ffc4c9}
+.quote-foot .quote-actions{margin:0;padding:0;border:0}
+.quote-foot .quote-actions-edit h3{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+.quote-foot .quote-actions-grid{grid-template-columns:auto auto minmax(0,1fr) auto auto}
+.quote-foot .quote-actions-grid .quote-save{grid-column:4}.quote-foot .quote-actions-grid .quote-send{grid-column:5;min-width:200px}
+.quote-foot .quote-actions-grid button{width:auto;min-height:42px;padding:0 14px;white-space:nowrap}
+.quote-foot .quote-actions:not(.quote-actions-edit){display:flex;flex-wrap:wrap;gap:8px}.quote-foot .quote-actions:not(.quote-actions-edit) :is(button,a){min-height:40px;margin:0}
+/* Partidas: cada control con su etiqueta; nada se superpone ni se corta */
+.quote-row{gap:10px;padding:12px}
+.quote-row-top{margin:0;align-items:flex-end}.quote-row-top .quote-row-remove{margin-left:auto;width:36px;min-height:36px;align-self:center}
+.quote-field{display:grid;gap:4px;min-width:0;margin:0;font-size:11px;font-weight:600;letter-spacing:.02em;color:#8fa6c4}
+.quote-field>span:first-child{white-space:nowrap}
+.quote-field :is(input,select,textarea){margin:0;min-width:0;width:100%}
+.quote-field-priority{flex:0 1 190px}.quote-row .quote-field-priority select.quote-row-priority{width:100%;min-width:0;height:36px;min-height:36px}
+.quote-row-fields{grid-template-columns:minmax(150px,1.5fr) 84px minmax(100px,.8fr) auto minmax(90px,auto);align-items:end;gap:10px}
+.quote-field-tax .quote-row-tax{min-height:40px}
+.quote-field-total{justify-items:end}.quote-field-total .quote-row-total{font-size:16px;line-height:40px}
+.quote-row .field-error{display:block;font-size:12px;font-weight:500;line-height:1.4;color:#ffb3b6}
+.quote-row [aria-invalid=true]{border-color:#e06c78!important;box-shadow:0 0 0 2px #e06c7833}
+.quote-row .adi-bar{justify-self:end}
+.quote-picker{align-items:center}.quote-picker button{min-height:42px;height:42px}
+.quote-extra{align-items:start}.quote-extra label .adi-bar{display:flex;justify-content:flex-end;margin-top:6px}
+.quote-editor-totals{min-width:min(100%,340px)}
+@media(max-width:900px){.quote-foot .quote-actions-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.quote-foot .quote-actions-grid .quote-save,.quote-foot .quote-actions-grid .quote-send{grid-column:auto;min-width:0}.quote-foot .quote-actions-grid button{width:100%;white-space:normal;padding:0 8px}}
+@media(max-width:720px){.quote-row-fields{grid-template-columns:1fr 1fr}.quote-field-category{grid-column:1/-1}.quote-row-fields select{grid-column:auto}.quote-field-total{justify-items:start}dialog.quote-dialog>.dialog-heading,dialog.quote-dialog>.quote-editor-head,dialog.quote-dialog>.quote-editor,dialog.quote-dialog>.quote-foot{padding-left:12px;padding-right:12px}}
+@media(max-height:560px){dialog.quote-dialog>.dialog-heading{padding-top:8px;padding-bottom:4px}dialog.quote-dialog>.quote-editor-head{padding-bottom:6px}dialog.quote-dialog>.quote-foot{padding-top:6px;gap:5px}.quote-foot .quote-actions-grid button{min-height:36px;font-size:12px}}
+@media(max-height:560px) and (min-width:560px){.quote-foot .quote-actions-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+/* Pie de la ventana Presupuesto: ancho suficiente y botones que nunca se aprietan ni se cortan */
+body[data-page=dashboard] dialog.quote-dialog{width:min(920px,calc(100vw - 24px));max-width:none}
+.quote-foot .quote-actions-grid button{line-height:1.15;text-align:center}
+@media(max-width:959px){.quote-foot .quote-actions-grid{grid-template-columns:1fr 1fr 1fr 1.45fr}.quote-foot .quote-actions-grid .quote-save,.quote-foot .quote-actions-grid .quote-send{grid-column:auto;min-width:0}.quote-foot .quote-actions-grid button{width:100%;white-space:normal;padding:0 8px;font-size:12px}}
+@media(max-width:600px){.quote-foot .quote-actions-grid{grid-template-columns:1fr 1fr}}
+@media(max-height:560px) and (min-width:601px){.quote-foot .quote-actions-grid{grid-template-columns:1fr 1fr 1fr 1.45fr}}
