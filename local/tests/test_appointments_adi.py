@@ -9,11 +9,12 @@ app.os.environ.setdefault('LOGIN_CAPTCHA','off')  # Las pruebas inician sesión 
 
 class AppointmentAndAdiTests(unittest.TestCase):
  def setUp(self):
+  import test_app;self.request_clock=test_app.open_requests();self.request_clock.start()
   self.temp=tempfile.TemporaryDirectory();self.paths=patch.multiple(app,DATA=Path(self.temp.name),DB=Path(self.temp.name)/'test.sqlite3');self.paths.start();self.env=patch.dict(app.os.environ,{'APP_URL':'http://127.0.0.1:8010','SESSION_SECURE':'false','MAIL_IMAP_HOST':'','MAIL_SMTP_HOST':'','MAIL_USERNAME':'','MAIL_PASSWORD':'','SMTP_HOST':'','SMTP_FROM':''});self.env.start();app.migrate()
   with app.connect() as c:
    self.admin=c.execute('INSERT INTO users(username,email,name,password_hash,role,created_at) VALUES (?,?,?,?,?,?)',('admin','a@example.invalid','Admin','hash','administrador',1)).lastrowid
    self.tech=c.execute('INSERT INTO users(username,email,name,password_hash,role,created_at) VALUES (?,?,?,?,?,?)',('tech','t@example.invalid','Tech','hash','tecnico',1)).lastrowid
- def tearDown(self):self.env.stop();self.paths.stop();self.temp.cleanup()
+ def tearDown(self):self.request_clock.stop();self.env.stop();self.paths.stop();self.temp.cleanup()
  def post(self,path,data,cookie='',csrf=''):
   h=object.__new__(app.Handler);h.path=path;h.client_address=('127.0.0.1',4444);h.headers=Message();h.headers['Origin']='http://127.0.0.1:8010';h.headers['Content-Type']='application/json';h.headers['Cookie']=cookie;h.headers['X-CSRF-Token']=csrf;raw=json.dumps(data).encode();h.headers['Content-Length']=str(len(raw));h.rfile=io.BytesIO(raw);out={};h.reply=lambda status,body,*args,**kwargs:out.update(status=status,body=body,cookie=kwargs.get('cookie'));h.do_POST();return out
  def data(self,day,time='09:00',**extra):return {'name':'Reserva de Prueba','identification':'','phone':'0991234567','email':'prueba@example.invalid','device_type':'portatil','brand':'Acer','model':'Prueba','service':'diagnostico','description':'Revisión general','notes':'','date':day.isoformat(),'time':time,'privacy_consent':True,'communications_consent':False,'request_key':'req_test_appointment_00001',**extra}

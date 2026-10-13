@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.126 — 2026-10-12 23:08 (UTC-05:00)
+
+Validación visual del inicio de sesión
+
+### Mejoras realizadas
+
+- Acceso: los campos muestran su estado con color, icono y texto (sin interacción, escribiendo, formato válido, error), «Verificando acceso…» al enviar y transición verde al confirmar; el rechazo sigue siendo genérico y no se consulta al servidor mientras se escribe.
+
 ## v1.5.125 — 2026-10-12 22:59 (UTC-05:00)
 
 Clientes: tabla con columnas independientes y acciones alineadas

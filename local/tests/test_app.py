@@ -16,6 +16,15 @@ app.os.environ.setdefault('UPDATE_REGISTRY_URL','off')  # Las pruebas no consult
 app.os.environ.setdefault('LOGIN_CAPTCHA','off')  # Las pruebas inician sesión sin verificación salvo que la activen.
 
 
+def open_requests():
+    """Las solicitudes de cita en línea se cierran a una hora fija: con el reloj real la batería no debe depender de la hora en que se
+    ejecuta. Las pruebas que fijan su propia hora (patch de reception_now) siguen usando la regla real."""
+    import business_hours
+    from unittest.mock import Mock
+    real=business_hours.requests_open
+    return patch.object(business_hours,'requests_open',side_effect=lambda config,now:real(config,now) if isinstance(app.reception_now,Mock) else (True,''))
+
+
 class SecurityTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -24,6 +33,8 @@ class SecurityTests(unittest.TestCase):
     def setUp(self):
         self.jobs=patch.object(app,'dispatch_security_job',side_effect=lambda job:job())
         self.jobs.start()
+        self.request_clock=open_requests()
+        self.request_clock.start()
         self.temp = tempfile.TemporaryDirectory()
         self.paths = patch.multiple(app, DATA=Path(self.temp.name), DB=Path(self.temp.name)/'test.sqlite3')
         self.paths.start()
@@ -36,6 +47,7 @@ class SecurityTests(unittest.TestCase):
                 app.service_terms.publish(c,{'version':'FIXTURE-ONLY','effective_date':'2020-01-01','full_text':'Condiciones ficticias de prueba, sin efectos reales.','compact_text':'Resumen ficticio de prueba.','approved':True},{'id':self.uid},app.reception_now())
 
     def tearDown(self):
+        self.request_clock.stop()
         self.jobs.stop()
         self.env.stop()
         self.paths.stop()

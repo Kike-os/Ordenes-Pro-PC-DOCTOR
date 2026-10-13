@@ -5037,3 +5037,33 @@ body[data-page=dashboard] :is(td,.order-row-actions,.appointment-row-actions,.cl
 }
 @media(max-width:760px){.clients-table td[data-col]{width:auto;white-space:normal;padding:2px 0}.clients-table tr{padding:12px 14px}.clients-table td[data-col=city]{grid-column:1}.clients-table td[data-col=orders]{grid-column:2}}
 @media(max-width:760px){.clients-panel[data-density] .clients-table td[data-col]{padding:2px 0}.clients-panel[data-density=comfortable] .clients-table tr{gap:10px 14px;padding:16px 14px}}
+/* Acceso: estados visuales de los campos. Azul sin interacción, ámbar mientras se escribe o falta completar, rojo con error confirmado y
+   verde con formato válido o acceso confirmado. Cada estado lleva además icono y texto: no depende solo del color. */
+body[data-page=login] #login-form .login-input{position:relative}
+body[data-page=login] #login-form .login-input input{border-color:#2f5385;transition:border-color .25s ease,box-shadow .25s ease,background .25s ease}
+body[data-page=login] #login-form .login-input>.icon{transition:color .25s ease}
+body[data-page=login] #login-form .login-state{position:absolute;top:50%;right:13px;width:18px;height:18px;margin-top:-9px;display:grid;place-items:center;pointer-events:none;opacity:0;transform:scale(.8);transition:opacity .25s ease,transform .25s ease,color .25s ease}
+body[data-page=login] #login-form .login-state svg{width:17px;height:17px}
+body[data-page=login] #login-form .password-wrap .login-state{right:84px}
+body[data-page=login] #login-form #login{padding-right:40px}
+body[data-page=login] #login-form .login-input[data-state]:not([data-state=idle]) .login-state{opacity:1;transform:none}
+body[data-page=login] #login-form .login-input[data-state=typing] input,body[data-page=login] #login-form .login-input[data-state=typing] input:focus{border-color:#e0b25c;box-shadow:0 0 0 3px #e0b25c26,0 0 20px #e0b25c14}
+body[data-page=login] #login-form .login-input[data-state=typing] :is(.login-state,.icon:first-child){color:#f3c677}
+body[data-page=login] #login-form .login-input[data-state=valid] input,body[data-page=login] #login-form .login-input[data-state=valid] input:focus,body[data-page=login] #login-form .login-input[data-state=ok] input{border-color:#3fbf8f;box-shadow:0 0 0 3px #3fbf8f24,0 0 20px #3fbf8f14}
+body[data-page=login] #login-form .login-input:is([data-state=valid],[data-state=ok]) :is(.login-state,.icon:first-child){color:#6fdcae}
+body[data-page=login] #login-form .login-input[data-state=ok] input{background:#0c2a24}
+body[data-page=login] #login-form .login-input[data-state=error] input,body[data-page=login] #login-form .login-input[data-state=error] input:focus{border-color:#e06c78;box-shadow:0 0 0 3px #e06c7826,0 0 20px #e06c7814}
+body[data-page=login] #login-form .login-input[data-state=error] :is(.login-state,.icon:first-child){color:#ff9aa6}
+body[data-page=login] #login-form .login-input[data-state=filled] .login-state{color:#8fb3e6}
+/* El texto de ayuda reserva su línea para que la tarjeta no cambie de tamaño al validar. */
+body[data-page=login] #login-form :is(#login-hint,#password-hint){display:block;min-height:17px;margin:-10px 0 9px;font-size:12px;line-height:1.4;color:#9fb4d3}
+body[data-page=login] #login-form :is(#login-hint,#password-hint):empty{display:block}
+body[data-page=login] #login-form :is(#login-hint,#password-hint)[data-state=typing]{color:#f3c677}
+body[data-page=login] #login-form :is(#login-hint,#password-hint)[data-state=error]{color:#ffadba}
+body[data-page=login] #login-form :is(#login-hint,#password-hint)[data-state=valid]{color:#8ad9b6}
+body[data-page=login] #login-form[aria-busy=true] .submit{position:relative;justify-content:center;gap:10px}
+body[data-page=login] #login-form[aria-busy=true] .submit::before{content:"";width:15px;height:15px;border:2px solid #ffffff59;border-top-color:#fff;border-radius:50%;animation:login-verify .8s linear infinite}
+@keyframes login-verify{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){body[data-page=login] #login-form[aria-busy=true] .submit::before{animation:none}}
+@media(max-width:480px){body[data-page=login] #login-form .login-input input{font-size:16px}}
+body[data-page=login] #login-form .password-wrap .login-state{right:48px}

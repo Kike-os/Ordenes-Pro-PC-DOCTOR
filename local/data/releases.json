@@ -8,6 +8,22 @@
   },
   "releases": [
     {
+      "version": "1.5.126",
+      "date": "2026-10-12T23:08:36-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Validación visual del inicio de sesión",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Acceso: los campos muestran su estado con color, icono y texto (sin interacción, escribiendo, formato válido, error), «Verificando acceso…» al enviar y transición verde al confirmar; el rechazo sigue siendo genérico y no se consulta al servidor mientras se escribe."
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.125",
       "date": "2026-10-12T22:59:49-05:00",
       "type": "patch",
