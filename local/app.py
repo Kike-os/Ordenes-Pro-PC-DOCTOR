@@ -45,6 +45,7 @@ import tempfile
 import subprocess
 import order_workspace
 import equipment
+import two_factor
 import quotes
 import corporate
 import client_registry
@@ -1460,12 +1461,15 @@ class Handler(BaseHTTPRequestHandler):
                     board=reports.build(c,report_filters,today)
                 except reports.ReportError as error:return self.reply(400,{'error':str(error)})
                 return self.reply(200, {'board':board,'statuses':counts,'clients':c.execute('SELECT COUNT(*) FROM clients').fetchone()[0],'devices':c.execute('SELECT COUNT(*) FROM devices').fetchone()[0]})
+            if path == '/api/account/second-step':
+                # Estado del segundo paso de la propia cuenta (cualquier usuario con sesión). Nunca devuelve el secreto ni los códigos.
+                return self.reply(200,{'second_step':two_factor.status(c,user['id'])})
             if path == '/api/settings':
                 if user['role'] != 'administrador':
                     return self.reply(403, {'error':'Solo administración puede acceder a la configuración.'})
-                labels={'login':'Inicio de sesión','logout':'Cierre de sesión','sessions_revoked':'Cierre de todas las sesiones','other_sessions_revoked':'Cierre de otras sesiones','password_changed':'Cambio de contraseña','password_reset':'Contraseña restablecida','profile_updated':'Perfil actualizado','auth_policy_updated':'Políticas de acceso actualizadas','account_approved':'Cuenta aprobada','account_rejected':'Solicitud rechazada','account_updated':'Cuenta del equipo modificada','clients_exported':'Exportación de clientes','clients_imported':'Importación de clientes'}
+                labels={'second_step_enabled':'Verificación en dos pasos activada','second_step_disabled':'Verificación en dos pasos desactivada','second_step_recovery_renewed':'Códigos de recuperación renovados','login_recovery_code_used':'Acceso con código de recuperación','login':'Inicio de sesión','logout':'Cierre de sesión','sessions_revoked':'Cierre de todas las sesiones','other_sessions_revoked':'Cierre de otras sesiones','password_changed':'Cambio de contraseña','password_reset':'Contraseña restablecida','profile_updated':'Perfil actualizado','auth_policy_updated':'Políticas de acceso actualizadas','account_approved':'Cuenta aprobada','account_rejected':'Solicitud rechazada','account_updated':'Cuenta del equipo modificada','clients_exported':'Exportación de clientes','clients_imported':'Importación de clientes'}
                 activity=[{'label':labels[r['action']],'at':r['created_at']} for r in c.execute('SELECT action,created_at FROM audit WHERE user_id=? AND action IN ('+','.join('?' for _ in labels)+') ORDER BY id DESC LIMIT 12',(user['id'],*labels))]
-                return self.reply(200, {'profile':{k:user[k] for k in ('name','username','email','role')},'me':user['id'],'active_sessions':c.execute('SELECT COUNT(*) FROM sessions WHERE user_id=? AND expires>?',(user['id'],int(time.time()))).fetchone()[0],'security_activity':activity,'registration_enabled':registration_enabled(),'captcha_mode':captcha_mode(),'mail':mail_pro.status(),'mail_signature':mail_signature(c),'mail_signature_card':mail_signature_card(c) if mail_pro.configured() else None,'accounts':[dict(r) for r in c.execute("SELECT u.id,u.name,u.username,u.email,u.role,u.active,(SELECT MAX(a.created_at) FROM audit a WHERE a.user_id=u.id AND a.action='login') last_login,(SELECT COUNT(*) FROM sessions s WHERE s.user_id=u.id AND s.expires>?) sessions FROM users u WHERE u.approval='approved' ORDER BY u.id",(int(time.time()),))],'requests':[dict(r) for r in c.execute("SELECT id,name,username,email,phone,identification,job_title,requested_at,approval FROM users WHERE approval IN ('pending','rejected') ORDER BY approval,id DESC")],'smtp_configured':bool(security_mail_ready()),'smtp_route':security_mail_ready(),'openai_configured':bool(os.getenv('OPENAI_API_KEY')),'login_lockout_seconds':auth_policy(c)['lockout_seconds'],'auth_policy':auth_policy(c),'antibot_configured':bool(os.getenv('TURNSTILE_SITE_KEY') and os.getenv('TURNSTILE_SECRET_KEY')),'origin':os.getenv('APP_URL','http://127.0.0.1:8010')})
+                return self.reply(200, {'profile':{k:user[k] for k in ('name','username','email','role')},'me':user['id'],'second_step':two_factor.status(c,user['id']),'active_sessions':c.execute('SELECT COUNT(*) FROM sessions WHERE user_id=? AND expires>?',(user['id'],int(time.time()))).fetchone()[0],'security_activity':activity,'registration_enabled':registration_enabled(),'captcha_mode':captcha_mode(),'mail':mail_pro.status(),'mail_signature':mail_signature(c),'mail_signature_card':mail_signature_card(c) if mail_pro.configured() else None,'accounts':[dict(r) for r in c.execute("SELECT u.id,u.name,u.username,u.email,u.role,u.active,(SELECT MAX(a.created_at) FROM audit a WHERE a.user_id=u.id AND a.action='login') last_login,(SELECT COUNT(*) FROM sessions s WHERE s.user_id=u.id AND s.expires>?) sessions,EXISTS(SELECT 1 FROM user_mfa m WHERE m.user_id=u.id AND m.confirmed_at IS NOT NULL) second_step FROM users u WHERE u.approval='approved' ORDER BY u.id",(int(time.time()),))],'requests':[dict(r) for r in c.execute("SELECT id,name,username,email,phone,identification,job_title,requested_at,approval FROM users WHERE approval IN ('pending','rejected') ORDER BY approval,id DESC")],'smtp_configured':bool(security_mail_ready()),'smtp_route':security_mail_ready(),'openai_configured':bool(os.getenv('OPENAI_API_KEY')),'login_lockout_seconds':auth_policy(c)['lockout_seconds'],'auth_policy':auth_policy(c),'antibot_configured':bool(os.getenv('TURNSTILE_SITE_KEY') and os.getenv('TURNSTILE_SECRET_KEY')),'origin':os.getenv('APP_URL','http://127.0.0.1:8010')})
             if path == '/api/notifications':
                 result=notifications.build(c,user,reception_now(),mail_allowed(user))
                 # Versión que ejecuta el servidor: permite avisar a una pestaña que quedó abierta con una versión anterior.
@@ -1910,14 +1914,39 @@ class Handler(BaseHTTPRequestHandler):
                         return self.reply(401, {'error':'No pudimos iniciar sesión. Verifica tus credenciales e inténtalo nuevamente.'})
                     if ARGON2 is not None and (not row['password_hash'].startswith('$argon2id$') or ARGON2.check_needs_rehash(row['password_hash'])):
                         c.execute('UPDATE users SET password_hash=? WHERE id=?',(password_hash(password),row['id']))
+                    remember = data.get('remember') is True
+                    if two_factor.active(c,row['id']):
+                        # Verificación en dos pasos: la contraseña correcta solo reserva un intento breve; la sesión se abre al validar el código.
+                        audit(c,row['id'],'login_second_step_required')
+                        return self.reply(200,{'ok':True,'second_step':True,'challenge':two_factor.challenge(c,row['id'],remember,digest)})
                     _, previous = self.session(c)
                     c.execute('DELETE FROM sessions WHERE token_hash=?', (digest(previous),))
-                    remember = data.get('remember') is True
                     token, csrf, age = make_session(c, row['id'], remember)
                     auth_event(c,account_hash,ip_hash,'success')
                     c.execute('DELETE FROM attempts WHERE bucket=?',(user_key,))
                     audit(c, row['id'], 'login')
                     return self.reply(200, {'ok':True}, cookie=self.cookie(token, age if remember else None))
+                if path == '/api/login/second-step':
+                    # Segundo paso: código de la aplicación de autenticación o código de recuperación. Sin datos que revelen la cuenta.
+                    ip_hash=digest(self.client_address[0])
+                    if limited(c,'second-step-ip:'+ip_hash,limit=20,window=900):return self.reply(429,{'error':'Por seguridad, el acceso está temporalmente limitado. Inténtalo más tarde.'})
+                    state,found=two_factor.answer(c,data.get('challenge',''),data.get('code',''),digest)
+                    if state=='expired':
+                        audit(c,None,'login_second_step_expired')
+                        return self.reply(401,{'error':'La verificación caducó. Vuelve a ingresar tu usuario y contraseña.','restart':True})
+                    if state=='bad':
+                        audit(c,None,'login_second_step_failed')
+                        return self.reply(401,{'error':'El código no es correcto. Revisa tu aplicación de autenticación e inténtalo de nuevo.'})
+                    row=c.execute('SELECT id,username,active FROM users WHERE id=?',(found['user_id'],)).fetchone()
+                    if not row or not row['active']:return self.reply(401,{'error':'La verificación caducó. Vuelve a ingresar tu usuario y contraseña.','restart':True})
+                    _, previous = self.session(c)
+                    c.execute('DELETE FROM sessions WHERE token_hash=?', (digest(previous),))
+                    remember=bool(found['remember']);token, csrf, age = make_session(c, row['id'], remember)
+                    auth_event(c,digest(row['username'].casefold()),ip_hash,'success')
+                    c.execute('DELETE FROM attempts WHERE bucket=?',('login-user:'+digest(row['username'].casefold()),))
+                    audit(c,row['id'],'login');audit(c,row['id'],'login_recovery_code_used' if found['kind']=='recovery' else 'login_second_step_ok')
+                    left=two_factor.status(c,row['id'])['recovery_left']
+                    return self.reply(200,{'ok':True,'recovery_used':found['kind']=='recovery','recovery_left':left},cookie=self.cookie(token, age if remember else None))
                 if path == '/api/register':
                     # El alta pública se retiró: las cuentas se crean en /api/users/create, solo por administración.
                     audit(c,None,'public_registration_blocked')
@@ -2145,6 +2174,31 @@ class Handler(BaseHTTPRequestHandler):
                     removed=c.execute('DELETE FROM sessions WHERE user_id=? AND token_hash!=?',(user['id'],digest(token))).rowcount
                     audit(c,user['id'],'other_sessions_revoked')
                     return self.reply(200,{'ok':True,'closed':max(0,removed)})
+                if path=='/api/account/second-step':
+                    # Verificación en dos pasos de la propia cuenta. Activar, desactivar y renovar códigos exigen la contraseña actual.
+                    action=str(data.get('action',''))
+                    if action not in ('start','confirm','disable','recovery'):return self.reply(400,{'error':'Operación no disponible.'})
+                    if limited(c,'second-step-setup:'+str(user['id']),limit=12,window=900):return self.reply(429,{'error':'Demasiados intentos. Inténtalo más tarde.'})
+                    account=c.execute('SELECT id,username,email,password_hash FROM users WHERE id=?',(user['id'],)).fetchone()
+                    if action!='confirm' and not password_ok(str(data.get('password','')),account['password_hash']):return self.reply(400,{'error':'Revisa los campos señalados.','fields':{'password':'La contraseña actual no es correcta.'}})
+                    if action=='start':
+                        made=two_factor.begin(c,account)
+                        if not made:return self.reply(409,{'error':'La verificación en dos pasos ya está activa en tu cuenta.'})
+                        audit(c,user['id'],'second_step_setup_started')
+                        return self.reply(200,{'ok':True,'secret':made['secret'],'qr':reception.qr_image(made['uri'],'svg').decode('utf-8')})
+                    if action=='confirm':
+                        codes=two_factor.confirm(c,account,data.get('code',''))
+                        if not codes:return self.reply(400,{'error':'Revisa los campos señalados.','fields':{'code':'El código no es correcto. Comprueba la hora de tu teléfono e inténtalo con el código actual.'}})
+                        # Las demás sesiones abiertas se cierran: a partir de ahora todas pasan por el segundo paso.
+                        c.execute('DELETE FROM sessions WHERE user_id=? AND token_hash!=?',(user['id'],digest(token)));audit(c,user['id'],'second_step_enabled')
+                        return self.reply(200,{'ok':True,'recovery':codes,'second_step':two_factor.status(c,user['id'])})
+                    if not two_factor.active(c,user['id']):return self.reply(409,{'error':'La verificación en dos pasos no está activa en tu cuenta.'})
+                    if not two_factor.check(c,user['id'],data.get('code','')):return self.reply(400,{'error':'Revisa los campos señalados.','fields':{'code':'El código no es correcto.'}})
+                    if action=='disable':
+                        two_factor.remove(c,user['id']);audit(c,user['id'],'second_step_disabled')
+                        return self.reply(200,{'ok':True,'second_step':two_factor.status(c,user['id'])})
+                    codes=two_factor.renew_recovery(c,user['id']);audit(c,user['id'],'second_step_recovery_renewed')
+                    return self.reply(200,{'ok':True,'recovery':codes,'second_step':two_factor.status(c,user['id'])})
                 if path=='/api/account/password':
                     if limited(c,'password-change:'+str(user['id']),limit=6,window=900):return self.reply(429,{'error':'Demasiados intentos. Inténtalo más tarde.'})
                     current=str(data.get('current',''));password=str(data.get('password',''));minimum=auth_policy(c)['password_min']
@@ -2200,8 +2254,13 @@ class Handler(BaseHTTPRequestHandler):
                     if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede gestionar cuentas.'})
                     target=str(data.get('id',''));action=str(data.get('action',''));role=str(data.get('role',''))
                     row=c.execute("SELECT id,role,active FROM users WHERE id=? AND approval='approved'",(target,)).fetchone() if target.isdigit() else None
-                    if not row or action not in ('activate','deactivate','role') or (action=='role' and role not in ('administrador','tecnico')):return self.reply(400,{'error':'Operación no disponible.'})
+                    if not row or action not in ('activate','deactivate','role','second_step_reset') or (action=='role' and role not in ('administrador','tecnico')):return self.reply(400,{'error':'Operación no disponible.'})
                     if row['id']==user['id']:return self.reply(400,{'error':'No puedes cambiar tu propia cuenta desde aquí.'})
+                    if action=='second_step_reset':
+                        # Teléfono perdido: administración retira el segundo paso de esa cuenta y cierra sus sesiones; la persona vuelve a activarlo.
+                        if not two_factor.active(c,row['id']):return self.reply(409,{'error':'Esa cuenta no tiene activa la verificación en dos pasos.'})
+                        two_factor.remove(c,row['id']);c.execute('DELETE FROM sessions WHERE user_id=?',(row['id'],));audit(c,user['id'],'second_step_reset_by_admin',row['id'])
+                        return self.reply(200,{'ok':True})
                     admins=c.execute("SELECT COUNT(*) FROM users WHERE role='administrador' AND active=1 AND approval='approved'").fetchone()[0]
                     if row['role']=='administrador' and row['active'] and admins<=1 and (action=='deactivate' or (action=='role' and role!='administrador')):return self.reply(400,{'error':'Debe quedar al menos un administrador activo.'})
                     if action=='role':c.execute('UPDATE users SET role=? WHERE id=?',(role,row['id']))

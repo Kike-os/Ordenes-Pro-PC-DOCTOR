@@ -6171,3 +6171,34 @@ body[data-page=appointments] input.adi-glow{border-color:#ff9ecb;box-shadow:0 0 
 .equip-pay-refund{display:inline-flex;align-items:center;gap:8px;margin-top:10px}.equip-pay-refund svg{width:15px;height:15px}
 @media(max-width:560px){.equip-totals-wrap .equip-totals{grid-template-columns:1fr 1fr}.equip-totals-wrap .equip-totals>div:last-child{grid-column:1/-1}.finance-card{padding:14px}}
 @media(prefers-reduced-motion:reduce){.finance-card{transition:none}.finance-card[data-state=loading] .finance-card-icon svg{animation:none}}
+/* ===== Verificación en dos pasos: ventana del acceso y bloque de Configuración → Seguridad ===== */
+.second-step-dialog{width:min(400px,calc(100% - 32px));margin:auto;padding:24px 22px 18px;border:1px solid #3a5a86a8;border-radius:18px;background:#0d1a2e;color:#e6eeff;box-shadow:0 24px 60px #020714cc}
+.second-step-dialog::backdrop{background:#02071499;-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+.second-step-dialog form{display:grid;gap:12px;margin:0}
+.second-step-dialog h2{margin:0;font-size:18px;color:#fff}.second-step-dialog p{margin:0;font-size:13.5px;line-height:1.5;color:#b9c9e2}
+.second-step-dialog label{display:grid;gap:6px;font-size:12.5px;font-weight:600;color:#c2d3ec}
+.second-step-dialog input{width:100%;min-height:50px;margin:0;padding:0 14px;border:1px solid #2c4468;border-radius:11px;background:#0a1322;color:#fff;font-size:22px;font-weight:650;letter-spacing:.22em;text-align:center;font-variant-numeric:tabular-nums}
+.second-step-dialog input:focus-visible{outline:2px solid #9cc4ff;outline-offset:1px}.second-step-dialog input[aria-invalid=true]{border-color:#e17b88}
+.second-step-dialog .message{min-height:0;font-size:12.5px;color:#ffb3b6}.second-step-dialog .message:empty{display:none}
+.second-step-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}.second-step-actions button{min-height:44px;margin:0;justify-content:center}
+.second-step-dialog .text-action{justify-self:center;min-height:36px;font-size:12.5px}
+.second-step-body{display:grid;gap:12px;min-width:0}
+.second-step-form{display:grid;gap:12px;max-width:460px;min-width:0}
+.second-step-field{display:grid;gap:5px;font-size:12.5px;font-weight:600;color:#c2d3ec}.second-step-field input{margin:0;max-width:260px}.second-step-field input[name=code]{font-size:18px;letter-spacing:.18em;font-variant-numeric:tabular-nums}
+.second-step-field .field-error{font-weight:400}.second-step-field .field-error:empty{display:none}
+.second-step-steps{display:grid;gap:6px;margin:0;padding-left:20px;font-size:13px;line-height:1.5;color:#c2d3ec}
+.second-step-key{display:inline-block;margin-top:4px;padding:4px 8px;border:1px solid #2c4468;border-radius:8px;background:#0a1322;color:#fff;font-size:13px;letter-spacing:.06em;overflow-wrap:anywhere;user-select:all}
+.second-step-qr{display:grid;place-items:center;width:196px;max-width:100%;padding:8px;border-radius:12px;background:#fff}.second-step-qr svg{display:block;width:100%;height:auto}
+.second-step-codes{display:grid;gap:10px;min-width:0}.second-step-codes strong{font-size:14px;color:#fff}
+.second-step-codes ul{list-style:none;display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:6px;margin:0;padding:12px;border:1px dashed #3a5a86;border-radius:12px;background:#0a1322}
+.second-step-codes li{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:14px;letter-spacing:.05em;color:#e6eeff;user-select:all}
+.second-step-warn{color:#ffd9a0!important}
+@media(max-width:420px){.second-step-actions{grid-template-columns:1fr}.second-step-field input{max-width:none}}
+.second-step-account .second-step{margin:0;padding:0;border:0;background:none}.second-step-account .second-step>h3{display:none}
+.second-step-holder{min-width:0}
+.second-step-dialog .second-step-actions button{border-radius:11px;font:inherit;font-size:14px;font-weight:650;cursor:pointer;opacity:1}
+.second-step-dialog .second-step-actions .secondary{border:1px solid #2c4468;background:#0c192d;color:#dbe8fb}
+.second-step-dialog .second-step-actions .primary{border:1px solid #3f7fe0;background:linear-gradient(180deg,#2c66bf,#22519c);color:#fff}
+.second-step-dialog .second-step-actions .primary:disabled{opacity:.6;cursor:progress}
+.second-step-dialog .text-action{border:0;background:none;color:#9cc4ff;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.second-step-dialog button:focus-visible{outline:2px solid #9cc4ff;outline-offset:2px}
