@@ -5180,3 +5180,19 @@ body[data-page=login] #login-form #password{padding-right:84px}
 .version-more{justify-self:center}
 .version-total{align-self:center;font-size:12px;color:#8fa5c4}
 @media(prefers-reduced-motion:reduce){.system-version-icon .icon{animation:none!important}}
+/* ADI — Corrección Inteligente (configuración) y estrella de revisión en turquesa con brillo rosado. */
+.adi-correction-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 18px;margin:10px 0 12px}
+.adi-correction .config-toggle{align-items:flex-start}.adi-correction .config-toggle span{display:grid;gap:2px}
+.adi-correction .config-toggle strong{font-size:13.5px;color:#e3eeff}.adi-correction .config-toggle small{font-size:12px;line-height:1.4;color:#9db1cf}
+.adi-correction-wait{display:flex;align-items:center;gap:10px;margin:0;font-size:13px;color:#c5d5ee}.adi-correction-wait select{width:auto;min-width:150px;margin:0}
+@media(max-width:760px){.adi-correction-grid{grid-template-columns:1fr}}
+.adi-bar[data-star=work] .adi-button .system-icon{color:#8fe9e3;animation:adi-star-work 1.3s ease-in-out infinite}
+@keyframes adi-star-work{0%,100%{filter:drop-shadow(0 0 0 #3fd8d000);transform:scale(1) rotate(0)}50%{filter:drop-shadow(0 0 4px #6fe6de) drop-shadow(0 0 8px #ff9ecb80);transform:scale(1.12) rotate(8deg)}}
+.adi-bar[data-star=done] .adi-button .system-icon{color:#6fe6de;animation:adi-star-done .75s ease-out 1}
+@keyframes adi-star-done{0%{filter:drop-shadow(0 0 0 #3fd8d000);transform:scale(1)}35%{filter:drop-shadow(0 0 7px #6fe6de) drop-shadow(0 0 13px #ff9ecb);transform:scale(1.4) rotate(18deg)}100%{filter:drop-shadow(0 0 0 #3fd8d000);transform:scale(1) rotate(0)}}
+.adi-fixed{animation:adi-fixed-glow .75s ease-out 1;background-image:linear-gradient(110deg,transparent 38%,#6fe6de24 48%,#ff9ecb1f 54%,transparent 64%)!important}
+@keyframes adi-fixed-glow{0%{box-shadow:0 0 0 0 #3fd8d000;background-position:120% 0}25%{box-shadow:0 0 0 1px #3fd8d0b3,0 0 16px 2px #ff9ecb47}100%{box-shadow:0 0 0 0 #3fd8d000;background-position:-60% 0}}
+/* Indicadores desactivados en Configuración: ni estrella animada ni destello. */
+body[data-adi-indicators=off] .adi-bar .adi-button .system-icon{animation:none!important;filter:none!important}
+body[data-adi-indicators=off] .adi-fixed{animation:none!important;background-image:none!important}
+@media(prefers-reduced-motion:reduce){.adi-bar .adi-button .system-icon{animation:none!important}.adi-fixed{animation:none!important;background-image:none!important}}
