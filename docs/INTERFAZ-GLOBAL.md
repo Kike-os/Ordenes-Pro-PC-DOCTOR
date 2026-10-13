@@ -21,3 +21,9 @@ El sistema ya no usa las ventanas nativas del navegador (`confirm`, `prompt`, `a
 - `confirmClose(...)` sigue siendo la base para los cierres con cambios sin guardar.
 
 Se convirtieron 17 avisos: plantilla y descarte de correo, eliminar foto, cierre de sesiones, cambio de rol, desactivar cuenta, rechazar solicitud, restaurar firma, generar o desactivar el enlace de seguimiento, importar clientes, consentimiento y reenvío de recordatorios, renombrar y eliminar conversaciones y activar el micrófono. Ninguna de esas acciones cambió su comportamiento en el servidor.
+
+## Botones de navegación y botón «Cerrar»
+
+**Cancelar · Anterior · Siguiente** comparten un estilo en la reserva de citas y en el asistente de recepción (clases `nav-cancel`, `nav-back`, `nav-next`): fondo oscuro con borde gris azulado para Cancelar y Anterior (con flecha a la izquierda), azul para Siguiente (con flecha a la derecha), 42 px de alto, radio de 11 px, borde rosado suave al pasar el cursor o recibir el foco y estado deshabilitado claramente apagado. Cancelar queda a la izquierda y Anterior y Siguiente agrupados a la derecha; en teléfonos Anterior y Siguiente comparten una fila y Cancelar ocupa la siguiente. La lógica no cambió: Siguiente valida antes de avanzar y Cancelar sigue pidiendo confirmación si hay datos escritos. El defecto corregido era el fondo blanco de Cancelar y Anterior en la página de citas.
+
+**Cerrar** con texto usa el componente `closeButton()` / clase `close-button`: icono X, sin subrayado, 40 px, mismo estilo oscuro. Se aplica en la reserva de citas, el detalle de reportes, la importación de clientes y el asistente de nombres. Solo cierra su ventana o panel; los botones de eliminar o anular no cambiaron.
