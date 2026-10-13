@@ -8,6 +8,30 @@
   },
   "releases": [
     {
+      "version": "1.5.134",
+      "date": "2026-10-13T07:50:14-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Clasificación e iconos en presupuestos, catálogo ampliado, importes con símbolo de dólar, cancelar y empezar desde cero, listado de órdenes adaptable e indicador de progreso",
+      "changes": {
+        "features": [
+          "Presupuestos: cada partida puede clasificarse como Necesario, Obligatorio u Opcional, con texto y color en el editor, en la página del cliente y en el PDF.",
+          "Catálogo: iconos automáticos por producto o servicio, diez elementos nuevos y marca «IVA por confirmar» que impide enviar un presupuesto hasta confirmarlo.",
+          "Indicador de progreso animado según el estado real de cada orden, con destello único al registrarse la entrega."
+        ],
+        "improvements": [
+          "Documentos: los importes llevan símbolo de dólar, separador de miles y dos decimales; el PDF del presupuesto muestra icono, clasificación y estado real de cada partida.",
+          "Editor de presupuestos: «Cancelar» cierra sin guardar, «Empezar desde cero» vacía el formulario y un presupuesto nuevo no se crea hasta el primer guardado.",
+          "Seguimiento de Órdenes: listado adaptable con teléfono del cliente, acciones con nombre, menú «Más» en pantallas pequeñas y orden por último movimiento."
+        ],
+        "fixes": [
+          "El botón «Seleccionar productos y servicios» mostraba su icono a tamaño gigante."
+        ],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.133",
       "date": "2026-10-13T07:17:21-05:00",
       "type": "patch",

@@ -4,6 +4,26 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.134 — 2026-10-13 07:50 (UTC-05:00)
+
+Clasificación e iconos en presupuestos, catálogo ampliado, importes con símbolo de dólar, cancelar y empezar desde cero, listado de órdenes adaptable e indicador de progreso
+
+### Nuevas funcionalidades
+
+- Presupuestos: cada partida puede clasificarse como Necesario, Obligatorio u Opcional, con texto y color en el editor, en la página del cliente y en el PDF.
+- Catálogo: iconos automáticos por producto o servicio, diez elementos nuevos y marca «IVA por confirmar» que impide enviar un presupuesto hasta confirmarlo.
+- Indicador de progreso animado según el estado real de cada orden, con destello único al registrarse la entrega.
+
+### Mejoras realizadas
+
+- Documentos: los importes llevan símbolo de dólar, separador de miles y dos decimales; el PDF del presupuesto muestra icono, clasificación y estado real de cada partida.
+- Editor de presupuestos: «Cancelar» cierra sin guardar, «Empezar desde cero» vacía el formulario y un presupuesto nuevo no se crea hasta el primer guardado.
+- Seguimiento de Órdenes: listado adaptable con teléfono del cliente, acciones con nombre, menú «Más» en pantallas pequeñas y orden por último movimiento.
+
+### Errores corregidos
+
+- El botón «Seleccionar productos y servicios» mostraba su icono a tamaño gigante.
+
 ## v1.5.133 — 2026-10-13 07:17 (UTC-05:00)
 
 Detalle de la Orden renovado, presupuestos con partidas por decidir y ejecución, gestión técnica del equipo y reserva desde el chat de ADI
