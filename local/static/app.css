@@ -5180,3 +5180,25 @@ body[data-page=login] #login-form #password{padding-right:84px}
 .version-more{justify-self:center}
 .version-total{align-self:center;font-size:12px;color:#8fa5c4}
 @media(prefers-reduced-motion:reduce){.system-version-icon .icon{animation:none!important}}
+/* Acceso: botón compacto «Agendar cita» bajo la tarjeta (abre /citas, el agendamiento existente) con un destello cada ocho segundos. */
+.login-book{position:relative;overflow:hidden;display:inline-flex;align-items:center;justify-content:center;gap:8px;min-width:150px;min-height:40px;margin:14px auto 0;padding:9px 18px;border:1px solid #3f9fd8;border-radius:999px;background:linear-gradient(135deg,#17477f,#12607a);color:#e8f7ff;font-size:13.5px;font-weight:650;letter-spacing:.01em;text-decoration:none;box-shadow:0 8px 22px -12px #3fd8d0b3,inset 0 1px #ffffff26;transition:border-color .2s,box-shadow .2s,background .2s}
+.login-book:hover{text-decoration:none;border-color:#6fe6de;background:linear-gradient(135deg,#1c549a,#157590);box-shadow:0 10px 26px -12px #3fd8d0,inset 0 1px #ffffff33}
+.login-book:focus-visible{outline:2px solid #8fe9e3;outline-offset:3px}
+.login-book .icon{flex:none;width:17px;height:17px;color:#8fe9e3}
+.login-book::after{content:"";position:absolute;top:0;bottom:0;left:-60%;width:45%;background:linear-gradient(105deg,transparent,#ffffff59 50%,transparent);transform:skewX(-18deg);animation:login-book-shine 8s ease-in-out infinite;pointer-events:none}
+@keyframes login-book-shine{0%,86%{left:-60%;opacity:0}88%{opacity:1}97%{left:120%;opacity:1}100%{left:120%;opacity:0}}
+/* Aviso de bienvenida de ADI junto a la esfera. */
+#adi-widget .adi-nudge{position:absolute;right:calc(100% + 12px);bottom:6px;display:flex;align-items:flex-start;gap:2px;width:min(270px,calc(100vw - 110px));padding:4px 4px 4px 6px;border:1px solid #3fd8d066;border-radius:16px 16px 4px 16px;background:linear-gradient(160deg,#10233cf7,#0c192df7);box-shadow:0 14px 34px -14px #000000d9,0 0 22px -8px #ff9ecb80,0 0 0 1px #ff9ecb1f;opacity:0;transform:translateY(8px) scale(.97);transition:opacity .26s ease,transform .26s ease;z-index:1}
+#adi-widget .adi-nudge.adi-nudge-in{opacity:1;transform:none}
+#adi-widget .adi-nudge-text{display:flex;align-items:flex-start;gap:8px;flex:1;min-width:0;margin:0;padding:8px 6px;border:0;border-radius:12px;background:none;color:#e3eeff;font-size:13px;line-height:1.45;font-weight:500;text-align:left;cursor:pointer}
+#adi-widget .adi-nudge-text:hover{transform:none;color:#fff}
+#adi-widget .adi-nudge-text svg{flex:none;width:16px;height:16px;margin-top:2px;fill:none;stroke:#6fe6de;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 0 4px #ff9ecb99)}
+#adi-widget .adi-nudge-close{flex:none;display:grid;place-items:center;width:30px;height:30px;margin:0;padding:0;border:0;border-radius:9px;background:none;color:#9db1cf;cursor:pointer}
+#adi-widget .adi-nudge-close:hover{background:#1b3b60;color:#fff;transform:none}
+#adi-widget .adi-nudge-close svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
+#adi-widget :is(.adi-nudge-text,.adi-nudge-close):focus-visible{outline:2px solid #8fe9e3;outline-offset:1px}
+/* Teléfonos: la esfera está arriba a la derecha, así que el aviso baja y queda a su izquierda sin tapar el formulario. */
+@media(max-width:480px){body[data-page=login] #adi-widget .adi-nudge{right:calc(100% + 8px);bottom:auto;top:2px;width:min(240px,calc(100vw - 86px));border-radius:16px 4px 16px 16px}.login-book{margin-top:12px}}
+@media(prefers-reduced-motion:reduce){.login-book::after{animation:none;display:none}#adi-widget .adi-nudge{transition:none}}
+#adi-widget .adi-nudge.adi-nudge-up{right:0;bottom:calc(100% + 12px);top:auto;border-radius:16px 16px 4px 16px}
+@media(max-width:480px){body[data-page=login] #adi-widget .adi-nudge.adi-nudge-up{right:0;top:calc(100% + 10px);bottom:auto;border-radius:16px 4px 16px 16px}}

@@ -33,3 +33,11 @@ Estado: implementado y probado en la rama de pruebas. **No está publicado.** Re
 - El navegador puede seguir sugiriendo nombres de usuario guardados en su lista de autocompletado; eso lo controla el navegador.
 
 Pruebas: `local/tests/test_login_security.py` y comprobación en navegador (campos, esperas, verificación silenciosa, aviso de inactividad, expiración, botón «Atrás», ventana de actualizaciones, 390 px).
+
+## Botón «Agendar cita» y aviso de ADI en el acceso (rama `acceso-citas-adi`, pendiente de aprobación)
+
+- **Agendar cita:** enlace compacto (150 × 40 px, azul y cian) centrado bajo la tarjeta de acceso. Abre `/citas`, el agendamiento público que ya existía y al que ADI ya remite; no hay módulo nuevo. Un destello lo recorre cada ocho segundos (se desactiva con «movimiento reducido»).
+- **Aviso de ADI:** tres segundos después de cargar aparece junto a la esfera «¡Hola! Soy ADI, tu asistente virtual de PC-DOCTOR. ¿Necesitas ayuda? ¡Puedes hablar conmigo!». Se puede cerrar, se retira solo a los ocho segundos y al pulsarlo abre el chat existente. Se muestra una vez por visita (pestaña). No abre el chat, no reproduce sonido ni activa el micrófono por su cuenta. No aparece si el chat ya está abierto o si la persona ya está escribiendo sus credenciales.
+- Si a la izquierda de la esfera taparía el botón o la tarjeta, se coloca encima de la esfera. En teléfonos la esfera está arriba a la derecha y el aviso queda bajo ella: durante esos ocho segundos cubre parte del logotipo y del título de la tarjeta, nunca los campos ni los botones.
+
+Comprobado en 1366, 1024, 820, 768, 390 y 320 px: botón centrado, sin desbordes, sin solape con el formulario ni con el botón, cierre manual, cierre automático, no repetición y apertura del chat.
