@@ -220,3 +220,9 @@ Comprobado con 0, 1, 5 y 12 partidas, descripciones largas y errores, en 1920×1
 El QR contiene la dirección real de autorización de ese presupuesto y versión; junto a él hay un botón clicable, la vigencia del enlace y una nota de seguridad. Un borrador, un presupuesto decidido o anulado, un enlace vencido, revocado o inventado no producen ningún QR. Escanearlo no aprueba nada: el cliente verifica su identidad y decide cada partida. Una versión nueva revoca el enlace anterior.
 
 **Vigencia del enlace.** Configurable entre 1 y 60 días (por omisión 15) en Configuración → Catálogo, junto a la tarifa de IVA. Aplica a los enlaces que se emitan desde entonces.
+
+## Equipo sin presupuestos
+
+Cuando un equipo no tiene ningún presupuesto, el panel «Presupuestos del equipo» muestra el contador «0 presupuestos» y el mensaje «Sin presupuestos registrados. Este equipo está listo para generar su primer presupuesto», con el botón «Crear presupuesto». El contador sale de las versiones reales que devuelve el servidor (no hay caché en el navegador).
+
+El 13/10/2026, con autorización expresa de administración y respaldo previo, se eliminaron de producción los cinco presupuestos de prueba de `PCD-20261012-0001` (E01 y E02) con sus partidas, eventos, enlace y firma de prueba. No se tocaron órdenes, clientes, historial técnico, pagos ni el correo archivado. Las numeraciones internas no se reiniciaron.
