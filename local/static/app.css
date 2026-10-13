@@ -5446,3 +5446,9 @@ dialog.catalog-picker-dialog{width:min(980px,calc(100% - 20px))}
 .confirm-mac-text input{width:100%;min-height:44px;margin:0;padding:9px 12px;border:1px solid #37618d;border-radius:11px;background:#0c192d;color:#e3eeff;font-size:14px}
 .confirm-mac-text input:focus-visible{outline:2px solid #8bb8ff;outline-offset:2px}
 .confirm-mac h2,.confirm-mac p{overflow-wrap:anywhere}
+/* ADI: horario ofrecido en el chat como botón de reserva, y aviso del horario propuesto en la Agenda de Citas */
+.adi-message a.adi-book{display:flex;align-items:center;justify-content:center;min-height:40px;margin:6px 0 0;padding:8px 12px;border:1px solid #37618d;border-radius:10px;background:#1b3b60;color:#e3eeff;font-weight:650;font-size:13.5px;text-decoration:none;text-align:center}
+.adi-message a.adi-book:hover{background:#24558d;border-color:#70b7f5}.adi-message a.adi-book:focus-visible{outline:2px solid #a8dcff;outline-offset:2px}
+.appointment-proposal{margin:0 0 12px;padding:10px 12px;border:1px solid #2f7d5f;border-radius:10px;background:#0f2a22;color:#b9f2d6;font-size:13px;line-height:1.45;overflow-wrap:anywhere}
+.appointment-proposal[data-state=gone]{border-color:#8a6a2c;background:#2a2110;color:#f3d79b}
+@media(prefers-reduced-motion:no-preference){.adi-message a.adi-book{transition:background .18s,border-color .18s}}
