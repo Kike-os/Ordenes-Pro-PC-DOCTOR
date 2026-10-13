@@ -34,7 +34,7 @@ def pulse(c):
  extra=c.execute("SELECT COALESCE(group_concat(value,'|'),'') FROM system_state WHERE key IN ('appointments_buffer','appointments_confirmation','appointments_config_stamp')").fetchone()[0]
  import hashlib
  return hashlib.sha256(('%s|%s|%s|%s|%s|%s'%(row['total'],row['last'],row['moves'],row['gone'],events,extra)).encode()).hexdigest()[:16]
-def settings(c):return {'buffer':buffer_minutes(c),'confirmation':confirmation_mode(c),'hours':[dict(r) for r in c.execute('SELECT * FROM appointment_hours ORDER BY weekday')],'staff_hours':[dict(r) for r in c.execute('SELECT h.*,u.name technician FROM appointment_staff_hours h JOIN users u ON u.id=h.technician_id ORDER BY u.name,h.weekday')],'holidays':[dict(r) for r in c.execute('SELECT * FROM appointment_holidays ORDER BY day')],'services':[dict(r) for r in c.execute('SELECT code,label,duration_minutes,active FROM appointment_services ORDER BY label')]}
+def settings(c):return {'buffer':buffer_minutes(c),'confirmation':confirmation_mode(c),'hours':[dict(r) for r in c.execute('SELECT * FROM appointment_hours ORDER BY weekday')],'staff_hours':[dict(r) for r in c.execute('SELECT h.*,u.name technician FROM appointment_staff_hours h JOIN users u ON u.id=h.technician_id ORDER BY u.name,h.weekday')],'holidays':[dict(r) for r in c.execute('SELECT * FROM appointment_holidays WHERE hidden=0 ORDER BY day')],'services':[dict(r) for r in c.execute('SELECT code,label,duration_minutes,active FROM appointment_services ORDER BY label')]}
 def update_settings(c,data):
  try:
   for item in data.get('hours',[]):
@@ -70,7 +70,7 @@ def update_settings(c,data):
   if holiday:
    day=date.fromisoformat(str(holiday.get('day','')));label=str(holiday.get('label','')).strip()[:100]
    if not label:return 400,{'error':'Escribe el motivo del día no laborable.'}
-   c.execute('INSERT INTO appointment_holidays(day,label) VALUES (?,?) ON CONFLICT(day) DO UPDATE SET label=excluded.label',(day.isoformat(),label))
+   c.execute("INSERT INTO appointment_holidays(day,label) VALUES (?,?) ON CONFLICT(day) DO UPDATE SET label=excluded.label,mode='cerrado',hidden=0",(day.isoformat(),label))
   if data.get('remove_holiday'):
    c.execute('DELETE FROM appointment_holidays WHERE day=?',(str(data['remove_holiday']),))
  except (ValueError,TypeError,KeyError):return 400,{'error':'La configuración de la agenda contiene datos inválidos.'}
@@ -84,12 +84,17 @@ def parse_start(raw):
   if value<=now()+timedelta(minutes=10) or value>now()+timedelta(days=90):raise ValueError()
   return value
  except (ValueError,TypeError):raise ValueError('Selecciona una fecha y una hora disponibles de la lista.')
+def day_hours(c,day):
+ """Horario de citas de una fecha: (inicio, fin) o None si no se atiende. Tiene en cuenta el horario del día de la semana y, si es feriado,
+ su modo de atención (normal, horario especial o cerrado)."""
+ import holidays
+ return holidays.hours(c,day,c.execute('SELECT * FROM appointment_hours WHERE weekday=?',(day.weekday(),)).fetchone())
 def slot_open(c,start,duration):
  if start.tzinfo is None:start=start.replace(tzinfo=TZ)
  local=start.astimezone(TZ);day=local.date()
- hours=c.execute('SELECT * FROM appointment_hours WHERE weekday=?',(day.weekday(),)).fetchone()
- if not hours or not hours['enabled'] or c.execute('SELECT 1 FROM appointment_holidays WHERE day=?',(day.isoformat(),)).fetchone():return False
- begin=time.fromisoformat(hours['start_time']);end=time.fromisoformat(hours['end_time']);clock=local.timetz().replace(tzinfo=None)
+ span=day_hours(c,day)
+ if not span:return False
+ begin,end=span;clock=local.timetz().replace(tzinfo=None)
  if clock<begin or (datetime.combine(day,clock)+timedelta(minutes=duration)).time()>end or ((clock.hour*60+clock.minute)-(begin.hour*60+begin.minute))%15:return False
  return True
 def technicians(c,start,duration,exclude=None):
@@ -117,9 +122,9 @@ def available_slots(c,day_text,service_code,staff=False):
  if day.isoformat()!=day_text or not first<=day<=now().date()+timedelta(days=90):raise ValueError('Elige una fecha entre hoy y los próximos 90 días.' if staff else 'Elige una fecha entre mañana y los próximos 90 días.')
  service=c.execute('SELECT * FROM appointment_services WHERE code=? AND active=1',(service_code,)).fetchone()
  if not service:raise ValueError('Selecciona un servicio disponible.')
- hours=c.execute('SELECT * FROM appointment_hours WHERE weekday=?',(day.weekday(),)).fetchone()
- if not hours or not hours['enabled'] or c.execute('SELECT 1 FROM appointment_holidays WHERE day=?',(day.isoformat(),)).fetchone():return []
- cursor=datetime.combine(day,time.fromisoformat(hours['start_time']),TZ);finish=datetime.combine(day,time.fromisoformat(hours['end_time']),TZ);out=[]
+ span=day_hours(c,day)
+ if not span:return []
+ cursor=datetime.combine(day,span[0],TZ);finish=datetime.combine(day,span[1],TZ);out=[]
  while cursor+timedelta(minutes=service['duration_minutes'])<=finish:
   free=technicians(c,cursor,service['duration_minutes']) if cursor>now()+timedelta(minutes=10) else []
   if free:out.append({'time':cursor.strftime('%H:%M'),'technician_id':free[0]})
@@ -248,9 +253,9 @@ def create_for_maintenance(c,mid,user=None):
  if not service:return None
  day=max(date.fromisoformat(row['due_date']),now().date()+timedelta(days=1));start=technician=None
  for _ in range(45):
-  hours=c.execute('SELECT * FROM appointment_hours WHERE weekday=?',(day.weekday(),)).fetchone()
-  if hours and hours['enabled'] and not c.execute('SELECT 1 FROM appointment_holidays WHERE day=?',(day.isoformat(),)).fetchone():
-   cursor=datetime.combine(day,time.fromisoformat(hours['start_time']),TZ);finish=datetime.combine(day,time.fromisoformat(hours['end_time']),TZ)
+  span=day_hours(c,day)
+  if span:
+   cursor=datetime.combine(day,span[0],TZ);finish=datetime.combine(day,span[1],TZ)
    while cursor+timedelta(minutes=service['duration_minutes'])<=finish and start is None:
     free=technicians(c,cursor,service['duration_minutes'])
     if free:start=cursor;technician=free[0]

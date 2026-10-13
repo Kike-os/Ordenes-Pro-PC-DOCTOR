@@ -5776,3 +5776,37 @@ textarea.adi-suggestion-edit{width:100%;min-height:96px;resize:vertical;font:inh
 .tracking-table .tracking-progress[data-status=entregado] .tracking-stages li{background:#3fbf8f;box-shadow:0 0 6px #3fbf8f66}
 @media(max-width:860px){.tracking-carousel{--track-row:200px}}
 .tracking-sort{white-space:nowrap}
+/* ===== Feriados: aviso de ADI, franja de la agenda y gestor en Configuración ===== */
+.adi-holiday{display:flex;align-items:center;gap:12px;margin:0 0 14px;padding:12px 14px;border:1px solid #ff9ecb66;border-radius:14px;background:linear-gradient(135deg,#2a1530,#10233c 70%);box-shadow:0 0 0 1px #ff9ecb14,0 8px 22px #02081366;animation:adi-holiday-in .6s ease-out 1}
+.adi-holiday-inline{margin:0 0 10px}
+.adi-holiday-icon{display:grid;place-items:center;flex:none;width:38px;height:38px;border:1px solid #ff9ecb80;border-radius:11px;background:#3a1b33;color:#ffd3e6;box-shadow:0 0 10px #ff9ecb59;animation:adi-holiday-glow 2.4s ease-in-out 2}
+.adi-holiday-icon svg{width:19px;height:19px}
+.adi-holiday>div{display:grid;gap:2px;min-width:0;flex:1 1 auto}.adi-holiday strong{font-size:13.5px;line-height:1.4;color:#ffe9f3;overflow-wrap:anywhere}.adi-holiday small{font-size:12px;color:#d9b9cb}
+.adi-holiday button{flex:none;min-height:36px;margin:0;font-size:12.5px}
+.adi-holiday[data-mode=cerrado]{border-color:#e06c7880}.adi-holiday[data-mode=sin-definir]{border-color:#e0b25c80}
+@keyframes adi-holiday-in{0%{opacity:0;transform:translateY(-6px)}100%{opacity:1;transform:none}}
+@keyframes adi-holiday-glow{0%,100%{box-shadow:0 0 6px #ff9ecb40}50%{box-shadow:0 0 16px #ff9ecb99}}
+.agenda-holidays{display:grid;gap:8px;margin:0 0 12px}.agenda-holidays[hidden]{display:none}
+.agenda-holidays h3{margin:0;font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#a9bdd8}
+.agenda-holiday-list{display:flex;flex-wrap:wrap;gap:8px;margin:0;padding:0;list-style:none}
+.agenda-holiday-list li{display:inline-flex;align-items:center;gap:7px;max-width:100%;padding:6px 11px;border:1px solid #2c4468;border-radius:999px;background:#0c192d;font-size:12px;color:#c7d6ec}
+.agenda-holiday-list svg{flex:none;width:14px;height:14px;color:#ff9ecb}.agenda-holiday-list time{color:#8fa6c4;white-space:nowrap}.agenda-holiday-list strong{color:#eef3ff;overflow-wrap:anywhere}
+.agenda-holiday-list em{font-style:normal;font-size:11px;font-weight:650;padding:1px 8px;border-radius:999px;background:#16304f;color:#cfe3ff;white-space:nowrap}
+.agenda-holiday-list li[data-mode=cerrado] em{background:#3a1a22;color:#ffc4c9}.agenda-holiday-list li[data-mode=especial] em{background:#3a2e14;color:#ffe2a8}.agenda-holiday-list li[data-mode=sin-definir] em{background:#1a2436;color:#b9c4d6}
+.agenda-holiday-list li[data-today=true]{border-color:#ff9ecb99;box-shadow:0 0 0 2px #ff9ecb1f}
+.holiday-admin{display:grid;gap:12px}.holiday-top{display:flex;align-items:center;justify-content:space-between;gap:10px}.holiday-top select{width:auto;min-width:110px;margin:0}
+.holiday-list{display:grid;margin:0;padding:0;list-style:none}
+.holiday-list li{display:grid;grid-template-columns:118px minmax(0,1fr) auto;align-items:center;gap:8px 12px;padding:10px 0;border-bottom:1px solid #16263f}.holiday-list li:last-child{border-bottom:0}
+.holiday-list li[data-past=true]{opacity:.55}.holiday-list time{font-size:12.5px;color:#a9bdd8;font-variant-numeric:tabular-nums}
+.holiday-list li>div:nth-child(2){display:grid;gap:2px;min-width:0}.holiday-list strong{font-size:13.5px;color:#eef3ff;overflow-wrap:anywhere}.holiday-list small{font-size:11.5px;color:#8fa6c4;overflow-wrap:anywhere}
+.holiday-controls{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:6px}.holiday-controls select{width:auto;min-width:170px;margin:0;height:36px;min-height:36px}
+.holiday-controls button{min-height:36px;margin:0;padding:0 12px;font-size:12.5px}.holiday-controls em{font-style:normal;font-size:12px;color:#c7d6ec}
+.holiday-times{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#8fa6c4}.holiday-times[hidden]{display:none}.holiday-times input{width:auto;min-width:104px;margin:0;height:36px;min-height:36px}
+.holiday-list li[data-mode=sin-definir] strong::after{content:'sin definir';margin-left:8px;padding:1px 8px;border-radius:999px;background:#2a2110;color:#f3d79b;font-size:10.5px;font-weight:650;vertical-align:middle}
+.holiday-conflicts{display:grid;gap:6px;padding:12px;border:1px solid #8a3a44;border-radius:12px;background:#2a1218;color:#ffd0d4}.holiday-conflicts p{margin:0;font-size:12.5px}.holiday-conflicts ul{margin:0;padding-left:18px;font-size:12.5px;line-height:1.5}.holiday-conflicts button{justify-self:start;margin:0}
+.holiday-hidden{display:flex;flex-wrap:wrap;align-items:center;gap:8px}.holiday-hidden small{color:#8fa6c4}.holiday-hidden button{min-height:34px;margin:0;font-size:12px}
+.holiday-new{display:grid;grid-template-columns:150px minmax(0,1fr) 170px;gap:8px;padding:12px;border:1px dashed #2c4468;border-radius:12px}.holiday-new strong{grid-column:1/-1;font-size:12.5px;color:#c7d6ec}
+.holiday-new :is(input,select){margin:0;min-width:0}.holiday-new [hidden]{display:none}.holiday-new button{grid-column:1/-1;justify-self:start;margin:0}
+@media(max-width:720px){.holiday-list li{grid-template-columns:1fr}.holiday-controls{justify-content:flex-start}.holiday-new{grid-template-columns:1fr}.adi-holiday{flex-wrap:wrap}.adi-holiday button{flex:1 1 100%}}
+@media(prefers-reduced-motion:reduce){.adi-holiday,.adi-holiday-icon{animation:none}}
+@media(max-width:420px){.agenda-holiday-list li{flex-wrap:wrap;border-radius:12px;width:100%}.agenda-holiday-list strong{flex:1 1 100%}}
