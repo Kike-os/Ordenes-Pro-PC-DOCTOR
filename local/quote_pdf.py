@@ -82,7 +82,7 @@ def render(quote, order):
             pdf.text(text, M, state['y'] + 12 * offset, 9, False, INK)
         pdf.text(str(item['quantity']), W - M - 232, state['y'], 9, False, INK)
         pdf.text(quotes.usd(item['unit_cents']), W - M - 196, state['y'], 9, False, INK)
-        pdf.text(quotes.usd(item['line_cents']), W - M - 128, state['y'], 9, True, INK)
+        pdf.text(quotes.usd(item.get('net_cents', item['line_cents'])), W - M - 128, state['y'], 9, True, INK)
         label, color = MARK[item['status']]
         pdf.text(label, W - M - 62, state['y'] + 1, 7.5, True, color)
         state['y'] += 12 * len(lines) + 5
@@ -94,7 +94,7 @@ def render(quote, order):
 
     totals, rate = quote['totals'], quote['tax_rate_bp'] / 100
     decided = quote['status'] in ('aprobado', 'parcial', 'rechazado')
-    rows = [('Subtotal con IVA %g %%' % rate, totals['base_taxed']), ('Subtotal tarifa 0 %', totals['base_zero']), ('IVA %g %%' % rate, totals['tax']), ('TOTAL COTIZADO', totals['quoted'])]
+    rows = ([('Importe antes del descuento', totals['gross']), ('%s (%g %%)' % (quotes.DISCOUNTS[totals['discount_bp']], totals['discount_bp'] / 100), -totals['discount'])] if totals.get('discount_bp') else []) + [('Subtotal con IVA %g %%' % rate, totals['base_taxed']), ('Subtotal tarifa 0 %', totals['base_zero']), ('IVA %g %%' % rate, totals['tax']), ('TOTAL COTIZADO', totals['quoted'])]
     if decided:
         rows += [('Total aprobado', totals['approved']), ('Importe rechazado', totals['rejected'])]
     need(16 * len(rows) + 12)
@@ -102,7 +102,7 @@ def render(quote, order):
     for label, value in rows:
         strong = label.isupper() or label == 'Total aprobado'
         pdf.text(label, W - M - 232, state['y'], 9.5 if strong else 9, strong, INK if strong else GRAY)
-        pdf.text(quotes.usd(value), W - M - 128, state['y'], 9.5 if strong else 9, strong, INK)
+        pdf.text(('− ' + quotes.usd(-value)) if value < 0 else quotes.usd(value), W - M - 128, state['y'], 9.5 if strong else 9, strong, INK)
         state['y'] += 16
     pdf.text('Los precios incluyen impuestos. Este documento es un presupuesto; no constituye una factura.', M, state['y'], 7.5, False, GRAY)
     state['y'] += 18
