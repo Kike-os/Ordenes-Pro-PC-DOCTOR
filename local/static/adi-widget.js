@@ -133,6 +133,19 @@
   toggle.setAttribute('aria-expanded',String(open));root.classList.toggle('adi-open',open);}
  const isOpen=()=>root.classList.contains('adi-open');
  toggle.addEventListener('click',()=>{const opening=!isOpen();flash();sound(opening?'open':'close');setOpen(opening);});
+ // Aviso de bienvenida en la pantalla de acceso: un mensaje pequeño junto a la esfera, una vez por visita. No abre el chat ni reproduce
+ // sonido por su cuenta; se puede cerrar, se retira solo a los ocho segundos y al pulsarlo abre el chat que ya existe.
+ if(document.body.dataset.page==='login'){const seenKey='ordenes-pro:adi-saludo';let seen=false;try{seen=sessionStorage.getItem(seenKey)==='1';}catch{}
+  if(!seen){let hide=null;const nudge=el('div',undefined,'adi-nudge'),open=el('button',undefined,'adi-nudge-text'),close=el('button',undefined,'adi-nudge-close'),spark=document.createElementNS('http://www.w3.org/2000/svg','svg'),path=document.createElementNS(spark.namespaceURI,'path'),cross=document.createElementNS(spark.namespaceURI,'svg'),line=document.createElementNS(spark.namespaceURI,'path');
+   spark.setAttribute('viewBox','0 0 24 24');spark.setAttribute('aria-hidden','true');path.setAttribute('d','M12 3l1.9 5.8a2 2 0 0 0 1.3 1.3L21 12l-5.8 1.9a2 2 0 0 0-1.3 1.3L12 21l-1.9-5.8a2 2 0 0 0-1.3-1.3L3 12l5.8-1.9a2 2 0 0 0 1.3-1.3z');spark.append(path);cross.setAttribute('viewBox','0 0 24 24');cross.setAttribute('aria-hidden','true');line.setAttribute('d','M18 6 6 18M6 6l12 12');cross.append(line);
+   open.type='button';close.type='button';open.append(spark,el('span','¡Hola! Soy ADI, tu asistente virtual de PC-DOCTOR. ¿Necesitas ayuda? ¡Puedes hablar conmigo!'));close.append(cross);close.setAttribute('aria-label','Cerrar el aviso de ADI');nudge.setAttribute('role','status');nudge.append(open,close);
+   const remember=()=>{try{sessionStorage.setItem(seenKey,'1');}catch{}},dismiss=()=>{clearTimeout(hide);nudge.classList.remove('adi-nudge-in');setTimeout(()=>nudge.remove(),260);};
+   close.addEventListener('click',event=>{event.stopPropagation();remember();dismiss();});open.addEventListener('click',()=>{remember();dismiss();if(!isOpen())toggle.click();});toggle.addEventListener('click',()=>{if(nudge.isConnected){remember();dismiss();}});
+   // Tres segundos después de cargar, y solo si la persona no está ya usando el chat ni escribiendo sus credenciales.
+   setTimeout(()=>{if(isOpen()||document.activeElement?.matches?.('#login-form input')&&document.activeElement.value)return;root.append(nudge);remember();
+    // Si a la izquierda de la esfera taparía el botón de citas o el formulario, el aviso se coloca encima de la esfera.
+    {const hit=node=>{if(!node)return false;const x=nudge.getBoundingClientRect(),y=node.getBoundingClientRect();return !(x.right<=y.left||y.right<=x.left||x.bottom<=y.top||y.bottom<=x.top);};if(hit(document.querySelector('.login-book'))||hit(document.querySelector('.access-card')))nudge.classList.add('adi-nudge-up');}
+    requestAnimationFrame(()=>nudge.classList.add('adi-nudge-in'));hide=setTimeout(dismiss,8000);},3000);}}
  $('adi-minimize').addEventListener('click',()=>{sound('close');setOpen(false);});
  // Cerrar también descarta el borrador sin enviar; minimizar lo conserva. La conversación guardada no se pierde en ningún caso.
  $('adi-close').addEventListener('click',()=>{input.value='';sound('close');setOpen(false);});
