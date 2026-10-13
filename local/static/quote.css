@@ -1,0 +1,36 @@
+/* Página privada del presupuesto (enlace enviado al cliente). Usa la base de tracking.css. */
+.quote-page{max-width:620px}
+.quote-card{display:grid;gap:12px}
+.quote-card small{letter-spacing:.14em}.quote-device,.quote-valid{font-size:13.5px;color:#a9bfde}
+.quote-form{gap:12px}
+.quote-bulk{display:flex;flex-wrap:wrap;gap:8px}
+.quote-bulk button,.quote-sign button,.quote-secondary{min-height:40px;padding:8px 14px;border:1px solid #37618d;border-radius:10px;background:#10233c;color:#e3eeff;font:600 13px/1.2 inherit;font-family:inherit;cursor:pointer}
+.quote-bulk button:hover,.quote-sign button:hover,.quote-secondary:hover{background:#1b3b60}
+.quote-item{margin:0;padding:12px 14px;border:1px solid #2c4468;border-radius:12px;background:#0c192d;display:grid;gap:6px}
+.quote-item legend{padding:0 6px;font-size:14.5px;font-weight:650;color:#fff}
+.quote-item[data-choice=aprobado]{border-color:#3fbf8f;box-shadow:0 0 0 1px #3fbf8f40}
+.quote-item[data-choice=rechazado]{border-color:#e06c78;opacity:.92}
+.quote-amount{font-size:13.5px;color:#b8cbe5}.quote-amount strong{color:#fff;font-size:15px}
+.quote-item label{display:flex;align-items:center;gap:9px;min-height:36px;font-size:14px;color:#dbe8fb;cursor:pointer}
+.quote-item input[type=radio]{width:18px;height:18px;accent-color:#3fd8d0}
+.quote-totals{display:grid;gap:6px;margin:4px 0;padding:12px 14px;border:1px solid #2c4468;border-radius:12px;background:#0c192d}
+.quote-totals div{display:flex;justify-content:space-between;gap:12px;font-size:14px}.quote-totals dt{color:#a9bfde;font-size:13.5px}.quote-totals dd{margin:0;font-variant-numeric:tabular-nums;color:#f2f6ff}
+.quote-totals .quote-total{padding-top:6px;border-top:1px solid #2c4468}.quote-totals .quote-total dt,.quote-totals .quote-total dd{font-weight:700;color:#fff;font-size:15.5px}
+.quote-totals .quote-chosen dd{color:#8fe9e3;font-weight:700}
+.quote-card h2{margin:6px 0 0;font-size:15px;color:#fff}
+.quote-conditions{margin:0;padding-left:18px;display:grid;gap:6px;font-size:13px;line-height:1.5;color:#c5d5ee}
+.quote-sign-label{font-size:13.5px;color:#dbe8fb}
+.quote-sign{display:grid;gap:8px;justify-items:start}
+.quote-sign canvas{width:100%;height:auto;aspect-ratio:10/3;border:1.5px dashed #5083b8;border-radius:12px;background:#fff;touch-action:none;cursor:crosshair}
+.quote-sign[data-signed=true] canvas{border-style:solid;border-color:#3fbf8f}
+.quote-accept{display:flex;align-items:flex-start;gap:10px;font-size:13.5px;line-height:1.45;color:#dbe8fb}.quote-accept input{width:18px;height:18px;margin-top:2px;accent-color:#3fd8d0;flex:none}
+.quote-primary{min-height:48px;padding:12px 18px;border:1px solid #5083b8;border-radius:12px;background:linear-gradient(135deg,#24558d,#1b6f8f);color:#fff;font:700 15px/1.2 inherit;font-family:inherit;cursor:pointer}
+.quote-primary:hover{background:linear-gradient(135deg,#2b63a3,#2083a6)}
+.quote-form :focus-visible{outline:2px solid #8fe9e3;outline-offset:2px}
+.quote-error{margin:0;padding:8px 11px;border:1px solid #e06c7880;border-radius:9px;background:#3a1a22;color:#ffc4c9!important;font-size:13px}
+.quote-pdf{text-align:center;font-size:13.5px}.quote-pdf a{color:#8fc4f5}
+.quote-state[data-status=aprobado]{border-color:#3fbf8f;background:#3fbf8f2e}.quote-state[data-status=parcial]{border-color:#5aa9e6;background:#2f6fc433}.quote-state[data-status=rechazado]{border-color:#e06c78;background:#e06c7826}.quote-state[data-status=modificacion]{border-color:#e0b25c;background:#e0b25c26}
+.quote-result{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.quote-result li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 12px;padding:10px 12px;border:1px solid #2c4468;border-left:3px solid #5083b8;border-radius:10px;background:#0c192d;font-size:14px}
+.quote-result li[data-status=aprobado]{border-left-color:#3fbf8f}.quote-result li[data-status=rechazado]{border-left-color:#e06c78}
+.quote-result span{color:#e3eeff;overflow-wrap:anywhere}.quote-result strong{color:#fff;font-variant-numeric:tabular-nums}.quote-result em{grid-column:1/-1;font-style:normal;font-size:12.5px;color:#a9bfde}

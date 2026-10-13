@@ -45,6 +45,7 @@ import tempfile
 import subprocess
 import order_workspace
 import equipment
+import quotes
 import corporate
 import client_registry
 import client_import
@@ -756,7 +757,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         path = urlsplit(self.path).path
-        files = {'/static/label.css':'label.css','/static/tracking.css':'tracking.css','/static/app.css':'app.css','/static/app.js':'app.js','/static/form-validation.js':'form-validation.js','/static/appointments.js':'appointments.js','/static/adi-widget.js':'adi-widget.js','/static/adi-orb.js':'adi-orb.js','/static/ui-select.js':'ui-select.js','/static/ticket.css':'ticket.css','/static/ticket.js':'ticket.js','/static/echarts.min.js':'echarts.min.js','/static/logo-original.png':'logo-original.png',
+        files = {'/static/label.css':'label.css','/static/tracking.css':'tracking.css','/static/app.css':'app.css','/static/app.js':'app.js','/static/form-validation.js':'form-validation.js','/static/appointments.js':'appointments.js','/static/adi-widget.js':'adi-widget.js','/static/adi-orb.js':'adi-orb.js','/static/ui-select.js':'ui-select.js','/static/ticket.css':'ticket.css','/static/ticket.js':'ticket.js','/static/quote.css':'quote.css','/static/quote-sign.js':'quote-sign.js','/static/echarts.min.js':'echarts.min.js','/static/logo-original.png':'logo-original.png',
                  '/favicon.ico':'favicon.ico','/static/favicon.ico':'favicon.ico','/static/favicon-16.png':'favicon-16.png','/static/favicon-32.png':'favicon-32.png','/static/logo-firma.png':'logo-firma.png','/static/favicon-48.png':'favicon-48.png',
                  '/apple-touch-icon.png':'apple-touch-icon.png','/apple-touch-icon-precomposed.png':'apple-touch-icon.png','/static/apple-touch-icon.png':'apple-touch-icon.png'}
         # Logotipos de marcas: solo nombres simples dentro de static/brands; si el archivo no existe la interfaz usa un icono genérico.
@@ -879,6 +880,22 @@ class Handler(BaseHTTPRequestHandler):
                 found=maintenance_reminders.lookup(c,maintenance_page[1])
                 return self.reply(200 if found else 404,maintenance_reminders.page(found,maintenance_page[1]) if found else maintenance_reminders.missing_page(),'text/html; charset=utf-8')
             # Autorización electrónica del cliente por enlace aleatorio. La respuesta es idéntica para enlaces inexistentes.
+            quote_page=re.fullmatch(r'/presupuesto/([A-Za-z0-9_-]{30,80})(/documento\.pdf)?',path)
+            if quote_page:
+                # Presupuesto por enlace privado: identidad con los últimos cuatro dígitos antes de mostrar importes; el PDF exige esa comprobación o una decisión ya registrada.
+                if limited(c,'quote-ip:'+digest(self.client_address[0]),60,300):return self.reply(429,{'error':'Demasiadas consultas. Intenta más tarde.'})
+                now=reception_now();quote,link=quotes.lookup(c,quote_page[1],now)
+                if not quote:return self.reply(404,quotes.missing_page(),'text/html; charset=utf-8')
+                document=order_document(c,quote['order_id'])
+                if quote_page[2]:
+                    if quote['status']=='enviado' and not (link['usable'] and quotes.valid_passkey(link,parse_qs(urlsplit(self.path).query).get('k',[''])[0],now)):return self.reply(404,quotes.missing_page(),'text/html; charset=utf-8')
+                    if quote['status'] in ('borrador','cancelado','modificacion'):return self.reply(404,quotes.missing_page(),'text/html; charset=utf-8')
+                    import quote_pdf
+                    number=re.sub(r'\D','',str(document.get('identification') or ''))
+                    return self.reply(200,quote_pdf.render(quotes.detail(c,quote),dict(document,identification=number[:2]+'*'*max(0,len(number)-2) if number else '')),'application/pdf',filename=quote['code']+'-PRESUPUESTO.pdf')
+                if quote['status']!='enviado':return self.reply(200,quotes.result_page(quote_page[1],quote,document,quotes.items_of(c,quote['id'])),'text/html; charset=utf-8')
+                if not link['usable']:return self.reply(404,quotes.missing_page(),'text/html; charset=utf-8')
+                return self.reply(200,quotes.identify_page(quote_page[1],quote,document),'text/html; charset=utf-8')
             authorize_page=re.fullmatch(r'/autorizar/([A-Za-z0-9_-]{20,80})(/comprobante\.pdf)?',path)
             if authorize_page:
                 import client_authorization
@@ -1459,6 +1476,22 @@ class Handler(BaseHTTPRequestHandler):
                 # Estado del Centro de Atenciones para el inicio: contadores sin solapes y atenciones que requieren respuesta. Solo administración.
                 if user['role']!='administrador':return self.reply(403,{'error':'Acceso no permitido.'})
                 return self.reply(200,live_support.summary(c))
+            if path == '/api/catalog':
+                if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
+                query=parse_qs(urlsplit(self.path).query)
+                return self.reply(200,{'rows':quotes.catalog(c,query.get('q',[''])[0][:80],query.get('all',[''])[0]!='1'),'categories':quotes.CATEGORIES,'tax_rate_bp':quotes.tax_rate(c),'can_edit':user['role']=='administrador'})
+            quote_get=re.fullmatch(r'/api/(?:orders/([0-9]+)/quote|quotes/([0-9]+)(/pdf)?)',path)
+            if quote_get:
+                if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
+                try:
+                    if quote_get[1]:
+                        quotes.order_code(c,int(quote_get[1]));return self.reply(200,dict(quotes.for_order(c,int(quote_get[1])),can_manage=user['role']=='administrador'))
+                    found=quotes.get(c,int(quote_get[2]))
+                    if quote_get[3]:
+                        import quote_pdf
+                        return self.reply(200,quote_pdf.render(quotes.detail(c,found),order_document(c,found['order_id'])),'application/pdf',filename=found['code']+'-PRESUPUESTO.pdf')
+                    return self.reply(200,{'quote':quotes.detail(c,found)})
+                except quotes.QuoteError as error:return self.reply(error.status,{'error':str(error)})
             if path == '/api/tracking':
                 # Seguimiento de Órdenes: una tarjeta por orden con su último movimiento; solo lectura, para cualquier usuario con sesión.
                 import tracking_board
@@ -1524,6 +1557,29 @@ class Handler(BaseHTTPRequestHandler):
                 notice=maintenance_reminders.respond(c,found,form.get('action',''),form.get('note',''),reception_now())
                 if notice is None:return self.reply(400,maintenance_reminders.page(found,maintenance_post[1],error='Elija una de las opciones.'),'text/html; charset=utf-8')
                 return self.reply(200,maintenance_reminders.page(found,maintenance_post[1],notice=notice),'text/html; charset=utf-8')
+        quote_post_public=re.fullmatch(r'/presupuesto/([A-Za-z0-9_-]{30,80})',urlsplit(self.path).path)
+        if quote_post_public:
+            try:length=int(self.headers.get('Content-Length','0') or 0)
+            except ValueError:length=0
+            if length<=0 or length>120000:return self.reply(400,{'error':'Solicitud inválida.'})
+            form={key:values[0] for key,values in parse_qs(self.rfile.read(length).decode('utf-8','replace'),keep_blank_values=True).items()}
+            token=quote_post_public[1]
+            with connect() as c:
+                c.execute('BEGIN IMMEDIATE')
+                if limited(c,'quote-post:'+digest(token),30,900) or limited(c,'quote-ip:'+digest(self.client_address[0]),60,300):
+                    c.commit();return self.reply(429,{'error':'Demasiados intentos. Intenta más tarde.'})
+                now=reception_now();quote,link=quotes.lookup(c,token,now)
+                if not quote:
+                    c.commit();return self.reply(404,quotes.missing_page(),'text/html; charset=utf-8')
+                document=order_document(c,quote['order_id'])
+                forwarded=(self.headers.get('X-Forwarded-For') or '').split(',')[0].strip()
+                page,status=quotes.handle(c,token,quote,link,document,form,now,{'ip':(forwarded or self.client_address[0])[:60],'agent':(self.headers.get('User-Agent') or '')[:160]})
+                if status:
+                    # La decisión queda en el historial de la orden. No cambia el estado de la orden ni inicia trabajos.
+                    order_workspace.event(c,quote['order_id'],None,now,'follow_up','Presupuesto '+quote['code']+': '+{'aprobado':'aprobado por el cliente','parcial':'aprobado parcialmente por el cliente','rechazado':'rechazado por el cliente','modificacion':'el cliente solicitó una modificación'}[status]+'.')
+                    audit(c,None,'quote_client_'+status,quote['order_id'])
+                c.commit()
+            return self.reply(200,page,'text/html; charset=utf-8')
         authorize_post=re.fullmatch(r'/autorizar/([A-Za-z0-9_-]{20,80})',urlsplit(self.path).path)
         if authorize_post:
             import client_authorization
@@ -1581,14 +1637,14 @@ class Handler(BaseHTTPRequestHandler):
             if not allowed_request_origin(origin,expected) or self.headers.get_content_type() != 'application/json':
                 return self.reply(403, {'error':'Solicitud no autorizada.'})
             path = urlsplit(self.path).path
-            workspace_post=bool(re.fullmatch(r'/api/orders/[0-9]+/workspace',path))
-            max_body=9000000 if path in ('/api/clients/import/preview','/api/clients/import/commit') else 6000000 if path in ('/api/mail/send','/api/mail/draft') else 100000 if path in ('/api/conditions','/api/order-draft','/api/conditions/draft','/api/conditions/compare') else 900000 if re.fullmatch(r'/api/orders/[0-9]+/photos',path) or path=='/api/profile/photo' else (65536 if workspace_post else 16384)
+            workspace_post=bool(re.fullmatch(r'/api/orders/[0-9]+/workspace',path));quote_json=bool(re.fullmatch(r'/api/quotes/[0-9]+',path))
+            max_body=9000000 if path in ('/api/clients/import/preview','/api/clients/import/commit') else 6000000 if path in ('/api/mail/send','/api/mail/draft') else 100000 if path in ('/api/conditions','/api/order-draft','/api/conditions/draft','/api/conditions/compare') else 900000 if re.fullmatch(r'/api/orders/[0-9]+/photos',path) or path=='/api/profile/photo' else (65536 if workspace_post or quote_json else 16384)
             length = int(self.headers.get('Content-Length', '0'))
             if length <= 0 or length > max_body:
                 return self.reply(400, {'error':'Solicitud inválida.'})
             data = json.loads(self.rfile.read(length))
             appointment_config_post=path=='/api/appointments/config'
-            if not isinstance(data, dict) or any(not isinstance(v,(str,bool)) and not (workspace_post and ((k=='lines' and isinstance(v,list)) or (k=='revision' and type(v) is int))) and not (appointment_config_post and ((k in ('hours','services','staff_hours') and isinstance(v,list)) or (k in ('holiday','new_service') and isinstance(v,dict)))) and not (path=='/api/business-hours' and k in ('hours','closures','request_limits') and isinstance(v,list)) for k,v in data.items()):
+            if not isinstance(data, dict) or any(not isinstance(v,(str,bool)) and not (quote_json and k=='items' and isinstance(v,list)) and not (workspace_post and ((k=='lines' and isinstance(v,list)) or (k=='revision' and type(v) is int))) and not (appointment_config_post and ((k in ('hours','services','staff_hours') and isinstance(v,list)) or (k in ('holiday','new_service') and isinstance(v,dict)))) and not (path=='/api/business-hours' and k in ('hours','closures','request_limits') and isinstance(v,list)) for k,v in data.items()):
                 return self.reply(400, {'error':'Datos inválidos.'})
             path = urlsplit(self.path).path
             with connect() as c:
@@ -2246,6 +2302,69 @@ class Handler(BaseHTTPRequestHandler):
                     c.execute('UPDATE orders SET updated_at=?,revision=revision+1 WHERE id=?',(now.isoformat(timespec='microseconds'),oid))
                     audit(c,user['id'],'order_follow_up',oid)
                     return self.reply(201,{'ok':True})
+                if path in ('/api/catalog','/api/catalog/tax'):
+                    # Catálogo de servicios y productos: solo administración. Cambiar un precio no altera los presupuestos ya emitidos.
+                    if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede modificar el catálogo.'})
+                    try:
+                        if path.endswith('/tax'):
+                            rate=quotes.set_tax_rate(c,data.get('tax',''));audit(c,user['id'],'quote_tax_updated');return self.reply(200,{'ok':True,'tax_rate_bp':rate})
+                        item=quotes.save_catalog_item(c,data,user,reception_now());audit(c,user['id'],'catalog_item_saved',item)
+                        return self.reply(200,{'ok':True,'id':item})
+                    except quotes.QuoteError as error:return self.reply(error.status,{'error':str(error),'fields':error.fields})
+                quote_route=re.fullmatch(r'/api/(?:orders/([0-9]+)/quote|quotes/([0-9]+))',path)
+                if quote_route:
+                    if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
+                    now=reception_now()
+                    try:
+                        if quote_route[1]:
+                            created=quotes.create(c,int(quote_route[1]),user,now);audit(c,user['id'],'quote_created',int(quote_route[1]))
+                            return self.reply(201,{'ok':True,'id':created})
+                        found=quotes.get(c,int(quote_route[2]));action=str(data.get('action',''))
+                        if action=='save':
+                            quotes.save(c,found,data,user,now);audit(c,user['id'],'quote_saved',found['order_id'])
+                            return self.reply(200,{'ok':True,'quote':quotes.detail(c,quotes.get(c,found['id']))})
+                        # Enviar, decidir en nombre del cliente, cancelar y versionar son acciones de administración, siempre registradas.
+                        if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede enviar, decidir o cancelar presupuestos.'})
+                        if action=='version':
+                            created=quotes.create(c,found['order_id'],user,now);audit(c,user['id'],'quote_created',found['order_id'])
+                            return self.reply(201,{'ok':True,'id':created})
+                        if action=='cancel':
+                            quotes.cancel(c,found,user,now,str(data.get('reason','')).strip());audit(c,user['id'],'quote_cancelled',found['order_id'])
+                            return self.reply(200,{'ok':True,'quote':quotes.detail(c,quotes.get(c,found['id']))})
+                        if action=='decide':
+                            approved={int(v) for v in str(data.get('approved','')).split(',') if v.isdigit()};rejected={int(v) for v in str(data.get('rejected','')).split(',') if v.isdigit()}
+                            note=str(data.get('note','')).strip()
+                            if len(note)<5:return self.reply(400,{'error':'Indica cómo comunicó el cliente su decisión (por ejemplo: «aprobó por teléfono»).','fields':{'note':'Nota obligatoria.'}})
+                            status=quotes.decide(c,found,{**{i:'aprobado' for i in approved},**{i:'rechazado' for i in rejected-approved}},now,user,note='Registrado por el personal: '+note[:300])
+                            order_workspace.event(c,found['order_id'],user['id'],now,'follow_up','Presupuesto '+found['code']+': decisión registrada por el personal ('+quotes.STATUS[status].lower()+').')
+                            audit(c,user['id'],'quote_staff_'+status,found['order_id'])
+                            return self.reply(200,{'ok':True,'quote':quotes.detail(c,quotes.get(c,found['id']))})
+                        if action=='send':
+                            document=order_document(c,found['order_id']);email=(document.get('email') or '').strip()
+                            if not re.fullmatch(r'[^\s@<>]+@[^\s@<>.]+(?:\.[^\s@<>.]+)+',email):return self.reply(409,{'error':'El cliente no tiene un correo electrónico válido registrado. Complétalo en su ficha.'})
+                            if len(re.sub(r'\D','',str(document.get('identification') or '')))<6:return self.reply(409,{'error':'El cliente no tiene una identificación registrada con la que comprobar su identidad.'})
+                            token=quotes.send(c,found,email,user,now);link=public_base_url().rstrip('/')+'/presupuesto/'+token
+                            order_workspace.event(c,found['order_id'],user['id'],now,'follow_up','Presupuesto '+found['code']+' enviado al cliente para su aprobación.')
+                            audit(c,user['id'],'quote_sent',found['order_id'])
+                            # El presupuesto queda enviado y su enlace creado antes de intentar el correo: si el envío falla, el enlace se puede compartir por otro medio.
+                            c.commit();result='not_configured'
+                            try:
+                                if mail_pro.configured():
+                                    detail=quotes.detail(c,quotes.get(c,found['id']));config=mail_pro.settings();card=mail_signature_card(c)
+                                    body='\n'.join(['Estimado/a '+document['client']+':','','Le enviamos el presupuesto N.º '+found['code']+' correspondiente a su orden de servicio '+document['code']+'.','',
+                                        'Total cotizado: '+quotes.usd(detail['totals']['quoted'])+' (impuestos incluidos).']+(['Válido hasta el '+appointments.date.fromisoformat(detail['valid_until']).strftime('%d/%m/%Y')+'.'] if detail['valid_until'] else [])+['',
+                                        'Para revisar el detalle y aprobar o rechazar cada servicio, ingrese al siguiente enlace privado:',link,'',
+                                        'Por su seguridad se le pedirán los últimos cuatro dígitos de su cédula o RUC. El enlace es personal: no lo reenvíe.','',
+                                        'No se ejecutará ningún trabajo sin su autorización.','','Atentamente,','','Departamento de Servicio Técnico','PC-DOCTOR S.A.'])
+                                    message,recipients=mail_pro.build_message(config,{'to':email,'subject':'PC-DOCTOR S.A. | Presupuesto N.º '+found['code'],'body':body,'from_name':corporate.settings()['name']},card if card.get('enabled') else '')
+                                    mail_pro.deliver(config,message,recipients);result='sent'
+                            except mail_pro.MailError as error:
+                                print('quote-mail',error.kind,flush=True);result='failed'
+                            with connect() as log:
+                                quotes.event(log,found['id'],'correo','Correo al cliente: '+{'sent':'aceptado por el servidor de correo','failed':'no se pudo enviar','not_configured':'el correo del sistema no está configurado'}[result]+'.',reception_now(),user)
+                            return self.reply(200,{'ok':True,'mail':result,'recipient':email,'link':link,'quote':quotes.detail(c,quotes.get(c,found['id']))})
+                        return self.reply(400,{'error':'Acción inválida.'})
+                    except quotes.QuoteError as error:return self.reply(error.status,{'error':str(error),'fields':error.fields})
                 payment_route=re.fullmatch(r'/api/orders/([0-9]+)/payments(/void)?',path)
                 if payment_route:
                     # Pagos por equipo: los registra el personal; anularlos (con motivo) es de administración. Nunca se borran.
