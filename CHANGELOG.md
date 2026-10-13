@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.143 — 2026-10-13 18:48 (UTC-05:00)
+
+Verificación en dos pasos opcional con aplicación de autenticación y códigos de recuperación
+
+### Actualizaciones de seguridad
+
+- Verificación en dos pasos opcional para el personal: código de una aplicación de autenticación al iniciar sesión, diez códigos de recuperación de un solo uso y retiro por administración si alguien pierde el teléfono.
+
 ## v1.5.142 — 2026-10-13 18:32 (UTC-05:00)
 
 Tarjeta financiera con saldo real, pagos generales, devoluciones y protección contra pagos duplicados
