@@ -11,7 +11,9 @@ Cada uno se muestra en el color corporativo que Simple Icons registra para la ma
 Apple, ASUS, Honor, Razer y Sony quedan en negro. Para usar el logotipo corporativo completo de un fabricante, descárgalo de su
 portal de marca y guárdalo aquí con el mismo nombre.
 
-Sin archivo todavía (muestran el icono genérico): Brother, Canon, Xerox, Gigabyte, Ricoh, Lexmark y el resto de marcas.
+El 13/10/2026 se añadieron del mismo catálogo: Framework, Fujifilm, Google, NEC, Sharp, System76 y Zebra.
+
+Sin archivo todavía (muestran el icono genérico): Brother, Canon, Compaq, Dynabook, Gigabyte, IBM, Konica Minolta, Lexmark, Microsoft, OKI, Ricoh, VAIO, Xerox y el resto de marcas. Simple Icons no las incluye; su logotipo debe bajarse del portal de marca de cada fabricante.
 
 ## Cómo añadir un logotipo
 
