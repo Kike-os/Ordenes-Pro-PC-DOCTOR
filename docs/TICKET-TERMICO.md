@@ -102,3 +102,9 @@ Mismo contenido y mismos textos de condiciones y autorizaciones; cambia solo la 
 - La muestra pasó de 442 mm a 354 mm de largo (una página).
 
 Comprobado: ZBar decodifica el QR y el Code 128 desde el PDF rasterizado a 203 dpi; el ráster Epson (`rastertotmtr`) se genera con un único corte; se envió una copia real con datos ficticios a `Epson_Red_192_168_128_45` (trabajo 9) y la cola la aceptó. La revisión del papel impreso queda a cargo del taller.
+
+## Encabezado ejecutivo (13/10/2026)
+
+La franja negra del título se eliminó. El comprobante queda sobre blanco: «COMPROBANTE DE RECEPCIÓN» en azul oscuro `#192B45` (11 pt, negrita, centrado), la copia debajo en rosado `#AA477C` (8 pt) y un filete rosado `#D9669F` de 1,2 pt al ancho útil. Las copias se titulan «COPIA DEL CLIENTE» y «COPIA DEL ESTABLECIMIENTO». No cambian el logo, los datos, las condiciones, el QR, el código de barras ni el tamaño de papel (80 mm, área útil de 72 mm).
+
+Comprobado en el PDF real con datos ficticios: dos páginas para ambas copias, QR y Code 128 legibles con ZBar a 203 dpi. **Pendiente:** impresión física. La impresora térmica solo tiene un tono: el azul oscuro sale negro pleno, y el rosado (título de la copia y filete) saldrá en gris tramado, más tenue que en pantalla.

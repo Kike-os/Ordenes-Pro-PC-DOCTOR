@@ -31,7 +31,10 @@ SUMMARY=(
 )
 
 
-COPIES={'cliente':('COPIA CLIENTE',),'taller':('COPIA TALLER',),'ambas':('COPIA CLIENTE','COPIA TALLER')}
+COPIES={'cliente':('COPIA DEL CLIENTE',),'taller':('COPIA DEL ESTABLECIMIENTO',),'ambas':('COPIA DEL CLIENTE','COPIA DEL ESTABLECIMIENTO')}
+# Encabezado ejecutivo sobre fondo blanco: título azul oscuro (#192B45), copia en rosado corporativo (#AA477C) y filete rosado (#D9669F).
+# Sin bloques de tinta: en la impresora térmica (un solo tono) el título sale negro pleno y el rosado, en gris tramado.
+TITLE_INK=(0x19/255,0x2B/255,0x45/255);COPY_INK=(0xAA/255,0x47/255,0x7C/255);ACCENT_INK=(0xD9/255,0x66/255,0x9F/255)
 LOGO_MM=26  # Ancho impreso del logo.
 LOGO_PX=416  # Dos píxeles por punto de impresora para conservar el detalle del original.
 BAR_HEIGHT=13*72/25.4  # Alto del Code 128: 13 mm, suficiente para el lector y más corto que antes.
@@ -113,12 +116,11 @@ def render_thermal(order,copy='cliente'):
         # 1–2. Logo original y datos del taller.
         logo_width=LOGO_MM*72/25.4;logo_height=logo_width*logo_h/logo_w;ops.append(('logo',y,logo_width,logo_height));y+=logo_height+3
         block(company['name'],10,True,0,True);block(company['specialty'],8,gap=0,center=True)
-        block('WhatsApp: '+company['whatsapp'],8,gap=0,center=True);block(company['website'],7.5,gap=4,center=True)
-        # Franja de título en negativo: identifica el documento y la copia de un vistazo.
-        band=25 if not order.get('preview') else 35;ops.append(('band',y,band));y+=4
-        block('COMPROBANTE DE RECEPCIÓN',9.5,True,0,True);ops[-1]=ops[-1]+('white',);block(copy_label,7.5,True,0,True);ops[-1]=ops[-1]+('white',)
-        if order.get('preview'):block('VISTA PREVIA · DATOS FICTICIOS',7.5,True,0,True);ops[-1]=ops[-1]+('white',)
-        y+=7
+        block('WhatsApp: '+company['whatsapp'],8,gap=0.5,center=True);block(company['website'],7.5,gap=4,center=True)
+        # Título del documento y de la copia, centrados sobre blanco, y filete fino al ancho útil.
+        y+=5;block('COMPROBANTE DE RECEPCIÓN',11,True,2.5,True);ops[-1]=ops[-1]+(TITLE_INK,);block(copy_label,8,True,0,True);ops[-1]=ops[-1]+(COPY_INK,)
+        if order.get('preview'):y+=2;block('VISTA PREVIA · DATOS FICTICIOS',7,True,0,True)
+        y+=4.5;ops.append(('accent',y));y+=8
         # 3. Número de orden destacado.
         block(order['code'],15,True,4,True)
         # 4. QR de la orden a la izquierda; fecha, estado y uso del código a su derecha.
@@ -178,8 +180,8 @@ def render_thermal(order,copy='cliente'):
             stream.begin_text();stream.set_font_size('F2' if bold else 'F1',size);stream.set_text_matrix(1,0,0,1,x,height-top-size);stream.show_text_string(value.encode('cp1252','replace'));stream.end_text()
         for op in ops:
             if op[0]=='text':
-                _,value,top,size,bold,center,x,width,justify=op[:9];white=len(op)>9
-                if white:stream.set_color_rgb(1,1,1)
+                _,value,top,size,bold,center,x,width,justify=op[:9];inked=len(op)>9
+                if inked:stream.set_color_rgb(*op[9])
                 if center:draw(value,(W-text_width(value,size,bold))/2,top,size,bold)
                 elif justify:
                     # Justificado: el espacio sobrante de la línea se reparte entre sus palabras.
@@ -189,9 +191,9 @@ def render_thermal(order,copy='cliente'):
                         cursor=x
                         for word in words:draw(word,cursor,top,size,bold);cursor+=text_width(word,size,bold)+spare
                 else:draw(value,x,top,size,bold)
-                if white:stream.set_color_rgb(0,0,0)
-            elif op[0]=='band':
-                stream.rectangle(M,height-op[1]-op[2],INNER,op[2]);stream.fill()
+                if inked:stream.set_color_rgb(0,0,0)
+            elif op[0]=='accent':
+                stream.set_color_rgb(*ACCENT_INK);stream.rectangle(M,height-op[1]-1.2,INNER,1.2);stream.fill();stream.set_color_rgb(0,0,0)
             elif op[0]=='rule':
                 stream.set_line_width(.5);stream.move_to(M,height-op[1]);stream.line_to(W-M,height-op[1]);stream.stroke()
             elif op[0]=='line':
