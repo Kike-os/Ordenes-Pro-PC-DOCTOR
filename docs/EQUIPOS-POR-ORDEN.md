@@ -36,3 +36,13 @@ Desde el detalle de una orden, el equipo se agrega a esa orden (mismo cliente). 
 - Los pagos son un control interno de saldo; no generan factura ni comprobante tributario.
 
 Pruebas: `local/tests/test_equipment.py`.
+
+## Selector de equipos dentro de la orden (rama `selector-equipos`, pendiente de aprobación)
+
+«Equipos de esta orden» pasa a ser un selector: cada equipo (E01, E02, E03… sin límite) es una tarjeta compacta que se pulsa entera. Al elegirla, un panel dentro de la misma página muestra sus datos: identificador en la orden, `EQ-…`, características, serie, color, técnico, estado, ingreso, entrega, falla reportada y su presupuesto, pagado y saldo propios.
+
+- Seleccionar no navega ni escribe nada en la base; solo cambia lo que se muestra.
+- Indicador del equipo activo: borde y franja luminosa; la tarjeta del equipo cuya página está abierta dice «En esta página».
+- Acciones del equipo elegido: «Abrir equipo», «Etiqueta QR», «Tarjeta de seguimiento» y, para administración, «Editar este equipo», que abre el formulario de edición en una ventana sobre la misma página y al guardar vuelve a ella con el mismo equipo seleccionado.
+- El resumen económico de la orden completa queda aparte, rotulado «Resumen de la orden completa (N equipos)», para no confundirlo con los importes del equipo elegido.
+- Teclado: flechas, Inicio y Fin cambian de equipo. En 390 px las tarjetas van en dos columnas y en 320 px en una.

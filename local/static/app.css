@@ -5274,3 +5274,26 @@ body[data-adi-indicators=off] .adi-fixed{animation:none!important;background-ima
 .mail-v2 .mail-row-actions .mail-row-more{position:static;display:grid}
 .mail-row-actions .mail-row-more .system-icon{stroke-width:2.8}
 .mail-row-menu{position:fixed;right:auto;top:0;left:0}.mail-row-menu[data-side=top]{top:0;bottom:auto}
+/* Selector de equipos de la orden: tarjetas compactas que eligen el equipo y un panel con sus datos, sin salir de la página. */
+.equip-picker{grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px}
+.equip-tab{display:grid;gap:5px;align-content:start;width:100%;margin:0;padding:11px 12px;text-align:left;font:inherit;cursor:pointer;transition:border-color .18s,box-shadow .18s,background .18s}
+.equip-tab:hover{transform:none;border-color:#5083b8}
+.equip-tab:focus-visible{outline:2px solid #a8dcff;outline-offset:2px}
+.equip-tab[aria-selected=true]{border-color:#70b7f5;background:linear-gradient(180deg,#143057,#0d2140);box-shadow:0 0 0 1px #70b7f566,0 10px 24px -16px #70b7f5}
+.equip-tab[aria-selected=true]::after{content:"";display:block;height:3px;margin:4px -12px -11px;border-radius:0 0 13px 13px;background:linear-gradient(90deg,#3f8fe6,#6fd3ff)}
+.equip-tab .equip-card-top{display:flex;align-items:center;gap:8px}.equip-tab .equip-card-top strong{font-size:14px;margin-right:auto}
+.equip-tab-name{font-size:13px;font-weight:600;color:#e3eeff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.equip-tab-sub{font-size:11.5px;color:#9db1cf;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.equip-tab-here{font-style:normal;font-size:11px;color:#a8dcff}
+.equip-card[data-current=true]:not([aria-selected=true]){box-shadow:none;border-color:#37618d66}
+.equip-detail{display:grid;gap:12px;margin-top:12px;padding:14px;border:1px solid #37618d80;border-radius:14px;background:#0c192d}
+.equip-detail:focus-visible{outline:2px solid #a8dcff;outline-offset:2px}
+.equip-detail-head{display:flex;align-items:center;gap:10px;min-width:0}.equip-detail-head>div{display:grid;gap:2px;min-width:0;margin-right:auto}
+.equip-detail-head strong{font:650 14.5px/1.3 ui-monospace,Menlo,Consolas,monospace;color:#fff;overflow-wrap:anywhere}.equip-detail-head small{font-size:12.5px;color:#a9bdd8}
+.equip-detail .equip-facts{grid-template-columns:repeat(3,minmax(0,1fr))}
+.equip-problem{margin:0;font-size:13px;line-height:1.5;color:#dbe8fb;overflow-wrap:anywhere}.equip-problem span{color:#8fa6c4}
+.equip-totals-wrap{display:grid;gap:6px;margin-top:12px}.equip-totals-wrap small{font-size:12px;color:#8fa6c4}.equip-totals-wrap .equip-totals{margin-top:0}
+@media(max-width:720px){.equip-picker{grid-template-columns:repeat(2,minmax(0,1fr))}.equip-detail .equip-facts{grid-template-columns:1fr 1fr}.equip-detail .equip-actions button{flex:1 1 140px;justify-content:center}}
+@media(max-width:360px){.equip-picker{grid-template-columns:1fr}}
+.equip-tab .equip-card-top strong{flex:none;white-space:nowrap}.equip-tab .equip-card-top .equip-state{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.equip-tab .equip-card-top .equip-logo{flex:none}
