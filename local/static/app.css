@@ -5436,3 +5436,7 @@ dialog.catalog-picker-dialog{width:min(980px,calc(100% - 20px))}
 .quote-editor-totals [data-kind=no] dd{color:#ffc4c9}
 @media(max-width:860px){.catalog-tools{grid-template-columns:1fr 1fr}.catalog-tools input{grid-column:1/-1}.quote-extra{grid-template-columns:1fr 1fr}.quote-extra label:last-child{grid-column:1/-1}}
 @media(max-width:720px){.catalog-form{grid-template-columns:1fr}.catalog-price-box{grid-template-columns:1fr}.catalog-calc{grid-template-columns:1fr}.catalog-cards{grid-template-columns:1fr;max-height:60vh}.catalog-form>button{justify-self:stretch}.quote-picker{grid-template-columns:1fr}.quote-extra{grid-template-columns:1fr}.catalog-table td[data-label]::before{content:attr(data-label);display:block;font-size:10.5px;color:#8198ba}.catalog-table td[data-label="Producto o servicio"]::before,.catalog-table td[data-label=Acciones]::before{display:none}}
+/* Presupuestos: solicitud del documento de identidad (editor) */
+.quote-extra .quote-identity-ask{grid-column:1/-1;display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border:1px solid #24558d;border-radius:10px;background:#0c192d}
+.quote-extra .quote-identity-ask input{flex:none;width:18px;height:18px;margin:2px 0 0}
+.quote-identity-ask span{display:grid;gap:2px;min-width:0}.quote-identity-ask small{font-size:11.5px;font-weight:400;color:#9db1cf}

@@ -34,3 +34,8 @@
 .quote-result li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 12px;padding:10px 12px;border:1px solid #2c4468;border-left:3px solid #5083b8;border-radius:10px;background:#0c192d;font-size:14px}
 .quote-result li[data-status=aprobado]{border-left-color:#3fbf8f}.quote-result li[data-status=rechazado]{border-left-color:#e06c78}
 .quote-result span{color:#e3eeff;overflow-wrap:anywhere}.quote-result strong{color:#fff;font-variant-numeric:tabular-nums}.quote-result em{grid-column:1/-1;font-style:normal;font-size:12.5px;color:#a9bfde}
+.quote-document{display:grid;gap:7px;padding:12px 14px;border:1px dashed #5083b8;border-radius:12px;background:#0c192d}
+.quote-document[data-ready=true]{border-style:solid;border-color:#3fbf8f}
+.quote-document-note{font-size:12.5px;line-height:1.5;color:#b8cbe5}
+.quote-document input[type=file]{width:100%;padding:8px;border:1px solid #2c4468;border-radius:9px;background:#081424;color:#e3eeff;font-size:14px}
+.quote-document small{font-size:12px;letter-spacing:0;color:#9db1cf}

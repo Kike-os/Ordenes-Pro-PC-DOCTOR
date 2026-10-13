@@ -1545,6 +1545,14 @@ class Handler(BaseHTTPRequestHandler):
                 picture=c.execute('SELECT mime,data FROM catalog_images WHERE item_id=?',(int(catalog_extra[1]),)).fetchone()
                 if not picture:return self.reply(404,{'error':'Sin imagen.'})
                 return self.reply(200,bytes(picture['data']),picture['mime'])
+            quote_identity=re.fullmatch(r'/api/quotes/([0-9]+)/identity',path)
+            if quote_identity:
+                # Documento de identidad adjuntado por el cliente: solo administración, y cada consulta queda auditada.
+                if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede consultar este documento.'})
+                paper=c.execute('SELECT d.mime,d.data,q.code,q.order_id FROM quote_documents d JOIN quotes q ON q.id=d.quote_id WHERE d.quote_id=?',(int(quote_identity[1]),)).fetchone()
+                if not paper:return self.reply(404,{'error':'Este presupuesto no tiene documento adjunto.'})
+                audit(c,user['id'],'quote_identity_viewed',paper['order_id']);c.commit()
+                return self.reply(200,bytes(paper['data']),paper['mime'],filename=paper['code']+'-IDENTIDAD.'+{'image/png':'png','image/jpeg':'jpg','image/webp':'webp','application/pdf':'pdf'}[paper['mime']])
             quote_get=re.fullmatch(r'/api/(?:orders/([0-9]+)/quote|quotes/([0-9]+)(/pdf)?)',path)
             if quote_get:
                 if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
@@ -1626,7 +1634,7 @@ class Handler(BaseHTTPRequestHandler):
         if quote_post_public:
             try:length=int(self.headers.get('Content-Length','0') or 0)
             except ValueError:length=0
-            if length<=0 or length>120000:return self.reply(400,{'error':'Solicitud inválida.'})
+            if length<=0 or length>1400000:return self.reply(400,{'error':'Solicitud inválida.'})  # admite el documento de identidad adjunto (hasta 700 KB)
             form={key:values[0] for key,values in parse_qs(self.rfile.read(length).decode('utf-8','replace'),keep_blank_values=True).items()}
             token=quote_post_public[1]
             with connect() as c:
@@ -2408,6 +2416,12 @@ class Handler(BaseHTTPRequestHandler):
                         if action=='version':
                             created=quotes.create(c,found['order_id'],user,now);audit(c,user['id'],'quote_created',found['order_id'])
                             return self.reply(201,{'ok':True,'id':created})
+                        if action=='remove_identity':
+                            # Eliminación del documento a pedido del cliente o al terminar su finalidad; el presupuesto y su evidencia se conservan.
+                            removed=c.execute('DELETE FROM quote_documents WHERE quote_id=?',(found['id'],)).rowcount
+                            if not removed:return self.reply(404,{'error':'Este presupuesto no tiene documento adjunto.'})
+                            quotes.event(c,found['id'],'identidad','Documento de identidad eliminado del sistema.',now,user);audit(c,user['id'],'quote_identity_removed',found['order_id'])
+                            return self.reply(200,{'ok':True,'quote':quotes.detail(c,quotes.get(c,found['id']))})
                         if action=='cancel':
                             quotes.cancel(c,found,user,now,str(data.get('reason','')).strip());audit(c,user['id'],'quote_cancelled',found['order_id'])
                             return self.reply(200,{'ok':True,'quote':quotes.detail(c,quotes.get(c,found['id']))})

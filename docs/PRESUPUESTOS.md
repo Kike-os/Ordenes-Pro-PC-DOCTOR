@@ -74,3 +74,24 @@ La tarifa (15 % por defecto) se cambia en el mismo panel.
 **Descuento autorizado.** Tres opciones fijas: sin descuento (0 %), especial (3 %) y máximo (5 %). El sistema solo tiene dos roles, `administrador` y `tecnico`; **no existe otro nivel administrativo**, así que solo `administrador` puede aplicarlo o cambiarlo (lo comprueban el servidor y la interfaz). Queda registrado quién y cuándo, y aparece en el historial del presupuesto. El descuento se aplica por línea con redondeo al centavo, de modo que una aprobación parcial suma exacto; el PDF y la página del cliente muestran el importe antes del descuento y lo descontado. Una versión nueva hereda el descuento.
 
 Pruebas: `local/tests/test_quotes.py` (modos de precio, códigos, duplicados, historial, imágenes, los 19 precios, permisos y límites del descuento) y recorrido en navegador a 1440, 390 y 320 px.
+
+## Documento de identidad al aprobar (opcional)
+
+El documento de identidad **no se pide por defecto**. Administración decide, presupuesto por presupuesto, marcar «Solicitar documento de identidad al aprobar» en el editor. Un técnico puede guardar el borrador, pero no activar ni desactivar esa solicitud.
+
+Cuando se solicita:
+
+- La página privada del cliente muestra el bloque «Documento de identidad» con un aviso que explica para qué se pide, quién lo consulta y que puede pedir su eliminación.
+- Se exige únicamente si el cliente aprueba al menos un servicio. Si rechaza todo o pide una modificación, no se le pide nada.
+- Se acepta una foto (JPG, PNG, WebP) o un PDF de hasta 700 KB. El servidor comprueba el contenido real del archivo, no su nombre.
+- Sin un documento válido la aprobación no se registra.
+
+Custodia:
+
+- El archivo se guarda en la base de datos (tabla `quote_documents`, migración 045), no en disco ni en enlaces públicos. No aparece en la página del cliente, en el PDF ni en los correos.
+- La evidencia de aceptación incluye la huella SHA-256 del archivo, de modo que se puede comprobar qué documento acompañó la firma aunque después se elimine.
+- Solo administración lo descarga (`/api/quotes/<id>/identity`) y cada consulta queda en la auditoría (`quote_identity_viewed`).
+- Administración puede eliminarlo («Eliminar documento») cuando el cliente lo pida o ya no haga falta; se registra en el historial del presupuesto y en la auditoría. El presupuesto, la firma y la evidencia se conservan.
+- Una nueva versión del presupuesto no hereda la solicitud: hay que volver a marcarla.
+
+Límites: el sistema no verifica la autenticidad del documento ni lo compara con la identificación registrada; es una copia aportada por el cliente para que administración la revise.

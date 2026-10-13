@@ -209,3 +209,59 @@ class CatalogProTests(unittest.TestCase):
         self.assertEqual(self.request('/api/quotes/%d/pdf'%quote,cookie=cookie)['body'][:4],b'%PDF')
         # La versión siguiente hereda el descuento autorizado.
         self.assertEqual(self.request('/api/quotes/%d'%post('/api/quotes/%d'%quote,action='version')['body']['id'],cookie=cookie)['body']['quote']['discount_bp'],500)
+
+
+class QuoteIdentityTests(unittest.TestCase):
+    setUpClass=classmethod(test_app.SecurityTests.setUpClass.__func__);setUp=test_app.SecurityTests.setUp;tearDown=test_app.SecurityTests.tearDown;request=test_app.SecurityTests.request;login=test_app.SecurityTests.login;order_data=test_app.SecurityTests.order_data;form=QuoteFlowTests.form
+
+    def test_identity_document_only_when_requested_and_admin_only(self):
+        import base64,hashlib
+        cookie,csrf=self.login();post=lambda path,**body:self.request(path,body,cookie=cookie,csrf=csrf)
+        order=self.request('/api/orders',self.order_data({'email':'cliente@example.invalid','request_key':'quote-identity-request-0001'}),cookie=cookie,csrf=csrf)['body']
+        quote=post('/api/orders/%d/quote'%order['id'])['body']['id'];items=[{'description':'Servicio ficticio','category':'servicio','quantity':1,'unit_cents':4000,'taxed':True}]
+        png=b'\x89PNG\r\n\x1a\n'+b'documento ficticio de prueba '*20;paper=base64.b64encode(png).decode()
+        self.assertEqual(quotes.clean_document(paper),('image/png',png));self.assertEqual(quotes.clean_document(base64.b64encode(b'%PDF-1.4 '+b'x'*300).decode())[0],'application/pdf')
+        for bad in ('',base64.b64encode(b'<html>'+b'x'*300).decode(),'no es base64 !!',base64.b64encode(b'\x89PNG\r\n\x1a\n'+b'x'*(quotes.DOCUMENT_LIMIT+1)).decode(),base64.b64encode(b'\x89PNG').decode()):self.assertIsNone(quotes.clean_document(bad))
+        # El técnico guarda el borrador, pero no decide pedir el documento.
+        with app.connect() as c:c.execute("UPDATE users SET role='tecnico' WHERE username='demo'");c.commit()
+        self.assertEqual(post('/api/quotes/%d'%quote,action='save',items=items,require_id=True)['status'],403)
+        self.assertEqual(post('/api/quotes/%d'%quote,action='save',items=items)['body']['quote']['require_id'],0)
+        with app.connect() as c:c.execute("UPDATE users SET role='administrador' WHERE username='demo'");c.commit()
+        saved=post('/api/quotes/%d'%quote,action='save',items=items,require_id=True)['body']['quote'];self.assertEqual((saved['require_id'],saved['identity_document']),(1,None))
+        with patch.object(app.mail_pro,'configured',return_value=False):result=post('/api/quotes/%d'%quote,action='send')['body']
+        path='/presupuesto/'+result['link'].rsplit('/',1)[1]
+        page=self.form(path,{'last4':'0017'})['body'];self.assertIn('name="id_document"',page);self.assertIn('no se comparte con terceros',page)
+        passkey=re.search(r'name="passkey" value="([^"]+)"',page)[1];item=int(re.search(r'name="decision_(\d+)"',page)[1])
+        base={'passkey':passkey,'action':'decide','name':'Cliente Ficticio','accept':'on','signature':SIGN,'decision_%d'%item:'aprobado'}
+        # Sin documento, o con un archivo que no es imagen ni PDF, la aprobación no se registra.
+        for wrong in ({},{'id_document':base64.b64encode(b'MZ'+b'x'*400).decode()}):self.assertIn('Adjunta una foto o PDF',self.form(path,dict(base,**wrong))['body'])
+        with app.connect() as c:self.assertEqual((c.execute('SELECT COUNT(*) FROM quote_acceptances').fetchone()[0],c.execute('SELECT COUNT(*) FROM quote_documents').fetchone()[0]),(0,0))
+        self.assertIn('Aprobado',self.form(path,dict(base,id_document=paper))['body'])
+        detail=self.request('/api/quotes/%d'%quote,cookie=cookie)['body']['quote']
+        self.assertEqual((detail['status'],detail['identity_document']['mime'],detail['identity_document']['size']),('aprobado','image/png',len(png)));self.assertNotIn('data',detail['identity_document'])
+        with app.connect() as c:
+            self.assertTrue(quotes.evidence_ok(c,quote));self.assertEqual(json.loads(c.execute('SELECT evidence FROM quote_acceptances').fetchone()[0])['identity_document_sha256'],hashlib.sha256(png).hexdigest())
+            with self.assertRaises(Exception):c.execute("UPDATE quote_documents SET mime='image/jpeg'")
+        # El archivo no aparece en la página ni en el PDF del cliente; solo lo descarga administración con sesión, y queda auditado.
+        self.assertNotIn(paper[:60],self.request(path)['body']);self.assertEqual(self.request('/api/quotes/%d/identity'%quote)['status'],401)
+        self.assertEqual(self.request('/api/quotes/%d/identity'%quote,cookie=cookie)['body'],png)
+        with app.connect() as c:
+            self.assertEqual(c.execute("SELECT COUNT(*) FROM audit WHERE action='quote_identity_viewed'").fetchone()[0],1)
+            c.execute("UPDATE users SET role='tecnico' WHERE username='demo'");c.commit()
+        self.assertEqual(self.request('/api/quotes/%d/identity'%quote,cookie=cookie)['status'],403);self.assertEqual(post('/api/quotes/%d'%quote,action='remove_identity')['status'],403)
+        with app.connect() as c:c.execute("UPDATE users SET role='administrador' WHERE username='demo'");c.commit()
+        # Eliminación a pedido: desaparece el archivo; la aceptación y su evidencia siguen íntegras.
+        removed=post('/api/quotes/%d'%quote,action='remove_identity');self.assertEqual((removed['status'],removed['body']['quote']['identity_document']),(200,None))
+        self.assertEqual(post('/api/quotes/%d'%quote,action='remove_identity')['status'],404);self.assertEqual(self.request('/api/quotes/%d/identity'%quote,cookie=cookie)['status'],404)
+        with app.connect() as c:self.assertTrue(quotes.evidence_ok(c,quote));self.assertEqual(c.execute('SELECT COUNT(*) FROM quote_acceptances').fetchone()[0],1)
+
+    def test_quotes_without_request_do_not_ask_for_a_document(self):
+        cookie,csrf=self.login();post=lambda path,**body:self.request(path,body,cookie=cookie,csrf=csrf)
+        order=self.request('/api/orders',self.order_data({'email':'cliente@example.invalid','request_key':'quote-identity-request-0002'}),cookie=cookie,csrf=csrf)['body']
+        quote=post('/api/orders/%d/quote'%order['id'])['body']['id'];post('/api/quotes/%d'%quote,action='save',items=[{'description':'Servicio ficticio','category':'servicio','quantity':1,'unit_cents':4000,'taxed':True}])
+        with patch.object(app.mail_pro,'configured',return_value=False):result=post('/api/quotes/%d'%quote,action='send')['body']
+        path='/presupuesto/'+result['link'].rsplit('/',1)[1];page=self.form(path,{'last4':'0017'})['body'];self.assertNotIn('id_document',page)
+        passkey=re.search(r'name="passkey" value="([^"]+)"',page)[1];item=int(re.search(r'name="decision_(\d+)"',page)[1])
+        self.assertIn('Aprobado',self.form(path,{'passkey':passkey,'action':'decide','name':'Cliente Ficticio','accept':'on','signature':SIGN,'decision_%d'%item:'aprobado','id_document':'ignorado'})['body'])
+        with app.connect() as c:self.assertEqual(c.execute('SELECT COUNT(*) FROM quote_documents').fetchone()[0],0)
+

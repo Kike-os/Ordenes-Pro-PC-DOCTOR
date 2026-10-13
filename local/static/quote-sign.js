@@ -17,5 +17,10 @@
   canvas.addEventListener('pointermove',event=>{if(!current)return;const next=point(event),last=current[current.length-1];if(Math.abs(next[0]-last[0])+Math.abs(next[1]-last[1])<3)return;if(strokes.reduce((sum,stroke)=>sum+stroke.length,0)<3500)current.push(next);draw();});
   const end=()=>{if(current&&current.length<2)strokes.pop();current=null;draw();};canvas.addEventListener('pointerup',end);canvas.addEventListener('pointercancel',end);
   pad.querySelector('[data-quote-clear]').addEventListener('click',()=>{strokes=[];draw();});draw();}
+ // Documento de identidad (solo si el taller lo solicitó): se lee en el navegador y viaja en el mismo envío; no se sube a ningún otro sitio.
+ const paper=form.querySelector('[data-quote-document]');
+ if(paper){const picker=paper.querySelector('input[type=file]'),hidden=paper.querySelector('input[name=id_document]'),note=paper.querySelector('[data-quote-document-status]');
+  picker.addEventListener('change',()=>{const file=picker.files[0];hidden.value='';paper.dataset.ready='false';if(!file)return;if(!['image/png','image/jpeg','image/webp','application/pdf'].includes(file.type)){note.textContent='Usa una foto (JPG, PNG, WebP) o un PDF.';picker.value='';return;}if(file.size>700000){note.textContent='El archivo supera los 700 KB. Toma la foto con menor resolución o recórtala.';picker.value='';return;}
+   const reader=new FileReader();reader.onload=()=>{hidden.value=String(reader.result).split(',')[1]||'';paper.dataset.ready='true';note.textContent='Documento listo: «'+file.name+'» ('+Math.max(1,Math.round(file.size/1024))+' KB).';};reader.onerror=()=>{note.textContent='No se pudo leer el archivo.';};reader.readAsDataURL(file);});}
  paint();
 })();

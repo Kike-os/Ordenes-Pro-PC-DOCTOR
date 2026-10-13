@@ -22,6 +22,9 @@ PRICE_MODES = {'incluido': 'IVA incluido', 'agregar': 'Agregar IVA', 'sin_iva': 
 # Descuento autorizado: únicamente estas tres opciones; solo lo aplica administración.
 DISCOUNTS = {0: 'Sin descuento', 300: 'Descuento especial', 500: 'Descuento máximo'}
 IMAGE_LIMIT = 300000
+DOCUMENT_LIMIT = 700000
+DOCUMENT_NOTICE = ('Se solicita una copia de su documento de identidad únicamente para comprobar quién autoriza este presupuesto. '
+                   'Solo la consulta el personal administrativo de PC-DOCTOR S.A., no se comparte con terceros y puede pedir su eliminación al taller.')
 LINK_DAYS = 15
 MAX_ITEMS = 60
 MAX_FAILED = 6
@@ -264,6 +267,7 @@ def get(c, quote_id):
 def detail(c, quote):
     items = items_of(c, quote['id'])
     acceptance = c.execute('SELECT signer_name,method,signature,evidence_hash,created_at FROM quote_acceptances WHERE quote_id=?', (quote['id'],)).fetchone()
+    paper = c.execute('SELECT mime,created_at,length(data) size FROM quote_documents WHERE quote_id=?', (quote['id'],)).fetchone()
     link = c.execute("SELECT created_at,expires_at,verified_at FROM quote_links WHERE quote_id=? AND revoked_at='' ORDER BY id DESC LIMIT 1", (quote['id'],)).fetchone()
     for item in items:
         item['line_cents'] = item['quantity'] * item['unit_cents']
@@ -271,7 +275,7 @@ def detail(c, quote):
         item['status_label'] = ITEM_STATUS[item['status']]
         item['category_label'] = CATEGORIES[item['category']]
     return dict(quote, status_label=STATUS[quote['status']], editable=quote['status'] in EDITABLE, items=items, totals=totals(items, quote['tax_rate_bp'], quote['discount_bp']), discount_label=DISCOUNTS[quote['discount_bp']],
-                acceptance=dict(acceptance, signed=bool(acceptance['signature'])) if acceptance else None, link=dict(link) if link else None,
+                acceptance=dict(acceptance, signed=bool(acceptance['signature'])) if acceptance else None, identity_document=dict(paper) if paper else None, link=dict(link) if link else None,
                 events=[dict(r) for r in c.execute('SELECT event,detail,actor,created_at FROM quote_events WHERE quote_id=? ORDER BY id DESC LIMIT 60', (quote['id'],))])
 
 
@@ -344,6 +348,11 @@ def save(c, quote, data, user, now):
         discount = int(data['discount'])
         c.execute('UPDATE quotes SET discount_bp=?,discount_by=?,discount_at=? WHERE id=?', (discount, user['id'], now.isoformat(timespec='seconds'), quote['id']))
         event(c, quote['id'], 'descuento', '%s (%g %%) aplicado al presupuesto.' % (DISCOUNTS[discount], discount / 100), now, user)
+    if data.get('require_id') in (True, False) and bool(quote['require_id']) != data['require_id']:
+        if user['role'] != 'administrador':
+            raise QuoteError('Solo administración puede solicitar el documento de identidad.', 403)
+        c.execute('UPDATE quotes SET require_id=? WHERE id=?', (1 if data['require_id'] else 0, quote['id']))
+        event(c, quote['id'], 'identidad', 'Documento de identidad %s para la aprobación.' % ('solicitado' if data['require_id'] else 'ya no solicitado'), now, user)
     c.execute('DELETE FROM quote_items WHERE quote_id=?', (quote['id'],))
     c.executemany('INSERT INTO quote_items(quote_id,position,catalog_id,description,category,quantity,unit_cents,taxed) VALUES (?,?,?,?,?,?,?,?)', [(quote['id'], *row) for row in clean])
     c.execute("UPDATE quotes SET valid_until=?,notes=?,status='borrador',updated_at=? WHERE id=?", (valid, notes, now.isoformat(timespec='seconds'), quote['id']))
@@ -456,6 +465,20 @@ def clean_signature(raw):
     return clean if points <= 4000 and sum(len(line) for line in clean) >= 8 else []
 
 
+def clean_document(raw):
+    """Documento de identidad enviado desde la página: imagen (PNG, JPEG, WebP) o PDF reales, de tamaño acotado. (tipo, contenido) o None."""
+    import base64
+    try:
+        content = base64.b64decode(str(raw or '').split(',')[-1], validate=True)
+    except Exception:
+        return None
+    if not 200 <= len(content) <= DOCUMENT_LIMIT:
+        return None
+    kind = ('image/png' if content[:8] == b'\x89PNG\r\n\x1a\n' else 'image/jpeg' if content[:3] == b'\xff\xd8\xff' else 'image/webp' if content[:4] == b'RIFF' and content[8:12] == b'WEBP'
+            else 'application/pdf' if content[:5] == b'%PDF-' else None)
+    return (kind, content) if kind else None
+
+
 def accept(c, quote, link, form, order, now, origin):
     """Decisión del cliente con su evidencia. `form`: decision_<id>, accept, name, signature, comment, action."""
     if quote['status'] != 'enviado' or not link['usable']:
@@ -483,11 +506,19 @@ def accept(c, quote, link, form, order, now, origin):
     approving = any(value == 'aprobado' for value in decisions.values())
     if approving and not signature:
         errors['signature'] = 'Firma en el recuadro para autorizar los servicios aprobados.'
+    document = None
+    if quote.get('require_id') and approving:
+        document = clean_document(form.get('id_document', ''))
+        if not document:
+            errors['id_document'] = 'Adjunta una foto o PDF legible de tu documento de identidad (hasta 700 KB).'
     if errors:
         raise QuoteError('Revisa los datos señalados.', fields=errors)
     status = decide(c, quote, decisions, now, actor='Cliente: ' + name, note=('Observación del cliente: ' + comment) if comment else '')
     final = items_of(c, quote['id'])
-    evidence = {'quote': quote['code'], 'order': order['code'], 'signer': name, 'method': METHOD, 'accepted_at': now.isoformat(timespec='seconds'), 'conditions': quote['conditions'] or CONDITIONS, 'comment': comment,
+    document_hash = hashlib.sha256(document[1]).hexdigest() if document else ''
+    if document:
+        c.execute('INSERT OR REPLACE INTO quote_documents(quote_id,mime,data,sha256,created_at) VALUES (?,?,?,?,?)', (quote['id'], document[0], document[1], document_hash, now.isoformat(timespec='seconds')))
+    evidence = {'identity_document_sha256': document_hash, 'quote': quote['code'], 'order': order['code'], 'signer': name, 'method': METHOD, 'accepted_at': now.isoformat(timespec='seconds'), 'conditions': quote['conditions'] or CONDITIONS, 'comment': comment,
                 'tax_rate_bp': quote['tax_rate_bp'], 'items': [{'description': item['description'], 'quantity': item['quantity'], 'unit_cents': item['unit_cents'], 'taxed': bool(item['taxed']), 'decision': item['status']} for item in final],
                 'discount_bp': quote['discount_bp'], 'totals': {key: value for key, value in totals(final, quote['tax_rate_bp'], quote['discount_bp']).items() if key != 'count'}, 'signature_points': sum(len(line) for line in signature), 'ip': origin.get('ip', ''), 'agent': origin.get('agent', '')}
     payload = json.dumps(evidence, ensure_ascii=False, sort_keys=True)
@@ -558,12 +589,13 @@ def decision_page(token, passkey, quote, order, items, errors=None, form=None):
             '<label for="name">Nombre completo de quien autoriza</label><input id="name" name="name" maxlength="120" value="%s" required>%s'
             '<label for="comment">Observaciones (opcional)</label><textarea id="comment" name="comment" rows="2" maxlength="600">%s</textarea>%s'
             '<p class="quote-sign-label">Firma con el dedo o el ratón dentro del recuadro</p><div class="quote-sign" data-quote-sign><canvas width="1000" height="300" aria-label="Recuadro de firma"></canvas><button type="button" data-quote-clear>Borrar firma</button></div><input type="hidden" name="signature" value="">%s'
-            '<label class="quote-accept"><input type="checkbox" name="accept"%s required> He leído los importes y las condiciones, y confirmo mi decisión sobre cada servicio.</label>%s'
+            '%s<label class="quote-accept"><input type="checkbox" name="accept"%s required> He leído los importes y las condiciones, y confirmo mi decisión sobre cada servicio.</label>%s'
             '<button class="quote-primary" type="submit" name="action" value="decide">Confirmar mi decisión</button>'
             '<button class="quote-secondary" type="submit" name="action" value="change" formnovalidate>Solicitar una modificación</button></form>'
             '<p class="quote-pdf"><a href="/presupuesto/%s/documento.pdf?k=%s">Descargar el presupuesto en PDF</a></p></section>'
             ) % (_summary_block(quote, order), 'Válido hasta el ' + e(date.fromisoformat(quote['valid_until']).strftime('%d/%m/%Y')) if quote['valid_until'] else 'Sin fecha límite indicada', e(token), e(passkey), problem('items'), rows,
                  ('<div><dt>%s (%g %%)</dt><dd>− %s</dd></div>' % (e(DISCOUNTS[quote['discount_bp']]), quote['discount_bp'] / 100, e(usd(summary['discount']))) if quote['discount_bp'] else ''), rate, e(usd(summary['base_taxed'])), e(usd(summary['base_zero'])), rate, e(usd(summary['tax'])), e(usd(summary['quoted'])), conditions, e(form.get('name', '')), problem('name'), e(form.get('comment', '')), problem('comment'), problem('signature'),
+                 ('<div class="quote-document" data-quote-document><p class="quote-sign-label">Documento de identidad</p><p class="quote-document-note">%s</p><input type="file" accept="image/png,image/jpeg,image/webp,application/pdf" aria-label="Foto o PDF de tu documento de identidad"><input type="hidden" name="id_document" value=""><small data-quote-document-status>Formatos: foto (JPG, PNG, WebP) o PDF, hasta 700 KB. Solo se exige si apruebas algún servicio.</small></div>%s' % (e(DOCUMENT_NOTICE), problem('id_document'))) if quote.get('require_id') else '',
                  ' checked' if form.get('accept') == 'on' else '', problem('accept'), e(token), e(passkey))
     return _shell('Presupuesto ' + quote['code'], body)
 
