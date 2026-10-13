@@ -64,7 +64,7 @@ class EquipmentTests(unittest.TestCase):
             c.execute('INSERT INTO order_budget(order_id,labor_cents) VALUES (?,3000)',(main['id'],));c.execute('INSERT INTO order_budget(order_id,labor_cents,parts_cents) VALUES (?,2000,500)',(second['id'],))
         pay=lambda oid,**body:self.request('/api/orders/'+str(oid)+'/payments',body,cookie=cookie,csrf=csrf)
         deliver=lambda oid:self.request('/api/order-status',{'id':str(oid),'status':'entregado'},cookie=cookie,csrf=csrf)
-        blocked=deliver(main['id']);self.assertEqual(blocked['status'],409);self.assertIn('$30.00',blocked['body']['error'])
+        blocked=deliver(main['id']);self.assertEqual(blocked['status'],409);self.assertIn('$30,00',blocked['body']['error'])
         for body in ({'amount':'0','method':'efectivo'},{'amount':'10.999','method':'efectivo'},{'amount':'10','method':'cheque'},{'amount':'30.01','method':'efectivo'}):
             self.assertEqual(pay(main['id'],**body)['status'],400)
         self.assertEqual(pay(main['id'],amount='10',method='efectivo')['status'],201)

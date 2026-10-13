@@ -99,7 +99,7 @@ class FinanceTests(unittest.TestCase):
 
     def test_large_amounts_refunds_and_overpayment(self):
         (oid,)=self.start(charges=(1234567,))
-        self.assertEqual(self.state(oid),('pendiente',1234567,0,0));self.assertEqual(equipment.usd(1234567),'$12345.67')   # 11. más de $9.999,99
+        self.assertEqual(self.state(oid),('pendiente',1234567,0,0));self.assertEqual(equipment.usd(1234567),'$12.345,67')   # 11. más de $9.999,99
         self.assertEqual(self.pay(oid,'12345.67')['status'],201);self.assertEqual(self.state(oid),('pagado',0,1234567,0))
         # 12. Los cargos bajan después de pagar: el exceso es saldo a favor, no cero.
         with app.connect() as c:c.execute('UPDATE order_budget SET labor_cents=1000000 WHERE order_id=?',(oid,));c.commit()

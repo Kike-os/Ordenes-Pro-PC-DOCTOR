@@ -70,7 +70,8 @@ def general(c,main_id):
 
 
 def usd(cents):
-    return '$%d.%02d'%(cents//100,cents%100)
+    """Importe en dólares con el formato de Ecuador ($1.234,56), a partir de centavos enteros."""
+    return '$'+format(cents//100,',').replace(',','.')+',%02d'%(cents%100)
 
 
 def delivery_block(c,order_id):

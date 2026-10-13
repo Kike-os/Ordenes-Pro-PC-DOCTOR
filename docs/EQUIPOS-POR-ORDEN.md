@@ -58,3 +58,20 @@ Pruebas: `local/tests/test_equipment.py`.
 - Cada equipo sigue siendo un ingreso propio: entregar E01 no cambia E02, y la entrega comprueba el saldo de ese equipo.
 
 **Tarjetas de «Equipos de esta orden».** El encabezado resume la orden en fichas (orden, equipos registrados y cuántos hay en cada etapa). Cada tarjeta tiene arriba el icono del tipo de equipo, el código (E01, E02…) y el estado en píldora; debajo, el nombre con protagonismo, el tipo, el identificador y la serie más discretos, y la última actualización. La seleccionada se distingue por borde, brillo, fondo y la etiqueta «Equipo seleccionado», no solo por una línea.
+
+## Tarjeta financiera y saldo real (migración 052)
+
+**Fuente única.** `equipment.summary(cargos, pagos)` calcula el saldo; lo usan el detalle de la orden, la entrega, el registro de pagos y la tarjeta. No hay una segunda tabla de saldos. Importes siempre en centavos enteros (`equipment.cents_of` convierte el texto con `Decimal`, nunca con flotantes).
+
+- **Total exigible** de un equipo = su importe de la orden (`order_budget`), que contiene solo lo aprobado por el cliente —ya neto del descuento del presupuesto— o los cargos manuales del taller. Lo rechazado o pendiente de aprobación no se cobra. No existe facturación en el sistema, así que no hay cargos duplicados entre presupuesto y factura.
+- **Pagos netos** = pagos confirmados − devoluciones, más lo asignado desde pagos generales. Los movimientos anulados no cuentan.
+- **Saldo** = total exigible − pagos netos. Si es negativo no se convierte en cero: se muestra como «Saldo a favor».
+- **Estados:** `sin_cargos` (sin cargos ni pagos: no se afirma que pagó), `pendiente` (rojo), `parcial` (ámbar), `pagado` (verde), `credito` (saldo a favor). En pantalla, además, «Consultando el saldo…» y «Saldo no disponible» (con «Reintentar») cuando no se pudo leer; nunca se muestra cero por un error de conexión.
+
+**Varios equipos.** Cada equipo conserva su saldo. Un pago puede registrarse como **general de la orden** (sin equipo): baja el saldo consolidado una sola vez y no se atribuye a ningún equipo hasta que se **asigna** (todo o una parte, sin superar el saldo del equipo ni lo que queda del pago). La tarjeta indica si muestra el «Saldo general de la orden» o el «Saldo del equipo E0X», con el desglose por equipo.
+
+**Movimientos** (`order_payments`, `order_payment_allocations`): pago, devolución (solo administración, con motivo) y asignación. No se editan ni se borran (disparadores); se anulan con motivo (solo administración). Cada uno guarda fecha, responsable y nota o referencia, y deja rastro en la auditoría y en el historial de la orden. El formulario envía una clave de solicitud: un doble clic o un reintento devuelve el mismo movimiento en lugar de crear otro. Las validaciones se hacen dentro de la transacción de escritura, de modo que dos solicitudes simultáneas no pueden superar el saldo.
+
+**Entrega.** Se mantiene la regla vigente: un equipo con saldo pendiente no se puede marcar como entregado; el aviso indica el importe y, si hay pagos generales sin asignar, lo dice. Registrar un pago no cambia el estado técnico.
+
+**Límites conocidos.** No hay facturas ni notas de crédito como documentos; los ajustes se hacen con cargos, devoluciones o anulaciones. Un pago que supera el saldo se rechaza: el saldo a favor solo aparece si los cargos bajan después de pagar. Los pagos de un equipo ya entregado no se anulan.
