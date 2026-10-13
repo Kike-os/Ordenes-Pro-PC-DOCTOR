@@ -28,3 +28,7 @@ La sincronización con Google Calendar **no está construida**. Requiere un proy
 5. Para las notificaciones en tiempo real (webhooks), verificar el dominio en Google Search Console.
 
 Diseño previsto, compatible con Vercel: tokens cifrados en la base (solo servidor) con renovación automática; un calendario elegido para las citas; cada cita lleva el identificador del evento de Google y cada evento una marca privada de Órdenes Pro, de modo que nunca se tocan eventos ajenos ni se duplican; a Google solo se envía servicio, hora y código de la cita, sin cédula, teléfono ni correo; cambios de Google por webhook más una sincronización de respaldo con el cron diario existente, que también renueva la suscripción antes de que venza.
+
+## Recordatorio de feriados sin definir
+
+Desde siete días antes de un feriado cuya atención nadie ha definido, ADI se lo recuerda a administración en el inicio y en la agenda: «ADI informa: El lunes 2 de noviembre es feriado nacional (Día de Difuntos) y aún no se ha definido la atención. Revisa el decreto oficial y elige atención normal, horario especial o cerrado». El botón «Definir atención» lleva al gestor. El recordatorio desaparece al elegir un modo o al ocultar la fecha, y solo lo ve administración.

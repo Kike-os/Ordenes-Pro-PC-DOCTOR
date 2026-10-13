@@ -68,3 +68,23 @@ class HolidayAgendaTests(unittest.TestCase):
         with app.connect() as c:c.execute("UPDATE users SET role='tecnico' WHERE username='demo'");c.commit()
         self.assertEqual(post(action='save',day='2026-12-08',label='Otro',scope='otro',mode='cerrado')['status'],403);self.assertEqual(self.request('/api/holidays?year=2026',cookie=cookie)['status'],200)
         self.assertEqual(self.request('/api/holidays')['status'],401)
+
+    def test_adi_reminds_admin_of_upcoming_undecided_holidays(self):
+        cookie,csrf=self.login();post=lambda **body:self.request('/api/holidays',body,cookie=cookie,csrf=csrf)
+        today=lambda:self.request('/api/holidays/today',cookie=cookie)['body']
+        # Diez días antes no se avisa; desde siete días antes sí, con el día de la semana, y «Mañana» la víspera.
+        with patch.object(appointments,'now',return_value=datetime(2026,10,23,9,0,tzinfo=appointments.TZ)):self.assertEqual(today()['reminders'],[])
+        with patch.object(appointments,'now',return_value=datetime(2026,10,27,9,0,tzinfo=appointments.TZ)):
+            found=today()['reminders'];self.assertEqual([(r['day'],r['days_left']) for r in found],[('2026-11-02',6),('2026-11-03',7)])
+            self.assertEqual(found[0]['text'],'ADI informa: El lunes 2 de noviembre es feriado nacional (Día de Difuntos) y aún no se ha definido la atención. Revisa el decreto oficial y elige atención normal, horario especial o cerrado.')
+            self.assertEqual(len(self.request('/api/agenda?from=2026-10-27&to=2026-11-30',cookie=cookie)['body']['holiday_reminders']),2)
+            # Al decidir la atención (cualquier modo) u ocultar la fecha, el recordatorio de ese día desaparece.
+            post(action='save',day='2026-11-02',label='Día de Difuntos',scope='nacional',mode='normal');self.assertEqual([r['day'] for r in today()['reminders']],['2026-11-03'])
+            post(action='remove',day='2026-11-03');self.assertEqual(today()['reminders'],[])
+            post(action='restore',day='2026-11-03')
+        with patch.object(appointments,'now',return_value=datetime(2026,11,2,9,0,tzinfo=appointments.TZ)):
+            body=today();self.assertTrue(body['reminders'][0]['text'].startswith('ADI informa: Mañana es feriado nacional (Independencia de Cuenca)'));self.assertEqual(body['notice']['label'],'Día de Difuntos')
+            # Solo administración recibe el recordatorio.
+            with app.connect() as c:c.execute("UPDATE users SET role='tecnico' WHERE username='demo'");c.commit()
+            self.assertEqual(today()['reminders'],[]);self.assertEqual(self.request('/api/agenda?from=2026-11-01&to=2026-11-30',cookie=cookie)['body']['holiday_reminders'],[])
+

@@ -183,3 +183,25 @@ def notice(c, today):
               'especial': 'Horario especial de hoy: %s a %s.' % (item['open_time'], item['close_time'])}[item['mode'] if item['decided'] else 'normal']
     return {'day': item['day'], 'label': item['label'], 'scope': item['scope'], 'mode': item['mode'], 'decided': item['decided'],
             'text': 'ADI informa: Hoy es %s (%s). %s' % (kind, item['label'], detail)}
+
+
+REMIND_DAYS = 7
+DAYS = ('lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo')
+MONTHS = ('enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre')
+
+
+def reminders(c, today, days=REMIND_DAYS):
+    """Feriados de los próximos días cuya atención nadie ha definido todavía. Sirve para que ADI se lo recuerde a administración a tiempo
+    de revisar el decreto oficial. En cuanto se elige un modo de atención (o se oculta la fecha) el recordatorio desaparece."""
+    out = []
+    for item in between(c, today + timedelta(days=1), today + timedelta(days=days)):
+        if item['decided']:
+            continue
+        day = date.fromisoformat(item['day'])
+        left = (day - today).days
+        when = 'Mañana' if left == 1 else 'El %s %d de %s' % (DAYS[day.weekday()], day.day, MONTHS[day.month - 1])
+        kind = {'nacional': 'feriado nacional', 'local': 'feriado local', 'otro': 'día no laborable'}[item['scope']]
+        out.append({'day': item['day'], 'label': item['label'], 'days_left': left,
+                    'text': 'ADI informa: %s es %s (%s) y aún no se ha definido la atención. Revisa el decreto oficial y elige atención normal, horario especial o cerrado.' % (when, kind, item['label'])})
+    return out
+

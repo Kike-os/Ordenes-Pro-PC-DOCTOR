@@ -5978,3 +5978,8 @@ body[data-page=dashboard] .wizard-dialog .wizard-actions :is(.nav-back,#wizard-n
 @media(prefers-reduced-motion:reduce){:is(.booking-actions,.wizard-actions) :is(.nav-cancel,.nav-back,.nav-next,.appointment-submit,#wizard-next),.close-button{transition:none}:is(.booking-actions,.wizard-actions) button:active,.close-button:active{transform:none}}
 .booking-actions #booking-cancel.nav-cancel{margin-right:auto}
 @media(max-width:480px){.booking-actions #booking-cancel.nav-cancel{margin-right:0}}
+/* Recordatorio de ADI: feriado próximo sin atención definida (ámbar, más discreto que el aviso del día) */
+.adi-holiday-soon{border-color:#e0b25c80;background:linear-gradient(135deg,#2a2110,#10233c 70%);animation:none}
+.adi-holiday-soon .adi-holiday-icon{border-color:#e0b25c80;background:#3a2e14;color:#ffe2a8;box-shadow:none;animation:none}
+.adi-holiday-soon strong{font-weight:600;color:#fdeccb}
+/* Seguimiento en teléfonos: cinco tarjetas, como en escritorio */

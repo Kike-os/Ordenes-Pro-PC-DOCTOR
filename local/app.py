@@ -999,7 +999,7 @@ class Handler(BaseHTTPRequestHandler):
                 if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
                 import holidays
                 today=appointments.now().date()
-                if path.endswith('/today'):return self.reply(200,{'notice':holidays.notice(c,today),'conflicts':len(holidays.conflicts(c,today)) if user['role']=='administrador' else 0})
+                if path.endswith('/today'):return self.reply(200,{'notice':holidays.notice(c,today),'reminders':holidays.reminders(c,today) if user['role']=='administrador' else [],'conflicts':len(holidays.conflicts(c,today)) if user['role']=='administrador' else 0})
                 year=parse_qs(urlsplit(self.path).query).get('year',[''])[0]
                 if year and not (year.isdigit() and today.year-1<=int(year)<=today.year+5):return self.reply(400,{'error':'Año no válido.'})
                 year=int(year or today.year)
@@ -1019,7 +1019,7 @@ class Handler(BaseHTTPRequestHandler):
                 summary['preventive']=sum(1 for r in preventive if r['state']=='scheduled' and r['due_date']>=today.isoformat())
                 summary['overdue']=sum(1 for r in preventive if r['state']=='scheduled' and r['due_date']<today.isoformat())
                 import holidays
-                return self.reply(200,{'holidays':holidays.between(c,first,last),'holiday_notice':holidays.notice(c,today),'appointments':rows,'maintenance':preventive,'summary':summary,'today':today.isoformat(),'from':first.isoformat(),'to':last.isoformat(),'statuses':appointments.STATUSES,'services':appointments.services(c),'device_types':DEVICE_TYPES,'confirmation':appointments.confirmation_mode(c),'settings':appointments.settings(c) if user['role']=='administrador' else None})
+                return self.reply(200,{'holidays':holidays.between(c,first,last),'holiday_notice':holidays.notice(c,today),'holiday_reminders':holidays.reminders(c,today) if user['role']=='administrador' else [],'appointments':rows,'maintenance':preventive,'summary':summary,'today':today.isoformat(),'from':first.isoformat(),'to':last.isoformat(),'statuses':appointments.STATUSES,'services':appointments.services(c),'device_types':DEVICE_TYPES,'confirmation':appointments.confirmation_mode(c),'settings':appointments.settings(c) if user['role']=='administrador' else None})
             if path == '/api/appointments':
                 if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
                 query=parse_qs(urlsplit(self.path).query);view=query.get('view',['day'])[0];raw=query.get('date',[''])[0]
