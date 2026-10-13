@@ -8,6 +8,22 @@
   },
   "releases": [
     {
+      "version": "1.5.144",
+      "date": "2026-10-13T18:58:38-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Prueba de entrega real de correo al administrador",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Configuración: nuevo botón «Enviar prueba a mi correo», que envía un correo de prueba al correo de la cuenta del administrador para comprobar la entrega real."
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.143",
       "date": "2026-10-13T18:48:28-05:00",
       "type": "patch",

@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.144 — 2026-10-13 18:58 (UTC-05:00)
+
+Prueba de entrega real de correo al administrador
+
+### Mejoras realizadas
+
+- Configuración: nuevo botón «Enviar prueba a mi correo», que envía un correo de prueba al correo de la cuenta del administrador para comprobar la entrega real.
+
 ## v1.5.143 — 2026-10-13 18:48 (UTC-05:00)
 
 Verificación en dos pasos opcional con aplicación de autenticación y códigos de recuperación
