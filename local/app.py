@@ -756,7 +756,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         path = urlsplit(self.path).path
-        files = {'/static/label.css':'label.css','/static/tracking.css':'tracking.css','/static/app.css':'app.css','/static/app.js':'app.js','/static/form-validation.js':'form-validation.js','/static/appointments.js':'appointments.js','/static/adi-widget.js':'adi-widget.js','/static/adi-orb.js':'adi-orb.js','/static/ui-select.js':'ui-select.js','/static/echarts.min.js':'echarts.min.js','/static/logo-original.png':'logo-original.png',
+        files = {'/static/label.css':'label.css','/static/tracking.css':'tracking.css','/static/app.css':'app.css','/static/app.js':'app.js','/static/form-validation.js':'form-validation.js','/static/appointments.js':'appointments.js','/static/adi-widget.js':'adi-widget.js','/static/adi-orb.js':'adi-orb.js','/static/ui-select.js':'ui-select.js','/static/ticket.css':'ticket.css','/static/ticket.js':'ticket.js','/static/echarts.min.js':'echarts.min.js','/static/logo-original.png':'logo-original.png',
                  '/favicon.ico':'favicon.ico','/static/favicon.ico':'favicon.ico','/static/favicon-16.png':'favicon-16.png','/static/favicon-32.png':'favicon-32.png','/static/logo-firma.png':'logo-firma.png','/static/favicon-48.png':'favicon-48.png',
                  '/apple-touch-icon.png':'apple-touch-icon.png','/apple-touch-icon-precomposed.png':'apple-touch-icon.png','/static/apple-touch-icon.png':'apple-touch-icon.png'}
         # Logotipos de marcas: solo nombres simples dentro de static/brands; si el archivo no existe la interfaz usa un icono genérico.
@@ -891,12 +891,18 @@ class Handler(BaseHTTPRequestHandler):
                     return self.reply(200,client_authorization.render_pdf(found),'application/pdf',filename=document['code']+'-AUTORIZACION.pdf')
                 return self.reply(200,client_authorization.start_page(c,authorize_page[1],found,document),'text/html; charset=utf-8')
             # Seguimiento público por enlace aleatorio: respuesta idéntica para enlaces inexistentes o revocados.
-            tracking_page=re.fullmatch(r'/s/([A-Za-z0-9_-]{1,64})',path)
+            tracking_page=re.fullmatch(r'/s/([A-Za-z0-9_-]{1,64})(/qr\.svg|/barcode\.svg)?',path)
             if tracking_page:
                 import order_tracking
-                if limited(c,'tracking-ip:'+digest(self.client_address[0]),40,300):return self.reply(429,{'error':'Demasiadas consultas. Intenta más tarde.'})
+                if limited(c,'tracking-ip:'+digest(self.client_address[0]),120 if tracking_page[2] else 40,300):return self.reply(429,{'error':'Demasiadas consultas. Intenta más tarde.'})
                 found=order_tracking.lookup(c,tracking_page[1])
-                return self.reply(200 if found else 404,order_tracking.public_page(found) if found else order_tracking.missing_page(),'text/html; charset=utf-8')
+                if tracking_page[2]:
+                    # Códigos reales de la tarjeta pública: el QR lleva al propio enlace de seguimiento y el de barras al número de la orden.
+                    if not found:return self.reply(404,{'error':'Enlace no disponible.'})
+                    if tracking_page[2]=='/qr.svg':return self.reply(200,qr_image(order_tracking.url(tracking_page[1])+'#'+found['code'],'svg'),'image/svg+xml')
+                    import barcode128
+                    return self.reply(200,barcode128.svg(found['code']),'image/svg+xml')
+                return self.reply(200 if found else 404,order_tracking.public_page(found,tracking_page[1]) if found else order_tracking.missing_page(),'text/html; charset=utf-8')
             if path == '/conditions':
                 active=service_terms.current(c,reception_now())
                 if not active:return self.reply(404,{'error':'Las condiciones vigentes aún no han sido publicadas.'})
@@ -916,6 +922,14 @@ class Handler(BaseHTTPRequestHandler):
             user, _ = self.session(c)
             if path in ('/', '/login') or re.fullmatch(r'/orders/[^/]{1,80}',path):
                 return self.page('dashboard.html' if user else 'login.html')
+            staff_card=re.fullmatch(r'/tarjeta/([0-9]{1,12})',path)
+            if staff_card:
+                # Tarjeta de seguimiento para imprimir o guardar como PDF, con los datos internos: exige sesión.
+                if not user:return self.page('login.html')
+                import order_tracking
+                found=order_tracking.staff_data(c,int(staff_card[1]))
+                if not found:return self.reply(404,{'error':'Orden no disponible.'})
+                return self.reply(200,order_tracking.card_page(found,'/api/orders/%d/tracking-qr.png'%found['id'] if order_tracking.active(c,found['id'])['active'] else '',False),'text/html; charset=utf-8')
             if path == '/forgot':
                 return self.page('forgot.html')
             if path == '/registro':
@@ -1152,12 +1166,20 @@ class Handler(BaseHTTPRequestHandler):
                 if not row:
                     return self.reply(404, {'error':'Foto no disponible.'})
                 return self.reply(200, base64.b64decode(row['data']), 'image/jpeg')
-            detail = re.fullmatch(r'/api/orders/([0-9]+)(?:/(qr\.(svg|png)|tracking-qr\.png|receipt\.pdf|thermal\.pdf|service\.pdf|label\.pdf|stay\.pdf))?', path)
+            detail = re.fullmatch(r'/api/orders/([0-9]+)(?:/(qr\.(svg|png)|tracking-qr\.png|receipt\.pdf|thermal\.pdf|service\.pdf|label\.pdf|stay\.pdf|barcode\.svg|tracking-card))?', path)
             if detail:
                 row = c.execute('SELECT o.*,COALESCE(NULLIF(d.kind,\'\'),d.category) type,d.brand,d.model,d.serial,d.color,d.code device_code,c.id client_id,c.name client,c.identification,c.phone,c.email,c.province,c.city,c.address,c.location_reference,s.label status_label FROM orders o JOIN devices d ON d.id=o.device_id JOIN clients c ON c.id=d.client_id JOIN statuses s ON s.code=o.status WHERE o.id=?',(int(detail[1]),)).fetchone()
                 if not row:
                     return self.reply(404, {'error':'Orden no disponible.'})
                 code = row['code'] or 'OP-'+str(row['id']).zfill(5)
+                if detail[2]=='barcode.svg':
+                    import barcode128
+                    return self.reply(200,barcode128.svg(code),'image/svg+xml')
+                if detail[2]=='tracking-card':
+                    # Tarjeta Digital de Seguimiento Técnico: el mismo fragmento que se imprime, con los datos actuales de la orden.
+                    import order_tracking
+                    link=order_tracking.active(c,row['id'])
+                    return self.reply(200,{'html':order_tracking.card(order_tracking.staff_data(c,row['id']),'/api/orders/%d/tracking-qr.png'%row['id'] if link['active'] else '',False),'code':code,'public_url':link['url'],'active':link['active'],'print_url':'/tarjeta/%d'%row['id']})
                 if detail[2]=='tracking-qr.png':
                     # QR del enlace público de seguimiento vigente: el mismo enlace que se copia y que imprime el ticket.
                     import order_tracking

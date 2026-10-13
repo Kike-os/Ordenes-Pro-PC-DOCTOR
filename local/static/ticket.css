@@ -1,0 +1,70 @@
+/* Tarjeta Digital de Seguimiento Técnico: ticket de dos secciones en azul tecnológico. La usan la página pública de seguimiento, la vista
+   interna para imprimir y la ventana del panel. Todas las reglas van bajo .ticket o .ticket-page para no afectar a otras pantallas. */
+.ticket-page{margin:0;min-height:100vh;background:radial-gradient(ellipse at 20% 0%,#10305a 0,transparent 55%),#060d19;color:#e3eeff;font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;line-height:1.45}
+.ticket-page *{box-sizing:border-box}
+.ticket-page main{width:min(100%,460px);margin:0 auto;padding:22px 14px 36px}
+.ticket{--ticket-gap:#060d19;position:relative;box-sizing:border-box;width:100%;max-width:432px;margin:0 auto;border:1px solid #2c5488;border-radius:22px;background:linear-gradient(165deg,#12305a 0,#0c1f3d 46%,#0a1830 100%);color:#e3eeff;box-shadow:0 26px 60px -28px #000000e6,0 0 0 1px #5aa9e61a,0 0 46px -18px #3f8fe680;font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;line-height:1.45;text-align:left}
+.ticket *{box-sizing:border-box}
+.ticket-top{padding:20px 22px 18px}.ticket-bottom{padding:16px 22px 20px}
+.ticket-head{display:flex;align-items:center;gap:14px;margin-bottom:16px}
+.ticket-logo{flex:none;width:96px;height:auto;max-height:46px;object-fit:contain}
+.ticket-head small{display:block;font-size:10.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#8fc4f5}
+.ticket-head h1{margin:2px 0 0;font-size:17px;line-height:1.25;letter-spacing:-.2px;color:#fff}
+.ticket-order{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:14px}
+.ticket-order small{display:block;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#8fa9cc}
+.ticket-order strong{display:block;margin-top:2px;font:700 21px/1.2 ui-monospace,"SF Mono",Menlo,Consolas,monospace;letter-spacing:.01em;color:#fff;overflow-wrap:anywhere}
+.ticket-state{flex:none;max-width:48%;padding:6px 12px;border:1px solid #5aa9e6;border-radius:999px;background:#2f6fc433;color:#dff0ff;font-size:12px;font-weight:700;line-height:1.25;text-align:center}
+.ticket-state[data-status=pendiente]{border-color:#8fa9cc;background:#8fa9cc26;color:#e6eefb}
+.ticket-state[data-status=esperando_cliente],.ticket-state[data-status=presupuesto]{border-color:#e0b25c;background:#e0b25c26;color:#ffe9b8}
+.ticket-state[data-status=listo],.ticket-state[data-status=espera_entrega]{border-color:#3fd8d0;background:#3fd8d026;color:#c9fbf6}
+.ticket-state[data-status=entregado]{border-color:#3fbf8f;background:#3fbf8f2e;color:#c6f5dd}
+.ticket-progress{height:6px;border-radius:999px;background:#1b3558;overflow:hidden}
+.ticket-progress span{display:block;height:100%;width:4%;border-radius:999px;background:linear-gradient(90deg,#3f8fe6,#6fd3ff);box-shadow:0 0 12px #5aa9e699}
+.ticket-progress span[data-progress="33"]{width:36%}.ticket-progress span[data-progress="67"]{width:68%}.ticket-progress span[data-progress="100"]{width:100%;background:linear-gradient(90deg,#3fbf8f,#7ff0c4)}
+.ticket-steps{list-style:none;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin:10px 0 16px;padding:0}
+.ticket-steps li{display:grid;justify-items:center;gap:5px;font-size:10.5px;line-height:1.25;text-align:center;color:#7f99bd}
+.ticket-steps i{width:11px;height:11px;border:2px solid #36567f;border-radius:50%;background:#0c1f3d}
+.ticket-steps li[data-state=done]{color:#a9d6ff}.ticket-steps li[data-state=done] i{border-color:#5aa9e6;background:#5aa9e6}
+.ticket-steps li[data-state=current]{color:#fff;font-weight:700}.ticket-steps li[data-state=current] i{border-color:#8fd3ff;background:#0c1f3d;box-shadow:0 0 0 3px #5aa9e640,0 0 10px #6fd3ff}
+.ticket-facts{display:grid;grid-template-columns:1fr 1fr;gap:10px 16px;margin:0}
+.ticket-facts div{min-width:0}.ticket-facts div:first-child:nth-last-child(odd){grid-column:1/-1}
+.ticket-facts dt{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:#8fa9cc}
+.ticket-facts dd{margin:2px 0 0;font-size:13.5px;font-weight:600;color:#f2f7ff;overflow-wrap:anywhere}
+/* Corte del ticket: línea punteada con dos muescas del color del fondo. */
+.ticket-cut{position:relative;height:0;margin:0 18px;border-top:2px dashed #3c629366}
+.ticket-cut::before,.ticket-cut::after{content:"";position:absolute;top:-13px;width:24px;height:24px;border-radius:50%;background:var(--ticket-gap);border:1px solid #2c5488}
+.ticket-cut::before{left:-31px;clip-path:inset(0 0 0 50%)}.ticket-cut::after{right:-31px;clip-path:inset(0 50% 0 0)}
+.ticket-bottom{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px 16px;align-items:center}
+.ticket-verify h2{margin:0 0 4px;font-size:14px;letter-spacing:-.1px;color:#fff}
+.ticket-verify p{margin:0;font-size:11.5px;line-height:1.45;color:#a9bfde}
+.ticket-qr{display:block;width:118px;height:118px;padding:6px;border-radius:12px;background:#fff}
+.ticket-noqr{margin:0;max-width:130px;font-size:11px;line-height:1.4;color:#a9bfde}
+.ticket-barcode{grid-column:1/-1;display:grid;justify-items:center;gap:5px;padding:10px 12px 8px;border-radius:12px;background:#fff}
+.ticket-barcode svg{display:block;width:100%;height:54px}
+.ticket-barcode span{font:600 12px/1.2 ui-monospace,"SF Mono",Menlo,Consolas,monospace;letter-spacing:.14em;color:#0b1526;overflow-wrap:anywhere;text-align:center}
+.ticket-bottom footer{grid-column:1/-1;display:flex;flex-wrap:wrap;justify-content:center;gap:2px 12px;padding-top:4px;font-size:11px;color:#8fa9cc;text-align:center}
+.ticket-bottom footer strong{flex:1 1 100%;font-size:11.5px;letter-spacing:.12em;color:#cfe4ff}
+.ticket-actions{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;max-width:432px;margin:16px auto 0}
+.ticket-actions button,.ticket-actions a{display:inline-flex;align-items:center;justify-content:center;min-height:42px;padding:9px 16px;border:1px solid #37618d;border-radius:10px;background:#10233c;color:#e3eeff;font:600 13px/1.2 inherit;font-family:inherit;text-decoration:none;cursor:pointer}
+.ticket-actions button{background:#24558d;border-color:#5083b8}
+.ticket-actions button:hover,.ticket-actions a:hover{background:#2b63a3}
+.ticket-actions :focus-visible{outline:2px solid #a8dcff;outline-offset:2px}
+.ticket-note{max-width:432px;margin:12px auto 0;font-size:11.5px;text-align:center;color:#7f93b1}
+@media(max-width:360px){.ticket-top{padding:16px 16px 14px}.ticket-bottom{padding:14px 16px 16px;grid-template-columns:1fr}.ticket-qr{justify-self:center}.ticket-order strong{font-size:17px}.ticket-logo{width:78px}.ticket-steps li{font-size:9.5px}.ticket-cut{margin:0 12px}.ticket-cut::before{left:-25px}.ticket-cut::after{right:-25px}}
+/* Modo papel: fondo blanco y tinta oscura para que el QR y el código de barras salgan nítidos. */
+@media print{
+ @page{margin:12mm}
+ .ticket-page{background:#fff;min-height:0}.ticket-page main{padding:0}
+ .ticket-actions,.ticket-note{display:none}
+ .ticket{--ticket-gap:#fff;border:1.5px solid #1c3a63;background:#fff;color:#102744;box-shadow:none;break-inside:avoid;print-color-adjust:exact;-webkit-print-color-adjust:exact}
+ .ticket-head h1,.ticket-order strong,.ticket-verify h2,.ticket-facts dd{color:#0b1f3d}
+ .ticket-head small,.ticket-order small,.ticket-facts dt,.ticket-verify p,.ticket-bottom footer,.ticket-bottom footer strong{color:#3d5578}
+ .ticket-state{background:#fff;color:#0b1f3d;border-color:#0b1f3d}
+ .ticket-progress{background:#d5e0ef}.ticket-progress span{background:#1c4f8f;box-shadow:none}
+ .ticket-steps li{color:#5a6f8f}.ticket-steps li[data-state=done],.ticket-steps li[data-state=current]{color:#0b1f3d}
+ .ticket-steps i{background:#fff;border-color:#8ea3c2}.ticket-steps li[data-state=done] i{background:#1c4f8f;border-color:#1c4f8f}.ticket-steps li[data-state=current] i{background:#fff;border-color:#1c4f8f;box-shadow:0 0 0 2px #1c4f8f55}
+ .ticket-cut{border-top-color:#8ea3c2}.ticket-cut::before,.ticket-cut::after{border-color:#1c3a63}
+ .ticket-qr,.ticket-barcode{border:1px solid #c5d2e4}
+}
+.ticket-actions a{font-size:13px;font-weight:600}
+@media(max-width:360px){.ticket-order{flex-wrap:wrap}.ticket-order strong{font-size:16px;white-space:nowrap}.ticket-state{max-width:none}}

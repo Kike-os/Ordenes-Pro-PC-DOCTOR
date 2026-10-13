@@ -5180,3 +5180,9 @@ body[data-page=login] #login-form #password{padding-right:84px}
 .version-more{justify-self:center}
 .version-total{align-self:center;font-size:12px;color:#8fa5c4}
 @media(prefers-reduced-motion:reduce){.system-version-icon .icon{animation:none!important}}
+/* Tarjeta de seguimiento dentro del panel (el ticket se define en ticket.css). */
+dialog.ticket-dialog{width:min(500px,calc(100% - 20px))}
+.ticket-holder{margin-top:14px}.ticket-holder .ticket{--ticket-gap:#0d192c}
+.ticket-dialog-actions{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:14px}.ticket-dialog-actions button{min-height:40px}
+.tracking-carousel .tracking-actions .tracking-ticket{padding:4px 8px}.tracking-carousel .tracking-actions .tracking-ticket svg{width:15px;height:15px}
+@media(max-width:1380px) and (min-width:861px){.tracking-carousel .tracking-actions button:nth-child(2) span{display:none}}
