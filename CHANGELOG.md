@@ -4,6 +4,27 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.135 — 2026-10-13 08:58 (UTC-05:00)
+
+Presupuestos por estado y eliminación de borradores, ventana Presupuesto reorganizada, feriados con modos de atención, panel de Seguimiento ajustado y botones uniformes
+
+### Nuevas funcionalidades
+
+- Presupuestos del equipo agrupados por estado, con eliminación segura de borradores que nunca se enviaron.
+- Feriados de Ecuador calculados con traslados, modos de atención por feriado, feriados locales y aviso de ADI.
+
+### Mejoras realizadas
+
+- Detalle de la orden: «Autorizaciones del cliente» y «Resumen del presupuesto» con importes autorizados, pagados y por cobrar claramente separados.
+- Ventana Presupuesto: encabezado y pie fijos, partidas con etiquetas, errores junto al campo, acciones reorganizadas y anulación aparte.
+- Historial de actividad del presupuesto y actividad reciente del equipo en línea de tiempo.
+- Botón Historial con contador en insignia; botones Cancelar, Anterior, Siguiente y Cerrar con un mismo estilo.
+
+### Errores corregidos
+
+- Al quitar el IVA de una partida, el precio baja a su valor sin impuesto.
+- El panel de Seguimiento de Órdenes ya no reserva altura vacía: mide las órdenes que muestra, hasta cinco.
+
 ## v1.5.134 — 2026-10-13 07:50 (UTC-05:00)
 
 Clasificación e iconos en presupuestos, catálogo ampliado, importes con símbolo de dólar, cancelar y empezar desde cero, listado de órdenes adaptable e indicador de progreso

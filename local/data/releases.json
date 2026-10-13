@@ -8,6 +8,31 @@
   },
   "releases": [
     {
+      "version": "1.5.135",
+      "date": "2026-10-13T08:58:40-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Presupuestos por estado y eliminación de borradores, ventana Presupuesto reorganizada, feriados con modos de atención, panel de Seguimiento ajustado y botones uniformes",
+      "changes": {
+        "features": [
+          "Presupuestos del equipo agrupados por estado, con eliminación segura de borradores que nunca se enviaron.",
+          "Feriados de Ecuador calculados con traslados, modos de atención por feriado, feriados locales y aviso de ADI."
+        ],
+        "improvements": [
+          "Detalle de la orden: «Autorizaciones del cliente» y «Resumen del presupuesto» con importes autorizados, pagados y por cobrar claramente separados.",
+          "Ventana Presupuesto: encabezado y pie fijos, partidas con etiquetas, errores junto al campo, acciones reorganizadas y anulación aparte.",
+          "Historial de actividad del presupuesto y actividad reciente del equipo en línea de tiempo.",
+          "Botón Historial con contador en insignia; botones Cancelar, Anterior, Siguiente y Cerrar con un mismo estilo."
+        ],
+        "fixes": [
+          "Al quitar el IVA de una partida, el precio baja a su valor sin impuesto.",
+          "El panel de Seguimiento de Órdenes ya no reserva altura vacía: mide las órdenes que muestra, hasta cinco."
+        ],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.134",
       "date": "2026-10-13T07:50:14-05:00",
       "type": "patch",
