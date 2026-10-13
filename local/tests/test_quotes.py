@@ -457,3 +457,43 @@ class QuotePriorityTests(unittest.TestCase):
         version=post('/api/quotes/%d'%quote,action='version')['body']['id']
         self.assertEqual([i['priority'] for i in self.request('/api/quotes/%d'%version,cookie=cookie)['body']['quote']['items']],['obligatorio','necesario','opcional',''])
 
+
+class QuoteDraftRemovalTests(unittest.TestCase):
+    setUpClass=classmethod(test_app.SecurityTests.setUpClass.__func__);setUp=test_app.SecurityTests.setUp;tearDown=test_app.SecurityTests.tearDown;request=test_app.SecurityTests.request;login=test_app.SecurityTests.login;order_data=test_app.SecurityTests.order_data
+
+    def test_only_unsent_drafts_are_removed_and_history_is_kept(self):
+        cookie,csrf=self.login();post=lambda path,**body:self.request(path,body,cookie=cookie,csrf=csrf)
+        order=self.request('/api/orders',self.order_data({'email':'cliente@example.invalid','request_key':'quote-removal-request-0001'}),cookie=cookie,csrf=csrf)['body']
+        other=self.request('/api/orders',self.order_data({'email':'cliente@example.invalid','serial':'OTRO-1','request_key':'quote-removal-request-0002'}),cookie=cookie,csrf=csrf)['body']
+        listing=lambda oid=order['id']:self.request('/api/orders/%d/quote'%oid,cookie=cookie)['body']
+        items=[{'description':'Servicio ficticio','category':'servicio','quantity':1,'unit_cents':4000,'taxed':True}]
+        first=post('/api/orders/%d/quote'%order['id'])['body']['id'];post('/api/quotes/%d'%first,action='save',items=items)
+        keep=post('/api/orders/%d/quote'%other['id'])['body']['id'];post('/api/quotes/%d'%keep,action='save',items=items)
+        card=listing()['versions'][0];self.assertEqual((card['status'],card['removable'],card['lines'],card['quoted_cents']),('borrador',True,1,4000))
+        # Enviado: ya no es eliminable (se anula, no se elimina).
+        with patch.object(app.mail_pro,'configured',return_value=False):post('/api/quotes/%d'%first,action='send')
+        self.assertFalse(listing()['versions'][0]['removable']);denied=post('/api/quotes/%d'%first,action='delete_draft');self.assertEqual(denied['status'],409);self.assertIn('se anula, no se elimina',denied['body']['error'])
+        # Aprobado: tampoco. Su nueva versión en borrador sí, y eliminarla no toca la aprobada ni el otro equipo.
+        item=str(self.request('/api/quotes/%d'%first,cookie=cookie)['body']['quote']['items'][0]['id']);post('/api/quotes/%d'%first,action='decide',note='Aprobó por teléfono (ficticio)',approved=item)
+        self.assertEqual(post('/api/quotes/%d'%first,action='delete_draft')['status'],409)
+        second=post('/api/quotes/%d'%first,action='version')['body']['id'];self.assertEqual([(v['version'],v['status'],v['removable']) for v in listing()['versions']],[(2,'borrador',True),(1,'aprobado',False)])
+        detail=lambda:(lambda d:d.get('order',d))(self.request('/api/orders/%d'%order['id'],cookie=cookie)['body']);before=(detail()['budget']['total_cents'],len(detail()['authorized_items']))
+        # Un técnico que no creó el borrador no lo elimina.
+        with app.connect() as c:
+            c.execute("UPDATE users SET role='tecnico' WHERE username='demo'");c.execute('UPDATE quotes SET created_by=NULL WHERE id=?',(second,));c.commit()
+        self.assertEqual(post('/api/quotes/%d'%second,action='delete_draft')['status'],403)
+        with app.connect() as c:c.execute("UPDATE users SET role='administrador' WHERE username='demo'");c.commit()
+        removed=post('/api/quotes/%d'%second,action='delete_draft');self.assertEqual((removed['status'],removed['body']['deleted']),(200,removed['body']['deleted']));self.assertTrue(removed['body']['deleted'].endswith('-P2'))
+        # No reaparece, no se puede abrir ni volver a eliminar; lo aprobado y el otro equipo siguen intactos.
+        self.assertEqual([(v['version'],v['status']) for v in listing()['versions']],[(1,'aprobado')]);self.assertEqual(listing()['current']['id'],first)
+        self.assertEqual(self.request('/api/quotes/%d'%second,cookie=cookie)['status'],404);self.assertEqual(post('/api/quotes/%d'%second,action='delete_draft')['status'],404)
+        self.assertEqual((detail()['budget']['total_cents'],len(detail()['authorized_items'])),before);self.assertEqual((before,detail()['budget_locked'].endswith('-P1')),((4000,1),True))
+        self.assertEqual([(v['id'],v['status']) for v in listing(other['id'])['versions']],[(keep,'borrador')])
+        # El registro y su historial se conservan para auditoría; el siguiente presupuesto no reutiliza el número eliminado.
+        with app.connect() as c:
+            row=c.execute('SELECT status,deleted_at,deleted_by FROM quotes WHERE id=?',(second,)).fetchone();self.assertTrue(row['status']=='borrador' and row['deleted_at'] and row['deleted_by'])
+            self.assertEqual([r[0] for r in c.execute('SELECT event FROM quote_events WHERE quote_id=? ORDER BY id',(second,))][-1],'eliminado')
+            self.assertEqual(c.execute("SELECT COUNT(*) FROM audit WHERE action='quote_draft_deleted'").fetchone()[0],1);self.assertTrue(quotes.evidence_ok(c,first) is not None)
+        third=post('/api/quotes/%d'%first,action='version')['body']['id'];self.assertTrue(self.request('/api/quotes/%d'%third,cookie=cookie)['body']['quote']['code'].endswith('-P3'))
+        brief=detail()['group']['units'][0]['quote'];self.assertEqual((brief['id'],brief['approved_count'],brief['pending_count'],brief['authorized_cents']),(third,0,1,4000))
+

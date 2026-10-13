@@ -172,3 +172,21 @@ El editor no tiene autoguardado: solo «Guardar borrador» y «Guardar y enviar 
 - **Empezar desde cero.** Tras confirmar, vacía la copia de trabajo: partidas, clasificaciones, descuento, validez, observaciones y la solicitud de documento. No toca el presupuesto guardado, sus versiones ni su historial. Si después se guarda sobre un presupuesto que tenía contenido, se pide confirmar «¿Reemplazar el presupuesto guardado?».
 - **Guardar borrador** conserva sin enviar; **Guardar y enviar al cliente** guarda y envía el enlace privado.
 - **Cancelar presupuesto** va en una zona aparte y solo aparece en presupuestos ya guardados: cambia su estado a cancelado y queda en el historial. No es salir sin guardar.
+
+## Presupuestos por estado y eliminación de borradores (migración 049)
+
+En el detalle de la orden, el panel **«Presupuestos del equipo»** agrupa todas las versiones según su estado real: Borradores, Pendientes de aprobación, Aprobados, Rechazados y Cancelados (este último plegado). Un borrador nunca aparece como si esperara la respuesta del cliente. Cada tarjeta muestra número, estado, total cotizado, partidas, creación, vencimiento, último envío y técnico, y solo las acciones de su estado.
+
+**Eliminar borrador.** Disponible solo en borradores que nunca salieron del taller (sin envío, sin enlace, sin autorización y sin versiones que los continúen). El servidor comprueba el estado real antes de eliminar; la puede ejecutar administración o quien creó el borrador. Es una eliminación lógica (`quotes.deleted_at`): el borrador sale de las listas y ya no se puede abrir, pero su registro y su historial se conservan para auditoría. No afecta a otras versiones ni a otros equipos, y el siguiente presupuesto no reutiliza su número. Un presupuesto enviado o decidido se anula, no se elimina.
+
+**«Autorizaciones del cliente».** Estado calculado con las partidas reales: Sin autorizaciones, Aprobación parcial o Totalmente aprobado. Cada partida aprobada muestra icono, cantidad, precio, fecha, presupuesto de origen y su ejecución; con cuatro o más se separan servicios y productos. Tres tarjetas: Total autorizado (solo partidas aprobadas), Total pagado y Saldo pendiente, o «Saldo a favor» si se pagó más de lo que hay que cobrar. Los cargos manuales del taller van aparte («Agregar cargo manual»); los pagos se registran en «Pagos y saldo».
+
+**«Resumen del presupuesto»** (tarjeta del equipo): número completo, cantidad de productos y servicios, estado, total cotizado destacado con un texto según el estado, avance de autorizaciones (aprobadas, rechazadas y pendientes por separado) y cuatro tarjetas: Autorizado, Pendiente de aprobación, Pagado y Saldo por cobrar. Lo pendiente o rechazado nunca se suma como deuda.
+
+## Ventana Presupuesto: acciones e historial de actividad
+
+- **Acciones del presupuesto**: Salir sin guardar, Empezar de cero, Guardar borrador y Guardar y enviar al cliente, del mismo tamaño y con indicador de carga al guardar o enviar.
+- **Anular presupuesto** va aparte, con el aviso «La anulación conservará el registro del presupuesto en el historial» y una confirmación que nombra el presupuesto. Un presupuesto con servicios aprobados no se anula: se crea una nueva versión.
+- **Historial de actividad**: plegado al abrir, con contador y línea de tiempo (icono y color por tipo de movimiento, fecha y hora, responsable, número de presupuesto y descripción). Es de solo lectura; el detalle largo se despliega bajo demanda y un movimiento recién registrado se destaca una vez.
+
+En «Gestión técnica del equipo», «Últimas modificaciones» pasó a ser **«Actividad reciente»** con la misma línea de tiempo: tres movimientos a la vista y «Ver historial completo».

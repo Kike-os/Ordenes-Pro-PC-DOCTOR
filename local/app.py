@@ -2419,6 +2419,10 @@ class Handler(BaseHTTPRequestHandler):
                         if action=='save':
                             quotes.save(c,found,data,user,now);audit(c,user['id'],'quote_saved',found['order_id'])
                             return self.reply(200,{'ok':True,'quote':quotes.detail(c,quotes.get(c,found['id']))})
+                        if action=='delete_draft':
+                            # Elimina (lógicamente) un borrador que nunca se envió. El servidor comprueba su estado real; no afecta a otras versiones.
+                            quotes.delete_draft(c,found,user,now);audit(c,user['id'],'quote_draft_deleted',found['order_id'])
+                            return self.reply(200,{'ok':True,'deleted':found['code']})
                         if action=='execution':
                             # Avance de una partida aprobada: lo marca el personal técnico o administración; queda en el historial del presupuesto.
                             if not str(data.get('item','')).isdigit():return self.reply(400,{'error':'Partida no válida.'})

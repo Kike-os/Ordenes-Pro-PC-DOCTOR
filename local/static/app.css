@@ -5776,3 +5776,92 @@ textarea.adi-suggestion-edit{width:100%;min-height:96px;resize:vertical;font:inh
 .tracking-table .tracking-progress[data-status=entregado] .tracking-stages li{background:#3fbf8f;box-shadow:0 0 6px #3fbf8f66}
 @media(max-width:860px){.tracking-carousel{--track-row:200px}}
 .tracking-sort{white-space:nowrap}
+/* ===== Línea de tiempo de actividad (presupuestos y gestión técnica) ===== */
+.activity-fold>summary{display:flex;align-items:center;gap:8px;cursor:pointer;list-style:none;padding:10px 12px;border:1px solid #1f3554;border-radius:11px;background:#0c192d;font-size:13px;font-weight:650;color:#e3eeff;transition:border-color .2s ease,background-color .2s ease}
+.activity-fold>summary::-webkit-details-marker{display:none}.activity-fold>summary svg{flex:none;width:16px;height:16px;color:#ff9ecb}
+.activity-fold>summary b{margin-left:auto;min-width:22px;padding:1px 8px;border-radius:999px;background:#3a1b33;border:1px solid #ff9ecb66;color:#ffd3e6;font-size:11.5px;text-align:center}
+.activity-fold>summary::after{content:'';flex:none;width:8px;height:8px;margin-left:4px;border-right:2px solid #8fa6c4;border-bottom:2px solid #8fa6c4;transform:rotate(45deg);transition:transform .25s ease}
+.activity-fold[open]>summary{border-color:#ff9ecb66}.activity-fold[open]>summary::after{transform:rotate(225deg)}
+.activity-fold>summary:hover{background:#10233c}.activity-fold>summary:focus-visible{outline:2px solid #ff9ecb;outline-offset:2px}
+.activity-fold[open]>.activity-timeline,.activity-fold[open]>p{animation:activity-open .28s ease-out 1}
+@keyframes activity-open{0%{opacity:0;transform:translateY(-6px)}100%{opacity:1;transform:none}}
+.activity-timeline{display:grid;gap:8px;margin-top:10px}
+.activity-timeline ol{display:grid;gap:0;max-height:320px;margin:0;padding:2px 4px 2px 0;list-style:none;overflow-y:auto;overscroll-behavior:contain}
+.activity-timeline li{position:relative;display:grid;grid-template-columns:30px minmax(0,1fr);gap:10px;padding:0 0 14px}.activity-timeline li[hidden]{display:none}.activity-timeline li:last-child{padding-bottom:2px}
+.activity-timeline li::before{content:'';position:absolute;left:14px;top:30px;bottom:0;width:2px;background:#1f3554}.activity-timeline li:last-child::before{display:none}
+.activity-mark{display:grid;place-items:center;width:30px;height:30px;border:1px solid var(--tone-line,#2c4468);border-radius:50%;background:var(--tone-bg,#10233c);color:var(--tone,#a8dcff);position:relative;z-index:1}
+.activity-mark svg{width:15px;height:15px}
+.activity-timeline li[data-tone=verde]{--tone:#aef0d2;--tone-bg:#12352b;--tone-line:#3fbf8f80}.activity-timeline li[data-tone=azul]{--tone:#cfe3ff;--tone-bg:#16304f;--tone-line:#5083b880}
+.activity-timeline li[data-tone=violeta]{--tone:#dccbff;--tone-bg:#2a1f47;--tone-line:#9b7fe680}.activity-timeline li[data-tone=celeste]{--tone:#bfeaff;--tone-bg:#0f2f43;--tone-line:#38bdf880}
+.activity-timeline li[data-tone=rojo]{--tone:#ffc4c9;--tone-bg:#3a1a22;--tone-line:#e06c7880}.activity-timeline li[data-tone=rojo-suave]{--tone:#e8b9bf;--tone-bg:#2a1a20;--tone-line:#b0626c66}
+.activity-timeline li[data-tone=ambar]{--tone:#ffe2a8;--tone-bg:#3a2e14;--tone-line:#e0b25c80}.activity-timeline li[data-tone=turquesa]{--tone:#9be8dc;--tone-bg:#0e2a2c;--tone-line:#3fbfb080}
+.activity-timeline li[data-tone=gris]{--tone:#b9c4d6;--tone-bg:#1a2436;--tone-line:#7b879866}
+.activity-timeline li>div{display:grid;gap:2px;min-width:0;padding-top:2px}
+.activity-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 8px}.activity-head strong{font-size:13px;color:var(--tone,#eef3ff);overflow-wrap:anywhere}
+.activity-ref{padding:0 7px;border:1px solid #2c4468;border-radius:999px;font:600 11px/1.6 ui-monospace,Menlo,Consolas,monospace;color:#a9bdd8;overflow-wrap:anywhere}
+.activity-meta{margin:0;font-size:11.5px;color:#8fa6c4}.activity-meta time{font-variant-numeric:tabular-nums}.activity-actor{color:#c7d6ec;font-weight:600}
+.activity-detail,.activity-more p{margin:2px 0 0;font-size:12.5px;line-height:1.5;color:#c7d6ec;overflow-wrap:anywhere}
+.activity-more summary{cursor:pointer;font-size:12.5px;line-height:1.5;color:#c7d6ec;overflow-wrap:anywhere;list-style:none}.activity-more summary::-webkit-details-marker{display:none}.activity-more[open] summary{display:none}
+.activity-more summary:focus-visible{outline:2px solid #ff9ecb;outline-offset:2px;border-radius:4px}
+.activity-all{justify-self:start;min-height:34px;margin:0;font-size:12.5px}
+.activity-timeline li.is-fresh .activity-mark{animation:activity-fresh 1.6s ease-out 1}
+@keyframes activity-fresh{0%{box-shadow:0 0 0 0 #ff9ecb00}30%{box-shadow:0 0 0 4px #ff9ecb66,0 0 16px #ff9ecb99}100%{box-shadow:0 0 0 0 #ff9ecb00}}
+@media(prefers-reduced-motion:reduce){.activity-fold[open]>.activity-timeline,.activity-fold[open]>p,.activity-timeline li.is-fresh .activity-mark{animation:none}.activity-fold>summary,.activity-fold>summary::after{transition:none}}
+/* ===== Acciones del presupuesto ===== */
+.quote-actions-edit{display:grid;gap:10px;justify-content:stretch}
+.quote-actions-edit h3{margin:0;font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#a9bdd8}
+.quote-actions-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.quote-actions-grid button{width:100%;min-width:0;min-height:44px;padding:0 10px;font-size:12.5px;line-height:1.2;transition:background-color .18s ease,border-color .18s ease,box-shadow .18s ease}
+.quote-actions-grid .quote-send{min-width:0}.quote-actions-grid button[data-loading=true]{cursor:progress;opacity:.85}
+@media(hover:hover){.quote-actions-grid button.secondary:hover:not(:disabled){border-color:#ff9ecb80;box-shadow:0 0 0 2px #ff9ecb1a;transform:none}}
+.quote-danger-zone{margin-top:10px;padding:8px 10px;border:1px solid #3a2530;border-radius:10px;background:none}
+.quote-danger-zone small{color:#a9bdd8}.quote-danger-zone button{display:inline-flex;align-items:center;gap:7px;min-height:34px;padding:0 12px;font-size:12px}.quote-danger-zone button svg{width:14px;height:14px}
+@media(max-width:900px){.quote-actions-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:380px){.quote-actions-grid{grid-template-columns:1fr}}
+/* ===== Detalle de la orden: presupuestos por estado, autorizaciones del cliente y resumen del presupuesto ===== */
+.budget-group{display:grid;gap:8px;min-width:0}
+.budget-group>:is(h3,summary){display:flex;align-items:center;gap:8px;margin:0;font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#a9bdd8;cursor:default;list-style:none}
+.budget-group>summary{cursor:pointer}.budget-group>summary::-webkit-details-marker{display:none}.budget-group>summary::after{content:'';width:7px;height:7px;margin-left:auto;border-right:2px solid #8fa6c4;border-bottom:2px solid #8fa6c4;transform:rotate(45deg);transition:transform .2s ease}.budget-group[open]>summary::after{transform:rotate(225deg)}
+.budget-group>:is(h3,summary) b{min-width:20px;padding:0 7px;border-radius:999px;background:#16304f;color:#cfe3ff;font-size:11px;line-height:1.7;text-align:center;letter-spacing:0}
+.budget-group[data-group=borradores]>h3 b{background:#22304a;color:#c3d0e6}.budget-group[data-group=pendientes]>h3 b{background:#3a2e14;color:#ffe2a8}.budget-group[data-group=aprobados]>h3 b{background:#12352b;color:#aef0d2}.budget-group[data-group=rechazados]>h3 b{background:#3a1a22;color:#ffc4c9}.budget-group[data-group=cancelados]>summary b{background:#1a2436;color:#b9c4d6}
+.budget-group-empty{margin:0;padding:8px 10px;border:1px dashed #2c4468;border-radius:10px;font-size:12.5px;color:#8fa6c4}
+#module-content .budget-pending{border-color:#2c4468;box-shadow:inset 3px 0 0 #ff9ecb80,0 10px 26px #02081366}
+.budget-pending .budget-head-icon{border-color:#37618d;background:linear-gradient(160deg,#1b3b60,#10233c);color:#a8dcff}
+.budget-quote-card{gap:8px;padding:12px;border-left:3px solid #7b8798}
+.budget-quote-card[data-stage=borrador]{border-left-color:#8ea0bd}.budget-quote-card:is([data-stage=enviado],[data-stage=revision],[data-stage=modificacion]){border-left-color:#e0b25c}.budget-quote-card:is([data-stage=aprobado],[data-stage=parcial]){border-left-color:#3fbf8f}.budget-quote-card:is([data-stage=rechazado],[data-stage=vencido]){border-left-color:#e06c78}
+.budget-quote-card .quote-summary-head>div:first-child{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;min-width:0}.budget-quote-card .quote-summary-head strong{overflow-wrap:anywhere}
+.quote-badge[data-status=borrador]{border-color:#8ea0bd80;background:#22304a;color:#c3d0e6}
+.budget-quote-amount b{font-size:17px}.budget-quote-card:not([data-stage=borrador]) .budget-quote-amount b{color:#f2f6ff}
+.budget-quote-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 14px;margin:0}
+.budget-quote-grid>div{display:grid;gap:1px;min-width:0}.budget-quote-grid dt{margin:0;font-size:10.5px;color:#8fa6c4}.budget-quote-grid dd{margin:0;font-size:12.5px;font-weight:600;color:#e3eeff;overflow-wrap:anywhere}
+.budget-card-actions{gap:6px;margin:2px 0 0}
+.budget-quote-card .budget-card-actions :is(button,a){flex:0 1 auto;display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:34px;margin:0;padding:0 11px;font-size:12px;text-decoration:none}
+.budget-card-actions svg{flex:none;width:14px;height:14px}
+.budget-card-actions .budget-delete{margin-left:auto;border-color:#6d3a44;background:transparent;color:#f0a3ab}.budget-card-actions .budget-delete:hover:not(:disabled){background:#3a1a22;color:#ffd0d4;transform:none}
+.budget-empty-compact{grid-template-columns:auto minmax(0,1fr);justify-items:start;text-align:left;gap:10px 12px;padding:14px}.budget-empty-compact .budget-empty-icon{width:42px;height:42px;margin:0}.budget-empty-compact .budget-empty-icon svg{width:20px;height:20px}
+.budget-empty-compact>div{display:grid;gap:2px;min-width:0}.budget-empty-compact p{font-size:12.5px;color:#9db1cf;margin:0}.budget-empty-compact button{grid-column:1/-1;margin:0}
+.budget-none{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid #1f3d33;border-radius:11px;background:#0b1f1a}
+.budget-none>span{display:grid;place-items:center;flex:none;width:32px;height:32px;border-radius:9px;border:1px solid #2f7d5f;color:#6fd9ad}.budget-none svg{width:16px;height:16px}
+.budget-none>div{display:grid;gap:2px;min-width:0}.budget-none strong{font-size:13px;color:#e3eeff}.budget-none small{font-size:11.5px;line-height:1.45;color:#9db1cf;overflow-wrap:anywhere}
+.budget-list-title{margin:0;font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#a9bdd8}
+.budget-approved-list li{align-items:center;transition:background-color .18s ease}.budget-approved-list li>.quote-row-icon{flex:none;border-color:#2f7d5f;background:#0e2620;color:#aef0d2}
+@media(hover:hover){.budget-approved-list li:hover{background:#0e1d33}}
+.budget-approved-list li>div:not(.budget-approved-side){flex:1 1 auto}
+.budget-totals>div small{font-size:10.5px;line-height:1.35;color:#8fa6c4}.budget-totals>div[data-kind=credit] dd{color:#bfeaff}.budget-totals>div[data-kind=total]{border-color:#2f7d5f}.budget-totals>div[data-kind=paid] dd{color:#cfe3ff}
+/* Resumen del presupuesto (tarjeta del equipo) */
+.equip-budget-ident{display:grid;gap:3px;min-width:0}.equip-budget-code{overflow-wrap:anywhere}
+.equip-budget-main{display:grid;gap:2px;padding:10px 12px;border:1px solid #1f3d44;border-radius:11px;background:#0a1a22}
+.equip-budget-main span{font-size:11px;color:#8fb5b8}.equip-budget-main b{font-size:24px;line-height:1.15;font-weight:750;font-variant-numeric:tabular-nums;color:#fff}.equip-budget-main small{font-size:12px;color:#b8d6d2}
+.equip-budget-progress{display:grid;gap:5px}.equip-budget-progress small{font-size:11.5px;color:#a9bdd8}
+.equip-budget-track{display:flex;gap:3px;height:6px;border-radius:999px;overflow:hidden;background:#17263f}
+.equip-budget-track i{display:block;flex:1 1 0;min-width:6px;border-radius:999px;background:#3a4b68}.equip-budget-track i[data-kind=aprobado]{background:#3fbf8f}.equip-budget-track i[data-kind=rechazado]{background:#e06c78}.equip-budget-track i[data-kind=pendiente]{background:#e0b25c}
+.equip-budget-values{grid-template-columns:repeat(4,minmax(0,1fr))}
+.equip-budget-values>div small{font-size:10.5px;line-height:1.35;color:#8fa6c4;white-space:normal}
+.equip-budget-values>div[data-kind=ok]{border-color:#2f7d5f66}.equip-budget-values>div[data-kind=ok] dd{color:#aef0d2}
+.equip-budget-values>div[data-kind=wait]{border-color:#8a6a2c66}.equip-budget-values>div[data-kind=wait] dd{color:#ffe2a8}
+.equip-budget-values>div[data-kind=paid]{border-color:#37618d66}.equip-budget-values>div[data-kind=paid] dd{color:#cfe3ff}
+.equip-budget-values>div[data-kind=due]{border-color:#e0b25c99;background:#2a2110}.equip-budget-values>div[data-kind=due] dd{color:#ffd9a0}
+.equip-budget-values>div[data-kind=credit] dd{color:#bfeaff}
+.equip-budget{box-shadow:inset 3px 0 0 #3fbfb0,inset 0 1px 0 #ff9ecb1f}
+@media(max-width:900px){.equip-budget-values{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:420px){.budget-quote-grid{grid-template-columns:1fr}.budget-card-actions .budget-delete{margin-left:0}.budget-quote-card .budget-card-actions :is(button,a){flex:1 1 130px}}

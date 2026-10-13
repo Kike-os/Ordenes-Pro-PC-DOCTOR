@@ -325,7 +325,7 @@ def items_of(c, quote_id):
 
 def get(c, quote_id):
     row = c.execute('SELECT * FROM quotes WHERE id=?', (quote_id,)).fetchone()
-    if not row:
+    if not row or row['deleted_at']:
         raise QuoteError('Presupuesto no disponible.', 404)
     return dict(row)
 
@@ -348,31 +348,42 @@ def detail(c, quote):
 
 def brief(c, order_id):
     """Resumen del presupuesto vigente de un equipo (su última versión) para la vista de la orden; None si no tiene."""
-    row = c.execute('SELECT * FROM quotes WHERE order_id=? ORDER BY version DESC LIMIT 1', (order_id,)).fetchone()
+    row = c.execute("SELECT * FROM quotes WHERE order_id=? AND deleted_at='' ORDER BY version DESC LIMIT 1", (order_id,)).fetchone()
     if not row:
         return None
     items = items_of(c, row['id'])
     t = totals(items, row['tax_rate_bp'], row['discount_bp'])
     return {'id': row['id'], 'code': row['code'], 'status': row['status'], 'status_label': STATUS[row['status']], 'editable': row['status'] in EDITABLE,
-            'lines': sum(1 for item in items if item['status'] != 'cancelado'), 'quoted_cents': t['quoted'], 'approved_cents': t['approved'], 'pending_cents': t['pending'], 'rejected_cents': t['rejected']}
+            'lines': sum(1 for item in items if item['status'] != 'cancelado'), 'approved_count': t['count']['aprobado'], 'rejected_count': t['count']['rechazado'], 'pending_count': t['count']['pendiente'],
+            'sent_at': row['sent_at'], 'authorized_cents': sum(line['net_cents'] for line in approved_lines(c, dict(row))) if row['status'] in DECIDED else (lambda found: sum(line['net_cents'] for line in found['items']) if found else 0)(authorized(c, order_id)),
+            'quoted_cents': t['quoted'], 'approved_cents': t['approved'], 'pending_cents': t['pending'], 'rejected_cents': t['rejected']}
 
 
 def for_order(c, order_id):
     """Presupuesto vigente de la orden (su última versión) y la lista de versiones."""
-    rows = [dict(r) for r in c.execute('SELECT * FROM quotes WHERE order_id=? ORDER BY version DESC', (order_id,))]
-    return {'current': detail(c, rows[0]) if rows else None, 'versions': [{'id': r['id'], 'code': r['code'], 'version': r['version'], 'status': r['status'], 'status_label': STATUS[r['status']], 'created_at': r['created_at']} for r in rows],
+    rows = [dict(r) for r in c.execute("SELECT * FROM quotes WHERE order_id=? AND deleted_at='' ORDER BY version DESC", (order_id,))]
+    versions = []
+    for r in rows:
+        items = items_of(c, r['id'])
+        t = totals(items, r['tax_rate_bp'], r['discount_bp'])
+        link = c.execute("SELECT verified_at FROM quote_links WHERE quote_id=? AND revoked_at='' ORDER BY id DESC LIMIT 1", (r['id'],)).fetchone()
+        versions.append({'id': r['id'], 'code': r['code'], 'version': r['version'], 'status': r['status'], 'status_label': STATUS[r['status']], 'created_at': r['created_at'], 'valid_until': r['valid_until'], 'sent_at': r['sent_at'],
+                         'sent_to': r['sent_to'], 'decided_at': r['decided_at'], 'editable': r['status'] in EDITABLE, 'lines': sum(1 for item in items if item['status'] != 'cancelado'), 'quoted_cents': t['quoted'], 'approved_cents': t['approved'],
+                         'pending_cents': t['pending'], 'rejected_cents': t['rejected'], 'count': t['count'], 'verified_at': link['verified_at'] if link else '', 'removable': removable(c, r) == ''})
+    return {'current': detail(c, rows[0]) if rows else None, 'versions': versions,
             'tax_rate_bp': tax_rate(c), 'categories': CATEGORIES, 'conditions': CONDITIONS, 'priorities': {key: {'label': label, 'color': color} for key, (label, color, _) in PRIORITIES.items()}, 'icons': catalog_icons.catalog(), 'discounts': {str(key): '%s: %g %%' % (label, key / 100) for key, label in DISCOUNTS.items()}}
 
 
 def create(c, order_id, user, now, copy_from=None, pending_only=False):
     """Nueva versión del presupuesto de la orden: P1, P2… La anterior, si seguía abierta, queda cancelada."""
     code = order_code(c, order_id)
-    last = c.execute('SELECT * FROM quotes WHERE order_id=? ORDER BY version DESC LIMIT 1', (order_id,)).fetchone()
+    last = c.execute("SELECT * FROM quotes WHERE order_id=? AND deleted_at='' ORDER BY version DESC LIMIT 1", (order_id,)).fetchone()
+    highest = c.execute('SELECT COALESCE(MAX(version),0) FROM quotes WHERE order_id=?', (order_id,)).fetchone()[0]
     if last and last['status'] in ('borrador',):
         raise QuoteError('Esta orden ya tiene un presupuesto en borrador. Edítalo o cancélalo antes de crear otra versión.', 409)
     if pending_only and not (last and last['status'] in DECIDED and any(item['status'] == 'pendiente' for item in items_of(c, last['id']))):
         raise QuoteError('El presupuesto vigente no tiene partidas que el cliente haya dejado pendientes.', 409)
-    version, stamp = (last['version'] + 1 if last else 1), now.isoformat(timespec='seconds')
+    version, stamp = highest + 1, now.isoformat(timespec='seconds')
     quote_id = c.execute("INSERT INTO quotes(order_id,version,code,status,tax_rate_bp,created_by,created_at,updated_at,discount_bp,discount_by,discount_at,continues_id) VALUES (?,?,?,'borrador',?,?,?,?,?,?,?,?)", (order_id, version, '%s-P%d' % (code, version), tax_rate(c), user['id'], stamp, stamp, last['discount_bp'] if last else 0, last['discount_by'] if last else None, last['discount_at'] if last else '', last['id'] if pending_only else None)).lastrowid
     if last and last['status'] in ('enviado', 'modificacion'):
         c.execute("UPDATE quotes SET status='cancelado',updated_at=? WHERE id=?", (stamp, last['id']))
@@ -545,6 +556,31 @@ def decide(c, quote, decisions, now, user=None, actor='', note=''):
     sync_budget(c, quote)
     event(c, quote['id'], status, '%d de %d ítems aprobados%s. Total autorizado: %s.%s' % (approved, len(items), ('; %d quedaron pendientes para una nueva versión' % waiting) if waiting else '', usd(approved_total), ' ' + note if note else ''), now, user, actor)
     return status
+
+
+def removable(c, quote):
+    """Motivo por el que un presupuesto NO se puede eliminar como borrador; '' si se puede. Solo borradores que nunca salieron del taller."""
+    if quote.get('deleted_at'):
+        return 'Este borrador ya fue eliminado.'
+    if quote['status'] != 'borrador' or quote['sent_at'] or quote['decided_at']:
+        return 'Solo se eliminan borradores que no se han enviado al cliente. Un presupuesto enviado o decidido se anula, no se elimina.'
+    if c.execute('SELECT 1 FROM quote_links WHERE quote_id=?', (quote['id'],)).fetchone() or c.execute('SELECT 1 FROM quote_acceptances WHERE quote_id=?', (quote['id'],)).fetchone():
+        return 'Este presupuesto ya tuvo un enlace o una autorización del cliente: no se elimina.'
+    if c.execute('SELECT 1 FROM quotes WHERE continues_id=?', (quote['id'],)).fetchone():
+        return 'Otra versión continúa este presupuesto: no se elimina.'
+    return ''
+
+
+def delete_draft(c, quote, user, now):
+    """Eliminación lógica de un borrador: sale de las listas y deja de editarse; su registro y su historial se conservan."""
+    reason = removable(c, quote)
+    if reason:
+        raise QuoteError(reason, 409)
+    if user['role'] != 'administrador' and quote['created_by'] != user['id']:
+        raise QuoteError('Solo administración o quien creó el borrador puede eliminarlo.', 403)
+    stamp = now.isoformat(timespec='seconds')
+    c.execute("UPDATE quotes SET deleted_at=?,deleted_by=?,updated_at=? WHERE id=? AND deleted_at='' AND status='borrador'", (stamp, user['id'], stamp, quote['id']))
+    event(c, quote['id'], 'eliminado', 'Borrador eliminado. Su registro se conserva para auditoría.', now, user)
 
 
 def cancel(c, quote, user, now, reason=''):
