@@ -27,7 +27,7 @@ def kind_for(status):
     return 'confirmation' if status=='confirmada' else 'request' if status=='solicitada' else 'rescheduled' if status=='reprogramada' else 'cancelled' if status=='cancelada' else ''
 
 
-def compose(row,kind,config):
+def compose(row,kind,config,signature=None):
     """Mensaje con versión de texto y HTML sencillo (tablas y estilos en línea, compatible con Gmail y Outlook)."""
     company=settings();title,lead,color,state=KINDS[kind]
     start=datetime.fromisoformat(row['starts_at']).astimezone(appointments.TZ)
@@ -38,27 +38,18 @@ def compose(row,kind,config):
     advice='' if kind=='cancelled' else 'Lleva tu equipo con su cargador y los accesorios relacionados con la falla. La orden de reparación se registra cuando recibimos físicamente el equipo.'
     contact='WhatsApp '+company['whatsapp']+' · '+company['website']
     text='Hola '+row['customer_name']+':\n\n'+lead+'\n\n'+'\n'.join(label+': '+value for label,value in facts)+('\n\n'+advice if advice else '')+'\n\nPara cambiar o cancelar tu cita, contáctanos.\n'+contact+'\n\n'+company['name']+'\n'+company['specialty']
-    e=html.escape
-    rows=''.join('<tr><td style="padding:7px 0;color:#5b6b82;font-size:13px;width:38%%">%s</td><td style="padding:7px 0;color:#16233a;font-size:14px;font-weight:600">%s</td></tr>'%(e(label),e(value)) for label,value in facts[1:])
-    body=('<div style="margin:0;padding:24px 12px;background:#eef2f7;font-family:Arial,Helvetica,sans-serif">'
-     '<table role="presentation" cellpadding="0" cellspacing="0" width="100%%" style="max-width:560px;margin:0 auto;background:#ffffff;border:1px solid #d7deea;border-radius:10px"><tr><td style="padding:18px 24px;background:#0f2a52;border-radius:10px 10px 0 0">'
-     '<table role="presentation" cellpadding="0" cellspacing="0" width="100%%"><tr><td style="width:84px"><img src="cid:logo-pcdoctor" alt="PC-DOCTOR S.A." width="72" style="display:block;border:0;background:#ffffff;border-radius:8px;padding:4px"></td>'
-     '<td style="color:#ffffff"><div style="font-size:17px;font-weight:700">%s</div><div style="font-size:12px;color:#c5d6f2">%s</div></td></tr></table></td></tr>'
-     '<tr><td style="padding:22px 24px 6px"><div style="font-size:18px;font-weight:700;color:#16233a">%s</div><p style="margin:8px 0 0;font-size:14px;line-height:1.5;color:#334155">Hola %s: %s</p></td></tr>'
-     '<tr><td style="padding:14px 24px"><table role="presentation" cellpadding="0" cellspacing="0" width="100%%" style="background:#f4f7fb;border:1px solid #d7deea;border-radius:8px"><tr><td style="padding:14px 16px">'
-     '<div style="font-size:12px;color:#5b6b82">Código de cita</div><div style="font-size:22px;font-weight:700;color:#0f2a52;letter-spacing:.5px">%s</div>'
-     '<div style="display:inline-block;margin-top:8px;padding:4px 10px;border-radius:999px;background:%s;color:#ffffff;font-size:12px;font-weight:700">%s</div></td></tr></table></td></tr>'
-     '<tr><td style="padding:0 24px"><table role="presentation" cellpadding="0" cellspacing="0" width="100%%">%s</table></td></tr>'
-     '%s<tr><td style="padding:16px 24px 22px;border-top:1px solid #e3e8f0"><div style="font-size:13px;color:#16233a;font-weight:700">%s</div><div style="font-size:12px;color:#5b6b82;line-height:1.5">%s<br>%s</div></td></tr></table></div>')%(
-     e(company['name']),e(company['specialty']),e(title),e(row['customer_name']),e(lead),e(row['public_code']),color,e(state),rows,
-     ('<tr><td style="padding:14px 24px 4px;font-size:13px;line-height:1.5;color:#334155">%s</td></tr>'%e(advice)) if advice else '',e(company['name']),e(company['specialty']),e(contact))
+    # Plantilla institucional común (encabezado textual, datos en tabla y firma autorizada al final).
+    import mailing
+    page_text='Hola '+row['customer_name']+':\n\n'+lead+'\n\n'+'\n'.join(label+': '+value for label,value in facts)+('\n\n'+advice if advice else '')+'\n\nPara cambiar o cancelar tu cita, contáctanos.\n'+contact
+    logo=Path(__file__).resolve().parent/'static/logo-firma.png';sign=signature if isinstance(signature,dict) and signature.get('enabled') else None
+    body=mailing.html(page_text,title,mail_pro.signature_html(sign,'cid:logo-pcdoctor' if logo.is_file() else 'https://ordenes-pro.ecuadorpcdoctor.com/static/logo-firma.png') if sign else '')
+    if sign:text+='\n\n-- \n'+mail_pro.signature_text(sign)
     message=EmailMessage()
     message['From']=company['name']+' <'+config['username']+'>';message['To']=row['email']
     message['Subject']=title+' — '+row['public_code']+' | '+company['name']
     message['Date']=formatdate(localtime=True);message['Message-ID']=make_msgid(domain=config['username'].split('@')[-1])
     message.set_content(text);message.add_alternative(body,subtype='html')
-    logo=Path(__file__).resolve().parent/'static/logo-firma.png'
-    if logo.is_file():message.get_payload()[1].add_related(logo.read_bytes(),'image','png',cid='<logo-pcdoctor>')
+    if sign and logo.is_file():message.get_payload()[1].add_related(logo.read_bytes(),'image','png',cid='<logo-pcdoctor>')
     return message
 
 
@@ -77,7 +68,17 @@ def send(c,appointment_id,kind,force=False):
     elif not ready:result,detail='not_configured',''
     else:
         try:
-            config=mail_pro.settings();mail_pro.deliver(config,compose(row,kind,config),[email])
+            import json,mailing
+            config=mail_pro.settings();card=c.execute('SELECT value FROM system_state WHERE key=?',('mail_signature_card:'+config['username'],)).fetchone()
+            try:raw=json.loads(card['value']) if card else {}
+            except ValueError:raw={}
+            message=compose(row,kind,config,mail_pro.clean_signature(raw,config['username']))
+            archive_id=mailing.archive(c,'appointment',None,email,str(message['Subject']),message,'plantilla',None,appointments.now())
+            c.commit()
+            try:mail_pro.deliver(config,message,[email])
+            except mail_pro.MailError as error:
+                mailing.mark(c,archive_id,'error',str(error));raise
+            mailing.mark(c,archive_id,'enviado','El servidor de correo aceptó el mensaje.',str(message['Message-ID'] or ''),appointments.now())
         except mail_pro.MailError as error:
             print('appointment-mail',kind,error.kind,flush=True);result,detail='failed',str(error)[:300]
         except Exception as error:  # Un fallo inesperado del correo no debe afectar a la cita.

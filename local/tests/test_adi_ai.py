@@ -92,7 +92,7 @@ class AdiWritingTests(unittest.TestCase):
     def test_smart_correction_settings_are_admin_only_and_enforced(self):
         cookie,csrf=self.login()
         rules=self.request('/api/adi/status',cookie=cookie)['body']['writing']['correction']
-        self.assertEqual(rules,{'auto_spelling':True,'grammar':True,'format':True,'professional':True,'indicators':True,'delay_ms':700})
+        self.assertEqual(rules,{'auto_spelling':True,'grammar':True,'format':True,'professional':True,'indicators':True,'mail_review':True,'delay_ms':700})
         save=lambda **body:self.request('/api/adi/settings',body,cookie=cookie,csrf=csrf)
         for bad in ({'delay_ms':'100'},{'delay_ms':'9000'},{'delay_ms':'abc'},{'grammar':'sí'}):self.assertEqual(save(**bad)['status'],400)
         saved=save(auto_spelling=False,professional=False,delay_ms='1000')['body']['writing']['correction']

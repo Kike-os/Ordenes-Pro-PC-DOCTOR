@@ -886,13 +886,19 @@ def build_message(config, data, signature=''):
     cut = QUOTE_START.search(body) if (sign or plain_sign) else None
     head, tail = (body[:cut.start()], body[cut.start():]) if cut else (body, '')
     message.set_content(head.rstrip() + ('\n\n-- \n' + plain_sign if plain_sign else '') + (tail.rstrip() if tail else '') + '\n')
-    if sign or data.get('rich'):
+    layout = data.get('layout') if isinstance(data.get('layout'), dict) else None
+    if sign or data.get('rich') or layout:
         # Versión HTML: el texto se escapa por completo; solo se convierten las marcas propias y se añade la firma generada por el servidor.
         cid = make_msgid(domain=config['username'].split('@')[-1])
         logo = SIGNATURE_LOGO.read_bytes() if sign and SIGNATURE_LOGO.exists() else None
         block = '<br>' + signature_html(sign, 'cid:' + cid[1:-1] if logo else 'https://ordenes-pro.ecuadorpcdoctor.com/static/logo-firma.png') if sign else ''
         quoted = '<blockquote style="margin:14px 0 0;padding-left:12px;border-left:3px solid #c9ccd1;color:#555555;">' + rich_html(tail.strip(), '', wrap=False) + '</blockquote>' if tail.strip() else ''
-        message.add_alternative('<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;color:#222222;">' + rich_html(head.rstrip(), '' if sign else plain_sign, wrap=False) + block + quoted + '</div>', subtype='html')
+        if layout:
+            # Plantilla institucional común: encabezado textual, contenido alineado y la firma autorizada al final.
+            import mailing
+            message.add_alternative(mailing.html(head.rstrip(), str(layout.get('title') or subject), block[4:] if block else '', quoted), subtype='html')
+        else:
+            message.add_alternative('<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;color:#222222;">' + rich_html(head.rstrip(), '' if sign else plain_sign, wrap=False) + block + quoted + '</div>', subtype='html')
         if logo:
             message.get_payload()[1].add_related(logo, 'image', 'png', cid=cid, disposition='inline')
     total = 0

@@ -55,7 +55,7 @@ def enabled(c):
 
 
 # Corrección Inteligente: lo que ADI hace por su cuenta mientras se escribe y lo que ofrece su botón. Lo decide administración.
-CORRECTION_DEFAULTS={'auto_spelling':True,'grammar':True,'format':True,'professional':True,'indicators':True,'delay_ms':700}
+CORRECTION_DEFAULTS={'auto_spelling':True,'grammar':True,'format':True,'professional':True,'indicators':True,'mail_review':True,'delay_ms':700}
 CORRECTION_DELAY=(400,3000)
 
 

@@ -312,6 +312,37 @@ def receipt_mail_status(c,oid):
     return {'history':rows,'sent':any(r['result']=='sent' for r in rows),'auto':not (auto and auto['value']=='off'),'configured':mail_pro.configured()}
 
 
+def order_from_text(c,*texts):
+    """Orden a la que se refiere un texto, solo si menciona un único número de orden existente."""
+    codes={match.upper() for text in texts for match in re.findall(r'PCD-\d{8}-\d{3,}(?:-E\d{2})?',str(text or ''),re.I)}
+    if len(codes)!=1:return None
+    row=c.execute('SELECT id FROM orders WHERE code=?',(codes.pop(),)).fetchone()
+    return row['id'] if row else None
+
+
+def send_institutional(c,kind,title,recipient,subject,body,order_id=None,actor=None,attachments=None,review=True,private=(),signed=True):
+    """Correo institucional: revisión de ADI, plantilla común, firma autorizada, copia exacta y vínculo con la orden.
+
+    Lanza mail_pro.MailError si el servidor no acepta el mensaje (queda registrado como error). «enviado» significa aceptado por el servidor."""
+    import mailing
+    now=reception_now();final,adi=mailing.review(c,body,now) if review else (body,'plantilla')
+    config=mail_pro.settings();card=mail_signature_card(c)
+    message,recipients=mail_pro.build_message(config,{'to':recipient,'subject':subject,'body':final,'from_name':corporate.settings()['name'],'attachments':attachments or [],'layout':{'title':title}},card if signed and card.get('enabled') else '')
+    archive_id=mailing.archive(c,kind,order_id,recipient,subject,message,adi,actor,now,[str(item.get('name','')) for item in attachments or []],private)
+    # La copia queda guardada como «preparado» antes de hablar con el servidor de correo.
+    c.commit()
+    try:mail_pro.deliver(config,message,recipients)
+    except mail_pro.MailError as error:
+        mailing.mark(c,archive_id,'error',str(error));c.commit();raise
+    message_id=str(message['Message-ID'] or '');sent=reception_now()
+    mailing.mark(c,archive_id,'enviado','El servidor de correo aceptó el mensaje.',message_id,sent)
+    if order_id and message_id:
+        # Vinculación automática: el mensaje nace unido a su orden y las respuestas del cliente se reconocen por esta referencia.
+        c.execute('INSERT OR IGNORE INTO mail_links(message_id,folder,uid,order_id,subject,correspondent,direction,sent_at,created_by,created_at) VALUES (?,?,0,?,?,?,?,?,?,?)',(message_id,'',order_id,subject[:300],recipient,'out',sent.isoformat(timespec='seconds'),actor,sent.isoformat(timespec='seconds')))
+    c.commit()
+    return {'archive_id':archive_id,'adi':adi,'message_id':message_id}
+
+
 def send_receipt_mail(c,oid,user,mode):
     """Envía por SMTP el comprobante A4 (con las Políticas de Reparaciones) al correo del cliente y registra el resultado.
 
@@ -342,10 +373,8 @@ def send_receipt_mail(c,oid,user,mode):
           'En este documento podrá consultar la información registrada del equipo, el servicio solicitado y las condiciones de recepción.\n\n'
           'Gracias por confiar en nuestro servicio técnico.\n\nAtentamente,\n\nDepartamento de Servicio Técnico\nPC-DOCTOR S.A.\nwww.ecuadorpcdoctor.com')
     try:
-        config=mail_pro.settings();card=mail_signature_card(c)
-        message,recipients=mail_pro.build_message(config,{'to':email,'subject':'PC-DOCTOR S.A. | Confirmación de recepción — Orden N.º '+order['code'],'body':body,'from_name':corporate.settings()['name'],
-            'attachments':[{'name':order['code']+'-COMPROBANTE-DE-RECEPCION.pdf','type':'application/pdf','data':base64.b64encode(pdf).decode()}]},card if card.get('enabled') else '')
-        mail_pro.deliver(config,message,recipients)
+        send_institutional(c,'receipt','Confirmación de recepción',email,'PC-DOCTOR S.A. | Confirmación de recepción — Orden N.º '+order['code'],body,oid,user['id'],
+            [{'name':order['code']+'-COMPROBANTE-DE-RECEPCION.pdf','type':'application/pdf','data':base64.b64encode(pdf).decode()}])
     except mail_pro.MailError as error:
         print('receipt-mail',error.kind,flush=True);log('failed',str(error),email,sha)
         return 200,{'result':'failed','message':'La orden está guardada, pero el correo no se pudo enviar: '+str(error)}
@@ -386,9 +415,8 @@ def send_authorization_mail(c,oid,user):
         +[title+': '+technical_access.STATE_LABELS[state]+'\n  '+detail for title,state,detail in rows]
         +['','La decisión fue expresada por el cliente y registrada en pantalla por el personal en recepción; no es una firma del cliente.','','Consultar la autorización (requiere iniciar sesión en Órdenes Pro):',public_base_url().rstrip('/')+'/#orders?id='+str(oid)])
     try:
-        config=mail_pro.settings();recipient=config['username']
-        message,recipients=mail_pro.build_message(config,{'to':recipient,'subject':'PC-DOCTOR S.A. | Autorización registrada — Orden N.º '+order['code'],'body':body,'from_name':corporate.settings()['name']},'')
-        mail_pro.deliver(config,message,recipients)
+        recipient=mail_pro.settings()['username']
+        send_institutional(c,'authorization_notice','Autorización registrada',recipient,'PC-DOCTOR S.A. | Autorización registrada — Orden N.º '+order['code'],body,oid,user['id'],review=False,signed=False)
     except mail_pro.MailError as error:
         print('authorization-mail',error.kind,flush=True);log('failed',str(error));return {'result':'failed','message':str(error)}
     log('sent','El servidor de correo aceptó el mensaje.',recipient)
@@ -414,9 +442,8 @@ def profile_photo_stamp(c,uid):
 
 def maintenance_deliver(recipient,subject,body):
     """Envío de un recordatorio de mantenimiento por el correo del sistema; lanza MailError si el servidor no lo acepta."""
-    config=mail_pro.settings()
-    message,recipients=mail_pro.build_message(config,{'to':recipient,'subject':subject,'body':body,'from_name':corporate.settings()['name']},'')
-    mail_pro.deliver(config,message,recipients)
+    with connect() as archive:
+        send_institutional(archive,'maintenance','Mantenimiento preventivo',recipient,subject,body,order_from_text(archive,subject,body))
 
 
 def maintenance_reminders_tick(c,now):
@@ -433,10 +460,8 @@ def maintenance_reminders_tick(c,now):
 
 def stay_deliver(recipient,subject,body):
     """Envío de un aviso de permanencia por el correo del sistema; devuelve el Message-ID aceptado por el servidor."""
-    config=mail_pro.settings()
-    message,recipients=mail_pro.build_message(config,{'to':recipient,'subject':subject,'body':body,'from_name':corporate.settings()['name']},'')
-    mail_pro.deliver(config,message,recipients)
-    return str(message['Message-ID'] or '')
+    with connect() as archive:
+        return send_institutional(archive,'stay','Aviso de permanencia del equipo',recipient,subject,body,order_from_text(archive,subject,body))['message_id']
 
 
 def send_verification_code(recipient,code,minutes,where,context=''):
@@ -482,10 +507,8 @@ def send_client_authorization(c,oid,user):
           'También puede escanear el código QR adjunto. El enlace es personal y caduca en '+str(client_authorization.EXPIRES_DAYS)+' días. Si usted no solicitó este servicio, ignore este mensaje.\n\n'
           'Atentamente,\n\nDepartamento de Servicio Técnico\nPC-DOCTOR S.A.')
     try:
-        config=mail_pro.settings();card=mail_signature_card(c)
-        message,recipients=mail_pro.build_message(config,{'to':order['email'],'subject':'PC-DOCTOR S.A. | Autorización de servicio — Orden N.º '+order['code'],'body':body,'from_name':corporate.settings()['name'],
-            'attachments':[{'name':order['code']+'-QR-AUTORIZACION.png','type':'image/png','data':base64.b64encode(qr_image(url,'png')).decode()}]},card if card.get('enabled') else '')
-        mail_pro.deliver(config,message,recipients);result='sent'
+        send_institutional(c,'client_authorization','Autorización de servicio',order['email'],'PC-DOCTOR S.A. | Autorización de servicio — Orden N.º '+order['code'],body,oid,user['id'] if user else None,
+            [{'name':order['code']+'-QR-AUTORIZACION.png','type':'image/png','data':base64.b64encode(qr_image(url,'png')).decode()}],private=(url,));result='sent'
     except mail_pro.MailError as error:
         print('client-authorization-mail',error.kind,flush=True);result='failed: '+str(error)[:200]
     c.execute('UPDATE client_authorizations SET mail_result=? WHERE token_hash=?',(result,client_authorization.digest(token)))
@@ -545,7 +568,7 @@ def send_access_mail(email,name,url,invite=True,hours=INVITE_HOURS):
     markup=('<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"></head><body style="margin:0;padding:0;background-color:#eef2f8">'
             '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#eef2f8"><tr><td align="center" style="padding:28px 12px">'
             '<table role="presentation" width="560" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:560px;background-color:#ffffff;border:1px solid #d9e2ef;border-radius:14px">'
-            '<tr><td align="center" style="padding:26px 24px 14px"><img src="'+e(verification_mail.logo_url())+'" width="132" alt="PC-DOCTOR S.A." style="display:block;border:0;width:132px;height:auto">'
+            '<tr><td align="center" style="padding:26px 24px 14px"><div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:18px;letter-spacing:2px;font-weight:bold;color:#1d5fb0;">PC-DOCTOR S.A.</div>'
             '<div style="'+font+';font-size:18px;line-height:24px;font-weight:700;color:#143f77;padding-top:10px">'+e(company['name'])+'</div></td></tr>'
             '<tr><td style="padding:0 24px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td height="3" bgcolor="#143f77" style="height:3px;line-height:3px;font-size:0">&nbsp;</td><td width="64" height="3" bgcolor="#d94049" style="width:64px;height:3px;line-height:3px;font-size:0">&nbsp;</td></tr></table></td></tr>'
             '<tr><td align="center" style="padding:26px 28px 6px"><h1 style="margin:0;'+font+';font-size:22px;line-height:30px;color:#102744">'+e(title)+'</h1>'
@@ -707,7 +730,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header('Cache-Control', 'no-store')
         self.send_header('X-Content-Type-Options', 'nosniff')
         self.send_header('Referrer-Policy', 'no-referrer')
-        self.send_header('Content-Security-Policy', "default-src 'self'; frame-src 'self' blob: https://challenges.cloudflare.com; script-src 'self' https://challenges.cloudflare.com; style-src 'self'; img-src 'self'; connect-src 'self' https://challenges.cloudflare.com; frame-ancestors 'none'; form-action 'self'; base-uri 'none'")
+        self.send_header('Content-Security-Policy', getattr(self,'content_policy',None) or "default-src 'self'; frame-src 'self' blob: https://challenges.cloudflare.com; script-src 'self' https://challenges.cloudflare.com; style-src 'self'; img-src 'self'; connect-src 'self' https://challenges.cloudflare.com; frame-ancestors 'none'; form-action 'self'; base-uri 'none'")
         if cookie:
             for value in (cookie if isinstance(cookie, (list, tuple)) else [cookie]):
                 self.send_header('Set-Cookie', value)
@@ -1264,6 +1287,8 @@ class Handler(BaseHTTPRequestHandler):
                 # Versión oficial vigente, para consultarla desde órdenes sin aceptación registrada (no implica que esta orden la haya aceptado).
                 active_terms=service_terms.current(c,reception_now());result['terms_current']=service_terms.metadata(active_terms) if active_terms else None
                 result['photos']=[dict(r) for r in c.execute('SELECT id,is_main,position,size,created_at FROM order_photos WHERE order_id=? ORDER BY is_main DESC,position,id',(result['id'],))]
+                import mailing
+                result['mail_history']=mailing.history(c,result['id'])
                 result['mail']=[dict(r) for r in c.execute('SELECT id,subject,correspondent,direction,sent_at,folder,uid FROM mail_links WHERE order_id=? ORDER BY id DESC LIMIT 30',(result['id'],))] if mail_allowed(user) else None
                 return self.reply(200, {'order':result})
             if path == '/api/devices/identify':
@@ -1456,6 +1481,20 @@ class Handler(BaseHTTPRequestHandler):
                         sender=(message['from'] or [{}])[0].get('address','') if folder['role']!='sent' else (message['to'] or [{}])[0].get('address','')
                         known=c.execute("SELECT id,name FROM clients WHERE email!='' AND lower(email)=lower(?) ORDER BY id LIMIT 1",(sender,)).fetchone() if sender else None
                         message['client']=dict(known) if known else None
+                        if message['message_id'] and folder['role']!='sent' and not c.execute('SELECT 1 FROM mail_links WHERE message_id=?',(message['message_id'],)).fetchone():
+                            # Vinculación automática de un correo recibido: solo con una referencia inequívoca. 1) Responde a un mensaje que el sistema
+                            # envió desde una orden. 2) El asunto nombra una única orden y el remitente es el correo registrado de su cliente. Con dudas no se vincula.
+                            parents=re.findall(r'<[^<>\s]+>',message.get('references') or '');target=None
+                            if parents:
+                                found={r['order_id'] for r in c.execute('SELECT DISTINCT order_id FROM mail_links WHERE message_id IN ('+','.join('?' for _ in parents)+')',parents)}
+                                if len(found)==1:target=found.pop()
+                            if target is None and sender:
+                                named=order_from_text(c,message.get('subject',''))
+                                if named and c.execute("SELECT 1 FROM orders o JOIN devices d ON d.id=o.device_id JOIN clients cl ON cl.id=d.client_id WHERE o.id=? AND cl.email!='' AND lower(cl.email)=lower(?)",(named,sender)).fetchone():target=named
+                            if target:
+                                stamp=reception_now().isoformat(timespec='seconds')
+                                c.execute('INSERT OR IGNORE INTO mail_links(message_id,folder,uid,order_id,subject,correspondent,direction,sent_at,created_by,created_at) VALUES (?,?,?,?,?,?,?,?,?,?)',(message['message_id'],folder['id'],int(arg('uid')),target,str(message.get('subject',''))[:300],sender,'in',message.get('date') or stamp,None,stamp))
+                                audit(c,None,'mail_auto_linked',target);c.commit();message['auto_linked']=True
                         message['links']=[dict(r) for r in c.execute('SELECT l.id,o.id order_id,o.code FROM mail_links l JOIN orders o ON o.id=l.order_id WHERE l.message_id=? ORDER BY l.id',(message['message_id'],))] if message['message_id'] else []
                         return self.reply(200,{'message':message})
                     if path=='/api/mail/attachment':
@@ -1476,6 +1515,19 @@ class Handler(BaseHTTPRequestHandler):
                 # Estado del Centro de Atenciones para el inicio: contadores sin solapes y atenciones que requieren respuesta. Solo administración.
                 if user['role']!='administrador':return self.reply(403,{'error':'Acceso no permitido.'})
                 return self.reply(200,live_support.summary(c))
+            archived=re.fullmatch(r'/(?:api/sent-mail|correo)/([0-9]{1,12})',path)
+            if archived:
+                # Copia exacta de un correo enviado por el sistema. Solo personal con sesión; el contenido archivado no se puede modificar.
+                if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
+                row=c.execute("SELECT m.*,COALESCE(o.code,'') order_code FROM mail_archive m LEFT JOIN orders o ON o.id=m.order_id WHERE m.id=?",(int(archived[1]),)).fetchone()
+                if not row:return self.reply(404,{'error':'Correo no disponible.'})
+                import mailing
+                if path.startswith('/correo/'):
+                    # Página aparte con su propia política: admite los estilos en línea del correo y ningún guion ni recurso externo.
+                    self.content_policy="default-src 'none'; style-src 'unsafe-inline'; img-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
+                    return self.reply(200,re.sub(r'cid:[^"\'\s>]+','/static/logo-firma.png',row['body_html']) or '<pre>'+html.escape(row['body_text'])+'</pre>','text/html; charset=utf-8')
+                return self.reply(200,{'mail':{'id':row['id'],'kind_label':mailing.LABELS.get(row['kind'],'Notificación'),'recipient':row['recipient'],'subject':row['subject'],'text':row['body_text'],'attachments':row['attachments'],'status':row['status'],'status_label':mailing.STATUS[row['status']],
+                    'adi':row['adi'],'detail':row['detail'],'created_at':row['created_at'],'sent_at':row['sent_at'],'order_code':row['order_code'],'view_url':'/correo/%d'%row['id'] if row['body_html'] else ''}})
             if path == '/api/catalog':
                 if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
                 query=parse_qs(urlsplit(self.path).query)
@@ -2350,14 +2402,13 @@ class Handler(BaseHTTPRequestHandler):
                             c.commit();result='not_configured'
                             try:
                                 if mail_pro.configured():
-                                    detail=quotes.detail(c,quotes.get(c,found['id']));config=mail_pro.settings();card=mail_signature_card(c)
+                                    detail=quotes.detail(c,quotes.get(c,found['id']))
                                     body='\n'.join(['Estimado/a '+document['client']+':','','Le enviamos el presupuesto N.º '+found['code']+' correspondiente a su orden de servicio '+document['code']+'.','',
                                         'Total cotizado: '+quotes.usd(detail['totals']['quoted'])+' (impuestos incluidos).']+(['Válido hasta el '+appointments.date.fromisoformat(detail['valid_until']).strftime('%d/%m/%Y')+'.'] if detail['valid_until'] else [])+['',
                                         'Para revisar el detalle y aprobar o rechazar cada servicio, ingrese al siguiente enlace privado:',link,'',
                                         'Por su seguridad se le pedirán los últimos cuatro dígitos de su cédula o RUC. El enlace es personal: no lo reenvíe.','',
                                         'No se ejecutará ningún trabajo sin su autorización.','','Atentamente,','','Departamento de Servicio Técnico','PC-DOCTOR S.A.'])
-                                    message,recipients=mail_pro.build_message(config,{'to':email,'subject':'PC-DOCTOR S.A. | Presupuesto N.º '+found['code'],'body':body,'from_name':corporate.settings()['name']},card if card.get('enabled') else '')
-                                    mail_pro.deliver(config,message,recipients);result='sent'
+                                    send_institutional(c,'quote','Presupuesto de servicio',email,'PC-DOCTOR S.A. | Presupuesto N.º '+found['code'],body,found['order_id'],user['id'],private=(link,));result='sent'
                             except mail_pro.MailError as error:
                                 print('quote-mail',error.kind,flush=True);result='failed'
                             with connect() as log:

@@ -31,7 +31,7 @@ class WSGIHandler(core.Handler):
             ('Content-Type', content_type), ('Content-Length', str(len(body))),
             ('Cache-Control', 'no-store'), ('X-Content-Type-Options', 'nosniff'),
             ('Referrer-Policy', 'no-referrer'),
-            ('Content-Security-Policy', "default-src 'self'; frame-src 'self' blob: https://challenges.cloudflare.com; script-src 'self' https://challenges.cloudflare.com; style-src 'self'; img-src 'self'; connect-src 'self' https://challenges.cloudflare.com; frame-ancestors 'none'; form-action 'self'; base-uri 'none'"),
+            ('Content-Security-Policy', getattr(self,'content_policy',None) or "default-src 'self'; frame-src 'self' blob: https://challenges.cloudflare.com; script-src 'self' https://challenges.cloudflare.com; style-src 'self'; img-src 'self'; connect-src 'self' https://challenges.cloudflare.com; frame-ancestors 'none'; form-action 'self'; base-uri 'none'"),
         ]
         # Mismo criterio que el servidor local: los documentos de la orden se guardan con su número real.
         if filename:
