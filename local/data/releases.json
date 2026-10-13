@@ -8,6 +8,29 @@
   },
   "releases": [
     {
+      "version": "1.5.133",
+      "date": "2026-10-13T07:17:21-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Detalle de la Orden renovado, presupuestos con partidas por decidir y ejecución, gestión técnica del equipo y reserva desde el chat de ADI",
+      "changes": {
+        "features": [
+          "Presupuestos: el cliente puede dejar partidas por decidir, que pasan a una versión de continuación sin perder lo ya autorizado; cada partida aprobada tiene su estado de ejecución.",
+          "ADI ofrece en el chat los próximos horarios libres como botones que abren la Agenda de Citas con fecha y hora ya elegidas."
+        ],
+        "improvements": [
+          "Detalle de la Orden: paneles «Presupuestos pendientes de aprobación» y «Servicios y productos aprobados», equipos con información técnica, presupuesto propio y resumen general, y encabezado con cliente, equipo, técnico y prioridad.",
+          "«Gestión técnica del equipo» (antes «Editar orden»): ventana por secciones, cambios pendientes, validación junto al campo y ADI con vista previa, edición de la propuesta y destello al aplicar."
+        ],
+        "fixes": [
+          "Los importes de un presupuesto aprobado por el cliente ya no se pueden alterar desde la edición de la orden.",
+          "El detalle de la orden muestra el teléfono y el correo vigentes del cliente, no los copiados al recibir el equipo."
+        ],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.132",
       "date": "2026-10-13T06:23:05-05:00",
       "type": "patch",

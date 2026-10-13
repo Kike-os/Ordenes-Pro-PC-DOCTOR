@@ -4,6 +4,25 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.133 — 2026-10-13 07:17 (UTC-05:00)
+
+Detalle de la Orden renovado, presupuestos con partidas por decidir y ejecución, gestión técnica del equipo y reserva desde el chat de ADI
+
+### Nuevas funcionalidades
+
+- Presupuestos: el cliente puede dejar partidas por decidir, que pasan a una versión de continuación sin perder lo ya autorizado; cada partida aprobada tiene su estado de ejecución.
+- ADI ofrece en el chat los próximos horarios libres como botones que abren la Agenda de Citas con fecha y hora ya elegidas.
+
+### Mejoras realizadas
+
+- Detalle de la Orden: paneles «Presupuestos pendientes de aprobación» y «Servicios y productos aprobados», equipos con información técnica, presupuesto propio y resumen general, y encabezado con cliente, equipo, técnico y prioridad.
+- «Gestión técnica del equipo» (antes «Editar orden»): ventana por secciones, cambios pendientes, validación junto al campo y ADI con vista previa, edición de la propuesta y destello al aplicar.
+
+### Errores corregidos
+
+- Los importes de un presupuesto aprobado por el cliente ya no se pueden alterar desde la edición de la orden.
+- El detalle de la orden muestra el teléfono y el correo vigentes del cliente, no los copiados al recibir el equipo.
+
 ## v1.5.132 — 2026-10-13 06:23 (UTC-05:00)
 
 Acciones de Seguimiento, correos institucionales, catálogo profesional de presupuestos, documento de identidad y avisos uniformes
