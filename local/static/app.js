@@ -2612,14 +2612,28 @@ function activityInfo(row){const kind=activityKind(row),comment=historyComment(r
 // desplegables, historial por fila y sincronización periódica. Las seis tarjetas de estado superiores actúan como filtro y muestran los totales reales.
 let trackingTimer=null,trackingStamp=0,trackingView=null;
 function trackingFilterStatus(code){const view=trackingView;if(!view)return;view.setStatus(view.status===code?'':code);document.querySelector('.tracking-pro')?.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion:reduce)').matches?'auto':'smooth',block:'nearest'});}
+// Menú de acciones de una fila (pantallas pequeñas). Se ancla al botón, se cierra con Escape, al pulsar fuera o al desplazar, y devuelve el foco.
+let trackingMenuOpen=null;
+function trackingMenu(anchor,items){if(trackingMenuOpen){const same=trackingMenuOpen.anchor===anchor;trackingMenuOpen.close();if(same)return;}
+ const box=el('div',undefined,'tracking-menu');box.setAttribute('role','menu');box.setAttribute('aria-label',anchor.getAttribute('aria-label')||'Más acciones');
+ const close=(focus=true)=>{box.remove();anchor.setAttribute('aria-expanded','false');removeEventListener('pointerdown',outside,true);removeEventListener('keydown',keys,true);removeEventListener('scroll',away,true);removeEventListener('resize',away);trackingMenuOpen=null;if(focus&&anchor.isConnected)anchor.focus();};
+ const outside=event=>{if(!box.contains(event.target)&&event.target!==anchor&&!anchor.contains(event.target))close(false);},away=()=>close(false);
+ const keys=event=>{const options=[...box.querySelectorAll('button:not(:disabled)')],at=options.indexOf(document.activeElement);if(event.key==='Escape'){event.preventDefault();event.stopPropagation();close();}else if(event.key==='ArrowDown'){event.preventDefault();options[(at+1)%options.length]?.focus();}else if(event.key==='ArrowUp'){event.preventDefault();options[(at-1+options.length)%options.length]?.focus();}else if(event.key==='Tab')close(false);};
+ for(const[label,glyph,run,disabled]of items){const option=button('',()=>{close(false);run();});option.setAttribute('role','menuitem');option.disabled=!!disabled;option.append(systemIcon(glyph),el('span',label));box.append(option);}
+ document.body.append(box);const spot=anchor.getBoundingClientRect(),size=box.getBoundingClientRect();box.style.left=Math.max(8,Math.min(innerWidth-size.width-8,spot.right-size.width))+'px';box.style.top=(spot.bottom+size.height+10>innerHeight?Math.max(8,spot.top-size.height-6):spot.bottom+6)+'px';
+ anchor.setAttribute('aria-expanded','true');trackingMenuOpen={anchor,close};addEventListener('pointerdown',outside,true);addEventListener('keydown',keys,true);addEventListener('scroll',away,true);addEventListener('resize',away);box.querySelector('button:not(:disabled)')?.focus();}
 function renderTracking(){
  const root=$('operations-activity'),status=$('tracking-status');if(!root)return;
  const view=trackingView={q:'',status:'',technician:'',from:'',to:'',known:new Map(),first:true,data:null,token:0,total:0,start:0,cache:new Map(),busy:false,hover:false,focus:false,touch:false,stale:false,moved:Date.now()};
  root.replaceChildren();root.className='tracking-board';
  const tools=el('form',undefined,'tracking-tools'),advanced=el('div',undefined,'tracking-advanced'),chips=el('div',undefined,'tracking-chips'),wrap=el('div',undefined,'tracking-table-wrap tracking-carousel'),table=el('table',undefined,'tracking-table'),body=el('tbody'),foot=el('div',undefined,'tracking-foot');
  tools.setAttribute('role','search');tools.noValidate=true;advanced.id='tracking-advanced';advanced.hidden=true;table.setAttribute('aria-label','Seguimiento de órdenes');
- const head=el('thead'),headRow=el('tr'),titles=['Orden','Cliente','Estado','Último movimiento','Técnico','Acciones'];for(const title of titles){const th=el('th',title);th.scope='col';headRow.append(th);}head.append(headRow);table.append(head,body);wrap.append(table);
- const search=el('input');search.type='search';search.placeholder='Buscar por orden, cliente, equipo, marca o estado';search.setAttribute('aria-label','Buscar en el seguimiento');search.maxLength=80;
+ const head=el('thead'),headRow=el('tr'),titles=['Orden','Cliente','Estado','Último movimiento','Técnico','Acciones'];let sortButton=null;for(const title of titles){const th=el('th',title);th.scope='col';
+  // «Último movimiento» ordena el listado: más reciente primero (por omisión) o más antiguo primero. El orden lo aplica el servidor.
+  if(title==='Último movimiento'){th.textContent='';sortButton=button('',()=>{view.sort=view.sort==='antiguo'?'reciente':'antiguo';paintSort();load();},'tracking-sort');sortButton.append(el('span',title),systemIcon('M12 5v14 M6 13l6 6 6-6'));th.append(sortButton);th.dataset.sort='true';}
+  headRow.append(th);}
+ const paintSort=()=>{const old=view.sort==='antiguo';sortButton.dataset.direction=old?'asc':'desc';sortButton.closest('th').setAttribute('aria-sort',old?'ascending':'descending');sortButton.title=old?'Ordenado del movimiento más antiguo al más reciente. Pulsa para invertir.':'Ordenado del movimiento más reciente al más antiguo. Pulsa para invertir.';sortButton.setAttribute('aria-label','Último movimiento: '+sortButton.title);};view.sort='reciente';view.stateSeen=new Map();paintSort();head.append(headRow);table.append(head,body);wrap.append(table);
+ const search=el('input');search.type='search';search.placeholder='Buscar por orden, cliente, equipo o número de serie';search.setAttribute('aria-label','Buscar en el seguimiento');search.maxLength=80;
  const pick=(label,name)=>{const box=el('label',undefined,'tracking-field'),node=el('select');node.name=name;box.append(el('span',label),node);return [box,node];},[stateBox,statePick]=pick('Estado','status'),[techBox,techPick]=pick('Técnico','technician');
  const dateField=(label,name)=>{const box=el('label',undefined,'tracking-field'),node=el('input');node.type='date';node.name=name;box.append(el('span',label),node);return [box,node];},[fromBox,fromNode]=dateField('Movimiento desde','from'),[toBox,toNode]=dateField('Movimiento hasta','to');
  advanced.append(stateBox,techBox,fromBox,toBox);
@@ -2636,18 +2650,23 @@ function renderTracking(){
    for(const event of data.rows){const info=activityInfo(event),item=el('li'),icon=el('span',undefined,'track-icon'),text=el('div');applyLook(item,icon,event);text.append(el('strong',info.title),el('span',info.detail));if(info.comment)text.append(el('q',info.comment));text.append(el('small',info.actor+' · '+formatOrderDate(event.occurred_at)));item.append(icon,text);steps.append(item);}
    holder.replaceChildren(data.rows.length?steps:el('p','Esta orden todavía no tiene movimientos registrados.','tracking-note'));}catch(error){holder.replaceChildren(el('p',error.message,'tracking-note'));}}
  function rows(row){
-  const tr=el('tr',undefined,'tracking-row');tr.dataset.order=row.id;tr.dataset.sign=JSON.stringify([row.event_id,row.status_code,row.responsible,row.priority,row.events,row.client]);if(row.priority==='urgente'||row.priority==='alta')tr.dataset.priority=row.priority;
+  const tr=el('tr',undefined,'tracking-row');tr.dataset.order=row.id;tr.dataset.sign=JSON.stringify([row.event_id,row.status_code,row.responsible,row.priority,row.events,row.client,row.phone]);if(row.priority==='urgente'||row.priority==='alta')tr.dataset.priority=row.priority;
   const event=row.event_id?{id:row.event_id,event:row.event,comment:row.comment,status_label:row.status_label,previous_label:row.previous_label,actor:row.actor,occurred_at:row.occurred_at,order_id:row.id,code:row.code}:null;
   const cell=(label,...nodes)=>{const td=el('td');td.dataset.label=label;td.append(...nodes);tr.append(td);return td;};
-  const id=el('div',undefined,'tracking-id'),code=button(row.code,()=>go('orders',new URLSearchParams({id:String(row.id)})),'order-code-link');code.title='Abrir la orden '+row.code;const who=el('div');who.append(code,el('small',[row.type_label,row.brand,row.model].filter(Boolean).join(' ')||'Equipo sin especificar'));id.append(deviceIcon(row.type),who);cell('Orden',id);
-  const client=el('span',row.client,'tracking-client');client.title=row.client;cell('Cliente',client);
+  const id=el('div',undefined,'tracking-id'),code=button(row.code,()=>go('orders',new URLSearchParams({id:String(row.id)})),'order-code-link');code.title='Abrir la orden '+row.code;const who=el('div'),gear=el('small',[row.type_label,row.brand,row.model].filter(Boolean).join(' ')||'Equipo sin especificar');gear.title=gear.textContent+(row.serial?' · Serie '+row.serial:'');who.append(code,gear);id.append(deviceIcon(row.type),who);cell('Orden',id);
+  const client=el('div',undefined,'tracking-who'),clientName=el('span',row.client,'tracking-client');clientName.title=row.client;client.append(clientName);if(row.phone){const phone=el('small',row.phone,'tracking-phone');phone.title='Teléfono: '+row.phone;client.append(phone);}{const helper=el('small','Técnico: '+(row.responsible||'Sin asignar'),'tracking-who-tech');helper.title=helper.textContent;client.append(helper);}cell('Cliente',client);
   // Estado y etapas: solo se marcan como completadas las que constan en el historial.
   const badge=orderBadge(row.status_code,row.status,row.id);if(statusGlyphs[row.status_code]){badge.classList.add('status-icon');badge.prepend(systemIcon(statusGlyphs[row.status_code]));}
   const steps=el('ol',undefined,'tracking-stages');steps.setAttribute('aria-label','Etapas: '+row.stages.map(stage=>stage.label+' '+({done:'completada',current:'actual',pending:'pendiente',unrecorded:'sin registro'})[stage.state]).join(', '));for(const stage of row.stages){const step=el('li');step.dataset.state=stage.state;step.title=stage.label+' · '+({done:'completada (consta en el historial)',current:'etapa actual',pending:'pendiente',unrecorded:'sin registro en el historial'})[stage.state];steps.append(step);}
-  const state=el('div',undefined,'tracking-state');state.append(badge,steps);cell('Estado',state);
+  // Indicador de progreso: refleja solo el estado real. La luz recorre la etapa actual unas pocas veces (no es una animación continua);
+  // al registrarse la entrega, todas las barras quedan en verde y aparece un destello breve, una sola vez.
+  const state=el('div',undefined,'tracking-state'),bars=el('div',undefined,'tracking-progress'),doneMark=el('span',undefined,'tracking-done');doneMark.append(systemIcon('M20 6 9 17l-5-5'));doneMark.title='Orden entregada';bars.append(steps,doneMark);bars.dataset.status=row.status_code;
+  bars.title=row.stages.map(stage=>stage.label+': '+({done:'completada',current:'actual',pending:'pendiente',unrecorded:'sin registro'})[stage.state]).join(' · ');
+  {const before=view.stateSeen.get(row.id);if(before&&before!==row.status_code){bars.classList.add(row.status_code==='entregado'?'is-celebrating':'is-advancing');setTimeout(()=>bars.classList.remove('is-celebrating','is-advancing'),2200);}view.stateSeen.set(row.id,row.status_code);}
+  state.append(badge,bars);cell('Estado',state);
   const last=el('div',undefined,'tracking-last');
   if(event){const info=activityInfo(event),when=el('time',formatOrderDate(row.occurred_at));when.dateTime=new Date(row.occurred_at).toISOString();const meta=el('small');meta.append(when,document.createTextNode(' · '+(relativeTime(row.occurred_at)||'')+(event.actor?' · '+event.actor:'')));last.append(el('strong',info.title),meta);last.title=info.detail+(info.comment?' — '+info.comment:'');}
-  else last.append(el('small','Sin movimientos registrados'));
+  else last.append(el('small','Sin movimientos registrados'));{const meta=last.querySelector('small');if(meta&&event)meta.title=meta.textContent;}
   cell('Último movimiento',last);
   const tech=el('div',undefined,'tracking-tech');tech.append(el('span',row.responsible||'Sin asignar'));tech.title=row.responsible||'Sin asignar';const priority=({baja:'Prioridad baja',alta:'Prioridad alta',urgente:'Urgente'})[row.priority];if(priority){const tag=el('em',priority);tag.dataset.priority=row.priority;tech.append(tag);}cell('Técnico',tech);
   // Acciones: cuatro botones del mismo tamaño en una sola fila (Ver, Historial, QR y Ticket). Con poco ancho quedan solo los iconos,
@@ -2657,6 +2676,9 @@ function renderTracking(){
   const toggle=act('Historial','M12 6v6l4 2 M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z',()=>{const dialog=smallDialog('Historial · '+row.code),holder=el('div',undefined,'tracking-history-dialog');dialog.classList.add('tracking-dialog');dialog.append(holder);history(row,holder);},'historial','Historial de movimientos ('+row.events+') de la orden');toggle.setAttribute('aria-haspopup','dialog');toggle.disabled=!row.events;toggle.append(el('b',String(row.events)));
   act('QR','M3 3h7v7H3z M14 3h7v7h-7z M3 14h7v7H3z M14 14h3v3h-3z M20 14v.01 M14 20v.01 M17 17h4v4h-4z',()=>openTrackingCard(row.id),'qr','Código QR y tarjeta de seguimiento de la orden').setAttribute('aria-haspopup','dialog');
   act('Ticket','M6 9V3h12v6 M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2 M6 14h12v7H6z',()=>showDocumentPreview(row.id,'thermal'),'ticket','Ticket de la orden').setAttribute('aria-haspopup','dialog');
+  // Pantallas pequeñas: «Ver» queda a la vista y las demás acciones pasan a un menú, sin perder ninguna función.
+  const menu=button('',()=>trackingMenu(menu,[['Historial ('+row.events+')','M12 6v6l4 2 M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z',()=>toggle.click(),!row.events],['Código QR y tarjeta','M3 3h7v7H3z M14 3h7v7h-7z M3 14h7v7H3z M14 14h3v3h-3z M17 17h4v4h-4z',()=>openTrackingCard(row.id)],['Ticket','M6 9V3h12v6 M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2 M6 14h12v7H6z',()=>showDocumentPreview(row.id,'thermal')]]),'secondary tracking-more-actions');
+  menu.dataset.action='mas';menu.append(systemIcon('M12 5v.01 M12 12v.01 M12 19v.01'),el('span','Más'));menu.title='Más acciones';menu.setAttribute('aria-label','Más acciones de la orden '+row.code);menu.setAttribute('aria-haspopup','menu');menu.setAttribute('aria-expanded','false');actions.append(menu);
   cell('Acciones',actions);
   return tr;}
 
@@ -2676,7 +2698,7 @@ function renderTracking(){
  // primera), se detiene mientras alguien interactúa o busca, y solo guarda en el navegador las páginas que va mostrando.
  const SHOW=3,CHUNK=12,EVERY=6000,still=matchMedia('(prefers-reduced-motion:reduce)');
  const filtered=()=>!!(view.q||view.status||view.technician||view.from||view.to);
- const query=page=>{const next=new URLSearchParams();for(const key of ['q','status','technician','from','to'])if(view[key])next.set(key,view[key]);next.set('page',String(page));next.set('size',String(CHUNK));return '/api/tracking?'+next.toString();};
+ const query=page=>{const next=new URLSearchParams();for(const key of ['q','status','technician','from','to'])if(view[key])next.set(key,view[key]);if(view.sort==='antiguo')next.set('sort','antiguo');next.set('page',String(page));next.set('size',String(CHUNK));return '/api/tracking?'+next.toString();};
  async function fetchPage(page,token){const data=await api(query(page));if(token!==view.token)return null;view.cache.set(page,data.rows);view.total=data.total;view.data=data;trackingStamp=Date.now();return data;}
  async function rowAt(index,token){const page=Math.floor(index/CHUNK)+1;if(!view.cache.has(page)&&!await fetchPage(page,token))return null;return (view.cache.get(page)||[])[index%CHUNK]||null;}
  const interacting=()=>view.hover||view.focus||view.touch||!!document.querySelector('dialog[open]')||(window.UiSelect?.isOpen?.()??false);
