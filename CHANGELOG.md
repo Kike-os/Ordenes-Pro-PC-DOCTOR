@@ -4,6 +4,19 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.131 — 2026-10-13 01:02 (UTC-05:00)
+
+Presupuestos profesionales, selector de equipos y tarjeta de seguimiento compacta
+
+### Nuevas funcionalidades
+
+- Presupuestos profesionales: catálogo de servicios y productos, presupuestos por ítems con IVA incluido y versiones (P1, P2…), estado por servicio, envío al cliente por enlace privado, aprobación con firma manuscrita y evidencia, PDF corporativo y aviso interno al aprobar.
+
+### Mejoras realizadas
+
+- Equipos de esta orden: selector con panel de detalle en la misma página (E01, E02…), acciones por equipo y resumen económico de la orden aparte.
+- Tarjeta de seguimiento más compacta, con el logotipo más grande e iconos por dato.
+
 ## v1.5.130 — 2026-10-13 00:37 (UTC-05:00)
 
 Tarjeta de seguimiento, identificación por serie, citas en el acceso, bandeja de correo y Corrección Inteligente

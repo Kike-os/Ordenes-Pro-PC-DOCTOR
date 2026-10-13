@@ -8,6 +8,25 @@
   },
   "releases": [
     {
+      "version": "1.5.131",
+      "date": "2026-10-13T01:02:49-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Presupuestos profesionales, selector de equipos y tarjeta de seguimiento compacta",
+      "changes": {
+        "features": [
+          "Presupuestos profesionales: catálogo de servicios y productos, presupuestos por ítems con IVA incluido y versiones (P1, P2…), estado por servicio, envío al cliente por enlace privado, aprobación con firma manuscrita y evidencia, PDF corporativo y aviso interno al aprobar."
+        ],
+        "improvements": [
+          "Equipos de esta orden: selector con panel de detalle en la misma página (E01, E02…), acciones por equipo y resumen económico de la orden aparte.",
+          "Tarjeta de seguimiento más compacta, con el logotipo más grande e iconos por dato."
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.130",
       "date": "2026-10-13T00:37:47-05:00",
       "type": "patch",
