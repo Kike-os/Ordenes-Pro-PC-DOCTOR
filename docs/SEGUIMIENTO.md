@@ -15,3 +15,17 @@ Módulo de solo lectura que muestra **una tarjeta por orden** con su último mov
 - Se eliminaron los cinco contadores internos, que repetían los indicadores superiores. Las **seis tarjetas de estado** del inicio filtran ahora la tabla al pulsarlas (y dejan de filtrar al pulsarlas otra vez); sus números se actualizan con cada sincronización.
 - La búsqueda queda siempre visible; estado, técnico y fechas están en «Filtros», con los filtros activos como etiquetas retirables.
 - El historial de cada orden se despliega bajo su fila y se mantiene abierto durante las sincronizaciones. No cambia nada del historial ni de los datos.
+
+## Carrusel de altura fija (1.5.127)
+
+El panel «Seguimiento de Órdenes» del inicio ya no crece con el número de órdenes: muestra **tres órdenes** en una ventana de altura fija (189 px en escritorio) y las secciones inferiores no se desplazan.
+
+- **Avance automático:** una fila cada 6 segundos, con una transición vertical de unos 520 ms. Funciona como una cinta: entra la orden siguiente y sale la primera; el DOM nunca tiene más de las filas visibles y la que entra. Al mostrar las tres últimas vuelve a las tres primeras. No hay botón para activarlo o desactivarlo.
+- **Pausas:** con el cursor sobre el panel, con el foco dentro (buscador, botones, filtros), al tocar la tabla (se reanuda 4 s después de soltar), con cualquier ventana abierta (historial, edición, menús), con búsqueda o filtros activos y con la pestaña oculta. Al terminar la interacción se espera el intervalo completo antes de volver a moverse. Con «movimiento reducido» no hay avance automático: quedan los controles manuales.
+- **Controles:** flechas discretas para retroceder y avanzar, indicador «Mostrando órdenes 4–6 de 20» y «Ver todas las órdenes», que abre el módulo Órdenes (búsqueda, filtros y 10, 20 o 50 por página).
+- **Búsqueda:** por número de orden, cliente, equipo, marca, modelo, serie y **estado**. Al buscar o filtrar el carrusel se detiene y muestra los resultados («Resultados 1–3 de 7») con los mismos controles.
+- **Datos:** el navegador pide bloques de 12 órdenes (`/api/tracking?size=12&page=N`) solo cuando hacen falta; funciona igual con miles de órdenes. Cada 30 s se vuelven a pedir las filas visibles: si algo cambió y nadie está interactuando se actualizan en su sitio; si hay una interacción en curso, se aplica al terminar. Nunca se sustituyen filas durante la transición.
+- **Historial:** se abre en una ventana («Historial · PCD-…») en lugar de desplegarse bajo la fila, para no alterar la altura del panel.
+- Espaciado vertical reducido (filas de 52 px; antes ~58). En pantallas de hasta 860 px cada orden es una tarjeta de 178 px.
+
+Pruebas: `local/tests/test_tracking_board.py` (bloques, búsqueda por estado, tamaños de página) y comprobación en navegador con 1, 2, 3, 5, 20, 45 y 100 órdenes.

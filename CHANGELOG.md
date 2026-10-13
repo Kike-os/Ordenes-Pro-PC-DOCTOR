@@ -4,6 +4,15 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.127 — 2026-10-12 23:26 (UTC-05:00)
+
+Seguimiento de Órdenes en carrusel de altura fija
+
+### Mejoras realizadas
+
+- Seguimiento de Órdenes: carrusel de altura fija con tres órdenes a la vista, avance automático cada 6 s, pausa al interactuar o buscar, controles manuales, indicador «Mostrando órdenes…» y «Ver todas las órdenes»; búsqueda también por estado.
+- Órdenes: el listado completo permite 10, 20 o 50 órdenes por página.
+
 ## v1.5.126 — 2026-10-12 23:08 (UTC-05:00)
 
 Validación visual del inicio de sesión

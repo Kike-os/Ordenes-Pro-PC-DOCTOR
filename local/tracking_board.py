@@ -23,6 +23,10 @@ def parse(query):
     filters = {'q': arg('q')[:80], 'status': arg('status'), 'technician': arg('technician'), 'from': arg('from'), 'to': arg('to')}
     try:
         filters['page'] = max(1, min(500, int(arg('page') or '1')))
+        # Tamaño de página: el carrusel del inicio pide bloques pequeños; nunca se entregan más de 50 filas por consulta.
+        filters['size'] = int(arg('size') or PAGE)
+        if not 3 <= filters['size'] <= 50:
+            raise ValueError()
     except ValueError:
         raise TrackingError('Página inválida.')
     for key in ('from', 'to'):
@@ -46,7 +50,7 @@ def build(c, filters):
     counters = [{'key': key, 'label': label, 'total': sum(totals.get(code, 0) for code in codes), 'status': codes[0] if len(codes) == 1 else ''} for key, label, codes in COUNTERS]
     where, args = ['1=1'], []
     if filters['q']:
-        where.append("instr(lower(COALESCE(o.code,'')||' '||cl.name||' '||COALESCE(d.brand,'')||' '||COALESCE(d.model,'')||' '||COALESCE(d.serial,'')),lower(?))>0")
+        where.append("instr(lower(COALESCE(o.code,'')||' '||cl.name||' '||COALESCE(d.brand,'')||' '||COALESCE(d.model,'')||' '||COALESCE(d.serial,'')||' '||s.label||' '||COALESCE(NULLIF(d.kind,''),d.category,'')),lower(?))>0")
         args.append(filters['q'])
     if filters['status']:
         where.append('o.status=?')
@@ -67,13 +71,14 @@ def build(c, filters):
               "LEFT JOIN users u ON u.id=o.assigned_to LEFT JOIN order_history h ON h.id=(SELECT MAX(x.id) FROM order_history x WHERE x.order_id=o.id) "
               "LEFT JOIN users a ON a.id=h.actor_id WHERE " + ' AND '.join(where))
     total = c.execute('SELECT COUNT(*) ' + source, args).fetchone()[0]
-    pages = max(1, (total + PAGE - 1) // PAGE)
+    size = filters.get('size', PAGE)
+    pages = max(1, (total + size - 1) // size)
     page = min(filters['page'], pages)
     rows = [dict(row) for row in c.execute(
         "SELECT o.id,COALESCE(o.code,'OP-'||printf('%05d',o.id)) code,o.status status_code,s.label status,o.priority,o.received_at,o.created_at,cl.name client,"
         "COALESCE(NULLIF(d.kind,''),d.category) type,d.brand,d.model,COALESCE(u.name,'') responsible,h.id event_id,h.event,h.comment,h.occurred_at,h.status_label,COALESCE(a.name,'') actor,"
         "(SELECT p.status_label FROM order_history p WHERE p.order_id=o.id AND p.id<h.id AND p.status_label!='' ORDER BY p.id DESC LIMIT 1) previous_label,"
-        "(SELECT COUNT(*) FROM order_history x WHERE x.order_id=o.id) events " + source + ' ORDER BY COALESCE(h.id,0) DESC,o.id DESC LIMIT ? OFFSET ?', (*args, PAGE, (page - 1) * PAGE))]
+        "(SELECT COUNT(*) FROM order_history x WHERE x.order_id=o.id) events " + source + ' ORDER BY COALESCE(h.id,0) DESC,o.id DESC LIMIT ? OFFSET ?', (*args, size, (page - 1) * size))]
     seen = {}
     if rows:
         marks = ','.join('?' for _ in rows)
@@ -83,7 +88,7 @@ def build(c, filters):
         row['type_label'] = DEVICE_TYPES.get(row['type'], '')
         row['stages'] = stages(row['status_code'], seen.get(row['id'], set()), statuses, bool(row['received_at'] or row['created_at']))
     people = [{'id': row['id'], 'name': row['name']} for row in c.execute("SELECT id,name FROM users WHERE approval='approved' AND active=1 ORDER BY name COLLATE NOCASE")]
-    return {'counters': counters, 'status_totals': totals, 'total_orders': sum(totals.values()), 'rows': rows, 'total': total, 'page': page, 'pages': pages, 'page_size': PAGE,
+    return {'counters': counters, 'status_totals': totals, 'total_orders': sum(totals.values()), 'rows': rows, 'total': total, 'page': page, 'pages': pages, 'page_size': size,
             'filters': {key: filters[key] for key in ('q', 'status', 'technician', 'from', 'to')},
             'options': {'statuses': [{'code': code, 'label': label} for code, label in statuses.items()], 'technicians': people}}
 

@@ -49,3 +49,28 @@ class TrackingBoardTests(unittest.TestCase):
 
 
 if __name__=='__main__':unittest.main()
+
+
+class TrackingCarouselPagesTests(unittest.TestCase):
+    """Carrusel del inicio: bloques pequeños por consulta, búsqueda por estado y tamaño de página del listado completo."""
+    setUpClass=classmethod(test_app.SecurityTests.setUpClass.__func__);setUp=test_app.SecurityTests.setUp;tearDown=test_app.SecurityTests.tearDown;request=test_app.SecurityTests.request;login=test_app.SecurityTests.login;order_data=test_app.SecurityTests.order_data
+
+    def test_chunks_status_search_and_order_page_sizes(self):
+        cookie,csrf=self.login();ids=[]
+        for index in range(14):
+            ids.append(self.request('/api/orders',self.order_data({'brand':'Lenovo' if index%2 else 'HP','serial':'CAR-%02d'%index,'request_key':'carousel-request-key-%04d'%index}),cookie=cookie,csrf=csrf)['body']['id'])
+        self.assertEqual(self.request('/api/order-status',{'id':str(ids[0]),'status':'listo'},cookie=cookie,csrf=csrf)['status'],200)
+        get=lambda query:self.request('/api/tracking?'+query,cookie=cookie)
+        first=get('size=12&page=1')['body'];second=get('size=12&page=2')['body']
+        self.assertEqual((len(first['rows']),len(second['rows']),first['total'],first['pages'],first['page_size']),(12,2,14,2,12))
+        self.assertEqual(len({row['id'] for row in first['rows']+second['rows']}),14)
+        self.assertEqual(len(get('')['body']['rows']),8)  # tamaño de siempre cuando no se indica
+        for bad in ('size=2','size=51','size=x'):self.assertEqual(get(bad)['status'],400)
+        # Se encuentra por estado, marca y número de orden.
+        self.assertEqual([row['id'] for row in get('q=listo+para')['body']['rows']],[ids[0]])
+        self.assertEqual(get('q=lenovo&size=50')['body']['total'],7)
+        self.assertEqual(get('q='+first['rows'][0]['code'])['body']['total'],1)
+        orders=lambda query:self.request('/api/orders?'+query,cookie=cookie)
+        self.assertEqual([(len(orders('size=%s'%size)['body']['rows']),orders('size=%s'%size)['body']['pages']) for size in ('10','20','50')],[(10,2),(14,1),(14,1)])
+        self.assertEqual((len(orders('size=10&page=2')['body']['rows']),orders('')['body']['size']),(4,50))
+        self.assertEqual(orders('size=7')['status'],400)

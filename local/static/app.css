@@ -5067,3 +5067,45 @@ body[data-page=login] #login-form[aria-busy=true] .submit::before{content:"";wid
 @media(prefers-reduced-motion:reduce){body[data-page=login] #login-form[aria-busy=true] .submit::before{animation:none}}
 @media(max-width:480px){body[data-page=login] #login-form .login-input input{font-size:16px}}
 body[data-page=login] #login-form .password-wrap .login-state{right:48px}
+/* Seguimiento de Órdenes: carrusel vertical de altura fija (tres órdenes a la vista). El panel ya no crece con el número de órdenes. */
+.tracking-board{gap:8px}
+.tracking-carousel{--track-row:52px;--track-head:31px;height:calc(var(--track-head) + 3*var(--track-row) + 2px);overflow:hidden;overflow-anchor:none;overscroll-behavior:contain}
+.tracking-carousel .tracking-table thead th{position:sticky;top:0;z-index:2;box-sizing:border-box;height:var(--track-head);padding-top:0;padding-bottom:0}
+.tracking-carousel .tracking-row>td{box-sizing:border-box;height:var(--track-row);padding-top:0;padding-bottom:0;overflow:hidden}
+.tracking-carousel .tracking-table tbody tr:last-child td{border-bottom:1px solid #152238}
+.tracking-carousel .tracking-client,.tracking-carousel .tracking-last strong,.tracking-carousel .tracking-last small,.tracking-carousel .tracking-tech>span{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tracking-carousel .tracking-state{gap:4px}.tracking-carousel .tracking-tech{gap:2px;min-width:0}
+.tracking-carousel td.tracking-empty{height:calc(3*var(--track-row))}
+.tracking-foot{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;padding:0 2px}
+.tracking-foot .tracking-count{margin:0 auto 0 0;font-size:12.5px;color:#9db1cf;font-variant-numeric:tabular-nums}
+.tracking-foot .tracking-pages{display:inline-flex;gap:6px}
+.tracking-nav{width:34px;min-height:34px;height:34px;padding:0;display:inline-grid;place-items:center;border-radius:9px}
+.tracking-nav svg{width:16px;height:16px}.tracking-nav:disabled{opacity:.4;cursor:not-allowed}
+.tracking-all{min-height:34px;padding:6px 12px;font-size:12.5px}
+.tracking-dialog{width:min(560px,calc(100% - 24px))}.tracking-history-dialog{margin-top:12px;max-height:60vh;overflow-y:auto;padding-right:4px}
+@media(max-width:860px){
+ .tracking-carousel{--track-row:176px;--track-head:0px}
+ .tracking-carousel .tracking-table .tracking-row{box-sizing:border-box;height:var(--track-row);overflow:hidden;align-content:start}
+ .tracking-carousel .tracking-row>td{height:auto;overflow:visible}
+ .tracking-carousel td.tracking-empty{display:block}
+ .tracking-foot .tracking-count{flex:1 1 100%}.tracking-all{flex:1 1 auto;justify-content:center}
+}
+.tracking-carousel .status-label,.tracking-carousel .order-code-link{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tracking-carousel .tracking-state,.tracking-carousel .tracking-id>div,.tracking-carousel .tracking-last{min-width:0;max-width:100%}
+.tracking-carousel .tracking-actions button span{white-space:nowrap}
+@media(max-width:1180px){.tracking-carousel .tracking-actions button:last-child span{display:none}}
+@media(max-width:860px){
+ .tracking-carousel{--track-row:158px}
+ .tracking-carousel .tracking-table .tracking-row{gap:5px 10px;padding:9px 12px}
+ .tracking-carousel .tracking-row>td{min-width:0;max-width:100%}
+ .tracking-carousel .tracking-row>td:nth-child(3){max-width:46vw}
+ .tracking-carousel .tracking-actions button:last-child span{display:inline}
+}
+@media(max-width:860px){
+ .tracking-carousel{--track-row:178px}
+ .tracking-carousel .tracking-client,.tracking-carousel .tracking-tech>span{display:inline}
+ .tracking-carousel .tracking-row>td:nth-child(2),.tracking-carousel .tracking-row>td:nth-child(5){overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ .tracking-carousel .tracking-table .tracking-row{gap:4px 10px;padding:8px 12px}
+ .tracking-carousel .tracking-table .tracking-actions button{min-height:32px}
+}
+body[data-page=dashboard] .orders-pagination .orders-page-size{width:auto;margin:0;min-height:36px;height:36px;font-size:13px}

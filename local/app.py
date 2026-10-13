@@ -1275,7 +1275,11 @@ class Handler(BaseHTTPRequestHandler):
                     size=query.get('size',['50'])[0]  # por defecto 50, como siempre; el listado permite elegir 10 o 25
                     if size not in ('10','25','50'):return self.reply(400,{'error':'Tamaño de página inválido.'})
                     size=int(size);page=min(page,max(1,(total+size-1)//size))
-                if path=='/api/orders':page=min(page,max(1,(total+49)//50))
+                if path=='/api/orders':
+                    # El listado completo permite 10, 20 o 50 órdenes por página (50 por defecto, como siempre).
+                    size=query.get('size',['50'])[0]
+                    if size not in ('10','20','50'):return self.reply(400,{'error':'Tamaño de página inválido.'})
+                    size=int(size);page=min(page,max(1,(total+size-1)//size))
                 rows = [dict(r) for r in c.execute('SELECT '+columns+' FROM '+source+condition+' ORDER BY '+ordering+' LIMIT ? OFFSET ?', (*args,size,(page-1)*size))]
                 if path == '/api/orders':
                     # Permanencia en taller: calculada en el servidor con las fechas guardadas de ingreso y entrega.
@@ -1289,7 +1293,7 @@ class Handler(BaseHTTPRequestHandler):
                             full=c.execute('SELECT * FROM clients WHERE id=?',(item['id'],)).fetchone();item['missing']=client_registry.missing(full) if full else []
                     cities=[row[0] for row in c.execute("SELECT DISTINCT COALESCE(NULLIF(city,''),canton,'') place FROM clients WHERE COALESCE(NULLIF(city,''),canton,'')!='' ORDER BY place COLLATE NOCASE LIMIT 200")]
                     return self.reply(200, {'rows':rows,'total':total,'page':page,'pages':max(1,(total+size-1)//size),'size':size,'cities':cities,'stats':{'total':counts['total'],'complete':counts['total']-counts['review'],'review':counts['review']}})
-                return self.reply(200, {'rows':rows,'total':total,'page':page,'pages':max(1,(total+49)//50)})
+                return self.reply(200, {'rows':rows,'total':total,'page':page,'pages':max(1,(total+size-1)//size),'size':size})
             if path == '/api/version':
                 # Versión que ejecuta realmente este servidor (la del código desplegado), para que las pestañas abiertas detecten cuándo deben recargarse.
                 try:

@@ -2202,19 +2202,19 @@ let trackingTimer=null,trackingStamp=0,trackingView=null;
 function trackingFilterStatus(code){const view=trackingView;if(!view)return;view.setStatus(view.status===code?'':code);document.querySelector('.tracking-pro')?.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion:reduce)').matches?'auto':'smooth',block:'nearest'});}
 function renderTracking(){
  const root=$('operations-activity'),status=$('tracking-status');if(!root)return;
- const view=trackingView={q:'',status:'',technician:'',from:'',to:'',page:1,open:new Set(),known:new Map(),first:true,data:null,token:0};
+ const view=trackingView={q:'',status:'',technician:'',from:'',to:'',known:new Map(),first:true,data:null,token:0,total:0,start:0,cache:new Map(),busy:false,hover:false,focus:false,touch:false,stale:false,moved:Date.now()};
  root.replaceChildren();root.className='tracking-board';
- const tools=el('form',undefined,'tracking-tools'),advanced=el('div',undefined,'tracking-advanced'),chips=el('div',undefined,'tracking-chips'),wrap=el('div',undefined,'tracking-table-wrap'),table=el('table',undefined,'tracking-table'),body=el('tbody'),foot=el('div',undefined,'tracking-foot');
+ const tools=el('form',undefined,'tracking-tools'),advanced=el('div',undefined,'tracking-advanced'),chips=el('div',undefined,'tracking-chips'),wrap=el('div',undefined,'tracking-table-wrap tracking-carousel'),table=el('table',undefined,'tracking-table'),body=el('tbody'),foot=el('div',undefined,'tracking-foot');
  tools.setAttribute('role','search');tools.noValidate=true;advanced.id='tracking-advanced';advanced.hidden=true;table.setAttribute('aria-label','Seguimiento de órdenes');
  const head=el('thead'),headRow=el('tr'),titles=['Orden','Cliente','Estado','Último movimiento','Técnico','Acciones'];for(const title of titles){const th=el('th',title);th.scope='col';headRow.append(th);}head.append(headRow);table.append(head,body);wrap.append(table);
- const search=el('input');search.type='search';search.placeholder='Buscar por orden, cliente o equipo';search.setAttribute('aria-label','Buscar en el seguimiento');search.maxLength=80;
+ const search=el('input');search.type='search';search.placeholder='Buscar por orden, cliente, equipo, marca o estado';search.setAttribute('aria-label','Buscar en el seguimiento');search.maxLength=80;
  const pick=(label,name)=>{const box=el('label',undefined,'tracking-field'),node=el('select');node.name=name;box.append(el('span',label),node);return [box,node];},[stateBox,statePick]=pick('Estado','status'),[techBox,techPick]=pick('Técnico','technician');
  const dateField=(label,name)=>{const box=el('label',undefined,'tracking-field'),node=el('input');node.type='date';node.name=name;box.append(el('span',label),node);return [box,node];},[fromBox,fromNode]=dateField('Movimiento desde','from'),[toBox,toNode]=dateField('Movimiento hasta','to');
  advanced.append(stateBox,techBox,fromBox,toBox);
  const more=button('',()=>{advanced.hidden=!advanced.hidden;more.setAttribute('aria-expanded',String(!advanced.hidden));},'secondary tracking-more');more.append(systemIcon('M3 6h18 M7 12h10 M10 18h4'),el('span','Filtros'));more.setAttribute('aria-expanded','false');more.setAttribute('aria-controls',advanced.id);
- const reset=()=>{search.value='';statePick.value='';techPick.value='';fromNode.value='';toNode.value='';Object.assign(view,{q:'',status:'',technician:'',from:'',to:'',page:1});load();};
+ const reset=()=>{search.value='';statePick.value='';techPick.value='';fromNode.value='';toNode.value='';Object.assign(view,{q:'',status:'',technician:'',from:'',to:''});load();};
  tools.append(search,more);root.append(tools,advanced,chips,wrap,foot);
- const apply=()=>{Object.assign(view,{q:search.value.trim(),status:statePick.value,technician:techPick.value,from:fromNode.value,to:toNode.value,page:1});load();};
+ const apply=()=>{Object.assign(view,{q:search.value.trim(),status:statePick.value,technician:techPick.value,from:fromNode.value,to:toNode.value});load();};
  view.setStatus=code=>{statePick.value=code;apply();};
  let typing=null;search.addEventListener('input',()=>{clearTimeout(typing);typing=setTimeout(apply,320);});tools.addEventListener('submit',event=>{event.preventDefault();clearTimeout(typing);apply();});for(const node of [statePick,techPick,fromNode,toNode])node.addEventListener('change',apply);
  const clock=value=>new Intl.DateTimeFormat('es-EC',{timeZone:'America/Guayaquil',hour:'2-digit',minute:'2-digit'}).format(value);
@@ -2224,7 +2224,7 @@ function renderTracking(){
    for(const event of data.rows){const info=activityInfo(event),item=el('li'),icon=el('span',undefined,'track-icon'),text=el('div');applyLook(item,icon,event);text.append(el('strong',info.title),el('span',info.detail));if(info.comment)text.append(el('q',info.comment));text.append(el('small',info.actor+' · '+formatOrderDate(event.occurred_at)));item.append(icon,text);steps.append(item);}
    holder.replaceChildren(data.rows.length?steps:el('p','Esta orden todavía no tiene movimientos registrados.','tracking-note'));}catch(error){holder.replaceChildren(el('p',error.message,'tracking-note'));}}
  function rows(row){
-  const tr=el('tr',undefined,'tracking-row'),extra=el('tr',undefined,'tracking-extra'),holder=el('td');holder.colSpan=titles.length;extra.append(holder);extra.hidden=true;tr.dataset.order=row.id;if(row.priority==='urgente'||row.priority==='alta')tr.dataset.priority=row.priority;
+  const tr=el('tr',undefined,'tracking-row');tr.dataset.order=row.id;tr.dataset.sign=JSON.stringify([row.event_id,row.status_code,row.responsible,row.priority,row.events,row.client]);if(row.priority==='urgente'||row.priority==='alta')tr.dataset.priority=row.priority;
   const event=row.event_id?{id:row.event_id,event:row.event,comment:row.comment,status_label:row.status_label,previous_label:row.previous_label,actor:row.actor,occurred_at:row.occurred_at,order_id:row.id,code:row.code}:null;
   const cell=(label,...nodes)=>{const td=el('td');td.dataset.label=label;td.append(...nodes);tr.append(td);return td;};
   const id=el('div',undefined,'tracking-id'),code=button(row.code,()=>go('orders',new URLSearchParams({id:String(row.id)})),'order-code-link');code.title='Abrir la orden '+row.code;const who=el('div');who.append(code,el('small',[row.type_label,row.brand,row.model].filter(Boolean).join(' ')||'Equipo sin especificar'));id.append(deviceIcon(row.type),who);cell('Orden',id);
@@ -2239,11 +2239,11 @@ function renderTracking(){
   cell('Último movimiento',last);
   const tech=el('div',undefined,'tracking-tech');tech.append(el('span',row.responsible||'Sin asignar'));const priority=({baja:'Prioridad baja',alta:'Prioridad alta',urgente:'Urgente'})[row.priority];if(priority){const tag=el('em',priority);tag.dataset.priority=row.priority;tech.append(tag);}cell('Técnico',tech);
   const actions=el('div',undefined,'tracking-actions'),detail=button('',()=>go('orders',new URLSearchParams({id:String(row.id)})),'primary');detail.append(systemIcon('M2.06 12.35a1 1 0 0 1 0-.7 10.75 10.75 0 0 1 19.88 0 1 1 0 0 1 0 .7 10.75 10.75 0 0 1-19.88 0 M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z'),el('span','Ver'));detail.title='Ver detalles de la orden';detail.setAttribute('aria-label','Ver detalles de la orden '+row.code);
-  const toggle=button('',()=>{const opening=extra.hidden;extra.hidden=!opening;toggle.setAttribute('aria-expanded',String(opening));tr.classList.toggle('is-open',opening);if(opening){view.open.add(row.id);history(row,holder);}else view.open.delete(row.id);},'secondary');toggle.append(systemIcon('M12 6v6l4 2 M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z'),el('span','Historial'),el('b',String(row.events)));toggle.title='Mostrar u ocultar el historial de movimientos';toggle.setAttribute('aria-label','Historial de la orden '+row.code+': '+row.events+' movimientos');toggle.setAttribute('aria-expanded','false');toggle.disabled=!row.events;
+  const toggle=button('',()=>{const dialog=smallDialog('Historial · '+row.code),holder=el('div',undefined,'tracking-history-dialog');dialog.classList.add('tracking-dialog');dialog.append(holder);history(row,holder);},'secondary');toggle.append(systemIcon('M12 6v6l4 2 M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z'),el('span','Historial'),el('b',String(row.events)));toggle.title='Ver el historial de movimientos';toggle.setAttribute('aria-label','Historial de la orden '+row.code+': '+row.events+' movimientos');toggle.setAttribute('aria-haspopup','dialog');toggle.disabled=!row.events;
   actions.append(detail,toggle);cell('Acciones',actions);
-  if(view.open.has(row.id)){extra.hidden=false;toggle.setAttribute('aria-expanded','true');tr.classList.add('is-open');history(row,holder);}
-  return [tr,extra];}
- function paint(data){
+  return tr;}
+
+ function paintMeta(data){
   view.data=data;
   fill(statePick,'Todos los estados',data.options.statuses.map(item=>[item.code,item.label]),view.status);fill(techPick,'Todos los técnicos',[...data.options.technicians.map(item=>[String(item.id),item.name]),['none','Sin asignar']],view.technician);
   // Las tarjetas superiores reflejan los totales reales y cuál está filtrando.
@@ -2253,24 +2253,65 @@ function renderTracking(){
   chips.replaceChildren();const names={q:'Búsqueda',status:'Estado',technician:'Técnico',from:'Desde',to:'Hasta'};
   for(const[key,label]of Object.entries(names)){if(!view[key])continue;const value=key==='status'?statusNames[view.status]||view.status:key==='technician'?(view.technician==='none'?'Sin asignar':data.options.technicians.find(item=>String(item.id)===view.technician)?.name||view.technician):view[key];const chip=button('',()=>{if(key==='q')search.value='';else if(key==='status')statePick.value='';else if(key==='technician')techPick.value='';else if(key==='from')fromNode.value='';else toNode.value='';apply();},'tracking-chip');chip.append(el('span',label+': '+value),systemIcon('M18 6 6 18 M6 6l12 12'));chip.setAttribute('aria-label','Quitar filtro '+label);chips.append(chip);}
   if(chips.childElementCount>1)chips.append(button('Limpiar todo',reset,'tracking-chip tracking-chip-clear'));chips.hidden=!chips.childElementCount;
-  body.replaceChildren();
-  if(!data.rows.length){const tr=el('tr'),td=el('td',data.total_orders?'Ninguna orden coincide con la búsqueda o los filtros.':'Todavía no hay órdenes registradas.','tracking-empty');td.colSpan=titles.length;tr.append(td);body.append(tr);}
-  for(const row of data.rows){const[tr,extra]=rows(row),before=view.known.get(row.id);
-   // Movimiento nuevo desde la última sincronización: resalte discreto; si además cambió el estado, se avisa.
-   if(!view.first&&(!before||before.event!==row.event_id)){tr.classList.add('track-new');if(before&&before.status!==row.status_code){noteStatus(row.id,row.status_code);toast('La orden '+row.code+' pasó a «'+row.status+'».','info',{label:'Ver orden',run:()=>go('orders',new URLSearchParams({id:String(row.id)}))},{title:'Cambio de estado',id:'tracking-'+row.id});}}
-   view.known.set(row.id,{event:row.event_id,status:row.status_code});body.append(tr,extra);}
-  view.first=false;foot.replaceChildren();
-  foot.append(el('p',data.total?((data.page-1)*data.page_size+1)+'–'+Math.min(data.total,data.page*data.page_size)+' de '+data.total+(data.total===1?' orden':' órdenes'):'0 órdenes','tracking-count'));
-  if(data.pages>1){const nav=el('div',undefined,'tracking-pages'),prev=button('Anterior',()=>{view.page=data.page-1;load();},'secondary'),next=button('Siguiente',()=>{view.page=data.page+1;load();},'secondary');prev.disabled=data.page<=1;next.disabled=data.page>=data.pages;nav.append(prev,el('span',data.page+' / '+data.pages),next);foot.append(nav);}}
- const query=()=>{const next=new URLSearchParams();for(const key of ['q','status','technician','from','to'])if(view[key])next.set(key,view[key]);next.set('page',String(view.page));return '/api/tracking?'+next.toString();};
- async function load(quiet){const token=++view.token;if(!quiet){paintStatus('loading');root.dataset.loading='true';}
-  try{const data=await api(query());if(token!==view.token||trackingView!==view||!root.isConnected)return;trackingStamp=Date.now();view.page=data.page;
-   const signature=JSON.stringify([data.status_totals,data.rows.map(r=>[r.id,r.event_id,r.status_code,r.responsible,r.priority]),data.total,data.page,view.status,view.technician,view.from,view.to,view.q]);
-   if(!quiet||signature!==view.signature)paint(data);view.signature=signature;paintStatus('ok');}
-  catch(error){if(token!==view.token)return;paintStatus('error');if(!view.data){const tr=el('tr'),td=el('td',error.message,'tracking-empty');td.colSpan=titles.length;tr.append(td);body.replaceChildren(tr);}}
+}
+
+ // Carrusel vertical: tres órdenes a la vista y altura fija. Avanza una fila cada seis segundos como una cinta (al terminar vuelve a la
+ // primera), se detiene mientras alguien interactúa o busca, y solo guarda en el navegador las páginas que va mostrando.
+ const SHOW=3,CHUNK=12,EVERY=6000,still=matchMedia('(prefers-reduced-motion:reduce)');
+ const filtered=()=>!!(view.q||view.status||view.technician||view.from||view.to);
+ const query=page=>{const next=new URLSearchParams();for(const key of ['q','status','technician','from','to'])if(view[key])next.set(key,view[key]);next.set('page',String(page));next.set('size',String(CHUNK));return '/api/tracking?'+next.toString();};
+ async function fetchPage(page,token){const data=await api(query(page));if(token!==view.token)return null;view.cache.set(page,data.rows);view.total=data.total;view.data=data;trackingStamp=Date.now();return data;}
+ async function rowAt(index,token){const page=Math.floor(index/CHUNK)+1;if(!view.cache.has(page)&&!await fetchPage(page,token))return null;return (view.cache.get(page)||[])[index%CHUNK]||null;}
+ const interacting=()=>view.hover||view.focus||view.touch||!!document.querySelector('dialog[open]')||(window.UiSelect?.isOpen?.()??false);
+ const canRun=()=>!view.busy&&!document.hidden&&!interacting()&&!filtered()&&view.total>SHOW&&!still.matches;
+ const prevBtn=button('',()=>step(-1,true),'secondary tracking-nav'),nextBtn=button('',()=>step(1,true),'secondary tracking-nav'),count=el('p',undefined,'tracking-count'),all=button('Ver todas las órdenes',()=>go('orders'),'secondary tracking-all');
+ prevBtn.append(systemIcon('m18 15-6-6-6 6'));prevBtn.title='Órdenes anteriores';prevBtn.setAttribute('aria-label','Mostrar las órdenes anteriores');nextBtn.append(systemIcon('m6 9 6 6 6-6'));nextBtn.title='Órdenes siguientes';nextBtn.setAttribute('aria-label','Mostrar las órdenes siguientes');count.setAttribute('aria-live','off');
+ {const nav=el('div',undefined,'tracking-pages');nav.append(prevBtn,nextBtn);foot.append(count,nav,all);}
+ function paintFoot(){const total=view.total,last=Math.min(total,view.start+SHOW);count.textContent=total?(filtered()?'Resultados ':'Mostrando órdenes ')+(view.start+1)+(last>view.start+1?'–'+last:'')+' de '+total:(filtered()?'Sin resultados':'0 órdenes');prevBtn.disabled=nextBtn.disabled=total<=SHOW;wrap.dataset.rows=String(Math.min(SHOW,total));}
+ function note(row,tr){const before=view.known.get(row.id);
+  // Movimiento nuevo desde la última sincronización: resalte discreto; si además cambió el estado, se avisa.
+  if(!view.first&&before&&before.event!==row.event_id){tr.classList.add('track-new');if(before.status!==row.status_code){noteStatus(row.id,row.status_code);toast('La orden '+row.code+' pasó a «'+row.status+'».','info',{label:'Ver orden',run:()=>go('orders',new URLSearchParams({id:String(row.id)}))},{title:'Cambio de estado',id:'tracking-'+row.id});}}
+  view.known.set(row.id,{event:row.event_id,status:row.status_code});return tr;}
+ async function fill3(token){const made=[];for(let n=0;n<Math.min(SHOW,view.total);n++){const row=await rowAt(view.start+n,token);if(token!==view.token)return false;if(row)made.push(note(row,rows(row)));}
+  if(!made.length){const tr=el('tr'),td=el('td',view.data?.total_orders?'Ninguna orden coincide con la búsqueda o los filtros.':'Todavía no hay órdenes registradas.','tracking-empty');td.colSpan=titles.length;tr.append(td);made.push(tr);}
+  body.replaceChildren(...made);wrap.scrollTop=0;view.first=false;paintFoot();return true;}
+ const slide=(from,to)=>new Promise(resolve=>{if(still.matches||from===to){wrap.scrollTop=to;resolve();return;}const began=performance.now(),span=520;const frame=now=>{const t=Math.min(1,(now-began)/span),e=t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2;wrap.scrollTop=from+(to-from)*e;if(t<1&&wrap.isConnected)requestAnimationFrame(frame);else resolve();};requestAnimationFrame(frame);});
+ async function step(direction,manual){if(view.busy||view.total<=SHOW)return;view.busy=true;const began=Date.now(),token=view.token,total=view.total,lastStart=total-SHOW;
+  try{// Al final del recorrido se vuelve a la primera orden (y al revés) con un cambio de bloque completo; en el resto, una fila cada vez.
+   let target=view.start+direction,count=1;if(target>lastStart){target=0;count=SHOW;}else if(target<0){target=lastStart;count=SHOW;}
+   const incoming=[];for(let n=0;n<count;n++){const index=direction>0?target+SHOW-count+n:target+n,row=await rowAt(index,token);if(token!==view.token||!row)return;incoming.push(note(row,rows(row)));}
+   const height=body.firstElementChild?.getBoundingClientRect().height||0,head=table.tHead?.getBoundingClientRect().height||0;void head;
+   if(direction>0){body.append(...incoming);await slide(0,height*count);for(let n=0;n<count;n++)body.firstElementChild?.remove();wrap.scrollTop=0;}
+   else{body.prepend(...incoming);wrap.scrollTop=height*count;await slide(height*count,0);for(let n=0;n<count;n++)body.lastElementChild?.remove();}
+   if(token===view.token){view.start=target;paintFoot();}}
+  catch{/* Sin conexión: el carrusel conserva lo que muestra y lo reintenta en el siguiente ciclo. */}
+  finally{view.busy=false;view.moved=manual?Date.now():began;}}
+ // Sincronización: se vuelven a pedir las páginas visibles; si algo cambió y nadie está interactuando, las filas se actualizan en su sitio.
+ async function refresh(){if(view.busy||!view.total&&filtered())return;const token=view.token,page=Math.floor(view.start/CHUNK)+1;
+  try{const old=view.cache,fresh=new Map();view.cache=fresh;const data=await fetchPage(page,token);if(!data){if(token===view.token)view.cache=old;return;}paintMeta(data);paintStatus('ok');
+   if(view.start>Math.max(0,view.total-SHOW))view.start=Math.max(0,view.total-SHOW);
+   const want=[];for(let n=0;n<Math.min(SHOW,view.total);n++){const row=await rowAt(view.start+n,token);if(token!==view.token)return;if(row)want.push(row);}
+   const shown=[...body.querySelectorAll('.tracking-row')],same=want.length===shown.length&&want.every((row,n)=>shown[n].dataset.order===String(row.id)&&shown[n].dataset.sign===JSON.stringify([row.event_id,row.status_code,row.responsible,row.priority,row.events,row.client]));
+   if(same){paintFoot();return;}
+   if(interacting()||view.busy){view.stale=true;return;}
+   view.stale=false;await fill3(token);}
+  catch{paintStatus('error');}}
+ async function load(){const token=++view.token;view.cache=new Map();view.start=0;view.stale=false;paintStatus('loading');root.dataset.loading='true';
+  try{const data=await fetchPage(1,token);if(!data||trackingView!==view||!root.isConnected)return;paintMeta(data);await fill3(token);paintStatus('ok');view.moved=Date.now();}
+  catch(error){if(token!==view.token)return;paintStatus('error');const tr=el('tr'),td=el('td',error.message,'tracking-empty');td.colSpan=titles.length;tr.append(td);body.replaceChildren(tr);view.total=0;paintFoot();}
   finally{if(token===view.token)delete root.dataset.loading;}}
- // Consulta periódica y ligera mientras el inicio está a la vista (se detiene al salir o con la pestaña oculta).
- clearInterval(trackingTimer);trackingTimer=setInterval(()=>{if(currentModule!=='home'||trackingView!==view||!root.isConnected){clearInterval(trackingTimer);return;}if(document.hidden)return;load(true);},30000);
+ // Pausas: cursor encima, foco dentro (buscador, botones), dedo sobre la tabla, ventanas abiertas, búsqueda o filtros activos y pestaña oculta.
+ const resume=()=>{view.moved=Date.now();};
+ root.addEventListener('pointerenter',event=>{if(event.pointerType!=='touch')view.hover=true;});root.addEventListener('pointerleave',()=>{view.hover=false;resume();});
+ root.addEventListener('focusin',()=>{view.focus=true;});root.addEventListener('focusout',()=>{setTimeout(()=>{view.focus=root.contains(document.activeElement);if(!view.focus)resume();},0);});
+ let touchTimer=null;root.addEventListener('touchstart',()=>{view.touch=true;clearTimeout(touchTimer);},{passive:true});const touchEnd=()=>{clearTimeout(touchTimer);touchTimer=setTimeout(()=>{view.touch=false;resume();},4000);};root.addEventListener('touchend',touchEnd,{passive:true});root.addEventListener('touchcancel',touchEnd,{passive:true});
+ clearInterval(trackingTimer);let lastSync=Date.now();
+ trackingTimer=setInterval(()=>{if(currentModule!=='home'||trackingView!==view||!root.isConnected){clearInterval(trackingTimer);return;}if(document.hidden){view.moved=Date.now();return;}
+  if(view.stale&&!interacting()&&!view.busy){view.stale=false;fill3(view.token);view.moved=Date.now();return;}
+  if(Date.now()-lastSync>=30000&&!view.busy){lastSync=Date.now();refresh();return;}
+  if(interacting()){view.moved=Date.now();return;}
+  if(canRun()&&Date.now()-view.moved>=EVERY)step(1,false);},250);
+ view.step=step;view.state=()=>({start:view.start,total:view.total,busy:view.busy,paused:interacting()||filtered(),pages:view.cache.size});
  load();
 }
 function renderActivityRows(root,rows,options={}){
@@ -2969,7 +3010,7 @@ function renderOrdersList(data,params){
  const results=el('section',undefined,'data-panel orders-results');results.setAttribute('aria-label','Resultados de órdenes');root.append(results);
  // Los resultados se repintan solos (búsqueda mientras se escribe): el resto del módulo, el foco y lo escrito no se tocan.
  function paint(list){results.replaceChildren();const bar=el('div',undefined,'orders-results-heading');const count=el('p',list.total+(list.total===1?' registro':' registros'),'result-count');count.setAttribute('role','status');bar.append(count,el('small',list.total?'Mostrando '+((list.page-1)*50+1)+'–'+Math.min(list.page*50,list.total)+' de '+list.total:'Sin resultados'));results.append(bar);const wrap=el('div');if(list.rows.length)renderOrderCards(wrap,list.rows);else{wrap.className='orders-empty';wrap.append(operationIcon('order'),el('h3',params.get('active')==='1'?'No hay órdenes activas.':params.size?'No hay órdenes para esta búsqueda.':'Todavía no hay órdenes registradas.'),el('p',params.get('active')==='1'?'Todas las órdenes que cumplen estos filtros ya fueron entregadas. Desmarca «Solo activas» para verlas.':params.size?'Ajusta la búsqueda o los filtros para encontrar otras órdenes.':'Registra una orden para iniciar el seguimiento del equipo.'));}results.append(wrap);
-  const pager=el('nav',undefined,'pager orders-pagination');pager.setAttribute('aria-label','Paginación de órdenes');const move=offset=>{const next=new URLSearchParams(params);next.set('page',String(list.page+offset));go('orders',next);},previous=button('',()=>move(-1)),next=button('',()=>move(1));previous.append(systemIcon('m15 18-6-6 6-6'),el('span','Anterior'));next.append(el('span','Siguiente'),systemIcon('m9 18 6-6-6-6'));previous.disabled=list.page<=1;next.disabled=list.page>=list.pages;const indicator=el('span',`Página ${list.page} de ${list.pages}`);indicator.setAttribute('aria-current','page');pager.append(el('small',list.total+(list.total===1?' orden':' órdenes'),'orders-pagination-total'),previous,indicator,next);results.append(pager);}
+  const pager=el('nav',undefined,'pager orders-pagination');pager.setAttribute('aria-label','Paginación de órdenes');const move=offset=>{const next=new URLSearchParams(params);next.set('page',String(list.page+offset));go('orders',next);},previous=button('',()=>move(-1)),next=button('',()=>move(1));previous.append(systemIcon('m15 18-6-6 6-6'),el('span','Anterior'));next.append(el('span','Siguiente'),systemIcon('m9 18 6-6-6-6'));previous.disabled=list.page<=1;next.disabled=list.page>=list.pages;const indicator=el('span',`Página ${list.page} de ${list.pages}`);indicator.setAttribute('aria-current','page');const perPage=el('select');perPage.setAttribute('aria-label','Órdenes por página');for(const value of ['10','20','50'])perPage.add(new Option(value+' por página',value));perPage.value=String(list.size||50);perPage.onchange=()=>{const next=new URLSearchParams(params);next.delete('page');if(perPage.value==='50')next.delete('size');else next.set('size',perPage.value);go('orders',next);};perPage.className='orders-page-size';const first=list.total?(list.page-1)*(list.size||50)+1:0;pager.append(el('small',list.total?first+'–'+Math.min(list.total,list.page*(list.size||50))+' de '+list.total+(list.total===1?' orden':' órdenes'):'0 órdenes','orders-pagination-total'),perPage,previous,indicator,next);results.append(pager);}
  const withQuery=value=>{const next=new URLSearchParams(params);next.delete('page');if(value)next.set('q',value);else next.delete('q');return next;};
  let version=0,timer=null;
  async function refresh(next){const token=++version;results.dataset.loading='true';try{const list=await api('/api/orders?'+next.toString());if(token!==version||!results.isConnected)return;params=next;history.replaceState(null,'','/#orders'+(next.size?'?'+next.toString():''));paint(list);}catch(error){if(token===version)notify(error.message);}finally{if(token===version)delete results.dataset.loading;}}
