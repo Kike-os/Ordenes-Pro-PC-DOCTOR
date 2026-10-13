@@ -2356,6 +2356,12 @@ class Handler(BaseHTTPRequestHandler):
                     import adi_ai
                     if path=='/api/adi/settings':
                         if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede cambiar esta configuración.'})
+                        if 'writing' not in data and any(key in data for key in adi_ai.CORRECTION_DEFAULTS):
+                            # Corrección Inteligente: interruptores y espera antes de revisar.
+                            problem=adi_ai.save_correction(c,data)
+                            if problem:return self.reply(400,{'error':problem})
+                            audit(c,user['id'],'adi_correction_updated')
+                            return self.reply(200,{'ok':True,'writing':adi_ai.status(c)})
                         if data.get('writing') not in (True,False):return self.reply(400,{'error':'Valor inválido.'})
                         c.execute("INSERT INTO system_state(key,value) VALUES ('adi_writing',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",('on' if data['writing'] else 'off',))
                         audit(c,user['id'],'adi_writing_'+('enabled' if data['writing'] else 'disabled'))
@@ -2367,6 +2373,9 @@ class Handler(BaseHTTPRequestHandler):
                     auto=data.get('auto') is True
                     if limited(c,('adi-auto:' if auto else 'adi-write:')+str(user['id']),limit=240 if auto else 60,window=3600):return self.reply(429,{'error':'Alcanzaste el límite de mejoras por hora. Intenta más tarde.','kind':'limite'})
                     mode='ortografia' if auto else str(data.get('mode',''));field=str(data.get('field',''))[:40]
+                    rules=adi_ai.correction(c)
+                    if auto and not rules['auto_spelling']:return self.reply(403,{'error':'La revisión ortográfica automática está desactivada en Configuración.','kind':'desactivado'})
+                    if not auto and mode!='ortografia' and not rules['professional']:return self.reply(403,{'error':'Las mejoras de redacción con ADI están desactivadas en Configuración.','kind':'desactivado'})
                     if auto and len(str(data.get('text','')))>1500:return self.reply(400,{'error':'Texto demasiado largo para la corrección automática.'})
                     # La llamada a la IA puede tardar varios segundos: se cierra antes la transacción para no bloquear otros guardados
                     # (ni otra petición de ADI del mismo usuario) mientras se espera la respuesta.

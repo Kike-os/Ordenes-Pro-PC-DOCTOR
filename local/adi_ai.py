@@ -54,9 +54,42 @@ def enabled(c):
     return not (row and row['value']=='off')
 
 
+# Corrección Inteligente: lo que ADI hace por su cuenta mientras se escribe y lo que ofrece su botón. Lo decide administración.
+CORRECTION_DEFAULTS={'auto_spelling':True,'grammar':True,'format':True,'professional':True,'indicators':True,'delay_ms':700}
+CORRECTION_DELAY=(400,3000)
+
+
+def correction(c):
+    import json
+    row=c.execute("SELECT value FROM system_state WHERE key='adi_correction'").fetchone()
+    try:saved=json.loads(row['value']) if row else {}
+    except ValueError:saved={}
+    result=dict(CORRECTION_DEFAULTS)
+    for key,default in CORRECTION_DEFAULTS.items():
+        value=saved.get(key,default)
+        result[key]=max(CORRECTION_DELAY[0],min(CORRECTION_DELAY[1],value)) if key=='delay_ms' and type(value) is int else value if type(value) is bool and key!='delay_ms' else default
+    return result
+
+
+def save_correction(c,data):
+    """Guarda los ajustes enviados (interruptores y espera en milisegundos). Devuelve el error de validación o None."""
+    import json
+    current=correction(c)
+    for key in CORRECTION_DEFAULTS:
+        if key not in data:continue
+        if key=='delay_ms':
+            value=str(data[key])
+            if not value.isdigit() or not CORRECTION_DELAY[0]<=int(value)<=CORRECTION_DELAY[1]:return 'La espera debe estar entre %d y %d milisegundos.'%CORRECTION_DELAY
+            current[key]=int(value)
+        elif data[key] in (True,False):current[key]=data[key]
+        else:return 'Valor inválido.'
+    c.execute("INSERT INTO system_state(key,value) VALUES ('adi_correction',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",(json.dumps(current),))
+    return None
+
+
 def status(c):
     name=provider()
-    return {'provider':name,'configured':bool(name),'enabled':enabled(c),'available':bool(name) and enabled(c),'model':model() if name else '',
+    return {'provider':name,'configured':bool(name),'enabled':enabled(c),'available':bool(name) and enabled(c),'model':model() if name else '','correction':correction(c),
             'modes':[{'code':code,'label':label} for code,(label,_) in MODES.items()]}
 
 

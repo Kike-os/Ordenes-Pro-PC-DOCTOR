@@ -87,3 +87,24 @@ class AdiWritingTests(unittest.TestCase):
             manual=self.request('/api/adi/write',{'text':'se reviso el equipo','mode':'tecnica','field':'findings'},cookie=cookie,csrf=csrf)['body']
             self.assertEqual(manual['simple'],False)
             self.assertEqual(self.request('/api/adi/write',{'text':'x'*1600,'mode':'ortografia','auto':True},cookie=cookie,csrf=csrf)['status'],400)
+
+
+    def test_smart_correction_settings_are_admin_only_and_enforced(self):
+        cookie,csrf=self.login()
+        rules=self.request('/api/adi/status',cookie=cookie)['body']['writing']['correction']
+        self.assertEqual(rules,{'auto_spelling':True,'grammar':True,'format':True,'professional':True,'indicators':True,'delay_ms':700})
+        save=lambda **body:self.request('/api/adi/settings',body,cookie=cookie,csrf=csrf)
+        for bad in ({'delay_ms':'100'},{'delay_ms':'9000'},{'delay_ms':'abc'},{'grammar':'sí'}):self.assertEqual(save(**bad)['status'],400)
+        saved=save(auto_spelling=False,professional=False,delay_ms='1000')['body']['writing']['correction']
+        self.assertEqual((saved['auto_spelling'],saved['professional'],saved['delay_ms'],saved['grammar']),(False,False,1000,True))
+        with patch.dict(app.os.environ,{'ANTHROPIC_API_KEY':'','OPENAI_API_KEY':'k'}),patch.object(adi_ai,'_complete',return_value=('El equipo no enciende.',5,5)) as call:
+            write=lambda **body:self.request('/api/adi/write',dict({'text':'el eqipo no ensiende','field':'problem'},**body),cookie=cookie,csrf=csrf)
+            # Con la revisión automática desactivada el servidor no consulta a la IA aunque el navegador lo pida.
+            self.assertEqual(write(mode='ortografia',auto=True)['status'],403)
+            # Sin mejoras profesionales, el botón solo corrige ortografía.
+            self.assertEqual(write(mode='tecnica')['status'],403);self.assertEqual(write(mode='ortografia')['status'],200)
+            self.assertEqual(call.call_count,1)
+        self.assertEqual(save(auto_spelling=True)['body']['writing']['correction']['auto_spelling'],True)
+        with app.connect() as c:
+            c.execute("UPDATE users SET role='tecnico' WHERE username='demo'");c.commit()
+        self.assertEqual(save(indicators=False)['status'],403)
