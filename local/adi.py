@@ -151,13 +151,18 @@ def hours_facts(c,now=None):
          'citas':'Las citas se atienden dentro del horario presencial y solo en las horas que la agenda tenga libres; se reservan y confirman en /citas.',
          'atencion_virtual':info['virtual_message'] or 'No disponible','asesores_humanos':'Los asesores responden en el horario de atención presencial; fuera de ese horario la solicitud queda registrada.'}
 
+def booking_link(day,hour,service):
+ """Enlace interno que abre la Agenda de Citas con fecha, hora y servicio ya elegidos. El chat lo muestra como botón «Reservar…».
+ No reserva nada: el cliente completa sus datos y consentimientos en /citas, y la disponibilidad se vuelve a comprobar al confirmar."""
+ return '/citas?fecha=%s&hora=%s&servicio=%s'%(day,hour,service)
+
 def next_slots(c,limit=3):
  """Próximas horas realmente libres en la agenda (el mismo cálculo que usa la página de reservas), para un diagnóstico o el primer servicio activo."""
  from datetime import timedelta
  service=c.execute("SELECT code,label FROM appointment_services WHERE active=1 ORDER BY (code='diagnostico') DESC,rowid LIMIT 1").fetchone()
  if not service:return []
  found=appointments.alternatives(c,(appointments.now().date()+timedelta(days=1)).isoformat(),service['code'],'',False,limit)
- return [{'servicio':service['label'],'fecha':item['date'],'hora':item['time'],'texto':item['date'][8:]+'/'+item['date'][5:7]+' a las '+appointments.clock12(item['time'])} for item in found]
+ return [{'servicio':service['label'],'fecha':item['date'],'hora':item['time'],'enlace':booking_link(item['date'],item['time'],service['code']),'texto':item['date'][8:]+'/'+item['date'][5:7]+' a las '+appointments.clock12(item['time'])} for item in found]
 
 def hours_answer(c,now=None,topic=''):
  """Respuesta breve sobre horarios, sin IA: distingue atención presencial, solicitud de citas y atención virtual."""
@@ -190,9 +195,9 @@ def slot_answer(c,text,now=None):
  label=day[8:]+'/'+day[5:7]+' a las '+appointments.clock12(hour)
  try:free=[item['time'] for item in appointments.available_slots(c,day,service['code'])]
  except ValueError:free=[]
- if hour in free:return 'El '+label+' está libre en este momento para '+service['label'].lower()+'. Resérvalo en /citas: la cita queda confirmada cuando el sistema te muestra su código.'
+ if hour in free:return 'El '+label+' está libre en este momento para '+service['label'].lower()+'. Toca para reservarlo:\n'+booking_link(day,hour,service['code'])+'\nCompletarás tus datos en la Agenda de Citas; la cita queda confirmada cuando el sistema te muestra su código.'
  options=appointments.alternatives(c,day,service['code'],hour,False,3) or appointments.alternatives(c,day,service['code'],'',False,3)
- if options:return 'El '+label+' no está disponible. Opciones libres más próximas: '+_dot('; '.join((item['date'][8:]+'/'+item['date'][5:7]+' a las '+appointments.clock12(item['time'])) for item in options))+' Puedes reservar la que prefieras en /citas.'
+ if options:return 'El '+label+' no está disponible. Opciones libres más próximas (toca una para reservarla):\n'+'\n'.join(booking_link(item['date'],item['time'],service['code']) for item in options)+'\nTambién puedes elegir otra fecha en /citas.'
  return 'El '+label+' no está disponible y no veo espacios libres en los próximos días. Un asesor puede ayudarte: usa «Contactar soporte técnico».'
 
 def reply(c,text,admin=False,context=None):
@@ -212,9 +217,12 @@ def reply(c,text,admin=False,context=None):
    context=dict(context or {},horarios_vigentes=hours_facts(c))
    if re.search(r'cita|agend|reserv|turno|disponib',plain(text)):context['proximos_espacios_libres_en_la_agenda']=next_slots(c) or 'sin espacios libres en los próximos días';context['como_reservar']='La reserva se hace y se confirma en /citas; ADI no confirma citas por sí misma.'
   except Exception:pass
- answer=ask(text,admin,context)
- if answer:return answer
- return fallback(c,text)
+ answer=ask(text,admin,context) or fallback(c,text)
+ # Si el cliente quiere una cita, la respuesta termina con los próximos horarios realmente libres como botones de reserva.
+ # Se añaden aquí, desde la agenda, para que no dependan de lo que redacte el modelo.
+ if not admin and isinstance(context,dict) and isinstance(context.get('proximos_espacios_libres_en_la_agenda'),list) and '/citas?fecha=' not in answer:
+  answer=answer.rstrip()+'\nPróximos horarios libres (toca uno para reservarlo):\n'+'\n'.join(item['enlace'] for item in context['proximos_espacios_libres_en_la_agenda'])
+ return answer
 
 DAYS=('lunes','martes','miércoles','jueves','viernes','sábado','domingo')
 

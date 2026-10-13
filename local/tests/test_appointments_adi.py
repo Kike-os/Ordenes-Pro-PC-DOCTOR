@@ -65,6 +65,19 @@ class AppointmentAndAdiTests(unittest.TestCase):
    price=adi.reply(c,'¿Cuánto cuesta formatear mi laptop?')
    self.assertIn('revisión técnica',price);self.assertNotRegex(price,r'\$|\bUSD\b|[0-9]+ ?d[oó]lares')
    self.assertIn('/citas',adi.reply(c,'Quiero agendar una cita'))
+   # Reserva desde el chat: ADI ofrece horarios realmente libres como enlaces de reserva; no crea ninguna cita por sí misma.
+   offered=adi.next_slots(c);answer=adi.reply(c,'Quiero agendar una cita');before=c.execute('SELECT COUNT(*) FROM appointments').fetchone()[0]
+   if offered:
+    for item in offered:
+     self.assertRegex(item['enlace'],r'^/citas\?fecha=\d{4}-\d{2}-\d{2}&hora=\d{2}:\d{2}&servicio=[a-z0-9_-]+$');self.assertIn(item['enlace'],answer)
+     self.assertIn(item['hora'],[slot['time'] for slot in appointments.available_slots(c,item['fecha'],item['enlace'].rsplit('=',1)[1])])
+   with patch.object(adi,'ask',return_value='Con gusto te ayudo a reservar.'):
+    written=adi.reply(c,'Necesito un turno para revisar mi laptop')
+    self.assertTrue(written.startswith('Con gusto te ayudo a reservar.'));self.assertEqual(written.count('/citas?fecha='),len(offered))
+    # Sin intención de cita no se añaden horarios, y en modo administrativo tampoco.
+    self.assertNotIn('/citas?fecha=',adi.reply(c,'¿Dónde están ubicados?'))
+   picked=adi.slot_answer(c,'Quiero ir mañana a las 10:00 a. m.')
+   self.assertRegex(picked,r'/citas\?fecha=\d{4}-\d{2}-\d{2}&hora=\d{2}:\d{2}&servicio=');self.assertEqual(c.execute('SELECT COUNT(*) FROM appointments').fetchone()[0],before)
    self.assertIn('Contactar soporte técnico',adi.reply(c,'quiero hablar con una persona'))
    self.assertIn('número de orden',adi.reply(c,'¿cómo va mi equipo? estado de mi orden'))
    self.assertIn('código temporal',adi.reply(c,'orden PCD-20260101-0001 cédula 0100000017'))
