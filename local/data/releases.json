@@ -8,6 +8,27 @@
   },
   "releases": [
     {
+      "version": "1.5.132",
+      "date": "2026-10-13T06:23:05-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Acciones de Seguimiento, correos institucionales, catálogo profesional de presupuestos, documento de identidad y avisos uniformes",
+      "changes": {
+        "features": [
+          "Correos institucionales: plantilla común con firma, revisión de redacción de ADI, copia exacta de cada envío e historial de correos por orden.",
+          "Presupuestos: catálogo profesional con códigos, marcas, imágenes, tres modos de IVA, historial de precios, ventana de selección y descuentos autorizados de 0, 3 o 5 %.",
+          "Presupuestos: administración puede solicitar el documento de identidad al aprobar; queda custodiado y solo lo consulta administración."
+        ],
+        "improvements": [
+          "Seguimiento de Órdenes: cuatro acciones uniformes (Ver, Historial, QR y Ticket) que ya no se cortan en ninguna pantalla.",
+          "Las confirmaciones del sistema usan un diálogo propio y uniforme en lugar de las ventanas del navegador."
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.131",
       "date": "2026-10-13T01:02:49-05:00",
       "type": "patch",

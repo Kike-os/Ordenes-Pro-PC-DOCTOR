@@ -4,6 +4,21 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.132 — 2026-10-13 06:23 (UTC-05:00)
+
+Acciones de Seguimiento, correos institucionales, catálogo profesional de presupuestos, documento de identidad y avisos uniformes
+
+### Nuevas funcionalidades
+
+- Correos institucionales: plantilla común con firma, revisión de redacción de ADI, copia exacta de cada envío e historial de correos por orden.
+- Presupuestos: catálogo profesional con códigos, marcas, imágenes, tres modos de IVA, historial de precios, ventana de selección y descuentos autorizados de 0, 3 o 5 %.
+- Presupuestos: administración puede solicitar el documento de identidad al aprobar; queda custodiado y solo lo consulta administración.
+
+### Mejoras realizadas
+
+- Seguimiento de Órdenes: cuatro acciones uniformes (Ver, Historial, QR y Ticket) que ya no se cortan en ninguna pantalla.
+- Las confirmaciones del sistema usan un diálogo propio y uniforme en lugar de las ventanas del navegador.
+
 ## v1.5.131 — 2026-10-13 01:02 (UTC-05:00)
 
 Presupuestos profesionales, selector de equipos y tarjeta de seguimiento compacta
