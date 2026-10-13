@@ -6003,3 +6003,4 @@ body[data-page=appointments] .appointment-error:not(:empty)::before{content:'!';
 #booking-order-field[hidden]{display:none}
 .clients-origin{display:inline-block;width:fit-content;margin-top:2px;padding:0 7px;border:1px solid #ff9ecb59;border-radius:999px;background:#3a1b3366;color:#ffd3e6;font-size:10.5px;font-weight:600}
 .client-tag-origin{border-color:#ff9ecb59;background:#3a1b3366;color:#ffd3e6}
+.quote-sent a.secondary{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:40px;padding:0 14px;text-decoration:none}.quote-sent a.secondary svg{width:16px;height:16px;flex:none}
