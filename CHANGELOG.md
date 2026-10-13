@@ -4,6 +4,15 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.122 — 2026-10-12 22:42 (UTC-05:00)
+
+Varios equipos por orden, identidad del equipo y pagos
+
+### Nuevas funcionalidades
+
+- Recepción: «+ Agregar equipo» (equipo nuevo, similar o existente) sustituye a «Duplicar orden»; una orden admite varios equipos con identificadores propios (E01, E02…), cada uno con su recepción, diagnóstico, fotos, presupuesto, estado y entrega.
+- Identidad permanente de cada equipo (EQ-0001), historial de equipos del cliente, pagos por equipo con resumen consolidado y bloqueo de entrega con saldo pendiente.
+
 ## v1.5.121 — 2026-10-12 22:24 (UTC-05:00)
 
 ADI: esfera de cristal líquido

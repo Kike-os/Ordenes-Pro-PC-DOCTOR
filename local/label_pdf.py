@@ -24,7 +24,7 @@ def render_label(order,width=100,height=60,show_client=False,monochrome=False):
     qr_size=min(64,h-86);text_width=w-3*m-qr_size;y=70
     entries=[]
     if show_client:entries.append(('Cliente',order['client']))
-    entries.extend([('Equipo',DEVICE_TYPES.get(order['type'],order['type'])),('Marca / modelo',' '.join(str(order.get(k) or '') for k in ('brand','model')) or 'No registrado'),('Serie',order.get('serial') or 'No registrada')])
+    entries.extend([('Equipo',' · '.join(part for part in (order.get('device_code') or '',DEVICE_TYPES.get(order['type'],order['type'])) if part)),('Marca / modelo',' '.join(str(order.get(k) or '') for k in ('brand','model')) or 'No registrado'),('Serie',order.get('serial') or 'No registrada')])
     for label,value in entries:
         lines=pdf.wrap(label+': '+value,text_width,7)
         for text in lines:

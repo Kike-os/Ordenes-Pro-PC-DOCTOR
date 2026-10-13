@@ -81,6 +81,11 @@ def save(c,oid,data,user,now):
     fields,errors=validate(c,data)
     if errors:return 400,{'error':'Revisa los campos señalados.','fields':errors}
     if str(data.get('revision',''))!=str(row['revision']):return 409,{'error':'Otro usuario actualizó esta orden. Recarga el detalle antes de guardar.'}
+    if fields['status']=='entregado' and row['status']!='entregado':
+        # Política de entrega: sin saldo pendiente. Se compara con el presupuesto que se está guardando.
+        import equipment
+        paid=equipment.money(c,oid)['paid_cents'];total=sum(fields[k+'_cents'] for k in BUDGET_KEYS)
+        if total>paid:return 409,{'error':'No se puede entregar: este equipo tiene un saldo pendiente de '+equipment.usd(total-paid)+'. Registra el pago antes de entregarlo.','balance':True}
     keys=('problem','status','priority','assigned_to','estimated_delivery','internal_notes','recommendations','findings')
     c.execute('UPDATE orders SET '+','.join(k+'=?' for k in keys)+',updated_at=?,revision=revision+1 WHERE id=?',(*(fields[k] for k in keys),now.isoformat(timespec='microseconds'),oid))
     from maintenance import transition

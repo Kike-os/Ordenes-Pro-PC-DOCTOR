@@ -4932,3 +4932,40 @@ body[data-page=dashboard] .adi-panel.adi-assist.adi-name{max-width:480px;margin-
 #adi-widget.adi-v2[data-orb=error] .adi-toggle .adi-online{background:#ff6b78;box-shadow:0 0 0 1.5px #1a1230d9,0 0 0 2.25px #ffffff66,0 0 7px #ff6b7899}
 /* Encabezado del chat sin WebGL: el mismo cristal en pequeño. */
 #adi-widget.adi-v2 .adi-panel>header .adi-avatar:not(.adi-avatar-gl){background:radial-gradient(ellipse 60% 26% at 60% 90%,#fff6fbd9 0,#ffd9ec00 80%),radial-gradient(circle at 82% 62%,#c3a4ff8f 0,#c3a4ff00 40%),radial-gradient(circle at 36% 26%,#fff0f7 0,#ffc6e2 30%,#f29ccb 58%,#c57cc4 84%,#a56bc4 100%);color:#fff;text-shadow:0 1px 1.5px #6a2f7ecc;box-shadow:inset 0 0 0 .75px #ffffffb3,inset 0 1.5px 2px #ffffffcc,inset 0 -5px 8px #7a3f9a59,0 0 12px #f6a8d640}
+/* Varios equipos por orden: barra «+ Agregar equipo» de la recepción, tarjetas de equipos, pagos e historial por equipo. */
+.equip-mode{display:flex;align-items:center;justify-content:space-between;gap:14px;margin:0 0 16px;padding:12px 14px;border:1px solid #37618d80;border-radius:12px;background:linear-gradient(180deg,#10233c,#0c192d);color:#e3eeff}
+.equip-mode[data-mode=similar]{border-color:#5aa9e680}.equip-mode[data-mode=existing]{border-color:#3ddc9780}
+.equip-mode-text{display:grid;gap:3px;min-width:0}.equip-mode-text strong{font-size:14px;color:#e3eeff}.equip-mode-text span{font-size:12.5px;line-height:1.45;color:#a9bdd8}
+.equip-add{flex:none;white-space:nowrap;min-height:40px}
+#order-form select[data-locked=true]{pointer-events:none;opacity:.75}#order-form[data-equipment-mode=existing] :is(input[name=brand],input[name=model],input[name=serial],input[name=color])[readonly]{opacity:.75;cursor:not-allowed}
+.equip-dialog{width:min(520px,calc(100% - 24px))}
+.equip-options,.equip-pick{display:grid;gap:10px;margin-top:14px}
+.equip-option,.equip-pick-row{display:flex;align-items:center;gap:12px;width:100%;padding:13px 14px;text-align:left;border:1px solid #37618d80;border-radius:12px;background:#10233c;color:#e3eeff;transition:background .18s,border-color .18s}
+.equip-option:hover,.equip-pick-row:hover:not(:disabled){background:#1b3b60;border-color:#5a8fc4;transform:none}.equip-option:focus-visible,.equip-pick-row:focus-visible{outline:2px solid #a8dcff;outline-offset:2px}
+.equip-option svg{flex:none;width:22px;height:22px;color:#a8dcff}.equip-option span,.equip-pick-row span{display:grid;gap:3px;min-width:0}
+.equip-option strong,.equip-pick-row strong{font-size:14px}.equip-option small,.equip-pick-row small{font-size:12.5px;line-height:1.4;color:#a9bdd8}
+.equip-pick-row:disabled{opacity:.55;cursor:not-allowed}.equip-pick-intro{margin:0;font-size:13px;line-height:1.5;color:#a9bdd8}
+.equip-code{flex:none;padding:4px 9px;border-radius:8px;background:#24558d;color:#e3eeff;font:600 12px/1.2 ui-monospace,Menlo,Consolas,monospace;letter-spacing:.02em}
+.equip-group-head{display:flex;align-items:center;flex-wrap:wrap;gap:10px 14px;margin-bottom:12px}.equip-group-head h2{margin:0;flex:1 1 auto}.equip-count{font-size:12.5px;color:#a9bdd8}
+.equip-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.equip-card{display:grid;gap:10px;align-content:start;padding:14px;border:1px solid #37618d66;border-radius:14px;background:linear-gradient(180deg,#10233c,#0c192d);color:#e3eeff;min-width:0}
+.equip-card[data-current=true]{border-color:#70b7f5;box-shadow:0 0 0 1px #70b7f540,0 8px 22px -14px #70b7f5}
+.equip-card-top{display:flex;align-items:center;justify-content:space-between;gap:8px;min-width:0}.equip-card-top strong{font:650 13.5px/1.3 ui-monospace,Menlo,Consolas,monospace;color:#e3eeff;overflow-wrap:anywhere}
+.equip-state{flex:none;padding:3px 9px;border-radius:999px;border:1px solid #5083b880;background:#16304f;color:#cfe3ff;font-size:11.5px;font-weight:600;white-space:nowrap}
+.equip-state[data-status=entregado]{border-color:#3ddc9766;background:#12352b;color:#aef0d2}.equip-state[data-status=listo],.equip-state[data-status=espera_entrega]{border-color:#69d0c066;background:#123438;color:#b5efe6}
+.equip-state[data-status=presupuesto],.equip-state[data-status=esperando_cliente]{border-color:#f3c67766;background:#3a2e14;color:#ffe2a8}
+.equip-facts{display:grid;grid-template-columns:1fr 1fr;gap:8px 12px;margin:0}.equip-facts div{min-width:0}.equip-facts dt{font-size:11.5px;color:#8fa6c4}.equip-facts dd{margin:2px 0 0;font-size:13px;color:#e3eeff;overflow-wrap:anywhere}
+.equip-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px}.equip-actions button{min-height:36px;padding:8px 12px}.equip-current{font-size:12px;color:#a8dcff;margin-right:auto}
+.equip-totals{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:12px;padding:12px 14px;border:1px solid #37618d66;border-radius:12px;background:#0c192d}
+.equip-totals div{display:grid;gap:3px;min-width:0}.equip-totals span{font-size:11.5px;color:#8fa6c4}.equip-totals strong{font-size:15px;color:#e3eeff}
+.equip-pay-note{display:block;margin:8px 0 0;font-size:12.5px;color:#a9bdd8}
+.equip-pay-list,.equip-visits{list-style:none;margin:12px 0 0;padding:0;display:grid;gap:8px}
+.equip-pay-list li,.equip-visits li{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding:9px 11px;border:1px solid #37618d4d;border-radius:10px;background:#0c192d}
+.equip-pay-list span,.equip-visits span{display:grid;gap:2px;min-width:0}.equip-pay-list strong,.equip-visits strong{font-size:13px;color:#e3eeff}.equip-pay-list small,.equip-visits small{font-size:12px;line-height:1.4;color:#a9bdd8;overflow-wrap:anywhere}
+.equip-pay-list li[data-voided=true] strong{text-decoration:line-through;color:#8fa6c4}
+.equip-visits li{justify-content:flex-start}.equip-visits .text-action{flex:none;white-space:nowrap}
+.equip-pay-form{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}.equip-pay-form :is(input,select){margin:0;min-height:42px}.equip-pay-form input[name=note],.equip-pay-form button,.equip-pay-form .message{grid-column:1/-1}.equip-pay-form .message{margin:0}
+.equip-void{display:grid;gap:10px;margin-top:12px}.equip-void p{margin:0;font-size:13px;line-height:1.5}
+.equip-history .equip-cards{margin-top:12px}.equip-name{margin:0;font-size:14px;font-weight:600;color:#e3eeff}.equip-sub{margin:0;font-size:12.5px;color:#a9bdd8}
+@media(max-width:640px){.equip-mode{flex-direction:column;align-items:stretch}.equip-add{width:100%}.equip-cards{grid-template-columns:1fr}.equip-totals{grid-template-columns:1fr 1fr}.equip-group-head .equip-add{width:100%}}
+.equip-group-head h2{display:flex;align-items:center;gap:8px}.equip-group-head h2 svg{flex:none;width:18px;height:18px}

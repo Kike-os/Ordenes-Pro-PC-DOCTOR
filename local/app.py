@@ -44,6 +44,7 @@ import thermal_printing
 import tempfile
 import subprocess
 import order_workspace
+import equipment
 import corporate
 import client_registry
 import client_import
@@ -1053,7 +1054,7 @@ class Handler(BaseHTTPRequestHandler):
                 # Citas del cliente y última atención registrada (entrega más reciente o, si no hay, último ingreso).
                 dates=[dict(r) for r in c.execute("SELECT a.id,a.public_code,a.starts_at,a.status,a.duration_minutes,COALESCE(s.label,a.service_code) service,a.brand,a.model FROM appointments a LEFT JOIN appointment_services s ON s.code=a.service_code WHERE a.client_id=? AND a.deleted_at IS NULL ORDER BY a.starts_at DESC LIMIT 30",(row['id'],))]
                 last=max((item['delivered_at'] or item['received_at'] or '' for item in orders),default='')
-                return self.reply(200,{'client':client_registry.profile(row),'devices':devices,'orders':orders,'appointments':dates,'last_service':last,'missing':client_registry.missing(row) if row['needs_review'] else [],'imported':dict(batch) if batch else None,'can_edit':user['role']=='administrador' or bool(row['needs_review'])})
+                return self.reply(200,{'client':client_registry.profile(row),'devices':devices,'orders':orders,'appointments':dates,'equipment':equipment.client_history(c,row['id']),'last_service':last,'missing':client_registry.missing(row) if row['needs_review'] else [],'imported':dict(batch) if batch else None,'can_edit':user['role']=='administrador' or bool(row['needs_review'])})
             if path in ('/api/clients/export.csv','/api/clients/import-report.csv'):
                 if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede exportar clientes.'})
                 if path=='/api/clients/export.csv':
@@ -1107,7 +1108,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(200, base64.b64decode(row['data']), 'image/jpeg')
             detail = re.fullmatch(r'/api/orders/([0-9]+)(?:/(qr\.(svg|png)|tracking-qr\.png|receipt\.pdf|thermal\.pdf|service\.pdf|label\.pdf|stay\.pdf))?', path)
             if detail:
-                row = c.execute('SELECT o.*,COALESCE(NULLIF(d.kind,\'\'),d.category) type,d.brand,d.model,d.serial,d.color,c.id client_id,c.name client,c.identification,c.phone,c.email,c.province,c.city,c.address,c.location_reference,s.label status_label FROM orders o JOIN devices d ON d.id=o.device_id JOIN clients c ON c.id=d.client_id JOIN statuses s ON s.code=o.status WHERE o.id=?',(int(detail[1]),)).fetchone()
+                row = c.execute('SELECT o.*,COALESCE(NULLIF(d.kind,\'\'),d.category) type,d.brand,d.model,d.serial,d.color,d.code device_code,c.id client_id,c.name client,c.identification,c.phone,c.email,c.province,c.city,c.address,c.location_reference,s.label status_label FROM orders o JOIN devices d ON d.id=o.device_id JOIN clients c ON c.id=d.client_id JOIN statuses s ON s.code=o.status WHERE o.id=?',(int(detail[1]),)).fetchone()
                 if not row:
                     return self.reply(404, {'error':'Orden no disponible.'})
                 code = row['code'] or 'OP-'+str(row['id']).zfill(5)
@@ -1155,6 +1156,10 @@ class Handler(BaseHTTPRequestHandler):
                 result = dict(row)
                 import order_tracking
                 result['tracking']=order_tracking.active(c,row['id'])
+                # Equipos de la orden, identidad permanente del equipo y pagos de este ingreso.
+                result['group']=equipment.group(c,row['id']);result['device_code']=row['device_code'] or ''
+                result['unit_code']=next((unit['unit_code'] for unit in result['group']['units'] if unit['id']==row['id']),'') if result['group']['multiple'] else ''
+                result['payments']=equipment.payments(c,row['id']);result['money']=equipment.money(c,row['id']);result['payment_methods']=equipment.METHODS
                 result['receipt_mail']=receipt_mail_status(c,row['id'])
                 result['authorization_mail']=authorization_mail_status(c,row['id'])
                 import client_authorization
@@ -2152,6 +2157,18 @@ class Handler(BaseHTTPRequestHandler):
                     c.execute('UPDATE orders SET updated_at=?,revision=revision+1 WHERE id=?',(now.isoformat(timespec='microseconds'),oid))
                     audit(c,user['id'],'order_follow_up',oid)
                     return self.reply(201,{'ok':True})
+                payment_route=re.fullmatch(r'/api/orders/([0-9]+)/payments(/void)?',path)
+                if payment_route:
+                    # Pagos por equipo: los registra el personal; anularlos (con motivo) es de administración. Nunca se borran.
+                    if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
+                    if payment_route[2]:
+                        if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede anular un pago.'})
+                        status,payload=equipment.void_payment(c,int(payment_route[1]),data,user,reception_now())
+                        if status==200:audit(c,user['id'],'order_payment_voided',int(payment_route[1]));order_workspace.event(c,int(payment_route[1]),user['id'],reception_now(),'payment','Pago anulado. Motivo: '+str(data.get('reason','')).strip())
+                    else:
+                        status,payload=equipment.add_payment(c,int(payment_route[1]),data,user,reception_now())
+                        if status==201:audit(c,user['id'],'order_payment_recorded',int(payment_route[1]));order_workspace.event(c,int(payment_route[1]),user['id'],reception_now(),'payment','Pago registrado: '+equipment.usd(c.execute('SELECT amount_cents FROM order_payments WHERE id=?',(payload['id'],)).fetchone()[0])+' ('+equipment.METHODS[str(data.get('method'))]+').')
+                    return self.reply(status,payload)
                 workspace_route=re.fullmatch(r'/api/orders/([0-9]+)/workspace',path)
                 if workspace_route:
                     if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede editar órdenes.'})
@@ -2202,6 +2219,9 @@ class Handler(BaseHTTPRequestHandler):
                         # Revertir una entrega reabre el contador de permanencia: solo administración, y queda auditado.
                         reverted=old=='entregado' and status!='entregado'
                         if reverted and user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede revertir una entrega registrada.'})
+                        if status=='entregado' and old!='entregado':
+                            blocked=equipment.delivery_block(c,int(oid))
+                            if blocked:return self.reply(409,{'error':blocked,'balance':True})
                         c.execute('UPDATE orders SET status=?,updated_at=?,revision=revision+1 WHERE id=?', (status,now.isoformat(timespec='microseconds'),oid))
                         planned=maintenance.transition(c,int(oid),old,status,now)
                         # La entrega crea también la cita futura del mantenimiento (pendiente de confirmación), sin pasos manuales.
@@ -2439,6 +2459,21 @@ class Handler(BaseHTTPRequestHandler):
                         if linked_appointment['client_id']!=selected['id']:return self.reply(409,{'error':'La cita no corresponde al cliente seleccionado.'})
                     personal=client_registry.profile(selected)
                     incoming=dict(data)
+                    # Varios equipos en una orden: el ingreso nuevo se une a la orden principal del mismo cliente.
+                    group_main=None;group_ref=str(data.get('group_order_id',''))
+                    if group_ref:
+                        group_main=equipment.root(c,int(group_ref)) if group_ref.isdigit() else None
+                        if not group_main:return self.reply(404,{'error':'La orden a la que quieres agregar el equipo ya no está disponible.'})
+                        if c.execute('SELECT client_id FROM devices WHERE id=?',(group_main['device_id'],)).fetchone()['client_id']!=selected['id']:
+                            return self.reply(409,{'error':'La orden seleccionada pertenece a otro cliente.','fields':{'client_id':'El equipo debe ser del mismo cliente de la orden.'}})
+                    # Equipo existente: se conserva su identidad e historial; sus características salen del registro, no del formulario.
+                    existing_device=None;device_ref=str(data.get('device_id',''))
+                    if device_ref:
+                        existing_device=c.execute("SELECT d.*,COALESCE(NULLIF(d.kind,''),d.category) kind_code FROM devices d WHERE d.id=? AND d.client_id=?",(int(device_ref),selected['id'])).fetchone() if device_ref.isdigit() else None
+                        if not existing_device:return self.reply(404,{'error':'El equipo seleccionado no pertenece a este cliente.'})
+                        busy=c.execute("SELECT COALESCE(code,'OP-'||printf('%05d',id)) code FROM orders WHERE device_id=? AND status!='entregado' ORDER BY id DESC LIMIT 1",(existing_device['id'],)).fetchone()
+                        if busy:return self.reply(409,{'error':'El equipo '+(existing_device['code'] or '')+' ya tiene un ingreso abierto ('+busy['code']+'). Entrégalo antes de registrar otro ingreso.'})
+                        incoming.update({'type':existing_device['kind_code'],'brand':existing_device['brand'] or '','model':existing_device['model'] or '','serial':existing_device['serial'] or '','color':existing_device['color'] or ''})
                     incoming.update({k:personal.get(k,'') for k in client_registry.PERSONAL})
                     incoming['client']=personal['name']
                     fields, errors = validate_order(incoming)
@@ -2471,18 +2506,31 @@ class Handler(BaseHTTPRequestHandler):
                     import device_lookup
                     # Sin duplicados: si este cliente ya tiene registrado exactamente el mismo equipo (misma serie, tipo, marca, modelo y color), se reutiliza.
                     same=c.execute("SELECT id FROM devices WHERE client_id=? AND COALESCE(NULLIF(kind,''),category)=? AND COALESCE(brand,'')=? AND COALESCE(model,'')=? AND COALESCE(color,'')=? AND COALESCE(serial,'')!='' AND upper(replace(serial,' ',''))=? ORDER BY id LIMIT 1",
-                        (client_id,fields['type'],fields['brand'],fields['model'],fields['color'],device_lookup.normalize(fields['serial']))).fetchone() if fields['serial'] else None
+                        (client_id,fields['type'],fields['brand'],fields['model'],fields['color'],device_lookup.normalize(fields['serial']))).fetchone() if fields['serial'] and not existing_device else None
+                    if existing_device:same=existing_device
+                    elif data.get('new_unit')=='1':
+                        # «Agregar equipo similar» registra una unidad física distinta: nunca se fusiona con otra; una serie ya registrada se rechaza.
+                        clash=c.execute("SELECT code FROM devices WHERE client_id=? AND COALESCE(serial,'')!='' AND upper(replace(serial,' ',''))=? LIMIT 1",(client_id,device_lookup.normalize(fields['serial']))).fetchone() if fields['serial'] else None
+                        if clash:return self.reply(409,{'error':'Ese número de serie ya pertenece al equipo '+(clash['code'] or 'registrado')+' de este cliente. Usa «Seleccionar equipo existente» o corrige la serie.','fields':{'serial':'Serie ya registrada en otro equipo del cliente.'}})
+                        same=None
                     identified=bool(fields['brand'] or fields['model'])
                     # La identificación queda vinculada al equipo con quién la confirmó y cuándo; las órdenes anteriores no se tocan.
                     device_id = same['id'] if same else c.execute('INSERT INTO devices(client_id,type,category,kind,brand,model,serial,color,identity_source,identity_confirmed_by,identity_confirmed_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
                         (client_id,legacy_type(fields['type']),stored_category(fields['type']),fields['type'],fields['brand'],fields['model'],fields['serial'],fields['color'],(device_lookup.source(data.get('identity_source')) or 'manual') if identified else '',user['id'] if identified else None,received.isoformat(timespec='seconds') if identified else '')).lastrowid
                     remember_brand(c,fields['brand'],fields['type'])
-                    number_date = received.strftime('%Y%m%d')
-                    c.execute('INSERT INTO daily_order_sequences(reception_date,value) VALUES (?,1) ON CONFLICT(reception_date) DO UPDATE SET value=value+1',(number_date,))
-                    sequence = c.execute('SELECT value FROM daily_order_sequences WHERE reception_date=?',(number_date,)).fetchone()[0]
-                    code = order_code(number_date,sequence)
-                    oid = c.execute("INSERT INTO orders(device_id,status,problem,created_by,created_at,accessories,physical_condition,technician_notes,code,request_key,received_at,number_date,daily_sequence) VALUES (?,'pendiente',?,?,?,?,?,?,?,?,?,?,?)",
-                        (device_id,fields['problem'],user['id'],int(received.timestamp()),fields['accessories'],fields['physical_condition'],fields['technician_notes'],code,request_key,received.isoformat(timespec='microseconds'),number_date,sequence)).lastrowid
+                    unit_number=1
+                    if group_main:
+                        # El equipo adicional no consume un número de orden: lleva el de la orden principal con su sufijo (-E02, -E03…).
+                        unit_number,code=equipment.next_unit(c,group_main);number_date=sequence=None
+                        if not code:return self.reply(409,{'error':'La orden alcanzó el máximo de equipos permitido.'})
+                    else:
+                        number_date = received.strftime('%Y%m%d')
+                        c.execute('INSERT INTO daily_order_sequences(reception_date,value) VALUES (?,1) ON CONFLICT(reception_date) DO UPDATE SET value=value+1',(number_date,))
+                        sequence = c.execute('SELECT value FROM daily_order_sequences WHERE reception_date=?',(number_date,)).fetchone()[0]
+                        code = order_code(number_date,sequence)
+                    oid = c.execute("INSERT INTO orders(device_id,status,problem,created_by,created_at,accessories,physical_condition,technician_notes,code,request_key,received_at,number_date,daily_sequence,group_id,unit_no) VALUES (?,'pendiente',?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                        (device_id,fields['problem'],user['id'],int(received.timestamp()),fields['accessories'],fields['physical_condition'],fields['technician_notes'],code,request_key,received.isoformat(timespec='microseconds'),number_date,sequence,group_main['id'] if group_main else None,unit_number)).lastrowid
+                    if group_main:audit(c,user['id'],'order_unit_added',oid)
                     c.execute('UPDATE orders SET qr_url=? WHERE id=?',(order_url(code),oid))
                     import order_tracking
                     order_tracking.create(c,oid,user['id'],received)

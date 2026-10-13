@@ -8,6 +8,23 @@
   },
   "releases": [
     {
+      "version": "1.5.122",
+      "date": "2026-10-12T22:42:05-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Varios equipos por orden, identidad del equipo y pagos",
+      "changes": {
+        "features": [
+          "Recepción: «+ Agregar equipo» (equipo nuevo, similar o existente) sustituye a «Duplicar orden»; una orden admite varios equipos con identificadores propios (E01, E02…), cada uno con su recepción, diagnóstico, fotos, presupuesto, estado y entrega.",
+          "Identidad permanente de cada equipo (EQ-0001), historial de equipos del cliente, pagos por equipo con resumen consolidado y bloqueo de entrega con saldo pendiente."
+        ],
+        "improvements": [],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.121",
       "date": "2026-10-12T22:24:08-05:00",
       "type": "patch",
