@@ -595,7 +595,8 @@ def decide(c, quote, decisions, now, user=None, actor='', note=''):
     if all(value == 'pendiente' for value in decisions.values()):
         raise QuoteError('Decide al menos una partida: aprueba o rechaza alguna antes de confirmar.')
     previous = sum(line['net_cents'] for old in chain(c, quote)[1:] for line in approved_lines(c, old) if line['quote_id'] == old['id'])
-    paid = c.execute('SELECT COALESCE(SUM(amount_cents),0) FROM order_payments WHERE order_id=? AND voided_at IS NULL', (quote['order_id'],)).fetchone()[0]
+    import equipment
+    paid = equipment.money(c, quote['order_id'])['paid_cents']  # pagos netos del equipo: la misma fuente que el saldo
     approved_total = previous + sum(net(item['quantity'] * item['unit_cents'], quote['discount_bp']) for item in items if decisions[item['id']] == 'aprobado')
     if paid > approved_total:
         raise QuoteError('La orden ya tiene pagos registrados por %s, más que el total aprobado (%s). Revisa los pagos antes de registrar esta decisión.' % (usd(paid), usd(approved_total)), 409)

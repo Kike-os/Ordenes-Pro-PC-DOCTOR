@@ -2520,17 +2520,23 @@ class Handler(BaseHTTPRequestHandler):
                             return self.reply(200,{'ok':True,'mail':result,'recipient':email,'link':link,'quote':quotes.detail(c,quotes.get(c,found['id']))})
                         return self.reply(400,{'error':'Acción inválida.'})
                     except quotes.QuoteError as error:return self.reply(error.status,{'error':str(error),'fields':error.fields})
-                payment_route=re.fullmatch(r'/api/orders/([0-9]+)/payments(/void)?',path)
+                payment_route=re.fullmatch(r'/api/orders/([0-9]+)/payments(/void|/assign)?',path)
                 if payment_route:
-                    # Pagos por equipo: los registra el personal; anularlos (con motivo) es de administración. Nunca se borran.
+                    # Movimientos financieros: pagos (de un equipo o generales de la orden) los registra el personal; devoluciones y
+                    # anulaciones (con motivo) son de administración. Nunca se borran ni cambian el estado técnico del equipo.
                     if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
-                    if payment_route[2]:
+                    oid=int(payment_route[1]);log=lambda action,text:(audit(c,user['id'],action,oid),order_workspace.event(c,oid,user['id'],reception_now(),'payment',text))
+                    if payment_route[2]=='/void':
                         if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede anular un pago.'})
-                        status,payload=equipment.void_payment(c,int(payment_route[1]),data,user,reception_now())
-                        if status==200:audit(c,user['id'],'order_payment_voided',int(payment_route[1]));order_workspace.event(c,int(payment_route[1]),user['id'],reception_now(),'payment','Pago anulado. Motivo: '+str(data.get('reason','')).strip())
+                        status,payload=equipment.void_payment(c,oid,data,user,reception_now())
+                        if status==200:log('order_payment_voided',('Devolución anulada' if payload['kind']=='devolucion' else 'Pago general anulado' if payload['scope']=='general' else 'Pago anulado')+'. Motivo: '+str(data.get('reason','')).strip())
+                    elif payment_route[2]=='/assign':
+                        status,payload=equipment.assign_payment(c,oid,data,user,reception_now())
+                        if status==201:log('order_payment_assigned','Pago general asignado a este equipo: '+equipment.usd(payload['amount_cents'])+'.')
                     else:
-                        status,payload=equipment.add_payment(c,int(payment_route[1]),data,user,reception_now())
-                        if status==201:audit(c,user['id'],'order_payment_recorded',int(payment_route[1]));order_workspace.event(c,int(payment_route[1]),user['id'],reception_now(),'payment','Pago registrado: '+equipment.usd(c.execute('SELECT amount_cents FROM order_payments WHERE id=?',(payload['id'],)).fetchone()[0])+' ('+equipment.METHODS[str(data.get('method'))]+').')
+                        status,payload=equipment.add_payment(c,oid,data,user,reception_now())
+                        if status==201:log('order_refund_recorded' if payload['kind']=='devolucion' else 'order_payment_recorded',('Devolución registrada' if payload['kind']=='devolucion' else 'Pago registrado')+(' (general de la orden)' if payload['scope']=='general' else '')+': '+equipment.usd(payload['amount_cents'])+' ('+equipment.METHODS[str(data.get('method'))]+').')
+                    if status<300:payload['finance']=equipment.finance(c,oid)
                     return self.reply(status,payload)
                 workspace_route=re.fullmatch(r'/api/orders/([0-9]+)/workspace',path)
                 if workspace_route:
