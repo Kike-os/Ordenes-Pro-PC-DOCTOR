@@ -4,6 +4,19 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.115 — 2026-10-12 19:44 (UTC-05:00)
+
+Gestión de Clientes: directorio rediseñado y búsqueda sin tildes
+
+### Nuevas funcionalidades
+
+- «Por completar» indica exactamente qué datos obligatorios faltan; la ficha del cliente muestra sus citas y la última atención; aviso cuando otra ficha comparte teléfono o correo.
+
+### Mejoras realizadas
+
+- Gestión de Clientes rediseñada: indicadores reales (clientes, fichas completas y por completar), barra de herramientas adaptable, tabla compacta con iconos y orden por columnas, y acciones de contacto (WhatsApp, llamada, correo).
+- Búsqueda de clientes sin tildes ni mayúsculas, por varias palabras en cualquier orden y por números con o sin guiones; también busca por cantón.
+
 ## v1.5.114 — 2026-10-12 19:09 (UTC-05:00)
 
 ADI comprueba en la agenda la hora pedida

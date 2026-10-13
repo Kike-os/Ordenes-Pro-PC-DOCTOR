@@ -1050,7 +1050,10 @@ class Handler(BaseHTTPRequestHandler):
                 devices=[dict(r) for r in c.execute('SELECT * FROM devices WHERE client_id=?',(row['id'],))]
                 orders=[dict(r) for r in c.execute("SELECT o.id,o.code,o.created_at,o.received_at,o.status status_code,s.label status,o.problem,o.findings,o.recommendations,o.delivered_at,COALESCE(NULLIF(d.kind,''),d.category) type,d.brand,d.model,d.serial,COALESCE((SELECT labor_cents+parts_cents+services_cents+digital_cents FROM order_budget b WHERE b.order_id=o.id),0) total_cents FROM orders o JOIN devices d ON d.id=o.device_id JOIN statuses s ON s.code=o.status WHERE d.client_id=? ORDER BY o.id DESC",(row['id'],))]
                 batch=c.execute('SELECT filename,created_at FROM client_import_batches WHERE id=?',(row['import_batch_id'],)).fetchone() if row['import_batch_id'] else None
-                return self.reply(200,{'client':client_registry.profile(row),'devices':devices,'orders':orders,'imported':dict(batch) if batch else None,'can_edit':user['role']=='administrador' or bool(row['needs_review'])})
+                # Citas del cliente y última atención registrada (entrega más reciente o, si no hay, último ingreso).
+                dates=[dict(r) for r in c.execute("SELECT a.id,a.public_code,a.starts_at,a.status,a.duration_minutes,COALESCE(s.label,a.service_code) service,a.brand,a.model FROM appointments a LEFT JOIN appointment_services s ON s.code=a.service_code WHERE a.client_id=? AND a.deleted_at IS NULL ORDER BY a.starts_at DESC LIMIT 30",(row['id'],))]
+                last=max((item['delivered_at'] or item['received_at'] or '' for item in orders),default='')
+                return self.reply(200,{'client':client_registry.profile(row),'devices':devices,'orders':orders,'appointments':dates,'last_service':last,'missing':client_registry.missing(row) if row['needs_review'] else [],'imported':dict(batch) if batch else None,'can_edit':user['role']=='administrador' or bool(row['needs_review'])})
             if path in ('/api/clients/export.csv','/api/clients/import-report.csv'):
                 if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede exportar clientes.'})
                 if path=='/api/clients/export.csv':
@@ -1202,7 +1205,11 @@ class Handler(BaseHTTPRequestHandler):
                 elif path == '/api/clients':
                     source, columns = 'clients c', "c.id,c.name,c.phone,c.phone_secondary,c.email,c.identification,c.document_type,c.trade_name,c.client_type,c.city,c.canton,c.needs_review,c.import_batch_id,(SELECT COUNT(*) FROM orders o JOIN devices d ON d.id=o.device_id WHERE d.client_id=c.id) orders"
                     search = "c.name||' '||COALESCE(c.phone,'')||' '||c.phone_secondary||' '||COALESCE(c.email,'')||' '||c.identification||' '||c.trade_name||' '||c.city"
-                    where, ordering = '', 'c.name COLLATE NOCASE' if query.get('sort',[''])[0]=='name' else 'c.id DESC'
+                    # Orden por columnas: nombre, ciudad u órdenes, en ambos sentidos; por defecto, los más recientes.
+                    sort=query.get('sort',[''])[0];descending=query.get('dir',[''])[0]=='desc'
+                    orderings={'name':'c.name COLLATE NOCASE','city':"COALESCE(NULLIF(c.city,''),c.canton,'') COLLATE NOCASE",'orders':'orders','id':'c.identification'}
+                    if sort and sort not in orderings:return self.reply(400,{'error':'Orden inválido.'})
+                    where, ordering = '', (orderings[sort]+(' DESC' if descending else '')+',c.id DESC') if sort else 'c.id DESC'
                     conditions={'review':'c.needs_review=1','complete':'c.needs_review=0','imported':'c.import_batch_id IS NOT NULL','orders':'EXISTS(SELECT 1 FROM devices d JOIN orders o ON o.device_id=d.id WHERE d.client_id=c.id)','no_id':"c.identification=''"}
                     chosen=query.get('filter',[''])[0]
                     if chosen:
@@ -1245,6 +1252,14 @@ class Handler(BaseHTTPRequestHandler):
                             except ValueError:return self.reply(400,{'error':'Fecha de filtro inválida.'})
                             where+=" AND date(o.created_at,'unixepoch','-5 hours')"+operator+'?';args.append(value)
                 condition = f' WHERE instr(lower({search}),lower(?))>0' + where
+                if path == '/api/clients':
+                    # Búsqueda de clientes sin tildes ni mayúsculas y por varias palabras en cualquier orden (nombre, razón social, nombre comercial,
+                    # cédula o RUC, teléfonos, correo y ciudad). Los números también se comparan sin espacios ni guiones.
+                    words=[client_registry.fold(word) for word in term.split()][:6] or ['']
+                    folded=client_registry.fold_sql(search+"||' '||COALESCE(c.canton,'')")
+                    digits="replace(replace(replace(COALESCE(c.phone,'')||' '||c.phone_secondary||' '||c.identification,' ',''),'-',''),'+','')"
+                    condition=' WHERE '+' AND '.join('(instr('+folded+',?)>0 OR instr('+digits+',?)>0)' for _ in words)+where
+                    args=[value for word in words for value in (word,word.replace('-','').replace('+','') or word)]+args[1:]
                 total = c.execute('SELECT COUNT(*) FROM '+source+condition, args).fetchone()[0]
                 if path=='/api/orders':page=min(page,max(1,(total+49)//50))
                 rows = [dict(r) for r in c.execute('SELECT '+columns+' FROM '+source+condition+' ORDER BY '+ordering+' LIMIT 50 OFFSET ?', (*args,(page-1)*50))]
@@ -1252,6 +1267,13 @@ class Handler(BaseHTTPRequestHandler):
                     # Permanencia en taller: calculada en el servidor con las fechas guardadas de ingreso y entrega.
                     stay_config=stay.settings(c);stay_now=reception_now()
                     for item in rows:item['stay']=stay.compute(item,stay_now,stay_config)
+                if path == '/api/clients':
+                    # Indicadores reales del directorio y, en cada ficha por completar, qué datos obligatorios faltan exactamente.
+                    counts=c.execute('SELECT COUNT(*) total,COALESCE(SUM(needs_review),0) review FROM clients').fetchone()
+                    for item in rows:
+                        if item['needs_review']:
+                            full=c.execute('SELECT * FROM clients WHERE id=?',(item['id'],)).fetchone();item['missing']=client_registry.missing(full) if full else []
+                    return self.reply(200, {'rows':rows,'total':total,'page':page,'pages':max(1,(total+49)//50),'stats':{'total':counts['total'],'complete':counts['total']-counts['review'],'review':counts['review']}})
                 return self.reply(200, {'rows':rows,'total':total,'page':page,'pages':max(1,(total+49)//50)})
             if path == '/api/version':
                 # Versión que ejecuta realmente este servidor (la del código desplegado), para que las pestañas abiertas detecten cuándo deben recargarse.

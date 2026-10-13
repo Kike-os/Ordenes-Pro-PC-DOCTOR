@@ -4788,3 +4788,47 @@ dialog.mail-composer[open]>form{scroll-padding-bottom:96px}
 .public-hours-state{color:#f3d48f}.public-hours-state[data-open=true]{color:#8ff0bd}
 .appointment-live{margin:6px 0 0;font-size:12px;line-height:1.4;color:#8ff0bd}.appointment-live[hidden]{display:none}.appointment-live[data-state=error]{color:#ffb3b6}.appointment-live::before{content:'';display:inline-block;width:7px;height:7px;margin-right:7px;border-radius:50%;background:currentColor;vertical-align:middle}
 .hours-limit{grid-template-columns:minmax(120px,1fr) auto 124px}.hours-limit .hours-day{font-size:13px;font-weight:600;color:#e5edf9}
+/* Gestión de Clientes: indicadores, barra de herramientas adaptable, tabla compacta con orden por columnas y acciones unificadas. */
+#module-add.with-icon{display:inline-flex;align-items:center;gap:8px}#module-add.with-icon svg{width:17px;height:17px}
+.clients-stats{display:grid;grid-template-columns:repeat(3,minmax(0,220px));gap:10px;margin-bottom:12px}
+.clients-stat{display:grid;gap:1px;width:auto;margin:0;padding:10px 14px;border:1px solid #22344f;border-left:3px solid #4d8df0;border-radius:11px;background:#0c1729;color:#c5d5ee;text-align:left;cursor:pointer;transition:background .18s,border-color .18s}
+.clients-stat:hover,.clients-stat:focus-visible{background:#11203a;border-color:#42628d;outline:0}
+.clients-stat[aria-pressed=true]:not([data-kind=total]){background:#132746;border-color:#69a7ff;box-shadow:0 0 0 2px #4087ef26}
+.clients-stat strong{font-size:22px;line-height:1.1;color:#fff}.clients-stat span{font-size:11.5px;color:#9db1cf}
+.clients-stat[data-kind=complete]{border-left-color:#3fbf8a}.clients-stat[data-kind=review]{border-left-color:#f3c677}
+.clients-toolbar{display:grid;grid-template-columns:minmax(220px,1.2fr) minmax(0,2fr) auto;gap:10px;align-items:center}
+.clients-toolbar form{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;margin:0}
+.clients-toolbar input[type=search],.clients-toolbar select{margin:0;min-height:40px;height:40px;font-size:13px}
+.clients-toolbar form button{width:auto;margin:0;min-height:40px;padding:8px 14px}
+.clients-filters{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.clients-actions{position:relative;display:flex;gap:8px;justify-content:flex-end}
+.clients-actions-menu{display:flex;gap:8px}.clients-actions button{display:inline-flex;align-items:center;gap:7px;width:auto;margin:0;min-height:40px;padding:8px 13px;font-size:13px}
+.clients-more{display:none!important}
+.clients-table th{padding:9px 14px;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:#8198ba}
+.clients-table td{padding:8px 14px;font-size:13px;line-height:1.4}
+.clients-sort{display:inline-flex;align-items:center;gap:5px;width:auto;margin:0;padding:0;border:0;background:none;color:inherit;font:inherit;letter-spacing:inherit;text-transform:inherit;cursor:pointer}
+.clients-sort svg{width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;opacity:.6}
+.clients-sort:hover,.clients-sort:focus-visible,th[aria-sort=ascending] .clients-sort,th[aria-sort=descending] .clients-sort{color:#cfe2ff;outline:0}th[aria-sort]:not([aria-sort=none]) .clients-sort svg{opacity:1}
+.clients-name{display:grid;gap:1px;justify-items:start}.clients-name small{font-size:11.5px;color:#8fa5c4}.clients-name .clients-kind{font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:#6f84a3}
+button.client-flag{width:auto;margin:3px 0 0;padding:2px 9px;border:1px solid #7a6230;border-radius:999px;background:#2b230f;color:#f3d48f;font-size:11px;font-weight:600;cursor:pointer}
+button.client-flag:hover,button.client-flag:focus-visible{border-color:#f3c677;outline:0}
+.clients-id{font-variant-numeric:tabular-nums;white-space:nowrap}
+.clients-contact{display:grid;gap:3px}
+.clients-line{display:flex;align-items:center;gap:7px;min-width:0}.clients-line svg{flex:none;width:14px;height:14px;color:#6f8fc0}.clients-line span{min-width:0;overflow-wrap:anywhere}
+.clients-line.clients-mail span{font-size:12px;color:#a9bbd6}
+button.clients-orders{width:auto;margin:0;min-width:30px;padding:3px 9px;border:1px solid #2c4468;border-radius:999px;background:#10203a;color:#cfe2ff;font-size:12.5px;font-weight:700;cursor:pointer}
+button.clients-orders:hover,button.clients-orders:focus-visible{border-color:#69a7ff;outline:0}
+.clients-row-actions{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.clients-row-actions .row-action{display:inline-grid;place-items:center;width:34px;height:34px;min-height:0;margin:0;padding:0;border:1px solid #2c4468;border-radius:9px;background:#10203a;color:#c5d5ee;text-decoration:none;cursor:pointer;transition:background .18s,border-color .18s,color .18s}
+.clients-row-actions .row-action svg{width:16px;height:16px}
+.clients-row-actions .row-action:hover,.clients-row-actions .row-action:focus-visible{background:#16294a;border-color:#69a7ff;color:#fff;outline:0}
+.clients-row-actions .row-action-main{display:inline-flex;gap:7px;width:auto;padding:0 11px;font-size:12.5px;font-weight:600}
+@media(max-width:1180px){.clients-toolbar{grid-template-columns:1fr}.clients-actions{justify-content:flex-start}}
+@media(max-width:760px){
+ .clients-stats{grid-template-columns:repeat(3,minmax(0,1fr))}.clients-stat{padding:9px 10px}.clients-stat strong{font-size:19px}
+ .clients-filters{grid-template-columns:1fr 1fr}.clients-filters select:last-child{grid-column:1/-1}
+ .clients-more{display:inline-flex!important}.clients-actions-menu{display:none;position:absolute;left:0;top:calc(100% + 6px);z-index:5;flex-direction:column;align-items:stretch;min-width:180px;padding:8px;border:1px solid #2c405c;border-radius:11px;background:#0b1526;box-shadow:0 16px 38px #020714b3}
+ .clients-actions[data-open=true] .clients-actions-menu{display:flex}
+ .clients-row-actions .row-action{width:40px;height:40px}.clients-row-actions .row-action-main{flex:1 1 auto;justify-content:center}
+}
+@media(max-width:420px){.clients-stats{grid-template-columns:1fr 1fr}.clients-stat[data-kind=total]{grid-column:1/-1}.clients-filters{grid-template-columns:1fr}}

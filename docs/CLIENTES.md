@@ -1,44 +1,13 @@
-# Gestión de clientes
+# Gestión de Clientes
 
-Las fichas viven en la tabla `clients` de la base del sistema (SQLite local o libSQL/Turso en el hosting), no en archivos ni en el navegador, por lo que sobreviven a actualizaciones y despliegues.
+Directorio y administración de clientes de PC-DOCTOR S.A. El rediseño de la 1.5.115 **no modifica ningún dato**: no hay migraciones ni escrituras sobre la tabla de clientes.
 
-## Importar
-
-Solo administración. **Clientes → Importar** acepta `.xls`, `.xlsx`, tablas HTML guardadas como `.xls` y CSV (máximo 6 MB y 20 000 filas).
-
-1. **Vista previa**: se analiza el archivo sin escribir nada. Muestra las columnas reconocidas, los clientes nuevos, los duplicados, las filas repetidas, las omitidas y las que tienen error.
-2. **Duplicados**: una fila cuya cédula o RUC ya existe nunca sobrescribe la ficha. Por cada una se elige *Omitir* o *Completar solo campos vacíos*.
-3. **Confirmación**: se crea una copia de seguridad (`local/var/backup-*.sqlite3`) y después se insertan los clientes. Si la copia falla, no se importa nada.
-4. **Informe**: queda registrado por fila en `client_import_rows` y se descarga como CSV.
-
-Desde la terminal, con el mismo motor:
-
-```bash
-python local/client_import.py preview archivo.xls
-python local/client_import.py import archivo.xls --confirmar
-```
-
-### Normalización
-
-- Cédulas y RUC: se quitan espacios, puntos y guiones, y se restituye el cero inicial que Excel elimina. Se valida el dígito verificador; si falla, la ficha se importa marcada *Por completar*, no se rechaza.
-- Identificaciones con letras u otra longitud se conservan como documento extranjero.
-- Teléfonos: se restituye el cero inicial; varios números en una celda se reparten entre teléfono y teléfono secundario.
-- Ubicación: los códigos de provincia, cantón y parroquia solo se asignan cuando el nombre coincide de forma inequívoca con el catálogo INEC.
-- `9999999999999` (consumidor final) se omite. Una fila sin nombre es un error.
-- No se crean órdenes ni equipos durante la importación.
-
-Los valores originales de cada fila, incluidas las columnas comerciales o de facturación que la ficha no usa, se guardan aparte en `client_import_rows.original`.
-
-### Fichas por completar
-
-Una orden exige identificación, teléfono, provincia, cantón, parroquia, ciudad y dirección. Las fichas importadas sin esos datos quedan marcadas *Por completar*: se pueden buscar y consultar, y al elegirlas en una orden nueva el sistema pide completarlas. Técnicos pueden completar una ficha pendiente; el resto de ediciones es de administración.
-
-## Buscar, filtrar y exportar
-
-- La búsqueda (listado y orden nueva) funciona mientras se escribe por nombre o razón social, cédula o RUC, teléfonos, correo y nombre comercial.
-- Filtros: estado de la ficha, tipo de cliente y orden alfabético.
-- **Exportar** (solo administración) genera un CSV; la acción queda en la auditoría. Las celdas que empiezan por `=`, `+`, `-` o `@` se neutralizan.
-
-## Privacidad
-
-Los archivos de clientes (`*.xls`, `*.xlsx`, `clientes*.csv`) están excluidos de Git y del despliegue. No los subas al repositorio.
+- **Indicadores** (reales, de toda la base): clientes, fichas completas y por completar. Los dos últimos filtran el listado.
+- **Barra de herramientas**: buscador, tipo de cliente, estado de la ficha, orden, Importar y Exportar. En teléfonos, Importar y Exportar pasan al menú «Más».
+- **Búsqueda**: por nombre, apellidos, razón social, nombre comercial, cédula o RUC, teléfonos, correo y ciudad o cantón. Ignora tildes y mayúsculas («gomez» encuentra «Gómez», «penafiel» encuentra «Peñafiel»), admite varias palabras en cualquier orden y números con o sin guiones.
+- **Tabla**: Cliente (con tipo y nombre comercial), Identificación, Contacto, Ciudad / Cantón, Órdenes y Acciones. Se ordena por nombre, identificación, ciudad u órdenes pulsando el encabezado. En teléfonos cada cliente se muestra como ficha.
+- **«Por completar»**: al pulsarlo indica exactamente qué datos obligatorios faltan para registrar órdenes (los opcionales no cuentan) y ofrece completar la ficha.
+- **Acciones**: Ver ficha, Editar o Completar (según permisos), Ver sus órdenes (si tiene), WhatsApp o llamada (si hay teléfono) y Correo (si hay dirección).
+- **Ficha**: añade las citas técnicas del cliente y la fecha de la última atención, además de órdenes y equipos.
+- **Duplicados**: una identificación repetida se rechaza indicando la ficha existente. Un teléfono o correo que ya usa otra ficha no bloquea el guardado (los contactos compartidos son válidos): se avisa para que se revise. Nunca se fusiona ni se elimina nada automáticamente.
+- **Importación y exportación** (sin cambios): la importación analiza el archivo, muestra una vista previa con errores y duplicados y solo escribe al confirmar; la exportación es solo para administración y queda auditada.

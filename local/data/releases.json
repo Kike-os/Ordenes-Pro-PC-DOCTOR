@@ -8,6 +8,25 @@
   },
   "releases": [
     {
+      "version": "1.5.115",
+      "date": "2026-10-12T19:44:10-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Gestión de Clientes: directorio rediseñado y búsqueda sin tildes",
+      "changes": {
+        "features": [
+          "«Por completar» indica exactamente qué datos obligatorios faltan; la ficha del cliente muestra sus citas y la última atención; aviso cuando otra ficha comparte teléfono o correo."
+        ],
+        "improvements": [
+          "Gestión de Clientes rediseñada: indicadores reales (clientes, fichas completas y por completar), barra de herramientas adaptable, tabla compacta con iconos y orden por columnas, y acciones de contacto (WhatsApp, llamada, correo).",
+          "Búsqueda de clientes sin tildes ni mayúsculas, por varias palabras en cualquier orden y por números con o sin guiones; también busca por cantón."
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.114",
       "date": "2026-10-12T19:09:43-05:00",
       "type": "patch",
