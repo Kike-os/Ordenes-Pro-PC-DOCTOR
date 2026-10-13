@@ -149,15 +149,44 @@ def conflict(c,fields,staff=False):
  options=alternatives(c,fields.get('date',''),fields.get('service',''),fields.get('time',''),staff)
  text='El horario seleccionado ya no está disponible.'+(' Puede agendar su cita a las '+options[0]['label']+' o seleccionar otro horario.' if options and options[0]['date']==fields.get('date') else ' Puede agendar su cita el '+options[0]['label']+' o seleccionar otro horario.' if options else ' Ese día no quedan espacios: elija otra fecha.')
  return {'error':text,'fields':{'time':text},'alternatives':options}
-def validate_booking(data,c):
- fields={k:str(data.get(k,'')).strip() for k in ['name','identification','phone','email','device_type','brand','model','service','description','date','time','notes']};errors={}
- if len(fields['name'])<2 or len(fields['name'])>150:errors['name']='Indica el nombre completo (2 a 150 caracteres).'
- if not valid_ecuador_phone(fields['phone']):errors['phone']='Ingresa un número de teléfono válido.'
+PICKUP='retiro'
+PICKUP_READY=('listo','espera_entrega')
+def phone_key(value):
+ """Teléfono reducido a sus dígitos significativos para comparar: 0991234567 y +593 99 123 4567 son el mismo número."""
+ digits=re.sub(r'\D','',str(value or ''))
+ return digits[3:] if digits.startswith('593') and len(digits)>=11 else digits.lstrip('0')
+def valid_phone(value):
+ """Número de contacto válido: formatos de Ecuador, o internacional con prefijo + y entre 8 y 15 dígitos."""
+ value=str(value or '').strip()
+ return valid_ecuador_phone(value) or bool(re.fullmatch(r'\+[1-9][0-9]{7,14}',re.sub(r'[ ()-]','',value)) and re.fullmatch(r'[+0-9 ()-]+',value))
+def pickup_order(c,fields,client=None):
+ """Orden indicada para un retiro. Devuelve (orden, error). El mensaje es el mismo si la orden no existe o si es de otra persona:
+ nunca se revela información de otro cliente. Agendar el retiro no entrega el equipo: la entrega se registra aparte en la orden."""
+ code=re.sub(r'\s+','',fields.get('order_code','')).upper()
+ if not code:return None,None
+ unknown='No encontramos una orden con ese número asociada a tus datos. Verifícalo o deja el campo vacío.'
+ if not re.fullmatch(r'[A-Z0-9-]{4,40}',code):return None,unknown
+ row=c.execute("SELECT o.id,o.code,o.status,cl.id client_id,cl.identification,cl.phone FROM orders o JOIN devices d ON d.id=o.device_id JOIN clients cl ON cl.id=d.client_id WHERE upper(o.code)=?",(code,)).fetchone()
+ if not row:return None,unknown
+ same=(client is not None and client['id']==row['client_id']) or (fields['identification'] and row['identification'] and fields['identification']==row['identification']) or (not row['identification'] and phone_key(fields['phone']) and phone_key(fields['phone'])==phone_key(row['phone']))
+ if not same:return None,unknown
+ if row['status']=='entregado':return None,'Esta orden ya figura como entregada. Si necesitas ayuda, contáctanos por WhatsApp.'
+ if row['status'] not in PICKUP_READY:return None,'Tu equipo todavía no está listo para el retiro. Te avisaremos en cuanto puedas pasar a retirarlo; por ahora no es posible agendar el retiro de esta orden.'
+ return dict(row),None
+def validate_booking(data,c,public=False,client=None):
+ fields={k:str(data.get(k,'')).strip() for k in ['name','identification','phone','email','device_type','brand','model','service','description','date','time','notes','order_code']};errors={}
+ pickup=fields['service']==PICKUP
+ if len(fields['name'])<2 or len(fields['name'])>150 or (public and len([part for part in fields['name'].split() if len(part)>=2])<2):errors['name']='Ingresa tu nombre y apellidos.' if public else 'Indica el nombre completo (2 a 150 caracteres).'
+ if not valid_phone(fields['phone']):errors['phone']='Ingresa un número de contacto válido.'
+ # En la reserva pública la cédula o el RUC son obligatorios: identifican al cliente sin depender del nombre.
+ if public and not fields['identification']:errors['identification']='Ingresa una cédula o RUC válido.'
+ if pickup and not fields['description']:fields['description']='Retiro de equipo'
+ if not pickup:fields['order_code']=''
  if fields['email'] and (len(fields['email'])>254 or not re.fullmatch(r'[^\s@<>]+@[^\s@<>.]+(?:\.[^\s@<>.]+)+',fields['email'])):errors['email']='Ingresa un correo electrónico válido.'
  if fields['identification']:
   err=reception.document_error(fields['identification'])
-  if err:errors['identification']=err
-  elif len(fields['identification']) not in (10,13):errors['identification']='Usa una cédula de 10 o un RUC de 13 dígitos.'
+  if err:errors['identification']='Ingresa una cédula o RUC válido.' if public else err
+  elif len(fields['identification']) not in (10,13):errors['identification']='Ingresa una cédula o RUC válido.' if public else 'Usa una cédula de 10 o un RUC de 13 dígitos.'
  if fields['device_type'] not in reception.DEVICE_TYPES:errors['device_type']='Selecciona el tipo de equipo.'
  if not fields['service'] or not c.execute('SELECT 1 FROM appointment_services WHERE code=? AND active=1',(fields['service'],)).fetchone():errors['service']='Selecciona un servicio.'
  if len(fields['description'])<3 or len(fields['description'])>1000:errors['description']='Describe brevemente la falla (3 a 1000 caracteres).'
@@ -168,40 +197,57 @@ def validate_booking(data,c):
   start=parse_start(fields['date']+'T'+fields['time']+':00-05:00');service=c.execute('SELECT duration_minutes FROM appointment_services WHERE code=?',(fields['service'],)).fetchone()
   if service and not slot_open(c,start,service['duration_minutes']):errors['time']='Ese horario no está disponible. Consulta otros espacios.'
  except ValueError as error:errors['time']=str(error);start=None
+ fields['pickup']=None
+ if pickup and 'identification' not in errors and 'phone' not in errors:
+  found,problem=pickup_order(c,fields,client)
+  if problem:errors['order_code']=problem
+  fields['pickup']=found
  return fields,errors,start
 def lookup_client(c,identification,phone,email):
+ """Cliente existente para una cita y cómo se encontró: (cliente, 'identificacion' | 'contacto') o (None, 'ambiguo' | '').
+ La identificación manda. Por teléfono o correo solo se enlaza si no contradice la identificación: cuando el contacto coincide con
+ un cliente que tiene OTRA cédula o RUC, no se enlaza ni se fusiona nada; se devuelve 'ambiguo' para que una persona lo revise."""
  if identification:
   row=c.execute('SELECT * FROM clients WHERE identification=? ORDER BY id LIMIT 1',(identification,)).fetchone()
-  if row:return row
- if phone:
-  row=c.execute('SELECT * FROM clients WHERE phone=? ORDER BY id LIMIT 1',(phone,)).fetchone()
-  if row:return row
- if email:
-  row=c.execute('SELECT * FROM clients WHERE lower(email)=lower(?) ORDER BY id LIMIT 1',(email,)).fetchone()
-  if row:return row
- return None
+  if row:return row,'identificacion'
+ found=None;key=phone_key(phone)
+ if key and len(key)>=7:
+  found=next((row for row in c.execute("SELECT * FROM clients WHERE phone LIKE ? ORDER BY id",('%'+key[-7:],)) if phone_key(row['phone'])==key),None)
+ if not found and email:
+  found=c.execute('SELECT * FROM clients WHERE lower(email)=lower(?) ORDER BY id LIMIT 1',(email,)).fetchone()
+ if not found:return None,''
+ if identification and found['identification'] and found['identification']!=identification:return None,'ambiguo'
+ return found,'contacto'
 def create(c,data,user=None):
  key=str(data.get('request_key','')).strip()
  if key and c.execute('SELECT 1 FROM appointments WHERE deleted_at IS NULL AND request_key=?',(key,)).fetchone():return 409,{'error':'Esta solicitud ya fue registrada.'}
- fields,errors,start=validate_booking(data,c)
+ chosen=str(data.get('client_id','')) if user else ''
+ client=c.execute('SELECT * FROM clients WHERE id=?',(int(chosen),)).fetchone() if chosen.isdigit() else None
+ if chosen and not client:return 404,{'error':'El cliente seleccionado ya no está disponible.'}
+ fields,errors,start=validate_booking(data,c,public=not user,client=client)
  if set(errors)=={'time'} and start is not None:return 409,conflict(c,fields,bool(user))
  if errors:return 400,{'error':'Revisa los datos de la cita.','fields':errors}
  duration=c.execute('SELECT duration_minutes FROM appointment_services WHERE code=?',(fields['service'],)).fetchone()['duration_minutes']
  # Comprobación final dentro de la misma transacción de escritura: dos solicitudes simultáneas no pueden quedarse con la misma franja.
  staff=technicians(c,start,duration)
  if not staff:return 409,conflict(c,fields,bool(user))
- technician=staff[0];chosen=str(data.get('client_id','')) if user else ''
- client=c.execute('SELECT * FROM clients WHERE id=?',(int(chosen),)).fetchone() if chosen.isdigit() else None
- if chosen and not client:return 404,{'error':'El cliente seleccionado ya no está disponible.'}
- if not client:client=lookup_client(c,fields['identification'],fields['phone'],fields['email'])
- if not client:client_id=c.execute('INSERT INTO clients(name,email,phone,identification) VALUES (?,?,?,?)',(fields['name'],fields['email'],fields['phone'],fields['identification'])).lastrowid
+ technician=staff[0];match='elegido' if client else ''
+ if not client:client,match=lookup_client(c,fields['identification'],fields['phone'],fields['email'])
+ # Cliente nuevo: se registra en Clientes con su origen. Si su contacto coincide con el de otra persona, queda marcado para revisión
+ # y no se fusiona ni se sobrescribe nada. Un cliente existente no se modifica: solo se le vincula la cita.
+ client_new=not client
+ if client_new:client_id=c.execute("INSERT INTO clients(name,email,phone,identification,origin,notes) VALUES (?,?,?,?,'cita',?)",(fields['name'],fields['email'],fields['phone'],fields['identification'],'Registrado desde una cita. Su teléfono o correo coincide con otro cliente que tiene una identificación distinta: revisar posible duplicado.' if match=='ambiguo' else '')).lastrowid
  else:client_id=client['id']
  token=secrets.token_urlsafe(32);created=stamp(now());public='CIT-'+now().strftime('%Y%m%d')+'-'+secrets.token_hex(3).upper()
  initial='confirmada' if user or confirmation_mode(c)=='auto' else 'solicitada'
  cursor=c.execute("INSERT INTO appointments(public_code,manage_token_hash,client_id,technician_id,customer_name,identification,phone,email,device_type,brand,model,service_code,description,notes,starts_at,duration_minutes,status,privacy_consent,communications_consent,created_at,updated_at,request_key) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?,?,?)",(public,token_hash(token),client_id,technician,fields['name'],fields['identification'],fields['phone'],fields['email'],fields['device_type'],fields['brand'],fields['model'],fields['service'],fields['description'],fields['notes'],stamp(start),duration,initial,int(data.get('communications_consent') is True),created,created,key or None))
  aid=cursor.lastrowid;c.execute("INSERT INTO appointment_events(appointment_id,actor_id,event,new_start,new_status,created_at) VALUES (?,?,?,?,?,?)",(aid,user['id'] if user else None,'created',stamp(start),initial,created))
  if initial=='confirmada' and fields['email'] and data.get('communications_consent') is True:c.execute("INSERT OR IGNORE INTO appointment_notifications(appointment_id,generation,event,channel,result,created_at) VALUES (?,1,'confirmation','email','pending',?)",(aid,created))
- return 201,{'id':aid,'code':public,'manage_token':token,'starts_at':stamp(start),'status':initial,'duration_minutes':duration}
+ if fields.get('pickup'):
+  c.execute('UPDATE appointments SET pickup_order_id=? WHERE id=?',(fields['pickup']['id'],aid))
+  c.execute("INSERT INTO appointment_events(appointment_id,actor_id,event,created_at,detail) VALUES (?,?,'note',?,?)",(aid,user['id'] if user else None,created,'Retiro agendado para la orden '+fields['pickup']['code']+'. La entrega se registra aparte en la orden.'))
+ if client_new and match=='ambiguo':c.execute("INSERT INTO appointment_events(appointment_id,actor_id,event,created_at,detail) VALUES (?,?,'note',?,?)",(aid,user['id'] if user else None,created,'Cliente registrado como nuevo: su teléfono o correo coincide con otro cliente que tiene una identificación distinta. Revisar posible duplicado.'))
+ return 201,{'id':aid,'code':public,'manage_token':token,'starts_at':stamp(start),'status':initial,'duration_minutes':duration,'client_id':client_id,'client_new':client_new,'client_review':client_new and match=='ambiguo','pickup_order':fields['pickup']['code'] if fields.get('pickup') else ''}
 def reschedule(c,row,start,user):
  duration=row['duration_minutes'];staff=technicians(c,start,duration,exclude=row['id'])
  if not staff:
@@ -269,7 +315,7 @@ def create_for_maintenance(c,mid,user=None):
  c.execute("UPDATE maintenance SET appointment_id=?,state='appointment',updated_at=? WHERE id=?",(aid,now().isoformat(),mid))
  return {'id':aid,'public_code':public,'starts_at':stamp(start),'status':'solicitada'}
 def admin_rows(c,start,end):
- return [dict(r) for r in c.execute("SELECT a.*,s.label service_label,u.name technician FROM appointments a JOIN appointment_services s ON s.code=a.service_code LEFT JOIN users u ON u.id=a.technician_id WHERE a.deleted_at IS NULL AND a.starts_at>=? AND a.starts_at<? ORDER BY a.starts_at,a.id",(start,end))]
+ return [dict(r) for r in c.execute("SELECT a.*,s.label service_label,u.name technician,(SELECT code FROM orders WHERE id=a.pickup_order_id) pickup_code FROM appointments a JOIN appointment_services s ON s.code=a.service_code LEFT JOIN users u ON u.id=a.technician_id WHERE a.deleted_at IS NULL AND a.starts_at>=? AND a.starts_at<? ORDER BY a.starts_at,a.id",(start,end))]
 
 def queue_notice(c,row,event,generation=None):
  """Encola un correo al cliente (confirmación o cancelación) solo si dejó correo y autorizó comunicaciones."""
@@ -283,6 +329,8 @@ def detail(c,aid):
  data['notices']=[dict(r) for r in c.execute("SELECT event,channel,result,created_at,completed_at FROM appointment_notifications WHERE appointment_id=? ORDER BY id DESC",(aid,))]
  order=c.execute('SELECT id,code FROM orders WHERE id=?',(row['converted_order_id'],)).fetchone() if row['converted_order_id'] else None
  data['order']=dict(order) if order else None
+ pickup=c.execute('SELECT o.id,o.code,o.status,s.label status_label FROM orders o JOIN statuses s ON s.code=o.status WHERE o.id=?',(row['pickup_order_id'],)).fetchone() if row['pickup_order_id'] else None
+ data['pickup_order']=dict(pickup) if pickup else None
  source=c.execute('SELECT m.id,m.due_date,o.id order_id,o.code FROM maintenance m JOIN orders o ON o.id=m.order_id WHERE m.appointment_id=?',(aid,)).fetchone()
  data['maintenance']=dict(source) if source else None
  import appointment_mail

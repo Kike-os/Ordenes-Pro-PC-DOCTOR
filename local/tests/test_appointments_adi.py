@@ -17,7 +17,7 @@ class AppointmentAndAdiTests(unittest.TestCase):
  def tearDown(self):self.request_clock.stop();self.env.stop();self.paths.stop();self.temp.cleanup()
  def post(self,path,data,cookie='',csrf=''):
   h=object.__new__(app.Handler);h.path=path;h.client_address=('127.0.0.1',4444);h.headers=Message();h.headers['Origin']='http://127.0.0.1:8010';h.headers['Content-Type']='application/json';h.headers['Cookie']=cookie;h.headers['X-CSRF-Token']=csrf;raw=json.dumps(data).encode();h.headers['Content-Length']=str(len(raw));h.rfile=io.BytesIO(raw);out={};h.reply=lambda status,body,*args,**kwargs:out.update(status=status,body=body,cookie=kwargs.get('cookie'));h.do_POST();return out
- def data(self,day,time='09:00',**extra):return {'name':'Reserva de Prueba','identification':'','phone':'0991234567','email':'prueba@example.invalid','device_type':'portatil','brand':'Acer','model':'Prueba','service':'diagnostico','description':'Revisión general','notes':'','date':day.isoformat(),'time':time,'privacy_consent':True,'communications_consent':False,'request_key':'req_test_appointment_00001',**extra}
+ def data(self,day,time='09:00',**extra):return {'name':'Reserva de Prueba','identification':'1710034065','phone':'0991234567','email':'prueba@example.invalid','device_type':'portatil','brand':'Acer','model':'Prueba','service':'diagnostico','description':'Revisión general','notes':'','date':day.isoformat(),'time':time,'privacy_consent':True,'communications_consent':False,'request_key':'req_test_appointment_00001',**extra}
  def day(self):
   day=appointments.now().date()+timedelta(days=1)
   while day.weekday()==6:day+=timedelta(days=1)

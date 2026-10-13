@@ -16,7 +16,7 @@ class AppointmentConflictTests(unittest.TestCase):
         return current.isoformat()
 
     def book(self,day,hour,key,service='diagnostico',**extra):
-        body=dict({'name':'Cliente ficticio '+key,'phone':'0991234567','email':'','identification':'','device_type':'portatil','brand':'HP','model':'X','service':service,'description':'Revisión de prueba','date':day,'time':hour,'notes':'','privacy_consent':True,'communications_consent':False,'request_key':'conflict-request-key-000-'+key},**extra)
+        body=dict({'name':'Cliente ficticio '+key,'phone':'0991234567','email':'','identification':'1710034065','device_type':'portatil','brand':'HP','model':'X','service':service,'description':'Revisión de prueba','date':day,'time':hour,'notes':'','privacy_consent':True,'communications_consent':False,'request_key':'conflict-request-key-000-'+key},**extra)
         return self.request('/api/public/appointments',body)
 
     def setUp(self):

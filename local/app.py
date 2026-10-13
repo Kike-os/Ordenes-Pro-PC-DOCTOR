@@ -1340,7 +1340,7 @@ class Handler(BaseHTTPRequestHandler):
                         stay_args=(limit_moment.isoformat(timespec='microseconds'),int(limit_moment.timestamp()))
                     ordering = 'o.id DESC'
                 elif path == '/api/clients':
-                    source, columns = 'clients c', "c.id,c.name,c.phone,c.phone_secondary,c.email,c.identification,c.document_type,c.trade_name,c.client_type,c.city,c.canton,c.needs_review,c.import_batch_id,(SELECT COUNT(*) FROM orders o JOIN devices d ON d.id=o.device_id WHERE d.client_id=c.id) orders"
+                    source, columns = 'clients c', "c.id,c.name,c.phone,c.phone_secondary,c.email,c.identification,c.document_type,c.trade_name,c.client_type,c.city,c.canton,c.needs_review,c.import_batch_id,c.origin,(SELECT COUNT(*) FROM orders o JOIN devices d ON d.id=o.device_id WHERE d.client_id=c.id) orders"
                     search = "c.name||' '||COALESCE(c.phone,'')||' '||c.phone_secondary||' '||COALESCE(c.email,'')||' '||c.identification||' '||c.trade_name||' '||c.city"
                     # Orden por columnas: nombre, ciudad u órdenes, en ambos sentidos; por defecto, los más recientes.
                     sort=query.get('sort',[''])[0];descending=query.get('dir',[''])[0]=='desc'
@@ -1760,6 +1760,8 @@ class Handler(BaseHTTPRequestHandler):
                     if status==201:
                         # Correo al cliente con los datos guardados: solicitud recibida o cita confirmada, según el estado real.
                         payload['mail']=appointment_mail.send(c,payload['id'],appointment_mail.kind_for(payload['status']))
+                        # La respuesta pública no dice si el cliente ya existía ni su identificador: eso solo lo ve el personal.
+                        for private in ('client_id','client_new','client_review'):payload.pop(private,None)
                         return self.reply(status,payload)
                     return self.reply(status,payload)
                 if path == '/api/public/appointments/manage':

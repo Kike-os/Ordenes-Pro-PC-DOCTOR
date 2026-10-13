@@ -5983,3 +5983,23 @@ body[data-page=dashboard] .wizard-dialog .wizard-actions :is(.nav-back,#wizard-n
 .adi-holiday-soon .adi-holiday-icon{border-color:#e0b25c80;background:#3a2e14;color:#ffe2a8;box-shadow:none;animation:none}
 .adi-holiday-soon strong{font-weight:600;color:#fdeccb}
 /* Seguimiento en teléfonos: cinco tarjetas, como en escritorio */
+/* ===== Avisos de validación y error: un componente compacto para todo el sistema (error por omisión; .success en verde) ===== */
+body[data-page=dashboard] dialog .message:not(:empty),body[data-page=dashboard] .reception-footer .message:not(:empty),body[data-page=appointments] .booking-actions .appointment-message:not(:empty){box-sizing:border-box;display:flex;align-items:flex-start;gap:9px;width:fit-content;max-width:100%;margin:0 0 10px;padding:8px 12px;border:1px solid #e06c7859;border-radius:10px;background:#3a1a2299;color:#ffc4c9;font-size:12.5px;font-weight:500;line-height:1.45;overflow-wrap:anywhere;animation:ui-alert-in .22s ease-out 1}
+body[data-page=dashboard] dialog .message:not(:empty)::before,body[data-page=dashboard] .reception-footer .message:not(:empty)::before,body[data-page=appointments] .booking-actions .appointment-message:not(:empty)::before{content:'!';flex:none;display:grid;place-items:center;width:17px;height:17px;margin-top:1px;border-radius:50%;background:#e06c78;color:#1a0d11;font-size:11.5px;font-weight:800;line-height:1}
+body[data-page=dashboard] dialog .message.success:not(:empty),body[data-page=dashboard] .reception-footer .message.success:not(:empty){border-color:#3fbf8f59;background:#12352b99;color:#b9f2d6}
+body[data-page=dashboard] dialog .message.success:not(:empty)::before,body[data-page=dashboard] .reception-footer .message.success:not(:empty)::before{content:'✓';background:#3fbf8f;color:#06231a}
+body[data-page=appointments] .booking-actions .appointment-message:not(:empty){flex:0 1 auto;margin:0 0 4px;order:-1}
+@keyframes ui-alert-in{0%{opacity:0;transform:translateY(4px)}100%{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){body[data-page=dashboard] dialog .message:not(:empty),body[data-page=dashboard] .reception-footer .message:not(:empty),body[data-page=appointments] .booking-actions .appointment-message:not(:empty){animation:none}}
+/* ===== Formulario público de citas: obligatorios, errores junto al campo y retiro de equipos ===== */
+.req{color:#ff7f9c;font-weight:700;margin-left:2px}
+.booking-required{margin:-6px 0 12px;font-size:12px;color:#9db1cf}
+body[data-page=appointments] #appointment-form :is(input,select,textarea){transition:border-color .2s ease,box-shadow .2s ease}
+body[data-page=appointments] #appointment-form :is(input,select,textarea):focus-visible{border-color:#ff9ecb;box-shadow:0 0 0 3px #ff9ecb29;outline:0}
+body[data-page=appointments] #appointment-form :is(input,select,textarea)[aria-invalid=true]{border-color:#e06c78;box-shadow:0 0 0 3px #e06c7826}
+body[data-page=appointments] .appointment-error:not(:empty){display:flex;align-items:flex-start;gap:6px;margin-top:5px;font-size:12px;font-weight:500;line-height:1.4;color:#ffb3b6}
+body[data-page=appointments] .appointment-error:not(:empty)::before{content:'!';flex:none;display:grid;place-items:center;width:14px;height:14px;margin-top:1px;border-radius:50%;background:#e06c78;color:#1a0d11;font-size:10px;font-weight:800;line-height:1}
+.booking-hint{display:block;margin-top:5px;font-size:11.5px;font-weight:400;line-height:1.45;color:#9db1cf}
+#booking-order-field[hidden]{display:none}
+.clients-origin{display:inline-block;width:fit-content;margin-top:2px;padding:0 7px;border:1px solid #ff9ecb59;border-radius:999px;background:#3a1b3366;color:#ffd3e6;font-size:10.5px;font-weight:600}
+.client-tag-origin{border-color:#ff9ecb59;background:#3a1b3366;color:#ffd3e6}
