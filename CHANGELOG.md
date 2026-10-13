@@ -4,6 +4,18 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.140 — 2026-10-13 14:29 (UTC-05:00)
+
+ADI revisa el nombre en la reserva de citas y nuevo encabezado ejecutivo del comprobante de recepción
+
+### Nuevas funcionalidades
+
+- ADI en el agendamiento público de citas: botón «ADI» junto a «Nombre y apellidos» que revisa mayúsculas, espacios, tildes y letras dudosas, y muestra una sugerencia que el cliente aplica o conserva; el nombre nunca cambia sin su confirmación.
+
+### Mejoras realizadas
+
+- Comprobante de recepción (ticket): encabezado ejecutivo sobre fondo blanco, sin franja negra, con título azul oscuro, copia en rosado («COPIA DEL CLIENTE» y «COPIA DEL ESTABLECIMIENTO») y filete fino.
+
 ## v1.5.139 — 2026-10-13 14:13 (UTC-05:00)
 
 Selector de Cédula o RUC rediseñado y validación real por tipo de documento

@@ -8,6 +8,24 @@
   },
   "releases": [
     {
+      "version": "1.5.140",
+      "date": "2026-10-13T14:29:34-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "ADI revisa el nombre en la reserva de citas y nuevo encabezado ejecutivo del comprobante de recepción",
+      "changes": {
+        "features": [
+          "ADI en el agendamiento público de citas: botón «ADI» junto a «Nombre y apellidos» que revisa mayúsculas, espacios, tildes y letras dudosas, y muestra una sugerencia que el cliente aplica o conserva; el nombre nunca cambia sin su confirmación."
+        ],
+        "improvements": [
+          "Comprobante de recepción (ticket): encabezado ejecutivo sobre fondo blanco, sin franja negra, con título azul oscuro, copia en rosado («COPIA DEL CLIENTE» y «COPIA DEL ESTABLECIMIENTO») y filete fino."
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.139",
       "date": "2026-10-13T14:13:25-05:00",
       "type": "patch",
