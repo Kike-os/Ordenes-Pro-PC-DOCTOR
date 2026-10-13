@@ -186,7 +186,7 @@ def validate_booking(data,c,public=False,client=None):
   if public:errors['identification']='Ingresa tu número de identificación para continuar.'
  elif not fields['identification'].isdigit() or (kind=='cedula' and len(fields['identification'])!=10) or (kind=='ruc' and len(fields['identification'])!=13) or not kind:
   errors['identification']='El RUC debe contener exactamente 13 dígitos.' if (fields['document_type']=='ruc' or (not fields['document_type'] and len(fields['identification'])>10)) else 'La cédula debe contener exactamente 10 dígitos.'
- elif reception.document_error(fields['identification']):errors['identification']='Verifica el número de identificación ingresado.'
+ elif reception.document_error(fields['identification'],kind):errors['identification']=reception.document_error(fields['identification'],kind)
  fields['document_type']=kind if fields['identification'] and 'identification' not in errors else ''
  if pickup and not fields['description']:fields['description']='Retiro de equipo'
  if not pickup:fields['order_code']=''

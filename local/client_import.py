@@ -230,7 +230,7 @@ def normalize_identification(value):
     notes = []
     if text.isdigit():
         # Excel elimina el cero inicial de cédulas y RUC guardados como número.
-        if len(text) in (9, 12) and not document_error('0' + text):
+        if len(text) in (9, 12) and not document_error('0' + text, strict=True):
             text = '0' + text
             notes.append('Se restituyó el cero inicial de la identificación.')
         if len(text) in (10, 13):

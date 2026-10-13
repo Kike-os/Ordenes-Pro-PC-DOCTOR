@@ -6005,20 +6005,28 @@ body[data-page=appointments] .appointment-error:not(:empty)::before{content:'!';
 .client-tag-origin{border-color:#ff9ecb59;background:#3a1b3366;color:#ffd3e6}
 .quote-sent a.secondary{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:40px;padding:0 14px;text-decoration:none}.quote-sent a.secondary svg{width:16px;height:16px;flex:none}
 /* ===== Identificación en la reserva de citas: tipo (Cédula | RUC) en botones segmentados y número con contador ===== */
-.booking-id{grid-column:1/-1;display:grid;grid-template-columns:minmax(0,220px) minmax(0,1fr);gap:16px;align-items:start;min-width:0}
-.id-kind{min-width:0;margin:0;padding:0;border:0}
-.id-kind legend{padding:0;margin:0 0 6px;font-size:inherit;font-weight:inherit;color:inherit}
-.id-kind-options{display:grid;grid-template-columns:1fr 1fr;gap:0;padding:3px;border:1px solid #2c4468;border-radius:11px;background:#0c192d}
-.id-kind-options label{position:relative;display:block;margin:0;cursor:pointer}
-.id-kind-options input{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:pointer}
-.id-kind-options span{display:grid;place-items:center;min-height:38px;border-radius:8px;font-size:13.5px;font-weight:650;color:#a9bdd8;transition:background-color .2s ease,color .2s ease,box-shadow .2s ease}
-.id-kind-options input:checked+span{background:linear-gradient(180deg,#2f6fd0,#2459ac);color:#fff;box-shadow:0 0 0 1px #ff9ecb66}
-.id-kind-options input:focus-visible+span{outline:2px solid #ff9ecb;outline-offset:2px}
-@media(hover:hover){.id-kind-options label:hover input:not(:checked)+span{background:#16304f;color:#e3eeff}}
+/* Identificación (cédula, RUC o pasaporte): selector segmentado y número con contador. Componente único de form-validation.js,
+   usado en la reserva pública, la ficha de cliente, la recepción y la cita del personal. */
+.seg-control{display:grid;grid-template-columns:repeat(var(--seg-count,2),minmax(0,1fr));gap:3px;box-sizing:border-box;width:100%;min-height:var(--seg-height,46px);padding:3px;border:1px solid #2c4468;border-radius:11px;background:#0c192d}
+.seg-control button{appearance:none;display:grid;place-items:center;min-width:0;min-height:0;height:auto;margin:0;padding:0 10px;border:0;border-radius:8px;background:transparent;box-shadow:none;font:inherit;font-size:13.5px;font-weight:650;line-height:1.2;letter-spacing:0;text-transform:none;color:#a9bdd8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;transition:background-color .17s ease,color .17s ease,box-shadow .17s ease}
+.seg-control button[aria-checked=true]{background:linear-gradient(180deg,#2c66bf,#22519c);color:#fff;box-shadow:inset 0 -2px 0 #ff9ecb}
+.seg-control button:focus-visible{outline:2px solid #9cc4ff;outline-offset:1px}
+.seg-control button:disabled{opacity:.45;cursor:not-allowed}
+@media(hover:hover){.seg-control button:not([aria-checked=true]):not(:disabled):hover{background:#15294a;color:#e3eeff}}
+.id-count{flex:none;min-width:5ch;margin:0;text-align:right;font-size:11.5px;font-weight:600;line-height:inherit;font-variant-numeric:tabular-nums;color:#8fa6c4}.id-count[data-state=ok]{color:#8ff0bd}.id-count[data-state=over]{color:#ffb3b6}
+@media(prefers-reduced-motion:reduce){.seg-control button{transition:none}}
+.booking-id{grid-column:1/-1;display:grid;grid-template-columns:minmax(0,230px) minmax(0,1fr);gap:16px;align-items:start;min-width:0}
+.id-kind{min-width:0}.id-kind-label{display:block}
 .id-number{min-width:0}.id-number-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
-#booking-id-count{font-size:11.5px;font-weight:600;font-variant-numeric:tabular-nums;color:#8fa6c4}#booking-id-count[data-state=ok]{color:#8ff0bd}#booking-id-count[data-state=over]{color:#ffb3b6}
-@media(max-width:640px){.booking-id{grid-template-columns:1fr;gap:12px}}
-@media(prefers-reduced-motion:reduce){.id-kind-options span{transition:none}}
+.booking-hint[data-state=warn]{color:#ffd9a0}
+@media(max-width:640px){.booking-id{grid-template-columns:1fr;gap:0}}
+/* Ficha de cliente y recepción: contador en la línea de la etiqueta; ayuda y avisos legibles bajo el campo. */
+.reception-field label:has(>.id-count){display:flex;align-items:center}.reception-field label>.id-count{margin-left:auto;padding-left:10px}
+.wizard-dialog .reception-field .seg-control{--seg-height:var(--id-field-height,42px)}
+.wizard-dialog .document-status{min-height:0;margin-top:5px}.wizard-dialog .document-status small{font-size:11.5px;line-height:1.45}
+#document-feedback:empty{display:none}#document-feedback[data-state=warn]{color:#ffd9a0}
+/* Cita del personal. */
+.agenda-booking-grid .id-kind{grid-column:1}.agenda-booking-grid .id-number-head{margin:0}.agenda-booking-grid .id-kind .seg-control{--seg-height:var(--id-field-height,44px)}
 /* ===== Detalle de la orden: progreso por equipo y estado general de la orden ===== */
 .order-progress-box{display:grid;gap:10px;margin:14px 0 0;padding:14px 16px;border:1px solid #253b5c;border-radius:12px;background:#0c1729}
 .order-progress-box .order-progress{margin:0;padding:6px 0 0;border:0;background:none}

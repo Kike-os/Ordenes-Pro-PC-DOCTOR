@@ -47,3 +47,13 @@ En «Tus datos» la identificación se pide con dos controles: **Tipo** (botones
 - La cita guarda tipo y número (`appointments.document_type`), y un cliente nuevo queda registrado con ambos. La respuesta pública de la reserva no devuelve la identificación.
 
 El diálogo «Nueva cita» del personal también permite indicar tipo y número (opcional) cuando el cliente no está en la base; con un cliente elegido de la base no se piden. Recepción y la ficha de cliente ya tenían su selector de tipo de identificación.
+
+## Componente único de identificación (cédula, RUC, pasaporte)
+
+`local/static/form-validation.js` contiene el componente que usan la reserva pública, la ficha de cliente (nueva y edición), la recepción y la cita del personal:
+
+- `segmentedSelect(select)`: muestra un `<select>` como selector segmentado accesible (grupo de radio, flechas, Inicio/Fin). El `<select>` sigue siendo el dato del formulario.
+- `identificationControl({select,input,count})`: límite por tipo (10, 13 o 30), teclado numérico, solo dígitos al escribir, pegado que conserva únicamente los dígitos sin superar el límite, ceros iniciales intactos y contador junto a la etiqueta. Cambiar de tipo no borra ni recorta lo escrito. El selector toma la altura y la separación del campo numérico.
+- `documentCheck(valor,tipo)`: mismas reglas que `reception.document_check` del servidor; una prueba (`test_identification.py`) ejecuta ambas con los mismos casos y exige resultados idénticos.
+
+Reglas: cédula = provincia (01–24 o 30), tercer dígito 0–5 y dígito verificador (módulo 10). RUC de persona natural = su cédula válida más el establecimiento (no `000`). RUC de entidad pública (tercer dígito 6) o de sociedad (9) = provincia y establecimiento; su dígito verificador (módulo 11) se comprueba, pero si no coincide **solo se avisa**, no se rechaza, para no dejar fuera RUC reales que no lo cumplen. Tercer dígito 7 u 8 no corresponde a ningún tipo. Los errores se muestran al completar el número o al salir del campo, nunca antes.

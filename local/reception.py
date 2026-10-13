@@ -36,24 +36,47 @@ def valid_cedula(value):
     return (-sum(n-9 if n>9 else n for n in products)) % 10 == int(value[9])
 
 
-def document_error(value):
-    if not re.fullmatch(r'[0-9]{10}|[0-9]{13}', value):
-        return 'Ingresa 10 dígitos para cédula o 13 para RUC, sin letras ni símbolos.'
-    if len(value) == 10:
-        return '' if valid_cedula(value) else 'La cédula no supera la validación del dígito verificador.'
-    if not (1 <= int(value[:2]) <= 24 or value[:2] == '30'):
-        return 'El código de provincia del RUC no es válido.'
+def _province(value):
+    return 1 <= int(value[:2]) <= 24 or value[:2] == '30'
+
+
+def document_check(value, kind=''):
+    """Valida una cédula o un RUC ecuatorianos con las reglas de cada tipo. Devuelve (error, aviso).
+    Cédula: 10 dígitos, provincia, tercer dígito 0-5 y dígito verificador (módulo 10).
+    RUC de persona natural (tercer dígito 0-5): su cédula válida más el establecimiento. RUC de entidad pública (6) o de sociedad (9):
+    provincia y establecimiento; su dígito verificador (módulo 11) se comprueba, pero si no coincide solo se avisa, porque el SRI
+    emite RUC de sociedades que no lo cumplen y rechazarlos dejaría fuera a contribuyentes reales.
+    `kind` ('cedula' o 'ruc') exige la longitud de ese tipo; vacío acepta cualquiera de los dos."""
+    size = {'cedula': 10, 'ruc': 13}.get(kind)
+    if not re.fullmatch(r'[0-9]+', value) or (len(value) != size if size else len(value) not in (10, 13)):
+        return ({10: 'La cédula debe contener exactamente 10 dígitos.', 13: 'El RUC debe contener exactamente 13 dígitos.'}.get(size, 'Ingresa 10 dígitos para cédula o 13 para RUC, sin letras ni símbolos.'), '')
     third = int(value[2])
+    if len(value) == 10:
+        if not _province(value):
+            return 'Los dos primeros dígitos de la cédula no corresponden a una provincia.', ''
+        if third > 5:
+            return 'El tercer dígito no corresponde a una cédula ecuatoriana.', ''
+        return ('' if valid_cedula(value) else 'El número de cédula no es válido. Revisa los dígitos ingresados.'), ''
+    if not _province(value):
+        return 'Los dos primeros dígitos del RUC no corresponden a una provincia.', ''
+    if third in (7, 8):
+        return 'El tercer dígito no corresponde a ningún tipo de RUC.', ''
     if third < 6:
-        valid = valid_cedula(value[:10]) and int(value[10:]) > 0
-    elif third in (6,9):
-        weights = [3,2,7,6,5,4,3,2] if third == 6 else [4,3,2,7,6,5,4,3,2]
-        check = (11-sum(int(n)*w for n,w in zip(value,weights)) % 11) % 11
-        position = 8 if third == 6 else 9
-        valid = check < 10 and check == int(value[position]) and int(value[position+1:]) > 0
-    else:
-        valid = False
-    return '' if valid else 'El RUC no supera la validación tradicional de su tipo y establecimiento.'
+        if not valid_cedula(value[:10]):
+            return 'Los diez primeros dígitos del RUC no forman una cédula válida. Revisa los dígitos ingresados.', ''
+        return ('' if int(value[10:]) > 0 else 'El RUC debe terminar en su número de establecimiento (por ejemplo, 001).'), ''
+    weights = [3,2,7,6,5,4,3,2] if third == 6 else [4,3,2,7,6,5,4,3,2]
+    position = 8 if third == 6 else 9
+    if int(value[position+1:]) == 0:
+        return 'El RUC debe terminar en su número de establecimiento (por ejemplo, 001).', ''
+    check = (11-sum(int(n)*w for n,w in zip(value,weights)) % 11) % 11
+    return '', ('' if check < 10 and check == int(value[position]) else 'No pudimos comprobar el dígito verificador de este RUC. Confirma que esté escrito correctamente.')
+
+
+def document_error(value, kind='', strict=False):
+    """Error de una cédula o RUC (vacío si es aceptable). Con `strict`, un RUC cuyo dígito verificador no se puede comprobar también es error."""
+    error, notice = document_check(value, kind)
+    return error or (notice if strict else '')
 
 
 def valid_ecuador_phone(value):
@@ -70,7 +93,7 @@ def validate_order(data):
             errors[key] = f'Admite hasta {limit} caracteres.'
         elif key in REQUIRED and not fields[key]:
             errors[key] = 'Completa este campo.'
-    if fields['document_type']!='pasaporte' and fields['identification'] and (error := document_error(fields['identification'])):
+    if fields['document_type']!='pasaporte' and fields['identification'] and (error := document_error(fields['identification'], fields['document_type'] if fields['document_type'] in ('cedula','ruc') else '')):
         errors['identification'] = error
     if fields['email'] and not re.fullmatch(r'[^\s@<>]+@[^\s@<>.]+(?:\.[^\s@<>.]+)+', fields['email']):
         errors['email'] = 'Ingresa un correo electrónico válido.'

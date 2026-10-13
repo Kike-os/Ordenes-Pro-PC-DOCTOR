@@ -25,10 +25,10 @@ class PickupAndClientsTests(unittest.TestCase):
         with test_app.open_requests(),patch.object(app,'limited',return_value=False):
             empty=self.book('0001',name='',identification='',phone='')
             self.assertEqual(empty['status'],400);self.assertEqual({k:empty['body']['fields'][k] for k in ('name','identification','phone')},{'name':'Ingresa tu nombre y apellidos.','identification':'Ingresa tu número de identificación para continuar.','phone':'Ingresa un número de contacto válido.'})
-            ten,thirteen='La cédula debe contener exactamente 10 dígitos.','El RUC debe contener exactamente 13 dígitos.';bad='Verifica el número de identificación ingresado.'
+            ten,thirteen='La cédula debe contener exactamente 10 dígitos.','El RUC debe contener exactamente 13 dígitos.';bad='El número de cédula no es válido. Revisa los dígitos ingresados.';bad_ruc='Los diez primeros dígitos del RUC no forman una cédula válida. Revisa los dígitos ingresados.';branch='El RUC debe terminar en su número de establecimiento (por ejemplo, 001).'
             # Cédula con 9, 10 y 11 dígitos; RUC con 12, 13 y 14; letras y símbolos; dígito verificador incorrecto; tipo que no corresponde al número.
             for kind,number,text in (('cedula','171003406',ten),('cedula','17100340655',ten),('cedula','1710034066',bad),('cedula','17100A4065',ten),('cedula','1710-03406',ten),('cedula','1710034065001',ten),
-                                     ('ruc','171003406500',thirteen),('ruc','17100340650011',thirteen),('ruc','1710034065',thirteen),('ruc','1710034066001',bad),('ruc','1710034065000',bad),('','1710034065',None)):
+                                     ('ruc','171003406500',thirteen),('ruc','17100340650011',thirteen),('ruc','1710034065',thirteen),('ruc','1710034066001',bad_ruc),('ruc','1710034065000',branch),('','1710034065',None)):
                 result=self.book('0002',document_type=kind,identification=number);self.assertEqual(result['status'],400,(kind,number))
                 if text:self.assertEqual(result['body']['fields'].get('identification'),text,(kind,number))
                 else:self.assertEqual(result['body']['fields'].get('document_type'),'Selecciona el tipo de identificación.')

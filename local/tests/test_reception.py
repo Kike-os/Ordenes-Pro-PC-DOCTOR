@@ -30,7 +30,10 @@ class ReceptionTests(unittest.TestCase):
         for value in valid:
             self.assertEqual(reception.document_error(value),'',value)
             changed=value[:7]+str((int(value[7])+1)%10)+value[8:]
-            self.assertTrue(reception.document_error(changed),changed)
+            # Un dígito alterado se rechaza en cédulas y RUC de persona natural; en RUC de sociedad o entidad pública solo se avisa
+            # (el SRI emite RUC que no cumplen el módulo 11), y en modo estricto también cuenta como error.
+            self.assertTrue(reception.document_error(changed,strict=True),changed)
+            self.assertEqual(bool(reception.document_error(changed)),value[2] not in '69',changed)
         for value in ['0000000000','2500000017','0100000017000','010000001700','01000000170a1','０１００００００１７','0100000017-','1234567890']:
             self.assertTrue(reception.document_error(value),value)
 
