@@ -4,6 +4,21 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.130 — 2026-10-13 00:37 (UTC-05:00)
+
+Tarjeta de seguimiento, identificación por serie, citas en el acceso, bandeja de correo y Corrección Inteligente
+
+### Nuevas funcionalidades
+
+- Tarjeta Digital de Seguimiento Técnico: ticket de dos secciones con QR real al enlace público y código de barras Code 128 del número de orden; se abre desde la orden y el Seguimiento, se imprime o guarda como PDF y es la nueva vista pública del cliente.
+
+### Mejoras realizadas
+
+- Identificación por serie: al reconocer un equipo del historial se completan sus datos (con «Deshacer»), se muestra su tarjeta con logotipo e historial y el ingreso se asocia al equipo existente; logotipo de marca en Equipos, fichas y órdenes.
+- Acceso: botón «Agendar cita» bajo el inicio de sesión y aviso de bienvenida de ADI junto a la esfera.
+- Correo: las acciones de cada mensaje tienen columna propia y menú «⋯»; ya no tapan el asunto ni la vista previa.
+- ADI: configuración «Corrección Inteligente» (revisión automática, sugerencias, formato, mejoras por botón, indicadores) con espera de 700 ms y estrella en turquesa.
+
 ## v1.5.129 — 2026-10-12 23:56 (UTC-05:00)
 
 Seguridad del acceso, cierre por inactividad y actualizaciones del sistema
