@@ -248,19 +248,19 @@ INITIAL = (
 
 
 # Segunda carga del catálogo (2026-10-13). (nombre, categoría, precio, descripción, icono, IVA por confirmar, palabras que identifican un registro previo a actualizar)
-# Las pantallas van en «Productos» con IVA incluido. El IVA de los siete servicios está por confirmar: se guarda el precio exacto indicado,
-# sin sumar ni descontar impuestos, y no se pueden enviar en un presupuesto hasta que administración lo confirme en el catálogo.
+# Las pantallas van en «Productos». Todos los precios incluyen IVA: el de los siete servicios lo confirmó la administración el 2026-10-13.
+# La marca «IVA por confirmar» sigue disponible para futuras cargas con el tratamiento tributario pendiente.
 ADDITIONS = (
  ('Cambio de pantalla de portátil de 14 pulgadas', 'otro', '115.00', 'Pantalla para portátil de 14 pulgadas con su instalación.', 'pantalla', False, ()),
  ('Cambio de pantalla de portátil de 15,6 pulgadas', 'otro', '150.00', 'Pantalla para portátil de 15,6 pulgadas con su instalación.', 'pantalla', False, ()),
  ('Cambio de pantalla de portátil gamer de 15,6 pulgadas', 'otro', '280.00', 'Pantalla para portátil gamer de 15,6 pulgadas con su instalación.', 'pantalla_gamer', False, ()),
- ('Reparación de bisagras de portátil de 14 pulgadas', 'servicio', '32.00', 'Reparación de las bisagras de un portátil de 14 pulgadas.', 'bisagra', True, ()),
- ('Reparación de bisagras de portátil de 15,6 pulgadas', 'servicio', '48.00', 'Reparación de las bisagras de un portátil de 15,6 pulgadas.', 'bisagra', True, ()),
- ('Pegado de bisagras de portátil de 14 pulgadas', 'servicio', '35.00', 'Pegado de las bisagras de un portátil de 14 pulgadas.', 'bisagra', True, ()),
- ('Pegado de bisagras de portátil de 15,6 pulgadas', 'servicio', '48.00', 'Pegado de las bisagras de un portátil de 15,6 pulgadas.', 'bisagra', True, ()),
- ('Mantenimiento de PC de escritorio y cambio de pasta térmica del CPU, sin tarjeta gráfica dedicada', 'servicio', '45.00', 'Mantenimiento de un PC de escritorio sin tarjeta gráfica dedicada, con cambio de la pasta térmica del procesador.', 'escritorio', True, ('mantenimiento', 'escritorio')),
- ('Mantenimiento de PC Gamer con cambio de pasta térmica del CPU', 'servicio', '75.00', 'Mantenimiento de un PC gamer con cambio de la pasta térmica del procesador.', 'pc_gamer', True, ()),
- ('Creación de nueva BIOS para computadora portátil', 'servicio', '130.00', 'Creación de una BIOS nueva para una computadora portátil. Es un servicio distinto de la actualización o reprogramación de BIOS.', 'bios', True, ()),
+ ('Reparación de bisagras de portátil de 14 pulgadas', 'servicio', '32.00', 'Reparación de las bisagras de un portátil de 14 pulgadas.', 'bisagra', False, ()),
+ ('Reparación de bisagras de portátil de 15,6 pulgadas', 'servicio', '48.00', 'Reparación de las bisagras de un portátil de 15,6 pulgadas.', 'bisagra', False, ()),
+ ('Pegado de bisagras de portátil de 14 pulgadas', 'servicio', '35.00', 'Pegado de las bisagras de un portátil de 14 pulgadas.', 'bisagra', False, ()),
+ ('Pegado de bisagras de portátil de 15,6 pulgadas', 'servicio', '48.00', 'Pegado de las bisagras de un portátil de 15,6 pulgadas.', 'bisagra', False, ()),
+ ('Mantenimiento de PC de escritorio y cambio de pasta térmica del CPU, sin tarjeta gráfica dedicada', 'servicio', '45.00', 'Mantenimiento de un PC de escritorio sin tarjeta gráfica dedicada, con cambio de la pasta térmica del procesador.', 'escritorio', False, ('mantenimiento', 'escritorio')),
+ ('Mantenimiento de PC Gamer con cambio de pasta térmica del CPU', 'servicio', '75.00', 'Mantenimiento de un PC gamer con cambio de la pasta térmica del procesador.', 'pc_gamer', False, ()),
+ ('Creación de nueva BIOS para computadora portátil', 'servicio', '130.00', 'Creación de una BIOS nueva para una computadora portátil. Es un servicio distinto de la actualización o reprogramación de BIOS.', 'bios', False, ()),
 )
 
 

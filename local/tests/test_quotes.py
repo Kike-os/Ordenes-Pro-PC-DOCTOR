@@ -406,8 +406,8 @@ class QuotePriorityTests(unittest.TestCase):
         again=post('/api/catalog/seed')['body'];self.assertEqual((again['created'],again['updated'],again['existing']),(0,0,29))
         data=self.request('/api/catalog?all=1',cookie=cookie)['body'];rows={r['name']:r for r in data['rows']};self.assertEqual(len(rows),29);self.assertEqual(data['initial_missing'],0)
         expected={'Cambio de pantalla de portátil de 14 pulgadas':(11500,'otro','pantalla',0),'Cambio de pantalla de portátil de 15,6 pulgadas':(15000,'otro','pantalla',0),'Cambio de pantalla de portátil gamer de 15,6 pulgadas':(28000,'otro','pantalla_gamer',0),
-                  'Reparación de bisagras de portátil de 14 pulgadas':(3200,'servicio','bisagra',1),'Reparación de bisagras de portátil de 15,6 pulgadas':(4800,'servicio','bisagra',1),'Pegado de bisagras de portátil de 14 pulgadas':(3500,'servicio','bisagra',1),'Pegado de bisagras de portátil de 15,6 pulgadas':(4800,'servicio','bisagra',1),
-                  'Mantenimiento de PC de escritorio y cambio de pasta térmica del CPU, sin tarjeta gráfica dedicada':(4500,'servicio','escritorio',0),'Mantenimiento de PC Gamer con cambio de pasta térmica del CPU':(7500,'servicio','pc_gamer',1),'Creación de nueva BIOS para computadora portátil':(13000,'servicio','bios',1)}
+                  'Reparación de bisagras de portátil de 14 pulgadas':(3200,'servicio','bisagra',0),'Reparación de bisagras de portátil de 15,6 pulgadas':(4800,'servicio','bisagra',0),'Pegado de bisagras de portátil de 14 pulgadas':(3500,'servicio','bisagra',0),'Pegado de bisagras de portátil de 15,6 pulgadas':(4800,'servicio','bisagra',0),
+                  'Mantenimiento de PC de escritorio y cambio de pasta térmica del CPU, sin tarjeta gráfica dedicada':(4500,'servicio','escritorio',0),'Mantenimiento de PC Gamer con cambio de pasta térmica del CPU':(7500,'servicio','pc_gamer',0),'Creación de nueva BIOS para computadora portátil':(13000,'servicio','bios',0)}
         for name,(price,category,icon,pending) in expected.items():
             row=rows[name];self.assertEqual((row['price_cents'],row['entered_cents'],row['category'],row['icon'],row['tax_pending']),(price,price,category,icon,pending),name)
         # El mantenimiento de escritorio conservó su identificador y dejó constancia del cambio de precio.
@@ -421,7 +421,7 @@ class QuotePriorityTests(unittest.TestCase):
         # Reemplazo manual del icono; activar o desactivar el elemento no lo pierde. Un icono inválido se rechaza.
         bios=rows['Creación de nueva BIOS para computadora portátil'];base={'id':str(bios['id']),'name':bios['name'],'description':bios['description'],'category':'servicio','price':'130.00','price_mode':'incluido'}
         self.assertEqual(post('/api/catalog',**dict(base,icon='no-existe'))['status'],400)
-        post('/api/catalog',**dict(base,icon='repuesto'));post('/api/catalog',**dict(base,available=False))
+        post('/api/catalog',**dict(base,icon='repuesto',tax_pending=True));post('/api/catalog',**dict(base,available=False))
         now={r['id']:r for r in self.request('/api/catalog?all=1',cookie=cookie)['body']['rows']}[bios['id']];self.assertEqual((now['icon'],now['available'],now['tax_pending']),('repuesto',0,1))
         # Confirmar el IVA es un acto expreso de administración.
         post('/api/catalog',**dict(base,price_mode='agregar',tax_confirmed=True,available=True))
@@ -444,7 +444,8 @@ class QuotePriorityTests(unittest.TestCase):
         # Se conserva al reabrir y al crear una versión; el PDF se genera con iconos, clasificación e importes con $.
         self.assertEqual([i['priority'] for i in self.request('/api/quotes/%d'%quote,cookie=cookie)['body']['quote']['items']],['obligatorio','necesario','opcional',''])
         pdf=self.request('/api/quotes/%d/pdf'%quote,cookie=cookie)['body'];self.assertEqual(pdf[:4],b'%PDF')
-        # No se envía mientras el IVA de un servicio del catálogo esté por confirmar.
+        # No se envía mientras el IVA de un elemento del catálogo esté marcado como «por confirmar».
+        post('/api/catalog',id=str(hinge['id']),name=hinge['name'],description=hinge['description'],category='servicio',price='32.00',price_mode='incluido',tax_pending=True)
         with patch.object(app.mail_pro,'configured',return_value=False):blocked=post('/api/quotes/%d'%quote,action='send')
         self.assertEqual(blocked['status'],409);self.assertIn('falta confirmar el IVA',blocked['body']['error']);self.assertIn('Reparación de bisagras',blocked['body']['error'])
         post('/api/catalog',id=str(hinge['id']),name=hinge['name'],description=hinge['description'],category='servicio',price='32.00',price_mode='incluido',tax_confirmed=True)

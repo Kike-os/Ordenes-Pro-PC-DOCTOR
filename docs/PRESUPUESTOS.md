@@ -155,7 +155,9 @@ Cada partida de un presupuesto puede llevar una clasificación: **Necesario** (r
 
 `quotes.ADDITIONS` añade 10 elementos: tres pantallas de portátil en la categoría «Productos» con IVA incluido ($115,00, $150,00 y $280,00) y siete servicios ($32,00, $48,00, $35,00, $48,00, $45,00, $75,00 y $130,00). «Importar catálogo» los registra sin duplicar; el mantenimiento de PC de escritorio actualiza el registro previo equivalente (conserva su identificador y deja el cambio en el historial de precios).
 
-El IVA de los siete servicios está pendiente de confirmación: se guardan con el precio exacto indicado y la marca `tax_pending`. No se les suma ni descuenta impuesto. Mientras la marca siga activa se pueden usar en un borrador (con el aviso «IVA por confirmar»), pero **el presupuesto no se puede enviar**. Administración la quita en el catálogo eligiendo el tratamiento del IVA y marcando la casilla de confirmación.
+La administración confirmó el 13 de octubre de 2026 que los siete servicios tienen el IVA incluido, igual que el resto del catálogo, y así quedaron en producción.
+
+La marca «IVA por confirmar» (`tax_pending`) sigue disponible para elementos cuyo tratamiento tributario esté pendiente: se pueden usar en un borrador (con el aviso «IVA por confirmar»), pero **el presupuesto no se puede enviar** hasta que administración elija el tratamiento del IVA en el catálogo y marque la casilla de confirmación.
 
 ## Importes en documentos
 
