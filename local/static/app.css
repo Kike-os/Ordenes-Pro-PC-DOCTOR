@@ -5776,3 +5776,23 @@ textarea.adi-suggestion-edit{width:100%;min-height:96px;resize:vertical;font:inh
 .tracking-table .tracking-progress[data-status=entregado] .tracking-stages li{background:#3fbf8f;box-shadow:0 0 6px #3fbf8f66}
 @media(max-width:860px){.tracking-carousel{--track-row:200px}}
 .tracking-sort{white-space:nowrap}
+/* ===== Botones de navegación de formularios (Cancelar · Anterior · Siguiente) y botón «Cerrar»: un solo estilo oscuro en todo el sistema ===== */
+:is(.booking-actions,.wizard-actions) :is(.nav-cancel,.nav-back,.nav-next,.appointment-submit,#wizard-next),.close-button{box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:42px;height:42px;margin:0;padding:0 18px;border:1px solid #37527a;border-radius:11px;font:650 13.5px/1 Inter,"Segoe UI",system-ui,sans-serif;letter-spacing:0;text-decoration:none;white-space:nowrap;cursor:pointer;transition:background-color .2s ease,border-color .2s ease,box-shadow .2s ease,color .2s ease,transform .12s ease}
+:is(.booking-actions,.wizard-actions) :is(.nav-cancel,.nav-back),.close-button{background:#10233c;color:#e3eeff}
+:is(.booking-actions,.wizard-actions) :is(.nav-next,.appointment-submit,#wizard-next){border-color:#3f7fd6;background:linear-gradient(180deg,#2f6fd0,#2459ac);color:#fff}
+.nav-icon,.close-button svg{flex:none;width:16px;height:16px}
+@media(hover:hover){
+ :is(.booking-actions,.wizard-actions) :is(.nav-cancel,.nav-back):hover:not(:disabled),.close-button:hover{background:#16304f;border-color:#ff9ecb99;box-shadow:0 0 0 3px #ff9ecb1f;color:#fff;transform:none}
+ :is(.booking-actions,.wizard-actions) :is(.nav-next,.appointment-submit,#wizard-next):hover:not(:disabled){background:linear-gradient(180deg,#3a7be0,#2a63bd);border-color:#ff9ecbb3;box-shadow:0 0 0 3px #ff9ecb29;transform:none}
+}
+:is(.booking-actions,.wizard-actions) :is(.nav-cancel,.nav-back,.nav-next,.appointment-submit,#wizard-next):active:not(:disabled),.close-button:active{transform:scale(.98)}
+:is(.booking-actions,.wizard-actions) :is(.nav-cancel,.nav-back,.nav-next,.appointment-submit,#wizard-next):focus-visible,.close-button:focus-visible{outline:2px solid #ff9ecb;outline-offset:2px}
+:is(.booking-actions,.wizard-actions) :is(.nav-cancel,.nav-back,.nav-next,.appointment-submit,#wizard-next):disabled{opacity:1;background:#0d1a2d;border-color:#1f3350;color:#5f7699;cursor:not-allowed;box-shadow:none}
+.close-button{min-height:40px;height:40px;padding:0 14px;font-size:13px}.close-button span{text-decoration:none}
+.booking-actions{gap:10px}.booking-actions .nav-cancel{margin-right:auto}.booking-actions .booking-spacer{display:none}
+body[data-page=dashboard] .wizard-dialog .wizard-actions :is(.nav-back,#wizard-next){height:42px;min-height:42px;padding:0 18px;font-size:13px}
+.control-pro button.close-button{height:36px;min-height:36px}
+@media(max-width:480px){.booking-actions .nav-cancel{flex:1 1 100%;margin-right:0;order:3}.booking-actions :is(.nav-back,.nav-next,.appointment-submit){flex:1 1 0;padding:0 10px}}
+@media(prefers-reduced-motion:reduce){:is(.booking-actions,.wizard-actions) :is(.nav-cancel,.nav-back,.nav-next,.appointment-submit,#wizard-next),.close-button{transition:none}:is(.booking-actions,.wizard-actions) button:active,.close-button:active{transform:none}}
+.booking-actions #booking-cancel.nav-cancel{margin-right:auto}
+@media(max-width:480px){.booking-actions #booking-cancel.nav-cancel{margin-right:0}}
