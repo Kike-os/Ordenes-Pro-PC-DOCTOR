@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.128 — 2026-10-12 23:30 (UTC-05:00)
+
+ADI: esfera con estados reales y sonidos rediseñados
+
+### Mejoras realizadas
+
+- ADI: esfera rosa y turquesa de 60 px con ondas internas de energía y estados diferenciados dibujados en 3D (escucha con el volumen real, proceso con anillo giratorio, respuesta, error discreto en coral); sonidos rediseñados, más suaves y con cola de eco tenue.
+
 ## v1.5.127 — 2026-10-12 23:26 (UTC-05:00)
 
 Seguimiento de Órdenes en carrusel de altura fija

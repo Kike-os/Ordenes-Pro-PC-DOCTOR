@@ -8,6 +8,22 @@
   },
   "releases": [
     {
+      "version": "1.5.128",
+      "date": "2026-10-12T23:30:56-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "ADI: esfera con estados reales y sonidos rediseñados",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "ADI: esfera rosa y turquesa de 60 px con ondas internas de energía y estados diferenciados dibujados en 3D (escucha con el volumen real, proceso con anillo giratorio, respuesta, error discreto en coral); sonidos rediseñados, más suaves y con cola de eco tenue."
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.127",
       "date": "2026-10-12T23:26:06-05:00",
       "type": "patch",

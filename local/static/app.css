@@ -5109,3 +5109,11 @@ body[data-page=login] #login-form .password-wrap .login-state{right:48px}
  .tracking-carousel .tracking-table .tracking-actions button{min-height:32px}
 }
 body[data-page=dashboard] .orders-pagination .orders-page-size{width:auto;margin:0;min-height:36px;height:36px;font-size:13px}
+/* ADI: esfera minimizada de 60 px (56 px en pantallas pequeñas). */
+#adi-widget.adi-v2 .adi-toggle{width:60px;height:60px;min-height:60px}
+@media(max-width:860px){#adi-widget.adi-v2 .adi-toggle,body[data-page=dashboard] #adi-widget.adi-v2 .adi-toggle{width:56px;height:56px;min-height:56px}}
+/* Error con WebGL: lo dibuja el propio sombreador (tono coral que late); sin sacudidas. */
+#adi-widget.adi-v2.adi-gl[data-orb=error] .adi-toggle{animation:none!important}
+/* Alternativa sin WebGL: el error también es discreto. */
+#adi-widget.adi-v2:not(.adi-gl)[data-orb=error] .adi-toggle{animation:none;box-shadow:0 14px 18px -9px #000000b3,0 0 0 1.5px #ff9a8fb3,0 0 18px #ff8a8059}
+#adi-widget.adi-v2:not(.adi-gl)[data-orb=error] .adi-orb{filter:saturate(.5) sepia(.25)}

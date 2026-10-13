@@ -15,7 +15,7 @@
  // Tonos breves generados en el navegador; solo suenan si la persona ya interactuó con la página y no los desactivó.
 // Esfera 3D (WebGL): lee el estado real del asistente en cada cuadro. Si el navegador no ofrece WebGL queda la esfera CSS como alternativa ligera.
  const orbState={level:0,busy:false,speaking:false,listening:false,dim:false,beatAt:0,pressAt:-1e9};let orb3d=null;
- const readOrb=()=>{orbState.busy=root.classList.contains('adi-busy');orbState.speaking=root.dataset.voice==='speaking';orbState.listening=root.dataset.voice==='listening';orbState.still=prefs.motion===false;orbState.dim=root.dataset.state==='offline'||root.dataset.state==='closed'||root.dataset.orb==='error';
+ const readOrb=()=>{orbState.busy=root.classList.contains('adi-busy');orbState.speaking=root.dataset.voice==='speaking';orbState.listening=root.dataset.voice==='listening';orbState.still=prefs.motion===false;orbState.error=root.dataset.orb==='error';orbState.dim=root.dataset.state==='offline'||root.dataset.state==='closed';
   // Sin medidor de volumen (teléfonos), el núcleo responde al inicio y fin de voz que informa el reconocimiento.
   if(!root.dataset.meter)orbState.level=orbState.listening?(root.dataset.heard?.55:.12):0;return orbState;};
  let headOrb=null;const headHost=panel.querySelector('.adi-avatar');
@@ -28,14 +28,19 @@
  // Efectos generados con Web Audio (sin archivos): tonos de cristal breves y suaves. Solo suenan tras una interacción real de la persona,
  // nunca al cargar la página; uno a la vez (el nuevo apaga al anterior) y callan mientras ADI habla para no pisar su voz.
  let audio=null,playing=null,touched=false;for(const kind of ['pointerdown','keydown','touchstart'])addEventListener(kind,()=>{touched=true;},{capture:true,passive:true});
- const tones={open:[[784,1175,0,.42,.05,'sine'],[1568,2349,.03,.38,.022,'sine'],[2349,3136,.08,.3,.01,'triangle']],close:[[1175,698,0,.3,.04,'sine'],[2349,1397,.02,.24,.014,'sine']],listen:[[988,1047,0,.16,.035,'sine'],[1976,2093,.01,.12,.012,'sine']],
-  message:[[1047,1047,0,.14,.035,'sine'],[1568,1568,.09,.2,.028,'sine']],advisor:[[660,660,0,.14,.04,'sine'],[880,880,.11,.22,.04,'sine']],error:[[233,196,0,.24,.05,'triangle']]};
+ const tones={open:[[523.25,523.25,0,.55,.034,'sine'],[783.99,783.99,.07,.6,.03,'sine'],[1046.5,1046.5,.15,.7,.018,'sine'],[1567.98,1567.98,.15,.5,.006,'sine']],
+  close:[[783.99,783.99,0,.38,.028,'sine'],[523.25,523.25,.09,.5,.03,'sine']],listen:[[880,880,0,.26,.024,'sine'],[1318.5,1318.5,.02,.22,.008,'sine']],
+  message:[[659.25,659.25,0,.3,.026,'sine'],[987.77,987.77,.1,.46,.024,'sine'],[1975.5,1975.5,.1,.3,.004,'sine']],advisor:[[587.33,587.33,0,.3,.03,'sine'],[880,880,.12,.5,.028,'sine']],
+  error:[[311.13,293.66,0,.3,.034,'sine'],[233.08,220,.16,.42,.03,'sine']]};
+ let chain=null;
  const sound=type=>{if(!prefs.sound||!tones[type]||!(touched||navigator.userActivation?.hasBeenActive))return;if(type!=='error'&&'speechSynthesis' in window&&speechSynthesis.speaking)return;
   try{const Context=window.AudioContext||window.webkitAudioContext;if(!Context)return;audio=audio||new Context();if(audio.state==='suspended')audio.resume().catch(()=>{});const now=audio.currentTime;
-   if(playing){try{playing.gain.cancelScheduledValues(now);playing.gain.setTargetAtTime(.0001,now,.015);}catch{}}
-   const master=audio.createGain();master.gain.value=1;master.connect(audio.destination);playing=master;
+   // Cadena común: filtro que quita aspereza y un eco corto y muy bajo que da sensación de espacio, sin alargar el sonido.
+   if(!chain){const filter=audio.createBiquadFilter(),delay=audio.createDelay(.5),feedback=audio.createGain(),wet=audio.createGain();filter.type='lowpass';filter.frequency.value=3400;filter.Q.value=.4;delay.delayTime.value=.11;feedback.gain.value=.22;wet.gain.value=.16;filter.connect(audio.destination);filter.connect(delay);delay.connect(feedback);feedback.connect(delay);delay.connect(wet);wet.connect(audio.destination);chain=filter;}
+   if(playing){try{playing.gain.cancelScheduledValues(now);playing.gain.setTargetAtTime(.0001,now,.03);}catch{}}
+   const master=audio.createGain();master.gain.value=1;master.connect(chain);playing=master;
    for(const[from,to,at,length,level,shape]of tones[type]){const osc=audio.createOscillator(),gain=audio.createGain();osc.type=shape;osc.frequency.setValueAtTime(from,now+at);if(to!==from)osc.frequency.exponentialRampToValueAtTime(to,now+at+length*.85);
-    gain.gain.setValueAtTime(.0001,now+at);gain.gain.linearRampToValueAtTime(level,now+at+.02);gain.gain.exponentialRampToValueAtTime(.0001,now+at+length);osc.connect(gain);gain.connect(master);osc.start(now+at);osc.stop(now+at+length+.04);}}catch{}};
+    gain.gain.setValueAtTime(.0001,now+at);gain.gain.linearRampToValueAtTime(level,now+at+.045);gain.gain.exponentialRampToValueAtTime(.0001,now+at+length);osc.connect(gain);gain.connect(master);osc.start(now+at);osc.stop(now+at+length+.05);}}catch{}};
  // Destello al tocar la esfera: el halo se expande una vez, a la par del sonido.
  const flash=()=>{orbState.pressAt=performance.now();root.classList.remove('adi-flash');void root.offsetWidth;root.classList.add('adi-flash');setTimeout(()=>root.classList.remove('adi-flash'),650);};
  // Enlaces seguros: solo direcciones https y la ruta interna de citas se convierten en vínculos.

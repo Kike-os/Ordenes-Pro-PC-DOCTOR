@@ -206,3 +206,21 @@ Al abrir, recargar o cambiar de sección, ADI no se abre, no habla, no suena y n
 **Voz.** El navegador no permite conectar la síntesis de voz (Web Speech) a un `AnalyserNode`: su audio no pasa por Web Audio. Por eso, al hablar, la esfera sigue los eventos de palabra que emite el propio motor de voz, no la amplitud; no hay temporizadores inventados. Un análisis de amplitud real exigiría generar la voz con un servicio propio que entregue el audio.
 
 **Comprobado a tamaño real** (68 px en escritorio, 56 px en móvil): movimiento continuo con el botón en su sitio, un solo contexto WebGL con y sin el chat abierto, espejo del encabezado dibujado, estados recorridos sin errores, memoria estable y, tras recargar, chat cerrado y sin voz ni micrófono.
+
+## Esfera de cristal rosa y turquesa con estados reales (1.5.128)
+
+**Por qué las versiones anteriores no convencían.** 1) A 56–60 px hay muy pocos píxeles: los filamentos finos y los destellos pequeños se perdían y la esfera se leía como un botón. 2) El interior estaba casi quieto en reposo. 3) Varios estados solo existían en la alternativa CSS (el error hacía temblar el botón; la escucha y el proceso apenas cambiaban el dibujo 3D). 4) En equipos sin aceleración gráfica se ve la alternativa CSS, más plana.
+
+**Qué hace ahora el sombreador (`local/static/adi-orb.js`).** Sigue siendo una esfera trazada por rayos (refracción, Fresnel, reflejo de entorno, cáustica), en rosa luminoso y turquesa, sin texto, con fondo transparente y halo delicado:
+
+- Reposo: respiración de dos ritmos, núcleo luminoso y **ondas internas de energía** (pliegues de luz que avanzan despacio).
+- Escucha: ondas turquesa que entran desde la superficie y crecen con el volumen real del micrófono (o con el inicio/fin de voz que informa el reconocimiento cuando no hay medidor).
+- Proceso: un anillo de energía que gira alrededor del núcleo y un latido suave.
+- Respuesta: ondas desde el núcleo con cada palabra que informa el motor de voz del navegador (no hay acceso a la amplitud del audio de Web Speech, así que no se simula).
+- Error: la esfera se apaga un poco y toma un tono coral que late; sin sacudidas.
+
+Los estados son los del asistente (`adi-busy`, `data-voice`, `data-orb`): nunca se muestran si la operación no está ocurriendo. Tamaño minimizado: 60 px (56 px en pantallas pequeñas). Las luces se comprimen para que los estados activos no quemen el cristal.
+
+**Sonidos.** Generados con Web Audio, sin archivos: notas senoidales suaves con ataque lento, filtro que quita aspereza y un eco corto muy bajo. Abrir (tres notas ascendentes), cerrar (dos descendentes), empezar a escuchar (una nota breve), respuesta recibida (dos notas), asesor conectado y error (dos notas graves). Solo suenan tras una interacción de la persona, nunca en bucle ni durante la respiración, callan mientras ADI habla y respetan el interruptor «Sonidos».
+
+**No verificado aquí:** cómo suenan en altavoces reales y cómo se ve en una GPU real (las pruebas usan dibujo por software).

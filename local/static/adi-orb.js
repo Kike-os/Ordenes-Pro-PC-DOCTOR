@@ -6,7 +6,7 @@
 (()=>{
  const VERTEX='attribute vec2 p;void main(){gl_Position=vec4(p,0.,1.);}';
  const FRAGMENT=`precision highp float;
-uniform vec2 uRes,uPointer;uniform float uTime,uLevel,uBusy,uSpeak,uDim,uPress,uShock,uSteps,uHover;
+uniform vec2 uRes,uPointer;uniform float uTime,uLevel,uBusy,uSpeak,uDim,uPress,uShock,uSteps,uHover,uListen,uError;
 const float R=.56;
 float hash(vec3 p){p=fract(p*.3183099+.1);p*=17.;return fract(p.x*p.y*p.z*(p.x+p.y+p.z));}
 float noise(vec3 x){vec3 i=floor(x),f=fract(x);f=f*f*(3.-2.*f);
@@ -27,12 +27,12 @@ void main(){
  float ang=atan(uv.y,uv.x);
  // El radio cambia de verdad: rebote elástico al toque, ondas de superficie y deformación suave al hablar o escuchar.
  float ripple=.004*sin(ang*4.+uTime*1.1)+.003*sin(ang*7.-uTime*.8+1.3);
- float rad=R*(1.+breath*.012+uPress*.07+ripple+uSpeak*(.022*sin(ang*3.+uTime*7.)+.014*sin(ang*5.-uTime*5.3))+uLevel*.02*sin(ang*6.+uTime*11.));
+ float rad=R*(1.+breath*.012+uPress*.07+ripple+uSpeak*(.016*sin(ang*3.+uTime*7.)+.010*sin(ang*5.-uTime*5.3))+uLevel*.012*sin(ang*6.+uTime*11.));
  float d=length(uv);
  vec3 pink=vec3(1.,.68,.86),pearl=vec3(1.,.93,.97),magenta=vec3(.93,.42,.70),lilac=vec3(.36,.88,.86),cyan=vec3(.55,.95,.98);
  float live=1.-uDim*.6;
  // Halo volumétrico discreto y onda expansiva al toque.
- float glow=exp(-(max(d-rad,0.))*10.5)*(.10+.045*breath+uHover*.05+uSpeak*.2+uLevel*.24+max(uPress,0.)*.22)*live;
+ float glow=exp(-(max(d-rad,0.))*12.)*(.085+.04*breath+uHover*.05+uSpeak*.18+uListen*(.05+uLevel*.26)+uBusy*(.05+.05*sin(uTime*4.2))+max(uPress,0.)*.2)*live;
  float ring=uShock>0.?exp(-pow((d-rad-(1.-uShock)*.30)*28.,2.))*uShock*.38:0.;
  vec3 aura=mix(pink,lilac,smoothstep(-.4,.5,uv.x-uv.y*.7)*.8);vec3 col=aura*(glow+ring);float alpha=glow*.85+ring*.8;
  if(d<rad){
@@ -51,7 +51,7 @@ void main(){
   // Giros con frecuencias que no se repiten juntas: el flujo cambia de dirección sin ciclo evidente.
   float a1=1.1*sin(uTime*.13)+.6*sin(uTime*.071+1.),a2=.9*sin(uTime*.09+2.)+.4*sin(uTime*.053),a3=.8*sin(uTime*.061+.5)+uBusy*1.4*sin(uTime*1.7);
   vec3 centre=vec3(uPointer*.10,0.)+vec3(.03*sin(uTime*.37),.03*sin(uTime*.29+1.),.02*sin(uTime*.23));
-  float core=.24+.03*breath+uLevel*.17*(.6+.4*sin(uTime*29.))+uSpeak*.09;
+  float core=.25+.04*breath+uLevel*.17*(.6+.4*sin(uTime*29.))+uSpeak*.10+uBusy*.05*sin(uTime*4.2);
   float orbit=mix(.58,.16,uBusy),spin=uTime*(1.+uBusy*3.2);
   for(int i=0;i<10;i++){
    if(float(i)>=uSteps)break;
@@ -62,7 +62,14 @@ void main(){
    vec3 warp=w*2.2+vec3(fbm(w*1.4+uTime*.09),fbm(w*1.4-uTime*.07+3.),0.)*1.3;
    float ridge=1.-abs(2.*noise(warp+vec3(0.,0.,uTime*.11))-1.);
    float fil=pow(ridge,mix(9.,5.,uBusy))*(1.-smoothstep(mix(.55,.38,uBusy),1.,r))*(.03+uBusy*1.1+uSpeak*.4+uLevel*.35);
-   float cloud=smoothstep(.42,1.,fbm(w*1.7+vec3(0.,uTime*.08,0.)))*(1.-smoothstep(.2,.9,r));
+   float f1=fbm(w*1.7+vec3(0.,uTime*.08,0.));
+   float cloud=smoothstep(.42,1.,f1)*(1.-smoothstep(.2,.9,r));
+   // Ondas internas de energía: pliegues de luz líquida que avanzan despacio y nunca se repiten igual.
+   float flow=pow(.5+.5*sin(w.y*5.2+f1*6.5-uTime*.5),3.)*(1.-smoothstep(.22,.98,r))*(.55+.2*breath);
+   // Escucha: ondas que entran desde la superficie y crecen con el volumen real del micrófono.
+   float ear=uListen*pow(.5+.5*sin(r*14.+uTime*5.5),2.)*smoothstep(.3,.95,r)*(.22+uLevel*1.7);
+   // Proceso: un anillo de energía que gira alrededor del núcleo.
+   vec3 u=q-centre;float swirl=uBusy*exp(-pow((length(u.xy)-.42)*4.6,2.))*exp(-u.z*u.z*5.)*pow(.5+.5*sin(atan(u.y,u.x)*2.-uTime*3.4),3.)*1.5;
    // Núcleo que cambia sutilmente de forma: su radio depende de la dirección.
    float shape=core*(1.+.22*noise(normalize(w+.001)*2.4+uTime*.33)-.11);
    float nucleus=exp(-r*r/(shape*shape))*1.15;
@@ -72,10 +79,13 @@ void main(){
     vec3 e=q-centre-c;sparks+=.0014/(dot(e,e)+.0014);}
    sparks*=uBusy;
    vec3 tint=mix(mix(magenta,lilac,smoothstep(-.5,.5,w.x)),pearl,clamp(nucleus*.8+cloud*.55+fil*.6,0.,1.));
-   acc+=(tint*(cloud*.42+wave)+mix(pink,vec3(1.),.55)*fil*1.25+pearl*nucleus*.8+vec3(1.,.95,.98)*sparks*.85)*(1.-dens);
+   vec3 tide=mix(pink,lilac,.5+.5*sin(w.x*3.1+f1*4.+uTime*.21));
+   acc+=(tint*(cloud*.42+wave)+tide*flow*.20+lilac*ear*.30+mix(pearl,lilac,.5)*swirl*.42+mix(pink,vec3(1.),.55)*fil*1.25+pearl*nucleus*.78+vec3(1.,.95,.98)*sparks*.85)*(1.-dens);
    dens+=(cloud*.09+nucleus*.05+fil*.03);
   }
   acc*=tmax/uSteps*2.1;
+  // Compresión suave de las luces: los estados activos brillan más sin quemar el detalle del cristal.
+  acc=acc/(1.+dot(acc,vec3(.333))*.85);
   // Cuerpo de cristal líquido: rosa perla translúcido, más claro y limpio en el centro, con lila y magenta suaves hacia los bordes.
   vec3 body=mix(magenta,pink,smoothstep(.05,.8,n.z));
   body=mix(body,lilac,smoothstep(-.25,.75,n.x*.60-n.y*.62+.05)*.78);
@@ -103,6 +113,7 @@ void main(){
   col+=vec3(1.)*smoothstep(.93,1.,rr)*smoothstep(-.9,.6,n.y-n.x*.4)*.34*live;
   // Resplandor moderado de las zonas más luminosas, sin quemar el detalle.
   col+=pearl*smoothstep(.75,1.6,dot(acc,vec3(.33)))*.10;
+  col=mix(col,vec3(dot(col,vec3(.3,.5,.2)))*vec3(1.,.70,.68),uError*(.42+.2*sin(uTime*8.)));
   // Color algo más vivo sin quemar los brillos.
   col=mix(vec3(dot(col,vec3(.3,.5,.2))),col,1.26);
   col=mix(col,vec3(dot(col,vec3(.3,.5,.2)))*vec3(.84,.80,.88),uDim*.75);
@@ -128,7 +139,7 @@ void main(){
    program=gl.createProgram();gl.attachShader(program,vs);gl.attachShader(program,fs);gl.linkProgram(program);gl.deleteShader(vs);gl.deleteShader(fs);if(!gl.getProgramParameter(program,gl.LINK_STATUS))return false;
    buffer=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buffer);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),gl.STATIC_DRAW);
    gl.useProgram(program);const at=gl.getAttribLocation(program,'p');gl.enableVertexAttribArray(at);gl.vertexAttribPointer(at,2,gl.FLOAT,false,0,0);
-   for(const name of ['uRes','uTime','uLevel','uBusy','uSpeak','uDim','uPress','uSteps','uPointer','uShock','uHover'])uniforms[name]=gl.getUniformLocation(program,name);
+   for(const name of ['uRes','uTime','uLevel','uBusy','uSpeak','uDim','uPress','uSteps','uPointer','uShock','uHover','uListen','uError'])uniforms[name]=gl.getUniformLocation(program,name);
    gl.disable(gl.DEPTH_TEST);gl.clearColor(0,0,0,0);return true;}
   if(!build())return null;
   host.append(canvas);
@@ -140,22 +151,22 @@ void main(){
   // Valores suavizados: los estados entran y salen con transición, sin saltos.
   const mirrors=new Set();
   function mirror(target){const copy=document.createElement('canvas');copy.className='adi-orb-gl adi-orb-mirror';copy.setAttribute('aria-hidden','true');const context=copy.getContext('2d');if(!context)return null;target.append(copy);const entry={canvas:copy,context};mirrors.add(entry);lastDraw=0;schedule();return{destroy(){mirrors.delete(entry);copy.remove();}};}
-  const smooth={level:0,busy:0,speak:0,dim:0,px:0,py:0,hover:0};let last=performance.now(),lastDraw=0;
+  const smooth={level:0,busy:0,speak:0,dim:0,px:0,py:0,hover:0,listen:0,error:0};let last=performance.now(),lastDraw=0;
   function draw(now){
    const state=read(),step=Math.min(.1,(now-last)/1000);last=now;
    const ease=(key,target,speed)=>{smooth[key]+=(target-smooth[key])*Math.min(1,step*speed);};
-   ease('level',state.level||0,14);ease('px',state.px||0,3);ease('py',state.py||0,3);ease('hover',state.hover?1:0,4);ease('busy',state.busy?1:0,3.5);ease('dim',state.dim?1:0,3);
+   ease('level',state.level||0,14);ease('px',state.px||0,3);ease('py',state.py||0,3);ease('hover',state.hover?1:0,4);ease('busy',state.busy?1:0,3.5);ease('dim',state.dim?1:0,3);ease('listen',state.listening?1:0,5);ease('error',state.error?1:0,6);
    // Hablando: envolvente que sube con cada palabra que informa el motor de voz y decae entre ellas.
    const sinceBeat=(now-(state.beatAt||0))/1000,envelope=state.speaking?Math.max(.35,Math.exp(-sinceBeat*5.5)):0;ease('speak',envelope,16);
    const sincePress=(now-(state.pressAt||-1e9))/1000,press=sincePress<1.2?Math.exp(-sincePress*5.2)*Math.cos(sincePress*17):0;
    resize();gl.clear(gl.COLOR_BUFFER_BIT);gl.useProgram(program);
    gl.uniform2f(uniforms.uRes,canvas.width,canvas.height);gl.uniform1f(uniforms.uTime,(still.matches||state.still)?12:(now-started)/1000);
-   gl.uniform1f(uniforms.uLevel,smooth.level);gl.uniform1f(uniforms.uBusy,smooth.busy);gl.uniform1f(uniforms.uSpeak,smooth.speak);gl.uniform1f(uniforms.uDim,smooth.dim);gl.uniform1f(uniforms.uPress,press);gl.uniform1f(uniforms.uShock,sincePress<.9?1-sincePress/.9:0);gl.uniform2f(uniforms.uPointer,smooth.px,smooth.py);gl.uniform1f(uniforms.uHover,smooth.hover);gl.uniform1f(uniforms.uSteps,steps);
+   gl.uniform1f(uniforms.uLevel,smooth.level);gl.uniform1f(uniforms.uBusy,smooth.busy);gl.uniform1f(uniforms.uSpeak,smooth.speak);gl.uniform1f(uniforms.uDim,smooth.dim);gl.uniform1f(uniforms.uPress,press);gl.uniform1f(uniforms.uShock,sincePress<.9?1-sincePress/.9:0);gl.uniform2f(uniforms.uPointer,smooth.px,smooth.py);gl.uniform1f(uniforms.uHover,smooth.hover);gl.uniform1f(uniforms.uListen,smooth.listen);gl.uniform1f(uniforms.uError,smooth.error);gl.uniform1f(uniforms.uSteps,steps);
    gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
    for(const copy of mirrors){const box=copy.canvas.getBoundingClientRect(),ratio=Math.min(window.devicePixelRatio||1,2),width=Math.max(24,Math.round(box.width*ratio)),height=Math.max(24,Math.round(box.height*ratio));if(copy.canvas.width!==width||copy.canvas.height!==height){copy.canvas.width=width;copy.canvas.height=height;}copy.context.clearRect(0,0,width,height);copy.context.drawImage(canvas,0,0,width,height);}}
   function loop(now){
    frame=0;if(!alive)return;
-   const state=read(),active=state.busy||state.speaking||state.listening||(now-(state.pressAt||-1e9))<1300;
+   const state=read(),active=state.busy||state.speaking||state.listening||state.error||(now-(state.pressAt||-1e9))<1300;
    // Con «movimiento reducido» apenas se redibuja; en reposo se limita a unos 30 cuadros por segundo para ahorrar batería y sube al reaccionar.
    const gap=(still.matches||state.still)?(active?120:600):(active?0:30);
    if(now-lastDraw>=gap){const before=performance.now();draw(now);lastDraw=now;
