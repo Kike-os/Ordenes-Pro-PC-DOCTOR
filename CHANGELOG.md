@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.121 — 2026-10-12 22:24 (UTC-05:00)
+
+ADI: esfera de cristal líquido
+
+### Mejoras realizadas
+
+- ADI: esfera de cristal líquido translúcido (rosa perla, lila, magenta suave e iridiscencia con reflejos cian), centro limpio y luminoso, cáustica interior, letras más finas e indicador de conexión engastado en el borde; la alternativa sin WebGL y el encabezado del chat usan el mismo material.
+
 ## v1.5.120 — 2026-10-12 20:08 (UTC-05:00)
 
 Título «Agenda de Citas»

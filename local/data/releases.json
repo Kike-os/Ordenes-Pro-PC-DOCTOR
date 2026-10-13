@@ -8,6 +8,22 @@
   },
   "releases": [
     {
+      "version": "1.5.121",
+      "date": "2026-10-12T22:24:08-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "ADI: esfera de cristal líquido",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "ADI: esfera de cristal líquido translúcido (rosa perla, lila, magenta suave e iridiscencia con reflejos cian), centro limpio y luminoso, cáustica interior, letras más finas e indicador de conexión engastado en el borde; la alternativa sin WebGL y el encabezado del chat usan el mismo material."
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.120",
       "date": "2026-10-12T20:08:16-05:00",
       "type": "patch",

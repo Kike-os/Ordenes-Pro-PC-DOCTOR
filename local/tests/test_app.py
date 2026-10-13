@@ -293,6 +293,7 @@ class SecurityTests(unittest.TestCase):
             self.assertEqual(self.request('/api/login',dict(good,bot_token=token))['status'],200)
             self.assertEqual(self.request('/api/login',dict(good,bot_token=token))['status'],403)
             other=self.request('/api/captcha',{})['body']
+            unsolved=next(n for n in range(100000) if hashlib.sha256((other['nonce']+':'+str(n)).encode()).digest()[0]!=0)
             self.assertEqual(self.request('/api/login',dict(good,bot_token='local:'+other['nonce']+':'+str(unsolved)))['status'],403)
             with app.connect() as c:
                 self.assertEqual(c.execute("SELECT COUNT(*) FROM attempts WHERE bucket LIKE 'login-%'").fetchone()[0],0)
