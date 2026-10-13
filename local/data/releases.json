@@ -8,6 +8,24 @@
   },
   "releases": [
     {
+      "version": "1.5.142",
+      "date": "2026-10-13T18:32:51-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Tarjeta financiera con saldo real, pagos generales, devoluciones y protección contra pagos duplicados",
+      "changes": {
+        "features": [
+          "Tarjeta financiera en el detalle de la orden: saldo real con estados automáticos (pendiente, pago parcial, sin saldo, sin cargos y saldo a favor), saldo por equipo y general de la orden, pagos generales con asignación a un equipo y devoluciones."
+        ],
+        "improvements": [],
+        "fixes": [],
+        "security": [
+          "Pagos: un doble clic o un reintento ya no registran el movimiento dos veces; los movimientos registrados no se editan ni se borran, y el saldo nunca se muestra en cero por un error de conexión."
+        ],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.141",
       "date": "2026-10-13T14:36:42-05:00",
       "type": "patch",

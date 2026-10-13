@@ -4,6 +4,18 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.142 — 2026-10-13 18:32 (UTC-05:00)
+
+Tarjeta financiera con saldo real, pagos generales, devoluciones y protección contra pagos duplicados
+
+### Nuevas funcionalidades
+
+- Tarjeta financiera en el detalle de la orden: saldo real con estados automáticos (pendiente, pago parcial, sin saldo, sin cargos y saldo a favor), saldo por equipo y general de la orden, pagos generales con asignación a un equipo y devoluciones.
+
+### Actualizaciones de seguridad
+
+- Pagos: un doble clic o un reintento ya no registran el movimiento dos veces; los movimientos registrados no se editan ni se borran, y el saldo nunca se muestra en cero por un error de conexión.
+
 ## v1.5.141 — 2026-10-13 14:36 (UTC-05:00)
 
 Ventana de ADI ordenada: accesos en cuadrícula, márgenes uniformes y controles alineados
