@@ -5117,3 +5117,30 @@ body[data-page=dashboard] .orders-pagination .orders-page-size{width:auto;margin
 /* Alternativa sin WebGL: el error también es discreto. */
 #adi-widget.adi-v2:not(.adi-gl)[data-orb=error] .adi-toggle{animation:none;box-shadow:0 14px 18px -9px #000000b3,0 0 0 1.5px #ff9a8fb3,0 0 18px #ff8a8059}
 #adi-widget.adi-v2:not(.adi-gl)[data-orb=error] .adi-orb{filter:saturate(.5) sepia(.25)}
+/* Acceso: usuario oculto con puntos (sigue siendo un campo de texto para los gestores de contraseñas) y campo trampa fuera de la vista. */
+body[data-page=login] #login[data-masked=true]:not(:placeholder-shown){-webkit-text-security:disc}
+@supports not (-webkit-text-security:disc){body[data-page=login] .reveal-user{display:none}}
+body[data-page=login] #login-form #login{padding-right:84px}
+body[data-page=login] #login-form .login-input .login-state{right:48px}
+.login-trap{position:absolute!important;left:-10000px;top:auto;width:1px;height:1px;overflow:hidden}
+body[data-page=login] .login-notice{margin:0 0 12px;padding:9px 12px;border:1px solid #2f8f8a80;border-radius:10px;background:#0c2a2c;color:#b5efe6;font-size:12.5px;line-height:1.45}
+/* Estados del acceso: turquesa mientras el campo está activo o con formato válido; el verde queda reservado al acceso confirmado por el servidor. */
+body[data-page=login] #login-form .login-input:is([data-state=typing],[data-state=valid]) input,body[data-page=login] #login-form .login-input:is([data-state=typing],[data-state=valid]) input:focus{border-color:#3fd8d0;box-shadow:0 0 0 3px #3fd8d026,0 0 22px #3fd8d01a}
+body[data-page=login] #login-form .login-input:is([data-state=typing],[data-state=valid]) :is(.login-state,.icon:first-child){color:#6fe6de}
+body[data-page=login] #login-form .login-input input:focus{border-color:#3fd8d0;box-shadow:0 0 0 3px #3fd8d026,0 0 22px #3fd8d01a}
+body[data-page=login] #login-form :is(#login-hint,#password-hint):is([data-state=typing],[data-state=valid]){color:#8fe9e3}
+/* Aviso de cierre por inactividad. */
+dialog.idle-dialog{width:min(380px,calc(100% - 28px));padding:26px 24px 22px;border:1px solid #2f8f8a99;border-radius:18px;background:linear-gradient(180deg,#10233c,#0b1729);color:#e3eeff;text-align:center;box-shadow:0 30px 80px -20px #000000d9,0 0 0 1px #3fd8d01f,0 0 40px #3fd8d014;animation:idle-in .25s ease-out}
+dialog.idle-dialog::backdrop{background:#020712cc;backdrop-filter:blur(4px)}
+@keyframes idle-in{from{opacity:0;transform:translateY(8px) scale(.98)}to{opacity:1;transform:none}}
+.idle-icon{display:inline-grid;place-items:center;width:52px;height:52px;margin:0 auto 12px;border:1px solid #3fd8d066;border-radius:50%;background:#0c2a2c;color:#6fe6de;box-shadow:0 0 22px #3fd8d026}
+.idle-icon svg{width:24px;height:24px}
+.idle-dialog h2{margin:0 0 6px;font-size:18px;letter-spacing:-.2px;color:#f2f6ff}
+.idle-dialog p{margin:0 0 14px;font-size:13.5px;line-height:1.5;color:#b8cbe5}
+.idle-time{display:flex;align-items:baseline;justify-content:center;gap:8px;margin:0 0 18px}
+.idle-count{font:650 34px/1 ui-monospace,Menlo,Consolas,monospace;letter-spacing:.04em;color:#6fe6de;font-variant-numeric:tabular-nums;text-shadow:0 0 18px #3fd8d040}
+.idle-time small{font-size:13px;color:#9fb4d3}
+.idle-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}.idle-actions button{min-height:44px;justify-content:center;padding:10px 12px;font-size:13px}
+@media(max-width:400px){.idle-actions{grid-template-columns:1fr}.idle-actions .primary{order:-1}}
+@media(prefers-reduced-motion:reduce){dialog.idle-dialog{animation:none}}
+body[data-page=login] #login-form #password{padding-right:84px}

@@ -232,10 +232,15 @@ CAPTCHA_SECONDS = 300
 
 
 def captcha_mode():
-    # Turnstile si hay claves; si no, verificación local «No soy un robot» salvo LOGIN_CAPTCHA=off.
+    # Turnstile si hay claves; si no, verificación propia y silenciosa (prueba de trabajo de un solo uso) salvo LOGIN_CAPTCHA=off.
     if os.getenv('TURNSTILE_SITE_KEY') and os.getenv('TURNSTILE_SECRET_KEY'):
         return 'turnstile' if bot_always() else ''
     return '' if os.getenv('LOGIN_CAPTCHA','on').strip().lower() in ('off','false','0','no') else 'local'
+
+
+def captcha_always():
+    # LOGIN_CAPTCHA=always exige la verificación en cada intento; por defecto solo se pide cuando hay fallos recientes.
+    return os.getenv('LOGIN_CAPTCHA','on').strip().lower()=='always'
 
 
 def new_captcha(c):
@@ -578,12 +583,43 @@ def auth_event(c,account_hash,ip_hash,result):
     c.execute('DELETE FROM login_attempt_events WHERE created_at<?',(int(time.time())-90*86400,))
 
 
+# Cierre por inactividad: una sesión sin actividad real de la persona durante IDLE_SECONDS deja de ser válida en el servidor.
+# El navegador avisa IDLE_WARNING segundos antes. «Recordarme» alarga la vida máxima de la sesión, no el tiempo de inactividad.
+IDLE_SECONDS = 15*60
+IDLE_WARNING = 2*60
+# El navegador lleva la cuenta exacta y avisa al servidor de la actividad como mucho una vez por minuto: el servidor concede ese margen
+# antes de invalidar la sesión por su cuenta, para no cortar a quien todavía ve la cuenta atrás.
+IDLE_GRACE = 75
+# Esperas progresivas tras intentos fallidos consecutivos (segundos según el número de fallos acumulados).
+LOGIN_WAITS = {2:3, 3:8, 4:20}
+LOGIN_USER_MAX = 50
+LOGIN_EMAIL_MAX = 254
+PASSWORD_MAX = 128          # contraseñas nuevas
+PASSWORD_LOGIN_MAX = 256    # el acceso sigue aceptando las contraseñas que ya existían
+
+
+def login_wait(c, keys):
+    """Segundos que faltan para poder volver a intentar el acceso con esta cuenta u origen."""
+    now=int(time.time());left=0
+    for key in keys:
+        row=c.execute('SELECT expires FROM attempts WHERE bucket=? AND expires>?',('wait:'+key,now)).fetchone()
+        if row:left=max(left,row[0]-now)
+    return left
+
+
+def login_risky(c, keys):
+    """Hay fallos recientes con esta cuenta u origen: se exige la verificación adicional (prueba de trabajo de un solo uso)."""
+    now=int(time.time())
+    return any((c.execute('SELECT count FROM attempts WHERE bucket=? AND expires>?',(key,now)).fetchone() or [0])[0]>=2 for key in keys)
+
+
 def make_session(c, user_id, remember=False):
     token, csrf = secrets.token_urlsafe(32), secrets.token_urlsafe(32)
     policy=auth_policy(c)
     age = policy['remember_days']*86400 if remember else policy['session_hours']*3600
-    c.execute('DELETE FROM sessions WHERE expires<?', (int(time.time()),))
-    c.execute('INSERT INTO sessions VALUES (?,?,?,?)', (digest(token), user_id, csrf, int(time.time())+age))
+    now=int(time.time())
+    c.execute('DELETE FROM sessions WHERE expires<? OR last_activity<?', (now,now-IDLE_SECONDS-IDLE_GRACE))
+    c.execute('INSERT INTO sessions(token_hash,user_id,csrf,expires,last_activity) VALUES (?,?,?,?,?)', (digest(token), user_id, csrf, now+age, now))
     return token, csrf, age
 
 
@@ -692,7 +728,8 @@ class Handler(BaseHTTPRequestHandler):
             token = cookies['pcdoctor_session'].value if 'pcdoctor_session' in cookies else ''
         except Exception:
             token = ''
-        return c.execute('SELECT u.id,u.username,u.name,u.email,u.role,s.csrf FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND s.expires>? AND u.active=1', (digest(token), int(time.time()))).fetchone(), token
+        now=int(time.time())
+        return c.execute('SELECT u.id,u.username,u.name,u.email,u.role,s.csrf FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND s.expires>? AND (s.last_activity IS NULL OR s.last_activity>?) AND u.active=1', (digest(token), now, now-IDLE_SECONDS-IDLE_GRACE)).fetchone(), token
 
     def page(self, name):
         content = (ROOT / 'templates' / name).read_text()
@@ -952,7 +989,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(200,live_support.detail(c,conv,after,appointments.stamp(appointments.now())))
             if path == '/api/me':
                 prefs=c.execute('SELECT value FROM system_state WHERE key=?',('mail_prefs:'+str(user['id']),)).fetchone() if mail_allowed(user) else None
-                return self.reply(200, {'user':dict(user,photo=profile_photo_stamp(c,user['id']),mail=mail_allowed(user),mail_prefs=json.loads(prefs['value']) if prefs else None,mail_signature=mail_signature_card(c) if mail_allowed(user) else None,storage='cloud' if remote_db.configured() else 'local'),'server_time':time.time()})
+                return self.reply(200, {'idle':{'seconds':IDLE_SECONDS,'warning':IDLE_WARNING},'user':dict(user,photo=profile_photo_stamp(c,user['id']),mail=mail_allowed(user),mail_prefs=json.loads(prefs['value']) if prefs else None,mail_signature=mail_signature_card(c) if mail_allowed(user) else None,storage='cloud' if remote_db.configured() else 'local'),'server_time':time.time()})
             if path == '/api/deliveries':
                 # Próximas Entregas: solo equipos terminados (listos o en espera de retiro) y entregas recientes; nunca órdenes en reparación.
                 if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
@@ -1633,16 +1670,26 @@ class Handler(BaseHTTPRequestHandler):
                     return self.reply(200,new_captcha(c))
                 if path == '/api/login':
                     login, password = str(data.get('login','')).strip(), str(data.get('password',''))
-                    if not login or not password or len(login)>254 or len(password)>256 or ('@' in login and not re.fullmatch(r'[^\s@]+@[^\s@]+\.[^\s@]+',login)):
+                    # Límites: usuario hasta 50 caracteres, correo hasta 254 y contraseña hasta 256 (las existentes no se truncan ni se rechazan).
+                    if not login or not password or len(login)>(LOGIN_EMAIL_MAX if '@' in login else LOGIN_USER_MAX) or len(password)>PASSWORD_LOGIN_MAX or ('@' in login and not re.fullmatch(r'[^\s@]+@[^\s@]+\.[^\s@]+',login)):
                         return self.reply(400,{'error':'Completa un usuario o correo válido y tu contraseña.'})
                     account_hash=digest(login.casefold());ip_hash=digest(self.client_address[0]);ip_key='login-ip:'+ip_hash;user_key='login-user:'+account_hash
+                    # Campo trampa: las personas no lo ven; un envío automatizado que lo rellena se trata como intento fallido, sin dar pistas.
+                    if str(data.get('website','')).strip():
+                        limited(c,ip_key,limit=4,window=auth_policy(c)['lockout_seconds']);auth_event(c,account_hash,ip_hash,'failed');audit(c,None,'login_bot_suspected')
+                        return self.reply(401, {'error':'No pudimos iniciar sesión. Verifica tus credenciales e inténtalo nuevamente.'})
                     blocked_ip=limit_reached(c,ip_key);blocked_user=limit_reached(c,user_key)
                     if blocked_ip or blocked_user:
                         auth_event(c,account_hash,ip_hash,'limited')
                         audit(c,None,'login_rate_limited')
                         return self.reply(429, {'error':'Por seguridad, el acceso está temporalmente limitado. Inténtalo más tarde o recupera tu contraseña.'})
-                    if captcha_mode()=='local' and not verify_captcha(c,str(data.get('bot_token',''))):
-                        return self.reply(403,{'error':'Marca «No soy un robot» para iniciar sesión.','challenge':True})
+                    # Espera progresiva tras fallos consecutivos: el intento no se evalúa ni cuenta hasta que termine.
+                    waiting=login_wait(c,(user_key,ip_key))
+                    if waiting:
+                        return self.reply(429,{'error':'Por seguridad, espera %d segundos antes de volver a intentarlo.'%waiting,'retry_after':waiting})
+                    # Verificación adicional solo cuando hace falta (fallos recientes): prueba de trabajo de un solo uso que el navegador resuelve sin intervención.
+                    if captcha_mode()=='local' and (captcha_always() or login_risky(c,(user_key,ip_key))) and not verify_captcha(c,str(data.get('bot_token',''))):
+                        return self.reply(403,{'error':'Comprobando la seguridad del acceso…','challenge':True,'silent':True})
                     if (bot_always() or bot_required(c,ip_key)) and not verify_bot(str(data.get('bot_token','')),'login'):
                         return self.reply(403,{'error':'Completa la verificación de seguridad. Si falla, puedes esperar o recuperar tu contraseña.','challenge':True,'sitekey':os.getenv('TURNSTILE_SITE_KEY')})
                     row = c.execute('SELECT * FROM users WHERE (username=? OR email=?) AND active=1', (login,login)).fetchone()
@@ -1654,6 +1701,9 @@ class Handler(BaseHTTPRequestHandler):
                             c.execute('UPDATE attempts SET expires=? WHERE bucket=? AND count=5',(int(time.time())+lock_window,key))
                         auth_event(c,account_hash,ip_hash,'failed')
                         audit(c, None, 'login_failed')
+                        for key in (user_key,ip_key):
+                            fails=(c.execute('SELECT count FROM attempts WHERE bucket=?',(key,)).fetchone() or [0])[0]
+                            if fails in LOGIN_WAITS:c.execute('INSERT INTO attempts VALUES (?,0,?) ON CONFLICT(bucket) DO UPDATE SET expires=excluded.expires',('wait:'+key,int(time.time())+LOGIN_WAITS[fails]))
                         if limit_reached(c,user_key) or limit_reached(c,ip_key):
                             auth_event(c,account_hash,ip_hash,'limited')
                             audit(c,None,'login_rate_limited')
@@ -1697,8 +1747,8 @@ class Handler(BaseHTTPRequestHandler):
                         return self.reply(429, {'error':'Demasiados intentos. Intenta más tarde.'})
                     password = str(data.get('password',''))
                     minimum=auth_policy(c)['password_min']
-                    if not minimum <= len(password) <= 256:
-                        return self.reply(400, {'error':f'Usa una contraseña de {minimum} a 256 caracteres.'})
+                    if not minimum <= len(password) <= PASSWORD_MAX:
+                        return self.reply(400, {'error':f'Usa una contraseña de {minimum} a {PASSWORD_MAX} caracteres.'})
                     if 'repeat' in data and password!=data['repeat']:
                         return self.reply(400,{'error':'Las contraseñas no coinciden.'})
                     common_file=os.getenv('PASSWORD_BLOCKLIST_FILE','')
@@ -1901,7 +1951,7 @@ class Handler(BaseHTTPRequestHandler):
                     current=str(data.get('current',''));password=str(data.get('password',''));minimum=auth_policy(c)['password_min']
                     stored=c.execute('SELECT password_hash,email FROM users WHERE id=?',(user['id'],)).fetchone()
                     if not password_ok(current,stored['password_hash']):return self.reply(400,{'error':'Revisa los campos señalados.','fields':{'current':'La contraseña actual no es correcta.'}})
-                    if not minimum<=len(password)<=256:return self.reply(400,{'error':'Revisa los campos señalados.','fields':{'password':f'Usa una contraseña de {minimum} a 256 caracteres.'}})
+                    if not minimum<=len(password)<=PASSWORD_MAX:return self.reply(400,{'error':'Revisa los campos señalados.','fields':{'password':f'Usa una contraseña de {minimum} a {PASSWORD_MAX} caracteres.'}})
                     if password!=str(data.get('repeat','')):return self.reply(400,{'error':'Revisa los campos señalados.','fields':{'repeat':'Las contraseñas no coinciden.'}})
                     if password==current:return self.reply(400,{'error':'Revisa los campos señalados.','fields':{'password':'Elige una contraseña distinta de la actual.'}})
                     common_file=os.getenv('PASSWORD_BLOCKLIST_FILE','')
@@ -2078,8 +2128,12 @@ class Handler(BaseHTTPRequestHandler):
                     return self.reply(status,payload)
                 if path == '/api/logout':
                     c.execute('DELETE FROM sessions WHERE token_hash=?', (digest(token),))
-                    audit(c, user['id'], 'logout')
+                    audit(c, user['id'], 'logout_idle' if data.get('reason')=='idle' else 'logout')
                     return self.reply(200, {'ok':True}, cookie=self.cookie('',0))
+                if path == '/api/session/activity':
+                    # Lo llama el navegador solo tras actividad real (teclado, clics, navegación) o al pulsar «Continuar sesión».
+                    c.execute('UPDATE sessions SET last_activity=? WHERE token_hash=?',(int(time.time()),digest(token)))
+                    return self.reply(200,{'ok':True,'idle_seconds':IDLE_SECONDS,'warning_seconds':IDLE_WARNING})
                 if path=='/api/maintenance/reminders':
                     import maintenance_reminders
                     if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede gestionar los recordatorios.'})

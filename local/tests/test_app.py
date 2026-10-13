@@ -215,7 +215,7 @@ class SecurityTests(unittest.TestCase):
             self.assertEqual(c.execute('SELECT COUNT(*) FROM reset_tokens').fetchone()[0],0)
 
     def test_fifth_failure_starts_full_lock_without_extension(self):
-        with patch.object(app.time,'time',return_value=2000000000):
+        with patch.object(app.time,'time',return_value=2000000000),patch.object(app,'LOGIN_WAITS',{}):
             for _ in range(4):
                 self.assertEqual(self.request('/api/login',{'login':'demo','password':'wrong'})['status'],401)
         with patch.object(app.time,'time',return_value=2000000800):
@@ -261,7 +261,7 @@ class SecurityTests(unittest.TestCase):
         self.assertEqual(self.request('/api/login',{'login':'demo','password':body['password']})['status'],200)
 
     def test_antibot_is_adaptive_and_verified_on_server(self):
-        with patch.dict(app.os.environ,{'TURNSTILE_SITE_KEY':'public-key','TURNSTILE_SECRET_KEY':'private-key','TURNSTILE_LOGIN_MODE':'adaptive'}):
+        with patch.dict(app.os.environ,{'TURNSTILE_SITE_KEY':'public-key','TURNSTILE_SECRET_KEY':'private-key','TURNSTILE_LOGIN_MODE':'adaptive'}),patch.object(app,'LOGIN_WAITS',{}):
             for _ in range(2):self.assertEqual(self.request('/api/login',{'login':'demo','password':'wrong'})['status'],401)
             with patch.object(app,'verify_bot',return_value=False) as verify:
                 result=self.request('/api/login',{'login':'demo','password':'contraseña-segura-de-prueba','bot_token':'forged'})
@@ -290,7 +290,7 @@ class SecurityTests(unittest.TestCase):
         good={'login':'demo','password':'contraseña-segura-de-prueba'}
         self.assertIn('data-captcha=""',self.request('/login')['body'])
         self.assertEqual(self.request('/api/captcha',{})['status'],404)
-        with patch.dict(app.os.environ,{'LOGIN_CAPTCHA':'on'}),patch.object(app,'CAPTCHA_BITS',8):
+        with patch.dict(app.os.environ,{'LOGIN_CAPTCHA':'always'}),patch.object(app,'CAPTCHA_BITS',8):
             self.assertIn('data-captcha="local"',self.request('/login')['body'])
             for token in ('','local:'+'x'*32+':1'):
                 result=self.request('/api/login',dict(good,bot_token=token))

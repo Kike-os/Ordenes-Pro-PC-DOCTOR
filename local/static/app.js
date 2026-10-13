@@ -3,7 +3,7 @@ let csrf = '';
 async function api(path, data) {
   const response = await fetch(path, {method:data === undefined ? 'GET':'POST', credentials:'same-origin',headers:data === undefined ? {}:{'Content-Type':'application/json','X-CSRF-Token':csrf},body:data === undefined ? undefined:JSON.stringify(data)});
   let result;try{result=await response.json();}catch{throw new Error("El servidor devolvió una respuesta no válida (HTTP "+response.status+").");}
-  if (!response.ok) {if(response.status === 401 && document.body.dataset.page === 'dashboard') location.replace('/'); const error=new Error(result.error || 'No se pudo completar la operación.');error.fields=result.fields;error.existing_id=result.existing_id;error.challenge=result.challenge;error.sitekey=result.sitekey;error.status=response.status;error.path=path;error.kind=result.kind;throw error;}
+  if (!response.ok) {if(response.status === 401 && document.body.dataset.page === 'dashboard' && path!=='/api/logout') location.replace('/login?motivo=sesion'); const error=new Error(result.error || 'No se pudo completar la operación.');error.fields=result.fields;error.existing_id=result.existing_id;error.challenge=result.challenge;error.sitekey=result.sitekey;error.silent=result.silent;error.retry_after=result.retry_after;error.status=response.status;error.path=path;error.kind=result.kind;throw error;}
   // La entrega de una orden crea su mantenimiento a seis meses: se avisa en cuanto el servidor lo confirma.
   if(path==='/api/order-status'&&result.maintenance&&typeof toast==='function')setTimeout(()=>toast('Previsto para el '+dashboardDate(result.maintenance.due_date)+'.'+(result.maintenance.appointment?' Cita '+result.maintenance.appointment.public_code+' propuesta para el '+appointmentDateTime(result.maintenance.appointment.starts_at)+', pendiente de confirmación.':' Queda pendiente de confirmar con el cliente.'),'success',{label:'Ver',run:()=>go('maintenance')},{title:result.maintenance.appointment?'Mantenimiento y cita programados':'Próximo mantenimiento programado'}),400);
   return result;
@@ -14,9 +14,12 @@ function formAction(id, action) {const form=document.getElementById(id); if(!for
 function passwordEye(button,show){
  const ns='http://www.w3.org/2000/svg',svg=document.createElementNS(ns,'svg');svg.setAttribute('viewBox','0 0 24 24');svg.setAttribute('fill','none');svg.setAttribute('stroke','currentColor');svg.setAttribute('stroke-width','2');svg.setAttribute('stroke-linecap','round');svg.setAttribute('stroke-linejoin','round');svg.setAttribute('aria-hidden','true');svg.classList.add('icon');
  const paths=show?['m2 2 20 20','M10.58 10.58a2 2 0 0 0 2.84 2.84','M9.88 5.09A10.94 10.94 0 0 1 12 5c7 0 10 7 10 7a13.87 13.87 0 0 1-3.36 4.48','M6.61 6.61A13.53 13.53 0 0 0 2 12s3 7 10 7a10.94 10.94 0 0 0 5.39-1.61']:['M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0'];
- paths.forEach(d=>{const path=document.createElementNS(ns,'path');path.setAttribute('d',d);svg.append(path);});if(!show){const circle=document.createElementNS(ns,'circle');circle.setAttribute('cx','12');circle.setAttribute('cy','12');circle.setAttribute('r','3');svg.append(circle);}button.replaceChildren(svg);button.setAttribute('aria-label',show?'Ocultar contraseña':'Mostrar contraseña');button.setAttribute('aria-pressed',String(show));
+ paths.forEach(d=>{const path=document.createElementNS(ns,'path');path.setAttribute('d',d);svg.append(path);});if(!show){const circle=document.createElementNS(ns,'circle');circle.setAttribute('cx','12');circle.setAttribute('cy','12');circle.setAttribute('r','3');svg.append(circle);}button.replaceChildren(svg);const what=button.classList.contains('reveal-user')?'usuario':'contraseña';button.setAttribute('aria-label',(show?'Ocultar ':'Mostrar ')+what);button.title=(show?'Ocultar ':'Mostrar ')+what;button.setAttribute('aria-pressed',String(show));
 }
-document.querySelectorAll('.reveal').forEach(button=>{passwordEye(button,false);button.addEventListener('click',()=>{const input=document.getElementById(button.getAttribute('aria-controls'));const show=input.type==='password';input.type=show?'text':'password';passwordEye(button,show);});});
+document.querySelectorAll('.reveal').forEach(button=>{passwordEye(button,false);button.addEventListener('click',()=>{const input=document.getElementById(button.getAttribute('aria-controls'));
+ // El usuario se oculta con puntos sin dejar de ser un campo de texto (los gestores de contraseñas lo siguen reconociendo).
+ if(input.dataset.masked!==undefined){const show=input.dataset.masked==='true';input.dataset.masked=String(!show);passwordEye(button,show);return;}
+ const show=input.type==='password';input.type=show?'text':'password';passwordEye(button,show);});});
 // El logotipo se utiliza sin modificar; mientras no exista, se muestra solo texto corporativo.
 document.querySelectorAll('.original-logo').forEach(img=>{img.addEventListener('load',()=>{img.hidden=false;img.parentElement.querySelector('.brand-text').hidden=true;});if(img.complete && img.naturalWidth){img.hidden=false;img.parentElement.querySelector('.brand-text').hidden=true;}});
 function accessError(input,text,valid=false){
@@ -29,7 +32,11 @@ function accessError(input,text,valid=false){
 // verde con formato local válido). Solo valida el formato en el navegador: no consulta al servidor ni afirma que un dato sea correcto.
 const loginGlyphs={typing:'M12 20h9 M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z',filled:'M6 12h.01 M12 12h.01 M18 12h.01',valid:'M5 12.5l4.5 4.5L19 7.5',error:'M12 8v5 M12 16.5h.01 M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z',ok:'M8 12.5l3 3 5-6 M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z'};
 function setLoginState(input,state,text){const box=input.closest('.login-input'),hint=document.getElementById(input.id+'-hint');if(!box)return;box.dataset.state=state;let mark=box.querySelector('.login-state');if(!mark){mark=document.createElement('i');mark.className='login-state';mark.setAttribute('aria-hidden','true');box.append(mark);}mark.replaceChildren();if(loginGlyphs[state])mark.append(systemIcon(loginGlyphs[state]));if(hint&&text!==undefined){hint.textContent=text;hint.dataset.state=state;hint.classList.toggle('valid',state==='valid'||state==='ok');}}
-function paintLoginState(input){const value=input.name==='password'?input.value:input.value.trim(),focused=input.dataset.focused==='true',submitted=input.form.dataset.submitted==='true',invalid=input.getAttribute('aria-invalid')==='true';
+function paintLoginState(input){const value=input.name==='password'?input.value:input.value.trim();
+ if(input.name==='password'&&value.length>=input.maxLength)return setLoginState(input,'typing','Has alcanzado el máximo de '+input.maxLength+' caracteres.');
+ if(input.name==='login'&&!value.includes('@')&&value.length>50)return setLoginState(input,'error','El usuario admite hasta 50 caracteres.');
+ if(input.name==='login'&&value.length>=input.maxLength)return setLoginState(input,'typing','Has alcanzado el máximo de '+input.maxLength+' caracteres.');
+ const focused=input.dataset.focused==='true',submitted=input.form.dataset.submitted==='true',invalid=input.getAttribute('aria-invalid')==='true';
  if(!value)return setLoginState(input,invalid?'error':'idle');
  if(input.name==='password')return setLoginState(input,focused?'typing':'filled',focused?'Escribiendo…':'Contraseña introducida.');
  if(value.includes('@')){if(!invalid)return setLoginState(input,'valid','✓ Formato de correo válido.');if(focused&&!submitted){input.setAttribute('aria-invalid','false');return setLoginState(input,'typing','Completa el correo electrónico.');}return setLoginState(input,'error','Revisa el formato del correo electrónico.');}
@@ -101,9 +108,15 @@ function localCaptcha(form){
   }catch(error){if(current===run){reset();message(form,error.message);}}
  });
 }
+// Prueba de trabajo de un solo uso: la emite el servidor y el navegador la resuelve sin intervención de la persona.
+async function solveLocalCaptcha(){const challenge=await api('/api/captcha',{}),shift=32-challenge.bits;for(let counter=0;;){for(let i=0;i<4000;i++,counter++)if(sha256Word(challenge.nonce+':'+counter)>>>shift===0)return 'local:'+challenge.nonce+':'+counter;await new Promise(resolve=>setTimeout(resolve));}}
+// Espera progresiva tras fallos: cuenta atrás visible; el botón se libera al terminar.
+let loginWaitUntil=0,loginWaitTimer=null;
+const loginWaitLeft=()=>Math.max(0,Math.ceil((loginWaitUntil-Date.now())/1000));
+function loginWaitStart(form,seconds){loginWaitUntil=Date.now()+seconds*1000;clearInterval(loginWaitTimer);const button=form.querySelector('.submit');loginWaitTimer=setInterval(()=>{const left=loginWaitLeft();if(left>0){if(form.getAttribute('aria-busy')!=='true'){button.disabled=true;message(form,'Por seguridad, espera '+left+(left===1?' segundo':' segundos')+' antes de volver a intentarlo.');}}else{clearInterval(loginWaitTimer);button.disabled=false;message(form,'');}},250);}
 let botScript;
 async function showBot(form,sitekey){
- if(form.dataset.captcha==='local'){localCaptcha(form);return;}
+ if(form.dataset.captcha==='local'){if(form.id!=='login-form')localCaptcha(form);return;}
  let container=form.querySelector('.auth-bot');if(!container){container=document.createElement('div');container.className='auth-bot';form.querySelector('.submit').before(container);}
  if(container.dataset.widget){window.turnstile?.reset(container.dataset.widget);return;}
  container.replaceChildren();const target=document.createElement('div');container.append(target);
@@ -114,9 +127,13 @@ async function showBot(form,sitekey){
  }catch(error){message(form,error.message+' Espera e inténtalo más tarde.');}
 }
 async function accessApi(form,path,data){data.bot_token=form.dataset.botToken||'';try{return await api(path,data);}finally{delete form.dataset.botToken;const bot=form.querySelector('.auth-bot'),widget=bot?.dataset.widget;if(widget)window.turnstile?.reset(widget);bot?.resetCaptcha?.();}}
-formAction('login-form',async(form,data)=>{data.login=data.login.trim();data.remember=form.elements.remember.checked;if(form.dataset.captcha==='local'&&!form.dataset.botToken)throw new Error('Marca «No soy un robot» para iniciar sesión.');if(form.dataset.sitekey&&!form.dataset.botToken)throw new Error('Completa la verificación de seguridad para iniciar sesión.');const password=form.elements.password;if(password.type!=='password'){password.type='password';passwordEye(form.querySelector('.reveal'),false);}try{await accessApi(form,'/api/login',data);}catch(error){if(error.status){loginOutcome(form,'error');form.elements.login.setAttribute('aria-invalid','true');password.setAttribute('aria-invalid','true');for(const id of ['login-hint','password-hint'])document.getElementById(id).textContent='';}else error.message='No se pudo conectar con el servidor. Revisa tu conexión e inténtalo de nuevo.';password.focus();password.select();throw error;}
+formAction('login-form',async(form,data)=>{data.login=data.login.trim();data.remember=form.elements.remember.checked;if(form.dataset.sitekey&&!form.dataset.botToken)throw new Error('Completa la verificación de seguridad para iniciar sesión.');const password=form.elements.password;for(const button of form.querySelectorAll('.reveal')){const input=document.getElementById(button.getAttribute('aria-controls'));if(input.dataset.masked==='false'){input.dataset.masked='true';passwordEye(button,false);}else if(input.dataset.masked===undefined&&input.type!=='password'){input.type='password';passwordEye(button,false);}}
+ if(loginWaitLeft()>0)throw new Error('Por seguridad, espera '+loginWaitLeft()+' segundos antes de volver a intentarlo.');
+ try{try{await accessApi(form,'/api/login',data);}catch(error){
+  // Verificación adicional pedida por el servidor (fallos recientes): el navegador la resuelve solo y reintenta una vez.
+  if(!(error.challenge&&error.silent))throw error;message(form,'Comprobando la seguridad del acceso…',true);form.dataset.botToken=await solveLocalCaptcha();data.bot_token='';await accessApi(form,'/api/login',data);}}catch(error){if(error.retry_after)loginWaitStart(form,error.retry_after);if(error.silent)error.challenge=false;if(error.status){loginOutcome(form,'error');form.elements.login.setAttribute('aria-invalid','true');password.setAttribute('aria-invalid','true');for(const id of ['login-hint','password-hint'])document.getElementById(id).textContent='';}else error.message='No se pudo conectar con el servidor. Revisa tu conexión e inténtalo de nuevo.';password.focus();password.select();throw error;}
  loginOutcome(form,'ok');message(form,'Acceso confirmado. Entrando…',true);form.querySelector('.submit').textContent='Acceso confirmado';await new Promise(resolve=>setTimeout(resolve,matchMedia('(prefers-reduced-motion:reduce)').matches?120:480));location.assign(/^\/orders\/[^/]{1,80}$/.test(location.pathname)?location.pathname:'/');});
-{const form=document.getElementById('login-form');if(form?.dataset.sitekey||form?.dataset.captcha==='local')showBot(form,form.dataset.sitekey);if(form){form.addEventListener('focus',event=>{if(event.target.matches?.('#login,#password')){event.target.dataset.focused='true';paintLoginState(event.target);}},true);form.addEventListener('blur',event=>{if(event.target.matches?.('#login,#password')){event.target.dataset.focused='false';if(event.target.id==='password')paintLoginState(event.target);}},true);for(const input of [form.elements.login,form.elements.password]){input.dataset.focused=String(document.activeElement===input);setLoginState(input,'idle');}}}
+{const form=document.getElementById('login-form');if(form?.dataset.sitekey)showBot(form,form.dataset.sitekey);if(form){{const why=new URLSearchParams(location.search).get('motivo'),notice=document.getElementById('login-notice');if(why==='inactividad'||why==='sesion'){notice.textContent=why==='inactividad'?'Tu sesión se cerró por inactividad. Inicia sesión de nuevo para continuar.':'Tu sesión terminó. Inicia sesión de nuevo para continuar.';notice.hidden=false;history.replaceState(null,'',location.pathname);}}form.addEventListener('focus',event=>{if(event.target.matches?.('#login,#password')){event.target.dataset.focused='true';paintLoginState(event.target);}},true);form.addEventListener('blur',event=>{if(event.target.matches?.('#login,#password')){event.target.dataset.focused='false';if(event.target.id==='password')paintLoginState(event.target);}},true);for(const input of [form.elements.login,form.elements.password]){input.dataset.focused=String(document.activeElement===input);setLoginState(input,'idle');}}}
 formAction('register-form',async(form,data)=>{if(form.dataset.captcha==='local'&&!form.dataset.botToken)throw new Error('Marca «No soy un robot» para enviar la solicitud.');for(const key of ['name','username','email','phone','identification','job_title'])data[key]=data[key].trim();try{const result=await accessApi(form,'/api/register',data);form.reset();form.querySelectorAll('.register-grid,.register-note,.auth-bot,.submit').forEach(node=>node.hidden=true);message(form,result.message,true);}catch(error){for(const[key,text]of Object.entries(error.fields||{})){const input=form.elements[key];if(input)accessError(input,text);}form.querySelector('[aria-invalid=true]')?.focus();throw error;}});
 {const form=document.getElementById('register-form');if(form){if(form.dataset.sitekey||form.dataset.captcha==='local')showBot(form,form.dataset.sitekey);form.elements.password.addEventListener('input',()=>{if(form.elements.repeat.value)checkAccessField(form.elements.repeat);});}}
 formAction('forgot-form',async(form,data)=>{data.email=data.email.trim();const result=await accessApi(form,'/api/forgot',data);message(form,result.message,true);});
@@ -317,8 +334,39 @@ function openProfilePhoto(){
 function identity(){ $('user-name').textContent=currentUser.name;$('user-role').textContent=admin()?'Administrador':'Técnico';$('account-name').textContent=currentUser.name;$('account-role').textContent=$('user-role').textContent;paintAvatar(document.querySelector('.avatar'));profilePhotoEntry();document.querySelector('[data-nav=mail]').hidden=!currentUser.mail;document.querySelector('[data-nav=live]').hidden=!admin();document.querySelector('[data-nav=adi]').hidden=!admin();$('assistance-menu').hidden=!admin(); }
 function routeState(){const [name,query='']=location.hash.slice(1).split('?');return {name:moduleInfo[name]?name:'home',params:new URLSearchParams(query)};}
 function go(name,params=new URLSearchParams()){if(location.pathname!=='/')history.replaceState(null,'','/'+location.hash);location.hash=name+(params.size?'?'+params.toString():'');}
+// Cierre por inactividad. Solo cuenta la actividad real de la persona (teclado, clics, toques, rueda, navegación); el carrusel, las
+// animaciones y las consultas automáticas no la renuevan. Dos minutos antes se avisa con cuenta atrás; al cumplirse el tiempo la sesión
+// se invalida en el servidor y se vuelve al acceso. El servidor aplica el mismo límite aunque el navegador no ejecute este código.
+function initIdleLogout(idle){
+ if(!idle||!idle.seconds)return;const limit=idle.seconds*1000,warn=(idle.seconds-idle.warning)*1000,key='ordenes-pro:actividad';
+ let last=Date.now(),pinged=Date.now(),dialog=null,count=null,ending=false;
+ const ping=()=>api('/api/session/activity',{}).then(()=>{pinged=Date.now();return true;});
+ const share=()=>{try{localStorage.setItem(key,String(last));}catch{}};
+ const active=event=>{if(!event.isTrusted||dialog||ending)return;last=Date.now();share();if(last-pinged>60000){pinged=last;ping().catch(()=>{});}};
+ for(const type of ['keydown','pointerdown','touchstart','wheel','input','change'])addEventListener(type,active,{capture:true,passive:true});addEventListener('hashchange',event=>active(event));
+ // Varias pestañas abiertas comparten la actividad: trabajar en una evita que otra cierre la sesión.
+ addEventListener('storage',event=>{if(event.key===key&&event.newValue&&!ending){const other=+event.newValue;if(other>last){last=other;if(dialog)closeWarning();}}});
+ const clock=ms=>{const total=Math.max(0,Math.ceil(ms/1000));return String(Math.floor(total/60)).padStart(2,'0')+':'+String(total%60).padStart(2,'0');};
+ function closeWarning(){if(dialog){dialog.close();dialog.remove();dialog=null;count=null;}}
+ async function finish(reason){if(ending)return;ending=true;
+  // Lo escrito en una recepción abierta se guarda como borrador antes de salir, para no perder trabajo.
+  try{if($('order-dialog')?.open&&typeof saveOrderDraft==='function')await Promise.race([saveOrderDraft({silent:true,force:true}),new Promise(resolve=>setTimeout(resolve,2500))]);}catch{}
+  try{await api('/api/logout',{reason});}catch{}
+  location.replace(reason==='idle'?'/login?motivo=inactividad':'/login');}
+ function showWarning(){
+  dialog=el('dialog',undefined,'idle-dialog');dialog.setAttribute('aria-labelledby','idle-title');dialog.setAttribute('aria-describedby','idle-text');
+  const icon=el('span',undefined,'idle-icon'),title=el('h2','Tu sesión está por finalizar'),text=el('p','Por seguridad, tu sesión se cerrará automáticamente en:'),unit=el('small','minutos'),actions=el('div',undefined,'idle-actions');
+  icon.append(systemIcon('M7 11V8a5 5 0 0 1 10 0v3 M6 11h12a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-8a1 1 0 0 1 1-1z M12 15v2'));icon.setAttribute('aria-hidden','true');title.id='idle-title';text.id='idle-text';
+  count=el('strong',clock(limit-(Date.now()-last)),'idle-count');count.setAttribute('role','timer');count.setAttribute('aria-live','off');const time=el('div',undefined,'idle-time');time.append(count,unit);
+  const stay=button('Continuar sesión',async()=>{stay.disabled=true;try{await ping();last=Date.now();share();closeWarning();}catch{finish('idle');}},'primary'),leave=button('Cerrar sesión ahora',()=>finish('manual'),'secondary');
+  actions.append(leave,stay);dialog.append(icon,title,text,time,actions);dialog.addEventListener('cancel',event=>event.preventDefault());document.body.append(dialog);dialog.showModal();stay.focus();}
+ setInterval(()=>{if(ending)return;const idleFor=Date.now()-last;if(idleFor>=limit){finish('idle');return;}if(idleFor>=warn){if(!dialog)showWarning();else if(count)count.textContent=clock(limit-idleFor);}},500);
+ // Al volver con «Atrás» desde otra página no se muestra una copia guardada: se recarga y, sin sesión, se vuelve al acceso.
+ addEventListener('pageshow',event=>{if(event.persisted)location.reload();});
+ share();ping().catch(()=>{});
+}
 async function dashboard(){
- const {user,server_time}=await api('/api/me');currentUser=user;csrf=user.csrf;identity();initHeaderNavigation();initHeader(server_time);initNotifications();initReleaseChip();initAutoUpdate();setTimeout(()=>runSystemCheck(false),1500);
+ const {user,server_time,idle}=await api('/api/me');currentUser=user;csrf=user.csrf;initIdleLogout(idle);identity();initHeaderNavigation();initHeader(server_time);initNotifications();initReleaseChip();initAutoUpdate();setTimeout(()=>runSystemCheck(false),1500);
  {// Fecha del día: día de la semana destacado y fecha en minúsculas correctas («11 de octubre de 2026»).
   const now=new Date(),zone={timeZone:'America/Guayaquil'},weekday=new Intl.DateTimeFormat('es-EC',{...zone,weekday:'long'}).format(now),date=new Intl.DateTimeFormat('es-EC',{...zone,day:'numeric',month:'long',year:'numeric'}).format(now),today=$('today');
   today.dateTime=new Intl.DateTimeFormat('en-CA',zone).format(now);today.replaceChildren(systemIcon('M8 2v4 M16 2v4 M3 10h18 M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z'),el('strong',weekday.charAt(0).toUpperCase()+weekday.slice(1)),el('span',date));today.setAttribute('aria-label','Hoy es '+weekday+', '+date);}
