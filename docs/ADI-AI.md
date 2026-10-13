@@ -233,3 +233,9 @@ En «Agendamiento de Citas Técnicas», el campo «Nombre y apellidos» tiene un
 - Siempre aplica el arreglo local (`tidy_name`): espacios duplicados y mayúsculas iniciales, con «de», «del», «la»… en minúscula. Si hay proveedor de IA y la redacción de ADI está activada, pide además tildes y letras dudosas. La respuesta de la IA solo se acepta si es un retoque (mismas palabras, mismo orden; tildes, mayúsculas o una o dos letras en palabras largas); cualquier otra cosa se descarta. Si la IA falla, queda el arreglo local: la reserva nunca depende de ella.
 - El nombre **nunca cambia solo**. El panel «Sugerencia de ADI» muestra el texto original y el sugerido, con «Aplicar sugerencia» y «Conservar original»; Escape o seguir escribiendo lo cierran sin cambios. Si no hay nada que corregir, lo indica y recuerda comprobar el nombre con el documento de identificación.
 - Al pulsar el botón, el nombre escrito viaja al proveedor de IA configurado en el servidor (solo ese texto). Sin pulsarlo no se envía nada.
+
+## Ventana flotante de ADI: distribución interna (13/10/2026)
+
+Solo diseño; no cambian funciones, enlaces, voz, esfera ni colores. Los cuatro accesos rápidos van en cuadrícula de 2×2 con botones iguales y 8 px de separación; el campo de mensaje, el micrófono y Enviar miden 44 px y se alinean por la base cuando el texto crece; «Contactar soporte técnico» y «Consultar reparación» ocupan dos columnas iguales; los controles del encabezado miden 32 px. Todos los bloques usan 14 px de margen interior. En pantallas pequeñas la ventana usa el ancho disponible y solo se desplaza el área de mensajes.
+
+Causa de los márgenes desiguales: la regla genérica `.adi-panel{padding:10px 12px}` del asistente de redacción también afectaba a esta ventana. Los componentes nuevos de ADI usan prefijos propios (`name-adi-…`) para no compartir clases; una prueba comprueba que cada página conserva `class="adi-panel" id="adi-panel"`.

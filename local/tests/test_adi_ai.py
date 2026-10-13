@@ -157,6 +157,14 @@ class AdiNameTests(unittest.TestCase):
             with app.connect() as c:c.execute("INSERT INTO system_state(key,value) VALUES ('adi_writing','off') ON CONFLICT(key) DO UPDATE SET value='off'");c.commit()
             with patch.object(adi_ai,'_post',side_effect=AssertionError('no debe consultar')):self.assertEqual(self.ask('juan perez')['body']['source'],'local')
 
+    def test_public_pages_keep_the_adi_window_markup(self):
+        # La ventana flotante de ADI y el panel de sugerencias del nombre son componentes distintos: cada uno conserva su clase.
+        from pathlib import Path
+        for name in ('appointments.html','login.html','dashboard.html'):
+            self.assertIn('<div class="adi-panel" id="adi-panel"',(Path(app.ROOT)/'templates'/name).read_text(encoding='utf-8'),name)
+        page=(Path(app.ROOT)/'templates'/'appointments.html').read_text(encoding='utf-8')
+        self.assertIn('id="booking-adi-panel" class="name-adi-panel"',page);self.assertIn('id="booking-adi" class="name-adi-chip"',page)
+
     def test_it_is_rate_limited_and_stores_nothing(self):
         with patch.dict(app.os.environ,{'ANTHROPIC_API_KEY':'','OPENAI_API_KEY':'','OPEN_API_KEY':''}):
             with app.connect() as c:before={t:c.execute('SELECT COUNT(*) FROM '+t).fetchone()[0] for t in ('clients','appointments','audit','adi_messages')}

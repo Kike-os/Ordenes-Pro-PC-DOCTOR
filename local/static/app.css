@@ -1921,6 +1921,7 @@ body[data-page=dashboard] .ai-ask textarea:focus{outline:none;border:0;box-shado
 @media(max-width:980px){.ai-shell{grid-template-columns:minmax(0,1fr);height:auto}.ai-side{display:contents}.ai-chat{order:1;height:var(--ai-h,560px)}.ai-status{order:2}.ai-history{order:3}.ai-tiles{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:700px){.ai-suggest{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:560px){.ai-tiles{gap:6px}.ai-tile>.system-icon{display:none}.ai-tile strong{font-size:18px}.ai-tile small{font-size:10.5px}.ai-status{padding:14px 12px}.ai-prefs{grid-template-columns:1fr;max-height:45%;overflow-y:auto}.ai-bubble{max-width:94%}.ai-chat-head{padding:9px 10px;gap:8px}.ai-log{padding:12px}.ai-ask{margin:0 8px 8px}.ai-hint{display:none}.ai-ask-bar{justify-content:space-between}.ai-count{margin-left:auto}.ai-orb{flex-basis:38px;width:38px;height:38px}}
+@media(max-height:560px){#adi-widget.adi-v2 .adi-panel,body[data-page=dashboard] #adi-widget.adi-v2 .adi-panel{max-height:calc(100dvh - 80px)}#adi-widget.adi-v2 .adi-panel>header{padding-top:8px;padding-bottom:8px}}
 @media(max-height:620px){body[data-page=dashboard] .ai-ask textarea{min-height:58px;padding-top:10px}.ai-welcome p{display:none}}
 @media(max-width:360px){.ai-suggest{grid-template-columns:1fr}.ai-tile{padding:8px 7px}}
 /* En este módulo ya se conversa con Adi: el lanzador flotante no debe tapar el campo de mensaje. */
@@ -6084,7 +6085,7 @@ body[data-page=appointments] .appointment-error:not(:empty)::before{content:'!';
 #module-content .equip-tab.equip-card :is(small,em){margin:0}
 /* ADI en el nombre de la reserva pública: botón compacto en la línea de la etiqueta (no cambia la altura del formulario) y panel
    flotante con la propuesta. El nombre solo cambia si el cliente la aplica. */
-.adi-name{position:relative;min-width:0}
+.name-adi-field{position:relative;min-width:0}
 .name-adi-chip{position:absolute;top:-4px;right:0;display:inline-flex;align-items:center;gap:5px;height:26px;min-height:0;margin:0;padding:0 10px 0 8px;border:1px solid #ff9ecb59;border-radius:999px;background:#17203f;color:#e3eeff;font:inherit;font-size:11.5px;font-weight:700;letter-spacing:.03em;line-height:1;cursor:pointer;box-shadow:none;transition:background-color .17s ease,border-color .17s ease,box-shadow .17s ease}
 .name-adi-chip svg{flex:none;width:14px;height:14px;color:#ff9ecb}
 @media(hover:hover){.name-adi-chip:hover{border-color:#ff9ecb;background:#1d2850}}
@@ -6108,3 +6109,33 @@ body[data-page=appointments] input.adi-glow{border-color:#ff9ecb;box-shadow:0 0 
 @keyframes name-adi-spark{0%{transform:scale(.6) rotate(-25deg)}55%{transform:scale(1.35) rotate(12deg);filter:drop-shadow(0 0 5px #ff9ecb)}100%{transform:none}}
 @keyframes name-adi-in{from{opacity:0;transform:translateY(-4px)}}
 @media(prefers-reduced-motion:reduce){.name-adi-chip,.name-adi-chip svg,.name-adi-panel,body[data-page=appointments] input.adi-glow,.name-adi-panel-actions button{animation:none!important;transition:none}}
+/* ===== Ventana de ADI: distribución interna, márgenes y alineación. Solo diseño: mismas funciones, enlaces, esfera y colores. ===== */
+#adi-widget.adi-v2 .adi-panel,#adi-widget.adi-v2 .adi-panel *{box-sizing:border-box}
+/* El relleno genérico de «.adi-panel» (pensado para el asistente de redacción) descuadraba los márgenes de esta ventana. */
+#adi-widget.adi-v2 .adi-panel{overflow:hidden;padding:0}
+#adi-widget.adi-v2 .adi-panel>header{gap:6px;padding:12px 14px;align-items:center}
+#adi-widget.adi-v2 .adi-panel>header>div:not(.adi-menu){min-width:0}
+#adi-widget.adi-v2 .adi-panel>header>button{flex:0 0 32px;width:32px;min-width:32px;height:32px;min-height:32px;margin:0;border-radius:9px}
+#adi-widget.adi-v2 .adi-messages{flex:1 1 auto;min-height:88px;padding:14px;overflow-x:hidden;overflow-wrap:anywhere}
+/* Accesos rápidos: dos columnas y dos filas, botones iguales con el texto centrado y 8 px de separación. */
+#adi-widget.adi-v2 .adi-quick,body[data-page=login] #adi-widget.adi-docked .adi-quick{flex:0 0 auto;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:10px 14px 0;overflow:visible}
+#adi-widget.adi-v2 .adi-quick[hidden]{display:none}
+#adi-widget.adi-v2 .adi-quick button{display:flex;align-items:center;justify-content:center;width:100%;min-width:0;min-height:36px;margin:0;padding:6px 10px;border-radius:10px;font-size:12.5px;line-height:1.2;text-align:center;white-space:normal;overflow-wrap:anywhere}
+#adi-widget.adi-v2 .adi-quick button:focus-visible{outline:2px solid #ffb3d4;outline-offset:2px}
+/* Campo de mensaje, micrófono y Enviar: misma altura y alineados por la base cuando el texto crece. */
+#adi-widget.adi-v2 .adi-panel form#adi-form{align-items:flex-end;gap:8px;padding:10px 14px}
+#adi-widget.adi-v2 #adi-form textarea{flex:1 1 auto;min-width:0;min-height:44px;margin:0}
+#adi-widget.adi-v2 #adi-form .adi-mic,#adi-widget.adi-v2 #adi-form .adi-stop{flex:0 0 44px;width:44px;height:44px;margin:0}
+#adi-widget.adi-v2 #adi-form button[type=submit]{flex:0 0 44px;width:44px;height:44px;margin:0}
+/* Accesos inferiores en dos columnas equilibradas (una sola si solo hay un acceso visible). */
+#adi-widget.adi-v2 .adi-foot{flex:0 0 auto;display:grid;grid-template-columns:repeat(auto-fit,minmax(104px,1fr));gap:8px;padding:0 14px 12px}
+#adi-widget.adi-v2 .adi-foot>*,#adi-widget.adi-v2 .adi-foot .adi-human{display:flex;align-items:center;justify-content:center;width:100%;min-width:0;min-height:36px;margin:0;padding:6px 8px;border:1px solid #24344f;border-radius:10px;background:#0d192c;font-size:12px;line-height:1.2;text-align:center;text-decoration:none;overflow-wrap:anywhere}
+#adi-widget.adi-v2 .adi-foot>[hidden]{display:none}
+@media(hover:hover){#adi-widget.adi-v2 .adi-foot>*:hover:not(:disabled){border-color:#ff9ecb80;background:#12233d;text-decoration:none}}
+#adi-widget.adi-v2 .adi-foot>*:focus-visible{outline:2px solid #ffb3d4;outline-offset:2px}
+/* Pantallas pequeñas: la ventana usa el ancho disponible y solo se desplaza el área de mensajes. */
+@media(max-width:480px){#adi-widget.adi-v2 .adi-panel{width:calc(100vw - 24px);max-width:calc(100vw - 24px)}}
+@media(max-height:560px){#adi-widget.adi-v2 .adi-panel,body[data-page=dashboard] #adi-widget.adi-v2 .adi-panel{max-height:calc(100dvh - 80px)}#adi-widget.adi-v2 .adi-panel>header{padding-top:8px;padding-bottom:8px}}
+@media(max-height:620px){#adi-widget.adi-v2 .adi-quick{gap:6px;padding-top:8px}#adi-widget.adi-v2 .adi-quick button,#adi-widget.adi-v2 .adi-foot>*,#adi-widget.adi-v2 .adi-foot .adi-human{min-height:32px}#adi-widget.adi-v2 .adi-messages{min-height:64px}}
+#adi-widget.adi-v2 #adi-input::placeholder{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media(max-width:360px){#adi-widget.adi-v2 .adi-panel>header strong{font-size:12.5px}#adi-widget.adi-v2 .adi-panel>header{gap:4px;padding-left:12px;padding-right:12px}#adi-widget.adi-v2 .adi-panel>header .adi-avatar{flex-basis:34px;width:34px;height:34px}}
