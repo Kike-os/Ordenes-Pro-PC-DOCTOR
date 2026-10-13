@@ -1531,7 +1531,20 @@ class Handler(BaseHTTPRequestHandler):
             if path == '/api/catalog':
                 if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
                 query=parse_qs(urlsplit(self.path).query)
-                return self.reply(200,{'rows':quotes.catalog(c,query.get('q',[''])[0][:80],query.get('all',[''])[0]!='1'),'categories':quotes.CATEGORIES,'tax_rate_bp':quotes.tax_rate(c),'can_edit':user['role']=='administrador'})
+                category=query.get('category',[''])[0]
+                logos={f.stem:f.name for f in sorted((ROOT/'static'/'brands').glob('*')) if f.suffix in ('.svg','.png') and re.fullmatch(r'[a-z0-9]+(?:-[a-z0-9]+)*',f.stem)}
+                names={name.lower() for name,*_ in quotes.INITIAL};present={r['name'].lower() for r in c.execute('SELECT name FROM catalog_items')}
+                return self.reply(200,{'rows':quotes.catalog(c,query.get('q',[''])[0][:80],query.get('all',[''])[0]!='1',category if category in quotes.CATEGORIES else ''),'categories':quotes.CATEGORIES,'price_modes':quotes.PRICE_MODES,
+                    'tax_rate_bp':quotes.tax_rate(c),'can_edit':user['role']=='administrador','brand_logos':logos,'initial_missing':len(names-present)})
+            catalog_extra=re.fullmatch(r'/api/catalog/([0-9]{1,9})/(image|history)',path)
+            if catalog_extra:
+                if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
+                if catalog_extra[2]=='history':
+                    if user['role']!='administrador':return self.reply(403,{'error':'Solo administración consulta el historial de precios.'})
+                    return self.reply(200,{'rows':quotes.price_history(c,int(catalog_extra[1]))})
+                picture=c.execute('SELECT mime,data FROM catalog_images WHERE item_id=?',(int(catalog_extra[1]),)).fetchone()
+                if not picture:return self.reply(404,{'error':'Sin imagen.'})
+                return self.reply(200,bytes(picture['data']),picture['mime'])
             quote_get=re.fullmatch(r'/api/(?:orders/([0-9]+)/quote|quotes/([0-9]+)(/pdf)?)',path)
             if quote_get:
                 if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
@@ -1690,7 +1703,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(403, {'error':'Solicitud no autorizada.'})
             path = urlsplit(self.path).path
             workspace_post=bool(re.fullmatch(r'/api/orders/[0-9]+/workspace',path));quote_json=bool(re.fullmatch(r'/api/quotes/[0-9]+',path))
-            max_body=9000000 if path in ('/api/clients/import/preview','/api/clients/import/commit') else 6000000 if path in ('/api/mail/send','/api/mail/draft') else 100000 if path in ('/api/conditions','/api/order-draft','/api/conditions/draft','/api/conditions/compare') else 900000 if re.fullmatch(r'/api/orders/[0-9]+/photos',path) or path=='/api/profile/photo' else (65536 if workspace_post or quote_json else 16384)
+            max_body=9000000 if path in ('/api/clients/import/preview','/api/clients/import/commit') else 6000000 if path in ('/api/mail/send','/api/mail/draft') else 100000 if path in ('/api/conditions','/api/order-draft','/api/conditions/draft','/api/conditions/compare') else 900000 if re.fullmatch(r'/api/orders/[0-9]+/photos',path) or path=='/api/profile/photo' or re.fullmatch(r'/api/catalog/[0-9]+/image',path) else (65536 if workspace_post or quote_json else 16384)
             length = int(self.headers.get('Content-Length', '0'))
             if length <= 0 or length > max_body:
                 return self.reply(400, {'error':'Solicitud inválida.'})
@@ -2354,6 +2367,21 @@ class Handler(BaseHTTPRequestHandler):
                     c.execute('UPDATE orders SET updated_at=?,revision=revision+1 WHERE id=?',(now.isoformat(timespec='microseconds'),oid))
                     audit(c,user['id'],'order_follow_up',oid)
                     return self.reply(201,{'ok':True})
+                catalog_image=re.fullmatch(r'/api/catalog/([0-9]{1,9})/image',path)
+                if path=='/api/catalog/seed' or catalog_image:
+                    if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede modificar el catálogo.'})
+                    try:
+                        if catalog_image:
+                            if data.get('action')=='delete':
+                                c.execute('DELETE FROM catalog_images WHERE item_id=?',(int(catalog_image[1]),));audit(c,user['id'],'catalog_image_removed',int(catalog_image[1]));return self.reply(200,{'ok':True,'image':''})
+                            try:content=base64.b64decode(str(data.get('data','')),validate=True)
+                            except Exception:return self.reply(400,{'error':'La imagen no se pudo leer.'})
+                            stamp=quotes.save_image(c,int(catalog_image[1]),content,user,reception_now());audit(c,user['id'],'catalog_image_saved',int(catalog_image[1]))
+                            return self.reply(200,{'ok':True,'image':stamp})
+                        # Catálogo inicial entregado por la administración: se registra una sola vez; lo que ya existe no se duplica ni se modifica.
+                        result=quotes.seed_initial(c,user,reception_now());audit(c,user['id'],'catalog_seeded')
+                        return self.reply(200,dict(result,ok=True))
+                    except quotes.QuoteError as error:return self.reply(error.status,{'error':str(error),'fields':error.fields})
                 if path in ('/api/catalog','/api/catalog/tax'):
                     # Catálogo de servicios y productos: solo administración. Cambiar un precio no altera los presupuestos ya emitidos.
                     if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede modificar el catálogo.'})

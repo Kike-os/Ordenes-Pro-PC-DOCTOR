@@ -135,3 +135,77 @@ class QuoteFlowTests(unittest.TestCase):
 
 
 if __name__=='__main__':unittest.main()
+
+
+class CatalogProTests(unittest.TestCase):
+    """Catálogo profesional: códigos, modos de precio, historial, imágenes, catálogo inicial sin duplicados y descuentos autorizados."""
+    setUpClass=classmethod(test_app.SecurityTests.setUpClass.__func__);setUp=test_app.SecurityTests.setUp;tearDown=test_app.SecurityTests.tearDown;request=test_app.SecurityTests.request;login=test_app.SecurityTests.login;order_data=test_app.SecurityTests.order_data
+
+    def test_price_modes_codes_history_images_and_initial_catalog(self):
+        cookie,csrf=self.login();post=lambda path,**body:self.request(path,body,cookie=cookie,csrf=csrf)
+        self.assertEqual((quotes.price_from(3000,'incluido',1500),quotes.price_from(3000,'agregar',1500),quotes.price_from(3000,'sin_iva',1500)),((3000,1),(3450,1),(3000,0)))
+        a=post('/api/catalog',name='Servicio con IVA incluido',category='servicio',price='30',price_mode='incluido',brand='Marca Ficticia')['body']['id']
+        b=post('/api/catalog',name='Servicio con IVA agregado',category='servicio',price='30',price_mode='agregar')['body']['id']
+        cc=post('/api/catalog',name='Producto sin IVA',category='otro',price='30',price_mode='sin_iva',license_term='1 año',devices='2 dispositivos')['body']['id']
+        rows={r['id']:r for r in self.request('/api/catalog?all=1',cookie=cookie)['body']['rows']}
+        self.assertEqual([(rows[i]['code'],rows[i]['price_cents'],rows[i]['entered_cents'],rows[i]['taxed']) for i in (a,b,cc)],[('PS-%04d'%a,3000,3000,1),('PS-%04d'%b,3450,3000,1),('PS-%04d'%cc,3000,3000,0)])
+        self.assertEqual((rows[cc]['license_term'],rows[cc]['devices'],rows[a]['brand']),('1 año','2 dispositivos','Marca Ficticia'))
+        # Sin productos duplicados: mismo nombre (sin distinguir mayúsculas) se rechaza.
+        dup=post('/api/catalog',name='servicio con iva incluido',category='servicio',price='1');self.assertEqual(dup['status'],400);self.assertIn('Ya existe',dup['body']['error'])
+        self.assertEqual(post('/api/catalog',name='Otro',category='servicio',price='1',price_mode='raro')['status'],400)
+        # Historial de precios: solo cuando el precio final cambia.
+        post('/api/catalog',id=str(a),name='Servicio con IVA incluido',category='servicio',price='30',price_mode='incluido',brand='Otra marca')
+        post('/api/catalog',id=str(a),name='Servicio con IVA incluido',category='servicio',price='35.50',price_mode='incluido')
+        history=self.request('/api/catalog/%d/history'%a,cookie=cookie)['body']['rows'];self.assertEqual([(h['old_cents'],h['new_cents'],h['actor']) for h in history],[(3000,3550,'Persona de prueba')])
+        with app.connect() as c:
+            with self.assertRaises(Exception):c.execute('DELETE FROM catalog_price_history')
+        # Imagen: solo imágenes reales y de tamaño acotado.
+        import base64
+        png=base64.b64encode(b'\x89PNG\r\n\x1a\n'+b'\x00'*120).decode()
+        self.assertEqual(self.request('/api/catalog/%d/image'%a,cookie=cookie)['status'],404)
+        self.assertEqual(post('/api/catalog/%d/image'%a,data=base64.b64encode(b'<svg onload=alert(1)>').decode())['status'],400)
+        self.assertTrue(post('/api/catalog/%d/image'%a,data=png)['body']['image']);self.assertEqual(self.request('/api/catalog/%d/image'%a,cookie=cookie)['body'][:4],b'\x89PNG')
+        self.assertEqual(post('/api/catalog/%d/image'%a,action='delete')['status'],200);self.assertEqual(self.request('/api/catalog/%d/image'%a,cookie=cookie)['status'],404)
+        # Catálogo inicial: 19 elementos, una sola vez, con sus precios finales tal cual.
+        listing=self.request('/api/catalog',cookie=cookie)['body'];self.assertEqual(listing['initial_missing'],19)
+        first=post('/api/catalog/seed')['body'];again=post('/api/catalog/seed')['body']
+        self.assertEqual(((first['created'],first['existing']),(again['created'],again['existing'])),((19,0),(0,19)))
+        seeded={r['name']:r for r in self.request('/api/catalog?all=1',cookie=cookie)['body']['rows']}
+        self.assertEqual(len(seeded),22);self.assertEqual(self.request('/api/catalog',cookie=cookie)['body']['initial_missing'],0)
+        expected={'Programación o flasheo de BIOS corrupta – PlayStation 5':15000,'Mantenimiento parcial – PlayStation 5':5500,'Cambio profesional de metal líquido – PlayStation 5':18900,'Tanque o caja de mantenimiento para impresora Epson':6856,
+                  'Microsoft Office Pro Plus 2024 + Windows 11 Pro':18999,'Microsoft Office 365 Pro Plus – 5 dispositivos':15500,'Microsoft Office 2024 Estándar':8599,'Microsoft Office Professional Plus 2021':7999,'Microsoft Office Professional Plus 2024':9999,
+                  'Windows 11 Pro – Licencia empresarial':16500,'Chequeo y diagnóstico profesional de memoria RAM':1800,'Windows 11 Home ES – Licencia':6999,'Windows 11 Pro – Actualización':11299,'Kaspersky Standard – Licencia Antivirus de 1 Año':3000,
+                  'Kaspersky Standard – Licencia Antivirus de Duración Ilimitada, 1 dispositivo':12500,'McAfee Plus – Licencia Antivirus, 1 dispositivo, 1 año':2500,'Defender Plus – Licencia Antivirus, 1 año':4500,'Norton 360 Estándar – Licencia Antivirus, 1 dispositivo, 1 año':4500,'ESET NOD32 Antivirus – Licencia de 1 Año':4000}
+        self.assertEqual({name:seeded[name]['price_cents'] for name in expected},expected)
+        self.assertTrue(all(seeded[name]['price_mode']=='incluido' and seeded[name]['taxed']==1 and seeded[name]['entered_cents']==price for name,price in expected.items()))
+        self.assertEqual(self.request('/api/catalog?category=seguridad',cookie=cookie)['body']['rows'][0]['category'],'seguridad');self.assertEqual(len(self.request('/api/catalog?q=kaspersky',cookie=cookie)['body']['rows']),2)
+        with app.connect() as c:c.execute("UPDATE users SET role='tecnico' WHERE username='demo'");c.commit()
+        for path in ('/api/catalog/seed','/api/catalog/%d/image'%a):self.assertEqual(post(path,data=png)['status'],403)
+        self.assertEqual(self.request('/api/catalog/%d/history'%a,cookie=cookie)['status'],403)
+
+    def test_authorized_discount_is_admin_only_and_limited(self):
+        cookie,csrf=self.login();post=lambda path,**body:self.request(path,body,cookie=cookie,csrf=csrf)
+        order=self.request('/api/orders',self.order_data({'email':'cliente@example.invalid','request_key':'quote-discount-request-0001'}),cookie=cookie,csrf=csrf)['body']
+        quote=post('/api/orders/%d/quote'%order['id'])['body']['id']
+        items=[{'description':'Servicio de cien','category':'servicio','quantity':1,'unit_cents':10000,'taxed':True},{'description':'Producto sin IVA','category':'otro','quantity':3,'unit_cents':3333,'taxed':False}]
+        self.assertEqual(quotes.net(10000,500),9500);self.assertEqual(quotes.net(9999,300),9699);self.assertEqual(quotes.net(1,500),1)
+        for bad in ('1000','250','-300','abc'):self.assertEqual(post('/api/quotes/%d'%quote,action='save',items=items,discount=bad)['status'],400)
+        saved=post('/api/quotes/%d'%quote,action='save',items=items,discount='500')['body']['quote'];t=saved['totals']
+        self.assertEqual((saved['discount_bp'],t['gross'],t['discount'],t['quoted']),(500,19999,1000,18999))
+        self.assertEqual(t['base_taxed']+t['base_zero']+t['tax'],t['quoted']);self.assertEqual([i['net_cents'] for i in saved['items']],[9500,9499])
+        with app.connect() as c:
+            row=c.execute('SELECT discount_by,discount_at FROM quotes WHERE id=?',(quote,)).fetchone();self.assertTrue(row['discount_by'] and row['discount_at'])
+            self.assertEqual(c.execute("SELECT COUNT(*) FROM quote_events WHERE quote_id=? AND event='descuento'",(quote,)).fetchone()[0],1)
+            c.execute("UPDATE users SET role='tecnico' WHERE username='demo'");c.commit()
+        # El técnico puede guardar el borrador, pero no tocar el descuento.
+        self.assertEqual(post('/api/quotes/%d'%quote,action='save',items=items,discount='0')['status'],403)
+        kept=post('/api/quotes/%d'%quote,action='save',items=items,discount='500');self.assertEqual((kept['status'],kept['body']['quote']['discount_bp']),(200,500))
+        self.assertEqual(post('/api/quotes/%d'%quote,action='save',items=items)['body']['quote']['discount_bp'],500)
+        with app.connect() as c:c.execute("UPDATE users SET role='administrador' WHERE username='demo'");c.commit()
+        post('/api/quotes/%d'%quote,action='send');detail=self.request('/api/quotes/%d'%quote,cookie=cookie)['body']['quote'];a,b=[i['id'] for i in detail['items']]
+        done=post('/api/quotes/%d'%quote,action='decide',approved=str(a),rejected=str(b),note='Aprobó en el local')['body']['quote']
+        self.assertEqual((done['totals']['approved'],done['totals']['rejected']),(9500,9499))
+        order_now=self.request('/api/orders/%d'%order['id'],cookie=cookie)['body'];order_now=order_now.get('order',order_now);self.assertEqual(order_now['budget']['total_cents'],9500)
+        self.assertEqual(self.request('/api/quotes/%d/pdf'%quote,cookie=cookie)['body'][:4],b'%PDF')
+        # La versión siguiente hereda el descuento autorizado.
+        self.assertEqual(self.request('/api/quotes/%d'%post('/api/quotes/%d'%quote,action='version')['body']['id'],cookie=cookie)['body']['quote']['discount_bp'],500)

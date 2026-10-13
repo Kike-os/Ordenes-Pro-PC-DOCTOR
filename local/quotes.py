@@ -18,6 +18,10 @@ STATUS = {'borrador': 'Borrador', 'enviado': 'Enviado al cliente', 'aprobado': '
 ITEM_STATUS = {'pendiente': 'Pendiente', 'aprobado': 'Aprobado', 'rechazado': 'Rechazado', 'cancelado': 'Cancelado'}
 EDITABLE = ('borrador', 'modificacion')
 DEFAULT_TAX_BP = 1500
+PRICE_MODES = {'incluido': 'IVA incluido', 'agregar': 'Agregar IVA', 'sin_iva': 'Sin IVA (tarifa 0 %)'}
+# Descuento autorizado: únicamente estas tres opciones; solo lo aplica administración.
+DISCOUNTS = {0: 'Sin descuento', 300: 'Descuento especial', 500: 'Descuento máximo'}
+IMAGE_LIMIT = 300000
 LINK_DAYS = 15
 MAX_ITEMS = 60
 MAX_FAILED = 6
@@ -82,18 +86,27 @@ def split(line_cents, taxed, rate_bp):
     return base, line_cents - base
 
 
-def totals(items, rate_bp):
-    """Importes cotizado, aprobado, rechazado y pendiente, con el desglose de base e IVA de lo cotizado y de lo aprobado."""
-    result = {'quoted': 0, 'approved': 0, 'rejected': 0, 'pending': 0, 'cancelled': 0, 'base_taxed': 0, 'base_zero': 0, 'tax': 0, 'approved_base_taxed': 0, 'approved_base_zero': 0, 'approved_tax': 0,
+def net(line_cents, discount_bp):
+    """Importe de una línea después del descuento autorizado (redondeo al centavo por línea)."""
+    return line_cents - (line_cents * discount_bp + 5000) // 10000
+
+
+def totals(items, rate_bp, discount_bp=0):
+    """Importes cotizado, aprobado, rechazado y pendiente, con el desglose de base e IVA de lo cotizado y de lo aprobado.
+    Con descuento, todos los importes son netos; `gross` y `discount` muestran el valor antes del descuento y lo descontado."""
+    result = {'gross': 0, 'discount': 0, 'discount_bp': discount_bp, 'quoted': 0, 'approved': 0, 'rejected': 0, 'pending': 0, 'cancelled': 0, 'base_taxed': 0, 'base_zero': 0, 'tax': 0, 'approved_base_taxed': 0, 'approved_base_zero': 0, 'approved_tax': 0,
               'count': {'aprobado': 0, 'rechazado': 0, 'pendiente': 0, 'cancelado': 0}}
     for item in items:
-        line = item['quantity'] * item['unit_cents']
+        full = item['quantity'] * item['unit_cents']
+        line = net(full, discount_bp)
         base, tax = split(line, item['taxed'], rate_bp)
         status = item.get('status', 'pendiente')
         result['count'][status] += 1
         if status == 'cancelado':
             result['cancelled'] += line
             continue
+        result['gross'] += full
+        result['discount'] += full - line
         result['quoted'] += line
         result['tax'] += tax
         result['base_taxed' if item['taxed'] else 'base_zero'] += base
@@ -106,16 +119,33 @@ def totals(items, rate_bp):
 
 # --- Catálogo ---------------------------------------------------------------------------------------------------------
 
-def catalog(c, query='', only_available=False):
-    rows = [dict(r) for r in c.execute('SELECT id,name,description,category,price_cents,taxed,available,updated_at FROM catalog_items ORDER BY category,name COLLATE NOCASE')]
+def catalog(c, query='', only_available=False, category=''):
+    rows = [dict(r) for r in c.execute("SELECT i.id,i.code,i.name,i.description,i.category,i.brand,i.price_cents,i.entered_cents,i.price_mode,i.taxed,i.available,i.license_term,i.devices,i.updated_at,"
+                                       "(SELECT updated_at FROM catalog_images g WHERE g.item_id=i.id) image FROM catalog_items i ORDER BY i.category,i.name COLLATE NOCASE")]
     words = [w for w in re.sub(r'\s+', ' ', str(query or '')).strip().lower().split(' ') if w]
-    return [r for r in rows if (r['available'] or not only_available) and all(w in (r['name'] + ' ' + r['description'] + ' ' + CATEGORIES[r['category']]).lower() for w in words)]
+    for row in rows:
+        row['image'] = row['image'] or ''
+        row['price_mode_label'] = PRICE_MODES[row['price_mode']]
+    return [r for r in rows if (r['available'] or not only_available) and (not category or r['category'] == category)
+            and all(w in ' '.join((r['code'] or '', r['name'], r['description'], r['brand'], CATEGORIES[r['category']])).lower() for w in words)]
+
+
+def price_from(entered_cents, mode, rate_bp):
+    """Precio final y si lleva IVA, según cómo se escribió: con IVA incluido, base más IVA o sin IVA."""
+    if mode == 'agregar':
+        return entered_cents + (entered_cents * rate_bp + 5000) // 10000, 1
+    return entered_cents, 0 if mode == 'sin_iva' else 1
 
 
 def save_catalog_item(c, data, user, now):
     name = re.sub(r'\s+', ' ', str(data.get('name', ''))).strip()
     description = str(data.get('description', '')).strip()
     category = str(data.get('category', ''))
+    brand = re.sub(r'\s+', ' ', str(data.get('brand', ''))).strip()
+    term = re.sub(r'\s+', ' ', str(data.get('license_term', ''))).strip()
+    devices = re.sub(r'\s+', ' ', str(data.get('devices', ''))).strip()
+    # Compatibilidad: «taxed» desmarcado equivale a «sin IVA» cuando no se indica el modo.
+    mode = str(data.get('price_mode', '') or ('sin_iva' if data.get('taxed') is False else 'incluido'))
     errors = {}
     if not 2 <= len(name) <= 120:
         errors['name'] = 'Indica un nombre de 2 a 120 caracteres.'
@@ -123,21 +153,88 @@ def save_catalog_item(c, data, user, now):
         errors['description'] = 'La descripción admite hasta 500 caracteres.'
     if category not in CATEGORIES:
         errors['category'] = 'Selecciona una categoría.'
+    if mode not in PRICE_MODES:
+        errors['price_mode'] = 'Selecciona cómo se trata el IVA.'
+    if len(brand) > 60 or len(term) > 60 or len(devices) > 40:
+        errors['brand'] = 'Marca, duración y dispositivos admiten textos breves.'
     try:
-        price = cents(data.get('price', ''))
+        entered = cents(data.get('price', ''))
     except QuoteError:
-        price = 0
-        errors['price'] = 'Indica el precio final (con IVA incluido) en USD.'
-    if errors:
-        raise QuoteError('Revisa los campos señalados.', fields=errors)
-    taxed, available, stamp = 1 if data.get('taxed') is not False else 0, 1 if data.get('available') is not False else 0, now.isoformat(timespec='seconds')
+        entered = 0
+        errors['price'] = 'Indica el precio en USD con hasta dos decimales.'
     item_id = str(data.get('id', ''))
+    if not errors and c.execute('SELECT 1 FROM catalog_items WHERE lower(name)=lower(?) AND id!=?', (name, int(item_id) if item_id.isdigit() else 0)).fetchone():
+        errors['name'] = 'Ya existe un elemento con ese nombre en el catálogo.'
+    if errors:
+        raise QuoteError(next(iter(errors.values())) if len(errors) == 1 else 'Revisa los campos señalados.', fields=errors)
+    price, taxed = price_from(entered, mode, tax_rate(c))
+    available, stamp = 1 if data.get('available') is not False else 0, now.isoformat(timespec='seconds')
     if item_id:
-        if not item_id.isdigit() or not c.execute('SELECT 1 FROM catalog_items WHERE id=?', (item_id,)).fetchone():
+        old = c.execute('SELECT price_cents FROM catalog_items WHERE id=?', (item_id,)).fetchone() if item_id.isdigit() else None
+        if not old:
             raise QuoteError('El elemento del catálogo ya no existe.', 404)
-        c.execute('UPDATE catalog_items SET name=?,description=?,category=?,price_cents=?,taxed=?,available=?,updated_at=?,updated_by=? WHERE id=?', (name, description, category, price, taxed, available, stamp, user['id'], item_id))
+        c.execute('UPDATE catalog_items SET name=?,description=?,category=?,brand=?,price_cents=?,entered_cents=?,price_mode=?,taxed=?,available=?,license_term=?,devices=?,updated_at=?,updated_by=? WHERE id=?',
+                  (name, description, category, brand, price, entered, mode, taxed, available, term, devices, stamp, user['id'], item_id))
+        if old['price_cents'] != price:
+            # Historial de precios: el cambio no toca los presupuestos ya emitidos, que guardan su propio importe.
+            c.execute('INSERT INTO catalog_price_history(item_id,old_cents,new_cents,user_id,created_at) VALUES (?,?,?,?,?)', (item_id, old['price_cents'], price, user['id'], stamp))
         return int(item_id)
-    return c.execute('INSERT INTO catalog_items(name,description,category,price_cents,taxed,available,created_at,updated_at,updated_by) VALUES (?,?,?,?,?,?,?,?,?)', (name, description, category, price, taxed, available, stamp, stamp, user['id'])).lastrowid
+    return c.execute('INSERT INTO catalog_items(name,description,category,brand,price_cents,entered_cents,price_mode,taxed,available,license_term,devices,created_at,updated_at,updated_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+                     (name, description, category, brand, price, entered, mode, taxed, available, term, devices, stamp, stamp, user['id'])).lastrowid
+
+
+def price_history(c, item_id):
+    return [dict(r) for r in c.execute("SELECT h.old_cents,h.new_cents,h.created_at,COALESCE(u.name,'') actor FROM catalog_price_history h LEFT JOIN users u ON u.id=h.user_id WHERE h.item_id=? ORDER BY h.id DESC LIMIT 50", (item_id,))]
+
+
+def save_image(c, item_id, content, user, now):
+    """Imagen o logotipo del elemento: PNG, JPEG o WebP reales (se comprueba la cabecera), hasta 300 KB."""
+    if not c.execute('SELECT 1 FROM catalog_items WHERE id=?', (item_id,)).fetchone():
+        raise QuoteError('El elemento del catálogo ya no existe.', 404)
+    kind = 'image/png' if content[:8] == b'\x89PNG\r\n\x1a\n' else 'image/jpeg' if content[:3] == b'\xff\xd8\xff' and content[-2:] == b'\xff\xd9' else 'image/webp' if content[:4] == b'RIFF' and content[8:12] == b'WEBP' else None
+    if not kind:
+        raise QuoteError('Usa una imagen PNG, JPG o WebP.')
+    if len(content) > IMAGE_LIMIT:
+        raise QuoteError('La imagen supera el máximo de 300 KB.')
+    stamp = now.isoformat(timespec='seconds')
+    c.execute('INSERT INTO catalog_images(item_id,mime,data,updated_at,updated_by) VALUES (?,?,?,?,?) ON CONFLICT(item_id) DO UPDATE SET mime=excluded.mime,data=excluded.data,updated_at=excluded.updated_at,updated_by=excluded.updated_by', (item_id, kind, content, stamp, user['id']))
+    return stamp
+
+
+# Catálogo inicial de PC-DOCTOR S.A. (13/10/2026): nombres y precios finales (IVA incluido) entregados por la administración.
+# Las descripciones no añaden características, compatibilidades, duraciones ni dispositivos que no consten en el nombre.
+INITIAL = (
+ ('Programación o flasheo de BIOS corrupta – PlayStation 5', 'servicio', 'PlayStation', '150.00', 'Servicio técnico especializado de reprogramación de la BIOS de la consola cuando su contenido está dañado.', '', ''),
+ ('Mantenimiento parcial – PlayStation 5', 'servicio', 'PlayStation', '55.00', 'Servicio de mantenimiento parcial de la consola realizado en el taller.', '', ''),
+ ('Cambio profesional de metal líquido – PlayStation 5', 'servicio', 'PlayStation', '189.00', 'Servicio de sustitución del metal líquido de la consola realizado por personal técnico.', '', ''),
+ ('Tanque o caja de mantenimiento para impresora Epson', 'repuesto', 'Epson', '68.56', 'Tanque o caja de mantenimiento para impresora Epson. La compatibilidad con el modelo se confirma en el taller.', '', ''),
+ ('Microsoft Office Pro Plus 2024 + Windows 11 Pro', 'licencia', 'Microsoft', '189.99', 'Licencias de Microsoft Office Pro Plus 2024 y Windows 11 Pro.', '', ''),
+ ('Microsoft Office 365 Pro Plus – 5 dispositivos', 'licencia', 'Microsoft', '155.00', 'Licencia de Microsoft Office 365 Pro Plus para cinco dispositivos.', '', '5 dispositivos'),
+ ('Microsoft Office 2024 Estándar', 'licencia', 'Microsoft', '85.99', 'Licencia de Microsoft Office 2024 Estándar.', '', ''),
+ ('Microsoft Office Professional Plus 2021', 'licencia', 'Microsoft', '79.99', 'Licencia de Microsoft Office Professional Plus 2021.', '', ''),
+ ('Microsoft Office Professional Plus 2024', 'licencia', 'Microsoft', '99.99', 'Licencia de Microsoft Office Professional Plus 2024.', '', ''),
+ ('Windows 11 Pro – Licencia empresarial', 'licencia', 'Microsoft', '165.00', 'Licencia empresarial de Windows 11 Pro.', '', ''),
+ ('Chequeo y diagnóstico profesional de memoria RAM', 'servicio', '', '18.00', 'Revisión y diagnóstico de la memoria RAM del equipo realizados en el taller.', '', ''),
+ ('Windows 11 Home ES – Licencia', 'licencia', 'Microsoft', '69.99', 'Licencia de Windows 11 Home en español.', '', ''),
+ ('Windows 11 Pro – Actualización', 'licencia', 'Microsoft', '112.99', 'Actualización a Windows 11 Pro.', '', ''),
+ ('Kaspersky Standard – Licencia Antivirus de 1 Año', 'seguridad', 'Kaspersky', '30.00', 'Licencia de antivirus Kaspersky Standard con vigencia de un año.', '1 año', ''),
+ ('Kaspersky Standard – Licencia Antivirus de Duración Ilimitada, 1 dispositivo', 'seguridad', 'Kaspersky', '125.00', 'Licencia de antivirus Kaspersky Standard de duración ilimitada para un dispositivo.', 'Duración ilimitada', '1 dispositivo'),
+ ('McAfee Plus – Licencia Antivirus, 1 dispositivo, 1 año', 'seguridad', 'McAfee', '25.00', 'Licencia de antivirus McAfee Plus para un dispositivo con vigencia de un año.', '1 año', '1 dispositivo'),
+ ('Defender Plus – Licencia Antivirus, 1 año', 'seguridad', 'Defender Plus', '45.00', 'Licencia de antivirus Defender Plus con vigencia de un año.', '1 año', ''),
+ ('Norton 360 Estándar – Licencia Antivirus, 1 dispositivo, 1 año', 'seguridad', 'Norton', '45.00', 'Licencia de antivirus Norton 360 Estándar para un dispositivo con vigencia de un año.', '1 año', '1 dispositivo'),
+ ('ESET NOD32 Antivirus – Licencia de 1 Año', 'seguridad', 'ESET', '40.00', 'Licencia de ESET NOD32 Antivirus con vigencia de un año.', '1 año', ''),
+)
+
+
+def seed_initial(c, user, now):
+    """Registra el catálogo inicial sin duplicar: un elemento con el mismo nombre no se vuelve a crear ni se modifica."""
+    created = 0
+    for name, category, brand, price, description, term, devices in INITIAL:
+        if c.execute('SELECT 1 FROM catalog_items WHERE lower(name)=lower(?)', (name,)).fetchone():
+            continue
+        save_catalog_item(c, {'name': name, 'category': category, 'brand': brand, 'price': price, 'description': description, 'license_term': term, 'devices': devices, 'price_mode': 'incluido'}, user, now)
+        created += 1
+    return {'created': created, 'existing': len(INITIAL) - created, 'total': len(INITIAL)}
 
 
 # --- Presupuestos -----------------------------------------------------------------------------------------------------
@@ -170,9 +267,10 @@ def detail(c, quote):
     link = c.execute("SELECT created_at,expires_at,verified_at FROM quote_links WHERE quote_id=? AND revoked_at='' ORDER BY id DESC LIMIT 1", (quote['id'],)).fetchone()
     for item in items:
         item['line_cents'] = item['quantity'] * item['unit_cents']
+        item['net_cents'] = net(item['line_cents'], quote['discount_bp'])
         item['status_label'] = ITEM_STATUS[item['status']]
         item['category_label'] = CATEGORIES[item['category']]
-    return dict(quote, status_label=STATUS[quote['status']], editable=quote['status'] in EDITABLE, items=items, totals=totals(items, quote['tax_rate_bp']),
+    return dict(quote, status_label=STATUS[quote['status']], editable=quote['status'] in EDITABLE, items=items, totals=totals(items, quote['tax_rate_bp'], quote['discount_bp']), discount_label=DISCOUNTS[quote['discount_bp']],
                 acceptance=dict(acceptance, signed=bool(acceptance['signature'])) if acceptance else None, link=dict(link) if link else None,
                 events=[dict(r) for r in c.execute('SELECT event,detail,actor,created_at FROM quote_events WHERE quote_id=? ORDER BY id DESC LIMIT 60', (quote['id'],))])
 
@@ -181,7 +279,7 @@ def for_order(c, order_id):
     """Presupuesto vigente de la orden (su última versión) y la lista de versiones."""
     rows = [dict(r) for r in c.execute('SELECT * FROM quotes WHERE order_id=? ORDER BY version DESC', (order_id,))]
     return {'current': detail(c, rows[0]) if rows else None, 'versions': [{'id': r['id'], 'code': r['code'], 'version': r['version'], 'status': r['status'], 'status_label': STATUS[r['status']], 'created_at': r['created_at']} for r in rows],
-            'tax_rate_bp': tax_rate(c), 'categories': CATEGORIES, 'conditions': CONDITIONS}
+            'tax_rate_bp': tax_rate(c), 'categories': CATEGORIES, 'conditions': CONDITIONS, 'discounts': {str(key): '%s: %g %%' % (label, key / 100) for key, label in DISCOUNTS.items()}}
 
 
 def create(c, order_id, user, now, copy_from=None):
@@ -191,7 +289,7 @@ def create(c, order_id, user, now, copy_from=None):
     if last and last['status'] in ('borrador',):
         raise QuoteError('Esta orden ya tiene un presupuesto en borrador. Edítalo o cancélalo antes de crear otra versión.', 409)
     version, stamp = (last['version'] + 1 if last else 1), now.isoformat(timespec='seconds')
-    quote_id = c.execute("INSERT INTO quotes(order_id,version,code,status,tax_rate_bp,created_by,created_at,updated_at) VALUES (?,?,?,'borrador',?,?,?,?)", (order_id, version, '%s-P%d' % (code, version), tax_rate(c), user['id'], stamp, stamp)).lastrowid
+    quote_id = c.execute("INSERT INTO quotes(order_id,version,code,status,tax_rate_bp,created_by,created_at,updated_at,discount_bp,discount_by,discount_at) VALUES (?,?,?,'borrador',?,?,?,?,?,?,?)", (order_id, version, '%s-P%d' % (code, version), tax_rate(c), user['id'], stamp, stamp, last['discount_bp'] if last else 0, last['discount_by'] if last else None, last['discount_at'] if last else '')).lastrowid
     if last and last['status'] in ('enviado', 'modificacion'):
         c.execute("UPDATE quotes SET status='cancelado',updated_at=? WHERE id=?", (stamp, last['id']))
         c.execute("UPDATE quote_links SET revoked_at=? WHERE quote_id=? AND revoked_at=''", (stamp, last['id']))
@@ -236,10 +334,20 @@ def save(c, quote, data, user, now):
     notes = str(data.get('notes', '')).strip()
     if len(notes) > 1500:
         raise QuoteError('Las observaciones admiten hasta 1500 caracteres.', fields={'notes': 'Texto demasiado largo.'})
+    # Descuento autorizado: solo 0, 3 o 5 %, y solo lo cambia administración. Queda registrado quién y cuándo.
+    discount = quote['discount_bp']
+    if 'discount' in data and str(data['discount']) != str(discount):
+        if user['role'] != 'administrador':
+            raise QuoteError('Solo administración puede aplicar o modificar descuentos.', 403)
+        if str(data['discount']) not in ('0', '300', '500'):
+            raise QuoteError('El descuento autorizado solo puede ser 0 %, 3 % o 5 %.', fields={'discount': 'Descuento no permitido.'})
+        discount = int(data['discount'])
+        c.execute('UPDATE quotes SET discount_bp=?,discount_by=?,discount_at=? WHERE id=?', (discount, user['id'], now.isoformat(timespec='seconds'), quote['id']))
+        event(c, quote['id'], 'descuento', '%s (%g %%) aplicado al presupuesto.' % (DISCOUNTS[discount], discount / 100), now, user)
     c.execute('DELETE FROM quote_items WHERE quote_id=?', (quote['id'],))
     c.executemany('INSERT INTO quote_items(quote_id,position,catalog_id,description,category,quantity,unit_cents,taxed) VALUES (?,?,?,?,?,?,?,?)', [(quote['id'], *row) for row in clean])
     c.execute("UPDATE quotes SET valid_until=?,notes=?,status='borrador',updated_at=? WHERE id=?", (valid, notes, now.isoformat(timespec='seconds'), quote['id']))
-    event(c, quote['id'], 'guardado', 'Borrador guardado con %d %s. Total cotizado: %s.' % (len(clean), 'ítem' if len(clean) == 1 else 'ítems', usd(sum(row[4] * row[5] for row in clean))), now, user)
+    event(c, quote['id'], 'guardado', 'Borrador guardado con %d %s. Total cotizado: %s.' % (len(clean), 'ítem' if len(clean) == 1 else 'ítems', usd(sum(net(row[4] * row[5], discount) for row in clean))), now, user)
 
 
 def send(c, quote, recipient, user, now):
@@ -262,7 +370,7 @@ def send(c, quote, recipient, user, now):
 
 def sync_budget(c, quote):
     """Traslada lo aprobado al presupuesto de la orden (del que salen el total a cobrar y el saldo). No toca pagos ni estado."""
-    lines = [(BUDGET_KEY[item['category']], ('%d × ' % item['quantity'] if item['quantity'] > 1 else '') + item['description'], item['quantity'] * item['unit_cents']) for item in items_of(c, quote['id']) if item['status'] == 'aprobado']
+    lines = [(BUDGET_KEY[item['category']], ('%d × ' % item['quantity'] if item['quantity'] > 1 else '') + item['description'], net(item['quantity'] * item['unit_cents'], quote['discount_bp'])) for item in items_of(c, quote['id']) if item['status'] == 'aprobado']
     sums = {key: sum(amount for category, _, amount in lines if category == key) for key in ('labor', 'parts', 'services', 'digital')}
     c.execute('INSERT INTO order_budget(order_id,labor_cents,parts_cents,services_cents,digital_cents) VALUES (?,?,?,?,?) ON CONFLICT(order_id) DO UPDATE SET labor_cents=excluded.labor_cents,parts_cents=excluded.parts_cents,services_cents=excluded.services_cents,digital_cents=excluded.digital_cents',
               (quote['order_id'], sums['labor'], sums['parts'], sums['services'], sums['digital']))
@@ -278,7 +386,7 @@ def decide(c, quote, decisions, now, user=None, actor='', note=''):
     if set(decisions) != {item['id'] for item in items} or any(value not in ('aprobado', 'rechazado') for value in decisions.values()):
         raise QuoteError('Indica si apruebas o rechazas cada uno de los ítems.')
     paid = c.execute('SELECT COALESCE(SUM(amount_cents),0) FROM order_payments WHERE order_id=? AND voided_at IS NULL', (quote['order_id'],)).fetchone()[0]
-    approved_total = sum(item['quantity'] * item['unit_cents'] for item in items if decisions[item['id']] == 'aprobado')
+    approved_total = sum(net(item['quantity'] * item['unit_cents'], quote['discount_bp']) for item in items if decisions[item['id']] == 'aprobado')
     if paid > approved_total:
         raise QuoteError('La orden ya tiene pagos registrados por %s, más que el total aprobado (%s). Revisa los pagos antes de registrar esta decisión.' % (usd(paid), usd(approved_total)), 409)
     for item in items:
@@ -381,7 +489,7 @@ def accept(c, quote, link, form, order, now, origin):
     final = items_of(c, quote['id'])
     evidence = {'quote': quote['code'], 'order': order['code'], 'signer': name, 'method': METHOD, 'accepted_at': now.isoformat(timespec='seconds'), 'conditions': quote['conditions'] or CONDITIONS, 'comment': comment,
                 'tax_rate_bp': quote['tax_rate_bp'], 'items': [{'description': item['description'], 'quantity': item['quantity'], 'unit_cents': item['unit_cents'], 'taxed': bool(item['taxed']), 'decision': item['status']} for item in final],
-                'totals': {key: value for key, value in totals(final, quote['tax_rate_bp']).items() if key != 'count'}, 'signature_points': sum(len(line) for line in signature), 'ip': origin.get('ip', ''), 'agent': origin.get('agent', '')}
+                'discount_bp': quote['discount_bp'], 'totals': {key: value for key, value in totals(final, quote['tax_rate_bp'], quote['discount_bp']).items() if key != 'count'}, 'signature_points': sum(len(line) for line in signature), 'ip': origin.get('ip', ''), 'agent': origin.get('agent', '')}
     payload = json.dumps(evidence, ensure_ascii=False, sort_keys=True)
     c.execute('INSERT INTO quote_acceptances(quote_id,signer_name,method,signature,evidence,evidence_hash,created_at) VALUES (?,?,?,?,?,?,?)', (quote['id'], name, METHOD, json.dumps(signature), payload, digest(payload + json.dumps(signature)), now.isoformat(timespec='seconds')))
     return status
@@ -427,7 +535,7 @@ def identify_page(token, quote, order, error=''):
 def decision_page(token, passkey, quote, order, items, errors=None, form=None):
     import html
     e, errors, form = html.escape, errors or {}, form or {}
-    summary = totals(items, quote['tax_rate_bp'])
+    summary = totals(items, quote['tax_rate_bp'], quote['discount_bp'])
     rows = ''
     for item in items:
         if item['status'] == 'cancelado':
@@ -436,7 +544,7 @@ def decision_page(token, passkey, quote, order, items, errors=None, form=None):
         rows += ('<fieldset class="quote-item"><legend>%s</legend><p class="quote-amount">%s%s · <strong>%s</strong>%s</p>'
                  '<label><input type="radio" name="decision_%d" value="aprobado"%s required> Apruebo este servicio</label>'
                  '<label><input type="radio" name="decision_%d" value="rechazado"%s> No lo apruebo</label></fieldset>'
-                 ) % (e(item['description']), '%d × ' % item['quantity'] if item['quantity'] > 1 else '', e(usd(item['unit_cents'])), e(usd(item['quantity'] * item['unit_cents'])), '' if item['taxed'] else ' <small>(tarifa 0 %)</small>',
+                 ) % (e(item['description']), '%d × ' % item['quantity'] if item['quantity'] > 1 else '', e(usd(item['unit_cents'])), e(usd(net(item['quantity'] * item['unit_cents'], quote['discount_bp']))), '' if item['taxed'] else ' <small>(tarifa 0 %)</small>',
                       item['id'], ' checked' if chosen == 'aprobado' else '', item['id'], ' checked' if chosen == 'rechazado' else '')
     problem = lambda key: '<p class="quote-error" role="alert">%s</p>' % e(errors[key]) if errors.get(key) else ''
     rate = quote['tax_rate_bp'] / 100
@@ -444,7 +552,7 @@ def decision_page(token, passkey, quote, order, items, errors=None, form=None):
     body = ('<section class="tracking-card quote-card">%s<p class="quote-valid">%s</p>'
             '<form class="auth-form quote-form" method="post" action="/presupuesto/%s" autocomplete="off"><input type="hidden" name="passkey" value="%s">'
             '<p class="auth-step">Paso 2 de 2 · Revisa y decide cada servicio</p><div class="quote-bulk"><button type="button" data-quote-all="aprobado">Aprobar todo</button><button type="button" data-quote-all="rechazado">Rechazar todo</button></div>%s%s'
-            '<dl class="quote-totals"><div><dt>Subtotal con IVA %g %%</dt><dd>%s</dd></div><div><dt>Subtotal tarifa 0 %%</dt><dd>%s</dd></div><div><dt>IVA %g %%</dt><dd>%s</dd></div><div class="quote-total"><dt>Total cotizado</dt><dd>%s</dd></div>'
+            '<dl class="quote-totals">%s<div><dt>Subtotal con IVA %g %%</dt><dd>%s</dd></div><div><dt>Subtotal tarifa 0 %%</dt><dd>%s</dd></div><div><dt>IVA %g %%</dt><dd>%s</dd></div><div class="quote-total"><dt>Total cotizado</dt><dd>%s</dd></div>'
             '<div class="quote-chosen"><dt>Total que apruebas</dt><dd data-quote-approved>—</dd></div></dl>'
             '<h2>Condiciones de autorización</h2><ul class="quote-conditions">%s</ul>'
             '<label for="name">Nombre completo de quien autoriza</label><input id="name" name="name" maxlength="120" value="%s" required>%s'
@@ -455,7 +563,7 @@ def decision_page(token, passkey, quote, order, items, errors=None, form=None):
             '<button class="quote-secondary" type="submit" name="action" value="change" formnovalidate>Solicitar una modificación</button></form>'
             '<p class="quote-pdf"><a href="/presupuesto/%s/documento.pdf?k=%s">Descargar el presupuesto en PDF</a></p></section>'
             ) % (_summary_block(quote, order), 'Válido hasta el ' + e(date.fromisoformat(quote['valid_until']).strftime('%d/%m/%Y')) if quote['valid_until'] else 'Sin fecha límite indicada', e(token), e(passkey), problem('items'), rows,
-                 rate, e(usd(summary['base_taxed'])), e(usd(summary['base_zero'])), rate, e(usd(summary['tax'])), e(usd(summary['quoted'])), conditions, e(form.get('name', '')), problem('name'), e(form.get('comment', '')), problem('comment'), problem('signature'),
+                 ('<div><dt>%s (%g %%)</dt><dd>− %s</dd></div>' % (e(DISCOUNTS[quote['discount_bp']]), quote['discount_bp'] / 100, e(usd(summary['discount']))) if quote['discount_bp'] else ''), rate, e(usd(summary['base_taxed'])), e(usd(summary['base_zero'])), rate, e(usd(summary['tax'])), e(usd(summary['quoted'])), conditions, e(form.get('name', '')), problem('name'), e(form.get('comment', '')), problem('comment'), problem('signature'),
                  ' checked' if form.get('accept') == 'on' else '', problem('accept'), e(token), e(passkey))
     return _shell('Presupuesto ' + quote['code'], body)
 
@@ -463,8 +571,8 @@ def decision_page(token, passkey, quote, order, items, errors=None, form=None):
 def result_page(token, quote, order, items):
     import html
     e = html.escape
-    summary = totals(items, quote['tax_rate_bp'])
-    lines = ''.join('<li data-status="%s"><span>%s</span><strong>%s</strong><em>%s</em></li>' % (e(item['status']), e(item['description']), e(usd(item['quantity'] * item['unit_cents'])), e(ITEM_STATUS[item['status']])) for item in items if item['status'] != 'cancelado')
+    summary = totals(items, quote['tax_rate_bp'], quote['discount_bp'])
+    lines = ''.join('<li data-status="%s"><span>%s</span><strong>%s</strong><em>%s</em></li>' % (e(item['status']), e(item['description']), e(usd(net(item['quantity'] * item['unit_cents'], quote['discount_bp']))), e(ITEM_STATUS[item['status']])) for item in items if item['status'] != 'cancelado')
     message = {'modificacion': 'Recibimos tu solicitud de modificación. El taller revisará el presupuesto y te enviará una nueva versión.', 'rechazado': 'Registramos que no apruebas este presupuesto. No se ejecutará ningún trabajo sin tu autorización.',
                'cancelado': 'Este presupuesto fue cancelado por el taller.'}.get(quote['status'], 'Registramos tu decisión. El taller ejecutará únicamente los servicios aprobados y te avisará del avance.')
     extra = '<dl class="quote-totals"><div><dt>Total cotizado</dt><dd>%s</dd></div><div class="quote-total"><dt>Total aprobado</dt><dd>%s</dd></div><div><dt>Importe rechazado</dt><dd>%s</dd></div></dl>' % (e(usd(summary['quoted'])), e(usd(summary['approved'])), e(usd(summary['rejected']))) if quote['status'] in ('aprobado', 'parcial', 'rechazado') else ''
