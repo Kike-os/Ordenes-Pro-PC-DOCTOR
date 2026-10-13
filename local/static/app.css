@@ -5345,3 +5345,30 @@ dialog.quote-dialog{width:min(860px,calc(100% - 20px))}
 .catalog-form label{margin:0}.catalog-form :is(input:not([type=checkbox]),select,textarea){margin-top:6px}
 @media(max-width:720px){.quote-row-fields{grid-template-columns:1fr 1fr}.quote-row-fields select{grid-column:1/-1}.quote-row-total{justify-self:start}.quote-extra{grid-template-columns:1fr}.quote-editor-totals{justify-self:stretch}.quote-items li{grid-template-columns:minmax(0,1fr) auto}.quote-items .quote-badge{grid-column:1/-1;justify-self:start}.quote-decide-row{grid-template-columns:1fr}
  .catalog-table thead{display:none}.catalog-table,.catalog-table tbody,.catalog-table tr,.catalog-table td{display:block;width:100%}.catalog-table tr{padding:10px 0;border-top:1px solid #1b2b44}.catalog-table td{padding:3px 0;border:0}}
+/* Seguimiento de Órdenes: columnas proporcionadas y cuatro acciones uniformes que nunca se cortan. */
+.tracking-carousel .tracking-table th:nth-child(1){width:23%}.tracking-carousel .tracking-table th:nth-child(2){width:14%}.tracking-carousel .tracking-table th:nth-child(3){width:17%}
+.tracking-carousel .tracking-table th:nth-child(4){width:20%}.tracking-carousel .tracking-table th:nth-child(5){width:10%}.tracking-carousel .tracking-table th:nth-child(6){width:164px}
+.tracking-carousel .tracking-table td:nth-child(6){padding-right:10px;overflow:visible}
+.tracking-carousel .tracking-table .tracking-actions{display:flex;flex-wrap:nowrap;justify-content:flex-start;gap:5px;min-width:0}
+.tracking-carousel .tracking-table .tracking-actions button{flex:none;box-sizing:border-box;width:32px;height:32px;min-height:32px;margin:0;padding:0;display:inline-grid;place-items:center;position:relative;border-radius:8px}
+.tracking-carousel .tracking-table .tracking-actions button svg{width:15px;height:15px}
+.tracking-carousel .tracking-table .tracking-actions button span{display:none}
+.tracking-carousel .tracking-table .tracking-actions button b{position:absolute;top:-5px;right:-5px;min-width:15px;height:15px;padding:0 3px;border-radius:999px;background:#24558d;color:#fff;font-size:9.5px;line-height:15px;text-align:center}
+.tracking-carousel .tracking-table .tracking-actions button:disabled{opacity:.4}
+.tracking-carousel .tracking-table .tracking-actions button:focus-visible{outline:2px solid #a8dcff;outline-offset:2px}
+/* Con espacio suficiente los botones llevan también su nombre, todos del mismo ancho. */
+@media(min-width:1600px){
+ .tracking-carousel .tracking-table th:nth-child(1){width:20%}.tracking-carousel .tracking-table th:nth-child(4){width:18%}.tracking-carousel .tracking-table th:nth-child(6){width:366px}
+ .tracking-carousel .tracking-table .tracking-actions button{width:84px;display:inline-flex;align-items:center;justify-content:center;gap:5px;font-size:11.5px}
+ .tracking-carousel .tracking-table .tracking-actions button span{display:inline}
+ .tracking-carousel .tracking-table .tracking-actions button b{position:static;min-width:0;height:auto;padding:0 4px;line-height:1.5;background:#ffffff26}
+}
+@media(max-width:1180px) and (min-width:861px){.tracking-carousel{overflow-x:auto}.tracking-carousel .tracking-table{min-width:760px}.tracking-carousel .tracking-table th:nth-child(1){width:27%}.tracking-carousel .tracking-table th:nth-child(4){width:24%}}
+/* Celulares: tarjeta por orden con los cuatro botones en una cuadrícula de dos columnas. */
+@media(max-width:860px){
+ .tracking-carousel{--track-row:222px}
+ .tracking-carousel .tracking-table .tracking-actions{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+ .tracking-carousel .tracking-table .tracking-actions button{width:100%;height:34px;min-height:34px;display:inline-flex;align-items:center;justify-content:center;gap:6px;font-size:12px}
+ .tracking-carousel .tracking-table .tracking-actions button span{display:inline}
+ .tracking-carousel .tracking-table .tracking-actions button b{position:static;min-width:0;height:auto;padding:0 5px;line-height:1.5;background:#ffffff26}
+}

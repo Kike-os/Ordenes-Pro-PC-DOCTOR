@@ -29,3 +29,16 @@ El panel «Seguimiento de Órdenes» del inicio ya no crece con el número de ó
 - Espaciado vertical reducido (filas de 52 px; antes ~58). En pantallas de hasta 860 px cada orden es una tarjeta de 178 px.
 
 Pruebas: `local/tests/test_tracking_board.py` (bloques, búsqueda por estado, tamaños de página) y comprobación en navegador con 1, 2, 3, 5, 20, 45 y 100 órdenes.
+
+## Columna «Acciones» sin cortes (rama `acciones-seguimiento`, pendiente de aprobación)
+
+**Causa del botón cortado:** la tabla usa columnas de ancho fijo y la de acciones tenía el 15 % para tres botones con texto; al añadirse el de la tarjeta, el último sobresalía de la celda y el contenedor (que recorta para mantener la altura fija) lo cortaba.
+
+**Solución:** la columna de acciones tiene un ancho propio en píxeles calculado para sus cuatro botones, y los botones no encogen ni saltan de línea.
+
+- Cuatro acciones del mismo tamaño en una fila: **Ver** (detalle de la orden), **Historial** (movimientos, con su contador), **QR** (tarjeta de seguimiento con el QR y el código de barras) y **Ticket** (ticket de la orden).
+- Desde 1600 px de ancho llevan icono y nombre (84 × 32 px); por debajo, solo el icono (32 × 32 px) con el nombre en la descripción emergente y en la etiqueta accesible.
+- Entre 861 y 1180 px la tabla se desplaza horizontalmente dentro de su panel si hace falta. Hasta 860 px cada orden es una tarjeta con los cuatro botones en cuadrícula de dos columnas.
+- Cliente y técnico muestran el nombre completo en la descripción emergente cuando se truncan.
+
+Comprobado a 1920, 1440, 1280, 1024, 768, 390 y 320 px, y con los visores equivalentes al 125 % y 150 % de zoom en una pantalla de 1920 px: ningún botón cortado ni montado, fila de 52 px, sin desbordes.
