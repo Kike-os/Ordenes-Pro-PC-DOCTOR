@@ -98,17 +98,26 @@ Límites: el sistema no verifica la autenticidad del documento ni lo compara con
 
 ## Presupuesto en la vista de la orden
 
-La orden muestra un único módulo «Presupuesto» (antes eran dos bloques con el mismo título):
+El detalle de la orden separa lo cotizado de lo autorizado en dos paneles:
 
-- **Encabezado** con subtítulo y una insignia de estado: Sin presupuesto, Borrador, Pendiente de aprobación, Aprobado parcialmente, Aprobado, Rechazado, Modificación solicitada o Cancelado.
-- **Presupuesto detallado**: si no existe, un estado vacío con el botón «Crear presupuesto»; si existe, su código, el total cotizado o autorizado, los datos de la decisión y las acciones «Editar/Abrir presupuesto» y «PDF».
-- **Resumen financiero**: mano de obra, repuestos, servicios, productos digitales y el Total USD destacado, las líneas registradas y «Agregar línea» (solo administración). Los valores son referenciales y no constituyen una factura.
+**«Presupuestos pendientes de aprobación»** (acento ámbar; azul si es borrador). Muestra el presupuesto vigente del equipo: código, equipo, estado, total cotizado, partidas pendientes, importe pendiente, emisión, vencimiento, último envío y técnico. Estados:
 
-En «Equipos de esta orden» la información se separa en cuatro niveles:
+- *Borrador*: todavía no se envió al cliente (nunca se presenta como enviado).
+- *Pendiente de aprobación*: enviado, sin respuesta.
+- *En revisión*: solo cuando consta que el cliente abrió y verificó su enlace privado.
+- *Vencido*: enviado y con la fecha de validez superada sin decisión.
+- *Aprobado parcialmente / Aprobado / Rechazado / Modificación solicitada / Cancelado*.
 
-1. Selector de equipos.
-2. **Información del equipo**: código, tipo, marca, modelo, serie, color, técnico, ingreso, entrega y falla, con sus acciones técnicas (Etiqueta QR, Tarjeta de seguimiento, Editar este equipo).
-3. **Presupuesto de este equipo** (acento turquesa): estado, total, aprobado, pendiente, pagado y saldo de ese equipo únicamente, con sus propias acciones. El presupuesto de otro equipo se gestiona abriendo ese equipo, para no mezclar importes.
-4. **Resumen general de la orden** (tarjetas): presupuesto total, total pagado, saldo pendiente y equipos entregados de toda la orden.
+Acciones: Editar borrador o Abrir presupuesto, Enviar al cliente, Reenviar notificación (administración), Historial y PDF o comprobante.
 
-El servidor entrega el resumen por equipo en `group.units[].quote` (`quotes.brief`).
+**«Servicios y productos aprobados»** (acento verde). Solo contiene partidas aprobadas: importes por categoría, total autorizado, listado de partidas (equipo, cantidad, precio final con IVA incluido, fecha de aprobación y estado del equipo como ejecución) y la evidencia: firma del cliente o, si la registró el personal, la indicación de que no consta firma. Debajo, total autorizado, total pagado y saldo pendiente según los pagos reales del equipo. Si no hay nada autorizado se muestra «Todavía no se han autorizado servicios o productos para este equipo» y se explica por qué el total es $0,00 aunque exista un presupuesto cotizado.
+
+Los importes manuales del taller (sin presupuesto aprobado) aparecen aparte como «Importes manuales del taller» y nunca como autorizados.
+
+### Importes fijados por un presupuesto aprobado
+
+Cuando la última versión decidida del presupuesto está aprobada (total o parcialmente), los importes de ese equipo quedan fijados: «Gestión técnica del equipo» los muestra en solo lectura y el servidor rechaza (409) cualquier intento de cambiarlos o borrarlos (`order_workspace.budget_lock`). Para modificarlos se crea una nueva versión del presupuesto; mientras esa versión no se decida, sigue vigente lo que el cliente ya autorizó. El detalle expone `budget_locked` con el código del presupuesto que los fija.
+
+### Equipos de la orden
+
+En «Equipos de esta orden» la información se separa en cuatro niveles: selector de equipos; **Información del equipo** con sus acciones técnicas; **Presupuesto de este equipo** (acento turquesa: estado, total, aprobado, pendiente, pagado y saldo solo de ese equipo; el de otro equipo se gestiona abriendo ese equipo); y **Resumen general de la orden** en tarjetas (presupuesto total, total pagado, saldo pendiente y equipos entregados). El servidor entrega el resumen por equipo en `group.units[].quote` (`quotes.brief`).

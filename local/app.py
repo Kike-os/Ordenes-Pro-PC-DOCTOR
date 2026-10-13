@@ -1280,6 +1280,10 @@ class Handler(BaseHTTPRequestHandler):
                 result.pop('request_key', None)
                 if result['reception_snapshot']:
                     result.update(json.loads(result['reception_snapshot']))
+                    # Los datos de contacto se muestran vigentes (los mismos que usan los correos y presupuestos); si cambiaron desde la
+                    # recepción, el valor de entonces se conserva aparte. Los documentos de recepción siguen usando su copia original.
+                    for key in ('phone','email'):
+                        if (row[key] or '')!=(result.get(key) or ''):result['reception_'+key]=result.get(key) or '';result[key]=row[key] or ''
                 result.pop('reception_snapshot',None)
                 result['code'] = code
                 service_terms.attach(c,result)

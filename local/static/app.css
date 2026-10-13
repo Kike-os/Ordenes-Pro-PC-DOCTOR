@@ -5562,3 +5562,38 @@ body[data-page=dashboard] .tech-editor footer .primary[data-loading=true]{opacit
 .adi-applied{animation:adi-applied 1s ease-out 1}
 @media(prefers-reduced-motion:reduce){.adi-applied{animation:none;outline:2px solid #ff9ecb;outline-offset:1px}}
 textarea.adi-suggestion-edit{width:100%;min-height:96px;resize:vertical;font:inherit;font-size:13px;line-height:1.5;color:#eef3ff;background:#0c192d;border:1px solid #37618d;border-radius:10px;padding:10px 12px}
+/* Presupuesto en dos paneles: pendientes (ámbar; azul si es borrador) y autorizados (verde) */
+.budget-panels{display:contents}
+#module-content .budget-module{gap:12px}
+#module-content .budget-pending{border-color:#6f5a2c;box-shadow:inset 3px 0 0 #e0b25c,0 10px 26px #02081366}
+#module-content .budget-pending:is([data-stage=borrador],[data-stage=cancelado]){border-color:#2c4f7d;box-shadow:inset 3px 0 0 #5aa9e6,0 10px 26px #02081366}
+#module-content .budget-pending:is([data-stage=aprobado]){border-color:#2f7d5f;box-shadow:inset 3px 0 0 #3fbf8f,0 10px 26px #02081366}
+#module-content .budget-pending:is([data-stage=vencido],[data-stage=rechazado]){border-color:#7d3a44;box-shadow:inset 3px 0 0 #e06c78,0 10px 26px #02081366}
+.budget-pending .budget-head-icon{border-color:#8a6a2c;background:linear-gradient(160deg,#3a2e14,#1a1608);color:#ffe2a8}
+.budget-pending:is([data-stage=borrador],[data-stage=cancelado]) .budget-head-icon{border-color:#37618d;background:linear-gradient(160deg,#1b3b60,#10233c);color:#a8dcff}
+#module-content .budget-approved{border-color:#2f7d5f;box-shadow:inset 3px 0 0 #3fbf8f,0 10px 26px #02081366}
+.budget-approved .budget-head-icon{border-color:#2f7d5f;background:linear-gradient(160deg,#12352b,#0b1f1a);color:#aef0d2}
+.budget-head-state .quote-badge:is([data-status=revision]){border-color:#e0b25c80;background:#3a2e14;color:#ffe2a8}
+.budget-head-state .quote-badge[data-status=vencido]{border-color:#e06c7880;background:#3a1a22;color:#ffc4c9}
+.budget-body{display:grid;gap:12px;min-width:0}.budget-body>.system-muted{margin:0;font-size:12.5px}
+.budget-quote-card .quote-summary-head>div:first-child{display:grid;gap:2px;min-width:0}.budget-quote-card .quote-summary-head small{font-size:11.5px;color:#8fa6c4;overflow-wrap:anywhere}
+.budget-stage-note{margin:0;padding:8px 10px;border-radius:9px;background:#10233c;font-size:12.5px;line-height:1.45;color:#c7d6ec}
+.budget-pending:not([data-stage=borrador]):not([data-stage=cancelado]) .budget-quote-amount b{color:#ffe2a8}
+.budget-quote-card .quote-summary-actions :is(button,a){flex:1 1 120px;min-height:38px;font-size:12.5px}
+.budget-empty-approved{border-color:#245c48;background:#0b1f1a}.budget-empty-approved .budget-empty-icon{border-color:#2f7d5f;background:radial-gradient(circle at 50% 35%,#12352b,#0b1f1a);color:#6fd9ad}
+.budget-approved .budget-finance-rows>.budget-finance-total{border-color:#2f7d5f;background:linear-gradient(135deg,#12352b,#0e2620)}.budget-approved .budget-finance-total dt{color:#aef0d2}
+.budget-approved .budget-finance-rows dt svg{color:#4fb992}
+.budget-approved-list{display:grid;margin:6px 0 0;padding:0;list-style:none}
+.budget-approved-list li{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid #16263f}.budget-approved-list li:last-child{border-bottom:0}
+.budget-approved-list li>div{display:grid;gap:2px;min-width:0}.budget-approved-list strong{font-size:13px;font-weight:600;color:#eef3ff;overflow-wrap:anywhere}
+.budget-approved-list small{font-size:11.5px;line-height:1.45;color:#8fa6c4;overflow-wrap:anywhere}.budget-approved-list b{flex:none;font-size:13.5px;font-weight:650;font-variant-numeric:tabular-nums;color:#eef3ff}
+.budget-evidence{margin:0;padding:8px 10px;border-left:3px solid #3fbf8f;border-radius:0 9px 9px 0;background:#0e2620;font-size:12px;line-height:1.45;color:#b9e8d4}
+.budget-manual{display:grid;gap:6px;padding:12px;border:1px dashed #2c4468;border-radius:12px;background:#0c192d}
+.budget-manual h3{margin:0;font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#a9bdd8}.budget-manual>p{margin:0;font-size:12px;line-height:1.45;color:#8fa6c4}
+.budget-manual ul{display:grid;margin:0;padding:0;list-style:none}.budget-manual li,.budget-manual-total{display:flex;justify-content:space-between;gap:12px;padding:5px 0;font-size:12.5px;color:#c7d6ec}
+.budget-manual li span{min-width:0;overflow-wrap:anywhere}.budget-manual b{flex:none;font-variant-numeric:tabular-nums;color:#eef3ff}.budget-manual-total{border-top:1px solid #1f3554;font-weight:650}
+.budget-totals{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:0}
+.budget-totals>div{display:grid;gap:3px;min-width:0;padding:10px;border:1px solid #1f3554;border-radius:11px;background:#0c192d}
+.budget-totals dt{margin:0;font-size:11px;color:#8fa6c4}.budget-totals dd{margin:0;font-size:15px;font-weight:700;font-variant-numeric:tabular-nums;color:#f2f6ff;white-space:nowrap}
+.budget-totals>div[data-kind=due] dd{color:#ffd9a0}.budget-totals>div[data-kind=clear] dd{color:#b4f0d6}
+@media(max-width:400px){.budget-totals{grid-template-columns:1fr}.budget-totals>div{display:flex;justify-content:space-between;align-items:baseline}}

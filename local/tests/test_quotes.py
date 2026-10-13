@@ -288,3 +288,41 @@ class QuoteBriefTests(unittest.TestCase):
         self.assertEqual((brief['status'],brief['editable'],brief['approved_cents'],brief['rejected_cents'],brief['pending_cents'],unit['budget_cents'],unit['balance_cents']),('parcial',False,4000,1500,0,4000,4000))
         self.assertEqual(units(first['id'])[first['id']]['budget_cents'],0)
 
+    def test_approved_amounts_are_locked_and_units_stay_independent(self):
+        cookie,csrf=self.login();post=lambda path,**body:self.request(path,body,cookie=cookie,csrf=csrf)
+        make=lambda key,**extra:self.request('/api/orders',self.order_data(dict({'email':'cliente@example.invalid','request_key':'quote-lock-request-'+key},**extra)),cookie=cookie,csrf=csrf)['body']
+        first=make('0001',serial='LOCK-1');second=make('0002',serial='LOCK-2',group_order_id=str(first['id']),new_unit='1')
+        order=lambda oid:(lambda d:d.get('order',d))(self.request('/api/orders/%d'%oid,cookie=cookie)['body'])
+        work=lambda oid,**extra:self.request('/api/orders/%d/workspace'%oid,dict({'revision':order(oid)['revision'],'status':'pendiente','priority':'normal','assigned_to':'','estimated_delivery':'','problem':'Trabajo ficticio','internal_notes':'','findings':'','recommendations':'','comment':''},**extra),cookie=cookie,csrf=csrf)
+        # Sin presupuesto aprobado los importes manuales se editan; editar E02 no toca E01.
+        self.assertEqual(work(second['id'],status='reparacion',priority='alta',internal_notes='Nota de E02',findings='Hallazgo de E02',lines=[{'category':'labor','description':'Manual','amount_cents':1000}])['status'],200)
+        one,two=order(first['id']),order(second['id'])
+        self.assertEqual((one['status'],one['priority'],one['internal_notes'],one['findings'],one['budget']['total_cents'],one['budget_locked']),('pendiente','normal','','',0,''))
+        self.assertEqual((two['status'],two['priority'],two['internal_notes'],two['findings'],two['budget']['total_cents'],two['budget_locked']),('reparacion','alta','Nota de E02','Hallazgo de E02',1000,''))
+        # Presupuesto aprobado en E01: sus importes quedan fijados.
+        quote=post('/api/orders/%d/quote'%first['id'])['body']['id'];post('/api/quotes/%d'%quote,action='save',items=[{'description':'Servicio ficticio','category':'servicio','quantity':1,'unit_cents':4000,'taxed':True}])
+        with patch.object(app.mail_pro,'configured',return_value=False):post('/api/quotes/%d'%quote,action='send')
+        item=str(self.request('/api/quotes/%d'%quote,cookie=cookie)['body']['quote']['items'][0]['id'])
+        self.assertEqual(post('/api/quotes/%d'%quote,action='decide',note='Aprobó por teléfono (ficticio)',approved=item)['status'],200)
+        locked=order(first['id']);code=locked['budget_locked'];self.assertTrue(code.endswith('-P1'));self.assertEqual(locked['budget']['total_cents'],4000)
+        denied=work(first['id'],lines=[{'category':'labor','description':'Alterado','amount_cents':1}]);self.assertEqual(denied['status'],409);self.assertIn(code,denied['body']['error'])
+        self.assertEqual(work(first['id'],lines=[])['status'],409)
+        # Guardar el informe técnico sin tocar importes (o reenviando los mismos) conserva lo autorizado.
+        self.assertEqual(work(first['id'],findings='Diagnóstico de E01')['status'],200)
+        same=[{'category':l['category'],'description':l['description'],'amount_cents':l['amount_cents']} for l in order(first['id'])['budget_lines']]
+        self.assertEqual(work(first['id'],findings='Diagnóstico de E01',recommendations='Limpieza anual',lines=same)['status'],200)
+        kept=order(first['id']);self.assertEqual((kept['budget']['total_cents'],len(kept['budget_lines']),kept['findings'],kept['recommendations'],kept['money']['balance_cents']),(4000,1,'Diagnóstico de E01','Limpieza anual',4000))
+        self.assertEqual((order(second['id'])['findings'],order(second['id'])['budget']['total_cents']),('Hallazgo de E02',1000))
+        # Entregar exige saldo en cero también con importes fijados.
+        self.assertEqual(work(first['id'],status='entregado')['status'],409)
+        # Mientras se prepara una versión nueva sigue vigente (y fijado) lo que el cliente ya autorizó.
+        post('/api/quotes/%d'%quote,action='version');again=order(first['id']);self.assertEqual((again['budget_locked'],again['budget']['total_cents']),(code,4000))
+
+    def test_order_detail_shows_current_contact_and_keeps_reception_copy(self):
+        cookie,csrf=self.login()
+        made=self.request('/api/orders',self.order_data({'email':'antes@example.invalid','request_key':'contact-current-request-01'}),cookie=cookie,csrf=csrf)['body']
+        order=lambda:(lambda d:d.get('order',d))(self.request('/api/orders/%d'%made['id'],cookie=cookie)['body'])
+        first=order();self.assertEqual(first['email'],'antes@example.invalid');self.assertNotIn('reception_email',first)
+        with app.connect() as c:c.execute("UPDATE clients SET email='ahora@example.invalid'");c.commit()
+        now=order();self.assertEqual((now['email'],now['reception_email']),('ahora@example.invalid','antes@example.invalid'));self.assertNotIn('reception_phone',now)
+

@@ -40,7 +40,8 @@ def attach(c,order):
 def budget_lock(c,oid):
     """Código del presupuesto aprobado que fija los importes de la orden, o '' si se pueden editar a mano.
     Lo que el cliente autorizó (total o parcialmente) no se altera desde «Editar orden»: se cambia con una nueva versión del presupuesto."""
-    try:row=c.execute("SELECT code,status FROM quotes WHERE order_id=? ORDER BY version DESC LIMIT 1",(oid,)).fetchone()
+    # Cuenta la última versión DECIDIDA: mientras se prepara una versión nueva (borrador o enviada), sigue vigente lo que el cliente ya autorizó.
+    try:row=c.execute("SELECT code,status FROM quotes WHERE order_id=? AND status IN ('aprobado','parcial','rechazado') ORDER BY version DESC LIMIT 1",(oid,)).fetchone()
     except Exception:return ''
     return row['code'] if row and row['status'] in ('aprobado','parcial') else ''
 

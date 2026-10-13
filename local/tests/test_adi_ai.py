@@ -108,3 +108,16 @@ class AdiWritingTests(unittest.TestCase):
         with app.connect() as c:
             c.execute("UPDATE users SET role='tecnico' WHERE username='demo'");c.commit()
         self.assertEqual(save(indicators=False)['status'],403)
+
+    def test_internal_fields_are_never_rewritten_for_the_client(self):
+        self.assertIn('findings',adi_ai.INTERNAL_FIELDS);self.assertIn('internal_notes',adi_ai.INTERNAL_FIELDS)
+        with patch.object(adi_ai,'_complete',return_value=('Texto corregido.',1,1)) as provider:
+            for field in adi_ai.INTERNAL_FIELDS:
+                with self.assertRaises(adi_ai.AdiError) as failure:adi_ai.improve('nota interna del taller','cliente',field)
+                self.assertEqual((failure.exception.kind,failure.exception.status),('interno',400))
+            provider.assert_not_called()
+            # Los mismos campos sí admiten corrección ortográfica, y un campo para el cliente admite la explicación.
+            self.assertEqual(adi_ai.improve('nota interna del taller','ortografia','findings')['suggestion'],'Texto corregido.')
+            self.assertEqual(adi_ai.improve('recomendacion al cliente','cliente','recommendations')['suggestion'],'Texto corregido.')
+        with app.connect() as c:self.assertEqual(adi_ai.status(c)['internal_fields'],list(adi_ai.INTERNAL_FIELDS))
+
