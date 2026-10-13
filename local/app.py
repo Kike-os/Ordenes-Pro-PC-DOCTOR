@@ -793,6 +793,15 @@ class Handler(BaseHTTPRequestHandler):
                 # Horarios vigentes para las páginas públicas: los mismos que usa ADI.
                 import business_hours
                 return self.reply(200,business_hours.public(c,reception_now()))
+            if path == '/api/public/versions':
+                # Historial público de versiones (las mismas notas que ya muestra /novedades), por páginas. Sin datos técnicos ni credenciales.
+                try:releases=versioning.load()['releases']
+                except versioning.RegistryError:return self.reply(503,{'error':'No se pudo leer el historial de versiones.'})
+                page=parse_qs(urlsplit(self.path).query).get('page',['1'])[0];page=int(page) if page.isdigit() and 1<=int(page)<=10000 else 1
+                size=12;pages=max(1,(len(releases)+size-1)//size);page=min(page,pages)
+                rows=[{'version':item['version'],'date':item.get('date',''),'type':versioning.TYPES.get(item.get('type'),item.get('type','')),'summary':item.get('summary',''),
+                       'notes':[{'key':key,'title':title,'items':item.get('changes',{}).get(key,[])} for key,title in versioning.CATEGORIES.items() if item.get('changes',{}).get(key)]} for item in releases[(page-1)*size:page*size]]
+                return self.reply(200,{'rows':rows,'page':page,'pages':pages,'total':len(releases)})
             if path == '/api/public/version':
                 # Estado real de la versión, sin sesión: la instalada (la del código desplegado) frente al registro publicado. Solo expone notas ya públicas.
                 # La comprobación se guarda 20 minutos para no consultar el registro en cada visita; «refresh=1» la repite (con límite).

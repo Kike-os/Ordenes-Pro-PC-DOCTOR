@@ -82,4 +82,13 @@ class LoginSecurityTests(unittest.TestCase):
             with app.connect() as c:self.assertEqual(c.execute("SELECT COUNT(*) FROM audit WHERE action='logout_idle'").fetchone()[0],1)
 
 
+    def test_public_version_history_is_paged_and_has_no_session_requirement(self):
+        first=self.request('/api/public/versions')['body'];total=first['total']
+        self.assertEqual((first['page'],len(first['rows'])),(1,min(12,total)));self.assertEqual(first['pages'],max(1,(total+11)//12))
+        self.assertEqual(set(first['rows'][0]),{'version','date','type','summary','notes'})
+        self.assertEqual(first['rows'][0]['version'],self.request('/api/public/version')['body']['version'])
+        last=self.request('/api/public/versions?page=99999')['body'];self.assertEqual(last['page'],1)  # página fuera de rango: se ignora
+        self.assertEqual(self.request('/api/public/versions?page='+str(first['pages']))['body']['page'],first['pages'])
+
+
 if __name__=='__main__':unittest.main()
