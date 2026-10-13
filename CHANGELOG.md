@@ -4,6 +4,19 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.129 — 2026-10-12 23:56 (UTC-05:00)
+
+Seguridad del acceso, cierre por inactividad y actualizaciones del sistema
+
+### Mejoras realizadas
+
+- Acceso: usuario oculto con su propio ojo, límites de longitud (usuario 50, contraseñas nuevas 128) y estados en turquesa, rojo y verde.
+- Versión del sistema: ventana única «Actualizaciones del sistema» con pestañas Novedades e Historial, aviso de novedades sin leer, icono de actualización e indicador verde, turquesa o ámbar.
+
+### Actualizaciones de seguridad
+
+- Acceso: cierre de sesión por inactividad a los 15 minutos con aviso y cuenta atrás; esperas progresivas tras intentos fallidos; verificación silenciosa solo cuando hay fallos recientes (se retira la casilla «No soy un robot»); campo trampa contra envíos automatizados.
+
 ## v1.5.128 — 2026-10-12 23:30 (UTC-05:00)
 
 ADI: esfera con estados reales y sonidos rediseñados
