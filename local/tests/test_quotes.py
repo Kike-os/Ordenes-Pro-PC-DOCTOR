@@ -166,12 +166,12 @@ class CatalogProTests(unittest.TestCase):
         self.assertEqual(post('/api/catalog/%d/image'%a,data=base64.b64encode(b'<svg onload=alert(1)>').decode())['status'],400)
         self.assertTrue(post('/api/catalog/%d/image'%a,data=png)['body']['image']);self.assertEqual(self.request('/api/catalog/%d/image'%a,cookie=cookie)['body'][:4],b'\x89PNG')
         self.assertEqual(post('/api/catalog/%d/image'%a,action='delete')['status'],200);self.assertEqual(self.request('/api/catalog/%d/image'%a,cookie=cookie)['status'],404)
-        # Catálogo inicial: 19 elementos, una sola vez, con sus precios finales tal cual.
-        listing=self.request('/api/catalog',cookie=cookie)['body'];self.assertEqual(listing['initial_missing'],19)
+        # Catálogo entregado por la administración: 19 elementos iniciales y 10 de la segunda carga, una sola vez, con sus precios tal cual.
+        listing=self.request('/api/catalog',cookie=cookie)['body'];self.assertEqual(listing['initial_missing'],29)
         first=post('/api/catalog/seed')['body'];again=post('/api/catalog/seed')['body']
-        self.assertEqual(((first['created'],first['existing']),(again['created'],again['existing'])),((19,0),(0,19)))
+        self.assertEqual(((first['created'],first['existing']),(again['created'],again['existing'])),((29,0),(0,29)))
         seeded={r['name']:r for r in self.request('/api/catalog?all=1',cookie=cookie)['body']['rows']}
-        self.assertEqual(len(seeded),22);self.assertEqual(self.request('/api/catalog',cookie=cookie)['body']['initial_missing'],0)
+        self.assertEqual(len(seeded),32);self.assertEqual(self.request('/api/catalog',cookie=cookie)['body']['initial_missing'],0)
         expected={'Programación o flasheo de BIOS corrupta – PlayStation 5':15000,'Mantenimiento parcial – PlayStation 5':5500,'Cambio profesional de metal líquido – PlayStation 5':18900,'Tanque o caja de mantenimiento para impresora Epson':6856,
                   'Microsoft Office Pro Plus 2024 + Windows 11 Pro':18999,'Microsoft Office 365 Pro Plus – 5 dispositivos':15500,'Microsoft Office 2024 Estándar':8599,'Microsoft Office Professional Plus 2021':7999,'Microsoft Office Professional Plus 2024':9999,
                   'Windows 11 Pro – Licencia empresarial':16500,'Chequeo y diagnóstico profesional de memoria RAM':1800,'Windows 11 Home ES – Licencia':6999,'Windows 11 Pro – Actualización':11299,'Kaspersky Standard – Licencia Antivirus de 1 Año':3000,
@@ -389,4 +389,70 @@ class QuotePendingTests(unittest.TestCase):
         with patch.object(app.mail_pro,'configured',return_value=False):link2=post('/api/quotes/%d'%second,action='send')['body']['link']
         self.client(link2,['rechazado'],signature='')
         final=detail();self.assertEqual((final['budget']['total_cents'],[(i['description'],i['execution']) for i in final['authorized_items']]),(2000,[('Servicio A','realizado')]));self.assertTrue(final['budget_locked'])
+
+
+class QuotePriorityTests(unittest.TestCase):
+    setUpClass=classmethod(test_app.SecurityTests.setUpClass.__func__);setUp=test_app.SecurityTests.setUp;tearDown=test_app.SecurityTests.tearDown;request=test_app.SecurityTests.request;login=test_app.SecurityTests.login;order_data=test_app.SecurityTests.order_data;form=QuoteFlowTests.form
+
+    def test_money_format_for_documents(self):
+        self.assertEqual([quotes.usd(v) for v in (0,5,4500,99999,100000,123456789,-1000)],['$0,00','$0,05','$45,00','$999,99','$1.000,00','$1.234.567,89','-$10,00'])
+
+    def test_additions_icons_tax_pending_and_no_duplicates(self):
+        import catalog_icons
+        cookie,csrf=self.login();post=lambda path,**body:self.request(path,body,cookie=cookie,csrf=csrf)
+        # Un mantenimiento de PC de escritorio previo, con otro nombre y precio: debe actualizarse, no duplicarse.
+        old=post('/api/catalog',name='Mantenimiento de PC de escritorio',category='servicio',price='40',price_mode='incluido')['body']['id']
+        first=post('/api/catalog/seed')['body'];self.assertEqual((first['created'],first['updated'],first['total']),(19+9,1,29))
+        again=post('/api/catalog/seed')['body'];self.assertEqual((again['created'],again['updated'],again['existing']),(0,0,29))
+        data=self.request('/api/catalog?all=1',cookie=cookie)['body'];rows={r['name']:r for r in data['rows']};self.assertEqual(len(rows),29);self.assertEqual(data['initial_missing'],0)
+        expected={'Cambio de pantalla de portátil de 14 pulgadas':(11500,'otro','pantalla',0),'Cambio de pantalla de portátil de 15,6 pulgadas':(15000,'otro','pantalla',0),'Cambio de pantalla de portátil gamer de 15,6 pulgadas':(28000,'otro','pantalla_gamer',0),
+                  'Reparación de bisagras de portátil de 14 pulgadas':(3200,'servicio','bisagra',1),'Reparación de bisagras de portátil de 15,6 pulgadas':(4800,'servicio','bisagra',1),'Pegado de bisagras de portátil de 14 pulgadas':(3500,'servicio','bisagra',1),'Pegado de bisagras de portátil de 15,6 pulgadas':(4800,'servicio','bisagra',1),
+                  'Mantenimiento de PC de escritorio y cambio de pasta térmica del CPU, sin tarjeta gráfica dedicada':(4500,'servicio','escritorio',0),'Mantenimiento de PC Gamer con cambio de pasta térmica del CPU':(7500,'servicio','pc_gamer',1),'Creación de nueva BIOS para computadora portátil':(13000,'servicio','bios',1)}
+        for name,(price,category,icon,pending) in expected.items():
+            row=rows[name];self.assertEqual((row['price_cents'],row['entered_cents'],row['category'],row['icon'],row['tax_pending']),(price,price,category,icon,pending),name)
+        # El mantenimiento de escritorio conservó su identificador y dejó constancia del cambio de precio.
+        desk=rows['Mantenimiento de PC de escritorio y cambio de pasta térmica del CPU, sin tarjeta gráfica dedicada'];self.assertEqual(desk['id'],old)
+        self.assertEqual([(h['old_cents'],h['new_cents']) for h in self.request('/api/catalog/%d/history'%old,cookie=cookie)['body']['rows']],[(4000,4500)])
+        self.assertEqual(data['categories']['otro'],'Productos');self.assertEqual(set(data['priorities']),{'necesario','obligatorio','opcional'});self.assertEqual(data['priorities']['opcional']['color'],'#38BDF8')
+        # Iconos: todos los elementos tienen uno válido; los del catálogo inicial se proponen por categoría y palabras clave.
+        self.assertTrue(all(r['icon'] in data['icons'] for r in rows.values()))
+        self.assertEqual((rows['ESET NOD32 Antivirus – Licencia de 1 Año']['icon'],rows['Windows 11 Home ES – Licencia']['icon'],rows['Microsoft Office 2024 Estándar']['icon'],rows['Mantenimiento parcial – PlayStation 5']['icon']),('antivirus','windows','ofimatica','consola'))
+        self.assertEqual(catalog_icons.guess('otro','Sin coincidencias'),'producto');self.assertEqual(catalog_icons.valid('inexistente'),'generico')
+        # Reemplazo manual del icono; activar o desactivar el elemento no lo pierde. Un icono inválido se rechaza.
+        bios=rows['Creación de nueva BIOS para computadora portátil'];base={'id':str(bios['id']),'name':bios['name'],'description':bios['description'],'category':'servicio','price':'130.00','price_mode':'incluido'}
+        self.assertEqual(post('/api/catalog',**dict(base,icon='no-existe'))['status'],400)
+        post('/api/catalog',**dict(base,icon='repuesto'));post('/api/catalog',**dict(base,available=False))
+        now={r['id']:r for r in self.request('/api/catalog?all=1',cookie=cookie)['body']['rows']}[bios['id']];self.assertEqual((now['icon'],now['available'],now['tax_pending']),('repuesto',0,1))
+        # Confirmar el IVA es un acto expreso de administración.
+        post('/api/catalog',**dict(base,price_mode='agregar',tax_confirmed=True,available=True))
+        now={r['id']:r for r in self.request('/api/catalog?all=1',cookie=cookie)['body']['rows']}[bios['id']];self.assertEqual((now['tax_pending'],now['price_cents'],now['entered_cents']),(0,14950,13000))
+
+    def test_priority_is_saved_shown_and_never_approves(self):
+        cookie,csrf=self.login();post=lambda path,**body:self.request(path,body,cookie=cookie,csrf=csrf)
+        post('/api/catalog/seed');rows={r['name']:r for r in self.request('/api/catalog?all=1',cookie=cookie)['body']['rows']}
+        screen,hinge=rows['Cambio de pantalla de portátil de 14 pulgadas'],rows['Reparación de bisagras de portátil de 14 pulgadas']
+        order=self.request('/api/orders',self.order_data({'email':'cliente@example.invalid','request_key':'quote-priority-request-001'}),cookie=cookie,csrf=csrf)['body']
+        quote=post('/api/orders/%d/quote'%order['id'])['body']['id']
+        line=lambda item,priority,**extra:dict({'catalog_id':item['id'],'description':item['name'],'category':item['category'],'quantity':1,'unit_cents':item['price_cents'],'taxed':bool(item['taxed']),'priority':priority},**extra)
+        free={'description':'Limpieza de teclado ficticia','category':'servicio','quantity':2,'unit_cents':60000,'taxed':True}
+        self.assertEqual(post('/api/quotes/%d'%quote,action='save',items=[line(screen,'urgente')])['status'],400)
+        saved=post('/api/quotes/%d'%quote,action='save',items=[line(screen,'obligatorio'),line(hinge,'necesario'),dict(free,priority='opcional'),dict(free,description='Sin clasificar ficticio')])['body']['quote']
+        self.assertEqual([(i['priority'],i['priority_label'],i['icon'],i['status']) for i in saved['items']],[('obligatorio','Obligatorio','pantalla','pendiente'),('necesario','Necesario','bisagra','pendiente'),('opcional','Opcional','mantenimiento','pendiente'),('','','servicio','pendiente')])
+        # La clasificación no cambia importes ni autoriza: el total es la suma de las partidas y nada pasa a lo aprobado.
+        self.assertEqual((saved['totals']['quoted'],saved['totals']['approved']),(11500+3200+120000+120000,0))
+        detail=lambda:(lambda d:d.get('order',d))(self.request('/api/orders/%d'%order['id'],cookie=cookie)['body']);self.assertEqual((detail()['authorized_items'],detail()['budget']['total_cents']),([],0))
+        # Se conserva al reabrir y al crear una versión; el PDF se genera con iconos, clasificación e importes con $.
+        self.assertEqual([i['priority'] for i in self.request('/api/quotes/%d'%quote,cookie=cookie)['body']['quote']['items']],['obligatorio','necesario','opcional',''])
+        pdf=self.request('/api/quotes/%d/pdf'%quote,cookie=cookie)['body'];self.assertEqual(pdf[:4],b'%PDF')
+        # No se envía mientras el IVA de un servicio del catálogo esté por confirmar.
+        with patch.object(app.mail_pro,'configured',return_value=False):blocked=post('/api/quotes/%d'%quote,action='send')
+        self.assertEqual(blocked['status'],409);self.assertIn('falta confirmar el IVA',blocked['body']['error']);self.assertIn('Reparación de bisagras',blocked['body']['error'])
+        post('/api/catalog',id=str(hinge['id']),name=hinge['name'],description=hinge['description'],category='servicio',price='32.00',price_mode='incluido',tax_confirmed=True)
+        with patch.object(app.mail_pro,'configured',return_value=False):sent=post('/api/quotes/%d'%quote,action='send')
+        self.assertEqual(sent['status'],200);path='/presupuesto/'+sent['body']['link'].rsplit('/',1)[1]
+        page=self.form(path,{'last4':'0017'})['body']
+        for text in ('data-priority="obligatorio">Obligatorio<','data-priority="necesario">Necesario<','data-priority="opcional">Opcional<','class="quote-icon"','$1.200,00','$2.547,00'):self.assertIn(text,page)
+        self.assertEqual(page.count('class="quote-priority"'),3);self.assertNotIn('style=',page)
+        version=post('/api/quotes/%d'%quote,action='version')['body']['id']
+        self.assertEqual([i['priority'] for i in self.request('/api/quotes/%d'%version,cookie=cookie)['body']['quote']['items']],['obligatorio','necesario','opcional',''])
 

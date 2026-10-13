@@ -5,13 +5,14 @@
 - Las decisiones solo cambian mediante acciones registradas (cliente por enlace privado o personal con sesión).
 - Una aprobación no cambia el estado de la orden ni inicia trabajos: el técnico confirma el inicio."""
 import hashlib
+import catalog_icons
 import json
 import re
 import secrets
 from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 
-CATEGORIES = {'servicio': 'Servicios técnicos y reparaciones', 'licencia': 'Licencias de Windows y Office', 'seguridad': 'Antivirus y seguridad', 'repuesto': 'Repuestos y componentes', 'otro': 'Otros productos'}
+CATEGORIES = {'servicio': 'Servicios técnicos y reparaciones', 'licencia': 'Licencias de Windows y Office', 'seguridad': 'Antivirus y seguridad', 'repuesto': 'Repuestos y componentes', 'otro': 'Productos'}
 # Categoría del presupuesto anterior de la orden a la que se traslada cada ítem aprobado (de ahí salen el total a cobrar y el saldo).
 BUDGET_KEY = {'servicio': 'labor', 'repuesto': 'parts', 'licencia': 'digital', 'seguridad': 'digital', 'otro': 'services'}
 STATUS = {'borrador': 'Borrador', 'enviado': 'Enviado al cliente', 'aprobado': 'Aprobado', 'parcial': 'Parcialmente aprobado', 'rechazado': 'Rechazado', 'modificacion': 'Modificación solicitada', 'cancelado': 'Cancelado'}
@@ -19,6 +20,8 @@ ITEM_STATUS = {'pendiente': 'Pendiente', 'aprobado': 'Aprobado', 'rechazado': 'R
 EDITABLE = ('borrador', 'modificacion')
 EXECUTION = {'pendiente': 'Pendiente', 'proceso': 'En proceso', 'realizado': 'Realizado'}
 DECIDED = ('aprobado', 'parcial', 'rechazado')
+# Clasificación de cada partida: informa al cliente qué tan necesaria es. No aprueba nada ni cambia precios. (etiqueta, color de pantalla, color RGB para el PDF)
+PRIORITIES = {'necesario': ('Necesario', '#DC3545', (.86, .21, .27)), 'obligatorio': ('Obligatorio', '#F59E0B', (.80, .50, .02)), 'opcional': ('Opcional', '#38BDF8', (.07, .52, .78))}
 DEFAULT_TAX_BP = 1500
 PRICE_MODES = {'incluido': 'IVA incluido', 'agregar': 'Agregar IVA', 'sin_iva': 'Sin IVA (tarifa 0 %)'}
 # Descuento autorizado: únicamente estas tres opciones; solo lo aplica administración.
@@ -48,7 +51,8 @@ def digest(value):
 
 
 def usd(cents):
-    return '$%d,%02d' % (cents // 100, cents % 100)
+    """Importe para documentos y mensajes al cliente: símbolo de dólar, separador de miles y dos decimales ($1.250,00). No altera el valor guardado."""
+    return ('-' if cents < 0 else '') + '$' + format(abs(cents) // 100, ',d').replace(',', '.') + ',%02d' % (abs(cents) % 100)
 
 
 def cents(value, field='price'):
@@ -125,12 +129,13 @@ def totals(items, rate_bp, discount_bp=0):
 # --- Catálogo ---------------------------------------------------------------------------------------------------------
 
 def catalog(c, query='', only_available=False, category=''):
-    rows = [dict(r) for r in c.execute("SELECT i.id,i.code,i.name,i.description,i.category,i.brand,i.price_cents,i.entered_cents,i.price_mode,i.taxed,i.available,i.license_term,i.devices,i.updated_at,"
+    rows = [dict(r) for r in c.execute("SELECT i.id,i.code,i.name,i.description,i.category,i.brand,i.price_cents,i.entered_cents,i.price_mode,i.taxed,i.available,i.license_term,i.devices,i.updated_at,i.icon,i.tax_pending,"
                                        "(SELECT updated_at FROM catalog_images g WHERE g.item_id=i.id) image FROM catalog_items i ORDER BY i.category,i.name COLLATE NOCASE")]
     words = [w for w in re.sub(r'\s+', ' ', str(query or '')).strip().lower().split(' ') if w]
     for row in rows:
         row['image'] = row['image'] or ''
         row['price_mode_label'] = PRICE_MODES[row['price_mode']]
+        row['icon'] = catalog_icons.valid(row['icon']) if row['icon'] else catalog_icons.guess(row['category'], row['name'], row['brand'])
     return [r for r in rows if (r['available'] or not only_available) and (not category or r['category'] == category)
             and all(w in ' '.join((r['code'] or '', r['name'], r['description'], r['brand'], CATEGORIES[r['category']])).lower() for w in words)]
 
@@ -172,20 +177,31 @@ def save_catalog_item(c, data, user, now):
         errors['name'] = 'Ya existe un elemento con ese nombre en el catálogo.'
     if errors:
         raise QuoteError(next(iter(errors.values())) if len(errors) == 1 else 'Revisa los campos señalados.', fields=errors)
+    icon = str(data.get('icon') or '')
+    if icon and icon not in catalog_icons.ICONS:
+        raise QuoteError('Selecciona un icono válido.', fields={'icon': 'Icono no válido.'})
     price, taxed = price_from(entered, mode, tax_rate(c))
     available, stamp = 1 if data.get('available') is not False else 0, now.isoformat(timespec='seconds')
     if item_id:
-        old = c.execute('SELECT price_cents FROM catalog_items WHERE id=?', (item_id,)).fetchone() if item_id.isdigit() else None
+        old = c.execute('SELECT price_cents,icon FROM catalog_items WHERE id=?', (item_id,)).fetchone() if item_id.isdigit() else None
         if not old:
             raise QuoteError('El elemento del catálogo ya no existe.', 404)
-        c.execute('UPDATE catalog_items SET name=?,description=?,category=?,brand=?,price_cents=?,entered_cents=?,price_mode=?,taxed=?,available=?,license_term=?,devices=?,updated_at=?,updated_by=? WHERE id=?',
-                  (name, description, category, brand, price, entered, mode, taxed, available, term, devices, stamp, user['id'], item_id))
+        # El icono elegido se conserva si la edición no indica otro (por ejemplo, al activar o desactivar el elemento).
+        icon = icon or old['icon'] or catalog_icons.guess(category, name, brand)
+        c.execute('UPDATE catalog_items SET name=?,description=?,category=?,brand=?,price_cents=?,entered_cents=?,price_mode=?,taxed=?,available=?,license_term=?,devices=?,icon=?,updated_at=?,updated_by=? WHERE id=?',
+                  (name, description, category, brand, price, entered, mode, taxed, available, term, devices, icon, stamp, user['id'], item_id))
+        # El IVA queda confirmado solo cuando administración lo indica expresamente; el alta marcada como pendiente lo conserva.
+        if data.get('tax_confirmed') is True:
+            c.execute('UPDATE catalog_items SET tax_pending=0 WHERE id=?', (item_id,))
+        elif data.get('tax_pending') is True:
+            c.execute('UPDATE catalog_items SET tax_pending=1 WHERE id=?', (item_id,))
         if old['price_cents'] != price:
             # Historial de precios: el cambio no toca los presupuestos ya emitidos, que guardan su propio importe.
             c.execute('INSERT INTO catalog_price_history(item_id,old_cents,new_cents,user_id,created_at) VALUES (?,?,?,?,?)', (item_id, old['price_cents'], price, user['id'], stamp))
         return int(item_id)
-    return c.execute('INSERT INTO catalog_items(name,description,category,brand,price_cents,entered_cents,price_mode,taxed,available,license_term,devices,created_at,updated_at,updated_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
-                     (name, description, category, brand, price, entered, mode, taxed, available, term, devices, stamp, stamp, user['id'])).lastrowid
+    icon = icon or catalog_icons.guess(category, name, brand)
+    return c.execute('INSERT INTO catalog_items(name,description,category,brand,price_cents,entered_cents,price_mode,taxed,available,license_term,devices,icon,tax_pending,created_at,updated_at,updated_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+                     (name, description, category, brand, price, entered, mode, taxed, available, term, devices, icon, 1 if data.get('tax_pending') is True else 0, stamp, stamp, user['id'])).lastrowid
 
 
 def price_history(c, item_id):
@@ -231,6 +247,48 @@ INITIAL = (
 )
 
 
+# Segunda carga del catálogo (2026-10-13). (nombre, categoría, precio, descripción, icono, IVA por confirmar, palabras que identifican un registro previo a actualizar)
+# Las pantallas van en «Productos» con IVA incluido. El IVA de los siete servicios está por confirmar: se guarda el precio exacto indicado,
+# sin sumar ni descontar impuestos, y no se pueden enviar en un presupuesto hasta que administración lo confirme en el catálogo.
+ADDITIONS = (
+ ('Cambio de pantalla de portátil de 14 pulgadas', 'otro', '115.00', 'Pantalla para portátil de 14 pulgadas con su instalación.', 'pantalla', False, ()),
+ ('Cambio de pantalla de portátil de 15,6 pulgadas', 'otro', '150.00', 'Pantalla para portátil de 15,6 pulgadas con su instalación.', 'pantalla', False, ()),
+ ('Cambio de pantalla de portátil gamer de 15,6 pulgadas', 'otro', '280.00', 'Pantalla para portátil gamer de 15,6 pulgadas con su instalación.', 'pantalla_gamer', False, ()),
+ ('Reparación de bisagras de portátil de 14 pulgadas', 'servicio', '32.00', 'Reparación de las bisagras de un portátil de 14 pulgadas.', 'bisagra', True, ()),
+ ('Reparación de bisagras de portátil de 15,6 pulgadas', 'servicio', '48.00', 'Reparación de las bisagras de un portátil de 15,6 pulgadas.', 'bisagra', True, ()),
+ ('Pegado de bisagras de portátil de 14 pulgadas', 'servicio', '35.00', 'Pegado de las bisagras de un portátil de 14 pulgadas.', 'bisagra', True, ()),
+ ('Pegado de bisagras de portátil de 15,6 pulgadas', 'servicio', '48.00', 'Pegado de las bisagras de un portátil de 15,6 pulgadas.', 'bisagra', True, ()),
+ ('Mantenimiento de PC de escritorio y cambio de pasta térmica del CPU, sin tarjeta gráfica dedicada', 'servicio', '45.00', 'Mantenimiento de un PC de escritorio sin tarjeta gráfica dedicada, con cambio de la pasta térmica del procesador.', 'escritorio', True, ('mantenimiento', 'escritorio')),
+ ('Mantenimiento de PC Gamer con cambio de pasta térmica del CPU', 'servicio', '75.00', 'Mantenimiento de un PC gamer con cambio de la pasta térmica del procesador.', 'pc_gamer', True, ()),
+ ('Creación de nueva BIOS para computadora portátil', 'servicio', '130.00', 'Creación de una BIOS nueva para una computadora portátil. Es un servicio distinto de la actualización o reprogramación de BIOS.', 'bios', True, ()),
+)
+
+
+def seed_additions(c, user, now):
+    """Registra la segunda carga sin duplicar. Un elemento con el mismo nombre no se toca; el mantenimiento de PC de escritorio actualiza
+    el registro previo equivalente (misma categoría, mismas palabras clave y sin «gamer») en lugar de crear otro."""
+    created = updated = 0
+    for name, category, price, description, icon, pending, match in ADDITIONS:
+        if c.execute('SELECT 1 FROM catalog_items WHERE lower(name)=lower(?)', (name,)).fetchone():
+            continue
+        previous = None
+        if match:
+            for row in c.execute('SELECT * FROM catalog_items WHERE category=? ORDER BY id', (category,)):
+                words = catalog_icons.plain(row['name'])
+                if all(word in words for word in match) and 'gamer' not in words:
+                    previous = dict(row)
+                    break
+        data = {'name': name, 'category': category, 'price': price, 'description': description, 'icon': icon, 'price_mode': 'incluido', 'tax_pending': pending}
+        if previous:
+            # Conserva identificador, código, marca, modo de IVA e historial; solo cambian nombre, descripción, icono y precio.
+            save_catalog_item(c, dict(data, id=str(previous['id']), brand=previous['brand'], price_mode=previous['price_mode'], license_term=previous['license_term'], devices=previous['devices'], available=bool(previous['available']), tax_pending=None), user, now)
+            updated += 1
+        else:
+            save_catalog_item(c, data, user, now)
+            created += 1
+    return {'created': created, 'updated': updated, 'existing': len(ADDITIONS) - created - updated, 'total': len(ADDITIONS)}
+
+
 def seed_initial(c, user, now):
     """Registra el catálogo inicial sin duplicar: un elemento con el mismo nombre no se vuelve a crear ni se modifica."""
     created = 0
@@ -256,7 +314,13 @@ def order_code(c, order_id):
 
 
 def items_of(c, quote_id):
-    return [dict(r) for r in c.execute('SELECT id,position,catalog_id,description,category,quantity,unit_cents,taxed,status,execution,execution_at FROM quote_items WHERE quote_id=? ORDER BY position,id', (quote_id,))]
+    rows = [dict(r) for r in c.execute('SELECT q.id,q.position,q.catalog_id,q.description,q.category,q.quantity,q.unit_cents,q.taxed,q.status,q.execution,q.execution_at,q.priority,'
+                                       "COALESCE(g.icon,'') catalog_icon,COALESCE(g.tax_pending,0) tax_pending FROM quote_items q LEFT JOIN catalog_items g ON g.id=q.catalog_id WHERE q.quote_id=? ORDER BY q.position,q.id", (quote_id,))]
+    for row in rows:
+        # Icono: el del elemento del catálogo (ligado a su identificador); en una línea libre, el propuesto para su categoría y descripción.
+        row['icon'] = catalog_icons.valid(row.pop('catalog_icon')) if row['catalog_id'] and row['catalog_icon'] else catalog_icons.guess(row['category'], row['description'])
+        row['priority_label'] = PRIORITIES[row['priority']][0] if row['priority'] else ''
+    return rows
 
 
 def get(c, quote_id):
@@ -297,7 +361,7 @@ def for_order(c, order_id):
     """Presupuesto vigente de la orden (su última versión) y la lista de versiones."""
     rows = [dict(r) for r in c.execute('SELECT * FROM quotes WHERE order_id=? ORDER BY version DESC', (order_id,))]
     return {'current': detail(c, rows[0]) if rows else None, 'versions': [{'id': r['id'], 'code': r['code'], 'version': r['version'], 'status': r['status'], 'status_label': STATUS[r['status']], 'created_at': r['created_at']} for r in rows],
-            'tax_rate_bp': tax_rate(c), 'categories': CATEGORIES, 'conditions': CONDITIONS, 'discounts': {str(key): '%s: %g %%' % (label, key / 100) for key, label in DISCOUNTS.items()}}
+            'tax_rate_bp': tax_rate(c), 'categories': CATEGORIES, 'conditions': CONDITIONS, 'priorities': {key: {'label': label, 'color': color} for key, (label, color, _) in PRIORITIES.items()}, 'icons': catalog_icons.catalog(), 'discounts': {str(key): '%s: %g %%' % (label, key / 100) for key, label in DISCOUNTS.items()}}
 
 
 def create(c, order_id, user, now, copy_from=None, pending_only=False):
@@ -318,7 +382,7 @@ def create(c, order_id, user, now, copy_from=None, pending_only=False):
     if source:
         for item in items_of(c, source):
             if item['status'] != 'cancelado' and (not pending_only or item['status'] == 'pendiente'):
-                c.execute("INSERT INTO quote_items(quote_id,position,catalog_id,description,category,quantity,unit_cents,taxed) VALUES (?,?,?,?,?,?,?,?)", (quote_id, item['position'], item['catalog_id'], item['description'], item['category'], item['quantity'], item['unit_cents'], item['taxed']))
+                c.execute("INSERT INTO quote_items(quote_id,position,catalog_id,description,category,quantity,unit_cents,taxed,priority) VALUES (?,?,?,?,?,?,?,?,?)", (quote_id, item['position'], item['catalog_id'], item['description'], item['category'], item['quantity'], item['unit_cents'], item['taxed'], item['priority']))
     event(c, quote_id, 'creado', 'Presupuesto %s-P%d creado%s.' % (code, version, ' con las partidas que el cliente dejó pendientes; lo ya autorizado se conserva' if pending_only else ' a partir de la versión anterior' if source else ''), now, user)
     return quote_id
 
@@ -343,7 +407,10 @@ def save(c, quote, data, user, now):
         catalog_id = row.get('catalog_id')
         if catalog_id is not None and (type(catalog_id) is not int or not c.execute('SELECT 1 FROM catalog_items WHERE id=?', (catalog_id,)).fetchone()):
             catalog_id = None
-        clean.append((index, catalog_id, description, category, quantity, unit, 1 if row.get('taxed') is not False else 0))
+        priority = str(row.get('priority') or '')
+        if priority and priority not in PRIORITIES:
+            raise QuoteError('El ítem %d tiene una clasificación no válida.' % (index + 1))
+        clean.append((index, catalog_id, description, category, quantity, unit, 1 if row.get('taxed') is not False else 0, priority))
     valid = str(data.get('valid_until', '')).strip()
     if valid:
         try:
@@ -370,7 +437,7 @@ def save(c, quote, data, user, now):
         c.execute('UPDATE quotes SET require_id=? WHERE id=?', (1 if data['require_id'] else 0, quote['id']))
         event(c, quote['id'], 'identidad', 'Documento de identidad %s para la aprobación.' % ('solicitado' if data['require_id'] else 'ya no solicitado'), now, user)
     c.execute('DELETE FROM quote_items WHERE quote_id=?', (quote['id'],))
-    c.executemany('INSERT INTO quote_items(quote_id,position,catalog_id,description,category,quantity,unit_cents,taxed) VALUES (?,?,?,?,?,?,?,?)', [(quote['id'], *row) for row in clean])
+    c.executemany('INSERT INTO quote_items(quote_id,position,catalog_id,description,category,quantity,unit_cents,taxed,priority) VALUES (?,?,?,?,?,?,?,?,?)', [(quote['id'], *row) for row in clean])
     c.execute("UPDATE quotes SET valid_until=?,notes=?,status='borrador',updated_at=? WHERE id=?", (valid, notes, now.isoformat(timespec='seconds'), quote['id']))
     event(c, quote['id'], 'guardado', 'Borrador guardado con %d %s. Total cotizado: %s.' % (len(clean), 'ítem' if len(clean) == 1 else 'ítems', usd(sum(net(row[4] * row[5], discount) for row in clean))), now, user)
 
@@ -382,6 +449,9 @@ def send(c, quote, recipient, user, now):
     items = items_of(c, quote['id'])
     if not items:
         raise QuoteError('Agrega al menos un ítem antes de enviar el presupuesto.')
+    unconfirmed = [item['description'].split(' — ')[0][:70] for item in items if item['tax_pending'] and item['status'] != 'cancelado']
+    if unconfirmed:
+        raise QuoteError('No se puede enviar: falta confirmar el IVA en el catálogo de «%s». Indica si su precio incluye IVA, se le agrega o no lleva IVA, y vuelve a intentarlo.' % '», «'.join(unconfirmed[:3]), 409)
     if quote['valid_until'] and quote['valid_until'] < now.date().isoformat():
         raise QuoteError('La vigencia del presupuesto ya venció. Actualízala antes de enviarlo.', fields={'valid_until': 'Fecha vencida.'})
     stamp, token = now.isoformat(timespec='seconds'), secrets.token_urlsafe(32)
@@ -642,11 +712,11 @@ def decision_page(token, passkey, quote, order, items, errors=None, form=None):
         if item['status'] == 'cancelado':
             continue
         chosen = form.get('decision_%d' % item['id'], '')
-        rows += ('<fieldset class="quote-item"><legend>%s</legend><p class="quote-amount">%s%s · <strong>%s</strong>%s</p>'
+        rows += ('<fieldset class="quote-item"><legend>%s%s</legend>%s<p class="quote-amount">%s%s · <strong>%s</strong>%s</p>'
                  '<label><input type="radio" name="decision_%d" value="aprobado"%s required> Apruebo este servicio</label>'
                  '<label><input type="radio" name="decision_%d" value="rechazado"%s> No lo apruebo</label>'
                  '<label><input type="radio" name="decision_%d" value="pendiente"%s> Lo decidiré después</label></fieldset>'
-                 ) % (e(item['description']), '%d × ' % item['quantity'] if item['quantity'] > 1 else '', e(usd(item['unit_cents'])), e(usd(net(item['quantity'] * item['unit_cents'], quote['discount_bp']))), '' if item['taxed'] else ' <small>(tarifa 0 %)</small>',
+                 ) % (_icon(item), e(item['description']), _priority(item), '%d × ' % item['quantity'] if item['quantity'] > 1 else '', e(usd(item['unit_cents'])), e(usd(net(item['quantity'] * item['unit_cents'], quote['discount_bp']))), '' if item['taxed'] else ' <small>(tarifa 0 %)</small>',
                       item['id'], ' checked' if chosen == 'aprobado' else '', item['id'], ' checked' if chosen == 'rechazado' else '', item['id'], ' checked' if chosen == 'pendiente' else '')
     problem = lambda key: '<p class="quote-error" role="alert">%s</p>' % e(errors[key]) if errors.get(key) else ''
     rate = quote['tax_rate_bp'] / 100
@@ -671,11 +741,20 @@ def decision_page(token, passkey, quote, order, items, errors=None, form=None):
     return _shell('Presupuesto ' + quote['code'], body)
 
 
+def _icon(item):
+    return '<svg class="quote-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="%s"/></svg>' % catalog_icons.svg_path(item.get('icon') or 'generico')
+
+
+def _priority(item):
+    """Clasificación de la partida para la página del cliente: texto y color (por clase; la página no usa estilos en línea)."""
+    return '<span class="quote-priority" data-priority="%s">%s</span>' % (item['priority'], PRIORITIES[item['priority']][0]) if item.get('priority') else ''
+
+
 def result_page(token, quote, order, items):
     import html
     e = html.escape
     summary = totals(items, quote['tax_rate_bp'], quote['discount_bp'])
-    lines = ''.join('<li data-status="%s"><span>%s</span><strong>%s</strong><em>%s</em></li>' % (e(item['status']), e(item['description']), e(usd(net(item['quantity'] * item['unit_cents'], quote['discount_bp']))), e('Por decidir' if item['status'] == 'pendiente' and quote['status'] in DECIDED else ITEM_STATUS[item['status']])) for item in items if item['status'] != 'cancelado')
+    lines = ''.join('<li data-status="%s"><span>%s%s</span><strong>%s</strong><em>%s</em></li>' % (e(item['status']), e(item['description']), (' ' + _priority(item)) if item.get('priority') else '', e(usd(net(item['quantity'] * item['unit_cents'], quote['discount_bp']))), e('Por decidir' if item['status'] == 'pendiente' and quote['status'] in DECIDED else ITEM_STATUS[item['status']])) for item in items if item['status'] != 'cancelado')
     waiting = quote['status'] in DECIDED and summary['pending'] > 0
     message = {'modificacion': 'Recibimos tu solicitud de modificación. El taller revisará el presupuesto y te enviará una nueva versión.', 'rechazado': 'Registramos que no apruebas este presupuesto. No se ejecutará ningún trabajo sin tu autorización.',
                'cancelado': 'Este presupuesto fue cancelado por el taller.'}.get(quote['status'], 'Registramos tu decisión. El taller ejecutará únicamente los servicios aprobados y te avisará del avance.')

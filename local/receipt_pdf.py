@@ -218,12 +218,13 @@ def render_receipt(order):
         item('Entrega estimada',order.get('estimated_delivery') or 'Sin definir')
         for key,label in [('current_problem','Descripción de trabajo actual'),('internal_notes','Observaciones del técnico'),('findings','Hallazgos internos'),('recommendations','Recomendaciones')]:
             if order.get(key):item(label,order[key])
-        section('Presupuesto USD')
-        money=lambda key:format(order['budget'].get(key+'_cents',0)/100,'.2f')+' USD'
+        section('Presupuesto')
+        from quotes import usd  # mismo formato de importes de todos los documentos: $1.250,00
+        money=lambda key:usd(order['budget'].get(key+'_cents',0))
         pair('Mano de obra',money('labor'),'Repuestos',money('parts'))
         pair('Servicios',money('services'),'Productos digitales',money('digital'))
         item('Total',money('total'))
-        for entry in order.get('budget_lines',[]):item(entry['description'],format(entry['amount_cents']/100,'.2f')+' USD')
+        for entry in order.get('budget_lines',[]):item(entry['description'],usd(entry['amount_cents']))
         section('Historial técnico')
         for entry in order.get('history',[]):
             when=datetime.fromisoformat(entry['occurred_at']).astimezone(ECUADOR_TZ).strftime('%d/%m/%Y %H:%M:%S')

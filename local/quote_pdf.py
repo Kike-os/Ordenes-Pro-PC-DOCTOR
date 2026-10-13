@@ -3,9 +3,10 @@ condiciones y, si existe, la evidencia de la aceptación del cliente con su firm
 import json
 from datetime import datetime
 
+import catalog_icons
 import quotes
 from corporate import settings
-from document_canvas import Canvas, BLUE, GRAY
+from document_canvas import Canvas, BLUE, GRAY, WIDTHS
 from reception import DEVICE_TYPES, ECUADOR_TZ
 
 W, H, M = 595.28, 841.89, 42
@@ -71,27 +72,55 @@ def render(quote, order):
            ('Técnico asignado', order.get('responsible') or 'Sin asignar'), ('Número de serie', order.get('serial') or 'No registrado')])
 
     heading('Servicios y productos cotizados')
-    columns = [(M, 'Descripción'), (W - M - 232, 'Cant.'), (W - M - 196, 'P. unitario'), (W - M - 128, 'Importe'), (W - M - 62, 'Decisión')]
+    # Cada partida: icono, descripción, clasificación (texto y color), cantidad, precio unitario, importe y estado real de autorización.
+    left = M + 26
+    columns = [(left, 'Descripción'), (W - M - 232, 'Cant.'), (W - M - 196, 'P. unitario'), (W - M - 128, 'Importe'), (W - M - 62, 'Autorización')]
     for x, title in columns:
         pdf.text(title, x, state['y'], 7.5, True, GRAY)
     state['y'] += 14
     for item in quote['items']:
-        lines = pdf.wrap(item['description'] + ('' if item['taxed'] else ' (tarifa 0 %)'), W - 2 * M - 246, 9)
-        need(13 * len(lines) + 10)
+        lines = pdf.wrap(item['description'] + ('' if item['taxed'] else ' (tarifa 0 %)'), W - 2 * M - 272, 9)
+        priority = quotes.PRIORITIES.get(item.get('priority') or '')
+        height = 12 * len(lines) + (13 if priority else 0)
+        need(max(height, 22) + 12)
+        catalog_icons.draw(pdf, item.get('icon') or 'generico', M, state['y'] - 2, 18)
         for offset, text in enumerate(lines):
-            pdf.text(text, M, state['y'] + 12 * offset, 9, False, INK)
+            pdf.text(text, left, state['y'] + 12 * offset, 9, False, INK)
+        if priority:
+            top = state['y'] + 12 * len(lines) + 1
+            label = priority[0].upper()
+            width = sum(WIDTHS.get(char, 600) for char in label) * 7 / 1000 + 14
+            pdf.stream.set_color_rgb(*((0, 0, 0) if pdf.mono else priority[2]))
+            pdf.stream.rectangle(left, H - top - 10.5, 3, 10)
+            pdf.stream.fill()
+            pdf.text(label, left + 7, top + 1, 7, True, priority[2])
         pdf.text(str(item['quantity']), W - M - 232, state['y'], 9, False, INK)
         pdf.text(quotes.usd(item['unit_cents']), W - M - 196, state['y'], 9, False, INK)
         pdf.text(quotes.usd(item.get('net_cents', item['line_cents'])), W - M - 128, state['y'], 9, True, INK)
         label, color = MARK[item['status']]
+        if item['status'] == 'pendiente' and quote['status'] in quotes.DECIDED:
+            label = 'POR DECIDIR'
         pdf.text(label, W - M - 62, state['y'] + 1, 7.5, True, color)
-        state['y'] += 12 * len(lines) + 5
+        state['y'] += max(height, 20) + 5
         pdf.line(M, state['y'], W - 2 * M)
         state['y'] += 6
     if not quote['items']:
         pdf.text('Este presupuesto todavía no tiene ítems.', M, state['y'], 9, False, GRAY)
         state['y'] += 16
 
+    if any(item.get('priority') for item in quote['items']):
+        need(26)
+        x = M
+        for key, (label, _, color) in quotes.PRIORITIES.items():
+            pdf.stream.set_color_rgb(*((0, 0, 0) if pdf.mono else color))
+            pdf.stream.rectangle(x, H - state['y'] - 8, 3, 8)
+            pdf.stream.fill()
+            text = label + ': ' + {'necesario': 'recomendado para solucionar el problema', 'obligatorio': 'indispensable para la intervención', 'opcional': 'adicional, a su elección'}[key]
+            pdf.text(text, x + 6, state['y'], 7, False, GRAY)
+            x += sum(WIDTHS.get(char, 556) for char in text) * 7 / 1000 + 20
+        state['y'] += 12
+        pdf.text('La clasificación es informativa: ninguna partida queda autorizada sin la aprobación del cliente.', M, state['y'], 7, False, GRAY)
+        state['y'] += 14
     totals, rate = quote['totals'], quote['tax_rate_bp'] / 100
     decided = quote['status'] in ('aprobado', 'parcial', 'rechazado')
     rows = ([('Importe antes del descuento', totals['gross']), ('%s (%g %%)' % (quotes.DISCOUNTS[totals['discount_bp']], totals['discount_bp'] / 100), -totals['discount'])] if totals.get('discount_bp') else []) + [('Subtotal con IVA %g %%' % rate, totals['base_taxed']), ('Subtotal tarifa 0 %', totals['base_zero']), ('IVA %g %%' % rate, totals['tax']), ('TOTAL COTIZADO', totals['quoted'])]

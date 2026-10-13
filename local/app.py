@@ -1540,9 +1540,10 @@ class Handler(BaseHTTPRequestHandler):
                 query=parse_qs(urlsplit(self.path).query)
                 category=query.get('category',[''])[0]
                 logos={f.stem:f.name for f in sorted((ROOT/'static'/'brands').glob('*')) if f.suffix in ('.svg','.png') and re.fullmatch(r'[a-z0-9]+(?:-[a-z0-9]+)*',f.stem)}
-                names={name.lower() for name,*_ in quotes.INITIAL};present={r['name'].lower() for r in c.execute('SELECT name FROM catalog_items')}
+                names={name.lower() for name,*_ in quotes.INITIAL}|{name.lower() for name,*_ in quotes.ADDITIONS};present={r['name'].lower() for r in c.execute('SELECT name FROM catalog_items')}
                 return self.reply(200,{'rows':quotes.catalog(c,query.get('q',[''])[0][:80],query.get('all',[''])[0]!='1',category if category in quotes.CATEGORIES else ''),'categories':quotes.CATEGORIES,'price_modes':quotes.PRICE_MODES,
-                    'tax_rate_bp':quotes.tax_rate(c),'can_edit':user['role']=='administrador','brand_logos':logos,'initial_missing':len(names-present)})
+                    'tax_rate_bp':quotes.tax_rate(c),'can_edit':user['role']=='administrador','brand_logos':logos,'initial_missing':len(names-present),'icons':quotes.catalog_icons.catalog(),
+                    'priorities':{key:{'label':label,'color':color} for key,(label,color,_) in quotes.PRIORITIES.items()}})
             catalog_extra=re.fullmatch(r'/api/catalog/([0-9]{1,9})/(image|history)',path)
             if catalog_extra:
                 if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
@@ -2394,8 +2395,8 @@ class Handler(BaseHTTPRequestHandler):
                             stamp=quotes.save_image(c,int(catalog_image[1]),content,user,reception_now());audit(c,user['id'],'catalog_image_saved',int(catalog_image[1]))
                             return self.reply(200,{'ok':True,'image':stamp})
                         # Catálogo inicial entregado por la administración: se registra una sola vez; lo que ya existe no se duplica ni se modifica.
-                        result=quotes.seed_initial(c,user,reception_now());audit(c,user['id'],'catalog_seeded')
-                        return self.reply(200,dict(result,ok=True))
+                        result=quotes.seed_initial(c,user,reception_now());extra=quotes.seed_additions(c,user,reception_now());audit(c,user['id'],'catalog_seeded')
+                        return self.reply(200,{'ok':True,'created':result['created']+extra['created'],'updated':extra['updated'],'existing':result['existing']+extra['existing'],'total':result['total']+extra['total']})
                     except quotes.QuoteError as error:return self.reply(error.status,{'error':str(error),'fields':error.fields})
                 if path in ('/api/catalog','/api/catalog/tax'):
                     # Catálogo de servicios y productos: solo administración. Cambiar un precio no altera los presupuestos ya emitidos.

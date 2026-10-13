@@ -133,3 +133,30 @@ La decisión registrada por el personal (lo que el cliente comunicó por teléfo
 ### Estado de ejecución por partida
 
 Cada partida aprobada tiene su avance: Pendiente, En proceso o Realizado (`quote_items.execution`). Lo marca el personal técnico o administración desde «Servicios y productos aprobados»; queda en el historial del presupuesto y en la auditoría. No cambia importes, pagos ni el estado del equipo.
+
+## Clasificación de las partidas (migración 047)
+
+Cada partida de un presupuesto puede llevar una clasificación: **Necesario** (rojo, #DC3545: recomendado para solucionar el problema detectado), **Obligatorio** (ámbar, #F59E0B: indispensable para la intervención) u **Opcional** (azul celeste, #38BDF8: adicional, a elección del cliente). También puede quedar «Sin clasificar», que es como se muestran los presupuestos anteriores.
+
+- Se elige en cada fila del editor, se guarda con la partida (`quote_items.priority`) y se conserva al reabrir y al crear versiones.
+- Siempre se muestra con texto y color: en el editor, en la página privada del cliente y en el PDF (con una leyenda).
+- Es informativa: no cambia el precio y no autoriza nada. Una partida solo queda aprobada con la decisión del cliente.
+
+## Iconos del catálogo
+
+`local/catalog_icons.py` define 20 iconos propios de trazo simple (pantalla, pantalla gamer, bisagra, PC de escritorio, PC gamer, BIOS, antivirus, sistema operativo, ofimática, licencia, consola, impresora, memoria, almacenamiento, mantenimiento, diagnóstico, repuesto, servicio, producto y genérico). Se definen una sola vez y se usan igual en pantalla y en el PDF.
+
+- El icono se guarda en el elemento (`catalog_items.icon`), ligado a su identificador. Al crear un elemento sin icono se propone uno por categoría y palabras clave; administración puede cambiarlo en el formulario del catálogo.
+- Orden de preferencia en pantalla: imagen subida por administración, logotipo de la marca que ya tenga el sistema, icono.
+- No son logotipos de marcas. Los logotipos oficiales de Microsoft, Windows, Office, ESET u otros no se dibujan ni se inventan: se muestran cuando administración sube la imagen oficial al elemento.
+- Una línea libre del presupuesto recibe el icono propuesto para su categoría y descripción.
+
+## Segunda carga del catálogo e IVA por confirmar
+
+`quotes.ADDITIONS` añade 10 elementos: tres pantallas de portátil en la categoría «Productos» con IVA incluido ($115,00, $150,00 y $280,00) y siete servicios ($32,00, $48,00, $35,00, $48,00, $45,00, $75,00 y $130,00). «Importar catálogo» los registra sin duplicar; el mantenimiento de PC de escritorio actualiza el registro previo equivalente (conserva su identificador y deja el cambio en el historial de precios).
+
+El IVA de los siete servicios está pendiente de confirmación: se guardan con el precio exacto indicado y la marca `tax_pending`. No se les suma ni descuenta impuesto. Mientras la marca siga activa se pueden usar en un borrador (con el aviso «IVA por confirmar»), pero **el presupuesto no se puede enviar**. Administración la quita en el catálogo eligiendo el tratamiento del IVA y marcando la casilla de confirmación.
+
+## Importes en documentos
+
+Los documentos generados (PDF del presupuesto, hoja interna de servicio, página privada y correo del presupuesto) muestran los importes con símbolo de dólar, separador de miles y dos decimales: `$1.250,00` (`quotes.usd`). El formato se aplica al generar el documento; los valores guardados y los cálculos no cambian. Los campos de precio de las ventanas del sistema conservan su formato.

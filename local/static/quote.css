@@ -39,3 +39,10 @@
 .quote-document-note{font-size:12.5px;line-height:1.5;color:#b8cbe5}
 .quote-document input[type=file]{width:100%;padding:8px;border:1px solid #2c4468;border-radius:9px;background:#081424;color:#e3eeff;font-size:14px}
 .quote-document small{font-size:12px;letter-spacing:0;color:#9db1cf}
+/* Icono y clasificación de cada partida (Necesario, Obligatorio, Opcional): siempre texto y color */
+.quote-icon{width:20px;height:20px;margin-right:8px;vertical-align:-4px;fill:none;stroke:#70b7f5;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.quote-priority{display:inline-flex;align-items:center;gap:6px;justify-self:start;padding:2px 10px;border:1px solid;border-radius:999px;font-size:12px;font-weight:700;letter-spacing:.02em}
+.quote-priority::before{content:'';width:8px;height:8px;border-radius:50%;background:currentColor}
+.quote-priority[data-priority=necesario]{color:#ff8a94;border-color:#dc354599;background:#dc35451f}
+.quote-priority[data-priority=obligatorio]{color:#fbbf4a;border-color:#f59e0b99;background:#f59e0b1f}
+.quote-priority[data-priority=opcional]{color:#7dd3fc;border-color:#38bdf899;background:#38bdf81f}
