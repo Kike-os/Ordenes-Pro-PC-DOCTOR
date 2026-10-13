@@ -72,3 +72,7 @@ El menú «Más» se abre anclado al botón, admite flechas, se cierra con Escap
 **Corrección.** El panel mide exactamente lo que muestra: la altura usa `--track-shown`, que el componente fija con el número real de filas visibles (entre 1 y el máximo). Se muestran las cinco órdenes con movimientos más recientes (tres en teléfonos, donde cada orden es una tarjeta alta). Con más órdenes de las visibles, la altura se mantiene y el recorrido es interno, con las flechas y el avance automático de siempre. Las flechas se ocultan cuando no hay más órdenes que las visibles; el contador y «Ver todas las órdenes» quedan inmediatamente bajo la última fila.
 
 Comprobado en navegador con 0, 1, 2, 5, 10 y 50 órdenes a 1440, 820 y 390 px: separación de 1 px entre la última fila y el borde del panel, y 8 px hasta el pie, en todos los casos.
+
+## Botón «Historial»
+
+Icono de historial (reloj con flecha), texto y contador separados con un espacio uniforme. El contador es una insignia redondeada dentro del botón, con el número real de movimientos de esa orden (hasta tres dígitos sin deformar las acciones; `999+` si hubiera más) y `0` cuando no hay ninguno. Se actualiza solo cuando el listado detecta un movimiento nuevo y muestra entonces un destello rosado, una sola vez. Entre 1181 y 1359 px el texto se omite y quedan icono y contador; en tableta y teléfono la acción está en el menú «Más» con su contador. Al pulsarlo abre el historial de esa orden, nunca el de otra.

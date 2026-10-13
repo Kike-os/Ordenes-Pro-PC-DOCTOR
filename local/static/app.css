@@ -5780,3 +5780,17 @@ textarea.adi-suggestion-edit{width:100%;min-height:96px;resize:vertical;font:inh
 .tracking-carousel{height:calc(var(--track-head) + var(--track-shown,5)*var(--track-row) + 2px)}
 .tracking-carousel td.tracking-empty{height:var(--track-row)}
 .tracking-foot .tracking-pages[hidden]{display:none}
+/* Botón «Historial»: icono, texto y contador separados; el contador es una insignia que no se sale del botón ni lo deforma */
+.tracking-carousel .tracking-table .tracking-actions button[data-action=historial]{gap:7px;border-color:#2f4d78;background:#10233c;border-radius:9px;transition:background-color .2s ease,border-color .2s ease,box-shadow .2s ease}
+.tracking-carousel .tracking-table .tracking-actions button[data-action=historial] .tracking-history-count{position:static;box-sizing:border-box;display:inline-grid;place-items:center;min-width:20px;height:18px;margin-left:1px;padding:0 6px;border:1px solid #ff9ecb59;border-radius:999px;background:#3a1b33;color:#ffd3e6;font-size:10.5px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
+@media(hover:hover){.tracking-carousel .tracking-table .tracking-actions button[data-action=historial]:hover:not(:disabled){border-color:#ff9ecb99;box-shadow:0 0 0 2px #ff9ecb1f;background:#16304f}}
+/* Sin espacio para el texto (1181–1359 px): variante compacta con el contador como insignia en la esquina, dentro del área del botón */
+@media(min-width:1181px) and (max-width:1359px){.tracking-carousel .tracking-table .tracking-actions button[data-action=historial]{width:auto;min-width:32px;padding:0 6px;display:inline-flex;align-items:center;gap:4px}.tracking-carousel .tracking-table th:nth-child(6){width:206px}}
+/* Movimiento nuevo: un destello rosado en el contador, una sola vez */
+.tracking-row.track-new .tracking-actions button[data-action=historial] .tracking-history-count{animation:tracking-count-new 1.4s ease-out 1}
+@keyframes tracking-count-new{0%{box-shadow:0 0 0 0 #ff9ecb00;transform:scale(1)}30%{box-shadow:0 0 0 4px #ff9ecb66,0 0 12px #ff9ecb;transform:scale(1.15)}100%{box-shadow:0 0 0 0 #ff9ecb00;transform:scale(1)}}
+@media(prefers-reduced-motion:reduce){.tracking-row.track-new .tracking-actions button[data-action=historial] .tracking-history-count{animation:none}.tracking-carousel .tracking-table .tracking-actions button[data-action=historial]{transition:none}}
+/* Espacio de la columna de acciones suficiente para contadores de hasta tres dígitos */
+@media(min-width:1360px){.tracking-carousel .tracking-table th:nth-child(6){width:364px}}
+@media(min-width:1600px){.tracking-carousel .tracking-table th:nth-child(6){width:392px}.tracking-carousel .tracking-table .tracking-actions button[data-action=historial]{width:auto;min-width:84px;padding:0 9px}}
+@media(min-width:1181px) and (max-width:1359px){.tracking-carousel .tracking-table th:nth-child(6){width:226px}}
