@@ -11,3 +11,13 @@ Un único diseño para toda la aplicación, definido al final de `local/static/a
 ## Selectores
 
 Letra de 14 px (16 px en móviles para evitar el zoom de iOS), esquinas de 10 px, texto centrado verticalmente y estados hover/foco uniformes. Las barras de filtros comparten 44 px de alto entre selectores y campos; los selectores dentro de filas de tabla usan 13 px y 36 px.
+
+## Confirmaciones y peticiones de texto
+
+El sistema ya no usa las ventanas nativas del navegador (`confirm`, `prompt`, `alert`). Todas las confirmaciones pasan por el diálogo propio:
+
+- `askConfirm(título, texto, botón, peligro)` devuelve `true` solo si la persona elige continuar. El foco inicial queda en «Cancelar»; Escape y el clic fuera cancelan. Las acciones destructivas (eliminar, desactivar, descartar, cerrar todas las sesiones) muestran el botón en rojo; las demás, en estilo neutro.
+- `askText(título, etiqueta, valor, botón)` pide un texto corto (renombrar una conversación de ADI). Enter guarda, Escape cancela y no acepta un texto vacío.
+- `confirmClose(...)` sigue siendo la base para los cierres con cambios sin guardar.
+
+Se convirtieron 17 avisos: plantilla y descarte de correo, eliminar foto, cierre de sesiones, cambio de rol, desactivar cuenta, rechazar solicitud, restaurar firma, generar o desactivar el enlace de seguimiento, importar clientes, consentimiento y reenvío de recordatorios, renombrar y eliminar conversaciones y activar el micrófono. Ninguna de esas acciones cambió su comportamiento en el servidor.

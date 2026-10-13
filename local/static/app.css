@@ -5440,3 +5440,9 @@ dialog.catalog-picker-dialog{width:min(980px,calc(100% - 20px))}
 .quote-extra .quote-identity-ask{grid-column:1/-1;display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border:1px solid #24558d;border-radius:10px;background:#0c192d}
 .quote-extra .quote-identity-ask input{flex:none;width:18px;height:18px;margin:2px 0 0}
 .quote-identity-ask span{display:grid;gap:2px;min-width:0}.quote-identity-ask small{font-size:11.5px;font-weight:400;color:#9db1cf}
+/* Diálogos propios de confirmación y de texto corto (sustituyen a confirm/prompt del navegador) */
+.confirm-mac-text{text-align:left}.confirm-mac-text h2{margin-bottom:12px;text-align:center}
+.confirm-mac-text label{display:grid;gap:6px;margin:0 0 16px;font-size:12.5px;font-weight:600;color:#b8c9e1}
+.confirm-mac-text input{width:100%;min-height:44px;margin:0;padding:9px 12px;border:1px solid #37618d;border-radius:11px;background:#0c192d;color:#e3eeff;font-size:14px}
+.confirm-mac-text input:focus-visible{outline:2px solid #8bb8ff;outline-offset:2px}
+.confirm-mac h2,.confirm-mac p{overflow-wrap:anywhere}
