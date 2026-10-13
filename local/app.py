@@ -868,7 +868,10 @@ class Handler(BaseHTTPRequestHandler):
                 query=parse_qs(urlsplit(self.path).query)
                 try: rows=appointments.available_slots(c,query.get('date',[''])[0],query.get('service',[''])[0])
                 except ValueError as error:return self.reply(400,{'error':str(error)})
-                return self.reply(200,{'slots':[{'time':r['time']} for r in rows]})
+                # Si la fecha es feriado, la página lo nombra (solo el nombre y el modo de atención; nada interno).
+                import holidays
+                found=holidays.on(c,appointments.date.fromisoformat(query.get('date',[''])[0]))
+                return self.reply(200,{'slots':[{'time':r['time']} for r in rows],'holiday':{'label':found['label'],'mode':found['mode'],'scope':found['scope']} if found else None})
             if path == '/api/public/appointments/manage':
                 query=parse_qs(urlsplit(self.path).query);code=query.get('code',[''])[0][:40];token=query.get('token',[''])[0]
                 row=c.execute('SELECT id,public_code,customer_name,device_type,brand,model,service_code,starts_at,status,generation,manage_token_hash FROM appointments WHERE deleted_at IS NULL AND public_code=?',(code,)).fetchone()
@@ -991,6 +994,17 @@ class Handler(BaseHTTPRequestHandler):
                 try: rows=appointments.available_slots(c,query.get('date',[''])[0],query.get('service',[''])[0],staff=True)
                 except ValueError as error:return self.reply(400,{'error':str(error)})
                 return self.reply(200,{'slots':[{'time':r['time']} for r in rows]})
+            if path in ('/api/holidays','/api/holidays/today'):
+                # Feriados: nacionales calculados y los definidos por administración, con su modo de atención y los conflictos con citas vigentes.
+                if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
+                import holidays
+                today=appointments.now().date()
+                if path.endswith('/today'):return self.reply(200,{'notice':holidays.notice(c,today),'conflicts':len(holidays.conflicts(c,today)) if user['role']=='administrador' else 0})
+                year=parse_qs(urlsplit(self.path).query).get('year',[''])[0]
+                if year and not (year.isdigit() and today.year-1<=int(year)<=today.year+5):return self.reply(400,{'error':'Año no válido.'})
+                year=int(year or today.year)
+                return self.reply(200,{'year':year,'today':today.isoformat(),'rows':holidays.between(c,appointments.date(year,1,1),appointments.date(year,12,31)),'hidden':holidays.hidden(c,year),'modes':holidays.MODES,'scopes':holidays.SCOPES,
+                    'conflicts':holidays.conflicts(c,today),'notice':holidays.notice(c,today),'can_edit':user['role']=='administrador'})
             if path == '/api/agenda':
                 # Agenda de Mantenimientos de Clientes: citas (misma tabla que la reserva en línea) y mantenimientos preventivos.
                 if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
@@ -1004,7 +1018,8 @@ class Handler(BaseHTTPRequestHandler):
                 preventive=maintenance.rows(c)
                 summary['preventive']=sum(1 for r in preventive if r['state']=='scheduled' and r['due_date']>=today.isoformat())
                 summary['overdue']=sum(1 for r in preventive if r['state']=='scheduled' and r['due_date']<today.isoformat())
-                return self.reply(200,{'appointments':rows,'maintenance':preventive,'summary':summary,'today':today.isoformat(),'from':first.isoformat(),'to':last.isoformat(),'statuses':appointments.STATUSES,'services':appointments.services(c),'device_types':DEVICE_TYPES,'confirmation':appointments.confirmation_mode(c),'settings':appointments.settings(c) if user['role']=='administrador' else None})
+                import holidays
+                return self.reply(200,{'holidays':holidays.between(c,first,last),'holiday_notice':holidays.notice(c,today),'appointments':rows,'maintenance':preventive,'summary':summary,'today':today.isoformat(),'from':first.isoformat(),'to':last.isoformat(),'statuses':appointments.STATUSES,'services':appointments.services(c),'device_types':DEVICE_TYPES,'confirmation':appointments.confirmation_mode(c),'settings':appointments.settings(c) if user['role']=='administrador' else None})
             if path == '/api/appointments':
                 if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
                 query=parse_qs(urlsplit(self.path).query);view=query.get('view',['day'])[0];raw=query.get('date',[''])[0]
@@ -2203,6 +2218,19 @@ class Handler(BaseHTTPRequestHandler):
                     if limited(c,'order-draft:'+str(user['id']),limit=240,window=3600):return self.reply(429,{'error':'Demasiados guardados seguidos. Espera un momento.'})
                     status,payload=order_drafts.save(c,user,data.get('data'),data.get('revision',''),data.get('force') is True,reception_now())
                     return self.reply(status,payload)
+                if path=='/api/holidays':
+                    # Ajustes de feriados: solo administración. Nunca se cancela una cita; los conflictos se devuelven para resolverlos a mano.
+                    if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede configurar los feriados.'})
+                    import holidays
+                    action=str(data.get('action','save'))
+                    try:
+                        if action=='save':day=holidays.save(c,data);audit(c,user['id'],'holiday_saved')
+                        elif action=='remove':holidays.remove(c,data.get('day',''));day=str(data.get('day',''));audit(c,user['id'],'holiday_removed')
+                        elif action=='restore':holidays.restore(c,data.get('day',''));day=str(data.get('day',''));audit(c,user['id'],'holiday_restored')
+                        else:return self.reply(400,{'error':'Acción no válida.'})
+                    except ValueError as error:return self.reply(400,{'error':str(error)})
+                    today=appointments.now().date()
+                    return self.reply(200,{'ok':True,'day':day,'conflicts':[item for item in holidays.conflicts(c,today) if item['starts_at'][:10]==day]})
                 if path=='/api/appointments/new':
                     # Cita registrada por el personal: mismas validaciones y disponibilidad que la reserva en línea.
                     if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
