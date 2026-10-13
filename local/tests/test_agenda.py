@@ -247,11 +247,11 @@ class AgendaTests(unittest.TestCase):
             detail=self.request('/api/appointments/%d'%pending['id'],cookie=cookie)['body']['appointment']
             self.assertEqual([(m['kind'],m['result']) for m in detail['mails']],[('cancelled','sent'),('rescheduled','sent'),('confirmation','sent'),('request','sent')])
             # Sin autorización o sin correo no se envía nada; un fallo de SMTP no pierde la cita y se puede reintentar.
-            quiet=self.request('/api/public/appointments',self.booking(slots[3],communications_consent=False,request_key='agenda-request-sinaviso-01'))['body']
-            nomail=self.request('/api/public/appointments',self.booking(slots[6],email='',request_key='agenda-request-sincorreo-1'))['body']
+            quiet=self.request('/api/public/appointments',self.booking(slots[0],communications_consent=False,request_key='agenda-request-sinaviso-01'))['body']
+            nomail=self.request('/api/public/appointments',self.booking(slots[len(slots)//2],email='',request_key='agenda-request-sincorreo-1'))['body']
             self.assertEqual((quiet['mail'],nomail['mail'],len(sent)),('no_consent','no_email',4))
             with patch.object(mail_pro,'deliver',side_effect=mail_pro.MailError('conexion','sin conexión')):
-                failed=self.request('/api/public/appointments',self.booking(slots[9],request_key='agenda-request-fallo-smtp1'))
+                failed=self.request('/api/public/appointments',self.booking(slots[-1],request_key='agenda-request-fallo-smtp1'))
             self.assertEqual((failed['status'],failed['body']['mail']),(201,'failed'))
             self.assertEqual(self.request('/api/appointments/%d'%failed['body']['id'],{'action':'resend_mail'},cookie=cookie,csrf=csrf)['body']['mail'],'sent')
             self.assertEqual(self.request('/api/appointments/%d'%failed['body']['id'],{'action':'resend_mail'},cookie=cookie,csrf=csrf)['body']['mail'],'sent')

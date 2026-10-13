@@ -24,6 +24,10 @@ Atención virtual: «Atención virtual disponible las 24 horas, los 7 días de l
 - **Página de citas** (`/citas`): estado actual, horario presencial, mensaje de atención virtual y próximos cierres (`GET /api/public/hours`).
 - **Panel**: Configuración → Horarios y Disponibilidad, con el estado actual, los siete días, los mensajes y los cierres extraordinarios. Solo administración guarda (`POST /api/business-hours`, auditado); «Restablecer horarios oficiales» recupera los de esta tabla.
 
-## Pendiente de confirmar por administración
+## Hora límite para solicitar citas en línea
 
-Los límites «para agendar citas» comunicados (lunes a viernes hasta las 11:00 p. m., sábado hasta las 10:30 p. m., domingo hasta las 7:30 p. m.) **no se han aplicado a la agenda**: son posteriores al cierre presencial y pueden significar la hora límite para *solicitar* una cita en línea o la hora hasta la que se *atienden* citas. La agenda sigue con sus franjas actuales hasta que se confirme.
+Lunes a viernes hasta las 11:00 p. m., sábado hasta las 10:30 p. m. y domingo hasta las 7:30 p. m. Es la hora hasta la que la página de reservas acepta solicitudes ese día; no es horario de atención ni indica que haya técnicos disponibles a esa hora. Se edita en Configuración → Horarios y Disponibilidad y se puede desactivar.
+
+## De dónde salían los horarios antiguos
+
+«Lunes a viernes de 09:00 a 17:00; sábado de 09:00 a 13:00» no estaba escrito en las instrucciones de ADI: eran las franjas guardadas en la agenda de citas y en el horario del técnico, que ADI leía al hablar de citas. El 12/10/2026 esas franjas se pusieron en el horario oficial y ADI dejó de citar las franjas de la agenda como horario: informa el horario presencial, la hora límite de solicitud y la atención virtual, y consulta las horas libres reales.

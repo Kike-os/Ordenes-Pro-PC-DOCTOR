@@ -59,7 +59,8 @@ class AppointmentAndAdiTests(unittest.TestCase):
  def test_adi_fallback_uses_configured_data_and_never_invents_prices(self):
   with patch.dict(app.os.environ,{'OPENAI_API_KEY':''}),app.connect() as c:
    hours=adi.reply(c,'¿Cuál es el horario de atención?')
-   self.assertIn(adi.schedule_text(appointments.settings(c)['hours']),hours)
+   # El horario que informa ADI es el oficial de atención presencial; las franjas internas de la agenda no se citan como horario.
+   self.assertIn('lunes a viernes de 7:45 a. m. a 8:30 p. m.',hours);self.assertNotIn(adi.schedule_text(appointments.settings(c)['hours']),hours);self.assertIn('hasta las 11:00 p. m.',hours)
    price=adi.reply(c,'¿Cuánto cuesta formatear mi laptop?')
    self.assertIn('revisión técnica',price);self.assertNotRegex(price,r'\$|\bUSD\b|[0-9]+ ?d[oó]lares')
    self.assertIn('/citas',adi.reply(c,'Quiero agendar una cita'))

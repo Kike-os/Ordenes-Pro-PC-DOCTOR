@@ -20,7 +20,21 @@ def ensure_staff_hours(c,technician_id):
  for weekday in range(7):
   end='13:00' if weekday==5 else '17:00';enabled=0 if weekday==6 else 1
   c.execute('INSERT OR IGNORE INTO appointment_staff_hours(technician_id,weekday,start_time,end_time,enabled) VALUES (?,?,?,?,?)',(technician_id,weekday,'09:00',end,enabled))
-def settings(c):return {'confirmation':confirmation_mode(c),'hours':[dict(r) for r in c.execute('SELECT * FROM appointment_hours ORDER BY weekday')],'staff_hours':[dict(r) for r in c.execute('SELECT h.*,u.name technician FROM appointment_staff_hours h JOIN users u ON u.id=h.technician_id ORDER BY u.name,h.weekday')],'holidays':[dict(r) for r in c.execute('SELECT * FROM appointment_holidays ORDER BY day')],'services':[dict(r) for r in c.execute('SELECT code,label,duration_minutes,active FROM appointment_services ORDER BY label')]}
+def buffer_minutes(c):
+ """Margen entre citas del mismo técnico (preparación y cierre de la atención). Por defecto 15 minutos; configurable de 0 a 60."""
+ row=c.execute("SELECT value FROM system_state WHERE key='appointments_buffer'").fetchone()
+ try:return max(0,min(60,int(row['value']))) if row else 15
+ except (ValueError,TypeError):return 15
+def clock12(value):
+ hour,minute=(int(part) for part in value.split(':'));return '%d:%02d %s'%(hour%12 or 12,minute,'a. m.' if hour<12 else 'p. m.')
+def pulse(c):
+ """Huella del estado de la agenda: cambia con cualquier cita creada, confirmada, reprogramada, cancelada o eliminada, y con la configuración. No contiene datos personales."""
+ row=c.execute("SELECT COUNT(*) total,COALESCE(MAX(updated_at),'') last,COALESCE(SUM(generation),0) moves,COUNT(deleted_at) gone FROM appointments").fetchone()
+ events=c.execute('SELECT COALESCE(MAX(id),0) FROM appointment_events').fetchone()[0]
+ extra=c.execute("SELECT COALESCE(group_concat(value,'|'),'') FROM system_state WHERE key IN ('appointments_buffer','appointments_confirmation','appointments_config_stamp')").fetchone()[0]
+ import hashlib
+ return hashlib.sha256(('%s|%s|%s|%s|%s|%s'%(row['total'],row['last'],row['moves'],row['gone'],events,extra)).encode()).hexdigest()[:16]
+def settings(c):return {'buffer':buffer_minutes(c),'confirmation':confirmation_mode(c),'hours':[dict(r) for r in c.execute('SELECT * FROM appointment_hours ORDER BY weekday')],'staff_hours':[dict(r) for r in c.execute('SELECT h.*,u.name technician FROM appointment_staff_hours h JOIN users u ON u.id=h.technician_id ORDER BY u.name,h.weekday')],'holidays':[dict(r) for r in c.execute('SELECT * FROM appointment_holidays ORDER BY day')],'services':[dict(r) for r in c.execute('SELECT code,label,duration_minutes,active FROM appointment_services ORDER BY label')]}
 def update_settings(c,data):
  try:
   for item in data.get('hours',[]):
@@ -35,6 +49,11 @@ def update_settings(c,data):
    code=str(item.get('code',''));duration=int(item.get('duration_minutes',0));active=1 if item.get('active') else 0
    if not c.execute('SELECT 1 FROM appointment_services WHERE code=?',(code,)).fetchone() or duration not in range(15,241,15):return 400,{'error':'Duración de servicio inválida; usa intervalos de 15 minutos.'}
    c.execute('UPDATE appointment_services SET duration_minutes=?,active=? WHERE code=?',(duration,active,code))
+  if str(data.get('buffer','')).strip()!='':
+   margin=int(str(data['buffer']))
+   if margin not in range(0,61,5):return 400,{'error':'El margen entre citas admite de 0 a 60 minutos, en pasos de 5.'}
+   c.execute("INSERT INTO system_state(key,value) VALUES ('appointments_buffer',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",(str(margin),))
+  c.execute("INSERT INTO system_state(key,value) VALUES ('appointments_config_stamp',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",(stamp(now()),))
   if data.get('confirmation') in ('auto','manual'):
    c.execute("INSERT INTO system_state(key,value) VALUES ('appointments_confirmation',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",(data['confirmation'],))
   # Servicios administrables: renombrar los existentes y añadir nuevos (código interno generado).
@@ -61,20 +80,20 @@ def parse_start(raw):
   value=datetime.fromisoformat(str(raw))
   if value.tzinfo is None:value=value.replace(tzinfo=TZ)
   value=value.astimezone(TZ)
-  if value.second or value.microsecond or value.minute%30:raise ValueError()
+  if value.second or value.microsecond or value.minute%15:raise ValueError()
   if value<=now()+timedelta(minutes=10) or value>now()+timedelta(days=90):raise ValueError()
   return value
- except (ValueError,TypeError):raise ValueError('Selecciona una fecha futura disponible en intervalos de 30 minutos.')
+ except (ValueError,TypeError):raise ValueError('Selecciona una fecha y una hora disponibles de la lista.')
 def slot_open(c,start,duration):
  if start.tzinfo is None:start=start.replace(tzinfo=TZ)
  local=start.astimezone(TZ);day=local.date()
  hours=c.execute('SELECT * FROM appointment_hours WHERE weekday=?',(day.weekday(),)).fetchone()
  if not hours or not hours['enabled'] or c.execute('SELECT 1 FROM appointment_holidays WHERE day=?',(day.isoformat(),)).fetchone():return False
  begin=time.fromisoformat(hours['start_time']);end=time.fromisoformat(hours['end_time']);clock=local.timetz().replace(tzinfo=None)
- if clock<begin or (datetime.combine(day,clock)+timedelta(minutes=duration)).time()>end or clock.minute%30:return False
+ if clock<begin or (datetime.combine(day,clock)+timedelta(minutes=duration)).time()>end or ((clock.hour*60+clock.minute)-(begin.hour*60+begin.minute))%15:return False
  return True
 def technicians(c,start,duration,exclude=None):
- start_s=stamp(start);end_s=stamp(start+timedelta(minutes=duration))
+ margin=buffer_minutes(c);start_s=stamp(start);end_s=stamp(start+timedelta(minutes=duration+margin))
  staff=[dict(r) for r in c.execute("SELECT id,name FROM users WHERE active=1 AND role IN ('administrador','tecnico') ORDER BY id")]
  if not staff:return [None] if slot_open(c,start,duration) else []
  available=[]
@@ -83,10 +102,11 @@ def technicians(c,start,duration,exclude=None):
   if staff_hours:
    staff_time=start.astimezone(TZ).timetz().replace(tzinfo=None)
    if not staff_hours['enabled'] or staff_time<time.fromisoformat(staff_hours['start_time']) or (datetime.combine(start.astimezone(TZ).date(),staff_time)+timedelta(minutes=duration)).time()>time.fromisoformat(staff_hours['end_time']):continue
-  args=[person['id'],end_s,start_s]
+  args=[person['id'],end_s,margin,start_s]
   ignore=' AND id!=?' if exclude else ''
   if exclude:args.append(exclude)
-  clash=c.execute("SELECT 1 FROM appointments WHERE deleted_at IS NULL AND technician_id=? AND status NOT IN ('cancelada','completada','no_asistio') AND datetime(starts_at)<datetime(?) AND datetime(starts_at,'+'||duration_minutes||' minutes')>datetime(?)"+ignore,args).fetchone()
+  # Estados que bloquean la franja: solicitada, confirmada y reprogramada. Cancelada, completada y «no asistió» la liberan.
+  clash=c.execute("SELECT 1 FROM appointments WHERE deleted_at IS NULL AND technician_id=? AND status NOT IN ('cancelada','completada','no_asistio') AND datetime(starts_at)<datetime(?) AND datetime(starts_at,'+'||(duration_minutes+?)||' minutes')>datetime(?)"+ignore,args).fetchone()
   if not clash and slot_open(c,start,duration):available.append(person['id'])
  return available
 def available_slots(c,day_text,service_code,staff=False):
@@ -103,8 +123,27 @@ def available_slots(c,day_text,service_code,staff=False):
  while cursor+timedelta(minutes=service['duration_minutes'])<=finish:
   free=technicians(c,cursor,service['duration_minutes']) if cursor>now()+timedelta(minutes=10) else []
   if free:out.append({'time':cursor.strftime('%H:%M'),'technician_id':free[0]})
-  cursor+=timedelta(minutes=30)
+  cursor+=timedelta(minutes=15)
  return out
+def alternatives(c,day_text,service_code,after='',staff=False,limit=3):
+ """Próximas horas realmente libres: primero el mismo día a partir de la hora pedida y luego los días siguientes (hasta una semana)."""
+ out=[]
+ try:day=date.fromisoformat(day_text)
+ except (ValueError,TypeError):return out
+ for offset in range(0,8):
+  current=day+timedelta(days=offset)
+  try:slots=available_slots(c,current.isoformat(),service_code,staff)
+  except ValueError:continue
+  for slot in slots:
+   if offset==0 and after and slot['time']<=after:continue
+   out.append({'date':current.isoformat(),'time':slot['time'],'label':('' if offset==0 else current.strftime('%d/%m')+' ')+clock12(slot['time'])})
+   if len(out)>=limit:return out
+ return out
+def conflict(c,fields,staff=False):
+ """Respuesta cuando la hora pedida no está libre: mensaje claro y alternativas actualizadas."""
+ options=alternatives(c,fields.get('date',''),fields.get('service',''),fields.get('time',''),staff)
+ text='El horario seleccionado ya no está disponible.'+(' Puede agendar su cita a las '+options[0]['label']+' o seleccionar otro horario.' if options and options[0]['date']==fields.get('date') else ' Puede agendar su cita el '+options[0]['label']+' o seleccionar otro horario.' if options else ' Ese día no quedan espacios: elija otra fecha.')
+ return {'error':text,'fields':{'time':text},'alternatives':options}
 def validate_booking(data,c):
  fields={k:str(data.get(k,'')).strip() for k in ['name','identification','phone','email','device_type','brand','model','service','description','date','time','notes']};errors={}
  if len(fields['name'])<2 or len(fields['name'])>150:errors['name']='Indica el nombre completo (2 a 150 caracteres).'
@@ -140,10 +179,12 @@ def create(c,data,user=None):
  key=str(data.get('request_key','')).strip()
  if key and c.execute('SELECT 1 FROM appointments WHERE deleted_at IS NULL AND request_key=?',(key,)).fetchone():return 409,{'error':'Esta solicitud ya fue registrada.'}
  fields,errors,start=validate_booking(data,c)
+ if set(errors)=={'time'} and start is not None:return 409,conflict(c,fields,bool(user))
  if errors:return 400,{'error':'Revisa los datos de la cita.','fields':errors}
  duration=c.execute('SELECT duration_minutes FROM appointment_services WHERE code=?',(fields['service'],)).fetchone()['duration_minutes']
+ # Comprobación final dentro de la misma transacción de escritura: dos solicitudes simultáneas no pueden quedarse con la misma franja.
  staff=technicians(c,start,duration)
- if not staff:return 409,{'error':'Ese espacio acaba de ocuparse. Elige otro horario.'}
+ if not staff:return 409,conflict(c,fields,bool(user))
  technician=staff[0];chosen=str(data.get('client_id','')) if user else ''
  client=c.execute('SELECT * FROM clients WHERE id=?',(int(chosen),)).fetchone() if chosen.isdigit() else None
  if chosen and not client:return 404,{'error':'El cliente seleccionado ya no está disponible.'}
@@ -158,7 +199,10 @@ def create(c,data,user=None):
  return 201,{'id':aid,'code':public,'manage_token':token,'starts_at':stamp(start),'status':initial,'duration_minutes':duration}
 def reschedule(c,row,start,user):
  duration=row['duration_minutes'];staff=technicians(c,start,duration,exclude=row['id'])
- if not staff:return 409,{'error':'Ese espacio no está disponible.'}
+ if not staff:
+  local=start.astimezone(TZ);options=alternatives(c,local.date().isoformat(),row['service_code'],local.strftime('%H:%M'),bool(user))
+  # Se devuelve un diccionario (como en el caso correcto): quien llama decide el código HTTP.
+  return {'error':'Ese espacio no está disponible.'+(' Próximo espacio libre: '+options[0]['label']+'.' if options else ''),'alternatives':options}
  old=row['starts_at'];oldstatus=row['status'];created=stamp(now());generation=row['generation']+1
  c.execute("UPDATE appointments SET starts_at=?,technician_id=?,status='reprogramada',generation=?,updated_at=? WHERE id=?",(stamp(start),staff[0],generation,created,row['id']))
  c.execute('INSERT INTO appointment_events(appointment_id,actor_id,event,old_start,new_start,old_status,new_status,created_at) VALUES (?,?,?,?,?,?,?,?)',(row['id'],user['id'] if user else None,'rescheduled',old,stamp(start),oldstatus,'reprogramada',created))

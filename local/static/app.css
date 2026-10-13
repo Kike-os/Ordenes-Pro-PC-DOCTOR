@@ -4786,3 +4786,5 @@ dialog.mail-composer[open]>form{scroll-padding-bottom:96px}
 .public-hours{display:grid;gap:3px;margin-top:10px;padding-top:10px;border-top:1px solid #22344f;font-size:12px;line-height:1.5;color:#b9c9e2}
 .public-hours[hidden]{display:none}.public-hours p{margin:0}
 .public-hours-state{color:#f3d48f}.public-hours-state[data-open=true]{color:#8ff0bd}
+.appointment-live{margin:6px 0 0;font-size:12px;line-height:1.4;color:#8ff0bd}.appointment-live[hidden]{display:none}.appointment-live[data-state=error]{color:#ffb3b6}.appointment-live::before{content:'';display:inline-block;width:7px;height:7px;margin-right:7px;border-radius:50%;background:currentColor;vertical-align:middle}
+.hours-limit{grid-template-columns:minmax(120px,1fr) auto 124px}.hours-limit .hours-day{font-size:13px;font-weight:600;color:#e5edf9}

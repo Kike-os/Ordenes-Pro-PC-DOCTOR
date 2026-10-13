@@ -8,6 +8,29 @@
   },
   "releases": [
     {
+      "version": "1.5.113",
+      "date": "2026-10-12T19:05:03-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Horarios correctos en ADI y agenda sin solapamientos, sincronizada",
+      "changes": {
+        "features": [
+          "Margen configurable entre citas (15 minutos por defecto): cada cita bloquea a su técnico durante la atención más el margen; horas de inicio cada 15 minutos desde la apertura.",
+          "Hora límite diaria para solicitar citas en línea, separada del horario presencial y configurable.",
+          "Agenda en línea sincronizada: la página de reservas y la agenda del panel se actualizan solas cuando alguien reserva, reprograma o cancela, con indicador de conexión."
+        ],
+        "improvements": [
+          "Cuando la hora elegida ya no está libre se ofrecen las alternativas reales más próximas."
+        ],
+        "fixes": [
+          "ADI ya no responde con horarios antiguos: informa la atención presencial oficial, la hora límite para solicitar citas y la atención virtual, y comprueba en la agenda real la hora que pide el cliente.",
+          "Reprogramar una cita a una hora ocupada muestra el aviso correspondiente en lugar de un error interno."
+        ],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.112",
       "date": "2026-10-12T18:49:28-05:00",
       "type": "patch",

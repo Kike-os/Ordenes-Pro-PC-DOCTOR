@@ -5,7 +5,8 @@ import appointments,order_workspace,maintenance
 SYSTEM_PUBLIC=("Eres ADI, asistente virtual de PC-DOCTOR S.A. Habla español con tono amable y profesional. "
 "Identifícate como asistente virtual cuando sea pertinente. No afirmes ser humana. "
 "No inventes diagnósticos, precios, garantías, fechas de entrega ni avances. Para esos asuntos solicita revisión del taller. "
-"No solicites contraseñas ni números completos de tarjetas. Reserva citas mediante el enlace del sistema.")
+"No solicites contraseñas ni números completos de tarjetas. Reserva citas mediante el enlace del sistema. "
+"Los horarios y la disponibilidad de citas vienen SIEMPRE en el contexto validado de cada mensaje: usa únicamente esos datos, distingue atención presencial, hora límite para solicitar citas y atención virtual, y no menciones ningún otro horario.")
 SYSTEM_ADMIN=("Eres ADI, asistente administrativa de PC-DOCTOR S.A. Responde en español de forma clara. "
 "Usa solamente los datos reales que aparecen en el contexto. No ejecutes cambios, envíos ni escrituras. "
 "Para una modificación indica que debe confirmarla y ejecutarla un usuario autorizado.")
@@ -133,21 +134,66 @@ def ask(text,admin=False,context=None):
   return answer[:2500] or None
  except (OSError,ValueError,KeyError,urllib.error.URLError):return None
 
+def _dot(text):
+ return text if text.endswith('.') else text+'.'
+
 def hours_facts(c,now=None):
  """Horarios vigentes leídos del sistema en cada consulta: atención presencial (y si está abierta ahora), franjas de la agenda de citas y atención virtual."""
  import business_hours
  from reception import ECUADOR_TZ
  from datetime import datetime
  info=business_hours.public(c,now or datetime.now(ECUADOR_TZ));agenda=schedule_text(appointments.settings(c)['hours'])
+ config=business_hours.get(c);limits=business_hours.limits_text(config)
+ # No se citan las franjas internas de la agenda como «horario»: las horas concretas se consultan siempre en la disponibilidad real.
  return {'zona_horaria':'America/Guayaquil (Ecuador)','hoy':info['today'],'hora_actual':info['now'],'atencion_presencial':info['presencial'] or 'sin horario presencial configurado','estado_presencial_ahora':info['status']['label'],
-         'cierres_extraordinarios':[item['date']+(' ('+item['note']+')' if item['note'] else '') for item in info['closures']],'citas':('Las citas se reservan en /citas según la disponibilidad real de la agenda: '+agenda) if agenda else 'Por ahora no hay franjas de citas habilitadas',
+         'cierres_extraordinarios':[item['date']+(' ('+item['note']+')' if item['note'] else '') for item in info['closures']],
+         'solicitud_de_citas':(_dot('Las solicitudes de cita en línea se reciben: '+limits)+' Esa hora límite es para enviar la solicitud; no significa que haya técnicos atendiendo hasta entonces.') if limits else 'Las solicitudes de cita en línea se reciben a cualquier hora.',
+         'citas':'Las citas se atienden dentro del horario presencial y solo en las horas que la agenda tenga libres; se reservan y confirman en /citas.',
          'atencion_virtual':info['virtual_message'] or 'No disponible','asesores_humanos':'Los asesores responden en el horario de atención presencial; fuera de ese horario la solicitud queda registrada.'}
 
-def hours_answer(c,now=None):
- """Respuesta breve sobre horarios, sin IA: distingue atención presencial, citas y atención virtual."""
- facts=hours_facts(c,now);lines=['Atención presencial (hora de Ecuador): '+facts['atencion_presencial']+'. '+facts['estado_presencial_ahora']+'.',facts['citas']+'.']
+def next_slots(c,limit=3):
+ """Próximas horas realmente libres en la agenda (el mismo cálculo que usa la página de reservas), para un diagnóstico o el primer servicio activo."""
+ from datetime import timedelta
+ service=c.execute("SELECT code,label FROM appointment_services WHERE active=1 ORDER BY (code='diagnostico') DESC,rowid LIMIT 1").fetchone()
+ if not service:return []
+ found=appointments.alternatives(c,(appointments.now().date()+timedelta(days=1)).isoformat(),service['code'],'',False,limit)
+ return [{'servicio':service['label'],'fecha':item['date'],'hora':item['time'],'texto':item['date'][8:]+'/'+item['date'][5:7]+' a las '+appointments.clock12(item['time'])} for item in found]
+
+def hours_answer(c,now=None,topic=''):
+ """Respuesta breve sobre horarios, sin IA: distingue atención presencial, solicitud de citas y atención virtual."""
+ facts=hours_facts(c,now);presencial=_dot('Atención presencial (hora de Ecuador): '+facts['atencion_presencial'])+' '+_dot(facts['estado_presencial_ahora'])
+ if topic=='virtual':return (facts['atencion_virtual'] if facts['atencion_virtual']!='No disponible' else 'La atención virtual no está activa en este momento.')+' '+_dot('La atención presencial es: '+facts['atencion_presencial'])
+ if topic=='solicitud':return facts['solicitud_de_citas']+' '+facts['citas']
+ lines=[presencial,facts['solicitud_de_citas'],facts['citas']]
  if facts['atencion_virtual']!='No disponible':lines.append(facts['atencion_virtual'])
  return ' '.join(lines)
+
+def requested_slot(text,now=None):
+ """Fecha y hora que pide el cliente en frases como «mañana a las 10:00 a. m.» o «hoy a las 4 de la tarde». Devuelve (fecha, 'HH:MM') o None."""
+ from datetime import timedelta
+ q=plain(text);base=(now or appointments.now()).astimezone(appointments.TZ).date();rest=q.replace('de la manana','')
+ day=base+timedelta(days=2) if 'pasado manana' in rest else base+timedelta(days=1) if re.search(r'\bmanana\b',rest) else base if re.search(r'\bhoy\b',rest) else None
+ match=re.search(r'\b(\d{1,2})(?:[:.h](\d{2}))?\s*(a\.?\s?m\b\.?|p\.?\s?m\b\.?|de la manana|de la tarde|de la noche|horas|hrs)?',q)
+ if not match or day is None:return None
+ hour,minute,suffix=int(match[1]),int(match[2] or 0),(match[3] or '').replace(' ','').replace('.','')
+ if suffix in ('pm','delatarde','delanoche') and hour<12:hour+=12
+ if suffix=='am' and hour==12:hour=0
+ if not (0<=hour<24 and 0<=minute<60) or not (match[2] or match[3]):return None
+ return day.isoformat(),'%02d:%02d'%(hour,minute)
+
+def slot_answer(c,text,now=None):
+ """Comprueba en la agenda real la hora que pide el cliente. No reserva nada: la cita se confirma en /citas."""
+ wanted=requested_slot(text,now)
+ if not wanted:return None
+ day,hour=wanted;service=c.execute("SELECT code,label FROM appointment_services WHERE active=1 ORDER BY (code='diagnostico') DESC,rowid LIMIT 1").fetchone()
+ if not service:return None
+ label=day[8:]+'/'+day[5:7]+' a las '+appointments.clock12(hour)
+ try:free=[item['time'] for item in appointments.available_slots(c,day,service['code'])]
+ except ValueError:free=[]
+ if hour in free:return 'El '+_dot(label).rstrip('.')+' está libre en este momento para '+service['label'].lower()+'. Resérvalo en /citas: la cita queda confirmada cuando el sistema te muestra su código.'
+ options=appointments.alternatives(c,day,service['code'],hour,False,3) or appointments.alternatives(c,day,service['code'],'',False,3)
+ if options:return 'El '+label+' no está disponible. Opciones libres más próximas: '+_dot('; '.join((item['date'][8:]+'/'+item['date'][5:7]+' a las '+appointments.clock12(item['time'])) for item in options))+' Puedes reservar la que prefieras en /citas.'
+ return 'El '+label+' no está disponible y no veo espacios libres en los próximos días. Un asesor puede ayudarte: usa «Contactar soporte técnico».'
 
 def reply(c,text,admin=False,context=None):
  if admin:
@@ -155,7 +201,11 @@ def reply(c,text,admin=False,context=None):
   if factual:return factual
  # Los horarios vigentes viajan siempre como contexto validado: ADI no usa horarios escritos de memoria.
  if not admin:
-  try:context=dict(context or {},horarios_vigentes=hours_facts(c))
+  try:
+   context=dict(context or {},horarios_vigentes=hours_facts(c))
+   if re.search(r'cita|agend|reserv|turno|disponib',plain(text)):context['proximos_espacios_libres_en_la_agenda']=next_slots(c) or 'sin espacios libres en los próximos días';context['como_reservar']='La reserva se hace y se confirma en /citas; ADI no confirma citas por sí misma.'
+   checked=slot_answer(c,text)
+   if checked:context['comprobacion_de_la_hora_pedida']=checked
   except Exception:pass
  answer=ask(text,admin,context)
  if answer:return answer
@@ -183,13 +233,20 @@ def fallback(c,text):
  has=lambda *keys:any(k in q for k in keys)
  if 'estado' in q or 'orden' in q or 'pcd-' in q or has('mi equipo','mi reparacion','seguimiento'):
   return ORDER_CHECK_HINT
+ if has('virtual','medianoche','madrugada','24 horas','las 24'):return hours_answer(c,topic='virtual')
  if has('cita','agendar','agenda','reservar','reserva','turno'):
-  return 'Puedes reservar tu cita en línea en /citas: elige el servicio, la fecha y una hora disponible. Recibirás un código para consultar, reprogramar o cancelar la cita.'
+  checked=slot_answer(c,text)
+  if checked:return checked
+  if has('hasta que hora','hasta cuando','limite','solicitar'):return hours_answer(c,topic='solicitud')
+  # Solo se ofrecen horas que la agenda tiene libres en este momento; la reserva se confirma en /citas, que vuelve a comprobarlas.
+  slots=next_slots(c)
+  free=' Próximos espacios libres para '+slots[0]['servicio'].lower()+': '+_dot('; '.join(item['texto'] for item in slots)) if slots else ' En este momento no veo espacios libres en los próximos días.'
+  return 'Puedes reservar tu cita en línea en /citas: elige el servicio, la fecha y una hora disponible.'+free+' La cita queda confirmada cuando el sistema te muestra su código.'
  if has('precio','costo','cuanto cuesta','cuanto vale','cuanto sale','cotiza','presupuesto','tarifa') or words&{'valor','vale','cobran'}:
   return 'El valor depende de la revisión técnica del equipo, por eso no puedo darte un precio por este medio. Puedes agendar un diagnóstico en /citas o pedir que un asesor te contacte con el botón «Contactar soporte técnico».'
  if has('garantia'):
   return 'Las condiciones de garantía dependen del servicio realizado y constan en las condiciones de tu orden. Un asesor puede confirmarte tu caso: usa «Contactar soporte técnico».'
- if has('horario','abren','abierto','atienden') or words&{'hora','horas'}:
+ if has('horario','abren','abierto','atienden','domingo','sabado','feriado') or words&{'hora','horas'}:
   return hours_answer(c)
  if has('contacto','whatsapp','telefono','llamar','correo','email','escribir'):
   return 'Puedes escribirnos por WhatsApp al '+company['whatsapp']+' o al correo '+company['support_email']+'. También puedo pasarte con un asesor en este chat.'

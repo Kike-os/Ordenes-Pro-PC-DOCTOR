@@ -790,6 +790,9 @@ class Handler(BaseHTTPRequestHandler):
                 brand_files={f.stem:f.name for f in sorted((ROOT / 'static' / 'brands').glob('*')) if f.suffix in ('.svg','.png') and re.fullmatch(r'[a-z0-9]+(?:-[a-z0-9]+)*', f.stem)}
                 brand_names=sorted({r['name'] for r in c.execute('SELECT name FROM brands')},key=str.lower)
                 return self.reply(200, {'services':appointments.services(c),'device_types':DEVICE_TYPES,'timezone':'America/Guayaquil','brands':brand_names,'brand_logos':brand_files})
+            if path == '/api/public/appointments/pulse':
+                # Señal ligera para sincronizar calendarios abiertos: cambia cuando cambia la agenda. Sin datos de citas ni de clientes.
+                return self.reply(200,{'pulse':appointments.pulse(c),'buffer':appointments.buffer_minutes(c),'server_time':reception_now().isoformat(timespec='seconds')})
             if path == '/api/public/appointments/availability':
                 query=parse_qs(urlsplit(self.path).query)
                 try: rows=appointments.available_slots(c,query.get('date',[''])[0],query.get('service',[''])[0])
@@ -1472,7 +1475,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(400, {'error':'Solicitud inválida.'})
             data = json.loads(self.rfile.read(length))
             appointment_config_post=path=='/api/appointments/config'
-            if not isinstance(data, dict) or any(not isinstance(v,(str,bool)) and not (workspace_post and ((k=='lines' and isinstance(v,list)) or (k=='revision' and type(v) is int))) and not (appointment_config_post and ((k in ('hours','services','staff_hours') and isinstance(v,list)) or (k in ('holiday','new_service') and isinstance(v,dict)))) and not (path=='/api/business-hours' and k in ('hours','closures') and isinstance(v,list)) for k,v in data.items()):
+            if not isinstance(data, dict) or any(not isinstance(v,(str,bool)) and not (workspace_post and ((k=='lines' and isinstance(v,list)) or (k=='revision' and type(v) is int))) and not (appointment_config_post and ((k in ('hours','services','staff_hours') and isinstance(v,list)) or (k in ('holiday','new_service') and isinstance(v,dict)))) and not (path=='/api/business-hours' and k in ('hours','closures','request_limits') and isinstance(v,list)) for k,v in data.items()):
                 return self.reply(400, {'error':'Datos inválidos.'})
             path = urlsplit(self.path).path
             with connect() as c:
@@ -1481,6 +1484,10 @@ class Handler(BaseHTTPRequestHandler):
                     if limited(c,'appointment-ip:'+digest(self.client_address[0]),12,900):return self.reply(429,{'error':'Demasiadas solicitudes. Intenta más tarde.'})
                     key=str(data.get('request_key','')).strip()
                     if not re.fullmatch(r'[A-Za-z0-9_-]{20,100}',key):return self.reply(400,{'error':'Actualiza el formulario e inténtalo nuevamente.'})
+                    # Hora límite del día para solicitar citas en línea (regla aparte del horario presencial y de la disponibilidad de técnicos).
+                    import business_hours
+                    accepting,notice=business_hours.requests_open(business_hours.get(c),reception_now())
+                    if not accepting:return self.reply(409,{'error':notice,'requests_closed':True})
                     previous=c.execute('SELECT id,public_code,starts_at,status FROM appointments WHERE deleted_at IS NULL AND request_key=?',(key,)).fetchone()
                     if previous:return self.reply(200,{'ok':True,'id':previous['id'],'code':previous['public_code'],'starts_at':previous['starts_at'],'status':previous['status'],'duplicate':True})
                     data['request_key']=key
