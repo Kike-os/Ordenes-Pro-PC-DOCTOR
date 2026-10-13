@@ -73,7 +73,7 @@ class EquipmentTests(unittest.TestCase):
         # Se entrega el primero mientras el segundo sigue en reparación con su propio saldo.
         self.assertEqual(deliver(main['id'])['status'],200);self.assertEqual(deliver(second['id'])['status'],409)
         order=self.request('/api/orders/'+str(second['id']),cookie=cookie)['body'];order=order.get('order',order)
-        self.assertEqual(order['group']['totals'],{'budget_cents':5500,'paid_cents':3000,'balance_cents':2500,'delivered':1,'units':2})
+        self.assertEqual({key:order['group']['totals'][key] for key in ('budget_cents','paid_cents','balance_cents','delivered','units','state')},{'budget_cents':5500,'paid_cents':3000,'balance_cents':2500,'delivered':1,'units':2,'state':'parcial'})
         self.assertEqual([(unit['status_code'],unit['balance_cents']) for unit in order['group']['units']],[('entregado',0),('pendiente',2500)])
         # Anular exige motivo, no borra el pago y no se permite sobre un equipo ya entregado.
         first_payment=pay(second['id'],amount='25',method='tarjeta')['body']['id']
