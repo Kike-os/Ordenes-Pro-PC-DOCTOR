@@ -17,6 +17,8 @@ BUDGET_KEY = {'servicio': 'labor', 'repuesto': 'parts', 'licencia': 'digital', '
 STATUS = {'borrador': 'Borrador', 'enviado': 'Enviado al cliente', 'aprobado': 'Aprobado', 'parcial': 'Parcialmente aprobado', 'rechazado': 'Rechazado', 'modificacion': 'Modificación solicitada', 'cancelado': 'Cancelado'}
 ITEM_STATUS = {'pendiente': 'Pendiente', 'aprobado': 'Aprobado', 'rechazado': 'Rechazado', 'cancelado': 'Cancelado'}
 EDITABLE = ('borrador', 'modificacion')
+EXECUTION = {'pendiente': 'Pendiente', 'proceso': 'En proceso', 'realizado': 'Realizado'}
+DECIDED = ('aprobado', 'parcial', 'rechazado')
 DEFAULT_TAX_BP = 1500
 PRICE_MODES = {'incluido': 'IVA incluido', 'agregar': 'Agregar IVA', 'sin_iva': 'Sin IVA (tarifa 0 %)'}
 # Descuento autorizado: únicamente estas tres opciones; solo lo aplica administración.
@@ -254,7 +256,7 @@ def order_code(c, order_id):
 
 
 def items_of(c, quote_id):
-    return [dict(r) for r in c.execute('SELECT id,position,catalog_id,description,category,quantity,unit_cents,taxed,status FROM quote_items WHERE quote_id=? ORDER BY position,id', (quote_id,))]
+    return [dict(r) for r in c.execute('SELECT id,position,catalog_id,description,category,quantity,unit_cents,taxed,status,execution,execution_at FROM quote_items WHERE quote_id=? ORDER BY position,id', (quote_id,))]
 
 
 def get(c, quote_id):
@@ -274,6 +276,7 @@ def detail(c, quote):
         item['net_cents'] = net(item['line_cents'], quote['discount_bp'])
         item['status_label'] = ITEM_STATUS[item['status']]
         item['category_label'] = CATEGORIES[item['category']]
+        item['execution_label'] = EXECUTION[item['execution']]
     return dict(quote, status_label=STATUS[quote['status']], editable=quote['status'] in EDITABLE, items=items, totals=totals(items, quote['tax_rate_bp'], quote['discount_bp']), discount_label=DISCOUNTS[quote['discount_bp']],
                 acceptance=dict(acceptance, signed=bool(acceptance['signature'])) if acceptance else None, identity_document=dict(paper) if paper else None, link=dict(link) if link else None,
                 events=[dict(r) for r in c.execute('SELECT event,detail,actor,created_at FROM quote_events WHERE quote_id=? ORDER BY id DESC LIMIT 60', (quote['id'],))])
@@ -297,14 +300,16 @@ def for_order(c, order_id):
             'tax_rate_bp': tax_rate(c), 'categories': CATEGORIES, 'conditions': CONDITIONS, 'discounts': {str(key): '%s: %g %%' % (label, key / 100) for key, label in DISCOUNTS.items()}}
 
 
-def create(c, order_id, user, now, copy_from=None):
+def create(c, order_id, user, now, copy_from=None, pending_only=False):
     """Nueva versión del presupuesto de la orden: P1, P2… La anterior, si seguía abierta, queda cancelada."""
     code = order_code(c, order_id)
     last = c.execute('SELECT * FROM quotes WHERE order_id=? ORDER BY version DESC LIMIT 1', (order_id,)).fetchone()
     if last and last['status'] in ('borrador',):
         raise QuoteError('Esta orden ya tiene un presupuesto en borrador. Edítalo o cancélalo antes de crear otra versión.', 409)
+    if pending_only and not (last and last['status'] in DECIDED and any(item['status'] == 'pendiente' for item in items_of(c, last['id']))):
+        raise QuoteError('El presupuesto vigente no tiene partidas que el cliente haya dejado pendientes.', 409)
     version, stamp = (last['version'] + 1 if last else 1), now.isoformat(timespec='seconds')
-    quote_id = c.execute("INSERT INTO quotes(order_id,version,code,status,tax_rate_bp,created_by,created_at,updated_at,discount_bp,discount_by,discount_at) VALUES (?,?,?,'borrador',?,?,?,?,?,?,?)", (order_id, version, '%s-P%d' % (code, version), tax_rate(c), user['id'], stamp, stamp, last['discount_bp'] if last else 0, last['discount_by'] if last else None, last['discount_at'] if last else '')).lastrowid
+    quote_id = c.execute("INSERT INTO quotes(order_id,version,code,status,tax_rate_bp,created_by,created_at,updated_at,discount_bp,discount_by,discount_at,continues_id) VALUES (?,?,?,'borrador',?,?,?,?,?,?,?,?)", (order_id, version, '%s-P%d' % (code, version), tax_rate(c), user['id'], stamp, stamp, last['discount_bp'] if last else 0, last['discount_by'] if last else None, last['discount_at'] if last else '', last['id'] if pending_only else None)).lastrowid
     if last and last['status'] in ('enviado', 'modificacion'):
         c.execute("UPDATE quotes SET status='cancelado',updated_at=? WHERE id=?", (stamp, last['id']))
         c.execute("UPDATE quote_links SET revoked_at=? WHERE quote_id=? AND revoked_at=''", (stamp, last['id']))
@@ -312,9 +317,9 @@ def create(c, order_id, user, now, copy_from=None):
     source = copy_from if copy_from is not None else (last['id'] if last else None)
     if source:
         for item in items_of(c, source):
-            if item['status'] != 'cancelado':
+            if item['status'] != 'cancelado' and (not pending_only or item['status'] == 'pendiente'):
                 c.execute("INSERT INTO quote_items(quote_id,position,catalog_id,description,category,quantity,unit_cents,taxed) VALUES (?,?,?,?,?,?,?,?)", (quote_id, item['position'], item['catalog_id'], item['description'], item['category'], item['quantity'], item['unit_cents'], item['taxed']))
-    event(c, quote_id, 'creado', 'Presupuesto %s-P%d creado%s.' % (code, version, ' a partir de la versión anterior' if source else ''), now, user)
+    event(c, quote_id, 'creado', 'Presupuesto %s-P%d creado%s.' % (code, version, ' con las partidas que el cliente dejó pendientes; lo ya autorizado se conserva' if pending_only else ' a partir de la versión anterior' if source else ''), now, user)
     return quote_id
 
 
@@ -388,9 +393,56 @@ def send(c, quote, recipient, user, now):
     return token
 
 
+def chain(c, quote):
+    """El presupuesto y las versiones que continúa (las que dejaron partidas pendientes), de la más reciente a la más antigua."""
+    rows, seen = [dict(quote)], {quote['id']}
+    while rows[-1].get('continues_id') and rows[-1]['continues_id'] not in seen:
+        previous = c.execute('SELECT * FROM quotes WHERE id=?', (rows[-1]['continues_id'],)).fetchone()
+        if not previous:
+            break
+        rows.append(dict(previous))
+        seen.add(previous['id'])
+    return rows
+
+
+def approved_lines(c, quote):
+    """Partidas aprobadas vigentes: las de este presupuesto y las de las versiones que continúa. Cada una se cuenta una sola vez."""
+    result = []
+    for row in reversed(chain(c, quote)):
+        if row['status'] not in DECIDED:
+            continue
+        acceptance = c.execute('SELECT signer_name,signature FROM quote_acceptances WHERE quote_id=?', (row['id'],)).fetchone()
+        for item in items_of(c, row['id']):
+            if item['status'] == 'aprobado':
+                result.append(dict(item, quote_id=row['id'], quote_code=row['code'], approved_at=row['decided_at'], net_cents=net(item['quantity'] * item['unit_cents'], row['discount_bp']), category_label=CATEGORIES[item['category']],
+                                   execution_label=EXECUTION[item['execution']], signed=bool(acceptance and acceptance['signature']), signer=acceptance['signer_name'] if acceptance else '', by_staff=str(row['decided_by']).startswith('personal')))
+    return result
+
+
+def authorized(c, order_id):
+    """Lo que el cliente tiene autorizado hoy para un equipo: {'code', 'items'} según la última versión decidida y las que continúa; None si no hay nada aprobado."""
+    row = c.execute("SELECT * FROM quotes WHERE order_id=? AND status IN ('aprobado','parcial','rechazado') ORDER BY version DESC LIMIT 1", (order_id,)).fetchone()
+    if not row:
+        return None
+    items = approved_lines(c, dict(row))
+    return {'code': row['code'], 'items': items} if items else None
+
+
+def set_execution(c, quote, item_id, value, user, now):
+    """Avance de una partida aprobada (pendiente, en proceso, realizado). No cambia importes, pagos ni el estado del equipo."""
+    if value not in EXECUTION:
+        raise QuoteError('Estado de ejecución no válido.')
+    item = c.execute('SELECT * FROM quote_items WHERE id=? AND quote_id=?', (item_id, quote['id'])).fetchone()
+    if not item or item['status'] != 'aprobado' or quote['status'] not in DECIDED:
+        raise QuoteError('Solo se marca el avance de partidas aprobadas por el cliente.', 409)
+    if item['execution'] != value:
+        c.execute('UPDATE quote_items SET execution=?,execution_by=?,execution_at=? WHERE id=?', (value, user['id'], now.isoformat(timespec='seconds'), item['id']))
+        event(c, quote['id'], 'ejecucion', '«%s»: %s.' % (item['description'][:80], EXECUTION[value].lower()), now, user)
+
+
 def sync_budget(c, quote):
     """Traslada lo aprobado al presupuesto de la orden (del que salen el total a cobrar y el saldo). No toca pagos ni estado."""
-    lines = [(BUDGET_KEY[item['category']], ('%d × ' % item['quantity'] if item['quantity'] > 1 else '') + item['description'], net(item['quantity'] * item['unit_cents'], quote['discount_bp'])) for item in items_of(c, quote['id']) if item['status'] == 'aprobado']
+    lines = [(BUDGET_KEY[item['category']], ('%d × ' % item['quantity'] if item['quantity'] > 1 else '') + item['description'], item['net_cents']) for item in approved_lines(c, get(c, quote['id']))]
     sums = {key: sum(amount for category, _, amount in lines if category == key) for key in ('labor', 'parts', 'services', 'digital')}
     c.execute('INSERT INTO order_budget(order_id,labor_cents,parts_cents,services_cents,digital_cents) VALUES (?,?,?,?,?) ON CONFLICT(order_id) DO UPDATE SET labor_cents=excluded.labor_cents,parts_cents=excluded.parts_cents,services_cents=excluded.services_cents,digital_cents=excluded.digital_cents',
               (quote['order_id'], sums['labor'], sums['parts'], sums['services'], sums['digital']))
@@ -399,24 +451,29 @@ def sync_budget(c, quote):
 
 
 def decide(c, quote, decisions, now, user=None, actor='', note=''):
-    """Registra la decisión sobre cada ítem pendiente. `decisions`: {id de ítem: 'aprobado' | 'rechazado'}."""
+    """Registra la decisión sobre cada ítem. `decisions`: {id de ítem: 'aprobado' | 'rechazado' | 'pendiente'}.
+    Lo que queda pendiente no se cuenta como aprobado ni rechazado: el taller lo ofrece después en una versión de continuación."""
     if quote['status'] != 'enviado':
         raise QuoteError('Este presupuesto no está pendiente de decisión.', 409)
     items = [item for item in items_of(c, quote['id']) if item['status'] != 'cancelado']
-    if set(decisions) != {item['id'] for item in items} or any(value not in ('aprobado', 'rechazado') for value in decisions.values()):
+    if set(decisions) != {item['id'] for item in items} or any(value not in ('aprobado', 'rechazado', 'pendiente') for value in decisions.values()):
         raise QuoteError('Indica si apruebas o rechazas cada uno de los ítems.')
+    if all(value == 'pendiente' for value in decisions.values()):
+        raise QuoteError('Decide al menos una partida: aprueba o rechaza alguna antes de confirmar.')
+    previous = sum(line['net_cents'] for old in chain(c, quote)[1:] for line in approved_lines(c, old) if line['quote_id'] == old['id'])
     paid = c.execute('SELECT COALESCE(SUM(amount_cents),0) FROM order_payments WHERE order_id=? AND voided_at IS NULL', (quote['order_id'],)).fetchone()[0]
-    approved_total = sum(net(item['quantity'] * item['unit_cents'], quote['discount_bp']) for item in items if decisions[item['id']] == 'aprobado')
+    approved_total = previous + sum(net(item['quantity'] * item['unit_cents'], quote['discount_bp']) for item in items if decisions[item['id']] == 'aprobado')
     if paid > approved_total:
         raise QuoteError('La orden ya tiene pagos registrados por %s, más que el total aprobado (%s). Revisa los pagos antes de registrar esta decisión.' % (usd(paid), usd(approved_total)), 409)
     for item in items:
         c.execute('UPDATE quote_items SET status=? WHERE id=?', (decisions[item['id']], item['id']))
     approved = sum(1 for value in decisions.values() if value == 'aprobado')
+    waiting = sum(1 for value in decisions.values() if value == 'pendiente')
     status, stamp = ('aprobado' if approved == len(items) else 'rechazado' if not approved else 'parcial'), now.isoformat(timespec='seconds')
     c.execute('UPDATE quotes SET status=?,decided_at=?,decided_by=?,updated_at=? WHERE id=?', (status, stamp, 'cliente' if not user else 'personal:%d' % user['id'], stamp, quote['id']))
     c.execute("UPDATE quote_links SET revoked_at=? WHERE quote_id=? AND revoked_at=''", (stamp, quote['id']))
     sync_budget(c, quote)
-    event(c, quote['id'], status, '%d de %d ítems aprobados. Total autorizado: %s.%s' % (approved, len(items), usd(approved_total), ' ' + note if note else ''), now, user, actor)
+    event(c, quote['id'], status, '%d de %d ítems aprobados%s. Total autorizado: %s.%s' % (approved, len(items), ('; %d quedaron pendientes para una nueva versión' % waiting) if waiting else '', usd(approved_total), ' ' + note if note else ''), now, user, actor)
     return status
 
 
@@ -506,8 +563,10 @@ def accept(c, quote, link, form, order, now, origin):
         return 'modificacion'
     decisions = {item['id']: form.get('decision_%d' % item['id'], '') for item in items}
     errors = {}
-    if any(value not in ('aprobado', 'rechazado') for value in decisions.values()):
+    if any(value not in ('aprobado', 'rechazado', 'pendiente') for value in decisions.values()):
         errors['items'] = 'Indica si apruebas o rechazas cada servicio.'
+    elif all(value == 'pendiente' for value in decisions.values()):
+        errors['items'] = 'Decide al menos un servicio: aprueba o rechaza alguno antes de confirmar.'
     name = re.sub(r'\s+', ' ', str(form.get('name', ''))).strip()
     if not 5 <= len(name) <= 120:
         errors['name'] = 'Escribe tu nombre completo.'
@@ -585,9 +644,10 @@ def decision_page(token, passkey, quote, order, items, errors=None, form=None):
         chosen = form.get('decision_%d' % item['id'], '')
         rows += ('<fieldset class="quote-item"><legend>%s</legend><p class="quote-amount">%s%s · <strong>%s</strong>%s</p>'
                  '<label><input type="radio" name="decision_%d" value="aprobado"%s required> Apruebo este servicio</label>'
-                 '<label><input type="radio" name="decision_%d" value="rechazado"%s> No lo apruebo</label></fieldset>'
+                 '<label><input type="radio" name="decision_%d" value="rechazado"%s> No lo apruebo</label>'
+                 '<label><input type="radio" name="decision_%d" value="pendiente"%s> Lo decidiré después</label></fieldset>'
                  ) % (e(item['description']), '%d × ' % item['quantity'] if item['quantity'] > 1 else '', e(usd(item['unit_cents'])), e(usd(net(item['quantity'] * item['unit_cents'], quote['discount_bp']))), '' if item['taxed'] else ' <small>(tarifa 0 %)</small>',
-                      item['id'], ' checked' if chosen == 'aprobado' else '', item['id'], ' checked' if chosen == 'rechazado' else '')
+                      item['id'], ' checked' if chosen == 'aprobado' else '', item['id'], ' checked' if chosen == 'rechazado' else '', item['id'], ' checked' if chosen == 'pendiente' else '')
     problem = lambda key: '<p class="quote-error" role="alert">%s</p>' % e(errors[key]) if errors.get(key) else ''
     rate = quote['tax_rate_bp'] / 100
     conditions = ''.join('<li>%s</li>' % e(line) for line in (quote['conditions'] or CONDITIONS).split('\n'))
@@ -615,9 +675,12 @@ def result_page(token, quote, order, items):
     import html
     e = html.escape
     summary = totals(items, quote['tax_rate_bp'], quote['discount_bp'])
-    lines = ''.join('<li data-status="%s"><span>%s</span><strong>%s</strong><em>%s</em></li>' % (e(item['status']), e(item['description']), e(usd(net(item['quantity'] * item['unit_cents'], quote['discount_bp']))), e(ITEM_STATUS[item['status']])) for item in items if item['status'] != 'cancelado')
+    lines = ''.join('<li data-status="%s"><span>%s</span><strong>%s</strong><em>%s</em></li>' % (e(item['status']), e(item['description']), e(usd(net(item['quantity'] * item['unit_cents'], quote['discount_bp']))), e('Por decidir' if item['status'] == 'pendiente' and quote['status'] in DECIDED else ITEM_STATUS[item['status']])) for item in items if item['status'] != 'cancelado')
+    waiting = quote['status'] in DECIDED and summary['pending'] > 0
     message = {'modificacion': 'Recibimos tu solicitud de modificación. El taller revisará el presupuesto y te enviará una nueva versión.', 'rechazado': 'Registramos que no apruebas este presupuesto. No se ejecutará ningún trabajo sin tu autorización.',
                'cancelado': 'Este presupuesto fue cancelado por el taller.'}.get(quote['status'], 'Registramos tu decisión. El taller ejecutará únicamente los servicios aprobados y te avisará del avance.')
+    if waiting:
+        message = 'Registramos tu decisión. Solo se ejecutarán los servicios aprobados. Los que dejaste por decidir (%s) no se realizarán por ahora: el taller te enviará un nuevo presupuesto con ellos.' % usd(summary['pending'])
     extra = '<dl class="quote-totals"><div><dt>Total cotizado</dt><dd>%s</dd></div><div class="quote-total"><dt>Total aprobado</dt><dd>%s</dd></div><div><dt>Importe rechazado</dt><dd>%s</dd></div></dl>' % (e(usd(summary['quoted'])), e(usd(summary['approved'])), e(usd(summary['rejected']))) if quote['status'] in ('aprobado', 'parcial', 'rechazado') else ''
     return _shell('Presupuesto ' + quote['code'], '<section class="tracking-card quote-card">%s<p class="tracking-state quote-state" data-status="%s">%s</p><p>%s</p><ul class="quote-result">%s</ul>%s</section>' % (_summary_block(quote, order), e(quote['status']), e(STATUS[quote['status']]), e(message), lines, extra))
 

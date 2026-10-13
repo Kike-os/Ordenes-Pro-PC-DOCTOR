@@ -326,3 +326,67 @@ class QuoteBriefTests(unittest.TestCase):
         with app.connect() as c:c.execute("UPDATE clients SET email='ahora@example.invalid'");c.commit()
         now=order();self.assertEqual((now['email'],now['reception_email']),('ahora@example.invalid','antes@example.invalid'));self.assertNotIn('reception_phone',now)
 
+
+class QuotePendingTests(unittest.TestCase):
+    setUpClass=classmethod(test_app.SecurityTests.setUpClass.__func__);setUp=test_app.SecurityTests.setUp;tearDown=test_app.SecurityTests.tearDown;request=test_app.SecurityTests.request;login=test_app.SecurityTests.login;order_data=test_app.SecurityTests.order_data;form=QuoteFlowTests.form
+
+    def client(self,link,choices,**extra):
+        path='/presupuesto/'+link.rsplit('/',1)[1];page=self.form(path,{'last4':'0017'})['body']
+        passkey=re.search(r'name="passkey" value="([^"]+)"',page)[1];ids=[int(v) for v in dict.fromkeys(re.findall(r'name="decision_(\d+)"',page))]
+        self.assertIn('Lo decidiré después',page)
+        return self.form(path,dict({'passkey':passkey,'action':'decide','name':'Cliente Ficticio','accept':'on','signature':SIGN},**{'decision_%d'%i:v for i,v in zip(ids,choices)},**extra))['body']
+
+    def test_pending_items_move_to_a_follow_up_version_and_execution_is_tracked(self):
+        cookie,csrf=self.login();post=lambda path,**body:self.request(path,body,cookie=cookie,csrf=csrf)
+        order=self.request('/api/orders',self.order_data({'email':'cliente@example.invalid','request_key':'quote-pending-request-0001'}),cookie=cookie,csrf=csrf)['body']
+        detail=lambda:(lambda d:d.get('order',d))(self.request('/api/orders/%d'%order['id'],cookie=cookie)['body'])
+        quote=post('/api/orders/%d/quote'%order['id'])['body']['id']
+        post('/api/quotes/%d'%quote,action='save',items=[{'description':'Mantenimiento ficticio','category':'servicio','quantity':1,'unit_cents':3000,'taxed':True},{'description':'Disco ficticio','category':'repuesto','quantity':1,'unit_cents':8000,'taxed':True},{'description':'Licencia ficticia','category':'licencia','quantity':1,'unit_cents':2500,'taxed':False}])
+        with patch.object(app.mail_pro,'configured',return_value=False):link=post('/api/quotes/%d'%quote,action='send')['body']['link']
+        # Dejar todo pendiente no registra nada.
+        self.assertIn('Decide al menos un servicio',self.client(link,['pendiente','pendiente','pendiente']))
+        with app.connect() as c:self.assertEqual(c.execute('SELECT COUNT(*) FROM quote_acceptances').fetchone()[0],0)
+        done=self.client(link,['aprobado','pendiente','rechazado']);self.assertIn('Por decidir',done);self.assertIn('nuevo presupuesto',done)
+        first=self.request('/api/quotes/%d'%quote,cookie=cookie)['body']['quote']
+        self.assertEqual((first['status'],[i['status'] for i in first['items']],first['totals']['approved'],first['totals']['pending'],first['totals']['rejected']),('parcial',['aprobado','pendiente','rechazado'],3000,8000,2500))
+        now=detail();self.assertEqual((now['budget']['total_cents'],now['budget_locked'],[(i['description'],i['net_cents'],i['execution'],i['signed']) for i in now['authorized_items']]),(3000,first['code'],[('Mantenimiento ficticio',3000,'pendiente',True)]))
+        # Ejecución: solo partidas aprobadas, valores válidos, y queda en el historial.
+        approved_id,pending_id=str(first['items'][0]['id']),str(first['items'][1]['id'])
+        self.assertEqual(post('/api/quotes/%d'%quote,action='execution',item=approved_id,value='proceso')['status'],200)
+        self.assertEqual(post('/api/quotes/%d'%quote,action='execution',item=approved_id,value='terminado')['status'],400)
+        self.assertEqual(post('/api/quotes/%d'%quote,action='execution',item=pending_id,value='realizado')['status'],409)
+        self.assertEqual(detail()['authorized_items'][0]['execution'],'proceso')
+        with app.connect() as c:self.assertEqual(c.execute("SELECT COUNT(*) FROM quote_events WHERE quote_id=? AND event='ejecucion'",(quote,)).fetchone()[0],1)
+        # Versión de continuación: solo la partida pendiente; lo autorizado sigue vigente y fijado mientras se prepara y se envía.
+        follow=post('/api/quotes/%d'%quote,action='pending_version');self.assertEqual(follow['status'],201);second=follow['body']['id']
+        draft=self.request('/api/quotes/%d'%second,cookie=cookie)['body']['quote'];self.assertEqual(([i['description'] for i in draft['items']],draft['continues_id']),(['Disco ficticio'],quote))
+        self.assertEqual((detail()['budget']['total_cents'],detail()['budget_locked']),(3000,first['code']))
+        with patch.object(app.mail_pro,'configured',return_value=False):link2=post('/api/quotes/%d'%second,action='send')['body']['link']
+        self.assertIn('Aprobado',self.client(link2,['aprobado']))
+        final=detail();code2=self.request('/api/quotes/%d'%second,cookie=cookie)['body']['quote']['code']
+        # Cada partida se cuenta una sola vez: 3000 de la primera versión + 8000 de la continuación.
+        self.assertEqual((final['budget']['total_cents'],final['money']['balance_cents'],final['budget_locked'],[(i['description'],i['quote_code'],i['execution']) for i in final['authorized_items']]),(11000,11000,code2,[('Mantenimiento ficticio',first['code'],'proceso'),('Disco ficticio',code2,'pendiente')]))
+        self.assertEqual(len(final['budget_lines']),2)
+        with app.connect() as c:self.assertTrue(quotes.evidence_ok(c,quote) and quotes.evidence_ok(c,second))
+        # Sin partidas pendientes no se crea una continuación.
+        self.assertEqual(post('/api/quotes/%d'%second,action='pending_version')['status'],409)
+
+    def test_follow_up_rejection_keeps_previous_authorization_and_roles(self):
+        cookie,csrf=self.login();post=lambda path,**body:self.request(path,body,cookie=cookie,csrf=csrf)
+        order=self.request('/api/orders',self.order_data({'email':'cliente@example.invalid','request_key':'quote-pending-request-0002'}),cookie=cookie,csrf=csrf)['body']
+        detail=lambda:(lambda d:d.get('order',d))(self.request('/api/orders/%d'%order['id'],cookie=cookie)['body'])
+        quote=post('/api/orders/%d/quote'%order['id'])['body']['id']
+        post('/api/quotes/%d'%quote,action='save',items=[{'description':'Servicio A','category':'servicio','quantity':1,'unit_cents':2000,'taxed':True},{'description':'Servicio B','category':'servicio','quantity':1,'unit_cents':5000,'taxed':True}])
+        with patch.object(app.mail_pro,'configured',return_value=False):link=post('/api/quotes/%d'%quote,action='send')['body']['link']
+        self.client(link,['aprobado','pendiente'])
+        with app.connect() as c:c.execute("UPDATE users SET role='tecnico' WHERE username='demo'");c.commit()
+        # El técnico marca la ejecución, pero no crea versiones ni decide por el cliente.
+        item=str(self.request('/api/quotes/%d'%quote,cookie=cookie)['body']['quote']['items'][0]['id'])
+        self.assertEqual(post('/api/quotes/%d'%quote,action='execution',item=item,value='realizado')['status'],200)
+        self.assertEqual(post('/api/quotes/%d'%quote,action='pending_version')['status'],403)
+        with app.connect() as c:c.execute("UPDATE users SET role='administrador' WHERE username='demo'");c.commit()
+        second=post('/api/quotes/%d'%quote,action='pending_version')['body']['id']
+        with patch.object(app.mail_pro,'configured',return_value=False):link2=post('/api/quotes/%d'%second,action='send')['body']['link']
+        self.client(link2,['rechazado'],signature='')
+        final=detail();self.assertEqual((final['budget']['total_cents'],[(i['description'],i['execution']) for i in final['authorized_items']]),(2000,[('Servicio A','realizado')]));self.assertTrue(final['budget_locked'])
+

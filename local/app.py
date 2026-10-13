@@ -1268,6 +1268,7 @@ class Handler(BaseHTTPRequestHandler):
                 result['group']=equipment.group(c,row['id']);
                 for unit in (result['group'] or {}).get('units',[]):unit['quote']=quotes.brief(c,unit['id']);unit['type_label']=DEVICE_TYPES.get(unit['type'],unit['type'] or '')  # presupuesto de cada equipo, para distinguirlo del resumen general
                 result['device_code']=row['device_code'] or ''
+                found=quotes.authorized(c,row['id']);result['authorized_items']=found['items'] if found else []
                 result['unit_code']=next((unit['unit_code'] for unit in result['group']['units'] if unit['id']==row['id']),'') if result['group']['multiple'] else ''
                 result['payments']=equipment.payments(c,row['id']);result['money']=equipment.money(c,row['id']);result['payment_methods']=equipment.METHODS
                 result['receipt_mail']=receipt_mail_status(c,row['id'])
@@ -2417,10 +2418,16 @@ class Handler(BaseHTTPRequestHandler):
                         if action=='save':
                             quotes.save(c,found,data,user,now);audit(c,user['id'],'quote_saved',found['order_id'])
                             return self.reply(200,{'ok':True,'quote':quotes.detail(c,quotes.get(c,found['id']))})
+                        if action=='execution':
+                            # Avance de una partida aprobada: lo marca el personal técnico o administración; queda en el historial del presupuesto.
+                            if not str(data.get('item','')).isdigit():return self.reply(400,{'error':'Partida no válida.'})
+                            quotes.set_execution(c,found,int(data['item']),str(data.get('value','')),user,now);audit(c,user['id'],'quote_item_execution',found['order_id'])
+                            return self.reply(200,{'ok':True,'items':quotes.approved_lines(c,quotes.get(c,found['id']))})
                         # Enviar, decidir en nombre del cliente, cancelar y versionar son acciones de administración, siempre registradas.
                         if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede enviar, decidir o cancelar presupuestos.'})
-                        if action=='version':
-                            created=quotes.create(c,found['order_id'],user,now);audit(c,user['id'],'quote_created',found['order_id'])
+                        if action in ('version','pending_version'):
+                            # «pending_version»: continuación con solo las partidas que el cliente dejó pendientes; lo ya autorizado se conserva.
+                            created=quotes.create(c,found['order_id'],user,now,pending_only=action=='pending_version');audit(c,user['id'],'quote_created',found['order_id'])
                             return self.reply(201,{'ok':True,'id':created})
                         if action=='remove_identity':
                             # Eliminación del documento a pedido del cliente o al terminar su finalidad; el presupuesto y su evidencia se conservan.

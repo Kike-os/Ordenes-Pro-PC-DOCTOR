@@ -5597,3 +5597,26 @@ textarea.adi-suggestion-edit{width:100%;min-height:96px;resize:vertical;font:inh
 .budget-totals dt{margin:0;font-size:11px;color:#8fa6c4}.budget-totals dd{margin:0;font-size:15px;font-weight:700;font-variant-numeric:tabular-nums;color:#f2f6ff;white-space:nowrap}
 .budget-totals>div[data-kind=due] dd{color:#ffd9a0}.budget-totals>div[data-kind=clear] dd{color:#b4f0d6}
 @media(max-width:400px){.budget-totals{grid-template-columns:1fr}.budget-totals>div{display:flex;justify-content:space-between;align-items:baseline}}
+/* Partidas aprobadas: importe y estado de ejecución */
+.budget-approved-side{display:grid;justify-items:end;gap:6px;flex:none}
+.budget-approved-list select.budget-execution{width:auto;min-width:118px;height:32px;min-height:32px;margin:0;padding:4px 26px 4px 10px;border:1px solid #2c4468;border-radius:8px;background-color:#0c192d;color:#e3eeff;font-size:12px}
+.budget-approved-list li[data-execution=proceso] select.budget-execution{border-color:#e0b25c80;color:#ffe2a8}
+.budget-approved-list li[data-execution=realizado] select.budget-execution{border-color:#3fbf8f80;color:#aef0d2}
+.budget-approved .budget-evidence+.budget-evidence{margin-top:-6px}
+@media(max-width:400px){.budget-approved-list li{flex-direction:column}.budget-approved-side{display:flex;align-items:center;justify-content:space-between;justify-items:stretch;width:100%}}
+/* Encabezado de la orden: cliente y resumen en fichas compactas; contacto rápido en los datos del cliente */
+.workspace-header .workspace-client{margin:2px 0 0;font-size:15px;font-weight:600;color:#dbe8fb;overflow-wrap:anywhere}
+.workspace-chips{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 0;padding:0;list-style:none}
+.workspace-chips li{display:inline-flex;align-items:center;gap:7px;min-width:0;max-width:100%;padding:5px 11px;border:1px solid #24406a;border-radius:999px;background:#0d1b30;font-size:12px}
+.workspace-chips svg{flex:none;width:14px;height:14px;color:#70b7f5}.workspace-chips small{font-size:11px;color:#8fa6c4;white-space:nowrap}
+.workspace-chips b{min-width:0;font-weight:600;color:#eef3ff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.workspace-chips li[data-priority=alta]{border-color:#8a6a2c}.workspace-chips li[data-priority=alta] b{color:#ffe2a8}
+.workspace-chips li[data-priority=urgente]{border-color:#8a3a44;background:#2a1218}.workspace-chips li[data-priority=urgente] b{color:#ffc4c9}
+.client-contact{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid #16263f}
+.client-contact :is(a,button){display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:38px;margin:0;padding:8px 14px;font-size:12.5px;text-decoration:none}
+.client-contact svg{flex:none;width:15px;height:15px}
+@media(max-width:520px){.client-contact :is(a,button){flex:1 1 110px}.workspace-chips li{padding:5px 9px}}
+.workspace-header>div:not(.workspace-state){min-width:0;max-width:100%}
+.workspace-header .workspace-chips small{letter-spacing:0;text-transform:none}
+.workspace-header .workspace-chips li{max-width:100%}
+@media(max-width:650px){.workspace-header>div:not(.workspace-state){width:100%}.workspace-chips{gap:6px}}

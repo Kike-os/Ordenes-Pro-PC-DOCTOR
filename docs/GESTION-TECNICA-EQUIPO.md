@@ -29,3 +29,7 @@ Es la ventana que antes se llamaba «Editar orden» (mismo componente, `openOrde
 ## Contacto del cliente en el detalle
 
 El detalle muestra el teléfono y el correo vigentes de la ficha del cliente (los mismos que usan los correos y presupuestos). Si cambiaron desde la recepción, se añade «Contacto al recibir el equipo» con el valor de entonces. Los documentos de recepción conservan su copia original.
+
+## Encabezado de la orden
+
+El encabezado muestra el número de orden, el nombre del cliente y fichas compactas con recepción, equipo (unidad, código y modelo), cantidad de equipos, técnico y prioridad (alta y urgente se resaltan). En «Datos del cliente» hay accesos de contacto con los datos vigentes: Llamar, WhatsApp y Correo (cuando el correo del sistema está disponible); cada uno abre su flujo existente y nada se envía automáticamente. El botón «Editar orden» pasó a llamarse «Gestión técnica».

@@ -121,3 +121,15 @@ Cuando la última versión decidida del presupuesto está aprobada (total o parc
 ### Equipos de la orden
 
 En «Equipos de esta orden» la información se separa en cuatro niveles: selector de equipos; **Información del equipo** con sus acciones técnicas; **Presupuesto de este equipo** (acento turquesa: estado, total, aprobado, pendiente, pagado y saldo solo de ese equipo; el de otro equipo se gestiona abriendo ese equipo); y **Resumen general de la orden** en tarjetas (presupuesto total, total pagado, saldo pendiente y equipos entregados). El servidor entrega el resumen por equipo en `group.units[].quote` (`quotes.brief`).
+
+### Partidas que el cliente deja por decidir (migración 046)
+
+En su enlace privado el cliente elige, para cada partida, «Apruebo este servicio», «No lo apruebo» o «Lo decidiré después». Debe decidir al menos una. Lo que deja por decidir no se ejecuta, no se cobra y no pasa al panel de aprobados; la página de resultado se lo explica.
+
+Administración lo ve en «Presupuestos pendientes de aprobación» y usa **«Crear versión con las pendientes»**: nace una versión de continuación (`quotes.continues_id`) que contiene solo esas partidas. Al decidirse, lo aprobado se **suma** a lo ya autorizado en la versión anterior; cada partida se cuenta una sola vez (`quotes.approved_lines`). «Nueva versión», en cambio, sigue creando una cotización completa que reemplaza a la anterior cuando el cliente la decide. Cada versión conserva su propia firma y evidencia.
+
+La decisión registrada por el personal (lo que el cliente comunicó por teléfono) se mantiene solo para administración, con nota obligatoria y auditoría, y se muestra siempre como «no consta firma del cliente».
+
+### Estado de ejecución por partida
+
+Cada partida aprobada tiene su avance: Pendiente, En proceso o Realizado (`quote_items.execution`). Lo marca el personal técnico o administración desde «Servicios y productos aprobados»; queda en el historial del presupuesto y en la auditoría. No cambia importes, pagos ni el estado del equipo.
