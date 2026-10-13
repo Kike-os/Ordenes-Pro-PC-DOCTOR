@@ -8,6 +8,22 @@
   },
   "releases": [
     {
+      "version": "1.5.125",
+      "date": "2026-10-12T22:59:49-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Clientes: tabla con columnas independientes y acciones alineadas",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Clientes: tabla con columnas separadas de teléfono y correo, acciones alineadas del mismo tamaño (ver, editar, crear orden, llamar, correo) con estados deshabilitados explicados, total de clientes registrados y tarjetas compactas en móviles."
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.124",
       "date": "2026-10-12T22:54:44-05:00",
       "type": "patch",

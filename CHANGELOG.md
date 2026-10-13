@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.125 — 2026-10-12 22:59 (UTC-05:00)
+
+Clientes: tabla con columnas independientes y acciones alineadas
+
+### Mejoras realizadas
+
+- Clientes: tabla con columnas separadas de teléfono y correo, acciones alineadas del mismo tamaño (ver, editar, crear orden, llamar, correo) con estados deshabilitados explicados, total de clientes registrados y tarjetas compactas en móviles.
+
 ## v1.5.124 — 2026-10-12 22:54 (UTC-05:00)
 
 Barras de desplazamiento, menús desplegables y selectores con el tema azul

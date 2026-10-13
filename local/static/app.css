@@ -5005,3 +5005,35 @@ body[data-page=dashboard] :is(.module-tools,.devices-tools,.control-pro .control
 body[data-page=dashboard] :is(td,.order-row-actions,.appointment-row-actions,.client-import-table,.serial-official,.clients-summary,.config-table) select{font-size:13px;min-height:36px;height:36px;padding-top:0;padding-bottom:0}
 @media(max-width:860px){body:is([data-page=dashboard],[data-page=appointments]) select,body[data-page=dashboard] :is(.module-tools,.devices-tools,.control-pro .control-field,.agenda-filters,.delivery-filters,.tracking-tools,.tracking-field,.clients-toolbar,.orders-filter-card .order-filters,.appointment-toolbar,.order-card-controls,.document-preview-options) :is(select,input:not([type=checkbox]):not([type=radio])){font-size:16px!important}}
 @media(min-width:861px){body[data-page=dashboard] :is(.wizard-dialog,.reception-dialog,.settings-panel,.workspace-editor,.maintenance-dialog) select{font-size:14px}}
+/* Clientes: tabla administrativa con columnas independientes (cliente, identificación, teléfono, correo, ciudad, órdenes y acciones). */
+.clients-table{border-collapse:collapse}
+.clients-table th,.clients-table td{text-align:left;vertical-align:middle}
+.clients-table th{white-space:nowrap}
+.clients-table tbody tr{transition:background .15s}.clients-table tbody tr:hover{background:#10213a}
+.clients-table :is(th,td)[data-col=name]{min-width:200px}
+.clients-table :is(th,td):is([data-col=id],[data-col=phone],[data-col=actions]){width:1%;white-space:nowrap}
+.clients-table :is(th,td)[data-col=orders]{width:1%;text-align:center}
+.clients-table td[data-col=mail]{max-width:240px}
+.clients-table td[data-col=city]{max-width:170px}
+.clients-phone{display:grid;gap:1px;font-variant-numeric:tabular-nums;color:#dbe8fb}.clients-phone small{font-size:11.5px;color:#8fa5c4}
+.clients-email,.clients-city{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#cfdcf2}
+.clients-row-actions{display:flex;flex-wrap:nowrap;align-items:center;gap:6px}
+.clients-row-actions .row-action,.clients-panel[data-density=compact] .clients-row-actions .row-action{flex:none;display:inline-grid;place-items:center;width:34px;height:34px;min-height:34px;margin:0;padding:0;border:1px solid #2c4468;border-radius:9px;background:#10203a;color:#c5d5ee;transition:background .15s,border-color .15s,color .15s}
+.clients-row-actions .row-action:hover{transform:none}
+.clients-row-actions .row-action:focus-visible{outline:2px solid #70b7f5;outline-offset:2px}
+.clients-row-actions .row-action[data-action=order]:not([data-disabled]){border-color:#3d6fb0;color:#a8dcff}
+.clients-row-actions .row-action[data-disabled=true]{opacity:.4;cursor:not-allowed;border-style:dashed;background:#0b1526}
+.clients-count{display:grid;gap:2px;margin-right:auto;min-width:0}.clients-count strong{font-size:15px;color:#e3edff;margin:0}.clients-count span{font-size:12px;color:#8fa5c4}
+.pager{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
+@media(min-width:761px) and (max-width:1240px){.clients-panel .table-wrap{overflow-x:auto}.clients-table{min-width:1040px}}
+@media(max-width:760px){
+ .clients-table tr{display:grid;grid-template-columns:1fr 1fr;gap:6px 14px}
+ .clients-table td{width:auto}.clients-table td:is([data-col=name],[data-col=mail],[data-col=actions]){grid-column:1/-1}
+ .clients-table td[data-col=mail],.clients-table td[data-col=city]{max-width:none}.clients-email,.clients-city{white-space:normal;overflow-wrap:anywhere}
+ .clients-table :is(th,td)[data-col=orders]{text-align:left}
+ .clients-row-actions{gap:8px;padding-top:4px}.clients-row-actions .row-action,.clients-panel[data-density=compact] .clients-row-actions .row-action{width:42px;height:42px;min-height:42px}
+ .clients-summary{align-items:flex-start}.clients-count{flex:1 1 100%}
+ .pager{justify-content:center}.pager span{order:-1;flex:1 1 100%;text-align:center}
+}
+@media(max-width:760px){.clients-table td[data-col]{width:auto;white-space:normal;padding:2px 0}.clients-table tr{padding:12px 14px}.clients-table td[data-col=city]{grid-column:1}.clients-table td[data-col=orders]{grid-column:2}}
+@media(max-width:760px){.clients-panel[data-density] .clients-table td[data-col]{padding:2px 0}.clients-panel[data-density=comfortable] .clients-table tr{gap:10px 14px;padding:16px 14px}}

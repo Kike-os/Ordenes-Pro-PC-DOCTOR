@@ -21,3 +21,10 @@ Directorio y administración de clientes de PC-DOCTOR S.A. El rediseño de la 1.
 - **Acciones**: Ver ficha, Editar, Órdenes, Llamar (WhatsApp si es móvil) y Correo. Llamar y Correo aparecen desactivados, con su motivo, cuando no hay un dato válido.
 - **Ficha rápida**: al pulsar el nombre se abre un panel lateral con identificación, contactos, dirección, ciudad y cantón, última atención, equipos, órdenes y citas (datos reales de `GET /api/clients/<id>`), con acceso a la ficha completa y a la edición según permisos.
 - La búsqueda y los filtros se aplican en el servidor sobre todos los registros, no solo sobre la página visible.
+
+## Tabla con columnas independientes (1.5.125)
+
+- Columnas: Cliente, Identificación, Teléfono, Correo electrónico, Ciudad / Cantón, Órdenes y Acciones. Teléfono y correo ya no comparten celda; el teléfono secundario aparece bajo el principal y los correos largos se recortan con puntos suspensivos (el completo queda en la descripción emergente).
+- Acciones en una sola línea, todas de 34 × 34 px: ver ficha, editar (o completar), **crear orden**, llamar o escribir por WhatsApp y enviar correo. Las no disponibles se muestran atenuadas y explican el motivo (ficha por completar, sin teléfono válido, sin correo válido). «Ver sus órdenes» sigue en el contador de la columna Órdenes.
+- Cabecera con el total de clientes registrados (o los resultados del filtro sobre el total), vista compacta o cómoda y tamaño de página.
+- Entre 761 y 1240 px la tabla se desplaza horizontalmente dentro de su panel; hasta 760 px cada cliente es una tarjeta con sus datos etiquetados y botones de 42 px.
