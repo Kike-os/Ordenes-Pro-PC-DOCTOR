@@ -4,6 +4,18 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.139 — 2026-10-13 14:13 (UTC-05:00)
+
+Selector de Cédula o RUC rediseñado y validación real por tipo de documento
+
+### Mejoras realizadas
+
+- Validación de cédula y RUC con las reglas de cada tipo y mensajes específicos (provincia, tercer dígito, dígito verificador, establecimiento); un RUC de sociedad o entidad pública cuyo dígito verificador no se puede comprobar se acepta con un aviso.
+
+### Errores corregidos
+
+- Selector de Cédula o RUC rediseñado y unificado en la reserva de citas, la ficha de cliente, la recepción y la cita del personal: botones alineados con el campo, contador junto a la etiqueta y pegado que conserva solo los dígitos.
+
 ## v1.5.138 — 2026-10-13 13:56 (UTC-05:00)
 
 Equipos sin presupuestos: contador en cero y mensaje claro para crear el primero

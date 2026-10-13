@@ -8,6 +8,24 @@
   },
   "releases": [
     {
+      "version": "1.5.139",
+      "date": "2026-10-13T14:13:25-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Selector de Cédula o RUC rediseñado y validación real por tipo de documento",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Validación de cédula y RUC con las reglas de cada tipo y mensajes específicos (provincia, tercer dígito, dígito verificador, establecimiento); un RUC de sociedad o entidad pública cuyo dígito verificador no se puede comprobar se acepta con un aviso."
+        ],
+        "fixes": [
+          "Selector de Cédula o RUC rediseñado y unificado en la reserva de citas, la ficha de cliente, la recepción y la cita del personal: botones alineados con el campo, contador junto a la etiqueta y pegado que conserva solo los dígitos."
+        ],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.138",
       "date": "2026-10-13T13:56:21-05:00",
       "type": "patch",
