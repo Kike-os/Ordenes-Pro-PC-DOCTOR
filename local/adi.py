@@ -6,7 +6,7 @@ SYSTEM_PUBLIC=("Eres ADI, asistente virtual de PC-DOCTOR S.A. Habla español con
 "Identifícate como asistente virtual cuando sea pertinente. No afirmes ser humana. "
 "No inventes diagnósticos, precios, garantías, fechas de entrega ni avances. Para esos asuntos solicita revisión del taller. "
 "No solicites contraseñas ni números completos de tarjetas. Reserva citas mediante el enlace del sistema. "
-"Los horarios y la disponibilidad de citas vienen SIEMPRE en el contexto validado de cada mensaje: usa únicamente esos datos, distingue atención presencial, hora límite para solicitar citas y atención virtual, y no menciones ningún otro horario.")
+"Los horarios y la disponibilidad de citas vienen SIEMPRE en el contexto validado de cada mensaje: usa únicamente esos datos, distingue atención presencial, hora límite para solicitar citas y atención virtual, y no menciones ningún otro horario. No puedes reservar, reprogramar ni confirmar citas: indica que se reservan y confirman en /citas, y ofrece solo las horas libres que figuren en el contexto.")
 SYSTEM_ADMIN=("Eres ADI, asistente administrativa de PC-DOCTOR S.A. Responde en español de forma clara. "
 "Usa solamente los datos reales que aparecen en el contexto. No ejecutes cambios, envíos ni escrituras. "
 "Para una modificación indica que debe confirmarla y ejecutarla un usuario autorizado.")
@@ -190,7 +190,7 @@ def slot_answer(c,text,now=None):
  label=day[8:]+'/'+day[5:7]+' a las '+appointments.clock12(hour)
  try:free=[item['time'] for item in appointments.available_slots(c,day,service['code'])]
  except ValueError:free=[]
- if hour in free:return 'El '+_dot(label).rstrip('.')+' está libre en este momento para '+service['label'].lower()+'. Resérvalo en /citas: la cita queda confirmada cuando el sistema te muestra su código.'
+ if hour in free:return 'El '+label+' está libre en este momento para '+service['label'].lower()+'. Resérvalo en /citas: la cita queda confirmada cuando el sistema te muestra su código.'
  options=appointments.alternatives(c,day,service['code'],hour,False,3) or appointments.alternatives(c,day,service['code'],'',False,3)
  if options:return 'El '+label+' no está disponible. Opciones libres más próximas: '+_dot('; '.join((item['date'][8:]+'/'+item['date'][5:7]+' a las '+appointments.clock12(item['time'])) for item in options))+' Puedes reservar la que prefieras en /citas.'
  return 'El '+label+' no está disponible y no veo espacios libres en los próximos días. Un asesor puede ayudarte: usa «Contactar soporte técnico».'
@@ -199,13 +199,18 @@ def reply(c,text,admin=False,context=None):
  if admin:
   factual=admin_answer(c,text)
   if factual:return factual
+ # Una fecha y hora concretas se responden con la comprobación real de la agenda, sin pasar por el modelo: así nunca se inventa ni se
+ # niega una disponibilidad. (En producción el modelo llegó a decir que una hora libre no lo estaba.)
+ if not admin:
+  try:
+   checked=slot_answer(c,text)
+   if checked:return checked
+  except Exception:pass
  # Los horarios vigentes viajan siempre como contexto validado: ADI no usa horarios escritos de memoria.
  if not admin:
   try:
    context=dict(context or {},horarios_vigentes=hours_facts(c))
    if re.search(r'cita|agend|reserv|turno|disponib',plain(text)):context['proximos_espacios_libres_en_la_agenda']=next_slots(c) or 'sin espacios libres en los próximos días';context['como_reservar']='La reserva se hace y se confirma en /citas; ADI no confirma citas por sí misma.'
-   checked=slot_answer(c,text)
-   if checked:context['comprobacion_de_la_hora_pedida']=checked
   except Exception:pass
  answer=ask(text,admin,context)
  if answer:return answer

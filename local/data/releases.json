@@ -8,6 +8,22 @@
   },
   "releases": [
     {
+      "version": "1.5.114",
+      "date": "2026-10-12T19:09:43-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "ADI comprueba en la agenda la hora pedida",
+      "changes": {
+        "features": [],
+        "improvements": [],
+        "fixes": [
+          "ADI responde con la comprobación real de la agenda cuando el cliente pide una fecha y hora concretas, sin dejar esa respuesta al modelo de IA."
+        ],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.113",
       "date": "2026-10-12T19:05:03-05:00",
       "type": "patch",

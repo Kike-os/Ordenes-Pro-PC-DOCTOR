@@ -35,6 +35,10 @@ class BusinessHoursTests(unittest.TestCase):
             self.assertIn('lunes a viernes de 7:45 a. m. a 8:30 p. m.',answer);self.assertIn('Cerrado ahora',answer);self.assertIn('las 24 horas, los 7 días de la semana',answer);self.assertIn('/citas',answer)
             self.assertIn('Abierto ahora',adi.hours_answer(c,self.at(2026,10,12,10,0)))
             self.assertIn('7:45 a. m.',adi.reply(c,'¿Cuál es el horario de atención?'))
+            # Una fecha y hora concretas las responde el sistema con la agenda real, sin consultar al modelo.
+            with patch.object(adi,'ask',side_effect=AssertionError('no debe consultarse al modelo')):
+                answer=adi.reply(c,'Quiero una cita mañana a las 10:00 a. m.')
+            self.assertRegex(answer,r'a las 10:00 a\. m\. (está libre|no está disponible)');self.assertIn('/citas',answer)
             # El contexto validado con los horarios vigentes viaja siempre al proveedor de IA.
             seen={}
             with patch.object(adi,'ask',side_effect=lambda text,admin,context:seen.update(context=context) or 'respuesta'):adi.reply(c,'hola')

@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.114 — 2026-10-12 19:09 (UTC-05:00)
+
+ADI comprueba en la agenda la hora pedida
+
+### Errores corregidos
+
+- ADI responde con la comprobación real de la agenda cuando el cliente pide una fecha y hora concretas, sin dejar esa respuesta al modelo de IA.
+
 ## v1.5.113 — 2026-10-12 19:05 (UTC-05:00)
 
 Horarios correctos en ADI y agenda sin solapamientos, sincronizada
