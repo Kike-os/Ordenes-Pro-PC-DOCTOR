@@ -1810,6 +1810,13 @@ class Handler(BaseHTTPRequestHandler):
                     if not found:return self.reply(400,{'error':'El código no es correcto o ya caducó. Revisa el correo o solicita uno nuevo.'})
                     audit(c,None,'order_checked_by_client',found.pop('id'))
                     return self.reply(200,{'ok':True,'order':found})
+                if path == '/api/public/adi/name':
+                    # ADI revisa cómo está escrito el nombre en la reserva pública de citas. Solo propone: no guarda ni cambia nada.
+                    import adi_ai
+                    if limited(c,'adi-name:'+digest(self.client_address[0]),10,900):return self.reply(429,{'error':'ADI ya revisó varios nombres desde esta conexión. Puedes continuar con tu reserva e intentarlo más tarde.'})
+                    use_ai=adi_ai.enabled(c);c.commit()  # se libera la base antes de consultar a la IA
+                    try:return self.reply(200,adi_ai.review_name(data.get('name',''),use_ai))
+                    except adi_ai.AdiError as error:return self.reply(error.status,{'error':str(error)})
                 if path == '/api/public/adi/message':
                     if limited(c,'adi-ip:'+digest(self.client_address[0]),30,300):return self.reply(429,{'error':'Espera un momento antes de enviar otro mensaje.'})
                     text=str(data.get('message','')).strip()

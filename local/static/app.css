@@ -6082,3 +6082,29 @@ body[data-page=appointments] .appointment-error:not(:empty)::before{content:'!';
 .equip-card-body{align-content:start}.equip-tab.equip-card{grid-template-rows:auto auto 1fr;align-content:start}.equip-card-foot{align-self:end}
 /* Una regla general daba 14 px de margen a cada «small» y alargaba las tarjetas de equipo */
 #module-content .equip-tab.equip-card :is(small,em){margin:0}
+/* ADI en el nombre de la reserva pública: botón compacto en la línea de la etiqueta (no cambia la altura del formulario) y panel
+   flotante con la propuesta. El nombre solo cambia si el cliente la aplica. */
+.adi-name{position:relative;min-width:0}
+.name-adi-chip{position:absolute;top:-4px;right:0;display:inline-flex;align-items:center;gap:5px;height:26px;min-height:0;margin:0;padding:0 10px 0 8px;border:1px solid #ff9ecb59;border-radius:999px;background:#17203f;color:#e3eeff;font:inherit;font-size:11.5px;font-weight:700;letter-spacing:.03em;line-height:1;cursor:pointer;box-shadow:none;transition:background-color .17s ease,border-color .17s ease,box-shadow .17s ease}
+.name-adi-chip svg{flex:none;width:14px;height:14px;color:#ff9ecb}
+@media(hover:hover){.name-adi-chip:hover{border-color:#ff9ecb;background:#1d2850}}
+.name-adi-chip:focus-visible{outline:2px solid #9cc4ff;outline-offset:2px}
+.name-adi-chip[data-state=working]{cursor:progress;border-color:#ff9ecb;box-shadow:0 0 0 3px #ff9ecb1f}.name-adi-chip[data-state=working] svg{animation:name-adi-pulse .9s ease-in-out infinite}
+.name-adi-chip[data-state=done] svg{animation:name-adi-spark .7s ease-out 1}
+body[data-page=appointments] input.adi-glow{border-color:#ff9ecb;box-shadow:0 0 0 3px #ff9ecb26,0 0 18px #ff9ecb33;transition:box-shadow .3s ease,border-color .3s ease}
+.name-adi-panel{position:absolute;z-index:30;left:0;right:0;top:calc(100% - 10px);display:grid;gap:8px;padding:13px 14px;border:1px solid #ff9ecb66;border-radius:13px;background:#101b33;box-shadow:0 14px 34px #000a,0 0 0 1px #0006;color:#dbe8fb;font-size:12.5px;font-weight:400;line-height:1.45;animation:name-adi-in .18s ease-out}
+.name-adi-panel[hidden]{display:none}
+.name-adi-panel-title{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:700;color:#fff}.name-adi-panel-title svg{flex:none;width:15px;height:15px;color:#ff9ecb}
+.name-adi-panel p,.name-adi-panel small{margin:0}.name-adi-panel small{font-size:11.5px;color:#9db1cf}
+.name-adi-panel-compare{display:grid;gap:6px;margin:0}.name-adi-panel-compare div{display:grid;grid-template-columns:82px minmax(0,1fr);gap:8px;align-items:baseline;padding:7px 10px;border:1px solid #2c4468;border-radius:9px;background:#0c1629}
+.name-adi-panel-compare dt{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#8fa6c4}.name-adi-panel-compare dd{margin:0;font-size:13.5px;font-weight:600;overflow-wrap:anywhere;color:#c2d3ec}
+.name-adi-panel-compare div[data-kind=old] dd{white-space:pre-wrap}.name-adi-panel-compare div[data-kind=new]{border-color:#ff9ecb73;background:#1a1a36}.name-adi-panel-compare div[data-kind=new] dd{color:#fff}
+.name-adi-panel-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:2px}
+.name-adi-panel-actions button{flex:1 1 150px;min-height:40px;margin:0;padding:0 14px;border-radius:10px;font:inherit;font-size:13px;font-weight:650;cursor:pointer;transition:background-color .17s ease,border-color .17s ease}
+.name-adi-panel-apply{border:1px solid #3f7fe0;background:linear-gradient(180deg,#2c66bf,#22519c);color:#fff}.name-adi-panel-keep{border:1px solid #2c4468;background:#0c192d;color:#dbe8fb}
+@media(hover:hover){.name-adi-panel-apply:hover{background:linear-gradient(180deg,#3472d0,#2859a9)}.name-adi-panel-keep:hover{border-color:#4a6c9c;background:#13233d}}
+.name-adi-panel-actions button:focus-visible{outline:2px solid #9cc4ff;outline-offset:2px}
+@keyframes name-adi-pulse{50%{opacity:.45;transform:scale(.86)}}
+@keyframes name-adi-spark{0%{transform:scale(.6) rotate(-25deg)}55%{transform:scale(1.35) rotate(12deg);filter:drop-shadow(0 0 5px #ff9ecb)}100%{transform:none}}
+@keyframes name-adi-in{from{opacity:0;transform:translateY(-4px)}}
+@media(prefers-reduced-motion:reduce){.name-adi-chip,.name-adi-chip svg,.name-adi-panel,body[data-page=appointments] input.adi-glow,.name-adi-panel-actions button{animation:none!important;transition:none}}

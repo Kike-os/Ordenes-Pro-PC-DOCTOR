@@ -224,3 +224,12 @@ Los estados son los del asistente (`adi-busy`, `data-voice`, `data-orb`): nunca 
 **Sonidos.** Generados con Web Audio, sin archivos: notas senoidales suaves con ataque lento, filtro que quita aspereza y un eco corto muy bajo. Abrir (tres notas ascendentes), cerrar (dos descendentes), empezar a escuchar (una nota breve), respuesta recibida (dos notas), asesor conectado y error (dos notas graves). Solo suenan tras una interacción de la persona, nunca en bucle ni durante la respiración, callan mientras ADI habla y respetan el interruptor «Sonidos».
 
 **No verificado aquí:** cómo suenan en altavoces reales y cómo se ve en una GPU real (las pruebas usan dibujo por software).
+
+## ADI en el nombre de la reserva pública de citas
+
+En «Agendamiento de Citas Técnicas», el campo «Nombre y apellidos» tiene un botón «ADI» (destellos rosados) en la línea de la etiqueta; no cambia la altura del formulario. Usa la misma integración de ADI (`adi_ai.py`), no un asistente aparte.
+
+- Ruta pública `POST /api/public/adi/name` con `{name}`. Solo acepta nombres escritos con letras (2 a 150 caracteres), con un máximo de 10 revisiones cada 15 minutos por conexión. **No guarda nada**: ni el nombre, ni la propuesta, ni registros.
+- Siempre aplica el arreglo local (`tidy_name`): espacios duplicados y mayúsculas iniciales, con «de», «del», «la»… en minúscula. Si hay proveedor de IA y la redacción de ADI está activada, pide además tildes y letras dudosas. La respuesta de la IA solo se acepta si es un retoque (mismas palabras, mismo orden; tildes, mayúsculas o una o dos letras en palabras largas); cualquier otra cosa se descarta. Si la IA falla, queda el arreglo local: la reserva nunca depende de ella.
+- El nombre **nunca cambia solo**. El panel «Sugerencia de ADI» muestra el texto original y el sugerido, con «Aplicar sugerencia» y «Conservar original»; Escape o seguir escribiendo lo cierran sin cambios. Si no hay nada que corregir, lo indica y recuerda comprobar el nombre con el documento de identificación.
+- Al pulsar el botón, el nombre escrito viaja al proveedor de IA configurado en el servidor (solo ese texto). Sin pulsarlo no se envía nada.
