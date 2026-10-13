@@ -64,3 +64,11 @@ El menú «Más» se abre anclado al botón, admite flechas, se cierra con Escap
 - Listo para entregar o en espera de entrega: verde suave. Entregado: todas las barras en verde y una marca de verificación.
 - Cuando el listado detecta que una orden pasó a «Entregado», las barras se llenan de izquierda a derecha y aparece un destello breve con dos estrellas, una sola vez. Si el estado se revierte, el indicador retrocede.
 - Con «reducir movimiento» activado no hay animaciones y los estados siguen visibles.
+
+## Altura del panel según las órdenes visibles
+
+**Causa del espacio vacío.** La regla `.tracking-carousel{height:calc(var(--track-head) + 3*var(--track-row) + 2px)}` fijaba la altura del panel a tres filas, hubiera una, dos o ninguna orden; la celda vacía (`td.tracking-empty`) también reservaba tres filas. No intervenían `flex`, `min-height` ni contenedores padres.
+
+**Corrección.** El panel mide exactamente lo que muestra: la altura usa `--track-shown`, que el componente fija con el número real de filas visibles (entre 1 y el máximo). Se muestran las cinco órdenes con movimientos más recientes (tres en teléfonos, donde cada orden es una tarjeta alta). Con más órdenes de las visibles, la altura se mantiene y el recorrido es interno, con las flechas y el avance automático de siempre. Las flechas se ocultan cuando no hay más órdenes que las visibles; el contador y «Ver todas las órdenes» quedan inmediatamente bajo la última fila.
+
+Comprobado en navegador con 0, 1, 2, 5, 10 y 50 órdenes a 1440, 820 y 390 px: separación de 1 px entre la última fila y el borde del panel, y 8 px hasta el pie, en todos los casos.

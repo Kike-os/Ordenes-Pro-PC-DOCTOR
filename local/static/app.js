@@ -2696,7 +2696,10 @@ function renderTracking(){
 
  // Carrusel vertical: tres órdenes a la vista y altura fija. Avanza una fila cada seis segundos como una cinta (al terminar vuelve a la
  // primera), se detiene mientras alguien interactúa o busca, y solo guarda en el navegador las páginas que va mostrando.
- const SHOW=3,CHUNK=12,EVERY=6000,still=matchMedia('(prefers-reduced-motion:reduce)');
+ // Órdenes a la vista: las cinco con movimientos más recientes (tres en teléfonos, donde cada orden es una tarjeta alta). El panel mide
+ // exactamente lo que muestra: con una orden, una fila; con dos, dos. Nunca reserva altura para filas que no existen.
+ const phone=matchMedia('(max-width:860px)'),SHOW=phone.matches?3:5,CHUNK=12,EVERY=6000,still=matchMedia('(prefers-reduced-motion:reduce)');
+ phone.addEventListener('change',()=>{if(root.isConnected&&trackingView===view)renderTracking();},{once:true});
  const filtered=()=>!!(view.q||view.status||view.technician||view.from||view.to);
  const query=page=>{const next=new URLSearchParams();for(const key of ['q','status','technician','from','to'])if(view[key])next.set(key,view[key]);if(view.sort==='antiguo')next.set('sort','antiguo');next.set('page',String(page));next.set('size',String(CHUNK));return '/api/tracking?'+next.toString();};
  async function fetchPage(page,token){const data=await api(query(page));if(token!==view.token)return null;view.cache.set(page,data.rows);view.total=data.total;view.data=data;trackingStamp=Date.now();return data;}
@@ -2706,7 +2709,7 @@ function renderTracking(){
  const prevBtn=button('',()=>step(-1,true),'secondary tracking-nav'),nextBtn=button('',()=>step(1,true),'secondary tracking-nav'),count=el('p',undefined,'tracking-count'),all=button('Ver todas las órdenes',()=>go('orders'),'secondary tracking-all');
  prevBtn.append(systemIcon('m18 15-6-6-6 6'));prevBtn.title='Órdenes anteriores';prevBtn.setAttribute('aria-label','Mostrar las órdenes anteriores');nextBtn.append(systemIcon('m6 9 6 6 6-6'));nextBtn.title='Órdenes siguientes';nextBtn.setAttribute('aria-label','Mostrar las órdenes siguientes');count.setAttribute('aria-live','off');
  {const nav=el('div',undefined,'tracking-pages');nav.append(prevBtn,nextBtn);foot.append(count,nav,all);}
- function paintFoot(){const total=view.total,last=Math.min(total,view.start+SHOW);count.textContent=total?(filtered()?'Resultados ':'Mostrando órdenes ')+(view.start+1)+(last>view.start+1?'–'+last:'')+' de '+total:(filtered()?'Sin resultados':'0 órdenes');prevBtn.disabled=nextBtn.disabled=total<=SHOW;wrap.dataset.rows=String(Math.min(SHOW,total));}
+ function paintFoot(){const total=view.total,last=Math.min(total,view.start+SHOW);count.textContent=total?(filtered()?'Resultados ':'Mostrando órdenes ')+(view.start+1)+(last>view.start+1?'–'+last:'')+' de '+total:(filtered()?'Sin resultados':'0 órdenes');const paged=total>SHOW;prevBtn.disabled=nextBtn.disabled=!paged;prevBtn.parentElement.hidden=!paged;wrap.dataset.rows=String(Math.min(SHOW,total));wrap.style.setProperty('--track-shown',String(Math.max(1,Math.min(SHOW,total))));wrap.dataset.empty=String(!total);}
  function note(row,tr){const before=view.known.get(row.id);
   // Movimiento nuevo desde la última sincronización: resalte discreto; si además cambió el estado, se avisa.
   if(!view.first&&before&&before.event!==row.event_id){tr.classList.add('track-new');if(before.status!==row.status_code){noteStatus(row.id,row.status_code);toast('La orden '+row.code+' pasó a «'+row.status+'».','info',{label:'Ver orden',run:()=>go('orders',new URLSearchParams({id:String(row.id)}))},{title:'Cambio de estado',id:'tracking-'+row.id});}}

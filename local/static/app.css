@@ -5776,3 +5776,7 @@ textarea.adi-suggestion-edit{width:100%;min-height:96px;resize:vertical;font:inh
 .tracking-table .tracking-progress[data-status=entregado] .tracking-stages li{background:#3fbf8f;box-shadow:0 0 6px #3fbf8f66}
 @media(max-width:860px){.tracking-carousel{--track-row:200px}}
 .tracking-sort{white-space:nowrap}
+/* Seguimiento de Órdenes: el panel mide exactamente las filas que muestra (antes reservaba siempre la altura de tres). */
+.tracking-carousel{height:calc(var(--track-head) + var(--track-shown,5)*var(--track-row) + 2px)}
+.tracking-carousel td.tracking-empty{height:var(--track-row)}
+.tracking-foot .tracking-pages[hidden]{display:none}
