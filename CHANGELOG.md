@@ -4,6 +4,26 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.136 — 2026-10-13 13:16 (UTC-05:00)
+
+Retiro de equipos en la agenda, datos obligatorios y clientes desde citas, PDF del presupuesto con código QR y recordatorio de feriados
+
+### Nuevas funcionalidades
+
+- Agenda de citas: nuevo servicio «Retiro de Equipos», con comprobación opcional de la orden y sin marcar el equipo como entregado.
+- Los clientes nuevos que agendan una cita se registran en Clientes con su origen; los existentes solo quedan vinculados y las coincidencias dudosas no se fusionan.
+- ADI recuerda a administración los feriados próximos sin atención definida; la vigencia del enlace de aprobación es configurable.
+
+### Mejoras realizadas
+
+- Reserva de citas: nombre, cédula o RUC y teléfono obligatorios, validación al salir de cada campo y avisos compactos y específicos.
+- PDF del presupuesto con diseño empresarial, importes alineados, condiciones por cláusulas y código QR del enlace de aprobación; el correo lo lleva adjunto.
+- El panel de Seguimiento muestra cinco órdenes en todas las pantallas.
+
+### Errores corregidos
+
+- El descuento del PDF del presupuesto mostraba un signo «?» en lugar del signo menos.
+
 ## v1.5.135 — 2026-10-13 08:58 (UTC-05:00)
 
 Presupuestos por estado y eliminación de borradores, ventana Presupuesto reorganizada, feriados con modos de atención, panel de Seguimiento ajustado y botones uniformes

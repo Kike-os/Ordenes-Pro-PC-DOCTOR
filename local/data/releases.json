@@ -8,6 +8,30 @@
   },
   "releases": [
     {
+      "version": "1.5.136",
+      "date": "2026-10-13T13:16:16-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Retiro de equipos en la agenda, datos obligatorios y clientes desde citas, PDF del presupuesto con código QR y recordatorio de feriados",
+      "changes": {
+        "features": [
+          "Agenda de citas: nuevo servicio «Retiro de Equipos», con comprobación opcional de la orden y sin marcar el equipo como entregado.",
+          "Los clientes nuevos que agendan una cita se registran en Clientes con su origen; los existentes solo quedan vinculados y las coincidencias dudosas no se fusionan.",
+          "ADI recuerda a administración los feriados próximos sin atención definida; la vigencia del enlace de aprobación es configurable."
+        ],
+        "improvements": [
+          "Reserva de citas: nombre, cédula o RUC y teléfono obligatorios, validación al salir de cada campo y avisos compactos y específicos.",
+          "PDF del presupuesto con diseño empresarial, importes alineados, condiciones por cláusulas y código QR del enlace de aprobación; el correo lo lleva adjunto.",
+          "El panel de Seguimiento muestra cinco órdenes en todas las pantallas."
+        ],
+        "fixes": [
+          "El descuento del PDF del presupuesto mostraba un signo «?» en lugar del signo menos."
+        ],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.135",
       "date": "2026-10-13T08:58:40-05:00",
       "type": "patch",
