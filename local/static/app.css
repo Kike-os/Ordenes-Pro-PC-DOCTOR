@@ -6057,3 +6057,5 @@ body[data-page=appointments] .appointment-error:not(:empty)::before{content:'!';
 @media(max-width:640px){.equip-picker{grid-template-columns:1fr}.equip-summary{flex-basis:100%}.equip-tab.equip-card{min-height:0}}
 @media(prefers-reduced-motion:reduce){.equip-tab.equip-card{transition:none}.equip-tab.equip-card:active{transform:none}}
 .equip-card-body{align-content:start}.equip-tab.equip-card{grid-template-rows:auto auto 1fr;align-content:start}.equip-card-foot{align-self:end}
+/* Una regla general daba 14 px de margen a cada «small» y alargaba las tarjetas de equipo */
+#module-content .equip-tab.equip-card :is(small,em){margin:0}
