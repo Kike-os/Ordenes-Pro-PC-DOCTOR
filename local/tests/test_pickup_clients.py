@@ -1,6 +1,7 @@
 """Citas: servicio «Retiro de Equipos» con orden verificada, datos obligatorios en la reserva pública y registro de clientes desde citas."""
 import unittest
 from datetime import timedelta
+from unittest.mock import patch
 import test_app
 import app,appointments
 app.os.environ.setdefault('LOGIN_CAPTCHA','off')
@@ -16,14 +17,22 @@ class PickupAndClientsTests(unittest.TestCase):
 
     def book(self,key,hour='09:00',**extra):
         body=dict({'name':'Cliente De Prueba','identification':'1710034065','phone':'0987654321','email':'','device_type':'portatil','brand':'HP','model':'X','service':'diagnostico','description':'Revisión ficticia','date':self.day(),'time':hour,
-                   'notes':'','privacy_consent':True,'communications_consent':False,'request_key':'pickup-clients-request-'+key},**extra)
+                   'notes':'','document_type':'cedula','privacy_consent':True,'communications_consent':False,'request_key':'pickup-clients-request-'+key},**extra)
         return self.request('/api/public/appointments',body)
 
     def test_public_form_requires_name_identification_and_phone_but_not_email(self):
-        with test_app.open_requests():
+        # El límite de solicitudes por IP (12 cada 15 minutos) tiene su propia prueba; aquí se aparta para recorrer todas las combinaciones.
+        with test_app.open_requests(),patch.object(app,'limited',return_value=False):
             empty=self.book('0001',name='',identification='',phone='')
-            self.assertEqual(empty['status'],400);self.assertEqual({k:empty['body']['fields'][k] for k in ('name','identification','phone')},{'name':'Ingresa tu nombre y apellidos.','identification':'Ingresa una cédula o RUC válido.','phone':'Ingresa un número de contacto válido.'})
-            for wrong,field,text in (({'name':'Solonombre'},'name','Ingresa tu nombre y apellidos.'),({'identification':'1710034066'},'identification','Ingresa una cédula o RUC válido.'),({'identification':'12345'},'identification','Ingresa una cédula o RUC válido.'),
+            self.assertEqual(empty['status'],400);self.assertEqual({k:empty['body']['fields'][k] for k in ('name','identification','phone')},{'name':'Ingresa tu nombre y apellidos.','identification':'Ingresa tu número de identificación para continuar.','phone':'Ingresa un número de contacto válido.'})
+            ten,thirteen='La cédula debe contener exactamente 10 dígitos.','El RUC debe contener exactamente 13 dígitos.';bad='Verifica el número de identificación ingresado.'
+            # Cédula con 9, 10 y 11 dígitos; RUC con 12, 13 y 14; letras y símbolos; dígito verificador incorrecto; tipo que no corresponde al número.
+            for kind,number,text in (('cedula','171003406',ten),('cedula','17100340655',ten),('cedula','1710034066',bad),('cedula','17100A4065',ten),('cedula','1710-03406',ten),('cedula','1710034065001',ten),
+                                     ('ruc','171003406500',thirteen),('ruc','17100340650011',thirteen),('ruc','1710034065',thirteen),('ruc','1710034066001',bad),('ruc','1710034065000',bad),('','1710034065',None)):
+                result=self.book('0002',document_type=kind,identification=number);self.assertEqual(result['status'],400,(kind,number))
+                if text:self.assertEqual(result['body']['fields'].get('identification'),text,(kind,number))
+                else:self.assertEqual(result['body']['fields'].get('document_type'),'Selecciona el tipo de identificación.')
+            for wrong,field,text in (({'name':'Solonombre'},'name','Ingresa tu nombre y apellidos.'),
                                      ({'phone':'12345'},'phone','Ingresa un número de contacto válido.'),({'email':'correo@mal'},'email','Ingresa un correo electrónico válido.')):
                 result=self.book('0002',**wrong);self.assertEqual((result['status'],result['body']['fields'].get(field)),(400,text),wrong)
             with app.connect() as c:self.assertEqual(c.execute('SELECT COUNT(*) FROM appointments').fetchone()[0],0)
@@ -32,7 +41,7 @@ class PickupAndClientsTests(unittest.TestCase):
             self.assertEqual(ok['status'],201,ok['body']);self.assertEqual({'client_id','client_new','client_review'}&set(ok['body']),set())
             with app.connect() as c:
                 client=c.execute('SELECT name,phone,email,identification,origin FROM clients WHERE identification=?',('1710034065',)).fetchone()
-                self.assertEqual(tuple(client),('María José Ñáñez de la Peña','+34 612 345 678','','1710034065','cita'))
+                self.assertEqual(tuple(client),('María José Ñáñez de la Peña','+34 612 345 678','','1710034065','cita'));self.assertEqual((c.execute('SELECT document_type FROM clients WHERE identification=?',('1710034065',)).fetchone()[0],c.execute('SELECT document_type,identification FROM appointments').fetchone()[0]),('cedula','cedula'))
             # La misma solicitud repetida no crea otra cita ni otro cliente.
             again=self.book('0003',name='María José Ñáñez de la Peña',phone='+34 612 345 678',email='');self.assertEqual((again['status'],again['body'].get('duplicate')),(200,True))
             with app.connect() as c:self.assertEqual((c.execute('SELECT COUNT(*) FROM appointments').fetchone()[0],c.execute("SELECT COUNT(*) FROM clients WHERE origin='cita'").fetchone()[0]),(1,1))
@@ -94,3 +103,16 @@ class PickupAndClientsTests(unittest.TestCase):
             with app.connect() as c:c.execute("UPDATE orders SET status='entregado' WHERE id=?",(mine['id'],));c.commit()
             late=self.book('0206','13:00',order_code=mine['code'],**owner);self.assertIn('ya figura como entregada',late['body']['fields']['order_code'])
             other=self.book('0207','15:00',identification='0100000017',phone='0991234567',order_code='cualquier-cosa');self.assertEqual((other['status'],other['body']['pickup_order']),(201,''))
+
+    def test_ruc_with_leading_zero_is_kept_and_links_the_same_client(self):
+        with test_app.open_requests():
+            first=self.book('0301',document_type='ruc',identification='0100000017001',phone='0976543210');self.assertEqual(first['status'],201,first['body'])
+            with app.connect() as c:
+                row=c.execute('SELECT c.id,c.identification,c.document_type,a.document_type kind,a.identification number FROM appointments a JOIN clients c ON c.id=a.client_id WHERE a.id=?',(first['body']['id'],)).fetchone()
+                self.assertEqual((row['identification'],row['document_type'],row['kind'],row['number']),('0100000017001','ruc','ruc','0100000017001'))
+            # El mismo RUC en otra reserva vincula al mismo cliente; no se crea otro.
+            again=self.book('0302','11:00',document_type='ruc',identification='0100000017001',phone='0976543210',name='Otra Forma De Escribirlo')
+            with app.connect() as c:self.assertEqual((c.execute('SELECT client_id FROM appointments WHERE id=?',(again['body']['id'],)).fetchone()[0],c.execute('SELECT COUNT(*) FROM clients').fetchone()[0]),(row['id'],1))
+            # La respuesta pública no devuelve la identificación.
+            self.assertNotIn('0100000017001',str(again['body']))
+

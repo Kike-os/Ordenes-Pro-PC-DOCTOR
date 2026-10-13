@@ -20,7 +20,7 @@ class AgendaTests(unittest.TestCase):
         return day.isoformat()
 
     def booking(self,time,**extra):
-        return dict({'name':'Cliente De Agenda','identification':'1710034065','phone':'0991234567','email':'agenda@example.invalid','device_type':'consola','brand':'Sony','model':'PS5','service':'mantenimiento',
+        return dict({'name':'Cliente De Agenda','identification':'1710034065','document_type':'cedula','phone':'0991234567','email':'agenda@example.invalid','device_type':'consola','brand':'Sony','model':'PS5','service':'mantenimiento',
                      'description':'Limpieza interna y cambio de pasta térmica','date':self.day(),'time':time,'notes':'','privacy_consent':True,'communications_consent':True,'request_key':'agenda-request-'+time.replace(':','')+'-0001'},**extra)
 
     def test_online_booking_reaches_agenda_notifications_and_staff_confirmation(self):

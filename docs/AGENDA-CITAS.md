@@ -35,3 +35,15 @@ Al guardar una cita, el cliente se busca por cédula o RUC; si no hay coincidenc
 - **Coincidencia dudosa** (mismo teléfono o correo que un cliente con otra identificación): no se enlaza ni se fusiona nada. Se crea un cliente nuevo con una nota de «posible duplicado» y el aviso queda en el historial de la cita, para que una persona lo revise.
 - El personal ve «Cliente registrado correctamente» o «Cita vinculada correctamente» después de que el servidor guarda. La reserva pública no dice si el cliente ya existía.
 - Una solicitud repetida no crea otra cita ni otro cliente. La ficha del cliente lista sus citas.
+
+## Tipo y número de identificación (migración 051)
+
+En «Tus datos» la identificación se pide con dos controles: **Tipo** (botones segmentados Cédula | RUC) y **Número**, con contador (`8/10`, `11/13`).
+
+- Solo se aceptan dígitos; las letras, espacios y símbolos no entran. La cédula admite 10 dígitos y el RUC 13. Los ceros iniciales se conservan.
+- Se validan el dígito verificador y las reglas de cédula y RUC, no solo la longitud; el servidor repite la validación.
+- Mensajes: «Ingresa tu número de identificación para continuar», «La cédula debe contener exactamente 10 dígitos», «El RUC debe contener exactamente 13 dígitos» y «Verifica el número de identificación ingresado».
+- Al cambiar de tipo se actualizan el título, la ayuda, el límite y el contador. El número escrito no se borra ni se recorta: se conserva para editarlo y se valida con las reglas del tipo nuevo. Nunca se guarda un tipo que no corresponda al número.
+- La cita guarda tipo y número (`appointments.document_type`), y un cliente nuevo queda registrado con ambos. La respuesta pública de la reserva no devuelve la identificación.
+
+El diálogo «Nueva cita» del personal también permite indicar tipo y número (opcional) cuando el cliente no está en la base; con un cliente elegido de la base no se piden. Recepción y la ficha de cliente ya tenían su selector de tipo de identificación.

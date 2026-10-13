@@ -174,19 +174,23 @@ def pickup_order(c,fields,client=None):
  if row['status'] not in PICKUP_READY:return None,'Tu equipo todavía no está listo para el retiro. Te avisaremos en cuanto puedas pasar a retirarlo; por ahora no es posible agendar el retiro de esta orden.'
  return dict(row),None
 def validate_booking(data,c,public=False,client=None):
- fields={k:str(data.get(k,'')).strip() for k in ['name','identification','phone','email','device_type','brand','model','service','description','date','time','notes','order_code']};errors={}
+ fields={k:str(data.get(k,'')).strip() for k in ['name','identification','document_type','phone','email','device_type','brand','model','service','description','date','time','notes','order_code']};errors={}
  pickup=fields['service']==PICKUP
  if len(fields['name'])<2 or len(fields['name'])>150 or (public and len([part for part in fields['name'].split() if len(part)>=2])<2):errors['name']='Ingresa tu nombre y apellidos.' if public else 'Indica el nombre completo (2 a 150 caracteres).'
  if not valid_phone(fields['phone']):errors['phone']='Ingresa un número de contacto válido.'
- # En la reserva pública la cédula o el RUC son obligatorios: identifican al cliente sin depender del nombre.
- if public and not fields['identification']:errors['identification']='Ingresa una cédula o RUC válido.'
+ # Identificación: tipo (cédula o RUC) y número. En la reserva pública es obligatoria; identifica al cliente sin depender del nombre.
+ # Si no llega el tipo (citas del personal o clientes antiguos) se deduce de la longitud; nunca se guarda un tipo que no corresponda al número.
+ kind=fields['document_type'] if fields['document_type'] in ('cedula','ruc') else {10:'cedula',13:'ruc'}.get(len(fields['identification']),'')
+ if public and fields['document_type'] not in ('cedula','ruc'):errors['document_type']='Selecciona el tipo de identificación.'
+ if not fields['identification']:
+  if public:errors['identification']='Ingresa tu número de identificación para continuar.'
+ elif not fields['identification'].isdigit() or (kind=='cedula' and len(fields['identification'])!=10) or (kind=='ruc' and len(fields['identification'])!=13) or not kind:
+  errors['identification']='El RUC debe contener exactamente 13 dígitos.' if (fields['document_type']=='ruc' or (not fields['document_type'] and len(fields['identification'])>10)) else 'La cédula debe contener exactamente 10 dígitos.'
+ elif reception.document_error(fields['identification']):errors['identification']='Verifica el número de identificación ingresado.'
+ fields['document_type']=kind if fields['identification'] and 'identification' not in errors else ''
  if pickup and not fields['description']:fields['description']='Retiro de equipo'
  if not pickup:fields['order_code']=''
  if fields['email'] and (len(fields['email'])>254 or not re.fullmatch(r'[^\s@<>]+@[^\s@<>.]+(?:\.[^\s@<>.]+)+',fields['email'])):errors['email']='Ingresa un correo electrónico válido.'
- if fields['identification']:
-  err=reception.document_error(fields['identification'])
-  if err:errors['identification']='Ingresa una cédula o RUC válido.' if public else err
-  elif len(fields['identification']) not in (10,13):errors['identification']='Ingresa una cédula o RUC válido.' if public else 'Usa una cédula de 10 o un RUC de 13 dígitos.'
  if fields['device_type'] not in reception.DEVICE_TYPES:errors['device_type']='Selecciona el tipo de equipo.'
  if not fields['service'] or not c.execute('SELECT 1 FROM appointment_services WHERE code=? AND active=1',(fields['service'],)).fetchone():errors['service']='Selecciona un servicio.'
  if len(fields['description'])<3 or len(fields['description'])>1000:errors['description']='Describe brevemente la falla (3 a 1000 caracteres).'
@@ -236,13 +240,14 @@ def create(c,data,user=None):
  # Cliente nuevo: se registra en Clientes con su origen. Si su contacto coincide con el de otra persona, queda marcado para revisión
  # y no se fusiona ni se sobrescribe nada. Un cliente existente no se modifica: solo se le vincula la cita.
  client_new=not client
- if client_new:client_id=c.execute("INSERT INTO clients(name,email,phone,identification,origin,notes) VALUES (?,?,?,?,'cita',?)",(fields['name'],fields['email'],fields['phone'],fields['identification'],'Registrado desde una cita. Su teléfono o correo coincide con otro cliente que tiene una identificación distinta: revisar posible duplicado.' if match=='ambiguo' else '')).lastrowid
+ if client_new:client_id=c.execute("INSERT INTO clients(name,email,phone,identification,document_type,origin,notes) VALUES (?,?,?,?,?,'cita',?)",(fields['name'],fields['email'],fields['phone'],fields['identification'],fields['document_type'] or 'cedula','Registrado desde una cita. Su teléfono o correo coincide con otro cliente que tiene una identificación distinta: revisar posible duplicado.' if match=='ambiguo' else '')).lastrowid
  else:client_id=client['id']
  token=secrets.token_urlsafe(32);created=stamp(now());public='CIT-'+now().strftime('%Y%m%d')+'-'+secrets.token_hex(3).upper()
  initial='confirmada' if user or confirmation_mode(c)=='auto' else 'solicitada'
  cursor=c.execute("INSERT INTO appointments(public_code,manage_token_hash,client_id,technician_id,customer_name,identification,phone,email,device_type,brand,model,service_code,description,notes,starts_at,duration_minutes,status,privacy_consent,communications_consent,created_at,updated_at,request_key) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?,?,?)",(public,token_hash(token),client_id,technician,fields['name'],fields['identification'],fields['phone'],fields['email'],fields['device_type'],fields['brand'],fields['model'],fields['service'],fields['description'],fields['notes'],stamp(start),duration,initial,int(data.get('communications_consent') is True),created,created,key or None))
  aid=cursor.lastrowid;c.execute("INSERT INTO appointment_events(appointment_id,actor_id,event,new_start,new_status,created_at) VALUES (?,?,?,?,?,?)",(aid,user['id'] if user else None,'created',stamp(start),initial,created))
  if initial=='confirmada' and fields['email'] and data.get('communications_consent') is True:c.execute("INSERT OR IGNORE INTO appointment_notifications(appointment_id,generation,event,channel,result,created_at) VALUES (?,1,'confirmation','email','pending',?)",(aid,created))
+ if fields['document_type']:c.execute('UPDATE appointments SET document_type=? WHERE id=?',(fields['document_type'],aid))
  if fields.get('pickup'):
   c.execute('UPDATE appointments SET pickup_order_id=? WHERE id=?',(fields['pickup']['id'],aid))
   c.execute("INSERT INTO appointment_events(appointment_id,actor_id,event,created_at,detail) VALUES (?,?,'note',?,?)",(aid,user['id'] if user else None,created,'Retiro agendado para la orden '+fields['pickup']['code']+'. La entrega se registra aparte en la orden.'))

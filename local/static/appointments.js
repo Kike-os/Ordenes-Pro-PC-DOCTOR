@@ -12,10 +12,17 @@ const STEP_FIELDS=[['name','identification','phone','email'],['device_type','ser
 // Número de contacto: formatos de Ecuador o internacional con prefijo + (8 a 15 dígitos). El servidor repite la comprobación.
 function validPhone(value){return validEcuadorPhone(value)||(/^[+0-9 ()-]+$/.test(value)&&/^\+[1-9][0-9]{7,14}$/.test(value.replace(/[ ()-]/g,'')));}
 const pickupChosen=()=>service.value==='retiro';
+// Identificación: tipo (cédula o RUC) y número. Solo dígitos, con el límite de cada tipo y un contador; los ceros iniciales se conservan.
+const idKind=()=>form.elements.document_type.value==='ruc'?'ruc':'cedula',idInput=form.elements.identification;
+function paintId(){const ruc=idKind()==='ruc',size=ruc?13:10,count=document.getElementById('booking-id-count');idInput.maxLength=size;document.getElementById('booking-id-label').textContent=ruc?'Número de RUC':'Número de cédula';document.getElementById('booking-id-help').textContent=ruc?'13 dígitos, sin guiones ni espacios.':'10 dígitos, sin guiones ni espacios.';count.textContent=idInput.value.length+'/'+size;count.dataset.state=idInput.value.length===size?'ok':idInput.value.length>size?'over':'';}
+idInput.addEventListener('beforeinput',event=>{if(event.data&&/[^0-9]/.test(event.data))event.preventDefault();});
+idInput.addEventListener('input',()=>{const clean=idInput.value.replace(/[^0-9]/g,'');if(clean!==idInput.value)idInput.value=clean;paintId();});
+// Al cambiar de tipo no se borra ni se recorta lo escrito: se conserva para editarlo y se vuelve a validar con las reglas del tipo nuevo.
+for(const radio of form.querySelectorAll('input[name=document_type]'))radio.addEventListener('change',()=>{paintId();if(idInput.value||idInput.dataset.touched){idInput.dataset.touched='1';checkField(idInput);}});
 // Validación del formulario. Cada error dice qué corregir; `missing` distingue «falta» de «está mal» para el aviso general.
 function validateAppointment(step){const errors={},only=step===undefined?null:STEP_FIELDS[step],has=name=>!only||only.includes(name),value=name=>form.elements[name].value.trim(),missing=new Set(),need=(name,text)=>{errors[name]=text;missing.add(name);};
  if(has('name')){if(!value('name'))need('name','Ingresa tu nombre y apellidos.');else if(value('name').split(/\s+/).filter(part=>part.length>=2).length<2)errors.name='Ingresa tu nombre y apellidos.';}
- if(has('identification')){if(!value('identification'))need('identification','Ingresa una cédula o RUC válido.');else if(documentError(value('identification')))errors.identification='Ingresa una cédula o RUC válido.';}
+ if(has('identification')){const number=value('identification'),ruc=idKind()==='ruc',size=ruc?13:10;if(!number)need('identification','Ingresa tu número de identificación para continuar.');else if(!/^[0-9]+$/.test(number)||number.length!==size)errors.identification=ruc?'El RUC debe contener exactamente 13 dígitos.':'La cédula debe contener exactamente 10 dígitos.';else if(documentError(number))errors.identification='Verifica el número de identificación ingresado.';}
  if(has('phone')){if(!value('phone'))need('phone','Ingresa un número de contacto válido.');else if(!validPhone(value('phone')))errors.phone='Ingresa un número de contacto válido.';}
  if(has('email')&&value('email')&&!/^[^\s@<>]+@[^\s@<>.]+(?:\.[^\s@<>.]+)+$/.test(value('email')))errors.email='Ingresa un correo electrónico válido.';
  if(has('device_type')&&!value('device_type'))need('device_type','Selecciona el tipo de equipo.');
@@ -55,9 +62,10 @@ stepButtons.forEach((button,index)=>button.addEventListener('click',()=>{if(inde
 form.addEventListener('input',paintSteps);form.addEventListener('change',paintSteps);
 // Enter en un campo avanza al paso siguiente en lugar de enviar el formulario antes de tiempo.
 form.addEventListener('keydown',event=>{if(event.key==='Enter'&&bookingStep<3&&event.target.tagName!=='TEXTAREA'&&!event.target.closest('.booking-brand')){event.preventDefault();advance();}});
-function bookingDirty(){return !bookingDone&&[...form.querySelectorAll('input,select,textarea')].some(input=>input.type==='checkbox'?input.checked:input.value.trim());}
+function bookingDirty(){return !bookingDone&&[...form.querySelectorAll('input,select,textarea')].some(input=>input.type==='radio'?false:input.type==='checkbox'?input.checked:input.value.trim());}
 // Confirmación propia para salir con datos escritos (no usa window.confirm).
 function bookingConfirm(title,text,stay,leave){return new Promise(resolve=>{const dialog=node('dialog',undefined,'confirm-mac'),heading=node('h2',title),body=node('p',text),actions=node('div',undefined,'confirm-mac-actions'),keep=node('button',stay,'primary'),out=node('button',leave,'secondary confirm-mac-discard');let answer='stay';keep.type=out.type='button';dialog.setAttribute('role','alertdialog');dialog.setAttribute('aria-label',title);keep.onclick=()=>dialog.close();out.onclick=()=>{answer='leave';dialog.close();};actions.append(keep,out);dialog.append(heading,body,actions);document.body.append(dialog);dialog.addEventListener('close',()=>{dialog.remove();resolve(answer);},{once:true});dialog.showModal();keep.focus();});}
+form.addEventListener('reset',()=>setTimeout(paintId,0));
 document.getElementById('booking-cancel').addEventListener('click',async()=>{if(bookingDirty()&&await bookingConfirm('¿Salir sin completar tu reserva?','Los datos que escribiste se perderán.','Continuar reservando','Descartar y salir')!=='leave')return;form.reset();appointmentErrors({});message.textContent='';bookingReached=0;paintBrand();slots.disabled=true;showStep(0);});
 document.getElementById('booking-close').addEventListener('click',async event=>{if(!bookingDirty())return;event.preventDefault();if(await bookingConfirm('¿Salir sin completar tu reserva?','Los datos que escribiste se perderán.','Continuar reservando','Descartar y salir')==='leave'){bookingDone=true;location.href='/';}});
 addEventListener('beforeunload',event=>{if(bookingDirty()){event.preventDefault();event.returnValue='';}});
@@ -82,6 +90,7 @@ form.addEventListener('input',event=>{if(event.target.name)event.target.dataset.
 // Retiro de equipos: se puede indicar la orden a retirar y la descripción deja de ser obligatoria.
 function paintPickup(){const pickup=pickupChosen(),field=document.getElementById('booking-order-field'),area=form.elements.description;field.hidden=!pickup;if(!pickup)form.elements.order_code.value='';area.required=!pickup;document.getElementById('booking-description-req').hidden=pickup;document.getElementById('booking-description-label').textContent=pickup?'Observaciones del retiro (opcional)':'Descripción breve del problema o mantenimiento';if(pickup&&area.hasAttribute('aria-invalid'))checkField(area);}
 service.addEventListener('change',paintPickup);
+paintId();
 showStep(0,false);
 
 // Horarios oficiales: se leen del servidor (la misma fuente que usa ADI); nunca están escritos en la página.
