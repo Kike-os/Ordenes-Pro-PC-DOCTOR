@@ -5647,3 +5647,18 @@ textarea.adi-suggestion-edit{width:100%;min-height:96px;resize:vertical;font:inh
 .catalog-tax-pending{padding:10px 12px;border:1px solid #8a6a2c;border-radius:10px;background:#2a2110;color:#f3d79b}
 /* Corrección: el icono del botón «Seleccionar productos y servicios» no tenía tamaño y ocupaba todo el botón */
 .quote-picker button{display:inline-flex;align-items:center;justify-content:center;gap:8px}.quote-picker button svg{flex:none;width:18px;height:18px}
+/* Editor de presupuestos: salir sin guardar, empezar desde cero, guardar y enviar; «Cancelar presupuesto» aparte */
+.quote-actions-edit{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;margin-top:14px;padding-top:14px;border-top:1px solid #1f3554}
+.quote-actions-exit,.quote-actions-keep{display:flex;flex-wrap:wrap;gap:8px}
+.quote-actions-edit button{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:42px;margin:0;padding:0 16px;font-size:13px}
+.quote-actions-edit button svg{flex:none;width:16px;height:16px}
+.quote-actions-edit .quote-leave{background:transparent;border-color:#2c4468;color:#c7d6ec}
+.quote-actions-edit .quote-wipe{background:transparent;border-color:#6f5a2c;color:#f3d79b}.quote-actions-edit .quote-wipe:hover{background:#2a2110}
+.quote-actions-edit .quote-save{border-color:#37618d;background:#16304f;color:#e3eeff;font-weight:650}
+.quote-actions-edit .quote-send{min-width:210px;font-weight:700}
+.quote-danger-zone{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;margin-top:12px;padding:10px 12px;border:1px dashed #6d3a44;border-radius:11px;background:#1a0f14}
+.quote-danger-zone small{flex:1 1 220px;min-width:0;font-size:11.5px;line-height:1.45;color:#d9b3b8}.quote-danger-zone button{flex:none;min-height:38px;margin:0}
+.quote-fresh{border-left:3px solid #5aa9e6;padding:8px 10px;border-radius:0 9px 9px 0;background:#10233c}
+@media(max-width:620px){.quote-actions-edit{flex-direction:column-reverse;align-items:stretch}.quote-actions-exit,.quote-actions-keep{display:grid;grid-template-columns:1fr 1fr}.quote-actions-keep:has(>:only-child){grid-template-columns:1fr}.quote-actions-edit .quote-send{min-width:0}.quote-danger-zone button{width:100%}}
+@media(max-width:380px){.quote-actions-exit,.quote-actions-keep{grid-template-columns:1fr}}
+@media(min-width:621px){.quote-actions-keep{margin-left:auto}}

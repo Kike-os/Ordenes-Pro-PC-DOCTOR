@@ -160,3 +160,13 @@ El IVA de los siete servicios está pendiente de confirmación: se guardan con e
 ## Importes en documentos
 
 Los documentos generados (PDF del presupuesto, hoja interna de servicio, página privada y correo del presupuesto) muestran los importes con símbolo de dólar, separador de miles y dos decimales: `$1.250,00` (`quotes.usd`). El formato se aplica al generar el documento; los valores guardados y los cálculos no cambian. Los campos de precio de las ventanas del sistema conservan su formato.
+
+## Cancelar, empezar desde cero y guardar
+
+El editor no tiene autoguardado: solo «Guardar borrador» y «Guardar y enviar al cliente» escriben en el servidor.
+
+- **Presupuesto nuevo.** «Crear presupuesto» abre el editor con una copia en memoria; el presupuesto no existe en el sistema hasta el primer guardado. Antes de crearlo se valida la copia de trabajo.
+- **Cancelar.** Cierra sin guardar. Si hay cambios pregunta «¿Descartar los cambios?» (Continuar editando / Descartar cambios); sin cambios cierra directamente. La X, Escape y el cambio de versión usan la misma comprobación.
+- **Empezar desde cero.** Tras confirmar, vacía la copia de trabajo: partidas, clasificaciones, descuento, validez, observaciones y la solicitud de documento. No toca el presupuesto guardado, sus versiones ni su historial. Si después se guarda sobre un presupuesto que tenía contenido, se pide confirmar «¿Reemplazar el presupuesto guardado?».
+- **Guardar borrador** conserva sin enviar; **Guardar y enviar al cliente** guarda y envía el enlace privado.
+- **Cancelar presupuesto** va en una zona aparte y solo aparece en presupuestos ya guardados: cambia su estado a cancelado y queda en el historial. No es salir sin guardar.
