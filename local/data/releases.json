@@ -8,6 +8,27 @@
   },
   "releases": [
     {
+      "version": "1.5.137",
+      "date": "2026-10-13T13:43:10-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Selector de cédula o RUC en las citas, progreso y estado por equipo y tarjetas de equipo rediseñadas",
+      "changes": {
+        "features": [
+          "Estado general de la orden con varios equipos (entrega parcial, atención en curso, orden completada) y resumen por etapas."
+        ],
+        "improvements": [
+          "Reserva de citas: selector de tipo de identificación (cédula o RUC) con contador, solo dígitos y validación del dígito verificador; también disponible en la cita registrada por el personal.",
+          "Tarjetas de «Equipos de esta orden» rediseñadas, con icono por tipo, estado en píldora y selección evidente."
+        ],
+        "fixes": [
+          "En órdenes con varios equipos, la barra de progreso y el estado muestran el equipo seleccionado; ya no aparece «Entregado» por otro equipo."
+        ],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.136",
       "date": "2026-10-13T13:16:16-05:00",
       "type": "patch",

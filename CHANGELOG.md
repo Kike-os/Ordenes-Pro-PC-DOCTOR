@@ -4,6 +4,23 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.137 — 2026-10-13 13:43 (UTC-05:00)
+
+Selector de cédula o RUC en las citas, progreso y estado por equipo y tarjetas de equipo rediseñadas
+
+### Nuevas funcionalidades
+
+- Estado general de la orden con varios equipos (entrega parcial, atención en curso, orden completada) y resumen por etapas.
+
+### Mejoras realizadas
+
+- Reserva de citas: selector de tipo de identificación (cédula o RUC) con contador, solo dígitos y validación del dígito verificador; también disponible en la cita registrada por el personal.
+- Tarjetas de «Equipos de esta orden» rediseñadas, con icono por tipo, estado en píldora y selección evidente.
+
+### Errores corregidos
+
+- En órdenes con varios equipos, la barra de progreso y el estado muestran el equipo seleccionado; ya no aparece «Entregado» por otro equipo.
+
 ## v1.5.136 — 2026-10-13 13:16 (UTC-05:00)
 
 Retiro de equipos en la agenda, datos obligatorios y clientes desde citas, PDF del presupuesto con código QR y recordatorio de feriados
