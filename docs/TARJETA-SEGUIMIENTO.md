@@ -36,3 +36,9 @@ La página pública anterior (`/s/<token>`) pasa a ser esta tarjeta; los enlaces
 - En una captura a 320 px y densidad 1 el código de barras no llega a leerse; en un teléfono real (densidad 2 o 3) y en papel sí tiene resolución suficiente. No se probó con un lector físico.
 
 Pruebas: `local/tests/test_tracking_card.py`.
+
+## Versión compacta (rama `tarjeta-compacta`, pendiente de aprobación)
+
+Tarjeta más estrecha y con menos espacio vacío (400 × 633 px en la vista del cliente), logotipo original más grande (136 px de ancho, sin modificarlo), un icono de trazo fino junto a cada dato, QR de 128 px y código de barras más alto. En 320 px los datos pasan a una columna. Se conservan los datos, las rutas y las funciones.
+
+Lectura comprobada con un lector independiente sobre capturas de pantalla: a la densidad de un teléfono (2× y 3×) se leen el QR y el código de barras; a densidad 1 (monitor corriente) el QR se lee y el código de barras no, porque cada barra mide menos de 1,5 píxeles. En papel ambos son vectoriales.

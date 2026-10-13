@@ -68,3 +68,24 @@
 }
 .ticket-actions a{font-size:13px;font-weight:600}
 @media(max-width:360px){.ticket-order{flex-wrap:wrap}.ticket-order strong{font-size:16px;white-space:nowrap}.ticket-state{max-width:none}}
+/* Versión compacta: menos espacio vacío, logotipo original más grande, iconos por dato y códigos con más superficie de lectura. */
+.ticket{max-width:400px;border-radius:20px}
+.ticket-top{padding:16px 18px 13px}.ticket-bottom{padding:12px 18px 14px;gap:10px 14px}
+.ticket-head{gap:12px;margin-bottom:11px}
+.ticket-logo{width:136px;max-height:66px}
+.ticket-head h1{font-size:15.5px}.ticket-head small{font-size:10px}
+.ticket-order{margin-bottom:10px}.ticket-order strong{font-size:19px}
+.ticket-steps{margin:8px 0 11px}
+.ticket-facts{gap:8px 14px}
+.ticket-facts div{display:flex;align-items:flex-start;gap:8px}
+.ticket-facts svg{flex:none;width:16px;height:16px;margin-top:2px;color:#8fc4f5}
+.ticket-facts span{display:block;min-width:0}
+.ticket-facts dt{font-size:10px}.ticket-facts dd{margin-top:1px;font-size:13px}
+.ticket-verify h2{font-size:13.5px}.ticket-verify p{font-size:11px;line-height:1.4}
+.ticket-qr{width:128px;height:128px;padding:7px}
+.ticket-barcode{padding:9px 12px 7px}.ticket-barcode svg{height:60px}
+.ticket-bottom footer{padding-top:2px}
+.ticket-actions{max-width:400px;margin-top:12px}.ticket-note{max-width:400px;margin-top:10px}
+.ticket-page main{padding:16px 12px 28px}
+@media(max-width:360px){.ticket-top{padding:14px 14px 12px}.ticket-bottom{padding:12px 14px 14px}.ticket-logo{width:112px}.ticket-facts{grid-template-columns:1fr}.ticket-qr{width:136px;height:136px}}
+@media print{.ticket-facts svg{color:#1c4f8f}}

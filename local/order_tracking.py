@@ -75,13 +75,16 @@ def card(data,qr_src,public):
     facts=[] if public else [('Cliente',data.get('client') or 'No registrado')]
     facts+=[('Equipo',data.get('device') or 'No registrado'),('Fecha de ingreso',data.get('received') or 'No registrada'),('Última actualización',data.get('updated') or 'Sin movimientos')]
     if not public:facts.append(('Técnico responsable',data.get('responsible') or 'Sin asignar'))
-    rows=''.join('<div><dt>%s</dt><dd>%s</dd></div>'%(e(label),e(value)) for label,value in facts)
+    # Iconos de trazo fino por dato (dibujados en línea: no dependen de fuentes ni de archivos externos).
+    icons={'Cliente':'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z','Equipo':'M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v9H4zM2 19h20','Fecha de ingreso':'M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z','Última actualización':'M12 6v6l4 2M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0z','Técnico responsable':'M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z'}
+    icon=lambda label:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="%s"/></svg>'%icons[label] if label in icons else ''
+    rows=''.join('<div>%s<span><dt>%s</dt><dd>%s</dd></span></div>'%(icon(label),e(label),e(value)) for label,value in facts)
     code=data['code']
     try:bars=barcode128.svg(code,color='#0b1526',background='#ffffff')
     except barcode128.BarcodeError:bars=''
-    qr='<img class="ticket-qr" src="%s" width="132" height="132" alt="Código QR del seguimiento de la orden %s">'%(e(qr_src),e(code)) if qr_src else '<p class="ticket-noqr">Sin enlace público activo. Genéralo desde la orden para obtener el código QR.</p>'
+    qr='<img class="ticket-qr" src="%s" width="140" height="140" alt="Código QR del seguimiento de la orden %s">'%(e(qr_src),e(code)) if qr_src else '<p class="ticket-noqr">Sin enlace público activo. Genéralo desde la orden para obtener el código QR.</p>'
     return ('<article class="ticket" data-status="%s"><section class="ticket-top" aria-label="Datos de la orden">'
-            '<header class="ticket-head"><img class="ticket-logo" src="/static/logo-original.png" alt="PC-DOCTOR S.A." width="120"><div><small>%s</small><h1>Seguimiento de reparación</h1></div></header>'
+            '<header class="ticket-head"><img class="ticket-logo" src="/static/logo-original.png" alt="PC-DOCTOR S.A." width="150"><div><small>%s</small><h1>Seguimiento de reparación</h1></div></header>'
             '<div class="ticket-order"><div><small>Orden de servicio</small><strong>%s</strong></div><span class="ticket-state" data-status="%s">%s</span></div>'
             '<div class="ticket-progress" role="img" aria-label="Avance: %s"><span data-progress="%d"></span></div><ol class="ticket-steps">%s</ol><dl class="ticket-facts">%s</dl></section>'
             '<div class="ticket-cut" aria-hidden="true"></div>'
