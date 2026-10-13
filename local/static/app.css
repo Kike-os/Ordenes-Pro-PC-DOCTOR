@@ -5518,3 +5518,47 @@ dialog.catalog-picker-dialog{width:min(980px,calc(100% - 20px))}
 .equip-totals>div[data-kind=due] strong{color:#ffd9a0}.equip-totals>div[data-kind=clear] strong,.equip-totals>div[data-kind=paid] strong{color:#b4f0d6}
 @media(max-width:720px){.equip-detail .equip-info .equip-facts{grid-template-columns:1fr 1fr}.equip-totals-wrap .equip-totals{grid-template-columns:1fr 1fr}.equip-budget-actions :is(button,a){flex:1 1 150px}}
 @media(max-width:380px){.equip-budget-values{grid-template-columns:1fr 1fr}.equip-totals-wrap .equip-totals strong{font-size:16px}.equip-block{padding:12px}}
+/* Gestión técnica del equipo (ventana «Editar orden»): secciones, encabezado y pie fijos, notas internas marcadas */
+body[data-page=dashboard] .tech-editor{width:min(880px,calc(100vw - 32px));max-width:880px}
+body[data-page=dashboard] .tech-editor form>header{align-items:flex-start;border-bottom:1px solid #1f3554}
+.tech-editor-head{display:grid;gap:6px;min-width:0}
+body[data-page=dashboard] .tech-editor .tech-editor-head h2{margin:0;font-size:18px;line-height:1.3}
+.tech-editor-ident{display:flex;flex-wrap:wrap;gap:8px;margin:0}
+.tech-editor-ident span{display:inline-flex;align-items:baseline;gap:6px;min-width:0;padding:3px 10px;border:1px solid #24558d;border-radius:999px;background:#10233c}
+.tech-editor-ident small{font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:#8fa6c4}.tech-editor-ident b{font:650 12.5px/1.4 ui-monospace,Menlo,Consolas,monospace;color:#e3eeff;overflow-wrap:anywhere}
+.tech-editor-device{margin:0;font-size:12.5px;color:#a9bdd8;overflow-wrap:anywhere}
+body[data-page=dashboard] .tech-editor .workspace-edit-fields{display:grid;grid-template-columns:minmax(0,1fr);gap:14px;align-content:start;overflow-y:auto}
+.tech-section{display:grid;gap:12px;min-width:0;padding:14px 16px;border:1px solid #1f3554;border-radius:13px;background:#0c192d}
+.tech-section>h3{display:flex;align-items:center;gap:8px;margin:0;font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#a8dcff}
+.tech-section>h3 svg{flex:none;width:15px;height:15px;color:#70b7f5}
+.tech-section-note{margin:-4px 0 0;font-size:12px;line-height:1.45;color:#8fa6c4}
+.tech-control{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.tech-editor .tech-section label{display:grid;gap:5px;margin:0;font-size:12px;font-weight:600;color:#c7d6ec}
+.tech-editor .tech-field{position:relative}
+.tech-editor .tech-field textarea{width:100%;min-height:74px}
+.tech-internal{justify-self:start;padding:1px 8px;border:1px solid #8a6a2c;border-radius:999px;background:#2a2110;color:#f3d79b;font-size:10.5px;font-weight:650;letter-spacing:.03em}
+.tech-hint{font-size:11.5px;font-weight:400;color:#8fa6c4}
+.tech-editor .field-error{font-size:12px;font-weight:500;color:#ffb3b6}
+.tech-editor [aria-invalid=true]{border-color:#e06c78!important;box-shadow:0 0 0 2px #e06c7833}
+.tech-amounts-foot{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
+.tech-amounts-foot button{display:inline-flex;align-items:center;gap:7px;min-height:38px;margin:0}.tech-amounts-foot button svg{width:15px;height:15px}
+.tech-amounts-foot .workspace-budget-total{margin-left:auto;font-size:14px;font-weight:700;font-variant-numeric:tabular-nums;color:#f2f6ff}
+.tech-editor .budget-line :disabled{opacity:.75;cursor:not-allowed}
+.tech-history summary{cursor:pointer;font-size:12.5px;font-weight:600;color:#a8caff}
+.tech-history ul{display:grid;gap:0;margin:8px 0 0;padding:0;list-style:none}
+.tech-history li{display:grid;gap:2px;padding:7px 0;border-bottom:1px solid #16263f;font-size:12.5px;color:#c7d6ec;overflow-wrap:anywhere}.tech-history li:last-child{border-bottom:0}
+.tech-history li b{font-size:11.5px;font-weight:600;color:#8fa6c4}
+body[data-page=dashboard] .tech-editor .message{flex:none;margin:0;padding:0 20px;font-size:12.5px}body[data-page=dashboard] .tech-editor .message:empty{display:none}
+body[data-page=dashboard] .tech-editor .message[data-kind=error]{padding:8px 20px;background:#3a1a22;color:#ffc4c9}
+body[data-page=dashboard] .tech-editor footer{display:flex;align-items:center;justify-content:flex-end;gap:10px;border-top:1px solid #1f3554;background:#0b1626}
+.tech-pending{display:inline-flex;align-items:center;gap:7px;margin-right:auto;font-size:12.5px;font-weight:600;color:#f3d79b}.tech-pending[hidden]{display:none}
+.tech-pending::before{content:'';width:8px;height:8px;border-radius:50%;background:#e7ae58;box-shadow:0 0 0 3px #e7ae5833}
+body[data-page=dashboard] .tech-editor footer .primary{min-width:170px;min-height:42px;font-size:13px;font-weight:700}
+body[data-page=dashboard] .tech-editor footer .primary[data-loading=true]{opacity:.8;cursor:progress}
+@media(max-width:760px){.tech-control{grid-template-columns:1fr 1fr}}
+@media(max-width:480px){.tech-control{grid-template-columns:1fr}.tech-section{padding:12px}body[data-page=dashboard] .tech-editor footer{flex-wrap:wrap}.tech-pending{flex:1 1 100%}body[data-page=dashboard] .tech-editor footer button{flex:1 1 0;justify-content:center}body[data-page=dashboard] .tech-editor footer .primary{min-width:0}}
+/* ADI: destello rosado discreto al aplicar una mejora y propuesta editable */
+@keyframes adi-applied{0%{box-shadow:0 0 0 0 #ff9ecb00}30%{box-shadow:0 0 0 3px #ff9ecb8c,0 0 18px #ff9ecb66}100%{box-shadow:0 0 0 0 #ff9ecb00}}
+.adi-applied{animation:adi-applied 1s ease-out 1}
+@media(prefers-reduced-motion:reduce){.adi-applied{animation:none;outline:2px solid #ff9ecb;outline-offset:1px}}
+textarea.adi-suggestion-edit{width:100%;min-height:96px;resize:vertical;font:inherit;font-size:13px;line-height:1.5;color:#eef3ff;background:#0c192d;border:1px solid #37618d;border-radius:10px;padding:10px 12px}

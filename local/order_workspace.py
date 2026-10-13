@@ -33,7 +33,16 @@ def attach(c,order):
     order['budget']={k+'_cents':row[k+'_cents'] if row else 0 for k in BUDGET_KEYS}
     order['budget']['total_cents']=sum(order['budget'].values())
     order['budget_lines']=[dict(r) for r in c.execute('SELECT category,description,amount_cents FROM order_budget_lines WHERE order_id=? ORDER BY id',(order['id'],))]
+    order['budget_locked']=budget_lock(c,order['id'])
     return order
+
+
+def budget_lock(c,oid):
+    """Código del presupuesto aprobado que fija los importes de la orden, o '' si se pueden editar a mano.
+    Lo que el cliente autorizó (total o parcialmente) no se altera desde «Editar orden»: se cambia con una nueva versión del presupuesto."""
+    try:row=c.execute("SELECT code,status FROM quotes WHERE order_id=? ORDER BY version DESC LIMIT 1",(oid,)).fetchone()
+    except Exception:return ''
+    return row['code'] if row and row['status'] in ('aprobado','parcial') else ''
 
 
 def validate(c,data):
@@ -78,13 +87,21 @@ def validate(c,data):
 def save(c,oid,data,user,now):
     row=c.execute('SELECT revision,status FROM orders WHERE id=?',(oid,)).fetchone()
     if not row:return 404,{'error':'Orden no disponible.'}
+    locked=budget_lock(c,oid)
+    if locked:
+        # Importes fijados por un presupuesto aprobado: se conservan tal como están. Si la ventana envía otros, se rechaza con una explicación.
+        stored=[(r['category'],r['description'],r['amount_cents']) for r in c.execute('SELECT category,description,amount_cents FROM order_budget_lines WHERE order_id=? ORDER BY id',(oid,))]
+        sent=data.get('lines')
+        if isinstance(sent,list) and [(str(l.get('category','')),str(l.get('description','')).strip(),l.get('amount_cents')) for l in sent if isinstance(l,dict)]!=stored:
+            return 409,{'error':'Los importes de este equipo provienen del presupuesto aprobado '+locked+' y no se modifican aquí. Para cambiarlos, crea una nueva versión del presupuesto.','fields':{'lines':'Importes fijados por el presupuesto aprobado.'}}
+        data={k:v for k,v in data.items() if k!='lines' and k not in BUDGET_KEYS}
     fields,errors=validate(c,data)
     if errors:return 400,{'error':'Revisa los campos señalados.','fields':errors}
     if str(data.get('revision',''))!=str(row['revision']):return 409,{'error':'Otro usuario actualizó esta orden. Recarga el detalle antes de guardar.'}
     if fields['status']=='entregado' and row['status']!='entregado':
         # Política de entrega: sin saldo pendiente. Se compara con el presupuesto que se está guardando.
         import equipment
-        paid=equipment.money(c,oid)['paid_cents'];total=sum(fields[k+'_cents'] for k in BUDGET_KEYS)
+        state=equipment.money(c,oid);paid=state['paid_cents'];total=state['budget_cents'] if locked else sum(fields[k+'_cents'] for k in BUDGET_KEYS)
         if total>paid:return 409,{'error':'No se puede entregar: este equipo tiene un saldo pendiente de '+equipment.usd(total-paid)+'. Registra el pago antes de entregarlo.','balance':True}
     keys=('problem','status','priority','assigned_to','estimated_delivery','internal_notes','recommendations','findings')
     c.execute('UPDATE orders SET '+','.join(k+'=?' for k in keys)+',updated_at=?,revision=revision+1 WHERE id=?',(*(fields[k] for k in keys),now.isoformat(timespec='microseconds'),oid))
@@ -96,8 +113,8 @@ def save(c,oid,data,user,now):
         booked=appointments.create_for_maintenance(c,planned['id'],user)
         if booked:event(c,oid,user['id'],now,'maintenance','Cita de mantenimiento preventivo generada automáticamente ('+booked['public_code']+').')
     columns=','.join(k+'_cents' for k in BUDGET_KEYS)
-    c.execute('INSERT INTO order_budget(order_id,'+columns+') VALUES (?,?,?,?,?) ON CONFLICT(order_id) DO UPDATE SET '+','.join(k+'_cents=excluded.'+k+'_cents' for k in BUDGET_KEYS),(oid,*(fields[k+'_cents'] for k in BUDGET_KEYS)))
-    if 'lines' in fields:
+    if not locked:c.execute('INSERT INTO order_budget(order_id,'+columns+') VALUES (?,?,?,?,?) ON CONFLICT(order_id) DO UPDATE SET '+','.join(k+'_cents=excluded.'+k+'_cents' for k in BUDGET_KEYS),(oid,*(fields[k+'_cents'] for k in BUDGET_KEYS)))
+    if 'lines' in fields and not locked:
         c.execute('DELETE FROM order_budget_lines WHERE order_id=?',(oid,))
         c.executemany('INSERT INTO order_budget_lines(order_id,category,description,amount_cents) VALUES (?,?,?,?)',[(oid,*line) for line in fields['lines']])
     # Si la edición cambió el estado, el registro lo dice de forma explícita para que sirva como auditoría.
