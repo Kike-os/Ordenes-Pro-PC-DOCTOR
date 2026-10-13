@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.120 — 2026-10-12 20:08 (UTC-05:00)
+
+Título «Agenda de Citas»
+
+### Mejoras realizadas
+
+- El módulo pasa a titularse «Agenda de Citas».
+
 ## v1.5.119 — 2026-10-12 20:06 (UTC-05:00)
 
 ADI Living Orb y etiqueta «Nombres y Apellidos»

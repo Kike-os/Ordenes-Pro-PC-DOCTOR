@@ -1,5 +1,5 @@
 'use strict';
-// Chat flotante de ADI: asistente virtual y relevo real a un asesor. Compartido por el panel y la agenda de citas.
+// Chat flotante de ADI: asistente virtual y relevo real a un asesor. Compartido por el panel y la Agenda de Citas.
 (()=>{
  const root=document.getElementById('adi-widget');if(!root||root.dataset.ready)return;root.dataset.ready='true';
  const $=id=>document.getElementById(id),toggle=$('adi-toggle'),panel=$('adi-panel'),list=$('adi-messages'),form=$('adi-form'),input=$('adi-input'),submit=form.querySelector('button'),human=$('adi-human'),status=$('adi-status'),quick=$('adi-quick'),badge=$('adi-unread'),more=$('adi-more'),menu=$('adi-menu');
@@ -39,7 +39,7 @@
  // Destello al tocar la esfera: el halo se expande una vez, a la par del sonido.
  const flash=()=>{orbState.pressAt=performance.now();root.classList.remove('adi-flash');void root.offsetWidth;root.classList.add('adi-flash');setTimeout(()=>root.classList.remove('adi-flash'),650);};
  // Enlaces seguros: solo direcciones https y la ruta interna de citas se convierten en vínculos.
- function rich(node,text){let last=0;for(const match of text.matchAll(/https:\/\/[^\s<>"']+[^\s<>"'.,;:!?)]|\/citas\b/g)){node.append(text.slice(last,match.index));const link=el('a',match[0]==='/citas'?'la agenda de citas':match[0]);link.href=match[0];if(match[0]!=='/citas'){link.target='_blank';link.rel='noopener noreferrer';}node.append(link);last=match.index+match[0].length;}node.append(text.slice(last));}
+ function rich(node,text){let last=0;for(const match of text.matchAll(/https:\/\/[^\s<>"']+[^\s<>"'.,;:!?)]|\/citas\b/g)){node.append(text.slice(last,match.index));const link=el('a',match[0]==='/citas'?'la Agenda de Citas':match[0]);link.href=match[0];if(match[0]!=='/citas'){link.target='_blank';link.rel='noopener noreferrer';}node.append(link);last=match.index+match[0].length;}node.append(text.slice(last));}
  const zone={timeZone:'America/Guayaquil'},clock=date=>new Intl.DateTimeFormat('es-EC',{...zone,hour:'2-digit',minute:'2-digit'}).format(date),dayKey=date=>new Intl.DateTimeFormat('en-CA',{...zone,year:'numeric',month:'2-digit',day:'2-digit'}).format(date);
  const dayLabel=date=>{const key=dayKey(date),today=new Date();if(key===dayKey(today))return 'Hoy';if(key===dayKey(new Date(today.getTime()-86400000)))return 'Ayer';return new Intl.DateTimeFormat('es-EC',{...zone,day:'numeric',month:'long',year:'numeric'}).format(date);};
  let pinned=true;const nearEnd=()=>list.scrollHeight-list.scrollTop-list.clientHeight<72;

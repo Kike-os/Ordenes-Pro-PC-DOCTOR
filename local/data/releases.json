@@ -8,6 +8,22 @@
   },
   "releases": [
     {
+      "version": "1.5.120",
+      "date": "2026-10-12T20:08:16-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Título «Agenda de Citas»",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "El módulo pasa a titularse «Agenda de Citas»."
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.119",
       "date": "2026-10-12T20:06:04-05:00",
       "type": "patch",

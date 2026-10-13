@@ -108,7 +108,7 @@ def admin_reply(c,text,now):
   return {'answer':f"Hay {live['chats_waiting']} conversación(es) esperando a un asesor.",'links':[link('Atención en vivo','#live')]}
  factual=admin_answer(c,text)
  if factual:
-  links=[link('Agenda de citas','#appointments')] if 'cita' in q else [link('Mantenimientos','#maintenance')] if 'mantenimiento' in q else [link('Órdenes','#orders?active=1')]
+  links=[link('Agenda de Citas','#appointments')] if 'cita' in q else [link('Mantenimientos','#maintenance')] if 'mantenimiento' in q else [link('Órdenes','#orders?active=1')]
   return {'answer':factual,'links':links}
  if has('cuantas ordenes','total de ordenes','ordenes activas','ordenes hay'):
   return {'answer':f"Hay {live['active']} órdenes activas y {live['statuses']['entregado']} entregadas en total.",'links':[link('Órdenes activas','#orders?active=1')]}
@@ -138,7 +138,7 @@ def _dot(text):
  return text if text.endswith('.') else text+'.'
 
 def hours_facts(c,now=None):
- """Horarios vigentes leídos del sistema en cada consulta: atención presencial (y si está abierta ahora), franjas de la agenda de citas y atención virtual."""
+ """Horarios vigentes leídos del sistema en cada consulta: atención presencial (y si está abierta ahora), franjas de la Agenda de Citas y atención virtual."""
  import business_hours
  from reception import ECUADOR_TZ
  from datetime import datetime
