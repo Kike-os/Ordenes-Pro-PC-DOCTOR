@@ -74,3 +74,22 @@ class TrackingCarouselPagesTests(unittest.TestCase):
         self.assertEqual([(len(orders('size=%s'%size)['body']['rows']),orders('size=%s'%size)['body']['pages']) for size in ('10','20','50')],[(10,2),(14,1),(14,1)])
         self.assertEqual((len(orders('size=10&page=2')['body']['rows']),orders('')['body']['size']),(4,50))
         self.assertEqual(orders('size=7')['status'],400)
+
+    def test_sort_by_last_movement_phone_and_serial_search(self):
+        cookie,csrf=self.login();ids=[TrackingBoardTests.order(self,cookie,csrf,'s%02d'%index,serial='SERIE-%03d'%index) for index in range(4)]
+        self.request('/api/order-status',{'id':str(ids[1]),'status':'reparacion'},cookie=cookie,csrf=csrf)
+        get=lambda query:self.request('/api/tracking?'+query,cookie=cookie)
+        recent=get('page=1')['body'];old=get('page=1&sort=antiguo')['body']
+        # El último movimiento registrado manda: la orden recién actualizada va primera (o última, al invertir el orden).
+        self.assertEqual((recent['rows'][0]['id'],old['rows'][-1]['id'],recent['filters']['sort'],old['filters']['sort']),(ids[1],ids[1],'reciente','antiguo'))
+        self.assertEqual([row['id'] for row in old['rows']],[row['id'] for row in reversed(recent['rows'])])
+        self.assertEqual(get('sort=cualquiera')['status'],400)
+        # Teléfono del cliente y número de serie viajan con la fila; se puede buscar por serie.
+        row=recent['rows'][0];self.assertEqual((row['phone'],row['serial']),('0991234567','SERIE-001'))
+        found=get('q=serie-002')['body'];self.assertEqual((found['total'],found['rows'][0]['id']),(1,ids[2]))
+        # Las etapas reflejan solo el estado real: una orden en espera no aparenta estar en reparación, y revertir el estado revierte la etapa.
+        waiting=next(r for r in recent['rows'] if r['id']==ids[0]);self.assertEqual([stage['state'] for stage in waiting['stages']],['current','pending','pending','pending'])
+        self.assertEqual([stage['state'] for stage in row['stages']],['done','current','pending','pending'])
+        self.request('/api/order-status',{'id':str(ids[1]),'status':'pendiente'},cookie=cookie,csrf=csrf)
+        back=next(r for r in get('page=1')['body']['rows'] if r['id']==ids[1]);self.assertEqual([stage['state'] for stage in back['stages']],['current','pending','pending','pending'])
+

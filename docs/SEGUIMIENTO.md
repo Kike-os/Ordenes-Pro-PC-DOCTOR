@@ -42,3 +42,25 @@ Pruebas: `local/tests/test_tracking_board.py` (bloques, búsqueda por estado, ta
 - Cliente y técnico muestran el nombre completo en la descripción emergente cuando se truncan.
 
 Comprobado a 1920, 1440, 1280, 1024, 768, 390 y 320 px, y con los visores equivalentes al 125 % y 150 % de zoom en una pantalla de 1920 px: ningún botón cortado ni montado, fila de 52 px, sin desbordes.
+
+## Listado profesional y indicador de progreso (octubre de 2026)
+
+**Columnas.** Orden (código completo, icono y equipo), Cliente (nombre en hasta dos líneas y teléfono), Estado (etiqueta e indicador de progreso), Último movimiento, Técnico y Acciones. Cuando un texto no cabe se recorta con puntos suspensivos y el contenido completo queda en la descripción emergente.
+
+**Acciones según el ancho.**
+
+- 1360 px o más: Ver, Historial (con su contador dentro del botón), QR y Ticket con su nombre.
+- 1181–1359 px: «Ver» con nombre y las otras tres como iconos.
+- 861–1180 px (tableta): «Ver» y un menú «Más» con Historial, QR y Ticket; el técnico pasa bajo el cliente. Sin desplazamiento horizontal.
+- 860 px o menos (teléfono): una tarjeta por orden con «Ver» y «Más».
+
+El menú «Más» se abre anclado al botón, admite flechas, se cierra con Escape, al pulsar fuera o al desplazar, y devuelve el foco.
+
+**Búsqueda y orden.** Se busca por orden, cliente, equipo, marca, estado o número de serie. El encabezado «Último movimiento» invierte el orden (más reciente o más antiguo primero); lo aplica el servidor (`sort=reciente|antiguo`).
+
+**Indicador de progreso.** Cuatro barras (Recibido, En proceso, Listo, Entregado) que reflejan solo el estado real de la orden; no hay avances por tiempo.
+
+- Etapa completada: iluminada. Etapa actual: una luz la recorre tres veces al pintarse y de nuevo al pasar el cursor; no es una animación continua. Pendientes: oscuras. Etapa sin registro en el historial: rayada.
+- Listo para entregar o en espera de entrega: verde suave. Entregado: todas las barras en verde y una marca de verificación.
+- Cuando el listado detecta que una orden pasó a «Entregado», las barras se llenan de izquierda a derecha y aparece un destello breve con dos estrellas, una sola vez. Si el estado se revierte, el indicador retrocede.
+- Con «reducir movimiento» activado no hay animaciones y los estados siguen visibles.
