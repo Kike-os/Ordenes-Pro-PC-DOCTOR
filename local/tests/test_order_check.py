@@ -49,7 +49,8 @@ class OrderCheckTests(unittest.TestCase):
         text=message.get_body(('plain',)).get_content();page=message.get_body(('html',)).get_content()
         self.assertIn('    048213',text);self.assertIn('Caduca en 10 minutos',text)
         for digit in '048213':self.assertIn('>'+digit+'</td>',page)
-        for needed in ('Verifica tu correo electrónico','Caduca en 10 minutos','https://','/static/logo-firma.png','role="presentation"'):self.assertIn(needed,page)
+        for needed in ('Verifica tu correo electrónico','Caduca en 10 minutos','https://','PC-DOCTOR S.A.','role="presentation"'):self.assertIn(needed,page)
+        self.assertNotIn('<img',page)  # sin logotipo en el encabezado: la identidad va en texto
         for banned in ('<script','<style','javascript:','http://','123456','password','contraseña:'):self.assertNotIn(banned,page.lower())
         with self.assertRaises(ValueError):verification_mail.build(config,'cliente@example.invalid','12345',10,'aquí')
 

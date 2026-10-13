@@ -5372,3 +5372,22 @@ dialog.quote-dialog{width:min(860px,calc(100% - 20px))}
  .tracking-carousel .tracking-table .tracking-actions button span{display:inline}
  .tracking-carousel .tracking-table .tracking-actions button b{position:static;min-width:0;height:auto;padding:0 5px;line-height:1.5;background:#ffffff26}
 }
+/* Historial de correos de la orden y copia exacta del mensaje enviado. */
+.mail-history-list{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:8px}
+.mail-history-list li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 10px;align-items:center;padding:10px 12px;border:1px solid #2c4468;border-left:3px solid #5083b8;border-radius:10px;background:#0c192d}
+.mail-history-list li[data-status=enviado]{border-left-color:#3fbf8f}.mail-history-list li[data-status=error]{border-left-color:#e06c78}
+.mail-history-list li>div:first-child{display:grid;gap:2px;min-width:0;grid-column:1/-1}.mail-history-list strong{font-size:13px;color:#e3eeff;overflow-wrap:anywhere}.mail-history-list small{font-size:12px;color:#9db1cf;overflow-wrap:anywhere}
+.mail-history-tags{display:flex;flex-wrap:wrap;align-items:center;gap:6px;min-width:0}
+.mail-history-state{padding:2px 9px;border-radius:999px;border:1px solid #5083b880;background:#16304f;color:#cfe3ff;font-size:11.5px;font-weight:650}
+.mail-history-state[data-status=enviado]{border-color:#3fbf8f66;background:#12352b;color:#aef0d2}.mail-history-state[data-status=error]{border-color:#e06c7880;background:#3a1a22;color:#ffc4c9}
+.mail-history-list button{min-height:34px;padding:6px 11px;font-size:12.5px}
+.adi-reviewed{display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border:1px solid #3fd8d066;border-radius:999px;background:#0c2a2c;color:#8fe9e3;font-size:11.5px;font-weight:650;white-space:nowrap}
+.adi-reviewed svg{width:13px;height:13px;flex:none;filter:drop-shadow(0 0 3px #ff9ecb99);animation:adi-reviewed-in 1s ease-out 1}
+@keyframes adi-reviewed-in{0%{transform:scale(.5) rotate(-25deg);filter:drop-shadow(0 0 0 #ff9ecb00)}45%{transform:scale(1.4) rotate(14deg);filter:drop-shadow(0 0 6px #6fe6de) drop-shadow(0 0 10px #ff9ecb)}100%{transform:none;filter:drop-shadow(0 0 3px #ff9ecb99)}}
+body[data-adi-indicators=off] .adi-reviewed svg{animation:none}
+@media(prefers-reduced-motion:reduce){.adi-reviewed svg{animation:none}}
+dialog.mail-archived-dialog{width:min(680px,calc(100% - 20px))}
+.mail-archived{display:grid;gap:12px;margin-top:12px}.mail-archived-note{font-size:12px;color:#9db1cf}
+.mail-archived-text{margin:0;max-height:46vh;overflow:auto;padding:14px;border:1px solid #2c4468;border-radius:10px;background:#0a1424;color:#e3eeff;font:13px/1.55 Inter,system-ui,sans-serif;white-space:pre-wrap;overflow-wrap:anywhere}
+.mail-archived a.primary{justify-self:start}
+.mail-link-manual{margin-top:8px}.mail-link-manual summary{cursor:pointer;font-size:12.5px;color:#9db1cf}.mail-link-manual .mail-link{margin-top:8px}

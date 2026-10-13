@@ -48,7 +48,7 @@ def markup(code, minutes, where, context=''):
             '<table role="presentation" width="560" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:560px;background-color:#ffffff;border:1px solid #d9e2ef;border-radius:14px">'
             # Encabezado: logo sobre fondo claro (se ve igual en modo oscuro) y filete con los colores corporativos.
             '<tr><td align="center" bgcolor="#ffffff" style="padding:26px 24px 14px;border-radius:14px 14px 0 0">'
-            '<img src="' + e(logo_url()) + '" width="132" height="101" alt="PC-DOCTOR S.A." style="display:block;border:0;outline:none;width:132px;height:auto;max-width:132px">'
+            '<div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:18px;letter-spacing:2px;font-weight:bold;color:#1d5fb0;">PC-DOCTOR S.A.</div>'
             '<div style="' + font + ';font-size:18px;line-height:24px;font-weight:700;color:#143f77;padding-top:10px">' + e(company['name']) + '</div>'
             '<div style="' + font + ';font-size:11px;line-height:16px;letter-spacing:1.4px;text-transform:uppercase;color:#68768a">' + e(company['specialty']) + '</div></td></tr>'
             '<tr><td style="padding:0 24px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>'
