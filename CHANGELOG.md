@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.117 — 2026-10-12 19:53 (UTC-05:00)
+
+Corrección urgente: consola del Centro de Atención
+
+### Errores corregidos
+
+- La consola del Centro de Atención en vivo vuelve a cargar: un cambio de la versión anterior provocaba un error interno al listar las conversaciones.
+
 ## v1.5.116 — 2026-10-12 19:50 (UTC-05:00)
 
 Centro de Atenciones y ficha del equipo

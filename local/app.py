@@ -1371,7 +1371,6 @@ class Handler(BaseHTTPRequestHandler):
             if path == '/api/assistance':
                 # Estado del Centro de Atenciones para el inicio: contadores sin solapes y atenciones que requieren respuesta. Solo administración.
                 if user['role']!='administrador':return self.reply(403,{'error':'Acceso no permitido.'})
-                import live_support
                 return self.reply(200,live_support.summary(c))
             if path == '/api/tracking':
                 # Seguimiento de Órdenes: una tarjeta por orden con su último movimiento; solo lectura, para cualquier usuario con sesión.
@@ -1407,7 +1406,6 @@ class Handler(BaseHTTPRequestHandler):
                 pending_chats=c.execute("SELECT count(*) FROM adi_conversations WHERE mode='human'").fetchone()[0] if user['role']=='administrador' else 0
                 assistance=None
                 if user['role']=='administrador':
-                    import live_support
                     assistance=live_support.summary(c)
                 return self.reply(200,{'counts':counts,'attention':attention,'activity':activity,'maintenance':scheduled,'deliveries':deliveries,'today':today,'appointments':today_appointments,'pending_chats':pending_chats,'assistance':assistance,'upcoming_appointments':c.execute("SELECT COUNT(*) FROM appointments WHERE deleted_at IS NULL AND status IN ('solicitada','confirmada','reprogramada') AND starts_at>=?",(appointments.stamp(now),)).fetchone()[0] if user['role'] in ('administrador','tecnico') else 0,'pending_accounts':c.execute("SELECT COUNT(*) FROM users WHERE approval='pending'").fetchone()[0] if user['role']=='administrador' else 0,'pending_appointments':c.execute("SELECT COUNT(*) FROM appointments WHERE deleted_at IS NULL AND status='solicitada' AND starts_at>=?",(appointments.stamp(now),)).fetchone()[0] if user['role'] in ('administrador','tecnico') else 0})
             search_route=path=='/api/search'
