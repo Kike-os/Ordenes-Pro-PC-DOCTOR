@@ -265,3 +265,26 @@ class QuoteIdentityTests(unittest.TestCase):
         self.assertIn('Aprobado',self.form(path,{'passkey':passkey,'action':'decide','name':'Cliente Ficticio','accept':'on','signature':SIGN,'decision_%d'%item:'aprobado','id_document':'ignorado'})['body'])
         with app.connect() as c:self.assertEqual(c.execute('SELECT COUNT(*) FROM quote_documents').fetchone()[0],0)
 
+
+class QuoteBriefTests(unittest.TestCase):
+    setUpClass=classmethod(test_app.SecurityTests.setUpClass.__func__);setUp=test_app.SecurityTests.setUp;tearDown=test_app.SecurityTests.tearDown;request=test_app.SecurityTests.request;login=test_app.SecurityTests.login;order_data=test_app.SecurityTests.order_data
+
+    def test_each_unit_shows_its_own_quote_summary(self):
+        cookie,csrf=self.login();post=lambda path,**body:self.request(path,body,cookie=cookie,csrf=csrf)
+        make=lambda key,**extra:self.request('/api/orders',self.order_data(dict({'email':'cliente@example.invalid','request_key':'quote-brief-request-'+key},**extra)),cookie=cookie,csrf=csrf)['body']
+        first=make('0001',serial='BRIEF-1');second=make('0002',serial='BRIEF-2',group_order_id=str(first['id']),new_unit='1')
+        units=lambda oid:{u['id']:u for u in (lambda d:d.get('order',d))(self.request('/api/orders/%d'%oid,cookie=cookie)['body'])['group']['units']}
+        self.assertEqual([u['quote'] for u in units(first['id']).values()],[None,None]);self.assertTrue(all(u['type_label'] for u in units(first['id']).values()))
+        quote=post('/api/orders/%d/quote'%second['id'])['body']['id']
+        post('/api/quotes/%d'%quote,action='save',items=[{'description':'Servicio ficticio','category':'servicio','quantity':2,'unit_cents':2000,'taxed':True},{'description':'Repuesto ficticio','category':'repuesto','quantity':1,'unit_cents':1500,'taxed':True}])
+        # El resumen pertenece solo al equipo del presupuesto; el otro equipo sigue sin presupuesto, se mire la orden desde cualquiera de los dos.
+        for seen in (first['id'],second['id']):
+            group=units(seen);self.assertIsNone(group[first['id']]['quote']);brief=group[second['id']]['quote']
+            self.assertEqual((brief['id'],brief['status'],brief['editable'],brief['lines'],brief['quoted_cents'],brief['approved_cents'],brief['pending_cents']),(quote,'borrador',True,2,5500,0,5500))
+        with patch.object(app.mail_pro,'configured',return_value=False):post('/api/quotes/%d'%quote,action='send')
+        ids=[str(i['id']) for i in self.request('/api/quotes/%d'%quote,cookie=cookie)['body']['quote']['items']]
+        self.assertEqual(post('/api/quotes/%d'%quote,action='decide',note='Aprobó por teléfono (ficticio)',approved=ids[0],rejected=ids[1])['status'],200)
+        unit=units(first['id'])[second['id']];brief=unit['quote']
+        self.assertEqual((brief['status'],brief['editable'],brief['approved_cents'],brief['rejected_cents'],brief['pending_cents'],unit['budget_cents'],unit['balance_cents']),('parcial',False,4000,1500,0,4000,4000))
+        self.assertEqual(units(first['id'])[first['id']]['budget_cents'],0)
+

@@ -279,6 +279,17 @@ def detail(c, quote):
                 events=[dict(r) for r in c.execute('SELECT event,detail,actor,created_at FROM quote_events WHERE quote_id=? ORDER BY id DESC LIMIT 60', (quote['id'],))])
 
 
+def brief(c, order_id):
+    """Resumen del presupuesto vigente de un equipo (su última versión) para la vista de la orden; None si no tiene."""
+    row = c.execute('SELECT * FROM quotes WHERE order_id=? ORDER BY version DESC LIMIT 1', (order_id,)).fetchone()
+    if not row:
+        return None
+    items = items_of(c, row['id'])
+    t = totals(items, row['tax_rate_bp'], row['discount_bp'])
+    return {'id': row['id'], 'code': row['code'], 'status': row['status'], 'status_label': STATUS[row['status']], 'editable': row['status'] in EDITABLE,
+            'lines': sum(1 for item in items if item['status'] != 'cancelado'), 'quoted_cents': t['quoted'], 'approved_cents': t['approved'], 'pending_cents': t['pending'], 'rejected_cents': t['rejected']}
+
+
 def for_order(c, order_id):
     """Presupuesto vigente de la orden (su última versión) y la lista de versiones."""
     rows = [dict(r) for r in c.execute('SELECT * FROM quotes WHERE order_id=? ORDER BY version DESC', (order_id,))]

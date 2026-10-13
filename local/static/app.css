@@ -5446,3 +5446,75 @@ dialog.catalog-picker-dialog{width:min(980px,calc(100% - 20px))}
 .confirm-mac-text input{width:100%;min-height:44px;margin:0;padding:9px 12px;border:1px solid #37618d;border-radius:11px;background:#0c192d;color:#e3eeff;font-size:14px}
 .confirm-mac-text input:focus-visible{outline:2px solid #8bb8ff;outline-offset:2px}
 .confirm-mac h2,.confirm-mac p{overflow-wrap:anywhere}
+/* Presupuesto de la orden: módulo único (encabezado con estado, presupuesto detallado o estado vacío y resumen financiero) */
+#module-content .budget-module{display:grid;gap:14px;padding:18px;border-radius:16px;box-shadow:0 10px 26px #02081366,inset 0 1px 0 #ffffff0a}
+.budget-head{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:12px}
+.budget-head-icon{display:grid;place-items:center;width:40px;height:40px;border:1px solid #37618d;border-radius:12px;background:linear-gradient(160deg,#1b3b60,#10233c);color:#a8dcff}
+.budget-head-icon svg{width:20px;height:20px}
+.budget-head h2{margin:0;font-size:16px;font-weight:700;letter-spacing:0;color:#f2f6ff}
+.budget-head p{margin:2px 0 0;font-size:12px;line-height:1.4;color:#8fa5c4}
+.budget-head-state{min-height:26px}.budget-head-state .quote-badge[data-status=vacio]{border-color:#7b879880;background:#1a2436;color:#b9c4d6}
+.budget-quote>.system-muted{margin:0;font-size:12.5px}
+.budget-empty{display:grid;justify-items:center;gap:8px;padding:22px 16px;border:1px dashed #2c4468;border-radius:14px;background:#0c192d;text-align:center}
+.budget-empty-icon{display:grid;place-items:center;width:54px;height:54px;margin-bottom:2px;border-radius:50%;border:1px solid #24558d;background:radial-gradient(circle at 50% 35%,#1b3b60,#0c192d);color:#70b7f5}
+.budget-empty-icon svg{width:26px;height:26px}
+.budget-empty strong{font-size:14.5px;line-height:1.35;color:#e3eeff;overflow-wrap:anywhere}
+.budget-empty p{max-width:44ch;margin:0;font-size:12.5px;line-height:1.55;color:#9db1cf}
+.budget-empty button{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:42px;margin:8px 0 0;padding:0 18px}
+.budget-empty button svg,.budget-add-line svg{width:16px;height:16px;flex:none}
+.budget-quote-card{display:grid;gap:10px;padding:14px;border:1px solid #1f3554;border-radius:14px;background:#0c192d}
+.budget-quote-card .quote-summary-head{margin:0;align-items:flex-start}
+.budget-quote-amount{display:grid;justify-items:end;gap:1px}.budget-quote-amount span{font-size:11px;color:#8fa5c4}.budget-quote-amount b{font-size:18px;font-weight:700;font-variant-numeric:tabular-nums;color:#f2f6ff}
+.budget-quote-card .quote-summary-actions{margin:2px 0 0}.budget-quote-card .quote-summary-actions :is(button,a){flex:1 1 130px;display:inline-flex;align-items:center;justify-content:center;margin:0}
+.budget-finance{display:grid;gap:10px;padding:14px;border:1px solid #1f3554;border-radius:14px;background:linear-gradient(180deg,#0e1d33,#0b1729)}
+.budget-finance h3{margin:0;font-size:11.5px;font-weight:650;letter-spacing:.06em;text-transform:uppercase;color:#8fa5c4}
+.budget-finance-rows{display:grid;margin:0}
+.budget-finance-rows>div{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid #1a2c47}
+.budget-finance-rows dt{display:flex;align-items:center;gap:9px;min-width:0;margin:0;font-size:13px;font-weight:500;color:#c7d6ec}
+.budget-finance-rows dt svg{flex:none;width:15px;height:15px;color:#5f8fc4}
+.budget-finance-rows dd{margin:0;font-size:13.5px;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap;color:#eef3ff}
+.budget-finance-rows dd.is-zero{font-weight:500;color:#7f93b3}
+.budget-finance-rows>.budget-finance-total{margin-top:8px;padding:12px 14px;border:1px solid #24558d;border-radius:12px;background:linear-gradient(135deg,#16304f,#10233c);box-shadow:inset 0 1px 0 #ffffff0d}
+.budget-finance-total dt{font-size:13px;font-weight:700;letter-spacing:.03em;color:#a8dcff}
+.budget-finance-total dd{font-size:20px;font-weight:750;color:#fff}
+.budget-finance-lines summary{cursor:pointer;font-size:12.5px;font-weight:600;color:#a8caff}.budget-finance-lines summary:focus-visible{outline:2px solid #8bb8ff;outline-offset:3px;border-radius:4px}
+.budget-finance-lines ul{display:grid;gap:0;margin:6px 0 0;padding:0;list-style:none}
+.budget-finance-lines li{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid #16263f;font-size:12.5px;color:#c7d6ec}.budget-finance-lines li:last-child{border-bottom:0}
+.budget-finance-lines li span{min-width:0;overflow-wrap:anywhere}.budget-finance-lines li b{flex:none;font-weight:600;font-variant-numeric:tabular-nums;color:#eef3ff}
+.budget-finance-foot{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.budget-finance-foot small{flex:1 1 0;min-width:0;font-size:11.5px;line-height:1.45;color:#8fa5c4}
+.budget-finance-foot .budget-add-line{flex:none;display:inline-flex;align-items:center;gap:7px;min-height:38px;margin:0;padding:0 14px;font-size:12.5px;white-space:nowrap}
+@media(max-width:480px){#module-content .budget-module{padding:14px}.budget-head{grid-template-columns:auto minmax(0,1fr)}.budget-head-state{grid-column:1/-1}.budget-finance-foot{flex-direction:column;align-items:stretch}.budget-finance-foot .budget-add-line{justify-content:center;min-height:42px}.budget-empty button{width:100%}.budget-finance-total dd{font-size:19px}}
+/* Equipos de la orden: cuatro niveles diferenciados (selector, información técnica, presupuesto del equipo y resumen general) */
+.equip-detail{gap:14px}
+.equip-block{display:grid;gap:12px;min-width:0;padding:14px;border:1px solid #1f3554;border-radius:13px;background:#0a1525}
+.equip-block>h3,.equip-budget-head h3,.equip-totals-wrap>h3{display:flex;align-items:center;gap:8px;margin:0;font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#a9bdd8}
+.equip-block h3 svg,.equip-totals-wrap>h3 svg{flex:none;width:15px;height:15px}
+.equip-detail .equip-info .equip-facts{grid-template-columns:repeat(3,minmax(0,1fr));gap:12px 18px}
+.equip-info .equip-facts dt{font-size:11px;letter-spacing:.02em}.equip-info .equip-facts dd{font-size:13.5px;font-weight:550}
+.equip-info .equip-problem{display:grid;gap:3px;padding:10px 12px;border-left:3px solid #37618d;border-radius:0 9px 9px 0;background:#0e1d33}
+.equip-info .equip-problem span{font-size:11px;letter-spacing:.02em;color:#8fa6c4}
+.equip-block .equip-actions{padding-top:12px;border-top:1px solid #16263f}
+/* Presupuesto del equipo: acento financiero (turquesa) para que no se confunda con los datos técnicos */
+.equip-budget{border-color:#2f7d7a;background:linear-gradient(160deg,#0c2428,#0b1a2a 70%);box-shadow:inset 3px 0 0 #3fbfb0}
+.equip-budget-head{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.equip-budget-head h3{color:#9be8dc}.equip-budget-head h3 svg{color:#3fbfb0}
+.equip-budget .quote-badge[data-status=vacio]{border-color:#7b879880;background:#1a2436;color:#b9c4d6}
+.equip-budget-code{margin:0;font:600 12.5px/1.3 ui-monospace,Menlo,Consolas,monospace;color:#cfe3ff;overflow-wrap:anywhere}
+.equip-budget-empty{margin:0;font-size:13px;line-height:1.5;color:#c7d6ec}
+.equip-budget-values{display:grid;grid-template-columns:repeat(auto-fit,minmax(128px,1fr));gap:8px;margin:0}
+.equip-budget-values>div{display:grid;gap:3px;min-width:0;padding:10px 12px;border:1px solid #1f3d44;border-radius:10px;background:#0a1a22}
+.equip-budget-values dt{margin:0;font-size:11px;color:#8fb5b8}
+.equip-budget-values dd{margin:0;font-size:15px;font-weight:650;font-variant-numeric:tabular-nums;color:#eef3ff;white-space:nowrap}
+.equip-budget-values>div[data-kind=total]{border-color:#3fbfb0;background:#0e2a2c}.equip-budget-values>div[data-kind=total] dd{font-size:17px;color:#fff}
+.equip-budget-actions{border-top-color:#1f3d44!important}.equip-budget-actions :is(button,a){display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:38px;margin:0;padding:8px 14px}.equip-budget-actions svg{width:15px;height:15px;flex:none}
+/* Resumen general de la orden: tarjetas tipo tablero (acento ejecutivo, azul-violeta) */
+.equip-totals-wrap{gap:8px;margin-top:16px;padding:14px;border:1px solid #3a4f8a;border-radius:14px;background:linear-gradient(160deg,#111d3a,#0c162b)}
+.equip-totals-wrap>h3{color:#c3cffa}.equip-totals-wrap>h3 svg{color:#8ea2f0}.equip-totals-wrap>small{font-size:12px;color:#8fa0c8}
+.equip-totals-wrap .equip-totals{gap:10px;margin-top:4px;padding:0;border:0;background:none}
+.equip-totals-wrap .equip-totals>div{gap:6px;padding:12px;border:1px solid #2b3c6b;border-radius:12px;background:#0d1730;box-shadow:inset 0 1px 0 #ffffff08}
+.equip-totals-wrap .equip-totals>div>span{display:flex;align-items:center;gap:7px;font-size:11.5px;color:#a3b2d8}.equip-totals-wrap .equip-totals svg{flex:none;width:14px;height:14px;color:#8ea2f0}
+.equip-totals-wrap .equip-totals strong{font-size:18px;font-weight:700;font-variant-numeric:tabular-nums;color:#fff;overflow-wrap:anywhere}
+.equip-totals>div[data-kind=due] strong{color:#ffd9a0}.equip-totals>div[data-kind=clear] strong,.equip-totals>div[data-kind=paid] strong{color:#b4f0d6}
+@media(max-width:720px){.equip-detail .equip-info .equip-facts{grid-template-columns:1fr 1fr}.equip-totals-wrap .equip-totals{grid-template-columns:1fr 1fr}.equip-budget-actions :is(button,a){flex:1 1 150px}}
+@media(max-width:380px){.equip-budget-values{grid-template-columns:1fr 1fr}.equip-totals-wrap .equip-totals strong{font-size:16px}.equip-block{padding:12px}}

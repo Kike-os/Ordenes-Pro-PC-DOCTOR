@@ -95,3 +95,20 @@ Custodia:
 - Una nueva versión del presupuesto no hereda la solicitud: hay que volver a marcarla.
 
 Límites: el sistema no verifica la autenticidad del documento ni lo compara con la identificación registrada; es una copia aportada por el cliente para que administración la revise.
+
+## Presupuesto en la vista de la orden
+
+La orden muestra un único módulo «Presupuesto» (antes eran dos bloques con el mismo título):
+
+- **Encabezado** con subtítulo y una insignia de estado: Sin presupuesto, Borrador, Pendiente de aprobación, Aprobado parcialmente, Aprobado, Rechazado, Modificación solicitada o Cancelado.
+- **Presupuesto detallado**: si no existe, un estado vacío con el botón «Crear presupuesto»; si existe, su código, el total cotizado o autorizado, los datos de la decisión y las acciones «Editar/Abrir presupuesto» y «PDF».
+- **Resumen financiero**: mano de obra, repuestos, servicios, productos digitales y el Total USD destacado, las líneas registradas y «Agregar línea» (solo administración). Los valores son referenciales y no constituyen una factura.
+
+En «Equipos de esta orden» la información se separa en cuatro niveles:
+
+1. Selector de equipos.
+2. **Información del equipo**: código, tipo, marca, modelo, serie, color, técnico, ingreso, entrega y falla, con sus acciones técnicas (Etiqueta QR, Tarjeta de seguimiento, Editar este equipo).
+3. **Presupuesto de este equipo** (acento turquesa): estado, total, aprobado, pendiente, pagado y saldo de ese equipo únicamente, con sus propias acciones. El presupuesto de otro equipo se gestiona abriendo ese equipo, para no mezclar importes.
+4. **Resumen general de la orden** (tarjetas): presupuesto total, total pagado, saldo pendiente y equipos entregados de toda la orden.
+
+El servidor entrega el resumen por equipo en `group.units[].quote` (`quotes.brief`).

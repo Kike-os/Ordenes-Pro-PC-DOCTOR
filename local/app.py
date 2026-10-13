@@ -1265,7 +1265,9 @@ class Handler(BaseHTTPRequestHandler):
                 import order_tracking
                 result['tracking']=order_tracking.active(c,row['id'])
                 # Equipos de la orden, identidad permanente del equipo y pagos de este ingreso.
-                result['group']=equipment.group(c,row['id']);result['device_code']=row['device_code'] or ''
+                result['group']=equipment.group(c,row['id']);
+                for unit in (result['group'] or {}).get('units',[]):unit['quote']=quotes.brief(c,unit['id']);unit['type_label']=DEVICE_TYPES.get(unit['type'],unit['type'] or '')  # presupuesto de cada equipo, para distinguirlo del resumen general
+                result['device_code']=row['device_code'] or ''
                 result['unit_code']=next((unit['unit_code'] for unit in result['group']['units'] if unit['id']==row['id']),'') if result['group']['multiple'] else ''
                 result['payments']=equipment.payments(c,row['id']);result['money']=equipment.money(c,row['id']);result['payment_methods']=equipment.METHODS
                 result['receipt_mail']=receipt_mail_status(c,row['id'])
