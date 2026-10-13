@@ -141,7 +141,7 @@ def render_receipt(order):
 
     new_page(True)
     section('Datos del cliente')
-    pair('Nombres y apellidos / Razón social',order['client'],
+    pair('Nombres y Apellidos / Razón social',order['client'],
          'Identificación',({'ruc':'RUC','pasaporte':'Pasaporte'}.get(order.get('document_type'),'Cédula'))+': '+(order.get('identification') or 'No registrado'))
     if order.get('trade_name'):item('Nombre comercial',order['trade_name'])
     pair('Teléfono / WhatsApp',order.get('phone'),'Correo electrónico',order.get('email'))

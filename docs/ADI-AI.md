@@ -189,3 +189,20 @@ Al abrir, recargar o cambiar de sección, ADI no se abre, no habla, no suena y n
 ## ADI en campos de nombre (1.5.118)
 
 «Nombres y apellidos / Razón social» y «Nombre comercial» del formulario de clientes tienen el botón ADI. En estos campos **no interviene la IA**: una regla fija normaliza mayúsculas, minúsculas y espacios repetidos (partículas como «de», «del», «la» en minúscula; siglas societarias como S.A. o CÍA. en mayúscula), conserva las tildes escritas y nunca añade, quita ni cambia palabras. Muestra una vista previa y solo se aplica con «Aplicar cambios». No hay herramientas de redacción en cédula, RUC, teléfono, correo, series ni importes.
+
+## ADI Living Orb — Crystal Intelligence (1.5.119)
+
+**Revisión del componente.** La esfera es un sombreador WebGL propio (`local/static/adi-orb.js`); el CSS solo actúa cuando el equipo no tiene aceleración gráfica. Recibe el estado real del asistente en cada cuadro (petición en curso, escucha, voz, conexión, cursor, toque). Problemas encontrados y corregidos en el propio motor:
+
+- El entorno reflejado y la energía interior **giraban de forma constante**. Ahora derivan con oscilaciones lentas de frecuencias distintas, sin rotación tipo «planeta».
+- La respiración era lenta (unos 7,5 s). Ahora combina ritmos de 4 y 6 s, por lo que no se repite igual.
+- Con el chat abierto había **dos renderizadores**. Ahora hay uno solo: la esfera del encabezado (40 px) copia el cuadro ya dibujado por la flotante.
+- No reaccionaba a la cercanía del cursor. Ahora intensifica los reflejos y orienta mínimamente el cristal al acercarse (o al tocarla), y vuelve sola al alejarse.
+- El toque solo expandía el halo. Ahora una onda recorre la superficie, con el rebote elástico.
+- Se añadió una iridiscencia leve en el borde y se redujo el halo exterior. Las letras «ADI» son más finas.
+
+**Tecnología.** WebGL 1 con GLSL (trazado de rayos sobre una esfera, refracción, Fresnel, ruido procedural). No se incorporó Three.js: para un elemento de 68 px añadiría cientos de KB y no mejora lo que ya calcula el sombreador.
+
+**Voz.** El navegador no permite conectar la síntesis de voz (Web Speech) a un `AnalyserNode`: su audio no pasa por Web Audio. Por eso, al hablar, la esfera sigue los eventos de palabra que emite el propio motor de voz, no la amplitud; no hay temporizadores inventados. Un análisis de amplitud real exigiría generar la voz con un servicio propio que entregue el audio.
+
+**Comprobado a tamaño real** (68 px en escritorio, 56 px en móvil): movimiento continuo con el botón en su sitio, un solo contexto WebGL con y sin el chat abierto, espejo del encabezado dibujado, estados recorridos sin errores, memoria estable y, tras recargar, chat cerrado y sin voz ni micrófono.

@@ -6,7 +6,7 @@
 (()=>{
  const VERTEX='attribute vec2 p;void main(){gl_Position=vec4(p,0.,1.);}';
  const FRAGMENT=`precision highp float;
-uniform vec2 uRes,uPointer;uniform float uTime,uLevel,uBusy,uSpeak,uDim,uPress,uShock,uSteps;
+uniform vec2 uRes,uPointer;uniform float uTime,uLevel,uBusy,uSpeak,uDim,uPress,uShock,uSteps,uHover;
 const float R=.56;
 float hash(vec3 p){p=fract(p*.3183099+.1);p*=17.;return fract(p.x*p.y*p.z*(p.x+p.y+p.z));}
 float noise(vec3 x){vec3 i=floor(x),f=fract(x);f=f*f*(3.-2.*f);
@@ -15,14 +15,14 @@ float noise(vec3 x){vec3 i=floor(x),f=fract(x);f=f*f*(3.-2.*f);
 float fbm(vec3 p){float a=.5,s=0.;for(int i=0;i<3;i++){s+=a*noise(p);p=p*2.03+7.1;a*=.5;}return s;}
 mat2 rot(float a){float c=cos(a),s=sin(a);return mat2(c,-s,s,c);}
 // Entorno de estudio que la superficie refleja: caja de luz superior, luz lateral y relleno. Deriva despacio y sigue levemente al cursor.
-vec3 env(vec3 d){d.xz*=rot(uTime*.06+uPointer.x*.35);d.yz*=rot(uPointer.y*.25+.08*sin(uTime*.23));
+vec3 env(vec3 d){d.xz*=rot(.34*sin(uTime*.11)+.19*sin(uTime*.047+1.3)+uPointer.x*(.3+uHover*.25));d.yz*=rot(uPointer.y*(.22+uHover*.2)+.09*sin(uTime*.23));
  float top=smoothstep(.3,.95,d.y),box=smoothstep(.5,.9,d.y)*smoothstep(.8,.05,abs(d.x+.22)),side=smoothstep(.55,1.,d.x)*smoothstep(.65,-.25,abs(d.y-.08));
  vec3 c=mix(vec3(.15,.03,.11),vec3(.96,.58,.80),top*.72);c+=vec3(1.,.97,.99)*box*1.6+vec3(1.,.82,.93)*side*.5;
  c+=vec3(.74,.36,.92)*smoothstep(-.15,-.9,d.y)*.24;return c;}
 void main(){
  vec2 uv=(gl_FragCoord.xy*2.-uRes)/min(uRes.x,uRes.y);
  // Levitación casi imperceptible y respiración asimétrica (dos ritmos que nunca coinciden).
- float breath=.6*sin(uTime*.83)+.4*sin(uTime*.31+1.7);
+ float breath=.6*sin(uTime*1.57)+.4*sin(uTime*1.05+1.7);
  uv.y-=.012*sin(uTime*.57)+.006*sin(uTime*.19+.6);uv.x-=.004*sin(uTime*.41+2.);
  float ang=atan(uv.y,uv.x);
  // El radio cambia de verdad: rebote elástico al toque, ondas de superficie y deformación suave al hablar o escuchar.
@@ -32,14 +32,16 @@ void main(){
  vec3 pink=vec3(1.,.58,.81),pearl=vec3(1.,.88,.94),magenta=vec3(.86,.26,.61);
  float live=1.-uDim*.6;
  // Halo volumétrico discreto y onda expansiva al toque.
- float glow=exp(-(max(d-rad,0.))*8.)*(.19+.07*breath+uSpeak*.22+uLevel*.26+max(uPress,0.)*.25)*live;
- float ring=uShock>0.?exp(-pow((d-rad-(1.-uShock)*.34)*26.,2.))*uShock*.55:0.;
+ float glow=exp(-(max(d-rad,0.))*9.5)*(.12+.045*breath+uHover*.05+uSpeak*.2+uLevel*.24+max(uPress,0.)*.22)*live;
+ float ring=uShock>0.?exp(-pow((d-rad-(1.-uShock)*.30)*28.,2.))*uShock*.38:0.;
  vec3 col=pink*(glow+ring);float alpha=glow*.85+ring*.8;
  if(d<rad){
   vec3 n=vec3(uv/rad,0.);n.z=sqrt(max(1.-dot(n.xy,n.xy),0.));
   // Pequeñas ondas que recorren la superficie: perturban la normal y, con ella, los reflejos.
   vec3 sp=n*3.2+vec3(uTime*.17,-uTime*.11,uTime*.07);
-  n=normalize(n+(vec3(noise(sp+vec3(.31,0.,0.)),noise(sp+vec3(0.,.31,0.)),0.)-.5)*(.085+uSpeak*.10+uLevel*.08));
+  float rr=length(uv)/rad;vec2 out2=uv/max(length(uv),1e-4);
+  float touch=uShock>0.?sin((rr-(1.-uShock)*1.25)*17.)*uShock*smoothstep(0.,.25,1.-uShock)*.16:0.;
+  n=normalize(n+(vec3(noise(sp+vec3(.31,0.,0.)),noise(sp+vec3(0.,.31,0.)),0.)-.5)*(.085+uSpeak*.10+uLevel*.08)+vec3(out2*touch+uPointer*uHover*.07,0.));
   vec3 v=vec3(0.,0.,1.);
   float fres=pow(1.-max(n.z,0.),2.6);
   // Interior: el rayo se refracta al entrar en el cristal y recorre la esfera acumulando luz.
@@ -47,10 +49,10 @@ void main(){
   float tmax=max(-2.*dot(ro,rd),.05);
   vec3 acc=vec3(0.);float dens=0.;
   // Giros con frecuencias que no se repiten juntas: el flujo cambia de dirección sin ciclo evidente.
-  float a1=uTime*.21+.6*sin(uTime*.047),a2=uTime*.13*sin(uTime*.031+1.)+uTime*.05,a3=.9*sin(uTime*.071)+uBusy*uTime*.9;
+  float a1=1.1*sin(uTime*.13)+.6*sin(uTime*.071+1.),a2=.9*sin(uTime*.09+2.)+.4*sin(uTime*.053),a3=.8*sin(uTime*.061+.5)+uBusy*1.4*sin(uTime*1.7);
   vec3 centre=vec3(uPointer*.10,0.)+vec3(.03*sin(uTime*.37),.03*sin(uTime*.29+1.),.02*sin(uTime*.23));
   float core=.24+.03*breath+uLevel*.17*(.6+.4*sin(uTime*29.))+uSpeak*.09;
-  float orbit=mix(.60,.18,uBusy),spin=uTime*(.45+uBusy*2.8);
+  float orbit=mix(.58,.16,uBusy),spin=uTime*(1.+uBusy*3.2);
   for(int i=0;i<10;i++){
    if(float(i)>=uSteps)break;
    float t=(float(i)+.5)/uSteps*tmax;vec3 q=ro+rd*t;
@@ -66,7 +68,7 @@ void main(){
    float nucleus=exp(-r*r/(shape*shape))*1.55;
    float wave=uSpeak*smoothstep(0.,.9,sin(r*16.-uTime*9.)*.5+.5)*(1.-r)*.9;
    float sparks=0.;
-   for(int k=0;k<5;k++){float fk=float(k);vec3 c=vec3(cos(spin*(1.+fk*.17)+fk*2.1),sin(spin*.7+fk*1.3)*.55,sin(spin*(1.+fk*.17)+fk*2.1))*orbit*(.75+.25*sin(fk*3.7));
+   for(int k=0;k<5;k++){float fk=float(k);vec3 c=vec3(sin(spin*.31+fk*2.1)+.35*sin(spin*.17+fk),sin(spin*.23+fk*1.3)*.6,cos(spin*.27+fk*2.9)+.3*sin(spin*.13+fk*1.7))*orbit*(.6+.2*sin(fk*3.7));
     vec3 e=q-centre-c;sparks+=.0014/(dot(e,e)+.0014);}
    vec3 tint=mix(magenta,pearl,clamp(nucleus*.7+cloud*.5+fil*.6,0.,1.));
    acc+=(tint*(cloud*.42+wave)+mix(pink,vec3(1.),.55)*fil*1.25+pearl*nucleus*.8+vec3(1.,.95,.98)*sparks*.85)*(1.-dens);
@@ -78,9 +80,10 @@ void main(){
   // Superficie: reflejo del entorno, dos brillos especulares (el principal sigue al cursor) y filo de contraluz.
   vec3 L=normalize(vec3(-.55+uPointer.x*.35,.62+uPointer.y*.3,.56)),L2=normalize(vec3(.62,-.5,.6));
   vec3 refl=env(reflect(-v,n));
-  float spec=pow(max(dot(reflect(-L,n),v),0.),72.)*1.5+pow(max(dot(reflect(-L2,n),v),0.),24.)*.22;
+  float spec=(pow(max(dot(reflect(-L,n),v),0.),72.)*1.5+pow(max(dot(reflect(-L2,n),v),0.),24.)*.22)*(1.+uHover*.55);
+  vec3 irid=.5+.5*cos(6.2831*(fres*1.5+n.x*.35+uTime*.021+vec3(0.,.33,.67)));
   float wrap=.62+.38*dot(n,L);
-  col=inner*wrap*live+refl*(.17+fres*.9)*live+vec3(1.)*spec*live+magenta*fres*.22;
+  col=inner*wrap*live+refl*(.17+uHover*.07+fres*.9)*live+vec3(1.)*spec*live+magenta*fres*.2+mix(pink,irid,.6)*fres*fres*.16*live;
   col+=pearl*pow(max(dot(n,-L)*.5+.5,0.),5.)*(1.-fres)*.30*live;
   // Resplandor moderado de las zonas más luminosas, sin quemar el detalle.
   col+=pink*smoothstep(.75,1.6,dot(acc,vec3(.33)))*.12;
@@ -107,7 +110,7 @@ void main(){
    program=gl.createProgram();gl.attachShader(program,vs);gl.attachShader(program,fs);gl.linkProgram(program);gl.deleteShader(vs);gl.deleteShader(fs);if(!gl.getProgramParameter(program,gl.LINK_STATUS))return false;
    buffer=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buffer);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),gl.STATIC_DRAW);
    gl.useProgram(program);const at=gl.getAttribLocation(program,'p');gl.enableVertexAttribArray(at);gl.vertexAttribPointer(at,2,gl.FLOAT,false,0,0);
-   for(const name of ['uRes','uTime','uLevel','uBusy','uSpeak','uDim','uPress','uSteps','uPointer','uShock'])uniforms[name]=gl.getUniformLocation(program,name);
+   for(const name of ['uRes','uTime','uLevel','uBusy','uSpeak','uDim','uPress','uSteps','uPointer','uShock','uHover'])uniforms[name]=gl.getUniformLocation(program,name);
    gl.disable(gl.DEPTH_TEST);gl.clearColor(0,0,0,0);return true;}
   if(!build())return null;
   host.append(canvas);
@@ -117,18 +120,21 @@ void main(){
   const still=matchMedia('(prefers-reduced-motion:reduce)');
   function resize(){const box=canvas.getBoundingClientRect(),ratio=Math.min(window.devicePixelRatio||1,2)*quality,width=Math.max(48,Math.round(box.width*ratio)),height=Math.max(48,Math.round(box.height*ratio));if(canvas.width!==width||canvas.height!==height){canvas.width=width;canvas.height=height;}gl.viewport(0,0,canvas.width,canvas.height);}
   // Valores suavizados: los estados entran y salen con transición, sin saltos.
-  const smooth={level:0,busy:0,speak:0,dim:0,px:0,py:0};let last=performance.now(),lastDraw=0;
+  const mirrors=new Set();
+  function mirror(target){const copy=document.createElement('canvas');copy.className='adi-orb-gl adi-orb-mirror';copy.setAttribute('aria-hidden','true');const context=copy.getContext('2d');if(!context)return null;target.append(copy);const entry={canvas:copy,context};mirrors.add(entry);lastDraw=0;schedule();return{destroy(){mirrors.delete(entry);copy.remove();}};}
+  const smooth={level:0,busy:0,speak:0,dim:0,px:0,py:0,hover:0};let last=performance.now(),lastDraw=0;
   function draw(now){
    const state=read(),step=Math.min(.1,(now-last)/1000);last=now;
    const ease=(key,target,speed)=>{smooth[key]+=(target-smooth[key])*Math.min(1,step*speed);};
-   ease('level',state.level||0,14);ease('px',state.px||0,3);ease('py',state.py||0,3);ease('busy',state.busy?1:0,3.5);ease('dim',state.dim?1:0,3);
+   ease('level',state.level||0,14);ease('px',state.px||0,3);ease('py',state.py||0,3);ease('hover',state.hover?1:0,4);ease('busy',state.busy?1:0,3.5);ease('dim',state.dim?1:0,3);
    // Hablando: envolvente que sube con cada palabra que informa el motor de voz y decae entre ellas.
    const sinceBeat=(now-(state.beatAt||0))/1000,envelope=state.speaking?Math.max(.35,Math.exp(-sinceBeat*5.5)):0;ease('speak',envelope,16);
    const sincePress=(now-(state.pressAt||-1e9))/1000,press=sincePress<1.2?Math.exp(-sincePress*5.2)*Math.cos(sincePress*17):0;
    resize();gl.clear(gl.COLOR_BUFFER_BIT);gl.useProgram(program);
    gl.uniform2f(uniforms.uRes,canvas.width,canvas.height);gl.uniform1f(uniforms.uTime,(still.matches||state.still)?12:(now-started)/1000);
-   gl.uniform1f(uniforms.uLevel,smooth.level);gl.uniform1f(uniforms.uBusy,smooth.busy);gl.uniform1f(uniforms.uSpeak,smooth.speak);gl.uniform1f(uniforms.uDim,smooth.dim);gl.uniform1f(uniforms.uPress,press);gl.uniform1f(uniforms.uShock,sincePress<.9?1-sincePress/.9:0);gl.uniform2f(uniforms.uPointer,smooth.px,smooth.py);gl.uniform1f(uniforms.uSteps,steps);
-   gl.drawArrays(gl.TRIANGLE_STRIP,0,4);}
+   gl.uniform1f(uniforms.uLevel,smooth.level);gl.uniform1f(uniforms.uBusy,smooth.busy);gl.uniform1f(uniforms.uSpeak,smooth.speak);gl.uniform1f(uniforms.uDim,smooth.dim);gl.uniform1f(uniforms.uPress,press);gl.uniform1f(uniforms.uShock,sincePress<.9?1-sincePress/.9:0);gl.uniform2f(uniforms.uPointer,smooth.px,smooth.py);gl.uniform1f(uniforms.uHover,smooth.hover);gl.uniform1f(uniforms.uSteps,steps);
+   gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
+   for(const copy of mirrors){const box=copy.canvas.getBoundingClientRect(),ratio=Math.min(window.devicePixelRatio||1,2),width=Math.max(24,Math.round(box.width*ratio)),height=Math.max(24,Math.round(box.height*ratio));if(copy.canvas.width!==width||copy.canvas.height!==height){copy.canvas.width=width;copy.canvas.height=height;}copy.context.clearRect(0,0,width,height);copy.context.drawImage(canvas,0,0,width,height);}}
   function loop(now){
    frame=0;if(!alive)return;
    const state=read(),active=state.busy||state.speaking||state.listening||(now-(state.pressAt||-1e9))<1300;
@@ -144,10 +150,10 @@ void main(){
   document.addEventListener('visibilitychange',onVisible);canvas.addEventListener('webglcontextlost',onLost);canvas.addEventListener('webglcontextrestored',onRestored);
   // Al salir de la página se detiene el dibujo y se liberan el programa, el búfer y el contexto gráfico.
   function destroy(){if(!alive)return;alive=false;if(frame)cancelAnimationFrame(frame);frame=0;document.removeEventListener('visibilitychange',onVisible);canvas.removeEventListener('webglcontextlost',onLost);canvas.removeEventListener('webglcontextrestored',onRestored);removeEventListener('pagehide',destroy);
-   try{gl.deleteBuffer(buffer);gl.deleteProgram(program);gl.getExtension('WEBGL_lose_context')?.loseContext();}catch{}canvas.remove();}
+   for(const copy of mirrors)copy.canvas.remove();mirrors.clear();try{gl.deleteBuffer(buffer);gl.deleteProgram(program);gl.getExtension('WEBGL_lose_context')?.loseContext();}catch{}canvas.remove();}
   addEventListener('pagehide',destroy);
   schedule();
-  return {destroy,canvas,info:()=>({steps,quality,width:canvas.width,height:canvas.height,running:!!frame})};
+  return {destroy,canvas,mirror,info:()=>({steps,quality,width:canvas.width,height:canvas.height,running:!!frame,mirrors:mirrors.size})};
  }
  window.AdiOrb={mount};
 })();

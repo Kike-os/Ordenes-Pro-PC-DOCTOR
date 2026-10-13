@@ -4,6 +4,19 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.119 — 2026-10-12 20:06 (UTC-05:00)
+
+ADI Living Orb y etiqueta «Nombres y Apellidos»
+
+### Mejoras realizadas
+
+- ADI Living Orb: movimiento orgánico sin giro constante, respiración irregular de unos 4 segundos, reacción a la cercanía del cursor, onda de superficie al tocarla e iridiscencia leve en el borde.
+- La etiqueta pasa a «Nombres y Apellidos» en formularios, ficha del cliente, citas y comprobante.
+
+### Optimización del rendimiento
+
+- La esfera del encabezado del chat reutiliza el cuadro de la esfera flotante: un solo renderizador gráfico.
+
 ## v1.5.118 — 2026-10-12 20:01 (UTC-05:00)
 
 Directorio de clientes compacto, ficha rápida y ADI en nombres

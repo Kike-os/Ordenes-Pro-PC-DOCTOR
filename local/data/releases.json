@@ -8,6 +8,25 @@
   },
   "releases": [
     {
+      "version": "1.5.119",
+      "date": "2026-10-12T20:06:04-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "ADI Living Orb y etiqueta «Nombres y Apellidos»",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "ADI Living Orb: movimiento orgánico sin giro constante, respiración irregular de unos 4 segundos, reacción a la cercanía del cursor, onda de superficie al tocarla e iridiscencia leve en el borde.",
+          "La etiqueta pasa a «Nombres y Apellidos» en formularios, ficha del cliente, citas y comprobante."
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": [
+          "La esfera del encabezado del chat reutiliza el cuadro de la esfera flotante: un solo renderizador gráfico."
+        ]
+      }
+    },
+    {
       "version": "1.5.118",
       "date": "2026-10-12T20:01:10-05:00",
       "type": "patch",
