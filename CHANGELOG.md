@@ -4,6 +4,15 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.141 — 2026-10-13 14:36 (UTC-05:00)
+
+Ventana de ADI ordenada: accesos en cuadrícula, márgenes uniformes y controles alineados
+
+### Errores corregidos
+
+- Ventana de ADI: accesos rápidos en cuadrícula de dos columnas, botones uniformes, márgenes interiores iguales, campo de mensaje alineado con el micrófono y Enviar, y accesos inferiores en dos columnas; nada se sale de la ventana en móviles.
+- Página de citas: la ventana de ADI recupera su estilo (la versión 1.5.140 le asignó por error una clase de otro componente).
+
 ## v1.5.140 — 2026-10-13 14:29 (UTC-05:00)
 
 ADI revisa el nombre en la reserva de citas y nuevo encabezado ejecutivo del comprobante de recepción

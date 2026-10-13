@@ -8,6 +8,23 @@
   },
   "releases": [
     {
+      "version": "1.5.141",
+      "date": "2026-10-13T14:36:42-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Ventana de ADI ordenada: accesos en cuadrícula, márgenes uniformes y controles alineados",
+      "changes": {
+        "features": [],
+        "improvements": [],
+        "fixes": [
+          "Ventana de ADI: accesos rápidos en cuadrícula de dos columnas, botones uniformes, márgenes interiores iguales, campo de mensaje alineado con el micrófono y Enviar, y accesos inferiores en dos columnas; nada se sale de la ventana en móviles.",
+          "Página de citas: la ventana de ADI recupera su estilo (la versión 1.5.140 le asignó por error una clase de otro componente)."
+        ],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.140",
       "date": "2026-10-13T14:29:34-05:00",
       "type": "patch",
