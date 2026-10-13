@@ -10,6 +10,25 @@ LIST_SQL="""SELECT v.id,v.mode,v.assigned_to,v.created_at,v.updated_at,v.last_se
  FROM adi_conversations v LEFT JOIN users u ON u.id=v.assigned_to LEFT JOIN clients cl ON cl.id=v.client_id LEFT JOIN orders o ON o.id=v.order_id """
 
 
+def summary(c):
+    """Contadores del Centro de Atenciones. Cada conversación abierta cuenta en una sola categoría:
+    - waiting: con un asesor (o solicitándolo) y el último mensaje es del cliente → espera respuesta humana;
+    - transferred: transferida por ADI a un asesor y ya respondida (en curso);
+    - new_conversations: atendida por ADI y con mensajes del cliente que el personal aún no ha visto.
+    Además devuelve las atenciones que requieren acción, de la que más tiempo lleva esperando a la más reciente."""
+    counts={'new_conversations':0,'waiting':0,'transferred':0};pending=[]
+    for row in c.execute(LIST_SQL+"WHERE v.mode!='closed' ORDER BY v.updated_at"):
+        if not row['total']:continue
+        if row['mode']=='human':kind='waiting' if row['last_author']=='client' else 'transferred'
+        elif row['unread'] or (row['last_seen_admin']=='' and row['last_author'] is not None):kind='new_conversations'
+        else:continue
+        counts[kind]+=1
+        if kind!='transferred':pending.append({'id':row['id'],'kind':kind,'client':row['client'] or '','order_code':row['order_code'] or '','source':'Transferida por ADI' if row['mode']=='human' else 'Chat con ADI',
+                                               'created_at':row['created_at'],'waiting_since':row['last_at'] or row['updated_at'],'unread':row['unread'],'preview':(row['last_message'] or '')[:120] if row['last_author']=='client' else ''})
+    pending.sort(key=lambda item:(item['kind']!='waiting',item['waiting_since']))
+    return dict(counts,pending=pending[:5],total=sum(counts.values()))
+
+
 def rows(c,scope='active'):
     if scope=='closed':sql=LIST_SQL+"WHERE v.mode='closed' ORDER BY v.updated_at DESC LIMIT 30"
     else:sql=LIST_SQL+"WHERE v.mode!='closed' ORDER BY v.updated_at DESC LIMIT 100"

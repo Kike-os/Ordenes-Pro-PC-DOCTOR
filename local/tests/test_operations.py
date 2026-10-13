@@ -115,7 +115,9 @@ class OperationsTests(unittest.TestCase):
                 cid=c.execute('INSERT INTO adi_conversations(token_hash,mode,created_at,updated_at,last_seen_admin) VALUES (?,?,?,?,?)',('test-conv-'+str(i),mode,now,now,seen)).lastrowid
                 c.execute('INSERT INTO adi_messages(conversation_id,author,content,created_at) VALUES (?,?,?,?)',(cid,last,'Prueba',now))
         dash=self.request('/api/dashboard',cookie=cookie)['body']
-        self.assertEqual(dash['assistance'],{'new_conversations':2,'waiting':1,'transferred':2})
+        # Cada conversación abierta cuenta en una sola categoría: una espera respuesta humana, otra está en curso con un asesor y otra es nueva con ADI.
+        self.assertEqual({key:dash['assistance'][key] for key in ('new_conversations','waiting','transferred','total')},{'new_conversations':1,'waiting':1,'transferred':1,'total':3})
+        self.assertEqual([(item['kind'],item['source']) for item in dash['assistance']['pending']],[('waiting','Transferida por ADI'),('new_conversations','Chat con ADI')])
         with app.connect() as c:c.execute("UPDATE users SET role='tecnico'")
         self.assertIsNone(self.request('/api/dashboard',cookie=cookie)['body']['assistance'])
         self.assertEqual(self.request('/api/adi/admin',cookie=cookie)['status'],403)

@@ -33,3 +33,15 @@ Conocer el número de orden no basta para ver datos:
 3. Con el código (`POST /api/public/adi/order/verify`) se muestran solo el estado, el equipo, la fecha de ingreso, la entrega estimada y el enlace de seguimiento vigente. Ningún dato personal.
 
 Protecciones: código de un solo uso, cinco intentos por código, cinco solicitudes por dirección cada 10 minutos y tres por orden cada 30; cada consulta verificada queda en la auditoría (`order_checked_by_client`). El chat ya no entrega el estado a partir del número de orden y la cédula: remite a esta verificación. Tabla `order_checks` (migración 038).
+
+## Centro de Atenciones (panel del inicio, 1.5.116)
+
+- Título «Centro de Atenciones» y subtítulo «Seguimiento de conversaciones y solicitudes pendientes». El encabezado muestra la conexión real («En línea · hora» de la última consulta correcta, o «Sin conexión · reintentando»).
+- **Contadores sin solapes** (`live_support.summary`): cada conversación abierta cuenta en una sola categoría.
+  - *Esperan respuesta*: con un asesor solicitado y el último mensaje es del cliente.
+  - *Transferidas por ADI*: pasadas a un asesor y ya respondidas (en curso).
+  - *Nuevas*: atendidas por ADI con mensajes que el personal aún no ha visto.
+  Antes una misma conversación podía sumar en las tres.
+- **Lista de atenciones** (hasta cinco, primero las que esperan respuesta y, entre ellas, la más antigua): cliente o número de conversación, origen («Transferida por ADI» o «Chat con ADI»), orden vinculada si existe, fecha y hora de ingreso, tiempo de espera y el último mensaje del cliente. Al pulsar una se abre esa conversación. No hay campo de prioridad en las conversaciones, así que no se muestra.
+- Un solo botón, «Abrir Centro de Atención» (antes había dos que hacían lo mismo).
+- Se actualiza cada 20 s con la pestaña visible (`GET /api/assistance`, solo administración) y avisa cuando aparece un cliente esperando respuesta.

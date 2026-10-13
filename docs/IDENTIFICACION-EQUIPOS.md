@@ -62,3 +62,9 @@ Al registrar una orden, si el cliente ya tiene exactamente el mismo equipo (seri
 **Conflictos:** si una serie figura en el historial con marcas distintas, la búsqueda lo avisa y no elige ninguna por su cuenta.
 
 **Ficha del equipo:** marca y modelo, tipo y serie, origen (Historial interno, Fabricante oficial o Selección manual) e identificación (Confirmada, Pendiente o No disponible).
+
+## Ficha del equipo (1.5.116)
+
+Estados que muestra la ficha: **Identificado** (historial del taller o servicio oficial del fabricante), **Registro manual completo**, **Datos incompletos** y **No identificado** (hay serie pero no marca ni modelo; se indica que no figura en el historial y se ofrece la consulta al soporte oficial). Ya no aparece «Marca sin indicar — Modelo pendiente de identificación».
+
+La consulta automática a fabricantes sigue pendiente de credenciales: ninguna integración está activa. Tras la limpieza de registros de prueba del 12/10/2026 el historial propio empieza vacío, así que las primeras series no se reconocerán hasta registrar los equipos.

@@ -8,6 +8,25 @@
   },
   "releases": [
     {
+      "version": "1.5.116",
+      "date": "2026-10-12T19:50:30-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Centro de Atenciones y ficha del equipo",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Centro de Atenciones: nuevo título y subtítulo, indicador de conexión real, tres contadores sin solapes, lista de atenciones con hora de ingreso, tiempo de espera y origen, y un solo botón de acceso.",
+          "La ficha del equipo en recepción explica con claridad su estado (identificado, registro manual, datos incompletos o no identificado)."
+        ],
+        "fixes": [
+          "Los contadores de atención ya no cuentan una misma conversación en varias categorías."
+        ],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.115",
       "date": "2026-10-12T19:44:10-05:00",
       "type": "patch",

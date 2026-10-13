@@ -4,6 +4,19 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.116 — 2026-10-12 19:50 (UTC-05:00)
+
+Centro de Atenciones y ficha del equipo
+
+### Mejoras realizadas
+
+- Centro de Atenciones: nuevo título y subtítulo, indicador de conexión real, tres contadores sin solapes, lista de atenciones con hora de ingreso, tiempo de espera y origen, y un solo botón de acceso.
+- La ficha del equipo en recepción explica con claridad su estado (identificado, registro manual, datos incompletos o no identificado).
+
+### Errores corregidos
+
+- Los contadores de atención ya no cuentan una misma conversación en varias categorías.
+
 ## v1.5.115 — 2026-10-12 19:44 (UTC-05:00)
 
 Gestión de Clientes: directorio rediseñado y búsqueda sin tildes
