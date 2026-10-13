@@ -34,10 +34,63 @@ LINK_DAYS = 15
 MAX_ITEMS = 60
 MAX_FAILED = 6
 METHOD = 'Enlace privado enviado al correo registrado y últimos cuatro dígitos de la identificación'
-CONDITIONS = ('Al aprobar y firmar este presupuesto, el cliente autoriza a PC-DOCTOR S.A. a ejecutar exclusivamente los servicios aceptados.\n'
-              'Una vez iniciados los trabajos, cualquier solicitud de cancelación será evaluada según su avance y las disposiciones legales aplicables.\n'
-              'En caso de desistimiento, podrán cobrarse los trabajos efectivamente realizados y los gastos debidamente justificados que legalmente correspondan.\n'
-              'Los servicios no autorizados no serán ejecutados sin una aprobación posterior.')
+# Condiciones de aprobación y ejecución (texto entregado por la administración el 2026-10-13, sujeto a revisión legal). Cada cláusula es
+# un título numerado seguido de su texto. Un presupuesto ya enviado conserva las condiciones con las que se envió.
+CONDITIONS = '\n'.join((
+    '1. Autorización del servicio',
+    'Mediante la aceptación de este presupuesto, el cliente autoriza expresamente a PC-DOCTOR S.A. a ejecutar los productos y servicios seleccionados, conforme a los valores y condiciones indicados.',
+    '2. Inicio de trabajos',
+    'Los trabajos autorizados podrán programarse o iniciarse una vez registrada la aprobación del cliente y cumplidas las condiciones necesarias para su ejecución.',
+    '3. Modificación o desistimiento',
+    'Una vez aprobado el presupuesto, cualquier solicitud posterior de modificación, rechazo o cancelación deberá comunicarse a PC-DOCTOR S.A. para su evaluación según el estado de ejecución. La aprobación no podrá revertirse unilateralmente mediante la simple modificación del enlace cuando ya existan trabajos iniciados o compromisos de adquisición de repuestos, sin perjuicio de los derechos legales del consumidor.',
+    '4. Trabajos y gastos realizados',
+    'En caso de cancelación posterior, podrán liquidarse únicamente los trabajos efectivamente realizados, los gastos debidamente justificados y los demás importes legalmente procedentes.',
+    '5. Servicios adicionales',
+    'Cualquier servicio adicional que implique un costo no contemplado en el presupuesto aprobado requerirá una nueva autorización del cliente.',
+    '6. Evidencia de aceptación',
+    'La aprobación electrónica quedará vinculada al número y versión del presupuesto, con la evidencia correspondiente.',
+    '7. Documento informativo',
+    'Este presupuesto no constituye factura ni comprobante de venta autorizado por el SRI.'))
+
+
+def clauses(text):
+    """Condiciones como lista de (título, texto). Un renglón «N. Título» encabeza el renglón siguiente; las condiciones antiguas, sin títulos, quedan como ('', renglón)."""
+    lines, out, index = [line.strip() for line in str(text or '').split('\n') if line.strip()], [], 0
+    while index < len(lines):
+        if re.fullmatch(r'\d{1,2}\. .{3,70}', lines[index]) and index + 1 < len(lines) and not re.match(r'\d{1,2}\. ', lines[index + 1]):
+            out.append((lines[index], lines[index + 1]))
+            index += 2
+        else:
+            out.append(('', lines[index]))
+            index += 1
+    return out
+
+
+def link_days(c):
+    """Días de vigencia del enlace privado de aprobación (configurable por administración entre 1 y 60; por omisión 15)."""
+    row = c.execute("SELECT value FROM system_state WHERE key='quote_link_days'").fetchone()
+    try:
+        return max(1, min(60, int(row['value']))) if row else LINK_DAYS
+    except (TypeError, ValueError):
+        return LINK_DAYS
+
+
+def set_link_days(c, value):
+    if not str(value).strip().isdigit() or not 1 <= int(str(value).strip()) <= 60:
+        raise QuoteError('La vigencia del enlace debe estar entre 1 y 60 días.', fields={'link_days': 'Valor inválido.'})
+    c.execute("INSERT INTO system_state(key,value) VALUES ('quote_link_days',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", (str(int(str(value).strip())),))
+    return int(str(value).strip())
+
+
+def active_link(c, quote, token, now):
+    """Datos del enlace para el documento si `token` es el enlace vigente de este presupuesto: {'expires_at'}; None en cualquier otro caso.
+    El sistema solo guarda la huella del enlace, así que el código QR solo puede emitirse a quien ya lo tiene (el cliente, o el personal al enviarlo)."""
+    if quote['status'] != 'enviado' or not re.fullmatch(r'[A-Za-z0-9_-]{30,80}', str(token or '')):
+        return None
+    link = c.execute("SELECT expires_at,failed FROM quote_links WHERE quote_id=? AND token_hash=? AND revoked_at=''", (quote['id'], digest(token))).fetchone()
+    if not link or datetime.fromisoformat(link['expires_at']) < now or link['failed'] >= MAX_FAILED:
+        return None
+    return {'expires_at': link['expires_at']}
 
 
 class QuoteError(ValueError):
@@ -467,7 +520,7 @@ def send(c, quote, recipient, user, now):
         raise QuoteError('La vigencia del presupuesto ya venció. Actualízala antes de enviarlo.', fields={'valid_until': 'Fecha vencida.'})
     stamp, token = now.isoformat(timespec='seconds'), secrets.token_urlsafe(32)
     c.execute("UPDATE quote_links SET revoked_at=? WHERE quote_id=? AND revoked_at=''", (stamp, quote['id']))
-    c.execute('INSERT INTO quote_links(quote_id,token_hash,created_at,expires_at) VALUES (?,?,?,?)', (quote['id'], digest(token), stamp, (now + timedelta(days=LINK_DAYS)).isoformat(timespec='seconds')))
+    c.execute('INSERT INTO quote_links(quote_id,token_hash,created_at,expires_at) VALUES (?,?,?,?)', (quote['id'], digest(token), stamp, (now + timedelta(days=link_days(c))).isoformat(timespec='seconds')))
     c.execute("UPDATE quotes SET status='enviado',conditions=?,sent_at=?,sent_to=?,updated_at=? WHERE id=?", (CONDITIONS, stamp, recipient, stamp, quote['id']))
     c.execute("UPDATE quote_items SET status='pendiente' WHERE quote_id=? AND status!='cancelado'", (quote['id'],))
     event(c, quote['id'], 'enviado', 'Enviado para aprobación a ' + recipient + '.', now, user)
@@ -756,7 +809,7 @@ def decision_page(token, passkey, quote, order, items, errors=None, form=None):
                       item['id'], ' checked' if chosen == 'aprobado' else '', item['id'], ' checked' if chosen == 'rechazado' else '', item['id'], ' checked' if chosen == 'pendiente' else '')
     problem = lambda key: '<p class="quote-error" role="alert">%s</p>' % e(errors[key]) if errors.get(key) else ''
     rate = quote['tax_rate_bp'] / 100
-    conditions = ''.join('<li>%s</li>' % e(line) for line in (quote['conditions'] or CONDITIONS).split('\n'))
+    conditions = ''.join('<li>%s%s</li>' % ('<strong>%s.</strong> ' % e(title.rstrip('.')) if title else '', e(body)) for title, body in clauses(quote['conditions'] or CONDITIONS))
     body = ('<section class="tracking-card quote-card">%s<p class="quote-valid">%s</p>'
             '<form class="auth-form quote-form" method="post" action="/presupuesto/%s" autocomplete="off"><input type="hidden" name="passkey" value="%s">'
             '<p class="auth-step">Paso 2 de 2 · Revisa y decide cada servicio</p><div class="quote-bulk"><button type="button" data-quote-all="aprobado">Aprobar todo</button><button type="button" data-quote-all="rechazado">Rechazar todo</button></div>%s%s'

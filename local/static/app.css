@@ -5978,3 +5978,4 @@ body[data-page=dashboard] .wizard-dialog .wizard-actions :is(.nav-back,#wizard-n
 @media(prefers-reduced-motion:reduce){:is(.booking-actions,.wizard-actions) :is(.nav-cancel,.nav-back,.nav-next,.appointment-submit,#wizard-next),.close-button{transition:none}:is(.booking-actions,.wizard-actions) button:active,.close-button:active{transform:none}}
 .booking-actions #booking-cancel.nav-cancel{margin-right:auto}
 @media(max-width:480px){.booking-actions #booking-cancel.nav-cancel{margin-right:0}}
+.quote-sent a.secondary{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:40px;padding:0 14px;text-decoration:none}.quote-sent a.secondary svg{width:16px;height:16px;flex:none}

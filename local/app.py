@@ -918,7 +918,8 @@ class Handler(BaseHTTPRequestHandler):
                     if quote['status'] in ('borrador','cancelado','modificacion'):return self.reply(404,quotes.missing_page(),'text/html; charset=utf-8')
                     import quote_pdf
                     number=re.sub(r'\D','',str(document.get('identification') or ''))
-                    return self.reply(200,quote_pdf.render(quotes.detail(c,quote),dict(document,identification=number[:2]+'*'*max(0,len(number)-2) if number else '')),'application/pdf',filename=quote['code']+'-PRESUPUESTO.pdf')
+                    live=quotes.active_link(c,quote,quote_page[1],now)
+                    return self.reply(200,quote_pdf.render(quotes.detail(c,quote),dict(document,identification=number[:2]+'*'*max(0,len(number)-2) if number else ''),dict(live,url=public_base_url().rstrip('/')+'/presupuesto/'+quote_page[1]) if live else None),'application/pdf',filename=quote['code']+'-PRESUPUESTO.pdf')
                 if quote['status']!='enviado':return self.reply(200,quotes.result_page(quote_page[1],quote,document,quotes.items_of(c,quote['id'])),'text/html; charset=utf-8')
                 if not link['usable']:return self.reply(404,quotes.missing_page(),'text/html; charset=utf-8')
                 return self.reply(200,quotes.identify_page(quote_page[1],quote,document),'text/html; charset=utf-8')
@@ -1557,7 +1558,7 @@ class Handler(BaseHTTPRequestHandler):
                 logos={f.stem:f.name for f in sorted((ROOT/'static'/'brands').glob('*')) if f.suffix in ('.svg','.png') and re.fullmatch(r'[a-z0-9]+(?:-[a-z0-9]+)*',f.stem)}
                 names={name.lower() for name,*_ in quotes.INITIAL}|{name.lower() for name,*_ in quotes.ADDITIONS};present={r['name'].lower() for r in c.execute('SELECT name FROM catalog_items')}
                 return self.reply(200,{'rows':quotes.catalog(c,query.get('q',[''])[0][:80],query.get('all',[''])[0]!='1',category if category in quotes.CATEGORIES else ''),'categories':quotes.CATEGORIES,'price_modes':quotes.PRICE_MODES,
-                    'tax_rate_bp':quotes.tax_rate(c),'can_edit':user['role']=='administrador','brand_logos':logos,'initial_missing':len(names-present),'icons':quotes.catalog_icons.catalog(),
+                    'tax_rate_bp':quotes.tax_rate(c),'link_days':quotes.link_days(c),'can_edit':user['role']=='administrador','brand_logos':logos,'initial_missing':len(names-present),'icons':quotes.catalog_icons.catalog(),
                     'priorities':{key:{'label':label,'color':color} for key,(label,color,_) in quotes.PRIORITIES.items()}})
             catalog_extra=re.fullmatch(r'/api/catalog/([0-9]{1,9})/(image|history)',path)
             if catalog_extra:
@@ -1585,7 +1586,8 @@ class Handler(BaseHTTPRequestHandler):
                     found=quotes.get(c,int(quote_get[2]))
                     if quote_get[3]:
                         import quote_pdf
-                        return self.reply(200,quote_pdf.render(quotes.detail(c,found),order_document(c,found['order_id'])),'application/pdf',filename=found['code']+'-PRESUPUESTO.pdf')
+                        token=parse_qs(urlsplit(self.path).query).get('t',[''])[0];live=quotes.active_link(c,found,token,reception_now())
+                        return self.reply(200,quote_pdf.render(quotes.detail(c,found),order_document(c,found['order_id']),dict(live,url=public_base_url().rstrip('/')+'/presupuesto/'+token) if live else None),'application/pdf',filename=found['code']+'-PRESUPUESTO.pdf')
                     return self.reply(200,{'quote':quotes.detail(c,found)})
                 except quotes.QuoteError as error:return self.reply(error.status,{'error':str(error)})
             if path == '/api/tracking':
@@ -2431,6 +2433,8 @@ class Handler(BaseHTTPRequestHandler):
                     if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede modificar el catálogo.'})
                     try:
                         if path.endswith('/tax'):
+                            if 'link_days' in data:
+                                days=quotes.set_link_days(c,data.get('link_days',''));audit(c,user['id'],'quote_link_days_updated');return self.reply(200,{'ok':True,'link_days':days})
                             rate=quotes.set_tax_rate(c,data.get('tax',''));audit(c,user['id'],'quote_tax_updated');return self.reply(200,{'ok':True,'tax_rate_bp':rate})
                         item=quotes.save_catalog_item(c,data,user,reception_now());audit(c,user['id'],'catalog_item_saved',item)
                         return self.reply(200,{'ok':True,'id':item})
@@ -2496,7 +2500,10 @@ class Handler(BaseHTTPRequestHandler):
                                         'Para revisar el detalle y aprobar o rechazar cada servicio, ingrese al siguiente enlace privado:',link,'',
                                         'Por su seguridad se le pedirán los últimos cuatro dígitos de su cédula o RUC. El enlace es personal: no lo reenvíe.','',
                                         'No se ejecutará ningún trabajo sin su autorización.','','Atentamente,','','Departamento de Servicio Técnico','PC-DOCTOR S.A.'])
-                                    send_institutional(c,'quote','Presupuesto de servicio',email,'PC-DOCTOR S.A. | Presupuesto N.º '+found['code'],body,found['order_id'],user['id'],private=(link,));result='sent'
+                                    import quote_pdf
+                                    number=re.sub(r'\D','',str(document.get('identification') or ''));live=quotes.active_link(c,detail,token,now)
+                                    attached=quote_pdf.render(detail,dict(document,identification=number[:2]+'*'*max(0,len(number)-2) if number else ''),dict(live,url=link) if live else None)
+                                    send_institutional(c,'quote','Presupuesto de servicio',email,'PC-DOCTOR S.A. | Presupuesto N.º '+found['code'],body,found['order_id'],user['id'],attachments=[{'name':found['code']+'-PRESUPUESTO.pdf','type':'application/pdf','data':base64.b64encode(attached).decode()}],private=(link,));result='sent'
                             except mail_pro.MailError as error:
                                 print('quote-mail',error.kind,flush=True);result='failed'
                             with connect() as log:
