@@ -46,3 +46,15 @@ Pruebas: `local/tests/test_equipment.py`.
 - Acciones del equipo elegido: «Abrir equipo», «Etiqueta QR», «Tarjeta de seguimiento» y, para administración, «Editar este equipo», que abre el formulario de edición en una ventana sobre la misma página y al guardar vuelve a ella con el mismo equipo seleccionado.
 - El resumen económico de la orden completa queda aparte, rotulado «Resumen de la orden completa (N equipos)», para no confundirlo con los importes del equipo elegido.
 - Teclado: flechas, Inicio y Fin cambian de equipo. En 390 px las tarjetas van en dos columnas y en 320 px en una.
+
+## Progreso y estado por equipo (octubre de 2026)
+
+**Problema.** La barra de progreso y la etiqueta de estado del detalle mostraban siempre el equipo de la página abierta. En una orden con E01 entregado y E02 en proceso, la barra aparecía completa hasta «Entregado» aunque se seleccionara E02, y parecía que toda la orden estaba entregada.
+
+**Corrección.**
+
+- La barra (Recibido, En proceso, Listo para entregar, Entregado) y la etiqueta «Estado de E02» muestran solo el equipo seleccionado en el selector, y cambian al instante al elegir otro, sin recargar. Etapas completadas en verde, la actual en azul y las pendientes en gris. «Entregado» solo se marca cuando ese equipo tiene su entrega registrada.
+- Con varios equipos aparece aparte el **estado general de la orden**, calculado en el servidor (`equipment.overall`) con el estado real de cada uno: «Orden completada» (todos entregados), «Entrega parcial» (alguno entregado y otros no), «Atención en curso» (alguno en proceso, o mezcla de recibidos y listos), «Listos para entrega» (todos listos) o «Equipos recibidos». Lleva un resumen del tipo «2 equipos · 1 entregado · 1 en proceso». Nunca dice completada mientras quede un equipo pendiente.
+- Cada equipo sigue siendo un ingreso propio: entregar E01 no cambia E02, y la entrega comprueba el saldo de ese equipo.
+
+**Tarjetas de «Equipos de esta orden».** El encabezado resume la orden en fichas (orden, equipos registrados y cuántos hay en cada etapa). Cada tarjeta tiene arriba el icono del tipo de equipo, el código (E01, E02…) y el estado en píldora; debajo, el nombre con protagonismo, el tipo, el identificador y la serie más discretos, y la última actualización. La seleccionada se distingue por borde, brillo, fondo y la etiqueta «Equipo seleccionado», no solo por una línea.

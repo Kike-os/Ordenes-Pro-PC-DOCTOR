@@ -1,7 +1,7 @@
 """Varios equipos por orden: identificadores por equipo, equipos idénticos, reingresos, pagos separados y entregas individuales."""
 import unittest
 import test_app
-import app
+import app,equipment
 app.os.environ.setdefault('LOGIN_CAPTCHA','off')
 
 
@@ -131,3 +131,21 @@ class SerialIdentificationTests(unittest.TestCase):
         with patch.object(device_manufacturers,'configured',return_value=('dell',)),patch.object(device_manufacturers,'lookup',side_effect=device_manufacturers.ProviderError('conexion','sin respuesta')):
             failed=self.request('/api/devices/identify?serial=ABC1234&brand=Dell',cookie=cookie)
             self.assertEqual((failed['status'],failed['body']['manufacturer']['state'],failed['body']['manufacturer']['result']),(200,'error',None))
+
+    def test_overall_state_never_closes_the_order_while_a_unit_is_pending(self):
+        rows=lambda *statuses:[{'status_code':code} for code in statuses]
+        cases=((('pendiente','pendiente'),'recibidos','Equipos recibidos','2 equipos · 2 recibidos'),(('pendiente','reparacion'),'curso','Atención en curso','2 equipos · 1 en proceso · 1 recibido'),
+               (('listo','pendiente'),'curso','Atención en curso','2 equipos · 1 listo para entregar · 1 recibido'),(('listo','espera_entrega'),'listos','Listos para entrega','2 equipos · 2 listos para entregar'),
+               (('entregado','reparacion'),'parcial','Entrega parcial','2 equipos · 1 entregado · 1 en proceso'),(('entregado','listo','presupuesto'),'parcial','Entrega parcial','3 equipos · 1 entregado · 1 listo para entregar · 1 en proceso'),
+               (('entregado','entregado'),'completada','Orden completada','2 equipos · 2 entregados'),(('esperando_cliente',),'curso','Atención en curso','1 equipo · 1 en proceso'))
+        for statuses,code,label,summary in cases:
+            got=equipment.overall(rows(*statuses));self.assertEqual((got['code'],got['label'],got['summary']),(code,label,summary),statuses)
+        # En el sistema real: entregar E01 no cambia E02, y el estado general queda en «Entrega parcial».
+        cookie,csrf=self.login();main=EquipmentTests.receive(self,cookie,csrf,'ov01')['body'];second=EquipmentTests.receive(self,cookie,csrf,'ov02',group_order_id=str(main['id']),new_unit='1')['body']
+        self.assertEqual(self.request('/api/order-status',{'id':str(second['id']),'status':'reparacion'},cookie=cookie,csrf=csrf)['status'],200)
+        self.assertEqual(self.request('/api/order-status',{'id':str(main['id']),'status':'entregado'},cookie=cookie,csrf=csrf)['status'],200)
+        for seen in (main['id'],second['id']):
+            detail=self.request('/api/orders/%d'%seen,cookie=cookie)['body'];group=detail.get('order',detail)['group']
+            self.assertEqual(([(u['status_code'],u['phase']) for u in group['units']],group['overall']['code'],group['overall']['summary']),([('entregado','entregado'),('reparacion','proceso')],'parcial','2 equipos · 1 entregado · 1 en proceso'))
+            self.assertTrue(all(u['updated_at'] for u in group['units']))
+

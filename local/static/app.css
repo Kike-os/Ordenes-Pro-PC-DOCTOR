@@ -6004,3 +6004,56 @@ body[data-page=appointments] .appointment-error:not(:empty)::before{content:'!';
 .clients-origin{display:inline-block;width:fit-content;margin-top:2px;padding:0 7px;border:1px solid #ff9ecb59;border-radius:999px;background:#3a1b3366;color:#ffd3e6;font-size:10.5px;font-weight:600}
 .client-tag-origin{border-color:#ff9ecb59;background:#3a1b3366;color:#ffd3e6}
 .quote-sent a.secondary{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:40px;padding:0 14px;text-decoration:none}.quote-sent a.secondary svg{width:16px;height:16px;flex:none}
+/* ===== Detalle de la orden: progreso por equipo y estado general de la orden ===== */
+.order-progress-box{display:grid;gap:10px;margin:14px 0 0;padding:14px 16px;border:1px solid #253b5c;border-radius:12px;background:#0c1729}
+.order-progress-box .order-progress{margin:0;padding:6px 0 0;border:0;background:none}
+.order-progress-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px}.order-progress-head:empty{display:none}
+.order-progress-head strong{font-size:13px;color:#eef3ff}.order-progress-head span{font-size:12.5px;color:#a9bdd8;overflow-wrap:anywhere}
+.order-progress-head em{flex:1 1 100%;font-style:normal;font-size:11.5px;color:#f3d79b}
+/* Etapas: completadas en verde, actual en azul, pendientes en gris */
+.order-progress li[data-state=done] .progress-label{color:#aef0d2}.order-progress li[data-state=current] .progress-label{color:#fff}
+.order-progress li[data-state=current]::before{background:linear-gradient(90deg,#3f9f78,#2868c5)}
+.order-overall{display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid #3a4f8a;border-radius:11px;background:linear-gradient(160deg,#111d3a,#0c162b)}
+.order-overall-icon{display:grid;place-items:center;flex:none;width:34px;height:34px;border-radius:10px;border:1px solid #3a4f8a;color:#c3cffa}.order-overall-icon svg{width:17px;height:17px}
+.order-overall>div{display:grid;gap:1px;min-width:0}.order-overall small{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:#8fa0c8}
+.order-overall strong{font-size:14.5px;color:#fff}.order-overall span{font-size:12.5px;color:#c7d6ec;overflow-wrap:anywhere}
+.order-overall[data-state=completada]{border-color:#2f7d5f;background:linear-gradient(160deg,#12352b,#0b1f1a)}.order-overall[data-state=completada] strong{color:#aef0d2}
+.order-overall[data-state=parcial]{border-color:#8a6a2c;background:linear-gradient(160deg,#2a2110,#10182b)}.order-overall[data-state=parcial] strong{color:#ffe2a8}
+.order-overall[data-state=listos] strong{color:#9be8dc}
+.equip-tab-when{display:block;font-size:11px;color:#8fa6c4}
+@media(max-width:520px){.order-progress-box{padding:12px}.order-progress .progress-label{font-size:10px}}
+/* ===== «Equipos de esta orden»: resumen de la orden y tarjetas de equipo con jerarquía clara y selección evidente ===== */
+.equip-group-head{align-items:center;gap:10px 14px}.equip-group-head h2{flex:0 0 auto}
+.equip-summary{display:flex;flex-wrap:wrap;gap:6px;flex:1 1 280px;min-width:0;margin:0;padding:0;list-style:none}
+.equip-summary li{padding:3px 10px;border:1px solid #2c4468;border-radius:999px;background:#0c192d;color:#c7d6ec;font-size:12px;font-weight:600;white-space:nowrap}
+.equip-summary li[data-kind=code]{font-family:ui-monospace,Menlo,Consolas,monospace;color:#e3eeff;border-color:#37618d}
+.equip-summary li[data-kind=entregado]{border-color:#3fbf8f66;background:#12352b;color:#aef0d2}.equip-summary li[data-kind=listo]{border-color:#3fbfb066;background:#0e2a2c;color:#9be8dc}
+.equip-summary li[data-kind=proceso]{border-color:#5aa9e666;background:#132c4d;color:#cfe6ff}.equip-summary li[data-kind=recibido]{border-color:#7b879866;background:#1a2436;color:#c3cfe2}
+.equip-picker{grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
+.equip-tab.equip-card{position:relative;display:grid;grid-template-rows:auto 1fr auto;gap:0;padding:0;border:1px solid #2c4468;border-radius:14px;background:linear-gradient(180deg,#112540,#0c192d);box-shadow:0 8px 20px -16px #000,inset 0 1px 0 #ffffff0a;overflow:hidden;transition:border-color .2s ease,box-shadow .2s ease,background .2s ease,transform .12s ease}
+.equip-tab.equip-card[data-current=true]{border-color:#2c4468;box-shadow:0 8px 20px -16px #000,inset 0 1px 0 #ffffff0a}
+.equip-tab .equip-card-top{padding:10px 12px;border-bottom:1px solid #1b2f4d;background:#0d1c33;justify-content:space-between}
+.equip-card-id{display:inline-flex;align-items:center;gap:8px;min-width:0}.equip-card-id strong{font:700 14px/1.2 ui-monospace,Menlo,Consolas,monospace;color:#fff;margin:0}
+.equip-card-icon{flex:none;width:28px;height:28px}
+.equip-card-body{display:grid;gap:3px;padding:10px 12px 8px;min-width:0}
+.equip-tab .equip-tab-name{font-size:14.5px;font-weight:700;line-height:1.3;color:#f2f6ff;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;white-space:normal;overflow:hidden;overflow-wrap:anywhere}
+.equip-tab-kind{font-size:12px;color:#a9bdd8}.equip-tab .equip-tab-sub{font-size:11.5px;color:#7f93b3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.equip-card-foot{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;min-height:30px;padding:6px 12px 10px}
+.equip-tab-when{font-size:11px;color:#7f93b3;margin-right:auto}
+.equip-card-picked{display:none;align-items:center;gap:5px;padding:2px 9px;border:1px solid #70b7f5;border-radius:999px;background:#143057;color:#d7ebff;font-size:11px;font-weight:700}
+.equip-card-picked svg{width:11px;height:11px;stroke-width:3}
+.equip-tab[aria-selected=true] .equip-card-picked{display:inline-flex}
+.equip-tab .equip-tab-here{font-style:normal;font-size:11px;color:#f3d79b}
+.equip-tab.equip-card[aria-selected=true]{border-color:#70b7f5;background:linear-gradient(180deg,#16335c,#0e2140);box-shadow:0 0 0 2px #70b7f54d,0 14px 28px -18px #70b7f5,inset 0 1px 0 #ffffff14}
+.equip-tab.equip-card[aria-selected=true] .equip-card-top{background:#12294a;border-bottom-color:#2f5a92}
+.equip-tab.equip-card[aria-selected=true]::after{content:none}
+@media(hover:hover){.equip-tab.equip-card:hover{border-color:#5083b8;box-shadow:0 10px 24px -16px #5083b8,inset 0 1px 0 #ffffff0f;transform:none}}
+.equip-tab.equip-card:active{transform:scale(.995)}
+/* Estados en píldora, uniformes: entregado verde, listo turquesa, en proceso azul, esperas ámbar, recibido gris azulado */
+.equip-state{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;line-height:1.3;font-size:11.5px;font-weight:650}
+.equip-state::before{content:'';width:6px;height:6px;border-radius:50%;background:currentColor;flex:none}
+.equip-state[data-status=pendiente]{border-color:#7b879880;background:#1a2436;color:#c3cfe2}
+.equip-state[data-status=reparacion]{border-color:#5aa9e680;background:#132c4d;color:#cfe6ff}
+@media(max-width:640px){.equip-picker{grid-template-columns:1fr}.equip-summary{flex-basis:100%}.equip-tab.equip-card{min-height:0}}
+@media(prefers-reduced-motion:reduce){.equip-tab.equip-card{transition:none}.equip-tab.equip-card:active{transform:none}}
+.equip-card-body{align-content:start}.equip-tab.equip-card{grid-template-rows:auto auto 1fr;align-content:start}.equip-card-foot{align-self:end}

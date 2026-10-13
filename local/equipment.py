@@ -90,11 +90,28 @@ def void_payment(c,order_id,data,user,now):
     return 200,{'ok':True,**money(c,order_id)}
 
 
-UNIT_SQL=("SELECT o.id,o.code,o.group_id,o.unit_no,o.status status_code,s.label status,o.received_at,o.delivered_at,o.problem,d.id device_id,d.code device_code,"
+UNIT_SQL=("SELECT o.id,o.code,o.group_id,o.unit_no,o.status status_code,s.label status,o.received_at,o.delivered_at,o.updated_at,o.problem,d.id device_id,d.code device_code,"
           "COALESCE(NULLIF(d.kind,''),d.category) type,d.brand,d.model,d.serial,d.color,COALESCE((SELECT name FROM users WHERE id=o.assigned_to),'Sin asignar') responsible,"
           +BUDGET+" budget_cents,"+PAID+" paid_cents FROM orders o JOIN devices d ON d.id=o.device_id JOIN statuses s ON s.code=o.status ")
 
 
+PHASES=(('recibido','Recibido',('pendiente',)),('proceso','En proceso',('reparacion','esperando_cliente','presupuesto')),('listo','Listo para entregar',('listo','espera_entrega')),('entregado','Entregado',('entregado',)))
+def phase(status):
+    """Etapa (recibido, proceso, listo, entregado) a la que pertenece un estado de equipo."""
+    return next((code for code,_,statuses in PHASES if status in statuses),'recibido')
+def overall(rows):
+    """Estado general de una orden con varios equipos, calculado con el estado real de cada uno. Nunca dice «completada» ni «entregada»
+    mientras quede un equipo sin entregar. Prioridad: todos entregados → completada; alguno entregado → entrega parcial; alguno en
+    proceso (o mezcla de recibidos y listos) → atención en curso; todos listos → listos para entrega; todos recibidos → recibidos."""
+    counts={code:sum(1 for row in rows if phase(row['status_code'])==code) for code,_,_ in PHASES};total=len(rows)
+    if counts['entregado']==total:code,label='completada','Orden completada'
+    elif counts['entregado']:code,label='parcial','Entrega parcial'
+    elif counts['proceso'] or (counts['listo'] and counts['recibido']):code,label='curso','Atención en curso'
+    elif counts['listo']==total:code,label='listos','Listos para entrega'
+    else:code,label='recibidos','Equipos recibidos'
+    words={'recibido':('recibido','recibidos'),'proceso':('en proceso','en proceso'),'listo':('listo para entregar','listos para entregar'),'entregado':('entregado','entregados')}
+    parts=['1 equipo' if total==1 else '%d equipos'%total]+['%d %s'%(counts[key],words[key][0 if counts[key]==1 else 1]) for key in ('entregado','listo','proceso','recibido') if counts[key]]
+    return {'code':code,'label':label,'summary':' · '.join(parts),'counts':counts}
 def group(c,order_id):
     """Equipos de la orden a la que pertenece un ingreso, con su resumen económico consolidado."""
     main=root(c,order_id)
@@ -105,7 +122,8 @@ def group(c,order_id):
         row['code']=row['code'] or 'OP-'+str(row['id']).zfill(5)
         row['unit_code']=main_code+'-E%02d'%row['unit_no']
         row['balance_cents']=max(0,row['budget_cents']-row['paid_cents'])
-    return {'main_id':main['id'],'main_code':main_code,'multiple':len(rows)>1,'units':rows,
+        row['phase']=phase(row['status_code'])
+    return {'main_id':main['id'],'main_code':main_code,'multiple':len(rows)>1,'units':rows,'overall':overall(rows),
             'totals':{'budget_cents':sum(r['budget_cents'] for r in rows),'paid_cents':sum(r['paid_cents'] for r in rows),'balance_cents':sum(r['balance_cents'] for r in rows),
                       'delivered':sum(1 for r in rows if r['status_code']=='entregado'),'units':len(rows)}}
 
