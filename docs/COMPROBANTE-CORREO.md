@@ -46,3 +46,9 @@ Cada vez que se registra una autorización (al crear la orden o al registrar una
 - Nunca bloquea: la orden y la decisión quedan guardadas antes de intentar el envío.
 - La decisión la registra el personal en recepción; el aviso lo indica y no la presenta como firma del cliente. No se inventa un motivo de rechazo: solo se incluye el detalle que se haya escrito.
 - WhatsApp no está incluido: el envío automático requiere la API de WhatsApp Business de Meta y plantillas aprobadas.
+
+## Prueba de entrega real al correo del administrador
+
+En Configuración → Notificaciones automáticas por correo hay dos pruebas: «Enviar correo de prueba» (al buzón del propio sistema) y «Enviar prueba a mi correo», que envía un mensaje con la plantilla y la firma al correo de la cuenta del administrador que la pulsa. Sirve para ver cómo llega a otro proveedor (bandeja de entrada o correo no deseado). No admite otra dirección: el destinatario lo decide el servidor, nunca el formulario. Comparte el límite de seis pruebas por hora y queda en la auditoría.
+
+La contraseña del buzón es un secreto de Vercel que no se puede leer fuera de producción; por eso esta prueba solo puede lanzarse desde el sistema publicado.

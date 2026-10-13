@@ -2735,16 +2735,21 @@ class Handler(BaseHTTPRequestHandler):
                 if receipt_route or path=='/api/receipt-mail/settings':
                     if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
                     if not receipt_route and data.get('action')=='test':
-                        # Correo de prueba: va al propio buzón del sistema, nunca a un cliente.
+                        # Correo de prueba: va al propio buzón del sistema o, con «target: me», al correo de la cuenta del administrador
+                        # que lo pide (para comprobar la entrega real en otro proveedor). Nunca a un cliente ni a una dirección escrita a mano.
                         if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede enviar la prueba.'})
                         if limited(c,'receipt-mail-test:'+str(user['id']),limit=6,window=3600):return self.reply(429,{'error':'Alcanzaste el límite de pruebas por hora.'})
+                        mine=data.get('target')=='me'
                         try:
                             if not mail_pro.configured():return self.reply(200,{'result':'not_configured','message':'El correo del sistema no está configurado en el servidor.'})
-                            config=mail_pro.settings();message,recipients=mail_pro.build_message(config,{'to':config['username'],'subject':'Prueba de notificaciones automáticas | Órdenes Pro','body':'Este es un correo de prueba enviado desde Configuración → Notificaciones automáticas por correo.\n\nSi lo recibes en el buzón del sistema, el envío de comprobantes está operativo.','from_name':corporate.settings()['name']},'')
+                            config=mail_pro.settings();recipient=user['email'] if mine else config['username'];card=mail_signature_card(c) if mine else {}
+                            body=('Este es un correo de prueba de Órdenes Pro, enviado desde Configuración → Notificaciones automáticas por correo a tu cuenta de administración.\n\nSi lo recibes en la bandeja de entrada, con el logotipo, la firma y las tildes correctas (áéíóú ñ ¿? ¡!), el envío de correos a clientes está operativo. Si llegó a «Spam» o «Promociones», conviene revisar la configuración del dominio (SPF, DKIM y DMARC).\n\nNo es necesario responder.' if mine
+                                  else 'Este es un correo de prueba enviado desde Configuración → Notificaciones automáticas por correo.\n\nSi lo recibes en el buzón del sistema, el envío de comprobantes está operativo.')
+                            message,recipients=mail_pro.build_message(config,{'to':recipient,'subject':('Prueba de envío real' if mine else 'Prueba de notificaciones automáticas')+' | Órdenes Pro','body':body,'from_name':corporate.settings()['name'],'attachments':[],'layout':{'title':'Prueba de envío' if mine else 'Prueba de notificaciones'}},card if card.get('enabled') else '')
                             mail_pro.deliver(config,message,recipients)
                         except mail_pro.MailError as error:
                             audit(c,user['id'],'receipt_mail_test_failed');return self.reply(200,{'result':'failed','message':'La prueba no se envió: '+str(error)})
-                        audit(c,user['id'],'receipt_mail_test_sent');return self.reply(200,{'result':'sent','recipient':config['username'],'message':'Prueba enviada a '+config['username']+'. El servidor de correo aceptó el mensaje.'})
+                        audit(c,user['id'],'receipt_mail_test_sent');return self.reply(200,{'result':'sent','recipient':recipient,'message':'Prueba enviada a '+recipient+'. El servidor de correo aceptó el mensaje; revisa también la carpeta de correo no deseado.'})
                     if not receipt_route:
                         if user['role']!='administrador' or data.get('auto') not in (True,False):return self.reply(403 if user['role']!='administrador' else 400,{'error':'No se pudo cambiar la configuración.'})
                         c.execute("INSERT INTO system_state(key,value) VALUES ('receipt_mail_auto',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",('on' if data['auto'] else 'off',))
