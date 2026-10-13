@@ -1207,10 +1207,11 @@ class Handler(BaseHTTPRequestHandler):
                     search = "c.name||' '||COALESCE(c.phone,'')||' '||c.phone_secondary||' '||COALESCE(c.email,'')||' '||c.identification||' '||c.trade_name||' '||c.city"
                     # Orden por columnas: nombre, ciudad u órdenes, en ambos sentidos; por defecto, los más recientes.
                     sort=query.get('sort',[''])[0];descending=query.get('dir',[''])[0]=='desc'
-                    orderings={'name':'c.name COLLATE NOCASE','city':"COALESCE(NULLIF(c.city,''),c.canton,'') COLLATE NOCASE",'orders':'orders','id':'c.identification'}
+                    last_service="(SELECT MAX(COALESCE(o.delivered_at,o.received_at,'')) FROM orders o JOIN devices d ON d.id=o.device_id WHERE d.client_id=c.id)"
+                    orderings={'name':'c.name COLLATE NOCASE','city':"COALESCE(NULLIF(c.city,''),c.canton,'') COLLATE NOCASE",'orders':'orders','id':'c.identification','registered':'c.id','last_service':'COALESCE('+last_service+",'')"}
                     if sort and sort not in orderings:return self.reply(400,{'error':'Orden inválido.'})
                     where, ordering = '', (orderings[sort]+(' DESC' if descending else '')+',c.id DESC') if sort else 'c.id DESC'
-                    conditions={'review':'c.needs_review=1','complete':'c.needs_review=0','imported':'c.import_batch_id IS NOT NULL','orders':'EXISTS(SELECT 1 FROM devices d JOIN orders o ON o.device_id=d.id WHERE d.client_id=c.id)','no_id':"c.identification=''"}
+                    conditions={'review':'c.needs_review=1','complete':'c.needs_review=0','imported':'c.import_batch_id IS NOT NULL','orders':'EXISTS(SELECT 1 FROM devices d JOIN orders o ON o.device_id=d.id WHERE d.client_id=c.id)','no_orders':'NOT EXISTS(SELECT 1 FROM devices d JOIN orders o ON o.device_id=d.id WHERE d.client_id=c.id)','no_id':"c.identification=''"}
                     chosen=query.get('filter',[''])[0]
                     if chosen:
                         if chosen not in conditions:return self.reply(400,{'error':'Filtro inválido.'})
@@ -1219,6 +1220,8 @@ class Handler(BaseHTTPRequestHandler):
                     if kind:
                         if kind not in ('natural','empresa'):return self.reply(400,{'error':'Filtro inválido.'})
                         where+=' AND c.client_type=?';client_kind=kind
+                    client_city=query.get('city',[''])[0][:80].strip()
+                    if client_city:where+=" AND "+client_registry.fold_sql("COALESCE(NULLIF(c.city,''),c.canton,'')")+"=?"
                 else:
                     source = 'devices d JOIN clients c ON c.id=d.client_id'
                     duplicate_sql="(SELECT COUNT(*) FROM devices x WHERE x.id!=d.id AND TRIM(COALESCE(d.serial,''))!='' AND lower(TRIM(COALESCE(x.serial,'')))=lower(TRIM(d.serial)))"
@@ -1232,6 +1235,7 @@ class Handler(BaseHTTPRequestHandler):
                     if query.get('duplicates',[''])[0]=='1':where+=' AND '+duplicate_sql+'>0'
                 args=[term]
                 if path == '/api/clients' and query.get('type',[''])[0]:args.append(query['type'][0])
+                if path == '/api/clients' and query.get('city',[''])[0].strip():args.append(client_registry.fold(query['city'][0][:80]))
                 if path == '/api/devices' and query.get('type',[''])[0]:args.append(query['type'][0])
                 if path == '/api/orders':
                     if query.get('stay',[''])[0]:args.extend(stay_args)
@@ -1261,8 +1265,13 @@ class Handler(BaseHTTPRequestHandler):
                     condition=' WHERE '+' AND '.join('(instr('+folded+',?)>0 OR instr('+digits+',?)>0)' for _ in words)+where
                     args=[value for word in words for value in (word,word.replace('-','').replace('+','') or word)]+args[1:]
                 total = c.execute('SELECT COUNT(*) FROM '+source+condition, args).fetchone()[0]
+                size=50
+                if path=='/api/clients':
+                    size=query.get('size',['50'])[0]  # por defecto 50, como siempre; el listado permite elegir 10 o 25
+                    if size not in ('10','25','50'):return self.reply(400,{'error':'Tamaño de página inválido.'})
+                    size=int(size);page=min(page,max(1,(total+size-1)//size))
                 if path=='/api/orders':page=min(page,max(1,(total+49)//50))
-                rows = [dict(r) for r in c.execute('SELECT '+columns+' FROM '+source+condition+' ORDER BY '+ordering+' LIMIT 50 OFFSET ?', (*args,(page-1)*50))]
+                rows = [dict(r) for r in c.execute('SELECT '+columns+' FROM '+source+condition+' ORDER BY '+ordering+' LIMIT ? OFFSET ?', (*args,size,(page-1)*size))]
                 if path == '/api/orders':
                     # Permanencia en taller: calculada en el servidor con las fechas guardadas de ingreso y entrega.
                     stay_config=stay.settings(c);stay_now=reception_now()
@@ -1273,7 +1282,8 @@ class Handler(BaseHTTPRequestHandler):
                     for item in rows:
                         if item['needs_review']:
                             full=c.execute('SELECT * FROM clients WHERE id=?',(item['id'],)).fetchone();item['missing']=client_registry.missing(full) if full else []
-                    return self.reply(200, {'rows':rows,'total':total,'page':page,'pages':max(1,(total+49)//50),'stats':{'total':counts['total'],'complete':counts['total']-counts['review'],'review':counts['review']}})
+                    cities=[row[0] for row in c.execute("SELECT DISTINCT COALESCE(NULLIF(city,''),canton,'') place FROM clients WHERE COALESCE(NULLIF(city,''),canton,'')!='' ORDER BY place COLLATE NOCASE LIMIT 200")]
+                    return self.reply(200, {'rows':rows,'total':total,'page':page,'pages':max(1,(total+size-1)//size),'size':size,'cities':cities,'stats':{'total':counts['total'],'complete':counts['total']-counts['review'],'review':counts['review']}})
                 return self.reply(200, {'rows':rows,'total':total,'page':page,'pages':max(1,(total+49)//50)})
             if path == '/api/version':
                 # Versión que ejecuta realmente este servidor (la del código desplegado), para que las pestañas abiertas detecten cuándo deben recargarse.

@@ -4,6 +4,20 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.118 — 2026-10-12 20:01 (UTC-05:00)
+
+Directorio de clientes compacto, ficha rápida y ADI en nombres
+
+### Nuevas funcionalidades
+
+- Ficha rápida del cliente en un panel lateral: contactos, ubicación, equipos, órdenes, citas y última atención, sin salir del listado.
+- ADI en «Nombres y apellidos» y «Nombre comercial»: normaliza mayúsculas, minúsculas y espacios con vista previa, sin IA y sin cambiar ninguna palabra.
+
+### Mejoras realizadas
+
+- Directorio de clientes: vista compacta o cómoda (se recuerda), 10, 25 o 50 clientes por página, filtro por ciudad o cantón y por clientes sin órdenes, y orden por fecha de registro y última atención.
+- Las acciones Llamar y Correo aparecen desactivadas, con su motivo, cuando el cliente no tiene un dato válido.
+
 ## v1.5.117 — 2026-10-12 19:53 (UTC-05:00)
 
 Corrección urgente: consola del Centro de Atención

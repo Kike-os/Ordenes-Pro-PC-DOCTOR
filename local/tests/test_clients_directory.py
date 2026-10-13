@@ -41,6 +41,13 @@ class ClientsDirectoryTests(unittest.TestCase):
         # Orden por columnas en ambos sentidos; un criterio desconocido se rechaza.
         ordered=names('','&sort=name');self.assertEqual(ordered,sorted(ordered,key=str.casefold));self.assertEqual(names('','&sort=name&dir=desc'),ordered[::-1])
         self.assertEqual(self.request('/api/clients?sort=inventado',cookie=cookie)['status'],400)
+        # Tamaño de página (10, 25 o 50), filtro por ciudad sin tildes, clientes sin órdenes y orden por registro o última atención.
+        small=self.request('/api/clients?size=10',cookie=cookie)['body'];self.assertEqual((small['size'],len(small['rows'])<=10,'Cuenca' in small['cities']),(10,True,True))
+        self.assertEqual(self.request('/api/clients?size=7',cookie=cookie)['status'],400)
+        self.assertIn('José Peñafiel Núñez',names('','&city=CUENCA'));self.assertEqual(names('','&city=Quito'),[])
+        self.assertEqual(find('','&filter=no_orders')['total']+find('','&filter=orders')['total'],len(before))
+        oldest=names('','&sort=registered');self.assertEqual(oldest,names('','&sort=registered&dir=desc')[::-1])
+        self.assertEqual(self.request('/api/clients?sort=last_service&dir=desc',cookie=cookie)['status'],200)
         # Ficha: citas, última atención y datos faltantes; consultar no modifica ningún cliente.
         detail=self.request('/api/clients/%d'%first['body']['id'],cookie=cookie)['body']
         self.assertEqual((detail['appointments'],detail['last_service'],detail['missing']),([],'',[]))

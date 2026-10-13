@@ -185,3 +185,7 @@ Al abrir, recargar o cambiar de sección, ADI no se abre, no habla, no suena y n
 **Flujo.** Elegir herramienta → «Generar mejora» (indicador de proceso; no admite solicitudes duplicadas) → vista previa con los cambios resaltados → «Aplicar cambios», «Regenerar» o «Cancelar». El texto solo cambia al aplicar; si la persona siguió escribiendo, la respuesta antigua se descarta. Los fallos se muestran como fallos, con «Reintentar» cuando tiene sentido.
 
 **No verificado aquí.** Las respuestas reales del proveedor de IA en producción (no hay clave en el equipo de desarrollo); en producción consta una corrección automática correcta registrada. La respuesta ante el límite de 60 mejoras por hora sí se observó y se muestra como error.
+
+## ADI en campos de nombre (1.5.118)
+
+«Nombres y apellidos / Razón social» y «Nombre comercial» del formulario de clientes tienen el botón ADI. En estos campos **no interviene la IA**: una regla fija normaliza mayúsculas, minúsculas y espacios repetidos (partículas como «de», «del», «la» en minúscula; siglas societarias como S.A. o CÍA. en mayúscula), conserva las tildes escritas y nunca añade, quita ni cambia palabras. Muestra una vista previa y solo se aplica con «Aplicar cambios». No hay herramientas de redacción en cédula, RUC, teléfono, correo, series ni importes.

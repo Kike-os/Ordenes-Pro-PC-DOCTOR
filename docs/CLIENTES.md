@@ -11,3 +11,13 @@ Directorio y administración de clientes de PC-DOCTOR S.A. El rediseño de la 1.
 - **Ficha**: añade las citas técnicas del cliente y la fecha de la última atención, además de órdenes y equipos.
 - **Duplicados**: una identificación repetida se rechaza indicando la ficha existente. Un teléfono o correo que ya usa otra ficha no bloquea el guardado (los contactos compartidos son válidos): se avisa para que se revise. Nunca se fusiona ni se elimina nada automáticamente.
 - **Importación y exportación** (sin cambios): la importación analiza el archivo, muestra una vista previa con errores y duplicados y solo escribe al confirmar; la exportación es solo para administración y queda auditada.
+
+## Listado compacto, filtros y ficha rápida (1.5.118)
+
+- **Densidad**: vista compacta (filas de unos 56 px) o cómoda; la elección se recuerda en el navegador. En teléfonos, fichas adaptativas sin desplazamiento horizontal.
+- **Tamaño de página**: 10, 25 o 50 clientes. El pie indica el rango mostrado, el total y la página; los filtros se conservan al cambiar de página.
+- **Filtros**: persona o empresa, estado de la ficha (por completar, completas, con órdenes, sin órdenes, importadas, sin identificación) y ciudad o cantón (lista de las que existen en la base).
+- **Orden**: registro más reciente o más antiguo, nombre, ciudad, número de órdenes y última atención.
+- **Acciones**: Ver ficha, Editar, Órdenes, Llamar (WhatsApp si es móvil) y Correo. Llamar y Correo aparecen desactivados, con su motivo, cuando no hay un dato válido.
+- **Ficha rápida**: al pulsar el nombre se abre un panel lateral con identificación, contactos, dirección, ciudad y cantón, última atención, equipos, órdenes y citas (datos reales de `GET /api/clients/<id>`), con acceso a la ficha completa y a la edición según permisos.
+- La búsqueda y los filtros se aplican en el servidor sobre todos los registros, no solo sobre la página visible.
