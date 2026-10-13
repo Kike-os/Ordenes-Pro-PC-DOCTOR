@@ -20,6 +20,7 @@ MANUFACTURERS=(
  {'slug':'msi','name':'MSI','aliases':(),'portal':'https://www.msi.com/support/','identifiers':'Número de serie o modelo','status':'manual','note':'No se encontró una API pública documentada.'},
  {'slug':'samsung','name':'Samsung','aliases':(),'portal':'https://www.samsung.com/latin/support/','identifiers':'Modelo o número de serie','status':'manual','note':'No se encontró una API pública documentada.'},
  {'slug':'huawei','name':'Huawei','aliases':(),'portal':'https://consumer.huawei.com/latin/support/warranty-query/','identifiers':'Número de serie','status':'manual','note':'La consulta pública puede pedir verificación; no hay API documentada.'},
+ {'slug':'dynabook','name':'Dynabook','aliases':('toshiba',),'portal':'https://support.dynabook.com/','identifiers':'Número de serie o número de modelo','status':'manual','note':'No se encontró una API pública documentada.'},
  {'slug':'epson','name':'Epson','aliases':(),'portal':'https://epson.com.ec/Soporte/Impresoras/sh/s1','identifiers':'Modelo de la impresora','status':'manual','note':'El portal busca por modelo, no por número de serie.'},
 )
 

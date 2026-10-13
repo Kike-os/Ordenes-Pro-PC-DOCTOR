@@ -94,3 +94,40 @@ class EquipmentTests(unittest.TestCase):
 
 
 if __name__=='__main__':unittest.main()
+
+
+class SerialIdentificationTests(unittest.TestCase):
+    """Identificación por serie: reconoce equipos ya registrados con su identidad e historial y guarda los resultados verificados del fabricante."""
+    setUpClass=classmethod(test_app.SecurityTests.setUpClass.__func__);setUp=test_app.SecurityTests.setUp;tearDown=test_app.SecurityTests.tearDown;request=test_app.SecurityTests.request;login=test_app.SecurityTests.login;order_data=test_app.SecurityTests.order_data
+
+    def test_known_serial_returns_identity_history_and_open_entry(self):
+        cookie,csrf=self.login()
+        first=self.request('/api/orders',self.order_data({'type':'portatil','brand':'Dell','model':'Latitude Ficticia','serial':'snficticia77','request_key':'serial-identify-request-0001'}),cookie=cookie,csrf=csrf)['body']
+        find=lambda serial,brand='':self.request('/api/devices/identify?serial='+serial+'&brand='+brand,cookie=cookie)['body']
+        found=find('SNFICTICIA77');match=found['matches'][0]
+        self.assertEqual((len(found['matches']),found['conflict'],match['brand'],match['model'],match['orders'],match['open_order']),(1,False,'Dell','Latitude Ficticia',1,first['code']))
+        self.assertTrue(match['device_code'].startswith('EQ-'));self.assertEqual([item['code'] for item in match['history']],[first['code']])
+        self.assertEqual(found['manufacturer']['state'],'unavailable')  # sin credenciales no hay consulta externa ni datos inventados
+        self.request('/api/order-status',{'id':str(first['id']),'status':'entregado'},cookie=cookie,csrf=csrf)
+        self.assertEqual(find('snficticia77')['matches'][0]['open_order'],'')
+        # Nueva orden del mismo equipo: mismo registro, sin duplicarlo.
+        again=self.request('/api/orders',self.order_data({'type':'portatil','device_id':str(match['device_id']),'request_key':'serial-identify-request-0002'}),cookie=cookie,csrf=csrf)['body']
+        with app.connect() as c:self.assertEqual(c.execute("SELECT COUNT(*) FROM devices WHERE upper(replace(serial,' ',''))='SNFICTICIA77'").fetchone()[0],1)
+        self.assertEqual([item['code'] for item in find('SNFICTICIA77')['matches'][0]['history']],[again['code'],first['code']])
+        self.assertEqual(find('NO-EXISTE-0001')['matches'],[]);self.assertEqual(self.request('/api/devices/identify?serial=ab',cookie=cookie)['status'],400)
+        self.assertEqual(self.request('/api/devices/identify?serial=SNFICTICIA77')['status'],401)
+
+    def test_manufacturer_result_is_cached_and_failures_do_not_block(self):
+        import device_lookup,device_manufacturers
+        from unittest.mock import patch
+        cookie,_=self.login();device_lookup._verified.clear()
+        answer={'brand':'Dell','model':'Modelo De Prueba','type':'','factory':{}}
+        with patch.object(device_manufacturers,'configured',return_value=('dell',)),patch.object(device_manufacturers,'lookup',return_value=answer) as call:
+            get=lambda:self.request('/api/devices/identify?serial=ABC1234&brand=Dell',cookie=cookie)['body']['manufacturer']
+            one=get();two=get()
+            self.assertEqual((one['state'],one['result']['model'],one['result']['source'],two['state'],two.get('cached')),('found','Modelo De Prueba','fabricante:dell','found',True))
+            self.assertEqual(call.call_count,1)  # la segunda consulta de la misma serie no vuelve a salir al fabricante
+        device_lookup._verified.clear()
+        with patch.object(device_manufacturers,'configured',return_value=('dell',)),patch.object(device_manufacturers,'lookup',side_effect=device_manufacturers.ProviderError('conexion','sin respuesta')):
+            failed=self.request('/api/devices/identify?serial=ABC1234&brand=Dell',cookie=cookie)
+            self.assertEqual((failed['status'],failed['body']['manufacturer']['state'],failed['body']['manufacturer']['result']),(200,'error',None))

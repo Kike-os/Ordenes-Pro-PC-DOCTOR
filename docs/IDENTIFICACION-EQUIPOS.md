@@ -68,3 +68,31 @@ Al registrar una orden, si el cliente ya tiene exactamente el mismo equipo (seri
 Estados que muestra la ficha: **Identificado** (historial del taller o servicio oficial del fabricante), **Registro manual completo**, **Datos incompletos** y **No identificado** (hay serie pero no marca ni modelo; se indica que no figura en el historial y se ofrece la consulta al soporte oficial). Ya no aparece «Marca sin indicar — Modelo pendiente de identificación».
 
 La consulta automática a fabricantes sigue pendiente de credenciales: ninguna integración está activa. Tras la limpieza de registros de prueba del 12/10/2026 el historial propio empieza vacío, así que las primeras series no se reconocerán hasta registrar los equipos.
+
+## Identificación automática, tarjeta y logotipos (rama `identificacion-serie`, 13/10/2026, pendiente de aprobación)
+
+**Qué cambia**
+
+- Al escribir o escanear una serie válida la consulta empieza sola (450 ms después de la última tecla; inmediata con Enter del lector). No hay botón.
+- **Autocompletado:** con un único resultado sin conflictos se rellenan tipo, marca, modelo y color, y aparece «Equipo identificado correctamente» con un destello de estrella. Queda el botón «Deshacer» y los campos siguen editables. Con varios resultados o marcas en conflicto no se elige nada por cuenta propia.
+- **Equipo ya registrado del mismo cliente:** el ingreso se asocia a ese equipo (su identificador `EQ-…` e historial), sin duplicarlo. Si ese equipo tiene un ingreso sin entregar, se avisa y no se asocia.
+- **Tarjeta del equipo:** logotipo de la marca, modelo, identificador permanente, serie, cliente, ingresos anteriores, «Historial técnico» y «Ver orden anterior».
+- **Sin resultado:** «No fue posible identificar automáticamente este equipo. Puedes completar sus datos manualmente.» La recepción continúa.
+- El aviso «Consultando información del fabricante…» solo aparece cuando la marca tiene un servicio oficial conectado; si no, dice «Buscando el equipo en el historial del taller…», que es lo que realmente ocurre.
+- Los resultados verificados de un fabricante se guardan seis horas en memoria: repetir la misma serie no vuelve a consultar.
+- El logotipo de la marca se muestra también en el listado de Equipos, la ficha del equipo, las tarjetas de equipos de la orden y el historial de equipos del cliente.
+
+**Logotipos.** Catálogo central en `local/static/brands/` (29 marcas). Se añadieron Framework, Fujifilm, Google, NEC, Sharp, System76 y Zebra, de Simple Icons 13.21.0 (CC0), en el color que ese catálogo registra para cada marca. **No se añadieron** Brother, Canon, Compaq, Dynabook, Gigabyte, IBM, Konica Minolta, Lexmark, Microsoft, OKI, Ricoh, VAIO ni Xerox: no figuran en ese catálogo de uso libre y un logotipo corporativo debe bajarse del portal de marca del fabricante aceptando sus condiciones. Para esas marcas se muestra el icono genérico; basta guardar el archivo oficial en la carpeta (ver su README). Son la marca en un solo color, no la versión corporativa completa.
+
+**Fabricantes: estado real y qué hace falta (consultado el 13/10/2026)**
+
+| Fabricante | Qué existe | Qué se necesita para conectarlo |
+|---|---|---|
+| Dell | API de garantía de TechDirect (OAuth 2.0, versión 5). El adaptador está escrito pero **nunca se probó contra Dell**. | Cuenta empresarial de TechDirect asociada a la empresa, solicitar la clave en Servicios → API, pasar el periodo de pruebas (sandbox) y la promoción a producción que hace Dell (días o semanas). Luego `DELL_API_CLIENT_ID` y `DELL_API_CLIENT_SECRET` en el servidor y una prueba con un Service Tag del taller. |
+| HP | «HP Warranty API» en developers.hp.com. | La solicita el gestor de cuenta de HP de la empresa a warrantyapi.customers@hp.com; HP aprueba a mano. Sin acceso no se puede ver la documentación de parámetros ni escribir el adaptador. |
+| Lenovo | API de garantía de eSupport. | Un `ClientID` que entrega Lenovo por su canal comercial o de soporte empresarial. |
+| Acer, ASUS, Epson, MSI, Samsung, Apple, Dynabook/Toshiba | Solo consulta web (varias con CAPTCHA). No se encontró API pública. | Nada que se pueda activar. Queda la consulta manual asistida, que abre el portal oficial sin enviarle la serie. |
+
+Fuentes: documentación de integradores de la API de Dell (SysAid, Patch My PC, JupiterOne), la comunidad de Lansweeper y ManageEngine para HP, y Omnissa y ServiceNow para Lenovo. Son terceros; las condiciones vigentes deben confirmarse en el portal de cada fabricante al pedir el acceso.
+
+**No verificado:** ninguna identificación real contra un fabricante. No hay credenciales, así que no se puede afirmar que Dell, HP ni ninguna otra marca identifique equipos automáticamente. Lo probado es el historial propio, el autocompletado, la asociación al equipo existente, la caché y el comportamiento cuando el servicio falla (con un proveedor simulado). No se obtienen imágenes del modelo ni estado de garantía: dependen de esas mismas API.
