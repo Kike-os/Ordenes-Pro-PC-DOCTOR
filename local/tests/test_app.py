@@ -678,6 +678,8 @@ class SecurityTests(unittest.TestCase):
                 self.assertEqual(self.request('/api/devices/identify?serial=SERIE-MUY-LARGA-123&brand=Dell',cookie=cookie)['body']['manufacturer']['state'],'not_found')
                 self.assertEqual(len(calls),before)
             with patch.object(makers,'_request',side_effect=makers.ProviderError('conexion','x')):
+                # Una serie ya verificada se sirve de la memoria aunque el fabricante falle; aquí se prueba el fallo sin resultado guardado.
+                import device_lookup;device_lookup._verified.clear()
                 makers._tokens.clear();failed=self.request(url,cookie=cookie)
                 self.assertEqual((failed['status'],failed['body']['manufacturer']['state']),(200,'error'))
             # El historial propio tiene prioridad: una serie ya registrada no sale del sistema.
