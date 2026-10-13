@@ -8,6 +8,22 @@
   },
   "releases": [
     {
+      "version": "1.5.138",
+      "date": "2026-10-13T13:56:21-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Equipos sin presupuestos: contador en cero y mensaje claro para crear el primero",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Presupuestos: un equipo sin presupuestos muestra «0 presupuestos» y el mensaje «Sin presupuestos registrados. Este equipo está listo para generar su primer presupuesto»."
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.137",
       "date": "2026-10-13T13:43:10-05:00",
       "type": "patch",

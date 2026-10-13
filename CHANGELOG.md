@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.138 — 2026-10-13 13:56 (UTC-05:00)
+
+Equipos sin presupuestos: contador en cero y mensaje claro para crear el primero
+
+### Mejoras realizadas
+
+- Presupuestos: un equipo sin presupuestos muestra «0 presupuestos» y el mensaje «Sin presupuestos registrados. Este equipo está listo para generar su primer presupuesto».
+
 ## v1.5.137 — 2026-10-13 13:43 (UTC-05:00)
 
 Selector de cédula o RUC en las citas, progreso y estado por equipo y tarjetas de equipo rediseñadas
