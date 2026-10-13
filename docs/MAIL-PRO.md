@@ -107,3 +107,14 @@ La eliminación definitiva (solo desde la Papelera) usa un modal propio: no se c
 - **Límite real: 3,1 MB por mensaje.** Vercel no admite peticiones de más de 4,5 MB y los adjuntos viajan en Base64 (un tercio más grandes). El límite anterior de 3,5 MB podía fallar en producción. Para llegar a 25 MB haría falta un almacenamiento externo de archivos.
 - «Comprimir en ZIP» (en el navegador, sin bibliotecas ni servicios externos): reúne los archivos en `adjuntos-PC-DOCTOR.zip`, comprime solo lo que no viene ya comprimido (no toca JPEG, PDF, ZIP, etc.) y muestra el tamaño original y el final. No reduce calidad ni altera el contenido. No genera RAR (formato propietario).
 - Los adjuntos se guardan con el borrador en el servidor de correo y se recuperan al reabrirlo.
+
+## Bandeja: acciones en su propia columna (rama `correos-adi`, pendiente de aprobación)
+
+Antes, los botones rápidos se dibujaban con posición absoluta encima del asunto y la vista previa al pasar el cursor. Ahora cada fila es una rejilla de tres columnas: selección · remitente, fecha, asunto y vista previa · acciones. Las acciones tienen espacio propio a la derecha y el texto se trunca con puntos suspensivos antes de llegar a ellas.
+
+- A la vista: destacar y eliminar (o restaurar en la Papelera). En listas estrechas y pantallas táctiles solo destacar y «⋯»; eliminar sigue en el menú.
+- Menú «⋯»: responder, marcar como leído o no leído, destacar, archivar, mover a carpeta y enviar a la Papelera. Se abre junto al botón, fijado a la ventana (no se recorta dentro de la lista), y hacia arriba cuando no cabe debajo.
+- Teclado: el botón anuncia el menú (`aria-haspopup`, `aria-expanded`); flechas, Inicio y Fin recorren las opciones; Escape cierra y devuelve el foco; Tab sale.
+- La fecha ya no se oculta al pasar el cursor. Los botones no desplazan nada al aparecer: siempre ocupan su sitio.
+
+Comprobado con correos simulados en 1440, 1180, 1024, 768, 390 y 320 px y con zoom de 80 % y 125 %: sin solapes, botones alineados y acciones operativas (destacar, eliminar, archivar, leído/no leído, mover). No se pudo comprobar en este entorno la variante con ratón (30 px y eliminar a la vista), porque el navegador de pruebas se declara táctil; usa la misma rejilla.

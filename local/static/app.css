@@ -5196,3 +5196,37 @@ body[data-page=login] #login-form #password{padding-right:84px}
 body[data-adi-indicators=off] .adi-bar .adi-button .system-icon{animation:none!important;filter:none!important}
 body[data-adi-indicators=off] .adi-fixed{animation:none!important;background-image:none!important}
 @media(prefers-reduced-motion:reduce){.adi-bar .adi-button .system-icon{animation:none!important}.adi-fixed{animation:none!important;background-image:none!important}}
+/* Bandeja de correos: cada fila es una rejilla de tres columnas (selección · remitente, asunto y vista previa · acciones). Las acciones
+   tienen su propio espacio a la derecha y nunca se dibujan encima del texto; las secundarias van en el menú «⋯». */
+.mail-v2 .mail-list{container-type:inline-size}
+.mail-v2 .mail-row{position:relative;display:grid;grid-template-columns:22px minmax(0,1fr) auto;column-gap:8px;row-gap:2px;align-items:start;padding:9px 8px 9px 10px}
+.mail-v2 .mail-row>.mail-check{grid-column:1;grid-row:1/span 3;align-self:start;margin-top:3px!important}
+.mail-v2 .mail-row>:is(.mail-row-top,.mail-row-bottom,.mail-row-preview){grid-column:2;min-width:0}
+.mail-v2 .mail-row>.mail-row-actions{grid-column:3;grid-row:1/span 3;align-self:center}
+.mail-v2 .mail-row:hover .mail-row-top time{visibility:visible}
+.mail-row-actions{position:relative;display:flex;align-items:center;gap:2px}
+.mail-row-actions .mail-quick{flex:none;width:30px;height:30px;border-radius:8px;color:#8198ba;opacity:.7;transition:background .16s,color .16s,opacity .16s}
+.mail-v2 .mail-row:is(:hover,:focus-within,.menu-open,[aria-current=true]) .mail-row-actions .mail-quick{opacity:1;color:#b8cbe5}
+.mail-row-actions .mail-quick:hover{background:#18335a;color:#fff;transform:none}
+.mail-row-actions .mail-quick:focus-visible{outline:2px solid #8bb8ff;outline-offset:1px;opacity:1}
+.mail-row-actions .mail-quick[data-action=star][aria-pressed=true]{color:#f3c677;opacity:1}
+.mail-row-actions .mail-quick[data-action=trash]:hover{background:#3a1a22;color:#ffb1b8}
+.mail-row-actions .mail-quick .system-icon{width:16px;height:16px}
+.mail-row-menu{position:absolute;z-index:30;right:0;top:calc(100% + 4px);display:grid;gap:1px;min-width:210px;padding:6px;border:1px solid #37618d;border-radius:12px;background:#0c192d;box-shadow:0 18px 40px -12px #000000cc;animation:ui-select-in .14s ease-out}
+.mail-row-menu[hidden]{display:none}
+.mail-row-menu[data-side=top]{top:auto;bottom:calc(100% + 4px)}
+.mail-menu-item{display:flex;align-items:center;gap:10px;width:100%;min-height:36px;margin:0;padding:7px 10px;border:0;border-radius:8px;background:#10233c;color:#e3eeff;font-size:13px;font-weight:500;text-align:left;cursor:pointer}
+.mail-menu-item:hover,.mail-menu-item:focus-visible{background:#1b3b60;transform:none;outline:0}
+.mail-menu-item:focus-visible{box-shadow:inset 0 0 0 2px #70b7f5}
+.mail-menu-item .system-icon{flex:none;width:15px;height:15px;color:#a8dcff}
+.mail-menu-item[data-action=trash]{color:#ffc4c9}.mail-menu-item[data-action=trash] .system-icon{color:#ff9aa6}
+.mail-v2 .mail-row.menu-open{z-index:5}
+/* Lista estrecha: solo quedan a la vista la estrella y «⋯»; eliminar sigue en el menú. */
+@container (max-width:340px){.mail-row-actions .mail-quick:is([data-action=trash],[data-action=restore]){display:none}}
+@media(hover:none),(max-width:860px){.mail-v2 .mail-row{padding-right:6px}.mail-row-actions .mail-quick{width:36px;height:36px;opacity:1}.mail-row-actions .mail-quick:is([data-action=trash],[data-action=restore]){display:none}.mail-menu-item{min-height:42px}}
+@media(prefers-reduced-motion:reduce){.mail-row-menu{animation:none}}
+.mail-v2 .mail-row>.mail-row-actions{grid-column:3!important;grid-row:1/span 3!important;align-self:center}
+.mail-v2 .mail-row>.mail-row-top{grid-row:1}.mail-v2 .mail-row>.mail-row-bottom{grid-row:2}.mail-v2 .mail-row>.mail-row-preview{grid-row:3}
+.mail-v2 .mail-row-actions .mail-row-more{position:static;display:grid}
+.mail-row-actions .mail-row-more .system-icon{stroke-width:2.8}
+.mail-row-menu{position:fixed;right:auto;top:0;left:0}.mail-row-menu[data-side=top]{top:0;bottom:auto}
