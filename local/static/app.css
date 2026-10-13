@@ -4904,22 +4904,22 @@ body[data-page=dashboard] .adi-panel.adi-assist.adi-name{max-width:480px;margin-
 @media(max-width:860px){#adi-widget.adi-v2.adi-gl .adi-orb-label{font-size:11.5px}}
 #adi-widget.adi-v2.adi-gl .adi-toggle:hover{transform:none}
 #adi-widget.adi-v2 .adi-orb-mirror{image-rendering:auto}
-/* ADI: esfera de cristal líquido (rosa perla, lila, magenta suave, blanco e iridiscencia con toques cian). Estas reglas visten la alternativa
+/* ADI: esfera de cristal líquido (rosa y turquesa, con blanco e iridiscencia). Estas reglas visten la alternativa
    sin WebGL con el mismo material que dibuja adi-orb.js: cuerpo translúcido de centro claro, cáustica inferior, filo fino y reflejos fríos. */
 #adi-widget.adi-v2:not(.adi-gl) .adi-orb{background:
- radial-gradient(circle at 50% 50%,#0000 60%,#b05fa838 82%,#7d4aa066 95%,#6a3f9080 100%),
+ radial-gradient(circle at 50% 50%,#0000 60%,#3fb7b338 82%,#1f8f9a66 95%,#17737f80 100%),
  radial-gradient(ellipse 58% 26% at 60% 88%,#fff6fbeb 0,#ffd9ecb0 40%,#ffc4e200 78%),
  radial-gradient(ellipse 34% 20% at 16% 74%,#8fe6ff59 0,#8fe6ff00 100%),
- radial-gradient(circle at 82% 62%,#c3a4ff8f 0,#c3a4ff00 38%),
+ radial-gradient(circle at 82% 62%,#5fe3dcb3 0,#5fe3dc00 46%),
  radial-gradient(circle at 50% 52%,#fff3f9b8 0,#ffd3e970 28%,#ffb7dc00 58%),
- radial-gradient(circle at 36% 26%,#fff0f7 0,#ffc6e2 28%,#f29ccb 56%,#d47cc0 80%,#a56bc4 100%);
- box-shadow:inset 0 0 0 .75px #ffffffb8,inset 0 1.5px 2px #ffffffd9,inset 0 -8px 13px #7a3f9a66,inset 6px 0 11px -8px #ffffff80,inset -5px -5px 9px -6px #bfeaff8c}
+ radial-gradient(circle at 36% 26%,#fff0f7 0,#ffc6e2 28%,#f29ccb 56%,#8fd6d6 80%,#3fbfc0 100%);
+ box-shadow:inset 0 0 0 .75px #ffffffb8,inset 0 1.5px 2px #ffffffd9,inset 0 -8px 13px #14707a66,inset 6px 0 11px -8px #ffffff80,inset -5px -5px 9px -6px #bfeaff8c}
 #adi-widget.adi-v2:not(.adi-gl) .adi-orb-swirl{opacity:.28;filter:blur(7px)}
 #adi-widget.adi-v2:not(.adi-gl) .adi-orb::before{opacity:0;animation:none}
 #adi-widget.adi-v2:not(.adi-gl) .adi-orb::after{opacity:.55}
-#adi-widget.adi-v2:not(.adi-gl) .adi-toggle{box-shadow:0 14px 18px -9px #000000b3,0 0 0 .75px #ffeaf44d,0 0 16px #f6a8d640,0 0 34px #b99cff26}
-#adi-widget.adi-v2 .adi-halo{background:radial-gradient(circle,#ffb3da59 0,#d9a8ff33 44%,#9fdcff14 60%,#ffb3da00 72%)}
-@keyframes adi-orb-breathe{0%,100%{box-shadow:0 14px 18px -9px #000000b3,0 0 0 .75px #ffeaf440,0 0 14px #f6a8d638,0 0 30px #b99cff1f;transform:translateY(0) scale(1)}50%{box-shadow:0 16px 20px -9px #000000b3,0 0 0 .75px #fff2f873,0 0 22px #f6a8d666,0 0 42px #b99cff38;transform:translateY(-1.5px) scale(1.02)}}
+#adi-widget.adi-v2:not(.adi-gl) .adi-toggle{box-shadow:0 14px 18px -9px #000000b3,0 0 0 .75px #ffeaf44d,0 0 16px #f6a8d640,0 0 34px #5fe3dc26}
+#adi-widget.adi-v2 .adi-halo{background:radial-gradient(circle,#ffb3da59 0,#8fe9e333 44%,#9fdcff14 60%,#ffb3da00 72%)}
+@keyframes adi-orb-breathe{0%,100%{box-shadow:0 14px 18px -9px #000000b3,0 0 0 .75px #ffeaf440,0 0 14px #f6a8d638,0 0 30px #5fe3dc1f;transform:translateY(0) scale(1)}50%{box-shadow:0 16px 20px -9px #000000b3,0 0 0 .75px #fff2f873,0 0 22px #f6a8d666,0 0 42px #5fe3dc38;transform:translateY(-1.5px) scale(1.02)}}
 /* Letras «ADI»: finas, espaciadas y nítidas dentro del cristal. */
 #adi-widget.adi-v2 .adi-orb-label,#adi-widget.adi-v2.adi-gl .adi-orb-label{font:600 13.5px/1 Inter,"Segoe UI",system-ui,sans-serif;letter-spacing:.24em;text-indent:.24em;color:#fff;opacity:.97;text-shadow:0 1px 1.5px #6a2f7ecc,0 0 6px #8a3f96a6,0 0 12px #ffffff59}
 @media(max-width:860px){#adi-widget.adi-v2 .adi-orb-label,#adi-widget.adi-v2.adi-gl .adi-orb-label{font-size:11.5px}}
@@ -4931,7 +4931,9 @@ body[data-page=dashboard] .adi-panel.adi-assist.adi-name{max-width:480px;margin-
 #adi-widget.adi-v2[data-state=offline] .adi-toggle .adi-online{background:#1a1230;box-shadow:0 0 0 1.5px #ff8a94,0 0 0 2.25px #1a123080}
 #adi-widget.adi-v2[data-orb=error] .adi-toggle .adi-online{background:#ff6b78;box-shadow:0 0 0 1.5px #1a1230d9,0 0 0 2.25px #ffffff66,0 0 7px #ff6b7899}
 /* Encabezado del chat sin WebGL: el mismo cristal en pequeño. */
-#adi-widget.adi-v2 .adi-panel>header .adi-avatar:not(.adi-avatar-gl){background:radial-gradient(ellipse 60% 26% at 60% 90%,#fff6fbd9 0,#ffd9ec00 80%),radial-gradient(circle at 82% 62%,#c3a4ff8f 0,#c3a4ff00 40%),radial-gradient(circle at 36% 26%,#fff0f7 0,#ffc6e2 30%,#f29ccb 58%,#c57cc4 84%,#a56bc4 100%);color:#fff;text-shadow:0 1px 1.5px #6a2f7ecc;box-shadow:inset 0 0 0 .75px #ffffffb3,inset 0 1.5px 2px #ffffffcc,inset 0 -5px 8px #7a3f9a59,0 0 12px #f6a8d640}
+#adi-widget.adi-v2 .adi-panel>header .adi-avatar:not(.adi-avatar-gl){background:radial-gradient(ellipse 60% 26% at 60% 90%,#fff6fbd9 0,#ffd9ec00 80%),radial-gradient(circle at 82% 62%,#5fe3dcb3 0,#5fe3dc00 40%),radial-gradient(circle at 36% 26%,#fff0f7 0,#ffc6e2 30%,#f29ccb 58%,#8fd6d6 84%,#3fbfc0 100%);color:#fff;text-shadow:0 1px 1.5px #6a2f7ecc;box-shadow:inset 0 0 0 .75px #ffffffb3,inset 0 1.5px 2px #ffffffcc,inset 0 -5px 8px #14707a59,0 0 12px #f6a8d640}
+/* La esfera no lleva texto: su nombre accesible está en el botón. */
+#adi-widget.adi-v2 .adi-orb-label,#adi-widget.adi-v2 .adi-panel>header .adi-avatar .adi-glyph{display:none}
 /* Varios equipos por orden: barra «+ Agregar equipo» de la recepción, tarjetas de equipos, pagos e historial por equipo. */
 .equip-mode{display:flex;align-items:center;justify-content:space-between;gap:14px;margin:0 0 16px;padding:12px 14px;border:1px solid #37618d80;border-radius:12px;background:linear-gradient(180deg,#10233c,#0c192d);color:#e3eeff}
 .equip-mode[data-mode=similar]{border-color:#5aa9e680}.equip-mode[data-mode=existing]{border-color:#3ddc9780}

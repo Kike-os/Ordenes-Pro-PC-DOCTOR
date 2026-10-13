@@ -17,8 +17,8 @@ mat2 rot(float a){float c=cos(a),s=sin(a);return mat2(c,-s,s,c);}
 // Entorno de estudio que la superficie refleja: caja de luz superior, luz lateral y relleno. Deriva despacio y sigue levemente al cursor.
 vec3 env(vec3 d){d.xz*=rot(.34*sin(uTime*.11)+.19*sin(uTime*.047+1.3)+uPointer.x*(.3+uHover*.25));d.yz*=rot(uPointer.y*(.22+uHover*.2)+.09*sin(uTime*.23));
  float top=smoothstep(.3,.95,d.y),box=smoothstep(.5,.9,d.y)*smoothstep(.8,.05,abs(d.x+.22)),side=smoothstep(.55,1.,d.x)*smoothstep(.65,-.25,abs(d.y-.08));
- vec3 c=mix(vec3(.20,.10,.25),vec3(.99,.80,.92),top*.78);c+=vec3(1.,.98,1.)*box*1.7+vec3(.86,.93,1.)*side*.55;
- c+=vec3(.66,.52,1.)*smoothstep(-.15,-.9,d.y)*.34;return c;}
+ vec3 c=mix(vec3(.08,.20,.24),vec3(.99,.80,.90),top*.80);c+=vec3(1.,.98,1.)*box*1.8+vec3(.80,.98,1.)*side*.6;
+ c+=vec3(.25,.85,.85)*smoothstep(-.15,-.9,d.y)*.42;return c;}
 void main(){
  vec2 uv=(gl_FragCoord.xy*2.-uRes)/min(uRes.x,uRes.y);
  // Levitación casi imperceptible y respiración asimétrica (dos ritmos que nunca coinciden).
@@ -29,12 +29,12 @@ void main(){
  float ripple=.004*sin(ang*4.+uTime*1.1)+.003*sin(ang*7.-uTime*.8+1.3);
  float rad=R*(1.+breath*.012+uPress*.07+ripple+uSpeak*(.022*sin(ang*3.+uTime*7.)+.014*sin(ang*5.-uTime*5.3))+uLevel*.02*sin(ang*6.+uTime*11.));
  float d=length(uv);
- vec3 pink=vec3(1.,.68,.86),pearl=vec3(1.,.93,.97),magenta=vec3(.84,.38,.72),lilac=vec3(.76,.64,1.),cyan=vec3(.58,.90,1.);
+ vec3 pink=vec3(1.,.68,.86),pearl=vec3(1.,.93,.97),magenta=vec3(.93,.42,.70),lilac=vec3(.36,.88,.86),cyan=vec3(.55,.95,.98);
  float live=1.-uDim*.6;
  // Halo volumétrico discreto y onda expansiva al toque.
  float glow=exp(-(max(d-rad,0.))*10.5)*(.10+.045*breath+uHover*.05+uSpeak*.2+uLevel*.24+max(uPress,0.)*.22)*live;
  float ring=uShock>0.?exp(-pow((d-rad-(1.-uShock)*.30)*28.,2.))*uShock*.38:0.;
- vec3 aura=mix(pink,lilac,smoothstep(-.5,.6,uv.x-uv.y*.6)*.55);vec3 col=aura*(glow+ring);float alpha=glow*.85+ring*.8;
+ vec3 aura=mix(pink,lilac,smoothstep(-.4,.5,uv.x-uv.y*.7)*.8);vec3 col=aura*(glow+ring);float alpha=glow*.85+ring*.8;
  if(d<rad){
   vec3 n=vec3(uv/rad,0.);n.z=sqrt(max(1.-dot(n.xy,n.xy),0.));
   // Pequeñas ondas que recorren la superficie: perturban la normal y, con ella, los reflejos.
@@ -78,16 +78,17 @@ void main(){
   acc*=tmax/uSteps*2.1;
   // Cuerpo de cristal líquido: rosa perla translúcido, más claro y limpio en el centro, con lila y magenta suaves hacia los bordes.
   vec3 body=mix(magenta,pink,smoothstep(.05,.8,n.z));
-  body=mix(body,lilac,smoothstep(-.1,.9,n.x*.62-n.y*.55+.12)*.46);
+  body=mix(body,lilac,smoothstep(-.25,.75,n.x*.60-n.y*.62+.05)*.78);
   body=mix(body,pearl,smoothstep(.5,1.,n.z)*.6);
   vec3 inner=body*(.66+.22*n.z)+acc*.42;
   // Profundidad: el lado opuesto a la luz queda más denso y saturado.
-  inner*=mix(vec3(.88,.66,.94),vec3(1.),smoothstep(-.95,.35,n.y*.75-n.x*.45));
+  inner*=mix(vec3(.72,.92,.94),vec3(1.),smoothstep(-.95,.35,n.y*.75-n.x*.45));
   // Cáustica: la luz que entra por arriba a la izquierda se concentra en un arco claro dentro del borde opuesto.
   float ca=pow(max(dot(out2,normalize(vec2(.6,-.66))),0.),2.4)*smoothstep(.42,.84,rr)*smoothstep(.99,.88,rr);
   inner+=pearl*ca*(.85+.12*breath);
   // Centro limpio y luminoso que respira.
   inner+=mix(pearl,pink,.35)*exp(-rr*rr*4.5)*(.13+.035*breath+uHover*.04);
+  inner*=1.-.16*smoothstep(.2,-1.,n.y)*smoothstep(.55,1.,rr);
   // Grosor del vidrio: banda apenas más densa antes del filo.
   inner*=1.-.20*smoothstep(.66,.90,rr)*smoothstep(1.,.92,rr);
   // Superficie: reflejo del entorno, dos brillos especulares (el principal sigue al cursor) y filo de contraluz.
@@ -98,10 +99,12 @@ void main(){
   float wrap=.70+.30*dot(n,L);
   col=inner*wrap*live+refl*(.15+uHover*.07+fres*.95)*live+vec3(1.)*spec*live+mix(pearl,irid,.7)*fres*(.16+fres*.34)*live;
   // Reflejos secundarios fríos (azul y cian) en el lado contrario a la luz y filo blanco de contraluz.
-  col+=cyan*pow(fres,1.4)*smoothstep(.15,-.85,n.y*.8+n.x*.5)*.42*live+lilac*pow(fres,1.2)*smoothstep(.0,.9,n.x-n.y*.3)*.22*live;
+  col+=cyan*pow(fres,1.4)*smoothstep(.15,-.85,n.y*.8+n.x*.5)*.40*live+pink*pow(fres,1.3)*smoothstep(.0,.9,n.y-n.x*.4)*.26*live;
   col+=vec3(1.)*smoothstep(.93,1.,rr)*smoothstep(-.9,.6,n.y-n.x*.4)*.34*live;
   // Resplandor moderado de las zonas más luminosas, sin quemar el detalle.
   col+=pearl*smoothstep(.75,1.6,dot(acc,vec3(.33)))*.10;
+  // Color algo más vivo sin quemar los brillos.
+  col=mix(vec3(dot(col,vec3(.3,.5,.2))),col,1.26);
   col=mix(col,vec3(dot(col,vec3(.3,.5,.2)))*vec3(.84,.80,.88),uDim*.75);
   float edge=smoothstep(rad,rad-.018,d);
   alpha=mix(alpha,1.,edge);col=mix(aura*(glow+ring),col,edge);

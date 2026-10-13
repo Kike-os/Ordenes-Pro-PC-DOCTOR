@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.123 — 2026-10-12 22:45 (UTC-05:00)
+
+ADI: esfera rosa y turquesa sin letras
+
+### Mejoras realizadas
+
+- ADI: esfera de cristal en rosa y turquesa, más realista (sombra interna, reflejos fríos y color más vivo) y sin letras en su interior.
+
 ## v1.5.122 — 2026-10-12 22:42 (UTC-05:00)
 
 Varios equipos por orden, identidad del equipo y pagos
