@@ -202,3 +202,21 @@ En «Gestión técnica del equipo», «Últimas modificaciones» pasó a ser **�
 - El resumen usa «Subtotal gravado», «Subtotal tarifa 0 %», «IVA» y «Total cotizado»; los cálculos no cambiaron.
 
 Comprobado con 0, 1, 5 y 12 partidas, descripciones largas y errores, en 1920×1080, 1440×900, 1366×768, 1366×560, 1024×768, 768×1024, 390×844, 390×560 y 320×640.
+
+## PDF del presupuesto y aprobación con código QR
+
+**Diseño.** Documento A4 sobre fondo blanco con acentos discretos (se imprime sin gastar tinta): encabezado con el logotipo, datos de la empresa, «PRESUPUESTO TÉCNICO», número, estado, emisión y vencimiento; datos del cliente y del equipo; partidas con icono, descripción, clasificación, cantidad, precio unitario, descuento, importe y estado real de autorización; resumen con importe original, descuento, subtotal gravado, subtotal tarifa 0 %, IVA, total cotizado y, si hay decisión, total autorizado, rechazado y por decidir; condiciones; bloque de aprobación en línea; y la evidencia de la decisión. Los saltos de página repiten el encabezado de la tabla.
+
+**Correcciones.** El «?» del descuento era el signo menos tipográfico (U+2212), que la fuente del PDF no tiene: ahora se escribe con guion y cualquier carácter ajeno a la fuente se sustituye antes de dibujarlo. Los importes se alinean a la derecha. El descuento se aplica y se redondea por partida, y el total es la suma de las partidas: para $240,99 con 3 % resultan $96,99 + $136,77 = $233,76 y un descuento de $7,23; base e IVA suman siempre el total. No se recalcula ningún presupuesto guardado.
+
+**Condiciones.** `quotes.CONDITIONS` contiene las siete cláusulas de «Condiciones de aprobación y ejecución» entregadas por la administración el 13 de octubre de 2026, **sujetas a revisión legal**. Cada presupuesto conserva las condiciones con las que se envió; los anteriores no cambian.
+
+**Código QR.** El sistema guarda solo la huella del enlace privado, no el enlace. Por eso el QR se dibuja únicamente cuando quien pide el documento ya tiene el enlace vigente:
+
+- el PDF adjunto al correo del presupuesto;
+- el PDF que el cliente descarga desde su enlace;
+- «Descargar PDF con código QR» en la ventana «Presupuesto enviado», justo después de enviarlo.
+
+El QR contiene la dirección real de autorización de ese presupuesto y versión; junto a él hay un botón clicable, la vigencia del enlace y una nota de seguridad. Un borrador, un presupuesto decidido o anulado, un enlace vencido, revocado o inventado no producen ningún QR. Escanearlo no aprueba nada: el cliente verifica su identidad y decide cada partida. Una versión nueva revoca el enlace anterior.
+
+**Vigencia del enlace.** Configurable entre 1 y 60 días (por omisión 15) en Configuración → Catálogo, junto a la tarifa de IVA. Aplica a los enlaces que se emitan desde entonces.

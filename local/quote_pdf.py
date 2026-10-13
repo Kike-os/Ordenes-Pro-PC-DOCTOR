@@ -53,7 +53,8 @@ def render(quote, order, link=None):
     decided = quote['status'] in quotes.DECIDED
 
     def width(text, size, bold=False):
-        return sum(WIDTHS.get(char, 556) for char in text) * size / 1000 * (1.06 if bold else 1)
+        # En negrita solo las letras son más anchas; cifras y signos miden lo mismo, de modo que los importes quedan alineados a la derecha.
+        return sum(WIDTHS.get(char, 556) * (1.1 if bold and char.isalpha() else 1) for char in text) * size / 1000
 
     def text(value, x, y, size=9, bold=False, color=INK, right=False):
         value = clean(value)
@@ -125,12 +126,17 @@ def render(quote, order, link=None):
     def pairs(rows, columns=3):
         cell = (W - 2 * M) / columns
         for index in range(0, len(rows), columns):
-            need(28)
+            need(40)
+            tallest = 1
             for column, (label, value) in enumerate(rows[index:index + columns]):
                 x = M + column * cell
                 text(label, x, state['y'], 7.2, False, GRAY)
-                text(wrap(value or 'No registrado', cell - 10, 9.2)[0], x, state['y'] + 10, 9.2, True, INK)
-            state['y'] += 27
+                # Un valor largo (por ejemplo, el modelo del equipo) ocupa una segunda línea en lugar de cortarse.
+                lines = wrap(value or 'No registrado', cell - 12, 9.2)[:2]
+                for offset, row in enumerate(lines):
+                    text(row, x, state['y'] + 10 + 11 * offset, 9.2, True, INK)
+                tallest = max(tallest, len(lines))
+            state['y'] += 16 + 11 * tallest
 
     page(True)
 
@@ -161,7 +167,7 @@ def render(quote, order, link=None):
             table_head()
         catalog_icons.draw(pdf, item.get('icon') or 'generico', M + 2, state['y'] - 2, 17)
         for offset, row in enumerate(lines):
-            text(row, left, state['y'] + 11.5 * offset, 9, offset == 0 and len(lines) == 1, INK)
+            text(row, left, state['y'] + 11.5 * offset, 9, False, INK)
         if priority:
             top = state['y'] + 11.5 * len(lines) + 1
             fill(left, top, 3, 9.5, priority[2])

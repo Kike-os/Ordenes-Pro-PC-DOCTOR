@@ -75,7 +75,7 @@ class QuoteFlowTests(unittest.TestCase):
         first=self.request(path);self.assertEqual(first['status'],200);self.assertIn('últimos cuatro dígitos',first['body']);self.assertNotIn('$35,00',first['body'])
         self.assertEqual(self.request(path+'/documento.pdf')['status'],404)
         self.assertIn('no coinciden',self.form(path,{'last4':'9999'})['body'])
-        page=self.form(path,{'last4':'0017'})['body'];self.assertIn('$35,00',page);self.assertIn('Total cotizado',page);self.assertIn('ejecutar exclusivamente los servicios aceptados',page)
+        page=self.form(path,{'last4':'0017'})['body'];self.assertIn('$35,00',page);self.assertIn('Total cotizado',page);self.assertIn('autoriza expresamente a PC-DOCTOR S.A. a ejecutar los productos y servicios seleccionados',page)
         passkey=re.search(r'name="passkey" value="([^"]+)"',page)[1];item_ids=[int(v) for v in dict.fromkeys(re.findall(r'name="decision_(\d+)"',page))]
         self.assertEqual(self.request(path+'/documento.pdf?k='+passkey)['body'][:4],b'%PDF')
         base={'passkey':passkey,'action':'decide','name':'Cliente Ficticio','accept':'on','decision_%d'%item_ids[0]:'aprobado','decision_%d'%item_ids[1]:'rechazado','decision_%d'%item_ids[2]:'aprobado'}
@@ -496,4 +496,68 @@ class QuoteDraftRemovalTests(unittest.TestCase):
             self.assertEqual(c.execute("SELECT COUNT(*) FROM audit WHERE action='quote_draft_deleted'").fetchone()[0],1);self.assertTrue(quotes.evidence_ok(c,first) is not None)
         third=post('/api/quotes/%d'%first,action='version')['body']['id'];self.assertTrue(self.request('/api/quotes/%d'%third,cookie=cookie)['body']['quote']['code'].endswith('-P3'))
         brief=detail()['group']['units'][0]['quote'];self.assertEqual((brief['id'],brief['approved_count'],brief['pending_count'],brief['authorized_cents']),(third,0,1,4000))
+
+
+class QuoteDocumentTests(unittest.TestCase):
+    setUpClass=classmethod(test_app.SecurityTests.setUpClass.__func__);setUp=test_app.SecurityTests.setUp;tearDown=test_app.SecurityTests.tearDown;request=test_app.SecurityTests.request;login=test_app.SecurityTests.login;order_data=test_app.SecurityTests.order_data;form=QuoteFlowTests.form
+
+    def test_clauses_money_and_document_text_are_safe_for_print(self):
+        import quote_pdf
+        parts=quotes.clauses(quotes.CONDITIONS);self.assertEqual([title for title,_ in parts],['1. Autorización del servicio','2. Inicio de trabajos','3. Modificación o desistimiento','4. Trabajos y gastos realizados','5. Servicios adicionales','6. Evidencia de aceptación','7. Documento informativo'])
+        self.assertTrue(all(body and not body[0].isdigit() for _,body in parts));self.assertIn('no constituye factura ni comprobante de venta autorizado por el SRI',parts[-1][1])
+        for absolute in ('bajo ninguna circunstancia','no hay derecho a reclamo'):self.assertNotIn(absolute,quotes.CONDITIONS.lower())
+        # Condiciones antiguas (sin títulos) siguen mostrándose renglón a renglón.
+        self.assertEqual(quotes.clauses('Primera condición antigua.\nSegunda condición antigua.'),[('','Primera condición antigua.'),('','Segunda condición antigua.')])
+        # El signo menos tipográfico y otros caracteres ajenos a la fuente del PDF nunca llegan como «?».
+        self.assertEqual(quote_pdf.clean('− $7,23 → total ≥ 0\u00a0✓'),'- $7,23 > total >= 0 ');self.assertNotIn('?',quote_pdf.clean('Año · «ñ» — … €'))
+
+    def test_discount_rounding_matches_line_by_line(self):
+        # Caso del documento real: $240,99 con 3 % de descuento.
+        items=[{'quantity':1,'unit_cents':9999,'taxed':True,'status':'pendiente'},{'quantity':1,'unit_cents':14100,'taxed':True,'status':'pendiente'}];t=quotes.totals(items,1500,300)
+        self.assertEqual((t['gross'],t['discount'],t['quoted']),(24099,723,23376));self.assertEqual(sum(quotes.net(i['quantity']*i['unit_cents'],300) for i in items),t['quoted']);self.assertEqual(t['base_taxed']+t['base_zero']+t['tax'],t['quoted'])
+        for bp in (0,300,500):
+            for cents in (1,99,3333,9999,123457,99999999):
+                t=quotes.totals([{'quantity':3,'unit_cents':cents,'taxed':True,'status':'aprobado'},{'quantity':1,'unit_cents':cents+1,'taxed':False,'status':'rechazado'}],1500,bp)
+                self.assertEqual(t['gross']-t['discount'],t['quoted']);self.assertEqual(t['base_taxed']+t['base_zero']+t['tax'],t['quoted']);self.assertEqual(t['approved']+t['rejected']+t['pending'],t['quoted'])
+
+    def test_qr_only_with_the_live_link_and_configurable_expiry(self):
+        cookie,csrf=self.login();post=lambda path,**body:self.request(path,body,cookie=cookie,csrf=csrf)
+        order=self.request('/api/orders',self.order_data({'email':'cliente@example.invalid','request_key':'quote-document-request-0001'}),cookie=cookie,csrf=csrf)['body']
+        quote=post('/api/orders/%d/quote'%order['id'])['body']['id'];post('/api/quotes/%d'%quote,action='save',items=[{'description':'Servicio ficticio','category':'servicio','quantity':1,'unit_cents':4000,'taxed':True}])
+        pdf=lambda extra='':self.request('/api/quotes/%d/pdf%s'%(quote,extra),cookie=cookie)['body']
+        # Borrador: PDF válido, sin enlace ni QR.
+        self.assertEqual(pdf()[:4],b'%PDF');self.assertNotIn(b'/URI',pdf())
+        # Vigencia configurable: solo administración, entre 1 y 60 días.
+        for bad in ('0','61','abc'):self.assertEqual(post('/api/catalog/tax',link_days=bad)['status'],400)
+        self.assertEqual(post('/api/catalog/tax',link_days='7')['body']['link_days'],7);self.assertEqual(self.request('/api/catalog',cookie=cookie)['body']['link_days'],7)
+        with patch.object(app.mail_pro,'configured',return_value=False):link=post('/api/quotes/%d'%quote,action='send')['body']['link']
+        token=link.rsplit('/',1)[1]
+        with app.connect() as c:
+            row=c.execute('SELECT created_at,expires_at FROM quote_links WHERE quote_id=?',(quote,)).fetchone()
+            self.assertEqual((app.appointments.datetime.fromisoformat(row['expires_at'])-app.appointments.datetime.fromisoformat(row['created_at'])).days,7)
+        # Enviado: el QR (y el enlace) solo aparecen con el enlace vigente; nunca con uno ajeno o inventado.
+        with_link=pdf('?t='+token);self.assertIn(link.encode(),with_link);self.assertEqual(with_link.count(b'/URI'),4)  # dos vínculos (código QR y botón), cada uno con su tipo y su dirección
+        for wrong in ('','?t='+'x'*43,'?t=corto'):self.assertNotIn(b'/URI',pdf(wrong))
+        path='/presupuesto/'+token;page=self.form(path,{'last4':'0017'})['body'];passkey=re.search(r'name="passkey" value="([^"]+)"',page)[1]
+        self.assertEqual(page.count('<li><strong>'),7);self.assertIn(link.encode(),self.request(path+'/documento.pdf?k='+passkey)['body'])
+        # Una versión nueva revoca el enlace anterior: su QR deja de emitirse.
+        post('/api/quotes/%d'%quote,action='version');self.assertNotIn(b'/URI',pdf('?t='+token))
+        # Decidido: el documento ya no ofrece aprobación en línea.
+        second=self.request('/api/orders/%d/quote'%order['id'],cookie=cookie)['body']['current']['id']
+        with patch.object(app.mail_pro,'configured',return_value=False):link2=post('/api/quotes/%d'%second,action='send')['body']['link']
+        item=str(self.request('/api/quotes/%d'%second,cookie=cookie)['body']['quote']['items'][0]['id']);post('/api/quotes/%d'%second,action='decide',note='Aprobó por teléfono (ficticio)',approved=item)
+        self.assertNotIn(b'/URI',self.request('/api/quotes/%d/pdf?t=%s'%(second,link2.rsplit('/',1)[1]),cookie=cookie)['body'])
+        with app.connect() as c:c.execute("UPDATE users SET role='tecnico' WHERE username='demo'");c.commit()
+        self.assertEqual(post('/api/catalog/tax',link_days='9')['status'],403)
+
+    def test_sent_mail_carries_the_pdf_with_the_same_link(self):
+        cookie,csrf=self.login();post=lambda path,**body:self.request(path,body,cookie=cookie,csrf=csrf)
+        order=self.request('/api/orders',self.order_data({'email':'cliente@example.invalid','request_key':'quote-document-request-0002'}),cookie=cookie,csrf=csrf)['body']
+        quote=post('/api/orders/%d/quote'%order['id'])['body']['id'];post('/api/quotes/%d'%quote,action='save',items=[{'description':'Servicio ficticio','category':'servicio','quantity':1,'unit_cents':4000,'taxed':True}])
+        sent=[]
+        with patch.object(app.mail_pro,'configured',return_value=True),patch.object(app.mail_pro,'settings',return_value={'username':'taller@example.invalid','password':'x'}),patch.object(app.mail_pro,'deliver',side_effect=lambda config,message,recipients:sent.append(message)):
+            result=post('/api/quotes/%d'%quote,action='send')['body']
+        self.assertEqual((result['mail'],len(sent)),('sent',1));files=[part for part in sent[0].iter_attachments()]
+        self.assertEqual([(part.get_filename(),part.get_content_type()) for part in files],[(result['quote']['code']+'-PRESUPUESTO.pdf','application/pdf')])
+        body=files[0].get_payload(decode=True);self.assertEqual(body[:4],b'%PDF');self.assertIn(result['link'].encode(),body)
 
