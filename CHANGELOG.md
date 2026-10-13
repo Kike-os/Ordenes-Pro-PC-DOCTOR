@@ -4,6 +4,15 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.124 — 2026-10-12 22:54 (UTC-05:00)
+
+Barras de desplazamiento, menús desplegables y selectores con el tema azul
+
+### Mejoras realizadas
+
+- Barras de desplazamiento con el tema azul en toda la aplicación (8 px, redondeadas, sin flechas).
+- Menús desplegables con lista propia en azul tecnológico, accesible por teclado, para todos los selectores; tipografía y altura uniformes en selectores y filtros.
+
 ## v1.5.123 — 2026-10-12 22:45 (UTC-05:00)
 
 ADI: esfera rosa y turquesa sin letras

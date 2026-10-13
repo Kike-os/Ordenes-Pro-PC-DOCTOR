@@ -8,6 +8,23 @@
   },
   "releases": [
     {
+      "version": "1.5.124",
+      "date": "2026-10-12T22:54:44-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Barras de desplazamiento, menús desplegables y selectores con el tema azul",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Barras de desplazamiento con el tema azul en toda la aplicación (8 px, redondeadas, sin flechas).",
+          "Menús desplegables con lista propia en azul tecnológico, accesible por teclado, para todos los selectores; tipografía y altura uniformes en selectores y filtros."
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.123",
       "date": "2026-10-12T22:45:49-05:00",
       "type": "patch",
