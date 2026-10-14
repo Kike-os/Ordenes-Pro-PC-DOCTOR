@@ -8,6 +8,22 @@
   },
   "releases": [
     {
+      "version": "1.5.160",
+      "date": "2026-10-14T08:50:46-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Ticket térmico definitivo: compacto, completo y con QR de condiciones",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Ticket térmico: distribución definitiva y más compacta (número, recepción, cliente, equipo, falla, servicio, condiciones, QR y firma), condiciones de recepción en siete puntos breves y QR de las condiciones completas junto al de seguimiento"
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.159",
       "date": "2026-10-14T08:35:01-05:00",
       "type": "patch",

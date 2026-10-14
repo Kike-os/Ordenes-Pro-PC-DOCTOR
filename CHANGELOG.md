@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.160 — 2026-10-14 08:50 (UTC-05:00)
+
+Ticket térmico definitivo: compacto, completo y con QR de condiciones
+
+### Mejoras realizadas
+
+- Ticket térmico: distribución definitiva y más compacta (número, recepción, cliente, equipo, falla, servicio, condiciones, QR y firma), condiciones de recepción en siete puntos breves y QR de las condiciones completas junto al de seguimiento
+
 ## v1.5.159 — 2026-10-14 08:35 (UTC-05:00)
 
 ADI AutoCare Pro: monitoreo, diagnóstico y recuperación segura
