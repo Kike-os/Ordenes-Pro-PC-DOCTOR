@@ -6547,3 +6547,23 @@ button.live-appointment .agenda-badge.state-pill,.live-card-meta .agenda-badge.s
  .tracking-pro>header>div{flex:1 1 100%}.tracking-pro>header .tracking-status{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
  .tracking-pro>header>a{order:3;margin-left:auto}
 }
+/* ===== Agenda → Calendario de Feriados y Atención: tarjetas compactas, dos columnas en escritorio y una en móvil. ===== */
+.agenda-holidays{display:grid;gap:12px;min-width:0}
+.feast-head{display:flex;align-items:center;gap:12px;min-width:0}
+.feast-icon{flex:none;display:grid;place-items:center;width:40px;height:40px;border:1px solid #ff9ecb66;border-radius:12px;background:#2a1530;color:#ffd3e6}.feast-icon svg{width:20px;height:20px}
+.feast-head h3{margin:0;font-size:15.5px;line-height:1.3;color:#fff;letter-spacing:0;text-transform:none}.feast-head p{margin:2px 0 0;font-size:12.5px;color:#9db1cf}
+.feast-list{list-style:none;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:0;padding:0}
+.feast-card{display:grid;grid-template-columns:54px minmax(0,1fr) auto;align-items:center;gap:6px 12px;min-width:0;padding:12px 14px;border:1px solid #223a5c;border-radius:14px;background:#0d1730;transition:border-color .17s ease}
+.feast-card[hidden]{display:none}.feast-card[data-today=true]{border-color:#ff9ecb99;box-shadow:0 0 0 2px #ff9ecb1f}
+.feast-date{display:grid;justify-items:center;padding:6px 4px;border:1px solid #2c4468;border-radius:10px;background:#0a1322;line-height:1.15}
+.feast-date b{font-size:20px;font-weight:750;font-variant-numeric:tabular-nums;color:#fff}.feast-date span{font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#ff9ecb}
+.feast-info{display:grid;gap:2px;min-width:0}.feast-info strong{font-size:14px;line-height:1.35;color:#fff;overflow-wrap:break-word}.feast-info small{margin:0;font-size:12px;line-height:1.4;color:#8fa6c4;overflow-wrap:break-word}.feast-info .feast-moved{color:#c7b6e8}
+.feast-state{display:inline-flex;align-items:center;gap:6px;max-width:100%;padding:3px 10px;border:1px solid;border-radius:999px;font-size:11.5px;font-weight:650;line-height:1.5;white-space:nowrap}
+.feast-state i{flex:none;width:7px;height:7px;border-radius:50%;background:currentColor}
+.feast-state[data-kind=normal]{border-color:#356B5C;background:#142C2A;color:#6DE4AF}.feast-state[data-kind=especial]{border-color:#3a6f9c;background:#13263a;color:#7cc7ff}
+.feast-state[data-kind=cerrado]{border-color:#86435A;background:#291927;color:#FF8794}.feast-state[data-kind=pendiente]{border-color:#80663D;background:#282319;color:#FFCA77}
+.feast-more{justify-self:center;display:inline-flex;align-items:center;gap:8px;min-height:38px;margin:0;padding:0 14px;font-size:13px}.feast-more b{padding:1px 8px;border-radius:999px;background:#ffffff1a;font-size:11.5px;font-variant-numeric:tabular-nums}.feast-more svg{width:15px;height:15px}
+.feast-more:focus-visible{outline:2px solid #9cc4ff;outline-offset:2px}
+@media(max-width:1100px){.feast-card{grid-template-columns:54px minmax(0,1fr)}.feast-state{grid-column:2;justify-self:start;white-space:normal}}
+@media(max-width:760px){.feast-list{grid-template-columns:1fr}}
+@media(prefers-reduced-motion:reduce){.feast-card{transition:none}}
