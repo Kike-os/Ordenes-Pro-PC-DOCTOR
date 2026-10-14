@@ -8,6 +8,26 @@
   },
   "releases": [
     {
+      "version": "1.5.161",
+      "date": "2026-10-14T09:08:20-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Libreta de direcciones y comunicados a clientes en Mail Pro; Servicio de Administración Remota en la agenda",
+      "changes": {
+        "features": [
+          "Mail Pro: libreta de direcciones con los clientes del registro (búsqueda, selección individual o de todos, contador y destinatarios en Para, CC o CCO)",
+          "Comunicados a clientes: plantillas con firma y logotipo, personalización con el nombre, vista previa, confirmación expresa, envío individual por lotes, control de duplicados, estados de entrega, historial y baja de comunicados",
+          "Agenda: nuevo servicio «Servicio de Administración Remota»"
+        ],
+        "improvements": [],
+        "fixes": [
+          "Agenda: el selector muestra «Selecciona el Servicio»"
+        ],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.160",
       "date": "2026-10-14T08:50:46-05:00",
       "type": "patch",

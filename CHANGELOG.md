@@ -4,6 +4,20 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.161 — 2026-10-14 09:08 (UTC-05:00)
+
+Libreta de direcciones y comunicados a clientes en Mail Pro; Servicio de Administración Remota en la agenda
+
+### Nuevas funcionalidades
+
+- Mail Pro: libreta de direcciones con los clientes del registro (búsqueda, selección individual o de todos, contador y destinatarios en Para, CC o CCO)
+- Comunicados a clientes: plantillas con firma y logotipo, personalización con el nombre, vista previa, confirmación expresa, envío individual por lotes, control de duplicados, estados de entrega, historial y baja de comunicados
+- Agenda: nuevo servicio «Servicio de Administración Remota»
+
+### Errores corregidos
+
+- Agenda: el selector muestra «Selecciona el Servicio»
+
 ## v1.5.160 — 2026-10-14 08:50 (UTC-05:00)
 
 Ticket térmico definitivo: compacto, completo y con QR de condiciones
