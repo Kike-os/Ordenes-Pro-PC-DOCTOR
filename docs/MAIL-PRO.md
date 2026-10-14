@@ -136,3 +136,15 @@ Comprobado con correos simulados en 1440, 1180, 1024, 768, 390 y 320 px y con zo
 - Acciones: Responder, Responder a todos, Reenviar, Destacar, leído/no leído, Imprimir (solo el mensaje), Eliminar, Ampliar y Cerrar. Con poco ancho, las secundarias pasan al menú «Más».
 
 **No verificado:** cómo se ve la firma en Gmail, Outlook y aplicaciones móviles reales (aquí se comprobó el HTML enviado y su lectura en el propio sistema), ni el cuadro de impresión del navegador.
+
+## Restauración de la firma corporativa original (13/10/2026, versión 1.5.149)
+
+**Causa.** El correo enviado siempre llevó el logotipo; lo que fallaba era la **vista previa** (redactor de correo y Configuración):
+
+1. En pantallas estrechas se apilaba en vertical: el logotipo quedaba arriba, fuera de la vista, y el separador vertical se convertía en una franja roja horizontal. Se veía «solo texto y datos de contacto».
+2. El nombre se pintaba en blanco sobre fondo blanco (un color heredado del diseño oscuro anterior), así que no se veía en ninguna pantalla.
+3. En la 1.5.147 se quitó por error el borde rojo inferior del diseño original; se ha restaurado.
+
+**Ahora.** La vista previa reproduce la firma que se envía: siempre horizontal, con el logotipo original a la izquierda, nombre, cargo y descripción, separador vertical rojo, datos de contacto a la derecha, fondo blanco y su borde. Si no cabe, se muestra a escala o se desplaza dentro de su recuadro; no se reordena ni se recorta. Con la casilla «Incluir la firma corporativa» desactivada, el correo sale sin firma, como antes.
+
+El logotipo es el archivo original `local/static/logo-firma.png`, incrustado en cada correo (CID); no se generó ni se modificó ninguno. No se cambiaron los datos de contacto guardados.

@@ -271,6 +271,18 @@ class MailRouteTests(test_app.SecurityTests):
             self.assertEqual((only_imap['state'],only_imap['cpanel'],only_imap['source']),('ok','sin_configurar','servidor de correo (IMAP QUOTA)'))
         self.assertEqual(self.request('/api/mail/storage')['status'],401)
 
+    def test_signature_preview_matches_the_signature_that_is_sent(self):
+        # El correo: logotipo incrustado a la izquierda, separador vertical rojo, datos a la derecha, fondo blanco y su borde original.
+        sign=mail_pro.clean_signature({},'buzon@example.invalid');page,cid,logo,kind=mail_pro.signature_part(sign,'example.invalid')
+        self.assertTrue(logo and logo[:8]==b'\x89PNG\r\n\x1a\n');self.assertEqual(kind,'png');self.assertIn('src="cid:'+cid[1:-1]+'" width="120"',page)
+        for expected in ('bgcolor="#ffffff"','border-bottom:3px solid #e03a3e','<td width="2" bgcolor="#e03a3e"','color:#1f2937;white-space:nowrap;">'+sign['name']):self.assertIn(expected,page)
+        self.assertLess(page.index('<img '),page.index(sign['name']));self.assertLess(page.index(sign['name']),page.index('<td width="2" bgcolor="#e03a3e"'));self.assertLess(page.index('<td width="2" bgcolor="#e03a3e"'),page.index(sign['phone']))
+        # La vista previa usa las mismas medidas y colores, siempre en horizontal: nunca se apila ni oculta el nombre.
+        css=(Path(app.ROOT)/'static'/'app.css').read_text(encoding='utf-8');block=css[css.index('/* ===== Firma corporativa original: la vista previa reproduce exactamente'):]
+        for rule in ('flex-direction:row!important','flex-wrap:nowrap!important','background:#ffffff','border-bottom:3px solid #e03a3e','.mail-sign-card>b{flex:0 0 2px!important;width:2px!important','background:#e03a3e','.mail-sign-card .mail-sign-logo img{display:block;width:120px','color:#1f2937!important;white-space:nowrap!important'):self.assertIn(rule,block)
+        self.assertNotIn('flex-direction:column',block)
+        js=(Path(app.ROOT)/'static'/'app.js').read_text(encoding='utf-8');self.assertIn("logo.src='/static/logo-firma.png'",js);self.assertTrue((Path(app.ROOT)/'static'/'logo-firma.png').is_file())
+
     def test_isolated_reading_page_keeps_original_html_and_blocks_active_content(self):
         from email.message import EmailMessage
         picture=b'\x89PNG\r\n\x1a\n'+b'0'*200
@@ -329,7 +341,7 @@ class MailRouteTests(test_app.SecurityTests):
             card['use_image']=False;off=post(card=json.dumps(card))['body']['card'];self.assertEqual((off['use_image'],off['image']['width']),(False,900))
             with app.connect() as c:plain_card=app.mail_signature_send(c)
             page=mail_pro.build_message(mail_pro.settings(),{'to':'cliente@example.invalid','subject':'Prueba','body':'Hola.','layout':{'title':'Prueba'}},plain_card)[0].get_body(('html',)).get_content()
-            self.assertIn('alt="PC-DOCTOR S.A."',page);self.assertNotIn('border-bottom:3px solid #e03a3e',page)
+            self.assertIn('alt="PC-DOCTOR S.A."',page);self.assertIn('border-bottom:3px solid #e03a3e',page)
             gone=post(remove_image=True)['body']['card'];self.assertEqual((gone['use_image'],gone['image']),(False,None));self.assertEqual(self.request('/api/mail/signature-image',cookie=cookie)['status'],404)
             with app.connect() as c:c.execute("UPDATE users SET role='tecnico' WHERE username='demo'");c.commit()
             self.assertEqual(post(image=base64.b64encode(picture).decode())['status'],403)
@@ -343,9 +355,8 @@ class MailRouteTests(test_app.SecurityTests):
         self.assertLess(plain.index('Texto **importante**'),plain.index('-- \nPersona'));self.assertLess(plain.index('Tel.: +593 99 000 0000'),plain.index('escribió:'))
         self.assertEqual(plain.count('-- \n'),1);self.assertEqual(page.count('alt="PC-DOCTOR S.A."'),1)
         self.assertLess(page.index('<strong>importante</strong>'),page.index('<table'));self.assertLess(page.index('</table></td></tr></table>'),page.index('<blockquote'))
-        for expected in ('href="tel:+593990000000"','href="mailto:buzon@example.invalid"','href="https://example.invalid"','bgcolor="#ffffff"','src="cid:'):
+        for expected in ('href="tel:+593990000000"','href="mailto:buzon@example.invalid"','href="https://example.invalid"','bgcolor="#ffffff"','border-bottom:3px solid #e03a3e','src="cid:'):
             self.assertIn(expected,page)
-        self.assertNotIn('border-bottom:3px solid #e03a3e',page)   # la firma no lleva franja roja inferior
         self.assertNotIn('<script',page);self.assertNotIn('<b>',page.split('<table')[1].split('Persona')[1][:40])
         # Estructura MIME: alternativa texto/HTML, con el logo como parte relacionada (CID) y sin rutas locales.
         html_part=message.get_payload()[1];self.assertEqual((message.get_content_type(),html_part.get_content_type()),('multipart/alternative','multipart/related'))
@@ -354,7 +365,7 @@ class MailRouteTests(test_app.SecurityTests):
         # Lectura: la firma se conserva (estilos validados e imagen incrustada servida por la aplicación) y lo peligroso se descarta.
         safe,blocked=mail_pro.sanitize_html(page+'<img src="https://rastreo.example.invalid/x.gif"><p style="position:fixed;background:url(x);color:#333" onclick="x()">t</p><img src="cid:otro">',{logo['Content-ID'][1:-1]:3})
         self.assertIn('<img data-part="3" alt="PC-DOCTOR S.A." width="120">',safe);self.assertEqual(blocked,2)
-        self.assertIn('background-color:#ffffff',safe);self.assertNotIn('#e03a3e;border',safe);self.assertIn('href="tel:+593990000000"',safe)
+        self.assertIn('background-color:#ffffff',safe);self.assertIn('href="tel:+593990000000"',safe)
         for bad in ('style=','onclick','position','url(','<script','src='):self.assertNotIn(bad,safe)
         self.assertIn('data-s="color:#333"',safe)
         with_file,_=mail_pro.build_message({'username':'buzon@example.invalid'},{'to':'a@example.invalid','subject':'Firma','body':'Hola','attachments':[{'name':'a.txt','type':'text/plain','data':'aG9sYQ=='}]},card)

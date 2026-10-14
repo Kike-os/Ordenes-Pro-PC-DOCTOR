@@ -986,7 +986,7 @@ def signature_html(sign, logo_src):
     web_href = sign['web'] if re.match(r'https?://', sign['web'], re.I) else 'https://' + sign['web']
     contact = (row('&#128222;', 'Teléfono', sign['phone'], phone_href) + row('&#9993;&#65039;', 'Correo', sign['email'], 'mailto:' + sign['email'])
                + row('&#127760;', 'Sitio web', sign['web'], web_href) + row('&#128205;', 'Dirección', sign['address']))
-    return ('<table role="presentation" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="background-color:#ffffff;border-collapse:collapse;border:1px solid #e2e6ee;">'
+    return ('<table role="presentation" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="background-color:#ffffff;border-collapse:collapse;border:1px solid #e2e6ee;border-bottom:3px solid #e03a3e;">'
             '<tr><td valign="middle" align="center" style="padding:14px 6px 14px 16px;">'
             '<img src="' + esc(logo_src) + '" width="120" alt="PC-DOCTOR S.A." style="display:block;width:120px;height:auto;border:0;color:#1f2937;font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:bold;"></td>'
             '<td valign="middle" style="padding:14px 18px 14px 10px;">'
