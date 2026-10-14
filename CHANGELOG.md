@@ -4,6 +4,21 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.150 — 2026-10-13 21:58 (UTC-05:00)
+
+Firma corregida en los correos automáticos, Seguimiento de Órdenes ultracompacto, indicadores de citas modernizados y calendario de feriados en la Agenda
+
+### Mejoras realizadas
+
+- Seguimiento de Órdenes ultracompacto: encabezado en una línea, filas de 54 px, columnas de ancho fijo, acciones alineadas, menú de acciones en tableta y celular y tarjetas resumidas en celulares
+- Órdenes con varios equipos en el seguimiento: identificador de la orden, etiqueta del equipo y estado general real (nunca completada con equipos en proceso)
+- Modernización de indicadores de citas: píldoras uniformes con icono para todos los estados (Por confirmar, Reagendada, En atención, No asistió…)
+- Calendario de Feriados y Atención en la Agenda con tarjetas compactas, estados de disponibilidad y lista ampliable
+
+### Errores corregidos
+
+- Firma corporativa en los correos automáticos: llega con las medidas de la vista previa, cabe completa en el mensaje y no se corta en celulares
+
 ## v1.5.149 — 2026-10-13 21:32 (UTC-05:00)
 
 Restauración de firma corporativa original

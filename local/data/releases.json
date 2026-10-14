@@ -8,6 +8,27 @@
   },
   "releases": [
     {
+      "version": "1.5.150",
+      "date": "2026-10-13T21:58:34-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Firma corregida en los correos automáticos, Seguimiento de Órdenes ultracompacto, indicadores de citas modernizados y calendario de feriados en la Agenda",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Seguimiento de Órdenes ultracompacto: encabezado en una línea, filas de 54 px, columnas de ancho fijo, acciones alineadas, menú de acciones en tableta y celular y tarjetas resumidas en celulares",
+          "Órdenes con varios equipos en el seguimiento: identificador de la orden, etiqueta del equipo y estado general real (nunca completada con equipos en proceso)",
+          "Modernización de indicadores de citas: píldoras uniformes con icono para todos los estados (Por confirmar, Reagendada, En atención, No asistió…)",
+          "Calendario de Feriados y Atención en la Agenda con tarjetas compactas, estados de disponibilidad y lista ampliable"
+        ],
+        "fixes": [
+          "Firma corporativa en los correos automáticos: llega con las medidas de la vista previa, cabe completa en el mensaje y no se corta en celulares"
+        ],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.149",
       "date": "2026-10-13T21:32:55-05:00",
       "type": "patch",
