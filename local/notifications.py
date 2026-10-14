@@ -200,17 +200,28 @@ def build(c, user, now, mail_access=False):
             except (ValueError,TypeError):fresh=False
             if fresh:items.append({'key':'ready:order:%d:%s'%(row['id'],row['updated_at'][:19]),'kind':'success','icon':'ready','title':'Equipo listo para entregar · '+row['code'],'detail':row['client']+' · '+(' '.join(x for x in (row['brand'],row['model']) if x) or 'equipo'),'at':row['updated_at'],'href':'#deliveries','action':'Ver entregas','sound':True,'group':'event'})
         alert('ready', ready, 'ready', 'warning', plural(ready, 'equipo pendiente de entrega', 'equipos pendientes de entrega'), 'Coordina el retiro o la entrega.', '#deliveries')
-        # Presupuestos decididos en las últimas 48 h: el personal sabe qué trabajos quedaron autorizados. La aprobación no inicia ningún trabajo.
+        # Presupuestos de las últimas 48 h: enviados (solo si el correo salió de verdad) y decididos. La aprobación no inicia ningún trabajo.
         try:
-            decided = c.execute("SELECT q.id,q.code,q.status,q.updated_at,q.order_id,cl.name client FROM quotes q JOIN orders o ON o.id=q.order_id JOIN devices d ON d.id=o.device_id JOIN clients cl ON cl.id=d.client_id WHERE q.status IN ('aprobado','parcial','rechazado','modificacion') ORDER BY q.updated_at DESC LIMIT 12").fetchall()
+            import quotes as quotes_module
+            recent = c.execute("SELECT q.id,q.code,q.status,q.updated_at,q.sent_at,q.decided_by,q.order_id,cl.name client FROM quotes q JOIN orders o ON o.id=q.order_id JOIN devices d ON d.id=o.device_id JOIN clients cl ON cl.id=d.client_id WHERE q.deleted_at='' AND q.status IN ('enviado','aprobado','parcial','rechazado','modificacion') ORDER BY q.updated_at DESC LIMIT 15").fetchall()
         except Exception:
-            decided = []
-        for row in decided:
-            try:fresh=(now-appointments.datetime.fromisoformat(row['updated_at'])).total_seconds()<172800
+            recent = []
+        for row in recent:
+            moment = row['sent_at'] if row['status'] == 'enviado' else row['updated_at']
+            try:fresh=(now-appointments.datetime.fromisoformat(moment)).total_seconds()<172800
             except (ValueError,TypeError):fresh=False
-            if fresh:
-                title={'aprobado':'Presupuesto aprobado','parcial':'Presupuesto aprobado parcialmente','rechazado':'Presupuesto rechazado','modificacion':'El cliente pide modificar el presupuesto'}[row['status']]
-                items.append({'key':'quote:%d:%s:%s'%(row['id'],row['status'],row['updated_at'][:19]),'kind':'success' if row['status'] in ('aprobado','parcial') else 'warning','icon':'budget','title':title+' · '+row['code'],'detail':row['client']+'. Revisa los servicios autorizados antes de iniciar trabajos.','at':row['updated_at'],'href':'#orders?id='+str(row['order_id']),'action':'Ver orden','sound':True,'group':'event'})
+            if not fresh:
+                continue
+            by_client = str(row['decided_by'] or '') == 'cliente'
+            if row['status'] == 'enviado':
+                if quotes_module.mail_state(c, row['id']) != 'sent':
+                    continue
+                items.append({'key':'quote:%d:enviado:%s'%(row['id'],moment[:19]),'kind':'info','icon':'budget','title':'Presupuesto enviado · '+row['code'],'detail':'Esperando respuesta del cliente ('+row['client']+').','at':moment,'href':'#orders?id='+str(row['order_id']),'group':'event'})
+                continue
+            title={'aprobado':'Presupuesto aprobado '+('por el cliente' if by_client else '(registrado por el personal)'),'parcial':'Presupuesto aprobado parcialmente','rechazado':'Presupuesto rechazado '+('por el cliente' if by_client else '(registrado por el personal)'),'modificacion':'El cliente pide modificar el presupuesto'}[row['status']]
+            note = quotes_module.client_note(c, row['id']) if row['status'] in ('rechazado','parcial','aprobado') else ''
+            detail = row['client'] + ('. Motivo u observación: ' + note[:160] if note else '') + ('. No se autoriza ningún servicio.' if row['status'] == 'rechazado' else '. Revisa los servicios autorizados antes de iniciar trabajos.')
+            items.append({'key':'quote:%d:%s:%s'%(row['id'],row['status'],row['updated_at'][:19]),'kind':'success' if row['status'] in ('aprobado','parcial') else 'warning','icon':'budget','title':title+' · '+row['code'],'detail':detail,'at':row['updated_at'],'href':'#orders?id='+str(row['order_id']),'group':'event'})
         start = appointments.stamp(appointments.datetime.combine(now.date(), appointments.time.min, appointments.TZ))
         end = appointments.stamp(appointments.datetime.combine(now.date() + appointments.timedelta(days=1), appointments.time.min, appointments.TZ))
         todays = count("SELECT COUNT(*) FROM appointments WHERE deleted_at IS NULL AND starts_at>=? AND starts_at<? AND status IN ('solicitada','confirmada','reprogramada')", start, end)

@@ -6886,3 +6886,10 @@ button.live-appointment .agenda-badge.state-pill,.live-card-meta .agenda-badge.s
 .recurrence-box strong{font-size:12.5px;color:#ffc27a}
 .recurrence-box ol{list-style:none;margin:6px 0 0;padding:0;display:grid;gap:5px}
 .recurrence-box li{display:grid;gap:1px;font-size:12px;color:#e8d6bd}.recurrence-box b{font-size:11px;color:#ffb75e}.recurrence-box small{font-size:11px;color:#b39b7c}
+/* Estados comerciales del presupuesto: esperando respuesta (ámbar, reloj), aprobado (verde), aprobado parcialmente (azul), rechazado (rojo). */
+.quote-badge[data-status=enviado],.quote-badge[data-status=revision]{border-color:#e0a24a80;background:#33260f;color:#ffd08a}
+.quote-badge[data-status=parcial]{border-color:#5aa9ff80;background:#11254a;color:#b9dcff}
+.quote-badge[data-status=sin_correo]{border-color:#e06c7880;background:#3a1a22;color:#ffc4c9}
+.budget-head-state .quote-badge[data-status=enviado],.budget-head-state .quote-badge[data-status=revision]{border-color:#e0a24a80;background:#33260f;color:#ffd08a}
+.budget-head-state .quote-badge[data-status=parcial]{border-color:#5aa9ff80;background:#11254a;color:#b9dcff}
+.budget-head-state .quote-badge[data-status=sin_correo]{border-color:#e06c7880;background:#3a1a22;color:#ffc4c9}

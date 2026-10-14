@@ -236,3 +236,18 @@ El 13/10/2026, con autorización expresa de administración y respaldo previo, s
 **Iconos técnicos nuevos** (`local/catalog_icons.py`, mismo dibujo en pantalla y en el PDF): portátil, placa electrónica, limpieza técnica, procesador y refrigeración, y red informática; más reglas para monitor, recuperación de datos, sistema operativo y reparación de portátiles o computadoras.
 
 **Ventana.** Encabezado y pie fijos; solo se desplaza la rejilla (dos columnas en escritorio, una en móvil). Tarjeta: logotipo o icono, nombre y marca · categoría; descripción (tres líneas con «Ver más»), vigencia, dispositivos y código; precio, tratamiento de IVA real del elemento («IVA incluido», «Tarifa 0 %» o «IVA por confirmar») y «Agregar» siempre abajo. Búsqueda sin tildes ni mayúsculas, con varias palabras, sinónimos habituales y combinada con el filtro; el catálogo se carga una sola vez. «Agregar» ignora el doble clic, indica cuántas unidades hay ya en el presupuesto y permite añadir más. Precios, códigos y cálculo de importes no cambian.
+
+## Estados automáticos y sincronización con la orden (1.5.163)
+
+| Estado del presupuesto | Cuándo | Aspecto |
+| --- | --- | --- |
+| Esperando respuesta | Enviado y el servidor de correo aceptó el mensaje con el enlace privado | Ámbar, reloj |
+| Enlace creado · correo no enviado | El enlace existe pero el correo falló o el sistema no tiene correo configurado: **no consta como enviado** | Rojo |
+| Aprobado | El cliente aprobó todas las partidas | Verde, verificación |
+| Aprobado parcialmente | Aprobó unas y rechazó otras; las que dejó «para después» se ofrecen en una nueva versión, que vuelve a estar «Esperando respuesta» | Azul |
+| Rechazado | No aprobó ninguna partida; se conserva el presupuesto y su historial y nada queda autorizado | Rojo |
+
+- Se registran fecha, hora, destinatario y número (historial del presupuesto y Centro de Entrega), la firma y la evidencia de aceptación (procedimiento existente) y el motivo u observación que escriba el cliente.
+- Sincronización: el estado técnico de la orden y el comercial del presupuesto son independientes. Única regla automática: si la orden estaba en «Aprobación de presupuesto» y el cliente aprueba (total o parcialmente), pasa a «Procesando» y lo deja escrito en el historial. Nunca se cambian «Listo para entregar», «En espera de entrega» ni «Entregado». Un rechazo deja la orden donde está, con una nota para coordinar la devolución.
+- Avisos en el centro de notificaciones: «Presupuesto enviado · Esperando respuesta del cliente» (solo si el correo salió), «Presupuesto aprobado por el cliente», «Presupuesto aprobado parcialmente» y «Presupuesto rechazado por el cliente» (con el motivo, si lo dio). El panel del presupuesto se actualiza solo cada minuto mientras espera respuesta.
+- Seguridad (sin cambios): enlace privado con huella y caducidad, verificación con los últimos dígitos de la identificación, decisión procesada en el servidor, enlace revocado tras decidir (no hay respuestas duplicadas) y presupuesto bloqueado para edición después de la decisión.

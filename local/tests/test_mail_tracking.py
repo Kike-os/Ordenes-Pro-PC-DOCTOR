@@ -150,9 +150,10 @@ class TrackingTests(unittest.TestCase):
 
     def test_07_temporary_delay_then_final_bounce(self):
         sent = self.institutional('lento@example.invalid')
-        self.report(dsn('delayed', '4.4.1', 'lento@example.invalid', sent['message_id'], date='Tue, 13 Oct 2026 10:05:00 -0500', diagnostic='smtp; 451 timeout'), 'dsn:1:40')
+        from email.utils import format_datetime
+        self.report(dsn('delayed', '4.4.1', 'lento@example.invalid', sent['message_id'], date=format_datetime(app.reception_now() + timedelta(hours=1)), diagnostic='smtp; 451 timeout'), 'dsn:1:40')
         self.assertEqual(self.row('lento@example.invalid')['status'], 'demorado')
-        self.report(dsn('failed', '4.4.7', 'lento@example.invalid', sent['message_id'], date='Thu, 15 Oct 2026 10:05:00 -0500', diagnostic='smtp; retry timeout exceeded'), 'dsn:1:41')
+        self.report(dsn('failed', '4.4.7', 'lento@example.invalid', sent['message_id'], date=format_datetime(app.reception_now() + timedelta(days=2)), diagnostic='smtp; retry timeout exceeded'), 'dsn:1:41')
         row = self.row('lento@example.invalid')
         self.assertEqual((row['status'], row['reason']), ('rebotado', 'La entrega se retrasó demasiado.'))
 
@@ -186,8 +187,10 @@ class TrackingTests(unittest.TestCase):
 
     def test_11_out_of_order_report_never_moves_the_state_back(self):
         sent = self.institutional('orden@example.invalid')
-        self.report(dsn('failed', '5.1.1', 'orden@example.invalid', sent['message_id'], date='Thu, 15 Oct 2026 10:00:00 -0500'), 'dsn:1:61')
-        self.report(dsn('delayed', '4.4.1', 'orden@example.invalid', sent['message_id'], date='Wed, 14 Oct 2026 10:00:00 -0500', diagnostic='smtp; 451 later'), 'dsn:1:60')
+        from email.utils import format_datetime
+        later, earlier = format_datetime(app.reception_now() + timedelta(days=2)), format_datetime(app.reception_now() + timedelta(days=1))
+        self.report(dsn('failed', '5.1.1', 'orden@example.invalid', sent['message_id'], date=later), 'dsn:1:61')
+        self.report(dsn('delayed', '4.4.1', 'orden@example.invalid', sent['message_id'], date=earlier, diagnostic='smtp; 451 later'), 'dsn:1:60')
         row = self.row('orden@example.invalid')
         self.assertEqual(row['status'], 'rebotado')
         self.assertEqual([e['event'] for e in self.events(row['id'])], ['creado', 'aceptado', 'demora', 'rebote'])

@@ -15,7 +15,7 @@ from decimal import Decimal, InvalidOperation
 CATEGORIES = {'servicio': 'Servicios técnicos y reparaciones', 'licencia': 'Licencias de Windows y Office', 'seguridad': 'Antivirus y seguridad', 'repuesto': 'Repuestos y componentes', 'otro': 'Productos'}
 # Categoría del presupuesto anterior de la orden a la que se traslada cada ítem aprobado (de ahí salen el total a cobrar y el saldo).
 BUDGET_KEY = {'servicio': 'labor', 'repuesto': 'parts', 'licencia': 'digital', 'seguridad': 'digital', 'otro': 'services'}
-STATUS = {'borrador': 'Borrador', 'enviado': 'Enviado al cliente', 'aprobado': 'Aprobado', 'parcial': 'Parcialmente aprobado', 'rechazado': 'Rechazado', 'modificacion': 'Modificación solicitada', 'cancelado': 'Cancelado'}
+STATUS = {'borrador': 'Borrador', 'enviado': 'Esperando respuesta', 'aprobado': 'Aprobado', 'parcial': 'Aprobado parcialmente', 'rechazado': 'Rechazado', 'modificacion': 'Modificación solicitada', 'cancelado': 'Cancelado'}
 ITEM_STATUS = {'pendiente': 'Pendiente', 'aprobado': 'Aprobado', 'rechazado': 'Rechazado', 'cancelado': 'Cancelado'}
 EDITABLE = ('borrador', 'modificacion')
 EXECUTION = {'pendiente': 'Pendiente', 'proceso': 'En proceso', 'realizado': 'Realizado'}
@@ -394,7 +394,7 @@ def detail(c, quote):
         item['status_label'] = ITEM_STATUS[item['status']]
         item['category_label'] = CATEGORIES[item['category']]
         item['execution_label'] = EXECUTION[item['execution']]
-    return dict(quote, status_label=STATUS[quote['status']], editable=quote['status'] in EDITABLE, items=items, totals=totals(items, quote['tax_rate_bp'], quote['discount_bp']), discount_label=DISCOUNTS[quote['discount_bp']],
+    return dict(quote, mail_state=mail_state(c, quote['id']), client_note=client_note(c, quote['id']), status_label=STATUS[quote['status']], editable=quote['status'] in EDITABLE, items=items, totals=totals(items, quote['tax_rate_bp'], quote['discount_bp']), discount_label=DISCOUNTS[quote['discount_bp']],
                 acceptance=dict(acceptance, signed=bool(acceptance['signature'])) if acceptance else None, identity_document=dict(paper) if paper else None, link=dict(link) if link else None,
                 events=[dict(r) for r in c.execute('SELECT event,detail,actor,created_at FROM quote_events WHERE quote_id=? ORDER BY id DESC LIMIT 60', (quote['id'],))])
 
@@ -412,6 +412,38 @@ def brief(c, order_id):
             'quoted_cents': t['quoted'], 'approved_cents': t['approved'], 'pending_cents': t['pending'], 'rejected_cents': t['rejected']}
 
 
+def mail_state(c, quote_id):
+    """Resultado real del último correo con el enlace: 'sent' (aceptado por el servidor), 'failed', 'not_configured' o '' si no hubo intento."""
+    row = c.execute("SELECT detail FROM quote_events WHERE quote_id=? AND event='correo' ORDER BY id DESC LIMIT 1", (quote_id,)).fetchone()
+    if not row:
+        return ''
+    return 'sent' if 'aceptado' in row['detail'] else 'not_configured' if 'no está configurado' in row['detail'] else 'failed'
+
+
+def client_note(c, quote_id):
+    """Motivo u observación que escribió el cliente al decidir (si lo dio)."""
+    row = c.execute("SELECT detail FROM quote_events WHERE quote_id=? AND event IN ('aprobado','parcial','rechazado') ORDER BY id DESC LIMIT 1", (quote_id,)).fetchone()
+    if row and 'Observación del cliente: ' in row['detail']:
+        return row['detail'].split('Observación del cliente: ', 1)[1].strip()
+    return ''
+
+
+def sync_order(c, quote, status, now):
+    """Estado técnico de la orden tras la decisión. Solo si la orden estaba en «Aprobación de presupuesto»: con algo aprobado vuelve a
+    «Procesando»; si se rechazó todo, queda donde estaba para que el taller decida. Nunca toca «Listo», «En espera de entrega» ni «Entregado»."""
+    import order_workspace
+    row = c.execute('SELECT status FROM orders WHERE id=?', (quote['order_id'],)).fetchone()
+    if not row or row['status'] != 'presupuesto':
+        return False
+    if status in ('aprobado', 'parcial'):
+        c.execute("UPDATE orders SET status='reparacion',updated_at=?,revision=revision+1 WHERE id=?", (now.isoformat(timespec='microseconds'), quote['order_id']))
+        order_workspace.event(c, quote['order_id'], None, now, 'status', 'Presupuesto ' + quote['code'] + ' ' + ('aprobado' if status == 'aprobado' else 'aprobado parcialmente') +
+                              ' por el cliente: el equipo pasa de «Aprobación de presupuesto» a «Procesando». Solo se ejecutan los servicios aprobados.')
+        return True
+    order_workspace.event(c, quote['order_id'], None, now, 'follow_up', 'Presupuesto ' + quote['code'] + ' rechazado: no se autoriza ningún servicio. Definir con el cliente la devolución del equipo.')
+    return False
+
+
 def for_order(c, order_id):
     """Presupuesto vigente de la orden (su última versión) y la lista de versiones."""
     rows = [dict(r) for r in c.execute("SELECT * FROM quotes WHERE order_id=? AND deleted_at='' ORDER BY version DESC", (order_id,))]
@@ -422,7 +454,8 @@ def for_order(c, order_id):
         link = c.execute("SELECT verified_at FROM quote_links WHERE quote_id=? AND revoked_at='' ORDER BY id DESC LIMIT 1", (r['id'],)).fetchone()
         versions.append({'id': r['id'], 'code': r['code'], 'version': r['version'], 'status': r['status'], 'status_label': STATUS[r['status']], 'created_at': r['created_at'], 'valid_until': r['valid_until'], 'sent_at': r['sent_at'],
                          'sent_to': r['sent_to'], 'decided_at': r['decided_at'], 'editable': r['status'] in EDITABLE, 'lines': sum(1 for item in items if item['status'] != 'cancelado'), 'quoted_cents': t['quoted'], 'approved_cents': t['approved'],
-                         'pending_cents': t['pending'], 'rejected_cents': t['rejected'], 'count': t['count'], 'verified_at': link['verified_at'] if link else '', 'removable': removable(c, r) == ''})
+                         'pending_cents': t['pending'], 'rejected_cents': t['rejected'], 'count': t['count'], 'verified_at': link['verified_at'] if link else '', 'removable': removable(c, r) == '',
+                         'mail_state': mail_state(c, r['id']), 'client_note': client_note(c, r['id'])})
     return {'current': detail(c, rows[0]) if rows else None, 'versions': versions,
             'tax_rate_bp': tax_rate(c), 'categories': CATEGORIES, 'conditions': CONDITIONS, 'priorities': {key: {'label': label, 'color': color} for key, (label, color, _) in PRIORITIES.items()}, 'icons': catalog_icons.catalog(), 'discounts': {str(key): '%s: %g %%' % (label, key / 100) for key, label in DISCOUNTS.items()}}
 
@@ -608,6 +641,7 @@ def decide(c, quote, decisions, now, user=None, actor='', note=''):
     c.execute('UPDATE quotes SET status=?,decided_at=?,decided_by=?,updated_at=? WHERE id=?', (status, stamp, 'cliente' if not user else 'personal:%d' % user['id'], stamp, quote['id']))
     c.execute("UPDATE quote_links SET revoked_at=? WHERE quote_id=? AND revoked_at=''", (stamp, quote['id']))
     sync_budget(c, quote)
+    sync_order(c, quote, status, now)
     event(c, quote['id'], status, '%d de %d ítems aprobados%s. Total autorizado: %s.%s' % (approved, len(items), ('; %d quedaron pendientes para una nueva versión' % waiting) if waiting else '', usd(approved_total), ' ' + note if note else ''), now, user, actor)
     return status
 

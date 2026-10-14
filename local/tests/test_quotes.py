@@ -85,7 +85,7 @@ class QuoteFlowTests(unittest.TestCase):
         self.assertEqual(self.form(path,dict(base,passkey='llave-falsa',signature=SIGN))['status'],200)
         with app.connect() as c:self.assertEqual(c.execute('SELECT COUNT(*) FROM quote_acceptances').fetchone()[0],0)
         done=self.form(path,dict(base,signature=SIGN,comment='Solo lo necesario'))['body']
-        self.assertIn('Parcialmente aprobado',done);self.assertIn('$45,00',done)
+        self.assertIn('Aprobado parcialmente',done);self.assertIn('$45,00',done)
         detail=self.request('/api/quotes/%d'%quote,cookie=cookie)['body']['quote']
         self.assertEqual((detail['status'],detail['decided_by'],detail['totals']['quoted'],detail['totals']['approved'],detail['totals']['rejected']),('parcial','cliente',7000,4500,2500))
         self.assertEqual([item['status'] for item in detail['items']],['aprobado','rechazado','aprobado']);self.assertEqual((detail['acceptance']['signer_name'],detail['acceptance']['signed']),('Cliente Ficticio',True))
@@ -98,7 +98,7 @@ class QuoteFlowTests(unittest.TestCase):
             for sql in ('UPDATE quote_acceptances SET signer_name=?','DELETE FROM quote_acceptances WHERE signer_name!=?','UPDATE quote_events SET detail=?'):
                 with self.assertRaises(Exception):c.execute(sql,('x',))
         # El enlace ya no decide de nuevo: muestra el resultado. El PDF incluye la decisión y oculta la identificación.
-        again=self.form(path,dict(base,signature=SIGN));self.assertIn('Parcialmente aprobado',again['body']);self.assertEqual(self.request(path+'/documento.pdf')['body'][:4],b'%PDF')
+        again=self.form(path,dict(base,signature=SIGN));self.assertIn('Aprobado parcialmente',again['body']);self.assertEqual(self.request(path+'/documento.pdf')['body'][:4],b'%PDF')
         self.assertEqual(self.request('/api/quotes/%d/pdf'%quote,cookie=cookie)['body'][:4],b'%PDF');self.assertEqual(self.request('/api/quotes/%d/pdf'%quote)['status'],401)
         self.assertEqual(post('/api/quotes/%d'%quote,action='cancel')['status'],409)
         self.assertEqual(self.request('/presupuesto/'+'x'*40)['status'],404)
