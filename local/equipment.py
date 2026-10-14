@@ -217,6 +217,48 @@ def finance(c,order_id):
             'units':[dict({key:row[key] for key in keys},id=row['id'],unit_code=row['unit_code']) for row in whole['units']]}
 
 
+def receipt(c,order_id,payment_id):
+    """Datos del recibo de un movimiento: el pago debe ser de este equipo o un pago general de su misma orden. None si no corresponde."""
+    main=root(c,order_id)
+    pay=c.execute("SELECT p.id,p.order_id,p.amount_cents,p.kind,p.scope,p.method,p.note,p.created_at,p.voided_at,p.void_reason,COALESCE(u.name,'') actor FROM order_payments p LEFT JOIN users u ON u.id=p.created_by WHERE p.id=?",(payment_id,)).fetchone()
+    if not main or not pay or (pay['order_id'],pay['scope']) not in ((order_id,'equipo'),(main['id'],'general')):return None
+    whole=group(c,order_id);unit=next(row for row in whole['units'] if row['id']==order_id)
+    order=c.execute("SELECT o.id,cl.name client,COALESCE(cl.identification,'') identification,COALESCE(cl.email,'') email,d.brand,d.model,d.serial FROM orders o JOIN devices d ON d.id=o.device_id JOIN clients cl ON cl.id=d.client_id WHERE o.id=?",(order_id,)).fetchone()
+    general_scope=pay['scope']=='general';source=whole['totals'] if general_scope else unit
+    account=dict({key:source[key] for key in ('budget_cents','paid_cents','balance_cents','credit_cents','state','state_label')},scope='de la orden' if general_scope or not whole['multiple'] else 'del equipo '+unit['unit_code'].split('-')[-1])
+    info=dict(order,code=whole['main_code'] if general_scope or not whole['multiple'] else unit['unit_code'])
+    if general_scope:info['brand'],info['model'],info['serial']='%d equipos de la orden'%len(whole['units']),'',''
+    return {'order':info,'payment':dict(pay),'account':account}
+
+
+def receivables(c,first,last):
+    """Reporte financiero: saldos por cobrar (por equipo y consolidado por orden) y lo cobrado entre dos fechas (incluidas), por forma
+    de pago. Todo sale de los mismos cargos y movimientos que la tarjeta del detalle; no hay cifras guardadas aparte."""
+    units=[dict(r) for r in c.execute("SELECT o.id,COALESCE(o.code,'OP-'||printf('%05d',o.id)) code,COALESCE(o.group_id,o.id) main_id,o.group_id,o.unit_no,o.status status_code,s.label status,cl.name client,"
+                                      "COALESCE(NULLIF(d.kind,''),d.category) type,d.brand,d.model,"+BUDGET+" budget_cents,"+PAID+" paid_cents "
+                                      "FROM orders o JOIN devices d ON d.id=o.device_id JOIN clients cl ON cl.id=d.client_id JOIN statuses s ON s.code=o.status ORDER BY o.id")]
+    free={main:general(c,main)[1] for (main,) in c.execute("SELECT DISTINCT order_id FROM order_payments WHERE scope='general'").fetchall()}
+    groups={};rows=[]
+    for unit in units:
+        unit.update(summary(unit['budget_cents'],unit['paid_cents']));groups.setdefault(unit['main_id'],[]).append(unit)
+        if unit['balance_cents'] or unit['credit_cents']:rows.append({key:unit[key] for key in ('id','code','client','type','brand','model','status','status_code','budget_cents','paid_cents','balance_cents','credit_cents','state','state_label')})
+    # Por cobrar consolidado: en cada orden, cargos menos pagos netos de sus equipos y menos sus pagos generales sin asignar (una sola vez).
+    due=credit=0
+    for main,members in groups.items():
+        net=sum(m['budget_cents']-m['paid_cents'] for m in members)-free.get(main,0)
+        if net>0:due+=net
+        else:credit-=net
+    rows.sort(key=lambda row:(-row['balance_cents'],-row['credit_cents'],row['id']))
+    moves=[dict(r) for r in c.execute("SELECT method,kind,COUNT(*) total,SUM(amount_cents) cents FROM order_payments WHERE voided_at IS NULL AND substr(created_at,1,10)>=? AND substr(created_at,1,10)<=? GROUP BY method,kind",(first.isoformat(),last.isoformat()))]
+    methods=[]
+    for code,label in METHODS.items():
+        paid=sum(m['cents'] for m in moves if m['method']==code and m['kind']=='pago');back=sum(m['cents'] for m in moves if m['method']==code and m['kind']=='devolucion')
+        if paid or back:methods.append({'code':code,'label':label,'paid_cents':paid,'refunded_cents':back,'net_cents':paid-back,'count':sum(m['total'] for m in moves if m['method']==code)})
+    paid=sum(m['paid_cents'] for m in methods);back=sum(m['refunded_cents'] for m in methods)
+    return {'from':first.isoformat(),'to':last.isoformat(),'receivable_cents':due,'credit_cents':credit,'general_cents':sum(v for v in free.values() if v>0),'units_due':sum(1 for row in rows if row['balance_cents']),
+            'rows':rows[:200],'total_rows':len(rows),'collected':{'paid_cents':paid,'refunded_cents':back,'net_cents':paid-back,'methods':methods}}
+
+
 def client_history(c,client_id):
     """Historial de equipos del cliente: cada equipo con su identidad permanente y todos sus ingresos."""
     devices=[dict(r) for r in c.execute("SELECT d.id,d.code,COALESCE(NULLIF(d.kind,''),d.category) type,d.brand,d.model,d.serial,d.color FROM devices d WHERE d.client_id=? ORDER BY d.id DESC",(client_id,))]

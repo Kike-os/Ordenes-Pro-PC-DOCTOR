@@ -13,10 +13,10 @@ const STEP_FIELDS=[['name','identification','phone','email'],['device_type','ser
 function validPhone(value){return validEcuadorPhone(value)||(/^[+0-9 ()-]+$/.test(value)&&/^\+[1-9][0-9]{7,14}$/.test(value.replace(/[ ()-]/g,'')));}
 const pickupChosen=()=>service.value==='retiro';
 // Identificación: tipo (cédula o RUC) y número. Solo dígitos, con el límite de cada tipo y un contador; los ceros iniciales se conservan.
-const idKind=()=>form.elements.document_type.value==='ruc'?'ruc':'cedula',idInput=form.elements.identification;
+const idKind=()=>['ruc','pasaporte'].includes(form.elements.document_type.value)?form.elements.document_type.value:'cedula',idInput=form.elements.identification;
 // El componente compartido (form-validation.js) aplica el límite, el teclado numérico, el filtro de dígitos al escribir o pegar y el contador.
-const idControl=identificationControl({select:form.elements.document_type,input:idInput,count:document.getElementById('booking-id-count')});
-function paintId(){const ruc=idKind()==='ruc';document.getElementById('booking-id-label').textContent=ruc?'Número de RUC':'Número de cédula';idControl.refresh();const state=idControl.check(),help=document.getElementById('booking-id-help'),warn=state.complete&&!state.error&&state.notice;help.textContent=warn?state.notice:ruc?'13 dígitos, sin guiones ni espacios.':'10 dígitos, sin guiones ni espacios.';help.dataset.state=warn?'warn':'';}
+const idControl=identificationControl({select:form.elements.document_type,input:idInput,count:document.getElementById('booking-id-count'),passport:/^[A-Za-z0-9-]{5,20}$/,passportMax:20});
+function paintId(){const kind=idKind();document.getElementById('booking-id-label').textContent={ruc:'Número de RUC',pasaporte:'Número de pasaporte'}[kind]||'Número de cédula';idControl.refresh();const state=idControl.check(),help=document.getElementById('booking-id-help'),warn=state.complete&&!state.error&&state.notice;help.textContent=warn?state.notice:{ruc:'13 dígitos, sin guiones ni espacios.',pasaporte:'De 5 a 20 letras y números, tal como aparece en tu pasaporte.'}[kind]||'10 dígitos, sin guiones ni espacios.';help.dataset.state=warn?'warn':'';}
 idInput.addEventListener('input',paintId);
 // Al cambiar de tipo no se borra ni se recorta lo escrito: se conserva para editarlo y se vuelve a validar con las reglas del tipo nuevo.
 form.elements.document_type.addEventListener('change',()=>{paintId();if(idInput.value||idInput.dataset.touched){idInput.dataset.touched='1';checkField(idInput);}});
@@ -43,7 +43,7 @@ form.elements.document_type.addEventListener('change',()=>{paintId();if(idInput.
 // Validación del formulario. Cada error dice qué corregir; `missing` distingue «falta» de «está mal» para el aviso general.
 function validateAppointment(step){const errors={},only=step===undefined?null:STEP_FIELDS[step],has=name=>!only||only.includes(name),value=name=>form.elements[name].value.trim(),missing=new Set(),need=(name,text)=>{errors[name]=text;missing.add(name);};
  if(has('name')){if(!value('name'))need('name','Ingresa tu nombre y apellidos.');else if(value('name').split(/\s+/).filter(part=>part.length>=2).length<2)errors.name='Ingresa tu nombre y apellidos.';}
- if(has('identification')){const number=value('identification'),ruc=idKind()==='ruc',size=ruc?13:10;if(!number)need('identification','Ingresa tu número de identificación para continuar.');else if(documentError(number,idKind()))errors.identification=documentError(number,idKind());}
+ if(has('identification')){const number=value('identification'),ruc=idKind()==='ruc',size=ruc?13:10;if(!number)need('identification','Ingresa tu número de identificación para continuar.');else if(idControl.check().error)errors.identification=idControl.check().error;}
  if(has('phone')){if(!value('phone'))need('phone','Ingresa un número de contacto válido.');else if(!validPhone(value('phone')))errors.phone='Ingresa un número de contacto válido.';}
  if(has('email')&&value('email')&&!/^[^\s@<>]+@[^\s@<>.]+(?:\.[^\s@<>.]+)+$/.test(value('email')))errors.email='Ingresa un correo electrónico válido.';
  if(has('device_type')&&!value('device_type'))need('device_type','Selecciona el tipo de equipo.');

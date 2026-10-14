@@ -6235,3 +6235,33 @@ body[data-page=appointments] input.adi-glow{border-color:#ff9ecb;box-shadow:0 0 
  .tracking-carousel .tracking-table .tracking-actions button:is([data-action=qr],[data-action=ticket]){flex:0 0 34px;width:34px;min-width:34px;padding:0}
 }
 @media(prefers-reduced-motion:reduce){.tracking-carousel .tracking-table .tracking-actions button{transition:none}}
+/* Marca de saldo en listados (órdenes y Seguimiento). */
+.finance-badge{display:inline-flex;align-items:center;gap:6px;max-width:100%;margin-top:5px;padding:2px 9px 2px 7px;border:1px solid #33466b;border-radius:999px;background:#101b31;font-size:11.5px;font-weight:650;line-height:1.5;color:#c9d6ee;white-space:nowrap;font-variant-numeric:tabular-nums}
+.finance-badge i{flex:none;width:7px;height:7px;border-radius:50%;background:currentColor}.finance-badge span{overflow:hidden;text-overflow:ellipsis}
+.finance-badge[data-state=pendiente]{border-color:#86435A;background:#291927;color:#FF8794}
+.finance-badge[data-state=parcial]{border-color:#80663D;background:#282319;color:#FFCA77}
+.finance-badge[data-state=pagado]{border-color:#356B5C;background:#142C2A;color:#6DE4AF}
+.finance-badge[data-state=credito]{border-color:#3a6f9c;background:#13263a;color:#7cc7ff}
+td>.status-label+.finance-badge{display:flex;width:fit-content}
+.tracking-state .finance-badge{margin-top:6px}
+/* Reportes → Saldos por cobrar. */
+.report-finance{display:grid;gap:14px;min-width:0}
+.report-finance-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.report-finance-kpis>div{display:grid;gap:4px;min-width:0;padding:12px 14px;border:1px solid #2b3c6b;border-radius:12px;background:#0d1730}
+.report-finance-kpis span{font-size:11.5px;color:#a3b2d8}.report-finance-kpis strong{font-size:20px;font-weight:750;font-variant-numeric:tabular-nums;color:#fff;overflow-wrap:anywhere}.report-finance-kpis small{font-size:11.5px;color:#8fa0c8}
+.report-finance-kpis>div[data-kind=due]{border-color:#86435A;background:#291927}.report-finance-kpis>div[data-kind=due] strong{color:#FF687B}
+.report-finance-kpis>div[data-kind=paid] strong,.report-finance-kpis>div[data-kind=clear] strong{color:#6DE4AF}.report-finance-kpis>div[data-kind=credit] strong{color:#7cc7ff}
+.report-finance-body{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:16px;align-items:start;min-width:0}
+.report-finance h3{margin:0 0 8px;font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#a9bdd8}
+.report-finance-table{width:100%;border-collapse:collapse;font-size:13px}
+.report-finance-table th{padding:8px 10px;border-bottom:1px solid #24344f;font-size:11.5px;font-weight:650;text-align:left;color:#8fa6c4;white-space:nowrap}
+.report-finance-table td{padding:9px 10px;border-bottom:1px solid #1a2740;color:#dbe6f8;vertical-align:top;overflow-wrap:anywhere}
+.report-finance-table td.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+.report-finance-table td a{font-weight:650;color:#9cc4ff;text-decoration:none}.report-finance-table td a:hover{text-decoration:underline}.report-finance-table td small{display:block;margin:2px 0 0;font-size:11.5px;color:#8fa6c4}
+.report-finance-table .finance-badge{margin-top:0}
+.report-finance-methods ul{list-style:none;display:grid;gap:8px;margin:0;padding:0}
+.report-finance-methods li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:1px 10px;padding:10px 12px;border:1px solid #223450;border-radius:10px;background:#0c192d}
+.report-finance-methods li span{font-size:13px;font-weight:650;color:#e3eeff}.report-finance-methods li small{grid-column:1;margin:0;font-size:11.5px;color:#8fa6c4}.report-finance-methods li b{grid-column:2;grid-row:1/3;align-self:center;font-size:14.5px;font-variant-numeric:tabular-nums;color:#fff}.report-finance-methods li em{grid-column:1/-1;font-size:11.5px;font-style:normal;color:#9bd3ff}
+@media(max-width:900px){.report-finance-kpis{grid-template-columns:1fr 1fr}.report-finance-body{grid-template-columns:1fr}}
+@media(max-width:560px){.report-finance-table thead{display:none}.report-finance-table tr{display:grid;grid-template-columns:1fr 1fr;gap:4px 10px;padding:10px 0;border-bottom:1px solid #1a2740}.report-finance-table td{padding:0;border:0}.report-finance-table td::before{content:attr(data-label);display:block;font-size:10.5px;color:#8fa6c4}.report-finance-table td:first-child,.report-finance-table td:nth-child(2){grid-column:1/-1}}
+@media(max-width:380px){.report-finance-kpis{grid-template-columns:1fr}}

@@ -180,10 +180,15 @@ def validate_booking(data,c,public=False,client=None):
  if not valid_phone(fields['phone']):errors['phone']='Ingresa un número de contacto válido.'
  # Identificación: tipo (cédula o RUC) y número. En la reserva pública es obligatoria; identifica al cliente sin depender del nombre.
  # Si no llega el tipo (citas del personal o clientes antiguos) se deduce de la longitud; nunca se guarda un tipo que no corresponda al número.
- kind=fields['document_type'] if fields['document_type'] in ('cedula','ruc') else {10:'cedula',13:'ruc'}.get(len(fields['identification']),'')
- if public and fields['document_type'] not in ('cedula','ruc'):errors['document_type']='Selecciona el tipo de identificación.'
+ passport=fields['document_type']=='pasaporte'
+ if passport:fields['identification']=re.sub(r'\s+','',fields['identification']).upper()
+ kind='pasaporte' if passport else fields['document_type'] if fields['document_type'] in ('cedula','ruc') else {10:'cedula',13:'ruc'}.get(len(fields['identification']),'')
+ if public and fields['document_type'] not in ('cedula','ruc','pasaporte'):errors['document_type']='Selecciona el tipo de identificación.'
  if not fields['identification']:
   if public:errors['identification']='Ingresa tu número de identificación para continuar.'
+ elif passport:
+  # Pasaporte (personas sin cédula ecuatoriana): no tiene dígito verificador; se comprueba solo su forma.
+  if not re.fullmatch(r'[A-Z0-9-]{5,20}',fields['identification']) or not re.search(r'[0-9]',fields['identification']):errors['identification']='Ingresa un número de pasaporte válido: de 5 a 20 letras y números, sin espacios.'
  elif not fields['identification'].isdigit() or (kind=='cedula' and len(fields['identification'])!=10) or (kind=='ruc' and len(fields['identification'])!=13) or not kind:
   errors['identification']='El RUC debe contener exactamente 13 dígitos.' if (fields['document_type']=='ruc' or (not fields['document_type'] and len(fields['identification'])>10)) else 'La cédula debe contener exactamente 10 dígitos.'
  elif reception.document_error(fields['identification'],kind):errors['identification']=reception.document_error(fields['identification'],kind)

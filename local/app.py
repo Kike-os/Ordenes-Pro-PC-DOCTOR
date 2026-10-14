@@ -1223,6 +1223,13 @@ class Handler(BaseHTTPRequestHandler):
                 if not row:
                     return self.reply(404, {'error':'Foto no disponible.'})
                 return self.reply(200, base64.b64decode(row['data']), 'image/jpeg')
+            pay_receipt = re.fullmatch(r'/api/orders/([0-9]+)/payments/([0-9]+)/receipt\.pdf', path)
+            if pay_receipt:
+                # Recibo de un pago, abono o devolución de esta orden, en PDF. Solo personal con sesión.
+                import payment_pdf
+                found = equipment.receipt(c, int(pay_receipt[1]), int(pay_receipt[2]))
+                if not found:return self.reply(404, {'error':'Recibo no disponible.'})
+                return self.reply(200, payment_pdf.render(found['order'], found['payment'], found['account'], equipment.METHODS, reception_now()), 'application/pdf', filename=payment_pdf.number(found['payment'])+'-'+found['order']['code']+'.pdf')
             finance_route = re.fullmatch(r'/api/orders/([0-9]+)/finance', path)
             if finance_route:
                 # Saldo del equipo y saldo general de su orden: lo consulta la tarjeta financiera tras un pago, anulación o devolución.
@@ -1335,7 +1342,7 @@ class Handler(BaseHTTPRequestHandler):
                     return self.reply(400, {'error':'Página inválida.'})
                 if path == '/api/orders':
                     source = 'orders o JOIN devices d ON d.id=o.device_id JOIN clients c ON c.id=d.client_id JOIN statuses s ON s.code=o.status'
-                    columns = "o.id,o.code,o.created_at,o.received_at,o.delivered_at,o.problem,o.status status_code,s.label status,COALESCE(NULLIF(d.kind,''),d.category) type,d.brand,d.model,c.name client,o.priority,o.estimated_delivery,COALESCE((SELECT name FROM users WHERE id=o.assigned_to),'Sin asignar') responsible"
+                    columns = "o.id,o.code,o.created_at,o.received_at,o.delivered_at,o.problem,o.status status_code,s.label status,COALESCE(NULLIF(d.kind,''),d.category) type,d.brand,d.model,c.name client,o.priority,o.estimated_delivery,COALESCE((SELECT name FROM users WHERE id=o.assigned_to),'Sin asignar') responsible,"+equipment.BUDGET+" budget_cents,"+equipment.PAID+" paid_cents"
                     search = "COALESCE(o.code,'OP-'||printf('%05d',o.id))||' '||CAST(o.id AS TEXT)||' '||c.name||' '||COALESCE(c.identification,'')||' '||COALESCE(c.phone,'')||' '||COALESCE(c.trade_name,'')||' '||COALESCE(d.category,'')||' '||COALESCE(d.brand,'')||' '||COALESCE(d.model,'')||' '||COALESCE(d.serial,'')||' '||o.problem||' '||s.label"
                     active = query.get('active', [''])[0] == '1'
                     where = ' AND o.status != \'entregado\'' if active else ''
@@ -1424,6 +1431,8 @@ class Handler(BaseHTTPRequestHandler):
                     # Permanencia en taller: calculada en el servidor con las fechas guardadas de ingreso y entrega.
                     stay_config=stay.settings(c);stay_now=reception_now()
                     for item in rows:item['stay']=stay.compute(item,stay_now,stay_config)
+                    # Estado financiero de cada equipo, con la misma fuente que la tarjeta del detalle (equipment.summary).
+                    for item in rows:item['finance']=equipment.summary(item.pop('budget_cents'),item.pop('paid_cents'))
                 if path == '/api/clients':
                     # Indicadores reales del directorio y, en cada ficha por completar, qué datos obligatorios faltan exactamente.
                     counts=c.execute('SELECT COUNT(*) total,COALESCE(SUM(needs_review),0) review FROM clients').fetchone()
@@ -1451,6 +1460,11 @@ class Handler(BaseHTTPRequestHandler):
                 if user['role']!='administrador':return self.reply(403,{'error':'Acceso no permitido.'})
                 import stay_reminders
                 return self.reply(200,{'reminders':stay_reminders.status(c,reception_now()),'settings':stay.settings(c)})
+            if path == '/api/reports/finance':
+                # Saldos por cobrar y cobros del rango de fechas del tablero. Usa los mismos filtros de fecha que el resto de reportes.
+                try:finance_filters=reports.parse_filters(parse_qs(urlsplit(self.path).query),reception_now().date())
+                except reports.ReportError as error:return self.reply(400,{'error':str(error)})
+                return self.reply(200,equipment.receivables(c,finance_filters['from'],finance_filters['to']))
             if path == '/api/reports':
                 counts = [dict(r) for r in c.execute("SELECT s.code,s.label,COUNT(o.id) total FROM statuses s LEFT JOIN orders o ON o.status=s.code GROUP BY s.code ORDER BY CASE s.code WHEN 'pendiente' THEN 1 WHEN 'reparacion' THEN 2 WHEN 'esperando_cliente' THEN 3 WHEN 'presupuesto' THEN 4 WHEN 'espera_entrega' THEN 5 WHEN 'listo' THEN 6 ELSE 7 END")]
                 # Centro de Control Técnico: indicadores calculados con las órdenes reales; «group» devuelve las órdenes de un segmento.
@@ -2584,7 +2598,27 @@ class Handler(BaseHTTPRequestHandler):
                             return self.reply(200,{'ok':True,'mail':result,'recipient':email,'link':link,'quote':quotes.detail(c,quotes.get(c,found['id']))})
                         return self.reply(400,{'error':'Acción inválida.'})
                     except quotes.QuoteError as error:return self.reply(error.status,{'error':str(error),'fields':error.fields})
-                payment_route=re.fullmatch(r'/api/orders/([0-9]+)/payments(/void|/assign)?',path)
+                payment_route=re.fullmatch(r'/api/orders/([0-9]+)/payments(/void|/assign|/receipt-mail)?',path)
+                if payment_route and payment_route[2]=='/receipt-mail':
+                    # Envía al correo registrado del cliente el recibo de un pago de esta orden. El destinatario lo decide el servidor.
+                    if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
+                    import payment_pdf
+                    oid=int(payment_route[1]);pid=str(data.get('payment_id',''));found=equipment.receipt(c,oid,int(pid)) if pid.isdigit() else None
+                    if not found:return self.reply(404,{'error':'Recibo no disponible.'})
+                    if found['payment']['voided_at']:return self.reply(409,{'error':'Este movimiento está anulado: su recibo no se envía al cliente.'})
+                    email=found['order']['email'].strip()
+                    if not re.fullmatch(r'[^\s@<>]+@[^\s@<>.]+(?:\.[^\s@<>.]+)+',email):return self.reply(409,{'error':'El cliente no tiene un correo electrónico válido registrado. Puedes imprimir el recibo.'})
+                    if not mail_pro.configured():return self.reply(503,{'error':'El correo del sistema no está configurado en el servidor.'})
+                    if limited(c,'payment-receipt-mail:'+str(user['id']),limit=30,window=3600):return self.reply(429,{'error':'Alcanzaste el límite de envíos por hora.'})
+                    pay=found['payment'];refund=pay['kind']=='devolucion';code=payment_pdf.number(pay);account=found['account']
+                    body=('Estimado/a '+found['order']['client']+':\n\n'+('Le confirmamos la devolución de ' if refund else 'Le confirmamos que recibimos su pago de ')+equipment.usd(pay['amount_cents'])+' ('+equipment.METHODS[pay['method']].lower()+'), correspondiente a la orden '+found['order']['code']+'.\n\n'
+                          +('Saldo a favor: '+equipment.usd(account['credit_cents']) if account['credit_cents'] else 'Saldo pendiente '+account['scope']+': '+equipment.usd(account['balance_cents']))+'.\n\nAdjuntamos el '+('comprobante de devolución' if refund else 'recibo')+' N.º '+code+'. Este documento no es una factura.\n\nGracias por confiar en PC-DOCTOR S.A.')
+                    attached=payment_pdf.render(found['order'],pay,account,equipment.METHODS,reception_now())
+                    try:send_institutional(c,'payment_receipt','Comprobante de devolución' if refund else 'Recibo de pago',email,'PC-DOCTOR S.A. | '+('Comprobante de devolución' if refund else 'Recibo de pago')+' N.º '+code,body,oid,user['id'],attachments=[{'name':code+'-'+found['order']['code']+'.pdf','type':'application/pdf','data':base64.b64encode(attached).decode()}],review=False)
+                    except mail_pro.MailError as error:
+                        audit(c,user['id'],'payment_receipt_mail_failed',oid);return self.reply(502,{'error':'El recibo no se envió: '+str(error)})
+                    audit(c,user['id'],'payment_receipt_mail_sent',oid);order_workspace.event(c,oid,user['id'],reception_now(),'payment','Recibo '+code+' enviado al correo del cliente.')
+                    return self.reply(200,{'ok':True,'recipient':email,'message':'Recibo enviado a '+email+'. El servidor de correo aceptó el mensaje.'})
                 if payment_route:
                     # Movimientos financieros: pagos (de un equipo o generales de la orden) los registra el personal; devoluciones y
                     # anulaciones (con motivo) son de administración. Nunca se borran ni cambian el estado técnico del equipo.

@@ -104,6 +104,19 @@ class PickupAndClientsTests(unittest.TestCase):
             late=self.book('0206','13:00',order_code=mine['code'],**owner);self.assertIn('ya figura como entregada',late['body']['fields']['order_code'])
             other=self.book('0207','15:00',identification='0100000017',phone='0991234567',order_code='cualquier-cosa');self.assertEqual((other['status'],other['body']['pickup_order']),(201,''))
 
+    def test_passport_is_accepted_for_people_without_cedula(self):
+        with test_app.open_requests():
+            for bad in ('AB','ABCDEFGH','A1 2','A'*21+'1','<AB12345>'):
+                refused=self.book('0401',document_type='pasaporte',identification=bad);self.assertEqual(refused['status'],400,bad);self.assertIn('pasaporte',refused['body']['fields']['identification'])
+            made=self.book('0402',document_type='pasaporte',identification=' ab-123456 ',phone='0976543299',name='Persona Extranjera Ficticia');self.assertEqual(made['status'],201,made['body'])
+            with app.connect() as c:
+                row=c.execute("SELECT a.identification number,a.document_type kind,cl.identification,cl.document_type FROM appointments a JOIN clients cl ON cl.id=a.client_id ORDER BY a.id DESC LIMIT 1").fetchone()
+                self.assertEqual(tuple(row),('AB-123456','pasaporte','AB-123456','pasaporte'))
+                clients=c.execute('SELECT COUNT(*) FROM clients').fetchone()[0]
+            # El mismo pasaporte, escrito en minúsculas, vincula al mismo cliente.
+            again=self.book('0403','11:00',document_type='pasaporte',identification='ab-123456',phone='0976543299',name='Persona Extranjera Ficticia');self.assertEqual(again['status'],201,again['body'])
+            with app.connect() as c:self.assertEqual(c.execute('SELECT COUNT(*) FROM clients').fetchone()[0],clients)
+
     def test_ruc_with_leading_zero_is_kept_and_links_the_same_client(self):
         with test_app.open_requests():
             first=self.book('0301',document_type='ruc',identification='0100000017001',phone='0976543210');self.assertEqual(first['status'],201,first['body'])

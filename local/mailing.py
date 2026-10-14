@@ -188,7 +188,7 @@ def mark(c, archive_id, status, detail='', message_id='', now=None):
     c.execute('UPDATE mail_archive SET status=?,detail=?,message_id=?,sent_at=? WHERE id=?', (status, str(detail)[:300], message_id, now.isoformat(timespec='seconds') if now and status == 'enviado' else '', archive_id))
 
 
-LABELS = {'receipt': 'Comprobante de recepción', 'client_authorization': 'Autorización de servicio', 'authorization_notice': 'Aviso interno de autorización', 'quote': 'Presupuesto', 'stay': 'Aviso de permanencia',
+LABELS = {'receipt': 'Comprobante de recepción', 'client_authorization': 'Autorización de servicio', 'authorization_notice': 'Aviso interno de autorización', 'quote': 'Presupuesto', 'payment_receipt': 'Recibo de pago', 'stay': 'Aviso de permanencia',
           'maintenance': 'Recordatorio de mantenimiento', 'appointment': 'Cita técnica', 'manual': 'Mensaje del personal'}
 STATUS = {'preparado': 'Preparado', 'enviado': 'Enviado', 'error': 'Error de envío'}
 

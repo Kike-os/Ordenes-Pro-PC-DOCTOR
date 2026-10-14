@@ -113,6 +113,51 @@ class FinanceTests(unittest.TestCase):
         self.assertEqual(self.void(oid,first[1]['id'])['status'],200);self.assertEqual(self.state(oid)[0],'credito')
         with app.connect() as c:self.assertEqual([r[0] for r in c.execute("SELECT action FROM audit WHERE action LIKE 'order_%' AND action!='order_created' ORDER BY id")][-3:],['order_payment_recorded','order_refund_recorded','order_payment_voided'])
 
+    def test_lists_and_report_use_the_same_balance(self):
+        first,second=self.start(units=2,charges=(22000,10000));self.pay(first,'180',method='transferencia');self.pay(second,'30',scope='general')
+        refund=self.pay(first,'5',kind='devolucion',note='Devolución ficticia');self.assertEqual(refund['status'],201)
+        gone=self.pay(second,'10',method='tarjeta')['body']['id'];self.assertEqual(self.void(second,gone)['status'],200)
+        listed={row['id']:row['finance'] for row in self.request('/api/orders',cookie=self.cookie)['body']['rows']}
+        self.assertEqual({k:(v['state'],v['balance_cents']) for k,v in listed.items()},{first:('parcial',4500),second:('pendiente',10000)})
+        board={row['id']:row['finance']['state'] for row in self.request('/api/tracking',cookie=self.cookie)['body']['rows']};self.assertEqual(board,{first:'parcial',second:'pendiente'})
+        report=self.request('/api/reports/finance',cookie=self.cookie)['body']
+        # Por cobrar consolidado: 320,00 de cargos − 175,00 netos del primer equipo − 30,00 generales sin asignar = 115,00.
+        self.assertEqual((report['receivable_cents'],report['general_cents'],report['units_due'],report['credit_cents'],report['total_rows']),(11500,3000,2,0,2))
+        self.assertEqual([(row['id'],row['balance_cents']) for row in report['rows']],[(second,10000),(first,4500)])
+        collected=report['collected'];self.assertEqual((collected['paid_cents'],collected['refunded_cents'],collected['net_cents']),(21000,500,20500))      # el pago anulado no cuenta
+        self.assertEqual({m['code']:(m['paid_cents'],m['refunded_cents']) for m in collected['methods']},{'efectivo':(3000,500),'transferencia':(18000,0)})
+        empty=self.request('/api/reports/finance?from=2020-01-01&to=2020-01-31',cookie=self.cookie)['body'];self.assertEqual((empty['collected']['net_cents'],empty['receivable_cents']),(0,11500))
+        self.assertEqual(self.request('/api/reports/finance?from=mal',cookie=self.cookie)['status'],400);self.assertEqual(self.request('/api/reports/finance')['status'],401)
+
+    def test_payment_receipt_pdf_and_mail(self):
+        import mail_pro,payment_pdf,re,zlib
+        from unittest.mock import patch
+        first,second=self.start(units=2,charges=(22000,10000))
+        with app.connect() as c:c.execute("UPDATE clients SET email='cliente@example.invalid'");c.commit()
+        paid=self.pay(first,'180',method='transferencia',note='Comprobante ficticio 778')['body']['id'];general=self.pay(second,'30',scope='general')['body']['id']
+        text=lambda pdf:b' '.join(zlib.decompress(m) for m in re.findall(rb'stream\r?\n(.*?)\r?\nendstream',pdf,re.S) if m[:1]==b'x' and b'Tf' in zlib.decompress(m)).decode('cp1252','replace')
+        got=self.request('/api/orders/%d/payments/%d/receipt.pdf'%(first,paid),cookie=self.cookie);self.assertEqual(got['status'],200);self.assertTrue(got['body'].startswith(b'%PDF'))
+        words=text(got['body'])
+        for expected in ('RECIBO DE PAGO','R-%06d'%paid,'$180,00','Transferencia','Comprobante ficticio 778','$220,00','$40,00','factura','DEL EQUIPO E01'):self.assertIn(expected,words)
+        # Pago general: recibo con el saldo consolidado de la orden; se abre desde cualquiera de sus equipos, no desde otra orden.
+        whole=text(self.request('/api/orders/%d/payments/%d/receipt.pdf'%(first,general),cookie=self.cookie)['body']);self.assertIn('pago general de la orden',whole);self.assertIn('$320,00',whole);self.assertIn('$110,00',whole)
+        other=self.request('/api/orders',self.order_data({'serial':'FIN-9998','request_key':'finance-fixture-key-9998'}),cookie=self.cookie,csrf=self.csrf)['body']['id']
+        for path in ('/api/orders/%d/payments/%d/receipt.pdf'%(other,paid),'/api/orders/%d/payments/%d/receipt.pdf'%(second,paid),'/api/orders/%d/payments/999999/receipt.pdf'%first):self.assertEqual(self.request(path,cookie=self.cookie)['status'],404,path)
+        self.assertEqual(self.request('/api/orders/%d/payments/%d/receipt.pdf'%(first,paid))['status'],401)
+        # Anulado: el recibo lo indica y ya no se envía al cliente.
+        send=lambda oid,pid:self.request('/api/orders/%d/payments/receipt-mail'%oid,{'payment_id':str(pid)},cookie=self.cookie,csrf=self.csrf)
+        sent=[]
+        with patch.object(mail_pro,'configured',return_value=True),patch.object(mail_pro,'settings',return_value={'username':'sistema@example.invalid','password':'x','smtp_host':'smtp.example.invalid','smtp_port':465,'imap_host':'imap.example.invalid','imap_port':993}),patch.object(mail_pro,'deliver',side_effect=lambda config,message,recipients:sent.append((recipients,message))):
+            ok=send(first,paid);self.assertEqual((ok['status'],ok['body'].get('recipient')),(200,'cliente@example.invalid'),ok['body'])
+            self.assertEqual(sent[0][0],['cliente@example.invalid']);self.assertIn('R-%06d'%paid,str(sent[0][1]['Subject']))
+            self.assertTrue(any(part.get_content_type()=='application/pdf' for part in sent[0][1].walk()))
+            self.assertEqual(send(other,paid)['status'],404)
+            self.assertEqual(self.void(first,paid)['status'],200);self.assertEqual(send(first,paid)['status'],409)
+            with app.connect() as c:c.execute("UPDATE clients SET email=''");c.commit()
+            self.assertEqual(send(second,general)['status'],409)
+        self.assertIn('MOVIMIENTO ANULADO',text(self.request('/api/orders/%d/payments/%d/receipt.pdf'%(first,paid),cookie=self.cookie)['body']))
+        with app.connect() as c:self.assertEqual(c.execute("SELECT kind,status FROM mail_archive ORDER BY id DESC LIMIT 1").fetchone()[:],('payment_receipt','enviado'))
+
     def test_summary_is_exact_integer_arithmetic(self):
         self.assertEqual(equipment.cents_of('0,10'),10);self.assertEqual(equipment.cents_of('0.1'),10);self.assertEqual(equipment.cents_of('1234.5'),123450);self.assertIsNone(equipment.cents_of('0.001'));self.assertIsNone(equipment.cents_of(0.1+0.2))
         self.assertEqual(equipment.summary(10,10)['state'],'pagado');self.assertEqual(equipment.summary(0,0)['state'],'sin_cargos');self.assertEqual(equipment.summary(0,5),{'budget_cents':0,'paid_cents':5,'balance_cents':0,'credit_cents':5,'state':'credito','state_label':'Saldo a favor del cliente'})
