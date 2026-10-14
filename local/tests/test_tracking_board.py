@@ -35,6 +35,23 @@ class TrackingBoardTests(unittest.TestCase):
         self.assertEqual(self.request('/api/tracking/999999',cookie=cookie)['status'],404)
         with app.connect() as c:self.assertEqual(c.execute('SELECT COUNT(*) FROM order_history').fetchone()[0],before)
 
+    def test_group_rows_carry_the_order_code_the_unit_and_the_real_overall_state(self):
+        # Orden con dos equipos: cada fila es un equipo, con el código de la orden, su número y el estado general calculado con todos.
+        cookie,csrf=self.login();main=self.order(cookie,csrf,'g1');solo=self.order(cookie,csrf,'g3')
+        second=self.request('/api/orders',self.order_data({'email':'g1@example.invalid','brand':'HP','model':'Modelo g2','request_key':'tracking-order-0000g2','group_order_id':str(main),'new_unit':'1'}),cookie=cookie,csrf=csrf)['body']['id']
+        self.request('/api/order-status',{'id':str(main),'status':'entregado'},cookie=cookie,csrf=csrf)
+        rows={row['id']:row for row in self.request('/api/tracking',cookie=cookie)['body']['rows']}
+        self.assertIsNone(rows[solo]['group']);self.assertNotIn('group_id',rows[solo]);self.assertNotIn('unit_no',rows[solo])
+        first,other=rows[main]['group'],rows[second]['group']
+        self.assertEqual((first['unit_no'],first['units'],other['unit_no'],other['units']),(1,2,2,2))
+        self.assertEqual(first['main_code'],other['main_code']);self.assertEqual(first['main_code'],rows[main]['code']);self.assertTrue(rows[second]['code'].endswith('-E02'))
+        # Un equipo entregado y otro en proceso: el equipo figura entregado, la orden NO figura completada.
+        self.assertEqual(rows[main]['status_code'],'entregado');self.assertEqual(first['overall']['code'],'parcial');self.assertEqual(other['overall']['label'],'Entrega parcial')
+        self.assertIn('2 equipos',first['overall']['summary'])
+        self.request('/api/order-status',{'id':str(second),'status':'entregado'},cookie=cookie,csrf=csrf)
+        rows={row['id']:row for row in self.request('/api/tracking',cookie=cookie)['body']['rows']}
+        self.assertEqual(rows[second]['group']['overall']['code'],'completada')
+
     def test_search_filters_and_pagination(self):
         cookie,csrf=self.login();ids=[self.order(cookie,csrf,'p%02d'%index,brand='Dell' if index%2 else 'Asus') for index in range(10)]
         self.request('/api/order-status',{'id':str(ids[0]),'status':'reparacion'},cookie=cookie,csrf=csrf)

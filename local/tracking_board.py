@@ -78,7 +78,7 @@ def build(c, filters):
     pages = max(1, (total + size - 1) // size)
     page = min(filters['page'], pages)
     rows = [dict(row) for row in c.execute(
-        "SELECT o.id,COALESCE(o.code,'OP-'||printf('%05d',o.id)) code,o.status status_code,s.label status,o.priority,o.received_at,o.created_at,cl.name client,COALESCE(cl.phone,'') phone,COALESCE(d.serial,'') serial,"
+        "SELECT o.id,o.group_id,o.unit_no,COALESCE(o.code,'OP-'||printf('%05d',o.id)) code,o.status status_code,s.label status,o.priority,o.received_at,o.created_at,cl.name client,COALESCE(cl.phone,'') phone,COALESCE(d.serial,'') serial,"
         "COALESCE(NULLIF(d.kind,''),d.category) type,d.brand,d.model,COALESCE(u.name,'') responsible,h.id event_id,h.event,h.comment,h.occurred_at,h.status_label,COALESCE(a.name,'') actor,"
         "(SELECT p.status_label FROM order_history p WHERE p.order_id=o.id AND p.id<h.id AND p.status_label!='' ORDER BY p.id DESC LIMIT 1) previous_label,"
         "(SELECT COUNT(*) FROM order_history x WHERE x.order_id=o.id) events," + equipment.BUDGET + " budget_cents," + equipment.PAID + " paid_cents " + source +
@@ -89,7 +89,23 @@ def build(c, filters):
         marks = ','.join('?' for _ in rows)
         for item in c.execute('SELECT DISTINCT order_id,status_label FROM order_history WHERE order_id IN (' + marks + ')', [row['id'] for row in rows]):
             seen.setdefault(item['order_id'], set()).add(item['status_label'])
+    # Órdenes con varios equipos: cada fila es un equipo. Se añade el código de la orden, el número de equipo y el estado general,
+    # calculado con el estado real de todos sus equipos (nunca «completada» mientras quede alguno sin entregar).
+    groups = {}
+    wanted = sorted({row['group_id'] for row in rows if row['group_id']})
+    if wanted:
+        marks = ','.join('?' for _ in wanted)
+        for item in c.execute("SELECT id,group_id,unit_no,status status_code,COALESCE(code,'OP-'||printf('%05d',id)) code FROM orders WHERE group_id IN (" + marks + ') ORDER BY unit_no', wanted):
+            groups.setdefault(item['group_id'], []).append(dict(item))
     for row in rows:
+        units = groups.get(row.pop('group_id'), [])
+        number = row.pop('unit_no')
+        row['group'] = None
+        if len(units) > 1:
+            main = next((unit['code'] for unit in units if unit['id'] == units[0]['group_id']), units[0]['code'])
+            state = equipment.overall(units)
+            row['group'] = {'main_id': units[0]['group_id'], 'main_code': main, 'unit_no': number, 'units': len(units),
+                            'overall': {'code': state['code'], 'label': state['label'], 'summary': state['summary']}}
         row['type_label'] = DEVICE_TYPES.get(row['type'], '')
         # Estado financiero del equipo: la misma fuente que la tarjeta del detalle de la orden.
         row['finance'] = equipment.summary(row.pop('budget_cents'), row.pop('paid_cents'))

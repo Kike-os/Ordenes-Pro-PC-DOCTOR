@@ -148,3 +148,7 @@ Comprobado con correos simulados en 1440, 1180, 1024, 768, 390 y 320 px y con zo
 **Ahora.** La vista previa reproduce la firma que se envía: siempre horizontal, con el logotipo original a la izquierda, nombre, cargo y descripción, separador vertical rojo, datos de contacto a la derecha, fondo blanco y su borde. Si no cabe, se muestra a escala o se desplaza dentro de su recuadro; no se reordena ni se recorta. Con la casilla «Incluir la firma corporativa» desactivada, el correo sale sin firma, como antes.
 
 El logotipo es el archivo original `local/static/logo-firma.png`, incrustado en cada correo (CID); no se generó ni se modificó ninguno. No se cambiaron los datos de contacto guardados.
+
+## Firma en los correos automáticos (1.5.150)
+
+La firma corporativa medía unos 700 px y la plantilla institucional 600 px: ensanchaba el mensaje y en el móvil se cortaba la columna de contacto. Ahora `mail_pro.signature_html` usa las medidas de la vista previa (logotipo de 92 px, unos 570 px en total) y la plantilla (`mailing.html`) tiene ancho fijo y un margen propio para la firma. En pantallas de menos de 620 px los datos de contacto pasan debajo del logotipo y el nombre, sin recortes. El diseño (logotipo original, separador rojo, borde inferior rojo) no cambia. Los correos de códigos de verificación y de seguridad de la cuenta conservan su pie propio, sin firma personal.

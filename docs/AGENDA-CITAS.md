@@ -67,3 +67,7 @@ El selector de identificación de «Agendamiento de Citas Técnicas» admite Cé
 Administración puede devolver a la agenda una cita «No asistió», cancelada o completada sin orden (detalle de la cita o menú de la fila → «Reactivar cita»). Recupera el estado que tenía antes de cerrarse, conserva fecha, hora, cliente, equipo, servicio, código e historial, y añade al historial «Cita reactivada por corrección administrativa de cierre accidental». Antes comprueba que el horario siga libre para el mismo técnico; si no, pide reprogramar. No crea otra cita ni envía avisos al cliente.
 
 El 13/10/2026 se reactivó así, a petición de administración y con respaldo previo, la cita `CIT-20261013-4522DF`.
+
+## Indicadores de estado de las citas (1.5.150)
+
+Todos los estados se pintan con una misma píldora de 26 px con icono y texto (`agendaPill` / `agendaBadge` en `app.js`): Nueva, Confirmada, Por confirmar (antes «Solicitada»), Reagendada (antes «Reprogramada»), En atención, No asistió, Cancelada y Completada; los mantenimientos preventivos llevan además la píldora «Preventivo». Es un cambio de presentación: los códigos de estado, las reglas y las citas existentes no se modifican.

@@ -86,3 +86,13 @@ El contador del botón «Historial» hacía crecer el botón con dos o más díg
 - Comprobado con 0, 1, 8, 9, 10, 12, 99, 100, 125, 999 y 1000 en 1920, 1440, 1366, 1280, 1024, 820, 390 y 320 px: no cambian el botón, las columnas, la altura de fila ni la posición de los demás botones.
 
 Los otros contadores revisados (avisos, ADI, asistencia en vivo, grupos de presupuestos) ya limitan su texto o no desplazan a sus vecinos; no se modificaron.
+
+## Seguimiento de Órdenes ultracompacto (1.5.150)
+
+- **Encabezado en una línea**: título, indicador «En vivo» discreto y enlace «Historial completo»; buscador y «Filtros» en una fila de 36 px.
+- **Filas de 54 px en escritorio** con ancho fijo por columna: el contenido de una columna nunca desplaza a las demás. Cliente, técnico y último movimiento se recortan en una línea; el texto completo queda en la descripción emergente y en el detalle de la orden.
+- **Acciones**: Ver, Historial (con contador de ancho estable: 1, 42, 128, 999+), QR y Ticket, alineadas a la derecha. Entre 861 y 1180 px, y en celulares, quedan «Ver» y el menú «Más» con Historial, QR y Ticket (teclado, Escape y foco). No se elimina ninguna función.
+- **Estados**: Procesando azul, Entregado verde, Listo para entregar turquesa, pendientes (En espera, respuesta del cliente, presupuesto) ámbar y cancelados rojo, con icono y texto.
+- **Órdenes con varios equipos**: cada fila es un equipo. El enlace muestra el identificador de la orden y la etiqueta «Equipo 2/3» el equipo (su código individual está en la descripción emergente). El indicador de la fila es el estado de ese equipo; debajo figura el **estado general de la orden**, calculado por `equipment.overall` con todos sus equipos: nunca dice «Orden completada» mientras quede un equipo sin entregar («Entrega parcial», «Atención en curso»…). El servidor lo entrega en `group` dentro de cada fila de `/api/tracking`.
+- **Celulares**: una tarjeta por equipo (orden y equipo, estado, cliente y técnico, último movimiento, acciones), sin desplazamiento horizontal.
+- Solo cambia la presentación: no se modifican estados, historiales, clientes, equipos, órdenes, QR, tickets ni la búsqueda.
