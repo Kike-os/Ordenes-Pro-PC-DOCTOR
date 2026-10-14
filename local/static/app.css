@@ -6016,7 +6016,7 @@ body[data-page=appointments] .appointment-error:not(:empty)::before{content:'!';
 @media(hover:hover){.seg-control button:not([aria-checked=true]):not(:disabled):hover{background:#15294a;color:#e3eeff}}
 .id-count{flex:none;min-width:5ch;margin:0;text-align:right;font-size:11.5px;font-weight:600;line-height:inherit;font-variant-numeric:tabular-nums;color:#8fa6c4}.id-count[data-state=ok]{color:#8ff0bd}.id-count[data-state=over]{color:#ffb3b6}
 @media(prefers-reduced-motion:reduce){.seg-control button{transition:none}}
-.booking-id{grid-column:1/-1;display:grid;grid-template-columns:minmax(0,230px) minmax(0,1fr);gap:16px;align-items:start;min-width:0}
+.booking-id{grid-column:1/-1;display:grid;grid-template-columns:minmax(0,310px) minmax(0,1fr);gap:16px;align-items:start;min-width:0}
 .id-kind{min-width:0}.id-kind-label{display:block}
 .id-number{min-width:0}.id-number-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
 .booking-hint[data-state=warn]{color:#ffd9a0}
@@ -6265,3 +6265,7 @@ td>.status-label+.finance-badge{display:flex;width:fit-content}
 @media(max-width:900px){.report-finance-kpis{grid-template-columns:1fr 1fr}.report-finance-body{grid-template-columns:1fr}}
 @media(max-width:560px){.report-finance-table thead{display:none}.report-finance-table tr{display:grid;grid-template-columns:1fr 1fr;gap:4px 10px;padding:10px 0;border-bottom:1px solid #1a2740}.report-finance-table td{padding:0;border:0}.report-finance-table td::before{content:attr(data-label);display:block;font-size:10.5px;color:#8fa6c4}.report-finance-table td:first-child,.report-finance-table td:nth-child(2){grid-column:1/-1}}
 @media(max-width:380px){.report-finance-kpis{grid-template-columns:1fr}}
+.report-finance,.report-finance>*{min-width:0;max-width:100%}.report-finance header :is(h2,p){overflow-wrap:anywhere}
+/* Panel propio del tablero (no es una tarjeta de la cuadrícula de gráficos): ocupa todo el ancho, con el mismo aspecto. */
+.control-pro>.report-finance{position:relative;padding:14px;border:1px solid #213552;border-radius:14px;background:#0b1626}
+.report-finance>header{display:grid;gap:3px}.report-finance>header h2{margin:0;font-size:14px;color:#e3edff}.report-finance>header p{margin:0;font-size:12px;line-height:1.45;color:#8fa5c4}

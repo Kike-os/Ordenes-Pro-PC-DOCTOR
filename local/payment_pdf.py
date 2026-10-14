@@ -45,7 +45,8 @@ def render(order, payment, account, methods, generated):
 
     def right(value, top, size, bold=False, color=INK):
         from document_canvas import WIDTHS
-        span = sum(WIDTHS.get(ch, 556) for ch in str(value)) * size / 1000 * (1.06 if bold else 1)
+        # En negrita las letras son algo más anchas que en la tabla de anchos normal; las cifras y los signos miden lo mismo.
+        span = sum(WIDTHS.get(ch, 556) * (1.09 if bold and ch.isalpha() else 1) for ch in str(value)) * size / 1000
         pdf.text(value, RIGHT - span, top, size, bold, color)
 
     fill(0, 0, W, 4, BLUE)

@@ -75,3 +75,9 @@ Pruebas: `local/tests/test_equipment.py`.
 **Entrega.** Se mantiene la regla vigente: un equipo con saldo pendiente no se puede marcar como entregado; el aviso indica el importe y, si hay pagos generales sin asignar, lo dice. Registrar un pago no cambia el estado técnico.
 
 **Límites conocidos.** No hay facturas ni notas de crédito como documentos; los ajustes se hacen con cargos, devoluciones o anulaciones. Un pago que supera el saldo se rechaza: el saldo a favor solo aparece si los cargos bajan después de pagar. Los pagos de un equipo ya entregado no se anulan.
+
+## Recibo de pago, saldo en listados y reporte de saldos (13/10/2026)
+
+- **Recibo de pago** (`local/payment_pdf.py`, A5): cada pago, abono o devolución tiene su recibo `R-000123` (el número es el del movimiento; no se reutiliza). Muestra cliente, equipo, importe, forma de pago, nota o referencia, quién lo registró y el estado de la cuenta al emitirlo (del equipo, o de la orden si es un pago general). Un movimiento anulado lo indica con su motivo. El documento dice expresamente que **no es una factura ni un comprobante de venta autorizado por el SRI**. Se abre desde «Recibo» en «Pagos y saldo»; «Enviar recibo» lo manda al correo registrado del cliente (el destinatario lo decide el servidor; un movimiento anulado no se envía) y queda en el historial de correos.
+- **Saldo en los listados:** el listado de órdenes y Seguimiento muestran una marca «Debe $…», «Abonó · debe $…», «Pagado» o «A favor $…», con el estado que calcula `equipment.summary`. Sin cargos registrados no se muestra nada.
+- **Reportes → Saldos por cobrar** (`/api/reports/finance`): por cobrar consolidado (cargos menos pagos netos y menos pagos generales sin asignar, por orden), equipos con saldo, y lo cobrado y devuelto en el rango de fechas del tablero por forma de pago. Los movimientos anulados no cuentan.

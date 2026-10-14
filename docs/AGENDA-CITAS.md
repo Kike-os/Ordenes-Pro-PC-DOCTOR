@@ -57,3 +57,7 @@ El diálogo «Nueva cita» del personal también permite indicar tipo y número 
 - `documentCheck(valor,tipo)`: mismas reglas que `reception.document_check` del servidor; una prueba (`test_identification.py`) ejecuta ambas con los mismos casos y exige resultados idénticos.
 
 Reglas: cédula = provincia (01–24 o 30), tercer dígito 0–5 y dígito verificador (módulo 10). RUC de persona natural = su cédula válida más el establecimiento (no `000`). RUC de entidad pública (tercer dígito 6) o de sociedad (9) = provincia y establecimiento; su dígito verificador (módulo 11) se comprueba, pero si no coincide **solo se avisa**, no se rechaza, para no dejar fuera RUC reales que no lo cumplen. Tercer dígito 7 u 8 no corresponde a ningún tipo. Los errores se muestran al completar el número o al salir del campo, nunca antes.
+
+## Pasaporte en la reserva pública
+
+El selector de identificación de «Agendamiento de Citas Técnicas» admite Cédula, RUC o Pasaporte, para personas sin cédula ecuatoriana. El pasaporte no tiene dígito verificador: se comprueba su forma (de 5 a 20 letras y números, con al menos una cifra, sin espacios) y se guarda en mayúsculas. El cliente se crea o se vincula por ese número igual que con cédula o RUC. La ficha de cliente del panel conserva su regla anterior (3 a 30 caracteres).
