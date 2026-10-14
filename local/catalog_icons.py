@@ -40,18 +40,26 @@ ICONS = {
     'repuesto': ('Repuesto o componente', [_box(5, 5, 14, 14), _box(9, 9, 6, 6)] + [(L, [(p, 2), (p, 5)], False) for p in (9, 15)] + [(L, [(p, 19), (p, 22)], False) for p in (9, 15)]),
     'servicio': ('Servicio técnico', [(L, [(14.5, 5.5), (18.5, 9.5)], False), (L, [(16.5, 7.5), (5, 19), (3, 21)], False), (L, [(14.5, 5.5), (17, 3), (21, 7), (18.5, 9.5)], False), (L, [(3, 5), (6, 3), (8, 5.5), (6.5, 8), (10, 11.5)], False)]),
     'producto': ('Producto', [(L, [(12, 2), (21, 7), (21, 17), (12, 22), (3, 17), (3, 7)], True), (L, [(3, 7), (12, 12), (21, 7)], False), (L, [(12, 12), (12, 22)], False)]),
+    'portatil': ('Portátil', LAPTOP),
+    'placa': ('Placa electrónica', [_box(3, 3, 18, 18), _box(9, 9, 6, 6), (L, [(12, 3), (12, 9)], False), (L, [(12, 15), (12, 21)], False), (L, [(3, 12), (9, 12)], False), (L, [(15, 12), (21, 12)], False), (C, 6.5, 6.5, 1), (C, 17.5, 17.5, 1)]),
+    'limpieza': ('Limpieza técnica', [(L, [(15, 3), (11, 10)], False), (L, [(7, 10), (15, 10), (16.5, 13.5), (5.5, 13.5)], True), (L, [(7.5, 13.5), (6.5, 20.5)], False), (L, [(11, 13.5), (11, 21)], False), (L, [(14.5, 13.5), (15.5, 20.5)], False)]),
+    'termica': ('Procesador y refrigeración', [_box(6, 6, 12, 12), (C, 12, 12, 2.8)] + [(L, [(p, 2.5), (p, 6)], False) for p in (9.5, 14.5)] + [(L, [(p, 18), (p, 21.5)], False) for p in (9.5, 14.5)] + [(L, [(2.5, p), (6, p)], False) for p in (9.5, 14.5)] + [(L, [(18, p), (21.5, p)], False) for p in (9.5, 14.5)]),
+    'red': ('Red informática', [(C, 12, 5, 2.4), (C, 5, 19, 2.4), (C, 19, 19, 2.4), (L, [(12, 7.4), (12, 12)], False), (L, [(5, 16.6), (5, 12), (19, 12), (19, 16.6)], False)]),
     'generico': ('Genérico', [_box(4, 4, 16, 16), (L, [(8, 12), (16, 12)], False), (L, [(12, 8), (12, 16)], False)]),
 }
 # Icono por omisión de cada categoría del catálogo, cuando ninguna palabra clave coincide.
 BY_CATEGORY = {'servicio': 'servicio', 'licencia': 'licencia', 'seguridad': 'antivirus', 'repuesto': 'repuesto', 'otro': 'producto'}
 # Palabras clave (sin tildes) → icono. Se evalúan en orden: lo más específico primero.
 RULES = (
-    (('pantalla', 'gamer'), 'pantalla_gamer'), (('pantalla',), 'pantalla'), (('display',), 'pantalla'), (('bisagra',), 'bisagra'),
+    (('pantalla', 'gamer'), 'pantalla_gamer'), (('pantalla',), 'pantalla'), (('display',), 'pantalla'), (('monitor',), 'pantalla'), (('bisagra',), 'bisagra'),
     (('bios',), 'bios'), (('gamer',), 'pc_gamer'), (('escritorio',), 'escritorio'),
     (('playstation',), 'consola'), (('xbox',), 'consola'), (('nintendo',), 'consola'), (('consola',), 'consola'),
     (('impresora',), 'impresora'), (('memoria', 'ram'), 'memoria'), (('ssd',), 'almacenamiento'), (('disco',), 'almacenamiento'),
     (('antivirus',), 'antivirus'), (('office',), 'ofimatica'), (('windows',), 'windows'),
-    (('diagnostico',), 'diagnostico'), (('chequeo',), 'diagnostico'), (('mantenimiento',), 'mantenimiento'), (('limpieza',), 'mantenimiento'),
+    (('recuperacion', 'datos'), 'almacenamiento'), (('pasta', 'termica'), 'termica'), (('termica',), 'termica'), (('electronica',), 'placa'), (('placa',), 'placa'),
+    (('redes',), 'red'), (('router',), 'red'), (('wifi',), 'red'), (('sistema', 'operativo'), 'windows'), (('instalacion', 'sistema'), 'windows'),
+    (('limpieza',), 'limpieza'), (('reparacion', 'portatil'), 'portatil'), (('reparacion', 'laptop'), 'portatil'), (('reparacion', 'computadora'), 'escritorio'),
+    (('diagnostico',), 'diagnostico'), (('chequeo',), 'diagnostico'), (('mantenimiento',), 'mantenimiento'),
 )
 
 

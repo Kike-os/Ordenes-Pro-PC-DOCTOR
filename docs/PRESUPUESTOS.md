@@ -226,3 +226,13 @@ El QR contiene la dirección real de autorización de ese presupuesto y versión
 Cuando un equipo no tiene ningún presupuesto, el panel «Presupuestos del equipo» muestra el contador «0 presupuestos» y el mensaje «Sin presupuestos registrados. Este equipo está listo para generar su primer presupuesto», con el botón «Crear presupuesto». El contador sale de las versiones reales que devuelve el servidor (no hay caché en el navegador).
 
 El 13/10/2026, con autorización expresa de administración y respaldo previo, se eliminaron de producción los cinco presupuestos de prueba de `PCD-20261012-0001` (E01 y E02) con sus partidas, eventos, enlace y firma de prueba. No se tocaron órdenes, clientes, historial técnico, pagos ni el correo archivado. Las numeraciones internas no se reiniciaron.
+
+## Catálogo «Premium Técnico» en la ventana de selección (13/10/2026)
+
+**Auditoría del catálogo de producción (29 elementos, solo lectura).** Con logotipo de marca: Kaspersky (2), McAfee, Norton, PlayStation (3) y Epson. Sin logotipo: Microsoft (5 de Office y 3 de Windows), ESET NOD32 y «Defender Plus» (marca no identificada con certeza: no se le asigna logotipo). Ninguna ruta de imagen estaba rota; ningún elemento tiene imagen propia cargada. La correspondencia es por la **marca registrada en el elemento**, no por parecido del nombre.
+
+**Logotipos.** Los de marca salen de `local/static/brands/` (Simple Icons 13.21.0, licencia CC0, sin modificar). Se añadió Bitdefender de esa misma fuente. **Microsoft y ESET no están en ella**, y no se dibujan ni se descargan de otros sitios: esos productos muestran un icono técnico (sistema operativo, ofimática, antivirus) hasta que administración suba el logotipo oficial en Configuración → Catálogo → imagen del elemento.
+
+**Iconos técnicos nuevos** (`local/catalog_icons.py`, mismo dibujo en pantalla y en el PDF): portátil, placa electrónica, limpieza técnica, procesador y refrigeración, y red informática; más reglas para monitor, recuperación de datos, sistema operativo y reparación de portátiles o computadoras.
+
+**Ventana.** Encabezado y pie fijos; solo se desplaza la rejilla (dos columnas en escritorio, una en móvil). Tarjeta: logotipo o icono, nombre y marca · categoría; descripción (tres líneas con «Ver más»), vigencia, dispositivos y código; precio, tratamiento de IVA real del elemento («IVA incluido», «Tarifa 0 %» o «IVA por confirmar») y «Agregar» siempre abajo. Búsqueda sin tildes ni mayúsculas, con varias palabras, sinónimos habituales y combinada con el filtro; el catálogo se carga una sola vez. «Agregar» ignora el doble clic, indica cuántas unidades hay ya en el presupuesto y permite añadir más. Precios, códigos y cálculo de importes no cambian.

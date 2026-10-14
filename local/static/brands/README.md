@@ -12,6 +12,7 @@ Apple, ASUS, Honor, Razer y Sony quedan en negro. Para usar el logotipo corporat
 portal de marca y guárdalo aquí con el mismo nombre.
 
 El 13/10/2026 se añadieron del mismo catálogo: Framework, Fujifilm, Google, NEC, Sharp, System76 y Zebra.
+Ese mismo día se añadió también Bitdefender (antivirus del catálogo de productos). ESET y Microsoft (Windows, Office, Microsoft 365) no están en Simple Icons: sus productos muestran un icono técnico hasta que administración suba el logotipo oficial en Configuración → Catálogo.
 
 Sin archivo todavía (muestran el icono genérico): Brother, Canon, Compaq, Dynabook, Gigabyte, IBM, Konica Minolta, Lexmark, Microsoft, OKI, Ricoh, VAIO, Xerox y el resto de marcas. Simple Icons no las incluye; su logotipo debe bajarse del portal de marca de cada fabricante.
 
