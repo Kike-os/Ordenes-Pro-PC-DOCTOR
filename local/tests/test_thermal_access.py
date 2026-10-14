@@ -204,7 +204,8 @@ class CompactTicketTests(unittest.TestCase):
         handler.command='GET';handler.headers={}
         app.Handler.reply(handler,200,b'%PDF-1.4','application/pdf',filename='TICKET-'+code+'.pdf')
         self.assertEqual(sent['Content-Disposition'],'inline; filename="TICKET-'+code+'.pdf"')
-        self.assertIn("frame-ancestors 'self'",sent['Content-Security-Policy'])
+        # Los PDF tampoco se pueden incrustar: la vista previa usa una URL de objeto temporal (blob:).
+        self.assertIn("frame-ancestors 'none'",sent['Content-Security-Policy'])
         # El resto de respuestas mantiene la prohibición de incrustarse.
         handler=object.__new__(app.Handler);other={}
         handler.send_response=lambda status:None;handler.end_headers=lambda:None;handler.wfile=__import__('io').BytesIO()
@@ -213,3 +214,9 @@ class CompactTicketTests(unittest.TestCase):
         self.assertIn("frame-ancestors 'none'",other['Content-Security-Policy'])
         js=(app.ROOT/'static'/'app.js').read_text()
         self.assertIn("download.download=kind==='thermal'?'TICKET-'+order.code+'.pdf'",js)
+        self.assertIn("frame.src=documentBlobUrl+'#toolbar=0&navpanes=0&view=FitH'",js)
+        self.assertNotIn('frame.src=named?source',js)
+        # «Ticket listo» solo cuando el visor cargó el documento; si no, aviso y «Reintentar».
+        block=js[js.index('async function load(){const version=++loadVersion;'):js.index("if(kind==='label')for(const input of")]
+        self.assertLess(block.index('frame.onload='),block.index("say(ready,'ready'"))
+        self.assertIn("retry.hidden=false",block)

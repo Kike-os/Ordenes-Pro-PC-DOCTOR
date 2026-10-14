@@ -799,8 +799,6 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header('Content-Type', content_type)
         # Nombre con el número real de la orden cuando el documento se guarda o descarga desde el navegador.
         if filename:self.send_header('Content-Disposition',content_disposition(filename))
-        # Los documentos PDF se pueden mostrar dentro del propio sistema (vista previa); así el visor guarda con su nombre real.
-        if content_type=='application/pdf' and not getattr(self,'content_policy',None):self.content_policy=DEFAULT_CSP.replace("frame-ancestors 'none'","frame-ancestors 'self'")
         self.send_header('Content-Length', str(len(body)))
         self.send_header('Cache-Control', 'no-store')
         self.send_header('X-Content-Type-Options', 'nosniff')
