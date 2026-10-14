@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.162 — 2026-10-14 09:45 (UTC-05:00)
+
+Estado «En revisión por falla recurrente» con trazabilidad completa
+
+### Nuevas funcionalidades
+
+- Nuevo estado «En revisión por falla recurrente» (ámbar oscuro): misma orden, motivo y técnico responsable obligatorios, número de revisiones, reingreso trazable de equipos ya entregados y aplicación solo al equipo afectado
+
 ## v1.5.161 — 2026-10-14 09:08 (UTC-05:00)
 
 Libreta de direcciones y comunicados a clientes en Mail Pro; Servicio de Administración Remota en la agenda

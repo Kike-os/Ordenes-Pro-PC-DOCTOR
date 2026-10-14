@@ -8,6 +8,22 @@
   },
   "releases": [
     {
+      "version": "1.5.162",
+      "date": "2026-10-14T09:45:18-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Estado «En revisión por falla recurrente» con trazabilidad completa",
+      "changes": {
+        "features": [
+          "Nuevo estado «En revisión por falla recurrente» (ámbar oscuro): misma orden, motivo y técnico responsable obligatorios, número de revisiones, reingreso trazable de equipos ya entregados y aplicación solo al equipo afectado"
+        ],
+        "improvements": [],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.161",
       "date": "2026-10-14T09:08:20-05:00",
       "type": "patch",
