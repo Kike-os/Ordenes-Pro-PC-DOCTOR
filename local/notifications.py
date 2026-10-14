@@ -161,6 +161,13 @@ def build(c, user, now, mail_access=False):
     staff = user['role'] in ('administrador', 'tecnico')
     admin = user['role'] == 'administrador'
     items = []
+    if admin:
+        # ADI AutoCare Pro: incidencias, recuperaciones automáticas y versiones verificadas (solo administración).
+        try:
+            import autocare
+            items += autocare.notifications(c, now)
+        except Exception as error:
+            print('autocare avisos', type(error).__name__, flush=True)
 
     def alert(name, count, icon, kind, title, detail, href):
         # La clave incluye el día y la cantidad: si la situación cambia, vuelve a aparecer como no leída.

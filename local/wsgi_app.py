@@ -66,6 +66,11 @@ def application(environ, start_response):
             handler.response_headers.append(('Allow', 'GET, HEAD, POST'))
     except Exception:
         logging.getLogger(__name__).exception("Error WSGI: %s %s", method, path)
+        try:
+            import app as application
+            application.note_runtime_error(method, path, sys.exc_info()[1])
+        except Exception:
+            pass
         handler.reply(500, {'error': 'No se pudo completar la operación.'})
     start_response(handler.response_status, handler.response_headers)
     return [b'' if method == 'HEAD' else handler.response_body]

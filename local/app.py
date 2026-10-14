@@ -597,6 +597,14 @@ def resend_delivery(c,row,address,user):
 DEFAULT_CSP="default-src 'self'; frame-src 'self' blob: https://challenges.cloudflare.com; script-src 'self' https://challenges.cloudflare.com; style-src 'self'; img-src 'self'; connect-src 'self' https://challenges.cloudflare.com; frame-ancestors 'none'; form-action 'self'; base-uri 'none'"
 
 
+def note_runtime_error(method,path,error):
+    """ADI AutoCare: registra el error de ejecución clasificado (sin datos de la petición). Nunca interrumpe la respuesta."""
+    try:
+        import autocare
+        with connect() as log:autocare.record_error(log,method,path,error,reception_now())
+    except Exception as failure:print('autocare registro',type(failure).__name__,flush=True)
+
+
 def mail_signature_send(c):
     # Firma corporativa del buzón remitente lista para ENVIAR (incluye los bytes de la firma gráfica original si está activa).
     return mail_pro.load_signature(c,mail_pro.settings()['username'])
@@ -1548,6 +1556,11 @@ class Handler(BaseHTTPRequestHandler):
                     return self.reply(200,{'version':latest['version'],'date':latest.get('date',''),'summary':latest.get('summary',''),'highlights':[text[:180] for text in changes[:3]],'more':max(0,len(changes)-3)})
                 except Exception:
                     return self.reply(503,{'error':'No se pudo leer la versión instalada.'})
+            if path == '/api/autocare':
+                # Panel ADI AutoCare Pro: solo administración. Solo lectura de los registros técnicos.
+                if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede ver ADI AutoCare.'})
+                import autocare
+                return self.reply(200,autocare.overview(c,reception_now()))
             if path == '/api/system':
                 try:return self.reply(200, versioning.overview())
                 except versioning.RegistryError as error:return self.reply(500,{'error':str(error)})
@@ -2142,6 +2155,23 @@ class Handler(BaseHTTPRequestHandler):
                     for key,value in values.items():c.execute('INSERT INTO auth_policy VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value',(key,value))
                     audit(c,user['id'],'auth_policy_updated')
                     return self.reply(200,{'ok':True})
+                if path in ('/api/autocare/diagnose','/api/autocare/settings','/api/autocare/review'):
+                    if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede usar ADI AutoCare.'})
+                    import autocare,stability
+                    now=reception_now()
+                    if path.endswith('diagnose'):
+                        if limited(c,'autocare-diagnose:'+str(user['id']),limit=6,window=3600):return self.reply(429,{'error':'Ya ejecutaste varios diagnósticos en la última hora. Espera unos minutos.'})
+                        if stability._running(c,now):return self.reply(409,{'error':'Ya hay un diagnóstico en curso.'})
+                        entry=stability.run(c,now,'manual');audit(c,user['id'],'autocare_diagnose')
+                        return self.reply(200,dict(autocare.overview(c,reception_now()),ran={'passed':entry['passed'],'total':entry['total']}))
+                    if path.endswith('review'):
+                        autocare.mark_reviewed(c,now);audit(c,user['id'],'autocare_reviewed')
+                        return self.reply(200,autocare.overview(c,now))
+                    try:raw=json.loads(str(data.get('settings') or '{}'))
+                    except ValueError:raw=None
+                    if not isinstance(raw,dict):return self.reply(400,{'error':'Configuración no válida.'})
+                    clean=autocare.save_settings(c,raw);audit(c,user['id'],'autocare_settings')
+                    return self.reply(200,{'ok':True,'settings':clean})
                 if path=='/api/system/check':
                     # Solo consulta y compara; no descarga, instala ni modifica archivos.
                     try:
@@ -3218,7 +3248,8 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(404, {'error':'Recurso no disponible.'})
         except (ValueError, json.JSONDecodeError):
             self.reply(400, {'error':'Solicitud inválida.'})
-        except Exception:
+        except Exception as error:
+            note_runtime_error('POST',urlsplit(self.path).path,error)
             self.reply(500, {'error':'No se pudo completar la operación.'})
 
 

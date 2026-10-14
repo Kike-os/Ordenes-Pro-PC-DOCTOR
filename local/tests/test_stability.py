@@ -35,7 +35,7 @@ class StabilityTests(unittest.TestCase):
             before = self.counts(c)
             entry = stability.run(c, now - timedelta(hours=30))
             self.assertEqual(self.counts(c), before)
-            self.assertEqual((entry['passed'], entry['total'], entry['critical_failures'], entry['warnings']), (8, 8, [], []))
+            self.assertEqual((entry['passed'], entry['total'], entry['critical_failures'], entry['warnings']), (13, 13, [], []))
             self.assertEqual(entry['version'], app.versioning.load()['releases'][0]['version'])
             self.assertEqual(stability.status(c, now)['state'], 'observing')
             stability.run(c, now - timedelta(hours=10))
@@ -43,7 +43,7 @@ class StabilityTests(unittest.TestCase):
             self.assertEqual((info['state'], info['checks_passed']), ('observing', 2))
             stability.run(c, now)
             info = stability.status(c, now)
-            self.assertEqual((info['state'], info['label'], info['short'], info['passed'], info['remaining_hours'], info['missing_passes']), ('stable', 'Versión estable', 'Estable', 8, 0.0, 0))
+            self.assertEqual((info['state'], info['label'], info['short'], info['passed'], info['remaining_hours'], info['missing_passes']), ('stable', 'Versión estable', 'Estable', 13, 0.0, 0))
 
     def test_a_critical_failure_requires_attention_and_blocks_stable(self):
         now = app.reception_now()
