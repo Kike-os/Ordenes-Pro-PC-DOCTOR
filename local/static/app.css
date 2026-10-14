@@ -6414,3 +6414,12 @@ dialog.catalog-picker-dialog>.dialog-heading{flex:0 0 auto;margin:0;padding:16px
 @media(max-width:380px){.catalog-picker-dialog .catalog-card-foot{flex-wrap:wrap}.catalog-picker-dialog .catalog-add{flex:1 1 100%;justify-content:center}}
 @media(prefers-reduced-motion:reduce){.catalog-picker-dialog :is(.catalog-card,.catalog-chip,.catalog-add){transition:none}}
 dialog.catalog-picker-dialog[open]{max-width:calc(100% - 20px)}
+/* Feriados: botones con icono, indicador de estado por tarjeta e indicador de carga. */
+.holiday-admin .holiday-actions button{display:inline-flex;align-items:center;gap:7px;transition:background-color .17s ease,border-color .17s ease,opacity .17s ease}
+.holiday-admin .holiday-actions button svg{flex:none;width:15px;height:15px}
+.holiday-admin .holiday-actions button[data-loading=true]{cursor:progress;opacity:.75}.holiday-admin .holiday-actions button[data-loading=true] svg{animation:draft-spin .9s linear infinite}
+.holiday-note{font-size:12px;font-weight:650;line-height:1.35}.holiday-note[hidden]{display:none}
+.holiday-note[data-kind=dirty]{color:#FFCA77}.holiday-note[data-kind=saved]{color:#6DE4AF}.holiday-note[data-kind=error]{color:#ff9aa8}.holiday-note[data-kind=idle]{color:#9db1cf;font-weight:500}
+.holiday-form-error[data-kind=dirty]{color:#FFCA77}
+@media(max-width:560px){.holiday-note{flex:1 1 100%}}
+@media(prefers-reduced-motion:reduce){.holiday-admin .holiday-actions button[data-loading=true] svg{animation:none}}

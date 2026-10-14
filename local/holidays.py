@@ -81,6 +81,8 @@ def between(c, first, last):
         out[day] = dict(base, day=day, label=row['label'], scope=row['scope'] if row['scope'] != 'otro' or not base.get('calculated') else 'nacional', place=row['place'], mode=row['mode'],
                         open_time=row['open_time'], close_time=row['close_time'], decided=True)
     for item in out.values():
+        saved = stored.get(item['day'])
+        item['version'] = '|'.join(str(saved[key]) for key in ('label', 'mode', 'open_time', 'close_time', 'scope', 'place', 'hidden')) if saved else ''
         item['mode_label'] = MODES[item['mode']]
         item['scope_label'] = SCOPES[item['scope']] + (' · ' + item['place'] if item['place'] else '')
     return sorted(out.values(), key=lambda item: item['day'])
@@ -146,16 +148,21 @@ def save(c, data):
 
 
 def remove(c, day_text):
-    """Quita un feriado. Si era uno calculado, queda oculto (se puede restaurar); si lo añadió administración, se elimina."""
+    """Quita la configuración de una fecha. Devuelve 'config' o 'day'.
+    Feriado oficial (calculado): se borra solo la configuración que añadió administración; el feriado **permanece en el calendario** y
+    vuelve a su estado predeterminado (atención sin definir). Día añadido a mano: se elimina de la lista. Nunca se toca una cita."""
     try:
         day = date.fromisoformat(str(day_text))
     except ValueError:
         raise ValueError('Indica una fecha válida.')
-    calculated = next((item for item in national(day.year) if item['day'] == day), None)
-    if calculated:
-        c.execute('INSERT INTO appointment_holidays(day,label,mode,scope,hidden) VALUES (?,?,?,?,1) ON CONFLICT(day) DO UPDATE SET hidden=1', (day.isoformat(), calculated['label'], 'normal', 'nacional'))
-    else:
-        c.execute('DELETE FROM appointment_holidays WHERE day=?', (day.isoformat(),))
+    c.execute('DELETE FROM appointment_holidays WHERE day=?', (day.isoformat(),))
+    return 'config' if any(item['day'] == day for item in national(day.year)) else 'day'
+
+
+def state_key(c, day_text):
+    """Huella de la configuración guardada de una fecha: sirve para avisar si otra persona la cambió mientras se editaba."""
+    row = c.execute('SELECT label,mode,open_time,close_time,scope,place,hidden FROM appointment_holidays WHERE day=?', (str(day_text),)).fetchone()
+    return '|'.join(str(value) for value in row) if row else ''
 
 
 def restore(c, day_text):

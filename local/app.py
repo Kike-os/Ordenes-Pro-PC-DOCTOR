@@ -2344,9 +2344,12 @@ class Handler(BaseHTTPRequestHandler):
                     action=str(data.get('action','save'))
                     # «check»: qué citas quedarían fuera de la atención con este ajuste, sin guardarlo (para pedir confirmación antes).
                     if action=='check':return self.reply(200,{'ok':True,'affected':holidays.affected(c,data,appointments.now().date())})
+                    # Dos administradores a la vez: si la configuración cambió desde que se cargó la pantalla, no se pisa; se pide revisar.
+                    if action in ('save','remove') and 'version' in data and str(data.get('version',''))!=holidays.state_key(c,data.get('day','')):
+                        return self.reply(409,{'error':'Otra persona cambió esta configuración mientras la editabas. La lista se actualizó: revísala y guarda de nuevo.','stale':True})
                     try:
                         if action=='save':day=holidays.save(c,data);audit(c,user['id'],'holiday_saved')
-                        elif action=='remove':holidays.remove(c,data.get('day',''));day=str(data.get('day',''));audit(c,user['id'],'holiday_removed')
+                        elif action=='remove':removed=holidays.remove(c,data.get('day',''));day=str(data.get('day',''));audit(c,user['id'],'holiday_config_removed' if removed=='config' else 'holiday_removed')
                         elif action=='restore':holidays.restore(c,data.get('day',''));day=str(data.get('day',''));audit(c,user['id'],'holiday_restored')
                         else:return self.reply(400,{'error':'Acción no válida.'})
                     except ValueError as error:return self.reply(400,{'error':str(error)})

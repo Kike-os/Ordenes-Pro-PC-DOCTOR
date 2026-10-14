@@ -43,13 +43,27 @@ class HolidayAgendaTests(unittest.TestCase):
             special=slots('2026-11-02');self.assertTrue(special and all('10:00'<=t<'12:00' for t in special));self.assertIn('10:00',special)
             for bad in ({'mode':'especial','open_time':'12:00','close_time':'10:00'},{'mode':'especial','open_time':'10:07','close_time':'12:00'},{'mode':'abierto'},{'scope':'local','mode':'cerrado','place':''},{'label':'x','mode':'cerrado'}):
                 self.assertEqual(post(**dict({'action':'save','day':'2026-11-02','label':'Día de Difuntos','scope':'nacional'},**bad))['status'],400)
-            # Feriado local con su cantón; ocultar y restaurar uno calculado.
+            # Feriado local con su cantón. «Quitar» en un feriado oficial solo borra su configuración: el feriado permanece en el calendario.
             self.assertEqual(post(action='save',day='2026-12-01',label='Fundación ficticia',scope='local',place='Otavalo',mode='cerrado')['status'],200)
+            self.assertEqual(post(action='save',day='2026-12-25',label='Navidad',scope='nacional',mode='especial',open_time='09:00',close_time='13:00')['status'],200)
             self.assertEqual(post(action='remove',day='2026-12-25')['status'],200)
             rows={r['day']:r for r in self.request('/api/holidays?year=2026',cookie=cookie)['body']['rows']}
-            self.assertNotIn('2026-12-25',rows);self.assertEqual((rows['2026-12-01']['scope_label'],rows['2026-12-01']['calculated'],rows['2026-11-02']['decided']),('Feriado local · Otavalo',False,True))
-            self.assertEqual([h['day'] for h in self.request('/api/holidays?year=2026',cookie=cookie)['body']['hidden']],['2026-12-25'])
-            post(action='restore',day='2026-12-25');self.assertIn('2026-12-25',{r['day'] for r in self.request('/api/holidays?year=2026',cookie=cookie)['body']['rows']})
+            self.assertEqual((rows['2026-12-25']['decided'],rows['2026-12-25']['calculated'],rows['2026-12-25']['mode'],rows['2026-12-25']['version']),(False,True,'normal',''))
+            self.assertEqual((rows['2026-12-01']['scope_label'],rows['2026-12-01']['calculated'],rows['2026-11-02']['decided']),('Feriado local · Otavalo',False,True))
+            self.assertEqual(self.request('/api/holidays?year=2026',cookie=cookie)['body']['hidden'],[])
+            # Un día añadido a mano sí se elimina; y un feriado que quedó oculto con la versión anterior se puede restaurar.
+            self.assertEqual(post(action='remove',day='2026-12-01')['status'],200);self.assertNotIn('2026-12-01',{r['day'] for r in self.request('/api/holidays?year=2026',cookie=cookie)['body']['rows']})
+            with app.connect() as c:c.execute("INSERT INTO appointment_holidays(day,label,mode,scope,hidden) VALUES ('2026-08-10','Primer Grito de Independencia','normal','nacional',1)");c.commit()
+            listed=self.request('/api/holidays?year=2026',cookie=cookie)['body'];self.assertEqual([h['day'] for h in listed['hidden']],['2026-08-10']);self.assertNotIn('2026-08-10',{r['day'] for r in listed['rows']})
+            post(action='restore',day='2026-08-10');self.assertIn('2026-08-10',{r['day'] for r in self.request('/api/holidays?year=2026',cookie=cookie)['body']['rows']})
+            # Dos administradores: guardar o quitar con una versión antigua no pisa el cambio del otro.
+            post(action='save',day='2026-05-01',label='Día del Trabajo',scope='nacional',mode='especial',open_time='09:00',close_time='13:00')
+            version=next(r for r in self.request('/api/holidays?year=2026',cookie=cookie)['body']['rows'] if r['day']=='2026-05-01')['version'];self.assertTrue(version)
+            self.assertEqual(post(action='save',day='2026-05-01',label='Día del Trabajo',scope='nacional',mode='normal',version=version)['status'],200)
+            stale=post(action='save',day='2026-05-01',label='Día del Trabajo',scope='nacional',mode='cerrado',version=version);self.assertEqual((stale['status'],stale['body'].get('stale')),(409,True))
+            self.assertEqual(post(action='remove',day='2026-05-01',version=version)['status'],409)
+            with app.connect() as c:self.assertEqual(c.execute("SELECT mode FROM appointment_holidays WHERE day='2026-05-01'").fetchone()[0],'normal')
+            with app.connect() as c:self.assertEqual([r[0] for r in c.execute("SELECT action FROM audit WHERE action IN ('holiday_config_removed','holiday_removed') ORDER BY id")],['holiday_config_removed','holiday_removed'])
             # Una cita existente no se cancela al cerrar el día: se avisa del conflicto.
             day='2026-10-20';time=slots(day)[0]
             made=self.request('/api/appointments/new',{'name':'Cliente Ficticio','identification':'0100000017','phone':'0991234567','email':'cita@example.invalid','device_type':'portatil','brand':'HP','model':'Ficticio','service':service,'date':day,'time':time,'description':'Revisión ficticia','notes':'','request_key':'holiday-appointment-request-1'},cookie=cookie,csrf=csrf)
@@ -113,10 +127,10 @@ class HolidayAgendaTests(unittest.TestCase):
             found=today()['reminders'];self.assertEqual([(r['day'],r['days_left']) for r in found],[('2026-11-02',6),('2026-11-03',7)])
             self.assertEqual(found[0]['text'],'ADI informa: El lunes 2 de noviembre es feriado nacional (Día de Difuntos) y aún no se ha definido la atención. Revisa el decreto oficial y elige atención normal, horario especial o cerrado.')
             self.assertEqual(len(self.request('/api/agenda?from=2026-10-27&to=2026-11-30',cookie=cookie)['body']['holiday_reminders']),2)
-            # Al decidir la atención (cualquier modo) u ocultar la fecha, el recordatorio de ese día desaparece.
+            # Al decidir la atención (cualquier modo), el recordatorio de ese día desaparece; al quitar esa configuración, vuelve.
             post(action='save',day='2026-11-02',label='Día de Difuntos',scope='nacional',mode='normal');self.assertEqual([r['day'] for r in today()['reminders']],['2026-11-03'])
-            post(action='remove',day='2026-11-03');self.assertEqual(today()['reminders'],[])
-            post(action='restore',day='2026-11-03')
+            post(action='save',day='2026-11-03',label='Independencia de Cuenca',scope='nacional',mode='cerrado');self.assertEqual(today()['reminders'],[])
+            post(action='remove',day='2026-11-03');self.assertEqual([r['day'] for r in today()['reminders']],['2026-11-03'])
         with patch.object(appointments,'now',return_value=datetime(2026,11,2,9,0,tzinfo=appointments.TZ)):
             body=today();self.assertTrue(body['reminders'][0]['text'].startswith('ADI informa: Mañana es feriado nacional (Independencia de Cuenca)'));self.assertEqual(body['notice']['label'],'Día de Difuntos')
             # Solo administración recibe el recordatorio.

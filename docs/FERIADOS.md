@@ -44,3 +44,16 @@ Desde siete días antes de un feriado cuya atención nadie ha definido, ADI se l
 **Validaciones del servidor.** Cierre posterior a la apertura, en intervalos de 15 minutos y con duración suficiente para la cita más corta que se ofrece. El formulario de alta no pisa una fecha ya registrada ni un feriado calculado.
 
 **Fuente de los feriados.** Los nacionales se calculan en `holidays.national` con las reglas de traslado de la ley; no se consulta ningún servicio externo. Los locales no se suponen: los agrega administración para su localidad. Un decreto puede cambiar fechas: debe ajustarse aquí a mano.
+
+## Guardar y Quitar: causas y corrección (13/10/2026)
+
+**Diagnóstico** (contra la base real, con cada operación ensayada dentro de una transacción revertida): el servidor guardaba y quitaba correctamente y la auditoría registraba cada acción. Las causas del problema eran de comportamiento:
+
+1. **«Quitar» en un feriado oficial lo ocultaba del calendario** (quedaba en una lista de «ocultos») en lugar de quitar solo la configuración añadida. Por eso desaparecían feriados nacionales.
+2. **«Guardar» se desactivaba** cuando no había cambios y no dejaba confirmación en la tarjeta: parecía no responder.
+
+**Ahora.**
+- **Guardar cambios:** siempre responde. Con cambios, valida, consulta las citas del día, guarda y solo entonces muestra «Configuración guardada» en la tarjeta y el aviso «Configuración del feriado guardada correctamente». Sin cambios, dice «No hay cambios por guardar». Si falla, muestra «No se pudieron guardar los cambios. Inténtalo nuevamente» y conserva lo escrito. Mientras guarda, el botón indica «Guardando…» y no admite otro clic.
+- **Quitar configuración** (feriado oficial): borra solo la configuración; **el feriado permanece en el calendario** y su atención vuelve a «sin definir». Solo aparece cuando hay una configuración que quitar. **Eliminar día** (día propio): lo elimina. Ambas piden confirmación y ninguna toca una cita.
+- **Dos administradores a la vez:** cada fila lleva una versión; si alguien la cambió mientras otro la editaba, el segundo recibe un aviso, la lista se actualiza y nada se pisa.
+- Los feriados que quedaron ocultos con la versión anterior siguen pudiendo restaurarse desde la lista «Feriados oficiales ocultos del calendario».
