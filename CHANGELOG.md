@@ -4,6 +4,23 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.164 — 2026-10-14 14:05 (UTC-05:00)
+
+Verificación en dos pasos reforzada y tarjetas de equipos rediseñadas
+
+### Mejoras realizadas
+
+- Seguridad de mi cuenta: asistente de activación en dos pasos (QR centrado, clave manual oculta con Copiar, campo de 6 dígitos que admite pegar), estados No configurado, Configuración pendiente y Protección activa, y descarga de los códigos de recuperación
+- Tarjetas de equipos E01, E02…: cabecera sin superposición, estado compacto «Revisión recurrente» con el nombre completo accesible y selección discreta
+
+### Errores corregidos
+
+- Seguimiento de Órdenes: la etiqueta de revisiones recurrentes ya no corta «Atención en curso»
+
+### Actualizaciones de seguridad
+
+- Verificación en dos pasos: el secreto TOTP se guarda cifrado y autenticado con una clave maestra fuera de la base; se auditan los intentos fallidos
+
 ## v1.5.163 — 2026-10-14 13:40 (UTC-05:00)
 
 Estados automáticos de presupuestos sincronizados con la orden

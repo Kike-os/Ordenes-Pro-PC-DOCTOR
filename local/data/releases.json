@@ -8,6 +8,27 @@
   },
   "releases": [
     {
+      "version": "1.5.164",
+      "date": "2026-10-14T14:05:52-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Verificación en dos pasos reforzada y tarjetas de equipos rediseñadas",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Seguridad de mi cuenta: asistente de activación en dos pasos (QR centrado, clave manual oculta con Copiar, campo de 6 dígitos que admite pegar), estados No configurado, Configuración pendiente y Protección activa, y descarga de los códigos de recuperación",
+          "Tarjetas de equipos E01, E02…: cabecera sin superposición, estado compacto «Revisión recurrente» con el nombre completo accesible y selección discreta"
+        ],
+        "fixes": [
+          "Seguimiento de Órdenes: la etiqueta de revisiones recurrentes ya no corta «Atención en curso»"
+        ],
+        "security": [
+          "Verificación en dos pasos: el secreto TOTP se guarda cifrado y autenticado con una clave maestra fuera de la base; se auditan los intentos fallidos"
+        ],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.163",
       "date": "2026-10-14T13:40:35-05:00",
       "type": "patch",
