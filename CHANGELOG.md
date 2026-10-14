@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.153 — 2026-10-14 06:43 (UTC-05:00)
+
+Indicador de estabilidad de versiones con verificaciones automáticas de solo lectura
+
+### Nuevas funcionalidades
+
+- Indicador de estabilidad de versiones en el acceso y en la barra superior: No verificada, Verificando, En observación, Estable o Requiere atención, según verificaciones reales registradas
+
 ## v1.5.152 — 2026-10-14 06:27 (UTC-05:00)
 
 Corrección de entregas revertidas por error: sin indicador «Entrega reabierta» y sin fecha de entrega residual

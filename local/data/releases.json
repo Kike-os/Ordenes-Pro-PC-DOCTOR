@@ -8,6 +8,22 @@
   },
   "releases": [
     {
+      "version": "1.5.153",
+      "date": "2026-10-14T06:43:35-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Indicador de estabilidad de versiones con verificaciones automáticas de solo lectura",
+      "changes": {
+        "features": [
+          "Indicador de estabilidad de versiones en el acceso y en la barra superior: No verificada, Verificando, En observación, Estable o Requiere atención, según verificaciones reales registradas"
+        ],
+        "improvements": [],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.152",
       "date": "2026-10-14T06:27:37-05:00",
       "type": "patch",
