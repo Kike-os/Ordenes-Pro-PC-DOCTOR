@@ -1811,7 +1811,7 @@ class Handler(BaseHTTPRequestHandler):
                 counts={r['code']:r['total'] for r in c.execute('SELECT s.code,COUNT(o.id) total FROM statuses s LEFT JOIN orders o ON o.status=s.code GROUP BY s.code')}
                 source='orders o JOIN devices d ON d.id=o.device_id JOIN clients c ON c.id=d.client_id JOIN statuses s ON s.code=o.status'
                 columns='o.id,o.code,o.status status_code,s.label status,o.updated_at,o.estimated_delivery,c.name client,c.phone,d.brand,d.model'
-                attention=[dict(r) for r in c.execute("SELECT "+columns+" FROM "+source+" WHERE o.status IN ('esperando_cliente','presupuesto','espera_entrega','listo') OR (o.estimated_delivery!='' AND o.estimated_delivery<? AND o.status!='entregado') ORDER BY CASE o.status WHEN 'esperando_cliente' THEN 1 WHEN 'presupuesto' THEN 2 WHEN 'espera_entrega' THEN 3 WHEN 'listo' THEN 4 ELSE 5 END,o.estimated_delivery,o.id LIMIT 8",(today,))]
+                attention=[dict(r) for r in c.execute("SELECT "+columns+" FROM "+source+" WHERE o.status IN ('esperando_cliente','presupuesto','espera_entrega','listo','revision_recurrente') OR (o.estimated_delivery!='' AND o.estimated_delivery<? AND o.status!='entregado') ORDER BY CASE o.status WHEN 'esperando_cliente' THEN 1 WHEN 'presupuesto' THEN 2 WHEN 'espera_entrega' THEN 3 WHEN 'listo' THEN 4 ELSE 5 END,o.estimated_delivery,o.id LIMIT 8",(today,))]
                 deliveries=[dict(r) for r in c.execute("SELECT "+columns+" FROM "+source+" WHERE o.status!='entregado' AND (o.estimated_delivery>=? OR o.status IN ('listo','espera_entrega')) ORDER BY CASE WHEN o.estimated_delivery='' THEN 1 ELSE 0 END,o.estimated_delivery,o.id LIMIT 5",(today,))]
                 scheduled=[r for r in maintenance.rows(c) if r['state'] in ('scheduled','appointment')][:5]
                 today_start=appointments.stamp(appointments.datetime.combine(now.date(),appointments.time.min,appointments.TZ));tomorrow=appointments.stamp(appointments.datetime.combine(now.date()+appointments.timedelta(days=1),appointments.time.min,appointments.TZ))
@@ -2968,6 +2968,14 @@ class Handler(BaseHTTPRequestHandler):
                         # Revertir una entrega reabre el contador de permanencia: solo administración, y queda auditado.
                         reverted=old=='entregado' and status!='entregado'
                         if reverted and user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede revertir una entrega registrada.'})
+                        # Falla recurrente: misma orden, motivo obligatorio y técnico responsable (el indicado o el asignado). Queda registrada aparte.
+                        if status==order_workspace.RECURRENT and old!=status:
+                            technician=str(data.get('technician',''))
+                            technician=int(technician) if technician.isdigit() and c.execute('SELECT 1 FROM users WHERE id=? AND active=1',(technician,)).fetchone() else c.execute('SELECT assigned_to FROM orders WHERE id=?',(oid,)).fetchone()[0]
+                            note,problem=order_workspace.recurrence(c,int(oid),old,comment,technician,user,now)
+                            if problem:return self.reply(400,{'error':problem,'fields':{'comment':problem}})
+                            if technician:c.execute('UPDATE orders SET assigned_to=? WHERE id=?',(technician,oid))
+                            comment=note
                         if status=='entregado' and old!='entregado':
                             blocked=equipment.delivery_block(c,int(oid))
                             if blocked:return self.reply(409,{'error':blocked,'balance':True})

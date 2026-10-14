@@ -2,7 +2,8 @@
 from datetime import date
 from decimal import Decimal, InvalidOperation
 
-STATUSES={'pendiente':'En espera','reparacion':'Procesando','esperando_cliente':'Esperando respuesta del cliente','presupuesto':'Aprobación de presupuesto','espera_entrega':'En espera de entrega','listo':'Listo para entregar','entregado':'Entregado'}
+STATUSES={'pendiente':'En espera','reparacion':'Procesando','revision_recurrente':'En revisión por falla recurrente','esperando_cliente':'Esperando respuesta del cliente','presupuesto':'Aprobación de presupuesto','espera_entrega':'En espera de entrega','listo':'Listo para entregar','entregado':'Entregado'}
+RECURRENT='revision_recurrente'
 BUDGET_KEYS=('labor','parts','services','digital')
 
 
@@ -21,6 +22,33 @@ def history(c,oid=None,limit=300):
     return [dict(r) for r in c.execute(HISTORY_SQL+' WHERE h.order_id=? ORDER BY h.id DESC',(oid,))]
 
 
+def recurrence(c,oid,old,reason,technician,user,now):
+    """Nueva revisión por falla recurrente en la misma orden: registro inmutable (número de vez, motivo, técnico, fecha y, si estaba
+    entregada, la entrega original) y su entrada en el historial. Devuelve el texto del historial o un error si falta el motivo."""
+    reason=' '.join(str(reason or '').split())
+    if len(reason)<10:return None,'Indica el motivo de la nueva revisión (al menos 10 caracteres).'
+    row=c.execute('SELECT delivered_at FROM orders WHERE id=?',(oid,)).fetchone()
+    number=c.execute('SELECT COALESCE(MAX(number),0)+1 FROM order_recurrences WHERE order_id=?',(oid,)).fetchone()[0]
+    tech=c.execute('SELECT id,name FROM users WHERE id=?',(technician,)).fetchone() if technician else None
+    reentry=old=='entregado'
+    c.execute('INSERT INTO order_recurrences(order_id,number,reason,technician_id,actor_id,previous_status,reentry,delivered_at,created_at) VALUES (?,?,?,?,?,?,?,?,?)',
+              (oid,number,reason[:2000],tech['id'] if tech else None,user['id'],old,1 if reentry else 0,(row['delivered_at'] or '') if reentry else '',now.isoformat(timespec='seconds')))
+    text='Revisión por falla recurrente n.º '+str(number)+' · Técnico responsable: '+(tech['name'] if tech else 'Sin asignar')+' · Motivo: '+reason
+    if reentry:
+        delivered=row['delivered_at'] or ''
+        try:
+            from datetime import datetime
+            from reception import ECUADOR_TZ
+            delivered=datetime.fromisoformat(delivered).astimezone(ECUADOR_TZ).strftime('%d/%m/%Y %H:%M') if delivered else ''
+        except ValueError:pass
+        text+=' · Reingreso del equipo tras la entrega'+(' del '+delivered if delivered else '')+' (la entrega original se conserva en el historial).'
+    return text,''
+
+
+def recurrences(c,oid):
+    return [dict(r) for r in c.execute("SELECT r.number,r.reason,r.previous_status,r.reentry,r.delivered_at,r.created_at,COALESCE(t.name,'') technician,COALESCE(a.name,'') actor FROM order_recurrences r LEFT JOIN users t ON t.id=r.technician_id LEFT JOIN users a ON a.id=r.actor_id WHERE r.order_id=? ORDER BY r.number",(oid,))]
+
+
 def transition_comment(old,new):
     return 'Estado cambiado de «%s» a «%s».'%(STATUSES.get(old,old),STATUSES.get(new,new))
 
@@ -29,6 +57,7 @@ def attach(c,order):
     actor=c.execute('SELECT name FROM users WHERE id=?',(order['assigned_to'],)).fetchone()
     order['responsible']=actor['name'] if actor else 'Sin asignar'
     order['history']=history(c,order['id'])
+    order['recurrences']=recurrences(c,order['id'])
     row=c.execute('SELECT * FROM order_budget WHERE order_id=?',(order['id'],)).fetchone()
     order['budget']={k+'_cents':row[k+'_cents'] if row else 0 for k in BUDGET_KEYS}
     order['budget']['total_cents']=sum(order['budget'].values())
@@ -106,6 +135,11 @@ def save(c,oid,data,user,now):
         import equipment
         state=equipment.money(c,oid);paid=state['paid_cents'];total=state['budget_cents'] if locked else sum(fields[k+'_cents'] for k in BUDGET_KEYS)
         if total>paid:return 409,{'error':'No se puede entregar: este equipo tiene un saldo pendiente de '+equipment.usd(total-paid)+'. Registra el pago antes de entregarlo.','balance':True}
+    # Falla recurrente: el motivo (comentario) es obligatorio y el técnico responsable es el asignado en este guardado.
+    note=''
+    if fields['status']==RECURRENT and row['status']!=RECURRENT:
+        note,problem=recurrence(c,oid,row['status'],fields['comment'],fields['assigned_to'],user,now)
+        if problem:return 400,{'error':problem,'fields':{'comment':problem}}
     keys=('problem','status','priority','assigned_to','estimated_delivery','internal_notes','recommendations','findings')
     c.execute('UPDATE orders SET '+','.join(k+'=?' for k in keys)+',updated_at=?,revision=revision+1 WHERE id=?',(*(fields[k] for k in keys),now.isoformat(timespec='microseconds'),oid))
     from maintenance import transition
@@ -122,5 +156,5 @@ def save(c,oid,data,user,now):
         c.executemany('INSERT INTO order_budget_lines(order_id,category,description,amount_cents) VALUES (?,?,?,?)',[(oid,*line) for line in fields['lines']])
     # Si la edición cambió el estado, el registro lo dice de forma explícita para que sirva como auditoría.
     changed=row['status']!=fields['status']
-    event(c,oid,user['id'],now,'status' if changed else 'updated',fields['comment'] or (transition_comment(row['status'],fields['status']) if changed else 'Seguimiento técnico actualizado.'))
+    event(c,oid,user['id'],now,'status' if changed else 'updated',note or fields['comment'] or (transition_comment(row['status'],fields['status']) if changed else 'Seguimiento técnico actualizado.'))
     return 200,{'ok':True}

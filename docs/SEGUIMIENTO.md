@@ -96,3 +96,12 @@ Los otros contadores revisados (avisos, ADI, asistencia en vivo, grupos de presu
 - **Órdenes con varios equipos**: cada fila es un equipo. El enlace muestra el identificador de la orden y la etiqueta «Equipo 2/3» el equipo (su código individual está en la descripción emergente). El indicador de la fila es el estado de ese equipo; debajo figura el **estado general de la orden**, calculado por `equipment.overall` con todos sus equipos: nunca dice «Orden completada» mientras quede un equipo sin entregar («Entrega parcial», «Atención en curso»…). El servidor lo entrega en `group` dentro de cada fila de `/api/tracking`.
 - **Celulares**: una tarjeta por equipo (orden y equipo, estado, cliente y técnico, último movimiento, acciones), sin desplazamiento horizontal.
 - Solo cambia la presentación: no se modifican estados, historiales, clientes, equipos, órdenes, QR, tickets ni la búsqueda.
+
+## Estado «En revisión por falla recurrente» (1.5.162)
+
+- Código `revision_recurrente` (migración `057_recurring_review.sql`), color ámbar oscuro e icono de revisión circular, en el selector de estados, el Seguimiento de Órdenes, el Centro de Seguimiento Técnico (atención), el detalle, la tarjeta y la página pública de seguimiento (etapa «Diagnóstico y reparación» / «En proceso»).
+- Misma orden y mismo número: no se crea otra orden. Al elegirlo se pide el **motivo** (obligatorio, mínimo 10 caracteres) y el **técnico responsable** (por omisión, el asignado). También desde la edición completa de la orden (el comentario es el motivo).
+- Cada revisión queda en `order_recurrences` (inmutable): número de vez, fecha y hora, técnico, quién la registró, estado anterior y, si el equipo ya estaba entregado, **reingreso** con la fecha de la entrega original. El historial anterior (diagnósticos, reparaciones, estados) no se toca; la entrada del historial dice «Revisión por falla recurrente n.º N · Técnico responsable · Motivo».
+- Conteo: «Revisión n.º N» en el Seguimiento de Órdenes y el bloque «Revisiones por falla recurrente» en el detalle. Las observaciones y resultados de pruebas se registran como siempre (seguimiento, hallazgos, recomendaciones).
+- Órdenes con varios equipos: cada equipo (E01, E02…) tiene su propio estado, así que solo cambia el equipo afectado y el estado general de la orden se recalcula.
+- Después se continúa con los estados normales (Procesando, Listo para entregar, Entregado). Al volver a entregar se registra la nueva entrega y su mantenimiento preventivo.

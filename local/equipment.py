@@ -173,7 +173,7 @@ UNIT_SQL=("SELECT o.id,o.code,o.group_id,o.unit_no,o.status status_code,s.label 
           +BUDGET+" budget_cents,"+PAID+" paid_cents FROM orders o JOIN devices d ON d.id=o.device_id JOIN statuses s ON s.code=o.status ")
 
 
-PHASES=(('recibido','Recibido',('pendiente',)),('proceso','En proceso',('reparacion','esperando_cliente','presupuesto')),('listo','Listo para entregar',('listo','espera_entrega')),('entregado','Entregado',('entregado',)))
+PHASES=(('recibido','Recibido',('pendiente',)),('proceso','En proceso',('reparacion','esperando_cliente','presupuesto','revision_recurrente')),('listo','Listo para entregar',('listo','espera_entrega')),('entregado','Entregado',('entregado',)))
 def phase(status):
     """Etapa (recibido, proceso, listo, entregado) a la que pertenece un estado de equipo."""
     return next((code for code,_,statuses in PHASES if status in statuses),'recibido')

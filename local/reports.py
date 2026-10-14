@@ -7,7 +7,7 @@ from datetime import date, datetime, timedelta
 from reception import DEVICE_TYPES, ECUADOR_TZ
 
 PERIODS = {'day': 'Diario', 'week': 'Semanal', 'month': 'Mensual', 'year': 'Anual'}
-STATUS_ORDER = ('pendiente', 'reparacion', 'esperando_cliente', 'presupuesto', 'espera_entrega', 'listo', 'entregado')
+STATUS_ORDER = ('pendiente', 'reparacion', 'revision_recurrente', 'esperando_cliente', 'presupuesto', 'espera_entrega', 'listo', 'entregado')
 MAX_BUCKETS = 120
 MAX_ROWS = 200
 

@@ -9,9 +9,9 @@ from reception import DEVICE_TYPES
 
 PAGE = 8
 # Etapas del flujo real y estados configurados que pertenecen a cada una.
-STAGES = (('Recibido', ('pendiente',)), ('En proceso', ('reparacion', 'esperando_cliente', 'presupuesto')), ('Listo', ('listo', 'espera_entrega')), ('Entregado', ('entregado',)))
+STAGES = (('Recibido', ('pendiente',)), ('En proceso', ('reparacion', 'esperando_cliente', 'presupuesto', 'revision_recurrente')), ('Listo', ('listo', 'espera_entrega')), ('Entregado', ('entregado',)))
 # Contadores superiores, calculados con los estados configurados (no existe un estado «diagnóstico» propio).
-COUNTERS = (('pending', 'En espera', ('pendiente',)), ('process', 'En proceso', ('reparacion',)), ('waiting', 'Esperando respuesta', ('esperando_cliente', 'presupuesto')),
+COUNTERS = (('pending', 'En espera', ('pendiente',)), ('process', 'En proceso', ('reparacion', 'revision_recurrente')), ('waiting', 'Esperando respuesta', ('esperando_cliente', 'presupuesto')),
             ('ready', 'Listas para entregar', ('listo', 'espera_entrega')), ('done', 'Entregadas', ('entregado',)))
 
 
@@ -81,7 +81,7 @@ def build(c, filters):
         "SELECT o.id,o.group_id,o.unit_no,COALESCE(o.code,'OP-'||printf('%05d',o.id)) code,o.status status_code,s.label status,o.priority,o.received_at,o.created_at,cl.name client,COALESCE(cl.phone,'') phone,COALESCE(d.serial,'') serial,"
         "COALESCE(NULLIF(d.kind,''),d.category) type,d.brand,d.model,COALESCE(u.name,'') responsible,h.id event_id,h.event,h.comment,h.occurred_at,h.status_label,COALESCE(a.name,'') actor,"
         "(SELECT p.status_label FROM order_history p WHERE p.order_id=o.id AND p.id<h.id AND p.status_label!='' ORDER BY p.id DESC LIMIT 1) previous_label,"
-        "(SELECT COUNT(*) FROM order_history x WHERE x.order_id=o.id) events," + equipment.BUDGET + " budget_cents," + equipment.PAID + " paid_cents " + source +
+        "(SELECT COUNT(*) FROM order_history x WHERE x.order_id=o.id) events,(SELECT COUNT(*) FROM order_recurrences r WHERE r.order_id=o.id) recurrences," + equipment.BUDGET + " budget_cents," + equipment.PAID + " paid_cents " + source +
         # Orden por fecha del último movimiento: lo más reciente primero (por omisión) o lo más antiguo primero.
         (' ORDER BY COALESCE(h.id,0) ASC,o.id ASC' if filters.get('sort') == 'antiguo' else ' ORDER BY COALESCE(h.id,0) DESC,o.id DESC') + ' LIMIT ? OFFSET ?', (*args, size, (page - 1) * size))]
     seen = {}

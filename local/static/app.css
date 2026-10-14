@@ -6876,3 +6876,13 @@ button.live-appointment .agenda-badge.state-pill,.live-card-meta .agenda-badge.s
 .campaign-recipients li small{grid-column:1;color:#8fa5c4;overflow:hidden;text-overflow:ellipsis}.campaign-recipients li>:last-child{grid-column:2;grid-row:1/span 2}
 .campaign-state{font-size:11px;color:#a9c1e4}
 @media(max-width:560px){.picker-foot{justify-content:stretch}.picker-foot>button{flex:1 1 100%}}
+/* Estado «En revisión por falla recurrente»: ámbar oscuro con icono de revisión circular, en todas las vistas de estado. */
+.status-label[data-status=revision_recurrente]{background:#2b1b08;border-color:#b5701a;color:#ffc27a}
+.tracking-state>.status-label[data-status=revision_recurrente]{--ts-line:#a86818;--ts-bg:#2b1b08;--ts-ink:#ffb75e}
+.equip-state[data-status=revision_recurrente]{border-color:#b5701a99;background:#2b1b08;color:#ffd29a}
+.oh-item[data-status=revision_recurrente],.tracking-item[data-status=revision_recurrente]{--tk:#d08a2e;--tk-soft:#d08a2e2b}
+.tracking-recur{flex:none;display:inline-flex;align-items:center;height:16px;padding:0 6px;border:1px solid #a86818;border-radius:999px;font-size:10px;font-weight:700;line-height:1;color:#ffb75e;white-space:nowrap}
+.recurrence-box{margin:0 0 10px;padding:9px 12px;border:1px solid #6b4512;border-left:3px solid #d08a2e;border-radius:10px;background:#1c1409}
+.recurrence-box strong{font-size:12.5px;color:#ffc27a}
+.recurrence-box ol{list-style:none;margin:6px 0 0;padding:0;display:grid;gap:5px}
+.recurrence-box li{display:grid;gap:1px;font-size:12px;color:#e8d6bd}.recurrence-box b{font-size:11px;color:#ffb75e}.recurrence-box small{font-size:11px;color:#b39b7c}

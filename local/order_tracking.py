@@ -13,7 +13,7 @@ from corporate import settings
 from reception import DEVICE_TYPES,ECUADOR_TZ,public_base_url
 
 TOKEN=re.compile(r'[A-Za-z0-9_-]{22}')
-PHASES=(('Recibido',('pendiente',)),('En proceso',('reparacion','esperando_cliente','presupuesto')),('Listo',('listo','espera_entrega')),('Entregado',('entregado',)))
+PHASES=(('Recibido',('pendiente',)),('En proceso',('reparacion','esperando_cliente','presupuesto','revision_recurrente')),('Listo',('listo','espera_entrega')),('Entregado',('entregado',)))
 
 
 def url(token):
@@ -61,7 +61,7 @@ def public_page(data,token=''):
 
 # Tarjeta Digital de Seguimiento Técnico: ticket de dos secciones (datos de la orden arriba; QR y código de barras abajo).
 # Las etapas salen del estado real de la orden; una etapa futura nunca se marca como completada.
-STAGES=(('Recepción',('pendiente',)),('Diagnóstico y reparación',('reparacion','esperando_cliente','presupuesto')),('Listo para retiro',('listo','espera_entrega')),('Entrega',('entregado',)))
+STAGES=(('Recepción',('pendiente',)),('Diagnóstico y reparación',('reparacion','esperando_cliente','presupuesto','revision_recurrente')),('Listo para retiro',('listo','espera_entrega')),('Entrega',('entregado',)))
 CARD_HEAD='<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><meta name="robots" content="noindex,nofollow">%s<title>Seguimiento de reparación %s | PC-DOCTOR S.A.</title><link rel="icon" href="/favicon.ico?v=2" sizes="48x48"><link rel="stylesheet" href="/static/ticket.css"><script defer src="/static/ticket.js"></script></head><body class="ticket-page"><main>'
 
 
