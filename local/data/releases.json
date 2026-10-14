@@ -8,6 +8,24 @@
   },
   "releases": [
     {
+      "version": "1.5.154",
+      "date": "2026-10-14T07:00:33-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Estabilidad de la versión automatizada con tareas programadas del servidor",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Estabilidad de la versión automatizada desde el servidor: tres verificaciones programadas al día, historial por versión, tiempo restante, próxima verificación y paso automático a «Versión estable»"
+        ],
+        "fixes": [
+          "La estabilidad ya no depende de las visitas, no pierde el historial de versiones anteriores y un fallo crítico reinicia el seguimiento en lugar de bloquearlo"
+        ],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.153",
       "date": "2026-10-14T06:43:35-05:00",
       "type": "patch",
