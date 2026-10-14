@@ -33,8 +33,8 @@ KEEP = 60
 KEEP_VERSIONS = 40
 # Horas (UTC) de las tareas programadas en Vercel que ejecutan las verificaciones; deben coincidir con vercel.json.
 SCHEDULE_UTC = (6, 14, 22)
-LABELS = {'unverified': 'No verificada', 'verifying': 'Verificando', 'observing': 'En observación', 'stable': 'Versión estable', 'attention': 'Requiere atención'}
-SHORT = {'unverified': 'No verificada', 'verifying': 'Verificando', 'observing': 'En observación', 'stable': 'Estable', 'attention': 'Requiere atención'}
+LABELS = {'unverified': 'Verificación pendiente', 'verifying': 'Verificando', 'observing': 'En observación', 'stable': 'Versión estable', 'attention': 'Incidencia detectada'}
+SHORT = {'unverified': 'Pendiente', 'verifying': 'Verificando', 'observing': 'En observación', 'stable': 'Estable', 'attention': 'Incidencia'}
 
 
 def _load(c, key, default):
@@ -225,7 +225,9 @@ def status(c, now):
     summary = _summary(c, version)
     history = _load(c, 'stability_runs', [])
     last = next((entry for entry in reversed(history) if entry['version'] == version), None)
-    remaining, missing = None, max(0, MIN_PASSES - summary['window_passes'])
+    remaining, missing, end = None, max(0, MIN_PASSES - summary['window_passes']), None
+    # Una prueba no crítica fallida en la última verificación no reinicia el período, pero impide declarar la versión estable.
+    clean = bool(last) and not last['warnings'] and not last['critical_failures']
     if _running(c, now) and _running(c, now).get('version') == version:
         state = 'verifying'
     elif not summary['runs']:
@@ -237,7 +239,7 @@ def status(c, now):
         # La decisión usa el instante exacto; el redondeo es solo para mostrar el tiempo restante.
         complete = now >= end
         remaining = 0.0 if complete else max(0.01, round((end - now).total_seconds() / 3600, 2))
-        state = 'stable' if complete and not missing else 'observing'
+        state = 'stable' if complete and not missing and clean else 'observing'
     incidents = [{'at': item['at'], 'items': item['items'], 'critical': True} for item in summary['criticals']]
     incidents += [{'at': entry['at'], 'items': entry['warnings'], 'critical': False} for entry in history if entry['version'] == version and entry['warnings'] and not entry['critical_failures']]
     incidents = sorted(incidents, key=lambda item: item['at'])[-5:]
@@ -250,4 +252,5 @@ def status(c, now):
             'tests': [{'name': r['name'], 'ok': r['ok'], 'critical': r['critical']} for r in (last['results'] if last else [])],
             'passed': last['passed'] if last else 0, 'total': last['total'] if last else len(checks(c)),
             'incidents': incidents, 'observation_hours': OBSERVATION_HOURS, 'min_passes': MIN_PASSES, 'remaining_hours': remaining,
-            'first_pass': summary['window_start'], 'next_scheduled': next_scheduled(now), 'previous': previous}
+            'first_pass': summary['window_start'], 'next_scheduled': next_scheduled(now), 'previous': previous,
+            'window_end': end.isoformat(timespec='seconds') if end else '', 'clean': clean, 'server_time': now.isoformat(timespec='seconds')}

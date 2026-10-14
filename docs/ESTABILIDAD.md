@@ -47,3 +47,12 @@ Las rutas programadas solo responden a la plataforma (cabecera `Authorization: B
 1. Pulsar el distintivo (acceso o barra superior): «Período de seguimiento», «Tiempo restante», «Próxima verificación programada» y «Última verificación».
 2. `GET /api/public/stability` devuelve los mismos datos (sin datos de clientes).
 3. Vercel → proyecto → Settings → Cron Jobs: las tres tareas y su última ejecución.
+
+## Monitor y barra superior (1.5.156)
+
+- Estados y colores: **Verificación pendiente** (azul, sin resultados), **Verificando** (azul), **En observación** (ámbar), **Versión estable** (verde) e **Incidencia detectada** (rojo).
+- «Versión estable» exige además que la **última verificación supere todas las pruebas**, también las no críticas (por ejemplo, el correo). Una prueba no crítica fallida no reinicia el período, pero impide declarar la versión estable hasta que se supere.
+- La ventana muestra cuenta atrás (anclada a la hora del servidor y al fin del período que calcula el servidor), barra del período, verificaciones completadas y pendientes, última y próxima verificación, pruebas, incidencias y versiones anteriores. Al cumplirse el tiempo vuelve a consultar al servidor, que decide el estado.
+- Recargar la página o iniciar sesión no reinicia nada: el período lo fija el servidor con la primera verificación correcta de la versión. Lo que inicia un período nuevo es publicar otra versión.
+- Barra superior: el indicador de versión y el de estabilidad son un único componente (`#release-chip`): versión, luz de estado y estado. Al pulsarlo abre «Estabilidad de la versión»; si hay una actualización pendiente o en curso abre el panel de actualizaciones, también accesible desde la ventana de estabilidad. Por debajo de 1000 px el componente va en el menú.
+- Buscador: «/» o Ctrl+K enfocan la búsqueda de órdenes, clientes y números de serie.

@@ -6719,3 +6719,67 @@ button.live-appointment .agenda-badge.state-pill,.live-card-meta .agenda-badge.s
 @media(max-width:1280px){#stability-top .stability-badge{width:32px}}
 .stability-previous{list-style:none;margin:0;padding:0;display:grid;gap:3px;font-size:12px;color:#b9c9e2}
 .stability-badge[data-state=stable]{box-shadow:inset 0 1px #ffffff1f,0 0 14px #3fd39a40}
+/* Monitor de estabilidad: colores de estado — estable verde, en observación ámbar, incidencia rojo, pendiente o verificando azul. */
+.stability-badge[data-state=unverified],.stability-state[data-state=unverified],.stability-dialog[data-state=unverified]{--st:#5aa9ff}
+.stability-badge[data-state=verifying],.stability-state[data-state=verifying],.stability-dialog[data-state=verifying]{--st:#5aa9ff}
+.stability-dialog[data-state=observing]{--st:#ffb455}.stability-dialog[data-state=stable]{--st:#3fd39a}.stability-dialog[data-state=attention]{--st:#ff6b78}
+/* Indicador unificado de la barra superior: versión + luz de estado + estado real de estabilidad, en un solo componente. */
+.premium-header .release-chip{gap:8px;height:34px;padding:0 12px 0 10px;border:1px solid #243a5c;background:linear-gradient(180deg,#0f1f38,#0b1629);box-shadow:inset 0 1px #ffffff0d;font-family:inherit}
+.release-chip .release-label{font-size:12px;font-weight:700;letter-spacing:.02em;font-variant-numeric:tabular-nums;color:#e6eefc;font-family:inherit}
+.release-chip .release-dot{display:none}
+.release-stability{--st:#5aa9ff;display:inline-flex;align-items:center;gap:6px;padding-left:9px;border-left:1px solid #26405f;font-size:10.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--st);white-space:nowrap}
+.release-stability[data-state=stable]{--st:#3fd39a}.release-stability[data-state=observing]{--st:#ffb455}.release-stability[data-state=attention],.release-stability[data-state=error]{--st:#ff6b78}
+.release-light{position:relative;flex:none;width:7px;height:7px;border-radius:50%;background:var(--st);box-shadow:0 0 0 2px color-mix(in srgb,var(--st) 22%,transparent),0 0 8px color-mix(in srgb,var(--st) 70%,transparent)}
+.release-stability:is([data-state=observing],[data-state=verifying],[data-state=pending]) .release-light::after{content:'';position:absolute;inset:-4px;border-radius:50%;border:1px solid var(--st);opacity:0;animation:release-light 2.6s ease-out infinite}
+@keyframes release-light{0%{transform:scale(.6);opacity:.55}100%{transform:scale(1.6);opacity:0}}
+.premium-header .release-chip:hover{border-color:#3b5f92}
+@media(max-width:1280px) and (min-width:1000px){.release-stability{font-size:0;gap:0;padding-left:8px}.release-stability .release-stability-text{display:none}}
+@media(max-width:999px){.release-chip{align-self:flex-start}}
+/* Ventana «Estabilidad de la versión»: compacta, con luz de estado, cuenta atrás, barra del período y verificaciones. */
+.stability-dialog{--st:#5aa9ff;width:min(420px,calc(100% - 24px));padding:14px 16px 12px}
+.stability-head{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:10px;margin-bottom:10px}
+.stability-head h2{margin:0;font-size:15px}
+.stability-sub{margin:1px 0 0;font-size:11.5px;color:#8fa5c4;font-variant-numeric:tabular-nums}
+.stability-light{width:10px;height:10px;border-radius:50%;background:var(--st);box-shadow:0 0 0 3px color-mix(in srgb,var(--st) 20%,transparent),0 0 12px color-mix(in srgb,var(--st) 65%,transparent)}
+.stability-dialog:is([data-state=observing],[data-state=verifying]) .stability-light{animation:stability-breathe 2.8s ease-in-out infinite}
+@keyframes stability-breathe{50%{box-shadow:0 0 0 5px color-mix(in srgb,var(--st) 10%,transparent),0 0 16px color-mix(in srgb,var(--st) 45%,transparent)}}
+.stability-dialog .stability-state{padding:8px 10px;margin-bottom:10px}
+.stability-dialog .stability-state strong{font-size:13px}.stability-dialog .stability-state span{font-size:11.5px}
+.stability-period{display:grid;gap:7px;padding:11px 12px;margin-bottom:10px;border:1px solid #1f3352;border-radius:12px;background:#0a1424}
+.stability-clock{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 8px}
+.stability-count{font-size:22px;line-height:1.1;font-weight:800;color:#f2f6ff;font-variant-numeric:tabular-nums}
+.stability-count-label{font-size:11.5px;color:#8fa5c4}
+.stability-bar{position:relative;height:6px;border-radius:999px;background:#16263f;overflow:hidden}
+.stability-bar i{position:absolute;inset:0 auto 0 0;width:0;border-radius:inherit;background:linear-gradient(90deg,color-mix(in srgb,var(--st) 60%,#0a1424),var(--st));box-shadow:0 0 8px color-mix(in srgb,var(--st) 55%,transparent);transition:width .6s ease}
+.stability-span{display:flex;justify-content:space-between;gap:8px;font-size:10.5px;color:#7f93b2;font-variant-numeric:tabular-nums}
+.stability-checks{display:flex;align-items:center;gap:9px;font-size:12px;color:#c5d5ee}
+.stability-dots{display:flex;gap:4px}
+.stability-dots i{width:18px;height:6px;border-radius:999px;background:#1d2f4c;border:1px solid #2a4063}
+.stability-dots i[data-done=true]{background:var(--st);border-color:transparent;box-shadow:0 0 6px color-mix(in srgb,var(--st) 55%,transparent)}
+.stability-dialog .stability-facts{grid-template-columns:1fr 1fr;gap:8px 12px;margin-bottom:8px}
+.stability-dialog .stability-facts div{display:grid;grid-template-columns:1fr;gap:1px}
+.stability-dialog .stability-facts dt{font-size:10.5px;letter-spacing:.04em;text-transform:uppercase}
+.stability-dialog .stability-facts dd{font-size:12.5px;font-variant-numeric:tabular-nums}
+.stability-note{margin:0 0 8px;padding:7px 10px;border-left:3px solid #ffb455;border-radius:6px;background:#1d1a14;font-size:11.5px;color:#f3dcb0}
+.stability-block{border-top:1px solid #1c2c47}
+.stability-block summary{display:flex;align-items:center;justify-content:space-between;padding:8px 2px;font-size:12px;font-weight:700;color:#c5d5ee;cursor:pointer;list-style:none}
+.stability-block summary::-webkit-details-marker{display:none}
+.stability-block summary::after{content:'';width:7px;height:7px;border-right:2px solid #6f84a3;border-bottom:2px solid #6f84a3;transform:rotate(45deg);transition:transform .2s}
+.stability-block[open] summary::after{transform:rotate(-135deg)}
+.stability-block summary:focus-visible{outline:2px solid #8bb8ff;outline-offset:2px;border-radius:6px}
+.stability-block>:not(summary){margin-bottom:8px}
+.stability-empty,.stability-incident{margin:0 0 4px;font-size:12px;color:#b9c9e2}.stability-incident[data-critical=true]{color:#ff9aa3}
+.stability-previous li{display:flex;flex-wrap:wrap;gap:4px 8px}.stability-previous strong{color:#e6eefc}
+.stability-updates{border-top:1px solid #1c2c47;padding-top:8px}
+.stability-updates-open{display:inline-flex;align-items:center;gap:7px;width:auto;min-height:32px;margin:0;padding:0 11px;border:1px solid #2a4063;border-radius:9px;background:#10203a;color:#c5d5ee;font-size:12px;font-weight:650;cursor:pointer}
+.stability-updates-open svg{width:14px;height:14px;fill:none;stroke:#8bb8ff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.stability-updates-open:focus-visible{outline:2px solid #8bb8ff;outline-offset:2px}
+.stability-dialog .stability-rule{margin-top:8px;font-size:10.5px}
+@media(max-width:420px){.stability-dialog .stability-facts{grid-template-columns:1fr}.stability-count{font-size:20px}}
+/* Buscador de la barra: atajo «/» visible en escritorio mientras el campo está vacío y sin foco. */
+.premium-header #global-search{position:relative}
+.premium-header #global-search .search-kbd{flex:none;display:inline-grid;place-items:center;min-width:18px;height:18px;padding:0 4px;border:1px solid #2c405c;border-radius:5px;background:#0b1626;color:#7f93b2;font:600 10.5px/1 ui-monospace,monospace}
+.premium-header #global-search:focus-within .search-kbd,.premium-header #global-search:has(input:not(:placeholder-shown)) .search-kbd{display:none}
+@media(hover:none),(max-width:999px){.premium-header #global-search .search-kbd{display:none}}
+@media(prefers-reduced-motion:reduce){.release-stability .release-light::after,.stability-dialog .stability-light{animation:none}.stability-bar i,.stability-block summary::after{transition:none}}
+.stability-head>div{min-width:0;text-align:left}.stability-head h2,.stability-head .stability-sub{text-align:left}

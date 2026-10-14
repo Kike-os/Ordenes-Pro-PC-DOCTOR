@@ -8,6 +8,9 @@ import app
 import stability
 
 
+MAIL = {'MAIL_IMAP_HOST': 'i.example.invalid', 'MAIL_SMTP_HOST': 's.example.invalid', 'MAIL_USERNAME': 'b@example.invalid', 'MAIL_PASSWORD': 'x'}
+
+
 class StabilityTests(unittest.TestCase):
     setUpClass = classmethod(test_app.SecurityTests.setUpClass.__func__)
     setUp = test_app.SecurityTests.setUp
@@ -22,7 +25,7 @@ class StabilityTests(unittest.TestCase):
     def test_without_checks_the_version_is_not_verified(self):
         with app.connect() as c:
             info = stability.status(c, app.reception_now())
-        self.assertEqual((info['state'], info['label'], info['last_check'], info['passed']), ('unverified', 'No verificada', '', 0))
+        self.assertEqual((info['state'], info['label'], info['last_check'], info['passed']), ('unverified', 'Verificación pendiente', '', 0))
 
     def test_checks_are_read_only_recorded_and_lead_to_observation_then_stable(self):
         cookie, csrf = self.login()
@@ -44,7 +47,7 @@ class StabilityTests(unittest.TestCase):
 
     def test_a_critical_failure_requires_attention_and_blocks_stable(self):
         now = app.reception_now()
-        with app.connect() as c:
+        with patch.dict(app.os.environ, MAIL), app.connect() as c:
             for hours in (40, 30):
                 stability.run(c, now - timedelta(hours=hours))
             # Una migración pendiente (simulada con una carpeta temporal) es un fallo crítico de la base de datos.
@@ -74,10 +77,23 @@ class StabilityTests(unittest.TestCase):
             entry = stability.run(c, app.reception_now())
         self.assertEqual((entry['critical_failures'], entry['warnings']), ([], ['Servicio de correo']))
 
+    def test_a_failed_non_critical_check_prevents_stable_until_everything_passes(self):
+        now = app.reception_now()
+        with app.connect() as c:
+            for hours in (30, 20, 2):
+                stability.run(c, now - timedelta(hours=hours))
+            info = stability.status(c, now)
+            # Período y verificaciones cumplidos, pero el correo falla: no se declara estable (y no se reinicia el período).
+            self.assertEqual((info['state'], info['clean'], info['window_passes'], info['remaining_hours']), ('observing', False, 3, 0.0))
+            with patch.dict(app.os.environ, MAIL):
+                stability.run(c, now)
+            self.assertEqual(stability.status(c, now)['state'], 'stable')
+            self.assertTrue(stability.status(c, now)['window_end'])
+
     def test_a_new_version_starts_a_new_follow_up_and_keeps_the_previous_history(self):
         now = app.reception_now()
         real = stability.versioning.load()
-        with app.connect() as c:
+        with patch.dict(app.os.environ, MAIL), app.connect() as c:
             for hours in (30, 20, 2):
                 stability.run(c, now - timedelta(hours=hours))
             old = real['releases'][0]['version']
