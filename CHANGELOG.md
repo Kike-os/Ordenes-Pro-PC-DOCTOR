@@ -4,6 +4,18 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.149 — 2026-10-13 21:32 (UTC-05:00)
+
+Restauración de firma corporativa original
+
+### Mejoras realizadas
+
+- Citas: una cita marcada «En atención» por error puede volver a agendada desde la agenda («Volver a cita agendada»), sin avisos al cliente y conservando su historial.
+
+### Errores corregidos
+
+- Restauración de firma corporativa original: se corrigió la visualización de la firma corporativa en la configuración y los correos electrónicos, restaurando el logotipo original de PC-DOCTOR y conservando su distribución y diseño institucional.
+
 ## v1.5.148 — 2026-10-13 21:17 (UTC-05:00)
 
 Corrección de configuración de feriados y horarios especiales

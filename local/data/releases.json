@@ -8,6 +8,24 @@
   },
   "releases": [
     {
+      "version": "1.5.149",
+      "date": "2026-10-13T21:32:55-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Restauración de firma corporativa original",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Citas: una cita marcada «En atención» por error puede volver a agendada desde la agenda («Volver a cita agendada»), sin avisos al cliente y conservando su historial."
+        ],
+        "fixes": [
+          "Restauración de firma corporativa original: se corrigió la visualización de la firma corporativa en la configuración y los correos electrónicos, restaurando el logotipo original de PC-DOCTOR y conservando su distribución y diseño institucional."
+        ],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.148",
       "date": "2026-10-13T21:17:59-05:00",
       "type": "patch",
