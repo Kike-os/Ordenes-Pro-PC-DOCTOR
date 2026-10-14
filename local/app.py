@@ -947,6 +947,12 @@ class Handler(BaseHTTPRequestHandler):
                 import stability
                 now=reception_now()
                 if stability.due(c,now,10):stability.run(c,now,'programada')
+                try:
+                    import campaigns
+                    for campaign in campaigns.queued(c)[:2]:
+                        owner=c.execute('SELECT confirmed_by FROM mail_campaigns WHERE id=?',(campaign,)).fetchone()['confirmed_by']
+                        campaigns.process(c,campaign,now,owner,lambda conn,subject,text,title,email,actor,private:send_institutional(conn,'campaign',title,email,subject,text,None,actor,review=False,private=private)['archive_id'],budget=8)
+                except Exception as error:print('campaigns cron',type(error).__name__,flush=True)
                 return self.reply(200,{'ok':True})
             if path == '/api/cron/reminders':
                 # Con CRON_SECRET definido solo responde a la llamada autenticada de la plataforma. No envía nada si los avisos están apagados.
@@ -958,6 +964,13 @@ class Handler(BaseHTTPRequestHandler):
                     mail_tracking.sweep(c,now);c.commit()
                     if mail_pro.configured():notifications.mail_status(c,now,0)
                 except Exception as error:print('mail-tracking cron',type(error).__name__,flush=True)
+                # Comunicados ya confirmados por administración que quedaron en cola: se continúa el envío por lotes.
+                try:
+                    import campaigns
+                    for campaign in campaigns.queued(c)[:2]:
+                        owner=c.execute('SELECT confirmed_by FROM mail_campaigns WHERE id=?',(campaign,)).fetchone()['confirmed_by']
+                        campaigns.process(c,campaign,now,owner,lambda conn,subject,text,title,email,actor,private:send_institutional(conn,'campaign',title,email,subject,text,None,actor,review=False,private=private)['archive_id'],budget=8)
+                except Exception as error:print('campaigns cron',type(error).__name__,flush=True)
                 # Verificación de estabilidad, independiente del correo: un fallo de un servicio no impide la otra tarea.
                 try:
                     import stability
@@ -999,6 +1012,13 @@ class Handler(BaseHTTPRequestHandler):
                 rows=[dict(r) for r in c.execute("SELECT id,author,content,created_at FROM adi_messages WHERE conversation_id=? AND visibility='public' AND id>? ORDER BY id LIMIT 100",(conv['id'],after))]
                 c.execute('UPDATE adi_conversations SET last_seen_client=? WHERE id=?',(appointments.stamp(appointments.now()),conv['id']))
                 return self.reply(200,{'messages':rows,'mode':conv['mode'],'state':adi_public_state(conv)})
+            optout=re.fullmatch(r'/baja/([A-Za-z0-9_-]{16,64})',path)
+            if optout:
+                # Baja de comunicados (enlace personal del correo). Solo comunicados; los correos de servicio no cambian.
+                import campaigns
+                self.content_policy="default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'"
+                found=campaigns.unsubscribe_lookup(c,optout[1])
+                return self.reply(200 if found else 404,campaigns.page(found),'text/html; charset=utf-8')
             preference=re.fullmatch(r'/maintenance-preferences/([A-Za-z0-9_-]{40,60})',path)
             if preference:
                 row=c.execute('SELECT consent FROM maintenance WHERE unsubscribe_token=?',(preference[1],)).fetchone()
@@ -1305,6 +1325,11 @@ class Handler(BaseHTTPRequestHandler):
                 if not mail_allowed(user):return self.reply(403,{'error':'No tienes acceso al correo o todavía no está configurado en el servidor.'})
                 if limited(c,'mail-contacts:'+str(user['id']),limit=240,window=300):return self.reply(429,{'error':'Demasiadas búsquedas seguidas. Espera un momento.'})
                 term=parse_qs(urlsplit(self.path).query).get('q',[''])[0][:80].strip()
+                if parse_qs(urlsplit(self.path).query).get('all',[''])[0]=='1':
+                    # Libreta completa: clientes con correo válido del registro de clientes, uno por dirección, con su estado de baja.
+                    import campaigns
+                    rows,stats=campaigns.contacts(c)
+                    return self.reply(200,{'rows':[{key:row[key] for key in ('id','name','email','trade_name','opted_out')}|{'duplicates':len(row['also'])} for row in rows],'stats':stats})
                 if parse_qs(urlsplit(self.path).query).get('recent',[''])[0]=='1':
                     # Contactos frecuentes del propio usuario: destinatarios de sus últimos envíos.
                     saved=c.execute('SELECT value FROM system_state WHERE key=?',('mail_recent:'+str(user['id']),)).fetchone()
@@ -1612,6 +1637,22 @@ class Handler(BaseHTTPRequestHandler):
                     except mail_pro.MailError as error:return self.reply(502,{'error':str(error),'kind':error.kind})
                     if not state:return self.reply(502,{'error':'El servidor de correo no informó la bandeja de entrada.'})
                     return self.reply(200,{'unread':state.get('unread',0),'checked':state.get('checked',''),'quota':state.get('quota'),'events':notifications.mail_events(c)[-5:]})
+                if path=='/api/mail/campaigns' or path.startswith('/api/mail/campaigns/'):
+                    if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede enviar comunicados a clientes.'})
+                    import campaigns
+                    if path=='/api/mail/campaigns':return self.reply(200,{'campaigns':campaigns.history(c),'templates':{key:{'subject':subject,'body':body} for key,(subject,body) in campaigns.TEMPLATES.items()}})
+                    found=re.fullmatch(r'/api/mail/campaigns/(\d+)(/preview)?',path)
+                    item=campaigns.detail(c,int(found[1])) if found else None
+                    if not item:return self.reply(404,{'error':'Comunicado no encontrado.'})
+                    if not found[2]:return self.reply(200,{'campaign':item})
+                    # Vista previa con el primer destinatario, en un marco aislado (sin scripts ni recursos externos; logotipo incrustado).
+                    import mailing
+                    first=item['recipients'][0] if item['recipients'] else {'name':'Cliente','email':'cliente@ejemplo.com'}
+                    subject,text,title=campaigns.message_parts(c,item,first['name'],public_base_url().rstrip('/')+'/baja/…')
+                    card=mail_signature_card(c);logo='data:image/png;base64,'+base64.b64encode(mail_pro.SIGNATURE_LOGO.read_bytes()).decode() if mail_pro.SIGNATURE_LOGO.exists() else ''
+                    page=mailing.html(text,title,mail_pro.signature_html(mail_pro.clean_signature(card,mail_pro.settings()['username']),logo) if card.get('enabled') else '')
+                    self.content_policy="default-src 'none'; img-src data:; style-src 'unsafe-inline'; form-action 'none'; frame-ancestors 'self'; base-uri 'none'; sandbox"
+                    return self.reply(200,page,'text/html; charset=utf-8')
                 if path=='/api/mail/deliveries':
                     # Centro de Entrega y Seguimiento: estados reales por destinatario, con filtros y búsqueda.
                     mail_tracking.sweep(c,reception_now());c.commit()
@@ -1795,6 +1836,16 @@ class Handler(BaseHTTPRequestHandler):
         return self.reply(404, {'error':'Recurso no disponible.'})
 
     def do_POST(self):
+        optout_post=re.fullmatch(r'/baja/([A-Za-z0-9_-]{16,64})',urlsplit(self.path).path)
+        if optout_post:
+            import campaigns
+            self.content_policy="default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'"
+            with connect() as c:
+                if limited(c,'optout:'+digest(optout_post[1]),20,900):return self.reply(429,campaigns.page(None,error='Demasiados intentos. Intenta más tarde.'),'text/html; charset=utf-8')
+                found=campaigns.unsubscribe_lookup(c,optout_post[1])
+                if not found:return self.reply(404,campaigns.page(None),'text/html; charset=utf-8')
+                campaigns.unsubscribe(c,optout_post[1],reception_now());audit(c,None,'mail_optout')
+                return self.reply(200,campaigns.page(found,done=True),'text/html; charset=utf-8')
         maintenance_post=re.fullmatch(r'/mantenimiento/([A-Za-z0-9_-]{40,60})',urlsplit(self.path).path)
         if maintenance_post:
             import maintenance_reminders
@@ -2192,6 +2243,33 @@ class Handler(BaseHTTPRequestHandler):
                         except mail_pro.MailError as error:return self.reply(200,{'ok':False,'kind':error.kind,'error':str(error),'steps':getattr(error,'steps',[])})
                         return self.reply(200,{'ok':True,'steps':steps})
                     if not mail_allowed(user):return self.reply(403,{'error':'No tienes acceso al correo o todavía no está configurado en el servidor.'})
+                    if path=='/api/mail/campaigns' or path.startswith('/api/mail/campaigns/'):
+                        if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede enviar comunicados a clientes.'})
+                        import campaigns
+                        now=reception_now()
+                        if path=='/api/mail/campaigns':
+                            try:ids=json.loads(str(data.get('client_ids') or '[]'))
+                            except ValueError:ids=None
+                            if not isinstance(ids,list):return self.reply(400,{'error':'Selección de clientes no válida.'})
+                            status,body=campaigns.create(c,user,dict(data,client_ids=ids),now)
+                            if status==201:audit(c,user['id'],'mail_campaign_draft',body['campaign']['id'])
+                            return self.reply(status,body)
+                        found=re.fullmatch(r'/api/mail/campaigns/(\d+)/(confirm|process|cancel)',path)
+                        if not found:return self.reply(404,{'error':'Operación no disponible.'})
+                        campaign=int(found[1])
+                        if found[2]=='confirm':
+                            # Envío masivo: exige la confirmación expresa con el número de destinatarios.
+                            item=campaigns.summary(c,campaign)
+                            if not item:return self.reply(404,{'error':'Comunicado no encontrado.'})
+                            if data.get('confirm') is not True or str(data.get('count',''))!=str(item['total']):return self.reply(400,{'error':'Confirma el envío indicando el número de destinatarios.'})
+                            status,body=campaigns.confirm(c,campaign,user,now)
+                            if status==200:audit(c,user['id'],'mail_campaign_confirmed',campaign)
+                            return self.reply(status,body)
+                        if found[2]=='cancel':
+                            status,body=campaigns.cancel(c,campaign,now);audit(c,user['id'],'mail_campaign_cancelled',campaign)
+                            return self.reply(status,body)
+                        sender=lambda conn,subject,text,title,email,actor,private:send_institutional(conn,'campaign',title,email,subject,text,None,actor,review=False,private=private)['archive_id']
+                        return self.reply(200,{'campaign':campaigns.process(c,campaign,now,user['id'],sender)})
                     if path in ('/api/mail/deliveries/resend','/api/mail/deliveries/resolve'):
                         found=c.execute('SELECT * FROM mail_deliveries WHERE id=?',(str(data.get('id','')),)).fetchone() if str(data.get('id','')).isdigit() else None
                         if not found:return self.reply(404,{'error':'Registro de envío no encontrado.'})

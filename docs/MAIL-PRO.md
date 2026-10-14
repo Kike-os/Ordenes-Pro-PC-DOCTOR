@@ -190,3 +190,18 @@ Mail Pro → barra lateral → «Centro de Entrega» (`#mail?view=entregas`). Ta
 En el centro de notificaciones (no dependen del navegador abierto): aviso emergente una vez por incidencia y estado, resumen de incidencias pendientes y «Fallos repetidos del servidor de correo» (3 o más en una hora, un aviso por hora). Administración elige en «Alertas» cuáles recibir: presupuestos, citas, equipos listos, otros errores y fallos del servidor. Nunca se envían avisos a direcciones externas. Al enviar desde Mail Pro: «Correo enviado correctamente. Esperando confirmación de entrega.», con acceso directo al seguimiento.
 
 Rutas (solo personal con acceso al correo): `GET /api/mail/deliveries`, `GET /api/mail/deliveries/<id>`, `POST /api/mail/deliveries/resend`, `POST /api/mail/deliveries/resolve`, `POST /api/mail/delivery-settings` (solo administración).
+
+## Libreta de direcciones y comunicados a clientes (1.5.161)
+
+**Libreta** (botón de contactos junto a «Para»): lista todos los clientes con correo del **registro de clientes** (no hay otra base; se consulta cada vez que se abre, así que los clientes nuevos y los correos actualizados aparecen al momento). Excluye clientes sin correo y correos no válidos, unifica los correos repetidos (se cuentan una vez) y marca quién se dio de baja de los comunicados. Búsqueda por nombre o correo, casillas, «Seleccionar todos» / «Deseleccionar todos» sobre lo filtrado, contador y «Agregar destinatarios» en Para, CC o CCO. Con varios clientes se propone CCO para no revelar sus correos. Los destinatarios se muestran como etiquetas que se quitan una a una.
+
+**Comunicados a clientes** (Mail Pro → «Comunicados», solo administración):
+1. Plantilla («Nuevo sistema de agendamiento de citas» o «Comunicado general»), asunto y mensaje con `{nombre}` y `{enlace_citas}`.
+2. Destinatarios: clientes seleccionados en la libreta o «Todos los contactos autorizados» (con correo válido y sin baja).
+3. Vista previa en un marco aislado con el primer destinatario: plantilla institucional y firma con el logotipo.
+4. Confirmación expresa escribiendo el número de destinatarios. Nada se envía antes.
+5. Envío por lotes (10 por tanda, cola con progreso; si se cierra la ventana, continúan las tareas programadas). **Cada cliente recibe su propio correo** (nadie ve otras direcciones), con un enlace personal de baja (`/baja/<token>`; la copia archivada no lo guarda).
+6. Duplicados: un registro por correo y comunicado; un envío que queda en duda no se repite; no se envía a direcciones declaradas inválidas por un rebote permanente.
+7. Estados: pendiente, enviado, fallido u omitido por destinatario, y el estado de entrega real del Centro de Entrega (enviado, entregado, demorado, rebotado). Historial de comunicados con sus resultados.
+
+**Bajas**: tabla `mail_optouts` (migración `055_mail_campaigns.sql`). Solo excluyen de los comunicados; los correos de servicio (comprobantes, citas, presupuestos) siguen llegando.

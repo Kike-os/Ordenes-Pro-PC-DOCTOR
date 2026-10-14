@@ -798,7 +798,7 @@ function openMailPrefs(){
  paint();
 }
 async function renderMail(){
- const root=$('module-content');if(routeState().params.get('view')==='entregas'){renderMailDeliveries(root);return;}root.replaceChildren(el('p','Conectando con el servidor de correo…','empty-module'));
+ const root=$('module-content');if(routeState().params.get('view')==='entregas'){renderMailDeliveries(root);return;}if(routeState().params.get('view')==='comunicados'){renderMailCampaigns(root);return;}root.replaceChildren(el('p','Conectando con el servidor de correo…','empty-module'));
  let data;try{data=await api('/api/mail/overview');}catch(error){root.replaceChildren(el('p',error.message,'empty-module'));return;}
  const params=routeState().params,state={folder:params.get('folder')||'INBOX',filter:params.get('flagged')==='1'?'starred':['unread','starred','attach'].includes(params.get('filter'))?params.get('filter'):'all',q:params.get('q')||'',page:Math.max(1,+(params.get('page')||1)),uid:/^\d+$/.test(params.get('uid')||'')?params.get('uid'):''};
  if(!data.folders.some(folder=>folder.id===state.folder))state.folder='INBOX';
@@ -837,7 +837,8 @@ async function renderMail(){
  const prefsButton=button('',()=>openMailPrefs(),'mail-folder mail-prefs-open');prefsButton.append(systemIcon(mailIcons.prefs),el('span','Preferencias'));prefsButton.title='Preferencias de notificaciones';
  const deliveriesButton=button('',()=>go('mail',new URLSearchParams({view:'entregas'})),'mail-folder mail-deliveries-open');deliveriesButton.append(systemIcon(deliveryIcons.enviado),el('span','Centro de Entrega'));deliveriesButton.title='Centro de Entrega y Seguimiento: estado real de los correos enviados';
  api('/api/mail/deliveries?filtro=incidencias').then(info=>{if(info.incidents){const badge=el('span',String(info.incidents),'mail-unread mail-delivery-alert');badge.setAttribute('aria-label',info.incidents+' incidencias de entrega');badge.title=badge.getAttribute('aria-label');deliveriesButton.append(badge);}}).catch(()=>{});
- const foot=el('div',undefined,'mail-side-foot');foot.append(deliveriesButton,prefsButton,storage);side.append(compose,account,nav,foot);
+ const campaignsButton=button('',()=>go('mail',new URLSearchParams({view:'comunicados'})),'mail-folder mail-campaigns-open');campaignsButton.append(systemIcon('M3 11l18-5v12L3 14v-3z M11.6 16.8a3 3 0 1 1-5.8-1.6'),el('span','Comunicados'));campaignsButton.title='Comunicados a clientes';campaignsButton.hidden=currentUser?.role!=='administrador';
+ const foot=el('div',undefined,'mail-side-foot');foot.append(deliveriesButton,campaignsButton,prefsButton,storage);side.append(compose,account,nav,foot);
  // Lista de mensajes
  const tools=el('form',undefined,'mail-search');tools.setAttribute('role','search');const search=el('input');search.type='search';search.placeholder='Buscar en esta carpeta';search.maxLength=120;search.value=state.q;search.setAttribute('aria-label','Buscar mensajes');
  const toggleSide=iconButton('Contraer o mostrar las carpetas',mailIcons.panel,()=>{collapsed=!collapsed;try{localStorage.setItem(mailPrefsKey()+':side',collapsed?'1':'');}catch{}paintSide();}),syncButton=iconButton('Sincronizar ahora',mailIcons.sync,()=>sync(true));
@@ -1108,11 +1109,92 @@ function mailRecipientField(form,label,name,initial){
  return{get value(){return hidden.value;},add,commit,focus:()=>input.focus(),pending:()=>input.value.trim(),input,hidden,set onchange(run){changed=run;}};
 }
 // Libreta de contactos: busca clientes sin salir del correo y los añade a Para, CC o CCO.
-function openMailAddressBook(fields){
- const dialog=smallDialog('Libreta de contactos');dialog.classList.add('mail-prefs','mail-book');const box=el('div',undefined,'mail-prefs-body'),search=el('input'),list=el('div',undefined,'mail-book-list');search.type='search';search.placeholder='Buscar por nombre, correo, nombre comercial o identificación';search.maxLength=80;search.setAttribute('aria-label','Buscar en la libreta de contactos');box.append(search,list);dialog.append(box);
- let timer,version=0;const paint=(rows,note)=>{list.replaceChildren();if(note)list.append(el('p',note,'rcpt-note'));for(const row of rows){const line=el('div',undefined,'mail-book-row'),info=mailContactRow(row,()=>{});info.disabled=true;line.append(info);if(row.email){for(const[key,label]of [['to','Para'],['cc','CC'],['bcc','CCO']])line.append(button(label,()=>{fields[key].add(row.email,row.name);toast('«'+row.name+'» añadido en '+label+'.','success');},'secondary'));}else if(row.id)line.append(button('Abrir ficha',()=>{dialog.close();showClientDetail(row.id);},'secondary'));list.append(line);}};
- const load=async()=>{const term=search.value.trim(),token=++version;try{const data=await api('/api/mail/contacts?'+(term.length>=2?'q='+encodeURIComponent(term):'recent=1'));if(token!==version)return;paint(data.rows,term.length>=2?(data.rows.length?(data.more?'Se muestran las 8 mejores coincidencias; escribe más para afinar.':''):'Sin clientes que coincidan.'):(data.rows.length?'Contactos frecuentes':'Escribe al menos 2 letras para buscar en Clientes.'));}catch(error){paint([],error.message);}};
- search.addEventListener('input',()=>{clearTimeout(timer);timer=setTimeout(load,250);});load();search.focus();
+// Libreta de direcciones: los contactos salen del registro de clientes cada vez que se abre (siempre al día), uno por correo.
+// Selección individual o múltiple, «Seleccionar todos» sobre lo filtrado y contador. En el redactor, varios clientes van por defecto
+// en CCO para no revelar sus correos; en los comunicados la selección define los destinatarios (cada uno recibe su propio mensaje).
+function openContactPicker({title='Libreta de direcciones',mode='compose',fields=null,selected=[],onDone=null}={}){
+ const dialog=smallDialog(title);dialog.classList.add('mail-book','contact-picker');
+ const box=el('div',undefined,'picker-body'),stats=el('p',undefined,'picker-stats'),search=el('input'),bulk=el('div',undefined,'picker-bulk'),list=el('ul',undefined,'picker-list'),foot=el('div',undefined,'picker-foot'),count=el('strong',undefined,'picker-count');
+ search.type='search';search.placeholder='Buscar por nombre o correo';search.maxLength=80;search.setAttribute('aria-label','Buscar contactos');list.setAttribute('role','listbox');list.setAttribute('aria-multiselectable','true');list.setAttribute('aria-label','Clientes con correo');
+ const all=button('Seleccionar todos',()=>{for(const row of visible())if(eligible(row))chosen.add(row.id);paint();},'secondary'),none=button('Deseleccionar todos',()=>{for(const row of visible())chosen.delete(row.id);paint();},'secondary');bulk.append(all,none);
+ let rows=[],chosen=new Set(selected.map(Number)),target=null;
+ const plain=text=>String(text||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
+ const eligible=row=>mode!=='campaign'||!row.opted_out;
+ const visible=()=>{const term=plain(search.value.trim());return term?rows.filter(row=>plain(row.name).includes(term)||plain(row.email).includes(term)||plain(row.trade_name).includes(term)):rows;};
+ if(mode==='compose'){target=el('select');for(const[value,text]of [['to','Para'],['cc','CC'],['bcc','CCO (ocultos)']])target.add(new Option(text,value));const label=el('label',undefined,'picker-target');label.append(el('span','Agregar en'),target);foot.append(label);}
+ const add=button(mode==='compose'?'Agregar destinatarios':'Usar selección',()=>{const picked=rows.filter(row=>chosen.has(row.id));if(!picked.length){toast('Selecciona al menos un contacto.','warning');return;}
+  if(mode==='compose'){const key=target.value;let added=0;for(const row of picked)if(fields[key].add(row.email,row.name))added++;toast(added===1?'1 destinatario agregado en '+target.selectedOptions[0].text+'.':added+' destinatarios agregados en '+target.selectedOptions[0].text+'.','success');}
+  dialog.close();onDone?.(picked);},'primary');
+ foot.append(count,add);
+ function paint(){const shown=visible();list.replaceChildren();
+  if(!shown.length)list.append(el('li',rows.length?'Sin contactos que coincidan.':'No hay clientes con correo registrado.','picker-empty'));
+  for(const row of shown.slice(0,400)){const li=el('li',undefined,'picker-row'),check=el('input'),label=el('label'),text=el('span',undefined,'picker-text');check.type='checkbox';check.checked=chosen.has(row.id);check.disabled=!eligible(row);check.id='picker-'+row.id;label.htmlFor=check.id;
+   text.append(el('strong',row.name),el('small',row.email));label.append(text);li.append(check,label);li.setAttribute('role','option');li.setAttribute('aria-selected',String(check.checked));
+   if(row.opted_out){const tag=el('em','Baja de comunicados','picker-tag');tag.dataset.kind='optout';li.append(tag);}
+   if(row.duplicates){const tag=el('em','Correo compartido ('+(row.duplicates+1)+')','picker-tag');tag.title='Este correo figura en '+(row.duplicates+1)+' fichas de cliente: se cuenta una sola vez.';li.append(tag);}
+   check.addEventListener('change',()=>{if(check.checked)chosen.add(row.id);else chosen.delete(row.id);paintCount();li.setAttribute('aria-selected',String(check.checked));});list.append(li);}
+  if(shown.length>400)list.append(el('li','Se muestran 400 de '+shown.length+'. Escribe en el buscador para afinar.','picker-empty'));
+  paintCount();}
+ function paintCount(){const n=[...chosen].filter(id=>rows.some(row=>row.id===id)).length;count.textContent=n===1?'1 seleccionado':n+' seleccionados';add.disabled=!n;
+  if(target&&!target.dataset.touched)target.value=n>1?'bcc':'to';}
+ if(target)target.addEventListener('change',()=>{target.dataset.touched='1';});
+ box.append(stats,search,bulk,list);dialog.append(box,foot);
+ search.addEventListener('input',paint);
+ (async()=>{list.replaceChildren(el('li','Cargando contactos…','picker-empty'));try{const data=await api('/api/mail/contacts?all=1');rows=data.rows;const s=data.stats;
+  stats.textContent=rows.length+' contactos con correo'+(s.duplicates?' · '+s.duplicates+' correos repetidos unificados':'')+(s.opted_out?' · '+s.opted_out+' de baja de comunicados':'')+(s.invalid?' · '+s.invalid+' correos no válidos excluidos':'');paint();search.focus();}
+  catch(error){list.replaceChildren(el('li',error.message,'picker-empty'));}})();
+}
+function openMailAddressBook(fields){openContactPicker({fields});}
+// Comunicados a clientes (solo administración): borrador → vista previa → confirmación expresa → envío por lotes con progreso → historial.
+async function renderMailCampaigns(root){
+ const wrap=el('section',undefined,'campaigns'),head=el('header',undefined,'delivery-head'),titles=el('div'),back=button('',()=>go('mail'),'secondary delivery-back');back.append(systemIcon('m15 18-6-6 6-6'),el('span','Volver al correo'));
+ titles.append(el('h2','Comunicados a clientes'),el('p','Mensajes informativos con la plantilla institucional y la firma de PC-DOCTOR S.A. Cada cliente recibe su propio correo y puede darse de baja.','delivery-sub'));head.append(titles,back);
+ const form=el('form',undefined,'campaign-form'),history=el('section',undefined,'campaign-history');form.noValidate=true;wrap.append(head,form,history);root.replaceChildren(wrap);
+ let data;try{data=await api('/api/mail/campaigns');}catch(error){form.replaceChildren(el('p',error.message,'tracking-note'));return;}
+ const field=(label,node)=>{const box=el('label',undefined,'campaign-field');box.append(el('span',label),node);return box;};
+ const template=el('select');template.add(new Option('Nuevo sistema de agendamiento de citas','agenda'));template.add(new Option('Comunicado general','general'));
+ const subject=el('input');subject.maxLength=200;const body=el('textarea');body.rows=9;body.maxLength=20000;
+ const fill=()=>{const t=data.templates[template.value];subject.value=t.subject;body.value=t.body;};template.addEventListener('change',fill);fill();
+ const hint=el('p','Usa {nombre} para el nombre de cada cliente y {enlace_citas} para el enlace de la agenda en línea. Al final se añaden la firma y el enlace de baja.','campaign-hint');
+ const audience=el('div',undefined,'campaign-audience'),allRadio=el('input'),someRadio=el('input'),pickBtn=button('Elegir clientes',()=>openContactPicker({title:'Destinatarios del comunicado',mode:'campaign',selected:[...picked],onDone:rows=>{picked=new Set(rows.map(row=>row.id));someRadio.checked=true;paintAudience();}}),'secondary');
+ let picked=new Set();allRadio.type=someRadio.type='radio';allRadio.name=someRadio.name='audience';allRadio.value='all';someRadio.value='selected';someRadio.checked=true;
+ const allLabel=el('label'),someLabel=el('label'),someText=el('span');allLabel.append(allRadio,el('span','Todos los contactos autorizados'));someLabel.append(someRadio,someText);audience.append(someLabel,pickBtn,allLabel);
+ const paintAudience=()=>{someText.textContent='Clientes seleccionados ('+picked.size+')';};paintAudience();
+ const prepare=button('Preparar y ver vista previa',null,'primary');prepare.type='submit';const errors=el('p',undefined,'campaign-error');errors.setAttribute('role','alert');
+ const stage=el('div',undefined,'campaign-stage');
+ form.append(field('Plantilla',template),field('Asunto',subject),field('Mensaje',body),hint,el('h3','Destinatarios'),audience,errors,prepare,stage);
+ form.addEventListener('submit',async event=>{event.preventDefault();errors.textContent='';if(someRadio.checked&&!picked.size){errors.textContent='Elige al menos un cliente o selecciona «Todos los contactos autorizados».';return;}
+  prepare.disabled=true;try{const result=await api('/api/mail/campaigns',{subject:subject.value,body:body.value,template:template.value,audience:allRadio.checked?'all':'selected',client_ids:JSON.stringify([...picked])});showDraft(result.campaign,result.excluded);}
+  catch(error){errors.textContent=Object.values(error.fields||{}).join(' ')||error.message;}finally{prepare.disabled=false;}});
+ function showDraft(campaign,excluded){stage.replaceChildren();const card=el('div',undefined,'campaign-draft');
+  const facts=el('p','Destinatarios: '+campaign.total+' clientes (cada uno recibe un correo individual).'+(excluded?' Excluidos: '+excluded.opted_out+' de baja, '+excluded.duplicates+' correos repetidos, '+excluded.invalid+' no válidos, '+excluded.without_email+' sin correo.':''),'campaign-facts');
+  const frame=el('iframe',undefined,'campaign-preview');frame.title='Vista previa del comunicado';frame.setAttribute('sandbox','');frame.src='/api/mail/campaigns/'+campaign.id+'/preview';
+  const send=button('Confirmar y enviar a '+campaign.total+' clientes',()=>confirmSend(campaign),'primary'),drop=button('Descartar borrador',async()=>{try{await api('/api/mail/campaigns/'+campaign.id+'/cancel',{});stage.replaceChildren();loadHistory();}catch(error){toast(error.message,'error');}},'secondary');
+  const row=el('div',undefined,'campaign-actions');row.append(drop,send);card.append(el('h3','Vista previa (primer destinatario)'),facts,frame,row);stage.append(card);card.scrollIntoView({block:'start',behavior:'smooth'});}
+ function confirmSend(campaign){const dialog=smallDialog('Confirmar envío masivo');const formC=el('form',undefined,'delivery-resend'),input=el('input');input.inputMode='numeric';input.autocomplete='off';
+  formC.append(el('p','Se enviará «'+campaign.subject+'» a '+campaign.total+' clientes, en mensajes individuales y por lotes. Esta acción no se puede deshacer una vez enviados.','campaign-facts'),field('Escribe '+campaign.total+' para confirmar',input));
+  const ok=button('Enviar comunicado',null,'primary');ok.type='submit';const row=el('div',undefined,'delivery-actions');row.append(button('Cancelar',()=>dialog.close(),'secondary'),ok);formC.append(row);dialog.append(formC);setTimeout(()=>input.focus(),30);
+  formC.addEventListener('submit',async event=>{event.preventDefault();if(input.value.trim()!==String(campaign.total)){toast('Escribe '+campaign.total+' para confirmar.','warning');input.focus();return;}ok.disabled=true;
+   try{await api('/api/mail/campaigns/'+campaign.id+'/confirm',{confirm:true,count:String(campaign.total)});dialog.close();run(campaign.id);}catch(error){ok.disabled=false;toast(error.message,'error');}});}
+ async function run(id){stage.replaceChildren();const card=el('div',undefined,'campaign-draft'),bar=el('div',undefined,'stability-bar campaign-bar'),fillBar=el('i'),text=el('p','Enviando…','campaign-facts'),stop=button('Detener envío',async()=>{stopped=true;try{await api('/api/mail/campaigns/'+id+'/cancel',{});}catch{}},'secondary');let stopped=false;
+  bar.append(fillBar);bar.setAttribute('role','progressbar');bar.setAttribute('aria-valuemin','0');bar.setAttribute('aria-valuemax','100');card.append(el('h3','Envío en curso'),bar,text,stop);stage.append(card);
+  while(!stopped){let c;try{c=(await api('/api/mail/campaigns/'+id+'/process',{})).campaign;}catch(error){text.textContent=error.message+' El envío continuará en la próxima tarea programada.';break;}
+   const done=c.counts.sent+c.counts.failed+c.counts.skipped,pct=c.total?Math.round(done*100/c.total):100;fillBar.style.width=pct+'%';bar.setAttribute('aria-valuenow',String(pct));
+   text.textContent=done+' de '+c.total+' procesados · '+c.counts.sent+' enviados · '+c.counts.failed+' fallidos · '+c.counts.skipped+' omitidos';
+   if(['done','cancelled'].includes(c.status)){toast(c.status==='done'?'Comunicado enviado: '+c.counts.sent+' correos aceptados por el servidor.':'Envío detenido.',c.counts.failed?'warning':'success');stop.remove();break;}}
+  loadHistory();}
+ async function loadHistory(){try{data=await api('/api/mail/campaigns');}catch{return;}history.replaceChildren(el('h3','Historial de comunicados'));
+  if(!data.campaigns.length){history.append(el('p','Aún no se han enviado comunicados.','autocare-empty'));return;}
+  const names={draft:'Borrador',queued:'En cola',sending:'Enviando',done:'Enviado',cancelled:'Cancelado'};const list=el('ul',undefined,'campaign-list');
+  for(const c of data.campaigns){const li=el('li'),open=button('',()=>showDetail(c.id),'campaign-open');const d=c.delivery||{};
+   open.append(el('strong',c.subject),el('small',formatOrderDate(c.created_at)+' · '+names[c.status]+' · '+c.total+' destinatarios'),el('span',c.counts.sent+' enviados · '+(d.entregado||0)+' entregados · '+(d.rebotado||0)+' rebotados · '+((d.fallido||0)+c.counts.failed)+' fallidos · '+c.counts.skipped+' omitidos'));li.append(open);list.append(li);}
+  history.append(list);}
+ async function showDetail(id){try{const {campaign:c}=await api('/api/mail/campaigns/'+id);const dialog=smallDialog(c.subject);dialog.classList.add('delivery-dialog');const list=el('ul',undefined,'campaign-recipients');
+  const label={pending:'Pendiente',sending:'Enviando',sent:'Enviado',failed:'Fallido',skipped:'Omitido'};
+  for(const r of c.recipients){const li=el('li');li.append(el('strong',r.name),el('small',r.email),r.delivery?deliveryPill(r.delivery):el('b',label[r.status],'campaign-state'));if(r.detail||r.reason)li.title=r.reason||r.detail;list.append(li);}
+  dialog.append(el('p',c.total+' destinatarios · creado '+formatOrderDate(c.created_at)+(c.confirmed_at?' · confirmado '+formatOrderDate(c.confirmed_at):''),'campaign-facts'),list);}catch(error){toast(error.message,'error');}}
+ loadHistory();
+ if(data.campaigns.some(c=>['queued','sending'].includes(c.status))){const pending=data.campaigns.find(c=>['queued','sending'].includes(c.status));run(pending.id);}
 }
 // Campo Orden del redactor: propone la orden en curso del destinatario. El servidor decide qué órdenes son válidas y vuelve a validar al enviar.
 function mailOrderLink(to,order,fixed){
@@ -3550,7 +3632,7 @@ async function openAgendaBooking(done,preset){
  const card=el('div',undefined,'brand-card full booking-brand-card'),logo=el('div',undefined,'brand-logo'),cardBody=el('div',undefined,'brand-body');cardBody.append(el('strong','','brand-name'),el('span','','brand-model'),el('small','','brand-meta'));card.append(logo,cardBody);card.hidden=true;grid.append(card);
  const paintBrand=()=>{const value=brand.value.trim();card.hidden=!value;if(!value)return;cardBody.children[0].textContent=value;cardBody.children[1].textContent=model.value.trim()||'Modelo sin indicar';cardBody.children[2].textContent=device.value?device.selectedOptions[0].textContent:'Tipo de equipo sin indicar';const file=receptionOptions?.brand_logos?.[brandSlug(value)]||'';if(logo.dataset.file===file)return;logo.dataset.file=file;if(!file){logo.dataset.kind='generic';logo.replaceChildren(systemIcon('M18 5a2 2 0 0 1 2 2v8.526a2 2 0 0 0 .212.897l1.068 2.127a1 1 0 0 1-.9 1.45H3.62a1 1 0 0 1-.9-1.45l1.068-2.127A2 2 0 0 0 4 15.526V7a2 2 0 0 1 2-2z M20.054 15.987H3.946'));return;}const image=new Image();image.alt='Logotipo de '+value;image.onerror=()=>{logo.dataset.file='';logo.dataset.kind='generic';logo.replaceChildren(systemIcon('M18 5a2 2 0 0 1 2 2v8.526a2 2 0 0 0 .212.897l1.068 2.127a1 1 0 0 1-.9 1.45H3.62a1 1 0 0 1-.9-1.45l1.068-2.127A2 2 0 0 0 4 15.526V7a2 2 0 0 1 2-2z M20.054 15.987H3.946'));};image.src='/static/brands/'+file;logo.dataset.kind='logo';logo.replaceChildren(image);};
  for(const node of [brand,model,device])for(const kind of ['input','change'])node.addEventListener(kind,paintBrand);
- const service=control(field(grid,'Servicio solicitado *','service','',{select:true}),'service');service.append(new Option('Selecciona el servicio',''));for(const item of catalog.services)service.append(new Option(item.label+' · '+item.duration_minutes+' min',item.code));
+ const service=control(field(grid,'Servicio solicitado *','service','',{select:true}),'service');service.append(new Option('Selecciona el Servicio',''));for(const item of catalog.services)service.append(new Option(item.label+' · '+item.duration_minutes+' min',item.code));
  const day=control(field(grid,'Fecha *','date','',{type:'date'}),'date'),slot=control(field(grid,'Horario disponible *','time','',{select:true}),'time');day.min=agendaDay(new Date(Date.now()+clockOffset));day.max=agendaShift(day.min,89);slot.disabled=true;slot.append(new Option('Elige servicio y fecha',''));
  const description=control(field(grid,'Descripción breve *','description','',{textarea:true,maxLength:1000}),'description');description.parentElement.classList.add('full');description.rows=2;
  const consent=el('label',undefined,'booking-consent full'),agree=el('input');agree.type='checkbox';agree.name='communications_consent';const consentText=el('span','Deseo recibir avisos relacionados con esta cita por correo electrónico.');consentText.append(el('small','Puedes continuar sin activar esta opción.'));consent.append(agree,consentText);grid.append(consent);

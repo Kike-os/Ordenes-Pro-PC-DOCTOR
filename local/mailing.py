@@ -189,7 +189,7 @@ def mark(c, archive_id, status, detail='', message_id='', now=None):
 
 
 LABELS = {'receipt': 'Comprobante de recepción', 'client_authorization': 'Autorización de servicio', 'authorization_notice': 'Aviso interno de autorización', 'quote': 'Presupuesto', 'payment_receipt': 'Recibo de pago', 'stay': 'Aviso de permanencia',
-          'maintenance': 'Recordatorio de mantenimiento', 'appointment': 'Cita técnica', 'manual': 'Mensaje del personal'}
+          'maintenance': 'Recordatorio de mantenimiento', 'appointment': 'Cita técnica', 'manual': 'Mensaje del personal', 'campaign': 'Comunicado a clientes'}
 STATUS = {'preparado': 'Preparado', 'enviado': 'Enviado', 'error': 'Error de envío'}
 
 

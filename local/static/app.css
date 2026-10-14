@@ -6828,3 +6828,51 @@ button.live-appointment .agenda-badge.state-pill,.live-card-meta .agenda-badge.s
 @media(max-width:1100px){.autocare-stats{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:700px){.autocare-head{grid-template-columns:auto minmax(0,1fr)}.autocare-run{grid-column:1/-1;justify-content:center}.autocare-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.autocare-services{grid-template-columns:1fr}.autocare-history li,.autocare-versions li{grid-template-columns:1fr;gap:1px}}
 @media(prefers-reduced-motion:reduce){.autocare-light,.autocare-run[data-busy=true] svg{animation:none}}
+/* Libreta de direcciones (Mail Pro): ventana compacta con lista desplazable, casillas, selección masiva y contador. */
+.contact-picker{width:min(560px,calc(100% - 24px));max-height:calc(100dvh - 32px)}
+.contact-picker[open]{display:grid;grid-template-rows:auto minmax(0,1fr) auto}
+.picker-body{display:grid;grid-template-rows:auto auto auto minmax(0,1fr);gap:8px;min-height:0;flex:1 1 auto;margin-top:8px}
+.picker-stats{margin:0;font-size:11.5px;color:#8fa5c4}
+.picker-body input[type=search]{margin:0;min-height:36px;height:36px;font-size:13px}
+.picker-bulk{display:flex;flex-wrap:wrap;gap:6px}.picker-bulk button{width:auto;margin:0;min-height:30px;padding:0 10px;font-size:12px}
+.picker-list{list-style:none;margin:0;padding:0;overflow-y:auto;max-height:min(46vh,420px);border:1px solid #1f3352;border-radius:10px;background:#0a1424;overscroll-behavior:contain}
+.picker-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:4px 10px;padding:7px 10px;border-bottom:1px solid #15243c}
+.picker-row:last-child{border-bottom:0}
+.picker-row input{width:16px;height:16px;min-height:0;margin:0;accent-color:#4d8df0}
+.picker-row label{margin:0;min-width:0;cursor:pointer}
+.picker-text{display:grid;min-width:0}.picker-text strong{font-size:12.5px;color:#e6eefc;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.picker-text small{font-size:11.5px;color:#8fa5c4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.picker-tag{grid-column:2/-1;justify-self:start;padding:1px 7px;border:1px solid #2a4063;border-radius:999px;font-size:10.5px;font-style:normal;color:#a9c1e4}
+.picker-tag[data-kind=optout]{border-color:#80663d;color:#ffca77}
+@media(min-width:520px){.picker-tag{grid-column:auto}}
+.picker-row:has(input:checked){background:#11254a}
+.picker-row:has(input:disabled){opacity:.6}
+.picker-empty{padding:14px;font-size:12.5px;color:#8fa5c4;text-align:center}
+.picker-foot{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding-top:10px;margin-top:8px;border-top:1px solid #1c2c47}
+.picker-count{flex:1 1 auto;font-size:12.5px;color:#c5d5ee}
+.picker-target{display:inline-flex;align-items:center;gap:6px;margin:0;font-size:12px;color:#9db1cf}.picker-target select{width:auto;min-height:32px;margin:0;font-size:12.5px}
+.picker-foot>button{width:auto;margin:0;min-height:36px;padding:0 14px}
+/* Comunicados a clientes */
+.campaigns{display:grid;gap:14px}
+.campaign-form{display:grid;gap:10px;padding:14px 16px;border:1px solid #22385a;border-radius:14px;background:#0e1b30}
+.campaign-field{display:grid;gap:4px;margin:0;font-size:12px;color:#9db1cf}
+.campaign-field input,.campaign-field select,.campaign-field textarea{margin:0;font-size:13px}
+.campaign-field textarea{min-height:170px;resize:vertical}
+.campaign-hint,.campaign-facts{margin:0;font-size:12px;color:#8fa5c4}
+.campaign-form h3,.campaign-history h3,.campaign-draft h3{margin:4px 0 0;font-size:13px;color:#e6eefc}
+.campaign-audience{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px}
+.campaign-audience label{display:inline-flex;align-items:center;gap:7px;margin:0;font-size:12.5px;color:#c5d5ee}
+.campaign-audience input{width:16px;height:16px;min-height:0;margin:0;accent-color:#4d8df0}
+.campaign-audience button,.campaign-form>button,.campaign-actions button,.campaign-draft>button{width:auto;margin:0;min-height:36px;padding:0 14px}
+.campaign-error{margin:0;min-height:0;font-size:12.5px;color:#ff8794}
+.campaign-draft{display:grid;gap:8px;padding-top:10px;border-top:1px solid #1c2c47}
+.campaign-preview{width:100%;height:min(60vh,520px);border:1px solid #22385a;border-radius:10px;background:#f2f4f8}
+.campaign-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px}
+.campaign-bar{--st:#5aa9ff}
+.campaign-list,.campaign-recipients{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.campaign-open{display:grid;gap:2px;width:100%;margin:0;padding:9px 12px;text-align:left;border:1px solid #1f3352;border-radius:10px;background:#0a1424;color:#c5d5ee;cursor:pointer}
+.campaign-open strong{font-size:13px;color:#e6eefc}.campaign-open small,.campaign-open span{font-size:11.5px;color:#8fa5c4}
+.campaign-open:focus-visible{outline:2px solid #8bb8ff;outline-offset:2px}
+.campaign-recipients li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:0 8px;align-items:center;font-size:12px}
+.campaign-recipients li small{grid-column:1;color:#8fa5c4;overflow:hidden;text-overflow:ellipsis}.campaign-recipients li>:last-child{grid-column:2;grid-row:1/span 2}
+.campaign-state{font-size:11px;color:#a9c1e4}
+@media(max-width:560px){.picker-foot{justify-content:stretch}.picker-foot>button{flex:1 1 100%}}
