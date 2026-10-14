@@ -4,6 +4,18 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.157 — 2026-10-14 08:13 (UTC-05:00)
+
+Ticket de recepción compacto y nombrado con el número de orden
+
+### Mejoras realizadas
+
+- Ticket de recepción: condiciones del servicio más breves, claras y compactas, en lista legible a 8 pt
+
+### Errores corregidos
+
+- El ticket se guarda y descarga como TICKET-<número de orden>.pdf, también desde el visor de la vista previa
+
 ## v1.5.156 — 2026-10-14 07:28 (UTC-05:00)
 
 Monitor de estabilidad profesional y barra superior unificada
