@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.158 — 2026-10-14 08:24 (UTC-05:00)
+
+Corrección urgente de la vista previa e impresión de tickets
+
+### Errores corregidos
+
+- Imprimir ticket: la vista previa volvía a quedar bloqueada en producción («ha rechazado la conexión»); ahora se muestra siempre, «Ticket listo» solo cuando el documento está visible y, si algo falla, aviso con «Reintentar»
+
 ## v1.5.157 — 2026-10-14 08:13 (UTC-05:00)
 
 Ticket de recepción compacto y nombrado con el número de orden

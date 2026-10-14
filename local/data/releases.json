@@ -8,6 +8,22 @@
   },
   "releases": [
     {
+      "version": "1.5.158",
+      "date": "2026-10-14T08:24:56-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Corrección urgente de la vista previa e impresión de tickets",
+      "changes": {
+        "features": [],
+        "improvements": [],
+        "fixes": [
+          "Imprimir ticket: la vista previa volvía a quedar bloqueada en producción («ha rechazado la conexión»); ahora se muestra siempre, «Ticket listo» solo cuando el documento está visible y, si algo falla, aviso con «Reintentar»"
+        ],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.157",
       "date": "2026-10-14T08:13:12-05:00",
       "type": "patch",
