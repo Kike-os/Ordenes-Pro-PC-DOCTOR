@@ -655,6 +655,43 @@ function initReleaseChip(){
  addEventListener('resize',()=>{if(open)place();});addEventListener('hashchange',()=>{if(open)setOpen(false);});
  document.addEventListener('systemcheck',paint);paint();
 }
+// ADI AutoCare Pro (administración): estado real del monitor del servidor. Todo sale de /api/autocare; nada se simula.
+const autocareGeneral={ok:['Sistema operativo','Todas las verificaciones superadas y sin errores de ejecución recientes.'],degraded:['Con incidencias','Hay servicios o errores que requieren revisión.'],critical:['Incidencia crítica','Un servicio esencial falla: revisa las incidencias activas.'],unverified:['Sin verificar','Todavía no hay verificaciones de esta versión.']};
+const autocareSeverity={'crítica':'critical','alta':'high','media':'medium','baja':'low'};
+async function renderAutoCare(box,preset){
+ box.setAttribute('aria-labelledby','autocare-title');
+ let data=preset;if(!data){box.replaceChildren(el('p','Cargando ADI AutoCare…','tracking-note'));try{data=await api('/api/autocare');}catch(error){box.replaceChildren(el('p',error.message,'tracking-note'));return;}}
+ const head=el('header',undefined,'autocare-head'),light=el('span',undefined,'autocare-light'),titles=el('div'),title=el('h2','ADI AutoCare Pro'),sub=el('p',undefined,'autocare-sub');title.id='autocare-title';light.setAttribute('aria-hidden','true');
+ const [label,help]=autocareGeneral[data.general]||autocareGeneral.unverified;box.dataset.general=data.general;
+ sub.textContent=label+' · '+help;titles.append(title,sub);
+ const run=button('',async()=>{run.disabled=true;run.dataset.busy='true';run.lastChild.textContent='Diagnosticando…';try{const fresh=await api('/api/autocare/diagnose',{});toast('Diagnóstico completado: '+fresh.ran.passed+' de '+fresh.ran.total+' verificaciones superadas.',fresh.ran.passed===fresh.ran.total?'success':'warning');renderAutoCare(box,fresh);loadStability();}catch(error){toast(error.message,'error');run.disabled=false;delete run.dataset.busy;run.lastChild.textContent='Ejecutar diagnóstico';}},'primary autocare-run');
+ run.append(systemIcon('M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2'),el('span','Ejecutar diagnóstico'));
+ head.append(light,titles,run);
+ const stats=el('dl',undefined,'autocare-stats');const stat=(name,value,hint)=>{const d=el('div');d.append(el('dt',name),el('dd',value));if(hint)d.title=hint;stats.append(d);};
+ const failing=data.services.filter(item=>!item.ok).length;
+ stat('Última verificación',data.last_check?formatOrderDate(data.last_check):'—',data.last_source?'Origen: '+data.last_source:'');stat('Servicios',data.services.length?(data.services.length-failing)+' de '+data.services.length+' correctos':'—');
+ stat('Incidencias activas',String(data.active.length));stat('Recuperaciones (últimas)',String(data.recoveries.length));
+ stat('Estabilidad','v'+data.stability.version+' · '+data.stability.label);stat('Próxima verificación',formatOrderDate(data.next_scheduled));
+ const services=el('ul',undefined,'autocare-services');for(const item of data.services){const li=el('li');li.dataset.ok=String(item.ok);li.append(el('i'),el('strong',item.name),el('span',item.detail),el('small',(item.recovered?'Recuperado · ':'')+item.ms+' ms'));li.title=item.name+' · severidad '+item.severity+(item.ok?'':' · fallo');services.append(li);}
+ if(!data.services.length)services.append(el('li','Sin verificaciones todavía: pulsa «Ejecutar diagnóstico».','autocare-empty'));
+ const incidents=el('div',undefined,'autocare-list');if(!data.active.length)incidents.append(el('p','Sin incidencias activas.','autocare-empty'));
+ for(const item of data.active){const row=el('article',undefined,'autocare-incident');row.dataset.severity=autocareSeverity[item.severity]||'medium';const top=el('div');top.append(el('b',item.severity),el('strong',item.module),el('small',formatOrderDate(item.at)+' · v'+item.version+' · '+item.source));row.append(top,el('p',item.diagnosis));if(item.path)row.append(el('code',item.path));incidents.append(row);}
+ const review=button('Marcar errores como revisados',async()=>{try{renderAutoCare(box,await api('/api/autocare/review',{}));toast('Errores de ejecución marcados como revisados. El registro se conserva.','success');}catch(error){toast(error.message,'error');}},'secondary');if(!data.active.some(item=>item.source==='ejecución'))review.hidden=true;
+ const kinds={incident:'Incidencia',resolved:'Resuelta',recovery:'Recuperación',version:'Versión',review:'Revisión'};
+ const history=el('ol',undefined,'autocare-history');for(const event of data.events.slice(0,25)){const li=el('li');li.dataset.kind=event.kind;li.append(el('b',kinds[event.kind]||event.kind),el('span',event.message+(event.detail?' '+event.detail:'')),el('small',formatOrderDate(event.at)+(event.version?' · v'+event.version:'')));history.append(li);}
+ if(!data.events.length)history.append(el('li','Aún no hay actividad registrada.','autocare-empty'));
+ const versions=el('ul',undefined,'autocare-versions');for(const item of data.releases.slice(0,6)){const li=el('li');li.append(el('strong','v'+item.version),el('span',item.summary||''),el('small',item.date?formatOrderDate(item.date):''));versions.append(li);}
+ const pending=el('p',data.pending_changes?data.pending_changes+' cambio(s) registrados pendientes de publicar.':'No hay cambios pendientes de publicar.','autocare-note');
+ const rollback=el('p','Reversión: desde Vercel → Deployments → «Instant Rollback» del despliegue anterior. Las correcciones de código se preparan en una rama de pruebas, pasan la batería completa y se publican solo con aprobación de administración.','autocare-note');
+ const prefs=el('form',undefined,'autocare-prefs'),names={incidents:'Incidencias detectadas',recoveries:'Recuperaciones automáticas',versions:'Versiones verificadas'},boxes={};
+ for(const[key,text]of Object.entries(names)){const row=el('label'),input=el('input');input.type='checkbox';input.checked=!!data.settings[key];boxes[key]=input;row.append(input,el('span',text));prefs.append(row);}
+ const level=el('select');for(const[value,text]of [['crítica','Solo críticas'],['alta','Altas o superiores'],['media','Medias o superiores'],['baja','Todas']])level.add(new Option(text,value));level.value=data.settings.min_severity;const levelRow=el('label',undefined,'autocare-level');levelRow.append(el('span','Avisar de incidencias'),level);prefs.append(levelRow);
+ const save=button('Guardar avisos',null,'secondary');save.type='submit';prefs.append(save);
+ prefs.addEventListener('submit',async event=>{event.preventDefault();save.disabled=true;try{await api('/api/autocare/settings',{settings:JSON.stringify({...Object.fromEntries(Object.entries(boxes).map(([k,v])=>[k,v.checked])),min_severity:level.value})});toast('Avisos de ADI AutoCare guardados.','success');}catch(error){toast(error.message,'error');}finally{save.disabled=false;}});
+ const block=(name,open,...nodes)=>{const d=el('details',undefined,'autocare-block');d.open=open;d.append(el('summary',name),...nodes);return d;};
+ box.replaceChildren(head,stats,block('Estado de los servicios',failing>0,services),block('Incidencias activas ('+data.active.length+')',data.active.length>0,incidents,review),block('Historial técnico',false,history),block('Versiones y actualizaciones',false,versions,pending,rollback),block('Configuración de avisos',false,prefs));
+ if(routeState().params.get('autocare')==='1')box.scrollIntoView({block:'start',behavior:matchMedia('(prefers-reduced-motion:reduce)').matches?'auto':'smooth'});
+}
 function renderSystem(data){
  const root=$('module-content');root.replaceChildren();const wrap=el('div',undefined,'system-module'),installed=data.installed;
  const heading=$('module-title'),badgeIcon=el('span',undefined,'system-title-icon');badgeIcon.append(systemIcon(systemIcons.check));heading.prepend(badgeIcon);
@@ -705,6 +742,7 @@ function renderSystem(data){
   tools.append(el('span',data.releases.length===1?'1 versión publicada':data.releases.length+' versiones publicadas','system-muted'),toggleAll);timeline.append(tools,list);
   if(data.releases.length>6){const more=button('Ver versiones anteriores ('+(data.releases.length-6)+')',()=>{rows().forEach(row=>row.hidden=false);more.remove();sync();},'version-more');timeline.append(more);}sync();}else timeline.append(el('p','Todavía no hay versiones publicadas.','empty-module'));
  wrap.append(top,result,timeline);root.append(wrap);paintCheck();
+ if(currentUser?.role==='administrador'){const care=el('section',undefined,'autocare');wrap.prepend(care);renderAutoCare(care);}
 }
 // PC-DOCTOR Mail Pro: el buzón se lee en vivo desde el servidor de correo; el navegador nunca recibe credenciales.
 const mailIcons={inbox:'M22 12h-6l-2 3h-4l-2-3H2 M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z',starred:'M11.5 2.3a.5.5 0 0 1 1 0l2.3 4.7a2.1 2.1 0 0 0 1.6 1.2l5.1.7a.5.5 0 0 1 .3.9l-3.7 3.6a2.1 2.1 0 0 0-.6 1.9l.9 5.1a.5.5 0 0 1-.8.6l-4.6-2.4a2.1 2.1 0 0 0-2 0L6.4 21a.5.5 0 0 1-.8-.6l.9-5.1a2.1 2.1 0 0 0-.6-1.9L2.2 9.8a.5.5 0 0 1 .3-.9l5.1-.7A2.1 2.1 0 0 0 9.2 7z',sent:'M14.5 21.7a.5.5 0 0 0 .9 0l6.5-19a.5.5 0 0 0-.6-.6l-19 6.5a.5.5 0 0 0 0 .9l8 3.2a2 2 0 0 1 1 1.1z M21.9 2.1 11 13.1',drafts:'M12 20h9 M16.4 3.6a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z',junk:'M12 16h.01 M12 8v4 M15.3 2a2 2 0 0 1 1.4.6l4.7 4.7a2 2 0 0 1 .6 1.4v6.6a2 2 0 0 1-.6 1.4l-4.7 4.7a2 2 0 0 1-1.4.6H8.7a2 2 0 0 1-1.4-.6l-4.7-4.7A2 2 0 0 1 2 15.3V8.7a2 2 0 0 1 .6-1.4l4.7-4.7A2 2 0 0 1 8.7 2z',trash:'M3 6h18 M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6 M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2 M10 11v6 M14 11v6',archive:'M2 4h20v5H2z M4 9v9a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9 M10 13h4',other:'M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.7-.9L9.6 3.9A2 2 0 0 0 7.9 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z',clip:'m21.4 11.1-9.2 9.2a6 6 0 0 1-8.5-8.5l8.6-8.6a4 4 0 0 1 5.7 5.7l-8.6 8.5a2 2 0 0 1-2.8-2.8l8.5-8.5',reply:'M9 17l-5-5 5-5 M20 18v-2a4 4 0 0 0-4-4H4',forward:'M15 17l5-5-5-5 M4 18v-2a4 4 0 0 1 4-4h12',compose:'M12 20h9 M16.4 3.6a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z',link:'M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7 M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7'};

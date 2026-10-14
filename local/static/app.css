@@ -6783,3 +6783,48 @@ button.live-appointment .agenda-badge.state-pill,.live-card-meta .agenda-badge.s
 @media(hover:none),(max-width:999px){.premium-header #global-search .search-kbd{display:none}}
 @media(prefers-reduced-motion:reduce){.release-stability .release-light::after,.stability-dialog .stability-light{animation:none}.stability-bar i,.stability-block summary::after{transition:none}}
 .stability-head>div{min-width:0;text-align:left}.stability-head h2,.stability-head .stability-sub{text-align:left}
+/* ADI AutoCare Pro (módulo Sistema): panel compacto con estado general, servicios, incidencias, historial, versiones y avisos. */
+.autocare{--ac:#5aa9ff;display:grid;gap:10px;margin-bottom:16px;padding:14px 16px;border:1px solid #22385a;border-radius:14px;background:linear-gradient(180deg,#0e1b30,#0a1424)}
+.autocare[data-general=ok]{--ac:#3fd39a}.autocare[data-general=degraded]{--ac:#ffb455}.autocare[data-general=critical]{--ac:#ff6b78}
+.autocare-head{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:12px}
+.autocare-head h2{margin:0;font-size:16px;color:#f2f6ff}
+.autocare-sub{margin:2px 0 0;font-size:12px;color:#9db1cf}
+.autocare-light{width:11px;height:11px;border-radius:50%;background:var(--ac);box-shadow:0 0 0 3px color-mix(in srgb,var(--ac) 22%,transparent),0 0 12px color-mix(in srgb,var(--ac) 60%,transparent)}
+.autocare[data-general=degraded] .autocare-light,.autocare[data-general=critical] .autocare-light{animation:stability-breathe 2.6s ease-in-out infinite;--st:var(--ac)}
+.autocare-run{display:inline-flex;align-items:center;gap:7px;width:auto;margin:0;min-height:36px;padding:0 14px;font-size:12.5px}
+.autocare-run svg{width:15px;height:15px}
+.autocare-run[data-busy=true] svg{animation:stability-spin 1.4s linear infinite}
+.autocare-stats{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;margin:0}
+.autocare-stats div{min-width:0;padding:8px 10px;border:1px solid #1f3352;border-radius:10px;background:#0b1628}
+.autocare-stats dt{font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:#7f93b2}
+.autocare-stats dd{margin:2px 0 0;font-size:12.5px;font-weight:650;color:#e6eefc;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.autocare-block{border-top:1px solid #1c2c47}
+.autocare-block summary{padding:9px 2px;font-size:12.5px;font-weight:700;color:#c5d5ee;cursor:pointer}
+.autocare-block summary:focus-visible{outline:2px solid #8bb8ff;outline-offset:2px;border-radius:6px}
+.autocare-block>:not(summary){margin:0 0 10px}
+.autocare-services{list-style:none;padding:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.autocare-services li{display:grid;grid-template-columns:auto minmax(0,1fr) auto;grid-template-areas:"dot name ms" "dot detail detail";gap:1px 8px;align-items:center;padding:7px 10px;border:1px solid #1c2c47;border-radius:9px;background:#0a1424;font-size:12px}
+.autocare-services li i{grid-area:dot;width:8px;height:8px;border-radius:50%;background:#3fd39a;box-shadow:0 0 6px #3fd39a80}
+.autocare-services li[data-ok=false] i{background:#ff6b78;box-shadow:0 0 6px #ff6b7880}
+.autocare-services li strong{grid-area:name;color:#e6eefc;font-size:12.5px}.autocare-services li span{grid-area:detail;color:#8fa5c4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.autocare-services li small{grid-area:ms;color:#6f84a3;font-variant-numeric:tabular-nums}
+.autocare-list{display:grid;gap:6px}
+.autocare-incident{--sv:#ffb455;padding:8px 10px;border:1px solid #1f3352;border-left:3px solid var(--sv);border-radius:9px;background:#0a1424}
+.autocare-incident[data-severity=critical]{--sv:#ff6b78}.autocare-incident[data-severity=high]{--sv:#ff8f5a}.autocare-incident[data-severity=low]{--sv:#5aa9ff}
+.autocare-incident div{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 8px}
+.autocare-incident b{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--sv)}.autocare-incident strong{font-size:12.5px;color:#e6eefc}.autocare-incident small{font-size:11px;color:#7f93b2}
+.autocare-incident p{margin:3px 0 0;font-size:12px;color:#c5d5ee}.autocare-incident code{display:block;margin-top:3px;font-size:11px;color:#8fa5c4;overflow-wrap:anywhere}
+.autocare-history,.autocare-versions{list-style:none;padding:0;display:grid;gap:5px}
+.autocare-history li,.autocare-versions li{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:8px;align-items:baseline;font-size:12px;color:#c5d5ee}
+.autocare-history b{font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:#8bb8ff}
+.autocare-history li[data-kind=incident] b{color:#ff8794}.autocare-history li[data-kind=recovery] b,.autocare-history li[data-kind=resolved] b{color:#6de4af}
+.autocare-history small,.autocare-versions small{color:#7f93b2;white-space:nowrap}.autocare-versions strong{color:#e6eefc}
+.autocare-empty,.autocare-note{font-size:12px;color:#8fa5c4}
+.autocare-prefs{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px}
+.autocare-prefs label{display:inline-flex;align-items:center;gap:7px;margin:0;font-size:12.5px;color:#c5d5ee}
+.autocare-prefs input[type=checkbox]{width:16px;height:16px;min-height:0;margin:0;accent-color:#4d8df0}
+.autocare-prefs select{width:auto;min-height:32px;margin:0;font-size:12.5px}
+.autocare-prefs button{width:auto;margin:0;min-height:32px;padding:0 12px;font-size:12px}
+@media(max-width:1100px){.autocare-stats{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:700px){.autocare-head{grid-template-columns:auto minmax(0,1fr)}.autocare-run{grid-column:1/-1;justify-content:center}.autocare-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.autocare-services{grid-template-columns:1fr}.autocare-history li,.autocare-versions li{grid-template-columns:1fr;gap:1px}}
+@media(prefers-reduced-motion:reduce){.autocare-light,.autocare-run[data-busy=true] svg{animation:none}}
