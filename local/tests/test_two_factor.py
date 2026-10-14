@@ -7,11 +7,17 @@ PASSWORD='contraseña-segura-de-prueba'
 
 
 class TwoFactorTests(unittest.TestCase):
-    setUpClass=classmethod(test_app.SecurityTests.setUpClass.__func__);setUp=test_app.SecurityTests.setUp;tearDown=test_app.SecurityTests.tearDown;request=test_app.SecurityTests.request;login=test_app.SecurityTests.login
+    setUpClass=classmethod(test_app.SecurityTests.setUpClass.__func__);tearDown=test_app.SecurityTests.tearDown;request=test_app.SecurityTests.request;login=test_app.SecurityTests.login
+
+    def setUp(self):
+        # Reloj detenido a mitad de un intervalo de 30 s: los códigos «actual» y «siguiente» no dependen del instante en que corre la prueba.
+        test_app.SecurityTests.setUp(self)
+        from unittest.mock import patch
+        self.now=int(time.time())//30*30+10;clock=patch.object(two_factor.time,'time',lambda:self.now);clock.start();self.addCleanup(clock.stop)
 
     def code(self,offset=0):
         with app.connect() as c:secret=c.execute('SELECT secret FROM user_mfa WHERE user_id=?',(self.uid,)).fetchone()[0]
-        return two_factor.code_at(secret,int(time.time()//30)+offset)
+        return two_factor.code_at(secret,self.now//30+offset)
 
     def enable(self):
         cookie,csrf=self.login();setup=lambda **body:self.request('/api/account/second-step',body,cookie=cookie,csrf=csrf)
