@@ -20,14 +20,14 @@ M=1*72/25.4
 DOT=72/203
 # Resumen informativo: no sustituye ni modifica la versión histórica aceptada.
 SUMMARY=(
- 'Diagnóstico: revisiones y pruebas técnicas expresamente acordadas.',
- 'Datos personales: se recomienda respaldar la información; las operaciones técnicas pueden implicar riesgos para los datos.',
- 'Reparaciones adicionales: los trabajos con costos no autorizados requieren aprobación previa.',
- 'Fallas preexistentes: los daños ocultos detectados durante el diagnóstico serán comunicados.',
- 'Plazos: estimados según complejidad y disponibilidad de repuestos.',
- 'Garantía: servicios y componentes según las condiciones informadas y la ley.',
- 'Almacenamiento: cargos solo si fueron informados y aceptados, con base de cálculo definida y conforme a la normativa.',
- 'Entrega: el cliente podrá verificar el equipo y registrar observaciones al retirarlo.',
+ 'Diagnóstico: se realizarán las revisiones técnicas autorizadas.',
+ 'Información: se recomienda respaldar los datos antes del servicio.',
+ 'Reparaciones: cualquier costo adicional requiere aprobación previa.',
+ 'Fallas ocultas: se informarán los daños detectados durante la revisión.',
+ 'Plazos: sujetos al diagnóstico y disponibilidad de repuestos.',
+ 'Garantía: conforme al servicio realizado y la normativa vigente.',
+ 'Almacenaje: cargos únicamente según condiciones previamente aceptadas.',
+ 'Entrega: el cliente podrá revisar su equipo al retirarlo.',
 )
 
 
@@ -113,6 +113,20 @@ def render_thermal(order,copy='cliente'):
             start=y;block(label,8,True,0,width=column-4,lead=1.25);label_end=y;y=start
             block(str(value or 'No registrado'),9,False,0,x=M+column,lead=1.2);y=max(y,label_end)+2.5
         def paragraph(value,size=8,gap=2.5):block(value,size,gap=gap,justify=True,lead=1.22)
+        def item(number,value,size=8,gap=1.6,lead=1.2):
+            # Condición numerada: «N. Término:» en negrita y el texto a continuación, alineado a la izquierda con sangría francesa.
+            nonlocal y
+            term,_,rest=value.partition(': ')
+            mark=str(number)+'. ';hang=text_width(mark,size,True);lead_text=mark+term+':'
+            # La negrita real es algo más ancha que la estimada: el texto empieza tras un espacio holgado (1,8 espacios).
+            start=text_width(lead_text,size,True)+text_width(' ',size)*1.8;first=INNER-start;words=rest.split(' ');line=''
+            while words and text_width((line+' '+words[0]).strip(),size)<=first:line=(line+' '+words.pop(0)).strip()
+            ops.append(('text',lead_text,y,size,True,False,M,INNER,False))
+            if line:ops.append(('text',line,y,size,False,False,M+start,first,False))
+            y+=size*lead
+            for text,_ in (wrap_to(' '.join(words),size,False,INNER-hang) if words else []):
+                ops.append(('text',text,y,size,False,False,M+hang,INNER-hang,False));y+=size*lead
+            y+=gap
         # 1–2. Logo original y datos del taller.
         logo_width=LOGO_MM*72/25.4;logo_height=logo_width*logo_h/logo_w;ops.append(('logo',y,logo_width,logo_height));y+=logo_height+3
         block(company['name'],10,True,0,True);block(company['specialty'],8,gap=0,center=True)
@@ -148,10 +162,10 @@ def render_thermal(order,copy='cliente'):
             block('Responsable: '+access['operator'],7.5,gap=2)
         block('Reinstalar / formatear / eliminar: '+({'authorized':'AUTORIZACIÓN ADICIONAL REGISTRADA','denied':'NO AUTORIZADO'}[destructive['decision']] if destructive else 'Sin autorización adicional'),8,True,2)
         paragraph('El diagnóstico no autoriza revisar datos privados ni borrar información fuera del alcance expresamente acordado.',7.5)
-        section('CONDICIONES DEL SERVICIO · RESUMEN')
+        section('CONDICIONES DEL SERVICIO')
         if terms:block('Versión aceptada: '+terms['version'],8,True,2)
         else:paragraph('Orden histórica: no consta aceptación de condiciones. Este resumen informa; no acredita consentimiento.',8,3);ops[-1]=ops[-1]
-        for n,text in enumerate(SUMMARY,1):paragraph(str(n)+'. '+text,8,2)
+        for n,text in enumerate(SUMMARY,1):item(n,text)
         if terms:
             block('Aceptación registrada: '+datetime.fromisoformat(order['terms_accepted_at']).astimezone(ECUADOR_TZ).strftime('%d/%m/%Y %H:%M:%S'),7.5,gap=1)
             block('La versión completa aceptada se conserva sin cambios. Consulta:',7.5,gap=1)

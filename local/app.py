@@ -594,6 +594,9 @@ def resend_delivery(c,row,address,user):
     return 200,{'ok':True,'id':next(iter(tracked.values())),'status':c.execute('SELECT status FROM mail_deliveries WHERE id=?',(next(iter(tracked.values())),)).fetchone()['status']}
 
 
+DEFAULT_CSP="default-src 'self'; frame-src 'self' blob: https://challenges.cloudflare.com; script-src 'self' https://challenges.cloudflare.com; style-src 'self'; img-src 'self'; connect-src 'self' https://challenges.cloudflare.com; frame-ancestors 'none'; form-action 'self'; base-uri 'none'"
+
+
 def mail_signature_send(c):
     # Firma corporativa del buzón remitente lista para ENVIAR (incluye los bytes de la firma gráfica original si está activa).
     return mail_pro.load_signature(c,mail_pro.settings()['username'])
@@ -796,11 +799,13 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header('Content-Type', content_type)
         # Nombre con el número real de la orden cuando el documento se guarda o descarga desde el navegador.
         if filename:self.send_header('Content-Disposition',content_disposition(filename))
+        # Los documentos PDF se pueden mostrar dentro del propio sistema (vista previa); así el visor guarda con su nombre real.
+        if content_type=='application/pdf' and not getattr(self,'content_policy',None):self.content_policy=DEFAULT_CSP.replace("frame-ancestors 'none'","frame-ancestors 'self'")
         self.send_header('Content-Length', str(len(body)))
         self.send_header('Cache-Control', 'no-store')
         self.send_header('X-Content-Type-Options', 'nosniff')
         self.send_header('Referrer-Policy', 'no-referrer')
-        self.send_header('Content-Security-Policy', getattr(self,'content_policy',None) or "default-src 'self'; frame-src 'self' blob: https://challenges.cloudflare.com; script-src 'self' https://challenges.cloudflare.com; style-src 'self'; img-src 'self'; connect-src 'self' https://challenges.cloudflare.com; frame-ancestors 'none'; form-action 'self'; base-uri 'none'")
+        self.send_header('Content-Security-Policy', getattr(self,'content_policy',None) or DEFAULT_CSP)
         if cookie:
             for value in (cookie if isinstance(cookie, (list, tuple)) else [cookie]):
                 self.send_header('Set-Cookie', value)
@@ -1384,7 +1389,7 @@ class Handler(BaseHTTPRequestHandler):
                         copy=parse_qs(urlsplit(self.path).query).get('copy',['cliente'])[0]
                         if copy not in ('cliente','taller','ambas'):return self.reply(400,{'error':'Copia inválida.'})
                         pdf_order['tracking_url']=order_tracking.active(c,row['id'])['url']
-                        return self.reply(200,render_thermal(pdf_order,copy),'application/pdf',filename=code+'-TICKET.pdf')
+                        return self.reply(200,render_thermal(pdf_order,copy),'application/pdf',filename='TICKET-'+code+'.pdf')
                     return self.reply(200, render_receipt(pdf_order), 'application/pdf',filename=code+'-COMPROBANTE-DE-RECEPCION.pdf')
                 result = dict(row)
                 import order_tracking
@@ -3005,7 +3010,7 @@ class Handler(BaseHTTPRequestHandler):
                         with tempfile.TemporaryDirectory(prefix='pcdoctor-ticket-') as folder:
                             references=[]
                             for number,pdf in enumerate(pdfs):
-                                path_pdf=Path(folder)/('ticket-%d.pdf'%number);path_pdf.write_bytes(pdf)
+                                path_pdf=Path(folder)/('TICKET-'+re.sub(r'[^A-Za-z0-9-]','',str(order.get('code') or oid))+('-%d'%(number+1) if number else '')+'.pdf');path_pdf.write_bytes(pdf)
                                 references.append(str(thermal_printing.send(path_pdf,config['queue'],thermal_printing.inspect_pdf(path_pdf)) or ''))
                             reference=', '.join(filter(None,references)) or None
                         c.execute("UPDATE thermal_print_jobs SET state='submitted',spool_reference=? WHERE request_key=?",(reference,key))

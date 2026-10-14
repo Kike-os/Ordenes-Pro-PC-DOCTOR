@@ -163,3 +163,53 @@ class ThermalAccessTests(unittest.TestCase):
             self.assertEqual(self.request(url,payload,cookie=cookie,csrf=csrf)['status'],503)
             self.assertEqual(self.request(url,payload,cookie=cookie,csrf=csrf)['status'],409);send.assert_called_once()
             with app.connect() as c:self.assertEqual(c.execute('select state from thermal_print_jobs').fetchone()[0],'uncertain')
+
+
+class CompactTicketTests(unittest.TestCase):
+    setUpClass=classmethod(test_app.SecurityTests.setUpClass.__func__)
+    setUp=test_app.SecurityTests.setUp
+    tearDown=test_app.SecurityTests.tearDown
+    login=test_app.SecurityTests.login
+    request=test_app.SecurityTests.request
+    order_data=test_app.SecurityTests.order_data
+
+    def text_of(self,pdf):
+        import subprocess,tempfile
+        with tempfile.NamedTemporaryFile(suffix='.pdf') as handle:
+            handle.write(pdf);handle.flush()
+            text=subprocess.run(['pdftotext','-layout',handle.name,'-'],capture_output=True,text=True,check=True).stdout
+            info=subprocess.run(['pdfinfo',handle.name],capture_output=True,text=True,check=True).stdout
+        return text,info
+
+    def test_compact_conditions_summary_keeps_every_mandatory_element(self):
+        import shutil,thermal_pdf
+        if not shutil.which('pdftotext'):self.skipTest('pdftotext no disponible')
+        self.assertEqual(len(thermal_pdf.SUMMARY),8)
+        cookie,csrf=self.login();oid=self.request('/api/orders',self.order_data({'request_key':'ticket-compact-request-01','client':'Cliente Ficticio Con Un Nombre Bastante Largo De Prueba'}),cookie=cookie,csrf=csrf)['body']['id']
+        pdf=self.request('/api/orders/%d/thermal.pdf'%oid,cookie=cookie)['body']
+        text,info=self.text_of(pdf);flat=' '.join(text.split())
+        self.assertIn('Pages:           1',info)
+        self.assertIn('CONDICIONES DEL SERVICIO',flat);self.assertNotIn('· RESUMEN',flat)
+        for n,item in enumerate(thermal_pdf.SUMMARY,1):self.assertIn(str(n)+'. '+item,flat)
+        # Se conservan las autorizaciones técnicas, firmas, datos del cliente y el enlace de consulta.
+        for required in ('AUTORIZACIÓN DE ACCESO TÉCNICO','Firma del cliente','Recibido por','Cliente Ficticio','FIRMA Y CONSTANCIA DE RECEPCIÓN'):self.assertIn(required,flat)
+        self.assertNotIn('Datos personales: se recomienda',flat)
+
+    def test_ticket_is_named_after_the_real_order_and_can_be_previewed_inside_the_system(self):
+        cookie,csrf=self.login();order=self.request('/api/orders',self.order_data({'request_key':'ticket-compact-request-02'}),cookie=cookie,csrf=csrf)['body']
+        code=self.request('/api/orders/%d'%order['id'],cookie=cookie)['body']['order']['code']
+        handler=object.__new__(app.Handler);sent={}
+        handler.send_response=lambda status:None;handler.end_headers=lambda:None;handler.wfile=__import__('io').BytesIO()
+        handler.send_header=lambda name,value:sent.__setitem__(name,value)
+        handler.command='GET';handler.headers={}
+        app.Handler.reply(handler,200,b'%PDF-1.4','application/pdf',filename='TICKET-'+code+'.pdf')
+        self.assertEqual(sent['Content-Disposition'],'inline; filename="TICKET-'+code+'.pdf"')
+        self.assertIn("frame-ancestors 'self'",sent['Content-Security-Policy'])
+        # El resto de respuestas mantiene la prohibición de incrustarse.
+        handler=object.__new__(app.Handler);other={}
+        handler.send_response=lambda status:None;handler.end_headers=lambda:None;handler.wfile=__import__('io').BytesIO()
+        handler.send_header=lambda name,value:other.__setitem__(name,value);handler.command='GET';handler.headers={}
+        app.Handler.reply(handler,200,{'ok':True})
+        self.assertIn("frame-ancestors 'none'",other['Content-Security-Policy'])
+        js=(app.ROOT/'static'/'app.js').read_text()
+        self.assertIn("download.download=kind==='thermal'?'TICKET-'+order.code+'.pdf'",js)
