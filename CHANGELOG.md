@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.152 — 2026-10-14 06:27 (UTC-05:00)
+
+Corrección de entregas revertidas por error: sin indicador «Entrega reabierta» y sin fecha de entrega residual
+
+### Errores corregidos
+
+- Entrega revertida por error: la previsión de mantenimiento anulada ya no aparece como «Entrega reabierta» y la orden deja de conservar la fecha de la entrega revertida
+
 ## v1.5.151 — 2026-10-13 22:24 (UTC-05:00)
 
 PC-DOCTOR Mail Pro — Seguimiento inteligente de entregas. Se incorporó un centro de seguimiento de correos con estados de envío, entrega, demora y rebote, historial de eventos, alertas administrativas y herramientas para corregir destinatarios y reenviar mensajes.
