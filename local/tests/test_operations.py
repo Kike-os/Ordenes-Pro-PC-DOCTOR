@@ -40,7 +40,11 @@ class OperationsTests(unittest.TestCase):
             for _ in range(2):self.assertEqual(self.request('/api/order-status',{'id':str(oid),'status':'entregado'},cookie=cookie,csrf=csrf)['status'],200)
         row=self.request('/api/maintenance',cookie=cookie)['body']['rows'][0];self.assertEqual(row['due_date'],'2027-04-09');self.assertEqual(row['generation'],1)
         self.request('/api/order-status',{'id':str(oid),'status':'reparacion'},cookie=cookie,csrf=csrf)
-        self.assertEqual(self.request('/api/maintenance',cookie=cookie)['body']['rows'][0]['state'],'cancelled')
+        # La previsión anulada por la entrega revertida no se lista, pero se conserva; la orden deja de tener fecha de entrega.
+        self.assertEqual(self.request('/api/maintenance',cookie=cookie)['body']['rows'],[])
+        with app.connect() as c:
+            self.assertEqual(c.execute('SELECT state FROM maintenance WHERE order_id=?',(oid,)).fetchone()[0],'cancelled')
+            self.assertEqual(c.execute('SELECT delivered_at FROM orders WHERE id=?',(oid,)).fetchone()[0],'')
         self.request('/api/order-status',{'id':str(oid),'status':'entregado'},cookie=cookie,csrf=csrf)
         rows=self.request('/api/maintenance',cookie=cookie)['body']['rows'];self.assertEqual(len(rows),1);self.assertEqual(rows[0]['generation'],3)
         for suffix in ['card.pdf','thermal.pdf']:

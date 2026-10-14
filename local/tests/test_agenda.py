@@ -138,7 +138,8 @@ class AgendaTests(unittest.TestCase):
         notes=[i for i in self.request('/api/notifications',cookie=cookie)['body']['items'] if i['key'].startswith(('maintenance:','appointment:'))]
         self.assertEqual(sorted(n['title'].split(' · ')[0] for n in notes),['Próximo mantenimiento programado','Solicitud de cita por confirmar'])
         # Revertir la entrega cancela la previsión y su cita automática sin borrarlas; volver a entregar reactiva el registro con una cita nueva.
-        post('listo');self.assertEqual(self.request('/api/maintenance',cookie=cookie)['body']['rows'][0]['state'],'cancelled')
+        post('listo');self.assertNotIn(oid,[r['order_id'] for r in self.request('/api/maintenance',cookie=cookie)['body']['rows']])
+        with app.connect() as c:self.assertEqual(c.execute('SELECT state FROM maintenance WHERE order_id=?',(oid,)).fetchone()[0],'cancelled')
         second=post('entregado')['body']['maintenance']['appointment']
         with app.connect() as c:
             self.assertEqual(c.execute('SELECT COUNT(*) FROM maintenance').fetchone()[0],1)

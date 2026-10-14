@@ -32,6 +32,8 @@ def transition(c,oid,old,new,now):
             c.execute("UPDATE appointments SET status='cancelada',updated_at=? WHERE id=?",(stamp,linked['id']))
             c.execute("INSERT INTO appointment_events(appointment_id,event,old_start,old_status,new_status,created_at,detail) VALUES (?,'cancelled',?,?,'cancelada',?,'La entrega de la orden fue reabierta')",(linked['id'],linked['starts_at'],linked['status'],stamp))
         c.execute("UPDATE maintenance SET state='cancelled',appointment_id=NULL,generation=generation+1,updated_at=? WHERE order_id=?",(stamp,oid))
+        # La orden ya no está entregada: la fecha de entrega revertida no debe seguir contando como entrega (estadías, reportes, último servicio).
+        c.execute("UPDATE orders SET delivered_at='' WHERE id=?",(oid,))
     return None
 
 def proximity(days):
@@ -49,7 +51,9 @@ def rows(c,today=None):
         out.append(row)
     return out
 def _rows(c):
-    return [dict(r) for r in c.execute("SELECT m.*,o.code,o.qr_url,c.id client_id,d.id device_id,c.name client,c.phone,c.email,COALESCE(NULLIF(d.kind,''),d.category) type,d.brand,d.model,d.serial,(SELECT a.starts_at FROM appointments a WHERE a.id=m.appointment_id) appointment_start,(SELECT a.status FROM appointments a WHERE a.id=m.appointment_id) appointment_status,(SELECT a.public_code FROM appointments a WHERE a.id=m.appointment_id) appointment_code,COALESCE((SELECT result FROM maintenance_notifications n WHERE n.maintenance_id=m.id AND n.generation=m.generation AND n.channel='email'),'Sin enviar') reminder FROM maintenance m JOIN orders o ON o.id=m.order_id JOIN devices d ON d.id=o.device_id JOIN clients c ON c.id=d.client_id ORDER BY m.due_date,m.id")]
+    # Una previsión anulada porque se revirtió la entrega no es un mantenimiento pendiente: no se lista. Se conserva en la base con su
+    # historial y la preferencia de recordatorios del cliente, y vuelve a «Programado» si la orden se entrega de verdad.
+    return [dict(r) for r in c.execute("SELECT m.*,o.code,o.qr_url,c.id client_id,d.id device_id,c.name client,c.phone,c.email,COALESCE(NULLIF(d.kind,''),d.category) type,d.brand,d.model,d.serial,(SELECT a.starts_at FROM appointments a WHERE a.id=m.appointment_id) appointment_start,(SELECT a.status FROM appointments a WHERE a.id=m.appointment_id) appointment_status,(SELECT a.public_code FROM appointments a WHERE a.id=m.appointment_id) appointment_code,COALESCE((SELECT result FROM maintenance_notifications n WHERE n.maintenance_id=m.id AND n.generation=m.generation AND n.channel='email'),'Sin enviar') reminder FROM maintenance m JOIN orders o ON o.id=m.order_id JOIN devices d ON d.id=o.device_id JOIN clients c ON c.id=d.client_id WHERE m.state!='cancelled' ORDER BY m.due_date,m.id")]
 
 def due(c,now):
     stamp=now.astimezone(ZONE).isoformat();today=now.astimezone(ZONE).date().isoformat()
