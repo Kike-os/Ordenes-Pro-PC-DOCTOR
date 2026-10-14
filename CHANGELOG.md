@@ -4,6 +4,19 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.156 — 2026-10-14 07:28 (UTC-05:00)
+
+Monitor de estabilidad profesional y barra superior unificada
+
+### Mejoras realizadas
+
+- Monitor de estabilidad rediseñado: luz de estado, cuenta atrás real, barra del período y verificaciones completadas y pendientes
+- Barra superior: versión y estabilidad en un único componente; atajo «/» o Ctrl+K para buscar órdenes, clientes y números de serie
+
+### Errores corregidos
+
+- Estabilidad: una versión con alguna prueba fallida en su última verificación ya no se declara estable
+
 ## v1.5.155 — 2026-10-14 07:04 (UTC-05:00)
 
 Historial de estabilidad completo al cambiar de versión

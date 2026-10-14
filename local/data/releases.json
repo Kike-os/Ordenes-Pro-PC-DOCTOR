@@ -8,6 +8,25 @@
   },
   "releases": [
     {
+      "version": "1.5.156",
+      "date": "2026-10-14T07:28:36-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Monitor de estabilidad profesional y barra superior unificada",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Monitor de estabilidad rediseñado: luz de estado, cuenta atrás real, barra del período y verificaciones completadas y pendientes",
+          "Barra superior: versión y estabilidad en un único componente; atajo «/» o Ctrl+K para buscar órdenes, clientes y números de serie"
+        ],
+        "fixes": [
+          "Estabilidad: una versión con alguna prueba fallida en su última verificación ya no se declara estable"
+        ],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.155",
       "date": "2026-10-14T07:04:02-05:00",
       "type": "patch",
