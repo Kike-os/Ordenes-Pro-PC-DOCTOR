@@ -8,6 +8,28 @@
   },
   "releases": [
     {
+      "version": "1.5.147",
+      "date": "2026-10-13T21:02:03-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Firma original en los correos, lector de correo, feriados y atención, catálogo Premium Técnico y reactivación de citas",
+      "changes": {
+        "features": [
+          "Citas: nueva acción «Reactivar cita» para devolver a la agenda una cita cerrada por error, con confirmación, comprobación del horario y sin avisos al cliente."
+        ],
+        "improvements": [
+          "Lector de correo rediseñado: el mensaje se muestra con su formato original (tablas, imágenes y firmas) en un área aislada y segura, sin desbordes; encabezado y acciones fijos, opción Ampliar, Imprimir y menú de acciones en pantallas pequeñas.",
+          "Mejora de calendario — Feriados y atención: se rediseñó la administración de feriados y días no laborables, corrigiendo problemas de visualización, alineación y distribución. Se optimizaron los controles de horarios especiales y la gestión de disponibilidad para citas.",
+          "Catálogo Premium Técnico — Mejoras de productos y servicios: se renovó la interfaz de selección de productos y servicios mediante tarjetas profesionales, logotipos de marca, iconos técnicos y una distribución optimizada. Se mejoraron la búsqueda, los filtros, la visualización de precios, la adaptación móvil y la estabilidad general del catálogo."
+        ],
+        "fixes": [
+          "Firma corporativa: el sistema ya no reconstruye la firma ni le añade una franja roja. Se puede cargar la firma original como imagen y se envía tal cual en todos los correos, desde un único punto para todos los módulos."
+        ],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.146",
       "date": "2026-10-13T20:08:23-05:00",
       "type": "patch",

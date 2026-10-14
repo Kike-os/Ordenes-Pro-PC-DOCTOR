@@ -4,6 +4,24 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.147 — 2026-10-13 21:02 (UTC-05:00)
+
+Firma original en los correos, lector de correo, feriados y atención, catálogo Premium Técnico y reactivación de citas
+
+### Nuevas funcionalidades
+
+- Citas: nueva acción «Reactivar cita» para devolver a la agenda una cita cerrada por error, con confirmación, comprobación del horario y sin avisos al cliente.
+
+### Mejoras realizadas
+
+- Lector de correo rediseñado: el mensaje se muestra con su formato original (tablas, imágenes y firmas) en un área aislada y segura, sin desbordes; encabezado y acciones fijos, opción Ampliar, Imprimir y menú de acciones en pantallas pequeñas.
+- Mejora de calendario — Feriados y atención: se rediseñó la administración de feriados y días no laborables, corrigiendo problemas de visualización, alineación y distribución. Se optimizaron los controles de horarios especiales y la gestión de disponibilidad para citas.
+- Catálogo Premium Técnico — Mejoras de productos y servicios: se renovó la interfaz de selección de productos y servicios mediante tarjetas profesionales, logotipos de marca, iconos técnicos y una distribución optimizada. Se mejoraron la búsqueda, los filtros, la visualización de precios, la adaptación móvil y la estabilidad general del catálogo.
+
+### Errores corregidos
+
+- Firma corporativa: el sistema ya no reconstruye la firma ni le añade una franja roja. Se puede cargar la firma original como imagen y se envía tal cual en todos los correos, desde un único punto para todos los módulos.
+
 ## v1.5.146 — 2026-10-13 20:08 (UTC-05:00)
 
 Recibo de pago en PDF, reporte de saldos por cobrar, saldo en los listados y pasaporte en la reserva de citas
