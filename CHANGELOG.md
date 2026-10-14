@@ -4,6 +4,20 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.146 — 2026-10-13 20:08 (UTC-05:00)
+
+Recibo de pago en PDF, reporte de saldos por cobrar, saldo en los listados y pasaporte en la reserva de citas
+
+### Nuevas funcionalidades
+
+- Recibo de pago en PDF para cada pago, abono o devolución, con el saldo al emitirlo; se puede abrir para imprimir o enviar al correo registrado del cliente.
+- Reportes: nuevo panel «Saldos por cobrar», con el total pendiente, los equipos con saldo y lo cobrado y devuelto en el rango de fechas por forma de pago.
+
+### Mejoras realizadas
+
+- El listado de órdenes y Seguimiento muestran el saldo de cada equipo (debe, abonó, pagado o a favor) sin abrir la orden.
+- Agendamiento de citas: se puede reservar con pasaporte, además de cédula o RUC.
+
 ## v1.5.145 — 2026-10-13 19:28 (UTC-05:00)
 
 Seguimiento de Órdenes: botón Historial y contadores de tamaño estable

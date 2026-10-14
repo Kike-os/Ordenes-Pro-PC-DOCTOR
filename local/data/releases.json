@@ -8,6 +8,26 @@
   },
   "releases": [
     {
+      "version": "1.5.146",
+      "date": "2026-10-13T20:08:23-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Recibo de pago en PDF, reporte de saldos por cobrar, saldo en los listados y pasaporte en la reserva de citas",
+      "changes": {
+        "features": [
+          "Recibo de pago en PDF para cada pago, abono o devolución, con el saldo al emitirlo; se puede abrir para imprimir o enviar al correo registrado del cliente.",
+          "Reportes: nuevo panel «Saldos por cobrar», con el total pendiente, los equipos con saldo y lo cobrado y devuelto en el rango de fechas por forma de pago."
+        ],
+        "improvements": [
+          "El listado de órdenes y Seguimiento muestran el saldo de cada equipo (debe, abonó, pagado o a favor) sin abrir la orden.",
+          "Agendamiento de citas: se puede reservar con pasaporte, además de cédula o RUC."
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.145",
       "date": "2026-10-13T19:28:35-05:00",
       "type": "patch",
