@@ -184,16 +184,19 @@ class CompactTicketTests(unittest.TestCase):
     def test_compact_conditions_summary_keeps_every_mandatory_element(self):
         import shutil,thermal_pdf
         if not shutil.which('pdftotext'):self.skipTest('pdftotext no disponible')
-        self.assertEqual(len(thermal_pdf.SUMMARY),8)
+        self.assertEqual(len(thermal_pdf.SUMMARY),7)
         cookie,csrf=self.login();oid=self.request('/api/orders',self.order_data({'request_key':'ticket-compact-request-01','client':'Cliente Ficticio Con Un Nombre Bastante Largo De Prueba'}),cookie=cookie,csrf=csrf)['body']['id']
         pdf=self.request('/api/orders/%d/thermal.pdf'%oid,cookie=cookie)['body']
         text,info=self.text_of(pdf);flat=' '.join(text.split())
-        self.assertIn('Pages:           1',info)
-        self.assertIn('CONDICIONES DEL SERVICIO',flat);self.assertNotIn('· RESUMEN',flat)
+        self.assertIn('Pages:           1',info);self.assertIn('Title:           TICKET-',info)
+        self.assertIn('CONDICIONES DE RECEPCIÓN',flat)
         for n,item in enumerate(thermal_pdf.SUMMARY,1):self.assertIn(str(n)+'. '+item,flat)
-        # Se conservan las autorizaciones técnicas, firmas, datos del cliente y el enlace de consulta.
-        for required in ('AUTORIZACIÓN DE ACCESO TÉCNICO','Firma del cliente','Recibido por','Cliente Ficticio','FIRMA Y CONSTANCIA DE RECEPCIÓN'):self.assertIn(required,flat)
-        self.assertNotIn('Datos personales: se recomienda',flat)
+        # Orden pedido: número, recepción, cliente, equipo, falla, servicio, condiciones, QR, firma.
+        order=[flat.index(mark) for mark in ('COMPROBANTE DE RECEPCIÓN','Recepción:','CLIENTE Nombre','EQUIPO Tipo','Accesorios','FALLA REPORTADA','SERVICIO SOLICITADO','CONDICIONES DE RECEPCIÓN','Condiciones completas','Seguimiento de tu','FIRMA Y CONSTANCIA')]
+        self.assertEqual(order,sorted(order))
+        # Se conservan las autorizaciones técnicas, firmas y datos del cliente.
+        for required in ('AUTORIZACIÓN DE ACCESO TÉCNICO','Reinstalar / formatear / eliminar','Firma del cliente','Recibido por','Cliente Ficticio','Versión aceptada'):self.assertIn(required,flat)
+        self.assertNotIn('Datos personales: se recomienda',flat);self.assertNotIn('https://',flat.split('CONDICIONES DE RECEPCIÓN')[1].split('FIRMA')[0])
 
     def test_ticket_is_named_after_the_real_order_and_can_be_previewed_inside_the_system(self):
         cookie,csrf=self.login();order=self.request('/api/orders',self.order_data({'request_key':'ticket-compact-request-02'}),cookie=cookie,csrf=csrf)['body']

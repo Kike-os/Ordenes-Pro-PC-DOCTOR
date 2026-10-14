@@ -118,3 +118,11 @@ Comprobado en el PDF real con datos ficticios: dos páginas para ambas copias, Q
 ## Corrección de la vista previa (1.5.158)
 
 En 1.5.157 la vista previa se cargó desde la URL del servidor y se permitió `frame-ancestors 'self'` solo en el servidor local; en producción (Vercel) las respuestas salen por `wsgi_app.py`, que envía `frame-ancestors 'none'`, y el navegador bloqueó el visor («ha rechazado la conexión»). Se revirtió: la vista previa vuelve a una URL de objeto temporal (`blob:`) y **ningún** PDF se puede incrustar (servidor local y WSGI aplican la misma política; hay una prueba en `test_wsgi.py`). El visor se muestra sin su barra (`#toolbar=0`): guardar se hace con «Descargar PDF», que usa el nombre real; «Abrir PDF» abre el documento del servidor en otra pestaña con ese mismo nombre. «Ticket listo» aparece solo cuando el visor cargó el documento; si falla la generación o la carga (12 s), se muestra el aviso con «Reintentar».
+
+## Distribución definitiva (1.5.160)
+
+Orden: logo compacto (20 mm) y datos del taller · título y copia · número de orden destacado · fecha y hora de recepción · cliente · equipo (tipo, marca/modelo, serie, accesorios, estado físico) · falla reportada · servicio solicitado (diagnóstico técnico de la falla informada y estado real; las notas internas no se imprimen) · autorización de acceso técnico (obligatoria, sin cambios) · **Condiciones de recepción** (versión aceptada y fecha, siete puntos breves) · fila con dos QR: **condiciones completas** (la versión aceptada) y **seguimiento de la reparación** · firma y constancia · Code 128.
+
+- Ancho: el área imprimible real de la TM-m30II en papel de 80 mm (72 mm = 576 puntos a 203 ppp), sin reducir el PDF; longitud variable según el contenido (≈ 323 mm con datos largos, antes ≈ 360 mm). Texto PDF real (no imagen), títulos en negrita, texto secundario de 7–8,5 pt.
+- Comprobado: una página por copia, ningún carácter fuera de márgenes, los dos QR y el Code 128 leídos con `zbarimg` a 203 ppp, procesamiento completo por el controlador Epson (`--render-only`, con corte). Título del PDF y nombre del archivo: `TICKET-<orden>`.
+- El resumen de condiciones es informativo: no modifica las condiciones legales aceptadas, que se consultan completas con el QR.
