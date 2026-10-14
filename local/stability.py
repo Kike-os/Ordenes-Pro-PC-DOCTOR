@@ -170,6 +170,9 @@ def run(c, now, source='automática'):
     summary = _summary(c, version, history)
     _account(summary, entry)
     summaries = _load(c, 'stability_versions', {})
+    # Versiones verificadas antes de existir el resumen: se incorporan desde las ejecuciones guardadas para no perder su historial.
+    for other in {item['version'] for item in history} - set(summaries) - {version}:
+        summaries[other] = _summary(c, other, history)
     summaries[version] = summary
     if len(summaries) > KEEP_VERSIONS:
         for old in sorted(summaries, key=lambda key: summaries[key]['last_run'])[:len(summaries) - KEEP_VERSIONS]:
@@ -179,6 +182,14 @@ def run(c, now, source='automática'):
     _save(c, 'stability_versions', summaries)
     c.commit()
     return entry
+
+
+def _known(c, history):
+    """Resúmenes guardados más los que aún solo constan en las ejecuciones (sin escribir nada)."""
+    summaries = dict(_load(c, 'stability_versions', {}))
+    for other in {item['version'] for item in history} - set(summaries):
+        summaries[other] = _summary(c, other, history)
+    return summaries
 
 
 def _running(c, now):
@@ -232,7 +243,7 @@ def status(c, now):
     incidents = sorted(incidents, key=lambda item: item['at'])[-5:]
     previous = [{'version': key, 'runs': value['runs'], 'passes': value['passes'], 'last_run': value['last_run'], 'stable': bool(value['window_start']) and value['window_passes'] >= MIN_PASSES
                  and datetime.fromisoformat(value['window_start']) + timedelta(hours=OBSERVATION_HOURS) <= datetime.fromisoformat(value['last_run'])}
-                for key, value in sorted(_load(c, 'stability_versions', {}).items(), key=lambda pair: pair[1]['last_run'], reverse=True) if key != version][:5]
+                for key, value in sorted(_known(c, history).items(), key=lambda pair: pair[1]['last_run'], reverse=True) if key != version][:5]
     return {'version': version, 'date': installed.get('date', ''), 'state': state, 'label': LABELS[state], 'short': SHORT[state],
             'last_check': summary['last_run'], 'checks_run': summary['runs'], 'checks_passed': summary['passes'],
             'window_start': summary['window_start'], 'window_passes': summary['window_passes'], 'missing_passes': missing,

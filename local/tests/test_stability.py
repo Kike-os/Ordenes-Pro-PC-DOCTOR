@@ -100,6 +100,14 @@ class StabilityTests(unittest.TestCase):
             c.execute("DELETE FROM system_state WHERE key='stability_versions'")
             info = stability.status(c, now)
             self.assertEqual((info['checks_run'], info['window_passes'], info['missing_passes']), (1, 1, 2))
+            # Al publicarse otra versión, la anterior figura en el historial y su resumen queda guardado en la primera verificación.
+            real = stability.versioning.load()
+            old = real['releases'][0]['version']
+            newer = dict(real, releases=[dict(real['releases'][0], version='99.1.0')] + real['releases'])
+            with patch.object(stability.versioning, 'load', return_value=newer):
+                self.assertEqual([item['version'] for item in stability.status(c, now)['previous']], [old])
+                stability.run(c, now)
+            self.assertEqual(stability._load(c, 'stability_versions', {})[old]['runs'], 1)
 
     def test_scheduled_task_is_protected_and_matches_vercel(self):
         import json
