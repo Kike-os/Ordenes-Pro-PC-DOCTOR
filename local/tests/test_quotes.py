@@ -437,7 +437,7 @@ class QuotePriorityTests(unittest.TestCase):
         free={'description':'Limpieza de teclado ficticia','category':'servicio','quantity':2,'unit_cents':60000,'taxed':True}
         self.assertEqual(post('/api/quotes/%d'%quote,action='save',items=[line(screen,'urgente')])['status'],400)
         saved=post('/api/quotes/%d'%quote,action='save',items=[line(screen,'obligatorio'),line(hinge,'necesario'),dict(free,priority='opcional'),dict(free,description='Sin clasificar ficticio')])['body']['quote']
-        self.assertEqual([(i['priority'],i['priority_label'],i['icon'],i['status']) for i in saved['items']],[('obligatorio','Obligatorio','pantalla','pendiente'),('necesario','Necesario','bisagra','pendiente'),('opcional','Opcional','mantenimiento','pendiente'),('','','servicio','pendiente')])
+        self.assertEqual([(i['priority'],i['priority_label'],i['icon'],i['status']) for i in saved['items']],[('obligatorio','Obligatorio','pantalla','pendiente'),('necesario','Necesario','bisagra','pendiente'),('opcional','Opcional','limpieza','pendiente'),('','','servicio','pendiente')])
         # La clasificación no cambia importes ni autoriza: el total es la suma de las partidas y nada pasa a lo aprobado.
         self.assertEqual((saved['totals']['quoted'],saved['totals']['approved']),(11500+3200+120000+120000,0))
         detail=lambda:(lambda d:d.get('order',d))(self.request('/api/orders/%d'%order['id'],cookie=cookie)['body']);self.assertEqual((detail()['authorized_items'],detail()['budget']['total_cents']),([],0))
