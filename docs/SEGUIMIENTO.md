@@ -76,3 +76,13 @@ Comprobado en navegador con 0, 1, 2, 5, 10 y 50 órdenes a 1440, 820 y 390 px: s
 ## Botón «Historial»
 
 Icono de historial (reloj con flecha), texto y contador separados con un espacio uniforme. El contador es una insignia redondeada dentro del botón, con el número real de movimientos de esa orden (hasta tres dígitos sin deformar las acciones; `999+` si hubiera más) y `0` cuando no hay ninguno. Se actualiza solo cuando el listado detecta un movimiento nuevo y muestra entonces un destello rosado, una sola vez. Entre 1181 y 1359 px el texto se omite y quedan icono y contador; en tableta y teléfono la acción está en el menú «Más» con su contador. Al pulsarlo abre el historial de esa orden, nunca el de otra.
+
+## Botón Historial y contador estable (13/10/2026)
+
+El contador del botón «Historial» hacía crecer el botón con dos o más dígitos (de 116 a 134 px con «999+») y descuadraba las demás acciones. Ahora:
+
+- **Contador estable global** (`stableCount` y `countText` en `app.js`, clase `.stable-count`): píldora de 35 × 23 px, cifras tabulares, sin salto de línea. Por encima de 999 muestra «999+»; el valor real queda en `data-count` y en el título. Cada módulo conserva su color con su propia clase.
+- **Acciones de Seguimiento**, con tamaños fijos por ancho de pantalla: desde 1360 px, «Historial» mide 146 × 38 px y todos los botones 38 px de alto (QR y Ticket muestran su texto desde 1600 px); entre 1181 y 1359 px, variante compacta de 74 × 34 px con icono y contador; hasta 1180 px las acciones secundarias siguen en el menú «Más».
+- Comprobado con 0, 1, 8, 9, 10, 12, 99, 100, 125, 999 y 1000 en 1920, 1440, 1366, 1280, 1024, 820, 390 y 320 px: no cambian el botón, las columnas, la altura de fila ni la posición de los demás botones.
+
+Los otros contadores revisados (avisos, ADI, asistencia en vivo, grupos de presupuestos) ya limitan su texto o no desplazan a sus vecinos; no se modificaron.
