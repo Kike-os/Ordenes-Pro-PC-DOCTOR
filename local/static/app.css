@@ -6662,3 +6662,58 @@ button.live-appointment .agenda-badge.state-pill,.live-card-meta .agenda-badge.s
  .delivery-facts div{grid-template-columns:1fr;gap:0}
 }
 @media(prefers-reduced-motion:reduce){.delivery-pill[data-status=enviando] svg{animation:none}.delivery-center[data-loading=true] .delivery-table-wrap{transition:none}}
+/* Indicador de estabilidad de la versión: distintivo de cristal tecnológico en el acceso y en la barra superior. */
+.stability-slot{display:inline-flex;min-width:0}
+#stability-login{display:flex;justify-content:flex-start;margin-top:8px}
+.stability-badge{--st:#7d8ba1;position:relative;box-sizing:border-box;display:inline-flex;align-items:center;gap:6px;max-width:100%;height:28px;margin:0;padding:0 11px 0 9px;border:1px solid color-mix(in srgb,var(--st) 45%,#21385a);border-radius:999px;background:linear-gradient(180deg,color-mix(in srgb,var(--st) 16%,#0f1d33cc),#0a1424cc);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);box-shadow:inset 0 1px #ffffff14,0 0 12px color-mix(in srgb,var(--st) 18%,transparent);color:#e6eefc;font-size:11.5px;font-weight:600;line-height:1;letter-spacing:.02em;white-space:nowrap;cursor:pointer;transition:border-color .2s,box-shadow .2s}
+.stability-badge:hover{border-color:color-mix(in srgb,var(--st) 75%,#21385a);box-shadow:inset 0 1px #ffffff1f,0 0 16px color-mix(in srgb,var(--st) 32%,transparent)}
+.stability-badge:focus-visible{outline:2px solid #8bb8ff;outline-offset:2px}
+.stability-badge svg{flex:none;width:14px;height:14px;fill:none;stroke:var(--st);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.stability-badge .stability-version{font-variant-numeric:tabular-nums}
+.stability-badge .stability-sep{color:#6f84a3}
+.stability-badge .stability-label{color:var(--st);font-weight:800;letter-spacing:.06em;overflow:hidden;text-overflow:ellipsis}
+.stability-badge[data-state=stable],.stability-state[data-state=stable]{--st:#3fd39a}
+.stability-badge[data-state=verifying],.stability-state[data-state=verifying]{--st:#5aa9ff}
+.stability-badge[data-state=observing],.stability-state[data-state=observing]{--st:#ffb455}
+.stability-badge[data-state=attention],.stability-state[data-state=attention]{--st:#ff6b78}
+.stability-badge[data-state=unverified],.stability-state[data-state=unverified]{--st:#9aa8bd}
+.stability-badge[data-state=verifying] svg{animation:stability-spin 1.4s linear infinite}
+@keyframes stability-spin{to{transform:rotate(360deg)}}
+.stability-dialog{width:min(440px,calc(100% - 24px));max-height:calc(100dvh - 32px);padding:16px 18px;border:1px solid #27406a;border-radius:16px;background:linear-gradient(180deg,#0f1d33,#0a1424);color:#dbe8fb;box-shadow:0 24px 60px #000a,0 0 0 1px #4087ef14;overflow-y:auto}
+.stability-dialog::backdrop{background:#030812b3;-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+.stability-dialog header{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+.stability-dialog h2{margin:0;font-size:16px;color:#f2f6ff}
+.stability-dialog h3{margin:12px 0 6px;font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:#8198ba}
+.stability-close{display:grid;place-items:center;width:30px;height:30px;min-height:0;margin:0;padding:0;border:1px solid #2a4063;border-radius:8px;background:#10203a;color:#c5d5ee;font-size:18px;line-height:1;cursor:pointer}
+.stability-close:focus-visible{outline:2px solid #8bb8ff;outline-offset:2px}
+.stability-state{--st:#9aa8bd;display:grid;grid-template-columns:auto 1fr;gap:2px 8px;align-items:center;margin:0 0 10px;padding:10px 12px;border:1px solid color-mix(in srgb,var(--st) 40%,#1f3352);border-radius:12px;background:color-mix(in srgb,var(--st) 9%,#0b1628)}
+.stability-state svg{grid-row:span 2;width:20px;height:20px;fill:none;stroke:var(--st);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.stability-state strong{color:var(--st);font-size:14px}.stability-state span{font-size:12px;line-height:1.45;color:#b9c9e2}
+.stability-facts{display:grid;gap:5px;margin:0}
+.stability-facts div{display:grid;grid-template-columns:170px minmax(0,1fr);gap:8px;font-size:12.5px}
+.stability-facts dt{color:#8198ba}.stability-facts dd{margin:0;color:#e6eefc;overflow-wrap:anywhere}
+.stability-tests{list-style:none;margin:0;padding:0;display:grid;gap:4px}
+.stability-tests li{display:flex;align-items:center;gap:7px;font-size:12.5px}
+.stability-tests svg{flex:none;width:14px;height:14px;fill:none;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+.stability-tests li[data-ok=true] svg{stroke:#3fd39a}.stability-tests li[data-ok=false] svg{stroke:#ff6b78}.stability-tests li[data-ok=false]{color:#ffc2c7}
+.stability-incidents p{margin:0 0 4px;font-size:12px;color:#b9c9e2}.stability-incidents p[data-critical=true]{color:#ff9aa3}
+.stability-rule{margin:12px 0 0;padding-top:10px;border-top:1px solid #1c2c47;font-size:11.5px;line-height:1.5;color:#8fa5c4}
+#stability-top{flex:none}
+.stability-badge .stability-label{overflow:visible;text-overflow:clip}
+#stability-login{padding-left:50px}
+@media(max-width:1440px){#stability-top .stability-badge .stability-version,#stability-top .stability-badge .stability-sep{display:none}}
+/* Con poco ancho la barra superior conserva solo el icono de estado (nombre accesible, descripción y la misma ventana de detalle). */
+@media(max-width:1280px){#stability-top .stability-badge{width:32px;height:32px;padding:0;justify-content:center}#stability-top .stability-badge>span{display:none}#stability-top .stability-badge svg{width:16px;height:16px}}
+/* Celulares: el distintivo completo pasa al menú de navegación; en la barra superior no hay espacio junto al título. */
+.stability-nav{display:none}
+@media(max-width:860px){#stability-top{display:none}.stability-nav{display:flex;padding:10px 12px 4px}}
+@media(max-width:420px){#stability-login{padding-left:0}}
+@media(max-width:480px){.stability-facts div{grid-template-columns:1fr;gap:0}}
+@media(prefers-reduced-motion:reduce){.stability-badge,.stability-badge[data-state=verifying] svg{transition:none;animation:none}}
+/* El distintivo conserva su tipografía dentro del menú de navegación (que agranda los textos de sus enlaces). */
+.stability-slot .stability-badge>span{font-size:11.5px;line-height:1;font-weight:600;letter-spacing:.02em;color:#e6eefc}
+.stability-slot .stability-badge>.stability-label{font-weight:800;letter-spacing:.06em;color:var(--st)}
+.stability-slot .stability-badge>.stability-sep{color:#6f84a3}
+.stability-slot .stability-badge{width:auto;min-width:0;max-width:100%;flex:none}
+.stability-nav{grid-column:1/-1}
+@media(max-width:1280px){#stability-top .stability-badge{width:32px}}

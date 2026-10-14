@@ -896,6 +896,14 @@ class Handler(BaseHTTPRequestHandler):
                 rows=[{'version':item['version'],'date':item.get('date',''),'type':versioning.TYPES.get(item.get('type'),item.get('type','')),'summary':item.get('summary',''),
                        'notes':[{'key':key,'title':title,'items':item.get('changes',{}).get(key,[])} for key,title in versioning.CATEGORIES.items() if item.get('changes',{}).get(key)]} for item in releases[(page-1)*size:page*size]]
                 return self.reply(200,{'rows':rows,'page':page,'pages':pages,'total':len(releases)})
+            if path == '/api/public/stability':
+                # Estabilidad de la versión instalada (acceso y barra superior). Verificaciones de solo lectura; como mucho una cada 30 minutos.
+                import stability
+                now=reception_now()
+                try:
+                    if stability.due(c,now):stability.run(c,now)
+                    return self.reply(200,stability.status(c,now))
+                except versioning.RegistryError:return self.reply(503,{'error':'No se pudo leer la versión instalada.'})
             if path == '/api/public/version':
                 # Estado real de la versión, sin sesión: la instalada (la del código desplegado) frente al registro publicado. Solo expone notas ya públicas.
                 # La comprobación se guarda 20 minutos para no consultar el registro en cada visita; «refresh=1» la repite (con límite).
@@ -928,6 +936,8 @@ class Handler(BaseHTTPRequestHandler):
                 # Seguimiento de correos: envíos sin respuesta registrada y lectura de informes de rebote o demora del buzón.
                 try:
                     mail_tracking.sweep(c,now);c.commit()
+                    import stability
+                    if stability.due(c,now):stability.run(c,now,'programada')
                     if mail_pro.configured():notifications.mail_status(c,now,0)
                 except Exception as error:print('mail-tracking cron',type(error).__name__,flush=True)
                 return self.reply(200,{'ok':True})
