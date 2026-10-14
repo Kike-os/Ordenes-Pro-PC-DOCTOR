@@ -32,6 +32,7 @@ from urllib.error import URLError
 from reception import (stored_category, valid_ecuador_phone, DEVICE_TYPES, validate_order, order_code, legacy_type, remember_brand, qr_image, production_enabled, reception_now, order_url, public_base_url)
 
 import remote_db
+import mail_tracking
 import reception
 import service_terms
 import order_drafts
@@ -330,13 +331,20 @@ def send_institutional(c,kind,title,recipient,subject,body,order_id=None,actor=N
     config=mail_pro.settings();card=mail_signature_send(c)
     message,recipients=mail_pro.build_message(config,{'to':recipient,'subject':subject,'body':final,'from_name':corporate.settings()['name'],'attachments':attachments or [],'layout':{'title':title}},card if signed and card.get('enabled') else '')
     archive_id=mailing.archive(c,kind,order_id,recipient,subject,message,adi,actor,now,[str(item.get('name','')) for item in attachments or []],private)
+    # Seguimiento de entrega: un registro por destinatario, con su historial de eventos reales.
+    tracked=mail_tracking.start(c,recipients,kind=kind,subject=str(message['Subject'] or subject),now=now,archive_id=archive_id,order_id=order_id,actor_id=actor)
     # La copia queda guardada como «preparado» antes de hablar con el servidor de correo.
     c.commit()
-    try:mail_pro.deliver(config,message,recipients)
+    # Los envíos automáticos no se repiten hacia direcciones declaradas inválidas por un rebote permanente.
+    refusal=next((reason for reason in (mail_tracking.blocked(c,address) for address in recipients) if reason),'') if actor is None else ''
+    try:
+        if refusal:raise mail_pro.MailError('destinatario',refusal+' No se reintenta automáticamente: corrige la dirección del destinatario.')
+        result=mail_pro.deliver(config,message,recipients)
     except mail_pro.MailError as error:
-        mailing.mark(c,archive_id,'error',str(error));c.commit();raise
+        mailing.mark(c,archive_id,'error',str(error));mail_tracking.failed(c,tracked,error,reception_now());c.commit();raise
     message_id=str(message['Message-ID'] or '');sent=reception_now()
     mailing.mark(c,archive_id,'enviado','El servidor de correo aceptó el mensaje.',message_id,sent)
+    mail_tracking.accepted(c,tracked,message_id,sent,result)
     if order_id and message_id:
         # Vinculación automática: el mensaje nace unido a su orden y las respuestas del cliente se reconocen por esta referencia.
         c.execute('INSERT OR IGNORE INTO mail_links(message_id,folder,uid,order_id,subject,correspondent,direction,sent_at,created_by,created_at) VALUES (?,?,0,?,?,?,?,?,?,?)',(message_id,'',order_id,subject[:300],recipient,'out',sent.isoformat(timespec='seconds'),actor,sent.isoformat(timespec='seconds')))
@@ -525,6 +533,65 @@ def content_disposition(filename):
     header='inline; filename="'+safe+'"'
     if safe!=filename:header+="; filename*=UTF-8''"+quote(filename,safe='')
     return header
+
+
+def resend_delivery(c,row,address,user):
+    """«Corregir destinatario y reenviar»: un intento NUEVO vinculado al original, que queda tal cual con su motivo de fallo.
+
+    Correos del sistema: se recompone el mismo texto archivado con la plantilla y la firma vigentes. Mensajes de Mail Pro: se reenvía
+    la copia exacta guardada en Enviados (con sus adjuntos) solo al destinatario corregido. Devuelve (estado HTTP, respuesta)."""
+    import mailing,email
+    from email import policy
+    from email.utils import formatdate,make_msgid
+    config=mail_pro.settings();now=reception_now()
+    if row['archive_id']:
+        archived=c.execute('SELECT * FROM mail_archive WHERE id=?',(row['archive_id'],)).fetchone()
+        body,signed=archived['body_text'],False
+        if '\n-- \n' in body:body,signed=body.split('\n-- \n',1)[0].rstrip(),True
+        card=mail_signature_send(c)
+        message,recipients=mail_pro.build_message(config,{'to':address,'subject':archived['subject'],'body':body,'from_name':corporate.settings()['name'],'layout':{'title':mailing.LABELS.get(archived['kind'],archived['subject'])}},card if signed and card.get('enabled') else '')
+        archive_id=mailing.archive(c,archived['kind'],archived['order_id'],address,archived['subject'],message,archived['adi'],user['id'],now)
+        outbox=''
+    else:
+        client=mail_pro.open_imap()
+        try:
+            folders=mail_pro.list_folders(client);sent=mail_pro.by_role(folders,'sent')
+            found=None
+            if sent:
+                client.select(mail_pro.quoted(sent),readonly=True)
+                code,data=client.uid('SEARCH',None,'HEADER','Message-ID',row['message_id'])
+                uids=(data[0] or b'').split() if code=='OK' and data else []
+                if uids:
+                    code,data=client.uid('FETCH',uids[-1],'(BODY.PEEK[])')
+                    raw=next((part[1] for part in data or [] if isinstance(part,tuple)),None)
+                    found=email.message_from_bytes(raw,policy=policy.default) if raw else None
+        finally:mail_pro.close_imap(client)
+        if not found:return 409,{'error':'No se encontró la copia del mensaje original en la carpeta Enviados: redáctalo de nuevo para el destinatario corregido.'}
+        for header in ('To','Cc','Bcc','Message-ID','Date','In-Reply-To','References','X-OrdenesPro-Resend-Of'):
+            del found[header]
+        found['To']=address;found['Date']=formatdate(localtime=True);found['Message-ID']=make_msgid(domain=config['username'].split('@')[-1]);found['X-OrdenesPro-Resend-Of']=row['message_id']
+        message,recipients,archive_id,outbox=found,[address],None,'reenvio-'+str(row['id'])+'-'+secrets.token_hex(4)
+    tracked=mail_tracking.start(c,recipients,kind=row['kind'],subject=str(message['Subject'] or row['subject']),now=now,archive_id=archive_id,outbox_key=outbox,order_id=row['order_id'],actor_id=user['id'],retry_of=row['id'])
+    # Solo se añade un evento al historial del intento original: su estado, código y motivo no cambian.
+    mail_tracking.note(c,row['id'],row['status'],'reenvio','personal',('Reenviado a '+address+' por '+user['name']+' (nuevo intento).')[:300],now,'resend:'+str(row['id'])+':'+str(next(iter(tracked.values()))))
+    c.execute("UPDATE mail_deliveries SET resolved_at=?,resolved_by=? WHERE id=? AND resolved_at=''",(now.isoformat(timespec='seconds'),user['id'],row['id']))
+    c.commit()
+    try:result=mail_pro.deliver(config,message,recipients)
+    except mail_pro.MailError as error:
+        if archive_id:mailing.mark(c,archive_id,'error',str(error))
+        mail_tracking.failed(c,tracked,error,reception_now());audit(c,user['id'],'mail_resend_failed');c.commit()
+        return 200,{'ok':False,'error':'No se reenvió: '+str(error),'id':next(iter(tracked.values()))}
+    message_id=str(message['Message-ID'] or '')
+    if archive_id:mailing.mark(c,archive_id,'enviado','El servidor de correo aceptó el mensaje.',message_id,reception_now())
+    mail_tracking.accepted(c,tracked,message_id,reception_now(),result)
+    if not archive_id:
+        try:
+            client=mail_pro.open_imap();sent=mail_pro.by_role(mail_pro.list_folders(client),'sent')
+            if sent:mail_pro.store(client,sent,message,'(\\Seen)')
+            mail_pro.close_imap(client)
+        except Exception:pass
+    audit(c,user['id'],'mail_resent');c.commit()
+    return 200,{'ok':True,'id':next(iter(tracked.values())),'status':c.execute('SELECT status FROM mail_deliveries WHERE id=?',(next(iter(tracked.values())),)).fetchone()['status']}
 
 
 def mail_signature_send(c):
@@ -858,6 +925,11 @@ class Handler(BaseHTTPRequestHandler):
                 expected=os.getenv('CRON_SECRET','')
                 if expected and not hmac.compare_digest(self.headers.get('Authorization',''),'Bearer '+expected):return self.reply(404,{'error':'No encontrado.'})
                 now=reception_now();maintenance_reminders_tick(c,now);stay_reminders_tick(c,now)
+                # Seguimiento de correos: envíos sin respuesta registrada y lectura de informes de rebote o demora del buzón.
+                try:
+                    mail_tracking.sweep(c,now);c.commit()
+                    if mail_pro.configured():notifications.mail_status(c,now,0)
+                except Exception as error:print('mail-tracking cron',type(error).__name__,flush=True)
                 return self.reply(200,{'ok':True})
             if path == '/api/public/appointments/services':
                 # Catálogo público para la reserva: servicios, tipos de equipo y marcas con su logotipo local. Sin datos de clientes.
@@ -1502,6 +1574,14 @@ class Handler(BaseHTTPRequestHandler):
                     except mail_pro.MailError as error:return self.reply(502,{'error':str(error),'kind':error.kind})
                     if not state:return self.reply(502,{'error':'El servidor de correo no informó la bandeja de entrada.'})
                     return self.reply(200,{'unread':state.get('unread',0),'checked':state.get('checked',''),'quota':state.get('quota'),'events':notifications.mail_events(c)[-5:]})
+                if path=='/api/mail/deliveries':
+                    # Centro de Entrega y Seguimiento: estados reales por destinatario, con filtros y búsqueda.
+                    mail_tracking.sweep(c,reception_now());c.commit()
+                    filters={'status':arg('status'),'q':arg('q'),'from':arg('from'),'to':arg('to'),'incidents':arg('filtro')=='incidencias','page':int(arg('page')) if arg('page').isdigit() else 1}
+                    return self.reply(200,dict(mail_tracking.listing(c,filters),labels=mail_tracking.LABELS,alerts=mail_tracking.settings(c),provider={'name':'Buzón cPanel (SMTP e IMAP)','delivery_confirmations':False,'webhooks':False,'opens':False}))
+                if path.startswith('/api/mail/deliveries/') and path.rsplit('/',1)[-1].isdigit():
+                    found=mail_tracking.detail(c,int(path.rsplit('/',1)[-1]))
+                    return self.reply(200,{'delivery':found}) if found else self.reply(404,{'error':'Registro de envío no encontrado.'})
                 if path=='/api/mail/signature-image':
                     # La firma gráfica cargada, para la vista previa y para ver los correos archivados. Solo personal con acceso al correo.
                     picture=mail_signature_card(c);row=c.execute('SELECT value FROM system_state WHERE key=?',('mail_signature_image:'+mail_pro.settings()['username'],)).fetchone() if picture.get('image') else None
@@ -2057,6 +2137,32 @@ class Handler(BaseHTTPRequestHandler):
                         except mail_pro.MailError as error:return self.reply(200,{'ok':False,'kind':error.kind,'error':str(error),'steps':getattr(error,'steps',[])})
                         return self.reply(200,{'ok':True,'steps':steps})
                     if not mail_allowed(user):return self.reply(403,{'error':'No tienes acceso al correo o todavía no está configurado en el servidor.'})
+                    if path in ('/api/mail/deliveries/resend','/api/mail/deliveries/resolve'):
+                        found=c.execute('SELECT * FROM mail_deliveries WHERE id=?',(str(data.get('id','')),)).fetchone() if str(data.get('id','')).isdigit() else None
+                        if not found:return self.reply(404,{'error':'Registro de envío no encontrado.'})
+                        if path.endswith('resolve'):
+                            if found['status'] not in mail_tracking.INCIDENTS:return self.reply(400,{'error':'Este envío no tiene una incidencia pendiente.'})
+                            c.execute("UPDATE mail_deliveries SET resolved_at=?,resolved_by=? WHERE id=? AND resolved_at=''",(reception_now().isoformat(timespec='seconds'),user['id'],found['id']));audit(c,user['id'],'mail_delivery_reviewed')
+                            return self.reply(200,{'ok':True})
+                        check=mail_tracking.resend_check(c,found)
+                        if not check['allowed']:return self.reply(409,{'error':check['reason']})
+                        try:address=mail_pro.clean_addresses(data.get('recipient',''))
+                        except mail_pro.MailError as error:return self.reply(400,{'error':str(error),'fields':{'recipient':str(error)}})
+                        if len(address)!=1:return self.reply(400,{'error':'Indica una sola dirección de correo.','fields':{'recipient':'Indica una sola dirección de correo.'}})
+                        address=address[0]
+                        if data.get('confirm') is not True:return self.reply(400,{'error':'Confirma el reenvío.'})
+                        blocked=mail_tracking.blocked(c,address)
+                        if blocked:return self.reply(409,{'error':blocked+' Usa otra dirección.','fields':{'recipient':'Esta dirección fue rechazada definitivamente.'}})
+                        if limited(c,'mail-send:'+str(user['id']),limit=40,window=3600):return self.reply(429,{'error':'Alcanzaste el límite de envíos por hora. Inténtalo más tarde.'})
+                        status,body=resend_delivery(c,found,address,user)
+                        return self.reply(status,body)
+                    if path=='/api/mail/delivery-settings':
+                        if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede cambiar las alertas.'})
+                        try:raw=json.loads(str(data.get('alerts') or '{}'))
+                        except ValueError:raw=None
+                        if not isinstance(raw,dict):return self.reply(400,{'error':'Alertas no válidas.'})
+                        clean=mail_tracking.save_settings(c,raw);audit(c,user['id'],'mail_delivery_alerts')
+                        return self.reply(200,{'ok':True,'alerts':clean})
                     if path=='/api/mail/prefs':
                         # Preferencias de avisos del propio usuario: solo interruptores y volumen, con valores validados.
                         try:raw=json.loads(str(data.get('prefs') or '{}'))
@@ -2165,13 +2271,16 @@ class Handler(BaseHTTPRequestHandler):
                             if previous and previous['status']=='sending':return self.reply(409,{'error':'Este mensaje ya se está enviando.'})
                             if limited(c,'mail-send:'+str(user['id']),limit=40,window=3600):return self.reply(429,{'error':'Alcanzaste el límite de envíos por hora. Inténtalo más tarde.'})
                             c.execute("INSERT INTO mail_outbox(request_key,user_id,status,message_id,created_at,updated_at) VALUES (?,?,'sending',?,?,?) ON CONFLICT(request_key) DO UPDATE SET status='sending',updated_at=excluded.updated_at",(key,user['id'],message['Message-ID'],now,now))
+                            tracked=mail_tracking.start(c,recipients,kind='manual',subject=str(message['Subject']),now=reception_now(),outbox_key=key,order_id=order['id'] if order else None,actor_id=user['id'])
                             c.commit()
-                            try:mail_pro.deliver(config,message,recipients)
+                            # Con varios destinatarios, cada uno tiene su estado: si el servidor rechaza a uno, los demás siguen.
+                            try:result=mail_pro.deliver(config,message,recipients,partial=True) if len(recipients)>1 else mail_pro.deliver(config,message,recipients)
                             except mail_pro.MailError as error:
-                                c.execute("UPDATE mail_outbox SET status='failed',updated_at=? WHERE request_key=?",(now,key));c.commit()
+                                c.execute("UPDATE mail_outbox SET status='failed',updated_at=? WHERE request_key=?",(now,key));mail_tracking.failed(c,tracked,error,reception_now());c.commit()
                                 return self.reply(400 if error.kind in ('configuracion','destinatario') else 502,{'error':'No se envió el mensaje. '+str(error),'kind':error.kind,'fields':{'to':str(error)} if error.kind=='destinatario' else None})
                             # Aceptado por el servidor SMTP: recién ahora se considera enviado.
                             c.execute("UPDATE mail_outbox SET status='sent',updated_at=? WHERE request_key=?",(now,key))
+                            mail_tracking.accepted(c,tracked,str(message['Message-ID'] or ''),reception_now(),result);refused=sorted((result or {}).get('refused') or {})
                             if order:c.execute('INSERT OR IGNORE INTO mail_links(message_id,folder,uid,order_id,subject,correspondent,direction,sent_at,created_by,created_at) VALUES (?,?,0,?,?,?,?,?,?,?)',(message['Message-ID'],'',order['id'],str(message['Subject']),recipients[0],'out',now,user['id'],now))
                             audit(c,user['id'],'mail_sent',order['id'] if order else None)
                             try:
@@ -2194,7 +2303,7 @@ class Handler(BaseHTTPRequestHandler):
                                 if source and uid.isdigit() and any(f['id']==source for f in folders):
                                     client.select(mail_pro.quoted(source),readonly=False);client.uid('STORE',uid,'+FLAGS','(\\Answered)')
                             except Exception:saved=False
-                            return self.reply(201,{'ok':True,'saved_in_sent':saved,'linked':order['code'] if order else ''})
+                            return self.reply(201,{'ok':True,'saved_in_sent':saved,'linked':order['code'] if order else '','refused':refused,'tracking':{'confirmations':bool((result or {}).get('dsn'))}})
                         return self.reply(404,{'error':'El servidor no reconoce esta operación de correo. Si la aplicación se actualizó hace poco, recarga la página; si continúa, hay que reiniciar el servicio.'})
                     except mail_pro.MailError as error:
                         return self.reply(400 if error.kind=='configuracion' else 502,{'error':str(error),'kind':error.kind})

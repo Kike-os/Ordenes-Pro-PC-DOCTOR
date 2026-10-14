@@ -60,8 +60,19 @@ def mail_status(c, now, max_age=60):
             reports = [row['uid'] for row in fresh if row.get('report')]
             if reports:
                 bounces, seen_bounces = _state(c, 'mail_bounces') or [], {(item['uidvalidity'], item['uid']) for item in (_state(c, 'mail_bounces') or [])}
+                import mail_tracking
                 for bounce in mail_pro.find_bounces(client, reports):
                     if (inbox['uidvalidity'], bounce['uid']) in seen_bounces:
+                        continue
+                    # Informe de un envío registrado: actualiza su seguimiento (una sola vez por informe y destinatario).
+                    try:
+                        if mail_tracking.from_report(c, bounce, 'dsn:' + str(inbox['uidvalidity']) + ':' + str(bounce['uid']), now):
+                            seen_bounces.add((inbox['uidvalidity'], bounce['uid']))
+                            bounces.append({'uidvalidity': inbox['uidvalidity'], 'uid': bounce['uid'], 'tracked': True, 'at': now.isoformat(timespec='seconds')})
+                            continue
+                    except Exception as error:
+                        print('mail-tracking informe', type(error).__name__, flush=True)
+                    if bounce['action'] not in ('failed', 'delayed'):
                         continue
                     try:
                         sent = c.execute("SELECT 1 FROM mail_outbox WHERE message_id=? AND status='sent'", (bounce['original_id'],)).fetchone() if bounce['original_id'] else None
@@ -273,7 +284,12 @@ def build(c, user, now, mail_access=False):
                 free = max(0, quota['limit'] - quota['used'])
                 items.append({'key': 'mailquota:' + ('90' if level >= 90 else '75'), 'kind': 'warning', 'icon': 'message', 'title': 'Buzón de correo al ' + str(level) + ' % de su capacidad',
                               'detail': 'Quedan ' + (str(round(free / 1048576)) + ' MB' if free >= 1048576 else str(round(free / 1024)) + ' KB') + ' disponibles. No se elimina ningún correo automáticamente.', 'at': state['checked'], 'href': '#mail', 'group': 'alert'})
-            for bounce in (_state(c, 'mail_bounces') or [])[-8:]:
+            try:
+                import mail_tracking
+                items += mail_tracking.alerts(c, now)
+            except Exception as error:
+                print('mail-tracking avisos', type(error).__name__, flush=True)
+            for bounce in [item for item in (_state(c, 'mail_bounces') or []) if not item.get('tracked')][-8:]:
                 items.append({'key': 'mail:bounce:' + str(bounce['uidvalidity']) + ':' + str(bounce['uid']), 'kind': 'error' if bounce['permanent'] else 'warning', 'icon': 'message',
                               'title': ('Correo devuelto · ' if bounce['permanent'] else 'Entrega retrasada · ') + bounce['recipient'], 'detail': bounce['reason'] + (' (' + bounce['status'] + ')' if bounce['status'] else '') + ('' if bounce['matched'] else ' No se pudo relacionar con un envío de esta aplicación.'),
                               'at': bounce['at'], 'href': '#mail?folder=INBOX&uid=' + str(bounce['uid']), 'group': 'event', 'bounce': True})

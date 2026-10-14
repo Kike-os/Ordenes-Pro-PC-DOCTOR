@@ -152,3 +152,41 @@ El logotipo es el archivo original `local/static/logo-firma.png`, incrustado en 
 ## Firma en los correos automáticos (1.5.150)
 
 La firma corporativa medía unos 700 px y la plantilla institucional 600 px: ensanchaba el mensaje y en el móvil se cortaba la columna de contacto. Ahora `mail_pro.signature_html` usa las medidas de la vista previa (logotipo de 92 px, unos 570 px en total) y la plantilla (`mailing.html`) tiene ancho fijo y un margen propio para la firma. En pantallas de menos de 620 px los datos de contacto pasan debajo del logotipo y el nombre, sin recortes. El diseño (logotipo original, separador rojo, borde inferior rojo) no cambia. Los correos de códigos de verificación y de seguridad de la cuenta conservan su pie propio, sin firma personal.
+
+## Seguimiento inteligente de entregas (1.5.151)
+
+### Qué permite consultar el proveedor actual
+
+Auditoría del 2026-10-13: el correo sale por el buzón cPanel de `ecuadorpcdoctor.com` (Exim, `server112.tecnoweb.net`) por **SMTP 465/587 e IMAP 993**. No hay API ni webhooks, y el servidor **no anuncia la extensión DSN** en EHLO. Por tanto:
+
+| Estado | Origen real | ¿Disponible hoy? |
+| --- | --- | --- |
+| Enviando | Órdenes Pro antes de hablar con el servidor | Sí |
+| Enviado | El servidor SMTP aceptó el mensaje para ese destinatario | Sí |
+| Rebotado | Rechazo SMTP por destinatario (5xx) o informe de rebote (RFC 3464) que llega al buzón | Sí |
+| Entrega demorada | Informe de demora (Action: delayed) que llega al buzón | Sí |
+| Fallido | Error de conexión, credenciales, rechazo temporal o del mensaje | Sí |
+| Estado desconocido | No se registró respuesta del servidor en 15 minutos | Sí |
+| Entregado | Informe real de entrega (Action: delivered/relayed) | **No**: requiere DSN. Si el servidor llega a anunciarlo, se pide `NOTIFY=SUCCESS,FAILURE,DELAY` automáticamente |
+| Abierto | — | **No**: no se insertan píxeles de seguimiento |
+
+Nunca se marca «Entregado» por una respuesta correcta del envío.
+
+### Funcionamiento
+
+- Tablas `mail_deliveries` (un registro por destinatario de cada envío) y `mail_delivery_events` (historial inmutable), migración `054_mail_delivery.sql`. Los registros no se borran y el destinatario, el asunto y el intento original no se modifican.
+- Módulo `local/mail_tracking.py`. Todos los envíos quedan registrados: correos institucionales (`send_institutional`: comprobantes, presupuestos, autorizaciones, recibos, permanencia, mantenimiento), correos de citas (`appointment_mail`) y mensajes de Mail Pro (con varios destinatarios, cada uno con su estado; si el servidor rechaza a uno, los demás siguen).
+- Los informes de rebote y demora se leen del buzón con la consulta periódica de correo (`notifications.mail_status`) y una vez al día con el cron. Se asocian por el Message-ID real y el destinatario; un informe repetido no duplica nada (huella única) y uno que llega fuera de orden queda en el historial sin hacer retroceder el estado.
+- Los envíos **automáticos** no se repiten a direcciones declaradas inválidas por un rebote permanente (5.1.1, 5.1.2, 5.1.3, 5.1.10, 5.2.1, 5.4.4). El buzón lleno (5.2.2) no invalida la dirección.
+
+### Centro de Entrega y Seguimiento
+
+Mail Pro → barra lateral → «Centro de Entrega» (`#mail?view=entregas`). Tabla compacta (tarjetas en celulares) con estado, destinatario, asunto, fecha, último evento y motivo; filtros Enviados, Entregados, Pendientes, Demorados, Rebotados, Fallidos e Incidencias; búsqueda por destinatario y asunto, y rango de fechas. «Historial» abre la línea de tiempo con los eventos recibidos y la cadena de intentos.
+
+**Corregir destinatario y reenviar**: muestra la dirección original y el motivo, valida el formato, rechaza direcciones declaradas inválidas, exige confirmación y crea un intento nuevo vinculado (`retry_of`). El intento original conserva su estado y su motivo. Los correos del sistema se recomponen con el texto archivado; los de Mail Pro se reenvían desde la copia exacta de Enviados. Los correos con adjuntos generados (comprobantes, PDF, QR) o con enlaces privados de un solo uso se reenvían desde la orden, porque esa información no se guarda.
+
+### Avisos
+
+En el centro de notificaciones (no dependen del navegador abierto): aviso emergente una vez por incidencia y estado, resumen de incidencias pendientes y «Fallos repetidos del servidor de correo» (3 o más en una hora, un aviso por hora). Administración elige en «Alertas» cuáles recibir: presupuestos, citas, equipos listos, otros errores y fallos del servidor. Nunca se envían avisos a direcciones externas. Al enviar desde Mail Pro: «Correo enviado correctamente. Esperando confirmación de entrega.», con acceso directo al seguimiento.
+
+Rutas (solo personal con acceso al correo): `GET /api/mail/deliveries`, `GET /api/mail/deliveries/<id>`, `POST /api/mail/deliveries/resend`, `POST /api/mail/deliveries/resolve`, `POST /api/mail/delivery-settings` (solo administración).

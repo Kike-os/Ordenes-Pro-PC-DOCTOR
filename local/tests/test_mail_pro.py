@@ -462,7 +462,7 @@ class MailRouteTests(test_app.SecurityTests):
         self.assertEqual((delayed['permanent'],delayed['action']),(False,'delayed'))
         # Un asunto alarmante sin informe real, una entrega correcta o datos incoherentes no se tratan como devolución.
         plain=email.message_from_string('Subject: Mail Delivery Failed\r\nContent-Type: text/plain\r\n\r\nfallo',policy=policy.default)
-        self.assertIsNone(mail_pro.parse_bounce(plain));self.assertIsNone(mail_pro.parse_bounce(dsn('delivered','2.0.0')));self.assertIsNone(mail_pro.parse_bounce(dsn('failed','no-es-estado')));self.assertIsNone(mail_pro.parse_bounce(dsn('failed','5.1.1',recipient='sin arroba')))
+        self.assertIsNone(mail_pro.parse_bounce(plain));self.assertEqual(mail_pro.parse_bounce(dsn('delivered','2.0.0'))['action'],'delivered');self.assertIsNone(mail_pro.parse_bounce(dsn('failed','no-es-estado')));self.assertIsNone(mail_pro.parse_bounce(dsn('failed','5.1.1',recipient='sin arroba')))
         kinds=lambda error:mail_pro.classify(error,'smtp.example.invalid',465)
         with patch('builtins.print'):
             self.assertEqual(kinds(smtplib.SMTPRecipientsRefused({'x@example.invalid':(550,b'no such user')})).kind,'destinatario')

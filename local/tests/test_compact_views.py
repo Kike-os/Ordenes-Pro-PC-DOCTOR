@@ -32,7 +32,7 @@ class CompactTrackingTests(unittest.TestCase):
         for code in ('completada','parcial','curso','listos','recibidos'):self.assertIn('.tracking-overall[data-overall='+code+']',CSS)
 
     def test_state_colours_and_compact_layout(self):
-        block=CSS[CSS.index('/* Seguimiento de Órdenes ultracompacto'):]
+        block=CSS[CSS.index('/* Seguimiento de Órdenes ultracompacto'):CSS.index('/* Centro de Entrega y Seguimiento')]
         for selector,colour in (('[data-status=reparacion]','#8cc3ff'),('[data-status=entregado]','#6de4af'),('[data-status=listo]','#62dbe0'),('[data-status=pendiente]','#ffca77'),('[data-status=cancelado]','#ff8794')):
             rule=next(line for line in block.splitlines() if selector in line and '--ts-ink' in line);self.assertIn(colour,rule)
         self.assertIn('.tracking-carousel{--track-row:54px}',block);self.assertIn('table-layout:fixed',block)

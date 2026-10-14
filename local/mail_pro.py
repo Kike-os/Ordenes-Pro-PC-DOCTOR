@@ -10,7 +10,7 @@ import smtplib
 import socket
 import ssl
 from email.message import EmailMessage
-from email.utils import formatdate, make_msgid
+from email.utils import parsedate_to_datetime, formatdate, make_msgid
 
 KEYS = ('MAIL_IMAP_HOST', 'MAIL_IMAP_PORT', 'MAIL_SMTP_HOST', 'MAIL_SMTP_PORT', 'MAIL_USERNAME', 'MAIL_PASSWORD')
 TIMEOUT = 15
@@ -22,6 +22,7 @@ class MailError(Exception):
     def __init__(self, kind, message):
         super().__init__(message)
         self.kind = kind
+        self.refused = {}
 
 
 def settings(env=None):
@@ -425,11 +426,29 @@ def date_iso(message):
         return ''
 
 
+# Motivos comprensibles de los códigos de estado ampliados (RFC 3463) más habituales.
+DSN_REASONS = {'5.1.1': 'La dirección no existe en el servidor de destino.', '5.1.2': 'El dominio del destinatario no existe.', '5.1.10': 'La dirección no existe en el servidor de destino.',
+               '5.1.3': 'La dirección del destinatario tiene un formato incorrecto.', '5.4.4': 'El dominio del destinatario no existe o no recibe correo.', '5.2.2': 'El buzón del destinatario está lleno.',
+               '5.2.1': 'El buzón del destinatario está desactivado.', '5.7.1': 'El servidor de destino rechazó el mensaje por sus políticas.', '4.4.1': 'No se pudo contactar al servidor de destino; se seguirá intentando.',
+               '4.4.7': 'La entrega se retrasó demasiado.', '4.2.2': 'El buzón del destinatario está lleno; se seguirá intentando.'}
+# Códigos que declaran inválida la dirección o el dominio (no el buzón lleno ni un rechazo por políticas).
+INVALID_ADDRESS = ('5.1.1', '5.1.2', '5.1.3', '5.1.10', '5.4.4', '5.2.1')
+
+
+def dsn_reason(code, action):
+    if code in DSN_REASONS:
+        return DSN_REASONS[code]
+    if action in ('delivered', 'relayed', 'expanded'):
+        return 'El servidor del destinatario confirmó que aceptó el mensaje.'
+    return 'El servidor de destino no aceptó el mensaje.' if action == 'failed' else 'La entrega está retrasada; el servidor seguirá intentándolo.'
+
+
 def parse_bounce(message):
     """Informe de entrega (DSN, RFC 3464) de un mensaje `multipart/report`. None si no es un informe fiable.
 
-    Devuelve destinatario, acción (failed/delayed), estado, diagnóstico y el Message-ID del envío original cuando el
-    informe lo incluye. No se guía por el asunto: solo por la estructura del informe.
+    Devuelve el primer destinatario (compatibilidad) y en `items` uno por cada destinatario informado, con su acción
+    (failed, delayed y, si el servidor las emite, delivered/relayed/expanded), estado, diagnóstico, fecha del informe y el
+    Message-ID del envío original cuando el informe lo incluye. No se guía por el asunto: solo por la estructura del informe.
     """
     if message.get_content_type() != 'multipart/report' or str(message.get_param('report-type') or '').lower() != 'delivery-status':
         return None
@@ -441,24 +460,40 @@ def parse_bounce(message):
     if not blocks:
         text = status.get_payload(decode=True) or b''
         blocks = [email.message_from_bytes(chunk, policy=policy.default) for chunk in re.split(rb'\r?\n\r?\n', text) if chunk.strip()]
-    report = next((block for block in blocks if block.get('Final-Recipient') or block.get('Original-Recipient')), None)
-    if report is None:
-        return None
-    recipient = header_text(str(report.get('Final-Recipient') or report.get('Original-Recipient')).split(';', 1)[-1])[:254]
-    action = header_text(report.get('Action')).lower()
-    code = header_text(report.get('Status'))[:20]
-    if action not in ('failed', 'delayed') or not re.fullmatch(r'[245]\.\d{1,3}\.\d{1,3}', code) or not re.fullmatch(r'[^\s@<>]+@[^\s@<>]+', recipient):
-        return None
     original = ''
     for part in message.walk():
         if part.get_content_type() in ('message/rfc822', 'text/rfc822-headers'):
             inner = part.get_payload()
             source = inner[0] if isinstance(inner, list) and inner else email.message_from_string(str(part.get_payload(decode=True).decode('utf-8', 'replace') if part.get_content_type() == 'text/rfc822-headers' else ''), policy=policy.default)
             original = header_text(source.get('Message-ID'))[:300]
-    diagnostic = header_text(str(report.get('Diagnostic-Code') or '').split(';', 1)[-1])[:240]
-    reasons = {'5.1.1': 'La dirección no existe en el servidor de destino.', '5.1.2': 'El dominio del destinatario no existe.', '5.1.10': 'La dirección no existe en el servidor de destino.', '5.2.2': 'El buzón del destinatario está lleno.', '5.2.1': 'El buzón del destinatario está desactivado.', '5.7.1': 'El servidor de destino rechazó el mensaje por sus políticas.', '4.4.1': 'No se pudo contactar al servidor de destino; se seguirá intentando.', '4.4.7': 'La entrega se retrasó demasiado.', '4.2.2': 'El buzón del destinatario está lleno; se seguirá intentando.'}
-    return {'recipient': recipient, 'action': action, 'permanent': action == 'failed' and code.startswith('5'), 'status': code, 'diagnostic': diagnostic, 'original_id': original,
-            'reason': reasons.get(code) or ('El servidor de destino no aceptó el mensaje.' if action == 'failed' else 'La entrega está retrasada; el servidor seguirá intentándolo.')}
+    stamp = ''
+    try:
+        stamp = parsedate_to_datetime(str(message.get('Date'))).isoformat(timespec='seconds')
+    except (TypeError, ValueError, IndexError):
+        stamp = ''
+    items = []
+    for report in blocks:
+        if not (report.get('Final-Recipient') or report.get('Original-Recipient')):
+            continue
+        recipient = header_text(str(report.get('Final-Recipient') or report.get('Original-Recipient')).split(';', 1)[-1])[:254]
+        action = header_text(report.get('Action')).lower()
+        code = header_text(report.get('Status'))[:20]
+        valid = (action in ('failed', 'delayed') and re.fullmatch(r'[45]\.\d{1,3}\.\d{1,3}', code)) or (action in ('delivered', 'relayed', 'expanded') and re.fullmatch(r'2\.\d{1,3}\.\d{1,3}', code))
+        if not valid or not re.fullmatch(r'[^\s@<>]+@[^\s@<>]+', recipient):
+            continue
+        when = stamp
+        for name in ('Last-Attempt-Date', 'Arrival-Date'):
+            try:
+                when = parsedate_to_datetime(str(report.get(name) or message.get(name) or '')).isoformat(timespec='seconds') if (report.get(name) or message.get(name)) else when
+                break
+            except (TypeError, ValueError, IndexError):
+                continue
+        items.append({'recipient': recipient, 'action': action, 'permanent': action == 'failed' and code.startswith('5'), 'status': code,
+                      'diagnostic': header_text(str(report.get('Diagnostic-Code') or '').split(';', 1)[-1])[:240], 'original_id': original,
+                      'reason': dsn_reason(code, action), 'date': when})
+    if not items:
+        return None
+    return dict(items[0], items=items)
 
 
 def find_bounces(client, uids):
@@ -1069,15 +1104,26 @@ def build_message(config, data, signature=''):
     return message, to + cc + [address for address in bcc if address not in to + cc]
 
 
-def deliver(config, message, recipients):
-    """Entrega por SMTP. Solo vuelve sin error cuando el servidor aceptó el mensaje."""
+def deliver(config, message, recipients, partial=False):
+    """Entrega por SMTP. Solo vuelve sin error cuando el servidor aceptó el mensaje.
+
+    Devuelve {'refused': {dirección: (código, texto)}, 'dsn': bool}. Con `partial`, si el servidor acepta a unos destinatarios y
+    rechaza a otros, vuelve con los rechazados en lugar de fallar (cada destinatario tiene su propio estado). Si el servidor anuncia
+    la extensión DSN se solicitan informes de entrega, retraso y fallo; si no la anuncia, nunca habrá confirmación de entrega final."""
     client = None
     try:
         client = smtp_client(config)
         client.login(config['username'], config['password'])
-        refused = client.send_message(message, from_addr=config['username'], to_addrs=recipients)
-        if refused:
+        dsn = bool(client.has_extn('dsn'))
+        options = {'mail_options': ['RET=HDRS'], 'rcpt_options': ['NOTIFY=SUCCESS,FAILURE,DELAY']} if dsn else {}
+        refused = client.send_message(message, from_addr=config['username'], to_addrs=recipients, **options)
+        if refused and not partial:
             raise smtplib.SMTPRecipientsRefused(refused)
+        return {'refused': {address: (int(value[0]), value[1].decode('utf-8', 'replace') if isinstance(value[1], bytes) else str(value[1])) for address, value in (refused or {}).items()}, 'dsn': dsn}
+    except smtplib.SMTPRecipientsRefused as error:
+        failure = classify(error, config['smtp_host'], config['smtp_port'])
+        failure.refused = {address: (int(value[0]), value[1].decode('utf-8', 'replace') if isinstance(value[1], bytes) else str(value[1])) for address, value in error.recipients.items() if isinstance(value, tuple)}
+        raise failure from None
     except Exception as error:
         raise classify(error, config['smtp_host'], config['smtp_port']) from None
     finally:
