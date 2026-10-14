@@ -2468,18 +2468,23 @@ class Handler(BaseHTTPRequestHandler):
                     account=c.execute('SELECT id,username,email,password_hash FROM users WHERE id=?',(user['id'],)).fetchone()
                     if action!='confirm' and not password_ok(str(data.get('password','')),account['password_hash']):return self.reply(400,{'error':'Revisa los campos señalados.','fields':{'password':'La contraseña actual no es correcta.'}})
                     if action=='start':
-                        made=two_factor.begin(c,account)
+                        try:made=two_factor.begin(c,account)
+                        except two_factor.KeyError_ as error:print('second-step clave',type(error).__name__,flush=True);return self.reply(503,{'error':'La verificación en dos pasos no está disponible: falta la configuración de seguridad del servidor. Avisa a administración.'})
                         if not made:return self.reply(409,{'error':'La verificación en dos pasos ya está activa en tu cuenta.'})
                         audit(c,user['id'],'second_step_setup_started')
                         return self.reply(200,{'ok':True,'secret':made['secret'],'qr':reception.qr_image(made['uri'],'svg').decode('utf-8')})
                     if action=='confirm':
                         codes=two_factor.confirm(c,account,data.get('code',''))
-                        if not codes:return self.reply(400,{'error':'Revisa los campos señalados.','fields':{'code':'El código no es correcto. Comprueba la hora de tu teléfono e inténtalo con el código actual.'}})
+                        if not codes:
+                            audit(c,user['id'],'second_step_confirm_failed')
+                            return self.reply(400,{'error':'Revisa los campos señalados.','fields':{'code':'El código no es correcto o ya caducó. Comprueba la hora de tu teléfono e inténtalo con el código actual.'}})
                         # Las demás sesiones abiertas se cierran: a partir de ahora todas pasan por el segundo paso.
                         c.execute('DELETE FROM sessions WHERE user_id=? AND token_hash!=?',(user['id'],digest(token)));audit(c,user['id'],'second_step_enabled')
                         return self.reply(200,{'ok':True,'recovery':codes,'second_step':two_factor.status(c,user['id'])})
                     if not two_factor.active(c,user['id']):return self.reply(409,{'error':'La verificación en dos pasos no está activa en tu cuenta.'})
-                    if not two_factor.check(c,user['id'],data.get('code','')):return self.reply(400,{'error':'Revisa los campos señalados.','fields':{'code':'El código no es correcto.'}})
+                    if not two_factor.check(c,user['id'],data.get('code','')):
+                        audit(c,user['id'],'second_step_check_failed')
+                        return self.reply(400,{'error':'Revisa los campos señalados.','fields':{'code':'El código no es correcto o ya se usó.'}})
                     if action=='disable':
                         two_factor.remove(c,user['id']);audit(c,user['id'],'second_step_disabled')
                         return self.reply(200,{'ok':True,'second_step':two_factor.status(c,user['id'])})

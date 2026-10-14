@@ -28,3 +28,11 @@ Segundo paso opcional al iniciar sesión, para el personal (administración y t�
 
 - No es obligatoria: cada persona decide activarla. No hay «recordar este equipo»: el código se pide en cada inicio de sesión.
 - La recuperación de contraseña por correo no quita el segundo paso.
+
+## Rediseño y refuerzo (1.5.164)
+
+- **Cifrado del secreto TOTP en la base**: valor `enc1:` con nonce aleatorio, cifrado en modo contador con HMAC-SHA256 y autenticación encrypt-then-MAC (biblioteca estándar). La clave maestra está fuera de la base: `MFA_ENCRYPTION_KEY` (secreto de Vercel, solo producción; nunca se muestra) y, en el servidor local, `mfa.key` (0600) en la carpeta de datos. Sin clave en Vercel no se inicia ninguna configuración (aviso claro). Un secreto anterior sin cifrar se lee y se vuelve a guardar cifrado al usarse.
+- **Estados reales**: No configurado, Configuración pendiente (se inició sin verificar; continuar genera una clave nueva e invalida la anterior), Protección activa; «Error de verificación» se muestra en el paso 2.
+- **Asistente**: paso 1 (QR centrado, aplicaciones compatibles, clave manual oculta con Mostrar/Ocultar y Copiar) y paso 2 (campo de 6 dígitos solo numérico, admite pegar el código completo y verifica al completarlo). La clave solo vive en la memoria de la ventana; nunca en el almacenamiento del navegador. Tras activar no vuelven a mostrarse ni el QR ni la clave.
+- **Códigos de recuperación**: se muestran una vez, con Copiar y Descargar (.txt).
+- **Auditoría**: se añaden los intentos fallidos al activar (`second_step_confirm_failed`) y al desactivar o renovar códigos (`second_step_check_failed`), además de los ya existentes (activación, desactivación, inicio de sesión con código o con código de recuperación, caducidad).
