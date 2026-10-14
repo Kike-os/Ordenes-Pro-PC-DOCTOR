@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.145 — 2026-10-13 19:28 (UTC-05:00)
+
+Seguimiento de Órdenes: botón Historial y contadores de tamaño estable
+
+### Mejoras realizadas
+
+- Mejora de interfaz — Seguimiento de Órdenes: se optimizó el diseño de los botones Historial y sus contadores numéricos, garantizando dimensiones uniformes, correcta alineación y estabilidad visual. También se mejoró la distribución de las acciones y la compatibilidad con diferentes tamaños de pantalla.
+
 ## v1.5.144 — 2026-10-13 18:58 (UTC-05:00)
 
 Prueba de entrega real de correo al administrador

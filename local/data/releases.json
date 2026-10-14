@@ -8,6 +8,22 @@
   },
   "releases": [
     {
+      "version": "1.5.145",
+      "date": "2026-10-13T19:28:35-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Seguimiento de Órdenes: botón Historial y contadores de tamaño estable",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Mejora de interfaz — Seguimiento de Órdenes: se optimizó el diseño de los botones Historial y sus contadores numéricos, garantizando dimensiones uniformes, correcta alineación y estabilidad visual. También se mejoró la distribución de las acciones y la compatibilidad con diferentes tamaños de pantalla."
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.144",
       "date": "2026-10-13T18:58:38-05:00",
       "type": "patch",
