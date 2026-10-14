@@ -6717,3 +6717,5 @@ button.live-appointment .agenda-badge.state-pill,.live-card-meta .agenda-badge.s
 .stability-slot .stability-badge{width:auto;min-width:0;max-width:100%;flex:none}
 .stability-nav{grid-column:1/-1}
 @media(max-width:1280px){#stability-top .stability-badge{width:32px}}
+.stability-previous{list-style:none;margin:0;padding:0;display:grid;gap:3px;font-size:12px;color:#b9c9e2}
+.stability-badge[data-state=stable]{box-shadow:inset 0 1px #ffffff1f,0 0 14px #3fd39a40}

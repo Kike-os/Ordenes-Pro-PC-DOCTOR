@@ -928,6 +928,15 @@ class Handler(BaseHTTPRequestHandler):
                                        'state':cached['state'],'latest':cached['latest'],'pending':cached['pending'],'checked_at':cached['at'],'source':cached['source'],'history':len(registry['releases']),
                                        # Identificador del despliegue en ejecución (lo define la plataforma al compilar); no es un secreto.
                                        'build':(os.getenv('VERCEL_GIT_COMMIT_SHA','') or 'local')[:7],'deployment':(os.getenv('VERCEL_DEPLOYMENT_ID','') or '')[-8:],'server_time':now.isoformat(timespec='seconds')})
+            if path in ('/api/cron/stability','/api/cron/stability-night'):
+                # Tarea programada de Vercel (vercel.json): verificación de estabilidad desde el servidor, sin depender de visitas.
+                # Solo responde a la llamada autenticada de la plataforma (CRON_SECRET); no devuelve detalles.
+                expected=os.getenv('CRON_SECRET','')
+                if not expected or not hmac.compare_digest(self.headers.get('Authorization',''),'Bearer '+expected):return self.reply(404,{'error':'No encontrado.'})
+                import stability
+                now=reception_now()
+                if stability.due(c,now,10):stability.run(c,now,'programada')
+                return self.reply(200,{'ok':True})
             if path == '/api/cron/reminders':
                 # Con CRON_SECRET definido solo responde a la llamada autenticada de la plataforma. No envía nada si los avisos están apagados.
                 expected=os.getenv('CRON_SECRET','')
@@ -936,10 +945,13 @@ class Handler(BaseHTTPRequestHandler):
                 # Seguimiento de correos: envíos sin respuesta registrada y lectura de informes de rebote o demora del buzón.
                 try:
                     mail_tracking.sweep(c,now);c.commit()
-                    import stability
-                    if stability.due(c,now):stability.run(c,now,'programada')
                     if mail_pro.configured():notifications.mail_status(c,now,0)
                 except Exception as error:print('mail-tracking cron',type(error).__name__,flush=True)
+                # Verificación de estabilidad, independiente del correo: un fallo de un servicio no impide la otra tarea.
+                try:
+                    import stability
+                    if stability.due(c,now,10):stability.run(c,now,'programada')
+                except Exception as error:print('stability cron',type(error).__name__,flush=True)
                 return self.reply(200,{'ok':True})
             if path == '/api/public/appointments/services':
                 # Catálogo público para la reserva: servicios, tipos de equipo y marcas con su logotipo local. Sin datos de clientes.

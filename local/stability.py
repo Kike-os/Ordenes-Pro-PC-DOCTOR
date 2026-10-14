@@ -5,8 +5,14 @@ Estados (nunca se deducen del despliegue ni se inventan):
 - verifying   «Verificando»: hay una verificación en curso.
 - observing   «En observación»: todas las verificaciones superadas, pero aún no se completa el período de seguimiento
                (OBSERVATION_HOURS desde la primera verificación correcta y al menos MIN_PASSES verificaciones correctas).
-- stable      «Estable»: período de seguimiento completo, sin fallos críticos desde la primera verificación correcta.
-- attention   «Requiere atención»: la última verificación detectó un fallo crítico.
+- stable      «Versión estable»: al menos MIN_PASSES verificaciones correctas durante OBSERVATION_HOURS, sin ningún fallo crítico en ese período.
+- attention   «Requiere atención»: la última verificación detectó un fallo crítico. El período de seguimiento vuelve a empezar desde
+              la siguiente verificación correcta: un fallo crítico nunca se pasa por alto.
+
+Ejecución automática en el servidor: tareas programadas de Vercel (SCHEDULE_UTC, ver vercel.json → /api/cron/stability, /api/cron/stability-night
+y /api/cron/reminders) y, además, como mucho cada EVERY_MINUTES al consultarse el indicador.
+Registro: cada ejecución en `stability_runs` (las últimas KEEP, con el detalle de cada prueba) y un resumen permanente por versión en
+`stability_versions` (las últimas KEEP_VERSIONS versiones), que conserva el historial al publicar una versión nueva.
 
 Las verificaciones no crean, modifican ni borran datos: leen la base, el registro de versiones y los archivos desplegados, y
 ejecutan en modo lectura las consultas de las funciones principales. Se guardan en system_state (sin migración), las últimas 60.
@@ -14,7 +20,7 @@ ejecutan en modo lectura las consultas de las funciones principales. Se guardan 
 import json
 import os
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import versioning
@@ -24,7 +30,11 @@ OBSERVATION_HOURS = 24
 MIN_PASSES = 3
 EVERY_MINUTES = 30
 KEEP = 60
-LABELS = {'unverified': 'No verificada', 'verifying': 'Verificando', 'observing': 'En observación', 'stable': 'Estable', 'attention': 'Requiere atención'}
+KEEP_VERSIONS = 40
+# Horas (UTC) de las tareas programadas en Vercel que ejecutan las verificaciones; deben coincidir con vercel.json.
+SCHEDULE_UTC = (6, 14, 22)
+LABELS = {'unverified': 'No verificada', 'verifying': 'Verificando', 'observing': 'En observación', 'stable': 'Versión estable', 'attention': 'Requiere atención'}
+SHORT = {'unverified': 'No verificada', 'verifying': 'Verificando', 'observing': 'En observación', 'stable': 'Estable', 'attention': 'Requiere atención'}
 
 
 def _load(c, key, default):
@@ -107,8 +117,37 @@ def checks(c):
             ('reports', 'Reportes y saldos', False, reports), ('mail', 'Servicio de correo', False, mail)]
 
 
+def _summary(c, version, history=None):
+    """Resumen permanente de una versión. Si aún no existe (versiones verificadas antes de este registro), se reconstruye con las ejecuciones guardadas."""
+    summaries = _load(c, 'stability_versions', {})
+    if version in summaries:
+        return summaries[version]
+    summary = {'version': version, 'first_run': '', 'last_run': '', 'runs': 0, 'passes': 0, 'window_start': '', 'window_passes': 0, 'last_ok': None, 'criticals': [], 'warnings': 0}
+    for entry in history if history is not None else _load(c, 'stability_runs', []):
+        if entry['version'] == version:
+            _account(summary, entry)
+    return summary
+
+
+def _account(summary, entry):
+    """Suma una ejecución al resumen. Un fallo crítico reinicia el período de seguimiento: cuenta desde la siguiente verificación correcta."""
+    ok = not entry['critical_failures']
+    summary['first_run'] = summary['first_run'] or entry['at']
+    summary['last_run'] = entry['at']
+    summary['runs'] += 1
+    summary['last_ok'] = ok
+    summary['warnings'] += 1 if entry['warnings'] else 0
+    if ok:
+        summary['passes'] += 1
+        summary['window_start'] = summary['window_start'] or entry['at']
+        summary['window_passes'] += 1
+    else:
+        summary['criticals'] = (summary['criticals'] + [{'at': entry['at'], 'items': entry['critical_failures']}])[-20:]
+        summary['window_start'], summary['window_passes'] = '', 0
+
+
 def run(c, now, source='automática'):
-    """Ejecuta todas las verificaciones y registra el resultado. Devuelve la ejecución registrada."""
+    """Ejecuta todas las verificaciones y registra el resultado (ejecución detallada y resumen de la versión). Devuelve la ejecución."""
     version = versioning.load()['releases'][0]['version']
     _save(c, 'stability_running', {'version': version, 'since': now.isoformat(timespec='seconds')})
     c.commit()
@@ -128,20 +167,43 @@ def run(c, now, source='automática'):
              'critical_failures': [r['name'] for r in results if r['critical'] and not r['ok']], 'warnings': [r['name'] for r in results if not r['critical'] and not r['ok']],
              'results': results}
     history = _load(c, 'stability_runs', [])
+    summary = _summary(c, version, history)
+    _account(summary, entry)
+    summaries = _load(c, 'stability_versions', {})
+    summaries[version] = summary
+    if len(summaries) > KEEP_VERSIONS:
+        for old in sorted(summaries, key=lambda key: summaries[key]['last_run'])[:len(summaries) - KEEP_VERSIONS]:
+            summaries.pop(old)
     history.append(entry)
     _save(c, 'stability_runs', history[-KEEP:])
+    _save(c, 'stability_versions', summaries)
     c.commit()
     return entry
 
 
-def due(c, now):
-    """¿Toca una verificación? Si esta versión no tiene ninguna o la última tiene más de EVERY_MINUTES (y no hay otra en curso)."""
-    version = versioning.load()['releases'][0]['version']
+def _running(c, now):
     running = _load(c, 'stability_running', None)
-    if running and running.get('since', '') > (now - timedelta(minutes=5)).isoformat(timespec='seconds'):
+    return running if running and running.get('since', '') > (now - timedelta(minutes=5)).isoformat(timespec='seconds') else None
+
+
+def due(c, now, minutes=EVERY_MINUTES):
+    """¿Toca una verificación? Si esta versión no tiene ninguna o la última tiene más de `minutes` (y no hay otra en curso)."""
+    version = versioning.load()['releases'][0]['version']
+    if _running(c, now):
         return False
-    mine = [entry for entry in _load(c, 'stability_runs', []) if entry['version'] == version]
-    return not mine or mine[-1]['at'] < (now - timedelta(minutes=EVERY_MINUTES)).isoformat(timespec='seconds')
+    last = _summary(c, version)['last_run']
+    return not last or last < (now - timedelta(minutes=minutes)).isoformat(timespec='seconds')
+
+
+def next_scheduled(now):
+    """Próxima tarea programada del servidor (hora de Ecuador), según SCHEDULE_UTC."""
+    utc = now.astimezone(timezone.utc)
+    for days in (0, 1):
+        for hour in SCHEDULE_UTC:
+            moment = (utc + timedelta(days=days)).replace(hour=hour, minute=0, second=0, microsecond=0)
+            if moment > utc:
+                return moment.astimezone(now.tzinfo).isoformat(timespec='seconds')
+    return ''
 
 
 def status(c, now):
@@ -149,30 +211,32 @@ def status(c, now):
     registry = versioning.load()
     installed = registry['releases'][0]
     version = installed['version']
-    mine = [entry for entry in _load(c, 'stability_runs', []) if entry['version'] == version]
-    running = _load(c, 'stability_running', None)
-    last = mine[-1] if mine else None
-    passes = [entry for entry in mine if not entry['critical_failures']]
-    if running and running.get('version') == version and running.get('since', '') > (now - timedelta(minutes=5)).isoformat(timespec='seconds'):
+    summary = _summary(c, version)
+    history = _load(c, 'stability_runs', [])
+    last = next((entry for entry in reversed(history) if entry['version'] == version), None)
+    remaining, missing = None, max(0, MIN_PASSES - summary['window_passes'])
+    if _running(c, now) and _running(c, now).get('version') == version:
         state = 'verifying'
-    elif not last:
+    elif not summary['runs']:
         state = 'unverified'
-    elif last['critical_failures']:
+    elif not summary['last_ok']:
         state = 'attention'
     else:
-        first = passes[0]['at']
-        failed_since = any(entry['critical_failures'] for entry in mine if entry['at'] >= first)
-        watched = datetime.fromisoformat(first) <= now - timedelta(hours=OBSERVATION_HOURS)
-        state = 'stable' if watched and len(passes) >= MIN_PASSES and not failed_since else 'observing'
-    remaining = None
-    if state == 'observing':
-        end = datetime.fromisoformat(passes[0]['at']) + timedelta(hours=OBSERVATION_HOURS)
-        remaining = max(0, round((end - now).total_seconds() / 3600, 1))
-    incidents = [{'at': entry['at'], 'items': entry['critical_failures'] + entry['warnings'], 'critical': bool(entry['critical_failures'])}
-                 for entry in mine if entry['critical_failures'] or entry['warnings']][-5:]
-    return {'version': version, 'date': installed.get('date', ''), 'state': state, 'label': LABELS[state],
-            'last_check': last['at'] if last else '', 'checks_run': len(mine), 'checks_passed': len(passes),
+        end = datetime.fromisoformat(summary['window_start']) + timedelta(hours=OBSERVATION_HOURS)
+        # La decisión usa el instante exacto; el redondeo es solo para mostrar el tiempo restante.
+        complete = now >= end
+        remaining = 0.0 if complete else max(0.01, round((end - now).total_seconds() / 3600, 2))
+        state = 'stable' if complete and not missing else 'observing'
+    incidents = [{'at': item['at'], 'items': item['items'], 'critical': True} for item in summary['criticals']]
+    incidents += [{'at': entry['at'], 'items': entry['warnings'], 'critical': False} for entry in history if entry['version'] == version and entry['warnings'] and not entry['critical_failures']]
+    incidents = sorted(incidents, key=lambda item: item['at'])[-5:]
+    previous = [{'version': key, 'runs': value['runs'], 'passes': value['passes'], 'last_run': value['last_run'], 'stable': bool(value['window_start']) and value['window_passes'] >= MIN_PASSES
+                 and datetime.fromisoformat(value['window_start']) + timedelta(hours=OBSERVATION_HOURS) <= datetime.fromisoformat(value['last_run'])}
+                for key, value in sorted(_load(c, 'stability_versions', {}).items(), key=lambda pair: pair[1]['last_run'], reverse=True) if key != version][:5]
+    return {'version': version, 'date': installed.get('date', ''), 'state': state, 'label': LABELS[state], 'short': SHORT[state],
+            'last_check': summary['last_run'], 'checks_run': summary['runs'], 'checks_passed': summary['passes'],
+            'window_start': summary['window_start'], 'window_passes': summary['window_passes'], 'missing_passes': missing,
             'tests': [{'name': r['name'], 'ok': r['ok'], 'critical': r['critical']} for r in (last['results'] if last else [])],
             'passed': last['passed'] if last else 0, 'total': last['total'] if last else len(checks(c)),
             'incidents': incidents, 'observation_hours': OBSERVATION_HOURS, 'min_passes': MIN_PASSES, 'remaining_hours': remaining,
-            'first_pass': passes[0]['at'] if passes else ''}
+            'first_pass': summary['window_start'], 'next_scheduled': next_scheduled(now), 'previous': previous}
