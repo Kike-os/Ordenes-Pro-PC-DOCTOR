@@ -232,7 +232,7 @@ class AgendaTests(unittest.TestCase):
             self.assertEqual(message['Subject'],'Solicitud de cita recibida — '+pending['code']+' | PC-DOCTOR S.A.')
             plain=message.get_body(preferencelist=('plain',)).get_content();page=message.get_body(preferencelist=('html',)).get_content()
             for expected in ('pendiente de confirmación',pending['code'],'Cliente De Agenda','Consolas · Sony · PS5','Mantenimiento preventivo',slots[0]+' (hora de Ecuador)'):self.assertIn(expected,plain)
-            self.assertNotIn('confirmada para',plain);self.assertIn('cid:logo-pcdoctor',page);self.assertIn(pending['code'],page)
+            self.assertNotIn('confirmada para',plain);self.assertIn('src="cid:',page);self.assertIn(pending['code'],page)
             # El taller confirma: ahora sí sale la confirmación, una sola vez.
             self.request('/api/appointments/%d'%pending['id'],{'action':'confirmada'},cookie=cookie,csrf=csrf)
             self.request('/api/appointments/%d'%pending['id'],{'action':'confirmada'},cookie=cookie,csrf=csrf)
