@@ -8,6 +8,22 @@
   },
   "releases": [
     {
+      "version": "1.5.148",
+      "date": "2026-10-13T21:17:59-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Corrección de configuración de feriados y horarios especiales",
+      "changes": {
+        "features": [],
+        "improvements": [],
+        "fixes": [
+          "Corrección de configuración de feriados y horarios especiales: se corrigió el funcionamiento de los controles Guardar y Quitar en la administración de feriados. Se mejoraron la persistencia de configuraciones, las validaciones de horarios, las confirmaciones y el diseño responsive."
+        ],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.147",
       "date": "2026-10-13T21:02:03-05:00",
       "type": "patch",

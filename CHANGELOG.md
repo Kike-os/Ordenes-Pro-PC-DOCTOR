@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.148 — 2026-10-13 21:17 (UTC-05:00)
+
+Corrección de configuración de feriados y horarios especiales
+
+### Errores corregidos
+
+- Corrección de configuración de feriados y horarios especiales: se corrigió el funcionamiento de los controles Guardar y Quitar en la administración de feriados. Se mejoraron la persistencia de configuraciones, las validaciones de horarios, las confirmaciones y el diseño responsive.
+
 ## v1.5.147 — 2026-10-13 21:02 (UTC-05:00)
 
 Firma original en los correos, lector de correo, feriados y atención, catálogo Premium Técnico y reactivación de citas
