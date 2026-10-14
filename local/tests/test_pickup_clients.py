@@ -104,6 +104,31 @@ class PickupAndClientsTests(unittest.TestCase):
             late=self.book('0206','13:00',order_code=mine['code'],**owner);self.assertIn('ya figura como entregada',late['body']['fields']['order_code'])
             other=self.book('0207','15:00',identification='0100000017',phone='0991234567',order_code='cualquier-cosa');self.assertEqual((other['status'],other['body']['pickup_order']),(201,''))
 
+    def test_closed_appointment_can_be_reactivated_without_duplicates_or_mail(self):
+        import mail_pro,appointments
+        from unittest.mock import patch
+        with test_app.open_requests():
+            made=self.book('0501');self.assertEqual(made['status'],201,made['body'])
+            with app.connect() as c:aid=c.execute('SELECT id FROM appointments ORDER BY id DESC LIMIT 1').fetchone()[0]
+            cookie,csrf=self.login();act=lambda action,ident=aid:self.request('/api/appointments/%d'%ident,{'action':action},cookie=cookie,csrf=csrf)
+            self.assertEqual(act('confirmada')['status'],200);self.assertEqual(act('reactivar')['status'],409)             # no está cerrada
+            self.assertEqual(act('no_asistio')['status'],200)
+            with app.connect() as c:before=dict(c.execute('SELECT * FROM appointments WHERE id=?',(aid,)).fetchone());total=c.execute('SELECT COUNT(*) FROM appointments').fetchone()[0]
+            with patch.object(mail_pro,'deliver',side_effect=AssertionError('no debe enviar correos')):
+                done=act('reactivar');self.assertEqual((done['status'],done['body'].get('status')),(200,'confirmada'),done['body'])
+            with app.connect() as c:
+                after=dict(c.execute('SELECT * FROM appointments WHERE id=?',(aid,)).fetchone());self.assertEqual(c.execute('SELECT COUNT(*) FROM appointments').fetchone()[0],total)
+                self.assertEqual({k:after[k] for k in after if k not in ('status','updated_at')},{k:before[k] for k in before if k not in ('status','updated_at')})   # misma cita, mismos datos
+                events=[tuple(r) for r in c.execute('SELECT event,old_status,new_status,detail FROM appointment_events WHERE appointment_id=? ORDER BY id',(aid,))]
+                self.assertEqual(events[-1],('reactivated','no_asistio','confirmada',appointments.REACTIVATE_NOTE));self.assertGreaterEqual(len(events),3)   # el historial anterior se conserva
+                self.assertEqual(c.execute("SELECT COUNT(*) FROM audit WHERE action='appointment_reactivated'").fetchone()[0],1)
+            # Si otra cita ocupó ese horario mientras estaba cerrada, no se reactiva encima.
+            self.assertEqual(act('cancelada')['status'],200)
+            other=self.book('0502',identification='0100000017',phone='0976500002');self.assertEqual(other['status'],201,other['body'])
+            clash=act('reactivar');self.assertEqual((clash['status'],clash['body'].get('conflict')),(409,True))
+            with app.connect() as c:c.execute("UPDATE users SET role='tecnico' WHERE username='demo'");c.commit()
+            self.assertEqual(act('reactivar')['status'],403)
+
     def test_passport_is_accepted_for_people_without_cedula(self):
         with test_app.open_requests():
             for bad in ('AB','ABCDEFGH','A1 2','A'*21+'1','<AB12345>'):

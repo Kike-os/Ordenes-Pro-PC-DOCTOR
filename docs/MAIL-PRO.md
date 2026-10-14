@@ -118,3 +118,21 @@ Antes, los botones rápidos se dibujaban con posición absoluta encima del asunt
 - La fecha ya no se oculta al pasar el cursor. Los botones no desplazan nada al aparecer: siempre ocupan su sitio.
 
 Comprobado con correos simulados en 1440, 1180, 1024, 768, 390 y 320 px y con zoom de 80 % y 125 %: sin solapes, botones alineados y acciones operativas (destacar, eliminar, archivar, leído/no leído, mover). No se pudo comprobar en este entorno la variante con ratón (30 px y eliminar a la vista), porque el navegador de pruebas se declara táctil; usa la misma rejilla.
+
+## Firma original y lector de correo (13/10/2026)
+
+**Causa del problema de la firma.** El sistema no usaba la firma original: la *reconstruía* con una tabla HTML a partir de datos (nombre, cargo, teléfono…) y le añadía una franja roja inferior. Además, el lector de correos recibidos mostraba una versión recortada del HTML (lista blanca de etiquetas y estilos), por lo que las firmas de los mensajes se veían sin su estructura ni sus imágenes.
+
+**Firma.**
+- Un único punto compone la firma de todos los correos: `mail_pro.signature_part`. Lo usan los correos institucionales (recepción, autorizaciones, presupuestos, permanencia, mantenimiento, recibos de pago), los de citas y los escritos a mano. Ningún módulo arma la firma por su cuenta y cada mensaje lleva una sola.
+- **Firma gráfica original:** en Configuración → Correo → Firma corporativa, «Cargar mi firma original» (PNG o JPG, hasta 400 KB, de 200 a 2400 px de ancho). El archivo se guarda y se envía **tal cual**, embebido en el mensaje (CID), a un ancho máximo de 600 px y sin deformarse. No se reconstruye ni se retoca. Se puede desactivar o quitar; entonces se usa la firma compuesta con los datos.
+- La firma compuesta ya no lleva franja roja inferior.
+- Los correos ya enviados no cambian.
+
+**Lector de correo.**
+- Cuatro áreas: encabezado (asunto, Ampliar y Cerrar), remitente y destinatarios, lectura y barra de acciones. Solo se desplaza el área de lectura.
+- El mensaje se muestra con su **HTML original** dentro de un marco aislado (`/api/mail/view`): política de contenido propia, sin scripts del remitente (solo el del visor, con un nonce por respuesta), sin formularios, marcos ni recursos externos; las imágenes incrustadas se muestran y las remotas solo al pulsar «Mostrar imágenes». El marco no comparte origen con la aplicación.
+- Tablas anchas: se ajustan cuando pueden y, si no, el desplazamiento horizontal queda dentro del mensaje, no en la ventana.
+- Acciones: Responder, Responder a todos, Reenviar, Destacar, leído/no leído, Imprimir (solo el mensaje), Eliminar, Ampliar y Cerrar. Con poco ancho, las secundarias pasan al menú «Más».
+
+**No verificado:** cómo se ve la firma en Gmail, Outlook y aplicaciones móviles reales (aquí se comprobó el HTML enviado y su lectura en el propio sistema), ni el cuadro de impresión del navegador.

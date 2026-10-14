@@ -327,7 +327,7 @@ def send_institutional(c,kind,title,recipient,subject,body,order_id=None,actor=N
     Lanza mail_pro.MailError si el servidor no acepta el mensaje (queda registrado como error). «enviado» significa aceptado por el servidor."""
     import mailing
     now=reception_now();final,adi=mailing.review(c,body,now) if review else (body,'plantilla')
-    config=mail_pro.settings();card=mail_signature_card(c)
+    config=mail_pro.settings();card=mail_signature_send(c)
     message,recipients=mail_pro.build_message(config,{'to':recipient,'subject':subject,'body':final,'from_name':corporate.settings()['name'],'attachments':attachments or [],'layout':{'title':title}},card if signed and card.get('enabled') else '')
     archive_id=mailing.archive(c,kind,order_id,recipient,subject,message,adi,actor,now,[str(item.get('name','')) for item in attachments or []],private)
     # La copia queda guardada como «preparado» antes de hablar con el servidor de correo.
@@ -527,12 +527,14 @@ def content_disposition(filename):
     return header
 
 
+def mail_signature_send(c):
+    # Firma corporativa del buzón remitente lista para ENVIAR (incluye los bytes de la firma gráfica original si está activa).
+    return mail_pro.load_signature(c,mail_pro.settings()['username'])
+
+
 def mail_signature_card(c):
-    # Firma corporativa del buzón remitente: datos validados; el HTML siempre lo compone el servidor.
-    account=mail_pro.settings()['username'];row=c.execute('SELECT value FROM system_state WHERE key=?',('mail_signature_card:'+account,)).fetchone()
-    try:raw=json.loads(row['value']) if row else {}
-    except ValueError:raw={}
-    return mail_pro.clean_signature(raw,account)
+    # La misma firma para MOSTRAR o responder al navegador: sus datos y las medidas de la imagen, nunca sus bytes.
+    return mail_pro.public_signature(mail_signature_send(c))
 
 
 def mail_signature(c):
@@ -1500,6 +1502,11 @@ class Handler(BaseHTTPRequestHandler):
                     except mail_pro.MailError as error:return self.reply(502,{'error':str(error),'kind':error.kind})
                     if not state:return self.reply(502,{'error':'El servidor de correo no informó la bandeja de entrada.'})
                     return self.reply(200,{'unread':state.get('unread',0),'checked':state.get('checked',''),'quota':state.get('quota'),'events':notifications.mail_events(c)[-5:]})
+                if path=='/api/mail/signature-image':
+                    # La firma gráfica cargada, para la vista previa y para ver los correos archivados. Solo personal con acceso al correo.
+                    picture=mail_signature_card(c);row=c.execute('SELECT value FROM system_state WHERE key=?',('mail_signature_image:'+mail_pro.settings()['username'],)).fetchone() if picture.get('image') else None
+                    if not row:return self.reply(404,{'error':'No hay una firma gráfica cargada.'})
+                    stored=json.loads(row['value']);return self.reply(200,base64.b64decode(stored['data']),'image/'+stored['kind'])
                 if path=='/api/mail/signature':
                     return self.reply(200,{'card':mail_signature_card(c)})
                 if path=='/api/mail/storage':
@@ -1543,6 +1550,12 @@ class Handler(BaseHTTPRequestHandler):
                                 audit(c,None,'mail_auto_linked',target);c.commit();message['auto_linked']=True
                         message['links']=[dict(r) for r in c.execute('SELECT l.id,o.id order_id,o.code FROM mail_links l JOIN orders o ON o.id=l.order_id WHERE l.message_id=? ORDER BY l.id',(message['message_id'],))] if message['message_id'] else []
                         return self.reply(200,{'message':message})
+                    if path=='/api/mail/view':
+                        # Lectura del mensaje con su HTML original en un marco aislado: política propia, sin scripts del remitente ni recursos
+                        # externos (las imágenes remotas solo si la persona lo pide). No marca el mensaje ni cambia nada en el buzón.
+                        nonce=secrets.token_urlsafe(16);original,_=mail_pro.fetch_message(client,folder['id'],int(arg('uid')))
+                        self.content_policy=mail_pro.view_policy(nonce,arg('images')=='1')
+                        return self.reply(200,mail_pro.message_page(original,nonce,arg('images')=='1'),'text/html; charset=utf-8')
                     if path=='/api/mail/attachment':
                         if not arg('part').isdigit():return self.reply(400,{'error':'Adjunto no válido.'})
                         if arg('inline')=='1':
@@ -1571,7 +1584,7 @@ class Handler(BaseHTTPRequestHandler):
                 if path.startswith('/correo/'):
                     # Página aparte con su propia política: admite los estilos en línea del correo y ningún guion ni recurso externo.
                     self.content_policy="default-src 'none'; style-src 'unsafe-inline'; img-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
-                    return self.reply(200,re.sub(r'cid:[^"\'\s>]+','/static/logo-firma.png',row['body_html']) or '<pre>'+html.escape(row['body_text'])+'</pre>','text/html; charset=utf-8')
+                    return self.reply(200,re.sub(r'cid:[^"\'\s>]+','/static/logo-firma.png',re.sub(r'cid:[^"\'\s>]*firma-grafica[^"\'\s>]*','/api/mail/signature-image',row['body_html'])) or '<pre>'+html.escape(row['body_text'])+'</pre>','text/html; charset=utf-8')
                 return self.reply(200,{'mail':{'id':row['id'],'kind_label':mailing.LABELS.get(row['kind'],'Notificación'),'recipient':row['recipient'],'subject':row['subject'],'text':row['body_text'],'attachments':row['attachments'],'status':row['status'],'status_label':mailing.STATUS[row['status']],
                     'adi':row['adi'],'detail':row['detail'],'created_at':row['created_at'],'sent_at':row['sent_at'],'order_code':row['order_code'],'view_url':'/correo/%d'%row['id'] if row['body_html'] else ''}})
             if path == '/api/catalog':
@@ -1759,7 +1772,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(403, {'error':'Solicitud no autorizada.'})
             path = urlsplit(self.path).path
             workspace_post=bool(re.fullmatch(r'/api/orders/[0-9]+/workspace',path));quote_json=bool(re.fullmatch(r'/api/quotes/[0-9]+',path))
-            max_body=9000000 if path in ('/api/clients/import/preview','/api/clients/import/commit') else 6000000 if path in ('/api/mail/send','/api/mail/draft') else 100000 if path in ('/api/conditions','/api/order-draft','/api/conditions/draft','/api/conditions/compare') else 900000 if re.fullmatch(r'/api/orders/[0-9]+/photos',path) or path=='/api/profile/photo' or re.fullmatch(r'/api/catalog/[0-9]+/image',path) else (65536 if workspace_post or quote_json else 16384)
+            max_body=9000000 if path in ('/api/clients/import/preview','/api/clients/import/commit') else 6000000 if path in ('/api/mail/send','/api/mail/draft') else 100000 if path in ('/api/conditions','/api/order-draft','/api/conditions/draft','/api/conditions/compare') else 900000 if re.fullmatch(r'/api/orders/[0-9]+/photos',path) or path in ('/api/profile/photo','/api/mail/signature') or re.fullmatch(r'/api/catalog/[0-9]+/image',path) else (65536 if workspace_post or quote_json else 16384)
             length = int(self.headers.get('Content-Length', '0'))
             if length <= 0 or length > max_body:
                 return self.reply(400, {'error':'Solicitud inválida.'})
@@ -2056,6 +2069,23 @@ class Handler(BaseHTTPRequestHandler):
                         return self.reply(200,{'ok':True,'prefs':clean})
                     if path=='/api/mail/signature':
                         if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede cambiar la firma.'})
+                        if 'image' in data or data.get('remove_image') is True:
+                            # Firma gráfica original: se guarda tal cual la sube administración (PNG o JPG) y se usa sin modificarla.
+                            account=mail_pro.settings()['username'];card_key='mail_signature_card:'+account;image_key='mail_signature_image:'+account
+                            row=c.execute('SELECT value FROM system_state WHERE key=?',(card_key,)).fetchone()
+                            try:raw=json.loads(row['value']) if row else {}
+                            except ValueError:raw={}
+                            raw=dict(mail_pro.clean_signature(raw,account))
+                            if data.get('remove_image') is True:
+                                c.execute('DELETE FROM system_state WHERE key=?',(image_key,));raw['use_image']=False;audit(c,user['id'],'mail_signature_image_removed')
+                            else:
+                                try:content=base64.b64decode(str(data.get('image','')),validate=True)
+                                except Exception:return self.reply(400,{'error':'La imagen no se pudo leer.'})
+                                picture,problem=mail_pro.check_signature_image(content)
+                                if not picture:return self.reply(400,{'error':problem})
+                                c.execute("INSERT INTO system_state VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",(image_key,json.dumps(picture)));raw['use_image']=True;audit(c,user['id'],'mail_signature_image_updated')
+                            c.execute("INSERT INTO system_state VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",(card_key,json.dumps(raw)))
+                            return self.reply(200,{'ok':True,'card':mail_signature_card(c)})
                         if data.get('restore') is True or 'card' in data:
                             key='mail_signature_card:'+mail_pro.settings()['username']
                             if data.get('restore') is True:c.execute('DELETE FROM system_state WHERE key=?',(key,))
@@ -2111,7 +2141,7 @@ class Handler(BaseHTTPRequestHandler):
                             except ValueError:files=None
                             if not isinstance(files,list) or len(files)>10 or any(not isinstance(item,dict) for item in files):return self.reply(400,{'error':'Adjuntos no válidos.'})
                             config=mail_pro.settings()
-                            message,recipients=mail_pro.build_message(config,{**{k:data.get(k,'') for k in ('to','cc','bcc','subject','body','in_reply_to','references')},'rich':data.get('rich') is True,'from_name':corporate.settings()['name'],'attachments':files,'draft':draft,'signature_pref':data.get('signature_pref')},(mail_signature_card(c) if data.get('signature') is True and not draft and mail_signature_card(c)['enabled'] else '') if 'signature' in data else mail_signature(c))
+                            message,recipients=mail_pro.build_message(config,{**{k:data.get(k,'') for k in ('to','cc','bcc','subject','body','in_reply_to','references')},'rich':data.get('rich') is True,'from_name':corporate.settings()['name'],'attachments':files,'draft':draft,'signature_pref':data.get('signature_pref')},(mail_signature_send(c) if data.get('signature') is True and not draft and mail_signature_card(c)['enabled'] else '') if 'signature' in data else mail_signature(c))
                             order=None;code=str(data.get('order_code','')).strip().upper()
                             if code:
                                 order=c.execute('SELECT id,code FROM orders WHERE code=?',(code,)).fetchone()
@@ -2357,6 +2387,11 @@ class Handler(BaseHTTPRequestHandler):
                         except ValueError as error:return self.reply(400,{'error':str(error)})
                         result=appointments.reschedule(c,row,start,user);status=200 if result.get('ok') else 409;payload=result
                         if status==200:payload['mail']=appointment_mail.send(c,row['id'],'rescheduled')
+                    elif action=='reactivar':
+                        # Reactivar una cita cerrada por error: solo administración; sin avisos al cliente; el historial se conserva.
+                        if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede reactivar una cita.'})
+                        status,payload=appointments.reactivate(c,row,user)
+                        if status==200:maintenance.appointment_changed(c,row['id'],payload['status'],reception_now());audit(c,user['id'],'appointment_reactivated',row['id'])
                     elif action in ('confirmada','presente','completada','no_asistio','cancelada'):
                         if action not in appointments.STATUSES:return self.reply(400,{'error':'Estado de cita inválido.'})
                         if row['status'] in ('cancelada','completada','no_asistio') and action not in ('confirmada',):return self.reply(409,{'error':'La cita ya está cerrada.'})
@@ -2776,7 +2811,7 @@ class Handler(BaseHTTPRequestHandler):
                         mine=data.get('target')=='me'
                         try:
                             if not mail_pro.configured():return self.reply(200,{'result':'not_configured','message':'El correo del sistema no está configurado en el servidor.'})
-                            config=mail_pro.settings();recipient=user['email'] if mine else config['username'];card=mail_signature_card(c) if mine else {}
+                            config=mail_pro.settings();recipient=user['email'] if mine else config['username'];card=mail_signature_send(c) if mine else {}
                             body=('Este es un correo de prueba de Órdenes Pro, enviado desde Configuración → Notificaciones automáticas por correo a tu cuenta de administración.\n\nSi lo recibes en la bandeja de entrada, con el logotipo, la firma y las tildes correctas (áéíóú ñ ¿? ¡!), el envío de correos a clientes está operativo. Si llegó a «Spam» o «Promociones», conviene revisar la configuración del dominio (SPF, DKIM y DMARC).\n\nNo es necesario responder.' if mine
                                   else 'Este es un correo de prueba enviado desde Configuración → Notificaciones automáticas por correo.\n\nSi lo recibes en el buzón del sistema, el envío de comprobantes está operativo.')
                             message,recipients=mail_pro.build_message(config,{'to':recipient,'subject':('Prueba de envío real' if mine else 'Prueba de notificaciones automáticas')+' | Órdenes Pro','body':body,'from_name':corporate.settings()['name'],'attachments':[],'layout':{'title':'Prueba de envío' if mine else 'Prueba de notificaciones'}},card if card.get('enabled') else '')

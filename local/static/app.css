@@ -6269,3 +6269,44 @@ td>.status-label+.finance-badge{display:flex;width:fit-content}
 /* Panel propio del tablero (no es una tarjeta de la cuadrícula de gráficos): ocupa todo el ancho, con el mismo aspecto. */
 .control-pro>.report-finance{position:relative;padding:14px;border:1px solid #213552;border-radius:14px;background:#0b1626}
 .report-finance>header{display:grid;gap:3px}.report-finance>header h2{margin:0;font-size:14px;color:#e3edff}.report-finance>header p{margin:0;font-size:12px;line-height:1.45;color:#8fa5c4}
+/* Firma de correo: sin franja roja inferior (no forma parte de la firma) y firma gráfica original cargada por administración. */
+.mail-sign-card{border-bottom:1px solid #e2e6ee}
+.mail-sign-graphic{display:block;width:fit-content;max-width:100%;padding:0;background:#fff;border:1px solid #e2e6ee;border-radius:6px;overflow:hidden}
+.mail-sign-graphic img{display:block;max-width:100%;height:auto}
+.mail-composer .mail-sign-box .mail-sign-graphic img{max-height:120px;width:auto}
+.mail-sign-upload{display:grid;gap:8px;margin:4px 0 10px;padding:14px;border:1px dashed #3a5a86;border-radius:12px;background:#0a1424}
+.mail-sign-upload strong{font-size:13.5px;color:#e3edff}.mail-sign-upload .config-note{margin:0}
+.mail-sign-pick{display:inline-flex;align-items:center;gap:8px;cursor:pointer}.mail-sign-pick svg{width:15px;height:15px}.mail-sign-pick:focus-visible{outline:2px solid #9cc4ff;outline-offset:2px}
+.mail-sign-form .config-fields[data-unused=true]{opacity:.55}
+/* ===== Lector de correo: cuatro áreas (encabezado, remitente y destinatarios, lectura y acciones). Solo se desplaza el área de
+   lectura; el mensaje se muestra con su HTML original dentro de un marco aislado, sobre fondo claro como en cualquier cliente. ===== */
+.mail-v2 .mail-reader{display:flex;flex-direction:column;padding:0;overflow:hidden;container-type:inline-size;container-name:mailreader}
+.mail-v2 .mail-reader>.mail-head{flex:0 0 auto;display:grid;gap:10px;min-width:0;max-height:46%;margin:0;padding:14px 18px 12px;border-bottom:1px solid #1b2b44;background:#0d1a2e;overflow-y:auto;overflow-x:hidden}
+.mail-top{display:flex;align-items:flex-start;gap:10px;min-width:0}
+.mail-top h2{flex:1 1 auto;min-width:0;margin:0;padding-top:4px;font-size:17px;line-height:1.35;color:#fff;overflow-wrap:anywhere;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden;outline:none}
+.mail-top-tools{flex:none;display:flex;gap:6px}
+.mail-v2 .mail-top .mail-tool,.mail-v2 .mail-bar .mail-tool{box-sizing:border-box;flex:0 0 38px;display:grid;place-items:center;width:38px;height:38px;min-height:38px;margin:0;padding:0;border-radius:10px}
+.mail-v2 .mail-top .mail-back{display:none}
+.mail-v2 .mail-reader .mail-meta{min-width:0}.mail-v2 .mail-reader .mail-meta>div{min-width:0}.mail-v2 .mail-reader .mail-meta :is(strong,span,p){overflow-wrap:anywhere}
+.mail-v2 .mail-reader .mail-context{min-width:0}.mail-v2 .mail-reader .mail-context:empty{display:none}
+.mail-v2 .mail-reader>.mail-scroll{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;padding:16px 18px 20px;background:#0a1322;overscroll-behavior:contain}
+.mail-v2 .mail-paper{max-width:880px;margin:0 auto;padding:0;border:1px solid #2a3b59;border-radius:12px;background:#fff;overflow:hidden}
+.mail-frame{display:block;width:100%;height:340px;border:0;background:#fff;color-scheme:light}
+.mail-v2 .mail-paper .mail-notice{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;margin:0;padding:9px 14px;border:0;border-bottom:1px solid #e2e6ee;border-radius:0;background:#f3f6fb;color:#3b4a61;font-size:12.5px;line-height:1.4}
+.mail-v2 .mail-paper .mail-notice .text-action{color:#1d5fb0;font-weight:650}
+.mail-v2 .mail-scroll>h3,.mail-v2 .mail-scroll>.mail-files{max-width:880px;margin-left:auto;margin-right:auto}
+.mail-v2 .mail-files{min-width:0}.mail-v2 .mail-file{max-width:100%;min-width:0}.mail-v2 .mail-file span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mail-v2 .mail-reader>.mail-bar{flex:0 0 auto;display:flex;flex-wrap:nowrap;align-items:center;gap:8px;min-width:0;padding:10px 14px;border-top:1px solid #1b2b44;border-bottom:0;background:#0d1a2e;overflow:hidden}
+.mail-v2 .mail-reader>.mail-bar>button:not(.mail-tool){box-sizing:border-box;flex:0 0 auto;display:inline-flex;align-items:center;gap:7px;height:38px;min-height:38px;margin:0;padding:0 14px;border-radius:10px;font-size:13px;white-space:nowrap}
+.mail-v2 .mail-reader>.mail-bar .mail-bar-space{flex:1 1 0;min-width:0}
+.mail-v2 .mail-reader>.mail-bar .mail-more{display:none}
+.mail-v2 .mail-reader :is(.mail-bar,.mail-top) button:focus-visible{outline:2px solid #9cc4ff;outline-offset:2px}
+@container mailreader (max-width:640px){.mail-v2 .mail-reader>.mail-bar>[data-secondary]{display:none!important}.mail-v2 .mail-reader>.mail-bar>.mail-more{display:grid}}
+@container mailreader (max-width:380px){.mail-v2 .mail-reader>.mail-bar>button.primary span{display:none}.mail-v2 .mail-reader>.mail-bar>button.primary{flex:0 0 38px;width:38px;padding:0;justify-content:center}.mail-v2 .mail-reader>.mail-head{padding:12px 12px 10px}.mail-v2 .mail-reader>.mail-scroll{padding:10px}}
+/* «Ampliar»: el lector ocupa casi toda la pantalla, por encima de la lista. */
+.mail-v2[data-reader=wide][data-view=reader] .mail-reader{position:fixed;z-index:70;inset:14px;width:auto;height:auto;max-width:1240px;margin:0 auto;border-color:#3a5a86;box-shadow:0 0 0 100vmax #020714d9,0 24px 60px #020714}
+.mail-v2[data-reader=wide][data-view=reader] .mail-paper,.mail-v2[data-reader=wide][data-view=reader] .mail-scroll>h3,.mail-v2[data-reader=wide][data-view=reader] .mail-scroll>.mail-files{max-width:1040px}
+@media(max-width:760px){.mail-v2 .mail-top .mail-back{display:grid}.mail-v2[data-view=reader] .mail-reader{flex:0 0 auto;height:calc(100dvh - 132px);min-height:380px;max-height:none}.mail-v2[data-reader=wide][data-view=reader] .mail-reader{inset:0;height:100dvh;border-radius:0}}
+/* La esfera de ADI flota en la esquina inferior derecha: la barra de acciones le deja sitio para que no tape ningún botón. */
+.mail-v2 .mail-reader>.mail-bar{padding-right:84px}
+.mail-v2[data-reader=wide][data-view=reader] .mail-reader>.mail-bar{padding-right:84px}

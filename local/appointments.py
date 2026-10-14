@@ -286,6 +286,23 @@ def edit(c,row,data,user):
  labels={'name':'nombre','phone':'teléfono','email':'correo','device_type':'tipo de equipo','brand':'marca','model':'modelo','description':'descripción','notes':'observaciones'}
  c.execute("INSERT INTO appointment_events(appointment_id,actor_id,event,old_start,new_start,old_status,new_status,created_at,detail) VALUES (?,?,'edited',?,?,?,?,?,?)",(row['id'],user['id'],row['starts_at'],row['starts_at'],row['status'],row['status'],created,'Datos modificados: '+', '.join(labels[k] for k in changed)))
  return 200,{'ok':True,'changed':changed}
+REACTIVATE_NOTE='Cita reactivada por corrección administrativa de cierre accidental'
+def reactivate(c,row,user,note=''):
+ """Devuelve a la agenda una cita cerrada por error («No asistió», cancelada o completada sin orden): recupera el estado que tenía
+ antes de cerrarse, conserva fecha, hora, cliente, equipo, servicio, código e historial, y comprueba que su horario siga libre.
+ No crea otra cita ni envía avisos al cliente. Devuelve (código HTTP, respuesta)."""
+ if row['deleted_at']:return 404,{'error':'Cita no disponible.'}
+ if row['status'] not in ('no_asistio','cancelada','completada'):return 409,{'error':'Esta cita no está cerrada: no hace falta reactivarla.'}
+ if row['converted_order_id']:return 409,{'error':'Esta cita ya generó una orden de servicio: no se puede reactivar.'}
+ before=c.execute("SELECT old_status FROM appointment_events WHERE appointment_id=? AND new_status=? AND old_status!='' ORDER BY id DESC LIMIT 1",(row['id'],row['status'])).fetchone()
+ target=before['old_status'] if before and before['old_status'] in ('solicitada','confirmada','reprogramada') else 'confirmada'
+ # El horario debe seguir libre para el mismo técnico (o para alguno, si la cita no tenía técnico asignado).
+ free=technicians(c,datetime.fromisoformat(row['starts_at']),row['duration_minutes'],exclude=row['id'])
+ if not free or (row['technician_id'] and row['technician_id'] not in free):return 409,{'error':'El horario de esta cita ya no está disponible. Reprográmala a otro horario.','conflict':True}
+ created=stamp(now());detail=(REACTIVATE_NOTE+('. '+str(note).strip()[:200] if str(note or '').strip() else ''))
+ c.execute('UPDATE appointments SET status=?,updated_at=? WHERE id=? AND status=?',(target,created,row['id'],row['status']))
+ c.execute("INSERT INTO appointment_events(appointment_id,actor_id,event,old_start,new_start,old_status,new_status,created_at,detail) VALUES (?,?,'reactivated',?,?,?,?,?,?)",(row['id'],user['id'] if user else None,row['starts_at'],row['starts_at'],row['status'],target,created,detail))
+ return 200,{'ok':True,'status':target,'status_label':STATUSES[target]}
 def remove(c,row,user,reason):
  """Eliminación lógica: la cita sale de la agenda activa y libera su horario; la fila, su historial y la orden o el mantenimiento de origen se conservan."""
  created=stamp(now());reason=str(reason or '').strip()[:300]

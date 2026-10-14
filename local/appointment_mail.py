@@ -41,15 +41,17 @@ def compose(row,kind,config,signature=None):
     # Plantilla institucional común (encabezado textual, datos en tabla y firma autorizada al final).
     import mailing
     page_text='Hola '+row['customer_name']+':\n\n'+lead+'\n\n'+'\n'.join(label+': '+value for label,value in facts)+('\n\n'+advice if advice else '')+'\n\nPara cambiar o cancelar tu cita, contáctanos.\n'+contact
-    logo=Path(__file__).resolve().parent/'static/logo-firma.png';sign=signature if isinstance(signature,dict) and signature.get('enabled') else None
-    body=mailing.html(page_text,title,mail_pro.signature_html(sign,'cid:logo-pcdoctor' if logo.is_file() else 'https://ordenes-pro.ecuadorpcdoctor.com/static/logo-firma.png') if sign else '')
+    # La firma la compone el mismo punto único que usan los demás correos del sistema (mail_pro.signature_part).
+    sign=signature if isinstance(signature,dict) and signature.get('enabled') else None
+    sign_html,sign_cid,sign_image,sign_kind=mail_pro.signature_part(sign,config['username'].split('@')[-1]) if sign else ('','',None,'png')
+    body=mailing.html(page_text,title,sign_html)
     if sign:text+='\n\n-- \n'+mail_pro.signature_text(sign)
     message=EmailMessage()
     message['From']=company['name']+' <'+config['username']+'>';message['To']=row['email']
     message['Subject']=title+' — '+row['public_code']+' | '+company['name']
     message['Date']=formatdate(localtime=True);message['Message-ID']=make_msgid(domain=config['username'].split('@')[-1])
     message.set_content(text);message.add_alternative(body,subtype='html')
-    if sign and logo.is_file():message.get_payload()[1].add_related(logo.read_bytes(),'image','png',cid='<logo-pcdoctor>')
+    if sign_image:message.get_payload()[1].add_related(sign_image,'image',sign_kind,cid=sign_cid,disposition='inline')
     return message
 
 
@@ -69,10 +71,8 @@ def send(c,appointment_id,kind,force=False):
     else:
         try:
             import json,mailing
-            config=mail_pro.settings();card=c.execute('SELECT value FROM system_state WHERE key=?',('mail_signature_card:'+config['username'],)).fetchone()
-            try:raw=json.loads(card['value']) if card else {}
-            except ValueError:raw={}
-            message=compose(row,kind,config,mail_pro.clean_signature(raw,config['username']))
+            config=mail_pro.settings()
+            message=compose(row,kind,config,mail_pro.load_signature(c,config['username']))
             archive_id=mailing.archive(c,'appointment',None,email,str(message['Subject']),message,'plantilla',None,appointments.now())
             c.commit()
             try:mail_pro.deliver(config,message,[email])

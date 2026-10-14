@@ -70,7 +70,7 @@ class ReviewTests(unittest.TestCase):
                     with self.assertRaises(mail_pro.MailError):app.send_institutional(c,'stay','Aviso','cliente@example.invalid','Asunto de prueba','Hola:\n\nTexto breve.',order['id'],None,review=False)
         self.assertEqual(done['adi'],'revisado');page=sent[0].get_body(('html',)).get_content();plain=sent[0].get_body(('plain',)).get_content()
         self.assertIn('Le confirmamos que su equipo',plain);self.assertIn('https://example.invalid/presupuesto/abc123',plain);self.assertIn('Enrique',page)   # firma institucional incorporada una sola vez
-        self.assertEqual(page.count('border-bottom:3px solid #e03a3e'),1)
+        self.assertEqual(page.count('alt="PC-DOCTOR S.A."'),1);self.assertNotIn('border-bottom:3px solid #e03a3e',page)   # una sola firma y sin franja roja
         detail=self.request('/api/orders/%d'%order['id'],cookie=cookie)['body'];detail=detail.get('order',detail)
         history=detail['mail_history'];self.assertEqual([(row['status'],row['adi'],row['kind_label']) for row in history],[('error','plantilla','Aviso de permanencia'),('enviado','revisado','Presupuesto')])
         self.assertIn(done['message_id'],[row['message_id'] for row in app.connect().execute('SELECT message_id FROM mail_links WHERE order_id=?',(order['id'],))])

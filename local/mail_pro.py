@@ -190,6 +190,8 @@ def test_smtp(env=None, send_to=''):
 # Gestor: lectura en vivo por IMAP y envío por SMTP. Nada de esto copia el buzón a la base.
 # ---------------------------------------------------------------------------------------------
 import base64
+import hashlib
+import json
 import email
 import html as html_lib
 import quopri
@@ -689,6 +691,69 @@ def read_message(client, folder, uid, mark_seen=True):
             'signature_pref': {'on': True, 'off': False}.get(header_text(message['x-ordenespro-signature']).lower())}
 
 
+VIEW_STYLE = ("html{overflow-x:auto;background:#fff;color-scheme:light}"
+              "body{box-sizing:border-box;max-width:820px;margin:0 auto;padding:22px 26px 28px;background:#fff;color:#1f2937;font:15px/1.6 Arial,Helvetica,sans-serif;overflow-wrap:break-word;word-break:normal}"
+              "img{max-width:100%;height:auto}table{max-width:100%}a{color:#1d5fb0;overflow-wrap:anywhere}pre{white-space:pre-wrap;overflow-wrap:anywhere}"
+              "pre.op-plain{margin:0;font:15px/1.65 Arial,Helvetica,sans-serif}blockquote{margin:12px 0 0;padding-left:12px;border-left:3px solid #c9ccd1;color:#555}"
+              "@media(max-width:520px){body{padding:14px 14px 20px;font-size:15px}}@media print{body{max-width:none;padding:0}}")
+VIEW_ACTIVE = re.compile(r'(?is)<(script|iframe|object|embed|applet|form|frameset|noscript)\b.*?</\1\s*>|<(?:script|iframe|object|embed|applet|form|frame|frameset|base|link|meta)\b[^>]*>|</(?:form|iframe|object|embed)\s*>')
+VIEW_EMBED_LIMIT = 6_000_000
+
+
+def view_policy(nonce, remote=False):
+    """Política de contenido del marco aislado en el que se lee un correo: sin scripts del remitente (solo el del visor, con su nonce),
+    sin formularios, marcos ni recursos externos; las imágenes remotas solo si la persona lo pide."""
+    return ("default-src 'none'; img-src data:" + (' https:' if remote else '') + "; style-src 'unsafe-inline'; script-src 'nonce-" + nonce + "'; "
+            "form-action 'none'; frame-ancestors 'self'; sandbox allow-scripts allow-popups allow-popups-to-escape-sandbox allow-modals")
+
+
+def message_page(message, nonce, remote=False):
+    """Documento HTML para leer un mensaje dentro de un marco aislado. Conserva el HTML original (tablas, estilos y firmas tal como
+    llegaron); solo retira contenido activo y sustituye las imágenes incrustadas (cid:) por sus propios datos. El texto sin formato
+    se muestra respetando sus saltos de línea. El único script es el del visor: avisa de la altura del contenido y permite imprimir."""
+    plain, rich, images = '', '', {}
+    for part in message.walk():
+        if part.is_multipart():
+            continue
+        kind, name, disposition = part.get_content_type(), part.get_filename(), part.get_content_disposition()
+        if kind in INLINE_IMAGES and part['content-id']:
+            content = part.get_payload(decode=True) or b''
+            if content.startswith(INLINE_IMAGES[kind]) and len(content) <= 3_000_000:
+                images[str(part['content-id']).strip().strip('<>')] = (kind, content)
+            continue
+        if disposition == 'attachment' or name or not kind.startswith('text/'):
+            continue
+        try:
+            content = part.get_content()
+        except Exception:
+            content = (part.get_payload(decode=True) or b'').decode('utf-8', 'replace')
+        if kind == 'text/plain' and not plain:
+            plain = content
+        elif kind == 'text/html' and not rich:
+            rich = content
+    if rich:
+        body, spent = VIEW_ACTIVE.sub('', rich[:1_500_000]), 0
+        body = re.sub(r'(?i)\son[a-z]+\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)', '', body)
+        body = re.sub(r'(?i)(href|src)\s*=\s*(["\']?)\s*(?:javascript|vbscript|data:text/html)[^"\'\s>]*\2', r'\1="#"', body)
+        def embed(match):
+            nonlocal spent
+            found = images.get(match.group(2).strip())
+            if not found or spent + len(found[1]) > VIEW_EMBED_LIMIT:
+                return match.group(0)
+            spent += len(found[1])
+            return match.group(1) + 'data:' + found[0] + ';base64,' + base64.b64encode(found[1]).decode()
+        body = re.sub(r'(?i)(src\s*=\s*["\']?)cid:([^"\'\s>]+)', embed, body)
+    else:
+        body = '<pre class="op-plain">' + html_lib.escape(plain[:400_000] or '(mensaje sin contenido)') + '</pre>'
+    script = ("(function(){var last=0;function tell(){var b=document.body,h=b?Math.ceil(b.offsetHeight+(document.documentElement.scrollWidth>document.documentElement.clientWidth?18:0)):0;"
+              "if(h!==last){last=h;parent.postMessage({ordenesProMail:'height',height:h},'*');}}"
+              "addEventListener('load',tell);addEventListener('resize',tell);if(window.ResizeObserver&&document.body)new ResizeObserver(tell).observe(document.body);"
+              "var n=0,t=setInterval(function(){tell();if(++n>12)clearInterval(t);},400);tell();"
+              "addEventListener('message',function(e){if(e.data==='ordenes-pro-mail-print'){try{print();}catch(x){}}});})();")
+    return ('<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light">'
+            '<base target="_blank"><style>' + VIEW_STYLE + '</style></head><body>' + body + '<script nonce="' + nonce + '">' + script + '</script></body></html>')
+
+
 INLINE_IMAGES = {'image/png': b'\x89PNG\r\n\x1a\n', 'image/jpeg': b'\xff\xd8\xff', 'image/gif': b'GIF8', 'image/webp': b'RIFF'}
 
 
@@ -809,12 +874,96 @@ def clean_signature(raw, account=''):
     """Datos de la firma validados: solo texto corto en cada campo; el HTML siempre lo genera el servidor."""
     raw = raw if isinstance(raw, dict) else {}
     result = {key: raw.get(key, SIGNATURE_DEFAULTS[key]) is True if key in raw else SIGNATURE_DEFAULTS[key] for key in ('enabled', 'on_new', 'on_reply', 'on_forward')}
+    result['use_image'] = raw.get('use_image') is True
     for key in SIGNATURE_FIELDS:
         value = re.sub(r'\s+', ' ', re.sub(r'[\r\n\t<>]+', ' ', str(raw.get(key, SIGNATURE_DEFAULTS[key]) if key in raw else SIGNATURE_DEFAULTS[key]))).strip()[:120]
         result[key] = value
     if not result['email']:
         result['email'] = account
     return result
+
+
+SIGNATURE_IMAGE_LIMIT = 400_000
+SIGNATURE_IMAGE_WIDTH = (200, 2400)
+SIGNATURE_DISPLAY_MAX = 600   # ancho de la plantilla de correo; una imagen mayor se muestra reducida, sin deformarse
+
+
+def image_size(content):
+    """(tipo, ancho, alto) de una imagen PNG o JPEG leída de sus propios bytes; None si no es una de las dos."""
+    if content[:8] == b'\x89PNG\r\n\x1a\n' and content[12:16] == b'IHDR' and len(content) > 24:
+        return 'png', int.from_bytes(content[16:20], 'big'), int.from_bytes(content[20:24], 'big')
+    if content[:3] == b'\xff\xd8\xff':
+        at = 2
+        while at + 9 < len(content):
+            if content[at] != 0xFF:
+                return None
+            marker = content[at + 1]
+            if marker in (0xC0, 0xC1, 0xC2):
+                return 'jpeg', int.from_bytes(content[at + 7:at + 9], 'big'), int.from_bytes(content[at + 5:at + 7], 'big')
+            if marker in (0xD8, 0x01) or 0xD0 <= marker <= 0xD7:
+                at += 2
+                continue
+            at += 2 + int.from_bytes(content[at + 2:at + 4], 'big')
+    return None
+
+
+def check_signature_image(content):
+    """Valida la firma gráfica subida por administración. Devuelve (datos, '') o (None, motivo)."""
+    if not 200 <= len(content) <= SIGNATURE_IMAGE_LIMIT:
+        return None, 'La imagen debe pesar como máximo %d KB.' % (SIGNATURE_IMAGE_LIMIT // 1000)
+    found = image_size(content)
+    if not found:
+        return None, 'Usa la firma en formato PNG o JPG.'
+    kind, width, height = found
+    if not SIGNATURE_IMAGE_WIDTH[0] <= width <= SIGNATURE_IMAGE_WIDTH[1] or not 40 <= height <= 1600:
+        return None, 'La imagen debe medir entre %d y %d px de ancho y hasta 1600 px de alto.' % SIGNATURE_IMAGE_WIDTH
+    return {'kind': kind, 'width': width, 'height': height, 'data': base64.b64encode(content).decode()}, ''
+
+
+def load_signature(c, account):
+    """Firma del buzón remitente lista para usar en cualquier correo del sistema: los datos validados y, si administración cargó la
+    firma gráfica original y la tiene activa, esa imagen (`image` con sus medidas y `_image` con sus bytes, que nunca sale al navegador)."""
+    row = c.execute('SELECT value FROM system_state WHERE key=?', ('mail_signature_card:' + account,)).fetchone()
+    try:
+        raw = json.loads(row['value']) if row else {}
+    except ValueError:
+        raw = {}
+    card = clean_signature(raw, account)
+    card['image'] = None
+    stored = c.execute('SELECT value FROM system_state WHERE key=?', ('mail_signature_image:' + account,)).fetchone()
+    try:
+        picture = json.loads(stored['value']) if stored else None
+        content = base64.b64decode(picture['data']) if picture else b''
+    except (ValueError, KeyError, TypeError):
+        picture, content = None, b''
+    if picture and image_size(content):
+        card['image'] = {key: picture[key] for key in ('kind', 'width', 'height')}
+        card['image']['stamp'] = hashlib.sha256(content).hexdigest()[:12]
+        if card['use_image']:
+            card['_image'] = content
+    else:
+        card['use_image'] = False
+    return card
+
+
+def public_signature(card):
+    """La firma sin los bytes de la imagen, para responder al navegador."""
+    return {key: value for key, value in card.items() if not key.startswith('_')}
+
+
+def signature_part(sign, domain):
+    """Único punto que compone la firma de un correo. Devuelve (html, identificador CID, bytes de la imagen embebida, subtipo).
+    Con la firma gráfica original activa, la firma es esa imagen tal cual (sin reconstruir nada); si no, la tarjeta con el logotipo."""
+    if sign.get('_image'):
+        cid = make_msgid(idstring='firma-grafica', domain=domain)
+        width = min(sign['image']['width'], SIGNATURE_DISPLAY_MAX)
+        alt = ' · '.join(item for item in (sign['name'], sign['role'], sign['phone'], sign['web']) if item)
+        page = ('<img src="cid:' + cid[1:-1] + '" width="' + str(width) + '" alt="' + html_lib.escape(alt, quote=True) + '" '
+                'style="display:block;width:' + str(width) + 'px;max-width:100%;height:auto;border:0;outline:none;text-decoration:none;">')
+        return page, cid, sign['_image'], sign['image']['kind']
+    cid = make_msgid(domain=domain)
+    logo = SIGNATURE_LOGO.read_bytes() if SIGNATURE_LOGO.exists() else None
+    return signature_html(sign, 'cid:' + cid[1:-1] if logo else 'https://ordenes-pro.ecuadorpcdoctor.com/static/logo-firma.png'), cid, logo, 'png'
 
 
 def signature_text(sign):
@@ -837,7 +986,7 @@ def signature_html(sign, logo_src):
     web_href = sign['web'] if re.match(r'https?://', sign['web'], re.I) else 'https://' + sign['web']
     contact = (row('&#128222;', 'Teléfono', sign['phone'], phone_href) + row('&#9993;&#65039;', 'Correo', sign['email'], 'mailto:' + sign['email'])
                + row('&#127760;', 'Sitio web', sign['web'], web_href) + row('&#128205;', 'Dirección', sign['address']))
-    return ('<table role="presentation" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="background-color:#ffffff;border-collapse:collapse;border:1px solid #e2e6ee;border-bottom:3px solid #e03a3e;">'
+    return ('<table role="presentation" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="background-color:#ffffff;border-collapse:collapse;border:1px solid #e2e6ee;">'
             '<tr><td valign="middle" align="center" style="padding:14px 6px 14px 16px;">'
             '<img src="' + esc(logo_src) + '" width="120" alt="PC-DOCTOR S.A." style="display:block;width:120px;height:auto;border:0;color:#1f2937;font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:bold;"></td>'
             '<td valign="middle" style="padding:14px 18px 14px 10px;">'
@@ -889,9 +1038,8 @@ def build_message(config, data, signature=''):
     layout = data.get('layout') if isinstance(data.get('layout'), dict) else None
     if sign or data.get('rich') or layout:
         # Versión HTML: el texto se escapa por completo; solo se convierten las marcas propias y se añade la firma generada por el servidor.
-        cid = make_msgid(domain=config['username'].split('@')[-1])
-        logo = SIGNATURE_LOGO.read_bytes() if sign and SIGNATURE_LOGO.exists() else None
-        block = '<br>' + signature_html(sign, 'cid:' + cid[1:-1] if logo else 'https://ordenes-pro.ecuadorpcdoctor.com/static/logo-firma.png') if sign else ''
+        page, cid, logo, logo_kind = signature_part(sign, config['username'].split('@')[-1]) if sign else ('', '', None, 'png')
+        block = '<br>' + page if sign else ''
         quoted = '<blockquote style="margin:14px 0 0;padding-left:12px;border-left:3px solid #c9ccd1;color:#555555;">' + rich_html(tail.strip(), '', wrap=False) + '</blockquote>' if tail.strip() else ''
         if layout:
             # Plantilla institucional común: encabezado textual, contenido alineado y la firma autorizada al final.
@@ -900,7 +1048,7 @@ def build_message(config, data, signature=''):
         else:
             message.add_alternative('<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;color:#222222;">' + rich_html(head.rstrip(), '' if sign else plain_sign, wrap=False) + block + quoted + '</div>', subtype='html')
         if logo:
-            message.get_payload()[1].add_related(logo, 'image', 'png', cid=cid, disposition='inline')
+            message.get_payload()[1].add_related(logo, 'image', logo_kind, cid=cid, disposition='inline')
     total = 0
     for item in data.get('attachments') or []:
         try:

@@ -61,3 +61,9 @@ Reglas: cédula = provincia (01–24 o 30), tercer dígito 0–5 y dígito verif
 ## Pasaporte en la reserva pública
 
 El selector de identificación de «Agendamiento de Citas Técnicas» admite Cédula, RUC o Pasaporte, para personas sin cédula ecuatoriana. El pasaporte no tiene dígito verificador: se comprueba su forma (de 5 a 20 letras y números, con al menos una cifra, sin espacios) y se guarda en mayúsculas. El cliente se crea o se vincula por ese número igual que con cédula o RUC. La ficha de cliente del panel conserva su regla anterior (3 a 30 caracteres).
+
+## Reactivar una cita cerrada por error
+
+Administración puede devolver a la agenda una cita «No asistió», cancelada o completada sin orden (detalle de la cita o menú de la fila → «Reactivar cita»). Recupera el estado que tenía antes de cerrarse, conserva fecha, hora, cliente, equipo, servicio, código e historial, y añade al historial «Cita reactivada por corrección administrativa de cierre accidental». Antes comprueba que el horario siga libre para el mismo técnico; si no, pide reprogramar. No crea otra cita ni envía avisos al cliente.
+
+El 13/10/2026 se reactivó así, a petición de administración y con respaldo previo, la cita `CIT-20261013-4522DF`.
