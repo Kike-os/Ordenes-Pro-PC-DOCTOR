@@ -122,6 +122,11 @@ class PickupAndClientsTests(unittest.TestCase):
                 events=[tuple(r) for r in c.execute('SELECT event,old_status,new_status,detail FROM appointment_events WHERE appointment_id=? ORDER BY id',(aid,))]
                 self.assertEqual(events[-1],('reactivated','no_asistio','confirmada',appointments.REACTIVATE_NOTE));self.assertGreaterEqual(len(events),3)   # el historial anterior se conserva
                 self.assertEqual(c.execute("SELECT COUNT(*) FROM audit WHERE action='appointment_reactivated'").fetchone()[0],1)
+            # «En atención» marcado por error: vuelve a su estado anterior sin revisar el horario (ya es suyo) y sin correos.
+            self.assertEqual(act('presente')['status'],200)
+            with patch.object(mail_pro,'deliver',side_effect=AssertionError('no debe enviar correos')):back=act('reactivar')
+            self.assertEqual((back['status'],back['body'].get('status')),(200,'confirmada'),back['body'])
+            with app.connect() as c:self.assertEqual(tuple(c.execute('SELECT event,old_status,new_status FROM appointment_events WHERE appointment_id=? ORDER BY id DESC LIMIT 1',(aid,)).fetchone()),('reactivated','presente','confirmada'))
             # Si otra cita ocupó ese horario mientras estaba cerrada, no se reactiva encima.
             self.assertEqual(act('cancelada')['status'],200)
             other=self.book('0502',identification='0100000017',phone='0976500002');self.assertEqual(other['status'],201,other['body'])
