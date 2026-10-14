@@ -8,6 +8,25 @@
   },
   "releases": [
     {
+      "version": "1.5.163",
+      "date": "2026-10-14T13:40:35-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Estados automáticos de presupuestos sincronizados con la orden",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Presupuestos: estados automáticos «Esperando respuesta», «Aprobado», «Aprobado parcialmente» y «Rechazado» con colores e iconos, motivo del cliente y avisos inmediatos",
+          "Al aprobar el cliente un presupuesto, la orden en «Aprobación de presupuesto» pasa sola a «Procesando»; nunca se cambian los estados de entrega"
+        ],
+        "fixes": [
+          "Un presupuesto cuyo correo no se pudo enviar ya no figura como enviado: se muestra «Enlace creado · correo no enviado»"
+        ],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.162",
       "date": "2026-10-14T09:45:18-05:00",
       "type": "patch",

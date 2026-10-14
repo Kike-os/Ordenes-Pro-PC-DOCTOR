@@ -4,6 +4,19 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.163 — 2026-10-14 13:40 (UTC-05:00)
+
+Estados automáticos de presupuestos sincronizados con la orden
+
+### Mejoras realizadas
+
+- Presupuestos: estados automáticos «Esperando respuesta», «Aprobado», «Aprobado parcialmente» y «Rechazado» con colores e iconos, motivo del cliente y avisos inmediatos
+- Al aprobar el cliente un presupuesto, la orden en «Aprobación de presupuesto» pasa sola a «Procesando»; nunca se cambian los estados de entrega
+
+### Errores corregidos
+
+- Un presupuesto cuyo correo no se pudo enviar ya no figura como enviado: se muestra «Enlace creado · correo no enviado»
+
 ## v1.5.162 — 2026-10-14 09:45 (UTC-05:00)
 
 Estado «En revisión por falla recurrente» con trazabilidad completa
