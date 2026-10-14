@@ -8,6 +8,24 @@
   },
   "releases": [
     {
+      "version": "1.5.151",
+      "date": "2026-10-13T22:24:01-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "PC-DOCTOR Mail Pro — Seguimiento inteligente de entregas. Se incorporó un centro de seguimiento de correos con estados de envío, entrega, demora y rebote, historial de eventos, alertas administrativas y herramientas para corregir destinatarios y reenviar mensajes.",
+      "changes": {
+        "features": [
+          "PC-DOCTOR Mail Pro — Seguimiento inteligente de entregas: Centro de Entrega y Seguimiento con estados de envío, entrega, demora y rebote por destinatario, historial de eventos, alertas administrativas y corrección de destinatario con reenvío"
+        ],
+        "improvements": [
+          "Los rebotes y demoras que llegan al buzón se asocian al envío real; los envíos automáticos no se repiten a direcciones declaradas inválidas"
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.150",
       "date": "2026-10-13T21:58:34-05:00",
       "type": "patch",
