@@ -157,13 +157,13 @@ def html(body, title, signature_html='', quoted_html=''):
             weight = 'font-weight:bold;' if kind == 'greeting' else ''
             rows.append('<p %sstyle="margin:0 0 16px;%sfont-size:14px;line-height:22px;color:#263445;text-align:%s;%s">%s</p>' % ('class="op-j" ' if long else '', FONT, 'justify' if long else 'left', weight, text))
     # La firma conserva su formato; en pantallas estrechas se desplaza dentro de su propio bloque en lugar de ensanchar el mensaje.
-    signature = '<tr><td class="op-pad" style="padding:4px 32px 24px;"><div style="max-width:100%%;overflow-x:auto;">%s</div></td></tr>' % signature_html if signature_html else ''
+    signature = '<tr><td class="op-pad op-sign" style="padding:4px 12px 24px;"><div style="max-width:100%%;overflow-x:auto;">%s</div></td></tr>' % signature_html if signature_html else ''
     quoted = '<tr><td class="op-pad" style="padding:0 32px 22px;">%s</td></tr>' % quoted_html if quoted_html else ''
     return ('<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>%s</title>'
-            '<style>@media only screen and (max-width:480px){.op-j{text-align:left!important}.op-pad{padding-left:18px!important;padding-right:18px!important}}</style></head>'
+            '<style>@media only screen and (max-width:480px){.op-j{text-align:left!important}.op-pad{padding-left:18px!important;padding-right:18px!important}.op-sign{padding-left:10px!important;padding-right:10px!important}.op-sig td,.op-sig div{white-space:normal!important}.op-sig-c a{word-break:break-all!important}}@media only screen and (max-width:620px){.op-sig-r{display:block!important}.op-sig-a{display:inline-block!important;vertical-align:middle!important}.op-sig-l{display:none!important}.op-sig-c{display:block!important;padding:8px 10px 10px!important;border-top:2px solid #e03a3e!important}}</style></head>'
             '<body style="margin:0;padding:0;background-color:#f2f4f8;">'
             '<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%%" bgcolor="#f2f4f8" style="background-color:#f2f4f8;"><tr><td align="center" style="padding:24px 12px;">'
-            '<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" bgcolor="#ffffff" style="width:100%%;max-width:600px;background-color:#ffffff;border:1px solid #dfe5ee;">'
+            '<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" bgcolor="#ffffff" style="width:100%%;max-width:600px;table-layout:fixed;background-color:#ffffff;border:1px solid #dfe5ee;">'
             '<tr><td class="op-pad" style="padding:22px 32px 16px;border-bottom:3px solid #1d5fb0;"><div style="%sfont-size:12px;line-height:16px;letter-spacing:2px;font-weight:bold;color:#1d5fb0;">PC-DOCTOR S.A.</div>'
             '<div style="%sfont-size:20px;line-height:27px;font-weight:bold;color:#14233b;margin-top:4px;">%s</div></td></tr>'
             '<tr><td class="op-pad" style="padding:24px 32px 6px;">%s</td></tr>%s%s'

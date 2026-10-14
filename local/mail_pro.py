@@ -867,6 +867,7 @@ SIGNATURE_FIELDS = ('name', 'role', 'unit', 'phone', 'email', 'web', 'address')
 SIGNATURE_DEFAULTS = {'enabled': True, 'on_new': True, 'on_reply': True, 'on_forward': True, 'name': 'Enrique Martínez Gómez', 'role': 'SOPORTECNICO', 'unit': 'Matriz | PC-DOCTOR',
                       'phone': '+593 987460591', 'email': '', 'web': 'www.ecuadorpcdoctor.com', 'address': 'Calle Bolívar, Juan Montalvo'}
 SIGNATURE_LOGO = Path(__file__).resolve().parent / 'static' / 'logo-firma.png'
+SIGNATURE_LOGO_WIDTH = 92     # la firma completa debe caber en los 536 px útiles de la plantilla institucional
 QUOTE_START = re.compile(r'\n+(?=El [^\n]{0,200} escribió:\n|-{5,} Mensaje reenviado -{5,})')
 
 
@@ -973,28 +974,29 @@ def signature_text(sign):
 
 
 def signature_html(sign, logo_src):
-    """Firma corporativa en tablas y estilos en línea, compatible con Gmail, Outlook, Thunderbird, Apple Mail y webmail."""
+    """Firma corporativa en tablas y estilos en línea, compatible con Gmail, Outlook, Thunderbird, Apple Mail y webmail.
+    Sus medidas caben en la plantilla institucional (600 px): la firma llega igual que en la vista previa, sin ensanchar el mensaje."""
     esc = lambda value: html_lib.escape(str(value), quote=True)
     font = "font-family:Arial,Helvetica,sans-serif;"
     def row(icon, label, value, href=''):
         if not value:
             return ''
         text = '<a href="' + esc(href) + '" style="color:#1f2937;text-decoration:none;">' + esc(value) + '</a>' if href else esc(value)
-        return ('<tr><td width="22" valign="top" style="padding:3px 7px 3px 0;' + font + 'font-size:12px;line-height:18px;color:#e03a3e;" title="' + esc(label) + '">' + icon + '</td>'
-                '<td valign="top" style="padding:3px 0;' + font + 'font-size:13px;line-height:18px;color:#1f2937;white-space:nowrap;">' + text + '</td></tr>')
+        return ('<tr><td width="18" valign="top" style="padding:2px 5px 2px 0;' + font + 'font-size:11px;line-height:16px;color:#e03a3e;" title="' + esc(label) + '">' + icon + '</td>'
+                '<td valign="top" style="padding:2px 0;' + font + 'font-size:11px;line-height:16px;color:#1f2937;white-space:nowrap;">' + text + '</td></tr>')
     phone_href = 'tel:' + re.sub(r'[^0-9+]', '', sign['phone'])
     web_href = sign['web'] if re.match(r'https?://', sign['web'], re.I) else 'https://' + sign['web']
     contact = (row('&#128222;', 'Teléfono', sign['phone'], phone_href) + row('&#9993;&#65039;', 'Correo', sign['email'], 'mailto:' + sign['email'])
                + row('&#127760;', 'Sitio web', sign['web'], web_href) + row('&#128205;', 'Dirección', sign['address']))
-    return ('<table role="presentation" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="background-color:#ffffff;border-collapse:collapse;border:1px solid #e2e6ee;border-bottom:3px solid #e03a3e;">'
-            '<tr><td valign="middle" align="center" style="padding:14px 6px 14px 16px;">'
-            '<img src="' + esc(logo_src) + '" width="120" alt="PC-DOCTOR S.A." style="display:block;width:120px;height:auto;border:0;color:#1f2937;font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:bold;"></td>'
-            '<td valign="middle" style="padding:14px 18px 14px 10px;">'
-            '<div style="' + font + 'font-size:16px;line-height:21px;font-weight:bold;color:#1f2937;white-space:nowrap;">' + esc(sign['name']) + '</div>'
-            + ('<div style="' + font + 'font-size:12px;line-height:17px;font-weight:bold;letter-spacing:1px;color:#e03a3e;white-space:nowrap;">' + esc(sign['role']) + '</div>' if sign['role'] else '')
-            + ('<div style="' + font + 'font-size:12px;line-height:17px;color:#5b6677;white-space:nowrap;">' + esc(sign['unit']) + '</div>' if sign['unit'] else '')
-            + '</td><td width="2" bgcolor="#e03a3e" style="background-color:#e03a3e;font-size:0;line-height:0;width:2px;">&nbsp;</td>'
-            '<td valign="middle" style="padding:14px 18px;"><table role="presentation" cellpadding="0" cellspacing="0" border="0">' + contact + '</table></td></tr></table>')
+    return ('<table role="presentation" class="op-sig" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="background-color:#ffffff;border-collapse:collapse;border:1px solid #e2e6ee;border-bottom:3px solid #e03a3e;">'
+            '<tr class="op-sig-r"><td class="op-sig-a" valign="middle" align="center" style="padding:10px 4px 10px 10px;">'
+            '<img src="' + esc(logo_src) + '" width="' + str(SIGNATURE_LOGO_WIDTH) + '" alt="PC-DOCTOR S.A." style="display:block;width:' + str(SIGNATURE_LOGO_WIDTH) + 'px;height:auto;border:0;color:#1f2937;font-family:Arial,Helvetica,sans-serif;font-size:13px;font-weight:bold;"></td>'
+            '<td class="op-sig-a" valign="middle" style="padding:10px 12px 10px 8px;">'
+            '<div style="' + font + 'font-size:13px;line-height:18px;font-weight:bold;color:#1f2937;white-space:nowrap;">' + esc(sign['name']) + '</div>'
+            + ('<div style="' + font + 'font-size:10px;line-height:15px;font-weight:bold;letter-spacing:1px;color:#e03a3e;white-space:nowrap;">' + esc(sign['role']) + '</div>' if sign['role'] else '')
+            + ('<div style="' + font + 'font-size:11px;line-height:15px;color:#5b6677;white-space:nowrap;">' + esc(sign['unit']) + '</div>' if sign['unit'] else '')
+            + '</td><td class="op-sig-l" width="2" bgcolor="#e03a3e" style="background-color:#e03a3e;font-size:0;line-height:0;width:2px;">&nbsp;</td>'
+            '<td class="op-sig-c" valign="middle" style="padding:10px 12px;"><table role="presentation" cellpadding="0" cellspacing="0" border="0">' + contact + '</table></td></tr></table>')
 
 
 def build_message(config, data, signature=''):
