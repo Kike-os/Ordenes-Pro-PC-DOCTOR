@@ -158,6 +158,11 @@ class FinanceTests(unittest.TestCase):
         self.assertIn('MOVIMIENTO ANULADO',text(self.request('/api/orders/%d/payments/%d/receipt.pdf'%(first,paid),cookie=self.cookie)['body']))
         with app.connect() as c:self.assertEqual(c.execute("SELECT kind,status FROM mail_archive ORDER BY id DESC LIMIT 1").fetchone()[:],('payment_receipt','enviado'))
 
+    def test_report_panel_does_not_reuse_chart_card_placement(self):
+        # El panel de saldos va directamente en el tablero: con la clase de las tarjetas de gráficos heredaba su colocación y lo descuadraba.
+        source=(Path(app.ROOT)/'static'/'app.js').read_text(encoding='utf-8')
+        self.assertIn("const node=el('section',undefined,'report-finance')",source);self.assertNotIn("'control-card report-finance'",source);self.assertNotIn("'control-card is-wide report-finance'",source)
+
     def test_summary_is_exact_integer_arithmetic(self):
         self.assertEqual(equipment.cents_of('0,10'),10);self.assertEqual(equipment.cents_of('0.1'),10);self.assertEqual(equipment.cents_of('1234.5'),123450);self.assertIsNone(equipment.cents_of('0.001'));self.assertIsNone(equipment.cents_of(0.1+0.2))
         self.assertEqual(equipment.summary(10,10)['state'],'pagado');self.assertEqual(equipment.summary(0,0)['state'],'sin_cargos');self.assertEqual(equipment.summary(0,5),{'budget_cents':0,'paid_cents':5,'balance_cents':0,'credit_cents':5,'state':'credito','state_label':'Saldo a favor del cliente'})
