@@ -8,6 +8,25 @@
   },
   "releases": [
     {
+      "version": "1.5.159",
+      "date": "2026-10-14T08:35:01-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "ADI AutoCare Pro: monitoreo, diagnóstico y recuperación segura",
+      "changes": {
+        "features": [
+          "ADI AutoCare Pro: panel en Sistema con estado general, servicios, incidencias activas, recuperaciones, versiones, historial técnico, «Ejecutar diagnóstico» y configuración de avisos"
+        ],
+        "improvements": [
+          "Estabilidad: 13 verificaciones de solo lectura (autenticación, clientes, tickets y presupuestos PDF, correo, agenda, ADI, errores de ejecución) con severidad y un reintento seguro ante fallos transitorios",
+          "Registro de errores de ejecución clasificados por severidad, sin datos personales, con avisos administrativos"
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.158",
       "date": "2026-10-14T08:24:56-05:00",
       "type": "patch",

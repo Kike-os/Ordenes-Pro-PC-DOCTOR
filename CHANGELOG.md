@@ -4,6 +4,19 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.159 — 2026-10-14 08:35 (UTC-05:00)
+
+ADI AutoCare Pro: monitoreo, diagnóstico y recuperación segura
+
+### Nuevas funcionalidades
+
+- ADI AutoCare Pro: panel en Sistema con estado general, servicios, incidencias activas, recuperaciones, versiones, historial técnico, «Ejecutar diagnóstico» y configuración de avisos
+
+### Mejoras realizadas
+
+- Estabilidad: 13 verificaciones de solo lectura (autenticación, clientes, tickets y presupuestos PDF, correo, agenda, ADI, errores de ejecución) con severidad y un reintento seguro ante fallos transitorios
+- Registro de errores de ejecución clasificados por severidad, sin datos personales, con avisos administrativos
+
 ## v1.5.158 — 2026-10-14 08:24 (UTC-05:00)
 
 Corrección urgente de la vista previa e impresión de tickets
