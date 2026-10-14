@@ -2342,6 +2342,8 @@ class Handler(BaseHTTPRequestHandler):
                     if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede configurar los feriados.'})
                     import holidays
                     action=str(data.get('action','save'))
+                    # «check»: qué citas quedarían fuera de la atención con este ajuste, sin guardarlo (para pedir confirmación antes).
+                    if action=='check':return self.reply(200,{'ok':True,'affected':holidays.affected(c,data,appointments.now().date())})
                     try:
                         if action=='save':day=holidays.save(c,data);audit(c,user['id'],'holiday_saved')
                         elif action=='remove':holidays.remove(c,data.get('day',''));day=str(data.get('day',''));audit(c,user['id'],'holiday_removed')

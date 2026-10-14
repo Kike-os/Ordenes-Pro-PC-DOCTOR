@@ -118,6 +118,12 @@ def save(c, data):
         raise ValueError('Escribe el nombre del feriado.')
     if mode not in MODES or scope not in SCOPES:
         raise ValueError('Selecciona un modo de atención y un ámbito válidos.')
+    # Alta desde el formulario («new»): no se pisa una fecha que ya está registrada ni un feriado calculado; esas se editan en la lista.
+    if data.get('new') is True:
+        taken = c.execute('SELECT label FROM appointment_holidays WHERE day=? AND hidden=0', (day.isoformat(),)).fetchone()
+        official = next((item for item in national(day.year) if item['day'] == day), None)
+        if taken or official:
+            raise ValueError('El %s ya está registrado como «%s». Cámbialo desde la lista en lugar de agregarlo de nuevo.' % (day.strftime('%d/%m/%Y'), taken['label'] if taken else official['label']))
     if scope == 'local' and not place:
         raise ValueError('Indica la ciudad o el cantón del feriado local.')
     start = end = ''
@@ -128,6 +134,10 @@ def save(c, data):
             raise ValueError('Indica la hora de apertura y de cierre del horario especial.')
         if begin >= finish or begin.minute % 15 or finish.minute % 15:
             raise ValueError('El horario especial debe abrir antes de cerrar, en intervalos de 15 minutos.')
+        # El horario especial debe dejar sitio, al menos, para la cita más corta que se ofrece.
+        shortest = (c.execute('SELECT MIN(duration_minutes) FROM appointment_services WHERE active=1').fetchone() or [None])[0] or 15
+        if (finish.hour * 60 + finish.minute) - (begin.hour * 60 + begin.minute) < shortest:
+            raise ValueError('El horario especial debe durar al menos %d minutos, lo que dura la cita más corta.' % shortest)
         start, end = begin.strftime('%H:%M'), finish.strftime('%H:%M')
     c.execute('INSERT INTO appointment_holidays(day,label,mode,open_time,close_time,scope,place,hidden) VALUES (?,?,?,?,?,?,?,0) ON CONFLICT(day) DO UPDATE SET '
               'label=excluded.label,mode=excluded.mode,open_time=excluded.open_time,close_time=excluded.close_time,scope=excluded.scope,place=excluded.place,hidden=0',
@@ -155,6 +165,23 @@ def restore(c, day_text):
 
 def hidden(c, year):
     return [dict(r) for r in c.execute('SELECT day,label FROM appointment_holidays WHERE hidden=1 AND day BETWEEN ? AND ? ORDER BY day', ('%d-01-01' % year, '%d-12-31' % year))]
+
+
+def affected(c, data, today):
+    """Citas vigentes que quedarían fuera de la atención si se guardara este ajuste. No guarda nada: sirve para avisar antes de confirmar."""
+    try:
+        day = date.fromisoformat(str(data.get('day', '')))
+    except ValueError:
+        return []
+    mode, start, end = str(data.get('mode', '')), str(data.get('open_time', '')), str(data.get('close_time', ''))
+    if mode not in ('cerrado', 'especial') or day < today:
+        return []
+    out = []
+    for row in c.execute("SELECT a.public_code,a.starts_at,cl.name client FROM appointments a LEFT JOIN clients cl ON cl.id=a.client_id WHERE a.deleted_at IS NULL "
+                         "AND a.status NOT IN ('cancelada','completada','no_asistio') AND substr(a.starts_at,1,10)=? ORDER BY a.starts_at", (day.isoformat(),)):
+        if mode == 'cerrado' or not start <= row['starts_at'][11:16] < end:
+            out.append({'code': row['public_code'], 'starts_at': row['starts_at'], 'client': row['client'] or ''})
+    return out
 
 
 def conflicts(c, today):

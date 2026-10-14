@@ -69,6 +69,41 @@ class HolidayAgendaTests(unittest.TestCase):
         self.assertEqual(post(action='save',day='2026-12-08',label='Otro',scope='otro',mode='cerrado')['status'],403);self.assertEqual(self.request('/api/holidays?year=2026',cookie=cookie)['status'],200)
         self.assertEqual(self.request('/api/holidays')['status'],401)
 
+    def test_duplicates_short_special_hours_and_affected_appointments_are_checked_before_saving(self):
+        cookie,csrf=self.login();post=lambda **body:self.request('/api/holidays',body,cookie=cookie,csrf=csrf)
+        base={'action':'save','label':'Inventario ficticio','scope':'otro','place':'','mode':'cerrado','open_time':'09:00','close_time':'13:00'}
+        # Alta desde el formulario: no pisa una fecha ya registrada ni un feriado calculado; editar la existente sigue permitido.
+        self.assertEqual(post(**base,day='2030-07-15',new=True)['status'],200)
+        again=post(**base,day='2030-07-15',new=True);self.assertEqual(again['status'],400);self.assertIn('ya está registrado',again['body']['error'])
+        official=post(**base,day='2030-12-25',new=True);self.assertEqual(official['status'],400);self.assertIn('Navidad',official['body']['error'])
+        self.assertEqual(post(**dict(base,label='Inventario y capacitación'),day='2030-07-15')['status'],200)
+        with app.connect() as c:self.assertEqual(tuple(c.execute("SELECT label,COUNT(*) FROM appointment_holidays WHERE day='2030-07-15'").fetchone()),('Inventario y capacitación',1))
+        # Horario especial: cierre posterior a la apertura y con sitio para la cita más corta.
+        with app.connect() as c:shortest=c.execute('SELECT MIN(duration_minutes) FROM appointment_services WHERE active=1').fetchone()[0]
+        special=dict(base,mode='especial',day='2030-07-16')
+        self.assertEqual(post(**dict(special,open_time='14:00',close_time='10:00'))['status'],400)
+        if shortest>15:
+            short=post(**dict(special,open_time='10:00',close_time='10:15'));self.assertEqual(short['status'],400);self.assertIn('%d minutos'%shortest,short['body']['error'])
+        self.assertEqual(post(**dict(special,open_time='09:00',close_time='13:00'))['status'],200)
+        # «check» informa de las citas que quedarían fuera, sin guardar nada ni tocar la cita.
+        import holidays
+        from datetime import date
+        with app.connect() as c:
+            client=c.execute("INSERT INTO clients(name,phone) VALUES ('Cliente Ficticio','0990000000')").lastrowid
+            c.execute("INSERT INTO appointments(public_code,manage_token_hash,client_id,customer_name,phone,email,device_type,brand,model,service_code,description,notes,starts_at,duration_minutes,status,privacy_consent,communications_consent,created_at,updated_at) VALUES ('CIT-FICTICIA-01','x',?,'Cliente Ficticio','0990000000','','portatil','HP','','diagnostico','Prueba','','2030-08-05T10:00:00-05:00',60,'confirmada',1,0,'2030-01-01T00:00:00-05:00','2030-01-01T00:00:00-05:00')",(client,));c.commit()
+            before=c.execute('SELECT COUNT(*) FROM appointment_holidays').fetchone()[0]
+        check=lambda **body:post(**dict(base,**body,action='check'))['body']['affected']
+        self.assertEqual([item['code'] for item in check(day='2030-08-05')],['CIT-FICTICIA-01']);self.assertEqual(check(day='2030-08-05',mode='normal'),[])
+        self.assertEqual(check(day='2030-08-05',mode='especial',open_time='09:00',close_time='13:00'),[]);self.assertEqual(len(check(day='2030-08-05',mode='especial',open_time='12:00',close_time='16:00')),1)
+        self.assertEqual(check(day='2030-08-06'),[]);self.assertEqual(check(day='mal'),[])
+        with app.connect() as c:
+            self.assertEqual(c.execute('SELECT COUNT(*) FROM appointment_holidays').fetchone()[0],before);self.assertEqual(c.execute("SELECT status,starts_at FROM appointments WHERE public_code='CIT-FICTICIA-01'").fetchone()[:],('confirmada','2030-08-05T10:00:00-05:00'))
+        # Guardar tampoco cancela ni mueve la cita: queda señalada como conflicto para resolverla a mano.
+        saved=post(**base,day='2030-08-05');self.assertEqual((saved['status'],[item['code'] for item in saved['body']['conflicts']]),(200,['CIT-FICTICIA-01']))
+        with app.connect() as c:self.assertEqual(c.execute("SELECT status FROM appointments WHERE public_code='CIT-FICTICIA-01'").fetchone()[0],'confirmada')
+        with app.connect() as c:c.execute("UPDATE users SET role='tecnico' WHERE username='demo'");c.commit()
+        self.assertEqual(post(**dict(base,day='2030-09-01',action='check'))['status'],403)
+
     def test_adi_reminds_admin_of_upcoming_undecided_holidays(self):
         cookie,csrf=self.login();post=lambda **body:self.request('/api/holidays',body,cookie=cookie,csrf=csrf)
         today=lambda:self.request('/api/holidays/today',cookie=cookie)['body']

@@ -6310,3 +6310,57 @@ td>.status-label+.finance-badge{display:flex;width:fit-content}
 /* La esfera de ADI flota en la esquina inferior derecha: la barra de acciones le deja sitio para que no tape ningún botón. */
 .mail-v2 .mail-reader>.mail-bar{padding-right:84px}
 .mail-v2[data-reader=wide][data-view=reader] .mail-reader>.mail-bar{padding-right:84px}
+/* ===== Feriados y atención: encabezado, tarjetas por feriado y días propios. La fecha y el nombre tienen su propio espacio; los
+   controles van en su propia fila y nunca comprimen el texto (antes una columna «auto» dejaba el nombre con ancho mínimo). ===== */
+.holiday-admin{display:grid;gap:16px;min-width:0}
+.holiday-head{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:12px 20px;min-width:0}
+.holiday-head>div{flex:1 1 280px;min-width:0}.holiday-head h3{margin:0 0 4px;font-size:16px;color:#fff}.holiday-head p{margin:0;font-size:12.5px;line-height:1.5;color:#9db1cf}
+.holiday-year{flex:none;display:grid;gap:4px;font-size:11.5px;font-weight:600;color:#a9bdd8}.holiday-year select{width:auto;min-width:104px;height:40px;min-height:40px;margin:0}
+.holiday-summary{list-style:none;display:flex;flex-wrap:wrap;gap:8px;margin:0;padding:0}
+.holiday-summary li{display:inline-flex;align-items:baseline;gap:6px;padding:6px 12px;border:1px solid #2c4468;border-radius:999px;background:#0c192d;font-size:12px;color:#c7d6ec;white-space:nowrap}
+.holiday-summary b{font-size:14px;font-variant-numeric:tabular-nums;color:#fff}
+.holiday-summary li[data-kind=wait]{border-color:#80663D;background:#282319}.holiday-summary li[data-kind=wait] b{color:#FFCA77}
+.holiday-summary li[data-kind=closed] b{color:#ff9aa8}.holiday-summary li[data-kind=special] b{color:#ffe2a8}.holiday-summary li[data-kind=own] b{color:#9bd3ff}
+.holiday-section{display:grid;gap:10px;min-width:0;padding:14px;border:1px solid #223450;border-radius:14px;background:#0a1424}
+.holiday-section h4{margin:0;font-size:13px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#c3cffa}.holiday-section>.config-note{margin:0}
+.holiday-admin .holiday-list{display:grid;gap:8px;margin:0;padding:0;list-style:none}
+.holiday-admin .holiday-list li.holiday-card{display:grid;grid-template-columns:64px minmax(0,1fr);grid-template-areas:"date info" "set set";align-items:center;gap:10px 14px;min-width:0;padding:12px 14px;border:1px solid #223450;border-bottom:1px solid #223450;border-radius:12px;background:#0d1730;transition:border-color .17s ease,background-color .17s ease}
+.holiday-card[data-mode=sin-definir]{border-color:#80663D!important}.holiday-card[data-past=true]{opacity:.6}
+.holiday-admin .holiday-list li.holiday-card[data-mode=sin-definir] strong::after{content:none}
+.holiday-date{grid-area:date;display:grid;justify-items:center;gap:0;padding:6px 4px;border:1px solid #2c4468;border-radius:10px;background:#0a1322;line-height:1.15}
+.holiday-date b{font-size:20px;font-weight:750;font-variant-numeric:tabular-nums;color:#fff}.holiday-date span{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#ff9ecb}
+.holiday-date small{margin:1px 0 0;font-size:10px;color:#8fa6c4;text-transform:capitalize;white-space:nowrap}
+.holiday-info{grid-area:info;display:grid;gap:6px;min-width:0}
+.holiday-admin .holiday-info strong{font-size:14.5px;line-height:1.35;color:#fff;overflow-wrap:break-word;word-break:normal;white-space:normal}
+.holiday-tags{display:flex;flex-wrap:wrap;gap:6px;min-width:0}
+.holiday-tag,.holiday-state{display:inline-block;padding:2px 9px;border-radius:999px;font-size:11.5px;line-height:1.5;white-space:nowrap}
+.holiday-tag{border:1px solid #2c4468;background:#0c192d;color:#b9c9e2}
+.holiday-state{border:1px solid #356B5C;background:#142C2A;color:#8fe8c0;font-weight:650}
+.holiday-card[data-mode=cerrado] .holiday-state{border-color:#86435A;background:#291927;color:#ff9aa8}.holiday-card[data-mode=especial] .holiday-state{border-color:#80663D;background:#282319;color:#FFCA77}.holiday-card[data-mode=sin-definir] .holiday-state{border-color:#80663D;background:#282319;color:#ffe2a8}
+.holiday-set{grid-area:set;display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px 12px;min-width:0;padding-top:10px;border-top:1px solid #1a2740}.holiday-set:empty{display:none}
+.holiday-field{display:grid;gap:4px;min-width:0;font-size:11.5px;font-weight:600;color:#a9bdd8}.holiday-field[hidden]{display:none}
+.holiday-admin .holiday-field :is(select,input){box-sizing:border-box;width:100%;min-width:0;height:40px;min-height:40px;margin:0}
+.holiday-set .holiday-field{flex:0 1 210px}
+.holiday-admin .holiday-times{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#8fa6c4}.holiday-admin .holiday-times[hidden]{display:none}
+.holiday-admin .holiday-times input{box-sizing:border-box;width:112px;min-width:0;height:40px;min-height:40px;margin:0}
+.holiday-actions{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:8px;margin-left:auto}
+.holiday-admin .holiday-actions button{flex:none;height:40px;min-height:40px;margin:0;padding:0 14px;font-size:13px;white-space:nowrap}
+.holiday-dirty{font-size:12px;font-weight:650;color:#FFCA77}.holiday-dirty[hidden]{display:none}
+.holiday-admin .holiday-new{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));align-items:end;gap:10px 12px;padding:12px;border:1px dashed #3a5a86;border-radius:12px;background:#0c192d}
+.holiday-admin .holiday-new>button{grid-column:auto;justify-self:start;height:40px;min-height:40px;margin:0;white-space:nowrap}
+.holiday-form-error{grid-column:1/-1;margin:0;font-size:12.5px;color:#ffb3b6}.holiday-form-error:empty{display:none}
+.holiday-more>summary{cursor:pointer;font-size:13px;font-weight:650;color:#9cc4ff;padding:4px 0}.holiday-more[open]>summary{margin-bottom:8px}
+.holiday-admin :is(button,select,input,summary):focus-visible{outline:2px solid #9cc4ff;outline-offset:2px}
+@media(max-width:560px){.holiday-admin .holiday-list li.holiday-card{grid-template-columns:56px minmax(0,1fr);padding:12px}.holiday-set .holiday-field{flex:1 1 100%}.holiday-admin .holiday-times{flex:1 1 100%}.holiday-admin .holiday-times input{flex:1 1 0;width:auto}.holiday-actions{margin-left:0;width:100%;justify-content:stretch}.holiday-admin .holiday-actions button{flex:1 1 auto}.holiday-dirty{flex:1 1 100%}.holiday-section{padding:12px}}
+@media(prefers-reduced-motion:reduce){.holiday-admin .holiday-list li.holiday-card{transition:none}}
+/* El bloque de feriados usa todo el ancho de la configuración (en una columna estrecha no cabían fecha, nombre y controles). */
+.config-block:has(.holiday-admin){grid-column:1/-1}
+.holiday-admin label.holiday-field,.holiday-admin label.holiday-year{display:grid;gap:4px;margin:0;padding:0;border:0;border-radius:0;background:none;box-shadow:none}
+.holiday-admin .holiday-field>span,.holiday-admin .holiday-year>span{font-size:11.5px;font-weight:600;color:#a9bdd8}
+.holiday-set .holiday-field{flex:0 1 230px}.holiday-admin .holiday-field select{min-width:190px}
+.holiday-section>.config-note,.holiday-admin>.config-note{margin:0;font-size:12.5px;line-height:1.5;color:#9db1cf}
+@media(min-width:900px){.holiday-admin .holiday-list li.holiday-card{grid-template-columns:64px minmax(220px,1fr) auto;grid-template-areas:"date info set";align-items:center}.holiday-card .holiday-set{padding-top:0;border-top:0;justify-content:flex-end;flex-wrap:nowrap;max-width:640px}.holiday-card .holiday-set .holiday-field{flex:0 0 200px}}
+@media(max-width:560px){.holiday-admin .holiday-field select{min-width:0}}
+@media(max-width:420px){.holiday-tag,.holiday-state{white-space:normal;overflow-wrap:anywhere}.holiday-admin .holiday-times{flex-wrap:wrap}.holiday-admin .holiday-times input{flex:1 1 96px;width:auto}.holiday-admin .holiday-list li.holiday-card{grid-template-columns:52px minmax(0,1fr);gap:8px 10px}}
+.holiday-admin label.holiday-field,.holiday-admin label.holiday-year{display:grid!important;grid-template-columns:minmax(0,1fr);align-items:stretch}
+@media(min-width:900px){.holiday-card .holiday-set .holiday-field{flex:0 0 200px}.holiday-card .holiday-set .holiday-field>span{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}.holiday-card .holiday-set .holiday-field select{min-width:0}}

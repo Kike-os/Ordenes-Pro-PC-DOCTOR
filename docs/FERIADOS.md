@@ -32,3 +32,15 @@ Diseño previsto, compatible con Vercel: tokens cifrados en la base (solo servid
 ## Recordatorio de feriados sin definir
 
 Desde siete días antes de un feriado cuya atención nadie ha definido, ADI se lo recuerda a administración en el inicio y en la agenda: «ADI informa: El lunes 2 de noviembre es feriado nacional (Día de Difuntos) y aún no se ha definido la atención. Revisa el decreto oficial y elige atención normal, horario especial o cerrado». El botón «Definir atención» lleva al gestor. El recordatorio desaparece al elegir un modo o al ocultar la fecha, y solo lo ve administración.
+
+## Rediseño de «Feriados y atención» (13/10/2026)
+
+**Causa del texto vertical.** Cada fila repartía el ancho en tres columnas (`118px minmax(0,1fr) auto`). La tercera, con el selector, las horas y los botones, tomaba todo el ancho que pedía y a la del nombre le quedaba un ancho mínimo; con `overflow-wrap:anywhere` el nombre se partía letra por letra. Además, el bloque estaba en una columna estrecha de la configuración.
+
+**Ahora.** El bloque ocupa todo el ancho. Tres zonas: encabezado (año y resumen: feriados, sin definir, sin atención, horario especial, días propios), **feriados nacionales y locales** y **días no laborables propios**. Cada fecha es una tarjeta con la fecha destacada, el nombre completo, tipo, origen y estado; los controles (atención, horas, Guardar, Editar, Quitar) van en su propia zona y no comprimen el texto. En móvil se apilan.
+
+**Guardado.** «Cambios sin guardar» por tarjeta; Guardar se desactiva mientras procesa y no admite doble clic; se conservan la posición y el foco. Antes de guardar un día sin atención o con horario especial se consultan las citas de ese día (`action: check`) y, si alguna queda fuera, se pide confirmación. **Nunca se cancela ni se mueve una cita.**
+
+**Validaciones del servidor.** Cierre posterior a la apertura, en intervalos de 15 minutos y con duración suficiente para la cita más corta que se ofrece. El formulario de alta no pisa una fecha ya registrada ni un feriado calculado.
+
+**Fuente de los feriados.** Los nacionales se calculan en `holidays.national` con las reglas de traslado de la ley; no se consulta ningún servicio externo. Los locales no se suponen: los agrega administración para su localidad. Un decreto puede cambiar fechas: debe ajustarse aquí a mano.
