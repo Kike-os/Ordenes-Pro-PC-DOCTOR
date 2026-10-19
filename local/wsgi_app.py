@@ -37,7 +37,9 @@ class WSGIHandler(core.Handler):
         if filename:
             self.response_headers.append(('Content-Disposition', core.content_disposition(filename)))
         if cookie:
-            self.response_headers.append(('Set-Cookie', cookie))
+            # Una cabecera Set-Cookie por cookie (por ejemplo, la sesión y el equipo de confianza en la misma respuesta).
+            for value in (cookie if isinstance(cookie, (list, tuple)) else [cookie]):
+                self.response_headers.append(('Set-Cookie', value))
         self.response_body = body
 
 

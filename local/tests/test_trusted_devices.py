@@ -160,3 +160,38 @@ class TrustedDeviceTests(unittest.TestCase):
 
 
 if __name__=='__main__':unittest.main()
+
+
+class TrustedDeviceProductionAdapterTests(TrustedDeviceTests):
+    """El mismo flujo por el adaptador WSGI que usa producción (Vercel): cada cookie debe llegar en su propia cabecera Set-Cookie."""
+    def wsgi(self,browser,path,body=None,csrf=''):
+        from wsgiref.util import setup_testing_defaults
+        from wsgiref.validate import validator
+        import wsgi_app
+        env={};setup_testing_defaults(env);raw=json.dumps(body or {}).encode()
+        cookie='; '.join(k+'='+v['value'] for k,v in browser.jar.items() if path.startswith(v['path']))
+        env.update(PATH_INFO=path,REQUEST_METHOD='POST' if body is not None else 'GET',CONTENT_TYPE='application/json',CONTENT_LENGTH=str(len(raw)),HTTP_ORIGIN='http://127.0.0.1:8010',
+                   HTTP_COOKIE=cookie,HTTP_USER_AGENT=browser.agent,HTTP_X_CSRF_TOKEN=csrf,**{'wsgi.input':io.BytesIO(raw)})
+        result={}
+        def start(status,headers,exc_info=None):result.update(status=int(status.split()[0]),headers=headers)
+        response=validator(wsgi_app.app)(env,start)
+        try:result['body']=json.loads(b''.join(response) or b'{}')
+        finally:response.close()
+        result['set_cookies']=[value for name,value in result['headers'] if name.lower()=='set-cookie']
+        browser.store(result['set_cookies']);return result
+
+    def test_trust_cookie_reaches_the_browser_through_the_production_adapter(self):
+        self.enable();laptop=Browser(self,CHROME)
+        first=self.wsgi(laptop,'/api/login',{'login':'demo','password':PASSWORD,'remember':True});self.assertTrue(first['body'].get('second_step'))
+        self.advance(30);done=self.wsgi(laptop,'/api/login/second-step',{'challenge':first['body']['challenge'],'code':self.code(),'trust_device':True})
+        self.assertEqual(done['status'],200,done['body']);self.assertEqual(len(done['set_cookies']),2,done['set_cookies'])
+        self.assertTrue(all(value.split('=',1)[0] in ('pcdoctor_session',trusted_devices.COOKIE) for value in done['set_cookies']))
+        self.assertIn(trusted_devices.COOKIE,laptop.jar);self.assertIn('pcdoctor_session',laptop.jar)
+        # Cerrar el navegador y volver a entrar: solo la contraseña.
+        laptop.jar.pop('pcdoctor_session');laptop.restart();self.advance(3600)
+        again=self.wsgi(laptop,'/api/login',{'login':'demo','password':PASSWORD,'remember':True})
+        self.assertEqual((again['status'],again['body'].get('trusted_device'),again['body'].get('second_step')),(200,True,None))
+        # Cerrar sesión en todos los dispositivos borra las dos cookies, cada una en su cabecera.
+        csrf=self.wsgi(laptop,'/api/me')['body']['user']['csrf']
+        closed=self.wsgi(laptop,'/api/sessions/revoke',{},csrf=csrf);self.assertEqual(len(closed['set_cookies']),2)
+        self.assertNotIn(trusted_devices.COOKIE,laptop.jar);self.assertNotIn('pcdoctor_session',laptop.jar)
