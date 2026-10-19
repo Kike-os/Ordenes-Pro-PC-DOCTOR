@@ -81,3 +81,11 @@ Se guarda dentro del registro inmutable de la decisión de acceso (`permissions.
 ## Foto de perfil (1.5.86)
 
 Cada persona del equipo puede poner, cambiar o quitar su foto desde el menú de su cuenta (arriba a la derecha → «Foto de perfil»). El navegador la recorta en cuadrado a 256 × 256 px; el servidor comprueba por su cabecera que sea un PNG, JPG o WebP real, con un máximo de 300 KB, y la guarda en la base (migración 035). Solo se sirve a sesiones iniciadas (`/api/users/<id>/photo`). Sin foto se muestran las iniciales.
+
+## Consecutivo permanente de órdenes OP-0001 (19/10/2026)
+
+- Las órdenes nuevas se numeran `OP-0001`, `OP-0002`… con un contador único y permanente (tabla `order_serial`, migración 058). No se reinicia por fecha, nunca retrocede ni se borra (triggers) y no reutiliza números de órdenes anuladas. Después de `OP-9999` continúa con `OP-10000`.
+- El contador arranca después de las órdenes principales que ya existían; los equipos adicionales siguen usando el sufijo `-E02`, `-E03`… y no consumen número.
+- El número se reserva dentro de la transacción de escritura (`BEGIN IMMEDIATE`), así que dos registros simultáneos no pueden obtener el mismo. Si un código ya existe (por ejemplo, el provisional `OP-00001` de una orden antigua), se salta al siguiente libre.
+- Las órdenes existentes conservan su código `PCD-AAAAMMDD-NNNN`, su QR y sus comprobantes. Las búsquedas, la consulta pública, el chat, ADI, la vinculación de correos y la lectura en voz reconocen los dos formatos.
+- La tabla antigua `order_sequence` (migración 002, sin uso) no se reutiliza.

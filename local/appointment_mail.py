@@ -58,7 +58,7 @@ def compose(row,kind,config,signature=None):
 def send(c,appointment_id,kind,force=False):
     """Envía (una sola vez por tipo y versión) y registra el resultado. Nunca lanza errores hacia la reserva."""
     if kind not in KINDS:return None
-    row=c.execute('SELECT a.*,s.label service_label FROM appointments a JOIN appointment_services s ON s.code=a.service_code WHERE a.id=?',(appointment_id,)).fetchone()
+    row=c.execute('SELECT a.*,COALESCE(NULLIF(a.services_summary,\'\'),s.label) service_label FROM appointments a JOIN appointment_services s ON s.code=a.service_code WHERE a.id=?',(appointment_id,)).fetchone()
     if not row:return None
     previous=c.execute('SELECT id,result FROM appointment_mail WHERE appointment_id=? AND kind=? AND generation=?',(row['id'],kind,row['generation'])).fetchone()
     if previous and (previous['result']=='sent' or not force):return previous['result']

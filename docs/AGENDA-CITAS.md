@@ -71,3 +71,22 @@ El 13/10/2026 se reactivó así, a petición de administración y con respaldo p
 ## Indicadores de estado de las citas (1.5.150)
 
 Todos los estados se pintan con una misma píldora de 26 px con icono y texto (`agendaPill` / `agendaBadge` en `app.js`): Nueva, Confirmada, Por confirmar (antes «Solicitada»), Reagendada (antes «Reprogramada»), En atención, No asistió, Cancelada y Completada; los mantenimientos preventivos llevan además la píldora «Preventivo». Es un cambio de presentación: los códigos de estado, las reglas y las citas existentes no se modifican.
+
+## Autorización digital de citas (19/10/2026)
+
+- Para confirmar una cita, el cliente marca la aceptación expresa de las **condiciones del servicio vigentes** (las publicadas por la administración en Configuración) y escribe los **últimos 4 dígitos de su cédula**. El botón «Confirmar y autorizar cita» se habilita solo cuando ambas cosas son válidas. El servidor vuelve a comprobarlo todo.
+- Los 4 dígitos deben ser exactamente numéricos y coincidir con la identificación escrita (cédula; en un RUC de persona natural, la cédula que contiene; en un pasaporte, sus últimos 4 dígitos). **No son una firma electrónica ni una prueba de identidad**: solo comprueban la coherencia de los datos.
+- Cada aceptación se guarda en `appointment_authorizations` (migración 059): identificador único `AUT-<UUID>`, cita, cliente, fecha y hora con zona `America/Guayaquil`, versión y huella SHA-256 de las condiciones, consentimiento expreso, los 4 dígitos, el canal (en línea o registrada por el personal, con quién la registró) y una copia de los datos de la cita en ese momento. Es inmutable: no se modifica ni se borra, y se conserva aunque la cita se reprograme o edite.
+- La base de datos impide que una cita pase a «Confirmada» sin autorización. Las citas automáticas (mantenimiento) y las anteriores a este cambio no reciben autorizaciones retroactivas: para confirmarlas, el personal registra la aceptación del cliente en el diálogo «Autorización del cliente». Una cita antigua que se reactiva vuelve como solicitud.
+- Si no hay condiciones vigentes publicadas, no se autoriza ninguna cita (no se fabrica la aceptación).
+- Acceso: el detalle de la autorización se ve en la agenda; los 4 dígitos y la copia de la cita, solo la administración.
+- Mensaje al cliente: «Cita confirmada correctamente. Su aceptación ha sido registrada con fecha, hora e identificador de autorización.»
+
+## Catálogo de servicios y citas con varios servicios (19/10/2026)
+
+- Servicios agrupados por categoría (Diagnóstico y reparación, Mantenimiento, BIOS, Software, sistemas y licencias, Redes y asistencia remota, Otros servicios), con buscador que no distingue tildes y busca también por palabras clave.
+- Servicios nuevos (migración 060, solo si no existía otro con el mismo código o nombre): Compra de licencia de software, Desbloqueo de BIOS, Recuperación de contraseña de BIOS, Actualización de BIOS, Reparación de BIOS corrupta, Instalación de Windows y otros sistemas operativos, Instalación y configuración de antivirus, Eliminación de virus y malware, Recuperación y respaldo de datos, Reparación de bisagras, Cambio de pantallas, Mantenimiento de consolas PlayStation y Configuración de redes y Wi-Fi. Las duraciones iniciales son estimaciones editables en Configuración de la agenda.
+- **No se duplicaron** (ya existían con otro nombre; se encuentran por el buscador): «Programación y recuperación de BIOS», «Asistencia técnica remota» = «Servicio de Administración Remota», «Reparación de impresoras» = «Servicio para impresoras» y «Diagnóstico y reparación de placas electrónicas» = «Reparación electrónica».
+- Se pueden elegir hasta 5 servicios por cita, sin repetir; la duración de la cita es la suma (máximo 8 horas). El retiro de equipos se agenda solo. La disponibilidad, la prevención de citas simultáneas, los horarios, los feriados y los avisos funcionan igual, con la duración total.
+- «Compra de licencia de software» pide el tipo de licencia (Windows 10 y Windows 11; Microsoft Office; Microsoft 365; Antivirus Kaspersky, ESET NOD32, McAfee, Norton y otros; Otras licencias de software) y observaciones opcionales.
+- La cita conserva su servicio principal (el primero) y guarda el detalle en `appointment_service_items`; la agenda y los correos muestran el resumen («Diagnóstico técnico + Reparación de bisagras»). Las citas anteriores no cambian.

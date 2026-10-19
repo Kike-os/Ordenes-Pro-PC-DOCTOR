@@ -44,7 +44,7 @@ def notify_staff(conn):
   # Primera ejecución: no se avisan las citas antiguas.
   newest=conn.execute('SELECT COALESCE(MAX(id),0) FROM appointments').fetchone()[0];conn.execute("INSERT INTO system_state(key,value) VALUES ('appointments_staff_notified',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",(str(newest),));conn.commit();return 0
  sent=0
- for row in conn.execute("SELECT a.*,s.label service_label FROM appointments a JOIN appointment_services s ON s.code=a.service_code WHERE a.id>? AND a.deleted_at IS NULL ORDER BY a.id LIMIT 20",(last,)).fetchall():
+ for row in conn.execute("SELECT a.*,COALESCE(NULLIF(a.services_summary,''),s.label) service_label FROM appointments a JOIN appointment_services s ON s.code=a.service_code WHERE a.id>? AND a.deleted_at IS NULL ORDER BY a.id LIMIT 20",(last,)).fetchall():
   try:send_staff(row)
   except Exception as error:
    print('citas: aviso al taller no enviado:',str(error)[:120]);break
@@ -64,7 +64,7 @@ def run():
    event='reminder_24h' if 23<=delta<=25 else ('reminder_2h' if 1.5<=delta<=2.5 else None)
    if event:conn.execute("INSERT OR IGNORE INTO appointment_notifications(appointment_id,generation,event,channel,result,created_at) VALUES (?,?,?,'email','pending',?)",(row['id'],row['generation'],event,now_s))
   conn.commit()
-  pending=conn.execute("SELECT n.id,n.event,a.* ,s.label service_label FROM appointment_notifications n JOIN appointments a ON a.id=n.appointment_id JOIN appointment_services s ON s.code=a.service_code WHERE n.result='pending' AND n.channel='email' AND a.deleted_at IS NULL AND a.communications_consent=1 AND a.email!='' ORDER BY n.id LIMIT 100").fetchall()
+  pending=conn.execute("SELECT n.id,n.event,a.* ,COALESCE(NULLIF(a.services_summary,''),s.label) service_label FROM appointment_notifications n JOIN appointments a ON a.id=n.appointment_id JOIN appointment_services s ON s.code=a.service_code WHERE n.result='pending' AND n.channel='email' AND a.deleted_at IS NULL AND a.communications_consent=1 AND a.email!='' ORDER BY n.id LIMIT 100").fetchall()
   sent=failed=0
   for row in pending:
    cur=conn.execute("UPDATE appointment_notifications SET result='sending' WHERE id=? AND result='pending'",(row['id'],));conn.commit()

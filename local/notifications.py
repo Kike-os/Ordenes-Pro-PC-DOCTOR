@@ -229,7 +229,7 @@ def build(c, user, now, mail_access=False):
         requested = count("SELECT COUNT(*) FROM appointments WHERE deleted_at IS NULL AND status='solicitada' AND starts_at>=?", appointments.stamp(now))
         alert('requested', requested, 'calendar', 'warning', plural(requested, 'cita por confirmar', 'citas por confirmar'), 'Solicitudes recibidas desde la agenda en línea.', '#appointments?estado=solicitada')
         # Una notificación por cita (clave única por id): cliente, servicio, fecha y hora, con acceso directo a la cita.
-        for row in c.execute("SELECT a.id,a.public_code,a.customer_name,a.starts_at,a.created_at,a.status,s.label service FROM appointments a JOIN appointment_services s ON s.code=a.service_code WHERE a.deleted_at IS NULL AND a.status IN ('solicitada','confirmada') ORDER BY a.id DESC LIMIT 8"):
+        for row in c.execute("SELECT a.id,a.public_code,a.customer_name,a.starts_at,a.created_at,a.status,COALESCE(NULLIF(a.services_summary,''),s.label) service FROM appointments a JOIN appointment_services s ON s.code=a.service_code WHERE a.deleted_at IS NULL AND a.status IN ('solicitada','confirmada') ORDER BY a.id DESC LIMIT 8"):
             when = appointments.datetime.fromisoformat(row['starts_at']).astimezone(appointments.TZ).strftime('%d/%m/%Y %H:%M')
             pending = row['status'] == 'solicitada'
             items.append({'key': 'appointment:' + str(row['id']), 'kind': 'warning' if pending else 'info', 'icon': 'calendar',

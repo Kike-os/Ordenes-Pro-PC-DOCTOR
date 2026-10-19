@@ -6964,3 +6964,26 @@ body[data-page=appointments] .appointment-authorized{margin:0 0 10px;padding:10p
 .agenda-authorize .agenda-actions{justify-content:flex-end}
 .agenda-authorize button:disabled{opacity:.55;cursor:not-allowed}
 @media (max-width:480px){.agenda-booking-grid .booking-authorization label:not(.booking-consent),.agenda-authorize label:not(.booking-consent){max-width:none}.agenda-authorize .agenda-actions{display:grid;grid-template-columns:1fr}.agenda-authorize .agenda-actions>*{width:100%}.agenda-authorize .agenda-actions>.primary{order:-1}}
+/* Selector de servicios de la Agenda (reserva pública y agenda del personal) */
+.booking-services{border:0;padding:0;margin:0 0 16px;min-width:0}
+.booking-services>legend{padding:0;margin-bottom:8px;font-size:12.5px;font-weight:600;color:#c2d3ec}
+.service-picker{display:grid;gap:10px;min-width:0}
+.service-picker input[type=search]{width:100%;max-width:none;margin:0;border-radius:10px}
+.service-picker-list{display:grid;gap:10px;max-height:360px;overflow:auto;overscroll-behavior:contain;padding:2px;border-radius:10px}
+.service-picker-group{border:1px solid #22385a;border-radius:10px;padding:8px 10px 6px;margin:0;min-width:0;background:#0a1424}
+.service-picker-group>legend{padding:0 6px;font-size:11.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#8ab8ff}
+.service-picker .service-option{display:grid!important;grid-template-columns:18px minmax(0,1fr) auto;align-items:center;gap:10px;padding:8px 6px;margin:0!important;border-radius:8px;cursor:pointer;font-size:13px!important;font-weight:500!important;color:#d7e3f5!important}
+.service-picker .service-option:hover{background:#12223a}
+.service-picker .service-option.is-selected{background:#132b4d}
+.service-picker .service-option.is-disabled{opacity:.5;cursor:not-allowed}
+.service-picker .service-option input{width:18px;height:18px;min-height:18px!important;margin:0!important;padding:0;accent-color:#4d8df0}
+.service-picker .service-option input:focus-visible{outline:2px solid #8bb8ff;outline-offset:2px}
+.service-option-name{min-width:0;overflow-wrap:anywhere;line-height:1.35}
+.service-option-time{font-size:11.5px;color:#9fb3cf;white-space:nowrap;font-variant-numeric:tabular-nums}
+.service-picker-summary{margin:0;font-size:12.5px;color:#bcd0ec}
+.service-picker-empty{margin:0;font-size:12.5px;color:#9fb3cf}
+.service-picker-license{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;padding:10px 12px;border:1px solid #2b4a75;border-radius:10px;background:#0b1830}
+.service-picker-license label{display:grid;gap:6px;margin:0!important;font-size:12.5px;font-weight:600;color:#c2d3ec}
+.service-picker-license :is(select,textarea){width:100%;max-width:none;margin:0}
+@media (max-width:600px){.service-picker-license{grid-template-columns:1fr}.service-picker-list{max-height:none}}
+@media (prefers-reduced-motion:reduce){.service-picker *{transition:none!important}}

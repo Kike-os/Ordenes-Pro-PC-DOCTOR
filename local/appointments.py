@@ -15,7 +15,27 @@ def confirmation_mode(c):
 def now():return datetime.now(TZ)
 def stamp(value):return value.astimezone(TZ).isoformat(timespec='seconds')
 def token_hash(value):return hashlib.sha256(value.encode()).hexdigest()
-def services(c):return [dict(r) for r in c.execute('SELECT code,label,duration_minutes FROM appointment_services WHERE active=1 ORDER BY label')]
+CATEGORY_ORDER=('Diagnóstico y reparación','Mantenimiento','BIOS','Software, sistemas y licencias','Redes y asistencia remota','Otros servicios')
+def services(c):
+ rows=[dict(r) for r in c.execute('SELECT code,label,duration_minutes,category,keywords FROM appointment_services WHERE active=1 ORDER BY label')]
+ return sorted(rows,key=lambda row:CATEGORY_ORDER.index(row['category']) if row['category'] in CATEGORY_ORDER else len(CATEGORY_ORDER))
+# Varios servicios en una cita: hasta MAX_SERVICES, sin repetir; la duración es la suma. El retiro de equipos se agenda solo.
+MAX_SERVICES=5
+MAX_TOTAL_MINUTES=480
+LICENSE='licencia'
+LICENSE_CATEGORIES={'windows':'Windows 10 y Windows 11','office':'Microsoft Office','m365':'Microsoft 365','antivirus':'Antivirus Kaspersky, ESET NOD32, McAfee, Norton y otros','otras':'Otras licencias de software'}
+def selected(c,raw):
+ """Servicios activos elegidos («a,b» o lista), en el orden indicado, y su duración total. ValueError con un mensaje claro si no son válidos."""
+ codes=[str(x).strip() for x in (raw if isinstance(raw,list) else str(raw or '').split(',')) if str(x).strip()]
+ if not codes:raise ValueError('Selecciona un servicio.')
+ if len(set(codes))!=len(codes):raise ValueError('Cada servicio se elige una sola vez.')
+ if len(codes)>MAX_SERVICES:raise ValueError('Elige hasta %d servicios por cita.'%MAX_SERVICES)
+ rows=[c.execute('SELECT * FROM appointment_services WHERE code=? AND active=1',(code,)).fetchone() for code in codes]
+ if not all(rows):raise ValueError('Selecciona un servicio disponible.')
+ if len(codes)>1 and PICKUP in codes:raise ValueError('El retiro de equipos se agenda por separado, sin otros servicios.')
+ total=sum(row['duration_minutes'] for row in rows)
+ if total>MAX_TOTAL_MINUTES:raise ValueError('La duración total de los servicios supera la jornada: divídelos en varias citas.')
+ return rows,total
 def ensure_staff_hours(c,technician_id):
  for weekday in range(7):
   end='13:00' if weekday==5 else '17:00';enabled=0 if weekday==6 else 1
@@ -120,13 +140,12 @@ def available_slots(c,day_text,service_code,staff=False):
  except (ValueError,TypeError):raise ValueError('Fecha no válida.')
  first=now().date() if staff else now().date()+timedelta(days=1)
  if day.isoformat()!=day_text or not first<=day<=now().date()+timedelta(days=90):raise ValueError('Elige una fecha entre hoy y los próximos 90 días.' if staff else 'Elige una fecha entre mañana y los próximos 90 días.')
- service=c.execute('SELECT * FROM appointment_services WHERE code=? AND active=1',(service_code,)).fetchone()
- if not service:raise ValueError('Selecciona un servicio disponible.')
+ _,minutes=selected(c,service_code)
  span=day_hours(c,day)
  if not span:return []
  cursor=datetime.combine(day,span[0],TZ);finish=datetime.combine(day,span[1],TZ);out=[]
- while cursor+timedelta(minutes=service['duration_minutes'])<=finish:
-  free=technicians(c,cursor,service['duration_minutes']) if cursor>now()+timedelta(minutes=10) else []
+ while cursor+timedelta(minutes=minutes)<=finish:
+  free=technicians(c,cursor,minutes) if cursor>now()+timedelta(minutes=10) else []
   if free:out.append({'time':cursor.strftime('%H:%M'),'technician_id':free[0]})
   cursor+=timedelta(minutes=15)
  return out
@@ -174,7 +193,12 @@ def pickup_order(c,fields,client=None):
  if row['status'] not in PICKUP_READY:return None,'Tu equipo todavía no está listo para el retiro. Te avisaremos en cuanto puedas pasar a retirarlo; por ahora no es posible agendar el retiro de esta orden.'
  return dict(row),None
 def validate_booking(data,c,public=False,client=None):
- fields={k:str(data.get(k,'')).strip() for k in ['name','identification','document_type','phone','email','device_type','brand','model','service','description','date','time','notes','order_code']};errors={}
+ fields={k:str(data.get(k,'')).strip() for k in ['name','identification','document_type','phone','email','device_type','brand','model','service','description','date','time','notes','order_code','license_category','license_notes']};errors={}
+ if isinstance(data.get('service'),list):fields['service']=','.join(str(x).strip() for x in data['service'])
+ chosen=[];fields['duration']=0
+ try:chosen,fields['duration']=selected(c,fields['service'])
+ except ValueError as error:errors['service']=str(error)
+ fields['services']=[dict(row) for row in chosen]
  pickup=fields['service']==PICKUP
  if len(fields['name'])<2 or len(fields['name'])>150 or (public and len([part for part in fields['name'].split() if len(part)>=2])<2):errors['name']='Ingresa tu nombre y apellidos.' if public else 'Indica el nombre completo (2 a 150 caracteres).'
  if not valid_phone(fields['phone']):errors['phone']='Ingresa un número de contacto válido.'
@@ -197,14 +221,18 @@ def validate_booking(data,c,public=False,client=None):
  if not pickup:fields['order_code']=''
  if fields['email'] and (len(fields['email'])>254 or not re.fullmatch(r'[^\s@<>]+@[^\s@<>.]+(?:\.[^\s@<>.]+)+',fields['email'])):errors['email']='Ingresa un correo electrónico válido.'
  if fields['device_type'] not in reception.DEVICE_TYPES:errors['device_type']='Selecciona el tipo de equipo.'
- if not fields['service'] or not c.execute('SELECT 1 FROM appointment_services WHERE code=? AND active=1',(fields['service'],)).fetchone():errors['service']='Selecciona un servicio.'
+ # Compra de licencia: tipo de licencia obligatorio y observaciones opcionales.
+ if any(row['code']==LICENSE for row in chosen):
+  if fields['license_category'] not in LICENSE_CATEGORIES:errors['license_category']='Selecciona el tipo de licencia.'
+  if len(fields['license_notes'])>500:errors['license_notes']='Las observaciones de la licencia admiten hasta 500 caracteres.'
+ else:fields['license_category']=fields['license_notes']=''
  if len(fields['description'])<3 or len(fields['description'])>1000:errors['description']='Describe brevemente la falla (3 a 1000 caracteres).'
  if len(fields['brand'])>100 or len(fields['model'])>100 or len(fields['notes'])>1000:errors['notes']='Revisa la longitud de marca, modelo u observaciones.'
  if data.get('privacy_consent') is not True:errors['privacy_consent']='Confirma el aviso de privacidad para registrar la cita.'
  if data.get('communications_consent') not in (True,False):errors['communications_consent']='Selecciona si autorizas comunicaciones de la cita.'
  try:
-  start=parse_start(fields['date']+'T'+fields['time']+':00-05:00');service=c.execute('SELECT duration_minutes FROM appointment_services WHERE code=?',(fields['service'],)).fetchone()
-  if service and not slot_open(c,start,service['duration_minutes']):errors['time']='Ese horario no está disponible. Consulta otros espacios.'
+  start=parse_start(fields['date']+'T'+fields['time']+':00-05:00')
+  if chosen and not slot_open(c,start,fields['duration']):errors['time']='Ese horario no está disponible. Consulta otros espacios.'
  except ValueError as error:errors['time']=str(error);start=None
  fields['pickup']=None
  if pickup and 'identification' not in errors and 'phone' not in errors:
@@ -269,13 +297,24 @@ def authorize(c,aid,terms,last4,channel,user=None):
  """Registra la autorización de una cita (una sola por cita: si ya existe, se devuelve la existente sin duplicarla)."""
  existing=authorization(c,aid)
  if existing:return existing
- row=c.execute('SELECT a.*,s.label service_label FROM appointments a JOIN appointment_services s ON s.code=a.service_code WHERE a.id=?',(aid,)).fetchone()
+ row=c.execute('SELECT a.*,COALESCE(NULLIF(a.services_summary,\'\'),s.label) service_label FROM appointments a JOIN appointment_services s ON s.code=a.service_code WHERE a.id=?',(aid,)).fetchone()
  accepted=stamp(now());code='AUT-'+str(uuid.uuid4()).upper()
  snapshot={'code':row['public_code'],'customer_name':row['customer_name'],'service':row['service_code'],'service_label':row['service_label'],'starts_at':row['starts_at'],'duration_minutes':row['duration_minutes'],'status':row['status']}
  c.execute('INSERT INTO appointment_authorizations(authorization_id,appointment_id,client_id,accepted_at,timezone,terms_id,terms_version,terms_hash,express_consent,id_last4,channel,recorded_by,snapshot) VALUES (?,?,?,?,?,?,?,?,1,?,?,?,?)',
            (code,aid,row['client_id'],accepted,'America/Guayaquil',terms['id'],terms['version'],terms['content_hash'],str(last4),channel,user['id'] if user else None,json.dumps(snapshot,ensure_ascii=False,sort_keys=True)))
  c.execute("INSERT INTO appointment_events(appointment_id,actor_id,event,created_at,detail) VALUES (?,?,'authorized',?,?)",(aid,user['id'] if user else None,accepted,'Autorización '+code+' · condiciones versión '+terms['version']+' · '+CHANNELS[channel]))
  return authorization(c,aid)
+def save_services(c,aid,fields):
+ """Servicios de la cita, en orden. Con más de uno, o con una licencia, la cita guarda también el resumen que muestran agenda y correos."""
+ parts=[]
+ for position,row in enumerate(fields['services'],1):
+  detail=''
+  if row['code']==LICENSE:detail=LICENSE_CATEGORIES[fields['license_category']]+(' · '+fields['license_notes'] if fields['license_notes'] else '')
+  c.execute('INSERT INTO appointment_service_items(appointment_id,position,service_code,label,duration_minutes,detail) VALUES (?,?,?,?,?,?)',(aid,position,row['code'],row['label'],row['duration_minutes'],detail))
+  parts.append(row['label']+(' ('+LICENSE_CATEGORIES[fields['license_category']]+')' if row['code']==LICENSE else ''))
+ if len(parts)>1 or any(row['code']==LICENSE for row in fields['services']):c.execute('UPDATE appointments SET services_summary=? WHERE id=?',(' + '.join(parts)[:500],aid))
+def service_items(c,aid):
+ return [dict(r) for r in c.execute('SELECT position,service_code,label,duration_minutes,detail FROM appointment_service_items WHERE appointment_id=? ORDER BY position',(aid,))]
 def create(c,data,user=None):
  key=str(data.get('request_key','')).strip()
  if key and c.execute('SELECT 1 FROM appointments WHERE deleted_at IS NULL AND request_key=?',(key,)).fetchone():return 409,{'error':'Esta solicitud ya fue registrada.'}
@@ -287,7 +326,7 @@ def create(c,data,user=None):
  errors.update(auth_errors)
  if set(errors)=={'time'} and start is not None:return 409,conflict(c,fields,bool(user))
  if errors:return 400,{'error':'Revisa los datos de la cita.','fields':errors}
- duration=c.execute('SELECT duration_minutes FROM appointment_services WHERE code=?',(fields['service'],)).fetchone()['duration_minutes']
+ duration=fields['duration'];primary=fields['services'][0]['code']
  # Comprobación final dentro de la misma transacción de escritura: dos solicitudes simultáneas no pueden quedarse con la misma franja.
  staff=technicians(c,start,duration)
  if not staff:return 409,conflict(c,fields,bool(user))
@@ -301,8 +340,9 @@ def create(c,data,user=None):
  token=secrets.token_urlsafe(32);created=stamp(now());public='CIT-'+now().strftime('%Y%m%d')+'-'+secrets.token_hex(3).upper()
  initial='confirmada' if user or confirmation_mode(c)=='auto' else 'solicitada'
  # Se guarda primero como solicitud; pasa a confirmada solo después de registrar la autorización (la base lo exige).
- cursor=c.execute("INSERT INTO appointments(public_code,manage_token_hash,client_id,technician_id,customer_name,identification,phone,email,device_type,brand,model,service_code,description,notes,starts_at,duration_minutes,status,privacy_consent,communications_consent,created_at,updated_at,request_key) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?,?,?)",(public,token_hash(token),client_id,technician,fields['name'],fields['identification'],fields['phone'],fields['email'],fields['device_type'],fields['brand'],fields['model'],fields['service'],fields['description'],fields['notes'],stamp(start),duration,'solicitada',int(data.get('communications_consent') is True),created,created,key or None))
+ cursor=c.execute("INSERT INTO appointments(public_code,manage_token_hash,client_id,technician_id,customer_name,identification,phone,email,device_type,brand,model,service_code,description,notes,starts_at,duration_minutes,status,privacy_consent,communications_consent,created_at,updated_at,request_key) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?,?,?)",(public,token_hash(token),client_id,technician,fields['name'],fields['identification'],fields['phone'],fields['email'],fields['device_type'],fields['brand'],fields['model'],primary,fields['description'],fields['notes'],stamp(start),duration,'solicitada',int(data.get('communications_consent') is True),created,created,key or None))
  aid=cursor.lastrowid
+ save_services(c,aid,fields)
  c.execute("INSERT INTO appointment_events(appointment_id,actor_id,event,new_start,new_status,created_at) VALUES (?,?,?,?,?,?)",(aid,user['id'] if user else None,'created',stamp(start),initial,created))
  evidence=authorize(c,aid,terms,data.get('id_last4'),'personal' if user else 'en_linea',user)
  if initial=='confirmada':c.execute("UPDATE appointments SET status='confirmada' WHERE id=?",(aid,))
@@ -401,14 +441,14 @@ def create_for_maintenance(c,mid,user=None):
  c.execute("UPDATE maintenance SET appointment_id=?,state='appointment',updated_at=? WHERE id=?",(aid,now().isoformat(),mid))
  return {'id':aid,'public_code':public,'starts_at':stamp(start),'status':'solicitada'}
 def admin_rows(c,start,end):
- return [dict(r) for r in c.execute("SELECT a.*,s.label service_label,u.name technician,(SELECT code FROM orders WHERE id=a.pickup_order_id) pickup_code,(SELECT authorization_id FROM appointment_authorizations WHERE appointment_id=a.id) authorization_id FROM appointments a JOIN appointment_services s ON s.code=a.service_code LEFT JOIN users u ON u.id=a.technician_id WHERE a.deleted_at IS NULL AND a.starts_at>=? AND a.starts_at<? ORDER BY a.starts_at,a.id",(start,end))]
+ return [dict(r) for r in c.execute("SELECT a.*,COALESCE(NULLIF(a.services_summary,''),s.label) service_label,u.name technician,(SELECT code FROM orders WHERE id=a.pickup_order_id) pickup_code,(SELECT authorization_id FROM appointment_authorizations WHERE appointment_id=a.id) authorization_id FROM appointments a JOIN appointment_services s ON s.code=a.service_code LEFT JOIN users u ON u.id=a.technician_id WHERE a.deleted_at IS NULL AND a.starts_at>=? AND a.starts_at<? ORDER BY a.starts_at,a.id",(start,end))]
 
 def queue_notice(c,row,event,generation=None):
  """Encola un correo al cliente (confirmación o cancelación) solo si dejó correo y autorizó comunicaciones."""
  if row['email'] and row['communications_consent']:c.execute("INSERT OR IGNORE INTO appointment_notifications(appointment_id,generation,event,channel,result,created_at) VALUES (?,?,?,'email','pending',?)",(row['id'],generation or row['generation'],event,stamp(now())))
 def detail(c,aid,full=False):
  """Cita con su servicio, técnico, cliente vinculado e historial de modificaciones."""
- row=c.execute("SELECT a.*,s.label service_label,u.name technician FROM appointments a JOIN appointment_services s ON s.code=a.service_code LEFT JOIN users u ON u.id=a.technician_id WHERE a.id=? AND a.deleted_at IS NULL",(aid,)).fetchone()
+ row=c.execute("SELECT a.*,COALESCE(NULLIF(a.services_summary,''),s.label) service_label,u.name technician FROM appointments a JOIN appointment_services s ON s.code=a.service_code LEFT JOIN users u ON u.id=a.technician_id WHERE a.id=? AND a.deleted_at IS NULL",(aid,)).fetchone()
  if not row:return None
  data=dict(row);data.pop('manage_token_hash',None);data.pop('request_key',None)
  data['events']=[dict(r) for r in c.execute("SELECT e.id,e.event,e.old_start,e.new_start,e.old_status,e.new_status,e.created_at,e.detail,u.name actor FROM appointment_events e LEFT JOIN users u ON u.id=e.actor_id WHERE e.appointment_id=? ORDER BY e.id DESC",(aid,))]
@@ -422,6 +462,7 @@ def detail(c,aid,full=False):
  import appointment_mail
  data['mails']=appointment_mail.history(c,aid)
  data['authorization']=authorization(c,aid,full)
+ data['services']=service_items(c,aid)
  return data
 def agenda(c,start,end):
  """Fuente única de la Agenda de Mantenimientos de Clientes: citas del período y su resumen."""

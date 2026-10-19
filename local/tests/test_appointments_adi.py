@@ -39,7 +39,7 @@ class AppointmentAndAdiTests(unittest.TestCase):
    c.execute('INSERT INTO appointment_holidays(day,label) VALUES (?,?)',(day.isoformat(),'Cierre'))
    self.assertEqual(appointments.available_slots(c,day.isoformat(),'diagnostico'),[])
    status,result=appointments.update_settings(c,{'services':[{'code':'diagnostico','duration_minutes':45,'active':True}]});self.assertEqual(status,200)
-   self.assertEqual(appointments.services(c)[0]['duration_minutes'],45)
+   self.assertEqual({r['code']:r['duration_minutes'] for r in appointments.services(c)}['diagnostico'],45)
  def test_agenda_configuration_saves_hours_staff_and_keeps_services_active(self):
   with app.connect() as c:
    app.appointments.ensure_staff_hours(c,self.tech);cfg=appointments.settings(c)
