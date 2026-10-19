@@ -316,7 +316,7 @@ def receipt_mail_status(c,oid):
 
 def order_from_text(c,*texts):
     """Orden a la que se refiere un texto, solo si menciona un único número de orden existente."""
-    codes={match.upper() for text in texts for match in re.findall(r'PCD-\d{8}-\d{3,}(?:-E\d{2})?',str(text or ''),re.I)}
+    codes={match.upper() for text in texts for match in re.findall(r'\b'+reception.ORDER_CODE_PATTERN,str(text or ''),re.I)}
     if len(codes)!=1:return None
     row=c.execute('SELECT id FROM orders WHERE code=?',(codes.pop(),)).fetchone()
     return row['id'] if row else None
@@ -2044,7 +2044,7 @@ class Handler(BaseHTTPRequestHandler):
                     answer='Un asesor de PC-DOCTOR S.A. revisará tu solicitud.' if conv['mode']=='human' and not conv['assigned_to'] else None  # Con un asesor conectado, ADI no interviene.
                     context=None
                     # El estado de una orden no se entrega por el chat: exige el código temporal enviado al correo registrado.
-                    if conv['mode']=='adi' and re.search(r'PCD-\d{8}-\d{3,}',text,re.I):answer=adi.ORDER_CHECK_HINT
+                    if conv['mode']=='adi' and re.search(r'\b'+reception.ORDER_CODE_PATTERN,text,re.I):answer=adi.ORDER_CHECK_HINT
                     if answer is None and conv['mode']=='adi':
                         # El mensaje del cliente queda guardado antes de consultar a la IA, para no retener la base durante la espera.
                         c.commit();answer=adi.reply(c,text,context=context)
@@ -3308,10 +3308,9 @@ class Handler(BaseHTTPRequestHandler):
                         unit_number,code=equipment.next_unit(c,group_main);number_date=sequence=None
                         if not code:return self.reply(409,{'error':'La orden alcanzó el máximo de equipos permitido.'})
                     else:
-                        number_date = received.strftime('%Y%m%d')
-                        c.execute('INSERT INTO daily_order_sequences(reception_date,value) VALUES (?,1) ON CONFLICT(reception_date) DO UPDATE SET value=value+1',(number_date,))
-                        sequence = c.execute('SELECT value FROM daily_order_sequences WHERE reception_date=?',(number_date,)).fetchone()[0]
-                        code = order_code(number_date,sequence)
+                        # Consecutivo permanente (OP-0001…): no depende de la fecha ni se reinicia. El índice único (number_date,daily_sequence)
+                        # con la serie «OP» impide duplicados; la fecha de recepción queda en received_at.
+                        sequence,code = reception.next_order_code(c);number_date='OP'
                     oid = c.execute("INSERT INTO orders(device_id,status,problem,created_by,created_at,accessories,physical_condition,technician_notes,code,request_key,received_at,number_date,daily_sequence,group_id,unit_no) VALUES (?,'pendiente',?,?,?,?,?,?,?,?,?,?,?,?,?)",
                         (device_id,fields['problem'],user['id'],int(received.timestamp()),fields['accessories'],fields['physical_condition'],fields['technician_notes'],code,request_key,received.isoformat(timespec='microseconds'),number_date,sequence,group_main['id'] if group_main else None,unit_number)).lastrowid
                     if group_main:audit(c,user['id'],'order_unit_added',oid)

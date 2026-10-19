@@ -12,7 +12,7 @@ from reception import DEVICE_TYPES, ECUADOR_TZ
 
 CODE_MINUTES = 10
 MAX_ATTEMPTS = 5
-ORDER_CODE = re.compile(r'[A-Z]{2,4}-\d{5,8}(?:-\d{3,6})?')
+ORDER_CODE = re.compile(r'[A-Z]{2,4}-\d{4,8}(?:-\d{3,6})?')
 MAIL = re.compile(r'[^\s@<>]+@[^\s@<>.]+(?:\.[^\s@<>.]+)+')
 NOTICE = 'Si el número corresponde a una orden con correo registrado, acabamos de enviar un código de 6 dígitos a ese correo. Caduca en %d minutos.' % CODE_MINUTES
 

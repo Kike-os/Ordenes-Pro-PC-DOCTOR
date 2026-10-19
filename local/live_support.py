@@ -1,6 +1,6 @@
 """Centro de Atención en Tiempo Real: conversaciones del chat público atendidas por ADI o por el personal."""
 import re
-ORDER_CODE=re.compile(r'\bPCD-\d{8}-\d{4}\b',re.I)
+ORDER_CODE=re.compile(r'\b(?:PCD-\d{8}-\d{4}|OP-\d{4,})\b',re.I)
 LIST_SQL="""SELECT v.id,v.mode,v.assigned_to,v.created_at,v.updated_at,v.last_seen_admin,v.client_id,v.order_id,u.name operator,cl.name client,o.code order_code,o.status order_status,
  (SELECT content FROM adi_messages m WHERE m.conversation_id=v.id AND m.visibility='public' ORDER BY m.id DESC LIMIT 1) last_message,
  (SELECT author FROM adi_messages m WHERE m.conversation_id=v.id AND m.visibility='public' ORDER BY m.id DESC LIMIT 1) last_author,

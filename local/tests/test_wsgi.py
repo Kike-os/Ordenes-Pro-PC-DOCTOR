@@ -77,7 +77,7 @@ class WSGITests(unittest.TestCase):
         result={}
         response=wsgi_app.application(env,lambda status,headers:result.update(status=status))
         order=json.loads(b''.join(response));self.assertTrue(result['status'].startswith('201'),order)
-        self.assertRegex(order['code'],r'^PCD-[0-9]{8}-0001$')
+        self.assertEqual(order['code'],'OP-0001')
         for suffix in ['', '/qr.png','/receipt.pdf']:
             response=self.call_wsgi('/api/orders/'+str(order['id'])+suffix,cookie=cookie)
             self.assertTrue(response['status'].startswith('200'),response)

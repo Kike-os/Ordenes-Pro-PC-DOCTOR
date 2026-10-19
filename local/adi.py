@@ -38,7 +38,7 @@ def admin_answer(c,text):
  if 'mantenimiento' in q:
   rows=[r for r in maintenance.rows(c) if r['state'] in ('scheduled','appointment')][:10]
   return 'Próximos mantenimientos: '+('; '.join(f"{r['code']} · {r['client']} · {r['due_date']}" for r in rows) if rows else 'ninguno programado.')
- match=re.search(r'PCD-\d{8}-\d{4,}',text,re.I)
+ match=re.search(r'(?:PCD-\d{8}-\d{4,}|OP-\d{4,})(?:-E\d{2})?',text,re.I)
  if match and 'historial' in q:
   rows=c.execute("SELECT o.code,h.status_label,h.comment,h.occurred_at,u.name actor FROM orders o JOIN order_history h ON h.order_id=o.id LEFT JOIN users u ON u.id=h.actor_id WHERE o.code=? ORDER BY h.id DESC LIMIT 10",(match[0],)).fetchall()
   return 'Historial registrado: '+('; '.join(f"{r['occurred_at']} · {r['status_label']} · {r['comment']} · {r['actor'] or 'sistema'}" for r in rows) if rows else 'no hay eventos disponibles para esa orden.')
@@ -72,7 +72,7 @@ def admin_reply(c,text,now):
  """Respuesta administrativa con enlaces a los módulos. Solo lectura: nunca ejecuta cambios."""
  q=plain(text);live=snapshot(c,now);today=now.date().isoformat();link=lambda label,href:{'label':label,'href':href}
  has=lambda *keys:any(k in q for k in keys)
- match=re.search(r'PCD-\d{8}-\d{4,}',text,re.I)
+ match=re.search(r'(?:PCD-\d{8}-\d{4,}|OP-\d{4,})(?:-E\d{2})?',text,re.I)
  if match and not has('historial'):
   row=c.execute("SELECT o.id,o.code,s.label status,cl.name,d.brand,d.model,o.estimated_delivery,o.priority FROM orders o JOIN devices d ON d.id=o.device_id JOIN clients cl ON cl.id=d.client_id JOIN statuses s ON s.code=o.status WHERE o.code=?",(match[0].upper(),)).fetchone()
   if not row:return {'answer':'No existe una orden con el número '+match[0].upper()+'.','links':[link('Ver órdenes','#orders')]}

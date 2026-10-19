@@ -719,7 +719,7 @@ class SecurityTests(unittest.TestCase):
         self.assertEqual((len(many['rows']),many['total']),(8,10));self.assertEqual(len({r['id'] for r in many['rows']}),8)
         exact=self.request('/api/search?q='+codes[0].lower(),cookie=cookie)['body']
         self.assertEqual((exact['rows'][0]['code'],exact['total']),(codes[0],1))
-        partial=self.request('/api/search?q='+codes[0][:12],cookie=cookie)['body'];self.assertEqual(partial['total'],10)
+        partial=self.request('/api/search?q='+codes[0][:5],cookie=cookie)['body'];self.assertEqual((codes[0],partial['total']),('OP-0001',10))
         for term,expected in (('SRCH-0007',1),('thinkpad t3',1),('srch-',10),('no-existe-xyz',0),("' OR 1=1",0)):
             found=self.request('/api/search?q='+quote(term),cookie=cookie)['body'];self.assertEqual((found['total'],len(found['rows'])),(expected,min(expected,8)),term)
         # Tolerancia a errores de escritura, tildes y varias palabras en cualquier orden; los números no se aproximan.
