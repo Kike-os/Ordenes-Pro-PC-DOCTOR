@@ -4,6 +4,18 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.167 — 2026-10-19 09:52 (UTC-05:00)
+
+Inventario de Licencias Digitales y presupuestos con existencias
+
+### Nuevas funcionalidades
+
+- Inventario de Licencias Digitales: productos con logo, licencias individuales cifradas, registro por lote, reservas al aprobar, confirmación de pago y autorización de entrega separadas, entrega por enlace privado con identificación y código, historial
+
+### Mejoras realizadas
+
+- Presupuestos: botón «Agregar producto, servicio o repuesto» con existencias de licencias y alta rápida de servicios o repuestos
+
 ## v1.5.166 — 2026-10-19 09:02 (UTC-05:00)
 
 Consecutivo OP-0001, autorización digital de citas y catálogo de servicios ampliado

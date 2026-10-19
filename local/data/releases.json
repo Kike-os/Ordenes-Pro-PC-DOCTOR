@@ -8,6 +8,24 @@
   },
   "releases": [
     {
+      "version": "1.5.167",
+      "date": "2026-10-19T09:52:01-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Inventario de Licencias Digitales y presupuestos con existencias",
+      "changes": {
+        "features": [
+          "Inventario de Licencias Digitales: productos con logo, licencias individuales cifradas, registro por lote, reservas al aprobar, confirmación de pago y autorización de entrega separadas, entrega por enlace privado con identificación y código, historial"
+        ],
+        "improvements": [
+          "Presupuestos: botón «Agregar producto, servicio o repuesto» con existencias de licencias y alta rápida de servicios o repuestos"
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.166",
       "date": "2026-10-19T09:02:43-05:00",
       "type": "patch",
