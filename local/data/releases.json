@@ -8,6 +8,27 @@
   },
   "releases": [
     {
+      "version": "1.5.166",
+      "date": "2026-10-19T09:02:43-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Consecutivo OP-0001, autorización digital de citas y catálogo de servicios ampliado",
+      "changes": {
+        "features": [
+          "Autorización digital de citas: aceptación expresa de las condiciones vigentes y últimos 4 dígitos de la cédula, con evidencia inmutable e identificador único",
+          "Catálogo de servicios de la Agenda ampliado: categorías, buscador, 13 servicios nuevos, varios servicios por cita y tipo de licencia"
+        ],
+        "improvements": [
+          "Consecutivo permanente de órdenes OP-0001: no se reinicia por fecha, no reutiliza números y es seguro con registros simultáneos; las órdenes existentes conservan su número"
+        ],
+        "fixes": [
+          "La consulta pública de estado y la verificación de los 4 dígitos en citas antiguas reconocen correctamente los números y documentos"
+        ],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.165",
       "date": "2026-10-19T08:08:16-05:00",
       "type": "patch",

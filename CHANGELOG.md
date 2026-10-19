@@ -4,6 +4,23 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.166 — 2026-10-19 09:02 (UTC-05:00)
+
+Consecutivo OP-0001, autorización digital de citas y catálogo de servicios ampliado
+
+### Nuevas funcionalidades
+
+- Autorización digital de citas: aceptación expresa de las condiciones vigentes y últimos 4 dígitos de la cédula, con evidencia inmutable e identificador único
+- Catálogo de servicios de la Agenda ampliado: categorías, buscador, 13 servicios nuevos, varios servicios por cita y tipo de licencia
+
+### Mejoras realizadas
+
+- Consecutivo permanente de órdenes OP-0001: no se reinicia por fecha, no reutiliza números y es seguro con registros simultáneos; las órdenes existentes conservan su número
+
+### Errores corregidos
+
+- La consulta pública de estado y la verificación de los 4 dígitos en citas antiguas reconocen correctamente los números y documentos
+
 ## v1.5.165 — 2026-10-19 08:08 (UTC-05:00)
 
 Corrección del QR de la autenticación en dos pasos
