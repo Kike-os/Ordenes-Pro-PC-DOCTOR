@@ -6936,3 +6936,11 @@ button.live-appointment .agenda-badge.state-pill,.live-card-meta .agenda-badge.s
 .mfa-status[data-state=error]{color:#ffb3b6}.mfa-status[data-state=busy]{color:#8bb8ff}
 @media(max-width:480px){.mfa-progress{grid-template-columns:1fr}.mfa-qr{width:160px}}
 @media(prefers-reduced-motion:reduce){.mfa-stage{animation:none}}
+/* QR de la autenticación en dos pasos: cuadro blanco cuadrado de tamaño fijo y SVG escalable que ocupa todo el cuadro (nunca recortado). */
+.mfa-qr{box-sizing:border-box;width:min(212px,100%);aspect-ratio:1/1;padding:6px;overflow:visible;border-radius:10px;background:#ffffff;box-shadow:0 0 0 1px #2a4063}
+.mfa-qr svg{display:block;width:100%!important;height:100%!important;max-width:none;transform:none;image-rendering:pixelated;shape-rendering:crispEdges}
+.mfa-qr-error{aspect-ratio:auto;padding:12px;background:#1a1416;box-shadow:0 0 0 1px #6b3340}
+.mfa-account{margin:0;font-size:11.5px;color:#8fa5c4;overflow-wrap:anywhere}.mfa-account strong{color:#c5d5ee;font-weight:650}
+.mfa-regen{min-height:28px;margin:0;font-size:12px}
+.mfa-actions{width:100%;justify-content:space-between}
+@media(max-width:480px){.mfa-qr{width:min(200px,100%)}}

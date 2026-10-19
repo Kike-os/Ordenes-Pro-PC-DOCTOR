@@ -23,7 +23,7 @@ class TwoFactorTests(unittest.TestCase):
     def enable(self):
         cookie,csrf=self.login();setup=lambda **body:self.request('/api/account/second-step',body,cookie=cookie,csrf=csrf)
         started=setup(action='start',password=PASSWORD);self.assertEqual(started['status'],200,started['body'])
-        done=setup(action='confirm',code=self.code());self.assertEqual(done['status'],200,done['body'])
+        done=setup(action='confirm',code=self.code(),setup=started['body']['setup']);self.assertEqual(done['status'],200,done['body'])
         return cookie,csrf,setup,started['body'],done['body']
 
     def sign_in(self):return self.request('/api/login',{'login':'demo','password':PASSWORD})
@@ -44,8 +44,8 @@ class TwoFactorTests(unittest.TestCase):
         self.assertEqual(setup(action='start',password='otra')['status'],400);self.assertEqual(self.request('/api/account/second-step',{'action':'start','password':PASSWORD},cookie=cookie)['status'],403)
         started=setup(action='start',password=PASSWORD)['body'];self.assertEqual(len(started['secret']),32);self.assertIn('<svg',started['qr'])
         # Sin confirmar no protege ni bloquea nada: el acceso sigue siendo solo con contraseña.
-        self.assertEqual(setup(action='confirm',code='000000')['status'],400);self.assertNotIn('second_step',self.sign_in()['body'])
-        done=setup(action='confirm',code=self.code());self.assertEqual((done['status'],len(done['body']['recovery']),done['body']['second_step']['enabled'],done['body']['second_step']['recovery_left']),(200,10,True,10))
+        self.assertEqual(setup(action='confirm',code='000000',setup=started['setup'])['status'],400);self.assertNotIn('second_step',self.sign_in()['body'])
+        done=setup(action='confirm',code=self.code(),setup=started['setup']);self.assertEqual((done['status'],len(done['body']['recovery']),done['body']['second_step']['enabled'],done['body']['second_step']['recovery_left']),(200,10,True,10))
         self.assertEqual(setup(action='start',password=PASSWORD)['status'],409)
         with app.connect() as c:
             stored=c.execute('SELECT recovery FROM user_mfa').fetchone()[0];self.assertFalse(any(code in stored for code in done['body']['recovery']))   # solo huellas
@@ -159,3 +159,51 @@ class SecretAtRestTests(unittest.TestCase):
             self.assertEqual(two_factor.check(c,self.uid,code,now),'totp')
             self.assertTrue(c.execute('SELECT secret FROM user_mfa WHERE user_id=?',(self.uid,)).fetchone()[0].startswith('enc1:'))
             self.assertIsNone(two_factor.check(c,self.uid,code,now))  # el mismo código no sirve dos veces
+
+
+class QrSetupTests(unittest.TestCase):
+    setUpClass=classmethod(test_app.SecurityTests.setUpClass.__func__);setUp=test_app.SecurityTests.setUp;tearDown=test_app.SecurityTests.tearDown
+    request=test_app.SecurityTests.request;login=test_app.SecurityTests.login
+
+    def decode(self,svg):
+        import shutil,subprocess,tempfile
+        if not (shutil.which('zbarimg') and shutil.which('magick')):self.skipTest('Faltan zbarimg o magick para leer el QR')
+        with tempfile.TemporaryDirectory() as folder:
+            source,image=Path(folder)/'qr.svg',Path(folder)/'qr.png'
+            source.write_text(svg)
+            # Se rasteriza como en una pantalla pequeña (220 px): un SVG sin viewBox saldría recortado y no se leería.
+            subprocess.run(['magick','-density','300',str(source),'-resize','220x220',str(image)],check=True,capture_output=True)
+            out=subprocess.run(['zbarimg','-q','--raw',str(image)],capture_output=True,text=True).stdout.strip()
+        return out
+
+    def test_qr_is_complete_scalable_and_carries_the_pending_secret(self):
+        from urllib.parse import urlsplit,parse_qs,unquote
+        cookie,csrf=self.login();setup=lambda **body:self.request('/api/account/second-step',body,cookie=cookie,csrf=csrf)
+        started=setup(action='start',password=PASSWORD)['body']
+        svg=started['qr'];head=svg.split('>',2)[1]
+        self.assertIn('viewBox="0 0 ',head);self.assertNotIn(' width=',head);self.assertIn('#000',svg)
+        uri=self.decode(svg)
+        self.assertTrue(uri.startswith('otpauth://totp/'),uri)
+        parts=urlsplit(uri);query=parse_qs(parts.query)
+        self.assertEqual((query['secret'][0],query['issuer'][0],query['digits'][0],query['period'][0],query['algorithm'][0]),(started['secret'],two_factor.ISSUER,'6','30','SHA1'))
+        self.assertEqual(unquote(parts.path[1:]),two_factor.ISSUER+':'+started['account'])
+        with app.connect() as c:self.assertEqual(two_factor.unseal(c.execute('SELECT secret FROM user_mfa WHERE user_id=?',(self.uid,)).fetchone()[0]),query['secret'][0])
+
+    def test_regenerate_invalidates_the_previous_key_and_needs_the_setup_token(self):
+        cookie,csrf=self.login();setup=lambda **body:self.request('/api/account/second-step',body,cookie=cookie,csrf=csrf)
+        first=setup(action='start',password=PASSWORD)['body'];now=time.time()
+        self.assertEqual(setup(action='regenerate',setup='comprobante-falso')['status'],409)
+        self.assertEqual(setup(action='confirm',code=two_factor.code_at(first['secret'],int(now//30)))['status'],409)
+        second=setup(action='regenerate',setup=first['setup'])['body']
+        self.assertNotEqual(second['secret'],first['secret']);self.assertIn('viewBox',second['qr'])
+        self.assertEqual(setup(action='regenerate',setup=first['setup'])['status'],409)  # el comprobante anterior ya no sirve
+        old=setup(action='confirm',code=two_factor.code_at(first['secret'],int(now//30)),setup=second['setup'])
+        self.assertEqual(old['status'],400)  # la clave anterior quedó invalidada
+        done=setup(action='confirm',code=two_factor.code_at(second['secret'],int(time.time()//30)),setup=second['setup'])
+        self.assertEqual((done['status'],done['body']['second_step']['state']),(200,'on'))
+        # Ya activa: no se puede regenerar ni reiniciar sin desactivar (que exige contraseña y código).
+        self.assertEqual(setup(action='regenerate',setup=second['setup'])['status'],409)
+        self.assertEqual(setup(action='start',password=PASSWORD)['status'],409)
+        with app.connect() as c:
+            actions=[r[0] for r in c.execute("SELECT action FROM audit WHERE action LIKE 'second_step%' ORDER BY id")]
+        self.assertIn('second_step_setup_regenerated',actions)

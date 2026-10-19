@@ -159,8 +159,14 @@ def remember_brand(c, name, category):
 
 def qr_image(payload, kind='svg'):
     stream = io.BytesIO()
-    segno.make_qr(payload, error='m').save(stream, kind=kind, scale=8, border=4, dark='#102744', light='#ffffff')
-    return stream.getvalue()
+    qr = segno.make_qr(payload, error='m')
+    qr.save(stream, kind=kind, scale=8, border=4, dark='#102744', light='#ffffff')
+    data = stream.getvalue()
+    if kind == 'svg' and b'viewBox' not in data:
+        # Mismo tamaño propio, pero escalable: sin viewBox, un SVG mostrado más pequeño se recorta en lugar de reducirse.
+        side = (qr.symbol_size(scale=8, border=4)[0])
+        data = data.replace(b'<svg ', b'<svg viewBox="0 0 %d %d" ' % (side, side), 1)
+    return data
 
 
 def production_enabled():

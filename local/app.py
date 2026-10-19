@@ -2463,21 +2463,29 @@ class Handler(BaseHTTPRequestHandler):
                 if path=='/api/account/second-step':
                     # Verificación en dos pasos de la propia cuenta. Activar, desactivar y renovar códigos exigen la contraseña actual.
                     action=str(data.get('action',''))
-                    if action not in ('start','confirm','disable','recovery'):return self.reply(400,{'error':'Operación no disponible.'})
+                    if action not in ('start','regenerate','confirm','disable','recovery'):return self.reply(400,{'error':'Operación no disponible.'})
                     if limited(c,'second-step-setup:'+str(user['id']),limit=12,window=900):return self.reply(429,{'error':'Demasiados intentos. Inténtalo más tarde.'})
                     account=c.execute('SELECT id,username,email,password_hash FROM users WHERE id=?',(user['id'],)).fetchone()
-                    if action!='confirm' and not password_ok(str(data.get('password','')),account['password_hash']):return self.reply(400,{'error':'Revisa los campos señalados.','fields':{'password':'La contraseña actual no es correcta.'}})
-                    if action=='start':
+                    # Regenerar y confirmar exigen el comprobante de la configuración en curso (emitido tras la contraseña); lo demás, la contraseña.
+                    if action in ('regenerate','confirm') and not two_factor.setup_ok(c,user['id'],data.get('setup','')):return self.reply(409,{'error':'La configuración caducó. Vuelve a empezar e ingresa tu contraseña.','restart':True})
+                    if action not in ('regenerate','confirm') and not password_ok(str(data.get('password','')),account['password_hash']):return self.reply(400,{'error':'Revisa los campos señalados.','fields':{'password':'La contraseña actual no es correcta.'}})
+                    if action in ('start','regenerate'):
+                        # Clave nueva (la pendiente anterior deja de servir) y su QR. Nunca sustituye una verificación ya activa.
                         try:made=two_factor.begin(c,account)
                         except two_factor.KeyError_ as error:print('second-step clave',type(error).__name__,flush=True);return self.reply(503,{'error':'La verificación en dos pasos no está disponible: falta la configuración de seguridad del servidor. Avisa a administración.'})
                         if not made:return self.reply(409,{'error':'La verificación en dos pasos ya está activa en tu cuenta.'})
-                        audit(c,user['id'],'second_step_setup_started')
-                        return self.reply(200,{'ok':True,'secret':made['secret'],'qr':reception.qr_image(made['uri'],'svg').decode('utf-8')})
+                        try:qr=two_factor.qr_svg(made['uri'])
+                        except Exception as error:
+                            print('second-step qr',type(error).__name__,flush=True)
+                            return self.reply(500,{'error':'No se pudo generar el código QR. Pulsa «Generar nuevo código QR» para reintentar.','retry':True})
+                        audit(c,user['id'],'second_step_setup_started' if action=='start' else 'second_step_setup_regenerated')
+                        return self.reply(200,{'ok':True,'secret':made['secret'],'qr':qr,'setup':two_factor.setup_token(c,user['id']),'issuer':two_factor.ISSUER,'account':account['email'] or account['username']})
                     if action=='confirm':
                         codes=two_factor.confirm(c,account,data.get('code',''))
                         if not codes:
                             audit(c,user['id'],'second_step_confirm_failed')
                             return self.reply(400,{'error':'Revisa los campos señalados.','fields':{'code':'El código no es correcto o ya caducó. Comprueba la hora de tu teléfono e inténtalo con el código actual.'}})
+                        two_factor.setup_close(c,user['id'])
                         # Las demás sesiones abiertas se cierran: a partir de ahora todas pasan por el segundo paso.
                         c.execute('DELETE FROM sessions WHERE user_id=? AND token_hash!=?',(user['id'],digest(token)));audit(c,user['id'],'second_step_enabled')
                         return self.reply(200,{'ok':True,'recovery':codes,'second_step':two_factor.status(c,user['id'])})

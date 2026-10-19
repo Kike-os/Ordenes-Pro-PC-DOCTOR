@@ -90,6 +90,40 @@ def uri(secret,account):
     return 'otpauth://totp/%s:%s?secret=%s&issuer=%s&algorithm=SHA1&digits=%d&period=%d'%(quote(ISSUER),quote(account),secret,quote(ISSUER),DIGITS,STEP)
 
 
+def qr_svg(payload):
+    """QR del alta en la aplicación de autenticación (biblioteca segno). SVG escalable (con viewBox y sin tamaño fijo): el navegador lo
+    reduce entero en lugar de recortarlo. Negro sobre blanco, corrección de errores M y zona blanca de 4 módulos, sin nada superpuesto."""
+    import io
+    from reception import segno  # biblioteca incluida en local/vendor (reception la deja disponible)
+    stream=io.BytesIO()
+    segno.make_qr(payload,error='m').save(stream,kind='svg',border=4,dark='#000000',light='#ffffff',omitsize=True)
+    svg=stream.getvalue().decode('utf-8')
+    if 'viewBox="0 0 ' not in svg or ' width=' in svg.split('>',2)[1]:raise ValueError('El código QR no se generó en formato escalable.')
+    return svg
+
+
+SETUP_SECONDS=900
+
+
+def setup_token(c,user_id,now=None):
+    """Comprobante de la configuración en curso (15 minutos): sin él no se regenera ni se confirma la clave pendiente. Solo se guarda su huella."""
+    token=secrets.token_urlsafe(24);moment=int(time.time() if now is None else now)
+    c.execute("INSERT INTO system_state(key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",('mfa_setup:%d'%user_id,json.dumps({'hash':hashlib.sha256(token.encode()).hexdigest(),'expires':moment+SETUP_SECONDS})))
+    return token
+
+
+def setup_ok(c,user_id,token,now=None):
+    row=c.execute("SELECT value FROM system_state WHERE key=?",('mfa_setup:%d'%user_id,)).fetchone()
+    try:data=json.loads(row['value']) if row else None
+    except ValueError:data=None
+    moment=int(time.time() if now is None else now)
+    return bool(data and data['expires']>=moment and hmac.compare_digest(data['hash'],hashlib.sha256(str(token or '').encode()).hexdigest()))
+
+
+def setup_close(c,user_id):
+    c.execute("DELETE FROM system_state WHERE key=?",('mfa_setup:%d'%user_id,))
+
+
 def _mark(code):
     return hashlib.sha256(('recuperacion:'+re.sub(r'[^A-Z0-9]','',str(code or '').upper())).encode()).hexdigest()
 

@@ -36,3 +36,11 @@ Segundo paso opcional al iniciar sesión, para el personal (administración y t�
 - **Asistente**: paso 1 (QR centrado, aplicaciones compatibles, clave manual oculta con Mostrar/Ocultar y Copiar) y paso 2 (campo de 6 dígitos solo numérico, admite pegar el código completo y verifica al completarlo). La clave solo vive en la memoria de la ventana; nunca en el almacenamiento del navegador. Tras activar no vuelven a mostrarse ni el QR ni la clave.
 - **Códigos de recuperación**: se muestran una vez, con Copiar y Descargar (.txt).
 - **Auditoría**: se añaden los intentos fallidos al activar (`second_step_confirm_failed`) y al desactivar o renovar códigos (`second_step_check_failed`), además de los ya existentes (activación, desactivación, inicio de sesión con código o con código de recuperación, caducidad).
+
+## Corrección del QR (1.5.165)
+
+- **Causa real**: el QR se generaba como SVG de tamaño fijo (488 × 488 px) **sin `viewBox`**; al mostrarlo en un cuadro de unos 156 px el navegador no lo reducía, lo recortaba (solo se veía la esquina superior izquierda) y no se podía escanear.
+- **Corrección**: `two_factor.qr_svg` genera un SVG escalable (con `viewBox`, sin ancho ni alto fijos), negro sobre blanco, corrección de errores M y zona blanca de 4 módulos, con la biblioteca segno; si no sale en formato escalable, el servidor responde con un aviso y la opción de reintentar. El QR general (`reception.qr_image`) también incorpora `viewBox` sin cambiar su tamaño propio.
+- **URI**: `otpauth://totp/<emisor>:<cuenta>?secret=…&issuer=…&algorithm=SHA1&digits=6&period=30` (RFC 6238; tolerancia de ±1 intervalo; un código aceptado no sirve dos veces).
+- **Regenerar**: «Generar nuevo código QR» crea una clave nueva e invalida la pendiente anterior. Regenerar y confirmar exigen el comprobante de configuración emitido tras la contraseña (15 minutos, solo se guarda su huella); con la verificación ya activa no se puede regenerar ni reiniciar.
+- **Pruebas**: el QR se rasteriza a 220 px y se decodifica con `zbarimg`; la URI leída contiene el mismo secreto que el pendiente en el servidor (descifrado), el emisor, la cuenta, 6 dígitos, 30 s y SHA1.
