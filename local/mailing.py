@@ -27,7 +27,11 @@ def blocks(body):
         lines = [line.rstrip() for line in chunk.split('\n') if line.strip()]
         if not lines:
             continue
-        if len(lines) == 1 and URL.fullmatch(lines[0].strip()):
+        labelled = re.fullmatch(r'\[([^\[\]\n]{2,40})\]\((https?://\S+)\)', lines[0].strip()) if len(lines) == 1 else None
+        if labelled:
+            # Botón con texto propio: «[Reagendar mi cita](https://…)» en una línea sola.
+            result.append(('button', (labelled[1], labelled[2])))
+        elif len(lines) == 1 and URL.fullmatch(lines[0].strip()):
             result.append(('link', lines[0].strip()))
         elif len(lines) >= 2 and all(FACT.match(line) and not URL.match(line.strip()) for line in lines):
             result.append(('facts', [FACT.match(line).groups() for line in lines]))
@@ -115,6 +119,8 @@ def join(parts):
             out.append('\n'.join('%s: %s' % pair for pair in value))
         elif kind == 'list':
             out.append('\n'.join('- ' + item for item in value))
+        elif kind == 'button':
+            out.append('[%s](%s)' % value)
         else:
             out.append(value)
     return '\n\n'.join(out)
@@ -147,6 +153,10 @@ def html(body, title, signature_html='', quoted_html=''):
             rows.append('<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%%" bgcolor="#f6f8fb" style="margin:0 0 16px;background-color:#f6f8fb;border:1px solid #e0e6ef;border-collapse:separate;">%s</table>' % cells)
         elif kind == 'list':
             rows.append('<ul style="margin:0 0 16px;padding:0 0 0 20px;%sfont-size:14px;line-height:22px;color:#263445;">%s</ul>' % (FONT, ''.join('<li style="margin:0 0 4px;">%s</li>' % e(item) for item in value)))
+        elif kind == 'button':
+            label, url = value
+            rows.append('<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:4px 0 10px;"><tr><td bgcolor="#1d5fb0" style="background-color:#1d5fb0;border-radius:6px;"><a href="%s" style="display:inline-block;padding:12px 26px;%sfont-size:15px;font-weight:bold;color:#ffffff;text-decoration:none;">%s</a></td></tr></table>'
+                        '<p style="margin:0 0 16px;%sfont-size:12px;line-height:18px;color:#5b6b82;word-break:break-all;">%s</p>' % (e(url), FONT, e(label), FONT, e(url)))
         elif kind == 'link':
             rows.append('<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:2px 0 8px;"><tr><td bgcolor="#1d5fb0" style="background-color:#1d5fb0;border-radius:6px;"><a href="%s" style="display:inline-block;padding:11px 22px;%sfont-size:14px;font-weight:bold;color:#ffffff;text-decoration:none;">Abrir enlace seguro</a></td></tr></table>'
                         '<p style="margin:0 0 16px;%sfont-size:12px;line-height:18px;color:#5b6b82;word-break:break-all;">%s</p>' % (e(value), FONT, FONT, e(value)))

@@ -77,6 +77,15 @@ def admin_reply(c,text,now):
   row=c.execute("SELECT o.id,o.code,s.label status,cl.name,d.brand,d.model,o.estimated_delivery,o.priority FROM orders o JOIN devices d ON d.id=o.device_id JOIN clients cl ON cl.id=d.client_id JOIN statuses s ON s.code=o.status WHERE o.code=?",(match[0].upper(),)).fetchone()
   if not row:return {'answer':'No existe una orden con el número '+match[0].upper()+'.','links':[link('Ver órdenes','#orders')]}
   return {'answer':f"{row['code']} está en «{row['status']}». Cliente: {row['name']}. Equipo: {' '.join(x for x in (row['brand'],row['model']) if x) or 'sin especificar'}. Entrega estimada: {row['estimated_delivery'] or 'sin definir'}.",'links':[link('Abrir la orden','#orders?id='+str(row['id']))]}
+ if has('inasistencia','no asistio','no asistieron','reagend'):
+  # Inasistencias de los últimos 7 días, enlaces enviados y citas reagendadas. Solo lectura.
+  since=(now-appointments.timedelta(days=7)).isoformat()
+  missed=c.execute("SELECT COUNT(*) FROM appointment_events WHERE event='no_show_auto' AND created_at>=?",(since,)).fetchone()[0]
+  sent=c.execute("SELECT COUNT(*) FROM appointment_reschedule_links WHERE mail_status='enviado' AND created_at>=?",(since,)).fetchone()[0]
+  failed=c.execute("SELECT COUNT(*) FROM appointment_reschedule_links WHERE mail_status='error' AND created_at>=?",(since,)).fetchone()[0]
+  again=c.execute("SELECT COUNT(*) FROM appointment_reschedule_links WHERE used_at>=?",(since,)).fetchone()[0]
+  answer=('En los últimos siete días se registraron %d inasistencias automáticas; %d clientes recibieron su enlace de reagendamiento%s y %d reagendaron su cita.'%(missed,sent,(' (%d con error de envío)'%failed) if failed else '',again)) if missed or sent or again else 'No se registraron inasistencias en los últimos siete días.'
+  return {'answer':answer,'links':[link('Abrir la agenda','#appointments')]}
  if has('licencia','renovacion','renovar','vencen','por vencer'):
   # Licencias Pro: próximas renovaciones (7 días) y resultado real de los recordatorios enviados. Solo lectura.
   import licenses

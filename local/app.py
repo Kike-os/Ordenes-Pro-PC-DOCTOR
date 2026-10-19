@@ -35,6 +35,7 @@ import remote_db
 import mail_tracking
 import reception
 import licenses
+import no_show
 import trusted_devices
 import service_terms
 import order_drafts
@@ -495,6 +496,46 @@ def send_license_mail(c,kind,data,actor,order_id=None,subject=None,intro=None,to
     return {'status':'enviado','label':'Aceptado por el servidor de correo','archive_id':archive_id,'error':''}
 
 
+def no_show_notify(c,row,token,rectify=False):
+    """Correo de servicio al cliente: «Reagenda tu cita técnica» (o rectificación si la inasistencia se registró por error), con la
+    plantilla institucional y la firma corporativa original. Devuelve (estado, detalle) para el registro del enlace."""
+    if not mail_pro.configured():return 'error','El correo del sistema no está configurado.'
+    when=appointments.datetime.fromisoformat(row['starts_at']).astimezone(appointments.TZ)
+    service=(c.execute('SELECT label FROM appointment_services WHERE code=?',(row['service_code'],)).fetchone() or {'label':'Servicio técnico'})['label']
+    if rectify:
+        subject='PC-DOCTOR S.A. | Rectificación sobre tu cita técnica'
+        lines=['Estimado/a '+row['customer_name']+':','','Le escribimos para rectificar un aviso anterior: por un error en nuestro registro le indicamos que no se registró su asistencia a la cita. Su cita sigue vigente y no necesita reagendarla.','',
+               'Número de cita: '+row['public_code'],'Servicio: '+service,'Fecha y hora: '+when.strftime('%d/%m/%Y, %H:%M')+' (hora de Ecuador)','','Disculpe las molestias.']
+        link=None
+    else:
+        link=public_base_url().rstrip('/')+'/reagendar/'+token
+        subject='PC-DOCTOR S.A. | Reagenda tu cita técnica'
+        lines=['Estimado/a '+row['customer_name']+':','','No se registró su asistencia a la cita técnica reservada. Nos gustaría atenderle en otra fecha: puede elegir un nuevo horario disponible desde su enlace privado.','',
+               'Número de cita: '+row['public_code'],'Servicio: '+service,'Fecha y hora reservadas: '+when.strftime('%d/%m/%Y, %H:%M')+' (hora de Ecuador)','','[Reagendar mi cita]('+link+')','',
+               'El enlace es personal y vence en %d días. Si necesita ayuda, escríbanos por WhatsApp al +593 98 746 0591.'%no_show.settings(c)['link_days']]
+    lines+=['','Atentamente,','','Departamento de Servicio Técnico','PC-DOCTOR S.A.']
+    try:
+        send_institutional(c,'appointment','Reagenda tu cita técnica' if not rectify else 'Rectificación de su cita',row['email'],subject,'\n'.join(lines),None,None,review=False,private=(link,) if link else ())
+    except mail_pro.MailError as error:
+        return 'error',str(error)[:200]
+    return 'enviado','Aceptado por el servidor de correo.'
+
+
+def no_show_tick(c,now,force=False):
+    """Revisión de inasistencias: la tarea diaria y, como mucho cada 5 minutos, la actividad del personal la ejecutan. Idempotente."""
+    if not force:
+        last=c.execute("SELECT value FROM system_state WHERE key='no_show_tick'").fetchone()
+        if last and last['value']>(now-appointments.timedelta(minutes=5)).isoformat(timespec='seconds'):return None
+    c.execute("INSERT INTO system_state(key,value) VALUES ('no_show_tick',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",(now.isoformat(timespec='seconds'),))
+    try:
+        summary=no_show.sweep(c,now,no_show_notify)
+    except Exception as error:
+        # Los errores quedan registrados para revisión administrativa; la tarea no se detiene ni repite cambios.
+        audit(c,None,'no_show_error');print('no-show',type(error).__name__,flush=True);return None
+    if summary['marked'] or summary['failed']:audit(c,None,'no_show_sweep')
+    return summary
+
+
 def license_notices_tick(c,now):
     """Tarea diaria: crea los avisos de renovación que tocan hoy (hora de Ecuador) y los envía, con reintentos controlados.
     Sin correo configurado o con los avisos desactivados no envía nada."""
@@ -943,7 +984,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         path = urlsplit(self.path).path
-        files = {'/static/label.css':'label.css','/static/tracking.css':'tracking.css','/static/licencias.css':'licencias.css','/static/app.css':'app.css','/static/app.js':'app.js','/static/service-picker.js':'service-picker.js','/static/licenses.js':'licenses.js','/static/form-validation.js':'form-validation.js','/static/appointments.js':'appointments.js','/static/adi-widget.js':'adi-widget.js','/static/adi-orb.js':'adi-orb.js','/static/ui-select.js':'ui-select.js','/static/ticket.css':'ticket.css','/static/ticket.js':'ticket.js','/static/quote.css':'quote.css','/static/quote-sign.js':'quote-sign.js','/static/echarts.min.js':'echarts.min.js','/static/logo-original.png':'logo-original.png',
+        files = {'/static/label.css':'label.css','/static/tracking.css':'tracking.css','/static/licencias.css':'licencias.css','/static/app.css':'app.css','/static/app.js':'app.js','/static/service-picker.js':'service-picker.js','/static/licenses.js':'licenses.js','/static/reschedule.js':'reschedule.js','/static/form-validation.js':'form-validation.js','/static/appointments.js':'appointments.js','/static/adi-widget.js':'adi-widget.js','/static/adi-orb.js':'adi-orb.js','/static/ui-select.js':'ui-select.js','/static/ticket.css':'ticket.css','/static/ticket.js':'ticket.js','/static/quote.css':'quote.css','/static/quote-sign.js':'quote-sign.js','/static/echarts.min.js':'echarts.min.js','/static/logo-original.png':'logo-original.png',
                  '/favicon.ico':'favicon.ico','/static/favicon.ico':'favicon.ico','/static/favicon-16.png':'favicon-16.png','/static/favicon-32.png':'favicon-32.png','/static/logo-firma.png':'logo-firma.png','/static/favicon-48.png':'favicon-48.png',
                  '/apple-touch-icon.png':'apple-touch-icon.png','/apple-touch-icon-precomposed.png':'apple-touch-icon.png','/static/apple-touch-icon.png':'apple-touch-icon.png'}
         # Logotipos de marcas: solo nombres simples dentro de static/brands; si el archivo no existe la interfaz usa un icono genérico.
@@ -962,6 +1003,9 @@ class Handler(BaseHTTPRequestHandler):
         with connect() as c:
             if path == '/citas':
                 return self.page('appointments.html')
+            if re.fullmatch(r'/reagendar/[A-Za-z0-9_-]{20,80}',path) or path=='/reagendar':
+                # Página pública de reagendamiento: los datos de la cita se piden por la API con el token (nunca en la URL de la página).
+                return self.page('reschedule.html')
             if path == '/novedades':
                 # Historial público: solo el registro de versiones ya publicado; sin datos internos ni de clientes.
                 try:registry=versioning.load()
@@ -1041,6 +1085,9 @@ class Handler(BaseHTTPRequestHandler):
                 expected=os.getenv('CRON_SECRET','')
                 if expected and not hmac.compare_digest(self.headers.get('Authorization',''),'Bearer '+expected):return self.reply(404,{'error':'No encontrado.'})
                 now=reception_now();maintenance_reminders_tick(c,now);stay_reminders_tick(c,now)
+                # Inasistencias: registra las vencidas y envía los avisos pendientes (también lo hace la actividad del personal cada 5 minutos).
+                try:no_show_tick(c,now,force=True)
+                except Exception as error:print('no-show cron',type(error).__name__,flush=True)
                 # Licencias Pro: avisos internos y correos de renovación a clientes (una vez al día, hora de Ecuador).
                 try:license_notices_tick(c,now)
                 except Exception as error:print('license-notices cron',type(error).__name__,flush=True)
@@ -1079,6 +1126,26 @@ class Handler(BaseHTTPRequestHandler):
                 import holidays
                 found=holidays.on(c,appointments.date.fromisoformat(query.get('date',[''])[0]))
                 return self.reply(200,{'slots':[{'time':r['time']} for r in rows],'holiday':{'label':found['label'],'mode':found['mode'],'scope':found['scope']} if found else None})
+            reschedule_info=re.fullmatch(r'/api/public/reschedule/([A-Za-z0-9_-]{20,80})',path)
+            if reschedule_info:
+                # Enlace privado de reagendamiento: estado de la cita, días con horarios realmente libres y, con ?date=, sus horarios.
+                if limited(c,'reschedule-ip:'+digest(self.client_address[0]),120,900):return self.reply(429,{'error':'Demasiadas consultas. Intenta más tarde.'})
+                now=reception_now();state,row,link=no_show.find(c,reschedule_info[1],now)
+                if state!='ok':return self.reply({'invalid':404,'expired':410}.get(state,409),{'error':no_show.MESSAGES[state],'state':state,'appointment':no_show.public(row) if row and state in ('used','closed','expired','limit') else None})
+                query=parse_qs(urlsplit(self.path).query);day=query.get('date',[''])[0]
+                if day:
+                    try:slots=[slot['time'] for slot in appointments.available_slots(c,day,row['service_code'])]
+                    except ValueError as error:return self.reply(400,{'error':str(error)})
+                    import holidays
+                    found=holidays.on(c,appointments.date.fromisoformat(day))
+                    return self.reply(200,{'slots':slots,'holiday':{'label':found['label'],'mode':found['mode']} if found else None})
+                days=[]
+                for offset in range(1,31):
+                    current=(now.date()+appointments.timedelta(days=offset)).isoformat()
+                    try:count=len(appointments.available_slots(c,current,row['service_code']))
+                    except ValueError:count=0
+                    days.append({'date':current,'slots':count})
+                return self.reply(200,{'state':'ok','appointment':no_show.public(row,link),'days':days})
             if path == '/api/public/appointments/manage':
                 query=parse_qs(urlsplit(self.path).query);code=query.get('code',[''])[0][:40];token=query.get('token',[''])[0]
                 row=c.execute('SELECT id,public_code,customer_name,device_type,brand,model,service_code,starts_at,status,generation,manage_token_hash FROM appointments WHERE deleted_at IS NULL AND public_code=?',(code,)).fetchone()
@@ -2142,6 +2209,23 @@ class Handler(BaseHTTPRequestHandler):
                         for private in ('client_id','client_new','client_review'):payload.pop(private,None)
                         return self.reply(status,payload)
                     return self.reply(status,payload)
+                if path=='/api/public/reschedule':
+                    # El cliente confirma su nueva fecha y hora desde el enlace privado. La transacción de escritura impide que dos personas
+                    # se queden con el mismo horario: la segunda recibe alternativas.
+                    if limited(c,'reschedule-post:'+digest(self.client_address[0]),30,900):return self.reply(429,{'error':'Demasiados intentos. Intenta más tarde.'})
+                    status,payload=no_show.confirm(c,str(data.get('token','')),str(data.get('date','')),str(data.get('time','')),reception_now())
+                    if status==200:
+                        row=c.execute('SELECT id FROM appointments WHERE public_code=?',(payload['code'],)).fetchone()
+                        audit(c,None,'appointment_rescheduled_by_client',row['id'])
+                        try:payload['mail']=appointment_mail.send(c,row['id'],'rescheduled')
+                        except Exception as error:print('reschedule-mail',type(error).__name__,flush=True)
+                    return self.reply(status,payload)
+                if path=='/api/public/reschedule/renew':
+                    # Enlace vencido: el cliente pide uno nuevo con su número de cita y su identificación. Respuesta siempre igual.
+                    if limited(c,'reschedule-renew:'+digest(self.client_address[0]),6,3600):return self.reply(429,{'error':'Demasiados intentos. Intenta más tarde.'})
+                    now=reception_now();row=no_show.renewable(c,data.get('code',''),data.get('identification',''),now)
+                    if row:no_show.deliver(c,row,now,no_show.settings(c),no_show_notify,'renovado')
+                    return self.reply(200,{'ok':True,'message':'Si los datos corresponden a una cita pendiente de reagendar y tiene correo registrado, le enviamos un enlace nuevo.'})
                 if path == '/api/public/appointments/manage':
                     code=str(data.get('code',''))[:40];token=str(data.get('token',''))
                     row=c.execute('SELECT * FROM appointments WHERE deleted_at IS NULL AND public_code=?',(code,)).fetchone()
@@ -2821,6 +2905,11 @@ class Handler(BaseHTTPRequestHandler):
                         if str(data.get('maintenance_id','')).isdigit():payload['maintenance_linked']=maintenance.link_appointment(c,int(data['maintenance_id']),payload['id'],user,reception_now())
                     return self.reply(status,payload)
                 appointment_route=re.fullmatch(r'/api/appointments/([0-9]+)',path)
+                if path=='/api/appointments/no-show':
+                    if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede configurar la agenda.'})
+                    try:saved=no_show.save_settings(c,data,reception_now())
+                    except ValueError as error:return self.reply(400,{'error':str(error)})
+                    audit(c,user['id'],'no_show_settings_saved');return self.reply(200,{'ok':True,'settings':saved})
                 if path=='/api/appointments/config':
                     if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede configurar la agenda.'})
                     status,payload=appointments.update_settings(c,data)
@@ -2831,6 +2920,19 @@ class Handler(BaseHTTPRequestHandler):
                     row=c.execute('SELECT * FROM appointments WHERE deleted_at IS NULL AND id=?',(int(appointment_route[1]),)).fetchone()
                     if not row:return self.reply(404,{'error':'Cita no disponible.'})
                     action=data.get('action');now=appointments.stamp(appointments.now())
+                    if action in ('send_reschedule','rectify'):
+                        # Enlace de reagendamiento manual (cita «No asistió») o rectificación tras reactivar una cita marcada por error.
+                        if user['role']!='administrador':return self.reply(403,{'error':'Solo administración envía estos avisos.'})
+                        if action=='send_reschedule':
+                            if row['status']!='no_asistio':return self.reply(409,{'error':'Solo las citas «No asistió» reciben un enlace de reagendamiento.'})
+                            cfg=no_show.settings(c);state=no_show.deliver(c,row,reception_now(),cfg,no_show_notify,'manual')
+                            audit(c,user['id'],'no_show_link_sent',row['id']);return self.reply(200,{'ok':state=='enviado','state':state,'link':no_show.latest(c,row['id'])})
+                        sent=c.execute("SELECT 1 FROM appointment_reschedule_links WHERE appointment_id=? AND mail_status='enviado'",(row['id'],)).fetchone()
+                        if row['status']=='no_asistio' or not sent:return self.reply(409,{'error':'La rectificación solo corresponde si la cita se reactivó después de haber enviado un aviso de inasistencia.'})
+                        if not (row['email'] or '').strip():return self.reply(409,{'error':'El cliente no tiene correo registrado.'})
+                        state,detail=no_show_notify(c,row,'',rectify=True)
+                        c.execute("INSERT INTO appointment_events(appointment_id,actor_id,event,created_at,detail) VALUES (?,?,'note',?,?)",(row['id'],user['id'],appointments.stamp(appointments.now()),'Rectificación enviada al cliente: '+('aceptada por el servidor de correo.' if state=='enviado' else 'no se pudo enviar ('+detail+').')))
+                        audit(c,user['id'],'no_show_rectified',row['id']);return self.reply(200,{'ok':state=='enviado','state':state})
                     if action=='resend_mail':
                         # Reintento expreso del último aviso que corresponde al estado actual de la cita.
                         kind=appointment_mail.kind_for(row['status'])
@@ -2847,11 +2949,13 @@ class Handler(BaseHTTPRequestHandler):
                         try:start=appointments.parse_start(str(data.get('starts_at','')))
                         except ValueError as error:return self.reply(400,{'error':str(error)})
                         result=appointments.reschedule(c,row,start,user);status=200 if result.get('ok') else 409;payload=result
+                        if status==200 and row['status']=='no_asistio':no_show.revoke(c,row['id'],reception_now())
                         if status==200:payload['mail']=appointment_mail.send(c,row['id'],'rescheduled')
                     elif action=='reactivar':
                         # Reactivar una cita cerrada por error: solo administración; sin avisos al cliente; el historial se conserva.
                         if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede reactivar una cita.'})
                         status,payload=appointments.reactivate(c,row,user)
+                        if status==200:no_show.revoke(c,row['id'],reception_now())
                         if status==200:maintenance.appointment_changed(c,row['id'],payload['status'],reception_now());audit(c,user['id'],'appointment_reactivated',row['id'])
                     elif action in ('confirmada','presente','completada','no_asistio','cancelada'):
                         if action not in appointments.STATUSES:return self.reply(400,{'error':'Estado de cita inválido.'})
@@ -2919,6 +3023,7 @@ class Handler(BaseHTTPRequestHandler):
                 if path == '/api/session/activity':
                     # Lo llama el navegador solo tras actividad real (teclado, clics, navegación) o al pulsar «Continuar sesión».
                     c.execute('UPDATE sessions SET last_activity=? WHERE token_hash=?',(int(time.time()),digest(token)))
+                    no_show_tick(c,reception_now())
                     return self.reply(200,{'ok':True,'idle_seconds':IDLE_SECONDS,'warning_seconds':IDLE_WARNING})
                 if path=='/api/maintenance/reminders':
                     import maintenance_reminders

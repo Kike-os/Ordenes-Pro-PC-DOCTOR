@@ -54,7 +54,10 @@ def pulse(c):
  extra=c.execute("SELECT COALESCE(group_concat(value,'|'),'') FROM system_state WHERE key IN ('appointments_buffer','appointments_confirmation','appointments_config_stamp')").fetchone()[0]
  import hashlib
  return hashlib.sha256(('%s|%s|%s|%s|%s|%s'%(row['total'],row['last'],row['moves'],row['gone'],events,extra)).encode()).hexdigest()[:16]
-def settings(c):return {'buffer':buffer_minutes(c),'confirmation':confirmation_mode(c),'hours':[dict(r) for r in c.execute('SELECT * FROM appointment_hours ORDER BY weekday')],'staff_hours':[dict(r) for r in c.execute('SELECT h.*,u.name technician FROM appointment_staff_hours h JOIN users u ON u.id=h.technician_id ORDER BY u.name,h.weekday')],'holidays':[dict(r) for r in c.execute('SELECT * FROM appointment_holidays WHERE hidden=0 ORDER BY day')],'services':[dict(r) for r in c.execute('SELECT code,label,duration_minutes,active FROM appointment_services ORDER BY label')]}
+def settings(c):
+ import no_show
+ return dict(_settings(c),no_show=no_show.settings(c))
+def _settings(c):return {'buffer':buffer_minutes(c),'confirmation':confirmation_mode(c),'hours':[dict(r) for r in c.execute('SELECT * FROM appointment_hours ORDER BY weekday')],'staff_hours':[dict(r) for r in c.execute('SELECT h.*,u.name technician FROM appointment_staff_hours h JOIN users u ON u.id=h.technician_id ORDER BY u.name,h.weekday')],'holidays':[dict(r) for r in c.execute('SELECT * FROM appointment_holidays WHERE hidden=0 ORDER BY day')],'services':[dict(r) for r in c.execute('SELECT code,label,duration_minutes,active FROM appointment_services ORDER BY label')]}
 def update_settings(c,data):
  try:
   for item in data.get('hours',[]):
@@ -362,6 +365,8 @@ def reschedule(c,row,start,user):
   return {'error':'Ese espacio no está disponible.'+(' Próximo espacio libre: '+options[0]['label']+'.' if options else ''),'alternatives':options}
  old=row['starts_at'];oldstatus=row['status'];created=stamp(now());generation=row['generation']+1
  c.execute("UPDATE appointments SET starts_at=?,technician_id=?,status='reprogramada',generation=?,updated_at=? WHERE id=?",(stamp(start),staff[0],generation,created,row['id']))
+ # Reagendar una cita a la que el cliente no asistió la marca como «Reagendada» (con su origen) y cuenta para el límite de reagendamientos.
+ if oldstatus=='no_asistio':c.execute('UPDATE appointments SET reschedules=reschedules+1,reschedule_origin=? WHERE id=?',('personal' if user else 'cliente',row['id']))
  c.execute('INSERT INTO appointment_events(appointment_id,actor_id,event,old_start,new_start,old_status,new_status,created_at) VALUES (?,?,?,?,?,?,?,?)',(row['id'],user['id'] if user else None,'rescheduled',old,stamp(start),oldstatus,'reprogramada',created))
  if row['email'] and row['communications_consent']:c.execute("INSERT OR IGNORE INTO appointment_notifications(appointment_id,generation,event,channel,result,created_at) VALUES (?,?,'rescheduled','email','pending',?)",(row['id'],generation,created))
  return {'ok':True,'starts_at':stamp(start)}
@@ -463,6 +468,8 @@ def detail(c,aid,full=False):
  data['mails']=appointment_mail.history(c,aid)
  data['authorization']=authorization(c,aid,full)
  data['services']=service_items(c,aid)
+ import no_show
+ data['reschedule_link']=no_show.latest(c,aid)
  return data
 def agenda(c,start,end):
  """Fuente única de la Agenda de Mantenimientos de Clientes: citas del período y su resumen."""
