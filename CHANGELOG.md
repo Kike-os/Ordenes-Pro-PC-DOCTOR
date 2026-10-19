@@ -4,6 +4,15 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.172 — 2026-10-19 14:04 (UTC-05:00)
+
+Licencias Pro: vigencias, renovaciones, notificaciones y Mis licencias
+
+### Nuevas funcionalidades
+
+- Licencias Pro — Control de Vigencia y Renovaciones: registro de licencias nuevas con logo y comprobante, vigencia por activación, compra o fecha fija, activación, renovaciones con historial, entrega manual, devoluciones y Mis licencias en la ficha del cliente
+- Notificaciones de renovación por correo con plantilla corporativa, configurables, con historial, reintentos y exclusión por cliente (desactivadas hasta activarlas)
+
 ## v1.5.171 — 2026-10-19 13:20 (UTC-05:00)
 
 Consecutivo diario de órdenes PCD-AAAAMMDD-0001

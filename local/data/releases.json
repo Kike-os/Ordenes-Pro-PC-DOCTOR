@@ -8,6 +8,23 @@
   },
   "releases": [
     {
+      "version": "1.5.172",
+      "date": "2026-10-19T14:04:22-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Licencias Pro: vigencias, renovaciones, notificaciones y Mis licencias",
+      "changes": {
+        "features": [
+          "Licencias Pro — Control de Vigencia y Renovaciones: registro de licencias nuevas con logo y comprobante, vigencia por activación, compra o fecha fija, activación, renovaciones con historial, entrega manual, devoluciones y Mis licencias en la ficha del cliente",
+          "Notificaciones de renovación por correo con plantilla corporativa, configurables, con historial, reintentos y exclusión por cliente (desactivadas hasta activarlas)"
+        ],
+        "improvements": [],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.171",
       "date": "2026-10-19T13:20:00-05:00",
       "type": "patch",
