@@ -4,6 +4,18 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.169 — 2026-10-19 12:37 (UTC-05:00)
+
+Recordar mi sesión, equipos de confianza y cierre de sesión en todos los dispositivos
+
+### Mejoras realizadas
+
+- Recordar mi sesión: hasta 30 días aunque se cierre el navegador; dispositivos de confianza en Configuración y cierre de sesión en todos los dispositivos
+
+### Actualizaciones de seguridad
+
+- Confiar en este equipo durante 30 días tras la verificación en dos pasos, con tokens guardados solo como huella y revocación automática
+
 ## v1.5.168 — 2026-10-19 09:56 (UTC-05:00)
 
 Corrección de estilos de la entrega de licencias

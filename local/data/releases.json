@@ -8,6 +8,24 @@
   },
   "releases": [
     {
+      "version": "1.5.169",
+      "date": "2026-10-19T12:37:43-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Recordar mi sesión, equipos de confianza y cierre de sesión en todos los dispositivos",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Recordar mi sesión: hasta 30 días aunque se cierre el navegador; dispositivos de confianza en Configuración y cierre de sesión en todos los dispositivos"
+        ],
+        "fixes": [],
+        "security": [
+          "Confiar en este equipo durante 30 días tras la verificación en dos pasos, con tokens guardados solo como huella y revocación automática"
+        ],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.168",
       "date": "2026-10-19T09:56:54-05:00",
       "type": "patch",
