@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.170 — 2026-10-19 13:01 (UTC-05:00)
+
+Corrección de equipos de confianza en producción
+
+### Errores corregidos
+
+- Equipos de confianza en producción: la cookie de confianza y el cierre de sesión en todos los dispositivos llegan correctamente al navegador
+
 ## v1.5.169 — 2026-10-19 12:37 (UTC-05:00)
 
 Recordar mi sesión, equipos de confianza y cierre de sesión en todos los dispositivos

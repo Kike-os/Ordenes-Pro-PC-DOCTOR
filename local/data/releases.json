@@ -8,6 +8,22 @@
   },
   "releases": [
     {
+      "version": "1.5.170",
+      "date": "2026-10-19T13:01:13-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Corrección de equipos de confianza en producción",
+      "changes": {
+        "features": [],
+        "improvements": [],
+        "fixes": [
+          "Equipos de confianza en producción: la cookie de confianza y el cierre de sesión en todos los dispositivos llegan correctamente al navegador"
+        ],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.169",
       "date": "2026-10-19T12:37:43-05:00",
       "type": "patch",
