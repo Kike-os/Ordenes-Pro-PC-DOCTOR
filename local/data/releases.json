@@ -8,6 +8,24 @@
   },
   "releases": [
     {
+      "version": "1.5.173",
+      "date": "2026-10-19T14:44:24-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Rediseño de Licencias Pro y del Centro de notificaciones",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Registrar nueva licencia y Vender o entregar licencia rediseñados por secciones, con resumen comercial, activación y pie fijo; Centro de notificaciones con contadores «sin leer · en total», filtros, ocultar avisos e historial"
+        ],
+        "fixes": [
+          "Licencias Pro: los formularios ya no tienen desplazamiento horizontal ni botones cortados (la ventana imponía un ancho mínimo mayor que su tamaño)"
+        ],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.172",
       "date": "2026-10-19T14:04:22-05:00",
       "type": "patch",

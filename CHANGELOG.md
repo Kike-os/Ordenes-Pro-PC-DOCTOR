@@ -4,6 +4,18 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.173 — 2026-10-19 14:44 (UTC-05:00)
+
+Rediseño de Licencias Pro y del Centro de notificaciones
+
+### Mejoras realizadas
+
+- Registrar nueva licencia y Vender o entregar licencia rediseñados por secciones, con resumen comercial, activación y pie fijo; Centro de notificaciones con contadores «sin leer · en total», filtros, ocultar avisos e historial
+
+### Errores corregidos
+
+- Licencias Pro: los formularios ya no tienen desplazamiento horizontal ni botones cortados (la ventana imponía un ancho mínimo mayor que su tamaño)
+
 ## v1.5.172 — 2026-10-19 14:04 (UTC-05:00)
 
 Licencias Pro: vigencias, renovaciones, notificaciones y Mis licencias
