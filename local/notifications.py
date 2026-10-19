@@ -154,7 +154,7 @@ def quota_level(quota):
     return min(100, round(quota['used'] * 100 / quota['limit']))
 
 
-def build(c, user, now, mail_access=False):
+def build(c, user, now, mail_access=False, hidden=False):
     """Lista ordenada de la más reciente a la más antigua. Solo incluye lo que este usuario puede ver."""
     today = now.date().isoformat()
     stamp = now.isoformat(timespec='seconds')
@@ -338,13 +338,36 @@ def build(c, user, now, mail_access=False):
             items.append({'key': 'event:' + str(row['id']), 'kind': kind, 'icon': icon, 'title': row['code'] + ' · ' + label,
                           'detail': ' · '.join(part for part in (text, row['actor']) if part), 'at': row['occurred_at'], 'href': '#orders?id=' + str(row['order_id']), 'group': 'event'})
     read = {row['key'] for row in c.execute('SELECT key FROM notification_reads WHERE user_id=?', (user['id'],))}
+    # Avisos ocultos por esta persona: no se borran; se consultan aparte («Ver ocultas») y se pueden volver a mostrar.
+    concealed = {row['key'] for row in c.execute('SELECT key FROM notification_hidden WHERE user_id=?', (user['id'],))}
+    items = [item for item in items if (item['key'] in concealed) == hidden]
     for item in items:
         item['read'] = item['key'] in read
+        item['hideable'] = not CRITICAL.match(item['key'])
     items.sort(key=lambda item: (item['group'] != 'alert', ), reverse=False)
     alerts = [item for item in items if item['group'] == 'alert']
     rest = sorted((item for item in items if item['group'] != 'alert'), key=lambda item: item['at'], reverse=True)
     ordered = alerts + rest
-    return {'items': ordered[:40], 'unread': sum(1 for item in ordered[:40] if not item['read'])}
+    shown = ordered[:40]
+    return {'items': shown, 'unread': sum(1 for item in shown if not item['read']), 'total': len(shown), 'hidden_count': len(concealed)}
+
+
+# Los riesgos de infraestructura (almacenamiento, respaldos) no se pueden ocultar: siguen visibles mientras exista la condición.
+CRITICAL = re.compile(r'(storage|backup):')
+
+
+def hide(c, user, keys, now, restore=False):
+    """Oculta (o vuelve a mostrar) avisos de esta persona. Solo claves que hoy le pertenecen y que no son riesgos críticos."""
+    if restore:
+        for key in keys:c.execute('DELETE FROM notification_hidden WHERE user_id=? AND key=?', (user['id'], key))
+        return len(keys)
+    valid = {item['key'] for item in build(c, user, now, True)['items'] if item['hideable']}
+    chosen = [key for key in keys if KEY.fullmatch(key) and key in valid]
+    for key in chosen:
+        c.execute('INSERT OR IGNORE INTO notification_hidden(user_id,key,hidden_at) VALUES (?,?,?)', (user['id'], key, now.isoformat(timespec='seconds')))
+        c.execute('INSERT OR IGNORE INTO notification_reads(user_id,key,read_at) VALUES (?,?,?)', (user['id'], key, now.isoformat(timespec='seconds')))
+    c.execute('DELETE FROM notification_hidden WHERE user_id=? AND hidden_at<?', (user['id'], (now - appointments.timedelta(days=120)).isoformat(timespec='seconds')))
+    return len(chosen)
 
 
 def mark(c, user, keys, now):

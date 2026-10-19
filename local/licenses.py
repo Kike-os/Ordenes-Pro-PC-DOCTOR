@@ -430,10 +430,15 @@ def register_new(c,data,user,now):
     """«+ Registrar nueva licencia»: crea el producto si todavía no existe (con su logo) y registra la primera licencia, todo o nada."""
     if str(data.get('product_id') or '').isdigit():
         return {'product_id':int(data['product_id']),'unit_id':register(c,data,user,now)}
+    if str(data.get('lines') or '').strip():
+        # Producto nuevo con varias licencias: todo en la misma transacción (si una línea falla, no se crea nada).
+        product=create_product(c,data,user,now)
+        units=register_many(c,dict(data,product_id=str(product)),user,now)
+        return {'product_id':product,'unit_id':units[0],'count':len(units)}
     _clean_secret(data)
     product=create_product(c,data,user,now)
     unit=register(c,dict(data,product_id=str(product)),user,now)
-    return {'product_id':product,'unit_id':unit}
+    return {'product_id':product,'unit_id':unit,'count':1}
 
 
 def register_many(c,data,user,now):
@@ -681,19 +686,41 @@ def deliver(c,data,user,now):
     if balance>0 and data.get('accept_balance') is not True:
         raise LicenseError('La orden tiene un saldo pendiente de %s. Para entregar igualmente, confírmalo expresamente.'%equipment.usd(balance),409,{'accept_balance':'Confirmación obligatoria.'})
     notes=_text(data,'notes',300,'Las observaciones');moment=stamp(now);token=secrets.token_urlsafe(32)
-    delivery=c.execute("INSERT INTO license_deliveries(order_id,client_id,kind,status,payment_confirmed_by,payment_confirmed_at,balance_cents,authorized_by,authorized_at,token_hash,token_expires_at,notes,created_at,updated_at) VALUES (?,?,?,'autorizada',?,?,?,?,?,?,?,?,?,?)",
-                       (order_id,client,kind,user['id'],moment,balance,user['id'],moment,_hash(token),stamp(now+timedelta(hours=LINK_HOURS)),notes,moment,moment)).lastrowid
+    # Datos comerciales informativos: precio, descuento autorizado y estado del pago. No se confirma ni registra ningún pago.
+    price=_cents(data.get('price'),'price','el precio de venta')
+    if price is None and kind=='directa':price=_product(c,units[0]['product_id'])['price_cents']
+    discount=_cents(data.get('discount'),'discount','el descuento') or 0
+    if price is not None and discount>price:raise LicenseError('El descuento no puede superar el precio de venta.',fields={'discount':'Descuento mayor que el precio.'})
+    payment=str(data.get('payment_status') or '')
+    if payment not in ('','pagado','parcial','pendiente','incluido'):raise LicenseError('Selecciona el estado del pago.',fields={'payment_status':'Opción no válida.'})
+    activation=_date(data.get('activated_at'),'activated_at',now.date(),future=False) if data.get('activated') is True else ''
+    if data.get('activated') is True and not activation:raise LicenseError('Indica la fecha real de activación.',fields={'activated_at':'Fecha obligatoria.'})
+    delivery=c.execute("INSERT INTO license_deliveries(order_id,client_id,kind,status,payment_confirmed_by,payment_confirmed_at,balance_cents,authorized_by,authorized_at,token_hash,token_expires_at,notes,price_cents,discount_cents,payment_status,created_at,updated_at) VALUES (?,?,?,'autorizada',?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                       (order_id,client,kind,user['id'],moment,balance,user['id'],moment,_hash(token),stamp(now+timedelta(hours=LINK_HOURS)),notes,price,discount,payment,moment,moment)).lastrowid
     for unit in units:
         allowed=('reservada',) if kind=='orden' else ('disponible',)
         if not c.execute("UPDATE license_units SET status='entregada',delivered_at=?,client_id=?,order_id=COALESCE(order_id,?),quote_id=COALESCE(quote_id,?),delivery_id=?,updated_at=? WHERE id=? AND status IN (%s)"%','.join('?'*len(allowed)),
                          (moment,client,order_id,quote,delivery,moment,unit['id'],*allowed)).rowcount:
             raise LicenseError('Una licencia cambió de estado mientras se entregaba. Vuelve a intentarlo.',409)
         event(c,'entregada',now,'Entrega confirmada manualmente por administración%s.%s'%(' con saldo pendiente de '+equipment.usd(balance)+' aceptado' if balance>0 else '',' '+notes if notes else ''),unit['id'],unit['product_id'],delivery,order_id,client,user)
-    event(c,'entrega_autorizada',now,'Entrega de %d %s al cliente. Enlace privado válido %d horas.'%(len(units),'licencia' if len(units)==1 else 'licencias',LINK_HOURS),delivery=delivery,order=order_id,client=client,user=user)
+    event(c,'entrega_autorizada',now,'Entrega de %d %s al cliente. Enlace privado válido %d horas.%s'%(len(units),'licencia' if len(units)==1 else 'licencias',LINK_HOURS,
+          (' Precio %s, descuento %s, total %s; pago: %s (informativo).'%(usd(price),usd(discount),usd(price-discount),payment or 'sin indicar')) if price is not None else ''),delivery=delivery,order=order_id,client=client,user=user)
+    if activation:
+        for unit in units:confirm_activation(c,unit['id'],activation,user,now)
     if order_id:
         import order_workspace
         order_workspace.event(c,order_id,user['id'],now,'follow_up','Licencias entregadas: '+', '.join(u['code']+' ('+u['product_name']+')' for u in units)+'.')
     return delivery,token
+
+
+def order_info(c,code):
+    """Resumen informativo de una orden para la venta: cliente, saldo y presupuestos. None si no existe."""
+    import equipment
+    row=c.execute("SELECT o.id,o.code,d.client_id,cl.name client FROM orders o JOIN devices d ON d.id=o.device_id JOIN clients cl ON cl.id=d.client_id WHERE upper(o.code)=upper(?)",(str(code or '').strip(),)).fetchone()
+    if not row:return None
+    money=equipment.money(c,row['id'])
+    return {'order_id':row['id'],'code':row['code'],'client_id':row['client_id'],'client':row['client'],'balance_cents':money['balance_cents'],'paid_cents':money['paid_cents'],
+            'quotes':[r[0] for r in c.execute("SELECT code FROM quotes WHERE order_id=? AND deleted_at='' ORDER BY version DESC",(row['id'],))]}
 
 
 def delivery_row(c,delivery_id):
@@ -839,7 +866,7 @@ def deliveries(c,now):
                        "LEFT JOIN users u ON u.id=d.authorized_by ORDER BY d.id DESC LIMIT 300"):
         row=dict(r);units_of=_delivery_units(c,row['id'])
         history.append({'id':row['id'],'kind':row['kind'],'status':row['status'],'client':row['client'],'order':row['order_code'],'by':row['by_name'],'at':row['authorized_at'] or row['payment_confirmed_at'],
-                        'balance_cents':row['balance_cents'],'notes':row['notes'],'reveal_count':row['reveal_count'],'link_active':row['status']=='autorizada' and row['token_expires_at']>stamp(now),
+                        'balance_cents':row['balance_cents'],'notes':row['notes'],'reveal_count':row['reveal_count'],'price_cents':row['price_cents'],'discount_cents':row['discount_cents'],'payment_status':row['payment_status'],'link_active':row['status']=='autorizada' and row['token_expires_at']>stamp(now),
                         'units':[{'code':u['code'],'product':u['product_name'],'status':u['status']} for u in units_of]})
     return {'waiting':out,'history':history}
 

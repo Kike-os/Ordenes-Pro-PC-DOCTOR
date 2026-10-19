@@ -58,3 +58,24 @@ Módulo «Licencias» del panel (solo administración). Migraciones 062 (inventa
 
 ## Pendiente de decisión
 - Correo automático de **confirmación de renovación** al cliente (propuesto en el encargo como mejora adicional): no implementado.
+
+## Rediseño (1.5.173)
+- **Causa del desplazamiento horizontal y del botón cortado:** el formulario ancho imponía `min-width:min(760px,88vw)` dentro de una
+  ventana de 650 px como máximo. Se retiró ese mínimo y las ventanas de licencias tienen ahora encabezado fijo (título y cierre), cuerpo
+  con desplazamiento solo vertical y pie fijo con las acciones; dos columnas en escritorio y una en móvil; ningún elemento sobresale.
+- **Registrar nueva licencia:** secciones A. Producto (con vista previa del logotipo), B. Configuración, C. Comercial y D. Inventario y
+  credenciales (una o varias claves, contador en vivo, aviso de líneas repetidas). Producto nuevo con varias claves en una sola operación.
+  Validación inmediata con el mensaje bajo cada campo. Botón «Guardar licencia».
+- **Vender o entregar licencia:** 1. Cliente (búsqueda y tarjeta con su correo), 2. Producto (tarjetas con logo, fabricante, duración,
+  dispositivos, precio y disponibles; las agotadas no se pueden elegir; clave individual opcional), 3. Comercial (orden con su saldo,
+  presupuesto, precio, descuento autorizado, total y estado de pago **informativo**), 4. Entrega y activación (fecha, responsable, estado
+  inicial, activación real opcional y vencimiento calculado), 5. Resumen. Precio, descuento y estado de pago se guardan en la entrega
+  (migración 065). No se confirma ningún pago.
+
+## Centro de notificaciones (1.5.173)
+- Las tarjetas muestran «N sin leer · M en total» por categoría (antes el número grande era el de no leídos sin indicarlo) y el encabezado
+  el total general. Filtros: Todas, Sin leer, Licencias, Órdenes, Citas, Correos, Conversaciones y Sistema.
+- Cada aviso: icono, título, resumen, fecha, indicador de lectura, «Marcar como leída», «Ocultar» y enlace. «Ver ocultas» permite
+  recuperarlas (tabla `notification_hidden`, por persona; los riesgos de almacenamiento y respaldos no se pueden ocultar).
+- «Marcar todas como leídas» indica «Todo está leído» cuando no hay pendientes, con contraste legible. Sin pendientes: «No tienes
+  notificaciones pendientes». Los contadores salen de la base y se conservan al recargar.

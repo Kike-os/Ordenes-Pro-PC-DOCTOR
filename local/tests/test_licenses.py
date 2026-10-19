@@ -307,3 +307,67 @@ class LicenseProTests(unittest.TestCase):
 
 
 if __name__=='__main__':unittest.main()
+
+
+class LicenseSaleRedesignTests(LicenseProTests):
+    """Rediseño de la venta y del registro: datos comerciales, activación al entregar, alta con varias claves y ventanas sin desbordes."""
+    # Solo reutiliza los ayudantes: las pruebas de la clase base no se repiten aquí.
+    for _name in [n for n in vars(LicenseProTests) if n.startswith('test_')]:locals()[_name]=None
+    def test_sale_with_price_discount_payment_and_activation(self):
+        self.admin();made=self.new_product();client=self.client_id();order,_=self.order_with_quote(made['product_id'])
+        with app.connect() as c:code=c.execute('SELECT code FROM orders WHERE id=?',(order,)).fetchone()[0]
+        info=self.get('/api/licenses/order-info?code='+code.lower())['body'];self.assertEqual((info['order_id'],info['client_id']),(order,client))
+        self.assertEqual(self.get('/api/licenses/order-info?code=PCD-00000000-0000')['status'],404)
+        bad=self.post('/api/licenses/deliver',client_id=str(client),product_id=str(made['product_id']),price='30',discount='31')
+        self.assertEqual(bad['status'],400);self.assertEqual(self.unit(made['unit_id'])['status'],'disponible')      # nada a medias
+        day=(self.today()-timedelta(days=2)).isoformat()
+        done=self.post('/api/licenses/deliver',client_id=str(client),product_id=str(made['product_id']),unit_id=str(made['unit_id']),order_code=code,price='30',discount='5',payment_status='pagado',activated=True,activated_at=day)
+        self.assertEqual(done['status'],200,done['body'])
+        with app.connect() as c:row=c.execute('SELECT price_cents,discount_cents,payment_status FROM license_deliveries').fetchone()
+        self.assertEqual(tuple(row),(3000,500,'pagado'))
+        unit=self.unit(made['unit_id']);self.assertEqual((unit['status'],unit['activated'],unit['activated_at'],unit['expires_at']),('entregada',1,day,licenses.add_months(date.fromisoformat(day),12).isoformat()))
+        history=self.get('/api/licenses/deliveries')['body']['history'][0];self.assertEqual((history['price_cents'],history['discount_cents'],history['payment_status']),(3000,500,'pagado'))
+        self.assertEqual(self.post('/api/licenses/deliver',client_id=str(client),product_id=str(made['product_id']),unit_id=str(made['unit_id']))['status'],409)
+
+    def test_new_product_with_several_keys_is_atomic(self):
+        self.admin()
+        failed=self.post('/api/licenses/new',name='Lote fallido ficticio',line='antivirus',duration='anual',validity_mode='activacion',price='20',lines='LOTE-KEY-0001\nLOTE-KEY-0001')
+        self.assertEqual(failed['status'],400)
+        with app.connect() as c:self.assertIsNone(c.execute("SELECT 1 FROM catalog_items WHERE name='Lote fallido ficticio'").fetchone())
+        made=self.post('/api/licenses/new',name='Lote correcto ficticio',line='antivirus',duration='anual',validity_mode='activacion',price='20',lines='LOTE-KEY-0001\nLOTE-KEY-0002\ncuenta@example.invalid;Clave 3')
+        self.assertEqual((made['status'],made['body']['count']),(201,3),made['body'])
+
+    def test_license_dialog_styles_never_force_a_minimum_width(self):
+        css=(app.ROOT/'static'/'app.css').read_text(encoding='utf-8')
+        self.assertNotIn('license-dialog-wide .license-form-grid{min-width',css)
+        self.assertIn('.license-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 16px;min-width:0}',css)
+        self.assertIn('.license-form-body{overflow-y:auto;overflow-x:hidden',css)
+
+
+class NoticeCenterTests(unittest.TestCase):
+    setUpClass=classmethod(test_app.SecurityTests.setUpClass.__func__)
+    setUp=test_app.SecurityTests.setUp
+    tearDown=test_app.SecurityTests.tearDown
+    request=test_app.SecurityTests.request
+    login=test_app.SecurityTests.login
+    order_data=test_app.SecurityTests.order_data
+
+    def test_hide_restore_and_exact_counters(self):
+        cookie,csrf=self.login()
+        for n in range(2):self.request('/api/orders',self.order_data({'request_key':'notice-center-%04d'%n}),cookie=cookie,csrf=csrf)
+        with app.connect() as c:
+            other=c.execute("INSERT INTO users(username,email,name,password_hash,role,created_at) VALUES ('tec2','tec2@example.invalid','Técnico 2',?,'tecnico',0)",(self.hash,)).lastrowid
+            c.execute("INSERT INTO order_history(order_id,actor_id,event,status_label,comment,occurred_at) SELECT id,?, 'follow_up','', 'Seguimiento ficticio', ? FROM orders",(other,app.reception_now().isoformat()))
+        data=self.request('/api/notifications',cookie=cookie)['body']
+        self.assertEqual(data['total'],len(data['items']));self.assertGreaterEqual(data['total'],1)
+        item=next(i for i in data['items'] if i['hideable'])
+        hidden=self.request('/api/notifications/hide',{'keys':item['key']},cookie=cookie,csrf=csrf)['body']
+        self.assertNotIn(item['key'],[i['key'] for i in hidden['items']]);self.assertEqual((hidden['total'],hidden['hidden_count']),(data['total']-1,1))
+        listed=self.request('/api/notifications?hidden=1',cookie=cookie)['body']['items'];self.assertEqual([i['key'] for i in listed],[item['key']])
+        restored=self.request('/api/notifications/hide',{'keys':item['key'],'restore':True},cookie=cookie,csrf=csrf)['body']
+        self.assertIn(item['key'],[i['key'] for i in restored['items']]);self.assertEqual(restored['hidden_count'],0)
+        self.assertEqual(self.request('/api/notifications/hide',{'keys':''},cookie=cookie,csrf=csrf)['status'],400)
+        read=self.request('/api/notifications/read',{'all':True},cookie=cookie,csrf=csrf)['body'];self.assertEqual(read['unread'],0)
+        self.assertEqual(self.request('/api/notifications',cookie=cookie)['body']['unread'],0)                  # se conserva al recargar
+        import notifications
+        self.assertTrue(notifications.CRITICAL.match('storage:local'));self.assertFalse(notifications.CRITICAL.match('event:12'))

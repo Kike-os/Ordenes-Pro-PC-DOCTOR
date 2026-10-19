@@ -1721,7 +1721,7 @@ class Handler(BaseHTTPRequestHandler):
                 activity=[{'label':labels[r['action']],'at':r['created_at']} for r in c.execute('SELECT action,created_at FROM audit WHERE user_id=? AND action IN ('+','.join('?' for _ in labels)+') ORDER BY id DESC LIMIT 12',(user['id'],*labels))]
                 return self.reply(200, {'profile':{k:user[k] for k in ('name','username','email','role')},'me':user['id'],'second_step':two_factor.status(c,user['id']),'trusted_devices':trusted_devices.active(c,user['id']),'active_sessions':c.execute('SELECT COUNT(*) FROM sessions WHERE user_id=? AND expires>?',(user['id'],int(time.time()))).fetchone()[0],'security_activity':activity,'registration_enabled':registration_enabled(),'captcha_mode':captcha_mode(),'mail':mail_pro.status(),'mail_signature':mail_signature(c),'mail_signature_card':mail_signature_card(c) if mail_pro.configured() else None,'accounts':[dict(r) for r in c.execute("SELECT u.id,u.name,u.username,u.email,u.role,u.active,(SELECT MAX(a.created_at) FROM audit a WHERE a.user_id=u.id AND a.action='login') last_login,(SELECT COUNT(*) FROM sessions s WHERE s.user_id=u.id AND s.expires>?) sessions,EXISTS(SELECT 1 FROM user_mfa m WHERE m.user_id=u.id AND m.confirmed_at IS NOT NULL) second_step FROM users u WHERE u.approval='approved' ORDER BY u.id",(int(time.time()),))],'requests':[dict(r) for r in c.execute("SELECT id,name,username,email,phone,identification,job_title,requested_at,approval FROM users WHERE approval IN ('pending','rejected') ORDER BY approval,id DESC")],'smtp_configured':bool(security_mail_ready()),'smtp_route':security_mail_ready(),'openai_configured':bool(os.getenv('OPENAI_API_KEY')),'login_lockout_seconds':auth_policy(c)['lockout_seconds'],'auth_policy':auth_policy(c),'antibot_configured':bool(os.getenv('TURNSTILE_SITE_KEY') and os.getenv('TURNSTILE_SECRET_KEY')),'origin':os.getenv('APP_URL','http://127.0.0.1:8010')})
             if path == '/api/notifications':
-                result=notifications.build(c,user,reception_now(),mail_allowed(user))
+                result=notifications.build(c,user,reception_now(),mail_allowed(user),parse_qs(urlsplit(self.path).query).get('hidden',[''])[0]=='1')
                 # Versión que ejecuta el servidor: permite avisar a una pestaña que quedó abierta con una versión anterior.
                 try:result['app_version']=versioning.load()['releases'][0]['version']
                 except Exception:pass
@@ -1867,6 +1867,8 @@ class Handler(BaseHTTPRequestHandler):
                         product=arg('product');client=arg('client')
                         return self.reply(200,{'rows':licenses.units(c,now,int(product) if product.isdigit() else None,arg('status'),arg('q')[:120],arg('state'),arg('from')[:10],arg('to')[:10],int(client) if client.isdigit() else None)})
                     if path=='/api/licenses/deliveries':return self.reply(200,licenses.deliveries(c,now))
+                    if path=='/api/licenses/order-info':
+                        info=licenses.order_info(c,arg('code')[:40]);return self.reply(200,info) if info else self.reply(404,{'error':'No existe una orden con ese número.'})
                     if path=='/api/licenses/history':
                         unit=arg('unit');return self.reply(200,{'rows':licenses.history(c,300,int(unit) if unit.isdigit() else None),'renewals':licenses.renewals(c,int(unit)) if unit.isdigit() else []})
                     if path=='/api/licenses/notices':
@@ -2626,6 +2628,11 @@ class Handler(BaseHTTPRequestHandler):
                         return self.reply(400 if error.kind=='configuracion' else 502,{'error':str(error),'kind':error.kind})
                     finally:
                         if client is not None:mail_pro.close_imap(client)
+                if path=='/api/notifications/hide':
+                    keys=[key for key in str(data.get('keys','')).split(',') if key][:60]
+                    if not keys:return self.reply(400,{'error':'Indica el aviso.'})
+                    notifications.hide(c,user,keys,reception_now(),data.get('restore') is True)
+                    return self.reply(200,notifications.build(c,user,reception_now(),mail_allowed(user)))
                 if path=='/api/notifications/read':
                     keys=None if data.get('all') is True else [key for key in str(data.get('keys','')).split(',') if key][:60]
                     notifications.mark(c,user,keys,reception_now())
