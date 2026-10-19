@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.171 — 2026-10-19 13:20 (UTC-05:00)
+
+Consecutivo diario de órdenes PCD-AAAAMMDD-0001
+
+### Errores corregidos
+
+- Número de orden: vuelve el consecutivo diario PCD-AAAAMMDD-0001 (reinicia cada día en hora de Ecuador), sin duplicados ni saltos por intentos fallidos y con aviso controlado al llegar a 9999
+
 ## v1.5.170 — 2026-10-19 13:01 (UTC-05:00)
 
 Corrección de equipos de confianza en producción
