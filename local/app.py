@@ -35,6 +35,7 @@ import remote_db
 import mail_tracking
 import reception
 import licenses
+import trusted_devices
 import service_terms
 import order_drafts
 import live_support
@@ -690,7 +691,7 @@ def auth_event(c,account_hash,ip_hash,result):
 
 
 # Cierre por inactividad: una sesión sin actividad real de la persona durante IDLE_SECONDS deja de ser válida en el servidor.
-# El navegador avisa IDLE_WARNING segundos antes. «Recordarme» alarga la vida máxima de la sesión, no el tiempo de inactividad.
+# El navegador avisa IDLE_WARNING segundos antes. Las sesiones con «Recordar mi sesión» no caducan por inactividad: duran hasta 30 días.
 IDLE_SECONDS = 15*60
 IDLE_WARNING = 2*60
 # El navegador lleva la cuenta exacta y avisa al servidor de la actividad como mucho una vez por minuto: el servidor concede ese margen
@@ -719,13 +720,16 @@ def login_risky(c, keys):
     return any((c.execute('SELECT count FROM attempts WHERE bucket=? AND expires>?',(key,now)).fetchone() or [0])[0]>=2 for key in keys)
 
 
-def make_session(c, user_id, remember=False):
+def make_session(c, user_id, remember=False, agent=''):
+    """Sesión nueva. «Recordar mi sesión» la mantiene hasta remember_days (máximo 30) aunque se cierre el navegador; una sesión normal
+    dura como mucho session_hours, termina al cerrar el navegador y se cierra tras IDLE_SECONDS sin actividad."""
     token, csrf = secrets.token_urlsafe(32), secrets.token_urlsafe(32)
     policy=auth_policy(c)
-    age = policy['remember_days']*86400 if remember else policy['session_hours']*3600
+    age = min(policy['remember_days'],30)*86400 if remember else policy['session_hours']*3600
     now=int(time.time())
-    c.execute('DELETE FROM sessions WHERE expires<? OR last_activity<?', (now,now-IDLE_SECONDS-IDLE_GRACE))
-    c.execute('INSERT INTO sessions(token_hash,user_id,csrf,expires,last_activity) VALUES (?,?,?,?,?)', (digest(token), user_id, csrf, now+age, now))
+    c.execute('DELETE FROM sessions WHERE expires<? OR (remember=0 AND last_activity<?)', (now,now-IDLE_SECONDS-IDLE_GRACE))
+    browser,system=trusted_devices.describe(agent)
+    c.execute('INSERT INTO sessions(token_hash,user_id,csrf,expires,last_activity,remember,created_at,device) VALUES (?,?,?,?,?,?,?,?)', (digest(token), user_id, csrf, now+age, now, 1 if remember else 0, now, browser+' en '+system))
     return token, csrf, age
 
 
@@ -821,7 +825,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def cookie(self, token, age=None):
         value = f'pcdoctor_session={token}; Path=/; HttpOnly; SameSite=Strict'
-        if os.getenv('SESSION_SECURE', 'false').lower() == 'true' or urlsplit(os.getenv('APP_URL','')).scheme=='https':
+        if self.secure_cookies():
             value += '; Secure'
         if age is not None:
             value += f'; Max-Age={age}'
@@ -835,7 +839,22 @@ class Handler(BaseHTTPRequestHandler):
         except Exception:
             token = ''
         now=int(time.time())
-        return c.execute('SELECT u.id,u.username,u.name,u.email,u.role,s.csrf FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND s.expires>? AND (s.last_activity IS NULL OR s.last_activity>?) AND u.active=1', (digest(token), now, now-IDLE_SECONDS-IDLE_GRACE)).fetchone(), token
+        # Las sesiones recordadas no caducan por inactividad (sí al llegar a su vencimiento, de 30 días como máximo).
+        return c.execute('SELECT u.id,u.username,u.name,u.email,u.role,s.csrf,s.remember FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND s.expires>? AND (s.remember=1 OR s.last_activity IS NULL OR s.last_activity>?) AND u.active=1', (digest(token), now, now-IDLE_SECONDS-IDLE_GRACE)).fetchone(), token
+
+    def secure_cookies(self):
+        return os.getenv('SESSION_SECURE', 'false').lower() == 'true' or urlsplit(os.getenv('APP_URL','')).scheme=='https'
+
+    def trust_token(self):
+        cookies = SimpleCookie()
+        try:
+            cookies.load(self.headers.get('Cookie', ''))
+            return cookies[trusted_devices.COOKIE].value if trusted_devices.COOKIE in cookies else ''
+        except Exception:
+            return ''
+
+    def agent(self):
+        return (self.headers.get('User-Agent') or '')[:400]
 
     def page(self, name):
         content = (ROOT / 'templates' / name).read_text()
@@ -1211,7 +1230,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(200,live_support.detail(c,conv,after,appointments.stamp(appointments.now())))
             if path == '/api/me':
                 prefs=c.execute('SELECT value FROM system_state WHERE key=?',('mail_prefs:'+str(user['id']),)).fetchone() if mail_allowed(user) else None
-                return self.reply(200, {'idle':{'seconds':IDLE_SECONDS,'warning':IDLE_WARNING},'user':dict(user,photo=profile_photo_stamp(c,user['id']),mail=mail_allowed(user),mail_prefs=json.loads(prefs['value']) if prefs else None,mail_signature=mail_signature_card(c) if mail_allowed(user) else None,storage='cloud' if remote_db.configured() else 'local'),'server_time':time.time()})
+                return self.reply(200, {'idle':None if user['remember'] else {'seconds':IDLE_SECONDS,'warning':IDLE_WARNING},'user':dict(user,photo=profile_photo_stamp(c,user['id']),mail=mail_allowed(user),mail_prefs=json.loads(prefs['value']) if prefs else None,mail_signature=mail_signature_card(c) if mail_allowed(user) else None,storage='cloud' if remote_db.configured() else 'local'),'server_time':time.time()})
             if path == '/api/deliveries':
                 # Próximas Entregas: solo equipos terminados (listos o en espera de retiro) y entregas recientes; nunca órdenes en reparación.
                 if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
@@ -1633,9 +1652,9 @@ class Handler(BaseHTTPRequestHandler):
             if path == '/api/settings':
                 if user['role'] != 'administrador':
                     return self.reply(403, {'error':'Solo administración puede acceder a la configuración.'})
-                labels={'second_step_enabled':'Verificación en dos pasos activada','second_step_disabled':'Verificación en dos pasos desactivada','second_step_recovery_renewed':'Códigos de recuperación renovados','login_recovery_code_used':'Acceso con código de recuperación','login':'Inicio de sesión','logout':'Cierre de sesión','sessions_revoked':'Cierre de todas las sesiones','other_sessions_revoked':'Cierre de otras sesiones','password_changed':'Cambio de contraseña','password_reset':'Contraseña restablecida','profile_updated':'Perfil actualizado','auth_policy_updated':'Políticas de acceso actualizadas','account_approved':'Cuenta aprobada','account_rejected':'Solicitud rechazada','account_updated':'Cuenta del equipo modificada','clients_exported':'Exportación de clientes','clients_imported':'Importación de clientes'}
+                labels={'login_trusted_device':'Acceso desde un equipo de confianza','trusted_device_added':'Equipo marcado como de confianza','trusted_device_revoked':'Confianza de un equipo revocada','trusted_devices_revoked_by_admin':'Confianza de equipos revocada por administración','trusted_device_revoked_suspicious':'Confianza revocada por actividad sospechosa','second_step_enabled':'Verificación en dos pasos activada','second_step_disabled':'Verificación en dos pasos desactivada','second_step_recovery_renewed':'Códigos de recuperación renovados','login_recovery_code_used':'Acceso con código de recuperación','login':'Inicio de sesión','logout':'Cierre de sesión','sessions_revoked':'Cierre de sesión en todos los dispositivos','other_sessions_revoked':'Cierre de otras sesiones','password_changed':'Cambio de contraseña','password_reset':'Contraseña restablecida','profile_updated':'Perfil actualizado','auth_policy_updated':'Políticas de acceso actualizadas','account_approved':'Cuenta aprobada','account_rejected':'Solicitud rechazada','account_updated':'Cuenta del equipo modificada','clients_exported':'Exportación de clientes','clients_imported':'Importación de clientes'}
                 activity=[{'label':labels[r['action']],'at':r['created_at']} for r in c.execute('SELECT action,created_at FROM audit WHERE user_id=? AND action IN ('+','.join('?' for _ in labels)+') ORDER BY id DESC LIMIT 12',(user['id'],*labels))]
-                return self.reply(200, {'profile':{k:user[k] for k in ('name','username','email','role')},'me':user['id'],'second_step':two_factor.status(c,user['id']),'active_sessions':c.execute('SELECT COUNT(*) FROM sessions WHERE user_id=? AND expires>?',(user['id'],int(time.time()))).fetchone()[0],'security_activity':activity,'registration_enabled':registration_enabled(),'captcha_mode':captcha_mode(),'mail':mail_pro.status(),'mail_signature':mail_signature(c),'mail_signature_card':mail_signature_card(c) if mail_pro.configured() else None,'accounts':[dict(r) for r in c.execute("SELECT u.id,u.name,u.username,u.email,u.role,u.active,(SELECT MAX(a.created_at) FROM audit a WHERE a.user_id=u.id AND a.action='login') last_login,(SELECT COUNT(*) FROM sessions s WHERE s.user_id=u.id AND s.expires>?) sessions,EXISTS(SELECT 1 FROM user_mfa m WHERE m.user_id=u.id AND m.confirmed_at IS NOT NULL) second_step FROM users u WHERE u.approval='approved' ORDER BY u.id",(int(time.time()),))],'requests':[dict(r) for r in c.execute("SELECT id,name,username,email,phone,identification,job_title,requested_at,approval FROM users WHERE approval IN ('pending','rejected') ORDER BY approval,id DESC")],'smtp_configured':bool(security_mail_ready()),'smtp_route':security_mail_ready(),'openai_configured':bool(os.getenv('OPENAI_API_KEY')),'login_lockout_seconds':auth_policy(c)['lockout_seconds'],'auth_policy':auth_policy(c),'antibot_configured':bool(os.getenv('TURNSTILE_SITE_KEY') and os.getenv('TURNSTILE_SECRET_KEY')),'origin':os.getenv('APP_URL','http://127.0.0.1:8010')})
+                return self.reply(200, {'profile':{k:user[k] for k in ('name','username','email','role')},'me':user['id'],'second_step':two_factor.status(c,user['id']),'trusted_devices':trusted_devices.active(c,user['id']),'active_sessions':c.execute('SELECT COUNT(*) FROM sessions WHERE user_id=? AND expires>?',(user['id'],int(time.time()))).fetchone()[0],'security_activity':activity,'registration_enabled':registration_enabled(),'captcha_mode':captcha_mode(),'mail':mail_pro.status(),'mail_signature':mail_signature(c),'mail_signature_card':mail_signature_card(c) if mail_pro.configured() else None,'accounts':[dict(r) for r in c.execute("SELECT u.id,u.name,u.username,u.email,u.role,u.active,(SELECT MAX(a.created_at) FROM audit a WHERE a.user_id=u.id AND a.action='login') last_login,(SELECT COUNT(*) FROM sessions s WHERE s.user_id=u.id AND s.expires>?) sessions,EXISTS(SELECT 1 FROM user_mfa m WHERE m.user_id=u.id AND m.confirmed_at IS NOT NULL) second_step FROM users u WHERE u.approval='approved' ORDER BY u.id",(int(time.time()),))],'requests':[dict(r) for r in c.execute("SELECT id,name,username,email,phone,identification,job_title,requested_at,approval FROM users WHERE approval IN ('pending','rejected') ORDER BY approval,id DESC")],'smtp_configured':bool(security_mail_ready()),'smtp_route':security_mail_ready(),'openai_configured':bool(os.getenv('OPENAI_API_KEY')),'login_lockout_seconds':auth_policy(c)['lockout_seconds'],'auth_policy':auth_policy(c),'antibot_configured':bool(os.getenv('TURNSTILE_SITE_KEY') and os.getenv('TURNSTILE_SECRET_KEY')),'origin':os.getenv('APP_URL','http://127.0.0.1:8010')})
             if path == '/api/notifications':
                 result=notifications.build(c,user,reception_now(),mail_allowed(user))
                 # Versión que ejecuta el servidor: permite avisar a una pestaña que quedó abierta con una versión anterior.
@@ -2176,12 +2195,23 @@ class Handler(BaseHTTPRequestHandler):
                         c.execute('UPDATE users SET password_hash=? WHERE id=?',(password_hash(password),row['id']))
                     remember = data.get('remember') is True
                     if two_factor.active(c,row['id']):
+                        # Equipo de confianza: tras la contraseña correcta, un navegador autorizado (token propio, vigente y del mismo navegador) no repite el código.
+                        trusted,why=trusted_devices.check(c,row['id'],self.trust_token(),self.agent())
+                        if why=='suspicious':audit(c,row['id'],'trusted_device_revoked_suspicious')
+                        if trusted:
+                            _, previous = self.session(c)
+                            c.execute('DELETE FROM sessions WHERE token_hash=?', (digest(previous),))
+                            token, csrf, age = make_session(c, row['id'], remember, self.agent())
+                            auth_event(c,account_hash,ip_hash,'success')
+                            c.execute('DELETE FROM attempts WHERE bucket=?',(user_key,))
+                            audit(c, row['id'], 'login');audit(c,row['id'],'login_trusted_device')
+                            return self.reply(200, {'ok':True,'trusted_device':True}, cookie=self.cookie(token, age if remember else None))
                         # Verificación en dos pasos: la contraseña correcta solo reserva un intento breve; la sesión se abre al validar el código.
                         audit(c,row['id'],'login_second_step_required')
                         return self.reply(200,{'ok':True,'second_step':True,'challenge':two_factor.challenge(c,row['id'],remember,digest)})
                     _, previous = self.session(c)
                     c.execute('DELETE FROM sessions WHERE token_hash=?', (digest(previous),))
-                    token, csrf, age = make_session(c, row['id'], remember)
+                    token, csrf, age = make_session(c, row['id'], remember, self.agent())
                     auth_event(c,account_hash,ip_hash,'success')
                     c.execute('DELETE FROM attempts WHERE bucket=?',(user_key,))
                     audit(c, row['id'], 'login')
@@ -2201,12 +2231,15 @@ class Handler(BaseHTTPRequestHandler):
                     if not row or not row['active']:return self.reply(401,{'error':'La verificación caducó. Vuelve a ingresar tu usuario y contraseña.','restart':True})
                     _, previous = self.session(c)
                     c.execute('DELETE FROM sessions WHERE token_hash=?', (digest(previous),))
-                    remember=bool(found['remember']);token, csrf, age = make_session(c, row['id'], remember)
+                    remember=bool(found['remember']);token, csrf, age = make_session(c, row['id'], remember, self.agent())
                     auth_event(c,digest(row['username'].casefold()),ip_hash,'success')
                     c.execute('DELETE FROM attempts WHERE bucket=?',('login-user:'+digest(row['username'].casefold()),))
                     audit(c,row['id'],'login');audit(c,row['id'],'login_recovery_code_used' if found['kind']=='recovery' else 'login_second_step_ok')
-                    left=two_factor.status(c,row['id'])['recovery_left']
-                    return self.reply(200,{'ok':True,'recovery_used':found['kind']=='recovery','recovery_left':left},cookie=self.cookie(token, age if remember else None))
+                    left=two_factor.status(c,row['id'])['recovery_left'];cookies=[self.cookie(token, age if remember else None)]
+                    # «Confiar en este equipo durante 30 días»: solo después de validar el código, y nunca con un código de recuperación.
+                    if data.get('trust_device') is True and found['kind']!='recovery':
+                        cookies.append(trusted_devices.cookie(trusted_devices.create(c,row['id'],self.agent()),self.secure_cookies()));audit(c,row['id'],'trusted_device_added')
+                    return self.reply(200,{'ok':True,'recovery_used':found['kind']=='recovery','recovery_left':left,'trusted':len(cookies)>1},cookie=cookies if len(cookies)>1 else cookies[0])
                 if path == '/api/register':
                     # El alta pública se retiró: las cuentas se crean en /api/users/create, solo por administración.
                     audit(c,None,'public_registration_blocked')
@@ -2249,6 +2282,7 @@ class Handler(BaseHTTPRequestHandler):
                     c.execute('UPDATE users SET password_hash=? WHERE id=?', (password_hash(password),row['user_id']))
                     c.execute('DELETE FROM reset_tokens WHERE user_id=?', (row['user_id'],))
                     c.execute('DELETE FROM sessions WHERE user_id=?', (row['user_id'],))
+                    trusted_devices.revoke_all(c,row['user_id'],'Contraseña restablecida')
                     c.execute('DELETE FROM attempts WHERE bucket IN (?,?)',('login-user:'+digest(row['email'].casefold()),'login-user:'+digest(c.execute('SELECT username FROM users WHERE id=?',(row['user_id'],)).fetchone()[0].casefold())))
                     audit(c, row['user_id'], 'password_reset')
                     if c.execute("SELECT 1 FROM audit WHERE action='account_created' AND entity_id=?",(row['user_id'],)).fetchone() and not c.execute("SELECT 1 FROM audit WHERE action='account_activated' AND entity_id=?",(row['user_id'],)).fetchone():audit(c,None,'account_activated',row['user_id'])
@@ -2558,7 +2592,7 @@ class Handler(BaseHTTPRequestHandler):
                         audit(c,user['id'],'second_step_check_failed')
                         return self.reply(400,{'error':'Revisa los campos señalados.','fields':{'code':'El código no es correcto o ya se usó.'}})
                     if action=='disable':
-                        two_factor.remove(c,user['id']);audit(c,user['id'],'second_step_disabled')
+                        two_factor.remove(c,user['id']);trusted_devices.revoke_all(c,user['id'],'Verificación en dos pasos desactivada');audit(c,user['id'],'second_step_disabled')
                         return self.reply(200,{'ok':True,'second_step':two_factor.status(c,user['id'])})
                     codes=two_factor.renew_recovery(c,user['id']);audit(c,user['id'],'second_step_recovery_renewed')
                     return self.reply(200,{'ok':True,'recovery':codes,'second_step':two_factor.status(c,user['id'])})
@@ -2575,6 +2609,7 @@ class Handler(BaseHTTPRequestHandler):
                     c.execute('UPDATE users SET password_hash=? WHERE id=?',(password_hash(password),user['id']))
                     # La sesión actual se conserva; las demás quedan invalidadas en el servidor.
                     c.execute('DELETE FROM sessions WHERE user_id=? AND token_hash!=?',(user['id'],digest(token)));c.execute('DELETE FROM reset_tokens WHERE user_id=?',(user['id'],))
+                    trusted_devices.revoke_all(c,user['id'],'Contraseña cambiada')
                     c.execute("DELETE FROM attempts WHERE bucket=?",('password-change:'+str(user['id']),))
                     audit(c,user['id'],'password_changed');c.commit()
                     dispatch_security_job(lambda:deliver_change_notice(stored['email'],user['id']))
@@ -2617,24 +2652,33 @@ class Handler(BaseHTTPRequestHandler):
                     if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede gestionar cuentas.'})
                     target=str(data.get('id',''));action=str(data.get('action',''));role=str(data.get('role',''))
                     row=c.execute("SELECT id,role,active FROM users WHERE id=? AND approval='approved'",(target,)).fetchone() if target.isdigit() else None
-                    if not row or action not in ('activate','deactivate','role','second_step_reset') or (action=='role' and role not in ('administrador','tecnico')):return self.reply(400,{'error':'Operación no disponible.'})
+                    if not row or action not in ('activate','deactivate','role','second_step_reset','revoke_devices') or (action=='role' and role not in ('administrador','tecnico')):return self.reply(400,{'error':'Operación no disponible.'})
                     if row['id']==user['id']:return self.reply(400,{'error':'No puedes cambiar tu propia cuenta desde aquí.'})
+                    if action=='revoke_devices':
+                        # Administración retira la confianza de todos los equipos de esa cuenta: volverán a pedir el código de dos pasos.
+                        count=trusted_devices.revoke_all(c,row['id'],'Revocado por administración');audit(c,user['id'],'trusted_devices_revoked_by_admin',row['id'])
+                        return self.reply(200,{'ok':True,'revoked':count})
                     if action=='second_step_reset':
                         # Teléfono perdido: administración retira el segundo paso de esa cuenta y cierra sus sesiones; la persona vuelve a activarlo.
                         if not two_factor.active(c,row['id']):return self.reply(409,{'error':'Esa cuenta no tiene activa la verificación en dos pasos.'})
-                        two_factor.remove(c,row['id']);c.execute('DELETE FROM sessions WHERE user_id=?',(row['id'],));audit(c,user['id'],'second_step_reset_by_admin',row['id'])
+                        two_factor.remove(c,row['id']);c.execute('DELETE FROM sessions WHERE user_id=?',(row['id'],));trusted_devices.revoke_all(c,row['id'],'Segundo paso retirado por administración');audit(c,user['id'],'second_step_reset_by_admin',row['id'])
                         return self.reply(200,{'ok':True})
                     admins=c.execute("SELECT COUNT(*) FROM users WHERE role='administrador' AND active=1 AND approval='approved'").fetchone()[0]
                     if row['role']=='administrador' and row['active'] and admins<=1 and (action=='deactivate' or (action=='role' and role!='administrador')):return self.reply(400,{'error':'Debe quedar al menos un administrador activo.'})
                     if action=='role':c.execute('UPDATE users SET role=? WHERE id=?',(role,row['id']))
                     else:c.execute('UPDATE users SET active=? WHERE id=?',(1 if action=='activate' else 0,row['id']))
                     # Un cambio de rol o una desactivación cierra las sesiones abiertas de esa cuenta.
-                    if action!='activate':c.execute('DELETE FROM sessions WHERE user_id=?',(row['id'],))
+                    if action!='activate':c.execute('DELETE FROM sessions WHERE user_id=?',(row['id'],));trusted_devices.revoke_all(c,row['id'],'Cuenta desactivada o rol cambiado por administración')
                     audit(c,user['id'],'account_updated',row['id'])
                     return self.reply(200,{'ok':True})
                 if path=='/api/sessions/revoke':
-                    c.execute('DELETE FROM sessions WHERE user_id=?',(user['id'],));audit(c,user['id'],'sessions_revoked')
-                    return self.reply(200,{'ok':True,'message':'Se cerraron las sesiones activas.'},cookie=self.cookie('',0))
+                    # «Cerrar sesión en todos los dispositivos»: todas las sesiones y todos los equipos de confianza; se vuelve a pedir usuario, contraseña y código.
+                    c.execute('DELETE FROM sessions WHERE user_id=?',(user['id'],));trusted_devices.revoke_all(c,user['id'],'Cierre de sesión en todos los dispositivos');audit(c,user['id'],'sessions_revoked')
+                    return self.reply(200,{'ok':True,'message':'Se cerraron las sesiones en todos los dispositivos.'},cookie=[self.cookie('',0),trusted_devices.cookie('',self.secure_cookies(),clear=True)])
+                if path=='/api/trusted-devices/revoke':
+                    device=str(data.get('id',''))
+                    if not device.isdigit() or not trusted_devices.revoke(c,user['id'],int(device)):return self.reply(404,{'error':'Ese dispositivo ya no es de confianza.'})
+                    audit(c,user['id'],'trusted_device_revoked');return self.reply(200,{'ok':True})
                 if path=='/api/client-log':
                     # Registro de diagnóstico del navegador: tipo y mensaje del fallo, nunca el texto que escribe el usuario.
                     # Además del registro del servidor (que caduca pronto) se guarda en la base durante 14 días para poder investigarlo después.

@@ -7057,3 +7057,12 @@ body[data-page=appointments] .appointment-authorized{margin:0 0 10px;padding:10p
 @media (max-width:700px){.licenses-filters{grid-template-columns:1fr 1fr}.licenses-filters input{grid-column:1/-1}.license-form-grid,.license-dynamic,.license-kind-fields,.license-secret,.license-batch{grid-template-columns:1fr}.license-form-grid{min-width:0}}
 @media (max-width:420px){.license-stock{grid-template-columns:repeat(2,minmax(0,1fr))}.licenses-filters{grid-template-columns:1fr}}
 @media print{body.license-printing *{visibility:hidden}.license-sheet,.license-sheet *{visibility:visible}}
+/* Inicio de sesión: confiar en este equipo (segundo paso) y Configuración → Seguridad → Dispositivos de confianza */
+.second-step-dialog label.second-step-trust{display:flex;align-items:center;gap:8px;font-weight:500;color:#cfdcf0;cursor:pointer}
+.second-step-dialog .second-step-trust input{width:16px;height:16px;min-height:16px;margin:0;accent-color:#4d8df0;flex:none}
+.second-step-dialog .second-step-trust input:focus-visible{outline:2px solid #8bb8ff;outline-offset:2px}
+.trusted-list{display:grid;gap:8px;margin:8px 0 0;padding:0;list-style:none}
+.trusted-item{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border:1px solid #22385a;border-radius:10px;background:#0b1626;min-width:0}
+.trusted-item div{display:grid;gap:3px;min-width:0}
+.trusted-item small{color:#9fb3cf;overflow-wrap:anywhere}
+@media (max-width:560px){.trusted-item{display:grid}.trusted-item button{width:100%}}

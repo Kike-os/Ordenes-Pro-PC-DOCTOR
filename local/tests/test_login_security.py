@@ -62,10 +62,14 @@ class LoginSecurityTests(unittest.TestCase):
     def test_idle_session_expires_on_server_and_activity_renews_it(self):
         clock=[2000000000]
         with patch.dict(app.os.environ,{'LOGIN_CAPTCHA':'off'}),patch.object(app.time,'time',side_effect=lambda:clock[0]):
-            for remember in (False,True):
+            # «Recordar mi sesión» (desde 19/10/2026): la sesión recordada dura hasta 30 días y no caduca por inactividad; la normal sí.
+            kept=self.request('/api/login',dict(GOOD,remember=True))['cookie'].split(';')[0]
+            self.assertIsNone(self.request('/api/me',cookie=kept)['body']['idle'])
+            clock[0]+=3*3600;self.assertEqual(self.request('/api/me',cookie=kept)['status'],200);clock[0]-=3*3600
+            for remember in (False,):
                 result=self.request('/api/login',dict(GOOD,remember=remember));cookie=result['cookie'].split(';')[0]
                 me=self.request('/api/me',cookie=cookie)['body'];csrf=me['user']['csrf'];self.assertEqual(me['idle'],{'seconds':900,'warning':120})
-                # Las consultas automáticas no renuevan la sesión: a los 15 minutos (más el margen de sincronización) deja de valer, con o sin «Recordarme».
+                # Las consultas automáticas no renuevan la sesión normal: a los 15 minutos (más el margen de sincronización) deja de valer.
                 clock[0]+=600;self.assertEqual(self.request('/api/tracking',cookie=cookie)['status'],200)
                 clock[0]+=299+app.IDLE_GRACE;self.assertEqual(self.request('/api/me',cookie=cookie)['status'],200)
                 # La actividad real (o «Continuar sesión») sí la renueva; exige el token CSRF.
@@ -76,7 +80,8 @@ class LoginSecurityTests(unittest.TestCase):
                 self.assertEqual(self.request('/api/session/activity',{},cookie=cookie,csrf=csrf)['status'],401)
             # Iniciar sesión otra vez emite un identificador nuevo y limpia las sesiones vencidas.
             fresh=self.request('/api/login',GOOD)['cookie'].split(';')[0];self.assertNotEqual(fresh,cookie)
-            with app.connect() as c:self.assertEqual(c.execute('SELECT COUNT(*) FROM sessions').fetchone()[0],1)
+            # Quedan la sesión nueva y la recordada (vigente); la normal vencida por inactividad se eliminó.
+            with app.connect() as c:self.assertEqual(c.execute('SELECT COUNT(*) FROM sessions').fetchone()[0],2);self.assertEqual(c.execute('SELECT COUNT(*) FROM sessions WHERE remember=1').fetchone()[0],1)
             new_csrf=self.request('/api/me',cookie=fresh)['body']['user']['csrf']
             self.assertEqual(self.request('/api/logout',{'reason':'idle'},cookie=fresh,csrf=new_csrf)['status'],200)
             with app.connect() as c:self.assertEqual(c.execute("SELECT COUNT(*) FROM audit WHERE action='logout_idle'").fetchone()[0],1)
