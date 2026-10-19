@@ -8,6 +8,24 @@
   },
   "releases": [
     {
+      "version": "1.5.165",
+      "date": "2026-10-19T08:08:16-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Corrección del QR de la autenticación en dos pasos",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Autenticación en dos pasos: botón «Generar nuevo código QR» que invalida la clave anterior, cuenta y emisor visibles y botones Cancelar y Continuar alineados"
+        ],
+        "fixes": [
+          "Autenticación en dos pasos: el código QR se mostraba recortado y no se podía escanear (SVG sin viewBox); ahora se ve completo y se comprueba su lectura"
+        ],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.164",
       "date": "2026-10-14T14:05:52-05:00",
       "type": "patch",

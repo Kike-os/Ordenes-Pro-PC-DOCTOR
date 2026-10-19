@@ -4,6 +4,18 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.165 — 2026-10-19 08:08 (UTC-05:00)
+
+Corrección del QR de la autenticación en dos pasos
+
+### Mejoras realizadas
+
+- Autenticación en dos pasos: botón «Generar nuevo código QR» que invalida la clave anterior, cuenta y emisor visibles y botones Cancelar y Continuar alineados
+
+### Errores corregidos
+
+- Autenticación en dos pasos: el código QR se mostraba recortado y no se podía escanear (SVG sin viewBox); ahora se ve completo y se comprueba su lectura
+
 ## v1.5.164 — 2026-10-14 14:05 (UTC-05:00)
 
 Verificación en dos pasos reforzada y tarjetas de equipos rediseñadas
