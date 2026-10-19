@@ -2,7 +2,7 @@ from reception import valid_ecuador_phone
 """Reglas transaccionales de reservas, disponibilidad y atención asistida."""
 from datetime import date,datetime,time,timedelta
 from zoneinfo import ZoneInfo
-import hashlib,secrets,re
+import hashlib,json,secrets,re,uuid
 import reception
 TZ=ZoneInfo('America/Guayaquil')
 STATUSES={'solicitada':'Pendiente de confirmación','confirmada':'Confirmada','reprogramada':'Reprogramada','cancelada':'Cancelada','presente':'En atención','completada':'Completada','no_asistio':'No asistió'}
@@ -227,6 +227,55 @@ def lookup_client(c,identification,phone,email):
  if not found:return None,''
  if identification and found['identification'] and found['identification']!=identification:return None,'ambiguo'
  return found,'contacto'
+# ---- Autorización digital de la cita ----
+# Al confirmar, el cliente marca la aceptación expresa de las condiciones vigentes y escribe los últimos 4 dígitos de su cédula. Se guarda
+# una evidencia inmutable (appointment_authorizations). Los 4 dígitos solo comprueban la coherencia con la identificación escrita: no son
+# una firma electrónica ni una prueba de identidad. Sin condiciones publicadas no se fabrica ninguna aceptación: la cita no se autoriza.
+AUTHORIZED_MESSAGE='Cita confirmada correctamente. Su aceptación ha sido registrada con fecha, hora e identificador de autorización.'
+REQUESTED_MESSAGE='Solicitud registrada. Su aceptación ha sido registrada con fecha, hora e identificador de autorización; le avisaremos cuando la cita quede confirmada.'
+CHANNELS={'en_linea':'Reserva en línea','personal':'Registrada por el personal'}
+def current_terms(c):
+ import service_terms
+ return service_terms.current(c,now())
+def last4_error(value,identification='',kind=''):
+ value=str(value if value is not None else '')
+ if not re.fullmatch(r'[0-9]{4}',value):return 'Ingresa exactamente 4 dígitos numéricos: los últimos de la cédula (o del pasaporte).'
+ digits=str(identification or '').strip()
+ # Citas o clientes antiguos sin tipo de documento: se deduce por la forma del número, como en la reserva.
+ if kind not in ('cedula','ruc','pasaporte'):kind={10:'cedula',13:'ruc'}.get(len(digits),'') if digits.isdigit() else 'pasaporte' if digits else ''
+ # Cédula: sus 4 últimos dígitos. RUC de persona natural: la cédula son sus 10 primeros dígitos. RUC de sociedad o sin identificación: solo el formato.
+ # Pasaporte: los 4 últimos dígitos que contenga el número.
+ expected=re.sub(r'[^0-9]','',digits)[-4:] if kind=='pasaporte' else digits[-4:] if kind=='cedula' and re.fullmatch(r'[0-9]{10}',digits) else digits[6:10] if kind=='ruc' and re.fullmatch(r'[0-9]{13}',digits) and digits[2] in '012345' else ''
+ if expected and value!=expected:return 'Los 4 dígitos no coinciden con la identificación ingresada.'
+ return ''
+def authorization_errors(c,data,identification='',kind=''):
+ """Errores de la autorización (casilla, versión de condiciones y 4 dígitos) y la versión vigente."""
+ errors={};terms=current_terms(c)
+ if not terms:errors['terms_accept']='No hay condiciones del servicio vigentes: la cita no puede autorizarse en este momento.'
+ elif data.get('terms_accept') is not True:errors['terms_accept']='Acepta los términos y condiciones para confirmar la cita.'
+ elif str(data.get('terms_id') or terms['id'])!=terms['id']:errors['terms_accept']='Las condiciones se actualizaron. Revisa la versión vigente y vuelve a aceptarla.'
+ problem=last4_error(data.get('id_last4'),identification,kind)
+ if problem:errors['id_last4']=problem
+ return errors,terms
+def authorization(c,aid,full=False):
+ """Evidencia de la cita o None. `full` (solo administración) incluye los 4 dígitos y la copia de la cita al aceptar."""
+ row=c.execute("SELECT z.*,COALESCE(u.name,'') recorded_by_name FROM appointment_authorizations z LEFT JOIN users u ON u.id=z.recorded_by WHERE z.appointment_id=?",(aid,)).fetchone()
+ if not row:return None
+ data={key:row[key] for key in ('authorization_id','appointment_id','client_id','accepted_at','timezone','terms_id','terms_version','terms_hash','express_consent','channel','recorded_by_name')}
+ data['channel_label']=CHANNELS.get(row['channel'],row['channel'])
+ if full:data['id_last4']=row['id_last4'];data['snapshot']=json.loads(row['snapshot'])
+ return data
+def authorize(c,aid,terms,last4,channel,user=None):
+ """Registra la autorización de una cita (una sola por cita: si ya existe, se devuelve la existente sin duplicarla)."""
+ existing=authorization(c,aid)
+ if existing:return existing
+ row=c.execute('SELECT a.*,s.label service_label FROM appointments a JOIN appointment_services s ON s.code=a.service_code WHERE a.id=?',(aid,)).fetchone()
+ accepted=stamp(now());code='AUT-'+str(uuid.uuid4()).upper()
+ snapshot={'code':row['public_code'],'customer_name':row['customer_name'],'service':row['service_code'],'service_label':row['service_label'],'starts_at':row['starts_at'],'duration_minutes':row['duration_minutes'],'status':row['status']}
+ c.execute('INSERT INTO appointment_authorizations(authorization_id,appointment_id,client_id,accepted_at,timezone,terms_id,terms_version,terms_hash,express_consent,id_last4,channel,recorded_by,snapshot) VALUES (?,?,?,?,?,?,?,?,1,?,?,?,?)',
+           (code,aid,row['client_id'],accepted,'America/Guayaquil',terms['id'],terms['version'],terms['content_hash'],str(last4),channel,user['id'] if user else None,json.dumps(snapshot,ensure_ascii=False,sort_keys=True)))
+ c.execute("INSERT INTO appointment_events(appointment_id,actor_id,event,created_at,detail) VALUES (?,?,'authorized',?,?)",(aid,user['id'] if user else None,accepted,'Autorización '+code+' · condiciones versión '+terms['version']+' · '+CHANNELS[channel]))
+ return authorization(c,aid)
 def create(c,data,user=None):
  key=str(data.get('request_key','')).strip()
  if key and c.execute('SELECT 1 FROM appointments WHERE deleted_at IS NULL AND request_key=?',(key,)).fetchone():return 409,{'error':'Esta solicitud ya fue registrada.'}
@@ -234,6 +283,8 @@ def create(c,data,user=None):
  client=c.execute('SELECT * FROM clients WHERE id=?',(int(chosen),)).fetchone() if chosen.isdigit() else None
  if chosen and not client:return 404,{'error':'El cliente seleccionado ya no está disponible.'}
  fields,errors,start=validate_booking(data,c,public=not user,client=client)
+ auth_errors,terms=authorization_errors(c,data,fields['identification'],fields['document_type'])
+ errors.update(auth_errors)
  if set(errors)=={'time'} and start is not None:return 409,conflict(c,fields,bool(user))
  if errors:return 400,{'error':'Revisa los datos de la cita.','fields':errors}
  duration=c.execute('SELECT duration_minutes FROM appointment_services WHERE code=?',(fields['service'],)).fetchone()['duration_minutes']
@@ -249,15 +300,20 @@ def create(c,data,user=None):
  else:client_id=client['id']
  token=secrets.token_urlsafe(32);created=stamp(now());public='CIT-'+now().strftime('%Y%m%d')+'-'+secrets.token_hex(3).upper()
  initial='confirmada' if user or confirmation_mode(c)=='auto' else 'solicitada'
- cursor=c.execute("INSERT INTO appointments(public_code,manage_token_hash,client_id,technician_id,customer_name,identification,phone,email,device_type,brand,model,service_code,description,notes,starts_at,duration_minutes,status,privacy_consent,communications_consent,created_at,updated_at,request_key) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?,?,?)",(public,token_hash(token),client_id,technician,fields['name'],fields['identification'],fields['phone'],fields['email'],fields['device_type'],fields['brand'],fields['model'],fields['service'],fields['description'],fields['notes'],stamp(start),duration,initial,int(data.get('communications_consent') is True),created,created,key or None))
- aid=cursor.lastrowid;c.execute("INSERT INTO appointment_events(appointment_id,actor_id,event,new_start,new_status,created_at) VALUES (?,?,?,?,?,?)",(aid,user['id'] if user else None,'created',stamp(start),initial,created))
+ # Se guarda primero como solicitud; pasa a confirmada solo después de registrar la autorización (la base lo exige).
+ cursor=c.execute("INSERT INTO appointments(public_code,manage_token_hash,client_id,technician_id,customer_name,identification,phone,email,device_type,brand,model,service_code,description,notes,starts_at,duration_minutes,status,privacy_consent,communications_consent,created_at,updated_at,request_key) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?,?,?)",(public,token_hash(token),client_id,technician,fields['name'],fields['identification'],fields['phone'],fields['email'],fields['device_type'],fields['brand'],fields['model'],fields['service'],fields['description'],fields['notes'],stamp(start),duration,'solicitada',int(data.get('communications_consent') is True),created,created,key or None))
+ aid=cursor.lastrowid
+ c.execute("INSERT INTO appointment_events(appointment_id,actor_id,event,new_start,new_status,created_at) VALUES (?,?,?,?,?,?)",(aid,user['id'] if user else None,'created',stamp(start),initial,created))
+ evidence=authorize(c,aid,terms,data.get('id_last4'),'personal' if user else 'en_linea',user)
+ if initial=='confirmada':c.execute("UPDATE appointments SET status='confirmada' WHERE id=?",(aid,))
  if initial=='confirmada' and fields['email'] and data.get('communications_consent') is True:c.execute("INSERT OR IGNORE INTO appointment_notifications(appointment_id,generation,event,channel,result,created_at) VALUES (?,1,'confirmation','email','pending',?)",(aid,created))
  if fields['document_type']:c.execute('UPDATE appointments SET document_type=? WHERE id=?',(fields['document_type'],aid))
  if fields.get('pickup'):
   c.execute('UPDATE appointments SET pickup_order_id=? WHERE id=?',(fields['pickup']['id'],aid))
   c.execute("INSERT INTO appointment_events(appointment_id,actor_id,event,created_at,detail) VALUES (?,?,'note',?,?)",(aid,user['id'] if user else None,created,'Retiro agendado para la orden '+fields['pickup']['code']+'. La entrega se registra aparte en la orden.'))
  if client_new and match=='ambiguo':c.execute("INSERT INTO appointment_events(appointment_id,actor_id,event,created_at,detail) VALUES (?,?,'note',?,?)",(aid,user['id'] if user else None,created,'Cliente registrado como nuevo: su teléfono o correo coincide con otro cliente que tiene una identificación distinta. Revisar posible duplicado.'))
- return 201,{'id':aid,'code':public,'manage_token':token,'starts_at':stamp(start),'status':initial,'duration_minutes':duration,'client_id':client_id,'client_new':client_new,'client_review':client_new and match=='ambiguo','pickup_order':fields['pickup']['code'] if fields.get('pickup') else ''}
+ return 201,{'id':aid,'code':public,'manage_token':token,'starts_at':stamp(start),'status':initial,'duration_minutes':duration,'client_id':client_id,'client_new':client_new,'client_review':client_new and match=='ambiguo','pickup_order':fields['pickup']['code'] if fields.get('pickup') else '',
+  'authorization':{key:evidence[key] for key in ('authorization_id','accepted_at','timezone','terms_version')},'message':AUTHORIZED_MESSAGE if initial=='confirmada' else REQUESTED_MESSAGE}
 def reschedule(c,row,start,user):
  duration=row['duration_minutes'];staff=technicians(c,start,duration,exclude=row['id'])
  if not staff:
@@ -296,6 +352,8 @@ def reactivate(c,row,user,note=''):
  if row['converted_order_id']:return 409,{'error':'Esta cita ya generó una orden de servicio: no se puede reactivar.'}
  before=c.execute("SELECT old_status FROM appointment_events WHERE appointment_id=? AND new_status=? AND old_status!='' ORDER BY id DESC LIMIT 1",(row['id'],row['status'])).fetchone()
  target=before['old_status'] if before and before['old_status'] in ('solicitada','confirmada','reprogramada') else 'confirmada'
+ # Sin autorización registrada (citas anteriores a la autorización digital) vuelve como solicitud: confirmarla exige la aceptación.
+ if target=='confirmada' and not authorization(c,row['id']):target='solicitada'
  if row['status']!='presente':
   # El horario debe seguir libre para el mismo técnico (o para alguno, si la cita no tenía técnico asignado).
   free=technicians(c,datetime.fromisoformat(row['starts_at']),row['duration_minutes'],exclude=row['id'])
@@ -343,12 +401,12 @@ def create_for_maintenance(c,mid,user=None):
  c.execute("UPDATE maintenance SET appointment_id=?,state='appointment',updated_at=? WHERE id=?",(aid,now().isoformat(),mid))
  return {'id':aid,'public_code':public,'starts_at':stamp(start),'status':'solicitada'}
 def admin_rows(c,start,end):
- return [dict(r) for r in c.execute("SELECT a.*,s.label service_label,u.name technician,(SELECT code FROM orders WHERE id=a.pickup_order_id) pickup_code FROM appointments a JOIN appointment_services s ON s.code=a.service_code LEFT JOIN users u ON u.id=a.technician_id WHERE a.deleted_at IS NULL AND a.starts_at>=? AND a.starts_at<? ORDER BY a.starts_at,a.id",(start,end))]
+ return [dict(r) for r in c.execute("SELECT a.*,s.label service_label,u.name technician,(SELECT code FROM orders WHERE id=a.pickup_order_id) pickup_code,(SELECT authorization_id FROM appointment_authorizations WHERE appointment_id=a.id) authorization_id FROM appointments a JOIN appointment_services s ON s.code=a.service_code LEFT JOIN users u ON u.id=a.technician_id WHERE a.deleted_at IS NULL AND a.starts_at>=? AND a.starts_at<? ORDER BY a.starts_at,a.id",(start,end))]
 
 def queue_notice(c,row,event,generation=None):
  """Encola un correo al cliente (confirmación o cancelación) solo si dejó correo y autorizó comunicaciones."""
  if row['email'] and row['communications_consent']:c.execute("INSERT OR IGNORE INTO appointment_notifications(appointment_id,generation,event,channel,result,created_at) VALUES (?,?,?,'email','pending',?)",(row['id'],generation or row['generation'],event,stamp(now())))
-def detail(c,aid):
+def detail(c,aid,full=False):
  """Cita con su servicio, técnico, cliente vinculado e historial de modificaciones."""
  row=c.execute("SELECT a.*,s.label service_label,u.name technician FROM appointments a JOIN appointment_services s ON s.code=a.service_code LEFT JOIN users u ON u.id=a.technician_id WHERE a.id=? AND a.deleted_at IS NULL",(aid,)).fetchone()
  if not row:return None
@@ -363,6 +421,7 @@ def detail(c,aid):
  data['maintenance']=dict(source) if source else None
  import appointment_mail
  data['mails']=appointment_mail.history(c,aid)
+ data['authorization']=authorization(c,aid,full)
  return data
 def agenda(c,start,end):
  """Fuente única de la Agenda de Mantenimientos de Clientes: citas del período y su resumen."""

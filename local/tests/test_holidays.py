@@ -66,7 +66,7 @@ class HolidayAgendaTests(unittest.TestCase):
             with app.connect() as c:self.assertEqual([r[0] for r in c.execute("SELECT action FROM audit WHERE action IN ('holiday_config_removed','holiday_removed') ORDER BY id")],['holiday_config_removed','holiday_removed'])
             # Una cita existente no se cancela al cerrar el día: se avisa del conflicto.
             day='2026-10-20';time=slots(day)[0]
-            made=self.request('/api/appointments/new',{'name':'Cliente Ficticio','identification':'0100000017','phone':'0991234567','email':'cita@example.invalid','device_type':'portatil','brand':'HP','model':'Ficticio','service':service,'date':day,'time':time,'description':'Revisión ficticia','notes':'','request_key':'holiday-appointment-request-1'},cookie=cookie,csrf=csrf)
+            made=self.request('/api/appointments/new',{'name':'Cliente Ficticio','identification':'0100000017','terms_accept':True,'id_last4':'0017','phone':'0991234567','email':'cita@example.invalid','device_type':'portatil','brand':'HP','model':'Ficticio','service':service,'date':day,'time':time,'description':'Revisión ficticia','notes':'','request_key':'holiday-appointment-request-1'},cookie=cookie,csrf=csrf)
             self.assertEqual(made['status'],201,made['body'])
             closed=post(action='save',day=day,label='Feriado decretado ficticio',scope='otro',mode='cerrado')['body'];self.assertEqual([c['code'] for c in closed['conflicts']],[made['body']['code']])
             with app.connect() as c:self.assertEqual(c.execute('SELECT status FROM appointments WHERE id=?',(made['body']['id'],)).fetchone()[0],made['body']['status'])

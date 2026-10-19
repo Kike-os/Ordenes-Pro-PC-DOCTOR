@@ -1,4 +1,5 @@
 """Citas: servicio «Retiro de Equipos» con orden verificada, datos obligatorios en la reserva pública y registro de clientes desde citas."""
+import re
 import unittest
 from datetime import timedelta
 from unittest.mock import patch
@@ -17,7 +18,9 @@ class PickupAndClientsTests(unittest.TestCase):
 
     def book(self,key,hour='09:00',**extra):
         body=dict({'name':'Cliente De Prueba','identification':'1710034065','phone':'0987654321','email':'','device_type':'portatil','brand':'HP','model':'X','service':'diagnostico','description':'Revisión ficticia','date':self.day(),'time':hour,
-                   'notes':'','document_type':'cedula','privacy_consent':True,'communications_consent':False,'request_key':'pickup-clients-request-'+key},**extra)
+                   'notes':'','document_type':'cedula','privacy_consent':True,'terms_accept':True,'id_last4':'4065','communications_consent':False,'request_key':'pickup-clients-request-'+key},**extra)
+        # Los 4 dígitos que escribe el cliente: los últimos de su cédula (o de la cédula contenida en un RUC de persona natural).
+        if 'id_last4' not in extra:number=str(body['identification']);body['id_last4']=re.sub(r'\D','',number)[-4:] if body.get('document_type')=='pasaporte' else number[6:10] if len(number)==13 else number[-4:]
         return self.request('/api/public/appointments',body)
 
     def test_public_form_requires_name_identification_and_phone_but_not_email(self):
@@ -66,10 +69,10 @@ class PickupAndClientsTests(unittest.TestCase):
                 self.assertEqual(dict(c.execute('SELECT * FROM clients WHERE id=?',(known['id'],)).fetchone()),known)
                 self.assertIn('Revisar posible duplicado',c.execute("SELECT detail FROM appointment_events WHERE appointment_id=? AND event='note'",(other['body']['id'],)).fetchone()[0])
             # El personal sí ve si el cliente era nuevo o existente; el listado de clientes muestra el origen.
-            staff=self.request('/api/appointments/new',{'client_id':'','name':'Cliente Del Personal','identification':'','phone':'0972223344','email':'','device_type':'portatil','brand':'HP','model':'X','service':'diagnostico','description':'Revisión ficticia',
+            staff=self.request('/api/appointments/new',{'client_id':'','terms_accept':True,'id_last4':'4065','name':'Cliente Del Personal','identification':'','phone':'0972223344','email':'','device_type':'portatil','brand':'HP','model':'X','service':'diagnostico','description':'Revisión ficticia',
                                'date':self.day(),'time':'13:00','notes':'','communications_consent':False,'maintenance_id':'','request_key':'pickup-clients-staff-000001'},cookie=cookie,csrf=csrf)
             self.assertEqual((staff['status'],staff['body']['client_new'],staff['body']['client_review']),(201,True,False))
-            linked=self.request('/api/appointments/new',{'client_id':str(known['id']),'name':known['name'],'identification':'','phone':known['phone'],'email':'','device_type':'portatil','brand':'HP','model':'X','service':'diagnostico','description':'Revisión ficticia',
+            linked=self.request('/api/appointments/new',{'client_id':str(known['id']),'terms_accept':True,'id_last4':'4065','name':known['name'],'identification':'','phone':known['phone'],'email':'','device_type':'portatil','brand':'HP','model':'X','service':'diagnostico','description':'Revisión ficticia',
                                 'date':self.day(),'time':'15:00','notes':'','communications_consent':False,'maintenance_id':'','request_key':'pickup-clients-staff-000002'},cookie=cookie,csrf=csrf)
             self.assertEqual((linked['status'],linked['body']['client_new'],linked['body']['client_id']),(201,False,known['id']))
         rows={r['id']:r for r in self.request('/api/clients?size=50',cookie=cookie)['body']['rows']};self.assertEqual((rows[known['id']]['origin'],rows[staff['body']['client_id']]['origin']),('','cita'))

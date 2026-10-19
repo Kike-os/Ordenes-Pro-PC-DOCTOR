@@ -981,7 +981,8 @@ class Handler(BaseHTTPRequestHandler):
                 # Catálogo público para la reserva: servicios, tipos de equipo y marcas con su logotipo local. Sin datos de clientes.
                 brand_files={f.stem:f.name for f in sorted((ROOT / 'static' / 'brands').glob('*')) if f.suffix in ('.svg','.png') and re.fullmatch(r'[a-z0-9]+(?:-[a-z0-9]+)*', f.stem)}
                 brand_names=sorted({r['name'] for r in c.execute('SELECT name FROM brands')},key=str.lower)
-                return self.reply(200, {'services':appointments.services(c),'device_types':DEVICE_TYPES,'timezone':'America/Guayaquil','brands':brand_names,'brand_logos':brand_files})
+                return self.reply(200, {'services':appointments.services(c),'device_types':DEVICE_TYPES,'timezone':'America/Guayaquil','brands':brand_names,'brand_logos':brand_files,
+                                         'terms':(lambda row:{key:row[key] for key in ('id','version')}|{'local_url':'/conditions/'+row['id']} if row else None)(appointments.current_terms(c))})
             if path == '/api/public/appointments/pulse':
                 # Señal ligera para sincronizar calendarios abiertos: cambia cuando cambia la agenda. Sin datos de citas ni de clientes.
                 return self.reply(200,{'pulse':appointments.pulse(c),'buffer':appointments.buffer_minutes(c),'server_time':reception_now().isoformat(timespec='seconds')})
@@ -1114,7 +1115,7 @@ class Handler(BaseHTTPRequestHandler):
             agenda_item=re.fullmatch(r'/api/appointments/([0-9]+)',path)
             if agenda_item:
                 if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
-                found=appointments.detail(c,int(agenda_item[1]))
+                found=appointments.detail(c,int(agenda_item[1]),user['role']=='administrador')
                 return self.reply(200,{'appointment':found}) if found else self.reply(404,{'error':'Cita no disponible.'})
             if path == '/api/appointments/availability':
                 # Horarios para el personal: incluye el día de hoy (la reserva pública empieza mañana).
@@ -2658,6 +2659,11 @@ class Handler(BaseHTTPRequestHandler):
                         if action==row['status']:return self.reply(200,{'ok':True})
                         # Al confirmar una solicitud se comprueba otra vez que el espacio siga libre en el servidor.
                         if action=='confirmada' and row['status'] in ('solicitada','cancelada','no_asistio') and not appointments.technicians(c,appointments.datetime.fromisoformat(row['starts_at']),row['duration_minutes'],exclude=row['id']):return self.reply(409,{'error':'Ese espacio ya no está disponible. Reprograma la cita.'})
+                        if action=='confirmada' and not appointments.authorization(c,row['id']):
+                            # Confirmar exige la autorización del cliente: el personal la registra con su aceptación expresa y los 4 dígitos.
+                            problems,terms=appointments.authorization_errors(c,data,row['identification'],row['document_type'])
+                            if problems:return self.reply(409,{'error':'Para confirmar la cita registre la autorización del cliente: aceptación de las condiciones y últimos 4 dígitos de su cédula.','fields':problems,'needs_authorization':True})
+                            appointments.authorize(c,row['id'],terms,data.get('id_last4'),'personal',user);audit(c,user['id'],'appointment_authorized',row['id'])
                         c.execute('UPDATE appointments SET status=?,updated_at=? WHERE id=?',(action,now,row['id']))
                         # El cliente recibe el aviso solo cuando la cita queda efectivamente confirmada o cancelada.
                         if action=='confirmada' and row['status']=='solicitada':appointments.queue_notice(c,row,'confirmation')

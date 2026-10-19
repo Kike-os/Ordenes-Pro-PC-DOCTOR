@@ -21,7 +21,7 @@ class AgendaTests(unittest.TestCase):
 
     def booking(self,time,**extra):
         return dict({'name':'Cliente De Agenda','identification':'1710034065','document_type':'cedula','phone':'0991234567','email':'agenda@example.invalid','device_type':'consola','brand':'Sony','model':'PS5','service':'mantenimiento',
-                     'description':'Limpieza interna y cambio de pasta térmica','date':self.day(),'time':time,'notes':'','privacy_consent':True,'communications_consent':True,'request_key':'agenda-request-'+time.replace(':','')+'-0001'},**extra)
+                     'description':'Limpieza interna y cambio de pasta térmica','date':self.day(),'time':time,'notes':'','privacy_consent':True,'terms_accept':True,'id_last4':'4065','communications_consent':True,'request_key':'agenda-request-'+time.replace(':','')+'-0001'},**extra)
 
     def test_online_booking_reaches_agenda_notifications_and_staff_confirmation(self):
         cookie,csrf=self.login()
@@ -61,7 +61,7 @@ class AgendaTests(unittest.TestCase):
         self.assertEqual(self.request('/api/appointments/%d'%aid,{'action':'confirmada'},cookie=cookie,csrf=csrf)['status'],200)
         self.assertEqual(self.request('/api/appointments/%d'%aid,{'action':'confirmada'},cookie=cookie,csrf=csrf)['status'],200)
         detail=self.request('/api/appointments/%d'%aid,cookie=cookie)['body']['appointment']
-        self.assertEqual((detail['status'],[(e['event'],e['old_status'],e['new_status'],bool(e['actor'])) for e in detail['events']]),('confirmada',[('status','solicitada','confirmada',True),('created','','solicitada',False)]))
+        self.assertEqual((detail['status'],[(e['event'],e['old_status'],e['new_status'],bool(e['actor'])) for e in detail['events']]),('confirmada',[('status','solicitada','confirmada',True),('authorized','','',False),('created','','solicitada',False)]))
         self.assertEqual([(n['event'],n['result']) for n in detail['notices']],[('confirmation','pending')])
         self.assertEqual(self.request('/api/appointments/999999',cookie=cookie)['status'],404)
         # Cancelar libera el espacio y avisa al cliente.
@@ -145,8 +145,15 @@ class AgendaTests(unittest.TestCase):
             self.assertEqual(c.execute('SELECT COUNT(*) FROM maintenance').fetchone()[0],1)
             self.assertEqual([(r['id'],r['status']) for r in c.execute('SELECT id,status FROM appointments ORDER BY id')],[(auto['id'],'cancelada'),(second['id'],'solicitada')])
         # El taller confirma la cita propuesta: no se envía correo (no hay consentimiento registrado) y la previsión sigue vinculada.
-        confirmed=self.request('/api/appointments/%d'%second['id'],{'action':'confirmada'},cookie=cookie,csrf=csrf)
-        self.assertEqual(confirmed['status'],200)
+        # La cita automática no tiene autorización del cliente: confirmarla exige registrarla (aceptación expresa y 4 dígitos).
+        refused=self.request('/api/appointments/%d'%second['id'],{'action':'confirmada'},cookie=cookie,csrf=csrf)
+        self.assertEqual((refused['status'],refused['body'].get('needs_authorization')),(409,True))
+        with app.connect() as c:self.assertEqual(c.execute('SELECT status FROM appointments WHERE id=?',(second['id'],)).fetchone()[0],'solicitada')
+        number=self.request('/api/appointments/%d'%second['id'],cookie=cookie)['body']['appointment']['identification']
+        confirmed=self.request('/api/appointments/%d'%second['id'],{'action':'confirmada','terms_accept':True,'id_last4':number[-4:]},cookie=cookie,csrf=csrf)
+        self.assertEqual(confirmed['status'],200,confirmed['body'])
+        evidence=self.request('/api/appointments/%d'%second['id'],cookie=cookie)['body']['appointment']['authorization']
+        self.assertEqual((evidence['channel'],evidence['id_last4']),('personal',number[-4:]))
         linked=self.request('/api/maintenance',cookie=cookie)['body']['rows'][0]
         self.assertEqual((linked['state'],linked['appointment_status'],linked['appointment_code']),('appointment','confirmada',second['public_code']))
         created={'body':{'id':second['id']}}
