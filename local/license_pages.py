@@ -8,7 +8,7 @@ e=html.escape
 
 def _shell(title,body):
     return ('<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><meta name="robots" content="noindex,nofollow">'
-            '<title>%s | PC-DOCTOR S.A.</title><link rel="icon" href="/favicon.ico?v=2" sizes="48x48"><link rel="stylesheet" href="/static/tracking.css"><link rel="stylesheet" href="/static/license.css"></head>'
+            '<title>%s | PC-DOCTOR S.A.</title><link rel="icon" href="/favicon.ico?v=2" sizes="48x48"><link rel="stylesheet" href="/static/tracking.css"><link rel="stylesheet" href="/static/licencias.css"></head>'
             '<body><main class="tracking-page license-page"><header><img src="/static/logo-original.png" alt="PC-DOCTOR S.A." width="150"><p>Licencias digitales originales</p></header>%s'
             '<footer><p>WhatsApp: +593 98 746 0591 · licencias-orig@ecuadorpcdoctor.com</p><p class="tracking-note">Enlace personal e intransferible. No lo reenvíe.</p></footer></main></body></html>') % (e(title),body)
 

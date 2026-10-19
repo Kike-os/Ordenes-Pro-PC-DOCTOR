@@ -8,6 +8,22 @@
   },
   "releases": [
     {
+      "version": "1.5.168",
+      "date": "2026-10-19T09:56:54-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Corrección de estilos de la entrega de licencias",
+      "changes": {
+        "features": [],
+        "improvements": [],
+        "fixes": [
+          "Página pública de entrega de licencias: su hoja de estilos se publica correctamente (el servidor omitía el archivo license.css)"
+        ],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.167",
       "date": "2026-10-19T09:52:01-05:00",
       "type": "patch",

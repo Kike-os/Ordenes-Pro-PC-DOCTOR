@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.168 — 2026-10-19 09:56 (UTC-05:00)
+
+Corrección de estilos de la entrega de licencias
+
+### Errores corregidos
+
+- Página pública de entrega de licencias: su hoja de estilos se publica correctamente (el servidor omitía el archivo license.css)
+
 ## v1.5.167 — 2026-10-19 09:52 (UTC-05:00)
 
 Inventario de Licencias Digitales y presupuestos con existencias

@@ -141,6 +141,8 @@ class LicenseInventoryTests(unittest.TestCase):
         self.assertEqual(self.post('/api/licenses/units/%d'%unit,action='release')['status'],409)
         # Entrega pública: la página no muestra nada sin identificación y código.
         page=self.request('/licencias/'+token)
+        # La hoja de estilos pública se sirve sin sesión y con un nombre que Vercel no descarta (los «license*» se omiten del paquete).
+        self.assertIn('/static/licencias.css',str(page['body']));self.assertEqual(self.request('/static/licencias.css')['status'],200)
         self.assertEqual(page['status'],200);self.assertNotIn(SERIAL,str(page['body']))
         self.assertEqual(self.request('/licencias/'+'x'*40)['status'],404)
         codes=[]
