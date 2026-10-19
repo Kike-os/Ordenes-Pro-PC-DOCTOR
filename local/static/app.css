@@ -6992,13 +6992,14 @@ body[data-page=appointments] .appointment-authorized{margin:0 0 10px;padding:10p
 .licenses-actions{display:flex;flex-wrap:wrap;gap:8px}
 .licenses-actions button{display:inline-flex;align-items:center;gap:8px}
 .licenses-tabs{display:flex;gap:4px;overflow-x:auto;border-bottom:1px solid #22385a;scrollbar-width:thin}
-.licenses-tab{display:inline-flex;align-items:center;gap:7px;padding:10px 12px;border:0;border-bottom:2px solid transparent;border-radius:8px 8px 0 0;background:none;color:#a9bddb;font-weight:600;white-space:nowrap;cursor:pointer}
+.licenses-tab{display:inline-flex;align-items:center;gap:7px;padding:10px 12px;font-size:13.5px;border:0;border-bottom:2px solid transparent;border-radius:8px 8px 0 0;background:none;color:#a9bddb;font-weight:600;white-space:nowrap;cursor:pointer}
 .licenses-tab[aria-selected=true]{color:#e3edff;border-bottom-color:#4d8df0;background:#0f1d33}
 .licenses-tab:focus-visible{outline:2px solid #8bb8ff;outline-offset:-2px}
 .licenses-panel{display:grid;gap:12px;min-width:0}
 .license-products{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
 .license-product,.license-delivery{display:grid;gap:10px;padding:14px;border:1px solid #22385a;border-radius:12px;background:#0b1626;min-width:0}
 .license-product header,.license-delivery header{display:flex;align-items:center;gap:10px;min-width:0;flex-wrap:wrap}
+.license-product header{flex-wrap:nowrap}.license-product header>div{min-width:0;flex:1}
 .license-product header strong{display:block;overflow-wrap:anywhere}
 .license-product header small{color:#9fb3cf}
 .license-logo{width:56px;height:44px;flex:none}

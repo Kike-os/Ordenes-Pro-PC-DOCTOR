@@ -28,3 +28,6 @@
 .license-credentials code{font-size:15px;font-weight:700;color:#0f172a;user-select:all}
 @media (max-width:480px){.license-facts{grid-template-columns:1fr}}
 @media print{body{background:#fff;color:#000}.license-form,.license-hint,footer{display:none}.license-card{break-inside:avoid;border-color:#000}}
+.license-card,.license-card header{text-align:left}
+.license-card dd,.license-card strong{color:#111827}
+.license-card dt{color:#4b5563}

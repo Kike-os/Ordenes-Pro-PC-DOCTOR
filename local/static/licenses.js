@@ -19,7 +19,7 @@ async function renderLicenses(){
  for(const[key,label,icon]of defs){const tab=button('',()=>{licenseState.tab=key;paint();},'licenses-tab');tab.setAttribute('role','tab');tab.dataset.tab=key;tab.append(systemIcon(licenseIcons[icon]),el('span',label));tabs.append(tab);}
  tabs.addEventListener('keydown',event=>{if(!['ArrowLeft','ArrowRight'].includes(event.key))return;const list=[...tabs.children],at=list.indexOf(document.activeElement);if(at<0)return;event.preventDefault();const next=list[(at+(event.key==='ArrowRight'?1:list.length-1))%list.length];next.focus();next.click();});
  wrap.append(bar,tabs,panel);
- async function paint(){for(const tab of tabs.children){const on=tab.dataset.tab===licenseState.tab;tab.setAttribute('aria-selected',String(on));tab.tabIndex=on?0:-1;}
+ async function paint(){for(const tab of tabs.children){const on=tab.dataset.tab===licenseState.tab;tab.setAttribute('aria-selected',String(on));tab.tabIndex=on?0:-1;if(on)tab.scrollIntoView({block:'nearest',inline:'nearest'});}
   panel.replaceChildren(el('p','Cargando…','system-muted'));
   try{if(licenseState.tab==='productos')licenseProducts(panel,data,reload);else if(licenseState.tab==='inventario')await licenseInventory(panel,data,reload);else if(licenseState.tab==='entregas')await licenseDeliveries(panel,reload);else await licenseHistory(panel);}
   catch(error){panel.replaceChildren(el('p',error.message,'empty-module'));}}
@@ -87,7 +87,7 @@ function licenseRegister(data,many){
 async function licenseInventory(panel,data,reload){
  const tools=el('form',undefined,'licenses-filters');tools.setAttribute('role','search');const product=el('select'),status=el('select'),search=el('input'),go=el('button','Buscar','secondary');go.type='submit';
  product.add(new Option('Todos los productos',''));for(const item of data.products.filter(row=>row.managed))product.add(new Option(item.name,String(item.id)));status.add(new Option('Todos los estados',''));for(const[key,text]of Object.entries(data.statuses))status.add(new Option(text,key));
- product.value=licenseState.product;status.value=licenseState.status;search.type='search';search.value=licenseState.q;search.placeholder='Buscar licencia: código, cliente, orden o la clave exacta';search.setAttribute('aria-label','Buscar licencia');search.spellcheck=false;
+ product.value=licenseState.product;status.value=licenseState.status;search.type='search';search.value=licenseState.q;search.placeholder='Código, cliente, orden o clave';search.setAttribute('aria-label','Buscar licencia');search.spellcheck=false;
  for(const[node,label]of [[product,'Producto'],[status,'Estado']])node.setAttribute('aria-label',label);tools.append(product,status,search,go);
  tools.onsubmit=event=>{event.preventDefault();licenseState.product=product.value;licenseState.status=status.value;licenseState.q=search.value.trim();licenseInventory(panel,data,reload);};product.onchange=status.onchange=()=>tools.requestSubmit();
  const query=new URLSearchParams({product:licenseState.product,status:licenseState.status,q:licenseState.q});const result=await api('/api/licenses/units?'+query.toString());
@@ -125,7 +125,7 @@ async function licenseDeliveries(panel,reload){
    confirm.disabled=row.blockers.length>0;card.append(confirm);}
   for(const delivery of row.deliveries){const box=el('div',undefined,'license-delivery-step');box.dataset.state=delivery.status;
    box.append(el('p',{pago_confirmado:'Pago confirmado',autorizada:'Entrega autorizada',anulada:'Confirmación anulada'}[delivery.status]+' · '+delivery.units.map(unit=>unit.code+' '+unit.product).join(', ')),
-    el('small',['Pago confirmado por '+delivery.confirmed_by+' el '+formatOrderDate(delivery.payment_confirmed_at),delivery.authorized_at?'Autorizada por '+delivery.authorized_by_name+' el '+formatOrderDate(delivery.authorized_at):'',delivery.reveal_count?'Consultada '+delivery.reveal_count+' vez/veces por el cliente':'',delivery.void_reason?'Motivo: '+delivery.void_reason:''].filter(Boolean).join(' · ')));
+    el('small',['Pago confirmado por '+delivery.confirmed_by+' el '+formatOrderDate(delivery.payment_confirmed_at),delivery.authorized_at?'Autorizada por '+delivery.authorized_by_name+' el '+formatOrderDate(delivery.authorized_at):'',delivery.reveal_count?'Consultada '+(delivery.reveal_count===1?'1 vez':delivery.reveal_count+' veces')+' por el cliente':'',delivery.void_reason?'Motivo: '+delivery.void_reason:''].filter(Boolean).join(' · ')));
    const actions=el('div',undefined,'license-row-actions');
    const share=result=>licenseShareLink(result,row);
    if(delivery.status==='pago_confirmado'){actions.append(button('Autorizar entrega',async()=>{if(await confirmClose({title:'¿Autorizar la entrega?',text:'Las licencias quedarán entregadas al cliente de la orden '+row.order+' y se generará su enlace privado ('+'72 h). Esta acción no se deshace.',keep:'Volver',discard:'Autorizar entrega'})!=='discard')return;try{share(await api('/api/licenses/deliveries/'+delivery.id,{action:'authorize'}));again();}catch(error){toast(error.message,'error');again();}},'primary'),
