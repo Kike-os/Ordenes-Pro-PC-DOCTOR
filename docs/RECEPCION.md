@@ -89,3 +89,19 @@ Cada persona del equipo puede poner, cambiar o quitar su foto desde el menú de 
 - El número se reserva dentro de la transacción de escritura (`BEGIN IMMEDIATE`), así que dos registros simultáneos no pueden obtener el mismo. Si un código ya existe (por ejemplo, el provisional `OP-00001` de una orden antigua), se salta al siguiente libre.
 - Las órdenes existentes conservan su código `PCD-AAAAMMDD-NNNN`, su QR y sus comprobantes. Las búsquedas, la consulta pública, el chat, ADI, la vinculación de correos y la lectura en voz reconocen los dos formatos.
 - La tabla antigua `order_sequence` (migración 002, sin uso) no se reutiliza.
+
+## Vuelta al consecutivo diario PCD-AAAAMMDD-0001 (19/10/2026, 1.5.171)
+
+Por decisión de administración se retira el consecutivo permanente OP-0001 y se restablece el formato diario:
+
+- `PCD-AAAAMMDD-0001`: fecha de recepción en hora de Ecuador (America/Guayaquil) y consecutivo de cuatro dígitos que vuelve a 0001 cada día.
+- El número lo genera el servidor dentro de la transacción de escritura (contador `daily_order_sequences`, que nunca retrocede ni se borra),
+  con índices únicos sobre el código y sobre (fecha, consecutivo). Registros simultáneos no se duplican.
+- Un intento fallido no deja salto: si la conversión de una cita falla porque otra persona ya la convirtió, se deshace todo (antes quedaba
+  una orden a medias y el número consumido).
+- Al llegar a 9999 en un mismo día se muestra un error controlado y no se registra la orden.
+- El número no cambia al editar, consultar, imprimir o actualizar la orden.
+- Revisión de las órdenes existentes (producción, 19/10/2026): sin duplicados. Todas las del formato diario terminan en 0001 porque cada
+  una fue la primera de su día. La orden **OP-0005** (19/10/2026) se conserva tal cual: el cliente ya recibió ese número por correo, en el
+  comprobante y en la autorización, y el QR impreso lo contiene. Se sigue encontrando en búsquedas, correos y chat. La tabla
+  `order_serial` queda sin uso y no se borra.

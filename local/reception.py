@@ -126,25 +126,16 @@ def reception_now():
     return datetime.now(ECUADOR_TZ)
 
 
+# Número de orden: PCD-AAAAMMDD-0001, con la fecha de recepción en hora de Ecuador y un consecutivo diario de cuatro dígitos.
+DAILY_LIMIT = 9999
+
+
 def order_code(date, number):
-    """Formato anterior (contador diario). Solo describe órdenes existentes: las nuevas usan next_order_code."""
     return f'PCD-{date}-{number:04d}'
 
 
-# Número de orden: «OP-» y un consecutivo permanente de al menos cuatro dígitos (OP-0001 … OP-9999, luego OP-10000…).
+# Números de orden reconocidos en textos (correos, chat, búsquedas): el formato diario y los OP-NNNN emitidos el 19/10/2026, que se conservan.
 ORDER_CODE_PATTERN = r'(?:OP-\d{4,}|PCD-\d{8}-\d{3,})(?:-E\d{2})?'
-
-
-def next_order_code(c):
-    """Reserva el siguiente consecutivo dentro de la transacción en curso (BEGIN IMMEDIATE): dos registros simultáneos nunca
-    obtienen el mismo número. Si un código ya existiera (formato antiguo OP-00001), se salta al siguiente libre."""
-    while True:
-        c.execute('UPDATE order_serial SET value=value+1 WHERE id=1')
-        number = c.execute('SELECT value FROM order_serial WHERE id=1').fetchone()[0]
-        code = 'OP-%04d' % number
-        # También se evita el código provisional que se muestra para órdenes antiguas sin número (OP-%05d por id).
-        if not c.execute("SELECT 1 FROM orders WHERE code=? OR (code IS NULL AND printf('OP-%05d',id)=?)", (code, code)).fetchone():
-            return number, code
 
 
 def public_base_url():

@@ -3475,9 +3475,16 @@ class Handler(BaseHTTPRequestHandler):
                         unit_number,code=equipment.next_unit(c,group_main);number_date=sequence=None
                         if not code:return self.reply(409,{'error':'La orden alcanzó el máximo de equipos permitido.'})
                     else:
-                        # Consecutivo permanente (OP-0001…): no depende de la fecha ni se reinicia. El índice único (number_date,daily_sequence)
-                        # con la serie «OP» impide duplicados; la fecha de recepción queda en received_at.
-                        sequence,code = reception.next_order_code(c);number_date='OP'
+                        # Consecutivo diario PCD-AAAAMMDD-0001: fecha de recepción en hora de Ecuador y contador por día en la base, dentro de esta misma
+                        # transacción de escritura (BEGIN IMMEDIATE): dos registros simultáneos no obtienen el mismo número y un intento que falla no deja
+                        # salto (todo se deshace). El índice único (number_date,daily_sequence) y el de code impiden duplicados.
+                        number_date=received.strftime('%Y%m%d')
+                        used=c.execute('SELECT value FROM daily_order_sequences WHERE reception_date=?',(number_date,)).fetchone()
+                        if used and used['value']>=reception.DAILY_LIMIT:
+                            c.rollback();return self.reply(409,{'error':'Se alcanzó el máximo de %d órdenes para el %s. No se registró la orden ni se generó ningún número.'%(reception.DAILY_LIMIT,received.strftime('%d/%m/%Y'))})
+                        c.execute('INSERT INTO daily_order_sequences(reception_date,value) VALUES (?,1) ON CONFLICT(reception_date) DO UPDATE SET value=value+1',(number_date,))
+                        sequence = c.execute('SELECT value FROM daily_order_sequences WHERE reception_date=?',(number_date,)).fetchone()[0]
+                        code = order_code(number_date,sequence)
                     oid = c.execute("INSERT INTO orders(device_id,status,problem,created_by,created_at,accessories,physical_condition,technician_notes,code,request_key,received_at,number_date,daily_sequence,group_id,unit_no) VALUES (?,'pendiente',?,?,?,?,?,?,?,?,?,?,?,?,?)",
                         (device_id,fields['problem'],user['id'],int(received.timestamp()),fields['accessories'],fields['physical_condition'],fields['technician_notes'],code,request_key,received.isoformat(timespec='microseconds'),number_date,sequence,group_main['id'] if group_main else None,unit_number)).lastrowid
                     if group_main:audit(c,user['id'],'order_unit_added',oid)
@@ -3495,7 +3502,8 @@ class Handler(BaseHTTPRequestHandler):
                     order_workspace.event(c,oid,user['id'],received,'created','Recepción registrada.')
                     if linked_appointment:
                         c.execute('UPDATE appointments SET converted_order_id=?,status=CASE WHEN status IN (\'confirmada\',\'reprogramada\',\'presente\') THEN \'completada\' ELSE status END,updated_at=? WHERE id=? AND converted_order_id IS NULL',(oid,received.isoformat(timespec='microseconds'),linked_appointment['id']))
-                        if c.execute('SELECT changes()').fetchone()[0]!=1:return self.reply(409,{'error':'La cita ya fue convertida en otra orden.'})
+                        # Si otra persona convirtió la cita mientras tanto, se deshace todo: no queda una orden a medias ni un número consumido.
+                        if c.execute('SELECT changes()').fetchone()[0]!=1:c.rollback();return self.reply(409,{'error':'La cita ya fue convertida en otra orden.'})
                         c.execute("INSERT INTO appointment_events(appointment_id,actor_id,event,new_status,created_at,detail) VALUES (?,?,'converted','completada',?,?)",(linked_appointment['id'],user['id'],received.isoformat(timespec='microseconds'),'Orden '+code))
                     audit(c, user['id'], 'order_created', oid)
                     # La orden queda guardada antes de intentar el correo: si el envío falla, la orden permanece y se puede reenviar.
