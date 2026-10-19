@@ -1,70 +1,60 @@
-# Inventario de Licencias Digitales
+# Licencias Pro — Control de Vigencia y Renovaciones
 
-Módulo «Licencias» del panel (solo administración). Rama de pruebas `licencias-inventario`; **no publicado**.
+Módulo «Licencias» del panel (solo administración). Migraciones 062 (inventario) y 064 (Licencias Pro). Rama de pruebas `licencias-pro`.
 
-## Flujo
+## Registro
+- **«+ Registrar nueva licencia»** crea el producto aunque la marca o el producto no existan en el catálogo (nombre, fabricante, categoría
+  Antivirus/Microsoft/Sistema operativo/Ofimática/Utilitarios/Otros, versión o edición, logotipo, descripción, dispositivos, duración,
+  tipo Suscripción/Perpetua/Otra, desde cuándo cuenta la vigencia, precio de venta y costo en USD) y registra la primera licencia.
+- Activación: clave o serial, usuario y contraseña **opcionales**, código de licencia del fabricante (todo cifrado), enlace oficial e
+  instrucciones. Comercial: proveedor, fecha de compra, costo, factura y **comprobante de compra** (PDF o imagen, privado).
+- Productos: **Editar | Duplicar producto | Agregar stock** (una o varias licencias; nunca sobrescribe las anteriores) **| Consultar |
+  Desactivar** (deja de ofrecerse en presupuestos; licencias e historial se conservan). Los logotipos se cargan o reemplazan con vista previa.
+- Una misma clave solo se registra varias veces en productos de **clave compartida** (hasta su número de clientes).
 
-Compra → registro de la credencial o serial → logo del producto → inventario disponible → presupuesto → aprobación → reserva →
-confirmación de pago completo → autorización administrativa → entrega segura → inventario actualizado.
+## Vigencia
+- Duración mensual, anual, bianual, trianual, perpetua o personalizada (meses). Meses de calendario: 19/10/2026 + 12 meses = 19/10/2027.
+- Modalidad por producto: **desde la activación** (sin activación no hay vencimiento: nunca se inventa uno), **desde la compra** o
+  **fecha fija del proveedor**. «Activar» registra la fecha real indicada por el personal; Órdenes Pro no afirma que se activó en los
+  servidores del fabricante. Las perpetuas no vencen ni generan avisos.
+- Estados con colores: Disponible (azul), Reservada (celeste), Entregada pendiente de activación (naranja), Activa (verde), Próxima a
+  vencer (amarillo, 30 días o menos), Vencida (rojo), Renovada (turquesa), Anulada (gris). Los días restantes se calculan cada día.
 
-## Modelo de datos (migración 062, solo tablas nuevas)
+## Ventas, entregas y devoluciones
+- Desde Presupuestos: al aprobarse se reservan unidades concretas (un borrador no descuenta). Si faltan existencias, quedan pendientes y
+  se reservan al registrar licencias nuevas.
+- **La entrega la confirma manualmente administración**, sin depender de la confirmación del pago. Si la orden tiene saldo pendiente hay
+  que aceptarlo expresamente y queda registrado. También hay **venta directa** a un cliente (con orden o presupuesto opcional).
+- Se registran cliente, licencia, serial (cifrado), fecha y hora, usuario, estado y orden/presupuesto; la entrega queda en el historial
+  de la orden. Una licencia entregada no puede entregarse otra vez. **Devolución autorizada**: la licencia queda anulada y no vuelve al
+  inventario.
+- El cliente consulta sus credenciales con un enlace privado (72 h) + identificación + código de 6 dígitos a su correo. El correo nunca
+  lleva claves.
 
-- **Producto** = elemento del catálogo con categoría «Licencias» o «Antivirus y seguridad». Nombre, precio de venta y logo siguen en el
-  catálogo (`catalog_items`, `catalog_images`). `license_products` añade tipo (Microsoft 365, Windows y Office, Antivirus, Otro),
-  proveedor, precio de compra, duración y dispositivos. El logo se registra una sola vez y lo reutilizan todas sus licencias.
-- **Unidad** (`license_units`): una fila por cuenta o serial, con su estado (Disponible, Reservada, Entregada, Anulada, Vencida),
-  datos visibles según el tipo y la credencial **cifrada**. La cantidad disponible se calcula a partir de las unidades.
-- **Compra** (`license_batches`): proveedor, costo unitario, fecha y factura de cada registro.
-- **Entrega** (`license_deliveries`): confirmación de pago (quién, cuándo, saldo), autorización (quién, cuándo) y enlace privado.
-- **Historial** (`license_events`): inmutable; registro, edición, reserva, anulación, pago, autorización, códigos y consultas.
+## Renovaciones
+- «Renovar licencia»: nuevo período, **fecha efectiva de inicio** (no se asume el día del pago), vencimiento fijo opcional, costo y precio,
+  y clave nueva si el fabricante la entrega (se crea otra licencia para el mismo cliente; la anterior queda «Renovada»). Cada renovación
+  queda en `license_renewals` con el período anterior; nada se borra. Se suspenden los avisos pendientes del vencimiento anterior.
 
-Protecciones en la base: no se borran unidades; una licencia entregada no cambia de estado, cliente, orden ni credencial; una anulada
-no vuelve al inventario; una reservada o entregada siempre está ligada a su partida y su orden.
+## Avisos y correos de renovación
+- Tarea diaria del servidor (cron de Vercel a las 14:00 UTC = 09:00 de Ecuador): avisos internos (30, 15, 7 y 1 días antes y el día del
+  vencimiento) en el panel y la campana, sin duplicados.
+- **Notificaciones de renovación** a clientes (desactivadas hasta que administración las active): días configurables, asunto y mensaje
+  personalizables, correo de prueba, historial con el resultado real (aceptado por el servidor; «entregado» solo con confirmación del
+  proveedor), errores, reenvío manual, reintentos controlados (hasta 3) y clientes excluidos. Plantilla HTML corporativa adaptable a
+  móviles con el logo de PC-DOCTOR S.A., el logo del producto y el botón «SOLICITAR RENOVACIÓN» (WhatsApp con mensaje preparado, sin datos
+  sensibles). Nunca incluye seriales, contraseñas ni claves. No avisa de perpetuas ni de licencias sin activar.
+- ADI responde «¿qué licencias vencen pronto?» con las próximas renovaciones (7 días) y el resultado de los recordatorios.
 
-## Seguridad de las credenciales
+## «Mis licencias» (ficha del cliente)
+- Tarjetas con logo, fabricante, tipo, dispositivos, fechas de entrega, activación y vencimiento, días restantes, estado, orden y
+  presupuesto, historial de renovaciones y barra de vigencia (verde, amarillo, rojo; azul si falta la activación).
+- Acciones de administración: Ver licencia, Activar, Renovar, Editar, Historial, Enviar información (sin credenciales) y avisos sí/no.
+  El personal técnico ve la sección sin credenciales ni acciones.
 
-- Cifrado autenticado con la clave `LICENSE_ENCRYPTION_KEY` (fuera de la base; en el servidor local, `license.key` 0600 en la carpeta
-  de datos). Es una clave distinta de la de la verificación en dos pasos. **Antes de publicar** hay que crearla en Vercel como secreto.
-- Para evitar duplicados se guarda una huella HMAC del serial o la cuenta (sin espacios ni guiones, sin distinguir mayúsculas). La
-  búsqueda por clave usa esa huella: encuentra la licencia sin guardarla ni mostrarla en claro.
-- Las credenciales no aparecen en listados, historial, auditoría ni correos. Administración las consulta una a una («Ver credencial»),
-  cada consulta queda registrada y la ventana se cierra sola a los 60 segundos.
+## Seguridad
+- Credenciales cifradas con `LICENSE_ENCRYPTION_KEY` (fuera de la base); ocultas por defecto; solo administración las ve, con registro y
+  cierre automático a los 60 s. Búsqueda por serial mediante huella, sin mostrarlo. Historial inmutable con usuario, fecha y hora.
 
-## Reservas y existencias
-
-- Un presupuesto en borrador no descuenta nada. Al aprobarse (por el cliente o registrado por el personal) se reservan unidades
-  concretas: primero las que vencen antes. Las vencidas no se venden.
-- Si no hay existencias suficientes, se reserva lo disponible y el resto queda «pendiente de existencias»; al registrar licencias nuevas
-  se reservan automáticamente para las ventas que esperaban, por orden de aprobación.
-- Ventas simultáneas: la reserva ocurre en la misma transacción de escritura y con condición de estado; una unidad no se vende dos veces.
-- «Anular reserva» devuelve la licencia al inventario solo si no fue activada ni entregada.
-- Los productos sin configurar en el inventario siguen funcionando en los presupuestos como hasta ahora (sin reservas).
-
-## Pago y entrega
-
-1. **Confirmar pago**: solo administración y solo si la orden no tiene saldo (pagos parciales no bastan). Agrupa las licencias reservadas.
-2. **Autorizar entrega**: acción separada de administración. El servidor vuelve a comprobar presupuesto aprobado, pago confirmado y saldo
-   cero; marca las licencias como entregadas al cliente y genera un enlace privado válido 72 horas.
-3. El cliente abre el enlace, escribe su identificación y recibe un código de 6 dígitos en su correo registrado (10 minutos, un solo
-   uso, 5 intentos fallidos bloquean el enlace hasta generar uno nuevo). La respuesta es la misma coincida o no la identificación.
-   Antes de mostrar la tarjeta privada se comprueba otra vez que no haya saldo (por ejemplo, tras anular un pago).
-4. El correo al cliente lleva solo el enlace, nunca usuarios, contraseñas ni seriales. Sin correo registrado, el código no puede
-   enviarse: registrar el correo o entregar en el taller.
-
-## Presupuestos
-
-El botón pasa a llamarse «Agregar producto, servicio o repuesto». El selector muestra servicios, repuestos y licencias con su logo,
-precio y existencias disponibles, y permite crear un servicio o repuesto nuevo sin salir del presupuesto (solo administración: queda
-registrado en el catálogo).
-
-## Tarjetas
-
-- Versión pública (panel): logo de PC-DOCTOR S.A., logo y nombre del producto, cliente, duración, dispositivos, fechas y contacto
-  (+593 98 746 0591 · licencias-orig@ecuadorpcdoctor.com), sin credenciales.
-- Versión privada: la que abre el cliente con su enlace, con las credenciales.
-
-## Pendiente antes de publicar
-
-- Visto bueno de administración.
-- Crear `LICENSE_ENCRYPTION_KEY` en Vercel (secreto) y excluir `data/license.key` del paquete de cPanel.
-- Configurar cada producto (tipo, proveedor, precio de compra) y subir sus logos originales.
+## Pendiente de decisión
+- Correo automático de **confirmación de renovación** al cliente (propuesto en el encargo como mejora adicional): no implementado.
