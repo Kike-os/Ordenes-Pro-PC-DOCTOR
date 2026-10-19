@@ -642,6 +642,13 @@ def decide(c, quote, decisions, now, user=None, actor='', note=''):
     c.execute("UPDATE quote_links SET revoked_at=? WHERE quote_id=? AND revoked_at=''", (stamp, quote['id']))
     sync_budget(c, quote)
     sync_order(c, quote, status, now)
+    if status in ('aprobado', 'parcial'):
+        # Licencias digitales con inventario: se reservan unidades concretas (sin revelar credenciales). Un borrador no descuenta nada.
+        import licenses
+        held = licenses.reserve_for_quote(c, quote, now, user, actor or ('' if user else 'cliente'))
+        if held['reserved'] or held['missing']:
+            event(c, quote['id'], 'licencias', '%d %s reservada%s del inventario.%s' % (held['reserved'], 'licencia' if held['reserved'] == 1 else 'licencias', '' if held['reserved'] == 1 else 's',
+                  (' %d pendiente%s de existencias.' % (held['missing'], '' if held['missing'] == 1 else 's')) if held['missing'] else ''), now, user, actor)
     event(c, quote['id'], status, '%d de %d ítems aprobados%s. Total autorizado: %s.%s' % (approved, len(items), ('; %d quedaron pendientes para una nueva versión' % waiting) if waiting else '', usd(approved_total), ' ' + note if note else ''), now, user, actor)
     return status
 

@@ -6987,3 +6987,72 @@ body[data-page=appointments] .appointment-authorized{margin:0 0 10px;padding:10p
 .service-picker-license :is(select,textarea){width:100%;max-width:none;margin:0}
 @media (max-width:600px){.service-picker-license{grid-template-columns:1fr}.service-picker-list{max-height:none}}
 @media (prefers-reduced-motion:reduce){.service-picker *{transition:none!important}}
+/* Inventario de Licencias Digitales (solo administración) */
+.licenses{display:grid;gap:14px;min-width:0}
+.licenses-actions{display:flex;flex-wrap:wrap;gap:8px}
+.licenses-actions button{display:inline-flex;align-items:center;gap:8px}
+.licenses-tabs{display:flex;gap:4px;overflow-x:auto;border-bottom:1px solid #22385a;scrollbar-width:thin}
+.licenses-tab{display:inline-flex;align-items:center;gap:7px;padding:10px 12px;border:0;border-bottom:2px solid transparent;border-radius:8px 8px 0 0;background:none;color:#a9bddb;font-weight:600;white-space:nowrap;cursor:pointer}
+.licenses-tab[aria-selected=true]{color:#e3edff;border-bottom-color:#4d8df0;background:#0f1d33}
+.licenses-tab:focus-visible{outline:2px solid #8bb8ff;outline-offset:-2px}
+.licenses-panel{display:grid;gap:12px;min-width:0}
+.license-products{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+.license-product,.license-delivery{display:grid;gap:10px;padding:14px;border:1px solid #22385a;border-radius:12px;background:#0b1626;min-width:0}
+.license-product header,.license-delivery header{display:flex;align-items:center;gap:10px;min-width:0;flex-wrap:wrap}
+.license-product header strong{display:block;overflow-wrap:anywhere}
+.license-product header small{color:#9fb3cf}
+.license-logo{width:56px;height:44px;flex:none}
+.license-logo img,.license-logo-large{object-fit:contain;max-width:100%;max-height:100%}
+.license-logo-large{width:180px;height:120px;object-fit:contain;background:#fff;border-radius:10px;padding:6px}
+.license-logo-preview{display:grid;place-items:center;min-height:130px;border:1px dashed #2b4a75;border-radius:10px;grid-column:1/-1}
+.license-stock{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin:0}
+.license-stock div{padding:6px;border-radius:8px;background:#0f1d33;text-align:center}
+.license-stock dt{font-size:11px;color:#9fb3cf}.license-stock dd{margin:0;font-size:18px;font-weight:700;font-variant-numeric:tabular-nums}
+.license-stock [data-state=disponible] dd{color:#7ee2a8}.license-stock [data-state=reservada] dd{color:#ffd27a}.license-stock [data-state=vencida] dd{color:#f59e9e}
+.license-facts-line,.license-row-facts,.license-hint,.license-count{margin:0;font-size:12.5px;color:#a9bddb;overflow-wrap:anywhere}
+.license-alert{margin:0;padding:8px 10px;border-radius:8px;border:1px solid #7a5a12;background:#2a2008;color:#fde6a8;font-size:12.5px}
+.license-card-actions,.license-row-actions,.license-dialog-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.license-dialog-actions{justify-content:flex-end;grid-column:1/-1}
+.licenses-filters{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,180px) minmax(0,2fr) auto;gap:8px}
+.licenses-filters :is(select,input){width:100%;max-width:none;margin:0}
+.license-table{display:grid;gap:8px}
+.license-row{display:grid;gap:6px;padding:10px 12px;border:1px solid #22385a;border-radius:10px;background:#0b1626;min-width:0}
+.license-row-main{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.license-badge{padding:2px 8px;border-radius:999px;font-size:11.5px;font-weight:700;background:#1b2b45;color:#cfe0ff}
+.license-badge[data-state=disponible]{background:#0f3324;color:#9ff0c3}.license-badge[data-state=reservada]{background:#3a2c08;color:#ffd98a}.license-badge[data-state=entregada]{background:#13284a;color:#a8c8ff}
+.license-badge[data-state=vencida],.license-badge[data-state=anulada]{background:#3a1216;color:#fdb4b4}
+.license-row-actions .danger{color:#fca5a5}
+.license-balance{margin-left:auto;font-size:12.5px;color:#9ff0c3}.license-balance.due{color:#fdb4b4}
+.license-delivery-step{display:grid;gap:6px;padding:10px;border-radius:10px;background:#0f1d33}
+.license-delivery-step p{margin:0;overflow-wrap:anywhere}.license-delivery-step small{color:#9fb3cf}
+.license-history{display:grid;gap:6px;margin:0;padding:0;list-style:none}
+.license-history li{display:grid;gap:2px;padding:8px 10px;border-left:3px solid #2b4a75;background:#0b1626;border-radius:0 8px 8px 0}
+.license-history small{color:#9fb3cf}
+.license-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 14px;min-width:min(560px,82vw)}
+.license-form-grid .wide,.license-form-grid .form-message{grid-column:1/-1}
+.license-dynamic,.license-kind-fields{display:grid;grid-template-columns:inherit;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 14px}
+.license-field{display:grid;gap:5px;min-width:0;font-size:12.5px;font-weight:600}
+.license-field :is(input,select,textarea){width:100%;max-width:none;margin:0}
+.license-field textarea[name=lines]{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px}
+.license-field-error{color:#fca5a5;font-weight:500}
+.license-secret,.license-batch{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 14px;border:1px solid #2b4a75;border-radius:10px;padding:10px 12px;margin:0;min-width:0}
+.license-secret legend,.license-batch legend{padding:0 6px;font-size:12px;font-weight:700;color:#8ab8ff}
+.license-secret .license-hint{grid-column:1/-1}
+.license-secret-view{display:grid;gap:8px;margin:8px 0 0}
+.license-secret-view dd{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0}
+.license-secret-view code{padding:6px 8px;border-radius:6px;background:#f1f5ff;color:#0f172a;font-size:14px;user-select:all;overflow-wrap:anywhere}
+.license-sheet{display:grid;gap:10px;padding:16px;border-radius:12px;background:#fff;color:#1f2937;max-width:560px}
+.license-sheet header{display:flex;align-items:center;gap:12px}.license-sheet header small{display:block;color:#5b6677}
+.license-brand{width:110px;height:auto}
+.license-sheet-item{padding:10px;border:1px solid #d6deec;border-radius:10px}
+.license-sheet-head{display:flex;align-items:center;gap:10px}
+.license-sheet .license-row-facts,.license-sheet .license-hint{color:#475569}
+.license-contact{margin:0;font-size:12.5px;font-weight:600}
+.catalog-stock{margin:6px 0 0;font-size:12px;font-weight:600;color:#7ee2a8}.catalog-stock[data-state=empty]{color:#ffd27a}
+.catalog-quick-open{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.catalog-quick{display:grid;gap:10px;min-width:min(420px,82vw)}
+.catalog-quick label{display:grid;gap:5px;font-size:12.5px;font-weight:600}
+.catalog-quick :is(input,select){width:100%;max-width:none;margin:0}
+@media (max-width:700px){.licenses-filters{grid-template-columns:1fr 1fr}.licenses-filters input{grid-column:1/-1}.license-form-grid,.license-dynamic,.license-kind-fields,.license-secret,.license-batch{grid-template-columns:1fr}.license-form-grid{min-width:0}}
+@media (max-width:420px){.license-stock{grid-template-columns:repeat(2,minmax(0,1fr))}.licenses-filters{grid-template-columns:1fr}}
+@media print{body.license-printing *{visibility:hidden}.license-sheet,.license-sheet *{visibility:visible}}

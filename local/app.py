@@ -34,6 +34,7 @@ from reception import (stored_category, valid_ecuador_phone, DEVICE_TYPES, valid
 import remote_db
 import mail_tracking
 import reception
+import licenses
 import service_terms
 import order_drafts
 import live_support
@@ -861,7 +862,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         path = urlsplit(self.path).path
-        files = {'/static/label.css':'label.css','/static/tracking.css':'tracking.css','/static/app.css':'app.css','/static/app.js':'app.js','/static/service-picker.js':'service-picker.js','/static/form-validation.js':'form-validation.js','/static/appointments.js':'appointments.js','/static/adi-widget.js':'adi-widget.js','/static/adi-orb.js':'adi-orb.js','/static/ui-select.js':'ui-select.js','/static/ticket.css':'ticket.css','/static/ticket.js':'ticket.js','/static/quote.css':'quote.css','/static/quote-sign.js':'quote-sign.js','/static/echarts.min.js':'echarts.min.js','/static/logo-original.png':'logo-original.png',
+        files = {'/static/label.css':'label.css','/static/tracking.css':'tracking.css','/static/license.css':'license.css','/static/app.css':'app.css','/static/app.js':'app.js','/static/service-picker.js':'service-picker.js','/static/licenses.js':'licenses.js','/static/form-validation.js':'form-validation.js','/static/appointments.js':'appointments.js','/static/adi-widget.js':'adi-widget.js','/static/adi-orb.js':'adi-orb.js','/static/ui-select.js':'ui-select.js','/static/ticket.css':'ticket.css','/static/ticket.js':'ticket.js','/static/quote.css':'quote.css','/static/quote-sign.js':'quote-sign.js','/static/echarts.min.js':'echarts.min.js','/static/logo-original.png':'logo-original.png',
                  '/favicon.ico':'favicon.ico','/static/favicon.ico':'favicon.ico','/static/favicon-16.png':'favicon-16.png','/static/favicon-32.png':'favicon-32.png','/static/logo-firma.png':'logo-firma.png','/static/favicon-48.png':'favicon-48.png',
                  '/apple-touch-icon.png':'apple-touch-icon.png','/apple-touch-icon-precomposed.png':'apple-touch-icon.png','/static/apple-touch-icon.png':'apple-touch-icon.png'}
         # Logotipos de marcas: solo nombres simples dentro de static/brands; si el archivo no existe la interfaz usa un icono genérico.
@@ -1035,6 +1036,19 @@ class Handler(BaseHTTPRequestHandler):
                 found=maintenance_reminders.lookup(c,maintenance_page[1])
                 return self.reply(200 if found else 404,maintenance_reminders.page(found,maintenance_page[1]) if found else maintenance_reminders.missing_page(),'text/html; charset=utf-8')
             # Autorización electrónica del cliente por enlace aleatorio. La respuesta es idéntica para enlaces inexistentes.
+            license_page=re.fullmatch(r'/licencias/([A-Za-z0-9_-]{30,80})(?:/logo/([0-9]{1,9}))?',path)
+            if license_page:
+                # Entrega de licencias por enlace privado: identificación y código antes de mostrar nada. El logo solo de productos de esa entrega.
+                import license_pages
+                if limited(c,'license-ip:'+digest(self.client_address[0]),60,300):return self.reply(429,{'error':'Demasiadas consultas. Intenta más tarde.'})
+                delivery=licenses.lookup(c,license_page[1],reception_now())
+                if not delivery:return self.reply(404,license_pages.missing_page(),'text/html; charset=utf-8')
+                if license_page[2]:
+                    owned=c.execute('SELECT 1 FROM license_units WHERE delivery_id=? AND product_id=?',(delivery['id'],int(license_page[2]))).fetchone()
+                    picture=c.execute('SELECT mime,data FROM catalog_images WHERE item_id=?',(int(license_page[2]),)).fetchone() if owned else None
+                    if not picture:return self.reply(404,{'error':'Sin imagen.'})
+                    return self.reply(200,bytes(picture['data']),picture['mime'])
+                return self.reply(200,license_pages.identify_page(license_page[1]),'text/html; charset=utf-8')
             quote_page=re.fullmatch(r'/presupuesto/([A-Za-z0-9_-]{30,80})(/documento\.pdf)?',path)
             if quote_page:
                 # Presupuesto por enlace privado: identidad con los últimos cuatro dígitos antes de mostrar importes; el PDF exige esa comprobación o una decisión ya registrada.
@@ -1747,6 +1761,23 @@ class Handler(BaseHTTPRequestHandler):
                     return self.reply(200,re.sub(r'cid:[^"\'\s>]+','/static/logo-firma.png',re.sub(r'cid:[^"\'\s>]*firma-grafica[^"\'\s>]*','/api/mail/signature-image',row['body_html'])) or '<pre>'+html.escape(row['body_text'])+'</pre>','text/html; charset=utf-8')
                 return self.reply(200,{'mail':{'id':row['id'],'kind_label':mailing.LABELS.get(row['kind'],'Notificación'),'recipient':row['recipient'],'subject':row['subject'],'text':row['body_text'],'attachments':row['attachments'],'status':row['status'],'status_label':mailing.STATUS[row['status']],
                     'adi':row['adi'],'detail':row['detail'],'created_at':row['created_at'],'sent_at':row['sent_at'],'order_code':row['order_code'],'view_url':'/correo/%d'%row['id'] if row['body_html'] else ''}})
+            if path.startswith('/api/licenses'):
+                # Inventario de Licencias Digitales: solo administración. Las credenciales nunca salen en estas consultas.
+                if user['role']!='administrador':return self.reply(403,{'error':'Solo administración accede al inventario de licencias.'})
+                query=parse_qs(urlsplit(self.path).query);now=reception_now()
+                try:
+                    if path=='/api/licenses':
+                        return self.reply(200,{'products':licenses.products(c,now),'kinds':licenses.KINDS,'statuses':licenses.STATUSES,'fields':licenses.FIELDS,'field_labels':licenses.FIELD_LABELS,
+                                               'secrets':{kind:[{'key':key,'label':label} for key,label in pairs] for kind,pairs in licenses.SECRETS.items()},'max_bulk':licenses.MAX_BULK,'contact':licenses.CONTACT,'link_hours':licenses.LINK_HOURS})
+                    if path=='/api/licenses/units':
+                        product=query.get('product',[''])[0]
+                        return self.reply(200,{'rows':licenses.units(c,now,int(product) if product.isdigit() else None,query.get('status',[''])[0],query.get('q',[''])[0][:120])})
+                    if path=='/api/licenses/deliveries':return self.reply(200,{'rows':licenses.deliveries(c,now)})
+                    if path=='/api/licenses/history':return self.reply(200,{'rows':licenses.history(c)})
+                    card_route=re.fullmatch(r'/api/licenses/deliveries/([0-9]{1,9})/card',path)
+                    if card_route:return self.reply(200,licenses.card(c,int(card_route[1]),private=False))
+                except licenses.LicenseError as error:return self.reply(error.status,{'error':str(error),'fields':error.fields})
+                return self.reply(404,{'error':'No encontrado.'})
             if path == '/api/catalog':
                 if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
                 query=parse_qs(urlsplit(self.path).query)
@@ -1755,7 +1786,7 @@ class Handler(BaseHTTPRequestHandler):
                 names={name.lower() for name,*_ in quotes.INITIAL}|{name.lower() for name,*_ in quotes.ADDITIONS};present={r['name'].lower() for r in c.execute('SELECT name FROM catalog_items')}
                 return self.reply(200,{'rows':quotes.catalog(c,query.get('q',[''])[0][:80],query.get('all',[''])[0]!='1',category if category in quotes.CATEGORIES else ''),'categories':quotes.CATEGORIES,'price_modes':quotes.PRICE_MODES,
                     'tax_rate_bp':quotes.tax_rate(c),'link_days':quotes.link_days(c),'can_edit':user['role']=='administrador','brand_logos':logos,'initial_missing':len(names-present),'icons':quotes.catalog_icons.catalog(),
-                    'priorities':{key:{'label':label,'color':color} for key,(label,color,_) in quotes.PRIORITIES.items()}})
+                    'priorities':{key:{'label':label,'color':color} for key,(label,color,_) in quotes.PRIORITIES.items()},'license_stock':licenses.stock(c,reception_now())})
             catalog_extra=re.fullmatch(r'/api/catalog/([0-9]{1,9})/(image|history)',path)
             if catalog_extra:
                 if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
@@ -1861,6 +1892,38 @@ class Handler(BaseHTTPRequestHandler):
                 notice=maintenance_reminders.respond(c,found,form.get('action',''),form.get('note',''),reception_now())
                 if notice is None:return self.reply(400,maintenance_reminders.page(found,maintenance_post[1],error='Elija una de las opciones.'),'text/html; charset=utf-8')
                 return self.reply(200,maintenance_reminders.page(found,maintenance_post[1],notice=notice),'text/html; charset=utf-8')
+        license_post=re.fullmatch(r'/licencias/([A-Za-z0-9_-]{30,80})',urlsplit(self.path).path)
+        if license_post:
+            import license_pages
+            try:length=int(self.headers.get('Content-Length','0') or 0)
+            except ValueError:length=0
+            if length<=0 or length>2000:return self.reply(400,{'error':'Solicitud inválida.'})
+            form={key:values[0] for key,values in parse_qs(self.rfile.read(length).decode('utf-8','replace'),keep_blank_values=True).items()}
+            token=license_post[1];html_type='text/html; charset=utf-8'
+            with connect() as c:
+                c.execute('BEGIN IMMEDIATE')
+                if limited(c,'license-post:'+digest(token),20,900) or limited(c,'license-ip:'+digest(self.client_address[0]),60,300):
+                    c.commit();return self.reply(429,{'error':'Demasiados intentos. Intenta más tarde.'})
+                now=reception_now();delivery=licenses.lookup(c,token,now)
+                if not delivery:
+                    c.commit();return self.reply(404,license_pages.missing_page(),html_type)
+                if form.get('step')=='verify':
+                    forwarded=(self.headers.get('X-Forwarded-For') or '').split(',')[0].strip()
+                    card=licenses.verify_code(c,delivery,form.get('code',''),now,(forwarded or self.client_address[0]))
+                    c.commit()
+                    if not card:return self.reply(400,license_pages.code_page(token,licenses.CODE_MINUTES,'El código no es válido o venció. Solicite uno nuevo si lo necesita.'),html_type)
+                    return self.reply(200,license_pages.card_page(token,card),html_type)
+                identification=str(form.get('identification',''))[:20]
+                if not identification.strip():
+                    c.commit();return self.reply(400,license_pages.identify_page(token,'Escriba su número de identificación.'),html_type)
+                pending=licenses.request_code(c,delivery,identification,now)
+                c.commit()
+                if pending:
+                    try:
+                        if mail_pro.configured():send_verification_code(pending[0],pending[1],licenses.CODE_MINUTES,'en la página de entrega de licencias de PC-DOCTOR S.A.','Entrega de licencias digitales')
+                    except mail_pro.MailError as error:print('license-code',error.kind,flush=True)
+                # La misma respuesta coincida o no la identificación: no revela datos del titular.
+                return self.reply(200,license_pages.code_page(token,licenses.CODE_MINUTES),html_type)
         quote_post_public=re.fullmatch(r'/presupuesto/([A-Za-z0-9_-]{30,80})',urlsplit(self.path).path)
         if quote_post_public:
             try:length=int(self.headers.get('Content-Length','0') or 0)
@@ -2801,6 +2864,60 @@ class Handler(BaseHTTPRequestHandler):
                     c.execute('UPDATE orders SET updated_at=?,revision=revision+1 WHERE id=?',(now.isoformat(timespec='microseconds'),oid))
                     audit(c,user['id'],'order_follow_up',oid)
                     return self.reply(201,{'ok':True})
+                if path.startswith('/api/licenses/'):
+                    # Inventario de Licencias Digitales: todo lo hace administración y queda en el historial y la auditoría.
+                    if user['role']!='administrador':return self.reply(403,{'error':'Solo administración gestiona las licencias.'})
+                    now=reception_now()
+                    try:
+                        licenses.expire(c,now)
+                        if path=='/api/licenses/products':
+                            item=licenses.save_product(c,data,user,now);audit(c,user['id'],'license_product_saved',item);return self.reply(200,{'ok':True,'id':item})
+                        if path=='/api/licenses/units':
+                            unit=licenses.register(c,data,user,now);audit(c,user['id'],'license_registered',unit);return self.reply(201,{'ok':True,'id':unit})
+                        if path=='/api/licenses/units/bulk':
+                            made=licenses.register_many(c,data,user,now);audit(c,user['id'],'license_bulk_registered',len(made));return self.reply(201,{'ok':True,'count':len(made)})
+                        unit_route=re.fullmatch(r'/api/licenses/units/([0-9]{1,9})',path)
+                        if unit_route:
+                            unit=int(unit_route[1]);action=str(data.get('action',''))
+                            if action=='edit':licenses.edit(c,unit,data,user,now)
+                            elif action=='void':licenses.void(c,unit,data.get('reason',''),user,now)
+                            elif action=='release':licenses.release(c,unit,user,now)
+                            elif action=='reveal':
+                                values=licenses.admin_reveal(c,unit,user,now);audit(c,user['id'],'license_credentials_viewed',unit);return self.reply(200,{'ok':True,'credentials':values})
+                            else:return self.reply(400,{'error':'Acción no válida.'})
+                            audit(c,user['id'],'license_'+action,unit);return self.reply(200,{'ok':True})
+                        pay_route=re.fullmatch(r'/api/licenses/orders/([0-9]{1,9})/confirm-payment',path)
+                        if pay_route:
+                            delivery=licenses.confirm_payment(c,int(pay_route[1]),user,now);audit(c,user['id'],'license_payment_confirmed',int(pay_route[1]));return self.reply(200,{'ok':True,'delivery':delivery})
+                        delivery_route=re.fullmatch(r'/api/licenses/deliveries/([0-9]{1,9})',path)
+                        if delivery_route:
+                            delivery=int(delivery_route[1]);action=str(data.get('action',''))
+                            if action=='void':
+                                licenses.void_confirmation(c,delivery,data.get('reason',''),user,now);audit(c,user['id'],'license_payment_voided',delivery);return self.reply(200,{'ok':True})
+                            if action not in ('authorize','renew'):return self.reply(400,{'error':'Acción no válida.'})
+                            token=licenses.authorize(c,delivery,user,now) if action=='authorize' else licenses.renew_link(c,delivery,user,now)
+                            audit(c,user['id'],'license_delivery_'+('authorized' if action=='authorize' else 'link_renewed'),delivery)
+                            link=public_base_url().rstrip('/')+'/licencias/'+token;row=licenses.delivery_row(c,delivery)
+                            client=c.execute('SELECT name,email FROM clients WHERE id=?',(row['client_id'],)).fetchone()
+                            # La autorización queda guardada antes del correo. El correo lleva solo el enlace: nunca usuarios, contraseñas ni seriales.
+                            c.commit();result='no_email'
+                            email=(client['email'] or '').strip() if client else ''
+                            if re.fullmatch(r'[^\s@<>]+@[^\s@<>.]+(?:\.[^\s@<>.]+)+',email):
+                                result='not_configured'
+                                try:
+                                    if mail_pro.configured():
+                                        body='\n'.join(['Estimado/a '+client['name']+':','','Su compra de licencias digitales fue autorizada para la entrega.','',
+                                            'Para consultar sus credenciales ingrese al siguiente enlace privado (válido %d horas):'%licenses.LINK_HOURS,link,'',
+                                            'Por su seguridad se le pedirá su número de identificación y un código que enviaremos a este correo. Por seguridad, este mensaje no contiene usuarios, contraseñas ni seriales.','',
+                                            'Atentamente,','','Departamento de Licencias','PC-DOCTOR S.A.','WhatsApp '+licenses.CONTACT['phone']+' · '+licenses.CONTACT['email']])
+                                        send_institutional(c,'license','Entrega de licencias digitales',email,'PC-DOCTOR S.A. | Entrega de licencias digitales',body,row['order_id'],user['id'],private=(link,));result='sent'
+                                except mail_pro.MailError as error:
+                                    print('license-mail',error.kind,flush=True);result='failed'
+                            return self.reply(200,{'ok':True,'link':link,'mail':result,'expires_at':licenses.delivery_row(c,delivery)['token_expires_at']})
+                    except licenses.LicenseError as error:
+                        # Todo o nada: si algo falla, no queda ningún cambio a medias (lote sin licencias, reservas parciales…).
+                        c.rollback();return self.reply(error.status,{'error':str(error),'fields':error.fields})
+                    return self.reply(404,{'error':'No encontrado.'})
                 catalog_image=re.fullmatch(r'/api/catalog/([0-9]{1,9})/image',path)
                 if path=='/api/catalog/seed' or catalog_image:
                     if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede modificar el catálogo.'})

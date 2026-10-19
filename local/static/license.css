@@ -1,0 +1,30 @@
+/* Entrega de licencias digitales: identificación, código y tarjeta privada (páginas públicas por enlace privado) */
+.license-page{max-width:640px}
+.license-card-box small{display:block;font-size:11.5px;font-weight:700;letter-spacing:.08em;color:#8ab8ff}
+.license-card-box h1{margin:4px 0 8px;font-size:22px}
+.license-form{display:grid;gap:10px;margin-top:14px}
+.license-form label{font-size:13px;font-weight:600;color:#c2d3ec}
+.license-form input{box-sizing:border-box;width:100%;min-height:46px;padding:10px 12px;border:1px solid #2b4a75;border-radius:10px;background:#081222;color:#e3edff;font-size:16px}
+.license-form input:focus-visible{outline:2px solid #69a7ff;outline-offset:2px}
+.license-form input[name=code]{letter-spacing:.4em;text-align:center;font-variant-numeric:tabular-nums}
+.license-primary{min-height:46px;border:0;border-radius:10px;background:#2563eb;color:#fff;font-weight:700;font-size:15px;cursor:pointer}
+.license-primary:focus-visible{outline:2px solid #fff;outline-offset:2px}
+.license-step{margin:0;font-size:12.5px;color:#9fb3cf}
+.license-error{margin:0;padding:10px 12px;border-radius:10px;border:1px solid #7f1d1d;background:#2a0f14;color:#fecaca}
+.license-notice{margin:0;padding:10px 12px;border-radius:10px;border:1px solid #1f4f7a;background:#0b2238;color:#cfe3ff;font-size:13.5px}
+.license-hint,.license-contact{font-size:12.5px;color:#9fb3cf}
+.license-hint a{color:#8ab8ff}
+.license-warning{padding:10px 12px;border-radius:10px;border:1px solid #7a5a12;background:#2a2008;color:#fde6a8;font-size:13px}
+.license-card{margin:14px 0;padding:14px;border:1px solid #2b4a75;border-radius:12px;background:#ffffff;color:#1f2937}
+.license-card header{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+.license-card header strong{display:block;font-size:16px}
+.license-card header small{color:#5b6677;letter-spacing:0;font-weight:600}
+.license-product-logo{width:72px;height:56px;object-fit:contain;flex:none}
+.license-product-mark{display:grid;place-items:center;border-radius:10px;background:#e8eefb;color:#1e3a8a;font-weight:800;font-size:22px}
+.license-facts,.license-credentials{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 14px;margin:0}
+.license-facts dt,.license-credentials dt{font-size:11.5px;color:#5b6677}
+.license-facts dd,.license-credentials dd{margin:0;font-size:13.5px;overflow-wrap:anywhere}
+.license-credentials{grid-template-columns:1fr;margin-top:10px;padding:10px;border-radius:10px;background:#f1f5ff;border:1px dashed #94a3c8}
+.license-credentials code{font-size:15px;font-weight:700;color:#0f172a;user-select:all}
+@media (max-width:480px){.license-facts{grid-template-columns:1fr}}
+@media print{body{background:#fff;color:#000}.license-form,.license-hint,footer{display:none}.license-card{break-inside:avoid;border-color:#000}}
