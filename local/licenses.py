@@ -1,33 +1,46 @@
-"""Inventario de Licencias Digitales: productos, unidades individuales (cuentas o seriales), reservas, pago, autorización y entrega.
+"""Licencias Pro — Control de Vigencia y Renovaciones.
 
-Producto = elemento del catálogo (categoría «licencia» o «seguridad») con su logo; sus datos de inventario están en license_products.
-Debajo, una unidad por cuenta o serial, con su estado. Un borrador no descuenta nada: al aprobarse el presupuesto se reservan unidades
-concretas, sin revelar sus credenciales. Las credenciales solo se liberan cuando el presupuesto está aprobado, el pago está confirmado,
-no queda saldo y un administrador autorizó la entrega; el servidor vuelve a comprobarlo todo en cada consulta.
+Producto = elemento del catálogo (categoría «licencia» o «seguridad») con su logo; sus datos de licencia (línea, edición, modalidad,
+duración, desde cuándo cuenta la vigencia, proveedor y costo) están en license_products. Debajo, una unidad por clave, serial o cuenta,
+con su estado. Un borrador de presupuesto no descuenta nada: al aprobarse se reservan unidades concretas. La entrega la confirma
+manualmente administración (sin depender de la confirmación del pago; si la orden tiene saldo, hay que aceptarlo expresamente).
 
-Cifrado de credenciales (solo biblioteca estándar, el mismo esquema que la verificación en dos pasos pero con OTRA clave): clave maestra
-de 32 bytes fuera de la base (variable LICENSE_ENCRYPTION_KEY en Vercel; en el servidor local, el archivo license.key 0600 en la carpeta
-de datos). De ella se derivan con HMAC-SHA256 la clave de cifrado, la de autenticación y la de huellas. Cifrado en modo contador con
-HMAC-SHA256 y autenticación encrypt-then-MAC. La huella (HMAC) del serial o cuenta impide registrarlo dos veces sin guardarlo en claro."""
-import base64,hashlib,hmac,json,os,re,secrets,struct
+Vigencia: duración mensual, anual, bianual, trianual, perpetua o personalizada (meses). Se cuenta desde la activación real, desde la
+compra o hasta una fecha fija del proveedor, según el producto. Los meses son de calendario (19/10/2026 + 12 meses = 19/10/2027). Una
+licencia que cuenta desde la activación no tiene vencimiento hasta que se registra su activación: Órdenes Pro registra la fecha que
+indica el personal; no afirma que la licencia se activó en los servidores del fabricante.
+
+Cifrado de credenciales (solo biblioteca estándar): clave maestra de 32 bytes fuera de la base (LICENSE_ENCRYPTION_KEY en Vercel; en el
+servidor local, license.key 0600 en la carpeta de datos). Cifrado en modo contador con HMAC-SHA256 y autenticación encrypt-then-MAC. La
+huella (HMAC) de la clave o cuenta impide registrarla dos veces, salvo en productos de clave compartida (hasta su número de puestos)."""
+import base64,calendar,hashlib,hmac,json,os,re,secrets,struct
 from datetime import date,datetime,timedelta
 from pathlib import Path
 
 KINDS={'m365':'Microsoft 365','windows_office':'Windows y Office','antivirus':'Antivirus','otro':'Otro producto digital'}
+LINES={'antivirus':'Antivirus','microsoft':'Microsoft','sistema':'Sistema operativo','ofimatica':'Ofimática','utilitarios':'Utilitarios','otros':'Otros'}
+MODELS={'suscripcion':'Suscripción','perpetua':'Perpetua','otra':'Otra'}
+DURATIONS={'mensual':'Mensual','anual':'Anual','bianual':'Bianual','trianual':'Trianual','perpetua':'Perpetua','personalizada':'Personalizada'}
+MONTHS={'mensual':1,'anual':12,'bianual':24,'trianual':36}
+VALIDITY={'activacion':'Desde la activación','compra':'Desde la compra','fija':'Fecha fija del proveedor'}
 STATUSES={'disponible':'Disponible','reservada':'Reservada','entregada':'Entregada','anulada':'Anulada','vencida':'Vencida'}
+# Estados que ve el personal (calculados a partir de la unidad y la fecha de hoy), con su color.
+STATES={'disponible':('Disponible','azul'),'reservada':('Reservada','celeste'),'pendiente_activacion':('Entregada, pendiente de activación','naranja'),
+        'activa':('Activa','verde'),'por_vencer':('Próxima a vencer','amarillo'),'vencida':('Vencida','rojo'),'renovada':('Renovada','turquesa'),'anulada':('Anulada','gris')}
 PRODUCT_CATEGORIES=('licencia','seguridad')
-# Credenciales (cifradas) y datos visibles de cada tipo. Cada cuenta o serial es un registro individual.
-SECRETS={'m365':(('username','Usuario'),('password','Contraseña')),'windows_office':(('key','Clave de activación'),),
-         'antivirus':(('serial','Serial o código de activación'),),'otro':(('serial','Serial, clave o código de activación'),)}
-FIELDS={'m365':('license_type','devices','activated_at','expires_at'),'windows_office':('edition','license_type','purchased_at'),
-        'antivirus':('manufacturer','version','devices','term','expires_at'),'otro':('edition','license_type','devices','term','expires_at')}
-FIELD_LABELS={'edition':'Producto y edición','license_type':'Tipo de licencia','manufacturer':'Fabricante','version':'Versión','devices':'Dispositivos',
-              'term':'Duración','purchased_at':'Fecha de compra','activated_at':'Fecha de activación','expires_at':'Fecha de vencimiento'}
+SECRET_LABELS={'key':'Clave de producto o serial','serial':'Serial o código de activación','username':'Usuario o correo de activación','password':'Contraseña de activación','license_code':'Código de licencia o identificador del fabricante'}
+SECRET_INPUTS=('key','username','password','license_code')
+FIELDS=('edition','license_type','manufacturer','version','devices','term','purchased_at','activated_at','expires_at','download_url','instructions')
+FIELD_LABELS={'edition':'Versión o edición','license_type':'Tipo de licencia','manufacturer':'Fabricante','version':'Versión','devices':'Dispositivos','term':'Duración',
+              'purchased_at':'Fecha de compra','activated_at':'Fecha de activación','expires_at':'Fecha de vencimiento','download_url':'Enlace de descarga o activación','instructions':'Instrucciones de instalación'}
 DATES=('purchased_at','activated_at','expires_at')
+ALERT_DAYS=(30,15,7,1,0)
+SOON_DAYS=30
 LINK_HOURS=72
 CODE_MINUTES=10
 MAX_CODE_FAILURES=5
 MAX_BULK=200
+RECEIPT_LIMIT=1500000
 CONTACT={'phone':'+593 98 746 0591','email':'licencias-orig@ecuadorpcdoctor.com'}
 
 
@@ -82,14 +95,15 @@ def unseal(value):
 
 
 def normalized(kind,values):
-    """Valor que identifica la cuenta o serial (para no registrarlo dos veces): la cuenta en minúsculas o la clave sin espacios ni guiones."""
-    if kind=='m365':return 'm365:'+values['username'].strip().lower()
+    """Lo que identifica la credencial: la clave o serial (sin espacios ni guiones, en mayúsculas) o, si no hay, la cuenta en minúsculas."""
     main=values.get('key') or values.get('serial') or ''
-    return 'key:'+re.sub(r'[\s-]+','',main).upper()
+    if main:return 'key:'+re.sub(r'[\s-]+','',main).upper()
+    return 'm365:'+str(values.get('username','')).strip().lower()
 
 
-def fingerprint(kind,values):
-    return hmac.new(_keys()[2],normalized(kind,values).encode(),hashlib.sha256).hexdigest()
+def fingerprint(kind,values,seat=1):
+    base=normalized(kind,values)+('' if seat==1 else '#%d'%seat)
+    return hmac.new(_keys()[2],base.encode(),hashlib.sha256).hexdigest()
 
 
 def _hash(value):
@@ -105,8 +119,45 @@ def event(c,name,now,detail='',unit=None,product=None,delivery=None,order=None,c
               (unit,product,delivery,order,client,name,detail[:500],user['id'] if user else None,actor or ('' if user else 'sistema'),stamp(now)))
 
 
+def add_months(day,months):
+    """Meses de calendario: el mismo día del mes de destino (o su último día si no existe: 31/01 + 1 mes = 28 o 29/02)."""
+    year,month=divmod(day.month-1+months,12);year+=day.year;month+=1
+    return date(year,month,min(day.day,calendar.monthrange(year,month)[1]))
+
+
+def months_of(product,duration=None,custom=None):
+    duration=duration or product.get('duration') or 'anual'
+    if duration=='perpetua':return None
+    if duration=='personalizada':return custom if custom is not None else product.get('duration_months')
+    return MONTHS[duration]
+
+
+def compute_expiry(product,purchased_at,activated_at,manual=''):
+    """Vencimiento según el producto. Sin activación (si cuenta desde la activación) o sin compra (si cuenta desde la compra) no hay
+    vencimiento: nunca se inventa una fecha. Las perpetuas no vencen."""
+    months=months_of(product)
+    if months is None:return ''
+    mode=product.get('validity_mode') or 'activacion'
+    if mode=='fija':return manual
+    base=activated_at if mode=='activacion' else purchased_at
+    return add_months(date.fromisoformat(base),months).isoformat() if base else ''
+
+
+def state_of(unit,today,mode='activacion'):
+    """Estado visible de una unidad hoy (y días restantes cuando tiene vencimiento)."""
+    days=(date.fromisoformat(unit['expires_at'])-today).days if unit.get('expires_at') else None
+    if unit['status']=='anulada':return 'anulada',days
+    if unit.get('renewed_to'):return 'renovada',days
+    if unit['status'] in ('disponible','vencida'):return ('vencida' if unit['status']=='vencida' or (days is not None and days<0) else 'disponible'),days
+    if unit['status']=='reservada':return 'reservada',days
+    if days is not None and days<0:return 'vencida',days
+    if not unit.get('activated'):return 'pendiente_activacion',days
+    if days is not None and days<=SOON_DAYS:return 'por_vencer',days
+    return 'activa',days
+
+
 def expire(c,now):
-    """Unidades disponibles cuyo vencimiento ya pasó: pasan a «Vencida» (no se venden). Las reservadas o entregadas no cambian."""
+    """Unidades en inventario cuyo vencimiento ya pasó: pasan a «Vencida» (no se venden). Las vendidas no cambian de estado guardado."""
     today=now.date().isoformat()
     rows=c.execute("SELECT id,product_id FROM license_units WHERE status='disponible' AND expires_at!='' AND expires_at<?",(today,)).fetchall()
     for row in rows:
@@ -116,13 +167,15 @@ def expire(c,now):
 
 
 def _product(c,product_id):
-    row=c.execute("SELECT i.id,i.name,i.category,i.brand,i.price_cents,i.available,p.kind,p.supplier,p.purchase_cents,p.term,p.devices FROM catalog_items i LEFT JOIN license_products p ON p.item_id=i.id WHERE i.id=?",(product_id,)).fetchone()
+    row=c.execute("SELECT i.id,i.name,i.category,i.brand,i.description,i.price_cents,i.available,p.kind,p.line,p.model,p.edition,p.supplier,p.purchase_cents,p.term,p.devices,"
+                  "p.duration,p.duration_months,p.validity_mode,p.shared_seats FROM catalog_items i LEFT JOIN license_products p ON p.item_id=i.id WHERE i.id=?",(product_id,)).fetchone()
     if not row or row['category'] not in PRODUCT_CATEGORIES:raise LicenseError('Producto de licencia no disponible.',404)
     return dict(row)
 
 
 def _text(data,key,limit,label):
-    value=re.sub(r'\s+',' ',str(data.get(key) or '')).strip()
+    value=re.sub(r'[ \t]+',' ',str(data.get(key) or '')).strip()
+    if key!='instructions':value=re.sub(r'\s+',' ',value)
     if len(value)>limit:raise LicenseError('%s admite hasta %d caracteres.'%(label,limit),fields={key:'Texto demasiado largo.'})
     return value
 
@@ -134,12 +187,13 @@ def _cents(value,key,label):
     whole,_,part=text.partition('.');return int(whole)*100+int((part+'00')[:2])
 
 
-def _date(value,key):
+def _date(value,key,today=None,future=True):
     text=str(value or '').strip()
     if not text:return ''
     try:
         if date.fromisoformat(text).isoformat()!=text:raise ValueError
     except ValueError:raise LicenseError('Indica una fecha válida.',fields={key:'Fecha no válida.'})
+    if not future and today and text>today.isoformat():raise LicenseError('%s no puede ser posterior a hoy.'%FIELD_LABELS.get(key,'La fecha'),fields={key:'Fecha futura.'})
     return text
 
 
@@ -150,124 +204,265 @@ def _devices(value,key='devices'):
     return int(text)
 
 
+def _url(value):
+    text=str(value or '').strip()
+    if text and (len(text)>300 or not re.fullmatch(r'https?://[^\s<>"]+',text)):raise LicenseError('El enlace debe empezar por https:// (o http://).',fields={'download_url':'Enlace no válido.'})
+    return text
+
+
 # ---- Productos --------------------------------------------------------------------------------------------------------
+def _product_settings(data,product=None):
+    product=product or {}
+    line=str(data.get('line') or product.get('line') or 'otros');model=str(data.get('model') or product.get('model') or 'otra')
+    duration=str(data.get('duration') or product.get('duration') or 'anual');validity=str(data.get('validity_mode') or product.get('validity_mode') or 'activacion')
+    if line not in LINES:raise LicenseError('Selecciona la categoría.',fields={'line':'Categoría no válida.'})
+    if model not in MODELS:raise LicenseError('Selecciona el tipo de licencia.',fields={'model':'Tipo no válido.'})
+    if duration not in DURATIONS:raise LicenseError('Selecciona la duración.',fields={'duration':'Duración no válida.'})
+    if validity not in VALIDITY:raise LicenseError('Selecciona desde cuándo cuenta la vigencia.',fields={'validity_mode':'Opción no válida.'})
+    custom=None
+    if duration=='personalizada':
+        raw=str(data.get('duration_months') if data.get('duration_months') is not None else product.get('duration_months') or '').strip()
+        if not raw.isdigit() or not 1<=int(raw)<=120:raise LicenseError('Indica la duración personalizada en meses (1 a 120).',fields={'duration_months':'Meses no válidos.'})
+        custom=int(raw)
+    if duration=='perpetua' and validity!='activacion':validity='activacion'
+    if model=='perpetua' and duration!='perpetua':raise LicenseError('Una licencia perpetua debe tener duración «Perpetua».',fields={'duration':'Duración incompatible.'})
+    seats=str(data.get('shared_seats') if data.get('shared_seats') is not None else product.get('shared_seats') or 0).strip() or '0'
+    if not seats.isdigit() or int(seats)>100 or int(seats)==1:raise LicenseError('Clave compartida: indica de 2 a 100 clientes, o 0 si cada cliente recibe su propia clave.',fields={'shared_seats':'Valor no válido.'})
+    kind='antivirus' if line=='antivirus' else (product.get('kind') if product.get('kind') in KINDS else 'otro')
+    return {'kind':kind,'line':line,'model':model,'duration':duration,'duration_months':custom,'validity_mode':validity,'shared_seats':int(seats),
+            'edition':_text(data,'edition',120,'La versión o edición'),'supplier':_text(data,'supplier',120,'El proveedor'),
+            'purchase_cents':_cents(data.get('purchase_price'),'purchase_price','el costo de adquisición'),'term':DURATIONS[duration] if duration!='personalizada' else '%d meses'%custom,'devices':_devices(data.get('devices'))}
+
+
+def _store_settings(c,item_id,s,user,now):
+    c.execute('INSERT INTO license_products(item_id,kind,supplier,purchase_cents,term,devices,line,model,edition,duration,duration_months,validity_mode,shared_seats,updated_at,updated_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) '
+              'ON CONFLICT(item_id) DO UPDATE SET kind=excluded.kind,supplier=excluded.supplier,purchase_cents=excluded.purchase_cents,term=excluded.term,devices=excluded.devices,line=excluded.line,model=excluded.model,'
+              'edition=excluded.edition,duration=excluded.duration,duration_months=excluded.duration_months,validity_mode=excluded.validity_mode,shared_seats=excluded.shared_seats,updated_at=excluded.updated_at,updated_by=excluded.updated_by',
+              (item_id,s['kind'],s['supplier'],s['purchase_cents'],s['term'],s['devices'],s['line'],s['model'],s['edition'],s['duration'],s['duration_months'],s['validity_mode'],s['shared_seats'],stamp(now),user['id']))
+
+
+def _catalog_values(data,product=None):
+    product=product or {}
+    name=re.sub(r'\s+',' ',str(data.get('name') if data.get('name') is not None else product.get('name') or '')).strip()
+    price=data.get('price') if data.get('price') not in (None,'') else (('%.2f'%(product['price_cents']/100)) if product.get('price_cents') is not None else '')
+    return {'name':name,'brand':str(data.get('brand') if data.get('brand') is not None else product.get('brand') or ''),'description':str(data.get('description') if data.get('description') is not None else product.get('description') or ''),
+            'price':price}
+
+
+def save_logo(c,item_id,content_b64,user,now):
+    if not content_b64:return
+    import quotes
+    try:content=base64.b64decode(str(content_b64),validate=True)
+    except Exception:raise LicenseError('El logotipo no se pudo leer.',fields={'logo':'Archivo no válido.'})
+    try:quotes.save_image(c,item_id,content,user,now)
+    except quotes.QuoteError as error:raise LicenseError(str(error),fields={'logo':str(error)})
+
+
+def create_product(c,data,user,now):
+    """Producto nuevo (aunque la marca o el producto no existan todavía en el catálogo): lo registra en el catálogo y en el inventario."""
+    import quotes
+    settings=_product_settings(data);values=_catalog_values(data)
+    if not values['price']:raise LicenseError('Indica el precio de venta en USD.',fields={'price':'Precio obligatorio.'})
+    try:item=quotes.save_catalog_item(c,{'name':values['name'],'description':values['description'],'category':'seguridad' if settings['line']=='antivirus' else 'licencia','brand':values['brand'],
+                                         'price':values['price'],'price_mode':'incluido','license_term':settings['term'],'devices':'%d dispositivo%s'%(settings['devices'],'' if settings['devices']==1 else 's') if settings['devices'] else ''},user,now)
+    except quotes.QuoteError as error:raise LicenseError(str(error),error.status,error.fields)
+    _store_settings(c,item,settings,user,now);save_logo(c,item,data.get('logo'),user,now)
+    event(c,'producto',now,'Producto «%s» creado (%s · %s).'%(values['name'],LINES[settings['line']],DURATIONS[settings['duration']]),product=item,user=user)
+    return item
+
+
+def save_product(c,data,user,now):
+    """Edita un producto: datos del catálogo (nombre, marca, descripción, precio de venta) y de licencia. No toca las licencias registradas."""
+    import quotes
+    item=str(data.get('item_id',''))
+    if not item.isdigit():raise LicenseError('Selecciona el producto del catálogo.',fields={'item_id':'Producto no válido.'})
+    product=_product(c,int(item))
+    if data.get('kind') in KINDS and not data.get('line'):data=dict(data,line={'antivirus':'antivirus','m365':'microsoft','windows_office':'microsoft'}.get(data['kind'],'otros'))
+    settings=_product_settings(data,product if product.get('line') else {})
+    if data.get('kind') in KINDS:settings['kind']=data['kind']
+    if product['kind'] and product['kind']!=settings['kind'] and c.execute('SELECT 1 FROM license_units WHERE product_id=?',(product['id'],)).fetchone():settings['kind']=product['kind']
+    values=_catalog_values(data,product)
+    try:quotes.save_catalog_item(c,{'id':str(product['id']),'name':values['name'],'description':values['description'],'category':'seguridad' if settings['line']=='antivirus' else 'licencia','brand':values['brand'],
+                                    'price':values['price'],'price_mode':'incluido','license_term':settings['term'],'devices':'%d dispositivo%s'%(settings['devices'],'' if settings['devices']==1 else 's') if settings['devices'] else '',
+                                    'available':bool(product['available'])},user,now)
+    except quotes.QuoteError as error:raise LicenseError(str(error),error.status,error.fields)
+    _store_settings(c,product['id'],settings,user,now);save_logo(c,product['id'],data.get('logo'),user,now)
+    event(c,'producto',now,'Datos del producto «%s» guardados.'%values['name'],product=product['id'],user=user)
+    return product['id']
+
+
+def duplicate_product(c,item_id,name,user,now):
+    """Copia un producto (datos y logo) con otro nombre, sin licencias. Útil para otra edición o duración del mismo fabricante."""
+    product=_product(c,item_id)
+    if not product['kind']:raise LicenseError('Configura primero el producto que quieres duplicar.',409)
+    data={key:product[key] for key in ('line','model','edition','supplier','duration','duration_months','validity_mode','shared_seats','brand','description')}
+    data.update(name=name,price='%.2f'%(product['price_cents']/100),purchase_price='%.2f'%(product['purchase_cents']/100) if product['purchase_cents'] is not None else '',devices=product['devices'] or '')
+    item=create_product(c,data,user,now)
+    logo=c.execute('SELECT mime,data FROM catalog_images WHERE item_id=?',(item_id,)).fetchone()
+    if logo:c.execute('INSERT INTO catalog_images(item_id,mime,data,updated_at,updated_by) VALUES (?,?,?,?,?)',(item,logo['mime'],logo['data'],stamp(now),user['id']))
+    return item
+
+
+def toggle_product(c,item_id,active,user,now):
+    """Desactivar: el producto deja de ofrecerse en los presupuestos; sus licencias y su historial se conservan."""
+    product=_product(c,item_id)
+    c.execute('UPDATE catalog_items SET available=?,updated_at=?,updated_by=? WHERE id=?',(1 if active else 0,stamp(now),user['id'],item_id))
+    event(c,'producto',now,'Producto «%s» %s.'%(product['name'],'activado' if active else 'desactivado'),product=item_id,user=user)
+
+
 def products(c,now):
-    """Productos de licencia del catálogo con sus existencias por estado (calculadas a partir de las unidades individuales)."""
-    today=now.date().isoformat()
-    rows=[dict(r) for r in c.execute("SELECT i.id,i.code,i.name,i.category,i.brand,i.price_cents,i.available,i.license_term,i.devices catalog_devices,(SELECT updated_at FROM catalog_images g WHERE g.item_id=i.id) image,"
-                                     "p.kind,p.supplier,p.purchase_cents,p.term,p.devices FROM catalog_items i LEFT JOIN license_products p ON p.item_id=i.id WHERE i.category IN ('licencia','seguridad') ORDER BY i.name COLLATE NOCASE")]
+    """Productos de licencia con existencias por estado (a partir de las unidades individuales)."""
+    today=now.date()
+    rows=[dict(r) for r in c.execute("SELECT i.id,i.code,i.name,i.category,i.brand,i.description,i.price_cents,i.available,i.license_term,(SELECT updated_at FROM catalog_images g WHERE g.item_id=i.id) image,"
+                                     "p.kind,p.line,p.model,p.edition,p.supplier,p.purchase_cents,p.term,p.devices,p.duration,p.duration_months,p.validity_mode,p.shared_seats "
+                                     "FROM catalog_items i LEFT JOIN license_products p ON p.item_id=i.id WHERE i.category IN ('licencia','seguridad') ORDER BY i.name COLLATE NOCASE")]
     counts={}
-    for r in c.execute("SELECT product_id,CASE WHEN status='disponible' AND expires_at!='' AND expires_at<? THEN 'vencida' ELSE status END state,COUNT(*) n FROM license_units GROUP BY product_id,state",(today,)):
-        counts.setdefault(r['product_id'],{})[r['state']]=r['n']
+    for unit in c.execute('SELECT product_id,status,expires_at,activated,renewed_to FROM license_units'):
+        state,_=state_of(dict(unit),today);counts.setdefault(unit['product_id'],{}).setdefault(state,0);counts[unit['product_id']][state]+=1
     for row in rows:
-        row['image']=row['image'] or '';row['managed']=bool(row['kind']);row['kind_label']=KINDS.get(row['kind'] or '','Sin configurar')
-        row['stock']={key:counts.get(row['id'],{}).get(key,0) for key in STATUSES}
+        row['image']=row['image'] or '';row['managed']=bool(row['kind'])
+        row['line_label']=LINES.get(row['line'] or '','Sin configurar') if row['managed'] else 'Sin configurar'
+        row['kind_label']=row['line_label']
+        row['duration_label']=row['term'] or '';row['validity_label']=VALIDITY.get(row['validity_mode'] or '','')
+        row['model_label']=MODELS.get(row['model'] or '','')
+        row['stock']={key:counts.get(row['id'],{}).get(key,0) for key in STATES}
+        row['stock'].update({'entregada':row['stock']['pendiente_activacion']+row['stock']['activa']+row['stock']['por_vencer']})
         row['pending']=sum(item['missing'] for item in pending_items(c,row['id']))
     return rows
 
 
-def save_product(c,data,user,now):
-    item=str(data.get('item_id',''))
-    if not item.isdigit():raise LicenseError('Selecciona el producto del catálogo.',fields={'item_id':'Producto no válido.'})
-    product=_product(c,int(item));kind=str(data.get('kind',''))
-    if kind not in KINDS:raise LicenseError('Selecciona el tipo de licencia.',fields={'kind':'Tipo no válido.'})
-    if product['kind'] and product['kind']!=kind and c.execute('SELECT 1 FROM license_units WHERE product_id=?',(product['id'],)).fetchone():
-        raise LicenseError('Este producto ya tiene licencias registradas: su tipo no se puede cambiar.',409,{'kind':'Tipo fijo.'})
-    values=(_text(data,'supplier',120,'El proveedor'),_cents(data.get('purchase_price'),'purchase_price','el precio de compra'),_text(data,'term',60,'La duración'),_devices(data.get('devices')))
-    c.execute('INSERT INTO license_products(item_id,kind,supplier,purchase_cents,term,devices,updated_at,updated_by) VALUES (?,?,?,?,?,?,?,?) ON CONFLICT(item_id) DO UPDATE SET '
-              'kind=excluded.kind,supplier=excluded.supplier,purchase_cents=excluded.purchase_cents,term=excluded.term,devices=excluded.devices,updated_at=excluded.updated_at,updated_by=excluded.updated_by',
-              (product['id'],kind,*values,stamp(now),user['id']))
-    event(c,'producto',now,'Datos de inventario del producto «%s» guardados (%s).'%(product['name'],KINDS[kind]),product=product['id'],user=user)
-    return product['id']
-
-
 # ---- Registro de licencias --------------------------------------------------------------------------------------------
-def _clean_unit(kind,data,partial=False):
-    """Datos visibles de la unidad según su tipo. Los campos que no corresponden al tipo se ignoran."""
+def _clean_unit(product,data,today):
     out={}
-    for key in FIELDS[kind]:
-        if key in DATES:out[key]=_date(data.get(key),key)
+    for key in FIELDS:
+        if key in DATES:out[key]=_date(data.get(key),key,today,future=key=='expires_at')
         elif key=='devices':out[key]=_devices(data.get(key))
+        elif key=='download_url':out[key]=_url(data.get(key))
+        elif key=='instructions':out[key]=_text(data,key,2000,FIELD_LABELS[key])
         else:out[key]=_text(data,key,120,FIELD_LABELS[key])
-    if out.get('activated_at') and out.get('expires_at') and out['expires_at']<out['activated_at']:
-        raise LicenseError('La fecha de vencimiento no puede ser anterior a la de activación.',fields={'expires_at':'Revisa la fecha.'})
+    if out['activated_at'] and out['purchased_at'] and out['activated_at']<out['purchased_at']:raise LicenseError('La activación no puede ser anterior a la compra.',fields={'activated_at':'Revisa la fecha.'})
+    if (product.get('validity_mode')=='fija' and months_of(product) is not None) and not out['expires_at']:raise LicenseError('Este producto vence en una fecha fija del proveedor: indícala.',fields={'expires_at':'Fecha obligatoria.'})
+    if months_of(product) is None:out['expires_at']=''
+    elif product.get('validity_mode')!='fija':out['expires_at']=compute_expiry(product,out['purchased_at'],out['activated_at'])
+    if out['expires_at'] and out['activated_at'] and out['expires_at']<out['activated_at']:raise LicenseError('El vencimiento no puede ser anterior a la activación.',fields={'expires_at':'Revisa la fecha.'})
+    out['term']=out['term'] or product.get('term') or ''
+    out['devices']=out['devices'] or product.get('devices')
+    out['edition']=out['edition'] or product.get('edition') or ''
+    out['manufacturer']=out['manufacturer'] or product.get('brand') or ''
     return out
 
 
-def _clean_secret(kind,data):
+def _clean_secret(data,required=True):
     values={}
-    for key,label in SECRETS[kind]:
-        raw=str(data.get(key) or '')
+    for key in SECRET_INPUTS:
+        raw=str(data.get(key) if data.get(key) is not None else data.get('serial') if key=='key' and data.get('serial') else '')
         value=raw if key=='password' else re.sub(r'\s+',' ',raw).strip()
-        if not value or len(value)>300 or '\n' in value:raise LicenseError('Indica %s (hasta 300 caracteres).'%label.lower(),fields={key:'Dato obligatorio.'})
-        values[key]=value
-    if kind=='m365' and not re.fullmatch(r'[^\s@]+@[^\s@]+\.[^\s@]+',values['username']):raise LicenseError('El usuario de Microsoft 365 debe ser una cuenta de correo.',fields={'username':'Cuenta no válida.'})
-    if kind!='m365' and len(re.sub(r'[\s-]+','',values[SECRETS[kind][0][0]]))<5:raise LicenseError('La clave o serial es demasiado corta.',fields={SECRETS[kind][0][0]:'Revisa el dato.'})
+        if '\n' in value or len(value)>300:raise LicenseError('%s admite hasta 300 caracteres en una línea.'%SECRET_LABELS[key],fields={key:'Dato no válido.'})
+        if value:values[key]=value
+    if required and not values.get('key') and not values.get('username'):raise LicenseError('Indica la clave de producto o serial, o el usuario de activación.',fields={'key':'Dato obligatorio.'})
+    if values.get('key') and len(re.sub(r'[\s-]+','',values['key']))<5:raise LicenseError('La clave o serial es demasiado corta.',fields={'key':'Revisa el dato.'})
+    if values.get('password') and not values.get('username'):raise LicenseError('Indica el usuario de la contraseña.',fields={'username':'Usuario obligatorio.'})
     return values
 
 
-def _insert_unit(c,product,kind,fields,values,batch,user,now,notes=''):
-    mark=fingerprint(kind,values)
-    found=c.execute('SELECT code FROM license_units WHERE fingerprint=?',(mark,)).fetchone()
-    if found:raise LicenseError('Esta cuenta o clave ya está registrada (%s).'%found['code'],409,{SECRETS[kind][0][0]:'Duplicada.'})
-    unit=c.execute('INSERT INTO license_units(product_id,batch_id,kind,edition,license_type,manufacturer,version,devices,term,purchased_at,activated_at,expires_at,secret,fingerprint,notes,created_by,created_at,updated_at) '
-                   'VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
-                   (product['id'],batch,kind,fields.get('edition',''),fields.get('license_type',''),fields.get('manufacturer',''),fields.get('version',''),fields.get('devices',product.get('devices')),
-                    fields.get('term') or product.get('term') or '',fields.get('purchased_at',''),fields.get('activated_at',''),fields.get('expires_at',''),seal(values),mark,notes,user['id'],stamp(now),stamp(now))).lastrowid
-    status='vencida' if fields.get('expires_at') and fields['expires_at']<now.date().isoformat() else 'disponible'
-    if status=='vencida':c.execute("UPDATE license_units SET status='vencida' WHERE id=?",(unit,))
-    event(c,'registrada',now,'Licencia registrada en el inventario%s.'%(' (ya vencida)' if status=='vencida' else ''),unit,product['id'],user=user)
+def _free_seat(c,product,values,exclude=None):
+    """Puesto libre para esta credencial: 1 si es única; en productos de clave compartida, el siguiente libre hasta su número de puestos."""
+    seats=max(1,product.get('shared_seats') or 0)
+    for seat in range(1,seats+1):
+        mark=fingerprint(product['kind'],values,seat)
+        found=c.execute('SELECT id,code FROM license_units WHERE fingerprint=?',(mark,)).fetchone()
+        if not found or found['id']==exclude:return seat,mark
+    found=c.execute('SELECT code FROM license_units WHERE fingerprint=?',(fingerprint(product['kind'],values,1),)).fetchone()
+    raise LicenseError(('Esta clave ya está registrada (%s).'%found['code']) if seats==1 else 'Esta clave compartida ya tiene sus %d puestos registrados.'%seats,409,{'key':'Duplicada.'})
+
+
+def _insert_unit(c,product,fields,values,batch,user,now,notes=''):
+    seat,mark=_free_seat(c,product,values)
+    unit=c.execute('INSERT INTO license_units(product_id,batch_id,kind,edition,license_type,manufacturer,version,devices,term,purchased_at,activated_at,expires_at,download_url,instructions,secret,fingerprint,seat,notes,created_by,created_at,updated_at) '
+                   'VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+                   (product['id'],batch,product['kind'],fields['edition'],fields['license_type'],fields['manufacturer'],fields['version'],fields['devices'],fields['term'],fields['purchased_at'],
+                    fields['activated_at'],fields['expires_at'],fields['download_url'],fields['instructions'],seal(values),mark,seat,notes,user['id'],stamp(now),stamp(now))).lastrowid
+    if fields['activated_at']:c.execute('UPDATE license_units SET activated=1 WHERE id=?',(unit,))
+    expired=fields['expires_at'] and fields['expires_at']<now.date().isoformat()
+    if expired:c.execute("UPDATE license_units SET status='vencida' WHERE id=?",(unit,))
+    event(c,'registrada',now,'Licencia registrada en el inventario%s.'%(' (ya vencida)' if expired else '' if seat==1 else ' (puesto %d de la clave compartida)'%seat),unit,product['id'],user=user)
     return unit
 
 
 def _batch(c,product,data,quantity,user,now):
-    return c.execute('INSERT INTO license_batches(product_id,supplier,unit_cost_cents,purchased_at,invoice,quantity,created_by,created_at) VALUES (?,?,?,?,?,?,?,?)',
-                     (product['id'],_text(data,'supplier',120,'El proveedor') or product.get('supplier') or '',_cents(data.get('unit_cost'),'unit_cost','el costo unitario') if data.get('unit_cost') not in (None,'') else product.get('purchase_cents'),
-                      _date(data.get('batch_date') or data.get('purchased_at'),'batch_date'),_text(data,'invoice',80,'La factura'),quantity,user['id'],stamp(now))).lastrowid
+    batch=c.execute('INSERT INTO license_batches(product_id,supplier,unit_cost_cents,purchased_at,invoice,quantity,created_by,created_at) VALUES (?,?,?,?,?,?,?,?)',
+                    (product['id'],_text(data,'supplier',120,'El proveedor') or product.get('supplier') or '',_cents(data.get('unit_cost'),'unit_cost','el costo de adquisición') if data.get('unit_cost') not in (None,'') else product.get('purchase_cents'),
+                     _date(data.get('batch_date') or data.get('purchased_at'),'batch_date',now.date(),future=False),_text(data,'invoice',80,'La factura'),quantity,user['id'],stamp(now))).lastrowid
+    save_receipt(c,batch,data.get('receipt'),data.get('receipt_name'),user,now)
+    return batch
+
+
+def save_receipt(c,batch,content_b64,name,user,now):
+    if not content_b64:return
+    try:content=base64.b64decode(str(content_b64),validate=True)
+    except Exception:raise LicenseError('El comprobante no se pudo leer.',fields={'receipt':'Archivo no válido.'})
+    mime='application/pdf' if content[:5]==b'%PDF-' else 'image/png' if content[:8]==b'\x89PNG\r\n\x1a\n' else 'image/jpeg' if content[:3]==b'\xff\xd8\xff' else 'image/webp' if content[:4]==b'RIFF' and content[8:12]==b'WEBP' else None
+    if not mime:raise LicenseError('El comprobante debe ser un PDF o una imagen PNG, JPG o WebP.',fields={'receipt':'Formato no admitido.'})
+    if len(content)>RECEIPT_LIMIT:raise LicenseError('El comprobante supera el máximo de 1,5 MB.',fields={'receipt':'Archivo demasiado grande.'})
+    clean=re.sub(r'[^\w .()-]+','',str(name or 'comprobante'))[:120] or 'comprobante'
+    c.execute('INSERT INTO license_receipts(batch_id,name,mime,data,created_at,created_by) VALUES (?,?,?,?,?,?)',(batch,clean,mime,content,stamp(now),user['id']))
 
 
 def _managed(c,product_id):
     product=_product(c,product_id)
-    if not product['kind']:raise LicenseError('Configura primero el tipo de licencia de este producto en «Administrar productos y logos».',409,{'product_id':'Producto sin configurar.'})
+    if not product['kind']:raise LicenseError('Configura primero los datos de licencia de este producto («Editar»).',409,{'product_id':'Producto sin configurar.'})
     return product
 
 
 def register(c,data,user,now):
-    """Una licencia: sus datos visibles y su credencial cifrada. Después se reservan automáticamente las ventas aprobadas que esperaban existencias."""
+    """Una licencia de un producto existente («Agregar stock»): datos visibles, credencial cifrada y compra. Después se reservan las ventas
+    aprobadas que esperaban existencias."""
     pid=str(data.get('product_id',''))
     if not pid.isdigit():raise LicenseError('Selecciona el producto.',fields={'product_id':'Producto no válido.'})
-    product=_managed(c,int(pid));kind=product['kind']
-    fields=_clean_unit(kind,data);values=_clean_secret(kind,data)
+    product=_managed(c,int(pid));fields=_clean_unit(product,data,now.date());values=_clean_secret(data)
     batch=_batch(c,product,data,1,user,now)
-    unit=_insert_unit(c,product,kind,fields,values,batch,user,now,_text(data,'notes',300,'Las observaciones'))
+    unit=_insert_unit(c,product,fields,values,batch,user,now,_text(data,'notes',500,'Las observaciones'))
     fill_pending(c,product['id'],now,user)
     return unit
 
 
+def register_new(c,data,user,now):
+    """«+ Registrar nueva licencia»: crea el producto si todavía no existe (con su logo) y registra la primera licencia, todo o nada."""
+    if str(data.get('product_id') or '').isdigit():
+        return {'product_id':int(data['product_id']),'unit_id':register(c,data,user,now)}
+    _clean_secret(data)
+    product=create_product(c,data,user,now)
+    unit=register(c,dict(data,product_id=str(product)),user,now)
+    return {'product_id':product,'unit_id':unit}
+
+
 def register_many(c,data,user,now):
-    """Varias licencias del mismo producto: una por línea («usuario;contraseña» en Microsoft 365, la clave o serial en los demás).
-    Todo o nada: si una línea no es válida o está repetida, no se registra ninguna."""
+    """Varias licencias del mismo producto: una por línea. «clave», o «usuario;contraseña», o «clave;usuario;contraseña». Todo o nada."""
     pid=str(data.get('product_id',''))
     if not pid.isdigit():raise LicenseError('Selecciona el producto.',fields={'product_id':'Producto no válido.'})
-    product=_managed(c,int(pid));kind=product['kind'];fields=_clean_unit(kind,data)
+    product=_managed(c,int(pid));fields=_clean_unit(product,data,now.date())
     lines=[line.strip() for line in str(data.get('lines') or '').replace('\r','').split('\n') if line.strip()]
     if not lines:raise LicenseError('Escribe al menos una licencia (una por línea).',fields={'lines':'Sin licencias.'})
     if len(lines)>MAX_BULK:raise LicenseError('Registra hasta %d licencias por vez.'%MAX_BULK,fields={'lines':'Demasiadas líneas.'})
-    parsed=[];marks=set()
+    parsed=[];seen={}
+    seats=max(1,product.get('shared_seats') or 0)
     for number,line in enumerate(lines,1):
-        if kind=='m365':
-            if ';' not in line:raise LicenseError('Línea %d: usa el formato usuario;contraseña.'%number,fields={'lines':'Formato no válido.'})
-            username,password=line.split(';',1);raw={'username':username,'password':password}
-        else:raw={SECRETS[kind][0][0]:line}
-        try:values=_clean_secret(kind,raw)
+        parts=[part.strip() for part in line.split(';')]
+        if len(parts)==1:raw={'key':parts[0]} if '@' not in parts[0] or product['kind']!='m365' else {'username':parts[0]}
+        elif len(parts)==2:raw={'username':parts[0],'password':parts[1]} if '@' in parts[0] else {'key':parts[0],'license_code':parts[1]}
+        elif len(parts)==3:raw={'key':parts[0],'username':parts[1],'password':parts[2]}
+        else:raise LicenseError('Línea %d: usa «clave», «usuario;contraseña» o «clave;usuario;contraseña».'%number,fields={'lines':'Formato no válido.'})
+        try:values=_clean_secret(raw)
         except LicenseError as error:raise LicenseError('Línea %d: %s'%(number,error),fields={'lines':'Línea %d no válida.'%number})
-        mark=fingerprint(kind,values)
-        if mark in marks:raise LicenseError('Línea %d: está repetida en la lista.'%number,fields={'lines':'Línea repetida.'})
-        found=c.execute('SELECT code FROM license_units WHERE fingerprint=?',(mark,)).fetchone()
-        if found:raise LicenseError('Línea %d: ya está registrada (%s).'%(number,found['code']),409,{'lines':'Licencia duplicada.'})
-        marks.add(mark);parsed.append(values)
+        key=normalized(product['kind'],values);seen[key]=seen.get(key,0)+1
+        if seen[key]>seats:raise LicenseError('Línea %d: está repetida en la lista.'%number,fields={'lines':'Línea repetida.'})
+        parsed.append(values)
+    # Comprobación previa de duplicados en el inventario (sin registrar nada todavía).
+    for number,values in enumerate(parsed,1):
+        try:_free_seat(c,product,values)
+        except LicenseError as error:raise LicenseError('Línea %d: %s'%(number,error),409,{'lines':'Licencia duplicada.'})
     batch=_batch(c,product,data,len(parsed),user,now)
-    units=[_insert_unit(c,product,kind,fields,values,batch,user,now) for values in parsed]
+    units=[_insert_unit(c,product,fields,values,batch,user,now) for values in parsed]
     fill_pending(c,product['id'],now,user)
     return units
 
@@ -279,56 +474,114 @@ def unit_row(c,unit_id):
 
 
 def edit(c,unit_id,data,user,now):
-    """Corrige datos de una licencia que no se ha entregado. La credencial solo se reemplaza si se escribe una nueva."""
+    """Corrige datos de una licencia no entregada. La credencial solo se reemplaza si se escribe una nueva (nunca se sobrescribe sin querer)."""
     unit=unit_row(c,unit_id)
-    if unit['status'] in ('entregada','anulada'):raise LicenseError('Una licencia %s no se modifica.'%STATUSES[unit['status']].lower(),409)
-    kind=unit['kind'];fields=_clean_unit(kind,data);changes=[]
-    product=_product(c,unit['product_id'])
-    secret,mark=unit['secret'],unit['fingerprint']
-    if any(str(data.get(key) or '').strip() for key,_ in SECRETS[kind]):
-        values=_clean_secret(kind,data);mark=fingerprint(kind,values)
-        other=c.execute('SELECT code FROM license_units WHERE fingerprint=? AND id!=?',(mark,unit_id)).fetchone()
-        if other:raise LicenseError('Esa cuenta o clave ya está registrada (%s).'%other['code'],409)
-        secret=seal(values);changes.append('credencial reemplazada')
-    columns=['edition','license_type','manufacturer','version','devices','term','purchased_at','activated_at','expires_at']
-    current={key:fields.get(key,unit[key]) for key in columns}
-    changes+=[FIELD_LABELS[key].lower() for key in columns if current[key]!=unit[key]]
-    notes=_text(data,'notes',300,'Las observaciones') if 'notes' in data else unit['notes']
-    if data.get('activated') in (True,False) and bool(unit['activated'])!=data['activated']:changes.append('marcada como activada' if data['activated'] else 'activación retirada')
-    activated=int(data['activated']) if data.get('activated') in (True,False) else unit['activated']
+    if unit['status'] in ('entregada','anulada'):
+        if unit['status']=='entregada' and set(data)-{'action','notes','activated'}<=set():pass
+        else:raise LicenseError('Una licencia %s no se modifica: usa «Confirmar activación» o «Renovar licencia».'%STATUSES[unit['status']].lower(),409)
+    product=_product(c,unit['product_id']);fields=_clean_unit(product,dict({k:unit[k] for k in FIELDS},**{k:v for k,v in data.items() if k in FIELDS}),now.date());changes=[]
+    secret,mark,seat=unit['secret'],unit['fingerprint'],unit['seat']
+    if any(str(data.get(key) or '').strip() for key in SECRET_INPUTS):
+        values=_clean_secret(data);seat,mark=_free_seat(c,product,values,exclude=unit_id);secret=seal(values);changes.append('credencial reemplazada')
+    changes+=[FIELD_LABELS[key].lower() for key in FIELDS if fields[key]!=unit[key]]
+    notes=_text(data,'notes',500,'Las observaciones') if 'notes' in data else unit['notes']
+    activated=int(data['activated']) if data.get('activated') in (True,False) else (1 if fields['activated_at'] else unit['activated'])
+    if activated!=unit['activated']:changes.append('marcada como activada' if activated else 'activación retirada')
     status=unit['status']
-    if status in ('disponible','vencida'):status='vencida' if current['expires_at'] and current['expires_at']<now.date().isoformat() else 'disponible'
-    c.execute('UPDATE license_units SET edition=?,license_type=?,manufacturer=?,version=?,devices=?,term=?,purchased_at=?,activated_at=?,expires_at=?,secret=?,fingerprint=?,notes=?,activated=?,status=?,updated_at=? WHERE id=?',
-              (*[current[key] for key in columns],secret,mark,notes,activated,status,stamp(now),unit_id))
+    if status in ('disponible','vencida'):status='vencida' if fields['expires_at'] and fields['expires_at']<now.date().isoformat() else 'disponible'
+    c.execute('UPDATE license_units SET edition=?,license_type=?,manufacturer=?,version=?,devices=?,term=?,purchased_at=?,activated_at=?,expires_at=?,download_url=?,instructions=?,secret=?,fingerprint=?,seat=?,notes=?,activated=?,status=?,updated_at=? WHERE id=?',
+              (*[fields[key] for key in FIELDS],secret,mark,seat,notes,activated,status,stamp(now),unit_id))
     event(c,'editada',now,'Datos corregidos: '+(', '.join(changes) if changes else 'sin cambios')+'.',unit_id,unit['product_id'],order=unit['order_id'],client=unit['client_id'],user=user)
     if status=='disponible':fill_pending(c,product['id'],now,user)
 
 
+def confirm_activation(c,unit_id,activated_at,user,now):
+    """Registra la fecha real de activación que indica el personal y recalcula el vencimiento (si cuenta desde la activación).
+    Es un dato declarado: no se comprueba con el fabricante."""
+    unit=unit_row(c,unit_id)
+    if unit['status'] not in ('entregada','reservada'):raise LicenseError('Solo se registra la activación de una licencia vendida.',409)
+    if unit['renewed_to']:raise LicenseError('Esta licencia fue renovada: registra la activación en la nueva.',409)
+    day=_date(activated_at or now.date().isoformat(),'activated_at',now.date(),future=False)
+    if unit['purchased_at'] and day<unit['purchased_at']:raise LicenseError('La activación no puede ser anterior a la compra.',fields={'activated_at':'Revisa la fecha.'})
+    product=_product(c,unit['product_id']);expires=unit['expires_at']
+    if product.get('validity_mode')=='activacion':expires=compute_expiry(product,unit['purchased_at'],day)
+    c.execute('UPDATE license_units SET activated=1,activated_at=?,expires_at=?,updated_at=? WHERE id=?',(day,expires,stamp(now),unit_id))
+    event(c,'activada',now,'Activación registrada el %s (dato indicado por el personal; no verificado con el fabricante).%s'%(day,' Vence el %s.'%expires if expires else ' Sin vencimiento.'),unit_id,unit['product_id'],order=unit['order_id'],client=unit['client_id'],user=user)
+    return expires
+
+
 def void(c,unit_id,reason,user,now):
     unit=unit_row(c,unit_id);reason=str(reason or '').strip()
-    if unit['status'] in ('entregada','anulada'):raise LicenseError('Una licencia %s no se anula.'%STATUSES[unit['status']].lower(),409)
-    if len(reason)<5:raise LicenseError('Indica el motivo de la anulación.',fields={'reason':'Motivo obligatorio.'})
-    c.execute("UPDATE license_units SET status='anulada',delivery_id=NULL,updated_at=? WHERE id=?",(stamp(now),unit_id))
-    event(c,'anulada',now,'Registro invalidado. Motivo: '+reason[:300],unit_id,unit['product_id'],order=unit['order_id'],client=unit['client_id'],user=user)
+    if unit['status']=='anulada':raise LicenseError('La licencia ya está anulada.',409)
+    if len(reason)<5:raise LicenseError('Indica el motivo.',fields={'reason':'Motivo obligatorio.'})
+    returned=unit['status']=='entregada'
+    c.execute("UPDATE license_units SET status='anulada',updated_at=? WHERE id=?",(stamp(now),unit_id))
+    if not returned:c.execute('UPDATE license_units SET delivery_id=NULL WHERE id=?',(unit_id,))
+    event(c,'devolucion' if returned else 'anulada',now,('Devolución autorizada: la licencia entregada queda anulada y no vuelve al inventario. Motivo: ' if returned else 'Registro invalidado. Motivo: ')+reason[:300],
+          unit_id,unit['product_id'],order=unit['order_id'],client=unit['client_id'],user=user)
 
 
 def release(c,unit_id,user,now):
     """Anula la reserva: la licencia vuelve a estar disponible solo si no fue activada ni entregada."""
     unit=unit_row(c,unit_id)
     if unit['status']!='reservada':raise LicenseError('Esta licencia no está reservada.',409)
-    if unit['delivery_id'] and c.execute("SELECT 1 FROM license_deliveries WHERE id=? AND status!='anulada'",(unit['delivery_id'],)).fetchone():
-        raise LicenseError('El pago de esta reserva ya fue confirmado: anula primero esa confirmación.',409)
     if unit['activated']:raise LicenseError('La licencia ya fue activada: no vuelve al inventario. Anúlala si no se usará.',409)
     expired=unit['expires_at'] and unit['expires_at']<now.date().isoformat()
     c.execute("UPDATE license_units SET status=?,quote_id=NULL,quote_item_id=NULL,order_id=NULL,client_id=NULL,delivery_id=NULL,reserved_at='',updated_at=? WHERE id=?",('vencida' if expired else 'disponible',stamp(now),unit_id))
     event(c,'reserva_anulada',now,'Reserva anulada: la licencia vuelve a estar %s.'%('vencida' if expired else 'disponible'),unit_id,unit['product_id'],order=unit['order_id'],client=unit['client_id'],user=user)
 
 
+# ---- Renovaciones -----------------------------------------------------------------------------------------------------
+def renew(c,unit_id,data,user,now):
+    """«Renovar licencia»: nuevo período desde la fecha efectiva indicada (no se asume el día del pago). Con una clave nueva se crea otra
+    licencia para el mismo cliente; sin ella se prolonga la misma. La renovación queda en el historial y nada anterior se borra."""
+    unit=unit_row(c,unit_id)
+    if unit['status']!='entregada':raise LicenseError('Solo se renuevan licencias entregadas a un cliente.',409)
+    if unit['renewed_to']:raise LicenseError('Esta licencia ya fue renovada con otra clave.',409)
+    product=_product(c,unit['product_id'])
+    duration=str(data.get('duration') or product.get('duration') or 'anual')
+    if duration not in DURATIONS or duration=='perpetua':raise LicenseError('Elige el nuevo período de vigencia (las licencias perpetuas no se renuevan).',fields={'duration':'Período no válido.'})
+    custom=None
+    if duration=='personalizada':
+        raw=str(data.get('duration_months') or '').strip()
+        if not raw.isdigit() or not 1<=int(raw)<=120:raise LicenseError('Indica los meses del nuevo período (1 a 120).',fields={'duration_months':'Meses no válidos.'})
+        custom=int(raw)
+    start=_date(data.get('starts_at'),'starts_at')
+    if not start:raise LicenseError('Indica la fecha efectiva de inicio de la nueva vigencia (según las condiciones del fabricante).',fields={'starts_at':'Fecha obligatoria.'})
+    manual=_date(data.get('expires_at'),'expires_at')
+    expires=manual or add_months(date.fromisoformat(start),MONTHS.get(duration,custom)).isoformat()
+    if expires<=start:raise LicenseError('El nuevo vencimiento debe ser posterior al inicio.',fields={'expires_at':'Revisa la fecha.'})
+    cost=_cents(data.get('cost'),'cost','el costo');price=_cents(data.get('price'),'price','el precio de venta')
+    values=_clean_secret(data,required=False);new_unit=None
+    if values:
+        values=_clean_secret(data)
+        fields={key:unit[key] for key in FIELDS};fields.update(purchased_at=start if start<=now.date().isoformat() else now.date().isoformat(),activated_at='',expires_at=expires,term=DURATIONS[duration] if duration!='personalizada' else '%d meses'%custom)
+        seat,mark=_free_seat(c,product,values)
+        new_unit=c.execute('INSERT INTO license_units(product_id,kind,edition,license_type,manufacturer,version,devices,term,purchased_at,activated_at,expires_at,download_url,instructions,secret,fingerprint,seat,status,quote_id,quote_item_id,order_id,client_id,delivery_id,delivered_at,renewed_from,notes,created_by,created_at,updated_at) '
+                           "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'entregada',?,?,?,?,?,?,?,?,?,?,?)",
+                           (unit['product_id'],unit['kind'],fields['edition'],fields['license_type'],fields['manufacturer'],fields['version'],fields['devices'],fields['term'],fields['purchased_at'],'',expires,
+                            fields['download_url'],fields['instructions'],seal(values),mark,seat,unit['quote_id'],unit['quote_item_id'],unit['order_id'],unit['client_id'],unit['delivery_id'],stamp(now),unit_id,
+                            'Renovación de '+unit['code'],user['id'],stamp(now),stamp(now))).lastrowid
+        c.execute('UPDATE license_units SET renewed_to=?,updated_at=? WHERE id=?',(new_unit,stamp(now),unit_id))
+    else:
+        c.execute('UPDATE license_units SET expires_at=?,updated_at=? WHERE id=?',(expires,stamp(now),unit_id))
+    renewal=c.execute('INSERT INTO license_renewals(unit_id,new_unit_id,client_id,previous_expires_at,starts_at,expires_at,duration,duration_months,cost_cents,price_cents,key_changed,notes,created_by,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+                      (unit_id,new_unit,unit['client_id'],unit['expires_at'],start,expires,duration,custom,cost,price,1 if new_unit else 0,_text(data,'notes',300,'Las observaciones'),user['id'],stamp(now))).lastrowid
+    detail='Renovada: nueva vigencia del %s al %s%s.'%(start,expires,' con una clave nueva' if new_unit else '')+(' Costo %s, precio %s.'%(usd(cost),usd(price)) if cost is not None or price is not None else '')
+    event(c,'renovada',now,detail,unit_id,unit['product_id'],order=unit['order_id'],client=unit['client_id'],user=user)
+    if new_unit:event(c,'registrada',now,'Licencia de renovación de %s, entregada al mismo cliente.'%unit['code'],new_unit,unit['product_id'],order=unit['order_id'],client=unit['client_id'],user=user)
+    return {'renewal_id':renewal,'new_unit_id':new_unit,'expires_at':expires}
+
+
+def usd(cents):
+    return '—' if cents is None else '$'+format(cents//100,',').replace(',','.')+',%02d'%(cents%100)
+
+
 # ---- Reservas desde presupuestos --------------------------------------------------------------------------------------
 def pending_items(c,product_id=None,order_id=None):
     """Partidas aprobadas de productos con inventario que aún no tienen todas sus unidades reservadas (las más antiguas primero)."""
     sql=("SELECT q.id quote_id,q.code quote_code,q.order_id,q.decided_at,i.id item_id,i.catalog_id product_id,i.quantity,i.description,"
-         "(SELECT COUNT(*) FROM license_units u WHERE u.quote_item_id=i.id AND u.status IN ('reservada','entregada')) assigned "
+         "(SELECT COUNT(*) FROM license_units u WHERE u.quote_item_id=i.id AND u.status IN ('reservada','entregada') AND u.renewed_from IS NULL) assigned "
          "FROM quote_items i JOIN quotes q ON q.id=i.quote_id JOIN license_products p ON p.item_id=i.catalog_id "
          "WHERE i.status='aprobado' AND q.status IN ('aprobado','parcial') AND q.deleted_at=''")
     args=[]
@@ -345,7 +598,6 @@ def _client_of(c,order_id):
 
 def _reserve_item(c,item,now,user=None,actor=''):
     today=now.date().isoformat();done=0
-    # Primero las que vencen antes (y las que no vencen, al final). La condición del UPDATE evita vender dos veces la misma unidad.
     for unit in c.execute("SELECT id FROM license_units WHERE product_id=? AND status='disponible' AND (expires_at='' OR expires_at>=?) ORDER BY expires_at='',expires_at,id LIMIT ?",(item['product_id'],today,item['missing'])).fetchall():
         client=_client_of(c,item['order_id'])
         if c.execute("UPDATE license_units SET status='reservada',quote_id=?,quote_item_id=?,order_id=?,client_id=?,reserved_at=?,updated_at=? WHERE id=? AND status='disponible'",
@@ -355,7 +607,7 @@ def _reserve_item(c,item,now,user=None,actor=''):
 
 
 def reserve_for_quote(c,quote,now,user=None,actor=''):
-    """Al aprobarse un presupuesto: reserva unidades concretas para cada partida de licencia aprobada. Lo que falte queda «pendiente de existencias»."""
+    """Al aprobarse un presupuesto: reserva unidades concretas para cada partida de licencia aprobada. Lo que falte queda pendiente."""
     expire(c,now);reserved=missing=0
     for item in pending_items(c,order_id=quote['order_id']):
         if item['quote_id']!=quote['id']:continue
@@ -364,14 +616,13 @@ def reserve_for_quote(c,quote,now,user=None,actor=''):
 
 
 def fill_pending(c,product_id,now,user=None):
-    """Con existencias nuevas, se reservan las ventas aprobadas que esperaban (por orden de aprobación)."""
     total=0
     for item in pending_items(c,product_id=product_id):
         total+=_reserve_item(c,item,now,user)
     return total
 
 
-# ---- Pago, autorización y entrega -------------------------------------------------------------------------------------
+# ---- Entrega (confirmación manual de administración) ------------------------------------------------------------------
 def _order_units(c,order_id,delivery_id=None):
     sql="SELECT u.*,i.name product_name FROM license_units u JOIN catalog_items i ON i.id=u.product_id WHERE u.order_id=?"
     args=[order_id]
@@ -379,35 +630,70 @@ def _order_units(c,order_id,delivery_id=None):
     return [dict(r) for r in c.execute(sql+' ORDER BY u.id',args)]
 
 
-def blockers(c,order_id,units):
-    """Motivos por los que NO se pueden liberar las credenciales. Lista vacía = se puede continuar. Se evalúa siempre en el servidor."""
+def _delivery_units(c,delivery_id):
+    return [dict(r) for r in c.execute("SELECT u.*,i.name product_name FROM license_units u JOIN catalog_items i ON i.id=u.product_id WHERE u.delivery_id=? ORDER BY u.id",(delivery_id,))]
+
+
+def _resolve_order(c,client_id,order_code,quote_code):
+    order=quote=None
+    if order_code:
+        row=c.execute("SELECT o.id,d.client_id FROM orders o JOIN devices d ON d.id=o.device_id WHERE upper(o.code)=upper(?)",(order_code.strip(),)).fetchone()
+        if not row:raise LicenseError('No existe una orden con ese número.',404,{'order_code':'Orden no encontrada.'})
+        if client_id and row['client_id']!=client_id:raise LicenseError('Esa orden pertenece a otro cliente.',409,{'order_code':'Otro cliente.'})
+        order=row['id'];client_id=row['client_id']
+    if quote_code:
+        row=c.execute("SELECT id,order_id FROM quotes WHERE upper(code)=upper(?) AND deleted_at=''",(quote_code.strip(),)).fetchone()
+        if not row:raise LicenseError('No existe un presupuesto con ese número.',404,{'quote_code':'Presupuesto no encontrado.'})
+        if order and row['order_id']!=order:raise LicenseError('Ese presupuesto es de otra orden.',409,{'quote_code':'Otra orden.'})
+        quote=row['id'];order=row['order_id'];client_id=client_id or _client_of(c,order)
+    return client_id,order,quote
+
+
+def deliver(c,data,user,now):
+    """Entrega confirmada manualmente por administración. Dos casos: las licencias reservadas de una orden (desde su presupuesto) o una
+    venta directa a un cliente (con orden o presupuesto opcional). No depende de la confirmación del pago; si la orden tiene saldo
+    pendiente hay que aceptarlo expresamente, y queda registrado. Una licencia entregada no puede entregarse otra vez."""
     import equipment
-    reasons=[]
-    if not units:reasons.append('No hay licencias reservadas pendientes de entrega en esta orden.')
+    if user['role']!='administrador':raise LicenseError('Solo administración confirma entregas de licencias.',403)
+    order_id=int(data['order_id']) if str(data.get('order_id') or '').isdigit() else None
+    if order_id:
+        client=_client_of(c,order_id);quote=None
+        wanted={int(x) for x in str(data.get('unit_ids') or '').split(',') if x.strip().isdigit()}
+        units=[u for u in _order_units(c,order_id) if u['status']=='reservada' and (not wanted or u['id'] in wanted)]
+        if not units:raise LicenseError('No hay licencias reservadas para entregar en esta orden.',409)
+        kind='orden'
+    else:
+        client=int(data['client_id']) if str(data.get('client_id') or '').isdigit() else None
+        if not client or not c.execute('SELECT 1 FROM clients WHERE id=?',(client,)).fetchone():raise LicenseError('Selecciona el cliente que recibe la licencia.',fields={'client_id':'Cliente obligatorio.'})
+        client,order_id,quote=_resolve_order(c,client,str(data.get('order_code') or ''),str(data.get('quote_code') or ''))
+        pid=str(data.get('product_id') or '')
+        if not pid.isdigit():raise LicenseError('Selecciona el producto.',fields={'product_id':'Producto obligatorio.'})
+        unit_id=str(data.get('unit_id') or '')
+        today=now.date().isoformat()
+        if unit_id.isdigit():
+            row=c.execute("SELECT * FROM license_units WHERE id=? AND product_id=?",(int(unit_id),int(pid))).fetchone()
+            if not row or row['status']!='disponible' or (row['expires_at'] and row['expires_at']<today):raise LicenseError('Esa licencia ya no está disponible (pudo entregarse o vencer).',409,{'unit_id':'No disponible.'})
+        else:
+            row=c.execute("SELECT * FROM license_units WHERE product_id=? AND status='disponible' AND (expires_at='' OR expires_at>=?) ORDER BY expires_at='',expires_at,id LIMIT 1",(int(pid),today)).fetchone()
+            if not row:raise LicenseError('No hay licencias disponibles de este producto.',409,{'product_id':'Sin existencias.'})
+        units=[dict(row,product_name=_product(c,int(pid))['name'])];kind='directa'
+    balance=equipment.money(c,order_id)['balance_cents'] if order_id else 0
+    if balance>0 and data.get('accept_balance') is not True:
+        raise LicenseError('La orden tiene un saldo pendiente de %s. Para entregar igualmente, confírmalo expresamente.'%equipment.usd(balance),409,{'accept_balance':'Confirmación obligatoria.'})
+    notes=_text(data,'notes',300,'Las observaciones');moment=stamp(now);token=secrets.token_urlsafe(32)
+    delivery=c.execute("INSERT INTO license_deliveries(order_id,client_id,kind,status,payment_confirmed_by,payment_confirmed_at,balance_cents,authorized_by,authorized_at,token_hash,token_expires_at,notes,created_at,updated_at) VALUES (?,?,?,'autorizada',?,?,?,?,?,?,?,?,?,?)",
+                       (order_id,client,kind,user['id'],moment,balance,user['id'],moment,_hash(token),stamp(now+timedelta(hours=LINK_HOURS)),notes,moment,moment)).lastrowid
     for unit in units:
-        row=c.execute("SELECT q.status,i.status item_status FROM quote_items i JOIN quotes q ON q.id=i.quote_id WHERE i.id=?",(unit['quote_item_id'],)).fetchone()
-        if not row or row['status'] not in ('aprobado','parcial') or row['item_status']!='aprobado':
-            reasons.append('El presupuesto de %s no está aprobado.'%unit['code']);break
-    balance=equipment.money(c,order_id)['balance_cents']
-    if balance>0:reasons.append('La orden tiene un saldo pendiente de %s: registra el pago completo antes de entregar.'%equipment.usd(balance))
-    return reasons
-
-
-def confirm_payment(c,order_id,user,now):
-    """«Confirmar pago»: administración comprueba que el pago está completo. Agrupa las licencias reservadas de la orden en una entrega."""
-    import equipment
-    if user['role']!='administrador':raise LicenseError('Solo administración puede confirmar pagos de licencias.',403)
-    if c.execute("SELECT 1 FROM license_deliveries WHERE order_id=? AND status='pago_confirmado'",(order_id,)).fetchone():
-        raise LicenseError('El pago de esta orden ya está confirmado y espera la autorización de entrega.',409)
-    units=[u for u in _order_units(c,order_id) if u['status']=='reservada' and not u['delivery_id']]
-    problems=blockers(c,order_id,units)
-    if problems:raise LicenseError(' '.join(problems),409)
-    client=_client_of(c,order_id)
-    delivery=c.execute("INSERT INTO license_deliveries(order_id,client_id,status,payment_confirmed_by,payment_confirmed_at,balance_cents,created_at,updated_at) VALUES (?,?,'pago_confirmado',?,?,?,?,?)",
-                       (order_id,client,user['id'],stamp(now),equipment.money(c,order_id)['balance_cents'],stamp(now),stamp(now))).lastrowid
-    for unit in units:c.execute('UPDATE license_units SET delivery_id=?,updated_at=? WHERE id=?',(delivery,stamp(now),unit['id']))
-    event(c,'pago_confirmado',now,'Pago completo confirmado para %d %s.'%(len(units),'licencia' if len(units)==1 else 'licencias'),delivery=delivery,order=order_id,client=client,user=user)
-    return delivery
+        allowed=('reservada',) if kind=='orden' else ('disponible',)
+        if not c.execute("UPDATE license_units SET status='entregada',delivered_at=?,client_id=?,order_id=COALESCE(order_id,?),quote_id=COALESCE(quote_id,?),delivery_id=?,updated_at=? WHERE id=? AND status IN (%s)"%','.join('?'*len(allowed)),
+                         (moment,client,order_id,quote,delivery,moment,unit['id'],*allowed)).rowcount:
+            raise LicenseError('Una licencia cambió de estado mientras se entregaba. Vuelve a intentarlo.',409)
+        event(c,'entregada',now,'Entrega confirmada manualmente por administración%s.%s'%(' con saldo pendiente de '+equipment.usd(balance)+' aceptado' if balance>0 else '',' '+notes if notes else ''),unit['id'],unit['product_id'],delivery,order_id,client,user)
+    event(c,'entrega_autorizada',now,'Entrega de %d %s al cliente. Enlace privado válido %d horas.'%(len(units),'licencia' if len(units)==1 else 'licencias',LINK_HOURS),delivery=delivery,order=order_id,client=client,user=user)
+    if order_id:
+        import order_workspace
+        order_workspace.event(c,order_id,user['id'],now,'follow_up','Licencias entregadas: '+', '.join(u['code']+' ('+u['product_name']+')' for u in units)+'.')
+    return delivery,token
 
 
 def delivery_row(c,delivery_id):
@@ -416,40 +702,10 @@ def delivery_row(c,delivery_id):
     return dict(row)
 
 
-def authorize(c,delivery_id,user,now):
-    """«Autorizar entrega»: administración libera las credenciales. Se vuelven a comprobar todas las condiciones. Devuelve el enlace privado."""
-    if user['role']!='administrador':raise LicenseError('Solo administración puede autorizar la entrega de licencias.',403)
-    delivery=delivery_row(c,delivery_id)
-    if delivery['status']!='pago_confirmado':raise LicenseError('Esta entrega no está pendiente de autorización.',409)
-    units=_order_units(c,delivery['order_id'],delivery_id)
-    if not units or any(u['status']!='reservada' for u in units):raise LicenseError('Las licencias de esta entrega ya no están reservadas.',409)
-    problems=blockers(c,delivery['order_id'],units)
-    if problems:raise LicenseError(' '.join(problems),409)
-    token=secrets.token_urlsafe(32);moment=stamp(now)
-    for unit in units:
-        if not c.execute("UPDATE license_units SET status='entregada',delivered_at=?,client_id=?,updated_at=? WHERE id=? AND status='reservada'",(moment,delivery['client_id'],moment,unit['id'])).rowcount:
-            raise LicenseError('Una licencia cambió de estado mientras se autorizaba. Vuelve a intentarlo.',409)
-        event(c,'entregada',now,'Entrega autorizada por administración.',unit['id'],unit['product_id'],delivery_id,delivery['order_id'],delivery['client_id'],user)
-    c.execute("UPDATE license_deliveries SET status='autorizada',authorized_by=?,authorized_at=?,token_hash=?,token_expires_at=?,updated_at=? WHERE id=?",
-              (user['id'],moment,_hash(token),stamp(now+timedelta(hours=LINK_HOURS)),moment,delivery_id))
-    event(c,'entrega_autorizada',now,'Entrega autorizada: %d %s para el cliente. Enlace privado válido %d horas.'%(len(units),'licencia' if len(units)==1 else 'licencias',LINK_HOURS),delivery=delivery_id,order=delivery['order_id'],client=delivery['client_id'],user=user)
-    return token
-
-
-def void_confirmation(c,delivery_id,reason,user,now):
-    if user['role']!='administrador':raise LicenseError('Solo administración puede anular la confirmación del pago.',403)
-    delivery=delivery_row(c,delivery_id);reason=str(reason or '').strip()
-    if delivery['status']!='pago_confirmado':raise LicenseError('Solo se anula una confirmación de pago todavía no autorizada.',409)
-    if len(reason)<5:raise LicenseError('Indica el motivo.',fields={'reason':'Motivo obligatorio.'})
-    c.execute("UPDATE license_deliveries SET status='anulada',voided_by=?,voided_at=?,void_reason=?,updated_at=? WHERE id=?",(user['id'],stamp(now),reason[:300],stamp(now),delivery_id))
-    c.execute("UPDATE license_units SET delivery_id=NULL,updated_at=? WHERE delivery_id=? AND status='reservada'",(stamp(now),delivery_id))
-    event(c,'pago_anulado',now,'Confirmación de pago anulada. Motivo: '+reason[:300],delivery=delivery_id,order=delivery['order_id'],client=delivery['client_id'],user=user)
-
-
 def renew_link(c,delivery_id,user,now):
     if user['role']!='administrador':raise LicenseError('Solo administración puede generar el enlace de entrega.',403)
     delivery=delivery_row(c,delivery_id)
-    if delivery['status']!='autorizada':raise LicenseError('La entrega no está autorizada.',409)
+    if delivery['status']!='autorizada':raise LicenseError('La entrega no está confirmada.',409)
     token=secrets.token_urlsafe(32)
     c.execute("UPDATE license_deliveries SET token_hash=?,token_expires_at=?,code_hash='',code_expires_at='',code_failures=0,updated_at=? WHERE id=?",(_hash(token),stamp(now+timedelta(hours=LINK_HOURS)),stamp(now),delivery_id))
     event(c,'enlace_renovado',now,'Nuevo enlace privado de entrega (el anterior deja de funcionar).',delivery=delivery_id,order=delivery['order_id'],client=delivery['client_id'],user=user)
@@ -458,7 +714,6 @@ def renew_link(c,delivery_id,user,now):
 
 # ---- Consulta privada de credenciales ---------------------------------------------------------------------------------
 def lookup(c,token,now):
-    """Entrega autorizada del enlace, o None si no existe, venció o fue reemplazado."""
     if not re.fullmatch(r'[A-Za-z0-9_-]{30,80}',token or ''):return None
     row=c.execute("SELECT * FROM license_deliveries WHERE token_hash=? AND status='autorizada'",(_hash(token),)).fetchone()
     if not row or datetime.fromisoformat(row['token_expires_at'])<now:return None
@@ -471,8 +726,6 @@ def _same_identification(a,b):
 
 
 def request_code(c,delivery,identification,now):
-    """Paso 1: si la identificación coincide con la del cliente y tiene correo registrado, devuelve (correo, código) para enviarlo. Si no, None.
-    La respuesta pública es siempre la misma: no revela si coincidió."""
     if delivery['code_failures']>=MAX_CODE_FAILURES:return None
     client=c.execute('SELECT identification,email FROM clients WHERE id=?',(delivery['client_id'],)).fetchone()
     if not client or not _same_identification(identification,client['identification']):
@@ -486,101 +739,151 @@ def request_code(c,delivery,identification,now):
 
 
 def verify_code(c,delivery,code,now,origin=''):
-    """Paso 2: con el código correcto (un solo uso) y todas las condiciones vigentes, devuelve la tarjeta privada con credenciales. Si no, None."""
     code=re.sub(r'\D','',str(code or ''))
     if delivery['code_failures']>=MAX_CODE_FAILURES or not delivery['code_hash'] or not delivery['code_expires_at'] or datetime.fromisoformat(delivery['code_expires_at'])<now:return None
     if len(code)!=6 or not hmac.compare_digest(delivery['code_hash'],_hash(str(delivery['id'])+':'+code)):
         c.execute('UPDATE license_deliveries SET code_failures=code_failures+1,updated_at=? WHERE id=?',(stamp(now),delivery['id']));return None
-    units=_order_units(c,delivery['order_id'],delivery['id'])
-    # Nueva comprobación en el servidor: aprobado, sin saldo y entregado. Si algo cambió (por ejemplo, un pago anulado), no se revela nada.
-    import equipment
-    if not units or any(u['status']!='entregada' for u in units) or equipment.money(c,delivery['order_id'])['balance_cents']>0:return None
+    units=_delivery_units(c,delivery['id'])
+    # Solo las licencias que siguen entregadas a este cliente (una devolución las retira del enlace).
+    if not any(u['status']=='entregada' for u in units):return None
     c.execute("UPDATE license_deliveries SET code_hash='',code_expires_at='',reveal_count=reveal_count+1,last_revealed_at=?,updated_at=? WHERE id=?",(stamp(now),stamp(now),delivery['id']))
     event(c,'credenciales_consultadas',now,'El cliente consultó sus credenciales por el enlace privado.'+(' Origen: '+origin[:80] if origin else ''),delivery=delivery['id'],order=delivery['order_id'],client=delivery['client_id'],actor='cliente')
     return card(c,delivery['id'],private=True)
 
 
+def credentials(unit):
+    values=unseal(unit['secret'])
+    return [{'key':key,'label':SECRET_LABELS[key],'value':values[key]} for key in ('key','serial','username','password','license_code') if values.get(key)]
+
+
 def admin_reveal(c,unit_id,user,now):
-    """Credencial de una unidad para administración (registro y soporte). Queda registrada cada consulta."""
     if user['role']!='administrador':raise LicenseError('Acceso no permitido.',403)
     unit=unit_row(c,unit_id)
     event(c,'credenciales_consultadas',now,'Credencial consultada por administración.',unit_id,unit['product_id'],order=unit['order_id'],client=unit['client_id'],user=user)
-    values=unseal(unit['secret'])
-    return [{'key':key,'label':label,'value':values.get(key,'')} for key,label in SECRETS[unit['kind']]]
+    return credentials(unit)
 
 
 def card(c,delivery_id,private=False):
-    """Datos de la tarjeta de entrega. La versión pública no incluye usuarios, contraseñas ni seriales."""
     delivery=delivery_row(c,delivery_id)
     client=c.execute('SELECT name FROM clients WHERE id=?',(delivery['client_id'],)).fetchone()
-    order=c.execute("SELECT COALESCE(code,'OP-'||printf('%05d',id)) code FROM orders WHERE id=?",(delivery['order_id'],)).fetchone()
+    order=c.execute("SELECT COALESCE(code,'OP-'||printf('%05d',id)) code FROM orders WHERE id=?",(delivery['order_id'],)).fetchone() if delivery['order_id'] else None
     items=[]
-    for unit in _order_units(c,delivery['order_id'],delivery_id):
+    for unit in _delivery_units(c,delivery_id):
+        if unit['status']!='entregada':continue
         item={'unit_code':unit['code'],'product_id':unit['product_id'],'product':unit['product_name'],'kind':KINDS[unit['kind']],'devices':unit['devices'],'term':unit['term'],
               'expires_at':unit['expires_at'],'activated_at':unit['activated_at'],'edition':unit['edition'],'license_type':unit['license_type'],'manufacturer':unit['manufacturer'],'version':unit['version'],
               'has_logo':bool(c.execute('SELECT 1 FROM catalog_images WHERE item_id=?',(unit['product_id'],)).fetchone())}
-        if private:
-            values=unseal(unit['secret']);item['credentials']=[{'label':label,'value':values.get(key,'')} for key,label in SECRETS[unit['kind']]]
+        if private:item.update(credentials=credentials(unit),download_url=unit['download_url'],instructions=unit['instructions'])
         items.append(item)
     return {'delivery_id':delivery_id,'client':client['name'] if client else '','order':order['code'] if order else '','delivered_at':delivery['authorized_at'],'status':delivery['status'],
             'items':items,'contact':CONTACT,'private':private}
 
 
 # ---- Consultas para la interfaz ---------------------------------------------------------------------------------------
-def units(c,now,product_id=None,status='',query=''):
-    today=now.date().isoformat()
-    sql=("SELECT u.id,u.code,u.product_id,i.name product,u.kind,u.edition,u.license_type,u.manufacturer,u.version,u.devices,u.term,u.purchased_at,u.activated_at,u.expires_at,u.activated,u.notes,"
-         "CASE WHEN u.status='disponible' AND u.expires_at!='' AND u.expires_at<? THEN 'vencida' ELSE u.status END status,u.reserved_at,u.delivered_at,u.created_at,"
-         "q.code quote_code,COALESCE(o.code,CASE WHEN o.id IS NULL THEN '' ELSE 'OP-'||printf('%05d',o.id) END) order_code,u.order_id,COALESCE(cl.name,'') client,b.supplier batch_supplier,b.invoice "
-         "FROM license_units u JOIN catalog_items i ON i.id=u.product_id LEFT JOIN quotes q ON q.id=u.quote_id LEFT JOIN orders o ON o.id=u.order_id LEFT JOIN clients cl ON cl.id=u.client_id LEFT JOIN license_batches b ON b.id=u.batch_id WHERE 1=1")
-    args=[today]
+def units(c,now,product_id=None,status='',query='',state='',date_from='',date_to='',client_id=None):
+    today=now.date()
+    sql=("SELECT u.id,u.code,u.product_id,i.name product,i.brand,u.kind,u.edition,u.license_type,u.manufacturer,u.version,u.devices,u.term,u.purchased_at,u.activated_at,u.expires_at,u.activated,u.notes,"
+         "u.download_url,u.instructions,u.status,u.reserved_at,u.delivered_at,u.created_at,u.renewed_from,u.renewed_to,u.seat,u.batch_id,"
+         "q.code quote_code,COALESCE(o.code,'') order_code,u.order_id,u.client_id,COALESCE(cl.name,'') client,b.supplier batch_supplier,b.invoice,b.unit_cost_cents,"
+         "(SELECT 1 FROM license_receipts r WHERE r.batch_id=u.batch_id) has_receipt,p.validity_mode,(SELECT COUNT(*) FROM license_renewals n WHERE n.unit_id=u.id) renewals "
+         "FROM license_units u JOIN catalog_items i ON i.id=u.product_id LEFT JOIN license_products p ON p.item_id=u.product_id LEFT JOIN quotes q ON q.id=u.quote_id LEFT JOIN orders o ON o.id=u.order_id "
+         "LEFT JOIN clients cl ON cl.id=u.client_id LEFT JOIN license_batches b ON b.id=u.batch_id WHERE 1=1")
+    args=[]
     if product_id:sql+=' AND u.product_id=?';args.append(product_id)
-    rows=[dict(r,status_label=STATUSES.get(r['status'],r['status']),kind_label=KINDS[r['kind']]) for r in c.execute(sql+' ORDER BY u.id DESC LIMIT 1000',args)]
+    if client_id:sql+=' AND u.client_id=?';args.append(client_id)
+    rows=[]
+    for r in c.execute(sql+' ORDER BY u.id DESC LIMIT 2000',args):
+        row=dict(r);row['state'],row['days_left']=state_of(row,today)
+        row['state_label'],row['state_color']=STATES[row['state']];row['status_label']=STATUSES.get(row['status'],row['status']);row['kind_label']=KINDS[row['kind']]
+        rows.append(row)
     if status:rows=[r for r in rows if r['status']==status]
+    if state:rows=[r for r in rows if r['state']==state]
+    if date_from or date_to:
+        start=date_from or '0000-01-01';end=date_to or '9999-12-31'
+        rows=[r for r in rows if any(start<=(r[k] or '')[:10]<=end for k in ('purchased_at','delivered_at','activated_at','expires_at') if r[k])]
     words=[w for w in re.sub(r'\s+',' ',str(query or '').lower()).split(' ') if w]
     if words:
-        # La búsqueda por clave o cuenta compara la huella: encuentra la licencia sin guardar ni mostrar la credencial en claro.
+        # Buscar por la clave o la cuenta compara su huella: encuentra la licencia sin mostrar ni guardar la credencial en claro.
         marks=set()
-        for kind in KINDS:
-            try:marks.add(fingerprint(kind,{'username':query,'key':query,'serial':query}))
-            except LicenseError:break
+        try:
+            for seat in range(1,11):marks|={fingerprint('otro',{'key':query},seat),fingerprint('m365',{'username':query},seat)}
+        except LicenseError:marks=set()
         exact={r['id'] for r in c.execute('SELECT id FROM license_units WHERE fingerprint IN (%s)'%','.join('?'*len(marks)),list(marks))} if marks else set()
-        rows=[r for r in rows if r['id'] in exact or all(w in ' '.join(str(r[k] or '') for k in ('code','product','edition','license_type','manufacturer','client','order_code','quote_code','batch_supplier','invoice')).lower() for w in words)]
+        rows=[r for r in rows if r['id'] in exact or all(w in ' '.join(str(r[k] or '') for k in ('code','product','brand','edition','license_type','manufacturer','client','order_code','quote_code','batch_supplier','invoice')).lower() for w in words)]
     return rows
 
 
+def dashboard(c,now):
+    """Indicadores del panel: disponibles, reservadas, activas, por vencer, vencidas y renovaciones realizadas."""
+    counts={key:0 for key in STATES}
+    for unit in c.execute('SELECT status,expires_at,activated,renewed_to FROM license_units'):
+        counts[state_of(dict(unit),now.date())[0]]+=1
+    return {'disponibles':counts['disponible'],'reservadas':counts['reservada'],'activas':counts['activa'],'pendientes_activacion':counts['pendiente_activacion'],
+            'por_vencer':counts['por_vencer'],'vencidas':counts['vencida'],'renovaciones':c.execute('SELECT COUNT(*) FROM license_renewals').fetchone()[0],'anuladas':counts['anulada']}
+
+
 def deliveries(c,now):
-    """Órdenes con licencias reservadas o entregadas, y el estado de su pago y autorización (para «Historial de ventas y entregas»)."""
-    import equipment
     out=[]
-    orders=[r['order_id'] for r in c.execute("SELECT DISTINCT order_id FROM license_units WHERE order_id IS NOT NULL UNION SELECT DISTINCT order_id FROM license_deliveries ORDER BY 1 DESC LIMIT 300")]
+    orders=[r['order_id'] for r in c.execute("SELECT DISTINCT order_id FROM license_units WHERE order_id IS NOT NULL AND status='reservada' ORDER BY 1 DESC LIMIT 300")]
     orders=list(dict.fromkeys(orders+[r['order_id'] for r in pending_items(c)]))
+    import equipment
     for order_id in orders:
-        info=c.execute("SELECT COALESCE(o.code,'OP-'||printf('%05d',o.id)) code,cl.name client,COALESCE(cl.email,'') email FROM orders o JOIN devices d ON d.id=o.device_id JOIN clients cl ON cl.id=d.client_id WHERE o.id=?",(order_id,)).fetchone()
+        info=c.execute("SELECT COALESCE(o.code,'') code,cl.name client FROM orders o JOIN devices d ON d.id=o.device_id JOIN clients cl ON cl.id=d.client_id WHERE o.id=?",(order_id,)).fetchone()
         if not info:continue
-        all_units=_order_units(c,order_id)
-        waiting=[u for u in all_units if u['status']=='reservada' and not u['delivery_id']]
-        out.append({'order_id':order_id,'order':info['code'],'client':info['client'],'has_email':bool(info['email']),'balance_cents':equipment.money(c,order_id)['balance_cents'],
+        waiting=[u for u in _order_units(c,order_id) if u['status']=='reservada']
+        out.append({'order_id':order_id,'order':info['code'],'client':info['client'],'balance_cents':equipment.money(c,order_id)['balance_cents'],
                     'reserved':[{'id':u['id'],'code':u['code'],'product':u['product_name'],'activated':u['activated']} for u in waiting],
-                    'pending':[{'product':r['description'],'missing':r['missing'],'quote':r['quote_code']} for r in pending_items(c,order_id=order_id)],
-                    'blockers':blockers(c,order_id,waiting) if waiting else [],
-                    'deliveries':[dict(r,units=[{'code':u['code'],'product':u['product_name'],'status':u['status']} for u in all_units if u['delivery_id']==r['id']],
-                                       confirmed_by=(c.execute('SELECT name FROM users WHERE id=?',(r['payment_confirmed_by'],)).fetchone() or {'name':''})['name'],
-                                       authorized_by_name=(c.execute('SELECT name FROM users WHERE id=?',(r['authorized_by'],)).fetchone() or {'name':''})['name'] if r['authorized_by'] else '',
-                                       link_active=r['status']=='autorizada' and r['token_expires_at']>stamp(now))
-                                  for r in [dict(x) for x in c.execute('SELECT id,status,payment_confirmed_by,payment_confirmed_at,authorized_by,authorized_at,token_expires_at,reveal_count,last_revealed_at,void_reason FROM license_deliveries WHERE order_id=? ORDER BY id DESC',(order_id,))]]})
-    return out
+                    'pending':[{'product':r['description'],'missing':r['missing'],'quote':r['quote_code']} for r in pending_items(c,order_id=order_id)]})
+    history=[]
+    for r in c.execute("SELECT d.*,COALESCE(cl.name,'') client,COALESCE(o.code,'') order_code,COALESCE(u.name,'') by_name FROM license_deliveries d LEFT JOIN clients cl ON cl.id=d.client_id LEFT JOIN orders o ON o.id=d.order_id "
+                       "LEFT JOIN users u ON u.id=d.authorized_by ORDER BY d.id DESC LIMIT 300"):
+        row=dict(r);units_of=_delivery_units(c,row['id'])
+        history.append({'id':row['id'],'kind':row['kind'],'status':row['status'],'client':row['client'],'order':row['order_code'],'by':row['by_name'],'at':row['authorized_at'] or row['payment_confirmed_at'],
+                        'balance_cents':row['balance_cents'],'notes':row['notes'],'reveal_count':row['reveal_count'],'link_active':row['status']=='autorizada' and row['token_expires_at']>stamp(now),
+                        'units':[{'code':u['code'],'product':u['product_name'],'status':u['status']} for u in units_of]})
+    return {'waiting':out,'history':history}
 
 
-def history(c,limit=300):
-    return [dict(r) for r in c.execute("SELECT e.id,e.event,e.detail,e.created_at,COALESCE(u.name,e.actor) actor,lu.code unit_code,i.name product,COALESCE(o.code,'') order_code,COALESCE(cl.name,'') client "
-                                       "FROM license_events e LEFT JOIN users u ON u.id=e.actor_id LEFT JOIN license_units lu ON lu.id=e.unit_id LEFT JOIN catalog_items i ON i.id=e.product_id "
-                                       "LEFT JOIN orders o ON o.id=e.order_id LEFT JOIN clients cl ON cl.id=e.client_id ORDER BY e.id DESC LIMIT ?",(limit,))]
+def history(c,limit=300,unit_id=None):
+    sql=("SELECT e.id,e.event,e.detail,e.created_at,COALESCE(u.name,e.actor) actor,lu.code unit_code,i.name product,COALESCE(o.code,'') order_code,COALESCE(cl.name,'') client "
+         "FROM license_events e LEFT JOIN users u ON u.id=e.actor_id LEFT JOIN license_units lu ON lu.id=e.unit_id LEFT JOIN catalog_items i ON i.id=e.product_id "
+         "LEFT JOIN orders o ON o.id=e.order_id LEFT JOIN clients cl ON cl.id=e.client_id")
+    args=[]
+    if unit_id:sql+=' WHERE e.unit_id=?';args.append(unit_id)
+    return [dict(r) for r in c.execute(sql+' ORDER BY e.id DESC LIMIT ?',(*args,limit))]
+
+
+def renewals(c,unit_id):
+    return [dict(r) for r in c.execute("SELECT n.*,COALESCE(u.name,'') by_name,nu.code new_code FROM license_renewals n LEFT JOIN users u ON u.id=n.created_by LEFT JOIN license_units nu ON nu.id=n.new_unit_id WHERE n.unit_id=? ORDER BY n.id DESC",(unit_id,))]
 
 
 def stock(c,now):
-    """Existencias disponibles por producto, para el selector del presupuesto (sin datos de licencias)."""
     today=now.date().isoformat()
     managed={r['item_id'] for r in c.execute('SELECT item_id FROM license_products')}
     free={r['product_id']:r['n'] for r in c.execute("SELECT product_id,COUNT(*) n FROM license_units WHERE status='disponible' AND (expires_at='' OR expires_at>=?) GROUP BY product_id",(today,))}
     return {item:free.get(item,0) for item in managed}
+
+
+# ---- Alertas de vencimiento -------------------------------------------------------------------------------------------
+def expiring(c,now,limit=200):
+    """Licencias vendidas con vencimiento en los próximos 30 días o ya vencidas (sin renovar): para el panel y la campana."""
+    today=now.date();out=[]
+    for r in c.execute("SELECT u.id,u.code,u.expires_at,u.status,u.activated,u.renewed_to,i.name product,COALESCE(cl.name,'') client FROM license_units u JOIN catalog_items i ON i.id=u.product_id "
+                       "LEFT JOIN clients cl ON cl.id=u.client_id WHERE u.status='entregada' AND u.expires_at!='' AND u.renewed_to IS NULL ORDER BY u.expires_at LIMIT ?",(limit,)):
+        days=(date.fromisoformat(r['expires_at'])-today).days
+        if days<=SOON_DAYS:out.append(dict(r,days_left=days))
+    return out
+
+
+def tick(c,now):
+    """Avisos de 30, 15, 7 y 1 días antes y del día del vencimiento: uno por licencia, fecha y anticipación (sin duplicados), con su
+    registro en el historial. Las perpetuas y las que aún no tienen vencimiento (sin activar) no generan avisos. Devuelve los nuevos."""
+    expire(c,now);new=[]
+    for unit in expiring(c,now,limit=2000):
+        days=unit['days_left'];threshold=next((t for t in reversed(ALERT_DAYS) if days<=t),None) if days>=0 else 0
+        if threshold is None:continue
+        if c.execute('INSERT OR IGNORE INTO license_alerts(unit_id,expires_at,days,created_at) VALUES (?,?,?,?)',(unit['id'],unit['expires_at'],threshold,stamp(now))).rowcount:
+            text='Vence hoy' if days==0 else 'Vencida el %s'%unit['expires_at'] if days<0 else 'Vence en %d día%s (%s)'%(days,'' if days==1 else 's',unit['expires_at'])
+            event(c,'aviso_vencimiento',now,'%s: %s.'%(unit['product'],text),unit['id'],client=None)
+            new.append(dict(unit,threshold=threshold,text=text))
+    return new

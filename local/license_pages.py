@@ -50,6 +50,8 @@ def card_page(token,card):
         facts=[('Tipo',item['kind'])]+[(label,value) for label,value in (('Edición',item['edition']),('Tipo de licencia',item['license_type']),('Fabricante',item['manufacturer']),('Versión',item['version']),
               ('Duración',item['term']),('Dispositivos autorizados',str(item['devices']) if item['devices'] else ''),('Activación',_day(item['activated_at'])),('Vencimiento',_day(item['expires_at']) or 'Según el fabricante')) if value]
         creds=''.join('<div class="license-credential"><dt>%s</dt><dd><code>%s</code></dd></div>' % (e(c['label']),e(c['value'])) for c in item.get('credentials',[]))
+        if item.get('download_url'):creds+='<div class="license-credential"><dt>Enlace oficial de descarga o activación</dt><dd><a href="%s" rel="noopener noreferrer">%s</a></dd></div>' % (e(item['download_url']),e(item['download_url']))
+        if item.get('instructions'):creds+='<div class="license-credential"><dt>Instrucciones de instalación</dt><dd>%s</dd></div>' % e(item['instructions']).replace('\n','<br>')
         blocks.append('<article class="license-card"><header>%s<div><strong>%s</strong><small>%s</small></div></header><dl class="license-facts">%s</dl>%s</article>'
                       % (logo,e(item['product']),e(item['unit_code']),''.join('<div><dt>%s</dt><dd>%s</dd></div>' % (e(a),e(b)) for a,b in facts),('<dl class="license-credentials">%s</dl>' % creds) if creds else ''))
     head=('<section class="tracking-card license-card-box"><small>TARJETA DE LICENCIAS · VERSIÓN PRIVADA</small><h1>%s</h1><p>Orden %s · Entregada el %s</p>'

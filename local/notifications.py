@@ -187,6 +187,21 @@ def build(c, user, now, mail_access=False):
                               'detail': (update.get('summary') or 'Hay una versión publicada posterior a la instalada.')[:160], 'at': update['date'], 'href': '#system', 'group': 'alert'})
     except (versioning.RegistryError, IndexError, ValueError, KeyError):
         pass
+    if admin:
+        # Licencias Pro: licencias que vencen en 7 días o ya vencidas sin renovar, y recordatorios con error de envío. Aviso discreto, uno por día.
+        try:
+            import licenses
+            due = [u for u in licenses.expiring(c, now, 500) if u['days_left'] <= 7]
+            soon = sum(1 for u in due if u['days_left'] >= 0)
+            failed = c.execute("SELECT COUNT(*) FROM license_notices WHERE status='error' AND attempts>=3").fetchone()[0]
+            if soon:
+                items.append({'key': f'alert:licenses:{today}:{soon}', 'kind': 'info', 'icon': 'status', 'title': plural(soon, 'licencia vence en los próximos 7 días', 'licencias vencen en los próximos 7 días'),
+                              'detail': 'Revisa las renovaciones en Licencias Pro.', 'at': stamp, 'href': '#licenses', 'group': 'alert'})
+            if failed:
+                items.append({'key': f'alert:license-mail:{today}:{failed}', 'kind': 'warning', 'icon': 'alert', 'title': plural(failed, 'recordatorio de renovación no se pudo enviar', 'recordatorios de renovación no se pudieron enviar'),
+                              'detail': 'Revisa «Notificaciones de renovación» en Licencias Pro.', 'at': stamp, 'href': '#licenses', 'group': 'alert'})
+        except Exception as error:
+            print('licencias avisos', type(error).__name__, flush=True)
     if staff:
         count = lambda sql, *args: c.execute(sql, args).fetchone()[0]
         alert('overdue', count("SELECT COUNT(*) FROM orders WHERE estimated_delivery!='' AND estimated_delivery<? AND status!='entregado'", today), 'alert', 'warning',

@@ -77,6 +77,19 @@ def admin_reply(c,text,now):
   row=c.execute("SELECT o.id,o.code,s.label status,cl.name,d.brand,d.model,o.estimated_delivery,o.priority FROM orders o JOIN devices d ON d.id=o.device_id JOIN clients cl ON cl.id=d.client_id JOIN statuses s ON s.code=o.status WHERE o.code=?",(match[0].upper(),)).fetchone()
   if not row:return {'answer':'No existe una orden con el número '+match[0].upper()+'.','links':[link('Ver órdenes','#orders')]}
   return {'answer':f"{row['code']} está en «{row['status']}». Cliente: {row['name']}. Equipo: {' '.join(x for x in (row['brand'],row['model']) if x) or 'sin especificar'}. Entrega estimada: {row['estimated_delivery'] or 'sin definir'}.",'links':[link('Abrir la orden','#orders?id='+str(row['id']))]}
+ if has('licencia','renovacion','renovar','vencen','por vencer'):
+  # Licencias Pro: próximas renovaciones (7 días) y resultado real de los recordatorios enviados. Solo lectura.
+  import licenses
+  soon=[u for u in licenses.expiring(c,now,500) if 0<=u['days_left']<=7]
+  ids=[u['id'] for u in soon];marks=','.join('?'*len(ids)) or 'NULL'
+  sent={r[0] for r in c.execute("SELECT DISTINCT unit_id FROM license_notices WHERE status='enviado' AND unit_id IN (%s)"%marks,ids)} if ids else set()
+  failed={r[0] for r in c.execute("SELECT DISTINCT unit_id FROM license_notices WHERE status='error' AND unit_id IN (%s)"%marks,ids)}-sent if ids else set()
+  if not soon:answer='No hay licencias que venzan durante los próximos siete días.'
+  else:
+   n=len(soon);answer=('Tiene %d licencia%s próxima%s a vencer durante los siguientes siete días.'%(n,'' if n==1 else 's','' if n==1 else 's'))
+   answer+=' %d cliente%s ya recibi%s su recordatorio'%(len(sent),'' if len(sent)==1 else 's','ó' if len(sent)==1 else 'eron') if sent else ' Ningún cliente recibió todavía su recordatorio'
+   answer+=(' y %d presenta%s un error de envío.'%(len(failed),'' if len(failed)==1 else 'n') if failed else '.')
+  return {'answer':answer,'links':[link('Abrir Licencias Pro','#licenses')]}
  if has('resumen','como va','como esta el taller','estado del taller','que hay hoy','panorama') or q in ('hoy','dia'):
   s=live['statuses'];parts=[f"{live['active']} órdenes activas ({s['pendiente']} en espera, {s['reparacion']+s.get('revision_recurrente',0)} en proceso, {s['esperando_cliente']+s['presupuesto']} esperando al cliente, {s['listo']+s['espera_entrega']} listas para entregar)",f"{live['received_today']} recibidas y {live['delivered_today']} entregadas hoy",f"{live['overdue']} con entrega vencida",f"{live['appointments_today']} citas para hoy"+(' (próxima: '+live['next_appointment']+')' if live['next_appointment'] else '')]
   if live['appointments_requested']:parts.append(f"{live['appointments_requested']} citas por confirmar")

@@ -475,6 +475,68 @@ def stay_deliver(recipient,subject,body):
         return send_institutional(archive,'stay','Aviso de permanencia del equipo',recipient,subject,body,order_from_text(archive,subject,body))['message_id']
 
 
+def send_license_mail(c,kind,data,actor,order_id=None,subject=None,intro=None,today=None):
+    """Correo de Licencias Pro (aviso de renovación, información o prueba) con la plantilla corporativa, archivado y con seguimiento de
+    entrega. Devuelve {'status': 'enviado'|'error', 'label', 'archive_id', 'error'}. «Enviado» = aceptado por el servidor de correo."""
+    import license_mail,mailing
+    now=reception_now();config=mail_pro.settings()
+    message,title,_=license_mail.build(config,data,today or now.date(),'info' if kind=='license_info' else 'renewal',subject if kind!='license_info' else None,intro if kind!='license_info' else None)
+    recipient=data['email'];archive_id=mailing.archive(c,kind,order_id,recipient,title,message,'plantilla',actor,now)
+    tracked=mail_tracking.start(c,[recipient],kind=kind,subject=title,now=now,archive_id=archive_id,order_id=order_id,actor_id=actor);c.commit()
+    try:
+        refusal=mail_tracking.blocked(c,recipient) if actor is None else ''
+        if refusal:raise mail_pro.MailError('destinatario',refusal)
+        result=mail_pro.deliver(config,message,[recipient])
+    except mail_pro.MailError as error:
+        mailing.mark(c,archive_id,'error',str(error));mail_tracking.failed(c,tracked,error,reception_now());c.commit()
+        return {'status':'error','label':'Error de envío','archive_id':archive_id,'error':str(error)[:300]}
+    message_id=str(message['Message-ID'] or '');sent=reception_now()
+    mailing.mark(c,archive_id,'enviado','El servidor de correo aceptó el mensaje.',message_id,sent);mail_tracking.accepted(c,tracked,message_id,sent,result)
+    return {'status':'enviado','label':'Aceptado por el servidor de correo','archive_id':archive_id,'error':''}
+
+
+def license_notices_tick(c,now):
+    """Tarea diaria: crea los avisos de renovación que tocan hoy (hora de Ecuador) y los envía, con reintentos controlados.
+    Sin correo configurado o con los avisos desactivados no envía nada."""
+    import license_mail
+    licenses.tick(c,now);due=license_mail.plan(c,now);c.commit()
+    if not due or not mail_pro.configured() or not license_mail.settings(c)['enabled']:return 0
+    config=license_mail.settings(c);sent=0
+    for notice in due:
+        data=license_mail.context(c,notice['unit_id'],notice['days'])
+        if not data or data['expires_at']!=notice['expires_at']:
+            c.execute("UPDATE license_notices SET status='cancelado',last_error='La licencia cambió de vencimiento' WHERE id=?",(notice['id'],));continue
+        result=send_license_mail(c,'license_renewal',data,None,None,config['subject'],config['intro'])
+        attempts=notice['attempts']+1;retry=(now+appointments.timedelta(hours=license_mail.RETRY_HOURS*attempts)).isoformat(timespec='seconds')
+        c.execute('UPDATE license_notices SET status=?,attempts=?,last_error=?,archive_id=?,sent_at=?,next_retry_at=? WHERE id=?',
+                  (result['status'],attempts,result['error'],result['archive_id'],licenses.stamp(now) if result['status']=='enviado' else '',retry if result['status']=='error' else '',notice['id']))
+        licenses.event(c,'aviso_enviado' if result['status']=='enviado' else 'aviso_error',now,'Aviso de renovación (%d días) al cliente: %s.'%(notice['days'],result['label']),notice['unit_id'],client=notice['client_id'])
+        c.commit();sent+=result['status']=='enviado'
+    return sent
+
+
+def license_delivery_reply(c,delivery,token,user,send_mail):
+    """Enlace privado de la entrega y, si se pide, correo al cliente con el enlace (nunca con credenciales)."""
+    link=public_base_url().rstrip('/')+'/licencias/'+token;row=licenses.delivery_row(c,delivery)
+    client=c.execute('SELECT name,email FROM clients WHERE id=?',(row['client_id'],)).fetchone() if row['client_id'] else None
+    c.commit();result='not_requested'
+    email=(client['email'] or '').strip() if client else ''
+    if send_mail:
+        result='no_email'
+        if re.fullmatch(r'[^\s@<>]+@[^\s@<>.]+(?:\.[^\s@<>.]+)+',email):
+            result='not_configured'
+            try:
+                if mail_pro.configured():
+                    body='\n'.join(['Estimado/a '+client['name']+':','','Le confirmamos la entrega de sus licencias digitales.','',
+                        'Para consultar sus credenciales ingrese al siguiente enlace privado (válido %d horas):'%licenses.LINK_HOURS,link,'',
+                        'Por su seguridad se le pedirá su número de identificación y un código que enviaremos a este correo. Este mensaje no contiene usuarios, contraseñas ni seriales.','',
+                        'Atentamente,','','Departamento de Licencias y Soporte Técnico','PC-DOCTOR S.A.','WhatsApp '+licenses.CONTACT['phone']+' · '+licenses.CONTACT['email']])
+                    send_institutional(c,'license','Entrega de licencias digitales',email,'PC-DOCTOR S.A. | Entrega de licencias digitales',body,row['order_id'],user['id'],private=(link,));result='sent'
+            except mail_pro.MailError as error:
+                print('license-mail',error.kind,flush=True);result='failed'
+    return {'ok':True,'delivery':delivery,'link':link,'mail':result,'expires_at':licenses.delivery_row(c,delivery)['token_expires_at'],'has_email':bool(email)}
+
+
 def send_verification_code(recipient,code,minutes,where,context=''):
     """Correo corporativo con un código de un solo uso, por el buzón del sistema. Lanza MailError si el servidor no lo acepta."""
     import verification_mail
@@ -979,6 +1041,9 @@ class Handler(BaseHTTPRequestHandler):
                 expected=os.getenv('CRON_SECRET','')
                 if expected and not hmac.compare_digest(self.headers.get('Authorization',''),'Bearer '+expected):return self.reply(404,{'error':'No encontrado.'})
                 now=reception_now();maintenance_reminders_tick(c,now);stay_reminders_tick(c,now)
+                # Licencias Pro: avisos internos y correos de renovación a clientes (una vez al día, hora de Ecuador).
+                try:license_notices_tick(c,now)
+                except Exception as error:print('license-notices cron',type(error).__name__,flush=True)
                 # Seguimiento de correos: envíos sin respuesta registrada y lectura de informes de rebote o demora del buzón.
                 try:
                     mail_tracking.sweep(c,now);c.commit()
@@ -1780,19 +1845,40 @@ class Handler(BaseHTTPRequestHandler):
                     return self.reply(200,re.sub(r'cid:[^"\'\s>]+','/static/logo-firma.png',re.sub(r'cid:[^"\'\s>]*firma-grafica[^"\'\s>]*','/api/mail/signature-image',row['body_html'])) or '<pre>'+html.escape(row['body_text'])+'</pre>','text/html; charset=utf-8')
                 return self.reply(200,{'mail':{'id':row['id'],'kind_label':mailing.LABELS.get(row['kind'],'Notificación'),'recipient':row['recipient'],'subject':row['subject'],'text':row['body_text'],'attachments':row['attachments'],'status':row['status'],'status_label':mailing.STATUS[row['status']],
                     'adi':row['adi'],'detail':row['detail'],'created_at':row['created_at'],'sent_at':row['sent_at'],'order_code':row['order_code'],'view_url':'/correo/%d'%row['id'] if row['body_html'] else ''}})
+            client_licenses=re.fullmatch(r'/api/clients/([0-9]{1,9})/licenses',path)
+            if client_licenses:
+                # «Mis licencias» de la ficha del cliente: el personal ve sus licencias (sin credenciales); las acciones son de administración.
+                if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
+                cid=int(client_licenses[1]);now=reception_now()
+                rows=licenses.units(c,now,client_id=cid)
+                for row in rows:row['renewal_history']=licenses.renewals(c,row['id'])
+                import license_mail
+                return self.reply(200,{'rows':rows,'states':licenses.STATES,'can_manage':user['role']=='administrador','notices_off':license_mail.opted_out(c,cid)})
             if path.startswith('/api/licenses'):
-                # Inventario de Licencias Digitales: solo administración. Las credenciales nunca salen en estas consultas.
-                if user['role']!='administrador':return self.reply(403,{'error':'Solo administración accede al inventario de licencias.'})
-                query=parse_qs(urlsplit(self.path).query);now=reception_now()
+                # Licencias Pro: solo administración. Las credenciales nunca salen en estas consultas.
+                if user['role']!='administrador':return self.reply(403,{'error':'Solo administración accede a Licencias Pro.'})
+                query=parse_qs(urlsplit(self.path).query);now=reception_now();arg=lambda key:query.get(key,[''])[0]
                 try:
                     if path=='/api/licenses':
-                        return self.reply(200,{'products':licenses.products(c,now),'kinds':licenses.KINDS,'statuses':licenses.STATUSES,'fields':licenses.FIELDS,'field_labels':licenses.FIELD_LABELS,
-                                               'secrets':{kind:[{'key':key,'label':label} for key,label in pairs] for kind,pairs in licenses.SECRETS.items()},'max_bulk':licenses.MAX_BULK,'contact':licenses.CONTACT,'link_hours':licenses.LINK_HOURS})
+                        return self.reply(200,{'products':licenses.products(c,now),'dashboard':licenses.dashboard(c,now),'expiring':licenses.expiring(c,now,30),'kinds':licenses.KINDS,'lines':licenses.LINES,'models':licenses.MODELS,
+                                               'durations':licenses.DURATIONS,'validity':licenses.VALIDITY,'statuses':licenses.STATUSES,'states':licenses.STATES,'fields':licenses.FIELDS,'field_labels':licenses.FIELD_LABELS,
+                                               'secret_labels':licenses.SECRET_LABELS,'max_bulk':licenses.MAX_BULK,'contact':licenses.CONTACT,'link_hours':licenses.LINK_HOURS})
                     if path=='/api/licenses/units':
-                        product=query.get('product',[''])[0]
-                        return self.reply(200,{'rows':licenses.units(c,now,int(product) if product.isdigit() else None,query.get('status',[''])[0],query.get('q',[''])[0][:120])})
-                    if path=='/api/licenses/deliveries':return self.reply(200,{'rows':licenses.deliveries(c,now)})
-                    if path=='/api/licenses/history':return self.reply(200,{'rows':licenses.history(c)})
+                        product=arg('product');client=arg('client')
+                        return self.reply(200,{'rows':licenses.units(c,now,int(product) if product.isdigit() else None,arg('status'),arg('q')[:120],arg('state'),arg('from')[:10],arg('to')[:10],int(client) if client.isdigit() else None)})
+                    if path=='/api/licenses/deliveries':return self.reply(200,licenses.deliveries(c,now))
+                    if path=='/api/licenses/history':
+                        unit=arg('unit');return self.reply(200,{'rows':licenses.history(c,300,int(unit) if unit.isdigit() else None),'renewals':licenses.renewals(c,int(unit)) if unit.isdigit() else []})
+                    if path=='/api/licenses/notices':
+                        import license_mail
+                        return self.reply(200,{'settings':license_mail.settings(c),'rows':license_mail.history(c),'mail_ready':mail_pro.configured(),'stages':license_mail.STAGES,
+                                               'optout':[dict(r) for r in c.execute('SELECT o.client_id,cl.name,o.created_at FROM license_notice_optout o JOIN clients cl ON cl.id=o.client_id ORDER BY cl.name')]})
+                    receipt_route=re.fullmatch(r'/api/licenses/batches/([0-9]{1,9})/receipt',path)
+                    if receipt_route:
+                        found=c.execute('SELECT name,mime,data FROM license_receipts WHERE batch_id=?',(int(receipt_route[1]),)).fetchone()
+                        if not found:return self.reply(404,{'error':'Sin comprobante.'})
+                        audit(c,user['id'],'license_receipt_viewed',int(receipt_route[1]))
+                        return self.reply(200,bytes(found['data']),found['mime'],filename=found['name'])
                     card_route=re.fullmatch(r'/api/licenses/deliveries/([0-9]{1,9})/card',path)
                     if card_route:return self.reply(200,licenses.card(c,int(card_route[1]),private=False))
                 except licenses.LicenseError as error:return self.reply(error.status,{'error':str(error),'fields':error.fields})
@@ -2024,7 +2110,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(403, {'error':'Solicitud no autorizada.'})
             path = urlsplit(self.path).path
             workspace_post=bool(re.fullmatch(r'/api/orders/[0-9]+/workspace',path));quote_json=bool(re.fullmatch(r'/api/quotes/[0-9]+',path))
-            max_body=9000000 if path in ('/api/clients/import/preview','/api/clients/import/commit') else 6000000 if path in ('/api/mail/send','/api/mail/draft') else 100000 if path in ('/api/conditions','/api/order-draft','/api/conditions/draft','/api/conditions/compare') else 900000 if re.fullmatch(r'/api/orders/[0-9]+/photos',path) or path in ('/api/profile/photo','/api/mail/signature') or re.fullmatch(r'/api/catalog/[0-9]+/image',path) else (65536 if workspace_post or quote_json else 16384)
+            max_body=9000000 if path in ('/api/clients/import/preview','/api/clients/import/commit') else 6000000 if path in ('/api/mail/send','/api/mail/draft') else 100000 if path in ('/api/conditions','/api/order-draft','/api/conditions/draft','/api/conditions/compare') else 3200000 if path in ('/api/licenses/new','/api/licenses/units','/api/licenses/units/bulk','/api/licenses/products','/api/licenses/products/duplicate') else 900000 if re.fullmatch(r'/api/orders/[0-9]+/photos',path) or path in ('/api/profile/photo','/api/mail/signature') or re.fullmatch(r'/api/catalog/[0-9]+/image',path) else (65536 if workspace_post or quote_json else 16384)
             length = int(self.headers.get('Content-Length', '0'))
             if length <= 0 or length > max_body:
                 return self.reply(400, {'error':'Solicitud inválida.'})
@@ -2909,57 +2995,81 @@ class Handler(BaseHTTPRequestHandler):
                     audit(c,user['id'],'order_follow_up',oid)
                     return self.reply(201,{'ok':True})
                 if path.startswith('/api/licenses/'):
-                    # Inventario de Licencias Digitales: todo lo hace administración y queda en el historial y la auditoría.
+                    # Licencias Pro: todo lo hace administración y queda en el historial (usuario, fecha y hora) y en la auditoría.
                     if user['role']!='administrador':return self.reply(403,{'error':'Solo administración gestiona las licencias.'})
                     now=reception_now()
+                    import license_mail
                     try:
                         licenses.expire(c,now)
+                        if path=='/api/licenses/new':
+                            made=licenses.register_new(c,data,user,now);audit(c,user['id'],'license_registered',made['unit_id']);return self.reply(201,dict(made,ok=True))
                         if path=='/api/licenses/products':
                             item=licenses.save_product(c,data,user,now);audit(c,user['id'],'license_product_saved',item);return self.reply(200,{'ok':True,'id':item})
+                        if path=='/api/licenses/products/duplicate':
+                            item=licenses.duplicate_product(c,int(data.get('item_id') or 0),str(data.get('name','')),user,now);audit(c,user['id'],'license_product_duplicated',item);return self.reply(201,{'ok':True,'id':item})
+                        if path=='/api/licenses/products/toggle':
+                            licenses.toggle_product(c,int(data.get('item_id') or 0),data.get('active') is True,user,now);audit(c,user['id'],'license_product_toggled',int(data.get('item_id') or 0));return self.reply(200,{'ok':True})
                         if path=='/api/licenses/units':
                             unit=licenses.register(c,data,user,now);audit(c,user['id'],'license_registered',unit);return self.reply(201,{'ok':True,'id':unit})
                         if path=='/api/licenses/units/bulk':
                             made=licenses.register_many(c,data,user,now);audit(c,user['id'],'license_bulk_registered',len(made));return self.reply(201,{'ok':True,'count':len(made)})
+                        if path=='/api/licenses/optout':
+                            cid=str(data.get('client_id',''))
+                            if not cid.isdigit() or not c.execute('SELECT 1 FROM clients WHERE id=?',(int(cid),)).fetchone():return self.reply(404,{'error':'Cliente no disponible.'})
+                            license_mail.set_optout(c,int(cid),data.get('off') is True,user,now);audit(c,user['id'],'license_notices_optout' if data.get('off') is True else 'license_notices_optin',int(cid));return self.reply(200,{'ok':True})
+                        if path=='/api/licenses/notices':
+                            try:saved=license_mail.save_settings(c,data,now)
+                            except license_mail.NoticeError as error:return self.reply(400,{'error':str(error),'fields':error.fields})
+                            audit(c,user['id'],'license_notices_saved');return self.reply(200,{'ok':True,'settings':saved})
+                        if path=='/api/licenses/notices/test':
+                            email=str(data.get('email','')).strip()
+                            if not re.fullmatch(r'[^\s@<>]+@[^\s@<>.]+(?:\.[^\s@<>.]+)+',email):return self.reply(400,{'error':'Indica un correo válido para la prueba.','fields':{'email':'Correo no válido.'}})
+                            if not mail_pro.configured():return self.reply(409,{'error':'El correo del sistema no está configurado.'})
+                            config=license_mail.settings(c);sample={'client':'Cliente de prueba','product':'ESET NOD32 Antivirus (ejemplo)','expires_at':(now.date()+appointments.timedelta(days=7)).isoformat(),
+                                    'activated_at':now.date().isoformat(),'model':'suscripcion','term':'Anual','email':email,'logo':None,'days':7}
+                            result=send_license_mail(c,'license_test',sample,user['id'],None,config['subject'],config['intro'])
+                            audit(c,user['id'],'license_notice_test');return self.reply(200,{'ok':result['status']=='enviado','result':result})
+                        notice_route=re.fullmatch(r'/api/licenses/notices/([0-9]{1,9})/resend',path)
+                        if notice_route:
+                            row=c.execute('SELECT * FROM license_notices WHERE id=?',(int(notice_route[1]),)).fetchone()
+                            if not row:return self.reply(404,{'error':'Aviso no disponible.'})
+                            if not mail_pro.configured():return self.reply(409,{'error':'El correo del sistema no está configurado.'})
+                            data_=license_mail.context(c,row['unit_id'],row['days'])
+                            if not data_['email'] or license_mail.opted_out(c,data_['client_id']):return self.reply(409,{'error':'El cliente no tiene correo válido o pidió no recibir avisos.'})
+                            config=license_mail.settings(c);result=send_license_mail(c,'license_renewal',data_,user['id'],None,config['subject'],config['intro'])
+                            c.execute('INSERT INTO license_notices(unit_id,client_id,expires_at,days,recipient,status,attempts,last_error,archive_id,manual,created_at,sent_at) VALUES (?,?,?,?,?,?,1,?,?,1,?,?)',
+                                      (row['unit_id'],row['client_id'],data_['expires_at'],row['days'],data_['email'],result['status'],result.get('error',''),result.get('archive_id'),licenses.stamp(now),licenses.stamp(now) if result['status']=='enviado' else ''))
+                            audit(c,user['id'],'license_notice_resent',row['unit_id']);return self.reply(200,{'ok':result['status']=='enviado','result':result})
+                        if path=='/api/licenses/deliver':
+                            delivery,token=licenses.deliver(c,data,user,now);audit(c,user['id'],'license_delivered',delivery)
+                            return self.reply(200,license_delivery_reply(c,delivery,token,user,data.get('send_mail') is True))
                         unit_route=re.fullmatch(r'/api/licenses/units/([0-9]{1,9})',path)
                         if unit_route:
                             unit=int(unit_route[1]);action=str(data.get('action',''))
                             if action=='edit':licenses.edit(c,unit,data,user,now)
                             elif action=='void':licenses.void(c,unit,data.get('reason',''),user,now)
                             elif action=='release':licenses.release(c,unit,user,now)
+                            elif action=='activate':
+                                expires=licenses.confirm_activation(c,unit,data.get('activated_at',''),user,now);audit(c,user['id'],'license_activate',unit);return self.reply(200,{'ok':True,'expires_at':expires})
+                            elif action=='renew':
+                                result=licenses.renew(c,unit,data,user,now);license_mail.cancel_for(c,unit);audit(c,user['id'],'license_renew',unit);return self.reply(200,dict(result,ok=True))
                             elif action=='reveal':
                                 values=licenses.admin_reveal(c,unit,user,now);audit(c,user['id'],'license_credentials_viewed',unit);return self.reply(200,{'ok':True,'credentials':values})
+                            elif action=='send_info':
+                                if not mail_pro.configured():return self.reply(409,{'error':'El correo del sistema no está configurado.'})
+                                data_=license_mail.context(c,unit)
+                                if not data_ or not re.fullmatch(r'[^\s@<>]+@[^\s@<>.]+(?:\.[^\s@<>.]+)+',data_['email'] or ''):return self.reply(409,{'error':'El cliente no tiene un correo válido registrado.'})
+                                result=send_license_mail(c,'license_info',data_,user['id'])
+                                licenses.event(c,'informacion_enviada',now,'Información de la licencia enviada al cliente por correo (sin credenciales): %s.'%result['label'],unit,data_['product_id'],client=data_['client_id'],user=user)
+                                audit(c,user['id'],'license_info_sent',unit);return self.reply(200,{'ok':result['status']=='enviado','result':result})
                             else:return self.reply(400,{'error':'Acción no válida.'})
                             audit(c,user['id'],'license_'+action,unit);return self.reply(200,{'ok':True})
-                        pay_route=re.fullmatch(r'/api/licenses/orders/([0-9]{1,9})/confirm-payment',path)
-                        if pay_route:
-                            delivery=licenses.confirm_payment(c,int(pay_route[1]),user,now);audit(c,user['id'],'license_payment_confirmed',int(pay_route[1]));return self.reply(200,{'ok':True,'delivery':delivery})
                         delivery_route=re.fullmatch(r'/api/licenses/deliveries/([0-9]{1,9})',path)
-                        if delivery_route:
-                            delivery=int(delivery_route[1]);action=str(data.get('action',''))
-                            if action=='void':
-                                licenses.void_confirmation(c,delivery,data.get('reason',''),user,now);audit(c,user['id'],'license_payment_voided',delivery);return self.reply(200,{'ok':True})
-                            if action not in ('authorize','renew'):return self.reply(400,{'error':'Acción no válida.'})
-                            token=licenses.authorize(c,delivery,user,now) if action=='authorize' else licenses.renew_link(c,delivery,user,now)
-                            audit(c,user['id'],'license_delivery_'+('authorized' if action=='authorize' else 'link_renewed'),delivery)
-                            link=public_base_url().rstrip('/')+'/licencias/'+token;row=licenses.delivery_row(c,delivery)
-                            client=c.execute('SELECT name,email FROM clients WHERE id=?',(row['client_id'],)).fetchone()
-                            # La autorización queda guardada antes del correo. El correo lleva solo el enlace: nunca usuarios, contraseñas ni seriales.
-                            c.commit();result='no_email'
-                            email=(client['email'] or '').strip() if client else ''
-                            if re.fullmatch(r'[^\s@<>]+@[^\s@<>.]+(?:\.[^\s@<>.]+)+',email):
-                                result='not_configured'
-                                try:
-                                    if mail_pro.configured():
-                                        body='\n'.join(['Estimado/a '+client['name']+':','','Su compra de licencias digitales fue autorizada para la entrega.','',
-                                            'Para consultar sus credenciales ingrese al siguiente enlace privado (válido %d horas):'%licenses.LINK_HOURS,link,'',
-                                            'Por su seguridad se le pedirá su número de identificación y un código que enviaremos a este correo. Por seguridad, este mensaje no contiene usuarios, contraseñas ni seriales.','',
-                                            'Atentamente,','','Departamento de Licencias','PC-DOCTOR S.A.','WhatsApp '+licenses.CONTACT['phone']+' · '+licenses.CONTACT['email']])
-                                        send_institutional(c,'license','Entrega de licencias digitales',email,'PC-DOCTOR S.A. | Entrega de licencias digitales',body,row['order_id'],user['id'],private=(link,));result='sent'
-                                except mail_pro.MailError as error:
-                                    print('license-mail',error.kind,flush=True);result='failed'
-                            return self.reply(200,{'ok':True,'link':link,'mail':result,'expires_at':licenses.delivery_row(c,delivery)['token_expires_at']})
+                        if delivery_route and data.get('action')=='renew':
+                            delivery=int(delivery_route[1]);token=licenses.renew_link(c,delivery,user,now);audit(c,user['id'],'license_delivery_link_renewed',delivery)
+                            return self.reply(200,license_delivery_reply(c,delivery,token,user,data.get('send_mail') is True))
                     except licenses.LicenseError as error:
-                        # Todo o nada: si algo falla, no queda ningún cambio a medias (lote sin licencias, reservas parciales…).
+                        # Todo o nada: si algo falla, no queda ningún cambio a medias (producto sin licencia, lote sin unidades, reservas parciales…).
                         c.rollback();return self.reply(error.status,{'error':str(error),'fields':error.fields})
                     return self.reply(404,{'error':'No encontrado.'})
                 catalog_image=re.fullmatch(r'/api/catalog/([0-9]{1,9})/image',path)
