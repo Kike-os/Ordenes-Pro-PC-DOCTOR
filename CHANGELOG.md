@@ -4,6 +4,15 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.180 — 2026-10-20 09:10 (UTC-05:00)
+
+Rendimiento del ticket PDF y del cálculo de horarios de la agenda
+
+### Optimización del rendimiento
+
+- Ticket PDF: el logotipo ya no se decodifica en cada instancia del servidor (píxeles precalculados con huella del PNG); de ~3 s a milisegundos
+- Agenda y reserva de citas: el cálculo de horarios hace ~100 consultas en lugar de ~460 por día, con los mismos resultados
+
 ## v1.5.179 — 2026-10-20 07:43 (UTC-05:00)
 
 Corrección de ADI AutoCare y servicios de pasta térmica para portátiles
