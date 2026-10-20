@@ -267,12 +267,15 @@ def checks(c, deep=False, now=None):
 
     def runtime_errors():
         import autocare
-        recent = autocare.recent_errors(c, hours=1)
+        # Solo cuentan los errores de incidencias sin resolver: marcar una incidencia como resuelta (tras corregirla) devuelve el
+        # panel a la normalidad sin borrar nada; si el error se repite, la incidencia se reabre y vuelve a contar.
+        recent = autocare.pending_errors(c, 1, now)
+        summary = autocare.errors_summary(recent)
         if len(recent) >= 5:
-            raise RuntimeError(str(len(recent)) + ' errores de ejecución en la última hora.')
+            raise RuntimeError(summary['problem'])
         if recent:
-            return ('warning', str(len(recent)) + ' error(es) de ejecución en la última hora (ver incidencias)')
-        return 'Sin errores de ejecución en la última hora'
+            return ('warning', summary['problem'] + ' Ver incidencias.')
+        return 'Sin errores de ejecución pendientes en la última hora'
 
     return [('database', 'Conectividad con la base de datos', 'crítica', database), ('auth', 'Autenticación y sesiones', 'crítica', authentication),
             ('clients', 'Registro de clientes', 'alta', clients), ('orders', 'Órdenes de reparación', 'crítica', orders),

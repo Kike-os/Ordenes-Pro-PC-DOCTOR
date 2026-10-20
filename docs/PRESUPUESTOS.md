@@ -271,3 +271,21 @@ Se crean una sola vez si no existen con ese nombre (`quotes.seed_thermal`; tambi
 | Servicio de Respaldo y Protección de Información Digital — respaldo de archivos personales y documentos importantes con verificación de integridad | $20,00 | Unidad de almacenamiento con flecha de copia y verificación (`respaldo`) |
 
 Precio final con IVA incluido (no se suma de nuevo). Se crean una sola vez (`quotes.SEED_BATCHES`, alta por nombre y marca en `system_state`): no se duplican aunque se repita la carga, y no cambian los demás servicios ni los presupuestos existentes. Disponibles en presupuestos (y, por ellos, en las órdenes).
+
+## Guardar y enviar sin errores (incidencia INC-20261020-003)
+
+**Causa real.** En producción, `POST /api/quotes/{id}` (acción «enviar») fallaba con `OperationalError` en `remote_db.py:309 · _post`. El presupuesto ya estaba guardado y marcado como enviado, y el servidor de correo ya había aceptado el mensaje. Pero mientras el sistema hablaba con el servidor de correo (7 y 12 s), Turso cerró la conexión HTTP inactiva. La anotación siguiente («correo aceptado») salía por esa conexión cerrada y no se reintentaba, ni siquiera siendo el primer paso de una transacción nueva. Las dos apariciones fueron dos presupuestos distintos (14:07 y 14:11), no un doble clic.
+
+**Corrección de raíz (`remote_db.py`):**
+- Las conexiones inactivas más de 3 s se renuevan antes de usarlas. Es seguro incluso dentro de una transacción, porque el *baton* identifica el flujo, no la conexión.
+- El primer envío de una transacción nueva se reintenta si la conexión estaba cortada: nada se confirma sin COMMIT.
+- Lo que va dentro de una transacción en curso nunca se repite. Si se pierde la respuesta, la transacción se descarta entera y el error indica la operación (verbo y tabla, sin valores).
+
+**Flujo profesional:**
+- **Antes de enviar** se comprueba que haya al menos una partida, que la fecha «Válido hasta» no haya pasado y que las observaciones no superen 1500 caracteres. Cantidades, precios y categorías se validan junto a cada campo, y el servidor vuelve a comprobarlo todo.
+- **Guardar y enviar** guarda primero («Guardando…») y después envía («Enviando…»). Mientras dura, todas las acciones del editor quedan bloqueadas.
+- **Envíos simultáneos:** el servidor reserva cada envío de forma atómica, con caducidad de 90 s. Un segundo envío simultáneo del mismo presupuesto recibe «Este presupuesto ya se está enviando», así que no se generan dos enlaces ni dos correos.
+- **Si falla el correo**, el presupuesto queda guardado y enviado, con su enlace válido, y se ofrece «Reintentar envío» en el resultado y en el presupuesto. Si se guardó pero el envío no llegó a completarse, el editor lo indica y el botón pasa a «Reintentar envío».
+- **Al terminar** aparece la notificación «Presupuesto guardado y enviado correctamente al cliente.».
+- **Ante un problema temporal de base de datos** se responde 503 con el mensaje «No se pudo guardar el presupuesto por un problema temporal de base de datos. Intente nuevamente.». La operación sin confirmar se descarta, y el error queda en ADI AutoCare con usuario, presupuesto, endpoint, operación SQL, hora, código interno y causa original.
+- **Totales:** se calculan siempre desde las partidas guardadas con la misma fórmula en pantalla y en el servidor (descuento por línea, IVA 15 % incluido solo en las partidas gravadas). Al quitar el IVA de una partida, su precio pasa a la base sin impuesto.

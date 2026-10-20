@@ -7,12 +7,18 @@ import base64
 import http.client
 import json
 import os
+import re
 import sqlite3
 import threading
+import time
 from urllib.parse import urlsplit
 
 TIMEOUT = 20
 CHUNK = 100
+# Segundos que una conexión HTTP puede quedar inactiva antes de reutilizarla. El servicio remoto cierra las conexiones keep-alive
+# inactivas (en producción falló tras 7 y 12 s esperando al servidor de correo): pasado este plazo se abre una conexión nueva antes
+# de enviar. Es seguro también dentro de una transacción, porque el «baton» identifica el flujo, no la conexión TCP.
+IDLE_REUSE = 3.0
 _pool = threading.local()
 
 
@@ -173,9 +179,12 @@ class Connection:
         if statement:
             steps.append({'condition': {'type': 'ok', 'step': 1}, 'stmt': statement})
         # El flujo queda abierto desde el envío: si falla la sentencia, la transacción sigue pendiente de rollback.
+        # El primer envío de una transacción nueva (todavía sin baton) sí puede repetirse si la conexión estaba cortada: nada se confirma
+        # sin COMMIT y un flujo huérfano se descarta en el servidor. Las peticiones posteriores de la transacción nunca se repiten.
+        fresh = self._baton is None
         self.in_transaction = True
         try:
-            result = self._send([{'type': 'batch', 'batch': {'steps': steps}}])[0]
+            result = self._send([{'type': 'batch', 'batch': {'steps': steps}}], retry=fresh)[0]
             errors = [error for error in result['step_errors'][:2] if error]
         except sqlite3.Error:
             self.close()
@@ -199,11 +208,21 @@ class Connection:
         self._baton = None
         self.in_transaction = False
 
-    def _send(self, requests):
+    def _send(self, requests, retry=None):
         body = {'requests': requests}
         if self._baton:
             body['baton'] = self._baton
-        payload = _post(self._secure, self._host, self._token, body, retry=not self._baton and not self.in_transaction)
+        if retry is None:
+            retry = not self._baton and not self.in_transaction
+        try:
+            payload = _post(self._secure, self._host, self._token, body, retry=retry)
+        except sqlite3.OperationalError as error:
+            # Sin respuesta dentro de una transacción: el servidor la descarta. La conexión queda libre (sin baton) y el error indica
+            # qué operación falló (verbo y tabla, sin valores) para poder diagnosticarlo.
+            error.operation = _operation(requests)
+            if self._baton:
+                self._release()
+            raise
         self._baton = payload.get('baton')
         if payload.get('base_url'):
             parts = urlsplit(payload['base_url'])
@@ -284,14 +303,40 @@ def _error(error):
     return kind(message)
 
 
+def _operation(requests):
+    """Resumen de la sentencia de una petición para los registros: verbo y tabla, nunca valores ni parámetros."""
+    for request in requests:
+        sql = (request.get('stmt') or {}).get('sql') or request.get('sql') or ''
+        steps = (request.get('batch') or {}).get('steps') or []
+        if steps:
+            sql = next((step['stmt']['sql'] for step in steps if not re.match(r'\s*(PRAGMA|BEGIN)', step['stmt']['sql'], re.I)), steps[-1]['stmt']['sql'])
+        found = re.match(r'\s*(INSERT(?:\s+OR\s+\w+)?\s+INTO|UPDATE|DELETE\s+FROM|SELECT|REPLACE\s+INTO|COMMIT|ROLLBACK|BEGIN\w*)\s*("?[\w]+"?)?', sql, re.I)
+        if found:
+            verb = re.sub(r'\s+', ' ', found[1].upper())
+            table = (found[2] or '').strip('"') if not verb.startswith(('SELECT', 'COMMIT', 'ROLLBACK', 'BEGIN')) else ''
+            if verb == 'SELECT':
+                source = re.search(r'\bFROM\s+("?\w+"?)', sql, re.I)
+                table = source[1].strip('"') if source else ''
+            return (verb + ' ' + table).strip()
+        if request.get('type') == 'close':
+            return 'CLOSE'
+    return ''
+
+
 def _post(secure, host, token, body, retry):
     connections = _pool.__dict__.setdefault('connections', {})
+    used = _pool.__dict__.setdefault('used', {})
     headers = {'Content-Type': 'application/json'}
     if token:
         headers['Authorization'] = 'Bearer ' + token
     data = json.dumps(body).encode('utf-8')
     for attempt in (1, 2):
         connection = connections.get((secure, host))
+        if connection is not None and time.monotonic() - used.get((secure, host), 0) > IDLE_REUSE:
+            # Inactiva demasiado tiempo: el servidor pudo cerrarla. Se abre otra antes de enviar (no es un reintento).
+            connection.close()
+            connections.pop((secure, host), None)
+            connection = None
         reused = connection is not None
         if not reused:
             kind = http.client.HTTPSConnection if secure else http.client.HTTPConnection
@@ -303,10 +348,13 @@ def _post(secure, host, token, body, retry):
         except (OSError, http.client.HTTPException) as error:
             connection.close()
             connections.pop((secure, host), None)
-            # Solo se reintenta una conexión reutilizada y sin transacción abierta: nunca se repite una escritura en curso.
-            if reused and retry and attempt == 1:
+            # Solo se reintenta lo que no puede duplicar una escritura: lecturas sueltas y el primer envío de una transacción.
+            if retry and attempt == 1:
                 continue
             raise sqlite3.OperationalError('No se pudo contactar la base de datos remota.') from error
+        used[(secure, host)] = time.monotonic()
+        if response.status in (502, 503, 504) and retry and attempt == 1:
+            continue
         if response.status != 200:
             raise sqlite3.OperationalError(f'La base de datos remota respondió HTTP {response.status}.')
         return json.loads(raw)

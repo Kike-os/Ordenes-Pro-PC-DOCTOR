@@ -83,9 +83,13 @@ def send(c,appointment_id,kind,force=False):
                 if refusal:raise mail_pro.MailError('destinatario',refusal+' No se reintenta automáticamente: corrige la dirección del cliente.')
                 outcome=mail_pro.deliver(config,message,[email])
             except mail_pro.MailError as error:
-                mailing.mark(c,archive_id,'error',str(error));mail_tracking.failed(c,tracked,error,appointments.now());raise
-            mailing.mark(c,archive_id,'enviado','El servidor de correo aceptó el mensaje.',str(message['Message-ID'] or ''),appointments.now())
-            mail_tracking.accepted(c,tracked,str(message['Message-ID'] or ''),appointments.now(),outcome)
+                try:mail_tracking.settle(c,lambda db:(mailing.mark(db,archive_id,'error',str(error)),mail_tracking.failed(db,tracked,error,appointments.now())))
+                except Exception as failure:print('appointment-mail registro',type(failure).__name__,flush=True)
+                raise
+            # Aceptado por el servidor: si anotarlo falla, se repite; el resultado de la cita sigue siendo «enviado» porque el correo salió.
+            try:mail_tracking.settle(c,lambda db:(mailing.mark(db,archive_id,'enviado','El servidor de correo aceptó el mensaje.',str(message['Message-ID'] or ''),appointments.now()),
+                                                  mail_tracking.accepted(db,tracked,str(message['Message-ID'] or ''),appointments.now(),outcome)))
+            except Exception as failure:print('appointment-mail registro',type(failure).__name__,flush=True)
         except mail_pro.MailError as error:
             print('appointment-mail',kind,error.kind,flush=True);result,detail='failed',str(error)[:300]
         except Exception as error:  # Un fallo inesperado del correo no debe afectar a la cita.

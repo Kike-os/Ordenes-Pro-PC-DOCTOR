@@ -77,3 +77,17 @@ Medido con los tiempos por paso del primer diagnóstico real (20/10/2026):
 
 - **Ticket PDF (3,1 s):** el 95 % era decodificar el logotipo PNG en Python puro en cada instancia nueva de Vercel. Ahora los píxeles del logo para los anchos de los documentos (384, 416 y 900) están precalculados en `static/logo-original.pixels`, con la huella SHA-256 del PNG: si el logo cambia, el archivo se ignora y se decodifica como antes. Regenerarlo: `python -c 'import document_logo;document_logo.build_cache()'` (una prueba avisa si quedó desactualizado). Resultado idéntico byte a byte.
 - **Agenda (2,4 s):** calcular los horarios de un día lanzaba ~460 consultas, casi todas idénticas (horario semanal, feriado, margen, técnicos y sus horarios). Una caché de lecturas que dura un solo cálculo las hace una vez (~100 consultas, las comprobaciones de choque de cada horario siguen una a una). Comprobado: mismos horarios en 480 combinaciones de día, servicio y modo.
+
+## Monitor de errores: detalle exacto, agrupación y resolución
+
+- **Detalle de cada error** (Incidencias → «Detalle técnico del error»):
+  - módulo, endpoint, método HTTP y código de estado;
+  - usuario, fecha y hora, y registro afectado (número interno);
+  - archivo y línea, tipo de error y causa original (por ejemplo, `ConnectionResetError`);
+  - operación de base de datos (solo verbo y tabla), mensaje técnico depurado, versión y código interno `ERR-XXXXXX`.
+  - Nunca se guardan contraseñas, tokens, valores SQL, correos ni números largos.
+- **Agrupación:** los errores iguales forman una sola incidencia con su contador de repeticiones y sus últimas apariciones.
+- **Niveles visibles:** Información (baja), Advertencia (media), Error (alta) y Crítico (crítica).
+- **Resolución:** se marca como Resuelta con una nota, y el seguimiento conserva el historial. Si el mismo error vuelve a ocurrir, se reabre automáticamente la misma incidencia (mismo código, marcada como «Reabierta»).
+- **«Registros de errores»** solo cuenta los errores de incidencias sin resolver. Al marcar la incidencia como resuelta tras corregirla, el panel vuelve a la normalidad sin borrar nada.
+- **Causa concreta:** el detalle muestra «Causa detectada» en lugar de una recomendación genérica. Por ejemplo: «Se registraron 2 fallos en el módulo Presupuestos durante operaciones POST (/api/quotes/:id…)» con «Revisar /api/quotes/:id y la operación de base de datos asociada».

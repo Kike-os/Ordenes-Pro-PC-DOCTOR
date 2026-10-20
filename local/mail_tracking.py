@@ -10,23 +10,32 @@ quedan en el historial sin retroceder el estado actual.
 """
 import json
 import re
+import sqlite3
 from datetime import timedelta
 
 import mail_pro
 
-LABELS = {'cola': 'En cola', 'enviando': 'Enviando', 'enviado': 'Enviado', 'entregado': 'Entregado', 'demorado': 'Entrega demorada', 'rebotado': 'Rebotado',
-          'fallido': 'Fallido', 'abierto': 'Abierto', 'desconocido': 'Estado desconocido'}
+LABELS = {'cola': 'En cola', 'enviando': 'Enviando', 'enviado': 'Enviado', 'entregado': 'Entregado al servidor', 'demorado': 'Demorado', 'rebotado': 'Rebotado',
+          'fallido': 'Fallido', 'abierto': 'Abierto', 'desconocido': 'Incidencia'}
+# Qué significa cada estado para quien lo lee. «Enviado» NO es entrega final: solo que el servidor SMTP del remitente lo aceptó.
+MEANING = {'cola': 'En la cola de salida, todavía sin conectar con el servidor SMTP.', 'enviando': 'Conectando o transmitiendo al servidor SMTP.',
+           'enviado': 'Aceptado por el servidor SMTP del remitente. La entrega final al destinatario no está confirmada (el servidor no emite confirmaciones).',
+           'entregado': 'Un informe real del servidor de destino confirmó la entrega.', 'demorado': 'El servidor informó una demora; seguirá intentando entregarlo.',
+           'rebotado': 'El servidor de destino devolvió el mensaje.', 'fallido': 'El envío no se completó: el servidor SMTP no aceptó el mensaje.',
+           'abierto': 'Abierto por el destinatario.', 'desconocido': 'No consta la respuesta del servidor SMTP: revisa la causa indicada.'}
 # Orden de avance: un evento de menor rango que llega tarde no hace retroceder el estado.
 RANK = {'cola': 0, 'enviando': 1, 'desconocido': 1, 'enviado': 2, 'demorado': 3, 'abierto': 3, 'entregado': 4, 'rebotado': 4, 'fallido': 4}
 FINAL = ('entregado', 'rebotado', 'fallido')
-FILTERS = {'enviados': ('enviado',), 'entregados': ('entregado',), 'pendientes': ('cola', 'enviando', 'desconocido'), 'demorados': ('demorado',), 'rebotados': ('rebotado',), 'fallidos': ('fallido',)}
-INCIDENTS = ('demorado', 'rebotado', 'fallido')
+FILTERS = {'enviados': ('enviado',), 'entregados': ('entregado',), 'pendientes': ('cola', 'enviando'), 'demorados': ('demorado',), 'rebotados': ('rebotado',), 'fallidos': ('fallido',)}
+INCIDENTS = ('demorado', 'rebotado', 'fallido', 'desconocido')
+STAGE_EVENTS = {'conexion': ('conectando', 'Conectando SMTP'), 'autenticacion': ('autenticado', 'Autenticado'), 'transmision': ('transmitiendo', 'Transmitiendo'), 'aceptado': ('aceptado', 'Aceptado por el servidor'), 'error': ('error_etapa', 'Error')}
 KINDS = {'receipt': 'Comprobante de recepción', 'client_authorization': 'Autorización de servicio', 'authorization_notice': 'Aviso interno de autorización', 'quote': 'Presupuesto',
          'payment_receipt': 'Recibo de pago', 'stay': 'Aviso de equipo listo / permanencia', 'maintenance': 'Recordatorio de mantenimiento', 'appointment': 'Cita técnica', 'manual': 'Mensaje de Mail Pro', 'campaign': 'Comunicado a clientes'}
 # Fallos del proveedor (no del destinatario): conexión, nombre, TLS, credenciales o servidor.
 PROVIDER = ('red', 'dns', 'tls', 'credenciales', 'servidor', 'conexion', 'temporal')
 ALERTS = {'quote': True, 'appointment': True, 'ready': True, 'permanent': True, 'provider': True}
-STALE_MINUTES = 15
+# Un envío dura como máximo unos segundos (tiempo de espera SMTP de 15 s y un reintento): pasado este plazo ya no está «Enviando».
+STALE_MINUTES = 3
 PAGE = 25
 
 
@@ -55,6 +64,24 @@ def enhanced(text):
     return found.group(1) if found else ''
 
 
+def settle(c, work, attempts=2):
+    """Anota el resultado de un envío (mark, accepted, failed…) y confirma. Si la base no responde (p. ej., la conexión remota se cortó
+    mientras se hablaba con el servidor de correo), deshace y repite: todas estas anotaciones son idempotentes (huellas únicas, INSERT OR
+    IGNORE y UPDATE del mismo valor), así que repetirlas no duplica nada. Si aun así falla, propaga el error para registrarlo."""
+    for attempt in range(attempts):
+        try:
+            work(c)
+            c.commit()
+            return True
+        except sqlite3.Error:
+            try:
+                c.rollback()
+            except sqlite3.Error:
+                pass
+            if attempt == attempts - 1:
+                raise
+
+
 def start(c, recipients, *, kind, subject, now, archive_id=None, outbox_key='', order_id=None, actor_id=None, retry_of=None):
     """Crea un registro «Enviando» por destinatario, con el evento «Mensaje creado». Devuelve {dirección: id}."""
     ids, at = {}, stamp(now)
@@ -63,9 +90,19 @@ def start(c, recipients, *, kind, subject, now, archive_id=None, outbox_key='', 
             continue
         row = c.execute('INSERT INTO mail_deliveries(archive_id,outbox_key,kind,subject,recipient,status,event_at,retry_of,order_id,actor_id,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',
                         (archive_id, outbox_key, kind, str(subject or '')[:300], address[:254], 'enviando', at, retry_of, order_id, actor_id, at, at)).lastrowid
-        _event(c, row, 'creado', 'enviando', 'sistema', '', 'Mensaje creado y entregado al proceso de envío.', at, now, 'created:' + str(row))
+        _event(c, row, 'creado', 'enviando', 'sistema', '', 'Mensaje creado.', at, now, 'created:' + str(row))
+        _event(c, row, 'cola', 'enviando', 'sistema', '', 'En cola de salida: listo para conectar con el servidor SMTP.', at, now, 'queued:' + str(row))
         ids[address] = row
     return ids
+
+
+def _stages(c, delivery, trace, now):
+    """Etapas reales del envío (conexión, autenticación, transmisión…), cada una con su hora, en el historial. No cambian el estado."""
+    for index, step in enumerate(trace or []):
+        event, _ = STAGE_EVENTS.get(step.get('stage'), ('etapa', ''))
+        if event == 'aceptado':
+            continue  # la aceptación se registra con su propio evento de estado
+        _event(c, delivery, event, 'enviando' if event != 'error_etapa' else 'fallido', 'smtp', '', step.get('detail', ''), step.get('at') or stamp(now), now, 'stage:' + str(delivery) + ':' + str(index))
 
 
 def accepted(c, ids, message_id, now, result=None):
@@ -74,24 +111,36 @@ def accepted(c, ids, message_id, now, result=None):
     refused = {key.lower(): value for key, value in (result.get('refused') or {}).items()}
     for address, delivery in ids.items():
         c.execute('UPDATE mail_deliveries SET message_id=? WHERE id=?', (str(message_id or '')[:300], delivery))
+        _stages(c, delivery, result.get('trace'), now)
         if address.lower() in refused:
             code, text = refused[address.lower()]
             _refusal(c, delivery, code, text, now)
         else:
-            record(c, delivery, 'enviado', 'aceptado', 'smtp', '250', 'Aceptado por el servidor de correo del remitente.' + ('' if result.get('dsn') else ' Este servidor no emite confirmaciones de entrega final.'),
-                   stamp(now), 'accepted:' + str(delivery), now)
+            record(c, delivery, 'enviado', 'aceptado', 'smtp', '250', 'Aceptado por el servidor SMTP del remitente (250).', stamp(now), 'accepted:' + str(delivery), now)
+            _event(c, delivery, 'resultado', 'enviado', 'sistema', '', 'Resultado final: enviado. ' + ('El servidor solicitará informes de entrega al destino.' if result.get('dsn') else
+                   'La entrega en el buzón del destinatario no se puede confirmar con este servidor (no emite confirmaciones de entrega final).'), stamp(now), now, 'result:' + str(delivery))
 
 
 def failed(c, ids, error, now):
-    """El envío no se completó. Con rechazos por destinatario, cada uno con su código; si no, fallo general."""
+    """El envío no se completó. Con rechazos por destinatario, cada uno con su código; si no, fallo general con la etapa exacta.
+    Si la conexión se cortó mientras se transmitía, no consta si el servidor lo aceptó: queda como Incidencia «sin confirmación»."""
     refused = {key.lower(): value for key, value in (getattr(error, 'refused', None) or {}).items()}
+    stage = getattr(error, 'stage', '')
+    where = mail_pro.STAGES.get(stage, '')
+    kind = getattr(error, 'kind', 'servidor')
+    smtp = getattr(error, 'smtp_code', 0) or 0
     for address, delivery in ids.items():
+        _stages(c, delivery, getattr(error, 'trace', None), now)
         if address.lower() in refused:
-            code, text = refused[address.lower()]
-            _refusal(c, delivery, code, text, now)
+            code_r, text = refused[address.lower()]
+            _refusal(c, delivery, code_r, text, now)
+        elif kind == 'sin_confirmacion':
+            record(c, delivery, 'desconocido', 'sin_confirmacion', 'smtp', 'sin confirmación', str(error)[:300], stamp(now), 'unconfirmed:' + str(delivery), now,
+                   reason='Servidor SMTP no devolvió confirmación (se cortó durante la transmisión).', permanent=False)
         else:
-            record(c, delivery, 'fallido', 'error_envio', 'smtp', getattr(error, 'kind', 'servidor'), str(error)[:300], stamp(now), 'failed:' + str(delivery), now,
-                   reason=str(error)[:300], permanent=getattr(error, 'kind', '') in ('destinatario', 'rechazo', 'configuracion'))
+            detail = ('Falló en la etapa «' + where + '»' + (' (respuesta SMTP ' + str(smtp) + ')' if smtp else '') + '. ' if where else '') + str(error)
+            record(c, delivery, 'fallido', 'error_envio', 'smtp', kind, detail[:300], stamp(now), 'failed:' + str(delivery), now,
+                   reason=detail[:300], permanent=kind in ('destinatario', 'rechazo', 'configuracion'))
 
 
 def _refusal(c, delivery, code, text, now):
@@ -157,11 +206,21 @@ def from_report(c, report, base, now):
 
 
 def sweep(c, now):
-    """Envíos que quedaron en «Enviando» sin respuesta registrada (p. ej., el proceso se interrumpió): estado desconocido."""
+    """Ningún envío se queda en «Enviando»: pasado el plazo se busca el resultado real que sí quedó anotado (archivo del mensaje o cola de
+    salida) y, si no lo hay, pasa a Incidencia con la causa exacta. Nada se borra y el historial conserva cada paso."""
     limit = stamp(now - timedelta(minutes=STALE_MINUTES))
-    for row in c.execute("SELECT id FROM mail_deliveries WHERE status IN ('cola','enviando') AND updated_at<?", (limit,)).fetchall():
-        record(c, row['id'], 'desconocido', 'sin_respuesta', 'sistema', '', 'No se registró la respuesta del servidor de correo para este envío.', stamp(now), 'stale:' + str(row['id']), now,
-               reason='No consta si el servidor aceptó el mensaje.')
+    for row in c.execute("SELECT id,archive_id,outbox_key FROM mail_deliveries WHERE status IN ('cola','enviando') AND updated_at<?", (limit,)).fetchall():
+        archived = c.execute('SELECT status,detail FROM mail_archive WHERE id=?', (row['archive_id'],)).fetchone() if row['archive_id'] else None
+        outbox = c.execute('SELECT status FROM mail_outbox WHERE request_key=?', (row['outbox_key'],)).fetchone() if row['outbox_key'] else None
+        if (archived and archived['status'] == 'enviado') or (outbox and outbox['status'] == 'sent'):
+            record(c, row['id'], 'enviado', 'aceptado', 'sistema', '250', 'Recuperado del registro del mensaje: el servidor SMTP lo había aceptado, pero el seguimiento no se actualizó a tiempo.', stamp(now), 'stale:' + str(row['id']), now)
+        elif (archived and archived['status'] == 'error') or (outbox and outbox['status'] == 'failed'):
+            record(c, row['id'], 'fallido', 'error_envio', 'sistema', 'servidor', 'Recuperado del registro del mensaje: el envío falló. ' + ((archived['detail'] if archived else '') or ''), stamp(now), 'stale:' + str(row['id']), now,
+                   reason=((archived['detail'] if archived else '') or 'El envío falló.')[:300])
+        else:
+            record(c, row['id'], 'desconocido', 'sin_confirmacion', 'sistema', 'sin confirmación',
+                   'Servidor SMTP no devolvió confirmación registrada: el proceso de envío se interrumpió antes de anotar la respuesta del servidor (p. ej., se cortó la conexión con la base de datos o terminó el tiempo de la petición). Revisa la carpeta Enviados del buzón antes de reenviarlo.',
+                   stamp(now), 'stale:' + str(row['id']), now, reason='Servidor SMTP no devolvió confirmación registrada (el envío se interrumpió).')
 
 
 def blocked(c, address):
@@ -175,6 +234,7 @@ def blocked(c, address):
 def _public(row):
     item = dict(row)
     item['label'] = LABELS[item['status']]
+    item['meaning'] = MEANING[item['status']]
     item['kind_label'] = KINDS.get(item['kind'], 'Notificación')
     item['incident'] = item['status'] in INCIDENTS and not item['resolved_at']
     return item
@@ -187,7 +247,7 @@ def listing(c, filters):
         where.append('d.status IN (' + ','.join('?' for _ in codes) + ')')
         args += codes
     if filters.get('incidents'):
-        where.append("d.status IN ('demorado','rebotado','fallido') AND d.resolved_at=''")
+        where.append("d.status IN ('demorado','rebotado','fallido','desconocido') AND d.resolved_at=''")
     query = str(filters.get('q') or '').strip()[:120]
     if query:
         where.append("instr(lower(d.recipient||' '||d.subject),lower(?))>0")
@@ -208,8 +268,15 @@ def listing(c, filters):
         for key, codes in FILTERS.items():
             if row['status'] in codes:
                 counts[key] += row['total']
-    pending = c.execute("SELECT COUNT(*) FROM mail_deliveries WHERE status IN ('demorado','rebotado','fallido') AND resolved_at=''").fetchone()[0]
-    return {'rows': rows, 'total': total, 'page': page, 'pages': max(1, (total + PAGE - 1) // PAGE), 'counts': counts, 'incidents': pending}
+    pending = c.execute("SELECT COUNT(*) FROM mail_deliveries WHERE status IN ('demorado','rebotado','fallido','desconocido') AND resolved_at=''").fetchone()[0]
+    counts['incidencias'] = pending
+    inbox = c.execute("SELECT value FROM system_state WHERE key='mail_inbox'").fetchone()
+    try:
+        inbox = json.loads(inbox['value']) if inbox else {}
+    except ValueError:
+        inbox = {}
+    imap = {'checked': inbox.get('checked', ''), 'error': inbox.get('error', '') if inbox.get('ts', 0) > 0 and inbox.get('error') else ''}
+    return {'rows': rows, 'total': total, 'page': page, 'pages': max(1, (total + PAGE - 1) // PAGE), 'counts': counts, 'incidents': pending, 'meaning': MEANING, 'imap': imap}
 
 
 def detail(c, delivery):

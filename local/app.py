@@ -346,14 +346,20 @@ def send_institutional(c,kind,title,recipient,subject,body,order_id=None,actor=N
         if refusal:raise mail_pro.MailError('destinatario',refusal+' No se reintenta automáticamente: corrige la dirección del destinatario.')
         result=mail_pro.deliver(config,message,recipients)
     except mail_pro.MailError as error:
-        mailing.mark(c,archive_id,'error',str(error));mail_tracking.failed(c,tracked,error,reception_now());c.commit();raise
+        try:mail_tracking.settle(c,lambda db:(mailing.mark(db,archive_id,'error',str(error)),mail_tracking.failed(db,tracked,error,reception_now())))
+        except sqlite3.Error as failure:note_runtime_error('MAIL','/mail/'+kind,failure)
+        raise
     message_id=str(message['Message-ID'] or '');sent=reception_now()
-    mailing.mark(c,archive_id,'enviado','El servidor de correo aceptó el mensaje.',message_id,sent)
-    mail_tracking.accepted(c,tracked,message_id,sent,result)
-    if order_id and message_id:
-        # Vinculación automática: el mensaje nace unido a su orden y las respuestas del cliente se reconocen por esta referencia.
-        c.execute('INSERT OR IGNORE INTO mail_links(message_id,folder,uid,order_id,subject,correspondent,direction,sent_at,created_by,created_at) VALUES (?,?,0,?,?,?,?,?,?,?)',(message_id,'',order_id,subject[:300],recipient,'out',sent.isoformat(timespec='seconds'),actor,sent.isoformat(timespec='seconds')))
-    c.commit()
+    def record(db):
+        mailing.mark(db,archive_id,'enviado','El servidor de correo aceptó el mensaje.',message_id,sent)
+        mail_tracking.accepted(db,tracked,message_id,sent,result)
+        if order_id and message_id:
+            # Vinculación automática: el mensaje nace unido a su orden y las respuestas del cliente se reconocen por esta referencia.
+            db.execute('INSERT OR IGNORE INTO mail_links(message_id,folder,uid,order_id,subject,correspondent,direction,sent_at,created_by,created_at) VALUES (?,?,0,?,?,?,?,?,?,?)',(message_id,'',order_id,subject[:300],recipient,'out',sent.isoformat(timespec='seconds'),actor,sent.isoformat(timespec='seconds')))
+    # El servidor de correo ya aceptó el mensaje: si anotarlo falla (conexión con la base cortada) se repite; si aun así no se puede, se
+    # registra el fallo técnico. Nunca se informa como no enviado un correo que sí salió.
+    try:mail_tracking.settle(c,record)
+    except sqlite3.Error as error:note_runtime_error('MAIL','/mail/'+kind,error)
     return {'archive_id':archive_id,'adi':adi,'message_id':message_id}
 
 
@@ -491,10 +497,12 @@ def send_license_mail(c,kind,data,actor,order_id=None,subject=None,intro=None,to
         if refusal:raise mail_pro.MailError('destinatario',refusal)
         result=mail_pro.deliver(config,message,[recipient])
     except mail_pro.MailError as error:
-        mailing.mark(c,archive_id,'error',str(error));mail_tracking.failed(c,tracked,error,reception_now());c.commit()
+        try:mail_tracking.settle(c,lambda db:(mailing.mark(db,archive_id,'error',str(error)),mail_tracking.failed(db,tracked,error,reception_now())))
+        except sqlite3.Error as failure:note_runtime_error('MAIL','/mail/'+kind,failure)
         return {'status':'error','label':'Error de envío','archive_id':archive_id,'error':str(error)[:300]}
     message_id=str(message['Message-ID'] or '');sent=reception_now()
-    mailing.mark(c,archive_id,'enviado','El servidor de correo aceptó el mensaje.',message_id,sent);mail_tracking.accepted(c,tracked,message_id,sent,result)
+    try:mail_tracking.settle(c,lambda db:(mailing.mark(db,archive_id,'enviado','El servidor de correo aceptó el mensaje.',message_id,sent),mail_tracking.accepted(db,tracked,message_id,sent,result)))
+    except sqlite3.Error as failure:note_runtime_error('MAIL','/mail/'+kind,failure)
     return {'status':'enviado','label':'Aceptado por el servidor de correo','archive_id':archive_id,'error':''}
 
 
@@ -701,12 +709,18 @@ def resend_delivery(c,row,address,user):
     c.commit()
     try:result=mail_pro.deliver(config,message,recipients)
     except mail_pro.MailError as error:
-        if archive_id:mailing.mark(c,archive_id,'error',str(error))
-        mail_tracking.failed(c,tracked,error,reception_now());audit(c,user['id'],'mail_resend_failed');c.commit()
+        def lost(db):
+            if archive_id:mailing.mark(db,archive_id,'error',str(error))
+            mail_tracking.failed(db,tracked,error,reception_now());audit(db,user['id'],'mail_resend_failed')
+        try:mail_tracking.settle(c,lost)
+        except sqlite3.Error as failure:note_runtime_error('MAIL','/mail/resend',failure,user)
         return 200,{'ok':False,'error':'No se reenvió: '+str(error),'id':next(iter(tracked.values()))}
     message_id=str(message['Message-ID'] or '')
-    if archive_id:mailing.mark(c,archive_id,'enviado','El servidor de correo aceptó el mensaje.',message_id,reception_now())
-    mail_tracking.accepted(c,tracked,message_id,reception_now(),result)
+    def done(db):
+        if archive_id:mailing.mark(db,archive_id,'enviado','El servidor de correo aceptó el mensaje.',message_id,reception_now())
+        mail_tracking.accepted(db,tracked,message_id,reception_now(),result)
+    try:mail_tracking.settle(c,done)
+    except sqlite3.Error as failure:note_runtime_error('MAIL','/mail/resend',failure,user)
     if not archive_id:
         try:
             client=mail_pro.open_imap();sent=mail_pro.by_role(mail_pro.list_folders(client),'sent')
@@ -720,12 +734,26 @@ def resend_delivery(c,row,address,user):
 DEFAULT_CSP="default-src 'self'; frame-src 'self' blob: https://challenges.cloudflare.com; script-src 'self' https://challenges.cloudflare.com; style-src 'self'; img-src 'self'; connect-src 'self' https://challenges.cloudflare.com; frame-ancestors 'none'; form-action 'self'; base-uri 'none'"
 
 
-def note_runtime_error(method,path,error):
+def note_runtime_error(method,path,error,user=None,status=500):
     """ADI AutoCare: registra el error de ejecución clasificado (sin datos de la petición). Nunca interrumpe la respuesta."""
     try:
         import autocare
-        with connect() as log:autocare.record_error(log,method,path,error,reception_now())
+        print('runtime-error',method,re.sub(r'/\d+','/:id',path.split('?',1)[0]),type(error).__name__,getattr(error,'operation',''),flush=True)
+        with connect() as log:autocare.record_error(log,method,path,error,reception_now(),user=user,status=status)
     except Exception as failure:print('autocare registro',type(failure).__name__,flush=True)
+
+
+def claim_slot(c,key,seconds):
+    """Reserva atómica y temporal (p. ej. un envío en curso): False si otra petición ya la tiene. Caduca sola si la petición se corta."""
+    now=time.time()
+    taken=c.execute('INSERT INTO system_state(key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value WHERE CAST(system_state.value AS REAL)<?',(key,str(now+seconds),now)).rowcount
+    c.commit();return taken>0
+
+
+def release_slot(key):
+    try:
+        with connect() as db:db.execute('DELETE FROM system_state WHERE key=?',(key,))
+    except sqlite3.Error as error:print('slot',type(error).__name__,flush=True)
 
 
 def mail_signature_send(c):
@@ -2638,7 +2666,11 @@ class Handler(BaseHTTPRequestHandler):
                         blocked=mail_tracking.blocked(c,address)
                         if blocked:return self.reply(409,{'error':blocked+' Usa otra dirección.','fields':{'recipient':'Esta dirección fue rechazada definitivamente.'}})
                         if limited(c,'mail-send:'+str(user['id']),limit=40,window=3600):return self.reply(429,{'error':'Alcanzaste el límite de envíos por hora. Inténtalo más tarde.'})
-                        status,body=resend_delivery(c,found,address,user)
+                        # Un solo reenvío a la vez por envío: un doble clic no manda dos correos.
+                        slot='mail-resend:'+str(found['id'])
+                        if not claim_slot(c,slot,90):return self.reply(409,{'error':'Este envío ya se está reenviando. Espera unos segundos.'})
+                        try:status,body=resend_delivery(c,found,address,user)
+                        finally:release_slot(slot)
                         return self.reply(status,body)
                     if path=='/api/mail/delivery-settings':
                         if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede cambiar las alertas.'})
@@ -2750,9 +2782,9 @@ class Handler(BaseHTTPRequestHandler):
                                 if old.isdigit() and str(data.get('draft_folder',''))==target:mail_pro.remove_draft(client,target,int(old))
                                 audit(c,user['id'],'mail_draft_saved')
                                 return self.reply(201,{'ok':True,'draft':True})
-                            previous=c.execute('SELECT status FROM mail_outbox WHERE request_key=?',(key,)).fetchone()
+                            previous=c.execute('SELECT status,updated_at FROM mail_outbox WHERE request_key=?',(key,)).fetchone()
                             if previous and previous['status']=='sent':return self.reply(200,{'ok':True,'duplicate':True})
-                            if previous and previous['status']=='sending':return self.reply(409,{'error':'Este mensaje ya se está enviando.'})
+                            if previous and previous['status']=='sending':return self.reply(409,{'error':'Este mensaje ya se está enviando.' if previous['updated_at']>(reception_now()-appointments.timedelta(minutes=mail_tracking.STALE_MINUTES)).isoformat(timespec='seconds') else 'No consta si este mensaje salió: el servidor de correo no devolvió confirmación. Revisa la carpeta Enviados; para volver a enviarlo, redáctalo de nuevo.'})
                             if limited(c,'mail-send:'+str(user['id']),limit=40,window=3600):return self.reply(429,{'error':'Alcanzaste el límite de envíos por hora. Inténtalo más tarde.'})
                             c.execute("INSERT INTO mail_outbox(request_key,user_id,status,message_id,created_at,updated_at) VALUES (?,?,'sending',?,?,?) ON CONFLICT(request_key) DO UPDATE SET status='sending',updated_at=excluded.updated_at",(key,user['id'],message['Message-ID'],now,now))
                             tracked=mail_tracking.start(c,recipients,kind='manual',subject=str(message['Subject']),now=reception_now(),outbox_key=key,order_id=order['id'] if order else None,actor_id=user['id'])
@@ -2760,11 +2792,15 @@ class Handler(BaseHTTPRequestHandler):
                             # Con varios destinatarios, cada uno tiene su estado: si el servidor rechaza a uno, los demás siguen.
                             try:result=mail_pro.deliver(config,message,recipients,partial=True) if len(recipients)>1 else mail_pro.deliver(config,message,recipients)
                             except mail_pro.MailError as error:
-                                c.execute("UPDATE mail_outbox SET status='failed',updated_at=? WHERE request_key=?",(now,key));mail_tracking.failed(c,tracked,error,reception_now());c.commit()
-                                return self.reply(400 if error.kind in ('configuracion','destinatario') else 502,{'error':'No se envió el mensaje. '+str(error),'kind':error.kind,'fields':{'to':str(error)} if error.kind=='destinatario' else None})
+                                # «Sin confirmación»: pudo haber salido. La cola de salida no lo da por fallido (evita un reenvío duplicado por la misma clave).
+                                outcome='sending' if error.kind=='sin_confirmacion' else 'failed'
+                                try:mail_tracking.settle(c,lambda db:(db.execute("UPDATE mail_outbox SET status=?,updated_at=? WHERE request_key=?",(outcome,now,key)),mail_tracking.failed(db,tracked,error,reception_now())))
+                                except sqlite3.Error as failure:note_runtime_error('POST',path,failure,user)
+                                return self.reply(400 if error.kind in ('configuracion','destinatario') else 502,{'error':'No se envió el mensaje. '+str(error) if error.kind!='sin_confirmacion' else str(error),'kind':error.kind,'fields':{'to':str(error)} if error.kind=='destinatario' else None})
                             # Aceptado por el servidor SMTP: recién ahora se considera enviado.
-                            c.execute("UPDATE mail_outbox SET status='sent',updated_at=? WHERE request_key=?",(now,key))
-                            mail_tracking.accepted(c,tracked,str(message['Message-ID'] or ''),reception_now(),result);refused=sorted((result or {}).get('refused') or {})
+                            try:mail_tracking.settle(c,lambda db:(db.execute("UPDATE mail_outbox SET status='sent',updated_at=? WHERE request_key=?",(now,key)),mail_tracking.accepted(db,tracked,str(message['Message-ID'] or ''),reception_now(),result)))
+                            except sqlite3.Error as failure:note_runtime_error('POST',path,failure,user)
+                            refused=sorted((result or {}).get('refused') or {})
                             if order:c.execute('INSERT OR IGNORE INTO mail_links(message_id,folder,uid,order_id,subject,correspondent,direction,sent_at,created_by,created_at) VALUES (?,?,0,?,?,?,?,?,?,?)',(message['Message-ID'],'',order['id'],str(message['Subject']),recipients[0],'out',now,user['id'],now))
                             audit(c,user['id'],'mail_sent',order['id'] if order else None)
                             try:
@@ -3368,27 +3404,37 @@ class Handler(BaseHTTPRequestHandler):
                             document=order_document(c,found['order_id']);email=(document.get('email') or '').strip()
                             if not re.fullmatch(r'[^\s@<>]+@[^\s@<>.]+(?:\.[^\s@<>.]+)+',email):return self.reply(409,{'error':'El cliente no tiene un correo electrónico válido registrado. Complétalo en su ficha.'})
                             if len(re.sub(r'\D','',str(document.get('identification') or '')))<6:return self.reply(409,{'error':'El cliente no tiene una identificación registrada con la que comprobar su identidad.'})
-                            token=quotes.send(c,found,email,user,now);link=public_base_url().rstrip('/')+'/presupuesto/'+token
-                            order_workspace.event(c,found['order_id'],user['id'],now,'follow_up','Presupuesto '+found['code']+' enviado al cliente para su aprobación.')
-                            audit(c,user['id'],'quote_sent',found['order_id'])
-                            # El presupuesto queda enviado y su enlace creado antes de intentar el correo: si el envío falla, el enlace se puede compartir por otro medio.
-                            c.commit();result='not_configured'
+                            # Un solo envío a la vez por presupuesto: un doble clic o un reintento simultáneo no genera dos enlaces ni dos correos.
+                            slot='quote-sending:'+str(found['id'])
+                            if not claim_slot(c,slot,90):return self.reply(409,{'error':'Este presupuesto ya se está enviando. Espera unos segundos y revisa su estado.','sending':True})
                             try:
-                                if mail_pro.configured():
-                                    detail=quotes.detail(c,quotes.get(c,found['id']))
-                                    body='\n'.join(['Estimado/a '+document['client']+':','','Le enviamos el presupuesto N.º '+found['code']+' correspondiente a su orden de servicio '+document['code']+'.','',
-                                        'Total cotizado: '+quotes.usd(detail['totals']['quoted'])+' (impuestos incluidos).']+(['Válido hasta el '+appointments.date.fromisoformat(detail['valid_until']).strftime('%d/%m/%Y')+'.'] if detail['valid_until'] else [])+['',
-                                        'Para revisar el detalle y aprobar o rechazar cada servicio, ingrese al siguiente enlace privado:',link,'',
-                                        'Por su seguridad se le pedirán los últimos cuatro dígitos de su cédula o RUC. El enlace es personal: no lo reenvíe.','',
-                                        'No se ejecutará ningún trabajo sin su autorización.','','Atentamente,','','Departamento de Servicio Técnico','PC-DOCTOR S.A.'])
-                                    import quote_pdf
-                                    number=re.sub(r'\D','',str(document.get('identification') or ''));live=quotes.active_link(c,detail,token,now)
-                                    attached=quote_pdf.render(detail,dict(document,identification=number[:2]+'*'*max(0,len(number)-2) if number else ''),dict(live,url=link) if live else None)
-                                    send_institutional(c,'quote','Presupuesto de servicio',email,'PC-DOCTOR S.A. | Presupuesto N.º '+found['code'],body,found['order_id'],user['id'],attachments=[{'name':found['code']+'-PRESUPUESTO.pdf','type':'application/pdf','data':base64.b64encode(attached).decode()}],private=(link,));result='sent'
-                            except mail_pro.MailError as error:
-                                print('quote-mail',error.kind,flush=True);result='failed'
-                            with connect() as log:
-                                quotes.event(log,found['id'],'correo','Correo al cliente: '+{'sent':'aceptado por el servidor de correo','failed':'no se pudo enviar','not_configured':'el correo del sistema no está configurado'}[result]+'.',reception_now(),user)
+                                token=quotes.send(c,quotes.get(c,found['id']),email,user,now);link=public_base_url().rstrip('/')+'/presupuesto/'+token
+                                order_workspace.event(c,found['order_id'],user['id'],now,'follow_up','Presupuesto '+found['code']+' enviado al cliente para su aprobación.')
+                                audit(c,user['id'],'quote_sent',found['order_id'])
+                                # El presupuesto queda enviado y su enlace creado antes de intentar el correo: si el envío falla, el enlace se puede compartir por otro medio.
+                                c.commit();result='not_configured'
+                                try:
+                                    if mail_pro.configured():
+                                        detail=quotes.detail(c,quotes.get(c,found['id']))
+                                        body='\n'.join(['Estimado/a '+document['client']+':','','Le enviamos el presupuesto N.º '+found['code']+' correspondiente a su orden de servicio '+document['code']+'.','',
+                                            'Total cotizado: '+quotes.usd(detail['totals']['quoted'])+' (impuestos incluidos).']+(['Válido hasta el '+appointments.date.fromisoformat(detail['valid_until']).strftime('%d/%m/%Y')+'.'] if detail['valid_until'] else [])+['',
+                                            'Para revisar el detalle y aprobar o rechazar cada servicio, ingrese al siguiente enlace privado:',link,'',
+                                            'Por su seguridad se le pedirán los últimos cuatro dígitos de su cédula o RUC. El enlace es personal: no lo reenvíe.','',
+                                            'No se ejecutará ningún trabajo sin su autorización.','','Atentamente,','','Departamento de Servicio Técnico','PC-DOCTOR S.A.'])
+                                        import quote_pdf
+                                        number=re.sub(r'\D','',str(document.get('identification') or ''));live=quotes.active_link(c,detail,token,now)
+                                        attached=quote_pdf.render(detail,dict(document,identification=number[:2]+'*'*max(0,len(number)-2) if number else ''),dict(live,url=link) if live else None)
+                                        send_institutional(c,'quote','Presupuesto de servicio',email,'PC-DOCTOR S.A. | Presupuesto N.º '+found['code'],body,found['order_id'],user['id'],attachments=[{'name':found['code']+'-PRESUPUESTO.pdf','type':'application/pdf','data':base64.b64encode(attached).decode()}],private=(link,));result='sent'
+                                except mail_pro.MailError as error:
+                                    print('quote-mail',error.kind,flush=True);result='failed'
+                                except Exception as error:
+                                    # Cualquier otro fallo antes de entregar el correo: el presupuesto ya está guardado y enviado; se puede reintentar.
+                                    note_runtime_error('POST',path,error,user);result='failed'
+                                try:
+                                    with connect() as log:
+                                        quotes.event(log,found['id'],'correo','Correo al cliente: '+{'sent':'aceptado por el servidor de correo','failed':'no se pudo enviar','not_configured':'el correo del sistema no está configurado'}[result]+'.',reception_now(),user)
+                                except sqlite3.Error as error:note_runtime_error('POST',path,error,user)
+                            finally:release_slot(slot)
                             return self.reply(200,{'ok':True,'mail':result,'recipient':email,'link':link,'quote':quotes.detail(c,quotes.get(c,found['id']))})
                         return self.reply(400,{'error':'Acción inválida.'})
                     except quotes.QuoteError as error:return self.reply(error.status,{'error':str(error),'fields':error.fields})
@@ -3851,8 +3897,13 @@ class Handler(BaseHTTPRequestHandler):
         except (ValueError, json.JSONDecodeError):
             self.reply(400, {'error':'Solicitud inválida.'})
         except Exception as error:
-            note_runtime_error('POST',urlsplit(self.path).path,error)
-            self.reply(500, {'error':'No se pudo completar la operación.'})
+            failed=urlsplit(self.path).path
+            note_runtime_error('POST',failed,error,locals().get('user'),503 if isinstance(error,sqlite3.OperationalError) else 500)
+            if isinstance(error,sqlite3.OperationalError):
+                # Base de datos momentáneamente inaccesible: lo hecho en esta petición se descartó (sin confirmar) y se puede repetir.
+                what='No se pudo guardar el presupuesto' if re.fullmatch(r'/api/(?:quotes/[0-9]+|orders/[0-9]+/quote)',failed) else 'No se pudo completar la operación'
+                self.reply(503, {'error':what+' por un problema temporal de base de datos. Intente nuevamente.'})
+            else:self.reply(500, {'error':'No se pudo completar la operación.'})
 
 
 def main():

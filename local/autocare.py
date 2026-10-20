@@ -11,6 +11,7 @@ Límites deliberados (seguridad): no modifica datos de clientes, órdenes, presu
 no borra información, no reinicia servicios ni cambia código. Las correcciones de código siguen el procedimiento de siempre
 (rama de pruebas, batería completa, aprobación administrativa y publicación), y la reversión se hace desde Vercel.
 """
+import hashlib
 import json
 import re
 import traceback
@@ -26,6 +27,8 @@ SEVERITY_ORDER = {'crítica': 0, 'alta': 1, 'media': 2, 'baja': 3}
 DEFAULTS = {'critical': True, 'unavailable': True, 'recurrent': True, 'connection': True, 'scheduled': False, 'updates': True, 'min_severity': 'media'}
 NOTICE_KEYS = ('critical', 'unavailable', 'recurrent', 'connection', 'scheduled', 'updates')
 INCIDENT_STATES = {'activa': 'Activa', 'en_revision': 'En revisión', 'resuelta': 'Resuelta'}
+# Nivel que ve la persona para cada gravedad interna: Información, Advertencia, Error o Crítico.
+LEVELS = {'baja': 'Información', 'media': 'Advertencia', 'alta': 'Error', 'crítica': 'Crítico'}
 RECURRENT = 3
 # Posible causa y acción recomendada por servicio verificado. ADI solo sugiere: nunca ejecuta reparaciones ni modifica datos.
 GUIDE = {
@@ -90,17 +93,24 @@ def _incident_code(c, now):
     return 'INC-' + day + '-' + str(number).zfill(3)
 
 
-def open_incident(c, key, service, severity, description, cause, action, now, source):
-    """Abre o actualiza una incidencia (sin duplicados: una por servicio o por tipo de error). Una resuelta que vuelve se reabre."""
+def open_incident(c, key, service, severity, description, cause, action, now, source, details=None):
+    """Abre o actualiza una incidencia (sin duplicados: una por servicio o por tipo de error, con contador de repeticiones).
+    Si vuelve a ocurrir después de resolverse, se reabre la MISMA incidencia (mismo código) y el seguimiento lo registra."""
     items = _load(c, 'autocare_incidents', [])
-    found = next((item for item in reversed(items) if item['key'] == key and item['status'] != 'resuelta'), None)
+    found = next((item for item in reversed(items) if item['key'] == key), None)
+    if found and found['status'] == 'resuelta':
+        found.update(status='activa', reopened=True, reopened_at=stamp(now))
+        found['history'] = (found.get('history', []) + [{'at': stamp(now), 'by': 'ADI AutoCare', 'status': 'activa', 'note': 'Reabierta automáticamente: el problema volvió a ocurrir después de resolverse.'}])[-20:]
+        log(c, 'incident', severity, service, 'Incidencia ' + found['code'] + ' reabierta: el problema volvió a ocurrir.', description, now)
     if found:
         found.update(last_at=stamp(now), count=found['count'] + 1, description=description[:300], severity=severity)
     else:
-        previous = next((item for item in reversed(items) if item['key'] == key), None)
         found = {'code': _incident_code(c, now), 'key': key, 'service': service, 'severity': severity, 'description': description[:300], 'cause': cause[:300], 'action': action[:300],
-                 'source': source, 'first_at': stamp(now), 'last_at': stamp(now), 'count': 1, 'status': 'activa', 'history': [], 'reopened': bool(previous)}
+                 'source': source, 'first_at': stamp(now), 'last_at': stamp(now), 'count': 1, 'status': 'activa', 'history': [], 'reopened': False}
         items.append(found)
+    if details:
+        found['details'] = details
+        found['occurrences'] = (found.get('occurrences', []) + [{key: details.get(key, '') for key in ('at', 'user', 'ref', 'status', 'origin')}])[-10:]
     _save(c, 'autocare_incidents', items[-KEEP_INCIDENTS:])
     return found
 
@@ -168,22 +178,76 @@ def where(error):
     return (frame.filename.replace('\\', '/').rsplit('/', 1)[-1] + ':' + str(frame.lineno) + ' · ' + frame.name) if frame else ''
 
 
-def record_error(c, method, path, error, now):
-    """Guarda un error de ejecución clasificado. Nunca guarda el cuerpo de la petición ni el mensaje (pueden contener datos)."""
+def _clean_message(error):
+    """Mensaje técnico sin datos: sin correos, textos entre comillas, números largos ni rutas de archivo."""
+    text = re.sub(r'\s+', ' ', str(error))[:220]
+    text = re.sub(r'[\w.+-]+@[\w-]+(?:\.[\w-]+)+', '[correo]', text)
+    text = re.sub(r"'[^']*'|\"[^\"]*\"", "'…'", text)
+    text = re.sub(r'\d{4,}', '[n]', text)
+    return re.sub(r'(/[\w.-]+)+/', '', text)[:160]
+
+
+def record_error(c, method, path, error, now, user=None, status=500):
+    """Guarda un error de ejecución clasificado. Nunca guarda el cuerpo de la petición; el mensaje se depura (sin datos personales,
+    valores ni secretos) y la operación de base de datos solo indica el verbo y la tabla."""
     severity, cause = classify(method, path, error)
+    try:
+        user = dict(user) if user is not None and not isinstance(user, dict) else user
+    except (TypeError, ValueError):
+        user = None
     try:
         version = versioning.load()['releases'][0]['version']
     except versioning.RegistryError:
         version = ''
-    item = {'at': stamp(now), 'version': version, 'method': method, 'path': re.sub(r'/\d+', '/:id', path.split('?', 1)[0])[:120],
-            'module': module_of(path), 'type': type(error).__name__, 'where': where(error)[:160], 'severity': severity, 'cause': cause}
+    clean_path = re.sub(r'/\d+', '/:id', path.split('?', 1)[0])[:120]
+    origin = error.__cause__ or error.__context__
+    ref = re.search(r'/(\d+)', path.split('?', 1)[0])
+    item = {'at': stamp(now), 'version': version, 'method': method, 'path': clean_path,
+            'module': module_of(path), 'type': type(error).__name__, 'where': where(error)[:160], 'severity': severity, 'cause': cause,
+            'status': status, 'user': str((user or {}).get('name') or (user or {}).get('username') or '')[:80], 'ref': ref[1] if ref else '',
+            'operation': str(getattr(error, 'operation', '') or '')[:80], 'origin': type(origin).__name__ if origin else '', 'message': _clean_message(error)}
+    key = 'error:' + item['module'] + ':' + item['type'] + ':' + item['where'].split(' · ')[0]
+    item['code'] = 'ERR-' + hashlib.sha256(key.encode()).hexdigest()[:6].upper()
     errors = _load(c, 'autocare_errors', [])
     errors.append(item)
     _save(c, 'autocare_errors', errors[-KEEP_ERRORS:])
-    open_incident(c, 'error:' + item['module'] + ':' + item['type'] + ':' + item['where'].split(' · ')[0], item['module'], severity,
+    incident = open_incident(c, key, item['module'], severity,
                   'Error de ejecución en ' + item['method'] + ' ' + item['path'] + (' (' + item['where'] + ')' if item['where'] else '') + '.', cause,
-                  'Revisar el punto del código indicado y preparar la corrección en una rama de pruebas; no se ejecuta ninguna reparación automática.', now, 'ejecución')
+                  'Revisar el punto del código indicado y preparar la corrección en una rama de pruebas; no se ejecuta ninguna reparación automática.', now, 'ejecución', details=item)
+    item['incident'] = incident['code']
+    _save(c, 'autocare_errors', errors[-KEEP_ERRORS:])
     return item
+
+
+def pending_errors(c, hours=1, now=None):
+    """Errores recientes que siguen abiertos: los de una incidencia marcada como resuelta DESPUÉS del error ya no cuentan para la
+    advertencia (el historial se conserva). Si el error vuelve a ocurrir, la incidencia se reabre y vuelve a contar."""
+    items = {item['key']: item for item in _load(c, 'autocare_incidents', [])}
+    out = []
+    for error in recent_errors(c, hours, now):
+        key = 'error:' + error['module'] + ':' + error['type'] + ':' + error['where'].split(' · ')[0]
+        incident = items.get(key)
+        if incident and incident['status'] == 'resuelta' and (incident.get('resolved_at') or '') >= error['at']:
+            continue
+        out.append(error)
+    return out
+
+
+def errors_summary(errors):
+    """Problema concreto y acción recomendada a partir de los errores registrados (módulo, método, ruta y punto del código)."""
+    if not errors:
+        return None
+    groups = {}
+    for error in errors:
+        groups.setdefault((error['module'], error['method'], error['path'], error['type'], error['where']), []).append(error)
+    (module, method, path, kind, place), first = max(groups.items(), key=lambda pair: len(pair[1]))
+    total = len(errors)
+    problem = 'Se registr' + ('ó 1 fallo' if total == 1 else 'aron ' + str(total) + ' fallos') + ' en el módulo ' + module + ' durante operaciones ' + method + ' (' + path + ', ' + kind + (' en ' + place if place else '') + ').'
+    if len(groups) > 1:
+        problem += ' Hay ' + str(len(groups)) + ' tipos de error distintos; se muestra el más frecuente.'
+    operation = next((e.get('operation') for e in first if e.get('operation')), '')
+    action = 'Revisar ' + path + (' y la operación de base de datos asociada (' + operation + ').' if operation else ' y la operación de base de datos asociada.' if kind in ('OperationalError', 'IntegrityError') else ' en ' + (place or 'el punto del código indicado') + '.')
+    return {'problem': problem, 'action': action, 'count': total, 'groups': len(groups)}
 
 
 def recent_errors(c, hours=24, now=None):
@@ -276,7 +340,12 @@ def service_detail(c, code, now):
     items = [dict(r, at=run['at'], source=run.get('source', '')) for run in reversed(history) for r in run['results'] if r['code'] == code][:30]
     if not items and code not in {item[0] for item in stability.checks(c)}:
         raise LookupError('Servicio no disponible.')
-    out = {'code': code, 'name': items[0]['name'] if items else code, 'cause': GUIDE.get(code, ('', ''))[0], 'action': GUIDE.get(code, ('', ''))[1],
+    cause, action = GUIDE.get(code, ('', ''))
+    if code == 'errors':
+        concrete = errors_summary(pending_errors(c, 1, now))
+        if concrete:
+            cause, action = 'Problema detectado: ' + concrete['problem'], concrete['action']
+    out = {'code': code, 'name': items[0]['name'] if items else code, 'cause': cause, 'action': action, 'concrete': code == 'errors' and bool(cause) and cause.startswith('Problema detectado'),
            'history': [{'at': i['at'], 'source': i['source'], 'status': i.get('status', 'ok' if i['ok'] else 'error'), 'ms': i.get('ms'), 'detail': i['detail']} for i in items],
            'timing': timing(history, code, items[0].get('ms') if items else None)}
     if code == 'licenses':

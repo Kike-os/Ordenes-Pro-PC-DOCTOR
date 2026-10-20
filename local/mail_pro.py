@@ -1104,34 +1104,69 @@ def build_message(config, data, signature=''):
     return message, to + cc + [address for address in bcc if address not in to + cc]
 
 
+# Etapas del envío por SMTP (trazabilidad del Centro de Entrega). Cada intento registra hasta dónde llegó.
+STAGES = {'conexion': 'Conectando con el servidor SMTP', 'autenticacion': 'Autenticando la cuenta del remitente', 'transmision': 'Transmitiendo el mensaje', 'aceptado': 'Aceptado por el servidor SMTP'}
+# Reintentos automáticos: solo si falló la CONEXIÓN por un problema temporal (red o servidor ocupado), antes de autenticar y de transmitir
+# nada. Nunca se reintenta después de empezar a transmitir: así no hay riesgo de enviar dos veces el mismo mensaje.
+RETRIES = 1
+RETRY_WAIT = 1.5
+
+
+def _now():
+    from datetime import datetime, timedelta, timezone
+    return datetime.now(timezone(timedelta(hours=-5))).isoformat(timespec='seconds')
+
+
 def deliver(config, message, recipients, partial=False):
     """Entrega por SMTP. Solo vuelve sin error cuando el servidor aceptó el mensaje.
 
-    Devuelve {'refused': {dirección: (código, texto)}, 'dsn': bool}. Con `partial`, si el servidor acepta a unos destinatarios y
+    Devuelve {'refused': {dirección: (código, texto)}, 'dsn': bool, 'trace': [...]}. Con `partial`, si el servidor acepta a unos destinatarios y
     rechaza a otros, vuelve con los rechazados en lugar de fallar (cada destinatario tiene su propio estado). Si el servidor anuncia
-    la extensión DSN se solicitan informes de entrega, retraso y fallo; si no la anuncia, nunca habrá confirmación de entrega final."""
-    client = None
-    try:
-        client = smtp_client(config)
-        client.login(config['username'], config['password'])
-        dsn = bool(client.has_extn('dsn'))
-        options = {'mail_options': ['RET=HDRS'], 'rcpt_options': ['NOTIFY=SUCCESS,FAILURE,DELAY']} if dsn else {}
-        refused = client.send_message(message, from_addr=config['username'], to_addrs=recipients, **options)
-        if refused and not partial:
-            raise smtplib.SMTPRecipientsRefused(refused)
-        return {'refused': {address: (int(value[0]), value[1].decode('utf-8', 'replace') if isinstance(value[1], bytes) else str(value[1])) for address, value in (refused or {}).items()}, 'dsn': dsn}
-    except smtplib.SMTPRecipientsRefused as error:
-        failure = classify(error, config['smtp_host'], config['smtp_port'])
-        failure.refused = {address: (int(value[0]), value[1].decode('utf-8', 'replace') if isinstance(value[1], bytes) else str(value[1])) for address, value in error.recipients.items() if isinstance(value, tuple)}
-        raise failure from None
-    except Exception as error:
-        raise classify(error, config['smtp_host'], config['smtp_port']) from None
-    finally:
-        if client is not None:
-            try:
-                client.quit()
-            except Exception:
-                pass
+    la extensión DSN se solicitan informes de entrega, retraso y fallo; si no la anuncia, nunca habrá confirmación de entrega final.
+    `trace` (y `error.trace`/`error.stage` si falla) indica cada etapa con su hora: conexión, autenticación, transmisión y aceptación."""
+    trace, host, port = [], config['smtp_host'], config['smtp_port']
+    mode = 'SSL/TLS' if port == 465 else 'STARTTLS'
+    for attempt in range(1, RETRIES + 2):
+        client, stage = None, 'conexion'
+        try:
+            trace.append({'stage': 'conexion', 'at': _now(), 'detail': 'Conectando con ' + host + ':' + str(port) + ' (' + mode + ')' + (' · reintento ' + str(attempt - 1) + ' de ' + str(RETRIES) if attempt > 1 else '') + '.'})
+            client = smtp_client(config)
+            stage = 'autenticacion'
+            client.login(config['username'], config['password'])
+            trace.append({'stage': 'autenticacion', 'at': _now(), 'detail': 'Conexión cifrada establecida y cuenta autenticada.'})
+            dsn = bool(client.has_extn('dsn'))
+            options = {'mail_options': ['RET=HDRS'], 'rcpt_options': ['NOTIFY=SUCCESS,FAILURE,DELAY']} if dsn else {}
+            stage = 'transmision'
+            trace.append({'stage': 'transmision', 'at': _now(), 'detail': 'Transmitiendo el mensaje a ' + str(len(recipients)) + (' destinatario.' if len(recipients) == 1 else ' destinatarios.')})
+            refused = client.send_message(message, from_addr=config['username'], to_addrs=recipients, **options)
+            if refused and not partial:
+                raise smtplib.SMTPRecipientsRefused(refused)
+            stage = 'aceptado'
+            trace.append({'stage': 'aceptado', 'at': _now(), 'detail': 'El servidor SMTP respondió 250: mensaje aceptado.' + ('' if dsn else ' Este servidor no emite confirmaciones de entrega final.')})
+            return {'refused': {address: (int(value[0]), value[1].decode('utf-8', 'replace') if isinstance(value[1], bytes) else str(value[1])) for address, value in (refused or {}).items()}, 'dsn': dsn, 'trace': trace}
+        except smtplib.SMTPRecipientsRefused as error:
+            failure = classify(error, host, port)
+            failure.refused = {address: (int(value[0]), value[1].decode('utf-8', 'replace') if isinstance(value[1], bytes) else str(value[1])) for address, value in error.recipients.items() if isinstance(value, tuple)}
+            failure.stage, failure.trace = stage, trace
+            raise failure from None
+        except Exception as error:
+            failure = classify(error, host, port)
+            if stage == 'transmision' and not isinstance(error, (smtplib.SMTPResponseException, MailError)):
+                # Se cortó o agotó el tiempo MIENTRAS se transmitía: el servidor pudo haberlo aceptado. No se reintenta ni se da por fallido.
+                failure = MailError('sin_confirmacion', 'El servidor SMTP no devolvió confirmación: la conexión se cortó o agotó el tiempo (' + type(error).__name__ + ') mientras se transmitía el mensaje. Puede haberse enviado: revisa la carpeta Enviados antes de reenviarlo.')
+            failure.stage, failure.trace = stage, trace
+            failure.smtp_code = int(getattr(error, 'smtp_code', 0) or 0)
+            trace.append({'stage': 'error', 'at': _now(), 'detail': 'Falló en la etapa «' + STAGES.get(stage, stage) + '»: ' + str(failure)[:220]})
+            if stage == 'conexion' and failure.kind in ('red', 'temporal', 'servidor') and attempt <= RETRIES:
+                time.sleep(RETRY_WAIT)
+                continue
+            raise failure from None
+        finally:
+            if client is not None:
+                try:
+                    client.quit()
+                except Exception:
+                    pass
 
 
 def store(client, folder, message, flags):

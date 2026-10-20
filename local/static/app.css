@@ -7732,3 +7732,26 @@ body:is([data-page=login],.auth-page) .login-ip-text p{line-height:1.38}
 @keyframes ls-in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
 @media (max-width:560px){.licenses .ls-head{grid-template-columns:minmax(0,1fr)}.licenses .ls-badges{justify-content:flex-start}.licenses .ls-item{grid-template-columns:30px minmax(0,1fr) auto}.licenses .ls-item .ls-logo{width:30px;height:30px}.licenses .ls-item>.license-sale-badge{grid-column:2/-1;justify-self:start}.licenses .ls-card{padding:10px}.licenses .ls-tools{position:static}}
 @media(prefers-reduced-motion:reduce){.licenses .ls-card,.licenses .ls-detail{animation:none}.licenses .ls-toggle svg,.licenses .ls-list[aria-busy=true]{transition:none}}
+/* ADI AutoCare · incidencias: nivel visible y detalle técnico del error (acotado a .autocare-*) */
+.autocare-level-tag{padding:1px 8px;border-radius:999px;font-size:11px;font-weight:800;letter-spacing:.02em;color:#0b1220;background:#93c5fd}
+.autocare-level-tag[data-level=media]{background:#fcd34d}.autocare-level-tag[data-level=alta]{background:#fb923c}.autocare-level-tag[data-level="crítica"]{background:#f87171}
+.autocare-incident-reopened{padding:1px 7px;border:1px solid #f59e0b;border-radius:999px;font-size:10.5px;font-weight:700;color:#fcd34d}
+.autocare-tech{padding:6px 9px;border:1px solid #1c3150;border-radius:9px;background:rgba(6,14,26,.5)}
+.autocare-incident .autocare-tech-grid{margin-top:6px}
+.autocare-incident .autocare-tech-grid div{grid-template-columns:170px minmax(0,1fr)}
+.autocare-tech-grid dd{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px}
+.autocare-tech-occ{margin:2px 0 0;padding-left:18px;font-size:11.5px;color:#a9bddb}
+@media (max-width:560px){.autocare-incident dl div,.autocare-incident .autocare-tech-grid div{grid-template-columns:minmax(0,1fr);gap:0}}
+/* Centro de Entrega: trazabilidad por etapas, significado del estado y lectura IMAP (acotado a .delivery-*) */
+.delivery-steps{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px;margin:0 0 4px;padding:0;list-style:none}
+.delivery-steps li{position:relative;display:grid;justify-items:center;gap:3px;min-width:0;padding:6px 4px;border:1px solid #1f3352;border-radius:9px;background:#0b1626;text-align:center}
+.delivery-steps strong{font-size:11.5px;color:#9fb3cf;overflow-wrap:anywhere}
+.delivery-steps small{font-size:10.5px;color:#9fb3cf;overflow-wrap:anywhere}
+.delivery-step-dot{width:10px;height:10px;border-radius:50%;background:#33486a}
+.delivery-steps li[data-state=done]{border-color:#1f5e4a}.delivery-steps li[data-state=done] .delivery-step-dot{background:#34d399}.delivery-steps li[data-state=done] strong{color:#d6f5e8}
+.delivery-steps li[data-state=failed]{border-color:#8a2f3a;background:#1d0f16}.delivery-steps li[data-state=failed] .delivery-step-dot{background:#f87171}.delivery-steps li[data-state=failed] strong,.delivery-steps li[data-state=failed] small{color:#fecaca}
+.delivery-state{display:grid;gap:3px;justify-items:start}
+.delivery-meaning{font-size:10.5px;color:#8fa5c4;line-height:1.25}
+.delivery-imap{margin:0;font-size:12px;color:#9fb3cf}.delivery-imap[data-state=error]{color:#fca5a5}
+.delivery-pill[data-status=desconocido]{--dp-line:#b45309;--dp-bg:#2a1a08;--dp-ink:#fcd34d}
+@media (max-width:640px){.delivery-steps{grid-template-columns:repeat(2,minmax(0,1fr))}}

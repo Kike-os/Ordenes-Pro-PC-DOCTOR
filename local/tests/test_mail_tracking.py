@@ -97,7 +97,7 @@ class TrackingTests(unittest.TestCase):
         sent = self.institutional('cliente1@example.invalid')
         row = self.row('cliente1@example.invalid')
         self.assertEqual((row['status'], row['message_id'], row['kind'], row['archive_id']), ('enviado', sent['message_id'], 'quote', sent['archive_id']))
-        self.assertEqual([e['event'] for e in self.events(row['id'])], ['creado', 'aceptado'])
+        self.assertEqual([e['event'] for e in self.events(row['id'])], ['creado', 'cola', 'conectando', 'autenticado', 'transmitiendo', 'aceptado', 'resultado'])  # Creado → En cola → Conectando SMTP → Autenticado → Aceptado → Resultado final
         self.assertIn('no emite confirmaciones de entrega final', self.events(row['id'])[-1]['detail'])
         # Sin DSN anunciado no se piden informes al servidor.
         self.assertEqual(FakeSMTP.sent[0][2], {})
@@ -183,7 +183,7 @@ class TrackingTests(unittest.TestCase):
         item = dsn('failed', '5.1.1', 'dup@example.invalid', sent['message_id'])
         self.report(item, 'dsn:1:50')
         self.report(item, 'dsn:1:50')
-        self.assertEqual([e['event'] for e in self.events(self.row('dup@example.invalid')['id'])], ['creado', 'aceptado', 'rebote'])
+        self.assertEqual([e['event'] for e in self.events(self.row('dup@example.invalid')['id'])], ['creado', 'cola', 'conectando', 'autenticado', 'transmitiendo', 'aceptado', 'resultado', 'rebote'])
 
     def test_11_out_of_order_report_never_moves_the_state_back(self):
         sent = self.institutional('orden@example.invalid')
@@ -193,7 +193,7 @@ class TrackingTests(unittest.TestCase):
         self.report(dsn('delayed', '4.4.1', 'orden@example.invalid', sent['message_id'], date=earlier, diagnostic='smtp; 451 later'), 'dsn:1:60')
         row = self.row('orden@example.invalid')
         self.assertEqual(row['status'], 'rebotado')
-        self.assertEqual([e['event'] for e in self.events(row['id'])], ['creado', 'aceptado', 'demora', 'rebote'])
+        self.assertEqual([e['event'] for e in self.events(row['id'])], ['creado', 'cola', 'conectando', 'autenticado', 'transmitiendo', 'aceptado', 'resultado', 'demora', 'rebote'])
 
     def test_12_correct_and_resend_creates_a_linked_attempt_and_keeps_the_original(self):
         FakeSMTP.refuse = {'error@example.invalid': (550, b'5.1.1 User unknown')}
@@ -228,7 +228,7 @@ class TrackingTests(unittest.TestCase):
             ids = mail_tracking.start(c, ['silencio@example.invalid'], kind='quote', subject='Sin respuesta', now=self.now - timedelta(hours=1))
             mail_tracking.sweep(c, self.now)
         row = self.row('silencio@example.invalid')
-        self.assertEqual((row['status'], row['reason']), ('desconocido', 'No consta si el servidor aceptó el mensaje.'))
+        self.assertEqual((row['status'], row['reason']), ('desconocido', 'Servidor SMTP no devolvió confirmación registrada (el envío se interrumpió).'))
         self.assertTrue(ids)
 
     def test_15_appointment_and_order_mails_are_tracked_and_access_is_restricted(self):
@@ -275,6 +275,92 @@ class TrackingTests(unittest.TestCase):
             check = mail_tracking.resend_check(c, row)
         self.assertFalse(check['allowed'])
         self.assertIn('adjuntos', check['reason'])
+
+
+class DeliveryCenterTests(TrackingTests):
+    """Centro de Entrega: etapas exactas, reintento seguro, «sin confirmación» como Incidencia, barrido sin estados eternos y contadores."""
+    locals().update({name: None for name in dir(TrackingTests) if name.startswith('test_')})
+
+    def test_connection_retry_is_safe_and_traced(self):
+        calls = []
+        def client(config):
+            calls.append(1)
+            if len(calls) == 1:
+                raise ConnectionResetError('red cortada')
+            return FakeSMTP()
+        with patch.object(mail_pro, 'smtp_client', side_effect=client), patch.object(mail_pro, 'RETRY_WAIT', 0):
+            self.institutional('reintento@example.invalid')
+        row = self.row('reintento@example.invalid')
+        self.assertEqual((row['status'], len(calls), len(FakeSMTP.sent)), ('enviado', 2, 1))
+        details = ' '.join(e['detail'] for e in self.events(row['id']))
+        self.assertIn('reintento 1 de 1', details);self.assertIn('Falló en la etapa «Conectando con el servidor SMTP»', details)
+
+    def test_authentication_failure_is_not_retried_and_names_the_stage(self):
+        calls = []
+        def client(config):
+            calls.append(1);fake = FakeSMTP();fake.login = lambda *a: (_ for _ in ()).throw(smtplib.SMTPAuthenticationError(535, b'bad'));return fake
+        with patch.object(mail_pro, 'smtp_client', side_effect=client):
+            self.institutional('clave@example.invalid')
+        row = self.row('clave@example.invalid')
+        self.assertEqual((row['status'], row['code'], len(calls)), ('fallido', 'credenciales', 1))
+        self.assertIn('Falló en la etapa «Autenticando la cuenta del remitente» (respuesta SMTP 535)', row['reason'])
+        self.assertEqual([e['event'] for e in self.events(row['id'])][:3], ['creado', 'cola', 'conectando'])
+
+    def test_cut_during_transmission_is_an_incident_without_confirmation_and_never_resent_automatically(self):
+        def cut(*a, **k):
+            raise smtplib.SMTPServerDisconnected('Connection unexpectedly closed')
+        with patch.object(FakeSMTP, 'send_message', side_effect=cut):
+            error = self.institutional('corte@example.invalid')
+        row = self.row('corte@example.invalid')
+        self.assertEqual((row['status'], error.kind), ('desconocido', 'sin_confirmacion'))
+        self.assertEqual(row['reason'], 'Servidor SMTP no devolvió confirmación (se cortó durante la transmisión).')
+        self.assertEqual(mail_tracking.LABELS[row['status']], 'Incidencia')
+        with app.connect() as c:
+            listing = mail_tracking.listing(c, {})
+        self.assertEqual((listing['counts']['pendientes'], listing['counts']['incidencias']), (0, 1))
+
+    def test_nothing_stays_sending_sweep_recovers_the_real_result(self):
+        import mailing
+        with app.connect() as c:
+            old = self.now - timedelta(minutes=10)
+            message = email.message.EmailMessage();message['Subject'] = 'x';message.set_content('x')
+            sent_id = mailing.archive(c, 'quote', None, 'a@example.invalid', 'x', message, 'plantilla', None, old)
+            mailing.mark(c, sent_id, 'enviado', 'El servidor de correo aceptó el mensaje.', '<id@x>', old)
+            lost_id = mailing.archive(c, 'quote', None, 'b@example.invalid', 'x', message, 'plantilla', None, old)
+            a = mail_tracking.start(c, ['a@example.invalid'], kind='quote', subject='x', now=old, archive_id=sent_id)
+            b = mail_tracking.start(c, ['b@example.invalid'], kind='quote', subject='x', now=old, archive_id=lost_id)
+            fresh = mail_tracking.start(c, ['c@example.invalid'], kind='quote', subject='x', now=self.now)
+            mail_tracking.sweep(c, self.now);c.commit()
+        self.assertEqual(self.row('a@example.invalid')['status'], 'enviado')
+        self.assertIn('Recuperado del registro del mensaje', self.events(self.row('a@example.invalid')['id'])[-1]['detail'])
+        lost = self.row('b@example.invalid');self.assertEqual(lost['status'], 'desconocido');self.assertIn('Servidor SMTP no devolvió confirmación registrada', lost['reason'])
+        self.assertEqual(self.row('c@example.invalid')['status'], 'enviando')  # en curso, todavía dentro del plazo
+
+    def test_accepted_means_sent_not_delivered_and_counters_are_exact(self):
+        self.institutional('uno@example.invalid');self.institutional('dos@example.invalid')
+        FakeSMTP.refuse = {'mala@example.invalid': (550, b'5.1.1 User unknown')};self.institutional('mala@example.invalid')
+        with app.connect() as c:
+            listing = mail_tracking.listing(c, {})
+        self.assertEqual({k: listing['counts'][k] for k in ('enviados', 'entregados', 'pendientes', 'rebotados', 'fallidos', 'incidencias')},
+                         {'enviados': 2, 'entregados': 0, 'pendientes': 0, 'rebotados': 1, 'fallidos': 0, 'incidencias': 1})
+        row = next(r for r in listing['rows'] if r['recipient'] == 'uno@example.invalid')
+        self.assertEqual(row['label'], 'Enviado');self.assertIn('La entrega final al destinatario no está confirmada', row['meaning'])
+
+    def test_bookkeeping_after_acceptance_survives_a_database_hiccup(self):
+        real = mail_tracking.accepted
+        calls = []
+        def flaky(*a, **k):
+            calls.append(1)
+            if len(calls) == 1:
+                import sqlite3
+                raise sqlite3.OperationalError('No se pudo contactar la base de datos remota.')
+            return real(*a, **k)
+        with patch.object(mail_tracking, 'accepted', side_effect=flaky):
+            result = self.institutional('hipo@example.invalid')
+        self.assertNotIsInstance(result, Exception)
+        self.assertEqual((self.row('hipo@example.invalid')['status'], len(FakeSMTP.sent), len(calls)), ('enviado', 1, 2))
+        with app.connect() as c:
+            self.assertEqual(c.execute("SELECT status FROM mail_archive ORDER BY id DESC LIMIT 1").fetchone()[0], 'enviado')
 
 
 if __name__ == '__main__':

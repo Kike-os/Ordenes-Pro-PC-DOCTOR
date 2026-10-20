@@ -205,3 +205,34 @@ Rutas (solo personal con acceso al correo): `GET /api/mail/deliveries`, `GET /ap
 7. Estados: pendiente, enviado, fallido u omitido por destinatario, y el estado de entrega real del Centro de Entrega (enviado, entregado, demorado, rebotado). Historial de comunicados con sus resultados.
 
 **Bajas**: tabla `mail_optouts` (migración `055_mail_campaigns.sql`). Solo excluyen de los comunicados; los correos de servicio (comprobantes, citas, presupuestos) siguen llegando.
+
+## Centro de Entrega y Seguimiento: estados reales y trazabilidad
+
+**Causa de «Enviando» y «Estado desconocido».** El servidor SMTP aceptaba el mensaje, pero anotar ese resultado fallaba porque la conexión con la base remota se había cerrado durante el envío. El registro se quedaba en «Enviando» y, a los 15 minutos, pasaba a «Estado desconocido». Así ocurrió con los dos presupuestos del 20 de octubre y con una cita del 18. La conexión ya se corrige en `remote_db`. Además, todas las anotaciones posteriores al envío pasan por `mail_tracking.settle`, que es idempotente y se repite si la base no responde: un correo que salió nunca se informa como no enviado.
+
+**Estados:**
+- En cola o Enviando: solo durante el envío.
+- **Enviado:** aceptado por el servidor SMTP del remitente. La entrega final al destinatario no está confirmada.
+- **Entregado al servidor:** solo con un informe real del destino.
+- Demorado, Rebotado y Fallido.
+- **Incidencia:** sustituye a «Estado desconocido» y siempre lleva su causa exacta. Por ejemplo: «Servidor SMTP no devolvió confirmación (se cortó durante la transmisión)» o «… confirmación registrada (el envío se interrumpió)».
+
+Nunca se marca «Entregado» solo porque el SMTP lo aceptó.
+
+**Envío por SMTP (`mail_pro.deliver`):**
+- Tiempo de espera de 15 s.
+- Un único reintento automático, y solo si falla la conexión por un problema temporal, antes de autenticar y de transmitir nada.
+- Nunca se reintenta después de empezar a transmitir. Si la conexión se corta en ese momento, no se da por fallido (pudo salir): queda como Incidencia «sin confirmación», con el aviso de revisar la carpeta Enviados antes de reenviar.
+- Los reenvíos desde el centro están protegidos contra el doble clic.
+- La cola de salida de Mail Pro informa si un mensaje quedó sin confirmación en lugar de bloquearlo sin explicación.
+
+**Nada se queda en «Enviando».** Pasados 3 minutos, el barrido busca el resultado real que sí quedó anotado (el archivo del mensaje o la cola de salida) y lo recupera. Si no existe, pasa a Incidencia con la causa exacta.
+
+**Historial:**
+- Muestra la trazabilidad Creado → En cola → Conectando SMTP → Autenticado → Aceptado por servidor → Resultado final, con la hora de cada etapa.
+- Si algo falla, se marca la etapa exacta; por ejemplo, «Autenticando la cuenta del remitente (respuesta SMTP 535)».
+- Incluye el código técnico, el último evento y el significado del estado.
+
+**Contadores:** Enviados, Entregados, Pendientes, Demorados, Rebotados, Fallidos e Incidencias (incluidas las de «sin confirmación»). Se actualizan cada 15 s si hay envíos en curso y cada 60 s si no.
+
+**IMAP:** el centro indica la última lectura correcta de rebotes y demoras o, si falla, «No se pudo consultar el estado por IMAP: <causa>».
