@@ -4,6 +4,20 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.184 — 2026-10-20 14:52 (UTC-05:00)
+
+Presupuestos estables, monitor de errores y Centro de Entrega con estados reales
+
+### Mejoras realizadas
+
+- Presupuestos: «Guardar y enviar» guarda y luego envía (Guardando…/Enviando…), valida partidas, vigencia y observaciones, bloquea envíos simultáneos, conserva lo guardado si falla el correo y ofrece «Reintentar envío»; aviso claro ante un fallo temporal de la base
+- ADI AutoCare: cada error muestra módulo, endpoint, método, código HTTP, usuario, hora, archivo y línea, operación SQL y repeticiones, sin datos sensibles; niveles Información/Advertencia/Error/Crítico, reapertura automática de la misma incidencia y causa concreta en lugar de una recomendación genérica
+
+### Errores corregidos
+
+- Presupuestos: corregida la incidencia INC-20261020-003 (OperationalError al enviar). La conexión con la base remota se renueva tras quedar inactiva y el primer paso de cada transacción se reintenta con seguridad; el correo ya aceptado nunca se informa como error
+- Centro de Entrega: ningún correo se queda en «Enviando»; «Estado desconocido» pasa a «Incidencia» con su causa exacta. «Enviado» significa aceptado por SMTP (entrega final no confirmada), con trazabilidad por etapas, reintento seguro solo en la conexión, contadores exactos y estado de IMAP
+
 ## v1.5.183 — 2026-10-20 13:58 (UTC-05:00)
 
 Ventas y Entregas de licencias rediseñadas con tarjetas compactas

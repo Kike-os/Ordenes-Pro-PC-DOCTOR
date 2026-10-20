@@ -8,6 +8,26 @@
   },
   "releases": [
     {
+      "version": "1.5.184",
+      "date": "2026-10-20T14:52:34-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Presupuestos estables, monitor de errores y Centro de Entrega con estados reales",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Presupuestos: «Guardar y enviar» guarda y luego envía (Guardando…/Enviando…), valida partidas, vigencia y observaciones, bloquea envíos simultáneos, conserva lo guardado si falla el correo y ofrece «Reintentar envío»; aviso claro ante un fallo temporal de la base",
+          "ADI AutoCare: cada error muestra módulo, endpoint, método, código HTTP, usuario, hora, archivo y línea, operación SQL y repeticiones, sin datos sensibles; niveles Información/Advertencia/Error/Crítico, reapertura automática de la misma incidencia y causa concreta en lugar de una recomendación genérica"
+        ],
+        "fixes": [
+          "Presupuestos: corregida la incidencia INC-20261020-003 (OperationalError al enviar). La conexión con la base remota se renueva tras quedar inactiva y el primer paso de cada transacción se reintenta con seguridad; el correo ya aceptado nunca se informa como error",
+          "Centro de Entrega: ningún correo se queda en «Enviando»; «Estado desconocido» pasa a «Incidencia» con su causa exacta. «Enviado» significa aceptado por SMTP (entrega final no confirmada), con trazabilidad por etapas, reintento seguro solo en la conexión, contadores exactos y estado de IMAP"
+        ],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.183",
       "date": "2026-10-20T13:58:22-05:00",
       "type": "patch",
