@@ -7260,3 +7260,79 @@ body[data-page=dashboard] .maintenance-dialog.license-sale-dialog{width:min(1120
 @media (prefers-reduced-motion:reduce){.license-sale-mode label{transition:none}}
 body[data-page=dashboard] .license-sale-sheet .license-sale-table th{background:#eef3fb;color:#334155}
 body[data-page=dashboard] .license-sale-sheet .license-sale-table td,body[data-page=dashboard] .license-sale-sheet .license-sale-table td:first-child{color:#1f2937;background:transparent}
+/* Gestión de Clientes (rediseño Enterprise): todo acotado a .clients-pro y a la ficha lateral. Azul oscuro y turquesa de la identidad. */
+.clients-pro{display:grid;gap:10px;min-width:0}
+.clients-pro .clients-stats{display:flex;flex-wrap:wrap;gap:8px;margin:0}
+.clients-pro .clients-stat{display:inline-flex;align-items:baseline;gap:8px;flex:0 1 auto;padding:7px 12px;border-radius:10px;border-left-width:3px}
+.clients-pro .clients-stat strong{font-size:18px}.clients-pro .clients-stat span{font-size:12px}
+.clients-pro .clients-stat[aria-pressed=true]{border-color:#2dd4bf;box-shadow:0 0 0 2px #2dd4bf26}
+.clients-bar{position:sticky;top:0;z-index:6;display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:8px;margin:0 -8px;border-radius:12px;background:#060d19eb;backdrop-filter:blur(6px)}
+.clients-search{position:relative;flex:1 1 360px;display:flex;align-items:center;margin:0;min-width:0}
+.clients-search .clients-search-icon{position:absolute;left:12px;width:17px;height:17px;color:#5eead4;pointer-events:none}
+.clients-pro .clients-search input[type=search]{width:100%;margin:0;min-height:44px;height:44px;padding:8px 42px 8px 38px;border:1px solid #2b4a75;border-radius:11px;background:#0b1626;font-size:14px}
+.clients-pro .clients-search input[type=search]:focus{border-color:#2dd4bf;box-shadow:0 0 0 3px #2dd4bf33;outline:0}
+.clients-search input[type=search]::-webkit-search-cancel-button{display:none}
+.clients-clear{position:absolute;right:6px;display:grid;place-items:center;width:32px;height:32px;min-height:0;margin:0;padding:0;border:0;border-radius:8px;background:transparent;color:#9fb3cf;cursor:pointer}
+.clients-clear:hover,.clients-clear:focus-visible{background:#132746;color:#fff;outline:2px solid #2dd4bf;outline-offset:0}.clients-clear[hidden]{display:none}
+.clients-clear svg{width:16px;height:16px}
+.clients-pro .clients-actions{display:flex;gap:8px;flex:0 0 auto}
+.clients-pro .clients-actions button{min-height:40px;padding:7px 12px}
+.clients-pro .clients-filters{display:flex;flex-wrap:wrap;gap:8px;align-items:end}
+.clients-filter{display:grid;gap:3px;flex:1 1 150px;min-width:0;margin:0}
+.clients-filter span{font-size:11px;font-weight:600;letter-spacing:.03em;color:#8fa5c4}
+.clients-pro .clients-filter select,.clients-pro .clients-filter input{width:100%;margin:0;min-height:36px;height:36px;padding:4px 10px;font-size:12.5px}
+.clients-filter-date{flex:0 1 150px}
+.clients-reset{flex:0 0 auto;align-self:end;min-height:36px}.clients-reset[hidden]{display:none}
+.clients-pro .clients-panel{padding:0;overflow:hidden}
+.clients-pro .clients-panel[aria-busy=true] .clients-scroll{opacity:.6;transition:opacity .15s}
+.clients-pro .clients-summary{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:9px 12px;border-bottom:1px solid #1b2b44}
+.clients-pro .clients-count{display:grid;gap:1px;margin-right:auto}.clients-pro .clients-count span{font-size:11.5px;color:#8fa5c4}
+.clients-scroll{max-height:max(340px,calc(100dvh - 360px));overflow:auto;overscroll-behavior:contain}
+.clients-pro .clients-table thead th{position:sticky;top:0;z-index:2;background:#0f1d33;box-shadow:inset 0 -1px 0 #22385a}
+.clients-pro .clients-table tbody tr{cursor:pointer}
+.clients-pro .clients-table tbody tr:hover{background:#0d2230}
+.clients-pro .clients-table tbody tr:focus-within{background:#0d2230}
+.clients-pager{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px;padding:8px 12px}
+.clients-pager[hidden]{display:none}
+.clients-pager-top{padding:0;justify-content:flex-end}
+.clients-pro .clients-pager:not(.clients-pager-top){border-top:1px solid #1b2b44}
+.clients-page{display:inline-flex;align-items:center;gap:5px;width:auto;margin:0;min-height:32px;padding:4px 10px;border:1px solid #2b4a75;border-radius:9px;background:#0b1626;color:#cfe2ff;font-size:12.5px;cursor:pointer}
+.clients-page svg{width:14px;height:14px}.clients-page:disabled{opacity:.4;cursor:not-allowed}
+.clients-page:not(:disabled):hover,.clients-page:focus-visible{border-color:#2dd4bf;outline:0}
+.clients-page-info{font-size:12px;color:#9fb3cf;font-variant-numeric:tabular-nums}
+.clients-counts{display:grid;justify-items:start;gap:2px}.clients-licenses{font-size:11px;color:#5eead4}
+.client-ok{display:inline-block;padding:2px 9px;border:1px solid #1f6f5c;border-radius:999px;background:#0d2b26;color:#8ef0d2;font-size:11px;font-weight:600}
+.clients-empty{display:grid;gap:10px;justify-items:center}
+.client-quick-actions{display:flex;flex-wrap:wrap;gap:6px}
+.client-quick-actions button{display:inline-flex;align-items:center;gap:6px;width:auto;flex:1 1 auto;margin:0;min-height:36px;padding:6px 11px;font-size:12.5px}
+.client-quick-actions svg{width:15px;height:15px}
+.client-quick-group .license-badge{font-size:10.5px;padding:1px 7px}
+@media(max-width:760px){.clients-scroll{max-height:none;overflow:visible}.clients-bar{margin:0 -4px;padding:6px 4px}.clients-pro .clients-actions{flex:1 1 100%}.clients-pro .clients-actions button{flex:1 1 0}.clients-pager-top{width:100%;justify-content:space-between}.clients-filter{flex:1 1 calc(50% - 8px)}.clients-filter-date{flex:1 1 calc(50% - 8px)}}
+@media(max-width:420px){.clients-filter,.clients-filter-date{flex:1 1 100%}.clients-pro .clients-stat{flex:1 1 calc(50% - 8px)}.clients-pro .clients-stat[data-kind=total]{flex-basis:100%}.clients-page span{display:none}.clients-page{padding:4px 8px}}
+@media(prefers-reduced-motion:reduce){.clients-pro .clients-panel[aria-busy=true] .clients-scroll{transition:none}}
+/* Gestión de Clientes: tarjetas compactas hasta tableta y filtros plegables en móvil. */
+.clients-filter-toggle{display:none!important}
+.clients-filter-count{display:inline-grid;place-items:center;min-width:18px;height:18px;padding:0 5px;border-radius:999px;background:#2dd4bf;color:#04201c;font-size:11px}.clients-filter-count[hidden]{display:none}
+@media(max-width:1024px){
+ .clients-pro .clients-table thead{display:none}
+ .clients-pro .clients-table,.clients-pro .clients-table tbody{display:block;width:100%}
+ .clients-pro .clients-table tr{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px 14px;padding:10px 14px;border-top:1px solid #1b2b44}
+ .clients-pro .clients-table td{display:block;width:auto;padding:0;border:0;min-width:0}
+ .clients-pro .clients-table td::before{content:attr(data-label);display:block;margin-bottom:1px;font-size:10px;letter-spacing:.04em;text-transform:uppercase;color:#8198ba}
+ .clients-pro .clients-table td[data-col=name],.clients-pro .clients-table td[data-col=actions]{grid-column:1/-1}
+ .clients-pro .clients-table td[data-col=name]::before,.clients-pro .clients-table td[data-col=actions]::before{display:none}
+}
+@media(max-width:760px){
+ .clients-filter-toggle{display:inline-flex!important;align-items:center;gap:6px;width:auto;margin:0;min-height:44px;padding:6px 12px}
+ .clients-filter-toggle svg{width:16px;height:16px}
+ .clients-pro .clients-filters:not([data-open=true]){display:none}
+ .clients-pro .clients-search{flex:1 1 calc(100% - 120px)}
+}
+@media(max-width:560px){.clients-pro .clients-table tr{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:1024px){
+ .clients-pro .clients-panel .clients-table td[data-col]{grid-column:auto;width:auto;max-width:none;padding:0;white-space:normal;text-align:left}
+ .clients-pro .clients-panel .clients-table td:is([data-col=name],[data-col=mail],[data-col=actions]){grid-column:1/-1}
+ .clients-pro .clients-panel[data-density] .clients-table tr{gap:8px 14px;padding:12px 14px}
+ .clients-pro .clients-panel .clients-table td[data-col=state] .client-flag{margin:0}
+}
+@media(max-width:1024px){.clients-pro .clients-table{min-width:0}}

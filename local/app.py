@@ -1481,7 +1481,13 @@ class Handler(BaseHTTPRequestHandler):
                 # Citas del cliente y última atención registrada (entrega más reciente o, si no hay, último ingreso).
                 dates=[dict(r) for r in c.execute("SELECT a.id,a.public_code,a.starts_at,a.status,a.duration_minutes,COALESCE(NULLIF(a.services_summary,''),s.label,a.service_code) service,a.brand,a.model FROM appointments a LEFT JOIN appointment_services s ON s.code=a.service_code WHERE a.client_id=? AND a.deleted_at IS NULL ORDER BY a.starts_at DESC LIMIT 30",(row['id'],))]
                 last=max((item['delivered_at'] or item['received_at'] or '' for item in orders),default='')
-                return self.reply(200,{'client':client_registry.profile(row),'devices':devices,'orders':orders,'appointments':dates,'equipment':equipment.client_history(c,row['id']),'last_service':last,'missing':client_registry.missing(row) if row['needs_review'] else [],'imported':dict(batch) if batch else None,'can_edit':user['role']=='administrador' or bool(row['needs_review'])})
+                # Ficha rápida: pagos registrados (órdenes y ventas de licencias) y ventas de licencias, solo para administración; los documentos
+                # vinculados son los comprobantes de cada orden.
+                money_view=user['role']=='administrador'
+                payments=[dict(r) for r in c.execute("SELECT 'orden' source,p.id,o.code reference,p.amount_cents,p.method,p.kind,p.created_at,p.voided_at!='' voided FROM order_payments p JOIN orders o ON o.id=p.order_id JOIN devices d ON d.id=o.device_id WHERE d.client_id=? "
+                    "UNION ALL SELECT 'licencia',p.id,s.code,p.amount_cents,p.method,p.status,p.created_at,p.status='anulado' FROM license_sale_payments p JOIN license_sales s ON s.id=p.sale_id WHERE s.client_id=? ORDER BY 7 DESC LIMIT 30",(row['id'],row['id']))] if money_view else None
+                sales=[dict(r) for r in c.execute("SELECT id,code,total_cents,payment_status,delivery_status,created_at FROM license_sales WHERE client_id=? ORDER BY id DESC LIMIT 20",(row['id'],))] if money_view else None
+                return self.reply(200,{'client':client_registry.profile(row),'devices':devices,'orders':orders,'appointments':dates,'equipment':equipment.client_history(c,row['id']),'last_service':last,'missing':client_registry.missing(row) if row['needs_review'] else [],'imported':dict(batch) if batch else None,'can_edit':user['role']=='administrador' or bool(row['needs_review']),'payments':payments,'license_sales':sales})
             if path in ('/api/clients/export.csv','/api/clients/import-report.csv'):
                 if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede exportar clientes.'})
                 if path=='/api/clients/export.csv':
@@ -1669,7 +1675,7 @@ class Handler(BaseHTTPRequestHandler):
                         stay_args=(limit_moment.isoformat(timespec='microseconds'),int(limit_moment.timestamp()))
                     ordering = 'o.id DESC'
                 elif path == '/api/clients':
-                    source, columns = 'clients c', "c.id,c.name,c.phone,c.phone_secondary,c.email,c.identification,c.document_type,c.trade_name,c.client_type,c.city,c.canton,c.needs_review,c.import_batch_id,c.origin,(SELECT COUNT(*) FROM orders o JOIN devices d ON d.id=o.device_id WHERE d.client_id=c.id) orders"
+                    source, columns = 'clients c', "c.id,c.name,c.phone,c.phone_secondary,c.email,c.identification,c.document_type,c.trade_name,c.client_type,c.city,c.canton,c.needs_review,c.import_batch_id,c.origin,c.created_at,(SELECT COUNT(*) FROM orders o JOIN devices d ON d.id=o.device_id WHERE d.client_id=c.id) orders,(SELECT COUNT(*) FROM license_units u WHERE u.client_id=c.id AND u.status IN ('entregada','reservada')) licenses"
                     search = "c.name||' '||COALESCE(c.phone,'')||' '||c.phone_secondary||' '||COALESCE(c.email,'')||' '||c.identification||' '||c.trade_name||' '||c.city"
                     # Orden por columnas: nombre, ciudad u órdenes, en ambos sentidos; por defecto, los más recientes.
                     sort=query.get('sort',[''])[0];descending=query.get('dir',[''])[0]=='desc'
@@ -1688,6 +1694,19 @@ class Handler(BaseHTTPRequestHandler):
                         where+=' AND c.client_type=?';client_kind=kind
                     client_city=query.get('city',[''])[0][:80].strip()
                     if client_city:where+=" AND "+client_registry.fold_sql("COALESCE(NULLIF(c.city,''),c.canton,'')")+"=?"
+                    # Filtros combinables: actividad (con órdenes, sin órdenes o con licencias) y fecha de registro de la ficha.
+                    has={'orders':conditions['orders'],'no_orders':conditions['no_orders'],'licenses':"(EXISTS(SELECT 1 FROM license_units u WHERE u.client_id=c.id AND u.status IN ('entregada','reservada')) OR EXISTS(SELECT 1 FROM license_sales v WHERE v.client_id=c.id AND v.delivery_status!='cancelado'))"}
+                    activity=query.get('has',[''])[0]
+                    if activity:
+                        if activity not in has:return self.reply(400,{'error':'Filtro inválido.'})
+                        where+=' AND '+has[activity]
+                    registered=[]
+                    for name,operator in (('from','>='),('to','<=')):
+                        value=query.get(name,[''])[0]
+                        if value:
+                            if not re.fullmatch(r'\d{4}-\d{2}-\d{2}',value):return self.reply(400,{'error':'Fecha de registro inválida.'})
+                            where+=" AND c.created_at!='' AND substr(c.created_at,1,10)"+operator+'?';registered.append(value)
+                    if len(registered)==2 and registered[0]>registered[1]:return self.reply(400,{'error':'La fecha Desde no puede ser posterior a Hasta.'})
                 else:
                     source = 'devices d JOIN clients c ON c.id=d.client_id'
                     duplicate_sql="(SELECT COUNT(*) FROM devices x WHERE x.id!=d.id AND TRIM(COALESCE(d.serial,''))!='' AND lower(TRIM(COALESCE(x.serial,'')))=lower(TRIM(d.serial)))"
@@ -1702,6 +1721,7 @@ class Handler(BaseHTTPRequestHandler):
                 args=[term]
                 if path == '/api/clients' and query.get('type',[''])[0]:args.append(query['type'][0])
                 if path == '/api/clients' and query.get('city',[''])[0].strip():args.append(client_registry.fold(query['city'][0][:80]))
+                if path == '/api/clients':args.extend(value for value in (query.get('from',[''])[0],query.get('to',[''])[0]) if value)
                 if path == '/api/devices' and query.get('type',[''])[0]:args.append(query['type'][0])
                 if path == '/api/orders':
                     if query.get('stay',[''])[0]:args.extend(stay_args)
@@ -1733,8 +1753,8 @@ class Handler(BaseHTTPRequestHandler):
                 total = c.execute('SELECT COUNT(*) FROM '+source+condition, args).fetchone()[0]
                 size=50
                 if path=='/api/clients':
-                    size=query.get('size',['50'])[0]  # por defecto 50, como siempre; el listado permite elegir 10 o 25
-                    if size not in ('10','25','50'):return self.reply(400,{'error':'Tamaño de página inválido.'})
+                    size=query.get('size',['50'])[0]  # por defecto 50 para los buscadores; el directorio pide 15 y permite 10, 25 o 50
+                    if size not in ('10','15','25','50'):return self.reply(400,{'error':'Tamaño de página inválido.'})
                     size=int(size);page=min(page,max(1,(total+size-1)//size))
                 if path=='/api/orders':
                     # El listado completo permite 10, 20 o 50 órdenes por página (50 por defecto, como siempre).

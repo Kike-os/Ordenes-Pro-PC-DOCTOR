@@ -245,6 +245,7 @@ function licenseSaleDialog(preset={}){
   form.prepend(form.lastChild);
   // 1. Cliente
   const s1=licenseSection(left,'1','Cliente');picker=licenseClientPicker(s1,()=>{parts.markDirty();paint();});
+  if(preset.client)setTimeout(()=>{picker.choose(preset.client);delete dialog.dataset.dirty;},0);
   // 2. Productos: buscador y lista compacta con existencias
   const s2=licenseSection(left,'2','Productos'),filter=el('input'),list=el('div',undefined,'license-sale-products');filter.type='search';filter.placeholder='Filtrar productos';filter.setAttribute('aria-label','Filtrar productos');filter.name='product_filter';s2.append(filter,list);
   function paintProducts(){const term=filter.value.trim().toLowerCase();list.replaceChildren();const shown=products.filter(item=>!term||[item.name,item.brand,item.line_label].join(' ').toLowerCase().includes(term));

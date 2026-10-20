@@ -338,7 +338,7 @@ def create(c,data,user=None):
  # Cliente nuevo: se registra en Clientes con su origen. Si su contacto coincide con el de otra persona, queda marcado para revisión
  # y no se fusiona ni se sobrescribe nada. Un cliente existente no se modifica: solo se le vincula la cita.
  client_new=not client
- if client_new:client_id=c.execute("INSERT INTO clients(name,email,phone,identification,document_type,origin,notes) VALUES (?,?,?,?,?,'cita',?)",(fields['name'],fields['email'],fields['phone'],fields['identification'],fields['document_type'] or 'cedula','Registrado desde una cita. Su teléfono o correo coincide con otro cliente que tiene una identificación distinta: revisar posible duplicado.' if match=='ambiguo' else '')).lastrowid
+ if client_new:client_id=c.execute("INSERT INTO clients(name,email,phone,identification,document_type,origin,notes,created_at) VALUES (?,?,?,?,?,'cita',?,?)",(fields['name'],fields['email'],fields['phone'],fields['identification'],fields['document_type'] or 'cedula','Registrado desde una cita. Su teléfono o correo coincide con otro cliente que tiene una identificación distinta: revisar posible duplicado.' if match=='ambiguo' else '',reception.reception_now().isoformat(timespec='seconds'))).lastrowid
  else:client_id=client['id']
  token=secrets.token_urlsafe(32);created=stamp(now());public='CIT-'+now().strftime('%Y%m%d')+'-'+secrets.token_hex(3).upper()
  initial='confirmada' if user or confirmation_mode(c)=='auto' else 'solicitada'

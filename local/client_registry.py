@@ -68,5 +68,7 @@ def save(c,data,user):
         if not c.execute('SELECT 1 FROM clients WHERE id=?',(oid,)).fetchone():return 404,{'error':'Cliente no disponible.'}
         c.execute('UPDATE clients SET '+','.join(k+'=?' for k in KEYS)+',identity_key=?,phone_secondary=?,notes=?,needs_review=0 WHERE id=?',(*(fields[k] for k in KEYS),key,extra['phone_secondary'],extra['notes'],oid))
     else:
-        oid=c.execute('INSERT INTO clients('+','.join(KEYS)+',identity_key,phone_secondary,notes) VALUES ('+','.join('?' for _ in range(len(KEYS)+3))+')',(*(fields[k] for k in KEYS),key,extra['phone_secondary'],extra['notes'])).lastrowid
+        # Fecha de registro de la ficha (hora de Ecuador): permite filtrar el directorio por fecha. Las fichas existentes no se modifican.
+        from reception import reception_now
+        oid=c.execute('INSERT INTO clients('+','.join(KEYS)+',identity_key,phone_secondary,notes,created_at) VALUES ('+','.join('?' for _ in range(len(KEYS)+4))+')',(*(fields[k] for k in KEYS),key,extra['phone_secondary'],extra['notes'],reception_now().isoformat(timespec='seconds'))).lastrowid
     return 200 if data.get('id') else 201,{'ok':True,'id':int(oid),'similar':similar(c,fields,int(oid))}
