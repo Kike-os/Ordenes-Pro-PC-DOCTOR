@@ -4,6 +4,20 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.177 — 2026-10-19 21:39 (UTC-05:00)
+
+Consecutivo global de órdenes, rediseño de Clientes e inventario profesional de Licencias
+
+### Mejoras realizadas
+
+- Gestión de Clientes rediseñada: buscador instantáneo fijo, tabla con encabezados fijos, paginación arriba y abajo, filtros combinables y ficha lateral con licencias, pagos y documentos
+- Licencias Pro: inventario por cliente, tabla y tarjetas compactas, barras de vigencia con porcentaje y días, menú de acciones por estado, exportación sin claves y detalle por secciones; selector de entrega compacto
+
+### Errores corregidos
+
+- Consecutivo de órdenes global PCD-AAAAMMDD-NNNN que no se reinicia por día; unificación de las órdenes existentes con su fecha original, tabla de equivalencias y códigos anteriores que siguen funcionando (QR, búsquedas y correos)
+- Licencias: una licencia en inventario ya no puede registrarse con fecha de activación; los datos inconsistentes se señalan «En revisión» sin modificarlos
+
 ## v1.5.176 — 2026-10-19 20:31 (UTC-05:00)
 
 Ventas de licencias independientes con carrito, pagos y entrega

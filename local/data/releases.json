@@ -8,6 +8,26 @@
   },
   "releases": [
     {
+      "version": "1.5.177",
+      "date": "2026-10-19T21:39:06-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Consecutivo global de órdenes, rediseño de Clientes e inventario profesional de Licencias",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Gestión de Clientes rediseñada: buscador instantáneo fijo, tabla con encabezados fijos, paginación arriba y abajo, filtros combinables y ficha lateral con licencias, pagos y documentos",
+          "Licencias Pro: inventario por cliente, tabla y tarjetas compactas, barras de vigencia con porcentaje y días, menú de acciones por estado, exportación sin claves y detalle por secciones; selector de entrega compacto"
+        ],
+        "fixes": [
+          "Consecutivo de órdenes global PCD-AAAAMMDD-NNNN que no se reinicia por día; unificación de las órdenes existentes con su fecha original, tabla de equivalencias y códigos anteriores que siguen funcionando (QR, búsquedas y correos)",
+          "Licencias: una licencia en inventario ya no puede registrarse con fecha de activación; los datos inconsistentes se señalan «En revisión» sin modificarlos"
+        ],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.176",
       "date": "2026-10-19T20:31:44-05:00",
       "type": "patch",
