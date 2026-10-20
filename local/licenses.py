@@ -557,6 +557,22 @@ def void(c,unit_id,reason,user,now):
           unit_id,unit['product_id'],order=unit['order_id'],client=unit['client_id'],user=user)
 
 
+def retire_activation(c,unit_id,reason,user,now):
+    """Corrección manual autorizada de un dato inconsistente: una licencia en inventario (sin vender) que figura con activación. Se retira
+    la activación y se recalcula el vencimiento; los valores anteriores, el motivo, la persona y la hora quedan en el historial."""
+    if user['role']!='administrador':raise LicenseError('Solo administración corrige datos de licencias.',403)
+    unit=unit_row(c,unit_id);reason=re.sub(r'\s+',' ',str(reason or '')).strip()
+    if unit['status'] not in ('disponible','vencida'):raise LicenseError('Solo se retira la activación de una licencia en inventario (sin vender).',409)
+    if not (unit['activated'] or unit['activated_at']):raise LicenseError('Esta licencia no tiene activación registrada.',409)
+    if len(reason)<5:raise LicenseError('Indica el motivo de la corrección.',fields={'reason':'Motivo obligatorio.'})
+    product=_product(c,unit['product_id'])
+    expires=unit['expires_at'] if product.get('validity_mode')=='fija' else compute_expiry(product,unit['purchased_at'],'')
+    status='vencida' if expires and expires<now.date().isoformat() else 'disponible'
+    c.execute("UPDATE license_units SET activated=0,activated_at='',expires_at=?,status=?,updated_at=? WHERE id=?",(expires,status,stamp(now),unit_id))
+    event(c,'correccion',now,'Corrección autorizada de datos inconsistentes: se retira la activación registrada en inventario (activación anterior: %s; vencimiento anterior: %s). Motivo: %s'%(unit['activated_at'] or 'sin fecha',unit['expires_at'] or 'sin fecha',reason[:300]),unit_id,unit['product_id'],user=user)
+    return status
+
+
 def release(c,unit_id,user,now,from_sale=False):
     """Anula la reserva: la licencia vuelve a estar disponible solo si no fue activada ni entregada."""
     unit=unit_row(c,unit_id)

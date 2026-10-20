@@ -127,7 +127,8 @@ class NoShowTests(unittest.TestCase):
         with app.connect() as c:c.execute("INSERT INTO appointment_holidays(day,label) VALUES (?,'Feriado ficticio')",(closed,))
         self.assertEqual(self.request('/api/public/reschedule/'+tokens[first]+'?date='+closed)['body']['slots'],[])
         # Dos clientes eligen a la vez el último puesto libre de un horario: solo uno lo obtiene.
-        other=self.day(4);free=self.request('/api/public/reschedule/'+tokens[first]+'?date='+other)['body']['slots'][0]
+        # Un día hábil distinto del ya lleno y del feriado (según el día de la semana, day(4) y day(5) pueden caer en el mismo lunes).
+        other=next(d for d in (self.day(n) for n in range(1,20)) if d not in (day,closed));free=self.request('/api/public/reschedule/'+tokens[first]+'?date='+other)['body']['slots'][0]
         while True:
             left=[s for s in [free] if s in self.request('/api/public/reschedule/'+tokens[first]+'?date='+other)['body']['slots']]
             with app.connect() as c:capacity=len(appointments.technicians(c,appointments.parse_start(other+'T'+free+':00-05:00'),60))

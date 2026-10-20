@@ -7482,3 +7482,68 @@ body[data-page=dashboard] .license-sale-mode input[type=radio]{appearance:auto;w
 @media (max-width:420px){body[data-page=dashboard] .license-sale-mode label{padding:4px 8px;gap:5px;font-size:12.5px}}
 @media (max-width:420px){body[data-page=dashboard] .license-sale-mode label{flex:1 1 auto}}
 @media (max-width:420px){body[data-page=dashboard] .license-sale-mode{border-radius:12px}body[data-page=dashboard] .license-sale-mode label{border-radius:9px}}
+/* Licencias Pro · inventario (revisión 1.5.178): filtros sin textos cortados, vista por cliente sin columna repetida, barra de 120 px. */
+.licenses .license-inv-filters{display:grid;grid-template-columns:minmax(220px,2fr) minmax(170px,1.3fr) minmax(170px,1.2fr) minmax(150px,1fr) minmax(130px,.9fr) minmax(130px,.9fr);gap:8px;align-items:end}
+.licenses .license-inv-buttons{grid-column:1/-1;justify-content:flex-end}
+.licenses .license-inv-field :is(select,input){text-overflow:ellipsis}
+.licenses .license-inv-field select{padding-right:30px}
+@media(max-width:1180px){.licenses .license-inv-filters{grid-template-columns:repeat(3,minmax(0,1fr))}.licenses .license-inv-field.is-wide{grid-column:1/-1}}
+@media(max-width:600px){.licenses .license-inv-filters{grid-template-columns:repeat(2,minmax(0,1fr))}.licenses .license-inv-buttons{justify-content:stretch}.licenses .license-inv-buttons>*{flex:1 1 auto}}
+.licenses .license-meter .license-meter-track,.client-licenses .license-meter .license-meter-track,.license-review .license-meter .license-meter-track{flex-basis:120px;height:6px}
+.license-meter[data-tone=running] .license-meter-track>span{transition:width .3s ease,background-color .3s ease}
+.license-group-title{display:grid;gap:1px;min-width:0;margin-right:auto}
+.license-group-head{flex-wrap:nowrap}
+.license-group-alert.is-review{border-color:#92400e;background:#2a1a05;color:#fcd34d;margin-left:0}
+.license-group-head .license-group-alert{margin-left:0;flex:none}
+@media(min-width:901px){.license-group-table th:nth-child(1){width:13%}.license-group-table th:nth-child(2){width:27%}.license-group-table th:nth-child(3){width:19%}
+ .license-group-table th:nth-child(4){width:24%}.license-group-table th:nth-child(5){width:11%}.license-group-table th:nth-child(6){width:6%}
+ .license-group-table td:nth-child(4){overflow:visible}.license-group-table td:nth-child(5){overflow:visible}}
+@media(max-width:600px){.license-group-head{flex-wrap:wrap}}
+.license-review-note{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 14px}
+.license-review-note span{flex:1 1 320px}.license-review-open{flex:none;min-height:34px;padding:6px 12px}
+.license-review-body{display:grid;gap:10px;max-height:min(70vh,640px);overflow:auto;padding-right:2px}
+.license-review-item{display:grid;gap:8px;padding:10px 12px;border:1px solid #92400e;border-left:3px solid #f59e0b;border-radius:10px;background:#0b1626}
+.license-review-item header{display:flex;flex-wrap:wrap;align-items:center;gap:8px}.license-review-item header span{color:#bcd0ec}
+.license-review-problems{margin:0;padding-left:18px;color:#fcd34d;font-size:13px}
+.license-review-facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:4px 14px;margin:0}
+.license-review-facts dt{font-size:11px;color:#8fa5c4}.license-review-facts dd{margin:0;font-size:13px}
+.license-review-history{padding:8px 10px;border-radius:8px;background:#0a1424}
+/* Licencias Pro · barra de vigencia premium: LED discreto y punto luminoso en el extremo; sin animación continua. */
+.license-meter.license-led{display:flex;align-items:center;gap:10px;min-width:0;background:none;border-radius:0}
+.license-led .license-meter-track{position:relative;display:block;flex:0 0 140px!important;height:7px!important;border-radius:999px;background:#0f1d33;box-shadow:inset 0 1px 2px #02071499,0 0 0 1px #1f3352;overflow:visible!important}
+.license-detail .license-led .license-meter-track{flex-basis:160px!important}
+.license-led .license-meter-fill{position:relative;display:block;height:100%;max-width:100%;border-radius:inherit;background:linear-gradient(90deg,color-mix(in srgb,var(--led,#64748b) 55%,#0b1220),var(--led,#64748b));box-shadow:0 0 6px color-mix(in srgb,var(--led,#64748b) 55%,transparent);transition:width .45s ease,background-color .45s ease}
+.license-led[data-tone=running] .license-meter-fill::after{content:"";position:absolute;right:-4px;top:50%;width:9px;height:9px;border-radius:50%;transform:translateY(-50%);background:radial-gradient(circle,#fff 0 30%,var(--led) 70%);box-shadow:0 0 6px 2px color-mix(in srgb,var(--led) 70%,transparent)}
+.license-led:is([data-tone=expired],[data-tone=pending],[data-tone=none]) .license-meter-fill{box-shadow:none}
+.license-led[data-tone=expired] .license-meter-track{box-shadow:inset 0 1px 2px #02071499,0 0 0 1px #7f1d1d}
+.license-meter-info{display:grid;gap:0;min-width:0;line-height:1.25}
+.license-led .license-meter-info small{font-size:12px;white-space:nowrap;color:#bcd0ec}
+.license-led[data-tone=running] .license-meter-info small:first-child{color:var(--led-text);font-weight:600}
+.license-led[data-tone=expired] .license-meter-info small:first-child{color:#fca5a5;font-weight:600}
+.license-led[data-tone=pending] .license-meter-info small:first-child{color:#94a3b8}
+.license-led .license-meter-info .license-meter-date{font-size:11px;color:#8fa5c4;font-weight:400}
+.license-led .license-meter-date[hidden]{display:none}
+@media(max-width:480px){.license-led .license-meter-track{flex-basis:110px!important}}
+@media(prefers-reduced-motion:reduce){.license-led .license-meter-fill{transition:none}}
+@media(forced-colors:active){.license-led .license-meter-fill{background:Highlight}.license-led .license-meter-fill::after{display:none}}
+/* Licencias Pro · botones de acción con iconos (32 × 32 px, radio 8 px, color por función, brillo suave y nombre al pasar el cursor). */
+.license-actionbar{display:inline-flex;align-items:center;justify-content:flex-end;gap:5px;flex-wrap:nowrap}
+.license-icon-btn,.license-actionbar .license-menu-trigger{--act:#94a3b8;position:relative;display:inline-grid;place-items:center;width:32px;height:32px;min-width:32px;min-height:0;margin:0;padding:0;border:1px solid #22385a;border-radius:8px;background:#0b1626;color:var(--act);cursor:pointer;transition:border-color .18s ease,box-shadow .18s ease,background-color .18s ease,color .18s ease}
+.license-icon-btn svg,.license-actionbar .license-menu-trigger svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.license-icon-btn[data-kind=view]{--act:#60a5fa}.license-icon-btn[data-kind=send]{--act:#c084fc}.license-icon-btn[data-kind=edit]{--act:#7dd3fc}.license-icon-btn[data-kind=renew]{--act:#4ade80}.license-icon-btn[data-kind=danger]{--act:#f87171}
+.license-icon-btn:hover,.license-icon-btn:focus-visible,.license-actionbar .license-menu-trigger:hover,.license-actionbar .license-menu-trigger:focus-visible,.license-actionbar .license-menu-trigger[aria-expanded=true]{border-color:color-mix(in srgb,var(--act) 60%,#22385a);background:color-mix(in srgb,var(--act) 12%,#0b1626);box-shadow:0 0 0 1px color-mix(in srgb,var(--act) 25%,transparent),0 0 10px color-mix(in srgb,var(--act) 22%,transparent);color:#fff;outline:0}
+.license-icon-btn:focus-visible,.license-actionbar .license-menu-trigger:focus-visible{outline:2px solid color-mix(in srgb,var(--act) 70%,#fff);outline-offset:2px}
+.license-icon-btn[data-tip]::after,.license-actionbar .license-menu-trigger[data-tip]::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 7px);left:50%;z-index:40;padding:4px 8px;border:1px solid #2b4a75;border-radius:6px;background:#0b1526;color:#e3edff;font-size:11.5px;font-weight:600;line-height:1.2;white-space:nowrap;pointer-events:none;opacity:0;transform:translate(-50%,3px);transition:opacity .15s ease,transform .15s ease}
+.license-icon-btn:is(:hover,:focus-visible)::after,.license-actionbar .license-menu-trigger:is(:hover,:focus-visible)::after{opacity:1;transform:translate(-50%,0)}
+.license-actionbar .license-menu-trigger[aria-expanded=true]::after{opacity:0}
+@media(pointer:coarse){.license-icon-btn,.license-actionbar .license-menu-trigger{width:40px;height:40px;min-width:40px}.license-icon-btn[data-tip]::after,.license-actionbar .license-menu-trigger[data-tip]::after{display:none}}
+@media(prefers-reduced-motion:reduce){.license-icon-btn,.license-actionbar .license-menu-trigger,.license-icon-btn::after{transition:none}}
+@media(min-width:901px){.license-group-table th:nth-child(1){width:11%}.license-group-table th:nth-child(2){width:22%}.license-group-table th:nth-child(3){width:15%}
+ .license-group-table th:nth-child(4){width:24%}.license-group-table th:nth-child(5){width:10%}.license-group-table th:nth-child(6){width:18%}
+ .license-group-table td.license-inv-actions{overflow:visible;text-align:right}
+ .license-flat-table td.license-inv-actions{white-space:nowrap}}
+.license-meter-info{min-width:0}
+@media(max-width:900px){.licenses .license-inv-table td.license-inv-actions{grid-column:1/-1!important;grid-row:auto!important;justify-content:flex-end}
+ .licenses .license-group-table td:is([data-label='Código LIC']){grid-column:1/-1!important}}
+@media(max-width:900px){.licenses .license-inv-table td:is(.license-inv-actions,.license-inv-pick){width:auto!important}
+ .license-led .license-meter-info small{white-space:normal}.licenses .license-inv-table td[data-label=Vigencia]{flex-wrap:wrap}}

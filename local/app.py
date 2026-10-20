@@ -3242,6 +3242,7 @@ class Handler(BaseHTTPRequestHandler):
                             if action=='edit':licenses.edit(c,unit,data,user,now)
                             elif action=='void':licenses.void(c,unit,data.get('reason',''),user,now)
                             elif action=='release':licenses.release(c,unit,user,now)
+                            elif action=='retire_activation':licenses.retire_activation(c,unit,data.get('reason',''),user,now)
                             elif action=='activate':
                                 expires=licenses.confirm_activation(c,unit,data.get('activated_at',''),user,now);audit(c,user['id'],'license_activate',unit);return self.reply(200,{'ok':True,'expires_at':expires})
                             elif action=='renew':

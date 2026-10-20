@@ -61,4 +61,35 @@ class LicenseInventoryTests(unittest.TestCase):
         self.assertEqual(licenses.export_csv([dict(rows[anual],client='=HYPERLINK("x")')]).count("'=HYPERLINK"),1)
 
 
+class LicenseReviewTests(LicenseInventoryTests):
+    def test_manual_correction_requires_reason_admin_and_is_logged(self):
+        self.admin();today=self.today().isoformat();made=self.new_product(key='REV-KEY-00001');uid=made['unit_id']
+        with app.connect() as c:c.execute("UPDATE license_units SET activated=1,activated_at=?,expires_at=? WHERE id=?",(today,(self.today()+timedelta(days=365)).isoformat(),uid))
+        path='/api/licenses/units/%d'%uid
+        self.assertEqual(self.post(path,action='retire_activation',reason='x')['status'],400)
+        with app.connect() as c:self.assertEqual(c.execute('SELECT activated FROM license_units WHERE id=?',(uid,)).fetchone()[0],1)  # nada cambia sin motivo
+        done=self.post(path,action='retire_activation',reason='Fecha cargada por error al registrar el lote');self.assertEqual(done['status'],200,done['body'])
+        unit=self.unit(uid);self.assertEqual((unit['status'],unit['activated'],unit['activated_at'],unit['expires_at']),('disponible',0,'',''))
+        last=self.get('/api/licenses/history?unit=%d'%uid)['body']['rows'][0]
+        self.assertEqual(last['event'],'correccion');self.assertIn(today,last['detail']);self.assertIn('Fecha cargada por error',last['detail']);self.assertTrue(last['actor'])
+        self.assertEqual(self.post(path,action='retire_activation',reason='Segundo intento ficticio')['status'],409)
+        # Una licencia vendida no se corrige así (su activación es real).
+        sold=self.post('/api/licenses/sales',client_id=str(self.client_id()),items=[{'product_id':str(made['product_id']),'quantity':'1'}],deliver=True,accept_balance=True,activated=True,activated_at=today)['body']
+        sold_unit=self.get('/api/licenses/sales/%d'%sold['sale'])['body']['units'][0]['id']
+        self.assertEqual(self.post('/api/licenses/units/%d'%sold_unit,action='retire_activation',reason='Intento sobre vendida')['status'],409)
+        with app.connect() as c:c.execute("UPDATE users SET role='tecnico' WHERE id=?",(self.uid,))
+        self.assertEqual(self.post(path,action='retire_activation',reason='Intento de técnico')['status'],403)
+
+    def test_dashboard_counts_match_records(self):
+        self.admin();client=self.client_id();made=self.new_product(key='CNT-KEY-00001');pid=made['product_id']
+        self.assertEqual(self.post('/api/licenses/units/bulk',product_id=str(pid),lines='CNT-KEY-00002\nCNT-KEY-00003\nCNT-KEY-00004')['status'],201)
+        self.post('/api/licenses/sales',client_id=str(client),items=[{'product_id':str(pid),'quantity':'1'}],deliver=True,accept_balance=True,activated=True,activated_at=(self.today()-timedelta(days=350)).isoformat())
+        self.post('/api/licenses/sales',client_id=str(client),items=[{'product_id':str(pid),'quantity':'1'}])
+        meta=self.get('/api/licenses')['body'];d=meta['dashboard'];rows=self.get('/api/licenses/units')['body']['rows']
+        count=lambda state:sum(1 for r in rows if r['state']==state)
+        for key,state in (('disponibles','disponible'),('reservadas','reservada'),('activas','activa'),('por_vencer','por_vencer'),('vencidas','vencida'),('pendientes_activacion','pendiente_activacion')):
+            self.assertEqual(d[key],count(state),key)
+        self.assertEqual((d['disponibles'],d['reservadas'],d['por_vencer']),(2,1,1))
+
+
 if __name__=='__main__':unittest.main()
