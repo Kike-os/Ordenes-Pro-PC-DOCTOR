@@ -4,6 +4,15 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.183 — 2026-10-20 13:58 (UTC-05:00)
+
+Ventas y Entregas de licencias rediseñadas con tarjetas compactas
+
+### Mejoras realizadas
+
+- Licencias · Ventas: tarjetas compactas con número, cliente, fecha, total, pagado y etiquetas de pago y entrega (incluida «Entrega parcial»), detalle desplegable por producto con logotipo, acciones con iconos y búsqueda por número, cliente, cédula o producto combinable con los filtros
+- Licencias · Entregas: reservas solo de presupuestos aprobados agrupadas por producto, historial con licencias agrupadas, códigos desplegables, tarjeta digital, enlace nuevo y registro completo de cada entrega, sin mostrar claves ni credenciales
+
 ## v1.5.182 — 2026-10-20 13:27 (UTC-05:00)
 
 Aviso de propiedad intelectual en el inicio de sesión y corrección del panel de ADI
