@@ -7619,7 +7619,7 @@ body[data-page=dashboard] .license-sale-mode input[type=radio]{appearance:auto;w
 @media(prefers-reduced-motion:reduce){.autocare-stat,.autocare-tab,.autocare-progress span{transition:none}.autocare-steps li[data-status=running] .autocare-step-icon svg{animation:none}}
 .autocare-stat small{line-height:1.2}
 @media(min-width:1101px){.autocare-pro .autocare-stats{grid-template-columns:repeat(6,minmax(0,1fr))}}
-@media(max-width:600px){.autocare-pro .autocare-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.autocare-stat{flex-direction:column;align-items:flex-start;gap:6px;padding:8px}.autocare-stat-icon{width:28px;height:28px}}
+@media(max-width:600px){.autocare-pro .autocare-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.autocare-stat{display:grid;justify-items:start;align-items:start;gap:6px;padding:8px}.autocare-stat-icon{width:28px;height:28px}}
 /* Licencias Pro · ajustar stock */
 .license-adjust-facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:6px;margin:0}
 .license-adjust-facts div{padding:7px 10px;border:1px solid #22385a;border-radius:9px;background:#0b1626}.license-adjust-facts dt{font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:#8fa5c4}.license-adjust-facts dd{margin:2px 0 0;font-size:13.5px;font-weight:600;color:#e3edff;overflow-wrap:anywhere}
