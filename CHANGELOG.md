@@ -4,6 +4,23 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.179 — 2026-10-20 07:43 (UTC-05:00)
+
+Corrección de ADI AutoCare y servicios de pasta térmica para portátiles
+
+### Nuevas funcionalidades
+
+- Presupuestos: Renovación de pasta térmica para portátiles sin GPU dedicada (0,00) y para portátiles Gamer con GPU dedicada (5,00), IVA incluido, con iconos propios en pantalla y PDF
+
+### Mejoras realizadas
+
+- ADI AutoCare: «Ver detalles» por servicio (tiempos con umbral real, últimos resultados, causa y acción; licencias afectadas, stock, duplicados y recomendaciones; estado del correo) y tiempos por paso en Órdenes y Agenda
+
+### Errores corregidos
+
+- ADI AutoCare: textos superpuestos en los servicios, indicador que contaba como correctos los no comprobados, correo «No comprobado» sin distinguir fallo real, prueba omitida o pendiente, y diagnóstico que fallaba si había una verificación automática en curso
+- Selector del catálogo: el botón de limpiar la búsqueda se montaba sobre «Nuevo servicio o repuesto»
+
 ## v1.5.178 — 2026-10-20 07:08 (UTC-05:00)
 
 ADI AutoCare Pro 2.0, ajuste de stock e inventario de licencias revisado
