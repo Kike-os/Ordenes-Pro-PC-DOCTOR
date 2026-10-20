@@ -123,7 +123,7 @@ class LicenseProTests(unittest.TestCase):
         self.assertEqual(self.unit(buy['unit_id'])['expires_at'],licenses.add_months(today-timedelta(days=10),12).isoformat())
         self.assertEqual(self.post('/api/licenses/new',name='Fija sin fecha',line='otros',duration='anual',validity_mode='fija',price='9',key='FIX-KEY-00001')['status'],400)
         fixed=self.new_product(name='Fecha fija',key='FIX-KEY-00002',validity='fija',expires_at='2028-03-31');self.assertEqual(self.unit(fixed['unit_id'])['expires_at'],'2028-03-31')
-        perpetual=self.new_product(name='Perpetua',key='PERP-KEY-0001',duration='perpetua',activated_at=today.isoformat())
+        perpetual=self.new_product(name='Perpetua',key='PERP-KEY-0001',duration='perpetua')
         self.assertEqual(self.unit(perpetual['unit_id'])['expires_at'],'')
         self.assertEqual(licenses.state_of({'status':'entregada','expires_at':(today+timedelta(days=10)).isoformat(),'activated':1,'renewed_to':None},today),('por_vencer',10))
         self.assertEqual(licenses.state_of({'status':'entregada','expires_at':'','activated':0,'renewed_to':None},today)[0],'pendiente_activacion')

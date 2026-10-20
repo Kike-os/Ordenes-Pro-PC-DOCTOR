@@ -1966,10 +1966,17 @@ class Handler(BaseHTTPRequestHandler):
                     if path=='/api/licenses':
                         return self.reply(200,{'products':licenses.products(c,now),'dashboard':licenses.dashboard(c,now),'expiring':licenses.expiring(c,now,30),'kinds':licenses.KINDS,'lines':licenses.LINES,'models':licenses.MODELS,
                                                'durations':licenses.DURATIONS,'validity':licenses.VALIDITY,'statuses':licenses.STATUSES,'states':licenses.STATES,'fields':licenses.FIELDS,'field_labels':licenses.FIELD_LABELS,
-                                               'secret_labels':licenses.SECRET_LABELS,'max_bulk':licenses.MAX_BULK,'contact':licenses.CONTACT,'link_hours':licenses.LINK_HOURS})
+                                               'secret_labels':licenses.SECRET_LABELS,'max_bulk':licenses.MAX_BULK,'contact':licenses.CONTACT,'link_hours':licenses.LINK_HOURS,'display':licenses.display_settings(c)})
                     if path=='/api/licenses/units':
                         product=arg('product');client=arg('client')
-                        return self.reply(200,{'rows':licenses.units(c,now,int(product) if product.isdigit() else None,arg('status'),arg('q')[:120],arg('state'),arg('from')[:10],arg('to')[:10],int(client) if client.isdigit() else None)})
+                        return self.reply(200,{'rows':licenses.units(c,now,int(product) if product.isdigit() else None,arg('status'),arg('q')[:120],arg('state'),arg('from')[:10],arg('to')[:10],int(client) if client.isdigit() else None,arg('field'))})
+                    if path=='/api/licenses/units/export.csv':
+                        # Exportación ordinaria: los mismos filtros (o la selección) y nunca claves, seriales, usuarios ni contraseñas.
+                        product=arg('product');rows=licenses.units(c,now,int(product) if product.isdigit() else None,arg('status'),arg('q')[:120],arg('state'),arg('from')[:10],arg('to')[:10],None,arg('field'))
+                        chosen={int(x) for x in arg('ids').split(',') if x.isdigit()}
+                        if chosen:rows=[r for r in rows if r['id'] in chosen]
+                        audit(c,user['id'],'licenses_exported');c.commit()
+                        return self.reply(200,licenses.export_csv(rows),'text/csv; charset=utf-8',filename='licencias-ordenes-pro.csv')
                     if path=='/api/licenses/deliveries':return self.reply(200,licenses.deliveries(c,now))
                     if path=='/api/licenses/order-info':
                         info=licenses.order_info(c,arg('code')[:40]);return self.reply(200,info) if info else self.reply(404,{'error':'No existe una orden con ese número.'})
@@ -3172,6 +3179,8 @@ class Handler(BaseHTTPRequestHandler):
                             unit=licenses.register(c,data,user,now);audit(c,user['id'],'license_registered',unit);return self.reply(201,{'ok':True,'id':unit})
                         if path=='/api/licenses/units/bulk':
                             made=licenses.register_many(c,data,user,now);audit(c,user['id'],'license_bulk_registered',len(made));return self.reply(201,{'ok':True,'count':len(made)})
+                        if path=='/api/licenses/settings':
+                            saved=licenses.save_display(c,data,user,now);audit(c,user['id'],'license_settings_saved');return self.reply(200,{'ok':True,'display':saved})
                         if path=='/api/licenses/optout':
                             cid=str(data.get('client_id',''))
                             if not cid.isdigit() or not c.execute('SELECT 1 FROM clients WHERE id=?',(int(cid),)).fetchone():return self.reply(404,{'error':'Cliente no disponible.'})

@@ -249,7 +249,7 @@ def detail(c,sale_id,now):
     units=[]
     for unit in c.execute("SELECT u.id,u.code,u.product_id,i.name product,u.status,u.activated,u.activated_at,u.expires_at,u.delivered_at,u.renewed_to,u.devices,u.term,p.validity_mode "
                           "FROM license_units u JOIN catalog_items i ON i.id=u.product_id LEFT JOIN license_products p ON p.item_id=u.product_id WHERE u.sale_id=? ORDER BY u.id",(sale_id,)):
-        unit=dict(unit);unit['state'],unit['days_left']=licenses.state_of(unit,today);unit['state_label']=licenses.STATES[unit['state']][0];units.append(unit)
+        unit=dict(unit);unit['state'],unit['days_left']=licenses.state_of(unit,today,soon=licenses.display_settings(c)['soon_days']);unit['state_label']=licenses.STATES[unit['state']][0];units.append(unit)
     out['units']=units
     out['payments']=[dict(r,method_label=METHODS[r['method']],status_label=PAYMENT_STATES[r['status']]) for r in c.execute(
         "SELECT p.id,p.amount_cents,p.method,p.reference,p.paid_on,p.status,p.notes,p.created_at,p.confirmed_at,p.voided_at,p.void_reason,COALESCE(u.name,'') by_name,"

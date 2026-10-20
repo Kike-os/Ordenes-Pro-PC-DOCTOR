@@ -143,7 +143,24 @@ def compute_expiry(product,purchased_at,activated_at,manual=''):
     return add_months(date.fromisoformat(base),months).isoformat() if base else ''
 
 
-def state_of(unit,today,mode='activacion'):
+def display_settings(c):
+    """Umbral (en días) desde el que una licencia vendida se muestra «Por vencer» (amarillo). Configurable por administración."""
+    row=c.execute("SELECT value FROM system_state WHERE key='license_display'").fetchone()
+    try:stored=json.loads(row['value']) if row else {}
+    except ValueError:stored={}
+    soon=stored.get('soon_days')
+    return {'soon_days':soon if type(soon) is int and 1<=soon<=180 else SOON_DAYS}
+
+
+def save_display(c,data,user,now):
+    text=str(data.get('soon_days') or '').strip()
+    if not text.isdigit() or not 1<=int(text)<=180:raise LicenseError('El aviso de próximo vencimiento debe estar entre 1 y 180 días.',fields={'soon_days':'Valor no válido.'})
+    c.execute("INSERT INTO system_state(key,value) VALUES ('license_display',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",(json.dumps({'soon_days':int(text)}),))
+    event(c,'configuracion',now,'Aviso de próximo vencimiento: %s días.'%text,user=user)
+    return display_settings(c)
+
+
+def state_of(unit,today,mode='activacion',soon=None):
     """Estado visible de una unidad hoy (y días restantes cuando tiene vencimiento)."""
     days=(date.fromisoformat(unit['expires_at'])-today).days if unit.get('expires_at') else None
     if unit['status']=='anulada':return 'anulada',days
@@ -152,7 +169,7 @@ def state_of(unit,today,mode='activacion'):
     if unit['status']=='reservada':return 'reservada',days
     if days is not None and days<0:return 'vencida',days
     if not unit.get('activated'):return 'pendiente_activacion',days
-    if days is not None and days<=SOON_DAYS:return 'por_vencer',days
+    if days is not None and days<=(soon or SOON_DAYS):return 'por_vencer',days
     return 'activa',days
 
 
@@ -377,6 +394,8 @@ def _free_seat(c,product,values,exclude=None):
 
 
 def _insert_unit(c,product,fields,values,batch,user,now,notes=''):
+    if fields['activated_at']:
+        raise LicenseError('Una licencia en inventario aún no está activada: la fecha real de activación se registra al entregarla o con «Confirmar activación».',fields={'activated_at':'Solo al entregar o confirmar la activación.'})
     seat,mark=_free_seat(c,product,values)
     unit=c.execute('INSERT INTO license_units(product_id,batch_id,kind,edition,license_type,manufacturer,version,devices,term,purchased_at,activated_at,expires_at,download_url,instructions,secret,fingerprint,seat,notes,created_by,created_at,updated_at) '
                    'VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
@@ -491,6 +510,10 @@ def edit(c,unit_id,data,user,now):
     changes+=[FIELD_LABELS[key].lower() for key in FIELDS if fields[key]!=unit[key]]
     notes=_text(data,'notes',500,'Las observaciones') if 'notes' in data else unit['notes']
     activated=int(data['activated']) if data.get('activated') in (True,False) else (1 if fields['activated_at'] else unit['activated'])
+    if unit['status'] in ('disponible','vencida'):
+        # En inventario no hay activación real: solo se puede retirar un dato anterior inconsistente (queda en el historial).
+        if fields['activated_at']:raise LicenseError('Una licencia en inventario aún no está activada: deja vacía la fecha de activación.',fields={'activated_at':'Solo al entregar o confirmar la activación.'})
+        activated=0
     if activated!=unit['activated']:changes.append('marcada como activada' if activated else 'activación retirada')
     status=unit['status']
     if status in ('disponible','vencida'):status='vencida' if fields['expires_at'] and fields['expires_at']<now.date().isoformat() else 'disponible'
@@ -814,12 +837,13 @@ def card(c,delivery_id,private=False):
 
 
 # ---- Consultas para la interfaz ---------------------------------------------------------------------------------------
-def units(c,now,product_id=None,status='',query='',state='',date_from='',date_to='',client_id=None):
-    today=now.date()
+def units(c,now,product_id=None,status='',query='',state='',date_from='',date_to='',client_id=None,field=''):
+    today=now.date();soon=display_settings(c)['soon_days']
     sql=("SELECT u.id,u.code,u.product_id,i.name product,i.brand,u.kind,u.edition,u.license_type,u.manufacturer,u.version,u.devices,u.term,u.purchased_at,u.activated_at,u.expires_at,u.activated,u.notes,"
          "u.download_url,u.instructions,u.status,u.reserved_at,u.delivered_at,u.created_at,u.renewed_from,u.renewed_to,u.seat,u.batch_id,"
-         "q.code quote_code,COALESCE(o.code,'') order_code,u.order_id,u.client_id,COALESCE(cl.name,'') client,b.supplier batch_supplier,b.invoice,b.unit_cost_cents,"
-         "(SELECT 1 FROM license_receipts r WHERE r.batch_id=u.batch_id) has_receipt,p.validity_mode,(SELECT COUNT(*) FROM license_renewals n WHERE n.unit_id=u.id) renewals "
+         "q.code quote_code,COALESCE(o.code,'') order_code,u.order_id,u.client_id,COALESCE(cl.name,'') client,COALESCE(cl.identification,'') client_identification,b.supplier batch_supplier,b.invoice,b.unit_cost_cents,"
+         "(SELECT 1 FROM license_receipts r WHERE r.batch_id=u.batch_id) has_receipt,p.validity_mode,p.duration,p.duration_months,(SELECT COUNT(*) FROM license_renewals n WHERE n.unit_id=u.id) renewals,"
+         "(SELECT s.code FROM license_sales s WHERE s.id=u.sale_id) sale_code,(SELECT s.payment_status FROM license_sales s WHERE s.id=u.sale_id) sale_payment,u.sale_id "
          "FROM license_units u JOIN catalog_items i ON i.id=u.product_id LEFT JOIN license_products p ON p.item_id=u.product_id LEFT JOIN quotes q ON q.id=u.quote_id LEFT JOIN orders o ON o.id=u.order_id "
          "LEFT JOIN clients cl ON cl.id=u.client_id LEFT JOIN license_batches b ON b.id=u.batch_id WHERE 1=1")
     args=[]
@@ -827,14 +851,15 @@ def units(c,now,product_id=None,status='',query='',state='',date_from='',date_to
     if client_id:sql+=' AND u.client_id=?';args.append(client_id)
     rows=[]
     for r in c.execute(sql+' ORDER BY u.id DESC LIMIT 2000',args):
-        row=dict(r);row['state'],row['days_left']=state_of(row,today)
+        row=dict(r);row['state'],row['days_left']=state_of(row,today,soon=soon);row['issues']=issues(row);row['term_days']=term_days(row)
         row['state_label'],row['state_color']=STATES[row['state']];row['status_label']=STATUSES.get(row['status'],row['status']);row['kind_label']=KINDS[row['kind']]
         rows.append(row)
     if status:rows=[r for r in rows if r['status']==status]
-    if state:rows=[r for r in rows if r['state']==state]
+    if state=='revision':rows=[r for r in rows if r['issues']]
+    elif state:rows=[r for r in rows if r['state']==state]
     if date_from or date_to:
-        start=date_from or '0000-01-01';end=date_to or '9999-12-31'
-        rows=[r for r in rows if any(start<=(r[k] or '')[:10]<=end for k in ('purchased_at','delivered_at','activated_at','expires_at') if r[k])]
+        start=date_from or '0000-01-01';end=date_to or '9999-12-31';keys=[DATE_FIELDS[field]] if field in DATE_FIELDS else ['purchased_at','delivered_at','activated_at','expires_at']
+        rows=[r for r in rows if any(start<=(r[k] or '')[:10]<=end for k in keys if r[k])]
     words=[w for w in re.sub(r'\s+',' ',str(query or '').lower()).split(' ') if w]
     if words:
         # Buscar por la clave o la cuenta compara su huella: encuentra la licencia sin mostrar ni guardar la credencial en claro.
@@ -843,17 +868,53 @@ def units(c,now,product_id=None,status='',query='',state='',date_from='',date_to
             for seat in range(1,11):marks|={fingerprint('otro',{'key':query},seat),fingerprint('m365',{'username':query},seat)}
         except LicenseError:marks=set()
         exact={r['id'] for r in c.execute('SELECT id FROM license_units WHERE fingerprint IN (%s)'%','.join('?'*len(marks)),list(marks))} if marks else set()
-        rows=[r for r in rows if r['id'] in exact or all(w in ' '.join(str(r[k] or '') for k in ('code','product','brand','edition','license_type','manufacturer','client','order_code','quote_code','batch_supplier','invoice')).lower() for w in words)]
+        rows=[r for r in rows if r['id'] in exact or all(w in ' '.join(str(r[k] or '') for k in ('code','product','brand','edition','license_type','manufacturer','client','client_identification','order_code','quote_code','batch_supplier','invoice','sale_code')).lower() for w in words)]
     return rows
+
+
+DATE_FIELDS={'compra':'purchased_at','registro':'created_at','entrega':'delivered_at','activacion':'activated_at','vencimiento':'expires_at'}
+
+
+def issues(row):
+    """Datos que no cuadran entre sí, para revisión administrativa. Solo se señalan: nunca se corrigen automáticamente."""
+    out=[]
+    if row['status'] in ('disponible','vencida') and (row['activated_at'] or row['activated']):out.append('Figura con activación estando en inventario (sin vender).')
+    elif row['activated_at'] and not row['activated']:out.append('Tiene fecha de activación sin activación confirmada.')
+    if row['activated'] and not row['activated_at']:out.append('Marcada como activada sin fecha de activación.')
+    if row['expires_at'] and row['activated_at'] and row['expires_at']<row['activated_at']:out.append('El vencimiento es anterior a la activación.')
+    if row['status']=='entregada' and not row['delivered_at']:out.append('Entregada sin fecha de entrega.')
+    return out
+
+
+def term_days(row):
+    """Días que dura el período de esta licencia según la duración de SU producto (mensual, anual, bianual…), sin suponer 365."""
+    if not row.get('expires_at'):return None
+    months=row.get('duration_months') if row.get('duration')=='personalizada' else MONTHS.get(row.get('duration') or '')
+    end=date.fromisoformat(row['expires_at'])
+    if months:return max(1,(end-add_months(end,-months)).days)
+    start=row.get('activated_at') or row.get('purchased_at')
+    return max(1,(end-date.fromisoformat(start[:10])).days) if start else None
+
+
+def export_csv(rows):
+    """Exportación ordinaria del inventario: sin claves, seriales, usuarios ni contraseñas."""
+    import csv,io
+    out=io.StringIO();writer=csv.writer(out)
+    safe=lambda value:("'"+value) if isinstance(value,str) and value[:1] in ('=','+','-','@','\t','\r') else value
+    writer.writerow(['Código','Producto','Fabricante','Cliente','Estado','Compra','Registro','Entrega','Activación','Vencimiento','Días restantes','Orden','Venta','Proveedor','Factura','Revisión'])
+    for r in rows:
+        writer.writerow([safe(v) for v in (r['code'],r['product'],r['manufacturer'] or r['brand'] or '',r['client'],r['state_label'],r['purchased_at'],(r['created_at'] or '')[:10],(r['delivered_at'] or '')[:10],r['activated_at'],r['expires_at'],
+                         '' if r['days_left'] is None else r['days_left'],r['order_code'],r['sale_code'] or '',r['batch_supplier'] or '',r['invoice'] or '',' '.join(r['issues']))])
+    return '\ufeff'+out.getvalue()
 
 
 def dashboard(c,now):
     """Indicadores del panel: disponibles, reservadas, activas, por vencer, vencidas y renovaciones realizadas."""
-    counts={key:0 for key in STATES}
-    for unit in c.execute('SELECT status,expires_at,activated,renewed_to FROM license_units'):
-        counts[state_of(dict(unit),now.date())[0]]+=1
+    counts={key:0 for key in STATES};soon=display_settings(c)['soon_days'];review=0
+    for unit in c.execute('SELECT status,expires_at,activated,activated_at,renewed_to,delivered_at FROM license_units'):
+        counts[state_of(dict(unit),now.date(),soon=soon)[0]]+=1;review+=bool(issues(dict(unit)))
     return {'disponibles':counts['disponible'],'reservadas':counts['reservada'],'activas':counts['activa'],'pendientes_activacion':counts['pendiente_activacion'],
-            'por_vencer':counts['por_vencer'],'vencidas':counts['vencida'],'renovaciones':c.execute('SELECT COUNT(*) FROM license_renewals').fetchone()[0],'anuladas':counts['anulada']}
+            'por_vencer':counts['por_vencer'],'vencidas':counts['vencida'],'renovaciones':c.execute('SELECT COUNT(*) FROM license_renewals').fetchone()[0],'anuladas':counts['anulada'],'revision':review,'soon_days':soon}
 
 
 def deliveries(c,now):
@@ -901,11 +962,11 @@ def stock(c,now):
 # ---- Alertas de vencimiento -------------------------------------------------------------------------------------------
 def expiring(c,now,limit=200):
     """Licencias vendidas con vencimiento en los próximos 30 días o ya vencidas (sin renovar): para el panel y la campana."""
-    today=now.date();out=[]
+    today=now.date();out=[];soon=display_settings(c)['soon_days']
     for r in c.execute("SELECT u.id,u.code,u.expires_at,u.status,u.activated,u.renewed_to,i.name product,COALESCE(cl.name,'') client FROM license_units u JOIN catalog_items i ON i.id=u.product_id "
                        "LEFT JOIN clients cl ON cl.id=u.client_id WHERE u.status='entregada' AND u.expires_at!='' AND u.renewed_to IS NULL ORDER BY u.expires_at LIMIT ?",(limit,)):
         days=(date.fromisoformat(r['expires_at'])-today).days
-        if days<=SOON_DAYS:out.append(dict(r,days_left=days))
+        if days<=soon:out.append(dict(r,days_left=days))
     return out
 
 
