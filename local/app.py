@@ -1353,6 +1353,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(200,{'writing':adi_ai.status(c),'today':usage,'channels':{'mail':mail_allowed(user),'web_chat':True,'whatsapp':False},'receipt_mail_auto':not (auto_receipt and auto_receipt['value']=='off')})
             if path == '/api/adi/admin':
                 if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede usar la asistente administrativa.'})
+                import adi_ai
                 return self.reply(200,{'enabled':bool(adi_ai.openai_key()),'message':'ADI responde consultas operativas desde datos autorizados.','live':adi.snapshot(c,reception_now())})
             adi_conversation=re.fullmatch(r'/api/adi/conversations(?:/([0-9]+))?',path)
             if adi_conversation:
