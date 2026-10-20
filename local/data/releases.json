@@ -8,6 +8,24 @@
   },
   "releases": [
     {
+      "version": "1.5.182",
+      "date": "2026-10-20T13:27:42-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Aviso de propiedad intelectual en el inicio de sesión y corrección del panel de ADI",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Inicio de sesión: aviso de software privado y propiedad intelectual de PC-DOCTOR S.A. bajo el botón, compacto y con los colores del sistema"
+        ],
+        "fixes": [
+          "El panel de ADI (asistente administrativa) no cargaba: el servidor cerraba la conexión por un módulo usado antes de importarse"
+        ],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.181",
       "date": "2026-10-20T09:28:09-05:00",
       "type": "patch",

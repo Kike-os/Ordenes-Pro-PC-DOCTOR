@@ -4,6 +4,18 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.182 — 2026-10-20 13:27 (UTC-05:00)
+
+Aviso de propiedad intelectual en el inicio de sesión y corrección del panel de ADI
+
+### Mejoras realizadas
+
+- Inicio de sesión: aviso de software privado y propiedad intelectual de PC-DOCTOR S.A. bajo el botón, compacto y con los colores del sistema
+
+### Errores corregidos
+
+- El panel de ADI (asistente administrativa) no cargaba: el servidor cerraba la conexión por un módulo usado antes de importarse
+
 ## v1.5.181 — 2026-10-20 09:28 (UTC-05:00)
 
 Servicios de formateo con Windows y de respaldo de información
