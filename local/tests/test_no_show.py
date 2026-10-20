@@ -55,7 +55,9 @@ class NoShowTests(unittest.TestCase):
             c.execute("UPDATE appointments SET status='presente' WHERE id=?",(ids['atendida'],))
             c.execute("UPDATE appointments SET status='completada' WHERE id=?",(ids['puntual'],))
             c.execute("UPDATE appointments SET status='cancelada' WHERE id=?",(ids['cancelada'],))
-            order=c.execute("INSERT INTO orders(device_id,status,problem,created_by,created_at,code,received_at) VALUES (NULL,'pendiente','Ficticia',?,0,'PCD-20990101-0001','2099-01-01T00:00:00-05:00')",(self.uid,)).lastrowid
+            client=c.execute('SELECT client_id FROM appointments WHERE id=?',(ids['orden'],)).fetchone()[0]
+            device=c.execute("INSERT INTO devices(client_id,type,category,kind,brand,model) VALUES (?,'portatil','portatil','portatil','HP','Ficticio')",(client,)).lastrowid
+            order=c.execute("INSERT INTO orders(device_id,status,problem,created_by,created_at,code,received_at) VALUES (?,'pendiente','Ficticia',?,0,'PCD-20990101-0001','2099-01-01T00:00:00-05:00')",(device,self.uid)).lastrowid
             c.execute('UPDATE appointments SET converted_order_id=? WHERE id=?',(order,ids['orden']))
         self.assertEqual(self.sweep()['marked'],0)                         # desactivado: nada cambia
         self.enable()

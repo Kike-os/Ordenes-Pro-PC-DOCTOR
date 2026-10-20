@@ -90,3 +90,15 @@ Todos los estados se pintan con una misma píldora de 26 px con icono y texto (`
 - Se pueden elegir hasta 5 servicios por cita, sin repetir; la duración de la cita es la suma (máximo 8 horas). El retiro de equipos se agenda solo. La disponibilidad, la prevención de citas simultáneas, los horarios, los feriados y los avisos funcionan igual, con la duración total.
 - «Compra de licencia de software» pide el tipo de licencia (Windows 10 y Windows 11; Microsoft Office; Microsoft 365; Antivirus Kaspersky, ESET NOD32, McAfee, Norton y otros; Otras licencias de software) y observaciones opcionales.
 - La cita conserva su servicio principal (el primero) y guarda el detalle en `appointment_service_items`; la agenda y los correos muestran el resumen («Diagnóstico técnico + Reparación de bisagras»). Las citas anteriores no cambian.
+
+## Inasistencias y reagendamiento (migración 066, 1.5.174)
+
+**Configuración** (Configuración → Agenda → «Inasistencias y reagendamientos», solo administración): control automático (desactivado por defecto), tolerancia en minutos (5-240, por defecto 15), envío del correo, vigencia del enlace (1-30 días, por defecto 7) y límite de reagendamientos por cita (1-5, por defecto 2).
+
+**Detección automática.** Una cita confirmada o reprogramada, sin llegada registrada ni orden creada, pasa a «No asistió» cuando vence la tolerancia. Solo se revisan citas posteriores al momento en que se activó el control y de las últimas 72 horas: nunca se reescribe el historial anterior. La revisión corre en la tarea diaria (`/api/cron/reminders`) y, como máximo cada 5 minutos, mientras hay usuarios con sesión. Cada inasistencia queda en el historial de la cita (`no_show_auto`). También se puede marcar a mano.
+
+**Enlace privado.** Se genera un enlace `/reagendar/<token>`; en la base solo se guarda la huella SHA-256. Un enlace nuevo anula los anteriores sin usar; se revoca al reprogramar o reactivar la cita desde la Agenda. El correo («PC-DOCTOR S.A. | Reagenda tu cita técnica») sale por Mail Pro con el botón «Reagendar mi cita»; si falla se reintenta hasta 3 veces. Desde la ficha de la cita se puede «Enviar enlace de reagendamiento» o «Enviar rectificación» (cuando la inasistencia fue un error).
+
+**Página pública.** Muestra la cita, el servicio, el equipo y la fecha anterior, y solo los días y horarios realmente libres (se vuelven a comprobar al confirmar). La cita conserva su código, datos e historial; queda marcada como «Reagendada» (morado) y suma un reagendamiento. Al alcanzar el límite, el cliente debe comunicarse por WhatsApp. Un enlace vencido puede pedir uno nuevo si la cita sigue en «No asistió».
+
+«No asistió» es distinto de «Cancelada» y se revierte con «Reactivar cita».
