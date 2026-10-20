@@ -148,4 +148,75 @@ class LicenseSalesTests(unittest.TestCase):
         self.assertEqual(self.post('/api/licenses/sales/%d'%sale,action='cancel',reason='Prueba de permisos')['status'],403)
 
 
+class LicenseSalesDeliveriesViewTests(LicenseSalesTests):
+    """Rediseño de Ventas y Entregas: estado por producto, entrega parcial, filtros combinados, reservas solo de presupuestos y registro
+    completo de cada entrega, siempre sin claves ni credenciales."""
+    order_with_quote=LicenseSalesTests._base['order_with_quote'];approve=LicenseSalesTests._base['approve']
+    test_cart_sale_without_order_reserves_keys_and_numbers_daily=test_invalid_cart_is_all_or_nothing=test_payments_partial_pending_confirmed_and_receipts=None
+    test_delivery_requires_balance_acceptance_and_hides_keys=test_cancel_requires_voided_payments_and_releases_keys=test_order_link_is_optional_and_must_belong_to_client=None
+    test_sale_and_delivery_in_one_step_sends_mail_without_keys=test_only_administration=None
+
+    def rows(self,**query):
+        from urllib.parse import urlencode
+        return self.get('/api/licenses/sales?'+urlencode(query))['body']['rows']
+
+    def test_item_states_partial_delivery_and_responsible(self):
+        av,ms,client=self.catalog()
+        sale=self.sale(client,[{'product_id':av,'quantity':2},{'product_id':ms,'quantity':1}])['body']['sale']
+        row=self.rows()[0];self.assertEqual((row['delivery_view'],row['delivery_view_label']),('pendiente','Pendiente de entrega'))
+        self.assertEqual([(i['product_name'],i['quantity'],i['delivery_state']) for i in row['items']],[('Bitdefender Antivirus Plus ficticio',2,'pendiente'),('Microsoft 365 ficticio',1,'pendiente')])
+        self.assertTrue(all('has_logo' in i for i in row['items']))
+        self.post('/api/licenses/sales/%d'%sale,action='deliver',accept_balance=True)
+        row=self.rows()[0];self.assertEqual(row['delivery_view'],'entregado');self.assertEqual({i['delivery_state'] for i in row['items']},{'entregado'})
+        with app.connect() as c:name=c.execute('SELECT name FROM users WHERE id=?',(self.uid,)).fetchone()[0]
+        self.assertEqual(row['delivered_name'],name)
+        # Una devolución de una de las dos claves deja la venta y ese producto en «Entrega parcial»; los datos no se borran.
+        unit=next(u for u in self.detail(sale)['units'] if u['product']=='Bitdefender Antivirus Plus ficticio')
+        self.assertEqual(self.post('/api/licenses/units/%d'%unit['id'],action='void',reason='Devolución autorizada por el cliente')['status'],200)
+        row=self.rows()[0];self.assertEqual((row['delivery_status'],row['delivery_view'],row['delivery_view_label']),('entregado','parcial','Entrega parcial'))
+        self.assertEqual([(i['delivered'],i['returned'],i['delivery_state']) for i in row['items']],[(1,1,'parcial'),(1,0,'entregado')])
+        self.assertNotIn('FICT-X',str(row));self.assertNotIn('FICT-0000',str(row))
+        with app.connect() as c:self.assertEqual(c.execute('SELECT COUNT(*) FROM license_sale_items WHERE sale_id=?',(sale,)).fetchone()[0],2)
+
+    def test_search_by_number_client_identification_product_and_combined_filters(self):
+        av,ms,client=self.catalog()
+        paid=self.sale(client,[{'product_id':ms,'quantity':1}],payment={'amount':'99,90','method':'efectivo','confirmed':True})['body']
+        due=self.sale(client,[{'product_id':av,'quantity':1}])['body']
+        for q,expected in ((paid['code'],[paid['code']]),('0100000017',[due['code'],paid['code']]),('microsoft',[paid['code']]),('no-existe-xyz',[])):
+            self.assertEqual([r['code'] for r in self.rows(q=q)],expected,q)
+        self.assertEqual([r['code'] for r in self.rows(payment='pagado',delivery='pendiente')],[paid['code']])
+        self.assertEqual([r['code'] for r in self.rows(q='bitdefender',payment='pagado')],[])
+        self.assertEqual([r['code'] for r in self.rows(q='bitdefender',payment='pendiente',delivery='pendiente')],[due['code']])
+
+    def test_reservations_only_from_approved_quotes_grouped_and_history_by_product(self):
+        av,ms,client=self.catalog()
+        order,quote=self.order_with_quote(av,quantity=2);self.assertEqual(self.approve(quote)['status'],200)
+        with app.connect() as c:code=c.execute('SELECT code FROM orders WHERE id=?',(order,)).fetchone()[0]
+        # Una venta vinculada a la misma orden reserva su clave, pero no aparece como reserva de presupuesto.
+        self.sale(client,[{'product_id':ms,'quantity':1}],link_order=True,order_code=code)
+        waiting=self.get('/api/licenses/deliveries')['body']['waiting'];row=next(w for w in waiting if w['order_id']==order)
+        self.assertEqual(len(row['reserved']),2);self.assertEqual(row['client_id'],client)
+        self.assertEqual([(g['product'],g['quantity'],g['state']) for g in row['groups']],[('Bitdefender Antivirus Plus ficticio',2,'Reservada, pendiente de entrega')])
+        self.assertTrue(row['groups'][0]['quote']);self.assertTrue(row['groups'][0]['reserved_at']);self.assertNotIn('FICT-X',str(waiting))
+        self.assertEqual(self.post('/api/licenses/deliver',order_id=str(order),accept_balance=True)['status'],200)
+        self.assertEqual(self.post('/api/licenses/deliver',order_id=str(order),accept_balance=True)['status'],409)  # sin entregas duplicadas
+        data=self.get('/api/licenses/deliveries')['body'];self.assertFalse([w for w in data['waiting'] if w['order_id']==order and w['reserved']])
+        entry=data['history'][0];self.assertEqual((entry['client_id'],entry['order_id'],entry['sale_code']),(client,order,''))
+        self.assertEqual([(g['product'],g['count'],g['delivered'],len(g['codes'])) for g in entry['products']],[('Bitdefender Antivirus Plus ficticio',2,2,2)])
+        self.assertTrue(all(code.startswith('LIC-') for code in entry['products'][0]['codes']));self.assertNotIn('FICT-X',str(data))
+
+    def test_delivery_log_lists_events_without_keys_and_is_admin_only(self):
+        av,ms,client=self.catalog()
+        sale=self.sale(client,[{'product_id':av,'quantity':1},{'product_id':ms,'quantity':1}],deliver=True,accept_balance=True)['body']
+        delivery=self.detail(sale['sale'])['delivery_id']
+        log=self.get('/api/licenses/deliveries/%d/events'%delivery);self.assertEqual(log['status'],200)
+        events=log['body']['rows'];self.assertTrue(events);self.assertTrue(all(e['created_at'] and e['actor'] for e in events))
+        self.assertEqual({e['unit_code'] for e in events if e['unit_code']},{u['code'] for u in self.detail(sale['sale'])['units']})
+        self.assertNotIn('FICT-X',str(events));self.assertNotIn('FICT-0000',str(events))
+        history=self.get('/api/licenses/deliveries')['body']['history'][0];self.assertEqual(history['sale_code'],sale['code'])
+        self.assertEqual(self.get('/api/licenses/deliveries/999999/events')['status'],404)
+        with app.connect() as c:c.execute("UPDATE users SET role='tecnico' WHERE id=?",(self.uid,))
+        self.assertEqual(self.get('/api/licenses/deliveries/%d/events'%delivery)['status'],403)
+
+
 if __name__=='__main__':unittest.main()

@@ -2003,6 +2003,8 @@ class Handler(BaseHTTPRequestHandler):
                         if not found:return self.reply(404,{'error':'Sin comprobante.'})
                         audit(c,user['id'],'license_receipt_viewed',int(receipt_route[1]))
                         return self.reply(200,bytes(found['data']),found['mime'],filename=found['name'])
+                    events_route=re.fullmatch(r'/api/licenses/deliveries/([0-9]{1,9})/events',path)
+                    if events_route:return self.reply(200,{'rows':licenses.delivery_events(c,int(events_route[1]))})
                     card_route=re.fullmatch(r'/api/licenses/deliveries/([0-9]{1,9})/card',path)
                     if card_route:return self.reply(200,licenses.card(c,int(card_route[1]),private=False))
                     if path=='/api/licenses/sales':

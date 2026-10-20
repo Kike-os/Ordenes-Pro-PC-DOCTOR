@@ -122,3 +122,20 @@ En **Productos y catálogo**, junto a «Editar» y «Agregar stock». El inventa
 - **Disminuir:** hay que elegir exactamente qué licencias disponibles se retiran (código, últimos 4 caracteres de la clave enmascarados, compra, registro, proveedor, factura y vencimiento). Pasan a «Anulada»: no se venden, y sus claves, usuarios, contraseñas e historial se conservan. Cada una registra «Retirada del inventario por ajuste de stock» y el producto un resumen con cantidad anterior y nueva, motivo y responsable.
 - **Aumentar:** no se inventan registros; la ventana indica cuántas licencias reales hay que registrar con «Agregar stock».
 - Solo administración; pide confirmación; impide cantidades negativas; nunca toca licencias reservadas o entregadas, ventas, pagos ni clientes. Indicadores y catálogo se actualizan al instante (`GET /api/licenses/products/<id>/stock`, `POST /api/licenses/products/adjust`).
+
+## Ventas y Entregas: tarjetas compactas (rama ventas-entregas-pro)
+
+**Ventas.** Cada venta es una tarjeta con número (VLIC-…), cliente, fecha, total, pagado, lo que está por confirmar y el saldo, más las etiquetas de pago (Pagado, Pago parcial, Pendiente de pago, Cancelado) y de entrega (Entregado, Entrega parcial, Pendiente de entrega, Cancelado). «Entrega parcial» es una vista: la venta está entregada, pero alguna licencia se devolvió después. Ese dato no se guarda; se calcula con las unidades. Los productos aparecen en «Ver detalles», que está plegado al principio. Hay una fila por producto con logotipo, cantidad, precio y estado de entrega; si la entrega es parcial, se indica cuántas licencias se entregaron. Los iconos de acción tienen nombre accesible y muestran una etiqueta al pasar el cursor:
+- Ver cliente;
+- Comprobante;
+- Revisar venta;
+- Registrar pago, si queda saldo;
+- Gestionar entrega.
+
+La búsqueda (número, cliente, cédula o RUC, producto) y los filtros de pago y entrega se combinan entre sí. «+ Nueva venta» permanece visible en la barra superior.
+
+**Entregas.**
+- «Licencias reservadas por presupuestos aprobados» solo muestra lo que está pendiente de entrega y viene de un presupuesto. Las ventas independientes vinculadas a una orden se gestionan en Ventas y no se duplican aquí. Cada orden muestra el cliente y el saldo, con una fila por presupuesto y producto: cantidad, fecha de reserva y estado. Las acciones son «Ver presupuesto y orden», «Ver cliente» y «Gestionar entrega». Esta última pide confirmación y, si queda saldo, obliga a aceptarlo de forma expresa. Una orden ya entregada no se puede volver a entregar. Si no hay reservas, aparece un aviso breve con un icono.
+- «Historial de entregas» muestra tarjetas con el número de venta (o la orden), el cliente, la fecha y quién entregó, y las licencias agrupadas por producto con su cantidad y las devoluciones. «Ver códigos de licencia» despliega los códigos internos LIC-…, que no son claves. Desde cada tarjeta se abren la tarjeta digital (sin credenciales), un enlace privado nuevo y el «Registro completo»: todos los eventos de la entrega y de sus licencias, con fecha, responsable y detalle (`GET /api/licenses/deliveries/<id>/events`, solo administración).
+
+Nada de esto muestra claves, contraseñas ni credenciales de Microsoft 365. No se borra ni se renumera nada, y no hay migración.

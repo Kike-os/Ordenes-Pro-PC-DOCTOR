@@ -7680,3 +7680,55 @@ body:is([data-page=login],.auth-page) .login-ip-text small{font-size:10px;line-h
 body:is([data-page=login],.auth-page) .login-ip{margin-top:10px;padding-top:8px;gap:8px}
 body:is([data-page=login],.auth-page) .login-ip-text{gap:1px}
 body:is([data-page=login],.auth-page) .login-ip-text p{line-height:1.38}
+/* Licencias · Ventas y Entregas: tarjetas compactas con detalle desplegable (acotado a .ls-*) */
+.licenses .ls-tools{position:sticky;top:0;z-index:5;margin:0 -6px 6px;padding:8px 6px;border-radius:0 0 10px 10px;background:rgba(8,17,31,.94);box-shadow:0 6px 14px rgba(0,0,0,.25)}
+.licenses .ls-tools .ls-new{flex:0 0 auto;white-space:nowrap}
+.licenses .ls-count{margin:0 0 8px}
+.licenses .ls-list{display:grid;gap:10px;margin-bottom:14px}
+.licenses .ls-list[aria-busy=true]{opacity:.6;transition:opacity .2s ease}
+.licenses .ls-card{display:grid;gap:8px;min-width:0;padding:12px 14px;border:1px solid #22385a;border-left:3px solid #3b82f6;border-radius:12px;background:linear-gradient(160deg,rgba(15,30,52,.92),rgba(9,19,34,.92));box-shadow:0 6px 18px rgba(0,0,0,.18);animation:ls-in .22s ease both;transition:border-color .18s ease,box-shadow .18s ease}
+.licenses .ls-card:hover,.licenses .ls-card.is-open{border-color:#2f5b91;box-shadow:0 8px 22px rgba(0,0,0,.26),0 0 0 1px rgba(96,165,250,.12)}
+.licenses .ls-card[data-payment=pagado][data-delivery=entregado],.licenses .ls-history{border-left-color:#22c55e}
+.licenses .ls-card[data-delivery=parcial]{border-left-color:#fb923c}
+.licenses .ls-card[data-payment=pendiente],.licenses .ls-card[data-payment=parcial]{border-left-color:#f59e0b}
+.licenses .ls-card[data-payment=cancelado]{border-left-color:#64748b;opacity:.85}
+.licenses .ls-reserve{border-left-color:#60a5fa}
+.licenses .ls-head{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 12px;align-items:start}
+.licenses .ls-id{display:grid;gap:1px;min-width:0}
+.licenses .ls-id strong{font-size:14.5px;color:#e3edff;overflow-wrap:anywhere}
+.licenses .ls-id .ls-client{font-size:13.5px;font-weight:600;color:#cfe0fa;overflow-wrap:anywhere}
+.licenses .ls-id small{font-size:12px;color:#93a9c9;overflow-wrap:anywhere}
+.licenses .ls-badges{display:flex;flex-wrap:wrap;gap:5px;justify-content:flex-end}
+.licenses .ls-money{display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:6px;margin:0}
+.licenses .ls-money div{min-width:0;padding:5px 9px;border:1px solid #1c3150;border-radius:8px;background:rgba(6,14,26,.55)}
+.licenses .ls-money dt{font-size:11px;color:#8ea4c4;text-transform:uppercase;letter-spacing:.04em}
+.licenses .ls-money dd{margin:0;font-size:14px;font-weight:700;color:#e3edff;font-variant-numeric:tabular-nums}
+.licenses .ls-money .is-paid dd{color:#5eead4}.licenses .ls-money .is-due dd{color:#fcd34d}
+.licenses .ls-actions{justify-content:flex-start;flex-wrap:wrap}
+.licenses .ls-actions .license-icon-btn:last-child[data-tip]::after{left:auto;right:0;transform:translate(0,3px)}
+.licenses .ls-actions .license-icon-btn:last-child:is(:hover,:focus-visible)::after{transform:translate(0,0)}
+.licenses .ls-actions .license-icon-btn:first-child[data-tip]::after{left:0;transform:translate(0,3px)}
+.licenses .ls-actions .license-icon-btn:first-child:is(:hover,:focus-visible)::after{transform:translate(0,0)}
+.licenses .ls-toggle svg{transition:transform .2s ease}
+.licenses .ls-toggle[aria-expanded=true] svg{transform:rotate(180deg)}
+.licenses .ls-detail{display:grid;gap:6px;padding-top:8px;border-top:1px dashed #22385a;animation:ls-in .2s ease both}
+.licenses .ls-detail[hidden]{display:none}
+.licenses .ls-items{display:grid;gap:6px}
+.licenses .ls-item{display:grid;grid-template-columns:34px minmax(0,1fr) auto auto;gap:4px 10px;align-items:center;min-width:0;padding:6px 8px;border:1px solid #1c3150;border-radius:9px;background:rgba(6,14,26,.45)}
+.licenses .ls-item .ls-logo{width:34px;height:34px}
+.licenses .ls-item-name{display:grid;min-width:0}
+.licenses .ls-item-name strong{font-size:13px;color:#e3edff;overflow-wrap:anywhere}
+.licenses .ls-item-name small{font-size:11.5px;color:#93a9c9;overflow-wrap:anywhere}
+.licenses .ls-item-total{font-size:13px;font-weight:700;color:#cfe0fa;white-space:nowrap;font-variant-numeric:tabular-nums}
+.licenses .ls-history .ls-item{grid-template-columns:34px minmax(0,1fr) auto}
+.licenses .ls-meta{font-size:12px}
+.licenses .ls-codes p{margin:0}
+.licenses .ls-section{display:flex;align-items:center;gap:8px;margin:10px 0 8px}
+.licenses .ls-section svg{width:18px;height:18px;fill:none;stroke:#60a5fa;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:0 0 auto}
+.licenses .ls-section-count{margin-left:2px;padding:1px 8px;border-radius:999px;background:#13253f;color:#93c5fd;font-size:12px}
+.licenses .ls-empty{display:flex;align-items:center;gap:10px;margin:0 0 12px;padding:10px 14px;border:1px dashed #2b4a75;border-radius:10px;color:#a9bddb;font-size:13px;background:rgba(6,14,26,.4)}
+.licenses .ls-empty svg{width:20px;height:20px;flex:0 0 auto;fill:none;stroke:#60a5fa;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.license-dialog .ls-log{max-height:min(60vh,520px);overflow:auto}
+@keyframes ls-in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+@media (max-width:560px){.licenses .ls-head{grid-template-columns:minmax(0,1fr)}.licenses .ls-badges{justify-content:flex-start}.licenses .ls-item{grid-template-columns:30px minmax(0,1fr) auto}.licenses .ls-item .ls-logo{width:30px;height:30px}.licenses .ls-item>.license-sale-badge{grid-column:2/-1;justify-self:start}.licenses .ls-card{padding:10px}.licenses .ls-tools{position:static}}
+@media(prefers-reduced-motion:reduce){.licenses .ls-card,.licenses .ls-detail{animation:none}.licenses .ls-toggle svg,.licenses .ls-list[aria-busy=true]{transition:none}}

@@ -223,15 +223,22 @@ def cancel(c,sale_id,reason,user,now):
 # ---- Consultas ------------------------------------------------------------------------------------------------------
 def _summary(c,row):
     row=dict(row);paid=_paid(c,row['id']);pending=_paid(c,row['id'],'por_confirmar')
-    items=[dict(r) for r in c.execute('SELECT product_id,product_name,quantity,unit_price_cents,discount_cents FROM license_sale_items WHERE sale_id=? ORDER BY position',(row['id'],))]
+    items=[dict(r) for r in c.execute("SELECT i.id,i.product_id,i.product_name,i.quantity,i.unit_price_cents,i.discount_cents,(SELECT 1 FROM catalog_images g WHERE g.item_id=i.product_id) has_logo,"
+                                      "(SELECT COUNT(*) FROM license_units u WHERE u.sale_item_id=i.id AND u.status='entregada') delivered,(SELECT COUNT(*) FROM license_units u WHERE u.sale_item_id=i.id AND u.status='anulada' AND u.delivered_at!='') returned "
+                                      "FROM license_sale_items i WHERE i.sale_id=? ORDER BY i.position",(row['id'],))]
+    for item in items:
+        item['delivery_state']='cancelado' if row['delivery_status']=='cancelado' else 'entregado' if item['delivered']>=item['quantity'] else 'parcial' if item['delivered'] or item['returned'] else 'pendiente'
+    # Vista de entrega: «Entrega parcial» si, tras entregar, alguna licencia no sigue entregada (por ejemplo, una devolución autorizada).
+    view=row['delivery_status']
+    if view=='entregado' and any(item['delivery_state']!='entregado' for item in items):view='parcial'
     row.update(paid_cents=paid,pending_cents=pending,balance_cents=max(row['total_cents']-paid,0),items=items,payment_label=PAYMENT[row['payment_status']],delivery_label=DELIVERY[row['delivery_status']],
-               quantity=sum(i['quantity'] for i in items))
+               quantity=sum(i['quantity'] for i in items),delivery_view=view,delivery_view_label={'parcial':'Entrega parcial'}.get(view,DELIVERY.get(view,view)))
     return row
 
 
 def sales(c,query='',payment='',delivery='',limit=300):
-    sql=("SELECT s.*,cl.name client,COALESCE(cl.identification,'') identification,COALESCE(o.code,'') order_code FROM license_sales s JOIN clients cl ON cl.id=s.client_id "
-         "LEFT JOIN orders o ON o.id=s.order_id WHERE 1=1")
+    sql=("SELECT s.*,cl.name client,COALESCE(cl.identification,'') identification,COALESCE(o.code,'') order_code,COALESCE(u.name,'') delivered_name FROM license_sales s JOIN clients cl ON cl.id=s.client_id "
+         "LEFT JOIN orders o ON o.id=s.order_id LEFT JOIN users u ON u.id=s.delivered_by WHERE 1=1")
     args=[]
     if payment in PAYMENT:sql+=' AND s.payment_status=?';args.append(payment)
     if delivery in DELIVERY:sql+=' AND s.delivery_status=?';args.append(delivery)

@@ -992,12 +992,21 @@ def deliveries(c,now):
     orders=[r['order_id'] for r in c.execute("SELECT DISTINCT order_id FROM license_units WHERE order_id IS NOT NULL AND status='reservada' ORDER BY 1 DESC LIMIT 300")]
     orders=list(dict.fromkeys(orders+[r['order_id'] for r in pending_items(c)]))
     import equipment
+    logos={r[0] for r in c.execute('SELECT item_id FROM catalog_images')}
     for order_id in orders:
         info=c.execute("SELECT COALESCE(o.code,'') code,cl.name client FROM orders o JOIN devices d ON d.id=o.device_id JOIN clients cl ON cl.id=d.client_id WHERE o.id=?",(order_id,)).fetchone()
         if not info:continue
-        waiting=[u for u in _order_units(c,order_id) if u['status']=='reservada']
-        out.append({'order_id':order_id,'order':info['code'],'client':info['client'],'balance_cents':equipment.money(c,order_id)['balance_cents'],
+        waiting=[u for u in _order_units(c,order_id) if u['status']=='reservada' and not u.get('sale_id')]
+        # Reservas agrupadas por presupuesto y producto: cantidad, fecha de la primera reserva y estado.
+        groups={}
+        for u in waiting:
+            g=groups.setdefault((u['quote_id'],u['product_id']),{'quote_id':u['quote_id'],'product_id':u['product_id'],'product':u['product_name'],'quantity':0,'reserved_at':u['reserved_at'],'activated':0,'units':[]})
+            g['quantity']+=1;g['activated']+=1 if u['activated'] else 0;g['reserved_at']=min(g['reserved_at'] or u['reserved_at'],u['reserved_at'] or g['reserved_at']);g['units'].append(u['code'])
+        quotes={r['id']:r['code'] for r in c.execute('SELECT id,code FROM quotes WHERE order_id=?',(order_id,))}
+        client=c.execute('SELECT d.client_id FROM orders o JOIN devices d ON d.id=o.device_id WHERE o.id=?',(order_id,)).fetchone()
+        out.append({'order_id':order_id,'order':info['code'],'client':info['client'],'client_id':client['client_id'] if client else None,'balance_cents':equipment.money(c,order_id)['balance_cents'],
                     'reserved':[{'id':u['id'],'code':u['code'],'product':u['product_name'],'activated':u['activated']} for u in waiting],
+                    'groups':[dict(g,quote=quotes.get(g['quote_id'],''),has_logo=g['product_id'] in logos,state='Reservada, pendiente de entrega') for g in groups.values()],
                     'pending':[{'product':r['description'],'missing':r['missing'],'quote':r['quote_code']} for r in pending_items(c,order_id=order_id)]})
     history=[]
     for r in c.execute("SELECT d.*,COALESCE(cl.name,'') client,COALESCE(o.code,'') order_code,COALESCE(u.name,'') by_name FROM license_deliveries d LEFT JOIN clients cl ON cl.id=d.client_id LEFT JOIN orders o ON o.id=d.order_id "
@@ -1005,8 +1014,26 @@ def deliveries(c,now):
         row=dict(r);units_of=_delivery_units(c,row['id'])
         history.append({'id':row['id'],'kind':row['kind'],'status':row['status'],'client':row['client'],'order':row['order_code'],'by':row['by_name'],'at':row['authorized_at'] or row['payment_confirmed_at'],
                         'balance_cents':row['balance_cents'],'notes':row['notes'],'reveal_count':row['reveal_count'],'price_cents':row['price_cents'],'discount_cents':row['discount_cents'],'payment_status':row['payment_status'],'link_active':row['status']=='autorizada' and row['token_expires_at']>stamp(now),
-                        'units':[{'code':u['code'],'product':u['product_name'],'status':u['status']} for u in units_of]})
+                        'units':[{'code':u['code'],'product':u['product_name'],'status':u['status']} for u in units_of],
+                        'sale_code':(c.execute('SELECT code FROM license_sales WHERE delivery_id=?',(row['id'],)).fetchone() or [''])[0],'client_id':row['client_id'],'order_id':row['order_id'],
+                        'products':[dict(g,has_logo=g['product_id'] in logos) for g in _group_units(units_of)]})
     return {'waiting':out,'history':history}
+
+
+def _group_units(units_of):
+    """Licencias de una entrega agrupadas por producto: cantidad entregada, devueltas y sus códigos internos (LIC-…, no son claves)."""
+    groups={}
+    for u in units_of:
+        g=groups.setdefault(u['product_id'],{'product_id':u['product_id'],'product':u['product_name'],'count':0,'delivered':0,'returned':0,'codes':[]})
+        g['count']+=1;g['delivered']+=u['status']=='entregada';g['returned']+=u['status']=='anulada';g['codes'].append(u['code'])
+    return list(groups.values())
+
+
+def delivery_events(c,delivery_id):
+    """Registro completo de una entrega: sus eventos y los de sus licencias, con fecha, responsable y detalle (sin credenciales)."""
+    delivery_row(c,delivery_id)
+    return [dict(r) for r in c.execute("SELECT e.created_at,e.event,e.detail,COALESCE(u.name,e.actor) actor,COALESCE(lu.code,'') unit_code FROM license_events e LEFT JOIN users u ON u.id=e.actor_id "
+                                       "LEFT JOIN license_units lu ON lu.id=e.unit_id WHERE e.delivery_id=? OR e.unit_id IN (SELECT id FROM license_units WHERE delivery_id=?) ORDER BY e.id",(delivery_id,delivery_id))]
 
 
 def history(c,limit=300,unit_id=None):
