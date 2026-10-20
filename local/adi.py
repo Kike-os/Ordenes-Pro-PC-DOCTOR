@@ -1,6 +1,6 @@
 """Respuestas acotadas de ADI. La IA nunca recibe permisos para ejecutar escrituras."""
 import json,os,re,urllib.request,urllib.error
-import appointments,order_workspace,maintenance
+import appointments,order_workspace,maintenance,reception
 
 SYSTEM_PUBLIC=("Eres ADI, asistente virtual de PC-DOCTOR S.A. Habla español con tono amable y profesional. "
 "Identifícate como asistente virtual cuando sea pertinente. No afirmes ser humana. "
@@ -14,7 +14,7 @@ SYSTEM_ADMIN=("Eres ADI, asistente administrativa de PC-DOCTOR S.A. Responde en 
 ORDER_CHECK_HINT='Para proteger tus datos, el estado de una reparación se consulta con un código temporal: pulsa «Consultar reparación», escribe tu número de orden y te enviaremos el código al correo registrado en ella.'
 
 def order_status(c,code,identification):
- row=c.execute("SELECT o.code,s.label status,d.brand,d.model FROM orders o JOIN statuses s ON s.code=o.status JOIN devices d ON d.id=o.device_id JOIN clients cl ON cl.id=d.client_id WHERE o.code=? AND cl.identification=?",(code,identification)).fetchone()
+ row=c.execute("SELECT o.code,s.label status,d.brand,d.model FROM orders o JOIN statuses s ON s.code=o.status JOIN devices d ON d.id=o.device_id JOIN clients cl ON cl.id=d.client_id WHERE o.code=? AND cl.identification=?",(reception.current_order_code(c,code),identification)).fetchone()
  return dict(row) if row else None
 
 def admin_answer(c,text):
@@ -40,7 +40,7 @@ def admin_answer(c,text):
   return 'Próximos mantenimientos: '+('; '.join(f"{r['code']} · {r['client']} · {r['due_date']}" for r in rows) if rows else 'ninguno programado.')
  match=re.search(r'(?:PCD-\d{8}-\d{4,}|OP-\d{4,})(?:-E\d{2})?',text,re.I)
  if match and 'historial' in q:
-  rows=c.execute("SELECT o.code,h.status_label,h.comment,h.occurred_at,u.name actor FROM orders o JOIN order_history h ON h.order_id=o.id LEFT JOIN users u ON u.id=h.actor_id WHERE o.code=? ORDER BY h.id DESC LIMIT 10",(match[0],)).fetchall()
+  rows=c.execute("SELECT o.code,h.status_label,h.comment,h.occurred_at,u.name actor FROM orders o JOIN order_history h ON h.order_id=o.id LEFT JOIN users u ON u.id=h.actor_id WHERE o.code=? ORDER BY h.id DESC LIMIT 10",(reception.current_order_code(c,match[0]),)).fetchall()
   return 'Historial registrado: '+('; '.join(f"{r['occurred_at']} · {r['status_label']} · {r['comment']} · {r['actor'] or 'sistema'}" for r in rows) if rows else 'no hay eventos disponibles para esa orden.')
  if 'redact' in q or 'notificación' in q:
   return 'Puedo ayudarte a redactar un mensaje. Incluye únicamente el estado o el dato ya confirmado que deseas comunicar; revisa el texto antes de enviarlo.'
@@ -74,7 +74,7 @@ def admin_reply(c,text,now):
  has=lambda *keys:any(k in q for k in keys)
  match=re.search(r'(?:PCD-\d{8}-\d{4,}|OP-\d{4,})(?:-E\d{2})?',text,re.I)
  if match and not has('historial'):
-  row=c.execute("SELECT o.id,o.code,s.label status,cl.name,d.brand,d.model,o.estimated_delivery,o.priority FROM orders o JOIN devices d ON d.id=o.device_id JOIN clients cl ON cl.id=d.client_id JOIN statuses s ON s.code=o.status WHERE o.code=?",(match[0].upper(),)).fetchone()
+  row=c.execute("SELECT o.id,o.code,s.label status,cl.name,d.brand,d.model,o.estimated_delivery,o.priority FROM orders o JOIN devices d ON d.id=o.device_id JOIN clients cl ON cl.id=d.client_id JOIN statuses s ON s.code=o.status WHERE o.code=?",(reception.current_order_code(c,match[0]),)).fetchone()
   if not row:return {'answer':'No existe una orden con el número '+match[0].upper()+'.','links':[link('Ver órdenes','#orders')]}
   return {'answer':f"{row['code']} está en «{row['status']}». Cliente: {row['name']}. Equipo: {' '.join(x for x in (row['brand'],row['model']) if x) or 'sin especificar'}. Entrega estimada: {row['estimated_delivery'] or 'sin definir'}.",'links':[link('Abrir la orden','#orders?id='+str(row['id']))]}
  if has('inasistencia','no asistio','no asistieron','reagend'):

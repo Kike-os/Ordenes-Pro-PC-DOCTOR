@@ -105,3 +105,23 @@ Por decisión de administración se retira el consecutivo permanente OP-0001 y s
   una fue la primera de su día. La orden **OP-0005** (19/10/2026) se conserva tal cual: el cliente ya recibió ese número por correo, en el
   comprobante y en la autorización, y el QR impreso lo contiene. Se sigue encontrando en búsquedas, correos y chat. La tabla
   `order_serial` queda sin uso y no se borra.
+
+## Consecutivo global PCD-AAAAMMDD-0001 (migración 068, 1.5.177)
+
+Sustituye al consecutivo diario de la 1.5.171, a petición de la administración.
+
+- **Formato:** `PCD` + fecha de ingreso (AAAAMMDD, hora de Ecuador) + consecutivo **global** de cuatro dígitos (desde 10000 sigue con más dígitos). El número **no se reinicia** al cambiar de día, mes ni año: `PCD-20261019-0005`, `PCD-20261020-0006`, `PCD-20261021-0007`…
+- **Contador central:** la tabla permanente `order_serial` (no retrocede ni se borra), incrementada dentro de la transacción de escritura (`BEGIN IMMEDIATE`). Dos registros simultáneos no reciben el mismo número; un intento que falla se deshace sin dejar salto. Los equipos adicionales (`-E02`, `-E03`…) usan el número de su orden principal y no consumen otro.
+- **El número es permanente:** cambiar de estado (En espera, Procesando, Esperando respuesta del cliente, Listo para entregar, Entregado), registrar pagos, entregar o cerrar nunca genera otro número (disparadores `immutable_order_number` e `immutable_order_qr`).
+- **Unificación de las órdenes existentes:** la migración 068 numera las órdenes principales por orden de ingreso, con su **fecha original de recepción**, y deja la tabla de equivalencias `order_renumbering` (no se modifica ni se borra). En producción:
+
+  | Antes | Ahora |
+  |---|---|
+  | PCD-20261012-0001 (y su -E02) | sin cambio |
+  | PCD-20261014-0001 | PCD-20261014-0002 |
+  | PCD-20261015-0001 | PCD-20261015-0003 |
+  | PCD-20261016-0001 | PCD-20261016-0004 |
+  | OP-0005 | PCD-20261019-0005 |
+
+- **Códigos anteriores:** quedan en `order_code_aliases` (permanente). Los QR ya impresos, la búsqueda del listado, la consulta pública, ADI, el chat, la vinculación de correos y Licencias Pro los reconocen y abren la misma orden; el detalle de la orden muestra «Código anterior». Los correos ya enviados, el historial y las citas conservan su texto original.
+- Ninguna orden se elimina; clientes, equipos, presupuestos, pagos, licencias, historial y documentos siguen ligados por el identificador interno. Una orden sin fecha real de ingreso conserva su código.

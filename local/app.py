@@ -322,7 +322,7 @@ def order_from_text(c,*texts):
     """Orden a la que se refiere un texto, solo si menciona un único número de orden existente."""
     codes={match.upper() for text in texts for match in re.findall(r'\b'+reception.ORDER_CODE_PATTERN,str(text or ''),re.I)}
     if len(codes)!=1:return None
-    row=c.execute('SELECT id FROM orders WHERE code=?',(codes.pop(),)).fetchone()
+    row=c.execute('SELECT id FROM orders WHERE code=?',(reception.current_order_code(c,codes.pop()),)).fetchone()
     return row['id'] if row else None
 
 
@@ -1446,7 +1446,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(200, {'rows':search_geography(level,get('province'),get('canton'),get('parish'),get('q')),'metadata':GEO_METADATA})
             if path.startswith('/api/order-by-code/'):
                 code = unquote(path[len('/api/order-by-code/'):])
-                row = c.execute('SELECT id FROM orders WHERE code=?',(code,)).fetchone()
+                row = c.execute('SELECT id FROM orders WHERE code=?',(reception.current_order_code(c,code),)).fetchone()
                 if not row:
                     return self.reply(404, {'error':'Orden no disponible.'})
                 return self.reply(200, {'id':row['id']})
@@ -1641,6 +1641,7 @@ class Handler(BaseHTTPRequestHandler):
                 technical_access.attach(c,result)
                 order_workspace.attach(c,result)
                 result['current_problem']=row['problem']
+                result['previous_codes']=[r[0] for r in c.execute('SELECT code FROM order_code_aliases WHERE order_id=? ORDER BY created_at,code',(result['id'],))]
                 # Versión oficial vigente, para consultarla desde órdenes sin aceptación registrada (no implica que esta orden la haya aceptado).
                 active_terms=service_terms.current(c,reception_now());result['terms_current']=service_terms.metadata(active_terms) if active_terms else None
                 result['photos']=[dict(r) for r in c.execute('SELECT id,is_main,position,size,created_at FROM order_photos WHERE order_id=? ORDER BY is_main DESC,position,id',(result['id'],))]
@@ -1664,7 +1665,7 @@ class Handler(BaseHTTPRequestHandler):
                 if path == '/api/orders':
                     source = 'orders o JOIN devices d ON d.id=o.device_id JOIN clients c ON c.id=d.client_id JOIN statuses s ON s.code=o.status'
                     columns = "o.id,o.code,o.created_at,o.received_at,o.delivered_at,o.problem,o.status status_code,s.label status,COALESCE(NULLIF(d.kind,''),d.category) type,d.brand,d.model,c.name client,o.priority,o.estimated_delivery,COALESCE((SELECT name FROM users WHERE id=o.assigned_to),'Sin asignar') responsible,"+equipment.BUDGET+" budget_cents,"+equipment.PAID+" paid_cents"
-                    search = "COALESCE(o.code,'OP-'||printf('%05d',o.id))||' '||CAST(o.id AS TEXT)||' '||c.name||' '||COALESCE(c.identification,'')||' '||COALESCE(c.phone,'')||' '||COALESCE(c.trade_name,'')||' '||COALESCE(d.category,'')||' '||COALESCE(d.brand,'')||' '||COALESCE(d.model,'')||' '||COALESCE(d.serial,'')||' '||o.problem||' '||s.label"
+                    search = "COALESCE(o.code,'OP-'||printf('%05d',o.id))||' '||COALESCE((SELECT group_concat(a.code,' ') FROM order_code_aliases a WHERE a.order_id=o.id),'')||' '||CAST(o.id AS TEXT)||' '||c.name||' '||COALESCE(c.identification,'')||' '||COALESCE(c.phone,'')||' '||COALESCE(c.trade_name,'')||' '||COALESCE(d.category,'')||' '||COALESCE(d.brand,'')||' '||COALESCE(d.model,'')||' '||COALESCE(d.serial,'')||' '||o.problem||' '||s.label"
                     active = query.get('active', [''])[0] == '1'
                     where = ' AND o.status != \'entregado\'' if active else ''
                     stay_filter = query.get('stay', [''])[0]
@@ -3777,15 +3778,12 @@ class Handler(BaseHTTPRequestHandler):
                         unit_number,code=equipment.next_unit(c,group_main);number_date=sequence=None
                         if not code:return self.reply(409,{'error':'La orden alcanzó el máximo de equipos permitido.'})
                     else:
-                        # Consecutivo diario PCD-AAAAMMDD-0001: fecha de recepción en hora de Ecuador y contador por día en la base, dentro de esta misma
-                        # transacción de escritura (BEGIN IMMEDIATE): dos registros simultáneos no obtienen el mismo número y un intento que falla no deja
-                        # salto (todo se deshace). El índice único (number_date,daily_sequence) y el de code impiden duplicados.
+                        # PCD-AAAAMMDD-0001: fecha de recepción en hora de Ecuador y consecutivo GLOBAL del contador permanente order_serial, dentro de
+                        # esta misma transacción de escritura (BEGIN IMMEDIATE): dos registros simultáneos no obtienen el mismo número, un intento que falla
+                        # no deja salto (todo se deshace) y el número no se reinicia al cambiar de día. Los índices únicos de code impiden duplicados.
                         number_date=received.strftime('%Y%m%d')
-                        used=c.execute('SELECT value FROM daily_order_sequences WHERE reception_date=?',(number_date,)).fetchone()
-                        if used and used['value']>=reception.DAILY_LIMIT:
-                            c.rollback();return self.reply(409,{'error':'Se alcanzó el máximo de %d órdenes para el %s. No se registró la orden ni se generó ningún número.'%(reception.DAILY_LIMIT,received.strftime('%d/%m/%Y'))})
-                        c.execute('INSERT INTO daily_order_sequences(reception_date,value) VALUES (?,1) ON CONFLICT(reception_date) DO UPDATE SET value=value+1',(number_date,))
-                        sequence = c.execute('SELECT value FROM daily_order_sequences WHERE reception_date=?',(number_date,)).fetchone()[0]
+                        c.execute('UPDATE order_serial SET value=value+1 WHERE id=1')
+                        sequence = c.execute('SELECT value FROM order_serial WHERE id=1').fetchone()[0]
                         code = order_code(number_date,sequence)
                     oid = c.execute("INSERT INTO orders(device_id,status,problem,created_by,created_at,accessories,physical_condition,technician_notes,code,request_key,received_at,number_date,daily_sequence,group_id,unit_no) VALUES (?,'pendiente',?,?,?,?,?,?,?,?,?,?,?,?,?)",
                         (device_id,fields['problem'],user['id'],int(received.timestamp()),fields['accessories'],fields['physical_condition'],fields['technician_notes'],code,request_key,received.isoformat(timespec='microseconds'),number_date,sequence,group_main['id'] if group_main else None,unit_number)).lastrowid

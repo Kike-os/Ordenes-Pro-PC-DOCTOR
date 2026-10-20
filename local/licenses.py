@@ -17,6 +17,8 @@ import base64,calendar,hashlib,hmac,json,os,re,secrets,struct
 from datetime import date,datetime,timedelta
 from pathlib import Path
 
+import reception
+
 KINDS={'m365':'Microsoft 365','windows_office':'Windows y Office','antivirus':'Antivirus','otro':'Otro producto digital'}
 LINES={'antivirus':'Antivirus','microsoft':'Microsoft','sistema':'Sistema operativo','ofimatica':'Ofimática','utilitarios':'Utilitarios','otros':'Otros'}
 MODELS={'suscripcion':'Suscripción','perpetua':'Perpetua','otra':'Otra'}
@@ -672,7 +674,7 @@ def _delivery_units(c,delivery_id):
 def _resolve_order(c,client_id,order_code,quote_code):
     order=quote=None
     if order_code:
-        row=c.execute("SELECT o.id,d.client_id FROM orders o JOIN devices d ON d.id=o.device_id WHERE upper(o.code)=upper(?)",(order_code.strip(),)).fetchone()
+        row=c.execute("SELECT o.id,d.client_id FROM orders o JOIN devices d ON d.id=o.device_id WHERE upper(o.code)=upper(?)",(reception.current_order_code(c,order_code),)).fetchone()
         if not row:raise LicenseError('No existe una orden con ese número.',404,{'order_code':'Orden no encontrada.'})
         if client_id and row['client_id']!=client_id:raise LicenseError('Esa orden pertenece a otro cliente.',409,{'order_code':'Otro cliente.'})
         order=row['id'];client_id=row['client_id']
@@ -746,7 +748,7 @@ def deliver(c,data,user,now):
 def order_info(c,code):
     """Resumen informativo de una orden para la venta: cliente, saldo y presupuestos. None si no existe."""
     import equipment
-    row=c.execute("SELECT o.id,o.code,d.client_id,cl.name client FROM orders o JOIN devices d ON d.id=o.device_id JOIN clients cl ON cl.id=d.client_id WHERE upper(o.code)=upper(?)",(str(code or '').strip(),)).fetchone()
+    row=c.execute("SELECT o.id,o.code,d.client_id,cl.name client FROM orders o JOIN devices d ON d.id=o.device_id JOIN clients cl ON cl.id=d.client_id WHERE upper(o.code)=upper(?)",(reception.current_order_code(c,code),)).fetchone()
     if not row:return None
     money=equipment.money(c,row['id'])
     return {'order_id':row['id'],'code':row['code'],'client_id':row['client_id'],'client':row['client'],'balance_cents':money['balance_cents'],'paid_cents':money['paid_cents'],
