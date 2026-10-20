@@ -8,6 +8,22 @@
   },
   "releases": [
     {
+      "version": "1.5.175",
+      "date": "2026-10-19T19:58:08-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Corrección de los botones de Vender o entregar licencia",
+      "changes": {
+        "features": [],
+        "improvements": [],
+        "fixes": [
+          "Vender o entregar licencia: la X, Cancelar y Escape vuelven a cerrar la ventana; aviso de cambios sin guardar, confirmación antes de registrar la entrega, un solo envío y mensaje de éxito solo si el servidor confirma"
+        ],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.174",
       "date": "2026-10-19T19:19:42-05:00",
       "type": "patch",

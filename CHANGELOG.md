@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.175 — 2026-10-19 19:58 (UTC-05:00)
+
+Corrección de los botones de Vender o entregar licencia
+
+### Errores corregidos
+
+- Vender o entregar licencia: la X, Cancelar y Escape vuelven a cerrar la ventana; aviso de cambios sin guardar, confirmación antes de registrar la entrega, un solo envío y mensaje de éxito solo si el servidor confirma
+
 ## v1.5.174 — 2026-10-19 19:19 (UTC-05:00)
 
 Inasistencias automáticas y reagendamiento por enlace privado
