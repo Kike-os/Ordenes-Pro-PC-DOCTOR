@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.181 — 2026-10-20 09:28 (UTC-05:00)
+
+Servicios de formateo con Windows y de respaldo de información
+
+### Nuevas funcionalidades
+
+- Presupuestos: Formateo e Instalación Profesional de Windows ($15,00) y Servicio de Respaldo y Protección de Información Digital ($20,00), IVA incluido, con iconos propios en pantalla y PDF
+
 ## v1.5.180 — 2026-10-20 09:10 (UTC-05:00)
 
 Rendimiento del ticket PDF y del cálculo de horarios de la agenda
