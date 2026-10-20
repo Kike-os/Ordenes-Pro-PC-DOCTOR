@@ -1,8 +1,17 @@
 """Renderizado del logo original para documentos, sin modificar el archivo fuente."""
 from functools import lru_cache
 from pathlib import Path
+import hashlib
+import json
 import struct
 import zlib
+
+ROOT=Path(__file__).resolve().parent
+LOGO=ROOT/'static/logo-original.png'
+# Píxeles ya decodificados del logo para los anchos que usan los documentos. Decodificar el PNG en Python puro tarda varios segundos
+# (en Vercel, en cada instancia nueva: el ticket PDF tardaba ~3 s). El archivo lleva la huella del PNG: si el logo cambia, no se usa.
+CACHE=ROOT/'static/logo-original.pixels'
+CACHE_WIDTHS=(384,416,900)  # recibo monocromo, ticket térmico (LOGO_PX) y documentos A4
 
 
 def _paeth(a,b,c):
@@ -10,9 +19,36 @@ def _paeth(a,b,c):
     return a if pa<=pb and pa<=pc else b if pb<=pc else c
 
 
-@lru_cache(maxsize=2)
+@lru_cache(maxsize=4)
 def pixels(out_width=384):
-    data=(Path(__file__).resolve().parent/'static/logo-original.png').read_bytes()
+    cached=_from_cache(out_width)
+    return cached if cached else decode(out_width)
+
+
+def _from_cache(out_width):
+    try:
+        blob=CACHE.read_bytes()
+        if blob[:32]!=hashlib.sha256(LOGO.read_bytes()).digest():return None
+        header,_,body=zlib.decompress(blob[32:]).partition(b'\n');index=json.loads(header)
+    except (OSError,ValueError,zlib.error):return None
+    entry=index.get(str(out_width))
+    if not entry:return None
+    w,h,start,sizes=entry;parts=[];at=start
+    for size in sizes:parts.append(bytes(body[at:at+size]));at+=size
+    return (w,h,*parts)
+
+
+def build_cache():
+    """Regenera el archivo de píxeles precalculados (ejecutar si cambia el logo: python -c 'import document_logo;document_logo.build_cache()')."""
+    index,body={},bytearray()
+    for width in CACHE_WIDTHS:
+        w,h,*parts=decode(width);index[str(width)]=[w,h,len(body),[len(part) for part in parts]]
+        for part in parts:body.extend(part)
+    CACHE.write_bytes(hashlib.sha256(LOGO.read_bytes()).digest()+zlib.compress(json.dumps(index).encode()+b'\n'+bytes(body),9))
+
+
+def decode(out_width=384):
+    data=LOGO.read_bytes()
     if data[:8]!=b'\x89PNG\r\n\x1a\n':raise ValueError('Logo PNG no válido')
     offset=8;compressed=[]
     while offset<len(data):

@@ -137,18 +137,34 @@ def technicians(c,start,duration,exclude=None):
   clash=c.execute("SELECT 1 FROM appointments WHERE deleted_at IS NULL AND technician_id=? AND status NOT IN ('cancelada','completada','no_asistio') AND datetime(starts_at)<datetime(?) AND datetime(starts_at,'+'||(duration_minutes+?)||' minutes')>datetime(?)"+ignore,args).fetchone()
   if not clash and slot_open(c,start,duration):available.append(person['id'])
  return available
+class _ReadCache:
+ """Lecturas repetidas dentro de un mismo cálculo de disponibilidad: la misma consulta con los mismos parámetros se ejecuta una sola
+ vez (antes, unas 460 por día, casi todas idénticas). Solo se usa para lecturas durante el cálculo, cuando los datos no cambian; las
+ comprobaciones de choque de cada horario siguen consultándose una a una."""
+ def __init__(self,c):self._c=c;self._rows={}
+ def execute(self,sql,params=()):
+  key=(sql,tuple(params))
+  if key not in self._rows:self._rows[key]=self._c.execute(sql,params).fetchall()
+  return _CachedRows(self._rows[key])
+ def __getattr__(self,name):return getattr(self._c,name)
+class _CachedRows:
+ def __init__(self,rows):self._rows=rows
+ def fetchone(self):return self._rows[0] if self._rows else None
+ def fetchall(self):return list(self._rows)
+ def __iter__(self):return iter(self._rows)
 def available_slots(c,day_text,service_code,staff=False):
  # La reserva pública empieza mañana; el personal también puede registrar citas para hoy en los horarios que aún no pasan.
  try:day=date.fromisoformat(day_text)
  except (ValueError,TypeError):raise ValueError('Fecha no válida.')
  first=now().date() if staff else now().date()+timedelta(days=1)
  if day.isoformat()!=day_text or not first<=day<=now().date()+timedelta(days=90):raise ValueError('Elige una fecha entre hoy y los próximos 90 días.' if staff else 'Elige una fecha entre mañana y los próximos 90 días.')
- _,minutes=selected(c,service_code)
- span=day_hours(c,day)
+ cache=_ReadCache(c)
+ _,minutes=selected(cache,service_code)
+ span=day_hours(cache,day)
  if not span:return []
  cursor=datetime.combine(day,span[0],TZ);finish=datetime.combine(day,span[1],TZ);out=[]
  while cursor+timedelta(minutes=minutes)<=finish:
-  free=technicians(c,cursor,minutes) if cursor>now()+timedelta(minutes=10) else []
+  free=technicians(cache,cursor,minutes) if cursor>now()+timedelta(minutes=10) else []
   if free:out.append({'time':cursor.strftime('%H:%M'),'technician_id':free[0]})
   cursor+=timedelta(minutes=15)
  return out

@@ -70,3 +70,10 @@ Centro de supervisión técnica del software (no es un módulo de vehículos). P
 - **Indicador «Servicios verificados»:** «N de 13 correctos» (las comprobaciones no ejecutadas no cuentan como correctas) y, aparte, la disponibilidad (los que responden), advertencias y sin comprobar.
 - **Rendimiento:** Órdenes y Agenda informan el tiempo de cada paso (seguimiento, ticket PDF, servicios, disponibilidad); el ticket PDF, lo más costoso, solo se genera en diagnósticos manuales y programados. Umbral de advertencia según mediciones reales (doble de la mediana, mínimo 1,5 s); un tiempo alto se señala como «Lento», nunca como Error.
 - «Ejecutar diagnóstico» espera y reintenta si hay una verificación automática terminando (antes fallaba con «Ya hay un diagnóstico en curso»).
+
+## Rendimiento (1.5.180)
+
+Medido con los tiempos por paso del primer diagnóstico real (20/10/2026):
+
+- **Ticket PDF (3,1 s):** el 95 % era decodificar el logotipo PNG en Python puro en cada instancia nueva de Vercel. Ahora los píxeles del logo para los anchos de los documentos (384, 416 y 900) están precalculados en `static/logo-original.pixels`, con la huella SHA-256 del PNG: si el logo cambia, el archivo se ignora y se decodifica como antes. Regenerarlo: `python -c 'import document_logo;document_logo.build_cache()'` (una prueba avisa si quedó desactualizado). Resultado idéntico byte a byte.
+- **Agenda (2,4 s):** calcular los horarios de un día lanzaba ~460 consultas, casi todas idénticas (horario semanal, feriado, margen, técnicos y sus horarios). Una caché de lecturas que dura un solo cálculo las hace una vez (~100 consultas, las comprobaciones de choque de cada horario siguen una a una). Comprobado: mismos horarios en 480 combinaciones de día, servicio y modo.
