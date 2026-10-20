@@ -8,6 +8,25 @@
   },
   "releases": [
     {
+      "version": "1.5.174",
+      "date": "2026-10-19T19:19:42-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Inasistencias automáticas y reagendamiento por enlace privado",
+      "changes": {
+        "features": [
+          "Inasistencias automáticas: las citas confirmadas sin llegada registrada pasan a «No asistió» tras la tolerancia configurada (desactivado por defecto)",
+          "Reagendamiento por enlace privado: correo «Reagenda tu cita técnica» y página pública con días y horarios libres; la cita conserva código e historial y queda marcada como «Reagendada»"
+        ],
+        "improvements": [
+          "Agenda: estado del enlace, envío manual del enlace o de una rectificación y configuración de tolerancia, vigencia y límite de reagendamientos"
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.173",
       "date": "2026-10-19T14:44:24-05:00",
       "type": "patch",

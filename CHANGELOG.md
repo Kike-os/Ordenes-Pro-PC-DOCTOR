@@ -4,6 +4,19 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.174 — 2026-10-19 19:19 (UTC-05:00)
+
+Inasistencias automáticas y reagendamiento por enlace privado
+
+### Nuevas funcionalidades
+
+- Inasistencias automáticas: las citas confirmadas sin llegada registrada pasan a «No asistió» tras la tolerancia configurada (desactivado por defecto)
+- Reagendamiento por enlace privado: correo «Reagenda tu cita técnica» y página pública con días y horarios libres; la cita conserva código e historial y queda marcada como «Reagendada»
+
+### Mejoras realizadas
+
+- Agenda: estado del enlace, envío manual del enlace o de una rectificación y configuración de tolerancia, vigencia y límite de reagendamientos
+
 ## v1.5.173 — 2026-10-19 14:44 (UTC-05:00)
 
 Rediseño de Licencias Pro y del Centro de notificaciones
