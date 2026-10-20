@@ -7471,3 +7471,14 @@ body[data-page=dashboard] .licenses .license-inv-table thead th{padding:7px 10px
  .licenses .license-inv-table td:is([data-label='Código'],[data-label='Código LIC'],[data-label=Acciones],.license-inv-pick)::before{display:none!important;content:none!important}
  .licenses .license-group-table td[data-label=Cliente]{display:none!important}
 }
+/* Entrega: selector segmentado compacto (las opciones no heredan el tamaño de los campos de texto). */
+body[data-page=dashboard] .license-sale-mode{display:inline-flex;flex-wrap:wrap;gap:4px;justify-self:start;width:auto;padding:3px;border:1px solid #2b4a75;border-radius:999px;background:#0a1424}
+body[data-page=dashboard] .license-sale-mode label{display:inline-flex;align-items:center;gap:6px;margin:0;min-height:32px;padding:4px 12px;border:1px solid transparent;border-radius:999px;background:transparent;font-size:13px;font-weight:600;line-height:1.2;white-space:nowrap;color:#bcd0ec;cursor:pointer;transition:background .15s ease,border-color .15s ease}
+body[data-page=dashboard] .license-sale-mode label:has(input:checked){background:#0d2b30;border-color:#2dd4bf;color:#e6fffb}
+body[data-page=dashboard] .license-sale-mode label:has(input:focus-visible){outline:2px solid #5eead4;outline-offset:2px}
+body[data-page=dashboard] .license-sale-mode input[type=radio]{appearance:auto;width:14px;height:14px;min-width:14px;min-height:0;margin:0;padding:0;border:0;box-shadow:none;background:none;accent-color:#2dd4bf;flex:none}
+@media (max-width:420px){body[data-page=dashboard] .license-sale-mode{display:flex;width:100%}body[data-page=dashboard] .license-sale-mode label{flex:1 1 0;justify-content:center;white-space:normal;text-align:center}}
+@media (prefers-reduced-motion:reduce){body[data-page=dashboard] .license-sale-mode label{transition:none}}
+@media (max-width:420px){body[data-page=dashboard] .license-sale-mode label{padding:4px 8px;gap:5px;font-size:12.5px}}
+@media (max-width:420px){body[data-page=dashboard] .license-sale-mode label{flex:1 1 auto}}
+@media (max-width:420px){body[data-page=dashboard] .license-sale-mode{border-radius:12px}body[data-page=dashboard] .license-sale-mode label{border-radius:9px}}
