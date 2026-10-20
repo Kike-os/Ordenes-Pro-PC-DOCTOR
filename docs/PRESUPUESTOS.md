@@ -251,3 +251,14 @@ El 13/10/2026, con autorización expresa de administración y respaldo previo, s
 - Sincronización: el estado técnico de la orden y el comercial del presupuesto son independientes. Única regla automática: si la orden estaba en «Aprobación de presupuesto» y el cliente aprueba (total o parcialmente), pasa a «Procesando» y lo deja escrito en el historial. Nunca se cambian «Listo para entregar», «En espera de entrega» ni «Entregado». Un rechazo deja la orden donde está, con una nota para coordinar la devolución.
 - Avisos en el centro de notificaciones: «Presupuesto enviado · Esperando respuesta del cliente» (solo si el correo salió), «Presupuesto aprobado por el cliente», «Presupuesto aprobado parcialmente» y «Presupuesto rechazado por el cliente» (con el motivo, si lo dio). El panel del presupuesto se actualiza solo cada minuto mientras espera respuesta.
 - Seguridad (sin cambios): enlace privado con huella y caducidad, verificación con los últimos dígitos de la identificación, decisión procesada en el servidor, enlace revocado tras decidir (no hay respuestas duplicadas) y presupuesto bloqueado para edición después de la decisión.
+
+## Renovación de pasta térmica en portátiles (1.5.179)
+
+Dos servicios en «Servicios técnicos y reparaciones», con precio final con IVA incluido (no se suma de nuevo) e iconos propios (trazo vectorial, iguales en pantalla y PDF):
+
+| Servicio | Precio | Icono |
+| --- | --- | --- |
+| Renovación de pasta térmica para portátiles sin GPU dedicada | $20,00 | Portátil con procesador y termómetro (`termica_portatil`) |
+| Renovación de pasta térmica para portátiles Gamer con GPU dedicada | $65,00 | Portátil gamer con CPU, GPU y ventilador (`termica_gamer`) |
+
+Se crean una sola vez si no existen con ese nombre (`quotes.seed_thermal`; también con «Cargar catálogo»). No modifican otros servicios ni presupuestos existentes. En el selector del presupuesto, el botón para limpiar la búsqueda ya no se monta sobre «Nuevo servicio o repuesto».

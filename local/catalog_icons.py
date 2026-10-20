@@ -45,12 +45,18 @@ ICONS = {
     'limpieza': ('Limpieza técnica', [(L, [(15, 3), (11, 10)], False), (L, [(7, 10), (15, 10), (16.5, 13.5), (5.5, 13.5)], True), (L, [(7.5, 13.5), (6.5, 20.5)], False), (L, [(11, 13.5), (11, 21)], False), (L, [(14.5, 13.5), (15.5, 20.5)], False)]),
     'termica': ('Procesador y refrigeración', [_box(6, 6, 12, 12), (C, 12, 12, 2.8)] + [(L, [(p, 2.5), (p, 6)], False) for p in (9.5, 14.5)] + [(L, [(p, 18), (p, 21.5)], False) for p in (9.5, 14.5)] + [(L, [(2.5, p), (6, p)], False) for p in (9.5, 14.5)] + [(L, [(18, p), (21.5, p)], False) for p in (9.5, 14.5)]),
     'red': ('Red informática', [(C, 12, 5, 2.4), (C, 5, 19, 2.4), (C, 19, 19, 2.4), (L, [(12, 7.4), (12, 12)], False), (L, [(5, 16.6), (5, 12), (19, 12), (19, 16.6)], False)]),
+    # Pasta térmica en portátiles (2026-10-20): portátil con procesador y termómetro; portátil gamer con CPU, GPU y ventilador.
+    'termica_portatil': ('Pasta térmica de portátil', LAPTOP + [_box(6.5, 7, 5, 5), (L, [(8, 5.6), (8, 7)], False), (L, [(10, 5.6), (10, 7)], False), (L, [(8, 12), (8, 13.4)], False), (L, [(10, 12), (10, 13.4)], False),
+                                                              (L, [(15.5, 6), (15.5, 10.4)], False), (C, 15.5, 11.8, 1.4), (L, [(17.2, 7), (18.3, 7)], False), (L, [(17.2, 8.8), (18.3, 8.8)], False)]),
+    'termica_gamer': ('Pasta térmica de portátil gamer', LAPTOP + [_box(5.8, 6.8, 4.2, 4.2), _box(11.2, 6.8, 4.2, 4.2), (L, [(7.2, 8.9), (8.6, 8.9)], False), (L, [(12.6, 8.9), (14, 8.9)], False),
+                                                                (C, 17.8, 8.9, 1.9), (C, 17.8, 8.9, .5), (L, [(6, 21.5), (10, 21.5)], False), (L, [(14, 21.5), (18, 21.5)], False)]),
     'generico': ('Genérico', [_box(4, 4, 16, 16), (L, [(8, 12), (16, 12)], False), (L, [(12, 8), (12, 16)], False)]),
 }
 # Icono por omisión de cada categoría del catálogo, cuando ninguna palabra clave coincide.
 BY_CATEGORY = {'servicio': 'servicio', 'licencia': 'licencia', 'seguridad': 'antivirus', 'repuesto': 'repuesto', 'otro': 'producto'}
 # Palabras clave (sin tildes) → icono. Se evalúan en orden: lo más específico primero.
 RULES = (
+    (('pasta', 'termica', 'portatil', 'gamer'), 'termica_gamer'), (('pasta', 'termica', 'portatil'), 'termica_portatil'),
     (('pantalla', 'gamer'), 'pantalla_gamer'), (('pantalla',), 'pantalla'), (('display',), 'pantalla'), (('monitor',), 'pantalla'), (('bisagra',), 'bisagra'),
     (('bios',), 'bios'), (('gamer',), 'pc_gamer'), (('escritorio',), 'escritorio'),
     (('playstation',), 'consola'), (('xbox',), 'consola'), (('nintendo',), 'consola'), (('consola',), 'consola'),

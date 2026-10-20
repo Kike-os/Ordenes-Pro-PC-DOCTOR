@@ -61,3 +61,12 @@ Centro de supervisión técnica del software (no es un módulo de vehículos). P
 **Versiones:** instalada, fecha de implementación, estado de estabilidad con la explicación concreta de «En observación» (verificaciones que faltan, horas restantes, fallos no críticos), versión disponible cuando puede verificarse (nunca se instala sola), resultado de la comprobación posterior al despliegue, cambios pendientes de publicar e historial de cambios.
 
 **Avisos configurables** (una vez por evento, sin duplicados): fallos críticos, servicios no disponibles, errores recurrentes (3 o más), problemas de conexión, diagnósticos programados y actualizaciones disponibles, con gravedad mínima.
+
+## Corrección (1.5.179)
+
+- **Tarjetas de servicio** rediseñadas con clases propias (`ac-svc-*`): nombre, estado, descripción completa, tiempo de respuesta y gravedad, sin superposiciones (se retiran los efectos de las reglas antiguas de `.autocare-services`); «Ver detalles» despliega por servicio los tiempos (mediana, p90, umbral), los últimos resultados, la posible causa y la acción recomendada.
+- **Licencias e inventario → Ver detalles:** licencias afectadas con su problema y fechas, stock frente a registros individuales (el stock se calcula de los registros: no hay contador que difiera), posibles duplicados (misma terminación de clave dentro de un producto, enmascarada) y recomendaciones. Nada se modifica.
+- **Envío de correos:** distingue *fallo real* (el buzón falló en el último diagnóstico manual o programado de 24 h), *prueba omitida* (verificación automática que muestra el último resultado real) y *comprobación pendiente* (ninguna comprobación real en 24 h). «Ver detalles» muestra servidores, cuenta (sin contraseña), última comprobación y envíos fallidos o rebotados de 7 días. Nunca se envían correos de prueba.
+- **Indicador «Servicios verificados»:** «N de 13 correctos» (las comprobaciones no ejecutadas no cuentan como correctas) y, aparte, la disponibilidad (los que responden), advertencias y sin comprobar.
+- **Rendimiento:** Órdenes y Agenda informan el tiempo de cada paso (seguimiento, ticket PDF, servicios, disponibilidad); el ticket PDF, lo más costoso, solo se genera en diagnósticos manuales y programados. Umbral de advertencia según mediciones reales (doble de la mediana, mínimo 1,5 s); un tiempo alto se señala como «Lento», nunca como Error.
+- «Ejecutar diagnóstico» espera y reintenta si hay una verificación automática terminando (antes fallaba con «Ya hay un diagnóstico en curso»).

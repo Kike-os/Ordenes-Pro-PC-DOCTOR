@@ -66,12 +66,23 @@ def _transient(error):
 STATUS_LABELS = {'ok': 'Correcto', 'warning': 'Advertencia', 'error': 'Error', 'not_checked': 'No comprobado'}
 
 
-def checks(c, deep=False):
+def checks(c, deep=False, now=None):
     """Lista de (código, nombre, severidad, función) de los 13 servicios de Órdenes Pro. Cada función devuelve un detalle (Correcto),
     una tupla («warning» o «not_checked», detalle) o lanza una excepción (Error). Todas son de solo lectura: no crean, modifican ni
     borran datos. `deep` añade las que usan la red (inicio de sesión real en el buzón), solo en ejecuciones programadas o manuales."""
-    from reception import reception_now
-    now = reception_now()
+    if now is None:
+        from reception import reception_now
+        now = reception_now()
+
+    def last_deep(code):
+        """Último resultado de una comprobación que solo se hace en diagnósticos manuales o programados (correcto o error)."""
+        for run in reversed(_load(c, 'stability_runs', [])):
+            if run.get('source') not in ('manual', 'programada'):
+                continue
+            found = next((r for r in run['results'] if r['code'] == code and r.get('status', 'ok' if r['ok'] else 'error') in ('ok', 'error')), None)
+            if found:
+                return dict(found, at=run['at'], source=run['source'])
+        return None
 
     def database():
         began = time.monotonic()
@@ -113,18 +124,26 @@ def checks(c, deep=False):
         from thermal_pdf import render_thermal
         if not c.execute('SELECT COUNT(*) FROM statuses').fetchone()[0]:
             raise RuntimeError('No hay estados de orden configurados.')
+        began = time.monotonic()
         board = tracking_board.build(c, tracking_board.parse({}))
+        board_ms = round((time.monotonic() - began) * 1000)
         serial = c.execute('SELECT value FROM order_serial WHERE id=1').fetchone()
         top = c.execute("SELECT MAX(daily_sequence) FROM orders WHERE number_date GLOB '[0-9]*'").fetchone()[0] or 0
         if serial is None or serial[0] < top:
             raise RuntimeError('El contador de órdenes está por detrás del último número asignado: riesgo de números repetidos.')
         row = c.execute('SELECT id FROM orders ORDER BY id DESC LIMIT 1').fetchone()
-        if row:
+        # El ticket PDF (lo más pesado) se genera solo en los diagnósticos manuales y programados.
+        ticket = 'ticket PDF no generado en verificaciones automáticas'
+        if row and deep:
+            began = time.monotonic()
             order = app.order_document(c, row['id'])
             order['tracking_url'] = order_tracking.active(c, row['id'])['url'] or app.public_base_url()
             if not render_thermal(order, 'cliente').startswith(b'%PDF'):
                 raise RuntimeError('El ticket de la orden no se generó como PDF.')
-        return str(board['total']) + ' órdenes en seguimiento · ' + ('ticket PDF generado' if row else 'sin órdenes para generar ticket') + ' · siguiente número ' + str(serial[0] + 1).zfill(4)
+            ticket = 'ticket PDF generado en ' + str(round((time.monotonic() - began) * 1000)) + ' ms'
+        elif not row:
+            ticket = 'sin órdenes para generar ticket'
+        return str(board['total']) + ' órdenes en seguimiento (' + str(board_ms) + ' ms) · ' + ticket + ' · siguiente número ' + str(serial[0] + 1).zfill(4)
 
     def quotes():
         import app
@@ -167,12 +186,16 @@ def checks(c, deep=False):
 
     def agenda():
         import appointments
+        began = time.monotonic()
         services = appointments.services(c)
+        services_ms = round((time.monotonic() - began) * 1000)
         if not services:
             raise RuntimeError('La agenda no tiene servicios de cita.')
         day = (datetime.now(appointments.TZ).date() + timedelta(days=1)).isoformat()
-        appointments.available_slots(c, day, services[0]['code'])
-        return str(len(services)) + ' servicios de cita · disponibilidad calculada'
+        began = time.monotonic()
+        slots = appointments.available_slots(c, day, services[0]['code'])
+        slots_ms = round((time.monotonic() - began) * 1000)
+        return str(len(services)) + ' servicios de cita (' + str(services_ms) + ' ms) · disponibilidad de mañana calculada: ' + str(len(slots)) + ' horarios (' + str(slots_ms) + ' ms)'
 
     def mail():
         import mail_pro
@@ -181,11 +204,20 @@ def checks(c, deep=False):
         except mail_pro.MailError:
             ready = False
         if not ready:
-            raise RuntimeError('El correo del sistema no está configurado.')
+            raise RuntimeError('El correo del sistema no está configurado (faltan servidor, usuario o contraseña).')
         if deep:
+            began = time.monotonic()
             mail_pro.test_imap()
-            return 'Correo configurado · conexión con el buzón correcta'
-        return ('not_checked', 'Configurado. La conexión con el buzón se comprueba en los diagnósticos manuales y programados.')
+            return 'Buzón accesible: autenticación IMAP correcta en ' + str(round((time.monotonic() - began) * 1000)) + ' ms'
+        # Verificación automática: no abre el buzón (prueba omitida) y usa el último resultado real de las últimas 24 h.
+        last = last_deep('mail')
+        fresh = last and last['at'] >= (now - timedelta(hours=24)).isoformat(timespec='seconds')
+        origin = lambda item: ('diagnóstico manual' if item['source'] == 'manual' else 'diagnóstico programado') + ' del ' + item['at'][8:10] + '/' + item['at'][5:7] + ' ' + item['at'][11:16]
+        if fresh and last['status'] == 'error':
+            raise RuntimeError('Fallo real en la última comprobación del buzón (' + origin(last) + '): ' + last['detail'])
+        if fresh:
+            return 'Buzón comprobado en el ' + origin(last) + ' · prueba omitida en esta verificación automática'
+        return ('not_checked', 'Comprobación pendiente: el buzón no se ha comprobado en las últimas 24 h. Se comprueba en los diagnósticos manuales y programados.')
 
     def notices():
         import notifications
@@ -344,7 +376,7 @@ def run(c, now, source='automática', by=''):
     c.commit()
     began_all = time.monotonic()
     try:
-        results = [execute(*item) for item in checks(c, source in ('programada', 'manual'))]
+        results = [execute(*item) for item in checks(c, source in ('programada', 'manual'), now)]
     finally:
         c.execute("DELETE FROM system_state WHERE key='stability_running'")
     return finish(c, now, source, results, round((time.monotonic() - began_all) * 1000), by)
@@ -369,7 +401,7 @@ def step_manual(c, now, run_id, code):
     done = len(state['results'])
     if done >= len(state['plan']) or state['plan'][done]['code'] != code:
         raise ValueError('Comprobación fuera de orden.')
-    item = next(entry for entry in checks(c, True) if entry[0] == code)
+    item = next(entry for entry in checks(c, True, now) if entry[0] == code)
     result = execute(*item)
     state['results'].append(result)
     state['ms'] += result['ms']

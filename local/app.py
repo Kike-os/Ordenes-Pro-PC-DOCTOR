@@ -145,6 +145,7 @@ def migrate():
                 name = p.name.replace("'", "''")
                 c.executescript('BEGIN IMMEDIATE;\n' + p.read_text() + f"\nINSERT INTO migrations VALUES ('{name}');\nCOMMIT;")
         initialize_catalog(c)
+        quotes.seed_thermal_once(c,reception_now())
         snapshot_rows = c.execute("SELECT o.id,c.name client,c.identification,c.document_type,c.trade_name,c.phone,c.email,c.province,c.province_code,c.canton,c.canton_code,c.parish,c.parish_code,c.city,c.locality_code,c.address,c.main_street,c.secondary_street,c.building_number,c.location_reference,c.geo_version,COALESCE(NULLIF(d.kind,''),d.category) type,d.brand,d.model,d.serial,d.color,o.accessories,o.physical_condition,o.problem,o.technician_notes FROM orders o JOIN devices d ON d.id=o.device_id JOIN clients c ON c.id=d.client_id WHERE o.reception_snapshot='' ").fetchall()
         for order in snapshot_rows:
             snapshot=dict(order)
@@ -1790,6 +1791,12 @@ class Handler(BaseHTTPRequestHandler):
                 if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede ver ADI AutoCare.'})
                 import autocare
                 return self.reply(200,autocare.overview(c,reception_now()))
+            autocare_service=re.fullmatch(r'/api/autocare/service/([a-z_]{2,20})',path)
+            if autocare_service:
+                if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede usar ADI AutoCare.'})
+                import autocare
+                try:return self.reply(200,autocare.service_detail(c,autocare_service[1],reception_now()))
+                except LookupError as error:return self.reply(404,{'error':str(error)})
             if path == '/api/system':
                 try:return self.reply(200, versioning.overview())
                 except versioning.RegistryError as error:return self.reply(500,{'error':str(error)})
@@ -3296,7 +3303,7 @@ class Handler(BaseHTTPRequestHandler):
                             stamp=quotes.save_image(c,int(catalog_image[1]),content,user,reception_now());audit(c,user['id'],'catalog_image_saved',int(catalog_image[1]))
                             return self.reply(200,{'ok':True,'image':stamp})
                         # Catálogo inicial entregado por la administración: se registra una sola vez; lo que ya existe no se duplica ni se modifica.
-                        result=quotes.seed_initial(c,user,reception_now());extra=quotes.seed_additions(c,user,reception_now());audit(c,user['id'],'catalog_seeded')
+                        result=quotes.seed_initial(c,user,reception_now());extra=quotes.seed_additions(c,user,reception_now());thermal=quotes.seed_thermal(c,user,reception_now());extra={**extra,'created':extra['created']+thermal['created'],'existing':extra['existing']+thermal['existing'],'total':extra['total']+thermal['total']};audit(c,user['id'],'catalog_seeded')
                         return self.reply(200,{'ok':True,'created':result['created']+extra['created'],'updated':extra['updated'],'existing':result['existing']+extra['existing'],'total':result['total']+extra['total']})
                     except quotes.QuoteError as error:return self.reply(error.status,{'error':str(error),'fields':error.fields})
                 if path in ('/api/catalog','/api/catalog/tax'):

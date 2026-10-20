@@ -56,8 +56,8 @@ class AutoCareTests(unittest.TestCase):
         real = stability.checks
         calls = {'n': 0}
 
-        def flaky(c, deep=False):
-            items = real(c, deep)
+        def flaky(c, deep=False, now=None):
+            items = real(c, deep, now)
             def once():
                 calls['n'] += 1
                 if calls['n'] == 1:
@@ -76,12 +76,12 @@ class AutoCareTests(unittest.TestCase):
         real = stability.checks
         state = {'fail': True}
 
-        def checks(c, deep=False):
+        def checks(c, deep=False, now=None):
             def unstable():
                 if state['fail']:
                     raise RuntimeError('Servicio no disponible')
                 return 'Correcto'
-            return [('svc', 'Servicio vigilado', 'alta', unstable)] + real(c, deep)[:1]
+            return [('svc', 'Servicio vigilado', 'alta', unstable)] + real(c, deep, now)[:1]
         now = app.reception_now()
         with patch.object(stability, 'checks', checks), app.connect() as c:
             stability.run(c, now - timedelta(hours=2), 'programada')
@@ -175,12 +175,12 @@ class AutoCareProTests(AutoCareTests):
         real = stability.checks
         state = {'fail': True}
 
-        def checks(c, deep=False):
+        def checks(c, deep=False, now=None):
             def unstable():
                 if state['fail']:
                     raise RuntimeError('No hay servicios de cita')
                 return 'Correcto'
-            return [('agenda', 'Agenda y citas', 'crítica', unstable)] + real(c, deep)[:1]
+            return [('agenda', 'Agenda y citas', 'crítica', unstable)] + real(c, deep, now)[:1]
         now = app.reception_now()
         with patch.object(stability, 'checks', checks), app.connect() as c:
             stability.run(c, now - timedelta(minutes=30), 'programada')
@@ -227,6 +227,71 @@ class AutoCareProTests(AutoCareTests):
         with patch.object(app.versioning, 'load', return_value=fake):
             panel = self.request('/api/autocare', cookie=cookie)['body']
         self.assertEqual(panel['pending_changes'], 3)
+
+
+class AutoCareFixTests(AutoCareTests):
+    MAIL = {'MAIL_IMAP_HOST': 'i.example.invalid', 'MAIL_SMTP_HOST': 's.example.invalid', 'MAIL_USERNAME': 'b@example.invalid', 'MAIL_PASSWORD': 'x'}
+
+    def mail_result(self, entry):
+        return next(r for r in entry['results'] if r['code'] == 'mail')
+
+    def test_mail_distinguishes_real_failure_omitted_and_pending(self):
+        now = app.reception_now()
+        with patch.dict(app.os.environ, self.MAIL), app.connect() as c:
+            pending = self.mail_result(stability.run(c, now))
+            self.assertEqual(pending['status'], 'not_checked');self.assertIn('pendiente', pending['detail'])
+            with patch.object(app.mail_pro, 'test_imap', return_value=None):
+                deep = self.mail_result(stability.run(c, now, 'manual'))
+            self.assertEqual(deep['status'], 'ok');self.assertIn('IMAP', deep['detail'])
+            omitted = self.mail_result(stability.run(c, now + timedelta(hours=1)))
+            self.assertEqual(omitted['status'], 'ok');self.assertIn('prueba omitida', omitted['detail'])
+            with patch.object(app.mail_pro, 'test_imap', side_effect=app.mail_pro.MailError('autenticacion', 'Usuario o contraseña rechazados')):
+                failed = self.mail_result(stability.run(c, now + timedelta(hours=2), 'programada'))
+            self.assertEqual(failed['status'], 'error')
+            real = self.mail_result(stability.run(c, now + timedelta(hours=3)))
+            self.assertEqual(real['status'], 'error');self.assertIn('Fallo real', real['detail'])
+            stale = self.mail_result(stability.run(c, now + timedelta(hours=30)))
+            self.assertEqual(stale['status'], 'not_checked')
+
+    def test_ticket_only_in_deep_runs_and_step_timings_are_reported(self):
+        cookie, csrf = self.login()
+        self.request('/api/orders', self.order_data({'request_key': 'autocare-fix-order-0001'}), cookie=cookie, csrf=csrf)
+        with app.connect() as c:
+            auto = next(r for r in stability.run(c, app.reception_now())['results'] if r['code'] == 'orders')
+            deep = next(r for r in stability.run(c, app.reception_now(), 'manual')['results'] if r['code'] == 'orders')
+            agenda = next(r for r in stability.run(c, app.reception_now())['results'] if r['code'] == 'agenda')
+        self.assertIn('no generado en verificaciones automáticas', auto['detail']);self.assertRegex(deep['detail'], r'ticket PDF generado en \d+ ms')
+        self.assertRegex(auto['detail'], r'seguimiento \(\d+ ms\)');self.assertRegex(agenda['detail'], r'horarios \(\d+ ms\)')
+
+    def test_slow_threshold_uses_real_measurements_and_never_changes_status(self):
+        history = [{'results': [{'code': 'agenda', 'ms': ms}]} for ms in (200, 210, 190, 205, 220, 198)]
+        info = autocare.timing(history, 'agenda', 900)
+        self.assertEqual((info['samples'], info['median'], info['threshold'], info['slow']), (6, 205, 1500, False))
+        self.assertTrue(autocare.timing(history, 'agenda', 1600)['slow'])
+        slow_history = [{'results': [{'code': 'orders', 'ms': ms}]} for ms in (3000, 3200, 3100, 3300, 2900)]
+        self.assertEqual(autocare.timing(slow_history, 'orders', 3323)['slow'], False)  # 3,3 s es su normal: no es lento
+
+    def test_service_detail_for_licenses_shows_affected_stock_and_duplicates(self):
+        cookie, csrf = self.login()
+        import licenses as lic
+        with app.connect() as c:
+            user = {'id': self.uid, 'role': 'administrador', 'name': 'Persona de prueba'}
+            made = lic.register_new(c, {'name': 'Antivirus ficticio', 'line': 'antivirus', 'duration': 'anual', 'price': '10', 'key': 'AAAA-1111-ZZ123456'}, user, app.reception_now())
+            lic.register(c, {'product_id': str(made['product_id']), 'key': 'BBBB-2222-ZZ123456'}, user, app.reception_now())
+            c.execute("UPDATE license_units SET activated=1,activated_at='2026-01-01' WHERE id=?", (made['unit_id'],))
+            stability.run(c, app.reception_now())
+            before = [tuple(r) for r in c.execute('SELECT * FROM license_units ORDER BY id')]
+        info = self.request('/api/autocare/service/licenses', cookie=cookie)['body']['licenses']
+        self.assertEqual([a['code'] for a in info['affected']], ['LIC-000001'])
+        self.assertEqual(info['products'][0]['registros'], 2);self.assertIn('registros individuales', info['stock_note'])
+        self.assertEqual(info['duplicates'][0]['codes'], ['LIC-000001', 'LIC-000002']);self.assertEqual(info['duplicates'][0]['hint'], '•••• 3456')
+        self.assertNotIn('AAAA-1111', str(info));self.assertTrue(info['recommendations'])
+        with app.connect() as c:self.assertEqual([tuple(r) for r in c.execute('SELECT * FROM license_units ORDER BY id')], before)
+        mail = self.request('/api/autocare/service/mail', cookie=cookie)['body']['mail']
+        self.assertEqual(mail['state'], 'Sin configurar');self.assertNotIn('password', {k for k, v in mail.items() if isinstance(v, str) and v == 'x'})
+        self.assertEqual(self.request('/api/autocare/service/inventado', cookie=cookie)['status'], 404)
+        with app.connect() as c:c.execute("UPDATE users SET role='tecnico' WHERE id=?", (self.uid,))
+        self.assertEqual(self.request('/api/autocare/service/licenses', cookie=cookie)['status'], 403)
 
 
 if __name__ == '__main__':

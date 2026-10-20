@@ -317,6 +317,37 @@ ADDITIONS = (
 )
 
 
+# Tercera carga (2026-10-20): renovación de pasta térmica en portátiles. Precios con IVA incluido (no se suma de nuevo).
+THERMAL = (
+ ('Renovación de pasta térmica para portátiles sin GPU dedicada', 'servicio', '20.00', 'Servicio de sustitución de pasta térmica del procesador (CPU) para optimizar la transferencia de calor y mejorar la refrigeración del equipo.', 'termica_portatil'),
+ ('Renovación de pasta térmica para portátiles Gamer con GPU dedicada', 'servicio', '65.00', 'Servicio de sustitución de pasta térmica del CPU y GPU para mejorar la disipación térmica y mantener temperaturas adecuadas de funcionamiento.', 'termica_gamer'),
+)
+
+
+def seed_thermal(c, user, now):
+    """Agrega los servicios de pasta térmica para portátiles sin duplicar: si ya existe un elemento con el mismo nombre, no se toca."""
+    created = 0
+    for name, category, price, description, icon in THERMAL:
+        if c.execute('SELECT 1 FROM catalog_items WHERE lower(name)=lower(?)', (name,)).fetchone():
+            continue
+        save_catalog_item(c, {'name': name, 'category': category, 'price': price, 'description': description, 'icon': icon, 'price_mode': 'incluido'}, user, now)
+        created += 1
+    return {'created': created, 'existing': len(THERMAL) - created, 'total': len(THERMAL)}
+
+
+def seed_thermal_once(c, now):
+    """Al iniciar: crea una sola vez los servicios de la tercera carga (queda marcado; si administración los renombra o desactiva
+    después, no se vuelven a crear). El alta queda a nombre de la primera cuenta de administración."""
+    if c.execute("SELECT 1 FROM system_state WHERE key='catalog_seed_20261020'").fetchone():
+        return None
+    admin = c.execute("SELECT id,name FROM users WHERE role='administrador' ORDER BY id LIMIT 1").fetchone()
+    if not admin:
+        return None
+    result = seed_thermal(c, {'id': admin['id'], 'name': admin['name'], 'role': 'administrador'}, now)
+    c.execute("INSERT INTO system_state(key,value) VALUES ('catalog_seed_20261020',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", (now.isoformat(timespec='seconds'),))
+    return result
+
+
 def seed_additions(c, user, now):
     """Registra la segunda carga sin duplicar. Un elemento con el mismo nombre no se toca; el mantenimiento de PC de escritorio actualiza
     el registro previo equivalente (misma categoría, mismas palabras clave y sin «gamer») en lugar de crear otro."""

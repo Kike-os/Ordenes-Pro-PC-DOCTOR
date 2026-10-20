@@ -254,6 +254,95 @@ def _explain(status):
     return 'En observación: todas las verificaciones críticas son correctas, pero ' + (', '.join(parts) if parts else 'el período de seguimiento aún no termina') + '.'
 
 
+SLOW_FLOOR_MS = 1500
+
+
+def timing(history, code, ms=None):
+    """Tiempos reales de un servicio (últimas 30 ejecuciones): mediana, p90 y umbral de advertencia (doble de la mediana, mínimo 1,5 s).
+    El tiempo nunca convierte un servicio en Error: solo se señala como lento."""
+    values = sorted(r['ms'] for run in history[-30:] for r in run['results'] if r['code'] == code and isinstance(r.get('ms'), (int, float)))
+    if not values:
+        return {'samples': 0, 'median': None, 'p90': None, 'threshold': SLOW_FLOOR_MS, 'slow': False}
+    median = values[len(values) // 2]
+    p90 = values[min(len(values) - 1, int(len(values) * 0.9))]
+    threshold = max(SLOW_FLOOR_MS, 2 * median)
+    return {'samples': len(values), 'median': median, 'p90': p90, 'threshold': threshold, 'slow': ms is not None and len(values) >= 5 and ms > threshold}
+
+
+def service_detail(c, code, now):
+    """Detalle de un servicio para el panel: historial de resultados y tiempos, y datos propios (licencias, correo)."""
+    import stability
+    history = stability._load(c, 'stability_runs', [])
+    items = [dict(r, at=run['at'], source=run.get('source', '')) for run in reversed(history) for r in run['results'] if r['code'] == code][:30]
+    if not items and code not in {item[0] for item in stability.checks(c)}:
+        raise LookupError('Servicio no disponible.')
+    out = {'code': code, 'name': items[0]['name'] if items else code, 'cause': GUIDE.get(code, ('', ''))[0], 'action': GUIDE.get(code, ('', ''))[1],
+           'history': [{'at': i['at'], 'source': i['source'], 'status': i.get('status', 'ok' if i['ok'] else 'error'), 'ms': i.get('ms'), 'detail': i['detail']} for i in items],
+           'timing': timing(history, code, items[0].get('ms') if items else None)}
+    if code == 'licenses':
+        out['licenses'] = _license_detail(c, now)
+    if code == 'mail':
+        out['mail'] = _mail_detail(c, history, now)
+    return out
+
+
+def _license_detail(c, now):
+    import licenses
+    cols = [d[1] for d in c.execute('PRAGMA table_info(license_units)').fetchall()]
+    rows = [dict(zip(cols, tuple(r))) for r in c.execute('SELECT * FROM license_units ORDER BY id').fetchall()]
+    names = {r[0]: r[1] for r in c.execute('SELECT id,name FROM catalog_items').fetchall()}
+    affected = [{'code': r['code'], 'product': names.get(r['product_id'], ''), 'status': licenses.STATUSES.get(r['status'], r['status']), 'activated_at': r['activated_at'], 'expires_at': r['expires_at'],
+                 'delivered_at': (r['delivered_at'] or '')[:10], 'problems': licenses.issues(r)} for r in rows if licenses.issues(r)]
+    products = {}
+    for r in rows:
+        item = products.setdefault(r['product_id'], {'product': names.get(r['product_id'], ''), 'registros': 0, **{key: 0 for key in licenses.STATUSES}})
+        item['registros'] += 1
+        item[r['status']] += 1
+    # Posibles duplicados: misma terminación de clave o usuario dentro de un producto (la huella ya impide claves idénticas).
+    groups, unreadable = {}, 0
+    for r in rows:
+        if r['status'] == 'anulada':
+            continue
+        try:
+            values = licenses.unseal(r['secret'])
+        except Exception:
+            unreadable += 1
+            continue
+        tail = ''.join(ch for ch in (values.get('key') or values.get('username') or '') if ch.isalnum())[-6:].upper()
+        if len(tail) >= 6:
+            groups.setdefault((r['product_id'], tail), []).append(r['code'])
+    duplicates = [{'product': names.get(pid, ''), 'codes': codes, 'hint': '•••• ' + tail[-4:]} for (pid, tail), codes in groups.items() if len(codes) > 1]
+    tips = []
+    if affected:
+        tips.append('Usa Licencias → Inventario → «Revisar inconsistencias»: cada corrección pide motivo y queda en el historial.')
+    if duplicates:
+        tips.append('Revisa las licencias con la misma terminación de clave; si una sobra, retírala con «Ajustar stock» (queda anulada, no se borra).')
+    if not tips:
+        tips.append('Sin acciones pendientes en el inventario de licencias.')
+    return {'affected': affected, 'products': sorted(products.values(), key=lambda item: item['product']), 'duplicates': duplicates, 'unreadable': unreadable,
+            'stock_note': 'El stock disponible se calcula siempre desde los registros individuales (LIC-…): no hay un contador aparte que pueda diferir.', 'recommendations': tips}
+
+
+def _mail_detail(c, history, now):
+    import mail_pro
+    info = mail_pro.status()
+    last = None
+    for run in reversed(history):
+        if run.get('source') in ('manual', 'programada'):
+            found = next((r for r in run['results'] if r['code'] == 'mail' and r.get('status', 'ok' if r['ok'] else 'error') in ('ok', 'error')), None)
+            if found:
+                last = {'at': run['at'], 'source': run['source'], 'status': found.get('status', 'ok' if found['ok'] else 'error'), 'detail': found['detail']}
+                break
+    since = (now - timedelta(days=7)).isoformat(timespec='seconds')
+    failed = c.execute("SELECT COUNT(*) FROM mail_deliveries WHERE status IN ('fallido','rebotado','demorado') AND created_at>=?", (since,)).fetchone()[0]
+    reason = c.execute("SELECT status,reason,created_at FROM mail_deliveries WHERE status IN ('fallido','rebotado','demorado') ORDER BY id DESC LIMIT 1").fetchone()
+    fresh = last and last['at'] >= (now - timedelta(hours=24)).isoformat(timespec='seconds')
+    state = ('Sin configurar' if not info.get('configured') else 'Fallo real' if fresh and last['status'] == 'error' else 'Comprobado' if fresh else 'Comprobación pendiente')
+    return {'configured': bool(info.get('configured')), 'imap': info.get('imap', ''), 'smtp': info.get('smtp', ''), 'account': info.get('account', ''), 'password_set': info.get('password_set', False),
+            'last_check': last, 'state': state, 'failed_7d': failed, 'last_failure': {'status': reason['status'], 'reason': (reason['reason'] or '')[:200], 'at': reason['created_at']} if reason else None,
+            'note': 'Las verificaciones automáticas no abren el buzón (prueba omitida) y muestran el resultado real del último diagnóstico manual o programado de las últimas 24 h. No se envía ningún correo de prueba.'}
+
+
 def overview(c, now):
     """Resumen del panel: indicadores, servicios, incidencias, recuperaciones, historial técnico, versiones y configuración de avisos."""
     import stability
@@ -261,7 +350,7 @@ def overview(c, now):
     history = stability._load(c, 'stability_runs', [])
     last = next((item for item in reversed(history) if item['version'] == status['version']), None)
     services = [{'code': r['code'], 'name': r['name'], 'severity': r.get('severity', 'crítica' if r['critical'] else 'media'), 'ok': r['ok'], 'status': r.get('status', 'ok' if r['ok'] else 'error'),
-                 'detail': r['detail'], 'ms': r['ms'], 'recovered': r.get('recovered', False)} for r in (last['results'] if last else [])]
+                 'detail': r['detail'], 'ms': r['ms'], 'recovered': r.get('recovered', False), 'timing': timing(history, r['code'], r['ms'])} for r in (last['results'] if last else [])]
     counts = {key: sum(1 for s in services if s['status'] == key) for key in stability.STATUS_LABELS}
     items = incidents(c)
     open_items = [item for item in items if item['status'] != 'resuelta']
