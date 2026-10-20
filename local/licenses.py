@@ -493,6 +493,58 @@ def register_many(c,data,user,now):
     return units
 
 
+# ---- Ajuste de stock: el inventario son licencias individuales (LIC-…), no un contador ------------------------------------
+ADJUST_REASONS={'duplicada':'Registro duplicado','incorrecta':'Registro incorrecto','invalida':'Clave inválida o rechazada por el fabricante','proveedor':'Devuelta al proveedor','extravio':'No localizada o extraviada','otro':'Otro motivo'}
+
+
+def _hint(unit):
+    """Últimos 4 caracteres de la clave o del usuario, enmascarados, para distinguir registros duplicados sin mostrar la credencial."""
+    try:values=unseal(unit['secret'])
+    except LicenseError:return ''
+    text=re.sub(r'[\s-]+','',values.get('key') or values.get('username') or '')
+    return ('•••• '+text[-4:]) if len(text)>=6 else ''
+
+
+def stock_detail(c,product_id,now):
+    if not c.execute('SELECT 1 FROM license_products WHERE item_id=?',(product_id,)).fetchone():raise LicenseError('Este producto no tiene inventario de licencias.',404)
+    product=_product(c,product_id);today=now.date().isoformat()
+    rows=[dict(r) for r in c.execute("SELECT u.id,u.code,u.secret,u.created_at,u.purchased_at,u.expires_at,u.notes,b.supplier,b.invoice FROM license_units u LEFT JOIN license_batches b ON b.id=u.batch_id "
+                                       "WHERE u.product_id=? AND u.status='disponible' AND (u.expires_at='' OR u.expires_at>=?) ORDER BY u.id",(product_id,today))]
+    counts={key:0 for key in STATUSES}
+    for r in c.execute('SELECT status,COUNT(*) n FROM license_units WHERE product_id=? GROUP BY status',(product_id,)):counts[r['status']]=r['n']
+    return {'product':{'id':product['id'],'name':product['name']},'available':[{k:v for k,v in dict(r,hint=_hint(r)).items() if k!='secret'} for r in rows],'counts':counts,'reasons':ADJUST_REASONS}
+
+
+def adjust_stock(c,data,user,now):
+    """Corrige las existencias disponibles de un producto al número real. Para disminuir hay que elegir QUÉ licencias se retiran:
+    pasan a «Anulada» (no se venden) con el motivo, y sus claves, usuarios y su historial se conservan. Nunca se tocan licencias
+    reservadas, entregadas, ventas, pagos ni clientes. Para aumentar hay que registrar las licencias reales con «Agregar stock»."""
+    if user['role']!='administrador':raise LicenseError('Solo administración ajusta el stock.',403)
+    pid=str(data.get('item_id') or '')
+    if not pid.isdigit():raise LicenseError('Producto no válido.',404)
+    detail=stock_detail(c,int(pid),now);available={u['id']:u for u in detail['available']};before=len(available)
+    real=str(data.get('real_quantity') if data.get('real_quantity') is not None else '').strip()
+    if not real.isdigit():raise LicenseError('Indica la cantidad real disponible (0 o más).',fields={'real_quantity':'Cantidad no válida.'})
+    real=int(real)
+    if real>before:raise LicenseError('Para aumentar el stock registra las %d licencia(s) reales con «Agregar stock»: el inventario se compone de licencias individuales con su clave.'%(real-before),409,{'real_quantity':'Registra las licencias que faltan.'})
+    if real==before:raise LicenseError('La cantidad real coincide con el stock disponible: no hay nada que ajustar.',409,{'real_quantity':'Sin diferencia.'})
+    reason=str(data.get('reason') or '')
+    if reason not in ADJUST_REASONS:raise LicenseError('Selecciona el motivo del ajuste.',fields={'reason':'Motivo obligatorio.'})
+    notes=_text(data,'notes',300,'Las observaciones')
+    if reason=='otro' and len(notes)<5:raise LicenseError('Describe el motivo en las observaciones.',fields={'notes':'Detalle obligatorio.'})
+    chosen=[int(x) for x in (data.get('unit_ids') or []) if str(x).isdigit()]
+    if len(set(chosen))!=len(chosen) or any(x not in available for x in chosen):raise LicenseError('Alguna licencia elegida ya no está disponible. Vuelve a abrir el ajuste.',409,{'unit_ids':'Selección no válida.'})
+    if len(chosen)!=before-real:raise LicenseError('Selecciona exactamente %d licencia(s) para retirar del inventario.'%(before-real),fields={'unit_ids':'Selección incompleta.'})
+    label=ADJUST_REASONS[reason]+('. '+notes if notes else '');moment=stamp(now)
+    for unit in chosen:
+        if not c.execute("UPDATE license_units SET status='anulada',delivery_id=NULL,updated_at=? WHERE id=? AND status='disponible'",(moment,unit)).rowcount:
+            raise LicenseError('Una licencia cambió de estado durante el ajuste. Vuelve a intentarlo.',409)
+        event(c,'retirada',now,'Retirada del inventario por ajuste de stock (disponibles: %d → %d). Motivo: %s. La clave y el historial se conservan.'%(before,real,label),unit,int(pid),user=user)
+    codes=[available[x]['code'] for x in chosen]
+    event(c,'ajuste_stock',now,'Ajuste de stock de «%s»: disponibles %d → %d. Retiradas: %s. Motivo: %s. Responsable: %s.'%(detail['product']['name'],before,real,', '.join(codes),label,user['name']),product=int(pid),user=user)
+    return {'before':before,'after':real,'retired':codes}
+
+
 def unit_row(c,unit_id):
     row=c.execute('SELECT * FROM license_units WHERE id=?',(unit_id,)).fetchone()
     if not row:raise LicenseError('Licencia no disponible.',404)

@@ -113,3 +113,12 @@ Las entregas desde presupuestos aprobados (pestaña «Entregas») siguen funcion
 - **Vista por cliente** sin la columna «Cliente» (el encabezado ya muestra nombre, identificación y número de licencias, y avisos «por renovar» o «en revisión»).
 - **Barra de vigencia premium** (140 × 7 px): se acorta con los días, cambia de color de forma progresiva (verde → amarillo → naranja → rojo), con brillo LED discreto y un punto luminoso en el extremo; junto a ella, porcentaje, días restantes y fecha de vencimiento. Vencida: vacía, «0 % · Vencida». Sin activar no corre la vigencia. Sin animación continua y sin transiciones con movimiento reducido.
 - **Acciones con iconos** (Lucide, 16 px, botones de 32 × 32 px y radio de 8 px; 40 px en pantallas táctiles): azul ver detalles, morado enviar información, azul claro editar, verde renovar, rojo anular o registrar devolución (solo si corresponde) y gris «Más opciones» con todas las acciones válidas. El nombre aparece al pasar el cursor o al enfocar.
+
+## Ajustar stock (1.5.178)
+
+En **Productos y catálogo**, junto a «Editar» y «Agregar stock». El inventario no es un contador: son licencias individuales (LIC-…), y las existencias se calculan siempre desde ellas (no hace falta recalcular).
+
+- La ventana muestra el producto, el stock disponible registrado, la cantidad real, la diferencia, el motivo (duplicado, registro incorrecto, clave inválida, devuelta al proveedor, no localizada u otro), observaciones, responsable y la fecha y hora (al confirmar).
+- **Disminuir:** hay que elegir exactamente qué licencias disponibles se retiran (código, últimos 4 caracteres de la clave enmascarados, compra, registro, proveedor, factura y vencimiento). Pasan a «Anulada»: no se venden, y sus claves, usuarios, contraseñas e historial se conservan. Cada una registra «Retirada del inventario por ajuste de stock» y el producto un resumen con cantidad anterior y nueva, motivo y responsable.
+- **Aumentar:** no se inventan registros; la ventana indica cuántas licencias reales hay que registrar con «Agregar stock».
+- Solo administración; pide confirmación; impide cantidades negativas; nunca toca licencias reservadas o entregadas, ventas, pagos ni clientes. Indicadores y catálogo se actualizan al instante (`GET /api/licenses/products/<id>/stock`, `POST /api/licenses/products/adjust`).

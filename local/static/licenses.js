@@ -49,7 +49,7 @@ function licenseProducts(panel){
   card.append(top,stock,el('p',[item.managed?'Venta '+licenseMoney(item.price_cents):'',item.purchase_cents!==null&&item.purchase_cents!==undefined?'Costo '+licenseMoney(item.purchase_cents):'',item.duration_label,item.validity_label,item.devices?item.devices+' dispositivo'+(item.devices===1?'':'s'):'',item.shared_seats?'Clave compartida ('+item.shared_seats+')':''].filter(Boolean).join(' · ')||'Sin datos de licencia','license-facts-line'));
   if(!item.available)card.append(el('p','Desactivado: no se ofrece en los presupuestos.','license-alert'));if(item.pending)card.append(el('p',item.pending+' pendiente'+(item.pending===1?'':'s')+' de existencias en ventas aprobadas','license-alert'));
   const actions=el('div',undefined,'license-card-actions');actions.append(button('Editar',()=>licenseProductDialog(item),'secondary'));
-  if(item.managed)actions.append(button('Agregar stock',()=>licenseNewDialog(item),'secondary'),button('Duplicar',()=>licenseDuplicate(item),'text-action'),button('Consultar',()=>{licenseState.tab='inventario';licenseState.product=String(item.id);licenseState.state='';window.licenseReload();},'text-action'));
+  if(item.managed)actions.append(button('Agregar stock',()=>licenseNewDialog(item),'secondary'),button('Ajustar stock',()=>licenseAdjustDialog(item),'secondary license-adjust-open'),button('Duplicar',()=>licenseDuplicate(item),'text-action'),button('Consultar',()=>{licenseState.tab='inventario';licenseState.product=String(item.id);licenseState.state='';window.licenseReload();},'text-action'));
   actions.append(button(item.available?'Desactivar':'Activar',async()=>{if(item.available&&await confirmClose({title:'¿Desactivar «'+item.name+'»?',text:'Dejará de ofrecerse en los presupuestos. Sus licencias, ventas e historial se conservan.',keep:'Volver',discard:'Desactivar'})!=='discard')return;try{await api('/api/licenses/products/toggle',{item_id:String(item.id),active:!item.available});toast(item.available?'Producto desactivado.':'Producto activado.','success');window.licenseReload();}catch(error){toast(error.message,'error');}},'text-action'));
   card.append(actions);grid.append(card);}
  panel.append(grid);}
@@ -147,6 +147,35 @@ function licenseNewDialog(product){
    else result=await api('/api/licenses/new',body);
    dialog.close();toast(product?((many?result.count+' licencias agregadas':'Licencia agregada')+' al inventario de '+product.name+'.'):'Producto y '+((result.count||1)===1?'licencia registrados':result.count+' licencias registradas')+' en el inventario.','success');licenseReloadAll();},'Guardar licencia');
  dialog.classList.add('license-dialog-wide');}
+// Ajustar stock: corrige las existencias disponibles al número real. Para disminuir se eligen las licencias a retirar (pasan a
+// «Anulada» con el motivo; claves e historial se conservan). Para aumentar se registran las licencias reales con «Agregar stock».
+async function licenseAdjustDialog(item){let info;try{info=await api('/api/licenses/products/'+item.id+'/stock');}catch(error){toast(error.message,'error');return;}
+ const current=info.available.length;let picked=new Set();
+ const dialog=licenseFormDialog('Ajustar stock',(form,dialog,parts)=>{form.classList.add('license-adjust-form');
+  const head=el('dl',undefined,'license-adjust-facts wide'),fact=(k,v,cls)=>{const row=el('div',undefined,cls||'');row.append(el('dt',k),el('dd',v));head.append(row);return row.lastChild;};
+  fact('Producto',info.product.name);fact('Stock disponible registrado',String(current));const diffNode=fact('Diferencia','0','license-adjust-diff');fact('Responsable',(typeof currentUser!=='undefined'&&currentUser?.name)||'Administración');fact('Fecha y hora','Al confirmar el ajuste');form.append(head);
+  form.append(el('p','Las existencias se calculan siempre desde las licencias individuales (LIC-…): este recuento ya está recalculado desde los registros válidos ('+info.counts.disponible+' disponibles, '+(info.counts.reservada||0)+' reservadas, '+(info.counts.entregada||0)+' entregadas). Las reservadas y entregadas no se tocan.','license-hint wide'));
+  const real=licenseField(form,'Cantidad real disponible *','real_quantity',String(current),{type:'number',required:true});real.min='0';real.max=String(current+500);real.step='1';
+  const reason=licenseField(form,'Motivo del ajuste *','reason','',{select:[['','Selecciona el motivo'],...Object.entries(info.reasons)],required:true});
+  licenseField(form,'Observaciones','notes','',{max:300,wide:true,textarea:true,rows:2});
+  const pickBox=el('fieldset',undefined,'license-group wide license-adjust-pick');pickBox.append(el('legend','Licencias a retirar del inventario'));const pickHelp=el('p','','license-hint');const list=el('div',undefined,'license-adjust-list');pickBox.append(pickHelp,list);form.append(pickBox);
+  const more=el('div',undefined,'license-alert wide');more.hidden=true;more.append(el('span',''),button('Agregar stock',()=>{dialog.dataset.dirty='';dialog.close();licenseNewDialog(item);},'secondary'));form.append(more);
+  for(const unit of info.available){const row=el('label',undefined,'license-adjust-unit'),box=el('input');box.type='checkbox';box.value=String(unit.id);box.addEventListener('change',()=>{if(box.checked)picked.add(unit.id);else picked.delete(unit.id);paint();});
+   const text=el('span');text.append(el('strong',unit.code),el('small',[unit.hint,unit.purchased_at?'Compra '+licenseDay(unit.purchased_at):'','Registrada '+formatOrderDate(unit.created_at).split(',')[0],unit.supplier,unit.invoice?'Factura '+unit.invoice:'',unit.expires_at?'Vence '+licenseDay(unit.expires_at):''].filter(Boolean).join(' · ')));row.append(box,text);list.append(row);}
+  if(!info.available.length)list.append(el('p','No hay licencias disponibles de este producto.','license-hint'));
+  function paint(){const value=parseInt(real.value,10),valid=Number.isFinite(value)&&value>=0,diff=valid?value-current:0,need=diff<0?-diff:0;
+   diffNode.textContent=valid?(diff>0?'+':'')+diff:'—';diffNode.parentElement.dataset.sign=diff<0?'down':diff>0?'up':'zero';
+   pickBox.hidden=!(diff<0);more.hidden=!(diff>0);more.firstChild.textContent=diff>0?'Para aumentar el stock registra las '+diff+' licencia(s) reales con su clave (el inventario no es un contador).':'';
+   pickHelp.textContent=need?'Selecciona exactamente '+need+' licencia(s) duplicadas, incorrectas o que deban retirarse ('+picked.size+' seleccionada'+(picked.size===1?'':'s')+'). No se borran claves, usuarios ni historial.':'';
+   for(const box of list.querySelectorAll('input'))box.disabled=!picked.has(+box.value)&&picked.size>=need;
+   parts.save.disabled=!valid||diff>=0||picked.size!==need;}
+  real.addEventListener('input',()=>{const value=parseInt(real.value,10);if(Number.isFinite(value)&&value-current<0&&picked.size>current-value){picked=new Set([...picked].slice(0,current-value));list.querySelectorAll('input').forEach(b=>b.checked=picked.has(+b.value));}paint();});
+  dialog.paint=paint;paint();},
+ async(form,dialog)=>{const v=name=>form.elements[name].value,target=parseInt(v('real_quantity'),10),codes=info.available.filter(u=>picked.has(u.id)).map(u=>u.code);
+  if(await confirmClose({title:'¿Ajustar el stock de «'+info.product.name+'»?',text:'Disponibles: '+current+' → '+target+'. Se retirarán del inventario: '+codes.join(', ')+'. Quedarán anuladas (no se venden) y su clave e historial se conservan. Quedará registrado con tu usuario, fecha y hora.',keep:'Revisar',discard:'Aplicar ajuste',danger:true})!=='discard')throw Object.assign(new Error(''),{cancelled:true});
+  const out=await api('/api/licenses/products/adjust',{item_id:String(item.id),real_quantity:String(target),reason:v('reason'),notes:v('notes'),unit_ids:[...picked].map(String)});
+  dialog.dataset.dirty='';dialog.close();toast('Stock ajustado: '+out.before+' → '+out.after+'. Retiradas: '+out.retired.join(', ')+'.','success');licenseReloadAll();},'Aplicar ajuste');
+ dialog.classList.add('license-adjust-dialog');}
 function licenseProductDialog(item){licenseFormDialog('Editar producto',form=>{licenseProductFields(form,item);},async(form,dialog)=>{const body=await licenseCollect(form);body.item_id=String(item.id);await api('/api/licenses/products',body);dialog.close();toast('Producto actualizado.','success');licenseReloadAll();}).classList.add('license-dialog-wide');}
 function licenseDuplicate(item){licenseFormDialog('Duplicar producto',form=>{form.append(el('p','Se copian los datos y el logotipo de «'+item.name+'», sin licencias. Útil para otra edición o duración.','license-hint wide'));licenseField(form,'Nombre del nuevo producto *','name',item.name+' (copia)',{max:120,wide:true});},
  async(form,dialog)=>{await api('/api/licenses/products/duplicate',{item_id:String(item.id),name:form.elements.name.value});dialog.close();toast('Producto duplicado.','success');licenseReloadAll();},'Duplicar');}

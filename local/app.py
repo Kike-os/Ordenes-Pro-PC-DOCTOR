@@ -1971,6 +1971,8 @@ class Handler(BaseHTTPRequestHandler):
                     if path=='/api/licenses/units':
                         product=arg('product');client=arg('client')
                         return self.reply(200,{'rows':licenses.units(c,now,int(product) if product.isdigit() else None,arg('status'),arg('q')[:120],arg('state'),arg('from')[:10],arg('to')[:10],int(client) if client.isdigit() else None,arg('field'))})
+                    stock_route=re.fullmatch(r'/api/licenses/products/([0-9]{1,9})/stock',path)
+                    if stock_route:return self.reply(200,licenses.stock_detail(c,int(stock_route[1]),now))
                     if path=='/api/licenses/units/export.csv':
                         # Exportación ordinaria: los mismos filtros (o la selección) y nunca claves, seriales, usuarios ni contraseñas.
                         product=arg('product');rows=licenses.units(c,now,int(product) if product.isdigit() else None,arg('status'),arg('q')[:120],arg('state'),arg('from')[:10],arg('to')[:10],None,arg('field'))
@@ -2240,7 +2242,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(400, {'error':'Solicitud inválida.'})
             data = json.loads(self.rfile.read(length))
             appointment_config_post=path=='/api/appointments/config'
-            if not isinstance(data, dict) or any(not isinstance(v,(str,bool)) and not (quote_json and k=='items' and isinstance(v,list)) and not (workspace_post and ((k=='lines' and isinstance(v,list)) or (k=='revision' and type(v) is int))) and not (appointment_config_post and ((k in ('hours','services','staff_hours') and isinstance(v,list)) or (k in ('holiday','new_service') and isinstance(v,dict)))) and not (path=='/api/business-hours' and k in ('hours','closures','request_limits') and isinstance(v,list)) and not (path=='/api/licenses/sales' and ((k=='items' and isinstance(v,list)) or (k=='payment' and isinstance(v,dict)))) for k,v in data.items()):
+            if not isinstance(data, dict) or any(not isinstance(v,(str,bool)) and not (quote_json and k=='items' and isinstance(v,list)) and not (workspace_post and ((k=='lines' and isinstance(v,list)) or (k=='revision' and type(v) is int))) and not (appointment_config_post and ((k in ('hours','services','staff_hours') and isinstance(v,list)) or (k in ('holiday','new_service') and isinstance(v,dict)))) and not (path=='/api/business-hours' and k in ('hours','closures','request_limits') and isinstance(v,list)) and not (path=='/api/licenses/sales' and ((k=='items' and isinstance(v,list)) or (k=='payment' and isinstance(v,dict)))) and not (path=='/api/licenses/products/adjust' and k=='unit_ids' and isinstance(v,list) and len(v)<=500) for k,v in data.items()):
                 return self.reply(400, {'error':'Datos inválidos.'})
             path = urlsplit(self.path).path
             with connect() as c:
@@ -3194,6 +3196,8 @@ class Handler(BaseHTTPRequestHandler):
                             unit=licenses.register(c,data,user,now);audit(c,user['id'],'license_registered',unit);return self.reply(201,{'ok':True,'id':unit})
                         if path=='/api/licenses/units/bulk':
                             made=licenses.register_many(c,data,user,now);audit(c,user['id'],'license_bulk_registered',len(made));return self.reply(201,{'ok':True,'count':len(made)})
+                        if path=='/api/licenses/products/adjust':
+                            result=licenses.adjust_stock(c,data,user,now);audit(c,user['id'],'license_stock_adjusted',int(data.get('item_id') or 0));return self.reply(200,dict(result,ok=True))
                         if path=='/api/licenses/settings':
                             saved=licenses.save_display(c,data,user,now);audit(c,user['id'],'license_settings_saved');return self.reply(200,{'ok':True,'display':saved})
                         if path=='/api/licenses/optout':

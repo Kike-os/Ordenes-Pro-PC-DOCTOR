@@ -7620,3 +7620,14 @@ body[data-page=dashboard] .license-sale-mode input[type=radio]{appearance:auto;w
 .autocare-stat small{line-height:1.2}
 @media(min-width:1101px){.autocare-pro .autocare-stats{grid-template-columns:repeat(6,minmax(0,1fr))}}
 @media(max-width:600px){.autocare-pro .autocare-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.autocare-stat{flex-direction:column;align-items:flex-start;gap:6px;padding:8px}.autocare-stat-icon{width:28px;height:28px}}
+/* Licencias Pro · ajustar stock */
+.license-adjust-facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:6px;margin:0}
+.license-adjust-facts div{padding:7px 10px;border:1px solid #22385a;border-radius:9px;background:#0b1626}.license-adjust-facts dt{font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:#8fa5c4}.license-adjust-facts dd{margin:2px 0 0;font-size:13.5px;font-weight:600;color:#e3edff;overflow-wrap:anywhere}
+.license-adjust-diff[data-sign=down] dd{color:#fca5a5}.license-adjust-diff[data-sign=up] dd{color:#86efac}
+.license-adjust-pick[hidden]{display:none}.license-adjust-list{display:grid;gap:5px;max-height:min(38vh,320px);overflow:auto}
+.license-adjust-unit{display:flex;align-items:center;gap:10px;margin:0;padding:7px 10px;border:1px solid #22385a;border-radius:9px;background:#0b1626;cursor:pointer}
+.license-adjust-unit:has(input:checked){border-color:#f87171;background:#1f0f14}.license-adjust-unit:has(input:disabled){opacity:.55;cursor:not-allowed}
+.license-adjust-unit input{width:16px;height:16px;min-height:0;margin:0;accent-color:#f87171;flex:none}
+.license-adjust-unit span{display:grid;gap:1px;min-width:0}.license-adjust-unit small{font-size:11.5px;color:#8fa5c4;overflow-wrap:anywhere}
+.license-adjust-form .license-alert{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px}.license-adjust-form .license-alert[hidden]{display:none}
+.license-adjust-pick{grid-template-columns:minmax(0,1fr)!important}.license-adjust-pick .license-hint{margin:0}

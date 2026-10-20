@@ -92,4 +92,33 @@ class LicenseReviewTests(LicenseInventoryTests):
         self.assertEqual((d['disponibles'],d['reservadas'],d['por_vencer']),(2,1,1))
 
 
+class LicenseStockAdjustTests(LicenseInventoryTests):
+    def test_decrease_retires_chosen_units_keeps_sold_and_history(self):
+        self.admin();client=self.client_id()
+        made=self.new_product(name='Office 365 Empresarial 5 dispositivos ficticio',key='OFF-KEY-00001');pid=made['product_id']
+        self.assertEqual(self.post('/api/licenses/units/bulk',product_id=str(pid),lines='OFF-KEY-00002\nOFF-KEY-00003\nOFF-KEY-00004')['status'],201)
+        for _ in range(2):self.post('/api/licenses/sales',client_id=str(client),items=[{'product_id':str(pid),'quantity':'1'}],deliver=True,accept_balance=True)
+        stock=self.get('/api/licenses/products/%d/stock'%pid)['body'];available=stock['available']
+        self.assertEqual((len(available),stock['counts']['entregada']),(2,2));self.assertTrue(all(u['hint'].startswith('•••• ') for u in available));self.assertNotIn('OFF-KEY',str(stock))
+        with app.connect() as c:sold=[dict(r) for r in c.execute("SELECT * FROM license_units WHERE status='entregada' ORDER BY id")]
+        post=lambda **body:self.post('/api/licenses/products/adjust',item_id=str(pid),**body)
+        self.assertEqual(post(real_quantity='-1',reason='duplicada',unit_ids=[])['status'],400)  # sin negativos
+        self.assertEqual(post(real_quantity='3',reason='duplicada',unit_ids=[])['status'],409)   # aumentar: registrar licencias reales
+        self.assertEqual(post(real_quantity='2',reason='duplicada',unit_ids=[])['status'],409)   # sin diferencia
+        self.assertEqual(post(real_quantity='1',reason='',unit_ids=[available[0]['id']])['status'],400)
+        self.assertEqual(post(real_quantity='1',reason='duplicada',unit_ids=[])['status'],400)  # hay que elegir cuál
+        self.assertEqual(post(real_quantity='1',reason='otro',notes='',unit_ids=[available[0]['id']])['status'],400)
+        sold_id=sold[0]['id'];self.assertEqual(post(real_quantity='1',reason='duplicada',unit_ids=[sold_id])['status'],409)  # una vendida no se retira
+        done=post(real_quantity='1',reason='duplicada',notes='Cargada dos veces',unit_ids=[available[0]['id']])
+        self.assertEqual(done['status'],200,done['body']);self.assertEqual((done['body']['before'],done['body']['after'],done['body']['retired']),(2,1,[available[0]['code']]))
+        retired=self.unit(available[0]['id']);self.assertEqual(retired['status'],'anulada');self.assertTrue(retired['secret'].startswith('lic1:'))
+        with app.connect() as c:self.assertEqual([dict(r) for r in c.execute("SELECT * FROM license_units WHERE status='entregada' ORDER BY id")],sold)
+        product=next(p for p in self.get('/api/licenses')['body']['products'] if p['id']==pid);self.assertEqual(product['stock']['disponible'],1)
+        history=self.get('/api/licenses/history')['body']['rows'];kinds=[r['event'] for r in history[:2]]
+        self.assertEqual(set(kinds),{'retirada','ajuste_stock'});summary=next(r for r in history if r['event']=='ajuste_stock')
+        self.assertIn('2 → 1',summary['detail']);self.assertIn('Registro duplicado',summary['detail']);self.assertIn('Persona de prueba',summary['detail']);self.assertEqual(summary['actor'],'Persona de prueba')
+        with app.connect() as c:c.execute("UPDATE users SET role='tecnico' WHERE id=?",(self.uid,))
+        self.assertEqual(post(real_quantity='0',reason='duplicada',unit_ids=[available[1]['id']])['status'],403)
+
+
 if __name__=='__main__':unittest.main()
