@@ -4,6 +4,18 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.176 — 2026-10-19 20:31 (UTC-05:00)
+
+Ventas de licencias independientes con carrito, pagos y entrega
+
+### Nuevas funcionalidades
+
+- Ventas de licencias independientes de las órdenes técnicas: número VLIC-AAAAMMDD-0001, carrito con varios productos, descuentos, reserva de claves, pagos completos o parciales con comprobante, entrega inmediata o posterior y comprobante sin claves
+
+### Mejoras realizadas
+
+- Pestaña «Ventas» en Licencias Pro con búsqueda, estados de pago y de entrega separados, historial de pagos, confirmación de pagos, cancelación y correo de entrega con instrucciones de activación
+
 ## v1.5.175 — 2026-10-19 19:58 (UTC-05:00)
 
 Corrección de los botones de Vender o entregar licencia
