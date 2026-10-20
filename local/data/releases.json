@@ -8,6 +8,27 @@
   },
   "releases": [
     {
+      "version": "1.5.178",
+      "date": "2026-10-20T07:08:16-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "ADI AutoCare Pro 2.0, ajuste de stock e inventario de licencias revisado",
+      "changes": {
+        "features": [
+          "ADI AutoCare Pro 2.0: 13 servicios verificados individualmente (correcto, advertencia, error o no comprobado), diagnóstico con progreso real, incidencias con código, causa, acción recomendada y resolución registrada, historial técnico con filtros y avisos configurables",
+          "Licencias: «Ajustar stock» eligiendo qué licencias se retiran del inventario (anuladas con motivo, sin borrar claves ni historial)"
+        ],
+        "improvements": [
+          "Licencias: revisar inconsistencias con corrección manual autorizada, búsqueda inmediata, vista por cliente sin columna repetida, barra de vigencia premium e iconos de acción por función"
+        ],
+        "fixes": [
+          "AutoCare mostraba siempre 0 cambios pendientes de publicar; el indicador de servicios decía «Todos correctos» con errores"
+        ],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.177",
       "date": "2026-10-19T21:39:06-05:00",
       "type": "patch",

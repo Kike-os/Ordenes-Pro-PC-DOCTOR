@@ -4,6 +4,23 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.178 — 2026-10-20 07:08 (UTC-05:00)
+
+ADI AutoCare Pro 2.0, ajuste de stock e inventario de licencias revisado
+
+### Nuevas funcionalidades
+
+- ADI AutoCare Pro 2.0: 13 servicios verificados individualmente (correcto, advertencia, error o no comprobado), diagnóstico con progreso real, incidencias con código, causa, acción recomendada y resolución registrada, historial técnico con filtros y avisos configurables
+- Licencias: «Ajustar stock» eligiendo qué licencias se retiran del inventario (anuladas con motivo, sin borrar claves ni historial)
+
+### Mejoras realizadas
+
+- Licencias: revisar inconsistencias con corrección manual autorizada, búsqueda inmediata, vista por cliente sin columna repetida, barra de vigencia premium e iconos de acción por función
+
+### Errores corregidos
+
+- AutoCare mostraba siempre 0 cambios pendientes de publicar; el indicador de servicios decía «Todos correctos» con errores
+
 ## v1.5.177 — 2026-10-19 21:39 (UTC-05:00)
 
 Consecutivo global de órdenes, rediseño de Clientes e inventario profesional de Licencias
