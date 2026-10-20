@@ -35,6 +35,7 @@ import remote_db
 import mail_tracking
 import reception
 import licenses
+import license_sales
 import no_show
 import trusted_devices
 import service_terms
@@ -556,7 +557,22 @@ def license_notices_tick(c,now):
     return sent
 
 
-def license_delivery_reply(c,delivery,token,user,send_mail):
+def license_sale_mail_lines(c,sale_id,link):
+    """Cuerpo del correo de entrega de una venta: número, productos, pagos, enlace privado e instrucciones de activación. Sin claves."""
+    sale=license_sales.detail(c,sale_id,reception_now())
+    lines=['Estimado/a '+sale['client']+':','','Le confirmamos la entrega de su compra de licencias digitales.','','Número de venta: '+sale['code'],'Fecha de entrega: '+sale['delivered_at'][:10],'']
+    for item in sale['items']:lines.append('• %d × %s'%(item['quantity'],item['product_name']))
+    lines+=['','Total: '+licenses.usd(sale['total_cents'])+' · Pagado: '+licenses.usd(sale['paid_cents'])+(' · Saldo pendiente: '+licenses.usd(sale['balance_cents']) if sale['balance_cents'] else ''),'',
+            'Para consultar sus claves ingrese al siguiente enlace privado (válido %d horas):'%licenses.LINK_HOURS,link,'',
+            'Por su seguridad se le pedirá su número de identificación y un código que enviaremos a este correo. Este mensaje no contiene usuarios, contraseñas ni seriales.']
+    guides=[]
+    for row in c.execute("SELECT i.name,MAX(u.instructions) instructions,MAX(u.download_url) url FROM license_units u JOIN catalog_items i ON i.id=u.product_id WHERE u.sale_id=? AND u.status='entregada' GROUP BY u.product_id ORDER BY i.name",(sale_id,)):
+        if row['instructions'] or row['url']:guides+=['',row['name']+':']+([row['instructions'][:600]] if row['instructions'] else [])+(['Descarga oficial: '+row['url']] if row['url'] else [])
+    lines+=['','Instrucciones de activación'+(':' if guides else ': instale el programa desde el sitio oficial del fabricante e ingrese la clave que verá en su enlace privado. Si necesita ayuda, escríbanos.')]+guides
+    return lines
+
+
+def license_delivery_reply(c,delivery,token,user,send_mail,sale=None):
     """Enlace privado de la entrega y, si se pide, correo al cliente con el enlace (nunca con credenciales)."""
     link=public_base_url().rstrip('/')+'/licencias/'+token;row=licenses.delivery_row(c,delivery)
     client=c.execute('SELECT name,email FROM clients WHERE id=?',(row['client_id'],)).fetchone() if row['client_id'] else None
@@ -568,11 +584,12 @@ def license_delivery_reply(c,delivery,token,user,send_mail):
             result='not_configured'
             try:
                 if mail_pro.configured():
-                    body='\n'.join(['Estimado/a '+client['name']+':','','Le confirmamos la entrega de sus licencias digitales.','',
+                    head=license_sale_mail_lines(c,sale,link) if sale else ['Estimado/a '+client['name']+':','','Le confirmamos la entrega de sus licencias digitales.','',
                         'Para consultar sus credenciales ingrese al siguiente enlace privado (válido %d horas):'%licenses.LINK_HOURS,link,'',
-                        'Por su seguridad se le pedirá su número de identificación y un código que enviaremos a este correo. Este mensaje no contiene usuarios, contraseñas ni seriales.','',
-                        'Atentamente,','','Departamento de Licencias y Soporte Técnico','PC-DOCTOR S.A.','WhatsApp '+licenses.CONTACT['phone']+' · '+licenses.CONTACT['email']])
-                    send_institutional(c,'license','Entrega de licencias digitales',email,'PC-DOCTOR S.A. | Entrega de licencias digitales',body,row['order_id'],user['id'],private=(link,));result='sent'
+                        'Por su seguridad se le pedirá su número de identificación y un código que enviaremos a este correo. Este mensaje no contiene usuarios, contraseñas ni seriales.']
+                    body='\n'.join(head+['','Atentamente,','','Departamento de Licencias y Soporte Técnico','PC-DOCTOR S.A.','WhatsApp '+licenses.CONTACT['phone']+' · '+licenses.CONTACT['email']])
+                    subject='PC-DOCTOR S.A. | Entrega de licencias · venta '+license_sales.sale_row(c,sale)['code'] if sale else 'PC-DOCTOR S.A. | Entrega de licencias digitales'
+                    send_institutional(c,'license','Entrega de licencias digitales',email,subject,body,row['order_id'],user['id'],private=(link,));result='sent'
             except mail_pro.MailError as error:
                 print('license-mail',error.kind,flush=True);result='failed'
     return {'ok':True,'delivery':delivery,'link':link,'mail':result,'expires_at':licenses.delivery_row(c,delivery)['token_expires_at'],'has_email':bool(email)}
@@ -1950,6 +1967,16 @@ class Handler(BaseHTTPRequestHandler):
                         return self.reply(200,bytes(found['data']),found['mime'],filename=found['name'])
                     card_route=re.fullmatch(r'/api/licenses/deliveries/([0-9]{1,9})/card',path)
                     if card_route:return self.reply(200,licenses.card(c,int(card_route[1]),private=False))
+                    if path=='/api/licenses/sales':
+                        return self.reply(200,{'rows':license_sales.sales(c,arg('q')[:120],arg('payment'),arg('delivery')),'methods':license_sales.METHODS,'payment_labels':license_sales.PAYMENT,'delivery_labels':license_sales.DELIVERY})
+                    sale_route=re.fullmatch(r'/api/licenses/sales/([0-9]{1,9})',path)
+                    if sale_route:return self.reply(200,license_sales.detail(c,int(sale_route[1]),now))
+                    payment_receipt=re.fullmatch(r'/api/licenses/payments/([0-9]{1,9})/receipt',path)
+                    if payment_receipt:
+                        found=license_sales.receipt_file(c,int(payment_receipt[1]))
+                        if not found:return self.reply(404,{'error':'Sin comprobante.'})
+                        audit(c,user['id'],'license_payment_receipt_viewed',int(payment_receipt[1]))
+                        return self.reply(200,bytes(found['data']),found['mime'],filename=found['name'])
                 except licenses.LicenseError as error:return self.reply(error.status,{'error':str(error),'fields':error.fields})
                 return self.reply(404,{'error':'No encontrado.'})
             if path == '/api/catalog':
@@ -2179,13 +2206,13 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(403, {'error':'Solicitud no autorizada.'})
             path = urlsplit(self.path).path
             workspace_post=bool(re.fullmatch(r'/api/orders/[0-9]+/workspace',path));quote_json=bool(re.fullmatch(r'/api/quotes/[0-9]+',path))
-            max_body=9000000 if path in ('/api/clients/import/preview','/api/clients/import/commit') else 6000000 if path in ('/api/mail/send','/api/mail/draft') else 100000 if path in ('/api/conditions','/api/order-draft','/api/conditions/draft','/api/conditions/compare') else 3200000 if path in ('/api/licenses/new','/api/licenses/units','/api/licenses/units/bulk','/api/licenses/products','/api/licenses/products/duplicate') else 900000 if re.fullmatch(r'/api/orders/[0-9]+/photos',path) or path in ('/api/profile/photo','/api/mail/signature') or re.fullmatch(r'/api/catalog/[0-9]+/image',path) else (65536 if workspace_post or quote_json else 16384)
+            max_body=9000000 if path in ('/api/clients/import/preview','/api/clients/import/commit') else 6000000 if path in ('/api/mail/send','/api/mail/draft') else 100000 if path in ('/api/conditions','/api/order-draft','/api/conditions/draft','/api/conditions/compare') else 3200000 if path in ('/api/licenses/new','/api/licenses/units','/api/licenses/units/bulk','/api/licenses/products','/api/licenses/products/duplicate','/api/licenses/sales') or re.fullmatch(r'/api/licenses/sales/[0-9]+',path) else 900000 if re.fullmatch(r'/api/orders/[0-9]+/photos',path) or path in ('/api/profile/photo','/api/mail/signature') or re.fullmatch(r'/api/catalog/[0-9]+/image',path) else (65536 if workspace_post or quote_json else 16384)
             length = int(self.headers.get('Content-Length', '0'))
             if length <= 0 or length > max_body:
                 return self.reply(400, {'error':'Solicitud inválida.'})
             data = json.loads(self.rfile.read(length))
             appointment_config_post=path=='/api/appointments/config'
-            if not isinstance(data, dict) or any(not isinstance(v,(str,bool)) and not (quote_json and k=='items' and isinstance(v,list)) and not (workspace_post and ((k=='lines' and isinstance(v,list)) or (k=='revision' and type(v) is int))) and not (appointment_config_post and ((k in ('hours','services','staff_hours') and isinstance(v,list)) or (k in ('holiday','new_service') and isinstance(v,dict)))) and not (path=='/api/business-hours' and k in ('hours','closures','request_limits') and isinstance(v,list)) for k,v in data.items()):
+            if not isinstance(data, dict) or any(not isinstance(v,(str,bool)) and not (quote_json and k=='items' and isinstance(v,list)) and not (workspace_post and ((k=='lines' and isinstance(v,list)) or (k=='revision' and type(v) is int))) and not (appointment_config_post and ((k in ('hours','services','staff_hours') and isinstance(v,list)) or (k in ('holiday','new_service') and isinstance(v,dict)))) and not (path=='/api/business-hours' and k in ('hours','closures','request_limits') and isinstance(v,list)) and not (path=='/api/licenses/sales' and ((k=='items' and isinstance(v,list)) or (k=='payment' and isinstance(v,dict)))) for k,v in data.items()):
                 return self.reply(400, {'error':'Datos inválidos.'})
             path = urlsplit(self.path).path
             with connect() as c:
@@ -3152,6 +3179,30 @@ class Handler(BaseHTTPRequestHandler):
                             c.execute('INSERT INTO license_notices(unit_id,client_id,expires_at,days,recipient,status,attempts,last_error,archive_id,manual,created_at,sent_at) VALUES (?,?,?,?,?,?,1,?,?,1,?,?)',
                                       (row['unit_id'],row['client_id'],data_['expires_at'],row['days'],data_['email'],result['status'],result.get('error',''),result.get('archive_id'),licenses.stamp(now),licenses.stamp(now) if result['status']=='enviado' else ''))
                             audit(c,user['id'],'license_notice_resent',row['unit_id']);return self.reply(200,{'ok':result['status']=='enviado','result':result})
+                        if path=='/api/licenses/sales':
+                            # Venta independiente de las órdenes técnicas; con «Entregar ahora» se entrega en la misma operación (todo o nada).
+                            sale=license_sales.create(c,data,user,now);audit(c,user['id'],'license_sale_created',sale)
+                            if data.get('deliver') is True:
+                                delivery,token=license_sales.deliver(c,sale,data,user,now);audit(c,user['id'],'license_sale_delivered',sale)
+                                return self.reply(201,dict(license_delivery_reply(c,delivery,token,user,data.get('send_mail') is True,sale),sale=sale,code=license_sales.sale_row(c,sale)['code']))
+                            c.commit();return self.reply(201,{'ok':True,'sale':sale,'code':license_sales.sale_row(c,sale)['code']})
+                        sale_post=re.fullmatch(r'/api/licenses/sales/([0-9]{1,9})',path)
+                        if sale_post:
+                            sale=int(sale_post[1]);action=str(data.get('action',''));payment=int(data['payment_id']) if str(data.get('payment_id') or '').isdigit() else 0
+                            if action=='pay':license_sales.add_payment(c,sale,data,user,now)
+                            elif action=='confirm_payment':license_sales.confirm_payment(c,sale,payment,user,now)
+                            elif action=='void_payment':license_sales.void_payment(c,sale,payment,data.get('reason',''),user,now)
+                            elif action=='cancel':license_sales.cancel(c,sale,data.get('reason',''),user,now)
+                            elif action=='deliver':
+                                delivery,token=license_sales.deliver(c,sale,data,user,now);audit(c,user['id'],'license_sale_delivered',sale)
+                                return self.reply(200,license_delivery_reply(c,delivery,token,user,data.get('send_mail') is True,sale))
+                            elif action=='link':
+                                row=license_sales.sale_row(c,sale)
+                                if not row['delivery_id']:return self.reply(409,{'error':'La venta aún no se entrega.'})
+                                token=licenses.renew_link(c,row['delivery_id'],user,now);audit(c,user['id'],'license_delivery_link_renewed',row['delivery_id'])
+                                return self.reply(200,license_delivery_reply(c,row['delivery_id'],token,user,data.get('send_mail') is True,sale))
+                            else:return self.reply(400,{'error':'Acción no válida.'})
+                            audit(c,user['id'],'license_sale_'+action,sale);return self.reply(200,{'ok':True,'detail':license_sales.detail(c,sale,now)})
                         if path=='/api/licenses/deliver':
                             delivery,token=licenses.deliver(c,data,user,now);audit(c,user['id'],'license_delivered',delivery)
                             return self.reply(200,license_delivery_reply(c,delivery,token,user,data.get('send_mail') is True))

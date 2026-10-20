@@ -515,8 +515,14 @@ def confirm_activation(c,unit_id,activated_at,user,now):
     return expires
 
 
+def _sale_lock(c,unit):
+    if unit.get('sale_id') and unit['status']=='reservada':
+        code=c.execute('SELECT code FROM license_sales WHERE id=?',(unit['sale_id'],)).fetchone()
+        raise LicenseError('Esta licencia está reservada para la venta %s: cancela la venta para liberarla.'%(code[0] if code else ''),409)
+
+
 def void(c,unit_id,reason,user,now):
-    unit=unit_row(c,unit_id);reason=str(reason or '').strip()
+    unit=unit_row(c,unit_id);reason=str(reason or '').strip();_sale_lock(c,unit)
     if unit['status']=='anulada':raise LicenseError('La licencia ya está anulada.',409)
     if len(reason)<5:raise LicenseError('Indica el motivo.',fields={'reason':'Motivo obligatorio.'})
     returned=unit['status']=='entregada'
@@ -526,9 +532,10 @@ def void(c,unit_id,reason,user,now):
           unit_id,unit['product_id'],order=unit['order_id'],client=unit['client_id'],user=user)
 
 
-def release(c,unit_id,user,now):
+def release(c,unit_id,user,now,from_sale=False):
     """Anula la reserva: la licencia vuelve a estar disponible solo si no fue activada ni entregada."""
     unit=unit_row(c,unit_id)
+    if not from_sale:_sale_lock(c,unit)
     if unit['status']!='reservada':raise LicenseError('Esta licencia no está reservada.',409)
     if unit['activated']:raise LicenseError('La licencia ya fue activada: no vuelve al inventario. Anúlala si no se usará.',409)
     expired=unit['expires_at'] and unit['expires_at']<now.date().isoformat()

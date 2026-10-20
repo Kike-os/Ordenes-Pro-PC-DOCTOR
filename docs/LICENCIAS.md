@@ -79,3 +79,19 @@ Módulo «Licencias» del panel (solo administración). Migraciones 062 (inventa
   recuperarlas (tabla `notification_hidden`, por persona; los riesgos de almacenamiento y respaldos no se pueden ocultar).
 - «Marcar todas como leídas» indica «Todo está leído» cuando no hay pendientes, con contraste legible. Sin pendientes: «No tienes
   notificaciones pendientes». Los contadores salen de la base y se conservan al recargar.
+
+## Ventas de licencias (migración 067, 1.5.176)
+
+**Vender o entregar** abre una venta independiente de las órdenes técnicas: no pide orden, equipo, marca, modelo ni serie. Cada venta pertenece a un cliente y recibe su propio número consecutivo diario **VLIC-AAAAMMDD-0001** (asignado dentro de la transacción de escritura, sin duplicados).
+
+- **Cliente:** buscador por nombre, cédula o RUC, teléfono o correo (sin tildes). «+ Registrar nuevo cliente» abre la ficha de cliente y, al guardarla, lo selecciona en la venta.
+- **Carrito:** varios productos con cantidad, precio unitario y descuento autorizado por partida; subtotal, descuentos, total y saldo se calculan en pantalla y se vuelven a validar en el servidor. No se puede pedir más de lo disponible.
+- **Reserva:** al registrar la venta se reservan claves concretas (todo o nada). Una clave reservada para una venta no se ofrece a otra ni se puede liberar o anular desde el inventario; solo se libera al cancelar la venta.
+- **Pagos:** completos o parciales, con método (efectivo, transferencia, depósito, tarjeta u otro), fecha, referencia y comprobante JPG, PNG o PDF (máx. 1,5 MB, comprobado por su contenido; solo administración lo descarga). Un pago queda «Confirmado» o «Por confirmar»; **solo los confirmados cuentan** para el estado comercial. Los pagos no se borran ni cambian de importe: se anulan con motivo.
+- **Estados separados:** comercial (Pendiente de pago, Pago parcial, Pagado) y de entrega (Pendiente de entrega, Entregado). Una venta cancelada queda «Cancelado» en ambos.
+- **Entrega:** ahora (en la misma operación) o después desde la pestaña «Ventas». Con saldo pendiente hay que aceptarlo expresamente y queda registrado. Las claves pasan a «Entregada», se genera el enlace privado (identificación + código) y, si se marca, se envía el correo de entrega con número de venta, productos, pagos e instrucciones de activación: **nunca incluye claves**. La activación y el vencimiento se gestionan por licencia («Confirmar activación» en el detalle de la venta).
+- **Orden técnica:** solo se vincula si se marca «Vincular a una orden técnica»; debe ser del mismo cliente. Al entregar se añade una línea al seguimiento de esa orden; nunca se modifica su historial.
+- **Cancelar:** solo ventas no entregadas y sin pagos vigentes (anúlalos antes, por ejemplo tras un reembolso). Las claves vuelven al inventario; la venta, sus partidas y su historial se conservan.
+- **Comprobante:** con el logotipo original, cliente, productos, cantidades, precios, pagos y estados; sin claves. Se imprime en un marco aparte.
+
+Las entregas desde presupuestos aprobados (pestaña «Entregas») siguen funcionando igual.
