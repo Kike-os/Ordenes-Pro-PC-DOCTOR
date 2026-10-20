@@ -63,31 +63,27 @@ def _transient(error):
     return getattr(error, 'kind', '') in ('red', 'temporal', 'conexion')
 
 
+STATUS_LABELS = {'ok': 'Correcto', 'warning': 'Advertencia', 'error': 'Error', 'not_checked': 'No comprobado'}
+
+
 def checks(c, deep=False):
-    """Lista de (código, nombre, severidad, función). Cada función devuelve un detalle breve o lanza una excepción si falla.
-    Todas son de solo lectura. `deep` añade las que usan la red (inicio de sesión real en el buzón), solo en las ejecuciones
-    programadas o manuales, nunca en las que dispara una visita."""
-    def deployment():
-        registry = versioning.load()
-        installed = registry['releases'][0]
-        versioning.parse(installed['version'])
-        build = (os.getenv('VERCEL_GIT_COMMIT_SHA', '') or 'local')[:7]
-        return 'Versión ' + installed['version'] + ' registrada · compilación ' + build
+    """Lista de (código, nombre, severidad, función) de los 13 servicios de Órdenes Pro. Cada función devuelve un detalle (Correcto),
+    una tupla («warning» o «not_checked», detalle) o lanza una excepción (Error). Todas son de solo lectura: no crean, modifican ni
+    borran datos. `deep` añade las que usan la red (inicio de sesión real en el buzón), solo en ejecuciones programadas o manuales."""
+    from reception import reception_now
+    now = reception_now()
 
     def database():
+        began = time.monotonic()
         c.execute('SELECT 1').fetchone()
+        ms = round((time.monotonic() - began) * 1000)
         files = {p.name for p in (ROOT / 'migrations').glob('*.sql')}
         applied = {row[0] for row in c.execute('SELECT name FROM migrations')}
         missing = sorted(files - applied)
         if missing:
             raise RuntimeError('Faltan migraciones: ' + ', '.join(missing[:3]))
-        return str(len(files)) + ' migraciones aplicadas'
-
-    def essential_data():
-        totals = {table: c.execute('SELECT COUNT(*) FROM ' + table).fetchone()[0] for table in ('users', 'clients', 'orders', 'statuses')}
-        if not totals['users'] or not totals['statuses']:
-            raise RuntimeError('No hay usuarios o estados configurados.')
-        return 'Usuarios, clientes, órdenes y estados accesibles'
+        detail = str(len(files)) + ' migraciones aplicadas · respuesta en ' + str(ms) + ' ms'
+        return ('warning', detail + ' (respuesta lenta)') if ms > 1500 else detail
 
     def authentication():
         import secrets
@@ -98,53 +94,76 @@ def checks(c, deep=False):
         admins = c.execute("SELECT COUNT(*) FROM users WHERE role='administrador' AND active=1 AND approval='approved'").fetchone()[0]
         if not admins:
             raise RuntimeError('No hay ninguna cuenta de administración activa.')
-        c.execute('SELECT COUNT(*) FROM sessions').fetchone()
-        return 'Cifrado de contraseñas y sesiones operativos'
+        sessions = c.execute('SELECT COUNT(*) FROM sessions WHERE expires>?', (int(time.time()),)).fetchone()[0]
+        return 'Cifrado de contraseñas correcto · ' + str(admins) + ' cuenta(s) de administración · ' + str(sessions) + ' sesión(es) vigentes'
 
     def clients():
         columns = {row[1] for row in c.execute('PRAGMA table_info(clients)')}
         missing = {'name', 'phone', 'email', 'identification'} - columns
         if missing:
             raise RuntimeError('Faltan campos del registro de clientes: ' + ', '.join(sorted(missing)))
+        total, review = c.execute('SELECT COUNT(*),COALESCE(SUM(needs_review),0) FROM clients').fetchone()
         c.execute('SELECT id,name FROM clients ORDER BY id DESC LIMIT 5').fetchall()
-        return 'Registro de clientes consultado'
+        return str(total) + ' clientes · ' + str(review) + ' fichas por completar'
 
-    def static_files():
-        for name in ('app.js', 'app.css', 'form-validation.js'):
-            path = ROOT / 'static' / name
-            if not path.exists() or path.stat().st_size < 1000:
-                raise RuntimeError('Archivo de interfaz ausente: ' + name)
-        for name in ('login.html', 'dashboard.html'):
-            if not (ROOT / 'templates' / name).exists():
-                raise RuntimeError('Plantilla ausente: ' + name)
-        return 'Interfaz y plantillas presentes'
-
-    def orders_tracking():
-        import tracking_board
-        board = tracking_board.build(c, tracking_board.parse({}))
-        return 'Seguimiento de órdenes: ' + str(board['total']) + ' órdenes consultadas'
-
-    def documents():
-        # Genera en memoria el ticket de la orden más reciente y el último presupuesto, tal como los pide el personal. No guarda nada.
+    def orders():
         import app
         import order_tracking
+        import tracking_board
         from thermal_pdf import render_thermal
+        if not c.execute('SELECT COUNT(*) FROM statuses').fetchone()[0]:
+            raise RuntimeError('No hay estados de orden configurados.')
+        board = tracking_board.build(c, tracking_board.parse({}))
+        serial = c.execute('SELECT value FROM order_serial WHERE id=1').fetchone()
+        top = c.execute("SELECT MAX(daily_sequence) FROM orders WHERE number_date GLOB '[0-9]*'").fetchone()[0] or 0
+        if serial is None or serial[0] < top:
+            raise RuntimeError('El contador de órdenes está por detrás del último número asignado: riesgo de números repetidos.')
         row = c.execute('SELECT id FROM orders ORDER BY id DESC LIMIT 1').fetchone()
-        made = []
         if row:
             order = app.order_document(c, row['id'])
             order['tracking_url'] = order_tracking.active(c, row['id'])['url'] or app.public_base_url()
             if not render_thermal(order, 'cliente').startswith(b'%PDF'):
-                raise RuntimeError('El ticket no se generó como PDF.')
-            made.append('ticket')
-        quote = c.execute('SELECT id,order_id FROM quotes ORDER BY id DESC LIMIT 1').fetchone()
-        if quote:
-            import quote_pdf
-            import quotes
-            if not quote_pdf.render(quotes.detail(c, quotes.get(c, quote['id'])), app.order_document(c, quote['order_id'])).startswith(b'%PDF'):
-                raise RuntimeError('El presupuesto no se generó como PDF.')
-            made.append('presupuesto')
-        return ('PDF generados: ' + ' y '.join(made)) if made else 'Sin órdenes para generar documentos'
+                raise RuntimeError('El ticket de la orden no se generó como PDF.')
+        return str(board['total']) + ' órdenes en seguimiento · ' + ('ticket PDF generado' if row else 'sin órdenes para generar ticket') + ' · siguiente número ' + str(serial[0] + 1).zfill(4)
+
+    def quotes():
+        import app
+        import quote_pdf
+        import quotes as quote_module
+        total = c.execute("SELECT COUNT(*) FROM quotes WHERE deleted_at=''").fetchone()[0]
+        quote = c.execute("SELECT id,order_id FROM quotes WHERE deleted_at='' ORDER BY id DESC LIMIT 1").fetchone()
+        if not quote:
+            return 'Sin presupuestos registrados todavía'
+        if not quote_pdf.render(quote_module.detail(c, quote_module.get(c, quote['id'])), app.order_document(c, quote['order_id'])).startswith(b'%PDF'):
+            raise RuntimeError('El presupuesto no se generó como PDF.')
+        return str(total) + ' presupuestos · PDF del más reciente generado'
+
+    def licenses_check():
+        import licenses
+        probe = {'key': 'AUTOCARE-PRUEBA-0000'}
+        if licenses.unseal(licenses.seal(probe)) != probe:
+            raise RuntimeError('El cifrado de credenciales de licencias no responde como se espera.')
+        board = licenses.dashboard(c, now)
+        detail = str(board['disponibles']) + ' disponibles · ' + str(board['activas']) + ' activas · ' + str(board['por_vencer']) + ' por vencer · cifrado correcto'
+        if board.get('revision'):
+            return ('warning', str(board['revision']) + ' licencia(s) con datos inconsistentes (Licencias → Revisar inconsistencias) · ' + detail)
+        return detail
+
+    def sales():
+        import equipment
+        today = now.date()
+        equipment.receivables(c, today - timedelta(days=30), today)
+        mismatched = []
+        for sale in c.execute("SELECT id,code,total_cents,payment_status FROM license_sales WHERE payment_status!='cancelado'").fetchall():
+            paid = c.execute("SELECT COALESCE(SUM(amount_cents),0) FROM license_sale_payments WHERE sale_id=? AND status='confirmado'", (sale['id'],)).fetchone()[0]
+            expected = 'pagado' if paid >= sale['total_cents'] else 'parcial' if paid > 0 else 'pendiente'
+            if expected != sale['payment_status']:
+                mismatched.append(sale['code'])
+        count = c.execute('SELECT COUNT(*) FROM license_sales').fetchone()[0]
+        detail = 'Cobros y saldos consultados · ' + str(count) + ' venta(s) de licencias'
+        if mismatched:
+            return ('warning', 'Estado de pago distinto de los pagos confirmados en: ' + ', '.join(mismatched[:5]) + ' · ' + detail)
+        return detail
 
     def agenda():
         import appointments
@@ -153,13 +172,7 @@ def checks(c, deep=False):
             raise RuntimeError('La agenda no tiene servicios de cita.')
         day = (datetime.now(appointments.TZ).date() + timedelta(days=1)).isoformat()
         appointments.available_slots(c, day, services[0]['code'])
-        return 'Agenda: ' + str(len(services)) + ' servicios y disponibilidad calculada'
-
-    def reports():
-        import equipment
-        today = datetime.now().date()
-        equipment.receivables(c, today - timedelta(days=30), today)
-        return 'Reportes y saldos consultados'
+        return str(len(services)) + ' servicios de cita · disponibilidad calculada'
 
     def mail():
         import mail_pro
@@ -171,33 +184,71 @@ def checks(c, deep=False):
             raise RuntimeError('El correo del sistema no está configurado.')
         if deep:
             mail_pro.test_imap()
-            return 'Correo configurado y buzón accesible'
-        return 'Correo del sistema configurado'
+            return 'Correo configurado · conexión con el buzón correcta'
+        return ('not_checked', 'Configurado. La conexión con el buzón se comprueba en los diagnósticos manuales y programados.')
 
-    def assistant():
+    def notices():
+        import notifications
+        admin = c.execute("SELECT * FROM users WHERE role='administrador' AND active=1 ORDER BY id LIMIT 1").fetchone()
+        if not admin:
+            raise RuntimeError('No hay ninguna cuenta de administración para recibir avisos.')
+        items = notifications.build(c, dict(admin), now)
+        failed = c.execute("SELECT COUNT(*) FROM license_notices WHERE status='error' AND created_at>=?", ((now - timedelta(hours=24)).isoformat(timespec='seconds'),)).fetchone()[0]
+        detail = 'Centro de notificaciones operativo (' + str(len(items)) + ' avisos para administración)'
+        if failed:
+            return ('warning', str(failed) + ' aviso(s) de renovación con error de envío en 24 h · ' + detail)
+        return detail
+
+    def integrations():
         import adi_ai
-        # Integración opcional: sin proveedor configurado ADI funciona con sus respuestas propias. No se llama al proveedor (evita costos).
+        import remote_db
         info = adi_ai.status(c)
-        if not info['configured']:
-            return 'No configurada (opcional): ADI responde sin inteligencia artificial'
-        if not info['enabled']:
-            return 'Configurada y desactivada por administración'
-        return 'Disponible con ' + str(info['provider']) + (' · ' + info['model'] if info.get('model') else '')
+        parts = ['base de datos ' + ('en la nube' if remote_db.configured() else 'local')]
+        parts.append('IA de ADI ' + ('no configurada (opcional)' if not info['configured'] else 'desactivada' if not info['enabled'] else 'con ' + str(info['provider'])))
+        missing = []
+        if os.getenv('VERCEL'):
+            if not os.getenv('CRON_SECRET'):
+                missing.append('CRON_SECRET (tareas programadas sin protección)')
+            if not os.getenv('LICENSE_ENCRYPTION_KEY'):
+                missing.append('LICENSE_ENCRYPTION_KEY (cifrado de licencias)')
+        if missing:
+            return ('warning', 'Falta configurar: ' + ', '.join(missing) + ' · ' + ' · '.join(parts))
+        return 'Configuración revisada: ' + ' · '.join(parts) + ' (la IA no se llama para no generar costos)'
+
+    def internal():
+        registry = versioning.load()
+        installed = registry['releases'][0]
+        versioning.parse(installed['version'])
+        for name in ('app.js', 'app.css', 'form-validation.js', 'licenses.js'):
+            path = ROOT / 'static' / name
+            if not path.exists() or path.stat().st_size < 1000:
+                raise RuntimeError('Archivo de interfaz ausente: ' + name)
+        for name in ('login.html', 'dashboard.html'):
+            if not (ROOT / 'templates' / name).exists():
+                raise RuntimeError('Plantilla ausente: ' + name)
+        detail = 'Versión ' + installed['version'] + ' · compilación ' + (os.getenv('VERCEL_GIT_COMMIT_SHA', '') or 'local')[:7] + ' · interfaz y plantillas presentes'
+        if os.getenv('VERCEL'):
+            last = next((run for run in reversed(_load(c, 'stability_runs', [])) if run.get('source') == 'programada'), None)
+            if not last or last['at'] < (now - timedelta(hours=12)).isoformat(timespec='seconds'):
+                return ('warning', 'Las tareas programadas no se ejecutan desde ' + (last['at'][:16].replace('T', ' ') if last else 'hace más de 12 h') + ' · ' + detail)
+        return detail
 
     def runtime_errors():
         import autocare
         recent = autocare.recent_errors(c, hours=1)
         if len(recent) >= 5:
             raise RuntimeError(str(len(recent)) + ' errores de ejecución en la última hora.')
-        return ('Sin errores de ejecución en la última hora' if not recent else str(len(recent)) + ' error(es) de ejecución en la última hora')
+        if recent:
+            return ('warning', str(len(recent)) + ' error(es) de ejecución en la última hora (ver incidencias)')
+        return 'Sin errores de ejecución en la última hora'
 
-    return [('deployment', 'Despliegue y registro de versión', 'crítica', deployment), ('database', 'Base de datos y migraciones', 'crítica', database),
-            ('data', 'Datos esenciales accesibles', 'crítica', essential_data), ('auth', 'Inicio de sesión y autenticación', 'crítica', authentication),
-            ('interface', 'Archivos de la interfaz', 'crítica', static_files), ('orders', 'Seguimiento de órdenes', 'crítica', orders_tracking),
-            ('agenda', 'Agenda de citas', 'crítica', agenda), ('clients', 'Registro de clientes', 'alta', clients),
-            ('documents', 'Tickets y presupuestos PDF', 'alta', documents), ('reports', 'Reportes y saldos', 'media', reports),
-            ('mail', 'Servicio de correo', 'media', mail), ('assistant', 'ADI con inteligencia artificial', 'baja', assistant),
-            ('errors', 'Errores de ejecución', 'media', runtime_errors)]
+    return [('database', 'Conectividad con la base de datos', 'crítica', database), ('auth', 'Autenticación y sesiones', 'crítica', authentication),
+            ('clients', 'Registro de clientes', 'alta', clients), ('orders', 'Órdenes de reparación', 'crítica', orders),
+            ('quotes', 'Presupuestos', 'alta', quotes), ('licenses', 'Licencias e inventario', 'alta', licenses_check),
+            ('sales', 'Ventas y pagos', 'alta', sales), ('agenda', 'Agenda y citas', 'crítica', agenda),
+            ('mail', 'Envío de correos', 'media', mail), ('notifications', 'Notificaciones', 'media', notices),
+            ('integrations', 'Integraciones configuradas', 'baja', integrations), ('internal', 'Servicios internos', 'crítica', internal),
+            ('errors', 'Registros de errores', 'media', runtime_errors)]
 
 
 def _summary(c, version, history=None):
@@ -229,38 +280,39 @@ def _account(summary, entry):
         summary['window_start'], summary['window_passes'] = '', 0
 
 
-def run(c, now, source='automática'):
-    """Ejecuta todas las verificaciones y registra el resultado (ejecución detallada y resumen de la versión). Devuelve la ejecución."""
-    version = versioning.load()['releases'][0]['version']
-    _save(c, 'stability_running', {'version': version, 'since': now.isoformat(timespec='seconds')})
-    c.commit()
-    results = []
-    deep = source in ('programada', 'manual')
-    began_all = time.monotonic()
+def execute(code, name, severity, test):
+    """Ejecuta una comprobación y devuelve su resultado: Correcto, Advertencia, No comprobado o Error. Un fallo transitorio se
+    reintenta una sola vez tras 1,5 s (recuperación automática, sin tocar datos)."""
+    began = time.monotonic()
+    recovered = False
+
+    def outcome(value):
+        if isinstance(value, tuple) and value and value[0] in ('warning', 'not_checked'):
+            return value[0], str(value[1])[:200]
+        return 'ok', str(value)[:200]
     try:
-        for code, name, severity, test in checks(c, deep):
-            began = time.monotonic()
-            recovered = False
+        status, detail = outcome(test())
+    except Exception as error:
+        status, detail = 'error', (str(error) or type(error).__name__)[:200]
+        if _transient(error):
+            time.sleep(1.5)
             try:
-                detail, ok = test(), True
-            except Exception as error:
-                detail, ok = (str(error) or type(error).__name__)[:160], False
-                if _transient(error):
-                    # Recuperación automática y segura: un único reintento tras una pausa breve, sin tocar datos.
-                    time.sleep(1.5)
-                    try:
-                        detail, ok, recovered = test(), True, True
-                    except Exception as again:
-                        detail = (str(again) or type(again).__name__)[:160]
-                print('stability', code, type(error).__name__, 'recuperado' if recovered else '', flush=True)
-            results.append({'code': code, 'name': name, 'severity': severity, 'critical': severity == 'crítica', 'ok': ok, 'detail': detail,
-                            'recovered': recovered, 'ms': round((time.monotonic() - began) * 1000)})
-    finally:
-        c.execute("DELETE FROM system_state WHERE key='stability_running'")
-    total_ms = round((time.monotonic() - began_all) * 1000)
-    entry = {'version': version, 'at': now.isoformat(timespec='seconds'), 'source': source, 'passed': sum(1 for r in results if r['ok']), 'total': len(results),
+                (status, detail), recovered = outcome(test()), True
+            except Exception as again:
+                detail = (str(again) or type(again).__name__)[:200]
+        print('stability', code, type(error).__name__, 'recuperado' if recovered else '', flush=True)
+    return {'code': code, 'name': name, 'severity': severity, 'critical': severity == 'crítica', 'ok': status != 'error', 'status': status,
+            'detail': detail, 'recovered': recovered, 'ms': round((time.monotonic() - began) * 1000)}
+
+
+def finish(c, now, source, results, total_ms, by=''):
+    """Registra una ejecución completa (detalle y resumen de la versión) y avisa a AutoCare. Devuelve la ejecución."""
+    version = versioning.load()['releases'][0]['version']
+    counts = {key: sum(1 for r in results if r.get('status', 'ok' if r['ok'] else 'error') == key) for key in STATUS_LABELS}
+    entry = {'version': version, 'at': now.isoformat(timespec='seconds'), 'source': source, 'by': by, 'passed': sum(1 for r in results if r['ok']), 'total': len(results),
              'critical_failures': [r['name'] for r in results if r['critical'] and not r['ok']], 'warnings': [r['name'] for r in results if not r['critical'] and not r['ok']],
-             'results': results, 'ms': total_ms}
+             'advisories': [r['name'] for r in results if r.get('status') == 'warning'], 'unchecked': [r['name'] for r in results if r.get('status') == 'not_checked'],
+             'counts': counts, 'results': results, 'ms': total_ms}
     history = _load(c, 'stability_runs', [])
     summary = _summary(c, version, history)
     _account(summary, entry)
@@ -283,6 +335,51 @@ def run(c, now, source='automática'):
     except Exception as error:
         print('autocare', type(error).__name__, flush=True)
     return entry
+
+
+def run(c, now, source='automática', by=''):
+    """Ejecuta todas las verificaciones y registra el resultado (ejecución detallada y resumen de la versión). Devuelve la ejecución."""
+    version = versioning.load()['releases'][0]['version']
+    _save(c, 'stability_running', {'version': version, 'since': now.isoformat(timespec='seconds')})
+    c.commit()
+    began_all = time.monotonic()
+    try:
+        results = [execute(*item) for item in checks(c, source in ('programada', 'manual'))]
+    finally:
+        c.execute("DELETE FROM system_state WHERE key='stability_running'")
+    return finish(c, now, source, results, round((time.monotonic() - began_all) * 1000), by)
+
+
+# ---- Diagnóstico manual paso a paso: el panel muestra el progreso real (cada paso ejecuta una comprobación en el servidor) ----
+def start_manual(c, now, by):
+    import secrets
+    version = versioning.load()['releases'][0]['version']
+    plan = [{'code': code, 'name': name, 'severity': severity} for code, name, severity, _ in checks(c, True)]
+    state = {'id': secrets.token_hex(8), 'version': version, 'since': now.isoformat(timespec='seconds'), 'by': by, 'plan': plan, 'results': [], 'ms': 0}
+    _save(c, 'stability_manual', state)
+    _save(c, 'stability_running', {'version': version, 'since': now.isoformat(timespec='seconds')})
+    return {'id': state['id'], 'plan': plan}
+
+
+def step_manual(c, now, run_id, code):
+    """Ejecuta la siguiente comprobación del diagnóstico en curso. Al completar la última, registra la ejecución."""
+    state = _load(c, 'stability_manual', None)
+    if not state or state.get('id') != run_id or state['since'] < (now - timedelta(minutes=10)).isoformat(timespec='seconds'):
+        raise ValueError('El diagnóstico ya no está en curso. Vuelve a iniciarlo.')
+    done = len(state['results'])
+    if done >= len(state['plan']) or state['plan'][done]['code'] != code:
+        raise ValueError('Comprobación fuera de orden.')
+    item = next(entry for entry in checks(c, True) if entry[0] == code)
+    result = execute(*item)
+    state['results'].append(result)
+    state['ms'] += result['ms']
+    if len(state['results']) < len(state['plan']):
+        _save(c, 'stability_manual', state)
+        _save(c, 'stability_running', {'version': state['version'], 'since': now.isoformat(timespec='seconds')})
+        return {'result': result, 'done': False}
+    c.execute("DELETE FROM system_state WHERE key IN ('stability_manual','stability_running')")
+    entry = finish(c, now, 'manual', state['results'], state['ms'], state.get('by', ''))
+    return {'result': result, 'done': True, 'entry': {key: entry[key] for key in ('at', 'passed', 'total', 'counts', 'critical_failures', 'warnings', 'advisories', 'unchecked')}}
 
 
 def _known(c, history):
@@ -350,7 +447,7 @@ def status(c, now):
     return {'version': version, 'date': installed.get('date', ''), 'state': state, 'label': LABELS[state], 'short': SHORT[state],
             'last_check': summary['last_run'], 'checks_run': summary['runs'], 'checks_passed': summary['passes'],
             'window_start': summary['window_start'], 'window_passes': summary['window_passes'], 'missing_passes': missing,
-            'tests': [{'name': r['name'], 'ok': r['ok'], 'critical': r['critical'], 'severity': r.get('severity', 'crítica' if r['critical'] else 'media'), 'recovered': r.get('recovered', False)} for r in (last['results'] if last else [])],
+            'tests': [{'name': r['name'], 'ok': r['ok'], 'status': r.get('status', 'ok' if r['ok'] else 'error'), 'critical': r['critical'], 'severity': r.get('severity', 'crítica' if r['critical'] else 'media'), 'recovered': r.get('recovered', False)} for r in (last['results'] if last else [])],
             'passed': last['passed'] if last else 0, 'total': last['total'] if last else len(checks(c)),
             'incidents': incidents, 'observation_hours': OBSERVATION_HOURS, 'min_passes': MIN_PASSES, 'remaining_hours': remaining,
             'first_pass': summary['window_start'], 'next_scheduled': next_scheduled(now), 'previous': previous,

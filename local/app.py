@@ -2531,14 +2531,28 @@ class Handler(BaseHTTPRequestHandler):
                     for key,value in values.items():c.execute('INSERT INTO auth_policy VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value',(key,value))
                     audit(c,user['id'],'auth_policy_updated')
                     return self.reply(200,{'ok':True})
-                if path in ('/api/autocare/diagnose','/api/autocare/settings','/api/autocare/review'):
+                if path in ('/api/autocare/diagnose','/api/autocare/settings','/api/autocare/review','/api/autocare/diagnose/start','/api/autocare/diagnose/step','/api/autocare/incident'):
                     if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede usar ADI AutoCare.'})
                     import autocare,stability
                     now=reception_now()
+                    if path=='/api/autocare/diagnose/start':
+                        # Diagnóstico con progreso real: el panel ejecuta cada comprobación en el servidor, una a una, y la última registra la ejecución.
+                        if stability._running(c,now):return self.reply(409,{'error':'Ya hay un diagnóstico en curso.'})
+                        if limited(c,'autocare-diagnose:'+str(user['id']),limit=6,window=3600):return self.reply(429,{'error':'Ya ejecutaste varios diagnósticos en la última hora. Espera unos minutos.'})
+                        started=stability.start_manual(c,now,user['name']);audit(c,user['id'],'autocare_diagnose');return self.reply(200,started)
+                    if path=='/api/autocare/diagnose/step':
+                        try:out=stability.step_manual(c,now,str(data.get('id','')),str(data.get('code','')))
+                        except ValueError as error:return self.reply(409,{'error':str(error)})
+                        return self.reply(200,out)
+                    if path=='/api/autocare/incident':
+                        try:item=autocare.update_incident(c,str(data.get('code','')),str(data.get('status','')),data.get('note',''),user['name'],now)
+                        except LookupError as error:return self.reply(404,{'error':str(error)})
+                        except ValueError as error:return self.reply(400,{'error':str(error),'fields':{'note':str(error)}})
+                        audit(c,user['id'],'autocare_incident_'+item['status']);return self.reply(200,{'ok':True,'incident':item})
                     if path.endswith('diagnose'):
                         if limited(c,'autocare-diagnose:'+str(user['id']),limit=6,window=3600):return self.reply(429,{'error':'Ya ejecutaste varios diagnósticos en la última hora. Espera unos minutos.'})
                         if stability._running(c,now):return self.reply(409,{'error':'Ya hay un diagnóstico en curso.'})
-                        entry=stability.run(c,now,'manual');audit(c,user['id'],'autocare_diagnose')
+                        entry=stability.run(c,now,'manual',user['name']);audit(c,user['id'],'autocare_diagnose')
                         return self.reply(200,dict(autocare.overview(c,reception_now()),ran={'passed':entry['passed'],'total':entry['total']}))
                     if path.endswith('review'):
                         autocare.mark_reviewed(c,now);audit(c,user['id'],'autocare_reviewed')

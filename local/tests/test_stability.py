@@ -59,7 +59,7 @@ class StabilityTests(unittest.TestCase):
                 shutil.copytree(stability.ROOT / 'static', Path(root) / 'static');shutil.copytree(stability.ROOT / 'templates', Path(root) / 'templates')
                 with patch.object(stability, 'ROOT', Path(root)):
                     failed = stability.run(c, now - timedelta(hours=2))
-            self.assertEqual(failed['critical_failures'], ['Base de datos y migraciones'])
+            self.assertEqual(failed['critical_failures'], ['Conectividad con la base de datos'])
             self.assertEqual(stability.status(c, now)['state'], 'attention')
             stability.run(c, now - timedelta(hours=1))
             # Tras un fallo crítico el seguimiento empieza de nuevo: no basta con las verificaciones correctas anteriores.
@@ -75,7 +75,7 @@ class StabilityTests(unittest.TestCase):
     def test_missing_mail_is_a_warning_not_a_critical_failure(self):
         with app.connect() as c:
             entry = stability.run(c, app.reception_now())
-        self.assertEqual((entry['critical_failures'], entry['warnings']), ([], ['Servicio de correo']))
+        self.assertEqual((entry['critical_failures'], entry['warnings']), ([], ['Envío de correos']))
 
     def test_a_failed_non_critical_check_prevents_stable_until_everything_passes(self):
         now = app.reception_now()
