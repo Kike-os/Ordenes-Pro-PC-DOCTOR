@@ -9,6 +9,7 @@ import secrets
 from datetime import datetime, timedelta
 
 from reception import DEVICE_TYPES, ECUADOR_TZ
+import reception
 
 CODE_MINUTES = 10
 MAX_ATTEMPTS = 5
@@ -26,7 +27,7 @@ def start(c, order_code, now):
     c.execute('DELETE FROM order_checks WHERE expires_at<?', ((now - timedelta(days=1)).isoformat(timespec='seconds'),))
     token, code = secrets.token_urlsafe(24), '%06d' % secrets.randbelow(1000000)
     wanted = re.sub(r'\s+', '', str(order_code or '')).upper()
-    row = c.execute("SELECT o.id,o.code,cl.name,cl.email FROM orders o JOIN devices d ON d.id=o.device_id JOIN clients cl ON cl.id=d.client_id WHERE UPPER(o.code)=?", (wanted,)).fetchone() if ORDER_CODE.fullmatch(wanted) else None
+    row = c.execute("SELECT o.id,o.code,cl.name,cl.email FROM orders o JOIN devices d ON d.id=o.device_id JOIN clients cl ON cl.id=d.client_id WHERE UPPER(o.code)=?", (reception.current_order_code(c,wanted).upper(),)).fetchone() if ORDER_CODE.fullmatch(wanted) else None
     email = (row['email'] or '').strip() if row else ''
     real = bool(row and MAIL.fullmatch(email))
     c.execute('INSERT INTO order_checks(token_hash,order_id,code_hash,expires_at,created_at) VALUES (?,?,?,?,?)',

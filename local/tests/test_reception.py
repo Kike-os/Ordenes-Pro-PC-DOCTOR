@@ -76,14 +76,13 @@ class ReceptionTests(unittest.TestCase):
         with app.connect() as c:
             self.assertEqual(c.execute('SELECT COUNT(*) FROM clients').fetchone()[0],1)
             self.assertEqual(c.execute('SELECT COUNT(*) FROM orders').fetchone()[0],1)
-            c.execute("UPDATE daily_order_sequences SET value=9998 WHERE reception_date='20261009'")
+            c.execute("UPDATE order_serial SET value=9998")
         self.assertEqual(self.request('/api/orders',self.order_data(),cookie=cookie,csrf=csrf)['body']['code'],'PCD-20261009-9999')
-        # Superar 9999 en un mismo día: error controlado, sin orden, sin número consumido y sin duplicados.
-        full=self.request('/api/orders',self.order_data(),cookie=cookie,csrf=csrf)
-        self.assertEqual(full['status'],409);self.assertIn('9999',full['body']['error'])
+        # Después de 9999 el consecutivo global sigue con más dígitos: no se reinicia ni se repite.
+        self.assertEqual(self.request('/api/orders',self.order_data(),cookie=cookie,csrf=csrf)['body']['code'],'PCD-20261009-10000')
         with app.connect() as c:
-            self.assertEqual(c.execute("SELECT value FROM daily_order_sequences WHERE reception_date='20261009'").fetchone()[0],9999)
-            self.assertEqual(c.execute('SELECT COUNT(*) FROM orders').fetchone()[0],2)
+            self.assertEqual(c.execute("SELECT value FROM order_serial").fetchone()[0],10000)
+            self.assertEqual(c.execute('SELECT COUNT(*) FROM orders').fetchone()[0],3)
         qr=self.request('/api/orders/1/qr.svg',cookie=cookie)
         self.assertEqual(qr['status'],200)
         self.assertIn(b'<svg',qr['body'])
@@ -131,11 +130,11 @@ class ReceptionTests(unittest.TestCase):
         self.assertEqual(first['code'],'PCD-20261009-0001')
         self.clock_mock.return_value=midnight
         second=self.request('/api/orders',self.order_data(),cookie=cookie,csrf=csrf)['body']
-        self.assertEqual(second['code'],'PCD-20261010-0001')
+        self.assertEqual(second['code'],'PCD-20261010-0002')
         # Reejecutar la migración y abrir otra conexión simula el estado tras reinicio.
         app.migrate()
         third=self.request('/api/orders',self.order_data(),cookie=cookie,csrf=csrf)['body']
-        self.assertEqual(third['code'],'PCD-20261010-0002')
+        self.assertEqual(third['code'],'PCD-20261010-0003')
         detail=self.request('/api/orders/'+str(first['id']),cookie=cookie)['body']['order']
         self.assertTrue(detail['received_at'].endswith('-05:00'))
         self.assertIn('/orders/PCD-20261009-0001',detail['qr_url'])
@@ -144,10 +143,11 @@ class ReceptionTests(unittest.TestCase):
             c.execute('UPDATE orders SET created_at=0 WHERE id=?',(first['id'],))
             with self.assertRaises(sqlite3.IntegrityError):c.execute("UPDATE orders SET code='CAMBIADO' WHERE id=?",(first['id'],))
             with self.assertRaises(sqlite3.IntegrityError):c.execute("UPDATE orders SET qr_url='https://otro.invalid' WHERE id=?",(first['id'],))
-            with self.assertRaises(sqlite3.IntegrityError):c.execute("DELETE FROM daily_order_sequences")
+            with self.assertRaises(sqlite3.IntegrityError):c.execute("DELETE FROM order_serial")
+            with self.assertRaises(sqlite3.IntegrityError):c.execute("UPDATE order_serial SET value=1")
             with self.assertRaises(sqlite3.IntegrityError):c.execute('DELETE FROM orders WHERE id=?',(third['id'],))
         fourth=self.request('/api/orders',self.order_data(),cookie=cookie,csrf=csrf)['body']
-        self.assertEqual(fourth['code'],'PCD-20261010-0003')
+        self.assertEqual(fourth['code'],'PCD-20261010-0004')
         self.assertEqual(self.request('/api/order-by-code/'+third['code'],cookie=cookie)['status'],200)
 
     def test_parallel_independent_technicians_get_distinct_numbers(self):
@@ -164,13 +164,16 @@ class ReceptionTests(unittest.TestCase):
         self.assertTrue(all(r['status']==201 for r in results),results)
         self.assertEqual({r['body']['code'] for r in results},{f'PCD-20261009-{i:04d}' for i in range(1,13)})
 
-    def test_daily_sequence_advances_resets_and_keeps_codes(self):
+    def test_global_sequence_continues_across_days_and_keeps_codes(self):
         cookie,csrf=self.login()
         day=lambda n:self.request('/api/orders',self.order_data(),cookie=cookie,csrf=csrf)['body']
         first=[day(n) for n in range(4)]
         self.assertEqual([o['code'] for o in first],['PCD-20261009-0001','PCD-20261009-0002','PCD-20261009-0003','PCD-20261009-0004'])
         self.clock_mock.return_value=datetime(2026,10,10,9,0,0,tzinfo=reception.ECUADOR_TZ)
-        self.assertEqual(day(5)['code'],'PCD-20261010-0001')
+        # Cambiar de día no reinicia el consecutivo: continúa desde el último número asignado.
+        self.assertEqual(day(5)['code'],'PCD-20261010-0005')
+        self.clock_mock.return_value=datetime(2027,1,1,9,0,0,tzinfo=reception.ECUADOR_TZ)
+        self.assertEqual(day(6)['code'],'PCD-20270101-0006')
         # Editar o cambiar el estado no altera el número; tampoco consultarlo, imprimirlo o vincularlo.
         with app.connect() as c:
             c.execute("UPDATE orders SET problem='Problema corregido',status='reparacion' WHERE id=?",(first[1]['id'],))
@@ -198,6 +201,57 @@ class ReceptionTests(unittest.TestCase):
         self.assertEqual((made['code'],nxt['code']),('PCD-20261009-0001','PCD-20261009-0002'))
         self.assertEqual(self.request('/api/order-by-code/OP-0005',cookie=cookie)['status'],200)
         with app.connect() as c:self.assertEqual(app.order_from_text(c,'Consulta de la orden OP-0005'),c.execute("SELECT id FROM orders WHERE code='OP-0005'").fetchone()[0])
+
+    def test_migration_unifies_existing_codes_keeps_aliases_and_relations(self):
+        """Reproduce las órdenes de producción (códigos diarios, un equipo adicional -E02 y OP-0005) y aplica la migración 068 real."""
+        cookie,csrf=self.login()
+        days=[(2026,10,12,21),(2026,10,14,21),(2026,10,15,19),(2026,10,16,9),(2026,10,19,12)]
+        made=[]
+        for y,m,d,h in days:
+            self.clock_mock.return_value=datetime(y,m,d,h,0,0,tzinfo=reception.ECUADOR_TZ)
+            made.append(self.request('/api/orders',self.order_data({'email':'cliente@example.invalid'}),cookie=cookie,csrf=csrf)['body'])
+        legacy=['PCD-20261012-0001','PCD-20261014-0001','PCD-20261015-0001','PCD-20261016-0001','OP-0005']
+        with app.connect() as c:
+            # Estado anterior a 068: se retira lo que crea la migración y se ponen los códigos antiguos (solo en esta base de prueba).
+            for t in ('order_renumbering_fixed','order_renumbering_no_delete','order_code_aliases_fixed','order_code_aliases_no_delete','immutable_order_number','immutable_order_qr'):c.execute('DROP TRIGGER '+t)
+            c.execute('DROP TABLE order_code_aliases');c.execute('DROP TABLE order_renumbering');c.execute("DELETE FROM migrations WHERE name='068_global_order_number.sql'")
+            for order,code in zip(made,legacy):
+                c.execute('UPDATE orders SET code=?,qr_url=?,number_date=?,daily_sequence=? WHERE id=?',('#'+code,'',None,None,order['id']))
+            for order,code in zip(made,legacy):
+                c.execute('UPDATE orders SET code=?,qr_url=?,number_date=?,daily_sequence=? WHERE id=?',(code,reception.order_url(code),'OP' if code.startswith('OP') else code[4:12],5 if code.startswith('OP') else 1,order['id']))
+            first=c.execute('SELECT * FROM orders WHERE id=?',(made[0]['id'],)).fetchone()
+            unit=c.execute("INSERT INTO orders(device_id,status,problem,created_by,created_at,code,received_at,group_id,unit_no,qr_url) VALUES (?,'reparacion','Segundo equipo ficticio',?,?,?,?,?,2,?)",
+                           (first['device_id'],self.uid,first['created_at']+60,legacy[0]+'-E02',first['received_at'],first['id'],reception.order_url(legacy[0]+'-E02'))).lastrowid
+            c.execute('UPDATE orders SET group_id=id WHERE id=?',(first['id'],))
+            c.execute("INSERT INTO order_history(order_id,actor_id,occurred_at,event,status_label,comment) VALUES (?,?,?,'follow_up','Pendiente','Nota que menciona OP-0005')",(made[4]['id'],self.uid,'2026-10-19T12:40:00-05:00'))
+            c.execute("CREATE TRIGGER immutable_order_number BEFORE UPDATE OF code,number_date,daily_sequence ON orders WHEN NEW.code IS NOT OLD.code OR NEW.number_date IS NOT OLD.number_date OR NEW.daily_sequence IS NOT OLD.daily_sequence BEGIN SELECT RAISE(ABORT,'El número de orden es permanente'); END")
+            c.execute("CREATE TRIGGER immutable_order_qr BEFORE UPDATE OF qr_url ON orders WHEN OLD.qr_url!='' AND NEW.qr_url IS NOT OLD.qr_url BEGIN SELECT RAISE(ABORT,'El QR de la orden es permanente'); END")
+            history=c.execute('SELECT * FROM order_history ORDER BY id').fetchall();payments=c.execute('SELECT * FROM order_payments ORDER BY id').fetchall()
+        app.migrate()
+        expected=['PCD-20261012-0001','PCD-20261014-0002','PCD-20261015-0003','PCD-20261016-0004','PCD-20261019-0005']
+        with app.connect() as c:
+            self.assertEqual([c.execute('SELECT code FROM orders WHERE id=?',(o['id'],)).fetchone()[0] for o in made],expected)
+            self.assertEqual(c.execute('SELECT code FROM orders WHERE id=?',(unit,)).fetchone()[0],'PCD-20261012-0001-E02')
+            self.assertTrue(c.execute('SELECT qr_url FROM orders WHERE id=?',(made[4]['id'],)).fetchone()[0].endswith('/orders/PCD-20261019-0005'))
+            self.assertEqual(c.execute('SELECT code FROM order_code_aliases ORDER BY order_id').fetchall()[0][0],'PCD-20261014-0001')
+            self.assertEqual(len(c.execute('SELECT * FROM order_renumbering').fetchall()),6)
+            self.assertEqual((c.execute('SELECT COUNT(*) FROM orders').fetchone()[0],c.execute('SELECT value FROM order_serial').fetchone()[0]),(6,5))
+            self.assertEqual(c.execute('SELECT * FROM order_history ORDER BY id').fetchall(),history);self.assertEqual(c.execute('SELECT * FROM order_payments ORDER BY id').fetchall(),payments)
+            with self.assertRaises(sqlite3.IntegrityError):c.execute("UPDATE orders SET code='X' WHERE id=?",(made[0]['id'],))
+            with self.assertRaises(sqlite3.IntegrityError):c.execute('DELETE FROM order_code_aliases')
+            self.assertEqual(app.order_from_text(c,'Respuesta sobre la orden OP-0005'),made[4]['id'])
+        # Los códigos anteriores siguen abriendo su orden (QR impresos, búsquedas y correos ya enviados).
+        for old,order in [('OP-0005',made[4]),('op-0005',made[4]),('PCD-20261014-0001',made[1])]:
+            self.assertEqual(self.request('/api/order-by-code/'+old,cookie=cookie)['body'],{'id':order['id']},old)
+        self.assertEqual(self.request('/api/orders?q=OP-0005',cookie=cookie)['body']['total'],1)
+        detail=self.request('/api/orders/%d'%made[4]['id'],cookie=cookie)['body']['order'];self.assertEqual((detail['code'],detail['previous_codes']),('PCD-20261019-0005',['OP-0005']))
+        # La siguiente orden continúa el consecutivo global con su propia fecha; estados, entrega y cierre no cambian el número.
+        self.clock_mock.return_value=datetime(2026,10,20,10,0,0,tzinfo=reception.ECUADOR_TZ)
+        nxt=self.request('/api/orders',self.order_data(),cookie=cookie,csrf=csrf)['body'];self.assertEqual(nxt['code'],'PCD-20261020-0006')
+        for status in ('reparacion','listo','entregado'):
+            self.assertEqual(self.request('/api/order-status',{'id':str(nxt['id']),'status':status},cookie=cookie,csrf=csrf)['status'],200,status)
+        self.assertEqual(self.request('/api/orders/%d'%nxt['id'],cookie=cookie)['body']['order']['code'],'PCD-20261020-0006')
+        self.assertEqual(self.request('/api/orders',self.order_data(),cookie=cookie,csrf=csrf)['body']['code'],'PCD-20261020-0007')
 
     def test_catalog_names_are_capitalized_and_existing_mirror_is_aligned(self):
         import geography

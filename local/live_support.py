@@ -1,5 +1,7 @@
 """Centro de Atención en Tiempo Real: conversaciones del chat público atendidas por ADI o por el personal."""
 import re
+
+import reception
 ORDER_CODE=re.compile(r'\b(?:PCD-\d{8}-\d{4}|OP-\d{4,})\b',re.I)
 LIST_SQL="""SELECT v.id,v.mode,v.assigned_to,v.created_at,v.updated_at,v.last_seen_admin,v.client_id,v.order_id,u.name operator,cl.name client,o.code order_code,o.status order_status,
  (SELECT content FROM adi_messages m WHERE m.conversation_id=v.id AND m.visibility='public' ORDER BY m.id DESC LIMIT 1) last_message,
@@ -49,7 +51,7 @@ def detail(c,conv,after,now):
         for row in c.execute("SELECT content FROM adi_messages WHERE conversation_id=? AND author='client' ORDER BY id DESC LIMIT 40",(conv['id'],)):
             for code in ORDER_CODE.findall(row['content']):
                 code=code.upper()
-                if code not in mentioned and c.execute('SELECT 1 FROM orders WHERE code=?',(code,)).fetchone():mentioned.append(code)
+                if code not in mentioned and c.execute('SELECT 1 FROM orders WHERE code=?',(reception.current_order_code(c,code),)).fetchone():mentioned.append(code)
     return {'conversation':info,'messages':messages,'client':dict(client) if client else None,'order':dict(order) if order else None,'actions':actions,'mentioned':mentioned[:3]}
 
 
@@ -72,7 +74,7 @@ def act(c,conv,user,data,now):
             c.execute('UPDATE adi_conversations SET client_id=NULL,order_id=NULL WHERE id=?',(conv['id'],));details='Vínculo retirado'
         elif str(data.get('order_code','')).strip():
             code=str(data['order_code']).strip().upper()
-            order=c.execute('SELECT o.id,o.code,d.client_id FROM orders o JOIN devices d ON d.id=o.device_id WHERE o.code=?',(code,)).fetchone()
+            order=c.execute('SELECT o.id,o.code,d.client_id FROM orders o JOIN devices d ON d.id=o.device_id WHERE o.code=?',(reception.current_order_code(c,code),)).fetchone()
             if not order:return 404,{'error':'No existe una orden con ese número.'}
             c.execute('UPDATE adi_conversations SET client_id=?,order_id=? WHERE id=?',(order['client_id'],order['id'],conv['id']));details='Orden '+order['code']
         elif str(data.get('client_id','')).isdigit():

@@ -126,16 +126,28 @@ def reception_now():
     return datetime.now(ECUADOR_TZ)
 
 
-# Número de orden: PCD-AAAAMMDD-0001, con la fecha de recepción en hora de Ecuador y un consecutivo diario de cuatro dígitos.
-DAILY_LIMIT = 9999
+# Número de orden: PCD-AAAAMMDD-0001 = fecha de recepción (hora de Ecuador) + consecutivo GLOBAL de cuatro dígitos (desde 10000 sigue con
+# más dígitos). El consecutivo no se reinicia por día, mes ni año: lo lleva el contador permanente order_serial.
 
 
 def order_code(date, number):
     return f'PCD-{date}-{number:04d}'
 
 
-# Números de orden reconocidos en textos (correos, chat, búsquedas): el formato diario y los OP-NNNN emitidos el 19/10/2026, que se conservan.
+# Números de orden reconocidos en textos (correos, chat, búsquedas): el formato vigente y los códigos anteriores (OP-NNNN y los PCD
+# diarios), que siguen llevando a su orden mediante order_code_aliases.
 ORDER_CODE_PATTERN = r'(?:OP-\d{4,}|PCD-\d{8}-\d{3,})(?:-E\d{2})?'
+
+
+def current_order_code(c, code):
+    """Código vigente de una orden a partir del vigente o de uno anterior (QR impresos, correos enviados, búsquedas). Si no existe,
+    devuelve el texto recibido normalizado, de modo que la consulta posterior simplemente no encuentre nada."""
+    text = str(code or '').strip().upper()
+    row = c.execute('SELECT code FROM orders WHERE upper(code)=?', (text,)).fetchone()
+    if row:
+        return row[0]
+    row = c.execute('SELECT o.code FROM order_code_aliases a JOIN orders o ON o.id=a.order_id WHERE a.code=?', (text,)).fetchone()
+    return row[0] if row else text
 
 
 def public_base_url():

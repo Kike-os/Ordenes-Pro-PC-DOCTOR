@@ -188,7 +188,7 @@ def pickup_order(c,fields,client=None):
  if not code:return None,None
  unknown='No encontramos una orden con ese número asociada a tus datos. Verifícalo o deja el campo vacío.'
  if not re.fullmatch(r'[A-Z0-9-]{4,40}',code):return None,unknown
- row=c.execute("SELECT o.id,o.code,o.status,cl.id client_id,cl.identification,cl.phone FROM orders o JOIN devices d ON d.id=o.device_id JOIN clients cl ON cl.id=d.client_id WHERE upper(o.code)=?",(code,)).fetchone()
+ row=c.execute("SELECT o.id,o.code,o.status,cl.id client_id,cl.identification,cl.phone FROM orders o JOIN devices d ON d.id=o.device_id JOIN clients cl ON cl.id=d.client_id WHERE upper(o.code)=?",(reception.current_order_code(c,code).upper(),)).fetchone()
  if not row:return None,unknown
  same=(client is not None and client['id']==row['client_id']) or (fields['identification'] and row['identification'] and fields['identification']==row['identification']) or (not row['identification'] and phone_key(fields['phone']) and phone_key(fields['phone'])==phone_key(row['phone']))
  if not same:return None,unknown
