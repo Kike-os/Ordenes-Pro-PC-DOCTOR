@@ -324,6 +324,26 @@ THERMAL = (
 )
 
 
+# Cuarta carga (2026-10-20): formateo con instalación de Windows y respaldo de información. Precios finales con IVA incluido.
+FORMAT_BACKUP = (
+ ('Formateo e Instalación Profesional de Windows', 'servicio', '15.00', 'Formateo de la unidad, instalación limpia de Windows, configuración inicial y controladores básicos.', 'formateo'),
+ ('Servicio de Respaldo y Protección de Información Digital', 'servicio', '20.00', 'Respaldo de archivos personales y documentos importantes con verificación de integridad.', 'respaldo'),
+)
+# Lotes que se crean una sola vez (marca en system_state). Si administración renombra o desactiva un servicio, no se vuelve a crear.
+SEED_BATCHES = (('catalog_seed_20261020', 'THERMAL'), ('catalog_seed_20261020b', 'FORMAT_BACKUP'))
+
+
+def seed_batch(c, items, user, now):
+    """Agrega servicios sin duplicar: si ya existe un elemento con el mismo nombre, no se toca."""
+    created = 0
+    for name, category, price, description, icon in items:
+        if c.execute('SELECT 1 FROM catalog_items WHERE lower(name)=lower(?)', (name,)).fetchone():
+            continue
+        save_catalog_item(c, {'name': name, 'category': category, 'price': price, 'description': description, 'icon': icon, 'price_mode': 'incluido'}, user, now)
+        created += 1
+    return {'created': created, 'existing': len(items) - created, 'total': len(items)}
+
+
 def seed_thermal(c, user, now):
     """Agrega los servicios de pasta térmica para portátiles sin duplicar: si ya existe un elemento con el mismo nombre, no se toca."""
     created = 0
@@ -336,16 +356,20 @@ def seed_thermal(c, user, now):
 
 
 def seed_thermal_once(c, now):
-    """Al iniciar: crea una sola vez los servicios de la tercera carga (queda marcado; si administración los renombra o desactiva
-    después, no se vuelven a crear). El alta queda a nombre de la primera cuenta de administración."""
-    if c.execute("SELECT 1 FROM system_state WHERE key='catalog_seed_20261020'").fetchone():
-        return None
+    """Al iniciar: crea una sola vez cada lote de servicios nuevos (queda marcado; si administración los renombra o desactiva después,
+    no se vuelven a crear). El alta queda a nombre de la primera cuenta de administración. Devuelve el resultado del primer lote
+    pendiente (None si no había ninguno)."""
     admin = c.execute("SELECT id,name FROM users WHERE role='administrador' ORDER BY id LIMIT 1").fetchone()
     if not admin:
         return None
-    result = seed_thermal(c, {'id': admin['id'], 'name': admin['name'], 'role': 'administrador'}, now)
-    c.execute("INSERT INTO system_state(key,value) VALUES ('catalog_seed_20261020',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", (now.isoformat(timespec='seconds'),))
-    return result
+    user, first = {'id': admin['id'], 'name': admin['name'], 'role': 'administrador'}, None
+    for flag, name in SEED_BATCHES:
+        if c.execute('SELECT 1 FROM system_state WHERE key=?', (flag,)).fetchone():
+            continue
+        result = seed_batch(c, globals()[name], user, now)
+        c.execute('INSERT INTO system_state(key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value', (flag, now.isoformat(timespec='seconds')))
+        first = first or result
+    return first
 
 
 def seed_additions(c, user, now):

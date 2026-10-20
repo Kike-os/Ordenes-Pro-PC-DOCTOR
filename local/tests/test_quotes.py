@@ -169,9 +169,9 @@ class CatalogProTests(unittest.TestCase):
         # Catálogo entregado por la administración: 19 elementos iniciales y 10 de la segunda carga, una sola vez, con sus precios tal cual.
         listing=self.request('/api/catalog',cookie=cookie)['body'];self.assertEqual(listing['initial_missing'],29)
         first=post('/api/catalog/seed')['body'];again=post('/api/catalog/seed')['body']
-        self.assertEqual(((first['created'],first['existing']),(again['created'],again['existing'])),((31,0),(0,31)))
+        self.assertEqual(((first['created'],first['existing']),(again['created'],again['existing'])),((33,0),(0,33)))
         seeded={r['name']:r for r in self.request('/api/catalog?all=1',cookie=cookie)['body']['rows']}
-        self.assertEqual(len(seeded),34);self.assertEqual(self.request('/api/catalog',cookie=cookie)['body']['initial_missing'],0)
+        self.assertEqual(len(seeded),36);self.assertEqual(self.request('/api/catalog',cookie=cookie)['body']['initial_missing'],0)
         expected={'Programación o flasheo de BIOS corrupta – PlayStation 5':15000,'Mantenimiento parcial – PlayStation 5':5500,'Cambio profesional de metal líquido – PlayStation 5':18900,'Tanque o caja de mantenimiento para impresora Epson':6856,
                   'Microsoft Office Pro Plus 2024 + Windows 11 Pro':18999,'Microsoft Office 365 Pro Plus – 5 dispositivos':15500,'Microsoft Office 2024 Estándar':8599,'Microsoft Office Professional Plus 2021':7999,'Microsoft Office Professional Plus 2024':9999,
                   'Windows 11 Pro – Licencia empresarial':16500,'Chequeo y diagnóstico profesional de memoria RAM':1800,'Windows 11 Home ES – Licencia':6999,'Windows 11 Pro – Actualización':11299,'Kaspersky Standard – Licencia Antivirus de 1 Año':3000,
@@ -402,9 +402,9 @@ class QuotePriorityTests(unittest.TestCase):
         cookie,csrf=self.login();post=lambda path,**body:self.request(path,body,cookie=cookie,csrf=csrf)
         # Un mantenimiento de PC de escritorio previo, con otro nombre y precio: debe actualizarse, no duplicarse.
         old=post('/api/catalog',name='Mantenimiento de PC de escritorio',category='servicio',price='40',price_mode='incluido')['body']['id']
-        first=post('/api/catalog/seed')['body'];self.assertEqual((first['created'],first['updated'],first['total']),(19+11,1,31))
-        again=post('/api/catalog/seed')['body'];self.assertEqual((again['created'],again['updated'],again['existing']),(0,0,31))
-        data=self.request('/api/catalog?all=1',cookie=cookie)['body'];rows={r['name']:r for r in data['rows']};self.assertEqual(len(rows),31);self.assertEqual(data['initial_missing'],0)
+        first=post('/api/catalog/seed')['body'];self.assertEqual((first['created'],first['updated'],first['total']),(19+13,1,33))
+        again=post('/api/catalog/seed')['body'];self.assertEqual((again['created'],again['updated'],again['existing']),(0,0,33))
+        data=self.request('/api/catalog?all=1',cookie=cookie)['body'];rows={r['name']:r for r in data['rows']};self.assertEqual(len(rows),33);self.assertEqual(data['initial_missing'],0)
         expected={'Cambio de pantalla de portátil de 14 pulgadas':(11500,'otro','pantalla',0),'Cambio de pantalla de portátil de 15,6 pulgadas':(15000,'otro','pantalla',0),'Cambio de pantalla de portátil gamer de 15,6 pulgadas':(28000,'otro','pantalla_gamer',0),
                   'Reparación de bisagras de portátil de 14 pulgadas':(3200,'servicio','bisagra',0),'Reparación de bisagras de portátil de 15,6 pulgadas':(4800,'servicio','bisagra',0),'Pegado de bisagras de portátil de 14 pulgadas':(3500,'servicio','bisagra',0),'Pegado de bisagras de portátil de 15,6 pulgadas':(4800,'servicio','bisagra',0),
                   'Mantenimiento de PC de escritorio y cambio de pasta térmica del CPU, sin tarjeta gráfica dedicada':(4500,'servicio','escritorio',0),'Mantenimiento de PC Gamer con cambio de pasta térmica del CPU':(7500,'servicio','pc_gamer',0),'Creación de nueva BIOS para computadora portátil':(13000,'servicio','bios',0)}

@@ -3303,7 +3303,7 @@ class Handler(BaseHTTPRequestHandler):
                             stamp=quotes.save_image(c,int(catalog_image[1]),content,user,reception_now());audit(c,user['id'],'catalog_image_saved',int(catalog_image[1]))
                             return self.reply(200,{'ok':True,'image':stamp})
                         # Catálogo inicial entregado por la administración: se registra una sola vez; lo que ya existe no se duplica ni se modifica.
-                        result=quotes.seed_initial(c,user,reception_now());extra=quotes.seed_additions(c,user,reception_now());thermal=quotes.seed_thermal(c,user,reception_now());extra={**extra,'created':extra['created']+thermal['created'],'existing':extra['existing']+thermal['existing'],'total':extra['total']+thermal['total']};audit(c,user['id'],'catalog_seeded')
+                        result=quotes.seed_initial(c,user,reception_now());extra=quotes.seed_additions(c,user,reception_now());thermal=quotes.seed_thermal(c,user,reception_now());more=quotes.seed_batch(c,quotes.FORMAT_BACKUP,user,reception_now());thermal={key:thermal[key]+more[key] for key in ('created','existing','total')};extra={**extra,'created':extra['created']+thermal['created'],'existing':extra['existing']+thermal['existing'],'total':extra['total']+thermal['total']};audit(c,user['id'],'catalog_seeded')
                         return self.reply(200,{'ok':True,'created':result['created']+extra['created'],'updated':extra['updated'],'existing':result['existing']+extra['existing'],'total':result['total']+extra['total']})
                     except quotes.QuoteError as error:return self.reply(error.status,{'error':str(error),'fields':error.fields})
                 if path in ('/api/catalog','/api/catalog/tax'):

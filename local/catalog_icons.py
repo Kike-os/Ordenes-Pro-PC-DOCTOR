@@ -50,12 +50,18 @@ ICONS = {
                                                               (L, [(15.5, 6), (15.5, 10.4)], False), (C, 15.5, 11.8, 1.4), (L, [(17.2, 7), (18.3, 7)], False), (L, [(17.2, 8.8), (18.3, 8.8)], False)]),
     'termica_gamer': ('Pasta térmica de portátil gamer', LAPTOP + [_box(5.8, 6.8, 4.2, 4.2), _box(11.2, 6.8, 4.2, 4.2), (L, [(7.2, 8.9), (8.6, 8.9)], False), (L, [(12.6, 8.9), (14, 8.9)], False),
                                                                 (C, 17.8, 8.9, 1.9), (C, 17.8, 8.9, .5), (L, [(6, 21.5), (10, 21.5)], False), (L, [(14, 21.5), (18, 21.5)], False)]),
+    # Formateo e instalación de Windows: portátil con el logotipo de ventanas en pantalla (2026-10-20).
+    'formateo': ('Formateo e instalación de Windows', LAPTOP + [_box(7.5, 5.8, 4, 3.6), _box(12.5, 5.8, 4, 3.6), _box(7.5, 10.4, 4, 3.2), _box(12.5, 10.4, 4, 3.2)]),
+    # Respaldo de información: unidad de almacenamiento, flecha de copia y verificación de integridad (2026-10-20).
+    'respaldo': ('Respaldo de información', [_box(3, 14, 18, 6), (C, 6.5, 17, .9), (L, [(10, 17), (17.5, 17)], False), (L, [(10, 11), (10, 3)], False), (L, [(6.8, 6.2), (10, 3), (13.2, 6.2)], False),
+                                             (L, [(14.5, 8), (16.5, 10), (20.5, 5.5)], False)]),
     'generico': ('Genérico', [_box(4, 4, 16, 16), (L, [(8, 12), (16, 12)], False), (L, [(12, 8), (12, 16)], False)]),
 }
 # Icono por omisión de cada categoría del catálogo, cuando ninguna palabra clave coincide.
 BY_CATEGORY = {'servicio': 'servicio', 'licencia': 'licencia', 'seguridad': 'antivirus', 'repuesto': 'repuesto', 'otro': 'producto'}
 # Palabras clave (sin tildes) → icono. Se evalúan en orden: lo más específico primero.
 RULES = (
+    (('formateo',), 'formateo'), (('respaldo',), 'respaldo'),
     (('pasta', 'termica', 'portatil', 'gamer'), 'termica_gamer'), (('pasta', 'termica', 'portatil'), 'termica_portatil'),
     (('pantalla', 'gamer'), 'pantalla_gamer'), (('pantalla',), 'pantalla'), (('display',), 'pantalla'), (('monitor',), 'pantalla'), (('bisagra',), 'bisagra'),
     (('bios',), 'bios'), (('gamer',), 'pc_gamer'), (('escritorio',), 'escritorio'),

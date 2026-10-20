@@ -262,3 +262,12 @@ Dos servicios en «Servicios técnicos y reparaciones», con precio final con IV
 | Renovación de pasta térmica para portátiles Gamer con GPU dedicada | $65,00 | Portátil gamer con CPU, GPU y ventilador (`termica_gamer`) |
 
 Se crean una sola vez si no existen con ese nombre (`quotes.seed_thermal`; también con «Cargar catálogo»). No modifican otros servicios ni presupuestos existentes. En el selector del presupuesto, el botón para limpiar la búsqueda ya no se monta sobre «Nuevo servicio o repuesto».
+
+## Formateo e instalación de Windows y respaldo de información (1.5.181)
+
+| Servicio | Precio | Icono |
+| --- | --- | --- |
+| Formateo e Instalación Profesional de Windows — formateo de la unidad, instalación limpia de Windows, configuración inicial y controladores básicos | $15,00 | Portátil con el logotipo de ventanas (`formateo`) |
+| Servicio de Respaldo y Protección de Información Digital — respaldo de archivos personales y documentos importantes con verificación de integridad | $20,00 | Unidad de almacenamiento con flecha de copia y verificación (`respaldo`) |
+
+Precio final con IVA incluido (no se suma de nuevo). Se crean una sola vez (`quotes.SEED_BATCHES`, alta por nombre y marca en `system_state`): no se duplican aunque se repita la carga, y no cambian los demás servicios ni los presupuestos existentes. Disponibles en presupuestos (y, por ellos, en las órdenes).
