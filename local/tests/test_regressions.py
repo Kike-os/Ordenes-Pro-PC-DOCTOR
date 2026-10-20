@@ -38,4 +38,18 @@ class RegressionTests(unittest.TestCase):
         self.assertEqual(problems,[])
 
 
+class LoginNoticeTests(unittest.TestCase):
+    setUpClass=classmethod(test_app.SecurityTests.setUpClass.__func__);setUp=test_app.SecurityTests.setUp;tearDown=test_app.SecurityTests.tearDown
+    request=test_app.SecurityTests.request;login=test_app.SecurityTests.login
+
+    def test_intellectual_property_notice_below_the_button_without_unproven_claims(self):
+        page=self.request('/login')['body'];page=page.decode() if isinstance(page,bytes) else page
+        button=page.index('<span>Iniciar sesión</span>');notice=page.index('class="login-ip"');self.assertLess(button,notice)
+        self.assertLess(page.index('</form>'),notice)  # fuera del formulario: no altera el envío
+        for text in ('Software privado · Propiedad intelectual protegida','uso exclusivo de PC-DOCTOR S.A.','acceso no autorizado al código fuente','© 2026 PC-DOCTOR S.A. | Todos los derechos reservados.'):self.assertIn(text,page)
+        block=page[notice:page.index('</aside>',notice)].lower()
+        for claim in ('registrado','certificado','patente','iepi','senadi'):self.assertNotIn(claim,block)
+        self.login()  # el inicio de sesión sigue funcionando
+
+
 if __name__=='__main__':unittest.main()

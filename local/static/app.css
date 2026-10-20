@@ -7667,3 +7667,16 @@ body[data-page=dashboard] .license-sale-mode input[type=radio]{appearance:auto;w
 /* Selector del catálogo: el botón «limpiar búsqueda» queda dentro del campo (antes se montaba sobre «Nuevo servicio o repuesto»). */
 .catalog-picker-dialog .catalog-search .catalog-search-clear{position:relative;right:auto;flex:none;margin:0 6px 0 -42px;z-index:1}
 .catalog-picker-dialog .catalog-search input[type=search]{padding-right:42px}
+/* Inicio de sesión · aviso de propiedad intelectual (1.5.182): compacto, con los colores del tema (--muted, --blue, --line). */
+body:is([data-page=login],.auth-page) .login-ip{display:grid;grid-template-columns:auto minmax(0,1fr);gap:9px;align-items:start;margin:12px 0 0;padding:10px 0 0;border-top:1px solid var(--line)}
+body:is([data-page=login],.auth-page) .login-ip-icon{display:grid;place-items:center;width:24px;height:24px;color:var(--blue)}
+body:is([data-page=login],.auth-page) .login-ip-icon .icon{width:19px;height:19px;filter:drop-shadow(0 0 0 transparent);animation:login-ip-glow 6s ease-in-out infinite}
+@keyframes login-ip-glow{0%,82%,100%{filter:drop-shadow(0 0 0 transparent)}90%{filter:drop-shadow(0 0 3px color-mix(in srgb,var(--blue) 45%,transparent))}}
+body:is([data-page=login],.auth-page) .login-ip-text{display:grid;gap:2px;min-width:0}
+body:is([data-page=login],.auth-page) .login-ip-text strong{font-size:9.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--blue);line-height:1.35}
+body:is([data-page=login],.auth-page) .login-ip-text p{margin:0;font-size:10.5px;line-height:1.45;color:var(--muted);overflow-wrap:anywhere}
+body:is([data-page=login],.auth-page) .login-ip-text small{font-size:10px;line-height:1.35;color:var(--muted);opacity:.85}
+@media(prefers-reduced-motion:reduce){body:is([data-page=login],.auth-page) .login-ip-icon .icon{animation:none}}
+body:is([data-page=login],.auth-page) .login-ip{margin-top:10px;padding-top:8px;gap:8px}
+body:is([data-page=login],.auth-page) .login-ip-text{gap:1px}
+body:is([data-page=login],.auth-page) .login-ip-text p{line-height:1.38}
