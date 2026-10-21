@@ -4,6 +4,18 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.198 — 2026-10-21 13:58 (UTC-05:00)
+
+ADI: indicador de presencia inteligente y todas las versiones de cada producto
+
+### Mejoras realizadas
+
+- ADI Smart Presence Indicator Pro: el punto de la esfera muestra el estado real de ADI (disponible, escuchando, preparando respuesta, hablando, asesor y sin conexión), late con el audio real, se anuncia de forma accesible y muestra una etiqueta al pasar el cursor.
+
+### Errores corregidos
+
+- ADI: al preguntar por un producto con varias versiones (por ejemplo, Microsoft 365) muestra todas con su precio y disponibilidad, incluidas las registradas en el catálogo general.
+
 ## v1.5.197 — 2026-10-21 09:34 (UTC-05:00)
 
 ADI Customer Intelligence Pro: catálogo real, memoria de la conversación y reserva de citas en el chat

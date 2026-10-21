@@ -8,6 +8,24 @@
   },
   "releases": [
     {
+      "version": "1.5.198",
+      "date": "2026-10-21T13:58:25-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "ADI: indicador de presencia inteligente y todas las versiones de cada producto",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "ADI Smart Presence Indicator Pro: el punto de la esfera muestra el estado real de ADI (disponible, escuchando, preparando respuesta, hablando, asesor y sin conexión), late con el audio real, se anuncia de forma accesible y muestra una etiqueta al pasar el cursor."
+        ],
+        "fixes": [
+          "ADI: al preguntar por un producto con varias versiones (por ejemplo, Microsoft 365) muestra todas con su precio y disponibilidad, incluidas las registradas en el catálogo general."
+        ],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.197",
       "date": "2026-10-21T09:34:22-05:00",
       "type": "patch",
