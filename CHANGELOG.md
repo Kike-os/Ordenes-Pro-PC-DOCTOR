@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.195 — 2026-10-21 08:36 (UTC-05:00)
+
+ADI con su diseño definitivo: esfera de filamentos de energía viva y reactiva
+
+### Mejoras realizadas
+
+- ADI con su diseño definitivo: esfera de filamentos de energía en rosado neón, magenta, violeta y azul eléctrico, con movimiento orgánico, respiración y reacción real a la escucha, al procesamiento y a la voz; alternativa ligera con la misma identidad cuando el equipo no admite gráficos 3D.
+
 ## v1.5.194 — 2026-10-21 08:05 (UTC-05:00)
 
 Licencias profesionales: método de activación, archivo de licencia, protección de duplicados y catálogo renovado

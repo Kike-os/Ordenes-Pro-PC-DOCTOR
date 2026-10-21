@@ -8,6 +8,22 @@
   },
   "releases": [
     {
+      "version": "1.5.195",
+      "date": "2026-10-21T08:36:27-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "ADI con su diseño definitivo: esfera de filamentos de energía viva y reactiva",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "ADI con su diseño definitivo: esfera de filamentos de energía en rosado neón, magenta, violeta y azul eléctrico, con movimiento orgánico, respiración y reacción real a la escucha, al procesamiento y a la voz; alternativa ligera con la misma identidad cuando el equipo no admite gráficos 3D."
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.194",
       "date": "2026-10-21T08:05:05-05:00",
       "type": "patch",
