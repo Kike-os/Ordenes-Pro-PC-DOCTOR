@@ -1,5 +1,5 @@
 """Respuestas acotadas de ADI. La IA nunca recibe permisos para ejecutar escrituras."""
-import json,os,re,urllib.request,urllib.error
+import contextvars,json,os,re,urllib.request,urllib.error
 import appointments,order_workspace,maintenance,reception
 
 SYSTEM_PUBLIC=("Eres ADI, asistente virtual de PC-DOCTOR S.A. Habla español latinoamericano con tono cálido, amable y profesional, como una recepcionista atenta. "
@@ -7,10 +7,17 @@ SYSTEM_PUBLIC=("Eres ADI, asistente virtual de PC-DOCTOR S.A. Habla español lat
 "Explica los servicios técnicos de manera sencilla. Mantén el contexto de la conversación. "
 "Para precios usa ÚNICAMENTE los «precios_registrados_iva_incluido» del contexto validado; si el servicio no aparece, di que el taller lo confirmará con un presupuesto. "
 "Cuando el cliente lo pida o el caso lo requiera (reclamos, garantías, decisiones del taller), ofrece hablar con un asesor humano. "
+"PC-DOCTOR S.A. vende licencias originales de software (antivirus, Microsoft Office, Microsoft 365, Windows y otras) cuando el «conocimiento_comercial» lo indica: nunca digas que no se venden licencias. "
+"Para productos, precios, disponibilidad, duración o dispositivos usa la herramienta consultar_catalogo y responde solo con lo que devuelva; si un producto está agotado, ofrece las alternativas disponibles. "
+"Si una consulta devuelve error, di que en este momento no puedes comprobarlo y ofrece un asesor: nunca niegues un producto ni inventes precios o existencias. "
+"Si el cliente describe una falla, oriéntalo con pasos seguros y generales, sin prometer diagnósticos ni reparaciones, y ofrece una revisión técnica. "
+"Cuando el cliente quiera una cita (reparación, mantenimiento, instalación, compra presencial o asesoría), consulta la disponibilidad real con consultar_disponibilidad_citas y usa ofrecer_reserva para mostrarle el formulario de reserva del chat: la cita solo existe cuando el sistema la guarda y entrega su código; nunca la des por confirmada tú. "
+"Si ya hay mensajes previos en la conversación, no vuelvas a saludar ni a presentarte: continúa el tema que se está tratando. "
 "Identifícate como asistente virtual cuando sea pertinente. No afirmes ser humana. "
 "No inventes diagnósticos, precios, garantías, fechas de entrega ni avances. Para esos asuntos solicita revisión del taller. "
-"No solicites contraseñas ni números completos de tarjetas. Reserva citas mediante el enlace del sistema. "
-"Los horarios y la disponibilidad de citas vienen SIEMPRE en el contexto validado de cada mensaje: usa únicamente esos datos, distingue atención presencial, hora límite para solicitar citas y atención virtual, y no menciones ningún otro horario. No puedes reservar, reprogramar ni confirmar citas: indica que se reservan y confirman en /citas, y ofrece solo las horas libres que figuren en el contexto.")
+"No solicites contraseñas ni números completos de tarjetas. Nunca reveles claves, seriales, contraseñas, costos internos ni datos de otros clientes. "
+"Los horarios vienen SIEMPRE en el contexto validado de cada mensaje: usa únicamente esos datos, distingue atención presencial, hora límite para solicitar citas y atención virtual, y no menciones ningún otro horario. "
+"No puedes reservar, reprogramar ni confirmar citas por tu cuenta: el cliente completa y confirma la reserva en el formulario del chat o en /citas, y solo ofreces horas libres que haya devuelto la agenda.")
 SYSTEM_ADMIN=("Eres ADI, asistente administrativa de PC-DOCTOR S.A. Responde en español de forma clara. "
 "Usa solamente los datos reales que aparecen en el contexto. No ejecutes cambios, envíos ni escrituras. "
 "Para una modificación indica que debe confirmarla y ejecutarla un usuario autorizado.")
@@ -147,18 +154,162 @@ def ask(text,admin=False,context=None):
  import adi_ai
  api_key=adi_ai.openai_key()
  if not api_key:return None
- payload={'model':os.getenv('OPENAI_MODEL','gpt-4.1-mini'),'instructions':SYSTEM_ADMIN if admin else SYSTEM_PUBLIC,'input':text[:3000],'max_output_tokens':350}
- if context:payload['instructions']+=' Contexto validado del sistema: '+str(context)[:3500]
- req=urllib.request.Request('https://api.openai.com/v1/responses',data=json.dumps(payload).encode(),headers={'Authorization':'Bearer '+api_key,'Content-Type':'application/json'},method='POST')
+ session=None if admin else _SESSION.get()
+ instructions=(SYSTEM_ADMIN if admin else SYSTEM_PUBLIC)+(' Contexto validado del sistema: '+json.dumps(context,ensure_ascii=False,default=str)[:6000] if context else '')
+ model=os.getenv('OPENAI_MODEL','gpt-4.1-mini')
+ # Con una conversación pública: historial de la sesión (contexto y continuidad) y herramientas de consulta de solo lectura.
+ history=_history(session) if session else []
+ payload={'model':model,'instructions':instructions,'input':history+[{'role':'user','content':text[:3000]}] if session else text[:3000],'max_output_tokens':450 if session else 350}
+ if session:payload['tools']=TOOLS
  try:
-  with urllib.request.urlopen(req,timeout=12) as response:data=json.loads(response.read(50000))
-  parts=[]
-  for item in data.get('output',[]):
-   if item.get('type')=='message':
-    parts.extend(part.get('text','') for part in item.get('content',[]) if part.get('type')=='output_text')
-  answer=' '.join(parts).strip()
-  return answer[:2500] or None
+  for _ in range(MAX_TOOL_ROUNDS+1):
+   data=_post(api_key,payload)
+   calls=[item for item in data.get('output',[]) if item.get('type')=='function_call']
+   if not calls or not session:return _text_of(data)[:2500] or None
+   outputs=[{'type':'function_call_output','call_id':call.get('call_id'),'output':json.dumps(run_tool(session,call.get('name'),call.get('arguments')),ensure_ascii=False,default=str)[:12000]} for call in calls]
+   payload={'model':model,'instructions':instructions,'previous_response_id':data.get('id'),'input':outputs,'tools':TOOLS,'max_output_tokens':450}
+  return _text_of(data)[:2500] or None
  except (OSError,ValueError,KeyError,urllib.error.URLError):return None
+
+# ---- ADI Customer Intelligence: conocimiento comercial y herramientas de solo lectura -------------------------------------------
+# El modelo no accede a la base: pide datos con estas herramientas (argumentos validados aquí) y solo recibe información pública
+# (nombre, precio de venta, disponibilidad, duración, dispositivos y método de activación). Nunca costos, proveedores ni credenciales.
+_SESSION=contextvars.ContextVar('adi_session',default=None)
+HISTORY_MESSAGES=12
+MAX_TOOL_ROUNDS=4
+LICENSE_WORDS=('licencia','antivirus','office','windows','microsoft','m365','365','nod32','eset','kaspersky','norton','mcafee','bitdefender','avast','autodesk','adobe')
+REPAIR_WORDS=('repar','arregl','no enciende','no prende','lent','pantalla','virus','formate','mantenimiento','diagnost','bios','impresora','portatil','laptop','computadora','teclado','bateria','cargador','calienta','se apaga','instal')
+
+def _term(item):
+ return {'mensual':'1 mes','anual':'1 año','bianual':'2 años','trianual':'3 años','perpetua':'perpetua'}.get(item.get('duration') or '') or (('%s meses'%item['duration_months']) if item.get('duration_months') else (item.get('term') or ''))
+
+def license_offer(c,now=None):
+ """Licencias activas del catálogo con datos públicos (sin costos ni credenciales). Disponibilidad real según el inventario."""
+ import licenses
+ out=[]
+ for row in licenses.products(c,now or appointments.now()):
+  if not row['available'] or not row['managed']:continue
+  free=row['stock'].get('disponible',0)
+  out.append({'nombre':row['name'],'fabricante':row['brand'] or '','categoria':row['line_label'],'tipo':row['model_label'],'precio':_usd(row['price_cents']),'duracion':_term(row),
+              'dispositivos':row['devices'] or None,'disponibilidad':'disponible' if free>0 else 'agotado por el momento','activacion':row['activation_label'] if row.get('activation_method') else ''})
+ return out
+
+def service_offer(c):
+ """Servicios técnicos del catálogo (con su precio final si está registrado) y los que se reservan en la agenda."""
+ import quotes
+ catalog=[{'nombre':r['name'],'precio':quotes.usd(r['price_cents']) if not r['tax_pending'] else 'se confirma con un presupuesto'} for r in quotes.catalog(c,only_available=True) if r['category'] not in ('licencia','seguridad')]
+ agenda=[{'codigo':s['code'],'nombre':s['label'],'duracion_minutos':s.get('duration_minutes')} for s in appointments.services(c) if s.get('active',1)]
+ return catalog,agenda
+
+def _usd(cents):
+ import quotes
+ return quotes.usd(cents) if cents is not None else 'se confirma con un asesor'
+
+def commercial_knowledge(c):
+ """Resumen que acompaña a cada consulta: qué se vende y qué servicios existen, calculado del catálogo vigente (no de un texto fijo)."""
+ try:
+  offer=license_offer(c);catalog,agenda=service_offer(c)
+  return {'licencias':{'se_venden':bool(offer),'categorias':sorted({x['categoria'] for x in offer}),'fabricantes':sorted({x['fabricante'] for x in offer if x['fabricante']}),'productos':len(offer)},
+          'servicios_tecnicos':[x['nombre'] for x in catalog][:30],'servicios_reservables':[x['nombre'] for x in agenda]}
+ except Exception:
+  return {'estado':'No se pudo leer el catálogo en este momento: no niegues productos ni inventes precios; ofrece un asesor.'}
+
+def _fold(text):return plain(str(text or ''))
+
+TOOLS=[
+ {'type':'function','name':'consultar_catalogo','strict':True,
+  'description':'Busca en el catálogo vigente de PC-DOCTOR S.A. licencias de software o servicios técnicos. Devuelve nombre, precio de venta, disponibilidad real, duración, dispositivos y activación.',
+  'parameters':{'type':'object','additionalProperties':False,'required':['tipo','busqueda','dispositivos'],
+   'properties':{'tipo':{'type':'string','enum':['licencias','servicios','todo']},'busqueda':{'type':'string','description':'Producto o servicio buscado; vacío para ver todo.'},
+                 'dispositivos':{'type':['integer','null'],'description':'Número de equipos que el cliente quiere proteger, si lo indicó.'}}}},
+ {'type':'function','name':'consultar_disponibilidad_citas','strict':True,
+  'description':'Horas realmente libres en la agenda de citas: de una fecha concreta o las próximas disponibles.',
+  'parameters':{'type':'object','additionalProperties':False,'required':['servicio','fecha'],
+   'properties':{'servicio':{'type':['string','null'],'description':'Nombre o código del servicio de la agenda.'},'fecha':{'type':['string','null'],'description':'Fecha AAAA-MM-DD, o null para las próximas.'}}}},
+ {'type':'function','name':'ofrecer_reserva','strict':True,
+  'description':'Muestra al cliente el formulario de reserva del chat (servicio, fecha y hora libres, sus datos y la aceptación de condiciones). No crea la cita: la confirma el cliente y la guarda el sistema.',
+  'parameters':{'type':'object','additionalProperties':False,'required':['servicio','fecha','hora'],
+   'properties':{'servicio':{'type':['string','null']},'fecha':{'type':['string','null']},'hora':{'type':['string','null']}}}},
+]
+
+def _agenda_service(c,value):
+ """Servicio de la agenda: primero el código exacto, después el nombre exacto y por último el que contiene la palabra."""
+ value=_fold(value);services=appointments.services(c)
+ if not value:return None
+ for test in (lambda s:value==_fold(s['code']),lambda s:value==_fold(s['label']),lambda s:_fold(s['label']).startswith(value),lambda s:value in _fold(s['label']) or _fold(s['label']) in value):
+  found=next((s for s in services if test(s)),None)
+  if found:return found
+ return None
+
+def run_tool(session,name,raw):
+ """Ejecuta una herramienta con argumentos validados. Siempre devuelve un diccionario serializable; nunca lanza al modelo un error interno."""
+ c=session['c']
+ try:args=json.loads(raw or '{}')
+ except ValueError:return {'error':'argumentos_no_validos'}
+ if not isinstance(args,dict):return {'error':'argumentos_no_validos'}
+ try:
+  if name=='consultar_catalogo':
+   kind=args.get('tipo') if args.get('tipo') in ('licencias','servicios','todo') else 'todo';words=[w for w in re.findall(r'[a-z0-9]{2,}',_fold(args.get('busqueda'))[:120]) if w not in ('licencia','licencias','de','la','el','para','precio','servicio','servicios')]
+   devices=args.get('dispositivos') if isinstance(args.get('dispositivos'),int) and 0<args['dispositivos']<=100 else None
+   out={}
+   if kind in ('licencias','todo'):
+    items=license_offer(c);session['topics'].add('licencias')
+    match=[x for x in items if all(w in _fold(' '.join(str(v) for v in x.values())) for w in words)] if words else items
+    if devices:match=[x for x in match if not x['dispositivos'] or x['dispositivos']>=devices] or match
+    out['licencias']=match[:15];out['licencias_activas_en_total']=len(items)
+    if words and not match:out['nota']='No hay un producto con ese nombre en el catálogo; ofrece las licencias disponibles o un asesor.'
+   if kind in ('servicios','todo'):
+    catalog,agenda=service_offer(c);session['topics'].add('servicios')
+    out['servicios']=[x for x in catalog if all(w in _fold(x['nombre']) for w in words)][:15] if words else catalog[:20]
+    out['servicios_reservables_en_la_agenda']=[x['nombre'] for x in agenda]
+   return out
+  if name=='consultar_disponibilidad_citas':
+   session['topics'].add('cita');service=_agenda_service(c,args.get('servicio'))
+   day=str(args.get('fecha') or '')
+   if day:
+    if not re.fullmatch(r'\d{4}-\d{2}-\d{2}',day):return {'error':'fecha_no_valida'}
+    code=(service or {}).get('code') or next((s['code'] for s in appointments.services(c) if s.get('active',1)),'')
+    slots=[slot['time'] for slot in appointments.available_slots(c,day,code)]
+    return {'servicio':(service or {}).get('label',''),'fecha':day,'horas_libres':slots[:12] or [],'nota':'' if slots else 'Ese día no tiene horas libres.'}
+   return {'proximos_espacios':[{'fecha':x['fecha'] if 'fecha' in x else '','texto':x['texto'],'servicio':x['servicio']} for x in next_slots(c)] or 'sin espacios libres en los próximos días'}
+  if name=='ofrecer_reserva':
+   service=_agenda_service(c,args.get('servicio'));day=str(args.get('fecha') or '');hour=str(args.get('hora') or '')
+   session['action']={'type':'booking','service':(service or {}).get('code',''),'date':day if re.fullmatch(r'\d{4}-\d{2}-\d{2}',day) else '','time':hour if re.fullmatch(r'\d{2}:\d{2}',hour) else ''}
+   session['topics'].add('cita')
+   return {'ok':True,'mensaje':'Se muestra al cliente el formulario de reserva del chat. La cita existirá cuando el cliente la confirme y el sistema le entregue su código.'}
+ except Exception as error:
+  print('adi-tool',name,type(error).__name__,flush=True)
+  return {'error':'consulta_no_disponible','mensaje':'No se pudo consultar en este momento. No niegues el producto ni inventes datos: ofrece un asesor.'}
+ return {'error':'herramienta_desconocida'}
+
+def _history(session):
+ """Mensajes previos de esta conversación (cliente y ADI/asesor) para que el modelo mantenga el contexto."""
+ rows=session['c'].execute("SELECT author,content FROM adi_messages WHERE conversation_id=? AND author IN ('client','adi','operator') ORDER BY id DESC LIMIT ?",(session['conversation_id'],HISTORY_MESSAGES+1)).fetchall()
+ rows=list(reversed(rows))
+ # El último mensaje del cliente es el que se está respondiendo: va aparte.
+ if rows and rows[-1]['author']=='client':rows=rows[:-1]
+ return [{'role':'user' if r['author']=='client' else 'assistant','content':str(r['content'])[:1500]} for r in rows]
+
+def _post(api_key,payload):
+ req=urllib.request.Request('https://api.openai.com/v1/responses',data=json.dumps(payload).encode(),headers={'Authorization':'Bearer '+api_key,'Content-Type':'application/json'},method='POST')
+ with urllib.request.urlopen(req,timeout=15) as response:return json.loads(response.read(200000))
+
+def _text_of(data):
+ parts=[]
+ for item in data.get('output',[]):
+  if item.get('type')=='message':parts.extend(part.get('text','') for part in item.get('content',[]) if part.get('type')=='output_text')
+ return ' '.join(parts).strip()
+
+def intent_of(text):
+ q=plain(text)
+ if any(w in q for w in LICENSE_WORDS):return 'licencias'
+ if re.search(r'\b(pcd|op)-\d|mi orden|estado de mi|mi equipo ya|seguimiento',q):return 'orden'
+ if re.search(r'cita|agend|reserv|turno',q):return 'cita'
+ if any(w in q for w in REPAIR_WORDS):return 'reparacion'
+ if re.search(r'asesor|humano|persona|hablar con',q):return 'asesor'
+ return ''
+
+SUGGESTIONS={'licencias':['licencias','cita','asesor'],'reparacion':['servicios','cita','asesor'],'cita':['cita','servicios'],'orden':['reparacion','asesor'],'servicios':['servicios','cita','asesor']}
 
 def catalog_prices(c,text,limit=25):
  """Servicios y productos disponibles del catálogo con su precio final (IVA incluido). Primero los que coinciden con la consulta."""
@@ -235,7 +386,9 @@ def slot_answer(c,text,now=None):
  if options:return 'El '+label+' no está disponible. Opciones libres más próximas (toca una para reservarla):\n'+'\n'.join(booking_link(item['date'],item['time'],service['code']) for item in options)+'\nTambién puedes elegir otra fecha en /citas.'
  return 'El '+label+' no está disponible y no veo espacios libres en los próximos días. Un asesor puede ayudarte: usa «Contactar soporte técnico».'
 
-def reply(c,text,admin=False,context=None):
+def reply(c,text,admin=False,context=None,conversation_id=None,session=None):
+ """Respuesta de ADI. `session` (si se pasa un diccionario) recibe la acción propuesta (formulario de reserva) y las sugerencias del chat."""
+ if session is not None:session.update(c=c,conversation_id=conversation_id,action=None,topics=set())
  if admin:
   factual=admin_answer(c,text)
   if factual:return factual
@@ -249,12 +402,18 @@ def reply(c,text,admin=False,context=None):
  # Los horarios vigentes viajan siempre como contexto validado: ADI no usa horarios escritos de memoria.
  if not admin:
   try:
-   context=dict(context or {},horarios_vigentes=hours_facts(c))
+   context=dict(context or {},horarios_vigentes=hours_facts(c),conocimiento_comercial=commercial_knowledge(c))
    # Precios: solo los registrados en el catálogo (con IVA incluido); ADI no calcula ni promete otros.
    if re.search(r'precio|cu[aá]nto|cuesta|costo|valor|tarifa|cobr|servicio',plain(text)):context['precios_registrados_iva_incluido']=catalog_prices(c,text)
-   if re.search(r'cita|agend|reserv|turno|disponib',plain(text)):context['proximos_espacios_libres_en_la_agenda']=next_slots(c) or 'sin espacios libres en los próximos días';context['como_reservar']='La reserva se hace y se confirma en /citas; ADI no confirma citas por sí misma.'
+   # Horas libres solo cuando se habla de una cita (no al preguntar por licencias «disponibles»).
+   if re.search(r'cita|agend|reserv|turno|disponib',plain(text)) and intent_of(text)!='licencias':context['proximos_espacios_libres_en_la_agenda']=next_slots(c) or 'sin espacios libres en los próximos días';context['como_reservar']='La reserva se hace y se confirma en /citas; ADI no confirma citas por sí misma.'
   except Exception:pass
- answer=ask(text,admin,context) or fallback(c,text)
+ token=_SESSION.set(session if (session is not None and conversation_id) else None)
+ try:answer=ask(text,admin,context) or fallback(c,text,session)
+ finally:_SESSION.reset(token)
+ if session is not None:
+  topic=intent_of(text) or next(iter(session['topics']),'')
+  session['suggestions']=SUGGESTIONS.get(topic,[])
  # Si el cliente quiere una cita, la respuesta termina con los próximos horarios realmente libres como botones de reserva.
  # Se añaden aquí, desde la agenda, para que no dependan de lo que redacte el modelo.
  if not admin and isinstance(context,dict) and isinstance(context.get('proximos_espacios_libres_en_la_agenda'),list) and '/citas?fecha=' not in answer:
@@ -276,7 +435,7 @@ def schedule_text(hours):
   else:groups.append([item['weekday'],item['weekday'],span])
  return '; '.join((DAYS[a] if a==b else DAYS[a]+' a '+DAYS[b])+' de '+span[0]+' a '+span[1] for a,b,span in groups)
 
-def fallback(c,text):
+def fallback(c,text,session=None):
  """Respuestas sin IA externa: solo datos configurados en el sistema, sin precios, diagnósticos ni plazos inventados."""
  import corporate
  q=plain(text);words=set(re.findall(r'[a-z0-9]+',q));company=corporate.settings();cfg=appointments.settings(c)
@@ -284,6 +443,18 @@ def fallback(c,text):
  if 'estado' in q or 'orden' in q or 'pcd-' in q or has('mi equipo','mi reparacion','seguimiento'):
   return ORDER_CHECK_HINT
  if has('virtual','medianoche','madrugada','24 horas','las 24'):return hours_answer(c,topic='virtual')
+ if any(w in q for w in LICENSE_WORDS):
+  # Licencias: lo que hay de verdad en el catálogo (precio de venta y disponibilidad). Si no se puede consultar, se dice; nunca se niega.
+  try:items=license_offer(c)
+  except Exception:return 'Sí comercializamos licencias originales, pero en este momento no puedo comprobar precios ni disponibilidad. Un asesor puede confirmártelos: pulsa «Hablar con un asesor».'
+  if not items:return 'En este momento no tengo licencias publicadas en el catálogo. Un asesor puede confirmarte si conseguimos la que necesitas: pulsa «Hablar con un asesor».'
+  words=[w for w in re.findall(r'[a-z0-9]{3,}',q) if w in ' '.join(_fold(' '.join([x['nombre'],x['fabricante'],x['categoria']])) for x in items) and w not in ('licencia','licencias','tienen','venden')]
+  match=[x for x in items if all(w in _fold(' '.join([x['nombre'],x['fabricante'],x['categoria']])) for w in words)] if words else items
+  shown=(match or items)[:6]
+  lines=['• '+x['nombre']+' · '+x['precio']+(' · '+x['duracion'] if x['duracion'] else '')+(' · %d dispositivo%s'%(x['dispositivos'],'' if x['dispositivos']==1 else 's') if x['dispositivos'] else '')+' · '+x['disponibilidad'] for x in shown]
+  head='¡Claro! En '+company['name']+' vendemos licencias originales de '+', '.join(sorted({x['categoria'].lower() for x in items}))+'.' if not words or not match else 'Esto es lo que tenemos:'
+  return head+'\n'+'\n'.join(lines)+'\n¿Quieres que te ayude a reservar una cita para la compra o prefieres hablar con un asesor?'
+ greeted=bool(session and session.get('conversation_id') and c.execute("SELECT COUNT(*) FROM adi_messages WHERE conversation_id=? AND author='adi'",(session['conversation_id'],)).fetchone()[0])
  if has('cita','agendar','agenda','reservar','reserva','turno'):
   checked=slot_answer(c,text)
   if checked:return checked
@@ -311,6 +482,6 @@ def fallback(c,text):
   return 'Con gusto. Si necesitas algo más, aquí estoy.'
  if words&{'adios','chao','chau'} or has('hasta luego','nos vemos'):
   return company['thanks']+' Que tengas un buen día.'
- if words&{'hola','buenas','buenos','saludos','hey','ola'}:
+ if words&{'hola','buenas','buenos','saludos','hey','ola'} and not greeted:
   return 'Hola, soy ADI, asistente virtual de '+company['name']+' Puedo ayudarte con servicios, citas, horarios, contacto y el estado de tu orden. ¿Qué necesitas?'
  return 'Soy ADI, asistente virtual de '+company['name']+' Puedo orientarte sobre servicios, citas, horarios, contacto y el estado de tu orden. Para una evaluación o presupuesto, el equipo técnico debe revisar el caso; si lo prefieres, solicita un asesor.'

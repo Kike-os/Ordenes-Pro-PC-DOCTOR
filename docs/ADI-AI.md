@@ -365,6 +365,46 @@ Prueba: `test_remote_external_calls.py`, que falla con el código anterior y pas
 - Las 13 comprobaciones de ADI Living Intelligence y las 12 de la conversación por voz, en verde.
 - Botón con WebGL, con la alternativa CSS y en móvil, sin errores de JavaScript.
 
+## ADI Customer Intelligence Pro (21/10/2026)
+
+**Diagnóstico de «Por el momento no vendemos licencias»:**
+- **Sin historial:** el modelo recibía solo el último mensaje. Por eso repetía el saludo y olvidaba el tema.
+- **Sin datos de licencias:** solo recibía precios cuando la pregunta contenía «precio», «cuánto», «cuesta»… «¿Tienes licencias en venta?» llegaba sin datos y el modelo lo negaba.
+- **Sin acceso estructurado:** no había herramientas de consulta del catálogo, la disponibilidad ni la agenda.
+
+**Ahora:**
+- **Conocimiento comercial** calculado en cada consulta a partir del catálogo vigente: si se venden licencias y de qué categorías y fabricantes, y qué servicios técnicos y reservables hay. Las instrucciones prohíben negar la venta de licencias cuando existen.
+- **Herramientas de solo lectura** (función de OpenAI con esquema estricto y argumentos validados en el servidor):
+  - `consultar_catalogo`: licencias activas con nombre, fabricante, categoría, tipo, precio de venta, duración, dispositivos, disponibilidad real («disponible» o «agotado por el momento») y método de activación, más los servicios técnicos con su precio. Filtra por número de dispositivos. Nunca devuelve costos, proveedores ni credenciales.
+  - `consultar_disponibilidad_citas`: horas realmente libres de una fecha o las próximas.
+  - `ofrecer_reserva`: abre el formulario de reserva del chat. No escribe nada.
+  - Si una consulta falla, la herramienta devuelve un error y ADI dice que no puede comprobarlo, sin negar el producto ni inventar datos.
+- **Memoria de la conversación:** se envían los últimos 12 mensajes (cliente, ADI y asesor). ADI no vuelve a saludar y entiende continuaciones como «para tres equipos».
+- **Reserva dentro del chat**, en tres pasos:
+  1. Servicio (y tipo de licencia si es una compra), fecha, horas libres de la agenda y modalidad.
+  2. Datos del cliente: nombre, identificación, teléfono, correo, equipo, motivo y observaciones. El sistema reconoce al cliente existente por su identificación.
+  3. Resumen, aviso de privacidad, condiciones vigentes aceptadas por el cliente y 4 últimos dígitos.
+  - Se guarda con la reserva pública de siempre (`/api/public/appointments`): hora límite, cupos, feriados, cierres, duplicados con `request_key`, autorización y correo.
+  - El código solo aparece si el sistema guardó la cita; si falla, se dice que no se registró.
+  - Escape cancela la reserva sin cerrar el chat.
+- **Accesos rápidos reales:** comprar licencias, servicios técnicos, agendar cita, consultar reparación (con el código temporal al correo, como antes) y hablar con un asesor.
+- **Sugerencias según el tema:**
+  - licencias: comprar, agendar o asesor;
+  - reparación: servicios, agendar o asesor;
+  - orden: consultar reparación.
+- **Sin OpenAI**, la respuesta de respaldo:
+  - lista las licencias reales con precio y disponibilidad;
+  - si el catálogo no responde, dice que no puede comprobarlo, sin negar la venta;
+  - no repite el saludo.
+- **Correcciones:** las licencias «disponibles» ya no añaden horarios de citas, y el servicio de la reserva coincide primero por código exacto («mantenimiento» no abre «correctivo»).
+
+**Pruebas:**
+- `test_adi_customer.py` (7), con OpenAI simulado como la API Responses (llamada a herramienta y respuesta): licencias sin datos internos, disponibilidad de ESET agotado, versiones de Microsoft 365, continuidad con filtro de dispositivos, reserva propuesta sin crear citas, fallo del catálogo, respaldo sin IA y orientación ante una falla.
+- En navegador, 14 comprobaciones del recorrido completo, incluida una cita real guardada en la base temporal con su autorización.
+- Las 40 pruebas de ADI anteriores y las de voz siguen en verde.
+
+**Pendiente:** probar en producción con la clave real de OpenAI. Crearía una conversación de prueba en el centro de atención.
+
 ## Tareas programadas: corrección de «no se ejecutan»
 
 **Causa:** la tarea solo verificaba si no había habido *ninguna* verificación en los 10 minutos anteriores, y las automáticas por visitas la tapaban sin dejar constancia. Además, el aviso alarmaba a las 12 h.

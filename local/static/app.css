@@ -8395,3 +8395,32 @@ body[data-page=dashboard] dialog.lcard-dialog .lcard-tools :is(input,select){hei
 .lcat-skeleton span{height:210px;border:1px solid #1f3352;border-radius:12px;background:linear-gradient(100deg,#0c182b 30%,#13243d 50%,#0c182b 70%);background-size:300% 100%;animation:lcat-skeleton 1.4s ease infinite}
 @keyframes lcat-skeleton{from{background-position:100% 0}to{background-position:0 0}}
 @media(prefers-reduced-motion:reduce){.lcat-skeleton span{animation:none}}
+/* ADI Customer Intelligence: sugerencias según el tema y reserva dentro del chat (acotado a #adi-widget). */
+#adi-widget .adi-suggest{display:flex;flex-wrap:wrap;gap:6px;margin:2px 0 8px 2px}
+#adi-widget .adi-suggest button{width:auto;min-height:30px;margin:0;padding:4px 11px;border:1px solid #ff7fb666;border-radius:999px;background:#ff7fb60f;color:#ffd1e5;font-size:12px;font-weight:600;cursor:pointer;transition:background-color .15s ease,border-color .15s ease}
+#adi-widget .adi-suggest button:hover{background:#ff7fb61f;border-color:#ff7fb6}
+#adi-widget .adi-suggest button:focus-visible{outline:2px solid #8fd3ff;outline-offset:2px}
+#adi-widget .adi-booking{display:grid;gap:8px}
+#adi-widget .adi-booking-head{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:2px 8px}
+#adi-widget .adi-booking-step{font-size:11.5px;color:#9fb3cf}
+#adi-widget .adi-booking-body{display:grid}
+#adi-widget .adi-booking-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+#adi-widget .adi-booking-grid[hidden]{display:none}
+#adi-widget .adi-booking-field{display:grid;gap:3px;min-width:0;margin:0;font-size:11.5px;font-weight:600;color:#c5d5ee}
+#adi-widget .adi-booking-field[hidden]{display:none}
+#adi-widget .adi-booking-field.wide,#adi-widget .adi-booking-mode,#adi-widget .adi-booking-summary,#adi-widget .adi-booking-check,#adi-widget .adi-booking-warn{grid-column:1/-1}
+#adi-widget .adi-booking-field :is(input,select,textarea){width:100%;min-width:0;min-height:34px;margin:0;padding:5px 8px;font-size:13px}
+#adi-widget .adi-booking-field textarea{resize:vertical}
+#adi-widget .adi-booking-mode{margin:0;font-size:12px;color:#9fd8ff}.adi-booking-mode:empty{display:none}
+#adi-widget .adi-booking-summary{display:grid;gap:3px;margin:0;padding:8px 10px;border:1px solid #2a4266;border-radius:9px;background:#0b1626}
+#adi-widget .adi-booking-summary div{display:grid;grid-template-columns:96px minmax(0,1fr);gap:8px;font-size:12px}
+#adi-widget .adi-booking-summary dt{color:#8ea4c4}#adi-widget .adi-booking-summary dd{margin:0;color:#eef3ff;overflow-wrap:anywhere}
+#adi-widget .adi-booking-check{display:flex;align-items:flex-start;gap:8px;margin:0;font-size:12px;line-height:1.4;color:#d9e6fb}
+#adi-widget .adi-booking-check input{flex:none;width:16px;height:16px;margin:2px 0 0}
+#adi-widget .adi-booking-check a{color:#ff9ecb}
+#adi-widget .adi-booking-warn{margin:0;font-size:12px;color:#fde6a8}
+#adi-widget .adi-booking .adi-check-actions{justify-content:flex-end}
+#adi-widget .adi-booking-done{display:grid;gap:3px;margin:4px 0 8px;padding:10px 12px;border:1px solid #2f6d5a;border-left:4px solid #3fbf8a;border-radius:10px;background:#0f2a26;font-size:12.5px;color:#d9fff0}
+#adi-widget .adi-booking-done strong{font-size:14px;color:#fff}#adi-widget .adi-booking-done small{color:#9ff0c8}
+@media(max-width:420px){#adi-widget .adi-booking-grid{grid-template-columns:1fr}}
+@media(prefers-reduced-motion:reduce){#adi-widget .adi-suggest button{transition:none}}

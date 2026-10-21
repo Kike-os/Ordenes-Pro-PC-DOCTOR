@@ -1162,6 +1162,7 @@ class Handler(BaseHTTPRequestHandler):
                 brand_files={f.stem:f.name for f in sorted((ROOT / 'static' / 'brands').glob('*')) if f.suffix in ('.svg','.png') and re.fullmatch(r'[a-z0-9]+(?:-[a-z0-9]+)*', f.stem)}
                 brand_names=sorted({r['name'] for r in c.execute('SELECT name FROM brands')},key=str.lower)
                 return self.reply(200, {'services':appointments.services(c),'device_types':DEVICE_TYPES,'timezone':'America/Guayaquil','brands':brand_names,'brand_logos':brand_files,
+                                         'license_code':appointments.LICENSE,'license_categories':appointments.LICENSE_CATEGORIES,
                                          'terms':(lambda row:{key:row[key] for key in ('id','version')}|{'local_url':'/conditions/'+row['id']} if row else None)(appointments.current_terms(c))})
             if path == '/api/public/appointments/pulse':
                 # Señal ligera para sincronizar calendarios abiertos: cambia cuando cambia la agenda. Sin datos de citas ni de clientes.
@@ -2448,15 +2449,18 @@ class Handler(BaseHTTPRequestHandler):
                         c.execute("UPDATE adi_conversations SET mode='adi',assigned_to=NULL,updated_at=? WHERE id=?",(now,conv['id']));conv=c.execute('SELECT * FROM adi_conversations WHERE id=?',(conv['id'],)).fetchone()
                     c.execute("INSERT INTO adi_messages(conversation_id,author,content,created_at) VALUES (?,'client',?,?)",(conv['id'],text,now))
                     answer='Un asesor de PC-DOCTOR S.A. revisará tu solicitud.' if conv['mode']=='human' and not conv['assigned_to'] else None  # Con un asesor conectado, ADI no interviene.
-                    context=None
+                    context=None;session={}
                     # El estado de una orden no se entrega por el chat: exige el código temporal enviado al correo registrado.
                     if conv['mode']=='adi' and re.search(r'\b'+reception.ORDER_CODE_PATTERN,text,re.I):answer=adi.ORDER_CHECK_HINT
                     if answer is None and conv['mode']=='adi':
                         # El mensaje del cliente queda guardado antes de consultar a la IA, para no retener la base durante la espera.
-                        c.commit();answer=adi.reply(c,text,context=context)
+                        c.commit();answer=adi.reply(c,text,context=context,conversation_id=conv['id'],session=session)
                     if answer:
                         c.execute("INSERT INTO adi_messages(conversation_id,author,content,created_at) VALUES (?,'adi',?,?)",(conv['id'],answer,now));c.execute('UPDATE adi_conversations SET updated_at=? WHERE id=?',(now,conv['id']))
                     response={'ok':True,'conversation_id':conv['id'],'mode':conv['mode'],'state':adi_public_state(conv),'messages':[dict(r) for r in c.execute("SELECT id,author,content,created_at FROM adi_messages WHERE conversation_id=? AND id>(SELECT COALESCE(MAX(id),0)-2 FROM adi_messages WHERE conversation_id=?) ORDER BY id",(conv['id'],conv['id']))]}
+                    # Acción propuesta por ADI (abrir el formulario de reserva del chat) y accesos rápidos según el tema; nunca escriben nada.
+                    if session.get('action'):response['action']=session['action']
+                    if session.get('suggestions'):response['suggestions']=session['suggestions']
                     cookie='pcdoctor_adi='+new_token+'; Path=/; Max-Age=2592000; HttpOnly; SameSite=Strict'+('; Secure' if os.getenv('SESSION_SECURE','false').lower()=='true' else '') if new_token else None
                     return self.reply(201,response,cookie=cookie)
                 if path == '/api/public/adi/human':
