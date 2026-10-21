@@ -244,3 +244,44 @@ Nada de esto muestra claves, contraseñas ni credenciales de Microsoft 365. No s
   - Filtros: Todos, Disponibles, Sin stock y Desactivados.
 - **Error corregido:** la política de seguridad bloqueaba las vistas previas `blob:` de imágenes, como el logotipo antes de guardar o la imagen del catálogo. `img-src` permite ahora `blob:`, que solo crea la propia página.
 - **Pruebas en navegador:** 19 comprobaciones de rejilla y columnas, logotipos e iniciales, proporción, nombre, indicadores frente a los registros, precio y detalles, ausencia de credenciales, menú y teclado, movimientos, confirmación, buscador, filtros y orden, subida de SVG, 1024, 768, 390 y 320 px, y ausencia de errores de JavaScript.
+
+## Enterprise License Catalog Pro (Productos y catálogo)
+
+Rediseño estructural del catálogo inspirado en Quantro (composición y jerarquía) y CWAM (organización técnica). Mantiene la identidad de Órdenes Pro: fondo azul oscuro, acentos rosados y magenta, azul eléctrico y turquesa.
+
+- **Cabecera compacta:** «Catálogo de Licencias y Productos Digitales», su subtítulo y «Nueva licencia».
+- **Barra:**
+  - buscador por producto, fabricante, categoría, tipo o activación, sin distinguir tildes;
+  - filtros de fabricante, categoría y disponibilidad (disponibles, stock bajo, agotados, desactivados);
+  - orden por nombre, precio o stock;
+  - selector Tarjetas/Tabla, que se recuerda en el navegador.
+  - «Quitar filtros» aparece solo cuando hay alguno aplicado. Cambiar de vista conserva la búsqueda y los filtros.
+- **Tarjeta horizontal:**
+  - A: logotipo a la izquierda (64 px, sin deformar, con fondo adaptado al logotipo); nombre en dos líneas como máximo, fabricante y tipo; estado discreto.
+  - B: precio destacado (con el costo debajo), duración, dispositivos y método de activación, sin repetir datos.
+  - C: inventario compacto con las cifras de la base: disponibles, reservadas, vendidas y vencidas.
+  - D: «Editar» y el menú «⋯» con consultar licencias, agregar stock, ajustar stock, ver historial, duplicar y desactivar producto (con confirmación).
+- **Estados:**
+  - Disponible (verde).
+  - Stock bajo (ámbar): 2 o menos disponibles, o ventas aprobadas por cubrir.
+  - Agotado (rojo discreto).
+  - Desactivado (gris).
+  - Sin configurar.
+  - Nunca se confunden las licencias disponibles con las vendidas o vencidas.
+  - Los productos anteriores sin método muestran «Método por definir».
+- **Vista de tabla (administración):**
+  - columnas imagen, producto, fabricante, activación, precio, disponibles, reservadas, vendidas, vencidas y acciones;
+  - encabezados ordenables con `aria-sort`, cabecera fija y desplazamiento propio en pantallas pequeñas.
+- **Rejilla:** 3 o 4 tarjetas por fila en escritorio (4 desde 1560 px), 2 en tableta y 1 en móvil. No hay alturas fijas que recorten información.
+- **Animaciones:**
+  - hover y transiciones de 150 a 250 ms, menú con apertura suave y esqueleto discreto durante la primera carga;
+  - al actualizar existencias no aparece «Cargando…» y la cifra que cambia se resalta un instante;
+  - todo se desactiva con movimiento reducido.
+- **Imágenes:**
+  - Se conservan todas las guardadas.
+  - La imagen del catálogo con versión en la dirección (`?v=` fecha de la imagen) se guarda en la caché privada del navegador 30 días. Al reemplazarla cambia la dirección, así que nunca se ve una antigua. El resto de respuestas sigue sin caché.
+  - Sin imagen propia se usa el logotipo de la marca guardado en el sistema y, si tampoco hay, las iniciales.
+  - En producción, Office Professional Plus 2024, Windows 11 Pro – Actualización y Windows 11 Pro – Licencia empresarial no tienen imagen: conviene subir su logotipo oficial desde «Editar».
+- **Pruebas:**
+  - `test_catalog_cache.py`.
+  - En navegador, 22 comprobaciones: esqueleto, cabecera, barra, tarjetas, logotipos, estados e inventario frente a los registros, información comercial, credenciales ocultas, menú, filtros, tabla con filtros conservados, orden, acciones, preferencia recordada, actualización sin parpadeo, caché e imagen reemplazada, 1024, 768, 390 y 320 px, movimiento reducido y ausencia de errores de JavaScript.

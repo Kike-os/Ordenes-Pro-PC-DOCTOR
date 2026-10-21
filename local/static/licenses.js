@@ -12,7 +12,10 @@ function licenseBadge(state,label){const badge=el('span',label||licenseMeta?.sta
 // Contador de vigencia: barra con el tiempo restante (verde vigente, amarillo próxima a vencer, rojo vencida, azul pendiente de activación).
 async function licenseLoadMeta(){licenseMeta=await api('/api/licenses');return licenseMeta;}
 async function renderLicenses(){
- const content=$('module-content');try{await licenseLoadMeta();}catch(error){content.replaceChildren(el('p',error.message,'empty-module'));return;}
+ const content=$('module-content');
+ // Esqueleto discreto mientras llegan los datos (solo la primera vez; las recargas redibujan sin parpadeos).
+ if(!licenseMeta){const ghost=el('div',undefined,'lcat-skeleton');ghost.setAttribute('aria-hidden','true');for(let i=0;i<6;i++)ghost.append(el('span'));const note=el('p','Cargando licencias…','license-sr');note.setAttribute('role','status');content.replaceChildren(note,ghost);}
+ try{await licenseLoadMeta();}catch(error){content.replaceChildren(el('p',error.message,'empty-module'));return;}
  content.replaceChildren();const wrap=el('section',undefined,'licenses');content.append(wrap);
  const bar=el('div',undefined,'licenses-actions'),action=(text,icon,run,kind='secondary')=>{const b=button('',run,kind);b.append(systemIcon(licenseIcons[icon]),el('span',text));bar.append(b);return b;};
  action('Registrar nueva licencia','plus',()=>licenseNewDialog(null),'primary');action('Vender o entregar','cart',()=>licenseSaleDialog({}));
@@ -24,7 +27,8 @@ async function renderLicenses(){
  function paintStats(){const d=licenseMeta.dashboard;stats.replaceChildren();for(const[key,label,state]of [['disponibles','Disponibles','disponible'],['reservadas','Reservadas','reservada'],['activas','Activas','activa'],['por_vencer','Por vencer','por_vencer'],['vencidas','Vencidas','vencida'],['renovaciones','Renovaciones realizadas','renovada'],...(d.revision?[['revision','En revisión','revision']]:[])]){
   const card=button('',()=>{if(key==='renovaciones')licenseState.tab='historial';else{licenseState.tab='inventario';licenseState.state=state;licenseState.page=1;}paint();},'license-stat');card.dataset.state=state;card.setAttribute('aria-pressed',String(licenseState.tab==='inventario'&&licenseState.state===state));card.title=key==='renovaciones'?'Ver el historial':'Filtrar el inventario: '+label.toLowerCase();card.append(el('strong',String(d[key])),el('span',label));stats.append(card);}}
  async function paint(){for(const tab of tabs.children){const on=tab.dataset.tab===licenseState.tab;tab.setAttribute('aria-selected',String(on));tab.tabIndex=on?0:-1;if(on)tab.scrollIntoView({block:'nearest',inline:'nearest'});}
-  paintStats();panel.replaceChildren(el('p','Cargando…','system-muted'));
+  // El catálogo se dibuja al instante con los datos ya cargados: sin «Cargando…» intermedio (evita el parpadeo al actualizar existencias).
+  paintStats();if(licenseState.tab!=='productos')panel.replaceChildren(el('p','Cargando…','system-muted'));
   try{const t=licenseState.tab;if(t==='panel')licensePanel(panel);else if(t==='productos')licenseProducts(panel);else if(t==='inventario')await licenseInventory(panel);else if(t==='ventas')await licenseSales(panel);else if(t==='entregas')await licenseDeliveries(panel);else if(t==='notificaciones')await licenseNotices(panel);else await licenseHistory(panel);}
   catch(error){panel.replaceChildren(el('p',error.message,'empty-module'));}}
  window.licenseReload=async()=>{try{await licenseLoadMeta();}catch(error){notify(error.message);}await paint();};await paint();
@@ -43,10 +47,10 @@ function licensePanel(panel){panel.replaceChildren();const rows=licenseMeta.expi
 // Catálogo de licencias: tarjetas uniformes con logotipo grande, nombre en dos líneas como máximo (completo al pasar el cursor), detalles
 // secundarios, cuatro indicadores reales de inventario (estados exclusivos calculados en el servidor: una licencia nunca cuenta dos veces),
 // precio destacado y acciones en «Editar» + menú «⋯». Los nombres guardados no cambian; nunca se muestran credenciales.
-const licenseCatalogState={q:'',filter:'todos',sort:'nombre',line:''};
 const licenseCatalogIcons={edit:'M12 20h9 M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z',stock:'M12 5v14 M5 12h14',adjust:'M4 21v-7 M4 10V3 M12 21v-9 M12 8V3 M20 21v-5 M20 12V3 M1 14h6 M9 8h6 M17 16h6',copy:'M8 8h12v12H8z M4 16V4h12',
  list:'M3 12h.01 M3 18h.01 M3 6h.01 M8 12h13 M8 18h13 M8 6h13',history:'M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8 M3 3v5h5 M12 7v5l4 2',off:'M18.36 6.64a9 9 0 1 1-12.73 0 M12 2v10',on:'M20 6 9 17l-5-5',
- search:'M21 21l-4.3-4.3 M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16z',card:'M3 5h18v14H3z M3 10h18'};
+ search:'M21 21l-4.3-4.3 M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16z',card:'M3 5h18v14H3z M3 10h18',clock:'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z M12 6v6l4 2',
+ device:'M5 4h14a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z M2 20h20',key:'M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z M16.5 7.5h.01'};
 const licenseTermText=item=>({mensual:'1 mes',anual:'1 año',bianual:'2 años',trianual:'3 años',perpetua:'Perpetua'})[item.duration]||(item.duration==='personalizada'&&item.duration_months?item.duration_months+(item.duration_months===1?' mes':' meses'):item.duration_label||'');
 const licenseFold=text=>String(text||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
 // Logotipo: el subido para el producto o, si no hay, el de la marca guardado en el sistema (procedencia documentada). Sin ninguno, las
@@ -61,10 +65,9 @@ function licenseCatalogLogo(item){const media=el('div',undefined,'lcat-media'),f
  image.onerror=()=>{image.remove();media.dataset.tone='dark';media.prepend(licenseMonogram(item));};
  image.src=item.image?'/api/catalog/'+item.id+'/image?v='+encodeURIComponent(item.image):'/static/brands/'+file;media.dataset.tone='light';media.append(image);return media;}
 function licenseCatalogActions(item){const items=[];
- if(item.managed)items.push({label:'Agregar stock',icon:'stock',run:()=>licenseNewDialog(item)},{label:'Ajustar stock',icon:'adjust',run:()=>licenseAdjustDialog(item)});
- items.push({label:'Duplicar producto',icon:'copy',run:()=>licenseDuplicate(item)});
- if(item.managed)items.push({label:'Consultar licencias',icon:'list',run:()=>{licenseState.tab='inventario';licenseState.product=String(item.id);licenseState.state='';window.licenseReload();}});
- items.push({label:'Ver movimientos',icon:'history',run:()=>licenseProductHistory(item)});
+ if(item.managed)items.push({label:'Consultar licencias',icon:'list',run:()=>{licenseState.tab='inventario';licenseState.product=String(item.id);licenseState.state='';window.licenseReload();}},
+  {label:'Agregar stock',icon:'stock',run:()=>licenseNewDialog(item)},{label:'Ajustar stock',icon:'adjust',run:()=>licenseAdjustDialog(item)});
+ items.push({label:'Ver historial',icon:'history',run:()=>licenseProductHistory(item)},{label:'Duplicar producto',icon:'copy',run:()=>licenseDuplicate(item)});
  items.push({label:item.available?'Desactivar producto':'Activar producto',icon:item.available?'off':'on',kind:item.available?'danger':'',run:async()=>{
   if(await confirmClose({title:(item.available?'¿Desactivar':'¿Activar')+' «'+item.name+'»?',text:item.available?'Dejará de ofrecerse en los presupuestos y en las ventas. Sus licencias, ventas e historial se conservan.':'Volverá a ofrecerse en los presupuestos y en las ventas.',keep:'Volver',discard:item.available?'Desactivar':'Activar',danger:item.available})!=='discard')return;
   try{await api('/api/licenses/products/toggle',{item_id:String(item.id),active:!item.available});toast(item.available?'Producto desactivado.':'Producto activado.','success');window.licenseReload();}catch(error){toast(error.message,'error');}}});
@@ -73,40 +76,74 @@ async function licenseProductHistory(item){const dialog=smallDialog('Movimientos
  try{const data=await api('/api/licenses/history?product='+item.id);wait.remove();if(!data.rows.length){dialog.append(el('p','Sin movimientos registrados.','empty-module'));return;}
   const list=el('ol',undefined,'license-history');for(const e of data.rows.slice(0,150)){const li=el('li');li.append(el('span',(e.unit_code?e.unit_code+' · ':'')+(e.detail||e.event)),el('small',formatOrderDate(e.created_at)+' · '+(e.actor||'Sistema')));list.append(li);}dialog.append(list);}
  catch(error){wait.textContent=error.message;}}
+// Estado de existencias de un producto, para la etiqueta discreta de la tarjeta y la tabla (no confunde disponibles con vendidas o vencidas).
+const LICENSE_LOW_STOCK=2;
+// Productos anteriores sin método guardado: se indica que falta elegirlo (se elige al agregar stock o al editar).
+const licenseActivationText=(item,short)=>!item.activation_method?'Método por definir':short?({clave:'Clave o serial',cuenta:'Usuario y contraseña',mixta:'Activación mixta',archivo:'Archivo de licencia'})[item.activation_method]||item.activation_label:item.activation_label;
+function licenseStockStatus(item){const free=item.stock?.disponible||0;
+ if(!item.available)return['off','Desactivado'];if(!item.managed)return['setup','Sin configurar'];if(!free)return['out','Agotado'];
+ if(free<=LICENSE_LOW_STOCK||item.pending)return['low',item.pending?'Stock bajo · '+item.pending+' por cubrir':'Stock bajo'];return['ok','Disponible'];}
+const licenseStockCells=[['disponible','Disponibles'],['reservada','Reservadas'],['entregada','Vendidas'],['vencida','Vencidas']];
+let licenseCatalogPrev=null;  // existencias de la vista anterior: una cifra que cambia se resalta un instante (sin redibujar a destiempo)
+function licenseStockValue(item,key){const value=item.stock?.[key]||0,node=el('b',String(value)),before=licenseCatalogPrev?.[item.id]?.[key];if(before!==undefined&&before!==value)node.classList.add('lcat-changed');return node;}
+function licenseStatusPill(item){const[state,label]=licenseStockStatus(item),pill=el('span',label,'lcat-status');pill.dataset.state=state;return pill;}
 function licenseCatalogCard(item){const card=el('article',undefined,'lcat-card');card.dataset.off=String(!item.available);card.dataset.product=String(item.id);
- const media=licenseCatalogLogo(item);if(!item.available)media.append(el('span','Desactivado','lcat-flag'));
- const body=el('div',undefined,'lcat-body'),name=el('h3',item.name,'lcat-name');name.title=item.name;
- const sub=[item.devices?item.devices+(item.devices===1?' dispositivo':' dispositivos'):'',licenseTermText(item)].filter(Boolean).join(' · ');
- body.append(el('p',item.brand||'Fabricante sin indicar','lcat-maker'),name,el('p',sub||item.line_label||'Sin datos de licencia','lcat-sub'));
+ // A · Encabezado: logotipo a la izquierda; nombre, fabricante y tipo a la derecha; estado discreto.
+ const head=el('header',undefined,'lcat-head'),info=el('div',undefined,'lcat-id'),name=el('h3',item.name,'lcat-name');name.title=item.name;
+ info.append(name,el('p',[item.brand||'Fabricante sin indicar',item.managed?item.model_label:''].filter(Boolean).join(' · '),'lcat-maker'),licenseStatusPill(item));head.append(licenseCatalogLogo(item),info);
+ // B · Información comercial: precio destacado y los datos que no se repiten en otro lugar.
+ const sale=el('div',undefined,'lcat-sale'),price=el('div',undefined,'lcat-price'),facts=el('ul',undefined,'lcat-facts');
+ price.append(el('strong',item.price_cents!==null&&item.price_cents!==undefined?licenseMoney(item.price_cents):'Sin precio'),el('small',item.purchase_cents!==null&&item.purchase_cents!==undefined?'Costo '+licenseMoney(item.purchase_cents):'Precio de venta'));
+ for(const[icon,text]of [['clock',licenseTermText(item)],['device',item.devices?item.devices+(item.devices===1?' dispositivo':' dispositivos'):''],['key',item.managed?licenseActivationText(item,true):'']])if(text){const li=el('li');li.append(systemIcon(licenseCatalogIcons[icon]),el('span',text));facts.append(li);}
+ sale.append(price,facts);
+ // C · Inventario compacto con las cifras reales de la base de datos.
  const stock=el('dl',undefined,'lcat-stock');stock.setAttribute('aria-label','Inventario de '+item.name);
- for(const[key,label]of [['disponible','Disponibles'],['reservada','Reservadas'],['entregada','Vendidas'],['vencida','Vencidas']]){const box=el('div');box.dataset.state=key;box.append(el('dd',String(item.stock?.[key]||0)),el('dt',label));stock.append(box);}
- const price=el('div',undefined,'lcat-price');price.append(el('small','Precio de venta'),el('strong',item.price_cents!==null&&item.price_cents!==undefined?licenseMoney(item.price_cents):'Sin precio'));
- const more=el('details',undefined,'lcat-more'),summary=el('summary','Detalles'),facts=el('dl');more.append(summary,facts);
- for(const[label,value]of [['Costo de adquisición',item.purchase_cents!==null&&item.purchase_cents!==undefined?licenseMoney(item.purchase_cents):''],['Duración',licenseTermText(item)],['Dispositivos',item.devices?String(item.devices):''],['Tipo de licencia',item.model_label],['Activación',item.managed?item.activation_label:''],['Vigencia',item.validity_label],['Categoría',item.line_label],['Edición',item.edition],['Fabricante',item.brand],['Clave compartida',item.shared_seats?item.shared_seats+' clientes por clave':'']]){if(!value)continue;const row=el('div');row.append(el('dt',label),el('dd',value));facts.append(row);}
- body.append(stock,price);if(facts.childElementCount)body.append(more);
- if(!item.managed)body.append(el('p','Sin datos de licencia: usa «Editar» para configurarlo.','lcat-alert'));
- if(item.pending)body.append(el('p',item.pending+(item.pending===1?' licencia pendiente':' licencias pendientes')+' de existencias en ventas aprobadas','lcat-alert'));
+ for(const[key,label]of licenseStockCells){const box=el('div');box.dataset.state=key;const dd=el('dd');dd.append(licenseStockValue(item,key));box.append(dd,el('dt',label));stock.append(box);}
+ // D · Acciones: «Editar» visible y el resto en el menú «⋯».
  const actions=el('div',undefined,'lcat-actions'),edit=button('',()=>licenseProductDialog(item),'secondary lcat-edit');edit.append(systemIcon(licenseCatalogIcons.edit),el('span','Editar'));edit.setAttribute('aria-label','Editar '+item.name);
- actions.append(edit,licenseItemsMenu('Más acciones · '+item.name,()=>licenseCatalogActions(item)));body.append(actions);card.append(media,body);return card;}
+ actions.append(edit,licenseItemsMenu('Más acciones · '+item.name,()=>licenseCatalogActions(item)));
+ card.append(head,sale,stock,actions);return card;}
+// Vista administrativa de tabla: compacta, con encabezados ordenables y las mismas búsquedas y filtros que las tarjetas.
+function licenseCatalogTable(list,s,repaint){const wrap=el('div',undefined,'lcat-table-wrap'),table=el('table',undefined,'lcat-table'),head=el('thead'),row=el('tr'),body=el('tbody');
+ const cols=[['','Imagen'],['nombre','Producto'],['fabricante','Fabricante'],['activacion','Activación'],['precio','Precio'],['disponibles','Disponibles'],['reservadas','Reservadas'],['vendidas','Vendidas'],['vencidas','Vencidas'],['','Acciones']];
+ for(const[key,label]of cols){const th=el('th');th.scope='col';if(key){const sort=button('',()=>{if(s.sort===key)s.dir=s.dir==='asc'?'desc':'asc';else{s.sort=key;s.dir=['precio','disponibles','reservadas','vendidas','vencidas'].includes(key)?'desc':'asc';}repaint();},'lcat-sort');sort.append(el('span',label));
+   if(s.sort===key){th.setAttribute('aria-sort',s.dir==='asc'?'ascending':'descending');sort.append(el('i',s.dir==='asc'?'▲':'▼'));}th.append(sort);}else th.append(el('span',label,key===''&&label==='Imagen'?'license-sr':''));row.append(th);}
+ head.append(row);table.append(head,body);wrap.append(table);
+ for(const item of list){const tr=el('tr');tr.dataset.off=String(!item.available);
+  const product=el('td',undefined,'lcat-t-product'),name=el('strong',item.name);name.title=item.name;product.append(name,el('small',[item.model_label,licenseTermText(item)].filter(Boolean).join(' · ')),licenseStatusPill(item));
+  const media=el('td',undefined,'lcat-t-media');media.append(licenseCatalogLogo(item));tr.append(media,product,el('td',item.brand||'—'),el('td',item.managed?licenseActivationText(item):'—'),el('td',item.price_cents!==null&&item.price_cents!==undefined?licenseMoney(item.price_cents):'—','lcat-t-price'));
+  for(const[key]of licenseStockCells){const td=el('td',undefined,'lcat-t-num');td.dataset.state=key;td.append(licenseStockValue(item,key));tr.append(td);}
+  const act=el('td',undefined,'lcat-t-actions'),edit=button('',()=>licenseProductDialog(item),'license-icon-btn');edit.append(systemIcon(licenseCatalogIcons.edit));edit.title='Editar';edit.setAttribute('aria-label','Editar '+item.name);act.append(edit,licenseItemsMenu('Más acciones · '+item.name,()=>licenseCatalogActions(item)));tr.append(act);body.append(tr);}
+ return wrap;}
+const licenseCatalogState={q:'',maker:'',line:'',stock:'',sort:'nombre',dir:'asc',view:(()=>{try{return localStorage.getItem('ordenes-pro:licencias-catalogo-vista')==='tabla'?'tabla':'tarjetas';}catch{return'tarjetas';}})()};
 function licenseProducts(panel){
  panel.replaceChildren();const s=licenseCatalogState,m=licenseMeta,products=m.products;
- const bar=el('div',undefined,'lcat-bar'),searchBox=el('label',undefined,'lcat-search'),search=el('input'),line=el('select'),sort=el('select');
- search.type='search';search.placeholder='Buscar por nombre, fabricante, categoría o tipo';search.setAttribute('aria-label','Buscar productos de licencia');search.value=s.q;searchBox.append(systemIcon(licenseCatalogIcons.search),search);
- line.setAttribute('aria-label','Categoría');line.add(new Option('Todas las categorías',''));for(const[key,label]of Object.entries(m.lines))line.add(new Option(label,key));line.value=s.line;
- sort.setAttribute('aria-label','Ordenar productos');for(const[key,label]of [['nombre','Nombre'],['precio','Precio'],['disponibles','Disponibilidad']])sort.add(new Option('Ordenar: '+label,key));sort.value=s.sort;
- const add=button('',()=>licenseNewDialog(null),'primary lcat-new');add.append(systemIcon(licenseIcons.plus),el('span','Nueva licencia'));
- const chips=el('div',undefined,'lcat-chips');chips.setAttribute('role','group');chips.setAttribute('aria-label','Filtrar por disponibilidad');
- for(const[key,label]of [['todos','Todos'],['disponibles','Disponibles'],['sin_stock','Sin stock'],['desactivados','Desactivados']]){const chip=button(label,()=>{s.filter=key;paint();},'lcat-chip');chip.dataset.filter=key;chips.append(chip);}
- const count=el('p','','lcat-count'),grid=el('div',undefined,'lcat-grid');count.setAttribute('aria-live','polite');bar.append(searchBox,line,sort,add);panel.append(bar,chips,count,grid);
- if(!products.length){grid.replaceWith(el('p','Todavía no hay productos de licencias. Usa «Nueva licencia» para registrar el primero, aunque la marca no exista en el catálogo.','empty-module'));return;}
+ const head=el('div',undefined,'lcat-top'),titles=el('div'),add=button('',()=>licenseNewDialog(null),'primary lcat-new');titles.append(el('h2','Catálogo de Licencias y Productos Digitales'),el('p','Administración de productos, credenciales, existencias y renovaciones.'));add.append(systemIcon(licenseIcons.plus),el('span','Nueva licencia'));head.append(titles,add);
+ const bar=el('div',undefined,'lcat-bar'),searchBox=el('label',undefined,'lcat-search'),search=el('input');search.type='search';search.placeholder='Buscar producto, fabricante, categoría o activación';search.setAttribute('aria-label','Buscar productos de licencia');search.value=s.q;searchBox.append(systemIcon(licenseCatalogIcons.search),search);
+ const select=(label,options,value)=>{const node=el('select');node.setAttribute('aria-label',label);for(const[key,text]of options)node.add(new Option(text,key));node.value=value;return node;};
+ const makers=[...new Set(products.map(p=>p.brand).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));
+ const maker=select('Fabricante',[['','Todos los fabricantes'],...makers.map(x=>[x,x])],s.maker),line=select('Categoría',[['','Todas las categorías'],...Object.entries(m.lines)],s.line),
+  stockSel=select('Disponibilidad',[['','Toda disponibilidad'],['ok','Disponibles'],['low','Stock bajo'],['out','Agotados'],['off','Desactivados']],s.stock),
+  sort=select('Ordenar',[['nombre','Ordenar: Nombre'],['precio','Ordenar: Precio'],['disponibles','Ordenar: Stock']],['nombre','precio','disponibles'].includes(s.sort)?s.sort:'nombre');
+ const views=el('div',undefined,'lcat-views');views.setAttribute('role','group');views.setAttribute('aria-label','Vista del catálogo');
+ for(const[key,label,icon]of [['tarjetas','Tarjetas','card'],['tabla','Tabla','list']]){const b=button('',()=>{s.view=key;try{localStorage.setItem('ordenes-pro:licencias-catalogo-vista',key);}catch{}paint();},'lcat-view');b.dataset.view=key;b.append(systemIcon(licenseCatalogIcons[icon]),el('span',label));views.append(b);}
+ bar.append(searchBox,maker,line,stockSel,sort,views);
+ const meta=el('div',undefined,'lcat-meta'),count=el('p','','lcat-count'),reset=button('Quitar filtros',()=>{Object.assign(s,{q:'',maker:'',line:'',stock:''});search.value='';maker.value=line.value=stockSel.value='';paint();},'text-action lcat-reset');count.setAttribute('aria-live','polite');meta.append(count,reset);
+ const body=el('div',undefined,'lcat-body-view');panel.append(head,bar,meta,body);
+ if(!products.length){body.append(el('p','Todavía no hay productos de licencias. Usa «Nueva licencia» para registrar el primero, aunque la marca no exista en el catálogo.','empty-module'));return;}
  const haystack=item=>licenseFold([item.name,item.brand,item.line_label,item.model_label,item.activation_label,item.edition,item.duration_label].join(' '));
- function paint(){for(const chip of chips.children)chip.setAttribute('aria-pressed',String(chip.dataset.filter===s.filter));
+ const value={nombre:i=>i.name,fabricante:i=>i.brand||'~',activacion:i=>i.activation_label||'~',precio:i=>i.price_cents??-1,disponibles:i=>i.stock?.disponible||0,reservadas:i=>i.stock?.reservada||0,vendidas:i=>i.stock?.entregada||0,vencidas:i=>i.stock?.vencida||0};
+ function paint(){for(const b of views.children)b.setAttribute('aria-pressed',String(b.dataset.view===s.view));
   const words=licenseFold(s.q).split(/\s+/).filter(Boolean);
-  let list=products.filter(item=>(!s.line||item.line===s.line)&&words.every(w=>haystack(item).includes(w))&&(s.filter==='todos'||(s.filter==='disponibles'?item.available&&(item.stock?.disponible||0)>0:s.filter==='sin_stock'?item.available&&(item.stock?.disponible||0)===0:!item.available)));
-  list=[...list].sort(s.sort==='precio'?(a,b)=>(a.price_cents??1e12)-(b.price_cents??1e12):s.sort==='disponibles'?(a,b)=>(b.stock?.disponible||0)-(a.stock?.disponible||0)||a.name.localeCompare(b.name,'es'):(a,b)=>a.name.localeCompare(b.name,'es',{sensitivity:'base'}));
-  count.textContent=list.length===products.length?products.length+(products.length===1?' producto':' productos'):list.length+' de '+products.length+' productos';
-  grid.replaceChildren(...list.map(licenseCatalogCard));if(!list.length)grid.append(el('p','Ningún producto coincide con la búsqueda o el filtro.','empty-module'));}
- let timer=0;search.addEventListener('input',()=>{s.q=search.value;clearTimeout(timer);timer=setTimeout(paint,120);});line.onchange=()=>{s.line=line.value;paint();};sort.onchange=()=>{s.sort=sort.value;paint();};paint();}
+  let list=products.filter(item=>(!s.maker||item.brand===s.maker)&&(!s.line||item.line===s.line)&&(!s.stock||(s.stock==='ok'?['ok','low'].includes(licenseStockStatus(item)[0]):licenseStockStatus(item)[0]===s.stock))&&words.every(w=>haystack(item).includes(w)));
+  const key=value[s.sort]||value.nombre;list=[...list].sort((a,b)=>{const x=key(a),y=key(b);const r=typeof x==='number'?x-y:String(x).localeCompare(String(y),'es',{sensitivity:'base'});return (s.dir==='desc'?-r:r)||a.name.localeCompare(b.name,'es');});
+  const filtered=!!(s.q||s.maker||s.line||s.stock);reset.hidden=!filtered;count.textContent=list.length===products.length?products.length+(products.length===1?' producto':' productos'):list.length+' de '+products.length+' productos';
+  body.replaceChildren(!list.length?el('p','Ningún producto coincide con la búsqueda o los filtros.','empty-module'):s.view==='tabla'?licenseCatalogTable(list,s,paint):Object.assign(el('div',undefined,'lcat-grid'),{}));
+  if(list.length&&s.view!=='tabla')body.firstChild.append(...list.map(licenseCatalogCard));
+  licenseCatalogPrev=Object.fromEntries(products.map(p=>[p.id,{...p.stock}]));}
+ let timer=0;search.addEventListener('input',()=>{s.q=search.value;clearTimeout(timer);timer=setTimeout(paint,120);});
+ maker.onchange=()=>{s.maker=maker.value;paint();};line.onchange=()=>{s.line=line.value;paint();};stockSel.onchange=()=>{s.stock=stockSel.value;paint();};sort.onchange=()=>{s.sort=sort.value;s.dir=sort.value==='nombre'?'asc':'desc';paint();};
+ paint();}
 function licenseField(form,label,name,value='',options={}){const box=el('label',undefined,'license-field'+(options.wide?' wide':''));box.append(el('span',label));const node=el(options.textarea?'textarea':options.select?'select':'input');node.name=name;
  if(options.select)for(const[key,text]of options.select)node.add(new Option(text,key));else if(!options.textarea){node.type=options.type||'text';node.autocomplete='off';node.spellcheck=false;}
  if(options.required){node.dataset.required='1';node.setAttribute('aria-required','true');} if(options.max)node.maxLength=options.max;if(options.rows)node.rows=options.rows;if(options.placeholder)node.placeholder=options.placeholder;if(options.inputmode)node.inputMode=options.inputmode;if(options.accept)node.accept=options.accept;if(options.type!=='file')node.value=value??'';

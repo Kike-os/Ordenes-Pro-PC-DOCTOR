@@ -27,9 +27,10 @@ class WSGIHandler(core.Handler):
         elif isinstance(body, str):
             body = body.encode('utf-8')
         self.response_status = f'{status} {HTTPStatus(status).phrase}'
+        policy, self.cache_policy = getattr(self, 'cache_policy', None), None
         self.response_headers = [
             ('Content-Type', content_type), ('Content-Length', str(len(body))),
-            ('Cache-Control', 'no-store'), ('X-Content-Type-Options', 'nosniff'),
+            ('Cache-Control', policy or 'no-store'), ('X-Content-Type-Options', 'nosniff'),
             ('Referrer-Policy', 'no-referrer'),
             ('Content-Security-Policy', getattr(self,'content_policy',None) or core.DEFAULT_CSP),
         ]

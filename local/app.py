@@ -962,7 +962,9 @@ class Handler(BaseHTTPRequestHandler):
         # Nombre con el número real de la orden cuando el documento se guarda o descarga desde el navegador.
         if filename:self.send_header('Content-Disposition',content_disposition(filename))
         self.send_header('Content-Length', str(len(body)))
-        self.send_header('Cache-Control', 'no-store')
+        # Por defecto nada se guarda en caché; una respuesta puede fijar su política una sola vez (se reinicia tras enviarla).
+        policy,self.cache_policy=getattr(self,'cache_policy',None),None
+        self.send_header('Cache-Control', policy or 'no-store')
         self.send_header('X-Content-Type-Options', 'nosniff')
         self.send_header('Referrer-Policy', 'no-referrer')
         self.send_header('Content-Security-Policy', getattr(self,'content_policy',None) or DEFAULT_CSP)
@@ -2087,6 +2089,9 @@ class Handler(BaseHTTPRequestHandler):
                     return self.reply(200,{'rows':quotes.price_history(c,int(catalog_extra[1]))})
                 picture=c.execute('SELECT mime,data FROM catalog_images WHERE item_id=?',(int(catalog_extra[1]),)).fetchone()
                 if not picture:return self.reply(404,{'error':'Sin imagen.'})
+                # Con la versión en la dirección (?v=fecha de la imagen) el navegador la guarda en su caché privada: al reemplazar la
+                # imagen cambia la dirección, así que nunca se muestra una anterior. Sin versión, como siempre: sin caché.
+                if re.fullmatch(r'[0-9T:+.-]{10,40}',parse_qs(urlsplit(self.path).query).get('v',[''])[0]):self.cache_policy='private, max-age=2592000, immutable'
                 return self.reply(200,bytes(picture['data']),picture['mime'])
             quote_identity=re.fullmatch(r'/api/quotes/([0-9]+)/identity',path)
             if quote_identity:

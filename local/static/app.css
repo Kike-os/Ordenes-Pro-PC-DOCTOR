@@ -8309,55 +8309,76 @@ body[data-page=dashboard] dialog.lcard-dialog .lcard-tools :is(input,select){hei
 @media(prefers-reduced-motion:reduce){.license-field-in{animation:none}.license-method,.license-row{transition:none}}
 /* Selección activa del modo (una o varias licencias): rosado sutil, como el método elegido. */
 .license-mode [aria-pressed=true]{border-color:#ff7fb6aa;background:linear-gradient(135deg,#ff7fb61a,#132b4d);color:#fff;box-shadow:0 0 12px -8px #ff7fb6}
-/* Licencias · Catálogo Enterprise (acotado a .lcat-*): tarjetas uniformes, logotipo grande, indicadores reales y acciones compactas. */
-.lcat-bar{display:grid;grid-template-columns:minmax(220px,1fr) minmax(150px,200px) minmax(150px,190px) auto;align-items:center;gap:8px;margin-bottom:8px}
-.lcat-search{position:relative;display:flex;align-items:center;margin:0}
+/* Licencias · Enterprise License Catalog Pro (acotado a .lcat-*): cabecera compacta, filtros, tarjetas horizontales y vista de tabla. */
+.lcat-top{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px;margin-bottom:12px}
+.lcat-top h2{margin:0;font-size:18px;line-height:1.25;color:#eef3ff}.lcat-top p{margin:2px 0 0;font-size:12.5px;color:#8ea4c4}
+.lcat-new{display:inline-flex;align-items:center;justify-content:center;gap:6px;width:auto;height:38px;min-height:38px;margin:0;padding:0 14px;font-size:13px;white-space:nowrap}.lcat-new svg{width:17px;height:17px}
+.lcat-bar{display:grid;grid-template-columns:minmax(220px,1.6fr) repeat(4,minmax(130px,1fr)) auto;align-items:center;gap:8px;padding:10px;border:1px solid #1f3352;border-radius:12px;background:#0c182b}
+.lcat-search{position:relative;display:flex;align-items:center;margin:0;min-width:0}
 .lcat-search svg{position:absolute;left:11px;width:17px;height:17px;color:#7f93b2;pointer-events:none}
-.lcat-search input{width:100%;height:38px;min-height:38px;margin:0;padding:0 12px 0 34px;font-size:13px}
-.lcat-bar select{height:38px;min-height:38px;margin:0;font-size:13px}
-.lcat-new{display:inline-flex;align-items:center;justify-content:center;gap:6px;width:auto;height:38px;min-height:38px;margin:0;padding:0 14px;font-size:13px;white-space:nowrap}
-.lcat-new svg{width:17px;height:17px}
-.lcat-chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
-.lcat-chip{width:auto;min-height:30px;margin:0;padding:3px 12px;border:1px solid #24395a;border-radius:999px;background:#0c182b;color:#c5d5ee;font-size:12px;font-weight:600;cursor:pointer;transition:border-color .15s ease,background-color .15s ease}
-.lcat-chip:hover{border-color:#36598a}
-.lcat-chip[aria-pressed=true]{border-color:#ff7fb6aa;background:linear-gradient(135deg,#ff7fb61f,#132b4d);color:#fff}
-.lcat-chip:focus-visible{outline:2px solid #8fd3ff;outline-offset:2px}
-.lcat-count{margin:0 0 8px;font-size:12px;color:#8ea4c4}
-.lcat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px;align-items:stretch}
-@media(min-width:1500px){.lcat-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
-.lcat-card{display:grid;grid-template-rows:auto 1fr;min-width:0;overflow:hidden;border:1px solid #1f3352;border-radius:14px;background:linear-gradient(180deg,#0f1f36,#0b1729);box-shadow:0 10px 24px -20px #000;transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease}
-.lcat-card:hover{transform:translateY(-2px);border-color:#36598a;box-shadow:0 16px 30px -18px #000,0 0 0 1px #ff7fb622}
-.lcat-card:focus-within{border-color:#4d8df0}
-.lcat-card[data-off=true]{opacity:.78}
-.lcat-media{position:relative;display:grid;place-items:center;height:118px;padding:14px 22px;background:radial-gradient(circle at 50% 40%,#ffffff,#e8eef6);border-bottom:1px solid #1f3352}
+.lcat-search input{width:100%;height:36px;min-height:36px;margin:0;padding:0 12px 0 34px;font-size:13px}
+.lcat-bar select{width:100%;min-width:0;height:36px;min-height:36px;margin:0;font-size:12.5px}
+.lcat-views{display:inline-flex;padding:3px;border:1px solid #24395a;border-radius:10px;background:#0a1424}
+.lcat-view{display:inline-flex;align-items:center;gap:6px;width:auto;min-height:30px;margin:0;padding:0 10px;border:0;border-radius:7px;background:transparent;color:#a9bddb;font-size:12.5px;font-weight:600;cursor:pointer;transition:background-color .18s ease,color .18s ease}
+.lcat-view svg{width:16px;height:16px}.lcat-view:hover{color:#fff}
+.lcat-view[aria-pressed=true]{background:linear-gradient(135deg,#ff7fb62b,#132b4d);color:#fff;box-shadow:inset 0 0 0 1px #ff7fb680}
+.lcat-view:focus-visible{outline:2px solid #8fd3ff;outline-offset:1px}
+.lcat-meta{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:30px;margin:6px 2px 8px}
+.lcat-count{margin:0;font-size:12px;color:#8ea4c4}.lcat-reset{min-height:0;padding:0;font-size:12px}.lcat-reset[hidden]{display:none}
+.lcat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;align-items:stretch}
+@media(min-width:1560px){.lcat-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.lcat-card{display:grid;grid-template-rows:auto auto auto 1fr;gap:10px;min-width:0;padding:12px;border:1px solid #1f3352;border-radius:12px;background:linear-gradient(180deg,#0f1f36,#0b1729);transition:border-color .2s ease,transform .2s ease,box-shadow .2s ease}
+.lcat-card:hover{transform:translateY(-2px);border-color:#36598a;box-shadow:0 12px 24px -18px #000,0 0 0 1px #ff7fb61f}
+.lcat-card:focus-within{border-color:#4d8df0}.lcat-card[data-off=true]{opacity:.75}
+.lcat-head{display:grid;grid-template-columns:64px minmax(0,1fr);align-items:start;gap:12px}
+.lcat-media{position:relative;display:grid;place-items:center;width:64px;height:64px;overflow:hidden;padding:6px;border:1px solid #24395a;border-radius:12px;background:radial-gradient(circle at 50% 40%,#ffffff,#e8eef6)}
 .lcat-media[data-tone=dark]{background:radial-gradient(circle at 50% 40%,#1c3254,#0c182b)}
-.lcat-media img{display:block;max-width:100%;max-height:86px;width:auto;height:auto;object-fit:contain}
-.lcat-mono{display:grid;place-items:center;width:70px;height:70px;border-radius:18px;background:linear-gradient(140deg,hsl(var(--hue) 70% 58%),hsl(calc(var(--hue) + 40) 65% 38%));color:#fff;font-size:24px;font-weight:800;letter-spacing:.02em;box-shadow:inset 0 1px #ffffff4d,0 8px 18px -10px #000}
-.lcat-flag{position:absolute;top:8px;right:8px;padding:2px 8px;border-radius:999px;background:#3a2e12;color:#fde6a8;font-size:10.5px;font-weight:700;letter-spacing:.04em}
-.lcat-body{display:grid;grid-template-rows:auto auto auto auto auto 1fr auto;gap:8px;min-width:0;padding:12px 14px 14px}
-.lcat-maker{margin:0;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#7f93b2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.lcat-name{display:-webkit-box;margin:-4px 0 0;overflow:hidden;font-size:15px;line-height:1.3;color:#eef3ff;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow-wrap:anywhere;min-height:2.6em}
-.lcat-sub{margin:-4px 0 0;font-size:12.5px;color:#a9bddb}
-.lcat-stock{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin:0}
-.lcat-stock div{display:grid;justify-items:center;gap:1px;min-width:0;padding:6px 4px;border:1px solid #1f3352;border-top:3px solid var(--tone);border-radius:9px;background:#0c182b}
-.lcat-stock div[data-state=disponible]{--tone:#3fbf8a}.lcat-stock div[data-state=reservada]{--tone:#f3c677}.lcat-stock div[data-state=entregada]{--tone:#69a7ff}.lcat-stock div[data-state=vencida]{--tone:#f87171}
-.lcat-stock dd{margin:0;font-size:18px;font-weight:800;line-height:1.1;color:var(--tone);font-variant-numeric:tabular-nums}
+.lcat-media img{display:block;max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain}
+.lcat-mono{display:grid;place-items:center;width:46px;height:46px;border-radius:12px;background:linear-gradient(140deg,hsl(var(--hue) 70% 58%),hsl(calc(var(--hue) + 40) 65% 38%));color:#fff;font-size:17px;font-weight:800;box-shadow:inset 0 1px #ffffff4d}
+.lcat-id{display:grid;justify-items:start;gap:3px;min-width:0}
+.lcat-name{display:-webkit-box;margin:0;overflow:hidden;font-size:14.5px;line-height:1.3;color:#eef3ff;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow-wrap:anywhere}
+.lcat-maker{margin:0;font-size:12px;color:#8ea4c4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lcat-status{display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border-radius:999px;background:#10233d;color:#c5d5ee;font-size:10.5px;font-weight:700;white-space:nowrap}
+.lcat-status::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.lcat-status[data-state=ok]{color:#7ff0c8;background:#0f2a26}.lcat-status[data-state=low]{color:#f3c677;background:#2b230f}.lcat-status[data-state=out]{color:#fca5a5;background:#2a0f16}
+.lcat-status[data-state=off]{color:#a9b2c3;background:#1a2230}.lcat-status[data-state=setup]{color:#9fd8ff;background:#0f2238}
+.lcat-sale{display:grid;gap:6px;padding:8px 0;border-top:1px solid #1a2e4b;border-bottom:1px solid #1a2e4b}
+.lcat-price{display:grid}.lcat-price strong{font-size:20px;line-height:1.1;color:#fff;font-variant-numeric:tabular-nums}.lcat-price small{font-size:11px;color:#8ea4c4}
+.lcat-facts{display:flex;flex-wrap:wrap;gap:4px 12px;margin:0;padding:0;list-style:none}
+.lcat-facts li{display:inline-flex;align-items:center;gap:4px;font-size:12px;color:#c5d5ee}.lcat-facts svg{width:14px;height:14px;color:#5fd4c8}
+.lcat-stock{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));margin:0;border:1px solid #1f3352;border-radius:10px;background:#0c182b;overflow:hidden}
+.lcat-stock div{display:grid;justify-items:center;gap:1px;min-width:0;padding:6px 2px;border-left:1px solid #1a2e4b}.lcat-stock div:first-child{border-left:0}
+.lcat-stock div[data-state=disponible],.lcat-t-num[data-state=disponible]{--tone:#3fbf8a}.lcat-stock div[data-state=reservada],.lcat-t-num[data-state=reservada]{--tone:#f3c677}
+.lcat-stock div[data-state=entregada],.lcat-t-num[data-state=entregada]{--tone:#69a7ff}.lcat-stock div[data-state=vencida],.lcat-t-num[data-state=vencida]{--tone:#f87171}
+.lcat-stock dd{margin:0;font-size:17px;font-weight:800;line-height:1.1;color:var(--tone);font-variant-numeric:tabular-nums}
 .lcat-stock dt{max-width:100%;font-size:10.5px;color:#a9bddb;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.lcat-price{display:flex;align-items:baseline;justify-content:space-between;gap:8px;padding-top:2px}
-.lcat-price small{font-size:11.5px;color:#8ea4c4}.lcat-price strong{font-size:20px;color:#fff;font-variant-numeric:tabular-nums}
-.lcat-more{border:1px solid #1f3352;border-radius:9px;background:#0c182b}
-.lcat-more summary{min-height:32px;padding:6px 10px;font-size:12px;font-weight:600;color:#9fd8ff;cursor:pointer;list-style-position:inside}
-.lcat-more summary:focus-visible{outline:2px solid #8fd3ff;outline-offset:1px;border-radius:8px}
-.lcat-more dl{display:grid;gap:3px;margin:0;padding:0 10px 8px}
-.lcat-more dl div{display:flex;justify-content:space-between;gap:10px;font-size:12px}.lcat-more dt{color:#8ea4c4}.lcat-more dd{margin:0;color:#e5edf9;text-align:right;overflow-wrap:anywhere}
-.lcat-alert{margin:0;padding:6px 9px;border:1px solid #7a5a12;border-radius:8px;background:#2a2008;color:#fde6a8;font-size:12px}
+.lcat-changed{display:inline-block;animation:lcat-changed .9s ease}
+@keyframes lcat-changed{0%{transform:scale(1.25);text-shadow:0 0 10px currentColor}100%{transform:none;text-shadow:none}}
 .lcat-actions{display:flex;align-items:center;gap:8px;align-self:end}
 .lcat-edit{display:inline-flex;align-items:center;justify-content:center;gap:6px;flex:1;width:auto;height:36px;min-height:36px;margin:0;padding:0 12px;font-size:13px}.lcat-edit svg{width:16px;height:16px}
 .lcat-actions .license-menu-trigger{width:36px;height:36px;min-width:36px}
 .license-menu-item:has(svg){display:flex;align-items:center;gap:8px}.license-menu-item svg{flex:none;width:16px;height:16px}
-@media(max-width:900px){.lcat-bar{grid-template-columns:1fr 1fr}.lcat-search{grid-column:1/-1}.lcat-new{grid-column:1/-1;justify-self:start}}
-@media(max-width:600px){.lcat-grid{grid-template-columns:1fr}.lcat-bar{grid-template-columns:1fr}.lcat-new{width:100%}}
-@media(prefers-reduced-motion:reduce){.lcat-card,.lcat-chip{transition:none}.lcat-card:hover{transform:none}}
+.license-menu-list{transform-origin:top right;animation:lcat-menu .16s ease both}@keyframes lcat-menu{from{opacity:0;transform:translateY(-3px) scale(.98)}to{opacity:1;transform:none}}
+/* Vista de tabla (administración): compacta, con cabecera fija y desplazamiento propio en pantallas pequeñas. */
+.lcat-table-wrap{overflow:auto;max-height:70vh;border:1px solid #1f3352;border-radius:12px;background:#0c182b}
+.lcat-table{width:100%;min-width:900px;border-collapse:collapse;font-size:12.5px}
+.lcat-table thead th{position:sticky;top:0;z-index:1;padding:0;background:#0f2038;border-bottom:1px solid #22385a;text-align:left;white-space:nowrap}
+.lcat-table thead th>span{display:block;padding:9px 10px;font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#7f93b2}
+.lcat-sort{display:flex;align-items:center;gap:4px;width:100%;min-height:0;margin:0;padding:9px 10px;border:0;border-radius:0;background:transparent;color:#7f93b2;font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;cursor:pointer}
+.lcat-sort:hover,[aria-sort] .lcat-sort{color:#eef3ff}.lcat-sort i{font-style:normal;font-size:9px;color:#ff9ecb}.lcat-sort:focus-visible{outline:2px solid #8fd3ff;outline-offset:-2px}
+.lcat-table td{padding:7px 10px;border-bottom:1px solid #16263f;color:#dbe6f6;vertical-align:middle}
+.lcat-table tbody tr{transition:background-color .15s ease}.lcat-table tbody tr:hover{background:#10223b}.lcat-table tr[data-off=true]{opacity:.7}
+.lcat-t-media .lcat-media{width:40px;height:40px;padding:4px;border-radius:9px}.lcat-t-media .lcat-mono{width:30px;height:30px;font-size:12px;border-radius:8px}
+.lcat-t-product{min-width:220px}.lcat-t-product strong{display:block;max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#eef3ff}
+.lcat-t-product small{display:block;margin:1px 0 3px;color:#8ea4c4}
+.lcat-t-price{font-weight:700;color:#fff;white-space:nowrap;font-variant-numeric:tabular-nums}
+.lcat-t-num{text-align:center;font-weight:800;color:var(--tone);font-variant-numeric:tabular-nums}
+.lcat-t-actions{white-space:nowrap}.lcat-t-actions>*{display:inline-flex;vertical-align:middle;margin-left:4px}
+@media(max-width:1180px){.lcat-bar{grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)}.lcat-search{grid-column:1/-1}.lcat-views{grid-column:span 2;justify-self:end}}
+@media(max-width:700px){.lcat-bar{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.lcat-views{grid-column:1/-1;justify-self:stretch}.lcat-view{flex:1;justify-content:center}.lcat-new{width:100%}}
+@media(max-width:600px){.lcat-grid{grid-template-columns:1fr}}
+@media(max-width:380px){.lcat-bar{grid-template-columns:1fr}.lcat-head{grid-template-columns:56px minmax(0,1fr)}.lcat-media{width:56px;height:56px}}
+@media(prefers-reduced-motion:reduce){.lcat-card,.lcat-view,.lcat-table tbody tr{transition:none}.lcat-card:hover{transform:none}.lcat-changed,.license-menu-list{animation:none}}
 /* ADI · diseño aprobado (21/10/2026): esfera de filamentos de energía. Con WebGL la dibuja adi-orb.js; el texto «ADI» no se superpone
    (el botón conserva su nombre accesible). Sin WebGL, la alternativa CSS usa la misma identidad: interior oscuro y anillo de energía
    rosado, magenta, violeta y azul eléctrico, con un giro lento que se detiene con «movimiento reducido». */
@@ -8370,3 +8391,7 @@ body[data-page=dashboard] dialog.lcard-dialog .lcard-tools :is(input,select){hei
 #adi-widget.adi-v2:not(.adi-gl).adi-busy .adi-toggle .adi-orb::before{animation-duration:4s}
 @keyframes adi-fil-spin{to{transform:rotate(360deg)}}
 @media(prefers-reduced-motion:reduce){#adi-widget.adi-v2:not(.adi-gl) .adi-toggle .adi-orb::before{animation:none}}
+.lcat-skeleton{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;margin-top:12px}
+.lcat-skeleton span{height:210px;border:1px solid #1f3352;border-radius:12px;background:linear-gradient(100deg,#0c182b 30%,#13243d 50%,#0c182b 70%);background-size:300% 100%;animation:lcat-skeleton 1.4s ease infinite}
+@keyframes lcat-skeleton{from{background-position:100% 0}to{background-position:0 0}}
+@media(prefers-reduced-motion:reduce){.lcat-skeleton span{animation:none}}
