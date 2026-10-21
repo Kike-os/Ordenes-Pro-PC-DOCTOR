@@ -8053,3 +8053,61 @@ body[data-page=dashboard] dialog.agenda-settings .dialog-heading>button{align-se
 @media(max-width:1100px) and (min-width:641px){#module-content .sysst-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:640px){#module-content .sysst-grid{grid-template-columns:minmax(0,1fr)}#module-content .sysst-action{justify-self:stretch;justify-content:center}}
 @media(prefers-reduced-motion:reduce){#module-content .sysst-card{animation:none;transition:none}#module-content .sysst-card[data-loading=true] .sysst-card-icon svg{animation:none}}
+/* Licencias · Tarjeta de Licencias Digitales (acotado a dialog.lcard-dialog y .lcard-*). Rejilla; la lista se desplaza por dentro. */
+body[data-page=dashboard] .maintenance-dialog.license-dialog.lcard-dialog{display:grid;grid-template-rows:auto auto auto minmax(0,1fr) auto;width:min(980px,calc(100vw - 24px));max-width:none;max-height:90dvh;padding:0;overflow:hidden;border:1px solid #2a4266;border-radius:16px;background:#0b1526}
+dialog.lcard-dialog:not([open]){display:none}
+body[data-page=dashboard] dialog.lcard-dialog .dialog-heading{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;align-content:start;row-gap:0;margin:0;padding:12px 18px 6px}
+body[data-page=dashboard] dialog.lcard-dialog .dialog-heading h2{grid-column:1;margin:0;line-height:1.25;font-size:17px}
+dialog.lcard-dialog .lcard-sub{grid-column:1;margin:1px 0 0;font-size:12px;color:#8ea4c4}
+body[data-page=dashboard] dialog.lcard-dialog .dialog-heading>button{grid-column:2;grid-row:1/span 2;align-self:center}
+.lcard-head{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:12px;padding:8px 18px 10px;border-bottom:1px solid #1d3150}
+.lcard-brand{width:64px;height:auto}
+.lcard-who{display:grid;gap:2px;min-width:0}.lcard-who strong{font-size:15px;color:#eef3ff;overflow-wrap:anywhere}.lcard-who small{font-size:11.5px;color:#8ea4c4;overflow-wrap:anywhere}
+.lcard-counts{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end}
+.lcard-count{display:inline-flex;align-items:baseline;gap:5px;padding:3px 9px;border:1px solid #23395a;border-radius:999px;background:#0d1c32;font-size:11px;color:#9fb4d3}.lcard-count b{font-size:13px;color:#fff}
+.lcard-count[data-key=por_vencer] b{color:#fcd34d}.lcard-count[data-key=vencida] b{color:#f87171}.lcard-count[data-key=vigentes] b{color:#5eead4}
+.lcard-tools{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 18px}
+body[data-page=dashboard] dialog.lcard-dialog .lcard-tools :is(input,select){height:34px;min-height:0;margin:0;padding:0 10px;font-size:12.5px}
+.lcard-tools input{flex:1 1 260px;min-width:0}.lcard-tools select{flex:0 1 210px;width:auto}
+.lcard-shown{margin-left:auto;font-size:11.5px;color:#8ea4c4}
+.lcard-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px;align-content:start;min-height:0;overflow-y:auto;padding:4px 18px 14px;overscroll-behavior:contain}
+.lcard-item{display:grid;gap:8px;align-content:start;min-width:0;padding:12px 14px;border:1px solid #22385a;border-radius:12px;background:linear-gradient(180deg,#10223b,#0b182b);animation:ls-in .2s ease both;transition:border-color .18s ease,box-shadow .18s ease}
+.lcard-item:hover{border-color:#2f5584;box-shadow:0 8px 20px -16px #5fd4c8}
+.lcard-item[hidden]{display:none}
+.lcard-item[data-state=vencida]{border-color:#6b2a33}.lcard-item[data-state=por_vencer]{border-color:#6b5524}
+.lcard-item-top{display:grid;grid-template-columns:40px minmax(0,1fr) auto;align-items:start;gap:10px}
+.lcard-item-top .lcard-logo{width:40px;height:40px}
+.lcard-name{display:grid;gap:2px;min-width:0}.lcard-name strong{font-size:13.5px;line-height:1.3;color:#eef3ff;overflow-wrap:anywhere}.lcard-name small{font-size:11.5px;color:#8ea4c4;overflow-wrap:anywhere}
+.lcard-facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 12px;margin:0}
+.lcard-facts div{min-width:0}.lcard-facts dt{display:flex;align-items:center;gap:5px;font-size:10.5px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:#7f93b3}
+.lcard-facts dt svg{width:12px;height:12px}.lcard-facts dd{margin:0;font-size:12.5px;color:#d9e6fb;overflow-wrap:anywhere}
+.lcard-vigencia{display:grid;gap:4px}
+.lcard-bar{--c:#7b8798;position:relative;height:7px;overflow:hidden;border-radius:999px;background:#1a2a42}
+.lcard-bar i{position:absolute;inset:0 auto 0 0;width:calc(var(--part,0) * 100%);border-radius:inherit;background:linear-gradient(90deg,color-mix(in srgb,var(--c) 70%,#000),var(--c));box-shadow:0 0 8px color-mix(in srgb,var(--c) 60%,transparent);transform-origin:left;animation:lcard-grow .6s ease both}
+.lcard-bar[data-tone=verde]{--c:#22c55e}.lcard-bar[data-tone=amarillo]{--c:#eab308}.lcard-bar[data-tone=naranja]{--c:#f97316}.lcard-bar[data-tone=rojo]{--c:#ef4444}
+@keyframes lcard-grow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+.lcard-days{font-size:11.5px;font-weight:600;color:#c5d5ee;font-variant-numeric:tabular-nums}
+.lcard-creds{display:grid;gap:4px;padding:8px 10px;border:1px dashed #23395a;border-radius:10px;background:#0a1525}
+.lcard-creds-title{display:flex;align-items:center;gap:6px;margin:0;font-size:11px;font-weight:700;color:#ff9cc8}.lcard-creds-title svg{width:13px;height:13px}
+.lcard-cred{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;font-size:11.5px}
+.lcard-cred-label{color:#8ea4c4;overflow-wrap:anywhere}.lcard-secret{font-size:12px;color:#e3edff;overflow-wrap:anywhere;letter-spacing:.04em}
+.lcard-item-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;padding-top:6px;border-top:1px solid #172a45}
+.lcard-code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;color:#9fd8ff}
+.lcard-empty{grid-column:1/-1;margin:8px 0;font-size:12.5px;color:#8ea4c4}.lcard-empty[hidden]{display:none}
+.lcard-foot{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:10px 16px;padding:10px 18px;border-top:1px solid #1d3150;background:#0a1424}
+.lcard-contact{display:grid;gap:1px;min-width:0;font-size:11.5px;color:#a9bddb}.lcard-contact strong{color:#e3edff;font-size:12px}.lcard-contact small{font-size:10.5px;color:#7f93b3}
+.lcard-actions{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end}
+.lcard-btn{display:inline-flex;align-items:center;gap:6px;min-height:34px;margin:0;padding:5px 11px;font-size:12px;text-decoration:none;transition:border-color .15s ease,background-color .15s ease}
+.lcard-btn svg{width:15px;height:15px}
+.lcard-private{border-color:#ff5fa266;color:#ffd1e5}.lcard-private:hover{border-color:#ff5fa2;background:#2a1020}
+.lcard-print-frame{position:fixed;right:0;bottom:0;width:1px;height:1px;border:0;opacity:0;pointer-events:none}
+@media(max-width:760px){body[data-page=dashboard] .maintenance-dialog.license-dialog.lcard-dialog{width:calc(100vw - 16px);max-height:90dvh;padding:0}}
+@media(max-width:640px){
+ .lcard-head{grid-template-columns:auto minmax(0,1fr);padding:8px 12px}.lcard-counts{grid-column:1/-1;justify-content:flex-start}.lcard-brand{width:48px}
+ .lcard-tools,.lcard-list{padding-left:12px;padding-right:12px}.lcard-list{grid-template-columns:minmax(0,1fr)}.lcard-shown{margin-left:0}
+ .lcard-foot{grid-template-columns:minmax(0,1fr);padding:10px 12px}.lcard-actions{justify-content:stretch}.lcard-actions>*{flex:1 1 140px;justify-content:center}}
+@media(prefers-reduced-motion:reduce){.lcard-item,.lcard-bar i{animation:none}.lcard-item,.lcard-btn{transition:none}}
+.lcard-list{overflow-x:hidden}
+.lcard-acts .license-icon-btn:last-child[data-tip]::after{left:auto;right:0;transform:translate(0,3px)}
+.lcard-acts .license-icon-btn:last-child:is(:hover,:focus-visible)::after{transform:translate(0,0)}
+.lcard-contact-line{display:flex;flex-wrap:wrap;gap:0 10px}.lcard-nowrap{white-space:nowrap}

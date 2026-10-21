@@ -890,8 +890,24 @@ def admin_reveal(c,unit_id,user,now):
     return credentials(unit)
 
 
-def card(c,delivery_id,private=False):
+METHODS={'clave':'Licencia con clave de producto','cuenta':'Licencia mediante cuenta','cuenta_clave':'Licencia con cuenta y clave'}
+
+
+def method_of(unit):
+    """Método de activación según los campos guardados (cifrados) y los NOMBRES de esos campos; nunca sus valores."""
+    try:
+        values=unseal(unit['secret'])
+    except Exception:
+        return '',[]
+    present=[key for key in ('key','serial','license_code','username','password') if values.get(key)]
+    has_key=any(key in present for key in ('key','serial','license_code'));has_account=any(key in present for key in ('username','password'))
+    method='cuenta_clave' if has_key and has_account else 'cuenta' if has_account else 'clave' if has_key else ''
+    return method,[SECRET_LABELS[key] for key in present]
+
+
+def card(c,delivery_id,private=False,now=None):
     delivery=delivery_row(c,delivery_id)
+    today=now.date() if now else date.today();soon=display_settings(c)['soon_days']
     client=c.execute('SELECT name FROM clients WHERE id=?',(delivery['client_id'],)).fetchone()
     order=c.execute("SELECT COALESCE(code,'OP-'||printf('%05d',id)) code FROM orders WHERE id=?",(delivery['order_id'],)).fetchone() if delivery['order_id'] else None
     items=[]
@@ -900,6 +916,14 @@ def card(c,delivery_id,private=False):
         item={'unit_code':unit['code'],'product_id':unit['product_id'],'product':unit['product_name'],'kind':KINDS[unit['kind']],'devices':unit['devices'],'term':unit['term'],
               'expires_at':unit['expires_at'],'activated_at':unit['activated_at'],'edition':unit['edition'],'license_type':unit['license_type'],'manufacturer':unit['manufacturer'],'version':unit['version'],
               'has_logo':bool(c.execute('SELECT 1 FROM catalog_images WHERE item_id=?',(unit['product_id'],)).fetchone())}
+        # Vigencia real (desde las fechas guardadas: editar no reinicia el periodo), método de activación y nombres de los campos.
+        state,days=state_of(unit,today,soon=soon)
+        period=None
+        if unit['activated_at'] and unit['expires_at']:
+            try:period=max(1,(date.fromisoformat(unit['expires_at'])-date.fromisoformat(unit['activated_at'][:10])).days)
+            except ValueError:period=None
+        method,fields=method_of(unit)
+        item.update(unit_id=unit['id'],state=state,state_label=STATES[state][0],days_left=days,period_days=period,method=method,method_label=METHODS.get(method,''),fields=fields)
         if private:item.update(credentials=credentials(unit),download_url=unit['download_url'],instructions=unit['instructions'])
         items.append(item)
     return {'delivery_id':delivery_id,'client':client['name'] if client else '','order':order['code'] if order else '','delivered_at':delivery['authorized_at'],'status':delivery['status'],

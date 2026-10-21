@@ -139,3 +139,28 @@ La búsqueda (número, cliente, cédula o RUC, producto) y los filtros de pago y
 - «Historial de entregas» muestra tarjetas con el número de venta (o la orden), el cliente, la fecha y quién entregó, y las licencias agrupadas por producto con su cantidad y las devoluciones. «Ver códigos de licencia» despliega los códigos internos LIC-…, que no son claves. Desde cada tarjeta se abren la tarjeta digital (sin credenciales), un enlace privado nuevo y el «Registro completo»: todos los eventos de la entrega y de sus licencias, con fecha, responsable y detalle (`GET /api/licenses/deliveries/<id>/events`, solo administración).
 
 Nada de esto muestra claves, contraseñas ni credenciales de Microsoft 365. No se borra ni se renumera nada, y no hay migración.
+
+## Tarjeta de Licencias Digitales (rama `licencias-tarjeta`)
+
+**Ventana (administración):**
+- Alto máximo del 90 %; encabezado, búsqueda y pie fijos; solo se desplaza la lista.
+- Una tarjeta por licencia. Cinco licencias iguales son cinco registros, cada una con su identificador LIC-…, su clave y su cliente. No se fusiona nada.
+- Cada tarjeta muestra el logotipo, el nombre completo, el tipo y el método de activación, los dispositivos, la duración, la activación, el vencimiento, los días restantes y el estado.
+- **Barra de vigencia:** su largo es proporcional a lo que queda del periodo real (de la activación al vencimiento guardados, así que editar no la reinicia). El color es verde, amarillo (30 días o menos), naranja (15 o menos) o rojo (7 o menos o vencida).
+- **Métodos:**
+  - **clave de producto:** clave, serial o código de licencia;
+  - **cuenta:** usuario y contraseña;
+  - **cuenta y clave:** ambos.
+  - Solo se muestran los campos guardados, ocultos («••••»). La tarjeta recibe únicamente los *nombres* de los campos (`fields`), nunca sus valores.
+- **«Mostrar» y «Copiar»:** consultan la credencial al servidor (`action:'reveal'`, solo administración). Cada consulta queda en el historial de la licencia y en la auditoría, sin el valor. La credencial se oculta sola a los 60 s.
+- **Herramientas:** búsqueda por producto, cliente o identificador; filtro por estado; detalles y edición (ficha de la licencia); enviar acceso seguro (enlace privado nuevo por correo); imprimir y PDF público; documento privado.
+- **Pie:** PC-DOCTOR S.A., teléfono, correo y sitio web, con el aviso de que las credenciales son personales.
+
+**Documentos:**
+- **PDF público** (`GET /api/licenses/deliveries/<id>/card.pdf`): mismos datos sin claves, usuarios ni contraseñas. «Imprimir» imprime esta versión.
+- **Documento privado** (`POST …/private-pdf` con `confirm`): solo administración y con una confirmación expresa. Cada licencia registra «Documento privado con credenciales generado por administración».
+- **Versión privada del cliente:** sigue siendo su enlace individual, con identificación y código, vencimiento, bloqueo por intentos y revocación al generar uno nuevo.
+
+**Pruebas** (datos ficticios):
+- Las pruebas del servidor comprueban siete licencias de un cliente (cinco iguales), sin cruces con otro cliente. Confirman también que ni la tarjeta ni el PDF público (descomprimido) contienen secretos, que el documento privado exige confirmación y queda registrado, y que nada se modifica.
+- En el navegador: 17 de 17 comprobaciones en 1366, 1920, 390 y 320 px.

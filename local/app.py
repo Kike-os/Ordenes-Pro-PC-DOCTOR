@@ -2033,8 +2033,14 @@ class Handler(BaseHTTPRequestHandler):
                         return self.reply(200,bytes(found['data']),found['mime'],filename=found['name'])
                     events_route=re.fullmatch(r'/api/licenses/deliveries/([0-9]{1,9})/events',path)
                     if events_route:return self.reply(200,{'rows':licenses.delivery_events(c,int(events_route[1]))})
-                    card_route=re.fullmatch(r'/api/licenses/deliveries/([0-9]{1,9})/card',path)
-                    if card_route:return self.reply(200,licenses.card(c,int(card_route[1]),private=False))
+                    card_route=re.fullmatch(r'/api/licenses/deliveries/([0-9]{1,9})/card(\.pdf)?',path)
+                    if card_route:
+                        found=licenses.card(c,int(card_route[1]),private=False,now=now)
+                        if card_route[2]:
+                            # PDF público: nunca lleva credenciales (card() sin private no las incluye).
+                            import license_card_pdf
+                            return self.reply(200,license_card_pdf.render(found),'application/pdf',filename='TARJETA-LICENCIAS-'+re.sub(r'[^A-Za-z0-9-]+','-',found['client'] or 'CLIENTE')[:40]+'.pdf')
+                        return self.reply(200,found)
                     if path=='/api/licenses/sales':
                         return self.reply(200,{'rows':license_sales.sales(c,arg('q')[:120],arg('payment'),arg('delivery')),'methods':license_sales.METHODS,'payment_labels':license_sales.PAYMENT,'delivery_labels':license_sales.DELIVERY})
                     sale_route=re.fullmatch(r'/api/licenses/sales/([0-9]{1,9})',path)
@@ -3324,6 +3330,15 @@ class Handler(BaseHTTPRequestHandler):
                                 audit(c,user['id'],'license_info_sent',unit);return self.reply(200,{'ok':result['status']=='enviado','result':result})
                             else:return self.reply(400,{'error':'Acción no válida.'})
                             audit(c,user['id'],'license_'+action,unit);return self.reply(200,{'ok':True})
+                        private_pdf=re.fullmatch(r'/api/licenses/deliveries/([0-9]{1,9})/private-pdf',path)
+                        if private_pdf:
+                            # Documento privado con credenciales: solo administración, con confirmación expresa; cada licencia registra la consulta.
+                            if data.get('confirm') is not True:return self.reply(400,{'error':'Confirma que estás autorizado a generar el documento con credenciales.'})
+                            delivery=int(private_pdf[1]);found=licenses.card(c,delivery,private=True,now=now)
+                            if not found['items']:return self.reply(409,{'error':'Esta entrega no tiene licencias vigentes con credenciales.'})
+                            for item in found['items']:licenses.event(c,'credenciales_consultadas',now,'Documento privado con credenciales generado por administración.',item['unit_id'],item['product_id'],delivery=delivery,user=user)
+                            audit(c,user['id'],'license_private_document',delivery);import license_card_pdf
+                            return self.reply(200,{'ok':True,'name':'TARJETA-LICENCIAS-PRIVADA-'+re.sub(r'[^A-Za-z0-9-]+','-',found['client'] or 'CLIENTE')[:40]+'.pdf','pdf':base64.b64encode(license_card_pdf.render(found,private=True)).decode()})
                         delivery_route=re.fullmatch(r'/api/licenses/deliveries/([0-9]{1,9})',path)
                         if delivery_route and data.get('action')=='renew':
                             delivery=int(delivery_route[1]);token=licenses.renew_link(c,delivery,user,now);audit(c,user['id'],'license_delivery_link_renewed',delivery)
