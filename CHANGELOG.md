@@ -4,6 +4,19 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.197 — 2026-10-21 09:34 (UTC-05:00)
+
+ADI Customer Intelligence Pro: catálogo real, memoria de la conversación y reserva de citas en el chat
+
+### Mejoras realizadas
+
+- ADI Customer Intelligence Pro: ADI consulta el catálogo real (licencias y servicios con precio, disponibilidad, duración y dispositivos) sin acceder a costos ni credenciales, recuerda la conversación sin repetir el saludo y orienta ante fallas técnicas.
+- ADI agenda citas dentro del chat: servicio, fecha y horas libres reales, datos del cliente, resumen y aceptación de condiciones; la cita se guarda con la agenda del sistema y muestra su código. Accesos rápidos y sugerencias según el tema.
+
+### Errores corregidos
+
+- ADI ya no responde que no se venden licencias: usa el catálogo vigente y, si no puede consultarlo, lo indica sin negar productos ni inventar precios.
+
 ## v1.5.196 — 2026-10-21 09:03 (UTC-05:00)
 
 Enterprise License Catalog Pro: catálogo de licencias empresarial con tarjetas, tabla, filtros e indicadores

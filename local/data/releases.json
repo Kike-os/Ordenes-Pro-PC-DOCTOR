@@ -8,6 +8,25 @@
   },
   "releases": [
     {
+      "version": "1.5.197",
+      "date": "2026-10-21T09:34:22-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "ADI Customer Intelligence Pro: catálogo real, memoria de la conversación y reserva de citas en el chat",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "ADI Customer Intelligence Pro: ADI consulta el catálogo real (licencias y servicios con precio, disponibilidad, duración y dispositivos) sin acceder a costos ni credenciales, recuerda la conversación sin repetir el saludo y orienta ante fallas técnicas.",
+          "ADI agenda citas dentro del chat: servicio, fecha y horas libres reales, datos del cliente, resumen y aceptación de condiciones; la cita se guarda con la agenda del sistema y muestra su código. Accesos rápidos y sugerencias según el tema."
+        ],
+        "fixes": [
+          "ADI ya no responde que no se venden licencias: usa el catálogo vigente y, si no puede consultarlo, lo indica sin negar productos ni inventar precios."
+        ],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.196",
       "date": "2026-10-21T09:03:35-05:00",
       "type": "patch",
