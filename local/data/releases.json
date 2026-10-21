@@ -8,6 +8,23 @@
   },
   "releases": [
     {
+      "version": "1.5.185",
+      "date": "2026-10-20T19:40:08-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Inicio de sesión compacto y tarjeta de equipo renovada",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Inicio de sesión más compacto en celular, tableta y PC: ancho adaptable (máx. 400 px), campos de 46 px, tipografía adaptativa, aviso de propiedad intelectual compacto y versión del sistema en una tarjeta pequeña; en 390 px entra completo con «Agendar cita» visible",
+          "Tarjeta de equipo en Órdenes: el estado ya no se corta (pasa a otra línea si no cabe), nombre del equipo como título, línea de código y serie y «Actualizado» con iconos discretos, y «En esta página» como etiqueta"
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.184",
       "date": "2026-10-20T14:52:34-05:00",
       "type": "patch",

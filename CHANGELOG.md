@@ -4,6 +4,15 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.185 — 2026-10-20 19:40 (UTC-05:00)
+
+Inicio de sesión compacto y tarjeta de equipo renovada
+
+### Mejoras realizadas
+
+- Inicio de sesión más compacto en celular, tableta y PC: ancho adaptable (máx. 400 px), campos de 46 px, tipografía adaptativa, aviso de propiedad intelectual compacto y versión del sistema en una tarjeta pequeña; en 390 px entra completo con «Agendar cita» visible
+- Tarjeta de equipo en Órdenes: el estado ya no se corta (pasa a otra línea si no cabe), nombre del equipo como título, línea de código y serie y «Actualizado» con iconos discretos, y «En esta página» como etiqueta
+
 ## v1.5.184 — 2026-10-20 14:52 (UTC-05:00)
 
 Presupuestos estables, monitor de errores y Centro de Entrega con estados reales
