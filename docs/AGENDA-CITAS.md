@@ -102,3 +102,35 @@ Todos los estados se pintan con una misma píldora de 26 px con icono y texto (`
 **Página pública.** Muestra la cita, el servicio, el equipo y la fecha anterior, y solo los días y horarios realmente libres (se vuelven a comprobar al confirmar). La cita conserva su código, datos e historial; queda marcada como «Reagendada» (morado) y suma un reagendamiento. Al alcanzar el límite, la página pide al cliente que se comunique con el taller. Con un enlace vencido, el cliente puede pedir uno nuevo indicando el código de la cita y su identificación, siempre que la cita siga en «No asistió» y no haya llegado al límite.
 
 «No asistió» es distinto de «Cancelada» y se revierte con «Reactivar cita».
+
+## Configuración de la agenda: ventana compacta con pestañas (rama `agenda-config-pro`)
+
+**Antes:** un bloque desplegable dentro de la agenda con todas las secciones abiertas a la vez (unos 4450 px de alto en 1366 × 768), con nombres de servicio cortados («Cambio de pa…»).
+
+**Ahora:**
+- La agenda muestra una tarjeta resumen (horario, servicios activos, margen y confirmación) con el botón «Configurar».
+- Ese botón abre una ventana de ancho máximo 1080 px y alto máximo `90dvh`, con desplazamiento interno, cuatro pestañas y el pie fijo «Cancelar | Guardar configuración».
+- Solo se ve la pestaña elegida y se puede cambiar de pestaña con las flechas, Inicio y Fin.
+
+**Pestañas:**
+- **Horarios:** una tarjeta del horario de atención de la agenda en línea y otra por técnico.
+  - Cada tarjeta tiene interruptor de disponibilidad, siete días con casilla, horas compactas y sábado y domingo resaltados con colores discretos.
+  - Si la hora de cierre no es posterior a la de inicio, se avisa en el día y no se guarda.
+  - «Copiar lunes a mar–vie / a todos» pide confirmación antes de cambiar días con un horario distinto.
+  - El horario presencial del local sigue aparte, en Configuración → Horarios y Disponibilidad.
+- **Servicios:** tabla con icono, nombre completo editable, duración (15 a 240 min), interruptor de activo, editar y eliminar.
+  - La tabla se desplaza por dentro; en celular cada servicio es una tarjeta.
+  - «Eliminar» pide confirmación y el servidor solo borra servicios que nunca se usaron en una cita (ni en sus partidas). Si tienen citas responde 409 y pide desactivarlos.
+  - Siempre debe quedar al menos un servicio activo.
+- **Reglas y márgenes:** margen entre citas (0 a 60 min, inicialmente 15), con un ejemplo de duración + margen.
+  - Reglas del servidor: sin citas superpuestas por técnico, restricciones por horario individual y límites de reservas (que se configuran en Horarios y Disponibilidad).
+  - Feriados y días no laborables.
+- **Confirmación:** automática o manual. El servidor vuelve a comprobar la disponibilidad al confirmar.
+  - Inasistencias y reagendamientos se guardan con el mismo botón.
+
+**Servidor:**
+- El guardado es todo o nada: un dato inválido deshace la petición completa. Antes podían quedar guardados los horarios aunque fallara un servicio.
+- Los mensajes indican el día y el técnico; por ejemplo, «Horario de admin-red del domingo: la hora de cierre debe ser posterior a la de inicio».
+- Se añadió `remove_service` con la comprobación de uso.
+
+No hay migración y no cambian los horarios, servicios, duraciones ni citas existentes.

@@ -58,15 +58,19 @@ def settings(c):
  import no_show
  return dict(_settings(c),no_show=no_show.settings(c))
 def _settings(c):return {'buffer':buffer_minutes(c),'confirmation':confirmation_mode(c),'hours':[dict(r) for r in c.execute('SELECT * FROM appointment_hours ORDER BY weekday')],'staff_hours':[dict(r) for r in c.execute('SELECT h.*,u.name technician FROM appointment_staff_hours h JOIN users u ON u.id=h.technician_id ORDER BY u.name,h.weekday')],'holidays':[dict(r) for r in c.execute('SELECT * FROM appointment_holidays WHERE hidden=0 ORDER BY day')],'services':[dict(r) for r in c.execute('SELECT code,label,duration_minutes,active FROM appointment_services ORDER BY label')]}
+DAY_NAMES=('lunes','martes','miércoles','jueves','viernes','sábado','domingo')
 def update_settings(c,data):
  try:
   for item in data.get('hours',[]):
    weekday=int(item['weekday']);start=time.fromisoformat(str(item['start_time']));end=time.fromisoformat(str(item['end_time']));enabled=1 if item.get('enabled') else 0
-   if weekday not in range(7) or start>=end:return 400,{'error':'Revisa los días y horarios de atención.'}
+   if weekday not in range(7):return 400,{'error':'Revisa los días y horarios de atención.'}
+   if start>=end:return 400,{'error':'Horario de atención del '+DAY_NAMES[weekday]+': la hora de cierre debe ser posterior a la de inicio.','field':'hours-'+str(weekday)}
    c.execute('UPDATE appointment_hours SET start_time=?,end_time=?,enabled=? WHERE weekday=?',(start.strftime('%H:%M'),end.strftime('%H:%M'),enabled,weekday))
   for item in data.get('staff_hours',[]):
    technician=int(item['technician_id']);weekday=int(item['weekday']);start=time.fromisoformat(str(item['start_time']));end=time.fromisoformat(str(item['end_time']));enabled=1 if item.get('enabled') else 0
-   if weekday not in range(7) or start>=end or not c.execute("SELECT 1 FROM users WHERE id=? AND active=1 AND role IN ('administrador','tecnico')",(technician,)).fetchone():return 400,{'error':'Horario de técnico inválido.'}
+   person=c.execute("SELECT name FROM users WHERE id=? AND active=1 AND role IN ('administrador','tecnico')",(technician,)).fetchone()
+   if weekday not in range(7) or not person:return 400,{'error':'Horario de técnico inválido.'}
+   if start>=end:return 400,{'error':'Horario de '+person['name']+' del '+DAY_NAMES[weekday]+': la hora de cierre debe ser posterior a la de inicio.','field':'staff-'+str(technician)+'-'+str(weekday)}
    c.execute('INSERT INTO appointment_staff_hours(technician_id,weekday,start_time,end_time,enabled) VALUES (?,?,?,?,?) ON CONFLICT(technician_id,weekday) DO UPDATE SET start_time=excluded.start_time,end_time=excluded.end_time,enabled=excluded.enabled',(technician,weekday,start.strftime('%H:%M'),end.strftime('%H:%M'),enabled))
   for item in data.get('services',[]):
    code=str(item.get('code',''));duration=int(item.get('duration_minutes',0));active=1 if item.get('active') else 0
@@ -96,6 +100,15 @@ def update_settings(c,data):
    c.execute("INSERT INTO appointment_holidays(day,label) VALUES (?,?) ON CONFLICT(day) DO UPDATE SET label=excluded.label,mode='cerrado',hidden=0",(day.isoformat(),label))
   if data.get('remove_holiday'):
    c.execute('DELETE FROM appointment_holidays WHERE day=?',(str(data['remove_holiday']),))
+  # Eliminar un servicio solo si nunca se usó: las citas y sus partidas lo referencian y su historial no se pierde.
+  removed=str(data.get('remove_service') or '')
+  if removed:
+   if not c.execute('SELECT 1 FROM appointment_services WHERE code=?',(removed,)).fetchone():return 404,{'error':'Servicio no disponible.'}
+   used=c.execute('SELECT (SELECT COUNT(*) FROM appointments WHERE service_code=?)+(SELECT COUNT(*) FROM appointment_service_items WHERE service_code=?)',(removed,removed)).fetchone()[0]
+   if used:return 409,{'error':'Este servicio tiene citas registradas y no se puede eliminar sin perder su historial. Desactívalo para que no se ofrezca en la agenda.'}
+   c.execute('DELETE FROM appointment_services WHERE code=?',(removed,))
+  # La agenda en línea necesita al menos un servicio que ofrecer.
+  if not c.execute('SELECT 1 FROM appointment_services WHERE active=1').fetchone():return 400,{'error':'Debe quedar al menos un servicio activo para la agenda en línea.'}
  except (ValueError,TypeError,KeyError):return 400,{'error':'La configuración de la agenda contiene datos inválidos.'}
  return 200,{'ok':True,'settings':settings(c)}
 def parse_start(raw):

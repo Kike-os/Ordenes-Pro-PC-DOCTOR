@@ -3030,6 +3030,8 @@ class Handler(BaseHTTPRequestHandler):
                 if path=='/api/appointments/config':
                     if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede configurar la agenda.'})
                     status,payload=appointments.update_settings(c,data)
+                    # Todo o nada: si algún dato es inválido no queda guardada una parte de la configuración.
+                    if status!=200:c.rollback()
                     if status==200:audit(c,user['id'],'appointment_settings_updated')
                     return self.reply(status,payload)
                 if appointment_route:
