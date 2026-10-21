@@ -8424,3 +8424,20 @@ body[data-page=dashboard] dialog.lcard-dialog .lcard-tools :is(input,select){hei
 #adi-widget .adi-booking-done strong{font-size:14px;color:#fff}#adi-widget .adi-booking-done small{color:#9ff0c8}
 @media(max-width:420px){#adi-widget .adi-booking-grid{grid-template-columns:1fr}}
 @media(prefers-reduced-motion:reduce){#adi-widget .adi-suggest button{transition:none}}
+/* ADI Smart Presence Indicator Pro: el punto de la esfera muestra el estado real (data-presence lo fija el widget con eventos reales).
+   No cambia la esfera: solo el punto (10 px, borde del color del fondo) y una etiqueta discreta al pasar el cursor. */
+#adi-widget.adi-v2 .adi-toggle .adi-online{display:block;right:1px;bottom:1px;width:10px;height:10px;border:2px solid #0a1020;--dot:#34d399;background:var(--dot);box-shadow:0 0 0 0 transparent;transition:background-color .2s ease,box-shadow .2s ease}
+#adi-widget.adi-v2[data-presence] .adi-toggle .adi-online{display:block;background:var(--dot);opacity:1}
+#adi-widget.adi-v2[data-presence=available] .adi-toggle .adi-online{--dot:#34d399;animation:adi-dot-breathe 3.2s ease-in-out infinite}
+#adi-widget.adi-v2[data-presence=listening] .adi-toggle .adi-online{--dot:#2dd4bf;transform:scale(calc(1 + var(--adi-level,0) * .45));box-shadow:0 0 calc(4px + var(--adi-level,0) * 10px) #2dd4bfb3}
+#adi-widget.adi-v2[data-presence=processing] .adi-toggle .adi-online{--dot:#f5b942;animation:adi-dot-think 1.4s ease-in-out infinite}
+#adi-widget.adi-v2[data-presence=speaking] .adi-toggle .adi-online{--dot:#ff5fa8;transform:scale(calc(1 + var(--adi-voice,.35) * .45));box-shadow:0 0 calc(4px + var(--adi-voice,.35) * 10px) #ff5fa8b3}
+#adi-widget.adi-v2[data-presence=waiting] .adi-toggle .adi-online{--dot:#f3c677}
+#adi-widget.adi-v2[data-presence=advisor] .adi-toggle .adi-online{--dot:#69a7ff}
+#adi-widget.adi-v2[data-presence=offline] .adi-toggle .adi-online{--dot:#d9534f;opacity:.85;box-shadow:none;animation:none}
+@keyframes adi-dot-breathe{0%,100%{box-shadow:0 0 0 0 #34d39900}50%{box-shadow:0 0 6px 1px #34d39980}}
+@keyframes adi-dot-think{0%,100%{box-shadow:0 0 0 0 #f5b94200;opacity:1}50%{box-shadow:0 0 6px 1px #f5b94299;opacity:.8}}
+#adi-widget .adi-presence-tip{position:absolute;right:calc(100% + 10px);bottom:14px;z-index:3;padding:5px 10px;border:1px solid #2a4266;border-radius:8px;background:#0b1626f2;color:#e5edf9;font-size:12px;font-weight:600;white-space:nowrap;pointer-events:none;opacity:0;transform:translateX(4px);transition:opacity .18s ease,transform .18s ease}
+#adi-widget .adi-presence-tip:empty{display:none}
+@media(hover:hover) and (pointer:fine){#adi-widget:not(.adi-open) .adi-toggle:is(:hover,:focus-visible)+.adi-presence-tip{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){#adi-widget.adi-v2 .adi-toggle .adi-online{animation:none!important;transform:none!important;transition:none}#adi-widget .adi-presence-tip{transition:none}}

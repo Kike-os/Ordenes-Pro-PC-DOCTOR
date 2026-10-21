@@ -21,7 +21,10 @@
   // Voz natural: amplitud real del audio que suena en este instante (envolvente calculada al recibirlo). Con la voz del navegador no hay
   // acceso al audio y la esfera late con cada palabra.
   const env=orbState.speaking&&premium?.adiEnvelope;orbState.voice=env?env[Math.min(env.length-1,Math.floor(premium.currentTime*ENVELOPE_RATE))]||0:null;
-  orbState.attend=performance.now()-typedAt<1600;return orbState;};
+  orbState.attend=performance.now()-typedAt<1600;
+  const pulse=orbState.speaking?(orbState.voice??.35):0;if(Math.abs(pulse-voicePulse)>.04){voicePulse=pulse;root.style.setProperty('--adi-voice',pulse.toFixed(2));}
+  return orbState;};
+ let voicePulse=0;
  const ENVELOPE_RATE=60;let typedAt=-1e9;
  // Envolvente de amplitud del audio de ADI: se decodifica aparte (sin tocar la reproducción, que sigue en el elemento de audio) y se resume
  // en 60 valores por segundo, normalizados para que la voz baja y la alta se distingan. Si el navegador no puede, se usa el latido por palabra.
@@ -68,11 +71,21 @@
  function note(text,kind){const node=el('p',text,'adi-note'+(kind?' adi-note-'+kind:''));if(kind==='error')node.setAttribute('role','alert');place(node);bottom();return node;}
  function setTyping(on){typing?.remove();typing=null;if(on){typing=el('p',undefined,'adi-message adi adi-typing');typing.setAttribute('aria-label','ADI está procesando tu consulta');typing.append(el('span'),el('span'),el('span'),el('em','ADI está procesando tu consulta…'));pinned=nearEnd();list.append(typing);bottom();}}
  // Estado real de la conversación: el servidor informa «asesor conectado» únicamente cuando una persona la tomó.
- const labels={adi:'ADI disponible',consulting:'ADI está procesando tu consulta…',requesting:'Contactando con soporte técnico…',waiting:'Esperando a un asesor',advisor:'Asesor conectado',closed:'Conversación finalizada',offline:'Sin conexión. Reintentando…'};
- const voiceLabels={listening:'ADI te está escuchando…',processing:'ADI está procesando tu voz…',speaking:'ADI está hablando…'};
- function paint(){const shown=failures>=3?'offline':transient||state;root.dataset.state=shown;status.textContent=(shown==='adi'||shown==='consulting')&&voiceLabels[root.dataset.voice]||labels[shown];toggle.title=/^ADI/.test(labels[shown])?labels[shown]:'ADI · '+labels[shown];human.hidden=state==='advisor';human.disabled=state==='waiting'||transient==='requesting';human.textContent=state==='waiting'?'Solicitud enviada: esperando a soporte técnico':transient==='requesting'?'Contactando…':'Contactar soporte técnico';}
+ const labels={adi:'ADI disponible',consulting:'Preparando respuesta…',requesting:'Contactando con soporte técnico…',waiting:'Esperando a un asesor',advisor:'Asesor conectado',closed:'Conversación finalizada',offline:'Sin conexión. Reintentando…'};
+ const voiceLabels={listening:'Escuchando…',processing:'Preparando respuesta…',speaking:'ADI está hablando'};
+ // Indicador de presencia (el punto de la esfera): refleja el estado REAL de ADI —conexión, micrófono, petición en curso, voz y asesor—.
+ // Lo actualizan los propios eventos (cambios de clase y de data-voice, conexión del navegador); no hay temporizadores que simulen estados.
+ const presenceText={available:'ADI · Disponible para ayudarte',listening:'Escuchando…',processing:'Preparando respuesta…',speaking:'ADI está hablando',waiting:'Esperando a un asesor',advisor:'Asesor conectado',offline:'Sin conexión · reintentando'};
+ const presenceTip=el('span','','adi-presence-tip');presenceTip.setAttribute('aria-hidden','true');toggle.after(presenceTip);
+ function presenceOf(){if(failures>=3||navigator.onLine===false)return 'offline';const v=root.dataset.voice;if(v==='listening')return 'listening';if(v==='speaking')return 'speaking';
+  if(v==='processing'||root.classList.contains('adi-busy')||transient==='consulting')return 'processing';if(state==='waiting'||transient==='requesting')return 'waiting';if(state==='advisor')return 'advisor';return 'available';}
+ function paintPresence(){const now=presenceOf();if(root.dataset.presence!==now)root.dataset.presence=now;presenceTip.textContent=presenceText[now];
+  const base=unread?'Abrir asistente ADI: '+unread+(unread===1?' mensaje nuevo':' mensajes nuevos'):'Abrir asistente ADI';toggle.setAttribute('aria-label',base+' · '+presenceText[now].replace(/^ADI · /,''));toggle.removeAttribute('title');}
+ function paint(){const shown=failures>=3?'offline':transient||state;root.dataset.state=shown;status.textContent=(shown==='adi'||shown==='consulting')&&voiceLabels[root.dataset.voice]||labels[shown];human.hidden=state==='advisor';human.disabled=state==='waiting'||transient==='requesting';human.textContent=state==='waiting'?'Solicitud enviada: esperando a soporte técnico':transient==='requesting'?'Contactando…':'Contactar soporte técnico';paintPresence();}
  function setState(value){if(!labels[value]||value===state){paint();return;}const before=state;state=value;paint();if(!loaded)return;if(value==='advisor'){note('Un asesor se unió a la conversación.');sound('advisor');}else if(value==='closed')note('El asesor finalizó la conversación. Si escribes de nuevo, ADI continuará atendiéndote.');else if(value==='adi'&&before==='advisor')note('ADI continúa con la conversación.');}
- function showBadge(){badge.hidden=!unread;badge.textContent=unread>9?'9+':String(unread||'');toggle.setAttribute('aria-label',unread?'Abrir asistente ADI: '+unread+(unread===1?' mensaje nuevo':' mensajes nuevos'):'Abrir asistente ADI');}
+ function showBadge(){badge.hidden=!unread;badge.textContent=unread>9?'9+':String(unread||'');paintPresence();}
+ new MutationObserver(paintPresence).observe(root,{attributes:true,attributeFilter:['class','data-voice']});
+ addEventListener('offline',paintPresence);addEventListener('online',()=>{paintPresence();poll();});
  function draw(items){let incoming=0;for(const item of items||[]){if(item.id<=lastId)continue;const date=new Date(item.created_at),valid=!Number.isNaN(date.getTime());if(valid&&dayKey(date)!==lastDay){lastDay=dayKey(date);place(el('p',dayLabel(date),'adi-day'));}
    const bubble=el('p',undefined,'adi-message '+item.author),who=item.author==='client'?'':item.author==='operator'?'Asesor':'ADI';if(who)bubble.append(el('span',who,'adi-author'));const body=el('span',undefined,'adi-text');rich(body,item.content);bubble.append(body);if(valid){const stamp=el('time',clock(date));stamp.dateTime=date.toISOString();stamp.title=new Intl.DateTimeFormat('es-EC',{...zone,dateStyle:'long',timeStyle:'short'}).format(date);bubble.append(stamp);}
    if(item.author!=='client'){const copy=el('button',undefined,'adi-copy');copy.type='button';copy.title='Copiar respuesta';copy.setAttribute('aria-label','Copiar respuesta');copy.append(svg(['M9 9h10a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2z','M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1']));const text=item.content;copy.addEventListener('click',async()=>{try{await navigator.clipboard.writeText(text);copy.dataset.done='true';copy.title='Copiado';setTimeout(()=>{delete copy.dataset.done;copy.title='Copiar respuesta';},1600);}catch{note('No se pudo copiar. Selecciona el texto y cópialo manualmente.','error');}});bubble.append(copy);}

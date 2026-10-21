@@ -409,6 +409,35 @@ Prueba: `test_remote_external_calls.py`, que falla con el código anterior y pas
 - Ante «¿Cuánto cuesta Microsoft 365?» mencionó una sola versión. Ahora debe enumerar todas con precio y disponibilidad. La búsqueda incluye también los artículos del catálogo general con ese nombre, como «Microsoft 365 Education (PC, Mac)», registrado en «Otro», marcados como «catálogo general» y sin inventario.
 - La prueba quedó como una conversación en el centro de atención.
 
+## ADI Smart Presence Indicator Pro (21/10/2026)
+
+El punto de la esfera indica el estado real de ADI. La esfera no cambia.
+
+| Estado | Color | Comportamiento |
+|---|---|---|
+| Disponible | Esmeralda | Respiración muy suave |
+| Escuchando | Turquesa | Crece con el volumen real del micrófono (`--adi-level`, ya suavizado) |
+| Preparando respuesta | Ámbar | Pulso discreto |
+| Hablando | Rosado | Crece con la amplitud real de la voz natural (`--adi-voice`, de la envolvente del audio) |
+| Esperando asesor | Ámbar fijo | — |
+| Asesor conectado | Azul fijo | — |
+| Sin conexión | Rojo tenue | Sin animación |
+
+- **Origen del estado:** `data-presence`, calculado con eventos reales:
+  - fallos reales de consulta al servidor o navegador sin red;
+  - `data-voice`;
+  - la petición en curso (`adi-busy`);
+  - el estado del asesor.
+  - Lo mantiene un observador de atributos más los eventos `online`/`offline`; no hay temporizadores. Sin conexión nunca muestra «Disponible»; antes, el punto se ocultaba.
+- **Tamaño y colores:** 10 px, con borde del color del fondo y transición de color de 200 ms. La escala sigue al audio sin retraso porque el nivel ya llega suavizado.
+- **Etiquetas:**
+  - El nombre accesible del botón incluye el estado.
+  - Al pasar el cursor, en equipos con ratón, aparece una etiqueta discreta («ADI · Disponible para ayudarte», «Escuchando…», «Preparando respuesta…», «ADI está hablando»).
+  - El encabezado del chat muestra los mismos textos, también en pantallas táctiles.
+- **Comportamiento conocido:** en la pantalla de acceso de escritorio, con el chat acoplado, el botón flotante se oculta por diseño; el estado se ve en el encabezado.
+- **Movimiento reducido:** sin animación ni escala.
+- **Pruebas en navegador:** 12 comprobaciones de los estados (con micrófono y voz reales simulados, desconexión y reconexión de red, petición lenta), la secuencia de estados, la etiqueta, el móvil y el movimiento reducido.
+
 ## Tareas programadas: corrección de «no se ejecutan»
 
 **Causa:** la tarea solo verificaba si no había habido *ninguna* verificación en los 10 minutos anteriores, y las automáticas por visitas la tapaban sin dejar constancia. Además, el aviso alarmaba a las 12 h.
