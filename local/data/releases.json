@@ -8,6 +8,25 @@
   },
   "releases": [
     {
+      "version": "1.5.187",
+      "date": "2026-10-20T21:10:48-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Configuración de la agenda con pestañas y Centro de Configuración Enterprise Pro",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Configuración de la agenda: ventana compacta con pestañas (Horarios, Servicios, Reglas y márgenes, Confirmación), pie fijo, copia del horario del lunes con confirmación, servicios con nombre completo y eliminación segura, y margen con ejemplo de duración + margen",
+          "Centro de Configuración: menú lateral amplio con el apartado activo resaltado (plegable en tableta y desplegable en celular), Mi perfil con tarjeta, estado real y botón Restablecer, y ADI como barra compacta integrada en Correo y servicios"
+        ],
+        "fixes": [
+          "Configuración de la agenda: el guardado ya es todo o nada (un dato inválido no deja la configuración a medias) y los errores indican el día y el técnico"
+        ],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.186",
       "date": "2026-10-20T20:27:36-05:00",
       "type": "patch",

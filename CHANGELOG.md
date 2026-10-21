@@ -4,6 +4,19 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.187 — 2026-10-20 21:10 (UTC-05:00)
+
+Configuración de la agenda con pestañas y Centro de Configuración Enterprise Pro
+
+### Mejoras realizadas
+
+- Configuración de la agenda: ventana compacta con pestañas (Horarios, Servicios, Reglas y márgenes, Confirmación), pie fijo, copia del horario del lunes con confirmación, servicios con nombre completo y eliminación segura, y margen con ejemplo de duración + margen
+- Centro de Configuración: menú lateral amplio con el apartado activo resaltado (plegable en tableta y desplegable en celular), Mi perfil con tarjeta, estado real y botón Restablecer, y ADI como barra compacta integrada en Correo y servicios
+
+### Errores corregidos
+
+- Configuración de la agenda: el guardado ya es todo o nada (un dato inválido no deja la configuración a medias) y los errores indican el día y el técnico
+
 ## v1.5.186 — 2026-10-20 20:27 (UTC-05:00)
 
 Identificación de equipos por número de serie con botón y estado real por fabricante
