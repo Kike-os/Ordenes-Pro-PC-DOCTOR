@@ -47,3 +47,28 @@ Para regenerar el paquete: `npm install echarts@5.6.0 esbuild`, importar `PieCha
 - Las animaciones duran entre 150 y 220 ms, sin efectos permanentes, y se desactivan con movimiento reducido.
 
 No cambian los endpoints, usuarios, contraseñas, verificación en dos pasos, permisos, correo, horarios, catálogo, condiciones ni la integración de ADI.
+
+## Estado del sistema y corrección del icono gigante (rama `estado-sistema-pro`)
+
+**Causa del icono gigante:**
+- `systemIcon()` crea SVG con `viewBox` pero sin ancho ni alto, y la clase `system-icon` solo tenía tamaño en contextos concretos.
+- En la 1.5.187 el panel pasó a ser una rejilla: el botón «Abrir el Centro de Actualizaciones» ocupó toda la fila y su icono creció con él (732 × 732 px).
+
+**Corrección de raíz:** tamaño por defecto `:where(svg.system-icon){width:18px;height:18px}`. Al tener especificidad cero, cualquier regla de contexto lo sigue mandando.
+
+**Verificación:**
+- Se midieron los 759 iconos de todos los módulos antes y después del cambio. Solo cambió el gigante, más un icono de inicio que medía 28 px frente a los 16 de sus hermanos y ahora mide 16.
+- Tras el cambio no queda ningún icono mayor de 40 px, ni en 1366 ni en 390 px (salvo el fondo tecnológico, que es intencionado).
+
+**Nuevo panel:** cinco tarjetas con datos reales.
+- **Acceso:** dirección oficial y enlace externo.
+- **Seguridad:**
+  - autenticación según el último diagnóstico de ADI AutoCare;
+  - roles con el número real de cuentas;
+  - políticas de sesión configuradas;
+  - registro de auditoría con su último evento.
+- **Usuarios:** cuentas activas, habilitadas y con verificación en dos pasos.
+- **Solicitudes:** pendientes y rechazadas.
+- **Centro de Actualizaciones:** versión, fecha y estado según `/api/public/version`. El icono solo gira mientras se consulta.
+
+Las clases llevan el prefijo `sysst-` porque `.status-label` ya existía para los estados de las órdenes. Las tarjetas se reparten en 4 columnas en 1920, 3 en 1366, 2 en tableta y 1 en celular.
