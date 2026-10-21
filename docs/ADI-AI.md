@@ -304,6 +304,33 @@ Prueba: `test_remote_external_calls.py`, que falla con el código anterior y pas
 
 **Pruebas:** `test_adi_voice_remote.py`. Usa el servidor libSQL de pruebas (`hrana_fake.py`) con caducidad de flujos inactivos y OpenAI simulado y lento. Las pruebas fallan con el código anterior y pasan con la corrección.
 
+## ADI Living Intelligence Pro (21/10/2026)
+
+**Lo que ya existía y se conserva:**
+- La esfera 3D en WebGL (`adi-orb.js`), con un sombreador propio y sin bibliotecas: cristal líquido, núcleo luminoso, filamentos de energía, halo volumétrico y ondas de superficie.
+- Estados ligados a eventos reales: reposo con respiración asimétrica, escucha según el volumen real del micrófono, pensamiento con un anillo de energía y partículas, voz, error y desconexión.
+- Rendimiento: unos 30 fps en reposo, pausa con la pestaña oculta, calidad adaptable, movimiento reducido, liberación del contexto gráfico y una esfera CSS de respaldo sin WebGL.
+- Ventana premium con la esfera en el encabezado, voz natural de OpenAI, conversación continua con interrupción, botón para detener la voz y barra de estado de voz.
+
+**Mejoras de esta versión:**
+- **Voz sincronizada con el audio real:** al recibir el audio de OpenAI, el navegador lo decodifica aparte (sin tocar la reproducción) y calcula 60 niveles de amplitud por segundo. La esfera pulsa con la amplitud de cada instante. Antes solo recibía un pulso al empezar y luego quedaba fija. Con la voz del navegador, que no da acceso al audio, sigue latiendo con cada palabra.
+- **Partículas de profundidad en reposo:** son tenues y giran despacio; al pensar se reúnen alrededor del núcleo y brillan algo más al hablar. No añaden coste: el cálculo ya existía y solo se mostraba al pensar.
+- **Atención al escribir:** mientras el cliente escribe, la esfera aumenta su brillo de cercanía.
+- **Encabezado con estado de voz:** «ADI te está escuchando…» (turquesa), «ADI está procesando tu voz…» (ámbar) y «ADI está hablando…» (rosa), con un punto que pulsa. Sin pulso con movimiento reducido.
+- **Reintentar sin perder la conversación:** si un mensaje no se envía, el aviso de error incluye «Reintentar». El texto se conserva y no se duplica.
+- **Sin coste fuera de pantalla:** la esfera deja de dibujar cuando no se ve, salvo que la necesite la copia del encabezado.
+- **Horarios ofrecidos por ADI:** los botones «Reservar» quedan seguidos, sin huecos entre ellos.
+- **Voz:** pausa ligera después del saludo y entonación ascendente en las preguntas.
+
+**Sin cambios:**
+- tamaño y posición de la esfera (62 px en escritorio y 48 px en móvil);
+- la integración con OpenAI, la corrección ortográfica, el chat, la agenda y los permisos.
+
+**Pruebas en navegador** (OpenAI simulado, micrófono falso y audio de amplitud variable):
+- 13 comprobaciones nuevas: esfera, estados del encabezado, amplitud real, reposo, atención, reintento, pausa fuera de pantalla, movimiento reducido, 320, 390 y 768 px, Escape y ausencia de errores de JavaScript;
+- las 12 comprobaciones anteriores de la conversación por voz;
+- la prueba de los botones de horario.
+
 ## Tareas programadas: corrección de «no se ejecutan»
 
 **Causa:** la tarea solo verificaba si no había habido *ninguna* verificación en los 10 minutos anteriores, y las automáticas por visitas la tapaban sin dejar constancia. Además, el aviso alarmaba a las 12 h.

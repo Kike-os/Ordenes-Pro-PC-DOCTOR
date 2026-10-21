@@ -8144,3 +8144,9 @@ body[data-page=dashboard] dialog.lcard-dialog .lcard-tools :is(input,select){hei
 #module-content .adiv-switch{font-size:12.5px;color:#d9e6fb}
 #module-content .adiv-play{display:inline-flex;align-items:center;gap:6px}#module-content .adiv-play svg{width:16px;height:16px}
 #module-content .adiv-audio:empty{display:none}
+/* ADI Living Intelligence Pro: el punto de estado del encabezado indica si ADI escucha, procesa la voz o habla (mismos colores que la barra de voz). */
+#adi-widget.adi-v2:is([data-state=adi],[data-state=consulting])[data-voice=listening] #adi-status::before{background:#5fd4c8;color:#5fd4c866;animation:adi-talk-pulse 1.4s ease-out infinite}
+#adi-widget.adi-v2:is([data-state=adi],[data-state=consulting])[data-voice=processing] #adi-status::before{background:#fcd34d;color:#fcd34d66;animation:adi-talk-pulse 1.4s ease-out infinite}
+#adi-widget.adi-v2:is([data-state=adi],[data-state=consulting])[data-voice=speaking] #adi-status::before{background:#ff7fb6;color:#ff7fb666;animation:adi-talk-pulse 1.1s ease-out infinite}
+#adi-widget.adi-v2 .adi-note-error .adi-retry:focus-visible{outline:2px solid #8fd3ff;outline-offset:2px}
+@media(prefers-reduced-motion:reduce){#adi-widget.adi-v2 #adi-status::before{animation:none}}

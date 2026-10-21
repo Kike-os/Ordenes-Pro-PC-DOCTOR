@@ -52,7 +52,7 @@ void main(){
   float a1=1.1*sin(uTime*.13)+.6*sin(uTime*.071+1.),a2=.9*sin(uTime*.09+2.)+.4*sin(uTime*.053),a3=.8*sin(uTime*.061+.5)+uBusy*1.4*sin(uTime*1.7);
   vec3 centre=vec3(uPointer*.10,0.)+vec3(.03*sin(uTime*.37),.03*sin(uTime*.29+1.),.02*sin(uTime*.23));
   float core=.25+.04*breath+uLevel*.17*(.6+.4*sin(uTime*29.))+uSpeak*.10+uBusy*.05*sin(uTime*4.2);
-  float orbit=mix(.58,.16,uBusy),spin=uTime*(1.+uBusy*3.2);
+  float orbit=mix(.58,.16,uBusy),spin=uTime*(.45+uBusy*3.75);
   for(int i=0;i<10;i++){
    if(float(i)>=uSteps)break;
    float t=(float(i)+.5)/uSteps*tmax;vec3 q=ro+rd*t;
@@ -77,7 +77,8 @@ void main(){
    float sparks=0.;
    for(int k=0;k<5;k++){float fk=float(k);vec3 c=vec3(sin(spin*.31+fk*2.1)+.35*sin(spin*.17+fk),sin(spin*.23+fk*1.3)*.6,cos(spin*.27+fk*2.9)+.3*sin(spin*.13+fk*1.7))*orbit*(.6+.2*sin(fk*3.7));
     vec3 e=q-centre-c;sparks+=.0014/(dot(e,e)+.0014);}
-   sparks*=uBusy;
+   // Partículas de profundidad: tenues en reposo, se reúnen alrededor del núcleo al pensar y brillan algo más al hablar.
+   sparks*=.16+uBusy*.84+uSpeak*.22;
    vec3 tint=mix(mix(magenta,lilac,smoothstep(-.5,.5,w.x)),pearl,clamp(nucleus*.8+cloud*.55+fil*.6,0.,1.));
    vec3 tide=mix(pink,lilac,.5+.5*sin(w.x*3.1+f1*4.+uTime*.21));
    acc+=(tint*(cloud*.42+wave)+tide*flow*.20+lilac*ear*.30+mix(pearl,lilac,.5)*swirl*.42+mix(pink,vec3(1.),.55)*fil*1.25+pearl*nucleus*.78+vec3(1.,.95,.98)*sparks*.85)*(1.-dens);
@@ -155,9 +156,9 @@ void main(){
   function draw(now){
    const state=read(),step=Math.min(.1,(now-last)/1000);last=now;
    const ease=(key,target,speed)=>{smooth[key]+=(target-smooth[key])*Math.min(1,step*speed);};
-   ease('level',state.level||0,14);ease('px',state.px||0,3);ease('py',state.py||0,3);ease('hover',state.hover?1:0,4);ease('busy',state.busy?1:0,3.5);ease('dim',state.dim?1:0,3);ease('listen',state.listening?1:0,5);ease('error',state.error?1:0,6);
+   ease('level',state.level||0,14);ease('px',state.px||0,3);ease('py',state.py||0,3);ease('hover',state.hover||state.attend?1:0,4);ease('busy',state.busy?1:0,3.5);ease('dim',state.dim?1:0,3);ease('listen',state.listening?1:0,5);ease('error',state.error?1:0,6);
    // Hablando: envolvente que sube con cada palabra que informa el motor de voz y decae entre ellas.
-   const sinceBeat=(now-(state.beatAt||0))/1000,envelope=state.speaking?Math.max(.35,Math.exp(-sinceBeat*5.5)):0;ease('speak',envelope,16);
+   const sinceBeat=(now-(state.beatAt||0))/1000,envelope=!state.speaking?0:state.voice!=null?.14+state.voice*.9:Math.max(.35,Math.exp(-sinceBeat*5.5));ease('speak',envelope,state.voice!=null?20:16);
    const sincePress=(now-(state.pressAt||-1e9))/1000,press=sincePress<1.2?Math.exp(-sincePress*5.2)*Math.cos(sincePress*17):0;
    resize();gl.clear(gl.COLOR_BUFFER_BIT);gl.useProgram(program);
    gl.uniform2f(uniforms.uRes,canvas.width,canvas.height);gl.uniform1f(uniforms.uTime,(still.matches||state.still)?12:(now-started)/1000);
@@ -172,17 +173,18 @@ void main(){
    if(now-lastDraw>=gap){const before=performance.now();draw(now);lastDraw=now;
     const cost=performance.now()-before;slow=cost>9?slow+1:Math.max(0,slow-1);if(slow>40&&(steps>5||quality>.6)){steps=Math.max(5,steps-2);quality=Math.max(.6,quality-.15);slow=0;}}
    schedule();}
-  const schedule=()=>{if(alive&&!frame&&!document.hidden)frame=requestAnimationFrame(loop);};
+  let shown=true;const schedule=()=>{if(alive&&!frame&&!document.hidden&&(shown||mirrors.size))frame=requestAnimationFrame(loop);};
+  const watch='IntersectionObserver' in window?new IntersectionObserver(entries=>{shown=entries[entries.length-1].isIntersecting;if(shown){last=performance.now();schedule();}}):null;watch?.observe(canvas);
   const onVisible=()=>{if(document.hidden){if(frame){cancelAnimationFrame(frame);frame=0;}}else{last=performance.now();schedule();}};
   const onLost=event=>{event.preventDefault();if(frame){cancelAnimationFrame(frame);frame=0;}};
   const onRestored=()=>{uniforms={};if(build())schedule();};
   document.addEventListener('visibilitychange',onVisible);canvas.addEventListener('webglcontextlost',onLost);canvas.addEventListener('webglcontextrestored',onRestored);
   // Al salir de la página se detiene el dibujo y se liberan el programa, el búfer y el contexto gráfico.
-  function destroy(){if(!alive)return;alive=false;if(frame)cancelAnimationFrame(frame);frame=0;document.removeEventListener('visibilitychange',onVisible);canvas.removeEventListener('webglcontextlost',onLost);canvas.removeEventListener('webglcontextrestored',onRestored);removeEventListener('pagehide',destroy);
+  function destroy(){if(!alive)return;alive=false;if(frame)cancelAnimationFrame(frame);frame=0;document.removeEventListener('visibilitychange',onVisible);watch?.disconnect();canvas.removeEventListener('webglcontextlost',onLost);canvas.removeEventListener('webglcontextrestored',onRestored);removeEventListener('pagehide',destroy);
    for(const copy of mirrors)copy.canvas.remove();mirrors.clear();try{gl.deleteBuffer(buffer);gl.deleteProgram(program);gl.getExtension('WEBGL_lose_context')?.loseContext();}catch{}canvas.remove();}
   addEventListener('pagehide',destroy);
   schedule();
-  return {destroy,canvas,mirror,info:()=>({steps,quality,width:canvas.width,height:canvas.height,running:!!frame,mirrors:mirrors.size})};
+  return {destroy,canvas,mirror,info:()=>({steps,quality,width:canvas.width,height:canvas.height,running:!!frame,mirrors:mirrors.size,shown,speak:smooth.speak,hover:smooth.hover})};
  }
  window.AdiOrb={mount};
 })();
