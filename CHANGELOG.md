@@ -4,6 +4,18 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.193 — 2026-10-21 02:24 (UTC-05:00)
+
+Horarios y Disponibilidad renovado: estado en vivo, tabla compacta de 24 h, validación y cambios pendientes
+
+### Mejoras realizadas
+
+- Horarios y Disponibilidad: indicador en vivo Abierto/Cerrado con la próxima apertura, la hora de Ecuador y los cierres; tabla compacta Día | Estado | Apertura | Cierre con interruptores y horas de 24 h; tarjetas para agenda, atención virtual ADI 24 h y cierres; cambios pendientes con Descartar y Guardar.
+
+### Errores corregidos
+
+- Horarios: la apertura posterior al cierre se marca en la fila y no deja guardar, y un cambio sin guardar ya no se pierde por una recarga automática de versión.
+
 ## v1.5.192 — 2026-10-21 01:59 (UTC-05:00)
 
 ADI Living Intelligence Pro: esfera que pulsa con la voz real, estados de voz visibles y reintento sin perder la conversación

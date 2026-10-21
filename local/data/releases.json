@@ -8,6 +8,24 @@
   },
   "releases": [
     {
+      "version": "1.5.193",
+      "date": "2026-10-21T02:24:52-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Horarios y Disponibilidad renovado: estado en vivo, tabla compacta de 24 h, validación y cambios pendientes",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Horarios y Disponibilidad: indicador en vivo Abierto/Cerrado con la próxima apertura, la hora de Ecuador y los cierres; tabla compacta Día | Estado | Apertura | Cierre con interruptores y horas de 24 h; tarjetas para agenda, atención virtual ADI 24 h y cierres; cambios pendientes con Descartar y Guardar."
+        ],
+        "fixes": [
+          "Horarios: la apertura posterior al cierre se marca en la fila y no deja guardar, y un cambio sin guardar ya no se pierde por una recarga automática de versión."
+        ],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.192",
       "date": "2026-10-21T01:59:09-05:00",
       "type": "patch",
