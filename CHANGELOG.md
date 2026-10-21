@@ -4,6 +4,19 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.196 — 2026-10-21 09:03 (UTC-05:00)
+
+Enterprise License Catalog Pro: catálogo de licencias empresarial con tarjetas, tabla, filtros e indicadores
+
+### Mejoras realizadas
+
+- Enterprise License Catalog Pro: cabecera compacta con buscador y filtros por fabricante, categoría y disponibilidad; orden por nombre, precio o stock; tarjetas horizontales con logotipo, precio, duración, dispositivos, activación, inventario y estado (disponible, stock bajo, agotado, desactivado).
+- Catálogo de licencias: nueva vista administrativa de tabla con columnas ordenables, que conserva búsqueda y filtros y recuerda la vista elegida; acciones reunidas en «Editar» y un menú con iconos (consultar, agregar y ajustar stock, historial, duplicar, desactivar).
+
+### Errores corregidos
+
+- Catálogo de licencias: las imágenes de los productos ya no se descargan de nuevo en cada visita, el inventario se actualiza sin parpadeos y los productos sin método de activación lo indican claramente.
+
 ## v1.5.195 — 2026-10-21 08:36 (UTC-05:00)
 
 ADI con su diseño definitivo: esfera de filamentos de energía viva y reactiva

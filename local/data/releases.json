@@ -8,6 +8,25 @@
   },
   "releases": [
     {
+      "version": "1.5.196",
+      "date": "2026-10-21T09:03:35-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Enterprise License Catalog Pro: catálogo de licencias empresarial con tarjetas, tabla, filtros e indicadores",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Enterprise License Catalog Pro: cabecera compacta con buscador y filtros por fabricante, categoría y disponibilidad; orden por nombre, precio o stock; tarjetas horizontales con logotipo, precio, duración, dispositivos, activación, inventario y estado (disponible, stock bajo, agotado, desactivado).",
+          "Catálogo de licencias: nueva vista administrativa de tabla con columnas ordenables, que conserva búsqueda y filtros y recuerda la vista elegida; acciones reunidas en «Editar» y un menú con iconos (consultar, agregar y ajustar stock, historial, duplicar, desactivar)."
+        ],
+        "fixes": [
+          "Catálogo de licencias: las imágenes de los productos ya no se descargan de nuevo en cada visita, el inventario se actualiza sin parpadeos y los productos sin método de activación lo indican claramente."
+        ],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.195",
       "date": "2026-10-21T08:36:27-05:00",
       "type": "patch",
