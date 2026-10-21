@@ -4,6 +4,19 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.188 — 2026-10-20 22:00 (UTC-05:00)
+
+Estado del sistema corregido y Tarjeta de Licencias Digitales Enterprise Pro
+
+### Mejoras realizadas
+
+- Estado del sistema: tarjetas con datos reales (acceso, seguridad según el último diagnóstico, usuarios, solicitudes) y Centro de Actualizaciones compacto con la versión y su estado
+- Tarjeta de Licencias Digitales: una tarjeta por licencia con su identificador, método de activación y credenciales ocultas, barra de vigencia según las fechas reales, búsqueda y filtro, PDF público sin credenciales y documento privado solo con autorización registrada
+
+### Errores corregidos
+
+- Estado del sistema: corregido el icono gigante del Centro de Actualizaciones. Los iconos sin tamaño propio tienen ahora un tamaño por defecto (verificado en todos los módulos)
+
 ## v1.5.187 — 2026-10-20 21:10 (UTC-05:00)
 
 Configuración de la agenda con pestañas y Centro de Configuración Enterprise Pro

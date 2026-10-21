@@ -8,6 +8,25 @@
   },
   "releases": [
     {
+      "version": "1.5.188",
+      "date": "2026-10-20T22:00:16-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Estado del sistema corregido y Tarjeta de Licencias Digitales Enterprise Pro",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Estado del sistema: tarjetas con datos reales (acceso, seguridad según el último diagnóstico, usuarios, solicitudes) y Centro de Actualizaciones compacto con la versión y su estado",
+          "Tarjeta de Licencias Digitales: una tarjeta por licencia con su identificador, método de activación y credenciales ocultas, barra de vigencia según las fechas reales, búsqueda y filtro, PDF público sin credenciales y documento privado solo con autorización registrada"
+        ],
+        "fixes": [
+          "Estado del sistema: corregido el icono gigante del Centro de Actualizaciones. Los iconos sin tamaño propio tienen ahora un tamaño por defecto (verificado en todos los módulos)"
+        ],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.187",
       "date": "2026-10-20T21:10:48-05:00",
       "type": "patch",
