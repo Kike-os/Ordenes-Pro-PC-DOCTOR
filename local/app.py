@@ -731,7 +731,7 @@ def resend_delivery(c,row,address,user):
     return 200,{'ok':True,'id':next(iter(tracked.values())),'status':c.execute('SELECT status FROM mail_deliveries WHERE id=?',(next(iter(tracked.values())),)).fetchone()['status']}
 
 
-DEFAULT_CSP="default-src 'self'; frame-src 'self' blob: https://challenges.cloudflare.com; script-src 'self' https://challenges.cloudflare.com; style-src 'self'; img-src 'self'; connect-src 'self' https://challenges.cloudflare.com; frame-ancestors 'none'; form-action 'self'; base-uri 'none'"
+DEFAULT_CSP="default-src 'self'; media-src 'self' blob:; frame-src 'self' blob: https://challenges.cloudflare.com; script-src 'self' https://challenges.cloudflare.com; style-src 'self'; img-src 'self'; connect-src 'self' https://challenges.cloudflare.com; frame-ancestors 'none'; form-action 'self'; base-uri 'none'"
 
 
 def note_runtime_error(method,path,error,user=None,status=500):
@@ -1118,7 +1118,7 @@ class Handler(BaseHTTPRequestHandler):
                 if not expected or not hmac.compare_digest(self.headers.get('Authorization',''),'Bearer '+expected):return self.reply(404,{'error':'No encontrado.'})
                 import stability
                 now=reception_now()
-                if stability.due(c,now,10):stability.run(c,now,'programada')
+                stability.scheduled_run(c,now,path.rsplit('/',1)[-1])
                 try:
                     import campaigns
                     for campaign in campaigns.queued(c)[:2]:
@@ -1152,7 +1152,7 @@ class Handler(BaseHTTPRequestHandler):
                 # Verificación de estabilidad, independiente del correo: un fallo de un servicio no impide la otra tarea.
                 try:
                     import stability
-                    if stability.due(c,now,10):stability.run(c,now,'programada')
+                    stability.scheduled_run(c,now,'reminders')
                 except Exception as error:print('stability cron',type(error).__name__,flush=True)
                 return self.reply(200,{'ok':True})
             if path == '/api/public/appointments/services':
@@ -1198,6 +1198,9 @@ class Handler(BaseHTTPRequestHandler):
                 if not row or not secrets.compare_digest(row['manage_token_hash'],appointments.token_hash(token)):
                     return self.reply(404,{'error':'No encontramos una cita válida con ese enlace.'})
                 result=dict(row);result.pop('manage_token_hash');return self.reply(200,{'appointment':result})
+            if path == '/api/public/adi/voice':
+                import adi_voice
+                return self.reply(200,adi_voice.public_config(c,reception_now()))
             if path == '/api/public/adi/messages':
                 cookies=SimpleCookie()
                 try:cookies.load(self.headers.get('Cookie',''))
@@ -1379,6 +1382,10 @@ class Handler(BaseHTTPRequestHandler):
                 usage=c.execute("SELECT COUNT(*) n FROM adi_actions WHERE action='writing_improve' AND created_at>=?",(reception_now().date().isoformat(),)).fetchone()['n']
                 auto_receipt=c.execute("SELECT value FROM system_state WHERE key='receipt_mail_auto'").fetchone()
                 return self.reply(200,{'writing':adi_ai.status(c),'today':usage,'channels':{'mail':mail_allowed(user),'web_chat':True,'whatsapp':False},'receipt_mail_auto':not (auto_receipt and auto_receipt['value']=='off')})
+            if path == '/api/adi/voice':
+                if user['role']!='administrador':return self.reply(403,{'error':'Solo administración configura la voz de ADI.'})
+                import adi_voice
+                return self.reply(200,adi_voice.admin_status(c,reception_now()))
             if path == '/api/adi/admin':
                 if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede usar la asistente administrativa.'})
                 import adi_ai
@@ -2280,7 +2287,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(403, {'error':'Solicitud no autorizada.'})
             path = urlsplit(self.path).path
             workspace_post=bool(re.fullmatch(r'/api/orders/[0-9]+/workspace',path));quote_json=bool(re.fullmatch(r'/api/quotes/[0-9]+',path))
-            max_body=9000000 if path in ('/api/clients/import/preview','/api/clients/import/commit') else 6000000 if path in ('/api/mail/send','/api/mail/draft') else 100000 if path in ('/api/conditions','/api/order-draft','/api/conditions/draft','/api/conditions/compare') else 3200000 if path in ('/api/licenses/new','/api/licenses/units','/api/licenses/units/bulk','/api/licenses/products','/api/licenses/products/duplicate','/api/licenses/sales') or re.fullmatch(r'/api/licenses/sales/[0-9]+',path) else 900000 if re.fullmatch(r'/api/orders/[0-9]+/photos',path) or path in ('/api/profile/photo','/api/mail/signature') or re.fullmatch(r'/api/catalog/[0-9]+/image',path) else (65536 if workspace_post or quote_json else 16384)
+            max_body=9000000 if path in ('/api/clients/import/preview','/api/clients/import/commit') else 1700000 if path=='/api/public/adi/listen' else 6000000 if path in ('/api/mail/send','/api/mail/draft') else 100000 if path in ('/api/conditions','/api/order-draft','/api/conditions/draft','/api/conditions/compare') else 3200000 if path in ('/api/licenses/new','/api/licenses/units','/api/licenses/units/bulk','/api/licenses/products','/api/licenses/products/duplicate','/api/licenses/sales') or re.fullmatch(r'/api/licenses/sales/[0-9]+',path) else 900000 if re.fullmatch(r'/api/orders/[0-9]+/photos',path) or path in ('/api/profile/photo','/api/mail/signature') or re.fullmatch(r'/api/catalog/[0-9]+/image',path) else (65536 if workspace_post or quote_json else 16384)
             length = int(self.headers.get('Content-Length', '0'))
             if length <= 0 or length > max_body:
                 return self.reply(400, {'error':'Solicitud inválida.'})
@@ -2345,6 +2352,33 @@ class Handler(BaseHTTPRequestHandler):
                         if result.get('ok'):appointment_mail.send(c,row['id'],'rescheduled')
                         return self.reply(200 if result.get('ok') else 409,result)
                     return self.reply(400,{'error':'Acción de cita inválida.'})
+                if path in ('/api/public/adi/speech','/api/public/adi/listen'):
+                    import adi_voice
+                    ip=digest(self.client_address[0]);now=reception_now()
+                    if limited(c,'adi-voice:'+ip,60,600):return self.reply(429,{'error':'Demasiadas solicitudes de voz. Espera unos minutos.','fallback':True})
+                    if not adi_voice.available(c,now):return self.reply(503,{'error':'La voz natural no está disponible ahora. ADI usa la voz del navegador.','fallback':True})
+                    cookies=SimpleCookie()
+                    try:cookies.load(self.headers.get('Cookie',''))
+                    except Exception:pass
+                    token=cookies['pcdoctor_adi'].value if 'pcdoctor_adi' in cookies else ''
+                    conv=c.execute('SELECT id FROM adi_conversations WHERE token_hash=?',(digest(token),)).fetchone() if token else None
+                    try:
+                        if path=='/api/public/adi/speech':
+                            if data.get('kind')=='greeting':text=adi_voice.settings(c)['greeting']
+                            else:
+                                # Solo se pronuncian respuestas de ADI o del asesor guardadas en la conversación de este navegador.
+                                mid=str(data.get('message_id',''))
+                                row=c.execute("SELECT content FROM adi_messages WHERE id=? AND conversation_id=? AND author IN ('adi','operator')",(int(mid),conv['id'])).fetchone() if mid.isdigit() and conv else None
+                                if not row:return self.reply(404,{'error':'Mensaje no disponible.'})
+                                text=row['content']
+                            audio,seconds=adi_voice.synthesize(c,now,text);return self.reply(200,{'ok':True,'mime':'audio/mpeg','audio':adi_voice.encode(audio),'seconds':round(seconds,1)})
+                        try:audio=base64.b64decode(str(data.get('audio','')),validate=True)
+                        except ValueError:return self.reply(400,{'error':'Grabación no válida.'})
+                        mime=str(data.get('mime','audio/webm'))[:60];duration=int(str(data.get('duration_ms','0')) or 0) if str(data.get('duration_ms','0')).isdigit() else 0
+                        if duration<300:return self.reply(200,{'ok':True,'text':''})
+                        return self.reply(200,{'ok':True,'text':adi_voice.transcribe(c,now,audio,mime,duration)})
+                    except adi_voice.VoiceError as error:
+                        print('adi-voice',error.kind,flush=True);return self.reply(error.status,{'error':str(error),'fallback':True})
                 if path == '/api/public/adi/order/request':
                     # Consulta de reparación: el código viaja solo al correo registrado. La respuesta no revela si la orden existe.
                     import order_check
@@ -3117,6 +3151,33 @@ class Handler(BaseHTTPRequestHandler):
                     if data.get('action')!='rename' or not title or len(title)>80:return self.reply(400,{'error':'Escribe un nombre de hasta 80 caracteres.'})
                     c.execute('UPDATE adi_admin_conversations SET title=? WHERE id=?',(title,row['id']))
                     return self.reply(200,{'ok':True,'title':title})
+                if path in ('/api/adi/voice','/api/adi/voice/sample','/api/adi/speech'):
+                    if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede usar la voz de ADI.'})
+                    import adi_voice
+                    now=reception_now()
+                    if path=='/api/adi/voice':
+                        errors,saved=adi_voice.save_settings(c,data)
+                        if errors:return self.reply(400,{'error':next(iter(errors.values())),'fields':errors})
+                        audit(c,user['id'],'adi_voice_settings');return self.reply(200,{'ok':True,**adi_voice.admin_status(c,now)})
+                    try:
+                        if path=='/api/adi/voice/sample':
+                            # Muestra de una voz con los ajustes elegidos (aunque aún no se hayan guardado); cuenta en el consumo del día.
+                            trial=dict(adi_voice.settings(c))
+                            for key in ('voice','style'):
+                                if data.get(key) in (adi_voice.VOICES if key=='voice' else adi_voice.STYLES):trial[key]=data[key]
+                            try:trial['speed']=min(1.25,max(0.8,float(str(data.get('speed',trial['speed'])).replace(',','.'))))
+                            except ValueError:pass
+                            text=re.sub(r'\s+',' ',str(data.get('greeting','')))[:300] if data.get('text')=='greeting' and len(str(data.get('greeting','')).strip())>=10 else adi_voice.SAMPLE
+                            if adi_voice.usage(c,now)>=adi_voice.settings(c)['daily_minutes']*60:return self.reply(429,{'error':'Se alcanzó el tope diario de voz. Súbelo o espera a mañana.'})
+                            audio,seconds=adi_voice.synthesize(c,now,text,trial)
+                        else:
+                            if not adi_voice.available(c,now):return self.reply(503,{'error':'La voz natural no está disponible ahora.','fallback':True})
+                            text=str(data.get('text','')).strip()
+                            if not text or len(text)>2500:return self.reply(400,{'error':'Texto no válido.'})
+                            audio,seconds=adi_voice.synthesize(c,now,text)
+                        return self.reply(200,{'ok':True,'mime':'audio/mpeg','audio':adi_voice.encode(audio),'seconds':round(seconds,1)})
+                    except adi_voice.VoiceError as error:
+                        print('adi-voice',error.kind,flush=True);return self.reply(error.status,{'error':str(error),'fallback':True})
                 if path == '/api/adi/admin':
                     if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede usar la asistente administrativa.'})
                     prompt=str(data.get('message','')).strip()

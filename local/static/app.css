@@ -8111,3 +8111,36 @@ body[data-page=dashboard] dialog.lcard-dialog .lcard-tools :is(input,select){hei
 .lcard-acts .license-icon-btn:last-child[data-tip]::after{left:auto;right:0;transform:translate(0,3px)}
 .lcard-acts .license-icon-btn:last-child:is(:hover,:focus-visible)::after{transform:translate(0,0)}
 .lcard-contact-line{display:flex;flex-wrap:wrap;gap:0 10px}.lcard-nowrap{white-space:nowrap}
+/* ADI · conversación por voz: barra compacta de estado (escuchando, procesando, hablando, en pausa) con silenciar y finalizar. */
+#adi-widget .adi-talk{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;align-items:center;gap:8px;margin:6px 10px 0;padding:6px 6px 6px 10px;border:1px solid #2a4266;border-radius:12px;background:linear-gradient(90deg,#5fd4c814,transparent 60%),#0d1a2e}
+#adi-widget .adi-talk[hidden]{display:none}
+#adi-widget .adi-talk-dot{width:10px;height:10px;border-radius:50%;background:#5fd4c8;box-shadow:0 0 0 0 #5fd4c866;animation:adi-talk-pulse 1.4s ease-out infinite}
+#adi-widget .adi-talk[data-state=processing] .adi-talk-dot{background:#fcd34d;box-shadow:0 0 0 0 #fcd34d66}
+#adi-widget .adi-talk[data-state=speaking] .adi-talk-dot{background:#ff7fb6;box-shadow:0 0 0 0 #ff7fb666}
+#adi-widget .adi-talk[data-state=muted] .adi-talk-dot{background:#64748b;animation:none}
+#adi-widget .adi-talk-text{min-width:0;font-size:12px;font-weight:600;color:#d9e6fb;overflow-wrap:anywhere}
+#adi-widget .adi-talk-mute,#adi-widget .adi-talk-end{display:inline-grid;place-items:center;min-height:30px;margin:0;padding:0 10px;border:1px solid #2a4266;border-radius:9px;background:#0b1626;color:#c5d5ee;font-size:12px;font-weight:600;cursor:pointer;transition:border-color .15s ease,background-color .15s ease}
+#adi-widget .adi-talk-mute{width:32px;padding:0}#adi-widget .adi-talk-mute svg{width:15px;height:15px}
+#adi-widget .adi-talk-mute[aria-pressed=true]{border-color:#f3c677;color:#f3c677}
+#adi-widget .adi-talk-end{border-color:#ff7fb666;color:#ffd1e5}#adi-widget .adi-talk-end:hover{border-color:#ff7fb6;background:#2a1020}
+#adi-widget .adi-talk-mute:focus-visible,#adi-widget .adi-talk-end:focus-visible{outline:2px solid #8fd3ff;outline-offset:2px}
+@keyframes adi-talk-pulse{0%{box-shadow:0 0 0 0 currentColor}70%{box-shadow:0 0 0 7px transparent}100%{box-shadow:0 0 0 0 transparent}}
+#adi-widget.adi-v2 .adi-start-voice{gap:6px;border-color:#5fd4c880;background:#0f2a33;color:#c7fbf3}
+#adi-widget.adi-v2 .adi-start-voice svg{width:14px;height:14px}
+#adi-widget.adi-v2 .adi-start-voice:hover,#adi-widget.adi-v2 .adi-start-voice:focus-visible{background:#123a44;border-color:#7ff0e4}
+#adi-widget.adi-v2 .adi-start[hidden]{display:none}
+#adi-widget.adi-talking .adi-mic{border-color:#5fd4c8;color:#7ff0e4}
+@media(prefers-reduced-motion:reduce){#adi-widget .adi-talk-dot{animation:none}}
+/* Centro de Configuración · Personalidad y Voz de ADI */
+#module-content .adiv{display:grid;gap:12px}
+#module-content .adiv-form{display:grid;gap:14px}
+#module-content .adiv-state{display:flex;flex-wrap:wrap;gap:6px}
+#module-content .adiv-chip{display:inline-flex;align-items:baseline;gap:6px;max-width:100%;padding:3px 10px;border:1px solid #2a4266;border-radius:999px;background:#0d1c32;font-size:11.5px;color:#c5d5ee;overflow-wrap:anywhere}
+#module-content .adiv-chip b{color:#8ea4c4;font-weight:700}
+#module-content .adiv-chip[data-on=true]{border-color:#1f7a5c}#module-content .adiv-chip[data-on=true] span{color:#7ee2b8}#module-content .adiv-chip[data-on=false]{border-color:#6b4e22}#module-content .adiv-chip[data-on=false] span{color:#f3c677}
+#module-content .adiv-speed-box{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:10px}
+#module-content .adiv-speed-box input{accent-color:#ff5fa2}#module-content .adiv-speed{min-width:52px;font-variant-numeric:tabular-nums;color:#ffd1e5}
+#module-content .adiv-toggles{display:grid;gap:8px}
+#module-content .adiv-switch{font-size:12.5px;color:#d9e6fb}
+#module-content .adiv-play{display:inline-flex;align-items:center;gap:6px}#module-content .adiv-play svg{width:16px;height:16px}
+#module-content .adiv-audio:empty{display:none}

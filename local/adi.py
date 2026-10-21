@@ -2,7 +2,11 @@
 import json,os,re,urllib.request,urllib.error
 import appointments,order_workspace,maintenance,reception
 
-SYSTEM_PUBLIC=("Eres ADI, asistente virtual de PC-DOCTOR S.A. Habla español con tono amable y profesional. "
+SYSTEM_PUBLIC=("Eres ADI, asistente virtual de PC-DOCTOR S.A. Habla español latinoamericano con tono cálido, amable y profesional, como una recepcionista atenta. "
+"Responde de forma breve y natural (normalmente de una a tres frases) y no repitas saludos ni la misma información; tus respuestas también se escuchan en voz alta. "
+"Explica los servicios técnicos de manera sencilla. Mantén el contexto de la conversación. "
+"Para precios usa ÚNICAMENTE los «precios_registrados_iva_incluido» del contexto validado; si el servicio no aparece, di que el taller lo confirmará con un presupuesto. "
+"Cuando el cliente lo pida o el caso lo requiera (reclamos, garantías, decisiones del taller), ofrece hablar con un asesor humano. "
 "Identifícate como asistente virtual cuando sea pertinente. No afirmes ser humana. "
 "No inventes diagnósticos, precios, garantías, fechas de entrega ni avances. Para esos asuntos solicita revisión del taller. "
 "No solicites contraseñas ni números completos de tarjetas. Reserva citas mediante el enlace del sistema. "
@@ -156,6 +160,15 @@ def ask(text,admin=False,context=None):
   return answer[:2500] or None
  except (OSError,ValueError,KeyError,urllib.error.URLError):return None
 
+def catalog_prices(c,text,limit=25):
+ """Servicios y productos disponibles del catálogo con su precio final (IVA incluido). Primero los que coinciden con la consulta."""
+ import quotes
+ words=[w for w in re.findall(r'[a-záéíóúñ0-9]{4,}',plain(text)) if w not in ('precio','cuanto','cuesta','costo','valor','tarifa','servicio','servicios','quiero','tienen','cobran')]
+ rows=[r for r in quotes.catalog(c,only_available=True) if not r['tax_pending']]
+ score=lambda r:sum(1 for w in words if w in plain(r['name']+' '+(r['description'] or '')))
+ rows.sort(key=lambda r:-score(r))
+ return [{'nombre':r['name'],'precio':quotes.usd(r['price_cents'])} for r in rows[:limit]] or 'sin precios registrados'
+
 def _dot(text):
  return text if text.endswith('.') else text+'.'
 
@@ -237,6 +250,8 @@ def reply(c,text,admin=False,context=None):
  if not admin:
   try:
    context=dict(context or {},horarios_vigentes=hours_facts(c))
+   # Precios: solo los registrados en el catálogo (con IVA incluido); ADI no calcula ni promete otros.
+   if re.search(r'precio|cu[aá]nto|cuesta|costo|valor|tarifa|cobr|servicio',plain(text)):context['precios_registrados_iva_incluido']=catalog_prices(c,text)
    if re.search(r'cita|agend|reserv|turno|disponib',plain(text)):context['proximos_espacios_libres_en_la_agenda']=next_slots(c) or 'sin espacios libres en los próximos días';context['como_reservar']='La reserva se hace y se confirma en /citas; ADI no confirma citas por sí misma.'
   except Exception:pass
  answer=ask(text,admin,context) or fallback(c,text)

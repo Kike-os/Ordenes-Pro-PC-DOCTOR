@@ -239,3 +239,52 @@ En «Agendamiento de Citas Técnicas», el campo «Nombre y apellidos» tiene un
 Solo diseño; no cambian funciones, enlaces, voz, esfera ni colores. Los cuatro accesos rápidos van en cuadrícula de 2×2 con botones iguales y 8 px de separación; el campo de mensaje, el micrófono y Enviar miden 44 px y se alinean por la base cuando el texto crece; «Contactar soporte técnico» y «Consultar reparación» ocupan dos columnas iguales; los controles del encabezado miden 32 px. Todos los bloques usan 14 px de margen interior. En pantallas pequeñas la ventana usa el ancho disponible y solo se desplaza el área de mensajes.
 
 Causa de los márgenes desiguales: la regla genérica `.adi-panel{padding:10px 12px}` del asistente de redacción también afectaba a esta ventana. Los componentes nuevos de ADI usan prefijos propios (`name-adi-…`) para no compartir clases; una prueba comprueba que cada página conserva `class="adi-panel" id="adi-panel"`.
+
+## Voz natural y conversación continua (rama `adi-voz`, 21/10/2026)
+
+**Diagnóstico previo:**
+- La voz era la del navegador (`speechSynthesis`): depende de las voces instaladas en cada equipo y en Android y Windows suena robótica.
+- El micrófono usaba el reconocimiento de voz del navegador por turnos (había que pulsar cada vez y no funcionaba en Firefox).
+- El chat usa OpenAI `gpt-4.1-mini` con la clave del servidor (`OPEN_API_KEY`).
+
+**Decisión del propietario:** voz por turnos con OpenAI y un tope diario inicial de **30 minutos**.
+
+**Cómo funciona:**
+- **Voz:** `gpt-4o-mini-tts`, con las voces femeninas coral (predeterminada), nova, shimmer y sage.
+  - Lleva indicaciones de tono cálido y español latinoamericano.
+  - Texto hablado propio: «Pe ce dóctor, ese a», importes en palabras, sin enlaces ni listas, y como máximo unos 600 caracteres (el texto completo queda en pantalla).
+  - El audio se reproduce como `blob:` (la CSP añade `media-src 'self' blob:`).
+- **Conversación continua:** se pulsa «Hablar con ADI» o el micrófono una sola vez.
+  - El navegador detecta el inicio y el final de cada intervención, con calibración del ruido, cancelación de eco y supresión de ruido.
+  - Envía solo esa grabación a `/api/public/adi/listen`, que transcribe con `gpt-4o-mini-transcribe`. El audio no se guarda.
+  - ADI responde y habla; si la persona habla encima, se interrumpe.
+  - Una barra compacta muestra el estado (escuchando, procesando, hablando o en pausa) con los botones Silenciar y Finalizar.
+  - Funciona también en Firefox y Safari porque la transcripción la hace el servidor.
+- **Seguridad:**
+  - `/api/public/adi/speech` solo pronuncia mensajes de ADI o del asesor de la conversación de ese navegador, o el saludo; no es un servicio de texto a voz abierto.
+  - Límite de 60 solicitudes de voz cada 10 minutos por conexión y tope diario de minutos.
+  - Al alcanzarlo, o si OpenAI falla, se usa la voz del navegador. Una interrupción no cuenta como fallo.
+  - La clave nunca llega al navegador.
+- **Saludo:** visual y automático en las páginas públicas (configurable). Solo se escucha al iniciar la primera conversación por voz; nunca se pide el micrófono sin una acción del cliente.
+- **Personalidad:**
+  - respuestas breves y naturales;
+  - precios solo de `precios_registrados_iva_incluido` (catálogo disponible y sin IVA pendiente);
+  - órdenes solo tras verificar con el código por correo, como antes;
+  - ofrece un asesor humano cuando hace falta.
+- **Modo administrador:** la ADI administrativa usa la voz natural (`/api/adi/speech`, solo administración) con la del navegador como respaldo.
+- **Configuración → Personalidad y Voz de ADI:**
+  - voz con muestra, estilo, velocidad, saludo (también se puede escuchar), conversación continua, sensibilidad y pausa;
+  - tope diario con el consumo de hoy;
+  - estado real de OpenAI y de los modelos.
+
+**Pruebas** (con OpenAI simulado y un micrófono falso de Chromium): la batería del servidor y 19 comprobaciones en el navegador.
+
+**Pendiente de verificar en producción** (requiere la clave real y consume crédito): la naturalidad de las voces, la latencia real y los dispositivos Android e iPhone.
+
+## Tareas programadas: corrección de «no se ejecutan»
+
+**Causa:** la tarea solo verificaba si no había habido *ninguna* verificación en los 10 minutos anteriores, y las automáticas por visitas la tapaban sin dejar constancia. Además, el aviso alarmaba a las 12 h.
+
+**Ahora:**
+- Cada llamada deja un latido (`cron_heartbeat`) y ejecuta su verificación completa, salvo que haya otra en curso.
+- El aviso «no se reciben» aparece tras 18 h sin llamadas. Hay tres tareas diarias separadas 8 h.

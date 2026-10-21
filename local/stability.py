@@ -260,9 +260,10 @@ def checks(c, deep=False, now=None):
                 raise RuntimeError('Plantilla ausente: ' + name)
         detail = 'Versión ' + installed['version'] + ' · compilación ' + (os.getenv('VERCEL_GIT_COMMIT_SHA', '') or 'local')[:7] + ' · interfaz y plantillas presentes'
         if os.getenv('VERCEL'):
-            last = next((run for run in reversed(_load(c, 'stability_runs', [])) if run.get('source') == 'programada'), None)
-            if not last or last['at'] < (now - timedelta(hours=12)).isoformat(timespec='seconds'):
-                return ('warning', 'Las tareas programadas no se ejecutan desde ' + (last['at'][:16].replace('T', ' ') if last else 'hace más de 12 h') + ' · ' + detail)
+            last = last_cron(c)
+            if not last or last < (now - timedelta(hours=CRON_GRACE_HOURS)).isoformat(timespec='seconds'):
+                return ('warning', 'Las tareas programadas no se reciben desde ' + (last[:16].replace('T', ' ') if last else 'hace más de %d h' % CRON_GRACE_HOURS) + ' · ' + detail)
+            detail += ' · última tarea programada ' + last[:16].replace('T', ' ')
         return detail
 
     def runtime_errors():
@@ -428,6 +429,33 @@ def _known(c, history):
 def _running(c, now):
     running = _load(c, 'stability_running', None)
     return running if running and running.get('since', '') > (now - timedelta(minutes=5)).isoformat(timespec='seconds') else None
+
+
+CRON_GRACE_HOURS = 18  # tres tareas diarias separadas 8 h: perder una no alarma; dejar de recibirlas se detecta en menos de un día
+
+
+def cron_heartbeat(c, now, name):
+    """Constancia de que la plataforma llamó a una tarea programada (aunque esa llamada no ejecute una verificación)."""
+    beats = _load(c, 'cron_heartbeat', {})
+    beats[name] = now.isoformat(timespec='seconds')
+    _save(c, 'cron_heartbeat', beats)
+
+
+def scheduled_run(c, now, name):
+    """Tarea programada: deja su latido y ejecuta la verificación completa, salvo que haya otra en curso en este momento.
+    (Antes se saltaba si había CUALQUIER verificación en los últimos 10 minutos, y las automáticas por visitas la tapaban.)"""
+    cron_heartbeat(c, now, name)
+    if _running(c, now):
+        return None
+    return run(c, now, 'programada')
+
+
+def last_cron(c):
+    """Última llamada recibida de una tarea programada: el latido o, en instalaciones anteriores, la última verificación programada."""
+    beats = list(_load(c, 'cron_heartbeat', {}).values())
+    runs = [run['at'] for run in _load(c, 'stability_runs', []) if run.get('source') == 'programada']
+    found = beats + runs[-1:]
+    return max(found) if found else ''
 
 
 def due(c, now, minutes=EVERY_MINUTES):
