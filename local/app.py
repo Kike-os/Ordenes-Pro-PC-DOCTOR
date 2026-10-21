@@ -2014,7 +2014,8 @@ class Handler(BaseHTTPRequestHandler):
                     if path=='/api/licenses':
                         return self.reply(200,{'products':licenses.products(c,now),'dashboard':licenses.dashboard(c,now),'expiring':licenses.expiring(c,now,30),'kinds':licenses.KINDS,'lines':licenses.LINES,'models':licenses.MODELS,
                                                'durations':licenses.DURATIONS,'validity':licenses.VALIDITY,'statuses':licenses.STATUSES,'states':licenses.STATES,'fields':licenses.FIELDS,'field_labels':licenses.FIELD_LABELS,
-                                               'secret_labels':licenses.SECRET_LABELS,'max_bulk':licenses.MAX_BULK,'contact':licenses.CONTACT,'link_hours':licenses.LINK_HOURS,'display':licenses.display_settings(c)})
+                                               'secret_labels':licenses.SECRET_LABELS,'max_bulk':licenses.MAX_BULK,'activation':licenses.ACTIVATION,'activation_fields':licenses.ACTIVATION_FIELDS,'activation_required':licenses.ACTIVATION_REQUIRED,
+                                               'file_types':sorted(licenses.FILE_TYPES),'file_limit':licenses.FILE_LIMIT,'duplicate_reason_min':licenses.DUPLICATE_REASON_MIN,'contact':licenses.CONTACT,'link_hours':licenses.LINK_HOURS,'display':licenses.display_settings(c)})
                     if path=='/api/licenses/units':
                         product=arg('product');client=arg('client')
                         return self.reply(200,{'rows':licenses.units(c,now,int(product) if product.isdigit() else None,arg('status'),arg('q')[:120],arg('state'),arg('from')[:10],arg('to')[:10],int(client) if client.isdigit() else None,arg('field'))})
@@ -2028,6 +2029,9 @@ class Handler(BaseHTTPRequestHandler):
                         audit(c,user['id'],'licenses_exported');c.commit()
                         return self.reply(200,licenses.export_csv(rows),'text/csv; charset=utf-8',filename='licencias-ordenes-pro.csv')
                     if path=='/api/licenses/deliveries':return self.reply(200,licenses.deliveries(c,now))
+                    if path=='/api/licenses/duplicates':
+                        # Informe de solo lectura: no modifica ningún registro ni incluye credenciales; la consulta queda en la auditoría.
+                        report=licenses.duplicate_review(c,now);audit(c,user['id'],'license_duplicate_review');c.commit();return self.reply(200,report)
                     if path=='/api/licenses/order-info':
                         info=licenses.order_info(c,arg('code')[:40]);return self.reply(200,info) if info else self.reply(404,{'error':'No existe una orden con ese número.'})
                     if path=='/api/licenses/history':
@@ -2062,7 +2066,7 @@ class Handler(BaseHTTPRequestHandler):
                         if not found:return self.reply(404,{'error':'Sin comprobante.'})
                         audit(c,user['id'],'license_payment_receipt_viewed',int(payment_receipt[1]))
                         return self.reply(200,bytes(found['data']),found['mime'],filename=found['name'])
-                except licenses.LicenseError as error:return self.reply(error.status,{'error':str(error),'fields':error.fields})
+                except licenses.LicenseError as error:return self.reply(error.status,dict(error.extra,error=str(error),fields=error.fields))
                 return self.reply(404,{'error':'No encontrado.'})
             if path == '/api/catalog':
                 if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
@@ -2291,13 +2295,13 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(403, {'error':'Solicitud no autorizada.'})
             path = urlsplit(self.path).path
             workspace_post=bool(re.fullmatch(r'/api/orders/[0-9]+/workspace',path));quote_json=bool(re.fullmatch(r'/api/quotes/[0-9]+',path))
-            max_body=9000000 if path in ('/api/clients/import/preview','/api/clients/import/commit') else 1700000 if path=='/api/public/adi/listen' else 6000000 if path in ('/api/mail/send','/api/mail/draft') else 100000 if path in ('/api/conditions','/api/order-draft','/api/conditions/draft','/api/conditions/compare') else 3200000 if path in ('/api/licenses/new','/api/licenses/units','/api/licenses/units/bulk','/api/licenses/products','/api/licenses/products/duplicate','/api/licenses/sales') or re.fullmatch(r'/api/licenses/sales/[0-9]+',path) else 900000 if re.fullmatch(r'/api/orders/[0-9]+/photos',path) or path in ('/api/profile/photo','/api/mail/signature') or re.fullmatch(r'/api/catalog/[0-9]+/image',path) else (65536 if workspace_post or quote_json else 16384)
+            max_body=9000000 if path in ('/api/clients/import/preview','/api/clients/import/commit') else 1700000 if path=='/api/public/adi/listen' else 6000000 if path in ('/api/mail/send','/api/mail/draft') else 100000 if path in ('/api/conditions','/api/order-draft','/api/conditions/draft','/api/conditions/compare') else 3200000 if path in ('/api/licenses/new','/api/licenses/units','/api/licenses/units/bulk','/api/licenses/check','/api/licenses/products','/api/licenses/products/duplicate','/api/licenses/sales') or re.fullmatch(r'/api/licenses/sales/[0-9]+',path) else 900000 if re.fullmatch(r'/api/orders/[0-9]+/photos',path) or path in ('/api/profile/photo','/api/mail/signature') or re.fullmatch(r'/api/catalog/[0-9]+/image',path) else (65536 if workspace_post or quote_json else 16384)
             length = int(self.headers.get('Content-Length', '0'))
             if length <= 0 or length > max_body:
                 return self.reply(400, {'error':'Solicitud inválida.'})
             data = json.loads(self.rfile.read(length))
             appointment_config_post=path=='/api/appointments/config'
-            if not isinstance(data, dict) or any(not isinstance(v,(str,bool)) and not (quote_json and k=='items' and isinstance(v,list)) and not (workspace_post and ((k=='lines' and isinstance(v,list)) or (k=='revision' and type(v) is int))) and not (appointment_config_post and ((k in ('hours','services','staff_hours') and isinstance(v,list)) or (k in ('holiday','new_service') and isinstance(v,dict)))) and not (path=='/api/business-hours' and k in ('hours','closures','request_limits') and isinstance(v,list)) and not (path=='/api/licenses/sales' and ((k=='items' and isinstance(v,list)) or (k=='payment' and isinstance(v,dict)))) and not (path=='/api/licenses/products/adjust' and k=='unit_ids' and isinstance(v,list) and len(v)<=500) for k,v in data.items()):
+            if not isinstance(data, dict) or any(not isinstance(v,(str,bool)) and not (quote_json and k=='items' and isinstance(v,list)) and not (workspace_post and ((k=='lines' and isinstance(v,list)) or (k=='revision' and type(v) is int))) and not (appointment_config_post and ((k in ('hours','services','staff_hours') and isinstance(v,list)) or (k in ('holiday','new_service') and isinstance(v,dict)))) and not (path=='/api/business-hours' and k in ('hours','closures','request_limits') and isinstance(v,list)) and not (path=='/api/licenses/sales' and ((k=='items' and isinstance(v,list)) or (k=='payment' and isinstance(v,dict)))) and not (path=='/api/licenses/products/adjust' and k=='unit_ids' and isinstance(v,list) and len(v)<=500) and not (path in ('/api/licenses/new','/api/licenses/units/bulk','/api/licenses/check') and k=='rows' and isinstance(v,list) and len(v)<=licenses.MAX_BULK) for k,v in data.items()):
                 return self.reply(400, {'error':'Datos inválidos.'})
             path = urlsplit(self.path).path
             with connect() as c:
@@ -3317,6 +3321,13 @@ class Handler(BaseHTTPRequestHandler):
                             unit=licenses.register(c,data,user,now);audit(c,user['id'],'license_registered',unit);return self.reply(201,{'ok':True,'id':unit})
                         if path=='/api/licenses/units/bulk':
                             made=licenses.register_many(c,data,user,now);audit(c,user['id'],'license_bulk_registered',len(made));return self.reply(201,{'ok':True,'count':len(made)})
+                        if path=='/api/licenses/check':
+                            # Comprobación de duplicados mientras se escribe: solo huellas en el servidor; la respuesta no contiene credenciales.
+                            pid=str(data.get('product_id') or '');product=licenses._product(c,int(pid)) if pid.isdigit() else {'id':0,'shared_seats':int(str(data.get('shared_seats') or '0')) if str(data.get('shared_seats') or '0').isdigit() else 0}
+                            rows=data.get('rows') if isinstance(data.get('rows'),list) else []
+                            entries=[{k:str(row.get(k) or '').strip() for k in ('key','username','password','license_code')}|({'file_sha256':row['file_sha256']} if re.fullmatch(r'[0-9a-f]{64}',str(row.get('file_sha256') or '')) else {}) for row in rows if isinstance(row,dict)]
+                            exclude=int(data['unit_id']) if str(data.get('unit_id') or '').isdigit() else None
+                            return self.reply(200,licenses.check_duplicates(c,product,entries,now.date(),exclude))
                         if path=='/api/licenses/products/adjust':
                             result=licenses.adjust_stock(c,data,user,now);audit(c,user['id'],'license_stock_adjusted',int(data.get('item_id') or 0));return self.reply(200,dict(result,ok=True))
                         if path=='/api/licenses/settings':
@@ -3388,6 +3399,8 @@ class Handler(BaseHTTPRequestHandler):
                                 result=licenses.renew(c,unit,data,user,now);license_mail.cancel_for(c,unit);audit(c,user['id'],'license_renew',unit);return self.reply(200,dict(result,ok=True))
                             elif action=='reveal':
                                 values=licenses.admin_reveal(c,unit,user,now);audit(c,user['id'],'license_credentials_viewed',unit);return self.reply(200,{'ok':True,'credentials':values})
+                            elif action=='file':
+                                found=licenses.admin_file(c,unit,user,now);audit(c,user['id'],'license_file_downloaded',unit);return self.reply(200,dict(found,ok=True))
                             elif action=='send_info':
                                 if not mail_pro.configured():return self.reply(409,{'error':'El correo del sistema no está configurado.'})
                                 data_=license_mail.context(c,unit)
@@ -3412,7 +3425,7 @@ class Handler(BaseHTTPRequestHandler):
                             return self.reply(200,license_delivery_reply(c,delivery,token,user,data.get('send_mail') is True))
                     except licenses.LicenseError as error:
                         # Todo o nada: si algo falla, no queda ningún cambio a medias (producto sin licencia, lote sin unidades, reservas parciales…).
-                        c.rollback();return self.reply(error.status,{'error':str(error),'fields':error.fields})
+                        c.rollback();return self.reply(error.status,dict(error.extra,error=str(error),fields=error.fields))
                     return self.reply(404,{'error':'No encontrado.'})
                 catalog_image=re.fullmatch(r'/api/catalog/([0-9]{1,9})/image',path)
                 if path=='/api/catalog/seed' or catalog_image:

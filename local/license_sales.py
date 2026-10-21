@@ -187,6 +187,7 @@ def deliver(c,sale_id,data,user,now):
     if len(units)!=expected:raise LicenseError('Faltan claves reservadas para esta venta. Revisa el inventario.',409)
     activation=licenses._date(data.get('activated_at'),'activated_at',now.date(),future=False) if data.get('activated') is True else ''
     if data.get('activated') is True and not activation:raise LicenseError('Indica la fecha real de activación.',fields={'activated_at':'Fecha obligatoria.'})
+    licenses._guard_delivery(c,units)  # un serial ya entregado no se entrega dos veces
     moment=stamp(now);token=licenses.secrets.token_urlsafe(32);status=sale['payment_status']
     delivery=c.execute("INSERT INTO license_deliveries(order_id,client_id,kind,status,payment_confirmed_by,payment_confirmed_at,balance_cents,authorized_by,authorized_at,token_hash,token_expires_at,notes,price_cents,discount_cents,payment_status,created_at,updated_at) VALUES (?,?,'directa','autorizada',?,?,?,?,?,?,?,?,?,?,?,?,?)",
                        (sale['order_id'],sale['client_id'],user['id'],moment,max(balance,0),user['id'],moment,licenses._hash(token),stamp(now+timedelta(hours=licenses.LINK_HOURS)),'Venta '+sale['code'],sale['subtotal_cents'],sale['discount_cents'],status if status in ('pagado','parcial','pendiente') else '',moment,moment)).lastrowid

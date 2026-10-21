@@ -8237,3 +8237,75 @@ body[data-page=dashboard] dialog.lcard-dialog .lcard-tools :is(input,select){hei
  #module-content .hours-actions button{width:100%;min-height:40px;padding:4px 8px;font-size:13px;line-height:1.2;white-space:normal}
 }
 @media(prefers-reduced-motion:reduce){#module-content .hours-table tbody :is(th,td){transition:none}}
+/* Licencias · Inventario y credenciales: método de activación, campos dinámicos, filas y ADI Duplicate Protection Pro (acotado a .license-*). */
+.license-methods-title{margin:0;font-size:12.5px;font-weight:600;color:#dbe6f6}
+.license-methods{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.license-method{position:relative;display:grid;grid-template-columns:30px minmax(0,1fr);align-items:center;gap:8px;min-width:0;margin:0;padding:9px 10px;border:1px solid #24395a;border-radius:10px;background:#0c182b;cursor:pointer;transition:border-color .18s ease,background-color .18s ease,box-shadow .18s ease}
+.license-method input{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:pointer}
+.license-method:hover{border-color:#36598a;background:#0f1f36}
+.license-method:has(input:checked){border-color:#ff7fb6aa;background:linear-gradient(135deg,#ff7fb614,#0f1f36 70%);box-shadow:0 0 14px -8px #ff7fb6}
+.license-method:has(input:focus-visible){outline:2px solid #8fd3ff;outline-offset:2px}
+.license-method-icon{display:grid;place-items:center;width:30px;height:30px;border:1px solid #2a4870;border-radius:9px;background:#10233d;color:#8fd3ff}
+.license-method:has(input:checked) .license-method-icon{border-color:#ff7fb666;color:#ff9ecb}
+.license-method-icon svg{width:18px;height:18px}
+.license-method-text{display:grid;gap:1px;min-width:0}.license-method-text strong{font-size:12.5px;line-height:1.25;color:#eef3ff;overflow-wrap:anywhere}.license-method-text small{font-size:11px;line-height:1.3;color:#8ea4c4;font-weight:400}
+.license-field-in{animation:license-field-in .2s ease both}
+@keyframes license-field-in{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+/* Aviso de duplicado debajo del campo: gris (comprobando), verde, ámbar o rojo. No cubre el formulario. */
+.license-dup{display:grid;gap:4px;margin-top:2px;padding:6px 9px;border:1px solid #2a3b55;border-left-width:3px;border-radius:8px;background:#0c1729;font-size:11.5px;font-weight:500;line-height:1.4;color:#c5d5ee}
+.license-dup[hidden]{display:none}
+.license-dup[data-level=pending]{border-color:#3a4a62;color:#a9b6c9}
+.license-dup[data-level=green]{border-color:#2f6d5a;border-left-color:#3fbf8a;color:#9ff0c8;background:#0c2420}
+.license-dup[data-level=amber]{border-color:#7a6230;border-left-color:#f3c677;color:#fde6a8;background:#241c0b}
+.license-dup[data-level=red]{border-color:#7f2a36;border-left-color:#f87171;color:#fecaca;background:#2a0f16}
+.license-dup-match{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;color:#dbe6f6}.license-dup-match .text-action{min-height:0;padding:0;font-size:11.5px}
+/* Varias licencias: filas compactas. */
+.license-rows{display:grid;gap:6px;min-width:0}
+.license-rows-head,.license-row{display:grid;grid-template-columns:26px repeat(var(--cols,2),minmax(0,1fr)) 72px;align-items:center;gap:6px}
+.license-rows-head{padding:0 8px;font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#7f93b2}
+.license-rows-list{display:grid;gap:6px}
+.license-row{padding:6px 8px;border:1px solid #1f3352;border-radius:9px;background:#0c182b;transition:border-color .18s ease}
+.license-row input:not([type=file]){width:100%;min-width:0;height:34px;min-height:34px;margin:0;padding:4px 8px;font-size:12.5px}
+.license-row[data-level=green]{border-color:#2f6d5a}.license-row[data-level=amber]{border-color:#b08a3a}.license-row[data-level=red]{border-color:#c2414f;background:#1f0d13}.license-row[data-level=pending]{border-color:#3a4a62}
+.license-row-n{font-size:12px;font-weight:700;color:#8ea4c4;text-align:center}
+.license-row-file{position:relative;display:flex;align-items:center;min-width:0;height:34px;margin:0;padding:0 8px;border:1px dashed #2f4a70;border-radius:8px;font-size:12px;color:#c5d5ee;overflow:hidden;cursor:pointer}
+.license-row-file span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.license-row-file input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.license-row-file:has(input:focus-visible){outline:2px solid #8fd3ff;outline-offset:1px}
+.license-row-actions{display:flex;justify-content:flex-end;gap:4px}
+.license-row-msg{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:2px 10px;margin:0;font-size:11.5px;line-height:1.4}.license-row-msg:empty{display:none}
+.license-row-msg [data-level=amber]{color:#fde6a8}.license-row-msg [data-level=red]{color:#fecaca}.license-row-msg .text-action{min-height:0;padding:0;font-size:11.5px}
+.license-rows-tools{display:flex;flex-wrap:wrap;align-items:center;gap:8px}.license-rows-tools button{width:auto;margin:0}.license-rows-tools svg{width:16px;height:16px}
+.license-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+/* ADI: aviso visual discreto (sin voz) y confirmación de una coincidencia legítima. */
+.license-adi-note{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 10px;align-items:start;padding:9px 12px;border:1px solid #7a6230;border-radius:10px;background:linear-gradient(90deg,#2a2008,#0c182b 75%)}
+.license-adi-note[hidden]{display:none}
+.license-adi-note[data-level=red]{border-color:#7f2a36;background:linear-gradient(90deg,#2a0f16,#0c182b 75%)}
+.license-adi-note[data-level=pending]{display:block;border-color:#3a4a62;background:#0c1729;font-size:12px;color:#a9b6c9}
+.license-adi-mark{display:grid;place-items:center;width:30px;height:30px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fff,#ffb3d4 40%,#5fd4c8);color:#3a0d24;font-size:9.5px}
+.license-adi-note>div{display:grid;gap:2px;min-width:0;font-size:12px;color:#e5edf9}.license-adi-note strong{font-size:12.5px;color:#fff}
+.license-adi-actions{grid-column:2;display:flex !important;flex-wrap:wrap;gap:4px 14px}.license-adi-actions .text-action{min-height:0;padding:0;font-size:12px}
+.license-dup-override{display:grid;gap:8px;padding:9px 12px;border:1px dashed #7a6230;border-radius:10px}.license-dup-override[hidden]{display:none}
+.license-dup-consent{display:flex;align-items:center;gap:8px;margin:0;font-size:12.5px;font-weight:600;color:#fde6a8;cursor:pointer}.license-dup-consent input{width:auto;margin:0}
+/* Revisión de duplicados del inventario (informe de solo lectura). */
+.license-dupes-open svg{width:16px;height:16px}
+.license-dupes-body{display:grid;gap:12px}
+.license-dupes-summary{display:grid;gap:2px;padding:10px 12px;border:1px solid #2f6d5a;border-left:4px solid #3fbf8a;border-radius:10px;background:#0c2420}
+.license-dupes-summary[data-level=amber]{border-color:#7a6230;border-left-color:#f3c677;background:#241c0b}
+.license-dupes-summary strong{font-size:13.5px;color:#fff}.license-dupes-summary small{font-size:11.5px;color:#c5d5ee}
+.license-dupes-section{display:grid;gap:6px;padding:10px 12px;border:1px solid #1f3352;border-left:3px solid #f3c677;border-radius:10px;background:#0c182b}
+.license-dupes-section[data-level=red]{border-left-color:#f87171}
+.license-dupes-section h3{margin:0;font-size:13.5px;color:#eef3ff}.license-dupes-section .license-hint{margin:0}
+.license-dupes-group{display:grid;gap:3px;margin:0;padding:6px 8px;border-radius:8px;background:#0f1f36;list-style:none}
+.license-dupes-group li{display:flex;flex-wrap:wrap;align-items:center;gap:2px 10px;font-size:12px;color:#dbe6f6}.license-dupes-group li b{color:#fde6a8;font-weight:600}.license-dupes-group .text-action{min-height:0;padding:0;font-size:12px}
+@media(max-width:760px){.license-methods{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){
+ .license-rows-head{display:none}
+ .license-row{grid-template-columns:minmax(0,1fr) auto;gap:6px}
+ .license-row-n{grid-column:1;grid-row:1;text-align:left}.license-row-n::before{content:"Licencia "}
+ .license-row-actions{grid-column:2;grid-row:1}
+ .license-row>input,.license-row>.license-row-file{grid-column:1/-1}
+}
+@media(max-width:380px){.license-methods{grid-template-columns:1fr}}
+@media(prefers-reduced-motion:reduce){.license-field-in{animation:none}.license-method,.license-row{transition:none}}
+/* Selección activa del modo (una o varias licencias): rosado sutil, como el método elegido. */
+.license-mode [aria-pressed=true]{border-color:#ff7fb6aa;background:linear-gradient(135deg,#ff7fb61a,#132b4d);color:#fff;box-shadow:0 0 12px -8px #ff7fb6}

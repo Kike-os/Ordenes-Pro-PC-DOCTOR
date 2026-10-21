@@ -32,6 +32,17 @@ STATES={'disponible':('Disponible','azul'),'reservada':('Reservada','celeste'),'
 PRODUCT_CATEGORIES=('licencia','seguridad')
 SECRET_LABELS={'key':'Clave de producto o serial','serial':'Serial o código de activación','username':'Usuario o correo de activación','password':'Contraseña de activación','license_code':'Código de licencia o identificador del fabricante'}
 SECRET_INPUTS=('key','username','password','license_code')
+# Método de activación de cada producto: solo se piden y se guardan los campos que ese método usa.
+# Vacío = producto anterior a la migración 069: el método se deduce de los datos guardados, como antes.
+ACTIVATION={'clave':'Clave de producto o serial','cuenta':'Usuario y contraseña','mixta':'Activación mixta','archivo':'Archivo de licencia'}
+ACTIVATION_FIELDS={'clave':('key','license_code'),'cuenta':('username','password','license_code'),'mixta':('key','username','password','license_code'),'archivo':('license_code',)}
+ACTIVATION_REQUIRED={'clave':('key',),'cuenta':('username','password'),'mixta':('key','username','password'),'archivo':()}
+# Archivo de licencia del fabricante: tipos de activación habituales; nunca programas, scripts ni comprimidos (se entrega al cliente tal cual).
+FILE_LIMIT=256*1024
+FILE_TYPES={'lic':'application/octet-stream','key':'application/octet-stream','dat':'application/octet-stream','xml':'application/xml','json':'application/json',
+            'txt':'text/plain','cfg':'text/plain','ini':'text/plain','pdf':'application/pdf'}
+TEXT_FILES=('xml','json','txt','cfg','ini')
+DUPLICATE_REASON_MIN=10
 FIELDS=('edition','license_type','manufacturer','version','devices','term','purchased_at','activated_at','expires_at','download_url','instructions')
 FIELD_LABELS={'edition':'Versión o edición','license_type':'Tipo de licencia','manufacturer':'Fabricante','version':'Versión','devices':'Dispositivos','term':'Duración',
               'purchased_at':'Fecha de compra','activated_at':'Fecha de activación','expires_at':'Fecha de vencimiento','download_url':'Enlace de descarga o activación','instructions':'Instrucciones de instalación'}
@@ -47,8 +58,8 @@ CONTACT={'phone':'+593 98 746 0591','email':'licencias-orig@ecuadorpcdoctor.com'
 
 
 class LicenseError(ValueError):
-    def __init__(self,message,status=400,fields=None):
-        super().__init__(message);self.status=status;self.fields=fields or {}
+    def __init__(self,message,status=400,fields=None,extra=None):
+        super().__init__(message);self.status=status;self.fields=fields or {};self.extra=extra or {}
 
 
 # ---- Cifrado ----------------------------------------------------------------------------------------------------------
@@ -100,6 +111,7 @@ def normalized(kind,values):
     """Lo que identifica la credencial: la clave o serial (sin espacios ni guiones, en mayúsculas) o, si no hay, la cuenta en minúsculas."""
     main=values.get('key') or values.get('serial') or ''
     if main:return 'key:'+re.sub(r'[\s-]+','',main).upper()
+    if not values.get('username') and values.get('file_sha256'):return 'file:'+values['file_sha256']
     return 'm365:'+str(values.get('username','')).strip().lower()
 
 
@@ -187,7 +199,7 @@ def expire(c,now):
 
 def _product(c,product_id):
     row=c.execute("SELECT i.id,i.name,i.category,i.brand,i.description,i.price_cents,i.available,p.kind,p.line,p.model,p.edition,p.supplier,p.purchase_cents,p.term,p.devices,"
-                  "p.duration,p.duration_months,p.validity_mode,p.shared_seats FROM catalog_items i LEFT JOIN license_products p ON p.item_id=i.id WHERE i.id=?",(product_id,)).fetchone()
+                  "p.duration,p.duration_months,p.validity_mode,p.shared_seats,COALESCE(p.activation_method,'') activation_method FROM catalog_items i LEFT JOIN license_products p ON p.item_id=i.id WHERE i.id=?",(product_id,)).fetchone()
     if not row or row['category'] not in PRODUCT_CATEGORIES:raise LicenseError('Producto de licencia no disponible.',404)
     return dict(row)
 
@@ -247,17 +259,19 @@ def _product_settings(data,product=None):
     if model=='perpetua' and duration!='perpetua':raise LicenseError('Una licencia perpetua debe tener duración «Perpetua».',fields={'duration':'Duración incompatible.'})
     seats=str(data.get('shared_seats') if data.get('shared_seats') is not None else product.get('shared_seats') or 0).strip() or '0'
     if not seats.isdigit() or int(seats)>100 or int(seats)==1:raise LicenseError('Clave compartida: indica de 2 a 100 clientes, o 0 si cada cliente recibe su propia clave.',fields={'shared_seats':'Valor no válido.'})
+    method=str(data.get('activation_method') if data.get('activation_method') is not None else product.get('activation_method') or '')
+    if method and method not in ACTIVATION:raise LicenseError('Selecciona el método de activación.',fields={'activation_method':'Método no válido.'})
     kind='antivirus' if line=='antivirus' else (product.get('kind') if product.get('kind') in KINDS else 'otro')
-    return {'kind':kind,'line':line,'model':model,'duration':duration,'duration_months':custom,'validity_mode':validity,'shared_seats':int(seats),
+    return {'activation_method':method,'kind':kind,'line':line,'model':model,'duration':duration,'duration_months':custom,'validity_mode':validity,'shared_seats':int(seats),
             'edition':_text(data,'edition',120,'La versión o edición'),'supplier':_text(data,'supplier',120,'El proveedor'),
             'purchase_cents':_cents(data.get('purchase_price'),'purchase_price','el costo de adquisición'),'term':DURATIONS[duration] if duration!='personalizada' else '%d meses'%custom,'devices':_devices(data.get('devices'))}
 
 
 def _store_settings(c,item_id,s,user,now):
-    c.execute('INSERT INTO license_products(item_id,kind,supplier,purchase_cents,term,devices,line,model,edition,duration,duration_months,validity_mode,shared_seats,updated_at,updated_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) '
+    c.execute('INSERT INTO license_products(item_id,kind,supplier,purchase_cents,term,devices,line,model,edition,duration,duration_months,validity_mode,shared_seats,activation_method,updated_at,updated_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) '
               'ON CONFLICT(item_id) DO UPDATE SET kind=excluded.kind,supplier=excluded.supplier,purchase_cents=excluded.purchase_cents,term=excluded.term,devices=excluded.devices,line=excluded.line,model=excluded.model,'
-              'edition=excluded.edition,duration=excluded.duration,duration_months=excluded.duration_months,validity_mode=excluded.validity_mode,shared_seats=excluded.shared_seats,updated_at=excluded.updated_at,updated_by=excluded.updated_by',
-              (item_id,s['kind'],s['supplier'],s['purchase_cents'],s['term'],s['devices'],s['line'],s['model'],s['edition'],s['duration'],s['duration_months'],s['validity_mode'],s['shared_seats'],stamp(now),user['id']))
+              'edition=excluded.edition,duration=excluded.duration,duration_months=excluded.duration_months,validity_mode=excluded.validity_mode,shared_seats=excluded.shared_seats,activation_method=excluded.activation_method,updated_at=excluded.updated_at,updated_by=excluded.updated_by',
+              (item_id,s['kind'],s['supplier'],s['purchase_cents'],s['term'],s['devices'],s['line'],s['model'],s['edition'],s['duration'],s['duration_months'],s['validity_mode'],s['shared_seats'],s['activation_method'],stamp(now),user['id']))
 
 
 def _catalog_values(data,product=None):
@@ -333,7 +347,7 @@ def products(c,now):
     """Productos de licencia con existencias por estado (a partir de las unidades individuales)."""
     today=now.date()
     rows=[dict(r) for r in c.execute("SELECT i.id,i.code,i.name,i.category,i.brand,i.description,i.price_cents,i.available,i.license_term,(SELECT updated_at FROM catalog_images g WHERE g.item_id=i.id) image,"
-                                     "p.kind,p.line,p.model,p.edition,p.supplier,p.purchase_cents,p.term,p.devices,p.duration,p.duration_months,p.validity_mode,p.shared_seats "
+                                     "p.kind,p.line,p.model,p.edition,p.supplier,p.purchase_cents,p.term,p.devices,p.duration,p.duration_months,p.validity_mode,p.shared_seats,COALESCE(p.activation_method,'') activation_method "
                                      "FROM catalog_items i LEFT JOIN license_products p ON p.item_id=i.id WHERE i.category IN ('licencia','seguridad') ORDER BY i.name COLLATE NOCASE")]
     counts={}
     for unit in c.execute('SELECT product_id,status,expires_at,activated,renewed_to FROM license_units'):
@@ -343,7 +357,7 @@ def products(c,now):
         row['line_label']=LINES.get(row['line'] or '','Sin configurar') if row['managed'] else 'Sin configurar'
         row['kind_label']=row['line_label']
         row['duration_label']=row['term'] or '';row['validity_label']=VALIDITY.get(row['validity_mode'] or '','')
-        row['model_label']=MODELS.get(row['model'] or '','')
+        row['model_label']=MODELS.get(row['model'] or '','');row['activation_label']=ACTIVATION.get(row['activation_method'],'Según los datos guardados')
         row['stock']={key:counts.get(row['id'],{}).get(key,0) for key in STATES}
         row['stock'].update({'entregada':row['stock']['pendiente_activacion']+row['stock']['activa']+row['stock']['por_vencer']})
         row['pending']=sum(item['missing'] for item in pending_items(c,row['id']))
@@ -371,22 +385,80 @@ def _clean_unit(product,data,today):
     return out
 
 
-def _clean_secret(data,required=True):
-    values={}
+def _clean_secret(data,required=True,method=''):
+    allowed=ACTIVATION_FIELDS.get(method,SECRET_INPUTS);values={}
     for key in SECRET_INPUTS:
+        if key not in allowed:continue
         raw=str(data.get(key) if data.get(key) is not None else data.get('serial') if key=='key' and data.get('serial') else '')
         value=raw if key=='password' else re.sub(r'\s+',' ',raw).strip()
         if '\n' in value or len(value)>300:raise LicenseError('%s admite hasta 300 caracteres en una línea.'%SECRET_LABELS[key],fields={key:'Dato no válido.'})
         if value:values[key]=value
-    if required and not values.get('key') and not values.get('username'):raise LicenseError('Indica la clave de producto o serial, o el usuario de activación.',fields={'key':'Dato obligatorio.'})
+    if method in ACTIVATION:
+        for key in ACTIVATION_REQUIRED[method] if required else ():
+            if not values.get(key):raise LicenseError('Falta %s (método «%s»).'%(SECRET_LABELS[key][0].lower()+SECRET_LABELS[key][1:],ACTIVATION[method]),fields={key:'Dato obligatorio.'})
+    elif required and not values.get('key') and not values.get('username'):raise LicenseError('Indica la clave de producto o serial, o el usuario de activación.',fields={'key':'Dato obligatorio.'})
     if values.get('key') and len(re.sub(r'[\s-]+','',values['key']))<5:raise LicenseError('La clave o serial es demasiado corta.',fields={'key':'Revisa el dato.'})
     if values.get('password') and not values.get('username'):raise LicenseError('Indica el usuario de la contraseña.',fields={'username':'Usuario obligatorio.'})
     return values
 
 
-def _free_seat(c,product,values,exclude=None):
-    """Puesto libre para esta credencial: 1 si es única; en productos de clave compartida, el siguiente libre hasta su número de puestos."""
-    seats=max(1,product.get('shared_seats') or 0)
+def _clean_file(data):
+    """Archivo de licencia del fabricante: extensión, tamaño y contenido validados. Devuelve None si no se adjuntó."""
+    raw=data.get('file')
+    if not raw:return None
+    name=str(data.get('file_name') or '').strip();ext=name.rsplit('.',1)[-1].lower() if '.' in name else ''
+    if ext not in FILE_TYPES:raise LicenseError('El archivo de licencia debe ser .lic, .key, .dat, .xml, .json, .txt, .cfg, .ini o .pdf.',fields={'file':'Formato no admitido.'})
+    try:content=base64.b64decode(str(raw),validate=True)
+    except Exception:raise LicenseError('El archivo de licencia no se pudo leer.',fields={'file':'Archivo no válido.'})
+    if not content:raise LicenseError('El archivo de licencia está vacío.',fields={'file':'Archivo vacío.'})
+    if len(content)>FILE_LIMIT:raise LicenseError('El archivo de licencia supera el máximo de 256 KB.',fields={'file':'Archivo demasiado grande.'})
+    if content[:2]==b'MZ' or content[:4] in (b'\x7fELF',b'PK\x03\x04',b'Rar!',b'\xca\xfe\xba\xbe') or content[:2]==b'#!' or content[:6]==b'7z\xbc\xaf\x27\x1c':
+        raise LicenseError('No se admiten programas, scripts ni archivos comprimidos como archivo de licencia.',fields={'file':'Contenido no permitido.'})
+    if ext=='pdf' and content[:5]!=b'%PDF-':raise LicenseError('El archivo no es un PDF válido.',fields={'file':'PDF no válido.'})
+    if ext in TEXT_FILES:
+        try:content.decode('utf-8')
+        except UnicodeDecodeError:raise LicenseError('Un archivo .%s debe ser texto (UTF-8).'%ext,fields={'file':'Contenido no válido.'})
+    clean=re.sub(r'[^\w .()-]+','',name)[:120] or 'licencia.'+ext
+    return {'name':clean,'mime':FILE_TYPES[ext],'size':len(content),'sha256':hashlib.sha256(content).hexdigest(),'data':content}
+
+
+def _credential(data,method,required=True):
+    """Credencial de una licencia según el método del producto: valores cifrables y, si es «archivo», el archivo validado."""
+    values=_clean_secret(data,required,method);file=_clean_file(data) if method=='archivo' else None
+    if method=='archivo':
+        if required and not file:raise LicenseError('Adjunta el archivo de licencia del fabricante.',fields={'file':'Archivo obligatorio.'})
+        if file:values['file_sha256']=file['sha256']
+    return values,file
+
+
+def _store_file(c,unit,file,user,now):
+    c.execute('INSERT INTO license_files(unit_id,name,mime,size,sha256,sealed,created_at,created_by) VALUES (?,?,?,?,?,?,?,?) ON CONFLICT(unit_id) DO UPDATE SET '
+              'name=excluded.name,mime=excluded.mime,size=excluded.size,sha256=excluded.sha256,sealed=excluded.sealed,created_at=excluded.created_at,created_by=excluded.created_by',
+              (unit,file['name'],file['mime'],file['size'],file['sha256'],seal({'data':base64.b64encode(file['data']).decode()}),stamp(now),user['id']))
+
+
+def file_of(c,unit_id):
+    """Archivo de licencia descifrado (nombre, tipo y contenido en base64) o None."""
+    row=c.execute('SELECT name,mime,size,sealed FROM license_files WHERE unit_id=?',(unit_id,)).fetchone()
+    if not row:return None
+    return {'name':row['name'],'mime':row['mime'],'size':row['size'],'data':unseal(row['sealed'])['data']}
+
+
+def _method_for(c,product,data,user,now):
+    """Método con el que se registran las licencias nuevas. Si el formulario elige otro, se guarda en el producto (las ya registradas no cambian)."""
+    wanted=str(data.get('activation_method') or '');current=product.get('activation_method') or ''
+    if wanted and wanted not in ACTIVATION:raise LicenseError('Selecciona el método de activación.',fields={'activation_method':'Método no válido.'})
+    if wanted and wanted!=current:
+        c.execute('UPDATE license_products SET activation_method=?,updated_at=?,updated_by=? WHERE item_id=?',(wanted,stamp(now),user['id'],product['id']))
+        event(c,'metodo_activacion',now,'Método de activación del producto: %s%s. Las licencias ya registradas conservan sus datos.'%(ACTIVATION[wanted],' (antes: %s)'%ACTIVATION[current] if current else ''),product=product['id'],user=user)
+        product['activation_method']=wanted
+    return product.get('activation_method') or ''
+
+
+def _free_seat(c,product,values,exclude=None,extra=0):
+    """Puesto libre para esta credencial: 1 si es única; en productos de clave compartida, el siguiente libre hasta su número de puestos.
+    `extra` solo se usa para una coincidencia de CUENTA autorizada con justificación (una cuenta con varias licencias legítimas)."""
+    seats=max(1,product.get('shared_seats') or 0)+extra
     for seat in range(1,seats+1):
         mark=fingerprint(product['kind'],values,seat)
         found=c.execute('SELECT id,code FROM license_units WHERE fingerprint=?',(mark,)).fetchone()
@@ -395,15 +467,16 @@ def _free_seat(c,product,values,exclude=None):
     raise LicenseError(('Esta clave ya está registrada (%s).'%found['code']) if seats==1 else 'Esta clave compartida ya tiene sus %d puestos registrados.'%seats,409,{'key':'Duplicada.'})
 
 
-def _insert_unit(c,product,fields,values,batch,user,now,notes=''):
+def _insert_unit(c,product,fields,values,batch,user,now,notes='',file=None,extra=0):
     if fields['activated_at']:
         raise LicenseError('Una licencia en inventario aún no está activada: la fecha real de activación se registra al entregarla o con «Confirmar activación».',fields={'activated_at':'Solo al entregar o confirmar la activación.'})
-    seat,mark=_free_seat(c,product,values)
+    seat,mark=_free_seat(c,product,values,extra=extra)
     unit=c.execute('INSERT INTO license_units(product_id,batch_id,kind,edition,license_type,manufacturer,version,devices,term,purchased_at,activated_at,expires_at,download_url,instructions,secret,fingerprint,seat,notes,created_by,created_at,updated_at) '
                    'VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
                    (product['id'],batch,product['kind'],fields['edition'],fields['license_type'],fields['manufacturer'],fields['version'],fields['devices'],fields['term'],fields['purchased_at'],
                     fields['activated_at'],fields['expires_at'],fields['download_url'],fields['instructions'],seal(values),mark,seat,notes,user['id'],stamp(now),stamp(now))).lastrowid
     if fields['activated_at']:c.execute('UPDATE license_units SET activated=1 WHERE id=?',(unit,))
+    if file:_store_file(c,unit,file,user,now)
     expired=fields['expires_at'] and fields['expires_at']<now.date().isoformat()
     if expired:c.execute("UPDATE license_units SET status='vencida' WHERE id=?",(unit,))
     event(c,'registrada',now,'Licencia registrada en el inventario%s.'%(' (ya vencida)' if expired else '' if seat==1 else ' (puesto %d de la clave compartida)'%seat),unit,product['id'],user=user)
@@ -440,9 +513,11 @@ def register(c,data,user,now):
     aprobadas que esperaban existencias."""
     pid=str(data.get('product_id',''))
     if not pid.isdigit():raise LicenseError('Selecciona el producto.',fields={'product_id':'Producto no válido.'})
-    product=_managed(c,int(pid));fields=_clean_unit(product,data,now.date());values=_clean_secret(data)
+    product=_managed(c,int(pid));method=_method_for(c,product,data,user,now);fields=_clean_unit(product,data,now.date());values,file=_credential(data,method)
+    report,reason=guard_duplicates(c,product,[values],data,user,now)
     batch=_batch(c,product,data,1,user,now)
-    unit=_insert_unit(c,product,fields,values,batch,user,now,_text(data,'notes',500,'Las observaciones'))
+    unit=_insert_unit(c,product,fields,values,batch,user,now,_text(data,'notes',500,'Las observaciones'),file=file,extra=100 if reason else 0)
+    _log_authorized(c,report,[unit],reason,product,user,now)
     fill_pending(c,product['id'],now,user)
     return unit
 
@@ -451,12 +526,12 @@ def register_new(c,data,user,now):
     """«+ Registrar nueva licencia»: crea el producto si todavía no existe (con su logo) y registra la primera licencia, todo o nada."""
     if str(data.get('product_id') or '').isdigit():
         return {'product_id':int(data['product_id']),'unit_id':register(c,data,user,now)}
-    if str(data.get('lines') or '').strip():
+    if str(data.get('lines') or '').strip() or isinstance(data.get('rows'),list):
         # Producto nuevo con varias licencias: todo en la misma transacción (si una línea falla, no se crea nada).
         product=create_product(c,data,user,now)
         units=register_many(c,dict(data,product_id=str(product)),user,now)
         return {'product_id':product,'unit_id':units[0],'count':len(units)}
-    _clean_secret(data)
+    _credential(data,str(data.get('activation_method') or ''))
     product=create_product(c,data,user,now)
     unit=register(c,dict(data,product_id=str(product)),user,now)
     return {'product_id':product,'unit_id':unit,'count':1}
@@ -466,31 +541,185 @@ def register_many(c,data,user,now):
     """Varias licencias del mismo producto: una por línea. «clave», o «usuario;contraseña», o «clave;usuario;contraseña». Todo o nada."""
     pid=str(data.get('product_id',''))
     if not pid.isdigit():raise LicenseError('Selecciona el producto.',fields={'product_id':'Producto no válido.'})
-    product=_managed(c,int(pid));fields=_clean_unit(product,data,now.date())
+    product=_managed(c,int(pid));method=_method_for(c,product,data,user,now);fields=_clean_unit(product,data,now.date())
+    if isinstance(data.get('rows'),list):
+        # Filas del formulario: cada licencia con sus propios campos (y archivo, si el método lo usa); errores por fila y campo.
+        rows=data['rows']
+        if not rows:raise LicenseError('Agrega al menos una licencia.',fields={'rows':'Sin licencias.'})
+        if len(rows)>MAX_BULK:raise LicenseError('Registra hasta %d licencias por vez.'%MAX_BULK,fields={'rows':'Demasiadas filas.'})
+        parsed,files=[],[]
+        for number,row in enumerate(rows,1):
+            if not isinstance(row,dict) or any(not isinstance(v,str) for v in row.values()):raise LicenseError('Fila %d: datos no válidos.'%number,fields={'rows':'Fila no válida.'})
+            try:values,file=_credential(row,method)
+            except LicenseError as error:raise LicenseError('Fila %d: %s'%(number,error),error.status,{'row-%d-%s'%(number,k):v for k,v in error.fields.items()},{'row':number})
+            parsed.append(values);files.append(file)
+        return _register_parsed(c,product,fields,parsed,files,data,user,now,'row-%d-key')
     lines=[line.strip() for line in str(data.get('lines') or '').replace('\r','').split('\n') if line.strip()]
     if not lines:raise LicenseError('Escribe al menos una licencia (una por línea).',fields={'lines':'Sin licencias.'})
     if len(lines)>MAX_BULK:raise LicenseError('Registra hasta %d licencias por vez.'%MAX_BULK,fields={'lines':'Demasiadas líneas.'})
-    parsed=[];seen={}
-    seats=max(1,product.get('shared_seats') or 0)
+    parsed=[]
     for number,line in enumerate(lines,1):
         parts=[part.strip() for part in line.split(';')]
         if len(parts)==1:raw={'key':parts[0]} if '@' not in parts[0] or product['kind']!='m365' else {'username':parts[0]}
         elif len(parts)==2:raw={'username':parts[0],'password':parts[1]} if '@' in parts[0] else {'key':parts[0],'license_code':parts[1]}
         elif len(parts)==3:raw={'key':parts[0],'username':parts[1],'password':parts[2]}
         else:raise LicenseError('Línea %d: usa «clave», «usuario;contraseña» o «clave;usuario;contraseña».'%number,fields={'lines':'Formato no válido.'})
-        try:values=_clean_secret(raw)
+        try:values=_clean_secret(raw,method=method if method!='archivo' else '')
         except LicenseError as error:raise LicenseError('Línea %d: %s'%(number,error),fields={'lines':'Línea %d no válida.'%number})
-        key=normalized(product['kind'],values);seen[key]=seen.get(key,0)+1
-        if seen[key]>seats:raise LicenseError('Línea %d: está repetida en la lista.'%number,fields={'lines':'Línea repetida.'})
         parsed.append(values)
-    # Comprobación previa de duplicados en el inventario (sin registrar nada todavía).
+    if method=='archivo':raise LicenseError('Las licencias con archivo se registran por filas, una con su archivo.',fields={'lines':'Usa las filas.'})
+    return _register_parsed(c,product,fields,parsed,[None]*len(parsed),data,user,now,'lines')
+
+
+def _register_parsed(c,product,fields,parsed,files,data,user,now,field):
+    """Todo o nada: duplicados revisados (inventario y la propia lista), puestos libres comprobados y después el lote y sus licencias."""
+    report,reason=guard_duplicates(c,product,parsed,data,user,now,label='Línea' if field=='lines' else 'Fila')
+    extra=100 if reason else 0
     for number,values in enumerate(parsed,1):
-        try:_free_seat(c,product,values)
-        except LicenseError as error:raise LicenseError('Línea %d: %s'%(number,error),409,{'lines':'Licencia duplicada.'})
+        try:_free_seat(c,product,values,extra=extra)
+        except LicenseError as error:raise LicenseError('%s %d: %s'%('Línea' if field=='lines' else 'Fila',number,error),409,{field if field=='lines' else field%number:'Licencia duplicada.'})
     batch=_batch(c,product,data,len(parsed),user,now)
-    units=[_insert_unit(c,product,fields,values,batch,user,now) for values in parsed]
+    units=[_insert_unit(c,product,fields,values,batch,user,now,file=file,extra=extra) for values,file in zip(parsed,files)]
+    _log_authorized(c,report,units,reason,product,user,now)
     fill_pending(c,product['id'],now,user)
     return units
+
+
+# ---- ADI Duplicate Protection Pro ---------------------------------------------------------------------------------------
+# Cada dato sensible se compara por su huella (HMAC con la clave del servidor), nunca en claro: ni la respuesta ni el historial
+# contienen claves, usuarios ni contraseñas. Rojo = no se registra (serial o archivo ya registrado: sería la misma licencia dos veces);
+# ámbar = coincidencia que puede ser legítima (una cuenta con varias licencias, mismo código del fabricante) y exige justificación
+# de administración; una contraseña repetida por sí sola nunca se marca.
+DUPLICATE_LABELS={'key':'Clave de producto o serial','username':'Usuario o correo de activación','account':'Usuario y contraseña','license_code':'Código del fabricante','file':'Archivo de licencia'}
+LEVELS=('green','amber','red')
+
+
+def credential_marks(values,product_id,key=None):
+    key=key or _keys()[2];mark=lambda label,value:hmac.new(key,('dup:'+label+':'+value).encode(),hashlib.sha256).hexdigest()
+    marks={};main=values.get('key') or values.get('serial');user=str(values.get('username') or '').strip().lower()
+    if main:marks['key']=mark('key',re.sub(r'[\s-]+','',str(main)).upper())
+    if user:
+        marks['username']=mark('user',user)
+        if values.get('password'):marks['account']=mark('account',user+'\x00'+str(values['password']))
+    if values.get('license_code'):marks['license_code']=mark('code:%s'%product_id,re.sub(r'[\s-]+','',str(values['license_code'])).upper())
+    if values.get('file_sha256'):marks['file']=mark('file',values['file_sha256'])
+    return marks
+
+
+def _credential_index(c,today,exclude=None):
+    key=_keys()[2];index={}
+    for row in c.execute('SELECT u.id,u.code,u.product_id,u.status,u.expires_at,u.activated,u.renewed_to,u.created_at,u.secret,i.name product FROM license_units u JOIN catalog_items i ON i.id=u.product_id ORDER BY u.id'):
+        unit=dict(row)
+        if unit['id']==exclude:continue
+        try:values=unseal(unit['secret'])
+        except LicenseError:continue
+        state,_=state_of(unit,today)
+        info={'unit_id':unit['id'],'code':unit['code'],'product_id':unit['product_id'],'product':unit['product'],'status':unit['status'],'state_label':STATES[state][0],'created_at':unit['created_at']}
+        for kind,mark in credential_marks(values,unit['product_id'],key).items():index.setdefault((kind,mark),[]).append(info)
+    return index
+
+
+def check_duplicates(c,product,entries,today,exclude=None):
+    """Coincidencias de cada licencia nueva (o editada) con el inventario y con las demás de la misma lista. Sin datos sensibles."""
+    index=_credential_index(c,today,exclude);key=_keys()[2];seats=max(1,product.get('shared_seats') or 0);earlier={};results=[]
+    for number,values in enumerate(entries,1):
+        fields={}
+        for kind,mark in credential_marks(values,product['id'],key).items():
+            found=index.get((kind,mark),[]);rows=earlier.setdefault((kind,mark),[])
+            if not found and not rows:fields[kind]={'level':'green','message':'Sin coincidencias.'}
+            elif kind in ('key','file'):
+                shared=seats>1 and all(item['product_id']==product['id'] for item in found) and len(found)+len(rows)<seats
+                fields[kind]={'level':'green' if shared else 'red','message':('Clave compartida: puesto %d de %d.'%(len(found)+len(rows)+1,seats)) if shared else
+                              (('Este serial' if kind=='key' else 'Este archivo de licencia')+(' ya se encuentra registrado en el inventario.' if found else ' está repetido en la fila %d de esta lista.'%rows[0]))}
+            elif kind=='username':
+                fields[kind]={'level':'amber','message':('Esta cuenta ya tiene %d %s en el inventario.'%(len(found),'licencia registrada' if len(found)==1 else 'licencias registradas') if found else 'Esta cuenta también está en la fila %d.'%rows[0])+' Una cuenta puede tener varias licencias legítimas: confirma con una justificación.'}
+            elif kind=='account':
+                fields[kind]={'level':'amber','message':'Ya existe una licencia con este mismo usuario y contraseña'+(' (fila %d).'%rows[0] if not found else '.')+' La contraseña registrada no se muestra.'}
+            else:
+                fields[kind]={'level':'amber','message':'Este código del fabricante ya está registrado en este producto'+(' (fila %d).'%rows[0] if not found else '.')}
+            fields[kind]['matches']=found[:5];fields[kind]['rows']=rows[:5];fields[kind]['label']=DUPLICATE_LABELS[kind]
+            rows.append(number)
+        level=max((item['level'] for item in fields.values()),key=LEVELS.index,default='green')
+        results.append({'row':number,'level':level,'fields':fields})
+    overall=max((item['level'] for item in results),key=LEVELS.index,default='green')
+    return {'level':overall,'entries':results,'reason_required':overall=='amber'}
+
+
+def guard_duplicates(c,product,entries,data,user,now,exclude=None,label='Fila'):
+    """Se repite al guardar (aunque el formulario ya lo haya comprobado): rojo bloquea; ámbar exige justificación de administración."""
+    report=check_duplicates(c,product,entries,now.date(),exclude)
+    if report['level']=='red':
+        entry=next(item for item in report['entries'] if item['level']=='red');kind,info=next((k,v) for k,v in entry['fields'].items() if v['level']=='red')
+        # Repetida en la propia lista = dato del formulario a corregir (400); ya registrada en el inventario = conflicto (409).
+        raise LicenseError(('%s %d: '%(label,entry['row']) if len(entries)>1 else '')+info['message']+(' (%s)'%', '.join(m['code'] for m in info['matches']) if info['matches'] else ''),
+                           409 if info['matches'] else 400,{(kind if label=='Fila' or len(entries)==1 else 'lines'):'Duplicado no permitido.'},{'duplicates':report})
+    if report['level']=='amber':
+        reason=re.sub(r'\s+',' ',str(data.get('duplicate_reason') or '')).strip()[:300]
+        if user['role']!='administrador':raise LicenseError('Solo administración puede autorizar una coincidencia.',403,extra={'duplicates':report})
+        if len(reason)<DUPLICATE_REASON_MIN:
+            raise LicenseError('Posible licencia duplicada: revisa la coincidencia y, si es legítima, escribe la justificación.',409,{'duplicate_reason':'Justificación obligatoria (mínimo %d caracteres).'%DUPLICATE_REASON_MIN},{'duplicates':report,'reason_required':True})
+        return report,reason
+    return report,''
+
+
+def _log_authorized(c,report,units,reason,product,user,now):
+    """Cada coincidencia autorizada queda en el historial de la licencia: qué dato coincidía, con qué registros, quién, cuándo y por qué."""
+    if not reason:return
+    for entry,unit in zip(report['entries'],units):
+        flagged=[(info['label'],info['matches']) for info in entry['fields'].values() if info['level']=='amber']
+        if not flagged:continue
+        detail='Coincidencia autorizada: '+'; '.join(label+(' con '+', '.join(m['code'] for m in matches) if matches else ' en la misma lista') for label,matches in flagged)+'. Motivo: '+reason
+        event(c,'duplicado_autorizado',now,detail,unit,product['id'],user=user)
+
+
+def _guard_delivery(c,units):
+    """Un serial (o archivo) ya entregado no se entrega otra vez, salvo clave compartida con puestos libres. Autorizar una coincidencia al
+    registrar no permite eludir esta regla."""
+    if not units:return
+    key=_keys()[2];delivered={}
+    for row in c.execute("SELECT u.id,u.code,u.product_id,u.secret FROM license_units u WHERE u.status='entregada'"):
+        try:values=unseal(row['secret'])
+        except LicenseError:continue
+        for kind,mark in credential_marks(values,row['product_id'],key).items():
+            if kind in ('key','file'):delivered.setdefault(mark,[]).append(row['code'])
+    for unit in units:
+        try:values=unseal(unit['secret'])
+        except LicenseError:continue
+        seats=max(1,(_product(c,unit['product_id']).get('shared_seats') or 0))
+        for kind,mark in credential_marks(values,unit['product_id'],key).items():
+            if kind in ('key','file') and len(delivered.get(mark,[]))>=seats:
+                raise LicenseError('%s ya fue entregado (%s) y esta licencia no admite otra asignación. Revisa el inventario antes de entregar.'%(unit['code']+': el serial' if kind=='key' else unit['code']+': el archivo de licencia',', '.join(delivered[mark][:3])),409)
+            if kind in ('key','file'):delivered.setdefault(mark,[]).append(unit['code'])
+
+
+def duplicate_review(c,now):
+    """Informe administrativo del inventario guardado: solo lectura, nunca modifica registros históricos ni muestra credenciales."""
+    today=now.date();key=_keys()[2];groups={kind:{} for kind in ('key','license_code','username','file')};stock=[];unreadable=[];seats={}
+    for row in c.execute('SELECT u.*,i.name product,COALESCE(p.shared_seats,0) shared_seats FROM license_units u JOIN catalog_items i ON i.id=u.product_id LEFT JOIN license_products p ON p.item_id=u.product_id ORDER BY u.id'):
+        unit=dict(row);state,_=state_of(unit,today);seats[unit['product_id']]=max(1,unit['shared_seats'] or 0)
+        info={'unit_id':unit['id'],'code':unit['code'],'product_id':unit['product_id'],'product':unit['product'],'status':unit['status'],'state_label':STATES[state][0],'created_at':unit['created_at'],'hint':_hint(unit)}
+        try:values=unseal(unit['secret'])
+        except LicenseError:unreadable.append(dict(info,problem='La credencial guardada no se puede verificar.'));continue
+        for kind,mark in credential_marks(values,unit['product_id'],key).items():
+            if kind in groups:groups[kind].setdefault(mark,[]).append(info)
+        problem=('Disponible pero vinculada a un cliente, una venta o una entrega.' if unit['status']=='disponible' and (unit['client_id'] or unit['delivery_id'] or unit['sale_id']) else
+                 'Reservada sin venta, presupuesto ni orden.' if unit['status']=='reservada' and not (unit['sale_id'] or unit['quote_id'] or unit['order_id']) else
+                 'Entregada sin registro de entrega.' if unit['status']=='entregada' and not unit['delivery_id'] else
+                 'Entregada sin cliente.' if unit['status']=='entregada' and not unit['client_id'] else
+                 'Marcada como activada sin fecha de activación.' if unit['activated'] and not unit['activated_at'] and unit['status']!='anulada' else '')
+        if problem:stock.append(dict(info,problem=problem))
+    def many(kind,keep):return [items for items in groups[kind].values() if len(items)>1 and keep(items)]
+    within=lambda items:len({i['product_id'] for i in items})==1 and len(items)<=seats[items[0]['product_id']]
+    serials=many('key',lambda items:not within(items));files=many('file',lambda items:not within(items))
+    # Entregas en conflicto: el mismo serial o archivo entregado más veces de las que permite la licencia.
+    delivered=[]
+    for items in list(groups['key'].values())+list(groups['file'].values()):
+        given=[i for i in items if i['status']=='entregada']
+        if given and len(given)>seats.get(given[0]['product_id'],1):delivered.append(given)
+    report={'serials':serials,'files':files,'codes':many('license_code',lambda items:True),'accounts':many('username',lambda items:len({i['product_id'] for i in items})>1),
+            'delivered':delivered,'stock':stock,'unreadable':unreadable,'checked_at':stamp(now)}
+    report['total']=sum(len(report[k]) for k in ('serials','files','codes','accounts','delivered','stock','unreadable'))
+    return report
 
 
 # ---- Ajuste de stock: el inventario son licencias individuales (LIC-…), no un contador ------------------------------------
@@ -551,6 +780,22 @@ def unit_row(c,unit_id):
     return dict(row)
 
 
+def _edit_credential(unit,product,data):
+    """Actualización parcial de la credencial: lo escrito sustituye a lo guardado y el resto se conserva (nunca se borra un dato sin
+    querer). Si la licencia tiene datos de otro método (registrada antes de elegirlo), se validan todos sin descartar ninguno."""
+    method=product.get('activation_method') or '';typed={key:data.get(key) for key in SECRET_INPUTS if str(data.get(key) or '').strip()}
+    file=_clean_file(data) if method=='archivo' else None
+    if not typed and not file:return None
+    current=unseal(unit['secret']);merged={key:value for key,value in current.items() if key in SECRET_INPUTS+('serial',)};merged.update(typed)
+    if 'serial' in merged and 'key' not in merged:merged['key']=merged.pop('serial')
+    fits=set(merged)<=set(ACTIVATION_FIELDS.get(method,SECRET_INPUTS))
+    values=_clean_secret(merged,required=method!='archivo',method=method if fits else '')
+    sha=file['sha256'] if file else current.get('file_sha256')
+    if method=='archivo' and not sha:raise LicenseError('Adjunta el archivo de licencia del fabricante.',fields={'file':'Archivo obligatorio.'})
+    if sha:values['file_sha256']=sha
+    return values,file
+
+
 def edit(c,unit_id,data,user,now):
     """Corrige datos de una licencia no entregada. La credencial solo se reemplaza si se escribe una nueva (nunca se sobrescribe sin querer)."""
     unit=unit_row(c,unit_id)
@@ -558,9 +803,11 @@ def edit(c,unit_id,data,user,now):
         if unit['status']=='entregada' and set(data)-{'action','notes','activated'}<=set():pass
         else:raise LicenseError('Una licencia %s no se modifica: usa «Confirmar activación» o «Renovar licencia».'%STATUSES[unit['status']].lower(),409)
     product=_product(c,unit['product_id']);fields=_clean_unit(product,dict({k:unit[k] for k in FIELDS},**{k:v for k,v in data.items() if k in FIELDS}),now.date());changes=[]
-    secret,mark,seat=unit['secret'],unit['fingerprint'],unit['seat']
-    if any(str(data.get(key) or '').strip() for key in SECRET_INPUTS):
-        values=_clean_secret(data);seat,mark=_free_seat(c,product,values,exclude=unit_id);secret=seal(values);changes.append('credencial reemplazada')
+    secret,mark,seat=unit['secret'],unit['fingerprint'],unit['seat'];report,reason,file=None,'',None
+    credential=_edit_credential(unit,product,data)
+    if credential:
+        values,file=credential;report,reason=guard_duplicates(c,product,[values],data,user,now,exclude=unit_id)
+        seat,mark=_free_seat(c,product,values,exclude=unit_id,extra=100 if reason else 0);secret=seal(values);changes.append('credencial actualizada'+(' con un archivo de licencia nuevo' if file else ''))
     changes+=[FIELD_LABELS[key].lower() for key in FIELDS if fields[key]!=unit[key]]
     notes=_text(data,'notes',500,'Las observaciones') if 'notes' in data else unit['notes']
     activated=int(data['activated']) if data.get('activated') in (True,False) else (1 if fields['activated_at'] else unit['activated'])
@@ -573,6 +820,8 @@ def edit(c,unit_id,data,user,now):
     if status in ('disponible','vencida'):status='vencida' if fields['expires_at'] and fields['expires_at']<now.date().isoformat() else 'disponible'
     c.execute('UPDATE license_units SET edition=?,license_type=?,manufacturer=?,version=?,devices=?,term=?,purchased_at=?,activated_at=?,expires_at=?,download_url=?,instructions=?,secret=?,fingerprint=?,seat=?,notes=?,activated=?,status=?,updated_at=? WHERE id=?',
               (*[fields[key] for key in FIELDS],secret,mark,seat,notes,activated,status,stamp(now),unit_id))
+    if file:_store_file(c,unit_id,file,user,now)
+    if report:_log_authorized(c,report,[unit_id],reason,product,user,now)
     event(c,'editada',now,'Datos corregidos: '+(', '.join(changes) if changes else 'sin cambios')+'.',unit_id,unit['product_id'],order=unit['order_id'],client=unit['client_id'],user=user)
     if status=='disponible':fill_pending(c,product['id'],now,user)
 
@@ -797,6 +1046,7 @@ def deliver(c,data,user,now):
     if data.get('activated') is True and not activation:raise LicenseError('Indica la fecha real de activación.',fields={'activated_at':'Fecha obligatoria.'})
     delivery=c.execute("INSERT INTO license_deliveries(order_id,client_id,kind,status,payment_confirmed_by,payment_confirmed_at,balance_cents,authorized_by,authorized_at,token_hash,token_expires_at,notes,price_cents,discount_cents,payment_status,created_at,updated_at) VALUES (?,?,?,'autorizada',?,?,?,?,?,?,?,?,?,?,?,?,?)",
                        (order_id,client,kind,user['id'],moment,balance,user['id'],moment,_hash(token),stamp(now+timedelta(hours=LINK_HOURS)),notes,price,discount,payment,moment,moment)).lastrowid
+    _guard_delivery(c,units)
     for unit in units:
         allowed=('reservada',) if kind=='orden' else ('disponible',)
         if not c.execute("UPDATE license_units SET status='entregada',delivered_at=?,client_id=?,order_id=COALESCE(order_id,?),quote_id=COALESCE(quote_id,?),delivery_id=?,updated_at=? WHERE id=? AND status IN (%s)"%','.join('?'*len(allowed)),
@@ -878,28 +1128,43 @@ def verify_code(c,delivery,code,now,origin=''):
     return card(c,delivery['id'],private=True)
 
 
-def credentials(unit):
+def credentials(unit,c=None):
     values=unseal(unit['secret'])
-    return [{'key':key,'label':SECRET_LABELS[key],'value':values[key]} for key in ('key','serial','username','password','license_code') if values.get(key)]
+    items=[{'key':key,'label':SECRET_LABELS[key],'value':values[key]} for key in ('key','serial','username','password','license_code') if values.get(key)]
+    found=c.execute('SELECT name,size FROM license_files WHERE unit_id=?',(unit['id'],)).fetchone() if c is not None else None
+    if found:items.append({'key':'file','label':'Archivo de licencia','value':found['name'],'size':found['size'],'file':True})
+    return items
 
 
 def admin_reveal(c,unit_id,user,now):
     if user['role']!='administrador':raise LicenseError('Acceso no permitido.',403)
     unit=unit_row(c,unit_id)
     event(c,'credenciales_consultadas',now,'Credencial consultada por administración.',unit_id,unit['product_id'],order=unit['order_id'],client=unit['client_id'],user=user)
-    return credentials(unit)
+    return credentials(unit,c)
 
 
-METHODS={'clave':'Licencia con clave de producto','cuenta':'Licencia mediante cuenta','cuenta_clave':'Licencia con cuenta y clave'}
+def admin_file(c,unit_id,user,now):
+    """Descarga del archivo de licencia por administración; queda en el historial como cualquier consulta de credenciales."""
+    if user['role']!='administrador':raise LicenseError('Acceso no permitido.',403)
+    unit=unit_row(c,unit_id);found=file_of(c,unit_id)
+    if not found:raise LicenseError('Esta licencia no tiene archivo.',404)
+    event(c,'archivo_descargado',now,'Archivo de licencia descargado por administración.',unit_id,unit['product_id'],order=unit['order_id'],client=unit['client_id'],user=user)
+    return found
 
 
-def method_of(unit):
-    """Método de activación según los campos guardados (cifrados) y los NOMBRES de esos campos; nunca sus valores."""
+METHODS={'clave':'Licencia con clave de producto','cuenta':'Licencia mediante cuenta','cuenta_clave':'Licencia con cuenta y clave',
+         'mixta':'Activación mixta (clave y cuenta)','archivo':'Licencia con archivo del fabricante'}
+
+
+def method_of(unit,stored=''):
+    """Método de activación: el guardado en el producto o, en productos anteriores, el que se deduce de los campos guardados (cifrados).
+    Devuelve también los NOMBRES de los campos presentes; nunca sus valores."""
     try:
         values=unseal(unit['secret'])
     except Exception:
-        return '',[]
+        return stored,[]
     present=[key for key in ('key','serial','license_code','username','password') if values.get(key)]
+    if stored in ACTIVATION:return stored,[SECRET_LABELS[key] for key in present]+(['Archivo de licencia'] if values.get('file_sha256') else [])
     has_key=any(key in present for key in ('key','serial','license_code'));has_account=any(key in present for key in ('username','password'))
     method='cuenta_clave' if has_key and has_account else 'cuenta' if has_account else 'clave' if has_key else ''
     return method,[SECRET_LABELS[key] for key in present]
@@ -922,9 +1187,9 @@ def card(c,delivery_id,private=False,now=None):
         if unit['activated_at'] and unit['expires_at']:
             try:period=max(1,(date.fromisoformat(unit['expires_at'])-date.fromisoformat(unit['activated_at'][:10])).days)
             except ValueError:period=None
-        method,fields=method_of(unit)
+        method,fields=method_of(unit,_product(c,unit['product_id']).get('activation_method') or '')
         item.update(unit_id=unit['id'],state=state,state_label=STATES[state][0],days_left=days,period_days=period,method=method,method_label=METHODS.get(method,''),fields=fields)
-        if private:item.update(credentials=credentials(unit),download_url=unit['download_url'],instructions=unit['instructions'])
+        if private:item.update(credentials=credentials(unit,c),download_url=unit['download_url'],instructions=unit['instructions'],file=file_of(c,unit['id']))
         items.append(item)
     return {'delivery_id':delivery_id,'client':client['name'] if client else '','order':order['code'] if order else '','delivered_at':delivery['authorized_at'],'status':delivery['status'],
             'items':items,'contact':CONTACT,'private':private}
@@ -936,7 +1201,7 @@ def units(c,now,product_id=None,status='',query='',state='',date_from='',date_to
     sql=("SELECT u.id,u.code,u.product_id,i.name product,i.brand,u.kind,u.edition,u.license_type,u.manufacturer,u.version,u.devices,u.term,u.purchased_at,u.activated_at,u.expires_at,u.activated,u.notes,"
          "u.download_url,u.instructions,u.status,u.reserved_at,u.delivered_at,u.created_at,u.renewed_from,u.renewed_to,u.seat,u.batch_id,"
          "q.code quote_code,COALESCE(o.code,'') order_code,u.order_id,u.client_id,COALESCE(cl.name,'') client,COALESCE(cl.identification,'') client_identification,b.supplier batch_supplier,b.invoice,b.unit_cost_cents,"
-         "(SELECT 1 FROM license_receipts r WHERE r.batch_id=u.batch_id) has_receipt,p.validity_mode,p.duration,p.duration_months,(SELECT COUNT(*) FROM license_renewals n WHERE n.unit_id=u.id) renewals,"
+         "(SELECT 1 FROM license_receipts r WHERE r.batch_id=u.batch_id) has_receipt,p.validity_mode,p.duration,p.duration_months,COALESCE(p.activation_method,'') activation_method,(SELECT 1 FROM license_files f WHERE f.unit_id=u.id) has_file,(SELECT COUNT(*) FROM license_renewals n WHERE n.unit_id=u.id) renewals,"
          "(SELECT s.code FROM license_sales s WHERE s.id=u.sale_id) sale_code,(SELECT s.payment_status FROM license_sales s WHERE s.id=u.sale_id) sale_payment,u.sale_id "
          "FROM license_units u JOIN catalog_items i ON i.id=u.product_id LEFT JOIN license_products p ON p.item_id=u.product_id LEFT JOIN quotes q ON q.id=u.quote_id LEFT JOIN orders o ON o.id=u.order_id "
          "LEFT JOIN clients cl ON cl.id=u.client_id LEFT JOIN license_batches b ON b.id=u.batch_id WHERE 1=1")

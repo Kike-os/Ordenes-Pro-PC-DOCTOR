@@ -164,3 +164,57 @@ Nada de esto muestra claves, contraseñas ni credenciales de Microsoft 365. No s
 **Pruebas** (datos ficticios):
 - Las pruebas del servidor comprueban siete licencias de un cliente (cinco iguales), sin cruces con otro cliente. Confirman también que ni la tarjeta ni el PDF público (descomprimido) contienen secretos, que el documento privado exige confirmación y queda registrado, y que nada se modifica.
 - En el navegador: 17 de 17 comprobaciones en 1366, 1920, 390 y 320 px.
+
+## Inventario y credenciales: método de activación y ADI Duplicate Protection Pro (migración 069, rama `licencias-credenciales`)
+
+**Método de activación por producto:** `license_products.activation_method`.
+
+| Método | Campos | Obligatorios |
+|---|---|---|
+| Clave de producto o serial | Clave e identificador del fabricante | Clave |
+| Usuario y contraseña | Usuario, contraseña e identificador del fabricante | Usuario y contraseña |
+| Activación mixta | Clave, usuario, contraseña e identificador del fabricante | Clave, usuario y contraseña |
+| Archivo de licencia | Archivo del fabricante e identificador del fabricante | Archivo |
+
+- **Selector:** cuatro tarjetas con iconos Lucide. Solo se muestran, se validan y se envían los campos del método elegido.
+- **Cambio de método:** si quedan datos escritos en campos que el nuevo método no usa, se pide confirmación. Lo escrito no se borra del formulario (se recupera volviendo al método anterior), pero no se guarda.
+- **Compatibilidad:** los productos anteriores quedan sin método («Según los datos guardados») y funcionan como antes. Al agregar stock se elige su método y queda guardado. Cambiar el método nunca modifica las licencias ya registradas.
+- **Archivo de licencia** (tabla `license_files`, una por licencia):
+  - Formatos `.lic`, `.key`, `.dat`, `.xml`, `.json`, `.txt`, `.cfg`, `.ini` y `.pdf`, hasta 256 KB.
+  - Se rechazan programas, scripts y comprimidos. Los formatos de texto deben ser UTF-8 y los PDF deben ser válidos.
+  - Se guarda cifrado con la misma clave que las credenciales, que está fuera de la base. Los listados no lo leen.
+  - Administración lo descarga desde el detalle, y la descarga queda en el historial.
+  - El cliente lo descarga desde la misma página privada que muestra las credenciales una sola vez.
+
+**Varias licencias por filas:**
+- Filas compactas con copiar fila, quitar fila y agregar fila, más «Pegar lista», que convierte líneas en filas.
+- Cuenta los registros nuevos y valida cada fila por separado: el error señala la fila y el campo.
+- El registro es todo o nada. El formato anterior por líneas se sigue aceptando.
+
+**Protección de duplicados:** se compara siempre en el servidor, por huellas HMAC calculadas con la clave del servidor. Las respuestas y el historial nunca incluyen claves, usuarios ni contraseñas.
+
+| Dato | Nivel | Regla |
+|---|---|---|
+| Serial o clave | **Rojo** | Normaliza espacios, guiones y mayúsculas. Bloquea siempre, salvo clave compartida con puestos libres (verde). |
+| Archivo | **Rojo** | El mismo archivo es la misma licencia. |
+| Usuario o correo | **Ámbar** | Una cuenta puede tener varias licencias legítimas. |
+| Usuario + contraseña | **Ámbar** | Aviso reforzado. La contraseña registrada no se muestra. |
+| Identificador del fabricante | **Ámbar** | Solo si se repite en el mismo producto. |
+| Contraseña sola | — | Nunca se marca. |
+
+- **En el formulario:** el aviso aparece debajo de cada campo o fila (gris mientras comprueba, verde, ámbar o rojo), con «Ver registro» del existente.
+- **Aviso de ADI:** «Atención: encontré una licencia que podría estar duplicada…», con «Corregir información» y «Cancelar registro». Es solo visual, sin voz.
+- **Ámbar:** se puede registrar marcando «Registrar de todas formas», con una justificación de al menos 10 caracteres y una confirmación explícita. Solo administración puede hacerlo. Queda en el historial (`duplicado_autorizado`) con el dato que coincidía, los registros, el usuario, la fecha y el motivo.
+- **Rojo:** no se puede saltar.
+- **Al guardar se repite la comprobación.** Una repetición dentro de la propia lista responde 400; un conflicto con el inventario, 409.
+- **Ediciones:** se comprueban del mismo modo. Lo escrito sustituye a lo guardado y el resto se conserva.
+
+**Entregas:** un serial o archivo ya entregado no se entrega otra vez, salvo clave compartida con puestos libres, tanto en la entrega directa como en las ventas. Autorizar una coincidencia al registrar no permite eludir esta regla. También bloquea los duplicados históricos.
+
+**Revisar duplicados** (Inventario):
+- Detecta seriales y archivos repetidos, identificadores del fabricante repetidos, cuentas en productos distintos, entregas en conflicto, posibles errores de stock y credenciales ilegibles.
+- Es un informe de solo lectura, sin credenciales, y la consulta queda en la auditoría.
+
+**Pruebas:**
+- `test_license_methods.py` (7) y las pruebas de licencias anteriores (40).
+- En navegador: 23 comprobaciones de alta, cambio de método, duplicados, filas, ámbar justificado, archivo, informe, teclado y 768, 390 y 320 px. Ventas (27), Entregas (15) y la Tarjeta (17) siguen en verde.
