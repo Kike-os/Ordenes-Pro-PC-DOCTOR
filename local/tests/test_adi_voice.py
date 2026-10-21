@@ -94,6 +94,8 @@ class CspTests(unittest.TestCase):
     def test_production_and_local_share_the_policy_and_allow_blob_audio(self):
         import wsgi_app
         self.assertIn("media-src 'self' blob:",app.DEFAULT_CSP)
+        # Vistas previas de imágenes antes de guardar (logotipos, imágenes del catálogo): se muestran con enlaces blob: de la propia página.
+        self.assertIn("img-src 'self' blob:;",app.DEFAULT_CSP);self.assertNotIn('img-src *',app.DEFAULT_CSP)
         source=open(wsgi_app.__file__,encoding='utf-8').read()
         self.assertIn('core.DEFAULT_CSP',source);self.assertNotIn("default-src 'self'",source)  # una sola definición
 

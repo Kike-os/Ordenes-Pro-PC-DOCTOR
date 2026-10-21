@@ -731,7 +731,7 @@ def resend_delivery(c,row,address,user):
     return 200,{'ok':True,'id':next(iter(tracked.values())),'status':c.execute('SELECT status FROM mail_deliveries WHERE id=?',(next(iter(tracked.values())),)).fetchone()['status']}
 
 
-DEFAULT_CSP="default-src 'self'; media-src 'self' blob:; frame-src 'self' blob: https://challenges.cloudflare.com; script-src 'self' https://challenges.cloudflare.com; style-src 'self'; img-src 'self'; connect-src 'self' https://challenges.cloudflare.com; frame-ancestors 'none'; form-action 'self'; base-uri 'none'"
+DEFAULT_CSP="default-src 'self'; media-src 'self' blob:; frame-src 'self' blob: https://challenges.cloudflare.com; script-src 'self' https://challenges.cloudflare.com; style-src 'self'; img-src 'self' blob:; connect-src 'self' https://challenges.cloudflare.com; frame-ancestors 'none'; form-action 'self'; base-uri 'none'"
 
 
 def note_runtime_error(method,path,error,user=None,status=500):
@@ -2015,7 +2015,9 @@ class Handler(BaseHTTPRequestHandler):
                         return self.reply(200,{'products':licenses.products(c,now),'dashboard':licenses.dashboard(c,now),'expiring':licenses.expiring(c,now,30),'kinds':licenses.KINDS,'lines':licenses.LINES,'models':licenses.MODELS,
                                                'durations':licenses.DURATIONS,'validity':licenses.VALIDITY,'statuses':licenses.STATUSES,'states':licenses.STATES,'fields':licenses.FIELDS,'field_labels':licenses.FIELD_LABELS,
                                                'secret_labels':licenses.SECRET_LABELS,'max_bulk':licenses.MAX_BULK,'activation':licenses.ACTIVATION,'activation_fields':licenses.ACTIVATION_FIELDS,'activation_required':licenses.ACTIVATION_REQUIRED,
-                                               'file_types':sorted(licenses.FILE_TYPES),'file_limit':licenses.FILE_LIMIT,'duplicate_reason_min':licenses.DUPLICATE_REASON_MIN,'contact':licenses.CONTACT,'link_hours':licenses.LINK_HOURS,'display':licenses.display_settings(c)})
+                                               'file_types':sorted(licenses.FILE_TYPES),'file_limit':licenses.FILE_LIMIT,'duplicate_reason_min':licenses.DUPLICATE_REASON_MIN,
+                                               # Logotipos locales con procedencia documentada (static/brands/README.md): solo de respaldo si el producto no tiene el suyo.
+                                               'brand_logos':{f.stem:f.name for f in sorted((ROOT/'static'/'brands').glob('*')) if f.suffix in ('.svg','.png') and re.fullmatch(r'[a-z0-9]+(?:-[a-z0-9]+)*',f.stem)},'contact':licenses.CONTACT,'link_hours':licenses.LINK_HOURS,'display':licenses.display_settings(c)})
                     if path=='/api/licenses/units':
                         product=arg('product');client=arg('client')
                         return self.reply(200,{'rows':licenses.units(c,now,int(product) if product.isdigit() else None,arg('status'),arg('q')[:120],arg('state'),arg('from')[:10],arg('to')[:10],int(client) if client.isdigit() else None,arg('field'))})
@@ -2035,7 +2037,7 @@ class Handler(BaseHTTPRequestHandler):
                     if path=='/api/licenses/order-info':
                         info=licenses.order_info(c,arg('code')[:40]);return self.reply(200,info) if info else self.reply(404,{'error':'No existe una orden con ese número.'})
                     if path=='/api/licenses/history':
-                        unit=arg('unit');return self.reply(200,{'rows':licenses.history(c,300,int(unit) if unit.isdigit() else None),'renewals':licenses.renewals(c,int(unit)) if unit.isdigit() else []})
+                        unit=arg('unit');product=arg('product');return self.reply(200,{'rows':licenses.history(c,300,int(unit) if unit.isdigit() else None,int(product) if product.isdigit() else None),'renewals':licenses.renewals(c,int(unit)) if unit.isdigit() else []})
                     if path=='/api/licenses/notices':
                         import license_mail
                         return self.reply(200,{'settings':license_mail.settings(c),'rows':license_mail.history(c),'mail_ready':mail_pro.configured(),'stages':license_mail.STAGES,

@@ -1325,12 +1325,13 @@ def delivery_events(c,delivery_id):
                                        "LEFT JOIN license_units lu ON lu.id=e.unit_id WHERE e.delivery_id=? OR e.unit_id IN (SELECT id FROM license_units WHERE delivery_id=?) ORDER BY e.id",(delivery_id,delivery_id))]
 
 
-def history(c,limit=300,unit_id=None):
+def history(c,limit=300,unit_id=None,product_id=None):
     sql=("SELECT e.id,e.event,e.detail,e.created_at,COALESCE(u.name,e.actor) actor,lu.code unit_code,i.name product,COALESCE(o.code,'') order_code,COALESCE(cl.name,'') client "
          "FROM license_events e LEFT JOIN users u ON u.id=e.actor_id LEFT JOIN license_units lu ON lu.id=e.unit_id LEFT JOIN catalog_items i ON i.id=e.product_id "
          "LEFT JOIN orders o ON o.id=e.order_id LEFT JOIN clients cl ON cl.id=e.client_id")
     args=[]
     if unit_id:sql+=' WHERE e.unit_id=?';args.append(unit_id)
+    elif product_id:sql+=' WHERE e.product_id=? OR lu.product_id=?';args+=[product_id,product_id]
     return [dict(r) for r in c.execute(sql+' ORDER BY e.id DESC LIMIT ?',(*args,limit))]
 
 

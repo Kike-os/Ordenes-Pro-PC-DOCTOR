@@ -218,3 +218,29 @@ Nada de esto muestra claves, contraseñas ni credenciales de Microsoft 365. No s
 **Pruebas:**
 - `test_license_methods.py` (7) y las pruebas de licencias anteriores (40).
 - En navegador: 23 comprobaciones de alta, cambio de método, duplicados, filas, ámbar justificado, archivo, informe, teclado y 768, 390 y 320 px. Ventas (27), Entregas (15) y la Tarjeta (17) siguen en verde.
+
+## Catálogo de licencias Enterprise (Productos y catálogo)
+
+- **Rejilla:** tarjetas uniformes con CSS Grid. En escritorio caben 3 o 4 por fila (4 a partir de 1500 px); en tableta, 2; en móvil, 1. Al pasar el cursor hay una microanimación, que se desactiva con movimiento reducido.
+- **Logotipo grande:** área de 118 px en la que el logotipo se ajusta sin deformarse. El fondo se elige analizando el propio logotipo: claro para logos oscuros y oscuro para logos claros.
+  - Si el producto no tiene logotipo subido, se usa el de la marca guardado en el sistema (`static/brands`, procedencia documentada).
+  - Sin ninguno, se muestran las iniciales del fabricante con un color propio de esa marca, nunca el mismo icono para todos.
+  - No se descargan imágenes de internet.
+- **Subida del logotipo** (Editar):
+  - Acepta PNG, JPG, WebP y SVG, con vista previa antes de guardar.
+  - Un SVG nunca se guarda como SVG: el navegador lo convierte en imagen. Las imágenes grandes se reducen a 512 px sin deformar.
+  - El servidor sigue aceptando solo PNG, JPG o WebP reales de hasta 300 KB.
+- **Nombre y datos:**
+  - Fabricante en texto pequeño; nombre en dos líneas como máximo, completo al pasar el cursor; debajo, por ejemplo, «1 dispositivo · 1 año».
+  - Los nombres guardados no cambian.
+- **Inventario:** cuatro indicadores calculados con los estados exclusivos del servidor, de modo que una licencia nunca cuenta dos veces: disponibles (verde), reservadas (ámbar), vendidas (azul) y vencidas (rojo).
+- **Precio:** el precio de venta va destacado y el valor no cambia. En «Detalles» (desplegable) aparecen costo, duración, dispositivos, tipo, activación, vigencia, categoría, edición, fabricante y clave compartida.
+- **Acciones:**
+  - «Editar» y un menú «⋯» con iconos: agregar stock, ajustar stock, duplicar producto, consultar licencias, ver movimientos (historial del producto) y desactivar o activar producto, con confirmación.
+  - El menú es el mismo componente del inventario: se maneja con flechas, Escape y Tab.
+- **Barra:**
+  - Buscador por nombre, fabricante, categoría, tipo de licencia o activación, sin distinguir tildes.
+  - Selector de categoría, orden por nombre, precio o disponibilidad, y «Nueva licencia» con icono.
+  - Filtros: Todos, Disponibles, Sin stock y Desactivados.
+- **Error corregido:** la política de seguridad bloqueaba las vistas previas `blob:` de imágenes, como el logotipo antes de guardar o la imagen del catálogo. `img-src` permite ahora `blob:`, que solo crea la propia página.
+- **Pruebas en navegador:** 19 comprobaciones de rejilla y columnas, logotipos e iniciales, proporción, nombre, indicadores frente a los registros, precio y detalles, ausencia de credenciales, menú y teclado, movimientos, confirmación, buscador, filtros y orden, subida de SVG, 1024, 768, 390 y 320 px, y ausencia de errores de JavaScript.
