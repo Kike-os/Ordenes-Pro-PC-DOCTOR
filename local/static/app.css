@@ -7755,3 +7755,62 @@ body:is([data-page=login],.auth-page) .login-ip-text p{line-height:1.38}
 .delivery-imap{margin:0;font-size:12px;color:#9fb3cf}.delivery-imap[data-state=error]{color:#fca5a5}
 .delivery-pill[data-status=desconocido]{--dp-line:#b45309;--dp-bg:#2a1a08;--dp-ink:#fcd34d}
 @media (max-width:640px){.delivery-steps{grid-template-columns:repeat(2,minmax(0,1fr))}}
+/* Inicio de sesión compacto (todas las pantallas): mismo contenido, menos altura. Responsive real, sin transform: scale(). */
+body[data-page=login] .access-shell{padding:clamp(10px,2vh,24px) 0;align-content:center;place-items:center}
+body[data-page=login] .access-shell .access-card{width:calc(100% - 24px);max-width:400px;box-sizing:border-box;padding:clamp(16px,3.2vw,22px) clamp(16px,4vw,24px) clamp(14px,3vw,18px);border:1px solid #38527b8c;border-radius:16px;box-shadow:0 16px 48px #0006,0 0 40px #2563be12,inset 0 1px #7eafff0d}
+body[data-page=login] .access-shell .brand{margin:0;padding:0}
+body[data-page=login] .access-shell .brand .original-logo{width:clamp(72px,20vw,92px);margin:0 auto 4px}
+body[data-page=login] .access-shell .brand h1{margin:0;font-size:clamp(1.35rem,1.05rem + 1.3vw,1.65rem);line-height:1.15}
+body[data-page=login] .access-shell .brand .brand-company{margin:3px 0 0;font-size:clamp(.68rem,.62rem + .3vw,.76rem)}
+body[data-page=login] .access-shell .brand .brand-tagline{margin:2px 0 0;font-size:clamp(.74rem,.7rem + .25vw,.82rem)}
+body[data-page=login] .access-shell #login-form{margin-top:clamp(10px,1.6vh,14px);padding:0}
+body[data-page=login] .access-shell #login-form>label{margin:0 0 5px;font-size:clamp(.78rem,.74rem + .2vw,.84rem)}
+body[data-page=login] .access-shell #login-form .login-input{min-height:46px;height:46px;margin:0}
+body[data-page=login] .access-shell #login-form .login-input input{height:100%;min-height:0}
+/* El aviso de cada campo conserva su hueco (el formulario no salta al escribir) y ese hueco es la separación entre campos. */
+body[data-page=login] .access-shell #login-form :is(#login-hint,#password-hint){min-height:15px;margin:3px 0 6px;font-size:11.5px;line-height:1.3}
+body[data-page=login] .access-shell #login-form .form-options{margin:0 0 12px;font-size:clamp(.76rem,.72rem + .2vw,.82rem)}
+body[data-page=login] .access-shell .submit{min-height:46px;height:46px;padding-block:0}
+body[data-page=login] .access-shell .access-card .login-ip{margin-top:10px;padding-top:8px;gap:8px}
+body[data-page=login] .access-shell .access-card .login-ip-text p{margin:1px 0;font-size:10.5px;line-height:1.32}
+body[data-page=login] .access-shell .access-card .login-ip-text strong{font-size:9.5px;line-height:1.3}
+body[data-page=login] .access-shell .access-card .login-ip-text small{font-size:9.5px}
+/* Versión del sistema: tarjeta pequeña dentro del acceso, con el estado y las acciones en una sola fila. */
+body[data-page=login] .access-shell .access-card .system-version{margin:10px 0 0;padding:9px 11px;gap:6px;border:1px solid #22385a;border-radius:12px;background:#0a1525cc}
+body[data-page=login] .access-shell .system-version-main{gap:2px 10px}
+body[data-page=login] .access-shell .system-version-icon{width:32px;height:32px;border-radius:9px}
+body[data-page=login] .access-shell .system-version-icon .icon{width:16px;height:16px}
+body[data-page=login] .access-shell .system-version-text{gap:0 8px}
+body[data-page=login] .access-shell .system-version-text small{font-size:9.5px}
+body[data-page=login] .access-shell .system-version-text strong{font-size:14px}
+body[data-page=login] .access-shell .system-version-status{font-size:11.5px;line-height:1.35}
+body[data-page=login] .access-shell .system-version-actions{margin-left:42px;align-items:center}
+body[data-page=login] .access-shell .system-version-link{padding:4px 9px;font-size:11.5px}
+body[data-page=login] .access-shell #stability-login{margin-top:0;padding-left:42px}
+body[data-page=login] .access-shell .login-book{min-height:38px;margin-top:10px;padding:7px 16px}
+@media(max-width:420px){body[data-page=login] .access-shell .system-version-actions,body[data-page=login] .access-shell #stability-login{margin-left:0;padding-left:0}}
+@media(max-height:700px){body[data-page=login] .access-shell{align-content:start}}
+/* Tarjeta de equipo (Órdenes): encabezado con icono + «Equipo», estado como insignia que pasa a otra línea si no cabe (nunca se corta),
+   confirmación a la derecha; nombre como título, tipo secundario, línea técnica e «Actualizado» con iconos, «En esta página» como etiqueta. */
+#module-content .equip-tab.equip-card{grid-template-rows:auto auto auto;align-content:start;gap:0;min-height:0;padding:0;border:1px solid #243a5c;border-radius:12px;background:linear-gradient(180deg,#10223b,#0b182b);box-shadow:0 6px 18px -14px #000,inset 0 1px 0 #ffffff08;transition:border-color .18s ease,box-shadow .18s ease,background-color .18s ease}
+#module-content .equip-tab .equip-card-top{position:relative;display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;min-width:0;padding:10px 40px 9px 12px;border-bottom:1px solid #1a2e4b;background:#0d1c32}
+#module-content .equip-tab .equip-card-id{display:inline-flex;align-items:center;flex:0 0 auto;gap:7px;margin:0}
+#module-content .equip-tab .equip-card-id strong{margin:0;font-size:13px;font-weight:700;letter-spacing:.02em;color:#dce8fb;white-space:nowrap}
+#module-content .equip-tab .equip-card-icon{width:24px;height:24px}
+#module-content .equip-tab .equip-card-top .equip-state{flex:0 1 auto;max-width:100%;min-width:0;height:auto;min-height:22px;margin:0;padding:3px 9px;border-radius:11px;font-size:11px;font-weight:700;line-height:1.25;white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere}
+#module-content .equip-tab .equip-card-picked{position:absolute;top:12px;right:12px;width:20px;height:20px}
+#module-content .equip-tab .equip-card-body{display:grid;gap:3px;padding:10px 14px 7px}
+#module-content .equip-tab .equip-tab-name{font-size:15px;font-weight:700;line-height:1.3;color:#f2f6ff}
+#module-content .equip-tab .equip-tab-kind{font-size:12px;line-height:1.35;color:#a9bdd8}
+#module-content .equip-tab :is(.equip-tab-sub,.equip-tab-when){display:flex;align-items:center;gap:6px;min-width:0;font-size:11.5px;line-height:1.35;color:#8ea4c4}
+#module-content .equip-tab .equip-tab-sub{margin-top:4px;font-variant-numeric:tabular-nums;letter-spacing:.01em}
+#module-content .equip-tab :is(.equip-tab-sub,.equip-tab-when) span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#module-content .equip-tab :is(.equip-tab-sub,.equip-tab-when) svg{flex:none;width:13px;height:13px;fill:none;stroke:#6f9fd8;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+#module-content .equip-tab .equip-card-foot{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 10px;padding:7px 14px 10px;border-top:1px dashed #1a2e4b}
+#module-content .equip-tab .equip-tab-when{margin:0;flex:1 1 auto}
+#module-content .equip-tab .equip-tab-here{flex:none;margin:0;padding:2px 8px;border:1px solid #2f6f9e;border-radius:999px;background:#0f2a44;color:#9fd8ff;font-size:10.5px;font-weight:700;font-style:normal;letter-spacing:.02em;line-height:1.4}
+#module-content .equip-tab.equip-card[aria-selected=true]{border-color:#5fa8ea;background:linear-gradient(180deg,#14304f,#0d1f39);box-shadow:0 0 0 1px #5fa8ea40,0 12px 26px -18px #5fa8ea}
+#module-content .equip-tab.equip-card[aria-selected=true] .equip-card-top{background:#11284a;border-bottom-color:#27507f}
+@media(max-width:480px){#module-content .equip-tab .equip-card-body{padding:10px 12px 7px}#module-content .equip-tab .equip-card-foot{padding:7px 12px 10px}#module-content .equip-tab .equip-tab-name{font-size:14.5px}}
+#module-content .equip-tab.equip-card:focus-visible{outline:2px solid #8fd3ff;outline-offset:2px}
+@media(prefers-reduced-motion:reduce){#module-content .equip-tab.equip-card{transition:none}}
