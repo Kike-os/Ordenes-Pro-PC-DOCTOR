@@ -8,6 +8,24 @@
   },
   "releases": [
     {
+      "version": "1.5.192",
+      "date": "2026-10-21T01:59:09-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "ADI Living Intelligence Pro: esfera que pulsa con la voz real, estados de voz visibles y reintento sin perder la conversación",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "ADI Living Intelligence Pro: la esfera 3D pulsa con la amplitud real de la voz natural, muestra partículas de profundidad en reposo y reacciona mientras el cliente escribe; el encabezado indica si ADI escucha, procesa o habla, y la voz hace pausas y pregunta con entonación natural."
+        ],
+        "fixes": [
+          "Chat de ADI: un mensaje que no se pudo enviar ofrece «Reintentar» sin perder el texto, la esfera deja de dibujar cuando no está a la vista y los botones de horario que propone ADI aparecen seguidos, sin huecos."
+        ],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.191",
       "date": "2026-10-21T01:35:18-05:00",
       "type": "patch",

@@ -4,6 +4,18 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.192 — 2026-10-21 01:59 (UTC-05:00)
+
+ADI Living Intelligence Pro: esfera que pulsa con la voz real, estados de voz visibles y reintento sin perder la conversación
+
+### Mejoras realizadas
+
+- ADI Living Intelligence Pro: la esfera 3D pulsa con la amplitud real de la voz natural, muestra partículas de profundidad en reposo y reacciona mientras el cliente escribe; el encabezado indica si ADI escucha, procesa o habla, y la voz hace pausas y pregunta con entonación natural.
+
+### Errores corregidos
+
+- Chat de ADI: un mensaje que no se pudo enviar ofrece «Reintentar» sin perder el texto, la esfera deja de dibujar cuando no está a la vista y los botones de horario que propone ADI aparecen seguidos, sin huecos.
+
 ## v1.5.191 — 2026-10-21 01:35 (UTC-05:00)
 
 Estabilidad: ninguna llamada externa lenta deja transacciones abiertas en la base remota
