@@ -4,6 +4,20 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.194 — 2026-10-21 08:05 (UTC-05:00)
+
+Licencias profesionales: método de activación, archivo de licencia, protección de duplicados y catálogo renovado
+
+### Mejoras realizadas
+
+- Licencias: método de activación por producto (clave o serial, usuario y contraseña, mixta o archivo de licencia) con solo los campos necesarios, registro de varias licencias por filas y archivo de licencia cifrado que el cliente descarga desde su enlace privado.
+- ADI Duplicate Protection Pro: detecta en el servidor seriales, cuentas, credenciales, códigos y archivos repetidos mientras se escribe, con avisos verde, ámbar o rojo, justificación registrada para coincidencias legítimas e informe «Revisar duplicados» del inventario.
+- Catálogo de licencias renovado: tarjetas uniformes con logotipo grande, indicadores de disponibles, reservadas, vendidas y vencidas, precio destacado, detalles desplegables, menú de acciones, buscador, filtros y orden.
+
+### Errores corregidos
+
+- Licencias: un serial ya entregado no puede entregarse otra vez, y las vistas previas de imágenes antes de guardar (logotipos y catálogo) vuelven a mostrarse.
+
 ## v1.5.193 — 2026-10-21 02:24 (UTC-05:00)
 
 Horarios y Disponibilidad renovado: estado en vivo, tabla compacta de 24 h, validación y cambios pendientes
