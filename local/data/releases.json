@@ -8,6 +8,23 @@
   },
   "releases": [
     {
+      "version": "1.5.190",
+      "date": "2026-10-21T01:01:38-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Voz de ADI estable en producción: audio natural permitido por la política de seguridad y sin errores de transacción inactiva",
+      "changes": {
+        "features": [],
+        "improvements": [],
+        "fixes": [
+          "Voz de ADI en producción: la política de seguridad del servidor permite reproducir el audio de la voz natural (antes solo la versión local lo permitía y en producción se usaba la voz del navegador)",
+          "Voz de ADI estable: la voz, la transcripción y la ADI administrativa ya no fallan con «stream was idle for too long» mientras OpenAI responde (INC-20261021-001); la conexión con la base se recupera sola si una transacción caduca."
+        ],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.189",
       "date": "2026-10-21T00:28:55-05:00",
       "type": "patch",

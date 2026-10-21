@@ -4,6 +4,15 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.190 — 2026-10-21 01:01 (UTC-05:00)
+
+Voz de ADI estable en producción: audio natural permitido por la política de seguridad y sin errores de transacción inactiva
+
+### Errores corregidos
+
+- Voz de ADI en producción: la política de seguridad del servidor permite reproducir el audio de la voz natural (antes solo la versión local lo permitía y en producción se usaba la voz del navegador)
+- Voz de ADI estable: la voz, la transcripción y la ADI administrativa ya no fallan con «stream was idle for too long» mientras OpenAI responde (INC-20261021-001); la conexión con la base se recupera sola si una transacción caduca.
+
 ## v1.5.189 — 2026-10-21 00:28 (UTC-05:00)
 
 ADI con voz natural y conversación continua, y tareas programadas corregidas
