@@ -90,4 +90,12 @@ class AdiVoiceTests(unittest.TestCase):
         self.assertNotIn('Servicio retirado ficticio',json.dumps(prices,ensure_ascii=False))
 
 
+class CspTests(unittest.TestCase):
+    def test_production_and_local_share_the_policy_and_allow_blob_audio(self):
+        import wsgi_app
+        self.assertIn("media-src 'self' blob:",app.DEFAULT_CSP)
+        source=open(wsgi_app.__file__,encoding='utf-8').read()
+        self.assertIn('core.DEFAULT_CSP',source);self.assertNotIn("default-src 'self'",source)  # una sola definición
+
+
 if __name__=='__main__':unittest.main()
