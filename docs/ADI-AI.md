@@ -403,7 +403,11 @@ Prueba: `test_remote_external_calls.py`, que falla con el código anterior y pas
 - En navegador, 14 comprobaciones del recorrido completo, incluida una cita real guardada en la base temporal con su autorización.
 - Las 40 pruebas de ADI anteriores y las de voz siguen en verde.
 
-**Pendiente:** probar en producción con la clave real de OpenAI. Crearía una conversación de prueba en el centro de atención.
+**Prueba real en producción (21/10/2026, con autorización):**
+- ADI respondió «Sí, vendemos licencias originales…» y dio ESET NOD32 disponible, 1 año, $40,00, con datos del catálogo.
+- Las respuestas tardaron entre 1,5 y 3,2 s.
+- Ante «¿Cuánto cuesta Microsoft 365?» mencionó una sola versión. Ahora debe enumerar todas con precio y disponibilidad. La búsqueda incluye también los artículos del catálogo general con ese nombre, como «Microsoft 365 Education (PC, Mac)», registrado en «Otro», marcados como «catálogo general» y sin inventario.
+- La prueba quedó como una conversación en el centro de atención.
 
 ## Tareas programadas: corrección de «no se ejecutan»
 

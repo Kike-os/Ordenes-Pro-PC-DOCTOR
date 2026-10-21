@@ -9,6 +9,7 @@ SYSTEM_PUBLIC=("Eres ADI, asistente virtual de PC-DOCTOR S.A. Habla español lat
 "Cuando el cliente lo pida o el caso lo requiera (reclamos, garantías, decisiones del taller), ofrece hablar con un asesor humano. "
 "PC-DOCTOR S.A. vende licencias originales de software (antivirus, Microsoft Office, Microsoft 365, Windows y otras) cuando el «conocimiento_comercial» lo indica: nunca digas que no se venden licencias. "
 "Para productos, precios, disponibilidad, duración o dispositivos usa la herramienta consultar_catalogo y responde solo con lo que devuelva; si un producto está agotado, ofrece las alternativas disponibles. "
+"Si la búsqueda devuelve varias versiones o ediciones del producto (por ejemplo, varias de Microsoft 365), enuméralas TODAS con su precio y disponibilidad para que el cliente compare; no elijas una sola. "
 "Si una consulta devuelve error, di que en este momento no puedes comprobarlo y ofrece un asesor: nunca niegues un producto ni inventes precios o existencias. "
 "Si el cliente describe una falla, oriéntalo con pasos seguros y generales, sin prometer diagnósticos ni reparaciones, y ofrece una revisión técnica. "
 "Cuando el cliente quiera una cita (reparación, mantenimiento, instalación, compra presencial o asesoría), consulta la disponibilidad real con consultar_disponibilidad_citas y usa ofrecer_reserva para mostrarle el formulario de reserva del chat: la cita solo existe cuando el sistema la guarda y entrega su código; nunca la des por confirmada tú. "
@@ -257,7 +258,14 @@ def run_tool(session,name,raw):
     match=[x for x in items if all(w in _fold(' '.join(str(v) for v in x.values())) for w in words)] if words else items
     if devices:match=[x for x in match if not x['dispositivos'] or x['dispositivos']>=devices] or match
     out['licencias']=match[:15];out['licencias_activas_en_total']=len(items)
-    if words and not match:out['nota']='No hay un producto con ese nombre en el catálogo; ofrece las licencias disponibles o un asesor.'
+    # Artículos del catálogo general con el mismo nombre (p. ej., una licencia registrada en «Otro»): se muestran con su precio, sin inventario.
+    if words:
+     import quotes
+     known={x['nombre'] for x in match}
+     extra=[{'nombre':r['name'],'precio':quotes.usd(r['price_cents']) if not r['tax_pending'] else 'se confirma con un asesor','disponibilidad':'consultar con un asesor','origen':'catálogo general'}
+            for r in quotes.catalog(c,only_available=True) if r['category'] not in ('licencia','seguridad') and r['name'] not in known and all(w in _fold(r['name']) for w in words)]
+     if extra:out['otros_articulos_del_catalogo']=extra[:10]
+    if words and not match and not out.get('otros_articulos_del_catalogo'):out['nota']='No hay un producto con ese nombre en el catálogo; ofrece las licencias disponibles o un asesor.'
    if kind in ('servicios','todo'):
     catalog,agenda=service_offer(c);session['topics'].add('servicios')
     out['servicios']=[x for x in catalog if all(w in _fold(x['nombre']) for w in words)][:15] if words else catalog[:20]

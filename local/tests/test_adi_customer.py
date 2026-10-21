@@ -116,4 +116,14 @@ class AdiCustomerTests(unittest.TestCase):
         self.assertTrue(seen['conocimiento_comercial']['licencias']['se_venden'])
 
 
+    def test_all_versions_are_listed_including_licenses_filed_in_the_general_catalog(self):
+        self.catalog()
+        with app.connect() as c:c.execute("INSERT INTO catalog_items(code,name,category,price_cents,available,created_at,updated_at) VALUES ('OTRO-365','Microsoft 365 Education ficticio','otro',11000,1,'2026-10-21T08:00:00','2026-10-21T08:00:00')")
+        fake=FakeModel('consultar_catalogo',{'tipo':'licencias','busqueda':'Microsoft 365','dispositivos':None},lambda out:'ok')
+        self.say('¿Cuánto cuesta Microsoft 365?',fake);out=fake.tool_output
+        self.assertEqual(sorted(x['nombre'] for x in out['licencias']),['Microsoft 365 Familia ficticio','Microsoft 365 Personal ficticio'])
+        self.assertEqual([(x['nombre'],x['origen']) for x in out['otros_articulos_del_catalogo']],[('Microsoft 365 Education ficticio','catálogo general')])
+        self.assertIn('enuméralas TODAS',fake.calls[0]['instructions'])
+
+
 if __name__=='__main__':unittest.main()
