@@ -2371,12 +2371,13 @@ class Handler(BaseHTTPRequestHandler):
                                 row=c.execute("SELECT content FROM adi_messages WHERE id=? AND conversation_id=? AND author IN ('adi','operator')",(int(mid),conv['id'])).fetchone() if mid.isdigit() and conv else None
                                 if not row:return self.reply(404,{'error':'Mensaje no disponible.'})
                                 text=row['content']
-                            audio,seconds=adi_voice.synthesize(c,now,text);return self.reply(200,{'ok':True,'mime':'audio/mpeg','audio':adi_voice.encode(audio),'seconds':round(seconds,1)})
+                            # Se confirma antes de la llamada a OpenAI: Turso cancela una transacción que queda inactiva mientras se genera el audio.
+                            c.commit();audio,seconds=adi_voice.synthesize(c,now,text);return self.reply(200,{'ok':True,'mime':'audio/mpeg','audio':adi_voice.encode(audio),'seconds':round(seconds,1)})
                         try:audio=base64.b64decode(str(data.get('audio','')),validate=True)
                         except ValueError:return self.reply(400,{'error':'Grabación no válida.'})
                         mime=str(data.get('mime','audio/webm'))[:60];duration=int(str(data.get('duration_ms','0')) or 0) if str(data.get('duration_ms','0')).isdigit() else 0
                         if duration<300:return self.reply(200,{'ok':True,'text':''})
-                        return self.reply(200,{'ok':True,'text':adi_voice.transcribe(c,now,audio,mime,duration)})
+                        c.commit();return self.reply(200,{'ok':True,'text':adi_voice.transcribe(c,now,audio,mime,duration)})
                     except adi_voice.VoiceError as error:
                         print('adi-voice',error.kind,flush=True);return self.reply(error.status,{'error':str(error),'fallback':True})
                 if path == '/api/public/adi/order/request':
@@ -3169,12 +3170,12 @@ class Handler(BaseHTTPRequestHandler):
                             except ValueError:pass
                             text=re.sub(r'\s+',' ',str(data.get('greeting','')))[:300] if data.get('text')=='greeting' and len(str(data.get('greeting','')).strip())>=10 else adi_voice.SAMPLE
                             if adi_voice.usage(c,now)>=adi_voice.settings(c)['daily_minutes']*60:return self.reply(429,{'error':'Se alcanzó el tope diario de voz. Súbelo o espera a mañana.'})
-                            audio,seconds=adi_voice.synthesize(c,now,text,trial)
+                            c.commit();audio,seconds=adi_voice.synthesize(c,now,text,trial)
                         else:
                             if not adi_voice.available(c,now):return self.reply(503,{'error':'La voz natural no está disponible ahora.','fallback':True})
                             text=str(data.get('text','')).strip()
                             if not text or len(text)>2500:return self.reply(400,{'error':'Texto no válido.'})
-                            audio,seconds=adi_voice.synthesize(c,now,text)
+                            c.commit();audio,seconds=adi_voice.synthesize(c,now,text)
                         return self.reply(200,{'ok':True,'mime':'audio/mpeg','audio':adi_voice.encode(audio),'seconds':round(seconds,1)})
                     except adi_voice.VoiceError as error:
                         print('adi-voice',error.kind,flush=True);return self.reply(error.status,{'error':str(error),'fallback':True})
@@ -3182,6 +3183,7 @@ class Handler(BaseHTTPRequestHandler):
                     if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede usar la asistente administrativa.'})
                     prompt=str(data.get('message','')).strip()
                     if not prompt or len(prompt)>2000:return self.reply(400,{'error':'Escribe una consulta de hasta 2000 caracteres.'})
+                    c.commit()  # la consulta a la IA puede tardar: no se deja abierta la transacción de la sesión
                     result=adi.admin_reply(c,prompt,reception_now());answer=result['answer']
                     c.execute('INSERT INTO adi_actions(user_id,action,created_at,details) VALUES (?,?,?,?)',(user['id'],'admin_query',appointments.stamp(appointments.now()),prompt[:500]))
                     stamp=reception_now().isoformat(timespec='seconds');chosen=str(data.get('conversation_id',''))

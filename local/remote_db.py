@@ -230,7 +230,13 @@ class Connection:
         results = []
         for item in payload['results']:
             if item['type'] != 'ok':
-                raise _error(item['error'])
+                error = _error(item['error'])
+                # Turso descartó la transacción porque su flujo quedó inactivo: la conexión se libera para que la siguiente operación
+                # empiece limpia (si no, cada sentencia posterior seguiría fallando con el flujo caducado).
+                if re.search(r'idle for too long|stream (?:not found|expired)|STREAM_EXPIRED', str(item['error']), re.I):
+                    error.operation = _operation(requests)
+                    self._release()
+                raise error
             response = item['response']
             if response['type'] != 'close':
                 results.append(response.get('result'))

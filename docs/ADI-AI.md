@@ -281,6 +281,22 @@ Causa de los márgenes desiguales: la regla genérica `.adi-panel{padding:10px 1
 
 **Pendiente de verificar en producción** (requiere la clave real y consume crédito): la naturalidad de las voces, la latencia real y los dispositivos Android e iPhone.
 
+## Voz de ADI estable con Turso (INC-20261021-001, 21/10/2026)
+
+**Síntoma:** `OperationalError` en `POST /api/public/adi/speech` (`remote_db.py:233 · _send`): «interactive transaction was rolled back because the stream was idle for too long».
+
+**Causa:**
+- La ruta anotaba el límite por conexión, lo que abre una transacción, y la dejaba abierta mientras OpenAI generaba el audio.
+- Turso descarta una transacción cuyo flujo queda inactivo, y la siguiente escritura (el consumo de minutos) fallaba con 503.
+- Lo mismo podía ocurrir en `/api/public/adi/listen`, en la muestra de voz, en `/api/adi/speech` y en la ADI administrativa (`/api/adi/admin`).
+
+**Corrección:**
+- Se confirma la transacción antes de cada llamada a OpenAI, igual que ya se hacía en el chat y en el correo (sección 1.5.90). El consumo se anota después, en una transacción nueva y breve.
+- Defensa en `remote_db`: si Turso responde que el flujo caducó, la conexión se libera y el error indica la operación. La siguiente operación empieza limpia en lugar de arrastrar el flujo caducado.
+- Producción (`wsgi_app.py`) usa la misma CSP que la aplicación, con `media-src 'self' blob:`, para que el audio natural se reproduzca en lugar de pasar a la voz del navegador.
+
+**Pruebas:** `test_adi_voice_remote.py`. Usa el servidor libSQL de pruebas (`hrana_fake.py`) con caducidad de flujos inactivos y OpenAI simulado y lento. Las pruebas fallan con el código anterior y pasan con la corrección.
+
 ## Tareas programadas: corrección de «no se ejecutan»
 
 **Causa:** la tarea solo verificaba si no había habido *ninguna* verificación en los 10 minutos anteriores, y las automáticas por visitas la tapaban sin dejar constancia. Además, el aviso alarmaba a las 12 h.

@@ -2,7 +2,8 @@
 
 Reproduce lo que importa del servicio remoto: flujos con «baton» que conservan una transacción entre peticiones, lotes con
 condiciones, secuencias y, sobre todo, que el servidor CIERRA las conexiones HTTP inactivas (keep-alive) al cabo de `idle`
-segundos, como hace Turso. Solo para pruebas automáticas: escucha en 127.0.0.1 y no tiene autenticación.
+segundos, como hace Turso. Con `stream_idle`, además, descarta la transacción de un flujo que pasó más de ese tiempo sin usarse,
+con el mismo mensaje que Turso («stream was idle for too long»). Solo para pruebas automáticas: escucha en 127.0.0.1 y no tiene autenticación.
 """
 import base64
 import http.server
@@ -10,6 +11,7 @@ import json
 import secrets
 import sqlite3
 import threading
+import time
 
 
 def _value(item):
@@ -43,9 +45,9 @@ def _error(error):
 
 
 class FakeLibsql:
-    def __init__(self, path, idle=0.3):
-        self.path, self.idle = path, idle
-        self.streams, self.lock = {}, threading.Lock()
+    def __init__(self, path, idle=0.3, stream_idle=None):
+        self.path, self.idle, self.stream_idle = path, idle, stream_idle
+        self.streams, self.used, self.lock = {}, {}, threading.Lock()
         self.requests = 0
         self.fail_next = 0  # Respuestas que se cortan sin contestar (simula una caída de red en mitad de la petición).
         server = self
@@ -100,6 +102,13 @@ class FakeLibsql:
         baton = body.get('baton')
         with self.lock:
             c = self.streams.pop(baton, None) if baton else self._connection()
+            used = self.used.pop(baton, None)
+        if c is not None and self.stream_idle is not None and used is not None and time.monotonic() - used > self.stream_idle:
+            if c.in_transaction:
+                c.rollback()
+            c.close()
+            message = 'interactive transaction was rolled back because the stream was idle for too long; retry the transaction'
+            return {'baton': None, 'base_url': None, 'results': [{'type': 'error', 'error': {'message': message}} for _ in body['requests']]}
         if c is None:
             return {'baton': None, 'base_url': None, 'results': [{'type': 'error', 'error': {'message': 'Stream not found', 'code': 'STREAM_EXPIRED'}} for _ in body['requests']]}
         results, closed = [], False
@@ -139,4 +148,5 @@ class FakeLibsql:
         token = secrets.token_hex(8)
         with self.lock:
             self.streams[token] = c
+            self.used[token] = time.monotonic()
         return {'baton': token, 'base_url': None, 'results': results}
