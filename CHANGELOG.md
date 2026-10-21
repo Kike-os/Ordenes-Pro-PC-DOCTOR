@@ -4,6 +4,20 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.189 — 2026-10-21 00:28 (UTC-05:00)
+
+ADI con voz natural y conversación continua, y tareas programadas corregidas
+
+### Mejoras realizadas
+
+- ADI: voz femenina natural de OpenAI con pronunciación cuidada y conversación continua (escucha sola, detecta pausas, permite interrumpirla, cancela el eco, botones para silenciar y finalizar), con la voz del navegador como respaldo y un tope diario de consumo
+- ADI: saludo visual configurable en las páginas públicas, respuestas más breves y naturales, precios solo del catálogo registrado y voz natural también en la asistente administrativa
+- Centro de Configuración: nuevo apartado «Personalidad y Voz de ADI» con voz y muestra, estilo, velocidad, saludo, conversación continua, sensibilidad, pausa y tope diario con el consumo del día
+
+### Errores corregidos
+
+- Tareas programadas: ya no se saltan en silencio cuando coincide una verificación automática. Cada llamada deja constancia y el aviso «no se reciben» solo aparece tras 18 h sin llamadas
+
 ## v1.5.188 — 2026-10-20 22:00 (UTC-05:00)
 
 Estado del sistema corregido y Tarjeta de Licencias Digitales Enterprise Pro

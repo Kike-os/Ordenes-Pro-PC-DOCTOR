@@ -8,6 +8,26 @@
   },
   "releases": [
     {
+      "version": "1.5.189",
+      "date": "2026-10-21T00:28:55-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "ADI con voz natural y conversación continua, y tareas programadas corregidas",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "ADI: voz femenina natural de OpenAI con pronunciación cuidada y conversación continua (escucha sola, detecta pausas, permite interrumpirla, cancela el eco, botones para silenciar y finalizar), con la voz del navegador como respaldo y un tope diario de consumo",
+          "ADI: saludo visual configurable en las páginas públicas, respuestas más breves y naturales, precios solo del catálogo registrado y voz natural también en la asistente administrativa",
+          "Centro de Configuración: nuevo apartado «Personalidad y Voz de ADI» con voz y muestra, estilo, velocidad, saludo, conversación continua, sensibilidad, pausa y tope diario con el consumo del día"
+        ],
+        "fixes": [
+          "Tareas programadas: ya no se saltan en silencio cuando coincide una verificación automática. Cada llamada deja constancia y el aviso «no se reciben» solo aparece tras 18 h sin llamadas"
+        ],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.188",
       "date": "2026-10-20T22:00:16-05:00",
       "type": "patch",
