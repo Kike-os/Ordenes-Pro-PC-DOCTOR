@@ -8,6 +8,23 @@
   },
   "releases": [
     {
+      "version": "1.5.186",
+      "date": "2026-10-20T20:27:36-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Identificación de equipos por número de serie con botón y estado real por fabricante",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Recepción: botón «Identificar equipo» junto al número de serie (sin aumentar la altura del formulario), guía del identificador por marca (Service Tag de Dell, SNID de Acer…) y aviso si el formato no coincide",
+          "Identificación por fabricante: un servicio por marca con estado real. Dell queda listo para activarse con credenciales de TechDirect; HP y Lenovo pendientes de autorización; ASUS, Acer y MSI con consulta manual asistida, sin enviar la serie a nadie"
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      }
+    },
+    {
       "version": "1.5.185",
       "date": "2026-10-20T19:40:08-05:00",
       "type": "patch",

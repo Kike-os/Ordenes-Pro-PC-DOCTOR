@@ -4,6 +4,15 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.186 — 2026-10-20 20:27 (UTC-05:00)
+
+Identificación de equipos por número de serie con botón y estado real por fabricante
+
+### Mejoras realizadas
+
+- Recepción: botón «Identificar equipo» junto al número de serie (sin aumentar la altura del formulario), guía del identificador por marca (Service Tag de Dell, SNID de Acer…) y aviso si el formato no coincide
+- Identificación por fabricante: un servicio por marca con estado real. Dell queda listo para activarse con credenciales de TechDirect; HP y Lenovo pendientes de autorización; ASUS, Acer y MSI con consulta manual asistida, sin enviar la serie a nadie
+
 ## v1.5.185 — 2026-10-20 19:40 (UTC-05:00)
 
 Inicio de sesión compacto y tarjeta de equipo renovada
