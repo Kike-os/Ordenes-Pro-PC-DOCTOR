@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.191 — 2026-10-21 01:35 (UTC-05:00)
+
+Estabilidad: ninguna llamada externa lenta deja transacciones abiertas en la base remota
+
+### Errores corregidos
+
+- Estabilidad: la identificación por número de serie con el fabricante, el correo de prueba de notificaciones y la verificación de seguridad del inicio de sesión ya no pueden fallar con «stream was idle for too long» cuando el servicio externo tarda.
+
 ## v1.5.190 — 2026-10-21 01:01 (UTC-05:00)
 
 Voz de ADI estable en producción: audio natural permitido por la política de seguridad y sin errores de transacción inactiva
