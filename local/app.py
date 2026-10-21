@@ -1466,7 +1466,7 @@ class Handler(BaseHTTPRequestHandler):
                 # SVG primero: al ordenar por nombre, «marca.png» queda antes y «marca.svg» lo reemplaza.
                 logos = {f.stem:f.name for f in sorted((ROOT / 'static' / 'brands').glob('*')) if f.suffix in ('.svg','.png') and re.fullmatch(r'[a-z0-9]+(?:-[a-z0-9]+)*', f.stem)}
                 import device_brands,device_manufacturers
-                return self.reply(200, {'geo_metadata':GEO_METADATA,'device_types':DEVICE_TYPES,'brands':brands,'brand_logos':logos,'manufacturers':device_brands.catalog(device_manufacturers.configured())})
+                return self.reply(200, {'geo_metadata':GEO_METADATA,'device_types':DEVICE_TYPES,'brands':brands,'brand_logos':logos,'manufacturers':device_brands.catalog(device_manufacturers.configured(),device_manufacturers.statuses())})
             if path.startswith('/api/geo/'):
                 query=parse_qs(urlsplit(self.path).query)
                 get=lambda key:query.get(key,[''])[0][:150]

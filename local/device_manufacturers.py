@@ -58,15 +58,54 @@ def dell_lookup(serial):
     return {'brand':'Dell','model':str(item['productLineDescription']).strip()[:150],'type':'','factory':factory}
 
 
-ADAPTERS={'dell':(dell_configured,dell_lookup)}
+class Provider:
+    """Interfaz común de un servicio de identificación por fabricante.
+
+    mode: 'api' (adaptador oficial escrito; solo consulta con credenciales propias), 'pendiente' (existe un programa oficial pero el
+    fabricante no ha concedido acceso ni publicado su documentación: no hay adaptador ni consultas) o 'manual' (sin API: consulta
+    asistida en el portal oficial). Ningún modo simula respuestas ni lee páginas web del fabricante."""
+    def __init__(self,slug,name,mode,credentials=(),access='',ready=None,query=None):
+        self.slug,self.name,self.mode,self.credentials,self.access=slug,name,mode,tuple(credentials),access
+        self._ready,self._query=ready,query
+
+    def configured(self):
+        return self.mode=='api' and bool(self._ready and self._ready())
+
+    def lookup(self,serial):
+        if not self.configured():return None
+        return self._query(serial)
+
+    def status(self):
+        """Estado real para la interfaz (sin valores de credenciales: solo sus nombres)."""
+        return {'slug':self.slug,'mode':self.mode,'automatic':self.configured(),'credentials':list(self.credentials),'access':self.access}
+
+
+PROVIDERS={p.slug:p for p in (
+ Provider('dell','Dell','api',('DELL_API_CLIENT_ID','DELL_API_CLIENT_SECRET'),
+          'Cuenta empresarial en Dell TechDirect (techdirect.dell.com) → Servicios → API: solicitar la API de garantía (Warranty API, OAuth 2.0). Dell revisa la solicitud, entrega un ID y un secreto de cliente para pruebas y después los promueve a producción.',
+          dell_configured,dell_lookup),
+ Provider('hp','HP','pendiente',('HP_API_KEY','HP_API_SECRET'),
+          'Cuenta en el portal de desarrolladores de HP (developers.hp.com) y solicitud de la HP Warranty API; según integradores, la tramita el gestor de cuenta de HP de la empresa (warrantyapi.customers@hp.com). HP aprueba a mano; con el acceso se obtiene la documentación para escribir el adaptador.'),
+ Provider('lenovo','Lenovo','pendiente',('LENOVO_CLIENT_ID',),
+          'ClientID de la API de garantía de Lenovo: se solicita al representante comercial o de soporte empresarial de Lenovo (requiere un Lenovo ID de empresa o socio). Con el ClientID y su documentación se escribe el adaptador.'),
+ Provider('asus','ASUS','manual',(),'No hay API pública. Para un acceso empresarial, consultar al canal de socios o servicio técnico regional de ASUS.'),
+ Provider('acer','Acer','manual',(),'No hay API pública. Para consultas masivas, Acer remite a su portal de servicio y a su canal de empresas o revendedores.'),
+ Provider('msi','MSI','manual',(),'No hay API pública y MSI prohíbe las consultas automatizadas a su verificador; solo consulta manual o acuerdo con su canal de empresas.'),
+)}
+# Compatibilidad: (configurado, consulta) por fabricante con adaptador oficial.
+ADAPTERS={slug:(p.configured,p.lookup) for slug,p in PROVIDERS.items() if p.mode=='api'}
 
 
 def configured():
-    return tuple(slug for slug,(ready,_) in ADAPTERS.items() if ready())
+    return tuple(slug for slug,p in PROVIDERS.items() if p.configured())
+
+
+def statuses():
+    return {slug:p.status() for slug,p in PROVIDERS.items()}
 
 
 def lookup(slug,serial):
     """Resultado verificable del fabricante, None si no lo reconoce. Lanza ProviderError si el servicio falla."""
-    adapter=ADAPTERS.get(slug)
-    if not adapter or not adapter[0]():return None
-    return adapter[1](serial)
+    provider=PROVIDERS.get(slug)
+    if not provider:return None
+    return provider.lookup(serial)

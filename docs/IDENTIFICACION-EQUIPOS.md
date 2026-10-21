@@ -96,3 +96,34 @@ La consulta automática a fabricantes sigue pendiente de credenciales: ninguna i
 Fuentes: documentación de integradores de la API de Dell (SysAid, Patch My PC, JupiterOne), la comunidad de Lansweeper y ManageEngine para HP, y Omnissa y ServiceNow para Lenovo. Son terceros; las condiciones vigentes deben confirmarse en el portal de cada fabricante al pedir el acceso.
 
 **No verificado:** ninguna identificación real contra un fabricante. No hay credenciales, así que no se puede afirmar que Dell, HP ni ninguna otra marca identifique equipos automáticamente. Lo probado es el historial propio, el autocompletado, la asociación al equipo existente, la caché y el comportamiento cuando el servicio falla (con un proveedor simulado). No se obtienen imágenes del modelo ni estado de garantía: dependen de esas mismas API.
+
+## Botón «Identificar equipo» y un servicio por fabricante (rama `identificacion-fabricantes`, 20/10/2026)
+
+**Interfaz:**
+- El botón «🔍 Identificar equipo» está en la misma fila que la serie y «Escanear serie», así que no añade altura. En celular «Escanear serie» queda solo con el icono; por debajo de 380 px, también «Identificar equipo».
+- Al elegir la marca, el campo indica qué identificador pide ese fabricante: Service Tag de Dell, serie de HP, SNID o serie de Acer…
+- Si el formato documentado no coincide (por ejemplo, un Service Tag de Dell con más de 7 caracteres), se avisa de un posible error de escritura sin bloquear.
+- La consulta asistida muestra el estado real del fabricante: conectado, pendiente de autorización o solo consulta manual.
+
+**Arquitectura:** `device_manufacturers.Provider` es la interfaz común (`configured()`, `lookup()` y `status()`), con un servicio por fabricante en `PROVIDERS`.
+
+| Marca | Modo | Credenciales en el servidor | Cómo obtenerlas |
+|---|---|---|---|
+| Dell | `api`: adaptador escrito (TechDirect, OAuth 2.0, v5). Sin credenciales no consulta | `DELL_API_CLIENT_ID`, `DELL_API_CLIENT_SECRET` | Cuenta empresarial en techdirect.dell.com → Servicios → API → solicitar la Warranty API. Dell aprueba y entrega un ID y un secreto, primero de prueba y luego de producción. |
+| HP | `pendiente`: sin adaptador ni consultas | `HP_API_KEY`, `HP_API_SECRET` | Portal developers.hp.com → HP Warranty API. Según integradores, la solicita el gestor de cuenta de HP de la empresa a warrantyapi.customers@hp.com y HP la aprueba a mano. Con el acceso se obtiene la documentación para escribir el adaptador. |
+| Lenovo | `pendiente`: sin adaptador ni consultas | `LENOVO_CLIENT_ID` | ClientID que entrega el representante comercial o de soporte empresarial de Lenovo; requiere un Lenovo ID de empresa o socio. |
+| ASUS | `manual` | — | No hay API pública; consultar el canal de socios regional. |
+| Acer | `manual` | — | No hay API pública; para consultas masivas, Acer remite a su portal de servicio y a su canal de empresas. |
+| MSI | `manual` | — | No hay API pública, y MSI prohíbe las consultas automatizadas a su verificador. |
+
+Fuentes, consultadas el 20/10/2026:
+- Dell: integradores de la API de TechDirect (JupiterOne, Axonius, Motadata, foro de PowerShell).
+- HP: comunidades de Lansweeper y ManageEngine, y documentación de Quest.
+- Lenovo: documentación de Omnissa, ServiceNow y Quest.
+- ASUS, Acer y MSI: sus páginas oficiales de consulta de garantía.
+
+Son fuentes de terceros o páginas públicas: las condiciones deben confirmarse con cada fabricante al solicitar el acceso.
+
+**Verificado:** el botón, la guía por marca, el aviso de formato, la identificación desde el historial del taller (completa marca y modelo, muestra el logotipo y guarda la procedencia `historial`), el estado de cada fabricante y que HP, Lenovo, ASUS, Acer y MSI no hacen ninguna consulta externa.
+
+**No verificado:** ninguna consulta real a un fabricante. No hay credenciales de ninguna marca, así que no se puede afirmar que alguna identifique equipos automáticamente. Dell queda listo para probarse con un Service Tag del taller en cuanto existan sus credenciales.

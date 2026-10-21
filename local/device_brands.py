@@ -25,6 +25,13 @@ MANUFACTURERS=(
 )
 
 
+# Formato documentado del identificador de cada marca (solo para avisar de un posible error de escritura; nunca bloquea ni deduce).
+FORMATS={'dell':(r'[A-Z0-9]{5,7}','El Service Tag de Dell tiene de 5 a 7 letras y números (normalmente 7). Está en la etiqueta del equipo o en la BIOS.'),
+         'hp':(r'[A-Z0-9]{10}','La serie de HP suele tener 10 caracteres. El número de producto (p. ej. 6YX12LA#ABM) está en la misma etiqueta.'),
+         'acer':(r'\d{11,12}|[A-Z0-9]{22}','Acer usa el SNID (11 o 12 dígitos) o la serie de 22 caracteres (con cero, nunca la letra O). Están en la etiqueta o en Acer Care Center.')}
+HINTS={'dell':'Service Tag (5 a 7 caracteres)','hp':'Número de serie (10 caracteres)','lenovo':'Número de serie','asus':'Número de serie','acer':'SNID (11-12 dígitos) o serie de 22','msi':'Número de serie'}
+
+
 def slug(name):
     text=unicodedata.normalize('NFD',str(name or ''))
     return re.sub(r'[^a-z0-9]+','-',''.join(ch for ch in text if not unicodedata.combining(ch)).lower()).strip('-')
@@ -35,5 +42,7 @@ def find(name):
     return next((m for m in MANUFACTURERS if key and (key==m['slug'] or key in m['aliases'])),None)
 
 
-def catalog(configured=()):
-    return [{'slug':m['slug'],'name':m['name'],'aliases':list(m['aliases']),'portal':m['portal'],'identifiers':m['identifiers'],'status':m['status'],'note':m['note'],'automatic':m['slug'] in configured} for m in MANUFACTURERS]
+def catalog(configured=(),providers=None):
+    providers=providers or {}
+    return [{'slug':m['slug'],'name':m['name'],'aliases':list(m['aliases']),'portal':m['portal'],'identifiers':m['identifiers'],'status':m['status'],'note':m['note'],'automatic':m['slug'] in configured,
+             'hint':HINTS.get(m['slug'],''),'format':FORMATS.get(m['slug'],('',''))[0],'format_note':FORMATS.get(m['slug'],('',''))[1],'access':(providers.get(m['slug']) or {}).get('access','')} for m in MANUFACTURERS]
