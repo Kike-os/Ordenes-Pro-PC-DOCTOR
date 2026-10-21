@@ -1,4 +1,4 @@
-# ADI AutoCare Pro (1.5.159)
+# ADI AutoCare Pro (1.5.159 · centro de control 1.5.199)
 
 Monitoreo, diagnóstico y recuperación segura de Órdenes Pro. Reutiliza el motor de estabilidad (`local/stability.py`, ver [ESTABILIDAD.md](ESTABILIDAD.md)): las mismas verificaciones, las mismas tareas programadas de Vercel (01:00, 09:00 y 17:00, Ecuador) y el mismo registro por versión. Panel en **Sistema → ADI AutoCare Pro** (solo administración).
 
@@ -91,3 +91,98 @@ Medido con los tiempos por paso del primer diagnóstico real (20/10/2026):
 - **Resolución:** se marca como Resuelta con una nota, y el seguimiento conserva el historial. Si el mismo error vuelve a ocurrir, se reabre automáticamente la misma incidencia (mismo código, marcada como «Reabierta»).
 - **«Registros de errores»** solo cuenta los errores de incidencias sin resolver. Al marcar la incidencia como resuelta tras corregirla, el panel vuelve a la normalidad sin borrar nada.
 - **Causa concreta:** el detalle muestra «Causa detectada» en lugar de una recomendación genérica. Por ejemplo: «Se registraron 2 fallos en el módulo Presupuestos durante operaciones POST (/api/quotes/:id…)» con «Revisar /api/quotes/:id y la operación de base de datos asociada».
+
+## Centro de control (1.5.199)
+
+### Indicadores
+
+Los seis indicadores salen de datos registrados:
+
+- **Última verificación:** fecha, hora, quién la ejecutó y duración.
+- **Servicios:** operativos frente a afectados (con error o advertencia). Aparte se muestran los «sin comprobar» y los «no disponibles».
+- **Incidencias abiertas:** número total, desglosado por gravedad.
+- **Recuperaciones:** automáticas y manuales, la última de ellas y las incidencias resueltas con una verificación correcta.
+- **Versión instalada:** estado de estabilidad y comparación con la versión publicada.
+- **Próxima comprobación:** la tarea programada del servidor.
+
+### Servicios y estados
+
+Se comprueban 15 servicios. Los nuevos son:
+
+- **Inteligencia artificial de ADI:** consulta el modelo en OpenAI (`GET /v1/models/<modelo>`). Valida la clave y el modelo sin generar texto ni coste, y la clave nunca aparece en el detalle. Solo se hace en los diagnósticos manuales y programados; la verificación automática usa el último resultado de las 24 h anteriores. También incluye los minutos de voz natural usados hoy.
+- **Copias de seguridad:** lee el registro que deja `maintenance/backup-cloud.py` (fecha, tamaño, clientes y órdenes). Una copia de más de 7 días da una advertencia; una copia fallida, un error.
+
+«Servicios internos» pasa a llamarse **Servicios internos y tareas programadas**.
+
+Hay cinco estados:
+
+- **Correcto.**
+- **Advertencia:** incluye una respuesta más lenta que su límite.
+- **Error.**
+- **No comprobado.**
+- **No disponible:** el servicio no está configurado; por ejemplo, la IA sin clave.
+
+Un servicio «No disponible» solo degrada el estado general si su gravedad es crítica o alta, y no abre incidencias. El correo sin configurar sigue siendo un **Error** (no crítico), como antes: sin correo no salen avisos ni comprobantes.
+
+Cada comprobación tiene un tiempo máximo: correo 20 s, IA 12 s y el resto 8 s. Si se supera, el estado es «Respuesta lenta» (advertencia), nunca Error.
+
+### Reintento por servicio
+
+El botón **Reintentar** de cada tarjeta repite solo esa comprobación, con la prueba de red (`POST /api/autocare/check`).
+
+- Se rechaza si hay otro diagnóstico en curso, para que nunca haya dos a la vez.
+- Admite un máximo de 30 reintentos por hora y usuario.
+- Si el resultado es correcto, la incidencia de ese servicio se cierra con esa evidencia y queda firmada por quien reintentó. Si sigue fallando, la incidencia continúa abierta.
+- El resultado (quién, cuándo, versión y resultado) se guarda en `stability_rechecks` y sustituye en el panel el estado de ese servicio hasta la siguiente verificación completa.
+- Las tarjetas con error o advertencia muestran la causa probable y los pasos sugeridos.
+
+### Recuperación segura
+
+Solo hay acciones de una lista cerrada en el servidor (`autocare.ACTIONS`, `POST /api/autocare/action`), sin parámetros libres. Cada una exige la confirmación expresa de administración, queda en el historial con el nombre de quien la ejecutó y termina repitiendo la comprobación del servicio.
+
+| Acción | Qué hace | Copia del cambio |
+|---|---|---|
+| Liberar un diagnóstico bloqueado | Quita la marca «en curso» si quedó colgada más de 5 minutos. Se rechaza si sigue activa. | No toca datos. |
+| Actualizar licencias vencidas del inventario | Pasa a «Vencida» las licencias **sin vender** cuya fecha ya pasó (`licenses.expire`). Las vendidas no cambian. | Los identificadores y su estado anterior («disponible») quedan en el registro, así el cambio es reversible. |
+
+### Historial y exportación
+
+- Cada evento tiene un identificador `EV-XXXXXXXX` y el usuario o proceso que lo originó. Los eventos anteriores reciben un identificador derivado, `EV-Hnnnnn`, y figuran como «ADI AutoCare»: no se inventa quién los hizo.
+- Filtros: fechas, servicio, gravedad, versión y usuario.
+- **Exportar CSV** (`GET /api/autocare/history.csv`, solo administración) aplica los mismos filtros.
+  - Se enmascaran los correos, las claves del tipo `sk-…` y los números largos.
+  - Nunca incluye contraseñas, tokens ni datos de clientes.
+  - Cada exportación queda en la auditoría.
+
+### Versiones
+
+- **Compilación desplegada:** el commit y la rama que informa Vercel (`VERCEL_GIT_COMMIT_SHA` y `VERCEL_GIT_COMMIT_REF`). En una instalación local se muestra «local».
+- **Última versión publicada** frente a la instalada.
+- **Migraciones:** las aplicadas frente a las del paquete. Vercel no ejecuta `migrate()`, así que una migración pendiente se muestra como aviso.
+- **Comparación:** número de cambios por tipo frente a la versión anterior.
+- **Quién registró y quién autorizó:**
+  - `versioning.py publish` anota `published_by`, que es el `user.name` de Git.
+  - La opción `--autorizado-por "…"` anota `authorized_by`.
+  - Las versiones anteriores a la 1.5.199 muestran «no registrado»; no se rellenan a posteriori.
+
+### Avisos
+
+La pestaña Avisos muestra los avisos de los dos últimos días, clasificados en **Crítica, Advertencia, Informativa y Recuperada** y con filtro por tipo. No hay duplicados: son los mismos avisos del centro de notificaciones, con una clave estable por evento.
+
+Las recuperaciones manuales aparecen como «Acción de recuperación ejecutada», no como un problema de conexión.
+
+### Permisos y rendimiento
+
+Todo es solo para administración y se valida en el backend; las acciones envían CSRF.
+
+Hay dos niveles de comprobación:
+
+- **Ligera:** la verificación automática por visitas. No abre el buzón, no llama a OpenAI ni genera el ticket PDF.
+- **Profunda:** el diagnóstico manual, el programado y los reintentos.
+
+### Lo que no se automatiza
+
+- **Reparaciones de código o de datos:** no se ejecutan desde el panel. Se preparan en una rama de pruebas y se publican con autorización.
+- **Reversión de una versión:** se hace desde Vercel con «Instant Rollback».
+- **Respaldo de la base central:** se hace con `maintenance/backup-cloud.py`, que necesita las variables de producción. El panel solo lee su registro y no puede lanzarlo desde Vercel.
+- **Quién autorizó las versiones anteriores:** no consta, así que no se muestra.

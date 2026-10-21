@@ -84,8 +84,13 @@ def validate(data):
             raise RegistryError('Fecha de publicación inválida en la versión ' + str(item.get('version')) + '.')
         if published.tzinfo is None or item.get('type') not in TYPES or item.get('status') != 'publicada':
             raise RegistryError('Datos de publicación inválidos en la versión ' + str(item.get('version')) + '.')
-        releases.append({'version': item['version'], 'date': published.isoformat(timespec='seconds'), 'type': item['type'], 'status': 'publicada',
-                         'summary': str(item.get('summary', '')).strip()[:400], 'changes': clean_changes(item.get('changes', {}))})
+        release = {'version': item['version'], 'date': published.isoformat(timespec='seconds'), 'type': item['type'], 'status': 'publicada',
+                   'summary': str(item.get('summary', '')).strip()[:400], 'changes': clean_changes(item.get('changes', {}))}
+        # Quién la registró y quién la autorizó: solo desde que se anota (las versiones anteriores no lo tienen y no se inventa).
+        for key in ('published_by', 'authorized_by'):
+            if str(item.get(key) or '').strip():
+                release[key] = str(item[key]).strip()[:80]
+        releases.append(release)
     releases.sort(key=lambda release: parse(release['version']), reverse=True)
     if len({release['version'] for release in releases}) != len(releases):
         raise RegistryError('Hay versiones repetidas en el registro.')
@@ -182,7 +187,7 @@ def changelog_text(registry):
     return '\n'.join(lines).rstrip('\n') + '\n'
 
 
-def publish(registry, kind, summary='', now=None):
+def publish(registry, kind, summary='', now=None, published_by='', authorized_by=''):
     """Registra una versión nueva con los cambios pendientes. No toca Git ni despliega."""
     if not any(registry['unreleased'].values()):
         raise RegistryError('No hay cambios pendientes que publicar. Regístralos con «add».')
@@ -190,7 +195,7 @@ def publish(registry, kind, summary='', now=None):
         raise RegistryError('Tipo de actualización inválido: major, minor o patch.')
     version = bump(registry['releases'][0]['version'], kind) if registry['releases'] else '1.0.0'
     release = {'version': version, 'date': (now or datetime.now(ECUADOR)).isoformat(timespec='seconds'), 'type': kind if registry['releases'] else 'initial', 'status': 'publicada',
-               'summary': summary.strip()[:400], 'changes': registry['unreleased']}
+               'summary': summary.strip()[:400], 'changes': registry['unreleased'], 'published_by': published_by, 'authorized_by': authorized_by}
     return validate({'unreleased': {}, 'releases': [release] + registry['releases']})
 
 
@@ -208,6 +213,7 @@ def main(argv=None):
     release = commands.add_parser('publish', help='Registra una versión nueva con los cambios pendientes.')
     release.add_argument('kind', choices=list(BUMPS))
     release.add_argument('--resumen', default='')
+    release.add_argument('--autorizado-por', default='', help='Quién autorizó la publicación (queda en el registro).')
     release.add_argument('--confirmar', action='store_true', help='Autoriza el registro; sin esta opción solo se muestra la vista previa.')
     commands.add_parser('changelog', help='Regenera CHANGELOG.md desde el registro.')
     commands.add_parser('tag', help='Crea la etiqueta de Git de la versión instalada (no la sube).')
@@ -227,7 +233,7 @@ def main(argv=None):
             CHANGELOG.write_text(changelog_text(load()), encoding='utf-8')
             print('Cambio anotado como pendiente. Aún no forma parte de ninguna versión.')
         elif args.command == 'publish':
-            updated = publish(registry, args.kind, args.resumen)
+            updated = publish(registry, args.kind, args.resumen, published_by=git('config', 'user.name').stdout.strip(), authorized_by=args.autorizado_por)
             print('Versión a registrar: v' + updated['releases'][0]['version'] + ' (' + BUMPS[args.kind] + ')')
             if not args.confirmar:
                 print('Vista previa: no se registró nada. Repite el comando con --confirmar tras las pruebas y la autorización.')

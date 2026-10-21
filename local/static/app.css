@@ -8441,3 +8441,37 @@ body[data-page=dashboard] dialog.lcard-dialog .lcard-tools :is(input,select){hei
 #adi-widget .adi-presence-tip:empty{display:none}
 @media(hover:hover) and (pointer:fine){#adi-widget:not(.adi-open) .adi-toggle:is(:hover,:focus-visible)+.adi-presence-tip{opacity:1;transform:none}}
 @media(prefers-reduced-motion:reduce){#adi-widget.adi-v2 .adi-toggle .adi-online{animation:none!important;transform:none!important;transition:none}#adi-widget .adi-presence-tip{transition:none}}
+/* ADI AutoCare · Centro de control (1.5.199): estado «No disponible», reintento por servicio, recuperación segura, exportación y avisos clasificados. */
+.autocare-pro{--na:#94a3b8}
+.autocare-chip[data-status=unavailable]{--c:var(--na,#94a3b8)}
+.ac-svc[data-status=unavailable]{--c:var(--na)}.ac-svc[data-status=unavailable] .ac-led{box-shadow:none;opacity:.7}
+.autocare-steps li[data-status=unavailable] .autocare-step-icon{color:#94a3b8}
+.ac-svc[data-busy]{opacity:.75}
+.ac-svc-guide{display:grid;gap:2px;padding:6px 8px;border-radius:7px;background:color-mix(in srgb,var(--c) 8%,#0a1424);font-size:11.5px;line-height:1.45;color:#c5d5ee}
+.ac-svc-guide p{margin:0;overflow-wrap:anywhere}
+.ac-svc-meta .ac-svc-retry{margin-left:auto}.ac-svc-meta .ac-svc-retry+.ac-svc-toggle{margin-left:0}
+.ac-svc-retry[disabled]{cursor:progress;opacity:.7}
+.ac-actions{display:grid;gap:6px;margin-top:6px}
+.ac-actions-list{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.ac-actions-list li{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:9px 12px;border:1px solid #1f3352;border-radius:10px;background:#0b1628}
+.ac-actions-list li>div{display:grid;gap:2px;flex:1 1 260px;min-width:0}
+.ac-actions-list strong{font-size:13px;color:#e6eefc}.ac-actions-list span{font-size:12px;line-height:1.45;color:#a9bbd6;overflow-wrap:anywhere}
+.ac-actions-list button{width:auto;margin:0}
+.autocare-pro .autocare-filters .autocare-export{display:inline-flex;align-items:center;gap:6px;flex:none;min-height:34px;padding:4px 12px;border:1px solid #2b4a75;border-radius:8px;background:#0b1626;color:#9fc5ff;font-size:12.5px;text-decoration:none}
+.autocare-pro .autocare-filters .autocare-export svg{width:15px;height:15px}
+.autocare-pro .autocare-filters .autocare-export:is(:hover,:focus-visible){border-color:#2dd4bf;background:#0f2235;outline:0}
+.autocare-pro .autocare-filter{flex-wrap:wrap;max-width:100%}
+.autocare-pro .autocare-warn{color:#fcd34d}
+.ac-alerts{list-style:none;margin:0;padding:0;display:grid;gap:5px}
+.ac-alerts li{--c:var(--nc);display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:2px 10px;align-items:baseline;padding:7px 10px;border:1px solid #1a2b45;border-left:3px solid var(--c);border-radius:8px;background:#0b1628;font-size:12px;color:#c5d5ee}
+.ac-alerts li[data-kind=error]{--c:var(--err)}.ac-alerts li[data-kind=warning]{--c:var(--warn)}.ac-alerts li[data-kind=success]{--c:var(--ok)}
+.ac-alerts li.autocare-empty{display:block;border-left-color:#1a2b45}
+.ac-alert-tag{color:var(--c);font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+.ac-alerts strong{color:#e6eefc;overflow-wrap:anywhere}.ac-alerts small{color:#7f93b2;white-space:nowrap}
+.ac-alerts li>span{grid-column:2/-1;overflow-wrap:anywhere;color:#a9bbd6}
+.autocare-action-dialog{width:min(520px,calc(100vw - 24px))}
+@media(max-width:600px){.ac-alerts li{grid-template-columns:minmax(0,1fr)}.ac-alerts li>span{grid-column:auto}.ac-actions-list button{width:100%}.autocare-pro .autocare-filters .autocare-export{flex:1 1 100%;justify-content:center}}
+.autocare-pro .autocare-filters{min-width:0}.autocare-pro .autocare-filters label{min-width:0;grid-template-columns:minmax(0,1fr)}.autocare-pro .autocare-filters :is(input,select){min-width:0;max-width:100%}
+.autocare-pro .autocare-panel{grid-template-columns:minmax(0,1fr)}.autocare-pro .autocare-history small{overflow-wrap:anywhere}
+.autocare-pro .autocare-history li>*{min-width:0;overflow-wrap:anywhere}@media(max-width:700px){.autocare-pro .autocare-history li{grid-template-columns:minmax(0,1fr)}}
+.ac-alerts small{grid-column:3;grid-row:1}@media(max-width:600px){.ac-alerts small{grid-column:auto;grid-row:auto}}

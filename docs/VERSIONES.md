@@ -27,8 +27,8 @@ python local/versioning.py status
 # 3. Vista previa del número que se asignaría (no escribe nada)
 python local/versioning.py publish patch --resumen "Descripción breve."
 
-# 4. Tras las pruebas y la autorización, registrar la versión
-python local/versioning.py publish patch --resumen "Descripción breve." --confirmar
+# 4. Tras las pruebas y la autorización, registrar la versión (anota quién la registró —user.name de Git— y quién la autorizó)
+python local/versioning.py publish patch --resumen "Descripción breve." --autorizado-por "Nombre de quien autoriza" --confirmar
 
 # 5. Confirmar en Git el registro y CHANGELOG.md, y etiquetar la versión
 git add local/data/releases.json CHANGELOG.md && git commit -m "Versión 1.0.1"

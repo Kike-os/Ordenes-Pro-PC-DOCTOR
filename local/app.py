@@ -1834,6 +1834,14 @@ class Handler(BaseHTTPRequestHandler):
                 if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede ver ADI AutoCare.'})
                 import autocare
                 return self.reply(200,autocare.overview(c,reception_now()))
+            if path == '/api/autocare/history.csv':
+                # Exportación del historial técnico con los mismos filtros del panel. Sin contraseñas, claves, tokens ni datos personales.
+                if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede usar ADI AutoCare.'})
+                import autocare
+                q=parse_qs(urlsplit(self.path).query);f={key:(q.get(key,[''])[0] or '')[:40] for key in ('from','to','service','severity','version','by')}
+                rows=autocare.history_rows(c,f['from'],f['to'],f['service'],f['severity'],f['version'],f['by'])
+                audit(c,user['id'],'autocare_export')
+                return self.reply(200,autocare.history_csv(rows),'text/csv; charset=utf-8',filename='historial-autocare.csv')
             autocare_service=re.fullmatch(r'/api/autocare/service/([a-z_]{2,20})',path)
             if autocare_service:
                 if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede usar ADI AutoCare.'})
@@ -2631,7 +2639,7 @@ class Handler(BaseHTTPRequestHandler):
                     for key,value in values.items():c.execute('INSERT INTO auth_policy VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value',(key,value))
                     audit(c,user['id'],'auth_policy_updated')
                     return self.reply(200,{'ok':True})
-                if path in ('/api/autocare/diagnose','/api/autocare/settings','/api/autocare/review','/api/autocare/diagnose/start','/api/autocare/diagnose/step','/api/autocare/incident'):
+                if path in ('/api/autocare/diagnose','/api/autocare/settings','/api/autocare/review','/api/autocare/diagnose/start','/api/autocare/diagnose/step','/api/autocare/incident','/api/autocare/check','/api/autocare/action'):
                     if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede usar ADI AutoCare.'})
                     import autocare,stability
                     now=reception_now()
@@ -2644,6 +2652,19 @@ class Handler(BaseHTTPRequestHandler):
                         try:out=stability.step_manual(c,now,str(data.get('id','')),str(data.get('code','')))
                         except ValueError as error:return self.reply(409,{'error':str(error)})
                         return self.reply(200,out)
+                    if path=='/api/autocare/check':
+                        # Reintento de un solo servicio. Cierra su incidencia únicamente si la comprobación sale correcta.
+                        if limited(c,'autocare-check:'+str(user['id']),limit=30,window=3600):return self.reply(429,{'error':'Demasiados reintentos en la última hora. Espera unos minutos.'})
+                        try:result=stability.recheck(c,now,str(data.get('code',''))[:20],user['name'])
+                        except ValueError as error:return self.reply(409,{'error':str(error)})
+                        audit(c,user['id'],'autocare_check');return self.reply(200,{'result':result,'overview':autocare.overview(c,reception_now())})
+                    if path=='/api/autocare/action':
+                        # Recuperación segura: solo acciones de la lista cerrada, con confirmación expresa y verificación posterior.
+                        if str(data.get('confirm',''))!='1':return self.reply(400,{'error':'Confirma la acción antes de ejecutarla.'})
+                        if limited(c,'autocare-action:'+str(user['id']),limit=10,window=3600):return self.reply(429,{'error':'Demasiadas acciones en la última hora. Espera unos minutos.'})
+                        try:out=autocare.run_action(c,now,str(data.get('action',''))[:30],user)
+                        except ValueError as error:return self.reply(409,{'error':str(error)})
+                        audit(c,user['id'],'autocare_action_'+out['action']);return self.reply(200,dict(out,overview=autocare.overview(c,reception_now())))
                     if path=='/api/autocare/incident':
                         try:item=autocare.update_incident(c,str(data.get('code','')),str(data.get('status','')),data.get('note',''),user['name'],now)
                         except LookupError as error:return self.reply(404,{'error':str(error)})

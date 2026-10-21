@@ -63,7 +63,14 @@ def _transient(error):
     return getattr(error, 'kind', '') in ('red', 'temporal', 'conexion')
 
 
-STATUS_LABELS = {'ok': 'Correcto', 'warning': 'Advertencia', 'error': 'Error', 'not_checked': 'No comprobado'}
+STATUS_LABELS = {'ok': 'Correcto', 'warning': 'Advertencia', 'error': 'Error', 'not_checked': 'No comprobado', 'unavailable': 'No disponible'}
+# «No disponible»: el servicio no está configurado o está desactivado (no es un fallo del sistema). «No comprobado»: existe, pero esta
+# verificación no lo probó (por ejemplo, una prueba de red que solo se hace en los diagnósticos manuales y programados).
+# Tiempo máximo de cada comprobación: si se supera, el resultado pasa a Advertencia con el tiempo medido (las pruebas de red tienen además
+# su propio límite de conexión, para que ninguna deje el diagnóstico esperando).
+MAX_MS = {'mail': 20000, 'ai': 12000}
+DEFAULT_MAX_MS = 8000
+NETWORK_TIMEOUT = 8
 
 
 def checks(c, deep=False, now=None):
@@ -204,6 +211,7 @@ def checks(c, deep=False, now=None):
         except mail_pro.MailError:
             ready = False
         if not ready:
+            # Sin correo no salen avisos ni comprobantes: es un fallo (no crítico) que impide declarar la versión estable, no un «no disponible».
             raise RuntimeError('El correo del sistema no está configurado (faltan servidor, usuario o contraseña).')
         if deep:
             began = time.monotonic()
@@ -278,12 +286,75 @@ def checks(c, deep=False, now=None):
             return ('warning', summary['problem'] + ' Ver incidencias.')
         return 'Sin errores de ejecución pendientes en la última hora'
 
+    def ai():
+        """Servicio de IA de ADI (chat y voz). La prueba de red (solo en diagnósticos manuales y programados) consulta el modelo en
+        OpenAI: valida la clave y el modelo sin generar texto ni costo. La clave nunca aparece en el detalle."""
+        import urllib.error
+        import urllib.parse
+        import urllib.request
+        import adi_ai
+        key = adi_ai.openai_key()
+        if not key:
+            return ('unavailable', 'La IA de ADI no está configurada: ADI responde con los datos del sistema, sin IA ni voz natural.')
+        model = os.getenv('OPENAI_MODEL', 'gpt-4.1-mini')
+        usage = ''
+        try:
+            import adi_voice
+            usage = ' · voz natural hoy: ' + str(round(adi_voice.usage(c, now) / 60, 1)).replace('.', ',') + ' min'
+        except Exception:
+            pass
+        if deep:
+            began = time.monotonic()
+            request = urllib.request.Request('https://api.openai.com/v1/models/' + urllib.parse.quote(model), headers={'Authorization': 'Bearer ' + key})
+            try:
+                with urllib.request.urlopen(request, timeout=NETWORK_TIMEOUT) as response:
+                    response.read(4000)
+            except urllib.error.HTTPError as error:
+                if error.code in (401, 403):
+                    raise RuntimeError('OpenAI rechazó la clave configurada (HTTP %d).' % error.code) from None
+                if error.code == 404:
+                    raise RuntimeError('El modelo ' + model + ' no está disponible para la clave configurada.') from None
+                if error.code == 429:
+                    return ('warning', 'OpenAI respondió con límite de uso (HTTP 429): ADI usará sus respuestas sin IA hasta que se libere' + usage)
+                raise ConnectionError('OpenAI respondió con error HTTP %d.' % error.code) from None
+            except (OSError, urllib.error.URLError):
+                raise ConnectionError('Sin respuesta de OpenAI en %d s.' % NETWORK_TIMEOUT) from None
+            return 'OpenAI accesible: clave válida y modelo ' + model + ' disponible en ' + str(round((time.monotonic() - began) * 1000)) + ' ms' + usage
+        last = last_deep('ai')
+        if last and last['at'] >= (now - timedelta(hours=24)).isoformat(timespec='seconds'):
+            if last['status'] == 'error':
+                raise RuntimeError('Fallo real en la última comprobación de OpenAI (' + last['at'][:16].replace('T', ' ') + '): ' + last['detail'])
+            return 'OpenAI comprobado el ' + last['at'][8:10] + '/' + last['at'][5:7] + ' ' + last['at'][11:16] + ' · prueba omitida en esta verificación automática' + usage
+        return ('not_checked', 'Clave configurada (modelo ' + model + '); la conexión con OpenAI se comprueba en los diagnósticos manuales y programados' + usage + '.')
+
+    def backups():
+        """Copias de seguridad de la base central: usa el registro que deja el respaldo verificado (fecha, tamaño, huella y recuentos)."""
+        import remote_db
+        info = _load(c, 'cloud_backup', None)
+        if not info:
+            if not remote_db.configured():
+                return ('not_checked', 'Base de datos local: los respaldos se hacen en el propio equipo (no hay registro central).')
+            return ('not_checked', 'No hay ningún respaldo verificado registrado de la base central.')
+        if not info.get('ok'):
+            raise RuntimeError('El último respaldo registrado no se completó (' + str(info.get('at', ''))[:16].replace('T', ' ') + ').')
+        at = str(info.get('at', ''))
+        try:
+            hours = (now - datetime.fromisoformat(at)).total_seconds() / 3600
+        except ValueError:
+            raise RuntimeError('El registro del último respaldo no tiene una fecha válida.') from None
+        detail = ('Último respaldo verificado el ' + at[8:10] + '/' + at[5:7] + ' ' + at[11:16] + ' · ' + str(round((info.get('bytes') or 0) / 1048576, 1)).replace('.', ',') + ' MB · '
+                  + str(info.get('clients', 0)) + ' clientes · ' + str(info.get('orders', 0)) + ' órdenes · integridad y recuentos comprobados')
+        if hours > 24 * 7:
+            return ('warning', 'Respaldo con más de 7 días · ' + detail)
+        return detail
+
     return [('database', 'Conectividad con la base de datos', 'crítica', database), ('auth', 'Autenticación y sesiones', 'crítica', authentication),
             ('clients', 'Registro de clientes', 'alta', clients), ('orders', 'Órdenes de reparación', 'crítica', orders),
             ('quotes', 'Presupuestos', 'alta', quotes), ('licenses', 'Licencias e inventario', 'alta', licenses_check),
             ('sales', 'Ventas y pagos', 'alta', sales), ('agenda', 'Agenda y citas', 'crítica', agenda),
             ('mail', 'Envío de correos', 'media', mail), ('notifications', 'Notificaciones', 'media', notices),
-            ('integrations', 'Integraciones configuradas', 'baja', integrations), ('internal', 'Servicios internos', 'crítica', internal),
+            ('integrations', 'Integraciones configuradas', 'baja', integrations), ('ai', 'Inteligencia artificial de ADI', 'media', ai),
+            ('internal', 'Servicios internos y tareas programadas', 'crítica', internal), ('backups', 'Copias de seguridad', 'alta', backups),
             ('errors', 'Registros de errores', 'media', runtime_errors)]
 
 
@@ -323,9 +394,9 @@ def execute(code, name, severity, test):
     recovered = False
 
     def outcome(value):
-        if isinstance(value, tuple) and value and value[0] in ('warning', 'not_checked'):
-            return value[0], str(value[1])[:200]
-        return 'ok', str(value)[:200]
+        if isinstance(value, tuple) and value and value[0] in ('warning', 'not_checked', 'unavailable'):
+            return value[0], str(value[1])[:240]
+        return 'ok', str(value)[:240]
     try:
         status, detail = outcome(test())
     except Exception as error:
@@ -337,8 +408,12 @@ def execute(code, name, severity, test):
             except Exception as again:
                 detail = (str(again) or type(again).__name__)[:200]
         print('stability', code, type(error).__name__, 'recuperado' if recovered else '', flush=True)
+    ms = round((time.monotonic() - began) * 1000)
+    limit = MAX_MS.get(code, DEFAULT_MAX_MS)
+    if status == 'ok' and ms > limit:
+        status, detail = 'warning', ('Respuesta lenta: ' + str(round(ms / 1000, 1)).replace('.', ',') + ' s (máximo ' + str(limit // 1000) + ' s) · ' + detail)[:240]
     return {'code': code, 'name': name, 'severity': severity, 'critical': severity == 'crítica', 'ok': status != 'error', 'status': status,
-            'detail': detail, 'recovered': recovered, 'ms': round((time.monotonic() - began) * 1000)}
+            'detail': detail, 'recovered': recovered, 'ms': ms, 'limit_ms': limit}
 
 
 def finish(c, now, source, results, total_ms, by=''):
@@ -348,6 +423,7 @@ def finish(c, now, source, results, total_ms, by=''):
     entry = {'version': version, 'at': now.isoformat(timespec='seconds'), 'source': source, 'by': by, 'passed': sum(1 for r in results if r['ok']), 'total': len(results),
              'critical_failures': [r['name'] for r in results if r['critical'] and not r['ok']], 'warnings': [r['name'] for r in results if not r['critical'] and not r['ok']],
              'advisories': [r['name'] for r in results if r.get('status') == 'warning'], 'unchecked': [r['name'] for r in results if r.get('status') == 'not_checked'],
+             'unavailable': [r['name'] for r in results if r.get('status') == 'unavailable'],
              'counts': counts, 'results': results, 'ms': total_ms}
     history = _load(c, 'stability_runs', [])
     summary = _summary(c, version, history)
@@ -416,6 +492,24 @@ def step_manual(c, now, run_id, code):
     c.execute("DELETE FROM system_state WHERE key IN ('stability_manual','stability_running')")
     entry = finish(c, now, 'manual', state['results'], state['ms'], state.get('by', ''))
     return {'result': result, 'done': True, 'entry': {key: entry[key] for key in ('at', 'passed', 'total', 'counts', 'critical_failures', 'warnings', 'advisories', 'unchecked')}}
+
+
+def recheck(c, now, code, by=''):
+    """Repite una sola comprobación (con prueba de red). Si vuelve a ser correcta, su incidencia se cierra con esa evidencia; nunca se
+    declara resuelta sin la comprobación. El resultado queda registrado (quién, cuándo, versión y resultado)."""
+    if _running(c, now):
+        raise ValueError('Hay un diagnóstico en curso: espera a que termine.')
+    item = next((entry for entry in checks(c, True, now) if entry[0] == code), None)
+    if not item:
+        raise ValueError('Servicio no válido.')
+    result = execute(*item)
+    version = versioning.load()['releases'][0]['version']
+    rechecks = _load(c, 'stability_rechecks', [])
+    rechecks.append({'at': now.isoformat(timespec='seconds'), 'by': by, 'version': version, 'result': result})
+    _save(c, 'stability_rechecks', rechecks[-60:])
+    import autocare
+    autocare.after_recheck(c, result, by, now, version)
+    return result
 
 
 def _known(c, history):

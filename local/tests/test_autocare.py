@@ -101,7 +101,7 @@ class AutoCareTests(unittest.TestCase):
         self.assertEqual(ran['status'], 200)
         self.assertEqual(ran['body']['ran']['total'], len(ran['body']['services']))
         names = {s['name'] for s in ran['body']['services']}
-        for required in ('Conectividad con la base de datos', 'Autenticación y sesiones', 'Registro de clientes', 'Órdenes de reparación', 'Presupuestos', 'Licencias e inventario', 'Ventas y pagos', 'Agenda y citas', 'Envío de correos', 'Notificaciones', 'Integraciones configuradas', 'Servicios internos', 'Registros de errores'):
+        for required in ('Conectividad con la base de datos', 'Autenticación y sesiones', 'Registro de clientes', 'Órdenes de reparación', 'Presupuestos', 'Licencias e inventario', 'Ventas y pagos', 'Agenda y citas', 'Envío de correos', 'Notificaciones', 'Integraciones configuradas', 'Inteligencia artificial de ADI', 'Servicios internos y tareas programadas', 'Copias de seguridad', 'Registros de errores'):
             self.assertIn(required, names)
         documents = next(s for s in ran['body']['services'] if s['name'] == 'Órdenes de reparación')
         self.assertTrue(documents['ok'])
@@ -142,32 +142,32 @@ class AutoCareProTests(AutoCareTests):
         with app.connect() as c:
             entry = stability.run(c, app.reception_now())  # automática: el buzón no se comprueba
         statuses = {r['code']: r['status'] for r in entry['results']}
-        self.assertEqual(len(statuses), 13)
+        self.assertEqual(len(statuses), 15)
         self.assertEqual(statuses['mail'], 'error')  # sin correo configurado
         with patch.dict(app.os.environ, {'MAIL_IMAP_HOST': 'i.example.invalid', 'MAIL_SMTP_HOST': 's.example.invalid', 'MAIL_USERNAME': 'b@example.invalid', 'MAIL_PASSWORD': 'x'}), app.connect() as c:
             entry = stability.run(c, app.reception_now())
         mail = next(r for r in entry['results'] if r['code'] == 'mail')
         self.assertEqual((mail['status'], mail['ok']), ('not_checked', True))
-        self.assertEqual(entry['counts']['not_checked'], 1);self.assertIn('Envío de correos', entry['unchecked'])
-        self.assertEqual(sum(entry['counts'].values()), 13)
+        self.assertEqual(entry['counts']['not_checked'], 2);self.assertIn('Envío de correos', entry['unchecked']);self.assertIn('Copias de seguridad', entry['unchecked'])  # sin registro de respaldo central
+        self.assertEqual(sum(entry['counts'].values()), 15)
 
     def test_stepwise_diagnosis_runs_each_check_on_the_server_and_records_once(self):
         cookie, csrf = self.login()
         started = self.request('/api/autocare/diagnose/start', {}, cookie=cookie, csrf=csrf)['body']
-        self.assertEqual(len(started['plan']), 13)
+        self.assertEqual(len(started['plan']), 15)
         self.assertEqual(self.request('/api/autocare/diagnose/start', {}, cookie=cookie, csrf=csrf)['status'], 409)  # ya hay uno en curso
         self.assertEqual(self.request('/api/autocare/diagnose/step', {'id': started['id'], 'code': started['plan'][1]['code']}, cookie=cookie, csrf=csrf)['status'], 409)  # fuera de orden
         with patch.object(app.mail_pro, 'configured', return_value=True), patch.object(app.mail_pro, 'test_imap', return_value=None):
             for index, item in enumerate(started['plan']):
                 out = self.request('/api/autocare/diagnose/step', {'id': started['id'], 'code': item['code']}, cookie=cookie, csrf=csrf)['body']
-                self.assertIn(out['result']['status'], ('ok', 'warning', 'error', 'not_checked'))
-                self.assertEqual(out['done'], index == 12)
-        self.assertEqual(out['entry']['total'], 13)
+                self.assertIn(out['result']['status'], ('ok', 'warning', 'error', 'not_checked', 'unavailable'))
+                self.assertEqual(out['done'], index == 14)
+        self.assertEqual(out['entry']['total'], 15)
         with app.connect() as c:
             runs = stability._load(c, 'stability_runs', [])
         self.assertEqual((len(runs), runs[-1]['source'], runs[-1]['by']), (1, 'manual', 'Persona de prueba'))
         panel = self.request('/api/autocare', cookie=cookie)['body']
-        self.assertEqual(panel['last_by'], 'Persona de prueba');self.assertEqual(panel['runs'][0]['counts']['ok'] + panel['runs'][0]['counts']['warning'] + panel['runs'][0]['counts']['error'] + panel['runs'][0]['counts']['not_checked'], 13)
+        self.assertEqual(panel['last_by'], 'Persona de prueba');self.assertEqual(sum(panel['runs'][0]['counts'].values()), 15)
         self.assertTrue(panel['explanation']);self.assertIsNotNone(panel['post_deploy'])
 
     def test_incident_lifecycle_with_code_cause_action_and_manual_resolution(self):

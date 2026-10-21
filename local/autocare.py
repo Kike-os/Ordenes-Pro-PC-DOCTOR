@@ -13,6 +13,7 @@ no borra información, no reinicia servicios ni cambia código. Las correcciones
 """
 import hashlib
 import json
+import secrets
 import re
 import traceback
 from datetime import datetime, timedelta
@@ -44,6 +45,8 @@ GUIDE = {
  'notifications': ('El centro de notificaciones falla o hay avisos que no se pudieron enviar.', 'Revisar Licencias → Notificaciones de renovación y el servicio de correo.'),
  'integrations': ('Falta una variable de configuración necesaria en el servidor.', 'Definir la variable indicada en Vercel → Settings → Environment Variables y volver a desplegar.'),
  'internal': ('Falta un archivo del despliegue o las tareas programadas no se ejecutan.', 'Revisar el último despliegue en Vercel y las tareas programadas (Cron Jobs).'),
+ 'ai': ('La clave de OpenAI no es válida, el modelo no está disponible o OpenAI no responde.', 'Revisar la variable OPENAI_API_KEY y el modelo (OPENAI_MODEL) en Vercel; mientras tanto ADI responde con los datos del sistema, sin IA.'),
+ 'backups': ('El último respaldo verificado de la base central es antiguo, falló o no está registrado.', 'Ejecutar el respaldo verificado (maintenance/backup-cloud.py) con las variables de producción y comprobar su registro.'),
  'errors': ('Se produjeron errores de ejecución recientes.', 'Revisar las incidencias de ejecución (ruta y punto del código) y preparar la corrección en una rama de pruebas.'),
 }
 MODULES = (('/api/login', 'Autenticación'), ('/api/session', 'Autenticación'), ('/api/password', 'Autenticación'), ('/api/second-step', 'Autenticación'),
@@ -259,14 +262,96 @@ def recent_errors(c, hours=24, now=None):
     return [item for item in _load(c, 'autocare_errors', []) if item['at'] >= since and item['at'] > reviewed]
 
 
-def log(c, kind, severity, module, message, detail='', now=None, version=''):
+def log(c, kind, severity, module, message, detail='', now=None, version='', by=''):
     events = _load(c, 'autocare_events', [])
     if now is None:
         from reception import reception_now
         now = reception_now()
-    events.append({'at': stamp(now), 'kind': kind, 'severity': severity, 'module': module, 'message': message,
-                   'detail': detail[:300], 'version': version})
+    events.append({'id': 'EV-' + secrets.token_hex(4).upper(), 'at': stamp(now), 'kind': kind, 'severity': severity, 'module': module, 'message': message,
+                   'detail': detail[:300], 'version': version, 'by': by})
     _save(c, 'autocare_events', events[-KEEP_EVENTS:])
+
+
+def after_recheck(c, result, by, now, version=''):
+    """Tras repetir una sola comprobación: correcta → su incidencia se cierra con esa evidencia; con error o advertencia → la incidencia
+    se abre o se actualiza (sin duplicados). Queda en la actividad técnica con quién la pidió."""
+    status = result.get('status', 'ok' if result['ok'] else 'error')
+    key = 'check:' + result['code']
+    was_open = any(item['key'] == key and item['status'] != 'resuelta' for item in _load(c, 'autocare_incidents', []))
+    if status == 'ok':
+        close_incident(c, key, now, by or 'ADI AutoCare', 'Comprobación individual correcta: ' + result['detail'])
+        if was_open:
+            log(c, 'resolved', result.get('severity', 'media'), result['name'], 'Incidencia resuelta en «' + result['name'] + '» tras repetir la comprobación.', result['detail'], now, version, by)
+    elif status in ('error', 'warning'):
+        cause, action = GUIDE.get(result['code'], ('Fallo en la verificación del servicio.', 'Revisar el detalle de la verificación.'))
+        open_incident(c, key, result['name'], result.get('severity', 'media') if status == 'error' else 'baja', result['detail'], cause, action, now, 'verificación')
+    log(c, 'review', result.get('severity', 'media') if status == 'error' else 'baja', result['name'], 'Comprobación repetida: ' + {'ok': 'correcta', 'warning': 'con advertencia', 'error': 'con error', 'not_checked': 'sin comprobar', 'unavailable': 'no disponible'}.get(status, status) + '.', result['detail'], now, version, by)
+
+
+# ---- Recuperación segura: solo estas acciones, sin parámetros libres, con confirmación de administración y comprobación posterior ----
+ACTIONS = {
+    'unlock_diagnosis': {'label': 'Liberar un diagnóstico bloqueado', 'check': 'internal',
+                         'description': 'Quita la marca de «diagnóstico en curso» cuando quedó colgada más de 5 minutos (por ejemplo, si se cerró la ventana a mitad). No toca ningún dato.'},
+    'license_expiry': {'label': 'Actualizar licencias vencidas del inventario', 'check': 'licenses',
+                       'description': 'Marca como «Vencida» las licencias SIN VENDER cuya fecha de vencimiento ya pasó, para que no se ofrezcan. Las vendidas no cambian.'},
+}
+
+
+def run_action(c, now, action, user):
+    """Ejecuta una acción de la lista cerrada y verifica el resultado con la comprobación del servicio. Devuelve lo hecho y la verificación."""
+    import stability
+    spec = ACTIONS.get(action)
+    if not spec:
+        raise ValueError('Acción no permitida.')
+    if action == 'unlock_diagnosis':
+        if stability._running(c, now):
+            raise ValueError('El diagnóstico sigue activo (menos de 5 minutos): no se libera. Espera a que termine.')
+        stuck = c.execute("SELECT COUNT(*) FROM system_state WHERE key IN ('stability_manual','stability_running')").fetchone()[0]
+        c.execute("DELETE FROM system_state WHERE key IN ('stability_manual','stability_running')")
+        done = 'Marca de diagnóstico liberada.' if stuck else 'No había ningún diagnóstico bloqueado.'
+    else:
+        import licenses
+        # Copia del cambio: los identificadores y su estado anterior («disponible») quedan en el registro, así el cambio es reversible.
+        ids = [row[0] for row in c.execute("SELECT id FROM license_units WHERE status='disponible' AND expires_at!='' AND expires_at<?", (now.date().isoformat(),)).fetchall()]
+        licenses.expire(c, now)
+        done = ('%d licencia(s) sin vender pasaron de «disponible» a «Vencida»: unidades %s.' % (len(ids), ', '.join('#' + str(i) for i in ids[:40]) + (' …' if len(ids) > 40 else ''))) if ids \
+            else 'No había licencias sin vender vencidas por actualizar.'
+    c.commit()
+    version = versioning.load()['releases'][0]['version']
+    log(c, 'recovery', 'media', spec['label'], 'Acción de recuperación autorizada por ' + user['name'] + ': ' + spec['label'] + '.', done, now, version, user['name'])
+    result = stability.recheck(c, now, spec['check'], user['name'])
+    return {'action': action, 'label': spec['label'], 'done': done, 'verification': result}
+
+
+def history_rows(c, frm='', to='', service='', severity='', version='', who=''):
+    """Actividad técnica filtrada (para la pantalla y la exportación): identificador, fecha, tipo, gravedad, servicio, acción, resultado,
+    versión y usuario. Sin contraseñas, claves, tokens ni datos personales (se enmascaran correos y números largos)."""
+    rows = []
+    for index, ev in enumerate(_load(c, 'autocare_events', [])):
+        at = ev.get('at', '')
+        if (frm and at[:10] < frm) or (to and at[:10] > to) or (service and ev.get('module') != service) or (severity and ev.get('severity') != severity) \
+                or (version and ev.get('version') != version) or (who and who.lower() not in (ev.get('by') or '').lower()):
+            continue
+        rows.append({'id': ev.get('id') or 'EV-H%05d' % index, 'at': at, 'kind': ev.get('kind', ''), 'severity': ev.get('severity', ''), 'module': ev.get('module', ''),
+                     'message': _scrub(ev.get('message', '')), 'detail': _scrub(ev.get('detail', '')), 'version': ev.get('version', ''), 'by': ev.get('by', '')})
+    return rows[::-1]
+
+
+def _scrub(text):
+    text = re.sub(r'[^\s@<>]+@[^\s@<>]+', '[correo]', str(text or ''))
+    text = re.sub(r'(sk|pk|rk)-[A-Za-z0-9_-]{8,}', '[clave]', text)
+    return re.sub(r'\b\d{9,}\b', '[número]', text)
+
+
+def history_csv(rows):
+    import csv
+    import io
+    out = io.StringIO()
+    writer = csv.writer(out)
+    writer.writerow(['Identificador', 'Fecha y hora (Ecuador)', 'Tipo', 'Gravedad', 'Servicio', 'Acción o evento', 'Resultado y evidencia', 'Versión', 'Usuario o proceso'])
+    for row in rows:
+        writer.writerow([row['id'], row['at'], row['kind'], row['severity'], row['module'], row['message'], row['detail'], row['version'], row['by'] or 'ADI AutoCare'])
+    return '\ufeff' + out.getvalue()
 
 
 def after_run(c, entry, summary, previous_history, now):
@@ -412,6 +497,26 @@ def _mail_detail(c, history, now):
             'note': 'Las verificaciones automáticas no abren el buzón (prueba omitida) y muestran el resultado real del último diagnóstico manual o programado de las últimas 24 h. No se envía ningún correo de prueba.'}
 
 
+def build_info():
+    """Compilación desplegada: en Vercel, el commit y la rama de la que se construyó; en el equipo local, «local»."""
+    import os
+    sha = os.environ.get('VERCEL_GIT_COMMIT_SHA', '')
+    return {'commit': sha[:7], 'branch': os.environ.get('VERCEL_GIT_COMMIT_REF', ''), 'environment': os.environ.get('VERCEL_ENV', '') or ('vercel' if os.environ.get('VERCEL') else 'local'),
+            'region': os.environ.get('VERCEL_REGION', '')}
+
+
+def migrations(c):
+    """Migraciones del paquete frente a las aplicadas en la base. En producción (Vercel) no se aplican solas: una pendiente es un aviso real."""
+    from pathlib import Path
+    files = sorted(p.name for p in (Path(__file__).resolve().parent / 'migrations').glob('*.sql'))
+    try:
+        applied = {row[0] for row in c.execute('SELECT name FROM migrations').fetchall()}
+    except Exception:
+        applied = set()
+    done = [name for name in files if name in applied]
+    return {'total': len(files), 'applied': len(done), 'last': done[-1] if done else '', 'pending': [name for name in files if name not in applied]}
+
+
 def overview(c, now):
     """Resumen del panel: indicadores, servicios, incidencias, recuperaciones, historial técnico, versiones y configuración de avisos."""
     import stability
@@ -420,15 +525,32 @@ def overview(c, now):
     last = next((item for item in reversed(history) if item['version'] == status['version']), None)
     services = [{'code': r['code'], 'name': r['name'], 'severity': r.get('severity', 'crítica' if r['critical'] else 'media'), 'ok': r['ok'], 'status': r.get('status', 'ok' if r['ok'] else 'error'),
                  'detail': r['detail'], 'ms': r['ms'], 'recovered': r.get('recovered', False), 'timing': timing(history, r['code'], r['ms'])} for r in (last['results'] if last else [])]
+    # Un reintento individual posterior a la última verificación completa sustituye el estado de ese servicio (con quién y cuándo).
+    latest = {}
+    for item in stability._load(c, 'stability_rechecks', []):
+        if last and item['at'] > last['at'] and item['version'] == status['version']:
+            latest[item['result']['code']] = item
+    for service in services:
+        again = latest.get(service['code'])
+        if again:
+            r = again['result']
+            service.update({'ok': r['ok'], 'status': r.get('status', 'ok' if r['ok'] else 'error'), 'detail': r['detail'], 'ms': r['ms'], 'recovered': r.get('recovered', False),
+                            'rechecked_at': again['at'], 'rechecked_by': again.get('by', '')})
+        if service['status'] in ('error', 'warning'):
+            service['cause'], service['action'] = GUIDE.get(service['code'], ('Fallo en la verificación del servicio.', 'Revisar el detalle de la verificación.'))
+        service['limit_ms'] = stability.MAX_MS.get(service['code'], stability.DEFAULT_MAX_MS)
     counts = {key: sum(1 for s in services if s['status'] == key) for key in stability.STATUS_LABELS}
     items = incidents(c)
     open_items = [item for item in items if item['status'] != 'resuelta']
     worst = min((SEVERITY_ORDER.get(item['severity'], 9) for item in open_items), default=9)
-    general = 'unverified' if not last else 'critical' if worst == 0 or counts['error'] and any(s['status'] == 'error' and s['severity'] == 'crítica' for s in services) else 'degraded' if open_items or counts['error'] or counts['warning'] else 'ok'
+    # «No disponible» (no configurado) solo degrada el estado general en servicios de gravedad crítica o alta.
+    missing = any(s['status'] == 'unavailable' and SEVERITY_ORDER.get(s['severity'], 9) <= SEVERITY_ORDER['alta'] for s in services)
+    general = 'unverified' if not last else 'critical' if worst == 0 or counts['error'] and any(s['status'] == 'error' and s['severity'] == 'crítica' for s in services) else 'degraded' if open_items or counts['error'] or counts['warning'] or missing else 'ok'
     events = _load(c, 'autocare_events', [])
     try:
         registry = versioning.load()
-        releases = [{'version': item['version'], 'date': item.get('date', ''), 'summary': item.get('summary', ''), 'changes': item.get('changes', {})} for item in registry['releases'][:10]]
+        releases = [{'version': item['version'], 'date': item.get('date', ''), 'type': item.get('type', ''), 'summary': item.get('summary', ''), 'changes': item.get('changes', {}),
+                     'published_by': item.get('published_by', ''), 'authorized_by': item.get('authorized_by', '')} for item in registry['releases'][:10]]
         unreleased = registry.get('unreleased') or {}
         pending = sum(len(value) for value in unreleased.values()) if isinstance(unreleased, dict) else len(unreleased)
     except versioning.RegistryError:
@@ -440,13 +562,19 @@ def overview(c, now):
              'results': [{'code': r['code'], 'name': r['name'], 'severity': r.get('severity', ''), 'status': r.get('status', 'ok' if r['ok'] else 'error'), 'detail': r['detail'], 'recovered': r.get('recovered', False)} for r in item['results']]}
             for item in reversed(history)]
     recoveries = [event for event in events if event['kind'] == 'recovery']
+    resolved = [event for event in events if event['kind'] == 'resolved']
+    by_severity = {level: sum(1 for item in open_items if item['severity'] == level) for level in SEVERITY_ORDER}
     return {'general': general, 'stability': status, 'explanation': _explain(status), 'last_check': last['at'] if last else '', 'last_source': last.get('source', '') if last else '',
             'last_by': last.get('by', '') if last else '', 'duration_ms': last.get('ms') if last else None, 'services': services, 'counts': counts, 'status_labels': stability.STATUS_LABELS,
             'incidents': sorted(items, key=lambda item: (item['status'] == 'resuelta', SEVERITY_ORDER.get(item['severity'], 9), item['last_at']), reverse=False)[:120],
             'active': [{'code': item['code'], 'module': item['service'], 'severity': item['severity'], 'diagnosis': item['description'], 'at': item['last_at'], 'source': item['source']} for item in open_items],
-            'incident_states': INCIDENT_STATES, 'recoveries_total': len(recoveries), 'recoveries': recoveries[-10:][::-1],
-            'resolved': [event for event in events if event['kind'] == 'resolved'][-10:][::-1], 'events': events[-120:][::-1], 'runs': runs,
-            'releases': releases, 'pending_changes': pending,
+            'incident_states': INCIDENT_STATES, 'incidents_by_severity': by_severity, 'recoveries_total': len(recoveries), 'recoveries': recoveries[-10:][::-1],
+            'resolved_total': len(resolved), 'resolved': resolved[-10:][::-1], 'events': history_rows(c)[:120], 'runs': runs,
+            'releases': releases, 'pending_changes': pending, 'build': build_info(), 'migrations': migrations(c),
+            'rechecks': [{'at': item['at'], 'by': item.get('by', ''), 'version': item['version'], 'code': item['result']['code'], 'name': item['result']['name'],
+                          'status': item['result'].get('status', ''), 'detail': item['result']['detail']} for item in stability._load(c, 'stability_rechecks', [])[-10:][::-1]],
+            'actions': [{'code': key, 'label': value['label'], 'description': value['description']} for key, value in ACTIONS.items()],
+            'alerts': notifications(c, now),
             'post_deploy': {'at': first['at'], 'passed': first['passed'], 'total': first['total'], 'counts': first.get('counts')} if first else None,
             'update': {'state': public.get('state', ''), 'latest': public.get('latest', ''), 'checked_at': public.get('at', '')},
             'settings': settings(c), 'next_scheduled': status['next_scheduled']}
@@ -467,7 +595,9 @@ def notifications(c, now):
             items.append({'key': key, 'kind': 'error' if event['severity'] in ('crítica', 'alta') else 'warning', 'icon': 'alert', 'title': 'ADI AutoCare · ' + ('Servicio no disponible' if event['severity'] == 'crítica' else 'Incidencia ' + event['severity']),
                           'detail': event['message'] + (' ' + event['detail'] if event['detail'] else ''), 'at': event['at'], 'href': link, 'group': 'event'})
         elif event['kind'] == 'recovery' and config['connection']:
-            items.append({'key': key, 'kind': 'success', 'icon': 'check', 'title': 'ADI AutoCare · Problema de conexión recuperado', 'detail': event['message'], 'at': event['at'], 'href': link, 'group': 'event'})
+            # Las automáticas no tienen usuario; las acciones de recuperación las ejecuta (y firma) administración.
+            title = 'Acción de recuperación ejecutada' if event.get('by') else 'Problema de conexión recuperado'
+            items.append({'key': key, 'kind': 'success', 'icon': 'check', 'title': 'ADI AutoCare · ' + title, 'detail': event['message'] + (' ' + event['detail'] if event.get('by') and event.get('detail') else ''), 'at': event['at'], 'href': link, 'group': 'event'})
         elif event['kind'] == 'version' and config['updates']:
             items.append({'key': key, 'kind': 'success' if event['severity'] == 'baja' else 'warning', 'icon': 'check', 'title': 'ADI AutoCare · Versión actualizada', 'detail': event['message'], 'at': event['at'], 'href': link, 'group': 'event'})
         elif event['kind'] == 'scheduled' and config['scheduled']:
