@@ -8150,3 +8150,90 @@ body[data-page=dashboard] dialog.lcard-dialog .lcard-tools :is(input,select){hei
 #adi-widget.adi-v2:is([data-state=adi],[data-state=consulting])[data-voice=speaking] #adi-status::before{background:#ff7fb6;color:#ff7fb666;animation:adi-talk-pulse 1.1s ease-out infinite}
 #adi-widget.adi-v2 .adi-note-error .adi-retry:focus-visible{outline:2px solid #8fd3ff;outline-offset:2px}
 @media(prefers-reduced-motion:reduce){#adi-widget.adi-v2 #adi-status::before{animation:none}}
+/* Horarios y Disponibilidad (Centro de Configuración): indicador en vivo, tabla compacta Día | Estado | Apertura | Cierre y tarjetas. */
+#module-content .hours-pro{display:grid;gap:14px;min-width:0}#module-content :is(.hours-pro,.hours-pro .hours-form,.hours-cards)>*{min-width:0}
+#module-content .hours-live{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:12px;padding:12px 16px;border:1px solid #2f6d5a;border-left:4px solid #3fbf8a;border-radius:12px;background:linear-gradient(90deg,#0f2a26,#0c182b 70%)}
+#module-content .hours-live[data-open=false]{border-color:#7a6230;border-left-color:#f3c677;background:linear-gradient(90deg,#2b230f,#0c182b 70%)}
+#module-content .hours-live-icon{display:grid;place-items:center;width:36px;height:36px;border-radius:50%;background:#123a33;color:#7ff0c8}
+#module-content .hours-live[data-open=false] .hours-live-icon{background:#3a2e12;color:#f3d48f}
+#module-content .hours-live-icon svg,#module-content .hours-card-icon svg{width:19px;height:19px}
+#module-content .hours-live-text{display:grid;gap:3px;min-width:0}
+#module-content .hours-live-top{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px}
+#module-content .hours-live-top strong{font-size:14px;color:#fff;overflow-wrap:anywhere}
+#module-content .hours-live-badge{padding:2px 9px;border-radius:999px;background:#1f6f55;color:#d9fff0;font-size:10.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
+#module-content .hours-live[data-open=false] .hours-live-badge{background:#6b5216;color:#fff1cc}
+#module-content .hours-live-text small{font-size:12px;line-height:1.45;color:#c5d5ee}#module-content .hours-live-text small[hidden]{display:none}
+#module-content .hours-live-clock{display:grid;gap:1px;text-align:right}
+#module-content .hours-live-clock strong{font-size:18px;font-weight:700;color:#fff;font-variant-numeric:tabular-nums;white-space:nowrap}
+#module-content .hours-live-clock small{font-size:10.5px;color:#8ea4c4;white-space:nowrap}
+#module-content .hours-pro .hours-form{display:grid;gap:14px}
+#module-content .hours-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:14px;align-items:start}
+#module-content .hours-card{display:grid;gap:10px;align-content:start;min-width:0;padding:14px 16px;border:1px solid #1d3150;border-radius:12px;background:#0c182b}
+#module-content .hours-card-head{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:start;gap:10px}
+#module-content .hours-card-icon{display:grid;place-items:center;width:34px;height:34px;border:1px solid #2a4870;border-radius:10px;background:#10233d;color:#8fd3ff}
+#module-content .hours-card[data-card=virtual] .hours-card-icon{border-color:#ff7fb64d;color:#ff9ecb}
+#module-content .hours-card-head h3{margin:0;font-size:14.5px;color:#eef3ff}
+#module-content .hours-card-head p{margin:2px 0 0;font-size:12px;line-height:1.45;color:#8ea4c4}
+#module-content .hours-card label{margin:0}
+#module-content .hours-table{width:100%;max-width:660px;border-collapse:separate;border-spacing:0 4px}
+#module-content .hours-table thead th{padding:0 10px 2px;font-size:10.5px;font-weight:700;letter-spacing:.07em;text-align:left;text-transform:uppercase;color:#7f93b2}
+#module-content .hours-table tbody th,#module-content .hours-table tbody td{padding:5px 10px;background:#0f1f36;vertical-align:middle;transition:background-color .15s ease}
+#module-content .hours-table tbody th{font-size:13px;font-weight:600;text-align:left;color:#e5edf9;white-space:nowrap;border-radius:9px 0 0 9px}
+#module-content .hours-table tbody td:last-child{border-radius:0 9px 9px 0}
+#module-content .hours-table tr[data-weekend=true] th{color:#ffb3d4}
+#module-content .hours-table tr[data-off=true] .hours-time{opacity:.45}
+#module-content .hours-table tr[data-invalid=true]>*{background:#3a121c}
+#module-content .hours-time{width:100%;min-width:88px;max-width:118px;height:34px;min-height:34px;margin:0;padding:4px 8px;font-size:13px;font-variant-numeric:tabular-nums}
+#module-content .hours-time[aria-invalid=true]{border-color:#ff7f95}
+#module-content .hours-row-error{display:block;margin-top:3px;font-size:11px;color:#ff9fb0}#module-content .hours-row-error:empty{display:none}
+#module-content .hours-table :is(th,td){border:0;box-shadow:none}
+#module-content .hours-table thead th{background:none}
+#module-content .hours-pro .hours-switch{display:inline-flex;flex-wrap:nowrap;align-items:center;gap:8px;width:auto;white-space:nowrap}
+#module-content .hours-switch .agenda-switch-label{min-width:52px;font-size:12px;line-height:20px;font-weight:600;color:#c5d5ee}
+#module-content .hours-switch input:checked~.agenda-switch-label{color:#7ff0c8}
+#module-content .hours-limits td{display:flex;align-items:center;gap:8px}
+#module-content .hours-limits .hours-to{font-size:12px;color:#8fa5c4;white-space:nowrap}
+#module-content .hours-pro .hours-agenda{margin:0;font-size:12.5px;line-height:1.5;color:#c5d5ee}
+#module-content .hours-card>button{justify-self:start;width:auto}
+#module-content .hours-card>.hours-restore{min-height:32px;padding:4px 12px;font-size:12.5px}
+#module-content .hours-pro .hours-closures{display:grid;gap:6px;max-width:none;margin:0;padding:0;list-style:none}
+#module-content .hours-pro .hours-closure{display:grid;grid-template-columns:92px minmax(0,1fr) auto;align-items:center;gap:10px;padding:7px 10px;border:1px solid #22344f;border-radius:9px;background:#0f1f36;font-size:12.5px}
+#module-content .hours-pro .hours-closure time{font-weight:700;color:#fff;font-variant-numeric:tabular-nums}
+#module-content .hours-pro .hours-closure span{color:#c5d5ee;overflow-wrap:anywhere}
+#module-content .hours-pro .hours-closure button{width:auto;min-height:30px;margin:0;padding:4px 10px;font-size:12px}
+#module-content .hours-empty{font-size:12.5px;color:#8ea4c4}
+#module-content .hours-pro .hours-add{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,140px),1fr));gap:8px;max-width:none;margin:0}
+#module-content .hours-pro .hours-add input{height:36px;min-height:36px;margin:0;font-size:13px}#module-content .hours-pro .hours-add button{width:auto;margin:0}
+/* La barra de cambios pendientes queda fija al pie mientras se edita: la sección no debe recortar su contenido. */
+#module-content #config-hours{overflow:visible}
+#module-content .hours-actions{position:sticky;bottom:0;z-index:2;padding:10px 12px;border:1px solid #22385a;border-radius:12px;background:#0b1729f2;box-shadow:0 -10px 24px -18px #000}
+/* Fija al pie, la barra deja libre la esquina de la esfera de ADI para que «Guardar cambios» nunca quede debajo. */
+#module-content .hours-actions{padding-right:84px}
+#module-content .hours-form:not([data-dirty=true]) .hours-actions{position:static}
+#module-content .hours-form[data-dirty=true] .hours-actions{border-color:#ff7fb666;box-shadow:0 -10px 24px -16px #ff7fb680}
+#module-content .hours-actions button{width:auto;margin:0}
+#module-content .hours-saved{margin-right:auto;font-size:12px;font-weight:600;color:#8ff0bd}#module-content .hours-saved:empty{display:none}
+#module-content .hours-message:empty{display:none}
+@media(max-width:700px){
+ #module-content .hours-live{grid-template-columns:auto minmax(0,1fr)}
+ #module-content .hours-live-clock{grid-column:1/-1;grid-template-columns:auto minmax(0,1fr);align-items:baseline;gap:8px;padding-top:8px;border-top:1px solid #ffffff14;text-align:left}
+ #module-content .hours-live-clock small{white-space:normal}
+}
+@media(max-width:560px){
+ #module-content .hours-table,#module-content .hours-table tbody{display:block;width:100%}
+ #module-content .hours-card{padding:12px}
+ #module-content .hours-table thead{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+ #module-content .hours-table tbody tr{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:center;gap:6px 10px;margin-bottom:6px;padding:8px 10px;border-radius:10px;background:#0f1f36}
+ #module-content .hours-table tr[data-invalid=true]{background:#3a121c}
+ #module-content .hours-table tbody tr>*{padding:0;background:none;border-radius:0}
+ #module-content .hours-table tbody td:nth-of-type(1){justify-self:end}
+ #module-content .hours-table tbody td:nth-of-type(2)::before{content:"Apertura";display:block;margin-bottom:2px;font-size:10.5px;color:#7f93b2}
+ #module-content .hours-table tbody td:nth-of-type(3)::before{content:"Cierre";display:block;margin-bottom:2px;font-size:10.5px;color:#7f93b2}
+ #module-content .hours-limits tbody tr{grid-template-columns:minmax(0,1fr) auto}
+ #module-content .hours-limits tbody td:nth-of-type(1){justify-self:end}#module-content .hours-limits tbody td::before{content:none!important}
+ #module-content .hours-time{max-width:none}
+ #module-content .hours-pro .hours-closure{grid-template-columns:minmax(0,1fr) auto}#module-content .hours-pro .hours-closure span{grid-column:1/-1;grid-row:2}
+ #module-content .hours-actions{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);justify-content:stretch;bottom:72px;padding-right:12px}#module-content .hours-actions :is(.config-dirty,.hours-saved){grid-column:1/-1}
+ #module-content .hours-actions button{width:100%;min-height:40px;padding:4px 8px;font-size:13px;line-height:1.2;white-space:normal}
+}
+@media(prefers-reduced-motion:reduce){#module-content .hours-table tbody :is(th,td){transition:none}}

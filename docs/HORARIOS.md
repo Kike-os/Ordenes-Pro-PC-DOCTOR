@@ -31,3 +31,30 @@ Lunes a viernes hasta las 11:00 p. m., sábado hasta las 10:30 p. m. y domingo h
 ## De dónde salían los horarios antiguos
 
 «Lunes a viernes de 09:00 a 17:00; sábado de 09:00 a 13:00» no estaba escrito en las instrucciones de ADI: eran las franjas guardadas en la agenda de citas y en el horario del técnico, que ADI leía al hablar de citas. El 12/10/2026 esas franjas se pusieron en el horario oficial y ADI dejó de citar las franjas de la agenda como horario: informa el horario presencial, la hora límite de solicitud y la atención virtual, y consulta las horas libres reales.
+
+## Rediseño de Horarios y Disponibilidad (21/10/2026)
+
+En Configuración → Horarios y Disponibilidad. Se conservan los datos guardados, la fuente única que usan ADI y las páginas públicas, y la regla del servidor de que la apertura sea anterior al cierre.
+
+- **Indicador en vivo:**
+  - Muestra «Abierto» o «Cerrado» con la etiqueta que calcula el servidor (hora de Ecuador, horario y cierres), por ejemplo «Cerrado ahora · abre hoy a las 7:45 a. m.».
+  - Indica el motivo si hoy hay un cierre extraordinario y el próximo cierre registrado.
+  - Muestra el reloj de Ecuador al segundo. Cada minuto vuelve a consultar el estado al servidor; no lo inventa el navegador.
+- **Atención presencial:** tabla compacta Día | Estado | Apertura | Cierre.
+  - Interruptores pequeños con «Abierto/Cerrado» y horas de 24 h en pasos de 15 minutos. Una hora guardada fuera de esa rejilla se conserva.
+  - Validación en vivo: si la apertura no es anterior al cierre, la fila se marca, se explica el motivo y no se puede guardar.
+  - «Restablecer horarios oficiales» carga los valores oficiales, que no se aplican hasta guardar.
+- **Tarjetas separadas:**
+  - Agenda de citas: hora límite de solicitud y franjas de la agenda, con acceso a su configuración.
+  - Atención virtual ADI 24 h.
+  - Cierres extraordinarios, sin fechas pasadas al añadir.
+- **Cambios pendientes:**
+  - La barra cuenta los cambios («2 cambios sin guardar»). Con cambios se fija al pie, con borde rosado, y deja libre la esquina de la esfera de ADI.
+  - «Descartar cambios» vuelve a lo guardado. «Guardar cambios» confirma con «Cambios guardados a las …» y un aviso, sin recargar la sección.
+  - La actualización automática del sistema no recarga mientras haya cambios sin guardar.
+- **Iconos Lucide de 18 a 20 px.** Estilos acotados a `#module-content .hours-pro`. El menú del Centro de Configuración (línea rosada, fondo azul tenue, contraíble) ya existía y no cambia.
+
+**Pruebas en navegador** (base temporal con datos ficticios):
+- 18 comprobaciones de la sección: indicador, tabla, horas de 24 h, validación, conteo, descartar, guardar y persistir, cierres, tarjetas, iconos, teclado, actualización automática, 1024, 768, 390 y 320 px, y ausencia de errores de JavaScript;
+- 4 comprobaciones de la barra fija frente a la esfera de ADI;
+- las 16 comprobaciones anteriores del Centro de Configuración.
