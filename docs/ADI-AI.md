@@ -331,6 +331,40 @@ Prueba: `test_remote_external_calls.py`, que falla con el código anterior y pas
 - las 12 comprobaciones anteriores de la conversación por voz;
 - la prueba de los botones de horario.
 
+## Diseño definitivo de ADI: esfera de filamentos de energía (21/10/2026)
+
+**Referencia:** la imagen aprobada por administración: esfera de filamentos luminosos y velos translúcidos con interior oscuro, rosado neón y magenta arriba a la derecha, violeta en la transición, azul eléctrico y cian abajo a la izquierda, borde orgánico y resplandor suave. No se sustituye por otra propuesta sin autorización.
+
+**Tecnología:** se revisó la implementación existente. `adi-orb.js` ya era WebGL con un sombreador propio, estados reales, límite de FPS, pausa fuera de vista, calidad adaptable, liberación del contexto gráfico y respaldo CSS. Se mantiene esa base y solo se sustituye el sombreador. Three.js (unos 600 KB) no aportaba fidelidad para un elemento de 60 px.
+
+**Cómo se dibuja:**
+- **Filamentos:** hilos finos de tres familias entrelazadas, con un halo tenue, y velos anchos y translúcidos. Se calculan sobre una esfera 3D real que gira despacio y sigue levemente al cursor. La cara trasera, más tenue, da profundidad.
+- **Silueta y borde:** donde se acumulan los hilos se forma un anillo luminoso, con hilos que rodean el contorno, destellos blanco-rosados arriba a la derecha y cian-blancos abajo a la izquierda. Los velos ondulados que salen del contorno evitan un círculo rígido.
+- **Grosor:** los hilos se engrosan en el botón de 60 px para que se vean, y en tamaños mayores son finos.
+- **Sin costuras:** el ruido del contorno usa el seno y el coseno del ángulo, no el ángulo directamente.
+
+**Estados (eventos reales):**
+- **Reposo:** respiración lenta y filamentos que se desplazan con movimiento orgánico.
+- **Escuchando:** el borde ondula y aparecen ondas según el volumen real del micrófono, con más resplandor rosado.
+- **Pensando:** las corrientes giran y se reorganizan alrededor del núcleo.
+- **Hablando:** luz, tamaño y velocidad siguen la amplitud real del audio de ADI. Nunca hay animación de habla sin audio.
+- **Error:** tono apagado y rojizo, discreto. El chat ofrece «Reintentar».
+- **Transiciones:** la fase del flujo se integra en JS, así que acelerar o volver al reposo nunca produce saltos.
+
+**Botón:**
+- Conserva su tamaño (60 px en escritorio y 48 px en móvil) y su posición.
+- El texto «ADI» ya no se superpone a la esfera; el nombre accesible del botón se mantiene.
+- La ventana de chat muestra la misma esfera en su encabezado.
+
+**Sin WebGL:** la alternativa CSS usa la misma identidad (interior oscuro y anillo de energía rosado, magenta, violeta y azul con arcos que giran). Se detiene con movimiento reducido.
+
+**Rendimiento:** en dibujo por software, con pantalla de alta densidad y estado activo, cada cuadro cuesta menos de 9 ms y la calidad adaptable no necesitó bajar. Se mantienen unos 30 fps en reposo y la pausa con la pestaña oculta o fuera de la vista.
+
+**Pruebas:**
+- Capturas de cada estado comparadas con la referencia.
+- Las 13 comprobaciones de ADI Living Intelligence y las 12 de la conversación por voz, en verde.
+- Botón con WebGL, con la alternativa CSS y en móvil, sin errores de JavaScript.
+
 ## Tareas programadas: corrección de «no se ejecutan»
 
 **Causa:** la tarea solo verificaba si no había habido *ninguna* verificación en los 10 minutos anteriores, y las automáticas por visitas la tapaban sin dejar constancia. Además, el aviso alarmaba a las 12 h.

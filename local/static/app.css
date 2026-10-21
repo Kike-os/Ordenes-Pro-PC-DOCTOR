@@ -8358,3 +8358,15 @@ body[data-page=dashboard] dialog.lcard-dialog .lcard-tools :is(input,select){hei
 @media(max-width:900px){.lcat-bar{grid-template-columns:1fr 1fr}.lcat-search{grid-column:1/-1}.lcat-new{grid-column:1/-1;justify-self:start}}
 @media(max-width:600px){.lcat-grid{grid-template-columns:1fr}.lcat-bar{grid-template-columns:1fr}.lcat-new{width:100%}}
 @media(prefers-reduced-motion:reduce){.lcat-card,.lcat-chip{transition:none}.lcat-card:hover{transform:none}}
+/* ADI · diseño aprobado (21/10/2026): esfera de filamentos de energía. Con WebGL la dibuja adi-orb.js; el texto «ADI» no se superpone
+   (el botón conserva su nombre accesible). Sin WebGL, la alternativa CSS usa la misma identidad: interior oscuro y anillo de energía
+   rosado, magenta, violeta y azul eléctrico, con un giro lento que se detiene con «movimiento reducido». */
+#adi-widget.adi-v2.adi-gl .adi-orb-label{display:none}
+#adi-widget.adi-v2:not(.adi-gl) .adi-toggle .adi-orb{background:radial-gradient(circle at 50% 48%,#0b0418 0,#140629 46%,#2a0b4d 60%,transparent 71%),conic-gradient(from 200deg,#2f6bff,#3fc8ff 12%,#6a2cff 26%,#c624e6 44%,#ff2fa6 60%,#ffb0dd 68%,#ff2fa6 76%,#8a2cff 90%,#2f6bff);box-shadow:0 0 16px #ff3fa880,0 0 4px #ffb3dd99,inset 0 0 12px #ff5cc580;filter:none}
+#adi-widget.adi-v2:not(.adi-gl) .adi-toggle .adi-orb::before{content:"";position:absolute;inset:4%;border-radius:50%;background:conic-gradient(from 0deg,#ffffff00 0 12%,#ff6fc8b3 22%,#ffffff00 34%,#5b8dffa6 50%,#ffffff00 62%,#d23cf0b3 78%,#ffffff00 90%);-webkit-mask:radial-gradient(circle,transparent 40%,#000 62%,transparent 76%);mask:radial-gradient(circle,transparent 40%,#000 62%,transparent 76%);filter:blur(1.5px);mix-blend-mode:screen;opacity:.9;animation:adi-fil-spin 12s linear infinite}
+#adi-widget.adi-v2:not(.adi-gl) .adi-toggle .adi-orb::after{display:none}
+#adi-widget.adi-v2:not(.adi-gl) :is(.adi-orb-shine,.adi-orb-swirl){display:none}
+#adi-widget.adi-v2:not(.adi-gl) .adi-orb-label{color:#fff;text-shadow:0 0 8px #ff3fa8,0 1px 2px #000}
+#adi-widget.adi-v2:not(.adi-gl).adi-busy .adi-toggle .adi-orb::before{animation-duration:4s}
+@keyframes adi-fil-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){#adi-widget.adi-v2:not(.adi-gl) .adi-toggle .adi-orb::before{animation:none}}
