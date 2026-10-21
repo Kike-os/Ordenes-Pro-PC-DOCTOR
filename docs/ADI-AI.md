@@ -295,6 +295,13 @@ Causa de los márgenes desiguales: la regla genérica `.adi-panel{padding:10px 1
 - Defensa en `remote_db`: si Turso responde que el flujo caducó, la conexión se libera y el error indica la operación. La siguiente operación empieza limpia en lugar de arrastrar el flujo caducado.
 - Producción (`wsgi_app.py`) usa la misma CSP que la aplicación, con `media-src 'self' blob:`, para que el audio natural se reproduzca en lugar de pasar a la voz del navegador.
 
+**Revisión del mismo patrón en todo el sistema (1.5.191):** se revisaron todas las llamadas externas. Los correos, el chat y la escritura con ADI ya confirmaban antes de llamar. Quedaban tres puntos que dejaban la transacción abierta mientras esperaban, y ahora confirman antes:
+- la identificación por número de serie con el servicio del fabricante (límite de consultas y hasta 8 s por petición);
+- el correo de prueba de Notificaciones automáticas;
+- la verificación Turnstile (Cloudflare) del inicio de sesión y de la recuperación de contraseña.
+
+Prueba: `test_remote_external_calls.py`, que falla con el código anterior y pasa con la corrección.
+
 **Pruebas:** `test_adi_voice_remote.py`. Usa el servidor libSQL de pruebas (`hrana_fake.py`) con caducidad de flujos inactivos y OpenAI simulado y lento. Las pruebas fallan con el código anterior y pasan con la corrección.
 
 ## Tareas programadas: corrección de «no se ejecutan»

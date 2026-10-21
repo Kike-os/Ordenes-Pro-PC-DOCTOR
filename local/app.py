@@ -1690,7 +1690,11 @@ class Handler(BaseHTTPRequestHandler):
                 if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
                 import device_lookup
                 lookup_query=parse_qs(urlsplit(self.path).query)
-                status,payload=device_lookup.identify(c,lookup_query.get('serial',[''])[0][:200],lookup_query.get('brand',[''])[0][:80],lambda:not limited(c,'device-external:'+str(user['id']),limit=40,window=3600))
+                def allow_external():
+                    # El límite se confirma antes de consultar al fabricante: la consulta puede tardar segundos y Turso descarta una
+                    # transacción que queda inactiva mientras tanto.
+                    allowed=not limited(c,'device-external:'+str(user['id']),limit=40,window=3600);c.commit();return allowed
+                status,payload=device_lookup.identify(c,lookup_query.get('serial',[''])[0][:200],lookup_query.get('brand',[''])[0][:80],allow_external)
                 return self.reply(status,payload)
             if path in ('/api/orders', '/api/clients', '/api/devices'):
                 query = parse_qs(urlsplit(self.path).query)
@@ -2480,7 +2484,7 @@ class Handler(BaseHTTPRequestHandler):
                     # Verificación adicional solo cuando hace falta (fallos recientes): prueba de trabajo de un solo uso que el navegador resuelve sin intervención.
                     if captcha_mode()=='local' and (captcha_always() or login_risky(c,(user_key,ip_key))) and not verify_captcha(c,str(data.get('bot_token',''))):
                         return self.reply(403,{'error':'Comprobando la seguridad del acceso…','challenge':True,'silent':True})
-                    if (bot_always() or bot_required(c,ip_key)) and not verify_bot(str(data.get('bot_token','')),'login'):
+                    if (bot_always() or bot_required(c,ip_key)) and not (c.commit() or verify_bot(str(data.get('bot_token','')),'login')):  # se confirma antes de consultar a Cloudflare
                         return self.reply(403,{'error':'Completa la verificación de seguridad. Si falla, puedes esperar o recuperar tu contraseña.','challenge':True,'sitekey':os.getenv('TURNSTILE_SITE_KEY')})
                     row = c.execute('SELECT * FROM users WHERE (username=? OR email=?) AND active=1', (login,login)).fetchone()
                     valid = password_ok(password, row['password_hash'] if row else DUMMY_HASH)
@@ -2556,7 +2560,7 @@ class Handler(BaseHTTPRequestHandler):
                     email = str(data.get('email','')).strip()
                     if len(email)>254 or not re.fullmatch(r'[^\s@]+@[^\s@]+\.[^\s@]+',email):
                         return self.reply(400,{'error':'Introduce un correo electrónico con formato válido.'})
-                    if bot_required(c,'reset-ip:'+digest(self.client_address[0])) and not verify_bot(str(data.get('bot_token','')),'forgot'):
+                    if bot_required(c,'reset-ip:'+digest(self.client_address[0])) and not (c.commit() or verify_bot(str(data.get('bot_token','')),'forgot')):
                         return self.reply(403,{'error':'Completa la verificación de seguridad. Puedes esperar e intentarlo más tarde.','challenge':True,'sitekey':os.getenv('TURNSTILE_SITE_KEY')})
                     ip_blocked = limited(c, 'reset-ip:'+digest(self.client_address[0]), 5)
                     mail_blocked = limited(c, 'reset-email:'+digest(email.casefold()), 3)
@@ -3708,7 +3712,7 @@ class Handler(BaseHTTPRequestHandler):
                             body=('Este es un correo de prueba de Órdenes Pro, enviado desde Configuración → Notificaciones automáticas por correo a tu cuenta de administración.\n\nSi lo recibes en la bandeja de entrada, con el logotipo, la firma y las tildes correctas (áéíóú ñ ¿? ¡!), el envío de correos a clientes está operativo. Si llegó a «Spam» o «Promociones», conviene revisar la configuración del dominio (SPF, DKIM y DMARC).\n\nNo es necesario responder.' if mine
                                   else 'Este es un correo de prueba enviado desde Configuración → Notificaciones automáticas por correo.\n\nSi lo recibes en el buzón del sistema, el envío de comprobantes está operativo.')
                             message,recipients=mail_pro.build_message(config,{'to':recipient,'subject':('Prueba de envío real' if mine else 'Prueba de notificaciones automáticas')+' | Órdenes Pro','body':body,'from_name':corporate.settings()['name'],'attachments':[],'layout':{'title':'Prueba de envío' if mine else 'Prueba de notificaciones'}},card if card.get('enabled') else '')
-                            mail_pro.deliver(config,message,recipients)
+                            c.commit();mail_pro.deliver(config,message,recipients)  # el límite queda confirmado antes de esperar al servidor de correo
                         except mail_pro.MailError as error:
                             audit(c,user['id'],'receipt_mail_test_failed');return self.reply(200,{'result':'failed','message':'La prueba no se envió: '+str(error)})
                         audit(c,user['id'],'receipt_mail_test_sent');return self.reply(200,{'result':'sent','recipient':recipient,'message':'Prueba enviada a '+recipient+'. El servidor de correo aceptó el mensaje; revisa también la carpeta de correo no deseado.'})
