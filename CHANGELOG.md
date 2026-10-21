@@ -4,6 +4,16 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.199 — 2026-10-21 18:43 (UTC-05:00)
+
+Centro de Actualizaciones (ADI AutoCare): reintento por servicio, recuperación segura, historial exportable, versiones con migraciones y avisos clasificados.
+
+### Mejoras realizadas
+
+- Centro de Actualizaciones (ADI AutoCare): seis indicadores con datos reales (última verificación con usuario y duración, servicios operativos y afectados, incidencias por gravedad, recuperaciones y su resultado, versión instalada frente a la publicada y próxima comprobación); 15 servicios, con la IA de ADI y las copias de seguridad; estado «No disponible» y tiempo máximo por comprobación.
+- AutoCare: botón «Reintentar» por servicio, que cierra la incidencia solo si la comprobación sale correcta y registra quién la hizo; causa probable y pasos sugeridos en cada tarjeta; recuperación segura (liberar un diagnóstico bloqueado y actualizar licencias vencidas sin vender) con confirmación, registro y verificación posterior.
+- AutoCare: historial con identificador por evento y filtros por fecha, servicio, gravedad, versión y usuario; exportación CSV sin contraseñas, claves ni datos personales; versiones con compilación desplegada, migraciones aplicadas y pendientes, comparación y quién registró y autorizó cada versión (desde esta); avisos clasificados en críticos, advertencias, informativos y recuperados.
+
 ## v1.5.198 — 2026-10-21 13:58 (UTC-05:00)
 
 ADI: indicador de presencia inteligente y todas las versiones de cada producto

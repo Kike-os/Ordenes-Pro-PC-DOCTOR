@@ -8,6 +8,26 @@
   },
   "releases": [
     {
+      "version": "1.5.199",
+      "date": "2026-10-21T18:43:03-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Centro de Actualizaciones (ADI AutoCare): reintento por servicio, recuperación segura, historial exportable, versiones con migraciones y avisos clasificados.",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Centro de Actualizaciones (ADI AutoCare): seis indicadores con datos reales (última verificación con usuario y duración, servicios operativos y afectados, incidencias por gravedad, recuperaciones y su resultado, versión instalada frente a la publicada y próxima comprobación); 15 servicios, con la IA de ADI y las copias de seguridad; estado «No disponible» y tiempo máximo por comprobación.",
+          "AutoCare: botón «Reintentar» por servicio, que cierra la incidencia solo si la comprobación sale correcta y registra quién la hizo; causa probable y pasos sugeridos en cada tarjeta; recuperación segura (liberar un diagnóstico bloqueado y actualizar licencias vencidas sin vender) con confirmación, registro y verificación posterior.",
+          "AutoCare: historial con identificador por evento y filtros por fecha, servicio, gravedad, versión y usuario; exportación CSV sin contraseñas, claves ni datos personales; versiones con compilación desplegada, migraciones aplicadas y pendientes, comparación y quién registró y autorizó cada versión (desde esta); avisos clasificados en críticos, advertencias, informativos y recuperados."
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Kike-os (administración)"
+    },
+    {
       "version": "1.5.198",
       "date": "2026-10-21T13:58:25-05:00",
       "type": "patch",
