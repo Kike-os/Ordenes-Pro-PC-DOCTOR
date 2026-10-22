@@ -15,7 +15,7 @@ from decimal import Decimal, InvalidOperation
 CATEGORIES = {'servicio': 'Servicios técnicos y reparaciones', 'licencia': 'Licencias de Windows y Office', 'seguridad': 'Antivirus y seguridad', 'repuesto': 'Repuestos y componentes', 'otro': 'Productos'}
 # Categoría del presupuesto anterior de la orden a la que se traslada cada ítem aprobado (de ahí salen el total a cobrar y el saldo).
 BUDGET_KEY = {'servicio': 'labor', 'repuesto': 'parts', 'licencia': 'digital', 'seguridad': 'digital', 'otro': 'services'}
-STATUS = {'borrador': 'Borrador', 'enviado': 'Esperando respuesta', 'aprobado': 'Aprobado', 'parcial': 'Aprobado parcialmente', 'rechazado': 'Rechazado', 'modificacion': 'Modificación solicitada', 'cancelado': 'Cancelado'}
+STATUS = {'borrador': 'Borrador', 'enviado': 'Esperando aprobación', 'aprobado': 'Aprobado', 'parcial': 'Aprobado parcialmente', 'rechazado': 'Rechazado', 'modificacion': 'Revisión solicitada', 'cancelado': 'Cancelado'}
 ITEM_STATUS = {'pendiente': 'Pendiente', 'aprobado': 'Aprobado', 'rechazado': 'Rechazado', 'cancelado': 'Cancelado'}
 EDITABLE = ('borrador', 'modificacion')
 EXECUTION = {'pendiente': 'Pendiente', 'proceso': 'En proceso', 'realizado': 'Realizado'}
@@ -483,17 +483,22 @@ def client_note(c, quote_id):
     return ''
 
 
+WAITING_ORDER = ('presupuesto', 'esperando_cliente')  # estados de la orden que esperan la decisión del presupuesto
+
+
 def sync_order(c, quote, status, now):
-    """Estado técnico de la orden tras la decisión. Solo si la orden estaba en «Aprobación de presupuesto»: con algo aprobado vuelve a
-    «Procesando»; si se rechazó todo, queda donde estaba para que el taller decida. Nunca toca «Listo», «En espera de entrega» ni «Entregado»."""
+    """Estado técnico de la orden tras la decisión. Solo si la orden esperaba esa decisión («Aprobación de presupuesto» o «Esperando respuesta
+    del cliente»): con algo aprobado pasa a «Procesando»; si se rechazó todo, queda donde estaba para que el taller decida.
+    Nunca toca «Listo», «En espera de entrega» ni «Entregado», y nunca marca el equipo como reparado."""
     import order_workspace
-    row = c.execute('SELECT status FROM orders WHERE id=?', (quote['order_id'],)).fetchone()
-    if not row or row['status'] != 'presupuesto':
+    row = c.execute('SELECT o.status,s.label FROM orders o JOIN statuses s ON s.code=o.status WHERE o.id=?', (quote['order_id'],)).fetchone()
+    if not row or row['status'] not in WAITING_ORDER:
         return False
+    who = 'por el cliente' if not str(c.execute('SELECT decided_by FROM quotes WHERE id=?', (quote['id'],)).fetchone()[0]).startswith('personal') else '(decisión registrada por el personal)'
     if status in ('aprobado', 'parcial'):
         c.execute("UPDATE orders SET status='reparacion',updated_at=?,revision=revision+1 WHERE id=?", (now.isoformat(timespec='microseconds'), quote['order_id']))
         order_workspace.event(c, quote['order_id'], None, now, 'status', 'Presupuesto ' + quote['code'] + ' ' + ('aprobado' if status == 'aprobado' else 'aprobado parcialmente') +
-                              ' por el cliente: el equipo pasa de «Aprobación de presupuesto» a «Procesando». Solo se ejecutan los servicios aprobados.')
+                              ' ' + who + ': el equipo pasa de «' + row['label'] + '» a «Procesando». Solo se ejecutan los servicios aprobados.')
         return True
     order_workspace.event(c, quote['order_id'], None, now, 'follow_up', 'Presupuesto ' + quote['code'] + ' rechazado: no se autoriza ningún servicio. Definir con el cliente la devolución del equipo.')
     return False

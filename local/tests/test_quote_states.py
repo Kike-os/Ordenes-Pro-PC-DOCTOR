@@ -49,9 +49,9 @@ class QuoteStateTests(unittest.TestCase):
 
     def test_sent_quote_waits_for_the_answer_and_notifies(self):
         order, quote, result = self.quote('000001')
-        self.assertEqual((result['mail'], result['quote']['status'], result['quote']['status_label'], result['quote']['mail_state']), ('sent', 'enviado', 'Esperando respuesta', 'sent'))
+        self.assertEqual((result['mail'], result['quote']['status'], result['quote']['status_label'], result['quote']['mail_state']), ('sent', 'enviado', 'Esperando aprobación', 'sent'))
         data = self.request('/api/orders/%d/quote' % order['id'], cookie=self.cookie)['body']
-        self.assertEqual((data['versions'][0]['mail_state'], data['current']['status_label']), ('sent', 'Esperando respuesta'))
+        self.assertEqual((data['versions'][0]['mail_state'], data['current']['status_label']), ('sent', 'Esperando aprobación'))
         sent = [n for n in self.notes() if ':enviado:' in n['key']]
         self.assertEqual(len(sent), 1)
         self.assertIn('Esperando respuesta del cliente', sent[0]['detail'])

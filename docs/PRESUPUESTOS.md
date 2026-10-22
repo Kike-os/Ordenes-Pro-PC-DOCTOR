@@ -289,3 +289,58 @@ Precio final con IVA incluido (no se suma de nuevo). Se crean una sola vez (`quo
 - **Al terminar** aparece la notificación «Presupuesto guardado y enviado correctamente al cliente.».
 - **Ante un problema temporal de base de datos** se responde 503 con el mensaje «No se pudo guardar el presupuesto por un problema temporal de base de datos. Intente nuevamente.». La operación sin confirmar se descarta, y el error queda en ADI AutoCare con usuario, presupuesto, endpoint, operación SQL, hora, código interno y causa original.
 - **Totales:** se calculan siempre desde las partidas guardadas con la misma fórmula en pantalla y en el servidor (descuento por línea, IVA 15 % incluido solo en las partidas gravadas). Al quitar el IVA de una partida, su precio pasa a la base sin impuesto.
+
+## Aprobaciones, estados y orden sincronizados (1.5.201)
+
+**Caso que lo motivó (PCD-20261019-0005).** El cliente firmó el 21/10 a las 19:17 la autorización de servicio (`/autorizar/`): diagnóstico, acceso al sistema, archivos y formateo. Esa firma no aprueba importes.
+
+El presupuesto P1 ($145,35) sigue «Esperando aprobación»:
+
+- su enlace nunca se abrió;
+- no tiene firma, aceptación ni decisión.
+
+No se crean aprobaciones a partir de la autorización de servicio. Para recuperarlo hay que pedir al cliente que confirme desde su enlace, o registrar una decisión del personal con una nota, que queda marcada como «sin firma del cliente».
+
+### Estados del presupuesto
+
+| Evento | Estado |
+|---|---|
+| Creado | Borrador |
+| Enviado | Esperando aprobación |
+| El cliente aprueba todas las partidas | Aprobado |
+| El cliente aprueba algunas | Aprobado parcialmente |
+| El cliente rechaza todas | Rechazado |
+| El cliente pide cambios | Revisión solicitada |
+
+El estado cambia en la misma transacción en que el servidor registra la decisión, junto con las partidas, la firma y la evidencia. El enlace queda revocado después, así que reenviarlo o abrirlo de nuevo no duplica nada.
+
+### Orden
+
+Si la orden esperaba la decisión («Aprobación de presupuesto» o «Esperando respuesta del cliente»), una aprobación total o parcial la pasa a **Procesando**. El historial dice si fue el cliente o el personal.
+
+- Un rechazo deja la orden donde estaba, para que el taller decida.
+- Nunca se toca «Listo», «En espera de entrega» ni «Entregado».
+- Nunca se marca el equipo como reparado.
+
+### Sin recargar
+
+Mientras un presupuesto espera respuesta, la orden consulta cada 30 s. Si cambia el estado de un presupuesto, se vuelve a leer la orden de la base de datos y se actualizan:
+
+- «Autorizaciones del cliente»;
+- el estado del equipo;
+- el saldo.
+
+Aparece también un aviso. El centro de notificaciones ya avisaba de las decisiones.
+
+### «AUTORIZACIÓN CONFIRMADA»
+
+El bloque de autorización se muestra en verde si se aprobó todo y en naranja si la aprobación fue parcial. Incluye:
+
+- presupuesto y estado;
+- partidas autorizadas;
+- total autorizado, sin mezclarlo con lo pagado;
+- fecha real de aprobación;
+- estado del proceso;
+- si lo aprobó el cliente o se registró por el personal.
+
+Cuando la autorización de servicio está firmada pero el presupuesto sigue pendiente, la orden lo explica. Administración ve además el botón «Pedir al cliente que apruebe …», que reenvía el enlace.

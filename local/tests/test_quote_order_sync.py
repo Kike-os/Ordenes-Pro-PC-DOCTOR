@@ -91,5 +91,48 @@ class QuoteOrderSyncTests(unittest.TestCase):
             self.assertEqual(quotes.pending_codes(c,order['id']),[])  # decidido: ya no se avisa
 
 
+    def set_status(self,oid,code):
+        with app.connect() as c:c.execute('UPDATE orders SET status=? WHERE id=?',(code,oid));c.commit()
+
+    def history(self,oid):
+        with app.connect() as c:return [tuple(r) for r in c.execute("SELECT event,comment FROM order_history WHERE order_id=? AND comment LIKE 'Presupuesto %' ORDER BY id",(oid,))]
+
+    def test_approval_moves_a_waiting_order_to_processing_once(self):
+        cookie,post,order,quote,path,passkey,items=self.sent()
+        self.set_status(order['id'],'esperando_cliente')  # como la orden PCD-20261019-0005
+        self.assertEqual(self.request('/api/orders/%d/quote'%order['id'],cookie=cookie)['body']['versions'][0]['status_label'],'Esperando aprobación')
+        self.decide(path,passkey,items,['aprobado']*3);self.decide(path,passkey,items,['aprobado']*3)  # enlace repetido
+        view=self.order(order['id'],cookie)
+        self.assertEqual((view['status'],view['status_label']),('reparacion','Procesando'))
+        moves=[h for h in self.history(order['id']) if h[0]=='status']
+        self.assertEqual(len(moves),1);self.assertIn('aprobado por el cliente',moves[0][1]);self.assertIn('«Esperando respuesta del cliente» a «Procesando»',moves[0][1])
+        # Persistencia: una conexión nueva (como tras reiniciar el servidor) lee lo mismo de la base de datos.
+        with app.connect() as c:
+            self.assertEqual(len(quotes.authorized(c,order['id'])['items']),3)
+            self.assertEqual(c.execute("SELECT COUNT(*) FROM audit WHERE action='quote_client_aprobado' AND entity_id=?",(order['id'],)).fetchone()[0],1)
+
+    def test_rejection_keeps_the_waiting_order_and_records_it(self):
+        cookie,post,order,quote,path,passkey,items=self.sent()
+        self.set_status(order['id'],'esperando_cliente')
+        self.decide(path,passkey,items,['rechazado']*3)
+        self.assertEqual(self.order(order['id'],cookie)['status'],'esperando_cliente')
+        self.assertTrue(any('rechazado' in h[1] for h in self.history(order['id'])))
+
+    def test_finished_orders_are_never_moved_and_staff_decisions_are_labelled(self):
+        cookie,post,order,quote,path,passkey,items=self.sent()
+        self.set_status(order['id'],'listo')
+        self.decide(path,passkey,items,['aprobado','aprobado','rechazado'])
+        self.assertEqual(self.order(order['id'],cookie)['status'],'listo')  # nunca se toca «Listo», «En espera de entrega» ni «Entregado»
+        cookie2,csrf2=cookie,None
+        with app.connect() as c:
+            self.assertEqual(quotes.STATUS['modificacion'],'Revisión solicitada')
+            # Decisión del personal sobre una orden que esperaba: pasa a Procesando y el historial lo dice así (no «por el cliente»).
+            c.execute("UPDATE quotes SET status='enviado',decided_at='',decided_by='' WHERE id=?",(quote,));c.execute("UPDATE quote_items SET status='pendiente' WHERE quote_id=?",(quote,))
+            c.execute("UPDATE orders SET status='presupuesto' WHERE id=?",(order['id'],));c.commit()
+            q=quotes.get(c,quote);quotes.decide(c,q,{i:'aprobado' for i in items},app.reception_now(),{'id':self.uid,'name':'Persona de prueba'});c.commit()
+        moves=[h for h in self.history(order['id']) if h[0]=='status']
+        self.assertIn('(decisión registrada por el personal)',moves[-1][1])
+
+
 if __name__=='__main__':
     unittest.main()
