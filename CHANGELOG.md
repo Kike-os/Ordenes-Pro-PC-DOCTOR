@@ -4,6 +4,18 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.202 — 2026-10-21 20:47 (UTC-05:00)
+
+Rediseño empresarial de «Autorizaciones del cliente» con línea de tiempo real, subtotal/IVA/total autorizados, evidencia y acciones operativas.
+
+### Nuevas funcionalidades
+
+- Autorizaciones del cliente: botones Ver historial, Reenviar notificación (confirmación al cliente con el comprobante, solo administración y con confirmación), Imprimir detalle, Consultar presupuesto e Ir a la orden; ejecución Pendiente, En proceso o Finalizado aparte de la aprobación.
+
+### Mejoras realizadas
+
+- Autorizaciones del cliente rediseñadas: cabecera con presupuesto, estado, fecha, partidas, total y quién registró; línea Enviado → En revisión → Aprobado → Procesando solo con hechos registrados; servicios y productos plegables; subtotal, IVA y total autorizados por línea; evidencia real (firma o personal).
+
 ## v1.5.201 — 2026-10-21 20:18 (UTC-05:00)
 
 Aprobaciones de presupuestos sincronizadas con la orden: estados automáticos, paso a Procesando, actualización sin recargar y autorización confirmada.

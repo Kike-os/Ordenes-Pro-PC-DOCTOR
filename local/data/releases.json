@@ -8,6 +8,26 @@
   },
   "releases": [
     {
+      "version": "1.5.202",
+      "date": "2026-10-21T20:47:33-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Rediseño empresarial de «Autorizaciones del cliente» con línea de tiempo real, subtotal/IVA/total autorizados, evidencia y acciones operativas.",
+      "changes": {
+        "features": [
+          "Autorizaciones del cliente: botones Ver historial, Reenviar notificación (confirmación al cliente con el comprobante, solo administración y con confirmación), Imprimir detalle, Consultar presupuesto e Ir a la orden; ejecución Pendiente, En proceso o Finalizado aparte de la aprobación."
+        ],
+        "improvements": [
+          "Autorizaciones del cliente rediseñadas: cabecera con presupuesto, estado, fecha, partidas, total y quién registró; línea Enviado → En revisión → Aprobado → Procesando solo con hechos registrados; servicios y productos plegables; subtotal, IVA y total autorizados por línea; evidencia real (firma o personal)."
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Kike-os (administración)"
+    },
+    {
       "version": "1.5.201",
       "date": "2026-10-21T20:18:13-05:00",
       "type": "patch",
