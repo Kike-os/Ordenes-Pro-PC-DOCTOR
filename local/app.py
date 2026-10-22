@@ -1389,6 +1389,11 @@ class Handler(BaseHTTPRequestHandler):
                 if user['role']!='administrador':return self.reply(403,{'error':'Solo administración configura la voz de ADI.'})
                 import adi_voice
                 return self.reply(200,adi_voice.admin_status(c,reception_now()))
+            if path == '/api/adi/admin/alerts':
+                # Trabajos atrasados y pendientes para el aviso de ADI al abrir el asistente. Solo administración; solo lectura.
+                if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede usar la asistente administrativa.'})
+                import adi_admin
+                return self.reply(200,adi_admin.alerts(c,reception_now()))
             if path == '/api/adi/admin':
                 if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede usar la asistente administrativa.'})
                 import adi_ai
@@ -3223,8 +3228,11 @@ class Handler(BaseHTTPRequestHandler):
                     if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede usar la asistente administrativa.'})
                     prompt=str(data.get('message','')).strip()
                     if not prompt or len(prompt)>2000:return self.reply(400,{'error':'Escribe una consulta de hasta 2000 caracteres.'})
+                    # Contexto de la conversación administrativa (solo la de este usuario) para que ADI entienda «¿y la segunda?».
+                    chosen_id=str(data.get('conversation_id',''))
+                    history=[{'role':'user' if r['role']=='user' else 'assistant','content':str(r['content'])[:1500]} for r in reversed(c.execute("SELECT m.role,m.content FROM adi_admin_messages m JOIN adi_admin_conversations v ON v.id=m.conversation_id WHERE v.id=? AND v.user_id=? ORDER BY m.id DESC LIMIT 10",(chosen_id,user['id'])).fetchall())] if chosen_id.isdigit() else []
                     c.commit()  # la consulta a la IA puede tardar: no se deja abierta la transacción de la sesión
-                    result=adi.admin_reply(c,prompt,reception_now());answer=result['answer']
+                    result=adi.admin_reply(c,prompt,reception_now(),history);answer=result['answer']
                     c.execute('INSERT INTO adi_actions(user_id,action,created_at,details) VALUES (?,?,?,?)',(user['id'],'admin_query',appointments.stamp(appointments.now()),prompt[:500]))
                     stamp=reception_now().isoformat(timespec='seconds');chosen=str(data.get('conversation_id',''))
                     conversation=c.execute('SELECT id,title FROM adi_admin_conversations WHERE id=? AND user_id=?',(chosen,user['id'])).fetchone() if chosen.isdigit() else None

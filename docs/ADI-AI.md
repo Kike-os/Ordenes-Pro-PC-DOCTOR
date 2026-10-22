@@ -445,3 +445,44 @@ El punto de la esfera indica el estado real de ADI. La esfera no cambia.
 **Ahora:**
 - Cada llamada deja un latido (`cron_heartbeat`) y ejecuta su verificación completa, salvo que haya otra en curso.
 - El aviso «no se reciben» aparece tras 18 h sin llamadas. Hay tres tareas diarias separadas 8 h.
+
+## ADI para administración con datos reales (1.5.203)
+
+**Problema.** El asistente flotante del panel usaba siempre el canal de clientes (`/api/public/adi/message`), también con una sesión de administración. Ese canal no tiene acceso a datos internos, por diseño, así que respondía «no tengo acceso a las órdenes» y ofrecía un asesor humano.
+
+Además, la ADI administrativa tenía un error de datos. Para los «presupuestos pendientes» miraba el estado de la *orden* («Aprobación de presupuesto») en lugar de los presupuestos reales. Un presupuesto enviado en una orden «Esperando respuesta del cliente» no aparecía.
+
+**Ahora, cada perfil recibe lo suyo:**
+
+| Quién | Canal | Datos |
+|---|---|---|
+| Cliente (login, /citas) | `/api/public/adi/message` | Catálogo, agenda pública y su conversación. Nunca datos internos. |
+| Administración (panel) | `/api/adi/admin` (el mismo asistente flotante, en «modo administración») | Órdenes, estados, presupuestos, citas, licencias y avisos. Solo lectura. |
+| Técnico (panel) | Chat de clientes, con la aclaración de que la consulta de datos es de administración | — |
+
+**Modo administración del asistente flotante** (`adi-widget.js`). Se activa si `/api/me` indica rol de administración. Incluye:
+
+- franja «Modo administración · datos reales del sistema, solo lectura»;
+- accesos rápidos: trabajos atrasados, resumen, presupuestos pendientes, citas de hoy, órdenes en proceso y licencias;
+- respuestas con botones que abren la orden o el módulo;
+- voz por `/api/adi/speech`.
+
+No consulta la conversación de clientes, no ofrece asesor ni reservas y envía CSRF en cada consulta. Al abrirlo, avisa de los trabajos atrasados (`GET /api/adi/admin/alerts`).
+
+**Consultas (`adi_admin.py`, solo lectura y parametrizadas).** Con IA, el modelo usa estas herramientas y conserva el contexto de la conversación del mismo usuario:
+
+- `resumen_taller` y `trabajos_atrasados`;
+- `buscar_ordenes` (por estado y texto) y `detalle_orden` (estado, presupuestos, autorización, cobro y últimos movimientos);
+- `presupuestos` (pendientes, aprobados, rechazados, borradores o todos);
+- `citas` (rango de hasta 31 días);
+- `licencias` (inventario o las que vencen en 30 días).
+
+Las instrucciones le prohíben inventar, escribir u ofrecer un asesor. Sin IA, o si falla, responde por datos con las mismas fuentes.
+
+**Qué se avisa como atrasado (solo hechos registrados):**
+
+- entrega estimada vencida y orden no entregada;
+- orden activa sin ningún evento en su historial durante 7 días o más (`STALE_DAYS`), salvo las listas para entregar;
+- presupuesto enviado cuya validez venció sin respuesta.
+
+Se informa además de las citas por confirmar y de las órdenes activas sin fecha de entrega, de las que no se puede saber si van atrasadas.

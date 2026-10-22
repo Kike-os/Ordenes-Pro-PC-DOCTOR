@@ -8541,3 +8541,7 @@ body[data-page=dashboard] dialog.lcard-dialog .lcard-tools :is(input,select){hei
  .az-money{grid-template-columns:1fr 1fr}.az-money [data-kind=total]{grid-column:1/-1}.az-actions :is(button,a){flex:1 1 calc(50% - 6px);justify-content:center}}
 @media(max-width:600px){.az-groups{max-height:none}}
 @media(prefers-reduced-motion:reduce){.az[data-fresh],.az-group[open]>.az-list{animation:none}.az-dot,.az-item{transition:none}}
+/* ADI · modo administración en el asistente flotante del panel (1.5.203): etiqueta en la cabecera y enlaces a los módulos. */
+#adi-widget[data-mode=admin] .adi-staff-tag{flex:none;margin:0;padding:4px 14px;border-bottom:1px solid #1f4a44;background:#0b2a26;color:#5eead4;font-size:11px;font-weight:700;letter-spacing:.02em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#adi-widget.adi-v2[data-mode=admin] .adi-human{display:none}
+#adi-widget[data-mode=admin] .adi-staff-links button{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

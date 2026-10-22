@@ -97,7 +97,7 @@ class AppointmentAndAdiTests(unittest.TestCase):
    self.assertEqual(set(live['statuses']),set(app.order_workspace.STATUSES))
    summary=adi.admin_reply(c,'Resumen del taller',now)
    self.assertIn('0 órdenes activas',summary['answer']);self.assertTrue(summary['links'])
-   self.assertIn('No hay órdenes con la entrega vencida',adi.admin_reply(c,'¿Qué órdenes están vencidas?',now)['answer'])
+   self.assertIn('ninguna orden con la entrega vencida',adi.admin_reply(c,'¿Qué órdenes están vencidas?',now)['answer'])
    self.assertIn('No existe una orden',adi.admin_reply(c,'estado de PCD-20260101-0001',now)['answer'])
    self.assertIn('0 clientes registrados',adi.admin_reply(c,'¿Cuántos clientes hay?',now)['answer'])
    self.assertIn('0 orden',adi.admin_reply(c,'¿Cuántas órdenes tengo en espera?',now)['answer'])

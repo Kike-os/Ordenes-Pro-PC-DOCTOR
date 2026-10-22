@@ -39,8 +39,12 @@ def admin_answer(c,text):
  if 'esperan respuesta' in q or 'esperando respuesta' in q:
   n=c.execute("SELECT count(*) FROM orders WHERE status='esperando_cliente'").fetchone()[0];return f"Hay {n} orden(es) que esperan respuesta del cliente."
  if 'presupuesto' in q:
-  rows=list(c.execute("SELECT o.code,cl.name,d.brand,d.model FROM orders o JOIN devices d ON d.id=o.device_id JOIN clients cl ON cl.id=d.client_id WHERE o.status='presupuesto' ORDER BY o.id DESC LIMIT 10"))
-  return 'Presupuestos pendientes: '+('; '.join(f"{r['code']} · {r['name']} · {r['brand'] or ''} {r['model'] or ''}" for r in rows) if rows else 'ninguno.')
+  # Presupuestos reales (tabla de presupuestos), no el estado de la orden: uno enviado puede estar en una orden «Esperando respuesta del cliente».
+  import adi_admin
+  group='aprobados' if 'aprob' in q else 'rechazados' if 'rechaz' in q else 'borradores' if 'borrador' in q else 'pendientes'
+  rows=adi_admin.quote_rows(c,group,appointments.now())
+  title={'pendientes':'Presupuestos pendientes de respuesta del cliente','aprobados':'Presupuestos aprobados','rechazados':'Presupuestos rechazados','borradores':'Presupuestos en borrador'}[group]
+  return title+': '+('; '.join(f"{r['presupuesto']} · {r['cliente']} · {r['estado']} · {r['cotizado']}"+(' · vencido sin respuesta' if r['vencido_sin_respuesta'] else '')+(f" · enviado {r['enviado']}" if group=='pendientes' else '') for r in rows[:10]) if rows else 'ninguno.')
  if 'cita' in q:
   from datetime import timedelta
   day=appointments.now().date()+timedelta(days=1) if 'mañana' in q else appointments.now().date()
@@ -80,8 +84,12 @@ def order_rows(c,where,args=(),limit=8):
 
 def order_line(r):return f"{r['code']} · {r['name']} · {' '.join(x for x in (r['brand'],r['model']) if x) or 'equipo sin especificar'}"
 
-def admin_reply(c,text,now):
- """Respuesta administrativa con enlaces a los módulos. Solo lectura: nunca ejecuta cambios."""
+def admin_reply(c,text,now,history=()):
+ """Respuesta administrativa con enlaces a los módulos. Solo lectura: nunca ejecuta cambios. Con IA: herramientas de consulta sobre los
+ datos reales (adi_admin); sin IA o si falla: respuestas por datos según las palabras de la consulta."""
+ import adi_admin
+ smart=adi_admin.ask(c,text,now,history)
+ if smart:return {'answer':smart['answer'],'links':adi_admin.links_for(c,smart['answer'],smart['tools']),'source':'ia'}
  q=plain(text);live=snapshot(c,now);today=now.date().isoformat();link=lambda label,href:{'label':label,'href':href}
  has=lambda *keys:any(k in q for k in keys)
  match=re.search(r'(?:PCD-\d{8}-\d{4,}|OP-\d{4,})(?:-E\d{2})?',text,re.I)
@@ -98,6 +106,9 @@ def admin_reply(c,text,now):
   again=c.execute("SELECT COUNT(*) FROM appointment_reschedule_links WHERE used_at>=?",(since,)).fetchone()[0]
   answer=('En los últimos siete días se registraron %d inasistencias automáticas; %d clientes recibieron su enlace de reagendamiento%s y %d reagendaron su cita.'%(missed,sent,(' (%d con error de envío)'%failed) if failed else '',again)) if missed or sent or again else 'No se registraron inasistencias en los últimos siete días.'
   return {'answer':answer,'links':[link('Abrir la agenda','#appointments')]}
+ if has('licencia') and has('stock','inventario','disponible','existencia','cuantas'):
+  rows=adi_admin.license_rows(c,'inventario',now)
+  return {'answer':('Inventario de licencias: '+'; '.join(f"{r['producto']}: {r['disponibles']} disponible(s), {r['reservadas']} reservada(s), {r['entregadas']} entregada(s)" for r in rows[:12])+'.') if rows else 'No hay productos de licencias configurados en el inventario.','links':[link('Abrir Licencias Pro','#licenses')]}
  if has('licencia','renovacion','renovar','vencen','por vencer'):
   # Licencias Pro: próximas renovaciones (7 días) y resultado real de los recordatorios enviados. Solo lectura.
   import licenses
@@ -117,9 +128,13 @@ def admin_reply(c,text,now):
   if live['chats_waiting']:parts.append(f"{live['chats_waiting']} conversaciones esperando a un asesor")
   if live['accounts_pending']:parts.append(f"{live['accounts_pending']} solicitudes de cuenta por revisar")
   return {'answer':'Resumen del taller: '+'; '.join(parts)+'.','links':[link('Centro de Operaciones','#home'),link('Órdenes activas','#orders?active=1')]}
- if has('vencid','atrasad','retras','fuera de plazo'):
-  rows=order_rows(c,"o.estimated_delivery!='' AND o.estimated_delivery<? AND o.status!='entregado'",(today,))
-  return {'answer':(f"Hay {live['overdue']} orden(es) con entrega vencida: "+'; '.join(order_line(r)+' (prevista '+r['estimated_delivery']+')' for r in rows)+'.') if rows else 'No hay órdenes con la entrega vencida.','links':[link('Órdenes activas','#orders?active=1')]}
+ if has('vencid','atrasad','retras','fuera de plazo','alerta','avisos') or (has('pendiente') and not has('presupuesto','cita','licencia','cuenta','espera')):
+  found=adi_admin.alerts(c,now)
+  if not found['total']:answer='No hay trabajos atrasados: ninguna orden con la entrega vencida ni sin movimiento ('+found['criterio_sin_movimiento']+') y ningún presupuesto vencido sin respuesta.'
+  else:answer='Trabajos que requieren atención ('+str(found['total'])+'): '+'; '.join(item['texto'] for item in found['avisos'][:8])+('; y '+str(found['total']-8)+' más' if found['total']>8 else '')+'.'
+  if found['citas_por_confirmar']:answer+=' Además hay '+str(found['citas_por_confirmar'])+' cita(s) por confirmar.'
+  if found['ordenes_activas_sin_fecha_de_entrega']:answer+=' '+str(found['ordenes_activas_sin_fecha_de_entrega'])+' orden(es) activa(s) no tienen fecha de entrega estimada: no se puede saber si van atrasadas.'
+  return {'answer':answer,'links':[link(item['texto'].split(' ')[0],item['enlace']) for item in found['avisos'][:3]]+[link('Órdenes activas','#orders?active=1')]}
  if has('procesando','en proceso','en reparacion','reparando'):
   rows=order_rows(c,"o.status='reparacion'")
   return {'answer':(f"Hay {live['statuses']['reparacion']} orden(es) en proceso: "+'; '.join(order_line(r) for r in rows)+'.') if rows else 'No hay órdenes en proceso.','links':[link('Ver en proceso','#orders?status=reparacion')]}
