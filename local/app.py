@@ -1275,7 +1275,7 @@ class Handler(BaseHTTPRequestHandler):
                 if limited(c,'cauth-ip:'+digest(self.client_address[0]),60,300):return self.reply(429,{'error':'Demasiadas consultas. Intenta más tarde.'})
                 found=client_authorization.lookup(c,authorize_page[1],reception_now())
                 if not found:return self.reply(404,client_authorization.missing_page(),'text/html; charset=utf-8')
-                document=order_document(c,found['order_id'])
+                document=dict(order_document(c,found['order_id']),pending_quotes=quotes.pending_codes(c,found['order_id']))
                 if authorize_page[2]:
                     if found['status'] not in ('signed','rejected'):return self.reply(404,client_authorization.missing_page(),'text/html; charset=utf-8')
                     return self.reply(200,client_authorization.render_pdf(found),'application/pdf',filename=document['code']+'-AUTORIZACION.pdf')
@@ -2265,7 +2265,7 @@ class Handler(BaseHTTPRequestHandler):
                 if limited(c,'cauth-post:'+digest(token),40,900) or limited(c,'cauth-ip:'+digest(self.client_address[0]),60,300):return self.reply(429,{'error':'Demasiados intentos. Intenta más tarde.'})
                 now=reception_now();found=client_authorization.lookup(c,token,now)
                 if not found:return self.reply(404,client_authorization.missing_page(),'text/html; charset=utf-8')
-                document=order_document(c,found['order_id']);active=service_terms.current(c,now);terms=dict(active) if active else None
+                document=dict(order_document(c,found['order_id']),pending_quotes=quotes.pending_codes(c,found['order_id']));active=service_terms.current(c,now);terms=dict(active) if active else None
                 def send_code(recipient,code):
                     # El código queda guardado antes de enviarlo; se envía solo al correo registrado en la orden.
                     c.commit()

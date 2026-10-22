@@ -641,6 +641,11 @@ def approved_lines(c, quote):
     return result
 
 
+def pending_codes(c, order_id):
+    """Presupuestos de la orden enviados al cliente y aún sin decidir (para avisarle de que se aprueban desde su propio enlace)."""
+    return [row[0] for row in c.execute("SELECT code FROM quotes WHERE order_id=? AND status='enviado' AND deleted_at='' ORDER BY version", (order_id,)).fetchall()]
+
+
 def authorized(c, order_id):
     """Lo que el cliente tiene autorizado hoy para un equipo: {'code', 'items'} según la última versión decidida y las que continúa; None si no hay nada aprobado."""
     row = c.execute("SELECT * FROM quotes WHERE order_id=? AND status IN ('aprobado','parcial','rechazado') ORDER BY version DESC LIMIT 1", (order_id,)).fetchone()

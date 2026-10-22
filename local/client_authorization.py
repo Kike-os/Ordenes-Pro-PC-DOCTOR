@@ -154,8 +154,12 @@ def result_page(token, row, order):
         labels = dict((key, title) for key, title, _ in ITEMS)
         lines = ''.join('<div><dt>%s</dt><dd class="auth-%s">%s</dd></div>' % (e(labels.get(key, key)), e(value), 'AUTORIZADO' if value == 'authorized' else 'NO AUTORIZADO') for key, value in ordered(evidence.get('decisions', {})))
         when = datetime.fromisoformat(row['signed_at']).astimezone(ECUADOR_TZ).strftime('%d/%m/%Y %H:%M')
-        return _page('Autorización registrada', '<section class="tracking-card auth-card"><small>AUTORIZACIÓN REGISTRADA</small><h1>Orden %s</h1><p>Sus decisiones quedaron registradas el %s (Ecuador).</p><dl>%s</dl><p class="auth-hint">Huella de la evidencia: %s</p><p><a class="auth-link" href="/autorizar/%s/comprobante.pdf">Descargar comprobante en PDF</a></p></section>'
-                     % (e(order['code']), e(when), lines, e(row['evidence_hash'][:32]) + '…', e(token)))
+        # Esta autorización no aprueba presupuestos: si hay uno pendiente, se indica que se decide desde su propio enlace.
+        pending = order.get('pending_quotes') or []
+        notice = ('<p class="auth-hint"><strong>Presupuesto pendiente: %s.</strong> Esta autorización no aprueba importes. Para aprobar o rechazar los servicios y productos cotizados, abra el enlace del correo «Presupuesto» que recibió o pida al taller que se lo reenvíe.</p>'
+                  % e(', '.join(pending))) if pending else ''
+        return _page('Autorización registrada', '<section class="tracking-card auth-card"><small>AUTORIZACIÓN REGISTRADA</small><h1>Orden %s</h1><p>Sus decisiones quedaron registradas el %s (Ecuador).</p><dl>%s</dl>%s<p class="auth-hint">Huella de la evidencia: %s</p><p><a class="auth-link" href="/autorizar/%s/comprobante.pdf">Descargar comprobante en PDF</a></p></section>'
+                     % (e(order['code']), e(when), lines, notice, e(row['evidence_hash'][:32]) + '…', e(token)))
     text = {'expired': 'Este enlace caducó. Solicite uno nuevo al taller.', 'revoked': 'Este enlace fue reemplazado por otro más reciente. Use el último correo recibido.',
             'locked': 'Por seguridad, este enlace se bloqueó tras varios intentos fallidos. Solicite uno nuevo al taller.'}.get(row['status'], 'Enlace no disponible.')
     return _page('Enlace no disponible', '<section class="tracking-card"><h1>Enlace no disponible</h1><p>%s</p></section>' % e(text))
