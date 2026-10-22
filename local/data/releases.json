@@ -8,6 +8,26 @@
   },
   "releases": [
     {
+      "version": "1.5.204",
+      "date": "2026-10-21T22:11:22-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Seguimiento de Órdenes Enterprise Pro: textos completos en todas las resoluciones, presupuesto vigente en el estado y búsqueda por teléfono.",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Seguimiento de Órdenes: estado del presupuesto vigente en cada fila (y aviso «actualizar estado» si está aprobado y la orden sigue esperando, sin cambiarla sola), búsqueda también por teléfono, actualización inmediata al volver a la pestaña, hover y transiciones discretas."
+        ],
+        "fixes": [
+          "Seguimiento de Órdenes: ya no se cortan nombres de clientes y técnicos, el equipo, el saldo, el estado ni el último movimiento en ninguna resolución o zoom (de 320 a 1920 px). El estado largo ya no se sale de su celda entre 1024 y 1280 px. El carrusel sigue desplazándose fila a fila."
+        ],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Kike-os (administración)"
+    },
+    {
       "version": "1.5.203",
       "date": "2026-10-21T21:40:49-05:00",
       "type": "patch",

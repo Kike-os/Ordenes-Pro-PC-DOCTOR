@@ -4,6 +4,18 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.204 — 2026-10-21 22:11 (UTC-05:00)
+
+Seguimiento de Órdenes Enterprise Pro: textos completos en todas las resoluciones, presupuesto vigente en el estado y búsqueda por teléfono.
+
+### Mejoras realizadas
+
+- Seguimiento de Órdenes: estado del presupuesto vigente en cada fila (y aviso «actualizar estado» si está aprobado y la orden sigue esperando, sin cambiarla sola), búsqueda también por teléfono, actualización inmediata al volver a la pestaña, hover y transiciones discretas.
+
+### Errores corregidos
+
+- Seguimiento de Órdenes: ya no se cortan nombres de clientes y técnicos, el equipo, el saldo, el estado ni el último movimiento en ninguna resolución o zoom (de 320 a 1920 px). El estado largo ya no se sale de su celda entre 1024 y 1280 px. El carrusel sigue desplazándose fila a fila.
+
 ## v1.5.203 — 2026-10-21 21:40 (UTC-05:00)
 
 ADI para administración con datos reales de órdenes, estados, presupuestos, citas y licencias, y aviso de trabajos atrasados; clientes y personal diferenciados.
