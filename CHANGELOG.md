@@ -4,6 +4,18 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.200 — 2026-10-21 19:50 (UTC-05:00)
+
+Presupuestos y órdenes: aviso de que la autorización de servicio no aprueba un presupuesto pendiente y pruebas de sincronización de partidas aprobadas.
+
+### Mejoras realizadas
+
+- Pruebas de sincronización Presupuesto → Orden: aprobación total, parcial y rechazo; apertura doble del enlace, recarga del administrador y reenvío sin duplicados; importes, fecha de Ecuador y firma guardados en la base de datos.
+
+### Errores corregidos
+
+- Presupuestos y órdenes: la autorización de servicio firmada ya no se confunde con la aprobación de un presupuesto. El cliente ve, tras firmarla, que tiene un presupuesto pendiente que se aprueba desde su propio enlace; la orden explica por qué no hay partidas aprobadas e indica si el cliente abrió el enlace del presupuesto.
+
 ## v1.5.199 — 2026-10-21 18:43 (UTC-05:00)
 
 Centro de Actualizaciones (ADI AutoCare): reintento por servicio, recuperación segura, historial exportable, versiones con migraciones y avisos clasificados.

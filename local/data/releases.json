@@ -8,6 +8,26 @@
   },
   "releases": [
     {
+      "version": "1.5.200",
+      "date": "2026-10-21T19:50:55-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Presupuestos y órdenes: aviso de que la autorización de servicio no aprueba un presupuesto pendiente y pruebas de sincronización de partidas aprobadas.",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Pruebas de sincronización Presupuesto → Orden: aprobación total, parcial y rechazo; apertura doble del enlace, recarga del administrador y reenvío sin duplicados; importes, fecha de Ecuador y firma guardados en la base de datos."
+        ],
+        "fixes": [
+          "Presupuestos y órdenes: la autorización de servicio firmada ya no se confunde con la aprobación de un presupuesto. El cliente ve, tras firmarla, que tiene un presupuesto pendiente que se aprueba desde su propio enlace; la orden explica por qué no hay partidas aprobadas e indica si el cliente abrió el enlace del presupuesto."
+        ],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Kike-os (administración)"
+    },
+    {
       "version": "1.5.199",
       "date": "2026-10-21T18:43:03-05:00",
       "type": "patch",
