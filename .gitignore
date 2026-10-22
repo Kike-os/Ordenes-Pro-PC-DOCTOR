@@ -21,3 +21,5 @@ skills-lock.json
 *.xlsx
 clientes*.csv
 informe-importacion*.csv
+
+.venv/
