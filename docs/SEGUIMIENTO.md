@@ -105,3 +105,33 @@ Los otros contadores revisados (avisos, ADI, asistencia en vivo, grupos de presu
 - Conteo: «Revisión n.º N» en el Seguimiento de Órdenes y el bloque «Revisiones por falla recurrente» en el detalle. Las observaciones y resultados de pruebas se registran como siempre (seguimiento, hallazgos, recomendaciones).
 - Órdenes con varios equipos: cada equipo (E01, E02…) tiene su propio estado, así que solo cambia el equipo afectado y el estado general de la orden se recalcula.
 - Después se continúa con los estados normales (Procesando, Listo para entregar, Entregado). Al volver a entregar se registra la nueva entrega y su mantenimiento preventivo.
+
+## Tabla «Seguimiento de Órdenes» · Enterprise Pro (1.5.204)
+
+**Fallos corregidos.** Las celdas tenían una altura fija y se cortaban con puntos suspensivos los nombres de clientes y técnicos, el equipo, el saldo y la fecha del último movimiento. Entre 1024 y 1280 px, además, el estado largo («Esperando respuesta del cliente») se salía de su celda.
+
+**Ahora ningún texto se recorta:**
+
+- Cliente, técnico, equipo, estado, saldo y último movimiento pasan a otra línea si no caben.
+- El carrusel (5 filas, giro cada 6 s y botones ▲▼) sigue funcionando. La altura uniforme que necesita para desplazarse una fila exacta la mide `fitRows()` con la fila más alta realmente dibujada. Solo crece mientras gira, para no saltar, y se recalcula al cambiar el ancho de la ventana.
+
+**Columna Estado:**
+
+- Estado de la orden y saldo en la misma línea; debajo, el progreso con etapas reales.
+- Debajo del progreso, el **presupuesto vigente** con su estado real: esperando aprobación, aprobado, aprobado parcialmente, rechazado o revisión solicitada.
+- Si el presupuesto ya está aprobado y la orden sigue en «Aprobación de presupuesto» o «Esperando respuesta del cliente», se marca «· actualizar estado» con borde discontinuo. La tabla **nunca** cambia el estado por su cuenta: eso lo hace el personal desde la orden.
+
+**Búsqueda:** por orden, cliente, **teléfono** (con o sin espacios ni guiones, a partir de 6 dígitos), marca, modelo, serie, estado y tipo de equipo.
+
+**Sincronización:**
+
+- La tabla se actualiza cada 30 s, y en el acto al volver a la pestaña.
+- La firma de cada fila incluye el estado del presupuesto, así que una aprobación redibuja la fila.
+- Si la orden esperaba esa decisión, al aprobarse pasa a «Procesando» (lo hace el servidor al registrar la decisión).
+
+**Comprobado:**
+
+- Sin textos cortados ni elementos montados a 1920, 1536, 1440, 1366, 1280, 1100, 1024, 910, 853, 768, 600, 390 y 320 px, con nombres de cliente de hasta 74 caracteres y técnicos con nombres compuestos. Los anchos de 1536, 910 y 853 px equivalen a un zoom del 125 % o del 150 %.
+- Botones Ver, Historial (con el número real de movimientos), QR e Imprimir.
+- Búsqueda, filtro, ordenación y Escape.
+- Aprobación de un presupuesto reflejada sin recargar.

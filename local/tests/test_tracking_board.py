@@ -35,6 +35,30 @@ class TrackingBoardTests(unittest.TestCase):
         self.assertEqual(self.request('/api/tracking/999999',cookie=cookie)['status'],404)
         with app.connect() as c:self.assertEqual(c.execute('SELECT COUNT(*) FROM order_history').fetchone()[0],before)
 
+    def test_search_by_phone_model_and_code_and_quote_state_without_changing_the_order(self):
+        cookie,csrf=self.login();a=self.order(cookie,csrf,'p1',model='ThinkPad Ficticio');b=self.order(cookie,csrf,'p2')
+        with app.connect() as c:
+            c.execute("UPDATE clients SET phone='099 876-5432' WHERE id=(SELECT d.client_id FROM orders o JOIN devices d ON d.id=o.device_id WHERE o.id=?)",(a,));c.commit()
+        find=lambda q:[row['id'] for row in self.request('/api/tracking?'+app.urlencode({'q':q}),cookie=cookie)['body']['rows']]
+        for query in ('0998765432','099-876-5432','876 5432','thinkpad'):
+            self.assertIn(a,find(query),query)
+        self.assertEqual(find('12345'),[])  # pocos dígitos: no busca por teléfono (evita coincidencias casuales)
+        code=self.request('/api/tracking?q=thinkpad',cookie=cookie)['body']['rows'][0]['code'];self.assertEqual(find(code),[a])
+        # Presupuesto vigente en la fila: aprobado con la orden aún en «Aprobación de presupuesto» se marca «stale» y el estado no cambia.
+        post=lambda path,**body:self.request(path,body,cookie=cookie,csrf=csrf)
+        quote=post('/api/orders/%d/quote'%b)['body']['id']
+        post('/api/quotes/%d'%quote,action='save',items=[{'description':'Servicio ficticio','category':'servicio','quantity':1,'unit_cents':2000,'taxed':True}])
+        post('/api/quotes/%d'%quote,action='send')
+        row=lambda:next(r for r in self.request('/api/tracking',cookie=cookie)['body']['rows'] if r['id']==b)
+        self.assertEqual((row()['quote']['status'],row()['quote']['label'],row()['quote']['stale']),('enviado','Presupuesto esperando aprobación',False))
+        items=[i['id'] for i in self.request('/api/quotes/%d'%quote,cookie=cookie)['body']['quote']['items']]
+        post('/api/quotes/%d'%quote,action='decide',approved=','.join(map(str,items)),note='Aprobó por teléfono')
+        with app.connect() as c:c.execute("UPDATE orders SET status='presupuesto' WHERE id=?",(b,));c.commit()
+        with app.connect() as c:before=c.execute('SELECT COUNT(*) FROM order_history').fetchone()[0]
+        current=row()
+        self.assertEqual((current['quote']['status'],current['quote']['stale'],current['status_code']),('aprobado',True,'presupuesto'))
+        with app.connect() as c:self.assertEqual(c.execute('SELECT COUNT(*) FROM order_history').fetchone()[0],before)  # consultar no escribe
+
     def test_group_rows_carry_the_order_code_the_unit_and_the_real_overall_state(self):
         # Orden con dos equipos: cada fila es un equipo, con el código de la orden, su número y el estado general calculado con todos.
         cookie,csrf=self.login();main=self.order(cookie,csrf,'g1');solo=self.order(cookie,csrf,'g3')

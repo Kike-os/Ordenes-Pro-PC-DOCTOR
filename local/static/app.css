@@ -8545,3 +8545,35 @@ body[data-page=dashboard] dialog.lcard-dialog .lcard-tools :is(input,select){hei
 #adi-widget[data-mode=admin] .adi-staff-tag{flex:none;margin:0;padding:4px 14px;border-bottom:1px solid #1f4a44;background:#0b2a26;color:#5eead4;font-size:11px;font-weight:700;letter-spacing:.02em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #adi-widget.adi-v2[data-mode=admin] .adi-human{display:none}
 #adi-widget[data-mode=admin] .adi-staff-links button{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* Seguimiento de Órdenes · Enterprise Pro (1.5.204). Ningún texto se recorta: nombres, técnico, equipo, estado y último movimiento
+   pasan a otra línea. La altura uniforme del carrusel la mide app.js (fitRows) con la fila más alta. Acotado a #operations-activity. */
+#operations-activity.tracking-board{--tk-pink:#f472b6;--tk-teal:#2dd4bf}
+#operations-activity .tracking-carousel .tracking-row>td{overflow:visible;transition:background-color .18s ease}
+@media(min-width:861px){#operations-activity .tracking-carousel .tracking-row>td{padding-top:9px;padding-bottom:9px;vertical-align:middle}}
+#operations-activity .tracking-carousel .tracking-row:hover>td{background:#0f1e35}
+#operations-activity .tracking-carousel .tracking-row:focus-within>td{background:#0f1e35}
+#operations-activity .tracking-carousel :is(.tracking-client,.tracking-phone,.tracking-who-tech,.tracking-tech>span,.tracking-last strong,.tracking-last small,.tracking-id small,.order-code-link,.status-label,.tracking-overall){
+ white-space:normal;overflow:visible;text-overflow:clip;-webkit-line-clamp:unset;overflow-wrap:anywhere;max-width:100%}
+#operations-activity .tracking-carousel .tracking-row>td:is(:nth-child(2),:nth-child(5)){white-space:normal;overflow:visible;text-overflow:clip}
+#operations-activity .tracking-carousel .tracking-client{line-height:1.3}
+#operations-activity .tracking-carousel .tracking-tech{display:flex;flex-wrap:wrap;align-items:center;gap:3px 6px;min-width:0}
+#operations-activity .tracking-carousel .tracking-tech>span{line-height:1.3;color:#d7e3f6}
+#operations-activity .tracking-carousel .status-label{display:inline-flex;text-align:left;line-height:1.25;padding-top:2px;padding-bottom:2px}
+#operations-activity .tracking-carousel .tracking-state{min-width:0;gap:4px}
+#operations-activity .tracking-quote{display:inline-flex;align-items:center;max-width:100%;padding:1px 7px;border-radius:999px;border:1px solid #2b4466;background:#0d1a2e;color:#9fb7da;font-size:10.5px;font-weight:650;line-height:1.3;white-space:normal;overflow-wrap:anywhere}
+#operations-activity .tracking-quote[data-quote=aprobado]{color:#6ee7b7;border-color:#1f6b52;background:#0b241c}
+#operations-activity .tracking-quote[data-quote=parcial]{color:#fdba74;border-color:#7c4a1d;background:#26180b}
+#operations-activity .tracking-quote[data-quote=rechazado]{color:#fca5a5;border-color:#7f2a33;background:#2a0f14}
+#operations-activity .tracking-quote[data-quote=enviado],#operations-activity .tracking-quote[data-quote=modificacion]{color:#93c5fd;border-color:#264a7a;background:#0c1a30}
+#operations-activity .tracking-quote[data-stale]{color:#fde68a;border-color:#8a6d1d;background:#2a2108;border-style:dashed}
+#operations-activity .tracking-carousel .order-code-link{font-variant-numeric:tabular-nums;letter-spacing:.01em}
+#operations-activity .tracking-carousel .tracking-actions button{transition:background-color .16s ease,border-color .16s ease,color .16s ease}
+@media(prefers-reduced-motion:reduce){#operations-activity .tracking-carousel .tracking-row>td,#operations-activity .tracking-carousel .tracking-actions button{transition:none}}
+#operations-activity .tracking-carousel .tracking-state>.status-label{justify-self:start;width:fit-content;max-width:100%;height:auto;min-height:22px}
+/* Columna Estado: estado y saldo en la misma línea (pasan a otra si no caben), debajo el progreso y después el presupuesto. */
+#operations-activity .tracking-carousel .tracking-state{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;min-width:0}
+#operations-activity .tracking-carousel .tracking-state>.status-label{order:1;flex:0 1 auto}
+#operations-activity .tracking-carousel .tracking-state>.finance-badge{order:2;flex:0 1 auto;max-width:100%;white-space:normal;overflow:visible;text-overflow:clip}
+#operations-activity .tracking-carousel .tracking-state>.finance-badge *{white-space:normal;overflow:visible;text-overflow:clip}
+#operations-activity .tracking-carousel .tracking-state>.tracking-state-extra{order:3;flex:1 1 100%;min-width:0}
+#operations-activity .tracking-carousel .tracking-state>.tracking-quote{order:4;flex:0 1 auto}

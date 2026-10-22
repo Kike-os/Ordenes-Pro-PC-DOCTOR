@@ -3591,7 +3591,7 @@ function trackingFilterStatus(code){const view=trackingView;if(!view)return;view
 const countText=(value,max=999)=>{const n=Math.max(0,Math.trunc(Number(value)||0));return n>max?max+'+':String(n);};
 function stableCount(value,{max=999,title,className=''}={}){const n=Math.max(0,Math.trunc(Number(value)||0)),node=el('b',countText(n,max),('stable-count '+className).trim());node.dataset.count=String(n);if(title)node.title=title;return node;}
 // Firma de una fila: lo que, al cambiar, obliga a repintarla (movimiento, estado, técnico, saldo y estado general de la orden).
-const trackingSign=row=>JSON.stringify([row.event_id,row.status_code,row.responsible,row.priority,row.events,row.client,row.phone,row.finance?.state,row.finance?.balance_cents,row.group?.overall.code,row.group?.units,row.recurrences]);
+const trackingSign=row=>JSON.stringify([row.event_id,row.status_code,row.responsible,row.priority,row.events,row.client,row.phone,row.finance?.state,row.finance?.balance_cents,row.group?.overall.code,row.group?.units,row.recurrences,row.quote?.status]);
 let trackingMenuOpen=null;
 function trackingMenu(anchor,items){if(trackingMenuOpen){const same=trackingMenuOpen.anchor===anchor;trackingMenuOpen.close();if(same)return;}
  const box=el('div',undefined,'tracking-menu');box.setAttribute('role','menu');box.setAttribute('aria-label',anchor.getAttribute('aria-label')||'Más acciones');
@@ -3601,6 +3601,7 @@ function trackingMenu(anchor,items){if(trackingMenuOpen){const same=trackingMenu
  for(const[label,glyph,run,disabled]of items){const option=button('',()=>{close(false);run();});option.setAttribute('role','menuitem');option.disabled=!!disabled;option.append(systemIcon(glyph),el('span',label));box.append(option);}
  document.body.append(box);const spot=anchor.getBoundingClientRect(),size=box.getBoundingClientRect();box.style.left=Math.max(8,Math.min(innerWidth-size.width-8,spot.right-size.width))+'px';box.style.top=(spot.bottom+size.height+10>innerHeight?Math.max(8,spot.top-size.height-6):spot.bottom+6)+'px';
  anchor.setAttribute('aria-expanded','true');trackingMenuOpen={anchor,close};addEventListener('pointerdown',outside,true);addEventListener('keydown',keys,true);addEventListener('scroll',away,true);addEventListener('resize',away);box.querySelector('button:not(:disabled)')?.focus();}
+let trackingWake=null;
 function renderTracking(){
  const root=$('operations-activity'),status=$('tracking-status');if(!root)return;
  const view=trackingView={q:'',status:'',technician:'',from:'',to:'',known:new Map(),first:true,data:null,token:0,total:0,start:0,cache:new Map(),busy:false,hover:false,focus:false,touch:false,stale:false,moved:Date.now()};
@@ -3612,7 +3613,7 @@ function renderTracking(){
   if(title==='Último movimiento'){th.textContent='';sortButton=button('',()=>{view.sort=view.sort==='antiguo'?'reciente':'antiguo';paintSort();load();},'tracking-sort');sortButton.append(el('span',title),systemIcon('M12 5v14 M6 13l6 6 6-6'));th.append(sortButton);th.dataset.sort='true';}
   headRow.append(th);}
  const paintSort=()=>{const old=view.sort==='antiguo';sortButton.dataset.direction=old?'asc':'desc';sortButton.closest('th').setAttribute('aria-sort',old?'ascending':'descending');sortButton.title=old?'Ordenado del movimiento más antiguo al más reciente. Pulsa para invertir.':'Ordenado del movimiento más reciente al más antiguo. Pulsa para invertir.';sortButton.setAttribute('aria-label','Último movimiento: '+sortButton.title);};view.sort='reciente';view.stateSeen=new Map();paintSort();head.append(headRow);table.append(head,body);wrap.append(table);
- const search=el('input');search.type='search';search.placeholder='Buscar por orden, cliente, equipo o número de serie';search.setAttribute('aria-label','Buscar en el seguimiento');search.maxLength=80;
+ const search=el('input');search.type='search';search.placeholder='Buscar por orden, cliente, teléfono, serie o modelo';search.setAttribute('aria-label','Buscar en el seguimiento');search.maxLength=80;
  const pick=(label,name)=>{const box=el('label',undefined,'tracking-field'),node=el('select');node.name=name;box.append(el('span',label),node);return [box,node];},[stateBox,statePick]=pick('Estado','status'),[techBox,techPick]=pick('Técnico','technician');
  const dateField=(label,name)=>{const box=el('label',undefined,'tracking-field'),node=el('input');node.type='date';node.name=name;box.append(el('span',label),node);return [box,node];},[fromBox,fromNode]=dateField('Movimiento desde','from'),[toBox,toNode]=dateField('Movimiento hasta','to');
  advanced.append(stateBox,techBox,fromBox,toBox);
@@ -3648,7 +3649,10 @@ function renderTracking(){
   badge.title=(row.group?'Estado de este equipo: ':'Estado de la orden: ')+row.status;const extra=el('div',undefined,'tracking-state-extra');extra.append(bars);
   // Estado general de la orden (solo con varios equipos): se calcula con todos sus equipos y nunca dice «completada» si queda alguno en proceso.
   if(row.recurrences){const recur=el('span','×'+row.recurrences,'tracking-recur');recur.title='Revisiones por falla recurrente: '+row.recurrences;recur.setAttribute('aria-label',recur.title);extra.append(recur);}if(row.group){const whole=el('span',row.group.overall.label,'tracking-overall');whole.dataset.overall=row.group.overall.code;whole.title='Estado general de la orden '+row.group.main_code+': '+row.group.overall.label+' ('+row.group.overall.summary+')';whole.setAttribute('aria-label',whole.title);extra.append(whole);}
-  state.append(badge,extra);{const money=financeBadge(row.finance);if(money)state.append(money);}cell('Estado',state);
+  state.append(badge,extra);{const money=financeBadge(row.finance);if(money)state.append(money);}
+  // Presupuesto vigente: su estado real. Si ya está aprobado y la orden sigue esperando esa decisión, se avisa (no se cambia nada solo).
+  if(row.quote){const q=el('span',row.quote.label,'tracking-quote');q.dataset.quote=row.quote.status;q.title=row.quote.code+' · '+row.quote.label+(row.quote.stale?'. La orden sigue en «'+row.status+'»: actualiza su estado desde la orden si corresponde.':'');if(row.quote.stale){q.dataset.stale='1';q.textContent=row.quote.label+' · actualizar estado';}state.append(q);}
+  cell('Estado',state);
   const last=el('div',undefined,'tracking-last');
   if(event){const info=activityInfo(event),when=el('time',formatOrderDate(row.occurred_at));when.dateTime=new Date(row.occurred_at).toISOString();const meta=el('small');meta.append(when,document.createTextNode(' · '+(relativeTime(row.occurred_at)||'')+(event.actor?' · '+event.actor:'')));last.append(el('strong',info.title),meta);last.title=info.detail+(info.comment?' — '+info.comment:'');}
   else last.append(el('small','Sin movimientos registrados'));{const meta=last.querySelector('small');if(meta&&event)meta.title=meta.textContent;}
@@ -3700,15 +3704,21 @@ function renderTracking(){
   view.known.set(row.id,{event:row.event_id,status:row.status_code});return tr;}
  async function fill3(token){const made=[];for(let n=0;n<Math.min(SHOW,view.total);n++){const row=await rowAt(view.start+n,token);if(token!==view.token)return false;if(row)made.push(note(row,rows(row)));}
   if(!made.length){const tr=el('tr'),td=el('td',view.data?.total_orders?'Ninguna orden coincide con la búsqueda o los filtros.':'Todavía no hay órdenes registradas.','tracking-empty');td.colSpan=titles.length;tr.append(td);made.push(tr);}
-  body.replaceChildren(...made);wrap.scrollTop=0;view.first=false;paintFoot();return true;}
+  body.replaceChildren(...made);fitRows();wrap.scrollTop=0;view.first=false;paintFoot();return true;}
+ // Altura uniforme de las filas = la de la más alta ya dibujada (medida sin recorte). Así ningún texto queda oculto y el carrusel se
+ // desplaza siempre una fila exacta; solo crece (no salta mientras gira) y se recalcula al cambiar el ancho.
+ function fitRows(){wrap.style.setProperty('--track-row','auto');let tallest=0;for(const tr of body.querySelectorAll('.tracking-row'))tallest=Math.max(tallest,Math.ceil(tr.getBoundingClientRect().height));
+  view.rowH=Math.max(view.rowH||0,tallest);if(view.rowH)wrap.style.setProperty('--track-row',view.rowH+'px');else wrap.style.removeProperty('--track-row');}
+ {let resized=null,lastWidth=innerWidth;addEventListener('resize',()=>{if(innerWidth===lastWidth)return;lastWidth=innerWidth;clearTimeout(resized);resized=setTimeout(()=>{if(!wrap.isConnected||view.busy)return;view.rowH=0;fitRows();},180);});}
  const slide=(from,to)=>new Promise(resolve=>{if(still.matches||from===to){wrap.scrollTop=to;resolve();return;}const began=performance.now(),span=520;const frame=now=>{const t=Math.min(1,(now-began)/span),e=t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2;wrap.scrollTop=from+(to-from)*e;if(t<1&&wrap.isConnected)requestAnimationFrame(frame);else resolve();};requestAnimationFrame(frame);});
  async function step(direction,manual){if(view.busy||view.total<=SHOW)return;view.busy=true;const began=Date.now(),token=view.token,total=view.total,lastStart=total-SHOW;
   try{// Al final del recorrido se vuelve a la primera orden (y al revés) con un cambio de bloque completo; en el resto, una fila cada vez.
    let target=view.start+direction,count=1;if(target>lastStart){target=0;count=SHOW;}else if(target<0){target=lastStart;count=SHOW;}
    const incoming=[];for(let n=0;n<count;n++){const index=direction>0?target+SHOW-count+n:target+n,row=await rowAt(index,token);if(token!==view.token||!row)return;incoming.push(note(row,rows(row)));}
-   const height=body.firstElementChild?.getBoundingClientRect().height||0,head=table.tHead?.getBoundingClientRect().height||0;void head;
-   if(direction>0){body.append(...incoming);await slide(0,height*count);for(let n=0;n<count;n++)body.firstElementChild?.remove();wrap.scrollTop=0;}
-   else{body.prepend(...incoming);wrap.scrollTop=height*count;await slide(height*count,0);for(let n=0;n<count;n++)body.lastElementChild?.remove();}
+   if(direction>0)body.append(...incoming);else body.prepend(...incoming);fitRows();
+   const height=body.firstElementChild?.getBoundingClientRect().height||0;
+   if(direction>0){await slide(0,height*count);for(let n=0;n<count;n++)body.firstElementChild?.remove();wrap.scrollTop=0;}
+   else{wrap.scrollTop=height*count;await slide(height*count,0);for(let n=0;n<count;n++)body.lastElementChild?.remove();}
    if(token===view.token){view.start=target;paintFoot();}}
   catch{/* Sin conexión: el carrusel conserva lo que muestra y lo reintenta en el siguiente ciclo. */}
   finally{view.busy=false;view.moved=manual?Date.now():began;}}
@@ -3722,7 +3732,7 @@ function renderTracking(){
    if(interacting()||view.busy){view.stale=true;return;}
    view.stale=false;await fill3(token);}
   catch{paintStatus('error');}}
- async function load(){const token=++view.token;view.cache=new Map();view.start=0;view.stale=false;paintStatus('loading');root.dataset.loading='true';
+ async function load(){const token=++view.token;view.cache=new Map();view.start=0;view.rowH=0;view.stale=false;paintStatus('loading');root.dataset.loading='true';
   try{const data=await fetchPage(1,token);if(!data||trackingView!==view||!root.isConnected)return;paintMeta(data);await fill3(token);paintStatus('ok');view.moved=Date.now();}
   catch(error){if(token!==view.token)return;paintStatus('error');const tr=el('tr'),td=el('td',error.message,'tracking-empty');td.colSpan=titles.length;tr.append(td);body.replaceChildren(tr);view.total=0;paintFoot();}
   finally{if(token===view.token)delete root.dataset.loading;}}
@@ -3737,6 +3747,9 @@ function renderTracking(){
   if(Date.now()-lastSync>=30000&&!view.busy){lastSync=Date.now();refresh();return;}
   if(interacting()){view.moved=Date.now();return;}
   if(canRun()&&Date.now()-view.moved>=EVERY)step(1,false);},250);
+ // Al volver a la pestaña (p. ej., tras aprobar un presupuesto en otra ventana o desde el teléfono) se sincroniza en el acto, sin esperar 30 s.
+ const wake=()=>{if(document.hidden||trackingView!==view||!root.isConnected||view.busy||Date.now()-lastSync<4000)return;lastSync=Date.now();refresh();};
+ trackingWake?.abort();trackingWake=new AbortController();document.addEventListener('visibilitychange',wake,{signal:trackingWake.signal});addEventListener('focus',wake,{signal:trackingWake.signal});
  view.step=step;view.state=()=>({start:view.start,total:view.total,busy:view.busy,paused:interacting()||filtered(),pages:view.cache.size});
  load();
 }
