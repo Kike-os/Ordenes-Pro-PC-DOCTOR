@@ -4,6 +4,18 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.203 — 2026-10-21 21:40 (UTC-05:00)
+
+ADI para administración con datos reales de órdenes, estados, presupuestos, citas y licencias, y aviso de trabajos atrasados; clientes y personal diferenciados.
+
+### Nuevas funcionalidades
+
+- ADI para administración: aviso al abrir de trabajos atrasados (entregas vencidas, órdenes sin movimiento en 7 días, presupuestos vencidos sin respuesta), accesos rápidos, enlaces a cada orden y contexto de la conversación. El técnico ve la aclaración y el cliente no recibe datos internos.
+
+### Errores corregidos
+
+- ADI en el panel: con sesión de administración ya no responde como chat de clientes («no tengo acceso a las órdenes» y asesor humano). Consulta órdenes, estados, presupuestos, citas y licencias reales (solo lectura). Los «presupuestos pendientes» salen de los presupuestos reales, no del estado de la orden.
+
 ## v1.5.202 — 2026-10-21 20:47 (UTC-05:00)
 
 Rediseño empresarial de «Autorizaciones del cliente» con línea de tiempo real, subtotal/IVA/total autorizados, evidencia y acciones operativas.
