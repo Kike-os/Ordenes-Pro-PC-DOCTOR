@@ -1658,7 +1658,7 @@ class Handler(BaseHTTPRequestHandler):
                 result['group']=equipment.group(c,row['id']);
                 for unit in (result['group'] or {}).get('units',[]):unit['quote']=quotes.brief(c,unit['id']);unit['type_label']=DEVICE_TYPES.get(unit['type'],unit['type'] or '')  # presupuesto de cada equipo, para distinguirlo del resumen general
                 result['device_code']=row['device_code'] or ''
-                found=quotes.authorized(c,row['id']);result['authorized_items']=found['items'] if found else []
+                found=quotes.authorized(c,row['id']);result['authorized_items']=found['items'] if found else [];result['authorization']=quotes.authorization(c,row['id'],row['status'])
                 result['unit_code']=next((unit['unit_code'] for unit in result['group']['units'] if unit['id']==row['id']),'') if result['group']['multiple'] else ''
                 result['payments']=equipment.payments(c,row['id']);result['money']=equipment.money(c,row['id']);result['payment_methods']=equipment.METHODS
                 result['receipt_mail']=receipt_mail_status(c,row['id'])
@@ -3529,6 +3529,32 @@ class Handler(BaseHTTPRequestHandler):
                             order_workspace.event(c,found['order_id'],user['id'],now,'follow_up','Presupuesto '+found['code']+': decisión registrada por el personal ('+quotes.STATUS[status].lower()+').')
                             audit(c,user['id'],'quote_staff_'+status,found['order_id'])
                             return self.reply(200,{'ok':True,'quote':quotes.detail(c,quotes.get(c,found['id']))})
+                        if action=='notify_decision':
+                            # Reenvía al cliente la confirmación de lo autorizado (con el comprobante). Solo presupuestos decididos; nunca reabre la decisión.
+                            if found['status'] not in quotes.DECIDED:return self.reply(409,{'error':'Este presupuesto todavía no tiene una decisión que confirmar.'})
+                            document=order_document(c,found['order_id']);email=(document.get('email') or '').strip()
+                            if not re.fullmatch(r'[^\s@<>]+@[^\s@<>.]+(?:\.[^\s@<>.]+)+',email):return self.reply(409,{'error':'El cliente no tiene un correo electrónico válido registrado. Complétalo en su ficha.'})
+                            if not mail_pro.configured():return self.reply(409,{'error':'El correo del sistema no está configurado.'})
+                            slot='quote-notify:'+str(found['id'])
+                            if not claim_slot(c,slot,90):return self.reply(409,{'error':'La confirmación ya se está enviando. Espera unos segundos.'})
+                            try:
+                                detail=quotes.detail(c,quotes.get(c,found['id']));c.commit();result='sent'
+                                lines=[item for item in detail['items'] if item['status']=='aprobado']
+                                by_staff=str(found['decided_by']).startswith('personal')
+                                body='\n'.join(['Estimado/a '+document['client']+':','','Le confirmamos lo autorizado en el presupuesto N.º '+found['code']+' de su orden de servicio '+document['code']+'.','']
+                                    +['- '+item['description'].split(' — ')[0]+' · cantidad '+str(item['quantity']) for item in lines]
+                                    +['','Total autorizado: '+quotes.usd(detail['totals']['approved'])+' (impuestos incluidos).','Fecha de la decisión: '+appointments.datetime.fromisoformat(found['decided_at']).strftime('%d/%m/%Y %H:%M')+' (Ecuador).',
+                                      'Forma de registro: '+('decisión comunicada al taller y registrada por nuestro personal.' if by_staff else 'aprobación desde su enlace privado con firma electrónica.'),'',
+                                      'Adjuntamos el comprobante. Solo se ejecutarán los servicios y productos autorizados. Si algo no coincide, responda a este correo.','','Atentamente,','','Departamento de Servicio Técnico','PC-DOCTOR S.A.'])
+                                import quote_pdf
+                                attached=quote_pdf.render(detail,order_document(c,found['order_id']),None)
+                                try:send_institutional(c,'quote','Confirmación de autorización',email,'PC-DOCTOR S.A. | Autorización del presupuesto N.º '+found['code'],body,found['order_id'],user['id'],attachments=[{'name':found['code']+'-AUTORIZACION.pdf','type':'application/pdf','data':base64.b64encode(attached).decode()}])
+                                except mail_pro.MailError as error:print('quote-notify',error.kind,flush=True);result='failed'
+                                with connect() as log:
+                                    quotes.event(log,found['id'],'correo','Confirmación de la autorización '+('enviada al cliente ('+email+').' if result=='sent' else 'no se pudo enviar.'),reception_now(),user)
+                                    audit(log,user['id'],'quote_decision_notified',found['order_id'])
+                            finally:release_slot(slot)
+                            return self.reply(200 if result=='sent' else 502,{'ok':result=='sent','recipient':email,'error':'' if result=='sent' else 'El servidor de correo no aceptó el mensaje. Inténtalo más tarde.'})
                         if action=='send':
                             document=order_document(c,found['order_id']);email=(document.get('email') or '').strip()
                             if not re.fullmatch(r'[^\s@<>]+@[^\s@<>.]+(?:\.[^\s@<>.]+)+',email):return self.reply(409,{'error':'El cliente no tiene un correo electrónico válido registrado. Complétalo en su ficha.'})

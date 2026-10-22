@@ -2,6 +2,7 @@
 (descripción, cantidad, precio unitario, subtotal, total, fecha de Ecuador y evidencia), una sola vez, y queda en la base de datos.
 Base temporal y datos ficticios; no se envían correos."""
 import json,re,unittest
+from unittest.mock import patch
 import test_app,test_quotes
 import app,client_authorization,quotes
 
@@ -132,6 +133,59 @@ class QuoteOrderSyncTests(unittest.TestCase):
             q=quotes.get(c,quote);quotes.decide(c,q,{i:'aprobado' for i in items},app.reception_now(),{'id':self.uid,'name':'Persona de prueba'});c.commit()
         moves=[h for h in self.history(order['id']) if h[0]=='status']
         self.assertIn('(decisión registrada por el personal)',moves[-1][1])
+
+
+    def test_staff_decision_sheet_like_order_0005(self):
+        # Como PCD-20261019-0005: enviado, el cliente no abre el enlace y el personal registra la aprobación con una nota.
+        cookie,post,order,quote,path,passkey,items=self.sent()
+        with app.connect() as c:c.execute("UPDATE quote_links SET verified_at=''");c.execute("UPDATE orders SET status='esperando_cliente' WHERE id=?",(order['id'],));c.commit()
+        ids=[i['id'] for i in self.request('/api/quotes/%d'%quote,cookie=cookie)['body']['quote']['items']]
+        self.assertEqual(post('/api/quotes/%d'%quote,action='decide',approved=','.join(map(str,ids)),note='Cliente aprobó, pagará con tarjeta')['status'],200)
+        view=self.order(order['id'],cookie);info=view['authorization']
+        self.assertEqual((info['status'],info['by_staff'],info['staff_name'],info['signed'],info['staff_note']),('aprobado',True,'Persona de prueba',False,'Cliente aprobó, pagará con tarjeta'))
+        self.assertEqual((info['approved_count'],info['total_count'],info['total_cents']),(3,3,14000))
+        self.assertEqual(info['subtotal_cents']+info['tax_cents'],info['total_cents'])  # el IVA va incluido: no se suma dos veces
+        with app.connect() as c:
+            q=quotes.get(c,quote);t=quotes.totals(quotes.items_of(c,quote),q['tax_rate_bp'],q['discount_bp'])
+        self.assertEqual((info['subtotal_cents'],info['tax_cents']),(t['approved_base_taxed']+t['approved_base_zero'],t['approved_tax']))
+        self.assertEqual(info['tax_cents'],1500)  # 35,00 y 80,00 con IVA del 15 %; la licencia sin IVA
+        steps={s['key']:s for s in info['steps']}
+        self.assertTrue(steps['enviado']['done'] and steps['enviado']['at'])
+        self.assertEqual((steps['revision']['done'],steps['revision']['at']),(False,''))  # sin apertura registrada: no se inventa
+        self.assertIn('personal',steps['revision']['note'])
+        self.assertEqual(steps['aprobado']['at'],info['decided_at']);self.assertTrue(steps['procesando']['done'] and steps['procesando']['at'])
+        self.assertEqual(view['status_label'],'Procesando')
+        self.assertTrue(any(e['event']=='aprobado' and 'Registrado por el personal' in e['detail'] for e in info['history']))
+        products=[i for i in view['authorized_items'] if i['category']!='servicio']
+        self.assertTrue(all('reference' in i and 'base_cents' in i and 'tax_cents' in i for i in view['authorized_items']));self.assertTrue(products)
+
+    def test_client_signed_sheet_shows_review_step_and_signature(self):
+        cookie,post,order,quote,path,passkey,items=self.sent()
+        self.decide(path,passkey,items,['aprobado','rechazado','aprobado'])
+        info=self.order(order['id'],cookie)['authorization']
+        self.assertEqual((info['status'],info['by_staff'],info['signed'],info['signer'],info['approved_count'],info['total_count']),('parcial',False,True,'Cliente Ficticio',2,3))
+        steps={s['key']:s for s in info['steps']}
+        self.assertTrue(steps['revision']['done'] and steps['revision']['at']);self.assertEqual(steps['aprobado']['label'],'Aprobado parcialmente')
+        self.assertFalse(steps['procesando']['done'])  # la orden de prueba estaba «En espera», no esperando al cliente: no se mueve
+        self.assertTrue(info['evidence_hash'])
+
+    def test_resend_decision_confirmation_is_real_admin_only_and_logged(self):
+        cookie,post,order,quote,path,passkey,items=self.sent()
+        self.assertEqual(post('/api/quotes/%d'%quote,action='notify_decision')['status'],409)  # todavía sin decisión
+        self.decide(path,passkey,items,['aprobado']*3)
+        sent=[]
+        mail={'configured':True}
+        with patch.object(app.mail_pro,'configured',return_value=True),patch.object(app.mail_pro,'settings',return_value={'username':'taller@example.invalid','password':'x'}),patch.object(app.mail_pro,'deliver',side_effect=lambda config,message,recipients:sent.append((recipients,message))):
+            out=post('/api/quotes/%d'%quote,action='notify_decision')
+        self.assertEqual((out['status'],out['body']['recipient'],len(sent)),(200,'cliente@example.invalid',1))
+        message=sent[0][1];text=message.get_body(('plain',)).get_content()
+        self.assertIn('Total autorizado: $140,00',text);self.assertIn('firma electrónica',text)
+        self.assertTrue(any(part.get_filename()==order['code']+'-P1-AUTORIZACION.pdf' for part in message.iter_attachments()))
+        with app.connect() as c:
+            self.assertEqual(c.execute("SELECT COUNT(*) FROM quote_events WHERE quote_id=? AND event='correo' AND detail LIKE 'Confirmación de la autorización enviada%'",(quote,)).fetchone()[0],1)
+            self.assertEqual(c.execute("SELECT status FROM quotes WHERE id=?",(quote,)).fetchone()[0],'aprobado')  # la decisión no cambia
+            c.execute("UPDATE users SET role='tecnico' WHERE id=?",(self.uid,));c.commit()
+        self.assertEqual(post('/api/quotes/%d'%quote,action='notify_decision')['status'],403)
 
 
 if __name__=='__main__':

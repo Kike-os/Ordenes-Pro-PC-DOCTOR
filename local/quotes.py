@@ -18,7 +18,7 @@ BUDGET_KEY = {'servicio': 'labor', 'repuesto': 'parts', 'licencia': 'digital', '
 STATUS = {'borrador': 'Borrador', 'enviado': 'Esperando aprobación', 'aprobado': 'Aprobado', 'parcial': 'Aprobado parcialmente', 'rechazado': 'Rechazado', 'modificacion': 'Revisión solicitada', 'cancelado': 'Cancelado'}
 ITEM_STATUS = {'pendiente': 'Pendiente', 'aprobado': 'Aprobado', 'rechazado': 'Rechazado', 'cancelado': 'Cancelado'}
 EDITABLE = ('borrador', 'modificacion')
-EXECUTION = {'pendiente': 'Pendiente', 'proceso': 'En proceso', 'realizado': 'Realizado'}
+EXECUTION = {'pendiente': 'Pendiente', 'proceso': 'En proceso', 'realizado': 'Finalizado'}
 DECIDED = ('aprobado', 'parcial', 'rechazado')
 # Clasificación de cada partida: informa al cliente qué tan necesaria es. No aprueba nada ni cambia precios. (etiqueta, color de pantalla, color RGB para el PDF)
 PRIORITIES = {'necesario': ('Necesario', '#DC3545', (.86, .21, .27)), 'obligatorio': ('Obligatorio', '#F59E0B', (.80, .50, .02)), 'opcional': ('Opcional', '#38BDF8', (.07, .52, .78))}
@@ -641,7 +641,10 @@ def approved_lines(c, quote):
         acceptance = c.execute('SELECT signer_name,signature FROM quote_acceptances WHERE quote_id=?', (row['id'],)).fetchone()
         for item in items_of(c, row['id']):
             if item['status'] == 'aprobado':
-                result.append(dict(item, quote_id=row['id'], quote_code=row['code'], approved_at=row['decided_at'], net_cents=net(item['quantity'] * item['unit_cents'], row['discount_bp']), category_label=CATEGORIES[item['category']],
+                line = net(item['quantity'] * item['unit_cents'], row['discount_bp'])
+                base, tax = split(line, item['taxed'], row['tax_rate_bp'])  # misma regla por línea que los totales del presupuesto
+                ref = c.execute('SELECT code,brand FROM catalog_items WHERE id=?', (item['catalog_id'],)).fetchone() if item['catalog_id'] else None
+                result.append(dict(item, quote_id=row['id'], quote_code=row['code'], approved_at=row['decided_at'], net_cents=line, base_cents=base, tax_cents=tax, reference=(ref['code'] or '') if ref else '', brand=(ref['brand'] or '') if ref else '', category_label=CATEGORIES[item['category']],
                                    execution_label=EXECUTION[item['execution']], signed=bool(acceptance and acceptance['signature']), signer=acceptance['signer_name'] if acceptance else '', by_staff=str(row['decided_by']).startswith('personal')))
     return result
 
@@ -658,6 +661,49 @@ def authorized(c, order_id):
         return None
     items = approved_lines(c, dict(row))
     return {'code': row['code'], 'items': items} if items else None
+
+
+PROCESSING = ('reparacion', 'revision_recurrente', 'listo', 'espera_entrega', 'entregado')  # la orden ya pasó a trabajarse (o más allá)
+
+
+def authorization(c, order_id, order_status=''):
+    """Ficha de «Autorizaciones del cliente»: quién y cuándo decidió, línea de tiempo con hechos registrados (sin inventar fechas),
+    subtotal, IVA y total autorizados por línea, y el historial de decisiones con su evidencia. None si no hay nada aprobado."""
+    found = authorized(c, order_id)
+    if not found:
+        return None
+    head = dict(c.execute("SELECT * FROM quotes WHERE order_id=? AND status IN ('aprobado','parcial','rechazado') ORDER BY version DESC LIMIT 1", (order_id,)).fetchone())
+    items = found['items']
+    acceptance = c.execute('SELECT signer_name,method,evidence_hash,created_at FROM quote_acceptances WHERE quote_id=?', (head['id'],)).fetchone()
+    staff = str(head['decided_by']).startswith('personal:')
+    who = ''
+    if staff:
+        user = c.execute('SELECT name FROM users WHERE id=?', (int(head['decided_by'].split(':', 1)[1]),)).fetchone()
+        who = user['name'] if user else 'Personal autorizado'
+    note = ''
+    decided = c.execute("SELECT detail,actor FROM quote_events WHERE quote_id=? AND event=? ORDER BY id DESC LIMIT 1", (head['id'], head['status'])).fetchone()
+    if decided and staff and 'Registrado por el personal: ' in decided['detail']:
+        note = decided['detail'].split('Registrado por el personal: ', 1)[1][:300]
+    sent = c.execute("SELECT MIN(created_at) FROM quote_events WHERE quote_id=? AND event='enviado'", (head['id'],)).fetchone()[0] or head['sent_at']
+    opened = c.execute("SELECT MIN(verified_at) FROM quote_links WHERE quote_id=? AND verified_at!=''", (head['id'],)).fetchone()[0] or ''
+    working = c.execute("SELECT occurred_at FROM order_history WHERE order_id=? AND event='status' AND status_label='Procesando' AND occurred_at>=? ORDER BY id LIMIT 1", (order_id, head['decided_at'])).fetchone()
+    steps = [{'key': 'enviado', 'label': 'Enviado', 'done': bool(sent), 'at': sent or ''},
+             {'key': 'revision', 'label': 'En revisión', 'done': bool(opened), 'at': opened, 'note': '' if opened else ('El cliente no abrió el enlace: la decisión la registró el personal.' if staff else '')},
+             {'key': 'aprobado', 'label': 'Aprobado parcialmente' if head['status'] == 'parcial' else 'Aprobado', 'done': head['status'] in ('aprobado', 'parcial'), 'at': head['decided_at']},
+             {'key': 'procesando', 'label': 'Procesando', 'done': bool(working) or order_status in PROCESSING, 'at': working['occurred_at'] if working else ''}]
+    codes = list(dict.fromkeys(item['quote_code'] for item in items))
+    history = []
+    for row in chain(c, head):
+        for e in c.execute('SELECT event,detail,actor,created_at FROM quote_events WHERE quote_id=? ORDER BY id', (row['id'],)):
+            history.append({'quote': row['code'], 'event': e['event'], 'detail': e['detail'], 'actor': e['actor'] or 'Sistema', 'at': e['created_at']})
+    history.sort(key=lambda e: e['at'], reverse=True)
+    t = totals(items_of(c, head['id']), head['tax_rate_bp'], head['discount_bp'])
+    return {'quote_id': head['id'], 'code': head['code'], 'codes': codes, 'status': head['status'], 'status_label': STATUS[head['status']], 'decided_at': head['decided_at'],
+            'by_staff': staff, 'staff_name': who, 'staff_note': note, 'signed': bool(acceptance), 'signer': acceptance['signer_name'] if acceptance else '',
+            'method': acceptance['method'] if acceptance else '', 'evidence_hash': (acceptance['evidence_hash'] or '')[:16] if acceptance else '',
+            'approved_count': len(items), 'total_count': sum(t['count'][k] for k in ('aprobado', 'rechazado', 'pendiente')) if len(codes) == 1 else None,
+            'subtotal_cents': sum(item['base_cents'] for item in items), 'tax_cents': sum(item['tax_cents'] for item in items), 'total_cents': sum(item['net_cents'] for item in items),
+            'steps': steps, 'history': history[:60]}
 
 
 def set_execution(c, quote, item_id, value, user, now):

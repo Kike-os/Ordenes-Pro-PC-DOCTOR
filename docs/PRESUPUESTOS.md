@@ -344,3 +344,44 @@ El bloque de autorización se muestra en verde si se aprobó todo y en naranja s
 - si lo aprobó el cliente o se registró por el personal.
 
 Cuando la autorización de servicio está firmada pero el presupuesto sigue pendiente, la orden lo explica. Administración ve además el botón «Pedir al cliente que apruebe …», que reenvía el enlace.
+
+## Autorizaciones del cliente: rediseño empresarial (1.5.202)
+
+El panel de la orden cuenta con estas partes:
+
+- **Cabecera.** Muestra:
+  - presupuesto, estado y total autorizado;
+  - fecha y hora de la decisión y partidas aprobadas («N de M»);
+  - quién registró la decisión (cliente o personal) y el estado de la orden.
+- **Línea de tiempo** Enviado → En revisión → Aprobado → Procesando. Cada paso usa un hecho registrado:
+  - el primer envío;
+  - la verificación del enlace por el cliente;
+  - la fecha de la decisión;
+  - el paso de la orden a «Procesando» en el historial.
+
+  Un paso sin registro dice «Sin registro». Por ejemplo, si la decisión la registró el personal, el cliente no abrió el enlace y no se inventa esa fecha.
+- **Evidencia.** Si aprobó el cliente, se indica la firma electrónica con su nombre y la huella de la evidencia. Si lo registró el personal, se indica «Decisión registrada por personal autorizado», con el nombre y la nota, y «No consta firma del cliente».
+- **Servicios técnicos y Productos.** Son secciones plegables, con desplazamiento interno en escritorio. Cada tarjeta muestra:
+  - icono, nombre, descripción en dos líneas, cantidad y precio unitario;
+  - referencia y marca del catálogo (en productos);
+  - importe, aprobación económica y estado de ejecución (Pendiente, En proceso o Finalizado).
+
+  Aprobación y ejecución son estados distintos.
+- **Subtotal autorizado, IVA y Total autorizado.** Se calculan en el servidor por línea, con la misma regla que el presupuesto (`quotes.split` sobre el importe neto con descuento). Los precios incluyen IVA, así que el subtotal más el IVA es el total. Lo pagado y el saldo siguen en su resumen aparte.
+- **Acciones:**
+  - Ver historial: eventos del presupuesto con fecha, usuario y evidencia; se cierra con Escape.
+  - Reenviar notificación: solo administración y con confirmación. Envía al correo registrado del cliente lo autorizado con el comprobante en PDF, no cambia la decisión y queda en el historial y la auditoría.
+  - Imprimir detalle: el comprobante en PDF.
+  - Consultar presupuesto.
+  - Ir a la orden.
+
+El panel se adapta al ancho real en el que está (columna lateral en escritorio o pantalla completa en el teléfono), mediante consultas de contenedor. Las animaciones son breves: al desplegar una sección y al llegar una autorización nueva sin recargar. Se desactivan con movimiento reducido.
+
+**Datos:** `quotes.authorization(c, order_id, estado)` se entrega en `GET /api/orders/:id` como `authorization`. La acción `notify_decision` está en `POST /api/quotes/:id`.
+
+**Verificación con la orden real PCD-20261019-0005** (decisión registrada por el personal el 21/10 a las 20:21):
+
+- 4 de 4 partidas aprobadas: 3 servicios y 1 producto;
+- subtotal $126,39, IVA $18,96 y total $145,35;
+- sin firma del cliente;
+- orden en «Procesando».
