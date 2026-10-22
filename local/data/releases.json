@@ -8,6 +8,26 @@
   },
   "releases": [
     {
+      "version": "1.5.201",
+      "date": "2026-10-21T20:18:13-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Aprobaciones de presupuestos sincronizadas con la orden: estados automáticos, paso a Procesando, actualización sin recargar y autorización confirmada.",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Presupuestos: estados «Esperando aprobación» y «Revisión solicitada»; bloque «AUTORIZACIÓN CONFIRMADA» (verde, o naranja si es parcial) con presupuesto, partidas, total autorizado, fecha real y estado del proceso; botón «Pedir al cliente que apruebe» cuando solo consta la autorización de servicio."
+        ],
+        "fixes": [
+          "Presupuestos y órdenes: al aprobar el cliente (total o parcial), la orden que esperaba su respuesta pasa a «Procesando» con registro en el historial, y la orden abierta se actualiza sola sin recargar (partidas autorizadas, estado y saldo). Un rechazo no mueve la orden; nunca se marca reparada ni entregada."
+        ],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Kike-os (administración)"
+    },
+    {
       "version": "1.5.200",
       "date": "2026-10-21T19:50:55-05:00",
       "type": "patch",

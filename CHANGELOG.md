@@ -4,6 +4,18 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.201 — 2026-10-21 20:18 (UTC-05:00)
+
+Aprobaciones de presupuestos sincronizadas con la orden: estados automáticos, paso a Procesando, actualización sin recargar y autorización confirmada.
+
+### Mejoras realizadas
+
+- Presupuestos: estados «Esperando aprobación» y «Revisión solicitada»; bloque «AUTORIZACIÓN CONFIRMADA» (verde, o naranja si es parcial) con presupuesto, partidas, total autorizado, fecha real y estado del proceso; botón «Pedir al cliente que apruebe» cuando solo consta la autorización de servicio.
+
+### Errores corregidos
+
+- Presupuestos y órdenes: al aprobar el cliente (total o parcial), la orden que esperaba su respuesta pasa a «Procesando» con registro en el historial, y la orden abierta se actualiza sola sin recargar (partidas autorizadas, estado y saldo). Un rechazo no mueve la orden; nunca se marca reparada ni entregada.
+
 ## v1.5.200 — 2026-10-21 19:50 (UTC-05:00)
 
 Presupuestos y órdenes: aviso de que la autorización de servicio no aprueba un presupuesto pendiente y pruebas de sincronización de partidas aprobadas.
