@@ -6,6 +6,11 @@ Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas
 
 ## Sin publicar
 
+### Nuevas funcionalidades
+
+- Facturación Electrónica en el menú principal (solo administración), en MODO DE PRUEBAS. Incluye facturas de prueba desde la orden pagada, con IVA exacto, consumidor final hasta USD 50,00, secuenciales, clave de acceso y XML del SRI. La emisión real está desactivada y no hay conexión con el SRI.
+- Dentro de Facturación Electrónica, en modo de pruebas: caja diaria por usuario con depósitos y comprobantes; cuentas bancarias; inventario con entradas, salidas, alertas y costo promedio; compras y proveedores. Nada de esto modifica clientes, órdenes, presupuestos ni pagos existentes.
+
 ### Mejoras realizadas
 
 - ADI AutoCare indica la causa concreta de los cortes de conexión con la base remota (por ejemplo, sin respuesta o conexión cerrada) y detecta las conexiones caducadas aunque el servidor haya estado en pausa.
@@ -14,6 +19,10 @@ Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas
 
 - Agenda y Notificaciones (INC-20261026-001 y 002): un corte o una espera de la conexión con la base en la nube ya no da error. Las lecturas se reintentan hasta tres veces, con una pausa breve, conexión nueva y un plazo por intento que no agota el límite del servidor.
 - Si la base en la nube no responde tras los reintentos, la consulta responde «problema temporal» (503 con Retry-After) en lugar de un error interno. Los calendarios y la campana de avisos lo vuelven a intentar solos, sin perder datos.
+
+### Actualizaciones de seguridad
+
+- Modo de pruebas fijado en el servidor: los clientes no ven datos bancarios en la página ni en el PDF del presupuesto, los presupuestos reales no se modifican y la caja solo la usa administración hasta la activación real.
 
 ## v1.5.204 — 2026-10-21 22:11 (UTC-05:00)
 

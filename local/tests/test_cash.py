@@ -3,10 +3,12 @@ ficticios; no se mueve dinero ni se conecta con ningún banco."""
 import base64
 import re
 import unittest
+from unittest.mock import patch
 
 import test_app
 import test_invoicing
 import app
+import invoicing
 import quotes
 
 ACCOUNT = {'bank': 'Banco Ficticio del Austro', 'account_type': 'corriente', 'number': '1234567890', 'holder': 'EMPRESA FICTICIA DE PRUEBAS S.A.', 'holder_id': test_invoicing.fake_ruc()}
@@ -71,6 +73,7 @@ class CashTests(unittest.TestCase):
         self.assertEqual(([r['number'] for r in listed['rows']], listed['can_manage']), (['1234567890'], False))  # solo activas
         self.assertEqual(self.request('/api/bank-accounts', dict(ACCOUNT, action='save', number='5555555555'), cookie=tcookie, csrf=tcsrf)['status'], 403)
 
+    @patch.object(invoicing, 'TEST_MODE', False)  # comportamiento previsto al activar la facturación
     def test_daily_closing_per_user_deposits_and_reconciliation(self):
         cookie, csrf = self.login()
         post = lambda path, **body: self.request(path, body, cookie=cookie, csrf=csrf)
@@ -140,6 +143,7 @@ class CashTests(unittest.TestCase):
         view = self.request('/api/cash/day', cookie=cookie)['body']
         self.assertEqual((view['closing']['expected_cash_cents'], len(view['closing']['late_movements'])), (6000, 1))
 
+    @patch.object(invoicing, 'TEST_MODE', False)  # comportamiento previsto al activar la facturación
     def test_bank_account_in_quotes_and_invoices(self):
         cookie, csrf = self.login()
         post = lambda path, **body: self.request(path, body, cookie=cookie, csrf=csrf)
@@ -168,6 +172,32 @@ class CashTests(unittest.TestCase):
         with app.connect() as c:
             xml = c.execute('SELECT xml_unsigned FROM invoices WHERE id=?', (draft['id'],)).fetchone()[0]
         self.assertIn('<campoAdicional nombre="Cuenta para depósito">Banco Ficticio del Austro · Corriente · 1234567890', xml)
+
+
+    def test_test_mode_keeps_real_records_and_client_documents_unchanged(self):
+        """MODO DE PRUEBAS (producción hasta la activación): presupuestos y páginas del cliente sin cambios; caja solo para administración."""
+        self.assertTrue(invoicing.TEST_MODE)
+        cookie, csrf = self.login()
+        post = lambda path, **body: self.request(path, body, cookie=cookie, csrf=csrf)
+        account = post('/api/bank-accounts', action='save', **ACCOUNT)['body']['rows'][0]
+        order = post('/api/orders', **self.order_data({'email': 'cliente@example.invalid', 'request_key': 'cash-order-request-000004'}))['body']
+        quote = post('/api/orders/%d/quote' % order['id'])['body']['id']
+        post('/api/quotes/%d' % quote, action='save', items=[{'description': 'Servicio ficticio', 'category': 'servicio', 'quantity': 1, 'unit_cents': 3000, 'taxed': True}])
+        detail = self.request('/api/quotes/%d' % quote, cookie=cookie)['body']['quote']
+        self.assertEqual((detail['bank_account'], detail['bank_enabled']), (None, False))
+        self.assertEqual(post('/api/quotes/%d' % quote, action='bank', bank_account_id=str(account['id']))['status'], 409)
+        with app.connect() as c:
+            self.assertIsNone(c.execute('SELECT bank_account_id FROM quotes WHERE id=?', (quote,)).fetchone()[0])  # el presupuesto no cambió
+        link = post('/api/quotes/%d' % quote, action='send')['body']['link']
+        form = test_invoicing.InvoiceFlowTests.form(self, '/presupuesto/' + link.rsplit('/', 1)[1], {'last4': '0017'})['body']
+        self.assertNotIn('Datos para depósito o transferencia', form);self.assertNotIn('1234567890', form)
+        pdf = self.request('/api/quotes/%d/pdf' % quote, cookie=cookie)['body']
+        self.assertEqual(pdf[:4], b'%PDF');self.assertNotIn(b'1234567890', pdf)
+        self.assertEqual(self.request('/api/cash/day', cookie=cookie)['status'], 200)  # administración prueba la caja
+        tcookie, tcsrf = self.technician()
+        self.assertEqual(self.request('/api/cash/day', cookie=tcookie)['status'], 403)
+        self.assertEqual(self.request('/api/cash/close', {'day': '', 'counted_cash': '0,00'}, cookie=tcookie, csrf=tcsrf)['status'], 403)
+        self.assertTrue(self.request('/api/invoicing/settings', cookie=cookie)['body']['settings']['test_mode'])
 
 
 if __name__ == '__main__':

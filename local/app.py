@@ -1844,7 +1844,8 @@ class Handler(BaseHTTPRequestHandler):
                 import banking
                 return self.reply(200,{'rows':banking.listing(c,active_only=user['role']!='administrador'),'types':banking.TYPES,'can_manage':user['role']=='administrador'})
             if path.startswith('/api/cash/'):
-                import cash
+                import cash,invoicing
+                if invoicing.TEST_MODE and user['role']!='administrador':return self.reply(403,{'error':'La caja está en modo de pruebas: por ahora solo administración puede usarla.'})
                 q=parse_qs(urlsplit(self.path).query);arg=lambda name:(q.get(name,[''])[0] or '')[:40]
                 try:
                     if path=='/api/cash/day':
@@ -2715,7 +2716,8 @@ class Handler(BaseHTTPRequestHandler):
                     audit(c,user['id'],'bank_account_'+action);return self.reply(200,{'ok':True,'rows':banking.listing(c)})
                 if path.startswith('/api/cash/'):
                     # Caja: cada persona cierra la suya; los depósitos se confirman a mano y solo administración concilia.
-                    import cash
+                    import cash,invoicing
+                    if invoicing.TEST_MODE and user['role']!='administrador':return self.reply(403,{'error':'La caja está en modo de pruebas: por ahora solo administración puede usarla.'})
                     now=reception_now()
                     try:
                         if path=='/api/cash/close':
@@ -3689,7 +3691,9 @@ class Handler(BaseHTTPRequestHandler):
                             return self.reply(200,{'ok':True,'items':quotes.approved_lines(c,quotes.get(c,found['id']))})
                         # Enviar, decidir en nombre del cliente, cancelar y versionar son acciones de administración, siempre registradas.
                         if action=='bank':
-                            import banking
+                            import banking,invoicing
+                            # Modo de pruebas de Facturación Electrónica: los presupuestos reales no se modifican.
+                            if invoicing.TEST_MODE:return self.reply(409,{'error':'La cuenta bancaria en los presupuestos se activará junto con la facturación electrónica.'})
                             value=str(data.get('bank_account_id','') or '')
                             try:account=banking.get(c,value,active=True) if value else None
                             except banking.BankError as error:return self.reply(error.status,{'error':str(error)})

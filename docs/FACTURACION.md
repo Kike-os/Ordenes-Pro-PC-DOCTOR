@@ -1,10 +1,19 @@
-# Facturación electrónica, cuentas bancarias y caja (rama `facturacion-electronica`, solo pruebas)
+# Facturación Electrónica, caja, inventario y cuentas bancarias (MODO DE PRUEBAS)
 
-**Estado:** en desarrollo, en una rama y un entorno aislado. No está publicado.
+**Estado:** integrado en Órdenes Pro desde la 1.5.205, en el menú **«Facturación Electrónica»** (solo administración). Funciona en **MODO DE PRUEBAS** (`invoicing.TEST_MODE = True`, fijado en el servidor):
 
-- La **emisión real está desactivada** y no se puede activar desde la interfaz.
-- **No hay conexión con el SRI:** ni de pruebas ni de producción. Se activará solo con una autorización expresa.
-- Nada de este módulo mueve dinero ni se conecta con bancos.
+- La **emisión real está desactivada** y no se puede activar desde la interfaz. **No hay conexión con el SRI**, ni de pruebas ni de producción. Se activará solo con la firma electrónica y una autorización expresa.
+- Todo lo que se registre en el módulo es **de prueba**: facturas, cajas, depósitos, inventario, compras, proveedores, cuentas y datos fiscales.
+  - Queda solo en las tablas propias del módulo (migraciones 070 a 072).
+  - **Ningún registro existente se modifica**: clientes, órdenes, presupuestos, pagos, licencias ni citas.
+- **Los clientes no ven ningún cambio:** los datos bancarios no aparecen en la página ni en el PDF del presupuesto, y el selector de cuenta del presupuesto está oculto (el servidor lo rechaza).
+- **La caja solo la usa administración**, como una pestaña del módulo. La dirección antigua `#cash` abre esa pestaña.
+- Nada de este módulo mueve dinero, se conecta con bancos ni envía correos.
+
+**Antes de la activación real** (cuando haya firma y autorización):
+1. Respaldo verificado de la nube.
+2. Vaciar las tablas del módulo con una migración propia (los datos de prueba no se mezclan con los reales).
+3. Poner `TEST_MODE = False`. Así se activan los datos bancarios para el cliente y la caja para todo el personal.
 
 ## Normativa de referencia
 Ficha técnica de comprobantes electrónicos del SRI, esquema offline, **v2.34** (julio de 2026):
@@ -15,7 +24,7 @@ Ficha técnica de comprobantes electrónicos del SRI, esquema offline, **v2.34**
 - **Firma:** XAdES-BES 1.3.2, *enveloped*, RSA-SHA1 con clave de 2048 bits. Pendiente de implementar.
 - **Servicios web:** de pruebas, `celcer.sri.gob.ec`, y de producción, `cel.sri.gob.ec`. No se usan todavía.
 
-## Facturación (menú «Facturación», solo administración)
+## Facturas (pestaña «Facturas»)
 
 **Origen:**
 - una orden **totalmente pagada** con presupuesto aprobado (botón en «Pagos y saldo» de la orden);
@@ -38,7 +47,7 @@ Los datos salen de los módulos existentes: cliente, partidas aprobadas, pagos y
 **Datos fiscales** (pestaña «Datos fiscales»): RUC validado, razón social, nombre comercial, direcciones, establecimiento, punto de emisión, contabilidad, régimen, contribuyente especial y agente de retención. Nunca se completan solos.
 
 ## Cuentas bancarias (catálogo central)
-Están en Facturación → «Cuentas bancarias» y en Caja → «Cuentas bancarias» (administración).
+Están en Facturación Electrónica → «Cuentas bancarias» (administración). En modo de pruebas no se muestran al cliente.
 
 - **Datos:** banco, tipo (corriente o ahorros), número, titular, RUC o identificación y estado (activa o inactiva).
 - **Reglas:**
@@ -50,7 +59,7 @@ Están en Facturación → «Cuentas bancarias» y en Caja → «Cuentas bancari
   - **Facturas:** selector en la ventana de la factura. Se muestra en la vista, se puede copiar y viaja en la información adicional del XML («Cuenta para depósito»).
   - **Depósitos de caja:** cuenta de destino.
 
-## Caja (menú «Caja», todo el personal)
+## Caja (pestaña «Caja»; al activarse, todo el personal)
 - **Cierre diario por usuario** (fecha de Ecuador). Cada persona cierra **su** caja con los cobros que registró ese día: pagos y devoluciones de órdenes no anulados, y pagos confirmados de licencias, por forma de pago.
   - Si el efectivo contado no coincide con el esperado, hay que explicar la diferencia.
   - Hay un cierre por persona y día. El cierre guarda la foto de los cobros y no se modifica.
@@ -64,7 +73,7 @@ Están en Facturación → «Cuentas bancarias» y en Caja → «Cuentas bancari
 - **Comprobantes de 5 MB en Vercel:** la plataforma no admite peticiones de más de 4,5 MB. Por eso el archivo viaja **por partes** de unos 1,4 MB. El servidor las recompone y verifica el tamaño (5 MB como máximo), el tipo **real** por su firma de bytes y la huella SHA-256. Las partes se borran al completarse.
 - **Historial de cierres** con filtros por persona (administración), estado de los depósitos y fechas, más el historial inmutable de cada cierre (`cash_events`).
 
-## Inventario, compras y proveedores (Facturación, solo administración)
+## Inventario, compras y proveedores (pestañas propias)
 - **Artículos:** se incorporan desde el catálogo (categorías «Repuesto» y «Otro»), como producto, repuesto o accesorio, con código interno opcional y único, existencia mínima y ubicación. No se eliminan: se desactivan.
 - **Existencias = suma de movimientos.** Los movimientos no se modifican ni se eliminan; una corrección es otro movimiento.
   - **Entradas:** existencia inicial, compra, devolución del cliente y ajuste.
@@ -84,7 +93,7 @@ Están en Facturación → «Cuentas bancarias» y en Caja → «Cuentas bancari
 - `071_bank_accounts_cash_closing.sql`: cuentas bancarias, cierres, depósitos, archivos, partes de subida, eventos, y las columnas `quotes.bank_account_id` e `invoices.bank_account_id`.
 - `072_inventory_purchases.sql`: artículos de inventario, movimientos, proveedores, compras, partidas y eventos.
 
-No modifican datos existentes. En producción, Vercel no ejecuta `migrate()`: habrá que aplicarlas con respaldo previo y transacción corta, solo cuando se autorice la publicación.
+No modifican datos existentes. En producción, Vercel no ejecuta `migrate()`: se aplican con un guion, con respaldo previo y una transacción corta por migración, y se comprueba que las tablas existentes conservan sus recuentos.
 
 ## Entornos de trabajo
 
@@ -93,10 +102,22 @@ No modifican datos existentes. En producción, Vercel no ejecuta `migrate()`: ha
 | Producción | ordenes-pro.ecuadorpcdoctor.com | `main` | Turso (no se toca) |
 | Sistema local | 127.0.0.1:8010 | `main` | `local/var/ordenes.sqlite3` |
 | Copia aislada (protegida) | 127.0.0.2:8011 | `main` | `~/OrdenesPro-CopiaLocal` |
-| **Desarrollo** | **127.0.0.3:8012** | **rama** (`~/Work/OrdenesPro-facturacion`) | `~/OrdenesPro-Desarrollo` (con las migraciones 070 a 072) |
+| Desarrollo | 127.0.0.3:8012 | rama (`~/Work/OrdenesPro-facturacion`) | `~/OrdenesPro-Desarrollo` (con las migraciones 070 a 072) |
+
+## Volver a la 1.5.204 si surge un inconveniente
+Las migraciones 070 a 072 **solo añaden** tablas, índices, disparadores y dos columnas vacías (`quotes.bank_account_id`, `invoices.bank_account_id`). La 1.5.204 funciona con ese esquema. Está comprobado: su batería completa pasa con las migraciones añadidas, y todos sus módulos responden con una copia migrada del respaldo. Por eso **no hace falta revertir la base**.
+
+1. **Código:** en Vercel, promover el despliegue anterior de la 1.5.204.
+   - Desde el panel: *Deployments* → despliegue de la 1.5.204 → *Promote to Production*.
+   - O desde la raíz del repositorio: `vercel ls` y luego `vercel promote <url-del-despliegue-1.5.204> --yes` (o `vercel rollback`).
+   - Comprobar con `curl -s https://ordenes-pro.ecuadorpcdoctor.com/api/public/version`.
+2. **Repositorio:** `git revert` del commit de la versión en una rama de pruebas. Nunca `reset --hard` ni `push --force`.
+3. **Base:** no se toca. Si alguna vez hiciera falta volver al estado anterior a la migración, existe el respaldo verificado `~/Respaldos-OrdenesPro/ordenes-pro-nube-AAAAMMDD-HHMMSS.sqlite3`, tomado justo antes de migrar. Restaurarlo exige una autorización expresa, porque se perderían los registros posteriores.
 
 ## Pendiente (no implementado)
 - Firma XAdES-BES y envío al SRI de **certificación**: requiere el certificado .p12, las librerías `cryptography` y `lxml` y una autorización expresa.
+- **Proformas** con PDF y logo, envío por correo o WhatsApp con enlace seguro, aprobación o rechazo por el cliente (últimos 4 dígitos de la cédula y código al correo), con evidencia; y conversión de la proforma aprobada en factura.
+- Notas de crédito, anticipos y abonos.
 - Factura A4 (RIDE en PDF) y ticket térmico de 80 mm (revisar antes `docs/TICKET-TERMICO.md`).
 - Botón de factura en las ventas de licencias, notas de crédito, proformas con aprobación del cliente y envío por Mail Pro.
 - Descontar existencias automáticamente al facturar o al usar repuestos en una orden (hoy la salida se registra a mano).

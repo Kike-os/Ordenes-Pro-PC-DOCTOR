@@ -22,6 +22,12 @@ REGIMES = {'general': 'Régimen General', 'rimpe_emprendedor': 'RIMPE Emprendedo
 PAYMENT_CODES = {'efectivo': '01', 'transferencia': '20', 'deposito': '20', 'tarjeta': '19', 'otro': '20'}
 PAYMENT_LABELS = {'01': 'Sin utilización del sistema financiero', '16': 'Tarjeta de débito', '19': 'Tarjeta de crédito', '20': 'Otros con utilización del sistema financiero'}
 TEST_ENVIRONMENT = '1'
+# MODO DE PRUEBAS del centro de Facturación Electrónica (hasta la firma electrónica y la autorización de activación real):
+# - todo lo que se registre (facturas, cajas, depósitos, inventario, compras, proveedores, cuentas) queda en las tablas propias del
+#   módulo, que se vaciarán con respaldo previo al activarlo; ningún registro existente se modifica;
+# - los clientes no ven ningún cambio: los datos bancarios no aparecen en la página ni en el PDF del presupuesto;
+# - solo administración usa el módulo, incluida la caja.
+TEST_MODE = True
 
 
 class InvoiceError(ValueError):
@@ -54,8 +60,9 @@ def settings(c):
     row = dict(c.execute('SELECT * FROM invoice_settings WHERE id=1').fetchone())
     row['regime_label'] = REGIMES.get(row['regime'], 'Sin definir')
     row['missing'] = missing_settings(row)
+    row['test_mode'] = TEST_MODE
     row['emission'] = {'environment': TEST_ENVIRONMENT, 'environment_label': 'Pruebas (SRI)', 'real_enabled': False,
-                       'note': 'La emisión real está desactivada. Solo se preparan comprobantes para el ambiente de pruebas del SRI.'}
+                       'note': 'Todo lo que se registre aquí es de prueba: no cambia clientes, órdenes, presupuestos ni pagos, y no se envía nada al SRI.'}
     return row
 
 

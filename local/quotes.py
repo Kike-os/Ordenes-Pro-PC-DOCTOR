@@ -451,7 +451,7 @@ def detail(c, quote):
         item['category_label'] = CATEGORIES[item['category']]
         item['execution_label'] = EXECUTION[item['execution']]
     return dict(quote, mail_state=mail_state(c, quote['id']), client_note=client_note(c, quote['id']), status_label=STATUS[quote['status']], editable=quote['status'] in EDITABLE, items=items, totals=totals(items, quote['tax_rate_bp'], quote['discount_bp']), discount_label=DISCOUNTS[quote['discount_bp']],
-                bank_account=bank_for(c, quote), acceptance=dict(acceptance, signed=bool(acceptance['signature'])) if acceptance else None, identity_document=dict(paper) if paper else None, link=dict(link) if link else None,
+                bank_account=bank_for(c, quote), bank_enabled=not __import__('invoicing').TEST_MODE, acceptance=dict(acceptance, signed=bool(acceptance['signature'])) if acceptance else None, identity_document=dict(paper) if paper else None, link=dict(link) if link else None,
                 events=[dict(r) for r in c.execute('SELECT event,detail,actor,created_at FROM quote_events WHERE quote_id=? ORDER BY id DESC LIMIT 60', (quote['id'],))])
 
 
@@ -949,6 +949,9 @@ def identify_page(token, quote, order, error=''):
 def bank_for(c, quote):
     """Cuenta para depósito o transferencia del presupuesto: la elegida o, si no se eligió, la predeterminada activa del catálogo."""
     import banking
+    import invoicing
+    if invoicing.TEST_MODE:
+        return None  # modo de pruebas: el cliente no ve datos bancarios todavía (ni en la página ni en el PDF)
     try:
         chosen = quote['bank_account_id'] if 'bank_account_id' in quote.keys() else None
         row = c.execute('SELECT * FROM bank_accounts WHERE id=? AND active=1', (chosen,)).fetchone() if chosen else c.execute('SELECT * FROM bank_accounts WHERE is_default=1 AND active=1').fetchone()
