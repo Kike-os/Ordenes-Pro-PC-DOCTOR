@@ -1,8 +1,13 @@
 {
   "unreleased": {
     "features": [],
-    "improvements": [],
-    "fixes": [],
+    "improvements": [
+      "ADI AutoCare indica la causa concreta de los cortes de conexión con la base remota (por ejemplo, sin respuesta o conexión cerrada) y detecta las conexiones caducadas aunque el servidor haya estado en pausa."
+    ],
+    "fixes": [
+      "Agenda y Notificaciones (INC-20261026-001 y 002): un corte o una espera de la conexión con la base en la nube ya no da error. Las lecturas se reintentan hasta tres veces, con una pausa breve, conexión nueva y un plazo por intento que no agota el límite del servidor.",
+      "Si la base en la nube no responde tras los reintentos, la consulta responde «problema temporal» (503 con Retry-After) en lugar de un error interno. Los calendarios y la campana de avisos lo vuelven a intentar solos, sin perder datos."
+    ],
     "security": [],
     "performance": []
   },

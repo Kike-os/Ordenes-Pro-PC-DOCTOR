@@ -4,6 +4,17 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## Sin publicar
+
+### Mejoras realizadas
+
+- ADI AutoCare indica la causa concreta de los cortes de conexión con la base remota (por ejemplo, sin respuesta o conexión cerrada) y detecta las conexiones caducadas aunque el servidor haya estado en pausa.
+
+### Errores corregidos
+
+- Agenda y Notificaciones (INC-20261026-001 y 002): un corte o una espera de la conexión con la base en la nube ya no da error. Las lecturas se reintentan hasta tres veces, con una pausa breve, conexión nueva y un plazo por intento que no agota el límite del servidor.
+- Si la base en la nube no responde tras los reintentos, la consulta responde «problema temporal» (503 con Retry-After) en lugar de un error interno. Los calendarios y la campana de avisos lo vuelven a intentar solos, sin perder datos.
+
 ## v1.5.204 — 2026-10-21 22:11 (UTC-05:00)
 
 Seguimiento de Órdenes Enterprise Pro: textos completos en todas las resoluciones, presupuesto vigente en el estado y búsqueda por teléfono.
