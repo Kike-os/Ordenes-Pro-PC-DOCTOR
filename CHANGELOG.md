@@ -4,7 +4,9 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
-## Sin publicar
+## v1.5.205 — 2026-10-26 14:43 (UTC-05:00)
+
+Agenda y Notificaciones estables ante cortes de la base en la nube, y Facturación Electrónica integrada en modo de pruebas
 
 ### Nuevas funcionalidades
 
