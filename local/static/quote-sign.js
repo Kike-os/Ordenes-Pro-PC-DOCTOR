@@ -24,3 +24,8 @@
    const reader=new FileReader();reader.onload=()=>{hidden.value=String(reader.result).split(',')[1]||'';paper.dataset.ready='true';note.textContent='Documento listo: «'+file.name+'» ('+Math.max(1,Math.round(file.size/1024))+' KB).';};reader.onerror=()=>{note.textContent='No se pudo leer el archivo.';};reader.readAsDataURL(file);});}
  paint();
 })();
+// Copiar los datos bancarios del presupuesto (para pegarlos en la app del banco, WhatsApp o un correo).
+(()=>{const button=document.querySelector('[data-copy-bank]');if(!button)return;const status=document.querySelector('[data-copy-status]');
+ button.addEventListener('click',async()=>{const text=button.dataset.copyBank||'';try{await navigator.clipboard.writeText(text);if(status)status.textContent='Datos bancarios copiados.';}
+  catch{const area=document.createElement('textarea');area.value=text;area.setAttribute('readonly','');area.style.position='fixed';area.style.opacity='0';document.body.append(area);area.select();
+   try{document.execCommand('copy');if(status)status.textContent='Datos bancarios copiados.';}catch{if(status)status.textContent='No se pudo copiar: selecciona los datos y cópialos.';}area.remove();}});})();

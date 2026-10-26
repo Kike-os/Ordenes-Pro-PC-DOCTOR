@@ -230,6 +230,13 @@ def render(quote, order, link=None):
     text('Los precios incluyen los impuestos indicados. Valores en dólares de los Estados Unidos de América.', M, state['y'], 7.2, False, GRAY)
     state['y'] += 16
 
+    # Datos para depósito o transferencia (catálogo central de cuentas). No en presupuestos rechazados ni cancelados.
+    account = quote.get('bank_account')
+    if account and quote['status'] not in ('rechazado', 'cancelado'):
+        heading('Datos para depósito o transferencia', 60)
+        pairs([('Banco', account['bank']), ('Tipo de cuenta', account['type_label']), ('Número de cuenta', account['number']),
+               ('Titular', account['holder']), ('RUC / identificación', account['holder_id'])], 3)
+
     if quote['notes']:
         heading('Observaciones')
         for row in wrap(quote['notes'], W - 2 * M, 9):

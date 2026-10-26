@@ -377,11 +377,29 @@ def emit(c, invoice_id, user, now, environment=TEST_ENVIRONMENT):
                issue_date_sri=issue.strftime('%d/%m/%Y'), reference=found['reference'])
     items = [dict(r) for r in c.execute('SELECT * FROM invoice_items WHERE invoice_id=? ORDER BY position', (invoice_id,))]
     payments = [dict(r) for r in c.execute('SELECT * FROM invoice_payments WHERE invoice_id=? ORDER BY id', (invoice_id,))]
+    account = c.execute('SELECT * FROM bank_accounts WHERE id=?', (inv['bank_account_id'],)).fetchone() if inv.get('bank_account_id') else None
+    if account:
+        import banking
+        inv['bank_info'] = '%s · %s · %s · %s · %s' % (account['bank'], banking.TYPES[account['account_type']], account['number'], account['holder'], account['holder_id'])
     xml = sri_xml.invoice_xml(cfg, inv, items, payments)
     c.execute("UPDATE invoices SET status='pendiente',environment=?,establishment=?,emission_point=?,sequential=?,access_key=?,issue_date=?,xml_unsigned=?,emitted_by=?,emitted_at=?,updated_at=? WHERE id=?",
               (environment, cfg['establishment'], cfg['emission_point'], sequential, access, issue.isoformat(), xml, user['id'], stamp(now), stamp(now), invoice_id))
     event(c, invoice_id, 'emitido', 'Factura %s preparada en ambiente de PRUEBAS (clave de acceso %s). Pendiente de firma electrónica y envío al SRI de pruebas.' % (number(inv), access), now, user)
     return invoice_id
+
+
+def set_bank(c, invoice_id, account_id, user, now):
+    """Cuenta para depósito o transferencia que se muestra en la factura (catálogo central). Solo en borradores y comprobantes no autorizados."""
+    import banking
+    inv = _get(c, invoice_id)
+    if inv['status'] not in ('borrador', 'pendiente'):
+        raise InvoiceError('La cuenta bancaria solo se cambia antes del envío al SRI.', 409)
+    try:
+        account = banking.get(c, account_id, active=True) if str(account_id or '') else None
+    except banking.BankError as error:
+        raise InvoiceError(str(error), error.status)
+    c.execute('UPDATE invoices SET bank_account_id=?,updated_at=? WHERE id=?', (account['id'] if account else None, stamp(now), invoice_id))
+    event(c, invoice_id, 'cuenta_bancaria', ('Cuenta para depósito o transferencia: ' + banking.label(account)) if account else 'Sin cuenta bancaria indicada.', now, user)
 
 
 def discard(c, invoice_id, user, now, reason=''):
@@ -411,7 +429,10 @@ def detail(c, invoice_id):
                sale_code=sale['code'] if sale else '', consumer_final_allowed=consumer_final_allowed(inv['total_cents']), consumer_final_limit_cents=CONSUMER_FINAL_LIMIT_CENTS,
                problems=buyer_problems(inv) if inv['status'] == 'borrador' else {}, blockers=found['blockers'] if found else [],
                adjusted=any(line.get('adjusted') for line in (found['lines'] if found else [])), sri_messages=json.loads(inv['sri_messages'] or '[]'))
-    return {'invoice': inv, 'items': items, 'payments': payments, 'rates': sorted(rates.values(), key=lambda g: g['rate_bp']), 'events': events, 'settings': settings(c)}
+    import banking
+    account = c.execute('SELECT * FROM bank_accounts WHERE id=?', (inv['bank_account_id'],)).fetchone() if inv.get('bank_account_id') else None
+    return {'invoice': inv, 'items': items, 'payments': payments, 'rates': sorted(rates.values(), key=lambda g: g['rate_bp']), 'events': events, 'settings': settings(c),
+            'bank_account': banking.public(account), 'bank_accounts': banking.listing(c, active_only=True)}
 
 
 def listing(c, status='', q=''):

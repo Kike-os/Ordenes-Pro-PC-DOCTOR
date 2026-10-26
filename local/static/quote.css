@@ -46,3 +46,9 @@
 .quote-priority[data-priority=necesario]{color:#ff8a94;border-color:#dc354599;background:#dc35451f}
 .quote-priority[data-priority=obligatorio]{color:#fbbf4a;border-color:#f59e0b99;background:#f59e0b1f}
 .quote-priority[data-priority=opcional]{color:#7dd3fc;border-color:#38bdf899;background:#38bdf81f}
+/* Datos para depósito o transferencia (catálogo central de cuentas). */
+.quote-bank{margin:16px 0;padding:12px 14px;border:1px solid #2b4466;border-radius:12px;background:#0b1628}
+.quote-bank h2{margin:0 0 8px;font-size:15px}
+.quote-bank dl{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,180px),1fr));gap:6px 14px;margin:0 0 10px}
+.quote-bank dl div{display:grid;gap:1px;min-width:0}.quote-bank dt{font-size:12px;opacity:.75}.quote-bank dd{margin:0;font-weight:600;overflow-wrap:anywhere}
+.quote-bank button{width:auto}.quote-bank-note{margin:6px 0 0;font-size:13px;min-height:1em}

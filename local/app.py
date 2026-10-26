@@ -1266,7 +1266,7 @@ class Handler(BaseHTTPRequestHandler):
                     number=re.sub(r'\D','',str(document.get('identification') or ''))
                     live=quotes.active_link(c,quote,quote_page[1],now)
                     return self.reply(200,quote_pdf.render(quotes.detail(c,quote),dict(document,identification=number[:2]+'*'*max(0,len(number)-2) if number else ''),dict(live,url=public_base_url().rstrip('/')+'/presupuesto/'+quote_page[1]) if live else None),'application/pdf',filename=quote['code']+'-PRESUPUESTO.pdf')
-                if quote['status']!='enviado':return self.reply(200,quotes.result_page(quote_page[1],quote,document,quotes.items_of(c,quote['id'])),'text/html; charset=utf-8')
+                if quote['status']!='enviado':return self.reply(200,quotes.result_page(quote_page[1],quote,document,quotes.items_of(c,quote['id']),quotes.bank_html(quotes.bank_for(c,quote))),'text/html; charset=utf-8')
                 if not link['usable']:return self.reply(404,quotes.missing_page(),'text/html; charset=utf-8')
                 return self.reply(200,quotes.identify_page(quote_page[1],quote,document),'text/html; charset=utf-8')
             authorize_page=re.fullmatch(r'/autorizar/([A-Za-z0-9_-]{20,80})(/comprobante\.pdf)?',path)
@@ -1839,6 +1839,28 @@ class Handler(BaseHTTPRequestHandler):
                 if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede ver ADI AutoCare.'})
                 import autocare
                 return self.reply(200,autocare.overview(c,reception_now()))
+            if path=='/api/bank-accounts':
+                # Catálogo central de cuentas bancarias: administración ve todas; el resto, solo las activas (para depósitos).
+                import banking
+                return self.reply(200,{'rows':banking.listing(c,active_only=user['role']!='administrador'),'types':banking.TYPES,'can_manage':user['role']=='administrador'})
+            if path.startswith('/api/cash/'):
+                import cash
+                q=parse_qs(urlsplit(self.path).query);arg=lambda name:(q.get(name,[''])[0] or '')[:40]
+                try:
+                    if path=='/api/cash/day':
+                        owner=int(arg('user')) if arg('user').isdigit() and user['role']=='administrador' else user['id']
+                        return self.reply(200,cash.day_view(c,user,owner,arg('day'),reception_now()))
+                    if path=='/api/cash/history':return self.reply(200,cash.history(c,user,arg('user'),arg('status'),arg('from'),arg('to')))
+                    found=re.fullmatch(r'/api/cash/closings/([0-9]{1,9})/events',path)
+                    if found:
+                        row=c.execute('SELECT user_id FROM cash_closings WHERE id=?',(int(found[1]),)).fetchone()
+                        if not row or (user['role']!='administrador' and row['user_id']!=user['id']):return self.reply(404,{'error':'No encontrado.'})
+                        return self.reply(200,{'events':cash.events(c,int(found[1]))})
+                    found=re.fullmatch(r'/api/cash/deposits/([0-9]{1,9})/file',path)
+                    if found:
+                        name,mime,raw=cash.file_of(c,user,int(found[1]));return self.reply(200,raw,mime,filename=name)
+                except cash.CashError as error:return self.reply(error.status,{'error':str(error),'fields':error.fields})
+                return self.reply(404,{'error':'No encontrado.'})
             if path.startswith('/api/invoicing'):
                 # Facturación electrónica: solo administración. Solo lectura en GET.
                 if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede usar la facturación electrónica.'})
@@ -2335,7 +2357,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(403, {'error':'Solicitud no autorizada.'})
             path = urlsplit(self.path).path
             workspace_post=bool(re.fullmatch(r'/api/orders/[0-9]+/workspace',path));quote_json=bool(re.fullmatch(r'/api/quotes/[0-9]+',path))
-            max_body=9000000 if path in ('/api/clients/import/preview','/api/clients/import/commit') else 1700000 if path=='/api/public/adi/listen' else 6000000 if path in ('/api/mail/send','/api/mail/draft') else 100000 if path in ('/api/conditions','/api/order-draft','/api/conditions/draft','/api/conditions/compare') else 3200000 if path in ('/api/licenses/new','/api/licenses/units','/api/licenses/units/bulk','/api/licenses/check','/api/licenses/products','/api/licenses/products/duplicate','/api/licenses/sales') or re.fullmatch(r'/api/licenses/sales/[0-9]+',path) else 900000 if re.fullmatch(r'/api/orders/[0-9]+/photos',path) or path in ('/api/profile/photo','/api/mail/signature') or re.fullmatch(r'/api/catalog/[0-9]+/image',path) else (65536 if workspace_post or quote_json else 16384)
+            max_body=1700000 if path=='/api/cash/upload' else 9000000 if path in ('/api/clients/import/preview','/api/clients/import/commit') else 1700000 if path=='/api/public/adi/listen' else 6000000 if path in ('/api/mail/send','/api/mail/draft') else 100000 if path in ('/api/conditions','/api/order-draft','/api/conditions/draft','/api/conditions/compare') else 3200000 if path in ('/api/licenses/new','/api/licenses/units','/api/licenses/units/bulk','/api/licenses/check','/api/licenses/products','/api/licenses/products/duplicate','/api/licenses/sales') or re.fullmatch(r'/api/licenses/sales/[0-9]+',path) else 900000 if re.fullmatch(r'/api/orders/[0-9]+/photos',path) or path in ('/api/profile/photo','/api/mail/signature') or re.fullmatch(r'/api/catalog/[0-9]+/image',path) else (65536 if workspace_post or quote_json else 16384)
             length = int(self.headers.get('Content-Length', '0'))
             if length <= 0 or length > max_body:
                 return self.reply(400, {'error':'Solicitud inválida.'})
@@ -2663,6 +2685,47 @@ class Handler(BaseHTTPRequestHandler):
                     for key,value in values.items():c.execute('INSERT INTO auth_policy VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value',(key,value))
                     audit(c,user['id'],'auth_policy_updated')
                     return self.reply(200,{'ok':True})
+                if path=='/api/bank-accounts':
+                    if user['role']!='administrador':return self.reply(403,{'error':'Solo administración gestiona las cuentas bancarias.'})
+                    import banking
+                    now=reception_now();action=str(data.get('action','save'))
+                    try:
+                        if action=='save':banking.save(c,data,user,now)
+                        elif action in ('activate','deactivate'):banking.set_state(c,data.get('id'),action=='activate',user,now)
+                        elif action=='default':banking.set_default(c,data.get('id'),user,now)
+                        else:return self.reply(400,{'error':'Acción inválida.'})
+                    except banking.BankError as error:return self.reply(error.status,{'error':str(error),'fields':error.fields})
+                    audit(c,user['id'],'bank_account_'+action);return self.reply(200,{'ok':True,'rows':banking.listing(c)})
+                if path.startswith('/api/cash/'):
+                    # Caja: cada persona cierra la suya; los depósitos se confirman a mano y solo administración concilia.
+                    import cash
+                    now=reception_now()
+                    try:
+                        if path=='/api/cash/close':
+                            c.commit();c.execute('BEGIN IMMEDIATE');closing=cash.close(c,user,data.get('day'),data,now);c.commit();audit(c,user['id'],'cash_closed',closing)
+                            return self.reply(200,cash.day_view(c,user,user['id'],data.get('day'),now))
+                        if path=='/api/cash/upload':
+                            upload_id=cash.upload_part(c,user,data,now);return self.reply(200,{'ok':True,'upload_id':upload_id})
+                        if path=='/api/cash/deposits':
+                            closing=c.execute('SELECT user_id,day FROM cash_closings WHERE id=?',(str(data.get('closing_id','')),)).fetchone() if str(data.get('closing_id','')).isdigit() else None
+                            if not closing:return self.reply(404,{'error':'Cierre no encontrado.'})
+                            c.commit();c.execute('BEGIN IMMEDIATE');cash.add_deposit(c,user,int(data['closing_id']),data,now);c.commit();audit(c,user['id'],'cash_deposit_added')
+                            return self.reply(200,cash.day_view(c,user,closing['user_id'],closing['day'],now))
+                        found=re.fullmatch(r'/api/cash/deposits/([0-9]{1,9})',path)
+                        if found:
+                            deposit_id=int(found[1]);action=str(data.get('action',''))
+                            if action=='confirm':c.commit();c.execute('BEGIN IMMEDIATE');cash.confirm_deposit(c,user,deposit_id,data,now);c.commit()
+                            elif action=='reconcile':cash.reconcile(c,user,deposit_id,now)
+                            elif action=='void':cash.void(c,user,deposit_id,data.get('reason',''),now)
+                            else:return self.reply(400,{'error':'Acción inválida.'})
+                            audit(c,user['id'],'cash_deposit_'+action,deposit_id)
+                            closing=c.execute('SELECT k.user_id,k.day FROM cash_deposits d JOIN cash_closings k ON k.id=d.closing_id WHERE d.id=?',(deposit_id,)).fetchone()
+                            return self.reply(200,cash.day_view(c,user,closing['user_id'],closing['day'],now))
+                        return self.reply(404,{'error':'No encontrado.'})
+                    except cash.CashError as error:
+                        c.rollback();return self.reply(error.status,{'error':str(error),'fields':error.fields})
+                    except sqlite3.IntegrityError:
+                        c.rollback();return self.reply(409,{'error':'El registro ya existe (por ejemplo, el mismo comprobante en la misma cuenta).'})
                 if path.startswith('/api/invoicing'):
                     # Facturación electrónica (solo ambiente de pruebas). Todas las reglas se comprueban aquí, no en el navegador.
                     if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede usar la facturación electrónica.'})
@@ -2691,6 +2754,8 @@ class Handler(BaseHTTPRequestHandler):
                                 c.commit();c.execute('BEGIN IMMEDIATE')
                                 invoicing.emit(c,invoice_id,user,now);c.commit();audit(c,user['id'],'invoice_emitted_test',invoice_id)
                                 return self.reply(200,invoicing.detail(c,invoice_id))
+                            if action=='bank':
+                                invoicing.set_bank(c,invoice_id,data.get('bank_account_id'),user,now);return self.reply(200,invoicing.detail(c,invoice_id))
                             if action=='discard':
                                 invoicing.discard(c,invoice_id,user,now,str(data.get('reason','')));audit(c,user['id'],'invoice_discarded',invoice_id)
                                 return self.reply(200,invoicing.detail(c,invoice_id))
@@ -3569,6 +3634,14 @@ class Handler(BaseHTTPRequestHandler):
                             quotes.set_execution(c,found,int(data['item']),str(data.get('value','')),user,now);audit(c,user['id'],'quote_item_execution',found['order_id'])
                             return self.reply(200,{'ok':True,'items':quotes.approved_lines(c,quotes.get(c,found['id']))})
                         # Enviar, decidir en nombre del cliente, cancelar y versionar son acciones de administración, siempre registradas.
+                        if action=='bank':
+                            import banking
+                            value=str(data.get('bank_account_id','') or '')
+                            try:account=banking.get(c,value,active=True) if value else None
+                            except banking.BankError as error:return self.reply(error.status,{'error':str(error)})
+                            c.execute('UPDATE quotes SET bank_account_id=?,updated_at=? WHERE id=?',(account['id'] if account else None,now.isoformat(timespec='seconds'),found['id']))
+                            quotes.event(c,found['id'],'cuenta_bancaria',('Cuenta para depósito o transferencia: '+banking.label(account)) if account else 'Sin cuenta bancaria indicada.',now,user)
+                            return self.reply(200,{'ok':True,'quote':quotes.detail(c,quotes.get(c,found['id']))})
                         if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede enviar, decidir o cancelar presupuestos.'})
                         if action in ('version','pending_version'):
                             # «pending_version»: continuación con solo las partidas que el cliente dejó pendientes; lo ya autorizado se conserva.

@@ -8,6 +8,7 @@ import hashlib
 import catalog_icons
 import json
 import re
+import sqlite3
 import secrets
 from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
@@ -450,7 +451,7 @@ def detail(c, quote):
         item['category_label'] = CATEGORIES[item['category']]
         item['execution_label'] = EXECUTION[item['execution']]
     return dict(quote, mail_state=mail_state(c, quote['id']), client_note=client_note(c, quote['id']), status_label=STATUS[quote['status']], editable=quote['status'] in EDITABLE, items=items, totals=totals(items, quote['tax_rate_bp'], quote['discount_bp']), discount_label=DISCOUNTS[quote['discount_bp']],
-                acceptance=dict(acceptance, signed=bool(acceptance['signature'])) if acceptance else None, identity_document=dict(paper) if paper else None, link=dict(link) if link else None,
+                bank_account=bank_for(c, quote), acceptance=dict(acceptance, signed=bool(acceptance['signature'])) if acceptance else None, identity_document=dict(paper) if paper else None, link=dict(link) if link else None,
                 events=[dict(r) for r in c.execute('SELECT event,detail,actor,created_at FROM quote_events WHERE quote_id=? ORDER BY id DESC LIMIT 60', (quote['id'],))])
 
 
@@ -945,7 +946,30 @@ def identify_page(token, quote, order, error=''):
                   % (_summary_block(quote, order), html.escape(token), '<p class="quote-error" role="alert">%s</p>' % html.escape(error) if error else ''))
 
 
-def decision_page(token, passkey, quote, order, items, errors=None, form=None):
+def bank_for(c, quote):
+    """Cuenta para depósito o transferencia del presupuesto: la elegida o, si no se eligió, la predeterminada activa del catálogo."""
+    import banking
+    try:
+        chosen = quote['bank_account_id'] if 'bank_account_id' in quote.keys() else None
+        row = c.execute('SELECT * FROM bank_accounts WHERE id=? AND active=1', (chosen,)).fetchone() if chosen else c.execute('SELECT * FROM bank_accounts WHERE is_default=1 AND active=1').fetchone()
+    except sqlite3.OperationalError:
+        return None  # instalación sin el catálogo de cuentas todavía
+    return banking.public(row)
+
+
+def bank_html(account):
+    """Bloque de la página del cliente con los datos de la cuenta y un botón para copiarlos (texto plano, sin estilos en línea)."""
+    import html
+    if not account:
+        return ''
+    e = html.escape
+    rows = ''.join('<div><dt>%s</dt><dd>%s</dd></div>' % (e(k), e(v)) for k, v in (('Banco', account['bank']), ('Tipo de cuenta', account['type_label']), ('Número de cuenta', account['number']),
+                                                                                  ('Titular', account['holder']), ('RUC / identificación', account['holder_id'])))
+    return ('<section class="quote-bank"><h2>Datos para depósito o transferencia</h2><dl>%s</dl><button type="button" class="quote-secondary" data-copy-bank="%s">Copiar datos bancarios</button>'
+            '<p class="quote-bank-note" data-copy-status role="status"></p></section>') % (rows, e(account['copy_text'], quote=True))
+
+
+def decision_page(token, passkey, quote, order, items, errors=None, form=None, bank=''):
     import html
     e, errors, form = html.escape, errors or {}, form or {}
     summary = totals(items, quote['tax_rate_bp'], quote['discount_bp'])
@@ -967,7 +991,7 @@ def decision_page(token, passkey, quote, order, items, errors=None, form=None):
             '<form class="auth-form quote-form" method="post" action="/presupuesto/%s" autocomplete="off"><input type="hidden" name="passkey" value="%s">'
             '<p class="auth-step">Paso 2 de 2 · Revisa y decide cada servicio</p><div class="quote-bulk"><button type="button" data-quote-all="aprobado">Aprobar todo</button><button type="button" data-quote-all="rechazado">Rechazar todo</button></div>%s%s'
             '<dl class="quote-totals">%s<div><dt>Subtotal con IVA %g %%</dt><dd>%s</dd></div><div><dt>Subtotal tarifa 0 %%</dt><dd>%s</dd></div><div><dt>IVA %g %%</dt><dd>%s</dd></div><div class="quote-total"><dt>Total cotizado</dt><dd>%s</dd></div>'
-            '<div class="quote-chosen"><dt>Total que apruebas</dt><dd data-quote-approved>—</dd></div></dl>'
+            '<div class="quote-chosen"><dt>Total que apruebas</dt><dd data-quote-approved>—</dd></div></dl>' + bank.replace('%', '%%') +
             '<h2>Condiciones de autorización</h2><ul class="quote-conditions">%s</ul>'
             '<label for="name">Nombre completo de quien autoriza</label><input id="name" name="name" maxlength="120" value="%s" required>%s'
             '<label for="comment">Observaciones (opcional)</label><textarea id="comment" name="comment" rows="2" maxlength="600">%s</textarea>%s'
@@ -992,7 +1016,7 @@ def _priority(item):
     return '<span class="quote-priority" data-priority="%s">%s</span>' % (item['priority'], PRIORITIES[item['priority']][0]) if item.get('priority') else ''
 
 
-def result_page(token, quote, order, items):
+def result_page(token, quote, order, items, bank=''):
     import html
     e = html.escape
     summary = totals(items, quote['tax_rate_bp'], quote['discount_bp'])
@@ -1003,14 +1027,16 @@ def result_page(token, quote, order, items):
     if waiting:
         message = 'Registramos tu decisión. Solo se ejecutarán los servicios aprobados. Los que dejaste por decidir (%s) no se realizarán por ahora: el taller te enviará un nuevo presupuesto con ellos.' % usd(summary['pending'])
     extra = '<dl class="quote-totals"><div><dt>Total cotizado</dt><dd>%s</dd></div><div class="quote-total"><dt>Total aprobado</dt><dd>%s</dd></div><div><dt>Importe rechazado</dt><dd>%s</dd></div></dl>' % (e(usd(summary['quoted'])), e(usd(summary['approved'])), e(usd(summary['rejected']))) if quote['status'] in ('aprobado', 'parcial', 'rechazado') else ''
-    return _shell('Presupuesto ' + quote['code'], '<section class="tracking-card quote-card">%s<p class="tracking-state quote-state" data-status="%s">%s</p><p>%s</p><ul class="quote-result">%s</ul>%s</section>' % (_summary_block(quote, order), e(quote['status']), e(STATUS[quote['status']]), e(message), lines, extra))
+    # Datos bancarios solo si queda algo aprobado por pagar (no en rechazados, cancelados ni modificaciones).
+    payable = bank if quote['status'] in ('aprobado', 'parcial') else ''
+    return _shell('Presupuesto ' + quote['code'], '<section class="tracking-card quote-card">%s<p class="tracking-state quote-state" data-status="%s">%s</p><p>%s</p><ul class="quote-result">%s</ul>%s%s</section>' % (_summary_block(quote, order), e(quote['status']), e(STATUS[quote['status']]), e(message), lines, extra, payable))
 
 
 def handle(c, token, quote, link, order, form, now, origin):
     """Atiende el formulario del enlace. Devuelve (página HTML, estado nuevo o None)."""
     items = items_of(c, quote['id'])
     if quote['status'] != 'enviado' or not link['usable']:
-        return (result_page(token, quote, order, items) if quote['status'] != 'enviado' else missing_page()), None
+        return (result_page(token, quote, order, items, bank_html(bank_for(c, quote))) if quote['status'] != 'enviado' else missing_page()), None
     passkey = str(form.get('passkey', ''))
     if not passkey:
         # Paso 1: comprobación de identidad. Al acertar se emite una llave de un solo uso para el paso 2 (treinta minutos).
@@ -1018,7 +1044,7 @@ def handle(c, token, quote, link, order, form, now, origin):
             return identify_page(token, quote, order, 'Los dígitos no coinciden con la identificación registrada.'), None
         passkey = secrets.token_urlsafe(24)
         c.execute('UPDATE quote_links SET verified_at=?,passkey_hash=?,failed=0 WHERE id=?', (now.isoformat(timespec='seconds'), digest(passkey), link['id']))
-        return decision_page(token, passkey, quote, order, items), None
+        return decision_page(token, passkey, quote, order, items, bank=bank_html(bank_for(c, quote))), None
     if not valid_passkey(link, passkey, now):
         return identify_page(token, quote, order, 'La comprobación de identidad caducó. Vuelve a escribir los cuatro dígitos.'), None
     try:
@@ -1026,8 +1052,8 @@ def handle(c, token, quote, link, order, form, now, origin):
     except QuoteError as error:
         if not error.fields:
             return identify_page(token, quote, order, str(error)), None
-        return decision_page(token, passkey, quote, order, items, error.fields, form), None
-    return result_page(token, get(c, quote['id']), order, items_of(c, quote['id'])), status
+        return decision_page(token, passkey, quote, order, items, error.fields, form, bank_html(bank_for(c, quote))), None
+    return result_page(token, get(c, quote['id']), order, items_of(c, quote['id']), bank_html(bank_for(c, quote))), status
 
 
 def valid_passkey(link, passkey, now):

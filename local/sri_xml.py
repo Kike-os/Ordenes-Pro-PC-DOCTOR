@@ -89,7 +89,7 @@ def invoice_xml(settings, invoice, items, payments):
                                                             _tag('precioUnitario', micros(item['unit_price_micros'])), _tag('descuento', money(item['discount_cents'])),
                                                             _tag('precioTotalSinImpuesto', money(item['base_cents'])), tax))
     extra = []
-    for name, value in (('Correo', inv.get('buyer_email')), ('Teléfono', inv.get('buyer_phone')), ('Orden', inv.get('reference'))):
+    for name, value in (('Correo', inv.get('buyer_email')), ('Teléfono', inv.get('buyer_phone')), ('Orden', inv.get('reference')), ('Cuenta para depósito', inv.get('bank_info'))):
         if value:
             extra.append('<campoAdicional nombre=%s>%s</campoAdicional>' % (quoteattr(name), escape(str(value)[:300])))
     return ('<?xml version="1.0" encoding="UTF-8"?>\n<factura id="comprobante" version="1.1.0"><infoTributaria>' + ''.join(head) + '</infoTributaria><infoFactura>' + ''.join(info)
