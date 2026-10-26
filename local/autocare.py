@@ -528,7 +528,7 @@ def overview(c, now):
     # Un reintento individual posterior a la última verificación completa sustituye el estado de ese servicio (con quién y cuándo).
     latest = {}
     for item in stability._load(c, 'stability_rechecks', []):
-        if last and item['at'] > last['at'] and item['version'] == status['version']:
+        if last and item['at'] >= last['at'] and item['version'] == status['version']:
             latest[item['result']['code']] = item
     for service in services:
         again = latest.get(service['code'])

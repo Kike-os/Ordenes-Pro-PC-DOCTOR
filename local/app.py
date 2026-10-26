@@ -1839,6 +1839,25 @@ class Handler(BaseHTTPRequestHandler):
                 if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede ver ADI AutoCare.'})
                 import autocare
                 return self.reply(200,autocare.overview(c,reception_now()))
+            if path.startswith('/api/invoicing'):
+                # Facturación electrónica: solo administración. Solo lectura en GET.
+                if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede usar la facturación electrónica.'})
+                import invoicing
+                q=parse_qs(urlsplit(self.path).query);arg=lambda name:(q.get(name,[''])[0] or '')[:80]
+                try:
+                    if path=='/api/invoicing':return self.reply(200,invoicing.listing(c,arg('status') if arg('status') in invoicing.STATUS else '',arg('q')))
+                    if path=='/api/invoicing/settings':return self.reply(200,{'settings':invoicing.settings(c),'regimes':invoicing.REGIMES})
+                    if path=='/api/invoicing/eligibility':
+                        if arg('kind') not in ('orden','venta_licencia') or not arg('id').isdigit():return self.reply(400,{'error':'Solicitud inválida.'})
+                        return self.reply(200,invoicing.eligibility(c,arg('kind'),int(arg('id'))))
+                    found=re.fullmatch(r'/api/invoicing/([0-9]{1,9})(/comprobante\.xml)?',path)
+                    if found and found[2]:
+                        row=c.execute('SELECT access_key,xml_unsigned FROM invoices WHERE id=?',(int(found[1]),)).fetchone()
+                        if not row or not row['xml_unsigned']:return self.reply(404,{'error':'La factura todavía no tiene XML.'})
+                        return self.reply(200,row['xml_unsigned'],'application/xml; charset=utf-8',filename=row['access_key']+'.xml')
+                    if found:return self.reply(200,invoicing.detail(c,int(found[1])))
+                except invoicing.InvoiceError as error:return self.reply(error.status,{'error':str(error),'fields':error.fields})
+                return self.reply(404,{'error':'No encontrado.'})
             if path == '/api/autocare/history.csv':
                 # Exportación del historial técnico con los mismos filtros del panel. Sin contraseñas, claves, tokens ni datos personales.
                 if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede usar ADI AutoCare.'})
@@ -2644,6 +2663,41 @@ class Handler(BaseHTTPRequestHandler):
                     for key,value in values.items():c.execute('INSERT INTO auth_policy VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value',(key,value))
                     audit(c,user['id'],'auth_policy_updated')
                     return self.reply(200,{'ok':True})
+                if path.startswith('/api/invoicing'):
+                    # Facturación electrónica (solo ambiente de pruebas). Todas las reglas se comprueban aquí, no en el navegador.
+                    if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede usar la facturación electrónica.'})
+                    import invoicing
+                    now=reception_now()
+                    try:
+                        if path=='/api/invoicing/settings':
+                            saved=invoicing.save_settings(c,data,user,now);audit(c,user['id'],'invoicing_settings');return self.reply(200,{'ok':True,'settings':saved})
+                        if path=='/api/invoicing/draft':
+                            kind=str(data.get('kind',''));sid=str(data.get('id',''))
+                            if kind not in ('orden','venta_licencia') or not sid.isdigit():return self.reply(400,{'error':'Solicitud inválida.'})
+                            c.commit();c.execute('BEGIN IMMEDIATE')
+                            invoice_id=invoicing.draft(c,kind,int(sid),user,now);c.commit();audit(c,user['id'],'invoice_draft',invoice_id)
+                            return self.reply(200,invoicing.detail(c,invoice_id))
+                        found=re.fullmatch(r'/api/invoicing/([0-9]{1,9})',path)
+                        if found:
+                            invoice_id=int(found[1]);action=str(data.get('action',''))
+                            if action=='buyer':
+                                try:invoicing.set_buyer(c,invoice_id,data,user,now)
+                                except invoicing.InvoiceError as error:
+                                    c.commit()  # el comprador queda guardado aunque falte algún dato; la emisión lo vuelve a exigir
+                                    return self.reply(error.status,{'error':str(error),'fields':error.fields,**invoicing.detail(c,invoice_id)})
+                                return self.reply(200,invoicing.detail(c,invoice_id))
+                            if action=='emit':
+                                if str(data.get('confirm',''))!='1':return self.reply(400,{'error':'Confirma la emisión antes de continuar.'})
+                                c.commit();c.execute('BEGIN IMMEDIATE')
+                                invoicing.emit(c,invoice_id,user,now);c.commit();audit(c,user['id'],'invoice_emitted_test',invoice_id)
+                                return self.reply(200,invoicing.detail(c,invoice_id))
+                            if action=='discard':
+                                invoicing.discard(c,invoice_id,user,now,str(data.get('reason','')));audit(c,user['id'],'invoice_discarded',invoice_id)
+                                return self.reply(200,invoicing.detail(c,invoice_id))
+                            return self.reply(400,{'error':'Acción inválida.'})
+                        return self.reply(404,{'error':'No encontrado.'})
+                    except invoicing.InvoiceError as error:
+                        c.rollback();return self.reply(error.status,{'error':str(error),'fields':error.fields})
                 if path in ('/api/autocare/diagnose','/api/autocare/settings','/api/autocare/review','/api/autocare/diagnose/start','/api/autocare/diagnose/step','/api/autocare/incident','/api/autocare/check','/api/autocare/action'):
                     if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede usar ADI AutoCare.'})
                     import autocare,stability
