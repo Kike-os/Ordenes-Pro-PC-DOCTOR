@@ -12,6 +12,7 @@ no borra información, no reinicia servicios ni cambia código. Las correcciones
 (rama de pruebas, batería completa, aprobación administrativa y publicación), y la reversión se hace desde Vercel.
 """
 import hashlib
+import http.client
 import json
 import secrets
 import re
@@ -161,6 +162,11 @@ def classify(method, path, error):
     import sqlite3
     name = type(error).__name__
     module = module_of(path)
+    origin = error.__cause__ or error.__context__
+    if isinstance(error, sqlite3.OperationalError) and isinstance(origin, (OSError, http.client.HTTPException)):
+        # Red entre el servidor y la base remota (conexión cortada o sin respuesta), no una consulta errónea: la operación se reintentó
+        # y no confirmó nada a medias.
+        return 'crítica', 'Base de datos remota: conexión cortada o sin respuesta (' + type(origin).__name__ + ') tras reintentar; no se guardó nada a medias.'
     if isinstance(error, (sqlite3.DatabaseError,)) or 'remote' in name.lower() or name in ('IntegrityError', 'OperationalError'):
         return 'crítica', 'Base de datos: la operación no se pudo leer o guardar (' + name + ').'
     if module == 'Autenticación':

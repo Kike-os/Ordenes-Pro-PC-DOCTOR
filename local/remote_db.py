@@ -19,6 +19,12 @@ CHUNK = 100
 # inactivas (en producción falló tras 7 y 12 s esperando al servidor de correo): pasado este plazo se abre una conexión nueva antes
 # de enviar. Es seguro también dentro de una transacción, porque el «baton» identifica el flujo, no la conexión TCP.
 IDLE_REUSE = 3.0
+# Lecturas sueltas y primer envío de una transacción (no pueden duplicar una escritura): hasta tres intentos, con una pausa breve y
+# conexión nueva en cada reintento, dentro de un plazo total menor que el límite de 30 s de la función en Vercel. Cada intento espera
+# como mucho RETRY_TIMEOUT sin respuesta: una conexión medio cerrada no consume todo el plazo (INC-20261026-001 y 002).
+RETRY_DEADLINE = 22.0
+RETRY_TIMEOUT = 8.0
+RETRY_PAUSES = (0.3, 1.0)
 _pool = threading.local()
 
 
@@ -336,31 +342,52 @@ def _post(secure, host, token, body, retry):
     if token:
         headers['Authorization'] = 'Bearer ' + token
     data = json.dumps(body).encode('utf-8')
-    for attempt in (1, 2):
-        connection = connections.get((secure, host))
-        if connection is not None and time.monotonic() - used.get((secure, host), 0) > IDLE_REUSE:
+    key = (secure, host)
+    started = time.monotonic()
+    attempts = 1 + len(RETRY_PAUSES) if retry else 1
+    for attempt in range(1, attempts + 1):
+        left = RETRY_DEADLINE - (time.monotonic() - started)
+        connection = connections.get(key)
+        # Inactividad medida con los dos relojes: si la función estuvo congelada entre peticiones, el reloj monotónico puede no avanzar
+        # y una conexión que el servidor ya cerró parecería recién usada.
+        last = used.get(key, (0.0, 0.0))
+        if connection is not None and max(time.monotonic() - last[0], time.time() - last[1]) > IDLE_REUSE:
             # Inactiva demasiado tiempo: el servidor pudo cerrarla. Se abre otra antes de enviar (no es un reintento).
             connection.close()
-            connections.pop((secure, host), None)
+            connections.pop(key, None)
             connection = None
-        reused = connection is not None
-        if not reused:
+        if connection is None:
             kind = http.client.HTTPSConnection if secure else http.client.HTTPConnection
-            connection = connections[(secure, host)] = kind(host, timeout=TIMEOUT)
+            connection = connections[key] = kind(host, timeout=TIMEOUT)
+        # Las peticiones que no se repiten conservan el plazo completo; las que sí, un plazo por intento para que quepa el reintento.
+        limit = min(RETRY_TIMEOUT, max(left, 1.0)) if retry else TIMEOUT
+        connection.timeout = limit
+        if connection.sock is not None:
+            connection.sock.settimeout(limit)
+        last_try = attempt == attempts
         try:
             connection.request('POST', '/v2/pipeline', body=data, headers=headers)
             response = connection.getresponse()
             raw = response.read()
         except (OSError, http.client.HTTPException) as error:
             connection.close()
-            connections.pop((secure, host), None)
+            connections.pop(key, None)
             # Solo se reintenta lo que no puede duplicar una escritura: lecturas sueltas y el primer envío de una transacción.
-            if retry and attempt == 1:
+            if not last_try and _pause(attempt, started):
                 continue
             raise sqlite3.OperationalError('No se pudo contactar la base de datos remota.') from error
-        used[(secure, host)] = time.monotonic()
-        if response.status in (502, 503, 504) and retry and attempt == 1:
+        used[key] = (time.monotonic(), time.time())
+        if response.status in (502, 503, 504) and not last_try and _pause(attempt, started):
             continue
         if response.status != 200:
             raise sqlite3.OperationalError(f'La base de datos remota respondió HTTP {response.status}.')
         return json.loads(raw)
+
+
+def _pause(attempt, started):
+    """Pausa antes del reintento `attempt`+1. False si ya no queda plazo para otro intento útil (se informa el error)."""
+    pause = RETRY_PAUSES[attempt - 1]
+    if RETRY_DEADLINE - (time.monotonic() - started) - pause < 2.0:
+        return False
+    time.sleep(pause)
+    return True

@@ -50,6 +50,7 @@ class FakeLibsql:
         self.streams, self.used, self.lock = {}, {}, threading.Lock()
         self.requests = 0
         self.fail_next = 0  # Respuestas que se cortan sin contestar (simula una caída de red en mitad de la petición).
+        self.hang_next, self.hang_seconds = 0, 0.0  # Peticiones que quedan sin respuesta `hang_seconds` y luego se cortan (servidor colgado).
         server = self
 
         class Handler(http.server.BaseHTTPRequestHandler):
@@ -62,6 +63,11 @@ class FakeLibsql:
             def do_POST(self):
                 raw = self.rfile.read(int(self.headers.get('Content-Length') or 0))
                 server.requests += 1
+                if server.hang_next:
+                    server.hang_next -= 1
+                    time.sleep(server.hang_seconds)
+                    self.close_connection = True
+                    return
                 if server.fail_next:
                     server.fail_next -= 1
                     self.close_connection = True

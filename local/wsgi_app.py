@@ -7,6 +7,7 @@ import json
 import re
 import logging
 import os
+import sqlite3
 import sys
 from email.message import Message
 from http import HTTPStatus
@@ -67,14 +68,20 @@ def application(environ, start_response):
         else:
             handler.reply(405, {'error': 'Método no permitido.'})
             handler.response_headers.append(('Allow', 'GET, HEAD, POST'))
-    except Exception:
+    except Exception as error:
         logging.getLogger(__name__).exception("Error WSGI: %s %s", method, path)
+        # Base de datos momentáneamente inaccesible (ya se reintentó): 503 con Retry-After, como en POST. La consulta no cambió nada y
+        # los sondeos periódicos (agenda, notificaciones) vuelven a intentarlo solos; no es un fallo del servidor (500).
+        busy = isinstance(error, sqlite3.OperationalError)
         try:
-            import app as application
-            application.note_runtime_error(method, path, sys.exc_info()[1])
+            core.note_runtime_error(method, path, error, status=503 if busy else 500)
         except Exception:
             pass
-        handler.reply(500, {'error': 'No se pudo completar la operación.'})
+        if busy:
+            handler.reply(503, {'error': 'No se pudo consultar por un problema temporal de base de datos. Intente nuevamente en unos segundos.'})
+            handler.response_headers.append(('Retry-After', '5'))
+        else:
+            handler.reply(500, {'error': 'No se pudo completar la operación.'})
     start_response(handler.response_status, handler.response_headers)
     return [b'' if method == 'HEAD' else handler.response_body]
 
