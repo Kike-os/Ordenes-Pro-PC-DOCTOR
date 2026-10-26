@@ -1861,13 +1861,30 @@ class Handler(BaseHTTPRequestHandler):
                         name,mime,raw=cash.file_of(c,user,int(found[1]));return self.reply(200,raw,mime,filename=name)
                 except cash.CashError as error:return self.reply(error.status,{'error':str(error),'fields':error.fields})
                 return self.reply(404,{'error':'No encontrado.'})
+            if path.startswith('/api/inventory'):
+                # Inventario, proveedores y compras: solo administración. Solo lectura en GET.
+                if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede ver el inventario.'})
+                import inventory
+                q=parse_qs(urlsplit(self.path).query);arg=lambda name:(q.get(name,[''])[0] or '')[:80]
+                try:
+                    if path=='/api/inventory':return self.reply(200,inventory.overview(c,reception_now(),arg('q')))
+                    if path=='/api/inventory/suppliers':return self.reply(200,{'rows':inventory.suppliers(c)})
+                    if path=='/api/inventory/purchases':return self.reply(200,{'rows':inventory.purchases(c,arg('status')),'statuses':inventory.PURCHASE_STATUS})
+                    found=re.fullmatch(r'/api/inventory/items/([0-9]{1,9})/movements',path)
+                    if found:return self.reply(200,inventory.movements(c,found[1]))
+                    found=re.fullmatch(r'/api/inventory/purchases/([0-9]{1,9})',path)
+                    if found:return self.reply(200,inventory.purchase_detail(c,found[1]))
+                except inventory.InventoryError as error:return self.reply(error.status,{'error':str(error),'fields':error.fields})
+                return self.reply(404,{'error':'No encontrado.'})
             if path.startswith('/api/invoicing'):
                 # Facturación electrónica: solo administración. Solo lectura en GET.
                 if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede usar la facturación electrónica.'})
                 import invoicing
                 q=parse_qs(urlsplit(self.path).query);arg=lambda name:(q.get(name,[''])[0] or '')[:80]
                 try:
-                    if path=='/api/invoicing':return self.reply(200,invoicing.listing(c,arg('status') if arg('status') in invoicing.STATUS else '',arg('q')))
+                    if path=='/api/invoicing':
+                        import inventory
+                        return self.reply(200,{**invoicing.listing(c,arg('status') if arg('status') in invoicing.STATUS else '',arg('q')),'inventory_alerts':inventory.alert_count(c)})
                     if path=='/api/invoicing/settings':return self.reply(200,{'settings':invoicing.settings(c),'regimes':invoicing.REGIMES})
                     if path=='/api/invoicing/eligibility':
                         if arg('kind') not in ('orden','venta_licencia') or not arg('id').isdigit():return self.reply(400,{'error':'Solicitud inválida.'})
@@ -2726,6 +2743,43 @@ class Handler(BaseHTTPRequestHandler):
                         c.rollback();return self.reply(error.status,{'error':str(error),'fields':error.fields})
                     except sqlite3.IntegrityError:
                         c.rollback();return self.reply(409,{'error':'El registro ya existe (por ejemplo, el mismo comprobante en la misma cuenta).'})
+                if path.startswith('/api/inventory'):
+                    # Inventario: cada operación en una transacción exclusiva, para que dos salidas simultáneas no dejen existencias negativas.
+                    if user['role']!='administrador':return self.reply(403,{'error':'Solo administración gestiona el inventario.'})
+                    import inventory
+                    now=reception_now();action=str(data.get('action',''))
+                    try:
+                        c.commit();c.execute('BEGIN IMMEDIATE')
+                        if path=='/api/inventory/items':
+                            if action=='save':result={'id':inventory.save_item(c,data,user,now)}
+                            elif action in ('activate','deactivate'):inventory.set_active(c,data.get('id'),action=='activate',user,now);result={}
+                            elif action=='move':
+                                direction=1 if str(data.get('direction',''))=='in' else -1 if str(data.get('direction',''))=='out' else 0
+                                if not direction:c.rollback();return self.reply(400,{'error':'Indica si es entrada o salida.'})
+                                reason=str(data.get('reason',''))
+                                if reason not in (inventory.MANUAL_IN if direction==1 else inventory.MANUAL_OUT):c.rollback();return self.reply(400,{'error':'Motivo no válido.','fields':{'reason':'Motivo no válido.'}})
+                                key=str(data.get('request_key',''))[:64] or None
+                                result={'movement':inventory.move(c,data.get('id'),direction,reason,data.get('quantity'),data.get('cost','0') or '0',user,now,note=data.get('note',''),request_key=key)}
+                            else:c.rollback();return self.reply(400,{'error':'Acción inválida.'})
+                        elif path=='/api/inventory/suppliers':
+                            if action=='save':result={'id':inventory.save_supplier(c,data,user,now)}
+                            elif action in ('activate','deactivate'):inventory.set_supplier_active(c,data.get('id'),action=='activate',user,now);result={}
+                            else:c.rollback();return self.reply(400,{'error':'Acción inválida.'})
+                        elif path=='/api/inventory/purchases':
+                            if action!='save':c.rollback();return self.reply(400,{'error':'Acción inválida.'})
+                            result={'id':inventory.save_purchase(c,data,user,now)}
+                        elif re.fullmatch(r'/api/inventory/purchases/([0-9]{1,9})',path):
+                            purchase_id=path.rsplit('/',1)[1]
+                            if action=='receive':inventory.receive(c,purchase_id,user,now)
+                            elif action=='void':inventory.void_purchase(c,purchase_id,data.get('reason',''),user,now)
+                            else:c.rollback();return self.reply(400,{'error':'Acción inválida.'})
+                            result={'id':int(purchase_id)}
+                        else:c.rollback();return self.reply(404,{'error':'No encontrado.'})
+                        c.commit();audit(c,user['id'],'inventory_'+(action or 'save'));return self.reply(200,{'ok':True,**result})
+                    except inventory.InventoryError as error:
+                        c.rollback();return self.reply(error.status,{'error':str(error),'fields':error.fields})
+                    except sqlite3.IntegrityError:
+                        c.rollback();return self.reply(409,{'error':'El registro ya existe (por ejemplo, el mismo documento ya movió este artículo).'})
                 if path.startswith('/api/invoicing'):
                     # Facturación electrónica (solo ambiente de pruebas). Todas las reglas se comprueban aquí, no en el navegador.
                     if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede usar la facturación electrónica.'})

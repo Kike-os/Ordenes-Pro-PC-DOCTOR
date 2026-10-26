@@ -64,9 +64,25 @@ Están en Facturación → «Cuentas bancarias» y en Caja → «Cuentas bancari
 - **Comprobantes de 5 MB en Vercel:** la plataforma no admite peticiones de más de 4,5 MB. Por eso el archivo viaja **por partes** de unos 1,4 MB. El servidor las recompone y verifica el tamaño (5 MB como máximo), el tipo **real** por su firma de bytes y la huella SHA-256. Las partes se borran al completarse.
 - **Historial de cierres** con filtros por persona (administración), estado de los depósitos y fechas, más el historial inmutable de cada cierre (`cash_events`).
 
+## Inventario, compras y proveedores (Facturación, solo administración)
+- **Artículos:** se incorporan desde el catálogo (categorías «Repuesto» y «Otro»), como producto, repuesto o accesorio, con código interno opcional y único, existencia mínima y ubicación. No se eliminan: se desactivan.
+- **Existencias = suma de movimientos.** Los movimientos no se modifican ni se eliminan; una corrección es otro movimiento.
+  - **Entradas:** existencia inicial, compra, devolución del cliente y ajuste.
+  - **Salidas:** venta, uso en una orden, devolución al proveedor, ajuste y baja.
+  - Una salida **nunca deja existencias negativas**: se comprueba en una transacción exclusiva.
+  - Un reintento con la misma clave no duplica el movimiento. Un mismo documento no mueve dos veces el mismo artículo (índice único).
+- **Alertas:** un artículo activo en su mínimo o por debajo aparece en el aviso del inventario y en el contador de la pestaña.
+- **Costo promedio** ponderado de las entradas con costo, y valor del inventario al costo.
+- **Licencias digitales:** se muestran en **solo lectura** (disponibles, reservadas y entregadas). Se gestionan en el módulo Licencias.
+- **Proveedores:** RUC o cédula validados y sin repetir. No se eliminan: se desactivan.
+- **Compras:** Borrador → **Recibida** (registra las entradas una sola vez) → Anulada.
+  - El mismo documento del mismo proveedor no se registra dos veces, salvo que la compra anterior esté anulada.
+  - Anular una compra recibida registra la salida de lo que entró. Si ya se usó parte y no alcanzan las existencias, se rechaza sin dejar nada a medias.
+
 ## Migraciones (solo aditivas)
 - `070_electronic_invoicing.sql`: configuración fiscal, secuenciales, facturas, partidas, formas de pago y eventos.
 - `071_bank_accounts_cash_closing.sql`: cuentas bancarias, cierres, depósitos, archivos, partes de subida, eventos, y las columnas `quotes.bank_account_id` e `invoices.bank_account_id`.
+- `072_inventory_purchases.sql`: artículos de inventario, movimientos, proveedores, compras, partidas y eventos.
 
 No modifican datos existentes. En producción, Vercel no ejecuta `migrate()`: habrá que aplicarlas con respaldo previo y transacción corta, solo cuando se autorice la publicación.
 
@@ -77,10 +93,11 @@ No modifican datos existentes. En producción, Vercel no ejecuta `migrate()`: ha
 | Producción | ordenes-pro.ecuadorpcdoctor.com | `main` | Turso (no se toca) |
 | Sistema local | 127.0.0.1:8010 | `main` | `local/var/ordenes.sqlite3` |
 | Copia aislada (protegida) | 127.0.0.2:8011 | `main` | `~/OrdenesPro-CopiaLocal` |
-| **Desarrollo** | **127.0.0.3:8012** | **rama** (`~/Work/OrdenesPro-facturacion`) | `~/OrdenesPro-Desarrollo` (con las migraciones 070 y 071) |
+| **Desarrollo** | **127.0.0.3:8012** | **rama** (`~/Work/OrdenesPro-facturacion`) | `~/OrdenesPro-Desarrollo` (con las migraciones 070 a 072) |
 
 ## Pendiente (no implementado)
 - Firma XAdES-BES y envío al SRI de **certificación**: requiere el certificado .p12, las librerías `cryptography` y `lxml` y una autorización expresa.
 - Factura A4 (RIDE en PDF) y ticket térmico de 80 mm (revisar antes `docs/TICKET-TERMICO.md`).
-- Botón de factura en las ventas de licencias, notas de crédito, envío por Mail Pro y control de existencias físicas.
+- Botón de factura en las ventas de licencias, notas de crédito, proformas con aprobación del cliente y envío por Mail Pro.
+- Descontar existencias automáticamente al facturar o al usar repuestos en una orden (hoy la salida se registra a mano).
 - Confirmar con el contador las formas de pago del SRI (tarjeta de crédito, código 19, o de débito, 16) y el tratamiento de los anticipos.

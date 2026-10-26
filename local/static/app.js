@@ -4757,12 +4757,15 @@ function invoiceTestBanner(settings){const box=el('div',undefined,'inv-banner'),
  const copy=el('div');copy.append(el('strong','Ambiente de PRUEBAS · emisión real desactivada'),el('small',settings?.emission?.note||'Los comprobantes solo se preparan para el ambiente de pruebas del SRI.'));box.append(mark,copy);return box;}
 async function renderInvoicing(){const root=$('module-content');let data;try{data=await api('/api/invoicing?'+new URLSearchParams({status:invoiceState.status,q:invoiceState.q}));}catch(error){root.replaceChildren(el('p',error.message,'empty-module'));return;}
  const wrap=el('div',undefined,'inv-module'),tabs=el('div',undefined,'inv-tabs'),panel=el('div',undefined,'inv-panel');tabs.setAttribute('role','tablist');
- for(const[key,label]of [['facturas','Facturas'],['fiscal','Datos fiscales'+(data.settings.missing.length?' ('+data.settings.missing.length+' pendientes)':'')],['cuentas','Cuentas bancarias']]){const t=button(label,()=>{invoiceState.tab=key;renderInvoicing();},'inv-tab');t.setAttribute('role','tab');t.setAttribute('aria-selected',String(invoiceState.tab===key));tabs.append(t);}
+ for(const[key,label]of [['facturas','Facturas'],['inventario','Inventario'+(data.inventory_alerts?' ('+data.inventory_alerts+(data.inventory_alerts===1?' alerta)':' alertas)'):'')],['compras','Compras'],['proveedores','Proveedores'],['cuentas','Cuentas bancarias'],['fiscal','Datos fiscales'+(data.settings.missing.length?' ('+data.settings.missing.length+' pendientes)':'')]]){const t=button(label,()=>{invoiceState.tab=key;renderInvoicing();},'inv-tab');t.setAttribute('role','tab');t.setAttribute('aria-selected',String(invoiceState.tab===key));tabs.append(t);}
  wrap.append(invoiceTestBanner(data.settings));
  if(data.settings.missing.length&&invoiceState.tab==='facturas'){const warn=el('p','Faltan datos fiscales para emitir: '+data.settings.missing.join(', ')+'. Complétalos en «Datos fiscales».','inv-warn');wrap.append(warn);}
  wrap.append(tabs,panel);root.replaceChildren(wrap);
  if(invoiceState.tab==='fiscal'){invoiceSettingsForm(panel);return;}
  if(invoiceState.tab==='cuentas'){bankAccountsPanel(panel);return;}
+ if(invoiceState.tab==='inventario'){inventoryPanel(panel);return;}
+ if(invoiceState.tab==='compras'){purchasesPanel(panel);return;}
+ if(invoiceState.tab==='proveedores'){suppliersPanel(panel);return;}
  const bar=el('div',undefined,'inv-bar'),search=el('input');search.type='search';search.placeholder='Buscar por cliente, identificación, orden o clave de acceso';search.value=invoiceState.q;search.maxLength=80;search.setAttribute('aria-label','Buscar facturas');
  let typing=null;search.addEventListener('input',()=>{clearTimeout(typing);typing=setTimeout(()=>{invoiceState.q=search.value.trim();renderInvoicing().then(()=>{const again=$('module-content').querySelector('.inv-bar input');again?.focus();again?.setSelectionRange(again.value.length,again.value.length);});},350);});
  const filters=el('div',undefined,'inv-filters');filters.setAttribute('role','group');filters.setAttribute('aria-label','Filtrar por estado');
@@ -4880,6 +4883,145 @@ async function bankAccountsPanel(panel){panel.replaceChildren(el('p','Cargando c
 // Factura: cuenta para depósito o transferencia (solo antes del envío al SRI).
 function invoiceBankBlock(dialog,body,data){const inv=data.invoice,editable=['borrador','pendiente'].includes(inv.status);
  return bankPicker({current:data.bank_account,accounts:data.bank_accounts||[],note:'Se muestra en las instrucciones de pago y en la información adicional del comprobante.',save:editable?async value=>{const fresh=await api('/api/invoicing/'+inv.id,{action:'bank',bank_account_id:value});data.bank_account=fresh.bank_account;}:null});}
+// ---- Inventario, compras y proveedores (centro de Facturación, solo administración) ----
+// Las existencias, los mínimos y las reglas (sin negativos, un movimiento por documento) los controla el servidor.
+let inventoryState={q:'',alerts:false,purchases:''};
+const invKey=prefix=>prefix+'-'+Date.now().toString(36)+Math.random().toString(36).slice(2,10);
+function invForm(className){const form=el('form',undefined,className),msg=el('p','','inv-form-message');msg.setAttribute('role','alert');form.noValidate=true;
+ const field=(name,label,{type='text',max=120,options=null,hint='',mode='',value='',area=false}={})=>{const box=el('label',undefined,'inv-field');let input;
+  if(options){input=el('select');for(const[v,t]of options)input.add(new Option(t,v));}else if(area){input=el('textarea');input.rows=2;input.maxLength=max;}else{input=el('input');input.type=type;input.maxLength=max;if(mode)input.inputMode=mode;}
+  input.name=name;input.value=value;box.append(el('span',label),input);if(hint)box.append(el('small',hint));form.append(box);return input;};
+ const fail=error=>{msg.textContent=error.message+' '+Object.values(error.fields||{}).join(' ');for(const name of Object.keys(error.fields||{}))form.elements[name]?.setAttribute('aria-invalid','true');};
+ const clear=()=>{msg.textContent='';form.querySelectorAll('[aria-invalid]').forEach(n=>n.removeAttribute('aria-invalid'));};
+ return{form,msg,field,fail,clear};}
+async function inventoryPanel(panel){panel.replaceChildren(el('p','Cargando inventario…','empty-module'));let data;
+ try{data=await api('/api/inventory?'+new URLSearchParams({q:inventoryState.q}));}catch(error){panel.replaceChildren(el('p',error.message,'empty-module'));return;}
+ panel.replaceChildren();const t=data.totals,cards=el('div',undefined,'cash-cards'),card=(label,value,kind)=>{const c=el('div',undefined,'cash-card');if(kind)c.dataset.kind=kind;c.append(el('small',label),el('strong',value));cards.append(c);};
+ card('Artículos activos',String(t.items));card('Unidades en existencia',String(t.units));card('Valor al costo promedio',quoteMoney(t.value_cents),'cash');card('Alertas de existencias',String(t.alerts),t.alerts?'warn':'');panel.append(cards);
+ if(data.alerts.length){const box=el('div',undefined,'stock-alerts');box.setAttribute('role','status');box.append(el('strong',data.alerts.length===1?'1 artículo en el mínimo o por debajo':data.alerts.length+' artículos en el mínimo o por debajo'));
+  const ul=el('ul');for(const a of data.alerts)ul.append(el('li',a.name+' · '+(a.stock<=0?'agotado':'quedan '+a.stock)+' (mínimo '+a.min_stock+')'));box.append(ul);panel.append(box);}
+ const bar=el('div',undefined,'inv-bar'),search=el('input');search.type='search';search.placeholder='Buscar por nombre, código, tipo o ubicación';search.value=inventoryState.q;search.maxLength=80;search.setAttribute('aria-label','Buscar en el inventario');
+ let typing=null;search.addEventListener('input',()=>{clearTimeout(typing);typing=setTimeout(()=>{inventoryState.q=search.value.trim();inventoryPanel(panel).then(()=>{const again=panel.querySelector('.inv-bar input');again?.focus();again?.setSelectionRange(again.value.length,again.value.length);});},350);});
+ const filters=el('div',undefined,'inv-filters');for(const[value,label]of [[false,'Todos ('+data.items.length+')'],[true,'Solo alertas ('+data.alerts.length+')']]){const b=button(label,()=>{inventoryState.alerts=value;inventoryPanel(panel);},'inv-filter');b.setAttribute('aria-pressed',String(inventoryState.alerts===value));filters.append(b);}
+ bar.append(search,filters);panel.append(bar);
+ const rows=inventoryState.alerts?data.alerts:data.items,list=el('ul',undefined,'bank-list stock-list');
+ for(const item of rows){const li=el('li');li.dataset.active=String(item.active);const info=el('div');info.append(el('strong',item.name),el('span',[item.kind_label,item.sku?'Código '+item.sku:item.code?'Catálogo '+item.code:'',item.location?'Ubicación: '+item.location:'','Costo promedio '+quoteMoney(item.average_cost_cents),'Precio '+quoteMoney(item.price_cents)].filter(Boolean).join(' · ')));
+  const tags=el('div',undefined,'bank-tags');if(!item.active)tags.append(invoiceChip('descartado','Inactivo'));else if(item.out)tags.append(invoiceChip('rechazado','Agotado'));else if(item.low)tags.append(invoiceChip('pendiente','En el mínimo o por debajo'));info.append(tags);
+  const qty=el('div',undefined,'stock-qty');qty.append(el('b',String(item.stock)),el('small','mín. '+item.min_stock));qty.setAttribute('aria-label','Existencias: '+item.stock+', mínimo '+item.min_stock);
+  const acts=el('div',undefined,'bank-acts');
+  if(item.active)acts.append(button('Entrada',()=>inventoryMoveDialog(item,'in',data,panel),'secondary'),button('Salida',()=>inventoryMoveDialog(item,'out',data,panel),'secondary'));
+  acts.append(button('Movimientos',()=>inventoryMovesDialog(item),'secondary'),button('Editar',()=>inventoryItemDialog(data,panel,item),'secondary'),
+   button(item.active?'Desactivar':'Activar',async()=>{try{await api('/api/inventory/items',{action:item.active?'deactivate':'activate',id:String(item.id)});inventoryPanel(panel);}catch(error){notify(error.message);}},'secondary'));
+  li.append(info,qty,acts);list.append(li);}
+ if(!rows.length)list.append(el('li',inventoryState.q||inventoryState.alerts?'No hay artículos con estos filtros.':'Todavía no hay artículos en el inventario.','empty-module'));
+ const add=button('',()=>inventoryItemDialog(data,panel),'primary inv-add');add.append(systemIcon('M12 5v14 M5 12h14'),el('span','Incorporar artículo del catálogo'));
+ panel.append(list,add);
+ const lic=el('section',undefined,'stock-licenses');lic.append(el('h3','Licencias digitales (solo lectura)'),el('p','Las licencias se registran, reservan y entregan en el módulo Licencias. Aquí solo se muestran sus existencias.','inv-form-note'));
+ if(data.licenses.length){const wrapT=el('div',undefined,'inv-items-wrap'),table=el('table',undefined,'inv-items'),head=el('tr');for(const h of ['Producto','Tipo','Disponibles','Reservadas','Entregadas'])head.append(el('th',h));const thead=el('thead');thead.append(head);const tbody=el('tbody');
+  for(const p of data.licenses){const tr=el('tr');tr.append(el('td',p.name),el('td','Licencia'),el('td',String(p.available)),el('td',String(p.reserved)),el('td',String(p.delivered)));if(!p.available)tr.dataset.kind='out';tbody.append(tr);}table.append(thead,tbody);wrapT.append(table);lic.append(wrapT);}
+ else lic.append(el('p','No hay productos de licencia configurados.','system-muted'));panel.append(lic);}
+function inventoryItemDialog(data,panel,item){const dialog=smallDialog(item?'Editar artículo':'Incorporar artículo al inventario');const{form,msg,field,fail,clear}=invForm('bank-form stock-form');
+ if(!item){if(!data.catalog_candidates.length){dialog.append(el('p','Todos los productos y repuestos del catálogo ya están en el inventario. Crea primero el artículo en el catálogo (categoría «Repuesto» u «Otro»).','inv-form-note'));const bar=el('div',undefined,'dialog-actions');bar.append(button('Cerrar',()=>dialog.close(),'secondary'));dialog.append(bar);return;}
+  field('catalog_id','Artículo del catálogo',{options:[['','Selecciona…'],...data.catalog_candidates.map(g=>[String(g.id),g.name+(g.code?' · '+g.code:'')])]});}
+ else form.append(el('p',item.name,'stock-form-name'));
+ field('kind','Tipo',{options:[['','Selecciona…'],...Object.entries(data.kinds)],value:item?.kind||''});field('sku','Código interno (opcional)',{max:40,value:item?.sku||''});
+ field('min_stock','Existencia mínima (alerta)',{mode:'numeric',max:6,value:String(item?.min_stock??0)});field('location','Ubicación (opcional)',{max:80,value:item?.location||''});
+ if(!item){field('initial_stock','Existencia inicial',{mode:'numeric',max:6,value:'0',hint:'Se registra como un movimiento de entrada.'});field('initial_cost','Costo unitario inicial',{mode:'decimal',max:14,value:'0,00'});}
+ const save=el('button',item?'Guardar cambios':'Incorporar al inventario','primary');save.type='submit';const bar=el('div',undefined,'dialog-actions');bar.append(button('Cancelar',()=>dialog.close(),'secondary'),save);form.append(msg,bar);dialog.append(form);form.elements[0].focus();
+ form.addEventListener('submit',async event=>{event.preventDefault();clear();save.disabled=true;const payload=Object.fromEntries(new FormData(form));payload.action='save';if(item)payload.id=String(item.id);
+  try{await api('/api/inventory/items',payload);toast(item?'Artículo actualizado.':'Artículo incorporado al inventario.','success');dialog.close();inventoryPanel(panel);}catch(error){fail(error);save.disabled=false;}});}
+function inventoryMoveDialog(item,direction,data,panel){const entry=direction==='in',dialog=smallDialog((entry?'Entrada de ':'Salida de ')+item.name);const{form,msg,field,fail,clear}=invForm('bank-form stock-form');const key=invKey('mov');
+ form.append(el('p','Existencias actuales: '+item.stock+(entry?'':' · No se puede sacar más de lo que hay.'),'stock-form-name'));
+ field('reason','Motivo',{options:[['','Selecciona…'],...Object.entries(entry?data.in_reasons:data.out_reasons)]});const qty=field('quantity','Cantidad',{mode:'numeric',max:6,value:'1'});
+ if(entry)field('cost','Costo unitario',{mode:'decimal',max:14,value:(item.average_cost_cents/100).toFixed(2).replace('.',','),hint:'Para el costo promedio. Las compras a proveedores se registran en «Compras».'});
+ field('note','Observación (orden, factura, motivo)',{area:true,max:300});if(!entry)qty.max=item.stock;
+ const save=el('button',entry?'Registrar entrada':'Registrar salida','primary');save.type='submit';const bar=el('div',undefined,'dialog-actions');bar.append(button('Cancelar',()=>dialog.close(),'secondary'),save);form.append(msg,bar);dialog.append(form);form.elements.reason.focus();
+ form.addEventListener('submit',async event=>{event.preventDefault();clear();if(!entry&&Number(qty.value)>item.stock){msg.textContent='Supera las existencias ('+item.stock+').';qty.setAttribute('aria-invalid','true');qty.focus();return;}save.disabled=true;
+  const payload=Object.fromEntries(new FormData(form));Object.assign(payload,{action:'move',id:String(item.id),direction,request_key:key});
+  try{await api('/api/inventory/items',payload);toast(entry?'Entrada registrada.':'Salida registrada.','success');dialog.close();inventoryPanel(panel);}catch(error){fail(error);save.disabled=false;}});}
+async function inventoryMovesDialog(item){const dialog=smallDialog('Movimientos · '+item.name);dialog.classList.add('inv-dialog');const body=el('div',undefined,'inv-body');body.append(el('p','Cargando…','empty-module'));dialog.append(body);
+ let data;try{data=await api('/api/inventory/items/'+item.id+'/movements');}catch(error){body.replaceChildren(el('p',error.message,'empty-module'));return;}
+ body.replaceChildren(el('p','Existencias: '+data.item.stock+' · mínimo '+data.item.min_stock+'. Los movimientos no se modifican ni se eliminan; una corrección es otro movimiento.','inv-form-note'));
+ if(!data.movements.length){body.append(el('p','Sin movimientos.','system-muted'));return;}
+ const wrap=el('div',undefined,'inv-items-wrap'),table=el('table',undefined,'inv-items stock-moves'),head=el('tr');for(const h of ['Fecha','Motivo','Cantidad','Costo','Saldo'])head.append(el('th',h));const thead=el('thead');thead.append(head);const tbody=el('tbody');
+ for(const m of data.movements){const tr=el('tr'),what=el('td');what.append(el('span',m.reason_label),el('small',[m.actor,m.reference,m.note].filter(Boolean).join(' · ')));tr.dataset.direction=m.direction>0?'in':'out';
+  tr.append(el('td',formatOrderDate(m.at)),what,el('td',(m.direction>0?'+':'−')+m.quantity),el('td',m.unit_cost_cents?quoteMoney(m.unit_cost_cents):'—'),el('td',String(m.balance)));tbody.append(tr);}
+ table.append(thead,tbody);wrap.append(table);body.append(wrap);}
+// Compras: el borrador no mueve existencias; «Recibir» registra las entradas una sola vez; anular revierte (si alcanzan las existencias).
+async function purchasesPanel(panel){panel.replaceChildren(el('p','Cargando compras…','empty-module'));let data;
+ try{data=await api('/api/inventory/purchases?'+new URLSearchParams({status:inventoryState.purchases}));}catch(error){panel.replaceChildren(el('p',error.message,'empty-module'));return;}
+ panel.replaceChildren(el('p','Registro interno de compras a proveedores. El borrador no mueve el inventario: las existencias suben al marcar la compra como recibida.','inv-form-note'));
+ const filters=el('div',undefined,'inv-filters');filters.setAttribute('role','group');filters.setAttribute('aria-label','Filtrar compras por estado');
+ for(const[key,label]of [['','Todas'],...Object.entries(data.statuses)]){const b=button(label,()=>{inventoryState.purchases=key;purchasesPanel(panel);},'inv-filter');b.setAttribute('aria-pressed',String(inventoryState.purchases===key));filters.append(b);}
+ const add=button('',()=>purchaseDialog(panel),'primary inv-add');add.append(systemIcon('M12 5v14 M5 12h14'),el('span','Nueva compra'));const bar=el('div',undefined,'inv-actions');bar.append(add);panel.append(filters,bar);
+ const list=el('ul',undefined,'inv-list');const chip={borrador:'pendiente',recibida:'autorizado',anulada:'descartado'};
+ for(const row of data.rows){const li=el('li'),open=button('',()=>purchaseDetail(row.id,panel),'inv-row');const who=el('div',undefined,'inv-row-who');who.append(el('strong',row.supplier),el('small','Documento '+row.document_number));
+  const meta=el('div',undefined,'inv-row-meta');meta.append(el('code',dashboardDate(row.issue_date)),el('small','Registrada '+formatOrderDate(row.created_at)));open.append(invoiceChip(chip[row.status],row.status_label),who,meta,el('b',quoteMoney(row.total_cents)));
+  open.setAttribute('aria-label','Abrir compra '+row.document_number+' de '+row.supplier);li.append(open);list.append(li);}
+ if(!data.rows.length)list.append(el('li',inventoryState.purchases?'No hay compras con este estado.':'Todavía no hay compras registradas.','empty-module'));panel.append(list);}
+function invCents(text){const t=String(text||'').trim().replace(/[$\s]/g,'');const n=/^\d{1,3}(\.\d{3})+(,\d{1,2})?$|^\d+(,\d{1,2})?$/.test(t)?t.replace(/\./g,'').replace(',','.'):t;return /^\d+(\.\d{1,2})?$/.test(n)?Math.round(Number(n)*100):NaN;}
+async function purchaseDialog(panel,existing){let inv,sup;try{[inv,sup]=await Promise.all([api('/api/inventory'),api('/api/inventory/suppliers')]);}catch(error){notify(error.message);return;}
+ const suppliers=sup.rows.filter(s=>s.active),items=inv.items.filter(i=>i.active);const dialog=smallDialog(existing?'Editar compra en borrador':'Nueva compra');dialog.classList.add('inv-dialog');
+ if(!suppliers.length||!items.length){dialog.append(el('p',!suppliers.length?'Registra primero un proveedor activo en «Proveedores».':'Incorpora primero los artículos en «Inventario».','inv-form-note'));const bar=el('div',undefined,'dialog-actions');bar.append(button('Cerrar',()=>dialog.close(),'secondary'));dialog.append(bar);return;}
+ const{form,msg,field,fail,clear}=invForm('stock-purchase');const head=el('div',undefined,'bank-form stock-purchase-head');form.append(head);
+ const put=(...args)=>{const node=field(...args);head.append(node.closest('label'));return node;};
+ put('supplier_id','Proveedor',{options:[['','Selecciona…'],...suppliers.map(s=>[String(s.id),s.name+(s.identification?' · '+s.identification:'')])],value:existing?String(existing.supplier.id):''});
+ put('document_number','Número del documento del proveedor',{max:40,value:existing?.document_number||'',hint:'Ej.: 001-001-000000123'});
+ const today=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Guayaquil'}).format(new Date());const date=put('issue_date','Fecha del documento',{type:'date',value:existing?.issue_date||today});date.max=today;
+ const lines=el('div',undefined,'stock-lines');lines.setAttribute('role','group');lines.setAttribute('aria-label','Artículos de la compra');const totals=el('dl',undefined,'inv-totals stock-totals');totals.setAttribute('aria-live','polite');
+ const recalc=()=>{let base=0,tax=0,bad=false;for(const row of lines.querySelectorAll('.stock-line')){const q=Number(row.querySelector('[data-k=quantity]').value),c=invCents(row.querySelector('[data-k=unit_cost]').value);if(!Number.isInteger(q)||q<=0||Number.isNaN(c)){bad=true;continue;}const b=q*c;base+=b;if(row.querySelector('[data-k=taxed]').checked)tax+=Math.round(b*0.15);}
+  totals.replaceChildren();for(const[k,v,kind]of [['Subtotal',quoteMoney(base)],['IVA 15 %',quoteMoney(tax)],['Total',quoteMoney(base+tax),'total']]){const d=el('div');if(kind)d.dataset.kind=kind;d.append(el('dt',k),el('dd',v));totals.append(d);}if(bad)totals.append(el('p','Hay partidas incompletas: el servidor las revisará al guardar.','system-muted'));};
+ const addLine=(line={})=>{const row=el('div',undefined,'stock-line'),pick=el('select'),qty=el('input'),cost=el('input'),taxBox=el('label',undefined,'inv-cf'),taxed=el('input');
+  pick.add(new Option('Artículo…',''));for(const i of items)pick.add(new Option(i.name+(i.sku?' · '+i.sku:''),String(i.id)));pick.value=line.item_id?String(line.item_id):'';pick.dataset.k='item_id';pick.setAttribute('aria-label','Artículo');
+  qty.inputMode='numeric';qty.maxLength=6;qty.value=String(line.quantity||1);qty.dataset.k='quantity';qty.setAttribute('aria-label','Cantidad');
+  cost.inputMode='decimal';cost.maxLength=14;cost.value=line.unit_cost_cents!==undefined?(line.unit_cost_cents/100).toFixed(2).replace('.',','):'';cost.placeholder='Costo unitario';cost.dataset.k='unit_cost';cost.setAttribute('aria-label','Costo unitario sin IVA');
+  taxed.type='checkbox';taxed.checked=line.tax_rate_bp===undefined?true:line.tax_rate_bp>0;taxed.dataset.k='taxed';taxBox.append(taxed,el('span','IVA 15 %'));
+  const drop=button('Quitar',()=>{row.remove();if(!lines.children.length)addLine();recalc();},'secondary');drop.setAttribute('aria-label','Quitar partida');
+  for(const n of [qty,cost,taxed,pick])n.addEventListener('input',recalc);row.append(pick,qty,cost,taxBox,drop);lines.append(row);};
+ for(const line of existing?.items||[{}])addLine(line);
+ const more=button('',()=>{addLine();recalc();lines.lastElementChild.querySelector('select').focus();},'secondary inv-add');more.append(systemIcon('M12 5v14 M5 12h14'),el('span','Agregar artículo'));
+ form.append(el('h3','Artículos (costo unitario sin IVA)','bank-form-title'),lines,more,totals);const notes=field('notes','Observaciones',{area:true,max:500,value:existing?.notes||''});form.append(notes.closest('label'));
+ const save=el('button',existing?'Guardar borrador':'Guardar como borrador','primary');save.type='submit';const bar=el('div',undefined,'dialog-actions');bar.append(button('Cancelar',()=>dialog.close(),'secondary'),save);form.append(msg,bar);dialog.append(form);recalc();form.elements.supplier_id.focus();
+ form.addEventListener('submit',async event=>{event.preventDefault();clear();save.disabled=true;
+  const payload={action:'save',supplier_id:form.elements.supplier_id.value,document_number:form.elements.document_number.value,issue_date:date.value,notes:notes.value,
+   items:JSON.stringify([...lines.querySelectorAll('.stock-line')].map(row=>({item_id:row.querySelector('[data-k=item_id]').value,quantity:row.querySelector('[data-k=quantity]').value,unit_cost:row.querySelector('[data-k=unit_cost]').value,taxed:row.querySelector('[data-k=taxed]').checked?'1':'0'})))};
+  if(existing)payload.id=String(existing.id);
+  try{const out=await api('/api/inventory/purchases',payload);toast('Compra guardada en borrador. Recíbela cuando llegue la mercadería.','success');dialog.close();purchasesPanel(panel);purchaseDetail(out.id,panel);}catch(error){fail(error);save.disabled=false;}});}
+async function purchaseDetail(id,panel){const dialog=smallDialog('Compra');dialog.classList.add('inv-dialog');const body=el('div',undefined,'inv-body');body.append(el('p','Cargando…','empty-module'));dialog.append(body);
+ let p;try{p=await api('/api/inventory/purchases/'+id);}catch(error){body.replaceChildren(el('p',error.message,'empty-module'));return;}
+ const chip={borrador:'pendiente',recibida:'autorizado',anulada:'descartado'},facts=el('dl',undefined,'inv-facts');body.replaceChildren();
+ for(const[k,v]of [['Proveedor',p.supplier.name+(p.supplier.identification?' · '+p.supplier.identification:'')],['Documento',p.document_number],['Fecha del documento',dashboardDate(p.issue_date)],['Registrada',formatOrderDate(p.created_at)],...(p.received_at?[['Recibida',formatOrderDate(p.received_at)]]:[]),...(p.void_reason?[['Motivo de anulación',p.void_reason]]:[])]){const d=el('div');d.append(el('dt',k),el('dd',v));facts.append(d);}
+ const top=el('div',undefined,'inv-actions');top.append(invoiceChip(chip[p.status],p.status_label));body.append(top,facts);
+ const wrap=el('div',undefined,'inv-items-wrap'),table=el('table',undefined,'inv-items'),head=el('tr');for(const h of ['Artículo','Código','Cantidad','Costo unit.','IVA','Subtotal'])head.append(el('th',h));const thead=el('thead');thead.append(head);const tbody=el('tbody');
+ for(const i of p.items){const tr=el('tr');tr.append(el('td',i.name),el('td',i.sku||'—'),el('td',String(i.quantity)),el('td',quoteMoney(i.unit_cost_cents)),el('td',i.tax_rate_bp?quoteMoney(i.tax_cents):'0 %'),el('td',quoteMoney(i.base_cents)));tbody.append(tr);}
+ table.append(thead,tbody);wrap.append(table);const totals=el('dl',undefined,'inv-totals');for(const[k,v,kind]of [['Subtotal',quoteMoney(p.subtotal_cents)],['IVA',quoteMoney(p.tax_cents)],['Total',quoteMoney(p.total_cents),'total']]){const d=el('div');if(kind)d.dataset.kind=kind;d.append(el('dt',k),el('dd',v));totals.append(d);}body.append(wrap,totals);
+ if(p.notes)body.append(el('p','Observaciones: '+p.notes,'inv-form-note'));
+ const acts=el('div',undefined,'inv-actions');const refresh=()=>{dialog.close();purchasesPanel(panel);purchaseDetail(id,panel);};
+ if(p.status==='borrador'){acts.append(button('Editar',()=>{dialog.close();purchaseDialog(panel,p);},'secondary'));
+  acts.append(button('Marcar como recibida',async()=>{if(await confirmClose({title:'¿Recibir la compra '+p.document_number+'?',text:'Se registrarán las entradas de '+p.items.reduce((a,i)=>a+i.quantity,0)+' unidades en el inventario. No se puede recibir dos veces.',keep:'Revisar',discard:'Recibir',plain:true})!=='discard')return;
+   try{await api('/api/inventory/purchases/'+p.id,{action:'receive'});toast('Compra recibida: existencias actualizadas.','success');refresh();}catch(error){notify(error.message);}},'primary'));}
+ if(p.status!=='anulada')acts.append(button('Anular',async()=>{const reason=await inventoryReason(p.status==='recibida'?'Se registrará la salida de lo que entró con esta compra (solo si las existencias alcanzan).':'El borrador queda en el historial.');if(!reason)return;
+  try{await api('/api/inventory/purchases/'+p.id,{action:'void',reason});toast('Compra anulada.','success');refresh();}catch(error){notify(error.message);}},'secondary'));
+ if(acts.children.length)body.append(acts);
+ const hist=el('details',undefined,'inv-history');hist.append(el('summary','Historial de la compra ('+p.events.length+')'));const ol=el('ol');for(const e of p.events)ol.append(el('li',formatOrderDate(e.created_at)+' · '+e.actor+' · '+e.detail));hist.append(ol);body.append(hist);}
+function inventoryReason(text){return new Promise(resolve=>{const dialog=smallDialog('Anular compra'),form=el('form',undefined,'cash-reason'),area=el('textarea'),msg=el('p','','inv-form-message');area.rows=3;area.maxLength=300;msg.setAttribute('role','alert');
+ const box=el('label',undefined,'inv-field');box.append(el('span','Motivo de la anulación'),area);const ok=el('button','Anular compra','primary');ok.type='submit';const bar=el('div',undefined,'dialog-actions');bar.append(button('Cancelar',()=>dialog.close(),'secondary'),ok);form.append(el('p',text,'inv-form-note'),box,msg,bar);dialog.append(form);area.focus();let done=false;
+ form.addEventListener('submit',event=>{event.preventDefault();if(area.value.trim().length<5){msg.textContent='Indica el motivo (al menos 5 caracteres).';return;}done=true;dialog.close();resolve(area.value.trim());});dialog.addEventListener('close',()=>{if(!done)resolve('');});});}
+// Proveedores: no se eliminan, se desactivan. La identificación (RUC o cédula) se valida y no se repite.
+async function suppliersPanel(panel){panel.replaceChildren(el('p','Cargando proveedores…','empty-module'));let data;try{data=await api('/api/inventory/suppliers');}catch(error){panel.replaceChildren(el('p',error.message,'empty-module'));return;}
+ const{form,msg,field,fail,clear}=invForm('bank-form');let editing=null;const title=el('h3','Nuevo proveedor','bank-form-title');form.append(title);
+ field('name','Nombre o razón social',{max:300});field('identification','RUC, cédula o identificación',{max:20});field('contact_name','Persona de contacto');field('phone','Teléfono',{max:40,mode:'tel'});field('email','Correo',{type:'email',max:200});field('address','Dirección',{max:300});
+ const save=el('button','Guardar proveedor','primary');save.type='submit';const cancel=button('Cancelar edición',()=>reset(),'secondary');cancel.hidden=true;const bar=el('div',undefined,'inv-actions');bar.append(save,cancel);form.append(msg,bar);
+ const reset=()=>{editing=null;form.reset();title.textContent='Nuevo proveedor';cancel.hidden=true;clear();};
+ form.addEventListener('submit',async event=>{event.preventDefault();clear();save.disabled=true;const payload=Object.fromEntries(new FormData(form));payload.action='save';if(editing)payload.id=String(editing);
+  try{await api('/api/inventory/suppliers',payload);toast(editing?'Proveedor actualizado.':'Proveedor registrado.','success');suppliersPanel(panel);}catch(error){fail(error);save.disabled=false;}});
+ const list=el('ul',undefined,'bank-list');for(const s of data.rows){const li=el('li');li.dataset.active=String(s.active);const info=el('div');info.append(el('strong',s.name),el('span',[s.identification,s.contact_name,s.phone,s.email].filter(Boolean).join(' · ')||'Sin datos de contacto'));
+  const tags=el('div',undefined,'bank-tags');tags.append(invoiceChip(s.active?'autorizado':'descartado',s.active?'Activo':'Inactivo'));info.append(tags);
+  const acts=el('div',undefined,'bank-acts');acts.append(button('Editar',()=>{editing=s.id;for(const k of ['name','identification','contact_name','phone','email','address'])form.elements[k].value=s[k]||'';title.textContent='Editar proveedor';cancel.hidden=false;form.scrollIntoView({block:'nearest'});form.elements.name.focus();},'secondary'),
+   button(s.active?'Desactivar':'Activar',async()=>{try{await api('/api/inventory/suppliers',{action:s.active?'deactivate':'activate',id:String(s.id)});suppliersPanel(panel);}catch(error){notify(error.message);}},'secondary'));
+  li.append(info,acts);list.append(li);}
+ if(!data.rows.length)list.append(el('li','Todavía no hay proveedores registrados.','empty-module'));
+ const wrap=el('div',undefined,'bank-panel');wrap.append(el('p','Los proveedores no se eliminan: se desactivan. Un proveedor inactivo no aparece en las compras nuevas.','inv-form-note'),list,form);panel.replaceChildren(wrap);}
 // ---- Caja ----
 let cashState={tab:'dia',day:'',user:'',hist:{user:'',status:'',from:'',to:''}};
 async function renderCash(){const root=$('module-content'),wrap=el('div',undefined,'cash-module'),tabs=el('div',undefined,'inv-tabs'),panel=el('div',undefined,'inv-panel');tabs.setAttribute('role','tablist');

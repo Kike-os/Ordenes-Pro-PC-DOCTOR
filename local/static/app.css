@@ -8670,3 +8670,23 @@ body[data-page=dashboard] dialog.lcard-dialog .lcard-tools :is(input,select){hei
 .cash-hist-row{grid-template-columns:minmax(0,1fr) auto}.cash-hist-sums{display:flex;flex-wrap:wrap;gap:4px;justify-content:flex-end}
 @media(max-width:700px){.cash-hist-row{grid-template-columns:minmax(0,1fr)}.cash-hist-sums{justify-content:flex-start}.cash-bar .inv-field{max-width:none}}
 @media(max-width:480px){.inv-tabs{flex-wrap:wrap;overflow-x:visible}.inv-tab{padding:7px 10px}}
+/* Inventario, compras y proveedores (rama · pruebas). Clases propias stock-*; reutiliza las listas y formularios bank-* e inv-*. */
+.cash-card[data-kind=warn]{border-color:#5a4410;background:#1f1a0d}.cash-card[data-kind=warn] strong{color:#fbbf24}
+.stock-alerts{display:grid;gap:4px;padding:9px 12px;border-left:3px solid #f59e0b;border-radius:9px;background:#1f1a0d;color:#fcd34d;font-size:12.5px}
+.stock-alerts ul{margin:0;padding-left:18px;display:grid;gap:2px;color:#fde68a}
+.stock-list>li>.stock-qty{display:grid;justify-items:center;min-width:58px;padding:4px 8px;border:1px solid #1f3352;border-radius:9px;background:#0a1424}
+.stock-qty b{font-size:18px;color:#eef3ff;font-variant-numeric:tabular-nums}.stock-qty small{font-size:10.5px;color:#8fa5c4}
+.inv-add{display:inline-flex;align-items:center;gap:6px;justify-self:start;width:auto;margin:0}.inv-add svg{width:16px;height:16px}
+.stock-licenses{display:grid;gap:8px;padding:12px;border:1px solid #1f3352;border-radius:12px;background:#0a1424}.stock-licenses h3{margin:0;font-size:13px;color:#cfe2ff}
+.stock-licenses tr[data-kind=out] td{color:#fca5a5}
+.stock-form{border:0;padding:0;background:none}.stock-form-name{grid-column:1/-1;margin:0;font-weight:700;color:#eef3ff;overflow-wrap:anywhere}.stock-form textarea{width:100%;margin:0}
+.stock-form>.dialog-actions,.stock-purchase>.dialog-actions{grid-column:1/-1}
+.stock-moves td small{display:block;font-size:11px;color:#8fa5c4}.stock-moves tr[data-direction=in] td:nth-child(3){color:#34d399}.stock-moves tr[data-direction=out] td:nth-child(3){color:#fca5a5}
+.stock-purchase{display:grid;gap:10px;max-height:min(78vh,860px);overflow:auto;overscroll-behavior:contain;padding-right:2px}.stock-purchase-head{border:0;padding:0;background:none}
+.stock-purchase textarea{width:100%;margin:0}.stock-purchase>.inv-field{max-width:none}
+.stock-lines{display:grid;gap:6px}
+.stock-line{display:grid;grid-template-columns:minmax(0,2.4fr) minmax(64px,.6fr) minmax(90px,1fr) auto auto;gap:6px;align-items:center;padding:6px;border:1px solid #1c2c47;border-radius:10px;background:#0b1628}
+.stock-line :is(select,input:not([type=checkbox])){width:100%;margin:0;min-width:0}.stock-line>button{width:auto;margin:0}
+.stock-totals{justify-self:end;min-width:min(100%,280px)}
+@media(max-width:700px){.stock-line{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.stock-line>select{grid-column:1/-1}.stock-totals{justify-self:stretch}}
+.stock-totals>p{margin:4px 0 0;font-size:11.5px;line-height:1.4}
