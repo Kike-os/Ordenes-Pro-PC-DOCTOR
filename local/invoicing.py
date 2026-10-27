@@ -21,6 +21,7 @@ REGIMES = {'general': 'Régimen General', 'rimpe_emprendedor': 'RIMPE Emprendedo
 # Forma de pago del SRI (tabla 24) según el método registrado en Órdenes Pro. Pendiente de confirmar con el contador (tarjeta de débito = 16).
 PAYMENT_CODES = {'efectivo': '01', 'transferencia': '20', 'deposito': '20', 'tarjeta': '19', 'otro': '20'}
 PAYMENT_LABELS = {'01': 'Sin utilización del sistema financiero', '16': 'Tarjeta de débito', '19': 'Tarjeta de crédito', '20': 'Otros con utilización del sistema financiero'}
+CREDIT_LABEL = 'Saldo pendiente (venta a crédito)'
 TEST_ENVIRONMENT = '1'
 # MODO DE PRUEBAS del centro de Facturación Electrónica (hasta la firma electrónica y la autorización de activación real):
 # - todo lo que se registre (facturas, cajas, depósitos, inventario, compras, proveedores, cuentas) queda en las tablas propias del
@@ -132,8 +133,9 @@ def _order_source(c, order_id):
     approved = sum(item['net_cents'] for item in items)
     if items and money['budget_cents'] != approved:
         blockers.append('El total a cobrar (%s) incluye cargos manuales sin IVA definido: no coincide con lo aprobado (%s).' % (quotes.usd(money['budget_cents']), quotes.usd(approved)))
-    if money['budget_cents'] <= 0 or money['paid_cents'] < money['budget_cents']:
-        blockers.append('La orden no está totalmente pagada (saldo %s).' % quotes.usd(max(0, money['budget_cents'] - money['paid_cents'])))
+    # Cobro y facturación son procesos separados: una orden puede facturarse con saldo pendiente (queda como venta a crédito).
+    if money['budget_cents'] <= 0:
+        blockers.append('La orden no tiene importe a facturar.')
     rates = {row['id']: (row['tax_rate_bp'], row['discount_bp']) for row in c.execute('SELECT id,tax_rate_bp,discount_bp FROM quotes WHERE order_id=?', (order_id,))}
     lines = []
     for n, item in enumerate(items, 1):
@@ -171,11 +173,58 @@ def _sale_source(c, sale_id):
             'reference': sale['code'], 'lines': lines, 'payments': payments, 'blockers': blockers}
 
 
+def _proforma_source(c, proforma_id):
+    """Partidas aprobadas de una proforma (o todas, si es una venta directa) y sus anticipos no anulados como pagos."""
+    row = c.execute('SELECT * FROM proformas WHERE id=?', (proforma_id,)).fetchone()
+    if not row:
+        raise InvoiceError('La proforma no existe.', 404)
+    blockers = []
+    if row['status'] not in ('aprobada', 'parcial', 'convertida'):
+        blockers.append('La proforma no está aprobada.')
+    lines = []
+    for n, item in enumerate(c.execute("SELECT * FROM proforma_items WHERE proforma_id=? AND status='aprobado' ORDER BY position,id", (proforma_id,)), 1):
+        gross = item['quantity'] * item['unit_cents']
+        lines.append(_line(n, item['code'] or '', item['description'], item['quantity'], gross, gross - item['discount_cents'], row['tax_rate_bp'] if item['taxed'] else 0, item['id'], item['catalog_id']))
+    if not lines:
+        blockers.append('La proforma no tiene partidas aprobadas.')
+    payments = {}
+    for a in c.execute("SELECT method,SUM(amount_cents) total FROM advances WHERE proforma_id=? AND voided_at='' GROUP BY method", (proforma_id,)):
+        method = {'debito': 'tarjeta', 'credito': 'tarjeta'}.get(a['method'], a['method'])
+        payments[method] = payments.get(method, 0) + a['total']
+    return {'kind': 'proforma', 'id': proforma_id, 'order_id': row['order_id'], 'quote_id': None, 'license_sale_id': None, 'client_id': row['client_id'], 'reference': row['code'],
+            'reference_label': 'Proforma', 'lines': lines, 'payments': payments, 'blockers': blockers, 'financing': row['financing'] or '{}',
+            'buyer': {'buyer_id_type': '05' if len(row['client_identification']) == 10 else '04' if len(row['client_identification']) == 13 else ('06' if row['client_identification'] else ''),
+                      'buyer_id': row['client_identification'], 'buyer_name': row['client_name'], 'buyer_address': row['client_address'], 'buyer_email': row['client_email'], 'buyer_phone': row['client_phone']}}
+
+
+def _inventory_source(c, movement_id):
+    """Venta registrada en el Centro de Inventario (precio por unidad con IVA incluido y descuento autorizado)."""
+    m = c.execute("SELECT m.*,k.name,k.code,k.taxed,k.id catalog_id FROM inventory_movements m JOIN inventory_items i ON i.id=m.item_id JOIN catalog_items k ON k.id=i.catalog_id WHERE m.id=? AND m.reason='venta'",
+                  (movement_id,)).fetchone()
+    if not m:
+        raise InvoiceError('La venta del inventario no existe.', 404)
+    serials = [r['serial'] or r['internal_code'] for r in c.execute('SELECT u.serial,u.internal_code FROM inventory_movement_units x JOIN inventory_units u ON u.id=x.unit_id WHERE x.movement_id=?', (movement_id,))]
+    description = m['name'] + ((' · Serie: ' + ', '.join(serials)) if serials else '')
+    unit = (m['sale_price_cents'] or 0) + (m['discount_cents'] or 0)
+    gross, net = unit * m['quantity'], (m['sale_price_cents'] or 0) * m['quantity']
+    blockers = [] if net > 0 else ['La venta no tiene precio registrado.']
+    lines = [_line(1, m['code'] or '', description, m['quantity'], gross, net, quotes.tax_rate(c) if m['taxed'] else 0, m['id'], m['catalog_id'])]
+    return {'kind': 'venta_inventario', 'id': movement_id, 'order_id': None, 'quote_id': None, 'license_sale_id': None, 'client_id': m['client_id'], 'reference': 'INV-%d' % movement_id,
+            'reference_label': 'Venta de inventario', 'lines': lines, 'payments': {}, 'blockers': blockers}
+
+
+SOURCES = ('orden', 'venta_licencia', 'proforma', 'venta_inventario')
+
+
 def source(c, kind, source_id):
     if kind == 'orden':
         return _order_source(c, source_id)
     if kind == 'venta_licencia':
         return _sale_source(c, source_id)
+    if kind == 'proforma':
+        return _proforma_source(c, source_id)
+    if kind == 'venta_inventario':
+        return _inventory_source(c, source_id)
     raise InvoiceError('Origen de factura no válido.')
 
 
@@ -187,13 +236,15 @@ def _payments_for(total, by_method):
         if take > 0:
             out.append({'method': method, 'sri_code': PAYMENT_CODES.get(method, '20'), 'amount_cents': take})
             left -= take
-    if left > 0:
-        out.append({'method': 'otro', 'sri_code': '20', 'amount_cents': left})
     merged = {}
     for item in out:
         key = item['sri_code']
         merged.setdefault(key, {'method': item['method'], 'sri_code': key, 'amount_cents': 0})['amount_cents'] += item['amount_cents']
-    return list(merged.values())
+    rows = list(merged.values())
+    if left > 0:
+        # Saldo sin cobrar: venta a crédito (se informa aparte de lo pagado).
+        rows.append({'method': 'credito', 'sri_code': '20', 'amount_cents': left})
+    return rows
 
 
 def totals(lines):
@@ -266,17 +317,18 @@ def draft(c, kind, source_id, user, now):
     if not found['lines']:
         raise InvoiceError('No hay partidas que facturar.', 409)
     t = totals(found['lines'])
-    buyer = _buyer_from_client(c, found['client_id'])
+    buyer = _buyer_from_client(c, found['client_id']) if found['client_id'] or not found.get('buyer') else found['buyer']
     cfg = settings(c)
     invoice_id = c.execute('INSERT INTO invoices(status,environment,source_kind,source_id,order_id,quote_id,license_sale_id,client_id,buyer_id_type,buyer_id,buyer_name,buyer_address,buyer_email,buyer_phone,'
-                           'subtotal_cents,discount_cents,tax_cents,total_cents,establishment,emission_point,created_by,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+                           'subtotal_cents,discount_cents,tax_cents,total_cents,establishment,emission_point,created_by,created_at,updated_at,financing) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
                            ('borrador', TEST_ENVIRONMENT, kind, source_id, found['order_id'], found['quote_id'], found['license_sale_id'], found['client_id'], buyer['buyer_id_type'], buyer['buyer_id'],
                             buyer['buyer_name'], buyer['buyer_address'], buyer['buyer_email'], buyer['buyer_phone'], t['subtotal_cents'], t['discount_cents'], t['tax_cents'], t['total_cents'],
-                            cfg['establishment'], cfg['emission_point'], user['id'], stamp(now), stamp(now))).lastrowid
+                            cfg['establishment'], cfg['emission_point'], user['id'], stamp(now), stamp(now), found.get('financing', '{}'))).lastrowid
     _write_lines(c, invoice_id, found['lines'])
     for p in _payments_for(t['total_cents'], found['payments']):
         c.execute('INSERT INTO invoice_payments(invoice_id,method,sri_code,amount_cents) VALUES (?,?,?,?)', (invoice_id, p['method'], p['sri_code'], p['amount_cents']))
-    event(c, invoice_id, 'creado', 'Borrador generado desde %s %s. Total %s.' % ('la orden' if kind == 'orden' else 'la venta', found['reference'], quotes.usd(t['total_cents'])), now, user)
+    event(c, invoice_id, 'creado', 'Borrador generado desde %s %s. Total %s.' % ({'orden': 'la orden', 'venta_licencia': 'la venta', 'proforma': 'la proforma',
+                                                                                  'venta_inventario': 'la venta del inventario'}[kind], found['reference'], quotes.usd(t['total_cents'])), now, user)
     return invoice_id
 
 
@@ -381,7 +433,7 @@ def emit(c, invoice_id, user, now, environment=TEST_ENVIRONMENT):
     issue = now.date()
     access = sri_xml.access_key(issue, '01', cfg['ruc'], environment, cfg['establishment'], cfg['emission_point'], sequential)
     inv.update(environment=environment, establishment=cfg['establishment'], emission_point=cfg['emission_point'], sequential=sequential, access_key=access,
-               issue_date_sri=issue.strftime('%d/%m/%Y'), reference=found['reference'])
+               issue_date_sri=issue.strftime('%d/%m/%Y'), reference=found['reference'], reference_label=found.get('reference_label', 'Orden'))
     items = [dict(r) for r in c.execute('SELECT * FROM invoice_items WHERE invoice_id=? ORDER BY position', (invoice_id,))]
     payments = [dict(r) for r in c.execute('SELECT * FROM invoice_payments WHERE invoice_id=? ORDER BY id', (invoice_id,))]
     account = c.execute('SELECT * FROM bank_accounts WHERE id=?', (inv['bank_account_id'],)).fetchone() if inv.get('bank_account_id') else None
@@ -408,6 +460,8 @@ def set_bank(c, invoice_id, account_id, user, now):
         account = banking.get(c, account_id, active=True) if str(account_id or '') else None
     except banking.BankError as error:
         raise InvoiceError(str(error), error.status)
+    if account and not account['verified']:
+        raise InvoiceError('Esa cuenta está pendiente de verificación con la documentación bancaria y tributaria: no se usa en documentos oficiales.', 409)
     c.execute('UPDATE invoices SET bank_account_id=?,updated_at=? WHERE id=?', (account['id'] if account else None, stamp(now), invoice_id))
     event(c, invoice_id, 'cuenta_bancaria', ('Cuenta para depósito o transferencia: ' + banking.label(account)) if account else 'Sin cuenta bancaria indicada.', now, user)
 
@@ -423,7 +477,7 @@ def discard(c, invoice_id, user, now, reason=''):
 def detail(c, invoice_id):
     inv = dict(_get(c, invoice_id))
     items = [dict(r) for r in c.execute('SELECT * FROM invoice_items WHERE invoice_id=? ORDER BY position', (invoice_id,))]
-    payments = [dict(r, label=PAYMENT_LABELS.get(r['sri_code'], r['sri_code'])) for r in c.execute('SELECT * FROM invoice_payments WHERE invoice_id=? ORDER BY id', (invoice_id,))]
+    payments = [dict(r, label=CREDIT_LABEL if r['method'] == 'credito' else PAYMENT_LABELS.get(r['sri_code'], r['sri_code'])) for r in c.execute('SELECT * FROM invoice_payments WHERE invoice_id=? ORDER BY id', (invoice_id,))]
     events = [dict(r) for r in c.execute('SELECT event,detail,actor,created_at FROM invoice_events WHERE invoice_id=? ORDER BY id DESC', (invoice_id,))]
     rates = {}
     for item in items:
@@ -431,6 +485,7 @@ def detail(c, invoice_id):
         group['base_cents'] += item['base_cents']
         group['tax_cents'] += item['tax_cents']
     ref = c.execute('SELECT code FROM orders WHERE id=?', (inv['order_id'],)).fetchone() if inv['order_id'] else None
+    proforma = c.execute('SELECT id,code FROM proformas WHERE id=?', (inv['source_id'],)).fetchone() if inv['source_kind'] == 'proforma' else None
     sale = c.execute('SELECT code FROM license_sales WHERE id=?', (inv['license_sale_id'],)).fetchone() if inv['license_sale_id'] else None
     found = source(c, inv['source_kind'], inv['source_id']) if inv['status'] == 'borrador' else None
     for key in ('xml_signed', 'xml_authorized'):
@@ -438,11 +493,34 @@ def detail(c, invoice_id):
     inv.update(status_label=STATUS[inv['status']], number=number(inv), id_type_label=sri_xml.ID_TYPES.get(inv['buyer_id_type'], ''), order_code=ref['code'] if ref else '',
                sale_code=sale['code'] if sale else '', consumer_final_allowed=consumer_final_allowed(inv['total_cents']), consumer_final_limit_cents=CONSUMER_FINAL_LIMIT_CENTS,
                problems=buyer_problems(inv) if inv['status'] == 'borrador' else {}, blockers=found['blockers'] if found else [],
-               adjusted=any(line.get('adjusted') for line in (found['lines'] if found else [])), sri_messages=json.loads(inv['sri_messages'] or '[]'))
+               adjusted=any(line.get('adjusted') for line in (found['lines'] if found else [])), sri_messages=json.loads(inv['sri_messages'] or '[]'),
+               proforma_code=proforma['code'] if proforma else '', proforma_id=proforma['id'] if proforma else None, inventory_ref=('INV-%d' % inv['source_id']) if inv['source_kind'] == 'venta_inventario' else '',
+               financing=json.loads(inv.get('financing') or '{}'))
     import banking
     account = c.execute('SELECT * FROM bank_accounts WHERE id=?', (inv['bank_account_id'],)).fetchone() if inv.get('bank_account_id') else None
+    paid = sum(p['amount_cents'] for p in payments if p['method'] != 'credito')
     return {'invoice': inv, 'items': items, 'payments': payments, 'rates': sorted(rates.values(), key=lambda g: g['rate_bp']), 'events': events, 'settings': settings(c),
-            'bank_account': banking.public(account), 'bank_accounts': banking.listing(c, active_only=True)}
+            'bank_account': banking.public(account), 'bank_accounts': [a for a in banking.listing(c, active_only=True) if a['verified']],
+            'paid_cents': paid, 'balance_cents': max(0, inv['total_cents'] - paid), 'receipts': receipts(c, inv)}
+
+
+def receipts(c, inv):
+    """Depósitos, transferencias y vouchers vinculados a los cobros de la operación facturada, con su banco y su estado de verificación."""
+    if inv['source_kind'] == 'orden':
+        cond, arg = 'payment_id IN (SELECT id FROM order_payments WHERE order_id IN (SELECT id FROM orders WHERE id=? OR group_id=(SELECT COALESCE(group_id,id) FROM orders WHERE id=?)))', (inv['order_id'], inv['order_id'])
+    elif inv['source_kind'] == 'proforma':
+        cond, arg = 'advance_id IN (SELECT id FROM advances WHERE proforma_id=?)', (inv['source_id'],)
+    else:
+        return []
+    import banking
+    out = []
+    for t in c.execute('SELECT t.*,a.bank,a.account_type,a.number FROM bank_transfers t JOIN bank_accounts a ON a.id=t.bank_account_id WHERE t.' + cond + ' ORDER BY t.paid_at', arg):
+        out.append({'kind': t['method'], 'code': t['code'], 'bank': t['bank'], 'account': '%s · %s' % (banking.TYPES.get(t['account_type'], t['account_type']), t['number']), 'amount_cents': t['amount_cents'],
+                    'date': t['paid_at'], 'reference': t['reference'], 'status': t['status'], 'status_label': banking.TRANSFER_STATUS[t['status']]})
+    for v in c.execute('SELECT * FROM card_vouchers WHERE ' + cond + ' ORDER BY paid_at', arg):
+        out.append({'kind': 'tarjeta', 'code': v['code'], 'bank': v['issuer_bank'], 'account': '%s •••• %s' % (v['brand'], v['last4']), 'amount_cents': v['amount_cents'], 'date': v['paid_at'],
+                    'reference': 'Lote %s · aut. %s' % (v['lot'], v['approval_code']), 'status': v['status'], 'status_label': v['status'].replace('_', ' ').capitalize()})
+    return out
 
 
 def listing(c, status='', q=''):
@@ -450,10 +528,11 @@ def listing(c, status='', q=''):
     if q:
         where.append("instr(lower(i.buyer_name||' '||i.buyer_id||' '||COALESCE(o.code,'')||' '||COALESCE(s.code,'')||' '||COALESCE(i.access_key,'')),lower(?))>0")
         args.append(q[:80])
-    rows = [dict(r) for r in c.execute('SELECT i.*,o.code order_code,s.code sale_code FROM invoices i LEFT JOIN orders o ON o.id=i.order_id LEFT JOIN license_sales s ON s.id=i.license_sale_id WHERE '
+    rows = [dict(r) for r in c.execute("SELECT i.*,o.code order_code,s.code sale_code,CASE WHEN i.source_kind='proforma' THEN (SELECT code FROM proformas WHERE id=i.source_id) "
+                                      "WHEN i.source_kind='venta_inventario' THEN 'INV-'||i.source_id END other_code FROM invoices i LEFT JOIN orders o ON o.id=i.order_id LEFT JOIN license_sales s ON s.id=i.license_sale_id WHERE "
                                       + ' AND '.join(where) + ' ORDER BY i.id DESC LIMIT 200', args)]
     out = [{'id': r['id'], 'number': number(r), 'status': r['status'], 'status_label': STATUS[r['status']], 'buyer_name': r['buyer_name'], 'buyer_id': r['buyer_id'],
-            'consumer_final': bool(r['consumer_final']), 'total_cents': r['total_cents'], 'reference': r['order_code'] or r['sale_code'] or '', 'source_kind': r['source_kind'],
+            'consumer_final': bool(r['consumer_final']), 'total_cents': r['total_cents'], 'reference': r['other_code'] or r['order_code'] or r['sale_code'] or '', 'source_kind': r['source_kind'],
             'order_id': r['order_id'], 'created_at': r['created_at'], 'issue_date': r['issue_date'], 'environment': r['environment'], 'has_xml': bool(r['access_key'])} for r in rows]
     counts = {code: c.execute('SELECT COUNT(*) FROM invoices WHERE status=?', (code,)).fetchone()[0] for code in STATUS if code != 'descartado'}
     return {'rows': out, 'counts': counts, 'statuses': {k: v for k, v in STATUS.items() if k != 'descartado'}, 'settings': settings(c), 'summary': summary(c, counts)}

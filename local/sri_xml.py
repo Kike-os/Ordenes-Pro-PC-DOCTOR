@@ -94,3 +94,42 @@ def invoice_xml(settings, invoice, items, payments):
             extra.append('<campoAdicional nombre=%s>%s</campoAdicional>' % (quoteattr(name), escape(str(value)[:300])))
     return ('<?xml version="1.0" encoding="UTF-8"?>\n<factura id="comprobante" version="1.1.0"><infoTributaria>' + ''.join(head) + '</infoTributaria><infoFactura>' + ''.join(info)
             + '</infoFactura><detalles>' + ''.join(details) + '</detalles>' + ('<infoAdicional>' + ''.join(extra) + '</infoAdicional>' if extra else '') + '</factura>')
+
+
+def credit_note_xml(settings, note, invoice, items):
+    """XML sin firmar de una nota de crédito (esquema 1.1.0) que modifica una factura emitida. Mismos importes en centavos que la factura."""
+    s = settings
+    head = [_tag('ambiente', note['environment']), _tag('tipoEmision', '1'), _tag('razonSocial', s['legal_name'])]
+    if s.get('trade_name'):
+        head.append(_tag('nombreComercial', s['trade_name']))
+    head += [_tag('ruc', s['ruc']), _tag('claveAcceso', note['access_key']), _tag('codDoc', '04'), _tag('estab', note['establishment']),
+             _tag('ptoEmi', note['emission_point']), _tag('secuencial', '%09d' % note['sequential']), _tag('dirMatriz', s['head_office_address'])]
+    if s.get('regime') in RIMPE_LEGENDS:
+        head.append(_tag('contribuyenteRimpe', RIMPE_LEGENDS[s['regime']]))
+    info = [_tag('fechaEmision', note['issue_date_sri'])]
+    if s.get('branch_address'):
+        info.append(_tag('dirEstablecimiento', s['branch_address']))
+    info += [_tag('tipoIdentificacionComprador', invoice['buyer_id_type']), _tag('razonSocialComprador', invoice['buyer_name']), _tag('identificacionComprador', invoice['buyer_id'])]
+    if s.get('special_taxpayer'):
+        info.append(_tag('contribuyenteEspecial', s['special_taxpayer']))
+    if s.get('keeps_accounts'):
+        info.append(_tag('obligadoContabilidad', s['keeps_accounts']))
+    info += [_tag('codDocModificado', '01'), _tag('numDocModificado', invoice['number']), _tag('fechaEmisionDocSustento', invoice['issue_date_sri']),
+             _tag('totalSinImpuestos', money(note['subtotal_cents'])), _tag('valorModificacion', money(note['total_cents'])), _tag('moneda', 'DOLAR')]
+    groups = {}
+    for item in items:
+        group = groups.setdefault(item['tax_code'], [0, 0])
+        group[0] += item['base_cents']
+        group[1] += item['tax_cents']
+    info.append('<totalConImpuestos>' + ''.join('<totalImpuesto>%s%s%s%s</totalImpuesto>' % (_tag('codigo', '2'), _tag('codigoPorcentaje', code), _tag('baseImponible', money(base)), _tag('valor', money(tax)))
+                                                for code, (base, tax) in sorted(groups.items())) + '</totalConImpuestos>')
+    info.append(_tag('motivo', note['reason'][:300]))
+    details = []
+    for item in items:
+        tax = '<impuestos><impuesto>%s%s%s%s%s</impuesto></impuestos>' % (_tag('codigo', '2'), _tag('codigoPorcentaje', item['tax_code']), _tag('tarifa', '%g' % (item['tax_rate_bp'] / 100)),
+                                                                         _tag('baseImponible', money(item['base_cents'])), _tag('valor', money(item['tax_cents'])))
+        details.append('<detalle>%s%s%s%s%s%s%s</detalle>' % (_tag('codigoInterno', item['code'][:25]), _tag('descripcion', item['description'][:300]), _tag('cantidad', '%d.000000' % item['quantity']),
+                                                            _tag('precioUnitario', micros(item['unit_price_micros'])), _tag('descuento', money(item['discount_cents'])),
+                                                            _tag('precioTotalSinImpuesto', money(item['base_cents'])), tax))
+    return ('<?xml version="1.0" encoding="UTF-8"?>\n<notaCredito id="comprobante" version="1.1.0"><infoTributaria>' + ''.join(head) + '</infoTributaria><infoNotaCredito>' + ''.join(info)
+            + '</infoNotaCredito><detalles>' + ''.join(details) + '</detalles></notaCredito>')

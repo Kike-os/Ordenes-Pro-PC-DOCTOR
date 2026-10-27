@@ -68,7 +68,9 @@ class EquipmentTests(unittest.TestCase):
         for body in ({'amount':'0','method':'efectivo'},{'amount':'10.999','method':'efectivo'},{'amount':'10','method':'cheque'},{'amount':'30.01','method':'efectivo'}):
             self.assertEqual(pay(main['id'],**body)['status'],400)
         self.assertEqual(pay(main['id'],amount='10',method='efectivo')['status'],201)
-        paid=pay(main['id'],amount='20.00',method='transferencia',note='Comprobante ficticio 123')
+        with app.connect() as c:
+            account=c.execute("INSERT INTO bank_accounts(bank,account_type,number,holder,holder_id,created_at,updated_at) VALUES ('Banco Ficticio','ahorros','5555000022','TITULAR FICTICIO','0100000017','x','x')").lastrowid;c.commit()
+        paid=pay(main['id'],amount='20.00',method='transferencia',note='Comprobante ficticio 123',bank_account_id=str(account),reference='TRX-EQ-0001')
         self.assertEqual((paid['status'],paid['body']['balance_cents']),(201,0))
         # Se entrega el primero mientras el segundo sigue en reparación con su propio saldo.
         self.assertEqual(deliver(main['id'])['status'],200);self.assertEqual(deliver(second['id'])['status'],409)

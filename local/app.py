@@ -1252,6 +1252,18 @@ class Handler(BaseHTTPRequestHandler):
                     if not picture:return self.reply(404,{'error':'Sin imagen.'})
                     return self.reply(200,bytes(picture['data']),picture['mime'])
                 return self.reply(200,license_pages.identify_page(license_page[1]),'text/html; charset=utf-8')
+            proforma_page=re.fullmatch(r'/proforma/([A-Za-z0-9_-]{30,80})(/documento\.pdf)?',path)
+            if proforma_page:
+                # Proforma por enlace privado: identidad (últimos cuatro dígitos) antes de mostrar importes; el PDF exige esa comprobación.
+                import proformas
+                if limited(c,'proforma-ip:'+digest(self.client_address[0]),60,300):return self.reply(429,{'error':'Demasiadas consultas. Intenta más tarde.'})
+                now=reception_now();row,link=proformas.lookup(c,proforma_page[1],now)
+                if not row:return self.reply(404,proformas.missing_page(),'text/html; charset=utf-8')
+                if proforma_page[2]:
+                    if not proformas.valid_passkey(row,proforma_page[1],parse_qs(urlsplit(self.path).query).get('k',[''])[0]):return self.reply(404,proformas.missing_page(),'text/html; charset=utf-8')
+                    return self.reply(200,proformas.pdf(c,row['id'],now),'application/pdf',filename='PROFORMA-%s.pdf'%row['code'])
+                if not link['usable']:return self.reply(200 if row['status'] in ('aprobada','parcial','rechazada','modificacion','convertida') else 404,proformas.result_page(row,row['status']) if row['status'] in ('aprobada','parcial','rechazada','modificacion','convertida') else proformas.missing_page(),'text/html; charset=utf-8')
+                return self.reply(200,proformas.identify_page(proforma_page[1],row),'text/html; charset=utf-8')
             quote_page=re.fullmatch(r'/presupuesto/([A-Za-z0-9_-]{30,80})(/documento\.pdf)?',path)
             if quote_page:
                 # Presupuesto por enlace privado: identidad con los últimos cuatro dígitos antes de mostrar importes; el PDF exige esa comprobación o una decisión ya registrada.
@@ -1665,7 +1677,11 @@ class Handler(BaseHTTPRequestHandler):
                 result['device_code']=row['device_code'] or ''
                 found=quotes.authorized(c,row['id']);result['authorized_items']=found['items'] if found else [];result['authorization']=quotes.authorization(c,row['id'],row['status'])
                 result['unit_code']=next((unit['unit_code'] for unit in result['group']['units'] if unit['id']==row['id']),'') if result['group']['multiple'] else ''
-                result['payments']=equipment.payments(c,row['id']);result['money']=equipment.money(c,row['id']);result['payment_methods']=equipment.METHODS
+                result['payments']=equipment.payments(c,row['id']);result['money']=equipment.money(c,row['id']);result['payment_methods']=equipment.METHODS;result['pay_methods']=equipment.PAY_METHODS
+                try:
+                    import banking as _banking
+                    result['statuses']=equipment.statuses(c,row['id']);result['bank_accounts']=_banking.listing(c,active_only=True)
+                except sqlite3.OperationalError:pass
                 result['receipt_mail']=receipt_mail_status(c,row['id'])
                 result['authorization_mail']=authorization_mail_status(c,row['id'])
                 import client_authorization
@@ -1856,6 +1872,63 @@ class Handler(BaseHTTPRequestHandler):
                 # Catálogo central de cuentas bancarias: administración ve todas; el resto, solo las activas (para depósitos).
                 import banking
                 return self.reply(200,{'rows':banking.listing(c,active_only=user['role']!='administrador'),'types':banking.TYPES,'can_manage':user['role']=='administrador'})
+            if path.startswith('/api/caja/') or path.startswith('/api/bank/') or path.startswith('/api/vouchers') or path.startswith('/api/proformas') or path.startswith('/api/credit-notes') or path=='/api/payments-all':
+                # Caja por sesiones, Centro bancario, vouchers, proformas, pagos y anticipos, y notas de crédito (solo lectura en GET).
+                import cash_sessions,banking,card_vouchers,proformas,credit_notes
+                if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
+                admin_only=path.startswith('/api/bank/') or path.startswith('/api/credit-notes') or path=='/api/payments-all'
+                if admin_only and user['role']!='administrador':return self.reply(403,{'error':'Solo administración.'})
+                q=parse_qs(urlsplit(self.path).query);f={k:(v[0] or '')[:80] for k,v in q.items()};now=reception_now()
+                try:
+                    if path=='/api/caja/state':return self.reply(200,cash_sessions.state(c,user,now))
+                    if path=='/api/caja/history':return self.reply(200,cash_sessions.history(c,user,f))
+                    if path=='/api/caja/denominations':return self.reply(200,{'rows':cash_sessions.denominations(c,False),'registers':cash_sessions.registers(c,False)})
+                    found=re.fullmatch(r'/api/caja/sessions/([0-9]{1,9})(/report\.pdf)?',path)
+                    if found:
+                        if found[2]:
+                            link=public_base_url().rstrip('/')+'/api/caja/sessions/%s/report.pdf'%found[1]  # el QR exige sesión y permisos
+                            thermal=f.get('formato')=='termico';pdf=cash_sessions.report_pdf(c,user,int(found[1]),link,thermal)
+                            return self.reply(200,pdf,'application/pdf',filename='CIERRE-CJ-%06d%s.pdf'%(int(found[1]),'-80MM' if thermal else ''))
+                        return self.reply(200,cash_sessions.view(c,user,int(found[1])))
+                    found=re.fullmatch(r'/api/(caja/movements|bank/transfers|vouchers)/([0-9]{1,9})/file',path)
+                    if found:
+                        name,mime,raw=cash_sessions.file_for(c,user,{'caja/movements':'movimiento','bank/transfers':'transferencia','vouchers':'voucher'}[found[1]],int(found[2]))
+                        return self.reply(200,raw,mime,filename=name)
+                    if path=='/api/bank/overview':return self.reply(200,{'accounts':banking.listing(c),'indicators':banking.indicators(c,f),'types':banking.TYPES,'statuses':banking.TRANSFER_STATUS})
+                    if path=='/api/bank/transfers':return self.reply(200,{'rows':banking.transfers(c,f),'statuses':banking.TRANSFER_STATUS})
+                    found=re.fullmatch(r'/api/bank/transfers\.(xlsx|pdf)',path)
+                    if found:
+                        import inventory_center
+                        rows=banking.transfers(c,f);columns=['Código','Fecha','Método','Banco','Cuenta','Cliente','Documento','Referencia','Importe','Estado','Registró']
+                        data_rows=[[r['code'],r['paid_at'][:16].replace('T',' '),r['method'],r['bank'],r['account'],r['client'],r['document'],r['reference'],r['amount_cents']/100,r['status_label'],r['actor']] for r in rows]
+                        if found[1]=='xlsx':return self.reply(200,inventory_center.xlsx('Transferencias',columns,data_rows),'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',filename='transferencias-depositos.xlsx')
+                        pdf_rows=[[*r[:8],banking.money(round(r[8]*100)),*r[9:]] for r in data_rows]
+                        total=banking.money(sum(r['amount_cents'] for r in rows))
+                        filters=', '.join('%s: %s'%(k,v) for k,v in f.items() if v) or 'Sin filtros'
+                        return self.reply(200,inventory_center.report_pdf('Historial de transferencias y depósitos',filters,columns,pdf_rows,[46,58,46,60,60,80,50,60,50,50,50],'Registros: %d · Total: %s'%(len(rows),total),now),'application/pdf',filename='transferencias-depositos.pdf')
+                    if path=='/api/vouchers':return self.reply(200,{'rows':card_vouchers.listing(c,f,now.date().isoformat()),'statuses':card_vouchers.STATUS,'types':card_vouchers.TYPES,'acquirers':list(card_vouchers.ACQUIRERS)})
+                    found=re.fullmatch(r'/api/vouchers/([0-9]{1,9})/events',path)
+                    if found:return self.reply(200,{'events':card_vouchers.events(c,int(found[1]))})
+                    if path=='/api/proformas':return self.reply(200,proformas.listing(c,f,now))
+                    found=re.fullmatch(r'/api/proformas/([0-9]{1,9})(\.pdf)?',path)
+                    if found:
+                        if found[2]:
+                            row=proformas.get(c,int(found[1]));return self.reply(200,proformas.pdf(c,int(found[1]),now),'application/pdf',filename='PROFORMA-%s.pdf'%row['code'])
+                        return self.reply(200,proformas.detail(c,int(found[1]),now))
+                    if path=='/api/payments-all':return self.reply(200,{'rows':proformas.all_payments(c,f)})
+                    if path=='/api/credit-notes':return self.reply(200,{'rows':credit_notes.listing(c)})
+                    found=re.fullmatch(r'/api/credit-notes/invoice/([0-9]{1,9})',path)
+                    if found:return self.reply(200,{'items':credit_notes.creditable(c,int(found[1]))})
+                    found=re.fullmatch(r'/api/credit-notes/([0-9]{1,9})(/comprobante\.xml)?',path)
+                    if found:
+                        if found[2]:
+                            n=c.execute('SELECT xml_unsigned,access_key FROM credit_notes WHERE id=?',(int(found[1]),)).fetchone()
+                            if not n or not n['xml_unsigned']:return self.reply(404,{'error':'XML no disponible.'})
+                            return self.reply(200,n['xml_unsigned'].encode(),'application/xml',filename='NOTA-CREDITO-%s.xml'%n['access_key'])
+                        return self.reply(200,credit_notes.detail(c,int(found[1])))
+                except (cash_sessions.CashError,banking.BankError,card_vouchers.VoucherError,proformas.ProformaError,credit_notes.CreditNoteError) as error:
+                    return self.reply(error.status,{'error':str(error),'fields':getattr(error,'fields',{})})
+                return self.reply(404,{'error':'No encontrado.'})
             if path.startswith('/api/cash/'):
                 import cash,invoicing
                 if invoicing.TEST_MODE and user['role']!='administrador':return self.reply(403,{'error':'La caja está en modo de pruebas: por ahora solo administración puede usarla.'})
@@ -1945,7 +2018,7 @@ class Handler(BaseHTTPRequestHandler):
                         return self.reply(200,{**invoicing.dashboard(c,reception_now()),'inventory_alerts':inventory.alert_count(c)})
                     if path=='/api/invoicing/settings':return self.reply(200,{'settings':invoicing.settings(c),'regimes':invoicing.REGIMES})
                     if path=='/api/invoicing/eligibility':
-                        if arg('kind') not in ('orden','venta_licencia') or not arg('id').isdigit():return self.reply(400,{'error':'Solicitud inválida.'})
+                        if arg('kind') not in invoicing.SOURCES or not arg('id').isdigit():return self.reply(400,{'error':'Solicitud inválida.'})
                         return self.reply(200,invoicing.eligibility(c,arg('kind'),int(arg('id'))))
                     if path=='/api/invoicing/policies':return self.reply(200,docs.policies(c))
                     found=re.fullmatch(r'/api/invoicing/policies/([0-9]{1,9})\.pdf',path)
@@ -2371,6 +2444,26 @@ class Handler(BaseHTTPRequestHandler):
                     except mail_pro.MailError as error:print('license-code',error.kind,flush=True)
                 # La misma respuesta coincida o no la identificación: no revela datos del titular.
                 return self.reply(200,license_pages.code_page(token,licenses.CODE_MINUTES),html_type)
+        proforma_post=re.fullmatch(r'/proforma/([A-Za-z0-9_-]{30,80})',urlsplit(self.path).path)
+        if proforma_post:
+            import proformas
+            try:length=int(self.headers.get('Content-Length','0') or 0)
+            except ValueError:length=0
+            if length<=0 or length>200000:return self.reply(400,{'error':'Solicitud inválida.'})
+            form={key:values[0] for key,values in parse_qs(self.rfile.read(length).decode('utf-8','replace'),keep_blank_values=True).items()}
+            token=proforma_post[1]
+            with connect() as c:
+                c.execute('BEGIN IMMEDIATE')
+                if limited(c,'proforma-post:'+digest(token),30,900) or limited(c,'proforma-ip:'+digest(self.client_address[0]),60,300):
+                    c.commit();return self.reply(429,{'error':'Demasiados intentos. Intenta más tarde.'})
+                now=reception_now();row,link=proformas.lookup(c,token,now)
+                if not row:
+                    c.commit();return self.reply(404,proformas.missing_page(),'text/html; charset=utf-8')
+                forwarded=(self.headers.get('X-Forwarded-For') or '').split(',')[0].strip()
+                page,decision=proformas.handle(c,token,row,link,form,now,{'ip':(forwarded or self.client_address[0])[:60],'agent':(self.headers.get('User-Agent') or '')[:160]})
+                if decision:audit(c,None,'proforma_client_'+decision,row['id'])
+                c.commit()
+            return self.reply(200,page,'text/html; charset=utf-8')
         quote_post_public=re.fullmatch(r'/presupuesto/([A-Za-z0-9_-]{30,80})',urlsplit(self.path).path)
         if quote_post_public:
             try:length=int(self.headers.get('Content-Length','0') or 0)
@@ -2452,7 +2545,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(403, {'error':'Solicitud no autorizada.'})
             path = urlsplit(self.path).path
             workspace_post=bool(re.fullmatch(r'/api/orders/[0-9]+/workspace',path));quote_json=bool(re.fullmatch(r'/api/quotes/[0-9]+',path))
-            max_body=1700000 if path=='/api/cash/upload' else 9000000 if path in ('/api/clients/import/preview','/api/clients/import/commit','/api/inventory/import/preview','/api/inventory/import/commit') else 200000 if path in ('/api/inventory/register','/api/invoicing/policies') else 1700000 if path=='/api/public/adi/listen' else 6000000 if path in ('/api/mail/send','/api/mail/draft') else 100000 if path in ('/api/conditions','/api/order-draft','/api/conditions/draft','/api/conditions/compare') else 3200000 if path in ('/api/licenses/new','/api/licenses/units','/api/licenses/units/bulk','/api/licenses/check','/api/licenses/products','/api/licenses/products/duplicate','/api/licenses/sales') or re.fullmatch(r'/api/licenses/sales/[0-9]+',path) else 900000 if re.fullmatch(r'/api/orders/[0-9]+/photos',path) or path in ('/api/profile/photo','/api/mail/signature') or re.fullmatch(r'/api/catalog/[0-9]+/image',path) else (65536 if workspace_post or quote_json else 16384)
+            max_body=1700000 if path in ('/api/cash/upload','/api/files/upload') else 65536 if path.startswith('/api/proformas') or path.startswith('/api/caja/') or re.fullmatch(r'/api/orders/[0-9]+/payments',path) or path=='/api/credit-notes' else 9000000 if path in ('/api/clients/import/preview','/api/clients/import/commit','/api/inventory/import/preview','/api/inventory/import/commit') else 200000 if path in ('/api/inventory/register','/api/invoicing/policies') else 1700000 if path=='/api/public/adi/listen' else 6000000 if path in ('/api/mail/send','/api/mail/draft') else 100000 if path in ('/api/conditions','/api/order-draft','/api/conditions/draft','/api/conditions/compare') else 3200000 if path in ('/api/licenses/new','/api/licenses/units','/api/licenses/units/bulk','/api/licenses/check','/api/licenses/products','/api/licenses/products/duplicate','/api/licenses/sales') or re.fullmatch(r'/api/licenses/sales/[0-9]+',path) else 900000 if re.fullmatch(r'/api/orders/[0-9]+/photos',path) or path in ('/api/profile/photo','/api/mail/signature') or re.fullmatch(r'/api/catalog/[0-9]+/image',path) else (65536 if workspace_post or quote_json else 16384)
             length = int(self.headers.get('Content-Length', '0'))
             if length <= 0 or length > max_body:
                 return self.reply(400, {'error':'Solicitud inválida.'})
@@ -2794,10 +2887,74 @@ class Handler(BaseHTTPRequestHandler):
                     try:
                         if action=='save':banking.save(c,data,user,now)
                         elif action in ('activate','deactivate'):banking.set_state(c,data.get('id'),action=='activate',user,now)
+                        elif action=='verify':banking.set_verified(c,data.get('id'),user,now)
                         elif action=='default':banking.set_default(c,data.get('id'),user,now)
                         else:return self.reply(400,{'error':'Acción inválida.'})
                     except banking.BankError as error:return self.reply(error.status,{'error':str(error),'fields':error.fields})
                     audit(c,user['id'],'bank_account_'+action);return self.reply(200,{'ok':True,'rows':banking.listing(c)})
+                if path=='/api/files/upload' or path.startswith('/api/caja/') or path.startswith('/api/bank/') or path.startswith('/api/vouchers') or path.startswith('/api/proformas') or path=='/api/credit-notes':
+                    # Caja por sesiones, Centro bancario, vouchers, proformas y notas de crédito. Permisos en el servidor; un error deshace todo.
+                    import cash,cash_sessions,banking,card_vouchers,proformas,credit_notes,invoicing
+                    if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
+                    if (path.startswith('/api/bank/') or path=='/api/credit-notes') and user['role']!='administrador':return self.reply(403,{'error':'Solo administración.'})
+                    now=reception_now();errors=(cash_sessions.CashError,banking.BankError,card_vouchers.VoucherError,proformas.ProformaError,credit_notes.CreditNoteError,cash.CashError)
+                    attach=lambda kind:cash_sessions.store_file(c,user,str(data.get('upload_id','') or ''),str(data.get('file_name','') or ''),kind,now)
+                    try:
+                        if path=='/api/files/upload':return self.reply(200,{'upload_id':cash.upload_part(c,user,data,now)})
+                        if path=='/api/caja/open':
+                            sid=cash_sessions.open_session(c,user,data,now);audit(c,user['id'],'cash_session_opened',sid);return self.reply(200,{'ok':True,'session_id':sid})
+                        if path=='/api/caja/movement':
+                            mid,dup=cash_sessions.add_movement(c,user,data,now,attach('egreso' if data.get('direction')=='egreso' else 'ingreso'));return self.reply(200,{'ok':True,'id':mid,'duplicate':dup})
+                        if path=='/api/caja/movement/void':cash_sessions.void_movement(c,user,data,now);return self.reply(200,{'ok':True})
+                        if path=='/api/caja/count':
+                            count=cash_sessions.save_count(c,user,data,now);return self.reply(200,{'ok':True,'count':count})
+                        if path=='/api/caja/close':
+                            result=cash_sessions.close(c,user,data,now);audit(c,user['id'],'cash_session_closed',int(data.get('session_id')));return self.reply(200,{'ok':True,**result})
+                        if path=='/api/caja/review':cash_sessions.review(c,user,data,now);return self.reply(200,{'ok':True})
+                        if path=='/api/caja/adjust':return self.reply(200,{'ok':True,'id':cash_sessions.adjust(c,user,data,now)})
+                        if path=='/api/caja/void':cash_sessions.void_session(c,user,data,now);return self.reply(200,{'ok':True})
+                        if path=='/api/caja/assign':cash_sessions.assign_incident(c,user,data,now);return self.reply(200,{'ok':True})
+                        if path=='/api/caja/registers':return self.reply(200,{'ok':True,'id':cash_sessions.save_register(c,data,user,now)})
+                        if path=='/api/caja/denominations':cash_sessions.set_denomination(c,data,user,now);return self.reply(200,{'ok':True})
+                        if path=='/api/bank/transfers':
+                            tid=banking.register_transfer(c,data,user,now,file_id=attach('transferencia'));return self.reply(200,{'ok':True,'id':tid})
+                        found=re.fullmatch(r'/api/bank/transfers/([0-9]{1,9})',path)
+                        if found:banking.transfer_action(c,found[1],str(data.get('action','')),data.get('note',''),user,now);return self.reply(200,{'ok':True})
+                        if path=='/api/vouchers':
+                            vid=card_vouchers.register(c,data,user,now,attach('voucher'));return self.reply(200,{'ok':True,'id':vid})
+                        found=re.fullmatch(r'/api/vouchers/([0-9]{1,9})',path)
+                        if found:
+                            action=str(data.get('action',''))
+                            if action=='corregir':card_vouchers.correct(c,found[1],data,user,now)
+                            else:card_vouchers.move(c,found[1],action,data,user,now)
+                            return self.reply(200,{'ok':True})
+                        if path=='/api/proformas':
+                            pid=proformas.save(c,data,user,now);return self.reply(200,{'ok':True,'id':pid,**proformas.detail(c,pid,now)})
+                        found=re.fullmatch(r'/api/proformas/([0-9]{1,9})',path)
+                        if found:
+                            pid=int(found[1]);action=str(data.get('action',''))
+                            if action=='save':proformas.save(c,data,user,now,pid)
+                            elif action=='send':
+                                token=proformas.send(c,pid,user,now,str(data.get('recipient','') or ''));link=public_base_url().rstrip('/')+'/proforma/'+token
+                                return self.reply(200,{'ok':True,'link':link,**proformas.detail(c,pid,now)})
+                            elif action=='decide':proformas.staff_decide(c,pid,data,user,now)
+                            elif action=='version':pid=proformas.new_version(c,pid,user,now)
+                            elif action=='cancel':proformas.cancel(c,pid,data,user,now)
+                            elif action=='convert':
+                                if user['role']!='administrador':return self.reply(403,{'error':'Solo administración genera facturas.'})
+                                invoice_id=proformas.convert(c,pid,user,now);return self.reply(200,{'ok':True,'invoice_id':invoice_id,**invoicing.detail(c,invoice_id)})
+                            elif action=='advance':
+                                proformas.add_advance(c,pid,data,user,now,attach('anticipo'))
+                            elif action=='void_advance':proformas.void_advance(c,data.get('advance_id'),data,user,now)
+                            else:return self.reply(400,{'error':'Acción no válida.'})
+                            return self.reply(200,{'ok':True,'id':pid,**proformas.detail(c,pid,now)})
+                        if path=='/api/credit-notes':
+                            invoice_id=str(data.get('invoice_id',''))
+                            if not invoice_id.isdigit():return self.reply(400,{'error':'Solicitud inválida.'})
+                            nid=credit_notes.create(c,int(invoice_id),data,user,now);audit(c,user['id'],'credit_note_test',nid);return self.reply(200,{'ok':True,'id':nid,**credit_notes.detail(c,nid)})
+                    except errors as error:
+                        c.rollback();return self.reply(error.status,{'error':str(error),'fields':getattr(error,'fields',{}),**getattr(error,'extra',{})})
+                    return self.reply(404,{'error':'No encontrado.'})
                 if path.startswith('/api/cash/'):
                     # Caja: cada persona cierra la suya; los depósitos se confirman a mano y solo administración concilia.
                     import cash,invoicing
@@ -2939,7 +3096,7 @@ class Handler(BaseHTTPRequestHandler):
                             return self.reply(200,{'ok':True,'mail':docs.mail_log(c,int(found[1])),'skipped':bool(sent.get('skipped'))})
                         if path=='/api/invoicing/draft':
                             kind=str(data.get('kind',''));sid=str(data.get('id',''))
-                            if kind not in ('orden','venta_licencia') or not sid.isdigit():return self.reply(400,{'error':'Solicitud inválida.'})
+                            if kind not in invoicing.SOURCES or not sid.isdigit():return self.reply(400,{'error':'Solicitud inválida.'})
                             c.commit();c.execute('BEGIN IMMEDIATE')
                             invoice_id=invoicing.draft(c,kind,int(sid),user,now);c.commit();audit(c,user['id'],'invoice_draft',invoice_id)
                             return self.reply(200,invoicing.detail(c,invoice_id))
@@ -3970,7 +4127,7 @@ class Handler(BaseHTTPRequestHandler):
                         if status==201:log('order_payment_assigned','Pago general asignado a este equipo: '+equipment.usd(payload['amount_cents'])+'.')
                     else:
                         status,payload=equipment.add_payment(c,oid,data,user,reception_now())
-                        if status==201:log('order_refund_recorded' if payload['kind']=='devolucion' else 'order_payment_recorded',('Devolución registrada' if payload['kind']=='devolucion' else 'Pago registrado')+(' (general de la orden)' if payload['scope']=='general' else '')+': '+equipment.usd(payload['amount_cents'])+' ('+equipment.METHODS[str(data.get('method'))]+').')
+                        if status==201:log('order_refund_recorded' if payload['kind']=='devolucion' else 'order_payment_recorded',('Devolución registrada' if payload['kind']=='devolucion' else 'Pago registrado')+(' (general de la orden)' if payload['scope']=='general' else '')+': '+equipment.usd(payload['amount_cents'])+' ('+('pago mixto '+payload['operation_id'] if payload.get('operation_id') else equipment.PAY_METHODS.get(str(data.get('method')),str(data.get('method'))).lower())+').')
                     if status<300:payload['finance']=equipment.finance(c,oid)
                     return self.reply(status,payload)
                 workspace_route=re.fullmatch(r'/api/orders/([0-9]+)/workspace',path)
@@ -4033,7 +4190,12 @@ class Handler(BaseHTTPRequestHandler):
                             comment=note
                         if status=='entregado' and old!='entregado':
                             blocked=equipment.delivery_block(c,int(oid))
-                            if blocked:return self.reply(409,{'error':blocked,'balance':True})
+                            if blocked:
+                                reason=re.sub(r'\s+',' ',str(data.get('balance_reason','') or '')).strip()
+                                if user['role']!='administrador' or str(data.get('authorize_balance',''))!='1' or len(reason)<10:
+                                    return self.reply(409,{'error':blocked+(' Administración puede autorizar la entrega con saldo indicando el motivo.' if user['role']=='administrador' else ''),'balance':True,'can_authorize':user['role']=='administrador'})
+                                order_workspace.event(c,int(oid),user['id'],now,'payment','Entrega con saldo pendiente autorizada por administración ('+equipment.usd(equipment.money(c,int(oid))['balance_cents'])+'). Motivo: '+reason[:300])
+                                audit(c,user['id'],'delivery_balance_authorized',int(oid))
                         c.execute('UPDATE orders SET status=?,updated_at=?,revision=revision+1 WHERE id=?', (status,now.isoformat(timespec='microseconds'),oid))
                         planned=maintenance.transition(c,int(oid),old,status,now)
                         # La entrega crea también la cita futura del mantenimiento (pendiente de confirmación), sin pasos manuales.

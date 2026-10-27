@@ -62,9 +62,11 @@ def money(c,order_id):
 def general(c,main_id):
     """Pagos generales de la orden (sin equipo) y lo que queda de ellos sin asignar a un equipo."""
     rows=[dict(r) for r in c.execute("SELECT p.id,p.amount_cents,p.kind,p.method,p.note,p.created_at,p.voided_at,p.void_reason,COALESCE(u.name,'') actor,"
-                                     "COALESCE((SELECT SUM(a.amount_cents) FROM order_payment_allocations a WHERE a.payment_id=p.id),0) allocated_cents "
+                                     "COALESCE((SELECT SUM(a.amount_cents) FROM order_payment_allocations a WHERE a.payment_id=p.id),0) allocated_cents,"+DETAIL_SQL+" "
                                      "FROM order_payments p LEFT JOIN users u ON u.id=p.created_by WHERE p.order_id=? AND p.scope='general' ORDER BY p.id",(main_id,))]
-    for row in rows:row['free_cents']=row['amount_cents']-row['allocated_cents'] if row['kind']=='pago' and not row['voided_at'] else 0
+    for row in rows:
+        row['free_cents']=row['amount_cents']-row['allocated_cents'] if row['kind']=='pago' and not row['voided_at'] else 0
+        row['method_label']=method_label(row['method'],row['method_detail']);row['receipt']='REC-%06d'%row['id']
     live=[row for row in rows if not row['voided_at']]
     return rows,sum(row['free_cents'] for row in live)-sum(row['amount_cents'] for row in live if row['kind']=='devolucion')
 
@@ -82,10 +84,18 @@ def delivery_block(c,order_id):
     return 'No se puede entregar: este equipo tiene un saldo pendiente de '+usd(state['balance_cents'])+'. '+('La orden tiene '+usd(free)+' de pagos generales sin asignar: asígnalos a este equipo o registra el pago antes de entregarlo.' if free>0 else 'Registra el pago antes de entregarlo.')
 
 
+DETAIL_SQL=("p.method_detail,p.reference,p.paid_at,p.operation_id,p.cash_session_id,"
+            "COALESCE((SELECT b.bank||' · '||b.number FROM bank_accounts b WHERE b.id=p.bank_account_id),'') bank,"
+            "COALESCE((SELECT t.status FROM bank_transfers t WHERE t.payment_id=p.id),'') transfer_status,"
+            "COALESCE((SELECT v.status FROM card_vouchers v WHERE v.payment_id=p.id AND v.status!='rechazada' ORDER BY v.id DESC LIMIT 1),'') voucher_status,"
+            "(SELECT v.id FROM card_vouchers v WHERE v.payment_id=p.id AND v.status!='rechazada' ORDER BY v.id DESC LIMIT 1) voucher_id")
+
+
 def payments(c,order_id):
     """Movimientos de un equipo: sus pagos y devoluciones, y lo que recibió de pagos generales de la orden."""
-    rows=[dict(r) for r in c.execute("SELECT p.id,p.amount_cents,p.kind,p.method,p.note,p.created_at,p.voided_at,p.void_reason,COALESCE(u.name,'') actor FROM order_payments p LEFT JOIN users u ON u.id=p.created_by WHERE p.order_id=? AND p.scope='equipo' ORDER BY p.id",(order_id,))]
-    rows+=[dict(r,kind='asignacion') for r in c.execute("SELECT a.id allocation_id,p.id,a.amount_cents,p.method,p.note,a.created_at,p.voided_at,p.void_reason,COALESCE(u.name,'') actor FROM order_payment_allocations a JOIN order_payments p ON p.id=a.payment_id LEFT JOIN users u ON u.id=a.created_by WHERE a.order_id=? ORDER BY a.id",(order_id,))]
+    rows=[dict(r) for r in c.execute("SELECT p.id,p.amount_cents,p.kind,p.method,p.note,p.created_at,p.voided_at,p.void_reason,COALESCE(u.name,'') actor,"+DETAIL_SQL+" FROM order_payments p LEFT JOIN users u ON u.id=p.created_by WHERE p.order_id=? AND p.scope='equipo' ORDER BY p.id",(order_id,))]
+    rows+=[dict(r,kind='asignacion') for r in c.execute("SELECT a.id allocation_id,p.id,a.amount_cents,p.method,p.note,a.created_at,p.voided_at,p.void_reason,COALESCE(u.name,'') actor,"+DETAIL_SQL+" FROM order_payment_allocations a JOIN order_payments p ON p.id=a.payment_id LEFT JOIN users u ON u.id=a.created_by WHERE a.order_id=? ORDER BY a.id",(order_id,))]
+    for row in rows:row['method_label']=method_label(row['method'],row['method_detail']);row['receipt']='REC-%06d'%row['id']
     return sorted(rows,key=lambda row:row['created_at'])
 
 
@@ -98,9 +108,59 @@ def cents_of(value):
     except (InvalidOperation,ValueError):return None
 
 
+# Formas de pago al registrar: débito, crédito y cheque se guardan con su detalle (la columna de método conserva sus valores históricos).
+PAY_METHODS={'efectivo':'Efectivo','transferencia':'Transferencia bancaria','deposito':'Depósito bancario','debito':'Tarjeta de débito','credito':'Tarjeta de crédito',
+             'cheque':'Cheque','tarjeta':'Tarjeta','otro':'Otro'}
+DETAIL_LABELS={'debito':'Tarjeta de débito','credito':'Tarjeta de crédito','cheque':'Cheque'}
+
+
+def stored_method(code):
+    """(método guardado, detalle) para una forma de pago elegida."""
+    return {'debito':('tarjeta','debito'),'credito':('tarjeta','credito'),'cheque':('otro','cheque')}.get(code,(code,''))
+
+
+def method_label(method,detail):
+    return DETAIL_LABELS.get(detail) or METHODS.get(method,method)
+
+
+def _lines(c,data,refund=False):
+    """Líneas del pago: una sola, o varias en un pago mixto (2 a 5) que deben sumar el importe indicado."""
+    import json
+    raw=data.get('lines')
+    if raw:
+        try:items=json.loads(raw) if isinstance(raw,str) else raw
+        except ValueError:return None,{'lines':'Detalle del pago mixto no válido.'}
+        if not isinstance(items,list) or not 2<=len(items)<=5:return None,{'lines':'Un pago mixto tiene de 2 a 5 formas de pago.'}
+    else:items=[{'method':data.get('method',''),'amount':data.get('amount',''),'bank_account_id':data.get('bank_account_id',''),'reference':data.get('reference','')}]
+    lines,errors=[],{}
+    for n,item in enumerate(items):
+        if not isinstance(item,dict):return None,{'lines':'Detalle del pago no válido.'}
+        suffix='' if len(items)==1 else '_%d'%n
+        code=str(item.get('method',''));cents=cents_of(item.get('amount',''));reference=re.sub(r'\s+',' ',str(item.get('reference','') or '')).strip()
+        if code not in PAY_METHODS:errors['method'+suffix]='Selecciona la forma de pago.'
+        if cents is None:errors['amount'+suffix]='Indica un importe mayor que cero con hasta dos decimales.'
+        account=None
+        if code in ('transferencia','deposito') and not refund:
+            acc=str(item.get('bank_account_id','') or '')
+            account=c.execute('SELECT * FROM bank_accounts WHERE id=? AND active=1',(int(acc),)).fetchone() if acc.isdigit() else None
+            if not account:errors['bank_account_id'+suffix]='Elige la cuenta que recibe el dinero.'
+            if not 3<=len(reference)<=60:errors['reference'+suffix]='Número de depósito o referencia bancaria (3 a 60 caracteres).'
+            elif account and c.execute("SELECT 1 FROM bank_transfers WHERE bank_account_id=? AND lower(reference)=lower(?) AND status!='rechazado'",(account['id'],reference)).fetchone():
+                errors['reference'+suffix]='Esa referencia ya está registrada en esta cuenta.'
+        if code=='cheque' and not 3<=len(reference)<=60:errors['reference'+suffix]='Número del cheque y banco.'
+        if len(reference)>60:errors['reference'+suffix]='Hasta 60 caracteres.'
+        lines.append({'code':code,'cents':cents or 0,'account':account,'reference':reference[:60]})
+    if len(lines)>1:
+        refs=[(l['account']['id'],l['reference'].lower()) for l in lines if l['account']]
+        if len(refs)!=len(set(refs)):errors['lines']='Hay dos líneas con la misma referencia en la misma cuenta.'
+    return lines,errors
+
+
 def add_payment(c,order_id,data,user,now):
-    """Registra un pago (o una devolución) de un equipo o general de la orden. Se llama dentro de una transacción de escritura, así
-    el saldo que se valida es el mismo que queda guardado aunque lleguen dos solicitudes a la vez."""
+    """Registra un pago, un abono o un pago mixto (o una devolución) de un equipo o general de la orden. Se llama dentro de una
+    transacción de escritura, así el saldo que se valida es el mismo que queda guardado aunque lleguen dos solicitudes a la vez.
+    Cada pago queda en la caja abierta (si la hay); una transferencia o un depósito queda además pendiente de verificación."""
+    import banking,secrets
     order=c.execute('SELECT id FROM orders WHERE id=?',(order_id,)).fetchone()
     if not order:return 404,{'error':'Orden no disponible.'}
     kind=str(data.get('kind','pago'));scope=str(data.get('scope','equipo'));key=str(data.get('request_key','')).strip()
@@ -109,18 +169,29 @@ def add_payment(c,order_id,data,user,now):
     if key and not KEY.fullmatch(key):return 400,{'error':'Solicitud no válida. Recarga la página e inténtalo nuevamente.'}
     main=root(c,order_id);target=main['id'] if scope=='general' else order_id
     if scope=='general' and not main['group_id']:return 400,{'error':'Esta orden tiene un solo equipo: registra el pago en el equipo.'}
-    errors={};cents=cents_of(data.get('amount',''))
-    if cents is None:errors['amount']='Indica un importe mayor que cero con hasta dos decimales.';cents=0
-    method=str(data.get('method',''))
-    if method not in METHODS:errors['method']='Selecciona la forma de pago.'
+    mixed=bool(data.get('lines'))
+    if mixed and kind=='devolucion':return 400,{'error':'Una devolución se registra con una sola forma de pago.'}
+    if mixed and key and len(key)>60:return 400,{'error':'Solicitud no válida. Recarga la página e inténtalo nuevamente.'}
+    lines,errors=_lines(c,data,kind=='devolucion')
+    if lines is None:return 400,{'error':next(iter(errors.values())),'fields':errors}
+    cents=sum(l['cents'] for l in lines)
+    if mixed:
+        expected=cents_of(data.get('amount',''))
+        if expected is None:errors['amount']='Indica el importe total del pago mixto.'
+        elif expected!=cents and not errors:errors['lines']='Las formas de pago suman '+usd(cents)+' y el total indicado es '+usd(expected)+': deben coincidir.'
     note=str(data.get('note','')).strip()
     if len(note)>300:errors['note']='La nota admite hasta 300 caracteres.'
     elif kind=='devolucion' and len(note)<5:errors['note']='Indica el motivo o la referencia de la devolución (al menos 5 caracteres).'
+    try:paid_at=banking.when(data.get('paid_at',''),now)
+    except banking.BankError as error:errors.update(error.fields)
     if key and not errors:
         # Reintento o doble clic: la misma solicitud devuelve el movimiento ya registrado en lugar de crear otro.
-        same=c.execute('SELECT id,order_id,amount_cents,kind,scope FROM order_payments WHERE request_key=?',(key,)).fetchone()
+        same=c.execute('SELECT id,order_id,amount_cents,kind,scope,operation_id FROM order_payments WHERE request_key=?',(key+('-1' if mixed else ''),)).fetchone()
         if same:
-            if (same['order_id'],same['amount_cents'],same['kind'],same['scope'])!=(target,cents,kind,scope):return 409,{'error':'Esta solicitud ya se utilizó para otro movimiento. Recarga la página e inténtalo nuevamente.'}
+            if mixed:
+                total=c.execute('SELECT SUM(amount_cents) FROM order_payments WHERE operation_id=?',(same['operation_id'],)).fetchone()[0]
+                if (same['order_id'],total,same['kind'],same['scope'])!=(target,cents,kind,scope):return 409,{'error':'Esta solicitud ya se utilizó para otro movimiento. Recarga la página e inténtalo nuevamente.'}
+            elif (same['order_id'],same['amount_cents'],same['kind'],same['scope'])!=(target,cents,kind,scope):return 409,{'error':'Esta solicitud ya se utilizó para otro movimiento. Recarga la página e inténtalo nuevamente.'}
             return 200,{'ok':True,'id':same['id'],'duplicate':True,**money(c,order_id)}
     if not errors:
         state=money(c,order_id);whole=group(c,order_id)['totals'] if scope=='general' else None
@@ -132,8 +203,24 @@ def add_payment(c,order_id,data,user,now):
             limit=max(0,whole['general_cents']) if whole else state['paid_cents']
             if cents>limit:errors['amount']='La devolución supera lo pagado '+('sin asignar de la orden' if whole else 'por este equipo')+' ('+usd(limit)+').'
     if errors:return 400,{'error':next(iter(errors.values())),'fields':errors}
-    pid=c.execute('INSERT INTO order_payments(order_id,amount_cents,method,note,created_by,created_at,kind,scope,request_key) VALUES (?,?,?,?,?,?,?,?,?)',(target,cents,method,note,user['id'],now.isoformat(timespec='seconds'),kind,scope,key or None)).lastrowid
-    return 201,{'ok':True,'id':pid,'amount_cents':cents,'kind':kind,'scope':scope,**money(c,order_id)}
+    try:
+        import cash_sessions
+        session=cash_sessions.current_for(c,user)
+    except Exception:
+        session=None
+    operation='OP-'+secrets.token_hex(6).upper() if mixed else ''
+    ids=[]
+    for n,line in enumerate(lines,1):
+        method,detail=stored_method(line['code'])
+        pid=c.execute('INSERT INTO order_payments(order_id,amount_cents,method,note,created_by,created_at,kind,scope,request_key,method_detail,bank_account_id,reference,paid_at,operation_id,cash_session_id) '
+                      'VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',(target,line['cents'],method,note,user['id'],now.isoformat(timespec='seconds'),kind,scope,(key+('-%d'%n if mixed else '')) if key else None,
+                                                             detail,line['account']['id'] if line['account'] else None,line['reference'],paid_at,operation,session)).lastrowid
+        ids.append(pid)
+        if line['code'] in ('transferencia','deposito') and kind=='pago':
+            client=c.execute('SELECT d.client_id FROM orders o JOIN devices d ON d.id=o.device_id WHERE o.id=?',(order_id,)).fetchone()
+            banking.register_transfer(c,{'method':line['code'],'bank_account_id':line['account']['id'],'reference':line['reference'],'amount_cents':line['cents'],'paid_at':paid_at,
+                                         'source_kind':'orden','source_id':order_id,'client_id':client['client_id'] if client else ''},user,now,payment_id=pid)
+    return 201,{'ok':True,'id':ids[0],'ids':ids,'operation_id':operation,'amount_cents':cents,'kind':kind,'scope':scope,'cash_session_id':session,**money(c,order_id)}
 
 
 def assign_payment(c,order_id,data,user,now):
@@ -205,6 +292,24 @@ def group(c,order_id):
     moves,free=general(c,main['id']);charges=sum(r['budget_cents'] for r in rows);paid=sum(r['paid_cents'] for r in rows)+free
     return {'main_id':main['id'],'main_code':main_code,'multiple':len(rows)>1,'units':rows,'overall':overall(rows),'general_payments':moves,
             'totals':{**summary(charges,paid),'general_cents':free,'delivered':sum(1 for r in rows if r['status_code']=='entregado'),'units':len(rows)}}
+
+
+def statuses(c,order_id):
+    """Estados independientes: pago (pendiente, abonada parcialmente, pagada), facturación y entrega, con el porcentaje pagado y el último pago."""
+    m=money(c,order_id)
+    pay={'sin_cargos':('sin_cargos','Sin cargos'),'pendiente':('pendiente','Pendiente'),'parcial':('parcial','Abonada parcialmente'),'pagado':('pagada','Pagada'),'credito':('pagada','Pagada (saldo a favor)')}[m['state']]
+    last=c.execute("SELECT MAX(CASE WHEN p.paid_at!='' THEN p.paid_at ELSE p.created_at END) FROM order_payments p WHERE p.order_id IN (?,(SELECT COALESCE(group_id,id) FROM orders WHERE id=?)) AND p.voided_at IS NULL AND p.kind='pago'",
+                   (order_id,order_id)).fetchone()[0]
+    try:
+        inv=c.execute("SELECT status FROM invoices WHERE source_kind='orden' AND source_id=? AND status!='descartado' ORDER BY id DESC LIMIT 1",(order_id,)).fetchone()
+    except Exception:
+        inv=None
+    billing={None:('sin_factura','Sin factura'),'borrador':('borrador','Factura en borrador'),'pendiente':('emitida','Factura emitida (pruebas)'),'enviado':('emitida','Factura enviada al SRI'),
+             'autorizado':('autorizada','Factura autorizada'),'rechazado':('rechazada','Factura rechazada')}[inv['status'] if inv else None]
+    status=c.execute('SELECT status FROM orders WHERE id=?',(order_id,)).fetchone()['status']
+    delivery=('entregado','Entregado') if status=='entregado' else ('listo','Listo para entregar') if status in ('listo','espera_entrega') else ('en_taller','En el taller')
+    percent=min(100,(m['paid_cents']*100//m['budget_cents'])) if m['budget_cents'] else 0
+    return {'payment':{'code':pay[0],'label':pay[1],'percent':percent,'last_payment_at':last or ''},'billing':{'code':billing[0],'label':billing[1]},'delivery':{'code':delivery[0],'label':delivery[1]}}
 
 
 def finance(c,order_id):

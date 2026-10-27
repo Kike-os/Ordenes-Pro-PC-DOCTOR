@@ -80,7 +80,7 @@ class CashTests(unittest.TestCase):
         account = post('/api/bank-accounts', action='save', **ACCOUNT)['body']['rows'][0]
         order = self.charged_order(post, cookie, '000001', 10000)
         self.assertEqual(post('/api/orders/%d/payments' % order['id'], amount='80,00', method='efectivo')['status'], 201)
-        post('/api/orders/%d/payments' % order['id'], amount='20,00', method='transferencia')
+        post('/api/orders/%d/payments' % order['id'], amount='20,00', method='transferencia', bank_account_id=str(account['id']), reference='TRX-CAJA-0001')
         day = self.request('/api/cash/day', cookie=cookie)['body']
         self.assertEqual((day['live']['cash_cents'], day['live']['total_cents'], day['live']['count'], day['closing']), (8000, 10000, 2, None))
         # Si el contado no coincide, hay que explicarlo; el cierre es único por persona y día.
@@ -163,7 +163,7 @@ class CashTests(unittest.TestCase):
         # Factura: la cuenta elegida aparece en la vista y en la información adicional del XML.
         items = [i['id'] for i in self.request('/api/quotes/%d' % quote, cookie=cookie)['body']['quote']['items']]
         post('/api/quotes/%d' % quote, action='decide', approved=','.join(map(str, items)), note='Aprobó por teléfono (ficticio)')
-        post('/api/orders/%d/payments' % order['id'], amount='30,00', method='transferencia')
+        post('/api/orders/%d/payments' % order['id'], amount='30,00', method='transferencia', bank_account_id=str(account['id']), reference='TRX-FACT-0001')
         draft = post('/api/invoicing/draft', kind='orden', id=str(order['id']))['body']['invoice']
         chosen = post('/api/invoicing/%d' % draft['id'], action='bank', bank_account_id=str(account['id']))['body']
         self.assertEqual(chosen['bank_account']['number'], '1234567890')

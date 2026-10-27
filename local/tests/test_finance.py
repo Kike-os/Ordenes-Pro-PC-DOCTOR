@@ -20,7 +20,16 @@ class FinanceTests(unittest.TestCase):
             c.commit()
         return ids
 
-    def pay(self,oid,amount,**extra):return self.request('/api/orders/%d/payments'%oid,dict({'amount':amount,'method':'efectivo'},**extra),cookie=self.cookie,csrf=self.csrf)
+    def pay(self,oid,amount,**extra):
+        # Una transferencia se registra con la cuenta que recibe el dinero y su referencia bancaria (únicas por cuenta).
+        if extra.get('method') in ('transferencia','deposito') and extra.get('kind')!='devolucion':
+            with app.connect() as c:
+                row=c.execute("SELECT id FROM bank_accounts WHERE number='5555000011'").fetchone()
+                account=row[0] if row else c.execute("INSERT INTO bank_accounts(bank,account_type,number,holder,holder_id,created_at,updated_at) VALUES ('Banco Ficticio','ahorros','5555000011','TITULAR FICTICIO','0100000017','x','x')").lastrowid
+                c.commit()
+            self.transfers=getattr(self,'transfers',0)+1
+            extra=dict(extra,bank_account_id=str(account),reference='TRX-FIN-%04d'%self.transfers)
+        return self.request('/api/orders/%d/payments'%oid,dict({'amount':amount,'method':'efectivo'},**extra),cookie=self.cookie,csrf=self.csrf)
     def void(self,oid,pid,reason='Registro ficticio equivocado'):return self.request('/api/orders/%d/payments/void'%oid,{'payment_id':str(pid),'reason':reason},cookie=self.cookie,csrf=self.csrf)
     def finance(self,oid):return self.request('/api/orders/%d/finance'%oid,cookie=self.cookie)['body']['finance']
     def state(self,oid):unit=self.finance(oid)['unit'];return unit['state'],unit['balance_cents'],unit['paid_cents'],unit['credit_cents']

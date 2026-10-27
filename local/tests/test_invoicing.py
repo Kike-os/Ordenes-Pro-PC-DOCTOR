@@ -83,8 +83,10 @@ class InvoiceFlowTests(unittest.TestCase):
         cookie, csrf, post, order = self.paid_order(3000, pay=False)
         self.assertEqual(self.request('/api/invoicing')['status'], 401)
         eligible = self.request('/api/invoicing/eligibility?kind=orden&id=%d' % order['id'], cookie=cookie)['body']
-        self.assertFalse(eligible['can_generate']);self.assertIn('no está totalmente pagada', ' '.join(eligible['blockers']))
-        self.assertEqual(post('/api/invoicing/draft', kind='orden', id=str(order['id']))['status'], 409)
+        # Cobro y facturación son independientes: una orden sin pagar se factura y su saldo queda como venta a crédito.
+        self.assertTrue(eligible['can_generate']);self.assertEqual(eligible['blockers'], [])
+        unpaid = post('/api/invoicing/draft', kind='orden', id=str(order['id']))['body']
+        self.assertEqual([(p['method'], p['amount_cents']) for p in unpaid['payments']], [('credito', 3000)])
         with app.connect() as c:
             c.execute("UPDATE users SET role='tecnico' WHERE id=?", (self.uid,));c.commit()
         self.assertEqual(self.request('/api/invoicing', cookie=cookie)['status'], 403)

@@ -145,8 +145,13 @@ def add_payment(c,sale_id,data,user,now):
     pending=_paid(c,sale_id)+_paid(c,sale_id,'por_confirmar');balance=sale['total_cents']-pending
     if amount>balance:raise LicenseError('El pago supera el saldo pendiente (%s).'%usd(max(balance,0)),fields={'amount':'Mayor que el saldo.'})
     receipt=_receipt(data);confirmed=data.get('confirmed') is True;moment=stamp(now)
-    payment=c.execute('INSERT INTO license_sale_payments(sale_id,amount_cents,method,reference,paid_on,status,notes,created_by,created_at,confirmed_by,confirmed_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
-                      (sale_id,amount,method,reference,paid_on,'confirmado' if confirmed else 'por_confirmar',notes,user['id'],moment,user['id'] if confirmed else None,moment if confirmed else '')).lastrowid
+    try:
+        import cash_sessions
+        session=cash_sessions.current_for(c,user)  # el cobro queda en la caja abierta, si la hay
+    except Exception:
+        session=None
+    payment=c.execute('INSERT INTO license_sale_payments(sale_id,amount_cents,method,reference,paid_on,status,notes,created_by,created_at,confirmed_by,confirmed_at,cash_session_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',
+                      (sale_id,amount,method,reference,paid_on,'confirmado' if confirmed else 'por_confirmar',notes,user['id'],moment,user['id'] if confirmed else None,moment if confirmed else '',session)).lastrowid
     if receipt:c.execute('INSERT INTO license_payment_receipts(payment_id,name,mime,data,created_at,created_by) VALUES (?,?,?,?,?,?)',(payment,*receipt,moment,user['id']))
     _log(c,sale_id,'pago','Pago de %s por %s%s (%s)%s.'%(usd(amount),METHODS[method].lower(),', ref. '+reference if reference else '','confirmado' if confirmed else 'por confirmar',', con comprobante' if receipt else ''),user,now)
     refresh(c,sale_id,now);return payment
