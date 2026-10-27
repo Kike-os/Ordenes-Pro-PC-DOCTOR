@@ -1,8 +1,17 @@
 {
   "unreleased": {
-    "features": [],
-    "improvements": [],
-    "fixes": [],
+    "features": [
+      "Caja por sesiones: Abrir Caja con conteo por denominaciones USD, ingresos y egresos con trazabilidad, arqueo, cierre guiado en 6 pasos con diferencias (cuadrado, sobrante, faltante) y revisión administrativa, fondo para el siguiente turno, historial y auditoría, y reporte oficial en PDF A4 y térmico de 80 mm.",
+      "Pagos y saldo de las órdenes: pago completo, abono o pago mixto con confirmación previa, débito, crédito, cheque, cuenta receptora elegida por banco, referencia y fecha; estados de pago, facturación y entrega por separado; la entrega con saldo solo con autorización administrativa y motivo.",
+      "Cuentas bancarias con verificación, indicadores, registro de depósitos y transferencias con comprobante, confirmación, rechazo y conciliación, historial con filtros y exportación a Excel y PDF; vouchers de tarjeta con lote, referencia, aprobación y últimos 4 dígitos, y liquidación con comisión.",
+      "Cotizaciones y proformas con financiamiento DATAFAST, enlace privado de aprobación con firma, versiones, anticipos y conversión a factura; factura directa, factura desde una venta del inventario y notas de crédito (en el ambiente de pruebas)."
+    ],
+    "improvements": [
+      "Inventario: reinicialización controlada y auditada, Kardex con saldo anterior y posterior, correcciones de costo y cambios de precio sin efecto en existencias, y ficha con código de barras único, existencia máxima, descripción y margen estimado."
+    ],
+    "fixes": [
+      "Facturación: una orden se factura aunque tenga saldo (queda como venta a crédito); cobro y facturación son procesos separados."
+    ],
     "security": [],
     "performance": []
   },
