@@ -1032,7 +1032,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         path = urlsplit(self.path).path
-        files = {'/static/label.css':'label.css','/static/tracking.css':'tracking.css','/static/licencias.css':'licencias.css','/static/app.css':'app.css','/static/app.js':'app.js','/static/service-picker.js':'service-picker.js','/static/licenses.js':'licenses.js','/static/reschedule.js':'reschedule.js','/static/form-validation.js':'form-validation.js','/static/appointments.js':'appointments.js','/static/adi-widget.js':'adi-widget.js','/static/adi-orb.js':'adi-orb.js','/static/ui-select.js':'ui-select.js','/static/ticket.css':'ticket.css','/static/ticket.js':'ticket.js','/static/quote.css':'quote.css','/static/quote-sign.js':'quote-sign.js','/static/echarts.min.js':'echarts.min.js','/static/logo-original.png':'logo-original.png',
+        files = {'/static/label.css':'label.css','/static/tracking.css':'tracking.css','/static/licencias.css':'licencias.css','/static/app.css':'app.css','/static/app.js':'app.js','/static/service-picker.js':'service-picker.js','/static/licenses.js':'licenses.js','/static/inventory.js':'inventory.js','/static/reschedule.js':'reschedule.js','/static/form-validation.js':'form-validation.js','/static/appointments.js':'appointments.js','/static/adi-widget.js':'adi-widget.js','/static/adi-orb.js':'adi-orb.js','/static/ui-select.js':'ui-select.js','/static/ticket.css':'ticket.css','/static/ticket.js':'ticket.js','/static/quote.css':'quote.css','/static/quote-sign.js':'quote-sign.js','/static/echarts.min.js':'echarts.min.js','/static/logo-original.png':'logo-original.png',
                  '/favicon.ico':'favicon.ico','/static/favicon.ico':'favicon.ico','/static/favicon-16.png':'favicon-16.png','/static/favicon-32.png':'favicon-32.png','/static/logo-firma.png':'logo-firma.png','/static/favicon-48.png':'favicon-48.png',
                  '/apple-touch-icon.png':'apple-touch-icon.png','/apple-touch-icon-precomposed.png':'apple-touch-icon.png','/static/apple-touch-icon.png':'apple-touch-icon.png'}
         # Logotipos de marcas: solo nombres simples dentro de static/brands; si el archivo no existe la interfaz usa un icono genérico.
@@ -1869,6 +1869,39 @@ class Handler(BaseHTTPRequestHandler):
                 q=parse_qs(urlsplit(self.path).query);arg=lambda name:(q.get(name,[''])[0] or '')[:80]
                 try:
                     if path=='/api/inventory':return self.reply(200,inventory.overview(c,reception_now(),arg('q')))
+                    import inventory_center as center
+                    now=reception_now()
+                    if path=='/api/inventory/center':return self.reply(200,center.dashboard(c,now))
+                    if path=='/api/inventory/taxonomy':return self.reply(200,center.taxonomy(c))
+                    if path=='/api/inventory/products':return self.reply(200,{'rows':center.products(c,arg('q'),arg('category'),arg('brand'),arg('state'))})
+                    found=re.fullmatch(r'/api/inventory/products/([0-9]{1,9})',path)
+                    if found:return self.reply(200,{'product':center.product(c,found[1]),'units':center.units(c,found[1]),'reservations':[r for r in center.reservations(c) if r['item_id']==int(found[1])]})
+                    if path=='/api/inventory/units':return self.reply(200,{'rows':center.units(c,arg('item'),arg('q'),arg('status')),'statuses':inventory.UNIT_STATUS})
+                    found=re.fullmatch(r'/api/inventory/units/([0-9]{1,9})',path)
+                    if found:return self.reply(200,center.unit_detail(c,found[1]))
+                    if path=='/api/inventory/serial-check':return self.reply(200,center.serial_check(c,arg('serial')))
+                    kardex_filters=lambda:{k:arg(k) for k in ('from','to','category_id','brand_id','item_id','serial','type','user_id')}
+                    if path=='/api/inventory/kardex':
+                        return self.reply(200,dict(center.kardex(c,kardex_filters()),types=center.KARDEX_TYPES,users=[dict(r) for r in c.execute("SELECT id,name FROM users ORDER BY name")]))
+                    if path in ('/api/inventory/kardex.xlsx','/api/inventory/kardex.csv','/api/inventory/kardex.pdf'):
+                        data=center.kardex(c,kardex_filters());day=now.date().isoformat()
+                        if path.endswith('.xlsx'):return self.reply(200,center.kardex_xlsx(data['rows']),'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',filename='kardex-'+day+'.xlsx')
+                        if path.endswith('.csv'):return self.reply(200,center.kardex_csv(data['rows']).encode('utf-8'),'text/csv; charset=utf-8',filename='kardex-'+day+'.csv')
+                        audit(c,user['id'],'inventory_kardex_pdf');c.commit()
+                        return self.reply(200,center.kardex_pdf(data['rows'],data['totals'],' · '.join(v for v in (arg('from'),arg('to')) if v)),'application/pdf',filename='kardex-'+day+'.pdf')
+                    if path=='/api/inventory/reservations':return self.reply(200,{'rows':center.reservations(c,arg('status') or 'activa')})
+                    if path=='/api/inventory/warranties':return self.reply(200,center.warranties(c,now.date(),arg('state'),arg('q')))
+                    if path=='/api/inventory/licenses':return self.reply(200,center.licenses_tree(c,now))
+                    if path=='/api/inventory/search':return self.reply(200,center.search(c,arg('q')))
+                    if path=='/api/inventory/reports':return self.reply(200,center.reports(c))
+                    if path=='/api/inventory/stock.xlsx':return self.reply(200,center.stock_xlsx(c),'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',filename='existencias-'+now.date().isoformat()+'.xlsx')
+                    if path=='/api/inventory/labels.pdf':
+                        units_arg=[u for u in (q.get('units',[''])[0] or '').split(',') if u.isdigit()][:500]
+                        return self.reply(200,center.labels_pdf(c,json.dumps(units_arg) if units_arg else None,arg('item'),arg('copies') or '1',arg('size') or '60x40'),'application/pdf',filename='etiquetas.pdf')
+                    if path=='/api/inventory/import/template.csv':return self.reply(200,center.import_template().encode('utf-8'),'text/csv; charset=utf-8',filename='plantilla-inventario.csv')
+                    if path=='/api/inventory/export.json':
+                        audit(c,user['id'],'inventory_export');c.commit()
+                        return self.reply(200,json.dumps(center.export_package(c,now),ensure_ascii=False,default=str).encode('utf-8'),'application/json',filename='inventario-pruebas-'+now.date().isoformat()+'.json')
                     if path=='/api/inventory/suppliers':return self.reply(200,{'rows':inventory.suppliers(c)})
                     if path=='/api/inventory/purchases':return self.reply(200,{'rows':inventory.purchases(c,arg('status')),'statuses':inventory.PURCHASE_STATUS})
                     found=re.fullmatch(r'/api/inventory/items/([0-9]{1,9})/movements',path)
@@ -2375,7 +2408,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(403, {'error':'Solicitud no autorizada.'})
             path = urlsplit(self.path).path
             workspace_post=bool(re.fullmatch(r'/api/orders/[0-9]+/workspace',path));quote_json=bool(re.fullmatch(r'/api/quotes/[0-9]+',path))
-            max_body=1700000 if path=='/api/cash/upload' else 9000000 if path in ('/api/clients/import/preview','/api/clients/import/commit') else 1700000 if path=='/api/public/adi/listen' else 6000000 if path in ('/api/mail/send','/api/mail/draft') else 100000 if path in ('/api/conditions','/api/order-draft','/api/conditions/draft','/api/conditions/compare') else 3200000 if path in ('/api/licenses/new','/api/licenses/units','/api/licenses/units/bulk','/api/licenses/check','/api/licenses/products','/api/licenses/products/duplicate','/api/licenses/sales') or re.fullmatch(r'/api/licenses/sales/[0-9]+',path) else 900000 if re.fullmatch(r'/api/orders/[0-9]+/photos',path) or path in ('/api/profile/photo','/api/mail/signature') or re.fullmatch(r'/api/catalog/[0-9]+/image',path) else (65536 if workspace_post or quote_json else 16384)
+            max_body=1700000 if path=='/api/cash/upload' else 9000000 if path in ('/api/clients/import/preview','/api/clients/import/commit','/api/inventory/import/preview','/api/inventory/import/commit') else 200000 if path=='/api/inventory/register' else 1700000 if path=='/api/public/adi/listen' else 6000000 if path in ('/api/mail/send','/api/mail/draft') else 100000 if path in ('/api/conditions','/api/order-draft','/api/conditions/draft','/api/conditions/compare') else 3200000 if path in ('/api/licenses/new','/api/licenses/units','/api/licenses/units/bulk','/api/licenses/check','/api/licenses/products','/api/licenses/products/duplicate','/api/licenses/sales') or re.fullmatch(r'/api/licenses/sales/[0-9]+',path) else 900000 if re.fullmatch(r'/api/orders/[0-9]+/photos',path) or path in ('/api/profile/photo','/api/mail/signature') or re.fullmatch(r'/api/catalog/[0-9]+/image',path) else (65536 if workspace_post or quote_json else 16384)
             length = int(self.headers.get('Content-Length', '0'))
             if length <= 0 or length > max_body:
                 return self.reply(400, {'error':'Solicitud inválida.'})
@@ -2770,6 +2803,48 @@ class Handler(BaseHTTPRequestHandler):
                         elif path=='/api/inventory/purchases':
                             if action!='save':c.rollback();return self.reply(400,{'error':'Acción inválida.'})
                             result={'id':inventory.save_purchase(c,data,user,now)}
+                        elif path in ('/api/inventory/categories','/api/inventory/brands','/api/inventory/families'):
+                            import inventory_center as center
+                            kind=path.rsplit('/',1)[1]
+                            save={'categories':center.save_category,'brands':center.save_brand,'families':center.save_family}[kind]
+                            toggle={'categories':center.set_category_active,'brands':center.set_brand_active,'families':center.set_family_active}[kind]
+                            if action=='save':result={'id':save(c,data,user,now)}
+                            elif action in ('activate','deactivate'):toggle(c,data.get('id'),action=='activate',user,now);result={}
+                            else:c.rollback();return self.reply(400,{'error':'Acción inválida.'})
+                        elif path=='/api/inventory/products':
+                            import inventory_center as center
+                            if action!='save':c.rollback();return self.reply(400,{'error':'Acción inválida.'})
+                            result={'id':center.save_product(c,data,user,now)}
+                        elif path=='/api/inventory/register':
+                            import inventory_center as center
+                            result=center.register(c,data,user,now)
+                        elif path=='/api/inventory/exit':
+                            import inventory_center as center
+                            result=center.exit_stock(c,data,user,now)
+                        elif path=='/api/inventory/delivery':
+                            import inventory_center as center
+                            result={'units':center.register_delivery(c,data.get('unit_ids'),data.get('delivered_at'),user,now)}
+                        elif re.fullmatch(r'/api/inventory/units/([0-9]{1,9})',path):
+                            import inventory_center as center
+                            if action!='serial':c.rollback();return self.reply(400,{'error':'Acción inválida.'})
+                            result={'id':center.set_serial(c,path.rsplit('/',1)[1],data.get('serial'),data.get('reason'),user,now)}
+                        elif path=='/api/inventory/reservations':
+                            import inventory_center as center
+                            if action=='reserve':result={'id':center.reserve(c,data,user,now)}
+                            elif action=='release':center.release(c,data.get('id'),user,now);result={}
+                            else:c.rollback();return self.reply(400,{'error':'Acción inválida.'})
+                        elif path=='/api/inventory/transfer':
+                            import inventory_center as center
+                            result={'moved':center.transfer(c,data,user,now)}
+                        elif path=='/api/inventory/licenses/classify':
+                            import inventory_center as center
+                            result={'id':center.classify_license(c,data,user,now)}
+                        elif path in ('/api/inventory/import/preview','/api/inventory/import/commit'):
+                            import inventory_center as center
+                            try:raw=base64.b64decode(str(data.get('file','')),validate=True)
+                            except ValueError:c.rollback();return self.reply(400,{'error':'El archivo no se pudo leer.'})
+                            if path.endswith('preview'):c.rollback();return self.reply(200,center.import_analyze(c,raw,str(data.get('name',''))[:120]))
+                            result=center.import_commit(c,raw,str(data.get('name',''))[:120],str(data.get('sha','')),user,now)
                         elif re.fullmatch(r'/api/inventory/purchases/([0-9]{1,9})',path):
                             purchase_id=path.rsplit('/',1)[1]
                             if action=='receive':inventory.receive(c,purchase_id,user,now)

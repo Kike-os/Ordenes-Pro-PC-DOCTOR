@@ -1,6 +1,8 @@
-# Facturación Electrónica, caja, inventario y cuentas bancarias (MODO DE PRUEBAS)
+# Facturación, caja, inventario y cuentas bancarias (MODO DE PRUEBAS)
 
-**Estado:** integrado en Órdenes Pro desde la 1.5.205, en el menú **«Facturación Electrónica»** (solo administración). Funciona en **MODO DE PRUEBAS** (`invoicing.TEST_MODE = True`, fijado en el servidor):
+> 1.5.206: interfaz rediseñada (pestañas con iconos, indicadores con datos reales, búsqueda y tabla de facturas, ventanas compactas). El inventario se gestiona en el **Centro de Inventario** (ver `docs/INVENTARIO.md`); la pestaña «Inventario» de Facturación muestra un resumen y el acceso.
+
+**Estado:** integrado en Órdenes Pro desde la 1.5.205, en el menú **«Facturación»** (solo administración; hasta la 1.5.205 se llamaba «Facturación Electrónica»). Funciona en **MODO DE PRUEBAS** (`invoicing.TEST_MODE = True`, fijado en el servidor):
 
 - La **emisión real está desactivada** y no se puede activar desde la interfaz. **No hay conexión con el SRI**, ni de pruebas ni de producción. Se activará solo con la firma electrónica y una autorización expresa.
 - Todo lo que se registre en el módulo es **de prueba**: facturas, cajas, depósitos, inventario, compras, proveedores, cuentas y datos fiscales.
@@ -47,7 +49,7 @@ Los datos salen de los módulos existentes: cliente, partidas aprobadas, pagos y
 **Datos fiscales** (pestaña «Datos fiscales»): RUC validado, razón social, nombre comercial, direcciones, establecimiento, punto de emisión, contabilidad, régimen, contribuyente especial y agente de retención. Nunca se completan solos.
 
 ## Cuentas bancarias (catálogo central)
-Están en Facturación Electrónica → «Cuentas bancarias» (administración). En modo de pruebas no se muestran al cliente.
+Están en Facturación → «Cuentas bancarias» (administración). En modo de pruebas no se muestran al cliente.
 
 - **Datos:** banco, tipo (corriente o ahorros), número, titular, RUC o identificación y estado (activa o inactiva).
 - **Reglas:**

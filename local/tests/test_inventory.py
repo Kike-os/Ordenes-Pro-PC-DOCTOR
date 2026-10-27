@@ -60,7 +60,7 @@ class InventoryTests(unittest.TestCase):
         post('/api/inventory/items', action='move', id=str(disk), direction='in', reason='ajuste_entrada', quantity='4', cost='20,50')
         history = self.request('/api/inventory/items/%d/movements' % disk, cookie=cookie)['body']
         self.assertEqual([m['balance'] for m in history['movements']], [5, 1, 3])
-        self.assertEqual(self.stock(cookie, disk)['average_cost_cents'], 1964)  # (3×18,50 + 4×20,50) / 7
+        self.assertEqual(self.stock(cookie, disk)['average_cost_cents'], 2010)  # promedio ponderado móvil: (1×18,50 + 4×20,50) / 5 tras la salida de 2
         with app.connect() as c:
             for sql in ('UPDATE inventory_movements SET quantity=99', 'DELETE FROM inventory_movements', 'DELETE FROM inventory_items', 'DELETE FROM inventory_events'):
                 with self.assertRaises(Exception):

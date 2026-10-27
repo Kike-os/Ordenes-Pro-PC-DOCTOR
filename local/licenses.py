@@ -471,9 +471,12 @@ def _insert_unit(c,product,fields,values,batch,user,now,notes='',file=None,extra
     if fields['activated_at']:
         raise LicenseError('Una licencia en inventario aún no está activada: la fecha real de activación se registra al entregarla o con «Confirmar activación».',fields={'activated_at':'Solo al entregar o confirmar la activación.'})
     seat,mark=_free_seat(c,product,values,extra=extra)
-    unit=c.execute('INSERT INTO license_units(product_id,batch_id,kind,edition,license_type,manufacturer,version,devices,term,purchased_at,activated_at,expires_at,download_url,instructions,secret,fingerprint,seat,notes,created_by,created_at,updated_at) '
-                   'VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
-                   (product['id'],batch,product['kind'],fields['edition'],fields['license_type'],fields['manufacturer'],fields['version'],fields['devices'],fields['term'],fields['purchased_at'],
+    import inventory_center
+    # Producto clasificado en el Centro de Inventario: código de su categoría (PCD-AV-000001). Sin clasificar: LIC-000001 (disparador).
+    code=inventory_center.license_code(c,product['id'])
+    unit=c.execute('INSERT INTO license_units(code,product_id,batch_id,kind,edition,license_type,manufacturer,version,devices,term,purchased_at,activated_at,expires_at,download_url,instructions,secret,fingerprint,seat,notes,created_by,created_at,updated_at) '
+                   'VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+                   (code,product['id'],batch,product['kind'],fields['edition'],fields['license_type'],fields['manufacturer'],fields['version'],fields['devices'],fields['term'],fields['purchased_at'],
                     fields['activated_at'],fields['expires_at'],fields['download_url'],fields['instructions'],seal(values),mark,seat,notes,user['id'],stamp(now),stamp(now))).lastrowid
     if fields['activated_at']:c.execute('UPDATE license_units SET activated=1 WHERE id=?',(unit,))
     if file:_store_file(c,unit,file,user,now)

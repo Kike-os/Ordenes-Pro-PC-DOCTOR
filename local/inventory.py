@@ -4,17 +4,24 @@
 - Una salida nunca deja existencias negativas: se comprueba dentro de la misma transacción.
 - Un mismo documento (compra, factura, orden) no mueve dos veces el mismo artículo (índice único en la base).
 - Las compras en borrador no mueven nada; al recibirlas se registran las entradas una sola vez.
-- Las licencias digitales siguen en su módulo: aquí solo se muestran sus existencias (lectura)."""
+- Las licencias digitales siguen en su módulo: aquí solo se muestran sus existencias (lectura).
+- Productos controlados por serie: cada entrada crea sus unidades (código interno único y, si existe, la serie original única) y cada
+  salida indica qué unidades salen. Las reservas apartan existencias sin descontarlas.
+- Costo promedio ponderado móvil: cada entrada se promedia con el saldo que queda; las salidas salen al promedio vigente."""
 import re
 from datetime import date
 
 KINDS = {'producto': 'Producto', 'repuesto': 'Repuesto', 'accesorio': 'Accesorio'}
-IN_REASONS = {'inicial': 'Existencia inicial', 'compra': 'Compra', 'devolucion_cliente': 'Devolución del cliente', 'ajuste_entrada': 'Ajuste (entrada)'}
+IN_REASONS = {'inicial': 'Inventario inicial', 'compra': 'Compra', 'devolucion_cliente': 'Devolución del cliente', 'ajuste_entrada': 'Ajuste (entrada)'}
 OUT_REASONS = {'venta': 'Venta', 'uso_orden': 'Uso en una orden', 'devolucion_proveedor': 'Devolución al proveedor', 'ajuste_salida': 'Ajuste (salida)', 'baja': 'Baja por daño o pérdida', 'anulacion_compra': 'Anulación de compra'}
 MANUAL_IN = ('devolucion_cliente', 'ajuste_entrada')
 MANUAL_OUT = ('venta', 'uso_orden', 'devolucion_proveedor', 'ajuste_salida', 'baja')
 PURCHASE_STATUS = {'borrador': 'Borrador', 'recibida': 'Recibida', 'anulada': 'Anulada'}
 STOCK_SQL = 'COALESCE((SELECT SUM(m.direction*m.quantity) FROM inventory_movements m WHERE m.item_id=i.id),0)'
+RESERVED_SQL = "COALESCE((SELECT SUM(r.quantity) FROM inventory_reservations r WHERE r.item_id=i.id AND r.status='activa'),0)"
+# Estado de una unidad según el motivo de su salida.
+UNIT_STATUS_OUT = {'venta': 'vendida', 'uso_orden': 'consumida', 'devolucion_proveedor': 'devuelta', 'ajuste_salida': 'baja', 'baja': 'baja', 'anulacion_compra': 'devuelta'}
+UNIT_STATUS = {'disponible': 'Disponible', 'reservada': 'Reservada', 'vendida': 'Vendida', 'consumida': 'Consumida en una orden', 'devuelta': 'Devuelta al proveedor', 'baja': 'De baja'}
 
 
 class InventoryError(ValueError):
@@ -51,24 +58,91 @@ def quantity(value, field='quantity'):
     return int(text)
 
 
-def event(c, now, user, name, detail, item_id=None, purchase_id=None, supplier_id=None):
-    c.execute('INSERT INTO inventory_events(item_id,purchase_id,supplier_id,event,detail,actor_id,actor,created_at) VALUES (?,?,?,?,?,?,?,?)',
-              (item_id, purchase_id, supplier_id, name, detail[:500], user['id'] if user else None, user['name'] if user else 'Sistema', stamp(now)))
+def event(c, now, user, name, detail, item_id=None, purchase_id=None, supplier_id=None, unit_id=None):
+    c.execute('INSERT INTO inventory_events(item_id,purchase_id,supplier_id,unit_id,event,detail,actor_id,actor,created_at) VALUES (?,?,?,?,?,?,?,?,?)',
+              (item_id, purchase_id, supplier_id, unit_id, name, detail[:500], user['id'] if user else None, user['name'] if user else 'Sistema', stamp(now)))
+
+
+# ---- Códigos internos y series -----------------------------------------------------------------------------------------
+
+def prefix_of(c, category_id):
+    """Prefijo de la categoría o, si no tiene uno propio, el de su categoría principal."""
+    row = c.execute('SELECT id,parent_id,prefix,name FROM inventory_categories WHERE id=?', (category_id,)).fetchone() if category_id else None
+    while row and not row['prefix'] and row['parent_id']:
+        row = c.execute('SELECT id,parent_id,prefix,name FROM inventory_categories WHERE id=?', (row['parent_id'],)).fetchone()
+    if not row or not row['prefix']:
+        raise InventoryError('La categoría no tiene prefijo de código interno: configúralo en «Categorías y marcas».', 409, {'category_id': 'Sin prefijo de código.'})
+    return row['prefix']
+
+
+def next_code(c, category_id):
+    """Siguiente código interno de la categoría (PCD-SSD-000001). La numeración solo avanza: un código nunca se reutiliza."""
+    prefix = prefix_of(c, category_id)
+    while True:
+        c.execute('UPDATE inventory_prefixes SET last_number=last_number+1 WHERE prefix=?', (prefix,))
+        code = 'PCD-%s-%06d' % (prefix, c.execute('SELECT last_number FROM inventory_prefixes WHERE prefix=?', (prefix,)).fetchone()[0])
+        if not c.execute('SELECT 1 FROM inventory_units WHERE internal_code=? UNION ALL SELECT 1 FROM license_units WHERE code=?', (code, code)).fetchone():
+            return code
+
+
+def serial_key(serial):
+    """Serie normalizada para detectar duplicados (sin espacios ni diferencias de mayúsculas)."""
+    return re.sub(r'\s+', '', str(serial or '')).upper()
+
+
+def clean_serial(serial):
+    text = re.sub(r'[\x00-\x1f\x7f]', '', str(serial or '')).strip()
+    if text and (len(text) > 60 or not re.fullmatch(r'[\x20-\x7e]+', text)):
+        raise InventoryError('Serie no válida: solo letras, números y signos simples (hasta 60).', fields={'serial': 'Serie no válida.'})
+    return text
+
+
+def serial_owner(c, serial):
+    key = serial_key(serial)
+    return c.execute('SELECT u.id,u.internal_code,u.status,g.name FROM inventory_units u JOIN inventory_items i ON i.id=u.item_id JOIN catalog_items g ON g.id=i.catalog_id WHERE u.serial_key=?',
+                     (key,)).fetchone() if key else None
 
 
 # ---- Artículos ---------------------------------------------------------------------------------------------------------
 
 def _item_row(c, item_id):
-    row = c.execute('SELECT i.*,g.name,g.code catalog_code,g.category,g.price_cents,g.taxed,' + STOCK_SQL + ' stock FROM inventory_items i JOIN catalog_items g ON g.id=i.catalog_id WHERE i.id=?',
+    row = c.execute('SELECT i.*,g.name,g.code catalog_code,g.category,g.price_cents,g.taxed,' + STOCK_SQL + ' stock,' + RESERVED_SQL + ' reserved FROM inventory_items i JOIN catalog_items g ON g.id=i.catalog_id WHERE i.id=?',
                     (item_id,)).fetchone() if str(item_id).isdigit() else None
     if not row:
         raise InventoryError('Artículo de inventario no encontrado.', 404)
     return row
 
 
+def _half(numerator, denominator):
+    return (2 * numerator + denominator) // (2 * denominator)
+
+
+def valuation(c, item_id):
+    """Kardex valorizado de un artículo con costo promedio ponderado móvil: [(movimiento, saldo, costo promedio, valor del saldo, costo aplicado)].
+    Una entrada sin costo (por ejemplo, una devolución del cliente) entra al promedio vigente; las salidas salen al promedio vigente."""
+    out, qty, value, avg = [], 0, 0, 0
+    for m in c.execute('SELECT * FROM inventory_movements WHERE item_id=? ORDER BY id', (item_id,)).fetchall():
+        if m['direction'] == 1:
+            applied = m['unit_cost_cents'] or avg
+            value += m['quantity'] * applied
+            qty += m['quantity']
+        else:
+            applied = avg
+            taken = value if m['quantity'] >= qty else _half(value * m['quantity'], qty) if qty else 0
+            value -= taken
+            qty -= m['quantity']
+        avg = _half(value, qty) if qty > 0 else avg
+        out.append((m, qty, avg, max(0, value), applied))
+    return out
+
+
 def average_cost(c, item_id):
-    row = c.execute("SELECT COALESCE(SUM(quantity*unit_cost_cents),0),COALESCE(SUM(quantity),0) FROM inventory_movements WHERE item_id=? AND direction=1 AND unit_cost_cents>0", (item_id,)).fetchone()
-    return (2 * row[0] + row[1]) // (2 * row[1]) if row[1] else 0
+    rows = valuation(c, item_id)
+    return rows[-1][2] if rows else 0
+
+
+def reserved(c, item_id):
+    return c.execute("SELECT COALESCE(SUM(quantity),0) FROM inventory_reservations WHERE item_id=? AND status='activa'", (item_id,)).fetchone()[0]
 
 
 def items(c, q='', alerts_only=False):
@@ -156,8 +230,11 @@ def set_active(c, item_id, active, user, now):
     event(c, now, user, 'articulo_activado' if active else 'articulo_desactivado', ('Activado: ' if active else 'Desactivado: ') + row['name'], row['id'])
 
 
-def move(c, item_id, direction, reason, qty, cost='0', user=None, now=None, reference_kind='', reference_id=None, note='', request_key=None):
-    """Registra una entrada (+1) o salida (−1). Las salidas no pueden dejar existencias negativas."""
+def move(c, item_id, direction, reason, qty, cost='0', user=None, now=None, reference_kind='', reference_id=None, note='', request_key=None, serials=None, unit_ids=None,
+         location='', reservation_id=None, unit_values=None):
+    """Registra una entrada (+1) o salida (−1). Las salidas no pueden dejar existencias negativas ni tomar lo reservado para otro.
+    Producto con serie: la entrada crea una unidad por cantidad (con las series indicadas; el resto, solo con código interno) y la salida
+    exige las unidades que salen. `unit_values` actualiza las unidades que salen (cliente, documento, garantías)."""
     row = _item_row(c, item_id)
     if direction == 1 and reason not in IN_REASONS or direction == -1 and reason not in OUT_REASONS:
         raise InventoryError('Motivo no válido.', fields={'reason': 'Motivo no válido.'})
@@ -165,13 +242,80 @@ def move(c, item_id, direction, reason, qty, cost='0', user=None, now=None, refe
     unit_cost = cents(cost, 'cost') if direction == 1 else 0
     if request_key and c.execute('SELECT id FROM inventory_movements WHERE request_key=?', (request_key,)).fetchone():
         return c.execute('SELECT id FROM inventory_movements WHERE request_key=?', (request_key,)).fetchone()[0]  # reintento: no se duplica
-    if direction == -1 and row['stock'] < amount:
-        raise InventoryError('Existencias insuficientes de %s: hay %d y se intentan sacar %d.' % (row['name'], row['stock'], amount), 409, {'quantity': 'Supera las existencias.'})
+    held = c.execute("SELECT * FROM inventory_reservations WHERE id=? AND item_id=? AND status='activa'", (reservation_id, row['id'])).fetchone() if reservation_id else None
+    if reservation_id and not held:
+        raise InventoryError('La reserva ya no está activa.', 409)
+    if direction == -1:
+        free = row['stock'] - reserved(c, row['id']) + (held['quantity'] if held else 0)
+        if row['stock'] < amount:
+            raise InventoryError('Existencias insuficientes de %s: hay %d y se intentan sacar %d.' % (row['name'], row['stock'], amount), 409, {'quantity': 'Supera las existencias.'})
+        if free < amount:
+            raise InventoryError('Existencias reservadas: de %s hay %d libres y se intentan sacar %d. Libera o usa la reserva.' % (row['name'], free, amount), 409, {'quantity': 'Supera lo disponible.'})
     if not row['active'] and direction == -1 and reason not in ('baja', 'ajuste_salida', 'devolucion_proveedor', 'anulacion_compra'):
         raise InventoryError('El artículo está inactivo.', 409)
+    serial_item = row['tracking'] == 'serie'
+    picked = []
+    if serial_item and (direction == -1 or reason == 'devolucion_cliente'):
+        ids = [int(u) for u in (unit_ids or []) if str(u).isdigit()]
+        if len(set(ids)) != amount:
+            raise InventoryError('Indica %s de %s que %s.' % ('la unidad' if amount == 1 else 'las %d unidades' % amount, row['name'], 'sale' if direction == -1 and amount == 1 else 'salen' if direction == -1 else 'vuelven'),
+                                 fields={'units': 'Elige o escanea las unidades.'})
+        allowed = ('vendida', 'consumida') if direction == 1 else ('disponible', 'reservada')
+        for unit_id in ids:
+            unit = c.execute('SELECT * FROM inventory_units WHERE id=? AND item_id=?', (unit_id, row['id'])).fetchone()
+            if not unit or unit['status'] not in allowed:
+                raise InventoryError('La unidad %s no está %s.' % (unit['internal_code'] if unit else unit_id, 'vendida ni consumida' if direction == 1 else 'disponible'), 409, {'units': 'Unidad no válida.'})
+            if unit['status'] == 'reservada' and (not held or unit['reservation_id'] != held['id']):
+                raise InventoryError('La unidad %s está reservada para otra operación.' % unit['internal_code'], 409, {'units': 'Unidad reservada.'})
+            picked.append(unit)
+    entry_serials = []
+    if serial_item and direction == 1 and reason != 'devolucion_cliente':
+        entry_serials = [clean_serial(v) for v in (serials or [])]
+        if len(entry_serials) > amount:
+            raise InventoryError('Hay más series (%d) que unidades (%d).' % (len(entry_serials), amount), fields={'quantity': 'Revisa la cantidad.'})
+        keys = [serial_key(v) for v in entry_serials if v]
+        if len(keys) != len(set(keys)):
+            raise InventoryError('Una serie está repetida en este ingreso.', 409, {'serials': 'Serie repetida.'})
+        for value in entry_serials:
+            owner = serial_owner(c, value)
+            if owner:
+                raise InventoryError('La serie %s ya está registrada (%s · %s).' % (value, owner['internal_code'], owner['name']), 409, {'serials': 'Serie duplicada.'})
+    applied = 0
+    if direction == -1:
+        history = valuation(c, row['id'])
+        applied = history[-1][2] if history else 0
     movement = c.execute('INSERT INTO inventory_movements(item_id,direction,reason,quantity,unit_cost_cents,reference_kind,reference_id,note,request_key,created_by,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
-                         (row['id'], direction, reason, amount, unit_cost, reference_kind, reference_id, re.sub(r'\s+', ' ', str(note or '')).strip()[:300], request_key,
+                         (row['id'], direction, reason, amount, unit_cost if direction == 1 else applied, reference_kind, reference_id, re.sub(r'\s+', ' ', str(note or '')).strip()[:300], request_key,
                           user['id'] if user else None, stamp(now))).lastrowid
+    created = []
+    if serial_item and direction == 1 and reason != 'devolucion_cliente':
+        place = re.sub(r'\s+', ' ', str(location or row['location'] or '')).strip()[:80]
+        for n in range(amount):
+            value = entry_serials[n] if n < len(entry_serials) else ''
+            unit = c.execute('INSERT INTO inventory_units(item_id,internal_code,serial,serial_key,status,location,unit_cost_cents,entry_movement_id,created_at,created_by,updated_at,updated_by) '
+                             "VALUES (?,?,?,?,'disponible',?,?,?,?,?,?,?)", (row['id'], next_code(c, row['category_id']), value, serial_key(value), place, unit_cost or applied, movement,
+                                                                            stamp(now), user['id'] if user else None, stamp(now), user['id'] if user else None)).lastrowid
+            created.append(unit)
+    for unit in picked:
+        if direction == 1:  # devolución del cliente: la unidad vuelve a estar disponible; su historial queda en los eventos
+            c.execute("UPDATE inventory_units SET status='disponible',client_id=NULL,order_id=NULL,invoice_id=NULL,document='',sold_at='',delivered_at='',store_warranty_from='',store_warranty_to='',"
+                      'maker_warranty_from=\'\',maker_warranty_to=\'\',exit_movement_id=NULL,reservation_id=NULL,updated_at=?,updated_by=? WHERE id=?', (stamp(now), user['id'] if user else None, unit['id']))
+            event(c, now, user, 'unidad_devuelta', 'Unidad %s devuelta por el cliente (vendida el %s; garantía PC-DOCTOR hasta %s).' % (unit['internal_code'], unit['sold_at'][:10] or '—', unit['store_warranty_to'] or '—'),
+                  row['id'], unit_id=unit['id'])
+        else:
+            values = dict(unit_values or {})
+            sets = ['status=?', 'exit_movement_id=?', 'reservation_id=NULL', 'updated_at=?', 'updated_by=?']
+            args = [UNIT_STATUS_OUT[reason], movement, stamp(now), user['id'] if user else None]
+            for key in ('client_id', 'order_id', 'invoice_id', 'document', 'sold_at', 'delivered_at', 'store_warranty_from', 'store_warranty_to', 'maker_warranty_from', 'maker_warranty_to'):
+                if key in values:
+                    sets.append(key + '=?')
+                    args.append(values[key])
+            c.execute('UPDATE inventory_units SET ' + ','.join(sets) + ' WHERE id=?', (*args, unit['id']))
+        created.append(unit['id'])
+    for unit_id in created:
+        c.execute('INSERT INTO inventory_movement_units(movement_id,unit_id) VALUES (?,?)', (movement, unit_id))
+    if held:
+        c.execute("UPDATE inventory_reservations SET status='consumida',movement_id=?,closed_by=?,closed_at=? WHERE id=?", (movement, user['id'] if user else None, stamp(now), held['id']))
     label = (IN_REASONS if direction == 1 else OUT_REASONS)[reason]
     event(c, now, user, 'entrada' if direction == 1 else 'salida', '%s: %s %d × %s%s.' % (label, '+' if direction == 1 else '−', amount, row['name'], (' a ' + usd(unit_cost)) if unit_cost else ''), row['id'])
     return movement
@@ -343,6 +487,12 @@ def void_purchase(c, purchase_id, reason, user, now):
         raise InventoryError('La compra ya está anulada.', 409)
     if row['status'] == 'recibida':
         for item in c.execute('SELECT * FROM purchase_items WHERE purchase_id=?', (row['id'],)).fetchall():
-            move(c, item['item_id'], -1, 'anulacion_compra', str(item['quantity']), '0', user, now, 'compra', row['id'], 'Anulación de la compra ' + row['document_number'])
+            units = None
+            if _item_row(c, item['item_id'])['tracking'] == 'serie':
+                entry = c.execute("SELECT id FROM inventory_movements WHERE reference_kind='compra' AND reference_id=? AND item_id=? AND direction=1", (row['id'], item['item_id'])).fetchone()
+                units = [u[0] for u in c.execute("SELECT id FROM inventory_units WHERE entry_movement_id=? AND status='disponible' ORDER BY id", (entry[0] if entry else 0,))]
+                if len(units) < item['quantity']:
+                    raise InventoryError('No se puede anular: ya salieron unidades de esta compra (%d de %d disponibles).' % (len(units), item['quantity']), 409)
+            move(c, item['item_id'], -1, 'anulacion_compra', str(item['quantity']), '0', user, now, 'compra', row['id'], 'Anulación de la compra ' + row['document_number'], unit_ids=units)
     c.execute("UPDATE purchases SET status='anulada',voided_by=?,voided_at=?,void_reason=? WHERE id=?", (user['id'], stamp(now), reason, row['id']))
     event(c, now, user, 'compra_anulada', 'Compra %s anulada: %s' % (row['document_number'], reason), purchase_id=row['id'], supplier_id=row['supplier_id'])
