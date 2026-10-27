@@ -4,6 +4,24 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.208 — 2026-10-27 08:31 (UTC-05:00)
+
+Facturación con Panel general y menú agrupado, y simulador de cuotas con tarjeta (DATAFAST 6.2) en modo de pruebas
+
+### Nuevas funcionalidades
+
+- Facturación con menú lateral agrupado (Facturación, Administración y Configuración), plegable en escritorio y desplegable en móvil, y Panel general con 7 indicadores, documentos de prueba separados de los reales, facturación mensual, documentos que requieren atención y actividad reciente.
+- Simulador de cuotas con tarjeta: banco, marca, categoría y plazo con la tabla DATAFAST 6.2 guardada en la base; muestra precio + recargo comercial + intereses = total y el valor de cada letra, y compara los plazos. El diferido sin intereses usa 0 %.
+- Tarjetas y DATAFAST: tabla de factores por grupo y plazo, bancos y categorías habilitados, y recargo comercial configurable (porcentaje, valor fijo, quién lo asume, métodos y vigencia) con historial de cambios.
+
+### Mejoras realizadas
+
+- Facturación: el acceso al Centro de Inventario reemplaza la pestaña de inventario duplicada; las funciones aún en desarrollo (proformas, notas de crédito, anticipos, firma electrónica e integración con el SRI) se identifican como tales y la Integración SRI muestra el estado real de cada etapa.
+
+### Actualizaciones de seguridad
+
+- Los factores bancarios y el recargo se aplican siempre en el servidor; solo administración cambia el recargo y cada cambio queda registrado. El factor de 36 meses de Banco Guayaquil queda pendiente de confirmar y no se puede usar.
+
 ## v1.5.207 — 2026-10-27 06:25 (UTC-05:00)
 
 Centro de Inventario profesional (estados y alertas, ficha de producto con ventas autorizadas, Kardex con períodos y reportes) y políticas comerciales de la factura (modo de pruebas)

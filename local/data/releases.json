@@ -8,6 +8,30 @@
   },
   "releases": [
     {
+      "version": "1.5.208",
+      "date": "2026-10-27T08:31:48-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Facturación con Panel general y menú agrupado, y simulador de cuotas con tarjeta (DATAFAST 6.2) en modo de pruebas",
+      "changes": {
+        "features": [
+          "Facturación con menú lateral agrupado (Facturación, Administración y Configuración), plegable en escritorio y desplegable en móvil, y Panel general con 7 indicadores, documentos de prueba separados de los reales, facturación mensual, documentos que requieren atención y actividad reciente.",
+          "Simulador de cuotas con tarjeta: banco, marca, categoría y plazo con la tabla DATAFAST 6.2 guardada en la base; muestra precio + recargo comercial + intereses = total y el valor de cada letra, y compara los plazos. El diferido sin intereses usa 0 %.",
+          "Tarjetas y DATAFAST: tabla de factores por grupo y plazo, bancos y categorías habilitados, y recargo comercial configurable (porcentaje, valor fijo, quién lo asume, métodos y vigencia) con historial de cambios."
+        ],
+        "improvements": [
+          "Facturación: el acceso al Centro de Inventario reemplaza la pestaña de inventario duplicada; las funciones aún en desarrollo (proformas, notas de crédito, anticipos, firma electrónica e integración con el SRI) se identifican como tales y la Integración SRI muestra el estado real de cada etapa."
+        ],
+        "fixes": [],
+        "security": [
+          "Los factores bancarios y el recargo se aplican siempre en el servidor; solo administración cambia el recargo y cada cambio queda registrado. El factor de 36 meses de Banco Guayaquil queda pendiente de confirmar y no se puede usar."
+        ],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Kike-os (administración): «Publica la versión»"
+    },
+    {
       "version": "1.5.207",
       "date": "2026-10-27T06:25:19-05:00",
       "type": "patch",
@@ -34,7 +58,7 @@
         "performance": []
       },
       "published_by": "Kike-os",
-      "authorized_by": "Kike-os (administración): «actualiza a la versión siguiente si todo está bien», "
+      "authorized_by": "Kike-os (administración): «actualiza a la versión siguiente si todo está bien»,"
     },
     {
       "version": "1.5.206",
