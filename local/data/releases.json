@@ -1,16 +1,41 @@
 {
   "unreleased": {
-    "features": [
-      "Facturación › Configuración › Políticas Comerciales: documento de políticas de venta, cambios, devoluciones y garantías con versiones, validación legal registrada, vista previa en PDF e historial; cada factura queda asociada a la versión vigente al emitirse.",
-      "Documentos de la factura: RIDE en PDF con código de barras de la clave de acceso, políticas asociadas y certificado de garantías con las coberturas de PC-DOCTOR y del fabricante por separado, tomadas del Centro de Inventario.",
-      "Envío de los documentos al cliente solo para facturas autorizadas por el SRI, una vez por factura, con reintentos controlados y registro de cada resultado; envío de prueba únicamente a la dirección autorizada y marcado como sin validez tributaria."
-    ],
+    "features": [],
     "improvements": [],
     "fixes": [],
     "security": [],
     "performance": []
   },
   "releases": [
+    {
+      "version": "1.5.207",
+      "date": "2026-10-27T06:25:19-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Centro de Inventario profesional (estados y alertas, ficha de producto con ventas autorizadas, Kardex con períodos y reportes) y políticas comerciales de la factura (modo de pruebas)",
+      "changes": {
+        "features": [
+          "Facturación › Configuración › Políticas Comerciales: documento de políticas de venta, cambios, devoluciones y garantías con versiones, validación legal registrada, vista previa en PDF e historial; cada factura queda asociada a la versión vigente al emitirse.",
+          "Documentos de la factura: RIDE en PDF con código de barras de la clave de acceso, políticas asociadas y certificado de garantías con las coberturas de PC-DOCTOR y del fabricante por separado, tomadas del Centro de Inventario.",
+          "Envío de los documentos al cliente solo para facturas autorizadas por el SRI, una vez por factura, con reintentos controlados y registro de cada resultado; envío de prueba únicamente a la dirección autorizada y marcado como sin validez tributaria.",
+          "Centro de Inventario con menú lateral agrupado (Resumen, Productos, Operaciones y Control), plegable en escritorio y desplegable en móvil, y panel ejecutivo con 8 indicadores, alertas por estado, actividad reciente y garantías por vencer.",
+          "Estados de existencias agotado, crítico, en el mínimo y normal; alertas desactivables por producto y revisión de datos (costos pendientes, marcas posiblemente duplicadas, licencias sin marca y duraciones por revisar) sin cambiar nada.",
+          "Ficha de producto con pestañas de resumen, unidades y series, ventas y precios, garantías y Kardex: precio mínimo y descuento autorizado, venta con autorización administrativa obligatoria para precios en 0, bajo el mínimo o con descuento mayor, y reservas con cliente y vencimiento.",
+          "Kardex de Inventario con períodos (hoy, 7 y 30 días, este mes o personalizado), variación frente al período anterior, saldo por producto, filas expandibles, costo pendiente y 8 reportes en Excel, PDF (logo, filtros, totales y páginas) y CSV.",
+          "Corrección de costo auditada: guarda el costo original, el nuevo, el motivo, el documento, el usuario y la fecha sin modificar el movimiento; el costo promedio se recalcula con la corrección."
+        ],
+        "improvements": [
+          "Catálogo con orden por columnas, filtros, columnas configurables, paginación y filas expandibles; categorías en árbol compacto con menú contextual y buscador de marcas; licencias digitales en tabla con filtros y sin mostrar claves; registro en un asistente de 5 pasos que conserva el lector USB."
+        ],
+        "fixes": [
+          "Inventario: el costo de entrada es obligatorio (antes un campo vacío se guardaba como version207.sh,00) y el inventario inicial figura como «Inventario inicial» en el Kardex."
+        ],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Kike-os (administración): «actualiza a la versión siguiente si todo está bien», "
+    },
     {
       "version": "1.5.206",
       "date": "2026-10-26T21:33:03-05:00",

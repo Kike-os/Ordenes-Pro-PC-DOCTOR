@@ -4,13 +4,28 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
-## Sin publicar
+## v1.5.207 — 2026-10-27 06:25 (UTC-05:00)
+
+Centro de Inventario profesional (estados y alertas, ficha de producto con ventas autorizadas, Kardex con períodos y reportes) y políticas comerciales de la factura (modo de pruebas)
 
 ### Nuevas funcionalidades
 
 - Facturación › Configuración › Políticas Comerciales: documento de políticas de venta, cambios, devoluciones y garantías con versiones, validación legal registrada, vista previa en PDF e historial; cada factura queda asociada a la versión vigente al emitirse.
 - Documentos de la factura: RIDE en PDF con código de barras de la clave de acceso, políticas asociadas y certificado de garantías con las coberturas de PC-DOCTOR y del fabricante por separado, tomadas del Centro de Inventario.
 - Envío de los documentos al cliente solo para facturas autorizadas por el SRI, una vez por factura, con reintentos controlados y registro de cada resultado; envío de prueba únicamente a la dirección autorizada y marcado como sin validez tributaria.
+- Centro de Inventario con menú lateral agrupado (Resumen, Productos, Operaciones y Control), plegable en escritorio y desplegable en móvil, y panel ejecutivo con 8 indicadores, alertas por estado, actividad reciente y garantías por vencer.
+- Estados de existencias agotado, crítico, en el mínimo y normal; alertas desactivables por producto y revisión de datos (costos pendientes, marcas posiblemente duplicadas, licencias sin marca y duraciones por revisar) sin cambiar nada.
+- Ficha de producto con pestañas de resumen, unidades y series, ventas y precios, garantías y Kardex: precio mínimo y descuento autorizado, venta con autorización administrativa obligatoria para precios en 0, bajo el mínimo o con descuento mayor, y reservas con cliente y vencimiento.
+- Kardex de Inventario con períodos (hoy, 7 y 30 días, este mes o personalizado), variación frente al período anterior, saldo por producto, filas expandibles, costo pendiente y 8 reportes en Excel, PDF (logo, filtros, totales y páginas) y CSV.
+- Corrección de costo auditada: guarda el costo original, el nuevo, el motivo, el documento, el usuario y la fecha sin modificar el movimiento; el costo promedio se recalcula con la corrección.
+
+### Mejoras realizadas
+
+- Catálogo con orden por columnas, filtros, columnas configurables, paginación y filas expandibles; categorías en árbol compacto con menú contextual y buscador de marcas; licencias digitales en tabla con filtros y sin mostrar claves; registro en un asistente de 5 pasos que conserva el lector USB.
+
+### Errores corregidos
+
+- Inventario: el costo de entrada es obligatorio (antes un campo vacío se guardaba como version207.sh,00) y el inventario inicial figura como «Inventario inicial» en el Kardex.
 
 ## v1.5.206 — 2026-10-26 21:33 (UTC-05:00)
 
