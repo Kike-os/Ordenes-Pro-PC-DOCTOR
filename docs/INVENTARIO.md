@@ -4,6 +4,21 @@ Módulo de administración de Órdenes Pro para registrar la mercadería física
 
 Para abrirlo, entra con una cuenta de administración y elige **Inventario** en el menú principal (dirección `#inventory`).
 
+El menú lateral agrupa las secciones en **Resumen** (Panel general, Alertas), **Productos** (Catálogo, Categorías y marcas, Licencias digitales), **Operaciones** (Registrar mercadería, Registrar salida, Inventario inicial, Movimientos, Kardex) y **Control** (Garantías, Reportes, Configuración). En escritorio se puede plegar y el equipo lo recuerda; en tableta y móvil se abre como un menú desplegable que se cierra con Escape.
+
+## Estados de existencias y alertas
+
+| Estado | Condición |
+|---|---|
+| Agotado | existencias en 0 |
+| Crítico | por debajo del mínimo |
+| En el mínimo | igual al mínimo |
+| Normal | por encima del mínimo |
+
+- Las alertas urgentes (agotado y crítico) cuentan en el aviso del menú; «en el mínimo» queda como pendiente de reposición.
+- En **Alertas** se pueden desactivar las alertas de un producto sin reposición automática; se pueden volver a activar en cualquier momento.
+- **Revisión de datos** muestra, sin cambiar nada, entradas con costo pendiente, marcas posiblemente duplicadas, licencias sin marca y duraciones por revisar.
+
 ## Entorno de pruebas persistente
 
 El entorno de pruebas es la instancia de desarrollo `http://127.0.0.3:8012`:
@@ -30,6 +45,8 @@ Los productos a granel, como cables o consumibles, se registran por cantidad, si
 
 ## Registrar el primer producto
 
+El registro es un asistente de cinco pasos: **Producto**, **Unidades**, **Datos comerciales**, **Garantías** y **Confirmación**.
+
 1. Abre **Inventario › Inventario inicial**.
 2. **Categoría y subcategoría:** por ejemplo, *Almacenamiento › SSD SATA 2.5"*.
 3. **Producto:** elige uno existente o pulsa **Producto nuevo**.
@@ -39,7 +56,7 @@ Los productos a granel, como cables o consumibles, se registran por cantidad, si
 4. **Unidades:** con el cursor en el campo de la serie, escanea con el lector USB. El lector escribe la serie y envía Enter, y la unidad se agrega a la lista.
    - Una serie repetida, en la lista o ya registrada, se rechaza y se indica su código interno.
    - Si el fabricante no puso serie, pulsa **Agregar sin serie**.
-5. **Costo y ubicación:** costo unitario sin IVA y ubicación física.
+5. **Costo y ubicación:** costo unitario sin IVA (obligatorio; se puede escribir 0,00 a propósito), proveedor, documento, IVA y ubicación física.
 6. **Guardar y generar códigos:** se crea el movimiento de apertura del Kardex y se muestran los códigos internos. Desde ahí puedes **Imprimir etiquetas**.
 
 **Registrar mercadería** funciona igual, con el motivo *Compra* o *Ajuste autorizado*.
@@ -53,7 +70,21 @@ Los productos a granel, como cables o consumibles, se registran por cantidad, si
   - Las reservas y los traslados se muestran sin cambiar el saldo.
 - **Inmutable:** los movimientos no se modifican ni se eliminan. Una corrección es otro movimiento, trazable.
 - **Filtros:** fecha, categoría, marca, producto, serie o código, movimiento y responsable.
-- **Exportación:** Excel (.xlsx), PDF y CSV.
+- **Período:** Hoy, últimos 7 o 30 días, este mes o personalizado; los indicadores comparan con el período anterior de igual duración.
+- **Por producto:** al elegir un producto se muestra su saldo inicial del período, entradas, salidas, ajustes y saldo final.
+- **Costo pendiente:** una entrada registrada con costo 0 se marca así. **Corregir costo** (solo entradas manuales, no compras) guarda el costo original, el nuevo, el motivo, el documento, el usuario y la fecha; el movimiento original no se modifica y el promedio se recalcula con la corrección.
+- **Exportación:** Excel (.xlsx, columnas numéricas), PDF (logo, fecha, filtros, totales y numeración de páginas) y CSV.
+- **Reportes:** Kardex general, por producto, por categoría, entradas y salidas por período, inventario valorizado, productos sin costo, ajustes y correcciones, y movimientos por responsable.
+
+## Ficha de producto y ventas
+
+La ficha tiene cinco pestañas: **Resumen**, **Unidades y series**, **Ventas y precios**, **Garantías** y **Kardex e historial**. Muestra avisos discretos de datos faltantes (precio, costo, garantías, ubicación) sin completarlos por su cuenta.
+
+- **Configurar precios:** precio mínimo y descuento máximo autorizado.
+- **Vender producto:** se elige la unidad (o la cantidad), el cliente y el precio con IVA. Un precio de 0,00, por debajo del mínimo o con un descuento mayor al autorizado exige marcar la autorización administrativa y escribir el motivo; queda registrada en el movimiento.
+- No se pueden vender unidades agotadas, entregadas ni reservadas para otra operación.
+- **Reservar producto:** cliente, motivo y vencimiento; reduce lo disponible, no las existencias.
+- Las garantías empiezan a correr con el evento configurado (venta o entrega), nunca antes.
 
 ## Salidas sin doble descuento
 
@@ -99,6 +130,10 @@ Las familias y ediciones son configurables. Describen lo que existe; no implican
 | Reserva automática desde presupuestos y proformas | Pendiente. |
 | Consumo desde la ficha de la orden | Pendiente: por ahora se registra desde el Centro con el número de orden. |
 
+## Licencias digitales en tabla
+
+**Licencias digitales** muestra una tabla por producto con disponibles, reservadas y entregadas, filtros por marca y estado, y nunca las claves. Si el nombre dice «ilimitada» pero la duración registrada es anual, se marca para revisar; no se cambia sola.
+
 ## Traslado futuro a producción
 
 **Configuración › Descargar paquete de traslado** genera un JSON con:
@@ -123,4 +158,7 @@ Las pruebas usan una base temporal con datos ficticios. Cubren:
 - garantías;
 - licencias de Kaspersky, Norton, McAfee y Microsoft clasificadas;
 - importación;
-- etiquetas, exportaciones y permisos.
+- etiquetas, exportaciones y permisos;
+- estados de existencias, alertas desactivables y costo obligatorio;
+- corrección de costo auditada, precios, ventas con autorización y reservas con vencimiento;
+- totales del Kardex por período, los 8 reportes y la revisión de datos.

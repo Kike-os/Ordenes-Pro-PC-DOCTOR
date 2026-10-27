@@ -270,10 +270,15 @@ def _product_dict(c, r, with_cost=True):
     units = {}
     if r['tracking'] == 'serie':
         units = {k: v for k, v in c.execute('SELECT status,COUNT(*) FROM inventory_units WHERE item_id=? GROUP BY status', (r['id'],))}
+    state = inventory.stock_state(stock, r['min_stock'])
+    alerts = bool(r['alerts_enabled']) if 'alerts_enabled' in r.keys() else True
     return {'id': r['id'], 'catalog_id': r['catalog_id'], 'name': r['name'], 'code': r['catalog_code'] or '', 'sku': r['sku'], 'model': r['model'], 'brand': r['brand'] or '',
             'brand_id': r['brand_id'], 'category_id': r['category_id'], 'category': path, 'top_category_id': r['category_parent'] or r['category_id'],
             'tracking': r['tracking'], 'tracking_label': TRACKING[r['tracking']], 'kind': r['kind'], 'stock': stock, 'reserved': r['reserved'], 'available': max(0, stock - r['reserved']),
-            'min_stock': r['min_stock'], 'low': bool(r['active']) and stock <= r['min_stock'], 'out': stock <= 0, 'location': r['location'], 'active': r['active'],
+            'min_stock': r['min_stock'], 'stock_state': state, 'stock_state_label': inventory.STOCK_STATES[state], 'alerts_enabled': alerts,
+            # «low»: necesita atención (agotado, crítico o en el mínimo); «urgent»: agotado o crítico. Solo si la ficha tiene las alertas activas.
+            'low': bool(r['active']) and alerts and state != 'normal', 'urgent': bool(r['active']) and alerts and state in ('agotado', 'critico'),
+            'out': stock <= 0, 'location': r['location'], 'active': r['active'], 'warranty_terms': r['warranty_terms'] if 'warranty_terms' in r.keys() else '',
             'price_cents': r['price_cents'], 'average_cost_cents': cost, 'value_cents': max(0, stock) * cost, 'description': r['description'] or '',
             'warranty_store': {'qty': r['warranty_store_qty'], 'unit': r['warranty_store_unit'], 'from': r['warranty_store_from'], 'label': period_label(r['warranty_store_qty'], r['warranty_store_unit'])},
             'warranty_maker': {'qty': r['warranty_maker_qty'], 'unit': r['warranty_maker_unit'], 'from': r['warranty_maker_from'], 'label': period_label(r['warranty_maker_qty'], r['warranty_maker_unit'])},
@@ -312,7 +317,8 @@ def products(c, q='', category_id='', brand_id='', state=''):
         if words and r['id'] not in unit_hits and not all(w in hay for w in words):
             continue
         item = _product_dict(c, r)
-        if state == 'bajo' and not item['low'] or state == 'agotado' and not item['out'] or state == 'inactivo' and item['active'] or state == 'activo' and not item['active']:
+        if (state == 'bajo' and not item['low'] or state in inventory.STOCK_STATES and (item['stock_state'] != state or not item['active'])
+                or state == 'inactivo' and item['active'] or state == 'activo' and not item['active'] or state == 'sin_alertas' and item['alerts_enabled']):
             continue
         out.append(item)
     return out
@@ -412,13 +418,58 @@ def save_product(c, data, user, now):
     if old:
         c.execute('UPDATE inventory_items SET category_id=?,brand_id=?,model=?,tracking=?,sku=?,min_stock=?,location=?,warranty_store_qty=?,warranty_store_unit=?,warranty_store_from=?,'
                   'warranty_maker_qty=?,warranty_maker_unit=?,warranty_maker_from=?,kind=?,updated_at=?,updated_by=? WHERE id=?', (*values[:-2], category['item_kind'], *values[-2:], old['id']))
+        _extra_fields(c, old['id'], data, old)
         event(c, now, user, 'ficha_editada', 'Ficha actualizada: %s.' % name, old['id'])
         return old['id']
     new_id = c.execute('INSERT INTO inventory_items(category_id,brand_id,model,tracking,sku,min_stock,location,warranty_store_qty,warranty_store_unit,warranty_store_from,'
                        'warranty_maker_qty,warranty_maker_unit,warranty_maker_from,catalog_id,kind,active,created_at,created_by,updated_at,updated_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?,?,?)',
                        (*values[:-2], catalog_id, category['item_kind'], stamp(now), user['id'], stamp(now), user['id'])).lastrowid
+    _extra_fields(c, new_id, data, None)
     event(c, now, user, 'ficha_creada', 'Ficha creada: %s (%s, %s).' % (name, category_path(c, category['id']), TRACKING[tracking].split(' (')[0].lower()), new_id)
     return new_id
+
+
+def _extra_fields(c, item_id, data, old):
+    """Alertas de la ficha y condiciones de garantía (migración 075). Si no se indican, se conservan."""
+    try:
+        if str(data.get('alerts_enabled', '')) in ('0', '1', 'true', 'false'):
+            c.execute('UPDATE inventory_items SET alerts_enabled=? WHERE id=?', (1 if str(data['alerts_enabled']) in ('1', 'true') else 0, item_id))
+        if 'warranty_terms' in data:
+            c.execute('UPDATE inventory_items SET warranty_terms=? WHERE id=?', (str(data.get('warranty_terms') or '').strip()[:500], item_id))
+    except Exception as error:
+        if 'no such column' not in str(error):
+            raise
+
+
+def set_alerts(c, item_id, enabled, user, now):
+    """Activa o desactiva las alertas de existencias de una ficha (p. ej., productos sin reposición automática)."""
+    item = product(c, item_id)
+    c.execute('UPDATE inventory_items SET alerts_enabled=?,updated_at=?,updated_by=? WHERE id=?', (1 if enabled else 0, stamp(now), user['id'], item['id']))
+    event(c, now, user, 'alertas_' + ('activadas' if enabled else 'desactivadas'), 'Alertas de existencias %s: %s.' % ('activadas' if enabled else 'desactivadas', item['name']), item['id'])
+
+
+def correct_cost(c, movement_id, cost, reason, user, now, document=''):
+    """Corrige el costo de una entrada registrada con un costo equivocado. El movimiento original no cambia: la corrección queda auditada
+    (costo anterior y nuevo, motivo, quién y cuándo) y el Kardex valorizado usa el costo corregido desde esa entrada."""
+    m = c.execute('SELECT * FROM inventory_movements WHERE id=?', (movement_id,)).fetchone() if _id(movement_id) else None
+    if not m or m['direction'] != 1 or m['reason'] not in ('inicial', 'compra', 'ajuste_entrada', 'devolucion_cliente'):
+        raise InventoryError('Solo se corrige el costo de una entrada.', 404 if not m else 409)
+    if m['reference_kind'] == 'compra':
+        raise InventoryError('Esta entrada viene de una compra registrada: corrige el documento de compra, no el Kardex.', 409)
+    if str(cost or '').strip() == '':
+        raise InventoryError('Indica el costo unitario correcto.', fields={'cost': 'Costo obligatorio.'})
+    new_cost = cents(cost, 'cost')
+    reason = re.sub(r'\s+', ' ', str(reason or '')).strip()[:300]
+    if len(reason) < 5:
+        raise InventoryError('Indica el motivo de la corrección.', fields={'reason': 'Motivo obligatorio (al menos 5 caracteres).'})
+    old = inventory.corrections(c, m['item_id']).get(m['id'], m['unit_cost_cents'])
+    if new_cost == old:
+        raise InventoryError('El costo indicado es igual al vigente.', fields={'cost': 'Sin cambio.'})
+    c.execute('INSERT INTO inventory_cost_corrections(movement_id,item_id,old_cost_cents,new_cost_cents,reason,document,created_by,created_at) VALUES (?,?,?,?,?,?,?,?)',
+              (m['id'], m['item_id'], old, new_cost, reason, re.sub(r'\s+', ' ', str(document or '')).strip()[:80], user['id'], stamp(now)))
+    c.execute('UPDATE inventory_units SET unit_cost_cents=?,updated_at=?,updated_by=? WHERE entry_movement_id=?', (new_cost, stamp(now), user['id'], m['id']))
+    event(c, now, user, 'costo_corregido', 'Costo de la entrada #%d corregido de %s a %s: %s' % (m['id'], usd(old), usd(new_cost), reason), m['item_id'])
+    return product(c, m['item_id'])
 
 
 # ---- Registrar mercadería e inventario inicial -------------------------------------------------------------------------
@@ -450,10 +501,22 @@ def register(c, data, user, now):
     item = product(c, item_id)
     if not item['active']:
         raise InventoryError('El producto está desactivado.', 409)
+    # Costo obligatorio: un campo vacío ya no se guarda como 0 (auditoría del 26/10/2026). Un costo 0 debe escribirse expresamente.
+    if str(data.get('cost', '') or '').strip() == '':
+        raise InventoryError('Indica el costo unitario (escribe 0 solo si el producto no tuvo costo).', fields={'cost': 'Costo obligatorio.'})
     try:
-        cost = cents(data.get('cost', '0') or '0', 'cost')
+        cost = cents(data.get('cost'), 'cost')
     except InventoryError:
         raise InventoryError('Costo unitario no válido.', fields={'cost': 'Importe en USD con hasta dos decimales.'})
+    supplier_id = _id(data.get('supplier_id'))
+    if supplier_id and not c.execute('SELECT 1 FROM suppliers WHERE id=? AND active=1', (supplier_id,)).fetchone():
+        raise InventoryError('Elige un proveedor activo.', fields={'supplier_id': 'Proveedor no válido.'})
+    tax = {'': 0, '0': 0, '15': 1500}.get(str(data.get('tax', '') or ''), None)
+    if tax is None:
+        raise InventoryError('IVA del costo no válido.', fields={'tax': 'Elige 0 % o 15 %.'})
+    document = _text(data, 'document', 80)
+    if not data.get('product'):
+        _update_commercial(c, item, data, user, now)
     serials = []
     if item['tracking'] == 'serie':
         units = _json_list(data.get('units'), 'units')
@@ -466,10 +529,34 @@ def register(c, data, user, now):
     else:
         amount = str(data.get('quantity') or '')
     movement = inventory.move(c, item_id, 1, reason, amount, '%d.%02d' % divmod(cost, 100), user, now, note=_text(data, 'note', 300) or ENTRY_REASONS[reason],
-                              request_key=key, serials=serials, location=_text(data, 'location', 80))
+                              request_key=key, serials=serials, location=_text(data, 'location', 80), supplier_id=supplier_id, document=document, tax_rate_bp=tax)
     if _text(data, 'location', 80) and item['tracking'] == 'granel':
         c.execute('UPDATE inventory_items SET location=? WHERE id=?', (_text(data, 'location', 80), item_id))
     return _register_result(c, item_id, movement)
+
+
+def _update_commercial(c, item, data, user, now):
+    """Producto existente: el asistente puede actualizar su precio de venta y sus garantías (queda en el historial de la ficha)."""
+    import quotes
+    price_text = str(data.get('price', '') or '').strip()
+    if price_text:
+        price = cents(price_text, 'price')
+        if price != item['price_cents']:
+            row = c.execute('SELECT * FROM catalog_items WHERE id=?', (item['catalog_id'],)).fetchone()
+            try:
+                quotes.save_catalog_item(c, {'id': str(row['id']), 'name': row['name'], 'description': row['description'], 'category': row['category'], 'brand': row['brand'],
+                                             'price': '%d.%02d' % divmod(price, 100), 'price_mode': 'incluido', 'available': bool(row['available'])}, user, now)
+            except quotes.QuoteError as error:
+                raise InventoryError(str(error), error.status, {'price': str(error)})
+            event(c, now, user, 'precio_actualizado', 'Precio de venta de %s: %s → %s.' % (item['name'], usd(item['price_cents']), usd(price)), item['id'])
+    if any(k in data for k in ('warranty_store_qty', 'warranty_maker_qty')):
+        errors = {}
+        store, maker = _warranty_fields(data, 'warranty_store', errors), _warranty_fields(data, 'warranty_maker', errors)
+        if errors:
+            raise InventoryError('Revisa las garantías.', fields=errors)
+        c.execute('UPDATE inventory_items SET warranty_store_qty=?,warranty_store_unit=?,warranty_store_from=?,warranty_maker_qty=?,warranty_maker_unit=?,warranty_maker_from=?,updated_at=?,updated_by=? WHERE id=?',
+                  (*store, *maker, stamp(now), user['id'], item['id']))
+        _extra_fields(c, item['id'], data, item)
 
 
 def _register_result(c, item_id, movement_id):
@@ -608,14 +695,169 @@ def exit_stock(c, data, user, now):
         values.update(document=document, sold_at=sold.isoformat(), delivered_at=delivered.isoformat() if delivered else '', **warranty_dates(item_row, sold, delivered))
     unit_ids = _json_list(data.get('unit_ids'), 'units') if item_row['tracking'] == 'serie' else None
     amount = str(len(unit_ids)) if unit_ids is not None else str(data.get('quantity') or '')
+    sale = _sale_price(c, item_row, data, values.get('client_id'), user, now) if reason == 'venta' else None
     try:
         movement = inventory.move(c, item_row['id'], -1, reason, amount, '0', user, now, reference_kind, reference_id, note, str(data.get('request_key') or '')[:64] or None,
-                                  unit_ids=unit_ids, reservation_id=_id(data.get('reservation_id')), unit_values=values)
+                                  unit_ids=unit_ids, reservation_id=_id(data.get('reservation_id')), unit_values=values, document=document if reason == 'venta' else '', sale=sale)
     except Exception as error:
         if 'UNIQUE' in str(error) and reference_kind == 'orden':
             raise InventoryError('La orden %s ya registró la salida de este producto: no se descuenta dos veces.' % order['code'], 409, {'order_code': 'Salida ya registrada.'})
         raise
     return {'movement_id': movement, 'item': product(c, item_row['id'])}
+
+
+def pricing(c, item):
+    """Costo, precio (con y sin IVA), IVA, margen bruto estimado, precio mínimo y descuento autorizado de una ficha."""
+    import quotes
+    row = c.execute('SELECT price_cents,taxed FROM catalog_items WHERE id=?', (item['catalog_id'],)).fetchone()
+    rate = quotes.tax_rate(c) if row['taxed'] else 0
+    price = row['price_cents']
+    net = (2 * price * 10000 + (10000 + rate)) // (2 * (10000 + rate)) if rate else price
+    cost = item['average_cost_cents']
+    margin = net - cost
+    keys = item.keys() if hasattr(item, 'keys') else item
+    return {'price_cents': price, 'net_cents': net, 'tax_rate_bp': rate, 'tax_cents': price - net, 'cost_cents': cost, 'margin_cents': margin,
+            'margin_bp': (margin * 10000 // net) if net else None, 'min_price_cents': item.get('min_price_cents', 0) if isinstance(item, dict) else 0,
+            'max_discount_bp': item.get('max_discount_bp', 0) if isinstance(item, dict) else 0}
+
+
+def _percent_bp(text, field):
+    value = str(text or '').strip().replace(',', '.').rstrip('%').strip()
+    if not value:
+        return 0
+    if not re.fullmatch(r'\d{1,3}(\.\d{1,2})?', value) or float(value) > 100:
+        raise InventoryError('Porcentaje no válido.', fields={field: 'De 0 a 100 %.'})
+    return int(round(float(value) * 100))
+
+
+def save_pricing(c, item_id, data, user, now):
+    """Precio de venta (IVA incluido), precio mínimo y descuento máximo autorizado de una ficha (solo administración)."""
+    import quotes
+    item = product(c, item_id)
+    errors = {}
+    try:
+        price = cents(data.get('price', '') or '0', 'price')
+    except InventoryError:
+        errors['price'] = 'Precio en USD con hasta dos decimales.'
+        price = 0
+    try:
+        minimum = cents(data.get('min_price', '') or '0', 'min_price')
+    except InventoryError:
+        errors['min_price'] = 'Precio en USD con hasta dos decimales.'
+        minimum = 0
+    try:
+        discount = _percent_bp(data.get('max_discount'), 'max_discount')
+    except InventoryError as error:
+        errors.update(error.fields)
+        discount = 0
+    if not errors and minimum > price and price:
+        errors['min_price'] = 'El precio mínimo no puede superar el precio de venta.'
+    if errors:
+        raise InventoryError('Revisa los precios.', fields=errors)
+    if price != item['price_cents']:
+        row = c.execute('SELECT * FROM catalog_items WHERE id=?', (item['catalog_id'],)).fetchone()
+        try:
+            quotes.save_catalog_item(c, {'id': str(row['id']), 'name': row['name'], 'description': row['description'], 'category': row['category'], 'brand': row['brand'],
+                                         'price': '%d.%02d' % divmod(price, 100), 'price_mode': 'incluido', 'available': bool(row['available'])}, user, now)
+        except quotes.QuoteError as error:
+            raise InventoryError(str(error), error.status, {'price': str(error)})
+    c.execute('UPDATE inventory_items SET min_price_cents=?,max_discount_bp=?,updated_at=?,updated_by=? WHERE id=?', (minimum, discount, stamp(now), user['id'], item['id']))
+    event(c, now, user, 'precios', 'Precios de %s: venta %s, mínimo %s, descuento máximo %s %%.' % (item['name'], usd(price), usd(minimum), ('%g' % (discount / 100)).replace('.', ',')), item['id'])
+    return product(c, item['id'])
+
+
+def _sale_price(c, item_row, data, client_id, user, now):
+    """Precio de una venta (por unidad, IVA incluido): de lista o el indicado, con el descuento autorizado. Un precio 0, por debajo del mínimo o
+    con un descuento mayor al autorizado exige una autorización administrativa expresa con su motivo, que queda registrada."""
+    listed = c.execute('SELECT price_cents FROM catalog_items WHERE id=?', (item_row['catalog_id'],)).fetchone()['price_cents']
+    text = str(data.get('unit_price', '') or '').strip()
+    try:
+        price = cents(text, 'unit_price') if text else listed
+    except InventoryError:
+        raise InventoryError('Precio no válido.', fields={'unit_price': 'Precio en USD con hasta dos decimales.'})
+    discount_bp = _percent_bp(data.get('discount'), 'discount')
+    discount = (2 * price * discount_bp + 10000) // 20000
+    final = price - discount
+    keys = item_row.keys()
+    minimum = item_row['min_price_cents'] if 'min_price_cents' in keys else 0
+    allowed = item_row['max_discount_bp'] if 'max_discount_bp' in keys else 0
+    problems = []
+    if final <= 0:
+        problems.append('el precio final es $0,00')
+    if minimum and final < minimum:
+        problems.append('es menor que el precio mínimo (%s)' % usd(minimum))
+    if discount_bp > allowed:
+        problems.append('el descuento supera el autorizado (%s %%)' % ('%g' % (allowed / 100)).replace('.', ','))
+    authorization = ''
+    if problems:
+        reason = re.sub(r'\s+', ' ', str(data.get('authorization', '') or '')).strip()[:200]
+        if str(data.get('authorize', '')) not in ('1', 'true') or len(reason) < 10:
+            raise InventoryError('Esta venta requiere autorización administrativa expresa: ' + '; '.join(problems) + '.', 409,
+                                 {'authorization': 'Marca la autorización e indica el motivo (al menos 10 caracteres).'})
+        authorization = '%s · %s: %s' % (user['name'], '; '.join(problems), reason)
+    return {'sale_price_cents': final, 'discount_cents': discount, 'client_id': client_id, 'price_authorization': authorization}
+
+
+def sales_history(c, item_id):
+    """Ventas del producto: fecha, cliente, documento, series vendidas, precio, estado actual de la unidad y garantía comercial."""
+    try:
+        rows = c.execute("SELECT m.*,COALESCE(k.name,'') client,COALESCE(s.name,'Sistema') actor FROM inventory_movements m LEFT JOIN clients k ON k.id=m.client_id "
+                         "LEFT JOIN users s ON s.id=m.created_by WHERE m.item_id=? AND m.reason='venta' ORDER BY m.id DESC", (item_id,)).fetchall()
+    except Exception:
+        return []
+    out = []
+    for m in rows:
+        units = [dict(u) for u in c.execute('SELECT u.id,u.internal_code,u.serial,u.status,u.store_warranty_to,COALESCE(k.name,\'\') client FROM inventory_movement_units x JOIN inventory_units u ON u.id=x.unit_id '
+                                             'LEFT JOIN clients k ON k.id=u.client_id WHERE x.movement_id=?', (m['id'],))]
+        client = m['client'] or next((u['client'] for u in units if u['client']), '')
+        status = 'devuelta' if units and all(u['status'] == 'disponible' for u in units) else 'vendida'
+        out.append({'id': m['id'], 'at': m['created_at'], 'client': client, 'document': m['document'] or m['note'], 'quantity': m['quantity'], 'units': units,
+                    'price_cents': m['sale_price_cents'], 'discount_cents': m['discount_cents'], 'authorization': m['price_authorization'], 'status': status,
+                    'warranty_to': next((u['store_warranty_to'] for u in units if u['store_warranty_to']), ''), 'actor': m['actor']})
+    return out
+
+
+def product_sheet(c, item_id, now):
+    """Ficha comercial completa: datos, precios y margen, unidades, reservas, ventas, entradas (con correcciones de costo), Kardex y
+    avisos de datos faltantes (sin inventar ningún valor)."""
+    item = product(c, item_id)
+    raw = c.execute('SELECT * FROM inventory_items WHERE id=?', (item['id'],)).fetchone()
+    item['min_price_cents'] = raw['min_price_cents'] if 'min_price_cents' in raw.keys() else 0
+    item['max_discount_bp'] = raw['max_discount_bp'] if 'max_discount_bp' in raw.keys() else 0
+    price = pricing(c, item)
+    fixed = inventory.corrections(c, item['id'])
+    entries = [{'id': m['id'], 'at': m['created_at'], 'reason': m['reason'], 'reason_label': inventory.IN_REASONS[m['reason']], 'quantity': m['quantity'], 'cost_cents': fixed.get(m['id'], m['unit_cost_cents']),
+                'original_cost_cents': m['unit_cost_cents'], 'corrected': m['id'] in fixed, 'supplier': m['supplier'] or '', 'document': m['document'] if 'document' in m.keys() else '',
+                'correctable': m['reference_kind'] != 'compra'} for m in c.execute(
+        'SELECT m.*,s.name supplier FROM inventory_movements m LEFT JOIN suppliers s ON s.id=' + ('m.supplier_id' if _has_column(c, 'inventory_movements', 'supplier_id') else 'NULL') + ' WHERE m.item_id=? AND m.direction=1 ORDER BY m.id', (item['id'],))]
+    alerts = []
+    if not price['price_cents']:
+        alerts.append(('price', 'Sin precio de venta: configúralo en «Ventas y precios» antes de vender.'))
+    if not item['warranty_store']['qty']:
+        alerts.append(('warranty_store', 'Garantía de PC-DOCTOR sin configurar.'))
+    if not item['warranty_maker']['qty']:
+        alerts.append(('warranty_maker', 'Garantía del fabricante sin configurar.'))
+    if any(not e['cost_cents'] for e in entries):
+        alerts.append(('cost', 'Hay entradas con costo $0,00: corrígelas en «Kardex e historial» si tuvieron costo.'))
+    units_list = []
+    if item['tracking'] == 'serie':
+        units_list = units(c, item['id'])
+        if any(not u['location'] for u in units_list if u['status'] in ('disponible', 'reservada')):
+            alerts.append(('location', 'Hay unidades sin ubicación registrada.'))
+    elif not item['location']:
+        alerts.append(('location', 'Ubicación sin registrar.'))
+    today = now.date()
+    for u in units_list:
+        w = _unit_warranty(c, u, today)
+        u['warranty_label'] = (w['store']['state'] if u['sold_at'] else 'sin_venta')
+        u['warranty_to'] = u['store_warranty_to']
+    res = [r for r in reservations(c) if r['item_id'] == item['id']]
+    return {'product': item, 'pricing': price, 'units': units_list, 'reservations': res, 'sales': sales_history(c, item['id']), 'entries': entries,
+            'kardex': kardex(c, {'item_id': str(item['id'])})['rows'][::-1], 'alerts': [{'field': f, 'text': t} for f, t in alerts]}
+
+
+def _has_column(c, table, column):
+    return any(r[1] == column for r in c.execute('PRAGMA table_info(' + table + ')'))
 
 
 def register_delivery(c, unit_ids, delivered_at, user, now):
@@ -705,8 +947,20 @@ def reserve(c, data, user, now):
         rows = []
     if stock - inventory.reserved(c, item['id']) < amount:
         raise InventoryError('No hay existencias libres suficientes para reservar %d.' % amount, 409, {'quantity': 'Supera lo disponible.'})
+    client = _id(data.get('client_id')) or (order['client_id'] if order else None)
+    if client and not c.execute('SELECT 1 FROM clients WHERE id=?', (client,)).fetchone():
+        raise InventoryError('Cliente no encontrado.', 404, {'client_id': 'Cliente no válido.'})
+    expires = _text(data, 'expires_at', 10)
+    if expires:
+        try:
+            if date.fromisoformat(expires) < now.date():
+                raise ValueError
+        except ValueError:
+            raise InventoryError('El vencimiento de la reserva debe ser hoy o una fecha futura.', fields={'expires_at': 'Fecha no válida.'})
     reservation = c.execute('INSERT INTO inventory_reservations(item_id,quantity,reference,order_id,status,note,created_by,created_at) VALUES (?,?,?,?,?,?,?,?)',
                             (item['id'], amount, reference, order['id'] if order else None, 'activa', _text(data, 'note', 300), user['id'], stamp(now))).lastrowid
+    if (client or expires) and _has_column(c, 'inventory_reservations', 'expires_at'):
+        c.execute('UPDATE inventory_reservations SET client_id=?,expires_at=? WHERE id=?', (client, expires, reservation))
     for unit in rows:
         c.execute("UPDATE inventory_units SET status='reservada',reservation_id=?,updated_at=?,updated_by=? WHERE id=?", (reservation, stamp(now), user['id'], unit['id']))
     event(c, now, user, 'reserva', 'Reserva de %d para %s (no descuenta existencias).' % (amount, reference), item['id'])
@@ -724,12 +978,17 @@ def release(c, reservation_id, user, now):
 
 def reservations(c, status='activa'):
     where = 'WHERE r.status=?' if status in ('activa', 'liberada', 'consumida') else ''
-    rows = c.execute("SELECT r.*,g.name product,i.tracking,COALESCE(s.name,'') actor,o.code order_code FROM inventory_reservations r JOIN inventory_items i ON i.id=r.item_id "
-                     'JOIN catalog_items g ON g.id=i.catalog_id LEFT JOIN users s ON s.id=r.created_by LEFT JOIN orders o ON o.id=r.order_id ' + where + ' ORDER BY r.id DESC LIMIT 300',
+    client = ",COALESCE(k.name,'') client" if _has_column(c, 'inventory_reservations', 'client_id') else ",'' client"
+    join = ' LEFT JOIN clients k ON k.id=r.client_id' if client.startswith(',COALESCE') else ''
+    rows = c.execute("SELECT r.*,g.name product,i.tracking,COALESCE(s.name,'') actor,o.code order_code" + client + " FROM inventory_reservations r JOIN inventory_items i ON i.id=r.item_id "
+                     'JOIN catalog_items g ON g.id=i.catalog_id LEFT JOIN users s ON s.id=r.created_by LEFT JOIN orders o ON o.id=r.order_id' + join + ' ' + where + ' ORDER BY r.id DESC LIMIT 300',
                      (status,) if where else ()).fetchall()
+    today = date.today().isoformat()
     out = []
     for r in rows:
         item = dict(r)
+        item['expires_at'] = item.get('expires_at') or ''
+        item['expired'] = bool(item['expires_at']) and item['expires_at'] < today and item['status'] == 'activa'
         item['units'] = [dict(u) for u in c.execute('SELECT id,internal_code,serial FROM inventory_units WHERE reservation_id=?', (r['id'],))]
         out.append(item)
     return out
@@ -768,7 +1027,8 @@ def transfer(c, data, user, now):
 
 # ---- Kardex --------------------------------------------------------------------------------------------------------------
 
-KARDEX_TYPES = {'entrada': 'Entradas', 'salida': 'Salidas', 'reserva': 'Reservas y liberaciones', 'traslado': 'Traslados', **{'m:' + k: v for k, v in inventory.IN_REASONS.items()},
+KARDEX_TYPES = {'entrada': 'Entradas', 'salida': 'Salidas', 'k:inicial': 'Inventario inicial', 'k:ajuste': 'Ajustes y bajas', 'k:devolucion': 'Devoluciones', 'reserva': 'Reservas y liberaciones',
+                'traslado': 'Traslados', 'correccion': 'Correcciones de costo', **{'m:' + k: v for k, v in inventory.IN_REASONS.items()},
                 **{'m:' + k: v for k, v in inventory.OUT_REASONS.items()}}
 
 
@@ -786,78 +1046,148 @@ def _reference(c, m):
     return ''
 
 
+MOVE_KINDS = {'inicial': ('inicial', 'Inventario inicial'), 'compra': ('entrada', 'Entrada'), 'devolucion_cliente': ('devolucion', 'Devolución del cliente'),
+              'ajuste_entrada': ('ajuste', 'Ajuste (entrada)'), 'venta': ('salida', 'Venta'), 'uso_orden': ('salida', 'Consumo en orden'), 'devolucion_proveedor': ('devolucion', 'Devolución al proveedor'),
+              'ajuste_salida': ('ajuste', 'Ajuste (salida)'), 'baja': ('ajuste', 'Baja'), 'anulacion_compra': ('salida', 'Anulación de compra')}
+
+
+def _period_before(start, end):
+    """Ventana anterior de la misma duración (para la variación de los indicadores)."""
+    a, b = date.fromisoformat(start), date.fromisoformat(end)
+    span = (b - a).days + 1
+    return (a - timedelta(days=span)).isoformat(), (a - timedelta(days=1)).isoformat()
+
+
 def kardex(c, filters=None):
-    """Kardex valorizado (costo promedio ponderado móvil) con reservas y traslados. El saldo se calcula sobre todo el historial del producto y
-    después se aplican los filtros: el saldo mostrado siempre es el real."""
+    """Kardex valorizado (costo promedio ponderado móvil) con reservas, traslados y correcciones de costo auditadas. El saldo se calcula sobre
+    todo el historial del producto y después se aplican los filtros: el saldo mostrado siempre es el real. Las salidas conservan el costo
+    aplicado en su momento; una corrección de costo no borra el movimiento original: se muestra como fila propia con su motivo."""
     f = filters or {}
     cats = _category_ids(c, f.get('category_id'))
     items = c.execute(PRODUCT_SQL + ' ORDER BY g.name COLLATE NOCASE').fetchall()
     serial = inventory.serial_key(f.get('serial') or '')
     kind = str(f.get('type') or '')
     user_id = _id(f.get('user_id'))
+    doc = str(f.get('document') or '').strip().lower()
     start, end = str(f.get('from') or ''), str(f.get('to') or '')
     names = {r[0]: r[1] for r in c.execute('SELECT id,name FROM users')}
-    rows = []
+    has_extra = _has_column(c, 'inventory_movements', 'supplier_id')
+    has_sale = _has_column(c, 'inventory_movements', 'client_id')
+    rows, stock_now, value_now, opening, chosen = [], 0, 0, 0, []
     for item in items:
         if cats and item['category_id'] not in cats or _id(f.get('brand_id')) and item['brand_id'] != int(f['brand_id']) or _id(f.get('item_id')) and item['id'] != int(f['item_id']):
             continue
-        base = {'item_id': item['id'], 'product': item['name'], 'sku': item['sku'], 'brand': item['brand'] or '', 'tracking': item['tracking'],
+        chosen.append(item['id'])
+        base = {'item_id': item['id'], 'product': item['name'], 'sku': item['sku'], 'brand': item['brand'] or '', 'tracking': item['tracking'], 'model': item['model'],
                 'category': (item['parent_name'] + ' › ' + item['category_name']) if item['parent_name'] else (item['category_name'] or 'Sin categoría')}
+        fixed = inventory.corrections(c, item['id'])
         timeline, moved_at = [], {}
-        for m, balance, avg, value, applied in inventory.valuation(c, item['id']):
-            serials = [dict(r) for r in c.execute('SELECT u.internal_code,u.serial FROM inventory_movement_units x JOIN inventory_units u ON u.id=x.unit_id WHERE x.movement_id=? ORDER BY u.id', (m['id'],))]
+        history = inventory.valuation(c, item['id'])
+        for m, balance, avg, value, applied in history:
+            units_ = [dict(r) for r in c.execute('SELECT u.id,u.internal_code,u.serial,u.location FROM inventory_movement_units x JOIN inventory_units u ON u.id=x.unit_id WHERE x.movement_id=? ORDER BY u.id', (m['id'],))]
             moved_at[m['id']] = m['created_at']
-            timeline.append((m['created_at'], 0, 2 * m['id'], dict(base, at=m['created_at'], type='entrada' if m['direction'] == 1 else 'salida', reason=m['reason'],
-                             label=(inventory.IN_REASONS if m['direction'] == 1 else inventory.OUT_REASONS)[m['reason']], entry=m['quantity'] if m['direction'] == 1 else 0,
-                             exit=m['quantity'] if m['direction'] == -1 else 0, unit_cost_cents=applied, average_cents=avg, balance=balance, balance_cents=value,
-                             document=_reference(c, m), note=m['note'], user_id=m['created_by'], actor=names.get(m['created_by'], 'Sistema'), units=serials)))
+            party = ''
+            if has_extra and m['supplier_id']:
+                party = (c.execute('SELECT name FROM suppliers WHERE id=?', (m['supplier_id'],)).fetchone() or [''])[0]
+            if has_sale and m['client_id']:
+                party = (c.execute('SELECT name FROM clients WHERE id=?', (m['client_id'],)).fetchone() or [''])[0]
+            if not party and m['direction'] == -1 and units_:
+                party = (c.execute('SELECT k.name FROM inventory_units u JOIN clients k ON k.id=u.client_id WHERE u.id=?', (units_[0]['id'],)).fetchone() or [''])[0]
+            mk, mlabel = MOVE_KINDS[m['reason']]
+            pending = m['direction'] == 1 and not applied and m['reason'] in ('inicial', 'compra', 'ajuste_entrada')
+            document = _reference(c, m) or ((m['document'] if has_extra else '') or '')
+            timeline.append((m['created_at'], 0, 2 * m['id'], dict(base, at=m['created_at'], id='m%d' % m['id'], movement_id=m['id'], type='entrada' if m['direction'] == 1 else 'salida', kind=mk, reason=m['reason'],
+                             label=mlabel, entry=m['quantity'] if m['direction'] == 1 else 0, exit=m['quantity'] if m['direction'] == -1 else 0, unit_cost_cents=applied,
+                             original_cost_cents=m['unit_cost_cents'], corrected=m['id'] in fixed, cost_pending=pending, average_cents=avg, balance=balance, balance_cents=value,
+                             line_cents=m['quantity'] * applied, document=document, party=party, location=', '.join(sorted({u['location'] for u in units_ if u['location']})) or item['location'],
+                             sale_price_cents=m['sale_price_cents'] if has_sale else None, tax_rate_bp=m['tax_rate_bp'] if has_extra else 0,
+                             note=m['note'], user_id=m['created_by'], actor=names.get(m['created_by'], 'Sistema'), units=units_)))
+        try:
+            fixes = c.execute('SELECT * FROM inventory_cost_corrections WHERE item_id=? ORDER BY id', (item['id'],)).fetchall()
+        except Exception:
+            fixes = []
+        for x in fixes:
+            timeline.append((x['created_at'], 3, x['id'], dict(base, at=x['created_at'], id='c%d' % x['id'], movement_id=x['movement_id'], type='correccion', kind='correccion', reason='correccion',
+                             label='Corrección de costo', entry=0, exit=0, document=x['document'], party='', location='', note='Entrada #%d: %s → %s. %s' % (x['movement_id'], usd(x['old_cost_cents']), usd(x['new_cost_cents']), x['reason']),
+                             old_cost_cents=x['old_cost_cents'], new_cost_cents=x['new_cost_cents'], user_id=x['created_by'], actor=names.get(x['created_by'], 'Sistema'), units=[])))
         for r in c.execute('SELECT * FROM inventory_reservations WHERE item_id=?', (item['id'],)).fetchall():
-            units_ = [dict(u) for u in c.execute('SELECT internal_code,serial FROM inventory_units WHERE reservation_id=? OR id IN (SELECT unit_id FROM inventory_movement_units WHERE movement_id=?)',
+            units_ = [dict(u) for u in c.execute('SELECT id,internal_code,serial,location FROM inventory_units WHERE reservation_id=? OR id IN (SELECT unit_id FROM inventory_movement_units WHERE movement_id=?)',
                                                   (r['id'], r['movement_id'] or 0))]
+            client = ''
+            if 'client_id' in r.keys() and r['client_id']:
+                client = (c.execute('SELECT name FROM clients WHERE id=?', (r['client_id'],)).fetchone() or [''])[0]
             # Una reserva consumida va siempre antes de la salida que la consumió (aunque ocurran en el mismo segundo).
             order_key = (r['created_at'], 0, 2 * r['movement_id'] - 1) if r['movement_id'] and r['created_at'] >= moved_at.get(r['movement_id'], '') else (r['created_at'], 1, r['id'])
-            timeline.append((*order_key, dict(base, at=r['created_at'], type='reserva', reason='reserva', label='Reserva (no descuenta)', entry=0, exit=0, reserved=r['quantity'],
-                             document=r['reference'], note=r['note'], user_id=r['created_by'], actor=names.get(r['created_by'], 'Sistema'), units=units_)))
+            timeline.append((*order_key, dict(base, at=r['created_at'], id='r%d' % r['id'], type='reserva', kind='reserva', reason='reserva', label='Reserva (no descuenta)', entry=0, exit=0, reserved=r['quantity'],
+                             document=r['reference'], party=client, location='', note=r['note'], user_id=r['created_by'], actor=names.get(r['created_by'], 'Sistema'), units=units_)))
             if r['status'] == 'liberada':
-                timeline.append((r['closed_at'], 1, r['id'], dict(base, at=r['closed_at'], type='reserva', reason='liberacion', label='Liberación de reserva', entry=0, exit=0, reserved=-r['quantity'],
-                                 document=r['reference'], note='', user_id=r['closed_by'], actor=names.get(r['closed_by'], 'Sistema'), units=units_)))
+                timeline.append((r['closed_at'], 1, r['id'], dict(base, at=r['closed_at'], id='l%d' % r['id'], type='reserva', kind='reserva', reason='liberacion', label='Liberación de reserva', entry=0, exit=0,
+                                 reserved=-r['quantity'], document=r['reference'], party=client, location='', note='', user_id=r['closed_by'], actor=names.get(r['closed_by'], 'Sistema'), units=units_)))
         for t in c.execute('SELECT t.*,u.internal_code,u.serial FROM inventory_transfers t LEFT JOIN inventory_units u ON u.id=t.unit_id WHERE t.item_id=?', (item['id'],)).fetchall():
-            timeline.append((t['created_at'], 2, t['id'], dict(base, at=t['created_at'], type='traslado', reason='traslado', label='Traslado: %s → %s' % (t['from_location'] or 'sin ubicación', t['to_location']),
-                             entry=0, exit=0, moved=t['quantity'], document='', note=t['note'], user_id=t['created_by'], actor=names.get(t['created_by'], 'Sistema'),
-                             units=[{'internal_code': t['internal_code'], 'serial': t['serial']}] if t['internal_code'] else [])))
+            timeline.append((t['created_at'], 2, t['id'], dict(base, at=t['created_at'], id='t%d' % t['id'], type='traslado', kind='traslado', reason='traslado',
+                             label='Traslado: %s → %s' % (t['from_location'] or 'sin ubicación', t['to_location']), entry=0, exit=0, moved=t['quantity'], document='', party='', location=t['to_location'],
+                             note=t['note'], user_id=t['created_by'], actor=names.get(t['created_by'], 'Sistema'), units=[{'internal_code': t['internal_code'], 'serial': t['serial']}] if t['internal_code'] else [])))
         timeline.sort(key=lambda e: (e[0], e[1], e[2]))
         last = {'balance': 0, 'average_cents': 0, 'balance_cents': 0}
         for _, _, _, row in timeline:
             if row['type'] in ('entrada', 'salida'):
                 last = {k: row[k] for k in last}
             else:
-                row.update(unit_cost_cents=0, **last)
+                row.update(unit_cost_cents=0, line_cents=0, **last)
+            if start and row['at'][:10] < start:
+                row['_before'] = True
             rows.append(row)
-    out = []
-    for row in rows:
+        if history:
+            stock_now += history[-1][1]
+            value_now += history[-1][3]
+            if start:
+                before = [h for h in history if h[0]['created_at'][:10] < start]
+                opening += before[-1][1] if before else 0
+
+    def keep(row, a, b):
         day = row['at'][:10]
-        if start and day < start or end and day > end:
-            continue
-        if kind in ('entrada', 'salida', 'reserva', 'traslado') and row['type'] != kind or kind.startswith('m:') and row['reason'] != kind[2:]:
-            continue
+        if a and day < a or b and day > b:
+            return False
+        if kind in ('entrada', 'salida', 'reserva', 'traslado', 'correccion') and row['type'] != kind or kind.startswith('k:') and row.get('kind') != kind[2:] or kind.startswith('m:') and row['reason'] != kind[2:]:
+            return False
         if user_id and row['user_id'] != user_id:
-            continue
+            return False
+        if doc and doc not in (str(row.get('document') or '') + ' ' + str(row.get('note') or '')).lower():
+            return False
         if serial and not any(serial in inventory.serial_key(u['serial'] or '') or serial in (u['internal_code'] or '') for u in row['units']):
-            continue
-        out.append(row)
-    out.sort(key=lambda r: r['at'])
-    totals = {'entries': sum(r['entry'] for r in out), 'exits': sum(r['exit'] for r in out), 'rows': len(out),
-              'entry_cents': sum(r['entry'] * r['unit_cost_cents'] for r in out if r['type'] == 'entrada'), 'exit_cents': sum(r['exit'] * r['unit_cost_cents'] for r in out if r['type'] == 'salida')}
-    return {'rows': out[-2000:], 'totals': totals, 'truncated': len(out) > 2000}
+            return False
+        return True
+
+    def summary(subset):
+        return {'rows': len(subset), 'entries': sum(r['entry'] for r in subset), 'exits': sum(r['exit'] for r in subset),
+                'entry_cents': sum(r.get('line_cents', 0) for r in subset if r['type'] == 'entrada'), 'exit_cents': sum(r.get('line_cents', 0) for r in subset if r['type'] == 'salida'),
+                'adjustments': sum(r['entry'] + r['exit'] for r in subset if r.get('kind') == 'ajuste'), 'cost_pending': sum(1 for r in subset if r.get('cost_pending') and not r.get('corrected'))}
+    out = sorted((r for r in rows if keep(r, start, end)), key=lambda r: r['at'])  # estable: conserva el orden real dentro del mismo segundo
+    totals = summary(out)
+    totals.update(stock_cents=value_now, stock_units=stock_now, products=len(chosen))
+    if start:
+        totals['opening'] = opening
+        totals['closing'] = opening + sum(r['entry'] - r['exit'] for r in rows if keep(r, start, end or '9999-12-31') and r['type'] in ('entrada', 'salida'))
+    previous = None
+    if start and end:
+        a, b = _period_before(start, end)
+        previous = summary([r for r in rows if keep(r, a, b)])
+    return {'rows': out[-2000:], 'totals': totals, 'previous': previous, 'truncated': len(out) > 2000}
 
 
-KARDEX_COLUMNS = ['Fecha', 'Producto', 'SKU', 'Categoría', 'Marca', 'Serie / código', 'Movimiento', 'Entrada', 'Salida', 'Costo unitario', 'Costo promedio', 'Saldo', 'Valor del saldo', 'Documento', 'Responsable']
+KARDEX_COLUMNS = ['Fecha', 'Producto', 'SKU', 'Categoría', 'Marca', 'Serie / código', 'Movimiento', 'Entrada', 'Salida', 'Saldo', 'Costo unitario', 'Valor del movimiento', 'Costo promedio',
+                  'Valor del saldo', 'Documento', 'Proveedor / cliente', 'Responsable', 'Observación']
+
+
+def _units_text(units):
+    return ', '.join((u['serial'] + ' (' + u['internal_code'] + ')') if u.get('serial') else u.get('internal_code') or '' for u in units)
 
 
 def _kardex_cells(r):
-    units_text = ', '.join((u['serial'] + ' (' + u['internal_code'] + ')') if u['serial'] else u['internal_code'] for u in r['units'])
-    return [r['at'].replace('T', ' ')[:16], r['product'], r['sku'], r['category'], r['brand'], units_text, r['label'], r['entry'] or '', r['exit'] or '',
-            r['unit_cost_cents'] / 100 if r['type'] in ('entrada', 'salida') else '', r['average_cents'] / 100, r['balance'], r['balance_cents'] / 100, r['document'] or r['note'], r['actor']]
+    money = r['type'] in ('entrada', 'salida')
+    return [r['at'].replace('T', ' ')[:16], r['product'], r['sku'], r['category'], r['brand'], _units_text(r['units']), r['label'] + (' · costo pendiente' if r.get('cost_pending') and not r.get('corrected') else ''),
+            r['entry'] or '', r['exit'] or '', r['balance'], r['unit_cost_cents'] / 100 if money else '', r.get('line_cents', 0) / 100 if money else '', r['average_cents'] / 100,
+            r['balance_cents'] / 100, r.get('document') or '', r.get('party') or '', r['actor'], r.get('note') or '']
 
 
 def _safe(value):
@@ -922,46 +1252,143 @@ def kardex_xlsx(rows):
     return xlsx('Kardex', KARDEX_COLUMNS, [_kardex_cells(r) for r in rows])
 
 
-def kardex_pdf(rows, totals, subtitle=''):
-    """Kardex en PDF A4 horizontal con el logo original de PC-DOCTOR, paginado."""
+REPORTS = {'general': 'Kardex general', 'producto': 'Kardex por producto', 'categoria': 'Kardex por categoría', 'periodo': 'Entradas y salidas por período',
+           'valorizado': 'Existencias valorizadas', 'sin_costo': 'Productos sin costo registrado', 'ajustes': 'Ajustes y devoluciones', 'responsable': 'Movimientos por responsable'}
+
+
+def filters_text(c, f):
+    parts = []
+    if f.get('from') or f.get('to'):
+        parts.append('Período: %s a %s' % (f.get('from') or 'inicio', f.get('to') or 'hoy'))
+    for key, label, sql in (('category_id', 'Categoría', None), ('brand_id', 'Marca', 'SELECT name FROM inventory_brands WHERE id=?'),
+                            ('item_id', 'Producto', 'SELECT g.name FROM inventory_items i JOIN catalog_items g ON g.id=i.catalog_id WHERE i.id=?'), ('user_id', 'Responsable', 'SELECT name FROM users WHERE id=?')):
+        if _id(f.get(key)):
+            value = category_path(c, f[key]) if key == 'category_id' else (c.execute(sql, (int(f[key]),)).fetchone() or ['—'])[0]
+            parts.append('%s: %s' % (label, value))
+    for key, label in (('serial', 'Serie o código'), ('document', 'Documento')):
+        if f.get(key):
+            parts.append('%s: %s' % (label, f[key]))
+    if f.get('type'):
+        parts.append('Movimiento: %s' % KARDEX_TYPES.get(f['type'], f['type']))
+    return ' · '.join(parts) or 'Sin filtros'
+
+
+def report(c, kind, f):
+    """Datos de un reporte: (título, columnas, filas con números utilizables, anchos para el PDF, línea de totales)."""
+    if kind not in REPORTS:
+        raise InventoryError('Reporte no válido.')
+    title = REPORTS[kind]
+    if kind in ('general', 'producto', 'categoria', 'ajustes'):
+        if kind == 'producto' and not _id(f.get('item_id')):
+            raise InventoryError('Elige el producto del reporte.', fields={'item_id': 'Producto obligatorio.'})
+        if kind == 'categoria' and not _id(f.get('category_id')):
+            raise InventoryError('Elige la categoría del reporte.', fields={'category_id': 'Categoría obligatoria.'})
+        data = kardex(c, f)
+        rows = data['rows'] if kind != 'ajustes' else [r for r in data['rows'] if r.get('kind') in ('ajuste', 'devolucion') or r['type'] == 'correccion']
+        t = data['totals']
+        totals = 'Movimientos: %d · Unidades ingresadas: %d · Unidades retiradas: %d · Valor de entradas: %s · Valor de salidas: %s · Existencias: %d · Valor actual: %s' % (
+            len(rows), sum(r['entry'] for r in rows), sum(r['exit'] for r in rows), usd(sum(r.get('line_cents', 0) for r in rows if r['type'] == 'entrada')),
+            usd(sum(r.get('line_cents', 0) for r in rows if r['type'] == 'salida')), t['stock_units'], usd(t['stock_cents']))
+        if t.get('opening') is not None and f.get('from'):
+            totals += ' · Saldo inicial: %d · Saldo final: %d' % (t['opening'], t['closing'])
+        return title, KARDEX_COLUMNS, [_kardex_cells(r) for r in rows], [58, 104, 50, 0, 0, 92, 72, 30, 30, 30, 46, 50, 0, 50, 70, 60, 54, 0], totals
+    if kind == 'periodo':
+        data = kardex(c, dict(f, type=''))
+        per = {}
+        for r in data['rows']:
+            row = per.setdefault(r['item_id'], {'product': r['product'], 'sku': r['sku'], 'category': r['category'], 'in': 0, 'out': 0, 'in_c': 0, 'out_c': 0, 'last': r['balance'], 'value': r['balance_cents']})
+            row['in'] += r['entry']
+            row['out'] += r['exit']
+            row['in_c'] += r.get('line_cents', 0) if r['type'] == 'entrada' else 0
+            row['out_c'] += r.get('line_cents', 0) if r['type'] == 'salida' else 0
+            row['last'], row['value'] = r['balance'], r['balance_cents']
+        rows = [[v['product'], v['sku'], v['category'], v['in'], v['in_c'] / 100, v['out'], v['out_c'] / 100, v['last'], v['value'] / 100] for v in per.values()]
+        return (title, ['Producto', 'SKU', 'Categoría', 'Unidades ingresadas', 'Valor ingresado', 'Unidades retiradas', 'Valor retirado', 'Saldo al cierre', 'Valor al cierre'], rows,
+                [170, 70, 130, 60, 60, 60, 60, 50, 60], 'Productos: %d · Ingresadas: %d · Retiradas: %d' % (len(rows), sum(r[3] for r in rows), sum(r[5] for r in rows)))
+    if kind == 'valorizado':
+        items = [p for p in products(c, '', f.get('category_id', ''), f.get('brand_id', '')) if p['active']]
+        rows = [[p['name'], p['sku'], p['category'], p['brand'], p['stock'], p['reserved'], p['average_cost_cents'] / 100, p['value_cents'] / 100, p['price_cents'] / 100, p['stock_state_label']] for p in items]
+        return (title, ['Producto', 'SKU', 'Categoría', 'Marca', 'Existencias', 'Reservadas', 'Costo promedio', 'Valor', 'Precio de venta', 'Estado'], rows,
+                [150, 66, 120, 66, 46, 46, 56, 56, 56, 50], 'Productos: %d · Unidades: %d · Valor total: %s' % (len(rows), sum(r[4] for r in rows), usd(round(sum(r[7] for r in rows) * 100))))
+    if kind == 'sin_costo':
+        data = kardex(c, dict(f, type=''))
+        rows = [[r['at'][:16].replace('T', ' '), r['product'], r['sku'], r['label'], r['entry'], _units_text(r['units']), r['actor']] for r in data['rows'] if r.get('cost_pending') and not r.get('corrected')]
+        return (title, ['Fecha', 'Producto', 'SKU', 'Movimiento', 'Unidades', 'Serie / código', 'Responsable'], rows, [70, 190, 80, 90, 50, 180, 90],
+                'Entradas sin costo: %d · Unidades: %d. Indica el costo real con «Corregir costo» (queda auditado).' % (len(rows), sum(r[4] for r in rows)))
+    data = kardex(c, f)
+    per = {}
+    for r in data['rows']:
+        row = per.setdefault(r['actor'], [r['actor'], 0, 0, 0, 0, 0])
+        row[1] += 1
+        row[2] += r['entry']
+        row[3] += r['exit']
+        row[4] += r.get('line_cents', 0) / 100 if r['type'] == 'entrada' else 0
+        row[5] += r.get('line_cents', 0) / 100 if r['type'] == 'salida' else 0
+    rows = sorted(per.values(), key=lambda r: -r[1])
+    return title, ['Responsable', 'Movimientos', 'Unidades ingresadas', 'Unidades retiradas', 'Valor ingresado', 'Valor retirado'], rows, [200, 90, 110, 110, 110, 110], 'Responsables: %d' % len(rows)
+
+
+def report_csv(columns, rows):
+    out = io.StringIO()
+    writer = csv.writer(out, delimiter=';')
+    writer.writerow(columns)
+    for row in rows:
+        writer.writerow([_safe(v) if isinstance(v, str) else ('%.2f' % v).replace('.', ',') if isinstance(v, float) else v for v in row])
+    return '\ufeff' + out.getvalue()
+
+
+def report_pdf(title, filters, columns, rows, widths, totals, now):
+    """PDF A4 horizontal: logo original, título, fecha de generación, filtros, tabla paginada con encabezado repetido, totales y «Página n de N»."""
     from document_canvas import Canvas, BLUE, GRAY
     w, h = 842, 595
-    pdf = Canvas(w, h, 'Kardex de inventario')
-    widths = [62, 120, 52, 70, 50, 100, 78, 34, 34, 46, 46, 36, 50, 64]
-    heads = ['Fecha', 'Producto', 'SKU', 'Categoría', 'Marca', 'Serie / código', 'Movimiento', 'Ent.', 'Sal.', 'C. unit.', 'C. prom.', 'Saldo', 'Valor', 'Documento']
-    pages = 0
-
-    def header():
-        nonlocal pages
-        pdf.page()
-        pages += 1
-        pdf.logo(24, 18, 70)
-        pdf.text('Kardex valorizado de inventario', 104, 22, 14, True, BLUE)
-        pdf.text('Costo promedio ponderado móvil · ' + (subtitle or 'todos los productos') + ' · página %d' % pages, 104, 42, 8, False, GRAY)
-        x = 24
-        for title, width in zip(heads, widths):
-            pdf.text(title, x, 74, 7, True, BLUE)
-            x += width
-        pdf.line(24, 86, w - 48)
-        return 92
-    y = header()
-    for r in rows:
-        cells = _kardex_cells(r)
-        values = [cells[0], cells[1], cells[2], cells[3], cells[4], cells[5], cells[6], str(cells[7]), str(cells[8]),
-                  usd(int(round(cells[9] * 100))) if cells[9] != '' else '', usd(r['average_cents']), str(r['balance']), usd(r['balance_cents']), cells[13]]
-        wrapped = [pdf.wrap(v, width - 4, 7)[:2] for v, width in zip(values, widths)]
-        height = 10 * max(len(x) for x in wrapped) + 4
-        if y + height > h - 40:
-            y = header()
-        x = 24
-        for lines, width in zip(wrapped, widths):
-            for n, line in enumerate(lines):
-                pdf.text(line, x, y + n * 10, 7)
-            x += width
+    keep = [i for i, width in enumerate(widths) if width]
+    cols, ws = [columns[i] for i in keep], [widths[i] for i in keep]
+    scale = (w - 48) / sum(ws)
+    ws = [x * scale for x in ws]
+    measure = Canvas(w, h, 'medida')
+    money_cols = {i for i, name in enumerate(cols) if any(k in name for k in ('Costo', 'Valor', 'Precio'))}
+    lines = []
+    for row in rows:
+        cells = []
+        for n, i in enumerate(keep):
+            value = row[i]
+            text = usd(int(round(value * 100))) if n in money_cols and isinstance(value, (int, float)) and value != '' else str(value)
+            cells.append(measure.wrap(text, ws[n] - 4, 7)[:3])
+        lines.append((cells, 10 * max(len(x) for x in cells) + 4))
+    pages, y, plan = 1, 96, []
+    for cells, height in lines:
+        if y + height > h - 56:
+            pages, y = pages + 1, 96
+        plan.append((pages, y, cells))
         y += height
-    pdf.line(24, y + 2, w - 48)
-    pdf.text('Movimientos: %d · Entradas: %d · Salidas: %d · Valor de entradas: %s · Valor de salidas: %s' % (totals['rows'], totals['entries'], totals['exits'], usd(totals['entry_cents']), usd(totals['exit_cents'])),
-             24, y + 8, 8, True)
+    pdf = Canvas(w, h, title)
+    for number in range(1, pages + 1):
+        pdf.page()
+        pdf.logo(24, 16, 70)
+        pdf.text(title, 104, 18, 14, True, BLUE)
+        pdf.text('Generado el %s · %s' % (now.strftime('%d/%m/%Y %H:%M'), filters)[:180], 104, 38, 8, False, GRAY)
+        x = 24
+        for name, width in zip(cols, ws):
+            pdf.text(measure.wrap(name, width - 4, 7)[0], x, 70, 7, True, BLUE)
+            x += width
+        pdf.line(24, 84, w - 48)
+        for page, y0, cells in plan:
+            if page != number:
+                continue
+            x = 24
+            for lines_, width in zip(cells, ws):
+                for k, piece in enumerate(lines_):
+                    pdf.text(piece, x, y0 + k * 10, 7)
+                x += width
+        if number == pages:
+            last = max([y0 + 10 for page, y0, _ in plan if page == number] or [96])
+            pdf.line(24, last + 6, w - 48)
+            for k, piece in enumerate(measure.wrap(totals, w - 48, 8)[:3]):
+                pdf.text(piece, 24, last + 12 + k * 11, 8, True)
+        pdf.line(24, h - 34, w - 48)
+        pdf.text('PC-DOCTOR S.A. · Centro de Inventario · ' + title, 24, h - 28, 7, False, GRAY)
+        label = 'Página %d de %d' % (number, pages)
+        pdf.text(label, w - 24 - len(label) * 3.6, h - 28, 7, False, GRAY)
     return pdf.finish()
 
 
@@ -1300,6 +1727,7 @@ def license_code(c, product_id):
 # ---- Panel general, búsqueda y traslado futuro -----------------------------------------------------------------------------
 
 def dashboard(c, now):
+    """Panel ejecutivo: indicadores, alertas (agotados, críticos y en el mínimo), actividad reciente y garantías por vencer."""
     today = now.date()
     items = products(c)
     active = [p for p in items if p['active']]
@@ -1311,10 +1739,76 @@ def dashboard(c, now):
         lic_free = sum(p['stock'].get('disponible', 0) for p in licenses.products(c, now) if p['managed'])
     except Exception:
         lic_free = 0
-    recent = kardex(c, {})['rows'][-12:][::-1]
-    return {'cards': {'products': len(active), 'available': sum(p['available'] for p in active), 'low': sum(1 for p in active if p['low']),
-                      'value_cents': sum(p['value_cents'] for p in active), 'licenses': lic_free, 'warranties_soon': len(expiring)},
-            'low': [p for p in active if p['low']][:10], 'expiring': [dict(e, days_left=(date.fromisoformat(e['store_warranty_to']) - today).days) for e in expiring[:10]], 'recent': recent}
+    rows = kardex(c, {})['rows']
+    week = (today - timedelta(days=6)).isoformat()
+    alerts = {state: [p for p in active if p['alerts_enabled'] and p['stock_state'] == state] for state in ('agotado', 'critico', 'minimo')}
+    serial_units = sum(p['units'].get('disponible', 0) for p in active if p['tracking'] == 'serie')
+    return {'cards': {'products': len(active), 'available': sum(p['available'] for p in active), 'serial_units': serial_units,
+                      'out': sum(1 for p in active if p['stock_state'] == 'agotado'), 'critical': sum(1 for p in active if p['stock_state'] == 'critico'),
+                      'at_min': sum(1 for p in active if p['stock_state'] == 'minimo'), 'low': sum(1 for p in active if p['urgent']),
+                      'value_cents': sum(p['value_cents'] for p in active), 'cost_pending': sum(1 for r in rows if r.get('cost_pending') and not r.get('corrected')),
+                      'licenses': lic_free, 'warranties_soon': len(expiring), 'moves_week': sum(1 for r in rows if r['at'][:10] >= week and r['type'] in ('entrada', 'salida'))},
+            'alerts': {k: v[:12] for k, v in alerts.items()}, 'low': [p for p in active if p['low']][:10],
+            'expiring': [dict(e, days_left=(date.fromisoformat(e['store_warranty_to']) - today).days) for e in expiring[:10]],
+            'recent': [r for r in rows if r['type'] != 'correccion'][-10:][::-1]}
+
+
+UNLIMITED = re.compile(r'ilimitad|perpetu|de por vida|lifetime|permanente|vitalici', re.I)
+
+
+def licenses_table(c, now):
+    """Licencias en una tabla compacta: categoría, marca, producto, edición, duración, dispositivos, precio y existencias del módulo Licencias
+    (sin claves). Señala para revisión (sin cambiar nada) las fichas cuyo nombre indica duración ilimitada pero su duración es otra."""
+    import licenses
+    classified = {r['item_id']: dict(r) for r in c.execute('SELECT l.*,b.name brand_name,f.name family FROM license_classification l JOIN inventory_brands b ON b.id=l.brand_id LEFT JOIN inventory_families f ON f.id=l.family_id')}
+    rows = []
+    for p in licenses.products(c, now):
+        if not p['managed']:
+            continue
+        cl = classified.get(p['id'])
+        s = p['stock']
+        stock = {'disponible': s.get('disponible', 0), 'reservada': s.get('reservada', 0), 'entregada': s.get('entregada', 0), 'vencida': s.get('vencida', 0)}
+        flags = []
+        if UNLIMITED.search(p['name']) and (p.get('duration') or '') != 'perpetua':
+            flags.append('El nombre indica duración ilimitada, pero la ficha registra «%s». Verifica la duración real del producto.' % (p.get('duration_label') or p.get('duration') or 'sin duración'))
+        if not (p['brand'] or (cl and cl['brand_name'])):
+            flags.append('Sin marca en el catálogo.')
+        state = 'revisar' if flags else 'disponible' if stock['disponible'] else 'sin_stock'
+        rows.append({'id': p['id'], 'name': p['name'], 'brand': (cl and cl['brand_name']) or p['brand'] or '', 'category': category_path(c, cl['category_id']) if cl else 'Sin clasificar',
+                     'category_id': cl['category_id'] if cl else None, 'family': (cl and cl['family']) or '', 'edition': (cl and cl['edition']) or p.get('edition') or '', 'type': p['line_label'],
+                     'duration': p.get('duration_label') or '', 'devices': p.get('devices'), 'price_cents': p['price_cents'], 'stock': stock, 'state': state, 'flags': flags,
+                     'classified': bool(cl), 'available': bool(p['available']), 'image': p.get('image') or ''})
+    rows.sort(key=lambda r: (r['category'], r['brand'].lower(), r['name'].lower()))
+    return {'rows': rows, 'totals': {k: sum(r['stock'][k] for r in rows) for k in ('disponible', 'reservada', 'entregada', 'vencida')}}
+
+
+def review(c, now):
+    """Revisión de datos (solo lectura): existencias contra unidades, entradas sin costo, posibles marcas repetidas, licencias por revisar y
+    productos de licencia sin unidades. No corrige nada: cada hallazgo indica dónde revisarlo."""
+    found = []
+    for p in products(c):
+        if p['tracking'] == 'serie' and p['active']:
+            in_stock = p['units'].get('disponible', 0) + p['units'].get('reservada', 0)
+            if in_stock != p['stock']:
+                found.append({'kind': 'existencias', 'level': 'error', 'item_id': p['id'], 'text': '%s: %d unidades en existencia y saldo del Kardex %d.' % (p['name'], in_stock, p['stock'])})
+    for r in kardex(c, {})['rows']:
+        if r.get('cost_pending') and not r.get('corrected'):
+            found.append({'kind': 'costo', 'level': 'aviso', 'item_id': r['item_id'], 'movement_id': r['movement_id'], 'text': '%s: entrada del %s sin costo (%s).' % (r['product'], r['at'][:10], r['label'])})
+    brands = [(b['id'], b['name']) for b in c.execute('SELECT id,name FROM inventory_brands WHERE active=1')]
+    norm = lambda t: re.sub(r'[^a-z0-9]', '', t.lower())
+    aliases = {'wd': 'westerndigital', 'hp': 'hewlettpackard'}
+    for i, (a_id, a) in enumerate(brands):
+        for b_id, b in brands[i + 1:]:
+            na, nb = norm(a), norm(b)
+            first_a, first_b = norm(a.split()[0]), norm(b.split()[0])
+            if na == nb or aliases.get(first_a) == nb or aliases.get(first_b) == na or (len(first_a) > 1 and first_a == first_b):
+                found.append({'kind': 'marca', 'level': 'aviso', 'text': 'Posibles marcas repetidas: «%s» y «%s».' % (a, b)})
+    for row in licenses_table(c, now)['rows']:
+        for flag in row['flags']:
+            found.append({'kind': 'licencia', 'level': 'aviso', 'license_id': row['id'], 'text': '%s: %s' % (row['name'], flag)})
+        if not any(row['stock'].values()):
+            found.append({'kind': 'licencia', 'level': 'info', 'license_id': row['id'], 'text': '%s: sin licencias registradas.' % row['name']})
+    return {'findings': found, 'counts': {k: sum(1 for f in found if f['level'] == k) for k in ('error', 'aviso', 'info')}}
 
 
 def search(c, q):

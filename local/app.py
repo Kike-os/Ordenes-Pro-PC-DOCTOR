@@ -1882,13 +1882,21 @@ class Handler(BaseHTTPRequestHandler):
                     if path=='/api/inventory/serial-check':return self.reply(200,center.serial_check(c,arg('serial')))
                     kardex_filters=lambda:{k:arg(k) for k in ('from','to','category_id','brand_id','item_id','serial','type','user_id')}
                     if path=='/api/inventory/kardex':
-                        return self.reply(200,dict(center.kardex(c,kardex_filters()),types=center.KARDEX_TYPES,users=[dict(r) for r in c.execute("SELECT id,name FROM users ORDER BY name")]))
-                    if path in ('/api/inventory/kardex.xlsx','/api/inventory/kardex.csv','/api/inventory/kardex.pdf'):
-                        data=center.kardex(c,kardex_filters());day=now.date().isoformat()
-                        if path.endswith('.xlsx'):return self.reply(200,center.kardex_xlsx(data['rows']),'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',filename='kardex-'+day+'.xlsx')
-                        if path.endswith('.csv'):return self.reply(200,center.kardex_csv(data['rows']).encode('utf-8'),'text/csv; charset=utf-8',filename='kardex-'+day+'.csv')
-                        audit(c,user['id'],'inventory_kardex_pdf');c.commit()
-                        return self.reply(200,center.kardex_pdf(data['rows'],data['totals'],' · '.join(v for v in (arg('from'),arg('to')) if v)),'application/pdf',filename='kardex-'+day+'.pdf')
+                        filters=kardex_filters();filters['document']=arg('document')
+                        return self.reply(200,dict(center.kardex(c,filters),types=center.KARDEX_TYPES,reports=center.REPORTS,users=[dict(r) for r in c.execute("SELECT id,name FROM users ORDER BY name")]))
+                    found=re.fullmatch(r'/api/inventory/products/([0-9]{1,9})/sheet',path)
+                    if found:return self.reply(200,center.product_sheet(c,found[1],now))
+                    if path=='/api/inventory/licenses/table':return self.reply(200,center.licenses_table(c,now))
+                    if path=='/api/inventory/review':return self.reply(200,center.review(c,now))
+                    found=re.fullmatch(r'/api/inventory/(kardex|report)\.(xlsx|csv|pdf)',path)
+                    if found:
+                        # Reportes del Kardex: los mismos filtros de la pantalla; Excel con columnas numéricas, PDF con logo, filtros, totales y páginas.
+                        kind=arg('kind') if found[1]=='report' else 'general';filters=kardex_filters();filters['document']=arg('document')
+                        title,columns,rows,widths,totals=center.report(c,kind,filters);day=now.date().isoformat();name=re.sub(r'[^a-z0-9]+','-',title.lower()).strip('-')
+                        if found[2]=='xlsx':return self.reply(200,center.xlsx(title,columns,rows),'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',filename=name+'-'+day+'.xlsx')
+                        if found[2]=='csv':return self.reply(200,center.report_csv(columns,rows).encode('utf-8'),'text/csv; charset=utf-8',filename=name+'-'+day+'.csv')
+                        audit(c,user['id'],'inventory_report_pdf');c.commit()
+                        return self.reply(200,center.report_pdf(title,center.filters_text(c,filters),columns,rows,widths,totals,now),'application/pdf',filename=name+'-'+day+'.pdf')
                     if path=='/api/inventory/reservations':return self.reply(200,{'rows':center.reservations(c,arg('status') or 'activa')})
                     if path=='/api/inventory/warranties':return self.reply(200,center.warranties(c,now.date(),arg('state'),arg('q')))
                     if path=='/api/inventory/licenses':return self.reply(200,center.licenses_tree(c,now))
@@ -2833,8 +2841,13 @@ class Handler(BaseHTTPRequestHandler):
                             else:c.rollback();return self.reply(400,{'error':'Acción inválida.'})
                         elif path=='/api/inventory/products':
                             import inventory_center as center
-                            if action!='save':c.rollback();return self.reply(400,{'error':'Acción inválida.'})
-                            result={'id':center.save_product(c,data,user,now)}
+                            if action=='save':result={'id':center.save_product(c,data,user,now)}
+                            elif action=='pricing':result={'product':center.save_pricing(c,data.get('id'),data,user,now)}
+                            elif action in ('alerts_on','alerts_off'):center.set_alerts(c,data.get('id'),action=='alerts_on',user,now);result={}
+                            else:c.rollback();return self.reply(400,{'error':'Acción inválida.'})
+                        elif path=='/api/inventory/cost-correction':
+                            import inventory_center as center
+                            result={'product':center.correct_cost(c,data.get('movement_id'),data.get('cost'),data.get('reason'),user,now,data.get('document',''))}
                         elif path=='/api/inventory/register':
                             import inventory_center as center
                             result=center.register(c,data,user,now)

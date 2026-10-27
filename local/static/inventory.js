@@ -20,25 +20,6 @@ Object.assign(invIcons,{'layout-dashboard':'<rect width="7" height="9" x="3" y="
  boxes:'<path d="M2.97 12.92A2 2 0 0 0 2 14.63v3.24a2 2 0 0 0 .97 1.71l3 1.8a2 2 0 0 0 2.06 0L12 19v-5.5l-5-3-4.03 2.42Z"/><path d="m7 16.5-4.74-2.85"/><path d="m7 16.5 5-3"/><path d="M7 16.5v5.17"/><path d="M12 13.5V19l3.97 2.38a2 2 0 0 0 2.06 0l3-1.8a2 2 0 0 0 .97-1.71v-3.24a2 2 0 0 0-.97-1.71L17 10.5l-5 3Z"/><path d="m17 16.5-5-3"/><path d="m17 16.5 4.74-2.85"/><path d="M17 16.5v5.17"/><path d="M7.97 4.42A2 2 0 0 0 7 6.13v4.37l5 3 5-3V6.13a2 2 0 0 0-.97-1.71l-3-1.8a2 2 0 0 0-2.06 0l-3 1.8Z"/><path d="M12 8 7.26 5.15"/><path d="m12 8 4.74-2.85"/><path d="M12 13.5V8"/>',
  lock:'<rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>','undo-2':'<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11"/>',
  calendar:'<path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/>',bookmark:'<path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/>'});
-let centerState={tab:'panel',catalog:{q:'',category:'',brand:'',state:''},kardex:{from:'',to:'',category_id:'',brand_id:'',item_id:'',serial:'',type:'',user_id:''},warranty:{state:'',q:''},taxKind:'fisico'};
-let centerTax=null;
-const centerTabs=[['panel','Panel general','layout-dashboard','Panel'],['categorias','Categorías y marcas','tags','Categorías'],['catalogo','Catálogo de productos','package','Catálogo'],
- ['registrar','Registrar mercadería','package-plus','Registrar'],['inicial','Inventario inicial','clipboard-list','Inicial'],['kardex','Kardex','scroll-text'],['movimientos','Movimientos','arrow-left-right'],
- ['licencias','Licencias digitales','key-round','Licencias'],['garantias','Garantías','shield-check'],['reportes','Reportes','chart-column'],['config','Configuración','settings','Ajustes']];
-const centerUnitTone={disponible:'autorizado',reservada:'enviado',vendida:'pendiente',consumida:'pendiente',devuelta:'descartado',baja:'rechazado'};
-async function centerTaxonomy(force){if(force||!centerTax)centerTax=await api('/api/inventory/taxonomy');return centerTax;}
-function centerGo(tab){centerState.tab=tab;renderInventoryCenter().then(()=>$('module-content').querySelector('.ic-module>.inv-tabs [aria-selected=true]')?.focus());}
-async function renderInventoryCenter(){const root=$('module-content');try{await centerTaxonomy();}catch(error){root.replaceChildren(el('p',error.message,'empty-module'));return;}
- const wrap=el('div',undefined,'inv-module ic-module'),panel=el('div',undefined,'inv-panel'),tab=centerTabs.find(t=>t[0]===centerState.tab)||centerTabs[0];panel.setAttribute('role','tabpanel');panel.setAttribute('aria-label',tab[1]);
- wrap.append(centerSearch(),centerTabBar(),panel);root.replaceChildren(wrap);
- const run={panel:centerPanel,categorias:centerCategories,catalogo:centerCatalog,registrar:p=>centerRegister(p,'compra'),inicial:p=>centerRegister(p,'inicial'),kardex:centerKardex,movimientos:centerMovements,
-  licencias:centerLicenses,garantias:centerWarranties,reportes:centerReports,config:centerConfig}[tab[0]];
- panel.append(el('p','Cargando…','empty-module'));try{await run(panel);}catch(error){panel.replaceChildren(el('p',error.message,'empty-module'));}}
-function centerTabBar(){const nav=el('div',undefined,'inv-tabs ic-tabs');nav.setAttribute('role','tablist');nav.setAttribute('aria-label','Secciones del Centro de Inventario');
- for(const[key,label,icon,short]of centerTabs){const on=centerState.tab===key,t=button('',()=>{if(centerState.tab!==key)centerGo(key);},'inv-tab');t.setAttribute('role','tab');t.setAttribute('aria-selected',String(on));t.tabIndex=on?0:-1;t.dataset.tab=key;
-  t.append(invIcon(icon),el('span',label,'inv-tab-label'));if(short){t.append(el('span',short,'inv-tab-short'));t.setAttribute('aria-label',label);}nav.append(t);}
- nav.addEventListener('keydown',event=>{const tabs=[...nav.querySelectorAll('.inv-tab')],i=tabs.indexOf(document.activeElement),next={ArrowRight:i+1,ArrowLeft:i-1,Home:0,End:tabs.length-1}[event.key];if(i<0||next===undefined)return;event.preventDefault();tabs[(next+tabs.length)%tabs.length].focus();});
- return nav;}
 // Búsqueda global: código interno, serie (también con el lector), marca, nombre y categoría.
 function centerSearch(){const box=el('div',undefined,'ic-search'),label=el('label',undefined,'inv-search'),input=el('input'),results=el('div',undefined,'ic-results');label.append(invIcon('scan-barcode'),input);
  input.type='search';input.placeholder='Buscar o escanear: código interno, serie, marca, producto o categoría';input.setAttribute('aria-label','Buscar en el inventario');input.maxLength=80;input.autocomplete='off';results.setAttribute('aria-live','polite');
@@ -59,47 +40,7 @@ function centerTable(columns,rows,className=''){const wrap=el('div',undefined,'i
  for(const c of columns){const th=el('th',c);th.scope='col';tr.append(th);}thead.append(tr);for(const r of rows)tbody.append(r);table.append(thead,tbody);wrap.append(table);return wrap;}
 function centerRow(cells){const tr=el('tr');for(const[label,...nodes]of cells){const td=el('td');td.dataset.label=label;td.append(...nodes.map(n=>n instanceof Node?n:String(n??'')));tr.append(td);}return tr;}
 // ---- Panel general ----
-async function centerPanel(panel){const data=await api('/api/inventory/center'),k=data.cards;panel.replaceChildren();
- panel.append(invKpis([['package','Total de productos',String(k.products),'Fichas activas','blue'],['boxes','Existencias disponibles',String(k.available),'Sin contar lo reservado','teal'],
-  ['triangle-alert','Productos con stock bajo',String(k.low),k.low?'En el mínimo o por debajo':'Ninguno en el mínimo',k.low?'amber':'green'],['circle-dollar-sign','Inventario valorizado',centerMoney(k.value_cents),'Costo promedio ponderado','magenta'],
-  ['key-round','Licencias disponibles',String(k.licenses),'Del módulo Licencias','blue'],['shield-check','Garantías próximas a vencer',String(k.warranties_soon),'PC-DOCTOR · próximos 30 días',k.warranties_soon?'amber':'green']]));
- const quick=el('div',undefined,'ic-quick');quick.append(invBtn('Registrar inventario inicial','clipboard-list',()=>centerGo('inicial'),'primary'),invBtn('Registrar mercadería','package-plus',()=>centerGo('registrar')),
-  invBtn('Registrar salida','arrow-left-right',()=>centerExitDialog()),invBtn('Kardex','scroll-text',()=>centerGo('kardex')),invBtn('Buscar o escanear','scan-barcode',()=>document.querySelector('.ic-search input')?.focus()));panel.append(quick);
- if(!k.products){panel.append(invEmpty('package','Todavía no hay productos registrados','Empieza con «Registrar inventario inicial»: elige la categoría, crea el producto, escanea las series y guarda. Cada unidad recibe su código interno.',invBtn('Registrar inventario inicial','clipboard-list',()=>centerGo('inicial'),'primary')));return;}
- const grid=el('div',undefined,'ic-grid');
- const low=el('section',undefined,'inv-card ic-card');low.append(centerCardHead('Stock bajo','triangle-alert',data.low.length?data.low.length+' productos':'Sin alertas'));
- if(data.low.length){const ul=el('ul',undefined,'ic-mini');for(const p of data.low){const li=el('li'),b=button('',()=>centerProductDialog(p.id),'ic-hit');b.append(el('strong',p.name),el('span',p.category),el('b',p.stock+' / mín. '+p.min_stock));li.append(b);ul.append(li);}low.append(ul);}
- else low.append(el('p','Todos los productos están sobre su mínimo.','ic-card-empty'));
- const war=el('section',undefined,'inv-card ic-card');war.append(centerCardHead('Garantías por vencer','shield-check','Próximos 30 días'));
- if(data.expiring.length){const ul=el('ul',undefined,'ic-mini');for(const u of data.expiring){const li=el('li'),b=button('',()=>centerUnitDialog(u.id),'ic-hit');b.append(el('strong',u.product),el('span',u.internal_code+(u.client?' · '+u.client:'')),el('b',u.days_left+' días'));li.append(b);ul.append(li);}war.append(ul);}
- else war.append(el('p','Ninguna garantía de PC-DOCTOR vence en los próximos 30 días.','ic-card-empty'));
- grid.append(low,war);panel.append(grid);
- const recent=el('section',undefined,'inv-card');recent.append(centerCardHead('Últimos movimientos','scroll-text','Kardex'));
- recent.append(data.recent.length?centerKardexTable(data.recent,true):el('p','Sin movimientos.','ic-card-empty'));panel.append(recent);}
-function centerCardHead(title,icon,note){const head=el('header',undefined,'inv-card-head ic-card-head'),t=el('div');const h=el('h3');h.append(invIcon(icon),el('span',title));t.append(h);if(note)t.append(el('small',note));head.append(t);return head;}
 // ---- Categorías, marcas y familias ----
-async function centerCategories(panel){const tax=await centerTaxonomy(true);panel.replaceChildren();
- const kind=centerState.taxKind,switcher=el('div',undefined,'inv-filters');switcher.setAttribute('role','group');switcher.setAttribute('aria-label','Tipo de categoría');
- for(const[key,label]of [['fisico','Productos físicos'],['licencia','Licencias digitales']]){const b=button(label,()=>{centerState.taxKind=key;centerCategories(panel);},'inv-filter');b.setAttribute('aria-pressed',String(kind===key));switcher.append(b);}
- panel.append(invSectionHead('Categorías y subcategorías','Cada categoría tiene su prefijo de código interno (PCD-SSD-000001). Un prefijo usado no se reutiliza; las categorías no se eliminan: se desactivan y conservan su historial.',
-  invBtn('Nueva categoría','plus',()=>centerCategoryDialog(null,null,kind),'primary')),switcher);
- const list=el('ul',undefined,'ic-tree');for(const cat of tax.categories.filter(c=>c.kind===kind)){const li=el('li');li.dataset.active=String(cat.active);li.append(centerCategoryRow(cat,true));
-  if(cat.children.length){const sub=el('ul');for(const ch of cat.children){const s=el('li');s.dataset.active=String(ch.active);s.append(centerCategoryRow(ch,false,cat));sub.append(s);}li.append(sub);}list.append(li);}
- panel.append(list);
- const brands=el('section',undefined,'inv-card ic-card');brands.append(centerCardHead('Marcas','bookmark',tax.brands.length+' registradas'));const bl=el('div',undefined,'ic-chips');
- for(const b of tax.brands){const chip=el('span',undefined,'ic-chip');chip.dataset.active=String(b.active);chip.append(el('span',b.name),el('small',String(b.products)),invIconBtn('Editar la marca '+b.name,'pencil',()=>centerBrandDialog(b)),
-  invIconBtn((b.active?'Desactivar':'Activar')+' la marca '+b.name,b.active?'circle-x':'circle-check',async()=>{try{await api('/api/inventory/brands',{action:b.active?'deactivate':'activate',id:String(b.id)});centerCategories(panel);}catch(error){notify(error.message);}}));bl.append(chip);}
- brands.append(bl);const addB=invBtn('Nueva marca','plus',()=>centerBrandDialog());addB.classList.add('ic-card-action');brands.append(addB);panel.append(brands);
- if(kind==='licencia'){const fam=el('section',undefined,'inv-card ic-card');fam.append(centerCardHead('Familias y ediciones','key-round','Categoría → Marca → Familia → Edición'));const ul=el('ul',undefined,'ic-mini');
-  for(const f of tax.families){const li=el('li'),row=el('div',undefined,'ic-family');row.dataset.active=String(f.active);row.append(el('strong',f.brand+' · '+f.name),el('span',f.editions.join(' · ')||'Sin ediciones'),invIconBtn('Editar la familia '+f.name,'pencil',()=>centerFamilyDialog(f)));li.append(row);ul.append(li);}
-  fam.append(ul);const addF=invBtn('Nueva familia','plus',()=>centerFamilyDialog());addF.classList.add('ic-card-action');fam.append(addF);panel.append(fam);}}
-function centerCategoryRow(cat,top,parent){const row=el('div',undefined,'ic-cat'+(top?' is-top':'')),info=el('div');
- info.append(el('strong',cat.name),el('span',[cat.effective_prefix?(cat.inherited?'Prefijo heredado ':'Prefijo ')+cat.effective_prefix:'Sin prefijo',cat.next_code?'próximo '+cat.next_code:'',cat.kind==='fisico'?(cat.tracking==='serie'?'por serie':'a granel'):'',cat.products+' producto'+(cat.products===1?'':'s')].filter(Boolean).join(' · ')));
- if(!cat.active)info.append(invoiceChip('descartado','Inactiva'));
- const acts=el('div',undefined,'bank-acts');if(top)acts.append(invBtn('Subcategoría','plus',()=>centerCategoryDialog(null,cat,cat.kind)));
- acts.append(invIconBtn('Editar '+cat.name,'pencil',()=>centerCategoryDialog(cat,parent,cat.kind)),invIconBtn((cat.active?'Desactivar ':'Activar ')+cat.name,cat.active?'circle-x':'circle-check',async()=>{
-  try{await api('/api/inventory/categories',{action:cat.active?'deactivate':'activate',id:String(cat.id)});centerTax=null;renderInventoryCenter();}catch(error){notify(error.message);}}));
- const code=el('code',cat.effective_prefix?'PCD-'+cat.effective_prefix:'—','ic-prefix');row.append(code,info,acts);return row;}
 function centerCategoryDialog(cat,parent,kind){const top=!(parent||cat?.parent_id),dialog=invDialog(cat?'Editar '+(top?'categoría':'subcategoría'):parent?'Nueva subcategoría de '+parent.name:'Nueva categoría'),{form,msg,field,fail,clear}=invForm('bank-form inv-sheet-form');
  form.append(invRequiredNote());field('name','Nombre',{required:true,max:80,value:cat?.name||''});
  field('prefix','Prefijo del código interno',{max:6,required:top,value:cat?.prefix||'',hint:top?'2 a 6 letras o números (PCD-PREFIJO-000001). No se reutiliza.':'Vacío: usa el de la categoría principal'+(parent?.prefix||cat?'':'')+'.'});
@@ -120,23 +61,6 @@ function centerFamilyDialog(fam){const dialog=invDialog(fam?'Editar familia':'Nu
  form.addEventListener('submit',async event=>{event.preventDefault();clear();save.disabled=true;const body=Object.fromEntries(new FormData(form));body.action='save';if(fam)body.id=String(fam.id);
   try{await api('/api/inventory/families',body);toast('Familia guardada.','success');dialog.close();centerTax=null;renderInventoryCenter();}catch(error){fail(error);save.disabled=false;}});}
 // ---- Catálogo de productos ----
-async function centerCatalog(panel){const s=centerState.catalog,data=await api('/api/inventory/products?'+new URLSearchParams({q:s.q,category:s.category,brand:s.brand,state:s.state}));panel.replaceChildren();
- panel.append(invSectionHead('Catálogo de productos','Ficha comercial de cada modelo (SKU). Cada unidad conserva su serie original y su código interno. Las fichas no se eliminan: se desactivan.',
-  invBtn('Nueva ficha','plus',()=>centerProductForm(null,()=>centerCatalog(panel)),'primary')));
- const bar=el('div',undefined,'inv-toolbar ic-filters'),box=el('label',undefined,'inv-search'),search=el('input');box.append(invIcon('search'),search);search.type='search';search.placeholder='Nombre, SKU, modelo, marca, código interno o serie';search.value=s.q;search.maxLength=80;search.setAttribute('aria-label','Buscar productos');
- let typing=null;search.addEventListener('input',()=>{clearTimeout(typing);typing=setTimeout(()=>{s.q=search.value.trim();centerCatalog(panel).then(()=>{const again=panel.querySelector('.ic-filters input[type=search]');again?.focus();again?.setSelectionRange(again.value.length,again.value.length);});},350);});
- const cat=centerCategoryOptions(el('select'),{value:s.category}),brand=el('select'),state=el('select');cat.setAttribute('aria-label','Categoría');brand.setAttribute('aria-label','Marca');state.setAttribute('aria-label','Estado');
- brand.add(new Option('Todas las marcas',''));for(const b of centerTax.brands)brand.add(new Option(b.name,String(b.id)));brand.value=s.brand;
- for(const[v,t]of [['','Todos'],['bajo','Stock bajo'],['agotado','Agotados'],['activo','Activos'],['inactivo','Inactivos']])state.add(new Option(t,v));state.value=s.state;
- for(const[node,key]of [[cat,'category'],[brand,'brand'],[state,'state']])node.addEventListener('change',()=>{s[key]=node.value;centerCatalog(panel);});bar.append(box,cat,brand,state);panel.append(bar);
- if(!data.rows.length){panel.append(invEmpty('package',s.q||s.category||s.brand||s.state?'No hay productos con estos filtros':'Todavía no hay productos',s.q||s.category||s.brand||s.state?'Prueba con otra búsqueda o limpia los filtros.':'Crea la primera ficha o usa «Registrar inventario inicial».'));return;}
- panel.append(centerTable(['Producto','Categoría','Marca','Control','Existencias','Costo prom.','Precio','Ubicación','Acciones'],data.rows.map(p=>{
-  const name=el('div',undefined,'ic-name');name.append(el('strong',p.name),el('small',[p.sku&&'SKU '+p.sku,p.code].filter(Boolean).join(' · ')));if(!p.active)name.append(invoiceChip('descartado','Inactivo'));
-  const stock=el('div',undefined,'ic-stock');stock.dataset.state=p.out?'out':p.low?'low':'ok';stock.append(el('b',String(p.stock)),el('small',(p.reserved?p.reserved+' reservadas · ':'')+'mín. '+p.min_stock));
-  const acts=el('div',undefined,'ic-acts');acts.append(invIconBtn('Ver '+p.name,'eye',()=>centerProductDialog(p.id)),invIconBtn('Registrar entrada de '+p.name,'arrow-down-to-line',()=>{centerState.preset={item_id:p.id};centerGo('registrar');}),
-   invIconBtn('Registrar salida de '+p.name,'arrow-up-from-line',()=>centerExitDialog(p.id)),invIconBtn('Editar '+p.name,'pencil',()=>centerProductForm(p,()=>centerCatalog(panel))));
-  const tr=centerRow([['Producto',name],['Categoría',p.category],['Marca',p.brand||'—'],['Control',invoiceChip(p.tracking==='serie'?'enviado':'borrador',p.tracking==='serie'?'Por serie':'A granel')],['Existencias',stock],
-   ['Costo prom.',centerMoney(p.average_cost_cents)],['Precio',centerMoney(p.price_cents)],['Ubicación',p.location||'—'],['Acciones',acts]]);tr.addEventListener('click',event=>{if(!event.target.closest('button,a'))centerProductDialog(p.id);});return tr;})));}
 function centerWarrantyFields(field,into,prefix,label,value){const box=el('fieldset',undefined,'inv-group ic-warranty');const legend=el('legend');legend.append(invIcon('shield-check'),el('span',label));box.append(legend);into.append(box);
  field(prefix+'_qty','Duración',{mode:'numeric',max:4,value:String(value?.qty??0),into:box,hint:'0 = sin garantía'});field(prefix+'_unit','Unidad',{options:Object.entries(centerTax.periods),value:value?.unit||'meses',into:box});
  field(prefix+'_from','Comienza',{options:Object.entries(centerTax.starts),value:value?.from||'venta',into:box});return box;}
@@ -156,30 +80,6 @@ function centerProductForm(p,done){const dialog=invDialog(p?'Editar ficha':'Nuev
  const save=el('button',p?'Guardar cambios':'Crear ficha','primary');save.type='submit';form.append(msg,invDialogActions(dialog,save));dialog.append(form);form.elements.category_id.focus();
  form.addEventListener('submit',async event=>{event.preventDefault();clear();save.disabled=true;const body=Object.fromEntries(new FormData(form));body.action='save';if(p)body.id=String(p.id);
   try{await api('/api/inventory/products',body);toast(p?'Ficha actualizada.':'Ficha creada. Regístrale sus unidades.','success');dialog.close();done&&done();}catch(error){fail(error);save.disabled=false;}});}
-async function centerProductDialog(id){const dialog=invDialog('Producto',true),body=el('div',undefined,'inv-body');body.append(el('p','Cargando…','empty-module'));dialog.append(body);
- let data;try{data=await api('/api/inventory/products/'+id);}catch(error){body.replaceChildren(el('p',error.message,'empty-module'));return;}
- const p=data.product,refresh=()=>{dialog.close();centerProductDialog(id);if(currentModule==='inventory')renderInventoryCenter();};dialog.querySelector('h2').textContent=p.name;body.replaceChildren();
- body.append(invKpis([['boxes','Existencias',String(p.stock),p.tracking==='serie'?'Unidades en existencia':'A granel','blue'],['lock','Reservadas',String(p.reserved),'No descuentan existencias','amber'],
-  ['circle-check','Disponibles',String(p.available),'Para vender o usar','green'],['circle-dollar-sign','Valor',centerMoney(p.value_cents),'Costo prom. '+centerMoney(p.average_cost_cents),'magenta']]));
- const facts=el('dl',undefined,'inv-facts');for(const[k,v]of [['Categoría',p.category],['Marca',p.brand||'—'],['Modelo',p.model||'—'],['SKU',p.sku||'—'],['Código del catálogo',p.code||'—'],['Control',p.tracking_label],['Ubicación',p.location||'—'],
-  ['Precio de venta',centerMoney(p.price_cents)],['Existencia mínima',String(p.min_stock)],['Garantía de PC-DOCTOR',p.warranty_store.label+' · '+centerTax.starts[p.warranty_store.from].toLowerCase()],['Garantía del fabricante',p.warranty_maker.label+' · '+centerTax.starts[p.warranty_maker.from].toLowerCase()]]){const d=el('div');d.append(el('dt',k),el('dd',v));facts.append(d);}
- body.append(facts);
- const acts=el('div',undefined,'inv-actions');acts.append(invBtn('Registrar entrada','arrow-down-to-line',()=>{dialog.close();centerState.preset={item_id:p.id};centerGo('registrar');},'primary'),invBtn('Registrar salida','arrow-up-from-line',()=>{dialog.close();centerExitDialog(p.id);}),
-  invBtn('Reservar','lock',()=>{dialog.close();centerReserveDialog(p.id);}),invBtn('Trasladar','map-pin',()=>{dialog.close();centerTransferDialog(p.id);}),invBtn('Kardex','scroll-text',()=>{dialog.close();centerState.kardex={...centerState.kardex,item_id:String(p.id)};centerGo('kardex');}),
-  invBtn('Editar ficha','pencil',()=>{dialog.close();centerProductForm(p,()=>renderInventoryCenter());}));
- if(p.tracking==='granel')acts.append(invBtn('Etiquetas','printer',()=>centerLabels({item:p.id,copies:Math.max(1,p.stock)})));body.append(acts);
- if(data.reservations.length){const sec=el('section',undefined,'inv-card ic-card');sec.append(centerCardHead('Reservas activas','lock',data.reservations.length+''));sec.append(centerReservationList(data.reservations,refresh));body.append(sec);}
- if(p.tracking==='serie'){const sec=el('section',undefined,'inv-card');sec.append(centerCardHead('Unidades','scan-barcode',data.units.length+' registradas'));
-  if(!data.units.length)sec.append(el('p','Todavía no hay unidades.','ic-card-empty'));
-  else{const picked=new Set(),bar=el('div',undefined,'ic-selbar'),count=el('span','Ninguna unidad seleccionada');
-   const print=invBtn('Imprimir etiquetas','printer',()=>centerLabels({units:[...picked]}));print.disabled=true;bar.append(count,print);
-   const sync=()=>{count.textContent=picked.size?picked.size+' seleccionada'+(picked.size===1?'':'s'):'Ninguna unidad seleccionada';print.disabled=!picked.size;};
-   sec.append(bar,centerTable(['','Código interno','Serie original','Estado','Ubicación','Costo','Cliente / documento','Acciones'],data.units.map(u=>{const box=el('input');box.type='checkbox';box.setAttribute('aria-label','Seleccionar '+u.internal_code);box.addEventListener('change',()=>{box.checked?picked.add(u.id):picked.delete(u.id);sync();});
-    const a=el('div',undefined,'ic-acts');a.append(invIconBtn('Ver la unidad '+u.internal_code,'eye',()=>centerUnitDialog(u.id)),invIconBtn('Etiqueta de '+u.internal_code,'printer',()=>centerLabels({units:[u.id]})));
-    if(!u.serial)a.append(invIconBtn('Agregar la serie a '+u.internal_code,'scan-barcode',()=>centerSerialDialog(u,refresh)));
-    return centerRow([['Seleccionar',box],['Código interno',el('code',u.internal_code)],['Serie original',u.serial||el('em','Sin serie','ic-muted')],['Estado',invoiceChip(centerUnitTone[u.status],u.status_label)],['Ubicación',u.location||'—'],
-     ['Costo',centerMoney(u.unit_cost_cents)],['Cliente / documento',[u.client,u.order_code&&'Orden '+u.order_code,u.document].filter(Boolean).join(' · ')||'—'],['Acciones',a]]);}),'ic-units'));}
-  body.append(sec);}}
 function centerLabels({units=[],item='',copies=1}){const size=(()=>{try{return localStorage.getItem('ic-label-size')||'60x40';}catch{return '60x40';}})();
  const link=el('a');link.href='/api/inventory/labels.pdf?'+new URLSearchParams(units.length?{units:units.join(','),size}:{item:String(item),copies:String(copies),size});link.target='_blank';link.rel='noopener';document.body.append(link);link.click();link.remove();}
 async function centerUnitDialog(id){const dialog=invDialog('Unidad',true),body=el('div',undefined,'inv-body');body.append(el('p','Cargando…','empty-module'));dialog.append(body);
@@ -204,62 +104,6 @@ function centerSerialDialog(u,done){const dialog=invDialog((u.serial?'Corregir l
  const save=el('button','Guardar serie','primary');save.type='submit';form.append(msg,invDialogActions(dialog,save));dialog.append(form);serial.focus();serial.select();
  form.addEventListener('submit',async event=>{event.preventDefault();clear();save.disabled=true;try{await api('/api/inventory/units/'+u.id,{action:'serial',serial:serial.value,reason:form.elements.reason?.value||''});toast('Serie guardada.','success');dialog.close();done&&done();}catch(error){fail(error);save.disabled=false;}});}
 // ---- Registrar mercadería e inventario inicial (asistente con lector de códigos de barras) ----
-async function centerRegister(panel,mode){const initial=mode==='inicial',preset=centerState.preset||{};centerState.preset=null;let products=(await api('/api/inventory/products')).rows.filter(p=>p.active);panel.replaceChildren();
- panel.append(invSectionHead(initial?'Registrar inventario inicial':'Registrar mercadería',initial?'Ingresa la mercadería que ya tienes: cada guardado genera el movimiento de apertura del Kardex y los códigos internos de las unidades.':
-  'Entradas de mercadería comprada o ajustes autorizados. Las compras con documento del proveedor también pueden registrarse en Facturación › Compras.'));
- const key=invKey(initial?'ini':'ent'),{form,msg,field,fail,clear}=invForm('ic-wizard');form.dataset.key=key;
- const step=(n,title,note)=>{const box=el('fieldset',undefined,'inv-group ic-step'),legend=el('legend');legend.append(el('b',String(n)),el('span',title));box.append(legend);if(note)box.append(el('p',note,'inv-form-note ic-step-note'));form.append(box);return box;};
- form.append(invRequiredNote());
- // 1. Categoría.
- const s1=step(1,'Categoría y subcategoría');const cat=centerCategoryOptions(field('filter_category','Categoría',{options:[],into:s1}),{blank:'Todas las categorías',value:''});
- // 2. Producto existente o nuevo.
- const s2=step(2,'Producto','Elige la ficha del modelo o crea una nueva si todavía no existe.'),mode2=el('div',undefined,'inv-filters');mode2.setAttribute('role','group');mode2.setAttribute('aria-label','Producto existente o nuevo');s2.append(mode2);
- const pick=field('item_id','Producto existente',{required:true,options:[],into:s2});const fresh=el('div',undefined,'ic-fresh');fresh.hidden=true;s2.append(fresh);
- let creating=false,freshFields=null;const freshForm=invForm('ic-fresh-fields');
- const paintPick=()=>{const c=cat.value,ids=c?[c,...(centerTax.categories.find(x=>String(x.id)===c)?.children||[]).map(x=>String(x.id))]:null;pick.replaceChildren(new Option(products.length?'Selecciona…':'No hay fichas: crea una nueva',''));
-  for(const p of products)if(!ids||ids.includes(String(p.category_id)))pick.add(new Option(p.name+(p.sku?' · '+p.sku:'')+' ('+(p.tracking==='serie'?'por serie':'a granel')+')',String(p.id)));if(preset.item_id)pick.value=String(preset.item_id);};
- const setMode=next=>{creating=next;for(const b of mode2.children)b.setAttribute('aria-pressed',String(b.dataset.mode===(next?'new':'old')));pick.closest('.inv-field').hidden=next;pick.required=!next;fresh.hidden=!next;
-  if(next&&!freshFields){freshFields=centerProductFields(fresh,(name,label,opts={})=>freshForm.field(name,label,{...opts,into:opts.into||fresh}),null,cat.value);freshFields.tracking.addEventListener('change',paintUnits);}
-  if(next&&freshFields&&cat.value){freshFields.cat.value=cat.value;freshFields.cat.dispatchEvent(new Event('change'));}paintUnits();};
- for(const[m,label]of [['old','Producto existente'],['new','Producto nuevo']]){const b=button(label,()=>setMode(m==='new'),'inv-filter');b.dataset.mode=m;mode2.append(b);}
- cat.addEventListener('change',()=>{paintPick();if(creating&&freshFields){freshFields.cat.value=cat.value;freshFields.cat.dispatchEvent(new Event('change'));}paintUnits();});pick.addEventListener('change',paintUnits);
- // 3. Unidades: lector de códigos (USB como teclado) o cantidad.
- const s3=step(3,'Unidades'),scanWrap=el('div',undefined,'ic-scan'),scanInput=el('input'),scanAdd=invBtn('Agregar','plus',()=>addSerial(scanInput.value)),bare=invBtn('Agregar sin serie','plus',()=>addSerial('',true)),list=el('ul',undefined,'ic-pending'),counter=el('p','','ic-count');
- scanInput.type='text';scanInput.autocomplete='off';scanInput.spellcheck=false;scanInput.placeholder='Escanea la serie (el lector envía Enter) o escríbela';scanInput.setAttribute('aria-label','Serie original');scanInput.maxLength=60;
- const scanLabel=el('label',undefined,'inv-search ic-scan-input');scanLabel.append(invIcon('scan-barcode'),scanInput);scanWrap.append(scanLabel,scanAdd,bare);const qty=field('quantity','Cantidad',{mode:'numeric',max:6,value:'1',required:true,into:s3});
- const scanNote=el('p','','inv-form-note ic-scan-note');scanNote.setAttribute('role','status');s3.append(scanWrap,scanNote,list,counter);const pending=[];
- const currentTracking=()=>creating?(freshFields?.tracking.value||'serie'):(products.find(p=>String(p.id)===pick.value)?.tracking||'serie');
- function paintUnits(){const serial=currentTracking()==='serie';scanWrap.hidden=!serial;list.hidden=!serial;counter.hidden=!serial;qty.closest('.inv-field').hidden=serial;qty.required=!serial;
-  s3.querySelector('.ic-step-note')?.remove();s3.querySelector('legend').after(el('p',serial?'Cada unidad recibe su código interno al guardar. Si el fabricante no puso serie, usa «Agregar sin serie».':'Producto a granel: indica la cantidad, sin serializar cada unidad.','inv-form-note ic-step-note'));paintList();paintSummary();}
- function paintList(){list.replaceChildren();pending.forEach((s,i)=>{const li=el('li'),drop=invIconBtn('Quitar '+(s||'la unidad sin serie'),'x',()=>{pending.splice(i,1);paintList();paintSummary();scanInput.focus();});li.append(el('b',String(i+1)),el('code',s||'Sin serie (solo código interno)'),el('span','Código al guardar','ic-muted'),drop);list.append(li);});
-  counter.textContent=pending.length?pending.length+' unidad'+(pending.length===1?'':'es')+' por registrar':'Todavía no agregaste unidades.';}
- async function addSerial(raw,allowEmpty=false){const value=String(raw||'').replace(/[\u0000-\u001f\u007f]/g,'').trim();scanNote.textContent='';scanNote.dataset.kind='';
-  if(!value&&!allowEmpty){scanInput.focus();return;}
-  if(value){const dupe=pending.some(p=>p&&p.replace(/\s+/g,'').toUpperCase()===value.replace(/\s+/g,'').toUpperCase());if(dupe){scanNote.textContent='La serie '+value+' ya está en esta lista.';scanNote.dataset.kind='error';scanInput.select();return;}
-   try{const check=await api('/api/inventory/serial-check?serial='+encodeURIComponent(value));if(check.exists){scanNote.textContent='Serie duplicada: '+value+' ya está registrada como '+check.unit.internal_code+' · '+check.unit.name+'.';scanNote.dataset.kind='error';scanInput.select();return;}}
-   catch(error){scanNote.textContent=error.message;scanNote.dataset.kind='error';return;}}
-  if(pending.length>=300){scanNote.textContent='Máximo 300 unidades por ingreso.';scanNote.dataset.kind='error';return;}
-  pending.push(value);scanInput.value='';scanNote.textContent=value?'Serie '+value+' agregada.':'Unidad sin serie agregada.';scanNote.dataset.kind='ok';paintList();paintSummary();scanInput.focus();}
- scanInput.addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();addSerial(scanInput.value);}});
- // 4. Costo, ubicación y motivo.
- const s4=step(4,'Costo y ubicación');if(!initial)field('reason','Motivo del ingreso',{required:true,options:[['compra','Compra o ingreso de mercadería'],['ajuste_entrada','Ajuste autorizado (entrada)']],into:s4});
- const cost=field('cost','Costo unitario (USD, sin IVA)',{required:true,mode:'decimal',max:14,value:'',into:s4,hint:'Para el Kardex valorizado (costo promedio ponderado).'});const where=field('location','Ubicación física',{max:80,into:s4,hint:'Ej.: Bodega A, vitrina, taller.'});
- field('note','Observación',{area:true,max:300,into:s4,hint:initial?'Ej.: conteo físico del 26/10/2026.':'Ej.: proveedor y número de documento.'});
- const summary=el('p','','ic-summary');summary.setAttribute('aria-live','polite');
- function paintSummary(){const n=currentTracking()==='serie'?pending.length:Number(qty.value)||0,c=invCents(cost.value);summary.textContent=n?'Se registrarán '+n+' unidad'+(n===1?'':'es')+(Number.isNaN(c)?'':' · costo total '+centerMoney(n*c))+'.':'Agrega las unidades o la cantidad.';}
- for(const n of [qty,cost])n.addEventListener('input',paintSummary);
- const save=el('button',undefined,'primary inv-btn');save.type='submit';save.append(invIcon('package-plus'),el('span','Guardar y generar códigos'));const foot=el('div',undefined,'inv-form-foot ic-foot');foot.append(summary,save);form.append(msg,foot);
- const result=el('div',undefined,'ic-result');result.hidden=true;panel.append(form,result);
- if(initial){const imp=el('section',undefined,'inv-card ic-card ic-import');imp.append(centerCardHead('Importar desde Excel o CSV','upload','Vista previa, validación y detección de duplicados'));imp.append(centerImport());panel.append(imp);}
- paintPick();setMode(false);if(preset.item_id){pick.value=String(preset.item_id);paintUnits();}
- form.addEventListener('submit',async event=>{event.preventDefault();clear();const serial=currentTracking()==='serie';
-  if(serial&&!pending.length){msg.textContent='Agrega al menos una unidad (escanea la serie o usa «Agregar sin serie»).';scanInput.focus();return;}
-  const body={request_key:form.dataset.key,reason:initial?'inicial':form.elements.reason.value,cost:cost.value,location:where.value,note:form.elements.note.value};
-  if(creating){const fields=Object.fromEntries(new FormData(freshForm.form));Object.assign(fields,Object.fromEntries([...fresh.querySelectorAll('[name]')].map(n=>[n.name,n.value])));body.product=JSON.stringify(fields);}else body.item_id=pick.value;
-  if(serial)body.units=JSON.stringify(pending.map(s=>({serial:s})));else body.quantity=qty.value;
-  save.disabled=true;try{const out=await api('/api/inventory/register',body);toast((out.units.length||out.quantity)+' unidad'+((out.units.length||out.quantity)===1?'':'es')+' registrada'+((out.units.length||out.quantity)===1?'':'s')+' en '+out.item.name+'.','success');
-   form.hidden=true;result.hidden=false;centerRegisterResult(result,out,()=>{products=null;centerState.preset=null;centerRegister(panel,mode);});}
-  catch(error){fail(error);save.disabled=false;}});}
 function centerRegisterResult(box,out,again){box.replaceChildren();const head=el('div',undefined,'ic-result-head'),mark=el('span',undefined,'inv-kpi-icon');mark.append(invIcon('circle-check'));
  head.append(mark,el('div'));head.lastChild.append(el('strong','Registrado: '+out.item.name),el('small',(out.units.length||out.quantity)+' unidad'+((out.units.length||out.quantity)===1?'':'es')+' · existencias '+out.item.stock+' · costo promedio '+centerMoney(out.item.average_cost_cents)));box.append(head);
  if(out.units.length)box.append(centerTable(['Código interno','Serie original','Ubicación'],out.units.map(u=>centerRow([['Código interno',el('code',u.internal_code)],['Serie original',u.serial||'Sin serie'],['Ubicación',u.location||'—']]))));
@@ -278,24 +122,6 @@ function centerImport(){const box=el('div',undefined,'ic-import-body'),file=el('
   go_.disabled=!!out.errors||!out.valid;preview.append(go_);});
  return box;}
 // ---- Kardex ----
-function centerKardexTable(rows,compact){return centerTable(compact?['Fecha','Producto','Movimiento','Cant.','Saldo','Responsable']:['Fecha','Producto','Serie / código','Movimiento','Entrada','Salida','Costo unit.','Costo prom.','Saldo','Valor','Documento','Responsable'],rows.map(r=>{
- const units=r.units.map(u=>u.serial?u.serial+' ('+u.internal_code+')':u.internal_code).join(', '),qty=r.entry?'+'+r.entry:r.exit?'−'+r.exit:r.reserved?'('+r.reserved+')':'';
- const kind=el('span',r.label,'ic-move');kind.dataset.type=r.type;
- const tr=compact?centerRow([['Fecha',formatOrderDate(r.at)],['Producto',r.product],['Movimiento',kind],['Cant.',qty],['Saldo',String(r.balance)],['Responsable',r.actor]]):
-  centerRow([['Fecha',formatOrderDate(r.at)],['Producto',r.product],['Serie / código',units||'—'],['Movimiento',kind],['Entrada',r.entry?String(r.entry):''],['Salida',r.exit?String(r.exit):''],['Costo unit.',['entrada','salida'].includes(r.type)?centerMoney(r.unit_cost_cents):''],
-   ['Costo prom.',centerMoney(r.average_cents)],['Saldo',String(r.balance)],['Valor',centerMoney(r.balance_cents)],['Documento',r.document||r.note||''],['Responsable',r.actor]]);tr.dataset.type=r.type;return tr;}),'ic-kardex');}
-async function centerKardex(panel){const f=centerState.kardex,data=await api('/api/inventory/kardex?'+new URLSearchParams(f)),products=(await api('/api/inventory/products')).rows;panel.replaceChildren();
- const query=new URLSearchParams(Object.fromEntries(Object.entries(f).filter(([,v])=>v))).toString(),link=(label,icon,ext)=>{const a=el('a',undefined,'secondary inv-btn');a.href='/api/inventory/kardex.'+ext+(query?'?'+query:'');a.append(invIcon(icon),el('span',label));return a;};
- panel.append(invSectionHead('Kardex','Costo promedio ponderado móvil. Los movimientos no se modifican ni se eliminan: una corrección es un ajuste trazable. Las reservas y los traslados se muestran sin cambiar el saldo.',
-  link('Excel','file-spreadsheet','xlsx'),link('PDF','file-text','pdf'),link('CSV','download','csv')));
- const form=el('form',undefined,'cash-hist-bar ic-kardex-filters');form.addEventListener('submit',e=>{e.preventDefault();});const fld=(label,node,key)=>{const b=el('label',undefined,'inv-field');b.append(el('span',label),node);form.append(b);node.value=f[key]||'';node.addEventListener('change',()=>{f[key]=node.value.trim();centerKardex(panel);});return node;};
- for(const[key,label]of [['from','Desde'],['to','Hasta']]){const d=el('input');d.type='date';fld(label,d,key);}
- fld('Categoría',centerCategoryOptions(el('select'),{value:f.category_id}),'category_id');const b=el('select');b.add(new Option('Todas',''));for(const x of centerTax.brands)b.add(new Option(x.name,String(x.id)));fld('Marca',b,'brand_id');
- const p=el('select');p.add(new Option('Todos',''));for(const x of products)p.add(new Option(x.name,String(x.id)));fld('Producto',p,'item_id');const serial=el('input');serial.placeholder='Serie o código';serial.maxLength=60;fld('Serie',serial,'serial');
- const t=el('select');t.add(new Option('Todos',''));for(const[k,v]of Object.entries(data.types))t.add(new Option(v,k));fld('Movimiento',t,'type');const u=el('select');u.add(new Option('Todos',''));for(const x of data.users)u.add(new Option(x.name,String(x.id)));fld('Responsable',u,'user_id');
- const reset=invBtn('Limpiar','x',()=>{centerState.kardex={from:'',to:'',category_id:'',brand_id:'',item_id:'',serial:'',type:'',user_id:''};centerKardex(panel);});form.append(reset);panel.append(form);
- const tt=data.totals;panel.append(invKpis([['scroll-text','Movimientos',String(tt.rows),data.truncated?'Se muestran los 2000 más recientes':'Con los filtros aplicados','blue'],['arrow-down-to-line','Entradas',String(tt.entries),centerMoney(tt.entry_cents),'green'],['arrow-up-from-line','Salidas',String(tt.exits),centerMoney(tt.exit_cents),'magenta']]));
- panel.append(data.rows.length?centerKardexTable([...data.rows].reverse()):invEmpty('scroll-text','Sin movimientos con estos filtros','Cambia las fechas o los filtros para ver más.'));}
 // ---- Movimientos: salidas, reservas, traslados y entregas ----
 async function centerMovements(panel){const res=await api('/api/inventory/reservations'),recent=await api('/api/inventory/kardex');panel.replaceChildren();
  panel.append(invSectionHead('Movimientos','Una venta o un consumo confirmado genera una sola salida; la reserva no descuenta existencias. Un repuesto consumido en una orden no vuelve a descontarse al facturarla.'));
@@ -304,8 +130,6 @@ async function centerMovements(panel){const res=await api('/api/inventory/reserv
   ['calendar','Registrar entrega','Fecha la entrega de unidades vendidas y empieza su garantía.',()=>centerDeliveryPicker()]]){const b=button('',run,'ic-action');const m=el('span',undefined,'inv-kpi-icon');m.append(invIcon(icon));const t=el('div');t.append(el('strong',title),el('small',text));b.append(m,t);actions.append(b);}
  panel.append(actions);const sec=el('section',undefined,'inv-card ic-card');sec.append(centerCardHead('Reservas activas','lock',res.rows.length?res.rows.length+'':'Ninguna'));sec.append(res.rows.length?centerReservationList(res.rows,()=>centerMovements(panel)):el('p','No hay reservas activas.','ic-card-empty'));panel.append(sec);
  const last=el('section',undefined,'inv-card');last.append(centerCardHead('Últimos movimientos','scroll-text','Kardex completo en su pestaña'));last.append(recent.rows.length?centerKardexTable(recent.rows.slice(-30).reverse(),true):el('p','Sin movimientos.','ic-card-empty'));panel.append(last);}
-function centerReservationList(rows,refresh){const ul=el('ul',undefined,'ic-mini');for(const r of rows){const li=el('li'),row=el('div',undefined,'ic-family');row.append(el('strong',r.product+' · '+r.quantity),el('span',r.reference+(r.order_code?' · orden '+r.order_code:'')+(r.units.length?' · '+r.units.map(u=>u.internal_code).join(', '):'')+' · '+formatOrderDate(r.created_at)),
- invBtn('Liberar','undo-2',async()=>{if(await confirmClose({title:'¿Liberar la reserva?',text:'Las existencias vuelven a estar disponibles. La reserva queda en el Kardex.',keep:'Mantener',discard:'Liberar',plain:true})!=='discard')return;try{await api('/api/inventory/reservations',{action:'release',id:String(r.id)});toast('Reserva liberada.','success');refresh();}catch(error){notify(error.message);}}));li.append(row);ul.append(li);}return ul;}
 async function centerItemPicker(field,itemId,onPick,filter){const rows=(await api('/api/inventory/products')).rows.filter(p=>p.active&&(!filter||filter(p)));const pick=field('item_id','Producto',{required:true,options:[['','Selecciona…'],...rows.map(p=>[String(p.id),p.name+' · '+p.available+' disp.'])],value:itemId?String(itemId):''});
  pick.addEventListener('change',()=>onPick(pick.value));if(pick.value)onPick(pick.value);return pick;}
 function centerUnitPicker(box,units,{scanLabel='Escanea o elige las unidades'}={}){box.replaceChildren();const chosen=new Set(),scan=el('input'),note=el('small','','inv-form-note');scan.placeholder='Escanea la serie o el código interno y pulsa Enter';scan.autocomplete='off';scan.setAttribute('aria-label',scanLabel);
@@ -315,7 +139,7 @@ function centerUnitPicker(box,units,{scanLabel='Escanea o elige las unidades'}={
   if(!u){note.textContent='No está entre las unidades disponibles: '+scan.value;note.dataset.kind='error';scan.select();return;}const node=list.querySelector('input[value="'+u.id+'"]');node.checked=true;chosen.add(u.id);note.textContent='Seleccionada '+u.internal_code+'.';note.dataset.kind='ok';scan.value='';});
  box.append(wrap,note,units.length?list:el('p','No hay unidades disponibles.','inv-warn'));return chosen;}
 async function centerExitDialog(itemId){const dialog=invDialog('Registrar salida',true),{form,msg,field,fail,clear}=invForm('bank-form inv-sheet-form ic-exit');form.append(invRequiredNote());dialog.append(form);let product=null,chosen=null;
- const reason=field('reason','Motivo',{required:true,options:[['venta','Venta'],['uso_orden','Consumo en una orden técnica'],['devolucion_proveedor','Devolución al proveedor'],['ajuste_salida','Ajuste autorizado (salida)'],['baja','Baja por daño o pérdida']]});
+ form.append(el('p','Para vender usa «Vender producto»: aplica el precio, el descuento autorizado y el cliente.','inv-form-note'));const reason=field('reason','Motivo',{required:true,options:[['uso_orden','Consumo en una orden técnica'],['devolucion_proveedor','Devolución al proveedor'],['ajuste_salida','Ajuste autorizado (salida)'],['baja','Baja por daño o pérdida']]});
  const units=el('div',undefined,'ic-units-box'),qty=field('quantity','Cantidad',{required:true,mode:'numeric',max:6,value:'1'});
  const order=field('order_code','Número de orden',{max:40,hint:'Obligatorio para el consumo en una orden. En una venta, opcional.'});const doc=field('document','Documento (factura o nota de venta)',{max:80});
  const client=field('client_id','Cliente',{options:[['','Sin cliente']]}),findBox=el('label',undefined,'inv-field'),find=el('input');find.placeholder='Buscar cliente por nombre o cédula';find.setAttribute('aria-label','Buscar cliente');findBox.append(el('span','Buscar cliente'),find);client.closest('.inv-field').before(findBox);
@@ -334,14 +158,6 @@ async function centerExitDialog(itemId){const dialog=invDialog('Registrar salida
   const body={item_id:String(product.id),reason:reason.value,order_code:order.value,document:doc.value,client_id:client.value,sold_at:sold.value,delivered:delivered.checked?'1':'0',reservation_id:reservation.value,note:form.elements.note.value,request_key:key};
   if(product.tracking==='serie')body.unit_ids=JSON.stringify([...(chosen||[])]);else body.quantity=qty.value;
   save.disabled=true;try{await api('/api/inventory/exit',body);toast('Salida registrada.','success');dialog.close();if(currentModule==='inventory')renderInventoryCenter();}catch(error){fail(error);if(error.fields?.units)msg.textContent=error.message;save.disabled=false;}});}
-async function centerReserveDialog(itemId){const dialog=invDialog('Reservar existencias'),{form,msg,field,fail,clear}=invForm('bank-form inv-sheet-form');form.append(invRequiredNote());dialog.append(form);let product=null,chosen=null;
- const units=el('div',undefined,'ic-units-box'),qty=field('quantity','Cantidad',{required:true,mode:'numeric',max:6,value:'1'});field('reference','Para (orden, presupuesto, proforma o cliente)',{required:true,max:80});field('order_code','Número de orden',{max:40,hint:'Opcional: enlaza la reserva con la orden.'});field('note','Observación',{area:true,max:300});
- const top=el('div',undefined,'ic-exit-product');form.prepend(top);const pickField=(name,label,opts)=>{const n=field(name,label,opts);top.append(n.closest('.inv-field'));return n;};
- await centerItemPicker(pickField,itemId,async id=>{units.replaceChildren();product=null;if(!id)return;const data=await api('/api/inventory/products/'+id);product=data.product;qty.closest('.inv-field').hidden=product.tracking==='serie';
-  if(product.tracking==='serie')chosen=centerUnitPicker(units,data.units.filter(u=>u.status==='disponible'));});top.after(units);
- const save=el('button','Reservar','primary');save.type='submit';form.append(msg,invDialogActions(dialog,save));
- form.addEventListener('submit',async event=>{event.preventDefault();clear();if(!product){fail({message:'Elige el producto.',fields:{item_id:'Producto obligatorio.'}});return;}const body=Object.fromEntries(new FormData(form));body.action='reserve';
-  if(product.tracking==='serie')body.unit_ids=JSON.stringify([...(chosen||[])]);save.disabled=true;try{await api('/api/inventory/reservations',body);toast('Reserva registrada: no descuenta existencias.','success');dialog.close();if(currentModule==='inventory')renderInventoryCenter();}catch(error){fail(error);if(error.fields?.units)msg.textContent=error.message;save.disabled=false;}});}
 async function centerTransferDialog(itemId){const dialog=invDialog('Trasladar a otra ubicación'),{form,msg,field,fail,clear}=invForm('bank-form inv-sheet-form');form.append(invRequiredNote());dialog.append(form);let product=null,chosen=null;
  const units=el('div',undefined,'ic-units-box'),info=el('p','','inv-form-note');field('to_location','Nueva ubicación',{required:true,max:80});field('note','Observación',{area:true,max:300});
  const top=el('div',undefined,'ic-exit-product');form.prepend(top);const pickField=(name,label,opts)=>{const n=field(name,label,opts);top.append(n.closest('.inv-field'));return n;};
@@ -358,18 +174,6 @@ function centerDeliveryDialog(units,done){const dialog=invDialog('Registrar entr
  const save=el('button','Registrar entrega','primary');save.type='submit';form.append(msg,invDialogActions(dialog,save));dialog.append(form);
  form.addEventListener('submit',async event=>{event.preventDefault();clear();save.disabled=true;try{await api('/api/inventory/delivery',{unit_ids:JSON.stringify([...chosen]),delivered_at:day.value});toast('Entrega registrada: la garantía empieza a contar.','success');dialog.close();done&&done();}catch(error){fail(error);if(error.fields?.units)msg.textContent=error.message;save.disabled=false;}});}
 // ---- Licencias digitales ----
-async function centerLicenses(panel){const data=await api('/api/inventory/licenses'),t=data.totals;panel.replaceChildren();
- panel.append(invSectionHead('Licencias digitales','Organizadas por Categoría → Marca → Familia → Edición, con las existencias reales del módulo Licencias (no hay un segundo inventario). Las claves se guardan cifradas y solo se ven en Licencias.',
-  invBtn('Registrar licencias','key-round',()=>go('licenses'),'primary')),invKpis([['circle-check','Disponibles',String(t.disponible),'','green'],['lock','Reservadas',String(t.reservada),'','amber'],['shield-check','Entregadas',String(t.entregada),'','blue'],['circle-x','Vencidas',String(t.vencida),'','red']]));
- if(data.unclassified.length){const sec=el('section',undefined,'inv-card ic-card');sec.append(centerCardHead('Sin clasificar','tags',data.unclassified.length+' productos'));const ul=el('ul',undefined,'ic-mini');
-  for(const p of data.unclassified){const li=el('li'),row=el('div',undefined,'ic-family');row.append(el('strong',p.name),el('span',[p.brand,p.line,p.stock.disponible+' disponibles'].filter(Boolean).join(' · ')),invBtn('Clasificar','tags',()=>centerClassifyDialog(p,()=>centerLicenses(panel))));li.append(row);ul.append(li);}sec.append(ul);panel.append(sec);}
- for(const cat of data.categories){const sec=el('section',undefined,'inv-card ic-card ic-lic');sec.append(centerCardHead(cat.name,'key-round',cat.prefix?'Códigos PCD-'+cat.prefix:''));
-  if(!cat.brands.length){sec.append(el('p','Sin marcas ni familias configuradas.','ic-card-empty'));panel.append(sec);continue;}
-  for(const b of cat.brands){const group=el('div',undefined,'ic-lic-brand');group.append(el('h4',b.name));for(const f of b.families){const fam=el('div',undefined,'ic-lic-family');const head=el('div',undefined,'ic-lic-head');head.append(el('strong',f.name),el('span',f.editions.join(' · '),'ic-muted'));fam.append(head);
-    if(f.products.length){const ul=el('ul',undefined,'ic-mini');for(const p of f.products){const li=el('li'),row=el('div',undefined,'ic-family');const st=el('span',undefined,'ic-lic-stock');for(const[k,l,tone]of [['disponible','disp.','autorizado'],['reservada','res.','enviado'],['entregada','entr.','descartado'],['vencida','venc.','rechazado']])if(p.stock[k]||k==='disponible')st.append(invoiceChip(tone,p.stock[k]+' '+l));
-      row.append(el('strong',p.name+(p.edition?' · '+p.edition:'')),el('span',[p.sku&&'SKU '+p.sku,p.region,p.duration,p.devices&&p.devices+' disp.',centerMoney(p.price_cents)].filter(Boolean).join(' · ')),st,invIconBtn('Clasificar '+p.name,'pencil',()=>centerClassifyDialog({...p,category_id:cat.id,family_id:f.id},()=>centerLicenses(panel))));li.append(row);ul.append(li);}fam.append(ul);}
-    else fam.append(el('p','Sin productos registrados en esta familia.','ic-muted'));group.append(fam);}sec.append(group);}
-  panel.append(sec);}}
 function centerClassifyDialog(p,done){const dialog=invDialog('Clasificar '+p.name),{form,msg,field,fail,clear}=invForm('bank-form inv-sheet-form');form.append(invRequiredNote());
  const cat=centerCategoryOptions(field('category_id','Categoría',{required:true,options:[]}),{kind:'licencia',blank:'Selecciona…',value:p.category_id?String(p.category_id):''});
  const brand=field('brand','Marca',{required:true,max:60,value:p.brand||'',hint:'Si no existe, se crea.'});const list=el('datalist');list.id=invKey('lbrands');for(const b of centerTax.brands)list.append(new Option(b.name));brand.setAttribute('list',list.id);form.append(list);
@@ -391,11 +195,6 @@ async function centerWarranties(panel){const w=centerState.warranty,data=await a
   const acts=el('div',undefined,'ic-acts');acts.append(invIconBtn('Ver la unidad '+r.internal_code,'eye',()=>centerUnitDialog(r.unit_id)));if(!r.delivered_at)acts.append(invBtn('Registrar entrega','calendar',()=>centerDeliveryDialog([{id:r.unit_id,internal_code:r.internal_code,serial:r.serial}],()=>centerWarranties(panel))));head.append(acts);
   li.append(head,centerWarrantyBlock(r));list.append(li);}panel.append(list);}
 // ---- Reportes y configuración ----
-async function centerReports(panel){const data=await api('/api/inventory/reports'),t=data.totals;panel.replaceChildren();
- const xl=el('a',undefined,'secondary inv-btn');xl.href='/api/inventory/stock.xlsx';xl.append(invIcon('file-spreadsheet'),el('span','Existencias en Excel'));
- panel.append(invSectionHead('Reportes','Valorización al costo promedio ponderado.',xl),invKpis([['package','Productos activos',String(t.products),'','blue'],['boxes','Unidades',String(t.units),'','teal'],['circle-dollar-sign','Valor del inventario',centerMoney(t.value_cents),'','magenta']]));
- const table=(title,rows,icon)=>{const sec=el('section',undefined,'inv-card');sec.append(centerCardHead(title,icon,rows.length+''));sec.append(rows.length?centerTable(['Nombre','Productos','Unidades','Valor','Stock bajo'],rows.map(r=>centerRow([['Nombre',r.name],['Productos',String(r.products)],['Unidades',String(r.units)],['Valor',centerMoney(r.value_cents)],['Stock bajo',String(r.low)]]))):el('p','Sin datos.','ic-card-empty'));return sec;};
- panel.append(table('Por categoría',data.by_category,'tags'),table('Por marca',data.by_brand,'bookmark'));}
 async function centerConfig(panel){const tax=await centerTaxonomy(true);panel.replaceChildren();panel.append(invSectionHead('Configuración','Prefijos de códigos, etiquetas, lector de códigos de barras y traslado futuro a producción.'));
  const pre=el('section',undefined,'inv-card');pre.append(centerCardHead('Prefijos de códigos internos','tags','Únicos y nunca reutilizables'));
  pre.append(centerTable(['Prefijo','Categoría','Último número','Próximo código'],tax.prefixes.map(p=>centerRow([['Prefijo',el('code',p.prefix)],['Categoría',p.category],['Último número',String(p.last_number)],['Próximo código','PCD-'+p.prefix+'-'+String(p.last_number+1).padStart(6,'0')]]))));panel.append(pre);
@@ -406,3 +205,458 @@ async function centerConfig(panel){const tax=await centerTaxonomy(true);panel.re
  const move=el('section',undefined,'inv-card ic-card');move.append(centerCardHead('Traslado futuro a producción','upload','Pendiente de autorización'));
  const pkg=el('a',undefined,'secondary inv-btn');pkg.href='/api/inventory/export.json';pkg.append(invIcon('download'),el('span','Descargar paquete de traslado (JSON)'));
  move.append(el('p','Lo que registres aquí no se mezcla con producción. El paquete conserva categorías, prefijos, fichas, unidades con sus códigos y series, y todo el Kardex, para una importación controlada que solo se hará con tu autorización. No incluye claves de licencias ni datos de clientes.','inv-form-note'),pkg);panel.append(move);}
+Object.assign(invIcons,{info:'<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>',ellipsis:'<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>',
+ 'chevron-down':'<path d="m6 9 6 6 6-6"/>','chevron-right':'<path d="m9 18 6-6-6-6"/>','chevron-up':'<path d="m18 15-6-6-6 6"/>','panel-left':'<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/>',
+ 'arrow-up-down':'<path d="m21 16-4 4-4-4"/><path d="M17 20V4"/><path d="m3 8 4-4 4 4"/><path d="M7 4v16"/>','refresh-cw':'<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>',
+ 'circle-alert':'<circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/>','trending-up':'<polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/>',
+ 'trending-down':'<polyline points="22 17 13.5 8.5 8.5 13.5 2 7"/><polyline points="16 17 22 17 22 11"/>',image:'<rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>',
+ 'hand-coins':'<path d="M11 15h2a2 2 0 1 0 0-4h-3c-.6 0-1.1.2-1.4.6L3 17"/><path d="m7 21 1.6-1.4c.3-.4.8-.6 1.4-.6h4c1.1 0 2.1-.4 2.8-1.2l4.6-4.4a2 2 0 0 0-2.75-2.91l-4.2 3.9"/><path d="m2 16 6 6"/><circle cx="16" cy="9" r="2.9"/><circle cx="6" cy="5" r="3"/>',
+ 'badge-percent':'<path d="M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z"/><path d="m15 9-6 6"/><path d="M9 9h.01"/><path d="M15 15h.01"/>'});
+let centerState={tab:'panel',catalog:{q:'',category:'',brand:'',state:'',sort:'name',dir:1,page:1},kardex:{period:'',from:'',to:'',category_id:'',brand_id:'',item_id:'',serial:'',type:'',user_id:'',document:'',page:1},warranty:{state:'',q:''},taxKind:'fisico',licenses:{q:'',category:'',brand:'',state:''}};
+let centerTax=null;
+// Navegación por grupos (menú lateral plegable en escritorio; desplegable en celulares). Las rutas internas se conservan.
+const centerGroups=[['Resumen',[['panel','Panel general','layout-dashboard'],['alertas','Alertas','triangle-alert']]],
+ ['Productos',[['catalogo','Catálogo','package'],['categorias','Categorías y marcas','tags'],['licencias','Licencias digitales','key-round']]],
+ ['Operaciones',[['registrar','Registrar mercadería','package-plus'],['salida','Registrar salida','arrow-up-from-line'],['inicial','Inventario inicial','clipboard-list'],['movimientos','Movimientos','arrow-left-right'],['kardex','Kardex','scroll-text']]],
+ ['Control',[['garantias','Garantías','shield-check'],['reportes','Reportes','chart-column'],['config','Configuración','settings']]]];
+const centerTabs=centerGroups.flatMap(([,items])=>items);
+const centerUnitTone={disponible:'autorizado',reservada:'enviado',vendida:'pendiente',consumida:'pendiente',devuelta:'descartado',baja:'rechazado'};
+const centerStateTone={agotado:'rechazado',critico:'pendiente',minimo:'enviado',normal:'autorizado'};
+async function centerTaxonomy(force){if(force||!centerTax)centerTax=await api('/api/inventory/taxonomy');return centerTax;}
+function centerGo(tab){centerState.tab=tab;renderInventoryCenter().then(()=>$('module-content').querySelector('.ic-nav [aria-current=page]')?.focus());}
+function centerPref(key,fallback){try{return JSON.parse(localStorage.getItem('ic-'+key))??fallback;}catch{return fallback;}}
+function centerSetPref(key,value){try{localStorage.setItem('ic-'+key,JSON.stringify(value));}catch{}}
+async function renderInventoryCenter(){const root=$('module-content');try{await centerTaxonomy();}catch(error){root.replaceChildren(el('p',error.message,'empty-module'));return;}
+ const tab=centerTabs.find(t=>t[0]===centerState.tab)||centerTabs[0];centerState.tab=tab[0];
+ const shell=el('div',undefined,'inv-module ic-module ic-shell'),main=el('div',undefined,'ic-main'),panel=el('div',undefined,'inv-panel');panel.setAttribute('aria-label',tab[1]);panel.id='ic-section';
+ shell.dataset.collapsed=String(!!centerPref('nav-collapsed',false));main.append(centerSearch(),panel);shell.append(centerNav(),main);root.replaceChildren(shell);
+ const run={panel:centerPanel,alertas:centerAlerts,categorias:centerCategories,catalogo:centerCatalog,registrar:p=>centerRegister(p,'compra'),inicial:p=>centerRegister(p,'inicial'),salida:centerSalida,
+  kardex:centerKardex,movimientos:centerMovements,licencias:centerLicenses,garantias:centerWarranties,reportes:centerReports,config:centerConfig}[tab[0]];
+ panel.append(el('p','Cargando…','empty-module'));try{await run(panel);}catch(error){panel.replaceChildren(el('p',error.message,'empty-module'));}}
+function centerNav(){const nav=el('nav',undefined,'ic-nav');nav.setAttribute('aria-label','Secciones del Centro de Inventario');const current=centerTabs.find(t=>t[0]===centerState.tab);
+ const toggle=button('',()=>{const shell=nav.closest('.ic-shell');const next=shell.dataset.collapsed!=='true';shell.dataset.collapsed=String(next);centerSetPref('nav-collapsed',next);toggle.setAttribute('aria-expanded',String(!next));},'ic-nav-collapse');
+ toggle.setAttribute('aria-label','Plegar o desplegar el menú');toggle.setAttribute('aria-expanded',String(!centerPref('nav-collapsed',false)));toggle.append(invIcon('panel-left'));
+ const mobile=button('',()=>{const open_=nav.dataset.open!=='true';nav.dataset.open=String(open_);mobile.setAttribute('aria-expanded',String(open_));},'ic-nav-mobile');mobile.setAttribute('aria-expanded','false');mobile.setAttribute('aria-controls','ic-nav-groups');
+ mobile.append(invIcon(current[2]),el('span',current[1]),invIcon('chevron-down'));
+ const groups=el('div',undefined,'ic-nav-groups');groups.id='ic-nav-groups';
+ for(const[title,items]of centerGroups){const g=el('div',undefined,'ic-nav-group');g.append(el('p',title,'ic-nav-title'));
+  for(const[key,label,icon]of items){const b=button('',()=>{nav.dataset.open='false';if(centerState.tab!==key)centerGo(key);},'ic-nav-item');b.dataset.tab=key;b.title=label;if(key===centerState.tab)b.setAttribute('aria-current','page');
+   b.append(invIcon(icon),el('span',label));g.append(b);}groups.append(g);}
+ nav.addEventListener('keydown',event=>{if(event.key==='Escape'&&nav.dataset.open==='true'){nav.dataset.open='false';mobile.setAttribute('aria-expanded','false');mobile.focus();}});
+ nav.append(mobile,toggle,groups);return nav;}
+// Menú contextual (⋯) para no repetir iconos en cada fila. Escape o clic fuera lo cierran.
+function centerMenu(label,items){const wrap=el('div',undefined,'ic-menu'),trigger=button('',()=>{list.hidden?show():hide();},'inv-icon-btn ic-menu-trigger'),list=el('div',undefined,'ic-menu-list');
+ trigger.setAttribute('aria-label',label);trigger.title=label;trigger.setAttribute('aria-haspopup','menu');trigger.setAttribute('aria-expanded','false');trigger.append(invIcon('ellipsis'));list.setAttribute('role','menu');list.hidden=true;
+ const outside=event=>{if(!wrap.contains(event.target))hide();};
+ const show=()=>{list.hidden=false;trigger.setAttribute('aria-expanded','true');list.querySelector('button')?.focus();document.addEventListener('pointerdown',outside);};
+ const hide=()=>{list.hidden=true;trigger.setAttribute('aria-expanded','false');document.removeEventListener('pointerdown',outside);};
+ for(const[text,run,danger]of items.filter(Boolean)){const b=button(text,()=>{hide();run();},'ic-menu-item');b.setAttribute('role','menuitem');if(danger)b.dataset.danger='true';list.append(b);}
+ wrap.addEventListener('keydown',event=>{if(event.key==='Escape'&&!list.hidden){event.stopPropagation();hide();trigger.focus();}if(['ArrowDown','ArrowUp'].includes(event.key)&&!list.hidden){event.preventDefault();const all=[...list.querySelectorAll('button')],i=all.indexOf(document.activeElement);all[(i+(event.key==='ArrowDown'?1:-1)+all.length)%all.length]?.focus();}});
+ wrap.append(trigger,list);return wrap;}
+function centerKpiGrid(list){const grid=el('div',undefined,'inv-kpis ic-kpis');for(const[icon,label,value,hint,tone,tab,extra]of list){const card=button('',()=>tab&&centerGo(tab),'inv-kpi ic-kpi');if(!tab)card.disabled=true;if(tone)card.dataset.tone=tone;
+  const mark=el('span',undefined,'inv-kpi-icon'),body=el('div');mark.append(invIcon(icon));body.append(el('small',label),el('strong',value));if(hint)body.append(el('em',hint));if(extra)body.append(extra);card.append(mark,body);card.setAttribute('aria-label',label+': '+value+(tab?'. Ver detalle':''));grid.append(card);}return grid;}
+
+// ---- Panel general (ejecutivo) ----
+async function centerPanel(panel){const data=await api('/api/inventory/center'),k=data.cards;panel.replaceChildren();
+ panel.append(centerKpiGrid([['package','Productos activos',String(k.products),'Fichas de productos físicos','blue','catalogo'],['boxes','Unidades disponibles',String(k.available),'En existencia, sin contar reservas','teal','catalogo'],
+  ['circle-x','Productos agotados',String(k.out),k.out?'Sin existencias':'Ninguno agotado',k.out?'red':'green','alertas'],['triangle-alert','Stock crítico',String(k.critical),(k.at_min?k.at_min+' en el mínimo · ':'')+'por debajo del mínimo',k.critical?'amber':'green','alertas'],
+  ['circle-dollar-sign','Inventario valorizado',centerMoney(k.value_cents),k.cost_pending?k.cost_pending+' entrada'+(k.cost_pending===1?'':'s')+' sin costo':'Costo promedio ponderado',k.cost_pending?'amber':'magenta',k.cost_pending?'alertas':'reportes'],
+  ['key-round','Licencias disponibles',String(k.licenses),'Del módulo Licencias','blue','licencias'],['shield-check','Garantías por vencer',String(k.warranties_soon),'PC-DOCTOR · próximos 30 días',k.warranties_soon?'amber':'green','garantias'],
+  ['scroll-text','Movimientos recientes',String(k.moves_week),'Entradas y salidas · 7 días','teal','kardex']]));
+ const quick=el('div',undefined,'ic-quick');quick.append(invBtn('Registrar mercadería','package-plus',()=>centerGo('registrar'),'primary'),invBtn('Registrar salida','arrow-up-from-line',()=>centerExitDialog()),invBtn('Inventario inicial','clipboard-list',()=>centerGo('inicial')),invBtn('Buscar o escanear','scan-barcode',()=>document.querySelector('.ic-search input')?.focus()));panel.append(quick);
+ if(!k.products){panel.append(invEmpty('package','Todavía no hay productos registrados','Empieza con «Inventario inicial»: elige la categoría, crea el producto, escanea las series y guarda. Cada unidad recibe su código interno.',invBtn('Inventario inicial','clipboard-list',()=>centerGo('inicial'),'primary')));return;}
+ const grid=el('div',undefined,'ic-areas');
+ const alerts=el('section',undefined,'inv-card ic-card');alerts.append(centerCardHead('Alertas de inventario','triangle-alert','Con alertas activas'));
+ const groups=[['agotado','Agotados'],['critico','Stock crítico'],['minimo','En el mínimo · reposición']];let any=false;
+ for(const[state,title]of groups){const list=data.alerts[state]||[];if(!list.length)continue;any=true;const h=el('p',undefined,'ic-area-title');h.append(invoiceChip(centerStateTone[state],title),el('span',' '+list.length));alerts.append(h);
+  const ul=el('ul',undefined,'ic-mini');for(const p of list.slice(0,5)){const li=el('li'),b=button('',()=>centerProductDialog(p.id),'ic-hit');b.append(el('strong',p.name),el('span',p.category),el('b',p.stock+' / mín. '+p.min_stock));li.append(b);ul.append(li);}alerts.append(ul);}
+ if(!any)alerts.append(el('p','Todos los productos están sobre su mínimo.','ic-card-empty'));const more=invBtn('Ver todas las alertas','chevron-right',()=>centerGo('alertas'));more.classList.add('ic-card-action');alerts.append(more);
+ const act=el('section',undefined,'inv-card ic-card');act.append(centerCardHead('Actividad reciente','scroll-text','Entradas, salidas, reservas y devoluciones'));
+ if(data.recent.length){const ul=el('ul',undefined,'ic-feed');for(const r of data.recent.slice(0,8)){const li=el('li'),mv=el('span',r.label,'ic-move');mv.dataset.kind=r.kind;const q=r.entry?'+'+r.entry:r.exit?'−'+r.exit:r.reserved?'('+r.reserved+')':'';
+   const body=el('div');body.append(el('strong',r.product),el('small',formatOrderDate(r.at)+' · '+r.actor));li.append(mv,body,el('b',q));ul.append(li);}act.append(ul);}else act.append(el('p','Sin movimientos.','ic-card-empty'));
+ const war=el('section',undefined,'inv-card ic-card');war.append(centerCardHead('Garantías','shield-check','Próximos vencimientos · PC-DOCTOR'));
+ if(data.expiring.length){const ul=el('ul',undefined,'ic-mini');for(const u of data.expiring){const li=el('li'),b=button('',()=>centerUnitDialog(u.id),'ic-hit');b.append(el('strong',u.product),el('span',u.internal_code+(u.client?' · '+u.client:'')),el('b',u.days_left+' días'));li.append(b);ul.append(li);}war.append(ul);}
+ else war.append(el('p','Ninguna garantía de PC-DOCTOR vence en los próximos 30 días.','ic-card-empty'));
+ grid.append(alerts,act,war);panel.append(grid);}
+function centerCardHead(title,icon,note){const head=el('header',undefined,'inv-card-head ic-card-head'),t=el('div');const h=el('h3');h.append(invIcon(icon),el('span',title));t.append(h);if(note)t.append(el('small',note));head.append(t);return head;}
+// ---- Alertas y revisión de datos ----
+async function centerAlerts(panel){const[data,review]=await Promise.all([api('/api/inventory/products'),api('/api/inventory/review')]);panel.replaceChildren();
+ panel.append(invSectionHead('Alertas','Agotado: sin existencias · Crítico: por debajo del mínimo · En el mínimo: igual al mínimo. Desactiva las alertas de los productos sin reposición automática.'));
+ const active=data.rows.filter(p=>p.active);
+ for(const[state,title,note]of [['agotado','Agotados','Sin existencias.'],['critico','Stock crítico','Por debajo del mínimo configurado.'],['minimo','En el mínimo','Pendientes de reposición.']]){
+  const list=active.filter(p=>p.stock_state===state);const sec=el('section',undefined,'inv-card');sec.append(centerCardHead(title,state==='agotado'?'circle-x':'triangle-alert',list.length+' · '+note));
+  if(!list.length){sec.append(el('p','Ninguno.','ic-card-empty'));panel.append(sec);continue;}
+  sec.append(centerTable(['Producto','Categoría','Existencias','Mínimo','Alertas','Acciones'],list.map(p=>{const name=el('div',undefined,'ic-name');name.append(el('strong',p.name),el('small',[p.sku&&'SKU '+p.sku,p.brand].filter(Boolean).join(' · ')));
+   const sw=el('label',undefined,'ic-switch'),box=el('input');box.type='checkbox';box.checked=p.alerts_enabled;box.setAttribute('aria-label','Alertas de '+p.name);sw.append(box,el('span',p.alerts_enabled?'Activas':'Desactivadas'));
+   box.addEventListener('change',async()=>{box.disabled=true;try{await api('/api/inventory/products',{action:box.checked?'alerts_on':'alerts_off',id:String(p.id)});toast(box.checked?'Alertas activadas.':'Alertas desactivadas para '+p.name+'.','success');centerAlerts(panel);}catch(error){notify(error.message);box.checked=!box.checked;box.disabled=false;}});
+   const acts=el('div',undefined,'ic-acts');acts.append(invBtn('Registrar entrada','package-plus',()=>{centerState.preset={item_id:p.id};centerGo('registrar');}),invIconBtn('Ver '+p.name,'eye',()=>centerProductDialog(p.id)));
+   return centerRow([['Producto',name],['Categoría',p.category],['Existencias',String(p.stock)],['Mínimo',String(p.min_stock)],['Alertas',sw],['Acciones',acts]]);}),'ic-alerts-table'));panel.append(sec);}
+ const off=active.filter(p=>!p.alerts_enabled);if(off.length){const p_=el('p','Alertas desactivadas en: '+off.map(p=>p.name).join(', ')+'.','inv-form-note');panel.append(p_);}
+ // Revisión de datos: no corrige nada sola; cada hallazgo indica dónde revisarlo.
+ const rev=el('section',undefined,'inv-card ic-card');rev.append(centerCardHead('Revisión de datos','circle-alert',review.findings.length?review.findings.length+' hallazgos':'Sin hallazgos'));
+ if(review.findings.length){const ul=el('ul',undefined,'ic-review');for(const f of review.findings){const li=el('li');li.dataset.level=f.level;li.append(invIcon(f.level==='error'?'circle-x':f.level==='aviso'?'triangle-alert':'info'),el('span',f.text));
+   if(f.kind==='costo')li.append(invBtn('Corregir costo','pencil',()=>centerCostDialog(f.movement_id,f.text,()=>centerAlerts(panel))));
+   if(f.kind==='licencia')li.append(button('Ver licencias',()=>centerGo('licencias'),'secondary'));if(f.kind==='marca')li.append(button('Ver marcas',()=>centerGo('categorias'),'secondary'));ul.append(li);}rev.append(ul);}
+ else rev.append(el('p','Existencias, costos, marcas y licencias sin observaciones.','ic-card-empty'));panel.append(rev);}
+// Corrección de costo auditada: el movimiento original no cambia; queda el motivo, quién, cuándo y el documento.
+function centerCostDialog(movementId,context,done){const dialog=invDialog('Corregir costo de una entrada'),{form,msg,field,fail,clear}=invForm('bank-form inv-sheet-form');
+ form.append(el('p',(context?context+' ':'')+'El movimiento original se conserva; la corrección queda en el Kardex con su motivo, tu usuario y la fecha, y el costo promedio se recalcula con el costo corregido.','inv-form-note'),invRequiredNote());
+ field('cost','Costo unitario correcto (USD, sin IVA)',{required:true,mode:'decimal',max:14});field('reason','Motivo de la corrección',{required:true,max:300,area:true,hint:'Ej.: costo según factura del proveedor.'});field('document','Documento relacionado',{max:80,hint:'Opcional: factura o comprobante de compra.'});
+ const save=el('button','Registrar corrección','primary');save.type='submit';form.append(msg,invDialogActions(dialog,save));dialog.append(form);form.elements.cost.focus();
+ form.addEventListener('submit',async event=>{event.preventDefault();clear();save.disabled=true;try{await api('/api/inventory/cost-correction',{movement_id:String(movementId),cost:form.elements.cost.value,reason:form.elements.reason.value,document:form.elements.document.value});toast('Costo corregido y registrado en el Kardex.','success');dialog.close();done&&done();}catch(error){fail(error);save.disabled=false;}});}
+
+// ---- Categorías y marcas: árbol compacto Categoría → Subcategoría → Marca, con menú contextual ----
+async function centerCategories(panel){const[tax,data]=await Promise.all([centerTaxonomy(true),api('/api/inventory/products')]);panel.replaceChildren();const kind=centerState.taxKind;
+ const switcher=el('div',undefined,'inv-filters');switcher.setAttribute('role','group');switcher.setAttribute('aria-label','Tipo de categoría');
+ for(const[key,label]of [['fisico','Productos físicos'],['licencia','Licencias digitales']]){const b=button(label,()=>{centerState.taxKind=key;centerCategories(panel);},'inv-filter');b.setAttribute('aria-pressed',String(kind===key));switcher.append(b);}
+ panel.append(invSectionHead('Categorías y marcas','Cada categoría tiene su prefijo de código interno (PCD-SSD-000001). Un prefijo usado no se reutiliza; las categorías y marcas no se eliminan: se desactivan.',invBtn('Nueva categoría','plus',()=>centerCategoryDialog(null,null,kind),'primary')),switcher);
+ const brandsBy={};for(const p of data.rows){const k=p.category_id;(brandsBy[k]=brandsBy[k]||{})[p.brand||'Sin marca']=((brandsBy[k]||{})[p.brand||'Sin marca']||0)+1;}
+ const families={};for(const f of tax.families){(families[f.category_id]=families[f.category_id]||[]).push(f);}
+ const tree=el('div',undefined,'ic-tree-table');tree.setAttribute('role','list');
+ const row=(cat,level,parent)=>{const r=el('div',undefined,'ic-tree-row');r.dataset.level=String(level);r.dataset.active=String(cat.active);r.setAttribute('role','listitem');
+  const name=el('div',undefined,'ic-tree-name');name.append(invIcon(level?'chevron-right':'tags'),el('strong',cat.name));if(!cat.active)name.append(invoiceChip('descartado','Inactiva'));
+  const prefix=el('code',cat.effective_prefix?'PCD-'+cat.effective_prefix:'—','ic-prefix');if(cat.inherited)prefix.title='Heredado de la categoría principal';
+  const brands=kind==='fisico'?Object.entries(brandsBy[cat.id]||{}):(families[cat.id]||[]).map(f=>[f.brand+' · '+f.name,f.editions.length]);
+  const chips=el('div',undefined,'ic-tree-brands');for(const[b,n]of brands.slice(0,8))chips.append(el('span',b+' ('+n+')','ic-tag'));if(brands.length>8)chips.append(el('span','+'+(brands.length-8),'ic-tag'));
+  const meta=el('small',[level?'':cat.children.length+' subcategorías',cat.products+' producto'+(cat.products===1?'':'s'),cat.kind==='fisico'?(cat.tracking==='serie'?'por serie':'a granel'):'',cat.next_code?'próximo '+cat.next_code:''].filter(Boolean).join(' · '),'ic-tree-meta');
+  r.append(name,prefix,meta,chips,centerMenu('Acciones de '+cat.name,[['Editar',()=>centerCategoryDialog(cat,parent,cat.kind)],!level&&['Nueva subcategoría',()=>centerCategoryDialog(null,cat,cat.kind)],
+   [cat.active?'Desactivar':'Activar',async()=>{try{await api('/api/inventory/categories',{action:cat.active?'deactivate':'activate',id:String(cat.id)});centerTax=null;renderInventoryCenter();}catch(error){notify(error.message);}},cat.active]]));return r;};
+ for(const cat of tax.categories.filter(c=>c.kind===kind)){tree.append(row(cat,0));for(const ch of cat.children)tree.append(row(ch,1,cat));}panel.append(tree);
+ // Marcas: buscador, filtro y contador de productos por marca.
+ const sec=el('section',undefined,'inv-card ic-card');sec.append(centerCardHead('Marcas','bookmark',tax.brands.length+' registradas'));const bar=el('div',undefined,'inv-toolbar ic-brand-bar');
+ const sbox=el('label',undefined,'inv-search'),q=el('input');sbox.append(invIcon('search'),q);q.type='search';q.placeholder='Buscar marca';q.setAttribute('aria-label','Buscar marca');
+ const filter=el('select');filter.setAttribute('aria-label','Filtrar marcas');for(const[v,t]of [['','Todas'],['activas','Activas'],['inactivas','Inactivas'],['con','Con productos'],['sin','Sin productos']])filter.add(new Option(t,v));
+ const add=invBtn('Nueva marca','plus',()=>centerBrandDialog());bar.append(sbox,filter,add);sec.append(bar);const list=el('div',undefined,'ic-brand-list');sec.append(list);
+ const paint=()=>{list.replaceChildren();const term=q.value.trim().toLowerCase();let n=0;for(const b of tax.brands){if(term&&!b.name.toLowerCase().includes(term))continue;const f=filter.value;
+   if(f==='activas'&&!b.active||f==='inactivas'&&b.active||f==='con'&&!b.products||f==='sin'&&b.products)continue;n++;
+   const item=el('div',undefined,'ic-brand');item.dataset.active=String(b.active);item.append(el('strong',b.name),el('span',b.products+' producto'+(b.products===1?'':'s'),'ic-muted'),
+    centerMenu('Acciones de la marca '+b.name,[['Editar',()=>centerBrandDialog(b)],[b.active?'Desactivar':'Activar',async()=>{try{await api('/api/inventory/brands',{action:b.active?'deactivate':'activate',id:String(b.id)});centerCategories(panel);}catch(error){notify(error.message);}},b.active]]));list.append(item);}
+  if(!n)list.append(el('p','Sin marcas con este filtro.','ic-card-empty'));};
+ q.addEventListener('input',paint);filter.addEventListener('change',paint);paint();panel.append(sec);
+ if(kind==='licencia'){const fam=el('section',undefined,'inv-card ic-card');fam.append(centerCardHead('Familias y ediciones','key-round','Categoría → Marca → Familia → Edición'));const ul=el('ul',undefined,'ic-mini');
+  for(const f of tax.families){const li=el('li'),r=el('div',undefined,'ic-family');r.dataset.active=String(f.active);r.append(el('strong',f.brand+' · '+f.name),el('span',f.editions.join(' · ')||'Sin ediciones'),centerMenu('Acciones de '+f.name,[['Editar',()=>centerFamilyDialog(f)]]));li.append(r);ul.append(li);}
+  fam.append(ul);const addF=invBtn('Nueva familia','plus',()=>centerFamilyDialog());addF.classList.add('ic-card-action');fam.append(addF);panel.append(fam);}}
+// ---- Catálogo: tabla con orden, filtros, paginación, columnas configurables y filas expandibles ----
+const centerColumns=[['sku','SKU'],['category','Categoría'],['brand','Marca'],['reserved','Reservadas'],['cost','Costo promedio'],['price','Precio de venta']];
+async function centerCatalog(panel){const s=centerState.catalog,data=await api('/api/inventory/products?'+new URLSearchParams({q:s.q,category:s.category,brand:s.brand,state:s.state}));panel.replaceChildren();
+ const shown=new Set(centerPref('catalog-cols',['sku','brand','cost','price']));
+ panel.append(invSectionHead('Catálogo de productos','Ficha comercial de cada modelo (SKU). Cada unidad conserva su serie original y su código interno. Las fichas no se eliminan: se desactivan.',invBtn('Nueva ficha','plus',()=>centerProductForm(null,()=>centerCatalog(panel)),'primary')));
+ const bar=el('div',undefined,'inv-toolbar ic-filters'),box=el('label',undefined,'inv-search'),search=el('input');box.append(invIcon('search'),search);search.type='search';search.placeholder='Nombre, SKU, modelo, marca, código interno o serie';search.value=s.q;search.maxLength=80;search.setAttribute('aria-label','Buscar productos');
+ let typing=null;search.addEventListener('input',()=>{clearTimeout(typing);typing=setTimeout(()=>{s.q=search.value.trim();s.page=1;centerCatalog(panel).then(()=>{const again=panel.querySelector('.ic-filters input[type=search]');again?.focus();again?.setSelectionRange(again.value.length,again.value.length);});},350);});
+ const cat=centerCategoryOptions(el('select'),{value:s.category}),brand=el('select'),state=el('select');cat.setAttribute('aria-label','Categoría');brand.setAttribute('aria-label','Marca');state.setAttribute('aria-label','Estado de stock');
+ brand.add(new Option('Todas las marcas',''));for(const b of centerTax.brands)brand.add(new Option(b.name,String(b.id)));brand.value=s.brand;
+ for(const[v,t]of [['','Todos los estados'],['normal','Normal'],['minimo','En el mínimo'],['critico','Crítico'],['agotado','Agotado'],['sin_alertas','Sin alertas'],['inactivo','Inactivos']])state.add(new Option(t,v));state.value=s.state;
+ for(const[node,key]of [[cat,'category'],[brand,'brand'],[state,'state']])node.addEventListener('change',()=>{s[key]=node.value;s.page=1;centerCatalog(panel);});
+ const cols=el('details',undefined,'ic-cols'),sum=el('summary');sum.append(invIcon('settings'),el('span','Columnas'));cols.append(sum);const colBox=el('div',undefined,'ic-cols-list');
+ for(const[key,label]of centerColumns){const l=el('label',undefined,'inv-cf'),c=el('input');c.type='checkbox';c.checked=shown.has(key);c.addEventListener('change',()=>{c.checked?shown.add(key):shown.delete(key);centerSetPref('catalog-cols',[...shown]);centerCatalog(panel);});l.append(c,el('span',label));colBox.append(l);}
+ cols.append(colBox);bar.append(box,cat,brand,state,cols);panel.append(bar);
+ if(!data.rows.length){panel.append(invEmpty('package',s.q||s.category||s.brand||s.state?'No hay productos con estos filtros':'Todavía no hay productos',s.q||s.category||s.brand||s.state?'Prueba con otra búsqueda o limpia los filtros.':'Crea la primera ficha o usa «Inventario inicial».'));return;}
+ const key={name:p=>p.name.toLowerCase(),sku:p=>p.sku,category:p=>p.category,brand:p=>p.brand,stock:p=>p.stock,reserved:p=>p.reserved,cost:p=>p.average_cost_cents,price:p=>p.price_cents,state:p=>['agotado','critico','minimo','normal'].indexOf(p.stock_state)};
+ const rows=[...data.rows].sort((a,b)=>{const x=key[s.sort](a),y=key[s.sort](b);return (x>y?1:x<y?-1:0)*s.dir;});const size=15,pages=Math.max(1,Math.ceil(rows.length/size));s.page=Math.min(s.page,pages);
+ const columns=[['name','Producto y modelo'],...centerColumns.filter(([k])=>shown.has(k)).map(([k,l])=>[k,l]),['stock','Existencias'],['state','Estado'],[null,'Acciones']];
+ const wrap=el('div',undefined,'ic-scroll'),table=el('table',undefined,'ic-table ic-catalog'),thead=el('thead'),hr=el('tr'),tbody=el('tbody');
+ for(const[k,label]of columns){const th=el('th');th.scope='col';if(k){const b=button('',()=>{s.dir=s.sort===k?-s.dir:1;s.sort=k;centerCatalog(panel);},'ic-sort');b.append(el('span',label),invIcon(s.sort===k?(s.dir>0?'chevron-up':'chevron-down'):'arrow-up-down'));th.append(b);th.setAttribute('aria-sort',s.sort===k?(s.dir>0?'ascending':'descending'):'none');}else th.textContent=label;hr.append(th);}thead.append(hr);
+ for(const p of rows.slice((s.page-1)*size,s.page*size)){const name=el('div',undefined,'ic-name');const toggle=invIconBtn('Ver detalle de '+p.name,'chevron-right',()=>expand());toggle.classList.add('ic-expand');toggle.setAttribute('aria-expanded','false');
+  const title=el('div');title.append(el('strong',p.name),el('small',[p.model,p.code,shown.has('category')?'':p.category].filter(Boolean).join(' · ')));if(!p.active)title.append(invoiceChip('descartado','Inactivo'));name.append(toggle,title);
+  const cell={sku:p.sku||'—',category:p.category,brand:p.brand||'—',reserved:String(p.reserved),cost:centerMoney(p.average_cost_cents),price:centerMoney(p.price_cents)};
+  const stock=el('div',undefined,'ic-stock');stock.dataset.state=p.stock_state;stock.append(el('b',String(p.stock)),el('small','mín. '+p.min_stock+(p.reserved?' · '+p.reserved+' res.':'')));
+  const st=invoiceChip(centerStateTone[p.stock_state],p.stock_state_label);if(!p.alerts_enabled)st.title='Alertas desactivadas';
+  const acts=el('div',undefined,'ic-acts');acts.append(invIconBtn('Ficha de '+p.name,'eye',()=>centerProductDialog(p.id)),centerMenu('Acciones de '+p.name,[['Registrar entrada',()=>{centerState.preset={item_id:p.id};centerGo('registrar');}],['Registrar salida',()=>centerExitDialog(p.id)],
+   ['Vender',()=>centerSellDialog(p.id)],['Reservar',()=>centerReserveDialog(p.id)],['Editar ficha',()=>centerProductForm(p,()=>centerCatalog(panel))]]));
+  const tr=centerRow([['Producto y modelo',name],...centerColumns.filter(([k])=>shown.has(k)).map(([k,l])=>[l,cell[k]]),['Existencias',stock],['Estado',st],['Acciones',acts]]);tr.dataset.state=p.stock_state;
+  const detail=el('tr',undefined,'ic-detail-row');detail.hidden=true;const td=el('td');td.colSpan=columns.length;detail.append(td);
+  const expand=async()=>{const open_=detail.hidden;detail.hidden=!open_;toggle.setAttribute('aria-expanded',String(open_));if(!open_||td.childElementCount)return;td.append(el('p','Cargando…','system-muted'));
+   try{const d=await api('/api/inventory/products/'+p.id+'/sheet');td.replaceChildren(centerExpanded(d));}catch(error){td.replaceChildren(el('p',error.message,'system-muted'));}};
+  tbody.append(tr,detail);}
+ table.append(thead,tbody);wrap.append(table);panel.append(wrap,centerPager(s.page,pages,rows.length,n=>{s.page=n;centerCatalog(panel);}));}
+function centerPager(page,pages,total,go_){const nav=el('nav',undefined,'ic-pager');nav.setAttribute('aria-label','Paginación');nav.append(el('span',total+' resultado'+(total===1?'':'s')+' · página '+page+' de '+pages,'ic-muted'));
+ const prev=button('Anterior',()=>go_(page-1),'secondary'),next=button('Siguiente',()=>go_(page+1),'secondary');prev.disabled=page<=1;next.disabled=page>=pages;nav.append(prev,next);return nav;}
+function centerExpanded(d){const box=el('div',undefined,'ic-expanded');const p=d.product;
+ const left=el('div');left.append(el('h4','Unidades'));if(d.units.length){const ul=el('ul',undefined,'ic-mini');for(const u of d.units.slice(0,8)){const li=el('li'),b=button('',()=>centerUnitDialog(u.id),'ic-hit');b.append(el('code',u.internal_code),el('span',(u.serial||'Sin serie')+' · '+(u.location||'sin ubicación')),invoiceChip(centerUnitTone[u.status],u.status_label));li.append(b);ul.append(li);}left.append(ul);}
+ else left.append(el('p',p.tracking==='serie'?'Sin unidades.':'A granel: '+p.stock+' en '+(p.location||'ubicación sin registrar')+'.','ic-muted'));
+ const mid=el('div');mid.append(el('h4','Entradas y garantías'));const dl=el('dl',undefined,'inv-facts');for(const[k,v]of [['Proveedor',[...new Set(d.entries.map(e=>e.supplier).filter(Boolean))].join(', ')||'—'],['Documentos',[...new Set(d.entries.map(e=>e.document).filter(Boolean))].join(', ')||'—'],
+  ['Garantía de PC-DOCTOR',p.warranty_store.label],['Garantía del fabricante',p.warranty_maker.label]]){const x=el('div');x.append(el('dt',k),el('dd',v));dl.append(x);}mid.append(dl);
+ const right=el('div');right.append(el('h4','Últimos movimientos'));const ul=el('ul',undefined,'ic-feed');for(const r of d.kardex.slice(0,4)){const li=el('li'),mv=el('span',r.label,'ic-move');mv.dataset.kind=r.kind;const b=el('div');b.append(el('strong',formatOrderDate(r.at)),el('small',r.actor));li.append(mv,b,el('b',r.entry?'+'+r.entry:r.exit?'−'+r.exit:''));ul.append(li);}right.append(ul);
+ box.append(left,mid,right);return box;}
+
+// ---- Ficha comercial del producto: Resumen · Unidades y series · Ventas y precios · Garantías · Kardex e historial ----
+function centerPercent(bp){return ((bp||0)/100).toLocaleString('es-EC',{maximumFractionDigits:2})+' %';}
+async function centerProductDialog(id,tab='resumen'){const dialog=invDialog('Producto',true);dialog.classList.add('ic-sheet');const body=el('div',undefined,'inv-body');body.append(el('p','Cargando…','empty-module'));dialog.append(body);
+ let d;try{d=await api('/api/inventory/products/'+id+'/sheet');}catch(error){body.replaceChildren(el('p',error.message,'empty-module'));return;}
+ const p=d.product,pr=d.pricing,refresh=(next=tab)=>{dialog.close();centerProductDialog(id,next);if(currentModule==='inventory'&&centerState.tab!=='panel')renderInventoryCenter();};
+ dialog.querySelector('h2').textContent=p.name;body.replaceChildren();
+ // Encabezado: imagen (si existe), marca y modelo, SKU, código del catálogo y disponibilidad.
+ const head=el('header',undefined,'ic-sheet-head'),pic=el('div',undefined,'ic-sheet-pic'),img=el('img');img.alt='';img.src='/api/catalog/'+p.catalog_id+'/image';img.loading='lazy';img.addEventListener('error',()=>{img.remove();pic.append(invIcon('image'));});pic.append(img);
+ const info=el('div');info.append(el('p',[p.brand,p.model].filter(Boolean).join(' · ')||'Sin marca ni modelo','ic-sheet-sub'));const tags=el('div',undefined,'bank-tags');
+ tags.append(invoiceChip(centerStateTone[p.stock_state],p.stock_state_label),el('span','SKU '+(p.sku||'—'),'ic-tag'),el('span',p.code||'Sin código de catálogo','ic-tag'),el('span',p.category,'ic-tag'));if(!p.active)tags.append(invoiceChip('descartado','Inactivo'));info.append(tags);head.append(pic,info);body.append(head);
+ body.append(invKpis([['boxes','Existencias físicas',String(p.stock),p.tracking==='serie'?'Unidades en existencia':'A granel','blue'],['lock','Reservadas',String(p.reserved),'Siguen en existencia','amber'],
+  ['circle-check','Disponibles',String(p.available),'Para vender o usar','green'],['circle-dollar-sign','Valor del inventario',centerMoney(p.value_cents),'Costo prom. '+centerMoney(pr.cost_cents),'magenta']]));
+ if(d.alerts.length){const box=el('div',undefined,'ic-sheet-alerts');for(const a of d.alerts){const row=el('p');row.append(invIcon('circle-alert'),el('span',a.text));const go_={price:'ventas',warranty_store:'garantias',warranty_maker:'garantias',cost:'kardex',location:'unidades'}[a.field];
+   if(go_)row.append(button('Completar',()=>show(go_),'ic-link'));box.append(row);}body.append(box);}
+ const tabs=el('div',undefined,'inv-tabs ic-sheet-tabs'),pane=el('div',undefined,'ic-sheet-pane');tabs.setAttribute('role','tablist');tabs.setAttribute('aria-label','Secciones de la ficha');
+ const sections=[['resumen','Resumen','layout-dashboard'],['unidades',p.tracking==='serie'?'Unidades y series':'Existencias','scan-barcode'],['ventas','Ventas y precios','hand-coins'],['garantias','Garantías','shield-check'],['kardex','Kardex e historial','scroll-text']];
+ const show=key=>{tab=key;for(const b of tabs.children){const on=b.dataset.tab===key;b.setAttribute('aria-selected',String(on));b.tabIndex=on?0:-1;}pane.replaceChildren(centerSheetPane(key,d,refresh,dialog));};
+ for(const[key,label,icon]of sections){const b=button('',()=>show(key),'inv-tab');b.dataset.tab=key;b.setAttribute('role','tab');b.append(invIcon(icon),el('span',label));tabs.append(b);}
+ tabs.addEventListener('keydown',event=>{const all=[...tabs.children],i=all.indexOf(document.activeElement),n={ArrowRight:i+1,ArrowLeft:i-1}[event.key];if(i<0||n===undefined)return;event.preventDefault();const t=all[(n+all.length)%all.length];t.focus();t.click();});
+ body.append(tabs,pane);show(tab);}
+function centerFacts(pairs){const dl=el('dl',undefined,'inv-facts ic-facts');for(const[k,v]of pairs){const x=el('div');x.append(el('dt',k),el('dd',v instanceof Node?'':String(v??'—')));if(v instanceof Node)x.lastChild.append(v);dl.append(x);}return dl;}
+function centerSheetPane(key,d,refresh,dialog){const p=d.product,pr=d.pricing,box=el('div',undefined,'ic-pane');
+ if(key==='resumen'){box.append(centerFacts([['Categoría',p.category],['Marca',p.brand||'—'],['Modelo',p.model||'—'],['SKU',p.sku||'—'],['Código del catálogo',p.code||'—'],['Control',p.tracking_label],
+   ['Ubicación',p.location||(p.tracking==='serie'?'Por unidad':'Sin registrar')],['Existencia mínima',String(p.min_stock)+(p.alerts_enabled?'':' · alertas desactivadas')],['Costo promedio',centerMoney(pr.cost_cents)],['Precio de venta',centerMoney(pr.price_cents)],
+   ['Margen bruto estimado',pr.net_cents?centerMoney(pr.margin_cents)+' ('+centerPercent(pr.margin_bp)+')':'Sin precio'],['Descripción',p.description||'—']]));
+  const acts=el('div',undefined,'inv-actions');acts.append(invBtn('Editar ficha','pencil',()=>{dialog.close();centerProductForm(p,()=>centerProductDialog(p.id));},'primary'),invBtn('Registrar entrada','package-plus',()=>{dialog.close();centerState.preset={item_id:p.id};centerGo('registrar');}),
+   invBtn('Trasladar','map-pin',()=>{dialog.close();centerTransferDialog(p.id);}),invBtn(p.alerts_enabled?'Desactivar alertas':'Activar alertas','triangle-alert',async()=>{try{await api('/api/inventory/products',{action:p.alerts_enabled?'alerts_off':'alerts_on',id:String(p.id)});refresh('resumen');}catch(error){notify(error.message);}}));
+  if(p.tracking==='granel')acts.append(invBtn('Etiquetas','printer',()=>centerLabels({item:p.id,copies:Math.max(1,p.stock)})));box.append(acts);return box;}
+ if(key==='unidades'){if(p.tracking!=='serie'){box.append(centerFacts([['Existencias',String(p.stock)],['Reservadas',String(p.reserved)],['Ubicación',p.location||'Sin registrar']]));return box;}
+  if(!d.units.length){box.append(el('p','Todavía no hay unidades.','ic-card-empty'));return box;}
+  const picked=new Set(),bar=el('div',undefined,'ic-selbar'),count=el('span','Ninguna unidad seleccionada'),print=invBtn('Imprimir etiquetas','printer',()=>centerLabels({units:[...picked]}));print.disabled=true;bar.append(count,print);
+  const sync=()=>{count.textContent=picked.size?picked.size+' seleccionada'+(picked.size===1?'':'s'):'Ninguna unidad seleccionada';print.disabled=!picked.size;};
+  box.append(bar,centerTable(['','Código interno','Serie original','Estado','Ubicación','Costo unitario','Garantía','Acciones'],d.units.map(u=>{const c=el('input');c.type='checkbox';c.setAttribute('aria-label','Seleccionar '+u.internal_code);c.addEventListener('change',()=>{c.checked?picked.add(u.id):picked.delete(u.id);sync();});
+   const a=el('div',undefined,'ic-acts');a.append(invIconBtn('Historial de '+u.internal_code,'history',()=>centerUnitDialog(u.id)),invIconBtn('Etiqueta de '+u.internal_code,'printer',()=>centerLabels({units:[u.id]})));if(!u.serial)a.append(invIconBtn('Agregar la serie a '+u.internal_code,'scan-barcode',()=>centerSerialDialog(u,()=>refresh('unidades'))));
+   const w=u.sold_at?(u.store_warranty_to?'Hasta '+dashboardDate(u.store_warranty_to):'Comienza con la entrega'):'Al vender';
+   return centerRow([['Seleccionar',c],['Código interno',el('code',u.internal_code)],['Serie original',u.serial||el('em','Sin serie','ic-muted')],['Estado',invoiceChip(centerUnitTone[u.status],u.status_label)],['Ubicación',u.location||'—'],['Costo unitario',centerMoney(u.unit_cost_cents)],['Garantía',w],['Acciones',a]]);}),'ic-units'));return box;}
+ if(key==='ventas'){const grid=el('div',undefined,'ic-price-grid');for(const[k,v,tone]of [['Costo promedio de adquisición',centerMoney(pr.cost_cents)],['Precio de venta sin IVA',centerMoney(pr.net_cents)],['IVA aplicable',pr.tax_rate_bp?centerPercent(pr.tax_rate_bp)+' · '+centerMoney(pr.tax_cents):'Sin IVA'],
+   ['Precio final con impuestos',centerMoney(pr.price_cents),'strong'],['Margen bruto estimado',pr.net_cents?centerMoney(pr.margin_cents)+' · '+centerPercent(pr.margin_bp):'Sin precio',pr.margin_cents<0?'bad':''],['Descuento autorizado',centerPercent(pr.max_discount_bp)],['Precio mínimo permitido',pr.min_price_cents?centerMoney(pr.min_price_cents):'Sin mínimo']]){
+   const c=el('div',undefined,'ic-price');if(tone)c.dataset.tone=tone;c.append(el('small',k),el('strong',v));grid.append(c);}box.append(grid);
+  const acts=el('div',undefined,'inv-actions');acts.append(invBtn('Vender producto','hand-coins',()=>{dialog.close();centerSellDialog(p.id);},'primary'),invBtn('Reservar producto','lock',()=>{dialog.close();centerReserveDialog(p.id);}),invBtn('Configurar precios','badge-percent',()=>centerPricingDialog(p,pr,()=>refresh('ventas'))));
+  const fact=button('Enviar a facturación',()=>{},'secondary');fact.disabled=true;fact.title='En desarrollo: las facturas se generan hoy desde órdenes y ventas de licencias.';acts.append(fact);box.append(acts);
+  if(d.reservations.length){box.append(el('h4','Reservas activas'));box.append(centerReservationList(d.reservations,()=>refresh('ventas')));}
+  box.append(el('h4','Historial de ventas'));
+  if(d.sales.length)box.append(centerTable(['Fecha','Cliente','Documento','Serie vendida','Precio','Estado','Garantía comercial'],d.sales.map(s=>centerRow([['Fecha',formatOrderDate(s.at)],['Cliente',s.client||'—'],['Documento',s.document||'—'],
+   ['Serie vendida',s.units.map(u=>u.serial||u.internal_code).join(', ')||String(s.quantity)+' u.'],['Precio',s.price_cents!=null?centerMoney(s.price_cents)+(s.discount_cents?' (−'+centerMoney(s.discount_cents)+')':''):'—'],
+   ['Estado',invoiceChip(s.status==='devuelta'?'descartado':'autorizado',s.status==='devuelta'?'Devuelta':'Vendida')],['Garantía comercial',s.warranty_to?'Hasta '+dashboardDate(s.warranty_to):'—']]))));
+  else box.append(el('p','Sin ventas registradas.','ic-card-empty'));return box;}
+ if(key==='garantias'){const cfg=el('div',undefined,'ic-warranty-cfg');for(const[k,title]of [['warranty_store','Garantía de PC-DOCTOR'],['warranty_maker','Garantía del fabricante']]){const w=p[k],c=el('div',undefined,'ic-coverage');c.append(el('strong',title),
+   el('small','Duración: '+w.label),el('small','Comienza: '+(w.qty?centerTax.starts[w.from].toLowerCase():'—')));if(k==='warranty_maker')c.append(el('small','Condiciones: '+(p.warranty_terms||'sin registrar')));cfg.append(c);}box.append(cfg);
+  const edit=invBtn('Configurar garantías','pencil',()=>{dialog.close();centerProductForm(p,()=>centerProductDialog(p.id,'garantias'));});box.append(edit);
+  const sold=d.units.filter(u=>u.sold_at);box.append(el('h4','Unidades vendidas'));
+  if(sold.length){for(const u of sold){const row=el('div',undefined,'inv-doc-unit');row.append(el('strong',u.internal_code+(u.serial?' · S/N '+u.serial:'')+(u.client?' · '+u.client:'')));
+    const w=el('div',undefined,'ic-warranties');const cov=(from,to,title,state)=>{if(!to)return centerCoverage(title,{state:state});const a=new Date(from),b=new Date(to),t=new Date(),total=Math.max(1,(b-a)/864e5),left=Math.round((b-t)/864e5);
+     return centerCoverage(title,{state:left<0?'vencida':left<=30?'por_vencer':'vigente',tone:left<0?'gris':left/total>.5?'verde':left/total>.2?'amarillo':'rojo',from,to,days_left:left,remaining:Math.max(0,Math.min(1,left/total))});};
+    w.append(cov(u.store_warranty_from,u.store_warranty_to,'Garantía de PC-DOCTOR',u.delivered_at?'sin_garantia':'pendiente_entrega'),cov(u.maker_warranty_from,u.maker_warranty_to,'Garantía del fabricante','sin_garantia'));row.append(w);box.append(row);}}
+  else box.append(el('p','Las garantías se fechan al vender o entregar cada unidad, según su política; nunca antes.','ic-card-empty'));return box;}
+ box.append(el('h4','Entradas'));
+ box.append(centerTable(['Fecha','Motivo','Cant.','Costo','Proveedor / documento','Acciones'],d.entries.map(e=>{const cost=el('span',centerMoney(e.cost_cents));if(!e.cost_cents)cost.append(' ',invoiceChip('pendiente','Costo pendiente'));if(e.corrected)cost.append(' ',invoiceChip('enviado','Corregido'));
+  const a=el('div',undefined,'ic-acts');if(e.correctable)a.append(invBtn('Corregir costo','pencil',()=>centerCostDialog(e.id,'Entrada del '+formatOrderDate(e.at)+' ('+e.reason_label+', costo registrado '+centerMoney(e.original_cost_cents)+').',()=>refresh('kardex'))));
+  return centerRow([['Fecha',formatOrderDate(e.at)],['Motivo',e.reason_label],['Cant.',String(e.quantity)],['Costo',cost],['Proveedor / documento',[e.supplier,e.document].filter(Boolean).join(' · ')||'—'],['Acciones',a]]);})));
+ box.append(el('h4','Kardex del producto'));box.append(d.kardex.length?centerKardexTable(d.kardex,true):el('p','Sin movimientos.','ic-card-empty'));
+ const all=invBtn('Abrir en el Kardex','scroll-text',()=>{dialog.close();centerState.kardex={...centerState.kardex,item_id:String(p.id),page:1};centerGo('kardex');});box.append(all);return box;}
+function centerPricingDialog(p,pr,done){const dialog=invDialog('Precios de '+p.name),{form,msg,field,fail,clear}=invForm('bank-form inv-sheet-form');form.append(el('p','El precio de venta incluye IVA'+(pr.tax_rate_bp?' ('+centerPercent(pr.tax_rate_bp)+')':'')+'. Una venta por debajo del mínimo, con precio $0,00 o con más descuento del autorizado exige una autorización administrativa expresa.','inv-form-note'),invRequiredNote());
+ const fmt=c=>(c/100).toFixed(2).replace('.',',');field('price','Precio de venta (IVA incluido)',{required:true,mode:'decimal',max:14,value:pr.price_cents?fmt(pr.price_cents):''});field('min_price','Precio mínimo permitido',{mode:'decimal',max:14,value:pr.min_price_cents?fmt(pr.min_price_cents):'',hint:'Vacío o 0: sin mínimo.'});
+ field('max_discount','Descuento máximo autorizado (%)',{mode:'decimal',max:6,value:pr.max_discount_bp?String(pr.max_discount_bp/100).replace('.',','):'0'});
+ const save=el('button','Guardar precios','primary');save.type='submit';form.append(msg,invDialogActions(dialog,save));dialog.append(form);form.elements.price.focus();
+ form.addEventListener('submit',async event=>{event.preventDefault();clear();save.disabled=true;try{await api('/api/inventory/products',{action:'pricing',id:String(p.id),price:form.elements.price.value,min_price:form.elements.min_price.value,max_discount:form.elements.max_discount.value});toast('Precios guardados.','success');dialog.close();done&&done();}catch(error){fail(error);save.disabled=false;}});}
+function centerClientField(form,field,msg){const client=field('client_id','Cliente',{options:[['','Sin cliente']]}),box=el('label',undefined,'inv-field'),find=el('input');find.placeholder='Buscar por nombre o cédula';find.setAttribute('aria-label','Buscar cliente');box.append(el('span','Buscar cliente'),find);client.closest('.inv-field').before(box);
+ let timer=null;find.addEventListener('input',()=>{clearTimeout(timer);timer=setTimeout(async()=>{const q=find.value.trim();if(q.length<2)return;try{const data=await api('/api/clients?q='+encodeURIComponent(q)+'&size=10');client.replaceChildren(new Option('Sin cliente',''));for(const c of data.rows)client.add(new Option(c.name+(c.identification?' · '+c.identification:''),String(c.id)));if(data.rows.length)client.selectedIndex=1;}catch(error){msg.textContent=error.message;}},300);});
+ return{client,box};}
+// Venta desde la ficha: unidad específica (con su serie), cliente, precio y descuento autorizados; confirma la salida del inventario.
+async function centerSellDialog(itemId){const dialog=invDialog('Vender producto',true),{form,msg,field,fail,clear}=invForm('bank-form inv-sheet-form ic-sell');dialog.append(form);form.append(invRequiredNote());
+ let d;try{d=await api('/api/inventory/products/'+itemId+'/sheet');}catch(error){form.append(el('p',error.message,'inv-warn'));return;}const p=d.product,pr=d.pricing;dialog.querySelector('h2').textContent='Vender · '+p.name;
+ if(!p.available){form.append(el('p','No hay unidades disponibles: el producto está agotado o todo lo que queda está reservado.','inv-warn'));return;}
+ const units=el('div',undefined,'ic-units-box'),qty=p.tracking==='granel'?field('quantity','Cantidad',{required:true,mode:'numeric',max:6,value:'1'}):null;form.append(units);
+ const chosen=p.tracking==='serie'?centerUnitPicker(units,d.units.filter(u=>u.status==='disponible'),{scanLabel:'Unidad que se vende'}):null;
+ const{client}=centerClientField(form,field,msg);const fmt=c=>(c/100).toFixed(2).replace('.',',');
+ const price=field('unit_price','Precio por unidad (IVA incluido)',{required:true,mode:'decimal',max:14,value:pr.price_cents?fmt(pr.price_cents):'',hint:'Precio de lista: '+centerMoney(pr.price_cents)+(pr.min_price_cents?' · mínimo '+centerMoney(pr.min_price_cents):'')});
+ const discount=field('discount','Descuento (%)',{mode:'decimal',max:6,value:'0',hint:'Autorizado hasta '+centerPercent(pr.max_discount_bp)+'.'});field('document','Documento (nota de venta o factura)',{max:80});
+ const today=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Guayaquil'}).format(new Date());const sold=field('sold_at','Fecha de la venta',{type:'date',value:today});sold.max=today;
+ const dBox=el('label',undefined,'inv-cf'),delivered=el('input');delivered.type='checkbox';delivered.checked=true;dBox.append(delivered,el('span','Entregado al cliente hoy (la garantía que cuenta desde la entrega empieza ahora)'));form.append(dBox);
+ const total=el('p','','ic-summary');total.setAttribute('aria-live','polite');form.append(total);
+ const auth=el('fieldset',undefined,'inv-group ic-auth');auth.hidden=true;const legend=el('legend');legend.append(invIcon('lock'),el('span','Autorización administrativa'));auth.append(legend);form.append(auth);
+ const ok=el('input');ok.type='checkbox';ok.name='authorize';const okL=el('label',undefined,'inv-cf');okL.append(ok,el('span','Autorizo expresamente esta venta'));auth.append(okL);field('authorization','Motivo de la autorización',{max:200,into:auth,hint:'Al menos 10 caracteres. Queda registrado con tu usuario.'});
+ const recalc=()=>{const c=invCents(price.value),pct=Number(String(discount.value||'0').replace(',','.'));if(Number.isNaN(c)||Number.isNaN(pct)){total.textContent='';return;}const n=p.tracking==='serie'?(chosen?.size||0):Number(qty.value)||0,disc=Math.round(c*pct/100),final=c-disc;
+  const needs=final<=0||(pr.min_price_cents&&final<pr.min_price_cents)||pct*100>pr.max_discount_bp;auth.hidden=!needs;total.textContent='Precio final por unidad: '+centerMoney(final)+(n?' · total '+centerMoney(final*n)+' ('+n+')':'')+(needs?' · requiere autorización':'');};
+ for(const n of [price,discount,qty].filter(Boolean))n.addEventListener('input',recalc);units.addEventListener('change',recalc);recalc();
+ const save=el('button','Confirmar venta y salida','primary');save.type='submit';form.append(msg,invDialogActions(dialog,save));const key=invKey('vta');
+ form.addEventListener('submit',async event=>{event.preventDefault();clear();const body={item_id:String(p.id),reason:'venta',client_id:client.value,unit_price:price.value,discount:discount.value,document:form.elements.document.value,sold_at:sold.value,
+   delivered:delivered.checked?'1':'0',authorize:ok.checked?'1':'0',authorization:form.elements.authorization.value,request_key:key};
+  if(p.tracking==='serie'){if(!chosen.size){msg.textContent='Elige o escanea la unidad que se vende.';return;}body.unit_ids=JSON.stringify([...chosen]);}else body.quantity=qty.value;
+  save.disabled=true;try{await api('/api/inventory/exit',body);toast('Venta registrada: salida del inventario confirmada.','success');dialog.close();centerProductDialog(p.id,'ventas');}catch(error){if(error.fields?.authorization)auth.hidden=false;fail(error);save.disabled=false;}});}
+async function centerReserveDialog(itemId){const dialog=invDialog('Reservar producto'),{form,msg,field,fail,clear}=invForm('bank-form inv-sheet-form');form.append(el('p','La reserva mantiene la unidad en existencia y solo reduce lo disponible para vender.','inv-form-note'),invRequiredNote());dialog.append(form);let product=null,chosen=null;
+ const units=el('div',undefined,'ic-units-box'),qty=field('quantity','Cantidad',{required:true,mode:'numeric',max:6,value:'1'});const{client}=centerClientField(form,field,msg);
+ field('reference','Motivo (orden, presupuesto, proforma o cliente)',{required:true,max:80});field('order_code','Número de orden',{max:40,hint:'Opcional: enlaza la reserva con la orden.'});
+ const today=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Guayaquil'}).format(new Date());const exp=field('expires_at','Vence el',{type:'date',hint:'Opcional. Una reserva vencida se señala para liberarla.'});exp.min=today;field('note','Observación',{area:true,max:300});
+ const top=el('div',undefined,'ic-exit-product');form.prepend(top);const pickField=(name,label,opts)=>{const n=field(name,label,opts);top.append(n.closest('.inv-field'));return n;};
+ await centerItemPicker(pickField,itemId,async id=>{units.replaceChildren();product=null;if(!id)return;const data=await api('/api/inventory/products/'+id);product=data.product;qty.closest('.inv-field').hidden=product.tracking==='serie';
+  if(product.tracking==='serie')chosen=centerUnitPicker(units,data.units.filter(u=>u.status==='disponible'));});top.after(units);
+ const save=el('button','Reservar','primary');save.type='submit';form.append(msg,invDialogActions(dialog,save));
+ form.addEventListener('submit',async event=>{event.preventDefault();clear();if(!product){fail({message:'Elige el producto.',fields:{item_id:'Producto obligatorio.'}});return;}const body=Object.fromEntries(new FormData(form));body.action='reserve';body.client_id=client.value;
+  if(product.tracking==='serie')body.unit_ids=JSON.stringify([...(chosen||[])]);save.disabled=true;try{await api('/api/inventory/reservations',body);toast('Reserva registrada: no descuenta existencias.','success');dialog.close();if(currentModule==='inventory')renderInventoryCenter();}catch(error){fail(error);if(error.fields?.units)msg.textContent=error.message;save.disabled=false;}});}
+function centerReservationList(rows,refresh){const ul=el('ul',undefined,'ic-mini');for(const r of rows){const li=el('li'),row=el('div',undefined,'ic-family');
+ row.append(el('strong',r.product+' · '+r.quantity+(r.expired?' · vencida':'')),el('span',[r.reference,r.client,r.order_code&&'orden '+r.order_code,r.units.map(u=>u.internal_code).join(', '),r.expires_at&&'vence '+dashboardDate(r.expires_at),formatOrderDate(r.created_at)].filter(Boolean).join(' · ')),
+  invBtn('Liberar','undo-2',async()=>{if(await confirmClose({title:'¿Liberar la reserva?',text:'Las existencias vuelven a estar disponibles. La reserva queda en el Kardex.',keep:'Mantener',discard:'Liberar',plain:true})!=='discard')return;try{await api('/api/inventory/reservations',{action:'release',id:String(r.id)});toast('Reserva liberada.','success');refresh();}catch(error){notify(error.message);}}));
+ if(r.expired)row.dataset.expired='true';li.append(row);ul.append(li);}return ul;}
+
+// ---- Registrar mercadería e inventario inicial: asistente compacto de 5 pasos (lector de códigos USB incluido) ----
+async function centerRegister(panel,mode){const initial=mode==='inicial',preset=centerState.preset||{};centerState.preset=null;
+ let[products,suppliers]=await Promise.all([api('/api/inventory/products').then(d=>d.rows.filter(p=>p.active)),api('/api/inventory/suppliers').then(d=>d.rows.filter(s=>s.active)).catch(()=>[])]);panel.replaceChildren();
+ panel.append(invSectionHead(initial?'Inventario inicial':'Registrar mercadería',initial?'Mercadería que ya tienes: cada guardado genera el movimiento de apertura del Kardex y los códigos internos de las unidades.':'Entradas por compra o ajuste autorizado, con proveedor, documento, costo e impuestos.'));
+ const key=invKey(initial?'ini':'ent'),{form,msg,field,fail,clear}=invForm('ic-wizard');form.dataset.key=key;
+ const stepper=el('ol',undefined,'ic-stepper');const names=['Producto','Unidades','Datos comerciales','Garantías','Confirmación'];
+ names.forEach((n,i)=>{const li=el('li');li.append(el('b',String(i+1)),el('span',n));stepper.append(li);});form.append(stepper,invRequiredNote());
+ const steps=names.map((n,i)=>{const box=el('fieldset',undefined,'inv-group ic-step'),legend=el('legend');legend.append(el('b',String(i+1)),el('span',n));box.append(legend);box.hidden=i>0;form.append(box);return box;});
+ let current=0;const go_=n=>{current=n;steps.forEach((s,i)=>{s.hidden=i!==n;});[...stepper.children].forEach((li,i)=>{li.dataset.state=i<n?'done':i===n?'current':'todo';li.setAttribute('aria-current',i===n?'step':'false');});
+  back.hidden=n===0;next.hidden=n===steps.length-1;save.hidden=n!==steps.length-1;if(n===4)paintConfirm();(steps[n].querySelector('input:not([type=hidden]):not([hidden]),select')||steps[n]).focus?.();};
+ // 1. Producto: categoría, subcategoría, marca y modelo existente o producto nuevo.
+ const s1=steps[0],cat=centerCategoryOptions(field('filter_category','Categoría o subcategoría',{options:[],into:s1}),{blank:'Todas las categorías',value:''});
+ const brandF=field('filter_brand','Marca',{options:[['','Todas las marcas'],...centerTax.brands.filter(b=>b.active).map(b=>[String(b.id),b.name])],into:s1});
+ const mode2=el('div',undefined,'inv-filters');mode2.setAttribute('role','group');mode2.setAttribute('aria-label','Producto existente o nuevo');s1.append(mode2);
+ const pick=field('item_id','Modelo existente',{required:true,options:[],into:s1});const fresh=el('div',undefined,'ic-fresh');fresh.hidden=true;s1.append(fresh);
+ let creating=false,freshFields=null;const freshForm=invForm('ic-fresh-fields');
+ const paintPick=()=>{const c=cat.value,ids=c?[c,...(centerTax.categories.find(x=>String(x.id)===c)?.children||[]).map(x=>String(x.id))]:null;pick.replaceChildren(new Option(products.length?'Selecciona…':'No hay fichas: crea una nueva',''));
+  for(const p of products)if((!ids||ids.includes(String(p.category_id)))&&(!brandF.value||String(p.brand_id)===brandF.value))pick.add(new Option(p.name+(p.sku?' · '+p.sku:'')+' ('+(p.tracking==='serie'?'por serie':'a granel')+')',String(p.id)));if(preset.item_id)pick.value=String(preset.item_id);};
+ const setMode=nextMode=>{creating=nextMode;for(const b of mode2.children)b.setAttribute('aria-pressed',String(b.dataset.mode===(nextMode?'new':'old')));pick.closest('.inv-field').hidden=nextMode;pick.required=!nextMode;fresh.hidden=!nextMode;
+  if(nextMode&&!freshFields){freshFields=centerProductFields(fresh,(name,label,opts={})=>freshForm.field(name,label,{...opts,into:opts.into||fresh}),null,cat.value);freshFields.tracking.addEventListener('change',paintUnits);
+   for(const n of fresh.querySelectorAll('.ic-warranty'))s4.append(n);for(const n of ['price','location'].map(k=>fresh.querySelector('[name='+k+']')?.closest('.inv-field')))n?.remove();}
+  if(nextMode&&freshFields&&cat.value){freshFields.cat.value=cat.value;freshFields.cat.dispatchEvent(new Event('change'));}paintUnits();paintWarranty();};
+ for(const[m,label]of [['old','Modelo existente'],['new','Producto nuevo']]){const b=button(label,()=>setMode(m==='new'),'inv-filter');b.dataset.mode=m;mode2.append(b);}
+ cat.addEventListener('change',()=>{paintPick();if(creating&&freshFields){freshFields.cat.value=cat.value;freshFields.cat.dispatchEvent(new Event('change'));}paintUnits();});brandF.addEventListener('change',paintPick);pick.addEventListener('change',()=>{paintUnits();paintWarranty();paintCommercial();});
+ // 2. Unidades: lector de códigos (USB como teclado) o cantidad.
+ const s3=steps[1],scanWrap=el('div',undefined,'ic-scan'),scanInput=el('input'),scanAdd=invBtn('Agregar','plus',()=>addSerial(scanInput.value)),bare=invBtn('Agregar sin serie','plus',()=>addSerial('',true)),list=el('ul',undefined,'ic-pending'),counter=el('p','','ic-count');
+ scanInput.type='text';scanInput.autocomplete='off';scanInput.spellcheck=false;scanInput.placeholder='Escanea la serie (el lector envía Enter) o escríbela';scanInput.setAttribute('aria-label','Serie original');scanInput.maxLength=60;
+ const scanLabel=el('label',undefined,'inv-search ic-scan-input');scanLabel.append(invIcon('scan-barcode'),scanInput);scanWrap.append(scanLabel,scanAdd,bare);const qty=field('quantity','Cantidad',{mode:'numeric',max:6,value:'1',required:true,into:s3});
+ const scanNote=el('p','','inv-form-note ic-scan-note');scanNote.setAttribute('role','status');s3.append(scanWrap,scanNote,list,counter);const pending=[];
+ const currentProduct=()=>products.find(p=>String(p.id)===pick.value);
+ const currentTracking=()=>creating?(freshFields?.tracking.value||'serie'):(currentProduct()?.tracking||'serie');
+ function paintUnits(){const serial=currentTracking()==='serie';scanWrap.hidden=!serial;list.hidden=!serial;counter.hidden=!serial;qty.closest('.inv-field').hidden=serial;qty.required=!serial;
+  s3.querySelector('.ic-step-note')?.remove();s3.querySelector('legend').after(el('p',serial?'Cada unidad recibe su código interno al guardar. Si el fabricante no puso serie, usa «Agregar sin serie».':'Producto a granel: indica la cantidad, sin serializar cada unidad.','inv-form-note ic-step-note'));paintList();}
+ function paintList(){list.replaceChildren();pending.forEach((s,i)=>{const li=el('li'),drop=invIconBtn('Quitar '+(s||'la unidad sin serie'),'x',()=>{pending.splice(i,1);paintList();scanInput.focus();});li.append(el('b',String(i+1)),el('code',s||'Sin serie (solo código interno)'),el('span','Código al guardar','ic-muted'),drop);list.append(li);});
+  counter.textContent=pending.length?pending.length+' unidad'+(pending.length===1?'':'es')+' por registrar':'Todavía no agregaste unidades.';}
+ async function addSerial(raw,allowEmpty=false){const value=String(raw||'').replace(/[\u0000-\u001f\u007f]/g,'').trim();scanNote.textContent='';scanNote.dataset.kind='';
+  if(!value&&!allowEmpty){scanInput.focus();return;}
+  if(value){const dupe=pending.some(p=>p&&p.replace(/\s+/g,'').toUpperCase()===value.replace(/\s+/g,'').toUpperCase());if(dupe){scanNote.textContent='La serie '+value+' ya está en esta lista.';scanNote.dataset.kind='error';scanInput.select();return;}
+   try{const check=await api('/api/inventory/serial-check?serial='+encodeURIComponent(value));if(check.exists){scanNote.textContent='Serie duplicada: '+value+' ya está registrada como '+check.unit.internal_code+' · '+check.unit.name+'.';scanNote.dataset.kind='error';scanInput.select();return;}}
+   catch(error){scanNote.textContent=error.message;scanNote.dataset.kind='error';return;}}
+  if(pending.length>=300){scanNote.textContent='Máximo 300 unidades por ingreso.';scanNote.dataset.kind='error';return;}
+  pending.push(value);scanInput.value='';scanNote.textContent=value?'Serie '+value+' agregada.':'Unidad sin serie agregada.';scanNote.dataset.kind='ok';paintList();scanInput.focus();}
+ scanInput.addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();addSerial(scanInput.value);}});
+ // 3. Datos comerciales.
+ const s4c=steps[2];if(!initial)field('reason','Motivo del ingreso',{required:true,options:[['compra','Compra o ingreso de mercadería'],['ajuste_entrada','Ajuste autorizado (entrada)']],into:s4c});
+ field('supplier_id','Proveedor',{options:[['',suppliers.length?'Sin proveedor':'No hay proveedores (Facturación › Proveedores)'],...suppliers.map(s=>[String(s.id),s.name])],into:s4c});
+ field('document','Documento de compra',{max:80,into:s4c,hint:'Ej.: factura 001-001-000000123.'});
+ const cost=field('cost','Costo unitario (USD, sin IVA)',{required:true,mode:'decimal',max:14,into:s4c,hint:'Obligatorio. Escribe 0 solo si no tuvo costo.'});
+ field('tax','IVA del costo',{options:[['15','15 %'],['0','0 %']],into:s4c});const priceIn=field('price','Precio de venta (IVA incluido)',{mode:'decimal',max:14,into:s4c,hint:'Actualiza el precio de la ficha.'});
+ const where=field('location','Ubicación física',{max:80,into:s4c,hint:'Ej.: Bodega A, estante 2.'});field('note','Observación',{area:true,max:300,into:s4c});
+ const paintCommercial=()=>{const p=currentProduct();if(p&&!creating&&!priceIn.dataset.touched)priceIn.value=p.price_cents?(p.price_cents/100).toFixed(2).replace('.',','):'';};priceIn.addEventListener('input',()=>{priceIn.dataset.touched='1';});
+ // 4. Garantías (de la ficha nueva o de la existente).
+ const s4=steps[3],warrantyHolder=el('div',undefined,'ic-warranty-holder');s4.append(warrantyHolder);let existingW=null;
+ const paintWarranty=()=>{if(creating){warrantyHolder.replaceChildren();if(existingW){existingW.remove();existingW=null;}return;}const p=currentProduct();warrantyHolder.replaceChildren();if(!p)return;
+  existingW=el('div',undefined,'ic-fresh');centerWarrantyFields((n,l,o={})=>field(n,l,{...o,into:o.into||existingW}),existingW,'warranty_store','Garantía de PC-DOCTOR',p.warranty_store);centerWarrantyFields((n,l,o={})=>field(n,l,{...o,into:o.into||existingW}),existingW,'warranty_maker','Garantía del fabricante',p.warranty_maker);
+  field('warranty_terms','Condiciones aplicables',{area:true,max:500,value:p.warranty_terms||'',into:existingW});warrantyHolder.append(existingW);};
+ // 5. Confirmación.
+ const s5=steps[4],confirm=el('div',undefined,'ic-confirm');s5.append(confirm);
+ function paintConfirm(){const p=currentProduct(),n=currentTracking()==='serie'?pending.length:Number(qty.value)||0,c=invCents(cost.value);
+  const name=creating?(fresh.querySelector('[name=name]')?.value||'Producto nuevo'):(p?.name||'—');confirm.replaceChildren(centerFacts([['Producto',name+(creating?' (ficha nueva)':'')],['Unidades',currentTracking()==='serie'?n+' (series: '+(pending.filter(Boolean).join(', ')||'sin serie')+')':String(n)],
+   ['Motivo',initial?'Inventario inicial':form.elements.reason.selectedOptions[0]?.textContent],['Proveedor',form.elements.supplier_id.selectedOptions[0]?.value?form.elements.supplier_id.selectedOptions[0].textContent:'—'],['Documento',form.elements.document.value||'—'],
+   ['Costo unitario',Number.isNaN(c)?'Pendiente':centerMoney(c)],['Costo total',Number.isNaN(c)?'—':centerMoney(c*n)],['Ubicación',where.value||'—']]));
+  const problems=[];if(!creating&&!pick.value)problems.push('Elige el producto (paso 1).');if(!n)problems.push(currentTracking()==='serie'?'Agrega al menos una unidad (paso 2).':'Indica la cantidad (paso 2).');if(cost.value.trim()==='')problems.push('Indica el costo unitario (paso 3).');
+  if(problems.length){const w=el('div',undefined,'inv-warn');w.append(...problems.map(t=>el('p',t)));confirm.append(w);}
+  else confirm.append(el('p','Al guardar se crea el movimiento de '+(initial?'apertura':'entrada')+' del Kardex y los códigos internos de las unidades. Después podrás imprimir las etiquetas.','inv-form-note'));}
+ const nav=el('div',undefined,'ic-wizard-nav'),back=button('Atrás',()=>go_(current-1),'secondary'),next=el('button','Siguiente','primary'),save=el('button',undefined,'primary inv-btn');next.type='button';save.type='submit';save.append(invIcon('package-plus'),el('span','Guardar y generar códigos'));
+ next.addEventListener('click',()=>{clear();if(current===0&&!creating&&!pick.value){fail({message:'Elige el modelo o crea un producto nuevo.',fields:{item_id:'Producto obligatorio.'}});return;}
+  if(current===0&&creating&&!fresh.querySelector('[name=category_id]').value){fail({message:'Elige la categoría del producto nuevo.',fields:{category_id:'Categoría obligatoria.'}});return;}
+  if(current===1&&currentTracking()==='serie'&&!pending.length){msg.textContent='Agrega al menos una unidad (escanea la serie o usa «Agregar sin serie»).';scanInput.focus();return;}
+  if(current===2&&cost.value.trim()===''){fail({message:'Indica el costo unitario.',fields:{cost:'Costo obligatorio (escribe 0 solo si no tuvo costo).'}});return;}go_(current+1);});
+ nav.append(back,next,save);form.append(msg,nav);
+ const result=el('div',undefined,'ic-result');result.hidden=true;panel.append(form,result);
+ if(initial){const imp=el('section',undefined,'inv-card ic-card ic-import');imp.append(centerCardHead('Importar desde Excel o CSV','upload','Vista previa, validación y detección de duplicados'));imp.append(centerImport());panel.append(imp);}
+ paintPick();setMode(false);if(preset.item_id){pick.value=String(preset.item_id);paintUnits();paintWarranty();paintCommercial();}go_(0);
+ form.addEventListener('submit',async event=>{event.preventDefault();clear();if(current!==4){next.click();return;}const serial=currentTracking()==='serie';
+  if(serial&&!pending.length){msg.textContent='Agrega al menos una unidad (escanea la serie o usa «Agregar sin serie»).';go_(1);return;}
+  const body={request_key:form.dataset.key,reason:initial?'inicial':form.elements.reason.value,cost:cost.value,location:where.value,note:form.elements.note.value,supplier_id:form.elements.supplier_id.value,document:form.elements.document.value,tax:form.elements.tax.value};
+  if(creating){const fields=Object.fromEntries([...fresh.querySelectorAll('[name]'),...s4.querySelectorAll('[name]')].map(n=>[n.name,n.value]));fields.price=priceIn.value;fields.location=where.value;body.product=JSON.stringify(fields);}
+  else{body.item_id=pick.value;if(priceIn.dataset.touched)body.price=priceIn.value;if(existingW)for(const n of existingW.querySelectorAll('[name]'))body[n.name]=n.value;}
+  if(serial)body.units=JSON.stringify(pending.map(s=>({serial:s})));else body.quantity=qty.value;
+  save.disabled=true;try{const out=await api('/api/inventory/register',body);const n=out.units.length||out.quantity;toast(n+' unidad'+(n===1?'':'es')+' registrada'+(n===1?'':'s')+' en '+out.item.name+'.','success');
+   form.hidden=true;result.hidden=false;centerRegisterResult(result,out,()=>{centerState.preset=null;centerRegister(panel,mode);});}
+  catch(error){fail(error);const field_=Object.keys(error.fields||{})[0];const at=steps.findIndex(s=>field_&&s.querySelector('[name='+field_+']'));if(at>=0)go_(at);save.disabled=false;}});}
+
+// ---- Registrar salida ----
+async function centerSalida(panel){const recent=await api('/api/inventory/kardex?type=salida');panel.replaceChildren();
+ panel.append(invSectionHead('Registrar salida','Una venta o un consumo confirmado genera una sola salida. Un repuesto consumido en una orden no vuelve a descontarse al facturarla.'));
+ const actions=el('div',undefined,'ic-actions-grid');for(const[icon,title,text,run]of [['hand-coins','Vender producto','Unidad específica, cliente, precio y descuento autorizados.',()=>centerSellPicker()],['arrow-up-from-line','Otra salida','Consumo en una orden técnica, devolución al proveedor, ajuste o baja.',()=>centerExitDialog()],
+  ['lock','Reservar','Aparta unidades para un cliente u orden sin descontarlas.',()=>centerReserveDialog()],['calendar','Registrar entrega','Fecha la entrega de unidades vendidas y empieza su garantía.',()=>centerDeliveryPicker()]]){
+  const b=button('',run,'ic-action');const m=el('span',undefined,'inv-kpi-icon');m.append(invIcon(icon));const t=el('div');t.append(el('strong',title),el('small',text));b.append(m,t);actions.append(b);}panel.append(actions);
+ const last=el('section',undefined,'inv-card');last.append(centerCardHead('Últimas salidas','scroll-text',recent.rows.length+' en total'));last.append(recent.rows.length?centerKardexTable(recent.rows.slice(-20).reverse(),true):el('p','Sin salidas registradas.','ic-card-empty'));panel.append(last);}
+async function centerSellPicker(){const rows=(await api('/api/inventory/products')).rows.filter(p=>p.active&&p.available>0);const dialog=invDialog('Vender producto'),{form,field}=invForm('bank-form inv-sheet-form');
+ if(!rows.length){dialog.append(el('p','No hay productos con unidades disponibles.','inv-form-note'));return;}field('item_id','Producto',{required:true,options:[['','Selecciona…'],...rows.map(p=>[String(p.id),p.name+' · '+p.available+' disp.'])]});
+ const go_=el('button','Continuar','primary');go_.type='submit';form.append(invDialogActions(dialog,go_));dialog.append(form);form.addEventListener('submit',event=>{event.preventDefault();if(!form.elements.item_id.value)return;dialog.close();centerSellDialog(form.elements.item_id.value);});}
+// ---- Kardex ----
+function centerPeriod(key){const fmt=d=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/Guayaquil'}).format(d),today=new Date(),day=864e5;
+ if(key==='hoy')return[fmt(today),fmt(today)];if(key==='7')return[fmt(new Date(today-6*day)),fmt(today)];if(key==='30')return[fmt(new Date(today-29*day)),fmt(today)];
+ if(key==='mes'){const t=fmt(today);return[t.slice(0,8)+'01',t];}return null;}
+function centerKardexTable(rows,compact,expandable){const columns=compact?['Fecha','Producto','Movimiento','Cant.','Saldo','Responsable']:['','Fecha','Producto','Movimiento','Entrada','Salida','Saldo','Costo unit.','Valor','Acciones'];
+ const wrap=el('div',undefined,'ic-scroll ic-kardex-wrap'),table=el('table',undefined,'ic-table ic-kardex'+(compact?' is-compact':'')),thead=el('thead'),hr=el('tr'),tbody=el('tbody');
+ for(const c of columns){const th=el('th',c);th.scope='col';hr.append(th);}thead.append(hr);
+ for(const r of rows){const units=r.units.map(u=>u.serial?u.serial+' · '+u.internal_code:u.internal_code).join(', ');const kind=el('span',r.label,'ic-move');kind.dataset.kind=r.kind||r.type;
+  const prod=el('div',undefined,'ic-name');prod.append(el('strong',r.product),el('small',[r.sku&&'SKU '+r.sku,units].filter(Boolean).join(' · ')||r.category));
+  const qty=r.entry?'+'+r.entry:r.exit?'−'+r.exit:r.reserved?'('+r.reserved+')':'';
+  if(compact){const tr=centerRow([['Fecha',formatOrderDate(r.at)],['Producto',r.product],['Movimiento',kind],['Cant.',qty],['Saldo',String(r.balance)],['Responsable',r.actor]]);tr.dataset.type=r.type;tbody.append(tr);continue;}
+  const money=['entrada','salida'].includes(r.type),cost=el('span',money?centerMoney(r.unit_cost_cents):'—');if(r.cost_pending&&!r.corrected)cost.append(' ',invoiceChip('pendiente','Costo pendiente'));if(r.corrected)cost.title='Costo corregido (registrado originalmente: '+centerMoney(r.original_cost_cents)+')';
+  const toggle=invIconBtn('Detalle del movimiento','chevron-right',()=>{const open_=detail.hidden;detail.hidden=!open_;toggle.setAttribute('aria-expanded',String(open_));});toggle.setAttribute('aria-expanded','false');toggle.classList.add('ic-expand');
+  const acts=el('div',undefined,'ic-acts');acts.append(invIconBtn('Ficha de '+r.product,'eye',()=>centerProductDialog(r.item_id,'kardex')));if(r.cost_pending&&!r.corrected&&r.movement_id)acts.append(invIconBtn('Corregir costo','pencil',()=>centerCostDialog(r.movement_id,r.product+' · '+formatOrderDate(r.at)+'.',()=>renderInventoryCenter())));
+  const tr=centerRow([['Detalle',toggle],['Fecha',formatOrderDate(r.at)],['Producto',prod],['Movimiento',kind],['Entrada',r.entry?String(r.entry):''],['Salida',r.exit?String(r.exit):''],['Saldo',String(r.balance)],['Costo unit.',cost],['Valor',money?centerMoney(r.line_cents):''],['Acciones',acts]]);tr.dataset.type=r.type;
+  const detail=el('tr',undefined,'ic-detail-row');detail.hidden=true;const td=el('td');td.colSpan=columns.length;detail.append(td);
+  td.append(centerFacts([['Fecha y hora',new Date(r.at).toLocaleString('es-EC',{timeZone:'America/Guayaquil'})],['Documento',r.document||'—'],[r.type==='entrada'?'Proveedor':'Cliente',r.party||'—'],['Responsable',r.actor],
+   ['Costo aplicado',money?centerMoney(r.unit_cost_cents)+(r.corrected?' (corregido; registrado '+centerMoney(r.original_cost_cents)+')':''):'—'],['Costo promedio',centerMoney(r.average_cents)],['Valor del saldo',centerMoney(r.balance_cents)],['Ubicación',r.location||'—'],
+   ['Unidades',units||'—'],['Observaciones',r.note||'—'],...(r.sale_price_cents!=null&&r.sale_price_cents!==undefined?[['Precio de venta',centerMoney(r.sale_price_cents)]]:[])]));tbody.append(tr,detail);}
+ table.append(thead,tbody);wrap.append(table);return wrap;}
+async function centerKardex(panel){const f=centerState.kardex;const query=Object.fromEntries(Object.entries(f).filter(([k,v])=>v&&!['period','page'].includes(k)));
+ const[data,products]=await Promise.all([api('/api/inventory/kardex?'+new URLSearchParams(query)),api('/api/inventory/products').then(d=>d.rows)]);panel.replaceChildren();
+ const qs=new URLSearchParams(query).toString();
+ const menu=el('details',undefined,'ic-export'),sum=el('summary');sum.append(invIcon('download'),el('span','Exportar'),invIcon('chevron-down'));menu.append(sum);const list=el('div',undefined,'ic-menu-list');
+ for(const[label,icon,ext]of [['Exportar Excel','file-spreadsheet','xlsx'],['Generar reporte PDF','file-text','pdf'],['Descargar CSV','download','csv']]){const a=el('a',undefined,'ic-menu-item');a.href='/api/inventory/report.'+ext+'?kind=general'+(qs?'&'+qs:'');a.append(invIcon(icon),el('span',label));list.append(a);}menu.append(list);
+ menu.addEventListener('keydown',event=>{if(event.key==='Escape'&&menu.open){event.stopPropagation();menu.open=false;sum.focus();}});
+ panel.append(invSectionHead('Kardex de Inventario','Control de entradas, salidas, existencias y valoración de mercadería (costo promedio ponderado móvil). Los movimientos no se modifican: las correcciones quedan auditadas.',menu,invBtn('Actualizar','refresh-cw',()=>centerKardex(panel))));
+ // Filtros compactos.
+ const form=el('form',undefined,'ic-kardex-filters');form.addEventListener('submit',e=>e.preventDefault());const fld=(label,node,keyName,wide)=>{const b=el('label',undefined,'inv-field'+(wide?' is-wide':''));b.append(el('span',label),node);form.append(b);node.value=f[keyName]||'';
+  node.addEventListener('change',()=>{f[keyName]=node.value.trim();f.page=1;if(keyName==='period'){const r=centerPeriod(node.value);if(r){[f.from,f.to]=r;}else if(!node.value){f.from=f.to='';}}centerKardex(panel);});return node;};
+ const period=el('select');for(const[v,t]of [['','Todo el historial'],['hoy','Hoy'],['7','Últimos 7 días'],['30','Últimos 30 días'],['mes','Este mes'],['custom','Personalizado']])period.add(new Option(t,v));fld('Período',period,'period');
+ if(f.period==='custom'){for(const[k,l]of [['from','Desde'],['to','Hasta']]){const d=el('input');d.type='date';fld(l,d,k);}}
+ fld('Categoría',centerCategoryOptions(el('select'),{value:f.category_id}),'category_id');const b=el('select');b.add(new Option('Todas',''));for(const x of centerTax.brands)b.add(new Option(x.name,String(x.id)));fld('Marca',b,'brand_id');
+ const p=el('select');p.add(new Option('Todos',''));for(const x of products)p.add(new Option(x.name,String(x.id)));fld('Producto',p,'item_id',true);const serial=el('input');serial.placeholder='Serie o código';serial.maxLength=60;fld('Serie o código',serial,'serial');
+ const t=el('select');t.add(new Option('Todos',''));for(const[k,v]of Object.entries(data.types))t.add(new Option(v,k));fld('Movimiento',t,'type');const u=el('select');u.add(new Option('Todos',''));for(const x of data.users)u.add(new Option(x.name,String(x.id)));fld('Responsable',u,'user_id');
+ const doc=el('input');doc.placeholder='Orden, factura, compra…';doc.maxLength=60;fld('Documento',doc,'document');
+ form.append(invBtn('Limpiar filtros','x',()=>{centerState.kardex={period:'',from:'',to:'',category_id:'',brand_id:'',item_id:'',serial:'',type:'',user_id:'',document:'',page:1};centerKardex(panel);}));panel.append(form);
+ const tt=data.totals,prev=data.previous,vary=(now_,before)=>{if(!prev||before===undefined)return null;const diff=now_-before,s=el('span',undefined,'ic-vary');s.dataset.dir=diff>0?'up':diff<0?'down':'flat';s.append(invIcon(diff>0?'trending-up':diff<0?'trending-down':'arrow-left-right'),el('span',(diff>0?'+':'')+diff+' vs. período anterior'));return s;};
+ panel.append(centerKpiGrid([['scroll-text','Movimientos',String(tt.rows),data.truncated?'Se muestran los 2000 más recientes':'Registros con los filtros','blue',null,vary(tt.rows,prev?.rows)],['arrow-down-to-line','Unidades ingresadas',String(tt.entries),centerMoney(tt.entry_cents)+' al costo','green',null,vary(tt.entries,prev?.entries)],
+  ['arrow-up-from-line','Unidades retiradas',String(tt.exits),centerMoney(tt.exit_cents)+' al costo','red',null,vary(tt.exits,prev?.exits)],['boxes','Saldo de existencias',String(tt.stock_units),tt.opening!==undefined?'Inicial '+tt.opening+' · final del período '+tt.closing:'Unidades actuales','teal'],
+  ['circle-dollar-sign','Valor actual del inventario',centerMoney(tt.stock_cents),tt.cost_pending?tt.cost_pending+' entrada'+(tt.cost_pending===1?'':'s')+' con costo pendiente':'Al costo promedio ponderado',tt.cost_pending?'amber':'magenta']]));
+ // Ficha Kardex por producto.
+ if(f.item_id){const prod=products.find(x=>String(x.id)===f.item_id);if(prod){const card=el('section',undefined,'inv-card ic-card');card.append(centerCardHead(prod.name,'package','Kardex del producto'));
+   card.append(centerFacts([['Marca',prod.brand||'—'],['Modelo',prod.model||'—'],['SKU',prod.sku||'—'],['Categoría',prod.category],['Existencias actuales',String(prod.stock)],['Costo promedio',centerMoney(prod.average_cost_cents)],['Valor total',centerMoney(prod.value_cents)],
+    ['Saldo inicial del período',tt.opening!==undefined?String(tt.opening):'Desde el inicio'],['Entradas',String(tt.entries)],['Salidas',String(tt.exits)],['Ajustes',String(tt.adjustments)],['Saldo final',String(tt.closing!==undefined?tt.closing:prod.stock)]]));
+   const open_=invBtn('Ver ficha y unidades','eye',()=>centerProductDialog(prod.id,'unidades'));open_.classList.add('ic-card-action');card.append(open_);panel.append(card);}}
+ if(!data.rows.length){panel.append(invEmpty('scroll-text','Sin movimientos con estos filtros','Cambia el período o los filtros para ver más.'));return;}
+ const rows=[...data.rows].reverse(),size=25,pages=Math.max(1,Math.ceil(rows.length/size));f.page=Math.min(f.page||1,pages);
+ panel.append(centerKardexTable(rows.slice((f.page-1)*size,f.page*size),false,true),centerPager(f.page,pages,rows.length,n=>{f.page=n;centerKardex(panel);}));}
+// ---- Licencias digitales: tabla compacta con filtros (sin claves) ----
+async function centerLicenses(panel){const data=await api('/api/inventory/licenses/table'),s=centerState.licenses,t=data.totals;panel.replaceChildren();
+ panel.append(invSectionHead('Licencias digitales','Categoría → Marca → Producto → Edición, con las existencias reales del módulo Licencias (no hay un segundo inventario). Las claves se guardan cifradas y solo se ven en Licencias.',invBtn('Registrar licencias','key-round',()=>go('licenses'),'primary')),
+  invKpis([['circle-check','Disponibles',String(t.disponible),'','green'],['lock','Reservadas',String(t.reservada),'','amber'],['shield-check','Entregadas',String(t.entregada),'','blue'],['circle-x','Vencidas',String(t.vencida),'','red']]));
+ const bar=el('div',undefined,'inv-toolbar ic-filters'),box=el('label',undefined,'inv-search'),q=el('input');box.append(invIcon('search'),q);q.type='search';q.placeholder='Nombre, marca o tipo de licencia';q.value=s.q;q.setAttribute('aria-label','Buscar licencias');
+ const cat=el('select'),brand=el('select'),state=el('select');cat.setAttribute('aria-label','Categoría');brand.setAttribute('aria-label','Marca');state.setAttribute('aria-label','Estado');
+ cat.add(new Option('Todas las categorías',''));for(const c of [...new Set(data.rows.map(r=>r.category))])cat.add(new Option(c,c));brand.add(new Option('Todas las marcas',''));for(const b of [...new Set(data.rows.map(r=>r.brand).filter(Boolean))].sort())brand.add(new Option(b,b));
+ for(const[v,l]of [['','Todos los estados'],['disponible','Con disponibles'],['sin_stock','Sin stock'],['revisar','Por revisar']])state.add(new Option(l,v));cat.value=s.category;brand.value=s.brand;state.value=s.state;bar.append(box,cat,brand,state);panel.append(bar);
+ const holder=el('div');panel.append(holder);
+ const paint=()=>{s.q=q.value.trim();s.category=cat.value;s.brand=brand.value;s.state=state.value;const words=s.q.toLowerCase().split(/\s+/).filter(Boolean);
+  const rows=data.rows.filter(r=>(!s.category||r.category===s.category)&&(!s.brand||r.brand===s.brand)&&(!s.state||r.state===s.state)&&words.every(w=>(r.name+' '+r.brand+' '+r.type+' '+r.edition).toLowerCase().includes(w)));
+  holder.replaceChildren(rows.length?centerTable(['Producto','Marca','Categoría','Duración','Dispositivos','Precio','Disponibles','Reservadas','Entregadas','Estado','Acciones'],rows.map(r=>{const name=el('div',undefined,'ic-name');name.append(el('strong',r.name),el('small',[r.family,r.edition,r.type].filter(Boolean).join(' · ')));
+   const st=r.state==='revisar'?invoiceChip('pendiente','Revisar duración'):r.state==='disponible'?invoiceChip('autorizado','Disponible'):invoiceChip('descartado','Sin stock');if(r.flags.length){st.title=r.flags.join(' ');}
+   const acts=el('div',undefined,'ic-acts');acts.append(centerMenu('Acciones de '+r.name,[['Clasificar',()=>centerClassifyDialog({id:r.id,name:r.name,brand:r.brand,category_id:r.category_id,edition:r.edition},()=>centerLicenses(panel))],['Abrir en Licencias',()=>go('licenses')]]));
+   const tr=centerRow([['Producto',name],['Marca',r.brand||'—'],['Categoría',r.category],['Duración',r.duration||'—'],['Dispositivos',r.devices?String(r.devices):'—'],['Precio',centerMoney(r.price_cents)],['Disponibles',String(r.stock.disponible)],['Reservadas',String(r.stock.reservada)],['Entregadas',String(r.stock.entregada)],['Estado',st],['Acciones',acts]]);
+   if(r.flags.length){const tr2=el('tr',undefined,'ic-flag-row');const td=el('td');td.colSpan=11;td.append(invIcon('circle-alert'),el('span',r.flags.join(' ')));tr2.append(td);const frag=document.createDocumentFragment();frag.append(tr,tr2);return frag;}return tr;}),'ic-licenses'):invEmpty('key-round','Sin licencias con estos filtros','Cambia la búsqueda o los filtros.'));};
+ let timer=null;q.addEventListener('input',()=>{clearTimeout(timer);timer=setTimeout(paint,250);});for(const n of [cat,brand,state])n.addEventListener('change',paint);paint();}
+// ---- Reportes ----
+async function centerReports(panel){const[data,meta,products]=await Promise.all([api('/api/inventory/reports'),api('/api/inventory/kardex?type=correccion'),api('/api/inventory/products').then(d=>d.rows)]);const t=data.totals;panel.replaceChildren();
+ panel.append(invSectionHead('Reportes','Excel con columnas numéricas, PDF con el logo original, fecha de generación, filtros aplicados, totales y numeración de páginas. Se aplican los filtros vigentes del Kardex.'),
+  invKpis([['package','Productos activos',String(t.products),'','blue'],['boxes','Unidades',String(t.units),'','teal'],['circle-dollar-sign','Valor del inventario',centerMoney(t.value_cents),'','magenta']]));
+ const f=centerState.kardex,sel=el('div',undefined,'ic-report-scope');const{form,field}=invForm('bank-form');const prod=field('item_id','Producto (para «Kardex por producto»)',{options:[['','Selecciona…'],...products.map(p=>[String(p.id),p.name])],value:f.item_id||''});
+ const cat=centerCategoryOptions(field('category_id','Categoría (para «Kardex por categoría»)',{options:[]}),{blank:'Selecciona…',value:f.category_id||''});sel.append(form);panel.append(sel);
+ const grid=el('div',undefined,'ic-reports');for(const[kind,title]of Object.entries(meta.reports)){const card=el('article',undefined,'ic-report');card.append(el('strong',title));const links=el('div',undefined,'inv-actions');
+  for(const[label,icon,ext]of [['Excel','file-spreadsheet','xlsx'],['PDF','file-text','pdf'],['CSV','download','csv']]){const a=el('a',undefined,'secondary inv-btn');a.append(invIcon(icon),el('span',label));
+   a.addEventListener('click',event=>{const q=Object.fromEntries(Object.entries(f).filter(([k,v])=>v&&!['period','page','item_id','category_id'].includes(k)));if(kind==='producto'){if(!prod.value){event.preventDefault();notify('Elige el producto del reporte.');prod.focus();return;}q.item_id=prod.value;}
+    else if(f.item_id)q.item_id=f.item_id;if(kind==='categoria'){if(!cat.value){event.preventDefault();notify('Elige la categoría del reporte.');cat.focus();return;}q.category_id=cat.value;}else if(f.category_id)q.category_id=f.category_id;a.href='/api/inventory/report.'+ext+'?'+new URLSearchParams({kind,...q});});
+   a.href='/api/inventory/report.'+ext+'?kind='+kind;links.append(a);}card.append(links);grid.append(card);}panel.append(grid);
+ const table=(title,rows,icon)=>{const sec=el('section',undefined,'inv-card');sec.append(centerCardHead(title,icon,rows.length+''));sec.append(rows.length?centerTable(['Nombre','Productos','Unidades','Valor','En alerta'],rows.map(r=>centerRow([['Nombre',r.name],['Productos',String(r.products)],['Unidades',String(r.units)],['Valor',centerMoney(r.value_cents)],['En alerta',String(r.low)]]))):el('p','Sin datos.','ic-card-empty'));return sec;};
+ panel.append(table('Por categoría',data.by_category,'tags'),table('Por marca',data.by_brand,'bookmark'));}
+

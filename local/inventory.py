@@ -21,6 +21,7 @@ STOCK_SQL = 'COALESCE((SELECT SUM(m.direction*m.quantity) FROM inventory_movemen
 RESERVED_SQL = "COALESCE((SELECT SUM(r.quantity) FROM inventory_reservations r WHERE r.item_id=i.id AND r.status='activa'),0)"
 # Estado de una unidad según el motivo de su salida.
 UNIT_STATUS_OUT = {'venta': 'vendida', 'uso_orden': 'consumida', 'devolucion_proveedor': 'devuelta', 'ajuste_salida': 'baja', 'baja': 'baja', 'anulacion_compra': 'devuelta'}
+STOCK_STATES = {'agotado': 'Agotado', 'critico': 'Crítico', 'minimo': 'En el mínimo', 'normal': 'Normal'}
 UNIT_STATUS = {'disponible': 'Disponible', 'reservada': 'Reservada', 'vendida': 'Vendida', 'consumida': 'Consumida en una orden', 'devuelta': 'Devuelta al proveedor', 'baja': 'De baja'}
 
 
@@ -117,13 +118,28 @@ def _half(numerator, denominator):
     return (2 * numerator + denominator) // (2 * denominator)
 
 
+def stock_state(stock, minimum):
+    """Agotado (0), crítico (entre 0 y el mínimo), en el mínimo (igual) o normal (sobre el mínimo)."""
+    return 'agotado' if stock <= 0 else 'critico' if stock < minimum else 'minimo' if stock == minimum else 'normal'
+
+
+def corrections(c, item_id):
+    """Costo corregido de cada entrada (la última corrección manda). Sin la migración 075, ninguna."""
+    try:
+        return {r[0]: r[1] for r in c.execute('SELECT movement_id,new_cost_cents FROM inventory_cost_corrections WHERE item_id=? ORDER BY id', (item_id,))}
+    except Exception:
+        return {}
+
+
 def valuation(c, item_id):
     """Kardex valorizado de un artículo con costo promedio ponderado móvil: [(movimiento, saldo, costo promedio, valor del saldo, costo aplicado)].
-    Una entrada sin costo (por ejemplo, una devolución del cliente) entra al promedio vigente; las salidas salen al promedio vigente."""
+    Una entrada sin costo (por ejemplo, una devolución del cliente) entra al promedio vigente; las salidas salen al promedio vigente.
+    Si el costo de una entrada se corrigió (corrección auditada), se usa el costo corregido; el movimiento original no cambia."""
     out, qty, value, avg = [], 0, 0, 0
+    fixed = corrections(c, item_id)
     for m in c.execute('SELECT * FROM inventory_movements WHERE item_id=? ORDER BY id', (item_id,)).fetchall():
         if m['direction'] == 1:
-            applied = m['unit_cost_cents'] or avg
+            applied = fixed.get(m['id'], m['unit_cost_cents']) or avg
             value += m['quantity'] * applied
             qty += m['quantity']
         else:
@@ -164,7 +180,11 @@ def items(c, q='', alerts_only=False):
 
 
 def alert_count(c):
-    return c.execute('SELECT COUNT(*) FROM inventory_items i WHERE i.active=1 AND ' + STOCK_SQL + '<=i.min_stock').fetchone()[0]
+    """Alertas urgentes: fichas activas con alertas activadas que están agotadas o por debajo del mínimo (no las que están justo en el mínimo)."""
+    try:
+        return c.execute('SELECT COUNT(*) FROM inventory_items i WHERE i.active=1 AND i.alerts_enabled=1 AND (' + STOCK_SQL + '<=0 OR ' + STOCK_SQL + '<i.min_stock)').fetchone()[0]
+    except Exception:
+        return c.execute('SELECT COUNT(*) FROM inventory_items i WHERE i.active=1 AND ' + STOCK_SQL + '<=i.min_stock').fetchone()[0]
 
 
 def overview(c, now, q=''):
@@ -231,7 +251,7 @@ def set_active(c, item_id, active, user, now):
 
 
 def move(c, item_id, direction, reason, qty, cost='0', user=None, now=None, reference_kind='', reference_id=None, note='', request_key=None, serials=None, unit_ids=None,
-         location='', reservation_id=None, unit_values=None):
+         location='', reservation_id=None, unit_values=None, supplier_id=None, document='', tax_rate_bp=0, sale=None):
     """Registra una entrada (+1) o salida (−1). Las salidas no pueden dejar existencias negativas ni tomar lo reservado para otro.
     Producto con serie: la entrada crea una unidad por cantidad (con las series indicadas; el resto, solo con código interno) y la salida
     exige las unidades que salen. `unit_values` actualiza las unidades que salen (cliente, documento, garantías)."""
@@ -284,9 +304,13 @@ def move(c, item_id, direction, reason, qty, cost='0', user=None, now=None, refe
     if direction == -1:
         history = valuation(c, row['id'])
         applied = history[-1][2] if history else 0
-    movement = c.execute('INSERT INTO inventory_movements(item_id,direction,reason,quantity,unit_cost_cents,reference_kind,reference_id,note,request_key,created_by,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
-                         (row['id'], direction, reason, amount, unit_cost if direction == 1 else applied, reference_kind, reference_id, re.sub(r'\s+', ' ', str(note or '')).strip()[:300], request_key,
-                          user['id'] if user else None, stamp(now))).lastrowid
+    values = (row['id'], direction, reason, amount, unit_cost if direction == 1 else applied, reference_kind, reference_id, re.sub(r'\s+', ' ', str(note or '')).strip()[:300], request_key,
+              user['id'] if user else None, stamp(now))
+    columns = ['item_id', 'direction', 'reason', 'quantity', 'unit_cost_cents', 'reference_kind', 'reference_id', 'note', 'request_key', 'created_by', 'created_at']
+    # Datos comerciales (migración 075), solo si se indican: proveedor, documento e IVA de la entrada; precio, descuento, cliente y autorización de la venta.
+    extra = {k: v for k, v in (('supplier_id', supplier_id), ('document', str(document or '')[:80]), ('tax_rate_bp', int(tax_rate_bp or 0))) if v}
+    extra.update({k: v for k, v in (sale or {}).items() if v not in (None, '')})
+    movement = c.execute('INSERT INTO inventory_movements(' + ','.join(columns + list(extra)) + ') VALUES (' + ','.join('?' * (len(columns) + len(extra))) + ')', (*values, *extra.values())).lastrowid
     created = []
     if serial_item and direction == 1 and reason != 'devolucion_cliente':
         place = re.sub(r'\s+', ' ', str(location or row['location'] or '')).strip()[:80]
