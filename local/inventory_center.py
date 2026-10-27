@@ -279,6 +279,8 @@ def _product_dict(c, r, with_cost=True):
             # «low»: necesita atención (agotado, crítico o en el mínimo); «urgent»: agotado o crítico. Solo si la ficha tiene las alertas activas.
             'low': bool(r['active']) and alerts and state != 'normal', 'urgent': bool(r['active']) and alerts and state in ('agotado', 'critico'),
             'out': stock <= 0, 'location': r['location'], 'active': r['active'], 'warranty_terms': r['warranty_terms'] if 'warranty_terms' in r.keys() else '',
+            'barcode': r['barcode'] if 'barcode' in r.keys() else '', 'max_stock': r['max_stock'] if 'max_stock' in r.keys() else 0,
+            'over_max': bool('max_stock' in r.keys() and r['max_stock'] and stock > r['max_stock']),
             'price_cents': r['price_cents'], 'average_cost_cents': cost, 'value_cents': max(0, stock) * cost, 'description': r['description'] or '',
             'warranty_store': {'qty': r['warranty_store_qty'], 'unit': r['warranty_store_unit'], 'from': r['warranty_store_from'], 'label': period_label(r['warranty_store_qty'], r['warranty_store_unit'])},
             'warranty_maker': {'qty': r['warranty_maker_qty'], 'unit': r['warranty_maker_unit'], 'from': r['warranty_maker_from'], 'label': period_label(r['warranty_maker_qty'], r['warranty_maker_unit'])},
@@ -430,7 +432,12 @@ def save_product(c, data, user, now):
 
 
 def _extra_fields(c, item_id, data, old):
-    """Alertas de la ficha y condiciones de garantía (migración 075). Si no se indican, se conservan."""
+    """Alertas de la ficha y condiciones de garantía (migración 075); código de barras y existencia máxima (077). Si no se indican, se conservan."""
+    if 'barcode' in data or 'max_stock' in data:
+        _codes(c, item_id, data)
+    if 'description' in data:
+        text = re.sub(r'[ \t]+', ' ', str(data.get('description') or '')).strip()[:500]
+        c.execute('UPDATE catalog_items SET description=? WHERE id=(SELECT catalog_id FROM inventory_items WHERE id=?)', (text, item_id))
     try:
         if str(data.get('alerts_enabled', '')) in ('0', '1', 'true', 'false'):
             c.execute('UPDATE inventory_items SET alerts_enabled=? WHERE id=?', (1 if str(data['alerts_enabled']) in ('1', 'true') else 0, item_id))
@@ -439,6 +446,29 @@ def _extra_fields(c, item_id, data, old):
     except Exception as error:
         if 'no such column' not in str(error):
             raise
+
+
+def _codes(c, item_id, data):
+    """Código de barras único (sin duplicar fichas) y existencia máxima mayor o igual que la mínima."""
+    if not _has_column(c, 'inventory_items', 'barcode'):
+        return
+    row = c.execute('SELECT min_stock,barcode,max_stock FROM inventory_items WHERE id=?', (item_id,)).fetchone()
+    barcode = re.sub(r'\s', '', str(data.get('barcode', row['barcode']) or ''))[:40]
+    if barcode and not re.fullmatch(r'[A-Za-z0-9.\-_/]{4,40}', barcode):
+        raise InventoryError('Código de barras no válido.', 400, {'barcode': 'Entre 4 y 40 letras, números o guiones.'})
+    if barcode:
+        other = c.execute('SELECT i.id,g.name FROM inventory_items i JOIN catalog_items g ON g.id=i.catalog_id WHERE i.barcode=? AND i.id!=?', (barcode, item_id)).fetchone()
+        if other:
+            raise InventoryError('Ese código de barras ya pertenece a «%s».' % other['name'], 409, {'barcode': 'Código de barras duplicado.'})
+        unit = c.execute('SELECT internal_code FROM inventory_units WHERE serial_key=?', (inventory.serial_key(barcode),)).fetchone()
+        if unit:
+            raise InventoryError('Ese código coincide con la serie de la unidad %s.' % unit['internal_code'], 409, {'barcode': 'Coincide con una serie.'})
+    raw = str(data.get('max_stock', row['max_stock']) if data.get('max_stock') not in (None, '') else '0').strip()
+    if not raw.isdigit() or int(raw) > 1000000:
+        raise InventoryError('Existencia máxima no válida.', 400, {'max_stock': 'Número entero.'})
+    if int(raw) and int(raw) < row['min_stock']:
+        raise InventoryError('La existencia máxima no puede ser menor que la mínima.', 400, {'max_stock': 'Menor que la mínima.'})
+    c.execute('UPDATE inventory_items SET barcode=?,max_stock=? WHERE id=?', (barcode, int(raw), item_id))
 
 
 def set_alerts(c, item_id, enabled, user, now):
@@ -1028,7 +1058,7 @@ def transfer(c, data, user, now):
 # ---- Kardex --------------------------------------------------------------------------------------------------------------
 
 KARDEX_TYPES = {'entrada': 'Entradas', 'salida': 'Salidas', 'k:inicial': 'Inventario inicial', 'k:ajuste': 'Ajustes y bajas', 'k:devolucion': 'Devoluciones', 'reserva': 'Reservas y liberaciones',
-                'traslado': 'Traslados', 'correccion': 'Correcciones de costo', **{'m:' + k: v for k, v in inventory.IN_REASONS.items()},
+                'traslado': 'Traslados', 'correccion': 'Correcciones de costo', 'precio': 'Cambios de precio', **{'m:' + k: v for k, v in inventory.IN_REASONS.items()},
                 **{'m:' + k: v for k, v in inventory.OUT_REASONS.items()}}
 
 
@@ -1078,7 +1108,7 @@ def kardex(c, filters=None):
         if cats and item['category_id'] not in cats or _id(f.get('brand_id')) and item['brand_id'] != int(f['brand_id']) or _id(f.get('item_id')) and item['id'] != int(f['item_id']):
             continue
         chosen.append(item['id'])
-        base = {'item_id': item['id'], 'product': item['name'], 'sku': item['sku'], 'brand': item['brand'] or '', 'tracking': item['tracking'], 'model': item['model'],
+        base = {'item_id': item['id'], 'product': item['name'], 'sku': item['sku'], 'code': item['catalog_code'] or item['sku'] or '', 'brand': item['brand'] or '', 'tracking': item['tracking'], 'model': item['model'],
                 'category': (item['parent_name'] + ' › ' + item['category_name']) if item['parent_name'] else (item['category_name'] or 'Sin categoría')}
         fixed = inventory.corrections(c, item['id'])
         timeline, moved_at = [], {}
@@ -1108,7 +1138,7 @@ def kardex(c, filters=None):
             fixes = []
         for x in fixes:
             timeline.append((x['created_at'], 3, x['id'], dict(base, at=x['created_at'], id='c%d' % x['id'], movement_id=x['movement_id'], type='correccion', kind='correccion', reason='correccion',
-                             label='Corrección de costo', entry=0, exit=0, document=x['document'], party='', location='', note='Entrada #%d: %s → %s. %s' % (x['movement_id'], usd(x['old_cost_cents']), usd(x['new_cost_cents']), x['reason']),
+                             label='Corrección de costo · sin movimiento de existencias', entry=0, exit=0, document=x['document'], party='', location='', note='Entrada #%d: %s → %s. %s' % (x['movement_id'], usd(x['old_cost_cents']), usd(x['new_cost_cents']), x['reason']),
                              old_cost_cents=x['old_cost_cents'], new_cost_cents=x['new_cost_cents'], user_id=x['created_by'], actor=names.get(x['created_by'], 'Sistema'), units=[])))
         for r in c.execute('SELECT * FROM inventory_reservations WHERE item_id=?', (item['id'],)).fetchall():
             units_ = [dict(u) for u in c.execute('SELECT id,internal_code,serial,location FROM inventory_units WHERE reservation_id=? OR id IN (SELECT unit_id FROM inventory_movement_units WHERE movement_id=?)',
@@ -1123,6 +1153,15 @@ def kardex(c, filters=None):
             if r['status'] == 'liberada':
                 timeline.append((r['closed_at'], 1, r['id'], dict(base, at=r['closed_at'], id='l%d' % r['id'], type='reserva', kind='reserva', reason='liberacion', label='Liberación de reserva', entry=0, exit=0,
                                  reserved=-r['quantity'], document=r['reference'], party=client, location='', note='', user_id=r['closed_by'], actor=names.get(r['closed_by'], 'Sistema'), units=units_)))
+        # Cambios del precio de venta: no mueven existencias ni costos; se muestran aparte para no confundirlos con entradas o salidas.
+        try:
+            prices = c.execute('SELECT * FROM catalog_price_history WHERE item_id=? ORDER BY id', (item['catalog_id'],)).fetchall()
+        except Exception:
+            prices = []
+        for x in prices:
+            timeline.append((x['created_at'], 4, x['id'], dict(base, at=x['created_at'], id='p%d' % x['id'], type='precio', kind='precio', reason='precio', label='Cambio de precio de venta · sin movimiento de existencias',
+                             entry=0, exit=0, document='', party='', location='', note='Precio de venta: %s → %s.' % (usd(x['old_cents']), usd(x['new_cents'])),
+                             old_price_cents=x['old_cents'], new_price_cents=x['new_cents'], user_id=x['user_id'], actor=names.get(x['user_id'], 'Sistema'), units=[])))
         for t in c.execute('SELECT t.*,u.internal_code,u.serial FROM inventory_transfers t LEFT JOIN inventory_units u ON u.id=t.unit_id WHERE t.item_id=?', (item['id'],)).fetchall():
             timeline.append((t['created_at'], 2, t['id'], dict(base, at=t['created_at'], id='t%d' % t['id'], type='traslado', kind='traslado', reason='traslado',
                              label='Traslado: %s → %s' % (t['from_location'] or 'sin ubicación', t['to_location']), entry=0, exit=0, moved=t['quantity'], document='', party='', location=t['to_location'],
@@ -1132,8 +1171,11 @@ def kardex(c, filters=None):
         for _, _, _, row in timeline:
             if row['type'] in ('entrada', 'salida'):
                 last = {k: row[k] for k in last}
+                row['balance_before'] = row['balance'] - row['entry'] + row['exit']
             else:
                 row.update(unit_cost_cents=0, line_cents=0, **last)
+                row['balance_before'] = row['balance']
+            row['stock_effect'] = row['type'] in ('entrada', 'salida')
             if start and row['at'][:10] < start:
                 row['_before'] = True
             rows.append(row)
@@ -1148,7 +1190,7 @@ def kardex(c, filters=None):
         day = row['at'][:10]
         if a and day < a or b and day > b:
             return False
-        if kind in ('entrada', 'salida', 'reserva', 'traslado', 'correccion') and row['type'] != kind or kind.startswith('k:') and row.get('kind') != kind[2:] or kind.startswith('m:') and row['reason'] != kind[2:]:
+        if kind in ('entrada', 'salida', 'reserva', 'traslado', 'correccion', 'precio') and row['type'] != kind or kind.startswith('k:') and row.get('kind') != kind[2:] or kind.startswith('m:') and row['reason'] != kind[2:]:
             return False
         if user_id and row['user_id'] != user_id:
             return False
@@ -1175,7 +1217,7 @@ def kardex(c, filters=None):
     return {'rows': out[-2000:], 'totals': totals, 'previous': previous, 'truncated': len(out) > 2000}
 
 
-KARDEX_COLUMNS = ['Fecha', 'Producto', 'SKU', 'Categoría', 'Marca', 'Serie / código', 'Movimiento', 'Entrada', 'Salida', 'Saldo', 'Costo unitario', 'Valor del movimiento', 'Costo promedio',
+KARDEX_COLUMNS = ['Fecha', 'Producto', 'SKU', 'Categoría', 'Marca', 'Serie / código', 'Movimiento', 'Entrada', 'Salida', 'Saldo anterior', 'Saldo', 'Costo unitario', 'Valor del movimiento', 'Costo promedio',
                   'Valor del saldo', 'Documento', 'Proveedor / cliente', 'Responsable', 'Observación']
 
 
@@ -1186,7 +1228,7 @@ def _units_text(units):
 def _kardex_cells(r):
     money = r['type'] in ('entrada', 'salida')
     return [r['at'].replace('T', ' ')[:16], r['product'], r['sku'], r['category'], r['brand'], _units_text(r['units']), r['label'] + (' · costo pendiente' if r.get('cost_pending') and not r.get('corrected') else ''),
-            r['entry'] or '', r['exit'] or '', r['balance'], r['unit_cost_cents'] / 100 if money else '', r.get('line_cents', 0) / 100 if money else '', r['average_cents'] / 100,
+            r['entry'] or '', r['exit'] or '', r.get('balance_before', r['balance']), r['balance'], r['unit_cost_cents'] / 100 if money else '', r.get('line_cents', 0) / 100 if money else '', r['average_cents'] / 100,
             r['balance_cents'] / 100, r.get('document') or '', r.get('party') or '', r['actor'], r.get('note') or '']
 
 
@@ -1291,7 +1333,7 @@ def report(c, kind, f):
             usd(sum(r.get('line_cents', 0) for r in rows if r['type'] == 'salida')), t['stock_units'], usd(t['stock_cents']))
         if t.get('opening') is not None and f.get('from'):
             totals += ' · Saldo inicial: %d · Saldo final: %d' % (t['opening'], t['closing'])
-        return title, KARDEX_COLUMNS, [_kardex_cells(r) for r in rows], [58, 104, 50, 0, 0, 92, 72, 30, 30, 30, 46, 50, 0, 50, 70, 60, 54, 0], totals
+        return title, KARDEX_COLUMNS, [_kardex_cells(r) for r in rows], [58, 104, 50, 0, 0, 92, 72, 30, 30, 34, 30, 46, 50, 0, 50, 70, 60, 54, 0], totals
     if kind == 'periodo':
         data = kardex(c, dict(f, type=''))
         per = {}
@@ -1750,7 +1792,7 @@ def dashboard(c, now):
                       'licenses': lic_free, 'warranties_soon': len(expiring), 'moves_week': sum(1 for r in rows if r['at'][:10] >= week and r['type'] in ('entrada', 'salida'))},
             'alerts': {k: v[:12] for k, v in alerts.items()}, 'low': [p for p in active if p['low']][:10],
             'expiring': [dict(e, days_left=(date.fromisoformat(e['store_warranty_to']) - today).days) for e in expiring[:10]],
-            'recent': [r for r in rows if r['type'] != 'correccion'][-10:][::-1]}
+            'recent': [r for r in rows if r['type'] not in ('correccion', 'precio')][-10:][::-1]}
 
 
 UNLIMITED = re.compile(r'ilimitad|perpetu|de por vida|lifetime|permanente|vitalici', re.I)
@@ -1864,3 +1906,85 @@ def export_package(c, now):
     body = json.dumps(tables, ensure_ascii=False, sort_keys=True, default=str)
     return {'format': 'ordenes-pro-inventario/1', 'generated_at': stamp(now), 'sha256': hashlib.sha256(body.encode()).hexdigest(),
             'counts': {k: len(v) for k, v in tables.items()}, 'tables': tables}
+
+
+# ---- Reinicialización controlada de existencias -----------------------------------------------------------------------------------
+REINIT_WORD = 'REINICIALIZAR'
+
+
+def _reinit_ids(raw):
+    ids = [int(x) for x in re.split(r'[,\s]+', str(raw or '')) if x.isdigit()]
+    if not 1 <= len(ids) <= 200 or len(set(ids)) != len(ids):
+        raise InventoryError('Elige los productos que se reinicializan.', 400, {'item_ids': 'Selecciona al menos un producto.'})
+    return ids
+
+
+def reinit_preview(c, raw_ids):
+    """Qué hará la reinicialización con cada ficha (solo lectura): existencias, unidades, movimientos, correcciones, ventas, reservas y
+    bloqueos. Nada se borra: las existencias quedan en 0 con una salida de ajuste trazable."""
+    rows = []
+    for item_id in _reinit_ids(raw_ids):
+        item = product(c, item_id)
+        units = [dict(u) for u in c.execute("SELECT id,internal_code,serial,status FROM inventory_units WHERE item_id=? ORDER BY id", (item_id,))]
+        moves = c.execute('SELECT COUNT(*),COALESCE(SUM(CASE WHEN reason IN (\'venta\',\'uso_orden\') THEN 1 ELSE 0 END),0) FROM inventory_movements WHERE item_id=?', (item_id,)).fetchone()
+        fixes = c.execute('SELECT COUNT(*) FROM inventory_cost_corrections WHERE item_id=?', (item_id,)).fetchone()[0] if _has_column(c, 'inventory_cost_corrections', 'id') else 0
+        held = c.execute("SELECT COUNT(*) FROM inventory_reservations WHERE item_id=? AND status='activa'", (item_id,)).fetchone()[0]
+        blockers = ['Tiene %d reserva(s) activa(s): libéralas antes.' % held] if held else []
+        out = [u for u in units if u['status'] == 'disponible']
+        if item['tracking'] == 'serie' and len(out) != item['stock'] and item['stock'] > 0:
+            blockers.append('Las unidades disponibles (%d) no coinciden con las existencias (%d): revisa la ficha.' % (len(out), item['stock']))
+        rows.append({'id': item_id, 'name': item['name'], 'sku': item['sku'], 'tracking': item['tracking'], 'stock': item['stock'], 'average_cost_cents': item['average_cost_cents'],
+                     'value_cents': item['value_cents'], 'movements': moves[0], 'sales': moves[1], 'corrections': fixes, 'reservations': held,
+                     'units': [{'internal_code': u['internal_code'], 'serial': u['serial'], 'status': u['status']} for u in units],
+                     'action': ('Salida de ajuste por %d unidad(es); las unidades disponibles pasan a baja y liberan su serie para el nuevo ingreso' % item['stock']) if item['stock'] > 0 else 'Ya está en 0: no se registra nada',
+                     'blockers': blockers})
+    return {'rows': rows, 'word': REINIT_WORD, 'blocked': any(r['blockers'] for r in rows)}
+
+
+def reinitialize(c, data, user, now):
+    """Deja en 0 las existencias de las fichas elegidas, con autorización expresa (administración, motivo y la palabra de confirmación).
+    Cada ficha recibe una salida de ajuste (los movimientos anteriores, las correcciones y las ventas no cambian); las unidades disponibles
+    pasan a baja y liberan su serie para volver a ingresarlas. Idempotente con la clave de solicitud."""
+    if user['role'] != 'administrador':
+        raise InventoryError('Solo administración reinicializa el inventario.', 403)
+    key = str(data.get('request_key', '') or '').strip()
+    if key:
+        if not re.fullmatch(r'[A-Za-z0-9-]{16,64}', key):
+            raise InventoryError('Solicitud no válida. Recarga la página.', 400)
+        same = c.execute('SELECT id,code,summary FROM inventory_reinit_batches WHERE request_key=?', (key,)).fetchone()
+        if same:
+            return {'batch': same['code'], 'rows': json.loads(same['summary']), 'duplicate': True}
+    if str(data.get('confirm', '')).strip() != REINIT_WORD:
+        raise InventoryError('Escribe %s para confirmar la reinicialización.' % REINIT_WORD, 400, {'confirm': 'Confirmación obligatoria.'})
+    reason = re.sub(r'\s+', ' ', str(data.get('reason', '') or '')).strip()
+    if not 10 <= len(reason) <= 300:
+        raise InventoryError('Indica el motivo de la reinicialización (10 a 300 caracteres).', 400, {'reason': 'Motivo obligatorio.'})
+    preview = reinit_preview(c, data.get('item_ids'))
+    if preview['blocked']:
+        raise InventoryError('Hay productos con bloqueos: ' + ' '.join(b for r in preview['rows'] for b in r['blockers']), 409)
+    seq = c.execute("SELECT seq FROM sqlite_sequence WHERE name='inventory_reinit_batches'").fetchone()
+    top = c.execute('SELECT COALESCE(MAX(id),0) FROM inventory_reinit_batches').fetchone()[0]
+    bid = max(seq[0] if seq else 0, top) + 1
+    code = 'RI-%06d' % bid
+    summary = []
+    for r in preview['rows']:
+        if r['stock'] <= 0:
+            summary.append({'id': r['id'], 'name': r['name'], 'before': r['stock'], 'after': r['stock'], 'movement_id': None})
+            continue
+        units = [u['id'] for u in c.execute("SELECT id FROM inventory_units WHERE item_id=? AND status='disponible' ORDER BY id", (r['id'],))] if r['tracking'] == 'serie' else None
+        mid = inventory.move(c, r['id'], -1, 'ajuste_salida', str(r['stock']), '0', user, now, reference_kind='reinicializacion', reference_id=bid,
+                             note='Reinicialización autorizada (%s): %s' % (code, reason), request_key='reinit-%d-%d' % (bid, r['id']), unit_ids=units)
+        for uid in units or []:
+            u = c.execute('SELECT serial,serial_key FROM inventory_units WHERE id=?', (uid,)).fetchone()
+            c.execute("UPDATE inventory_units SET status='baja',serial_key='',released_serial=?,updated_at=?,updated_by=? WHERE id=?", (u['serial'], stamp(now), user['id'], uid))
+        after = product(c, r['id'])['stock']
+        event(c, now, user, 'reinicializacion', 'Reinicialización %s: existencias %d → %d. Motivo: %s' % (code, r['stock'], after, reason), r['id'])
+        summary.append({'id': r['id'], 'name': r['name'], 'before': r['stock'], 'after': after, 'movement_id': mid})
+    c.execute('INSERT INTO inventory_reinit_batches(id,code,reason,items,summary,request_key,created_by,created_at) VALUES (?,?,?,?,?,?,?,?)',
+              (bid, code, reason, json.dumps([r['id'] for r in preview['rows']]), json.dumps(summary, ensure_ascii=False), key or None, user['id'], stamp(now)))
+    return {'batch': code, 'rows': summary, 'duplicate': False}
+
+
+def reinit_batches(c):
+    names = {r[0]: r[1] for r in c.execute('SELECT id,name FROM users')}
+    return [dict(r, summary=json.loads(r['summary']), actor=names.get(r['created_by'], '')) for r in c.execute('SELECT id,code,reason,summary,created_by,created_at FROM inventory_reinit_batches ORDER BY id DESC LIMIT 50')]

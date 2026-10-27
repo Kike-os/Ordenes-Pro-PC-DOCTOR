@@ -9317,3 +9317,9 @@ body[data-page=dashboard] .pf-result:is(:hover,:focus-visible){border-color:var(
 .bank-toolbar{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1fr);gap:8px;align-items:center}
 .bank-toolbar select{min-height:40px;min-width:0}
 @media (max-width:720px){.bank-toolbar{grid-template-columns:minmax(0,1fr)}}
+.ic-margin{grid-column:1/-1;margin:0;font-size:12.5px;font-weight:700;color:#6EE7B7}
+.ic-margin[data-tone=bad]{color:#FCA5A5}.ic-margin[data-tone=zero]{color:#FCD9A0}.ic-margin:empty{display:none}
+.ic-reinit-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr));gap:6px;padding:12px 14px}
+.ic-reinit .inv-actions{padding:0 14px 12px}
+.ic-reinit-out{display:grid;gap:10px;padding:0 14px 14px}
+.ic-reinit-out:empty{display:none}

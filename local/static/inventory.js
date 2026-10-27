@@ -69,7 +69,9 @@ function centerProductFields(form,field,p,categoryId){const cat=centerCategoryOp
  const model=field('model','Modelo',{max:120,value:p?.model||'',hint:'Ej.: A400 256 GB'});const name=field('name','Nombre del producto',{required:true,max:120,value:p?.name||'',hint:'Se propone con la marca y el modelo.'});
  field('sku','SKU (modelo comercial)',{max:40,value:p?.sku||'',hint:'Opcional. Único por modelo.'});
  const tracking=field('tracking','Control',{options:Object.entries(centerTax.tracking),value:p?.tracking||''});field('price','Precio de venta (IVA incluido)',{mode:'decimal',max:14,value:p?(p.price_cents/100).toFixed(2).replace('.',','):'',hint:'USD. Se usa en presupuestos y facturas.'});
- field('min_stock','Existencia mínima (alerta)',{mode:'numeric',max:6,value:String(p?.min_stock??1)});field('location','Ubicación física',{max:80,value:p?.location||'',hint:'Ej.: Bodega A, estante 2'});
+ field('min_stock','Existencia mínima (alerta)',{mode:'numeric',max:6,value:String(p?.min_stock??1)});field('max_stock','Existencia máxima',{mode:'numeric',max:7,value:p?.max_stock?String(p.max_stock):'',hint:'Opcional. Avisa si se supera.'});
+ field('barcode','Código de barras',{max:40,value:p?.barcode||'',hint:'Opcional. Único: no se repite en otra ficha.'});field('location','Ubicación física',{max:80,value:p?.location||'',hint:'Ej.: Bodega A, estante 2'});
+ field('description','Descripción',{area:true,max:500,value:p?.description||''});
  centerWarrantyFields(field,form,'warranty_store','Garantía de PC-DOCTOR',p?.warranty_store);centerWarrantyFields(field,form,'warranty_maker','Garantía del fabricante',p?.warranty_maker);
  const findCat=id=>{for(const c of centerTax.categories){if(String(c.id)===id)return c;for(const ch of c.children)if(String(ch.id)===id)return ch;}return null;};
  const suggest=()=>{if(name.dataset.touched)return;const c=findCat(cat.value);name.value=[c&&c.parent_id?c.name:'',brand.value.trim(),model.value.trim()].filter(Boolean).join(' ');};
@@ -195,7 +197,26 @@ async function centerWarranties(panel){const w=centerState.warranty,data=await a
   const acts=el('div',undefined,'ic-acts');acts.append(invIconBtn('Ver la unidad '+r.internal_code,'eye',()=>centerUnitDialog(r.unit_id)));if(!r.delivered_at)acts.append(invBtn('Registrar entrega','calendar',()=>centerDeliveryDialog([{id:r.unit_id,internal_code:r.internal_code,serial:r.serial}],()=>centerWarranties(panel))));head.append(acts);
   li.append(head,centerWarrantyBlock(r));list.append(li);}panel.append(list);}
 // ---- Reportes y configuración ----
+// Reinicialización controlada: deja en 0 las fichas elegidas con una salida de ajuste trazable (nada se borra). Solo administración,
+// con vista previa, motivo y la palabra de confirmación.
+async function centerReinitCard(){const card=el('section',undefined,'inv-card ic-card ic-reinit');card.append(centerCardHead('Reinicializar inventario','refresh-cw','Deja en 0 las fichas elegidas para volver a registrar su inventario inicial'));
+ const data=await api('/api/inventory/products');const list=el('div',undefined,'ic-reinit-list');const checks=[];
+ for(const p of data.rows.filter(x=>x.active)){const l=el('label',undefined,'inv-cf'),c=el('input');c.type='checkbox';c.value=String(p.id);l.append(c,el('span',p.name+' · existencias '+p.stock+(p.reserved?' · '+p.reserved+' reservadas':'')));list.append(l);checks.push(c);}
+ const all=button('Seleccionar todas',()=>{for(const c of checks)c.checked=true;},'secondary');const out=el('div',undefined,'ic-reinit-out');
+ const preview=invBtn('Ver qué se hará','eye',async()=>{const ids=checks.filter(c=>c.checked).map(c=>c.value).join(',');if(!ids){notify('Elige al menos un producto.');return;}
+  let r;try{r=await api('/api/inventory/reinitialize?ids='+ids);}catch(error){notify(error.message);return;}out.replaceChildren();
+  out.append(centerTable(['Producto','Existencias','Movimientos','Correcciones','Ventas','Acción','Bloqueos'],r.rows.map(x=>centerRow([['Producto',x.name],['Existencias',String(x.stock)],['Movimientos',String(x.movements)],['Correcciones',String(x.corrections)],['Ventas',String(x.sales)],['Acción',x.action],['Bloqueos',x.blockers.join(' ')||'—']]))));
+  out.append(el('p','Los movimientos anteriores, las correcciones de costo, las ventas y las facturas no cambian. Cada ficha recibe una salida de ajuste con el motivo y el lote; las unidades disponibles pasan a baja y liberan su serie para volver a ingresarlas.','inv-form-note'));
+  if(r.blocked){out.append(el('p','Resuelve los bloqueos antes de continuar.','inv-warn'));return;}
+  const{form,msg,field,fail,clear}=invForm('bank-form');field('reason','Motivo de la reinicialización',{area:true,max:300,required:true});field('confirm','Escribe '+r.word+' para confirmar',{max:20,required:true});
+  const go=el('button',undefined,'primary inv-btn');go.type='submit';go.append(invIcon('refresh-cw'),el('span','Reinicializar'));form.append(msg,go);out.append(form);const key=invKey('reinit').replace(/[^A-Za-z0-9-]/g,'').padEnd(20,'0').slice(0,40);
+  form.addEventListener('submit',async e=>{e.preventDefault();clear();if(!await askConfirm('¿Reinicializar '+r.rows.length+' producto(s)?','Las existencias quedarán en 0. Esta acción queda registrada con tu nombre, el motivo y la fecha.','Reinicializar',true))return;go.disabled=true;
+   try{const done=await api('/api/inventory/reinitialize',{item_ids:ids,reason:form.elements.reason.value,confirm:form.elements.confirm.value,request_key:key});toast('Inventario reinicializado ('+done.batch+').','success');renderInventoryCenter();}catch(error){go.disabled=false;fail(error);}});});
+ const acts=el('div',undefined,'inv-actions');acts.append(all,preview);card.append(list,acts,out);
+ const batches=await api('/api/inventory/reinit-batches').catch(()=>({rows:[]}));if(batches.rows.length)card.append(el('h4','Reinicializaciones registradas','cj-sub'),centerTable(['Lote','Fecha','Responsable','Motivo','Productos'],batches.rows.map(b=>centerRow([['Lote',b.code],['Fecha',formatOrderDate(b.created_at)],['Responsable',b.actor],['Motivo',b.reason],['Productos',b.summary.map(x=>x.name+' '+x.before+'→'+x.after).join(' · ')]]))));
+ return card;}
 async function centerConfig(panel){const tax=await centerTaxonomy(true);panel.replaceChildren();panel.append(invSectionHead('Configuración','Prefijos de códigos, etiquetas, lector de códigos de barras y traslado futuro a producción.'));
+ panel.append(await centerReinitCard());
  const pre=el('section',undefined,'inv-card');pre.append(centerCardHead('Prefijos de códigos internos','tags','Únicos y nunca reutilizables'));
  pre.append(centerTable(['Prefijo','Categoría','Último número','Próximo código'],tax.prefixes.map(p=>centerRow([['Prefijo',el('code',p.prefix)],['Categoría',p.category],['Último número',String(p.last_number)],['Próximo código','PCD-'+p.prefix+'-'+String(p.last_number+1).padStart(6,'0')]]))));panel.append(pre);
  const labels=el('section',undefined,'inv-card ic-card');labels.append(centerCardHead('Etiquetas','printer','Logo original, producto, código de barras y serie'));const{form,field}=invForm('bank-form');
@@ -537,6 +558,12 @@ async function centerRegister(panel,mode){const initial=mode==='inicial',preset=
  field('document','Documento de compra',{max:80,into:s4c,hint:'Ej.: factura 001-001-000000123.'});
  const cost=field('cost','Costo unitario (USD, sin IVA)',{required:true,mode:'decimal',max:14,into:s4c,hint:'Obligatorio. Escribe 0 solo si no tuvo costo.'});
  field('tax','IVA del costo',{options:[['15','15 %'],['0','0 %']],into:s4c});const priceIn=field('price','Precio de venta (IVA incluido)',{mode:'decimal',max:14,into:s4c,hint:'Actualiza el precio de la ficha.'});
+ // Margen estimado en vivo: precio sin IVA (15 %) menos el costo. Solo informativo; no cambia ningún valor guardado.
+ const marginOut=el('p','','ic-margin');marginOut.setAttribute('aria-live','polite');s4c.append(marginOut);
+ const parseMoney=v=>{const t=String(v||'').trim();return /^\d{1,7}([.,]\d{1,2})?$/.test(t)?Math.round(parseFloat(t.replace(',','.'))*100):NaN;};
+ const paintMargin=()=>{const c=parseMoney(cost.value),p=parseMoney(priceIn.value);if(Number.isNaN(c)||Number.isNaN(p)||!p){marginOut.textContent='';return;}const net=Math.round(p*10000/11500),m=net-c;
+  marginOut.textContent='Margen estimado: '+centerMoney(m)+' por unidad ('+(net?(m*100/net).toFixed(1).replace('.',','):'0')+' % sobre el precio sin IVA de '+centerMoney(net)+').';marginOut.dataset.tone=m<0?'bad':m===0?'zero':'ok';};
+ cost.addEventListener('input',paintMargin);priceIn.addEventListener('input',paintMargin);
  const where=field('location','Ubicación física',{max:80,into:s4c,hint:'Ej.: Bodega A, estante 2.'});field('note','Observación',{area:true,max:300,into:s4c});
  const paintCommercial=()=>{const p=currentProduct();if(p&&!creating&&!priceIn.dataset.touched)priceIn.value=p.price_cents?(p.price_cents/100).toFixed(2).replace('.',','):'';};priceIn.addEventListener('input',()=>{priceIn.dataset.touched='1';});
  // 4. Garantías (de la ficha nueva o de la existente).
@@ -586,17 +613,20 @@ async function centerSellPicker(){const rows=(await api('/api/inventory/products
 function centerPeriod(key){const fmt=d=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/Guayaquil'}).format(d),today=new Date(),day=864e5;
  if(key==='hoy')return[fmt(today),fmt(today)];if(key==='7')return[fmt(new Date(today-6*day)),fmt(today)];if(key==='30')return[fmt(new Date(today-29*day)),fmt(today)];
  if(key==='mes'){const t=fmt(today);return[t.slice(0,8)+'01',t];}return null;}
-function centerKardexTable(rows,compact,expandable){const columns=compact?['Fecha','Producto','Movimiento','Cant.','Saldo','Responsable']:['','Fecha','Producto','Movimiento','Entrada','Salida','Saldo','Costo unit.','Valor','Acciones'];
+function centerKardexTable(rows,compact,expandable){const columns=compact?['Fecha','Producto','Movimiento','Cant.','Saldo','Responsable']:['','Fecha','Producto','Movimiento','Documento','Entrada','Salida','Saldo anterior','Saldo posterior','Costo unit.','Valor','Responsable','Acciones'];
  const wrap=el('div',undefined,'ic-scroll ic-kardex-wrap'),table=el('table',undefined,'ic-table ic-kardex'+(compact?' is-compact':'')),thead=el('thead'),hr=el('tr'),tbody=el('tbody');
  for(const c of columns){const th=el('th',c);th.scope='col';hr.append(th);}thead.append(hr);
  for(const r of rows){const units=r.units.map(u=>u.serial?u.serial+' · '+u.internal_code:u.internal_code).join(', ');const kind=el('span',r.label,'ic-move');kind.dataset.kind=r.kind||r.type;
-  const prod=el('div',undefined,'ic-name');prod.append(el('strong',r.product),el('small',[r.sku&&'SKU '+r.sku,units].filter(Boolean).join(' · ')||r.category));
+  const prod=el('div',undefined,'ic-name');prod.append(el('strong',r.product),el('small',[r.code&&'Cód. '+r.code,r.sku&&r.sku!==r.code&&'SKU '+r.sku,units].filter(Boolean).join(' · ')||r.category));
+  // Correcciones de costo y cambios de precio: filas propias que no mueven existencias (la entrada y la salida quedan vacías).
+  if(r.stock_effect===false&&['correccion','precio'].includes(r.type))kind.append(' ',invoiceChip('descartado','Sin efecto en existencias'));
   const qty=r.entry?'+'+r.entry:r.exit?'−'+r.exit:r.reserved?'('+r.reserved+')':'';
   if(compact){const tr=centerRow([['Fecha',formatOrderDate(r.at)],['Producto',r.product],['Movimiento',kind],['Cant.',qty],['Saldo',String(r.balance)],['Responsable',r.actor]]);tr.dataset.type=r.type;tbody.append(tr);continue;}
-  const money=['entrada','salida'].includes(r.type),cost=el('span',money?centerMoney(r.unit_cost_cents):'—');if(r.cost_pending&&!r.corrected)cost.append(' ',invoiceChip('pendiente','Costo pendiente'));if(r.corrected)cost.title='Costo corregido (registrado originalmente: '+centerMoney(r.original_cost_cents)+')';
+  const money=['entrada','salida'].includes(r.type),cost=el('span',money?centerMoney(r.unit_cost_cents):r.type==='correccion'?centerMoney(r.old_cost_cents)+' → '+centerMoney(r.new_cost_cents):r.type==='precio'?'Precio '+centerMoney(r.old_price_cents)+' → '+centerMoney(r.new_price_cents):'—');if(r.cost_pending&&!r.corrected)cost.append(' ',invoiceChip('pendiente','Costo pendiente'));if(r.corrected)cost.title='Costo corregido (registrado originalmente: '+centerMoney(r.original_cost_cents)+')';
   const toggle=invIconBtn('Detalle del movimiento','chevron-right',()=>{const open_=detail.hidden;detail.hidden=!open_;toggle.setAttribute('aria-expanded',String(open_));});toggle.setAttribute('aria-expanded','false');toggle.classList.add('ic-expand');
   const acts=el('div',undefined,'ic-acts');acts.append(invIconBtn('Ficha de '+r.product,'eye',()=>centerProductDialog(r.item_id,'kardex')));if(r.cost_pending&&!r.corrected&&r.movement_id)acts.append(invIconBtn('Corregir costo','pencil',()=>centerCostDialog(r.movement_id,r.product+' · '+formatOrderDate(r.at)+'.',()=>renderInventoryCenter())));
-  const tr=centerRow([['Detalle',toggle],['Fecha',formatOrderDate(r.at)],['Producto',prod],['Movimiento',kind],['Entrada',r.entry?String(r.entry):''],['Salida',r.exit?String(r.exit):''],['Saldo',String(r.balance)],['Costo unit.',cost],['Valor',money?centerMoney(r.line_cents):''],['Acciones',acts]]);tr.dataset.type=r.type;
+  const tr=centerRow([['Detalle',toggle],['Fecha',formatOrderDate(r.at)],['Producto',prod],['Movimiento',kind],['Documento',r.document||'—'],['Entrada',r.entry?String(r.entry):''],['Salida',r.exit?String(r.exit):''],
+   ['Saldo anterior',String(r.balance_before??r.balance)],['Saldo posterior',String(r.balance)],['Costo unit.',cost],['Valor',money?centerMoney(r.line_cents):''],['Responsable',r.actor||'—'],['Acciones',acts]]);tr.dataset.type=r.type;
   const detail=el('tr',undefined,'ic-detail-row');detail.hidden=true;const td=el('td');td.colSpan=columns.length;detail.append(td);
   td.append(centerFacts([['Fecha y hora',new Date(r.at).toLocaleString('es-EC',{timeZone:'America/Guayaquil'})],['Documento',r.document||'—'],[r.type==='entrada'?'Proveedor':'Cliente',r.party||'—'],['Responsable',r.actor],
    ['Costo aplicado',money?centerMoney(r.unit_cost_cents)+(r.corrected?' (corregido; registrado '+centerMoney(r.original_cost_cents)+')':''):'—'],['Costo promedio',centerMoney(r.average_cents)],['Valor del saldo',centerMoney(r.balance_cents)],['Ubicación',r.location||'—'],

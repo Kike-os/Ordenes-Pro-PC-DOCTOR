@@ -1974,6 +1974,8 @@ class Handler(BaseHTTPRequestHandler):
                     if found:return self.reply(200,center.product_sheet(c,found[1],now))
                     if path=='/api/inventory/licenses/table':return self.reply(200,center.licenses_table(c,now))
                     if path=='/api/inventory/review':return self.reply(200,center.review(c,now))
+                    if path=='/api/inventory/reinitialize':return self.reply(200,center.reinit_preview(c,(q.get('ids',[''])[0] or '')[:1200]))
+                    if path=='/api/inventory/reinit-batches':return self.reply(200,{'rows':center.reinit_batches(c)})
                     found=re.fullmatch(r'/api/inventory/(kardex|report)\.(xlsx|csv|pdf)',path)
                     if found:
                         # Reportes del Kardex: los mismos filtros de la pantalla; Excel con columnas numéricas, PDF con logo, filtros, totales y páginas.
@@ -3025,6 +3027,9 @@ class Handler(BaseHTTPRequestHandler):
                             elif action=='pricing':result={'product':center.save_pricing(c,data.get('id'),data,user,now)}
                             elif action in ('alerts_on','alerts_off'):center.set_alerts(c,data.get('id'),action=='alerts_on',user,now);result={}
                             else:c.rollback();return self.reply(400,{'error':'Acción inválida.'})
+                        elif path=='/api/inventory/reinitialize':
+                            import inventory_center as center
+                            result=center.reinitialize(c,data,user,now)
                         elif path=='/api/inventory/cost-correction':
                             import inventory_center as center
                             result={'product':center.correct_cost(c,data.get('movement_id'),data.get('cost'),data.get('reason'),user,now,data.get('document',''))}

@@ -484,3 +484,22 @@ CREATE TABLE cash_adjustments (
 );
 CREATE TRIGGER cash_adjustments_no_update BEFORE UPDATE ON cash_adjustments BEGIN SELECT RAISE(ABORT,'Un ajuste de caja no se modifica'); END;
 CREATE TRIGGER cash_adjustments_no_delete BEFORE DELETE ON cash_adjustments BEGIN SELECT RAISE(ABORT,'Un ajuste de caja no se elimina'); END;
+
+-- Fichas de producto: código de barras (único si se indica) y existencia máxima.
+ALTER TABLE inventory_items ADD COLUMN barcode TEXT NOT NULL DEFAULT '';
+ALTER TABLE inventory_items ADD COLUMN max_stock INTEGER NOT NULL DEFAULT 0 CHECK(max_stock>=0);
+CREATE UNIQUE INDEX inventory_items_barcode ON inventory_items(barcode) WHERE barcode!='';
+-- Reinicialización controlada: lotes autorizados (con motivo y responsable) y la serie original de las unidades dadas de baja por un lote.
+CREATE TABLE inventory_reinit_batches (
+ id INTEGER PRIMARY KEY AUTOINCREMENT,
+ code TEXT NOT NULL UNIQUE,
+ reason TEXT NOT NULL CHECK(length(reason) BETWEEN 10 AND 300),
+ items TEXT NOT NULL DEFAULT '[]',
+ summary TEXT NOT NULL DEFAULT '[]',
+ request_key TEXT UNIQUE,
+ created_by INTEGER NOT NULL REFERENCES users(id),
+ created_at TEXT NOT NULL
+);
+CREATE TRIGGER inventory_reinit_batches_no_update BEFORE UPDATE ON inventory_reinit_batches BEGIN SELECT RAISE(ABORT,'Un lote de reinicialización no se modifica'); END;
+CREATE TRIGGER inventory_reinit_batches_no_delete BEFORE DELETE ON inventory_reinit_batches BEGIN SELECT RAISE(ABORT,'Un lote de reinicialización no se elimina'); END;
+ALTER TABLE inventory_units ADD COLUMN released_serial TEXT NOT NULL DEFAULT '';
