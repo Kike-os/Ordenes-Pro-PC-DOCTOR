@@ -451,6 +451,21 @@ def listing(c, status='', q=''):
                                       + ' AND '.join(where) + ' ORDER BY i.id DESC LIMIT 200', args)]
     out = [{'id': r['id'], 'number': number(r), 'status': r['status'], 'status_label': STATUS[r['status']], 'buyer_name': r['buyer_name'], 'buyer_id': r['buyer_id'],
             'consumer_final': bool(r['consumer_final']), 'total_cents': r['total_cents'], 'reference': r['order_code'] or r['sale_code'] or '', 'source_kind': r['source_kind'],
-            'order_id': r['order_id'], 'created_at': r['created_at'], 'issue_date': r['issue_date'], 'environment': r['environment']} for r in rows]
+            'order_id': r['order_id'], 'created_at': r['created_at'], 'issue_date': r['issue_date'], 'environment': r['environment'], 'has_xml': bool(r['access_key'])} for r in rows]
     counts = {code: c.execute('SELECT COUNT(*) FROM invoices WHERE status=?', (code,)).fetchone()[0] for code in STATUS if code != 'descartado'}
-    return {'rows': out, 'counts': counts, 'statuses': {k: v for k, v in STATUS.items() if k != 'descartado'}, 'settings': settings(c)}
+    return {'rows': out, 'counts': counts, 'statuses': {k: v for k, v in STATUS.items() if k != 'descartado'}, 'settings': settings(c), 'summary': summary(c, counts)}
+
+
+def summary(c, counts):
+    """Indicadores del panel, solo con lo registrado (nada estimado). «Facturado» suma lo emitido sin rechazo; los saldos salen de los pagos
+    actuales de las órdenes y ventas ya facturadas (por ejemplo, un pago anulado después de facturar)."""
+    import equipment
+    live = "status NOT IN ('descartado','rechazado')"
+    billed = c.execute("SELECT COALESCE(SUM(total_cents),0) FROM invoices WHERE status IN ('pendiente','enviado','autorizado')").fetchone()[0]
+    dues = [r[0] for r in c.execute('SELECT ' + equipment.BUDGET + '-' + equipment.PAID + " FROM orders o WHERE o.id IN (SELECT order_id FROM invoices WHERE source_kind='orden' AND " + live + ')')]
+    dues += [r[0] for r in c.execute("SELECT s.total_cents-COALESCE((SELECT SUM(amount_cents) FROM license_sale_payments p WHERE p.sale_id=s.id AND p.status='confirmado'),0) FROM license_sales s "
+                                     "WHERE s.cancelled_at='' AND s.id IN (SELECT license_sale_id FROM invoices WHERE source_kind='venta_licencia' AND " + live + ')')]
+    dues = [d for d in dues if d > 0]
+    return {'emitted': sum(counts.get(k, 0) for k in ('pendiente', 'enviado', 'autorizado', 'rechazado')), 'pending': sum(counts.get(k, 0) for k in ('borrador', 'pendiente', 'enviado')),
+            'drafts': counts.get('borrador', 0), 'to_send': counts.get('pendiente', 0) + counts.get('enviado', 0), 'authorized': counts.get('autorizado', 0),
+            'rejected': counts.get('rechazado', 0), 'billed_cents': billed, 'unpaid_count': len(dues), 'unpaid_cents': sum(dues)}

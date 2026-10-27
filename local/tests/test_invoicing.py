@@ -130,6 +130,15 @@ class InvoiceFlowTests(unittest.TestCase):
         self.assertEqual(post2('/api/invoicing/%d' % draft2['id'], action='emit', confirm='1')['body']['invoice']['number'], '001-001-000000002')  # consecutivo
         listing = self.request('/api/invoicing', cookie=second_cookie)['body']
         self.assertEqual((listing['counts']['pendiente'], listing['counts']['autorizado']), (1, 1))
+        # Indicadores del panel: solo lo registrado; las dos órdenes están pagadas, así que no hay saldos pendientes.
+        s = listing['summary']
+        self.assertEqual((s['emitted'], s['pending'], s['drafts'], s['to_send'], s['authorized'], s['rejected'], s['billed_cents'], s['unpaid_count'], s['unpaid_cents']),
+                         (2, 1, 0, 1, 1, 0, 16535, 0, 0))
+        self.assertEqual({r['number']: r['has_xml'] for r in listing['rows']}, {'001-001-000000001': True, '001-001-000000002': True})
+        with app.connect() as c:  # un pago anulado después de facturar deja saldo en la orden ya facturada
+            c.execute("UPDATE order_payments SET voided_at='2026-01-01 00:00:00',void_reason='prueba' WHERE order_id=?", (order2['id'],));c.commit()
+        s = self.request('/api/invoicing', cookie=second_cookie)['body']['summary']
+        self.assertEqual((s['unpaid_count'], s['unpaid_cents']), (1, 2000))
 
     def test_consumer_final_boundaries_are_enforced_by_the_server(self):
         results = {}
