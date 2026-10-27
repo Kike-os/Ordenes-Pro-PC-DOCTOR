@@ -8,6 +8,36 @@
   },
   "releases": [
     {
+      "version": "1.5.206",
+      "date": "2026-10-26T21:33:03-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Centro de Inventario con Kardex, códigos por categoría, series y garantías, y Facturación rediseñada (modo de pruebas)",
+      "changes": {
+        "features": [
+          "Centro de Inventario (solo administración): categorías, subcategorías y marcas administrables; ficha por modelo (SKU) y unidades con su serie original y un código interno por categoría (PCD-SSD-000001). Los prefijos y los códigos no se reutilizan.",
+          "Inventario inicial y registro de mercadería con lector de códigos de barras USB: detecta series duplicadas, genera los códigos internos, admite unidades sin serie y productos a granel, e importa desde Excel o CSV con vista previa y validación.",
+          "Kardex valorizado con costo promedio ponderado, reservas y traslados, filtros por fecha, categoría, marca, producto, serie, movimiento y responsable, y exportación a Excel, PDF y CSV.",
+          "Salidas por venta, consumo en una orden técnica, devolución, ajuste o baja con una sola salida por documento: lo consumido en una orden no se vuelve a descontar al facturarla.",
+          "Garantías de PC-DOCTOR y del fabricante por separado (en días, meses o años, desde la venta o la entrega), con panel de días restantes, vencimientos y su historial.",
+          "Licencias digitales clasificadas por categoría, marca, familia y edición con las existencias reales del módulo Licencias; las licencias nuevas de productos clasificados reciben el código de su categoría (PCD-AV, PCD-M365).",
+          "Etiquetas en PDF con el logo original, el nombre del producto, el código interno en código de barras y la serie original."
+        ],
+        "improvements": [
+          "Facturación rediseñada: nombre «Facturación» con nuevo icono, aviso compacto de MODO DE PRUEBAS, pestañas con iconos y navegación por teclado, indicadores con datos reales, búsqueda, filtros y tabla de facturas, estados vacíos y ventanas compactas con campos obligatorios y errores junto a cada campo."
+        ],
+        "fixes": [
+          "Facturación › Caja: abrir un cierre desde el historial ya no reemplaza el módulo por la caja suelta."
+        ],
+        "security": [
+          "El Centro de Inventario es solo de administración (comprobado en el servidor); las claves de las licencias siguen cifradas en su módulo y nunca se muestran ni se exportan desde el inventario."
+        ],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Kike-os: versión en pruebas; producción pendiente de autorización"
+    },
+    {
       "version": "1.5.205",
       "date": "2026-10-26T14:43:00-05:00",
       "type": "patch",

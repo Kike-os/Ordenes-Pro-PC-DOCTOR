@@ -4,6 +4,32 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.206 — 2026-10-26 21:33 (UTC-05:00)
+
+Centro de Inventario con Kardex, códigos por categoría, series y garantías, y Facturación rediseñada (modo de pruebas)
+
+### Nuevas funcionalidades
+
+- Centro de Inventario (solo administración): categorías, subcategorías y marcas administrables; ficha por modelo (SKU) y unidades con su serie original y un código interno por categoría (PCD-SSD-000001). Los prefijos y los códigos no se reutilizan.
+- Inventario inicial y registro de mercadería con lector de códigos de barras USB: detecta series duplicadas, genera los códigos internos, admite unidades sin serie y productos a granel, e importa desde Excel o CSV con vista previa y validación.
+- Kardex valorizado con costo promedio ponderado, reservas y traslados, filtros por fecha, categoría, marca, producto, serie, movimiento y responsable, y exportación a Excel, PDF y CSV.
+- Salidas por venta, consumo en una orden técnica, devolución, ajuste o baja con una sola salida por documento: lo consumido en una orden no se vuelve a descontar al facturarla.
+- Garantías de PC-DOCTOR y del fabricante por separado (en días, meses o años, desde la venta o la entrega), con panel de días restantes, vencimientos y su historial.
+- Licencias digitales clasificadas por categoría, marca, familia y edición con las existencias reales del módulo Licencias; las licencias nuevas de productos clasificados reciben el código de su categoría (PCD-AV, PCD-M365).
+- Etiquetas en PDF con el logo original, el nombre del producto, el código interno en código de barras y la serie original.
+
+### Mejoras realizadas
+
+- Facturación rediseñada: nombre «Facturación» con nuevo icono, aviso compacto de MODO DE PRUEBAS, pestañas con iconos y navegación por teclado, indicadores con datos reales, búsqueda, filtros y tabla de facturas, estados vacíos y ventanas compactas con campos obligatorios y errores junto a cada campo.
+
+### Errores corregidos
+
+- Facturación › Caja: abrir un cierre desde el historial ya no reemplaza el módulo por la caja suelta.
+
+### Actualizaciones de seguridad
+
+- El Centro de Inventario es solo de administración (comprobado en el servidor); las claves de las licencias siguen cifradas en su módulo y nunca se muestran ni se exportan desde el inventario.
+
 ## v1.5.205 — 2026-10-26 14:43 (UTC-05:00)
 
 Agenda y Notificaciones estables ante cortes de la base en la nube, y Facturación Electrónica integrada en modo de pruebas
