@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## Sin publicar
+
+### Nuevas funcionalidades
+
+- Facturación › Configuración › Políticas Comerciales: documento de políticas de venta, cambios, devoluciones y garantías con versiones, validación legal registrada, vista previa en PDF e historial; cada factura queda asociada a la versión vigente al emitirse.
+- Documentos de la factura: RIDE en PDF con código de barras de la clave de acceso, políticas asociadas y certificado de garantías con las coberturas de PC-DOCTOR y del fabricante por separado, tomadas del Centro de Inventario.
+- Envío de los documentos al cliente solo para facturas autorizadas por el SRI, una vez por factura, con reintentos controlados y registro de cada resultado; envío de prueba únicamente a la dirección autorizada y marcado como sin validez tributaria.
+
 ## v1.5.206 — 2026-10-26 21:33 (UTC-05:00)
 
 Centro de Inventario con Kardex, códigos por categoría, series y garantías, y Facturación rediseñada (modo de pruebas)
