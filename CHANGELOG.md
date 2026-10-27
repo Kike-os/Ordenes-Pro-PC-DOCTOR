@@ -4,6 +4,25 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.209 — 2026-10-27 18:47 (UTC-05:00)
+
+Caja por sesiones con arqueo y cierre guiado, pagos y saldo profesionales, cuentas bancarias con verificación, vouchers, proformas con aprobación, notas de crédito (pruebas) e inventario con reinicialización controlada y Kardex corregido
+
+### Nuevas funcionalidades
+
+- Caja por sesiones: Abrir Caja con conteo por denominaciones USD, ingresos y egresos con trazabilidad, arqueo, cierre guiado en 6 pasos con diferencias (cuadrado, sobrante, faltante) y revisión administrativa, fondo para el siguiente turno, historial y auditoría, y reporte oficial en PDF A4 y térmico de 80 mm.
+- Pagos y saldo de las órdenes: pago completo, abono o pago mixto con confirmación previa, débito, crédito, cheque, cuenta receptora elegida por banco, referencia y fecha; estados de pago, facturación y entrega por separado; la entrega con saldo solo con autorización administrativa y motivo.
+- Cuentas bancarias con verificación, indicadores, registro de depósitos y transferencias con comprobante, confirmación, rechazo y conciliación, historial con filtros y exportación a Excel y PDF; vouchers de tarjeta con lote, referencia, aprobación y últimos 4 dígitos, y liquidación con comisión.
+- Cotizaciones y proformas con financiamiento DATAFAST, enlace privado de aprobación con firma, versiones, anticipos y conversión a factura; factura directa, factura desde una venta del inventario y notas de crédito (en el ambiente de pruebas).
+
+### Mejoras realizadas
+
+- Inventario: reinicialización controlada y auditada, Kardex con saldo anterior y posterior, correcciones de costo y cambios de precio sin efecto en existencias, y ficha con código de barras único, existencia máxima, descripción y margen estimado.
+
+### Errores corregidos
+
+- Facturación: una orden se factura aunque tenga saldo (queda como venta a crédito); cobro y facturación son procesos separados.
+
 ## v1.5.208 — 2026-10-27 08:31 (UTC-05:00)
 
 Facturación con Panel general y menú agrupado, y simulador de cuotas con tarjeta (DATAFAST 6.2) en modo de pruebas
