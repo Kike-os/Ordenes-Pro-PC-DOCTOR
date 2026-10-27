@@ -472,3 +472,60 @@ def summary(c, counts):
     return {'emitted': sum(counts.get(k, 0) for k in ('pendiente', 'enviado', 'autorizado', 'rechazado')), 'pending': sum(counts.get(k, 0) for k in ('borrador', 'pendiente', 'enviado')),
             'drafts': counts.get('borrador', 0), 'to_send': counts.get('pendiente', 0) + counts.get('enviado', 0), 'authorized': counts.get('autorizado', 0),
             'rejected': counts.get('rechazado', 0), 'billed_cents': billed, 'unpaid_count': len(dues), 'unpaid_cents': sum(dues)}
+
+
+ENVIRONMENTS = {'1': 'Pruebas', '2': 'Producción'}
+EVENT_LABELS = {'creado': 'Borrador creado', 'comprador': 'Comprador actualizado', 'emitido': 'Emitida en pruebas', 'descartado': 'Borrador descartado',
+                'cuenta_bancaria': 'Cuenta bancaria'}
+
+
+def dashboard(c, now):
+    """Panel general (solo lectura): indicadores separados por ambiente (pruebas y producción), facturación mensual de los últimos 12 meses,
+    actividad reciente y documentos que requieren atención. Solo cuenta lo registrado: nada se estima."""
+    by_env = {env: {code: 0 for code in STATUS if code != 'descartado'} for env in ENVIRONMENTS}
+    billed = {env: 0 for env in ENVIRONMENTS}
+    for r in c.execute("SELECT environment,status,COUNT(*) n,COALESCE(SUM(total_cents),0) total FROM invoices WHERE status!='descartado' GROUP BY 1,2"):
+        if r['environment'] in by_env:
+            by_env[r['environment']][r['status']] = r['n']
+            if r['status'] in ('pendiente', 'enviado', 'autorizado'):
+                billed[r['environment']] += r['total']
+    counts = {code: sum(by_env[env][code] for env in ENVIRONMENTS) for code in by_env['1']}
+    s = summary(c, counts)
+    first = now.date().replace(day=1)
+    months = []
+    for back in range(11, -1, -1):
+        y, m = first.year, first.month - back
+        while m <= 0:
+            y, m = y - 1, m + 12
+        months.append('%04d-%02d' % (y, m))
+    monthly = {key: {env: 0 for env in ENVIRONMENTS} for key in months}
+    for r in c.execute("SELECT substr(issue_date,1,7) month,environment,COALESCE(SUM(total_cents),0) total FROM invoices WHERE status IN ('pendiente','enviado','autorizado') "
+                       "AND issue_date>=? GROUP BY 1,2", (months[0] + '-01',)):
+        if r['month'] in monthly and r['environment'] in ENVIRONMENTS:
+            monthly[r['month']][r['environment']] = r['total']
+    recent = [{'invoice_id': r['invoice_id'], 'event': r['event'], 'label': EVENT_LABELS.get(r['event'], r['event'].replace('_', ' ').capitalize()), 'detail': r['detail'],
+               'actor': r['actor'], 'at': r['created_at'], 'number': number(r), 'buyer_name': r['buyer_name'], 'environment': r['environment']}
+              for r in c.execute('SELECT e.invoice_id,e.event,e.detail,e.actor,e.created_at,i.establishment,i.emission_point,i.sequential,i.buyer_name,i.environment '
+                                 'FROM invoice_events e JOIN invoices i ON i.id=e.invoice_id ORDER BY e.id DESC LIMIT 8')]
+    attention = []
+    for r in c.execute("SELECT * FROM invoices WHERE status IN ('borrador','pendiente','rechazado') ORDER BY id DESC LIMIT 30"):
+        inv = dict(r)
+        if inv['status'] == 'rechazado':
+            reason = 'Rechazada: revisa los mensajes del SRI y corrige los datos.'
+        elif inv['status'] == 'pendiente':
+            reason = 'Emitida en pruebas: pendiente de firma electrónica y envío al SRI de pruebas.'
+        else:
+            try:
+                found = source(c, inv['source_kind'], inv['source_id'])
+            except InvoiceError:
+                found = {'blockers': ['El origen de este borrador ya no está disponible.']}
+            problems = list(buyer_problems(inv).values())
+            reason = (found['blockers'] + problems)[0] if found['blockers'] or problems else 'Borrador listo para revisar y emitir en pruebas.'
+        attention.append({'id': inv['id'], 'status': inv['status'], 'status_label': STATUS[inv['status']], 'number': number(inv), 'buyer_name': inv['buyer_name'],
+                          'total_cents': inv['total_cents'], 'reason': reason, 'environment': inv['environment']})
+    cfg = settings(c)
+    return {'summary': s, 'environments': {env: {'label': ENVIRONMENTS[env], 'counts': by_env[env], 'billed_cents': billed[env],
+                                                 'documents': sum(by_env[env].values())} for env in ENVIRONMENTS},
+            'monthly': [{'month': key, 'test_cents': monthly[key]['1'], 'real_cents': monthly[key]['2']} for key in months],
+            'has_monthly': any(v['1'] or v['2'] for v in monthly.values()), 'recent': recent, 'attention': attention[:8], 'attention_total': len(attention),
+            'settings': {'test_mode': TEST_MODE, 'missing': cfg['missing'], 'environment': ENVIRONMENTS[TEST_ENVIRONMENT]}}

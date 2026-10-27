@@ -198,7 +198,7 @@ formAction('reset-form',async(form,data)=>{data.token=new URLSearchParams(locati
 let currentUser, currentModule='home', requestVersion=0, recordType='';
 const $=id=>document.getElementById(id);
 const statusNames={pendiente:'En espera',reparacion:'Procesando',revision_recurrente:'En revisión por falla recurrente',esperando_cliente:'Esperando respuesta del cliente',presupuesto:'Aprobación de presupuesto',espera_entrega:'En espera de entrega',listo:'Listo para entregar',entregado:'Entregado'};
-const moduleInfo={cash:['Caja','Cierre diario por usuario y depósitos en las cuentas bancarias de la empresa'],inventory:['Centro de Inventario','Productos, unidades con serie, Kardex, licencias digitales y garantías de PC-DOCTOR S.A.'],invoicing:['Facturación','Facturas, inventario, compras, proveedores, caja y cuentas, integrados con órdenes, presupuestos y pagos'],licenses:['Licencias Pro — Control de Vigencia y Renovaciones','Inventario, entregas, activaciones, vencimientos y renovaciones de licencias'],notices:['Centro de notificaciones','Licencias, órdenes, citas, correos y avisos del sistema'],orders:['Órdenes de Reparación','Gestione, consulte y dé seguimiento al estado de los equipos recibidos'],clients:['Gestión de Clientes','Directorio y administración de clientes de PC-DOCTOR S.A.'],devices:['Equipos','Registro y consulta de computadoras y portátiles.'],reports:['CENTRO DE CONTROL TÉCNICO','Monitoreo de órdenes, productividad e indicadores operativos en tiempo real'],maintenance:['Próximos Mantenimientos','Mantenimientos preventivos programados para equipos entregados'],deliveries:['Próximas Entregas','Control de equipos listos, pendientes y programados para entrega.'],activity:['Seguimiento de órdenes','Actividad y movimientos del taller: cambios de estado, seguimientos e incidencias.'],settings:['Centro de Configuración y Administración','Gestiona tu perfil, seguridad, usuarios y preferencias del sistema.'],appointments:['Agenda de Citas','Gestiona y da seguimiento a todas las citas de servicio técnico.'],live:['Centro de Atención en Tiempo Real','Gestión de conversaciones activas, asistencia de ADI y atención del personal.'],adi:['ADI — Centro de Inteligencia Administrativa','Asistente inteligente de PC-DOCTOR S.A. · Gestión y análisis del taller'],mail:['PC-DOCTOR Mail Pro','Correo empresarial integrado con clientes y órdenes.'],system:['Centro de Actualizaciones','Gestión de versiones, historial de cambios y estado del sistema.']};
+const moduleInfo={cash:['Caja','Cierre diario por usuario y depósitos en las cuentas bancarias de la empresa'],inventory:['Centro de Inventario','Productos, unidades con serie, Kardex, licencias digitales y garantías de PC-DOCTOR S.A.'],invoicing:['Facturación','Facturas, caja, compras, proveedores y cuentas bancarias, integrados con órdenes, presupuestos, pagos y el Centro de Inventario'],licenses:['Licencias Pro — Control de Vigencia y Renovaciones','Inventario, entregas, activaciones, vencimientos y renovaciones de licencias'],notices:['Centro de notificaciones','Licencias, órdenes, citas, correos y avisos del sistema'],orders:['Órdenes de Reparación','Gestione, consulte y dé seguimiento al estado de los equipos recibidos'],clients:['Gestión de Clientes','Directorio y administración de clientes de PC-DOCTOR S.A.'],devices:['Equipos','Registro y consulta de computadoras y portátiles.'],reports:['CENTRO DE CONTROL TÉCNICO','Monitoreo de órdenes, productividad e indicadores operativos en tiempo real'],maintenance:['Próximos Mantenimientos','Mantenimientos preventivos programados para equipos entregados'],deliveries:['Próximas Entregas','Control de equipos listos, pendientes y programados para entrega.'],activity:['Seguimiento de órdenes','Actividad y movimientos del taller: cambios de estado, seguimientos e incidencias.'],settings:['Centro de Configuración y Administración','Gestiona tu perfil, seguridad, usuarios y preferencias del sistema.'],appointments:['Agenda de Citas','Gestiona y da seguimiento a todas las citas de servicio técnico.'],live:['Centro de Atención en Tiempo Real','Gestión de conversaciones activas, asistencia de ADI y atención del personal.'],adi:['ADI — Centro de Inteligencia Administrativa','Asistente inteligente de PC-DOCTOR S.A. · Gestión y análisis del taller'],mail:['PC-DOCTOR Mail Pro','Correo empresarial integrado con clientes y órdenes.'],system:['Centro de Actualizaciones','Gestión de versiones, historial de cambios y estado del sistema.']};
 function el(tag,text,className){const node=document.createElement(tag);if(text!==undefined)node.textContent=text;if(className)node.className=className;return node;}
 function button(text,action,className='secondary'){const b=el('button',text,className);b.type='button';b.addEventListener('click',action);return b;}
 function notify(text,success=false){const box=$('dashboard-message');box.textContent='';box.classList.toggle('success',success);if(text)toast(text,success?'success':'error');}
@@ -4752,7 +4752,7 @@ function openOrderStatusDialog(row){
 // aquí solo se reflejan para guiar a la persona.
 const invoiceGlyph='M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z M14 8H8 M16 12H8 M13 16H8';
 const invoiceIdTypes={'05':'Cédula','04':'RUC','06':'Pasaporte','08':'Identificación del exterior'};
-let invoiceState={status:'',q:'',tab:'facturas'};
+let invoiceState={status:'',q:'',tab:'panel'};
 // Iconos Lucide del módulo (licencia ISC en static/lucide-LICENSE): trazos fijos del paquete oficial, sin cargar nada externo.
 const invIcons={'receipt-text':'<path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M14 8H8"/><path d="M16 12H8"/><path d="M13 16H8"/>',
  package:'<path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><path d="m3.3 7 7.703 4.734a2 2 0 0 0 1.994 0L20.7 7"/><path d="m7.5 4.27 9 5.15"/>',
@@ -4778,6 +4778,8 @@ const invIcons={'receipt-text':'<path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1
  history:'<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/>',
  'arrow-down-to-line':'<path d="M12 17V3"/><path d="m6 11 6 6 6-6"/><path d="M19 21H5"/>','arrow-up-from-line':'<path d="m18 9-6-6-6 6"/><path d="M12 3v14"/><path d="M5 21h14"/>',
  send:'<path d="M14.5 21.7a.5.5 0 0 0 .9 0l6.5-19a.5.5 0 0 0-.6-.6l-19 6.5a.5.5 0 0 0 0 .9l8 3.2a2 2 0 0 1 1 1.1z"/><path d="m21.9 2.1-10.9 11"/>'};
+// Iconos de la navegación y el panel de Facturación (mismo paquete Lucide).
+Object.assign(invIcons,{'signature':'<path d="m21 17-2.156-1.868A.5.5 0 0 0 18 15.5v.5a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1c0-2.545-3.991-3.97-8.5-4a1 1 0 0 0 0 5c4.153 0 4.745-11.295 5.708-13.5a2.5 2.5 0 1 1 3.31 3.284"/><path d="M3 21h18"/>','plug-zap':'<path d="M6.3 20.3a2.4 2.4 0 0 0 3.4 0L12 18l-6-6-2.3 2.3a2.4 2.4 0 0 0 0 3.4Z"/><path d="m2 22 3-3"/><path d="M7.5 13.5 10 11"/><path d="M10.5 16.5 13 14"/><path d="m18 3-4 4h6l-4 4"/>','activity':'<path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"/>','external-link':'<path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>','arrow-right':'<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>','clock':'<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>','coins':'<circle cx="8" cy="8" r="6"/><path d="M18.09 10.37A6 6 0 1 1 10.34 18"/><path d="M7 6h1v4"/><path d="m16.71 13.88.7.71-2.82 2.82"/>','credit-card':'<rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/>','sliders-horizontal':'<line x1="21" x2="14" y1="4" y2="4"/><line x1="10" x2="3" y1="4" y2="4"/><line x1="21" x2="12" y1="12" y2="12"/><line x1="8" x2="3" y1="12" y2="12"/><line x1="21" x2="16" y1="20" y2="20"/><line x1="12" x2="3" y1="20" y2="20"/><line x1="14" x2="14" y1="2" y2="6"/><line x1="8" x2="8" y1="10" y2="14"/><line x1="16" x2="16" y1="18" y2="22"/>','file-pen-line':'<path d="m18 5-2.414-2.414A2 2 0 0 0 14.172 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2"/><path d="M21.378 12.626a1 1 0 0 0-3.004-3.004l-4.01 4.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"/><path d="M8 18h1"/>','badge-check':'<path d="M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z"/><path d="m9 12 2 2 4-4"/>'});
 function invIcon(name){const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');for(const[k,v]of [['viewBox','0 0 24 24'],['fill','none'],['stroke','currentColor'],['stroke-width','1.8'],['stroke-linecap','round'],['stroke-linejoin','round'],['aria-hidden','true']])svg.setAttribute(k,v);svg.classList.add('inv-icon');svg.innerHTML=invIcons[name]||'';return svg;}
 function invBtn(label,icon,action,className='secondary'){const b=button('',action,className+' inv-btn');b.append(invIcon(icon),el('span',label));return b;}
 function invIconBtn(label,icon,action){const b=button('',action,'inv-icon-btn');b.setAttribute('aria-label',label);b.title=label;b.append(invIcon(icon));return b;}
@@ -4792,37 +4794,113 @@ function invEmpty(icon,title,text,action){const box=el('div',undefined,'inv-empt
 function invoiceChip(status,label){const chip=el('span',label,'inv-chip');chip.dataset.status=status;return chip;}
 function invoiceTestBanner(settings){const box=el('div',undefined,'inv-banner'),mark=el('span',undefined,'inv-banner-mark');box.setAttribute('role','note');mark.append(invIcon('flask-conical'));
  const copy=el('div');copy.append(el('strong','MODO DE PRUEBAS — EMISIÓN REAL DESACTIVADA'),el('small',settings?.emission?.note||'Los comprobantes solo se preparan para el ambiente de pruebas del SRI.'));box.append(mark,copy,el('span','Ambiente: Pruebas','inv-banner-env'));return box;}
-const invoiceTabs=[['facturas','Facturas','receipt-text'],['inventario','Inventario','package'],['compras','Compras','shopping-cart'],['proveedores','Proveedores','truck'],['caja','Caja','wallet'],['cuentas','Cuentas bancarias','landmark','Cuentas'],['fiscal','Datos fiscales','building-2','Fiscal'],['config','Configuración','settings','Ajustes']];
-// Funciones todavía en desarrollo: se muestran como tales y nunca como operativas. Se convertirán en pestañas cuando estén terminadas.
-const invoiceSoon=[['file-check-2','Proformas con aprobación del cliente'],['file-x-2','Notas de crédito'],['banknote','Anticipos y abonos'],['file-text','Factura en PDF (RIDE)'],['send','Firma electrónica y envío al SRI']];
-function invoiceTabBar(data){const nav=el('div',undefined,'inv-tabs'),alerts=data.inventory_alerts,missing=data.settings.missing.length;nav.setAttribute('role','tablist');nav.setAttribute('aria-label','Secciones de Facturación');
- const badges={inventario:alerts?[alerts,alerts===1?'1 alerta de existencias':alerts+' alertas de existencias']:null,fiscal:missing?[missing,missing===1?'1 dato pendiente':missing+' datos pendientes']:null};
- for(const[key,label,icon,short]of invoiceTabs){const on=invoiceState.tab===key,t=button('',()=>{if(invoiceState.tab===key)return;invoiceState.tab=key;renderInvoicing().then(()=>$('module-content').querySelector('.inv-module>.inv-tabs [aria-selected=true]')?.focus());},'inv-tab');
-  t.setAttribute('role','tab');t.setAttribute('aria-selected',String(on));t.tabIndex=on?0:-1;t.dataset.tab=key;t.append(invIcon(icon),el('span',label,'inv-tab-label'));if(short)t.append(el('span',short,'inv-tab-short'));
-  if(badges[key]){const b=el('span',String(badges[key][0]),'inv-tab-badge');b.title=badges[key][1];t.append(b);t.setAttribute('aria-label',label+' · '+badges[key][1]);}else if(short)t.setAttribute('aria-label',label);nav.append(t);}
- // Teclado: flechas, Inicio y Fin recorren las pestañas; Enter o Espacio la abren.
- nav.addEventListener('keydown',event=>{const tabs=[...nav.querySelectorAll('.inv-tab')],i=tabs.indexOf(document.activeElement),next={ArrowRight:i+1,ArrowLeft:i-1,Home:0,End:tabs.length-1}[event.key];if(i<0||next===undefined)return;event.preventDefault();tabs[(next+tabs.length)%tabs.length].focus();});
- return nav;}
-async function renderInvoicing(){const root=$('module-content');let data;try{data=await api('/api/invoicing?'+new URLSearchParams({status:invoiceState.status,q:invoiceState.q}));}catch(error){root.replaceChildren(el('p',error.message,'empty-module'));return;}
- const wrap=el('div',undefined,'inv-module'),panel=el('div',undefined,'inv-panel');panel.setAttribute('role','tabpanel');panel.setAttribute('aria-label',(invoiceTabs.find(t=>t[0]===invoiceState.tab)||invoiceTabs[0])[1]);
- wrap.append(invoiceTestBanner(data.settings),invoiceTabBar(data),panel);root.replaceChildren(wrap);
- if(invoiceState.tab==='fiscal'){invoiceSettingsForm(panel);return;}
- if(invoiceState.tab==='config'){invoicePoliciesPanel(panel);return;}
- if(invoiceState.tab==='cuentas'){bankAccountsPanel(panel);return;}
- if(invoiceState.tab==='inventario'){inventoryPanel(panel);return;}
- if(invoiceState.tab==='compras'){purchasesPanel(panel);return;}
- if(invoiceState.tab==='proveedores'){suppliersPanel(panel);return;}
- if(invoiceState.tab==='caja'){renderCash(panel);return;}
- invoicesPanel(panel,data);}
+// Navegación agrupada de Facturación (misma estructura que el Centro de Inventario). Las secciones marcadas con 1 están en desarrollo y se
+// presentan como tales: nunca como operativas. «@inventory» abre el Centro de Inventario existente (no se duplica dentro de Facturación).
+const invoiceGroups=[['Facturación',[['panel','Panel general','layout-dashboard'],['facturas','Facturas','receipt-text'],['proformas','Proformas','file-check-2',1],['notas','Notas de crédito','file-x-2',1],['pagos','Pagos y anticipos','banknote',1]]],
+ ['Administración',[['caja','Caja','wallet'],['compras','Compras','shopping-cart'],['proveedores','Proveedores','truck'],['cuentas','Cuentas bancarias','landmark'],['@inventory','Centro de Inventario','package']]],
+ ['Configuración',[['fiscal','Datos fiscales','building-2'],['firma','Firma electrónica','signature',1],['sri','Integración SRI','plug-zap',1],['config','Políticas comerciales','scroll-text'],['general','Configuración general','sliders-horizontal']]]];
+const invoiceTabs=invoiceGroups.flatMap(([,items])=>items).filter(t=>!t[0].startsWith('@'));
+function invoicePref(key,fallback){try{return JSON.parse(localStorage.getItem('fx-'+key))??fallback;}catch{return fallback;}}
+function invoiceSetPref(key,value){try{localStorage.setItem('fx-'+key,JSON.stringify(value));}catch{}}
+function invoiceGo(key){if(key==='@inventory'){go('inventory');return;}if(invoiceState.tab===key)return;invoiceState.tab=key;renderInvoicing().then(()=>$('module-content').querySelector('.fx-nav [aria-current=page]')?.focus());}
+function invoiceNav(data){const nav=el('nav',undefined,'ic-nav fx-nav');nav.setAttribute('aria-label','Secciones de Facturación');const current=invoiceTabs.find(t=>t[0]===invoiceState.tab)||invoiceTabs[0];
+ const alerts=data.inventory_alerts||0,missing=(data.settings?.missing||[]).length;
+ const badges={'@inventory':alerts?[alerts,alerts===1?'1 alerta de existencias':alerts+' alertas de existencias']:null,fiscal:missing?[missing,missing===1?'1 dato pendiente':missing+' datos pendientes']:null};
+ const toggle=button('',()=>{const shell=nav.closest('.ic-shell');const next=shell.dataset.collapsed!=='true';shell.dataset.collapsed=String(next);invoiceSetPref('nav-collapsed',next);toggle.setAttribute('aria-expanded',String(!next));},'ic-nav-collapse');
+ toggle.setAttribute('aria-label','Plegar o desplegar el menú');toggle.setAttribute('aria-expanded',String(!invoicePref('nav-collapsed',false)));toggle.append(invIcon('panel-left'));
+ const mobile=button('',()=>{const open_=nav.dataset.open!=='true';nav.dataset.open=String(open_);mobile.setAttribute('aria-expanded',String(open_));},'ic-nav-mobile');mobile.setAttribute('aria-expanded','false');mobile.setAttribute('aria-controls','fx-nav-groups');
+ mobile.append(invIcon(current[2]),el('span',current[1]),invIcon('chevron-down'));
+ const groups=el('div',undefined,'ic-nav-groups');groups.id='fx-nav-groups';
+ for(const[title,items]of invoiceGroups){const g=el('div',undefined,'ic-nav-group');g.append(el('p',title,'ic-nav-title'));
+  for(const[key,label,icon,soon]of items){const b=button('',()=>{nav.dataset.open='false';invoiceGo(key);},'ic-nav-item');b.dataset.tab=key;b.title=label+(soon?' (en desarrollo)':'');
+   if(key===current[0])b.setAttribute('aria-current','page');b.append(invIcon(key.startsWith('@')?'external-link':icon),el('span',label));
+   if(badges[key]){const n=el('b',String(badges[key][0]),'fx-nav-badge');n.title=badges[key][1];b.append(n);b.setAttribute('aria-label',label+' · '+badges[key][1]);}
+   else if(soon){const mark=el('i',undefined,'fx-nav-soon');mark.append(invIcon('clock'));b.append(mark);b.setAttribute('aria-label',label+' · en desarrollo');}
+   else if(key.startsWith('@'))b.setAttribute('aria-label',label+' (abre el módulo)');
+   g.append(b);}groups.append(g);}
+ nav.addEventListener('keydown',event=>{if(event.key==='Escape'&&nav.dataset.open==='true'){nav.dataset.open='false';mobile.setAttribute('aria-expanded','false');mobile.focus();}});
+ nav.append(mobile,toggle,groups);return nav;}
+async function renderInvoicing(){const root=$('module-content');const tab=invoiceTabs.find(t=>t[0]===invoiceState.tab)||invoiceTabs[0];invoiceState.tab=tab[0];
+ let data;try{data=await api(tab[0]==='panel'?'/api/invoicing/dashboard':'/api/invoicing?'+new URLSearchParams({status:invoiceState.status,q:invoiceState.q}));}catch(error){root.replaceChildren(el('p',error.message,'empty-module'));return;}
+ const shell=el('div',undefined,'inv-module fx-module ic-shell'),main=el('div',undefined,'ic-main'),panel=el('div',undefined,'inv-panel');panel.id='fx-section';panel.setAttribute('aria-label',tab[1]);
+ shell.dataset.collapsed=String(!!invoicePref('nav-collapsed',false));main.append(invoiceTestBanner(data.settings),panel);shell.append(invoiceNav(data),main);root.replaceChildren(shell);
+ const run={panel:p=>invoiceDashboard(p,data),facturas:p=>invoicesPanel(p,data),fiscal:invoiceSettingsForm,config:invoicePoliciesPanel,cuentas:bankAccountsPanel,compras:purchasesPanel,proveedores:suppliersPanel,
+  caja:renderCash,general:invoiceGeneralPanel,proformas:invoiceSoonPanel,notas:invoiceSoonPanel,pagos:invoiceSoonPanel,firma:invoiceSoonPanel,sri:invoiceSriPanel}[tab[0]];
+ try{await run(panel);}catch(error){panel.replaceChildren(el('p',error.message,'empty-module'));}}
+// Indicadores compactos. Con acción, la tarjeta es un botón que abre el detalle (por ejemplo, las facturas de ese estado).
+function invoiceKpis(list){const grid=el('div',undefined,'fx-kpis');for(const[icon,label,value,hint,tone,action]of list){const card=action?button('',action,'fx-kpi'):el('article',undefined,'fx-kpi'),mark=el('span',undefined,'fx-kpi-icon'),body=el('div');
+  if(tone)card.dataset.tone=tone;mark.append(invIcon(icon));body.append(el('small',label),el('strong',value));if(hint)body.append(el('em',hint));card.append(mark,body);if(action)card.setAttribute('aria-label',label+': '+value+'. Ver detalle');grid.append(card);}return grid;}
+function invoiceCard(title,icon,note,...actions){const card=el('section',undefined,'inv-card fx-card'),head=el('header',undefined,'fx-card-head'),copy=el('div'),h=el('h3');h.append(invIcon(icon),el('span',title));copy.append(h);if(note)copy.append(el('small',note));head.append(copy);
+ if(actions.length){const acts=el('div',undefined,'fx-card-acts');acts.append(...actions);head.append(acts);}card.append(head);return card;}
+function invoiceShowStatus(status){invoiceState.status=status;invoiceState.q='';invoiceGo('facturas');}
+function invoiceEnvTag(env){const t=el('span',env==='2'?'Real':'Prueba','fx-env');t.dataset.env=env==='2'?'real':'prueba';return t;}
+// Panel general: todo sale de lo registrado; los documentos de prueba se separan de los reales.
+async function invoiceDashboard(panel,data){const s=data.summary,test=data.environments['1'],real=data.environments['2'];panel.replaceChildren();
+ panel.append(invSectionHead('Panel general','Indicadores con lo registrado, sin estimaciones. Mientras la emisión real esté desactivada, todos los documentos son de prueba y no tienen validez tributaria.',invBtn('Ver facturas','receipt-text',()=>invoiceShowStatus(''))));
+ if(data.settings.missing.length){const warn=el('div',undefined,'inv-warn inv-warn-action');warn.setAttribute('role','status');warn.append(invIcon('triangle-alert'),el('span','Faltan datos fiscales para emitir: '+data.settings.missing.join(', ')+'.'),button('Completar datos fiscales',()=>invoiceGo('fiscal'),'secondary'));panel.append(warn);}
+ const envs=el('div',undefined,'fx-envs');envs.setAttribute('aria-label','Documentos por ambiente');
+ for(const[env,info,note]of [['1',test,'Ambiente de pruebas del SRI · sin validez tributaria'],['2',real,data.settings.test_mode?'Emisión real desactivada':'Ambiente de producción del SRI']]){const box=el('div',undefined,'fx-env-box');box.dataset.env=env==='2'?'real':'prueba';
+  box.append(invoiceEnvTag(env),el('strong',info.documents===1?'1 documento':info.documents+' documentos'),el('span',quoteMoney(info.billed_cents)+' facturado'),el('small',note));envs.append(box);}
+ panel.append(envs);
+ panel.append(invoiceKpis([['receipt-text','Facturas emitidas',String(s.emitted),'Con número y clave de acceso','blue',()=>invoiceShowStatus('pendiente')],
+  ['file-pen-line','Borradores',String(s.drafts),'Sin número asignado','amber',()=>invoiceShowStatus('borrador')],
+  ['hourglass','Pendientes de autorización',String(s.to_send),'Por firmar y enviar al SRI','amber',()=>invoiceShowStatus('pendiente')],
+  ['badge-check','Autorizadas',String(s.authorized),data.settings.test_mode?'El envío al SRI está en desarrollo':'Autorizadas por el SRI','green',()=>invoiceShowStatus('autorizado')],
+  ['circle-x','Rechazadas',String(s.rejected),s.rejected?'Revisa y corrige los datos':'Ningún rechazo','red',()=>invoiceShowStatus('rechazado')],
+  ['circle-dollar-sign','Total facturado',quoteMoney(s.billed_cents),'Emitidas sin rechazo','teal'],
+  ['wallet','Pagos pendientes',quoteMoney(s.unpaid_cents),s.unpaid_count?(s.unpaid_count===1?'1 operación facturada con saldo':s.unpaid_count+' operaciones con saldo'):'Sin saldos en lo facturado','magenta']]));
+ const grid=el('div',undefined,'fx-grid');
+ // Facturación mensual: solo con datos; barras separadas para pruebas y documentos reales.
+ const chart=invoiceCard('Facturación mensual','chart-column','Últimos 12 meses · emitidas sin rechazo');chart.classList.add('fx-chart-card');
+ if(data.has_monthly){const plot=el('div',undefined,'fx-plot');plot.setAttribute('role','img');const months=data.monthly.map(m=>{const[y,mo]=m.month.split('-');return ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'][Number(mo)-1]+' '+y.slice(2);});
+  plot.setAttribute('aria-label','Facturación mensual: '+data.monthly.filter(m=>m.test_cents||m.real_cents).map((m,i)=>m.month+' '+quoteMoney(m.test_cents+m.real_cents)).join(', '));chart.append(plot);
+  loadChartLibrary().then(ok=>{if(!ok||!plot.isConnected)return;const css=getComputedStyle(panel.closest('.inv-module')),c=n=>css.getPropertyValue(n).trim();const instance=window.echarts.init(plot);new ResizeObserver(()=>instance.resize()).observe(plot);
+   const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+   instance.setOption({animation:!reduce,grid:{left:8,right:8,top:28,bottom:4,containLabel:true},legend:{top:0,right:0,itemWidth:10,itemHeight:10,textStyle:{color:c('--inv-muted')||'#94A3B8',fontSize:11}},
+    tooltip:{trigger:'axis',valueFormatter:v=>quoteMoney(Math.round(v*100))},xAxis:{type:'category',data:months,axisLabel:{color:c('--inv-soft')||'#64748B',fontSize:10},axisLine:{lineStyle:{color:'#1E2A3D'}},axisTick:{show:false}},
+    yAxis:{type:'value',axisLabel:{color:c('--inv-soft')||'#64748B',fontSize:10,formatter:v=>'$'+v},splitLine:{lineStyle:{color:'#1A2436'}}},
+    series:[{name:'Pruebas',type:'bar',stack:'t',barMaxWidth:22,itemStyle:{color:'#D9A441',borderRadius:[3,3,0,0]},data:data.monthly.map(m=>m.test_cents/100)},{name:'Reales',type:'bar',stack:'t',barMaxWidth:22,itemStyle:{color:'#3B82F6',borderRadius:[3,3,0,0]},data:data.monthly.map(m=>m.real_cents/100)}]});});}
+ else chart.append(invEmpty('chart-column','Sin facturación en los últimos 12 meses','El gráfico aparece cuando se emitan facturas.'));
+ // Documentos que requieren atención.
+ const att=invoiceCard('Requieren atención','circle-alert',data.attention_total?(data.attention_total===1?'1 documento':data.attention_total+' documentos'):'Nada pendiente');
+ if(data.attention.length){const ul=el('ul',undefined,'fx-list');for(const a of data.attention){const li=el('li'),b=button('',()=>openInvoice(a.id),'fx-row');const top=el('span',undefined,'fx-row-top');
+   top.append(el('strong',a.number||'Borrador'),invoiceChip(a.status,a.status_label),invoiceEnvTag(a.environment));b.append(top,el('span',(a.buyer_name||'Comprador sin definir')+' · '+quoteMoney(a.total_cents),'fx-row-sub'),el('small',a.reason));
+   b.setAttribute('aria-label','Abrir '+(a.number||'borrador')+': '+a.reason);li.append(b);ul.append(li);}att.append(ul);}
+ else att.append(invEmpty('circle-check','Todo al día','No hay borradores, emisiones pendientes ni rechazos por revisar.'));
+ // Actividad reciente (historial inmutable de las facturas).
+ const act=invoiceCard('Actividad reciente','activity','Últimos movimientos del historial');
+ if(data.recent.length){const ul=el('ul',undefined,'fx-list fx-timeline');for(const r of data.recent){const li=el('li'),b=button('',()=>openInvoice(r.invoice_id),'fx-row');const top=el('span',undefined,'fx-row-top');
+   top.append(el('strong',r.label),invoiceEnvTag(r.environment));b.append(top,el('span',(r.number||'Borrador')+(r.buyer_name?' · '+r.buyer_name:''),'fx-row-sub'),el('small',formatOrderDate(r.at)+(r.actor?' · '+r.actor:'')));li.append(b);ul.append(li);}act.append(ul);}
+ else act.append(invEmpty('activity','Sin actividad todavía','Aquí aparecerán los borradores, emisiones y cambios de las facturas.'));
+ grid.append(chart,att,act);panel.append(grid);}
+// Secciones en desarrollo: explican lo previsto y por qué todavía no está disponible. No simulan ninguna operación.
+const invoicePlans={
+ proformas:['Proformas','file-check-2','Fase 3',['Creación desde clientes, órdenes o catálogo, con productos, servicios, descuentos e impuestos','Vigencia de la oferta, PDF corporativo y envío por correo','Aprobación y aceptación del cliente con un mecanismo seguro, con historial de versiones','Conversión controlada a factura (en pruebas mientras la emisión real esté desactivada)'],'Una proforma no es un comprobante tributario.'],
+ notas:['Notas de crédito','file-x-2','Fase 3',['Anulación total o parcial de una factura emitida, con motivo obligatorio','Devolución de productos al inventario sin doble movimiento','XML y RIDE de la nota en el ambiente de pruebas'],'Hoy una factura emitida no se modifica ni se borra: queda en su historial.'],
+ pagos:['Pagos y anticipos','banknote','Fase 2',['Pagos completos, abonos parciales y pagos mixtos con confirmación previa','Anticipos antes de facturar, con trazabilidad hasta la factura','Movimiento automático en la sesión de Caja y en la cuenta bancaria, sin duplicar ingresos al facturar','Recibos imprimibles y anulaciones con motivo y reversión'],'Mientras tanto, los cobros se registran en «Pagos y saldo» de cada orden.'],
+ firma:['Firma electrónica','signature','Fase 5',['Carga del certificado autorizado (.p12) guardado cifrado y nunca visible','Firma XAdES-BES de los comprobantes','Aviso de vencimiento del certificado'],'No hay ningún certificado cargado: la firma y la emisión real están desactivadas.']};
+function invoiceSoonPanel(panel){const[title,icon,phase,items,note]=invoicePlans[invoiceState.tab];panel.replaceChildren(invSectionHead(title,'Sección en desarrollo ('+phase+'). Todavía no está disponible.'));
+ const card=invoiceCard('Qué incluirá',icon,phase);card.classList.add('fx-plan');const ul=el('ul',undefined,'fx-plan-list');for(const t of items){const li=el('li');li.append(invIcon('circle-check'),el('span',t));ul.append(li);}card.append(ul);
+ const info=el('p',undefined,'fx-plan-note');info.append(invIcon('info'),el('span',note));card.append(info);panel.append(card);}
+// Integración SRI: estado de cada etapa. Solo «Generación del XML» funciona hoy, y únicamente en el ambiente de pruebas.
+function invoiceSriPanel(panel){panel.replaceChildren(invSectionHead('Integración SRI','Arquitectura preparada por etapas. La conexión real con el SRI está desactivada hasta contar con el certificado, las credenciales y la autorización administrativa.'));
+ const steps=[['Generación del XML','Disponible en pruebas','ok','Secuencial, clave de acceso y XML sin firmar al emitir en pruebas.'],['Validación con el esquema XSD','Pendiente','soon','Comprobar el XML contra el esquema oficial antes de firmar.'],
+  ['Firma electrónica','Falta el certificado','off','Firma XAdES-BES con el certificado autorizado.'],['Recepción (ambiente de pruebas)','Pendiente','soon','Envío del comprobante firmado al servicio de recepción de pruebas.'],
+  ['Autorización y consulta de estados','Pendiente','soon','Consulta de la autorización y registro de cada respuesta.'],['Gestión de rechazos','Pendiente','soon','Mensajes del SRI junto a la factura para corregir y reenviar.'],
+  ['Descarga de XML autorizado y RIDE','Parcial','soon','El RIDE en PDF ya se genera; el XML autorizado llegará con la recepción.']];
+ const card=invoiceCard('Etapas de la emisión electrónica','plug-zap','Ambiente: Pruebas · emisión real desactivada'),ol=el('ol',undefined,'fx-steps');
+ for(const[name,state,tone,hint]of steps){const li=el('li');li.dataset.tone=tone;const head=el('div');head.append(el('strong',name));const chip=el('span',state,'fx-step-state');head.append(chip);li.append(head,el('small',hint));ol.append(li);}
+ card.append(ol);const info=el('p',undefined,'fx-plan-note');info.append(invIcon('info'),el('span','Ninguna autorización se simula: una factura de prueba nunca se presenta como autorizada por el SRI.'));card.append(info);panel.append(card);}
+// Configuración general: resumen de solo lectura y accesos a cada ajuste.
+async function invoiceGeneralPanel(panel){const data=await api('/api/invoicing/settings'),s=data.settings;panel.replaceChildren(invSectionHead('Configuración general','Resumen de la configuración de facturación. Cada ajuste se cambia en su sección.'));
+ const card=invoiceCard('Emisión','receipt-text',s.test_mode?'Modo de pruebas activo':'');card.append(invFacts([['Ambiente',s.emission?.environment_label||'Pruebas (SRI)'],['Emisión real',s.emission?.real_enabled?'Activada':'Desactivada'],['Establecimiento',s.establishment||'—'],['Punto de emisión',s.emission_point||'—'],
+  ['Consumidor final','Hasta USD 50,00 por factura'],['Datos fiscales',s.missing.length?'Faltan: '+s.missing.join(', '):'Completos']]));
+ const links=el('div',undefined,'fx-card-acts');links.append(invBtn('Datos fiscales','building-2',()=>invoiceGo('fiscal')),invBtn('Políticas y envío de documentos','scroll-text',()=>invoiceGo('config')),invBtn('Cuentas bancarias','landmark',()=>invoiceGo('cuentas')));card.append(links);panel.append(card);}
+function invFacts(pairs){const dl=el('dl',undefined,'inv-facts fx-facts');for(const[k,v]of pairs){const x=el('div');x.append(el('dt',k),el('dd',String(v??'—')));dl.append(x);}return dl;}
 // Panel de facturas: indicadores con lo registrado (nada estimado), búsqueda, filtros por estado y tabla.
 function invoicesPanel(panel,data){const s=data.summary,test=data.settings.test_mode!==false,filtered=!!(invoiceState.q||invoiceState.status);
- if(data.settings.missing.length){const warn=el('div',undefined,'inv-warn inv-warn-action');warn.setAttribute('role','status');warn.append(invIcon('triangle-alert'),el('span','Faltan datos fiscales para emitir: '+data.settings.missing.join(', ')+'.'),button('Completar datos fiscales',()=>{invoiceState.tab='fiscal';renderInvoicing();},'secondary'));panel.append(warn);}
- panel.append(invKpis([['receipt-text','Facturas emitidas',String(s.emitted),test?'Numeradas en ambiente de pruebas':'Con número y clave de acceso','blue'],
-  ['hourglass','Facturas pendientes',String(s.pending),(s.drafts===1?'1 borrador':s.drafts+' borradores')+' · '+s.to_send+' por enviar al SRI','amber'],
-  ['circle-check','Facturas autorizadas',String(s.authorized),test?'El envío al SRI está en desarrollo':'Autorizadas por el SRI','green'],
-  ['circle-x','Facturas rechazadas',String(s.rejected),s.rejected?'Revísalas y corrige los datos':'Ningún rechazo registrado','red'],
-  ['circle-dollar-sign','Total facturado',quoteMoney(s.billed_cents),test?'Emitidas sin rechazo · pruebas':'Emitidas sin rechazo','teal'],
-  ['wallet','Pagos pendientes',quoteMoney(s.unpaid_cents),s.unpaid_count?(s.unpaid_count===1?'1 operación facturada con saldo':s.unpaid_count+' operaciones facturadas con saldo'):'Sin saldos en lo facturado','magenta']]));
+ if(data.settings.missing.length){const warn=el('div',undefined,'inv-warn inv-warn-action');warn.setAttribute('role','status');warn.append(invIcon('triangle-alert'),el('span','Faltan datos fiscales para emitir: '+data.settings.missing.join(', ')+'.'),button('Completar datos fiscales',()=>{invoiceGo('fiscal');},'secondary'));panel.append(warn);}
+
  const card=el('section',undefined,'inv-card'),head=el('header',undefined,'inv-card-head'),title=el('div');title.append(el('h3','Facturas'),el('small',data.rows.length===1?'1 documento':data.rows.length+' documentos'+(data.rows.length>=200?' · los 200 más recientes':'')));head.append(title);
  const clearFilters=()=>{invoiceState.q='';invoiceState.status='';renderInvoicing();};
  // Búsqueda y filtros.
@@ -4843,10 +4921,7 @@ function invoicesPanel(panel,data){const s=data.summary,test=data.settings.test_
    if(row.order_id)acts.append(invIconBtn('Ver la orden '+row.reference,'file-text',()=>go('orders',new URLSearchParams({id:String(row.order_id)}))));
    tr.addEventListener('click',event=>{if(!event.target.closest('button,a'))openInvoice(row.id);});tbody.append(tr);}
   table.append(thead,tbody);wrapT.append(table);card.append(wrapT);}
- panel.append(card,invoiceRoadmap());}
-function invoiceRoadmap(){const box=el('section',undefined,'inv-soon'),head=el('div',undefined,'inv-soon-head'),ul=el('ul');box.setAttribute('aria-label','Funciones en desarrollo');
- head.append(el('strong','En desarrollo'),el('small','Todavía no disponibles. Se incorporarán al módulo cuando su desarrollo esté terminado y probado.'));
- for(const[icon,label]of invoiceSoon){const li=el('li');li.append(invIcon(icon),el('span',label),el('em','Próximamente'));ul.append(li);}box.append(head,ul);return box;}
+ panel.append(card);}
 async function invoiceSettingsForm(panel){panel.replaceChildren(el('p','Cargando…','empty-module'));let data;try{data=await api('/api/invoicing/settings');}catch(error){panel.replaceChildren(el('p',error.message,'empty-module'));return;}
  const s=data.settings,{form,msg,field,fail,clear}=invForm('inv-settings');
  const group=(icon,title)=>{const box=el('fieldset',undefined,'inv-group'),legend=el('legend');legend.append(invIcon(icon),el('span',title));box.append(legend);form.append(box);return box;};

@@ -1927,6 +1927,9 @@ class Handler(BaseHTTPRequestHandler):
                     if path=='/api/invoicing':
                         import inventory
                         return self.reply(200,{**invoicing.listing(c,arg('status') if arg('status') in invoicing.STATUS else '',arg('q')),'inventory_alerts':inventory.alert_count(c)})
+                    if path=='/api/invoicing/dashboard':
+                        import inventory
+                        return self.reply(200,{**invoicing.dashboard(c,reception_now()),'inventory_alerts':inventory.alert_count(c)})
                     if path=='/api/invoicing/settings':return self.reply(200,{'settings':invoicing.settings(c),'regimes':invoicing.REGIMES})
                     if path=='/api/invoicing/eligibility':
                         if arg('kind') not in ('orden','venta_licencia') or not arg('id').isdigit():return self.reply(400,{'error':'Solicitud inválida.'})
