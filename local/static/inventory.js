@@ -422,9 +422,11 @@ function centerSheetPane(key,d,refresh,dialog){const p=d.product,pr=d.pricing,bo
   const fact=button('Enviar a facturación',()=>{},'secondary');fact.disabled=true;fact.title='En desarrollo: las facturas se generan hoy desde órdenes y ventas de licencias.';acts.append(fact);box.append(acts);
   if(d.reservations.length){box.append(el('h4','Reservas activas'));box.append(centerReservationList(d.reservations,()=>refresh('ventas')));}
   box.append(el('h4','Historial de ventas'));
-  if(d.sales.length)box.append(centerTable(['Fecha','Cliente','Documento','Serie vendida','Precio','Estado','Garantía comercial'],d.sales.map(s=>centerRow([['Fecha',formatOrderDate(s.at)],['Cliente',s.client||'—'],['Documento',s.document||'—'],
+  if(d.sales.length)box.append(centerTable(['Fecha','Cliente','Documento','Serie vendida','Precio','Estado','Garantía comercial','Facturación'],d.sales.map(s=>centerRow([['Fecha',formatOrderDate(s.at)],['Cliente',s.client||'—'],['Documento',s.document||'—'],
    ['Serie vendida',s.units.map(u=>u.serial||u.internal_code).join(', ')||String(s.quantity)+' u.'],['Precio',s.price_cents!=null?centerMoney(s.price_cents)+(s.discount_cents?' (−'+centerMoney(s.discount_cents)+')':''):'—'],
-   ['Estado',invoiceChip(s.status==='devuelta'?'descartado':'autorizado',s.status==='devuelta'?'Devuelta':'Vendida')],['Garantía comercial',s.warranty_to?'Hasta '+dashboardDate(s.warranty_to):'—']]))));
+   ['Estado',invoiceChip(s.status==='devuelta'?'descartado':'autorizado',s.status==='devuelta'?'Devuelta':'Vendida')],['Garantía comercial',s.warranty_to?'Hasta '+dashboardDate(s.warranty_to):'—'],
+   // Enviar a facturación: un borrador por venta (si ya existe, se abre el mismo); nada se emite al SRI.
+   ['Facturación',s.status==='devuelta'?'—':button('Enviar a facturación',async()=>{try{const r=await api('/api/invoicing/draft',{kind:'venta_inventario',id:String(s.id)});dialog.close();openInvoice(r.invoice.id);}catch(error){notify(error.message);}},'text-action')]]))));
   else box.append(el('p','Sin ventas registradas.','ic-card-empty'));return box;}
  if(key==='garantias'){const cfg=el('div',undefined,'ic-warranty-cfg');for(const[k,title]of [['warranty_store','Garantía de PC-DOCTOR'],['warranty_maker','Garantía del fabricante']]){const w=p[k],c=el('div',undefined,'ic-coverage');c.append(el('strong',title),
    el('small','Duración: '+w.label),el('small','Comienza: '+(w.qty?centerTax.starts[w.from].toLowerCase():'—')));if(k==='warranty_maker')c.append(el('small','Condiciones: '+(p.warranty_terms||'sin registrar')));cfg.append(c);}box.append(cfg);

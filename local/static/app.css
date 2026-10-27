@@ -9178,3 +9178,142 @@ body[data-page=dashboard] .fx-row:focus-visible{box-shadow:inset 0 0 0 2px var(-
 .fx-sim-facts>div{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:baseline;padding:5px 0;border-bottom:1px solid #1A2638}
 .fx-sim-facts dt{font-size:12px;color:var(--inv-muted)}
 .fx-sim-facts dd{margin:0;font-size:13px;font-weight:700;color:var(--inv-text);text-align:right}
+
+/* Caja por sesiones (prefijo cj-). */
+.cj-module{display:grid;gap:12px;min-width:0}
+.cj-panel{display:grid;gap:14px;min-width:0}
+.cj-chip{display:inline-flex;align-items:center;gap:6px;padding:2px 10px;border-radius:999px;font-size:11.5px;font-weight:700;white-space:nowrap;--c:#94A3B8;color:var(--c);background:color-mix(in srgb,var(--c) 14%,transparent);border:1px solid color-mix(in srgb,var(--c) 35%,transparent)}
+.cj-chip[data-status=abierta],.cj-chip[data-status=recibido],.cj-chip[data-status=confirmado],.cj-chip[data-status=liquidada],.cj-chip[data-status=aprobada],.cj-chip[data-status=convertida],.cj-chip[data-status=pagado]{--c:#34D399}
+.cj-chip[data-status=arqueo],.cj-chip[data-status=revision],.cj-chip[data-status=pendiente],.cj-chip[data-status=enviada],.cj-chip[data-status=vista],.cj-chip[data-status=pendiente_liquidacion],.cj-chip[data-status=registrada],.cj-chip[data-status=parcial],.cj-chip[data-status=modificacion]{--c:#F5B544}
+.cj-chip[data-status=cerrada],.cj-chip[data-status=conciliado],.cj-chip[data-status=autorizada],.cj-chip[data-status=cerrada_libre],.cj-chip[data-status=borrador]{--c:#60A5FA}
+.cj-chip[data-status=cerrada_diferencia]{--c:#D946A8}
+.cj-chip[data-status=rechazado],.cj-chip[data-status=rechazada],.cj-chip[data-status=reversada],.cj-chip[data-status=anulado],.cj-chip[data-status=cancelada],.cj-chip[data-status=vencida]{--c:#F87171}
+.cj-chip[data-status=anulada],.cj-chip[data-status=reemplazada],.cj-chip[data-status=documento]{--c:#94A3B8}
+.cj-register{gap:0}
+.cj-register-head{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;padding:12px 14px;border-bottom:1px solid var(--inv-line)}
+.cj-register-head h3{margin:0;font-size:15px;color:var(--inv-text)}
+.cj-register-head small{display:block;font-size:12px;color:var(--inv-soft)}
+.cj-closed{display:grid;justify-items:start;gap:10px;padding:16px 14px}
+.cj-fund-note{margin:0;font-size:13px;color:#FCD9A0}
+.cj-session-slot{display:grid;gap:12px;padding:12px 14px;min-width:0}
+.cj-facts{margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,170px),1fr));gap:8px 14px}
+.cj-facts dt{font-size:11px;color:var(--inv-soft)}.cj-facts dd{margin:0;font-size:13px;font-weight:600;color:var(--inv-text);overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+.cj-actions{display:flex;flex-wrap:wrap;gap:8px}
+.cj-columns{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:12px;align-items:start}
+.cj-columns .inv-card{grid-template-columns:minmax(0,1fr)}
+.cj-columns .cj-facts{padding:12px 14px;grid-template-columns:minmax(0,1fr)}
+.cj-columns .cj-facts>div{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px}
+.cj-sub{margin:4px 0;padding:0 14px;font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--inv-soft)}
+.inv-sheet .cj-sub{padding:0}
+.cj-scroll{max-width:100%;overflow-x:auto}
+.cj-table{min-width:640px}
+.cj-table tr[data-direction=egreso] td[data-label=Importe]{color:#FCA5A5}
+.cj-table tr[data-diff=faltante] td[data-label=Diferencia]{color:#F87171;font-weight:700}
+.cj-table tr[data-diff=sobrante] td[data-label=Diferencia]{color:#F5B544;font-weight:700}
+.cj-table tr[data-diff=cuadrado] td[data-label=Diferencia]{color:#34D399;font-weight:700}
+.cj-denoms{display:grid;gap:10px}
+.cj-denom-table{min-width:0}
+.cj-denom-table input{width:100%;max-width:120px;min-height:36px;padding:4px 10px;border:1px solid var(--inv-line-2,#2A3D5E);border-radius:8px;background:#0B1220;color:var(--inv-text,#F1F5F9);font:inherit;font-variant-numeric:tabular-nums;text-align:right}
+.cj-denom-table input[aria-invalid=true]{border-color:#F87171;box-shadow:0 0 0 2px #F8717133}
+.cj-denom-table td:nth-child(2),.cj-denom-table td:nth-child(4){font-variant-numeric:tabular-nums}
+.cj-denom-sum{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr));gap:8px;margin:0}
+.cj-denom-sum>div{padding:8px 10px;border:1px solid var(--inv-line,#1E2D47);border-radius:10px;background:var(--inv-panel-2,#0E1828)}
+.cj-denom-sum dt{font-size:11px;color:var(--inv-soft,#7D8DA6)}.cj-denom-sum dd{margin:0;font-size:16px;font-weight:800;color:var(--inv-text,#F1F5F9);font-variant-numeric:tabular-nums}
+.cj-denom-sum>div[data-tone=total]{border-color:#3B82F680}
+.cj-denom-sum>div[data-tone=ok]{border-color:#34D39980}.cj-denom-sum>div[data-tone=ok] dd{color:#34D399}
+.cj-denom-sum>div[data-tone=short]{border-color:#F8717180}.cj-denom-sum>div[data-tone=short] dd{color:#F87171}
+.cj-denom-sum>div[data-tone=over]{border-color:#F5B54480}.cj-denom-sum>div[data-tone=over] dd{color:#F5B544}
+.cj-denom-error{margin:0;min-height:1em;font-size:12.5px;color:#FCA5A5}
+.cj-count-actions{flex-wrap:wrap}
+.cj-wizard{display:grid;gap:12px}
+.cj-stepper{counter-reset:none}
+.cj-step{display:grid;gap:10px;min-width:0}
+.cj-confirm-form{display:grid;gap:10px}
+.cj-open-meta{grid-column:1/-1;margin:0;font-size:12.5px;color:var(--inv-soft)}
+.cj-fund{border-color:#F5B54466}
+.cj-filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr));gap:8px;min-width:0}
+.cj-filters .inv-field{min-width:0}.cj-filters .inv-field>:is(input,select){width:100%;min-width:0}
+.cj-add-register{display:flex;flex-wrap:wrap;gap:8px;padding:12px 14px}
+.cj-add-register input{flex:1 1 200px;min-height:38px}
+.cj-incidents{border-color:#F5B54466}
+
+/* Pagos y saldo de la orden (prefijo pay-; funciona dentro y fuera de Facturación). */
+.pay-strip{display:grid;gap:8px;margin:8px 0;padding:12px;border:1px solid #1E2D47;border-radius:12px;background:#0E1828}
+.pay-nums{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:0}
+.pay-nums dt{font-size:11px;color:#7D8DA6}.pay-nums dd{margin:0;font-size:17px;font-weight:800;color:#F1F5F9;font-variant-numeric:tabular-nums}
+.pay-progress{height:8px;border-radius:999px;background:#1E2D47;overflow:hidden}
+.pay-progress span{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#20C7C7,#34D399);transition:width .3s ease}
+.pay-last{font-size:12px;color:#94A3B8}
+.pay-chips{display:flex;flex-wrap:wrap;gap:6px}
+.pay-chip{display:inline-flex;gap:6px;align-items:center;padding:3px 10px;border-radius:999px;border:1px solid #2A3D5E;font-size:12px;color:#CBD5E1}
+.pay-chip b{font-weight:800;color:#7D8DA6}
+.pay-chip[data-state=pagada],.pay-chip[data-state=autorizada],.pay-chip[data-state=entregado]{border-color:#34D39966;color:#6EE7B7}
+.pay-chip[data-state=parcial],.pay-chip[data-state=borrador],.pay-chip[data-state=emitida],.pay-chip[data-state=listo]{border-color:#F5B54466;color:#FCD9A0}
+.pay-chip[data-state=pendiente],.pay-chip[data-state=rechazada]{border-color:#F8717166;color:#FCA5A5}
+body[data-page=dashboard] .equip-pay-main{justify-self:start;margin:4px 0}
+.pay-history{margin-top:8px}
+.pay-history>summary{display:inline-grid;grid-template-columns:16px auto;gap:8px;align-items:center;cursor:pointer;font-weight:700;color:#CBD5E1}
+.pay-history .inv-icon{width:16px;height:16px}
+.pay-table{min-width:760px}
+.pay-table tr[data-voided=true] td{opacity:.6;text-decoration:line-through}
+.pay-table tr[data-voided=true] td.pay-acts,.pay-table tr[data-voided=true] td[data-label=Estado]{text-decoration:none}
+.pay-acts{display:flex;flex-wrap:wrap;gap:4px 10px}
+.pay-bank,.pay-mix{grid-column:1/-1}
+.pay-lines{display:grid;gap:8px}
+.pay-line{display:grid;grid-template-columns:minmax(120px,1.2fr) minmax(80px,.8fr) minmax(120px,1.2fr) minmax(100px,1fr) auto;gap:6px;align-items:center}
+.pay-line input,.pay-line select{min-height:36px;min-width:0}
+.pay-mix-sum{margin:0;font-size:13px;font-weight:700;color:#FCD9A0}
+.pay-mix-sum[data-ok=true]{color:#6EE7B7}
+
+/* Cuentas bancarias (tarjetas por cuenta). */
+.bank-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,290px),1fr));gap:12px}
+.bank-card{display:grid;gap:10px;align-content:start;min-width:0;padding:14px;border:1px solid var(--inv-line);border-radius:14px;background:linear-gradient(180deg,#132036,#0F1A2D)}
+.bank-card[data-active=false]{opacity:.7}
+.bank-card>header{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;align-items:center}
+.bank-card>header strong{display:block;font-size:15px;color:var(--inv-text)}.bank-card>header small{font-size:12px;color:var(--inv-soft)}
+.bank-mark{display:grid;place-items:center;width:44px;height:44px;border-radius:12px;background:var(--bank-bg);color:var(--bank-fg);font-size:14px;font-weight:900;letter-spacing:.02em;box-shadow:inset 0 0 0 1px #ffffff22}
+.bank-number{margin:0;font-size:20px;font-weight:800;letter-spacing:.06em;color:#fff;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.bank-facts{display:grid;gap:4px;margin:0}
+.bank-facts>div{display:grid;grid-template-columns:110px minmax(0,1fr);gap:8px}
+.bank-facts dt{font-size:12px;color:var(--inv-soft)}.bank-facts dd{margin:0;font-size:12.5px;color:var(--inv-text);overflow-wrap:anywhere}
+.bank-card .bank-acts{justify-content:flex-start}
+.bank-admin{position:relative}
+body[data-page=dashboard] .bank-admin>summary{display:inline-flex;align-items:center;gap:6px;min-height:34px;padding:0 12px;border:1px solid var(--inv-line-2);border-radius:9px;cursor:pointer;list-style:none;font-size:13px;color:var(--inv-text)}
+.bank-admin>summary::-webkit-details-marker{display:none}
+.bank-admin>summary .inv-icon{width:15px;height:15px}
+.bank-admin .ic-menu-list{position:absolute;z-index:5;right:0;top:calc(100% + 4px);min-width:220px}
+.bank-transfers{gap:0}
+.bank-transfers .cj-filters{padding:12px 14px}
+.bank-transfers>.fx-card-acts{padding:0 14px 8px}
+.bank-table{min-width:900px}
+
+/* Proformas (prefijo pf-). */
+.pf-form{display:grid;gap:12px}
+.pf-finder,.pf-pick{display:grid;gap:6px;position:relative}
+.pf-finder input,.pf-pick input{min-height:38px}
+.pf-results{display:grid;gap:2px;margin:0;padding:0;list-style:none}
+body[data-page=dashboard] .pf-result{width:100%;margin:0;padding:8px 10px;border:1px solid var(--inv-line);border-radius:8px;background:var(--inv-panel-2);color:var(--inv-text);text-align:left;font:inherit;font-size:13px;cursor:pointer}
+body[data-page=dashboard] .pf-result:is(:hover,:focus-visible){border-color:var(--inv-blue);transform:none}
+.pf-lines{display:grid;gap:8px}
+.pf-line{display:grid;grid-template-columns:minmax(160px,2.2fr) 64px minmax(90px,1fr) minmax(80px,.9fr) auto minmax(80px,auto) auto;gap:6px;align-items:center;padding:8px;border:1px solid var(--inv-line);border-radius:10px;background:var(--inv-panel-2)}
+.pf-line[data-error]{border-color:#F87171}
+.pf-line>input{min-height:36px;min-width:0}
+.pf-line>input:last-child{grid-column:1/-1;font-size:12.5px}
+.pf-taxed{display:inline-flex;gap:4px;align-items:center;font-size:12px;color:var(--inv-muted)}
+.pf-line-total{font-weight:800;color:var(--inv-text);text-align:right;font-variant-numeric:tabular-nums}
+.pf-totals{display:flex;flex-wrap:wrap;gap:6px 18px;justify-content:flex-end;margin:0}
+.pf-totals>div{display:flex;gap:8px}.pf-totals dt{color:var(--inv-soft);font-size:12.5px}.pf-totals dd{margin:0;font-weight:800;color:var(--inv-text)}
+.pf-finance{display:grid;gap:4px;padding:10px 12px;border:1px solid #20C7C740;border-radius:10px;background:#20C7C70f}
+.pf-finance:empty{display:none}
+.pf-letter,.pf-eq{margin:0;font-weight:800;color:var(--inv-teal);font-variant-numeric:tabular-nums}
+.pf-note{font-size:11.5px;color:var(--inv-soft)}
+.pf-head{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.pf-meta{font-size:12.5px;color:var(--inv-soft)}
+.voucher-table{min-width:980px}.pay-all{min-width:900px}.pf-table{min-width:760px}
+.inv-money .cj-scroll{margin-top:8px}
+@media (max-width:720px){.pay-line{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.pay-line>button{justify-self:end}.pf-line{grid-template-columns:minmax(0,1fr) 64px minmax(0,1fr)}.pf-line>input:first-child{grid-column:1/-1}
+ .pay-nums dd{font-size:15px}.bank-number{font-size:18px}.cj-register-head{grid-template-columns:minmax(0,1fr)}}
+@media (prefers-reduced-motion:reduce){.pay-progress span{transition:none}}
+.bank-toolbar{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1fr);gap:8px;align-items:center}
+.bank-toolbar select{min-height:40px;min-width:0}
+@media (max-width:720px){.bank-toolbar{grid-template-columns:minmax(0,1fr)}}
