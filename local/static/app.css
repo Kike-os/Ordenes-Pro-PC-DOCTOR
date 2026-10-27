@@ -8927,3 +8927,11 @@ body[data-page=dashboard] .ic-action:is(:hover,:focus-visible){border-color:var(
  .ic-kardex-filters .inv-field{max-width:none}
 }
 @media(prefers-reduced-motion:reduce){.ic-progress span{transition:none}}
+/* Facturación › Configuración › Políticas Comerciales y documentos de la factura (rama · pruebas). */
+.pol-body{display:grid;gap:10px}.pol-draft{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:0;font-size:12.5px;color:var(--inv-muted)}
+body[data-page=dashboard] .pol-editor .pol-text{min-height:300px;font:13px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.pol-editor>.inv-field:has(.pol-text){grid-column:1/-1}.pol-count{justify-self:end;font-size:11.5px;color:var(--inv-soft)}
+.ic-doc-settings .inv-group>.inv-cf{grid-column:1/-1}
+.inv-docs{gap:10px}.inv-docs>.inv-actions{gap:6px}
+.inv-doc-warranties{display:grid;gap:8px}.inv-doc-unit{display:grid;gap:6px;padding:10px;border:1px solid var(--inv-line);border-radius:10px;background:var(--inv-bg)}.inv-doc-unit>strong{font-size:12.5px;color:var(--inv-text);overflow-wrap:anywhere}
+.inv-doc-log{display:grid;gap:4px;margin:0;padding:0;list-style:none;font-size:12px;color:#CBD5E1}.inv-doc-log li{display:flex;flex-wrap:wrap;align-items:center;gap:4px;overflow-wrap:anywhere}

@@ -4792,7 +4792,7 @@ function invEmpty(icon,title,text,action){const box=el('div',undefined,'inv-empt
 function invoiceChip(status,label){const chip=el('span',label,'inv-chip');chip.dataset.status=status;return chip;}
 function invoiceTestBanner(settings){const box=el('div',undefined,'inv-banner'),mark=el('span',undefined,'inv-banner-mark');box.setAttribute('role','note');mark.append(invIcon('flask-conical'));
  const copy=el('div');copy.append(el('strong','MODO DE PRUEBAS — EMISIÓN REAL DESACTIVADA'),el('small',settings?.emission?.note||'Los comprobantes solo se preparan para el ambiente de pruebas del SRI.'));box.append(mark,copy,el('span','Ambiente: Pruebas','inv-banner-env'));return box;}
-const invoiceTabs=[['facturas','Facturas','receipt-text'],['inventario','Inventario','package'],['compras','Compras','shopping-cart'],['proveedores','Proveedores','truck'],['caja','Caja','wallet'],['cuentas','Cuentas bancarias','landmark','Cuentas'],['fiscal','Datos fiscales','building-2','Fiscal']];
+const invoiceTabs=[['facturas','Facturas','receipt-text'],['inventario','Inventario','package'],['compras','Compras','shopping-cart'],['proveedores','Proveedores','truck'],['caja','Caja','wallet'],['cuentas','Cuentas bancarias','landmark','Cuentas'],['fiscal','Datos fiscales','building-2','Fiscal'],['config','Configuración','settings','Ajustes']];
 // Funciones todavía en desarrollo: se muestran como tales y nunca como operativas. Se convertirán en pestañas cuando estén terminadas.
 const invoiceSoon=[['file-check-2','Proformas con aprobación del cliente'],['file-x-2','Notas de crédito'],['banknote','Anticipos y abonos'],['file-text','Factura en PDF (RIDE)'],['send','Firma electrónica y envío al SRI']];
 function invoiceTabBar(data){const nav=el('div',undefined,'inv-tabs'),alerts=data.inventory_alerts,missing=data.settings.missing.length;nav.setAttribute('role','tablist');nav.setAttribute('aria-label','Secciones de Facturación');
@@ -4807,6 +4807,7 @@ async function renderInvoicing(){const root=$('module-content');let data;try{dat
  const wrap=el('div',undefined,'inv-module'),panel=el('div',undefined,'inv-panel');panel.setAttribute('role','tabpanel');panel.setAttribute('aria-label',(invoiceTabs.find(t=>t[0]===invoiceState.tab)||invoiceTabs[0])[1]);
  wrap.append(invoiceTestBanner(data.settings),invoiceTabBar(data),panel);root.replaceChildren(wrap);
  if(invoiceState.tab==='fiscal'){invoiceSettingsForm(panel);return;}
+ if(invoiceState.tab==='config'){invoicePoliciesPanel(panel);return;}
  if(invoiceState.tab==='cuentas'){bankAccountsPanel(panel);return;}
  if(invoiceState.tab==='inventario'){inventoryPanel(panel);return;}
  if(invoiceState.tab==='compras'){purchasesPanel(panel);return;}
@@ -4861,6 +4862,68 @@ async function invoiceSettingsForm(panel){panel.replaceChildren(el('p','Cargando
  form.addEventListener('submit',async event=>{event.preventDefault();clear();save.disabled=true;
   try{await api('/api/invoicing/settings',Object.fromEntries(new FormData(form)));toast('Datos fiscales guardados.','success');invoiceState.tab='fiscal';renderInvoicing();}catch(error){fail(error);save.disabled=false;}});
  panel.replaceChildren(invSectionHead('Datos fiscales','Datos del emisor tal como constan en el RUC. No se completan solos: revísalos con el certificado y la documentación del SRI.'),form);}
+// ---- Facturación › Configuración › Políticas Comerciales ----
+// El texto corporativo lo carga administración; una versión se publica solo con la validación legal registrada y, publicada, no cambia.
+// Cada factura queda asociada al emitirse a la versión vigente de su alcance. Nada de esto envía correos por sí solo.
+async function invoicePoliciesPanel(panel){panel.replaceChildren(el('p','Cargando…','empty-module'));let data;try{data=await api('/api/invoicing/policies');}catch(error){panel.replaceChildren(el('p',error.message,'empty-module'));return;}
+ const refresh=()=>invoicePoliciesPanel(panel);panel.replaceChildren(invSectionHead('Políticas Comerciales','Documento «'+data.default_title+'» por versiones. Una versión se publica solo con su validación legal registrada; publicada no cambia y queda asociada a las facturas que se emitan mientras esté vigente.'));
+ if(!Object.values(data.scopes).some(s=>s.current)){const warn=el('div',undefined,'inv-warn inv-warn-action');warn.append(invIcon('triangle-alert'),el('span','Todavía no hay una versión vigente: no se adjunta ningún documento de políticas. Carga el texto corporativo validado y publícalo.'));panel.append(warn);}
+ // Envío de documentos.
+ const{form,msg,field,fail,clear}=invForm('inv-settings ic-doc-settings');const group=el('fieldset',undefined,'inv-group'),legend=el('legend');legend.append(invIcon('send'),el('span','Envío de documentos'));group.append(legend);form.append(group);
+ const autoBox=el('label',undefined,'inv-cf'),auto=el('input');auto.type='checkbox';auto.name='auto';auto.checked=data.settings.auto;autoBox.append(auto,el('span','Adjuntar automáticamente RIDE, XML, políticas y garantías al enviar una factura autorizada'));group.append(autoBox);
+ field('test_recipient','Correo autorizado para pruebas',{type:'email',max:200,value:data.settings.test_recipient,into:group,hint:'Las pruebas solo se envían a esta dirección, marcadas como «PRUEBA — SIN VALIDEZ TRIBUTARIA».'});
+ const save=el('button',undefined,'primary inv-btn');save.type='submit';save.append(invIcon('circle-check'),el('span','Guardar'));const foot=el('div',undefined,'inv-form-foot');foot.append(save);form.append(msg,foot);
+ form.addEventListener('submit',async event=>{event.preventDefault();clear();save.disabled=true;try{await api('/api/invoicing/policies',{action:'settings',auto:auto.checked?'1':'0',test_recipient:form.elements.test_recipient.value});toast('Configuración de envío guardada.','success');}catch(error){fail(error);}finally{save.disabled=false;}});
+ panel.append(form);
+ for(const[scope,s]of Object.entries(data.scopes)){const card=el('section',undefined,'inv-card ic-card pol-card');card.append(centerCardHead(s.label,'file-text',s.current?'Vigente: versión '+s.current.version:'Sin versión vigente'));
+  const body=el('div',undefined,'pol-body');
+  if(s.current){const facts=el('dl',undefined,'inv-facts');for(const[k,v]of [['Código',s.current.code],['Versión vigente',s.current.version],['Vigente desde',formatOrderDate(s.current.published_at)],['Validación legal',s.current.legal_validated_by+' · '+formatOrderDate(s.current.legal_validated_at)],['Facturas asociadas',String(s.current.invoices)]]){const d=el('div');d.append(el('dt',k),el('dd',v));facts.append(d);}body.append(facts);}
+  const acts=el('div',undefined,'inv-actions');
+  if(s.current)acts.append(invPolicyLink('Ver PDF vigente',s.current.id));
+  if(s.draft){const tag=el('p',undefined,'pol-draft');tag.append(invoiceChip('pendiente','Borrador'),el('span',' Versión '+s.draft.version+' · actualizado '+formatOrderDate(s.draft.updated_at)+' · '+s.draft.body.length+' caracteres'));body.append(tag);
+   acts.append(invBtn('Editar borrador','pencil',()=>invPolicyEditor(scope,s.draft,null,refresh),'primary'),invPolicyLink('Vista previa',s.draft.id),invBtn('Publicar','circle-check',()=>invPolicyPublish(s.draft,refresh)),
+    button('Descartar',async()=>{if(await confirmClose({title:'¿Descartar el borrador '+s.draft.version+'?',text:'Se elimina este borrador. Las versiones publicadas no cambian.',keep:'Conservar',discard:'Descartar',danger:true})!=='discard')return;try{await api('/api/invoicing/policies',{action:'discard',id:String(s.draft.id)});refresh();}catch(error){notify(error.message);}},'secondary'));}
+  else acts.append(invBtn(s.current?'Nueva versión':'Cargar el texto','plus',()=>invPolicyEditor(scope,null,s.current,refresh),s.current?'secondary':'primary'));
+  body.append(acts);
+  if(s.history.length){const hist=el('details',undefined,'inv-history'),ol=el('ol');hist.append(el('summary','Historial de versiones ('+s.history.length+')'));for(const h of s.history){const li=el('li');const a=el('a','PDF');a.href='/api/invoicing/policies/'+h.id+'.pdf';a.target='_blank';a.rel='noopener';
+    li.append(el('span',h.version+' · '+{borrador:'borrador',vigente:'vigente',archivada:'archivada'}[h.status]+(h.published_at?' · publicada '+formatOrderDate(h.published_at):'')+(h.legal_validated_by?' · validada por '+h.legal_validated_by:'')+' · '+h.invoices+' facturas · '),a);ol.append(li);}hist.append(ol);body.append(hist);}
+  card.append(body);panel.append(card);}}
+function invPolicyLink(label,id){const a=el('a',undefined,'secondary inv-btn');a.href='/api/invoicing/policies/'+id+'.pdf';a.target='_blank';a.rel='noopener';a.append(invIcon('file-text'),el('span',label));return a;}
+function invPolicyEditor(scope,draft,current,done){const dialog=invDialog(draft?'Editar borrador '+draft.version:current?'Nueva versión de las políticas':'Cargar el texto de las políticas',true),{form,msg,field,fail,clear}=invForm('bank-form inv-sheet-form pol-editor');
+ const base=draft||current||{};form.append(invRequiredNote());field('code','Código del documento',{required:true,max:40,value:base.code||'PCD-POL-VTA'});field('version','Versión',{required:true,max:20,value:draft?draft.version:'',hint:current?'Distinta de la vigente ('+current.version+'). Ej.: 2026.10.1':'Ej.: 2026.10.1'});
+ field('title','Título',{required:true,max:200,value:base.title||'Políticas de Venta, Cambios, Devoluciones y Garantías — PC-DOCTOR S.A.'});
+ const text=field('body','Texto corporativo',{area:true,max:60000,required:true,value:base.body||'',hint:'Pega el texto validado. Formato: «# Título» para secciones, «1.1 Subtítulo» en una línea corta, «- » para viñetas y una línea en blanco entre párrafos.'});text.rows=16;text.classList.add('pol-text');
+ const count=el('small','','pol-count');text.after(count);const paint=()=>{count.textContent=text.value.length+' caracteres';};text.addEventListener('input',paint);paint();
+ const preview=button('Guardar y ver vista previa',()=>submit(true),'secondary');const save=el('button','Guardar borrador','primary');save.type='submit';const bar=invDialogActions(dialog,save);bar.insertBefore(preview,save);form.append(msg,bar);dialog.append(form);form.elements.version.focus();
+ const submit=async show=>{clear();save.disabled=preview.disabled=true;const body=Object.fromEntries(new FormData(form));body.action='save';body.scope=scope;if(draft)body.id=String(draft.id);
+  try{const out=await api('/api/invoicing/policies',body);draft=draft||{id:out.id};toast('Borrador guardado. No se usa hasta publicarlo.','success');if(show){const a=el('a');a.href='/api/invoicing/policies/'+out.id+'.pdf';a.target='_blank';a.rel='noopener';document.body.append(a);a.click();a.remove();}else dialog.close();}
+  catch(error){fail(error);}finally{save.disabled=preview.disabled=false;}};
+ form.addEventListener('submit',event=>{event.preventDefault();submit(false);});dialog.addEventListener('close',()=>done&&done());}
+function invPolicyPublish(draft,done){const dialog=invDialog('Publicar la versión '+draft.version),{form,msg,field,fail,clear}=invForm('bank-form inv-sheet-form');
+ form.append(el('p','Al publicarla pasa a ser la versión vigente y se asocia a las facturas que se emitan desde ahora. La versión anterior queda archivada con sus facturas. Una versión publicada no se modifica.','inv-form-note'),invRequiredNote());
+ field('validated_by','Validación legal realizada por',{required:true,max:120,hint:'Nombre de la persona o del estudio jurídico que revisó el texto.'});
+ const box=el('label',undefined,'inv-cf'),ok=el('input');ok.type='checkbox';ok.name='confirm';box.append(ok,el('span','Confirmo que este texto fue revisado y validado legalmente'));form.append(box);
+ const save=el('button','Publicar como vigente','primary');save.type='submit';form.append(msg,invDialogActions(dialog,save));dialog.append(form);form.elements.validated_by.focus();
+ form.addEventListener('submit',async event=>{event.preventDefault();clear();save.disabled=true;try{await api('/api/invoicing/policies',{action:'publish',id:String(draft.id),validated_by:form.elements.validated_by.value,confirm:ok.checked?'1':'0'});toast('Versión '+draft.version+' publicada.','success');dialog.close();done&&done();}
+  catch(error){fail(error);if(error.fields?.confirm||error.fields?.body)msg.textContent=error.message+' '+Object.values(error.fields).join(' ');save.disabled=false;}});}
+// Documentos de una factura: RIDE, políticas asociadas, garantías y envíos (con su registro).
+function invoiceDocumentsBlock(inv){const box=el('section',undefined,'inv-buyer inv-docs');const head=el('h3');head.append(invIcon('file-text'),el('span','Documentos y envíos'));box.append(head,el('p','Cargando…','system-muted'));
+ const paint=async()=>{let d;try{d=await api('/api/invoicing/'+inv.id+'/documents');}catch(error){box.lastChild.textContent=error.message;return;}box.replaceChildren(head);
+  const links=el('div',undefined,'inv-actions'),link=(label,icon,href)=>{const a=el('a',undefined,'secondary inv-btn');a.href=href;a.target='_blank';a.rel='noopener';a.append(invIcon(icon),el('span',label));links.append(a);};
+  link('RIDE (PDF)','receipt-text','/api/invoicing/'+inv.id+'/ride.pdf');for(const p of d.policies)link('Políticas '+p.version,'file-text','/api/invoicing/'+inv.id+'/politicas.pdf?scope='+p.scope);
+  if(d.warranties.units.length||d.warranties.products.some(p=>p.warranty_store_qty||p.warranty_maker_qty))link('Garantías (PDF)','shield-check','/api/invoicing/'+inv.id+'/garantias.pdf');box.append(links);
+  if(!d.policies.length)box.append(el('p','Sin políticas asociadas: se asocian al emitir la factura si hay una versión vigente (Facturación › Configuración).','inv-form-note'));
+  if(d.warranties.units.length){const list=el('div',undefined,'inv-doc-warranties');for(const u of d.warranties.units){const row=el('div',undefined,'inv-doc-unit');row.append(el('strong',u.name+' · '+u.internal_code+(u.serial?' · S/N '+u.serial:'')));
+    const w=el('div',undefined,'ic-warranties');w.append(centerCoverage('Garantía de PC-DOCTOR',u.store||{state:'sin_fecha'}),centerCoverage('Garantía del fabricante',u.maker||{state:'sin_fecha'}));row.append(w);list.append(row);}box.append(list);}
+  const send=el('div',undefined,'inv-actions');
+  const test=invBtn(d.settings.test_recipient?'Enviar prueba a '+d.settings.test_recipient:'Enviar prueba','send',async()=>{test.disabled=true;try{await api('/api/invoicing/'+inv.id+'/send',{kind:'prueba'});toast('Prueba enviada a '+d.settings.test_recipient+'.','success');paint();}catch(error){notify(error.message);test.disabled=false;}});
+  test.disabled=!d.emitted||!d.settings.test_recipient;if(!d.settings.test_recipient)test.title='Configura el correo de prueba en Facturación › Configuración.';send.append(test);
+  const client=d.mail.find(m=>m.kind==='cliente');const real=invBtn(client?'Reenviar al cliente':'Enviar al cliente','send',async()=>{real.disabled=true;try{await api('/api/invoicing/'+inv.id+'/send',{kind:client?'reenvio':'cliente'});toast('Documentos enviados al cliente.','success');paint();}catch(error){notify(error.message);real.disabled=false;}},'primary');
+  real.disabled=!d.authorized;if(!d.authorized)real.title='Solo facturas autorizadas por el SRI.';send.append(real);box.append(send);
+  if(!d.authorized)box.append(el('p','El envío al cliente se habilita cuando la factura esté autorizada por el SRI. Las pruebas van solo al correo de prueba, marcadas como sin validez tributaria.','inv-form-note'));
+  if(d.mail.length){const ol=el('ol',undefined,'inv-doc-log');for(const m of d.mail){const li=el('li');li.append(invoiceChip({enviado:'autorizado',enviando:'enviado',error:'rechazado',sin_confirmacion:'pendiente'}[m.status],{enviado:'Enviado',enviando:'Enviando',error:'Error',sin_confirmacion:'Sin confirmación'}[m.status]),
+    el('span',' '+{cliente:'Cliente',reenvio:'Reenvío',prueba:'Prueba'}[m.kind]+' · '+m.recipient+' · '+formatOrderDate(m.updated_at)+' · '+m.attachments.length+' adjuntos'+(m.attempts>1?' · '+m.attempts+' intentos':'')+(m.detail&&m.status!=='enviado'?' · '+m.detail:'')));ol.append(li);}box.append(ol);}};
+ paint();return box;}
 async function openInvoice(id,initial){const dialog=invDialog('Factura electrónica',true);const body=el('div',undefined,'inv-body');dialog.append(body);body.append(el('p','Cargando…','empty-module'));
  let data=initial;try{data=data||await api('/api/invoicing/'+id);}catch(error){body.replaceChildren(el('p',error.message,'empty-module'));return;}paintInvoice(dialog,body,data);}
 function paintInvoice(dialog,body,data){const inv=data.invoice,s=data.settings,draft=inv.status==='borrador';body.replaceChildren(invoiceTestBanner(s));
@@ -4905,6 +4968,7 @@ function paintInvoice(dialog,body,data){const inv=data.invoice,s=data.settings,d
   actions.append(emitB,drop);}
  if(inv.access_key){const xml=el('a',undefined,'secondary');xml.href='/api/invoicing/'+inv.id+'/comprobante.xml';xml.append(systemIcon('M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6 M10 13l-2 2 2 2 M14 13l2 2-2 2'),el('span','Descargar XML'));actions.append(xml);
   const note=el('small','Siguiente etapa: firma electrónica y envío al SRI de pruebas (requiere el certificado). PDF A4 y ticket térmico en preparación.','inv-next');actions.append(note);}
+ if(inv.access_key)body.append(invoiceDocumentsBlock(inv));
  if(inv.order_id){actions.append(button('Ver la orden',()=>{dialog.close();go('orders',new URLSearchParams({id:String(inv.order_id)}));},'secondary'));}
  body.append(actions);}
 // Bloque en «Pagos y saldo» de la orden: generar la factura cuando el equipo está totalmente pagado (o ver la que ya existe).

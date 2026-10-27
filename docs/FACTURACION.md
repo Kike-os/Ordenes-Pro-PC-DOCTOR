@@ -124,3 +124,29 @@ Las migraciones 070 a 072 **solo añaden** tablas, índices, disparadores y dos 
 - Botón de factura en las ventas de licencias, notas de crédito, proformas con aprobación del cliente y envío por Mail Pro.
 - Descontar existencias automáticamente al facturar o al usar repuestos en una orden (hoy la salida se registra a mano).
 - Confirmar con el contador las formas de pago del SRI (tarjeta de crédito, código 19, o de débito, 16) y el tratamiento de los anticipos.
+
+## Políticas comerciales y documentos de la factura (rama `politicas-comerciales`)
+
+**Facturación › Configuración › Políticas Comerciales** administra el documento «Políticas de Venta, Cambios, Devoluciones y Garantías — PC-DOCTOR S.A.».
+
+- **Sin texto incluido:** el texto corporativo no viene con el sistema. Lo carga administración y se usa la versión validada legalmente; Órdenes Pro no redacta condiciones.
+- **Versiones:** hay un borrador por alcance, para productos físicos y servicios o para productos digitales (licencias). Para publicarlo se exige:
+  - el texto completo (al menos 200 caracteres);
+  - el nombre de quien hizo la validación legal;
+  - la confirmación expresa de esa validación.
+- **Inmutable:** una versión publicada no se modifica ni se elimina (lo impiden disparadores de la base). La anterior pasa a archivada.
+- **Asociación:** al emitir una factura se asocia la versión vigente de su alcance; una factura con productos físicos y digitales recibe las dos. Los cambios posteriores no alteran lo ya asociado. Las facturas emitidas antes de publicar una versión quedan sin política: no se reescribe la historia.
+- **Formato del texto:** `# Título` para secciones, `1.1 Subtítulo` en una línea corta y `- ` para viñetas.
+- **PDF:** incluye el logo original, el título, el código, la versión y la fecha de vigencia, los datos de la factura y del cliente, el contacto, y un pie con la numeración «Página n de N».
+
+**Documentos de cada factura emitida** (en el detalle de la factura):
+- **RIDE en PDF:** emisor con el logo, número, autorización, ambiente, clave de acceso con código de barras, comprador, detalle, totales y formas de pago. Mientras no esté autorizado por el SRI en producción, cada página dice «DOCUMENTO DE PRUEBA — SIN VALIDEZ TRIBUTARIA».
+- **Políticas asociadas** en PDF.
+- **Certificado de garantías:** cada unidad facturada o consumida en la orden, con su nombre, marca, modelo, SKU, código interno, serie original y las dos coberturas por separado con sus fechas. Se toman del Centro de Inventario.
+
+**Envío:**
+- **Al cliente:** solo de facturas **autorizadas por el SRI en producción**. Se hace una sola vez por factura, con hasta 3 intentos controlados, y cada resultado queda registrado (no se elimina). Lleva RIDE, XML autorizado, políticas y garantías.
+- **Reenvío manual:** solo de facturas autorizadas.
+- **Prueba:** solo a la dirección configurada. El asunto empieza por «[PRUEBA — SIN VALIDEZ TRIBUTARIA]».
+- **Cómo sale el correo:** por el correo institucional, con copia archivada y seguimiento de entrega.
+- **Enganche con el SRI:** `invoice_documents.on_authorized` deja preparado el envío automático. Se conectará cuando exista la autorización real del SRI; mientras la Facturación siga en modo de pruebas, no sale nada al cliente.

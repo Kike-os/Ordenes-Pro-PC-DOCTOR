@@ -1913,7 +1913,7 @@ class Handler(BaseHTTPRequestHandler):
             if path.startswith('/api/invoicing'):
                 # Facturación electrónica: solo administración. Solo lectura en GET.
                 if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede usar la facturación electrónica.'})
-                import invoicing
+                import invoicing,invoice_documents as docs
                 q=parse_qs(urlsplit(self.path).query);arg=lambda name:(q.get(name,[''])[0] or '')[:80]
                 try:
                     if path=='/api/invoicing':
@@ -1923,6 +1923,25 @@ class Handler(BaseHTTPRequestHandler):
                     if path=='/api/invoicing/eligibility':
                         if arg('kind') not in ('orden','venta_licencia') or not arg('id').isdigit():return self.reply(400,{'error':'Solicitud inválida.'})
                         return self.reply(200,invoicing.eligibility(c,arg('kind'),int(arg('id'))))
+                    if path=='/api/invoicing/policies':return self.reply(200,docs.policies(c))
+                    found=re.fullmatch(r'/api/invoicing/policies/([0-9]{1,9})\.pdf',path)
+                    if found:
+                        policy=docs._policy(c,found[1]);return self.reply(200,docs.policy_pdf(policy),'application/pdf',filename='POLITICAS-%s-%s%s.pdf'%(policy['code'],policy['version'],'-BORRADOR' if policy['status']=='borrador' else ''))
+                    found=re.fullmatch(r'/api/invoicing/([0-9]{1,9})/(documents|ride\.pdf|garantias\.pdf|politicas\.pdf)',path)
+                    if found:
+                        invoice_id=int(found[1]);inv=invoicing.detail(c,invoice_id)['invoice']
+                        if found[2]=='documents':
+                            linked=docs.invoice_policies(c,invoice_id)
+                            return self.reply(200,{'policies':linked,'warranties':docs.warranty_rows(c,invoice_id),'mail':docs.mail_log(c,invoice_id),'settings':docs.settings(c),
+                                                   'emitted':bool(inv['access_key']),'authorized':inv['status']=='autorizado' and inv['environment']=='2' and not invoicing.TEST_MODE,'max_tries':docs.MAX_TRIES})
+                        if found[2]=='ride.pdf':return self.reply(200,docs.ride_pdf(c,invoice_id),'application/pdf',filename='FACTURA-%s.pdf'%(inv['number'] or invoice_id))
+                        if found[2]=='garantias.pdf':
+                            pdf=docs.warranty_pdf(c,invoice_id)
+                            if not pdf:return self.reply(404,{'error':'Esta factura no tiene productos con garantía.'})
+                            return self.reply(200,pdf,'application/pdf',filename='GARANTIAS-%s.pdf'%(inv['number'] or invoice_id))
+                        linked=[p for p in docs.invoice_policies(c,invoice_id) if not arg('scope') or p['scope']==arg('scope')]
+                        if not linked:return self.reply(404,{'error':'Esta factura no tiene políticas asociadas (se asocian al emitirla, si hay una versión vigente).'})
+                        return self.reply(200,docs.policy_pdf(linked[0],dict(inv,test=inv['environment']!='2' or inv['status']!='autorizado')),'application/pdf',filename='POLITICAS-%s-%s.pdf'%(linked[0]['code'],linked[0]['version']))
                     found=re.fullmatch(r'/api/invoicing/([0-9]{1,9})(/comprobante\.xml)?',path)
                     if found and found[2]:
                         row=c.execute('SELECT access_key,xml_unsigned FROM invoices WHERE id=?',(int(found[1]),)).fetchone()
@@ -1930,6 +1949,7 @@ class Handler(BaseHTTPRequestHandler):
                         return self.reply(200,row['xml_unsigned'],'application/xml; charset=utf-8',filename=row['access_key']+'.xml')
                     if found:return self.reply(200,invoicing.detail(c,int(found[1])))
                 except invoicing.InvoiceError as error:return self.reply(error.status,{'error':str(error),'fields':error.fields})
+                except docs.DocumentError as error:return self.reply(error.status,{'error':str(error),'fields':error.fields})
                 return self.reply(404,{'error':'No encontrado.'})
             if path == '/api/autocare/history.csv':
                 # Exportación del historial técnico con los mismos filtros del panel. Sin contraseñas, claves, tokens ni datos personales.
@@ -2408,7 +2428,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(403, {'error':'Solicitud no autorizada.'})
             path = urlsplit(self.path).path
             workspace_post=bool(re.fullmatch(r'/api/orders/[0-9]+/workspace',path));quote_json=bool(re.fullmatch(r'/api/quotes/[0-9]+',path))
-            max_body=1700000 if path=='/api/cash/upload' else 9000000 if path in ('/api/clients/import/preview','/api/clients/import/commit','/api/inventory/import/preview','/api/inventory/import/commit') else 200000 if path=='/api/inventory/register' else 1700000 if path=='/api/public/adi/listen' else 6000000 if path in ('/api/mail/send','/api/mail/draft') else 100000 if path in ('/api/conditions','/api/order-draft','/api/conditions/draft','/api/conditions/compare') else 3200000 if path in ('/api/licenses/new','/api/licenses/units','/api/licenses/units/bulk','/api/licenses/check','/api/licenses/products','/api/licenses/products/duplicate','/api/licenses/sales') or re.fullmatch(r'/api/licenses/sales/[0-9]+',path) else 900000 if re.fullmatch(r'/api/orders/[0-9]+/photos',path) or path in ('/api/profile/photo','/api/mail/signature') or re.fullmatch(r'/api/catalog/[0-9]+/image',path) else (65536 if workspace_post or quote_json else 16384)
+            max_body=1700000 if path=='/api/cash/upload' else 9000000 if path in ('/api/clients/import/preview','/api/clients/import/commit','/api/inventory/import/preview','/api/inventory/import/commit') else 200000 if path in ('/api/inventory/register','/api/invoicing/policies') else 1700000 if path=='/api/public/adi/listen' else 6000000 if path in ('/api/mail/send','/api/mail/draft') else 100000 if path in ('/api/conditions','/api/order-draft','/api/conditions/draft','/api/conditions/compare') else 3200000 if path in ('/api/licenses/new','/api/licenses/units','/api/licenses/units/bulk','/api/licenses/check','/api/licenses/products','/api/licenses/products/duplicate','/api/licenses/sales') or re.fullmatch(r'/api/licenses/sales/[0-9]+',path) else 900000 if re.fullmatch(r'/api/orders/[0-9]+/photos',path) or path in ('/api/profile/photo','/api/mail/signature') or re.fullmatch(r'/api/catalog/[0-9]+/image',path) else (65536 if workspace_post or quote_json else 16384)
             length = int(self.headers.get('Content-Length', '0'))
             if length <= 0 or length > max_body:
                 return self.reply(400, {'error':'Solicitud inválida.'})
@@ -2860,11 +2880,27 @@ class Handler(BaseHTTPRequestHandler):
                 if path.startswith('/api/invoicing'):
                     # Facturación electrónica (solo ambiente de pruebas). Todas las reglas se comprueban aquí, no en el navegador.
                     if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede usar la facturación electrónica.'})
-                    import invoicing
+                    import invoicing,invoice_documents as docs
                     now=reception_now()
                     try:
                         if path=='/api/invoicing/settings':
                             saved=invoicing.save_settings(c,data,user,now);audit(c,user['id'],'invoicing_settings');return self.reply(200,{'ok':True,'settings':saved})
+                        if path=='/api/invoicing/policies':
+                            action=str(data.get('action',''));c.commit();c.execute('BEGIN IMMEDIATE')
+                            if action=='save':result={'id':docs.save_policy(c,data,user,now)}
+                            elif action=='discard':docs.discard_policy(c,data.get('id'));result={}
+                            elif action=='publish':result={'id':docs.publish_policy(c,data.get('id'),data,user,now)}
+                            elif action=='settings':result={'settings':docs.save_settings(c,data,user,now)}
+                            else:c.rollback();return self.reply(400,{'error':'Acción inválida.'})
+                            c.commit();audit(c,user['id'],'sales_policy_'+action);return self.reply(200,{'ok':True,**result,**docs.policies(c)})
+                        found=re.fullmatch(r'/api/invoicing/([0-9]{1,9})/send',path)
+                        if found:
+                            kind=str(data.get('kind',''))
+                            if kind not in ('prueba','reenvio','cliente'):return self.reply(400,{'error':'Tipo de envío no válido.'})
+                            deliver=lambda kind_,title,to,subject,body,files:send_institutional(c,kind_,title,to,subject,body,None,user['id'],attachments=files,review=False)
+                            sent=docs.send(c,int(found[1]),kind,user,now,deliver,str(data.get('recipient','') or ''))
+                            audit(c,user['id'],'invoice_documents_'+kind,int(found[1]));c.commit()
+                            return self.reply(200,{'ok':True,'mail':docs.mail_log(c,int(found[1])),'skipped':bool(sent.get('skipped'))})
                         if path=='/api/invoicing/draft':
                             kind=str(data.get('kind',''));sid=str(data.get('id',''))
                             if kind not in ('orden','venta_licencia') or not sid.isdigit():return self.reply(400,{'error':'Solicitud inválida.'})
@@ -2893,6 +2929,8 @@ class Handler(BaseHTTPRequestHandler):
                             return self.reply(400,{'error':'Acción inválida.'})
                         return self.reply(404,{'error':'No encontrado.'})
                     except invoicing.InvoiceError as error:
+                        c.rollback();return self.reply(error.status,{'error':str(error),'fields':error.fields})
+                    except docs.DocumentError as error:
                         c.rollback();return self.reply(error.status,{'error':str(error),'fields':error.fields})
                 if path in ('/api/autocare/diagnose','/api/autocare/settings','/api/autocare/review','/api/autocare/diagnose/start','/api/autocare/diagnose/step','/api/autocare/incident','/api/autocare/check','/api/autocare/action'):
                     if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede usar ADI AutoCare.'})

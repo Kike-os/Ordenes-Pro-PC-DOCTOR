@@ -392,6 +392,9 @@ def emit(c, invoice_id, user, now, environment=TEST_ENVIRONMENT):
     c.execute("UPDATE invoices SET status='pendiente',environment=?,establishment=?,emission_point=?,sequential=?,access_key=?,issue_date=?,xml_unsigned=?,emitted_by=?,emitted_at=?,updated_at=? WHERE id=?",
               (environment, cfg['establishment'], cfg['emission_point'], sequential, access, issue.isoformat(), xml, user['id'], stamp(now), stamp(now), invoice_id))
     event(c, invoice_id, 'emitido', 'Factura %s preparada en ambiente de PRUEBAS (clave de acceso %s). Pendiente de firma electrónica y envío al SRI de pruebas.' % (number(inv), access), now, user)
+    # Políticas comerciales vigentes al emitir: quedan asociadas a esta factura y no cambian después.
+    import invoice_documents
+    invoice_documents.attach_policies(c, invoice_id, now)
     return invoice_id
 
 
