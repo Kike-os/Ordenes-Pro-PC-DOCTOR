@@ -4796,9 +4796,9 @@ function invoiceTestBanner(settings){const box=el('div',undefined,'inv-banner'),
  const copy=el('div');copy.append(el('strong','MODO DE PRUEBAS — EMISIÓN REAL DESACTIVADA'),el('small',settings?.emission?.note||'Los comprobantes solo se preparan para el ambiente de pruebas del SRI.'));box.append(mark,copy,el('span','Ambiente: Pruebas','inv-banner-env'));return box;}
 // Navegación agrupada de Facturación (misma estructura que el Centro de Inventario). Las secciones marcadas con 1 están en desarrollo y se
 // presentan como tales: nunca como operativas. «@inventory» abre el Centro de Inventario existente (no se duplica dentro de Facturación).
-const invoiceGroups=[['Facturación',[['panel','Panel general','layout-dashboard'],['facturas','Facturas','receipt-text'],['proformas','Proformas','file-check-2',1],['notas','Notas de crédito','file-x-2',1],['pagos','Pagos y anticipos','banknote',1]]],
+const invoiceGroups=[['Facturación',[['panel','Panel general','layout-dashboard'],['facturas','Facturas','receipt-text'],['simulador','Simulador de cuotas','credit-card'],['proformas','Proformas','file-check-2',1],['notas','Notas de crédito','file-x-2',1],['pagos','Pagos y anticipos','banknote',1]]],
  ['Administración',[['caja','Caja','wallet'],['compras','Compras','shopping-cart'],['proveedores','Proveedores','truck'],['cuentas','Cuentas bancarias','landmark'],['@inventory','Centro de Inventario','package']]],
- ['Configuración',[['fiscal','Datos fiscales','building-2'],['firma','Firma electrónica','signature',1],['sri','Integración SRI','plug-zap',1],['config','Políticas comerciales','scroll-text'],['general','Configuración general','sliders-horizontal']]]];
+ ['Configuración',[['fiscal','Datos fiscales','building-2'],['firma','Firma electrónica','signature',1],['sri','Integración SRI','plug-zap',1],['tarjetas','Tarjetas y DATAFAST','badge-percent'],['config','Políticas comerciales','scroll-text'],['general','Configuración general','sliders-horizontal']]]];
 const invoiceTabs=invoiceGroups.flatMap(([,items])=>items).filter(t=>!t[0].startsWith('@'));
 function invoicePref(key,fallback){try{return JSON.parse(localStorage.getItem('fx-'+key))??fallback;}catch{return fallback;}}
 function invoiceSetPref(key,value){try{localStorage.setItem('fx-'+key,JSON.stringify(value));}catch{}}
@@ -4825,7 +4825,7 @@ async function renderInvoicing(){const root=$('module-content');const tab=invoic
  const shell=el('div',undefined,'inv-module fx-module ic-shell'),main=el('div',undefined,'ic-main'),panel=el('div',undefined,'inv-panel');panel.id='fx-section';panel.setAttribute('aria-label',tab[1]);
  shell.dataset.collapsed=String(!!invoicePref('nav-collapsed',false));main.append(invoiceTestBanner(data.settings),panel);shell.append(invoiceNav(data),main);root.replaceChildren(shell);
  const run={panel:p=>invoiceDashboard(p,data),facturas:p=>invoicesPanel(p,data),fiscal:invoiceSettingsForm,config:invoicePoliciesPanel,cuentas:bankAccountsPanel,compras:purchasesPanel,proveedores:suppliersPanel,
-  caja:renderCash,general:invoiceGeneralPanel,proformas:invoiceSoonPanel,notas:invoiceSoonPanel,pagos:invoiceSoonPanel,firma:invoiceSoonPanel,sri:invoiceSriPanel}[tab[0]];
+  caja:renderCash,general:invoiceGeneralPanel,simulador:invoiceCardSimulator,tarjetas:invoiceCardSettings,proformas:invoiceSoonPanel,notas:invoiceSoonPanel,pagos:invoiceSoonPanel,firma:invoiceSoonPanel,sri:invoiceSriPanel}[tab[0]];
  try{await run(panel);}catch(error){panel.replaceChildren(el('p',error.message,'empty-module'));}}
 // Indicadores compactos. Con acción, la tarjeta es un botón que abre el detalle (por ejemplo, las facturas de ese estado).
 function invoiceKpis(list){const grid=el('div',undefined,'fx-kpis');for(const[icon,label,value,hint,tone,action]of list){const card=action?button('',action,'fx-kpi'):el('article',undefined,'fx-kpi'),mark=el('span',undefined,'fx-kpi-icon'),body=el('div');
@@ -4897,6 +4897,96 @@ async function invoiceGeneralPanel(panel){const data=await api('/api/invoicing/s
   ['Consumidor final','Hasta USD 50,00 por factura'],['Datos fiscales',s.missing.length?'Faltan: '+s.missing.join(', '):'Completos']]));
  const links=el('div',undefined,'fx-card-acts');links.append(invBtn('Datos fiscales','building-2',()=>invoiceGo('fiscal')),invBtn('Políticas y envío de documentos','scroll-text',()=>invoiceGo('config')),invBtn('Cuentas bancarias','landmark',()=>invoiceGo('cuentas')));card.append(links);panel.append(card);}
 function invFacts(pairs){const dl=el('dl',undefined,'inv-facts fx-facts');for(const[k,v]of pairs){const x=el('div');x.append(el('dt',k),el('dd',String(v??'—')));dl.append(x);}return dl;}
+// Simulador de cuotas con tarjeta: selectores dependientes banco → marca → categoría → plazo. Los factores y el recargo salen de la base;
+// el servidor hace todo el cálculo (aquí solo se muestra). Nada se registra: es una simulación.
+const cardMoney=c=>quoteMoney(c),cardPct=bp=>(bp/100).toFixed(2).replace('.',',')+' %';
+async function invoiceCardSimulator(panel){const data=await api('/api/payments/cards');panel.replaceChildren();
+ panel.append(invSectionHead('Simulador de cuotas','Elige el banco, la tarjeta, la categoría y el plazo: Órdenes Pro calcula el recargo, el interés del diferido, el total y cada letra con los factores guardados.'));
+ const layout=el('div',undefined,'fx-sim'),{form,msg,field,fail,clear}=invForm('inv-settings fx-sim-form');form.addEventListener('submit',e=>e.preventDefault());
+ const g1=el('fieldset',undefined,'inv-group'),l1=el('legend');l1.append(invIcon('circle-dollar-sign'),el('span','Venta'));g1.append(l1);form.append(g1);
+ const amount=field('amount','Importe base de la venta (USD)',{required:true,mode:'decimal',max:14,value:'140,00',into:g1,hint:'Con impuestos incluidos, antes del recargo y del financiamiento.'});
+ const method=field('method','Forma de pago',{options:Object.entries(data.methods),value:'diferido_con_intereses',into:g1});
+ const g2=el('fieldset',undefined,'inv-group fx-sim-card'),l2=el('legend');l2.append(invIcon('credit-card'),el('span','Tarjeta'));g2.append(l2);form.append(g2);
+ const bank=field('bank','Banco',{options:[['','Selecciona…'],...Object.keys(data.banks).map(b=>[b,b])],into:g2,required:true});
+ const brand=field('brand','Marca de tarjeta',{options:[['','Selecciona el banco']],into:g2,required:true}),category=field('category','Categoría',{options:[['','Selecciona la marca']],into:g2,required:true});
+ const months=field('months','Plazo',{options:[['','Selecciona la categoría']],into:g2,required:true});
+ const fill=(select,list,empty)=>{const keep=select.value;select.replaceChildren(new Option(list.length?'Selecciona…':empty,''));for(const[v,t]of list)select.add(new Option(t,v));select.value=list.some(([v])=>v===keep)?keep:list.length===1?list[0][0]:'';select.disabled=!list.length;};
+ const group=()=>(data.banks[bank.value]?.[brand.value]||[]).find(x=>x.category===category.value)?.group;
+ const sync=()=>{const m=method.value,card=['credito_corriente','diferido_con_intereses','diferido_sin_intereses'].includes(m),deferred=m.startsWith('diferido');g2.hidden=!card;
+  fill(brand,Object.keys(data.banks[bank.value]||{}).map(b=>[b,b]),'Selecciona el banco');fill(category,(data.banks[bank.value]?.[brand.value]||[]).map(x=>[x.category,x.category]),'Selecciona la marca');
+  const g=group();months.closest('.inv-field').hidden=!deferred;
+  if(m==='diferido_con_intereses')fill(months,(data.factors[g]||[]).map(f=>[String(f.months),f.months+' meses · '+(f.usable?cardPct(f.factor_bp):'pendiente de confirmar')]),'Selecciona la categoría');
+  else fill(months,g?data.months.map(x=>[String(x),x+' meses · 0,00 %']):[],'Selecciona la categoría');
+  for(const o of months.options){const f=(data.factors[g]||[]).find(x=>String(x.months)===o.value);if(m==='diferido_con_intereses'&&f&&!f.usable)o.disabled=true;}
+  if(months.selectedOptions[0]?.disabled)months.value='';};
+ // Resumen siempre visible: PRECIO + RECARGO + INTERESES = TOTAL y TOTAL ÷ MESES = LETRA.
+ const side=el('aside',undefined,'fx-sim-summary');side.setAttribute('aria-live','polite');side.setAttribute('aria-label','Resumen del financiamiento');
+ const acts=el('div',undefined,'fx-card-acts'),compareBtn=invBtn('Comparar plazos','arrow-up-down',()=>compare()),copyBtn=invBtn('Copiar resumen','clipboard-list',()=>copy());acts.append(compareBtn,copyBtn);
+ const compareBox=el('section',undefined,'inv-card fx-card fx-compare');compareBox.hidden=true;
+ layout.append(form,side);panel.append(layout,acts,compareBox);
+ let last=null,timer=null,seq=0;
+ const query=()=>new URLSearchParams({amount:amount.value,method:method.value,bank:bank.value,brand:brand.value,category:category.value,months:months.value});
+ const ready=()=>{const m=method.value;if(!amount.value.trim())return 'Escribe el importe base.';if(['credito_corriente','diferido_con_intereses','diferido_sin_intereses'].includes(m)&&!(bank.value&&brand.value&&category.value))return 'Elige el banco, la marca y la categoría.';if(m.startsWith('diferido')&&!months.value)return 'Elige el plazo.';return '';};
+ const paint=r=>{side.replaceChildren();last=r;if(!r){side.append(invEmpty('credit-card','Completa los datos',ready()||'Revisa los datos.'));copyBtn.disabled=true;return;}copyBtn.disabled=false;
+  const head=el('div',undefined,'fx-sim-head');head.append(el('small',r.method_label+(r.bank?' · '+r.bank+' · '+r.brand:'')),el('strong',cardMoney(r.total_cents)),el('span','Total a pagar','fx-sim-label'));side.append(head);
+  const eq=el('p',undefined,'fx-sim-eq');eq.append(el('span',cardMoney(r.base_cents)),el('i','+'),el('span',cardMoney(r.surcharge_cents)),el('i','+'),el('span',cardMoney(r.interest_cents)),el('i','='),el('b',cardMoney(r.total_cents)));
+  const eqLabels=el('p',undefined,'fx-sim-eq fx-sim-eq-labels');eqLabels.append(el('span','Precio'),el('i',''),el('span','Recargo comercial'),el('i',''),el('span','Intereses'),el('i',''),el('b','Total'));side.append(eq,eqLabels);
+  const letter=el('p',undefined,'fx-sim-letter');letter.append(el('span',cardMoney(r.total_cents)+' ÷ '+r.months+(r.months===1?' pago':' meses')+' ='),el('strong',cardMoney(r.installment_cents)),el('small',r.months===1?'Pago único':'Valor de cada letra'));side.append(letter);
+  const dl=el('dl',undefined,'inv-facts fx-facts fx-sim-facts'),rows=[['Importe inicial',cardMoney(r.base_cents)],['Recargo comercial',r.surcharge_applies?cardMoney(r.surcharge_cents)+' ('+cardPct(r.surcharge_bp)+(r.surcharge_fixed_cents?' + '+cardMoney(r.surcharge_fixed_cents):'')+')':'$0,00 · no aplica'],
+   ['Subtotal financiable',cardMoney(r.financeable_cents)],['Porcentaje del diferido',r.method==='diferido_con_intereses'?cardPct(r.factor_bp)+(r.group?' · grupo '+r.group:''):'0,00 %'],['Interés de financiamiento',cardMoney(r.interest_cents)],
+   ['Total a pagar',cardMoney(r.total_cents)],['Número de letras',String(r.months)],['Valor de cada letra',cardMoney(r.installment_cents)]];
+  for(const[k,v]of rows){const x=el('div');x.append(el('dt',k),el('dd',v));dl.append(x);}side.append(dl);
+  if(r.months>1){const det=el('details',undefined,'fx-sim-plan'),sum=el('summary');sum.append(invIcon('scroll-text'),el('span','Tabla de letras ('+r.months+')'));det.append(sum);const t=el('table',undefined,'inv-table fx-sim-table'),tb=el('tbody');
+   t.append(el('thead'));t.tHead.append(el('tr'));for(const h of ['Letra','Importe']){const th=el('th',h);th.scope='col';t.tHead.rows[0].append(th);}
+   for(const i of r.installments){const tr=el('tr');tr.append(el('td',String(i.number)),el('td',cardMoney(i.amount_cents),'inv-num'));tb.append(tr);}const tot=el('tr','', 'fx-sim-total');tot.append(el('th','Total'),el('td',cardMoney(r.total_cents),'inv-num'));tb.append(tot);t.append(tb);det.append(t);side.append(det);}
+  if(r.factor_source)side.append(el('small',r.factor_source,'fx-sim-source'));
+  for(const w of r.warnings){const p=el('p',undefined,'fx-sim-warn');p.append(invIcon('info'),el('span',w));side.append(p);}};
+ const calc=async()=>{clear();const need=ready();if(need){paint(null);return;}const mine=++seq;try{const r=await api('/api/payments/simulate?'+query());if(mine===seq)paint(r);}catch(error){if(mine!==seq)return;fail(error);paint(null);}};
+ const schedule=()=>{clearTimeout(timer);timer=setTimeout(calc,250);};
+ const compare=async()=>{compareBox.hidden=false;compareBox.replaceChildren(el('p','Calculando…','empty-module'));if(ready()&&!(method.value.startsWith('diferido')&&bank.value&&brand.value&&category.value&&amount.value)){compareBox.replaceChildren(invEmpty('arrow-up-down','Elige la tarjeta','Para comparar plazos elige el banco, la marca y la categoría.'));return;}
+  try{const d=await api('/api/payments/compare?'+query());const card=invoiceCard('Comparación de plazos','arrow-up-down',bank.value+' · '+brand.value+' · '+category.value);compareBox.replaceWith(card);card.classList.add('fx-compare');
+   const wrap=el('div',undefined,'inv-table-wrap'),t=el('table',undefined,'inv-table'),tr=el('tr');for(const h of ['Plazo','Con intereses: factor','Con intereses: total','Con intereses: letra','Sin intereses: total','Sin intereses: letra']){const th=el('th',h);th.scope='col';tr.append(th);}t.append(el('thead'));t.tHead.append(tr);const tb=el('tbody');
+   for(const r of d.rows){const row=el('tr'),con=r.diferido_con_intereses,sin=r.diferido_sin_intereses,cell=(label,text,num)=>{const td=el('td',text,num?'inv-num':'');td.dataset.label=label;row.append(td);};cell('Plazo',r.months+' meses');
+    if(con.unavailable){cell('Factor','Pendiente');cell('Total','—');cell('Letra','—');}else{cell('Factor',cardPct(con.factor_bp),1);cell('Total',cardMoney(con.total_cents),1);cell('Letra',cardMoney(con.installment_cents),1);}
+    cell('Total sin intereses',sin.unavailable?'—':cardMoney(sin.total_cents),1);cell('Letra sin intereses',sin.unavailable?'—':cardMoney(sin.installment_cents),1);tb.append(row);}t.append(tb);wrap.append(t);card.append(wrap);}
+  catch(error){compareBox.replaceChildren(el('p',error.message,'empty-module'));}};
+ const copy=async()=>{if(!last)return;const r=last,lines=['Simulación de pago — PC-DOCTOR S.A.',r.method_label+(r.bank?' · '+r.bank+' · '+r.brand+' · '+r.category:''),'Precio: '+cardMoney(r.base_cents),'Recargo comercial: '+cardMoney(r.surcharge_cents),
+   'Intereses ('+cardPct(r.factor_bp)+'): '+cardMoney(r.interest_cents),'Total a pagar: '+cardMoney(r.total_cents),(r.months>1?r.months+' letras de ':'Pago único: ')+cardMoney(r.installment_cents),'Valores referenciales; el cobro lo realiza el emisor de la tarjeta.'];
+  try{await navigator.clipboard.writeText(lines.join('\n'));toast('Resumen copiado.','success');}catch{toast('No se pudo copiar el resumen.','error');}};
+ for(const input of [amount])input.addEventListener('input',schedule);
+ for(const select of [method,bank,brand,category])select.addEventListener('change',()=>{sync();schedule();});months.addEventListener('change',schedule);
+ sync();calc();}
+// Tarjetas y DATAFAST: tabla de factores guardada en la base, correspondencia de grupos y recargo comercial con su historial.
+async function invoiceCardSettings(panel){const data=await api('/api/payments/cards'),t=data.table,s=data.surcharge;panel.replaceChildren();
+ panel.append(invSectionHead('Tarjetas y DATAFAST','Factores de diferido con intereses guardados en la base de datos'+(t.source?' ('+t.source.source+', versión '+t.source.version+', vigentes desde '+dashboardDate(t.source.valid_from)+')':'')+'. No representan la comisión del establecimiento.'));
+ // Recargo comercial (separado de los factores).
+ const card=invoiceCard('Recargo comercial','badge-percent',s.active?'Activo · '+cardPct(s.percent_bp)+(s.fixed_cents?' + '+cardMoney(s.fixed_cents):''):'Desactivado');
+ if(s.active&&!s.validated){const w=el('p',undefined,'fx-plan-note fx-warn-note');w.append(invIcon('triangle-alert'),el('span','Pendiente de validación contractual, tributaria y comercial antes de trasladarlo al cliente.'));card.append(w);}
+ if(data.can_manage){const{form,msg,field,fail,clear}=invForm('inv-settings fx-surcharge');form.append(invRequiredNote());
+  const grid=el('div',undefined,'fx-form-grid');form.append(grid);
+  field('percent','Recargo porcentual (%)',{value:(s.percent_bp/100).toFixed(2).replace('.',','),mode:'decimal',max:6,into:grid,required:true});field('fixed','Recargo fijo (USD)',{value:(s.fixed_cents/100).toFixed(2).replace('.',','),mode:'decimal',max:10,into:grid});
+  field('payer','Quién asume el costo',{options:[['cliente','El cliente (se suma al total)'],['empresa','La empresa (no se suma)']],value:s.payer,into:grid});
+  field('valid_from','Vigente desde',{type:'date',value:s.valid_from,into:grid});field('valid_to','Vigente hasta',{type:'date',value:s.valid_to,into:grid});
+  const methods=el('fieldset',undefined,'inv-group fx-checks'),lg=el('legend');lg.append(el('span','Métodos a los que aplica'));methods.append(lg);
+  for(const m of data.surcharge_methods){const l=el('label',undefined,'inv-cf'),c=el('input');c.type='checkbox';c.name='m_'+m;c.checked=s.methods.includes(m);l.append(c,el('span',data.methods[m]));methods.append(l);}form.append(methods);
+  const flags=el('div',undefined,'fx-checks');for(const[name,label,on]of [['active','Recargo activo',s.active],['validated','Validado contractual y tributariamente',s.validated]]){const l=el('label',undefined,'inv-cf'),c=el('input');c.type='checkbox';c.name=name;c.checked=on;l.append(c,el('span',label));flags.append(l);}form.append(flags);
+  field('note','Motivo del cambio',{area:true,max:300,required:true,hint:'Queda en el historial con tu nombre y la fecha.'});
+  const save=el('button',undefined,'primary inv-btn');save.type='submit';save.append(invIcon('circle-check'),el('span','Guardar recargo'));const foot=el('div',undefined,'inv-form-foot');foot.append(save);form.append(msg,foot);
+  form.addEventListener('submit',async event=>{event.preventDefault();clear();const fd=new FormData(form),body={percent:fd.get('percent'),fixed:fd.get('fixed'),payer:fd.get('payer'),valid_from:fd.get('valid_from'),valid_to:fd.get('valid_to'),note:fd.get('note'),
+    active:fd.get('active')?'1':'',validated:fd.get('validated')?'1':'',methods:data.surcharge_methods.filter(m=>fd.get('m_'+m)).join(',')};save.disabled=true;
+   try{await api('/api/payments/surcharge',body);toast('Recargo comercial guardado.','success');invoiceCardSettings(panel);}catch(error){fail(error);save.disabled=false;}});card.append(form);}
+ panel.append(card);
+ // Tabla de factores por grupo y plazo.
+ const codes=Object.keys(t.groups),tableCard=invoiceCard('Factores de diferido con intereses','scroll-text','Porcentaje por grupo y plazo · '+codes.length+' grupos'),wrap=el('div',undefined,'inv-table-wrap fx-factors'),table=el('table',undefined,'inv-table'),hr=el('tr');
+ for(const h of ['Meses',...codes]){const th=el('th',h);th.scope='col';hr.append(th);}table.append(el('thead'));table.tHead.append(hr);const tb=el('tbody');
+ for(const r of t.rows){const tr=el('tr'),th=el('th',String(r.months));th.scope='row';tr.append(th);for(const code of codes){const f=r.factors[code],td=el('td',f?(f.status==='pendiente'?'Pendiente':cardPct(f.factor_bp)):'—','inv-num');if(f?.status==='pendiente'){td.dataset.pending='1';td.title='Pendiente de confirmar con el documento original';}tr.append(td);}tb.append(tr);}
+ table.append(tb);wrap.append(table);tableCard.append(wrap);panel.append(tableCard);
+ // Correspondencia de bancos y grupos.
+ const map=invoiceCard('Bancos, marcas y categorías','landmark','Solo estas combinaciones se pueden elegir'),list=el('div',undefined,'fx-groups');
+ for(const code of codes){const box=el('div',undefined,'fx-group');box.append(el('strong','Grupo '+code));const ul=el('ul');for(const item of t.groups[code]){ul.append(el('li',item));}box.append(ul);list.append(box);}map.append(list);panel.append(map);
+ if(data.can_manage){const hist=invoiceCard('Historial del recargo','clock','Cada cambio, con su responsable');panel.append(hist);try{const h=await api('/api/payments/surcharge/history');const ul=el('ul',undefined,'fx-list fx-timeline');
+   for(const r of h.rows){const li=el('li'),box=el('div',undefined,'fx-row');const top=el('span',undefined,'fx-row-top');top.append(el('strong',cardPct(r.percent_bp)+(r.fixed_cents?' + '+cardMoney(r.fixed_cents):'')+' · '+(r.active?'activo':'desactivado')+' · asume '+r.payer));box.append(top,el('span',r.note,'fx-row-sub'),el('small',formatOrderDate(r.changed_at)+(r.actor?' · '+r.actor:'')));li.append(box);ul.append(li);}hist.append(ul);}
+  catch(error){hist.append(el('p',error.message,'empty-module'));}}}
 // Panel de facturas: indicadores con lo registrado (nada estimado), búsqueda, filtros por estado y tabla.
 function invoicesPanel(panel,data){const s=data.summary,test=data.settings.test_mode!==false,filtered=!!(invoiceState.q||invoiceState.status);
  if(data.settings.missing.length){const warn=el('div',undefined,'inv-warn inv-warn-action');warn.setAttribute('role','status');warn.append(invIcon('triangle-alert'),el('span','Faltan datos fiscales para emitir: '+data.settings.missing.join(', ')+'.'),button('Completar datos fiscales',()=>{invoiceGo('fiscal');},'secondary'));panel.append(warn);}

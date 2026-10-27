@@ -1839,6 +1839,19 @@ class Handler(BaseHTTPRequestHandler):
                 if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede ver ADI AutoCare.'})
                 import autocare
                 return self.reply(200,autocare.overview(c,reception_now()))
+            if path.startswith('/api/payments/'):
+                # Centro de Métodos de Pago: catálogo de tarjetas, factores DATAFAST y simulador (solo lectura, sin datos de clientes).
+                import card_finance
+                q=parse_qs(urlsplit(self.path).query);data={k:(v[0] or '')[:80] for k,v in q.items()};today=reception_now().date().isoformat()
+                try:
+                    if path=='/api/payments/cards':return self.reply(200,{**card_finance.options(c,today),'table':card_finance.factor_table(c),'can_manage':user['role']=='administrador'})
+                    if path=='/api/payments/simulate':return self.reply(200,card_finance.simulate(c,data,today))
+                    if path=='/api/payments/compare':return self.reply(200,{'rows':card_finance.compare(c,data,today)})
+                    if path=='/api/payments/surcharge/history':
+                        if user['role']!='administrador':return self.reply(403,{'error':'Solo administración ve el historial del recargo.'})
+                        return self.reply(200,{'rows':card_finance.surcharge_history(c)})
+                except card_finance.CardError as error:return self.reply(error.status,{'error':str(error),'fields':error.fields})
+                return self.reply(404,{'error':'No encontrado.'})
             if path=='/api/bank-accounts':
                 # Catálogo central de cuentas bancarias: administración ve todas; el resto, solo las activas (para depósitos).
                 import banking
@@ -2767,6 +2780,13 @@ class Handler(BaseHTTPRequestHandler):
                     for key,value in values.items():c.execute('INSERT INTO auth_policy VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value',(key,value))
                     audit(c,user['id'],'auth_policy_updated')
                     return self.reply(200,{'ok':True})
+                if path=='/api/payments/surcharge':
+                    if user['role']!='administrador':return self.reply(403,{'error':'Solo administración configura el recargo comercial.'})
+                    import card_finance
+                    try:surcharge=card_finance.save_surcharge(c,data,user,reception_now())
+                    except card_finance.CardError as error:return self.reply(error.status,{'error':str(error),'fields':error.fields})
+                    audit(c,user['id'],'card_surcharge_updated')
+                    return self.reply(200,{'ok':True,'surcharge':surcharge})
                 if path=='/api/bank-accounts':
                     if user['role']!='administrador':return self.reply(403,{'error':'Solo administración gestiona las cuentas bancarias.'})
                     import banking
