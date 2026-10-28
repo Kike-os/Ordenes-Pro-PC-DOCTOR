@@ -137,7 +137,7 @@ class InvoiceDocumentsTests(unittest.TestCase):
         self.assertEqual(to, 'pruebas@example.invalid')
         self.assertTrue(subject.startswith('[PRUEBA — SIN VALIDEZ TRIBUTARIA]'))
         self.assertIn('no fue autorizada por el SRI', body)
-        self.assertEqual([f.split('-')[0] for f in files], ['FACTURA', 'POLITICAS'])
+        self.assertEqual([f.split('-')[0] if f.startswith('POLITICAS') else f.rsplit('_', 1)[0] for f in files], ['PC-DOCTOR_FACTURA', 'POLITICAS'])  # nombre automático del RIDE
         self.assertEqual(test['body']['mail'][0]['status'], 'enviado')
         # Factura autorizada en producción (simulada en la base temporal): una sola vez, con reintentos controlados.
         with app.connect() as c:

@@ -1261,7 +1261,7 @@ class Handler(BaseHTTPRequestHandler):
                 if not row:return self.reply(404,proformas.missing_page(),'text/html; charset=utf-8')
                 if proforma_page[2]:
                     if not proformas.valid_passkey(row,proforma_page[1],parse_qs(urlsplit(self.path).query).get('k',[''])[0]):return self.reply(404,proformas.missing_page(),'text/html; charset=utf-8')
-                    return self.reply(200,proformas.pdf(c,row['id'],now),'application/pdf',filename='PROFORMA-%s.pdf'%row['code'])
+                    return self.reply(200,proformas.pdf(c,row['id'],now),'application/pdf',filename=__import__('document_style').filename('PROFORMA',row['code']))
                 if not link['usable']:return self.reply(200 if row['status'] in ('aprobada','parcial','rechazada','modificacion','convertida') else 404,proformas.result_page(row,row['status']) if row['status'] in ('aprobada','parcial','rechazada','modificacion','convertida') else proformas.missing_page(),'text/html; charset=utf-8')
                 return self.reply(200,proformas.identify_page(proforma_page[1],row),'text/html; charset=utf-8')
             quote_page=re.fullmatch(r'/presupuesto/([A-Za-z0-9_-]{30,80})(/documento\.pdf)?',path)
@@ -1913,7 +1913,7 @@ class Handler(BaseHTTPRequestHandler):
                     found=re.fullmatch(r'/api/proformas/([0-9]{1,9})(\.pdf)?',path)
                     if found:
                         if found[2]:
-                            row=proformas.get(c,int(found[1]));return self.reply(200,proformas.pdf(c,int(found[1]),now),'application/pdf',filename='PROFORMA-%s.pdf'%row['code'])
+                            row=proformas.get(c,int(found[1]));return self.reply(200,proformas.pdf(c,int(found[1]),now,public_base_url().rstrip('/')+'/#invoicing?proforma=%d'%row['id']),'application/pdf',filename=__import__('document_style').filename('PROFORMA',row['code']))
                         return self.reply(200,proformas.detail(c,int(found[1]),now))
                     if path=='/api/payments-all':return self.reply(200,{'rows':proformas.all_payments(c,f)})
                     if path=='/api/credit-notes':return self.reply(200,{'rows':credit_notes.listing(c)})
@@ -1966,7 +1966,7 @@ class Handler(BaseHTTPRequestHandler):
                     found=re.fullmatch(r'/api/inventory/units/([0-9]{1,9})',path)
                     if found:return self.reply(200,center.unit_detail(c,found[1]))
                     if path=='/api/inventory/serial-check':return self.reply(200,center.serial_check(c,arg('serial')))
-                    kardex_filters=lambda:{k:arg(k) for k in ('from','to','category_id','brand_id','item_id','serial','type','user_id')}
+                    kardex_filters=lambda:{k:arg(k) for k in ('from','to','category_id','brand_id','item_id','serial','type','user_id','archived')}
                     if path=='/api/inventory/kardex':
                         filters=kardex_filters();filters['document']=arg('document')
                         return self.reply(200,dict(center.kardex(c,filters),types=center.KARDEX_TYPES,reports=center.REPORTS,users=[dict(r) for r in c.execute("SELECT id,name FROM users ORDER BY name")]))
@@ -2041,7 +2041,7 @@ class Handler(BaseHTTPRequestHandler):
                             linked=docs.invoice_policies(c,invoice_id)
                             return self.reply(200,{'policies':linked,'warranties':docs.warranty_rows(c,invoice_id),'mail':docs.mail_log(c,invoice_id),'settings':docs.settings(c),
                                                    'emitted':bool(inv['access_key']),'authorized':inv['status']=='autorizado' and inv['environment']=='2' and not invoicing.TEST_MODE,'max_tries':docs.MAX_TRIES})
-                        if found[2]=='ride.pdf':return self.reply(200,docs.ride_pdf(c,invoice_id),'application/pdf',filename='FACTURA-%s.pdf'%(inv['number'] or invoice_id))
+                        if found[2]=='ride.pdf':return self.reply(200,docs.ride_pdf(c,invoice_id),'application/pdf',filename=__import__('document_style').filename('FACTURA',inv['number'] or invoice_id))
                         if found[2]=='garantias.pdf':
                             pdf=docs.warranty_pdf(c,invoice_id)
                             if not pdf:return self.reply(404,{'error':'Esta factura no tiene productos con garantía.'})

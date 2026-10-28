@@ -8,6 +8,33 @@
   },
   "releases": [
     {
+      "version": "1.5.211",
+      "date": "2026-10-27T22:06:24-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Proformas y facturas (RIDE) en PDF con la identidad de PC-DOCTOR y códigos de barras reales, e inventario limpio como nuevo",
+      "changes": {
+        "features": [
+          "Proforma en PDF rediseñada (A4): logo original y nombre comercial PC-DOCTOR, contacto, número, emisión, vencimiento y estado; cliente; partidas con descripciones ajustadas; resumen con base imponible, IVA y TOTAL GENERAL destacado; forma de pago, vigencia, garantía, observaciones y condiciones.",
+          "Proforma: código de barras Code 128 con su código único (verificado con escáner) y, en la copia interna, un QR que abre la proforma en Órdenes Pro con sesión iniciada. Pie: PROFORMA COMERCIAL — NO ES COMPROBANTE TRIBUTARIO.",
+          "Factura (RIDE) rediseñada con la misma identidad: emisor con razón social, RUC, direcciones, contabilidad y leyenda RIMPE; bloque tributario con número, autorización, ambiente, emisión y clave de acceso con Code 128 legible; comprador, detalle, información adicional, formas de pago y resumen de impuestos."
+        ],
+        "improvements": [
+          "PDF con encabezado de tabla repetido en cada página, filas que no se parten entre páginas, paginación y nombres automáticos (PC-DOCTOR_PROFORMA_PF-000001.pdf y PC-DOCTOR_FACTURA_001-001-000000001.pdf).",
+          "Centro de Inventario como nuevo: el panel, el Kardex general y la revisión ya no muestran los productos archivados; su historial sigue disponible desde su ficha o con el filtro «Productos archivados: Incluir»."
+        ],
+        "fixes": [
+          "Factura directa: «Crear e imprimir» abría un RIDE inexistente (una factura en borrador no tiene RIDE); ahora es «Emitir e imprimir (pruebas)» y solo abre el RIDE si la emisión de prueba se realizó."
+        ],
+        "security": [
+          "La advertencia DOCUMENTO DE PRUEBA — SIN VALIDEZ TRIBUTARIA se mantiene en cada página mientras la factura no esté autorizada por el SRI; nunca se generan autorizaciones ficticias. La proforma no usa claves de acceso del SRI."
+        ],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Kike-os (administración): «Actualiza a la versión siguiente con las mejoras func"
+    },
+    {
       "version": "1.5.210",
       "date": "2026-10-27T20:49:18-05:00",
       "type": "patch",

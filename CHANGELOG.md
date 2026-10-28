@@ -4,6 +4,29 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.211 — 2026-10-27 22:06 (UTC-05:00)
+
+Proformas y facturas (RIDE) en PDF con la identidad de PC-DOCTOR y códigos de barras reales, e inventario limpio como nuevo
+
+### Nuevas funcionalidades
+
+- Proforma en PDF rediseñada (A4): logo original y nombre comercial PC-DOCTOR, contacto, número, emisión, vencimiento y estado; cliente; partidas con descripciones ajustadas; resumen con base imponible, IVA y TOTAL GENERAL destacado; forma de pago, vigencia, garantía, observaciones y condiciones.
+- Proforma: código de barras Code 128 con su código único (verificado con escáner) y, en la copia interna, un QR que abre la proforma en Órdenes Pro con sesión iniciada. Pie: PROFORMA COMERCIAL — NO ES COMPROBANTE TRIBUTARIO.
+- Factura (RIDE) rediseñada con la misma identidad: emisor con razón social, RUC, direcciones, contabilidad y leyenda RIMPE; bloque tributario con número, autorización, ambiente, emisión y clave de acceso con Code 128 legible; comprador, detalle, información adicional, formas de pago y resumen de impuestos.
+
+### Mejoras realizadas
+
+- PDF con encabezado de tabla repetido en cada página, filas que no se parten entre páginas, paginación y nombres automáticos (PC-DOCTOR_PROFORMA_PF-000001.pdf y PC-DOCTOR_FACTURA_001-001-000000001.pdf).
+- Centro de Inventario como nuevo: el panel, el Kardex general y la revisión ya no muestran los productos archivados; su historial sigue disponible desde su ficha o con el filtro «Productos archivados: Incluir».
+
+### Errores corregidos
+
+- Factura directa: «Crear e imprimir» abría un RIDE inexistente (una factura en borrador no tiene RIDE); ahora es «Emitir e imprimir (pruebas)» y solo abre el RIDE si la emisión de prueba se realizó.
+
+### Actualizaciones de seguridad
+
+- La advertencia DOCUMENTO DE PRUEBA — SIN VALIDEZ TRIBUTARIA se mantiene en cada página mientras la factura no esté autorizada por el SRI; nunca se generan autorizaciones ficticias. La proforma no usa claves de acceso del SRI.
+
 ## v1.5.210 — 2026-10-27 20:49 (UTC-05:00)
 
 Nueva factura directa y Cotización y proforma rediseñadas, y archivo controlado de productos físicos del inventario

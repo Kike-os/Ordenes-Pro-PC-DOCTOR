@@ -69,6 +69,9 @@ class DirectInvoiceTests(unittest.TestCase):
         self.assertNotIn(item, [p['id'] for p in self.get('/api/inventory/products')['body']['rows']])  # fuera del catálogo activo
         self.assertIn(item, [p['id'] for p in self.get('/api/inventory/products?state=archivado')['body']['rows']])
         self.assertTrue(self.get('/api/inventory/kardex?item_id=%d' % item)['body']['rows'])  # el historial sigue disponible
+        self.assertNotIn(item, [r['item_id'] for r in self.get('/api/inventory/kardex')['body']['rows']])  # el Kardex general queda como nuevo
+        self.assertIn(item, [r['item_id'] for r in self.get('/api/inventory/kardex?archived=1')['body']['rows']])
+        self.assertEqual(self.get('/api/inventory/center')['body']['cards']['moves_week'], 0)
         with app.connect() as c:
             row = c.execute('SELECT i.active,i.sku,i.barcode,i.alerts_enabled,g.available,g.name FROM inventory_items i JOIN catalog_items g ON g.id=i.catalog_id WHERE i.id=?', (item,)).fetchone()
             self.assertEqual(tuple(row)[:5], (0, '', '', 0, 0));self.assertIn('(archivado AR-', row['name'])

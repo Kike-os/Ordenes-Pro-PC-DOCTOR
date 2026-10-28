@@ -489,7 +489,7 @@ async function renderRoute(){
  if(name==='live'){if(!admin()){go('home');return;}await renderLive();return;}
  if(name==='adi'){if(!admin()){go('home');return;}await renderAdminAdi();return;}
  if(name==='licenses'){if(!admin()){go('home');return;}await renderLicenses();return;}
- if(name==='invoicing'){if(!admin()){go('home');return;}await renderInvoicing();return;}
+ if(name==='invoicing'){if(!admin()){go('home');return;}const pf=params.get('proforma');if(pf&&/^\d{1,9}$/.test(pf))invoiceState.tab='proformas';await renderInvoicing();if(pf&&/^\d{1,9}$/.test(pf))proformaDetail(+pf,()=>renderInvoicing());return;}  // el QR de la proforma abre su detalle (requiere sesión)
  if(name==='inventory'){if(!admin()){go('home');return;}await renderInventoryCenter();return;}
  if(name==='cash'){invoiceState.tab='caja';go('invoicing');return;}  // la caja vive dentro de Facturación
  if(name==='activity'){await renderActivity();return;}
@@ -5739,8 +5739,8 @@ async function invoiceComposer(existing=null,done=null,mode='factura'){const P=m
  const acts=el('div',undefined,'fxc-actions'),msg=el('p','','inv-form-message');msg.setAttribute('role','alert');
  const cancel=button('Cancelar',()=>requestModalClose(dialog),'secondary');let draftB,createB,printB,emitB;
  if(P){createB=invBtn(p?'Guardar cambios':'Guardar proforma','circle-check',()=>submit('proforma'),'primary');draftB=createB;acts.append(cancel,createB);}
- else{draftB=invBtn('Guardar borrador','file-pen-line',()=>submit('draft'));createB=invBtn('Crear factura','receipt-text',()=>submit('create'),'primary');printB=invBtn('Crear e imprimir','printer',()=>submit('print'));emitB=invBtn('Guardar y emitir (pruebas)','send',()=>submit('emit'),'primary');
-  if(setup.settings.missing.length){emitB.disabled=true;emitB.title='Completa los datos fiscales para emitir.';}acts.append(cancel,draftB,printB,createB,emitB);}
+ else{draftB=invBtn('Guardar borrador','file-pen-line',()=>submit('draft'));createB=invBtn('Crear factura','receipt-text',()=>submit('create'),'primary');printB=invBtn('Emitir e imprimir (pruebas)','printer',()=>submit('print'));emitB=invBtn('Guardar y emitir (pruebas)','send',()=>submit('emit'),'primary');
+  if(setup.settings.missing.length)for(const b of [emitB,printB]){b.disabled=true;b.title='Completa los datos fiscales para emitir.';}acts.append(cancel,draftB,printB,createB,emitB);}
  foot.append(msg,acts);const buttons=[draftB,createB,printB,emitB].filter(Boolean);
  let totals={total:0},ft=null,seq=0;
  function paint(){let gross=0,disc=0,taxedNet=0,zeroNet=0;const rows=[...tbody.children];empty.hidden=rows.length>0;wrap.hidden=!rows.length;
@@ -5781,9 +5781,9 @@ async function invoiceComposer(existing=null,done=null,mode='factura'){const P=m
   if(!data.lines.length)problems.push('Agrega al menos un producto o servicio.');if([...tbody.children].some(tr=>tr.dataset.invalid==='true'))problems.push('Revisa las partidas marcadas (cantidad, precio o descuento).');
   if(P&&!valid.value)problems.push('Indica hasta cuándo es válida la proforma.');
   if(!P&&how!=='draft'){const paid=data.payments.reduce((s,x)=>s+parse(x.amount),0);if(paid>totals.total)problems.push('Los pagos superan el total.');for(const x of data.payments)if(['transferencia','deposito'].includes(x.method)&&(!x.bank_account_id||x.reference.length<3))problems.push('Indica la cuenta receptora y la referencia de cada transferencia o depósito.');
-   if(how==='emit'&&!cfc.checked&&!cid.value.trim())problems.push('Para emitir indica la identificación del cliente o marca «Consumidor final».');}
+   if(['emit','print'].includes(how)&&!cfc.checked&&!cid.value.trim())problems.push('Para emitir indica la identificación del cliente o marca «Consumidor final».');}
   if(problems.length){msg.textContent=[...new Set(problems)].join(' ');return;}
-  if(!P&&how!=='draft'&&!await askConfirm(how==='emit'?'¿Crear y emitir la factura en PRUEBAS?':'¿Crear la factura?','Cliente: '+(cfc.checked?'CONSUMIDOR FINAL':cname.value.trim())+'\nTotal: '+money(totals.total)+' · '+data.lines.length+' partida(s)\n'+(data.payments.length?'Pagos: '+data.payments.map(x=>methods[x.method]+' '+money(parse(x.amount))).join(' + '):'Sin cobro: saldo a crédito')+(how==='emit'?'\nEmisión de PRUEBAS: sin validez tributaria; no se envía al SRI.':''),how==='emit'?'Crear y emitir':how==='print'?'Crear e imprimir':'Crear factura'))return;
+  if(!P&&how!=='draft'&&!await askConfirm(how==='emit'||how==='print'?'¿Crear y emitir la factura en PRUEBAS?':'¿Crear la factura?','Cliente: '+(cfc.checked?'CONSUMIDOR FINAL':cname.value.trim())+'\nTotal: '+money(totals.total)+' · '+data.lines.length+' partida(s)\n'+(data.payments.length?'Pagos: '+data.payments.map(x=>methods[x.method]+' '+money(parse(x.amount))).join(' + '):'Sin cobro: saldo a crédito')+(how==='emit'||how==='print'?'\nEmisión de PRUEBAS: sin validez tributaria; no se envía al SRI.':''),how==='emit'?'Crear y emitir':how==='print'?'Emitir e imprimir':'Crear factura'))return;
   const win=how==='print'?window.open('about:blank','_blank'):null;
   busy=true;for(const b of buttons)b.disabled=true;acts.setAttribute('aria-busy','true');msg.textContent='Procesando…';
   try{const payload={client_id:clientId.value,client_name:cfc.checked&&!cname.value.trim()?'CONSUMIDOR FINAL':cname.value.trim(),client_identification:cid.value.trim(),client_address:caddr.value.trim(),client_phone:cphone.value.trim(),client_email:cmail.value.trim(),items:JSON.stringify(data.lines),notes:data.notes};
@@ -5792,10 +5792,10 @@ async function invoiceComposer(existing=null,done=null,mode='factura'){const P=m
    const saved=pid?await api('/api/proformas/'+pid,{...payload,action:'save'}):await api('/api/proformas',{...payload,request_key:keys.save});pid=saved.id||pid;
    if(P){dirty=false;dialog.close();toast('Proforma '+(saved.proforma?.code||'')+' guardada.','success');done&&done();proformaDetail(pid,done);return;}
    if(how==='draft'){dirty=false;msg.textContent='Borrador guardado ('+(saved.proforma?.code||'')+').';toast('Borrador guardado.','success');done&&done();return;}
-   const r=await api('/api/proformas/'+pid,{action:'checkout',payments:JSON.stringify(data.payments),emit:how==='emit'?'1':'',consumer_final:cfc.checked?'1':'',internal_note:internal.value.trim(),request_key:keys.checkout});
-   dirty=false;dialog.close();done&&done();if(win)win.location.href='/api/invoicing/'+r.invoice_id+'/ride.pdf';
-   if(r.emit_error)toast('La factura quedó en borrador: '+r.emit_error,'error');else toast(how==='emit'?'Factura '+(r.invoice.number||'')+' emitida en pruebas.':'Factura creada en borrador.','success');openInvoice(r.invoice_id);}
-  catch(error){win?.close();msg.textContent=error.message;showFields(error.fields);}finally{busy=false;for(const b of buttons)b.disabled=false;if(emitB)emitB.disabled=!!setup.settings.missing.length;acts.removeAttribute('aria-busy');}}
+   const r=await api('/api/proformas/'+pid,{action:'checkout',payments:JSON.stringify(data.payments),emit:how==='emit'||how==='print'?'1':'',consumer_final:cfc.checked?'1':'',internal_note:internal.value.trim(),request_key:keys.checkout});
+   dirty=false;dialog.close();done&&done();if(win){if(r.emit_error)win.close();else win.location.href='/api/invoicing/'+r.invoice_id+'/ride.pdf';}
+   if(r.emit_error)toast('La factura quedó en borrador: '+r.emit_error,'error');else toast(how==='emit'||how==='print'?'Factura '+(r.invoice.number||'')+' emitida en pruebas.':'Factura creada en borrador.','success');openInvoice(r.invoice_id);}
+  catch(error){win?.close();msg.textContent=error.message;showFields(error.fields);}finally{busy=false;for(const b of buttons)b.disabled=false;for(const b of [emitB,printB])if(b)b.disabled=!!setup.settings.missing.length;acts.removeAttribute('aria-busy');}}
  (p?pq:fq).focus();}
 // ---- Proformas, pagos y anticipos, vouchers y notas de crédito ----------------------------------------------------------------------
 let proformaState={status:'',q:''};

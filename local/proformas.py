@@ -588,107 +588,151 @@ def all_payments(c, f):
 
 # ---- Documento PDF y página del cliente -------------------------------------------------------------------------------------
 
-def pdf(c, pid, now):
+def pdf(c, pid, now, staff_url=''):
+    """Proforma comercial A4 con la identidad de PC-DOCTOR: encabezado (logo, contacto, número, fechas y estado), cliente, partidas con el
+    encabezado repetido en cada página, resumen financiero, información comercial, condiciones y un Code 128 con el código único de la
+    proforma. El QR (solo en la copia interna) abre la proforma en Órdenes Pro y exige iniciar sesión. No es un comprobante tributario."""
+    import document_style as ds
+    import invoicing as inv_
+    from document_canvas import GRAY, INK
     d = detail(c, pid, now)
     p, items, t = d['proforma'], d['items'], d['totals']
-    from document_canvas import Canvas, BLUE, GRAY
-    from corporate import settings
-    company = settings()
-    doc = Canvas(595, 842, 'Proforma ' + p['code'])
-    M, W = 40, 515
-    pages = []
+    company = __import__('corporate').settings()
+    fiscal = inv_.settings(c)
+    rate = p['tax_rate_bp']
+    pct = ('%g' % (rate / 100)).replace('.', ',')
+    doc = ds.Doc('Proforma ' + p['code'])
+    left, right = ds.M, ds.A4[0] - ds.M
 
-    def new_page():
+    def continuation():
         doc.page()
-        pages.append(1)
-        return 40
-    y = new_page()
-    doc.logo(M, y, 120)
-    doc.text('PROFORMA ' + p['code'], 595 - M - 200, y, 14, True, BLUE)
-    doc.text('Emitida: %s · Válida hasta: %s' % (_d(p['issue_date']), _d(p['valid_until'])), 595 - M - 200, y + 20, 8, False, GRAY)
-    doc.text('Estado: ' + p['status_label'], 595 - M - 200, y + 32, 8, False, GRAY)
-    y += 70
-    doc.text(company.get('name', 'PC-DOCTOR S.A.'), M, y, 9, True)
-    y += 14
-    doc.text('Cliente: %s · %s' % (p['client_name'], p['client_identification'] or 'sin identificación'), M, y, 9)
+        doc.logo(left, 26, 46)
+        doc.text(ds.TRADE_NAME, left + 56, 30, 12, True, ds.NAVY)
+        doc.text('Proforma %s · continuación' % p['code'], left + 56, 46, 8.5, False, GRAY)
+        doc.hline(left, 66, right - left, ds.NAVY, 1)
+        return 78
+
+    def room(y, need):
+        return continuation() if y + need > ds.BOTTOM else y
+
+    doc.page()
+    # Encabezado: marca y contacto (izquierda), datos del documento (derecha).
+    address = fiscal.get('branch_address') or fiscal.get('head_office_address') or ''
+    contact = [(address, False)] if address else []
+    contact += [('Tel. / WhatsApp: ' + company['whatsapp'], False)] if company.get('whatsapp') else []
+    contact += [(company['support_email'], False)] if company.get('support_email') else []
+    used = doc.brand(left, 26, contact)
+    bx, bw = right - 196, 196
+    doc.rect(bx, 26, bw, 96, fill=ds.SOFT)
+    doc.text('PROFORMA', bx + 12, 34, 15, True, ds.NAVY)
+    doc.text('No. ' + p['code'] + (' · versión %d' % p['version'] if p['version'] > 1 else ''), bx + 12, 54, 10, True)
+    for n, (k, v) in enumerate((('Emisión', _d(p['issue_date'])), ('Vence', _d(p['valid_until'])), ('Estado', p['status_label']))):
+        doc.text(k, bx + 12, 72 + n * 14, 8, False, GRAY)
+        doc.right(v, bx + bw - 12, 72 + n * 14, 8.5, True)
+    y = max(26 + used, 122) + 10
+    doc.hline(left, y, right - left, ds.NAVY, 1.2)
     y += 12
-    for value in (p['client_address'], ' · '.join(x for x in (p['client_phone'], p['client_email']) if x)):
-        if value:
-            doc.text(value, M, y, 8, False, GRAY)
-            y += 11
-    y += 8
-    cols = [('Descripción', 260), ('Cant.', 40), ('P. unit.', 70), ('Desc.', 65), ('Total', 80)]
-    x = M
-    for name, width in cols:
-        doc.text(name, x, y, 8, True, BLUE)
-        x += width
-    y += 12
-    doc.line(M, y, W)
-    y += 4
-    for item in items:
-        lines = doc.wrap(item['description'] + ('' if item['taxed'] else ' (tarifa 0 %)'), 255, 8)
-        if y + 12 * len(lines) > 760:
-            y = new_page()
-        doc.text(lines[0], M, y, 8)
-        values = [str(item['quantity']), usd(item['unit_cents']), usd(item['discount_cents']) if item['discount_cents'] else '—', usd(item['net_cents'])]
-        x = M + 260
-        for value, (_, width) in zip(values, cols[1:]):
-            doc.text(value, x, y, 8)
-            x += width
-        for extra in lines[1:]:
-            y += 11
-            doc.text(extra, M, y, 8)
-        if item['status'] != 'pendiente':
-            y += 10
-            doc.text('Decisión del cliente: ' + item['status'], M + 8, y, 7, False, GRAY)
-        y += 14
-    doc.line(M, y, W)
-    y += 8
-    rate = p['tax_rate_bp'] / 100
-    for label, value in (('Subtotal sin impuestos', usd(t['subtotal_cents'])), ('Descuentos', usd(t['discount_cents'])), ('IVA %g %%' % rate, usd(t['tax_cents'])), ('TOTAL', usd(t['total_cents']))):
-        doc.text(label, 595 - M - 220, y, 9, label == 'TOTAL')
-        doc.text(value, 595 - M - 80, y, 9, label == 'TOTAL')
-        y += 13
-    y += 6
-    doc.text('Forma de pago: ' + p['payment_label'], M, y, 9, True)
+    # Cliente.
+    doc.label('Datos del cliente', left, y)
     y += 14
+    fields = [('Nombres o razón social', p['client_name']), ('Cédula o RUC', p['client_identification'] or '—'), ('Dirección', p['client_address'] or '—'),
+              ('Teléfono', p['client_phone'] or '—'), ('Correo electrónico', p['client_email'] or '—')]
+    half = (right - left) / 2
+    doc.text(fields[0][0], left, y + 1, 7.5, False, GRAY)
+    doc.text(doc.wrap(fields[0][1], right - left - 120, 10)[0], left + 110, y, 10, True)
+    y += 16
+    pairs = [fields[1:3], fields[3:5]]
+    for pair in pairs:
+        tall = 1
+        for n, (k, v) in enumerate(pair):
+            x = left + n * half
+            doc.text(k, x, y + 1, 7.5, False, GRAY)
+            pieces = doc.wrap(v, half - 118, 8.5)[:2]
+            for i, piece in enumerate(pieces):
+                doc.text(piece, x + 110, y + i * 10.5, 8.5)
+            tall = max(tall, len(pieces))
+        y += 10.5 * tall + 3
+    y += 8
+    # Partidas.
+    warranty = {}
+    try:
+        import inventory_center
+        for i in items:
+            if i.get('inventory_item_id'):
+                w = c.execute('SELECT warranty_store_qty,warranty_store_unit,warranty_maker_qty,warranty_maker_unit FROM inventory_items WHERE id=?', (i['inventory_item_id'],)).fetchone()
+                if w and (w[0] or w[2]):
+                    parts = ([('tienda ' + inventory_center.period_label(w[0], w[1]))] if w[0] else []) + ([('fabricante ' + inventory_center.period_label(w[2], w[3]))] if w[2] else [])
+                    warranty[i['description']] = ' · '.join(parts)
+    except Exception:
+        warranty = {}
+    rows = []
+    for i in items:
+        rows.append({'code': i.get('code') or '—', 'desc': i['description'], 'qty': str(i['quantity']), 'unit': usd(i['unit_cents']),
+                     'disc': usd(i['discount_cents']) if i['discount_cents'] else '—', 'tax': (pct + ' %') if i['taxed'] else '0 %', 'total': usd(i['net_cents']),
+                     '_note': ('Decisión del cliente: ' + i['status']) if i['status'] != 'pendiente' else ''})
+    cols = [('Código', 64, 'l', 'code', True), ('Descripción', 205, 'l', 'desc', True), ('Cant.', 38, 'r', 'qty', False), ('P. unitario', 64, 'r', 'unit', False),
+            ('Descuento', 56, 'r', 'disc', False), ('IVA', 34, 'r', 'tax', False), ('Total', 62, 'r', 'total', False)]
+    y = doc.table(cols, rows, y, continuation)
+    # Resumen financiero (derecha) y código de barras con el identificador único (izquierda).
+    gross = sum(i['quantity'] * i['unit_cents'] for i in items)
+    base_taxed = sum(line_amounts(i, rate)['base_cents'] for i in items if i['taxed'])
+    base_zero = sum(line_amounts(i, rate)['base_cents'] for i in items if not i['taxed'])
+    lines = [('Subtotal (IVA incluido)', usd(gross)), ('Descuentos', '-' + usd(t['discount_cents']) if t['discount_cents'] else usd(0)),
+             ('Base imponible ' + pct + ' %', usd(base_taxed))] + ([('Base imponible 0 %', usd(base_zero))] if base_zero else []) + [('IVA ' + pct + ' %', usd(t['tax_cents']))]
+    need = 14 * len(lines) + 40
+    y = room(y + 6, max(need, 96))
+    tw = 228
+    end = doc.totals(right - tw, y + 8, tw, lines, ('TOTAL GENERAL', usd(t['total_cents'])))
+    doc.label('Identificador de la proforma', left, y + 4)
+    doc.barcode(p['code'], left - 4, y + 18, 190, 38)
+    doc.center(p['code'], left + 91, y + 60, 9, True)
+    if staff_url:
+        doc.qr(staff_url, left + 200, y + 10, 66)
+        doc.text('Consulta interna', left + 205, y + 78, 7, False, GRAY)
+    y = max(end, y + 92) + 6
+    # Información comercial.
+    info = [('Forma de pago', p['payment_label']), ('Vigencia de la oferta', 'Hasta el %s' % _d(p['valid_until']))]
     f = p['financing']
     if f:
-        if y > 680:
-            y = new_page()
-        doc.text('Financiamiento con tarjeta: %s · %s · %s · %d %s' % (f['bank'], f['brand'], f['category'], f['months'], 'mes' if f['months'] == 1 else 'meses'), M, y, 8)
-        y += 12
-        doc.text('PRECIO %s + RECARGO COMERCIAL %s + INTERESES %s = TOTAL A PAGAR %s' % (usd(f['base_cents']), usd(f['surcharge_cents']), usd(f['interest_cents']), usd(f['total_cents'])), M, y, 8, True)
-        y += 12
-        doc.text('TOTAL A PAGAR %s ÷ %d = VALOR DE CADA LETRA %s (factor %s)' % (usd(f['total_cents']), f['months'], usd(f['installment_cents']), ('%.2f %%' % (f['factor_bp'] / 100)).replace('.', ',')), M, y, 8, True)
-        y += 12
-        doc.text('Cuotas referenciales: el interés del diferido lo cobra el banco emisor. La factura se emite por el precio de los productos y servicios.', M, y, 7, False, GRAY)
-        y += 14
+        info.append(('Financiamiento con tarjeta', '%s · %s · %s · %d %s. PRECIO %s + RECARGO %s + INTERESES %s = TOTAL A PAGAR %s; %d letras de %s. El interés del diferido lo cobra '
+                     'el banco emisor; la factura se emite por el precio.' % (f['bank'], f['brand'], f['category'], f['months'], 'mes' if f['months'] == 1 else 'meses', usd(f['base_cents']),
+                                                                             usd(f['surcharge_cents']), usd(f['interest_cents']), usd(f['total_cents']), f['months'], usd(f['installment_cents']))))
     account = d['bank_account']
     if account:
-        doc.text('Datos para depósito o transferencia: %s · %s · %s · %s · %s' % (account['bank'], account['type_label'], account['number'], account['holder'], account['holder_ruc'] or account['holder_id']), M, y, 8)
-        y += 14
+        info.append(('Depósito o transferencia', '%s · %s · %s · %s · %s' % (account['bank'], account['type_label'], account['number'], account['holder'], account['holder_ruc'] or account['holder_id'])))
     if d['paid_cents']:
-        doc.text('Anticipos registrados: %s · saldo: %s' % (usd(d['paid_cents']), usd(d['balance_cents'])), M, y, 8)
-        y += 14
+        info.append(('Anticipos registrados', '%s · saldo %s' % (usd(d['paid_cents']), usd(d['balance_cents']))))
+    info.append(('Garantía aplicable', '; '.join('%s: %s' % (k, v) for k, v in warranty.items()) or 'Según las políticas comerciales vigentes y la garantía de cada producto o servicio.'))
     if p['notes']:
-        for line in doc.wrap('Observaciones: ' + p['notes'], W, 8):
-            doc.text(line, M, y, 8)
+        info.append(('Observaciones', p['notes']))
+    y = room(y, 40)
+    doc.label('Información comercial', left, y)
+    y += 14
+    for k, v in info:
+        pieces = doc.wrap(v, right - left - 132, 8.5)
+        y = room(y, 11 * len(pieces) + 4)
+        doc.text(k, left, y, 8, True, ds.NAVY)
+        for piece in pieces:
+            doc.text(piece, left + 132, y, 8.5)
             y += 11
+        y += 3
     y += 6
-    doc.text('Condiciones comerciales', M, y, 9, True, BLUE)
-    y += 13
-    for title, body in quotes.clauses(p['conditions']):
-        for line in doc.wrap(((title.rstrip('.') + '. ') if title else '') + body, W, 7.5):
-            if y > 790:
-                y = new_page()
-            doc.text(line, M, y, 7.5)
-            y += 10
-    y += 6
+    clauses = quotes.clauses(p['conditions'])
+    if clauses:
+        y = room(y, 40)
+        doc.label('Condiciones comerciales', left, y)
+        y += 14
+        for title, body in clauses:
+            for n, piece in enumerate(doc.wrap(((title.rstrip('.') + '. ') if title else '') + body, right - left, 7.8)):
+                y = room(y, 10)
+                doc.text(piece, left, y, 7.8, False, INK)
+                y += 10
+            y += 2
     if d['acceptance']:
         a = d['acceptance']
-        doc.text('Decisión: %s · %s · %s · %s · huella %s' % (a['decision'], a['signer_name'], a['method'], _dt(a['created_at']), a['evidence_hash'][:16]), M, min(y, 800), 7, False, GRAY)
-    doc.text('Esta proforma no es un comprobante de venta ni tiene validez tributaria.', M, 815, 7, True, GRAY)
+        y = room(y + 4, 14)
+        doc.text('Decisión: %s · %s · %s · %s · huella %s' % (a['decision'], a['signer_name'], a['method'], _dt(a['created_at']), a['evidence_hash'][:16]), left, y, 7.5, False, GRAY)
+    doc.footer('PROFORMA COMERCIAL — NO ES COMPROBANTE TRIBUTARIO')
     return doc.finish()
 
 

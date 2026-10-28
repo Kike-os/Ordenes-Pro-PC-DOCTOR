@@ -320,119 +320,132 @@ def policy_pdf(policy, invoice=None):
 # ---- RIDE (representación impresa de la factura) ---------------------------------------------------------------------------
 
 def ride_pdf(c, invoice_id):
-    """RIDE A4 de una factura emitida: emisor con el logo original, número, clave de acceso con código de barras, ambiente, comprador,
-    detalle, totales y formas de pago. Si no está autorizada por el SRI, lo indica en cada página: no es un comprobante válido."""
+    """RIDE A4 de una factura emitida con la identidad de PC-DOCTOR: emisor (logo original, nombre comercial, razón social, RUC, direcciones,
+    contabilidad, régimen y agente de retención según la configuración), bloque tributario (número, autorización, ambiente, emisión y clave de
+    acceso con su Code 128), comprador, detalle con el encabezado repetido en cada página, información adicional, formas de pago y resumen de
+    impuestos con los valores registrados. Si no está autorizada por el SRI lo indica en cada página: no es un comprobante válido."""
+    import document_style as ds
+    import sri_xml
     data = invoicing.detail(c, invoice_id)
     inv, s = data['invoice'], data['settings']
     if not inv['access_key']:
         raise DocumentError('La factura todavía no se emitió: no tiene RIDE.', 409)
     valid = inv['status'] == 'autorizado' and inv['environment'] == '2'
     note = '' if valid else ('DOCUMENTO DE PRUEBA — SIN VALIDEZ TRIBUTARIA' if inv['environment'] == '1' else 'NO AUTORIZADO POR EL SRI — SIN VALIDEZ TRIBUTARIA')
-    page = Page('Factura ' + inv['number'])
-    left, right = 36, A4[0] - 36
-    rows = data['items']
-    per_page = 22
-    chunks = [rows[i:i + per_page] for i in range(0, len(rows), per_page)] or [[]]
-    for number, chunk in enumerate(chunks, 1):
-        page.pdf.page()
+    doc = ds.Doc('Factura ' + inv['number'])
+    left, right = ds.M, ds.A4[0] - ds.M
+
+    def warning(y):
         if note:
-            page.rect(left, 16, right - left, 18, fill=(.99, .93, .93), stroke=RED)
-            page.center(note, A4[0] / 2, 21, 9, True, RED)
-        # Emisor.
-        page.rect(left, 42, 262, 190)
-        page.pdf.logo(left + 12, 52, 96)
-        y = 132
-        for label, value, bold in ((None, s['legal_name'] or 'Razón social sin configurar', True), (None, s['trade_name'], False), ('Dirección matriz', s['head_office_address'], False),
-                                   ('Dirección sucursal', s['branch_address'], False), ('Contribuyente especial', s['special_taxpayer'], False),
-                                   ('Obligado a llevar contabilidad', s['keeps_accounts'] or '—', False), ('Régimen', s['regime_label'] if s['regime'] else '', False)):
-            if not value:
-                continue
-            for piece in page.pdf.wrap((label + ': ' if label else '') + value, 238, 8 if label else 9)[:2]:
-                page.pdf.text(piece, left + 12, y, 8 if label else 9, bold, INK if bold else GRAY)
-                y += 11
-        # Comprobante.
-        x2 = left + 272
-        page.rect(x2, 42, right - x2, 190)
-        page.pdf.text('R.U.C.: ' + (s['ruc'] or '—'), x2 + 10, 52, 10, True)
-        page.pdf.text('FACTURA', x2 + 10, 70, 13, True, BLUE)
-        page.pdf.text('No. ' + inv['number'], x2 + 10, 88, 10, True)
-        page.pdf.text('NÚMERO DE AUTORIZACIÓN', x2 + 10, 106, 7, True, GRAY)
-        page.pdf.text(inv['authorization_number'] or ('Pendiente de autorización del SRI' if inv['environment'] == '2' else 'Ambiente de pruebas: no autorizada'), x2 + 10, 116, 7.5)
-        page.pdf.text('FECHA Y HORA DE AUTORIZACIÓN: ' + (inv['authorized_at'][:19].replace('T', ' ') if inv['authorized_at'] else '—'), x2 + 10, 130, 7)
-        page.pdf.text('AMBIENTE: ' + ('PRODUCCIÓN' if inv['environment'] == '2' else 'PRUEBAS') + '   ·   EMISIÓN: NORMAL', x2 + 10, 142, 7.5, True)
-        page.pdf.text('CLAVE DE ACCESO', x2 + 10, 158, 7, True, GRAY)
-        page.barcode(inv['access_key'], x2 + 4, 168, right - x2 - 8, 34)
-        page.center(inv['access_key'], (x2 + right) / 2, 206, 6.6)
-        # Comprador.
-        page.rect(left, 240, right - left, 46)
-        buyer = 'CONSUMIDOR FINAL' if inv['consumer_final'] else inv['buyer_name']
-        page.pdf.text('Razón social / Nombres: ' + page.pdf.wrap(buyer or '—', 300, 8.5)[0], left + 10, 248, 8.5)
-        page.pdf.text('Identificación: ' + ('9999999999999' if inv['consumer_final'] else inv['buyer_id'] or '—'), left + 360, 248, 8.5)
-        page.pdf.text('Fecha de emisión: ' + dmy(inv['issue_date']), left + 10, 262, 8.5)
-        page.pdf.text('Dirección: ' + page.pdf.wrap(inv['buyer_address'] or '—', 300, 8.5)[0], left + 10, 274, 8.5)
-        if inv['order_code']:
-            page.pdf.text('Orden: ' + inv['order_code'], left + 360, 262, 8.5)
-        # Detalle.
-        cols = [('Cód.', 52), ('Cant.', 36), ('Descripción', 248), ('P. unitario', 62), ('Descuento', 62), ('Total', 63)]
-        y = 296
-        page.rect(left, y, right - left, 16, fill=(.93, .95, .98))
-        x = left
-        for title_, w in cols:
-            (page.right if title_ not in ('Cód.', 'Descripción') else page.pdf.text)(title_, x + w - 4 if title_ not in ('Cód.', 'Descripción') else x + 4, y + 4, 7.5, True, BLUE)
-            x += w
-        y += 20
-        for item in chunk:
-            desc = page.pdf.wrap(item['description'], cols[2][1] - 8, 8)[:3]
-            values = [item['code'] or '', str(item['quantity']), None, '%.4f' % (item['unit_price_micros'] / 1e6), usd(item['discount_cents'])[1:], usd(item['base_cents'])[1:]]
-            x = left
-            for (title_, w), value in zip(cols, values):
-                if value is None:
-                    for n, piece in enumerate(desc):
-                        page.pdf.text(piece, x + 4, y + n * 10, 8)
-                elif title_ == 'Cód.':
-                    page.pdf.text(page.pdf.wrap(value, w - 6, 7)[0], x + 4, y, 7)
-                else:
-                    page.right(value.replace('.', ',') if title_ == 'P. unitario' else value, x + w - 4, y, 8)
-                x += w
-            y += max(1, len(desc)) * 10 + 4
-            page.pdf.line(left, y - 2, right - left)
-        if number < len(chunks):
-            page.pdf.text('Continúa en la página siguiente.', left, y + 4, 8, False, GRAY)
-        else:
-            # Información adicional y formas de pago (izquierda); totales (derecha).
-            y = max(y + 8, 470)
-            info = [('Correo', inv['buyer_email']), ('Teléfono', inv['buyer_phone']), ('Orden', inv['order_code']), ('Venta', inv['sale_code'])]
-            if data['bank_account']:
-                b = data['bank_account']
-                info.append(('Cuenta para pagos', '%s · %s · %s' % (b['bank'], b['type_label'], b['number'])))
-            info = [(k, v) for k, v in info if v]
-            box_h = 22 + 12 * max(1, len(info)) + 18 + 12 * max(1, len(data['payments']))
-            page.rect(left, y, 300, box_h)
-            page.pdf.text('INFORMACIÓN ADICIONAL', left + 10, y + 8, 7.5, True, BLUE)
-            yy = y + 22
-            for k, v in info:
-                page.pdf.text(page.pdf.wrap(k + ': ' + v, 280, 8)[0], left + 10, yy, 8)
-                yy += 12
-            page.pdf.text('FORMA DE PAGO', left + 10, yy + 4, 7.5, True, BLUE)
-            yy += 18
-            for p in data['payments']:
-                page.pdf.text(p['sri_code'] + ' · ' + p['label'], left + 10, yy, 7.5)
-                page.right(usd(p['amount_cents']), left + 290, yy, 8)
-                yy += 12
-            totals = [('SUBTOTAL ' + ('%g' % (g['rate_bp'] / 100)) + ' %', g['base_cents']) for g in data['rates']]
-            totals += [('SUBTOTAL SIN IMPUESTOS', inv['subtotal_cents']), ('DESCUENTO', inv['discount_cents'])]
-            totals += [('IVA ' + ('%g' % (g['rate_bp'] / 100)) + ' %', g['tax_cents']) for g in data['rates'] if g['rate_bp']]
-            totals += [('VALOR TOTAL', inv['total_cents'])]
-            x3 = left + 312
-            page.rect(x3, y, right - x3, 14 * len(totals) + 8)
-            yy = y + 6
-            for k, v in totals:
-                bold = k == 'VALOR TOTAL'
-                page.pdf.text(k, x3 + 8, yy, 8, bold, BLUE if bold else INK)
-                page.right(usd(v), right - 8, yy, 8.5 if bold else 8, bold)
-                yy += 14
-        _footer(page, number, len(chunks), note)
-    return page.pdf.finish()
+            doc.rect(left, y, right - left, 18, fill=(.99, .93, .93), stroke=RED)
+            doc.center(note, ds.A4[0] / 2, y + 5, 9, True, RED)
+            return y + 24
+        return y
+
+    def continuation():
+        doc.page()
+        y = warning(14)
+        doc.logo(left, y, 46)
+        doc.text(ds.TRADE_NAME, left + 56, y + 4, 12, True, ds.NAVY)
+        doc.text('Factura No. %s · R.U.C. %s · continuación' % (inv['number'], s['ruc'] or '—'), left + 56, y + 20, 8.5, False, GRAY)
+        doc.hline(left, y + 40, right - left, ds.NAVY, 1)
+        return y + 52
+
+    doc.page()
+    y = warning(14)
+    top = y
+    # Emisor (izquierda).
+    ew = 250
+    doc.rect(left, top, ew, 214)
+    doc.logo(left + 12, top + 10, 84)
+    doc.text(ds.TRADE_NAME, left + 106, top + 14, 17, True, ds.NAVY)
+    if s['trade_name'] and s['trade_name'].strip().upper() != ds.TRADE_NAME:
+        doc.text('Nombre comercial: ' + doc.wrap(s['trade_name'], 150, 7.5)[0], left + 106, top + 36, 7.5, False, GRAY)
+    yy = top + 84
+    rows = [('', s['legal_name'] or 'Razón social sin configurar', True, 9), ('Dirección matriz: ', s['head_office_address'], False, 8),
+            ('Dirección establecimiento: ', s['branch_address'], False, 8), ('Contribuyente especial Nro.: ', s['special_taxpayer'], False, 8),
+            ('OBLIGADO A LLEVAR CONTABILIDAD: ', s['keeps_accounts'] or '—', False, 8), ('', sri_xml.RIMPE_LEGENDS.get(s['regime'], ''), True, 8),
+            ('Agente de Retención Resolución No. ', s['withholding_agent'], False, 8)]
+    for label, value, bold, size in rows:
+        if not value:
+            continue
+        for piece in doc.wrap(label + value, ew - 24, size)[:2]:
+            if yy > top + 204:
+                break
+            doc.text(piece, left + 12, yy, size, bold, INK if bold else GRAY)
+            yy += size + 3.5
+    # Bloque tributario (derecha).
+    x2 = left + ew + 10
+    tw = right - x2
+    doc.rect(x2, top, tw, 214, fill=ds.SOFT)
+    doc.text('R.U.C.: ' + (s['ruc'] or '—'), x2 + 12, top + 10, 10.5, True)
+    doc.text('FACTURA', x2 + 12, top + 28, 15, True, ds.NAVY)
+    doc.text('No. ' + inv['number'], x2 + 12, top + 48, 10.5, True)
+    doc.label('Número de autorización', x2 + 12, top + 66, GRAY)
+    auth = inv['authorization_number'] or ('Pendiente de autorización del SRI' if inv['environment'] == '2' else 'Ambiente de pruebas: no autorizada')
+    doc.text(auth, x2 + 12, top + 77, 8 if len(auth) > 40 else 8.5, bool(inv['authorization_number']))
+    doc.text('Fecha y hora de autorización: ' + (inv['authorized_at'][:19].replace('T', ' ') if inv['authorized_at'] else '—'), x2 + 12, top + 93, 8)
+    doc.text('Ambiente: ' + ('PRODUCCIÓN' if inv['environment'] == '2' else 'PRUEBAS'), x2 + 12, top + 106, 8.5, True)
+    doc.text('Emisión: NORMAL', x2 + 12 + tw / 2, top + 106, 8.5, True)
+    doc.label('Clave de acceso', x2 + 12, top + 124, GRAY)
+    doc.barcode(inv['access_key'], x2 + 2, top + 136, tw - 4, 46)
+    doc.center(inv['access_key'], x2 + tw / 2, top + 188, 7.5)
+    y = top + 224
+    # Comprador.
+    buyer = 'CONSUMIDOR FINAL' if inv['consumer_final'] else inv['buyer_name']
+    doc.rect(left, y, right - left, 52)
+    half = (right - left) / 2
+    doc.text('Razón social / Nombres', left + 10, y + 8, 7.5, False, GRAY)
+    doc.text(doc.wrap(buyer or '—', half + 60, 9.5)[0], left + 110, y + 7, 9.5, True)
+    doc.text('Identificación', left + half + 80, y + 8, 7.5, False, GRAY)
+    doc.text('9999999999999' if inv['consumer_final'] else inv['buyer_id'] or '—', left + half + 140, y + 7, 9, True)
+    doc.text('Fecha de emisión', left + 10, y + 23, 7.5, False, GRAY)
+    doc.text(dmy(inv['issue_date']), left + 110, y + 22, 8.5)
+    if inv['order_code']:
+        doc.text('Orden', left + half + 80, y + 23, 7.5, False, GRAY)
+        doc.text(inv['order_code'], left + half + 140, y + 22, 8.5)
+    doc.text('Dirección', left + 10, y + 37, 7.5, False, GRAY)
+    doc.text(doc.wrap(inv['buyer_address'] or '—', right - left - 130, 8.5)[0], left + 110, y + 36, 8.5)
+    y += 62
+    # Detalle.
+    items = [{'code': i['code'] or '', 'qty': str(i['quantity']), 'desc': i['description'], 'unit': ('%.4f' % (i['unit_price_micros'] / 1e6)).replace('.', ','),
+              'disc': usd(i['discount_cents'])[1:], 'total': usd(i['base_cents'])[1:]} for i in data['items']]
+    cols = [('Cód. principal', 70, 'l', 'code', True), ('Cant.', 40, 'r', 'qty', False), ('Descripción', 223, 'l', 'desc', True), ('P. unitario', 64, 'r', 'unit', False),
+            ('Descuento', 58, 'r', 'disc', False), ('Precio total', 68, 'r', 'total', False)]
+    y = doc.table(cols, items, y, continuation)
+    # Información adicional y formas de pago (izquierda); resumen de impuestos (derecha).
+    info = [('Correo', inv['buyer_email']), ('Teléfono', inv['buyer_phone']), ('Orden', inv['order_code']), ('Venta', inv['sale_code'])]
+    if data['bank_account']:
+        b = data['bank_account']
+        info.append(('Cuenta para pagos', '%s · %s · %s' % (b['bank'], b['type_label'], b['number'])))
+    info = [(k, v) for k, v in info if v]
+    totals = [('SUBTOTAL ' + ('%g' % (g['rate_bp'] / 100)).replace('.', ',') + ' %', usd(g['base_cents'])) for g in data['rates']]
+    totals += [('SUBTOTAL SIN IMPUESTOS', usd(inv['subtotal_cents'])), ('TOTAL DESCUENTO', usd(inv['discount_cents']))]
+    totals += [('IVA ' + ('%g' % (g['rate_bp'] / 100)).replace('.', ',') + ' %', usd(g['tax_cents'])) for g in data['rates'] if g['rate_bp']]
+    need_left = 34 + 12 * max(1, len(info)) + 30 + 13 * max(1, len(data['payments']))
+    need = max(need_left, 14 * len(totals) + 44)
+    if y + need > ds.BOTTOM:
+        y = continuation()
+    lw = 300
+    doc.rect(left, y, lw, need_left)
+    doc.label('Información adicional', left + 10, y + 9)
+    yy = y + 24
+    for k, v in info or [('—', '')]:
+        doc.text(k, left + 10, yy, 8, True, ds.NAVY)
+        doc.text(doc.wrap(v, lw - 100, 8.5)[0] if v else '', left + 90, yy, 8.5)
+        yy += 12
+    yy += 6
+    doc.label('Forma de pago', left + 10, yy)
+    yy += 14
+    for p in data['payments']:
+        doc.text(doc.wrap(p['sri_code'] + ' · ' + p['label'], lw - 90, 8)[0], left + 10, yy, 8)
+        doc.right(usd(p['amount_cents']), left + lw - 10, yy, 8.5, True)
+        yy += 13
+    tx = left + lw + 12
+    doc.rect(tx, y, right - tx, 14 * len(totals) + 42)
+    doc.totals(tx, y + 8, right - tx, totals, ('VALOR TOTAL', usd(inv['total_cents'])))
+    doc.footer(note, RED)
+    return doc.finish()
 
 
 # ---- Garantías de la factura ------------------------------------------------------------------------------------------------
@@ -525,7 +538,7 @@ def package(c, invoice_id):
     inv = data['invoice']
     if not inv['access_key']:
         raise DocumentError('La factura todavía no se emitió.', 409)
-    files = [{'name': 'FACTURA-%s.pdf' % inv['number'], 'type': 'application/pdf', 'data': base64.b64encode(ride_pdf(c, invoice_id)).decode()}]
+    files = [{'name': __import__('document_style').filename('FACTURA', inv['number']), 'type': 'application/pdf', 'data': base64.b64encode(ride_pdf(c, invoice_id)).decode()}]
     row = c.execute('SELECT xml_authorized FROM invoices WHERE id=?', (invoice_id,)).fetchone()
     if inv['status'] == 'autorizado' and row['xml_authorized']:
         files.append({'name': 'FACTURA-%s.xml' % inv['number'], 'type': 'application/xml', 'data': base64.b64encode(row['xml_authorized'].encode('utf-8')).decode()})

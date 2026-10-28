@@ -1109,7 +1109,12 @@ def kardex(c, filters=None):
     has_extra = _has_column(c, 'inventory_movements', 'supplier_id')
     has_sale = _has_column(c, 'inventory_movements', 'client_id')
     rows, stock_now, value_now, opening, chosen = [], 0, 0, 0, []
+    # Los productos archivados (limpieza autorizada) no aparecen en el Kardex general, el panel ni la revisión; su historial se consulta
+    # desde su ficha (filtro por producto) o pidiendo expresamente incluir los archivados.
+    hidden = set() if _id(f.get('item_id')) or str(f.get('archived') or '') == '1' else archived_ids(c)
     for item in items:
+        if item['id'] in hidden:
+            continue
         if cats and item['category_id'] not in cats or _id(f.get('brand_id')) and item['brand_id'] != int(f['brand_id']) or _id(f.get('item_id')) and item['id'] != int(f['item_id']):
             continue
         chosen.append(item['id'])
