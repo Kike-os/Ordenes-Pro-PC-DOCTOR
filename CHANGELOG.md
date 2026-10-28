@@ -4,6 +4,26 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.210 — 2026-10-27 20:49 (UTC-05:00)
+
+Nueva factura directa y Cotización y proforma rediseñadas, y archivo controlado de productos físicos del inventario
+
+### Nuevas funcionalidades
+
+- Nueva factura directa rediseñada: ventana amplia con comprobante (tipo, número, establecimiento, punto de emisión, fecha, vendedor y estado tomados de la configuración) y cliente con búsqueda por nombre, cédula o RUC y registro sin salir de la factura.
+- Factura directa: tabla de productos y servicios (código, cantidad, unidad, precio, descuento, IVA y subtotal) con búsqueda en inventario y catálogo y aviso de inventario insuficiente; formas de pago con pago mixto y cambio; observaciones y TOTAL A PAGAR destacado.
+- Botones Guardar borrador, Crear factura, Crear e imprimir y Guardar y emitir (pruebas), con validaciones, confirmación antes de crear o descartar, atajos de teclado (F2, Ctrl+Enter, Ctrl+S) y protección contra facturas duplicadas por clics repetidos.
+- Cotización y proforma con la misma ventana profesional: vigencia, forma de pago y financiamiento con tarjeta, cuenta para depósito y autorización de descuentos.
+- Centro de Inventario › Configuración: Archivar productos físicos para volver a registrar la mercadería; deja las fichas inactivas y fuera del catálogo, libera nombre, SKU y código de barras, conserva Kardex, ventas, facturas y garantías, y nunca incluye licencias digitales.
+
+### Mejoras realizadas
+
+- Menú de Facturación: el grupo principal se llama Ventas, con Facturación y Cotización y proforma. La tarifa de IVA se toma siempre de la configuración tributaria; las partidas manuales conservan su código.
+
+### Actualizaciones de seguridad
+
+- La emisión sigue siendo solo de pruebas y nunca se simula una autorización del SRI. Archivar productos exige administración, motivo y la palabra ARCHIVAR, y queda registrado en un lote con los datos originales.
+
 ## v1.5.209 — 2026-10-27 18:47 (UTC-05:00)
 
 Caja por sesiones con arqueo y cierre guiado, pagos y saldo profesionales, cuentas bancarias con verificación, vouchers, proformas con aprobación, notas de crédito (pruebas) e inventario con reinicialización controlada y Kardex corregido

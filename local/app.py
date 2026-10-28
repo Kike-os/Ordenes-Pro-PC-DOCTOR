@@ -1974,6 +1974,7 @@ class Handler(BaseHTTPRequestHandler):
                     if found:return self.reply(200,center.product_sheet(c,found[1],now))
                     if path=='/api/inventory/licenses/table':return self.reply(200,center.licenses_table(c,now))
                     if path=='/api/inventory/review':return self.reply(200,center.review(c,now))
+                    if path=='/api/inventory/archive':return self.reply(200,center.archive_preview(c))
                     if path=='/api/inventory/reinitialize':return self.reply(200,center.reinit_preview(c,(q.get('ids',[''])[0] or '')[:1200]))
                     if path=='/api/inventory/reinit-batches':return self.reply(200,{'rows':center.reinit_batches(c)})
                     found=re.fullmatch(r'/api/inventory/(kardex|report)\.(xlsx|csv|pdf)',path)
@@ -2019,6 +2020,13 @@ class Handler(BaseHTTPRequestHandler):
                         import inventory
                         return self.reply(200,{**invoicing.dashboard(c,reception_now()),'inventory_alerts':inventory.alert_count(c)})
                     if path=='/api/invoicing/settings':return self.reply(200,{'settings':invoicing.settings(c),'regimes':invoicing.REGIMES})
+                    if path=='/api/invoicing/direct-setup':
+                        # Datos de la cabecera de una factura directa, desde la configuración (nunca fijados en la pantalla).
+                        import banking
+                        cfg=invoicing.settings(c);seq=c.execute('SELECT last_number FROM invoice_sequences WHERE environment=? AND establishment=? AND emission_point=? AND doc_type=?',(invoicing.TEST_ENVIRONMENT,cfg['establishment'],cfg['emission_point'],'01')).fetchone()
+                        return self.reply(200,{'settings':{k:cfg[k] for k in ('establishment','emission_point','missing','test_mode','ruc','legal_name','emission')},'tax_rate_bp':quotes.tax_rate(c),
+                                               'next_number':'%s-%s-%09d'%(cfg['establishment'] or '000',cfg['emission_point'] or '000',(seq[0] if seq else 0)+1),'seller':user['name'],'today':reception_now().date().isoformat(),
+                                               'accounts':banking.listing(c,active_only=True),'doc_types':{'01':'Factura'},'consumer_final_limit_cents':invoicing.CONSUMER_FINAL_LIMIT_CENTS})
                     if path=='/api/invoicing/eligibility':
                         if arg('kind') not in invoicing.SOURCES or not arg('id').isdigit():return self.reply(400,{'error':'Solicitud inválida.'})
                         return self.reply(200,invoicing.eligibility(c,arg('kind'),int(arg('id'))))
@@ -2948,6 +2956,22 @@ class Handler(BaseHTTPRequestHandler):
                             elif action=='advance':
                                 proformas.add_advance(c,pid,data,user,now,attach('anticipo'))
                             elif action=='void_advance':proformas.void_advance(c,data.get('advance_id'),data,user,now)
+                            elif action=='checkout':
+                                if user['role']!='administrador':return self.reply(403,{'error':'Solo administración genera facturas.'})
+                                invoice_id=proformas.checkout(c,pid,data,user,now);c.commit()
+                                emit_error=''
+                                if str(data.get('consumer_final',''))=='1':
+                                    # Consumidor final solo hasta el límite legal (lo comprueba el servidor); si no procede, se informa y no se emite.
+                                    c.execute('BEGIN IMMEDIATE')
+                                    try:invoicing.set_buyer(c,invoice_id,{'consumer_final':'1'},user,now);c.commit()
+                                    except invoicing.InvoiceError as error:c.rollback();emit_error=str(error);data=dict(data,emit='')
+                                if str(data.get('emit',''))=='1':
+                                    # Emisión en el ambiente de PRUEBAS; si falta algún dato, la factura queda en borrador y se informa el motivo.
+                                    c.execute('BEGIN IMMEDIATE')
+                                    try:invoicing.emit(c,invoice_id,user,now);c.commit()
+                                    except invoicing.InvoiceError as error:c.rollback();emit_error=str(error)
+                                audit(c,user['id'],'invoice_direct',invoice_id);c.commit()
+                                return self.reply(200,{'ok':True,'invoice_id':invoice_id,'emit_error':emit_error,**invoicing.detail(c,invoice_id)})
                             else:return self.reply(400,{'error':'Acción no válida.'})
                             return self.reply(200,{'ok':True,'id':pid,**proformas.detail(c,pid,now)})
                         if path=='/api/credit-notes':
@@ -3030,6 +3054,9 @@ class Handler(BaseHTTPRequestHandler):
                         elif path=='/api/inventory/reinitialize':
                             import inventory_center as center
                             result=center.reinitialize(c,data,user,now)
+                        elif path=='/api/inventory/archive':
+                            import inventory_center as center
+                            result=center.archive(c,data,user,now)
                         elif path=='/api/inventory/cost-correction':
                             import inventory_center as center
                             result={'product':center.correct_cost(c,data.get('movement_id'),data.get('cost'),data.get('reason'),user,now,data.get('document',''))}

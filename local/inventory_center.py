@@ -309,8 +309,13 @@ def products(c, q='', category_id='', brand_id='', state=''):
     if q:
         key = inventory.serial_key(q)
         unit_hits = {r[0] for r in c.execute('SELECT item_id FROM inventory_units WHERE serial_key LIKE ? OR internal_code LIKE ?', ('%' + key + '%', '%' + key + '%'))}
+    archived = archived_ids(c)
     out = []
     for r in rows:
+        if r['id'] in archived and state not in ('inactivo', 'archivado'):
+            continue  # archivadas: fuera del catálogo activo (siguen en el Kardex, las ventas y las facturas)
+        if state == 'archivado' and r['id'] not in archived:
+            continue
         if cats and r['category_id'] not in cats:
             continue
         if _id(brand_id) and r['brand_id'] != int(brand_id):
@@ -387,7 +392,7 @@ def save_product(c, data, user, now):
     maker = _warranty_fields(data, 'warranty_maker', errors)
     brand_id = ensure_brand(c, brand_name, user, now) if brand_name and not errors else None
     if not errors and brand_id and model and category:
-        clash = c.execute('SELECT g.name FROM inventory_items i JOIN catalog_items g ON g.id=i.catalog_id WHERE i.category_id=? AND i.brand_id=? AND lower(i.model)=lower(?) AND i.id!=?',
+        clash = c.execute('SELECT g.name FROM inventory_items i JOIN catalog_items g ON g.id=i.catalog_id WHERE i.active=1 AND i.category_id=? AND i.brand_id=? AND lower(i.model)=lower(?) AND i.id!=?',
                           (category['id'], brand_id, model, item_id or 0)).fetchone()
         if clash:
             errors['model'] = 'Ya existe la ficha «%s» con esa marca y modelo: regístrale las unidades a ella.' % clash[0]
@@ -1987,4 +1992,109 @@ def reinitialize(c, data, user, now):
 
 def reinit_batches(c):
     names = {r[0]: r[1] for r in c.execute('SELECT id,name FROM users')}
-    return [dict(r, summary=json.loads(r['summary']), actor=names.get(r['created_by'], '')) for r in c.execute('SELECT id,code,reason,summary,created_by,created_at FROM inventory_reinit_batches ORDER BY id DESC LIMIT 50')]
+    return [dict(r, summary=json.loads(r['summary']), actor=names.get(r['created_by'], ''), kind='archivo' if r['code'].startswith('AR-') else 'reinicializacion')
+            for r in c.execute('SELECT id,code,reason,summary,created_by,created_at FROM inventory_reinit_batches ORDER BY id DESC LIMIT 50')]
+
+
+
+# ---- Archivo de productos físicos (limpieza autorizada del catálogo) ---------------------------------------------------------------
+ARCHIVE_WORD = 'ARCHIVAR'
+PHYSICAL = ('repuesto', 'otro')
+
+
+def archived_ids(c):
+    try:
+        ids = set()
+        for r in c.execute("SELECT items FROM inventory_reinit_batches WHERE code LIKE 'AR-%'"):
+            ids.update(json.loads(r['items']).get('inventory', []) if r['items'].startswith('{') else [])
+        return ids
+    except Exception:
+        return set()
+
+
+def _license_catalog_ids(c):
+    ids = {r[0] for r in c.execute('SELECT item_id FROM license_products')}
+    ids |= {r[0] for r in c.execute("SELECT id FROM catalog_items WHERE category NOT IN ('repuesto','otro','servicio')")}
+    return ids
+
+
+def archive_preview(c):
+    """Qué se archivaría (solo lectura): fichas físicas del inventario y productos físicos del catálogo sin ficha. Nunca incluye licencias,
+    servicios ni productos con existencias; indica dónde se usan (presupuestos, facturas, ventas de licencias) para conservar el historial."""
+    licenses = _license_catalog_ids(c)
+    archived = archived_ids(c)
+    uses = lambda table, col, i: c.execute('SELECT COUNT(*) FROM ' + table + ' WHERE ' + col + '=?', (i,)).fetchone()[0]
+    inventory_rows = []
+    for r in c.execute(PRODUCT_SQL + ' ORDER BY i.id').fetchall():
+        if r['id'] in archived or r['catalog_id'] in licenses:
+            continue
+        blockers = []
+        if r['stock'] > 0:
+            blockers.append('Tiene %d en existencia: reinicialízalo antes.' % r['stock'])
+        if r['reserved']:
+            blockers.append('Tiene reservas activas.')
+        inventory_rows.append({'id': r['id'], 'catalog_id': r['catalog_id'], 'name': r['name'], 'sku': r['sku'], 'barcode': r['barcode'] if 'barcode' in r.keys() else '', 'stock': r['stock'],
+                               'price_cents': r['price_cents'], 'units': c.execute('SELECT COUNT(*) FROM inventory_units WHERE item_id=?', (r['id'],)).fetchone()[0],
+                               'movements': c.execute('SELECT COUNT(*) FROM inventory_movements WHERE item_id=?', (r['id'],)).fetchone()[0],
+                               'quotes': uses('quote_items', 'catalog_id', r['catalog_id']), 'invoices': uses('invoice_items', 'catalog_id', r['catalog_id']), 'blockers': blockers})
+    linked = {r[0] for r in c.execute('SELECT catalog_id FROM inventory_items')}
+    catalog_rows = [{'id': r['id'], 'name': r['name'], 'category': r['category'], 'price_cents': r['price_cents'], 'quotes': uses('quote_items', 'catalog_id', r['id']),
+                     'invoices': uses('invoice_items', 'catalog_id', r['id'])}
+                    for r in c.execute("SELECT * FROM catalog_items WHERE category IN ('repuesto','otro') AND available=1 ORDER BY id") if r['id'] not in linked and r['id'] not in licenses]
+    licenses_state = {r[0]: r[1] for r in c.execute('SELECT status,COUNT(*) FROM license_units GROUP BY status')}
+    return {'inventory': inventory_rows, 'catalog': catalog_rows, 'word': ARCHIVE_WORD, 'licenses': licenses_state,
+            'blocked': any(r['blockers'] for r in inventory_rows)}
+
+
+def archive(c, data, user, now):
+    """Archiva (no borra) los productos físicos elegidos: las fichas quedan inactivas, sin alertas y fuera del catálogo; el nombre, el SKU y el
+    código de barras se liberan para volver a registrarlos (los originales quedan en el lote). Kardex, unidades, ventas, presupuestos, facturas y
+    garantías no cambian. Licencias y servicios nunca se tocan. Solo administración, con motivo y la palabra de confirmación; idempotente."""
+    if user['role'] != 'administrador':
+        raise InventoryError('Solo administración archiva productos.', 403)
+    key = str(data.get('request_key', '') or '').strip()
+    if key:
+        if not re.fullmatch(r'[A-Za-z0-9-]{16,64}', key):
+            raise InventoryError('Solicitud no válida. Recarga la página.', 400)
+        same = c.execute('SELECT code,summary FROM inventory_reinit_batches WHERE request_key=?', (key,)).fetchone()
+        if same:
+            return {'batch': same['code'], 'rows': json.loads(same['summary']), 'duplicate': True}
+    if str(data.get('confirm', '')).strip() != ARCHIVE_WORD:
+        raise InventoryError('Escribe %s para confirmar.' % ARCHIVE_WORD, 400, {'confirm': 'Confirmación obligatoria.'})
+    reason = re.sub(r'\s+', ' ', str(data.get('reason', '') or '')).strip()
+    if not 10 <= len(reason) <= 300:
+        raise InventoryError('Indica el motivo (10 a 300 caracteres).', 400, {'reason': 'Motivo obligatorio.'})
+    ids = lambda raw: [int(x) for x in re.split(r'[,\s]+', str(raw or '')) if x.isdigit()]
+    want_inv, want_cat = set(ids(data.get('item_ids'))), set(ids(data.get('catalog_ids')))
+    if not want_inv and not want_cat:
+        raise InventoryError('Elige los productos que se archivan.', 400, {'item_ids': 'Selecciona al menos un producto.'})
+    preview = archive_preview(c)
+    inv_rows = {r['id']: r for r in preview['inventory']}
+    cat_rows = {r['id']: r for r in preview['catalog']}
+    if not want_inv <= set(inv_rows) or not want_cat <= set(cat_rows):
+        raise InventoryError('Hay productos que no se pueden archivar (licencias, servicios o ya archivados).', 409)
+    blocked = [b for i in want_inv for b in inv_rows[i]['blockers']]
+    if blocked:
+        raise InventoryError('Hay productos con bloqueos: ' + ' '.join(blocked), 409)
+    seq = c.execute("SELECT seq FROM sqlite_sequence WHERE name='inventory_reinit_batches'").fetchone()
+    bid = max(seq[0] if seq else 0, c.execute('SELECT COALESCE(MAX(id),0) FROM inventory_reinit_batches').fetchone()[0]) + 1
+    code = 'AR-%06d' % bid
+    suffix = ' (archivado %s)' % code
+    summary = []
+    for i in sorted(want_inv):
+        r = inv_rows[i]
+        c.execute("UPDATE inventory_items SET active=0,sku='',updated_at=?,updated_by=? WHERE id=?", (stamp(now), user['id'], i))
+        if _has_column(c, 'inventory_items', 'barcode'):
+            c.execute("UPDATE inventory_items SET barcode='' WHERE id=?", (i,))
+        if _has_column(c, 'inventory_items', 'alerts_enabled'):
+            c.execute('UPDATE inventory_items SET alerts_enabled=0 WHERE id=?', (i,))
+        c.execute('UPDATE catalog_items SET available=0,name=?,updated_at=?,updated_by=? WHERE id=?', ((r['name'] + suffix)[:200], stamp(now), user['id'], r['catalog_id']))
+        event(c, now, user, 'archivado', 'Producto archivado (%s): %s. Motivo: %s' % (code, r['name'], reason), i)
+        summary.append({'kind': 'inventario', 'id': i, 'catalog_id': r['catalog_id'], 'name': r['name'], 'sku': r['sku'], 'barcode': r['barcode'], 'price_cents': r['price_cents']})
+    for i in sorted(want_cat):
+        r = cat_rows[i]
+        c.execute('UPDATE catalog_items SET available=0,name=?,updated_at=?,updated_by=? WHERE id=?', ((r['name'] + suffix)[:200], stamp(now), user['id'], i))
+        summary.append({'kind': 'catalogo', 'id': i, 'name': r['name'], 'category': r['category'], 'price_cents': r['price_cents']})
+    c.execute('INSERT INTO inventory_reinit_batches(id,code,reason,items,summary,request_key,created_by,created_at) VALUES (?,?,?,?,?,?,?,?)',
+              (bid, code, reason, json.dumps({'inventory': sorted(want_inv), 'catalog': sorted(want_cat)}), json.dumps(summary, ensure_ascii=False), key or None, user['id'], stamp(now)))
+    return {'batch': code, 'rows': summary, 'duplicate': False}

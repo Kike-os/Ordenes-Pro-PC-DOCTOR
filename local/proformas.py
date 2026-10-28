@@ -140,6 +140,8 @@ def _items(c, raw, user, rate_bp):
                 errors['item_%d' % n] = 'Producto o servicio del catálogo no disponible.'
                 continue
             catalog, code = row['id'], row['code'] or ''
+        else:
+            code = re.sub(r'[^A-Za-z0-9._/-]', '', str(item.get('code', '') or ''))  # código propio de una partida manual
         description = re.sub(r'\s+', ' ', str(item.get('description', '') or '')).strip()[:300]
         if len(description) < 2:
             errors['item_%d' % n] = 'Describe la partida.'
@@ -261,7 +263,7 @@ def save(c, data, user, now, pid=None):
                    item['discount_cents'], item['taxed'], 'aprobado' if origin == 'directa' else 'pendiente', item['authorization']))
         if item['authorization']:
             event(c, pid, 'autorizacion', 'Partida «%s» autorizada: %s' % (item['description'], item['authorization']), now, user)
-    if origin == 'directa':
+    if origin == 'directa' and str(data.get('finalize', '')) in ('1', 'true'):
         # Venta directa (sin cotización al cliente): queda aprobada internamente para facturarla; no es una aceptación del cliente.
         c.execute("UPDATE proformas SET status='aprobada',decided_at=? WHERE id=?", (stamp(now), pid))
         event(c, pid, 'aprobada', 'Venta directa registrada por el personal (sin cotización enviada al cliente).', now, user)
@@ -492,7 +494,7 @@ def convert(c, pid, user, now):
 ADVANCE_METHODS = ('efectivo', 'transferencia', 'deposito', 'debito', 'credito', 'cheque', 'otro')
 
 
-def add_advance(c, pid, data, user, now, file_id=None):
+def add_advance(c, pid, data, user, now, file_id=None, operation=''):
     """Anticipo o abono antes de facturar. No supera el total aprobado (o el total, si aún no se decide)."""
     row = get(c, pid)
     if row['status'] in ('cancelada', 'reemplazada', 'rechazada', 'vencida'):
@@ -535,8 +537,8 @@ def add_advance(c, pid, data, user, now, file_id=None):
     nid, code = banking.next_code(c, 'advances', 'AN')
     session = cash_sessions.current_for(c, user)
     note = re.sub(r'\s+', ' ', str(data.get('note', '') or '')).strip()[:300]
-    c.execute('INSERT INTO advances(id,code,client_id,proforma_id,method,bank_account_id,reference,amount_cents,paid_at,cash_session_id,note,request_key,created_by,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
-              (nid, code, row['client_id'], row['id'], method, account['id'] if account else None, reference, amount, paid_at, session, note, key or None, user['id'], stamp(now)))
+    c.execute('INSERT INTO advances(id,code,client_id,proforma_id,method,bank_account_id,reference,amount_cents,paid_at,cash_session_id,note,request_key,created_by,created_at,operation_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+              (nid, code, row['client_id'], row['id'], method, account['id'] if account else None, reference, amount, paid_at, session, note, key or None, user['id'], stamp(now), operation))
     if account:
         banking.register_transfer(c, {'method': method, 'bank_account_id': account['id'], 'reference': reference, 'amount_cents': amount, 'paid_at': paid_at, 'source_kind': 'proforma',
                                       'source_id': row['id'], 'client_id': row['client_id'] or '', 'payer': row['client_name']}, user, now, advance_id=nid, file_id=file_id)
@@ -787,3 +789,38 @@ def handle(c, token, row, link, form, now, origin):
 
 def valid_passkey(row, token, key):
     return bool(key) and secrets.compare_digest(str(key), passkey(row, token))
+
+
+
+def checkout(c, pid, data, user, now):
+    """Cierra una factura directa en una sola transacción: aprueba la venta, registra los pagos (uno o varios: pago mixto) como anticipos
+    vinculados a la caja abierta y crea el borrador de factura con esos pagos aplicados. Idempotente: si ya tiene factura, devuelve esa."""
+    import secrets
+    row = get(c, pid)
+    if row['origin'] != 'directa':
+        raise ProformaError('Solo una factura directa se cierra desde aquí.', 409)
+    if row['invoice_id']:
+        return row['invoice_id']
+    if row['status'] not in ('borrador', 'aprobada'):
+        raise ProformaError('Esta venta no se puede facturar (%s).' % STATUS[row['status']].lower(), 409)
+    try:
+        lines = json.loads(data.get('payments', '[]')) if isinstance(data.get('payments'), str) else (data.get('payments') or [])
+    except ValueError:
+        raise ProformaError('Formas de pago no válidas.', 400, {'payments': 'Formas de pago no válidas.'})
+    if not isinstance(lines, list) or len(lines) > 5:
+        raise ProformaError('Hasta cinco formas de pago.', 400, {'payments': 'Hasta cinco formas de pago.'})
+    stamp_ = stamp(now)
+    c.execute("UPDATE proforma_items SET status='aprobado' WHERE proforma_id=?", (row['id'],))
+    if row['status'] != 'aprobada':
+        c.execute("UPDATE proformas SET status='aprobada',decided_at=?,updated_at=? WHERE id=?", (stamp_, stamp_, row['id']))
+        event(c, row['id'], 'aprobada', 'Venta directa confirmada por el personal (sin cotización enviada al cliente).', now, user)
+    note = re.sub(r'\s+', ' ', str(data.get('internal_note', '') or '')).strip()[:500]
+    if note:
+        event(c, row['id'], 'nota_interna', 'Nota interna: ' + note, now, user)
+    key = str(data.get('request_key', '') or '').strip()[:48]
+    operation = ('OP-' + secrets.token_hex(6).upper()) if len(lines) > 1 else ''
+    for n, line in enumerate(lines, 1):
+        if not isinstance(line, dict):
+            raise ProformaError('Formas de pago no válidas.', 400, {'payments': 'Formas de pago no válidas.'})
+        add_advance(c, row['id'], {**line, 'request_key': (key + '-p%d' % n) if len(key) >= 16 else '', 'paid_at': data.get('paid_at', ''), 'note': 'Cobro de la factura directa'}, user, now, operation=operation)
+    return convert(c, row['id'], user, now)

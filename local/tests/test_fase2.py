@@ -308,7 +308,7 @@ class Fase2Tests(unittest.TestCase):
 
     def test_direct_invoice_versions_and_cancel(self):
         cookie, csrf, post, order = self.paid_order(1000)
-        direct = post('/api/proformas', origin='directa', items=json.dumps([{'kind': 'servicio', 'description': 'Instalación ficticia', 'quantity': '1', 'unit_price': '30'}]), client_name='Cliente Directo', client_identification='0100000017')
+        direct = post('/api/proformas', origin='directa', finalize='1', items=json.dumps([{'kind': 'servicio', 'description': 'Instalación ficticia', 'quantity': '1', 'unit_price': '30'}]), client_name='Cliente Directo', client_identification='0100000017')
         self.assertEqual((direct['status'], direct['body']['proforma']['status']), (200, 'aprobada'))
         self.assertEqual(post('/api/proformas/%d' % direct['body']['id'], action='convert')['status'], 200)
         p = post('/api/proformas', items=json.dumps([{'kind': 'servicio', 'description': 'Servicio ficticio', 'quantity': '1', 'unit_price': '10'}]), client_name='Cliente Ficticio', client_identification='0100000017')['body']
