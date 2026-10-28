@@ -11,10 +11,12 @@ import app,licenses
 
 def pdf_text(raw):
     """Texto de un PDF con flujos comprimidos (para comprobar qué contiene de verdad)."""
+    # Cada flujo se lee con su /Length declarada: buscar «endstream» como texto falla cuando los bytes comprimidos lo contienen por azar.
     out=[]
-    for m in re.finditer(rb'stream\r?\n(.*?)\r?\nendstream',raw,re.S):
-        try:out.append(zlib.decompress(m.group(1)).decode('latin-1'))
-        except zlib.error:out.append(m.group(1).decode('latin-1','replace'))
+    for m in re.finditer(rb'/Length (\d+)[^>]*>>\s*stream\r?\n',raw):
+        data=raw[m.end():m.end()+int(m.group(1))]
+        try:out.append(zlib.decompress(data).decode('latin-1'))
+        except zlib.error:out.append(data.decode('latin-1','replace'))
     return '\n'.join(out)
 
 

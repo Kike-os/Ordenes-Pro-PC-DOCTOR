@@ -14,9 +14,10 @@ import document_style
 def pdf_text(raw):
     """Texto de todos los flujos (comprimidos) del PDF."""
     out = []
-    for match in re.finditer(rb'stream\r?\n(.*?)\r?\nendstream', raw, re.S):
+    for match in re.finditer(rb'/Length (\d+)[^>]*>>\s*stream\r?\n', raw):  # cada flujo con su longitud declarada
+        data = raw[match.end():match.end() + int(match.group(1))]
         try:
-            out.append(zlib.decompress(match.group(1)).decode('cp1252', 'replace'))
+            out.append(zlib.decompress(data).decode('cp1252', 'replace'))
         except zlib.error:
             pass
     return '\n'.join(re.findall(r'\((.*?)\) ?Tj', '\n'.join(out)))
@@ -67,10 +68,32 @@ class DocumentStyleTests(unittest.TestCase):
         self.assertIn('DOCUMENTO DE PRUEBA', ride)  # nunca se presenta como autorizada
         self.assertIn('Ambiente de pruebas: no autorizada', ride)
         self.assertIn(inv['access_key'], ride)
-        self.assertIn('No. ' + inv['number'], ride)
+        self.assertIn('No.\n' + inv['number'], ride)  # etiqueta y número del comprobante
         self.assertNotIn('PC-DOCTOR S.A.', ride.replace(inv.get('legal_name', '') or '\x00', ''))
         t = inv['total_cents']
         self.assertIn('$' + format(t // 100, ',d').replace(',', '.') + ',%02d' % (t % 100), ride)
+
+
+    def test_ride_warning_depends_only_on_real_authorization(self):
+        """Base temporal ficticia: solo una factura autorizada en ambiente 2 deja de mostrar la advertencia; en pruebas, siempre se muestra."""
+        cookie, csrf = self.login()
+        post = lambda path, **body: self.request(path, body, cookie=cookie, csrf=csrf)
+        self.configure(post)
+        items = json.dumps([{'kind': 'servicio', 'description': 'Servicio ficticio', 'quantity': '1', 'unit_price': '11,50'}])
+        d = post('/api/proformas', origin='directa', items=items, client_name='Cliente Ficticio', client_identification='0100000017', request_key='ride-estado-00000001')
+        made = post('/api/proformas/%d' % d['body']['id'], action='checkout', payments='[]', emit='1', request_key='ride-estado-cobro-001')
+        iid = made['body']['invoice_id']
+        test_pdf = pdf_text(self.request('/api/invoicing/%d/ride.pdf' % iid, cookie=cookie)['body'])
+        self.assertIn('DOCUMENTO DE PRUEBA', test_pdf)
+        self.assertIn('PRUEBAS', test_pdf)
+        import app
+        with app.connect() as c:  # solo en la base temporal: simula la respuesta de autorización del SRI para revisar la presentación
+            c.execute("UPDATE invoices SET environment='2',status='autorizado',authorization_number=access_key,authorized_at='2026-10-28T09:00:00-05:00' WHERE id=?", (iid,))
+            c.commit()
+        real = pdf_text(self.request('/api/invoicing/%d/ride.pdf' % iid, cookie=cookie)['body'])
+        self.assertNotIn('SIN VALIDEZ TRIBUTARIA', real)
+        self.assertIn('PRODUCCIÓN', real)
+        self.assertIn('2026-10-28 09:00:00', real)
 
 
 if __name__ == '__main__':

@@ -8,6 +8,30 @@
   },
   "releases": [
     {
+      "version": "1.5.213",
+      "date": "2026-10-28T08:01:35-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Proformas y facturas en PDF con diseño premium de PC-DOCTOR",
+      "changes": {
+        "features": [
+          "Proforma PDF premium: encabezado en tres zonas (logo original, datos comerciales en líneas cortas y bloque PROFORMA con número, emisión, vencimiento y estado), cliente en tarjeta a dos columnas, tabla con filas alternas, cantidades centradas e importes alineados, y márgenes de 16 mm.",
+          "Proforma: información comercial junto al panel de totales con TOTAL GENERAL en franja azul, bloque de identificación con Code 128 y QR «Consultar proforma», condiciones numeradas legibles y pie «PROFORMA COMERCIAL — DOCUMENTO SIN VALIDEZ TRIBUTARIA».",
+          "Factura (RIDE) premium con márgenes de 15 mm: emisor y bloque tributario alineados, dirección sin repetir cuando matriz y establecimiento coinciden, leyenda RIMPE destacada, clave de acceso con Code 128 legible, comprador en tarjeta, tabla moderna y VALOR TOTAL en franja azul."
+        ],
+        "improvements": [
+          "RIDE: el precio unitario se muestra con la precisión exacta del XML (hasta 6 decimales); verificado que precios, IVA, total y clave de acceso del PDF coinciden con el XML en facturas de 1, 10, 20 y 40 partidas."
+        ],
+        "fixes": [],
+        "security": [
+          "La advertencia DOCUMENTO DE PRUEBA — SIN VALIDEZ TRIBUTARIA solo desaparece con la autorización real del SRI en producción; no se modifican XML, cálculos, secuenciales ni datos."
+        ],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Kike-os (administración): «Actualiza a la versión siguiente después que esté tod"
+    },
+    {
       "version": "1.5.212",
       "date": "2026-10-28T00:35:43-05:00",
       "type": "patch",

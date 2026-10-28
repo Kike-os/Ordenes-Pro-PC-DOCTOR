@@ -4,6 +4,24 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.213 — 2026-10-28 08:01 (UTC-05:00)
+
+Proformas y facturas en PDF con diseño premium de PC-DOCTOR
+
+### Nuevas funcionalidades
+
+- Proforma PDF premium: encabezado en tres zonas (logo original, datos comerciales en líneas cortas y bloque PROFORMA con número, emisión, vencimiento y estado), cliente en tarjeta a dos columnas, tabla con filas alternas, cantidades centradas e importes alineados, y márgenes de 16 mm.
+- Proforma: información comercial junto al panel de totales con TOTAL GENERAL en franja azul, bloque de identificación con Code 128 y QR «Consultar proforma», condiciones numeradas legibles y pie «PROFORMA COMERCIAL — DOCUMENTO SIN VALIDEZ TRIBUTARIA».
+- Factura (RIDE) premium con márgenes de 15 mm: emisor y bloque tributario alineados, dirección sin repetir cuando matriz y establecimiento coinciden, leyenda RIMPE destacada, clave de acceso con Code 128 legible, comprador en tarjeta, tabla moderna y VALOR TOTAL en franja azul.
+
+### Mejoras realizadas
+
+- RIDE: el precio unitario se muestra con la precisión exacta del XML (hasta 6 decimales); verificado que precios, IVA, total y clave de acceso del PDF coinciden con el XML en facturas de 1, 10, 20 y 40 partidas.
+
+### Actualizaciones de seguridad
+
+- La advertencia DOCUMENTO DE PRUEBA — SIN VALIDEZ TRIBUTARIA solo desaparece con la autorización real del SRI en producción; no se modifican XML, cálculos, secuenciales ni datos.
+
 ## v1.5.212 — 2026-10-28 00:35 (UTC-05:00)
 
 Caja profesional (apertura con conteo, bloqueo de cobros con la caja cerrada, cierre con desglose y configuración) e integración con AZUR en pruebas

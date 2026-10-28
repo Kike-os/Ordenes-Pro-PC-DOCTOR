@@ -65,6 +65,30 @@ class Doc:
             s.rectangle(x, self.h - y - h, w, h)
             s.stroke()
 
+    def rounded(self, x, y, w, h, r=6, fill=None, stroke=LINE, line=.6):
+        """Rectángulo con esquinas redondeadas (curvas de Bézier). Coordenadas desde arriba."""
+        s, k, top = self.c.stream, .5523 * r, self.h - y
+        def path():
+            s.move_to(x + r, top)
+            s.line_to(x + w - r, top)
+            s.curve_to(x + w - r + k, top, x + w, top - r + k, x + w, top - r)
+            s.line_to(x + w, top - h + r)
+            s.curve_to(x + w, top - h + r - k, x + w - r + k, top - h, x + w - r, top - h)
+            s.line_to(x + r, top - h)
+            s.curve_to(x + r - k, top - h, x, top - h + r - k, x, top - h + r)
+            s.line_to(x, top - r)
+            s.curve_to(x, top - r + k, x + r - k, top, x + r, top)
+            s.close()
+        if fill:
+            s.set_color_rgb(*fill)
+            path()
+            s.fill()
+        if stroke:
+            s.set_color_rgb(*stroke, stroke=True)
+            s.set_line_width(line)
+            path()
+            s.stroke()
+
     def hline(self, x, y, w, color=LINE, weight=.6):
         s = self.c.stream
         s.set_color_rgb(*color)
@@ -106,7 +130,7 @@ class Doc:
                 yy += 10.5
         return max(h, yy - y)
 
-    def footer(self, legend='', legend_color=GRAY, contact=True):
+    def footer(self, legend='', legend_color=GRAY, contact=True, margin=M):
         """Pie de todas las páginas: contacto discreto, leyenda (proforma o advertencia de prueba) y «Página n de N»."""
         company = corporate()
         info = ' · '.join(v for v in (TRADE_NAME, 'WhatsApp ' + company['whatsapp'] if company.get('whatsapp') else '', company.get('support_email', ''),
@@ -115,51 +139,56 @@ class Doc:
         keep = self.c.stream
         for n, stream in enumerate(self.streams, 1):
             self.c.stream = stream
-            self.hline(M, self.h - 44, self.w - 2 * M)
+            self.hline(margin, self.h - 44, self.w - 2 * margin)
             if contact:
-                self.text(info, M, self.h - 38, 7.5, False, GRAY)
-            self.right('Página %d de %d' % (n, total), self.w - M, self.h - 38, 7.5, False, GRAY)
+                self.text(info, margin, self.h - 38, 7.5, False, GRAY)
+            self.right('Página %d de %d' % (n, total), self.w - margin, self.h - 38, 7.5, False, GRAY)
             if legend:
                 self.center(legend, self.w / 2, self.h - 26, 7.5, True, legend_color)
         self.c.stream = keep
 
-    def table(self, cols, rows, y, on_new_page):
-        """Tabla con encabezado azul repetido en cada página. cols: (título, ancho, alineación 'l'/'r', clave, ajusta). Las filas no se parten:
+    def table(self, cols, rows, y, on_new_page, left=M, width=None, bottom=BOTTOM, size=8.5, head_h=18, pad=6):
+        """Tabla con encabezado azul repetido en cada página. cols: (título, ancho, alineación 'l'/'c'/'r', clave, ajusta). Las filas no se parten:
         si una fila no cabe, pasa entera a la página siguiente. on_new_page() abre la página y devuelve la nueva coordenada y."""
+        width = width or self.w - 2 * left
+        line_h = size + 2.5
+
+        def place(value, align, x, w, y_, sz, bold=False, color=INK):
+            if align == 'r':
+                self.right(value, x + w - 6, y_, sz, bold, color)
+            elif align == 'c':
+                self.center(value, x + w / 2, y_, sz, bold, color)
+            else:
+                self.text(value, x + 6, y_, sz, bold, color)
+
         def head(y):
-            self.rect(M, y, self.w - 2 * M, 18, fill=NAVY, stroke=None)
-            x = M
+            self.rect(left, y, width, head_h, fill=NAVY, stroke=None)
+            x = left
             for title, w, align, _, _ in cols:
-                if align == 'r':
-                    self.right(title, x + w - 5, y + 5, 7.5, True, WHITE)
-                else:
-                    self.text(title, x + 5, y + 5, 7.5, True, WHITE)
+                place(title, align, x, w, y + (head_h - 7.5) / 2, 7.5, True, WHITE)
                 x += w
-            return y + 22
+            return y + head_h + 4
         y = head(y)
         for n, row in enumerate(rows):
             cells = []
             for title, w, align, key, wraps in cols:
                 value = str(row.get(key, '') if row.get(key) is not None else '')
-                cells.append(self.wrap(value, w - 10, 8.5) if wraps else [value])
+                cells.append(self.wrap(value, w - 12, size) if wraps else [value])
             extra = row.get('_note') or ''
-            height = max(len(c) for c in cells) * 11 + (10 if extra else 0) + 6
-            if y + height > BOTTOM:
+            height = max(len(cl) for cl in cells) * line_h + (10 if extra else 0) + pad
+            if y + height > bottom:
                 y = head(on_new_page())
             if n % 2:
-                self.rect(M, y - 3, self.w - 2 * M, height, fill=SOFT, stroke=None)
-            x = M
+                self.rect(left, y - pad / 2, width, height, fill=SOFT, stroke=None)
+            x = left
             for (title, w, align, key, wraps), lines in zip(cols, cells):
                 for i, piece in enumerate(lines):
-                    if align == 'r':
-                        self.right(piece, x + w - 5, y + i * 11, 8.5)
-                    else:
-                        self.text(piece, x + 5, y + i * 11, 8.5 if key != 'code' else 8)
+                    place(piece, align, x, w, y + i * line_h, size if key != 'code' else size - .5)
                 x += w
             if extra:
-                self.text(extra, M + cols[0][1] + 5, y + max(len(c) for c in cells) * 11, 7.5, False, GRAY)
+                self.text(extra, left + cols[0][1] + 6, y + max(len(cl) for cl in cells) * line_h, 7.5, False, GRAY)
             y += height
-            self.hline(M, y - 3, self.w - 2 * M)
+            self.hline(left, y - pad / 2, width)
         return y + 4
 
     def totals(self, x, y, w, lines, grand):

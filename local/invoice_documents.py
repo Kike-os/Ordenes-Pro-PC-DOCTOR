@@ -319,11 +319,19 @@ def policy_pdf(policy, invoice=None):
 
 # ---- RIDE (representación impresa de la factura) ---------------------------------------------------------------------------
 
+def _unit(micros):
+    """Precio unitario exacto del XML (6 decimales), con al menos 2 decimales y sin ceros finales sobrantes: 8,70 · 10,4533."""
+    whole, frac = divmod(int(micros), 1_000_000)
+    digits = ('%06d' % frac).rstrip('0')
+    return '%s,%s' % (format(whole, ',d').replace(',', '.'), (digits + '00')[:max(2, len(digits))])
+
+
 def ride_pdf(c, invoice_id):
-    """RIDE A4 de una factura emitida con la identidad de PC-DOCTOR: emisor (logo original, nombre comercial, razón social, RUC, direcciones,
-    contabilidad, régimen y agente de retención según la configuración), bloque tributario (número, autorización, ambiente, emisión y clave de
-    acceso con su Code 128), comprador, detalle con el encabezado repetido en cada página, información adicional, formas de pago y resumen de
-    impuestos con los valores registrados. Si no está autorizada por el SRI lo indica en cada página: no es un comprobante válido."""
+    """RIDE A4 de una factura emitida, con la identidad de PC-DOCTOR (márgenes de 15 mm): bloque del emisor (logo original, razón social, nombre
+    comercial, direcciones sin repetir, contabilidad, contribuyente especial, leyenda RIMPE y agente de retención según los Datos fiscales) y bloque
+    tributario (RUC, FACTURA, número, autorización, fecha y hora, ambiente, emisión y clave de acceso con su Code 128); comprador en tarjeta,
+    detalle con el encabezado repetido, información adicional, formas de pago y resumen de impuestos con los valores registrados. Si no está
+    autorizada por el SRI lo indica en cada página: no es un comprobante válido. No inventa ningún dato tributario."""
     import document_style as ds
     import sri_xml
     data = invoicing.detail(c, invoice_id)
@@ -333,115 +341,158 @@ def ride_pdf(c, invoice_id):
     valid = inv['status'] == 'autorizado' and inv['environment'] == '2'
     note = '' if valid else ('DOCUMENTO DE PRUEBA — SIN VALIDEZ TRIBUTARIA' if inv['environment'] == '1' else 'NO AUTORIZADO POR EL SRI — SIN VALIDEZ TRIBUTARIA')
     doc = ds.Doc('Factura ' + inv['number'])
-    left, right = ds.M, ds.A4[0] - ds.M
+    L = 42.5  # 15 mm
+    R = ds.A4[0] - L
+    W = R - L
+    PANEL = (.965, .972, .984)
+    LABEL = (.42, .47, .55)
+
+    def label(value, x, y, color=LABEL):
+        doc.text(value.upper(), x, y, 6.6, True, color)
 
     def warning(y):
         if note:
-            doc.rect(left, y, right - left, 18, fill=(.99, .93, .93), stroke=RED)
-            doc.center(note, ds.A4[0] / 2, y + 5, 9, True, RED)
+            doc.rounded(L, y, W, 17, 5, fill=(.995, .93, .93), stroke=RED, line=.5)
+            doc.center(note, ds.A4[0] / 2, y + 5, 8.5, True, RED)
             return y + 24
         return y
 
     def continuation():
         doc.page()
-        y = warning(14)
-        doc.logo(left, y - 4, 52)
-        doc.text('Factura No. %s · R.U.C. %s · continuación' % (inv['number'], s['ruc'] or '—'), left + 64, y + 12, 9, True, ds.NAVY)
-        doc.hline(left, y + 40, right - left, ds.NAVY, 1)
-        return y + 52
+        y = warning(16)
+        doc.logo(L, y - 2, 50)
+        doc.text('Factura No. %s' % inv['number'], L + 62, y + 4, 11, True, ds.NAVY)
+        doc.text('R.U.C. %s · %s · continuación' % (s['ruc'] or '—', s['legal_name'] or ''), L + 62, y + 20, 8.3, False, GRAY)
+        doc.hline(L, y + 44, W, ds.NAVY, 1.4)
+        return y + 56
 
     doc.page()
-    y = warning(14)
-    top = y
-    # Emisor (izquierda).
-    ew = 250
-    doc.rect(left, top, ew, 214)
-    logo_h = doc.logo(left + 12, top + 10, 116)  # el logo original ya muestra el nombre comercial
-    yy = top + 18 + logo_h
-    rows = [('', s['legal_name'] or 'Razón social sin configurar', True, 9),
-            ('Nombre comercial: ', s['trade_name'] if s['trade_name'] and s['trade_name'].strip().upper() != ds.TRADE_NAME else '', False, 8), ('Dirección matriz: ', s['head_office_address'], False, 8),
-            ('Dirección establecimiento: ', s['branch_address'], False, 8), ('Contribuyente especial Nro.: ', s['special_taxpayer'], False, 8),
-            ('OBLIGADO A LLEVAR CONTABILIDAD: ', s['keeps_accounts'] or '—', False, 8), ('', sri_xml.RIMPE_LEGENDS.get(s['regime'], ''), True, 8),
-            ('Agente de Retención Resolución No. ', s['withholding_agent'], False, 8)]
-    for label, value, bold, size in rows:
-        if not value:
+    top = warning(16)
+    # ---- Bloque tributario (derecha): ancho suficiente para un Code 128 legible de 49 dígitos.
+    tw = 268
+    tx = R - tw
+    ew = W - tw - 12
+    rows = [('No.', inv['number'], True), ('Número de autorización', inv['authorization_number'] or ('Pendiente de autorización del SRI' if inv['environment'] == '2' else 'Ambiente de pruebas: no autorizada'), bool(inv['authorization_number'])),
+            ('Fecha y hora de autorización', inv['authorized_at'][:19].replace('T', ' ') if inv['authorized_at'] else '—', False),
+            ('Ambiente', 'PRODUCCIÓN' if inv['environment'] == '2' else 'PRUEBAS', True), ('Tipo de emisión', 'NORMAL', True)]
+    th = 40 + 15 * (len(rows) - 1) + 24 + 66 + 8  # filas, autorización (dos líneas), clave de acceso con su código
+    # ---- Bloque del emisor (izquierda): sin repetir la dirección cuando matriz y establecimiento coinciden.
+    head_office, branch = (s['head_office_address'] or '').strip(), (s['branch_address'] or '').strip()
+    same = head_office and branch and re.sub(r'\W+', '', head_office.lower()) == re.sub(r'\W+', '', branch.lower())
+    fields = [('Razón social', s['legal_name'] or 'Razón social sin configurar', True), ('Nombre comercial', s['trade_name'] or ds.TRADE_NAME, False)]
+    if same:
+        fields.append(('Dirección matriz y establecimiento', head_office, False))
+    else:
+        fields += [('Dirección matriz', head_office, False), ('Dirección del establecimiento', branch, False)]
+    fields += [('Contribuyente especial Nro.', s['special_taxpayer'], False), ('Obligado a llevar contabilidad', s['keeps_accounts'] or '—', False),
+               ('Agente de retención', ('Resolución No. ' + s['withholding_agent']) if s['withholding_agent'] else '', False)]
+    fields = [(k, v, b) for k, v, b in fields if v]
+    legend = sri_xml.RIMPE_LEGENDS.get(s['regime'], '')
+    logo_h = 0
+    eh = 0
+    # Altura: se calcula primero para alinear los dos bloques.
+    wrapped = [(k, doc.wrap(v, ew - 28, 8.6 if not b else 9.2)[:2], b) for k, v, b in fields]
+    eh = 14 + 70 + 10 + sum(9 + 10.5 * len(v) + 3 for k, v, b in wrapped) + (16 if legend else 0) + 6
+    hh = max(eh, th)
+    doc.rounded(L, top, ew, hh, 7, fill=None, stroke=ds.LINE)
+    logo_h = doc.logo(L + 14, top + 12, 92)
+    yy = top + 12 + logo_h + 10
+    for k, v, b in wrapped:
+        label(k, L + 14, yy)
+        for i, piece in enumerate(v):
+            doc.text(piece, L + 14, yy + 9 + i * 10.5, 9.2 if b else 8.6, b, ds.NAVY if b else INK)
+        yy += 9 + 10.5 * len(v) + 3
+    if legend:
+        doc.rounded(L + 10, yy + 1, ew - 20, 14, 4, fill=PANEL, stroke=None)
+        doc.center(legend, L + ew / 2, yy + 4.5, 7.4, True, ds.NAVY)
+    doc.rounded(tx, top, tw, hh, 7, fill=PANEL, stroke=ds.LINE)
+    doc.rounded(tx, top, tw, 30, 7, fill=ds.NAVY, stroke=None)
+    doc.rect(tx, top + 22, tw, 8, fill=ds.NAVY, stroke=None)
+    doc.text('FACTURA', tx + 12, top + 8, 14, True, ds.WHITE)
+    doc.right('R.U.C. ' + (s['ruc'] or '—'), tx + tw - 12, top + 10.5, 9.5, True, ds.WHITE)
+    yy = top + 40
+    for k, v, b in rows:
+        if k == 'Número de autorización':
+            label(k, tx + 12, yy)
+            doc.text(v, tx + 12, yy + 9, 8 if len(v) > 40 else 8.6, b, INK)
+            yy += 24
             continue
-        for piece in doc.wrap(label + value, ew - 24, size)[:2]:
-            if yy > top + 204:
-                break
-            doc.text(piece, left + 12, yy, size, bold, INK if bold else GRAY)
-            yy += size + 3.5
-    # Bloque tributario (derecha).
-    x2 = left + ew + 10
-    tw = right - x2
-    doc.rect(x2, top, tw, 214, fill=ds.SOFT)
-    doc.text('R.U.C.: ' + (s['ruc'] or '—'), x2 + 12, top + 10, 10.5, True)
-    doc.text('FACTURA', x2 + 12, top + 28, 15, True, ds.NAVY)
-    doc.text('No. ' + inv['number'], x2 + 12, top + 48, 10.5, True)
-    doc.label('Número de autorización', x2 + 12, top + 66, GRAY)
-    auth = inv['authorization_number'] or ('Pendiente de autorización del SRI' if inv['environment'] == '2' else 'Ambiente de pruebas: no autorizada')
-    doc.text(auth, x2 + 12, top + 77, 8 if len(auth) > 40 else 8.5, bool(inv['authorization_number']))
-    doc.text('Fecha y hora de autorización: ' + (inv['authorized_at'][:19].replace('T', ' ') if inv['authorized_at'] else '—'), x2 + 12, top + 93, 8)
-    doc.text('Ambiente: ' + ('PRODUCCIÓN' if inv['environment'] == '2' else 'PRUEBAS'), x2 + 12, top + 106, 8.5, True)
-    doc.text('Emisión: NORMAL', x2 + 12 + tw / 2, top + 106, 8.5, True)
-    doc.label('Clave de acceso', x2 + 12, top + 124, GRAY)
-    doc.barcode(inv['access_key'], x2 + 2, top + 136, tw - 4, 46)
-    doc.center(inv['access_key'], x2 + tw / 2, top + 188, 7.5)
-    y = top + 224
-    # Comprador.
+        doc.text(k, tx + 12, yy, 8, False, LABEL)
+        doc.right(v, tx + tw - 12, yy - .5, 9 if k == 'No.' else 8.6, b, ds.NAVY if k == 'No.' else INK)
+        yy += 15
+    label('Clave de acceso', tx + 12, yy + 2)
+    doc.rect(tx + 6, yy + 12, tw - 12, 48, fill=ds.WHITE, stroke=None)  # fondo blanco: mejor lectura del código
+    doc.barcode(inv['access_key'], tx + 6, yy + 14, tw - 12, 40)
+    doc.center(inv['access_key'], tx + tw / 2, yy + 58, 7.4, False, INK)
+    y = top + hh + 12
+    # ---- Comprador: tarjeta gris clara a dos columnas.
     buyer = 'CONSUMIDOR FINAL' if inv['consumer_final'] else inv['buyer_name']
-    doc.rect(left, y, right - left, 52)
-    half = (right - left) / 2
-    doc.text('Razón social / Nombres', left + 10, y + 8, 7.5, False, GRAY)
-    doc.text(doc.wrap(buyer or '—', half + 60, 9.5)[0], left + 110, y + 7, 9.5, True)
-    doc.text('Identificación', left + half + 80, y + 8, 7.5, False, GRAY)
-    doc.text('9999999999999' if inv['consumer_final'] else inv['buyer_id'] or '—', left + half + 140, y + 7, 9, True)
-    doc.text('Fecha de emisión', left + 10, y + 23, 7.5, False, GRAY)
-    doc.text(dmy(inv['issue_date']), left + 110, y + 22, 8.5)
-    if inv['order_code']:
-        doc.text('Orden', left + half + 80, y + 23, 7.5, False, GRAY)
-        doc.text(inv['order_code'], left + half + 140, y + 22, 8.5)
-    doc.text('Dirección', left + 10, y + 37, 7.5, False, GRAY)
-    doc.text(doc.wrap(inv['buyer_address'] or '—', right - left - 130, 8.5)[0], left + 110, y + 36, 8.5)
-    y += 62
-    # Detalle.
-    items = [{'code': i['code'] or '', 'qty': str(i['quantity']), 'desc': i['description'], 'unit': ('%.4f' % (i['unit_price_micros'] / 1e6)).replace('.', ','),
+    half = (W - 28) / 2
+    addr = doc.wrap(inv['buyer_address'] or '—', half - 4, 8.8)[:2]
+    ch = 60 + 11 * max(0, len(addr) - 1) + (0 if not inv['order_code'] else 0)
+    doc.rounded(L, y, W, ch, 7, fill=PANEL, stroke=ds.LINE)
+    label('Comprador · Razón social / Nombres', L + 14, y + 10, ds.NAVY)
+    doc.text(doc.wrap(buyer or '—', W - 28, 10.5)[0], L + 14, y + 21, 10.5, True, ds.NAVY)
+    col2 = L + 14 + half + 14
+    yy = y + 38
+    label('Identificación', L + 14, yy)
+    doc.text('9999999999999' if inv['consumer_final'] else (inv['buyer_id'] or '—'), L + 14, yy + 9, 8.8)
+    label('Fecha de emisión', L + 14 + half / 2, yy)
+    doc.text(dmy(inv['issue_date']), L + 14 + half / 2, yy + 9, 8.8)
+    label('Dirección', col2, yy)
+    for i, piece in enumerate(addr):
+        doc.text(piece, col2, yy + 9 + i * 11, 8.8)
+    y += ch + 12
+    # ---- Detalle.
+    items = [{'code': i['code'] or '', 'qty': str(i['quantity']), 'desc': i['description'], 'unit': _unit(i['unit_price_micros']),
               'disc': usd(i['discount_cents'])[1:], 'total': usd(i['base_cents'])[1:]} for i in data['items']]
-    cols = [('Cód. principal', 70, 'l', 'code', True), ('Cant.', 40, 'r', 'qty', False), ('Descripción', 223, 'l', 'desc', True), ('P. unitario', 64, 'r', 'unit', False),
-            ('Descuento', 58, 'r', 'disc', False), ('Precio total', 68, 'r', 'total', False)]
-    y = doc.table(cols, items, y, continuation)
-    # Información adicional y formas de pago (izquierda); resumen de impuestos (derecha).
+    cols = [('Cód. principal', 62, 'l', 'code', True), ('Cant.', 36, 'c', 'qty', False), ('Descripción', W - 62 - 36 - 70 - 58 - 68, 'l', 'desc', True),
+            ('P. unitario', 70, 'r', 'unit', False), ('Descuento', 58, 'r', 'disc', False), ('Precio total', 68, 'r', 'total', False)]
+    y = doc.table(cols, items, y, continuation, left=L, width=W, size=8.7, head_h=19, pad=7)
+    # ---- Información adicional y formas de pago (izquierda) · resumen de impuestos (derecha).
     info = [('Correo', inv['buyer_email']), ('Teléfono', inv['buyer_phone']), ('Orden', inv['order_code']), ('Venta', inv['sale_code'])]
     if data['bank_account']:
         b = data['bank_account']
         info.append(('Cuenta para pagos', '%s · %s · %s' % (b['bank'], b['type_label'], b['number'])))
     info = [(k, v) for k, v in info if v]
-    totals = [('SUBTOTAL ' + ('%g' % (g['rate_bp'] / 100)).replace('.', ',') + ' %', usd(g['base_cents'])) for g in data['rates']]
-    totals += [('SUBTOTAL SIN IMPUESTOS', usd(inv['subtotal_cents'])), ('TOTAL DESCUENTO', usd(inv['discount_cents']))]
+    totals = [('Subtotal ' + ('%g' % (g['rate_bp'] / 100)).replace('.', ',') + ' %', usd(g['base_cents'])) for g in data['rates']]
+    totals += [('Subtotal sin impuestos', usd(inv['subtotal_cents'])), ('Total descuento', usd(inv['discount_cents']))]
     totals += [('IVA ' + ('%g' % (g['rate_bp'] / 100)).replace('.', ',') + ' %', usd(g['tax_cents'])) for g in data['rates'] if g['rate_bp']]
-    need_left = 34 + 12 * max(1, len(info)) + 30 + 13 * max(1, len(data['payments']))
-    need = max(need_left, 14 * len(totals) + 44)
-    if y + need > ds.BOTTOM:
+    sw = 210
+    iw = W - sw - 14
+    pays = data['payments']
+    lh = 28 + 13 * max(1, len(info)) + 22 + 13 * max(1, len(pays)) + 8
+    sh = 12 + 16 * len(totals) + 40
+    if y + max(lh, sh) + 6 > ds.BOTTOM:
         y = continuation()
-    lw = 300
-    doc.rect(left, y, lw, need_left)
-    doc.label('Información adicional', left + 10, y + 9)
-    yy = y + 24
+    y += 6
+    doc.rounded(L, y, iw, lh, 7, fill=None, stroke=ds.LINE)
+    label('Información adicional', L + 14, y + 10, ds.NAVY)
+    yy = y + 26
     for k, v in info or [('—', '')]:
-        doc.text(k, left + 10, yy, 8, True, ds.NAVY)
-        doc.text(doc.wrap(v, lw - 100, 8.5)[0] if v else '', left + 90, yy, 8.5)
-        yy += 12
-    yy += 6
-    doc.label('Forma de pago', left + 10, yy)
-    yy += 14
-    for p in data['payments']:
-        doc.text(doc.wrap(p['sri_code'] + ' · ' + p['label'], lw - 90, 8)[0], left + 10, yy, 8)
-        doc.right(usd(p['amount_cents']), left + lw - 10, yy, 8.5, True)
+        doc.text(k, L + 14, yy, 8.2, True, LABEL)
+        doc.text(doc.wrap(v, iw - 110, 8.6)[0] if v else '', L + 96, yy, 8.6)
         yy += 13
-    tx = left + lw + 12
-    doc.rect(tx, y, right - tx, 14 * len(totals) + 42)
-    doc.totals(tx, y + 8, right - tx, totals, ('VALOR TOTAL', usd(inv['total_cents'])))
-    doc.footer(note, RED)
+    yy += 6
+    label('Forma de pago', L + 14, yy)
+    doc.right('Valor', L + iw - 14, yy, 6.6, True, LABEL)
+    yy += 14
+    for pay in pays:
+        doc.text(doc.wrap(pay['sri_code'] + ' · ' + pay['label'], iw - 110, 8.3)[0], L + 14, yy, 8.3)
+        doc.right(usd(pay['amount_cents']), L + iw - 14, yy, 8.8, True)
+        yy += 13
+    tx = R - sw
+    doc.rounded(tx, y, sw, sh, 7, fill=PANEL, stroke=ds.LINE)
+    yy = y + 12
+    for k, v in totals:
+        doc.text(k, tx + 12, yy, 8.6)
+        doc.right(v, tx + sw - 12, yy, 8.8)
+        yy += 16
+    doc.rounded(tx, y + sh - 32, sw, 32, 7, fill=ds.NAVY, stroke=None)
+    doc.rect(tx, y + sh - 32, sw, 8, fill=ds.NAVY, stroke=None)
+    doc.text('VALOR TOTAL', tx + 12, y + sh - 21, 9.5, True, ds.WHITE)
+    doc.right(usd(inv['total_cents']), tx + sw - 12, y + sh - 24, 14, True, ds.WHITE)
+    doc.footer(note, RED, margin=L)
     return doc.finish()
 
 
