@@ -31,6 +31,7 @@ OUT_KINDS = {'gasto_operativo': 'Gasto operativo', 'pago_proveedor': 'Pago a pro
 # Egresos que solo administración puede registrar (autorización administrativa expresa).
 ADMIN_OUT = ('reembolso', 'devolucion', 'devolucion_anticipo', 'retiro', 'salida_extraordinaria', 'nota_credito')
 MAX_QTY = 100000
+CLOSED_MESSAGE = 'La caja se encuentra cerrada. Debe abrir un turno de caja antes de registrar esta operación.'
 
 
 class CashError(ValueError):
@@ -121,6 +122,82 @@ def set_denomination(c, data, user, now):
     active = 0 if str(data.get('active', '')) in ('0', 'false', '') else 1
     c.execute('UPDATE cash_denominations SET active=? WHERE id=?', (active, row['id']))
     event(c, 'caja', 0, 'denominacion', '%s de %s %s (los arqueos históricos no cambian).' % (row['kind'].capitalize(), usd(row['value_cents']), 'activada' if active else 'desactivada'), user, now)
+
+
+# ---- Configuración general y tarjetas de las cajas ----------------------------------------------------------------------------------
+def settings(c):
+    """Configuración general de la caja; si la tabla aún no existe (base sin migrar), los valores de siempre."""
+    try:
+        row = c.execute('SELECT default_fund_cents,require_open,difference_limit_cents,updated_at FROM cash_settings WHERE id=1').fetchone()
+    except sqlite3.OperationalError:
+        row = None
+    return {'default_fund_cents': row['default_fund_cents'] if row else 0, 'require_open': bool(row['require_open']) if row else False,
+            'difference_limit_cents': row['difference_limit_cents'] if row else 0, 'updated_at': row['updated_at'] if row else ''}
+
+
+def save_settings(c, data, user, now):
+    if not is_admin(user):
+        raise CashError('Solo administración cambia la configuración de caja.', 403)
+    fund = cents_of(data.get('default_fund', '0') or '0', 'default_fund', allow_zero=True)
+    limit = cents_of(data.get('difference_limit', '0') or '0', 'difference_limit', allow_zero=True)
+    if limit > 1000000:
+        raise CashError('El límite de diferencia no puede superar $10.000,00.', 400, {'difference_limit': 'Límite demasiado alto.'})
+    require = 1 if str(data.get('require_open', '')) in ('1', 'true') else 0
+    before = settings(c)
+    c.execute('UPDATE cash_settings SET default_fund_cents=?,require_open=?,difference_limit_cents=?,updated_at=?,updated_by=? WHERE id=1', (fund, require, limit, stamp(now), user['id']))
+    event(c, 'caja', 0, 'configuracion', 'Configuración de caja: fondo inicial predeterminado %s → %s; apertura obligatoria %s → %s; diferencia aceptada sin revisión %s → %s.' % (
+        usd(before['default_fund_cents']), usd(fund), 'sí' if before['require_open'] else 'no', 'sí' if require else 'no', usd(before['difference_limit_cents']), usd(limit)), user, now)
+    return settings(c)
+
+
+def session_for_payment(c, user):
+    """Sesión a la que se vincula un cobro. Con la apertura obligatoria activada, sin caja abierta no se registra el cobro."""
+    session = current_for(c, user)
+    if session is None and settings(c)['require_open']:
+        raise CashError(CLOSED_MESSAGE, 409, {'cash': 'Caja cerrada.'}, {'cash_closed': True})
+    return session
+
+
+def register_cards(c):
+    """Cajas con su estado operativo: turno abierto (cajero, turno y código), última apertura y último cierre."""
+    out = []
+    for r in registers(c, False):
+        s = c.execute("SELECT s.*,u.name cashier FROM cash_sessions s LEFT JOIN users u ON u.id=s.cashier_id WHERE s.register_id=? AND s.status IN ('abierta','arqueo') ORDER BY s.id DESC LIMIT 1", (r['id'],)).fetchone()
+        last_open = c.execute("SELECT MAX(opened_at) FROM cash_sessions WHERE register_id=? AND status!='anulada'", (r['id'],)).fetchone()[0]
+        last_close = c.execute("SELECT MAX(k.closed_at) FROM cash_session_closings k JOIN cash_sessions s ON s.id=k.session_id WHERE s.register_id=?", (r['id'],)).fetchone()[0]
+        out.append(dict(r, session={'id': s['id'], 'code': code_of(s), 'cashier': s['cashier'] or '', 'shift': s['shift'] if 'shift' in s.keys() else '', 'status': s['status']} if s else None,
+                        last_opened=last_open or '', last_closed=last_close or ''))
+    return out
+
+
+def set_denominations(c, data, user, now):
+    """Activa exactamente las denominaciones indicadas (al menos una). No borra ninguna: los arqueos guardan su propio valor."""
+    if not is_admin(user):
+        raise CashError('Solo administración configura las denominaciones.', 403)
+    ids = {int(x) for x in re.split(r'[,\s]+', str(data.get('active_ids', '') or '')) if x.isdigit()}
+    rows = c.execute('SELECT id,kind,value_cents,active FROM cash_denominations').fetchall()
+    if not ids or not ids <= {r['id'] for r in rows}:
+        raise CashError('Deja al menos una denominación activa.', 400, {'active_ids': 'Selecciona denominaciones válidas.'})
+    changed = []
+    for r in rows:
+        active = 1 if r['id'] in ids else 0
+        if active != r['active']:
+            c.execute('UPDATE cash_denominations SET active=? WHERE id=?', (active, r['id']))
+            changed.append('%s de %s %s' % (r['kind'], usd(r['value_cents']), 'activada' if active else 'desactivada'))
+    if changed:
+        event(c, 'caja', 0, 'denominacion', 'Denominaciones: ' + '; '.join(changed) + ' (los arqueos históricos no cambian).', user, now)
+    return len(changed)
+
+
+def config(c):
+    used = set()  # denominaciones que aparecen en arqueos guardados (nunca se eliminan; solo se desactivan)
+    for r in c.execute('SELECT counts FROM cash_counts'):
+        try:
+            used.update(x.get('id') for x in json.loads(r['counts'] or '[]') if isinstance(x, dict))
+        except ValueError:
+            pass
+    verified = c.execute('SELECT COUNT(*) FROM bank_accounts WHERE active=1 AND verified=1').fetchone()[0]
+    return {'registers': register_cards(c), 'denominations': [dict(d, used=d['id'] in used) for d in denominations(c, False)], 'settings': settings(c), 'accounts_verified': verified}
 
 
 def count_of(c, raw):
@@ -364,7 +441,24 @@ def summary(c, session):
                  for t in c.execute('SELECT * FROM bank_transfers WHERE payment_id IN (SELECT id FROM order_payments WHERE cash_session_id=?) OR advance_id IN (SELECT id FROM advances WHERE cash_session_id=?) ORDER BY id',
                                     (session['id'], session['id']))]
     adjustments = [dict(a) for a in c.execute("SELECT a.*,COALESCE(u.name,'') actor FROM cash_adjustments a LEFT JOIN users u ON u.id=a.created_by WHERE a.session_id=? ORDER BY a.id", (session['id'],))]
-    return {'rows': rows, 'by_method': by_method, 'opening_cents': session['opening_cents'], 'cash_in_cents': cash_in, 'cash_out_cents': cash_out, 'expected_cash_cents': expected,
+    cash = [r for r in live if r['method'] == 'efectivo' and r['kind'] != 'retencion_recibida']
+    refunds = ('devolucion', 'devolucion_anticipo', 'reembolso', 'nota_credito')
+    breakdown = {'opening_cents': session['opening_cents'],
+                 'sales_cents': sum(r['amount_cents'] for r in cash if r['direction'] == 'ingreso' and r['kind'] != 'otro_ingreso'),
+                 'other_in_cents': sum(r['amount_cents'] for r in cash if r['direction'] == 'ingreso' and r['kind'] == 'otro_ingreso'),
+                 'out_cents': sum(r['amount_cents'] for r in cash if r['direction'] == 'egreso' and r['kind'] not in refunds),
+                 'refunds_cents': sum(r['amount_cents'] for r in cash if r['direction'] == 'egreso' and r['kind'] in refunds)}
+    breakdown['expected_cents'] = breakdown['opening_cents'] + breakdown['sales_cents'] + breakdown['other_in_cents'] - breakdown['out_cents'] - breakdown['refunds_cents']
+    accounts = {}
+    for t in transfers:
+        slot = accounts.setdefault(t['account'], {'account': t['account'], 'transfer_cents': 0, 'deposit_cents': 0, 'count': 0})
+        slot['deposit_cents' if t.get('method') == 'deposito' else 'transfer_cents'] += t['amount_cents']
+        slot['count'] += 1
+    collections = {'cash_cents': by_method['efectivo']['in_cents'], 'transfer_cents': by_method['transferencia']['in_cents'], 'deposit_cents': by_method['deposito']['in_cents'],
+                   'card_cents': by_method['debito']['in_cents'] + by_method['credito']['in_cents'], 'datafast_cents': sum(v['amount_cents'] for v in vouchers if v['status'] not in ('rechazada', 'reversada')),
+                   'other_cents': by_method['cheque']['in_cents'] + by_method['otro']['in_cents']}
+    collections['total_cents'] = sum(v for k, v in collections.items() if k != 'datafast_cents')
+    return {'rows': rows, 'by_method': by_method, 'opening_cents': session['opening_cents'], 'cash_breakdown': breakdown, 'by_account': list(accounts.values()), 'collections': collections, 'cash_in_cents': cash_in, 'cash_out_cents': cash_out, 'expected_cash_cents': expected,
             'income_cents': sum(r['amount_cents'] for r in income), 'outgo_cents': sum(r['amount_cents'] for r in outgo), 'received_cents': received,
             'pending_cents': sum(r['amount_cents'] for r in income if r['state'] == 'pendiente'), 'pending': [{'ref': r['ref'], 'label': r['kind_label'], 'state_label': r['state_label'],
                                                                                                                 'amount_cents': r['amount_cents'], 'method_label': r['method_label']} for r in pending],
@@ -442,7 +536,7 @@ def state(c, user, now):
     users = [dict(u) for u in c.execute("SELECT id,name FROM users WHERE active=1 AND role IN ('administrador','tecnico') ORDER BY name")] if is_admin(user) else []
     return {'registers': regs, 'shifts': list(SHIFTS), 'denominations': denominations(c), 'in_kinds': IN_KINDS, 'out_kinds': OUT_KINDS, 'admin_out': list(ADMIN_OUT), 'methods': METHODS,
             'accounts': banking.listing(c, active_only=True), 'users': users, 'incidents': incidents(c), 'can_admin': is_admin(user), 'me': user['id'],
-            'indicators': indicators(c, now)}
+            'me_name': user['name'], 'next_code': 'CJ-%06d' % next_id(c, 'cash_sessions'), 'indicators': indicators(c, now), **{k: v for k, v in settings(c).items() if k != 'updated_at'}}
 
 
 def incidents(c):
@@ -615,7 +709,8 @@ def close(c, user, data, now):
     if str(data.get('confirm', '')) not in ('1', 'true', 'on'):
         raise CashError('Confirma expresamente el cierre.', 400, {'confirm': 'Confirmación obligatoria.'})
     confirmed = _text(data, 'confirmed_name', 120, 5, 'El nombre de quien confirma')
-    status = 'cerrada' if difference == 0 else 'revision'
+    limit = settings(c)['difference_limit_cents']
+    status = 'cerrada' if difference == 0 else 'cerrada_diferencia' if abs(difference) <= limit else 'revision'
     snapshot = {k: v for k, v in data_sum.items() if k != 'rows'}
     snapshot['rows'] = data_sum['rows']
     try:

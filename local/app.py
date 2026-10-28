@@ -1883,6 +1883,12 @@ class Handler(BaseHTTPRequestHandler):
                     if path=='/api/caja/state':return self.reply(200,cash_sessions.state(c,user,now))
                     if path=='/api/caja/history':return self.reply(200,cash_sessions.history(c,user,f))
                     if path=='/api/caja/denominations':return self.reply(200,{'rows':cash_sessions.denominations(c,False),'registers':cash_sessions.registers(c,False)})
+                    if path=='/api/caja/config':
+                        if not cash_sessions.is_admin(user):return self.reply(403,{'error':'Solo administración configura la caja.'})
+                        return self.reply(200,cash_sessions.config(c))
+                    if path=='/api/caja/status':
+                        # Para las ventanas de cobro: si la apertura es obligatoria y no hay caja abierta, se avisa antes de intentar el cobro.
+                        return self.reply(200,{'require_open':cash_sessions.settings(c)['require_open'],'open':cash_sessions.current_for(c,user) is not None,'can_open':user['role'] in ('administrador','tecnico'),'message':cash_sessions.CLOSED_MESSAGE})
                     found=re.fullmatch(r'/api/caja/sessions/([0-9]{1,9})(/report\.pdf)?',path)
                     if found:
                         if found[2]:
@@ -2925,7 +2931,10 @@ class Handler(BaseHTTPRequestHandler):
                         if path=='/api/caja/void':cash_sessions.void_session(c,user,data,now);return self.reply(200,{'ok':True})
                         if path=='/api/caja/assign':cash_sessions.assign_incident(c,user,data,now);return self.reply(200,{'ok':True})
                         if path=='/api/caja/registers':return self.reply(200,{'ok':True,'id':cash_sessions.save_register(c,data,user,now)})
-                        if path=='/api/caja/denominations':cash_sessions.set_denomination(c,data,user,now);return self.reply(200,{'ok':True})
+                        if path=='/api/caja/denominations':
+                            if data.get('action')=='batch':return self.reply(200,{'ok':True,'changed':cash_sessions.set_denominations(c,data,user,now)})
+                            cash_sessions.set_denomination(c,data,user,now);return self.reply(200,{'ok':True})
+                        if path=='/api/caja/config':return self.reply(200,{'ok':True,'settings':cash_sessions.save_settings(c,data,user,now)})
                         if path=='/api/bank/transfers':
                             tid=banking.register_transfer(c,data,user,now,file_id=attach('transferencia'));return self.reply(200,{'ok':True,'id':tid})
                         found=re.fullmatch(r'/api/bank/transfers/([0-9]{1,9})',path)

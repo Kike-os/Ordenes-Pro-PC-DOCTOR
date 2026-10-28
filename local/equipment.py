@@ -203,11 +203,11 @@ def add_payment(c,order_id,data,user,now):
             limit=max(0,whole['general_cents']) if whole else state['paid_cents']
             if cents>limit:errors['amount']='La devolución supera lo pagado '+('sin asignar de la orden' if whole else 'por este equipo')+' ('+usd(limit)+').'
     if errors:return 400,{'error':next(iter(errors.values())),'fields':errors}
+    import cash_sessions
     try:
-        import cash_sessions
-        session=cash_sessions.current_for(c,user)
-    except Exception:
-        session=None
+        session=cash_sessions.session_for_payment(c,user)  # con la caja cerrada no se registra el cobro (si la apertura es obligatoria)
+    except cash_sessions.CashError as error:
+        return error.status,{'error':str(error),'fields':error.fields,'cash_closed':True}
     operation='OP-'+secrets.token_hex(6).upper() if mixed else ''
     ids=[]
     for n,line in enumerate(lines,1):

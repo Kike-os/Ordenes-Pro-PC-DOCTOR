@@ -711,6 +711,11 @@ def exit_stock(c, data, user, now):
         note = note or 'Consumo en la orden ' + order['code']
     document = _text(data, 'document', 80)
     if reason == 'venta':
+        import cash_sessions
+        try:
+            cash_sessions.session_for_payment(c, user)  # una venta presencial no se confirma con la caja cerrada
+        except cash_sessions.CashError as error:
+            raise InventoryError(str(error), error.status, error.fields)
         client = _id(data.get('client_id'))
         if client and not c.execute('SELECT 1 FROM clients WHERE id=?', (client,)).fetchone():
             raise InventoryError('Cliente no encontrado.', 404, {'client_id': 'Cliente no válido.'})

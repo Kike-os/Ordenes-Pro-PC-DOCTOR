@@ -112,7 +112,10 @@ def register(c, data, user, now, file_id=None):
         if str(data.get('client_id', '')).isdigit():
             client_id = int(data['client_id'])
         import cash_sessions as cs
-        session_id = cs.current_for(c, user)
+        try:
+            session_id = cs.session_for_payment(c, user)
+        except cs.CashError as error:
+            raise VoucherError(str(error), error.status, error.fields)
     dup = c.execute("SELECT code FROM card_vouchers WHERE acquirer=? AND lot=? AND approval_code=? AND status NOT IN ('rechazada','reversada')", (clean['acquirer'], clean['lot'], clean['approval_code'])).fetchone()
     if dup and str(data.get('confirm_duplicate', '')) not in ('1', 'true'):
         raise VoucherError('Ya existe el voucher %s con el mismo adquirente, lote y código de aprobación. Confirma si de verdad es otra operación.' % dup['code'], 409,

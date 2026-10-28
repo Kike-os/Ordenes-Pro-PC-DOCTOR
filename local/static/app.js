@@ -2800,7 +2800,7 @@ function paymentsSection(order){const section=el('section',undefined,'workspace-
  return section;}
 function payNow(){const d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,16);}
 // Ventana de registro: pago completo o abono, forma de pago (incluido el pago mixto), cuenta receptora según el banco, referencia y fecha.
-function paymentDialog(order,{canPayUnit,canPayOrder,multiple,whole,unitName}){const dialog=invDialog('Registrar pago · '+order.code,true),{form,msg,field,fail,clear}=invForm('bank-form inv-sheet-form pay-form');dialog.append(form);form.append(invRequiredNote());
+function paymentDialog(order,{canPayUnit,canPayOrder,multiple,whole,unitName}){const dialog=invDialog('Registrar pago · '+order.code,true),{form,msg,field,fail,clear}=invForm('bank-form inv-sheet-form pay-form');dialog.append(form);form.append(invRequiredNote());cashGuard(form);
  const m=order.money,accounts=order.bank_accounts||[],methods=order.pay_methods||order.payment_methods;let key=financeKey();
  const top=el('div',undefined,'fx-form-grid');form.append(top);
  const scope=field('scope','Aplicar a',{options:[...(canPayUnit?[['equipo',multiple?'Este equipo ('+unitName+')':'Este equipo']]:[]),...(canPayOrder?[['general','Pago general de la orden']]:[])],into:top});if(!multiple)scope.closest('.inv-field').hidden=true;
@@ -2834,7 +2834,7 @@ function paymentDialog(order,{canPayUnit,canPayOrder,multiple,whole,unitName}){c
   save.disabled=true;try{const result=await api('/api/orders/'+order.id+'/payments',body);dialog.close();toast(result.duplicate?'Este pago ya estaba registrado.':'Pago registrado.','success');await refreshOrderFinance(order.id);}catch(error){save.disabled=false;fail(error);}});}
 // Voucher de tarjeta (DATAFAST u otro adquirente): solo los últimos cuatro dígitos; nunca CVV, PIN, banda ni número completo.
 async function voucherDialog(source,done){let cards;try{cards=await api('/api/payments/cards');}catch(error){notify(error.message);return;}
- const dialog=invDialog('Registrar voucher de tarjeta',true),{form,msg,field,fail,clear}=invForm('bank-form inv-sheet-form');dialog.append(form);form.append(el('p',source.label||'Cobro con tarjeta','inv-form-note'),invRequiredNote());
+ const dialog=invDialog('Registrar voucher de tarjeta',true),{form,msg,field,fail,clear}=invForm('bank-form inv-sheet-form');dialog.append(form);cashGuard(form);form.append(el('p',source.label||'Cobro con tarjeta','inv-form-note'),invRequiredNote());
  const grid=el('div',undefined,'fx-form-grid');form.append(grid);
  const bank=field('issuer_bank','Banco emisor',{options:[['','Selecciona…'],...Object.keys(cards.banks).map(b=>[b,b]),['Otro banco','Otro banco']],into:grid,required:true});field('acquirer','Banco adquirente',{options:[['DATAFAST','DATAFAST'],['Medianet','Medianet'],['Otro','Otro']],into:grid});
  const brand=field('brand','Marca de tarjeta',{options:[['','Elige el banco']],into:grid,required:true}),category=field('category','Categoría',{options:[['','Elige la marca']],into:grid});
@@ -4850,6 +4850,8 @@ const invIcons={'receipt-text':'<path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1
  send:'<path d="M14.5 21.7a.5.5 0 0 0 .9 0l6.5-19a.5.5 0 0 0-.6-.6l-19 6.5a.5.5 0 0 0 0 .9l8 3.2a2 2 0 0 1 1 1.1z"/><path d="m21.9 2.1-10.9 11"/>'};
 // Iconos de la navegación y el panel de Facturación (mismo paquete Lucide).
 Object.assign(invIcons,{'signature':'<path d="m21 17-2.156-1.868A.5.5 0 0 0 18 15.5v.5a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1c0-2.545-3.991-3.97-8.5-4a1 1 0 0 0 0 5c4.153 0 4.745-11.295 5.708-13.5a2.5 2.5 0 1 1 3.31 3.284"/><path d="M3 21h18"/>','plug-zap':'<path d="M6.3 20.3a2.4 2.4 0 0 0 3.4 0L12 18l-6-6-2.3 2.3a2.4 2.4 0 0 0 0 3.4Z"/><path d="m2 22 3-3"/><path d="M7.5 13.5 10 11"/><path d="M10.5 16.5 13 14"/><path d="m18 3-4 4h6l-4 4"/>','activity':'<path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"/>','external-link':'<path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>','arrow-right':'<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>','clock':'<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>','coins':'<circle cx="8" cy="8" r="6"/><path d="M18.09 10.37A6 6 0 1 1 10.34 18"/><path d="M7 6h1v4"/><path d="m16.71 13.88.7.71-2.82 2.82"/>','credit-card':'<rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/>','sliders-horizontal':'<line x1="21" x2="14" y1="4" y2="4"/><line x1="10" x2="3" y1="4" y2="4"/><line x1="21" x2="12" y1="12" y2="12"/><line x1="8" x2="3" y1="12" y2="12"/><line x1="21" x2="16" y1="20" y2="20"/><line x1="12" x2="3" y1="20" y2="20"/><line x1="14" x2="14" y1="2" y2="6"/><line x1="8" x2="8" y1="10" y2="14"/><line x1="16" x2="16" y1="18" y2="22"/>','file-pen-line':'<path d="m18 5-2.414-2.414A2 2 0 0 0 14.172 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2"/><path d="M21.378 12.626a1 1 0 0 0-3.004-3.004l-4.01 4.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"/><path d="M8 18h1"/>','badge-check':'<path d="M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z"/><path d="m9 12 2 2 4-4"/>'});
+// Iconos de la caja (mismo paquete Lucide).
+Object.assign(invIcons,{'calculator':'<rect width="16" height="20" x="4" y="2" rx="2"/><line x1="8" x2="16" y1="6" y2="6"/><line x1="16" x2="16" y1="14" y2="18"/><path d="M16 10h.01"/><path d="M12 10h.01"/><path d="M8 10h.01"/><path d="M12 14h.01"/><path d="M8 14h.01"/><path d="M12 18h.01"/><path d="M8 18h.01"/>','check-check':'<path d="M18 6 7 17l-5-5"/><path d="m22 10-7.5 7.5L13 16"/>','rotate-ccw':'<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>','save':'<path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7"/><path d="M7 3v4a1 1 0 0 0 1 1h7"/>','scale':'<path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/>'});
 Object.assign(invIcons,{'user':'<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>'});
 function invIcon(name){const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');for(const[k,v]of [['viewBox','0 0 24 24'],['fill','none'],['stroke','currentColor'],['stroke-width','1.8'],['stroke-linecap','round'],['stroke-linejoin','round'],['aria-hidden','true']])svg.setAttribute(k,v);svg.classList.add('inv-icon');svg.innerHTML=invIcons[name]||'';return svg;}
 function invBtn(label,icon,action,className='secondary'){const b=button('',action,className+' inv-btn');b.append(invIcon(icon),el('span',label));return b;}
@@ -5429,24 +5431,69 @@ function cjTable(columns,rows,className=''){const wrap=el('div',undefined,'inv-t
 function cjRow(cells){const tr=el('tr');for(const[label,...nodes]of cells){const td=el('td');td.dataset.label=label;td.append(...nodes.map(n=>n instanceof Node?n:String(n??'')));tr.append(td);}return tr;}
 function cjKey(){return financeKey().replace(/[^A-Za-z0-9-]/g,'').slice(0,48)||'k'+Date.now();}
 // Tabla de denominaciones: el cajero solo escribe cantidades enteras; los subtotales y totales se recalculan al instante.
+// Conteo por denominaciones en tarjetas (billetes y monedas): Denominación × Cantidad = Subtotal, con botones − y +. Importes en centavos
+// enteros (sin decimales flotantes). Devuelve la misma interfaz que antes (values, totals, clear, setExpected, invalid) y además el resumen
+// (summary) para que la ventana lo coloque donde convenga.
 function cjDenoms(denoms,initial={},expected=null){const box=el('div',undefined,'cj-denoms'),rows=[],error=el('p','','cj-denom-error');error.setAttribute('role','alert');
- const tbody=el('tbody'),table=el('table',undefined,'inv-table cj-denom-table'),head=el('tr');for(const h of ['Tipo','Denominación','Cantidad','Subtotal']){const th=el('th',h);th.scope='col';head.append(th);}
- const summary=el('dl',undefined,'cj-denom-sum');const val={};
- for(const d of denoms){const tr=el('tr'),input=el('input'),sub=el('td','$0,00','inv-num');input.inputMode='numeric';input.autocomplete='off';input.maxLength=6;input.value=initial[d.id]?String(initial[d.id]):'';input.placeholder='0';
-  input.setAttribute('aria-label','Cantidad de '+(d.kind==='moneda'?'monedas':'billetes')+' de '+cjMoney(d.value_cents));input.dataset.id=d.id;
-  const kind=el('td',d.kind==='moneda'?'Moneda':'Billete');const cell=el('td');cell.append(input);tr.dataset.kind=d.kind;tr.dataset.value=String(d.value_cents);tr.append(kind,el('td',cjMoney(d.value_cents),'inv-num'),cell,sub);tbody.append(tr);rows.push({d,input,sub,tr});
-  input.addEventListener('input',()=>paint());input.addEventListener('focus',()=>input.select());}
- table.append(el('thead'),tbody);table.tHead.append(head);
- const totals=()=>{let coins=0,bills=0,bad=false;for(const r of rows){const t=r.input.value.trim();const ok=/^\d{0,6}$/.test(t)&&(t===''||Number(t)<=100000);r.input.setAttribute('aria-invalid',String(!ok));if(!ok){bad=true;continue;}
-   const q=Number(t||0),s=q*r.d.value_cents;r.sub.textContent=cjMoney(s);if(r.d.kind==='moneda')coins+=s;else bills+=s;}return {coins,bills,total:coins+bills,bad};};
+ const summary=el('dl',undefined,'cj-denom-sum');
+ for(const[kind,title,icon]of [['billete','Billetes','banknote'],['moneda','Monedas','coins']]){const list=denoms.filter(d=>d.kind===kind);if(!list.length)continue;
+  const group=el('section',undefined,'cj-denom-group'),gh=el('h4');gh.append(invIcon(icon),el('span',title));const grid=el('div',undefined,'cj-denom-grid');group.append(gh,grid);box.append(group);
+  for(const d of list){const tile=el('div',undefined,'cj-denom-tile'),input=el('input'),sub=el('output','$0,00','cj-denom-sub'),label=cjMoney(d.value_cents);tile.dataset.kind=d.kind;tile.dataset.value=String(d.value_cents);
+   input.inputMode='numeric';input.autocomplete='off';input.maxLength=6;input.value=initial[d.id]?String(initial[d.id]):'';input.placeholder='0';input.dataset.id=d.id;
+   input.setAttribute('aria-label','Cantidad de '+(d.kind==='moneda'?'monedas':'billetes')+' de '+label);
+   const step=delta=>{const n=Math.max(0,Math.min(100000,(parseInt(input.value,10)||0)+delta));input.value=n?String(n):'';paint();};
+   const minus=button('−',()=>step(-1),'cj-step'),plus=button('+',()=>step(1),'cj-step');minus.setAttribute('aria-label','Quitar una de '+label);plus.setAttribute('aria-label','Agregar una de '+label);
+   const qty=el('div',undefined,'cj-denom-qty');qty.append(minus,input,plus);
+   const top=el('div',undefined,'cj-denom-top');top.append(el('strong',label,'cj-denom-value'),el('span',d.kind==='moneda'?'moneda':'billete','cj-denom-kind'));
+   tile.append(top,qty,sub);grid.append(tile);rows.push({d,input,sub,tile});
+   input.addEventListener('input',()=>paint());input.addEventListener('focus',()=>input.select());
+   input.addEventListener('keydown',e=>{if(e.key==='ArrowUp'){e.preventDefault();step(1);}else if(e.key==='ArrowDown'){e.preventDefault();step(-1);}});}}
+ const totals=()=>{let coins=0,bills=0,pieces=0,bad=false;for(const r of rows){const t=r.input.value.trim();const ok=/^\d{0,6}$/.test(t)&&(t===''||Number(t)<=100000);r.input.setAttribute('aria-invalid',String(!ok));if(!ok){bad=true;continue;}
+   const q=Number(t||0),s=q*r.d.value_cents;r.sub.textContent=cjMoney(s);r.tile.dataset.filled=String(q>0);pieces+=q;if(r.d.kind==='moneda')coins+=s;else bills+=s;}return {coins,bills,total:coins+bills,pieces,bad};};
  const paint=()=>{const t=totals();error.textContent=t.bad?'Solo números enteros, sin negativos ni decimales.':'';summary.replaceChildren();
   const add=(k,v,tone)=>{const x=el('div');if(tone)x.dataset.tone=tone;x.append(el('dt',k),el('dd',v));summary.append(x);};
-  add('Total de monedas',cjMoney(t.coins));add('Total de billetes',cjMoney(t.bills));add('Efectivo físico',cjMoney(t.total),'total');
+  add('Total de billetes',cjMoney(t.bills));add('Total de monedas',cjMoney(t.coins));add('Cantidad de piezas',String(t.pieces));add('Efectivo físico',cjMoney(t.total),'total');
   if(expected!==null){const diff=t.total-expected,tone=diff===0?'ok':diff<0?'short':'over';add('Efectivo esperado',cjMoney(expected));add('Diferencia',(diff>0?'+':'')+cjMoney(diff),tone);
    add('Estado del arqueo',diff===0?'Cuadrado':diff<0?'Faltante':'Sobrante',tone);}
   box.dispatchEvent(new CustomEvent('cj-change',{detail:t}));};
- box.append(cjTable(['Tipo de dinero','Denominación','Cantidad','Subtotal'],[]),summary,error);box.querySelector('.cj-scroll').replaceChildren(table);paint();
- return {node:box,values:()=>JSON.stringify(rows.map(r=>({id:r.d.id,qty:r.input.value.trim()||'0'}))),totals,clear:()=>{for(const r of rows)r.input.value='';paint();},paint,setExpected:v=>{expected=v;paint();},invalid:()=>totals().bad};}
+ box.append(error);const wrap=el('div',undefined,'cj-denoms-wrap');wrap.append(box,summary);paint();
+ return {node:wrap,grid:box,summary,values:()=>JSON.stringify(rows.map(r=>({id:r.d.id,qty:r.input.value.trim()||'0'}))),totals,clear:()=>{for(const r of rows)r.input.value='';paint();},paint,setExpected:v=>{expected=v;paint();},invalid:()=>totals().bad};}
+
+// Abrir Caja en tres columnas: información de la caja, conteo por denominaciones y resumen (fondo inicial destacado). El fondo empieza en $0,00.
+async function cashOpenDialog(state,reg,target){const dialog=invDialog('Abrir Caja',true);dialog.classList.add('cj-open-dialog');const{form,msg,field,fail,clear}=invForm('bank-form cj-open');dialog.append(form);
+ const cols=el('div',undefined,'cj-open-cols'),left=el('section',undefined,'cj-open-col cj-open-info'),mid=el('section',undefined,'cj-open-col cj-open-count'),right=el('section',undefined,'cj-open-col cj-open-sum');cols.append(left,mid,right);form.append(cols);
+ const head=(node,icon,text)=>{const h=el('h3');h.append(invIcon(icon),el('span',text));node.append(h);};
+ head(left,'wallet','Información de caja');
+ field('register_id','Caja o punto de venta',{options:state.registers.filter(r=>r.active!==false&&!r.session).map(r=>[String(r.id),r.name]),value:String(reg.id),into:left,required:true});
+ field('shift','Turno',{options:state.shifts.map(s=>[s,s]),into:left,required:true});
+ if(state.can_admin&&state.users.length)field('cashier_id','Cajero responsable',{options:state.users.map(u=>[String(u.id),u.name]),value:String(state.me),into:left});
+ else{const l=el('label',undefined,'inv-field'),i=el('input');i.readOnly=true;i.value=state.me_name||'';l.append(el('span','Cajero responsable'),i);left.append(l);}
+ const meta=el('dl',undefined,'cj-open-meta'),clock=el('dd');for(const[k,v]of [['Fecha y hora de apertura',clock],['Número de apertura',el('dd',(state.next_code||'Automático')+' · se asigna al confirmar')]]){const x=el('div');x.append(el('dt',k),v);meta.append(x);}left.append(meta);
+ const tick=()=>{clock.textContent=new Date().toLocaleString('es-EC',{timeZone:'America/Guayaquil'});};tick();const timer=setInterval(tick,1000);dialog.addEventListener('close',()=>clearInterval(timer));
+ const tips=el('ul',undefined,'cj-open-tips');for(const t of ['Cuenta el efectivo frente a la cámara o a un testigo, separado por denominación.','El fondo inicial puede ser $0,00; ingresa cantidades solo si hay dinero para dar cambio.','No se permiten dos turnos abiertos en la misma caja.','Las transferencias y tarjetas no forman parte del efectivo físico.'])tips.append(el('li',t));left.append(tips);
+ const fund=reg.pending_fund,expected=fund?fund.reserved_cents:(state.default_fund_cents>0?state.default_fund_cents:null);
+ if(fund){const box=el('div',undefined,'cj-fund'),c=el('label',undefined,'inv-cf'),chk=el('input');box.append(el('p','El cierre '+fund.code+' dejó '+cjMoney(fund.reserved_cents)+' para esta apertura (entregó '+fund.delivered_by+').'));
+  chk.type='checkbox';chk.name='fund_confirm';c.append(chk,el('span','Confirmo que recibí el fondo y lo conté.'));box.append(c);field('fund_received_by','Nombre de quien recibe',{max:120,into:box,required:true});left.append(box);}
+ head(mid,'banknote','Conteo por denominaciones');mid.append(el('p','Denominación × Cantidad = Subtotal. Deja en blanco lo que no tengas.','cj-open-hint'));
+ const table=cjDenoms(state.denominations,{},expected);mid.append(table.grid);
+ head(right,'calculator','Resumen');const big=el('div',undefined,'cj-open-total'),bigV=el('strong','$0,00');big.append(el('span','Fondo inicial total'),bigV);right.append(big,table.summary);
+ if(expected!==null)right.append(el('p',fund?'Se compara con el fondo dejado por el turno anterior.':'Se compara con el fondo inicial predeterminado de la configuración.','cj-open-hint'));
+ field('note','Observaciones (opcional)',{area:true,max:300,into:right});
+ table.grid.addEventListener('cj-change',e=>{bigV.textContent=cjMoney(e.detail.total);});table.paint();
+ const foot=el('div',undefined,'cj-open-foot'),cancel=button('Cancelar',()=>requestModalClose(dialog),'secondary'),reset=invBtn('Restablecer conteo','rotate-ccw',()=>{table.clear();});
+ const save=el('button',undefined,'primary inv-btn');save.type='submit';save.append(invIcon('circle-check'),el('span','Confirmar y Abrir Caja'));foot.append(msg,cancel,reset,save);form.append(foot);const key=cjKey();
+ form.addEventListener('submit',async event=>{event.preventDefault();clear();if(table.invalid()){msg.textContent='Revisa las cantidades del conteo.';return;}const t=table.totals();
+  if(!await askConfirm('¿Abrir la caja?','Fondo inicial: '+cjMoney(t.total)+' ('+t.pieces+' piezas).','Abrir Caja'))return;
+  const fd=new FormData(form),body={request_key:key,counts:table.values()};for(const[k,v]of fd.entries())body[k]=k==='fund_confirm'?'1':String(v);
+  save.disabled=true;try{await api('/api/caja/open',body);dialog.close();toast('Caja abierta con '+cjMoney(t.total)+'.','success');renderCash(target);}catch(error){save.disabled=false;fail(error);if(error.status===409&&!error.fields?.register_id){dialog.close();renderCash(target);}}});
+ form.querySelector('select,input')?.focus();}
+
+// Aviso de caja cerrada en las ventanas de cobro: la regla la aplica el servidor; aquí solo se explica y se ofrece abrir la caja.
+const CASH_CLOSED_MESSAGE='La caja se encuentra cerrada. Debe abrir un turno de caja antes de registrar esta operación.';
+async function cashGuard(container){let s;try{s=await api('/api/caja/status');}catch{return true;}if(!s.require_open||s.open)return true;
+ const box=el('div',undefined,'cj-guard');box.setAttribute('role','alert');const copy=el('div');copy.append(el('strong','Caja cerrada'),el('p',CASH_CLOSED_MESSAGE));box.append(invIcon('lock'),copy);
+ if(s.can_open)box.append(invBtn('Abrir Caja','wallet',()=>{for(const d of document.querySelectorAll('dialog[open]'))d.close();invoiceState.tab='caja';if(routeState().name==='invoicing')renderInvoicing();else go('invoicing');},'primary'));
+ container.prepend(box);return false;}
 async function renderCash(target){const root=target||$('module-content');root.replaceChildren(el('p','Cargando caja…','empty-module'));let data;
  try{data=await api('/api/caja/state');}catch(error){root.replaceChildren(el('p',error.message,'empty-module'));return;}
  const wrap=el('div',undefined,'cj-module'),tabs=el('div',undefined,'inv-tabs cj-tabs'),panel=el('div',undefined,'inv-panel cj-panel');tabs.setAttribute('role','tablist');tabs.setAttribute('aria-label','Secciones de Caja');
@@ -5498,21 +5545,6 @@ function cashGeneral(sum){const wrap=el('div',undefined,'cj-columns');
  const general=invoiceCard('Datos generales del cierre','clipboard-list','Calculados desde las transacciones reales; no se editan'),gl=el('dl',undefined,'inv-facts fx-facts cj-facts');
  for(const[label,count,cents]of sum.general){const x=el('div');x.append(el('dt',label),el('dd',cents===null||cents===undefined?String(count):count+' · '+cjMoney(cents)));gl.append(x);}general.append(gl);
  wrap.append(income,outgo,general);return wrap;}
-async function cashOpenDialog(state,reg,target){const dialog=invDialog('Abrir Caja',true),{form,msg,field,fail,clear}=invForm('bank-form inv-sheet-form cj-open');dialog.append(form);form.append(invRequiredNote());
- const head=el('div',undefined,'fx-form-grid');form.append(head);
- head.append(el('p','Número de apertura: se asigna al confirmar · '+new Date().toLocaleString('es-EC'),'cj-open-meta'));
- field('register_id','Caja o punto de venta',{options:state.registers.filter(r=>!r.session).map(r=>[String(r.id),r.name]),value:String(reg.id),into:head,required:true});
- field('shift','Turno',{options:state.shifts.map(s=>[s,s]),into:head,required:true});
- if(state.can_admin&&state.users.length)field('cashier_id','Cajero responsable',{options:state.users.map(u=>[String(u.id),u.name]),value:String(state.me),into:head});
- const fund=reg.pending_fund;
- if(fund){const box=el('fieldset',undefined,'inv-group cj-fund'),lg=el('legend');lg.append(invIcon('wallet'),el('span','Fondo del turno anterior'));box.append(lg,el('p','El cierre '+fund.code+' dejó '+cjMoney(fund.reserved_cents)+' para esta apertura (entregó '+fund.delivered_by+').'));
-  const c=el('label',undefined,'inv-cf'),chk=el('input');chk.type='checkbox';chk.name='fund_confirm';c.append(chk,el('span','Confirmo que recibí el fondo y lo conté.'));box.append(c);field('fund_received_by','Nombre de quien recibe',{max:120,into:box,required:true});form.append(box);}
- const group=el('fieldset',undefined,'inv-group'),legend=el('legend');legend.append(invIcon('banknote'),el('span','Conteo del fondo inicial por denominaciones'));group.append(legend);
- const table=cjDenoms(state.denominations,{},fund?fund.reserved_cents:null);group.append(table.node);form.append(group);
- field('note','Observaciones',{area:true,max:300});
- const save=el('button',undefined,'primary inv-btn');save.type='submit';save.append(invIcon('circle-check'),el('span','Confirmar Apertura'));form.append(msg,invDialogActions(dialog,save));const key=cjKey();
- form.addEventListener('submit',async event=>{event.preventDefault();clear();if(table.invalid()){msg.textContent='Revisa las cantidades del conteo.';return;}const fd=new FormData(form),body={request_key:key,counts:table.values()};for(const[k,v]of fd.entries())body[k]=k==='fund_confirm'?'1':String(v);
-  save.disabled=true;try{await api('/api/caja/open',body);dialog.close();toast('Caja abierta.','success');renderCash(target);}catch(error){save.disabled=false;fail(error);if(error.status===409){dialog.close();renderCash(target);}}});}
 async function cashMovementDialog(direction,s,state,done){const dialog=invDialog(direction==='ingreso'?'Registrar ingreso':'Registrar egreso'),{form,msg,field,fail,clear}=invForm('bank-form inv-sheet-form');dialog.append(form);form.append(invRequiredNote());
  const kinds=direction==='ingreso'?state.in_kinds:state.out_kinds;
  const kind=field('kind','Tipo',{options:Object.entries(kinds).filter(([k])=>direction==='ingreso'||state.can_admin||!state.admin_out.includes(k)).map(([k,v])=>[k,v+(direction==='egreso'&&state.admin_out.includes(k)?' (autorización administrativa)':'')]),required:true});
@@ -5557,6 +5589,17 @@ function cashPrintCount(d,table){const t=table.totals(),win=window.open('','_bla
   const tr=doc.createElement('tr');for(const value of row){const td=doc.createElement('td');td.textContent=value;td.style.padding='3px 6px';td.style.borderBottom='1px solid #ccc';tr.append(td);}grid.append(tr);}
  doc.body.append(grid);const p=doc.createElement('p');p.textContent='Monedas '+cjMoney(t.coins)+' · Billetes '+cjMoney(t.bills)+' · Total '+cjMoney(t.total)+' · Esperado '+cjMoney(d.summary.expected_cash_cents);doc.body.append(p);win.focus();win.print();}
 // Cierre guiado en seis pasos, con resumen y confirmación explícita al final.
+// Cuadre del efectivo: Fondo inicial + Entradas de efectivo − Salidas de efectivo = Efectivo esperado (solo efectivo físico).
+function cjCashBreakdown(sum){const b=sum.cash_breakdown||{},box=el('section',undefined,'cj-breakdown');box.append(el('h4','Cuadre del efectivo'));const dl=el('dl');
+ for(const[k,v,sign,tone]of [['Fondo inicial',b.opening_cents,''],['Ventas cobradas en efectivo',b.sales_cents,'+'],['Entradas adicionales de efectivo',b.other_in_cents,'+'],['Retiros y egresos de efectivo',b.out_cents,'−'],['Devoluciones en efectivo',b.refunds_cents,'−'],['Efectivo esperado',b.expected_cents,'=','total']]){
+  const x=el('div');if(tone)x.dataset.tone=tone;x.append(el('dt',(sign?sign+' ':'')+k),el('dd',cjMoney(v||0)));dl.append(x);}
+ box.append(dl,el('p','Las transferencias, depósitos y tarjetas no forman parte del efectivo del cajón. Un depósito de efectivo en el banco es una salida de efectivo: no se cuenta dos veces.','inv-form-note'));return box;}
+// Cobros del turno por medio de pago y por cuenta receptora.
+function cjCollections(sum){const c=sum.collections||{},box=el('section',undefined,'cj-breakdown');box.append(el('h4','Cobros del turno'));const dl=el('dl');
+ for(const[k,v,tone]of [['Efectivo recibido',c.cash_cents],['Transferencias',c.transfer_cents],['Depósitos bancarios',c.deposit_cents],['Pagos con tarjeta',c.card_cents],['Vouchers DATAFAST',c.datafast_cents],['Otros (cheque u otro)',c.other_cents],['Total general de cobros',c.total_cents,'total']]){
+  const x=el('div');if(tone)x.dataset.tone=tone;x.append(el('dt',k),el('dd',cjMoney(v||0)));dl.append(x);}box.append(dl);
+ if((sum.by_account||[]).length)box.append(cjTable(['Cuenta receptora','Transferencias','Depósitos','Operaciones'],sum.by_account.map(a=>cjRow([['Cuenta receptora',a.account],['Transferencias',cjMoney(a.transfer_cents)],['Depósitos',cjMoney(a.deposit_cents)],['Operaciones',String(a.count)]]))));
+ return box;}
 function cashCloseWizard(d,state,target){const dialog=invDialog('Cerrar Caja '+d.session.code,true),body=el('div',undefined,'inv-body cj-wizard');dialog.append(body);const s=d.session,sum=d.summary;
  const steps=['Verificar movimientos','Ingresos y egresos','Contar efectivo','Otros métodos de pago','Diferencias','Confirmar el cierre'],list=el('ol',undefined,'ic-stepper cj-stepper');let step=0;
  const pane=el('div',undefined,'cj-step'),msg=el('p','','inv-form-message'),bar=el('div',undefined,'dialog-actions');msg.setAttribute('role','alert');
@@ -5567,15 +5610,16 @@ function cashCloseWizard(d,state,target){const dialog=invDialog('Cerrar Caja '+d
  const paint=()=>{[...list.children].forEach((li,i)=>li.dataset.state=i<step?'done':i===step?'current':'next');back.disabled=step===0;next.querySelector('span').textContent=step===steps.length-1?'Revisar y cerrar':'Siguiente';msg.textContent='';pane.replaceChildren();
   if(step===0){pane.append(el('p',sum.operations+' operaciones registradas. '+(sum.pending.length?sum.pending.length+' pendientes de conciliación: el cierre las deja registradas como pendientes.':'Sin pendientes.'),'inv-form-note'));
    if(sum.pending.length)pane.append(cjTable(['Referencia','Tipo','Método','Importe','Estado'],sum.pending.map(p=>cjRow([['Referencia',p.ref],['Tipo',p.label],['Método',p.method_label],['Importe',cjMoney(p.amount_cents)],['Estado',p.state_label]]))));}
-  if(step===1)pane.append(cashGeneral(sum));
+  if(step===1)pane.append(cjCashBreakdown(sum),cashGeneral(sum));
   if(step===2){pane.append(el('p','Cuenta el efectivo físico del cajón por denominaciones.','inv-form-note'),table.node);}
   if(step===3){pane.append(el('p','Los pagos electrónicos no son efectivo del cajón: se concilian con sus comprobantes. Una transferencia sin confirmar no cuenta como dinero recibido.','inv-form-note'));
+   pane.append(cjCollections(sum));
    const rows=[...sum.transfers.map(t=>cjRow([['Tipo',t.method],['Detalle',t.account+' · ref. '+t.reference],['Importe',cjMoney(t.amount_cents)],['Estado',cjChip(t.status,t.status)]])),...sum.vouchers.map(v=>cjRow([['Tipo','Tarjeta '+v.brand],['Detalle',v.issuer_bank+' · lote '+v.lot+' · aut. '+v.approval_code],['Importe',cjMoney(v.amount_cents)],['Estado',cjChip(v.status,v.status.replace(/_/g,' '))]]))];
    const methods=Object.entries(sum.by_method).filter(([k,m])=>k!=='efectivo'&&m.count);pane.append(methods.length?cjTable(['Método','Entradas','Salidas','Operaciones'],methods.map(([k,m])=>cjRow([['Método',state.methods[k]],['Entradas',cjMoney(m.in_cents)],['Salidas',cjMoney(m.out_cents)],['Operaciones',String(m.count)]]))):el('p','Sin pagos electrónicos en esta caja.','ic-card-empty'));
    if(rows.length)pane.append(cjTable(['Tipo','Detalle','Importe','Estado'],rows));}
   if(step===4){const t=table.totals(),diff=t.total-sum.expected_cash_cents,pct=sum.expected_cash_cents?Math.abs(diff)*100/sum.expected_cash_cents:0;const box=el('dl',undefined,'cj-denom-sum');
    for(const[k,v,tone]of [['Total del sistema',cjMoney(sum.expected_cash_cents)],['Total contado',cjMoney(t.total)],['Diferencia',(diff>0?'+':'')+cjMoney(diff),diff===0?'ok':diff<0?'short':'over'],['Tipo de diferencia',diff===0?'Cuadrado':diff<0?'Faltante':'Sobrante',diff===0?'ok':diff<0?'short':'over'],['Desviación',pct.toFixed(2).replace('.',',')+' %']]){const x=el('div');if(tone)x.dataset.tone=tone;x.append(el('dt',k),el('dd',v));box.append(x);}
-   pane.append(box);if(diff){const l=el('label',undefined,'inv-field');l.append(el('span','Explicación de la diferencia (obligatoria)'),reason);pane.append(l,el('p','La caja quedará «Pendiente de revisión» hasta que administración la apruebe. Ningún ajuste automático oculta la diferencia.','inv-form-note'));}}
+   pane.append(box);if(diff){const l=el('label',undefined,'inv-field');l.append(el('span','Explicación de la diferencia (obligatoria)'),reason);const lim=state.difference_limit_cents||0;pane.append(l,el('p',Math.abs(diff)<=lim?'La diferencia está dentro del límite autorizado ('+cjMoney(lim)+'): la caja quedará «Cerrada con diferencia», con tu explicación y tu nombre.':'La caja quedará «Pendiente de revisión» hasta que administración la apruebe. Ningún ajuste automático oculta la diferencia.','inv-form-note'));}}
   if(step===5){form.replaceChildren();const t=table.totals();const grid=el('div',undefined,'fx-form-grid');form.append(grid);
    const mk=(name,label,attrs={})=>{const l=el('label',undefined,'inv-field'),i=el('input');i.name=name;Object.assign(i,attrs);l.append(el('span',label),i);grid.append(l);return i;};
    const reserved=mk('reserved','Dinero reservado para la siguiente apertura (USD)',{inputMode:'decimal',value:'0,00',maxLength:12});mk('delivered_to','Quién recibe el efectivo entregado',{maxLength:120});mk('confirmed_name','Nombre de quien confirma (cajero)',{maxLength:120});
@@ -5591,7 +5635,7 @@ function cashCloseWizard(d,state,target){const dialog=invDialog('Cerrar Caja '+d
   if(!fd.get('confirm')){msg.textContent='Confirma expresamente el cierre definitivo.';form.elements.confirm.focus();return;}
   if(!await askConfirm('¿Cerrar la caja '+s.code+'?','Cajero: '+s.cashier+' · '+new Date().toLocaleString('es-EC')+'\nOperaciones: '+sum.operations+' · Efectivo esperado: '+cjMoney(sum.expected_cash_cents)+' · Contado: '+cjMoney(t.total)+' · Diferencia: '+cjMoney(diff)+'\nPendientes: '+sum.pending.length+(fd.get('note')?'\nObservaciones: '+fd.get('note'):''),'Cerrar definitivamente'))return;
   next.disabled=true;try{const r=await api('/api/caja/close',{session_id:String(s.id),counts:table.values(),difference_reason:reason.value,reserved:String(fd.get('reserved')||'0'),delivered_to:String(fd.get('delivered_to')||''),confirmed_name:String(fd.get('confirmed_name')||''),note:String(fd.get('note')||''),confirm:fd.get('confirm')?'1':''});
-   dialog.close();toast(r.status==='cerrada'?'Caja cerrada correctamente.':'Caja cerrada: pendiente de revisión por la diferencia.','success');cashSessionDialog(s.id,target);renderCash(target);}catch(error){next.disabled=false;msg.textContent=error.message;}});
+   dialog.close();toast(r.status==='cerrada'?'Caja cerrada correctamente (cuadrada).':r.status==='cerrada_diferencia'?'Caja cerrada con diferencia dentro del límite autorizado.':'Caja cerrada: pendiente de revisión por la diferencia.','success');cashSessionDialog(s.id,target);renderCash(target);}catch(error){next.disabled=false;msg.textContent=error.message;}});
  bar.append(back,next);body.append(list,pane,msg,bar);paint();}
 async function cashSessionDialog(sid,target){const dialog=invDialog('Cierre de caja',true),body=el('div',undefined,'inv-body');dialog.append(body);body.append(el('p','Cargando…','empty-module'));let d;
  try{d=await api('/api/caja/sessions/'+sid);}catch(error){body.replaceChildren(el('p',error.message,'empty-module'));return;}
@@ -5625,15 +5669,62 @@ async function cashHistoryPanel(panel,state){panel.append(invSectionHead('Histor
     if(r.difference_type)tr.dataset.diff=r.difference_type;const last=tr.lastChild;last.append(button('Consultar',()=>cashSessionDialog(r.id),'text-action'));const a=el('a','PDF','text-action');a.href='/api/caja/sessions/'+r.id+'/report.pdf';a.target='_blank';a.rel='noopener';last.append(a);
     const t=el('a','Térmico','text-action');t.href='/api/caja/sessions/'+r.id+'/report.pdf?formato=termico';t.target='_blank';t.rel='noopener';last.append(t);return tr;}),'cj-history'):invEmpty('scroll-text','Sin cierres con estos filtros','Cambia los filtros o registra la primera apertura.'));};
  panel.append(bar,slot);load();}
-function cashConfigPanel(panel,state,target){panel.append(invSectionHead('Configuración de caja','Cajas independientes y denominaciones activas. Desactivar una denominación no altera los arqueos históricos.'));
- const regs=invoiceCard('Cajas o puntos de venta','wallet','Una sola sesión abierta por caja'),list=el('ul',undefined,'fx-list');
- api('/api/caja/denominations').then(data=>{for(const r of data.registers){const li=el('li'),row=el('div',undefined,'fx-row');row.append(el('strong',r.name+(r.active?'':' (inactiva)')));
-   row.append(invBtn(r.active?'Desactivar':'Activar',r.active?'circle-x':'circle-check',async()=>{try{await api('/api/caja/registers',{id:String(r.id),name:r.name,active:r.active?'0':'1'});renderCash(target);}catch(error){notify(error.message);}}));li.append(row);list.append(li);}
-  const den=invoiceCard('Denominaciones USD','banknote','Monedas y billetes que se cuentan en los arqueos'),dl=el('ul',undefined,'fx-list');
-  for(const d of data.rows){const li=el('li'),lab=el('label',undefined,'inv-cf'),c=el('input');c.type='checkbox';c.checked=!!d.active;c.addEventListener('change',async()=>{try{await api('/api/caja/denominations',{id:String(d.id),active:c.checked?'1':'0'});toast('Denominación actualizada.','success');}catch(error){c.checked=!c.checked;notify(error.message);}});lab.append(c,el('span',d.label));li.append(lab);dl.append(li);}
-  den.append(dl);panel.append(den);});
- const add=el('form',undefined,'bank-form cj-add-register'),input=el('input');input.maxLength=60;input.placeholder='Nombre de la nueva caja';input.setAttribute('aria-label','Nombre de la nueva caja');const b=el('button',undefined,'secondary inv-btn');b.type='submit';b.append(invIcon('plus'),el('span','Agregar caja'));add.append(input,b);
- add.addEventListener('submit',async e=>{e.preventDefault();try{await api('/api/caja/registers',{name:input.value});toast('Caja agregada.','success');renderCash(target);}catch(error){notify(error.message);}});regs.append(list,add);panel.append(regs);}
+// Configuración de caja: A) cajas y puntos de venta en tarjetas, B) denominaciones en dos grupos con interruptores, C) reglas de operación.
+// Solo administración (el servidor lo comprueba). Desactivar una caja o una denominación nunca altera los cierres anteriores.
+async function cashConfigPanel(panel,state,target){panel.append(invSectionHead('Configuración de caja','Cajas y puntos de venta, denominaciones de los arqueos y reglas de operación. Los cambios no alteran los cierres anteriores.'));
+ const slot=el('div',undefined,'cjc');panel.append(slot);slot.append(el('p','Cargando…','empty-module'));let data;
+ try{data=await api('/api/caja/config');}catch(error){slot.replaceChildren(el('p',error.message,'inv-warn'));return;}
+ slot.replaceChildren();const reload=()=>renderCash(target);
+ // A. Cajas y puntos de venta.
+ const regs=invoiceCard('Cajas y puntos de venta','wallet',data.registers.length===1?'1 caja':data.registers.length+' cajas'),grid=el('div',undefined,'cjc-registers');
+ const rename=async(r)=>{const name=await askText(r?'Editar caja':'Agregar caja','Nombre de la caja (3 a 60 caracteres)',r?.name||'',r?'Guardar':'Agregar',60);if(name===null)return;
+  try{await api('/api/caja/registers',r?{id:String(r.id),name,active:r.active?'1':'0'}:{name});toast(r?'Caja actualizada.':'Caja agregada.','success');reload();}catch(error){notify(error.message);}};
+ for(const r of data.registers){const card=el('article',undefined,'cjc-register');card.dataset.active=String(!!r.active);card.dataset.open=String(!!r.session);
+  const head=el('header'),title=el('div');title.append(el('h4',r.name));const chips=el('div',undefined,'cjc-chips');chips.append(cjChip(r.active?'activa':'inactiva',r.active?'Activa':'Inactiva'),cjChip(r.session?'abierta':'cerrada',r.session?(r.session.status==='arqueo'?'En arqueo':'Abierta'):'Cerrada'));title.append(chips);head.append(invIcon('wallet'),title);card.append(head);
+  const facts=el('dl',undefined,'cjc-facts');for(const[k,v]of [['Cajero responsable',r.session?r.session.cashier:'—'],['Turno actual',r.session?(r.session.shift||'—')+' · '+r.session.code:'Sin turno abierto'],['Última apertura',r.last_opened?formatOrderDate(r.last_opened):'—'],['Último cierre',r.last_closed?formatOrderDate(r.last_closed):'—']]){const x=el('div');x.append(el('dt',k),el('dd',v));facts.append(x);}
+  card.append(facts);const acts=el('div',undefined,'cjc-actions');acts.append(invBtn('Editar','pencil',()=>rename(r)));
+  const toggle=invBtn(r.active?'Desactivar caja':'Activar caja',r.active?'circle-x':'circle-check',async()=>{
+   if(r.active&&!await askConfirm('¿Desactivar '+r.name+'?','No se podrá abrir hasta activarla otra vez. Sus cierres e historial se conservan.','Desactivar caja',true))return;
+   try{await api('/api/caja/registers',{id:String(r.id),name:r.name,active:r.active?'0':'1'});toast(r.active?'Caja desactivada.':'Caja activada.','success');reload();}catch(error){notify(error.message);}},r.active?'secondary cjc-danger':'secondary');
+  if(r.active&&r.session){toggle.disabled=true;toggle.title='Tiene un turno abierto: ciérralo antes de desactivarla.';acts.append(toggle,el('small','Tiene un turno abierto: ciérralo antes de desactivarla.','cjc-hint'));}else acts.append(toggle);
+  card.append(acts);grid.append(card);}
+ const add=button('',()=>rename(null),'cjc-register cjc-add');add.append(invIcon('plus'),el('span','Agregar caja'));grid.append(add);regs.append(grid);slot.append(regs);
+ // B. Denominaciones.
+ const den=invoiceCard('Denominaciones','banknote','Las activas son las que se cuentan al abrir y cerrar caja'),saved=new Map(data.denominations.map(d=>[d.id,!!d.active])),now=new Map(saved);
+ const groups=el('div',undefined,'cjc-denoms'),status=el('p','','cjc-dirty');status.setAttribute('aria-live','polite');const switches=[];
+ const paintDirty=()=>{const changed=[...now].filter(([id,v])=>saved.get(id)!==v).length;status.textContent=changed?changed+' cambio(s) sin guardar.':'Sin cambios pendientes.';status.dataset.dirty=String(!!changed);saveB.disabled=!changed;resetB.disabled=!changed;};
+ for(const[kind,label]of [['moneda','Monedas'],['billete','Billetes']]){const g=el('section',undefined,'cjc-denom-group'),gh=el('h4');gh.append(invIcon(kind==='moneda'?'coins':'banknote'),el('span',label));const list=el('div',undefined,'cjc-denom-grid');g.append(gh,list);
+  for(const d of data.denominations.filter(x=>x.kind===kind)){const tile=el('label',undefined,'cjc-denom'),sw=el('input');sw.type='checkbox';sw.setAttribute('role','switch');sw.checked=!!d.active;sw.dataset.id=String(d.id);
+   const txt=el('span',undefined,'cjc-denom-text');txt.append(el('strong',cjMoney(d.value_cents)),el('small',d.used?'Usada en arqueos':kind==='moneda'?'Moneda':'Billete'));
+   const knob=el('span',undefined,'cjc-switch');knob.setAttribute('aria-hidden','true');sw.setAttribute('aria-label',d.label);tile.append(txt,sw,knob);tile.dataset.on=String(sw.checked);
+   sw.addEventListener('change',()=>{now.set(d.id,sw.checked);tile.dataset.on=String(sw.checked);paintDirty();});switches.push([sw,tile,d]);list.append(tile);}
+  groups.append(g);}
+ const bar=el('div',undefined,'cjc-bar'),allB=invBtn('Activar todas','check-check',()=>{for(const[sw,tile,d]of switches){sw.checked=true;tile.dataset.on='true';now.set(d.id,true);}paintDirty();}),
+  resetB=invBtn('Restablecer','rotate-ccw',()=>{for(const[sw,tile,d]of switches){sw.checked=saved.get(d.id);tile.dataset.on=String(sw.checked);now.set(d.id,sw.checked);}paintDirty();}),
+  saveB=invBtn('Guardar cambios','save',async()=>{const active=[...now].filter(([,v])=>v).map(([id])=>id);if(!active.length){notify('Deja al menos una denominación activa.');return;}
+   saveB.disabled=true;try{await api('/api/caja/denominations',{action:'batch',active_ids:active.join(',')});for(const[id,v]of now)saved.set(id,v);toast('Denominaciones guardadas. Se usarán en Abrir Caja y Cerrar Caja.','success');}catch(error){notify(error.message);}paintDirty();},'primary');
+ resetB.title='Vuelve a la configuración guardada';bar.append(status,allB,resetB,saveB);den.append(groups,bar);slot.append(den);paintDirty();
+ // C. Configuración general.
+ const gen=invoiceCard('Configuración general','sliders-horizontal','Reglas de operación de la caja'),{form,msg,field,fail,clear}=invForm('bank-form cjc-general');
+ const s=data.settings,fund=field('default_fund','Fondo inicial predeterminado (USD)',{value:(s.default_fund_cents/100).toFixed(2).replace('.',','),max:12,hint:'Se propone como fondo esperado al abrir una caja que no recibe fondo del turno anterior.'});fund.inputMode='decimal';
+ const limit=field('difference_limit','Diferencia aceptada sin revisión (USD)',{value:((s.difference_limit_cents||0)/100).toFixed(2).replace('.',','),max:12,hint:'0,00: toda diferencia queda pendiente de revisión de administración. Siempre se exige explicación.'});limit.inputMode='decimal';
+ const rules=el('div',undefined,'cjc-rules');
+ const rule=(icon,title,text,input)=>{const r=el(input?'label':'div',undefined,'cjc-rule'),copy=el('span',undefined,'cjc-rule-copy');copy.append(el('strong',title),el('small',text));r.append(invIcon(icon),copy);
+  if(input){r.append(input,el('span',undefined,'cjc-switch'));}else{const lock=el('span',undefined,'cjc-lock');lock.append(invIcon('lock'),el('span','Siempre activo'));r.append(lock);}rules.append(r);};
+ const req=el('input');req.type='checkbox';req.setAttribute('role','switch');req.name='require_open';req.checked=!!s.require_open;
+ rule('shield-check','Apertura obligatoria para cobrar','Sin una caja abierta no se registran cobros, anticipos, vouchers ni ventas de licencias. Si está desactivada, el cobro queda como incidencia para asignarlo a una caja.',req);
+ rule('banknote','Conteo por denominaciones','La apertura, el arqueo y el cierre se cuentan por monedas y billetes activos.');
+ rule('scale','Control de diferencias','Toda diferencia en el cierre exige explicación y queda para revisión de administración.');
+ rule('user','Registro obligatorio del cajero','Cada turno queda a nombre de quien lo abre y de quien lo cierra.');
+ rule('scroll-text','Historial y auditoría','Aperturas, movimientos, arqueos, cierres y cambios de configuración quedan registrados.');
+ rule('clock','Turnos','Mañana, tarde, noche o jornada completa. Una sola sesión abierta por caja a la vez.');
+ rule('key-round','Permisos de apertura y cierre','Abren caja administración y técnicos; cierra el cajero de la sesión o administración; las diferencias y ajustes los revisa administración.');
+ form.append(rules);const save=el('button',undefined,'primary inv-btn');save.type='submit';save.append(invIcon('save'),el('span','Guardar configuración'));form.append(msg,save);
+ form.addEventListener('submit',async e=>{e.preventDefault();clear();
+  if(req.checked&&!s.require_open&&!await askConfirm('¿Exigir caja abierta para cobrar?','A partir de ahora no se podrán registrar cobros, anticipos, vouchers ni ventas de licencias si no hay una caja abierta.','Activar'))return;
+  save.disabled=true;try{const r=await api('/api/caja/config',{default_fund:fund.value,difference_limit:limit.value,require_open:req.checked?'1':'0'});Object.assign(s,r.settings);toast('Configuración de caja guardada.','success');}catch(error){fail(error);}save.disabled=false;});
+ gen.append(form);slot.append(gen);
+ const banks=invoiceCard('Cuentas bancarias','landmark','Cuentas receptoras para transferencias y depósitos');banks.append(el('p',data.accounts_verified+' cuenta(s) verificada(s) disponibles al registrar transferencias y depósitos.','cjc-hint'),invBtn('Administrar cuentas bancarias','landmark',()=>invoiceGo('cuentas')));slot.append(banks);}
 
 let cashState={tab:'dia',day:'',user:'',hist:{user:'',status:'',from:'',to:''}};
 // ---- Ventas: Nueva factura directa y Cotización y proforma (misma ventana amplia: comprobante, cliente, partidas, pago, observaciones y resumen) --
@@ -5647,7 +5738,7 @@ async function invoiceComposer(existing=null,done=null,mode='factura'){const P=m
  const pct=(rate/100+'').replace('.',','),dialog=invDialog(P?(p?'Cotización y proforma · '+p.code:'Nueva cotización y proforma'):(p?'Factura directa · '+p.code:'Nueva factura directa'),true);dialog.classList.add('fx-composer');
  let dirty=false,pid=p?.id||null,busy=false;const touch=()=>{dirty=true;};
  dialog.beforeClose=async()=>!dirty||await askConfirm('¿Descartar los cambios?',(P?'La proforma':'La factura')+' tiene cambios sin guardar. Si cierras ahora, se perderán.','Descartar',true);
- const body=el('div',undefined,'inv-body fxc-body');dialog.append(body);if(setup.settings.test_mode&&!P)body.append(invoiceTestBanner(setup.settings));
+ const body=el('div',undefined,'inv-body fxc-body');dialog.append(body);if(setup.settings.test_mode&&!P)body.append(invoiceTestBanner(setup.settings));if(!P)cashGuard(body);
  // Zona superior: comprobante y cliente.
  const top=el('div',undefined,'fxc-top');body.append(top);
  const doc=el('section',undefined,'fxc-card fxc-doc'),dh=el('h3');dh.append(invIcon(P?'file-check-2':'receipt-text'),el('span',P?'Documento':'Comprobante'));doc.append(dh);const dgrid=el('div',undefined,'fxc-grid');doc.append(dgrid);
@@ -5845,7 +5936,7 @@ function proformaDecision(id,done){const dialog=invDialog('Registrar decisión d
  field('decision','Decisión',{options:[['aprobada','Aprobó toda la proforma'],['rechazada','Rechazó la proforma']],required:true});field('note','Cómo y quién confirmó la decisión',{area:true,max:300,required:true});
  const save=el('button',undefined,'primary inv-btn');save.type='submit';save.append(invIcon('circle-check'),el('span','Registrar'));form.append(msg,invDialogActions(dialog,save));
  form.addEventListener('submit',async e=>{e.preventDefault();clear();save.disabled=true;try{await api('/api/proformas/'+id,{action:'decide',...Object.fromEntries(new FormData(form))});dialog.close();done();}catch(error){save.disabled=false;fail(error);}});}
-async function advanceDialog(d,done){const p=d.proforma,dialog=invDialog('Registrar anticipo · '+p.code),{form,msg,field,fail,clear}=invForm('bank-form inv-sheet-form');dialog.append(form);form.append(el('p','Saldo de la proforma: '+quoteMoney(d.balance_cents)+'. El anticipo se aplica a su factura sin cobrarse dos veces.','inv-form-note'),invRequiredNote());
+async function advanceDialog(d,done){const p=d.proforma,dialog=invDialog('Registrar anticipo · '+p.code),{form,msg,field,fail,clear}=invForm('bank-form inv-sheet-form');dialog.append(form);cashGuard(form);form.append(el('p','Saldo de la proforma: '+quoteMoney(d.balance_cents)+'. El anticipo se aplica a su factura sin cobrarse dos veces.','inv-form-note'),invRequiredNote());
  const accounts=(await api('/api/bank-accounts').catch(()=>({rows:[]}))).rows.filter(a=>a.active);
  const method=field('method','Forma de pago',{options:[['efectivo','Efectivo'],['transferencia','Transferencia'],['deposito','Depósito'],['debito','Tarjeta de débito'],['credito','Tarjeta de crédito'],['cheque','Cheque'],['otro','Otro']],required:true});
  field('amount','Monto (USD)',{mode:'decimal',max:12,required:true,value:(d.balance_cents/100).toFixed(2).replace('.',',')});const bank=field('bank','Banco de destino',{options:[['','Selecciona…'],...[...new Set(accounts.map(a=>a.bank))].map(b=>[b,b])]}),account=field('bank_account_id','Cuenta receptora',{options:[['','Elige el banco']]});

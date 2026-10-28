@@ -492,7 +492,7 @@ function centerClientField(form,field,msg){const client=field('client_id','Clien
  let timer=null;find.addEventListener('input',()=>{clearTimeout(timer);timer=setTimeout(async()=>{const q=find.value.trim();if(q.length<2)return;try{const data=await api('/api/clients?q='+encodeURIComponent(q)+'&size=10');client.replaceChildren(new Option('Sin cliente',''));for(const c of data.rows)client.add(new Option(c.name+(c.identification?' · '+c.identification:''),String(c.id)));if(data.rows.length)client.selectedIndex=1;}catch(error){msg.textContent=error.message;}},300);});
  return{client,box};}
 // Venta desde la ficha: unidad específica (con su serie), cliente, precio y descuento autorizados; confirma la salida del inventario.
-async function centerSellDialog(itemId){const dialog=invDialog('Vender producto',true),{form,msg,field,fail,clear}=invForm('bank-form inv-sheet-form ic-sell');dialog.append(form);form.append(invRequiredNote());
+async function centerSellDialog(itemId){const dialog=invDialog('Vender producto',true),{form,msg,field,fail,clear}=invForm('bank-form inv-sheet-form ic-sell');dialog.append(form);form.append(invRequiredNote());cashGuard(form);
  let d;try{d=await api('/api/inventory/products/'+itemId+'/sheet');}catch(error){form.append(el('p',error.message,'inv-warn'));return;}const p=d.product,pr=d.pricing;dialog.querySelector('h2').textContent='Vender · '+p.name;
  if(!p.available){form.append(el('p','No hay unidades disponibles: el producto está agotado o todo lo que queda está reservado.','inv-warn'));return;}
  const units=el('div',undefined,'ic-units-box'),qty=p.tracking==='granel'?field('quantity','Cantidad',{required:true,mode:'numeric',max:6,value:'1'}):null;form.append(units);

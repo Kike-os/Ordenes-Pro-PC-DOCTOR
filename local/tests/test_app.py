@@ -42,6 +42,7 @@ class SecurityTests(unittest.TestCase):
         self.env.start()
         app.migrate()
         with app.connect() as c:
+            c.execute('UPDATE cash_settings SET require_open=0 WHERE id=1')  # las pruebas de caja la activan (test_cash_rules)
             self.uid = c.execute('INSERT INTO users(username,email,name,password_hash,role,created_at) VALUES (?,?,?,?,?,?)',('demo','demo@example.invalid','Persona de prueba',self.hash,'administrador',int(time.time()))).lastrowid
             if self.__class__.__name__!='ServiceTermsTests':
                 app.service_terms.publish(c,{'version':'FIXTURE-ONLY','effective_date':'2020-01-01','full_text':'Condiciones ficticias de prueba, sin efectos reales.','compact_text':'Resumen ficticio de prueba.','approved':True},{'id':self.uid},app.reception_now())

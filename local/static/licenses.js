@@ -679,7 +679,7 @@ function licenseSaleDialog(preset={}){
   if(now)licenseShareLink(result);licenseState.tab='ventas';licenseReloadAll();},'Registrar y entregar');
  dialog.classList.add('license-dialog-wide','license-sale-dialog');return dialog;}
 function licensePayDialog(sale,done){const balance=Math.max(sale.total_cents-sale.paid_cents-(sale.pending_cents||0),0);
- licenseFormDialog('Registrar pago · '+sale.code,(form,dialog,parts)=>{form.append(el('p','Saldo pendiente: '+licenseMoney(balance)+'. Solo los pagos confirmados cuentan para marcar la venta como pagada.','license-hint wide'));
+ licenseFormDialog('Registrar pago · '+sale.code,(form,dialog,parts)=>{if(typeof cashGuard==='function')cashGuard(form);form.append(el('p','Saldo pendiente: '+licenseMoney(balance)+'. Solo los pagos confirmados cuentan para marcar la venta como pagada.','license-hint wide'));
   licenseField(form,'Monto recibido (USD) *','amount',licenseAmount(balance),{inputmode:'decimal',required:true});const method=licenseField(form,'Método de pago *','method','efectivo',{select:Object.entries(licenseMethods)});
   const day=licenseField(form,'Fecha del pago','paid_on',licenseToday(),{type:'date'});day.max=licenseToday();licenseField(form,'Referencia o n.º de transacción','reference','',{max:80});
   licenseField(form,'Adjuntar comprobante (JPG, PNG o PDF, máx. 1,5 MB)','receipt','',{type:'file',accept:'image/jpeg,image/png,application/pdf',wide:true});licenseField(form,'Nota','notes','',{max:200,wide:true});

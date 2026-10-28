@@ -535,7 +535,10 @@ def add_advance(c, pid, data, user, now, file_id=None, operation=''):
         if c.execute("SELECT 1 FROM bank_transfers WHERE bank_account_id=? AND lower(reference)=lower(?) AND status!='rechazado'", (account['id'], reference)).fetchone():
             raise ProformaError('Esa referencia ya está registrada en esta cuenta.', 409, {'reference': 'Referencia repetida.'})
     nid, code = banking.next_code(c, 'advances', 'AN')
-    session = cash_sessions.current_for(c, user)
+    try:
+        session = cash_sessions.session_for_payment(c, user)
+    except cash_sessions.CashError as error:
+        raise ProformaError(str(error), error.status, error.fields)
     note = re.sub(r'\s+', ' ', str(data.get('note', '') or '')).strip()[:300]
     c.execute('INSERT INTO advances(id,code,client_id,proforma_id,method,bank_account_id,reference,amount_cents,paid_at,cash_session_id,note,request_key,created_by,created_at,operation_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
               (nid, code, row['client_id'], row['id'], method, account['id'] if account else None, reference, amount, paid_at, session, note, key or None, user['id'], stamp(now), operation))
@@ -844,6 +847,11 @@ def checkout(c, pid, data, user, now):
         raise ProformaError('Solo una factura directa se cierra desde aquí.', 409)
     if row['invoice_id']:
         return row['invoice_id']
+    import cash_sessions
+    try:
+        cash_sessions.session_for_payment(c, user)  # confirmar la venta exige la caja abierta (el borrador sí se guarda sin caja)
+    except cash_sessions.CashError as error:
+        raise ProformaError(str(error), error.status, error.fields)
     if row['status'] not in ('borrador', 'aprobada'):
         raise ProformaError('Esta venta no se puede facturar (%s).' % STATUS[row['status']].lower(), 409)
     try:
