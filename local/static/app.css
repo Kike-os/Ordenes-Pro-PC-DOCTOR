@@ -9464,3 +9464,5 @@ label.cjc-rule{cursor:pointer}.cjc-rule>.inv-icon{width:18px;height:18px;color:v
 @media (prefers-reduced-motion:reduce){.cjc-switch,.cjc-switch::after,.cj-denom-tile{transition:none}}
 
 .cjc-danger{border-color:#F8717166!important;color:#FCA5A5!important}.cjc-danger:hover:not(:disabled){background:#F871711a!important}.cjc-danger:disabled{opacity:.55;cursor:not-allowed}
+
+.fx-azur{display:grid;gap:10px}.fx-azur-msgs{margin:0;padding-left:18px;font-size:12.5px;color:#FCA5A5}.fx-azur-steps{margin:0;padding-left:20px;display:grid;gap:6px;font-size:13px;color:var(--inv-muted,#A9B6CC)}

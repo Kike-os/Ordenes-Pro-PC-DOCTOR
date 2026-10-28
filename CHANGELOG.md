@@ -4,6 +4,27 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.212 — 2026-10-28 00:35 (UTC-05:00)
+
+Caja profesional (apertura con conteo, bloqueo de cobros con la caja cerrada, cierre con desglose y configuración) e integración con AZUR en pruebas
+
+### Nuevas funcionalidades
+
+- Abrir Caja rediseñada en tres columnas: información (caja, turno, cajero, fecha y hora, número de apertura), conteo por denominaciones en tarjetas con cantidad, botones − y + y subtotal, y resumen en tiempo real con el fondo inicial destacado; fondo de /tmp/claude-1000/-home-admin-red-Work-Ordenes-Pro-PC-DOCTOR/ef7cd55d-efcd-491b-bc6d-c552dbe4288c/scratchpad/version212.sh,00 por defecto.
+- Apertura obligatoria: con la caja cerrada no se registran cobros, anticipos, vouchers ni pagos de licencias, ni se confirman ventas del inventario o facturas directas (validado en el servidor); las ventanas muestran el aviso con el botón Abrir Caja. Borradores y proformas siguen permitidos.
+- Cerrar Caja: cuadre del efectivo (fondo + ventas en efectivo + entradas − egresos − devoluciones = esperado) y cobros del turno por medio (efectivo, transferencias, depósitos, tarjetas, DATAFAST) y por cuenta receptora.
+- Configuración de caja: tarjetas por caja (estado, turno, cajero, última apertura y cierre), denominaciones en dos grupos con interruptores (activar todas, restablecer, guardar), fondo predeterminado, apertura obligatoria y diferencia aceptada sin revisión.
+- Integración con AZUR (API REST v2) en ambiente de PRUEBAS: enviar la factura al SRI a través de AZUR (firma con el certificado verificado en AZUR), consultar el estado sin duplicar, guardar PDF y XML al autorizarse, correo solo a la dirección de prueba y anulación con confirmación tras solicitarla en SRI en línea.
+
+### Mejoras realizadas
+
+- Factura (RIDE) y proforma en PDF: se quita el nombre que se repetía junto al logo; el logo se ve más grande y los datos se reacomodan.
+
+### Actualizaciones de seguridad
+
+- AZUR: credenciales solo por variables de entorno (nunca en registros ni respuestas); se rechaza una credencial de producción y una clave de acceso de producción; cada operación queda registrada; un comprobante autorizado no se modifica (la anulación se registra aparte).
+- La apertura obligatoria viene activada (administración puede desactivarla). No se desactiva una caja con turno abierto; los cambios de configuración y de denominaciones quedan auditados y no alteran los cierres anteriores.
+
 ## v1.5.211 — 2026-10-27 22:06 (UTC-05:00)
 
 Proformas y facturas (RIDE) en PDF con la identidad de PC-DOCTOR y códigos de barras reales, e inventario limpio como nuevo

@@ -327,13 +327,16 @@ def order_from_text(c,*texts):
     return row['id'] if row else None
 
 
-def send_institutional(c,kind,title,recipient,subject,body,order_id=None,actor=None,attachments=None,review=True,private=(),signed=True):
+def send_institutional(c,kind,title,recipient,subject,body,order_id=None,actor=None,attachments=None,review=True,private=(),signed=True,account=''):
     """Correo institucional: revisión de ADI, plantilla común, firma autorizada, copia exacta y vínculo con la orden.
 
     Lanza mail_pro.MailError si el servidor no acepta el mensaje (queda registrado como error). «enviado» significa aceptado por el servidor."""
     import mailing
     now=reception_now();final,adi=mailing.review(c,body,now) if review else (body,'plantilla')
     config=mail_pro.settings();card=mail_signature_send(c)
+    if account=='facturacion' and os.environ.get('FACTURACION_MAIL_USERNAME','').strip() and os.environ.get('FACTURACION_MAIL_PASSWORD',''):
+        # Las facturas salen del buzón de facturación (mismo servidor, credenciales propias en variables de entorno).
+        config=dict(config,username=os.environ['FACTURACION_MAIL_USERNAME'].strip(),password=os.environ['FACTURACION_MAIL_PASSWORD'])
     message,recipients=mail_pro.build_message(config,{'to':recipient,'subject':subject,'body':final,'from_name':corporate.settings()['name'],'attachments':attachments or [],'layout':{'title':title}},card if signed and card.get('enabled') else '')
     archive_id=mailing.archive(c,kind,order_id,recipient,subject,message,adi,actor,now,[str(item.get('name','')) for item in attachments or []],private)
     # Seguimiento de entrega: un registro por destinatario, con su historial de eventos reales.
@@ -361,6 +364,19 @@ def send_institutional(c,kind,title,recipient,subject,body,order_id=None,actor=N
     try:mail_tracking.settle(c,record)
     except sqlite3.Error as error:note_runtime_error('MAIL','/mail/'+kind,error)
     return {'archive_id':archive_id,'adi':adi,'message_id':message_id}
+
+
+def invoice_autosend(c,invoice_id,user,now):
+    """Al autorizarse una factura se envían su RIDE y su XML desde la cuenta de facturación. En PRUEBAS solo a la dirección de prueba
+    configurada (nunca al cliente). Un fallo del correo no cambia la autorización: queda registrado y se puede reenviar."""
+    import invoice_documents as docs,invoicing
+    kind='prueba' if invoicing.TEST_MODE else 'cliente'
+    deliver=lambda kind_,title,to,subject,body,files:send_institutional(c,kind_,title,to,subject,body,None,user['id'] if user else None,attachments=files,review=False,account='facturacion')
+    try:
+        docs.send(c,invoice_id,kind,user,now,deliver);c.commit();return {'sent':True,'kind':kind}
+    except (docs.DocumentError,mail_pro.MailError) as error:
+        c.rollback();invoicing.event(c,invoice_id,'correo_pendiente','Autorizada, pero el correo automático no salió: %s'%error,now,user);c.commit()
+        return {'sent':False,'error':str(error)}
 
 
 def send_receipt_mail(c,oid,user,mode):
@@ -1139,6 +1155,13 @@ class Handler(BaseHTTPRequestHandler):
                 # Licencias Pro: avisos internos y correos de renovación a clientes (una vez al día, hora de Ecuador).
                 try:license_notices_tick(c,now)
                 except Exception as error:print('license-notices cron',type(error).__name__,flush=True)
+                # Facturas enviadas a AZUR que siguen pendientes: se consulta su estado (nunca se reenvían); al autorizarse se envía el correo.
+                try:
+                    import azur_invoicing
+                    if azur_invoicing.readiness(c)['ready']:
+                        for invoice_id in azur_invoicing.pending(c):
+                            if azur_invoicing.sync(c,invoice_id,None,now,quiet=True).get('newly_authorized'):invoice_autosend(c,invoice_id,None,now)
+                except Exception as error:print('azur cron',type(error).__name__,flush=True)
                 # Seguimiento de correos: envíos sin respuesta registrada y lectura de informes de rebote o demora del buzón.
                 try:
                     mail_tracking.sweep(c,now);c.commit()
@@ -2026,6 +2049,16 @@ class Handler(BaseHTTPRequestHandler):
                         import inventory
                         return self.reply(200,{**invoicing.dashboard(c,reception_now()),'inventory_alerts':inventory.alert_count(c)})
                     if path=='/api/invoicing/settings':return self.reply(200,{'settings':invoicing.settings(c),'regimes':invoicing.REGIMES})
+                    if path=='/api/invoicing/azur':
+                        import azur_invoicing
+                        return self.reply(200,azur_invoicing.readiness(c))
+                    found=re.fullmatch(r'/api/invoicing/([0-9]{1,9})/azur/(pdf|xml_autorizado|xml_firmado)',path)
+                    if found:
+                        import azur_invoicing
+                        inv=invoicing.detail(c,int(found[1]))['invoice'];raw=azur_invoicing.file_for(c,int(found[1]),found[2])
+                        kind='FACTURA' if found[2]=='pdf' else 'FACTURA-XML'
+                        name=__import__('document_style').filename(kind,inv['number'] or found[1])
+                        return self.reply(200,raw,'application/pdf' if found[2]=='pdf' else 'application/xml',filename=name if found[2]=='pdf' else name[:-4]+('-autorizado' if found[2]=='xml_autorizado' else '-firmado')+'.xml')
                     if path=='/api/invoicing/direct-setup':
                         # Datos de la cabecera de una factura directa, desde la configuración (nunca fijados en la pantalla).
                         import banking
@@ -3131,7 +3164,7 @@ class Handler(BaseHTTPRequestHandler):
                         if found:
                             kind=str(data.get('kind',''))
                             if kind not in ('prueba','reenvio','cliente'):return self.reply(400,{'error':'Tipo de envío no válido.'})
-                            deliver=lambda kind_,title,to,subject,body,files:send_institutional(c,kind_,title,to,subject,body,None,user['id'],attachments=files,review=False)
+                            deliver=lambda kind_,title,to,subject,body,files:send_institutional(c,kind_,title,to,subject,body,None,user['id'],attachments=files,review=False,account='facturacion')
                             sent=docs.send(c,int(found[1]),kind,user,now,deliver,str(data.get('recipient','') or ''))
                             audit(c,user['id'],'invoice_documents_'+kind,int(found[1]));c.commit()
                             return self.reply(200,{'ok':True,'mail':docs.mail_log(c,int(found[1])),'skipped':bool(sent.get('skipped'))})
@@ -3155,6 +3188,17 @@ class Handler(BaseHTTPRequestHandler):
                                 c.commit();c.execute('BEGIN IMMEDIATE')
                                 invoicing.emit(c,invoice_id,user,now);c.commit();audit(c,user['id'],'invoice_emitted_test',invoice_id)
                                 return self.reply(200,invoicing.detail(c,invoice_id))
+                            if action in ('azur_send','azur_sync','azur_annul','azur_files'):
+                                # AZUR firma y envía al SRI de PRUEBAS; nunca se emite dos veces (clave de idempotencia y secuencial propio).
+                                import azur_invoicing
+                                c.commit()
+                                if action=='azur_send':result=azur_invoicing.send(c,invoice_id,user,now)
+                                elif action=='azur_sync':result=azur_invoicing.sync(c,invoice_id,user,now,live=str(data.get('live',''))=='1')
+                                elif action=='azur_annul':result=azur_invoicing.annul(c,invoice_id,user,now,data)
+                                else:result={'files':azur_invoicing.fetch_files(c,invoice_id,azur_invoicing.az.config(),now,user)};c.commit()
+                                audit(c,user['id'],'invoice_'+action,invoice_id);c.commit()
+                                if result.get('newly_authorized'):result['mail']=invoice_autosend(c,invoice_id,user,now)
+                                return self.reply(200,{'azur':result,**invoicing.detail(c,invoice_id)})
                             if action=='bank':
                                 invoicing.set_bank(c,invoice_id,data.get('bank_account_id'),user,now);return self.reply(200,invoicing.detail(c,invoice_id))
                             if action=='discard':

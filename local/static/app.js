@@ -4871,7 +4871,7 @@ function invoiceTestBanner(settings){const box=el('div',undefined,'inv-banner'),
 // presentan como tales: nunca como operativas. «@inventory» abre el Centro de Inventario existente (no se duplica dentro de Facturación).
 const invoiceGroups=[['Ventas',[['panel','Panel general','layout-dashboard'],['facturas','Facturación','receipt-text'],['simulador','Simulador de cuotas','credit-card'],['proformas','Cotización y proforma','file-check-2'],['notas','Notas de crédito','file-x-2'],['pagos','Pagos y anticipos','banknote']]],
  ['Administración',[['caja','Caja','wallet'],['compras','Compras','shopping-cart'],['proveedores','Proveedores','truck'],['cuentas','Cuentas bancarias','landmark'],['@inventory','Centro de Inventario','package']]],
- ['Configuración',[['fiscal','Datos fiscales','building-2'],['firma','Firma electrónica','signature',1],['sri','Integración SRI','plug-zap',1],['tarjetas','Tarjetas y DATAFAST','badge-percent'],['config','Políticas comerciales','scroll-text'],['general','Configuración general','sliders-horizontal']]]];
+ ['Configuración',[['fiscal','Datos fiscales','building-2'],['firma','Firma electrónica','signature'],['sri','Integración SRI','plug-zap'],['tarjetas','Tarjetas y DATAFAST','badge-percent'],['config','Políticas comerciales','scroll-text'],['general','Configuración general','sliders-horizontal']]]];
 const invoiceTabs=invoiceGroups.flatMap(([,items])=>items).filter(t=>!t[0].startsWith('@'));
 function invoicePref(key,fallback){try{return JSON.parse(localStorage.getItem('fx-'+key))??fallback;}catch{return fallback;}}
 function invoiceSetPref(key,value){try{localStorage.setItem('fx-'+key,JSON.stringify(value));}catch{}}
@@ -4898,7 +4898,7 @@ async function renderInvoicing(){const root=$('module-content');const tab=invoic
  const shell=el('div',undefined,'inv-module fx-module ic-shell'),main=el('div',undefined,'ic-main'),panel=el('div',undefined,'inv-panel');panel.id='fx-section';panel.setAttribute('aria-label',tab[1]);
  shell.dataset.collapsed=String(!!invoicePref('nav-collapsed',false));main.append(invoiceTestBanner(data.settings),panel);shell.append(invoiceNav(data),main);root.replaceChildren(shell);
  const run={panel:p=>invoiceDashboard(p,data),facturas:p=>invoicesPanel(p,data),fiscal:invoiceSettingsForm,config:invoicePoliciesPanel,cuentas:bankAccountsPanel,compras:purchasesPanel,proveedores:suppliersPanel,
-  caja:renderCash,general:invoiceGeneralPanel,simulador:invoiceCardSimulator,tarjetas:invoiceCardSettings,proformas:proformasPanel,notas:creditNotesPanel,pagos:paymentsAllPanel,firma:invoiceSoonPanel,sri:invoiceSriPanel}[tab[0]];
+  caja:renderCash,general:invoiceGeneralPanel,simulador:invoiceCardSimulator,tarjetas:invoiceCardSettings,proformas:proformasPanel,notas:creditNotesPanel,pagos:paymentsAllPanel,firma:invoiceSriPanel,sri:invoiceSriPanel}[tab[0]];
  try{await run(panel);}catch(error){panel.replaceChildren(el('p',error.message,'empty-module'));}}
 // Indicadores compactos. Con acción, la tarjeta es un botón que abre el detalle (por ejemplo, las facturas de ese estado).
 function invoiceKpis(list){const grid=el('div',undefined,'fx-kpis');for(const[icon,label,value,hint,tone,action]of list){const card=action?button('',action,'fx-kpi'):el('article',undefined,'fx-kpi'),mark=el('span',undefined,'fx-kpi-icon'),body=el('div');
@@ -4955,15 +4955,23 @@ const invoicePlans={
 function invoiceSoonPanel(panel){const[title,icon,phase,items,note]=invoicePlans[invoiceState.tab];panel.replaceChildren(invSectionHead(title,'Sección en desarrollo ('+phase+'). Todavía no está disponible.'));
  const card=invoiceCard('Qué incluirá',icon,phase);card.classList.add('fx-plan');const ul=el('ul',undefined,'fx-plan-list');for(const t of items){const li=el('li');li.append(invIcon('circle-check'),el('span',t));ul.append(li);}card.append(ul);
  const info=el('p',undefined,'fx-plan-note');info.append(invIcon('info'),el('span',note));card.append(info);panel.append(card);}
-// Integración SRI: estado de cada etapa. Solo «Generación del XML» funciona hoy, y únicamente en el ambiente de pruebas.
-function invoiceSriPanel(panel){panel.replaceChildren(invSectionHead('Integración SRI','Arquitectura preparada por etapas. La conexión real con el SRI está desactivada hasta contar con el certificado, las credenciales y la autorización administrativa.'));
- const steps=[['Generación del XML','Disponible en pruebas','ok','Secuencial, clave de acceso y XML sin firmar al emitir en pruebas.'],['Validación con el esquema XSD','Pendiente','soon','Comprobar el XML contra el esquema oficial antes de firmar.'],
-  ['Firma electrónica','Falta el certificado','off','Firma XAdES-BES con el certificado autorizado.'],['Recepción (ambiente de pruebas)','Pendiente','soon','Envío del comprobante firmado al servicio de recepción de pruebas.'],
-  ['Autorización y consulta de estados','Pendiente','soon','Consulta de la autorización y registro de cada respuesta.'],['Gestión de rechazos','Pendiente','soon','Mensajes del SRI junto a la factura para corregir y reenviar.'],
-  ['Descarga de XML autorizado y RIDE','Parcial','soon','El RIDE en PDF ya se genera; el XML autorizado llegará con la recepción.']];
- const card=invoiceCard('Etapas de la emisión electrónica','plug-zap','Ambiente: Pruebas · emisión real desactivada'),ol=el('ol',undefined,'fx-steps');
- for(const[name,state,tone,hint]of steps){const li=el('li');li.dataset.tone=tone;const head=el('div');head.append(el('strong',name));const chip=el('span',state,'fx-step-state');head.append(chip);li.append(head,el('small',hint));ol.append(li);}
- card.append(ol);const info=el('p',undefined,'fx-plan-note');info.append(invIcon('info'),el('span','Ninguna autorización se simula: una factura de prueba nunca se presenta como autorizada por el SRI.'));card.append(info);panel.append(card);}
+// Integración SRI y firma electrónica a través de AZUR: estado real de la configuración (sin mostrar secretos), punto de emisión y
+// registro de operaciones. AZUR firma con el certificado del contribuyente verificado en AZUR; Órdenes Pro no guarda el certificado.
+async function invoiceSriPanel(panel){const firma=invoiceState.tab==='firma';panel.replaceChildren(el('p','Cargando…','empty-module'));let r;
+ try{r=await api('/api/invoicing/azur');}catch(error){panel.replaceChildren(el('p',error.message,'inv-warn'));return;}
+ panel.replaceChildren(invSectionHead(firma?'Firma electrónica':'Integración SRI',firma?'La firma la aplica AZUR con tu certificado verificado en AZUR: el certificado y su contraseña nunca pasan por Órdenes Pro.':'Emisión a través de AZUR (API REST v2) en el ambiente de PRUEBAS. La emisión real está desactivada hasta tu autorización.'));
+ const card=invoiceCard('Conexión con AZUR','plug-zap',r.ready?'Lista para pruebas':'Configuración pendiente');
+ card.append(invFacts([['Ambiente de la credencial',r.environment==='pruebas'?'Pruebas':r.environment==='produccion'?'Producción (bloqueada)':'—'],['Credencial de consulta (AZUR_CREDENCIAL)',r.credential?'Configurada':'Falta'],
+  ['Clave del punto de emisión (AZUR_API_KEY_EMISION)',r.emission_key?'Configurada':'Falta'],['Punto de emisión de Órdenes Pro',r.point||'—'],['Datos fiscales',r.fiscal_point],['Servidor',r.host],['Modo de pruebas',r.test_mode?'Activo':'Desactivado']]));
+ if(r.problems.length){const ul=el('ul',undefined,'fx-azur-msgs');for(const p of r.problems)ul.append(el('li',p));card.append(ul);}
+ const flow=el('ol',undefined,'fx-steps');for(const[name,state,tone,hint]of [['Emisión en Órdenes Pro','Disponible','ok','Secuencial propio y XML de control.'],['Firma XAdES-BES','En AZUR',r.ready?'ok':'soon','AZUR firma con tu certificado verificado.'],
+   ['Envío y autorización del SRI','Pruebas',r.ready?'ok':'soon','Botón «Enviar al SRI (AZUR pruebas)» en cada factura; consulta de estado sin duplicar.'],['Documentos','Al autorizarse',r.ready?'ok':'soon','PDF, XML firmado y autorizado guardados en la factura.'],
+   ['Correo al cliente','Solo prueba','soon','Desde facturacion@ordenes-pro.ecuadorpcdoctor.com; en pruebas solo a la dirección de prueba.'],['Anulación','Con confirmación','ok','Primero en SRI en línea; Órdenes Pro comprueba y registra.']]){
+  const li=el('li');li.dataset.tone=tone;const head=el('div');head.append(el('strong',name),el('span',state,'fx-step-state'));li.append(head,el('small',hint));flow.append(li);}
+ card.append(flow);const info=el('p',undefined,'fx-plan-note');info.append(invIcon('info'),el('span','Nunca se presenta como autorizada una factura sin la respuesta real del SRI. Las credenciales se configuran como variables de entorno y nunca se muestran.'));card.append(info);panel.append(card);
+ const ops=invoiceCard('Historial de operaciones con AZUR','scroll-text',r.operations.length+' recientes');
+ ops.append(r.operations.length?cjTable(['Fecha','Factura','Operación','Resultado','Detalle','Usuario'],r.operations.map(o=>cjRow([['Fecha',formatOrderDate(o.created_at)],['Factura',o.invoice_id?'#'+o.invoice_id:'—'],['Operación',o.action],['Resultado',cjChip(o.result==='ok'?'cerrada':o.result==='error'?'anulada':'abierta',o.result)],['Detalle',(o.code?o.code+' · ':'')+o.detail],['Usuario',o.actor]]))):el('p','Todavía no hay operaciones.','ic-card-empty'));
+ panel.append(ops);}
 // Configuración general: resumen de solo lectura y accesos a cada ajuste.
 async function invoiceGeneralPanel(panel){const data=await api('/api/invoicing/settings'),s=data.settings;panel.replaceChildren(invSectionHead('Configuración general','Resumen de la configuración de facturación. Cada ajuste se cambia en su sección.'));
  const card=invoiceCard('Emisión','receipt-text',s.test_mode?'Modo de pruebas activo':'');card.append(invFacts([['Ambiente',s.emission?.environment_label||'Pruebas (SRI)'],['Emisión real',s.emission?.real_enabled?'Activada':'Desactivada'],['Establecimiento',s.establishment||'—'],['Punto de emisión',s.emission_point||'—'],
@@ -5172,6 +5180,33 @@ function invoiceMoneyBlock(data){const box=el('section',undefined,'inv-buyer inv
  const f=inv.financing;if(f&&f.total_cents)box.append(el('p','Financiamiento con tarjeta (informativo): '+f.bank+' · '+f.brand+' · '+f.months+' meses · precio '+quoteMoney(f.base_cents)+' + recargo '+quoteMoney(f.surcharge_cents)+' + intereses '+quoteMoney(f.interest_cents)+' = '+quoteMoney(f.total_cents)+' ('+quoteMoney(f.installment_cents)+' cada letra). La factura no cambia por el financiamiento.','inv-form-note'));
  if(inv.proforma_code)box.append(el('p','Origen: proforma '+inv.proforma_code+'.','inv-form-note'));if(inv.inventory_ref)box.append(el('p','Origen: venta del inventario '+inv.inventory_ref+'.','inv-form-note'));
  return box;}
+// SRI a través de AZUR (ambiente de PRUEBAS): AZUR firma con el certificado del contribuyente y envía; aquí solo se muestra lo que responde.
+const AZUR_STATES={'-1':'Borrador en AZUR','0':'En proceso','3':'Recibido por el SRI','4':'Autorizado','5':'No autorizado','6':'Error de secuencial','7':'Error al firmar','9':'Anulado','11':'SRI no disponible','15':'Establecimiento cerrado','17':'Corregir la firma','18':'Corregir el comprobante'};
+function invoiceAzurBlock(dialog,body,data){const inv=data.invoice,box=el('section',undefined,'inv-buyer fx-azur'),h=el('h3');h.append(invIcon('plug-zap'),el('span','SRI a través de AZUR · ambiente de pruebas'));box.append(h);
+ const state=inv.provider==='azur'?AZUR_STATES[String(inv.provider_state??0)]||('Estado '+inv.provider_state):'Sin enviar al SRI';const facts=el('dl',undefined,'inv-facts');
+ const rows=[['Estado en AZUR / SRI',state],['Clave de acceso',inv.access_key||'—']];if(inv.status==='autorizado')rows.push(['Número de autorización',inv.authorization_number],['Fecha de autorización',formatOrderDate(inv.authorized_at)]);
+ if(inv.annulment)rows.push(['Anulación',formatOrderDate(inv.annulment.annulled_at)+' · '+inv.annulment.reason]);if(inv.provider_synced_at)rows.push(['Última consulta',formatOrderDate(inv.provider_synced_at)]);
+ for(const[k,v]of rows){const x=el('div');x.append(el('dt',k),el('dd',v));facts.append(x);}box.append(facts);
+ if(inv.status==='autorizado')box.append(el('p','Autorizada por el SRI en el ambiente de PRUEBAS: sin validez tributaria.','inv-warn'));
+ const msgs=(inv.sri_messages||[]).slice(-5);if(msgs.length){const ul=el('ul',undefined,'fx-azur-msgs');for(const m of msgs)ul.append(el('li',(m.origen||'')+' '+(m.codigo||'')+': '+m.mensaje));box.append(ul);}
+ const acts=el('div',undefined,'cj-actions'),warn=el('p','','inv-warn');warn.hidden=true;box.append(warn,acts);
+ const call=async(action,extra={},ok='')=>{try{const fresh=await api('/api/invoicing/'+inv.id,{action,...extra});const r=fresh.azur||{};
+   toast(ok||(r.newly_authorized?'Factura AUTORIZADA en pruebas.'+(r.mail?(r.mail.sent?' Correo de prueba enviado.':' El correo no salió: '+r.mail.error):''):r.label?'Estado: '+r.label:'Actualizado.'),r.errors&&r.errors.length?'error':'success');paintInvoice(dialog,body,fresh);if(currentModule==='invoicing')renderInvoicing();}
+  catch(error){notify(error.message);}};
+ if(admin()&&['pendiente','rechazado'].includes(inv.status)){const send=invBtn(inv.status==='rechazado'&&inv.provider==='azur'?'Reprocesar en AZUR':'Enviar al SRI (AZUR pruebas)','send',async()=>{
+   if(await confirmClose({title:'¿Enviar al SRI de PRUEBAS?',text:'AZUR firmará la factura '+inv.number+' con tu certificado y la enviará al SRI de pruebas. Si ya se envió antes, solo se consulta: nunca se emite dos veces.',keep:'Cancelar',discard:'Enviar',plain:true})!=='discard')return;
+   send.disabled=true;await call('azur_send');send.disabled=false;},'primary');acts.append(send);
+  api('/api/invoicing/azur').then(r=>{if(!r.ready){send.disabled=true;warn.hidden=false;warn.textContent='AZUR no está listo: '+r.problems.join(' ');}}).catch(()=>{});}
+ if(inv.provider==='azur'){acts.append(invBtn('Consultar estado','refresh-cw',()=>call('azur_sync')),invBtn('Consultar en el SRI en vivo','activity',()=>call('azur_sync',{live:'1'})));
+  if(inv.status==='autorizado')for(const[label,kind]of [['PDF de AZUR','pdf'],['XML autorizado','xml_autorizado'],['XML firmado','xml_firmado']]){const a=el('a',undefined,'secondary inv-btn');a.href='/api/invoicing/'+inv.id+'/azur/'+kind;a.target='_blank';a.rel='noopener';a.append(invIcon('file-text'),el('span',label));acts.append(a);}
+  if(admin()&&inv.status==='autorizado'&&!inv.annulment)acts.append(invBtn('Anular factura','circle-x',()=>invoiceAnnulDialog(inv,fresh=>paintInvoice(dialog,body,fresh)),'secondary cjc-danger'));}
+ return box;}
+function invoiceAnnulDialog(inv,done){const dialog=invDialog('Anular factura '+inv.number),{form,msg,field,fail,clear}=invForm('bank-form inv-sheet-form');dialog.append(form);
+ const steps=el('ol',undefined,'fx-azur-steps');for(const t of ['Ingresa a SRI en línea › Facturación Electrónica › Anulación de comprobantes y solicita la anulación de esta factura (clave '+inv.access_key+').','Espera la aceptación del comprador si el SRI la requiere.','Vuelve aquí y confirma: Órdenes Pro comprueba con AZUR que el SRI ya la anuló. Nada se anula automáticamente.','Si el plazo del SRI ya venció, corrige con una nota de crédito.'])steps.append(el('li',t));
+ form.append(el('p','AZUR no anula en el SRI: la solicitud la presenta el contribuyente en SRI en línea.','inv-warn'),steps);
+ field('reason','Motivo de la anulación',{area:true,max:300,required:true});field('confirm','Escribe ANULAR para confirmar',{max:10,required:true});
+ const go=el('button',undefined,'primary inv-btn');go.type='submit';go.append(invIcon('circle-x'),el('span','Comprobar y registrar la anulación'));form.append(msg,invDialogActions(dialog,go));
+ form.addEventListener('submit',async e=>{e.preventDefault();clear();go.disabled=true;try{const fresh=await api('/api/invoicing/'+inv.id,{action:'azur_annul',reason:form.elements.reason.value,confirm:form.elements.confirm.value});dialog.close();toast('Anulación registrada.','success');done(fresh);}catch(error){go.disabled=false;fail(error);}});}
 function paintInvoice(dialog,body,data){const inv=data.invoice,s=data.settings,draft=inv.status==='borrador';body.replaceChildren(invoiceTestBanner(s));
  // Cabecera tipo RIDE: emisor (logo original y datos fiscales configurados) y comprobante.
  const head=el('header',undefined,'inv-ride-head'),issuer=el('div',undefined,'inv-issuer'),logo=el('img');logo.src='/static/logo-original.png';logo.alt='PC-DOCTOR S.A.';logo.className='inv-logo';
@@ -5215,7 +5250,7 @@ function paintInvoice(dialog,body,data){const inv=data.invoice,s=data.settings,d
   actions.append(emitB,drop);}
  if(inv.access_key){const xml=el('a',undefined,'secondary');xml.href='/api/invoicing/'+inv.id+'/comprobante.xml';xml.append(systemIcon('M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6 M10 13l-2 2 2 2 M14 13l2 2-2 2'),el('span','Descargar XML'));actions.append(xml);
   if(['pendiente','enviado','autorizado'].includes(inv.status))actions.append(invBtn('Nota de crédito','file-x-2',()=>creditNoteDialog(inv,()=>openInvoice(inv.id))));
-  const note=el('small','Siguiente etapa: firma electrónica y envío al SRI de pruebas (requiere el certificado).','inv-next');actions.append(note);}
+  body.append(invoiceAzurBlock(dialog,body,data));}
  if(data.balance_cents>0&&inv.status!=='descartado'&&admin())actions.append(invBtn('Registrar depósito o transferencia','arrow-down-to-line',async()=>{const accounts=await api('/api/bank-accounts');transferDialog(accounts,null,{payer:inv.buyer_name,source_kind:'factura',source_id:String(inv.id)});}));
  if(inv.access_key)body.append(invoiceDocumentsBlock(inv));
  if(inv.order_id){actions.append(button('Ver la orden',()=>{dialog.close();go('orders',new URLSearchParams({id:String(inv.order_id)}));},'secondary'));}

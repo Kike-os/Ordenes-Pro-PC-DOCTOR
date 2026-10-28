@@ -8,6 +8,7 @@ Reglas que se aplican SIEMPRE en el servidor (la interfaz solo las refleja):
 - Los precios del catálogo y de los presupuestos ya incluyen el IVA: la base y el impuesto se descomponen por línea de forma exacta.
 - Un comprobante emitido no se modifica (disparadores en la base) y todo queda en un historial inmutable."""
 import json
+import sqlite3
 import re
 from datetime import datetime
 
@@ -496,6 +497,11 @@ def detail(c, invoice_id):
                adjusted=any(line.get('adjusted') for line in (found['lines'] if found else [])), sri_messages=json.loads(inv['sri_messages'] or '[]'),
                proforma_code=proforma['code'] if proforma else '', proforma_id=proforma['id'] if proforma else None, inventory_ref=('INV-%d' % inv['source_id']) if inv['source_kind'] == 'venta_inventario' else '',
                financing=json.loads(inv.get('financing') or '{}'))
+    try:
+        ann = c.execute('SELECT annulled_at,reason,source FROM invoice_annulments WHERE invoice_id=?', (invoice_id,)).fetchone()
+    except sqlite3.OperationalError:
+        ann = None  # base anterior a la integración con AZUR
+    inv['annulment'] = dict(ann) if ann else None
     import banking
     account = c.execute('SELECT * FROM bank_accounts WHERE id=?', (inv['bank_account_id'],)).fetchone() if inv.get('bank_account_id') else None
     paid = sum(p['amount_cents'] for p in payments if p['method'] != 'credito')
