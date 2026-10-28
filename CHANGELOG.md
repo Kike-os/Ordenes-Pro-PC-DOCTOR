@@ -4,6 +4,19 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.214 — 2026-10-28 08:32 (UTC-05:00)
+
+Proforma PDF con distribución dinámica, estados y anticipos correctos
+
+### Mejoras realizadas
+
+- Proforma PDF: totales con suma de partidas (IVA incluido), descuentos, base imponible e IVA separados; panel de anticipos confirmados, por verificar y saldo pendiente; condiciones más legibles con numeración alineada que continúan en otra página si hace falta.
+
+### Errores corregidos
+
+- Proforma PDF: la tarjeta del cliente crece con su contenido (nombres largos, direcciones de varias líneas, correos largos) y ningún dato sobresale; el encabezado no muestra etiquetas vacías y separa dirección, teléfono, correo y sitio web reales.
+- Proforma PDF: estado dinámico con la factura vinculada cuando está convertida y una nota que evita la contradicción con las condiciones; teléfonos separados cuando vienen con separador (las cifras pegadas solo se dividen si es inequívoco, sin modificar el dato).
+
 ## v1.5.213 — 2026-10-28 08:01 (UTC-05:00)
 
 Proformas y facturas en PDF con diseño premium de PC-DOCTOR

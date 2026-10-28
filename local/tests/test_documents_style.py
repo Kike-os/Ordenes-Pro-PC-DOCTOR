@@ -96,5 +96,31 @@ class DocumentStyleTests(unittest.TestCase):
         self.assertIn('2026-10-28 09:00:00', real)
 
 
+    def test_proforma_phones_status_invoice_and_advances(self):
+        import proformas
+        self.assertEqual(proformas.phones('0991234567 / 022345678'), ['0991234567', '022345678'])
+        self.assertEqual(proformas.phones('0223456780987654321'), ['022345678', '0987654321'])  # una sola división válida
+        self.assertEqual(proformas.phones('022345678098765432'), ['022345678098765432'])  # dudoso: se muestra tal como está registrado
+        self.assertEqual(proformas.phones(''), [])
+        cookie, csrf = self.login()
+        post = lambda path, **body: self.request(path, body, cookie=cookie, csrf=csrf)
+        self.configure(post)
+        items = json.dumps([{'kind': 'servicio', 'description': 'Servicio ficticio', 'quantity': '1', 'unit_price': '20,00'}])
+        pf = post('/api/proformas', origin='cliente', items=items, client_name='Cliente Ficticio', client_identification='0100000017', client_phone='0991234567 / 022345678',
+                  request_key='pdf-anticipo-proforma-1')
+        self.assertEqual(post('/api/proformas/%d' % pf['body']['id'], action='advance', method='efectivo', amount='5', request_key='pdf-anticipo-cobro-001')['status'], 200)
+        text = pdf_text(self.request('/api/proformas/%d.pdf' % pf['body']['id'], cookie=cookie)['body'])
+        for expected in ('0991234567 · 022345678', 'Anticipos confirmados', '$5,00', 'Saldo pendiente', '$15,00', 'Suma de partidas', 'IVA incluido', 'Base imponible 15 %'):
+            self.assertIn(expected, text)
+        d = post('/api/proformas', origin='directa', items=items, client_name='Cliente Ficticio', client_identification='0100000017', request_key='pdf-convertida-000001')
+        made = post('/api/proformas/%d' % d['body']['id'], action='checkout', payments=json.dumps([{'method': 'efectivo', 'amount': '20,00'}]), emit='1', request_key='pdf-convertida-cobro1')
+        self.assertEqual(made['status'], 200, made['body'])
+        text = pdf_text(self.request('/api/proformas/%d.pdf' % d['body']['id'], cookie=cookie)['body'])
+        self.assertIn('Convertida a factura', text)
+        self.assertIn(made['body']['invoice']['number'], text)  # referencia a la factura vinculada
+        self.assertIn('ya fue convertida en la factura', text)
+        self.assertIn('Saldo pendiente', text)
+
+
 if __name__ == '__main__':
     unittest.main()

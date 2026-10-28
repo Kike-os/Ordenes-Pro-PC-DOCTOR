@@ -25,7 +25,7 @@ class OrderCheckTests(unittest.TestCase):
         # Misma respuesta exista o no la orden; solo la real genera un correo, y la respuesta no contiene datos de la orden.
         self.assertEqual((real['status'],ghost['status'],real['body']['message']),(200,200,ghost['body']['message']))
         self.assertEqual(set(real['body']),set(ghost['body']));self.assertEqual(len(sent),1);self.assertEqual(sent[0][0],'cliente@example.invalid')
-        self.assertNotIn('cliente@',str(real['body']));self.assertNotIn('HP',str(real['body']))
+        shown=str({k:v for k,v in real['body'].items() if k!='token'});self.assertNotIn('cliente@',shown);self.assertNotIn('HP',shown)  # el token es aleatorio y puede contener cualquier letra
         secret=sent[0][1];self.assertRegex(secret,r'^\d{6}$');self.assertEqual(sent[0][2],order_check.CODE_MINUTES)
         verify=lambda token,value:self.request('/api/public/adi/order/verify',{'token':token,'code':value})
         self.assertEqual(verify(ghost['body']['token'],secret)['status'],400)

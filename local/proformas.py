@@ -591,11 +591,34 @@ def all_payments(c, f):
 
 # ---- Documento PDF y página del cliente -------------------------------------------------------------------------------------
 
+PHONE_PARTS = re.compile(r'^(0[2-7]\d{7}|09\d{8}|\+?593\d{8,9})$')
+
+
+def phones(value):
+    """Teléfonos para mostrar (no modifica el dato): separa los que vienen con separador y, si son solo cifras pegadas, los divide únicamente
+    cuando hay una sola forma válida de hacerlo (fijo de 9 cifras o celular de 10). Si no, se muestran tal como están registrados."""
+    raw = (value or '').strip()
+    parts = [x.strip() for x in re.split(r'[;,/|]+|\s{2,}| y ', raw) if x.strip()]
+    if len(parts) > 1:
+        return parts
+    digits = re.sub(r'\D', '', raw)
+    if raw and digits == re.sub(r'[\s-]', '', raw) and len(digits) > 10:
+        options = []
+        for cut in range(9, len(digits) - 8):
+            first, second = digits[:cut], digits[cut:]
+            if PHONE_PARTS.match(first) and PHONE_PARTS.match(second):
+                options.append([first, second])
+        if len(options) == 1:
+            return options[0]
+    return [raw] if raw else []
+
+
 def pdf(c, pid, now, staff_url=''):
-    """Proforma comercial A4 de PC-DOCTOR (diseño premium): encabezado en tres zonas (logo original, datos comerciales y bloque PROFORMA),
-    cliente en tarjeta, tabla con encabezado repetido y filas que no se parten, información comercial junto al panel de totales, bloque de
-    identificación (Code 128 con el código único y, en la copia interna, QR para consultarla en Órdenes Pro) y condiciones numeradas.
-    Márgenes de 16 mm. Mismos datos y cálculos de siempre; no es un comprobante tributario."""
+    """Proforma comercial A4 de PC-DOCTOR con distribución dinámica: encabezado en tres zonas (logo original, datos comerciales reales sin
+    etiquetas vacías y bloque PROFORMA con estado y factura vinculada), cliente en tarjeta que crece con su contenido, tabla con encabezado
+    repetido y filas que no se parten, información comercial, totales con el IVA desglosado y panel de anticipos confirmados y saldo, bloque de
+    identificación (Code 128 y, en la copia interna, QR que abre la proforma en Órdenes Pro con sesión) y condiciones que continúan en otra página
+    si hace falta. Márgenes de 16 mm. Mismos datos y cálculos de siempre; no es un comprobante tributario."""
     import document_style as ds
     import invoicing as inv_
     from document_canvas import GRAY, INK
@@ -612,6 +635,7 @@ def pdf(c, pid, now, staff_url=''):
     PANEL = (.965, .972, .984)
     LABEL = (.42, .47, .55)
     bottom = ds.BOTTOM
+    invoice = d.get('invoice')
 
     def label(value, x, y, color=LABEL):
         doc.text(value.upper(), x, y, 6.6, True, color)
@@ -627,60 +651,69 @@ def pdf(c, pid, now, staff_url=''):
     def room(y, need):
         return continuation() if y + need > bottom else y
 
+    def field_lines(value, width, size, limit):
+        """Líneas de un valor; un correo o una dirección sin espacios se parte por caracteres sin perder nada."""
+        return doc.wrap(value, width, size)[:limit]
+
     doc.page()
     # ---- Encabezado: logo (izquierda), datos comerciales (centro) y bloque PROFORMA (derecha).
     top = 30
-    logo_h = doc.logo(L, top + 2, 112)
-    cx = L + 126
-    cw = (R - 180) - cx - 12
-    address = fiscal.get('branch_address') or fiscal.get('head_office_address') or ''
-    web = re.sub(r'^https?://|/$', '', company.get('website', '') or '')
-    yy = top + 2
-    for name, value in (('Dirección', address), ('Teléfono · WhatsApp', company.get('whatsapp', '')), ('Correo', company.get('support_email', '')), ('Web', web)):
-        if not value:
-            continue
-        label(name, cx, yy)
-        for piece in doc.wrap(value, cw, 8.2)[:2]:
-            yy += 9.5
-            doc.text(piece, cx, yy, 8.2, False, INK)
-        yy += 12
-    bw = 180
+    logo_h = doc.logo(L, top + 2, 108)
+    bw = 184
     bx = R - bw
-    rows = (('N.º', p['code'] + (' · v%d' % p['version'] if p['version'] > 1 else '')), ('Emisión', _d(p['issue_date'])), ('Vence', _d(p['valid_until'])), ('Estado', p['status_label']))
-    bh = 34 + 15 * len(rows) + 8
+    cx = L + 122
+    cw = bx - cx - 14
+    address = (fiscal.get('branch_address') or fiscal.get('head_office_address') or '').strip()
+    web = re.sub(r'^https?://|/$', '', company.get('website', '') or '')
+    contact = [(k, v) for k, v in (('Dirección', address), ('Teléfono · WhatsApp', company.get('whatsapp', '')), ('Correo', company.get('support_email', '')), ('Sitio web', web)) if v]
+    yy = top + 4
+    for name, value in contact:
+        label(name, cx, yy)
+        for piece in field_lines(value, cw, 8.2, 2):
+            yy += 9.6
+            doc.text(piece, cx, yy, 8.2, False, INK)
+        yy += 12.5
+    rows = [('N.º', p['code'] + (' · v%d' % p['version'] if p['version'] > 1 else '')), ('Emisión', _d(p['issue_date'])), ('Vence', _d(p['valid_until'])), ('Estado', p['status_label'])]
+    if invoice:
+        rows.append(('Factura', invoice['number'] or 'en borrador'))
+    bh = 38 + 15 * len(rows) + 4
     doc.rounded(bx, top, bw, bh, 7, fill=PANEL, stroke=ds.LINE)
     doc.rounded(bx, top, bw, 30, 7, fill=ds.NAVY, stroke=None)
-    doc.rect(bx, top + 22, bw, 8, fill=ds.NAVY, stroke=None)  # esquinas inferiores rectas de la franja
+    doc.rect(bx, top + 22, bw, 8, fill=ds.NAVY, stroke=None)
     doc.text('PROFORMA', bx + 12, top + 8, 13.5, True, ds.WHITE)
     doc.right('COTIZACIÓN', bx + bw - 12, top + 12, 6.8, True, (.75, .82, .92))
     ry = top + 40
     for name, value in rows:
         doc.text(name, bx + 12, ry, 8, False, LABEL)
-        doc.right(value, bx + bw - 12, ry - .5, 9, True, ds.NAVY if name == 'N.º' else INK)
+        doc.right(doc.wrap(value, bw - 70, 8.8)[0], bx + bw - 12, ry - .5, 8.8, True, ds.NAVY if name in ('N.º', 'Estado', 'Factura') else INK)
         ry += 15
-    y = top + max(logo_h, bh, yy - top) + 8
+    y = top + max(logo_h + 4, bh, yy - top) + 8
     doc.hline(L, y, W, ds.NAVY, 1.6)
     y += 12
-    # ---- Cliente: tarjeta gris clara a dos columnas, con el nombre destacado.
-    half = (W - 28) / 2
-    addr = doc.wrap(p['client_address'] or '—', half - 4, 8.8)[:2]
-    ch = 84 + 11 * max(0, len(addr) - 1)
+    # ---- Cliente: tarjeta que crece con el contenido (nombre, identificación, teléfonos, dirección y correo).
+    pad = 14
+    half = (W - 2 * pad - 16) / 2
+    col2 = L + pad + half + 16
+    name_lines = field_lines(p['client_name'] or '—', W - 2 * pad, 11.5, 2)
+    left = [('Cédula o RUC', [p['client_identification'] or '—']), ('Teléfono' if len(phones(p['client_phone'])) < 2 else 'Teléfonos', [' · '.join(phones(p['client_phone'])) or '—'])]
+    right = [('Dirección', [p['client_address'] or '—']), ('Correo electrónico', [p['client_email'] or '—'])]
+    left = [(k, field_lines(v[0], half, 8.8, 2)) for k, v in left]
+    right = [(k, field_lines(v[0], half, 8.8, 3 if k == 'Dirección' else 2)) for k, v in right]
+    row_h = [max(9 + 11 * len(left[i][1]), 9 + 11 * len(right[i][1])) + 9 for i in range(2)]
+    ch = 12 + 9 + 13.5 * len(name_lines) + 8 + sum(row_h) + 4
     doc.rounded(L, y, W, ch, 7, fill=PANEL, stroke=ds.LINE)
-    label('Cliente', L + 14, y + 11, ds.NAVY)
-    doc.text(doc.wrap(p['client_name'], W - 28, 11.5)[0], L + 14, y + 23, 11.5, True, ds.NAVY)
-    col2 = L + 14 + half + 14
-    yy = y + 44
-    for (name, value), x in ((('Cédula o RUC', p['client_identification'] or '—'), L + 14), (('Dirección', None), col2)):
-        label(name, x, yy)
-        if value is None:
-            for i, piece in enumerate(addr):
-                doc.text(piece, x, yy + 10 + i * 11, 8.8)
-        else:
-            doc.text(value, x, yy + 10, 8.8)
-    yy += 26 + 11 * max(0, len(addr) - 1)
-    for (name, value), x in ((('Teléfono', p['client_phone'] or '—'), L + 14), (('Correo electrónico', p['client_email'] or '—'), col2)):
-        label(name, x, yy)
-        doc.text(doc.wrap(value, half - 4, 8.8)[0], x, yy + 10, 8.8)
+    label('Cliente', L + pad, y + 12, ds.NAVY)
+    yy = y + 24
+    for piece in name_lines:
+        doc.text(piece, L + pad, yy, 11.5, True, ds.NAVY)
+        yy += 13.5
+    yy += 6
+    for i in range(2):
+        for x, (k, v) in ((L + pad, left[i]), (col2, right[i])):
+            label(k, x, yy)
+            for j, piece in enumerate(v):
+                doc.text(piece, x, yy + 9.5 + j * 11, 8.8)
+        yy += row_h[i]
     y += ch + 12
     # ---- Productos y servicios.
     rows_ = [{'code': i.get('code') or '—', 'desc': i['description'], 'qty': str(i['quantity']), 'unit': usd(i['unit_cents']),
@@ -689,7 +722,7 @@ def pdf(c, pid, now, staff_url=''):
     cols = [('Código', 52, 'l', 'code', True), ('Descripción', W - 52 - 34 - 62 - 56 - 32 - 66, 'l', 'desc', True), ('Cant.', 34, 'c', 'qty', False),
             ('P. unitario', 62, 'r', 'unit', False), ('Descuento', 56, 'r', 'disc', False), ('IVA', 32, 'c', 'tax', False), ('Total', 66, 'r', 'total', False)]
     y = doc.table(cols, rows_, y, continuation, left=L, width=W, bottom=bottom, size=8.7, head_h=19, pad=7)
-    # ---- Información comercial (izquierda) y panel de totales (derecha).
+    # ---- Información comercial (izquierda) y totales con anticipos (derecha).
     warranty = []
     try:
         import inventory_center
@@ -701,7 +734,8 @@ def pdf(c, pid, now, staff_url=''):
                                                                                    + ([('fabricante ' + inventory_center.period_label(w[2], w[3]))] if w[2] else []))))
     except Exception:
         warranty = []
-    info = [('Forma de pago', p['payment_label']), ('Vence', 'Oferta válida hasta el %s' % _d(p['valid_until']))]
+    state = p['status_label'] + (' · factura %s' % invoice['number'] if invoice and invoice.get('number') else ' · factura en borrador' if invoice else '')
+    info = [('Estado', state), ('Forma de pago', p['payment_label']), ('Vigencia', 'Oferta válida hasta el %s' % _d(p['valid_until']))]
     f = p['financing']
     if f:
         info.append(('Financiamiento', '%s %s · %d %s · %d cuotas de %s (total %s). El interés lo cobra el banco emisor.' % (
@@ -709,21 +743,24 @@ def pdf(c, pid, now, staff_url=''):
     account = d['bank_account']
     if account:
         info.append(('Depósito', '%s · %s %s · %s' % (account['bank'], account['type_label'], account['number'], account['holder'])))
-    if d['paid_cents']:
-        info.append(('Anticipos', '%s recibido · saldo %s' % (usd(d['paid_cents']), usd(d['balance_cents']))))
     info.append(('Garantía', '; '.join(warranty) if warranty else 'Según las políticas comerciales vigentes de PC-DOCTOR.'))
     if p['notes']:
         info.append(('Observaciones', re.sub(r'\s+', ' ', p['notes'])[:400]))
-    tw = 200
+    tw = 206
     iw = W - tw - 16
     wrapped = [(k, doc.wrap(v, iw - 104, 8.6)[:4]) for k, v in info]
     ih = 30 + sum(11 * len(v) + 6 for k, v in wrapped)
     gross = sum(i['quantity'] * i['unit_cents'] for i in items)
     base_taxed = sum(line_amounts(i, rate)['base_cents'] for i in items if i['taxed'])
     base_zero = sum(line_amounts(i, rate)['base_cents'] for i in items if not i['taxed'])
-    lines = [('Subtotal (IVA incluido)', usd(gross)), ('Descuentos', ('-' + usd(t['discount_cents'])) if t['discount_cents'] else usd(0)),
-             ('Base imponible ' + pct + ' %', usd(base_taxed))] + ([('Base imponible 0 %', usd(base_zero))] if base_zero else []) + [('IVA ' + pct + ' %', usd(t['tax_cents']))]
-    th = 14 + 16 * len(lines) + 40
+    live = [a for a in d['advances'] if not a['voided_at']]
+    confirmed = sum(a['amount_cents'] for a in live if a.get('transfer_status') in (None, '', 'confirmado', 'conciliado'))
+    pending = sum(a['amount_cents'] for a in live) - confirmed
+    group1 = [('Suma de partidas (IVA incluido)', usd(gross)), ('Descuentos', ('-' + usd(t['discount_cents'])) if t['discount_cents'] else usd(0))]
+    group2 = [('Base imponible ' + pct + ' %', usd(base_taxed))] + ([('Base imponible 0 %', usd(base_zero))] if base_zero else []) + [('IVA ' + pct + ' %', usd(t['tax_cents']))]
+    group3 = [('Anticipos confirmados', usd(confirmed))] + ([('Anticipos por verificar', usd(pending))] if pending else []) + \
+             [('Saldo pendiente', usd(max(0, t['total_cents'] - confirmed - pending)))]
+    th = 12 + 15 * len(group1) + 8 + 15 * len(group2) + 4 + 34 + 10 + 15 * len(group3) + 4
     y = room(y + 8, max(ih, th))
     doc.rounded(L, y, iw, ih, 7, fill=None, stroke=ds.LINE)
     label('Información comercial', L + 14, y + 11, ds.NAVY)
@@ -731,49 +768,71 @@ def pdf(c, pid, now, staff_url=''):
     for k, v in wrapped:
         doc.text(k, L + 14, yy, 8.2, True, LABEL)
         for i, piece in enumerate(v):
-            doc.text(piece, L + 104, yy + i * 11, 8.6)
+            doc.text(piece, L + 104, yy + i * 11, 8.6, k == 'Estado', ds.NAVY if k == 'Estado' else INK)
         yy += 11 * len(v) + 6
     tx = R - tw
     doc.rounded(tx, y, tw, th, 7, fill=PANEL, stroke=ds.LINE)
-    yy = y + 14
-    for k, v in lines:
-        doc.text(k, tx + 12, yy, 8.6, False, INK)
-        doc.right(v, tx + tw - 12, yy, 8.8)
-        yy += 16
-    doc.rounded(tx, y + th - 34, tw, 34, 7, fill=ds.NAVY, stroke=None)
-    doc.rect(tx, y + th - 34, tw, 8, fill=ds.NAVY, stroke=None)
-    doc.text('TOTAL GENERAL', tx + 12, y + th - 22, 9, True, ds.WHITE)
-    doc.right(usd(t['total_cents']), tx + tw - 12, y + th - 25, 15, True, ds.WHITE)
+    yy = y + 12
+    for k, v in group1:
+        doc.text(k, tx + 12, yy, 8.4, False, INK)
+        doc.right(v, tx + tw - 12, yy, 8.7)
+        yy += 15
+    doc.hline(tx + 12, yy - 3, tw - 24)
+    yy += 5
+    for k, v in group2:
+        doc.text(k, tx + 12, yy, 8.4, False, INK)
+        doc.right(v, tx + tw - 12, yy, 8.7)
+        yy += 15
+    yy += 2
+    doc.rect(tx, yy, tw, 34, fill=ds.NAVY, stroke=None)
+    doc.text('TOTAL GENERAL', tx + 12, yy + 12, 9, True, ds.WHITE)
+    doc.right(usd(t['total_cents']), tx + tw - 12, yy + 9, 15, True, ds.WHITE)
+    yy += 34 + 10
+    for k, v in group3:
+        bold = k == 'Saldo pendiente'
+        doc.text(k, tx + 12, yy, 8.4, bold, ds.NAVY if bold else INK)
+        doc.right(v, tx + tw - 12, yy, 8.8, bold, ds.NAVY if bold else INK)
+        yy += 15
     y += max(ih, th) + 10
-    # ---- Identificación y consulta: Code 128 con el código único y QR (solo en la copia interna, con enlace funcional).
+    # ---- Identificación y consulta: Code 128 con el código único y QR solo en la copia interna (enlace que exige sesión).
     y = room(y, 70)
     doc.rounded(L, y, W, 64, 7, fill=None, stroke=ds.LINE)
     label('Identificación de la proforma', L + 14, y + 9, ds.NAVY)
     doc.barcode(p['code'], L + 8, y + 19, 200, 28)
     doc.center(p['code'], L + 108, y + 50, 8.8, True, ds.NAVY)
-    note_x = L + 230
-    for i, piece in enumerate(doc.wrap('Código único de esta proforma: identifícala en Órdenes Pro escaneando el código de barras%s.' % (' o el QR' if staff_url else ''), (R - 90 if staff_url else R - 14) - note_x, 8.2)[:3]):
+    note_x = L + 228
+    text = ('Escanee el código de barras para identificar esta proforma, o el QR para abrirla en Órdenes Pro (requiere iniciar sesión).' if staff_url
+            else 'Escanee el código de barras para identificar esta proforma en PC-DOCTOR.')
+    for i, piece in enumerate(doc.wrap(text, (R - 84 if staff_url else R - 14) - note_x, 8.2)[:3]):
         doc.text(piece, note_x, y + 20 + i * 11, 8.2, False, GRAY)
     if staff_url:
         doc.qr(staff_url, R - 66, y + 3, 50)
         doc.center('Consultar proforma', R - 41, y + 53, 6.6, True, LABEL)
     y += 64 + 12
-    # ---- Condiciones comerciales numeradas.
+    # ---- Condiciones comerciales: numeración alineada; una condición larga continúa en la página siguiente.
     clauses = quotes.clauses(p['conditions'])
     if clauses:
         y = room(y, 40)
         label('Condiciones comerciales', L, y, ds.NAVY)
         y += 14
+        if p['status'] == 'convertida' and invoice:
+            note = 'Esta proforma ya fue convertida en la factura %s; las condiciones se conservan como fueron aceptadas.' % (invoice['number'] or 'en borrador')
+            for piece in doc.wrap(note, W, 8.4):
+                y = room(y, 12.5)
+                doc.text(piece, L, y, 8.4, True, ds.NAVY)
+                y += 12.5
+            y += 4
+        size, lead = 8.8, 12.6
         for n, (title, body) in enumerate(clauses, 1):
             head = re.sub(r'^\d+[.)]\s*', '', (title or '').strip()).rstrip('.')
-            number = '%d.' % n
-            text = (head + '. ' if head else '') + body
-            pieces = doc.wrap(text, W - 18, 8.4)
-            y = room(y, 11 * len(pieces) + 4)
-            doc.text(number, L, y, 8.4, True, ds.NAVY)
-            for i, piece in enumerate(pieces):
-                doc.text(piece, L + 18, y + i * 11, 8.4, False, INK)
-            y += 11 * len(pieces) + 4
+            pieces = doc.wrap((head + '. ' if head else '') + body, W - 22, size)
+            y = room(y, lead * min(2, len(pieces)))
+            doc.right('%d.' % n, L + 14, y, size, True, ds.NAVY)
+            for piece in pieces:
+                y = room(y, lead)
+                doc.text(piece, L + 22, y, size, False, INK)
+                y += lead
+            y += 3
     if d['acceptance']:
         a = d['acceptance']
         y = room(y + 6, 14)

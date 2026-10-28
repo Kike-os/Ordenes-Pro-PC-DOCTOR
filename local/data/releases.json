@@ -8,6 +8,27 @@
   },
   "releases": [
     {
+      "version": "1.5.214",
+      "date": "2026-10-28T08:32:30-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Proforma PDF con distribución dinámica, estados y anticipos correctos",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Proforma PDF: totales con suma de partidas (IVA incluido), descuentos, base imponible e IVA separados; panel de anticipos confirmados, por verificar y saldo pendiente; condiciones más legibles con numeración alineada que continúan en otra página si hace falta."
+        ],
+        "fixes": [
+          "Proforma PDF: la tarjeta del cliente crece con su contenido (nombres largos, direcciones de varias líneas, correos largos) y ningún dato sobresale; el encabezado no muestra etiquetas vacías y separa dirección, teléfono, correo y sitio web reales.",
+          "Proforma PDF: estado dinámico con la factura vinculada cuando está convertida y una nota que evita la contradicción con las condiciones; teléfonos separados cuando vienen con separador (las cifras pegadas solo se dividen si es inequívoco, sin modificar el dato)."
+        ],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Kike-os (administración): «Actualiza a la versión siguiente con las mejoras apli"
+    },
+    {
       "version": "1.5.213",
       "date": "2026-10-28T08:01:35-05:00",
       "type": "patch",
