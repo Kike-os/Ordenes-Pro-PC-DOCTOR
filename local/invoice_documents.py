@@ -345,9 +345,8 @@ def ride_pdf(c, invoice_id):
     def continuation():
         doc.page()
         y = warning(14)
-        doc.logo(left, y, 46)
-        doc.text(ds.TRADE_NAME, left + 56, y + 4, 12, True, ds.NAVY)
-        doc.text('Factura No. %s · R.U.C. %s · continuación' % (inv['number'], s['ruc'] or '—'), left + 56, y + 20, 8.5, False, GRAY)
+        doc.logo(left, y - 4, 52)
+        doc.text('Factura No. %s · R.U.C. %s · continuación' % (inv['number'], s['ruc'] or '—'), left + 64, y + 12, 9, True, ds.NAVY)
         doc.hline(left, y + 40, right - left, ds.NAVY, 1)
         return y + 52
 
@@ -357,12 +356,10 @@ def ride_pdf(c, invoice_id):
     # Emisor (izquierda).
     ew = 250
     doc.rect(left, top, ew, 214)
-    doc.logo(left + 12, top + 10, 84)
-    doc.text(ds.TRADE_NAME, left + 106, top + 14, 17, True, ds.NAVY)
-    if s['trade_name'] and s['trade_name'].strip().upper() != ds.TRADE_NAME:
-        doc.text('Nombre comercial: ' + doc.wrap(s['trade_name'], 150, 7.5)[0], left + 106, top + 36, 7.5, False, GRAY)
-    yy = top + 84
-    rows = [('', s['legal_name'] or 'Razón social sin configurar', True, 9), ('Dirección matriz: ', s['head_office_address'], False, 8),
+    logo_h = doc.logo(left + 12, top + 10, 116)  # el logo original ya muestra el nombre comercial
+    yy = top + 18 + logo_h
+    rows = [('', s['legal_name'] or 'Razón social sin configurar', True, 9),
+            ('Nombre comercial: ', s['trade_name'] if s['trade_name'] and s['trade_name'].strip().upper() != ds.TRADE_NAME else '', False, 8), ('Dirección matriz: ', s['head_office_address'], False, 8),
             ('Dirección establecimiento: ', s['branch_address'], False, 8), ('Contribuyente especial Nro.: ', s['special_taxpayer'], False, 8),
             ('OBLIGADO A LLEVAR CONTABILIDAD: ', s['keeps_accounts'] or '—', False, 8), ('', sri_xml.RIMPE_LEGENDS.get(s['regime'], ''), True, 8),
             ('Agente de Retención Resolución No. ', s['withholding_agent'], False, 8)]

@@ -606,9 +606,8 @@ def pdf(c, pid, now, staff_url=''):
 
     def continuation():
         doc.page()
-        doc.logo(left, 26, 46)
-        doc.text(ds.TRADE_NAME, left + 56, 30, 12, True, ds.NAVY)
-        doc.text('Proforma %s · continuación' % p['code'], left + 56, 46, 8.5, False, GRAY)
+        doc.logo(left, 22, 52)
+        doc.text('Proforma %s · continuación' % p['code'], left + 64, 38, 9, True, ds.NAVY)
         doc.hline(left, 66, right - left, ds.NAVY, 1)
         return 78
 

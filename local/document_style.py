@@ -96,11 +96,10 @@ class Doc:
 
     # Bloques compartidos.
     def brand(self, x, y, lines):
-        """Logo original y nombre comercial con los datos de contacto; devuelve la altura usada."""
-        h = self.logo(x, y, 92)
-        tx = x + 104
-        self.text(TRADE_NAME, tx, y + 2, 19, True, NAVY)
-        yy = y + 26
+        """Logo original (ya incluye el nombre comercial) con los datos de contacto al lado; devuelve la altura usada."""
+        h = self.logo(x, y, 112)
+        tx = x + 126
+        yy = y + max(4, (h - 10.5 * len(lines)) / 2)
         for value, bold in lines:
             for piece in self.wrap(value, 210, 8)[:2]:
                 self.text(piece, tx, yy, 8, bold, INK if bold else GRAY)
