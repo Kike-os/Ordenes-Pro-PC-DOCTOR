@@ -4,6 +4,21 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.215 — 2026-10-30 07:21 (UTC-05:00)
+
+Centro profesional de seguimiento técnico y comunicación con el cliente en cada orden
+
+### Nuevas funcionalidades
+
+- Centro de seguimiento de la orden: nuevo formulario con 16 tipos de seguimiento, fecha y técnico automáticos, estado actual, prioridad, próxima acción y fecha, presupuesto relacionado y evidencias (fotos y PDF), separando lo interno del taller de lo visible para el cliente.
+- Historial de la orden como línea de tiempo con filtros por categoría (estados, técnicos, autorizaciones, comunicación, incidencias y pagos), búsqueda, vista detallada, colores e iconos por tipo, y acciones de preparar mensaje y corregir.
+- Preparar mensaje al cliente con plantillas y datos reales (cliente, orden, equipo, novedad autorizada, presupuesto y enlace de seguimiento); envío por correo (Mail Pro), por WhatsApp Business cuando esté configurado o apertura manual de WhatsApp.
+- El enlace público de seguimiento muestra «Novedades del servicio» solo con los mensajes marcados como visibles; la nota interna nunca se publica ni se envía.
+
+### Actualizaciones de seguridad
+
+- Un mensaje copiado o abierto en WhatsApp queda como «preparado», nunca como enviado; entregado y leído solo con el aviso firmado de WhatsApp. Seguimientos, evidencias y mensajes son inmutables (las correcciones se registran aparte) y sin envíos duplicados.
+
 ## v1.5.214 — 2026-10-28 08:32 (UTC-05:00)
 
 Proforma PDF con distribución dinámica, estados y anticipos correctos

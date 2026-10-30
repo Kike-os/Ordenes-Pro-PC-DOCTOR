@@ -379,6 +379,40 @@ def invoice_autosend(c,invoice_id,user,now):
         return {'sent':False,'error':str(error)}
 
 
+def order_tracking_active(c,oid):
+    import order_tracking
+    return order_tracking.active(c,oid)
+
+
+def order_followup_mail(c,oid,data,user,now):
+    """Actualización técnica por correo (Mail Pro): texto preparado, evidencias VISIBLES para el cliente elegidas y, si se pide, el PDF del
+    presupuesto. «enviado» = aceptado por el servidor de correo; queda en el historial de mensajes y en el archivo de correo de la orden."""
+    import order_followups
+    order=order_followups._order(c,oid)
+    to=str(data.get('recipient','') or order['email'] or '').strip()
+    if not re.fullmatch(r'[^\s@<>]+@[^\s@<>.]+(\.[^\s@<>.]+)+',to):return 400,{'error':'El cliente no tiene un correo válido.','fields':{'recipient':'Correo no válido.'}}
+    if not mail_pro.configured():return 409,{'error':'El correo no está configurado en Mail Pro.'}
+    key=str(data.get('request_key','') or '')[:64]
+    same=c.execute('SELECT * FROM order_messages WHERE request_key=?',(key,)).fetchone() if key else None
+    if same and same['status']!='error':return 200,{'ok':True,'message':dict(same),'duplicate':True}
+    ids=[int(x) for x in str(data.get('file_ids','') or '').split(',') if x.isdigit()][:3]
+    files=[]
+    for fid in ids:
+        row=c.execute('SELECT name,mime,data FROM order_followup_files WHERE id=? AND order_id=? AND visible_to_client=1',(fid,oid)).fetchone()
+        if not row:return 400,{'error':'Solo se envían evidencias marcadas como visibles para el cliente.'}
+        files.append({'name':row['name'],'type':row['mime'],'data':row['data']})
+    body=str(data.get('body','') or '').strip()[:4000]
+    if len(body)<10:return 400,{'error':'Escribe el mensaje para el cliente.'}
+    subject='PC-DOCTOR · Orden %s · %s'%(order['code'],order_followups.TEMPLATES.get(str(data.get('template','')),'Actualización de su servicio'))
+    try:
+        send_institutional(c,'seguimiento',subject,to,subject,body,oid,user['id'],attachments=files,review=False)
+        row,_=order_followups.record(c,oid,dict(data,channel='correo'),user,now,'enviado',recipient=to)
+    except mail_pro.MailError as error:
+        row,_=order_followups.record(c,oid,dict(data,channel='correo'),user,now,'error',error=str(error),recipient=to)
+    c.commit();audit(c,user['id'],'order_followup_mail',oid)
+    return (200 if row['status']=='enviado' else 502),{'ok':row['status']=='enviado','message':row,'error':row['error']}
+
+
 def send_receipt_mail(c,oid,user,mode):
     """Envía por SMTP el comprobante A4 (con las Políticas de Reparaciones) al correo del cliente y registra el resultado.
 
@@ -1316,6 +1350,10 @@ class Handler(BaseHTTPRequestHandler):
                     return self.reply(200,client_authorization.render_pdf(found),'application/pdf',filename=document['code']+'-AUTORIZACION.pdf')
                 return self.reply(200,client_authorization.start_page(c,authorize_page[1],found,document),'text/html; charset=utf-8')
             # Seguimiento público por enlace aleatorio: respuesta idéntica para enlaces inexistentes o revocados.
+            if path=='/api/public/whatsapp/webhook':
+                import order_followups
+                answer=order_followups.webhook_verify({k:v[0] for k,v in parse_qs(urlsplit(self.path).query).items()})
+                return self.reply(200,answer,'text/plain; charset=utf-8') if answer is not None else self.reply(403,{'error':'No autorizado.'})
             tracking_page=re.fullmatch(r'/s/([A-Za-z0-9_-]{1,64})(/qr\.svg|/barcode\.svg)?',path)
             if tracking_page:
                 import order_tracking
@@ -1551,6 +1589,24 @@ class Handler(BaseHTTPRequestHandler):
                 history=[dict(r) for r in c.execute("SELECT o.id,COALESCE(o.code,'OP-'||printf('%05d',o.id)) code,o.created_at,o.received_at,o.delivered_at,o.status status_code,s.label status,o.problem,o.findings,o.recommendations,COALESCE((SELECT name FROM users WHERE id=o.assigned_to),'Sin asignar') responsible FROM orders o JOIN statuses s ON s.code=o.status WHERE o.device_id=? ORDER BY o.id DESC LIMIT 200",(device['id'],))]
                 same=[dict(r) for r in c.execute("SELECT x.id,x.brand,x.model,x.serial,cl.name client,(SELECT COUNT(*) FROM orders o WHERE o.device_id=x.id) orders FROM devices x JOIN clients cl ON cl.id=x.client_id WHERE x.id!=? AND ?!='' AND lower(TRIM(COALESCE(x.serial,'')))=lower(?) ORDER BY x.id LIMIT 20",(device['id'],(device['serial'] or '').strip(),(device['serial'] or '').strip()))]
                 return self.reply(200,{'device':device,'history':history,'duplicates':same,'summary':{'orders':len(history),'delivered':sum(1 for h in history if h['status_code']=='entregado'),'open':sum(1 for h in history if h['status_code']!='entregado'),'first':history[-1]['created_at'] if history else None,'last':history[0]['created_at'] if history else None}})
+            followups_get=re.fullmatch(r'/api/orders/([0-9]+)/followups(?:/files/([0-9]+))?',path)
+            if followups_get:
+                import order_followups,quotes as quotes_mod  # alias: un «import quotes» aquí ocultaría el módulo en todo do_GET
+                if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
+                oid=int(followups_get[1])
+                try:
+                    if followups_get[2]:
+                        name,mime,raw=order_followups.file_for(c,oid,int(followups_get[2]))
+                        return self.reply(200,raw,mime,filename=name)
+                    order=order_followups._order(c,oid)
+                    data=order_followups.listing(c,oid)
+                    try:versions=quotes_mod.for_order(c,oid)['versions']
+                    except Exception:versions=[]
+                    data.update(order={'id':oid,'code':order['code'],'status':order['status'],'status_label':order['status_label'],'client':order['client'],'email':order['email'] or '','phone':order['phone'] or ''},
+                                quotes=[{'id':v['id'],'code':v['code'],'status_label':v['status_label'],'quoted_cents':v.get('quoted_cents',0)} for v in versions],tracking=order_tracking_active(c,oid),
+                                mail=mail_pro.configured())
+                    return self.reply(200,data)
+                except order_followups.FollowupError as error:return self.reply(error.status,{'error':str(error)})
             client_detail=re.fullmatch(r'/api/clients/([0-9]+)',path)
             if client_detail:
                 row=c.execute('SELECT * FROM clients WHERE id=?',(int(client_detail[1]),)).fetchone()
@@ -2437,6 +2493,16 @@ class Handler(BaseHTTPRequestHandler):
         return self.reply(404, {'error':'Recurso no disponible.'})
 
     def do_POST(self):
+        if urlsplit(self.path).path=='/api/public/whatsapp/webhook':
+            # Avisos de entrega y lectura de WhatsApp Business: solo cuentan con la firma de Meta (X-Hub-Signature-256).
+            import order_followups
+            try:length=int(self.headers.get('Content-Length','0') or 0)
+            except ValueError:length=0
+            if length<=0 or length>200000:return self.reply(400,{'error':'Solicitud inválida.'})
+            raw=self.rfile.read(length)
+            with connect() as c:
+                changed=order_followups.webhook_status(c,raw,self.headers.get('X-Hub-Signature-256',''),reception_now());c.commit()
+            return self.reply(200,{'ok':True,'changed':changed})
         optout_post=re.fullmatch(r'/baja/([A-Za-z0-9_-]{16,64})',urlsplit(self.path).path)
         if optout_post:
             import campaigns
@@ -2594,7 +2660,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(403, {'error':'Solicitud no autorizada.'})
             path = urlsplit(self.path).path
             workspace_post=bool(re.fullmatch(r'/api/orders/[0-9]+/workspace',path));quote_json=bool(re.fullmatch(r'/api/quotes/[0-9]+',path))
-            max_body=1700000 if path in ('/api/cash/upload','/api/files/upload') else 65536 if path.startswith('/api/proformas') or path.startswith('/api/caja/') or re.fullmatch(r'/api/orders/[0-9]+/payments',path) or path=='/api/credit-notes' else 9000000 if path in ('/api/clients/import/preview','/api/clients/import/commit','/api/inventory/import/preview','/api/inventory/import/commit') else 200000 if path in ('/api/inventory/register','/api/invoicing/policies') else 1700000 if path=='/api/public/adi/listen' else 6000000 if path in ('/api/mail/send','/api/mail/draft') else 100000 if path in ('/api/conditions','/api/order-draft','/api/conditions/draft','/api/conditions/compare') else 3200000 if path in ('/api/licenses/new','/api/licenses/units','/api/licenses/units/bulk','/api/licenses/check','/api/licenses/products','/api/licenses/products/duplicate','/api/licenses/sales') or re.fullmatch(r'/api/licenses/sales/[0-9]+',path) else 900000 if re.fullmatch(r'/api/orders/[0-9]+/photos',path) or path in ('/api/profile/photo','/api/mail/signature') or re.fullmatch(r'/api/catalog/[0-9]+/image',path) else (65536 if workspace_post or quote_json else 16384)
+            max_body=3900000 if re.fullmatch(r'/api/orders/[0-9]+/followups',path) else 1700000 if path in ('/api/cash/upload','/api/files/upload') else 65536 if path.startswith('/api/proformas') or path.startswith('/api/caja/') or re.fullmatch(r'/api/orders/[0-9]+/payments',path) or path=='/api/credit-notes' else 9000000 if path in ('/api/clients/import/preview','/api/clients/import/commit','/api/inventory/import/preview','/api/inventory/import/commit') else 200000 if path in ('/api/inventory/register','/api/invoicing/policies') else 1700000 if path=='/api/public/adi/listen' else 6000000 if path in ('/api/mail/send','/api/mail/draft') else 100000 if path in ('/api/conditions','/api/order-draft','/api/conditions/draft','/api/conditions/compare') else 3200000 if path in ('/api/licenses/new','/api/licenses/units','/api/licenses/units/bulk','/api/licenses/check','/api/licenses/products','/api/licenses/products/duplicate','/api/licenses/sales') or re.fullmatch(r'/api/licenses/sales/[0-9]+',path) else 900000 if re.fullmatch(r'/api/orders/[0-9]+/photos',path) or path in ('/api/profile/photo','/api/mail/signature') or re.fullmatch(r'/api/catalog/[0-9]+/image',path) else (65536 if workspace_post or quote_json else 16384)
             length = int(self.headers.get('Content-Length', '0'))
             if length <= 0 or length > max_body:
                 return self.reply(400, {'error':'Solicitud inválida.'})
@@ -3898,6 +3964,31 @@ class Handler(BaseHTTPRequestHandler):
                     pid=c.execute('INSERT INTO order_photos(order_id,position,is_main,mime,size,data,created_by,created_at) VALUES (?,?,?,?,?,?,?,?)',(oid,position,1 if main else 0,'image/jpeg',len(content),base64.b64encode(content).decode('ascii'),user['id'],reception_now().isoformat(timespec='seconds'))).lastrowid
                     audit(c,user['id'],'order_photo_added',oid)
                     return self.reply(201,{'ok':True,'id':pid})
+                followup_post=re.fullmatch(r'/api/orders/([0-9]+)/(followups|messages)',path)
+                if followup_post:
+                    import order_followups
+                    oid=int(followup_post[1]);now=reception_now()
+                    if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
+                    try:
+                        if followup_post[2]=='followups':
+                            c.commit();c.execute('BEGIN IMMEDIATE');fid=order_followups.create(c,oid,data,user,now);audit(c,user['id'],'order_followup',oid);c.commit()
+                            return self.reply(201,{'ok':True,'id':fid})
+                        action=str(data.get('action',''))
+                        if action=='compose':
+                            link=order_tracking_active(c,oid)
+                            return self.reply(200,{'body':order_followups.compose(c,oid,str(data.get('template','')),int(data['followup_id']) if str(data.get('followup_id','')).isdigit() else None,link['url'] if link['active'] else '')})
+                        if action=='prepare':
+                            # Abrir WhatsApp a mano o copiar el texto: queda «preparado», nunca «enviado».
+                            row,dup=order_followups.record(c,oid,dict(data,channel='whatsapp_manual' if data.get('channel')=='whatsapp_manual' else 'copia'),user,now,'preparado');c.commit()
+                            return self.reply(200,{'ok':True,'message':row,'duplicate':dup})
+                        if action=='whatsapp':
+                            row,dup=order_followups.send_whatsapp(c,oid,data,user,now);c.commit();audit(c,user['id'],'order_whatsapp',oid)
+                            return self.reply(200 if row['status']!='error' else 502,{'ok':row['status']!='error','message':row,'duplicate':dup,'error':row['error']})
+                        if action=='email':
+                            return self.reply(*order_followup_mail(c,oid,data,user,now))
+                        return self.reply(400,{'error':'Acción inválida.'})
+                    except order_followups.FollowupError as error:
+                        c.rollback();return self.reply(error.status,{'error':str(error),'fields':error.fields})
                 follow_route=re.fullmatch(r'/api/orders/([0-9]+)/follow-up',path)
                 if follow_route:
                     oid=int(follow_route[1]);comment=str(data.get('comment','')).strip()

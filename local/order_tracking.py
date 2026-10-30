@@ -48,8 +48,13 @@ def lookup(c,token):
         except (TypeError,ValueError):return ''
     received=stamp(row['received_at']) or datetime.fromtimestamp(row['created_at'],ECUADOR_TZ).strftime('%d/%m/%Y %H:%M')
     kind=row['category'] or row['type']
+    try:
+        import order_followups
+        updates=[dict(u,at=stamp(u['at'])) for u in order_followups.public_updates(c,row['id'])]
+    except Exception:
+        updates=[]  # base anterior al centro de seguimiento
     return {'id':row['id'],'code':row['code'] or 'OP-%05d'%row['id'],'status':row['status'],'status_label':row['status_label'],'received':received,'updated':stamp(row['updated_at']),
-            'device':' · '.join(filter(None,[DEVICE_TYPES.get(kind,''),' '.join(filter(None,[row['brand'],row['model']]))]))}
+            'device':' · '.join(filter(None,[DEVICE_TYPES.get(kind,''),' '.join(filter(None,[row['brand'],row['model']]))])),'updates':updates}
 
 
 HEAD='<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><meta name="robots" content="noindex,nofollow"><title>%s | PC-DOCTOR S.A.</title><link rel="icon" href="/favicon.ico?v=2" sizes="48x48"><link rel="stylesheet" href="/static/tracking.css"></head><body><main class="tracking-page"><header><img src="/static/logo-original.png" alt="PC-DOCTOR S.A." width="150"><p>%s</p></header>'
@@ -79,6 +84,10 @@ def card(data,qr_src,public):
     icons={'Cliente':'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z','Equipo':'M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v9H4zM2 19h20','Fecha de ingreso':'M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z','Última actualización':'M12 6v6l4 2M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0z','Técnico responsable':'M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z'}
     icon=lambda label:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="%s"/></svg>'%icons[label] if label in icons else ''
     rows=''.join('<div>%s<span><dt>%s</dt><dd>%s</dd></span></div>'%(icon(label),e(label),e(value)) for label,value in facts)
+    # Novedades: solo los mensajes que el técnico marcó como visibles para el cliente (la nota interna del taller nunca se publica).
+    if data.get('updates'):
+        rows+='</dl><section class="ticket-updates" aria-label="Novedades del servicio"><h2>Novedades del servicio</h2><ol>'+''.join(
+            '<li><time>%s</time><strong>%s</strong><p>%s</p></li>'%(e(u['at']),e(u['label']),e(u['message']).replace('\n','<br>')) for u in data['updates'])+'</ol></section><dl class="ticket-facts" hidden>'
     code=data['code']
     try:bars=barcode128.svg(code,color='#0b1526',background='#ffffff')
     except barcode128.BarcodeError:bars=''
