@@ -8,11 +8,11 @@ Cada orden tiene un centro de seguimiento (desde la 1.5.215) y una ventana **«C
 - Separa siempre dos clases de información:
   - **Solo para el taller** (`internal_note`): nunca se publica, se copia ni se envía.
   - **Para el cliente** (`client_message` y `recommendation`): es lo único que puede comunicarse. Con «Mostrar en el enlace público» aparece además en «Novedades del servicio».
-- Los seguimientos, las evidencias y los mensajes registrados no se modifican ni se borran (lo impiden triggers de la base). Para corregir un seguimiento se registra otro que lo referencia (`corrects_id`).
+- Los seguimientos, las evidencias y los mensajes registrados no se modifican ni se borran (lo impiden triggers de la base). Para corregir un seguimiento se registra otro que lo referencia (`corrects_id`). Si la corrección cambia el texto para el cliente, el original deja de usarse en mensajes y deja de mostrarse en el enlace público; si solo corrige la nota interna, lo comunicado sigue vigente.
 
 ## Ventana «Comunicación con el cliente»
 
-Se abre con «Preparar mensaje al cliente» en el historial de la orden, o con «Preparar mensaje» en un seguimiento.
+Se abre con «Mensaje al cliente» o «Preparar mensaje al cliente» en la orden, con «Preparar mensaje» en un seguimiento y con «Contactar cliente» en Entregas. Desde la 1.5.217 reemplaza al antiguo diálogo de WhatsApp, que copiaba los hallazgos internos al mensaje y no dejaba registro.
 
 ### Qué se comunica
 
@@ -33,7 +33,7 @@ La opción «Información que desea comunicar» ofrece cuatro modos:
 
 ### Plantillas y costo
 
-Hay diez plantillas: diagnóstico técnico, novedad importante, reparación en proceso, repuesto necesario, presupuesto pendiente, solicitud de autorización, reparación terminada, pruebas realizadas, equipo listo para retirar y recordatorio de retiro.
+Hay trece plantillas: diagnóstico técnico, novedad importante, reparación en proceso, repuesto necesario, presupuesto pendiente, solicitud de autorización, reparación terminada, pruebas realizadas, equipo listo para retirar, recordatorio de retiro, recepción del equipo, estado de la orden y recordatorio de pago. Esta última muestra el saldo real de la orden, no el total del presupuesto; si no hay saldo, avisa antes de enviar.
 
 Cada borrador incluye:
 - saludo;
@@ -54,7 +54,8 @@ Cada borrador incluye:
 
 | Estado | Significado |
 | --- | --- |
-| Borrador · sin registrar | El texto está en el editor y todavía no se registró nada. |
+| Borrador · sin registrar | El texto está en el editor y todavía no se guardó ni se registró nada. |
+| Borrador guardado | «Guardar borrador» lo conserva en el servidor, uno por orden y usuario, para retomarlo después. No es una comunicación: el cliente no recibió nada. Desaparece al registrar o enviar el mensaje, o con «Descartar borrador». |
 | Preparado (copiado, no enviado) | El texto se copió de verdad al portapapeles. Si la copia falla, no se registra. |
 | Abierto en WhatsApp (manual, sin confirmación) | Se abrió `wa.me` con el número del cliente. No confirma que el mensaje se haya enviado. |
 | Enviado | WhatsApp Business devolvió el identificador del mensaje, o el servidor de correo (Mail Pro) lo aceptó. |

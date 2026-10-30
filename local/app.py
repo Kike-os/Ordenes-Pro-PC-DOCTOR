@@ -421,6 +421,7 @@ def order_followup_mail(c,oid,data,user,now):
         row=order_followups.retry(c,same['id'],'enviado','','',now) if same else order_followups.record(c,oid,dict(data,channel='correo'),user,now,'enviado',recipient=to)[0]
     except mail_pro.MailError as error:
         row=order_followups.retry(c,same['id'],'error','',str(error),now) if same else order_followups.record(c,oid,dict(data,channel='correo'),user,now,'error',error=str(error),recipient=to)[0]
+    if row['status']!='error':order_followups.draft_discard(c,oid,user)
     c.commit();audit(c,user['id'],'order_followup_mail',oid)
     return (200 if row['status']=='enviado' else 502),{'ok':row['status']=='enviado','message':row,'error':row['error']}
 
@@ -1611,7 +1612,7 @@ class Handler(BaseHTTPRequestHandler):
                         name,mime,raw=order_followups.file_for(c,oid,int(followups_get[2]))
                         return self.reply(200,raw,mime,filename=name)
                     order=order_followups._order(c,oid)
-                    data=order_followups.listing(c,oid)
+                    data=order_followups.listing(c,oid);data['draft']=order_followups.draft_for(c,oid,user)
                     try:versions=quotes_mod.for_order(c,oid)['versions']
                     except Exception:versions=[]
                     data.update(order={'id':oid,'code':order['code'],'status':order['status'],'status_label':order['status_label'],'client':order['client'],'email':order['email'] or '','phone':order['phone'] or '',
@@ -4001,13 +4002,21 @@ class Handler(BaseHTTPRequestHandler):
                             # Se registra el número al que se abrió la conversación (el del cliente si no se eligió otro).
                             manual=data.get('channel')=='whatsapp_manual';number=order_followups.ecuador_number(str(data.get('recipient','') or order_followups._order(c,oid)['phone'] or '')) if manual else ''
                             if manual and not number:return self.reply(400,{'error':'El número no es un celular válido para WhatsApp.','fields':{'recipient':'Número no válido.'}})
-                            row,dup=order_followups.record(c,oid,dict(data,channel='whatsapp_manual' if manual else 'copia'),user,now,'preparado',recipient=number);c.commit()
+                            row,dup=order_followups.record(c,oid,dict(data,channel='whatsapp_manual' if manual else 'copia'),user,now,'preparado',recipient=number);order_followups.draft_discard(c,oid,user);c.commit()
                             return self.reply(200,{'ok':True,'message':row,'duplicate':dup})
                         if action=='whatsapp':
-                            row,dup=order_followups.send_whatsapp(c,oid,data,user,now);c.commit();audit(c,user['id'],'order_whatsapp',oid)
+                            row,dup=order_followups.send_whatsapp(c,oid,data,user,now)
+                            if row['status']!='error':order_followups.draft_discard(c,oid,user)
+                            c.commit();audit(c,user['id'],'order_whatsapp',oid)
                             return self.reply(200 if row['status']!='error' else 502,{'ok':row['status']!='error','message':row,'duplicate':dup,'error':row['error']})
                         if action=='email':
                             return self.reply(*order_followup_mail(c,oid,data,user,now))
+                        if action=='draft':
+                            draft=order_followups.draft_save(c,oid,data,user,now);c.commit()
+                            return self.reply(200,{'ok':True,'draft':draft})
+                        if action=='draft_discard':
+                            order_followups.draft_discard(c,oid,user);audit(c,user['id'],'order_message_draft_discard',oid);c.commit()
+                            return self.reply(200,{'ok':True})
                         return self.reply(400,{'error':'Acción inválida.'})
                     except order_followups.FollowupError as error:
                         c.rollback();return self.reply(error.status,{'error':str(error),'fields':error.fields})

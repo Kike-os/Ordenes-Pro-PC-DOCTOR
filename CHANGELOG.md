@@ -4,6 +4,23 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.217 — 2026-10-30 16:49 (UTC-05:00)
+
+Comunicación con el cliente sin el diálogo antiguo, con borradores guardados y correcciones al enlace público
+
+### Nuevas funcionalidades
+
+- Borrador de mensaje guardado en el servidor, por orden y usuario: se recupera al reabrir la ventana, se puede descartar y desaparece al registrar o enviar; no cuenta como comunicación (migración 082, tabla nueva).
+- Plantillas de recepción del equipo, estado de la orden y recordatorio de pago en la ventana nueva; el recordatorio usa el saldo real de la orden, no el total del presupuesto.
+
+### Errores corregidos
+
+- Un mensaje corregido deja de mostrarse en el enlace público y de usarse en mensajes nuevos; una corrección solo de la nota interna ya no invalida lo comunicado al cliente.
+
+### Actualizaciones de seguridad
+
+- El antiguo diálogo «Mensaje por WhatsApp» copiaba los hallazgos internos al mensaje y no dejaba registro: se retira y sus accesos (orden y Entregas) abren «Comunicación con el cliente».
+
 ## v1.5.216 — 2026-10-30 09:07 (UTC-05:00)
 
 Ventana profesional de comunicación con el cliente que recupera el seguimiento técnico registrado

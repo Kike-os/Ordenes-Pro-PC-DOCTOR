@@ -8,6 +8,29 @@
   },
   "releases": [
     {
+      "version": "1.5.217",
+      "date": "2026-10-30T16:49:58-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Comunicación con el cliente sin el diálogo antiguo, con borradores guardados y correcciones al enlace público",
+      "changes": {
+        "features": [
+          "Borrador de mensaje guardado en el servidor, por orden y usuario: se recupera al reabrir la ventana, se puede descartar y desaparece al registrar o enviar; no cuenta como comunicación (migración 082, tabla nueva).",
+          "Plantillas de recepción del equipo, estado de la orden y recordatorio de pago en la ventana nueva; el recordatorio usa el saldo real de la orden, no el total del presupuesto."
+        ],
+        "improvements": [],
+        "fixes": [
+          "Un mensaje corregido deja de mostrarse en el enlace público y de usarse en mensajes nuevos; una corrección solo de la nota interna ya no invalida lo comunicado al cliente."
+        ],
+        "security": [
+          "El antiguo diálogo «Mensaje por WhatsApp» copiaba los hallazgos internos al mensaje y no dejaba registro: se retira y sus accesos (orden y Entregas) abren «Comunicación con el cliente»."
+        ],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Kike-os: «corrígeme todo… si hay que actualiza»"
+    },
+    {
       "version": "1.5.216",
       "date": "2026-10-30T09:07:21-05:00",
       "type": "patch",

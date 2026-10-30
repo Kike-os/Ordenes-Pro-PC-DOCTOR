@@ -145,6 +145,60 @@ class OrderMessageTests(unittest.TestCase):
         with app.connect() as c:
             self.assertEqual(c.execute("SELECT COUNT(*) FROM order_messages WHERE order_id=? AND channel='correo'", (oid,)).fetchone()[0], 1)
 
+    def test_corrections_public_link_and_drafts(self):
+        cookie, csrf, post, order = self.paid_order(10500, pay=False, key='msg5')
+        oid = order['id']
+        first = self.followup(post, oid, kind='novedad', client_message='Texto original para el cliente.', client_visible='1')
+        # Corregir solo la nota interna no invalida lo comunicado.
+        self.followup(post, oid, kind='novedad', internal_note='Corrección solo interna.', corrects_id=str(first))
+        with app.connect() as c:
+            self.assertEqual(order_followups.compose(c, oid, 'novedad', company={})['sources'], [{'type': 'followup', 'id': first}])
+            self.assertEqual([u['message'] for u in order_followups.public_updates(c, oid)], ['Texto original para el cliente.'])
+        # Corregir el texto para el cliente lo reemplaza en los mensajes y en el enlace público.
+        fix = self.followup(post, oid, kind='novedad', client_message='Texto corregido para el cliente.', client_visible='1', corrects_id=str(first))
+        with app.connect() as c:
+            composed = order_followups.compose(c, oid, 'novedad', company={})
+            self.assertEqual(composed['sources'], [{'type': 'followup', 'id': fix}])
+            self.assertNotIn('Texto original', composed['body'])
+            self.assertEqual([u['message'] for u in order_followups.public_updates(c, oid)], ['Texto corregido para el cliente.'])
+        # Borrador: es del usuario y de la orden, se reemplaza, admite espacios por completar y no cuenta como comunicación.
+        url = '/api/orders/%d/messages' % oid
+        used = json.dumps([{'type': 'followup', 'id': fix}])
+        self.assertEqual(post(url, action='draft', body='')['status'], 400)
+        self.assertEqual(post(url, action='draft', body='Texto', sources=json.dumps([{'type': 'followup', 'id': 999999}]))['status'], 404)
+        saved = post(url, action='draft', template='novedad', channel='correo', recipient='cliente@example.invalid', subject='Asunto ficticio', body='Borrador [Escriba aquí]', sources=used)
+        self.assertEqual((saved['status'], saved['body']['draft']['channel'], saved['body']['draft']['sources']), (200, 'correo', [{'type': 'followup', 'id': fix}]))
+        post(url, action='draft', template='novedad', body='Borrador final de prueba', sources=used)
+        data = self.request('/api/orders/%d/followups' % oid, cookie=cookie)['body']
+        self.assertEqual((data['draft']['body'], data['draft']['channel'], data['messages']), ('Borrador final de prueba', 'whatsapp', []))
+        # Otro usuario no lo ve.
+        with app.connect() as c:
+            self.assertIsNone(order_followups.draft_for(c, oid, {'id': self.uid + 999}))
+        self.assertEqual(post(url, action='draft_discard')['status'], 200)
+        self.assertIsNone(self.request('/api/orders/%d/followups' % oid, cookie=cookie)['body']['draft'])
+        # Registrar o enviar el mensaje retira el borrador.
+        post(url, action='draft', body='Borrador que se registrará', sources=used)
+        self.assertEqual(post(url, action='prepare', channel='copia', body='Mensaje final para el cliente.', sources=used, request_key='mensaje-borrador-msg5')['status'], 200)
+        self.assertIsNone(self.request('/api/orders/%d/followups' % oid, cookie=cookie)['body']['draft'])
+
+    def test_status_reception_and_payment_templates(self):
+        # Sin marca ni modelo, las frases siguen completas en todas las plantillas.
+        for template, intro in order_followups.INTRO.items():
+            self.assertEqual(intro.replace(' {device}', '').casefold().count('su equipo'), 1, template)
+        cookie, csrf, post, order = self.paid_order(10500, pay=False, key='msg6')
+        oid = order['id']
+        self.assertIn('se encuentra en estado:', self.compose(post, oid, template='estado', selection='manual')['body'])
+        self.assertIn('recibimos su equipo', self.compose(post, oid, template='recepcion', selection='manual')['body'])
+        due = self.compose(post, oid, template='pago', selection='manual')
+        self.assertIn('Saldo pendiente: $105,00.', due['body'])
+        self.assertEqual(due['warnings'], [])
+        self.assertEqual(post('/api/orders/%d/payments' % oid, amount='45,00', method='efectivo')['status'], 201)
+        self.assertIn('Saldo pendiente: $60,00.', self.compose(post, oid, template='pago', selection='manual')['body'])  # el saldo real, no el total
+        self.assertEqual(post('/api/orders/%d/payments' % oid, amount='60,00', method='efectivo')['status'], 201)
+        paid = self.compose(post, oid, template='pago', selection='manual')
+        self.assertNotIn('Saldo pendiente', paid['body'])
+        self.assertTrue(any('no registra saldo' in w for w in paid['warnings']))
+
     def test_a_note_written_as_a_full_letter_keeps_only_its_content(self):
         letter = ('Estimado cliente:\nReciba un cordial saludo de parte del Departamento de Servicio Técnico de PC-DOCTOR S.A.\n'
                   'Detectamos fallas en la unidad de almacenamiento.\nRecomendamos reemplazarla.\nAgradecemos su confianza en nuestros servicios.\nPC-DOCTOR S.A.')

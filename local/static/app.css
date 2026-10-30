@@ -3522,7 +3522,6 @@ body[data-page=dashboard] .access-pro label.access-mini :is(input,select){height
 @media(prefers-reduced-motion:reduce){#adi-widget.adi-v2 .adi-toggle,#adi-widget.adi-v2 .adi-orb-swirl,#adi-widget.adi-v2 .adi-orb::after,#adi-widget.adi-v2.adi-busy .adi-toggle,#adi-widget.adi-v2.adi-pulse .adi-toggle{animation:none;transition:none}#adi-widget.adi-v2 .adi-toggle:hover{transform:none}}
 /* WhatsApp desde la orden */
 #module-content button.order-whatsapp{display:inline-flex;align-items:center;justify-content:center;gap:8px;width:100%;margin-top:10px}#module-content button.order-whatsapp svg{width:16px;height:16px}
-.whatsapp-form{display:grid;gap:10px}.whatsapp-form .agenda-hint[data-state=error]{color:#f6dfa6}.whatsapp-form .agenda-actions{justify-content:flex-end}
 /* ===== Centro de Atención en Tiempo Real · consola de tres paneles ===== */
 .live-pro{display:grid;gap:12px}
 .live-pro .live-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 12px;border:1px solid #1e3252;border-radius:12px;background:#0b1626}
@@ -9533,7 +9532,7 @@ body[data-page=dashboard] .maintenance-dialog.cm-dialog>form.cm-form{display:gri
 .cm-tabs{display:inline-flex;border:1px solid var(--inv-line-2,#2A3D5E);border-radius:10px;overflow:hidden}
 .cm-tab{border:0;border-radius:0;background:transparent;padding:6px 14px;min-height:36px;font-size:12.5px;color:var(--inv-soft,#9FB0C8)}
 .cm-tab[aria-pressed=true]{background:#20C7C71f;color:var(--inv-text,#F1F5F9)}.cm-tab:focus-visible{outline:2px solid #20C7C7;outline-offset:-2px}
-.cm-state{font-size:12px;padding:2px 9px;border-radius:999px;border:1px dashed var(--inv-line-2,#2A3D5E);color:var(--inv-soft,#9FB0C8)}.cm-state[data-tone=edit]{border-color:#F5B544;color:#F5B544}
+.cm-state{font-size:12px;padding:2px 9px;border-radius:999px;border:1px dashed var(--inv-line-2,#2A3D5E);color:var(--inv-soft,#9FB0C8)}.cm-state[data-tone=edit]{border-color:#F5B544;color:#F5B544}.cm-state[data-tone=saved]{border-style:solid;border-color:#20C7C7;color:#7FE7E7}.cm-toolbar>[hidden]{display:none}
 .cm-count{margin-left:auto;font-size:12px;color:var(--inv-soft,#7D8DA6);font-variant-numeric:tabular-nums}
 .cm-dialog textarea.cm-text{display:block;width:100%;min-height:340px;max-height:none;resize:vertical;overflow-y:auto;box-sizing:border-box;padding:12px 14px;border-radius:12px;font-size:14.5px;line-height:1.6}
 .cm-dialog textarea.cm-text[hidden],.cm-preview[hidden]{display:none}

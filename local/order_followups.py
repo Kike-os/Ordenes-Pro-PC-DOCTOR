@@ -37,7 +37,8 @@ PRIORITIES = {'baja': 'Baja', 'normal': 'Normal', 'alta': 'Alta', 'urgente': 'Ur
 TEMPLATES = {
     'diagnostico': 'Diagnóstico técnico', 'novedad': 'Novedad importante', 'reparacion': 'Reparación en proceso', 'repuesto': 'Repuesto necesario',
     'presupuesto': 'Presupuesto pendiente', 'autorizacion': 'Solicitud de autorización', 'completado': 'Reparación terminada', 'pruebas': 'Pruebas realizadas',
-    'listo': 'Equipo listo para retirar', 'recordatorio': 'Recordatorio de retiro',
+    'listo': 'Equipo listo para retirar', 'recordatorio': 'Recordatorio de retiro', 'recepcion': 'Recepción del equipo', 'estado': 'Estado de la orden',
+    'pago': 'Recordatorio de pago',
 }
 # Plantilla sugerida según el tipo del seguimiento que se comunica.
 TEMPLATE_FOR_KIND = {'recepcion': 'novedad', 'diagnostico': 'diagnostico', 'novedad': 'novedad', 'repuesto': 'repuesto', 'presupuesto_enviado': 'presupuesto',
@@ -55,6 +56,9 @@ INTRO = {
     'pruebas': 'Le informamos que realizamos las pruebas de funcionamiento de su equipo {device}, orden de servicio {code}.',
     'listo': 'Su equipo {device}, orden de servicio {code}, está listo para retirar en nuestro local.',
     'recordatorio': 'Le recordamos que su equipo {device}, orden de servicio {code}, está listo y espera su retiro en nuestro local.',
+    'recepcion': 'Le confirmamos que recibimos su equipo {device} con la orden de servicio {code}.',
+    'estado': 'Le informamos que la orden de servicio {code} de su equipo {device} se encuentra en estado: {status}.',
+    'pago': 'Le recordamos el valor pendiente de la orden de servicio {code} de su equipo {device}.',
 }
 CLOSING = {
     'diagnostico': ['Le mantendremos informado sobre el avance.'], 'novedad': ['Le mantendremos informado sobre el avance.'],
@@ -62,6 +66,7 @@ CLOSING = {
     'presupuesto': ['Quedamos atentos a su aprobación para continuar.'], 'autorizacion': ['Para continuar necesitamos su autorización.', 'Quedamos atentos a su respuesta.'],
     'completado': ['Le mantendremos informado sobre la entrega.'], 'pruebas': ['Le mantendremos informado sobre el avance.'],
     'listo': ['Al retirarlo, por favor presente su comprobante de recepción.'], 'recordatorio': ['Al retirarlo, por favor presente su comprobante de recepción.'],
+    'recepcion': ['Le mantendremos informado sobre el avance.'], 'estado': ['Le mantendremos informado sobre el avance.'], 'pago': ['Gracias por su atención.'],
 }
 NEEDS_NEWS = ('diagnostico', 'novedad', 'autorizacion', 'pruebas', 'repuesto')  # sin novedad elegida, el borrador lleva un espacio a completar
 PLACEHOLDER = '[Escriba aquí la novedad para el cliente]'
@@ -229,12 +234,18 @@ def message_label(channel, status):
     return {'enviado': 'Enviado', 'entregado': 'Entregado', 'leido': 'Leído', 'error': 'Fallido'}.get(status, status)
 
 
+def _superseded(c, oid):
+    """Seguimientos cuyo texto para el cliente fue corregido. Una corrección solo de la nota interna no invalida lo que se le comunicó."""
+    return {r['corrects_id']: r['id'] for r in c.execute("SELECT id,corrects_id FROM order_followups WHERE order_id=? AND corrects_id IS NOT NULL "
+                                                         "AND (client_message!='' OR recommendation!='') ORDER BY id", (oid,))}
+
+
 def sources(c, oid):
     """Lo que puede usarse para redactar un mensaje, del más reciente al más antiguo. Un seguimiento es comunicable si tiene mensaje o
     recomendación para el cliente; su nota interna nunca se ofrece. Los comentarios técnicos anteriores al centro de seguimiento quedaron en el
     historial como registros internos: se listan para que el técnico decida, pero nunca se usan de forma automática."""
     out = []
-    superseded = {r['corrects_id']: r['id'] for r in c.execute('SELECT id,corrects_id FROM order_followups WHERE order_id=? AND corrects_id IS NOT NULL ORDER BY id', (oid,))}
+    superseded = _superseded(c, oid)
     for r in c.execute("SELECT f.id,f.kind,f.client_message,f.recommendation,f.quote_id,f.created_at,COALESCE(u.name,'') actor FROM order_followups f "
                        "LEFT JOIN users u ON u.id=f.created_by WHERE f.order_id=? ORDER BY f.id DESC", (oid,)):
         label, group = KINDS.get(r['kind'], (r['kind'], 'tecnico'))[:2]
@@ -271,9 +282,11 @@ def file_for(c, oid, file_id):
 
 def public_updates(c, oid, limit=10):
     """Lo único que ve el cliente en el enlace público: los mensajes marcados como visibles (nunca la nota interna)."""
+    corrected = _superseded(c, oid)  # un texto ya corregido deja de mostrarse: el original se conserva solo en el historial interno
+    rows = c.execute("SELECT id,kind,client_message,recommendation,created_at FROM order_followups WHERE order_id=? AND client_visible=1 "
+                     "AND (client_message!='' OR recommendation!='') ORDER BY id DESC", (oid,)).fetchall()
     return [{'label': KINDS.get(r['kind'], (r['kind'],))[0], 'message': '\n'.join(x for x in (r['client_message'], r['recommendation']) if x), 'at': r['created_at']}
-            for r in c.execute("SELECT kind,client_message,recommendation,created_at FROM order_followups WHERE order_id=? AND client_visible=1 "
-                               "AND (client_message!='' OR recommendation!='') ORDER BY id DESC LIMIT ?", (oid, limit))]
+            for r in rows if r['id'] not in corrected][:limit]
 
 
 # ---- Mensajes al cliente ---------------------------------------------------------------------------------------------------------------
@@ -384,7 +397,7 @@ def compose(c, oid, template, followup_ids=None, history_ids=(), cost=None, orde
     company = company or __import__('corporate').settings()
     phone = company.get('whatsapp', '')
     device = ' '.join(x for x in (o['brand'], o['model']) if x)
-    intro = INTRO[template].format(device=device, code=o['code']) if device else INTRO[template].replace(' {device}', '').format(code=o['code'])
+    intro = (INTRO[template] if device else INTRO[template].replace(' {device}', '')).format(device=device, code=o['code'], status=o['status_label'])
     lines = ['Estimado/a %s:' % _first_name(o['client']), '', 'Reciba un cordial saludo de PC-DOCTOR.', '', intro]
     warnings = []
     for p in news + advice:
@@ -396,6 +409,15 @@ def compose(c, oid, template, followup_ids=None, history_ids=(), cost=None, orde
         lines += ['', '%s: %s.' % (price['label'], price['amount'])]
         if price['draft']:
             warnings.append('El presupuesto %s está en borrador: el valor aún puede cambiar.' % price['code'])
+    if template == 'pago':
+        # El saldo real de la orden (cobros y anticipos incluidos), no el total del presupuesto.
+        import equipment
+        account = equipment.finance(c, oid)
+        balance = account['order']['balance_cents'] if account else 0
+        if balance:
+            lines += ['', 'Saldo pendiente: %s.' % quotes_usd(balance)]
+        else:
+            warnings.append('Esta orden no registra saldo pendiente: revisa si corresponde enviar este recordatorio.')
     closing = CLOSING[template]
     if include and template in ('diagnostico', 'novedad', 'repuesto', 'pruebas'):
         closing = ['Quedamos atentos a su respuesta.']
@@ -436,6 +458,31 @@ def record(c, oid, data, user, now, status='preparado', provider_id='', error=''
                     (oid, fid, channel, _text(data.get('template'), 40), recipient[:200], subject, body, status, provider_id, error[:400],
                      1 if status in ('enviado', 'error') else 0, json.dumps(used), key or None, user['id'] if user else None, stamp(now), stamp(now))).lastrowid
     return dict(c.execute('SELECT * FROM order_messages WHERE id=?', (mid,)).fetchone()), False
+
+
+def draft_for(c, oid, user):
+    row = c.execute('SELECT template,channel,recipient,subject,body,sources,updated_at FROM order_message_drafts WHERE order_id=? AND user_id=?', (oid, user['id'])).fetchone()
+    return dict(row, sources=_loads(row['sources'])) if row else None
+
+
+def draft_save(c, oid, data, user, now):
+    """Guarda el borrador de este usuario en esta orden (reemplaza el anterior). No es una comunicación: no aparece como enviada ni preparada."""
+    _order(c, oid)
+    body = str(data.get('body', '') or '').strip()[:4000]
+    if not body:
+        raise FollowupError('Escribe el mensaje antes de guardar el borrador.', 400, {'body': 'Obligatorio.'})
+    template = str(data.get('template', '') or '')
+    channel = 'correo' if data.get('channel') == 'correo' else 'whatsapp'
+    c.execute('INSERT INTO order_message_drafts(order_id,user_id,template,channel,recipient,subject,body,sources,updated_at) VALUES (?,?,?,?,?,?,?,?,?) '
+              'ON CONFLICT(order_id,user_id) DO UPDATE SET template=excluded.template,channel=excluded.channel,recipient=excluded.recipient,subject=excluded.subject,'
+              'body=excluded.body,sources=excluded.sources,updated_at=excluded.updated_at',
+              (oid, user['id'], template if template in TEMPLATES else '', channel, _text(data.get('recipient'), 200), _text(data.get('subject'), 150), body,
+               json.dumps(message_sources(c, oid, data)), stamp(now)))
+    return draft_for(c, oid, user)
+
+
+def draft_discard(c, oid, user):
+    c.execute('DELETE FROM order_message_drafts WHERE order_id=? AND user_id=?', (oid, user['id']))
 
 
 def retry(c, message_id, status, provider_id, error, now):
