@@ -4,6 +4,21 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.216 — 2026-10-30 09:07 (UTC-05:00)
+
+Ventana profesional de comunicación con el cliente que recupera el seguimiento técnico registrado
+
+### Nuevas funcionalidades
+
+- Nueva ventana «Comunicación con el cliente»: dos columnas (información del seguimiento y preparación del mensaje), editor amplio que crece con el texto, vista previa de WhatsApp y de correo, canal, destinatario, asunto automático y pie fijo; una columna en celular.
+- Recupera sola el último seguimiento comunicable de la orden (o uno o varios elegidos, o un mensaje manual) y lo incorpora al mensaje con recomendaciones y costo según reglas; nunca la nota interna. Los registros técnicos anteriores solo se usan si se eligen y confirman.
+- Diez plantillas profesionales con número de orden, marca y modelo; varias novedades se resumen sin repetir frases; recomendación para el cliente en cada seguimiento; historial de comunicaciones con fuentes usadas, destinatario, resultado e identificador del proveedor.
+
+### Errores corregidos
+
+- Cambiar de plantilla ya no reemplaza un texto editado sin confirmar; «Copiar» solo se registra si la copia funcionó; la apertura de WhatsApp no la bloquea el navegador y registra el número usado; un reintento de correo exitoso ya no queda como fallido; el correo adjunta el presupuesto enviado.
+- Las comunicaciones sin seguimiento ahora aparecen en el historial de la orden; un aviso de fallo de WhatsApp ya no deshace un «entregado» o «leído»; validación de celulares igual a la de la pantalla; plantilla aprobada de WhatsApp opcional para fuera de las 24 h (migración 081, solo agrega columnas).
+
 ## v1.5.215 — 2026-10-30 07:21 (UTC-05:00)
 
 Centro profesional de seguimiento técnico y comunicación con el cliente en cada orden

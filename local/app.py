@@ -395,20 +395,32 @@ def order_followup_mail(c,oid,data,user,now):
     key=str(data.get('request_key','') or '')[:64]
     same=c.execute('SELECT * FROM order_messages WHERE request_key=?',(key,)).fetchone() if key else None
     if same and same['status']!='error':return 200,{'ok':True,'message':dict(same),'duplicate':True}
+    try:
+        order_followups.message_body(data);order_followups.message_sources(c,oid,data)
+    except order_followups.FollowupError as error:return error.status,{'error':str(error),'fields':error.fields}
     ids=[int(x) for x in str(data.get('file_ids','') or '').split(',') if x.isdigit()][:3]
     files=[]
     for fid in ids:
         row=c.execute('SELECT name,mime,data FROM order_followup_files WHERE id=? AND order_id=? AND visible_to_client=1',(fid,oid)).fetchone()
         if not row:return 400,{'error':'Solo se envían evidencias marcadas como visibles para el cliente.'}
         files.append({'name':row['name'],'type':row['mime'],'data':row['data']})
-    body=str(data.get('body','') or '').strip()[:4000]
-    if len(body)<10:return 400,{'error':'Escribe el mensaje para el cliente.'}
-    subject='PC-DOCTOR · Orden %s · %s'%(order['code'],order_followups.TEMPLATES.get(str(data.get('template','')),'Actualización de su servicio'))
+    if str(data.get('quote_id','') or '').isdigit():
+        # Solo un presupuesto ya comunicable (no borrador ni cancelado), con la identificación enmascarada como en su envío habitual.
+        import quote_pdf
+        found=c.execute("SELECT * FROM quotes WHERE id=? AND order_id=? AND deleted_at=''",(int(data['quote_id']),oid)).fetchone()
+        if not found or found['status'] in ('borrador','cancelado'):return 400,{'error':'Solo se adjunta un presupuesto enviado o decidido (no un borrador).'}
+        document=order_document(c,oid);number=re.sub(r'\D','',str(document.get('identification') or ''))
+        pdf=quote_pdf.render(quotes.detail(c,quotes.get(c,found['id'])),dict(document,identification=number[:2]+'*'*max(0,len(number)-2) if number else ''),None)
+        files.append({'name':found['code']+'-PRESUPUESTO.pdf','type':'application/pdf','data':base64.b64encode(pdf).decode()})
+    body=order_followups.message_body(data)
+    subject=order_followups._text(data.get('subject'),150) or 'PC-DOCTOR · Orden %s · %s'%(order['code'],order_followups.TEMPLATES.get(str(data.get('template','')),'Actualización de su servicio'))
+    data=dict(data,subject=subject)
+    if same:body,subject=same['body'],same['subject'] or subject  # reintento de un fallido: el mismo texto registrado
     try:
         send_institutional(c,'seguimiento',subject,to,subject,body,oid,user['id'],attachments=files,review=False)
-        row,_=order_followups.record(c,oid,dict(data,channel='correo'),user,now,'enviado',recipient=to)
+        row=order_followups.retry(c,same['id'],'enviado','','',now) if same else order_followups.record(c,oid,dict(data,channel='correo'),user,now,'enviado',recipient=to)[0]
     except mail_pro.MailError as error:
-        row,_=order_followups.record(c,oid,dict(data,channel='correo'),user,now,'error',error=str(error),recipient=to)
+        row=order_followups.retry(c,same['id'],'error','',str(error),now) if same else order_followups.record(c,oid,dict(data,channel='correo'),user,now,'error',error=str(error),recipient=to)[0]
     c.commit();audit(c,user['id'],'order_followup_mail',oid)
     return (200 if row['status']=='enviado' else 502),{'ok':row['status']=='enviado','message':row,'error':row['error']}
 
@@ -1602,8 +1614,10 @@ class Handler(BaseHTTPRequestHandler):
                     data=order_followups.listing(c,oid)
                     try:versions=quotes_mod.for_order(c,oid)['versions']
                     except Exception:versions=[]
-                    data.update(order={'id':oid,'code':order['code'],'status':order['status'],'status_label':order['status_label'],'client':order['client'],'email':order['email'] or '','phone':order['phone'] or ''},
-                                quotes=[{'id':v['id'],'code':v['code'],'status_label':v['status_label'],'quoted_cents':v.get('quoted_cents',0)} for v in versions],tracking=order_tracking_active(c,oid),
+                    data.update(order={'id':oid,'code':order['code'],'status':order['status'],'status_label':order['status_label'],'client':order['client'],'email':order['email'] or '','phone':order['phone'] or '',
+                                       'brand':order['brand'] or '','model':order['model'] or '','kind':order['kind'] or '','technician':order['technician'],
+                                       'findings':order['findings'] or '','recommendations':order['recommendations'] or ''},
+                                quotes=[{'id':v['id'],'code':v['code'],'status':v['status'],'status_label':v['status_label'],'quoted_cents':v.get('quoted_cents',0),'approved_cents':v.get('approved_cents',0)} for v in versions],tracking=order_tracking_active(c,oid),
                                 mail=mail_pro.configured())
                     return self.reply(200,data)
                 except order_followups.FollowupError as error:return self.reply(error.status,{'error':str(error)})
@@ -3975,11 +3989,19 @@ class Handler(BaseHTTPRequestHandler):
                             return self.reply(201,{'ok':True,'id':fid})
                         action=str(data.get('action',''))
                         if action=='compose':
-                            link=order_tracking_active(c,oid)
-                            return self.reply(200,{'body':order_followups.compose(c,oid,str(data.get('template','')),int(data['followup_id']) if str(data.get('followup_id','')).isdigit() else None,link['url'] if link['active'] else '')})
+                            # selection: auto (último seguimiento comunicable), ids (los elegidos) o manual (sin seguimientos).
+                            link=order_tracking_active(c,oid);ids=lambda key:[int(x) for x in str(data.get(key,'') or '').split(',') if x.isdigit()][:20]
+                            selection=str(data.get('selection','') or ('ids' if str(data.get('followup_id','')).isdigit() else 'auto'))
+                            chosen=None if selection=='auto' else [] if selection=='manual' else ids('followup_ids') or ids('followup_id')
+                            cost={'1':True,'0':False}.get(str(data.get('cost','')))
+                            return self.reply(200,order_followups.compose(c,oid,str(data.get('template','')),chosen,ids('history_ids') if selection=='ids' else [],cost,
+                                                                          str(data.get('order_recommendations',''))=='1',link['url'] if link['active'] else ''))
                         if action=='prepare':
                             # Abrir WhatsApp a mano o copiar el texto: queda «preparado», nunca «enviado».
-                            row,dup=order_followups.record(c,oid,dict(data,channel='whatsapp_manual' if data.get('channel')=='whatsapp_manual' else 'copia'),user,now,'preparado');c.commit()
+                            # Se registra el número al que se abrió la conversación (el del cliente si no se eligió otro).
+                            manual=data.get('channel')=='whatsapp_manual';number=order_followups.ecuador_number(str(data.get('recipient','') or order_followups._order(c,oid)['phone'] or '')) if manual else ''
+                            if manual and not number:return self.reply(400,{'error':'El número no es un celular válido para WhatsApp.','fields':{'recipient':'Número no válido.'}})
+                            row,dup=order_followups.record(c,oid,dict(data,channel='whatsapp_manual' if manual else 'copia'),user,now,'preparado',recipient=number);c.commit()
                             return self.reply(200,{'ok':True,'message':row,'duplicate':dup})
                         if action=='whatsapp':
                             row,dup=order_followups.send_whatsapp(c,oid,data,user,now);c.commit();audit(c,user['id'],'order_whatsapp',oid)

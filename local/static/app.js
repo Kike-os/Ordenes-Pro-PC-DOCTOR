@@ -2516,7 +2516,7 @@ function orderTrackingSection(order){
 const historySeen=new Map();let historyTimer=null,historyCollapsed=false;const HISTORY_RECENT=5;
 function orderHistoryPanel(order){
  const panel=el('section',undefined,'workspace-section order-history');panel.id='order-history';panel.tabIndex=-1;panel.setAttribute('aria-labelledby','order-history-title');
- const state={filter:'all',all:false,rows:[],fu:new Map(),q:'',detail:false},seen=historySeen.get(order.id),known=seen||new Set();let first=!seen;historySeen.set(order.id,known);
+ const state={filter:'all',all:false,rows:[],base:[],msgs:[],fu:new Map(),q:'',detail:false},seen=historySeen.get(order.id),known=seen||new Set();let first=!seen;historySeen.set(order.id,known);
  const head=el('header',undefined,'oh-head'),mark=el('span',undefined,'track-icon oh-mark'),titles=el('div',undefined,'oh-titles'),title=el('h2','Historial de la Orden'),meta=el('div',undefined,'oh-meta'),count=el('span','','oh-chip'),sync=el('span','','tracking-status');title.id='order-history-title';mark.append(systemIcon('M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8 M3 3v5h5 M12 7v5l4 2'));titles.append(title,el('p','Registro de estados, intervenciones y seguimiento técnico'));sync.setAttribute('role','status');meta.append(el('span',order.code,'oh-chip oh-code'),count,sync);
  const body=el('div',undefined,'oh-body'),toggle=button('',()=>{historyCollapsed=!historyCollapsed;paintCollapse();},'oh-toggle');body.id='order-history-body';toggle.setAttribute('aria-controls',body.id);head.append(mark,titles,meta,toggle);
  const bar=el('div',undefined,'track-filters'),list=el('ol',undefined,'oh-list'),note=el('p','','track-note'),foot=el('footer',undefined,'oh-foot'),more=button('',()=>{state.all=!state.all;paint();},'oh-more');bar.setAttribute('role','group');bar.setAttribute('aria-label','Filtrar el historial de la orden');
@@ -2524,38 +2524,46 @@ function orderHistoryPanel(order){
  const search=el('input');search.type='search';search.placeholder='Buscar en el historial';search.className='oh-search';search.setAttribute('aria-label','Buscar en el historial');search.addEventListener('input',()=>{state.q=search.value.trim().toLowerCase();state.all=false;paint();});
  const detailL=el('label',undefined,'inv-cf oh-detail-toggle'),detailC=el('input');detailC.type='checkbox';detailC.addEventListener('change',()=>{state.detail=detailC.checked;paint();});detailL.append(detailC,el('span','Vista detallada'));bar.append(search,detailL);
  // Grupo de cada evento: el del seguimiento (si lo tiene) o el del historial (estado, nota o incidencia).
- const groupOf=row=>{const fu=state.fu.get(row.id);if(fu)return fu.group;if(row.event==='payment')return 'pago';const g=activityKind(row).group;return g==='note'?'tecnico':g==='incident'?'incidencia':g;};
- const textOf=row=>{const fu=state.fu.get(row.id);return [row.comment,row.status_label,row.actor,fu&&fu.kind_label,fu&&fu.internal_note,fu&&fu.client_message,fu&&fu.next_action].filter(Boolean).join(' ').toLowerCase();};
+ const groupOf=row=>{if(row.msg)return 'comunicacion';const fu=state.fu.get(row.id);if(fu)return fu.group;if(row.event==='payment')return 'pago';const g=activityKind(row).group;return g==='note'?'tecnico':g==='incident'?'incidencia':g;};
+ const textOf=row=>{if(row.msg)return [row.msg.body,row.msg.status_label,row.msg.actor,row.msg.recipient,OF_CHANNEL[row.msg.channel]].join(' ').toLowerCase();const fu=state.fu.get(row.id);return [row.comment,row.status_label,row.actor,fu&&fu.kind_label,fu&&fu.internal_note,fu&&fu.client_message,fu&&fu.recommendation,fu&&fu.next_action].filter(Boolean).join(' ').toLowerCase();};
  const add=button('+ Agregar seguimiento',()=>addOrderFollowUp(order.id)),compose=button('Preparar mensaje al cliente',()=>orderMessageComposer(order.id),'secondary');foot.append(more,compose,add);body.append(bar,list,note,foot);panel.append(head,body);
  function paintCollapse(){body.hidden=historyCollapsed;panel.dataset.collapsed=String(historyCollapsed);toggle.setAttribute('aria-expanded',String(!historyCollapsed));toggle.replaceChildren(el('span',historyCollapsed?'Mostrar':'Contraer'),systemIcon(historyCollapsed?'m6 9 6 6 6-6':'m18 15-6-6-6 6'));}
- function setRows(rows){const byId=new Map();for(const row of rows)byId.set(row.id,row);state.rows=[...byId.values()].sort((a,b)=>new Date(b.occurred_at)-new Date(a.occurred_at)||b.id-a.id);}
+ function setRows(rows){state.base=rows;const byId=new Map();for(const row of [...rows,...state.msgs.map(m=>({id:'m'+m.id,occurred_at:m.created_at,msg:m}))])byId.set(row.id,row);state.rows=[...byId.values()].sort((a,b)=>new Date(b.occurred_at)-new Date(a.occurred_at)||b.id-a.id);}
  function paint(){const total=state.rows.length,groups={all:total,status:0,tecnico:0,autorizacion:0,comunicacion:0,incidencia:0,pago:0};for(const row of state.rows)groups[groupOf(row)]=(groups[groupOf(row)]||0)+1;
   count.textContent=total===1?'1 evento':total+' eventos';bar.hidden=total<2;bar.querySelectorAll('.track-filter').forEach(chip=>{const key=chip.dataset.filter;chip.setAttribute('aria-pressed',String(key===state.filter));chip.textContent=chip.textContent.replace(/ · \d+$/,'')+' · '+groups[key];chip.disabled=key!=='all'&&!groups[key];});
   const visible=state.rows.filter(row=>(state.filter==='all'||groupOf(row)===state.filter)&&(!state.q||textOf(row).includes(state.q))),shown=state.all?visible:visible.slice(0,HISTORY_RECENT);list.replaceChildren();
   note.textContent=visible.length?'':total?'Ningún evento cumple este filtro.':'No hay eventos registrados.';note.dataset.empty=String(!visible.length);
   more.hidden=visible.length<=HISTORY_RECENT;more.textContent=state.all?'Ver solo los últimos '+HISTORY_RECENT:'Ver todos ('+visible.length+')';more.setAttribute('aria-expanded',String(state.all));
-  for(const row of shown){const info=activityInfo(row),item=el('li',undefined,'oh-item'),icon=el('span',undefined,'track-icon'),main=el('div',undefined,'oh-main'),side=el('div',undefined,'oh-side'),when=el('time',formatOrderDate(row.occurred_at));
+  for(const row of shown){if(row.msg){list.append(messageRow(row));continue;}const info=activityInfo(row),item=el('li',undefined,'oh-item'),icon=el('span',undefined,'track-icon'),main=el('div',undefined,'oh-main'),side=el('div',undefined,'oh-side'),when=el('time',formatOrderDate(row.occurred_at));
    item.dataset.tone=info.kind.tone;applyLook(item,icon,row);if(!first&&!known.has(row.id))item.classList.add('track-new');when.dateTime=new Date(row.occurred_at).toISOString();when.title=relativeTime(row.occurred_at)||'';
    const fu=state.fu.get(row.id);
    if(fu){const[glyph,color]=OF_LOOK[fu.group]||OF_LOOK.tecnico;item.style.setProperty('--tk',color);item.style.setProperty('--tk-soft',color+'26');icon.replaceChildren(systemIcon(glyph));item.dataset.group=fu.group;
     const chips=el('div',undefined,'of-chips');if(fu.priority!=='normal')chips.append(cjChip(fu.priority==='urgente'||fu.priority==='alta'?'anulada':'abierta','Prioridad '+fu.priority_label.toLowerCase()));
-    if(fu.client_visible)chips.append(cjChip('cerrada','Visible para el cliente'));if(fu.files.length)chips.append(cjChip('borrador',fu.files.length+' evidencia(s)'));for(const m of fu.messages.slice(0,2))chips.append(cjChip(m.status==='error'?'anulada':m.status==='preparado'?'borrador':'cerrada',OF_CHANNEL[m.channel]+': '+OF_MSG[m.status]));
+    if(fu.client_visible)chips.append(cjChip('cerrada','Visible para el cliente'));if(fu.files.length)chips.append(cjChip('borrador',fu.files.length+' evidencia(s)'));for(const m of fu.messages.slice(0,2))chips.append(cjChip(m.status==='error'?'anulada':m.status==='preparado'?'borrador':'cerrada',OF_CHANNEL[m.channel]+': '+m.status_label));
     if(fu.quote_code)chips.append(cjChip('abierta','Presupuesto '+fu.quote_code));if(fu.corrects_id)chips.append(cjChip('revision','Corrige #'+fu.corrects_id));
     main.append(el('strong',fu.kind_label),chips);
     if(state.detail){if(fu.internal_note){const p=el('p',undefined,'of-internal');p.append(el('b','Interno: '),document.createTextNode(fu.internal_note));main.append(p);}
      if(fu.client_message){const p=el('p',undefined,'of-client');p.append(el('b','Para el cliente: '),document.createTextNode(fu.client_message));main.append(p);}
+     if(fu.recommendation){const p=el('p',undefined,'of-client');p.append(el('b','Recomendación: '),document.createTextNode(fu.recommendation));main.append(p);}
      if(fu.next_action||fu.next_date)main.append(el('p','Próxima acción: '+[fu.next_action,fu.next_date?dashboardDate(fu.next_date):''].filter(Boolean).join(' · '),'oh-detail'));
      if(fu.files.length){const fl=el('div',undefined,'of-file-links');for(const f of fu.files){const a=el('a',f.name+(f.visible_to_client?' (visible)':' (interno)'));a.href='/api/orders/'+order.id+'/followups/files/'+f.id;a.target='_blank';a.rel='noopener';fl.append(a);}main.append(fl);}
-     for(const m of fu.messages)main.append(el('p',OF_CHANNEL[m.channel]+' · '+OF_MSG[m.status]+(m.error?' · '+m.error:'')+' · '+formatOrderDate(m.updated_at),'oh-detail'));}
-    else if(fu.client_message||fu.internal_note)main.append(el('span',(fu.internal_note||fu.client_message).slice(0,140)+((fu.internal_note||fu.client_message).length>140?'…':''),'oh-detail'));
+     for(const m of fu.messages)main.append(el('p',OF_CHANNEL[m.channel]+' · '+m.status_label+(m.error?' · '+m.error:'')+' · '+formatOrderDate(m.updated_at),'oh-detail'));}
+    else{const t=fu.internal_note||fu.client_message||fu.recommendation;if(t)main.append(el('span',t.slice(0,140)+(t.length>140?'…':''),'oh-detail'));}
     const ra=el('div',undefined,'of-row-acts');ra.append(button('Preparar mensaje',()=>orderMessageComposer(order.id,fu.id),'oh-more'),button('Corregir',()=>addOrderFollowUp(order.id,{kind:fu.kind,corrects_id:fu.id}),'oh-more'));main.append(ra);}
    else main.append(el('strong',info.title),el('span',info.detail,'oh-detail'));
    if(info.comment&&!fu){const text=el('p',info.comment,'oh-comment'),long=info.comment.length>150||info.comment.includes('\n');main.append(text);if(long){text.dataset.clamp='true';const expand=button('Ver detalle',()=>{const open=text.dataset.clamp==='true';text.dataset.clamp=String(!open);expand.textContent=open?'Ocultar detalle':'Ver detalle';expand.setAttribute('aria-expanded',String(open));},'oh-expand');expand.setAttribute('aria-expanded','false');main.append(expand);}}
    side.append(when,el('span',info.actor));item.append(icon,main,side);list.append(item);}
   state.rows.forEach(row=>known.add(row.id));first=false;}
+ // Cada comunicación con el cliente es un evento de la línea de tiempo con su estado real (preparado, abierto en WhatsApp, enviado, entregado o fallido).
+ function messageRow(row){const m=row.msg,item=el('li',undefined,'oh-item oh-message'),icon=el('span',undefined,'track-icon'),main=el('div',undefined,'oh-main'),side=el('div',undefined,'oh-side'),when=el('time',formatOrderDate(m.created_at));
+  const[glyph,color]=OF_LOOK.comunicacion;item.style.setProperty('--tk',color);item.style.setProperty('--tk-soft',color+'26');icon.append(systemIcon(glyph));item.dataset.group='comunicacion';item.dataset.status=m.status;when.dateTime=new Date(m.created_at).toISOString();
+  const chips=el('div',undefined,'of-chips');chips.append(cjChip(m.status==='error'?'anulada':m.status==='preparado'?'borrador':'cerrada',m.status_label));if(m.sources?.length)chips.append(cjChip('abierta',m.sources.length+' seguimiento(s) usado(s)'));
+  main.append(el('strong','Mensaje al cliente · '+(OF_CHANNEL[m.channel]||m.channel)),chips,el('span',[m.recipient&&'Para: '+m.recipient,m.subject&&'Asunto: '+m.subject,m.provider_id&&'Id. del proveedor: '+m.provider_id,m.error&&'Error: '+m.error].filter(Boolean).join(' · ')||'Sin destinatario registrado','oh-detail'));
+  if(state.detail){const p=el('p',undefined,'of-client');p.append(document.createTextNode(m.body));main.append(p);}
+  side.append(when,el('span',m.actor||'—'));item.append(icon,main,side);return item;}
  const stamp=error=>{sync.dataset.state=error?'error':'ok';sync.textContent=error?'Sin conexión · se reintentará':'Actualizado · '+new Intl.DateTimeFormat('es-EC',{timeZone:'America/Guayaquil',hour:'2-digit',minute:'2-digit'}).format(new Date(Date.now()+clockOffset));};
  setRows((order.history||[]).map(row=>({code:order.code,...row})));paintCollapse();paint();stamp(false);
- api('/api/orders/'+order.id+'/followups').then(d=>{state.fu=new Map(d.followups.filter(f=>f.history_id).map(f=>[f.history_id,f]));paint();}).catch(()=>{});
+ api('/api/orders/'+order.id+'/followups').then(d=>{state.fu=new Map(d.followups.filter(f=>f.history_id).map(f=>[f.history_id,f]));state.msgs=d.messages||[];setRows(state.base);paint();}).catch(()=>{});
  // Revisiones por falla recurrente: cuántas veces volvió el equipo y por qué (registro inmutable, misma orden).
  if(order.recurrences?.length){const box=el('div',undefined,'recurrence-box'),list=el('ol');box.append(el('strong','Revisiones por falla recurrente: '+order.recurrences.length));
   for(const item of order.recurrences){const li=el('li');li.append(el('b','N.º '+item.number+(item.reentry?' · reingreso':'')),el('span',item.reason),el('small',formatOrderDate(item.created_at)+' · '+(item.technician||'Sin técnico asignado')));list.append(li);}
@@ -3274,7 +3282,6 @@ function clientEquipmentHistory(data){const items=data.equipment||[],section=el(
 const OF_LOOK={tecnico:['M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z','#38BDF8'],
  autorizacion:['M9 12l2 2 4-4 M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9 9 4.03 9 9z','#F5B544'],comunicacion:['M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z','#A78BFA'],
  incidencia:['M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z M12 9v4 M12 17h.01','#F87171'],pago:['M2 7h20v10H2z M12 12h.01 M6 12h.01 M18 12h.01','#34D399']};
-const OF_MSG={preparado:'Preparado (no enviado)',enviado:'Enviado',entregado:'Entregado',leido:'Leído',error:'Error de envío'};
 const OF_CHANNEL={whatsapp:'WhatsApp Business',whatsapp_manual:'WhatsApp (manual)',correo:'Correo',copia:'Texto copiado'};
 async function addOrderFollowUp(id,preset={}){let data;try{data=await api('/api/orders/'+id+'/followups');}catch(error){notify(error.message);return;}
  const dialog=invDialog('Agregar seguimiento · '+data.order.code,true);dialog.classList.add('of-dialog');const{form,msg,field,fail,clear}=invForm('bank-form inv-sheet-form of-form');dialog.append(form);
@@ -3287,7 +3294,7 @@ async function addOrderFollowUp(id,preset={}){let data;try{data=await api('/api/
  const internal=el('fieldset',undefined,'inv-group of-private'),il=el('legend');il.append(invIcon('lock'),el('span','Solo para el taller (nunca se envía ni se publica)'));internal.append(il);form.append(internal);
  field('internal_note','Descripción técnica interna',{area:true,max:2000,into:internal});
  const pub=el('fieldset',undefined,'inv-group of-public'),pl=el('legend');pl.append(invIcon('send'),el('span','Para el cliente'));pub.append(pl);form.append(pub);
- field('client_message','Mensaje destinado al cliente',{area:true,max:1500,into:pub,hint:'Solo lo que se puede comunicar: sin datos internos ni credenciales.'});
+ field('client_message','Mensaje destinado al cliente',{area:true,max:1500,into:pub,hint:'Solo lo que se puede comunicar: sin datos internos ni credenciales.'});field('recommendation','Recomendación para el cliente',{area:true,max:800,into:pub,hint:'Opcional. Por ejemplo: «Recomendamos reemplazar la unidad de almacenamiento.»'});
  const vis=el('label',undefined,'inv-cf'),visC=el('input');visC.type='checkbox';visC.name='client_visible';vis.append(visC,el('span','Mostrar este mensaje en el enlace público de seguimiento'));pub.append(vis);
  const ev=el('fieldset',undefined,'inv-group'),el_=el('legend');el_.append(invIcon('file-text'),el('span','Evidencias (máx. 3 · 900 KB c/u · JPG, PNG, WEBP o PDF)'));ev.append(el_);form.append(ev);
  const fileIn=el('input');fileIn.type='file';fileIn.multiple=true;fileIn.accept='image/jpeg,image/png,image/webp,application/pdf';fileIn.setAttribute('aria-label','Adjuntar evidencias');const flist=el('ul',undefined,'of-files');ev.append(fileIn,flist);let picked=[];
@@ -3301,29 +3308,127 @@ async function addOrderFollowUp(id,preset={}){let data;try{data=await api('/api/
  form.addEventListener('submit',async e=>{e.preventDefault();clear();const fd=new FormData(form),body={request_key:key,files:JSON.stringify(picked.map(f=>({name:f.name,data:f.data,visible:f.visible?'1':''})))};
   for(const[k,v]of fd.entries())body[k]=k==='client_visible'?'1':String(v);save.disabled=true;
   try{const r=await api('/api/orders/'+id+'/followups',body);dialog.close();toast('Seguimiento registrado.','success');await showOrderDetail(id);
-   if(body.client_message&&await askConfirm('¿Preparar un mensaje para el cliente?','Puedes enviarlo por WhatsApp o por correo con una plantilla, revisándolo antes.','Preparar mensaje'))orderMessageComposer(id,r.id);}
+   if((body.client_message||body.recommendation)&&await askConfirm('¿Preparar un mensaje para el cliente?','Puedes enviarlo por WhatsApp o por correo con una plantilla, revisándolo antes.','Preparar mensaje'))orderMessageComposer(id,r.id);}
   catch(error){save.disabled=false;fail(error);}});}
+// Copia al portapapeles con respaldo para navegadores sin permiso; devuelve si de verdad se copió (solo entonces se registra).
+async function copyToClipboard(text){try{await navigator.clipboard.writeText(text);return true;}catch{}const area=el('textarea');area.value=text;area.readOnly=true;area.className='sr-only';document.body.append(area);area.select();let ok=false;try{ok=document.execCommand('copy');}catch{}area.remove();return ok;}
+const CM_MODES=[['auto','Último seguimiento comunicable'],['one','Seleccionar un seguimiento anterior'],['many','Seleccionar varias novedades'],['manual','Preparar mensaje manual']];
+// Ventana «Comunicación con el cliente»: recupera el último seguimiento comunicable de la orden (nunca su nota interna), arma el borrador con
+// la plantilla y deja revisar, editar y comunicar. Abrir WhatsApp o copiar quedan registrados como lo que son, nunca como «enviado».
 async function orderMessageComposer(id,followupId=null){let data;try{data=await api('/api/orders/'+id+'/followups');}catch(error){notify(error.message);return;}
- const fu=followupId?data.followups.find(f=>f.id===followupId):null,dialog=invDialog('Preparar mensaje al cliente · '+data.order.code,true);dialog.classList.add('of-dialog');const{form,msg,field,fail,clear}=invForm('bank-form inv-sheet-form of-form');dialog.append(form);
- form.append(el('p','Revisa y edita el texto antes de enviarlo. No incluye la nota interna del taller.','inv-form-note'));
- const tpl=field('template','Plantilla',{options:Object.entries(data.templates),value:fu&&fu.kind==='esperando_autorizacion'?'autorizacion':fu&&fu.kind==='listo_entrega'?'listo':fu&&fu.kind==='repuesto'?'repuesto':'novedad'});
- const text=field('body','Mensaje',{area:true,max:4000,required:true});text.rows=12;
- const load=async()=>{try{const r=await api('/api/orders/'+id+'/messages',{action:'compose',template:tpl.value,followup_id:followupId?String(followupId):''});text.value=r.body;}catch(error){notify(error.message);}};tpl.addEventListener('change',load);await load();
- if(!data.tracking.active)form.append(el('p','La orden no tiene enlace público de seguimiento activo: el mensaje irá sin enlace.','inv-warn'));
- const visible=(fu?.files||[]).filter(f=>f.visible_to_client);const picks=[];if(visible.length){const box=el('fieldset',undefined,'inv-group'),lg=el('legend');lg.append(invIcon('file-text'),el('span','Adjuntar al correo (evidencias visibles para el cliente)'));box.append(lg);
-  for(const f of visible){const l=el('label',undefined,'inv-cf'),c=el('input');c.type='checkbox';c.value=String(f.id);picks.push(c);l.append(c,el('span',f.name));box.append(l);}form.append(box);}
- const acts=el('div',undefined,'of-actions'),keys={},note=el('p','','of-hint');form.append(msg,acts,note);let busy=false;
- // Una clave por canal durante toda la ventana: un doble clic o un reintento no envían dos veces.
- const run=async(action,extra)=>{if(busy)return null;clear();if(text.value.trim().length<10){msg.textContent='Escribe el mensaje.';return null;}busy=true;acts.setAttribute('aria-busy','true');const channel=action+(extra?.channel||'');keys[channel]=keys[channel]||cjKey();
-  try{return await api('/api/orders/'+id+'/messages',{action,template:tpl.value,body:text.value,followup_id:followupId?String(followupId):'',request_key:keys[channel],...extra});}catch(error){fail(error);return null;}finally{busy=false;acts.removeAttribute('aria-busy');}};
- const wa=whatsappNumber(data.order.phone);
- if(data.whatsapp.configured)acts.append(invBtn('Enviar por WhatsApp Business','send',async()=>{if(!await askConfirm('¿Enviar por WhatsApp Business?','Se enviará a '+(data.order.phone||'—')+'. El estado de entrega y lectura llegará solo si WhatsApp lo confirma.','Enviar'))return;const r=await run('whatsapp');if(r){toast(r.ok?'Enviado por WhatsApp Business.':'WhatsApp no aceptó el mensaje: '+r.error,r.ok?'success':'error');dialog.close();showOrderDetail(id);}},'primary'));
- const manual=invBtn('Abrir WhatsApp (manual)','external-link',async()=>{const r=await run('prepare',{channel:'whatsapp_manual',recipient:data.order.phone});if(!r)return;const a=el('a');whatsappLink(a,data.order.phone,text.value);if(a.href&&a.href!=='#')window.open(a.href,'_blank','noopener');toast('Abierto en WhatsApp. Queda como «preparado»: el sistema no puede confirmar que lo enviaste.','info');dialog.close();showOrderDetail(id);});
- if(!wa.ok){manual.disabled=true;manual.title=wa.reason||'Sin número válido.';}acts.append(manual);
- const mail=invBtn('Enviar por correo','mail',async()=>{if(!await askConfirm('¿Enviar por correo?','Para: '+(data.order.email||'—')+(picks.some(p=>p.checked)?' · con '+picks.filter(p=>p.checked).length+' adjunto(s)':''),'Enviar'))return;const r=await run('email',{recipient:data.order.email,file_ids:picks.filter(p=>p.checked).map(p=>p.value).join(',')});if(r){toast(r.ok?'Correo enviado (aceptado por el servidor).':'El correo no salió: '+r.error,r.ok?'success':'error');dialog.close();showOrderDetail(id);}});
- if(!data.mail||!data.order.email){mail.disabled=true;mail.title=!data.mail?'El correo no está configurado en Mail Pro.':'El cliente no tiene correo registrado.';}acts.append(mail);
- acts.append(invBtn('Copiar texto','file-text',async()=>{try{await navigator.clipboard.writeText(text.value);}catch{}const r=await run('prepare',{channel:'copia'});if(r){toast('Texto copiado. Queda como «preparado», no como enviado.','info');dialog.close();showOrderDetail(id);}}));
- note.textContent=data.whatsapp.configured?'WhatsApp Business está configurado.':'WhatsApp Business no está configurado: solo la opción manual, que se registra como «preparado» (no enviado).';}
+ const o=data.order,src=data.sources,keyOf=s=>s.type+':'+s.id,byKey=new Map(src.map(s=>[keyOf(s),s]));
+ const dialog=invDialog('Comunicación con el cliente',true);dialog.classList.add('cm-dialog');
+ {const heading=dialog.querySelector('.dialog-heading'),h2=heading.querySelector('h2'),titles=el('div',undefined,'cm-titles'),facts=el('p',undefined,'cm-facts'),status=el('span',o.status_label,'cm-status');status.dataset.status=o.status;
+  facts.append(el('span',o.code,'cm-code'),el('span',o.client||'Cliente sin nombre','cm-client'),status);h2.replaceWith(titles);titles.append(h2,facts);}
+ const{form,msg,field,fail,clear}=invForm('cm-form');dialog.append(form);form.addEventListener('submit',e=>e.preventDefault());
+ const body=el('div',undefined,'cm-body'),info=el('aside',undefined,'cm-info'),main=el('section',undefined,'cm-main'),foot=el('footer',undefined,'cm-foot');body.append(info,main);form.append(body,foot);
+ info.setAttribute('aria-label','Información del seguimiento');main.setAttribute('aria-label','Preparación del mensaje');
+ const card=(title,glyph,cls='')=>{const s=el('section',undefined,'cm-card '+cls),h=el('h3');h.append(invIcon(glyph),el('span',title));s.append(h);info.append(s);return s;};
+ const facts=(box,rows)=>{const dl=el('dl',undefined,'cm-dl');for(const[k,v]of rows){if(!v)continue;dl.append(el('dt',k),el('dd',v));}box.append(dl);return dl;};
+ const device=[receptionOptions?.device_types?.[o.kind]||o.kind,[o.brand,o.model].filter(Boolean).join(' ')].filter(Boolean).join(' · ');
+ facts(card('Orden y cliente','monitor'),[['Cliente',o.client||'Sin nombre'],['Equipo',device||'Sin datos del equipo'],['Orden',o.code],['Estado actual',o.status_label],['Técnico responsable',o.technician||'Sin asignar']]);
+ // Qué se comunica: el último seguimiento comunicable, uno o varios elegidos, o nada (mensaje manual).
+ const pick=card('Información que desea comunicar','list-checks','cm-pick');
+ const mode=field('mode','Origen del mensaje',{options:CM_MODES,into:pick});const pickNote=el('p','','cm-note');const list=el('ul',undefined,'cm-sources');list.setAttribute('aria-label','Seguimientos de la orden');pick.append(pickNote,list);
+ const latest=card('Última novedad técnica','history','cm-latest');const latestBody=el('div');latest.append(latestBody);
+ if(o.findings){const c=card('Diagnóstico (hallazgos internos)','lock','cm-private');c.append(el('p',o.findings,'cm-quote'),el('small','Referencia del taller: no se incluye en el mensaje.','cm-note'));}
+ let recC=null;if(o.recommendations){const c=card('Recomendaciones de la orden','circle-check');c.append(el('p',o.recommendations,'cm-quote'));const l=el('label',undefined,'inv-cf');recC=el('input');recC.type='checkbox';l.append(recC,el('span','Incluir en el mensaje'));c.append(l);}
+ const costCard=card('Presupuesto relacionado','circle-dollar-sign','cm-cost'),costInfo=el('p','','cm-note'),costL=el('label',undefined,'inv-cf'),costC=el('input');costC.type='checkbox';costL.append(costC,el('span','Incluir el costo en el mensaje'));costCard.append(costInfo,costL);
+ // Columna derecha: plantilla, canal, destinatario, editor y vista previa.
+ const top=el('div',undefined,'cm-row');main.append(top);
+ const tpl=field('template','Plantilla',{options:Object.entries(data.templates),into:top});
+ const chan=el('fieldset',undefined,'cm-channel');chan.append(el('legend','Canal de comunicación'));const radios={};
+ for(const[v,l,g]of [['whatsapp','WhatsApp','message-circle'],['correo','Correo','mail']]){const lab=el('label',undefined,'cm-seg'),r=el('input');r.type='radio';r.name='channel';r.value=v;radios[v]=r;lab.append(r,invIcon(g),el('span',l));chan.append(lab);}top.append(chan);
+ const to=el('div',undefined,'cm-row cm-to');main.append(to);
+ const phone=field('recipient','WhatsApp del cliente',{value:o.phone,max:30,mode:'tel',into:to,hint:' '}),phoneHint=phone.closest('.inv-field').querySelector('small');
+ const email=field('recipient_email','Correo del cliente',{type:'email',value:o.email,max:200,into:to}),subject=field('subject','Asunto del correo',{max:150,into:to});
+ const editor=el('div',undefined,'cm-editor'),bar=el('div',undefined,'cm-toolbar'),tabs=el('div',undefined,'cm-tabs'),tabEdit=button('Editar',()=>view(false),'cm-tab'),tabPrev=button('Vista previa',()=>view(true),'cm-tab');tabs.setAttribute('role','group');tabs.setAttribute('aria-label','Modo del editor');tabs.append(tabEdit,tabPrev);
+ const state=el('span','','cm-state'),count=el('span','','cm-count'),regen=invBtn('Regenerar','rotate-ccw',()=>regenerate(false));bar.append(tabs,state,count,regen);
+ const text=el('textarea',undefined,'cm-text');text.name='body';text.maxLength=4000;text.setAttribute('aria-label','Mensaje para el cliente');text.spellcheck=true;
+ const preview=el('div',undefined,'cm-preview');preview.hidden=true;preview.setAttribute('aria-live','polite');const warn=el('ul',undefined,'cm-warn');editor.append(bar,warn,text,preview);main.append(editor);
+ // Correo: evidencias visibles para el cliente y el PDF del presupuesto (solo si ya fue enviado o decidido).
+ const attach=el('fieldset',undefined,'inv-group cm-attach'),al=el('legend');al.append(invIcon('file-text'),el('span','Adjuntos del correo'));attach.append(al);const filePicks=[];let quotePick=null;
+ for(const f of data.followups.flatMap(f=>f.files.filter(x=>x.visible_to_client))){const l=el('label',undefined,'inv-cf'),c=el('input');c.type='checkbox';c.value=String(f.id);c.addEventListener('change',()=>{if(filePicks.filter(p=>p.checked).length>3){c.checked=false;notify('Máximo 3 evidencias por correo.');}paintPreview();});filePicks.push(c);l.append(c,el('span',f.name+' (evidencia)'));attach.append(l);}
+ const sendable=data.quotes.find(q=>!['borrador','cancelado'].includes(q.status));if(sendable){const l=el('label',undefined,'inv-cf');quotePick=el('input');quotePick.type='checkbox';quotePick.value=String(sendable.id);quotePick.addEventListener('change',paintPreview);l.append(quotePick,el('span','Presupuesto '+sendable.code+' en PDF ('+sendable.status_label.toLowerCase()+')'));attach.append(l);}
+ if(!filePicks.length&&!quotePick)attach.append(el('small','Sin adjuntos disponibles: solo se envían evidencias marcadas como visibles para el cliente y presupuestos ya enviados.','cm-note'));main.append(attach);
+ // Historial de comunicaciones de la orden, con su estado real.
+ const log=el('details',undefined,'cm-log'),ls=el('summary','Historial de comunicaciones ('+data.messages.length+')'),ll=el('ol');log.append(ls,ll);
+ for(const m of data.messages){const li=el('li'),head=el('div');head.append(el('strong',m.status_label),el('span',OF_CHANNEL[m.channel]||m.channel,'cm-chip'));li.dataset.status=m.status;
+  li.append(head,el('small',[formatOrderDate(m.created_at),m.actor,m.recipient&&'Para: '+m.recipient,m.sources?.length?m.sources.length+' seguimiento(s) usado(s)':'Mensaje manual',m.provider_id&&'Id. del proveedor: '+m.provider_id].filter(Boolean).join(' · ')));
+  if(m.subject)li.append(el('small','Asunto: '+m.subject));if(m.error)li.append(el('small','Error: '+m.error,'cm-error'));li.append(el('p',m.body.length>220?m.body.slice(0,220)+'…':m.body,'cm-quote'));ll.append(li);}
+ if(!data.messages.length)ll.append(el('li','Aún no hay comunicaciones registradas en esta orden.','cm-note'));main.append(log);
+ // Pie fijo: copiar y comunicar por el canal elegido.
+ const note=el('p','','cm-foot-note'),acts=el('div',undefined,'cm-actions');foot.append(note,msg,acts);
+ const close=button('Cancelar',()=>requestModalClose(dialog),'secondary'),copy=invBtn('Copiar texto','copy',()=>doCopy()),openWa=invBtn('Abrir WhatsApp','external-link',()=>doManual()),
+  business=invBtn('Enviar por WhatsApp Business','send',()=>doBusiness(false),'primary'),approved=invBtn('Enviar plantilla aprobada','badge-check',()=>doBusiness(true)),mail=invBtn('Enviar por correo','mail',()=>doMail(),'primary');
+ acts.append(close,copy,openWa,approved,business,mail);
+ let generated='',used=[],costTouched=false,tplTouched=false,done=false,busy=false,pending=false;const confirmed=new Set(),keys={},chosen=new Set();
+ const dirty=()=>!!text.value.trim()&&text.value.trim()!==generated.trim();
+ const channel=()=>radios.correo.checked?'correo':'whatsapp';
+ const fit=()=>{if(preview.hidden){text.style.height='auto';text.style.height=Math.max(text.scrollHeight+4,window.innerWidth<700?260:340)+'px';}};
+ function view(prev){preview.hidden=!prev;text.hidden=prev;tabEdit.setAttribute('aria-pressed',String(!prev));tabPrev.setAttribute('aria-pressed',String(prev));if(prev)paintPreview();else fit();}
+ function paintState(){const n=text.value.length;count.textContent=n+' / 4000 caracteres';state.textContent=pending?'Cambios sin aplicar: pulsa Regenerar':dirty()?'Borrador editado · sin registrar':'Borrador · sin registrar';state.dataset.tone=pending||dirty()?'edit':'draft';}
+ function paintPreview(){preview.replaceChildren();const ch=channel();
+  if(ch==='whatsapp'){const wa=el('div',undefined,'cm-wa'),bubble=el('div',undefined,'cm-bubble'),t=whatsappNumber(phone.value);wa.append(el('small','Para: '+(t.ok?'+'+t.number:phone.value||'sin número'),'cm-note'));bubble.append(el('p',text.value||'(sin texto)'),el('small',new Intl.DateTimeFormat('es-EC',{timeZone:'America/Guayaquil',hour:'2-digit',minute:'2-digit'}).format(new Date()),'cm-time'));wa.append(bubble);preview.append(wa);}
+  else{const m=el('div',undefined,'cm-mail'),files=[...filePicks.filter(p=>p.checked).map(p=>p.nextSibling.textContent),...(quotePick?.checked?[quotePick.nextSibling.textContent]:[])];
+   facts(m,[['Para',email.value||'sin correo'],['Asunto',subject.value],['Adjuntos',files.join(', ')||'Ninguno']]);m.append(el('p',text.value||'(sin texto)','cm-mail-body'));preview.append(m);}}
+ function paintChannel(){const ch=channel();for(const n of [phone.closest('.inv-field')])n.hidden=ch!=='whatsapp';for(const n of [email.closest('.inv-field'),subject.closest('.inv-field'),attach])n.hidden=ch!=='correo';
+  openWa.hidden=business.hidden=approved.hidden=ch!=='whatsapp';mail.hidden=ch!=='correo';business.hidden||=!data.whatsapp.configured;approved.hidden||=!(data.whatsapp.configured&&data.whatsapp.template);
+  openWa.classList.toggle('primary',!data.whatsapp.configured);openWa.classList.toggle('secondary',!!data.whatsapp.configured);
+  const t=whatsappNumber(phone.value);phoneHint.textContent=t.ok?'Se abrirá la conversación con +'+t.number+'.':t.reason;phoneHint.dataset.tone=t.ok?'ok':'warn';openWa.disabled=business.disabled=approved.disabled=!t.ok;
+  mail.disabled=!data.mail||!email.value.trim();mail.title=!data.mail?'El correo no está configurado en Mail Pro.':!email.value.trim()?'Indica el correo del cliente.':'';
+  note.textContent=ch==='correo'?(data.mail?'El correo se envía con Mail Pro; «enviado» significa que el servidor lo aceptó.':'Mail Pro no está configurado: no se puede enviar correo.'):data.whatsapp.configured?'WhatsApp Business configurado: el estado de entrega y lectura llega solo si WhatsApp lo confirma.':'WhatsApp Business no está configurado: «Abrir WhatsApp» prepara el mensaje y queda registrado como abierto, no como enviado.';paintPreview();}
+ // Selección de seguimientos según el modo; los registros técnicos anteriores (internos) piden confirmación expresa.
+ const auto=src.find(s=>s.auto),newest=src.find(s=>s.type==='followup');
+ function paintSources(){const m=mode.value;list.replaceChildren();list.hidden=m==='auto'||m==='manual';
+  pickNote.textContent=m==='manual'?'Mensaje manual: no se usa ningún seguimiento; escribe el texto en el editor.':m==='auto'?(auto?(newest&&newest!==auto&&!newest.communicable?'El último seguimiento es solo interno: se usa el último comunicable.':'Se usa el último seguimiento comunicable.'):'No hay seguimientos comunicables. Elige un registro anterior o prepara el mensaje manual; la nota interna nunca se incluye.'):m==='one'?(auto?'Elige el seguimiento que quieres comunicar (del más reciente al más antiguo).':'No hay seguimientos comunicables. Puedes elegir un registro técnico anterior (interno, con confirmación) o preparar el mensaje manual.'):'Marca las novedades que quieres comunicar: se resumen sin repetir frases.';
+  for(const s of src){const li=el('li'),lab=el('label',undefined,'cm-src'),input=el('input'),txt=el('div');input.type=m==='one'?'radio':'checkbox';input.name='cm-source';input.value=keyOf(s);input.checked=chosen.has(keyOf(s));
+   const usable=s.type==='history'||s.communicable;input.disabled=!usable;li.dataset.type=s.type;li.dataset.usable=String(usable);
+   const tags=el('span',undefined,'cm-src-tags');if(s.type==='history')tags.append(el('span','Interno anterior','cm-chip cm-chip-warn'));else if(!s.communicable)tags.append(el('span','Solo interno','cm-chip cm-chip-off'));if(s.group==='pago')tags.append(el('span','Pago','cm-chip'));if(s.superseded_by)tags.append(el('span','Corregido por #'+s.superseded_by,'cm-chip'));
+   txt.append(el('strong',s.label),tags,el('small',formatOrderDate(s.at)+' · '+(s.actor||'Sistema')),el('p',s.summary,'cm-src-sum'));lab.append(input,txt);li.append(lab);list.append(li);
+   input.addEventListener('change',async()=>{if(input.checked&&s.type==='history'&&!confirmed.has(keyOf(s))){if(!await askConfirm('¿Usar un registro técnico interno?','Este comentario se registró en el historial como nota técnica, antes del centro de seguimiento. Se copiará al borrador para que lo revises: quita lo que no deba conocer el cliente.','Usar en el borrador')){input.checked=false;return;}confirmed.add(keyOf(s));}
+    if(m==='one')chosen.clear();if(input.checked)chosen.add(keyOf(s));else chosen.delete(keyOf(s));paintLatest();regenerate(false);});}}
+ function current(){return mode.value==='auto'?(auto?[auto]:[]):mode.value==='manual'?[]:src.filter(s=>chosen.has(keyOf(s)));}
+ function paintLatest(){latestBody.replaceChildren();const items=current();if(!items.length){latestBody.append(el('p',mode.value==='manual'?'Mensaje manual.':'Sin novedad comunicable seleccionada.','cm-note'));return;}
+  for(const s of items){const b=el('div',undefined,'cm-latest-item');facts(b,[['Fecha',formatOrderDate(s.at)],['Tipo',s.label],['Técnico',s.actor||'—']]);b.append(el('p',s.type==='history'?s.text:s.summary,'cm-quote'));latestBody.append(b);}
+  if(!tplTouched){const k=items[items.length-1]?.kind;if(data.template_for_kind[k])tpl.value=data.template_for_kind[k];}}
+ function selection(){const m=mode.value;if(m==='auto'||m==='manual')return{selection:m};const items=current();return{selection:'ids',followup_ids:items.filter(s=>s.type==='followup').map(s=>s.id).join(','),history_ids:items.filter(s=>s.type==='history').map(s=>s.id).join(',')};}
+ function paintCost(r){const c=r.cost;costCard.hidden=!c&&!data.quotes.length;if(!c){costInfo.textContent=data.quotes.length?'El presupuesto no tiene un valor comunicable (cancelado, rechazado o sin partidas).':'';costL.hidden=true;return;}
+  costL.hidden=false;costC.checked=r.cost_included;costInfo.textContent=c.code+' · '+c.status_label+' · '+c.label+': '+c.amount+(c.draft?' · En borrador: no se incluye salvo que lo marques.':'');costInfo.dataset.tone=c.draft?'warn':'';}
+ async function regenerate(initial){if(busy)return;if(!initial&&dirty()&&!await askConfirm('¿Reemplazar el mensaje editado?','Modificaste el texto a mano. El nuevo borrador lo reemplazará por completo.','Reemplazar')){pending=true;paintState();return;}
+  regen.disabled=true;try{const r=await api('/api/orders/'+id+'/messages',{action:'compose',template:tpl.value,...selection(),cost:costTouched?(costC.checked?'1':'0'):'',order_recommendations:recC?.checked?'1':''});
+   generated=r.body;text.value=r.body;subject.value=r.subject;used=r.sources;pending=false;paintCost(r);warn.replaceChildren(...r.warnings.map(w=>el('li',w)));fit();paintState();paintPreview();}
+  catch(error){notify(error.message);}finally{regen.disabled=false;}}
+ mode.addEventListener('change',()=>{if(mode.value==='one'&&chosen.size>1){const first=[...chosen][0];chosen.clear();chosen.add(first);}paintSources();paintLatest();regenerate(false);});
+ tpl.addEventListener('change',()=>{tplTouched=true;regenerate(false);});costC.addEventListener('change',()=>{costTouched=true;regenerate(false);});recC?.addEventListener('change',()=>regenerate(false));
+ for(const r of Object.values(radios))r.addEventListener('change',paintChannel);phone.addEventListener('input',paintChannel);email.addEventListener('input',paintChannel);subject.addEventListener('input',paintPreview);
+ text.addEventListener('input',()=>{fit();paintState();});window.addEventListener('resize',fit,{passive:true});dialog.addEventListener('close',()=>window.removeEventListener('resize',fit));
+ // Cerrar con cambios propios pide confirmación (Escape, la X o Cancelar); después de comunicar se cierra sin preguntar.
+ dialog.beforeClose=async()=>{if(!done&&dirty()&&!await askConfirm('¿Descartar el mensaje?','Editaste el texto y aún no se registró. Si cierras, se perderán los cambios.','Descartar',true))return false;delete dialog.dataset.baseline;return true;};
+ const ready=()=>{clear();const v=text.value.trim();if(v.length<10){msg.textContent='Escribe el mensaje para el cliente.';view(false);text.focus();return false;}
+  if(v.includes('[Escriba')){msg.textContent='El mensaje tiene espacios por completar: reemplaza el texto entre corchetes.';view(false);text.focus();return false;}return true;};
+ const latestFollowup=()=>[...used].reverse().find(s=>s.type==='followup')?.id||'';
+ // Una clave por canal y texto: un doble clic o un reintento del mismo mensaje no lo duplican; un texto distinto es otro mensaje.
+ async function run(action,extra){if(busy)return null;busy=true;acts.setAttribute('aria-busy','true');const k=action+(extra.channel||'')+(extra.mode||'')+'|'+text.value.trim();keys[k]=keys[k]||cjKey();
+  try{return await api('/api/orders/'+id+'/messages',{action,template:tpl.value,body:text.value.trim(),subject:subject.value,sources:JSON.stringify(used),followup_id:String(latestFollowup()),request_key:keys[k],...extra});}
+  catch(error){fail(error);return null;}finally{busy=false;acts.removeAttribute('aria-busy');}}
+ const finish=(message,tone)=>{done=true;toast(message,tone);dialog.close();showOrderDetail(id);};
+ async function doCopy(){if(!ready())return;if(!await copyToClipboard(text.value.trim())){notify('No se pudo copiar: selecciona el texto y cópialo manualmente. No se registró nada.');return;}const r=await run('prepare',{channel:'copia'});if(r)finish('Texto copiado. Queda como «preparado (copiado)», no como enviado.','info');}
+ async function doManual(){if(!ready())return;const t=whatsappNumber(phone.value);if(!t.ok){fail({message:t.reason,fields:{recipient:t.reason}});return;}
+  // La ventana se abre en el mismo clic (si no, el navegador la bloquea) y se dirige a WhatsApp solo después de registrar la apertura.
+  const w=window.open('','_blank');const r=await run('prepare',{channel:'whatsapp_manual',recipient:phone.value});if(!r){w?.close();return;}
+  const url='https://wa.me/'+t.number+'?text='+encodeURIComponent(text.value.trim());if(w){w.opener=null;w.location.href=url;}else window.location.assign(url);
+  finish('Se abrió WhatsApp con el mensaje para +'+t.number+'. Queda como «abierto en WhatsApp (manual)»: Órdenes Pro no puede confirmar que lo enviaste.','info');}
+ async function doBusiness(template){if(!template&&!ready())return;if(!await askConfirm(template?'¿Enviar la plantilla aprobada?':'¿Enviar por WhatsApp Business?',(template?'Se enviará la plantilla «'+data.whatsapp.template+'» con el nombre del cliente y el número de orden':'Se enviará este texto')+' a '+phone.value+'. Entregado y leído se marcan solo cuando WhatsApp lo confirma.','Enviar'))return;
+  const r=await run('whatsapp',{recipient:phone.value,...(template?{mode:'template'}:{})});if(r)r.ok?finish('WhatsApp Business aceptó el mensaje (enviado).','success'):msg.textContent='WhatsApp no aceptó el mensaje: '+(r.error||'error')+'. Quedó registrado como fallido; puedes reintentar.';}
+ async function doMail(){if(!ready())return;const files=filePicks.filter(p=>p.checked);if(!await askConfirm('¿Enviar por correo?','Para: '+email.value+' · Asunto: '+subject.value+(files.length||quotePick?.checked?' · Adjuntos: '+(files.length+(quotePick?.checked?1:0)):''),'Enviar'))return;
+  const r=await run('email',{recipient:email.value.trim(),file_ids:files.map(p=>p.value).join(','),quote_id:quotePick?.checked?quotePick.value:''});if(r)r.ok?finish('Correo enviado (aceptado por el servidor de correo).','success'):msg.textContent='El correo no salió: '+(r.error||'error')+'. Quedó registrado como fallido.';}
+ // Estado inicial: el seguimiento desde el que se abrió (si es comunicable) o el último comunicable.
+ const start=followupId?byKey.get('followup:'+followupId):null;
+ if(start&&start.communicable){mode.value='one';chosen.add(keyOf(start));}else if(start){mode.value=auto?'auto':'manual';toast('Ese seguimiento solo tiene nota interna: no se comunica. Se usa '+(auto?'el último seguimiento comunicable.':'un mensaje manual.'),'info');}
+ else if(!auto)mode.value=src.some(s=>s.type==='history')?'one':'manual';
+ (whatsappNumber(o.phone).ok||!o.email?radios.whatsapp:radios.correo).checked=true;
+ paintSources();paintLatest();paintChannel();view(false);await regenerate(true);text.focus({preventScroll:true});text.setSelectionRange(0,0);main.scrollTop=0;}
 let documentPreviewVersion=0,documentBlobUrl='';
 async function fetchDocument(url){const response=await fetch(url,{credentials:'same-origin'});if(!response.ok){let message='No se pudo generar el documento.';try{message=(await response.json()).error||message;}catch{}throw new Error(message);}return response.blob();}
 async function showDocumentPreview(id,kind='receipt'){
@@ -4925,6 +5030,7 @@ Object.assign(invIcons,{'mail':'<rect width="20" height="16" x="2" y="4" rx="2"/
 // Iconos de la caja (mismo paquete Lucide).
 Object.assign(invIcons,{'calculator':'<rect width="16" height="20" x="4" y="2" rx="2"/><line x1="8" x2="16" y1="6" y2="6"/><line x1="16" x2="16" y1="14" y2="18"/><path d="M16 10h.01"/><path d="M12 10h.01"/><path d="M8 10h.01"/><path d="M12 14h.01"/><path d="M8 14h.01"/><path d="M12 18h.01"/><path d="M8 18h.01"/>','check-check':'<path d="M18 6 7 17l-5-5"/><path d="m22 10-7.5 7.5L13 16"/>','rotate-ccw':'<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>','save':'<path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7"/><path d="M7 3v4a1 1 0 0 0 1 1h7"/>','scale':'<path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/>'});
 Object.assign(invIcons,{'user':'<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>'});
+Object.assign(invIcons,{'lock':'<rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>','message-circle':'<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22z"/>','copy':'<rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>','monitor':'<rect width="20" height="14" x="2" y="3" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/>','list-checks':'<path d="m3 17 2 2 4-4"/><path d="m3 7 2 2 4-4"/><path d="M13 6h8"/><path d="M13 12h8"/><path d="M13 18h8"/>'});
 function invIcon(name){const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');for(const[k,v]of [['viewBox','0 0 24 24'],['fill','none'],['stroke','currentColor'],['stroke-width','1.8'],['stroke-linecap','round'],['stroke-linejoin','round'],['aria-hidden','true']])svg.setAttribute(k,v);svg.classList.add('inv-icon');svg.innerHTML=invIcons[name]||'';return svg;}
 function invBtn(label,icon,action,className='secondary'){const b=button('',action,className+' inv-btn');b.append(invIcon(icon),el('span',label));return b;}
 function invIconBtn(label,icon,action){const b=button('',action,'inv-icon-btn');b.setAttribute('aria-label',label);b.title=label;b.append(invIcon(icon));return b;}
