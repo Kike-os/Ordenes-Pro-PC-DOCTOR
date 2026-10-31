@@ -9629,3 +9629,15 @@ input:focus-visible+.cjc-switch{outline-color:var(--ctl-focus)}
 .service-picker .service-option{grid-template-columns:var(--ctl-size) minmax(0,1fr) auto}
 .service-picker .service-option:has(input:checked){background:var(--ctl-card-on);box-shadow:inset 0 0 0 1px var(--ctl-on)}
 @media (prefers-reduced-motion:reduce){input:is([type=checkbox],[type=radio]),input:is([type=checkbox],[type=radio])::before,.app-card,.agenda-switch-track,.agenda-switch-track::after{transition:none!important}}
+.adi-assist button.adi-tool[data-mode=mensaje]{grid-column:1/-1;min-height:44px;border-color:#3B82F666;background:linear-gradient(135deg,#3B82F61F,#0d1b30 70%);font-size:13px}
+.adi-assist button.adi-tool[data-mode=mensaje][aria-checked=true]{border-color:var(--ctl-on);background:var(--ctl-card-on);box-shadow:0 0 0 1px var(--ctl-on)}
+/* Formulario de seguimiento: una columna (la regla general de los formularios de hoja tiene más peso que form.of-form). */
+.inv-sheet form.of-form{grid-template-columns:minmax(0,1fr)}
+/* Panel ADI: el contenido no queda debajo de los botones. El resultado se desplaza solo y las acciones van debajo. */
+.adi-panel.adi-assist{width:min(100%,560px);max-height:none;overflow:visible}
+.adi-panel.adi-assist[data-state=done]{display:grid;grid-template-rows:auto minmax(0,1fr) auto;max-height:min(78dvh,640px);overflow:hidden}
+.adi-assist[data-state=done] .adi-result{min-height:0;overflow-y:auto;overscroll-behavior:contain;align-content:start}
+.adi-assist[data-state=done] .adi-suggestion{max-height:none;overflow:visible}
+.adi-assist .adi-actions,.adi-assist .adi-foot .adi-actions{position:static;bottom:auto;margin:0;padding:0;background:none}
+.adi-assist[data-state=done] .adi-actions button{flex:1 1 auto;min-height:36px;justify-content:center}
+.adi-assist .adi-foot{display:grid;gap:8px}

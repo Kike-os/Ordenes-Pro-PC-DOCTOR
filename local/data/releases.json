@@ -8,6 +8,30 @@
   },
   "releases": [
     {
+      "version": "1.5.219",
+      "date": "2026-10-30T22:35:56-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Asistente técnico de redacción en el panel ADI, con los datos de la orden y controles contra datos inventados",
+      "changes": {
+        "features": [
+          "Panel ADI: nueva herramienta «Generar mensaje profesional», que convierte las anotaciones del técnico en un mensaje para el cliente con los datos técnicos de la orden; saludo, orden, valores, cierre, enlace y firma los agrega el sistema. También «Ampliar explicación» y «Preparar para WhatsApp»."
+        ],
+        "improvements": [
+          "«Redacción técnica profesional», «Lenguaje profesional para clientes» y «Resumir mensaje» interpretan abreviaturas y errores con la terminología del taller, y distinguen falla confirmada, posible causa y recomendación."
+        ],
+        "fixes": [
+          "El formulario «Agregar seguimiento» volvió a una sola columna (salía en cuatro con casillas gigantes) y en el panel ADI los botones ya no tapan el texto."
+        ],
+        "security": [
+          "A la IA no viajan el nombre ni el contacto del cliente, el número de orden, las notas internas, credenciales ni precios. Un importe inventado invalida el resultado; datos o afirmaciones sin respaldo se muestran como avisos. Nada se envía sin revisión del técnico."
+        ],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Kike-os: «esta autorizado»"
+    },
+    {
       "version": "1.5.218",
       "date": "2026-10-30T21:51:34-05:00",
       "type": "patch",

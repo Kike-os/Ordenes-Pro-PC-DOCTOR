@@ -4,6 +4,26 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.219 — 2026-10-30 22:35 (UTC-05:00)
+
+Asistente técnico de redacción en el panel ADI, con los datos de la orden y controles contra datos inventados
+
+### Nuevas funcionalidades
+
+- Panel ADI: nueva herramienta «Generar mensaje profesional», que convierte las anotaciones del técnico en un mensaje para el cliente con los datos técnicos de la orden; saludo, orden, valores, cierre, enlace y firma los agrega el sistema. También «Ampliar explicación» y «Preparar para WhatsApp».
+
+### Mejoras realizadas
+
+- «Redacción técnica profesional», «Lenguaje profesional para clientes» y «Resumir mensaje» interpretan abreviaturas y errores con la terminología del taller, y distinguen falla confirmada, posible causa y recomendación.
+
+### Errores corregidos
+
+- El formulario «Agregar seguimiento» volvió a una sola columna (salía en cuatro con casillas gigantes) y en el panel ADI los botones ya no tapan el texto.
+
+### Actualizaciones de seguridad
+
+- A la IA no viajan el nombre ni el contacto del cliente, el número de orden, las notas internas, credenciales ni precios. Un importe inventado invalida el resultado; datos o afirmaciones sin respaldo se muestran como avisos. Nada se envía sin revisión del técnico.
+
 ## v1.5.218 — 2026-10-30 21:51 (UTC-05:00)
 
 Rediseño global de los controles de selección, sin cambios de funcionamiento

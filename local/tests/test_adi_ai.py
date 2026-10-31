@@ -32,7 +32,7 @@ class AdiWritingTests(unittest.TestCase):
             sent.append((url,payload,headers));return {'content':[{'type':'text','text':GOOD}],'usage':{'input_tokens':120,'output_tokens':60}}
         with patch.dict(app.os.environ,{'ANTHROPIC_API_KEY':'clave-secreta-de-prueba','OPENAI_API_KEY':''}),patch.object(adi_ai,'_post',side_effect=fake):
             status=self.request('/api/adi/status',cookie=cookie)['body']['writing']
-            self.assertEqual((status['provider'],status['available'],[m['code'] for m in status['modes']]),('anthropic',True,['ortografia','redaccion','tecnica','simple','cliente']))
+            self.assertEqual((status['provider'],status['available'],[m['code'] for m in status['modes']]),('anthropic',True,['mensaje','tecnica','cliente','ampliar','simple','redaccion','ortografia']))
             self.assertNotIn('clave-secreta-de-prueba',json.dumps(status))
             self.assertEqual(self.request('/api/adi/write',{'text':ORIGINAL,'mode':'tecnica','field':'problem'},cookie=cookie)['status'],403)
             done=self.request('/api/adi/write',{'text':ORIGINAL,'mode':'tecnica','field':'problem'},cookie=cookie,csrf=csrf)

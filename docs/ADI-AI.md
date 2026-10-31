@@ -486,3 +486,30 @@ Las instrucciones le prohíben inventar, escribir u ofrecer un asesor. Sin IA, o
 - presupuesto enviado cuya validez venció sin respuesta.
 
 Se informa además de las citas por confirmar y de las órdenes activas sin fecha de entrega, de las que no se puede saber si van atrasadas.
+
+## Redacción técnica profesional y mensajes para clientes (1.5.219)
+
+Se mejoró el panel ADI de cada campo de texto; no hay otro módulo. El técnico escribe la novedad, aunque tenga errores o abreviaturas, y elige una herramienta. Siempre ve el resultado antes de aplicarlo: **nada se envía desde el panel**.
+
+| Herramienta | Qué hace |
+| --- | --- |
+| Generar mensaje profesional | Mensaje completo para el cliente. |
+| Redacción técnica profesional | Lenguaje técnico avanzado, con la terminología del taller. |
+| Lenguaje profesional para clientes | Explicación fácil de comprender. No se ofrece en los campos internos. |
+| Ampliar explicación / Resumir mensaje | Desarrollan o acortan el texto, sin hechos nuevos. |
+| Regenerar / Editar | Otra versión / ajustar la propuesta antes de aplicarla. |
+| Preparar para WhatsApp | Abre «Comunicación con el cliente» con el texto; ahí se revisa el número y se abre WhatsApp. |
+
+**Qué recibe la IA en una orden:** tipo, marca y modelo del equipo, estado, falla reportada (marcada como no confirmada), novedades y recomendaciones comunicables, y las anotaciones. Antes de enviarlos se quitan credenciales, correos, teléfonos, identificaciones y el nombre del cliente.
+
+**Qué NO recibe:** nombre y contacto del cliente, número de orden, notas internas y precios. Saludo, orden, valor (con las reglas del presupuesto), cierre, enlace y firma los agrega el servidor, sin que la IA pueda alterarlos. El diagnóstico interno solo viaja si se marca «Dárselo a ADI como contexto» en la ventana de comunicación.
+
+**Controles que no dependen del modelo:**
+- Un importe que no está en lo entregado invalida el resultado y hay que volver a generarlo.
+- Datos técnicos nuevos y expresiones sobre trabajos, plazos o garantías sin respaldo se muestran como avisos.
+- Si el resultado recomienda un cambio, el cierre pide autorización y confirmación del presupuesto.
+
+Estos controles no detectan todo lo que un modelo pudiera inventar con palabras comunes: **la revisión del técnico antes de enviar sigue siendo obligatoria.**
+
+Rutas: `POST /api/adi/write` con `mode` y, opcionalmente, `order_id`. El uso queda en `adi_actions`, sin guardar el texto.
+

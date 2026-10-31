@@ -103,7 +103,7 @@ def _mime(raw):
 
 
 def _order(c, oid):
-    row = c.execute("SELECT o.id,o.code,o.status,s.label status_label,o.findings,o.recommendations,c.name client,c.email,c.phone,d.brand,d.model,"
+    row = c.execute("SELECT o.id,o.code,o.status,s.label status_label,o.problem,o.findings,o.recommendations,c.name client,c.email,c.phone,d.brand,d.model,"
                     "COALESCE((SELECT name FROM users WHERE id=o.assigned_to),'') technician,"
                     "COALESCE(NULLIF(d.kind,''),d.category) kind FROM orders o JOIN statuses s ON s.code=o.status JOIN devices d ON d.id=o.device_id "
                     "JOIN clients c ON c.id=d.client_id WHERE o.id=?", (oid,)).fetchone()
@@ -297,7 +297,7 @@ def _norm(text):
 
 GREETING = re.compile(r'^\s*(estimad[oa]s?|señor(a|es)?|sr\.|sra\.|hola|buen(os|as) (días|tardes|noches))\b.{0,80}$', re.I)
 COURTESY = re.compile(r'^\s*(reciban? un cordial saludo|agradecemos su (confianza|preferencia)|quedamos atentos|saludos|atentamente|cordialmente|'
-                      r'gracias por|pc-doctor( s\.a\.)?\.?\s*$|servicio t[ée]cnico especializado|departamento de servicio t[ée]cnico)', re.I)
+                      r'gracias por|pc-doctor( s\.a\.)?\.?\s*$|servicio t[ée]cnico especializado|departamento (de servicio )?t[ée]cnico)', re.I)
 
 
 def _strip_letter(text):
@@ -430,6 +430,92 @@ def compose(c, oid, template, followup_ids=None, history_ids=(), cost=None, orde
         warnings.append('Incluye registros técnicos anteriores, que eran internos: revisa que todo se pueda comunicar.')
     return {'body': '\n'.join(lines), 'subject': 'PC-DOCTOR · Orden %s · %s' % (o['code'], TEMPLATES[template]),
             'sources': [{'type': s['type'], 'id': s['id']} for s in chosen], 'cost': price, 'cost_included': include, 'warnings': warnings}
+
+
+AI_LEAD = re.compile(r'^\s*(orden de servicio:|puede revisar el estado|tel\.:|costo propuesto:|valor autorizado:|saldo pendiente:)', re.I)
+
+
+def ai_previous(text, closings=()):
+    """Solo el cuerpo del texto del editor: sin saludo, datos de la orden, valores, enlace, cierre ni firma, que agrega el sistema."""
+    all_closings = {x for group in CLOSING.values() for x in group} | {AI_CLOSING, 'Quedamos atentos a su respuesta.'} | set(closings)
+    lines = [x for x in _strip_letter(text).splitlines() if not AI_LEAD.match(x) and x.strip() not in all_closings]
+    return _strip_letter('\n'.join(lines)).strip()
+
+
+AI_CLOSING = 'Una vez confirmado el presupuesto, podremos continuar con el procedimiento correspondiente, previa autorización.'
+AI_RECOMMENDS = re.compile(r'recomend|sustitu|reemplaz|cambiar', re.I)
+
+
+def ai_request(c, oid, followup_ids=None, history_ids=(), order_recommendations=False, findings=False):
+    """Datos técnicos que recibe la IA, depurados. Nunca viajan el nombre del cliente, su contacto, el número de orden, las notas internas ni los
+    precios. El diagnóstico interno solo si el técnico lo marca, y los registros anteriores solo si los eligió."""
+    import adi_ai
+    o = _order(c, oid)
+    available = {(s['type'], s['id']): s for s in sources(c, oid)}
+    if followup_ids is None:
+        auto = next((s for s in available.values() if s['type'] == 'followup' and s['auto']), None)
+        followup_ids = [auto['id']] if auto else []
+    chosen = []
+    for kind, ids in (('followup', followup_ids), ('history', history_ids)):
+        for i in ids:
+            s = available.get((kind, int(i)))
+            if not s:
+                raise FollowupError('Seguimiento no disponible.', 404)
+            if kind == 'followup' and not s['communicable']:
+                raise FollowupError('Ese seguimiento solo tiene nota interna: no se comunica al cliente.', 400)
+            chosen.append(s)
+    chosen.sort(key=_when)
+    rows = {r['id']: r for r in c.execute('SELECT id,client_message,recommendation FROM order_followups WHERE order_id=?', (oid,))}
+    news, advice = [], []
+    for s in chosen:
+        if s['type'] == 'followup':
+            news.append(rows[s['id']]['client_message'])
+            advice.append(rows[s['id']]['recommendation'])
+        else:
+            news.append(s['text'])
+    client = (o['client'] or '').strip()
+    names = [client, client.split()[0] if client else '']
+    clean = lambda text: adi_ai.redact(_strip_letter(text), names).strip()
+    device = ' '.join(x for x in (o['kind'], o['brand'], o['model']) if x)
+    seen = set()
+    data = {'Equipo': device, 'Estado actual de la reparación': o['status_label'], 'Falla reportada por el cliente (no confirmada)': clean(o['problem'] or ''),
+            'Novedades registradas': '\n'.join(_paragraphs([clean(x) for x in news], seen)), 'Recomendaciones registradas': '\n'.join(_paragraphs([clean(x) for x in advice], seen))}
+    if order_recommendations and (o['recommendations'] or '').strip():
+        data['Recomendaciones de la orden'] = clean(o['recommendations'])
+    if findings and (o['findings'] or '').strip():
+        data['Diagnóstico técnico'] = clean(o['findings'])
+    return {'data': {k: v for k, v in data.items() if v}, 'names': names, 'sources': [{'type': s['type'], 'id': s['id']} for s in chosen], 'chosen_news': any(news) or any(advice)}
+
+
+def ai_wrap(c, oid, template, body, cost=None, tracking_url='', company=None):
+    """Mensaje completo con lo que no decide la IA: saludo con el nombre real, orden y equipo, valor según las reglas del presupuesto, cierre, enlace y
+    firma. Sin orden (un campo fuera de una orden), el saludo es general y no hay valores ni enlace."""
+    if template not in TEMPLATES:
+        raise FollowupError('Plantilla no válida.', 400, {'template': 'No válida.'})
+    company = company or __import__('corporate').settings()
+    phone = company.get('whatsapp', '')
+    o = _order(c, oid) if oid else None
+    device = ' '.join(x for x in (o['brand'], o['model']) if x) if o else ''
+    lines = ['Estimado/a %s:' % (_first_name(o['client']) if o else 'cliente'), '', 'Reciba un cordial saludo de PC-DOCTOR.', '']
+    if o:
+        lines += ['Orden de servicio: %s' % o['code'] + (' · %s' % device if device else ''), '']
+    lines.append(body.strip())
+    price = _cost(c, oid) if o else None
+    include = bool(price) and (price['default'] and template in COST_BY_DEFAULT if cost is None else bool(cost))
+    warnings = []
+    if include:
+        lines += ['', '%s: %s.' % (price['label'], price['amount'])]
+        if price['draft']:
+            warnings.append('El presupuesto %s está en borrador: el valor aún puede cambiar.' % price['code'])
+    closing = CLOSING[template]
+    if template not in ('autorizacion', 'presupuesto') and AI_RECOMMENDS.search(body):
+        closing = [AI_CLOSING]  # una recomendación nunca se presenta como trabajo ya decidido
+    for line in closing:
+        lines += ['', line]
+    if tracking_url:
+        lines += ['', 'Puede revisar el estado de su orden aquí: %s' % tracking_url]
+    lines += ['', 'Atentamente,', 'Departamento Técnico – PC-DOCTOR'] + (['Tel.: ' + phone] if phone else [])
+    return {'body': '\n'.join(lines), 'warnings': warnings}
 
 
 def quotes_usd(cents):

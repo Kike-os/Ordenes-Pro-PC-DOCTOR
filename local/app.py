@@ -4472,13 +4472,42 @@ class Handler(BaseHTTPRequestHandler):
                     # La llamada a la IA puede tardar varios segundos: se cierra antes la transacción para no bloquear otros guardados
                     # (ni otra petición de ADI del mismo usuario) mientras se espera la respuesta.
                     c.commit()
-                    try:result=adi_ai.improve(data.get('text',''),mode,field)
+                    # Con una orden, la IA recibe sus datos técnicos depurados; nombre, contacto, número de orden, notas internas y precios no viajan: los agrega el servidor.
+                    import order_followups
+                    context=None;text=str(data.get('text','') or '');order_ref=str(data.get('order_id','') or '');letter=text.lstrip().lower().startswith('estimad')
+                    if mode=='mensaje' and not rules['professional']:return self.reply(403,{'error':'Las mejoras de redacción con ADI están desactivadas en Configuración.','kind':'desactivado'})
+                    try:
+                        if not auto and mode in ('mensaje',)+adi_ai.GUARDED_MODES and order_ref.isdigit():
+                            ids=lambda key:[int(x) for x in str(data.get(key,'') or '').split(',') if x.isdigit()][:20]
+                            selection=str(data.get('selection','') or 'auto')
+                            context=order_followups.ai_request(c,int(order_ref),None if selection=='auto' else [] if selection=='manual' else ids('followup_ids'),ids('history_ids') if selection=='ids' else [],str(data.get('order_recommendations',''))=='1',str(data.get('findings',''))=='1')
+                    except order_followups.FollowupError as error:
+                        return self.reply(error.status,{'error':str(error),'fields':error.fields})
+                    if mode=='mensaje' or context:text=adi_ai.redact(order_followups.ai_previous(text) if letter else text,context['names'] if context else ())
+                    ai_template=str(data.get('template','') or 'novedad');cost_choice={'1':True,'0':False}.get(str(data.get('cost','')))
+                    c.commit()
+                    try:
+                        if mode=='mensaje':
+                            done=adi_ai.professional_message(text,context['data'] if context else None)
+                            link=order_tracking_active(c,int(order_ref)) if context else {'active':False}
+                            wrapped=order_followups.ai_wrap(c,int(order_ref) if context else None,ai_template,done['body'],cost_choice,link['url'] if link['active'] else '')
+                            result=dict(done,suggestion=wrapped['body'],missing=[],changed=True,warnings=done['warnings']+wrapped['warnings'])
+                        else:
+                            result=adi_ai.improve(text,mode,field,context['data'] if context else None)
+                            if letter and context:
+                                link=order_tracking_active(c,int(order_ref))
+                                wrapped=order_followups.ai_wrap(c,int(order_ref),ai_template,result['suggestion'],cost_choice,link['url'] if link['active'] else '')
+                                result=dict(result,suggestion=wrapped['body'],warnings=result['warnings']+wrapped['warnings'])
+                    except order_followups.FollowupError as error:
+                        return self.reply(error.status,{'error':str(error),'fields':error.fields})
                     except adi_ai.AdiError as error:
                         print('adi-write',error.kind,flush=True)
                         return self.reply(error.status,{'error':str(error),'kind':error.kind})
                     # Registro de uso: quién, qué tipo de mejora y consumo. No se guarda el texto.
                     c.execute('INSERT INTO adi_actions(user_id,action,created_at,details) VALUES (?,?,?,?)',(user['id'],'writing_improve',reception_now().isoformat(timespec='seconds'),json.dumps({'mode':mode,'auto':auto,'field':field,'model':result['model'],'tokens_in':result['tokens_in'],'tokens_out':result['tokens_out'],'missing':len(result['missing'])})))
-                    return self.reply(200,{'suggestion':result['suggestion'],'missing':result['missing'],'changed':result['changed'],'simple':result['changed'] and adi_ai.is_simple(str(data.get('text','')).strip(),result['suggestion'])})
+                    answer={'suggestion':result['suggestion'],'missing':result['missing'],'changed':result['changed'],'simple':result['changed'] and adi_ai.is_simple(str(data.get('text','')).strip(),result['suggestion'])}
+                    if result.get('warnings'):answer['warnings']=result['warnings']
+                    return self.reply(200,answer)
                 receipt_route=re.fullmatch(r'/api/orders/([0-9]+)/receipt-mail',path)
                 if receipt_route or path=='/api/receipt-mail/settings':
                     if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
