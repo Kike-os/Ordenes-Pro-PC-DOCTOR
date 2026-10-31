@@ -4,6 +4,19 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.218 — 2026-10-30 21:51 (UTC-05:00)
+
+Rediseño global de los controles de selección, sin cambios de funcionamiento
+
+### Nuevas funcionalidades
+
+- Componentes reutilizables AppCheckbox, AppSwitch, AppRadioGroup, AppSelectionCard y AppTableSelection; la selección de licencias muestra un estado parcial cuando solo hay algunas elegidas.
+
+### Mejoras realizadas
+
+- Nuevo diseño único para casillas, radios e interruptores en todo el sistema y en las páginas públicas: bordes redondeados, azul al seleccionar, visto claro, estados deshabilitado, parcial y con enfoque, y zona táctil de 44 px en celulares. Los valores y el funcionamiento de los formularios no cambian.
+- Las opciones de configuración usan interruptores (avisos, firma de correo, horarios, reglas de presupuesto, recargo activo); seleccionar registros sigue siendo con casillas y las opciones excluyentes con radios. Tarjetas seleccionables para opciones con descripción.
+
 ## v1.5.217 — 2026-10-30 16:49 (UTC-05:00)
 
 Comunicación con el cliente sin el diálogo antiguo, con borradores guardados y correcciones al enlace público

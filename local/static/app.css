@@ -9564,3 +9564,68 @@ body[data-page=dashboard] .maintenance-dialog.cm-dialog>form.cm-form{display:gri
  .cm-dialog textarea.cm-text,.cm-preview{min-height:260px}
 }
 @media (max-width:520px){.cm-actions>*{flex-basis:calc(50% - 4px)}.cm-actions>.primary{flex-basis:100%}.cm-foot-note{font-size:11.5px}.cm-sources{max-height:none}.cm-count{margin-left:0}}
+/* ===== Sistema de controles de selección (AppCheckbox, AppSwitch, AppRadioGroup, AppSelectionCard, AppTableSelection) =====
+   Da estilo a los controles nativos: valores, envío de formularios, teclado y lectores de pantalla siguen siendo los del navegador.
+   Lista de :not(): controles que ya están ocultos dentro de su propia tarjeta o interruptor. */
+:root{--ctl-size:18px;--ctl-radius:5px;--ctl-on:#3B82F6;--ctl-on-hover:#60A5FA;--ctl-bg:#0B1424;--ctl-border:#5B7196;--ctl-border-hover:#8CA3C7;--ctl-tick:#fff;--ctl-focus:#93C5FD;--ctl-dis-bg:#1A2436;--ctl-dis-border:#33425C;--ctl-dis-on:#3D5277;--ctl-track:#334766;--ctl-knob:#F1F5F9;--ctl-card-bg:#0E1828;--ctl-card-line:#2A3D5E;--ctl-card-on:#3B82F61C;--ctl-text:#F1F5F9;--ctl-soft:#9FB0C8;--ctl-speed:.14s}
+@media (pointer:coarse){:root{--ctl-size:22px;--ctl-radius:6px}}
+input:is([type=checkbox],[type=radio]):not(:is(.check-chip,label.access-card,.agenda-switch,.license-method,.license-row-file,.cjc-denom,.cjc-rule,.cm-seg) input){-webkit-appearance:none!important;appearance:none!important;box-sizing:border-box!important;display:inline-block;flex:none!important;width:var(--ctl-size)!important;min-width:var(--ctl-size)!important;max-width:var(--ctl-size)!important;height:var(--ctl-size)!important;min-height:var(--ctl-size)!important;max-height:var(--ctl-size)!important;padding:0!important;border:1.5px solid var(--ctl-border)!important;border-radius:var(--ctl-radius)!important;background:var(--ctl-bg) center/calc(var(--ctl-size) - 4px) no-repeat!important;box-shadow:none!important;position:relative;vertical-align:middle;cursor:pointer;transition:background-color var(--ctl-speed) ease,border-color var(--ctl-speed) ease,box-shadow var(--ctl-speed) ease}
+input[type=radio]:not(:is(.check-chip,label.access-card,.agenda-switch,.license-method,.license-row-file,.cjc-denom,.cjc-rule,.cm-seg) input){border-radius:50%!important}
+input:is([type=checkbox],[type=radio]):not(:is(.check-chip,label.access-card,.agenda-switch,.license-method,.license-row-file,.cjc-denom,.cjc-rule,.cm-seg) input):hover:not(:disabled){border-color:var(--ctl-border-hover)!important}
+input[type=checkbox]:not([role=switch]):not(:is(.check-chip,label.access-card,.agenda-switch,.license-method,.license-row-file,.cjc-denom,.cjc-rule,.cm-seg) input):checked{border-color:var(--ctl-on)!important;background-color:var(--ctl-on)!important}
+input[type=checkbox]:not([role=switch]):not(:is(.check-chip,label.access-card,.agenda-switch,.license-method,.license-row-file,.cjc-denom,.cjc-rule,.cm-seg) input):indeterminate{border-color:var(--ctl-on)!important;background-color:var(--ctl-on)!important}
+input[type=radio]:not(:is(.check-chip,label.access-card,.agenda-switch,.license-method,.license-row-file,.cjc-denom,.cjc-rule,.cm-seg) input):checked{border-color:var(--ctl-on)!important;background-image:radial-gradient(circle,var(--ctl-on-hover) 0 42%,transparent 47%)!important;background-size:100% 100%!important}
+input:is([type=checkbox],[type=radio]):not(:is(.check-chip,label.access-card,.agenda-switch,.license-method,.license-row-file,.cjc-denom,.cjc-rule,.cm-seg) input):focus-visible{outline:2px solid var(--ctl-focus)!important;outline-offset:2px!important}
+input:is([type=checkbox],[type=radio]):not(:is(.check-chip,label.access-card,.agenda-switch,.license-method,.license-row-file,.cjc-denom,.cjc-rule,.cm-seg) input):disabled{border-color:var(--ctl-dis-border)!important;background-color:var(--ctl-dis-bg)!important;cursor:not-allowed}
+input[type=checkbox]:not([role=switch]):not(:is(.check-chip,label.access-card,.agenda-switch,.license-method,.license-row-file,.cjc-denom,.cjc-rule,.cm-seg) input):disabled:is(:checked,:indeterminate){border-color:var(--ctl-dis-on)!important;background-color:var(--ctl-dis-on)!important}
+input[type=radio]:not(:is(.check-chip,label.access-card,.agenda-switch,.license-method,.license-row-file,.cjc-denom,.cjc-rule,.cm-seg) input):disabled:checked{background-image:radial-gradient(circle,var(--ctl-dis-on) 0 42%,transparent 47%)!important}
+input:is([type=checkbox],[type=radio])[aria-invalid=true]:not(:is(.check-chip,label.access-card,.agenda-switch,.license-method,.license-row-file,.cjc-denom,.cjc-rule,.cm-seg) input){border-color:#F87171!important}
+/* Visto y guion dibujados con CSS: la política de seguridad del sistema no permite imágenes data:. */
+input[type=checkbox]:not([role=switch]):not(:is(.check-chip,label.access-card,.agenda-switch,.license-method,.license-row-file,.cjc-denom,.cjc-rule,.cm-seg) input):checked::before{content:"";position:absolute;left:calc(var(--ctl-size)*.3);top:calc(var(--ctl-size)*.08);width:calc(var(--ctl-size)*.28);height:calc(var(--ctl-size)*.55);border:solid var(--ctl-tick);border-width:0 2.2px 2.2px 0;border-radius:1px;box-sizing:border-box;transform:rotate(45deg)}
+input[type=checkbox]:not([role=switch]):not(:is(.check-chip,label.access-card,.agenda-switch,.license-method,.license-row-file,.cjc-denom,.cjc-rule,.cm-seg) input):indeterminate::before{content:"";position:absolute;left:18%;right:18%;top:calc(50% - 1.2px);width:auto;height:2.2px;border:0;border-radius:2px;background:var(--ctl-tick);transform:none}
+label:has(>input:is([type=checkbox],[type=radio]):disabled){cursor:not-allowed}
+/* Área táctil de al menos 44 px sin agrandar el diseño. */
+@media (pointer:coarse){input:is([type=checkbox],[type=radio]):not(:is(.check-chip,label.access-card,.agenda-switch,.license-method,.license-row-file,.cjc-denom,.cjc-rule,.cm-seg) input)::after{content:"";position:absolute;inset:-11px}}
+@media (forced-colors:active){input:is([type=checkbox],[type=radio]){-webkit-appearance:auto!important;appearance:auto!important;background-image:none!important}}
+/* AppSwitch: solo para activar o desactivar funciones y configuraciones (nunca para elegir registros). */
+input[type=checkbox][role=switch]:not(:is(.agenda-switch,.cjc-denom,.cjc-rule) input){width:38px!important;min-width:38px!important;max-width:38px!important;height:22px!important;min-height:22px!important;max-height:22px!important;border:0!important;border-radius:999px!important;background:var(--ctl-track)!important}
+input[type=checkbox][role=switch]:not(:is(.agenda-switch,.cjc-denom,.cjc-rule) input)::before{content:"";position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:var(--ctl-knob);box-shadow:0 1px 2px #0006;transition:transform var(--ctl-speed) ease}
+input[type=checkbox][role=switch]:not(:is(.agenda-switch,.cjc-denom,.cjc-rule) input):checked{background:var(--ctl-on)!important}
+input[type=checkbox][role=switch]:not(:is(.agenda-switch,.cjc-denom,.cjc-rule) input):checked::before{transform:translateX(16px)}
+input[type=checkbox][role=switch]:not(:is(.agenda-switch,.cjc-denom,.cjc-rule) input):hover:not(:disabled){background-color:#40557A!important}
+input[type=checkbox][role=switch]:not(:is(.agenda-switch,.cjc-denom,.cjc-rule) input):checked:hover:not(:disabled){background-color:var(--ctl-on-hover)!important}
+input[type=checkbox][role=switch]:not(:is(.agenda-switch,.cjc-denom,.cjc-rule) input):disabled{background:var(--ctl-dis-bg)!important}
+input[type=checkbox][role=switch]:not(:is(.agenda-switch,.cjc-denom,.cjc-rule) input):disabled:checked{background:var(--ctl-dis-on)!important}
+input[type=checkbox][role=switch]:not(:is(.agenda-switch,.cjc-denom,.cjc-rule) input):disabled::before{background:#7D8DA6}
+/* Interruptores que ya existían con su propia pista: mismas medidas y colores. */
+.agenda-switch input{width:38px;height:22px}
+.agenda-switch-track{width:38px;height:22px;background:var(--ctl-track);transition:background-color var(--ctl-speed) ease}
+.agenda-switch-track::after{width:16px;height:16px;background:var(--ctl-knob);transition:transform var(--ctl-speed) ease}
+.agenda-switch input:checked+.agenda-switch-track{background:var(--ctl-on)}
+.agenda-switch input:checked+.agenda-switch-track::after{transform:translateX(16px)}
+.agenda-switch input:focus-visible+.agenda-switch-track{outline:2px solid var(--ctl-focus);outline-offset:2px}
+.agenda-switch input:disabled+.agenda-switch-track{background:var(--ctl-dis-bg);cursor:not-allowed}
+.agenda-switch input:disabled:checked+.agenda-switch-track{background:var(--ctl-dis-on)}
+input:checked+.cjc-switch{background:var(--ctl-on)}
+.cjc-switch{background:var(--ctl-track)}.cjc-switch::after{background:var(--ctl-knob)}
+input:focus-visible+.cjc-switch{outline-color:var(--ctl-focus)}
+.cjc-denom[data-on=true]{border-color:#3B82F680}
+/* AppCheckbox y AppRadioGroup. */
+.app-check{display:inline-flex;align-items:center;gap:10px;margin:0;cursor:pointer;font-size:13.5px;line-height:1.4;color:var(--ctl-text)}
+.app-check:has(small){align-items:flex-start}.app-check>input{margin:0}.app-check-text{display:grid;gap:1px;min-width:0}.app-check-text small{font-size:12px;color:var(--ctl-soft)}
+.app-radio-group{display:grid;gap:8px;margin:0;padding:0;border:0;min-width:0}.app-radio-group>legend{margin:0 0 6px;padding:0;font-size:12.5px;font-weight:600;color:var(--ctl-soft)}
+/* AppSelectionCard: opciones con descripción, icono o precio. */
+.app-card{display:flex;align-items:flex-start;gap:10px;margin:0;padding:10px 12px;border:1px solid var(--ctl-card-line);border-radius:12px;background:var(--ctl-card-bg);cursor:pointer;min-width:0;transition:border-color var(--ctl-speed) ease,background-color var(--ctl-speed) ease,box-shadow var(--ctl-speed) ease}
+.app-card:hover{border-color:#4A6188}
+.app-card:has(input:checked){border-color:var(--ctl-on);background:var(--ctl-card-on);box-shadow:0 0 0 1px var(--ctl-on)}
+.app-card:has(input:focus-visible){outline:2px solid var(--ctl-focus);outline-offset:2px}
+.app-card:has(input:disabled){opacity:.65;cursor:not-allowed}
+.app-card>input{margin:1px 0 0}.app-card-icon{flex:none;display:grid;place-items:center;width:32px;height:32px;border-radius:9px;background:#3B82F61F;color:#93C5FD}.app-card-icon svg{width:18px;height:18px}
+.app-card-text{display:grid;gap:2px;min-width:0;flex:1;overflow-wrap:anywhere}.app-card-text strong{font-size:13.5px;font-weight:650;color:var(--ctl-text)}.app-card-text small{font-size:12px;font-weight:400;line-height:1.4;color:var(--ctl-soft)}
+.app-card-price{flex:none;margin-left:auto;font-size:13.5px;font-weight:700;color:var(--ctl-text);font-variant-numeric:tabular-nums}
+.catalog-mode:has(input:checked){border-color:var(--ctl-on);background:var(--ctl-card-on)}
+.license-method:has(input:checked){border-color:var(--ctl-on);background:linear-gradient(135deg,#3B82F61C,#0f1f36 70%);box-shadow:0 0 0 1px var(--ctl-on)}
+.cm-seg:has(input:checked),.cm-src:has(input:checked){border-color:var(--ctl-on);background:var(--ctl-card-on)}.cm-seg:has(input:focus-visible),.cm-src:has(input:focus-visible){outline-color:var(--ctl-focus)}
+.service-picker .service-option{grid-template-columns:var(--ctl-size) minmax(0,1fr) auto}
+.service-picker .service-option:has(input:checked){background:var(--ctl-card-on);box-shadow:inset 0 0 0 1px var(--ctl-on)}
+@media (prefers-reduced-motion:reduce){input:is([type=checkbox],[type=radio]),input:is([type=checkbox],[type=radio])::before,.app-card,.agenda-switch-track,.agenda-switch-track::after{transition:none!important}}

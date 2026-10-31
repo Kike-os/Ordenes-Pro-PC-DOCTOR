@@ -8,6 +8,27 @@
   },
   "releases": [
     {
+      "version": "1.5.218",
+      "date": "2026-10-30T21:51:34-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Rediseño global de los controles de selección, sin cambios de funcionamiento",
+      "changes": {
+        "features": [
+          "Componentes reutilizables AppCheckbox, AppSwitch, AppRadioGroup, AppSelectionCard y AppTableSelection; la selección de licencias muestra un estado parcial cuando solo hay algunas elegidas."
+        ],
+        "improvements": [
+          "Nuevo diseño único para casillas, radios e interruptores en todo el sistema y en las páginas públicas: bordes redondeados, azul al seleccionar, visto claro, estados deshabilitado, parcial y con enfoque, y zona táctil de 44 px en celulares. Los valores y el funcionamiento de los formularios no cambian.",
+          "Las opciones de configuración usan interruptores (avisos, firma de correo, horarios, reglas de presupuesto, recargo activo); seleccionar registros sigue siendo con casillas y las opciones excluyentes con radios. Tarjetas seleccionables para opciones con descripción."
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Kike-os: «termina y después publica»"
+    },
+    {
       "version": "1.5.217",
       "date": "2026-10-30T16:49:58-05:00",
       "type": "patch",
