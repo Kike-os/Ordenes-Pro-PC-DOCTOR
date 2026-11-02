@@ -9698,3 +9698,7 @@ button.pi-option{display:flex;align-items:flex-start;gap:10px;padding:12px;borde
 @media (prefers-reduced-motion:reduce){.sv-start{transition:none}.sv-start:hover{transform:none}}
 @media (max-width:960px){.sv-grid{grid-template-columns:minmax(0,1fr)}}
 @media (max-width:700px){.sv-bar select,.sv-bar .sv-date{flex:1 1 calc(50% - 4px)}.sv-bar .sv-date input{flex:1}.sv-quick .inv-btn{flex:1 1 calc(50% - 4px)}.sv-table .ic-menu-list{left:0;right:auto}}
+
+/* Menú principal con «Ventas» (1.5.221): entre 1200 y 1439 px los enlaces se compactan para que el menú quepa sin desbordar la página. */
+@media(min-width:1200px) and (max-width:1365px){.premium-header nav>a{padding:0 6px;gap:5px}}
+@media(min-width:1366px) and (max-width:1439px){.premium-header nav{gap:3px}.premium-header nav>a{padding:0 9px}}
