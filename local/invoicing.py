@@ -473,6 +473,13 @@ def discard(c, invoice_id, user, now, reason=''):
         raise InvoiceError('Solo se descarta un borrador. Una factura emitida se anula con los documentos que admite el SRI.', 409)
     c.execute("UPDATE invoices SET status='descartado',updated_at=? WHERE id=?", (stamp(now), invoice_id))
     event(c, invoice_id, 'descartado', ('Borrador descartado. ' + reason.strip())[:500], now, user)
+    import inventory_center  # lo que salió del inventario con esta venta vuelve (una sola vez, con las mismas unidades)
+    try:
+        returned = inventory_center.sale_return(c, invoice_id, user, now, 'Devolución por borrador de factura descartado %s' % invoice_id)
+    except inventory_center.InventoryError as error:
+        raise InvoiceError('No se pudo devolver al inventario lo vendido: %s' % error, 409)
+    if returned:
+        event(c, invoice_id, 'inventario', 'Los productos de la venta volvieron al inventario.', now, user)
 
 
 def detail(c, invoice_id):
@@ -495,7 +502,7 @@ def detail(c, invoice_id):
                sale_code=sale['code'] if sale else '', consumer_final_allowed=consumer_final_allowed(inv['total_cents']), consumer_final_limit_cents=CONSUMER_FINAL_LIMIT_CENTS,
                problems=buyer_problems(inv) if inv['status'] == 'borrador' else {}, blockers=found['blockers'] if found else [],
                adjusted=any(line.get('adjusted') for line in (found['lines'] if found else [])), sri_messages=json.loads(inv['sri_messages'] or '[]'),
-               proforma_code=proforma['code'] if proforma else '', proforma_id=proforma['id'] if proforma else None, inventory_ref=('INV-%d' % inv['source_id']) if inv['source_kind'] == 'venta_inventario' else '',
+               proforma_code=proforma['code'] if proforma else '', proforma_id=proforma['id'] if proforma else None, stock_out=bool(c.execute("SELECT 1 FROM inventory_movements WHERE reference_kind='factura' AND reference_id=? AND direction=-1", (invoice_id,)).fetchone()), inventory_ref=('INV-%d' % inv['source_id']) if inv['source_kind'] == 'venta_inventario' else '',
                financing=json.loads(inv.get('financing') or '{}'))
     try:
         ann = c.execute('SELECT annulled_at,reason,source FROM invoice_annulments WHERE invoice_id=?', (invoice_id,)).fetchone()

@@ -981,6 +981,69 @@ def invoice_exit(c, invoice_id, user, now):
     return {'moved': moved, 'skipped': skipped}
 
 
+def sale_exit(c, invoice_id, proforma_id, user, now, units=None):
+    """Salida por venta (factura directa o cotización aprobada sin orden técnica): cada producto del inventario sale una vez por factura, con
+    la factura como referencia del Kardex («Venta»), el cliente, el precio cobrado y las fechas de garantía. Se valida en la misma transacción
+    que crea la factura: si no alcanzan las existencias, no se factura nada. Las unidades con serie elegidas en la venta salen tal cual; si
+    no se eligieron, salen las disponibles más antiguas (quedan registradas). Repetirla no descuenta otra vez."""
+    try:
+        chosen = json.loads(units) if isinstance(units, str) and units.strip() else (units or {})
+    except ValueError:
+        raise InventoryError('Unidades no válidas.', 400, {'units': 'Unidades no válidas.'})
+    if not isinstance(chosen, dict):
+        raise InventoryError('Unidades no válidas.', 400, {'units': 'Unidades no válidas.'})
+    invoice = c.execute('SELECT * FROM invoices WHERE id=?', (invoice_id,)).fetchone()
+    lines = {}
+    for row in c.execute("SELECT inventory_item_id,quantity,unit_cents,discount_cents,authorization FROM proforma_items WHERE proforma_id=? AND inventory_item_id IS NOT NULL "
+                         "AND status='aprobado' ORDER BY position", (proforma_id,)):
+        line = lines.setdefault(row['inventory_item_id'], {'quantity': 0, 'gross': 0, 'discount': 0, 'authorization': ''})
+        line['quantity'] += row['quantity']
+        line['gross'] += row['quantity'] * row['unit_cents']
+        line['discount'] += row['discount_cents']
+        line['authorization'] = line['authorization'] or row['authorization']
+    sold = date.fromisoformat((invoice['issue_date'] or now.date().isoformat())[:10])
+    moved = []
+    for item_id, line in lines.items():
+        if c.execute("SELECT 1 FROM inventory_movements WHERE reference_kind='factura' AND reference_id=? AND item_id=? AND direction=-1", (invoice_id, item_id)).fetchone():
+            continue
+        item = c.execute('SELECT * FROM inventory_items WHERE id=?', (item_id,)).fetchone()
+        unit_ids = None
+        if item['tracking'] == 'serie':
+            picked = chosen.get(str(item_id)) or []
+            if not isinstance(picked, list) or any(not str(u).isdigit() for u in picked):
+                raise InventoryError('Unidades no válidas.', 400, {'units': 'Unidades no válidas.'})
+            unit_ids = [int(u) for u in picked]
+            if unit_ids and len(set(unit_ids)) != line['quantity']:
+                raise InventoryError('Elige %d %s de %s (elegiste %d).' % (line['quantity'], 'unidad' if line['quantity'] == 1 else 'unidades', product(c, item_id)['name'], len(set(unit_ids))),
+                                     409, {'units': 'Cantidad de series distinta de la vendida.'})
+            if not unit_ids:
+                unit_ids = [r[0] for r in c.execute("SELECT id FROM inventory_units WHERE item_id=? AND status='disponible' AND reservation_id IS NULL ORDER BY id LIMIT ?",
+                                                    (item_id, line['quantity']))]
+        values = {'invoice_id': invoice_id, 'client_id': invoice['client_id'], 'document': 'Factura %s' % invoice_id, 'sold_at': sold.isoformat(),
+                  'delivered_at': sold.isoformat(), **warranty_dates(item, sold, sold)}
+        net = line['gross'] - line['discount']
+        sale = {'sale_price_cents': net // line['quantity'], 'discount_cents': line['discount'] // line['quantity'], 'client_id': invoice['client_id'],
+                'price_authorization': line['authorization']}
+        movement = inventory.move(c, item_id, -1, 'venta', str(line['quantity']), '0', user, now, 'factura', invoice_id, 'Venta · factura %s' % invoice_id,
+                                  unit_ids=unit_ids, unit_values=values, document='Factura %s' % invoice_id, sale=sale)
+        moved.append({'item_id': item_id, 'movement_id': movement, 'quantity': line['quantity']})
+    return moved
+
+
+def sale_return(c, invoice_id, user, now, note):
+    """Devuelve al inventario lo que salió con una factura que no llegó a emitirse (borrador descartado o venta anulada): una entrada
+    «Devolución del cliente» por producto, con las mismas unidades y el costo con que salieron. Repetirla no suma otra vez."""
+    returned = []
+    for out in c.execute("SELECT * FROM inventory_movements WHERE reference_kind='factura' AND reference_id=? AND direction=-1 AND reason='venta'", (invoice_id,)).fetchall():
+        if c.execute("SELECT 1 FROM inventory_movements WHERE reference_kind='factura' AND reference_id=? AND item_id=? AND direction=1", (invoice_id, out['item_id'])).fetchone():
+            continue
+        units = [r[0] for r in c.execute("SELECT x.unit_id FROM inventory_movement_units x JOIN inventory_units u ON u.id=x.unit_id WHERE x.movement_id=? AND u.status='vendida'", (out['id'],))]
+        inventory.move(c, out['item_id'], 1, 'devolucion_cliente', str(out['quantity']), '%d.%02d' % divmod(out['unit_cost_cents'] or 0, 100), user, now, 'factura', invoice_id,
+                       note[:300], unit_ids=units or None)
+        returned.append(out['item_id'])
+    return returned
+
+
 def reserve(c, data, user, now):
     """Reserva (orden, presupuesto, proforma o venta): aparta existencias sin descontarlas."""
     item = c.execute('SELECT * FROM inventory_items WHERE id=?', (data.get('item_id'),)).fetchone() if _id(data.get('item_id')) else None

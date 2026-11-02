@@ -1040,7 +1040,8 @@ def deliver(c,data,user,now):
     notes=_text(data,'notes',300,'Las observaciones');moment=stamp(now);token=secrets.token_urlsafe(32)
     # Datos comerciales informativos: precio, descuento autorizado y estado del pago. No se confirma ni registra ningún pago.
     price=_cents(data.get('price'),'price','el precio de venta')
-    if price is None and kind=='directa':price=_product(c,units[0]['product_id'])['price_cents']
+    if data.get('assign') is True:price=None;data=dict(data,discount='',payment_status='')  # «Asignar o entregar»: sin venta ni cobro (las ventas van al Centro de Ventas)
+    elif price is None and kind=='directa':price=_product(c,units[0]['product_id'])['price_cents']
     discount=_cents(data.get('discount'),'discount','el descuento') or 0
     if price is not None and discount>price:raise LicenseError('El descuento no puede superar el precio de venta.',fields={'discount':'Descuento mayor que el precio.'})
     payment=str(data.get('payment_status') or '')

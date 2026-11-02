@@ -473,8 +473,9 @@ def cancel(c, pid, data, user, now):
     event(c, row['id'], 'cancelada', 'Proforma cancelada: ' + reason, now, user)
 
 
-def convert(c, pid, user, now):
-    """Convierte una proforma aprobada en un borrador de factura (ambiente de pruebas). Idempotente: si ya tiene factura, devuelve esa."""
+def convert(c, pid, user, now, units=None):
+    """Convierte una proforma aprobada en un borrador de factura (ambiente de pruebas). Idempotente: si ya tiene factura, devuelve esa.
+    Sin orden técnica, los productos del inventario salen en la misma transacción (Kardex «Venta»); con orden, los descuenta la orden."""
     row = expire(c, get(c, pid), now.date().isoformat())
     if row['invoice_id']:
         return row['invoice_id']
@@ -484,6 +485,12 @@ def convert(c, pid, user, now):
         invoice_id = invoicing.draft(c, 'proforma', row['id'], user, now)
     except invoicing.InvoiceError as error:
         raise ProformaError(str(error), error.status, error.fields)
+    if not row['order_id']:
+        import inventory_center
+        try:
+            inventory_center.sale_exit(c, invoice_id, row['id'], user, now, units)
+        except inventory_center.InventoryError as error:
+            raise ProformaError(str(error), error.status, error.fields)
     c.execute("UPDATE proformas SET status='convertida',invoice_id=?,updated_at=? WHERE id=?", (invoice_id, stamp(now), row['id']))
     event(c, row['id'], 'convertida', 'Convertida en borrador de factura (ambiente de pruebas).', now, user)
     return invoice_id
@@ -977,4 +984,4 @@ def checkout(c, pid, data, user, now):
         if not isinstance(line, dict):
             raise ProformaError('Formas de pago no válidas.', 400, {'payments': 'Formas de pago no válidas.'})
         add_advance(c, row['id'], {**line, 'request_key': (key + '-p%d' % n) if len(key) >= 16 else '', 'paid_at': data.get('paid_at', ''), 'note': 'Cobro de la factura directa'}, user, now, operation=operation)
-    return convert(c, row['id'], user, now)
+    return convert(c, row['id'], user, now, data.get('units'))

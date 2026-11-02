@@ -49,6 +49,7 @@ Inicio como centro de operaciones, con navegación superior, búsqueda, contador
 - Clientes: búsqueda, registro y edición por administración.
 - Equipos: consulta, registro y edición con selección de cliente por administración.
 - Reportes: conteos reales por estado, clientes y equipos; descarga del resumen en CSV.
+- Ventas: Centro de Ventas (administración) con panel, nueva venta (productos con inventario y series, licencias, cotizaciones y órdenes), pedidos comerciales, historial, cobros y reportes. Ver [Centro de Ventas](docs/VENTAS.md).
 - Configuración: perfil del administrador, cuentas y estado del correo. No expone secretos ni modifica roles desde la interfaz.
 
 Los técnicos pueden recibir equipos y consultar órdenes/comprobantes; la edición de registros, estados y configuración requiere administración. Todos los POST nuevos conservan validación de sesión, origen y CSRF, consultas parametrizadas y auditoría. No se cambió el esquema ni se eliminaron datos.

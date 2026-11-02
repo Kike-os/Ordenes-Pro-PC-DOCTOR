@@ -18,9 +18,9 @@ async function renderLicenses(){
  try{await licenseLoadMeta();}catch(error){content.replaceChildren(el('p',error.message,'empty-module'));return;}
  content.replaceChildren();const wrap=el('section',undefined,'licenses');content.append(wrap);
  const bar=el('div',undefined,'licenses-actions'),action=(text,icon,run,kind='secondary')=>{const b=button('',run,kind);b.append(systemIcon(licenseIcons[icon]),el('span',text));bar.append(b);return b;};
- action('Registrar nueva licencia','plus',()=>licenseNewDialog(null),'primary');action('Vender o entregar','cart',()=>licenseSaleDialog({}));
+ action('Registrar nueva licencia','plus',()=>licenseNewDialog(null),'primary');action('Asignar o entregar licencia','truck',()=>licenseAssignDialog({}));action('Ventas de licencias','cart',()=>{if(typeof salesState==='object')salesState.tab='licencias';go('sales');});
  const stats=el('div',undefined,'license-stats'),tabs=el('div',undefined,'licenses-tabs'),panel=el('div',undefined,'licenses-panel');tabs.setAttribute('role','tablist');tabs.setAttribute('aria-label','Secciones de Licencias Pro');panel.setAttribute('role','tabpanel');
- const defs=[['panel','Panel de vigencias','gauge'],['productos','Productos y catálogo','image'],['inventario','Inventario','list'],['ventas','Ventas','cart'],['entregas','Entregas','truck'],['notificaciones','Notificaciones de renovación','mail'],['historial','Historial','history']];
+ const defs=[['panel','Panel de vigencias','gauge'],['productos','Productos y catálogo','image'],['inventario','Inventario','list'],['entregas','Entregas','truck'],['notificaciones','Notificaciones de renovación','mail'],['historial','Historial','history']];
  for(const[key,label,icon]of defs){const tab=button('',()=>{licenseState.tab=key;paint();},'licenses-tab');tab.setAttribute('role','tab');tab.dataset.tab=key;tab.append(systemIcon(licenseIcons[icon]),el('span',label));tabs.append(tab);}
  tabs.addEventListener('keydown',event=>{if(!['ArrowLeft','ArrowRight'].includes(event.key))return;const list=[...tabs.children],at=list.indexOf(document.activeElement);if(at<0)return;event.preventDefault();const next=list[(at+(event.key==='ArrowRight'?1:list.length-1))%list.length];next.focus();next.click();});
  wrap.append(bar,stats,tabs,panel);
@@ -29,7 +29,7 @@ async function renderLicenses(){
  async function paint(){for(const tab of tabs.children){const on=tab.dataset.tab===licenseState.tab;tab.setAttribute('aria-selected',String(on));tab.tabIndex=on?0:-1;if(on)tab.scrollIntoView({block:'nearest',inline:'nearest'});}
   // El catálogo se dibuja al instante con los datos ya cargados: sin «Cargando…» intermedio (evita el parpadeo al actualizar existencias).
   paintStats();if(licenseState.tab!=='productos')panel.replaceChildren(el('p','Cargando…','system-muted'));
-  try{const t=licenseState.tab;if(t==='panel')licensePanel(panel);else if(t==='productos')licenseProducts(panel);else if(t==='inventario')await licenseInventory(panel);else if(t==='ventas')await licenseSales(panel);else if(t==='entregas')await licenseDeliveries(panel);else if(t==='notificaciones')await licenseNotices(panel);else await licenseHistory(panel);}
+  try{const t=licenseState.tab;if(t==='panel')licensePanel(panel);else if(t==='productos')licenseProducts(panel);else if(t==='inventario')await licenseInventory(panel);else if(t==='entregas')await licenseDeliveries(panel);else if(t==='notificaciones')await licenseNotices(panel);else await licenseHistory(panel);}
   catch(error){panel.replaceChildren(el('p',error.message,'empty-module'));}}
  window.licenseReload=async()=>{try{await licenseLoadMeta();}catch(error){notify(error.message);}await paint();};await paint();
 }
@@ -392,7 +392,7 @@ function licenseMeter(row,compact=true){const box=el('div',undefined,'license-me
 function licenseActionList(row,refresh){const done=()=>{refresh&&refresh();licenseReloadAll();},list=[];const add=(label,run,kind='')=>list.push({label,run,kind});
  add('Ver detalles',()=>licenseView(row.id,row,refresh));
  if(!['entregada','anulada'].includes(row.status))add('Editar',()=>licenseEditDialog(row,refresh));
- if(row.status==='disponible')add('Vender o entregar',()=>licenseSaleDialog({product_id:row.product_id}));
+ if(row.status==='disponible')add('Asignar o entregar',()=>licenseAssignDialog({product_id:row.product_id,unit:row}));
  if(['entregada','reservada'].includes(row.status)&&!row.renewed_to&&!row.activated)add('Confirmar activación',()=>licenseActivateDialog(row,refresh));
  if(row.status==='entregada'&&!row.renewed_to)add('Renovar',()=>licenseRenewDialog(row,refresh));
  add('Historial',()=>licenseHistoryDialog(row));
@@ -581,7 +581,7 @@ const licenseMethods={efectivo:'Efectivo',transferencia:'Transferencia',deposito
 const licenseCents=value=>{const text=String(value??'').trim().replace(',','.');return /^\d{1,7}(\.\d{1,2})?$/.test(text)?Math.round(parseFloat(text)*100):null;};
 const licenseAmount=cents=>(cents/100).toFixed(2);
 function licenseSaleBadge(kind,state,label){const badge=el('span',label,'license-sale-badge');badge.dataset.kind=kind;badge.dataset.state=state;return badge;}
-function licenseDeliverDialog(preset){licenseSaleDialog(preset);}
+function licenseDeliverDialog(preset){licenseAssignDialog(preset);}
 // Buscador de clientes por nombre, cédula o RUC, teléfono o correo, con alta de un cliente nuevo sin salir de la venta.
 function licenseClientPicker(box,onChange){let client=null;
  const pick=el('label',undefined,'license-field wide'),search=el('input'),results=el('div',undefined,'license-client-results'),card=el('div',undefined,'license-client-card'),add=button('+ Registrar nuevo cliente',()=>{
@@ -598,9 +598,38 @@ function licenseClientPicker(box,onChange){let client=null;
   info.append(el('strong',row.name),el('small',[row.identification,row.phone].filter(Boolean).join(' · ')||'Sin identificación registrada'),el('small',row.email?'Correo: '+row.email:'Sin correo registrado: no podrá recibir el enlace privado por correo.'));
   card.append(info,button('Cambiar',()=>{client=null;card.hidden=true;pick.hidden=false;add.hidden=false;search.focus();onChange(null);},'text-action'));onChange(row);}
  return {get client(){return client;},choose,focus:()=>search.focus()};}
+// «Asignar o entregar licencia»: entrega o asignación autorizada, sin venta ni cobro (las ventas se registran en el Centro de Ventas).
+// El servidor elige la licencia disponible y vigente más próxima a vencer, salvo que se indique una; queda en el historial con el responsable.
+function licenseAssignDialog(preset={}){const products=(licenseMeta?.products||[]).filter(item=>item.managed);let picker=null;
+ const dialog=licenseFormDialog('Asignar o entregar licencia',(form,dialog,parts)=>{
+  form.append(el('p','Entrega o asignación autorizada: no registra venta, precio ni cobro. Para vender una licencia usa Ventas → Nueva venta.','license-hint wide'));
+  const s1=licenseSection(form,'1','Cliente');picker=licenseClientPicker(s1,()=>{parts.markDirty();paint();});
+  if(preset.client)setTimeout(()=>{picker.choose(preset.client);delete dialog.dataset.dirty;},0);
+  const s2=licenseSection(form,'2','Licencia');
+  const product=licenseField(s2,'Producto *','product_id',String(preset.product_id||''),{select:[['','Selecciona el producto'],...products.map(item=>[String(item.id),item.name+' · '+(item.stock?.disponible||0)+' disponible'+((item.stock?.disponible||0)===1?'':'s')])],required:true,wide:true});
+  if(preset.unit){product.disabled=true;s2.append(el('p','Licencia elegida: '+(preset.unit.code||'#'+preset.unit.id)+(preset.unit.expires_at?' · vence el '+licenseDay(preset.unit.expires_at):''),'license-hint wide'));}
+  else s2.append(el('p','Se entrega la licencia disponible y vigente que vence primero. La clave no se muestra aquí.','license-hint wide'));
+  const s3=licenseSection(form,'3','Entrega');
+  const activeBox=el('label',undefined,'booking-consent wide'),active=el('input');active.type='checkbox';active.name='activated';activeBox.append(active,el('span','La licencia ya fue activada (fecha real de activación)'));s3.append(activeBox);
+  const activatedAt=licenseField(s3,'Fecha de activación *','activated_at',licenseToday(),{type:'date'});activatedAt.max=licenseToday();
+  const mailBox=el('label',undefined,'booking-consent wide'),send=el('input');send.type='checkbox';send.name='send_mail';send.checked=true;mailBox.append(send,el('span','Enviar al cliente el correo de entrega con su enlace privado e instrucciones'));s3.append(mailBox);
+  const linkBox=el('label',undefined,'booking-consent wide'),link=el('input');link.type='checkbox';link.name='link_order';linkBox.append(link,el('span','Vincular a una orden técnica (opcional)'));s3.append(linkBox);
+  const orderField=licenseField(s3,'Número de orden *','order_code','',{max:40,placeholder:'PCD-AAAAMMDD-0001',wide:true});
+  const balanceBox=el('label',undefined,'booking-consent wide license-balance-accept'),balance=el('input');balance.type='checkbox';balance.name='accept_balance';balanceBox.append(balance,el('span','La orden tiene saldo pendiente: entregar igualmente (queda registrado).'));balanceBox.hidden=true;s3.append(balanceBox);
+  licenseField(s3,'Observaciones','notes','',{max:300,wide:true});
+  function paint(){activatedAt.closest('label').hidden=!active.checked;activatedAt.toggleAttribute('data-required',active.checked);orderField.closest('label').hidden=!link.checked;orderField.toggleAttribute('data-required',link.checked);parts.save.disabled=!picker.client;}
+  for(const node of [active,link])node.addEventListener('change',paint);dialog.paint=paint;dialog.balanceBox=balanceBox;paint();setTimeout(()=>picker.focus(),0);},
+ async(form,dialog)=>{const v=name=>form.elements[name],client=picker.client;if(!client)throw Object.assign(new Error('Selecciona el cliente que recibe la licencia.'),{fields:{}});
+  const name=(products.find(item=>String(item.id)===v('product_id').value)||{}).name||'la licencia';
+  const body={assign:true,client_id:String(client.id),product_id:v('product_id').value,unit_id:preset.unit?String(preset.unit.id):'',order_code:v('link_order').checked?v('order_code').value.trim():'',activated:v('activated').checked,
+   activated_at:v('activated').checked?v('activated_at').value:'',send_mail:v('send_mail').checked,accept_balance:v('accept_balance').checked,notes:v('notes').value.trim()};
+  if(await confirmClose({title:'¿Confirmar la entrega?',text:'Se entregará '+name+' a '+client.name+' sin venta ni cobro. Quedará registrado con fecha, hora y responsable.',keep:'Revisar',discard:'Confirmar entrega'})!=='discard')throw Object.assign(new Error(''),{cancelled:true});
+  let result;try{result=await api('/api/licenses/deliver',body);}catch(error){if(error.fields?.accept_balance){dialog.balanceBox.hidden=false;}throw error;}
+  dialog.dataset.dirty='';dialog.close();toast('Licencia entregada a '+client.name+'.'+(body.send_mail&&result.mail!=='sent'?' El correo está pendiente: comparte el enlace desde la ventana siguiente.':''),'success');licenseShareLink(result);licenseReloadAll();},'Confirmar entrega');
+ dialog.classList.add('license-dialog-wide','license-assign-dialog');return dialog;}
 function licenseSaleDialog(preset={}){
  const products=(licenseMeta?.products||[]).filter(item=>item.managed);let picker=null;const cart=[];
- const dialog=licenseFormDialog('Vender o entregar licencia',(form,dialog,parts)=>{
+ const dialog=licenseFormDialog('Venta de licencias',(form,dialog,parts)=>{
   form.classList.add('license-sale-form');const left=el('div',undefined,'license-sale-col'),right=el('div',undefined,'license-sale-col');form.append(left,right);
   form.append(el('p','Venta independiente: no necesita orden técnica ni datos del equipo. Las claves se reservan al registrar la venta y no se muestran aquí.','license-hint wide license-sale-intro'));
   form.prepend(form.lastChild);
@@ -627,7 +656,7 @@ function licenseSaleDialog(preset={}){
     price.addEventListener('input',()=>{line.price=price.value;paintTotals();});discount.addEventListener('input',()=>{line.discount=discount.value;paintTotals();});
     row.append(name,remove,field('Cant.',qty),field('Precio (USD)',price),field('Descuento',discount),sub);line.sub=sub;lines.append(row);}}
   // 4. Pago (opcional)
-  const s4=licenseSection(right,'4','Pago','Solo los pagos confirmados cuentan para marcar la venta como pagada. Puedes registrar pagos después desde la pestaña «Ventas».');
+  const s4=licenseSection(right,'4','Pago','Solo los pagos confirmados cuentan para marcar la venta como pagada. Puedes registrar pagos después en Ventas → Ventas de licencias.');
   const payBox=el('label',undefined,'booking-consent wide'),payNow=el('input');payNow.type='checkbox';payNow.name='pay_now';payBox.append(payNow,el('span','Registrar un pago ahora'));s4.append(payBox);
   const payFields=el('div',undefined,'license-form-grid license-pay-fields wide');s4.append(payFields);
   const amount=licenseField(payFields,'Monto recibido (USD) *','amount','',{inputmode:'decimal'}),method=licenseField(payFields,'Método de pago *','method','efectivo',{select:Object.entries(licenseMethods)});
@@ -676,7 +705,7 @@ function licenseSaleDialog(preset={}){
   const result=await api('/api/licenses/sales',body);dialog.dataset.dirty='';dialog.close();
   const mailPending=now&&body.send_mail&&result.mail!=='sent';
   toast((now?'Venta '+result.code+' registrada y entregada.':'Venta '+result.code+' registrada. Las licencias quedan reservadas hasta su entrega.')+(mailPending?' El correo está pendiente: comparte el enlace desde la ventana siguiente.':''),mailPending?'warning':'success',null,{title:now?'Venta entregada':'Venta registrada',duration:8000});
-  if(now)licenseShareLink(result);licenseState.tab='ventas';licenseReloadAll();},'Registrar y entregar');
+  if(now)licenseShareLink(result);licenseReloadAll();if(typeof salesReload==='function')salesReload();},'Registrar y entregar');
  dialog.classList.add('license-dialog-wide','license-sale-dialog');return dialog;}
 function licensePayDialog(sale,done){const balance=Math.max(sale.total_cents-sale.paid_cents-(sale.pending_cents||0),0);
  licenseFormDialog('Registrar pago · '+sale.code,(form,dialog,parts)=>{if(typeof cashGuard==='function')cashGuard(form);form.append(el('p','Saldo pendiente: '+licenseMoney(balance)+'. Solo los pagos confirmados cuentan para marcar la venta como pagada.','license-hint wide'));

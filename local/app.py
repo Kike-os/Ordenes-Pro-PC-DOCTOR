@@ -1095,7 +1095,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         path = urlsplit(self.path).path
-        files = {'/static/label.css':'label.css','/static/tracking.css':'tracking.css','/static/licencias.css':'licencias.css','/static/app.css':'app.css','/static/app.js':'app.js','/static/service-picker.js':'service-picker.js','/static/licenses.js':'licenses.js','/static/inventory.js':'inventory.js','/static/reschedule.js':'reschedule.js','/static/form-validation.js':'form-validation.js','/static/appointments.js':'appointments.js','/static/adi-widget.js':'adi-widget.js','/static/adi-orb.js':'adi-orb.js','/static/ui-select.js':'ui-select.js','/static/ticket.css':'ticket.css','/static/ticket.js':'ticket.js','/static/quote.css':'quote.css','/static/quote-sign.js':'quote-sign.js','/static/echarts.min.js':'echarts.min.js','/static/logo-original.png':'logo-original.png',
+        files = {'/static/label.css':'label.css','/static/tracking.css':'tracking.css','/static/licencias.css':'licencias.css','/static/app.css':'app.css','/static/app.js':'app.js','/static/service-picker.js':'service-picker.js','/static/licenses.js':'licenses.js','/static/inventory.js':'inventory.js','/static/sales.js':'sales.js','/static/reschedule.js':'reschedule.js','/static/form-validation.js':'form-validation.js','/static/appointments.js':'appointments.js','/static/adi-widget.js':'adi-widget.js','/static/adi-orb.js':'adi-orb.js','/static/ui-select.js':'ui-select.js','/static/ticket.css':'ticket.css','/static/ticket.js':'ticket.js','/static/quote.css':'quote.css','/static/quote-sign.js':'quote-sign.js','/static/echarts.min.js':'echarts.min.js','/static/logo-original.png':'logo-original.png',
                  '/favicon.ico':'favicon.ico','/static/favicon.ico':'favicon.ico','/static/favicon-16.png':'favicon-16.png','/static/favicon-32.png':'favicon-32.png','/static/logo-firma.png':'logo-firma.png','/static/favicon-48.png':'favicon-48.png',
                  '/apple-touch-icon.png':'apple-touch-icon.png','/apple-touch-icon-precomposed.png':'apple-touch-icon.png','/static/apple-touch-icon.png':'apple-touch-icon.png'}
         # Logotipos de marcas: solo nombres simples dentro de static/brands; si el archivo no existe la interfaz usa un icono genérico.
@@ -2047,6 +2047,21 @@ class Handler(BaseHTTPRequestHandler):
                     if found:
                         name,mime,raw=cash.file_of(c,user,int(found[1]));return self.reply(200,raw,mime,filename=name)
                 except cash.CashError as error:return self.reply(error.status,{'error':str(error),'fields':error.fields})
+                return self.reply(404,{'error':'No encontrado.'})
+            if path.startswith('/api/sales/'):
+                # Centro de Ventas: solo administración. Lectura de lo que ya registran proformas, licencias, inventario y facturación.
+                if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede ver las ventas.'})
+                import sales_center
+                q=parse_qs(urlsplit(self.path).query);f={k:(v[0] or '')[:80] for k,v in q.items()}
+                try:
+                    if path=='/api/sales/dashboard':return self.reply(200,sales_center.dashboard(c,reception_now()))
+                    if path=='/api/sales/history':return self.reply(200,{'rows':sales_center.ledger(c,f)[:300],'kinds':sales_center.KINDS,'states':sales_center.STATES,
+                                                                       'users':[dict(r) for r in c.execute("SELECT id,name FROM users WHERE role='administrador' OR id IN (SELECT created_by FROM proformas) ORDER BY name")]})
+                    if path=='/api/sales/report':return self.reply(200,sales_center.report(c,f,reception_now()))
+                    if path=='/api/sales/requests':return self.reply(200,{'rows':sales_center.requests(c,f),'status':sales_center.REQUEST_STATUS,'kinds':sales_center.REQUEST_KINDS})
+                    found=re.fullmatch(r'/api/sales/requests/([0-9]{1,9})',path)
+                    if found:return self.reply(200,sales_center.request_detail(c,found[1]))
+                except sales_center.SalesError as error:return self.reply(error.status,{'error':str(error),'fields':error.fields})
                 return self.reply(404,{'error':'No encontrado.'})
             if path.startswith('/api/inventory'):
                 # Inventario, proveedores y compras: solo administración. Solo lectura en GET.
@@ -3083,12 +3098,13 @@ class Handler(BaseHTTPRequestHandler):
                             elif action=='cancel':proformas.cancel(c,pid,data,user,now)
                             elif action=='convert':
                                 if user['role']!='administrador':return self.reply(403,{'error':'Solo administración genera facturas.'})
-                                invoice_id=proformas.convert(c,pid,user,now);return self.reply(200,{'ok':True,'invoice_id':invoice_id,**invoicing.detail(c,invoice_id)})
+                                c.commit();c.execute('BEGIN IMMEDIATE');invoice_id=proformas.convert(c,pid,user,now,data.get('units'));c.commit();return self.reply(200,{'ok':True,'invoice_id':invoice_id,**invoicing.detail(c,invoice_id)})
                             elif action=='advance':
                                 proformas.add_advance(c,pid,data,user,now,attach('anticipo'))
                             elif action=='void_advance':proformas.void_advance(c,data.get('advance_id'),data,user,now)
                             elif action=='checkout':
                                 if user['role']!='administrador':return self.reply(403,{'error':'Solo administración genera facturas.'})
+                                c.commit();c.execute('BEGIN IMMEDIATE')  # exclusiva: dos ventas simultáneas no toman la misma existencia
                                 invoice_id=proformas.checkout(c,pid,data,user,now);c.commit()
                                 emit_error=''
                                 if str(data.get('consumer_final',''))=='1':
@@ -3143,6 +3159,23 @@ class Handler(BaseHTTPRequestHandler):
                         c.rollback();return self.reply(error.status,{'error':str(error),'fields':error.fields})
                     except sqlite3.IntegrityError:
                         c.rollback();return self.reply(409,{'error':'El registro ya existe (por ejemplo, el mismo comprobante en la misma cuenta).'})
+                if path.startswith('/api/sales/'):
+                    # Centro de Ventas: pedidos comerciales y paso de una orden a facturación, cada uno en una transacción exclusiva.
+                    if user['role']!='administrador':return self.reply(403,{'error':'Solo administración gestiona las ventas.'})
+                    import sales_center
+                    now=reception_now()
+                    try:
+                        c.commit();c.execute('BEGIN IMMEDIATE')
+                        found=re.fullmatch(r'/api/sales/requests/([0-9]{1,9})',path)
+                        if path=='/api/sales/requests':rid=sales_center.save_request(c,data,user,now)
+                        elif found:rid=sales_center.request_action(c,found[1],data,user,now)
+                        elif path=='/api/sales/from-order':
+                            invoice_id=sales_center.from_order(c,data.get('order_code'),user,now);c.commit();audit(c,user['id'],'sales_from_order',invoice_id)
+                            return self.reply(200,{'ok':True,'invoice_id':invoice_id})
+                        else:c.rollback();return self.reply(404,{'error':'No encontrado.'})
+                        c.commit();audit(c,user['id'],'sales_request',rid);return self.reply(200,{'ok':True,'id':rid,**sales_center.request_detail(c,rid)})
+                    except sales_center.SalesError as error:
+                        c.rollback();return self.reply(error.status,{'error':str(error),'fields':error.fields})
                 if path.startswith('/api/inventory'):
                     # Inventario: cada operación en una transacción exclusiva, para que dos salidas simultáneas no dejen existencias negativas.
                     if user['role']!='administrador':return self.reply(403,{'error':'Solo administración gestiona el inventario.'})

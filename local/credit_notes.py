@@ -110,7 +110,38 @@ def create(c, invoice_id, data, user, now):
     invoicing.event(c, invoice_id, 'nota_credito', 'Nota de crédito %s (%s) emitida en ambiente de PRUEBAS por %s: %s' % (number, 'total' if scope == 'total' else 'parcial', invoicing.quotes.usd(subtotal + tax_total), reason), now, user)
     if str(data.get('return_stock', '')) in ('1', 'true', 'on') and inv['source_kind'] == 'venta_inventario':
         _return_stock(c, inv, note_id, rows, user, now)
+    elif str(data.get('return_stock', '')) in ('1', 'true', 'on'):
+        import inventory
+        try:
+            _return_sale_stock(c, inv, note_id, rows, items, user, now)
+        except inventory.InventoryError as error:
+            raise CreditNoteError('No se pudo devolver al inventario: %s' % error, 409)
     return note_id
+
+
+def _return_sale_stock(c, inv, note_id, rows, items, user, now):
+    """Venta del Centro de Ventas (salida del Kardex con la factura): vuelve al inventario lo acreditado de cada producto, sin superar lo
+    que salió con la factura menos lo ya devuelto por notas anteriores. Con serie, vuelven las unidades vendidas en esa factura."""
+    import inventory
+    credited = {}
+    for r in rows:
+        catalog = items[r['invoice_item_id']]['catalog_id']
+        item = c.execute('SELECT id FROM inventory_items WHERE catalog_id=?', (catalog,)).fetchone() if catalog else None
+        if item:
+            credited[item[0]] = credited.get(item[0], 0) + r['quantity']
+    for item_id, qty in credited.items():
+        out = c.execute("SELECT * FROM inventory_movements WHERE reference_kind='factura' AND reference_id=? AND item_id=? AND direction=-1 AND reason='venta'", (inv['id'], item_id)).fetchone()
+        if not out:
+            continue
+        back = c.execute("SELECT COALESCE(SUM(m.quantity),0) FROM inventory_movements m JOIN credit_notes n ON n.id=m.reference_id WHERE m.reference_kind='nota_credito' AND n.invoice_id=? "
+                         "AND m.item_id=? AND m.direction=1", (inv['id'], item_id)).fetchone()[0]
+        amount = min(qty, out['quantity'] - back)
+        if amount <= 0:
+            continue
+        units = [r[0] for r in c.execute("SELECT x.unit_id FROM inventory_movement_units x JOIN inventory_units u ON u.id=x.unit_id WHERE x.movement_id=? AND u.status='vendida' ORDER BY u.id",
+                                         (out['id'],))][:amount]
+        inventory.move(c, item_id, 1, 'devolucion_cliente', str(amount), '%d.%02d' % divmod(out['unit_cost_cents'] or 0, 100), user, now, reference_kind='nota_credito', reference_id=note_id,
+                       note='Devolución por nota de crédito de la factura ' + invoicing.number(inv), unit_ids=units or None)
 
 
 def _return_stock(c, inv, note_id, rows, user, now):
