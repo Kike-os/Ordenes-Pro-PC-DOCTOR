@@ -8,6 +8,31 @@
   },
   "releases": [
     {
+      "version": "1.5.221",
+      "date": "2026-11-02T14:28:57-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Centro de Ventas, pedidos comerciales, asignación de licencias sin cobro y salida de inventario en la venta directa",
+      "changes": {
+        "features": [
+          "Nuevo Centro de Ventas en el menú principal (administración): panel con ventas del día y del mes, total facturado, ventas y cobros pendientes, productos más vendidos y últimas transacciones.",
+          "Nueva venta de productos, servicios y licencias, desde cotización o desde una orden técnica sin duplicar conceptos; historial con filtros; cotizaciones, cobros y ventas de licencias; reportes por fechas, productos, clientes, usuarios y tipo con exportación CSV.",
+          "Pedidos comerciales (PED-000001): solicitudes de clientes, pedido al proveedor, recepción y entrega, con historial; se cancelan con motivo y nunca se borran."
+        ],
+        "improvements": [
+          "Licencias Pro: «Asignar o entregar licencia» reemplaza a «Vender o entregar» y entrega sin precio ni cobro; las ventas de licencias pasan al Centro de Ventas conservando todo el historial."
+        ],
+        "fixes": [
+          "La venta directa ahora descuenta el inventario y registra el Kardex (cliente, precio, garantía y número de serie elegido) en la misma operación; sin existencias no factura, no descuenta dos veces y dos ventas simultáneas no toman la misma unidad. Descartar el borrador de la factura o emitir una nota de crédito devuelve lo vendido una sola vez.",
+          "El menú principal ya no desborda la página entre 1200 y 1439 px."
+        ],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Kike-os: «Sí, aplica y publica» (Centro de Ventas)"
+    },
+    {
       "version": "1.5.220",
       "date": "2026-11-02T08:33:27-05:00",
       "type": "patch",

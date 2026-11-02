@@ -4,6 +4,25 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.221 — 2026-11-02 14:28 (UTC-05:00)
+
+Centro de Ventas, pedidos comerciales, asignación de licencias sin cobro y salida de inventario en la venta directa
+
+### Nuevas funcionalidades
+
+- Nuevo Centro de Ventas en el menú principal (administración): panel con ventas del día y del mes, total facturado, ventas y cobros pendientes, productos más vendidos y últimas transacciones.
+- Nueva venta de productos, servicios y licencias, desde cotización o desde una orden técnica sin duplicar conceptos; historial con filtros; cotizaciones, cobros y ventas de licencias; reportes por fechas, productos, clientes, usuarios y tipo con exportación CSV.
+- Pedidos comerciales (PED-000001): solicitudes de clientes, pedido al proveedor, recepción y entrega, con historial; se cancelan con motivo y nunca se borran.
+
+### Mejoras realizadas
+
+- Licencias Pro: «Asignar o entregar licencia» reemplaza a «Vender o entregar» y entrega sin precio ni cobro; las ventas de licencias pasan al Centro de Ventas conservando todo el historial.
+
+### Errores corregidos
+
+- La venta directa ahora descuenta el inventario y registra el Kardex (cliente, precio, garantía y número de serie elegido) en la misma operación; sin existencias no factura, no descuenta dos veces y dos ventas simultáneas no toman la misma unidad. Descartar el borrador de la factura o emitir una nota de crédito devuelve lo vendido una sola vez.
+- El menú principal ya no desborda la página entre 1200 y 1439 px.
+
 ## v1.5.220 — 2026-11-02 08:33 (UTC-05:00)
 
 Ingreso de mercadería por proveedor con factura XML, corrección controlada de ingresos y series, y Centro de Proveedores
