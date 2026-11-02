@@ -237,6 +237,23 @@ def build(c, user, now, mail_access=False, hidden=False):
             note = quotes_module.client_note(c, row['id']) if row['status'] in ('rechazado','parcial','aprobado') else ''
             detail = row['client'] + ('. Motivo u observación: ' + note[:160] if note else '') + ('. No se autoriza ningún servicio.' if row['status'] == 'rechazado' else '. Revisa los servicios autorizados antes de iniciar trabajos.')
             items.append({'key':'quote:%d:%s:%s'%(row['id'],row['status'],row['updated_at'][:19]),'kind':'success' if row['status'] in ('aprobado','parcial') else 'warning','icon':'budget','title':title+' · '+row['code'],'detail':detail,'at':row['updated_at'],'href':'#orders?id='+str(row['order_id']),'group':'event'})
+        # Proformas decididas en las últimas 48 h (por el cliente con su firma o registradas por el personal), con su orden si está vinculada.
+        try:
+            decided = c.execute("SELECT p.id,p.code,p.status,p.decided_at,p.order_id,p.client_name,(SELECT a.method FROM proforma_acceptances a WHERE a.proforma_id=p.id ORDER BY a.id DESC LIMIT 1) method,"
+                                "(SELECT o.code FROM orders o WHERE o.id=p.order_id) order_code FROM proformas p WHERE p.status IN ('aprobada','parcial','rechazada','modificacion') AND p.origin!='directa' "
+                                "AND p.decided_at!='' ORDER BY p.decided_at DESC LIMIT 12").fetchall()
+        except Exception:
+            decided = []
+        for row in decided if admin else []:  # las proformas son documentos de administración
+            try:fresh=(now-appointments.datetime.fromisoformat(row['decided_at'])).total_seconds()<172800
+            except (ValueError,TypeError):fresh=False
+            if not fresh:
+                continue
+            by_staff = (row['method'] or '') == 'Registrada por el personal'
+            title = {'aprobada':'Proforma aprobada','parcial':'Proforma aprobada parcialmente','rechazada':'Proforma rechazada','modificacion':'El cliente pide modificar la proforma'}[row['status']] + (' (registrada por el personal)' if by_staff else ' por el cliente' if row['status'] != 'modificacion' else '')
+            items.append({'key':'proforma:%d:%s:%s'%(row['id'],row['status'],row['decided_at'][:19]),'kind':'success' if row['status'] in ('aprobada','parcial') else 'warning','icon':'budget','title':title+' · '+row['code'],
+                          'detail':(row['client_name'] or 'Cliente')+(' · orden '+row['order_code'] if row['order_code'] else '')+'. El estado técnico de la orden no cambia.','at':row['decided_at'],
+                          'href':'#orders?id='+str(row['order_id']) if row['order_id'] else '#invoicing?proforma='+str(row['id']),'group':'event'})
         start = appointments.stamp(appointments.datetime.combine(now.date(), appointments.time.min, appointments.TZ))
         end = appointments.stamp(appointments.datetime.combine(now.date() + appointments.timedelta(days=1), appointments.time.min, appointments.TZ))
         todays = count("SELECT COUNT(*) FROM appointments WHERE deleted_at IS NULL AND starts_at>=? AND starts_at<? AND status IN ('solicitada','confirmada','reprogramada')", start, end)

@@ -242,7 +242,11 @@ def save(c, data, user, now, pid=None):
             raise ProformaError('Esa cuenta está pendiente de verificación: no se puede usar en documentos para clientes.', 409, {'bank_account_id': 'Cuenta sin verificar.'})
     notes = re.sub(r'[ \t]+', ' ', str(data.get('notes', '') or '')).strip()[:1000]
     conditions = str(data.get('conditions', '') or '').strip()[:4000] or CONDITIONS
-    order_id = int(data['order_id']) if origin == 'orden' and str(data.get('order_id', '')).isdigit() and c.execute('SELECT 1 FROM orders WHERE id=?', (int(data['order_id']),)).fetchone() else None
+    order = order_brief(c, data['order_id']) if not row and str(data.get('order_id', '') or '').strip() else None
+    if origin == 'orden' and not row and not order:
+        raise ProformaError('Indica la orden de servicio de esta proforma.', 400, {'order_id': 'Orden obligatoria.'})
+    order_id = order['id'] if order else None
+    link_note = _check_client({'client_id': client['client_id'], 'client_identification': client['client_identification'], 'client_name': client['client_name']}, order, data) if order else ''
     values = dict(client, valid_until=valid_date.isoformat(), payment_method=method, financing=json.dumps(financing, ensure_ascii=False), bank_account_id=account['id'] if account else None,
                   notes=notes, conditions=conditions, tax_rate_bp=rate, subtotal_cents=t['subtotal_cents'], discount_cents=t['discount_cents'], tax_cents=t['tax_cents'],
                   total_cents=t['total_cents'], updated_at=stamp(now))
@@ -257,6 +261,9 @@ def save(c, data, user, now, pid=None):
                   (nid, code, origin, order_id, today.isoformat(), 'borrador', user['id'], stamp(now), key or None, *values.values()))
         pid = nid
         event(c, pid, 'creada', 'Proforma %s creada (%s): %d partidas, total %s.' % (code, ORIGINS[origin], len(items), usd(t['total_cents'])), now, user)
+        if order:
+            event(c, pid, 'vinculada', 'Vinculada a la orden %s al crearla.%s' % (order['code'], link_note), now, user)
+            _order_event(c, order['id'], now, 'Proforma %s creada %s: %d partidas, total %s.%s' % (code, 'desde la orden' if origin == 'orden' else 'y vinculada', len(items), usd(t['total_cents']), link_note), user)
     for item in items:
         c.execute('INSERT INTO proforma_items(proforma_id,position,kind,catalog_id,inventory_item_id,code,description,quantity,unit_cents,discount_cents,taxed,status,authorization) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',
                   (pid, item['position'], item['kind'], item['catalog_id'], item['inventory_item_id'], item['code'], item['description'], item['quantity'], item['unit_cents'],
@@ -276,6 +283,7 @@ def detail(c, pid, now):
     for item in items:
         item.update(line_amounts(item, row['tax_rate_bp']))
     p = dict(row, status_label=STATUS[row['status']], origin_label=ORIGINS[row['origin']], payment_label=PAYMENT[row['payment_method']], financing=json.loads(row['financing'] or '{}'))
+    p['order'] = order_brief(c, row['order_id']) if row['order_id'] else None
     account = c.execute('SELECT * FROM bank_accounts WHERE id=?', (row['bank_account_id'],)).fetchone() if row['bank_account_id'] else None
     advances = [dict(a, method_label=ADVANCE_LABELS.get(a['method'], a['method']))
                 for a in c.execute("SELECT a.*,COALESCE(u.name,'') actor,(SELECT t.status FROM bank_transfers t WHERE t.advance_id=a.id) transfer_status FROM advances a LEFT JOIN users u ON u.id=a.created_by "
@@ -292,6 +300,7 @@ def detail(c, pid, now):
             'balance_cents': max(0, (approved['total_cents'] if row['status'] in ('aprobada', 'parcial', 'convertida') else row['total_cents']) - paid),
             'bank_account': banking.public(account), 'versions': versions, 'acceptance': dict(acceptance) if acceptance else None,
             'invoice': dict(invoice, number=invoicing.number(invoice)) if invoice else None, 'events': events, 'statuses': STATUS, 'payment_methods': PAYMENT,
+            'overlaps': overlaps(c, row), 'can_link': row['status'] in LINKABLE, 'can_unlink': bool(row['order_id']) and row['origin'] != 'orden',
             'can_edit': row['status'] in EDITABLE, 'can_send': row['status'] in ('borrador', 'modificacion', 'enviada', 'vista'),
             'can_convert': row['status'] in ('aprobada', 'parcial') and not row['invoice_id'], 'can_version': row['status'] in ('enviada', 'vista', 'rechazada', 'modificacion', 'vencida', 'parcial', 'aprobada')}
 
@@ -304,11 +313,16 @@ def listing(c, f, now):
     if f.get('status') in STATUS:
         where.append('p.status=?')
         args.append(f['status'])
+    if f.get('order') == 'con':
+        where.append('p.order_id IS NOT NULL')
+    elif f.get('order') == 'sin':
+        where.append('p.order_id IS NULL')
     if f.get('q'):
-        where.append("instr(lower(p.code||' '||p.client_name||' '||p.client_identification),lower(?))>0")
+        where.append("instr(lower(p.code||' '||p.client_name||' '||p.client_identification||' '||COALESCE((SELECT o.code FROM orders o WHERE o.id=p.order_id),'')),lower(?))>0")
         args.append(str(f['q'])[:80])
     rows = [dict(r, status_label=STATUS[r['status']], origin_label=ORIGINS[r['origin']]) for r in c.execute(
-        "SELECT p.id,p.code,p.version,p.status,p.origin,p.client_name,p.client_identification,p.issue_date,p.valid_until,p.total_cents,p.payment_method,p.invoice_id,"
+        "SELECT p.id,p.code,p.version,p.status,p.origin,p.client_name,p.client_identification,p.issue_date,p.valid_until,p.total_cents,p.payment_method,p.invoice_id,p.order_id,"
+        "(SELECT o.code FROM orders o WHERE o.id=p.order_id) order_code,"
         "COALESCE((SELECT SUM(a.amount_cents) FROM advances a WHERE a.proforma_id=p.id AND a.voided_at=''),0) paid_cents FROM proformas p WHERE " + ' AND '.join(where) + ' ORDER BY p.id DESC LIMIT 300', args)]
     counts = {k: c.execute('SELECT COUNT(*) FROM proformas WHERE status=?', (k,)).fetchone()[0] for k in STATUS}
     return {'rows': rows, 'counts': counts, 'statuses': STATUS}
@@ -407,6 +421,7 @@ def _record(c, row, link, decision, name, signature, comment, items, now, origin
     c.execute("UPDATE proforma_links SET revoked_at=? WHERE id=?", (stamp_, link['id']))
     event(c, row['id'], decision, {'aprobada': 'El cliente aprobó la proforma', 'parcial': 'El cliente aprobó parte de la proforma', 'rechazada': 'El cliente rechazó la proforma',
                                    'modificacion': 'El cliente solicitó una modificación'}[decision] + ((': ' + comment) if comment else '.') + ' Firmó: ' + name + '.', now, actor='Cliente: ' + name)
+    notify_order(c, get(c, row['id']), decision, name + ' (firma del cliente)' if signature else name, now, comment=comment)
     return decision
 
 
@@ -431,6 +446,7 @@ def staff_decide(c, pid, data, user, now):
     c.execute('UPDATE proformas SET status=?,decided_at=?,updated_at=? WHERE id=?', (decision, stamp(now), stamp(now), row['id']))
     c.execute("UPDATE proforma_links SET revoked_at=? WHERE proforma_id=? AND revoked_at=''", (stamp(now), row['id']))
     event(c, row['id'], decision, 'Decisión registrada por el personal: ' + note, now, user)
+    notify_order(c, get(c, row['id']), decision, user['name'] + ' (registrada por el personal)', now, user, note)
 
 
 def new_version(c, pid, user, now):
@@ -473,26 +489,36 @@ def cancel(c, pid, data, user, now):
     event(c, row['id'], 'cancelada', 'Proforma cancelada: ' + reason, now, user)
 
 
-def convert(c, pid, user, now, units=None):
+def convert(c, pid, user, now, units=None, accept_overlap=False):
     """Convierte una proforma aprobada en un borrador de factura (ambiente de pruebas). Idempotente: si ya tiene factura, devuelve esa.
-    Sin orden técnica, los productos del inventario salen en la misma transacción (Kardex «Venta»); con orden, los descuenta la orden."""
+    Los productos del inventario salen en la misma transacción (Kardex «Venta»), salvo en una proforma creada desde la orden: esos los
+    descuenta la orden. Si está vinculada a una orden, no sale lo que la orden ya consumió."""
     row = expire(c, get(c, pid), now.date().isoformat())
     if row['invoice_id']:
         return row['invoice_id']
     if row['status'] not in ('aprobada', 'parcial'):
         raise ProformaError('Solo se factura una proforma aprobada (%s).' % STATUS[row['status']].lower(), 409)
+    repeated = overlaps(c, row)
+    if repeated and not accept_overlap:
+        # Lo mismo autorizado en el presupuesto técnico de la orden se cobraría dos veces: se confirma expresamente (queda registrado).
+        error = ProformaError('Estos conceptos también están autorizados en el presupuesto de la orden: %s. Confirma que no se cobran dos veces.' % '; '.join(repeated[:6]), 409,
+                              {'accept_overlap': 'Confirmación obligatoria.'})
+        error.extra = {'overlaps': repeated}
+        raise error
     try:
         invoice_id = invoicing.draft(c, 'proforma', row['id'], user, now)
     except invoicing.InvoiceError as error:
         raise ProformaError(str(error), error.status, error.fields)
-    if not row['order_id']:
+    if row['origin'] != 'orden':  # creada desde la orden: los repuestos los descuenta la orden; vinculada después: sale como venta
         import inventory_center
         try:
             inventory_center.sale_exit(c, invoice_id, row['id'], user, now, units)
         except inventory_center.InventoryError as error:
             raise ProformaError(str(error), error.status, error.fields)
     c.execute("UPDATE proformas SET status='convertida',invoice_id=?,updated_at=? WHERE id=?", (invoice_id, stamp(now), row['id']))
-    event(c, row['id'], 'convertida', 'Convertida en borrador de factura (ambiente de pruebas).', now, user)
+    event(c, row['id'], 'convertida', 'Convertida en borrador de factura (ambiente de pruebas).' + (' Conceptos también presentes en el presupuesto de la orden, confirmados: ' + '; '.join(repeated[:6]) if repeated else ''), now, user)
+    if row['order_id']:
+        _order_event(c, row['order_id'], now, 'Proforma %s convertida en borrador de factura (ambiente de pruebas).' % row['code'], user)
     return invoice_id
 
 
@@ -984,4 +1010,143 @@ def checkout(c, pid, data, user, now):
         if not isinstance(line, dict):
             raise ProformaError('Formas de pago no válidas.', 400, {'payments': 'Formas de pago no válidas.'})
         add_advance(c, row['id'], {**line, 'request_key': (key + '-p%d' % n) if len(key) >= 16 else '', 'paid_at': data.get('paid_at', ''), 'note': 'Cobro de la factura directa'}, user, now, operation=operation)
-    return convert(c, row['id'], user, now, data.get('units'))
+    return convert(c, row['id'], user, now, data.get('units'), str(data.get('accept_overlap', '')) in ('1', 'true'))
+
+
+# ---- Vinculación con órdenes de servicio ------------------------------------------------------------------------------------------
+# La relación es la columna proformas.order_id (Proforma → Orden) y se consulta también desde la orden (Orden → Proforma). Vincular o
+# desvincular no crea otra proforma ni toca la aprobación, la firma, los importes, los anticipos ni la factura: solo registra la relación
+# con su evidencia en el historial de la proforma y en el de la orden. Los cobros siguen separados: el saldo de la orden sale de su
+# presupuesto técnico y sus pagos; el de la proforma, de lo aprobado y sus anticipos. Nunca se suman entre sí.
+
+LINKABLE = ('borrador', 'enviada', 'vista', 'aprobada', 'parcial', 'rechazada', 'modificacion', 'vencida', 'convertida')
+ORDER_SQL = ("SELECT o.id,o.code,o.status,s.label status_label,o.created_at,d.client_id,d.brand,d.model,k.name client,k.identification,k.phone "
+             "FROM orders o JOIN devices d ON d.id=o.device_id JOIN clients k ON k.id=d.client_id LEFT JOIN statuses s ON s.code=o.status")
+
+
+def order_brief(c, oid):
+    row = c.execute(ORDER_SQL + ' WHERE o.id=?', (oid,)).fetchone() if str(oid or '').isdigit() else None
+    if not row:
+        raise ProformaError('Orden de servicio no encontrada.', 404, {'order_id': 'Orden no encontrada.'})
+    return dict(row, device=' '.join(x for x in (row['brand'], row['model']) if x) or 'Equipo')
+
+
+def search_orders(c, q):
+    """Órdenes por número, cliente, cédula o RUC, o teléfono (las más recientes primero)."""
+    term = re.sub(r'\s+', ' ', str(q or '')).strip()[:60]
+    if len(term) < 2:
+        return []
+    digits = re.sub(r'\D', '', term)
+    rows = c.execute(ORDER_SQL + " WHERE instr(lower(o.code),lower(?))>0 OR instr(lower(k.name),lower(?))>0" + (" OR instr(k.identification,?)>0 OR instr(k.phone,?)>0" if len(digits) >= 4 else '') +
+                     ' ORDER BY o.id DESC LIMIT 12', (term, term, digits, digits) if len(digits) >= 4 else (term, term)).fetchall()
+    return [dict(r, device=' '.join(x for x in (r['brand'], r['model']) if x) or 'Equipo') for r in rows]
+
+
+def _same_client(row, order):
+    if row['client_id'] and order['client_id']:
+        return row['client_id'] == order['client_id']
+    ident = re.sub(r'\s', '', row['client_identification'] or '')
+    return bool(ident) and ident == re.sub(r'\s', '', order['identification'] or '')
+
+
+def _order_event(c, oid, now, text, user=None):
+    import order_workspace
+    order_workspace.event(c, oid, user['id'] if user else None, now, 'proforma', text[:900])
+
+
+def _check_client(row, order, data):
+    """Una proforma de otro cliente solo se vincula con confirmación expresa y su motivo (queda registrado)."""
+    if _same_client(row, order):
+        return ''
+    note = re.sub(r'\s+', ' ', str(data.get('note', '') or '')).strip()
+    if str(data.get('confirm_client', '')) not in ('1', 'true') or len(note) < 10:
+        raise ProformaError('La proforma es de %s y la orden %s es de %s. Para vincularlas confirma que corresponde e indica el motivo.' % (row['client_name'] or 'otro cliente', order['code'], order['client']),
+                            409, {'confirm_client': 'Confirmación obligatoria.', 'note': 'Motivo obligatorio (10 caracteres).'})
+    return ' Cliente distinto confirmado: ' + note[:200]
+
+
+def link_order(c, pid, data, user, now):
+    row = get(c, pid)
+    if row['status'] not in LINKABLE:
+        raise ProformaError('Una proforma %s no se vincula: usa su versión vigente.' % STATUS[row['status']].lower(), 409)
+    order = order_brief(c, data.get('order_id'))
+    if row['order_id'] == order['id']:
+        return order['id']
+    if row['order_id']:
+        current = c.execute('SELECT code FROM orders WHERE id=?', (row['order_id'],)).fetchone()
+        raise ProformaError('Ya está vinculada a la orden %s: desvincúlala primero.' % (current['code'] if current else row['order_id']), 409)
+    extra = _check_client(row, order, data)
+    c.execute('UPDATE proformas SET order_id=?,updated_at=? WHERE id=? AND order_id IS NULL', (order['id'], stamp(now), row['id']))
+    event(c, row['id'], 'vinculada', 'Vinculada a la orden %s (%s). Se conservan la aprobación, la firma, los importes y los anticipos.%s' % (order['code'], STATUS[row['status']].lower(), extra), now, user)
+    acceptance = c.execute('SELECT decision,signer_name,created_at FROM proforma_acceptances WHERE proforma_id=? ORDER BY id DESC LIMIT 1', (row['id'],)).fetchone()
+    _order_event(c, order['id'], now, 'Proforma %s vinculada (%s, total %s%s).%s' % (row['code'], STATUS[row['status']].lower(), usd(row['total_cents']),
+                 ('; decisión del cliente registrada el %s por %s' % (acceptance['created_at'][:16].replace('T', ' '), acceptance['signer_name'])) if acceptance else '', extra), user)
+    return order['id']
+
+
+def unlink_order(c, pid, data, user, now):
+    row = get(c, pid)
+    if not row['order_id']:
+        raise ProformaError('La proforma no está vinculada a ninguna orden.', 409)
+    if row['origin'] == 'orden':
+        raise ProformaError('Esta proforma se creó desde la orden: su relación no se quita.', 409)
+    reason = re.sub(r'\s+', ' ', str(data.get('reason', '') or '')).strip()
+    if len(reason) < 5:
+        raise ProformaError('Indica el motivo.', 400, {'reason': 'Motivo obligatorio.'})
+    order = c.execute('SELECT code FROM orders WHERE id=?', (row['order_id'],)).fetchone()
+    c.execute('UPDATE proformas SET order_id=NULL,updated_at=? WHERE id=?', (stamp(now), row['id']))
+    event(c, row['id'], 'desvinculada', 'Desvinculada de la orden %s: %s' % (order['code'] if order else row['order_id'], reason), now, user)
+    _order_event(c, row['order_id'], now, 'Proforma %s desvinculada: %s' % (row['code'], reason), user)
+
+
+def _key(text):
+    return re.sub(r'\s+', ' ', str(text or '')).strip().casefold()
+
+
+def overlaps(c, row):
+    """Conceptos de la proforma que ya están autorizados en el presupuesto técnico de su orden (mismo producto del catálogo o misma
+    descripción). Sirve para no cobrar dos veces lo mismo; no bloquea por sí solo."""
+    if not row['order_id']:
+        return []
+    found = quotes.authorized(c, row['order_id'])
+    if not found:
+        return []
+    catalogs = {i['catalog_id'] for i in found['items'] if i['catalog_id']}
+    names = {_key(i['description']) for i in found['items']}
+    return [i['description'] for i in items_of(c, row['id']) if i['status'] != 'rechazado' and ((i['catalog_id'] and i['catalog_id'] in catalogs) or _key(i['description']) in names)]
+
+
+def decision_summary(c, row):
+    items = items_of(c, row['id'])
+    approved = [i for i in items if i['status'] == 'aprobado']
+    t = totals(items, row['tax_rate_bp'], only_approved=True)
+    names = ', '.join('%d × %s' % (i['quantity'], i['description']) for i in approved[:8]) + (' y %d más' % (len(approved) - 8) if len(approved) > 8 else '')
+    return approved, t, names
+
+
+def notify_order(c, row, decision, signer, now, user=None, comment=''):
+    """La decisión del cliente queda en la orden (sin cambiar su estado técnico): resultado, lo autorizado, fecha, hora y quién firmó."""
+    if not row['order_id']:
+        return
+    approved, t, names = decision_summary(c, row)
+    text = {'aprobada': 'Proforma %s aprobada', 'parcial': 'Proforma %s aprobada parcialmente', 'rechazada': 'Proforma %s rechazada', 'modificacion': 'Proforma %s: el cliente pide una modificación'}[decision] % row['code']
+    text += ' por %s el %s.' % (signer, stamp(now)[:16].replace('T', ' '))
+    if decision in ('aprobada', 'parcial'):
+        text += ' Autorizado: %s. Total autorizado %s.' % (names or 'sin partidas', usd(t['total_cents']))
+    if comment:
+        text += ' Comentario: ' + comment[:200]
+    _order_event(c, row['order_id'], now, text + ' El estado técnico de la orden no cambia.', user)
+
+
+def for_order(c, oid, now):
+    """Proformas vinculadas a una orden, con su decisión, lo autorizado, anticipos, factura y conceptos repetidos con el presupuesto."""
+    order = order_brief(c, oid)
+    out = []
+    for r in c.execute("SELECT id FROM proformas WHERE order_id=? AND status!='reemplazada' ORDER BY id DESC", (order['id'],)).fetchall():
+        d = detail(c, r['id'], now)
+        p = d['proforma']
+        out.append({'id': p['id'], 'code': p['code'], 'status': p['status'], 'status_label': p['status_label'], 'origin': p['origin'], 'total_cents': d['totals']['total_cents'],
+                    'approved_cents': d['approved_totals']['total_cents'], 'paid_cents': d['paid_cents'], 'balance_cents': d['balance_cents'], 'acceptance': d['acceptance'],
+                    'authorized': [{'description': i['description'], 'quantity': i['quantity'], 'total_cents': i['net_cents']} for i in d['items'] if i['status'] == 'aprobado'],
+                    'invoice': d['invoice'], 'overlaps': overlaps(c, get(c, p['id'])), 'issue_date': p['issue_date'], 'valid_until': p['valid_until']})
+    return {'order': order, 'rows': out}

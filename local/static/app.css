@@ -9702,3 +9702,18 @@ button.pi-option{display:flex;align-items:flex-start;gap:10px;padding:12px;borde
 /* Menú principal con «Ventas» (1.5.221): entre 1200 y 1439 px los enlaces se compactan para que el menú quepa sin desbordar la página. */
 @media(min-width:1200px) and (max-width:1365px){.premium-header nav>a{padding:0 6px;gap:5px}}
 @media(min-width:1366px) and (max-width:1439px){.premium-header nav{gap:3px}.premium-header nav>a{padding:0 9px}}
+
+/* ---- Proformas y órdenes de servicio (1.5.222): buscador de órdenes, sección en la orden y vinculación; acotado a .po-* ---- */
+.po-picker{display:grid;gap:6px;min-width:0}.po-results{margin:0}
+.po-result{display:grid!important;gap:2px;text-align:left;width:100%}.po-result strong{font-size:14px}.po-result span{font-size:12px;opacity:.8;overflow-wrap:anywhere}
+.po-card{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;border:1px solid var(--inv-line,#1E2D47);border-radius:12px;background:#3B82F612}
+.po-facts{display:grid;gap:2px;min-width:0}.po-facts>*{overflow-wrap:anywhere}.po-facts small{opacity:.8}
+.po-other{display:grid;gap:8px;margin-top:6px}
+.fxc-order{grid-column:1/-1;margin-top:10px}.fxc-order-ro{margin:10px 0 0;font-size:13px;opacity:.85}
+.po-section .po-list{display:grid;gap:10px}.po-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}.po-actions .inv-btn{flex:1 1 200px;justify-content:center}
+.po-item{display:grid;gap:8px;padding:12px;border:1px solid #2c405c;border-radius:12px;background:#0e1b2d;min-width:0}
+.po-top{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px}
+.po-money{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:6px;margin:0}.po-money div{display:grid;gap:2px}.po-money dt{font-size:11px;opacity:.75}.po-money dd{margin:0;font-weight:600}
+.po-decision{margin:0;font-size:13px;overflow-wrap:anywhere}.po-auth{margin:0;padding-left:18px;font-size:13px;display:grid;gap:2px}.po-auth li{overflow-wrap:anywhere}
+.po-links{display:flex;flex-wrap:wrap;gap:6px 14px}
+.po-pick{display:grid;gap:10px;grid-template-columns:minmax(0,1fr);min-width:0}.po-pick>*{min-width:0;max-width:100%}.po-pick input[type=search]{width:100%}

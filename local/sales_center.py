@@ -1,5 +1,5 @@
-"""Centro de Ventas: reúne lo que ya existe sin duplicarlo. Las ventas son las facturas directas y las cotizaciones convertidas sin orden
-técnica (proformas), las ventas de licencias (VLIC) y las ventas registradas desde el inventario; los cobros, la caja, la facturación
+"""Centro de Ventas: reúne lo que ya existe sin duplicarlo. Las ventas son las facturas directas y las cotizaciones convertidas que no se
+crearon desde una orden técnica (proformas), las ventas de licencias (VLIC) y las ventas registradas desde el inventario; los cobros, la caja, la facturación
 electrónica (solo pruebas) y el Kardex siguen en sus módulos. Lo único propio son los pedidos comerciales (PED-000001) y los indicadores.
 Nada se borra: una venta se anula descartando su borrador de factura o con nota de crédito; un pedido se cancela con motivo."""
 import re
@@ -72,7 +72,7 @@ def ledger(c, f=None):
                        "COALESCE(i.created_at,p.updated_at) at,p.created_by,u.name user,p.invoice_id,i.status inv_status,i.establishment,i.emission_point,i.sequential,"
                        "(SELECT COALESCE(SUM(a.amount_cents),0) FROM advances a WHERE a.proforma_id=p.id AND COALESCE(a.voided_at,'')='') paid "
                        "FROM proformas p LEFT JOIN clients k ON k.id=p.client_id LEFT JOIN users u ON u.id=p.created_by LEFT JOIN invoices i ON i.id=p.invoice_id "
-                       "WHERE p.status='convertida' AND p.order_id IS NULL"):
+                       "WHERE p.status='convertida' AND p.origin!='orden'"):
         void = r['inv_status'] == 'descartado'
         balance = 0 if void else max(r['total'] - r['paid'], 0)
         rows.append({'kind': 'directa' if r['origin'] == 'directa' else 'cotizacion', 'id': r['id'], 'code': r['code'], 'at': r['at'], 'client_id': r['client_id'],
@@ -112,7 +112,7 @@ def lines(c, start='', end=''):
     """Partidas vendidas (no anuladas) para los productos más vendidos y el reporte por producto."""
     out = []
     for r in c.execute("SELECT x.description name,x.quantity,x.quantity*x.unit_cents-x.discount_cents total,COALESCE(i.created_at,p.updated_at) at FROM proforma_items x "
-                       "JOIN proformas p ON p.id=x.proforma_id LEFT JOIN invoices i ON i.id=p.invoice_id WHERE p.status='convertida' AND p.order_id IS NULL "
+                       "JOIN proformas p ON p.id=x.proforma_id LEFT JOIN invoices i ON i.id=p.invoice_id WHERE p.status='convertida' AND p.origin!='orden' "
                        "AND x.status='aprobado' AND COALESCE(i.status,'')!='descartado'"):
         out.append(dict(r))
     for r in c.execute("SELECT x.product_name name,x.quantity,x.quantity*x.unit_price_cents-x.discount_cents total,s.created_at at FROM license_sale_items x "
@@ -145,7 +145,7 @@ def dashboard(c, now):
     mon = [r for r in live if r['at'][:7] == month]
     invoiced = c.execute("SELECT COALESCE(SUM(i.total_cents),0),COUNT(*) FROM invoices i LEFT JOIN proformas p ON i.source_kind='proforma' AND p.id=i.source_id "
                          "WHERE i.status IN ('pendiente','enviado','autorizado') AND substr(COALESCE(NULLIF(i.emitted_at,''),i.created_at),1,7)=? "
-                         "AND (i.source_kind IN ('venta_licencia','venta_inventario') OR (i.source_kind='proforma' AND p.order_id IS NULL))", (month,)).fetchone()
+                         "AND (i.source_kind IN ('venta_licencia','venta_inventario') OR (i.source_kind='proforma' AND p.origin!='orden'))", (month,)).fetchone()
     drafts = c.execute("SELECT COUNT(*) FROM proformas WHERE origin='directa' AND status IN ('borrador','aprobada')").fetchone()[0]
     to_deliver = c.execute("SELECT COUNT(*) FROM license_sales WHERE delivery_status='pendiente' AND payment_status!='cancelado'").fetchone()[0]
     to_emit = len([r for r in live if r['invoice_status'] == 'borrador'])

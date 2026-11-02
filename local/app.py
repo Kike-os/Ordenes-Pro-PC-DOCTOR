@@ -2010,6 +2010,9 @@ class Handler(BaseHTTPRequestHandler):
                     found=re.fullmatch(r'/api/vouchers/([0-9]{1,9})/events',path)
                     if found:return self.reply(200,{'events':card_vouchers.events(c,int(found[1]))})
                     if path=='/api/proformas':return self.reply(200,proformas.listing(c,f,now))
+                    if path=='/api/proformas/orders':return self.reply(200,{'rows':proformas.search_orders(c,f.get('q',''))})
+                    found=re.fullmatch(r'/api/proformas/order/([0-9]{1,9})',path)
+                    if found:return self.reply(200,proformas.for_order(c,found[1],now))
                     found=re.fullmatch(r'/api/proformas/([0-9]{1,9})(\.pdf)?',path)
                     if found:
                         if found[2]:
@@ -3094,11 +3097,15 @@ class Handler(BaseHTTPRequestHandler):
                                 token=proformas.send(c,pid,user,now,str(data.get('recipient','') or ''));link=public_base_url().rstrip('/')+'/proforma/'+token
                                 return self.reply(200,{'ok':True,'link':link,**proformas.detail(c,pid,now)})
                             elif action=='decide':proformas.staff_decide(c,pid,data,user,now)
+                            elif action in ('link','unlink'):
+                                if user['role']!='administrador':return self.reply(403,{'error':'Solo administración vincula proformas con órdenes.'})
+                                if action=='link':proformas.link_order(c,pid,data,user,now)
+                                else:proformas.unlink_order(c,pid,data,user,now)
                             elif action=='version':pid=proformas.new_version(c,pid,user,now)
                             elif action=='cancel':proformas.cancel(c,pid,data,user,now)
                             elif action=='convert':
                                 if user['role']!='administrador':return self.reply(403,{'error':'Solo administración genera facturas.'})
-                                c.commit();c.execute('BEGIN IMMEDIATE');invoice_id=proformas.convert(c,pid,user,now,data.get('units'));c.commit();return self.reply(200,{'ok':True,'invoice_id':invoice_id,**invoicing.detail(c,invoice_id)})
+                                c.commit();c.execute('BEGIN IMMEDIATE');invoice_id=proformas.convert(c,pid,user,now,data.get('units'),str(data.get('accept_overlap',''))=='1');c.commit();return self.reply(200,{'ok':True,'invoice_id':invoice_id,**invoicing.detail(c,invoice_id)})
                             elif action=='advance':
                                 proformas.add_advance(c,pid,data,user,now,attach('anticipo'))
                             elif action=='void_advance':proformas.void_advance(c,data.get('advance_id'),data,user,now)

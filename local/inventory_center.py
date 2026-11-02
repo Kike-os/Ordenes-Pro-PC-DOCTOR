@@ -1002,10 +1002,13 @@ def sale_exit(c, invoice_id, proforma_id, user, now, units=None):
         line['discount'] += row['discount_cents']
         line['authorization'] = line['authorization'] or row['authorization']
     sold = date.fromisoformat((invoice['issue_date'] or now.date().isoformat())[:10])
+    order_id = c.execute('SELECT order_id FROM proformas WHERE id=?', (proforma_id,)).fetchone()[0]
     moved = []
     for item_id, line in lines.items():
         if c.execute("SELECT 1 FROM inventory_movements WHERE reference_kind='factura' AND reference_id=? AND item_id=? AND direction=-1", (invoice_id, item_id)).fetchone():
             continue
+        if order_id and c.execute("SELECT 1 FROM inventory_movements WHERE reference_kind='orden' AND reference_id=? AND item_id=? AND direction=-1", (order_id, item_id)).fetchone():
+            continue  # proforma vinculada: lo que la orden ya consumió no sale otra vez
         item = c.execute('SELECT * FROM inventory_items WHERE id=?', (item_id,)).fetchone()
         unit_ids = None
         if item['tracking'] == 'serie':
