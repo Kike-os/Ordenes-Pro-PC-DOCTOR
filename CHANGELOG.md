@@ -4,6 +4,21 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.222 — 2026-11-02 16:09 (UTC-05:00)
+
+Proformas vinculadas a órdenes de servicio (al crearlas o después), decisión del cliente en la orden y control de cobros duplicados
+
+### Nuevas funcionalidades
+
+- Proformas vinculadas a órdenes de servicio: al crearla se busca la orden por número, cliente, cédula o RUC y se muestran sus datos; también se crea directamente desde la orden. La relación se ve en la orden y en la proforma.
+- Vincular proformas ya enviadas, aprobadas o facturadas a una orden sin crear otra proforma ni perder la aprobación, la firma, los importes, los anticipos ni el historial; con otro cliente se pide confirmación y motivo, y desvincular queda registrado.
+- La aprobación, el rechazo o la aprobación parcial de una proforma vinculada queda en el historial de la orden con lo autorizado, fecha, hora y quién decidió, sin cambiar el estado técnico; aviso al personal y acceso al documento original.
+
+### Mejoras realizadas
+
+- Conceptos repetidos entre una proforma y el presupuesto técnico de su orden: aviso en ambos módulos y confirmación expresa al facturar para no cobrar dos veces; los saldos de la orden y de la proforma siguen separados.
+- Listado de proformas con la orden vinculada y filtro por vinculación; el historial de la orden se actualiza al instante al vincular o crear una proforma desde ella.
+
 ## v1.5.221 — 2026-11-02 14:28 (UTC-05:00)
 
 Centro de Ventas, pedidos comerciales, asignación de licencias sin cobro y salida de inventario en la venta directa

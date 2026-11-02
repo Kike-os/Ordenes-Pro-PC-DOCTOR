@@ -8,6 +8,29 @@
   },
   "releases": [
     {
+      "version": "1.5.222",
+      "date": "2026-11-02T16:09:52-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Proformas vinculadas a órdenes de servicio (al crearlas o después), decisión del cliente en la orden y control de cobros duplicados",
+      "changes": {
+        "features": [
+          "Proformas vinculadas a órdenes de servicio: al crearla se busca la orden por número, cliente, cédula o RUC y se muestran sus datos; también se crea directamente desde la orden. La relación se ve en la orden y en la proforma.",
+          "Vincular proformas ya enviadas, aprobadas o facturadas a una orden sin crear otra proforma ni perder la aprobación, la firma, los importes, los anticipos ni el historial; con otro cliente se pide confirmación y motivo, y desvincular queda registrado.",
+          "La aprobación, el rechazo o la aprobación parcial de una proforma vinculada queda en el historial de la orden con lo autorizado, fecha, hora y quién decidió, sin cambiar el estado técnico; aviso al personal y acceso al documento original."
+        ],
+        "improvements": [
+          "Conceptos repetidos entre una proforma y el presupuesto técnico de su orden: aviso en ambos módulos y confirmación expresa al facturar para no cobrar dos veces; los saldos de la orden y de la proforma siguen separados.",
+          "Listado de proformas con la orden vinculada y filtro por vinculación; el historial de la orden se actualiza al instante al vincular o crear una proforma desde ella."
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Kike-os: «autoriso si esta todo bien»"
+    },
+    {
       "version": "1.5.221",
       "date": "2026-11-02T14:28:57-05:00",
       "type": "patch",
