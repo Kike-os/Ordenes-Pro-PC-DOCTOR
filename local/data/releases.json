@@ -8,6 +8,29 @@
   },
   "releases": [
     {
+      "version": "1.5.223",
+      "date": "2026-11-02T16:56:15-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Varios presupuestos independientes por orden y Resumen de presupuestos con proformas vinculadas",
+      "changes": {
+        "features": [
+          "Varios presupuestos independientes por orden: «Nuevo presupuesto independiente» convive con los demás (por ejemplo, P1 aprobado y pagado, P2 pendiente, P3 aprobado sin pagar) y el cliente aprueba cada uno por separado con el mismo enlace seguro; «Nueva versión» sigue corrigiendo solo su propio presupuesto.",
+          "Resumen de presupuestos en la orden: presupuestos técnicos y proformas vinculadas (también las ya vinculadas) con número de orden, cliente, importe, fecha, aprobación y estado de pago, y botones Ver, Imprimir, Reenviar e Historial; se actualiza solo cuando el cliente decide."
+        ],
+        "improvements": [
+          "El saldo y la factura de la orden suman lo aprobado de todos sus presupuestos una sola vez; el estado de pago de cada presupuesto se calcula con los pagos reales (aprobar no es pagar) y las proformas se cobran aparte."
+        ],
+        "fixes": [
+          "Las proformas vinculadas ahora aparecen en el resumen del presupuesto de la orden y del equipo, con su aprobación, anticipos y saldo."
+        ],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Kike-os: «Sí, aplica y publica» (presupuestos múltiples)"
+    },
+    {
       "version": "1.5.222",
       "date": "2026-11-02T16:09:52-05:00",
       "type": "patch",

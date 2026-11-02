@@ -4,6 +4,23 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.223 — 2026-11-02 16:56 (UTC-05:00)
+
+Varios presupuestos independientes por orden y Resumen de presupuestos con proformas vinculadas
+
+### Nuevas funcionalidades
+
+- Varios presupuestos independientes por orden: «Nuevo presupuesto independiente» convive con los demás (por ejemplo, P1 aprobado y pagado, P2 pendiente, P3 aprobado sin pagar) y el cliente aprueba cada uno por separado con el mismo enlace seguro; «Nueva versión» sigue corrigiendo solo su propio presupuesto.
+- Resumen de presupuestos en la orden: presupuestos técnicos y proformas vinculadas (también las ya vinculadas) con número de orden, cliente, importe, fecha, aprobación y estado de pago, y botones Ver, Imprimir, Reenviar e Historial; se actualiza solo cuando el cliente decide.
+
+### Mejoras realizadas
+
+- El saldo y la factura de la orden suman lo aprobado de todos sus presupuestos una sola vez; el estado de pago de cada presupuesto se calcula con los pagos reales (aprobar no es pagar) y las proformas se cobran aparte.
+
+### Errores corregidos
+
+- Las proformas vinculadas ahora aparecen en el resumen del presupuesto de la orden y del equipo, con su aprobación, anticipos y saldo.
+
 ## v1.5.222 — 2026-11-02 16:09 (UTC-05:00)
 
 Proformas vinculadas a órdenes de servicio (al crearlas o después), decisión del cliente en la orden y control de cobros duplicados
