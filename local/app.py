@@ -1767,7 +1767,7 @@ class Handler(BaseHTTPRequestHandler):
                 result['tracking']=order_tracking.active(c,row['id'])
                 # Equipos de la orden, identidad permanente del equipo y pagos de este ingreso.
                 result['group']=equipment.group(c,row['id']);
-                for unit in (result['group'] or {}).get('units',[]):unit['quote']=quotes.brief(c,unit['id']);unit['type_label']=DEVICE_TYPES.get(unit['type'],unit['type'] or '')  # presupuesto de cada equipo, para distinguirlo del resumen general
+                for unit in (result['group'] or {}).get('units',[]):unit['quote']=quotes.brief(c,unit['id']);unit['proformas']=quotes.linked_proformas(c,unit['id']);unit['type_label']=DEVICE_TYPES.get(unit['type'],unit['type'] or '')  # presupuesto de cada equipo, para distinguirlo del resumen general
                 result['device_code']=row['device_code'] or ''
                 found=quotes.authorized(c,row['id']);result['authorized_items']=found['items'] if found else [];result['authorization']=quotes.authorization(c,row['id'],row['status'])
                 result['unit_code']=next((unit['unit_code'] for unit in result['group']['units'] if unit['id']==row['id']),'') if result['group']['multiple'] else ''
@@ -2475,7 +2475,7 @@ class Handler(BaseHTTPRequestHandler):
                 if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
                 try:
                     if quote_get[1]:
-                        quotes.order_code(c,int(quote_get[1]));return self.reply(200,dict(quotes.for_order(c,int(quote_get[1])),can_manage=user['role']=='administrador'))
+                        quotes.order_code(c,int(quote_get[1]));return self.reply(200,dict(quotes.for_order(c,int(quote_get[1])),summary=quotes.summary(c,int(quote_get[1]),reception_now()),can_manage=user['role']=='administrador'))
                     found=quotes.get(c,int(quote_get[2]))
                     if quote_get[3]:
                         import quote_pdf
@@ -4264,7 +4264,10 @@ class Handler(BaseHTTPRequestHandler):
                     now=reception_now()
                     try:
                         if quote_route[1]:
-                            created=quotes.create(c,int(quote_route[1]),user,now);audit(c,user['id'],'quote_created',int(quote_route[1]))
+                            # «independent»: presupuesto nuevo en su propia serie; no reemplaza a los demás de la orden (solo administración).
+                            independent=str(data.get('independent',''))=='1'
+                            if independent and user['role']!='administrador':return self.reply(403,{'error':'Solo administración crea presupuestos independientes.'})
+                            created=quotes.create(c,int(quote_route[1]),user,now,independent=independent);audit(c,user['id'],'quote_created',int(quote_route[1]))
                             return self.reply(201,{'ok':True,'id':created})
                         found=quotes.get(c,int(quote_route[2]));action=str(data.get('action',''))
                         if action=='save':
@@ -4293,7 +4296,7 @@ class Handler(BaseHTTPRequestHandler):
                         if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede enviar, decidir o cancelar presupuestos.'})
                         if action in ('version','pending_version'):
                             # «pending_version»: continuación con solo las partidas que el cliente dejó pendientes; lo ya autorizado se conserva.
-                            created=quotes.create(c,found['order_id'],user,now,pending_only=action=='pending_version');audit(c,user['id'],'quote_created',found['order_id'])
+                            created=quotes.create(c,found['order_id'],user,now,pending_only=action=='pending_version',base=found);audit(c,user['id'],'quote_created',found['order_id'])
                             return self.reply(201,{'ok':True,'id':created})
                         if action=='remove_identity':
                             # Eliminación del documento a pedido del cliente o al terminar su finalidad; el presupuesto y su evidencia se conservan.

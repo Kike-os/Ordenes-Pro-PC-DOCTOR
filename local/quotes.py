@@ -464,7 +464,8 @@ def brief(c, order_id):
     t = totals(items, row['tax_rate_bp'], row['discount_bp'])
     return {'id': row['id'], 'code': row['code'], 'status': row['status'], 'status_label': STATUS[row['status']], 'editable': row['status'] in EDITABLE,
             'lines': sum(1 for item in items if item['status'] != 'cancelado'), 'approved_count': t['count']['aprobado'], 'rejected_count': t['count']['rechazado'], 'pending_count': t['count']['pendiente'],
-            'sent_at': row['sent_at'], 'authorized_cents': sum(line['net_cents'] for line in approved_lines(c, dict(row))) if row['status'] in DECIDED else (lambda found: sum(line['net_cents'] for line in found['items']) if found else 0)(authorized(c, order_id)),
+            'sent_at': row['sent_at'], 'budgets': c.execute("SELECT COUNT(DISTINCT series) FROM quotes WHERE order_id=? AND deleted_at=''", (order_id,)).fetchone()[0],
+            'authorized_cents': (lambda found: sum(line['net_cents'] for line in found['items']) if found else 0)(authorized(c, order_id)),  # todos los presupuestos aprobados
             'quoted_cents': t['quoted'], 'approved_cents': t['approved'], 'pending_cents': t['pending'], 'rejected_cents': t['rejected']}
 
 
@@ -513,7 +514,7 @@ def for_order(c, order_id):
         items = items_of(c, r['id'])
         t = totals(items, r['tax_rate_bp'], r['discount_bp'])
         link = c.execute("SELECT verified_at FROM quote_links WHERE quote_id=? AND revoked_at='' ORDER BY id DESC LIMIT 1", (r['id'],)).fetchone()
-        versions.append({'id': r['id'], 'code': r['code'], 'version': r['version'], 'status': r['status'], 'status_label': STATUS[r['status']], 'created_at': r['created_at'], 'valid_until': r['valid_until'], 'sent_at': r['sent_at'],
+        versions.append({'id': r['id'], 'code': r['code'], 'version': r['version'], 'series': r['series'], 'status': r['status'], 'status_label': STATUS[r['status']], 'created_at': r['created_at'], 'valid_until': r['valid_until'], 'sent_at': r['sent_at'],
                          'sent_to': r['sent_to'], 'decided_at': r['decided_at'], 'editable': r['status'] in EDITABLE, 'lines': sum(1 for item in items if item['status'] != 'cancelado'), 'quoted_cents': t['quoted'], 'approved_cents': t['approved'],
                          'pending_cents': t['pending'], 'rejected_cents': t['rejected'], 'count': t['count'], 'verified_at': link['verified_at'] if link else '', 'removable': removable(c, r) == '',
                          'mail_state': mail_state(c, r['id']), 'client_note': client_note(c, r['id'])})
@@ -521,17 +522,21 @@ def for_order(c, order_id):
             'tax_rate_bp': tax_rate(c), 'categories': CATEGORIES, 'conditions': CONDITIONS, 'priorities': {key: {'label': label, 'color': color} for key, (label, color, _) in PRIORITIES.items()}, 'icons': catalog_icons.catalog(), 'discounts': {str(key): '%s: %g %%' % (label, key / 100) for key, label in DISCOUNTS.items()}}
 
 
-def create(c, order_id, user, now, copy_from=None, pending_only=False):
-    """Nueva versión del presupuesto de la orden: P1, P2… La anterior, si seguía abierta, queda cancelada."""
+def create(c, order_id, user, now, copy_from=None, pending_only=False, base=None, independent=False):
+    """Nueva versión del presupuesto de la orden: P1, P2… La anterior de la misma serie, si seguía abierta, queda cancelada.
+    `independent`: presupuesto nuevo en su propia serie (sin copiar partidas ni reemplazar a los demás); los presupuestos de otras
+    series conservan su estado, su aprobación y sus pagos. La numeración P1, P2… es una sola por orden."""
     code = order_code(c, order_id)
-    last = c.execute("SELECT * FROM quotes WHERE order_id=? AND deleted_at='' ORDER BY version DESC LIMIT 1", (order_id,)).fetchone()
+    series = (c.execute('SELECT COALESCE(MAX(series),0)+1 FROM quotes WHERE order_id=?', (order_id,)).fetchone()[0] if independent else base['series'] if base
+              else (c.execute("SELECT series FROM quotes WHERE order_id=? AND deleted_at='' ORDER BY version DESC LIMIT 1", (order_id,)).fetchone() or [1])[0])
+    last = None if independent else c.execute("SELECT * FROM quotes WHERE order_id=? AND series=? AND deleted_at='' ORDER BY version DESC LIMIT 1", (order_id, series)).fetchone()
     highest = c.execute('SELECT COALESCE(MAX(version),0) FROM quotes WHERE order_id=?', (order_id,)).fetchone()[0]
     if last and last['status'] in ('borrador',):
-        raise QuoteError('Esta orden ya tiene un presupuesto en borrador. Edítalo o cancélalo antes de crear otra versión.', 409)
+        raise QuoteError('Este presupuesto ya tiene un borrador (%s). Edítalo o cancélalo antes de crear otra versión.' % last['code'], 409)
     if pending_only and not (last and last['status'] in DECIDED and any(item['status'] == 'pendiente' for item in items_of(c, last['id']))):
         raise QuoteError('El presupuesto vigente no tiene partidas que el cliente haya dejado pendientes.', 409)
     version, stamp = highest + 1, now.isoformat(timespec='seconds')
-    quote_id = c.execute("INSERT INTO quotes(order_id,version,code,status,tax_rate_bp,created_by,created_at,updated_at,discount_bp,discount_by,discount_at,continues_id) VALUES (?,?,?,'borrador',?,?,?,?,?,?,?,?)", (order_id, version, '%s-P%d' % (code, version), tax_rate(c), user['id'], stamp, stamp, last['discount_bp'] if last else 0, last['discount_by'] if last else None, last['discount_at'] if last else '', last['id'] if pending_only else None)).lastrowid
+    quote_id = c.execute("INSERT INTO quotes(order_id,version,code,status,tax_rate_bp,created_by,created_at,updated_at,discount_bp,discount_by,discount_at,continues_id,series) VALUES (?,?,?,'borrador',?,?,?,?,?,?,?,?,?)", (order_id, version, '%s-P%d' % (code, version), tax_rate(c), user['id'], stamp, stamp, last['discount_bp'] if last else 0, last['discount_by'] if last else None, last['discount_at'] if last else '', last['id'] if pending_only else None, series)).lastrowid
     if last and last['status'] in ('enviado', 'modificacion'):
         c.execute("UPDATE quotes SET status='cancelado',updated_at=? WHERE id=?", (stamp, last['id']))
         c.execute("UPDATE quote_links SET revoked_at=? WHERE quote_id=? AND revoked_at=''", (stamp, last['id']))
@@ -541,7 +546,8 @@ def create(c, order_id, user, now, copy_from=None, pending_only=False):
         for item in items_of(c, source):
             if item['status'] != 'cancelado' and (not pending_only or item['status'] == 'pendiente'):
                 c.execute("INSERT INTO quote_items(quote_id,position,catalog_id,description,category,quantity,unit_cents,taxed,priority) VALUES (?,?,?,?,?,?,?,?,?)", (quote_id, item['position'], item['catalog_id'], item['description'], item['category'], item['quantity'], item['unit_cents'], item['taxed'], item['priority']))
-    event(c, quote_id, 'creado', 'Presupuesto %s-P%d creado%s.' % (code, version, ' con las partidas que el cliente dejó pendientes; lo ya autorizado se conserva' if pending_only else ' a partir de la versión anterior' if source else ''), now, user)
+    event(c, quote_id, 'creado', 'Presupuesto %s-P%d creado%s.' % (code, version, ' con las partidas que el cliente dejó pendientes; lo ya autorizado se conserva' if pending_only else ' a partir de la versión anterior' if source
+          else ' como presupuesto independiente: no reemplaza a los demás de la orden ni cambia sus aprobaciones o pagos' if independent else ''), now, user)
     return quote_id
 
 
@@ -655,13 +661,27 @@ def pending_codes(c, order_id):
     return [row[0] for row in c.execute("SELECT code FROM quotes WHERE order_id=? AND status='enviado' AND deleted_at='' ORDER BY version", (order_id,)).fetchall()]
 
 
+def heads(c, order_id, decided_only=True):
+    """Presupuesto vigente de cada serie de la orden: su última versión decidida (o la última de todas, con decided_only=False)."""
+    where = " AND status IN ('aprobado','parcial','rechazado')" if decided_only else " AND deleted_at=''"
+    out = []
+    for (series,) in c.execute('SELECT DISTINCT series FROM quotes WHERE order_id=? ORDER BY series', (order_id,)).fetchall():
+        row = c.execute('SELECT * FROM quotes WHERE order_id=? AND series=?' + where + ' ORDER BY version DESC LIMIT 1', (order_id, series)).fetchone()
+        if row:
+            out.append(dict(row))
+    return out
+
+
 def authorized(c, order_id):
-    """Lo que el cliente tiene autorizado hoy para un equipo: {'code', 'items'} según la última versión decidida y las que continúa; None si no hay nada aprobado."""
-    row = c.execute("SELECT * FROM quotes WHERE order_id=? AND status IN ('aprobado','parcial','rechazado') ORDER BY version DESC LIMIT 1", (order_id,)).fetchone()
-    if not row:
-        return None
-    items = approved_lines(c, dict(row))
-    return {'code': row['code'], 'items': items} if items else None
+    """Lo que el cliente tiene autorizado hoy para un equipo: {'code', 'items'} con la última versión decidida de cada presupuesto (serie)
+    y las que continúa; None si no hay nada aprobado. Con un solo presupuesto es exactamente lo de siempre."""
+    items, code = [], None
+    for row in sorted(heads(c, order_id), key=lambda r: r['version']):
+        lines = approved_lines(c, row)
+        items += lines
+        if lines:
+            code = row['code']
+    return {'code': code, 'items': items} if items else None
 
 
 PROCESSING = ('reparacion', 'revision_recurrente', 'listo', 'espera_entrega', 'entregado')  # la orden ya pasó a trabajarse (o más allá)
@@ -694,7 +714,7 @@ def authorization(c, order_id, order_status=''):
              {'key': 'procesando', 'label': 'Procesando', 'done': bool(working) or order_status in PROCESSING, 'at': working['occurred_at'] if working else ''}]
     codes = list(dict.fromkeys(item['quote_code'] for item in items))
     history = []
-    for row in chain(c, head):
+    for row in [r for h in heads(c, order_id) for r in chain(c, h)]:
         for e in c.execute('SELECT event,detail,actor,created_at FROM quote_events WHERE quote_id=? ORDER BY id', (row['id'],)):
             history.append({'quote': row['code'], 'event': e['event'], 'detail': e['detail'], 'actor': e['actor'] or 'Sistema', 'at': e['created_at']})
     history.sort(key=lambda e: e['at'], reverse=True)
@@ -721,7 +741,8 @@ def set_execution(c, quote, item_id, value, user, now):
 
 def sync_budget(c, quote):
     """Traslada lo aprobado al presupuesto de la orden (del que salen el total a cobrar y el saldo). No toca pagos ni estado."""
-    lines = [(BUDGET_KEY[item['category']], ('%d × ' % item['quantity'] if item['quantity'] > 1 else '') + item['description'], item['net_cents']) for item in approved_lines(c, get(c, quote['id']))]
+    found = authorized(c, quote['order_id'])  # todos los presupuestos aprobados de la orden, cada partida una sola vez
+    lines = [(BUDGET_KEY[item['category']], ('%d × ' % item['quantity'] if item['quantity'] > 1 else '') + item['description'], item['net_cents']) for item in (found['items'] if found else [])]
     sums = {key: sum(amount for category, _, amount in lines if category == key) for key in ('labor', 'parts', 'services', 'digital')}
     c.execute('INSERT INTO order_budget(order_id,labor_cents,parts_cents,services_cents,digital_cents) VALUES (?,?,?,?,?) ON CONFLICT(order_id) DO UPDATE SET labor_cents=excluded.labor_cents,parts_cents=excluded.parts_cents,services_cents=excluded.services_cents,digital_cents=excluded.digital_cents',
               (quote['order_id'], sums['labor'], sums['parts'], sums['services'], sums['digital']))
@@ -740,6 +761,8 @@ def decide(c, quote, decisions, now, user=None, actor='', note=''):
     if all(value == 'pendiente' for value in decisions.values()):
         raise QuoteError('Decide al menos una partida: aprueba o rechaza alguna antes de confirmar.')
     previous = sum(line['net_cents'] for old in chain(c, quote)[1:] for line in approved_lines(c, old) if line['quote_id'] == old['id'])
+    series = quote['series'] if 'series' in quote.keys() else 1
+    previous += sum(line['net_cents'] for head in heads(c, quote['order_id']) if head['series'] != series for line in approved_lines(c, head))  # otros presupuestos aprobados
     import equipment
     paid = equipment.money(c, quote['order_id'])['paid_cents']  # pagos netos del equipo: la misma fuente que el saldo
     approved_total = previous + sum(net(item['quantity'] * item['unit_cents'], quote['discount_bp']) for item in items if decisions[item['id']] == 'aprobado')
@@ -1063,3 +1086,77 @@ def valid_passkey(link, passkey, now):
     if not link.get('passkey_hash') or not link.get('verified_at') or not secrets.compare_digest(link['passkey_hash'], digest(str(passkey))):
         return False
     return datetime.fromisoformat(link['verified_at']) + timedelta(minutes=30) >= now
+
+
+# ---- Resumen de presupuestos de la orden ------------------------------------------------------------------------------------------
+PAYMENT_STATES = {'pagado': 'Pagado', 'parcial': 'Pago parcial', 'pendiente': 'Pendiente de pago', 'no_aplica': 'Sin importe autorizado'}
+
+
+def _pay_state(authorized_cents, paid_cents):
+    if authorized_cents <= 0:
+        return 'no_aplica'
+    return 'pagado' if paid_cents >= authorized_cents else 'parcial' if paid_cents > 0 else 'pendiente'
+
+
+def summary(c, order_id, now):
+    """Todos los presupuestos de la orden en una tabla: cada presupuesto técnico (su versión vigente por serie) y cada proforma vinculada,
+    con importe, fecha, aprobación y pago. Nada se crea ni se marca: el pago de los presupuestos técnicos se reparte con los pagos reales
+    del equipo, del aprobado más antiguo al más reciente (aprobar no es pagar); el de una proforma son sus propios anticipos. Las proformas
+    no se suman al saldo de la orden."""
+    import equipment
+    import proformas
+    order = c.execute('SELECT o.code,k.name client FROM orders o JOIN devices d ON d.id=o.device_id JOIN clients k ON k.id=d.client_id WHERE o.id=?', (order_id,)).fetchone()
+    money = equipment.money(c, order_id)
+    rows, approved = [], []
+    for head in heads(c, order_id, decided_only=False):
+        decided = c.execute("SELECT * FROM quotes WHERE order_id=? AND series=? AND status IN ('aprobado','parcial','rechazado') ORDER BY version DESC LIMIT 1", (order_id, head['series'])).fetchone()
+        auth = sum(line['net_cents'] for line in approved_lines(c, dict(decided))) if decided else 0
+        t = totals(items_of(c, head['id']), head['tax_rate_bp'], head['discount_bp'])
+        acceptance = c.execute('SELECT signer_name,method,created_at FROM quote_acceptances WHERE quote_id=?', (decided['id'],)).fetchone() if decided else None
+        row = {'kind': 'presupuesto', 'id': head['id'], 'code': head['code'], 'series': head['series'], 'status': head['status'], 'status_label': STATUS[head['status']],
+               'date': head['decided_at'] or head['sent_at'] or head['created_at'], 'quoted_cents': t['quoted'], 'authorized_cents': auth, 'authorized_code': decided['code'] if decided else '',
+               'decided_at': decided['decided_at'] if decided else '', 'signer': acceptance['signer_name'] if acceptance else '', 'pdf': '/api/quotes/%d/pdf' % head['id'],
+               'can_resend': head['status'] == 'enviado', 'editable': head['status'] in EDITABLE}
+        rows.append(row)
+        if auth:
+            approved.append(row)
+    left = money['paid_cents']
+    for row in sorted(approved, key=lambda r: (r['decided_at'] or '', r['id'])):
+        row['paid_cents'] = min(left, row['authorized_cents'])
+        left -= row['paid_cents']
+    for row in rows:
+        row.setdefault('paid_cents', 0)
+        row['balance_cents'] = max(row['authorized_cents'] - row['paid_cents'], 0)
+        row['payment'] = _pay_state(row['authorized_cents'], row['paid_cents'])
+        row['payment_label'] = PAYMENT_STATES[row['payment']]
+    for p in proformas.for_order(c, order_id, now)['rows']:
+        auth = p['approved_cents'] if p['status'] in ('aprobada', 'parcial', 'convertida') else 0
+        state = _pay_state(auth, p['paid_cents'])
+        rows.append({'kind': 'proforma', 'id': p['id'], 'code': p['code'], 'status': p['status'], 'status_label': p['status_label'],
+                     'date': (p['acceptance'] or {}).get('created_at') or p['issue_date'], 'quoted_cents': p['total_cents'], 'authorized_cents': auth, 'paid_cents': p['paid_cents'],
+                     'balance_cents': max(auth - p['paid_cents'], 0), 'payment': state, 'payment_label': PAYMENT_STATES[state], 'signer': (p['acceptance'] or {}).get('signer_name', ''),
+                     'decided_at': (p['acceptance'] or {}).get('created_at', ''), 'pdf': '/api/proformas/%d.pdf' % p['id'], 'can_resend': p['status'] in ('enviada', 'vista'),
+                     'invoice': p['invoice'], 'overlaps': p['overlaps']})
+    rows.sort(key=lambda r: r['date'] or '', reverse=True)
+    quotes_rows = [r for r in rows if r['kind'] == 'presupuesto']
+    proforma_rows = [r for r in rows if r['kind'] == 'proforma']
+    return {'order': {'id': order_id, 'code': order['code'] if order else '', 'client': order['client'] if order else ''}, 'rows': rows,
+            'totals': {'quotes': {'count': len(quotes_rows), 'authorized_cents': sum(r['authorized_cents'] for r in quotes_rows), 'paid_cents': money['paid_cents'],
+                                  'balance_cents': money['balance_cents'] if 'balance_cents' in money else max(money['budget_cents'] - money['paid_cents'], 0)},
+                       'proformas': {'count': len(proforma_rows), 'authorized_cents': sum(r['authorized_cents'] for r in proforma_rows), 'paid_cents': sum(r['paid_cents'] for r in proforma_rows),
+                                     'balance_cents': sum(r['balance_cents'] for r in proforma_rows)}},
+            'payment_states': PAYMENT_STATES}
+
+
+def linked_proformas(c, order_id):
+    """Proformas vinculadas a un equipo (para su «Resumen del presupuesto»): lo aprobado, sus anticipos y su saldo, aparte del saldo de la orden."""
+    rows = [dict(r) for r in c.execute(
+        "SELECT p.id,p.code,p.status,p.total_cents,(SELECT COALESCE(SUM(MAX(0,x.quantity*x.unit_cents-x.discount_cents)),0) FROM proforma_items x WHERE x.proforma_id=p.id AND x.status='aprobado') approved_cents,"
+        "(SELECT COALESCE(SUM(a.amount_cents),0) FROM advances a WHERE a.proforma_id=p.id AND a.voided_at='') paid_cents FROM proformas p WHERE p.order_id=? AND p.status NOT IN ('reemplazada','cancelada') ORDER BY p.id",
+        (order_id,))]
+    for r in rows:
+        if r['status'] not in ('aprobada', 'parcial', 'convertida'):
+            r['approved_cents'] = 0
+        r['balance_cents'] = max(r['approved_cents'] - r['paid_cents'], 0)
+    return {'count': len(rows), 'codes': [r['code'] for r in rows], 'pending': sum(1 for r in rows if r['status'] in ('borrador', 'enviada', 'vista', 'modificacion')),
+            'authorized_cents': sum(r['approved_cents'] for r in rows), 'paid_cents': sum(r['paid_cents'] for r in rows), 'balance_cents': sum(r['balance_cents'] for r in rows)} if rows else None
