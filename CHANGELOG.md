@@ -4,6 +4,25 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.220 — 2026-11-02 08:33 (UTC-05:00)
+
+Ingreso de mercadería por proveedor con factura XML, corrección controlada de ingresos y series, y Centro de Proveedores
+
+### Nuevas funcionalidades
+
+- Nuevo ingreso de mercadería por proveedor con tres opciones: importar la factura electrónica XML del SRI (vista previa, relación de productos, creación de productos, duplicados detectados), adjuntar factura física, foto o PDF, o ingresar sin factura y adjuntarla después.
+- Corrección de ingresos sin borrar nada: editar o descartar borradores, revertir una partida confirmada con un movimiento del Kardex, corregir su costo con auditoría, agregar lo que faltó, anular y volver a ingresar.
+- Control de números de serie: editar, eliminar y volver a ingresar una unidad equivocada; duplicados rechazados y unidades vendidas, facturadas o en una orden protegidas, con quién, cuándo y el dato anterior.
+
+### Mejoras realizadas
+
+- Centro de Proveedores rediseñado: indicadores reales, búsqueda instantánea, filtros, orden, paginación, tabla compacta y tarjetas en celular; ficha con datos completos, compras, productos suministrados con historial de costos y documentos.
+- Productos con último proveedor, fecha y costo de ingreso, margen y varios proveedores por producto; accesos directos en el Centro de Inventario.
+
+### Errores corregidos
+
+- Al recibir una compra ahora se guardan las series, el proveedor, el documento y el IVA en el Kardex; el mismo producto puede ir dos veces en una compra; una serie revertida queda libre para volver a ingresarla.
+
 ## v1.5.219 — 2026-10-30 22:35 (UTC-05:00)
 
 Asistente técnico de redacción en el panel ADI, con los datos de la orden y controles contra datos inventados

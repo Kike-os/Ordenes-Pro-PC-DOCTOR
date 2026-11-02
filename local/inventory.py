@@ -360,14 +360,34 @@ def movements(c, item_id):
 # ---- Proveedores -------------------------------------------------------------------------------------------------------
 
 def suppliers(c, active_only=False):
-    return [dict(r) for r in c.execute('SELECT * FROM suppliers' + (' WHERE active=1' if active_only else '') + ' ORDER BY active DESC,name COLLATE NOCASE')]
+    return [dict(r) for r in c.execute("SELECT s.*,(SELECT COUNT(*) FROM purchases p WHERE p.supplier_id=s.id AND p.status='recibida') purchases_count,"
+                                       "COALESCE((SELECT MAX(p.issue_date) FROM purchases p WHERE p.supplier_id=s.id AND p.status='recibida'),'') last_purchase,"
+                                       "COALESCE((SELECT MAX(substr(m.created_at,1,10)) FROM inventory_movements m WHERE m.supplier_id=s.id AND m.direction=1),'') last_entry FROM suppliers s"
+                                       + (' WHERE s.active=1' if active_only else '') + ' ORDER BY s.active DESC,s.name COLLATE NOCASE')]
+
+
+def supplier_center(c):
+    """Listado e indicadores reales del Centro de Proveedores."""
+    rows = suppliers(c)
+    for row in rows:
+        row['last_purchase'] = max(row['last_purchase'], row['last_entry'])
+        row['has_purchases'] = bool(row['purchases_count'] or row['last_entry'])
+    return {'rows': rows, 'kpis': {'total': len(rows), 'active': sum(1 for r in rows if r['active']), 'inactive': sum(1 for r in rows if not r['active']), 'with_purchases': sum(1 for r in rows if r['has_purchases'])}}
+
+
+def _phone_ok(value):
+    return not value or (re.fullmatch(r'[0-9+() -]{7,20}', value) and 7 <= len(re.sub(r'\D', '', value)) <= 15)
 
 
 def save_supplier(c, data, user, now):
     text = lambda key, size: re.sub(r'\s+', ' ', str(data.get(key, '') or '')).strip()[:size]
     clean = {'name': text('name', 300), 'identification': re.sub(r'\s', '', str(data.get('identification', '')))[:20], 'contact_name': text('contact_name', 120),
-             'phone': text('phone', 40), 'email': text('email', 200), 'address': text('address', 300)}
+             'phone': text('phone', 40), 'email': text('email', 200), 'address': text('address', 300), 'trade_name': text('trade_name', 300), 'whatsapp': text('whatsapp', 40),
+             'city': text('city', 80), 'province': text('province', 80), 'notes': text('notes', 500)}
     errors = {}
+    for key in ('phone', 'whatsapp'):
+        if not _phone_ok(clean[key]):
+            errors[key] = 'Teléfono no válido (7 a 15 dígitos).'
     if len(clean['name']) < 2:
         errors['name'] = 'Nombre o razón social.'
     if clean['identification']:
@@ -381,17 +401,24 @@ def save_supplier(c, data, user, now):
     if clean['email'] and not re.fullmatch(r'[^\s@<>]+@[^\s@<>.]+(\.[^\s@<>.]+)+', clean['email']):
         errors['email'] = 'Correo no válido.'
     supplier_id = str(data.get('id', '') or '')
-    if clean['identification'] and c.execute('SELECT 1 FROM suppliers WHERE identification=?' + (' AND id!=?' if supplier_id else ''), (clean['identification'], *([int(supplier_id)] if supplier_id else []))).fetchone():
-        errors['identification'] = 'Ya hay un proveedor con esa identificación.'
+    same = c.execute('SELECT name FROM suppliers WHERE identification=?' + (' AND id!=?' if supplier_id else ''), (clean['identification'], *([int(supplier_id)] if supplier_id else []))).fetchone() if clean['identification'] else None
+    if same:
+        errors['identification'] = 'Ya hay un proveedor con esa identificación: %s.' % same['name']
+    # Sin identificación que los distinga, el mismo nombre es el mismo proveedor.
+    wanted = re.sub(r'[^a-z0-9]+', '', clean['name'].lower())
+    for other in c.execute('SELECT id,name,identification FROM suppliers').fetchall():
+        if str(other['id']) != supplier_id and re.sub(r'[^a-z0-9]+', '', other['name'].lower()) == wanted and not (clean['identification'] and other['identification']):
+            errors['name'] = 'Ya existe un proveedor con ese nombre: edítalo en lugar de crear otro.'
+            break
     if errors:
         raise InventoryError('Revisa los datos del proveedor.', fields=errors)
     if supplier_id:
         if not c.execute('SELECT 1 FROM suppliers WHERE id=?', (supplier_id,)).fetchone():
             raise InventoryError('Proveedor no encontrado.', 404)
-        c.execute('UPDATE suppliers SET name=?,identification=?,contact_name=?,phone=?,email=?,address=?,updated_at=?,updated_by=? WHERE id=?', (*clean.values(), stamp(now), user['id'], int(supplier_id)))
+        c.execute('UPDATE suppliers SET name=?,identification=?,contact_name=?,phone=?,email=?,address=?,trade_name=?,whatsapp=?,city=?,province=?,notes=?,updated_at=?,updated_by=? WHERE id=?', (*clean.values(), stamp(now), user['id'], int(supplier_id)))
         event(c, now, user, 'proveedor_editado', 'Proveedor actualizado: ' + clean['name'], supplier_id=int(supplier_id))
         return int(supplier_id)
-    new_id = c.execute('INSERT INTO suppliers(name,identification,contact_name,phone,email,address,active,created_at,created_by,updated_at,updated_by) VALUES (?,?,?,?,?,?,1,?,?,?,?)',
+    new_id = c.execute('INSERT INTO suppliers(name,identification,contact_name,phone,email,address,trade_name,whatsapp,city,province,notes,active,created_at,created_by,updated_at,updated_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,1,?,?,?,?)',
                        (*clean.values(), stamp(now), user['id'], stamp(now), user['id'])).lastrowid
     event(c, now, user, 'proveedor_creado', 'Proveedor registrado: ' + clean['name'], supplier_id=new_id)
     return new_id
@@ -415,21 +442,81 @@ def _purchase(c, purchase_id):
 
 
 def purchase_detail(c, purchase_id):
+    import json
+    import purchase_intake
     p = dict(_purchase(c, purchase_id))
     p['status_label'] = PURCHASE_STATUS[p['status']]
+    p['source_label'] = purchase_intake.SOURCES.get(p['source'], '')
     p['supplier'] = dict(c.execute('SELECT id,name,identification FROM suppliers WHERE id=?', (p['supplier_id'],)).fetchone())
-    p['items'] = [dict(r) for r in c.execute('SELECT p.*,g.name,i.sku FROM purchase_items p JOIN inventory_items i ON i.id=p.item_id JOIN catalog_items g ON g.id=i.catalog_id WHERE p.purchase_id=? ORDER BY p.id', (p['id'],))]
+    p['items'] = [dict(r) for r in c.execute('SELECT p.*,g.name,i.sku,i.tracking FROM purchase_items p JOIN inventory_items i ON i.id=p.item_id JOIN catalog_items g ON g.id=i.catalog_id WHERE p.purchase_id=? ORDER BY p.id', (p['id'],))]
     for item in p['items']:
+        fixed = corrections(c, item['item_id'])
+        movement = item['movement_id'] or purchase_intake._line_movement(c, p, item)
+        item['original_cost_cents'] = item['unit_cost_cents']
+        item['unit_cost_cents'] = fixed.get(movement, item['unit_cost_cents'])
         base = item['quantity'] * item['unit_cost_cents']
         item['base_cents'], item['tax_cents'] = base, (2 * base * item['tax_rate_bp'] + 10000) // 20000
+        item['reversed'] = purchase_intake.reversed_qty(c, item['id'])
+        try:
+            item['serials'] = json.loads(item['serials'] or '[]')
+        except ValueError:
+            item['serials'] = []
+        item['units'] = [dict(r) for r in c.execute('SELECT id,internal_code,serial,status FROM inventory_units WHERE entry_movement_id=? ORDER BY id', (movement or 0,))] if movement else []
+    p['files'] = purchase_intake.files_of(c, purchase_id=p['id'])
     p['events'] = [dict(r) for r in c.execute('SELECT event,detail,actor,created_at FROM inventory_events WHERE purchase_id=? ORDER BY id DESC', (p['id'],))]
     return p
 
 
-def purchases(c, status=''):
-    where, args = ('WHERE p.status=?', (status,)) if status in PURCHASE_STATUS else ('', ())
-    return [dict(r, status_label=PURCHASE_STATUS[r['status']]) for r in c.execute('SELECT p.id,p.document_number,p.issue_date,p.status,p.total_cents,p.created_at,s.name supplier FROM purchases p JOIN suppliers s ON s.id=p.supplier_id '
-                                                                                 + where + ' ORDER BY p.id DESC LIMIT 200', args)]
+def purchases(c, status='', q='', supplier_id=''):
+    where, args = [], []
+    if status in PURCHASE_STATUS:
+        where.append('p.status=?')
+        args.append(status)
+    if str(supplier_id).isdigit():
+        where.append('p.supplier_id=?')
+        args.append(int(supplier_id))
+    if q:
+        where.append('(p.document_number LIKE ? OR s.name LIKE ? OR s.identification LIKE ?)')
+        args += ['%' + str(q).strip() + '%'] * 3
+    return [dict(r, status_label=PURCHASE_STATUS[r['status']]) for r in c.execute('SELECT p.id,p.document_number,p.issue_date,p.status,p.source,p.total_cents,p.created_at,s.name supplier,s.identification,(SELECT COUNT(*) FROM purchase_items x WHERE x.purchase_id=p.id) lines '
+                                                                                 'FROM purchases p JOIN suppliers s ON s.id=p.supplier_id ' + ('WHERE ' + ' AND '.join(where) + ' ' if where else '') + 'ORDER BY p.id DESC LIMIT 200', args)]
+
+
+def no_document_number(c, now):
+    """Identificador de un ingreso sin factura: el documento real puede agregarse después."""
+    return 'SF-%s-%06d' % (now.strftime('%Y%m%d'), c.execute('SELECT COALESCE(MAX(id),0)+1 FROM purchases').fetchone()[0])
+
+
+def clean_line(c, line):
+    """Partida de un ingreso validada: (artículo, cantidad, costo, IVA, descripción, código del proveedor, series, ubicación, descuento, precio de venta)."""
+    import json
+    item = _item_row(c, line.get('item_id'))
+    amount = quantity(line.get('quantity'))
+    cost = cents(line.get('unit_cost'), 'unit_cost')
+    if 'tax_rate_bp' in line and str(line.get('tax_rate_bp', '')).isdigit():
+        rate = min(int(line['tax_rate_bp']), 10000)
+    else:
+        rate = 1500 if str(line.get('taxed', '')) in ('1', 'true', 'True') else 0
+    raw = line.get('serials') or []
+    serials = [clean_serial(v) for v in (raw if isinstance(raw, list) else str(raw).split('\n'))]
+    serials = [v for v in serials if v]
+    if serials and item['tracking'] != 'serie':
+        raise InventoryError('%s se controla por cantidad: no lleva series.' % item['name'], fields={'items': 'Producto sin series.'})
+    if len(serials) > amount:
+        raise InventoryError('%s tiene más series (%d) que unidades (%d).' % (item['name'], len(serials), amount), fields={'items': 'Revisa las series.'})
+    keys = [serial_key(v) for v in serials]
+    if len(keys) != len(set(keys)):
+        raise InventoryError('Hay una serie repetida en %s.' % item['name'], 409, {'items': 'Serie repetida.'})
+    for value in serials:
+        owner = serial_owner(c, value)
+        if owner:
+            raise InventoryError('La serie %s ya está registrada (%s · %s).' % (value, owner['internal_code'], owner['name']), 409, {'items': 'Serie duplicada.'})
+    price = None
+    if str(line.get('sale_price', '') or '').strip():
+        price = cents(line.get('sale_price'), 'sale_price')
+    text = lambda key, size: re.sub(r'\s+', ' ', str(line.get(key, '') or '')).strip()[:size]
+    discount = line.get('discount_cents') or 0
+    return item['id'], amount, cost, rate, text('description', 300), text('supplier_code', 60), json.dumps(serials), text('location', 80), int(discount) if str(discount).isdigit() else 0, price
 
 
 def save_purchase(c, data, user, now):
@@ -440,6 +527,11 @@ def save_purchase(c, data, user, now):
     if not supplier:
         errors['supplier_id'] = 'Elige un proveedor activo.'
     number = re.sub(r'\s', '', str(data.get('document_number', '')))[:40]
+    source = str(data.get('source', '') or 'manual')
+    if source not in ('manual', 'xml', 'comprobante', 'sin_factura'):
+        source = 'manual'
+    if not number and source in ('sin_factura', 'comprobante'):  # el número de factura es opcional en estos ingresos
+        number = no_document_number(c, now)
     if not re.fullmatch(r'[A-Za-z0-9-]{1,40}', number):
         errors['document_number'] = 'Número del documento del proveedor.'
     try:
@@ -457,11 +549,16 @@ def save_purchase(c, data, user, now):
     clean = []
     for n, line in enumerate(lines[:100]):
         try:
-            item = _item_row(c, line.get('item_id'))
-            clean.append((item['id'], quantity(line.get('quantity')), cents(line.get('unit_cost'), 'unit_cost'), 1500 if str(line.get('taxed', '')) in ('1', 'true', 'True') else 0))
-        except (InventoryError, AttributeError):
+            clean.append(clean_line(c, line))
+        except InventoryError as error:
+            errors['items'] = 'Partida %d: %s' % (n + 1, str(error)) if error.fields.get('items') else 'Revisa la partida %d: artículo, cantidad y costo.' % (n + 1)
+            break
+        except AttributeError:
             errors['items'] = 'Revisa la partida %d: artículo, cantidad y costo.' % (n + 1)
             break
+    all_serials = [v for line in clean for v in json.loads(line[6])]
+    if len({serial_key(v) for v in all_serials}) != len(all_serials):
+        errors['items'] = 'Hay una serie repetida entre las partidas de este ingreso.'
     if not clean and 'items' not in errors:
         errors['items'] = 'Agrega al menos un artículo.'
     purchase_id = str(data.get('id', '') or '')
@@ -470,24 +567,45 @@ def save_purchase(c, data, user, now):
         errors['document_number'] = 'Ese documento de este proveedor ya está registrado.'
     if errors:
         raise InventoryError('Revisa la compra.', fields=errors)
-    subtotal = sum(q * cost for _, q, cost, _ in clean)
-    tax = sum((2 * q * cost * rate + 10000) // 20000 for _, q, cost, rate in clean)
+    subtotal = sum(line[1] * line[2] for line in clean)
+    tax = sum((2 * line[1] * line[2] * line[3] + 10000) // 20000 for line in clean)
     notes = re.sub(r'\s+', ' ', str(data.get('notes', ''))).strip()[:500]
     if purchase_id:
         row = _purchase(c, purchase_id)
         if row['status'] != 'borrador':
             raise InventoryError('Solo se edita una compra en borrador.', 409)
-        c.execute('UPDATE purchases SET supplier_id=?,document_number=?,issue_date=?,subtotal_cents=?,tax_cents=?,total_cents=?,notes=? WHERE id=?',
-                  (supplier['id'], number, issue.isoformat(), subtotal, tax, subtotal + tax, notes, row['id']))
+        if row['source'] == 'xml' and (supplier['id'] != row['supplier_id'] or number != row['document_number']):
+            raise InventoryError('El proveedor y el número de una factura XML no se cambian: descarta el ingreso si hay un error.', 409)
+        c.execute('UPDATE purchases SET supplier_id=?,document_number=?,issue_date=?,subtotal_cents=?,tax_cents=?,total_cents=?,notes=?,source=? WHERE id=?',
+                  (supplier['id'], number, issue.isoformat(), subtotal, tax, subtotal + tax, notes, 'xml' if row['source'] == 'xml' else source, row['id']))
         c.execute('DELETE FROM purchase_items WHERE purchase_id=?', (row['id'],))
         pid = row['id']
     else:
-        pid = c.execute('INSERT INTO purchases(supplier_id,document_number,issue_date,status,subtotal_cents,tax_cents,total_cents,notes,created_by,created_at) VALUES (?,?,?,?,?,?,?,?,?,?)',
-                        (supplier['id'], number, issue.isoformat(), 'borrador', subtotal, tax, subtotal + tax, notes, user['id'], stamp(now))).lastrowid
-    for item_id, q, cost, rate in clean:
-        c.execute('INSERT INTO purchase_items(purchase_id,item_id,quantity,unit_cost_cents,tax_rate_bp) VALUES (?,?,?,?,?)', (pid, item_id, q, cost, rate))
+        pid = c.execute('INSERT INTO purchases(supplier_id,document_number,issue_date,status,subtotal_cents,tax_cents,total_cents,notes,created_by,created_at,source,access_key,authorization_number,authorized_at,xml_total_cents) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+                        (supplier['id'], number, issue.isoformat(), 'borrador', subtotal, tax, subtotal + tax, notes, user['id'], stamp(now), source, str(data.get('access_key', '') or ''), str(data.get('authorization_number', '') or ''),
+                         str(data.get('authorized_at', '') or ''), data.get('xml_total_cents'))).lastrowid
+    for line in clean:
+        c.execute('INSERT INTO purchase_items(purchase_id,item_id,quantity,unit_cost_cents,tax_rate_bp,description,supplier_code,serials,location,discount_cents,sale_price_cents) VALUES (?,?,?,?,?,?,?,?,?,?,?)', (pid, *line))
     event(c, now, user, 'compra_guardada', 'Compra %s de %s en borrador: %s.' % (number, supplier['name'], usd(subtotal + tax)), purchase_id=pid, supplier_id=supplier['id'])
     return pid
+
+
+def receive_line(c, purchase, line, user, now):
+    """Entrada de una partida: serie, proveedor, documento e IVA quedan en el Kardex. Debe enlazarse antes de que la compra deje de ser borrador."""
+    import json
+    twice = c.execute("SELECT 1 FROM inventory_movements WHERE reference_kind='compra' AND reference_id=? AND item_id=? AND direction=1", (purchase['id'], line['item_id'])).fetchone()
+    kind, ref = ('compra_linea', line['id']) if twice else ('compra', purchase['id'])
+    movement = move(c, line['item_id'], 1, 'compra', str(line['quantity']), '%d.%02d' % divmod(line['unit_cost_cents'], 100), user, now, kind, ref, 'Compra ' + purchase['document_number'],
+                    serials=json.loads(line['serials'] or '[]'), location=line['location'], supplier_id=purchase['supplier_id'], document=purchase['document_number'], tax_rate_bp=line['tax_rate_bp'])
+    if line['location'] and _item_row(c, line['item_id'])['tracking'] == 'granel':
+        c.execute('UPDATE inventory_items SET location=? WHERE id=?', (line['location'], line['item_id']))
+    if line['supplier_code']:
+        c.execute('INSERT INTO supplier_item_codes(supplier_id,code,item_id,updated_at) VALUES (?,?,?,?) ON CONFLICT(supplier_id,code) DO UPDATE SET item_id=excluded.item_id,updated_at=excluded.updated_at',
+                  (purchase['supplier_id'], line['supplier_code'], line['item_id'], stamp(now)))
+    if line['sale_price_cents'] is not None:
+        import inventory_center as center
+        center._update_commercial(c, center.product(c, line['item_id']), {'price': '%d.%02d' % divmod(line['sale_price_cents'], 100)}, user, now)
+    return movement
 
 
 def receive(c, purchase_id, user, now):
@@ -495,14 +613,16 @@ def receive(c, purchase_id, user, now):
     row = _purchase(c, purchase_id)
     if row['status'] != 'borrador':
         raise InventoryError('Esta compra ya fue recibida o anulada.', 409)
-    for item in c.execute('SELECT * FROM purchase_items WHERE purchase_id=?', (row['id'],)).fetchall():
-        move(c, item['item_id'], 1, 'compra', str(item['quantity']), '%d.%02d' % divmod(item['unit_cost_cents'], 100), user, now, 'compra', row['id'], 'Compra ' + row['document_number'])
+    for item in c.execute('SELECT * FROM purchase_items WHERE purchase_id=? ORDER BY id', (row['id'],)).fetchall():
+        movement = receive_line(c, row, item, user, now)
+        c.execute('UPDATE purchase_items SET movement_id=? WHERE id=?', (movement, item['id']))
     c.execute("UPDATE purchases SET status='recibida',received_by=?,received_at=? WHERE id=?", (user['id'], stamp(now), row['id']))
     event(c, now, user, 'compra_recibida', 'Compra %s recibida: existencias actualizadas.' % row['document_number'], purchase_id=row['id'], supplier_id=row['supplier_id'])
 
 
 def void_purchase(c, purchase_id, reason, user, now):
-    """Anula una compra. Si ya se recibió, registra la salida de lo que entró (solo si las existencias alcanzan)."""
+    """Anula una compra. Si ya se recibió, registra la salida de lo que entró (solo si las existencias alcanzan); las partidas ya revertidas no vuelven a salir."""
+    import purchase_intake
     row = _purchase(c, purchase_id)
     reason = re.sub(r'\s+', ' ', str(reason or '')).strip()[:300]
     if len(reason) < 5:
@@ -510,13 +630,9 @@ def void_purchase(c, purchase_id, reason, user, now):
     if row['status'] == 'anulada':
         raise InventoryError('La compra ya está anulada.', 409)
     if row['status'] == 'recibida':
-        for item in c.execute('SELECT * FROM purchase_items WHERE purchase_id=?', (row['id'],)).fetchall():
-            units = None
-            if _item_row(c, item['item_id'])['tracking'] == 'serie':
-                entry = c.execute("SELECT id FROM inventory_movements WHERE reference_kind='compra' AND reference_id=? AND item_id=? AND direction=1", (row['id'], item['item_id'])).fetchone()
-                units = [u[0] for u in c.execute("SELECT id FROM inventory_units WHERE entry_movement_id=? AND status='disponible' ORDER BY id", (entry[0] if entry else 0,))]
-                if len(units) < item['quantity']:
-                    raise InventoryError('No se puede anular: ya salieron unidades de esta compra (%d de %d disponibles).' % (len(units), item['quantity']), 409)
-            move(c, item['item_id'], -1, 'anulacion_compra', str(item['quantity']), '0', user, now, 'compra', row['id'], 'Anulación de la compra ' + row['document_number'], unit_ids=units)
+        for item in c.execute('SELECT * FROM purchase_items WHERE purchase_id=? ORDER BY id', (row['id'],)).fetchall():
+            left = item['quantity'] - purchase_intake.reversed_qty(c, item['id'])
+            if left > 0:
+                purchase_intake.reverse_line(c, row['id'], item['id'], str(left), None, reason, user, now)
     c.execute("UPDATE purchases SET status='anulada',voided_by=?,voided_at=?,void_reason=? WHERE id=?", (user['id'], stamp(now), reason, row['id']))
     event(c, now, user, 'compra_anulada', 'Compra %s anulada: %s' % (row['document_number'], reason), purchase_id=row['id'], supplier_id=row['supplier_id'])

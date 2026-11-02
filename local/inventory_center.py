@@ -327,8 +327,19 @@ def products(c, q='', category_id='', brand_id='', state=''):
         if (state == 'bajo' and not item['low'] or state in inventory.STOCK_STATES and (item['stock_state'] != state or not item['active'])
                 or state == 'inactivo' and item['active'] or state == 'activo' and not item['active'] or state == 'sin_alertas' and item['alerts_enabled']):
             continue
-        out.append(item)
+        out.append(_with_purchase_facts(c, item))
     return out
+
+
+def _with_purchase_facts(c, item):
+    """Último proveedor, fecha y costo de ingreso, y margen sobre el precio sin IVA. Sin precio de venta no se informa margen."""
+    entry = c.execute("SELECT m.id,m.created_at,m.unit_cost_cents,COALESCE(s.name,'') supplier FROM inventory_movements m LEFT JOIN suppliers s ON s.id=m.supplier_id WHERE m.item_id=? AND m.direction=1 AND m.reason IN ('compra','inicial','ajuste_entrada') ORDER BY m.id DESC LIMIT 1", (item['id'],)).fetchone()
+    item['last_supplier'] = entry['supplier'] if entry else ''
+    item['last_entry'] = entry['created_at'][:10] if entry else ''
+    item['last_cost_cents'] = inventory.corrections(c, item['id']).get(entry['id'], entry['unit_cost_cents']) if entry else 0
+    price = pricing(c, item)
+    item['margin_bp'] = price['margin_bp'] if price['net_cents'] else None
+    return item
 
 
 def _warranty_fields(data, prefix, errors):
@@ -483,14 +494,14 @@ def set_alerts(c, item_id, enabled, user, now):
     event(c, now, user, 'alertas_' + ('activadas' if enabled else 'desactivadas'), 'Alertas de existencias %s: %s.' % ('activadas' if enabled else 'desactivadas', item['name']), item['id'])
 
 
-def correct_cost(c, movement_id, cost, reason, user, now, document=''):
+def correct_cost(c, movement_id, cost, reason, user, now, document='', allow_purchase=False):
     """Corrige el costo de una entrada registrada con un costo equivocado. El movimiento original no cambia: la corrección queda auditada
     (costo anterior y nuevo, motivo, quién y cuándo) y el Kardex valorizado usa el costo corregido desde esa entrada."""
     m = c.execute('SELECT * FROM inventory_movements WHERE id=?', (movement_id,)).fetchone() if _id(movement_id) else None
     if not m or m['direction'] != 1 or m['reason'] not in ('inicial', 'compra', 'ajuste_entrada', 'devolucion_cliente'):
         raise InventoryError('Solo se corrige el costo de una entrada.', 404 if not m else 409)
-    if m['reference_kind'] == 'compra':
-        raise InventoryError('Esta entrada viene de una compra registrada: corrige el documento de compra, no el Kardex.', 409)
+    if m['reference_kind'] in ('compra', 'compra_linea') and not allow_purchase:
+        raise InventoryError('Esta entrada viene de una compra registrada: corrige el costo desde esa compra.', 409)
     if str(cost or '').strip() == '':
         raise InventoryError('Indica el costo unitario correcto.', fields={'cost': 'Costo obligatorio.'})
     new_cost = cents(cost, 'cost')
@@ -632,6 +643,8 @@ def unit_detail(c, unit_id):
         'LEFT JOIN users s ON s.id=m.created_by WHERE x.unit_id=? ORDER BY m.id', (row['id'],))]
     out['events'] = [dict(r) for r in c.execute('SELECT event,detail,actor,created_at FROM inventory_events WHERE unit_id=? ORDER BY id DESC', (row['id'],))]
     out['warranty'] = _unit_warranty(c, row, date.today())
+    import purchase_intake
+    out['lock'], out['serial_lock'] = purchase_intake.unit_lock(c, row), purchase_intake.serial_lock(row)
     return out
 
 
@@ -640,6 +653,10 @@ def set_serial(c, unit_id, serial, reason, user, now):
     row = c.execute('SELECT * FROM inventory_units WHERE id=?', (unit_id,)).fetchone() if _id(unit_id) else None
     if not row:
         raise InventoryError('Unidad no encontrada.', 404)
+    import purchase_intake
+    lock = purchase_intake.serial_lock(row)
+    if lock and row['serial']:  # registrar la serie que faltaba sí se permite; cambiar la de un documento emitido, no
+        raise InventoryError('La serie de esta unidad no se puede cambiar: %s.' % lock, 409, {'serial': 'Unidad protegida.'})
     value = inventory.clean_serial(serial)
     if not value:
         raise InventoryError('Escanea o escribe la serie.', fields={'serial': 'Serie obligatoria.'})
@@ -860,7 +877,7 @@ def sales_history(c, item_id):
 def product_sheet(c, item_id, now):
     """Ficha comercial completa: datos, precios y margen, unidades, reservas, ventas, entradas (con correcciones de costo), Kardex y
     avisos de datos faltantes (sin inventar ningún valor)."""
-    item = product(c, item_id)
+    item = _with_purchase_facts(c, product(c, item_id))
     raw = c.execute('SELECT * FROM inventory_items WHERE id=?', (item['id'],)).fetchone()
     item['min_price_cents'] = raw['min_price_cents'] if 'min_price_cents' in raw.keys() else 0
     item['max_discount_bp'] = raw['max_discount_bp'] if 'max_discount_bp' in raw.keys() else 0
@@ -868,7 +885,7 @@ def product_sheet(c, item_id, now):
     fixed = inventory.corrections(c, item['id'])
     entries = [{'id': m['id'], 'at': m['created_at'], 'reason': m['reason'], 'reason_label': inventory.IN_REASONS[m['reason']], 'quantity': m['quantity'], 'cost_cents': fixed.get(m['id'], m['unit_cost_cents']),
                 'original_cost_cents': m['unit_cost_cents'], 'corrected': m['id'] in fixed, 'supplier': m['supplier'] or '', 'document': m['document'] if 'document' in m.keys() else '',
-                'correctable': m['reference_kind'] != 'compra'} for m in c.execute(
+                'correctable': m['reference_kind'] not in ('compra', 'compra_linea')} for m in c.execute(
         'SELECT m.*,s.name supplier FROM inventory_movements m LEFT JOIN suppliers s ON s.id=' + ('m.supplier_id' if _has_column(c, 'inventory_movements', 'supplier_id') else 'NULL') + ' WHERE m.item_id=? AND m.direction=1 ORDER BY m.id', (item['id'],))]
     alerts = []
     if not price['price_cents']:
@@ -892,7 +909,8 @@ def product_sheet(c, item_id, now):
         u['warranty_label'] = (w['store']['state'] if u['sold_at'] else 'sin_venta')
         u['warranty_to'] = u['store_warranty_to']
     res = [r for r in reservations(c) if r['item_id'] == item['id']]
-    return {'product': item, 'pricing': price, 'units': units_list, 'reservations': res, 'sales': sales_history(c, item['id']), 'entries': entries,
+    import purchase_intake
+    return {'suppliers': purchase_intake.product_suppliers(c, item['id']), 'product': item, 'pricing': price, 'units': units_list, 'reservations': res, 'sales': sales_history(c, item['id']), 'entries': entries,
             'kardex': kardex(c, {'item_id': str(item['id'])})['rows'][::-1], 'alerts': [{'field': f, 'text': t} for f, t in alerts]}
 
 
@@ -1077,6 +1095,12 @@ def _reference(c, m):
     if kind == 'compra':
         row = c.execute('SELECT document_number FROM purchases WHERE id=?', (ref,)).fetchone()
         return 'Compra ' + (row[0] if row else str(ref))
+    if kind == 'compra_linea':
+        row = c.execute('SELECT p.document_number FROM purchase_items x JOIN purchases p ON p.id=x.purchase_id WHERE x.id=?', (ref,)).fetchone()
+        return 'Compra ' + (row[0] if row else str(ref))
+    if kind == 'compra_reverso':
+        row = c.execute('SELECT p.document_number FROM purchase_reversals r JOIN purchases p ON p.id=r.purchase_id WHERE r.id=?', (ref,)).fetchone()
+        return 'Reverso de la compra ' + (row[0] if row else str(ref))
     if kind == 'orden':
         row = c.execute('SELECT code FROM orders WHERE id=?', (ref,)).fetchone()
         return 'Orden ' + (row[0] if row else str(ref))

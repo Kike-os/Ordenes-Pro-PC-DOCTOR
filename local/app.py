@@ -2099,8 +2099,16 @@ class Handler(BaseHTTPRequestHandler):
                     if path=='/api/inventory/export.json':
                         audit(c,user['id'],'inventory_export');c.commit()
                         return self.reply(200,json.dumps(center.export_package(c,now),ensure_ascii=False,default=str).encode('utf-8'),'application/json',filename='inventario-pruebas-'+now.date().isoformat()+'.json')
-                    if path=='/api/inventory/suppliers':return self.reply(200,{'rows':inventory.suppliers(c)})
-                    if path=='/api/inventory/purchases':return self.reply(200,{'rows':inventory.purchases(c,arg('status')),'statuses':inventory.PURCHASE_STATUS})
+                    if path=='/api/inventory/suppliers':return self.reply(200,inventory.supplier_center(c))
+                    if path=='/api/inventory/purchases':return self.reply(200,{'rows':inventory.purchases(c,arg('status'),arg('q'),arg('supplier')),'statuses':inventory.PURCHASE_STATUS})
+                    import purchase_intake
+                    found=re.fullmatch(r'/api/inventory/suppliers/([0-9]{1,9})',path)
+                    if found:return self.reply(200,purchase_intake.supplier_sheet(c,found[1]))
+                    found=re.fullmatch(r'/api/inventory/files/([0-9]{1,9})',path)
+                    if found:
+                        name,mime,raw=purchase_intake.file_for(c,found[1])
+                        return self.reply(200,raw,mime,filename=name)
+                    if path=='/api/inventory/serials':return self.reply(200,purchase_intake.serial_panel(c,arg('q'),arg('state')))
                     found=re.fullmatch(r'/api/inventory/items/([0-9]{1,9})/movements',path)
                     if found:return self.reply(200,inventory.movements(c,found[1]))
                     found=re.fullmatch(r'/api/inventory/purchases/([0-9]{1,9})',path)
@@ -2675,7 +2683,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(403, {'error':'Solicitud no autorizada.'})
             path = urlsplit(self.path).path
             workspace_post=bool(re.fullmatch(r'/api/orders/[0-9]+/workspace',path));quote_json=bool(re.fullmatch(r'/api/quotes/[0-9]+',path))
-            max_body=3900000 if re.fullmatch(r'/api/orders/[0-9]+/followups',path) else 1700000 if path in ('/api/cash/upload','/api/files/upload') else 65536 if path.startswith('/api/proformas') or path.startswith('/api/caja/') or re.fullmatch(r'/api/orders/[0-9]+/payments',path) or path=='/api/credit-notes' else 9000000 if path in ('/api/clients/import/preview','/api/clients/import/commit','/api/inventory/import/preview','/api/inventory/import/commit') else 200000 if path in ('/api/inventory/register','/api/invoicing/policies') else 1700000 if path=='/api/public/adi/listen' else 6000000 if path in ('/api/mail/send','/api/mail/draft') else 100000 if path in ('/api/conditions','/api/order-draft','/api/conditions/draft','/api/conditions/compare') else 3200000 if path in ('/api/licenses/new','/api/licenses/units','/api/licenses/units/bulk','/api/licenses/check','/api/licenses/products','/api/licenses/products/duplicate','/api/licenses/sales') or re.fullmatch(r'/api/licenses/sales/[0-9]+',path) else 900000 if re.fullmatch(r'/api/orders/[0-9]+/photos',path) or path in ('/api/profile/photo','/api/mail/signature') or re.fullmatch(r'/api/catalog/[0-9]+/image',path) else (65536 if workspace_post or quote_json else 16384)
+            max_body=3900000 if re.fullmatch(r'/api/orders/[0-9]+/followups',path) else 1500000 if path in ('/api/inventory/purchases/xml','/api/inventory/purchases/from-xml') else 1700000 if path in ('/api/cash/upload','/api/files/upload') else 65536 if path.startswith('/api/proformas') or path.startswith('/api/caja/') or re.fullmatch(r'/api/orders/[0-9]+/payments',path) or path=='/api/credit-notes' else 9000000 if path in ('/api/clients/import/preview','/api/clients/import/commit','/api/inventory/import/preview','/api/inventory/import/commit') else 200000 if path in ('/api/inventory/register','/api/invoicing/policies') else 1700000 if path=='/api/public/adi/listen' else 6000000 if path in ('/api/mail/send','/api/mail/draft') else 100000 if path in ('/api/conditions','/api/order-draft','/api/conditions/draft','/api/conditions/compare') else 3200000 if path in ('/api/licenses/new','/api/licenses/units','/api/licenses/units/bulk','/api/licenses/check','/api/licenses/products','/api/licenses/products/duplicate','/api/licenses/sales') or re.fullmatch(r'/api/licenses/sales/[0-9]+',path) else 900000 if re.fullmatch(r'/api/orders/[0-9]+/photos',path) or path in ('/api/profile/photo','/api/mail/signature') or re.fullmatch(r'/api/catalog/[0-9]+/image',path) else (65536 if workspace_post or quote_json else 16384)
             length = int(self.headers.get('Content-Length', '0'))
             if length <= 0 or length > max_body:
                 return self.reply(400, {'error':'Solicitud inválida.'})
@@ -3157,6 +3165,23 @@ class Handler(BaseHTTPRequestHandler):
                             if action=='save':result={'id':inventory.save_supplier(c,data,user,now)}
                             elif action in ('activate','deactivate'):inventory.set_supplier_active(c,data.get('id'),action=='activate',user,now);result={}
                             else:c.rollback();return self.reply(400,{'error':'Acción inválida.'})
+                        elif path in ('/api/inventory/purchases/xml','/api/inventory/purchases/from-xml'):
+                            import purchase_intake
+                            try:raw=base64.b64decode(str(data.get('file','')),validate=True)
+                            except ValueError:c.rollback();return self.reply(400,{'error':'El archivo no se pudo leer.'})
+                            if path.endswith('/xml'):
+                                preview=purchase_intake.analyze(c,raw);c.rollback()  # la vista previa no escribe nada
+                                return self.reply(200,preview)
+                            result={'id':purchase_intake.create_from_xml(c,raw,data,user,now)}
+                        elif re.fullmatch(r'/api/inventory/suppliers/([0-9]{1,9})',path):
+                            import purchase_intake
+                            supplier_ref=path.rsplit('/',1)[1]
+                            if action=='attach':result={'file_id':purchase_intake.attach_supplier(c,supplier_ref,data,user,now)}
+                            else:c.rollback();return self.reply(400,{'error':'Acción inválida.'})
+                        elif re.fullmatch(r'/api/inventory/files/([0-9]{1,9})',path):
+                            import purchase_intake
+                            if action!='discard':c.rollback();return self.reply(400,{'error':'Acción inválida.'})
+                            purchase_intake.discard_file(c,path.rsplit('/',1)[1],data.get('reason'),user,now);result={}
                         elif path=='/api/inventory/purchases':
                             if action!='save':c.rollback();return self.reply(400,{'error':'Acción inválida.'})
                             result={'id':inventory.save_purchase(c,data,user,now)}
@@ -3194,8 +3219,13 @@ class Handler(BaseHTTPRequestHandler):
                             result={'units':center.register_delivery(c,data.get('unit_ids'),data.get('delivered_at'),user,now)}
                         elif re.fullmatch(r'/api/inventory/units/([0-9]{1,9})',path):
                             import inventory_center as center
-                            if action!='serial':c.rollback();return self.reply(400,{'error':'Acción inválida.'})
-                            result={'id':center.set_serial(c,path.rsplit('/',1)[1],data.get('serial'),data.get('reason'),user,now)}
+                            import purchase_intake
+                            unit_ref=path.rsplit('/',1)[1]
+                            if action=='serial':result={'id':center.set_serial(c,unit_ref,data.get('serial'),data.get('reason'),user,now)}
+                            elif action=='edit':result={'id':purchase_intake.edit_unit(c,unit_ref,data,user,now)}
+                            elif action=='discard':result={'movement':purchase_intake.discard_unit(c,unit_ref,data.get('reason'),user,now)}
+                            elif action=='reenter':result={'id':purchase_intake.reenter_unit(c,unit_ref,data,user,now)}
+                            else:c.rollback();return self.reply(400,{'error':'Acción inválida.'})
                         elif path=='/api/inventory/reservations':
                             import inventory_center as center
                             if action=='reserve':result={'id':center.reserve(c,data,user,now)}
@@ -3215,10 +3245,17 @@ class Handler(BaseHTTPRequestHandler):
                             result=center.import_commit(c,raw,str(data.get('name',''))[:120],str(data.get('sha','')),user,now)
                         elif re.fullmatch(r'/api/inventory/purchases/([0-9]{1,9})',path):
                             purchase_id=path.rsplit('/',1)[1]
+                            import purchase_intake
+                            result={'id':int(purchase_id)}
                             if action=='receive':inventory.receive(c,purchase_id,user,now)
                             elif action=='void':inventory.void_purchase(c,purchase_id,data.get('reason',''),user,now)
+                            elif action=='header':purchase_intake.update_header(c,purchase_id,data,user,now)
+                            elif action=='reverse':purchase_intake.reverse_line(c,purchase_id,data.get('line_id'),data.get('quantity'),data.get('unit_ids'),data.get('reason'),user,now)
+                            elif action=='cost':purchase_intake.correct_line_cost(c,purchase_id,data.get('line_id'),data.get('cost'),data.get('reason'),user,now)
+                            elif action=='add_line':purchase_intake.add_line(c,purchase_id,data,user,now)
+                            elif action=='attach':purchase_intake.attach(c,purchase_id,data,user,now)
+                            elif action=='reenter':result={'id':purchase_intake.reenter(c,purchase_id,user,now)}
                             else:c.rollback();return self.reply(400,{'error':'Acción inválida.'})
-                            result={'id':int(purchase_id)}
                         else:c.rollback();return self.reply(404,{'error':'No encontrado.'})
                         c.commit();audit(c,user['id'],'inventory_'+(action or 'save'));return self.reply(200,{'ok':True,**result})
                     except inventory.InventoryError as error:

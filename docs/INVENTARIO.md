@@ -162,3 +162,41 @@ Las pruebas usan una base temporal con datos ficticios. Cubren:
 - estados de existencias, alertas desactivables y costo obligatorio;
 - corrección de costo auditada, precios, ventas con autorización y reservas con vencimiento;
 - totales del Kardex por período, los 8 reportes y la revisión de datos.
+
+## Ingreso de mercadería por proveedor (1.5.220)
+
+**Inventario › Nuevo ingreso**: busca el proveedor y elige cómo registrar. Las existencias y el Kardex cambian solo al confirmar.
+
+| Opción | Cómo funciona |
+|---|---|
+| **Factura electrónica XML** | Lee proveedor (por RUC), productos, cantidades, precios, descuentos e impuestos. Muestra una vista previa para relacionar cada línea con un producto, crear uno nuevo o excluirla (por ejemplo, un transporte). Detecta facturas duplicadas por clave de acceso y número. |
+| **Factura física, foto o PDF** | Adjunta el comprobante (hasta 5 MB) e ingresa los productos a mano. |
+| **Sin factura adjunta** | Indica proveedor, productos, cantidades y costos. El ingreso recibe un número `SF-…` y el documento puede agregarse después. |
+
+**Qué comprueba el XML:** estructura de factura del SRI, autorización incluida, dígito verificador de la clave de acceso, RUC, totales y comprador. Rechaza los comprobantes no autorizados y los que no son factura, y avisa de los que no traen autorización, son del ambiente de pruebas o no cuadran. **No consulta al SRI en línea.** El costo unitario se calcula sobre el total de línea sin impuestos, con el descuento ya aplicado. El inventario solo admite cantidades enteras: una cantidad con decimales se corrige o la línea se excluye.
+
+### Corregir un ingreso
+
+| Estado | Qué se puede hacer |
+|---|---|
+| **Borrador** | Editar todo, quitar productos o descartarlo. No toca existencias. |
+| **Confirmado** | Revertir una partida o parte de ella, corregir su costo, agregar lo que faltó, editar el documento (salvo el de un XML) o anular todo. |
+| **Anulado** | Volver a ingresarlo como borrador nuevo. Queda en el historial. |
+
+Revertir registra una salida en el Kardex solo de esa partida, sin afectar el resto del inventario, y libera las series revertidas. Solo salen unidades aún disponibles: si ya se vendieron, no se puede. Corregir el costo no cambia el movimiento original ni las ventas realizadas.
+
+### Control de series
+
+**Inventario › Control de series** y la ficha de cada unidad ofrecen:
+- **Editar serie:** con motivo; se rechazan los duplicados.
+- **Eliminar registro:** la unidad sale con un movimiento, su serie queda libre y se conserva el historial.
+- **Volver a ingresar:** retira el registro e ingresa uno correcto en una sola operación, con el mismo costo y un código interno nuevo.
+
+Una unidad vendida, consumida, facturada o vinculada a una orden no se puede cambiar; una reservada o con movimientos posteriores no se puede eliminar. Cada cambio guarda quién, cuándo y el dato anterior.
+
+## Centro de Proveedores (1.5.220)
+
+Disponible en **Inventario › Proveedores** y en **Facturación › Proveedores**. Muestra indicadores reales, búsqueda por nombre, RUC, cédula, correo o teléfono, filtros, orden y paginación. Su ficha tiene información general, historial de compras, productos suministrados con su historial de costos y documentos.
+
+Un proveedor no se puede duplicar por identificación ni, cuando no hay identificación que los distinga, por nombre. Los proveedores no se eliminan: se desactivan y se pueden reactivar. Un mismo producto puede tener varios proveedores, y su ficha los muestra con su último costo.
+

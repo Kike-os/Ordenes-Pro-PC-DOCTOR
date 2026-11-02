@@ -5580,81 +5580,11 @@ async function inventoryPanel(panel){panel.replaceChildren(el('p','Cargando inve
   invKpis([['package','Total de productos',String(k.products),'Fichas activas','blue'],['boxes','Existencias disponibles',String(k.available),'Sin contar lo reservado','teal'],['circle-dollar-sign','Inventario valorizado',quoteMoney(k.value_cents),'Costo promedio ponderado','magenta'],
    ['triangle-alert','Productos con stock bajo',String(k.low),k.low?'En el mínimo o por debajo':'Sin alertas',k.low?'amber':'green']]));}
 // Compras: el borrador no mueve existencias; «Recibir» registra las entradas una sola vez; anular revierte (si alcanzan las existencias).
-async function purchasesPanel(panel){panel.replaceChildren(el('p','Cargando compras…','empty-module'));let data;
- try{data=await api('/api/inventory/purchases?'+new URLSearchParams({status:inventoryState.purchases}));}catch(error){panel.replaceChildren(el('p',error.message,'empty-module'));return;}
- panel.replaceChildren(invSectionHead('Compras','Registro interno de compras a proveedores. El borrador no mueve el inventario: las existencias suben al marcar la compra como recibida.',invBtn('Nueva compra','plus',()=>purchaseDialog(panel),'primary inv-add')));
- const filters=el('div',undefined,'inv-filters');filters.setAttribute('role','group');filters.setAttribute('aria-label','Filtrar compras por estado');
- for(const[key,label]of [['','Todas'],...Object.entries(data.statuses)]){const b=button(label,()=>{inventoryState.purchases=key;purchasesPanel(panel);},'inv-filter');b.setAttribute('aria-pressed',String(inventoryState.purchases===key));filters.append(b);}
- panel.append(filters);
- const list=el('ul',undefined,'inv-list');const chip={borrador:'pendiente',recibida:'autorizado',anulada:'descartado'};
- for(const row of data.rows){const li=el('li'),open=button('',()=>purchaseDetail(row.id,panel),'inv-row');const who=el('div',undefined,'inv-row-who');who.append(el('strong',row.supplier),el('small','Documento '+row.document_number));
-  const meta=el('div',undefined,'inv-row-meta');meta.append(el('code',dashboardDate(row.issue_date)),el('small','Registrada '+formatOrderDate(row.created_at)));open.append(invoiceChip(chip[row.status],row.status_label),who,meta,el('b',quoteMoney(row.total_cents)));
-  open.setAttribute('aria-label','Abrir compra '+row.document_number+' de '+row.supplier);li.append(open);list.append(li);}
- panel.append(data.rows.length?list:invEmpty('shopping-cart',inventoryState.purchases?'No hay compras con este estado':'Todavía no hay compras registradas',inventoryState.purchases?'Elige otro estado para ver más compras.':'Registra la primera con «Nueva compra». El inventario solo cambia al recibirla.'));}
 function invCents(text){const t=String(text||'').trim().replace(/[$\s]/g,'');const n=/^\d{1,3}(\.\d{3})+(,\d{1,2})?$|^\d+(,\d{1,2})?$/.test(t)?t.replace(/\./g,'').replace(',','.'):t;return /^\d+(\.\d{1,2})?$/.test(n)?Math.round(Number(n)*100):NaN;}
-async function purchaseDialog(panel,existing){let inv,sup;try{[inv,sup]=await Promise.all([api('/api/inventory'),api('/api/inventory/suppliers')]);}catch(error){notify(error.message);return;}
- const suppliers=sup.rows.filter(s=>s.active),items=inv.items.filter(i=>i.active);const dialog=invDialog(existing?'Editar compra en borrador':'Nueva compra',true);
- if(!suppliers.length||!items.length){dialog.append(el('p',!suppliers.length?'Registra primero un proveedor activo en «Proveedores».':'Incorpora primero los artículos en «Inventario».','inv-form-note'));const bar=el('div',undefined,'dialog-actions');bar.append(button('Cerrar',()=>dialog.close(),'secondary'));dialog.append(bar);return;}
- const{form,msg,field,fail,clear}=invForm('stock-purchase');const head=el('div',undefined,'bank-form stock-purchase-head');form.append(invRequiredNote(),head);
- const put=(...args)=>{const node=field(...args);head.append(node.closest('label'));return node;};
- put('supplier_id','Proveedor',{required:true,options:[['','Selecciona…'],...suppliers.map(s=>[String(s.id),s.name+(s.identification?' · '+s.identification:'')])],value:existing?String(existing.supplier.id):''});
- put('document_number','Número del documento del proveedor',{required:true,max:40,value:existing?.document_number||'',hint:'Ej.: 001-001-000000123'});
- const today=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Guayaquil'}).format(new Date());const date=put('issue_date','Fecha del documento',{required:true,type:'date',value:existing?.issue_date||today});date.max=today;
- const lines=el('div',undefined,'stock-lines');lines.setAttribute('role','group');lines.setAttribute('aria-label','Artículos de la compra');const totals=el('dl',undefined,'inv-totals stock-totals');totals.setAttribute('aria-live','polite');
- const recalc=()=>{let base=0,tax=0,bad=false;for(const row of lines.querySelectorAll('.stock-line')){const q=Number(row.querySelector('[data-k=quantity]').value),c=invCents(row.querySelector('[data-k=unit_cost]').value);if(!Number.isInteger(q)||q<=0||Number.isNaN(c)){bad=true;continue;}const b=q*c;base+=b;if(row.querySelector('[data-k=taxed]').checked)tax+=Math.round(b*0.15);}
-  totals.replaceChildren();for(const[k,v,kind]of [['Subtotal',quoteMoney(base)],['IVA 15 %',quoteMoney(tax)],['Total',quoteMoney(base+tax),'total']]){const d=el('div');if(kind)d.dataset.kind=kind;d.append(el('dt',k),el('dd',v));totals.append(d);}if(bad)totals.append(el('p','Hay partidas incompletas: el servidor las revisará al guardar.','system-muted'));};
- const addLine=(line={})=>{const row=el('div',undefined,'stock-line'),pick=el('select'),qty=el('input'),cost=el('input'),taxBox=el('label',undefined,'inv-cf'),taxed=el('input');
-  pick.add(new Option('Artículo…',''));for(const i of items)pick.add(new Option(i.name+(i.sku?' · '+i.sku:''),String(i.id)));pick.value=line.item_id?String(line.item_id):'';pick.dataset.k='item_id';pick.setAttribute('aria-label','Artículo');
-  qty.inputMode='numeric';qty.maxLength=6;qty.value=String(line.quantity||1);qty.dataset.k='quantity';qty.setAttribute('aria-label','Cantidad');
-  cost.inputMode='decimal';cost.maxLength=14;cost.value=line.unit_cost_cents!==undefined?(line.unit_cost_cents/100).toFixed(2).replace('.',','):'';cost.placeholder='Costo unitario';cost.dataset.k='unit_cost';cost.setAttribute('aria-label','Costo unitario sin IVA');
-  taxed.type='checkbox';taxed.checked=line.tax_rate_bp===undefined?true:line.tax_rate_bp>0;taxed.dataset.k='taxed';taxBox.append(taxed,el('span','IVA 15 %'));
-  const drop=button('Quitar',()=>{row.remove();if(!lines.children.length)addLine();recalc();},'secondary');drop.setAttribute('aria-label','Quitar partida');
-  for(const n of [qty,cost,taxed,pick])n.addEventListener('input',recalc);row.append(pick,qty,cost,taxBox,drop);lines.append(row);};
- for(const line of existing?.items||[{}])addLine(line);
- const more=button('',()=>{addLine();recalc();lines.lastElementChild.querySelector('select').focus();},'secondary inv-add');more.append(systemIcon('M12 5v14 M5 12h14'),el('span','Agregar artículo'));
- form.append(el('h3','Artículos (costo unitario sin IVA)','bank-form-title'),lines,more,totals);const notes=field('notes','Observaciones',{area:true,max:500,value:existing?.notes||''});form.append(notes.closest('label'));
- const save=el('button',existing?'Guardar borrador':'Guardar como borrador','primary');save.type='submit';const bar=el('div',undefined,'dialog-actions');bar.append(button('Cancelar',()=>dialog.close(),'secondary'),save);form.append(msg,bar);dialog.append(form);recalc();form.elements.supplier_id.focus();
- form.addEventListener('submit',async event=>{event.preventDefault();clear();save.disabled=true;
-  const payload={action:'save',supplier_id:form.elements.supplier_id.value,document_number:form.elements.document_number.value,issue_date:date.value,notes:notes.value,
-   items:JSON.stringify([...lines.querySelectorAll('.stock-line')].map(row=>({item_id:row.querySelector('[data-k=item_id]').value,quantity:row.querySelector('[data-k=quantity]').value,unit_cost:row.querySelector('[data-k=unit_cost]').value,taxed:row.querySelector('[data-k=taxed]').checked?'1':'0'})))};
-  if(existing)payload.id=String(existing.id);
-  try{const out=await api('/api/inventory/purchases',payload);toast('Compra guardada en borrador. Recíbela cuando llegue la mercadería.','success');dialog.close();purchasesPanel(panel);purchaseDetail(out.id,panel);}catch(error){fail(error);save.disabled=false;}});}
-async function purchaseDetail(id,panel){const dialog=invDialog('Compra',true);const body=el('div',undefined,'inv-body');body.append(el('p','Cargando…','empty-module'));dialog.append(body);
- let p;try{p=await api('/api/inventory/purchases/'+id);}catch(error){body.replaceChildren(el('p',error.message,'empty-module'));return;}
- const chip={borrador:'pendiente',recibida:'autorizado',anulada:'descartado'},facts=el('dl',undefined,'inv-facts');body.replaceChildren();
- for(const[k,v]of [['Proveedor',p.supplier.name+(p.supplier.identification?' · '+p.supplier.identification:'')],['Documento',p.document_number],['Fecha del documento',dashboardDate(p.issue_date)],['Registrada',formatOrderDate(p.created_at)],...(p.received_at?[['Recibida',formatOrderDate(p.received_at)]]:[]),...(p.void_reason?[['Motivo de anulación',p.void_reason]]:[])]){const d=el('div');d.append(el('dt',k),el('dd',v));facts.append(d);}
- const top=el('div',undefined,'inv-actions');top.append(invoiceChip(chip[p.status],p.status_label));body.append(top,facts);
- const wrap=el('div',undefined,'inv-items-wrap'),table=el('table',undefined,'inv-items'),head=el('tr');for(const h of ['Artículo','Código','Cantidad','Costo unit.','IVA','Subtotal'])head.append(el('th',h));const thead=el('thead');thead.append(head);const tbody=el('tbody');
- for(const i of p.items){const tr=el('tr');tr.append(el('td',i.name),el('td',i.sku||'—'),el('td',String(i.quantity)),el('td',quoteMoney(i.unit_cost_cents)),el('td',i.tax_rate_bp?quoteMoney(i.tax_cents):'0 %'),el('td',quoteMoney(i.base_cents)));tbody.append(tr);}
- table.append(thead,tbody);wrap.append(table);const totals=el('dl',undefined,'inv-totals');for(const[k,v,kind]of [['Subtotal',quoteMoney(p.subtotal_cents)],['IVA',quoteMoney(p.tax_cents)],['Total',quoteMoney(p.total_cents),'total']]){const d=el('div');if(kind)d.dataset.kind=kind;d.append(el('dt',k),el('dd',v));totals.append(d);}body.append(wrap,totals);
- if(p.notes)body.append(el('p','Observaciones: '+p.notes,'inv-form-note'));
- const acts=el('div',undefined,'inv-actions');const refresh=()=>{dialog.close();purchasesPanel(panel);purchaseDetail(id,panel);};
- if(p.status==='borrador'){acts.append(button('Editar',()=>{dialog.close();purchaseDialog(panel,p);},'secondary'));
-  acts.append(button('Marcar como recibida',async()=>{if(await confirmClose({title:'¿Recibir la compra '+p.document_number+'?',text:'Se registrarán las entradas de '+p.items.reduce((a,i)=>a+i.quantity,0)+' unidades en el inventario. No se puede recibir dos veces.',keep:'Revisar',discard:'Recibir',plain:true})!=='discard')return;
-   try{await api('/api/inventory/purchases/'+p.id,{action:'receive'});toast('Compra recibida: existencias actualizadas.','success');refresh();}catch(error){notify(error.message);}},'primary'));}
- if(p.status!=='anulada')acts.append(button('Anular',async()=>{const reason=await inventoryReason(p.status==='recibida'?'Se registrará la salida de lo que entró con esta compra (solo si las existencias alcanzan).':'El borrador queda en el historial.');if(!reason)return;
-  try{await api('/api/inventory/purchases/'+p.id,{action:'void',reason});toast('Compra anulada.','success');refresh();}catch(error){notify(error.message);}},'secondary'));
- if(acts.children.length)body.append(acts);
- const hist=el('details',undefined,'inv-history');hist.append(el('summary','Historial de la compra ('+p.events.length+')'));const ol=el('ol');for(const e of p.events)ol.append(el('li',formatOrderDate(e.created_at)+' · '+e.actor+' · '+e.detail));hist.append(ol);body.append(hist);}
 function inventoryReason(text){return new Promise(resolve=>{const dialog=invDialog('Anular compra'),form=el('form',undefined,'cash-reason'),area=el('textarea'),msg=el('p','','inv-form-message');area.rows=3;area.maxLength=300;msg.setAttribute('role','alert');
  const box=el('label',undefined,'inv-field');box.append(el('span','Motivo de la anulación'),area);const ok=el('button','Anular compra','primary');ok.type='submit';const bar=el('div',undefined,'dialog-actions');bar.append(button('Cancelar',()=>dialog.close(),'secondary'),ok);form.append(el('p',text,'inv-form-note'),box,msg,bar);dialog.append(form);area.focus();let done=false;
  form.addEventListener('submit',event=>{event.preventDefault();if(area.value.trim().length<5){msg.textContent='Indica el motivo (al menos 5 caracteres).';return;}done=true;dialog.close();resolve(area.value.trim());});dialog.addEventListener('close',()=>{if(!done)resolve('');});});}
 // Proveedores: no se eliminan, se desactivan. La identificación (RUC o cédula) se valida y no se repite.
-async function suppliersPanel(panel){panel.replaceChildren(el('p','Cargando proveedores…','empty-module'));let data;try{data=await api('/api/inventory/suppliers');}catch(error){panel.replaceChildren(el('p',error.message,'empty-module'));return;}
- const list=el('ul',undefined,'bank-list');for(const s of data.rows){const li=el('li');li.dataset.active=String(s.active);const mark=el('span',undefined,'inv-list-icon');mark.append(invIcon('truck'));
-  const info=el('div');info.append(el('strong',s.name),el('span',[s.identification,s.contact_name,s.phone,s.email].filter(Boolean).join(' · ')||'Sin datos de contacto'));
-  const tags=el('div',undefined,'bank-tags');tags.append(invoiceChip(s.active?'autorizado':'descartado',s.active?'Activo':'Inactivo'));info.append(tags);
-  const acts=el('div',undefined,'bank-acts');acts.append(invBtn('Editar','pencil',()=>supplierDialog(panel,s)),
-   button(s.active?'Desactivar':'Activar',async()=>{try{await api('/api/inventory/suppliers',{action:s.active?'deactivate':'activate',id:String(s.id)});suppliersPanel(panel);}catch(error){notify(error.message);}},'secondary'));
-  li.append(mark,info,acts);list.append(li);}
- panel.replaceChildren(invSectionHead('Proveedores','Los proveedores no se eliminan: se desactivan. Un proveedor inactivo no aparece en las compras nuevas.',invBtn('Nuevo proveedor','plus',()=>supplierDialog(panel),'primary inv-add')),
-  data.rows.length?list:invEmpty('truck','Todavía no hay proveedores registrados','Registra el primero con «Nuevo proveedor» para poder cargar compras.'));}
-function supplierDialog(panel,supplier){const dialog=invDialog(supplier?'Editar proveedor':'Nuevo proveedor'),{form,msg,field,fail,clear}=invForm('bank-form inv-sheet-form');
- form.append(invRequiredNote());field('name','Nombre o razón social',{max:300,required:true,value:supplier?.name||''});field('identification','RUC, cédula o identificación',{max:20,value:supplier?.identification||'',hint:'Opcional. Se valida y no se puede repetir.'});
- field('contact_name','Persona de contacto',{value:supplier?.contact_name||''});field('phone','Teléfono',{max:40,mode:'tel',value:supplier?.phone||''});field('email','Correo',{type:'email',max:200,value:supplier?.email||''});field('address','Dirección',{max:300,value:supplier?.address||''});
- const save=el('button',supplier?'Guardar cambios':'Guardar proveedor','primary');save.type='submit';form.append(msg,invDialogActions(dialog,save));dialog.append(form);form.elements.name.focus();
- form.addEventListener('submit',async event=>{event.preventDefault();clear();save.disabled=true;const payload=Object.fromEntries(new FormData(form));payload.action='save';if(supplier)payload.id=String(supplier.id);
-  try{await api('/api/inventory/suppliers',payload);toast(supplier?'Proveedor actualizado.':'Proveedor registrado.','success');dialog.close();suppliersPanel(panel);}catch(error){fail(error);save.disabled=false;}});}
 // ---- Caja ----
 // ---- Caja por sesiones: apertura, movimientos, arqueo por denominaciones, cierre guiado, historial y configuración ----------------------
 // Todo se calcula en el servidor a partir de lo registrado; aquí solo se muestra. Los botones dependen del estado guardado en la base.
