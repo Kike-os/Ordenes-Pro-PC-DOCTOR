@@ -378,7 +378,7 @@ def _rows(c, session):
                     'state_label': 'Anulado: ' + p['void_reason'] if p['voided_at'] else note})
     for p in c.execute("SELECT p.*,s.code sale_code,COALESCE(k.name,'') client,COALESCE(u.name,'') actor FROM license_sale_payments p JOIN license_sales s ON s.id=p.sale_id "
                        "LEFT JOIN clients k ON k.id=s.client_id LEFT JOIN users u ON u.id=p.created_by WHERE p.cash_session_id=? ORDER BY p.id", (sid,)):
-        method = 'credito' if p['method'] == 'tarjeta' else p['method']
+        method = ((p['card_kind'] if 'card_kind' in p.keys() else '') or 'credito') if p['method'] == 'tarjeta' else p['method']  # crédito o débito, según el pago
         state, note = settle(method, ('licencia', p['id']))
         if p['method'] in ('transferencia', 'deposito') and p['status'] == 'confirmado':
             state, note = 'recibido', 'Confirmado en Licencias'

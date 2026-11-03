@@ -31,3 +31,5 @@
 .license-card,.license-card header{text-align:left}
 .license-card dd,.license-card strong{color:#111827}
 .license-card dt{color:#4b5563}
+/* Aviso del recargo por pago con tarjeta de crédito en los pagos de licencias. */
+.license-surcharge{margin:0;padding:8px 10px;border:1px solid #20C7C766;border-radius:9px;background:#20C7C714;color:#99F6E4;font-size:12.5px;line-height:1.45}

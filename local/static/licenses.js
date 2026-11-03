@@ -578,6 +578,14 @@ function licenseAddMonths(day,months){const[y,m,d]=day.split('-').map(Number),to
 const licenseMonths={mensual:1,anual:12,bianual:24,trianual:36};
 // ---- Ventas de licencias (VLIC-AAAAMMDD-0001): independientes de las órdenes técnicas, con carrito, pagos y entrega ----------------
 const licenseMethods={efectivo:'Efectivo',transferencia:'Transferencia',deposito:'Depósito',tarjeta:'Tarjeta',otro:'Otro'};
+// Pago con tarjeta: crédito o débito. Con crédito, el servidor suma el recargo configurado si lo paga el cliente; aquí solo se avisa el importe.
+function licenseCardKind(box,method,amount){const kind=licenseField(box,'Tipo de tarjeta *','card_kind','credito',{select:[['credito','Crédito'],['debito','Débito']]}),wrap=kind.closest('.license-field');
+ const note=el('p','','license-hint wide license-surcharge');note.hidden=true;box.append(note);let sc=null;
+ const paint=()=>{wrap.hidden=method.value!=='tarjeta';const today=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Guayaquil'}).format(new Date()),base=licenseCents(amount.value)||0;
+  const on=!!(sc&&sc.active&&sc.payer==='cliente'&&sc.methods.includes('credito_corriente')&&(!sc.valid_from||today>=sc.valid_from)&&(!sc.valid_to||today<=sc.valid_to));
+  const extra=on&&method.value==='tarjeta'&&kind.value==='credito'&&base>0?Math.round(base*sc.percent_bp/10000)+sc.fixed_cents:0;note.hidden=!extra;
+  if(extra)note.textContent='Recargo por pago con tarjeta de crédito ('+(sc.percent_bp/100).toString().replace('.',',')+' %): '+licenseMoney(extra)+'. Cobra '+licenseMoney(base+extra)+' con la tarjeta; el total de la venta sube en ese valor y la factura lo incluye.';};
+ method.addEventListener('change',paint);kind.addEventListener('change',paint);amount.addEventListener('input',paint);api('/api/payments/cards').then(d=>{sc=d.surcharge;paint();}).catch(()=>{});paint();return kind;}
 const licenseCents=value=>{const text=String(value??'').trim().replace(',','.');return /^\d{1,7}(\.\d{1,2})?$/.test(text)?Math.round(parseFloat(text)*100):null;};
 const licenseAmount=cents=>(cents/100).toFixed(2);
 function licenseSaleBadge(kind,state,label){const badge=el('span',label,'license-sale-badge');badge.dataset.kind=kind;badge.dataset.state=state;return badge;}
@@ -660,6 +668,7 @@ function licenseSaleDialog(preset={}){
   const payBox=el('label',undefined,'booking-consent wide'),payNow=el('input');payNow.type='checkbox';payNow.name='pay_now';payBox.append(payNow,el('span','Registrar un pago ahora'));s4.append(payBox);
   const payFields=el('div',undefined,'license-form-grid license-pay-fields wide');s4.append(payFields);
   const amount=licenseField(payFields,'Monto recibido (USD) *','amount','',{inputmode:'decimal'}),method=licenseField(payFields,'Método de pago *','method','efectivo',{select:Object.entries(licenseMethods)});
+  licenseCardKind(payFields,method,amount);
   const paidOn=licenseField(payFields,'Fecha del pago','paid_on',licenseToday(),{type:'date'});paidOn.max=licenseToday();const reference=licenseField(payFields,'Referencia o n.º de transacción','reference','',{max:80});
   licenseField(payFields,'Adjuntar comprobante (JPG, PNG o PDF, máx. 1,5 MB)','receipt','',{type:'file',accept:'image/jpeg,image/png,application/pdf',wide:true});
   const okBox=el('label',undefined,'booking-consent wide'),confirmed=el('input');confirmed.type='checkbox';confirmed.name='confirmed';confirmed.checked=true;okBox.append(confirmed,el('span','Pago verificado (confirmado). Desmárcalo si la transferencia aún no se comprueba.'));payFields.append(okBox);
@@ -698,7 +707,7 @@ function licenseSaleDialog(preset={}){
   const now=value('deliver_mode').form.querySelector('[name=deliver_mode]:checked').value==='now';
   const body={client_id:String(client.id),items:cart.map(line=>({product_id:String(line.product.id),quantity:String(line.quantity),price:line.price,discount:line.discount})),notes:value('notes').value,link_order:value('link_order').checked,order_code:value('order_code').value.trim(),
    deliver:now,activated:now&&value('activated').checked,activated_at:now&&value('activated').checked?value('activated_at').value:'',send_mail:now&&value('send_mail').checked,accept_balance:now&&value('accept_balance').checked};
-  if(value('pay_now').checked){const file=value('receipt').files?.[0];body.payment={amount:value('amount').value,method:value('method').value,paid_on:value('paid_on').value,reference:value('reference').value.trim(),confirmed:value('confirmed').checked};
+  if(value('pay_now').checked){const file=value('receipt').files?.[0];body.payment={amount:value('amount').value,method:value('method').value,card_kind:value('method').value==='tarjeta'?value('card_kind').value:'',paid_on:value('paid_on').value,reference:value('reference').value.trim(),confirmed:value('confirmed').checked};
    if(file){body.payment.receipt=await licenseFile(file,1500000,['image/jpeg','image/png','application/pdf']);body.payment.receipt_type=file.type;body.payment.receipt_name=file.name;}}
   const lines=[['Cliente',client.name],['Productos',cart.map(line=>line.quantity+' × '+line.product.name).join(', ')],['Total',licenseMoney(t.total)],['Pago',body.payment?licenseMoney(licenseCents(body.payment.amount)||0)+' · '+licenseMethods[body.payment.method]+(body.payment.confirmed?' (confirmado)':' (por confirmar)'):'Sin pago registrado'],['Saldo',licenseMoney(t.balance)],['Entrega',now?'Ahora'+(body.send_mail?', con correo al cliente':''):'Pendiente'],['Orden técnica',body.link_order?body.order_code:'Sin vincular']];
   if(await confirmClose({title:now?'¿Registrar y entregar la venta?':'¿Registrar la venta?',text:lines.map(([a,b])=>a+': '+b).join(' · ')+'. Quedará registrada con fecha, hora y responsable.',keep:'Revisar',discard:now?'Confirmar entrega':'Registrar venta'})!=='discard')throw Object.assign(new Error(''),{cancelled:true});
@@ -709,11 +718,11 @@ function licenseSaleDialog(preset={}){
  dialog.classList.add('license-dialog-wide','license-sale-dialog');return dialog;}
 function licensePayDialog(sale,done){const balance=Math.max(sale.total_cents-sale.paid_cents-(sale.pending_cents||0),0);
  licenseFormDialog('Registrar pago · '+sale.code,(form,dialog,parts)=>{if(typeof cashGuard==='function')cashGuard(form);form.append(el('p','Saldo pendiente: '+licenseMoney(balance)+'. Solo los pagos confirmados cuentan para marcar la venta como pagada.','license-hint wide'));
-  licenseField(form,'Monto recibido (USD) *','amount',licenseAmount(balance),{inputmode:'decimal',required:true});const method=licenseField(form,'Método de pago *','method','efectivo',{select:Object.entries(licenseMethods)});
+  const amount=licenseField(form,'Monto recibido (USD) *','amount',licenseAmount(balance),{inputmode:'decimal',required:true});const method=licenseField(form,'Método de pago *','method','efectivo',{select:Object.entries(licenseMethods)});licenseCardKind(form,method,amount);
   const day=licenseField(form,'Fecha del pago','paid_on',licenseToday(),{type:'date'});day.max=licenseToday();licenseField(form,'Referencia o n.º de transacción','reference','',{max:80});
   licenseField(form,'Adjuntar comprobante (JPG, PNG o PDF, máx. 1,5 MB)','receipt','',{type:'file',accept:'image/jpeg,image/png,application/pdf',wide:true});licenseField(form,'Nota','notes','',{max:200,wide:true});
   const box=el('label',undefined,'booking-consent wide'),ok=el('input');ok.type='checkbox';ok.name='confirmed';ok.checked=true;box.append(ok,el('span','Pago verificado (confirmado)'));form.append(box);method.addEventListener('change',()=>{ok.checked=!['transferencia','deposito'].includes(method.value);});},
- async(form,dialog)=>{const v=name=>form.elements[name],file=v('receipt').files?.[0],body={action:'pay',amount:v('amount').value,method:v('method').value,paid_on:v('paid_on').value,reference:v('reference').value.trim(),notes:v('notes').value,confirmed:v('confirmed').checked};
+ async(form,dialog)=>{const v=name=>form.elements[name],file=v('receipt').files?.[0],body={action:'pay',amount:v('amount').value,method:v('method').value,card_kind:v('method').value==='tarjeta'?v('card_kind').value:'',paid_on:v('paid_on').value,reference:v('reference').value.trim(),notes:v('notes').value,confirmed:v('confirmed').checked};
   if(file){body.receipt=await licenseFile(file,1500000,['image/jpeg','image/png','application/pdf']);body.receipt_type=file.type;body.receipt_name=file.name;}
   const result=await api('/api/licenses/sales/'+sale.id,body);dialog.dataset.dirty='';dialog.close();toast('Pago registrado'+(body.confirmed?'':' como «Por confirmar»')+'. Estado: '+result.detail.payment_label+'.','success');done&&done();},'Registrar pago');}
 function licenseSaleDeliverDialog(sale,done){const balance=Math.max(sale.total_cents-sale.paid_cents,0);

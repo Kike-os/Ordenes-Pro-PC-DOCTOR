@@ -132,6 +132,9 @@ def _order_source(c, order_id):
     money = equipment.money(c, order_id)
     items = found['items'] if found else []
     approved = sum(item['net_cents'] for item in items)
+    # Recargos por pago con tarjeta de crédito de este equipo (cargos propios, con IVA): suman a lo aprobado y van como partidas.
+    surcharges = [dict(r) for r in c.execute('SELECT id,amount_cents,percent_bp FROM order_card_surcharges WHERE order_id=? AND voided_at IS NULL ORDER BY id', (order_id,))]
+    approved += sum(r['amount_cents'] for r in surcharges)
     if items and money['budget_cents'] != approved:
         blockers.append('El total a cobrar (%s) incluye cargos manuales sin IVA definido: no coincide con lo aprobado (%s).' % (quotes.usd(money['budget_cents']), quotes.usd(approved)))
     # Cobro y facturación son procesos separados: una orden puede facturarse con saldo pendiente (queda como venta a crédito).
@@ -143,6 +146,9 @@ def _order_source(c, order_id):
         rate_bp, discount_bp = rates[item['quote_id']]
         gross = item['quantity'] * item['unit_cents']
         lines.append(_line(n, item.get('reference') or '', item['description'], item['quantity'], gross, item['net_cents'], rate_bp if item['taxed'] else 0, item['id'], item.get('catalog_id')))
+    for r in surcharges:
+        pct = ('%.2f' % (r['percent_bp'] / 100)).rstrip('0').rstrip('.').replace('.', ',')
+        lines.append(_line(len(lines) + 1, 'RECARGO-TARJETA', 'Recargo por pago con tarjeta de crédito (%s %%)' % pct, 1, r['amount_cents'], r['amount_cents'], quotes.tax_rate(c)))
     payments = {}
     for row in c.execute("SELECT p.method,SUM(CASE p.kind WHEN 'devolucion' THEN -p.amount_cents ELSE p.amount_cents END) total FROM order_payments p WHERE p.order_id=? AND p.scope='equipo' AND p.voided_at IS NULL GROUP BY p.method", (order_id,)):
         payments[row['method']] = payments.get(row['method'], 0) + row['total']
@@ -165,6 +171,10 @@ def _sale_source(c, sale_id):
     for n, item in enumerate(c.execute('SELECT s.*,i.code,i.taxed FROM license_sale_items s JOIN catalog_items i ON i.id=s.product_id WHERE s.sale_id=? ORDER BY s.position,s.id', (sale_id,)), 1):
         gross = item['quantity'] * item['unit_price_cents']
         lines.append(_line(n, item['code'] or '', item['product_name'], item['quantity'], gross, gross - item['discount_cents'], quotes.tax_rate(c) if item['taxed'] else 0, item['id'], item['product_id']))
+    # Recargos por pago con tarjeta de crédito (suben el total de la venta): una partida con IVA por cada uno.
+    for r in c.execute('SELECT amount_cents,percent_bp FROM license_sale_surcharges WHERE sale_id=? AND voided_at IS NULL ORDER BY id', (sale_id,)):
+        pct = ('%.2f' % (r['percent_bp'] / 100)).rstrip('0').rstrip('.').replace('.', ',')
+        lines.append(_line(len(lines) + 1, 'RECARGO-TARJETA', 'Recargo por pago con tarjeta de crédito (%s %%)' % pct, 1, r['amount_cents'], r['amount_cents'], quotes.tax_rate(c)))
     # El descuento de la venta es la suma de los de sus partidas, ya restados en cada línea: solo un excedente sería un descuento general sin repartir.
     general = (sale['discount_cents'] or 0) - sum(item['discount_cents'] for item in c.execute('SELECT discount_cents FROM license_sale_items WHERE sale_id=?', (sale_id,)))
     if general > 0 and lines:

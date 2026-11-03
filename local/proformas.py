@@ -28,6 +28,9 @@ EDITABLE = ('borrador', 'modificacion')
 ADVANCE_LABELS = {'efectivo': 'Efectivo', 'transferencia': 'Transferencia', 'deposito': 'Depósito', 'debito': 'Tarjeta de débito', 'credito': 'Tarjeta de crédito', 'cheque': 'Cheque', 'otro': 'Otro'}
 DECIDABLE = ('enviada', 'vista')
 FREE_DISCOUNT_BP = 1000  # hasta 10 % sin autorización; por encima, solo administración con motivo
+# Recargo por pago con tarjeta de crédito: partida propia (servicio con IVA) que el servidor añade y recalcula; nunca la escribe el personal.
+SURCHARGE_CODE = 'RECARGO-TARJETA'
+CREDIT_METHODS = ('credito_corriente', 'diferido_con_intereses', 'diferido_sin_intereses')
 LINK_DAYS = 15
 MAX_FAILED = 6
 METHOD = 'Enlace privado y últimos cuatro dígitos de la identificación del cliente'
@@ -187,6 +190,25 @@ def _items(c, raw, user, rate_bp):
     return out
 
 
+def surcharge_label(cfg):
+    pct = ('%.2f' % (cfg['percent_bp'] / 100)).rstrip('0').rstrip('.').replace('.', ',')
+    return 'Recargo por pago con tarjeta de crédito (%s %%%s)' % (pct, (' + ' + usd(cfg['fixed_cents'])) if cfg['fixed_cents'] else '')
+
+
+def surcharge_item(c, base_cents, method, today, position=0):
+    """Partida del recargo por pago con tarjeta de crédito si la configuración lo traslada al cliente (Tarjetas y DATAFAST → Recargo
+    comercial: activo, a cargo del cliente, vigente y con ese método). Se calcula sobre el importe pagado con la tarjeta (IVA incluido) y
+    lleva IVA, como el resto de la venta: el total queda en importe + recargo. None si no corresponde."""
+    cfg = card_finance.surcharge_settings(c)
+    if base_cents <= 0 or not card_finance._surcharge_applies(cfg, method, today):
+        return None
+    amount = card_finance.percent_of(base_cents, cfg['percent_bp']) + cfg['fixed_cents']
+    if amount <= 0:
+        return None
+    return {'position': position, 'kind': 'servicio', 'catalog_id': None, 'inventory_item_id': None, 'code': SURCHARGE_CODE, 'description': surcharge_label(cfg), 'quantity': 1,
+            'unit_cents': amount, 'discount_cents': 0, 'taxed': 1, 'status': 'pendiente', 'authorization': ''}
+
+
 def _financing(c, method, data, total, today):
     """Detalle informativo del financiamiento con tarjeta (con los factores de la base). Vacío si la forma de pago no es tarjeta."""
     if method not in ('credito_corriente', 'diferido_con_intereses', 'diferido_sin_intereses') or total <= 0:
@@ -231,6 +253,9 @@ def save(c, data, user, now, pid=None):
     method = str(data.get('payment_method', 'efectivo'))
     if method not in PAYMENT:
         raise ProformaError('Elige la forma de pago.', 400, {'payment_method': 'Forma de pago no válida.'})
+    # El recargo por tarjeta no es una partida que el cliente apruebe: se añade al facturar, sobre lo que se pague con la tarjeta. Aquí solo se
+    # muestra como información en el financiamiento; una partida de recargo recibida al editar se descarta.
+    items = [i for i in items if i['code'] != SURCHARGE_CODE]
     t = totals(items, rate)
     financing = _financing(c, method, data, t['total_cents'], today.isoformat())
     account = None
@@ -505,6 +530,20 @@ def convert(c, pid, user, now, units=None, accept_overlap=False):
                               {'accept_overlap': 'Confirmación obligatoria.'})
         error.extra = {'overlaps': repeated}
         raise error
+    # Forma de pago con tarjeta de crédito: al facturar se añade el recargo configurado sobre lo aprobado que se pagará con la tarjeta (lo
+    # aprobado menos los anticipos pagados por otros medios). La venta directa ya lo añade al confirmar, por cada línea con tarjeta.
+    if row['payment_method'] in CREDIT_METHODS and not c.execute('SELECT 1 FROM proforma_items WHERE proforma_id=? AND code=?', (row['id'], SURCHARGE_CODE)).fetchone():
+        approved = totals(items_of(c, row['id']), row['tax_rate_bp'], only_approved=True)['total_cents']
+        other = c.execute("SELECT COALESCE(SUM(amount_cents),0) FROM advances WHERE proforma_id=? AND voided_at='' AND method!='credito'", (row['id'],)).fetchone()[0]
+        position = c.execute('SELECT COALESCE(MAX(position),0)+1 FROM proforma_items WHERE proforma_id=?', (row['id'],)).fetchone()[0]
+        extra = surcharge_item(c, approved - other, row['payment_method'], now.date().isoformat(), position)
+        if extra:
+            c.execute('INSERT INTO proforma_items(proforma_id,position,kind,catalog_id,inventory_item_id,code,description,quantity,unit_cents,discount_cents,taxed,status,authorization) '
+                      "VALUES (?,?,'servicio',NULL,NULL,?,?,1,?,0,1,'aprobado','')", (row['id'], position, SURCHARGE_CODE, extra['description'], extra['unit_cents']))
+            t = totals(items_of(c, row['id']), row['tax_rate_bp'])
+            c.execute('UPDATE proformas SET subtotal_cents=?,discount_cents=?,tax_cents=?,total_cents=?,updated_at=? WHERE id=?',
+                      (t['subtotal_cents'], t['discount_cents'], t['tax_cents'], t['total_cents'], stamp(now), row['id']))
+            event(c, row['id'], 'recargo_tarjeta', 'Recargo por pago con tarjeta de crédito al facturar: %s sobre %s.' % (usd(extra['unit_cents']), usd(approved - other)), now, user)
     try:
         invoice_id = invoicing.draft(c, 'proforma', row['id'], user, now)
     except invoicing.InvoiceError as error:
@@ -997,6 +1036,29 @@ def checkout(c, pid, data, user, now):
     if not isinstance(lines, list) or len(lines) > 5:
         raise ProformaError('Hasta cinco formas de pago.', 400, {'payments': 'Hasta cinco formas de pago.'})
     stamp_ = stamp(now)
+    # Pago con tarjeta de crédito: el recargo configurado se calcula sobre lo que se paga con la tarjeta, se añade como partida de la venta
+    # (una sola, aunque haya varias líneas con tarjeta) y se suma a esas mismas líneas de cobro, así lo facturado y lo cobrado coinciden.
+    credit = [line for line in lines if isinstance(line, dict) and line.get('method') == 'credito']
+    if credit and not c.execute('SELECT 1 FROM proforma_items WHERE proforma_id=? AND code=?', (row['id'], SURCHARGE_CODE)).fetchone():
+        import cash_sessions
+        cfg, added = card_finance.surcharge_settings(c), 0
+        if card_finance._surcharge_applies(cfg, 'credito_corriente', now.date().isoformat()):
+            for n, line in enumerate(credit):
+                try:
+                    amount = cash_sessions.cents_of(line.get('amount', ''))
+                except cash_sessions.CashError as error:
+                    raise ProformaError(str(error), 400, error.fields)
+                extra = card_finance.percent_of(amount, cfg['percent_bp']) + (cfg['fixed_cents'] if n == 0 else 0)
+                line['amount'] = '%d.%02d' % divmod(amount + extra, 100)
+                added += extra
+        if added:
+            position = c.execute('SELECT COALESCE(MAX(position),0)+1 FROM proforma_items WHERE proforma_id=?', (row['id'],)).fetchone()[0]
+            c.execute('INSERT INTO proforma_items(proforma_id,position,kind,catalog_id,inventory_item_id,code,description,quantity,unit_cents,discount_cents,taxed,status,authorization) '
+                      "VALUES (?,?,'servicio',NULL,NULL,?,?,1,?,0,1,'aprobado','')", (row['id'], position, SURCHARGE_CODE, surcharge_label(cfg), added))
+            t = totals(items_of(c, row['id']), row['tax_rate_bp'])
+            c.execute('UPDATE proformas SET subtotal_cents=?,discount_cents=?,tax_cents=?,total_cents=?,updated_at=? WHERE id=?',
+                      (t['subtotal_cents'], t['discount_cents'], t['tax_cents'], t['total_cents'], stamp_, row['id']))
+            event(c, row['id'], 'recargo_tarjeta', 'Recargo por pago con tarjeta de crédito: %s sobre %s pagado con tarjeta.' % (usd(added), usd(sum(cash_sessions.cents_of(l['amount']) for l in credit) - added)), now, user)
     c.execute("UPDATE proforma_items SET status='aprobado' WHERE proforma_id=?", (row['id'],))
     if row['status'] != 'aprobada':
         c.execute("UPDATE proformas SET status='aprobada',decided_at=?,updated_at=? WHERE id=?", (stamp_, stamp_, row['id']))

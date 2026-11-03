@@ -289,8 +289,9 @@ class Fase2Tests(unittest.TestCase):
         again = post('/api/proformas/%d' % p['id'], action='convert')
         self.assertEqual(again['body']['invoice_id'], inv['body']['invoice_id'])  # sin facturas duplicadas
         invoice = inv['body']['invoice']
-        self.assertEqual((invoice['total_cents'], invoice['source_kind'], invoice['proforma_code'], invoice['financing']['months']), (18000, 'proforma', p['proforma']['code'], 3))
-        self.assertEqual([(x['method'], x['amount_cents']) for x in inv['body']['payments']], [('transferencia', 8000), ('credito', 10000)])
+        # Recargo por tarjeta de crédito (lo paga el cliente desde la 1.5.234): 9 % de lo que se paga con la tarjeta, $180 − $80 de anticipo = $9,00.
+        self.assertEqual((invoice['total_cents'], invoice['source_kind'], invoice['proforma_code'], invoice['financing']['months']), (18900, 'proforma', p['proforma']['code'], 3))
+        self.assertEqual([(x['method'], x['amount_cents']) for x in inv['body']['payments']], [('transferencia', 8000), ('credito', 10900)])
         emitted = post('/api/invoicing/%d' % invoice['id'], action='emit', confirm='1')
         self.assertEqual(emitted['status'], 200, emitted['body'])
         # Nota de crédito parcial y total; nunca más de lo facturado.
@@ -300,10 +301,10 @@ class Fase2Tests(unittest.TestCase):
         self.assertEqual(part['body']['note']['total_cents'], 4000)
         self.assertEqual(post('/api/credit-notes', invoice_id=str(invoice['id']), scope='parcial', reason='Exceso', lines=json.dumps([{'item_id': items_inv[1]['id'], 'quantity': 2}]))['status'], 400)
         total = post('/api/credit-notes', invoice_id=str(invoice['id']), scope='total', reason='Anulación del resto (ficticia)')
-        self.assertEqual((total['status'], total['body']['note']['total_cents']), (200, 14000))
+        self.assertEqual((total['status'], total['body']['note']['total_cents']), (200, 14900))
         self.assertEqual(post('/api/credit-notes', invoice_id=str(invoice['id']), scope='total', reason='Otra vez')['status'], 409)
         xml = self.request('/api/credit-notes/%d/comprobante.xml' % total['body']['id'], cookie=cookie)['body'].decode()
-        self.assertIn('<codDoc>04</codDoc>', xml);self.assertIn('<valorModificacion>140.00</valorModificacion>', xml);self.assertIn('<ambiente>1</ambiente>', xml)
+        self.assertIn('<codDoc>04</codDoc>', xml);self.assertIn('<valorModificacion>149.00</valorModificacion>', xml);self.assertIn('<ambiente>1</ambiente>', xml)
         self.assertEqual(self.request('/api/proformas/%d.pdf' % p['id'], cookie=cookie)['body'][:4], b'%PDF')
 
     def test_direct_invoice_versions_and_cancel(self):

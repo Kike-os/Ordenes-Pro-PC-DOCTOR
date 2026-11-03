@@ -109,6 +109,9 @@ def collect(c, kind, sale_id):
         # Nunca se imprimen claves ni cuentas de licencias: solo el producto vendido.
         lines = [_line(i['product_name'], i['quantity'], i['unit_price_cents'], i['discount_cents'], rate if i['taxed'] else 0)
                  for i in c.execute('SELECT x.*,k.taxed FROM license_sale_items x JOIN catalog_items k ON k.id=x.product_id WHERE x.sale_id=? ORDER BY x.position,x.id', (sale_id,))]
+        # Recargos por pago con tarjeta de crédito: suben el total de la venta y van como partidas propias, con IVA.
+        lines += [_line('Recargo por pago con tarjeta de crédito (%s %%)' % ('%.2f' % (r['percent_bp'] / 100)).rstrip('0').rstrip('.').replace('.', ','), 1, r['amount_cents'], 0, rate)
+                  for r in c.execute('SELECT amount_cents,percent_bp FROM license_sale_surcharges WHERE sale_id=? AND voided_at IS NULL ORDER BY id', (sale_id,))]
         # El descuento de la venta es la suma de los de sus partidas (ya restados en cada una): solo un excedente sería un descuento general.
         general_discount = max(0, (s['discount_cents'] or 0) - sum(x['discount_cents'] for x in lines))
         client = {'name': s['client'], 'id': s['identification'], 'phone': s['phone'], 'email': s['email'], 'address': ''}

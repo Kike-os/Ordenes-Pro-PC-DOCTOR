@@ -8,7 +8,9 @@ from decimal import Decimal, InvalidOperation
 
 METHODS={'efectivo':'Efectivo','transferencia':'Transferencia','tarjeta':'Tarjeta','deposito':'Depósito','otro':'Otro'}
 MAX_UNITS=50
-BUDGET="COALESCE((SELECT labor_cents+parts_cents+services_cents+digital_cents FROM order_budget b WHERE b.order_id=o.id),0)"
+# Cargos de un equipo: su presupuesto más los recargos por pago con tarjeta de crédito vigentes (migración 089; se anulan con su pago).
+SURCHARGES="COALESCE((SELECT SUM(s.amount_cents) FROM order_card_surcharges s WHERE s.order_id=o.id AND s.voided_at IS NULL),0)"
+BUDGET="(COALESCE((SELECT labor_cents+parts_cents+services_cents+digital_cents FROM order_budget b WHERE b.order_id=o.id),0)+"+SURCHARGES+")"
 # Pagos netos de un equipo: sus pagos confirmados menos sus devoluciones, más lo que se le asignó de pagos generales de la orden.
 # Los movimientos anulados no cuentan. Importes siempre en centavos enteros.
 NET="CASE p.kind WHEN 'devolucion' THEN -p.amount_cents ELSE p.amount_cents END"
@@ -55,8 +57,17 @@ def summary(charges,paid):
 
 def money(c,order_id):
     """Resumen financiero de un equipo. Es la única fuente del saldo: lo usan el detalle, la entrega, los pagos y la tarjeta."""
-    row=c.execute('SELECT '+BUDGET+' budget,'+PAID+' paid FROM orders o WHERE o.id=?',(order_id,)).fetchone()
-    return summary(*((row['budget'],row['paid']) if row else (0,0)))
+    row=c.execute('SELECT '+BUDGET+' budget,'+PAID+' paid,'+SURCHARGES+' surcharge FROM orders o WHERE o.id=?',(order_id,)).fetchone()
+    return {**summary(*((row['budget'],row['paid']) if row else (0,0))),'surcharge_cents':row['surcharge'] if row else 0}
+
+
+def _base(c,payment_ids):
+    """Importe de unos pagos sin su recargo por tarjeta (para reconocer un reintento con el mismo importe que se pidió)."""
+    ids=[int(i) for i in payment_ids]
+    if not ids:return 0
+    marks=','.join('?'*len(ids))
+    return (c.execute('SELECT COALESCE(SUM(amount_cents),0) FROM order_payments WHERE id IN ('+marks+')',ids).fetchone()[0]
+            -c.execute('SELECT COALESCE(SUM(amount_cents),0) FROM order_card_surcharges WHERE payment_id IN ('+marks+')',ids).fetchone()[0])
 
 
 def general(c,main_id):
@@ -183,7 +194,7 @@ def add_payment(c,order_id,data,user,now):
         # bancaria ya figura registrada y no debe confundirse con un duplicado de otra persona).
         same=c.execute('SELECT id,order_id,amount_cents,kind,scope,operation_id FROM order_payments WHERE request_key=?',(key+('-1' if mixed else ''),)).fetchone()
         if same:
-            total=c.execute('SELECT SUM(amount_cents) FROM order_payments WHERE operation_id=?',(same['operation_id'],)).fetchone()[0] if mixed else same['amount_cents']
+            total=_base(c,[r[0] for r in c.execute('SELECT id FROM order_payments WHERE operation_id=?',(same['operation_id'],))]) if mixed else _base(c,[same['id']])
             if (same['order_id'],total,same['kind'],same['scope'])!=(target,cents_of(data.get('amount','')),kind,scope):return 409,{'error':'Esta solicitud ya se utilizó para otro movimiento. Recarga la página e inténtalo nuevamente.'}
             return 200,{'ok':True,'id':same['id'],'duplicate':True,**money(c,order_id)}
     lines,errors=_lines(c,data,kind=='devolucion')
@@ -203,9 +214,9 @@ def add_payment(c,order_id,data,user,now):
         same=c.execute('SELECT id,order_id,amount_cents,kind,scope,operation_id FROM order_payments WHERE request_key=?',(key+('-1' if mixed else ''),)).fetchone()
         if same:
             if mixed:
-                total=c.execute('SELECT SUM(amount_cents) FROM order_payments WHERE operation_id=?',(same['operation_id'],)).fetchone()[0]
+                total=_base(c,[r[0] for r in c.execute('SELECT id FROM order_payments WHERE operation_id=?',(same['operation_id'],))])
                 if (same['order_id'],total,same['kind'],same['scope'])!=(target,cents,kind,scope):return 409,{'error':'Esta solicitud ya se utilizó para otro movimiento. Recarga la página e inténtalo nuevamente.'}
-            elif (same['order_id'],same['amount_cents'],same['kind'],same['scope'])!=(target,cents,kind,scope):return 409,{'error':'Esta solicitud ya se utilizó para otro movimiento. Recarga la página e inténtalo nuevamente.'}
+            elif (same['order_id'],_base(c,[same['id']]),same['kind'],same['scope'])!=(target,cents,kind,scope):return 409,{'error':'Esta solicitud ya se utilizó para otro movimiento. Recarga la página e inténtalo nuevamente.'}
             return 200,{'ok':True,'id':same['id'],'duplicate':True,**money(c,order_id)}
     if not errors:
         state=money(c,order_id);whole=group(c,order_id)['totals'] if scope=='general' else None
@@ -231,17 +242,29 @@ def add_payment(c,order_id,data,user,now):
         try:proof=cash_sessions.store_file(c,user,upload,str(data.get('proof_name','') or 'comprobante'),'transferencia',now)
         except cash_sessions.CashError as error:return error.status,{'error':str(error),'fields':{'proof':str(error)}}
     ids=[]
+    # Recargo por pago con tarjeta de crédito (si la configuración lo traslada al cliente): se calcula sobre lo pagado con la tarjeta, se suma
+    # a ese pago y queda como cargo del equipo (order_card_surcharges); así el saldo no cambia y la factura lo incluye como partida.
+    import card_finance
+    cfg=card_finance.surcharge_settings(c);applies=kind=='pago' and card_finance._surcharge_applies(cfg,'credito_corriente',now.date().isoformat());fixed=cfg['fixed_cents'];extras=0
     for n,line in enumerate(lines,1):
         method,detail=stored_method(line['code'])
+        extra=card_finance.percent_of(line['cents'],cfg['percent_bp'])+fixed if applies and line['code']=='credito' else 0
+        if extra:fixed=0
         pid=c.execute('INSERT INTO order_payments(order_id,amount_cents,method,note,created_by,created_at,kind,scope,request_key,method_detail,bank_account_id,reference,paid_at,operation_id,cash_session_id) '
-                      'VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',(target,line['cents'],method,note,user['id'],now.isoformat(timespec='seconds'),kind,scope,(key+('-%d'%n if mixed else '')) if key else None,
+                      'VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',(target,line['cents']+extra,method,note,user['id'],now.isoformat(timespec='seconds'),kind,scope,(key+('-%d'%n if mixed else '')) if key else None,
                                                              detail,line['account']['id'] if line['account'] else None,line['reference'],paid_at,operation,session)).lastrowid
         ids.append(pid)
+        if extra:
+            c.execute('INSERT INTO order_card_surcharges(order_id,payment_id,base_cents,amount_cents,percent_bp,fixed_cents,created_by,created_at) VALUES (?,?,?,?,?,?,?,?)',
+                      (target,pid,line['cents'],extra,cfg['percent_bp'],extra-card_finance.percent_of(line['cents'],cfg['percent_bp']),user['id'],now.isoformat(timespec='seconds')))
+            extras+=extra
         if line['code'] in ('transferencia','deposito') and kind=='pago':
             client=c.execute('SELECT d.client_id FROM orders o JOIN devices d ON d.id=o.device_id WHERE o.id=?',(order_id,)).fetchone()
             banking.register_transfer(c,{'method':line['code'],'bank_account_id':line['account']['id'],'reference':line['reference'],'amount_cents':line['cents'],'paid_at':paid_at,
                                          'source_kind':'orden','source_id':order_id,'client_id':client['client_id'] if client else ''},user,now,payment_id=pid,file_id=proof)
-    return 201,{'ok':True,'id':ids[0],'ids':ids,'operation_id':operation,'amount_cents':cents,'kind':kind,'scope':scope,'cash_session_id':session,**money(c,order_id)}
+    # El resumen de la orden va primero: su recargo total (surcharge_cents) no debe pisar el recargo de este pago.
+    return 201,{**money(c,order_id),'ok':True,'id':ids[0],'ids':ids,'operation_id':operation,'amount_cents':cents+extras,'surcharge_cents':extras,'order_surcharge_cents':money(c,order_id)['surcharge_cents'],
+                'kind':kind,'scope':scope,'cash_session_id':session}
 
 
 def assign_payment(c,order_id,data,user,now):
@@ -273,6 +296,7 @@ def void_payment(c,order_id,data,user,now):
         if left<0:return 409,{'error':'Este pago tiene devoluciones registradas: anula primero la devolución.'}
         if row['scope']=='general' and any(money(c,oid)['paid_cents']<c.execute('SELECT SUM(amount_cents) FROM order_payment_allocations WHERE payment_id=? AND order_id=?',(row['id'],oid)).fetchone()[0] for oid in touched):return 409,{'error':'Un equipo que recibió parte de este pago tiene devoluciones registradas: anula primero la devolución.'}
     c.execute('UPDATE order_payments SET voided_at=?,voided_by=?,void_reason=? WHERE id=?',(now.isoformat(timespec='seconds'),user['id'],reason,row['id']))
+    c.execute('UPDATE order_card_surcharges SET voided_at=? WHERE payment_id=? AND voided_at IS NULL',(now.isoformat(timespec='seconds'),row['id']))  # su recargo deja de cobrarse
     return 200,{'ok':True,'kind':row['kind'],'scope':row['scope'],**money(c,order_id)}
 
 

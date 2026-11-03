@@ -142,6 +142,8 @@ def add_payment(c,sale_id,data,user,now):
     paid_on=licenses._date(data.get('paid_on') or now.date().isoformat(),'paid_on',now.date(),future=False)
     reference=licenses._text(data,'reference',80,'La referencia');notes=licenses._text(data,'notes',200,'La nota del pago')
     if method in ('transferencia','deposito') and not reference and not data.get('receipt'):raise LicenseError('Indica la referencia o adjunta el comprobante de la transferencia.',fields={'reference':'Referencia o comprobante obligatorio.'})
+    card_kind=str(data.get('card_kind') or '') if method=='tarjeta' else ''
+    if card_kind not in ('','credito','debito'):raise LicenseError('Indica si la tarjeta es de crédito o de débito.',fields={'card_kind':'Tipo de tarjeta no válido.'})
     pending=_paid(c,sale_id)+_paid(c,sale_id,'por_confirmar');balance=sale['total_cents']-pending
     if amount>balance:raise LicenseError('El pago supera el saldo pendiente (%s).'%usd(max(balance,0)),fields={'amount':'Mayor que el saldo.'})
     receipt=_receipt(data);confirmed=data.get('confirmed') is True;moment=stamp(now)
@@ -150,8 +152,17 @@ def add_payment(c,sale_id,data,user,now):
         session=cash_sessions.session_for_payment(c,user)  # el cobro queda en la caja abierta; cerrada y obligatoria, no se registra
     except cash_sessions.CashError as error:
         raise LicenseError(str(error),fields=error.fields,status=error.status)
-    payment=c.execute('INSERT INTO license_sale_payments(sale_id,amount_cents,method,reference,paid_on,status,notes,created_by,created_at,confirmed_by,confirmed_at,cash_session_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',
-                      (sale_id,amount,method,reference,paid_on,'confirmado' if confirmed else 'por_confirmar',notes,user['id'],moment,user['id'] if confirmed else None,moment if confirmed else '',session)).lastrowid
+    # Recargo por pago con tarjeta de crédito (si la configuración lo traslada al cliente): se calcula sobre lo pagado con la tarjeta, sube
+    # el total de la venta en la misma cantidad y se suma a este pago; el saldo baja como un pago normal y la factura lo lleva como partida.
+    import card_finance
+    cfg=card_finance.surcharge_settings(c)
+    extra=card_finance.percent_of(amount,cfg['percent_bp'])+cfg['fixed_cents'] if card_kind=='credito' and card_finance._surcharge_applies(cfg,'credito_corriente',now.date().isoformat()) else 0
+    payment=c.execute('INSERT INTO license_sale_payments(sale_id,amount_cents,method,reference,paid_on,status,notes,created_by,created_at,confirmed_by,confirmed_at,cash_session_id,card_kind) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',
+                      (sale_id,amount+extra,method,reference,paid_on,'confirmado' if confirmed else 'por_confirmar',notes,user['id'],moment,user['id'] if confirmed else None,moment if confirmed else '',session,card_kind)).lastrowid
+    if extra:
+        c.execute('INSERT INTO license_sale_surcharges(sale_id,payment_id,base_cents,amount_cents,percent_bp,created_by,created_at) VALUES (?,?,?,?,?,?,?)',(sale_id,payment,amount,extra,cfg['percent_bp'],user['id'],moment))
+        c.execute('UPDATE license_sales SET subtotal_cents=subtotal_cents+?,total_cents=total_cents+?,updated_at=? WHERE id=?',(extra,extra,moment,sale_id))  # total = subtotal − descuento
+        _log(c,sale_id,'recargo_tarjeta','Recargo por pago con tarjeta de crédito: %s sobre %s.'%(usd(extra),usd(amount)),user,now)
     if receipt:c.execute('INSERT INTO license_payment_receipts(payment_id,name,mime,data,created_at,created_by) VALUES (?,?,?,?,?,?)',(payment,*receipt,moment,user['id']))
     _log(c,sale_id,'pago','Pago de %s por %s%s (%s)%s.'%(usd(amount),METHODS[method].lower(),', ref. '+reference if reference else '','confirmado' if confirmed else 'por confirmar',', con comprobante' if receipt else ''),user,now)
     refresh(c,sale_id,now);return payment
@@ -175,6 +186,11 @@ def void_payment(c,sale_id,payment_id,reason,user,now):
     if payment['status']=='anulado':raise LicenseError('El pago ya está anulado.',409)
     if len(reason)<5:raise LicenseError('Indica el motivo de la anulación.',fields={'reason':'Motivo obligatorio.'})
     c.execute("UPDATE license_sale_payments SET status='anulado',voided_by=?,voided_at=?,void_reason=? WHERE id=?",(user['id'],stamp(now),reason[:200],payment_id))
+    # Su recargo por tarjeta (si lo tuvo) deja de cobrarse: el total de la venta vuelve a ser el de antes de ese pago.
+    extra=c.execute('SELECT id,amount_cents FROM license_sale_surcharges WHERE payment_id=? AND voided_at IS NULL',(payment_id,)).fetchone()
+    if extra:
+        c.execute('UPDATE license_sale_surcharges SET voided_at=? WHERE id=?',(stamp(now),extra['id']))
+        c.execute('UPDATE license_sales SET subtotal_cents=subtotal_cents-?,total_cents=total_cents-?,updated_at=? WHERE id=?',(extra['amount_cents'],extra['amount_cents'],stamp(now),sale_id))
     _log(c,sale_id,'pago_anulado','Pago de %s anulado. Motivo: %s'%(usd(payment['amount_cents']),reason[:200]),user,now);return refresh(c,sale_id,now)
 
 
