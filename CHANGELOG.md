@@ -4,6 +4,25 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.225 — 2026-11-02 21:40 (UTC-05:00)
+
+Seguimiento en cascada automática con orden por prioridad y Registrar pago con bancos, cuentas y comprobante
+
+### Nuevas funcionalidades
+
+- Seguimiento de Órdenes en cascada automática: avanza una orden cada ~5 s con transición suave y sin saltos; se detiene con el cursor, el foco, texto seleccionado, ventanas abiertas, la pestaña oculta o «reducir movimiento», y muestra si está en movimiento o en pausa.
+- Seguimiento ordenado por prioridad por omisión: urgentes y prioridad alta, luego lo que espera aprobación o respuesta, en proceso, listo para entregar, recibido y entregado.
+
+### Mejoras realizadas
+
+- Registrar pago rediseñado: formas de pago con icono, banco con su logotipo, cuentas de ese banco con tipo, número y titular, comprobante bancario opcional (JPG, PNG o PDF hasta 5 MB) y ventana de una columna en el teléfono.
+- Si no hay cuentas bancarias activas, Registrar pago lo explica y no permite una transferencia o depósito sin cuenta receptora; administración ve el acceso a Cuentas bancarias. Registradas las cinco cuentas de la empresa (sin verificar).
+- La fila de filtros del Seguimiento tiene altura reservada: filtrar no mueve los paneles de abajo.
+
+### Errores corregidos
+
+- Un pago por transferencia reenviado (doble clic o reintento) ya no responde «Esa referencia ya está registrada»: se reconoce como el mismo pago («Este pago ya estaba registrado»).
+
 ## v1.5.224 — 2026-11-02 20:26 (UTC-05:00)
 
 Autorizaciones según el tipo de equipo, comprobante corregido de PCD-20261102-0012 y Seguimiento de Órdenes compacto con Activas, Entregadas y Todas
