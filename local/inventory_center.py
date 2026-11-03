@@ -1484,58 +1484,90 @@ def report_csv(columns, rows):
     return '\ufeff' + out.getvalue()
 
 
-def report_pdf(title, filters, columns, rows, widths, totals, now):
-    """PDF A4 horizontal: logo original, título, fecha de generación, filtros, tabla paginada con encabezado repetido, totales y «Página n de N»."""
+# Columnas de dinero (alineadas a la derecha). «Saldo» no: en el Kardex son unidades.
+MONEY_WORDS = ('Costo', 'Valor', 'Precio', 'Importe', 'Monto')
+
+
+def report_pdf(title, filters, columns, rows, widths, totals, now, area='Centro de Inventario'):
+    """PDF A4 horizontal: logo original, título, fecha de generación, filtros, tabla paginada con encabezado repetido en una franja,
+    filas alternas con su separador debajo de TODA la fila (nunca sobre una segunda línea), importes alineados a la derecha, totales y
+    «Página n de N». Una celda de más de tres líneas termina en «…» en lugar de cortarse sin aviso."""
     from document_canvas import Canvas, BLUE, GRAY
     w, h = 842, 595
+    left, right = 28, 842 - 28
+    size, lead, pad = 7.2, 9.4, 4  # letra de las celdas, interlineado y relleno vertical de cada fila
     keep = [i for i, width in enumerate(widths) if width]
     cols, ws = [columns[i] for i in keep], [widths[i] for i in keep]
-    scale = (w - 48) / sum(ws)
+    scale = (right - left) / sum(ws)
     ws = [x * scale for x in ws]
     measure = Canvas(w, h, 'medida')
-    money_cols = {i for i, name in enumerate(cols) if any(k in name for k in ('Costo', 'Valor', 'Precio'))}
+    money_cols = {i for i, name in enumerate(cols) if any(k in name for k in MONEY_WORDS)}
+
+    def fit(text, width):
+        pieces = measure.wrap(text, width, size)
+        if len(pieces) <= 3:
+            return pieces
+        last = pieces[2]
+        while last and measure.width_of(last + '…', size) > width:
+            last = last[:-1]
+        return pieces[:2] + [last.rstrip() + '…']
+    heads = [measure.wrap(name, width - 8, 7)[:2] for name, width in zip(cols, ws)]
+    head_h = 2 * pad + 9 * max(len(x) for x in heads) + 2
     lines = []
     for row in rows:
         cells = []
         for n, i in enumerate(keep):
             value = row[i]
-            text = usd(int(round(value * 100))) if n in money_cols and isinstance(value, (int, float)) and value != '' else str(value)
-            cells.append(measure.wrap(text, ws[n] - 4, 7)[:3])
-        lines.append((cells, 10 * max(len(x) for x in cells) + 4))
-    pages, y, plan = 1, 96, []
+            text = usd(int(round(value * 100))) if n in money_cols and isinstance(value, (int, float)) and value != '' else str(value if value is not None else '')
+            cells.append(fit(text, ws[n] - 8))
+        lines.append((cells, 2 * pad + lead * max(len(x) for x in cells)))
+    top, bottom = 88, h - 58
+    pages, y, plan = 1, top + head_h, []
     for cells, height in lines:
-        if y + height > h - 56:
-            pages, y = pages + 1, 96
-        plan.append((pages, y, cells))
+        if y + height > bottom:
+            pages, y = pages + 1, top + head_h
+        plan.append((pages, y, cells, height))
         y += height
+    total_lines = measure.wrap(totals, right - left, 8.5)[:3]
+    if y + 10 + 12 * len(total_lines) > h - 44:  # los totales no caben sobre el pie: van en una hoja aparte
+        pages += 1
     pdf = Canvas(w, h, title)
     for number in range(1, pages + 1):
         pdf.page()
-        pdf.logo(24, 16, 70)
-        pdf.text(title, 104, 18, 14, True, BLUE)
-        pdf.text('Generado el %s · %s' % (now.strftime('%d/%m/%Y %H:%M'), filters)[:180], 104, 38, 8, False, GRAY)
-        x = 24
-        for name, width in zip(cols, ws):
-            pdf.text(measure.wrap(name, width - 4, 7)[0], x, 70, 7, True, BLUE)
+        pdf.logo(left, 18, 66)
+        pdf.text(title, left + 80, 22, 15, True, BLUE)
+        for k, piece in enumerate(measure.wrap('Generado el %s · %s' % (now.strftime('%d/%m/%Y %H:%M'), filters), right - left - 80, 8)[:2]):
+            pdf.text(piece, left + 80, 44 + k * 10, 8, False, GRAY)
+        pdf.box(left, top, right - left, head_h, (.91, .94, .98))
+        x = left
+        for n, (name_lines, width) in enumerate(zip(heads, ws)):
+            for k, piece in enumerate(name_lines):
+                tx = x + width - 12 - measure.width_of(piece, 7, True) if n in money_cols else x + 4
+                pdf.text(piece, tx, top + pad + 1 + k * 9, 7, True, BLUE)
             x += width
-        pdf.line(24, 84, w - 48)
-        for page, y0, cells in plan:
+        pdf.line(left, top + head_h, right - left)
+        stripe = 0
+        for page, y0, cells, height in plan:
             if page != number:
                 continue
-            x = 24
-            for lines_, width in zip(cells, ws):
-                for k, piece in enumerate(lines_):
-                    pdf.text(piece, x, y0 + k * 10, 7)
+            if stripe % 2:
+                pdf.box(left, y0, right - left, height, (.97, .98, .99))
+            stripe += 1
+            x = left
+            for n, (pieces, width) in enumerate(zip(cells, ws)):
+                for k, piece in enumerate(pieces):
+                    tx = x + width - 12 - measure.width_of(piece, size) if n in money_cols else x + 4
+                    pdf.text(piece, tx, y0 + pad + k * lead, size)
                 x += width
+            pdf.line(left, y0 + height, right - left)
         if number == pages:
-            last = max([y0 + 10 for page, y0, _ in plan if page == number] or [96])
-            pdf.line(24, last + 6, w - 48)
-            for k, piece in enumerate(measure.wrap(totals, w - 48, 8)[:3]):
-                pdf.text(piece, 24, last + 12 + k * 11, 8, True)
-        pdf.line(24, h - 34, w - 48)
-        pdf.text('PC-DOCTOR S.A. · Centro de Inventario · ' + title, 24, h - 28, 7, False, GRAY)
+            last = max([y0 + height for page, y0, _, height in plan if page == number] or [top + head_h])
+            for k, piece in enumerate(total_lines):
+                pdf.text(piece, left, last + 10 + k * 12, 8.5, True, BLUE)
+        pdf.line(left, h - 36, right - left)
+        pdf.text('PC-DOCTOR S.A. · %s · %s' % (area, title), left, h - 30, 7, False, GRAY)
         label = 'Página %d de %d' % (number, pages)
-        pdf.text(label, w - 24 - len(label) * 3.6, h - 28, 7, False, GRAY)
+        pdf.text(label, right - measure.width_of(label, 7), h - 30, 7, False, GRAY)
     return pdf.finish()
 
 

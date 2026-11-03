@@ -770,8 +770,26 @@ def void_session(c, user, data, now):
     event(c, 'sesion', s['id'], 'anulada', 'Sesión anulada por administración: ' + reason, user, now)
 
 
+def _figures(c, session, closing_summary):
+    """Cifras de una sesión para el historial. Una caja cerrada usa la foto guardada en su cierre (inmutable: lo que se anule o corrija después
+    no reescribe el cierre, va en ajustes); una abierta, sus operaciones actuales. Separa el efectivo del cajón de los cobros electrónicos."""
+    snap = None
+    if closing_summary:
+        try:
+            snap = json.loads(closing_summary)
+        except ValueError:
+            snap = None
+    if not snap or 'by_method' not in snap or 'income_cents' not in snap:
+        snap = summary(c, session)
+    cash = snap['by_method'].get('efectivo') or {}
+    return {'income_cents': snap['income_cents'], 'outgo_cents': snap['outgo_cents'], 'cash_in_cents': cash.get('in_cents', 0), 'cash_out_cents': cash.get('out_cents', 0),
+            'electronic_in_cents': snap['income_cents'] - cash.get('in_cents', 0), 'electronic_out_cents': snap['outgo_cents'] - cash.get('out_cents', 0),
+            'methods': [k for k, v in snap['by_method'].items() if v.get('count')]}
+
+
 def history(c, user, f):
-    """HISTORIAL Y AUDITORÍA DE CAJAS: un cajero ve sus sesiones; administración, todas. Filtros por fecha, cajero, caja, estado, tipo de diferencia y método."""
+    """HISTORIAL Y AUDITORÍA DE CAJAS: un cajero ve sus sesiones; administración, todas. Filtros por fecha, cajero, caja, estado (o «ajustada»: con
+    ajustes posteriores), tipo de diferencia y método. Los indicadores se calculan con las mismas filas filtradas."""
     where, args = ['1=1'], []
     if not is_admin(user):
         where.append('s.cashier_id=?')
@@ -785,26 +803,56 @@ def history(c, user, f):
     if f.get('status') in STATUS:
         where.append('s.status=?')
         args.append(f['status'])
+    elif f.get('status') == 'ajustada':
+        where.append('EXISTS (SELECT 1 FROM cash_adjustments a WHERE a.session_id=s.id)')
     for key, op in (('from', '>='), ('to', '<=')):
         if re.fullmatch(r'\d{4}-\d{2}-\d{2}', str(f.get(key, ''))):
             where.append('substr(s.opened_at,1,10)' + op + '?')
             args.append(f[key])
     if f.get('difference') in ('cuadrado', 'sobrante', 'faltante'):
         where.append({'cuadrado': 'k.difference_cents=0', 'sobrante': 'k.difference_cents>0', 'faltante': 'k.difference_cents<0'}[f['difference']])
+    adjusted = {r[0]: (r[1], r[2]) for r in c.execute('SELECT session_id,COUNT(*),SUM(amount_cents) FROM cash_adjustments GROUP BY session_id')}
     rows = []
-    for r in c.execute("SELECT s.*,g.name register,u.name cashier,COALESCE(v.name,'') reviewer,k.closed_at,k.expected_cash_cents,k.counted_cash_cents,k.difference_cents FROM cash_sessions s "
-                       "JOIN cash_registers g ON g.id=s.register_id JOIN users u ON u.id=s.cashier_id LEFT JOIN users v ON v.id=s.reviewed_by LEFT JOIN cash_session_closings k ON k.session_id=s.id WHERE "
-                       + ' AND '.join(where) + ' ORDER BY s.id DESC LIMIT 300', args):
-        d = summary(c, r)
-        if f.get('method') in METHODS and not d['by_method'][f['method']]['count']:
+    for r in c.execute("SELECT s.*,g.name register,u.name cashier,COALESCE(v.name,'') reviewer,k.closed_at,k.expected_cash_cents,k.counted_cash_cents,k.difference_cents,k.summary closing_summary "
+                       "FROM cash_sessions s JOIN cash_registers g ON g.id=s.register_id JOIN users u ON u.id=s.cashier_id LEFT JOIN users v ON v.id=s.reviewed_by "
+                       "LEFT JOIN cash_session_closings k ON k.session_id=s.id WHERE " + ' AND '.join(where) + ' ORDER BY s.id DESC LIMIT 300', args):
+        d = _figures(c, r, r['closing_summary'])
+        if f.get('method') in METHODS and f['method'] not in d['methods']:
             continue
+        count, cents = adjusted.get(r['id'], (0, 0))
         rows.append({'id': r['id'], 'code': code_of(r), 'register': r['register'], 'cashier': r['cashier'], 'shift': r['shift'], 'opened_at': r['opened_at'], 'closed_at': r['closed_at'] or '',
-                     'opening_cents': r['opening_cents'], 'income_cents': d['income_cents'], 'outgo_cents': d['outgo_cents'],
-                     'expected_cents': r['expected_cash_cents'] if r['expected_cash_cents'] is not None else d['expected_cash_cents'], 'counted_cents': r['counted_cash_cents'],
+                     'opening_cents': r['opening_cents'], 'income_cents': d['income_cents'], 'outgo_cents': d['outgo_cents'], 'cash_in_cents': d['cash_in_cents'],
+                     'cash_out_cents': d['cash_out_cents'], 'electronic_in_cents': d['electronic_in_cents'], 'electronic_out_cents': d['electronic_out_cents'],
+                     'expected_cents': r['expected_cash_cents'] if r['expected_cash_cents'] is not None else summary(c, r)['expected_cash_cents'], 'counted_cents': r['counted_cash_cents'],
                      'difference_cents': r['difference_cents'], 'difference_type': difference_type(r['difference_cents']) if r['difference_cents'] is not None else '',
-                     'status': r['status'], 'status_label': STATUS[r['status']], 'authorized_by': r['reviewer']})
-    return {'rows': rows, 'statuses': STATUS, 'registers': registers(c, False), 'methods': METHODS,
+                     'status': r['status'], 'status_label': STATUS[r['status']], 'authorized_by': r['reviewer'], 'adjustments': count, 'adjusted_cents': cents or 0})
+    live = [r for r in rows if r['status'] != 'anulada']
+    totals = {'count': len(rows), 'ok': sum(1 for r in rows if r['status'] == 'cerrada'), 'with_difference': sum(1 for r in live if r['difference_cents']),
+              'review': sum(1 for r in rows if r['status'] == 'revision'), 'adjusted': sum(1 for r in rows if r['adjustments']), 'open': sum(1 for r in rows if r['status'] in OPEN),
+              'income_cents': sum(r['income_cents'] for r in live), 'outgo_cents': sum(r['outgo_cents'] for r in live),
+              'cash_in_cents': sum(r['cash_in_cents'] for r in live), 'electronic_in_cents': sum(r['electronic_in_cents'] for r in live)}
+    return {'rows': rows, 'totals': totals, 'limit': 300, 'statuses': {**STATUS, 'ajustada': 'Con ajustes posteriores'}, 'registers': registers(c, False), 'methods': METHODS,
             'cashiers': [dict(u) for u in c.execute("SELECT id,name FROM users WHERE role IN ('administrador','tecnico') ORDER BY name")] if is_admin(user) else []}
+
+
+HISTORY_COLUMNS = ('Cierre', 'Apertura', 'Cierre (fecha)', 'Responsable', 'Caja', 'Turno', 'Fondo inicial', 'Entradas', 'Entradas en efectivo', 'Entradas electrónicas', 'Salidas',
+                   'Efectivo esperado', 'Efectivo contado', 'Diferencia', 'Estado', 'Ajustes posteriores', 'Autorizó')
+
+
+def history_csv(data):
+    """Exportación de las filas filtradas del historial (separador «;», importes con coma decimal, sin fórmulas al abrir en Excel)."""
+    import csv
+    import io
+    money = lambda cents: '' if cents is None else ('-' if cents < 0 else '') + '%d,%02d' % (abs(cents) // 100, abs(cents) % 100)
+    safe = lambda text: "'" + text if str(text)[:1] in ('=', '+', '-', '@') else str(text)
+    out = io.StringIO()
+    writer = csv.writer(out, delimiter=';')
+    writer.writerow(HISTORY_COLUMNS)
+    for r in data['rows']:
+        writer.writerow([r['code'], _dt(r['opened_at']), _dt(r['closed_at']) if r['closed_at'] else '', safe(r['cashier']), safe(r['register']), safe(r['shift']), money(r['opening_cents']),
+                         money(r['income_cents']), money(r['cash_in_cents']), money(r['electronic_in_cents']), money(r['outgo_cents']), money(r['expected_cents']),
+                         money(r['counted_cents']), money(r['difference_cents']), r['status_label'], money(r['adjusted_cents']) if r['adjustments'] else '', safe(r['authorized_by'])])
+    return '﻿' + out.getvalue()
 
 
 # ---- Reporte oficial de cierre (A4 y térmico 80 mm) -----------------------------------------------------------------------------

@@ -23,6 +23,12 @@ class Canvas:
         color=(0,0,0) if self.mono else color;self.stream.set_color_rgb(*color);self.stream.begin_text();self.stream.set_font_size('F2' if bold else 'F1',size);self.stream.set_text_matrix(1,0,0,1,x,self.h-y-size);self.stream.show_text_string(str(value).encode('cp1252','replace'));self.stream.end_text()
     def line(self,x,y,width):
         self.stream.set_color_rgb(*((0,0,0) if self.mono else (.75,.80,.86)));self.stream.rectangle(x,self.h-y,width,.5);self.stream.fill()
+    def box(self,x,y,width,height,color):
+        """Rectángulo relleno (fondos de encabezados y filas alternas); y es el borde superior, como en text()."""
+        if self.mono:return
+        self.stream.set_color_rgb(*color);self.stream.rectangle(x,self.h-y-height,width,height);self.stream.fill()
+    def width_of(self,value,size=9,bold=False):
+        return sum(WIDTHS.get(c,556) for c in str(value))*size/1000*(1.06 if bold else 1)
     def logo(self,x,y,width):
         h=width*self.ih/self.iw;self.stream.push_state();self.stream.set_matrix(width,0,0,h,x,self.h-y-h);self.stream.draw_x_object('Logo');self.stream.pop_state();return h
     def wrap(self,value,width,size=9):

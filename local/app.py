@@ -1998,6 +1998,7 @@ class Handler(BaseHTTPRequestHandler):
                 try:
                     if path=='/api/caja/state':return self.reply(200,cash_sessions.state(c,user,now))
                     if path=='/api/caja/history':return self.reply(200,cash_sessions.history(c,user,f))
+                    if path=='/api/caja/history.csv':return self.reply(200,cash_sessions.history_csv(cash_sessions.history(c,user,f)).encode('utf-8'),'text/csv; charset=utf-8',filename='historial-caja-%s.csv'%now.date().isoformat())
                     if path=='/api/caja/denominations':return self.reply(200,{'rows':cash_sessions.denominations(c,False),'registers':cash_sessions.registers(c,False)})
                     if path=='/api/caja/config':
                         if not cash_sessions.is_admin(user):return self.reply(403,{'error':'Solo administración configura la caja.'})
@@ -2022,12 +2023,17 @@ class Handler(BaseHTTPRequestHandler):
                     if found:
                         import inventory_center
                         rows=banking.transfers(c,f);columns=['Código','Fecha','Método','Banco','Cuenta','Cliente','Documento','Referencia','Importe','Estado','Registró']
-                        data_rows=[[r['code'],r['paid_at'][:16].replace('T',' '),r['method'],r['bank'],r['account'],r['client'],r['document'],r['reference'],r['amount_cents']/100,r['status_label'],r['actor']] for r in rows]
+                        methods={'transferencia':'Transferencia','deposito':'Depósito'}
+                        when=lambda v:'%s/%s/%s %s'%(v[8:10],v[5:7],v[:4],v[11:16]) if re.match(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}',v or '') else (v or '')
+                        data_rows=[[r['code'],when(r['paid_at']),methods.get(r['method'],r['method']),r['bank'],r['account'],r['client'],r['document'],r['reference'],r['amount_cents']/100,r['status_label'],r['actor']] for r in rows]
                         if found[1]=='xlsx':return self.reply(200,inventory_center.xlsx('Transferencias',columns,data_rows),'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',filename='transferencias-depositos.xlsx')
                         pdf_rows=[[*r[:8],banking.money(round(r[8]*100)),*r[9:]] for r in data_rows]
                         total=banking.money(sum(r['amount_cents'] for r in rows))
-                        filters=', '.join('%s: %s'%(k,v) for k,v in f.items() if v) or 'Sin filtros'
-                        return self.reply(200,inventory_center.report_pdf('Historial de transferencias y depósitos',filters,columns,pdf_rows,[46,58,46,60,60,80,50,60,50,50,50],'Registros: %d · Total: %s'%(len(rows),total),now),'application/pdf',filename='transferencias-depositos.pdf')
+                        names={'bank':'Banco','account':'Cuenta','status':'Estado','from':'Desde','to':'Hasta','q':'Búsqueda'}
+                        account=c.execute('SELECT * FROM bank_accounts WHERE id=?',(int(f['account']),)).fetchone() if str(f.get('account','')).isdigit() else None
+                        shown=lambda k,v:banking.TRANSFER_STATUS.get(v,v) if k=='status' else ('%s/%s/%s'%(v[8:10],v[5:7],v[:4]) if k in ('from','to') and len(v)==10 else banking.label(account,masked=True) if k=='account' and account else v)
+                        filters=' · '.join('%s: %s'%(names.get(k,k),shown(k,v)) for k,v in f.items() if v and k in names) or 'Sin filtros'
+                        return self.reply(200,inventory_center.report_pdf('Historial de transferencias y depósitos',filters,columns,pdf_rows,[46,72,56,62,72,100,80,60,62,62,80],'Registros: %d · Total: %s'%(len(rows),total),now,'Facturación · Cuentas bancarias'),'application/pdf',filename='transferencias-depositos.pdf')
                     if path=='/api/vouchers':return self.reply(200,{'rows':card_vouchers.listing(c,f,now.date().isoformat()),'statuses':card_vouchers.STATUS,'types':card_vouchers.TYPES,'acquirers':list(card_vouchers.ACQUIRERS)})
                     found=re.fullmatch(r'/api/vouchers/([0-9]{1,9})/events',path)
                     if found:return self.reply(200,{'events':card_vouchers.events(c,int(found[1]))})

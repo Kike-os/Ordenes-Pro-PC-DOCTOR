@@ -114,6 +114,48 @@ class CashRulesTests(unittest.TestCase):
         hist = self.request('/api/caja/history', cookie=cookie)['body']['rows']
         self.assertEqual(sorted(h['status'] for h in hist if h['id'] in (sid, nxt, third)), ['cerrada', 'cerrada_diferencia', 'revision'])
 
+    def test_history_uses_closing_snapshot_separates_cash_and_exports(self):
+        # Caso como CJ-000002: fondo $0,00 y un depósito de $142,50. El efectivo esperado es $0,00 y la entrada es electrónica, no del cajón.
+        cookie, csrf, post, order = self.paid_order(50000, pay=False)
+        reg = self.request('/api/caja/state', cookie=cookie)['body']['registers'][0]['id']
+        sid = post('/api/caja/open', register_id=str(reg), shift='Mañana', counts='[]')['body']['session_id']
+        acc = self.account(post)
+        dep = post('/api/orders/%d/payments' % order['id'], amount='142,50', method='deposito', bank_account_id=str(acc), reference='DEP-FICTICIO-01')
+        self.assertEqual(dep['status'], 201, dep['body'])
+        self.assertEqual(post('/api/caja/movement', session_id=str(sid), direction='ingreso', kind='otro_ingreso', method='efectivo', amount='10', concept='Ingreso ficticio')['status'], 200)
+        done = post('/api/caja/close', session_id=str(sid), counts=self.counts(cookie, {('billete', 1000): 1}), confirm='1', confirmed_name='Persona de prueba', reserved='0',
+                    delivered_to='Administración ficticia')
+        self.assertEqual((done['status'], done['body']['status'], done['body']['expected_cents']), (200, 'cerrada', 1000))
+        h = self.request('/api/caja/history', cookie=cookie)['body']
+        row = next(r for r in h['rows'] if r['id'] == sid)
+        self.assertEqual((row['income_cents'], row['cash_in_cents'], row['electronic_in_cents'], row['expected_cents'], row['difference_cents']), (15250, 1000, 14250, 1000, 0))
+        self.assertEqual((h['totals']['count'], h['totals']['ok'], h['totals']['with_difference'], h['totals']['income_cents']), (1, 1, 0, 15250))
+        # El historial muestra la foto del cierre: un cambio posterior en los cobros no reescribe el cierre.
+        with app.connect() as c:
+            c.execute("UPDATE order_payments SET voided_at='2026-11-02T23:00:00-05:00',void_reason='Prueba ficticia' WHERE id=?", (dep['body']['id'],))
+            c.commit()
+        self.assertEqual(next(r for r in self.request('/api/caja/history', cookie=cookie)['body']['rows'] if r['id'] == sid)['income_cents'], 15250)
+        # Ajuste posterior: el cierre conserva sus cifras, aparece como «ajustada» y el filtro la encuentra.
+        self.assertEqual(post('/api/caja/adjust', session_id=str(sid), sign='-', amount='2', reason='Ajuste ficticio de conciliación')['status'], 200)
+        adjusted = self.request('/api/caja/history?status=ajustada', cookie=cookie)['body']['rows']
+        self.assertEqual([(r['id'], r['adjustments'], r['adjusted_cents'], r['expected_cents']) for r in adjusted], [(sid, 1, -200, 1000)])
+        self.assertEqual(self.request('/api/caja/history?method=deposito', cookie=cookie)['body']['totals']['count'], 1)
+        self.assertEqual(self.request('/api/caja/history?method=credito', cookie=cookie)['body']['totals']['count'], 0)
+        # Exportación CSV con los mismos filtros; un técnico solo exporta sus propias cajas.
+        csv = self.request('/api/caja/history.csv?status=ajustada', cookie=cookie)
+        self.assertEqual(csv['status'], 200)
+        text = csv['body'].decode('utf-8')
+        self.assertIn('Entradas electrónicas', text)
+        self.assertIn('142,50', text)
+        self.assertIn('-2,00', text)
+        tcookie, tcsrf = self.tech()
+        self.assertNotIn('CJ-', self.request('/api/caja/history.csv', cookie=tcookie)['body'].decode('utf-8'))
+        self.assertEqual(self.request('/api/caja/history', cookie=tcookie)['body']['rows'], [])
+        # Reporte PDF de transferencias y depósitos (diseño compartido): se genera con el método legible.
+        pdf = self.request('/api/bank/transfers.pdf', cookie=cookie)
+        self.assertEqual(pdf['status'], 200)
+        self.assertTrue(pdf['body'].startswith(b'%PDF'))
+
     def test_configuration_cards_denominations_and_permissions(self):
         cookie, csrf, post, order = self.paid_order(1000, pay=False)
         cfg = self.request('/api/caja/config', cookie=cookie)['body']

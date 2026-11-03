@@ -5737,7 +5737,7 @@ function inventoryReason(text){return new Promise(resolve=>{const dialog=invDial
 // ---- Caja por sesiones: apertura, movimientos, arqueo por denominaciones, cierre guiado, historial y configuración ----------------------
 // Todo se calcula en el servidor a partir de lo registrado; aquí solo se muestra. Los botones dependen del estado guardado en la base.
 let cashState2={tab:'caja'};
-const cjMoney=c=>quoteMoney(c||0),cjTone={abierta:'green',arqueo:'amber',revision:'amber',cerrada:'blue',cerrada_diferencia:'magenta',anulada:'gray'};
+const cjMoney=c=>(c||0)<0?'−'+quoteMoney(-c):quoteMoney(c||0),cjTone={abierta:'green',arqueo:'amber',revision:'amber',cerrada:'blue',cerrada_diferencia:'magenta',anulada:'gray'};
 function cjChip(status,label){const chip=el('span',label,'cj-chip');chip.dataset.status=status;return chip;}
 function cjTable(columns,rows,className=''){const wrap=el('div',undefined,'inv-table-wrap cj-scroll'),table=el('table',undefined,'inv-table cj-table '+className),thead=el('thead'),tr=el('tr'),tbody=el('tbody');
  for(const h of columns){const th=el('th',h);th.scope='col';tr.append(th);}thead.append(tr);for(const r of rows)tbody.append(r);table.append(thead,tbody);wrap.append(table);return wrap;}
@@ -5810,8 +5810,8 @@ async function cashGuard(container){let s;try{s=await api('/api/caja/status');}c
 async function renderCash(target){const root=target||$('module-content');root.replaceChildren(el('p','Cargando caja…','empty-module'));let data;
  try{data=await api('/api/caja/state');}catch(error){root.replaceChildren(el('p',error.message,'empty-module'));return;}
  const wrap=el('div',undefined,'cj-module'),tabs=el('div',undefined,'inv-tabs cj-tabs'),panel=el('div',undefined,'inv-panel cj-panel');tabs.setAttribute('role','tablist');tabs.setAttribute('aria-label','Secciones de Caja');
- const sections=[['caja','Caja','wallet'],['historial','Historial y auditoría','scroll-text'],['diarios','Cierres diarios anteriores','clock'],...(data.can_admin?[['config','Configuración','settings']]:[])];
- for(const[key,label,icon]of sections){const t=button('',()=>{cashState2.tab=key;renderCash(target);},'inv-tab');t.dataset.tab=key;t.setAttribute('role','tab');t.setAttribute('aria-selected',String(cashState2.tab===key));t.append(invIcon(icon),el('span',label));tabs.append(t);}
+ const sections=[['caja','Caja','wallet','Caja'],['historial','Historial y auditoría','scroll-text','Historial'],['diarios','Cierres diarios anteriores','clock','Anteriores'],...(data.can_admin?[['config','Configuración','settings','Configurar']]:[])];
+ for(const[key,label,icon,short]of sections){const t=button('',()=>{cashState2.tab=key;renderCash(target);},'inv-tab');t.dataset.tab=key;t.setAttribute('role','tab');t.setAttribute('aria-selected',String(cashState2.tab===key));t.title=label;t.append(invIcon(icon),el('span',label,'inv-tab-label'),el('span',short,'inv-tab-short'));tabs.append(t);}
  wrap.append(tabs,panel);root.replaceChildren(wrap);
  if(cashState2.tab==='historial'){cashHistoryPanel(panel,data);return;}
  if(cashState2.tab==='diarios'){legacyCash(panel);return;}
@@ -5950,38 +5950,130 @@ function cashCloseWizard(d,state,target){const dialog=invDialog('Cerrar Caja '+d
   next.disabled=true;try{const r=await api('/api/caja/close',{session_id:String(s.id),counts:table.values(),difference_reason:reason.value,reserved:String(fd.get('reserved')||'0'),delivered_to:String(fd.get('delivered_to')||''),confirmed_name:String(fd.get('confirmed_name')||''),note:String(fd.get('note')||''),confirm:fd.get('confirm')?'1':''});
    dialog.close();toast(r.status==='cerrada'?'Caja cerrada correctamente (cuadrada).':r.status==='cerrada_diferencia'?'Caja cerrada con diferencia dentro del límite autorizado.':'Caja cerrada: pendiente de revisión por la diferencia.','success');cashSessionDialog(s.id,target);renderCash(target);}catch(error){next.disabled=false;msg.textContent=error.message;}});
  bar.append(back,next);body.append(list,pane,msg,bar);paint();}
-async function cashSessionDialog(sid,target){const dialog=invDialog('Cierre de caja',true),body=el('div',undefined,'inv-body');dialog.append(body);body.append(el('p','Cargando…','empty-module'));let d;
- try{d=await api('/api/caja/sessions/'+sid);}catch(error){body.replaceChildren(el('p',error.message,'empty-module'));return;}
- const s=d.session,k=d.closing,sum=d.summary;dialog.querySelector('h2').textContent='Cierre '+s.code;body.replaceChildren();
- const facts=el('dl',undefined,'inv-facts fx-facts cj-facts');for(const[a,b]of [['Caja',s.register],['Turno',s.shift],['Cajero',s.cashier],['Apertura',formatOrderDate(s.opened_at)],['Cierre',k?formatOrderDate(k.closed_at):'—'],['Estado',s.status_label],['Saldo inicial',cjMoney(s.opening_cents)],
-  ['Ingresos',cjMoney(sum.income_cents)],['Egresos',cjMoney(sum.outgo_cents)],['Efectivo esperado',cjMoney(k?k.expected_cash_cents:sum.expected_cash_cents)],['Efectivo contado',k?cjMoney(k.counted_cash_cents):'—'],['Diferencia',k?cjMoney(k.difference_cents):'—'],
-  ['Reservado para el siguiente turno',k?cjMoney(k.reserved_cents)+(d.fund_next?(d.fund_next.received?' · recibido en '+d.fund_next.session+' por '+d.fund_next.received_by:' · pendiente de recibir'):''):'—'],['Entregado',k?cjMoney(k.withdrawn_cents)+(k.delivered_to?' a '+k.delivered_to:''):'—'],['Autorizó',s.reviewed_by_name||'—']]){const x=el('div');x.append(el('dt',a),el('dd',b));facts.append(x);}
- body.append(facts);if(k&&k.difference_reason)body.append(el('p','Explicación: '+k.difference_reason,'inv-form-note'));
- const acts=el('div',undefined,'cj-actions');for(const[label,fmt]of [['Reporte PDF (A4)',''],['Impresión térmica 80 mm','?formato=termico']]){const a=el('a',undefined,'secondary inv-btn');a.href='/api/caja/sessions/'+sid+'/report.pdf'+fmt;a.target='_blank';a.rel='noopener';a.append(invIcon('file-text'),el('span',label));acts.append(a);}
- acts.append(invBtn('Ver movimientos','scroll-text',()=>cashMovementsDialog(d,{methods:{}},()=>{})));
- if(d.can_admin&&s.status==='revision')acts.append(invBtn('Aprobar diferencia','badge-check',()=>{dialog.close();cashReasonAction('Revisar diferencia '+s.code,'La caja pasará a «Cerrada con diferencia». Indica la revisión realizada.','/api/caja/review',{session_id:String(sid)},'review_note',()=>renderCash(target));},'primary'));
- if(d.can_admin&&['revision','cerrada','cerrada_diferencia'].includes(s.status))acts.append(invBtn('Registrar ajuste posterior','sliders-horizontal',()=>{dialog.close();cashAdjustDialog(sid,target);}));
- body.append(acts);
- if(k&&k.counts.length)body.append(el('h4','Arqueo por denominaciones','cj-sub'),cjTable(['Tipo','Denominación','Cantidad','Subtotal'],k.counts.map(r=>cjRow([['Tipo',r.kind==='moneda'?'Moneda':'Billete'],['Denominación',cjMoney(r.value_cents)],['Cantidad',String(r.qty)],['Subtotal',cjMoney(r.subtotal_cents)]]))));
- if(sum.adjustments.length)body.append(el('h4','Ajustes posteriores','cj-sub'),cjTable(['Fecha','Importe','Motivo','Responsable'],sum.adjustments.map(a=>cjRow([['Fecha',formatOrderDate(a.created_at)],['Importe',cjMoney(a.amount_cents)],['Motivo',a.reason],['Responsable',a.actor]]))));
- if(d.events.length){const ul=el('ul',undefined,'fx-list fx-timeline');for(const e of d.events){const li=el('li'),r=el('div',undefined,'fx-row');r.append(el('strong',e.event.replace(/_/g,' ')),el('span',e.detail,'fx-row-sub'),el('small',formatOrderDate(e.created_at)+' · '+e.actor));li.append(r);ul.append(li);}body.append(el('h4','Historial de auditoría','cj-sub'),ul);}}
 function cashAdjustDialog(sid,target){const dialog=invDialog('Ajuste posterior al cierre'),{form,msg,field,fail,clear}=invForm('bank-form inv-sheet-form');dialog.append(form);form.append(el('p','El cierre original no cambia: el ajuste queda registrado aparte con su motivo y responsable.','inv-form-note'),invRequiredNote());
  field('sign','Tipo',{options:[['+','Aumenta el efectivo'],['-','Disminuye el efectivo']]});field('amount','Importe (USD)',{mode:'decimal',max:12,required:true});field('reason','Motivo',{area:true,max:300,required:true});
  const save=el('button',undefined,'primary inv-btn');save.type='submit';save.append(invIcon('circle-check'),el('span','Registrar ajuste'));form.append(msg,invDialogActions(dialog,save));
  form.addEventListener('submit',async event=>{event.preventDefault();clear();save.disabled=true;try{await api('/api/caja/adjust',{...Object.fromEntries(new FormData(form)),session_id:String(sid)});dialog.close();toast('Ajuste registrado.','success');renderCash(target);}catch(error){save.disabled=false;fail(error);}});}
-async function cashHistoryPanel(panel,state){panel.append(invSectionHead('Historial y auditoría de cajas','Cada cierre conserva sus registros originales. Las correcciones aparecen como ajustes posteriores.'));
- const f=cashState2.hist||(cashState2.hist={from:'',to:'',status:'',difference:'',register:'',cashier:'',method:''});const bar=el('form',undefined,'cj-filters');bar.addEventListener('submit',e=>e.preventDefault());const slot=el('div');
- const sel=(label,key,options)=>{const l=el('label',undefined,'inv-field'),s=el('select');for(const[v,t]of options)s.add(new Option(t,v));s.value=f[key];s.addEventListener('change',()=>{f[key]=s.value;load();});l.append(el('span',label),s);bar.append(l);};
- const date=(label,key)=>{const l=el('label',undefined,'inv-field'),i=el('input');i.type='date';i.value=f[key];i.addEventListener('change',()=>{f[key]=i.value;load();});l.append(el('span',label),i);bar.append(l);};
- date('Desde','from');date('Hasta','to');let meta=null;
- const load=async()=>{slot.replaceChildren(el('p','Cargando…','empty-module'));let data;try{data=await api('/api/caja/history?'+new URLSearchParams(f));}catch(error){slot.replaceChildren(el('p',error.message,'empty-module'));return;}
-  if(!meta){meta=data;sel('Estado','status',[['','Todos'],...Object.entries(data.statuses)]);sel('Diferencia','difference',[['','Todas'],['cuadrado','Cuadrado'],['sobrante','Sobrante'],['faltante','Faltante']]);sel('Caja','register',[['','Todas'],...data.registers.map(r=>[String(r.id),r.name])]);
-   if(data.cashiers.length)sel('Cajero','cashier',[['','Todos'],...data.cashiers.map(u=>[String(u.id),u.name])]);sel('Método de pago','method',[['','Todos'],...Object.entries(data.methods)]);}
-  slot.replaceChildren(data.rows.length?cjTable(['N.º','Fecha','Cajero','Caja','Turno','Fondo inicial','Entradas','Salidas','Esperado','Contado','Diferencia','Estado','Autorizó',''],data.rows.map(r=>{const tr=cjRow([['N.º',r.code],['Fecha',formatOrderDate(r.opened_at)],['Cajero',r.cashier],['Caja',r.register],['Turno',r.shift],['Fondo inicial',cjMoney(r.opening_cents)],['Entradas',cjMoney(r.income_cents)],['Salidas',cjMoney(r.outgo_cents)],
-    ['Esperado',cjMoney(r.expected_cents)],['Contado',r.counted_cents===null?'—':cjMoney(r.counted_cents)],['Diferencia',r.difference_cents===null?'—':cjMoney(r.difference_cents)],['Estado',cjChip(r.status,r.status_label)],['Autorizó',r.authorized_by||'—'],['','']]);
-    if(r.difference_type)tr.dataset.diff=r.difference_type;const last=tr.lastChild;last.append(button('Consultar',()=>cashSessionDialog(r.id),'text-action'));const a=el('a','PDF','text-action');a.href='/api/caja/sessions/'+r.id+'/report.pdf';a.target='_blank';a.rel='noopener';last.append(a);
-    const t=el('a','Térmico','text-action');t.href='/api/caja/sessions/'+r.id+'/report.pdf?formato=termico';t.target='_blank';t.rel='noopener';last.append(t);return tr;}),'cj-history'):invEmpty('scroll-text','Sin cierres con estos filtros','Cambia los filtros o registra la primera apertura.'));};
- panel.append(bar,slot);load();}
+// Iconos del historial de caja (Lucide); solo se añaden los que todavía no existen.
+for(const[k,v]of Object.entries({'ellipsis-vertical':'<circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/>',
+ 'eye':'<path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/>',
+ 'download':'<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/>',
+ 'printer':'<path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 9V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v6"/><rect x="6" y="14" width="12" height="8" rx="1"/>',
+ 'shield-check':'<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/>',
+ 'search':'<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>','filter':'<polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>','chevron-down':'<path d="m6 9 6 6 6-6"/>',
+ 'info':'<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>','scale':'<path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/>'}))invIcons[k]??=v;
+// Detalle de un cierre: información general, resumen financiero con el efectivo del cajón separado de los pagos electrónicos (cifras de la
+// foto guardada al cerrar; si la caja sigue abierta, las de sus operaciones), arqueo, ajustes posteriores y auditoría. El cierre original
+// nunca se modifica: una corrección se ve como ajuste aparte. focus='auditoria' abre la ventana en la sección de auditoría.
+async function cashSessionDialog(sid,target,focus){const dialog=invDialog('Cierre de caja',true),body=el('div',undefined,'inv-body cjd');dialog.classList.add('cjd-dialog');dialog.append(body);body.append(el('p','Cargando…','empty-module'));let d;
+ try{d=await api('/api/caja/sessions/'+sid);}catch(error){body.replaceChildren(el('p',error.message,'empty-module'));return;}
+ const s=d.session,k=d.closing,live=d.summary,snap=k&&k.summary&&k.summary.by_method?k.summary:live,bm=snap.by_method,cb=snap.cash_breakdown||live.cash_breakdown,groups=snap.income_groups||{};
+ dialog.querySelector('h2').textContent='Cierre '+s.code;body.replaceChildren();
+ const head=el('div',undefined,'cjd-head'),st=el('div',undefined,'cjh-status');st.append(cjChip(s.status,s.status_label));if(live.adjustments.length)st.append(cjChip('ajustada','Ajustada'));
+ head.append(st,el('small',k?'Cifras guardadas al cerrar ('+formatOrderDate(k.closed_at)+'). No se modifican: las correcciones son ajustes aparte.':'Caja en curso: las cifras cambian con cada operación.'));
+ const acts=el('div',undefined,'cjd-actions'),pdf=invBtn('Descargar PDF','download',()=>cjBusy(pdf,()=>downloadFile('/api/caja/sessions/'+sid+'/report.pdf','CIERRE-'+s.code+'.pdf')));pdf.title='Reporte oficial del cierre en A4';
+ const thermal=invBtn('Comprobante térmico','printer',()=>cjThermal(sid));thermal.title='Abre el comprobante de 80 mm para imprimirlo';
+ const moves=invBtn('Movimientos','scroll-text',()=>cashMovementsDialog(d,{methods:{}},()=>{}));moves.title='Todas las operaciones de la caja';acts.append(pdf,thermal,moves);
+ if(d.can_admin&&s.status==='revision')acts.append(invBtn('Aprobar diferencia','badge-check',()=>{dialog.close();cashReasonAction('Revisar diferencia '+s.code,'La caja pasará a «Cerrada con diferencia». Indica la revisión realizada.','/api/caja/review',{session_id:String(sid)},'review_note',()=>renderCash(target));},'primary'));
+ if(d.can_admin&&['revision','cerrada','cerrada_diferencia'].includes(s.status))acts.append(invBtn('Registrar ajuste posterior','sliders-horizontal',()=>{dialog.close();cashAdjustDialog(sid,target);}));
+ body.append(head,acts);
+ const section=(title,icon,note)=>{const sec=el('section',undefined,'cjd-section'),h=el('h3');h.append(invIcon(icon),el('span',title));sec.append(h);if(note)sec.append(el('p',note,'cjd-note'));body.append(sec);return sec;};
+ const facts=pairs=>{const dl=el('dl',undefined,'cjd-facts');for(const[a,b,tone]of pairs){const x=el('div');if(tone)x.dataset.tone=tone;x.append(el('dt',a),el('dd',b));dl.append(x);}return dl;};
+ const ledger=(rows,total)=>{const t=el('dl',undefined,'cjd-ledger');for(const[a,cents,sign]of rows){const x=el('div');x.append(el('dt',a),el('dd',(sign&&cents?sign:'')+cjMoney(cents)));t.append(x);}if(total){const x=el('div',undefined,'cjd-total');x.append(el('dt',total[0]),el('dd',cjMoney(total[1])));if(total[2])x.dataset.tone=total[2];t.append(x);}return t;};
+ section('Información general','info').append(facts([['Código de cierre',s.code],['Caja y turno',s.register+' · '+(s.shift||'—')],['Apertura',formatOrderDate(s.opened_at)],['Cierre',k?formatOrderDate(k.closed_at):'En curso'],
+  ['Cajero',s.cashier],['Abrió la caja',s.opened_by_name||'—'],['Confirmó el cierre',k?k.confirmed_name:'—'],['Responsable de autorización',s.reviewed_by_name?s.reviewed_by_name+(s.reviewed_at?' · '+formatOrderDate(s.reviewed_at):''):'—']]));
+ const money=section('Resumen financiero','scale','El efectivo esperado solo cuenta el dinero del cajón. Transferencias, depósitos y tarjetas no entran al cajón: se concilian aparte.'),grid=el('div',undefined,'cjd-money');
+ const expected=k?k.expected_cash_cents:snap.expected_cash_cents,diff=k?k.difference_cents:null,tone=diff===null?'':diff===0?'ok':diff>0?'over':'short';
+ const cash=el('article',undefined,'cjd-box');cash.append(el('h4','Efectivo del cajón'),ledger([['Fondo inicial',cb.opening_cents],['Ventas y cobros en efectivo',cb.sales_cents],['Otras entradas de efectivo',cb.other_in_cents],['Salidas de efectivo',cb.out_cents,'− '],['Devoluciones en efectivo',cb.refunds_cents,'− ']],['Efectivo esperado',expected]));
+ const counted=el('dl',undefined,'cjd-ledger cjd-count');for(const[a,b,t]of [['Efectivo contado',k?cjMoney(k.counted_cash_cents):'—'],['Diferencia',diff===null?'—':cjMoney(diff)+(diff?' ('+(diff>0?'sobrante':'faltante')+')':' (cuadrado)'),tone]]){const x=el('div');if(t)x.dataset.tone=t;x.append(el('dt',a),el('dd',b));counted.append(x);}cash.append(counted);
+ const m=key=>(bm[key]||{}).in_cents||0,electronic=m('transferencia')+m('deposito')+m('credito')+m('debito')+m('cheque')+m('otro');
+ const elec=el('article',undefined,'cjd-box');elec.append(el('h4','Pagos electrónicos y otros medios'),ledger([['Transferencias bancarias',m('transferencia')],['Depósitos',m('deposito')],['Tarjetas de crédito y débito',m('credito')+m('debito')],['Cheques y otros métodos',m('cheque')+m('otro')]],['Total fuera del cajón',electronic]));
+ if(live.pending.length)elec.append(el('p',live.pending.length+(live.pending.length===1?' cobro pendiente':' cobros pendientes')+' de verificar o liquidar ('+cjMoney(live.pending_cents)+').','cjd-warn'));
+ const g=key=>(groups[key]||{}).cents||0;const concept=el('article',undefined,'cjd-box');concept.append(el('h4','Entradas y salidas por concepto'),ledger([['Cobros de órdenes (pagos y abonos)',g('cobro_orden')],['Anticipos de clientes',g('anticipo')],['Ventas de licencias',g('venta_licencia')],['Otros ingresos de caja',snap.income_cents-g('cobro_orden')-g('anticipo')-g('venta_licencia')],['Total de entradas',snap.income_cents],['Total de salidas',snap.outgo_cents,'− ']]));
+ grid.append(cash,elec,concept);money.append(grid);
+ if(k){money.append(facts([['Reservado para el siguiente turno',cjMoney(k.reserved_cents)+(d.fund_next?(d.fund_next.received?' · recibido en '+d.fund_next.session+' por '+d.fund_next.received_by:' · pendiente de recibir'):'')],['Entregado',cjMoney(k.withdrawn_cents)+(k.delivered_to?' a '+k.delivered_to:'')]]));
+  if(k.difference_reason)money.append(el('p','Explicación de la diferencia: '+k.difference_reason,'cjd-note'));if(s.review_note)money.append(el('p','Revisión de administración: '+s.review_note,'cjd-note'));if(k.note)money.append(el('p','Observaciones: '+k.note,'cjd-note'));}
+ if(k&&k.counts.length)section('Arqueo por denominaciones','coins').append(cjTable(['Tipo','Denominación','Cantidad','Subtotal'],k.counts.map(r=>cjRow([['Tipo',r.kind==='moneda'?'Moneda':'Billete'],['Denominación',cjMoney(r.value_cents)],['Cantidad',String(r.qty)],['Subtotal',cjMoney(r.subtotal_cents)]]))));
+ const adj=section('Ajustes posteriores','sliders-horizontal',live.adjustments.length?'Se registran aparte con su motivo y responsable; el cierre original no cambia. Total ajustado: '+cjMoney(live.adjusted_cents)+'.':'Sin ajustes posteriores.');
+ if(live.adjustments.length)adj.append(cjTable(['Fecha y hora','Importe','Motivo','Responsable'],live.adjustments.map(a=>cjRow([['Fecha y hora',formatOrderDate(a.created_at)],['Importe',(a.amount_cents>0?'+':'')+cjMoney(a.amount_cents)],['Motivo',a.reason],['Responsable',a.actor]]))));
+ const audit=section('Auditoría','shield-check','Cada operación con su responsable, fecha y referencia, y el registro de aperturas, arqueos, cierres, revisiones y ajustes.');
+ audit.append(live.rows.length?cjTable(['Fecha y hora','Usuario','Tipo','Método','Valor','Referencia','Justificación o estado'],live.rows.map(r=>{const tr=cjRow([['Fecha y hora',formatOrderDate(r.at)],['Usuario',r.actor||'—'],['Tipo',r.kind_label],['Método',r.method_label+(r.bank?' · '+r.bank:'')],
+   ['Valor',(r.direction==='egreso'?'− ':'')+cjMoney(r.amount_cents)],['Referencia',[r.ref,r.document,r.reference].filter(Boolean).join(' · ')],['Justificación o estado',[r.concept,r.note,r.state_label].filter(Boolean).join(' · ')||'—']]);tr.dataset.direction=r.direction;if(r.voided)tr.dataset.voided='true';return tr;}),'cjd-audit'):el('p','Sin operaciones registradas en esta caja.','cjd-note'));
+ if(d.events.length){const ul=el('ul',undefined,'fx-list fx-timeline cjd-events');for(const e of d.events){const li=el('li'),r=el('div',undefined,'fx-row');r.append(el('strong',e.event.replace(/_/g,' ')),el('span',e.detail,'fx-row-sub'),el('small',formatOrderDate(e.created_at)+' · '+e.actor));li.append(r);ul.append(li);}audit.append(el('h4','Registro de eventos','cj-sub'),ul);}
+ if(focus==='auditoria')requestAnimationFrame(()=>{audit.scrollIntoView({block:'start',behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});audit.querySelector('h3').tabIndex=-1;audit.querySelector('h3').focus({preventScroll:true});});}
+// Estado de carga de un botón mientras se genera un documento o se consulta el servidor (sin dobles clics).
+async function cjBusy(btn,task){if(btn.dataset.busy==='true')return;btn.dataset.busy='true';btn.setAttribute('aria-busy','true');btn.disabled=true;
+ try{await task();}catch(error){notify(error.message);}finally{btn.dataset.busy='false';btn.removeAttribute('aria-busy');btn.disabled=false;}}
+function cjThermal(sid){const w=window.open('/api/caja/sessions/'+sid+'/report.pdf?formato=termico','_blank');if(w)w.opener=null;else toast('Permite las ventanas emergentes para abrir el comprobante térmico.','error');}
+// Fecha y hora compactas para la tabla (02/11/2026 22:24, hora de Ecuador); la descripción emergente conserva el formato largo.
+function cjhDate(value){const d=new Date(value);if(Number.isNaN(d.getTime()))return '—';const p=Object.fromEntries(new Intl.DateTimeFormat('es-EC',{timeZone:'America/Guayaquil',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(d).map(x=>[x.type,x.value]));return p.day+'/'+p.month+'/'+p.year+' '+p.hour+':'+p.minute;}
+// Menú de acciones de un cierre (tres puntos). Se crea al abrirlo y se elimina al cerrarlo; usa el mismo aspecto que el menú de las órdenes.
+let cjMenuSeq=0;
+function cjhMenu(r){const trigger=button('',()=>menu?close():open(),'cjh-more');trigger.type='button';trigger.append(invIcon('ellipsis-vertical'));trigger.title='Acciones de '+r.code;
+ trigger.setAttribute('aria-label','Acciones de '+r.code);trigger.setAttribute('aria-haspopup','menu');trigger.setAttribute('aria-expanded','false');let menu=null;
+ const items=[['Ver detalle','eye',()=>cashSessionDialog(r.id)],['Descargar PDF','download',()=>downloadFile('/api/caja/sessions/'+r.id+'/report.pdf','CIERRE-'+r.code+'.pdf')],
+  ['Imprimir comprobante térmico','printer',()=>cjThermal(r.id)],['Consultar movimientos','scroll-text',async()=>{const d=await api('/api/caja/sessions/'+r.id);cashMovementsDialog(d,{methods:{}},()=>{});}],
+  ['Consultar auditoría','shield-check',()=>cashSessionDialog(r.id,undefined,'auditoria')]];
+ function close(restore=false){const m=menu;if(!m)return;menu=null;removeEventListener('click',outside,true);removeEventListener('scroll',moved,true);removeEventListener('resize',moved);
+  if(typeof m.hidePopover==='function'&&m.matches(':popover-open'))m.hidePopover();m.remove();trigger.setAttribute('aria-expanded','false');if(restore)trigger.focus();}
+ // Cierre propio (no el general de los menús de órdenes): al enfocar el botón la tabla puede desplazarse sola; ese primer desplazamiento no cierra.
+ let openedAt=0;const outside=e=>{if(menu&&!menu.contains(e.target)&&!trigger.contains(e.target))close();};const moved=e=>{if(menu&&!menu.contains(e.target)&&performance.now()-openedAt>350)close();};
+ function open(){dismissOrderMenus();document.querySelectorAll('.cjh-menu').forEach(x=>x.dispatchEvent(new Event('cjh-close')));const m=el('div',undefined,'orders-action-menu cjh-menu');menu=m;m.id='cjh-menu-'+(++cjMenuSeq);m.setAttribute('role','menu');m.addEventListener('cjh-close',()=>close());m.setAttribute('aria-label','Acciones de '+r.code);trigger.setAttribute('aria-controls',m.id);
+  for(const[label,icon,action]of items){const b=button('',()=>{close(true);cjBusy(trigger,action);},'orders-menu-item');b.type='button';b.setAttribute('role','menuitem');b.append(invIcon(icon),el('span',label));m.append(b);}
+  const native=typeof m.showPopover==='function';if(native){m.setAttribute('popover','manual');m.addEventListener('toggle',e=>{if(e.newState==='closed'&&menu===m)close();});}
+  document.body.append(m);if(native)m.showPopover();trigger.setAttribute('aria-expanded','true');
+  const gap=8,rect=trigger.getBoundingClientRect(),box=m.getBoundingClientRect(),below=innerHeight-rect.bottom-gap,down=box.height<=below||below>=rect.top;
+  m.style.left=Math.max(gap,Math.min(rect.right-box.width,innerWidth-box.width-gap))+'px';m.style.top=Math.max(gap,down?rect.bottom+6:rect.top-box.height-6)+'px';m.dataset.side=down?'down':'up';
+  m.addEventListener('keydown',e=>{const list=[...m.querySelectorAll('button')],i=list.indexOf(document.activeElement);if(e.key==='Escape'||e.key==='Tab'){e.preventDefault();close(true);}
+   if(['ArrowDown','ArrowUp','Home','End'].includes(e.key)){e.preventDefault();list[e.key==='Home'?0:e.key==='End'?list.length-1:(i+(e.key==='ArrowDown'?1:-1)+list.length)%list.length].focus();}});
+  openedAt=performance.now();addEventListener('click',outside,true);addEventListener('scroll',moved,true);addEventListener('resize',moved);m.querySelector('button').focus({preventScroll:true});}
+ trigger.addEventListener('keydown',e=>{if(e.key==='ArrowDown'&&!menu){e.preventDefault();open();}});return trigger;}
+// Historial y auditoría de cajas. Las cifras salen del servidor (la foto de cada cierre); aquí solo se presentan. Los filtros se aplican con
+// «Buscar» y los indicadores usan las mismas filas filtradas. La tabla se desplaza dentro de su marco con la primera columna fija; en
+// tabletas oculta las columnas secundarias y en el teléfono cada cierre es una tarjeta.
+async function cashHistoryPanel(panel,state){panel.append(invSectionHead('Historial y auditoría de cajas','Cada cierre conserva sus cifras originales; las correcciones aparecen como ajustes posteriores. Las entradas separan el efectivo del cajón de los pagos electrónicos.'));
+ const f=cashState2.hist||(cashState2.hist={from:'',to:'',status:'',difference:'',register:'',cashier:'',method:''});
+ const wrap=el('div',undefined,'cjh'),kpis=el('div',undefined,'cjh-kpis'),filters=el('details',undefined,'cjh-filters'),summary=el('summary'),form=el('form',undefined,'cjh-form'),slot=el('div',undefined,'cjh-results');
+ kpis.setAttribute('aria-live','polite');filters.open=!matchMedia('(max-width:720px)').matches;const badge=el('b','','cjh-filter-count');badge.hidden=true;
+ summary.append(invIcon('filter'),el('span','Filtros'),badge,invIcon('chevron-down'));filters.append(summary,form);const inputs={};
+ const field=(label,key,node)=>{const l=el('label',undefined,'inv-field');node.name=key;l.append(el('span',label),node);form.append(l);node.value=f[key];inputs[key]=node;};
+ const date=(label,key)=>{const i=el('input');i.type='date';field(label,key,i);};
+ const select=(label,key,options)=>{const s=el('select');for(const[v,t]of options)s.add(new Option(t,v));field(label,key,s);};
+ date('Desde','from');date('Hasta','to');
+ const acts=el('div',undefined,'cjh-form-acts'),search=el('button',undefined,'primary inv-btn');search.type='submit';search.append(invIcon('search'),el('span','Buscar'));
+ const clear=invBtn('Limpiar filtros','rotate-ccw',()=>{for(const key of Object.keys(f))f[key]='';for(const node of Object.values(inputs))node.value='';load();});
+ const exp=invBtn('Exportar resultados','download',()=>cjBusy(exp,()=>downloadFile('/api/caja/history.csv?'+query(),'historial-caja.csv')));exp.title='Descarga en CSV los cierres filtrados';acts.append(search,clear,exp);
+ form.addEventListener('submit',e=>{e.preventDefault();for(const[key,node]of Object.entries(inputs))f[key]=node.value;load();});
+ const query=()=>new URLSearchParams(Object.entries(f).filter(([,v])=>v));let meta=null;
+ const paintKpis=t=>kpis.replaceChildren(invoiceKpis([['scroll-text','Cierres registrados',String(t.count),t.open?t.open+' en curso':'Con los filtros aplicados','blue'],
+  ['badge-check','Cierres correctos',String(t.ok),'Cerrados sin diferencia','green'],['scale','Con diferencias',String(t.with_difference),t.review?t.review+(t.review===1?' pendiente de revisión':' pendientes de revisión'):'Ninguno pendiente de revisión',t.with_difference?'magenta':'teal'],
+  ['arrow-down-to-line','Total de entradas',cjMoney(t.income_cents),'Efectivo '+cjMoney(t.cash_in_cents)+' · electrónico '+cjMoney(t.electronic_in_cents),'teal'],['arrow-up-from-line','Total de salidas',cjMoney(t.outgo_cents),'Sin cajas anuladas','red']]));
+ const cols=[['code','N.º de cierre'],['date','Fecha y hora'],['who','Responsable'],['reg','Caja'],['shift','Turno'],['open','Fondo inicial',1],['in','Entradas',1],['out','Salidas',1],['exp','Efectivo esperado',1],['count','Efectivo contado',1],['diff','Diferencia',1],['st','Estado'],['acts','Acciones']];
+ const paintRows=data=>{if(!data.rows.length){slot.replaceChildren(invEmpty('scroll-text','Sin cierres con estos filtros','Cambia o limpia los filtros para ver otros cierres.'));return;}
+  const scroll=el('div',undefined,'cjh-scroll'),table=el('table',undefined,'cjh-table'),thead=el('thead'),hr=el('tr'),tbody=el('tbody');scroll.tabIndex=0;scroll.setAttribute('role','region');scroll.setAttribute('aria-label','Cierres de caja');
+  for(const[key,label,num]of cols){const th=el('th',label);th.scope='col';th.dataset.col=key;if(num)th.classList.add('num');hr.append(th);}thead.append(hr);
+  for(const r of data.rows){const tr=el('tr');tr.dataset.status=r.status;if(r.difference_type)tr.dataset.diff=r.difference_type;
+   const cell=(key,label,...nodes)=>{const td=el(key==='code'?'th':'td');if(key==='code')td.scope='row';td.dataset.col=key;td.dataset.label=label;td.append(...nodes);tr.append(td);return td;};
+   const amount=(key,label,cents,...lines)=>{const td=cell(key,label,el('span',cents===null||cents===undefined?'—':cjMoney(cents),'cjh-amt'));td.classList.add('num');for(const line of lines)if(line)td.append(el('small',line));return td;};
+   const code=button('',()=>cashSessionDialog(r.id),'cjh-code');code.type='button';code.textContent=r.code;code.title='Ver detalle de '+r.code;cell('code','N.º de cierre',code);
+   const when=el('span',undefined,'cjh-when');when.append(el('span',r.closed_at?cjhDate(r.closed_at):'En curso'),el('small','Apertura '+cjhDate(r.opened_at)));when.title='Apertura: '+formatOrderDate(r.opened_at)+(r.closed_at?' · Cierre: '+formatOrderDate(r.closed_at):'');cell('date','Fecha y hora',when);
+   const who=el('span',r.cashier,'cjh-ellipsis');who.title=r.cashier+(r.authorized_by?' · autorizó '+r.authorized_by:'');cell('who','Responsable',who);
+   cell('reg','Caja',r.register);cell('shift','Turno',r.shift||'—');amount('open','Fondo inicial',r.opening_cents);
+   amount('in','Entradas',r.income_cents,...(r.electronic_in_cents?['Efectivo '+cjMoney(r.cash_in_cents),'Electrónico '+cjMoney(r.electronic_in_cents)]:[]));
+   amount('out','Salidas',r.outgo_cents,r.electronic_out_cents?'Efectivo '+cjMoney(r.cash_out_cents):'');
+   amount('exp','Efectivo esperado',r.expected_cents);amount('count','Efectivo contado',r.counted_cents);amount('diff','Diferencia',r.difference_cents);
+   const st=el('div',undefined,'cjh-status');st.append(cjChip(r.status,r.status_label));if(r.adjustments){const a=cjChip('ajustada','Ajustada');a.title=r.adjustments+(r.adjustments===1?' ajuste':' ajustes')+' posteriores: '+cjMoney(r.adjusted_cents);st.append(a);}cell('st','Estado',st);
+   const more=el('div',undefined,'cjh-acts'),view=button('',()=>cashSessionDialog(r.id),'secondary inv-btn cjh-view');view.type='button';view.append(invIcon('eye'),el('span','Ver detalles'));more.append(view,cjhMenu(r));cell('acts','Acciones',more);
+   tbody.append(tr);}
+  table.append(thead,tbody);scroll.append(table);const foot=el('p',data.rows.length+(data.rows.length===1?' cierre':' cierres')+(data.rows.length>=data.limit?' (se muestran los '+data.limit+' más recientes: acota las fechas para ver otros)':''),'cjh-foot');slot.replaceChildren(scroll,foot);};
+ const load=async()=>{search.disabled=true;slot.setAttribute('aria-busy','true');if(!slot.firstChild)slot.append(el('p','Cargando…','empty-module'));let data;
+  try{data=await api('/api/caja/history?'+query());}catch(error){slot.replaceChildren(el('p',error.message,'empty-module'));return;}finally{search.disabled=false;slot.removeAttribute('aria-busy');}
+  if(!meta){meta=data;select('Estado','status',[['','Todos'],...Object.entries(data.statuses)]);select('Diferencia','difference',[['','Todas'],['cuadrado','Sin diferencia'],['sobrante','Sobrante'],['faltante','Faltante']]);
+   select('Caja','register',[['','Todas'],...data.registers.map(r=>[String(r.id),r.name])]);if(data.cashiers.length)select('Cajero','cashier',[['','Todos'],...data.cashiers.map(u=>[String(u.id),u.name])]);
+   select('Método de pago','method',[['','Todos'],...Object.entries(data.methods)]);form.append(acts);}
+  const active=Object.values(f).filter(Boolean).length;badge.textContent=String(active);badge.hidden=!active;badge.title=active+(active===1?' filtro aplicado':' filtros aplicados');
+  paintKpis(data.totals);paintRows(data);};
+ wrap.append(kpis,filters,slot);panel.append(wrap);load();}
 // Configuración de caja: A) cajas y puntos de venta en tarjetas, B) denominaciones en dos grupos con interruptores, C) reglas de operación.
 // Solo administración (el servidor lo comprueba). Desactivar una caja o una denominación nunca altera los cierres anteriores.
 async function cashConfigPanel(panel,state,target){panel.append(invSectionHead('Configuración de caja','Cajas y puntos de venta, denominaciones de los arqueos y reglas de operación. Los cambios no alteran los cierres anteriores.'));
