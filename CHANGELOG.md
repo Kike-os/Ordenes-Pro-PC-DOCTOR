@@ -4,6 +4,15 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.226 — 2026-11-02 21:57 (UTC-05:00)
+
+Documentación al día: secciones publicadas con su versión y pendientes de Facturación revisados (sin cambios en la aplicación)
+
+### Mejoras realizadas
+
+- Documentación al día: 18 secciones que figuraban como «rama de pruebas» o «pendiente de aprobación» indican ahora la versión en que se publicaron.
+- Pendientes de Facturación revisados contra el código: quedan la emisión real ante el SRI (requiere autorización administrativa), el ticket térmico de la factura y el consumo automático de repuestos en la orden.
+
 ## v1.5.225 — 2026-11-02 21:40 (UTC-05:00)
 
 Seguimiento en cascada automática con orden por prioridad y Registrar pago con bancos, cuentas y comprobante

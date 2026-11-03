@@ -8,6 +8,25 @@
   },
   "releases": [
     {
+      "version": "1.5.226",
+      "date": "2026-11-02T21:57:52-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Documentación al día: secciones publicadas con su versión y pendientes de Facturación revisados (sin cambios en la aplicación)",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Documentación al día: 18 secciones que figuraban como «rama de pruebas» o «pendiente de aprobación» indican ahora la versión en que se publicaron.",
+          "Pendientes de Facturación revisados contra el código: quedan la emisión real ante el SRI (requiere autorización administrativa), el ticket térmico de la factura y el consumo automático de repuestos en la orden."
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Kike-os: «haga los pendientes y actualiza a la versión siguiente» (02/11/2026)"
+    },
+    {
       "version": "1.5.225",
       "date": "2026-11-02T21:40:42-05:00",
       "type": "patch",
