@@ -8,7 +8,11 @@ se guarda igual, con su historial. Sin migración.
 
 Grupos configurados (con combinaciones activas, de los existentes), bancos habilitados, combinaciones banco · marca · categoría, plazos con
 al menos un factor vigente y factores pendientes (por confirmar o sin configurar). Lo calcula `card_finance.factor_table` (`summary`).
-Con los datos actuales: 10 de 10 grupos, 8 bancos, 31 combinaciones, 11 de 11 plazos y 1 factor pendiente (grupo J a 36 meses).
+Con los datos actuales: 10 de 10 grupos, 8 bancos, 31 combinaciones, 11 de 11 plazos y ningún factor pendiente.
+
+**Grupo J a 36 meses (migración 087, 1.5.233):** quedó pendiente en la 076 porque la cifra no era legible en el texto del PDF. Con la tabla
+original DATAFAST 6.2 enviada por administración el 03/11/2026 se confirmó **26,67 %**. La fila pendiente (sin valor) se completó con la
+misma versión de la tabla y su nota conserva el estado anterior; un factor pendiente sigue sin poder usarse para cobrar.
 
 ## Tabla de factores
 

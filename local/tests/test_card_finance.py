@@ -13,7 +13,7 @@ EXPECTED = {
     'C': '1,67 2,09 2,51 2,94 4,22 4,65 5,51 6,81 8,12 10,78 16,21', 'D': '1,60 2,01 2,42 2,82 4,05 4,47 5,29 6,54 7,80 10,35 15,56',
     'E': '4,26 5,34 6,44 7,54 10,89 12,02 14,31 17,79 21,34 28,64 44,01', 'F': '3,80 4,76 5,74 6,72 9,69 10,70 12,72 15,81 18,94 25,37 38,85',
     'G': '3,40 4,26 5,13 6,01 8,66 9,55 11,36 14,10 16,88 22,57 34,45', 'H': '2,62 3,28 3,95 4,62 6,65 7,33 8,70 10,78 12,89 17,17 26,05',
-    'I': '2,61 3,27 3,93 4,59 6,61 7,28 8,65 10,71 12,80 17,05 25,85', 'J': '2,68 3,36 4,05 4,73 6,81 7,50 8,91 11,03 13,19 17,58 pendiente'}
+    'I': '2,61 3,27 3,93 4,59 6,61 7,28 8,65 10,71 12,80 17,05 25,85', 'J': '2,68 3,36 4,05 4,73 6,81 7,50 8,91 11,03 13,19 17,58 26,67'}  # 36 meses: confirmado con la tabla original (migración 087)
 ONE = 'Única (la tabla no distingue categoría)'
 GROUPS = {('Banco Diners', 'Diners', 'Personal'): 'A', ('Banco Diners', 'Discover', 'Personal'): 'A', ('Banco Diners', 'Visa Titanium', 'Personal'): 'A',
           ('Banco Diners', 'Mastercard Titanium', 'Personal'): 'A', ('Banco Diners', 'Diners', 'Corporativa'): 'B', ('Banco Diners', 'Diners', 'Empresarial'): 'C',
@@ -51,6 +51,20 @@ class CardFinanceTests(unittest.TestCase):
                         self.assertEqual((f['factor_bp'], f['status'], f['version'], f['valid_from']), (int(value.replace(',', '')), 'vigente', '6.2', '2026-10-01'), (group, months))
             with self.assertRaises(Exception):
                 c.execute('DELETE FROM card_factors')
+
+    def test_pending_factor_cannot_be_used_and_j36_is_confirmed(self):
+        cookie, csrf = self.login()
+        r = self.sim(cookie, amount='140', method='diferido_con_intereses', months='36', **GYE)
+        self.assertEqual((r['status'], r['body']['factor_bp']), (200, 2667))
+        with app.connect() as c:
+            note = c.execute("SELECT note FROM card_factors WHERE group_code='J' AND months=36 AND status='vigente'").fetchone()[0]
+            self.assertIn('Antes: pendiente', note)
+            # Un factor pendiente (sin valor) sigue sin poder usarse para cobrar.
+            c.execute("UPDATE card_factors SET status='pendiente',factor_bp=NULL WHERE group_code='A' AND months=3 AND status='vigente'")
+            c.commit()
+        blocked = self.sim(cookie, amount='140', method='diferido_con_intereses', months='3', bank='Banco Pichincha', brand='Visa', category='Personal')
+        self.assertEqual(blocked['status'], 409)
+        self.assertIn('pendiente de confirmar', blocked['body']['error'])
 
     def test_screen_table_keeps_every_factor_and_real_summary(self):
         # La pantalla recibe los mismos factores que la base (sin redondear ni rellenar) y un resumen calculado con lo guardado.
@@ -139,10 +153,10 @@ class CardFinanceTests(unittest.TestCase):
         cards = self.request('/api/payments/cards', cookie=cookie)['body']
         self.assertEqual(sorted(cards['banks']), sorted({k[0] for k in GROUPS}))
         self.assertEqual(sorted(cards['banks']['Banco Guayaquil']), ['American Express', 'Mastercard', 'Visa'])
-        self.assertEqual([f['usable'] for f in cards['factors']['J']][-1], False)
+        self.assertEqual([f['usable'] for f in cards['factors']['J']][-1], True)  # J a 36 meses, confirmado (migración 087)
         rows = self.request('/api/payments/compare?amount=140&bank=Banco+Guayaquil&brand=Visa&category=' + ONE.replace(' ', '+'), cookie=cookie)['body']['rows']
         self.assertEqual(len(rows), 11)
-        self.assertEqual(rows[0]['diferido_con_intereses']['total_cents'], 15669);self.assertIn('unavailable', rows[-1]['diferido_con_intereses'])
+        self.assertEqual(rows[0]['diferido_con_intereses']['total_cents'], 15669);self.assertEqual(rows[-1]['diferido_con_intereses'], {'total_cents': 19330, 'installment_cents': 537, 'factor_bp': 2667, 'interest_cents': 4070})  # 36 meses: 152,60 × 26,67 % = 40,70
         self.assertEqual(rows[-1]['diferido_sin_intereses']['total_cents'], 15260)
         with app.connect() as c:
             c.execute("UPDATE users SET role='tecnico' WHERE id=?", (self.uid,));c.commit()
