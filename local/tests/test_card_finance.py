@@ -52,6 +52,21 @@ class CardFinanceTests(unittest.TestCase):
             with self.assertRaises(Exception):
                 c.execute('DELETE FROM card_factors')
 
+    def test_screen_table_keeps_every_factor_and_real_summary(self):
+        # La pantalla recibe los mismos factores que la base (sin redondear ni rellenar) y un resumen calculado con lo guardado.
+        cookie, csrf = self.login()
+        t = self.request('/api/payments/cards', cookie=cookie)['body']['table']
+        for row in t['rows']:
+            for group, expected in EXPECTED.items():
+                value = expected.split()[MONTHS.index(row['months'])]
+                f = row['factors'][group]
+                self.assertEqual((f['status'], f['factor_bp']), ('pendiente', None) if value == 'pendiente' else ('vigente', int(value.replace(',', ''))), (group, row['months']))
+        combos = {(x['bank'], x['brand'], x['category']): code for code, rows in t['combos'].items() for x in rows}
+        self.assertEqual(combos, GROUPS)  # mismas combinaciones autorizadas, cada una en su grupo
+        pending = sum(v.split().count('pendiente') for v in EXPECTED.values())
+        self.assertEqual(t['summary'], {'groups': len(set(GROUPS.values())), 'groups_total': 10, 'banks': len({b for b, _, _ in GROUPS}), 'combinations': len(GROUPS),
+                                        'months': len(MONTHS), 'months_total': len(MONTHS), 'pending': pending, 'missing': 0})
+
     def test_example_of_140_dollars_with_surcharge_and_deferred_interest(self):
         cookie, _ = self.login()
         r = self.sim(cookie, amount='140,00', method='diferido_con_intereses', months='3', **GYE)['body']

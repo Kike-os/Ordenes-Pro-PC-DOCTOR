@@ -5361,6 +5361,10 @@ function invFacts(pairs){const dl=el('dl',undefined,'inv-facts fx-facts');for(co
 const cardMoney=c=>quoteMoney(c),cardPct=bp=>(bp/100).toFixed(2).replace('.',',')+' %';
 async function invoiceCardSimulator(panel){const data=await api('/api/payments/cards');panel.replaceChildren();
  panel.append(invSectionHead('Simulador de cuotas','Elige el banco, la tarjeta, la categoría y el plazo: Órdenes Pro calcula el recargo, el interés del diferido, el total y cada letra con los factores guardados.'));
+ cardSimulator(panel,data);}
+// Simulador de pagos con tarjeta (también dentro de Tarjetas y DATAFAST). Todo el cálculo lo hace el servidor con los factores y el recargo
+// vigentes (/api/payments/simulate); aquí solo se eligen los datos y se presenta el desglose.
+function cardSimulator(panel,data){
  const layout=el('div',undefined,'fx-sim'),{form,msg,field,fail,clear}=invForm('inv-settings fx-sim-form');form.addEventListener('submit',e=>e.preventDefault());
  const g1=el('fieldset',undefined,'inv-group'),l1=el('legend');l1.append(invIcon('circle-dollar-sign'),el('span','Venta'));g1.append(l1);form.append(g1);
  const amount=field('amount','Importe base de la venta (USD)',{required:true,mode:'decimal',max:14,value:'140,00',into:g1,hint:'Con impuestos incluidos, antes del recargo y del financiamiento.'});
@@ -5391,9 +5395,9 @@ async function invoiceCardSimulator(panel){const data=await api('/api/payments/c
   const eq=el('p',undefined,'fx-sim-eq');eq.append(el('span',cardMoney(r.base_cents)),el('i','+'),el('span',cardMoney(r.surcharge_cents)),el('i','+'),el('span',cardMoney(r.interest_cents)),el('i','='),el('b',cardMoney(r.total_cents)));
   const eqLabels=el('p',undefined,'fx-sim-eq fx-sim-eq-labels');eqLabels.append(el('span','Precio'),el('i',''),el('span','Recargo comercial'),el('i',''),el('span','Intereses'),el('i',''),el('b','Total'));side.append(eq,eqLabels);
   const letter=el('p',undefined,'fx-sim-letter');letter.append(el('span',cardMoney(r.total_cents)+' ÷ '+r.months+(r.months===1?' pago':' meses')+' ='),el('strong',cardMoney(r.installment_cents)),el('small',r.months===1?'Pago único':'Valor de cada letra'));side.append(letter);
-  const dl=el('dl',undefined,'inv-facts fx-facts fx-sim-facts'),rows=[['Importe inicial',cardMoney(r.base_cents)],['Recargo comercial',r.surcharge_applies?cardMoney(r.surcharge_cents)+' ('+cardPct(r.surcharge_bp)+(r.surcharge_fixed_cents?' + '+cardMoney(r.surcharge_fixed_cents):'')+')':'$0,00 · no aplica'],
-   ['Subtotal financiable',cardMoney(r.financeable_cents)],['Porcentaje del diferido',r.method==='diferido_con_intereses'?cardPct(r.factor_bp)+(r.group?' · grupo '+r.group:''):'0,00 %'],['Interés de financiamiento',cardMoney(r.interest_cents)],
-   ['Total a pagar',cardMoney(r.total_cents)],['Número de letras',String(r.months)],['Valor de cada letra',cardMoney(r.installment_cents)]];
+  const dl=el('dl',undefined,'inv-facts fx-facts fx-sim-facts'),rows=[['Valor original',cardMoney(r.base_cents)],['Porcentaje de recargo',r.surcharge_applies?cardPct(r.surcharge_bp)+(r.surcharge_fixed_cents?' + '+cardMoney(r.surcharge_fixed_cents):''):'No aplica'],
+   ['Valor del recargo',cardMoney(r.surcharge_cents)],['Base de cálculo de intereses',cardMoney(r.financeable_cents)],['Factor financiero aplicado',r.method==='diferido_con_intereses'?cardPct(r.factor_bp)+(r.group?' · grupo '+r.group:''):'0,00 % · sin intereses'],
+   ['Valor de intereses',cardMoney(r.interest_cents)],['Total final',cardMoney(r.total_cents)],[r.months>1?'Cuota mensual ('+r.months+' meses)':'Pago único',cardMoney(r.installment_cents)]];
   for(const[k,v]of rows){const x=el('div');x.append(el('dt',k),el('dd',v));dl.append(x);}side.append(dl);
   if(r.months>1){const det=el('details',undefined,'fx-sim-plan'),sum=el('summary');sum.append(invIcon('scroll-text'),el('span','Tabla de letras ('+r.months+')'));det.append(sum);const t=el('table',undefined,'inv-table fx-sim-table'),tb=el('tbody');
    t.append(el('thead'));t.tHead.append(el('tr'));for(const h of ['Letra','Importe']){const th=el('th',h);th.scope='col';t.tHead.rows[0].append(th);}
@@ -5415,37 +5419,99 @@ async function invoiceCardSimulator(panel){const data=await api('/api/payments/c
  for(const input of [amount])input.addEventListener('input',schedule);
  for(const select of [method,bank,brand,category])select.addEventListener('change',()=>{sync();schedule();});months.addEventListener('change',schedule);
  sync();calc();}
-// Tarjetas y DATAFAST: tabla de factores guardada en la base, correspondencia de grupos y recargo comercial con su historial.
-async function invoiceCardSettings(panel){const data=await api('/api/payments/cards'),t=data.table,s=data.surcharge;panel.replaceChildren();
+// Tarjetas y DATAFAST: resumen con lo guardado, tabla de factores (filtros por grupo, plazo y banco, búsqueda de porcentaje, encabezados y
+// columna de meses fijos), grupos bancarios en tarjetas desplegables, simulador y recargo comercial. Solo presenta: factores, combinaciones,
+// recargo y cálculos salen del servidor y no se modifican aquí (salvo el recargo, con su formulario y su historial).
+for(const[k,v]of Object.entries({'layers':'<path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/>',
+ 'calendar':'<path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/>','chevrons-up-down':'<path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/>',
+ 'chevron-down':'<path d="m6 9 6 6 6-6"/>','pencil':'<path d="M21.17 6.81a1 1 0 0 0-3.99-3.99L3.84 16.17a2 2 0 0 0-.5.83l-1.32 4.35a.5.5 0 0 0 .62.62l4.35-1.32a2 2 0 0 0 .83-.5z"/><path d="m15 5 4 4"/>'}))invIcons[k]??=v;
+const cardBrandKey=b=>{const t=String(b||'').toLowerCase();return t.includes('visa')?'visa':t.includes('master')?'mastercard':t.includes('diners')?'diners':t.includes('discover')?'discover':t.includes('american')||t.includes('amex')?'amex':t.includes('pacificard')?'pacificard':'otra';};
+function cardBrandChip(brand){const chip=el('span',brand,'fxp-brand');chip.dataset.brand=cardBrandKey(brand);return chip;}
+async function invoiceCardSettings(panel){const data=await api('/api/payments/cards'),t=data.table,s=data.surcharge,sum=t.summary||{};panel.replaceChildren();
  panel.append(invSectionHead('Tarjetas y DATAFAST','Factores de diferido con intereses guardados en la base de datos'+(t.source?' ('+t.source.source+', versión '+t.source.version+', vigentes desde '+dashboardDate(t.source.valid_from)+')':'')+'. No representan la comisión del establecimiento.'));
- // Recargo comercial (separado de los factores).
- const card=invoiceCard('Recargo comercial','badge-percent',s.active?'Activo · '+cardPct(s.percent_bp)+(s.fixed_cents?' + '+cardMoney(s.fixed_cents):''):'Desactivado');
- if(s.active&&!s.validated){const w=el('p',undefined,'fx-plan-note fx-warn-note');w.append(invIcon('triangle-alert'),el('span','Pendiente de validación contractual, tributaria y comercial antes de trasladarlo al cliente.'));card.append(w);}
- if(data.can_manage){const{form,msg,field,fail,clear}=invForm('inv-settings fx-surcharge');form.append(invRequiredNote());
-  const grid=el('div',undefined,'fx-form-grid');form.append(grid);
-  field('percent','Recargo porcentual (%)',{value:(s.percent_bp/100).toFixed(2).replace('.',','),mode:'decimal',max:6,into:grid,required:true});field('fixed','Recargo fijo (USD)',{value:(s.fixed_cents/100).toFixed(2).replace('.',','),mode:'decimal',max:10,into:grid});
-  field('payer','Quién asume el costo',{options:[['cliente','El cliente (se suma al total)'],['empresa','La empresa (no se suma)']],value:s.payer,into:grid});
-  field('valid_from','Vigente desde',{type:'date',value:s.valid_from,into:grid});field('valid_to','Vigente hasta',{type:'date',value:s.valid_to,into:grid});
+ const wrap=el('div',undefined,'fxp');panel.append(wrap);const codes=Object.keys(t.groups),combos=t.combos||{};
+ const pendingTotal=(sum.pending||0)+(sum.missing||0);
+ wrap.append(invoiceKpis([['layers','Grupos configurados',(sum.groups??codes.length)+' de '+(sum.groups_total??codes.length),'Grupos con combinaciones activas','blue'],['landmark','Bancos habilitados',String(sum.banks??0),'Emisores con combinaciones activas','teal'],
+  ['credit-card','Combinaciones bancarias',String(sum.combinations??0),'Banco · marca · categoría','teal'],['calendar','Plazos disponibles',(sum.months??0)+' de '+(sum.months_total??0),'Con al menos un factor vigente','blue'],
+  ['triangle-alert','Factores pendientes',String(pendingTotal),pendingTotal?(sum.pending||0)+' por confirmar · '+(sum.missing||0)+' sin configurar':'Todos configurados',pendingTotal?'amber':'green']]));
+ // 1 · Tabla de factores.
+ const tableCard=invoiceCard('Factores de diferido con intereses','scroll-text','Porcentaje por grupo y plazo · '+codes.length+' grupos · '+t.rows.length+' plazos'),tools=el('div',undefined,'fxp-tools');
+ const sel=(label,options)=>{const l=el('label',undefined,'inv-field'),x=el('select');for(const[v,txt]of options)x.add(new Option(txt,v));l.append(el('span',label),x);tools.append(l);return x;};
+ const banks=[...new Set(Object.values(combos).flat().map(x=>x.bank))].sort((a,b)=>a.localeCompare(b,'es'));
+ const fGroup=sel('Grupo',[['','Todos'],...codes.map(c=>[c,'Grupo '+c])]),fMonths=sel('Plazo',[['','Todos'],...t.rows.map(r=>[String(r.months),r.months+' meses'])]),fBank=sel('Banco',[['','Todos'],...banks.map(b=>[b,b])]);
+ const qBox=el('label',undefined,'inv-field fxp-q'),q=el('input');q.type='search';q.inputMode='decimal';q.placeholder='Ej.: 8,45';q.setAttribute('aria-label','Buscar un porcentaje');qBox.append(el('span','Buscar porcentaje'),q);tools.append(qBox);
+ const clearB=invBtn('Limpiar','rotate-ccw',()=>{fGroup.value=fMonths.value=fBank.value=q.value='';apply();});tools.append(clearB);
+ const legend=el('p',undefined,'fxp-legend');legend.append(el('span','Pendiente de confirmar','fxp-tag'),el('span','Sin configurar','fxp-tag fxp-tag-none'),el('span','Ningún valor se rellena: un pendiente no se puede usar para cobrar.'));
+ const count=el('p','','fxp-count');count.setAttribute('aria-live','polite');
+ const scroll=el('div',undefined,'fxp-scroll'),table=el('table',undefined,'fxp-table'),thead=el('thead'),hr=el('tr'),tbody=el('tbody');scroll.tabIndex=0;scroll.setAttribute('role','region');scroll.setAttribute('aria-label','Factores por grupo y plazo');
+ {const th=el('th','Meses');th.scope='col';th.dataset.col='m';hr.append(th);}for(const code of codes){const th=el('th');th.scope='col';th.dataset.group=code;th.append(el('b',code),el('small',(combos[code]||[]).length+' comb.'));th.title='Grupo '+code;hr.append(th);}thead.append(hr);
+ for(const r of t.rows){const tr=el('tr');tr.dataset.months=String(r.months);const th=el('th');th.scope='row';th.append(el('b',String(r.months)),el('small','meses'));tr.append(th);
+  for(const code of codes){const f=r.factors[code],td=el('td');td.dataset.group=code;
+   if(!f){td.dataset.state='none';td.append(el('span','—'));td.title='Sin factor configurado para el grupo '+code+' a '+r.months+' meses';}
+   else if(f.status==='pendiente'||f.factor_bp==null){td.dataset.state='pending';td.append(el('span','Pendiente','fxp-tag'));td.title='Pendiente de confirmar con el documento original: no se puede usar todavía';}
+   else{td.dataset.state='ok';td.dataset.text=cardPct(f.factor_bp);td.append(el('span',cardPct(f.factor_bp)));td.title='Grupo '+code+' · '+r.months+' meses · '+cardPct(f.factor_bp);}
+   tr.append(td);}tbody.append(tr);}
+ table.append(thead,tbody);scroll.append(table);tableCard.append(tools,legend,scroll,count);wrap.append(tableCard);
+ const norm=v=>String(v||'').replace(/[%\s]/g,'').replace('.',',');
+ function apply(){const g=fGroup.value,m=fMonths.value,b=fBank.value,needle=norm(q.value);const groups=new Set(codes.filter(code=>(!g||code===g)&&(!b||(combos[code]||[]).some(x=>x.bank===b))));
+  for(const cell of table.querySelectorAll('[data-group]'))cell.hidden=!groups.has(cell.dataset.group);let hits=0,rows=0;
+  for(const tr of tbody.rows){const show=!m||tr.dataset.months===m;tr.hidden=!show;if(show)rows++;for(const td of tr.querySelectorAll('td')){const hit=!!needle&&!td.hidden&&td.dataset.state==='ok'&&norm(td.dataset.text).includes(needle);td.classList.toggle('fxp-hit',hit);if(hit)hits++;}}
+  table.classList.toggle('fxp-searching',!!needle);
+  count.textContent=!groups.size?'Ningún grupo con esos filtros.':(needle?hits+(hits===1?' coincidencia':' coincidencias')+' de «'+q.value.trim()+'» · ':'')+groups.size+(groups.size===1?' grupo':' grupos')+' · '+rows+(rows===1?' plazo':' plazos');
+  for(const card of grid.querySelectorAll('.fxp-group'))card.dataset.active=String(!!g&&card.dataset.group===g);}
+ for(const x of [fGroup,fMonths,fBank])x.addEventListener('change',apply);q.addEventListener('input',apply);
+ // 2 · Grupos bancarios.
+ const groupsCard=invoiceCard('Grupos bancarios','landmark','Solo estas combinaciones de banco, marca y categoría se pueden elegir al cobrar'),gTools=el('div',undefined,'fxp-tools');
+ const gq=el('input');gq.type='search';gq.placeholder='Buscar banco, marca o categoría';gq.setAttribute('aria-label','Buscar en los grupos bancarios');const gBox=el('label',undefined,'inv-search fxp-gsearch');gBox.append(invIcon('search'),gq);
+ const toggleAll=invBtn('Expandir todo','chevrons-up-down',()=>{const open=toggleAll.dataset.open!=='true';toggleAll.dataset.open=String(open);toggleAll.lastChild.textContent=open?'Contraer todo':'Expandir todo';for(const c of grid.querySelectorAll('.fxp-group:not([hidden])'))setOpen(c,open);});
+ gTools.append(gBox,toggleAll);const grid=el('div',undefined,'fxp-groups'),gEmpty=invEmpty('search','Sin coincidencias','Ningún grupo tiene ese banco, marca o categoría.');gEmpty.hidden=true;
+ const setOpen=(card,open)=>{card.dataset.open=String(open);card.querySelector('.fxp-more').setAttribute('aria-expanded',String(open));card.querySelector('.fxp-detail').hidden=!open;card.querySelector('.fxp-more span').textContent=open?'Ocultar':'Combinaciones';card.querySelector('.fxp-more').title=(open?'Ocultar':'Ver')+' las combinaciones del grupo '+card.dataset.group;};
+ for(const code of codes){const list=combos[code]||[],byBank={};for(const x of list)((byBank[x.bank]??={})[x.brand]??=[]).push(x.category);
+  const brands=[...new Set(list.map(x=>x.brand))],cats=[...new Set(list.map(x=>x.category))];
+  const card=el('article',undefined,'fxp-group');card.dataset.group=code;card.dataset.text=list.map(x=>[x.bank,x.brand,x.category].join(' ')).join(' ').toLowerCase();
+  const top=el('header'),badge=el('span',code,'fxp-gcode'),title=el('div');title.append(el('strong','Grupo '+code),el('small',list.length?list.length+(list.length===1?' combinación':' combinaciones'):'Sin combinaciones activas'));top.append(badge,title);
+  const stats=el('dl',undefined,'fxp-gstats');for(const[k,v]of [['Bancos',Object.keys(byBank).length],['Marcas',brands.length],['Categorías',cats.length]]){const x=el('div');x.append(el('dt',k),el('dd',String(v)));stats.append(x);}
+  const logos=el('div',undefined,'fxp-logos');for(const b of Object.keys(byBank).slice(0,5)){const l=bankLogo(b);l.title=b;logos.append(l);}if(Object.keys(byBank).length>5)logos.append(el('span','+'+(Object.keys(byBank).length-5),'fxp-more-logos'));
+  const chips=el('div',undefined,'fxp-chips');for(const b of brands)chips.append(cardBrandChip(b));
+  const detail=el('div',undefined,'fxp-detail');detail.hidden=true;for(const[bank,brandsOf]of Object.entries(byBank)){const row=el('div',undefined,'fxp-bank'),name=el('div',undefined,'fxp-bank-name');name.append(bankLogo(bank),el('strong',bank));row.append(name);
+   for(const[brand,catsOf]of Object.entries(brandsOf)){const line=el('div',undefined,'fxp-line');line.append(cardBrandChip(brand));const cs=el('div',undefined,'fxp-cats');for(const cat of catsOf)cs.append(el('span',cat,'fxp-cat'));line.append(cs);row.append(line);}detail.append(row);}
+  const acts=el('div',undefined,'fxp-gacts'),more=button('',()=>setOpen(card,card.dataset.open!=='true'),'secondary inv-btn fxp-more');more.append(invIcon('chevron-down'),el('span','Combinaciones'));more.setAttribute('aria-expanded','false');more.title='Ver las combinaciones del grupo '+code;
+  const see=invBtn('Ver factores','scroll-text',()=>{fGroup.value=code;fMonths.value='';fBank.value='';apply();tableCard.scrollIntoView({block:'start',behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});});see.title='Muestra solo la columna del grupo '+code+' en la tabla de factores';
+  if(!list.length){more.disabled=true;}acts.append(more,see);card.append(top,stats,logos,chips,acts,detail);grid.append(card);}
+ gq.addEventListener('input',()=>{const needle=gq.value.trim().toLowerCase();let shown=0;for(const card of grid.querySelectorAll('.fxp-group')){const hit=!needle||card.dataset.text.includes(needle)||('grupo '+card.dataset.group.toLowerCase()).includes(needle);card.hidden=!hit;if(hit)shown++;if(needle&&hit)setOpen(card,true);}gEmpty.hidden=!!shown;});
+ groupsCard.append(gTools,grid,gEmpty);wrap.append(groupsCard);
+ // 3 · Simulador (mismas reglas que las ventas y el registro de pagos).
+ const simCard=invoiceCard('Simulador de pagos con tarjeta','calculator','Usa los factores vigentes y el recargo configurado; el cálculo lo hace el servidor');simCard.classList.add('fxp-sim');wrap.append(simCard);cardSimulator(simCard,data);
+ // 4 · Recargo comercial: vista de lectura y edición con «Editar», «Guardar cambios» y «Cancelar».
+ const rc=invoiceCard('Recargo comercial','badge-percent',s.active?'Activo · '+cardPct(s.percent_bp)+(s.fixed_cents?' + '+cardMoney(s.fixed_cents):''):'Desactivado');
+ if(s.active&&!s.validated){const w=el('p',undefined,'fx-plan-note fx-warn-note');w.append(invIcon('triangle-alert'),el('span','Pendiente de validación contractual, tributaria y comercial antes de trasladarlo al cliente.'));rc.append(w);}
+ const view=el('dl',undefined,'fxp-facts');for(const[k,v]of [['Recargo porcentual',cardPct(s.percent_bp)],['Recargo fijo',cardMoney(s.fixed_cents)],['Quién lo asume',s.payer==='cliente'?'El cliente (se suma al total)':'La empresa (no se suma)'],
+  ['Métodos',s.methods.length?s.methods.map(m=>data.methods[m]||m).join(', '):'Ninguno'],['Vigencia',(s.valid_from?dashboardDate(s.valid_from):'Sin inicio')+' — '+(s.valid_to?dashboardDate(s.valid_to):'sin fin')],['Estado',(s.active?'Activo':'Desactivado')+(s.validated?' · validado':' · sin validar')]]){const x=el('div');x.append(el('dt',k),el('dd',v));view.append(x);}
+ rc.append(view);
+ if(data.can_manage){const edit=invBtn('Editar','pencil',()=>{view.hidden=true;edit.hidden=true;form.hidden=false;form.querySelector('input')?.focus();});const bar=el('div',undefined,'fxp-rc-acts');bar.append(edit);rc.append(bar);
+  const{form,msg,field,fail,clear}=invForm('inv-settings fx-surcharge');form.hidden=true;form.append(invRequiredNote());
+  const grid2=el('div',undefined,'fx-form-grid');form.append(grid2);
+  field('percent','Recargo porcentual (%)',{value:(s.percent_bp/100).toFixed(2).replace('.',','),mode:'decimal',max:6,into:grid2,required:true});field('fixed','Recargo fijo (USD)',{value:(s.fixed_cents/100).toFixed(2).replace('.',','),mode:'decimal',max:10,into:grid2});
+  field('payer','Quién asume el costo',{options:[['cliente','El cliente (se suma al total)'],['empresa','La empresa (no se suma)']],value:s.payer,into:grid2});
+  field('valid_from','Vigente desde',{type:'date',value:s.valid_from,into:grid2});field('valid_to','Vigente hasta',{type:'date',value:s.valid_to,into:grid2});
   const methods=el('fieldset',undefined,'inv-group fx-checks'),lg=el('legend');lg.append(el('span','Métodos a los que aplica'));methods.append(lg);
   for(const m of data.surcharge_methods){const l=el('label',undefined,'inv-cf'),c=el('input');c.type='checkbox';c.name='m_'+m;c.checked=s.methods.includes(m);l.append(c,el('span',data.methods[m]));methods.append(l);}form.append(methods);
   const flags=el('div',undefined,'fx-checks');for(const[name,label,on]of [['active','Recargo activo',s.active],['validated','Validado contractual y tributariamente',s.validated]]){const l=el('label',undefined,'inv-cf'),c=el('input');c.type='checkbox';if(name==='active')asSwitch(c);c.name=name;c.checked=on;l.append(c,el('span',label));flags.append(l);}form.append(flags);
   field('note','Motivo del cambio',{area:true,max:300,required:true,hint:'Queda en el historial con tu nombre y la fecha.'});
-  const save=el('button',undefined,'primary inv-btn');save.type='submit';save.append(invIcon('circle-check'),el('span','Guardar recargo'));const foot=el('div',undefined,'inv-form-foot');foot.append(save);form.append(msg,foot);
+  const save=el('button',undefined,'primary inv-btn');save.type='submit';save.append(invIcon('circle-check'),el('span','Guardar cambios'));
+  const cancel=invBtn('Cancelar','x',()=>{form.reset();clear();form.hidden=true;view.hidden=false;edit.hidden=false;edit.focus();});
+  const foot=el('div',undefined,'inv-form-foot fxp-rc-acts');foot.append(cancel,save);form.append(msg,foot);
   form.addEventListener('submit',async event=>{event.preventDefault();clear();const fd=new FormData(form),body={percent:fd.get('percent'),fixed:fd.get('fixed'),payer:fd.get('payer'),valid_from:fd.get('valid_from'),valid_to:fd.get('valid_to'),note:fd.get('note'),
-    active:fd.get('active')?'1':'',validated:fd.get('validated')?'1':'',methods:data.surcharge_methods.filter(m=>fd.get('m_'+m)).join(',')};save.disabled=true;
-   try{await api('/api/payments/surcharge',body);toast('Recargo comercial guardado.','success');invoiceCardSettings(panel);}catch(error){fail(error);save.disabled=false;}});card.append(form);}
- panel.append(card);
- // Tabla de factores por grupo y plazo.
- const codes=Object.keys(t.groups),tableCard=invoiceCard('Factores de diferido con intereses','scroll-text','Porcentaje por grupo y plazo · '+codes.length+' grupos'),wrap=el('div',undefined,'inv-table-wrap fx-factors'),table=el('table',undefined,'inv-table'),hr=el('tr');
- for(const h of ['Meses',...codes]){const th=el('th',h);th.scope='col';hr.append(th);}table.append(el('thead'));table.tHead.append(hr);const tb=el('tbody');
- for(const r of t.rows){const tr=el('tr'),th=el('th',String(r.months));th.scope='row';tr.append(th);for(const code of codes){const f=r.factors[code],td=el('td',f?(f.status==='pendiente'?'Pendiente':cardPct(f.factor_bp)):'—','inv-num');if(f?.status==='pendiente'){td.dataset.pending='1';td.title='Pendiente de confirmar con el documento original';}tr.append(td);}tb.append(tr);}
- table.append(tb);wrap.append(table);tableCard.append(wrap);panel.append(tableCard);
- // Correspondencia de bancos y grupos.
- const map=invoiceCard('Bancos, marcas y categorías','landmark','Solo estas combinaciones se pueden elegir'),list=el('div',undefined,'fx-groups');
- for(const code of codes){const box=el('div',undefined,'fx-group');box.append(el('strong','Grupo '+code));const ul=el('ul');for(const item of t.groups[code]){ul.append(el('li',item));}box.append(ul);list.append(box);}map.append(list);panel.append(map);
- if(data.can_manage){const hist=invoiceCard('Historial del recargo','clock','Cada cambio, con su responsable');panel.append(hist);try{const h=await api('/api/payments/surcharge/history');const ul=el('ul',undefined,'fx-list fx-timeline');
-   for(const r of h.rows){const li=el('li'),box=el('div',undefined,'fx-row');const top=el('span',undefined,'fx-row-top');top.append(el('strong',cardPct(r.percent_bp)+(r.fixed_cents?' + '+cardMoney(r.fixed_cents):'')+' · '+(r.active?'activo':'desactivado')+' · asume '+r.payer));box.append(top,el('span',r.note,'fx-row-sub'),el('small',formatOrderDate(r.changed_at)+(r.actor?' · '+r.actor:'')));li.append(box);ul.append(li);}hist.append(ul);}
-  catch(error){hist.append(el('p',error.message,'empty-module'));}}}
+    active:fd.get('active')?'1':'',validated:fd.get('validated')?'1':'',methods:data.surcharge_methods.filter(m=>fd.get('m_'+m)).join(',')};
+   save.disabled=cancel.disabled=true;save.setAttribute('aria-busy','true');save.lastChild.textContent='Guardando…';form.setAttribute('aria-busy','true');
+   try{await api('/api/payments/surcharge',body);toast('Recargo comercial guardado. El cambio quedó en el historial.','success');invoiceCardSettings(panel);}
+   catch(error){fail(error);save.disabled=cancel.disabled=false;save.removeAttribute('aria-busy');save.lastChild.textContent='Guardar cambios';form.removeAttribute('aria-busy');}});rc.append(form);}
+ wrap.append(rc);
+ if(data.can_manage){const hist=invoiceCard('Historial del recargo','clock','Cada cambio, con su responsable');wrap.append(hist);try{const h=await api('/api/payments/surcharge/history');const ul=el('ul',undefined,'fx-list fx-timeline');
+   for(const r of h.rows){const li=el('li'),box=el('div',undefined,'fx-row');const top=el('span',undefined,'fx-row-top');top.append(el('strong',cardPct(r.percent_bp)+(r.fixed_cents?' + '+cardMoney(r.fixed_cents):'')+' · '+(r.active?'activo':'desactivado')+' · asume '+r.payer));box.append(top,el('span',r.note,'fx-row-sub'),el('small',formatOrderDate(r.changed_at)+(r.actor?' · '+r.actor:'')));li.append(box);ul.append(li);}
+   hist.append(h.rows.length?ul:invEmpty('clock','Sin cambios registrados','El primer cambio del recargo aparecerá aquí.'));}
+  catch(error){hist.append(el('p',error.message,'empty-module'));}}
+ apply();}
 // Panel de facturas: indicadores con lo registrado (nada estimado), búsqueda, filtros por estado y tabla.
 function invoicesPanel(panel,data){const s=data.summary,test=data.settings.test_mode!==false,filtered=!!(invoiceState.q||invoiceState.status);
  if(data.settings.missing.length){const warn=el('div',undefined,'inv-warn inv-warn-action');warn.setAttribute('role','status');warn.append(invIcon('triangle-alert'),el('span','Faltan datos fiscales para emitir: '+data.settings.missing.join(', ')+'.'),button('Completar datos fiscales',()=>{invoiceGo('fiscal');},'secondary'));panel.append(warn);}

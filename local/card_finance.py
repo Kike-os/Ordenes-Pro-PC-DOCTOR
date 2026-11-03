@@ -172,7 +172,18 @@ def factor_table(c):
     for r in c.execute("SELECT group_code,months,factor_bp,status FROM card_factors WHERE status IN ('vigente','pendiente')"):
         rows.setdefault(r['months'], {})[r['group_code']] = {'factor_bp': r['factor_bp'], 'status': r['status']}
     meta = c.execute("SELECT source,version,valid_from FROM card_factors WHERE status='vigente' ORDER BY id DESC LIMIT 1").fetchone()
-    return {'groups': {code: groups.get(code, []) for code in sorted(r[0] for r in c.execute('SELECT code FROM card_factor_groups'))},
+    codes = sorted(r[0] for r in c.execute('SELECT code FROM card_factor_groups'))
+    # Combinaciones de cada grupo ya separadas (banco, marca y categoría) y un resumen calculado con lo guardado: nada se estima ni se rellena.
+    combos = {code: [] for code in codes}
+    for r in c.execute('SELECT group_code,bank,brand,category FROM card_products WHERE active=1 ORDER BY group_code,bank,brand,category'):
+        combos.setdefault(r['group_code'], []).append({'bank': r['bank'], 'brand': r['brand'], 'category': r['category']})
+    cells = [(m, code, rows.get(m, {}).get(code)) for m in MONTHS for code in codes]
+    summary = {'groups': sum(1 for code in codes if combos.get(code)), 'groups_total': len(codes),
+               'banks': c.execute('SELECT COUNT(DISTINCT bank) FROM card_products WHERE active=1').fetchone()[0],
+               'combinations': sum(len(v) for v in combos.values()), 'months': len([m for m in MONTHS if any(f and f['status'] == 'vigente' for _, code, f in cells if _ == m)]),
+               'months_total': len(MONTHS), 'pending': sum(1 for _, _, f in cells if f and (f['status'] == 'pendiente' or f['factor_bp'] is None)),
+               'missing': sum(1 for _, _, f in cells if not f)}
+    return {'groups': {code: groups.get(code, []) for code in codes}, 'combos': combos, 'summary': summary,
             'rows': [{'months': m, 'factors': rows.get(m, {})} for m in MONTHS], 'source': dict(meta) if meta else None}
 
 

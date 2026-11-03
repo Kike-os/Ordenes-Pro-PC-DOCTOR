@@ -76,6 +76,7 @@ Están en Facturación → «Cuentas bancarias» (administración). En modo de p
 - **Historial de cierres** con filtros por persona (administración), estado de los depósitos y fechas, más el historial inmutable de cada cierre (`cash_events`).
 - **Caja por sesiones → Historial y auditoría** (rediseño 1.5.227): ver [CAJA-HISTORIAL.md](CAJA-HISTORIAL.md).
 - **Reportes de cierre A4 y ticket de 80 mm**: ver [CAJA-REPORTES.md](CAJA-REPORTES.md).
+- **Tarjetas y DATAFAST** (rediseño 1.5.232): ver [TARJETAS-DATAFAST.md](TARJETAS-DATAFAST.md).
 
 ## Inventario, compras y proveedores (pestañas propias)
 - **Artículos:** se incorporan desde el catálogo (categorías «Repuesto» y «Otro»), como producto, repuesto o accesorio, con código interno opcional y único, existencia mínima y ubicación. No se eliminan: se desactivan.
