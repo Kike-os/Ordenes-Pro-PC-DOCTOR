@@ -8,6 +8,26 @@
   },
   "releases": [
     {
+      "version": "1.5.231",
+      "date": "2026-11-03T17:36:35-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Repuestos del inventario registrados desde la orden técnica",
+      "changes": {
+        "features": [
+          "Orden técnica: sección «Repuestos del inventario» para registrar desde la propia orden los repuestos usados, con lo ya usado y lo reservado; con serie, la unidad reservada viene marcada."
+        ],
+        "improvements": [
+          "La salida «uso en orden» se registra sin escribir el código: una por producto y orden, consume la reserva de la orden, nunca deja existencias negativas y la factura de la orden no la descuenta otra vez. Solo administración."
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Kike-os: «Sí, publica 1.5.231 y 1.5.232» (03/11/2026)"
+    },
+    {
       "version": "1.5.230",
       "date": "2026-11-03T08:09:33-05:00",
       "type": "patch",

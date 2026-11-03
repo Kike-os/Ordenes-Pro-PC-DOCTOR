@@ -4,6 +4,18 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.231 — 2026-11-03 17:36 (UTC-05:00)
+
+Repuestos del inventario registrados desde la orden técnica
+
+### Nuevas funcionalidades
+
+- Orden técnica: sección «Repuestos del inventario» para registrar desde la propia orden los repuestos usados, con lo ya usado y lo reservado; con serie, la unidad reservada viene marcada.
+
+### Mejoras realizadas
+
+- La salida «uso en orden» se registra sin escribir el código: una por producto y orden, consume la reserva de la orden, nunca deja existencias negativas y la factura de la orden no la descuenta otra vez. Solo administración.
+
 ## v1.5.230 — 2026-11-03 08:09 (UTC-05:00)
 
 Reportes de cierre de caja A4 y ticket monocromo de 80 mm para la Epson, turno según la hora y factura de licencias con descuento
