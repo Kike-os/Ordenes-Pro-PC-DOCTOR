@@ -165,7 +165,9 @@ def _sale_source(c, sale_id):
     for n, item in enumerate(c.execute('SELECT s.*,i.code,i.taxed FROM license_sale_items s JOIN catalog_items i ON i.id=s.product_id WHERE s.sale_id=? ORDER BY s.position,s.id', (sale_id,)), 1):
         gross = item['quantity'] * item['unit_price_cents']
         lines.append(_line(n, item['code'] or '', item['product_name'], item['quantity'], gross, gross - item['discount_cents'], quotes.tax_rate(c) if item['taxed'] else 0, item['id'], item['product_id']))
-    if sale['discount_cents'] and lines:
+    # El descuento de la venta es la suma de los de sus partidas, ya restados en cada línea: solo un excedente sería un descuento general sin repartir.
+    general = (sale['discount_cents'] or 0) - sum(item['discount_cents'] for item in c.execute('SELECT discount_cents FROM license_sale_items WHERE sale_id=?', (sale_id,)))
+    if general > 0 and lines:
         blockers.append('La venta tiene un descuento general: todavía no se reparte entre las partidas de la factura.')
     payments = {}
     for row in c.execute("SELECT method,SUM(amount_cents) total FROM license_sale_payments WHERE sale_id=? AND status='confirmado' GROUP BY method", (sale_id,)):

@@ -59,6 +59,18 @@ class LicenseSalesTests(unittest.TestCase):
             self.assertEqual(c.execute('SELECT COUNT(*) FROM license_sales').fetchone()[0],0)
             self.assertEqual(c.execute("SELECT COUNT(*) FROM license_units WHERE status='disponible'").fetchone()[0],5)
 
+    def test_sale_with_line_discount_can_be_invoiced(self):
+        # El descuento por partida ya va en cada línea: no es un descuento general y no bloquea la factura (antes la bloqueaba).
+        import invoicing
+        av,ms,client=self.catalog()
+        total=2*3000-500+9990
+        sale=self.sale(client,[{'product_id':av,'quantity':2,'discount':'5'},{'product_id':ms,'quantity':1}],payment={'amount':'%d,%02d'%(total//100,total%100),'method':'efectivo','confirmed':True})
+        self.assertEqual(sale['status'],201,sale['body'])
+        with app.connect() as c:
+            source=invoicing.source(c,'venta_licencia',sale['body']['sale'])
+        self.assertEqual(source['blockers'],[])
+        self.assertEqual(sum(line['total_cents'] for line in source['lines']),total)
+
     def test_payments_partial_pending_confirmed_and_receipts(self):
         av,ms,client=self.catalog()
         sale=self.sale(client,[{'product_id':av,'quantity':1}],payment={'amount':'10','method':'efectivo','confirmed':True})['body']['sale']
