@@ -2010,7 +2010,7 @@ class Handler(BaseHTTPRequestHandler):
                     if found:
                         if found[2]:
                             link=public_base_url().rstrip('/')+'/api/caja/sessions/%s/report.pdf'%found[1]  # el QR exige sesión y permisos
-                            thermal=f.get('formato')=='termico';pdf=cash_sessions.report_pdf(c,user,int(found[1]),link,thermal)
+                            thermal=f.get('formato')=='termico';pdf=cash_sessions.report_pdf(c,user,int(found[1]),link,thermal,now)
                             return self.reply(200,pdf,'application/pdf',filename='CIERRE-CJ-%06d%s.pdf'%(int(found[1]),'-80MM' if thermal else ''))
                         return self.reply(200,cash_sessions.view(c,user,int(found[1])))
                     found=re.fullmatch(r'/api/(caja/movements|bank/transfers|vouchers)/([0-9]{1,9})/file',path)

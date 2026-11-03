@@ -18,6 +18,12 @@ from datetime import datetime, timedelta
 import banking
 
 SHIFTS = ('Mañana', 'Tarde', 'Noche', 'Jornada completa')
+
+
+def suggested_shift(now):
+    """Turno que se propone al abrir la caja según la hora de Ecuador (el cajero puede cambiarlo): antes se preseleccionaba siempre «Mañana»,
+    también en aperturas nocturnas. Los turnos ya registrados no se modifican."""
+    return 'Mañana' if 5 <= now.hour < 12 else 'Tarde' if 12 <= now.hour < 18 else 'Noche'
 STATUS = {'abierta': 'Caja abierta', 'arqueo': 'En proceso de arqueo', 'revision': 'Pendiente de revisión', 'cerrada': 'Cerrada correctamente',
           'cerrada_diferencia': 'Cerrada con diferencia', 'anulada': 'Anulada'}
 OPEN = ('abierta', 'arqueo')
@@ -534,7 +540,7 @@ def state(c, user, now):
                      'last': {'id': last['id'], 'code': 'CJ-%06d' % last['id'], 'status': last['status'], 'status_label': STATUS[last['status']]} if last else None,
                      'pending_fund': pending_fund(c, r['id'])})
     users = [dict(u) for u in c.execute("SELECT id,name FROM users WHERE active=1 AND role IN ('administrador','tecnico') ORDER BY name")] if is_admin(user) else []
-    return {'registers': regs, 'shifts': list(SHIFTS), 'denominations': denominations(c), 'in_kinds': IN_KINDS, 'out_kinds': OUT_KINDS, 'admin_out': list(ADMIN_OUT), 'methods': METHODS,
+    return {'registers': regs, 'shifts': list(SHIFTS), 'suggested_shift': suggested_shift(now), 'denominations': denominations(c), 'in_kinds': IN_KINDS, 'out_kinds': OUT_KINDS, 'admin_out': list(ADMIN_OUT), 'methods': METHODS,
             'accounts': banking.listing(c, active_only=True), 'users': users, 'incidents': incidents(c), 'can_admin': is_admin(user), 'me': user['id'],
             'me_name': user['name'], 'next_code': 'CJ-%06d' % next_id(c, 'cash_sessions'), 'indicators': indicators(c, now), **{k: v for k, v in settings(c).items() if k != 'updated_at'}}
 
@@ -857,119 +863,10 @@ def history_csv(data):
 
 # ---- Reporte oficial de cierre (A4 y térmico 80 mm) -----------------------------------------------------------------------------
 
-def report_pdf(c, user, session_id, link, thermal=False):
-    d = view(c, user, session_id)
-    s, data, closing = d['session'], d['summary'], d['closing']
-    from document_canvas import Canvas, BLUE, GRAY
-    from corporate import settings
-    company = settings()
-    lines = []  # (texto, tamaño, negrita, sangría)
-
-    def add(text, size=8, bold=False, indent=0):
-        lines.append((text, size, bold, indent))
-    title = 'REPORTE OFICIAL DE CIERRE DE CAJA'
-    add('PC-DOCTOR S.A. — ' + title, 11 if not thermal else 8, True)
-    add('%s · RUC %s' % (company.get('name', 'PC-DOCTOR S.A.'), company.get('ruc', '') or '—'), 7.5)
-    add('Cierre %s · %s · turno %s' % (s['code'], s['register'], s['shift']), 9 if not thermal else 7.5, True)
-    add('Estado: %s' % s['status_label'], 8)
-    add('Cajero: %s · abrió: %s' % (s['cashier'], s['opened_by_name']), 8)
-    add('Apertura: %s' % _dt(s['opened_at']), 8)
-    if closing:
-        add('Cierre: %s · confirmado por %s' % (_dt(closing['closed_at']), closing['confirmed_name']), 8)
-    add('', 4)
-    add('INGRESOS DEL PERÍODO', 9, True)
-    add('Monto de apertura: %s' % usd(s['opening_cents']), 8, False, 8)
-    for key, g in data['income_groups'].items():
-        add('%s (%d): %s' % (g['label'], g['count'], usd(g['cents'])), 8, False, 8)
-    add('Total de ingresos: %s' % usd(data['income_cents']), 8, True, 8)
-    add('EGRESOS Y SALIDAS DE CAJA', 9, True)
-    for key, g in data['outgo_groups'].items():
-        add('%s (%d): %s' % (g['label'], g['count'], usd(g['cents'])), 8, False, 8)
-    add('Total de egresos: %s' % usd(data['outgo_cents']), 8, True, 8)
-    add('MÉTODOS DE PAGO', 9, True)
-    for key, m in data['by_method'].items():
-        if m['count']:
-            add('%s: entradas %s · salidas %s (%d)' % (METHODS[key], usd(m['in_cents']), usd(m['out_cents']), m['count']), 8, False, 8)
-    if data['vouchers']:
-        add('OPERACIONES CON TARJETA', 9, True)
-        for v in data['vouchers']:
-            add('%s %s · %s · lote %s · aut. %s · %s · comisión %s · neto %s · %s' % (v['brand'], v['issuer_bank'], v['tx_type'].replace('_', ' '), v['lot'], v['approval_code'],
-                                                                                    usd(v['amount_cents']), usd(v['commission_cents'] + v['commission_tax_cents']),
-                                                                                    usd(v['net_cents']) if v['net_cents'] is not None else 'por liquidar', v['status'].replace('_', ' ')), 7.5, False, 8)
-    if data['transfers']:
-        add('TRANSFERENCIAS Y DEPÓSITOS', 9, True)
-        for t in data['transfers']:
-            add('%s %s · %s · ref. %s · %s · %s' % (t['code'], t['method'], t['account'], t['reference'], usd(t['amount_cents']), t['status']), 7.5, False, 8)
-    add('ARQUEO DE EFECTIVO — DENOMINACIONES USD', 9, True)
-    counted_rows = closing['counts'] if closing else (d['counts'].get('cierre') or {}).get('counts', [])
-    for r in counted_rows:
-        add('%s %s × %d = %s' % ('Moneda' if r['kind'] == 'moneda' else 'Billete', usd(r['value_cents']), r['qty'], usd(r['subtotal_cents'])), 8, False, 8)
-    expected = closing['expected_cash_cents'] if closing else data['expected_cash_cents']
-    add('Efectivo esperado: %s' % usd(expected), 8, True, 8)
-    if closing:
-        add('Efectivo contado: %s' % usd(closing['counted_cash_cents']), 8, True, 8)
-        add('Diferencia: %s (%s)' % (usd(closing['difference_cents']), difference_type(closing['difference_cents'])), 8, True, 8)
-        if closing['difference_reason']:
-            add('Explicación: ' + closing['difference_reason'], 8, False, 8)
-        add('Reservado para el siguiente turno: %s · entregado: %s%s' % (usd(closing['reserved_cents']), usd(closing['withdrawn_cents']),
-                                                                         (' a ' + closing['delivered_to']) if closing['withdrawn_cents'] else ''), 8, False, 8)
-        if closing['note']:
-            add('Observaciones: ' + closing['note'], 8, False, 8)
-    if s['reviewed_by_name']:
-        add('Autorizado por: %s · %s' % (s['reviewed_by_name'], s['review_note']), 8)
-    for a in data['adjustments']:
-        add('Ajuste posterior %s: %s (%s)' % (usd(a['amount_cents']), a['reason'], a['actor']), 7.5, False, 8)
-    if data['pending']:
-        add('Pendientes de conciliación: %d' % len(data['pending']), 8, True)
-    if thermal:
-        width = 204
-        margin = 8
-        wrapped = []
-        probe = Canvas(width + 2 * margin, 100, 'Cierre ' + s['code'], mono=True)
-        for text, size, bold, indent in lines:
-            for piece in probe.wrap(text, width - indent, size) or ['']:
-                wrapped.append((piece, size, bold, indent))
-        height = 60 + sum(size * 1.45 for _, size, _, _ in wrapped) + 150
-        pdf = Canvas(width + 2 * margin, height, 'Cierre ' + s['code'], mono=True)
-        pdf.page()
-        y = 8 + pdf.logo(margin + 40, 8, width - 80) + 8
-        for text, size, bold, indent in wrapped:
-            pdf.text(text, margin + indent / 2, y, size, bold)
-            y += size * 1.45
-        y += 10
-        pdf.text('Firma del cajero: ______________________', margin, y, 7.5)
-        pdf.text('Firma del administrador: _______________', margin, y + 14, 7.5)
-        if link:
-            pdf.qr(link, margin + width / 2 - 40, y + 26, 80)
-        return pdf.finish()
-    pdf = Canvas(595, 842, 'Cierre ' + s['code'])
-    margin, width = 40, 515
-    pages, page_lines = [], []
-    y0 = 120
-    y = y0
-    for text, size, bold, indent in lines:
-        for piece in pdf.wrap(text, width - indent, size) or ['']:
-            if y > 760:
-                pages.append(page_lines)
-                page_lines, y = [], 60
-            page_lines.append((piece, size, bold, indent, y))
-            y += size * 1.5
-    pages.append(page_lines)
-    for number, chunk in enumerate(pages, 1):
-        pdf.page()
-        if number == 1:
-            pdf.logo(margin, 30, 120)
-            if link:
-                pdf.qr(link, 595 - margin - 70, 26, 70)
-                pdf.text('Consulta interna (requiere sesión)', 595 - margin - 150, 98, 6.5, False, GRAY)
-        for text, size, bold, indent, yy in chunk:
-            pdf.text(text, margin + indent, yy, size, bold, BLUE if bold and size >= 9 else (.10, .15, .22))
-        pdf.text('Página %d de %d · generado %s' % (number, len(pages), _dt(datetime.now().isoformat())), margin, 812, 7, False, GRAY)
-    pdf.text('Firma del cajero', margin + 20, 790, 8)
-    pdf.line(margin, 786, 200)
-    pdf.text('Firma del administrador', 595 - margin - 180, 790, 8)
-    pdf.line(595 - margin - 200, 786, 200)
-    return pdf.finish()
+def report_pdf(c, user, session_id, link, thermal=False, now=None):
+    """Reporte oficial de cierre (A4 o ticket de 80 mm): ver cash_report. Solo lee; la hora de generación es la de Ecuador."""
+    import cash_report
+    return cash_report.render(c, user, session_id, link, thermal, now)
 
 
 def _dt(value):

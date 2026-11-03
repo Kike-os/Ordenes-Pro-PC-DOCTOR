@@ -156,6 +156,43 @@ class CashRulesTests(unittest.TestCase):
         self.assertEqual(pdf['status'], 200)
         self.assertTrue(pdf['body'].startswith(b'%PDF'))
 
+    def test_closing_report_a4_and_80mm_keep_values_and_integrity(self):
+        # Réplica de CJ-000002 (regresión): fondo $0,00 y un depósito de $142,50 → esperado $0,00, todo electrónico.
+        import re
+        from datetime import datetime
+        import cash_report
+        cookie, csrf, post, order = self.paid_order(50000, pay=False)
+        reg = self.request('/api/caja/state', cookie=cookie)['body']['registers'][0]['id']
+        sid = post('/api/caja/open', register_id=str(reg), shift='Tarde', counts='[]')['body']['session_id']
+        acc = self.account(post, bank='Banco Pichincha', number='2211992424')
+        self.assertEqual(post('/api/orders/%d/payments' % order['id'], amount='142,50', method='deposito', bank_account_id=str(acc), reference='174067550')['status'], 201)
+        self.assertEqual(post('/api/caja/close', session_id=str(sid), counts='[]', confirm='1', confirmed_name='Persona de prueba', reserved='0')['status'], 200)
+        with app.connect() as c:
+            user = dict(c.execute("SELECT * FROM users WHERE role='administrador' ORDER BY id LIMIT 1").fetchone())
+            data = cash_report.collect(c, user, sid)
+            t = data['totals']
+            self.assertEqual((t['income'], t['deposit'], t['cash'], t['electronic'], t['expected'], t['counted'], t['difference']), (14250, 14250, 0, 14250, 0, 0, 0))
+            self.assertTrue(all(ok for _, ok in data['checks']), data['checks'])
+            self.assertEqual([(x['bank'], x['last4'], x['reference'], x['amount']) for x in data['transfers']], [('Banco Pichincha', '2424', '174067550', 14250)])
+            self.assertEqual(data['counts'], [])  # sin denominaciones: el reporte dice «Desglose no registrado», no inventa cantidades
+            self.assertEqual(cash_report._method(data['income'][0]), 'Depósito · Banco Pichincha · Ahorros · •••• 2424')  # cuenta enmascarada
+            self.assertEqual(data['company']['ruc'], '')  # sin datos fiscales: se avisa, no se inventa
+            c.execute("UPDATE invoice_settings SET ruc='1790011674001',legal_name='EMPRESA FICTICIA S.A.' WHERE id=1")
+            c.commit()
+            self.assertEqual(cash_report.collect(c, user, sid)['company']['ruc'], '1790011674001')
+        a4 = self.request('/api/caja/sessions/%d/report.pdf' % sid, cookie=cookie)['body']
+        ticket = self.request('/api/caja/sessions/%d/report.pdf?formato=termico' % sid, cookie=cookie)['body']
+        self.assertTrue(a4.startswith(b'%PDF') and ticket.startswith(b'%PDF'))
+        width = float(re.search(rb'/MediaBox \[0 0 ([\d.]+) ([\d.]+)\]', ticket).group(1))
+        self.assertAlmostEqual(width * 25.4 / 72, 72, places=1)  # 72 mm útiles de la Epson TM-m30II: nada se escala al imprimir
+        self.assertEqual(len(re.findall(rb'/Type /Page\b', ticket)), 1)
+        # Un técnico no ve el reporte de una caja ajena.
+        tcookie, tcsrf = self.tech()
+        self.assertEqual(self.request('/api/caja/sessions/%d/report.pdf' % sid, cookie=tcookie)['status'], 403)
+        # El turno se propone según la hora de Ecuador (antes quedaba siempre «Mañana»).
+        self.assertEqual([cash_sessions.suggested_shift(datetime(2026, 11, 2, h, 0)) for h in (6, 11, 12, 17, 18, 20, 23, 3)],
+                         ['Mañana', 'Mañana', 'Tarde', 'Tarde', 'Noche', 'Noche', 'Noche', 'Noche'])
+
     def test_configuration_cards_denominations_and_permissions(self):
         cookie, csrf, post, order = self.paid_order(1000, pay=False)
         cfg = self.request('/api/caja/config', cookie=cookie)['body']

@@ -75,6 +75,7 @@ Están en Facturación → «Cuentas bancarias» (administración). En modo de p
 - **Comprobantes de 5 MB en Vercel:** la plataforma no admite peticiones de más de 4,5 MB. Por eso el archivo viaja **por partes** de unos 1,4 MB. El servidor las recompone y verifica el tamaño (5 MB como máximo), el tipo **real** por su firma de bytes y la huella SHA-256. Las partes se borran al completarse.
 - **Historial de cierres** con filtros por persona (administración), estado de los depósitos y fechas, más el historial inmutable de cada cierre (`cash_events`).
 - **Caja por sesiones → Historial y auditoría** (rediseño 1.5.227): ver [CAJA-HISTORIAL.md](CAJA-HISTORIAL.md).
+- **Reportes de cierre A4 y ticket de 80 mm**: ver [CAJA-REPORTES.md](CAJA-REPORTES.md).
 
 ## Inventario, compras y proveedores (pestañas propias)
 - **Artículos:** se incorporan desde el catálogo (categorías «Repuesto» y «Otro»), como producto, repuesto o accesorio, con código interno opcional y único, existencia mínima y ubicación. No se eliminan: se desactivan.

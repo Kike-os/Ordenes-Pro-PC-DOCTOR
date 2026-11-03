@@ -5781,7 +5781,7 @@ async function cashOpenDialog(state,reg,target){const dialog=invDialog('Abrir Ca
  const head=(node,icon,text)=>{const h=el('h3');h.append(invIcon(icon),el('span',text));node.append(h);};
  head(left,'wallet','Información de caja');
  field('register_id','Caja o punto de venta',{options:state.registers.filter(r=>r.active!==false&&!r.session).map(r=>[String(r.id),r.name]),value:String(reg.id),into:left,required:true});
- field('shift','Turno',{options:state.shifts.map(s=>[s,s]),into:left,required:true});
+ field('shift','Turno',{options:state.shifts.map(s=>[s,s]),value:state.suggested_shift||'',into:left,required:true,hint:'Propuesto según la hora de Ecuador; cámbialo si corresponde.'});
  if(state.can_admin&&state.users.length)field('cashier_id','Cajero responsable',{options:state.users.map(u=>[String(u.id),u.name]),value:String(state.me),into:left});
  else{const l=el('label',undefined,'inv-field'),i=el('input');i.readOnly=true;i.value=state.me_name||'';l.append(el('span','Cajero responsable'),i);left.append(l);}
  const meta=el('dl',undefined,'cj-open-meta'),clock=el('dd');for(const[k,v]of [['Fecha y hora de apertura',clock],['Número de apertura',el('dd',(state.next_code||'Automático')+' · se asigna al confirmar')]]){const x=el('div');x.append(el('dt',k),v);meta.append(x);}left.append(meta);
@@ -5967,7 +5967,7 @@ for(const[k,v]of Object.entries({'ellipsis-vertical':'<circle cx="12" cy="12" r=
  'info':'<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>','scale':'<path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/>'}))invIcons[k]??=v;
 // Detalle de un cierre: información general, resumen financiero con el efectivo del cajón separado de los pagos electrónicos (cifras de la
 // foto guardada al cerrar; si la caja sigue abierta, las de sus operaciones), arqueo, ajustes posteriores y auditoría. El cierre original
-// nunca se modifica: una corrección se ve como ajuste aparte. focus='auditoria' abre la ventana en la sección de auditoría.
+// nunca se modifica: una corrección se ve como ajuste aparte. focus ('auditoria' o 'arqueo') abre la ventana en esa sección.
 async function cashSessionDialog(sid,target,focus){const dialog=invDialog('Cierre de caja',true),body=el('div',undefined,'inv-body cjd');dialog.classList.add('cjd-dialog');dialog.append(body);body.append(el('p','Cargando…','empty-module'));let d;
  try{d=await api('/api/caja/sessions/'+sid);}catch(error){body.replaceChildren(el('p',error.message,'empty-module'));return;}
  const s=d.session,k=d.closing,live=d.summary,snap=k&&k.summary&&k.summary.by_method?k.summary:live,bm=snap.by_method,cb=snap.cash_breakdown||live.cash_breakdown,groups=snap.income_groups||{};
@@ -5975,8 +5975,10 @@ async function cashSessionDialog(sid,target,focus){const dialog=invDialog('Cierr
  const head=el('div',undefined,'cjd-head'),st=el('div',undefined,'cjh-status');st.append(cjChip(s.status,s.status_label));if(live.adjustments.length)st.append(cjChip('ajustada','Ajustada'));
  head.append(st,el('small',k?'Cifras guardadas al cerrar ('+formatOrderDate(k.closed_at)+'). No se modifican: las correcciones son ajustes aparte.':'Caja en curso: las cifras cambian con cada operación.'));
  const acts=el('div',undefined,'cjd-actions'),pdf=invBtn('Descargar PDF','download',()=>cjBusy(pdf,()=>downloadFile('/api/caja/sessions/'+sid+'/report.pdf','CIERRE-'+s.code+'.pdf')));pdf.title='Reporte oficial del cierre en A4';
- const thermal=invBtn('Comprobante térmico','printer',()=>cjThermal(sid));thermal.title='Abre el comprobante de 80 mm para imprimirlo';
- const moves=invBtn('Movimientos','scroll-text',()=>cashMovementsDialog(d,{methods:{}},()=>{}));moves.title='Todas las operaciones de la caja';acts.append(pdf,thermal,moves);
+ const ticket=invBtn('Descargar ticket 80 mm','download',()=>cjBusy(ticket,()=>downloadFile('/api/caja/sessions/'+sid+'/report.pdf?formato=termico','CIERRE-'+s.code+'-80MM.pdf')));ticket.title='Ticket de 72 mm útiles para la Epson TM-m30II';
+ const print=invBtn('Imprimir A4','printer',()=>cjOpenPdf('/api/caja/sessions/'+sid+'/report.pdf'));print.title='Abre el reporte A4 para imprimirlo';
+ const thermal=invBtn('Imprimir ticket','printer',()=>cjThermal(sid));thermal.title='Abre el ticket de 80 mm para imprimirlo al 100 %';
+ const moves=invBtn('Movimientos','scroll-text',()=>cashMovementsDialog(d,{methods:{}},()=>{}));moves.title='Todas las operaciones de la caja';acts.append(pdf,ticket,print,thermal,moves);
  if(d.can_admin&&s.status==='revision')acts.append(invBtn('Aprobar diferencia','badge-check',()=>{dialog.close();cashReasonAction('Revisar diferencia '+s.code,'La caja pasará a «Cerrada con diferencia». Indica la revisión realizada.','/api/caja/review',{session_id:String(sid)},'review_note',()=>renderCash(target));},'primary'));
  if(d.can_admin&&['revision','cerrada','cerrada_diferencia'].includes(s.status))acts.append(invBtn('Registrar ajuste posterior','sliders-horizontal',()=>{dialog.close();cashAdjustDialog(sid,target);}));
  body.append(head,acts);
@@ -5996,33 +5998,39 @@ async function cashSessionDialog(sid,target,focus){const dialog=invDialog('Cierr
  grid.append(cash,elec,concept);money.append(grid);
  if(k){money.append(facts([['Reservado para el siguiente turno',cjMoney(k.reserved_cents)+(d.fund_next?(d.fund_next.received?' · recibido en '+d.fund_next.session+' por '+d.fund_next.received_by:' · pendiente de recibir'):'')],['Entregado',cjMoney(k.withdrawn_cents)+(k.delivered_to?' a '+k.delivered_to:'')]]));
   if(k.difference_reason)money.append(el('p','Explicación de la diferencia: '+k.difference_reason,'cjd-note'));if(s.review_note)money.append(el('p','Revisión de administración: '+s.review_note,'cjd-note'));if(k.note)money.append(el('p','Observaciones: '+k.note,'cjd-note'));}
- if(k&&k.counts.length)section('Arqueo por denominaciones','coins').append(cjTable(['Tipo','Denominación','Cantidad','Subtotal'],k.counts.map(r=>cjRow([['Tipo',r.kind==='moneda'?'Moneda':'Billete'],['Denominación',cjMoney(r.value_cents)],['Cantidad',String(r.qty)],['Subtotal',cjMoney(r.subtotal_cents)]]))));
+ const arqueo=section('Arqueo por denominaciones','coins',k?'Conteo guardado al cerrar. Esperado '+cjMoney(k.expected_cash_cents)+' · contado '+cjMoney(k.counted_cash_cents)+' · diferencia '+cjMoney(k.difference_cents)+'.':'La caja sigue abierta: el arqueo se registra al cerrar.');
+ const tally=k?k.counts.filter(r=>r.qty):[];if(tally.length)arqueo.append(cjTable(['Tipo','Denominación','Cantidad','Subtotal'],tally.map(r=>cjRow([['Tipo',r.kind==='moneda'?'Moneda':'Billete'],['Denominación',cjMoney(r.value_cents)],['Cantidad',String(r.qty)],['Subtotal',cjMoney(r.subtotal_cents)]]))));else if(k)arqueo.append(el('p','Desglose no registrado.','cjd-note'));
  const adj=section('Ajustes posteriores','sliders-horizontal',live.adjustments.length?'Se registran aparte con su motivo y responsable; el cierre original no cambia. Total ajustado: '+cjMoney(live.adjusted_cents)+'.':'Sin ajustes posteriores.');
  if(live.adjustments.length)adj.append(cjTable(['Fecha y hora','Importe','Motivo','Responsable'],live.adjustments.map(a=>cjRow([['Fecha y hora',formatOrderDate(a.created_at)],['Importe',(a.amount_cents>0?'+':'')+cjMoney(a.amount_cents)],['Motivo',a.reason],['Responsable',a.actor]]))));
  const audit=section('Auditoría','shield-check','Cada operación con su responsable, fecha y referencia, y el registro de aperturas, arqueos, cierres, revisiones y ajustes.');
  audit.append(live.rows.length?cjTable(['Fecha y hora','Usuario','Tipo','Método','Valor','Referencia','Justificación o estado'],live.rows.map(r=>{const tr=cjRow([['Fecha y hora',formatOrderDate(r.at)],['Usuario',r.actor||'—'],['Tipo',r.kind_label],['Método',r.method_label+(r.bank?' · '+r.bank:'')],
    ['Valor',(r.direction==='egreso'?'− ':'')+cjMoney(r.amount_cents)],['Referencia',[r.ref,r.document,r.reference].filter(Boolean).join(' · ')],['Justificación o estado',[r.concept,r.note,r.state_label].filter(Boolean).join(' · ')||'—']]);tr.dataset.direction=r.direction;if(r.voided)tr.dataset.voided='true';return tr;}),'cjd-audit'):el('p','Sin operaciones registradas en esta caja.','cjd-note'));
  if(d.events.length){const ul=el('ul',undefined,'fx-list fx-timeline cjd-events');for(const e of d.events){const li=el('li'),r=el('div',undefined,'fx-row');r.append(el('strong',e.event.replace(/_/g,' ')),el('span',e.detail,'fx-row-sub'),el('small',formatOrderDate(e.created_at)+' · '+e.actor));li.append(r);ul.append(li);}audit.append(el('h4','Registro de eventos','cj-sub'),ul);}
- if(focus==='auditoria')requestAnimationFrame(()=>{audit.scrollIntoView({block:'start',behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});audit.querySelector('h3').tabIndex=-1;audit.querySelector('h3').focus({preventScroll:true});});}
+ const jump={auditoria:audit,arqueo}[focus];if(jump)requestAnimationFrame(()=>{jump.scrollIntoView({block:'start',behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});const h=jump.querySelector('h3');h.tabIndex=-1;h.focus({preventScroll:true});});}
 // Estado de carga de un botón mientras se genera un documento o se consulta el servidor (sin dobles clics).
 async function cjBusy(btn,task){if(btn.dataset.busy==='true')return;btn.dataset.busy='true';btn.setAttribute('aria-busy','true');btn.disabled=true;
  try{await task();}catch(error){notify(error.message);}finally{btn.dataset.busy='false';btn.removeAttribute('aria-busy');btn.disabled=false;}}
-function cjThermal(sid){const w=window.open('/api/caja/sessions/'+sid+'/report.pdf?formato=termico','_blank');if(w)w.opener=null;else toast('Permite las ventanas emergentes para abrir el comprobante térmico.','error');}
+function cjThermal(sid){cjOpenPdf('/api/caja/sessions/'+sid+'/report.pdf?formato=termico');}
+// Abre el PDF en otra pestaña para imprimirlo con el diálogo del navegador (el ticket mide 72 mm útiles: imprimir al 100 %, sin ajustar).
+function cjOpenPdf(url){const w=window.open(url,'_blank');if(w)w.opener=null;else toast('Permite las ventanas emergentes para abrir el documento.','error');}
 // Fecha y hora compactas para la tabla (02/11/2026 22:24, hora de Ecuador); la descripción emergente conserva el formato largo.
 function cjhDate(value){const d=new Date(value);if(Number.isNaN(d.getTime()))return '—';const p=Object.fromEntries(new Intl.DateTimeFormat('es-EC',{timeZone:'America/Guayaquil',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(d).map(x=>[x.type,x.value]));return p.day+'/'+p.month+'/'+p.year+' '+p.hour+':'+p.minute;}
 // Menú de acciones de un cierre (tres puntos). Se crea al abrirlo y se elimina al cerrarlo; usa el mismo aspecto que el menú de las órdenes.
 let cjMenuSeq=0;
 function cjhMenu(r){const trigger=button('',()=>menu?close():open(),'cjh-more');trigger.type='button';trigger.append(invIcon('ellipsis-vertical'));trigger.title='Acciones de '+r.code;
  trigger.setAttribute('aria-label','Acciones de '+r.code);trigger.setAttribute('aria-haspopup','menu');trigger.setAttribute('aria-expanded','false');let menu=null;
- const items=[['Ver detalle','eye',()=>cashSessionDialog(r.id)],['Descargar PDF','download',()=>downloadFile('/api/caja/sessions/'+r.id+'/report.pdf','CIERRE-'+r.code+'.pdf')],
-  ['Imprimir comprobante térmico','printer',()=>cjThermal(r.id)],['Consultar movimientos','scroll-text',async()=>{const d=await api('/api/caja/sessions/'+r.id);cashMovementsDialog(d,{methods:{}},()=>{});}],
-  ['Consultar auditoría','shield-check',()=>cashSessionDialog(r.id,undefined,'auditoria')]];
+ const pdf='/api/caja/sessions/'+r.id+'/report.pdf';
+ const items=[['Consultar'],['Ver resumen del cierre','eye',()=>cashSessionDialog(r.id)],['Consultar movimientos','scroll-text',async()=>{const d=await api('/api/caja/sessions/'+r.id);cashMovementsDialog(d,{methods:{}},()=>{});}],
+  ['Consultar arqueo','coins',()=>cashSessionDialog(r.id,undefined,'arqueo')],['Consultar auditoría','shield-check',()=>cashSessionDialog(r.id,undefined,'auditoria')],
+  ['Documentos'],['Descargar PDF A4','download',()=>downloadFile(pdf,'CIERRE-'+r.code+'.pdf')],['Descargar ticket 80 mm','download',()=>downloadFile(pdf+'?formato=termico','CIERRE-'+r.code+'-80MM.pdf')],
+  ['Imprimir A4','printer',()=>cjOpenPdf(pdf)],['Imprimir ticket 80 mm','printer',()=>cjThermal(r.id)]];
  function close(restore=false){const m=menu;if(!m)return;menu=null;removeEventListener('click',outside,true);removeEventListener('scroll',moved,true);removeEventListener('resize',moved);
   if(typeof m.hidePopover==='function'&&m.matches(':popover-open'))m.hidePopover();m.remove();trigger.setAttribute('aria-expanded','false');if(restore)trigger.focus();}
  // Cierre propio (no el general de los menús de órdenes): al enfocar el botón la tabla puede desplazarse sola; ese primer desplazamiento no cierra.
  let openedAt=0;const outside=e=>{if(menu&&!menu.contains(e.target)&&!trigger.contains(e.target))close();};const moved=e=>{if(menu&&!menu.contains(e.target)&&performance.now()-openedAt>350)close();};
  function open(){dismissOrderMenus();document.querySelectorAll('.cjh-menu').forEach(x=>x.dispatchEvent(new Event('cjh-close')));const m=el('div',undefined,'orders-action-menu cjh-menu');menu=m;m.id='cjh-menu-'+(++cjMenuSeq);m.setAttribute('role','menu');m.addEventListener('cjh-close',()=>close());m.setAttribute('aria-label','Acciones de '+r.code);trigger.setAttribute('aria-controls',m.id);
-  for(const[label,icon,action]of items){const b=button('',()=>{close(true);cjBusy(trigger,action);},'orders-menu-item');b.type='button';b.setAttribute('role','menuitem');b.append(invIcon(icon),el('span',label));m.append(b);}
+  for(const[label,icon,action]of items){if(!action){if(m.childElementCount)m.append(el('hr',undefined,'orders-menu-rule'));const g=el('span',label,'orders-menu-group');g.setAttribute('role','presentation');m.append(g);continue;}
+   const b=button('',()=>{close(true);cjBusy(trigger,action);},'orders-menu-item');b.type='button';b.setAttribute('role','menuitem');b.append(invIcon(icon),el('span',label));m.append(b);}
   const native=typeof m.showPopover==='function';if(native){m.setAttribute('popover','manual');m.addEventListener('toggle',e=>{if(e.newState==='closed'&&menu===m)close();});}
   document.body.append(m);if(native)m.showPopover();trigger.setAttribute('aria-expanded','true');
   const gap=8,rect=trigger.getBoundingClientRect(),box=m.getBoundingClientRect(),below=innerHeight-rect.bottom-gap,down=box.height<=below||below>=rect.top;
