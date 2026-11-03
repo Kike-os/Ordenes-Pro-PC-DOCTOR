@@ -4,6 +4,19 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.233 — 2026-11-03 18:33 (UTC-05:00)
+
+DATAFAST según la tabla original: factor J a 36 meses (26,67 %) y combinaciones de Banco Diners
+
+### Mejoras realizadas
+
+- Tabla DATAFAST verificada celda por celda con el documento original: los 110 porcentajes coinciden.
+
+### Errores corregidos
+
+- DATAFAST: el factor del grupo J (Banco Guayaquil: American Express, Visa y Mastercard) a 36 meses queda en 26,67 % según la tabla original 6.2; antes figuraba como pendiente y ese plazo no se podía cobrar.
+- DATAFAST: se añaden las 15 combinaciones de Banco Diners que la tabla incluye (Visa Titanium y Mastercard Titanium en Corporativa, Empresarial y PYMES; Discover, Visa Titanium y Mastercard en Minorista, Simple y Ampliado).
+
 ## v1.5.232 — 2026-11-03 17:49 (UTC-05:00)
 
 Tarjetas y DATAFAST con diseño financiero profesional

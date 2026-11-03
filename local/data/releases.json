@@ -8,6 +8,27 @@
   },
   "releases": [
     {
+      "version": "1.5.233",
+      "date": "2026-11-03T18:33:09-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "DATAFAST según la tabla original: factor J a 36 meses (26,67 %) y combinaciones de Banco Diners",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Tabla DATAFAST verificada celda por celda con el documento original: los 110 porcentajes coinciden."
+        ],
+        "fixes": [
+          "DATAFAST: el factor del grupo J (Banco Guayaquil: American Express, Visa y Mastercard) a 36 meses queda en 26,67 % según la tabla original 6.2; antes figuraba como pendiente y ese plazo no se podía cobrar.",
+          "DATAFAST: se añaden las 15 combinaciones de Banco Diners que la tabla incluye (Visa Titanium y Mastercard Titanium en Corporativa, Empresarial y PYMES; Discover, Visa Titanium y Mastercard en Minorista, Simple y Ampliado)."
+        ],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Kike-os: «Sí, aplica y publica» (03/11/2026)"
+    },
+    {
       "version": "1.5.232",
       "date": "2026-11-03T17:49:20-05:00",
       "type": "patch",
