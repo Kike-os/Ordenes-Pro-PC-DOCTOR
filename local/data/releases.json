@@ -8,6 +8,30 @@
   },
   "releases": [
     {
+      "version": "1.5.230",
+      "date": "2026-11-03T08:09:33-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Reportes de cierre de caja A4 y ticket monocromo de 80 mm para la Epson, turno según la hora y factura de licencias con descuento",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Reporte de cierre de caja A4 rediseñado: encabezado con logo original y datos fiscales, franja del turno, resumen ejecutivo (recaudación, movimiento de efectivo y saldo de caja), tablas de ingresos, egresos, transferencias y tarjetas, arqueo por denominaciones, controles de integridad y firmas; varias páginas cuando hace falta.",
+          "Historial de caja: menú de acciones con Consultar (resumen, movimientos, arqueo y auditoría) y Documentos (PDF A4, ticket de 80 mm e impresión de cada uno)."
+        ],
+        "fixes": [
+          "Ticket de cierre de caja de 80 mm: ahora mide los 72 mm útiles de la Epson TM-m30II (antes 77,6 mm) y se imprime sin escalar, en monocromo, con montos alineados, arqueo, estado final, firmas y el QR completo (antes salía cortado).",
+          "Reportes de caja: el RUC se toma de los Datos fiscales (salía vacío), la hora de generación es la de Ecuador (en el servidor salía 5 h adelantada) y las cuentas bancarias van enmascaradas.",
+          "Abrir Caja propone el turno según la hora de Ecuador (antes quedaba siempre «Mañana», también de noche).",
+          "Facturación: una venta de licencias con descuento por partida ya se puede facturar (se confundía con un descuento general)."
+        ],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Kike-os: «Sí, publica 1.5.229 y 1.5.230» (03/11/2026)"
+    },
+    {
       "version": "1.5.229",
       "date": "2026-11-03T07:53:16-05:00",
       "type": "patch",

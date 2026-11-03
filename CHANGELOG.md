@@ -4,6 +4,22 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.230 — 2026-11-03 08:09 (UTC-05:00)
+
+Reportes de cierre de caja A4 y ticket monocromo de 80 mm para la Epson, turno según la hora y factura de licencias con descuento
+
+### Mejoras realizadas
+
+- Reporte de cierre de caja A4 rediseñado: encabezado con logo original y datos fiscales, franja del turno, resumen ejecutivo (recaudación, movimiento de efectivo y saldo de caja), tablas de ingresos, egresos, transferencias y tarjetas, arqueo por denominaciones, controles de integridad y firmas; varias páginas cuando hace falta.
+- Historial de caja: menú de acciones con Consultar (resumen, movimientos, arqueo y auditoría) y Documentos (PDF A4, ticket de 80 mm e impresión de cada uno).
+
+### Errores corregidos
+
+- Ticket de cierre de caja de 80 mm: ahora mide los 72 mm útiles de la Epson TM-m30II (antes 77,6 mm) y se imprime sin escalar, en monocromo, con montos alineados, arqueo, estado final, firmas y el QR completo (antes salía cortado).
+- Reportes de caja: el RUC se toma de los Datos fiscales (salía vacío), la hora de generación es la de Ecuador (en el servidor salía 5 h adelantada) y las cuentas bancarias van enmascaradas.
+- Abrir Caja propone el turno según la hora de Ecuador (antes quedaba siempre «Mañana», también de noche).
+- Facturación: una venta de licencias con descuento por partida ya se puede facturar (se confundía con un descuento general).
+
 ## v1.5.229 — 2026-11-03 07:53 (UTC-05:00)
 
 Ventas: imprimir comprobante de venta (80 mm y A4) y RIDE de la factura autorizada
