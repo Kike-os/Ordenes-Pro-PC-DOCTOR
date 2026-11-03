@@ -9809,3 +9809,79 @@ body[data-page=dashboard] .devauth .devauth-chip input{flex:none;width:15px;heig
  .tracking-pro .tracking-carousel.tracking-scroll{height:min(440px,62vh)}
 }
 @media (prefers-reduced-motion:reduce){.tracking-pro .tracking-phase,.tracking-pro .tracking-stat{transition:none}}
+
+/* 1.5.225 — Seguimiento de Órdenes en cascada: altura fija para unas 4 órdenes (2 tarjetas en teléfonos), sin barra visible; la
+   lista avanza sola una fila cada ~5 s y se detiene mientras alguien la usa. Si todas caben, queda quieta. */
+.tracking-pro .tracking-carousel.tracking-cascade{--track-row:86px;--track-head:31px;height:calc(var(--track-head) + 4*var(--track-row) + 2px);overflow:hidden;overscroll-behavior:contain;scrollbar-width:none}
+.tracking-pro .tracking-cascade::-webkit-scrollbar{display:none}
+.tracking-pro .tracking-cascade .tracking-row>td{height:var(--track-row);padding-top:6px;padding-bottom:6px;overflow:hidden}
+.tracking-pro .tracking-cascade td.tracking-empty{height:calc(4*var(--track-row));text-align:center}
+.tracking-pro .tracking-cascade:focus-visible{outline:2px solid #6ea8ff;outline-offset:2px}
+.tracking-pro .tracking-motion{font-size:12px;color:#8fa5c4;white-space:nowrap}
+.tracking-pro .tracking-motion:empty{display:none}
+.tracking-pro .tracking-motion::before{content:"";display:inline-block;width:7px;height:7px;margin-right:6px;border-radius:50%;background:#52688a;vertical-align:1px}
+.tracking-pro .tracking-motion[data-state=run]::before{background:#3dbf87}
+@media(max-width:860px){
+ .tracking-pro .tracking-carousel.tracking-cascade{--track-row:236px;--track-head:0px;height:calc(2*var(--track-row) + 2px)}
+ .tracking-pro .tracking-cascade .tracking-table .tracking-row{box-sizing:border-box;height:var(--track-row);overflow:hidden}
+ .tracking-pro .tracking-cascade .tracking-row>td{height:auto;padding-top:0;padding-bottom:0;overflow:visible}
+ .tracking-pro .tracking-cascade td.tracking-empty{height:calc(2*var(--track-row) - 2px)}
+}
+
+.tracking-pro .tracking-chips{display:flex;flex-wrap:nowrap;align-items:center;gap:6px;min-height:28px;overflow-x:auto;scrollbar-width:none}
+.tracking-pro .tracking-chips::-webkit-scrollbar{display:none}
+.tracking-pro .tracking-chips .tracking-chip{flex:none}
+.tracking-pro .tracking-chips-note{font-size:12px;color:#8fa5c4;white-space:nowrap}
+@media(max-width:480px){.tracking-pro .tracking-carousel.tracking-cascade{--track-row:256px}}
+
+/* 1.5.225 — Registrar pago: encabezado con logotipo y saldo, formas de pago con icono, bancos con su logotipo, cuentas como
+   tarjetas, comprobante adjunto y aviso cuando no hay cuentas. Solo afecta a esta ventana (.pay-pro). */
+.pay-pro{display:grid;gap:12px}
+.pay-pro .pay-head{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:12px;padding:10px 12px;border:1px solid #223a5c;border-radius:12px;background:#0c1830}
+.pay-pro .pay-logo{width:56px;height:auto;display:block}
+.pay-pro .pay-who{display:grid;gap:2px;min-width:0}
+.pay-pro .pay-who strong{color:#eef3ff;font-size:14.5px}
+.pay-pro .pay-who span{color:#9db1cf;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pay-pro .pay-due{display:grid;justify-items:end;gap:1px;text-align:right}
+.pay-pro .pay-due small{color:#9db1cf;font-size:11px;text-transform:uppercase;letter-spacing:.05em}
+.pay-pro .pay-due b{color:#fff;font-size:18px;font-variant-numeric:tabular-nums}
+.pay-pro .pay-section{display:grid;gap:8px}
+.pay-pro .pay-section[hidden],.pay-pro .pay-bank-part[hidden],.pay-pro .pay-empty[hidden],.pay-pro .pay-proof[hidden]{display:none}
+.pay-pro .pay-label{font-size:12.5px;font-weight:600;color:#c2d3ec}
+.pay-pro .pay-methods{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,128px),1fr));gap:6px}
+.pay-pro .pay-method{display:flex;align-items:center;gap:8px;width:100%;min-height:40px;margin:0;padding:7px 10px;border:1px solid #2b4466;border-radius:10px;background:#0d1a33;color:#c5d5ee;font-size:12.5px;font-weight:600;text-align:left;cursor:pointer}
+.pay-pro .pay-method .inv-icon{width:17px;height:17px;flex:none}
+.pay-pro .pay-method[aria-checked=true]{border-color:#3f7fd0;background:#143563;color:#fff;box-shadow:inset 0 0 0 1px #3f7fd0}
+.pay-pro .pay-bank-part{display:grid;gap:8px}
+.pay-pro .pay-banks{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,150px),1fr));gap:6px}
+.pay-pro .pay-bank-chip,.pay-pro .pay-account{display:flex;align-items:center;gap:10px;width:100%;min-height:46px;margin:0;padding:6px 10px;border:1px solid #2b4466;border-radius:10px;background:#0d1a33;color:#d7e4f7;font-size:12.5px;font-weight:600;text-align:left;cursor:pointer}
+.pay-pro .pay-bank-chip[aria-checked=true],.pay-pro .pay-account[aria-checked=true]{border-color:#3f7fd0;background:#143563;box-shadow:inset 0 0 0 1px #3f7fd0}
+.pay-pro .pay-bank-chip span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pay-pro .bank-logo{flex:none;display:inline-grid;place-items:center;width:58px;height:30px;padding:3px 5px;box-sizing:border-box;border-radius:7px;background:#fff;overflow:hidden}
+.pay-pro .bank-logo img{max-width:100%;max-height:100%;object-fit:contain;display:block}
+.pay-pro .bank-logo[data-initials=true]{background:#1d3357;color:#d7e4f7;font-size:12px;font-weight:700}
+.pay-pro .pay-accounts{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,240px),1fr));gap:6px}
+.pay-pro .pay-account-info{display:grid;gap:1px;min-width:0}
+.pay-pro .pay-account-info strong{font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.pay-pro .pay-account-info small{color:#9db1cf;font-weight:400;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pay-pro .pay-hint{margin:0;font-size:12px;color:#8fa5c4}
+.pay-pro .pay-empty{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:start;gap:6px 10px;padding:10px 12px;border:1px solid #8a6a2a;border-radius:10px;background:#2a2110;color:#f3d38b;font-size:12.5px}
+.pay-pro .pay-empty p{margin:0;line-height:1.45}
+.pay-pro .pay-empty .inv-btn{grid-column:1/-1;justify-self:start}
+.pay-pro .pay-proof input[type=file]{width:100%;min-width:0;box-sizing:border-box}
+.pay-pro .pay-responsible{display:flex;align-items:center;gap:6px;margin:0}
+.pay-pro .pay-responsible .inv-icon{width:15px;height:15px}
+.pay-pro .pay-method:focus-visible,.pay-pro .pay-bank-chip:focus-visible,.pay-pro .pay-account:focus-visible{outline:2px solid #6ea8ff;outline-offset:2px}
+@media(max-width:480px){
+ .pay-pro .pay-head{grid-template-columns:auto minmax(0,1fr)}
+ .pay-pro .pay-due{grid-column:1/-1;justify-items:start;text-align:left;grid-auto-flow:column;align-items:baseline;gap:8px}
+ .pay-pro .pay-methods{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+/* La ventana de pago es de una sola columna: cada bloque usa todo el ancho y organiza sus campos en su propia cuadrícula. */
+body[data-page=dashboard] .pay-pro{grid-template-columns:minmax(0,1fr)}
+body[data-page=dashboard] .pay-pro>*{grid-column:1/-1;min-width:0}
+.pay-pro .pay-banks{grid-template-columns:repeat(auto-fill,minmax(min(100%,190px),1fr))}
+.pay-pro .pay-bank-chip span:last-child{white-space:normal;overflow:visible;line-height:1.25}
+body[data-page=dashboard] .maintenance-dialog.inv-sheet.inv-dialog:has(.pay-pro),body[data-page=dashboard] dialog.inv-dialog:has(.pay-pro){width:min(760px,calc(100vw - 24px));max-width:min(760px,calc(100vw - 24px))}
+.pay-pro .pay-banks{grid-template-columns:repeat(auto-fill,minmax(min(100%,160px),1fr))}
+.pay-pro .bank-logo{width:70px}

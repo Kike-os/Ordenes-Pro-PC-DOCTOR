@@ -22,6 +22,14 @@ PHASES = {'activas': "o.status!='entregado'", 'entregadas': "o.status='entregado
 OWED = '(' + equipment.BUDGET + '-' + equipment.PAID + ')>0'
 
 
+# Prioridad del seguimiento diario (solo ordena; no cambia nada): primero lo urgente y de prioridad alta; después, con el
+# mismo criterio del Centro de Seguimiento Técnico, lo que espera aprobación o respuesta, lo que está en proceso y lo listo
+# para entregar; luego lo recién recibido y, al final, lo entregado. Dentro de cada grupo, el movimiento más reciente primero.
+PRIORITY_ORDER = (" ORDER BY CASE o.priority WHEN 'urgente' THEN 0 WHEN 'alta' THEN 1 ELSE 2 END,"
+                  " CASE o.status WHEN 'presupuesto' THEN 0 WHEN 'esperando_cliente' THEN 0 WHEN 'reparacion' THEN 1 WHEN 'revision_recurrente' THEN 1"
+                  " WHEN 'listo' THEN 2 WHEN 'espera_entrega' THEN 2 WHEN 'pendiente' THEN 3 ELSE 4 END, COALESCE(h.id,0) DESC, o.id DESC")
+
+
 class TrackingError(ValueError):
     pass
 
@@ -32,7 +40,7 @@ def parse(query):
                'phase': arg('phase') or 'todas', 'balance': arg('balance') == '1'}
     if filters['phase'] not in PHASES:
         raise TrackingError('Vista inválida.')
-    if filters['sort'] not in ('reciente', 'antiguo'):
+    if filters['sort'] not in ('reciente', 'antiguo', 'prioridad'):
         raise TrackingError('Orden inválido.')
     try:
         filters['page'] = max(1, min(500, int(arg('page') or '1')))
@@ -103,7 +111,7 @@ def build(c, filters):
         "(SELECT COUNT(*) FROM order_history x WHERE x.order_id=o.id) events,(SELECT COUNT(*) FROM order_recurrences r WHERE r.order_id=o.id) recurrences," + equipment.BUDGET + " budget_cents," + equipment.PAID + " paid_cents,"
         "(SELECT q.code||'|'||q.status FROM quotes q WHERE q.order_id=o.id AND q.deleted_at='' ORDER BY q.version DESC LIMIT 1) quote " + source +
         # Orden por fecha del último movimiento: lo más reciente primero (por omisión) o lo más antiguo primero.
-        (' ORDER BY COALESCE(h.id,0) ASC,o.id ASC' if filters.get('sort') == 'antiguo' else ' ORDER BY COALESCE(h.id,0) DESC,o.id DESC') + ' LIMIT ? OFFSET ?', (*args, size, (page - 1) * size))]
+        (' ORDER BY COALESCE(h.id,0) ASC,o.id ASC' if filters.get('sort') == 'antiguo' else PRIORITY_ORDER if filters.get('sort') == 'prioridad' else ' ORDER BY COALESCE(h.id,0) DESC,o.id DESC') + ' LIMIT ? OFFSET ?', (*args, size, (page - 1) * size))]
     seen = {}
     if rows:
         marks = ','.join('?' for _ in rows)

@@ -181,3 +181,23 @@ Devuelve además `phases`, con los contadores, las entregadas con saldo y su imp
 **Pruebas:**
 - `local/tests/test_tracking_phases.py`;
 - navegador con 55 órdenes ficticias a 1366, 820, 390 y 320 px, con la altura constante de 1 a 55 resultados, las páginas, la alerta de cobro, la sincronización y el teclado.
+
+## Cascada automática (1.5.225)
+
+A pedido de administración vuelve el movimiento automático, ahora lento y con pausas:
+
+- **Altura fija** para unas 4 órdenes en escritorio (2 tarjetas en teléfonos y tabletas de hasta 860 px), **sin barra visible**.
+- Cada orden queda **unos 5 s** y la lista avanza una fila con una **transición de 850 ms**. Al terminar sigue con la primera **sin salto**:
+  las filas rotan en su sitio, sin copias. Con más de 50 órdenes continúa con la página siguiente y luego vuelve a la primera.
+- **Quieta** cuando todas caben (4 o menos en escritorio).
+- **Se detiene** con el cursor encima, con el foco dentro (buscador, botones), con texto seleccionado, con ventanas abiertas, con la pestaña
+  oculta y con «reducir movimiento»; se reanuda unos 5 s después. Un indicador muestra «En movimiento», «En pausa» o «Movimiento reducido».
+- Recorrido manual sin barra: flechas del pie, rueda del ratón y teclas ↑ ↓ con el foco en la lista.
+- Cambiar fase, filtros o búsqueda, o recibir datos nuevos, reinicia el recorrido desde la primera.
+- **Un solo temporizador** para todo el panel (medido: nunca menos de 5 s entre órdenes, aunque se vuelva al Inicio varias veces).
+- **Orden por prioridad** por omisión (`sort=prioridad`): urgentes y de prioridad alta; después, como el Centro de Seguimiento Técnico,
+  lo que espera aprobación o respuesta, lo que está en proceso y lo listo para entregar; luego lo recibido y al final lo entregado. El
+  encabezado «Último movimiento» alterna prioridad → más reciente → más antiguo. Ordenar no cambia ninguna orden.
+- La fila de filtros tiene altura reservada (muestra la vista actual cuando no hay filtros): filtrar no mueve los paneles de abajo.
+
+Pruebas: `test_tracking_phases.py` (orden por prioridad) y la suite de navegador `cascada` (19 comprobaciones con tiempos medidos).

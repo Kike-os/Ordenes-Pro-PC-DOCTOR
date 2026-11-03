@@ -75,6 +75,25 @@ class TrackingPhaseTests(unittest.TestCase):
         self.assertEqual((ids(data), data['phases']['entregadas_saldo']), (set(), 0))
         self.assertEqual(ids(self.board(cookie, '&phase=entregadas')), {owed})
 
+    def test_priority_order_for_the_daily_cascade(self):
+        cookie, csrf = self.login()
+        post = lambda path, **data: self.request(path, data, cookie=cookie, csrf=csrf)
+        made = {}
+        for key, state, priority in (('recibida', 'pendiente', 'normal'), ('lista', 'listo', 'normal'), ('proceso', 'reparacion', 'normal'),
+                                     ('aprobacion', 'presupuesto', 'normal'), ('urgente', 'pendiente', 'urgente'), ('entregada', 'entregado', 'normal')):
+            oid = post('/api/orders', **self.order_data({'email': 'cliente@example.invalid', 'model': key, 'priority': priority, 'request_key': 'phase-priority-' + key.ljust(6, '0')}))['body']['id']
+            if state != 'pendiente':
+                self.assertEqual(post('/api/order-status', id=str(oid), status=state)['status'], 200)
+            made[oid] = key
+        with app.connect() as c:
+            before = dict(c.execute('SELECT id,status FROM orders').fetchall())
+        rows = self.board(cookie, '&phase=todas&sort=prioridad')['rows']
+        self.assertEqual([made[r['id']] for r in rows], ['urgente', 'aprobacion', 'proceso', 'lista', 'recibida', 'entregada'])
+        self.assertEqual([made[r['id']] for r in self.board(cookie, '&phase=activas&sort=prioridad')['rows']], ['urgente', 'aprobacion', 'proceso', 'lista', 'recibida'])
+        self.assertEqual(self.request('/api/tracking?sort=otro', cookie=cookie)['status'], 400)
+        with app.connect() as c:
+            self.assertEqual(dict(c.execute('SELECT id,status FROM orders').fetchall()), before)  # ordenar no cambia ninguna orden
+
 
 if __name__ == '__main__':
     unittest.main()

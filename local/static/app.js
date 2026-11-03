@@ -2821,6 +2821,8 @@ function paymentsSection(order){const section=el('section',undefined,'workspace-
    cell('Referencia',pay.reference||pay.note||'—');cell('Responsable',pay.actor||'—');cell('Estado',el('span',state+(pay.general?' · general':''),'pay-state'));
    const acts=cell('Acciones');acts.className='pay-acts';
    if(pay.kind!=='asignacion'){const pdf=el('a','Recibo','text-action');pdf.href='/api/orders/'+order.id+'/payments/'+pay.id+'/receipt.pdf';pdf.target='_blank';pdf.rel='noopener';pdf.setAttribute('aria-label','Recibo '+(pay.receipt||'')+' en PDF');acts.append(pdf);
+    // Comprobante bancario adjunto (transferencia o depósito): solo administración (Caja → transferencias).
+    if(pay.proof&&pay.transfer_id&&admin()){const proofLink=el('a','Comprobante','text-action');proofLink.href='/api/bank/transfers/'+pay.transfer_id+'/file';proofLink.target='_blank';proofLink.rel='noopener';proofLink.setAttribute('aria-label','Comprobante bancario del pago '+(pay.receipt||''));acts.append(proofLink);}
     if(!pay.voided_at){const send=button('Correo',async()=>{if(send.disabled)return;if(!await askConfirm('¿Enviar el recibo al cliente?','Se enviará por correo a '+(order.email||'la dirección registrada del cliente')+' el recibo de '+equipmentMoney(pay.amount_cents)+', con el saldo actual.','Enviar recibo'))return;send.disabled=true;try{const result=await api('/api/orders/'+order.id+'/payments/receipt-mail',{payment_id:String(pay.id)});toast(result.message,'success',undefined,{title:'Recibo enviado'});}catch(error){notify(error.message);}finally{send.disabled=false;}},'text-action');acts.append(send);
      const phone=String(order.phone||'').replace(/\D/g,'');if(phone){const wa=el('a','WhatsApp','text-action');wa.href='https://wa.me/'+(phone.startsWith('0')?'593'+phone.slice(1):phone)+'?text='+encodeURIComponent('PC-DOCTOR S.A. · Recibo '+(pay.receipt||'')+' de la orden '+order.code+': '+equipmentMoney(pay.amount_cents)+' ('+(pay.method_label||pay.method)+'). Saldo pendiente: '+equipmentMoney(m.balance_cents)+'.');wa.target='_blank';wa.rel='noopener';acts.append(wa);}}}
    if(pay.method==='tarjeta'&&pay.kind==='pago'&&!pay.voided_at&&!pay.voucher_id)acts.append(button('Registrar voucher',()=>voucherDialog({payment_id:pay.id,amount_cents:pay.amount_cents,label:'Pago '+(pay.receipt||'')+' de la orden '+order.code},()=>refreshOrderFinance(order.id)),'text-action'));
@@ -2832,27 +2834,59 @@ function paymentsSection(order){const section=el('section',undefined,'workspace-
  return section;}
 function payNow(){const d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,16);}
 // Ventana de registro: pago completo o abono, forma de pago (incluido el pago mixto), cuenta receptora según el banco, referencia y fecha.
-function paymentDialog(order,{canPayUnit,canPayOrder,multiple,whole,unitName}){const dialog=invDialog('Registrar pago · '+order.code,true),{form,msg,field,fail,clear}=invForm('bank-form inv-sheet-form pay-form');dialog.append(form);form.append(invRequiredNote());cashGuard(form);
+// Logotipo de un banco (static/bancos, procedencia en su README) o sus iniciales si no hay archivo.
+const bankLogoFiles=[['pichincha','pichincha'],['guayaquil','guayaquil'],['pacífico','pacifico'],['pacifico','pacifico'],['produbanco','produbanco']];
+function bankLogo(name){const text=String(name||''),file=bankLogoFiles.find(([k])=>text.toLowerCase().includes(k))?.[1],box=el('span',undefined,'bank-logo'),initials=()=>text.split(/\s+/).filter(w=>!/^(banco|del?|la|el|s\.?a\.?)$/i.test(w)).map(w=>w[0]).join('').slice(0,2).toUpperCase()||'B';
+ box.setAttribute('aria-hidden','true');if(file){const img=el('img');img.src='/static/bancos/'+file+'.png';img.alt='';img.decoding='async';img.onerror=()=>{img.remove();box.textContent=initials();box.dataset.initials='true';};box.append(img);}else{box.textContent=initials();box.dataset.initials='true';}return box;}
+function paymentDialog(order,{canPayUnit,canPayOrder,multiple,whole,unitName}){const dialog=invDialog('Registrar pago · '+order.code,true),{form,msg,field,fail,clear}=invForm('bank-form inv-sheet-form pay-form pay-pro');dialog.append(form);cashGuard(form);
  const m=order.money,accounts=order.bank_accounts||[],methods=order.pay_methods||order.payment_methods;let key=financeKey();
+ // Encabezado: logotipo original de PC-DOCTOR, orden, cliente y saldo pendiente (se actualiza con «Aplicar a»).
+ const head=el('div',undefined,'pay-head'),logo=el('img'),who=el('div',undefined,'pay-who'),due=el('div',undefined,'pay-due');logo.src='/static/logo-original.png';logo.alt='PC-DOCTOR S.A.';logo.className='pay-logo';who.append(el('strong','Orden '+order.code),el('span',order.client||''));head.append(logo,who,due);form.append(head,invRequiredNote());
  const top=el('div',undefined,'fx-form-grid');form.append(top);
  const scope=field('scope','Aplicar a',{options:[...(canPayUnit?[['equipo',multiple?'Este equipo ('+unitName+')':'Este equipo']]:[]),...(canPayOrder?[['general','Pago general de la orden']]:[])],into:top});if(!multiple)scope.closest('.inv-field').hidden=true;
  const type=field('type','Tipo',{options:[['completo','Pago completo'],['abono','Abono parcial']],into:top});
  const limit=()=>scope.value==='general'?whole.balance_cents:m.balance_cents;
  const amount=field('amount','Monto (USD)',{mode:'decimal',max:12,into:top,required:true});const method=field('method','Forma de pago',{options:[...Object.entries(methods).filter(([k])=>k!=='tarjeta'),['mixto','Pago mixto']],into:top,required:true});
- const banks=[...new Set(accounts.map(a=>a.bank))];const bankBox=el('div',undefined,'fx-form-grid pay-bank');form.append(bankBox);
- const bank=field('bank','Banco de destino',{options:[['','Selecciona…'],...banks.map(b=>[b,b])],into:bankBox}),account=field('bank_account_id','Cuenta receptora',{options:[['','Elige el banco']],into:bankBox}),reference=field('reference','N.º de comprobante o referencia',{max:60,into:bankBox});
- const fillAccounts=()=>{const list=accounts.filter(a=>a.bank===bank.value);account.replaceChildren(new Option(list.length?'Selecciona…':'Elige el banco',''));for(const a of list)account.add(new Option(a.type_label+' · '+a.number+(a.verified?'':' (sin verificar)'),String(a.id)));if(list.length===1)account.value=String(list[0].id);};bank.addEventListener('change',fillAccounts);
- const when=field('paid_at','Fecha y hora del pago',{type:'datetime-local',value:payNow()});field('note','Observaciones',{max:300});form.append(el('p','Responsable: '+(currentUser?.name||'tú'),'inv-form-note'));
+ // Formas de pago como botones con icono (el selector original sigue siendo el dato que se envía).
+ const methodIcons={efectivo:'banknote',transferencia:'landmark',deposito:'building-2',debito:'credit-card',credito:'credit-card',cheque:'file-text',otro:'wallet',mixto:'coins'};
+ method.closest('.inv-field').hidden=true;const methodBox=el('div',undefined,'pay-section'),chips=el('div',undefined,'pay-methods');methodBox.append(el('span','Forma de pago','pay-label'),chips);chips.setAttribute('role','radiogroup');chips.setAttribute('aria-label','Forma de pago');form.append(methodBox);
+ for(const option of method.options){const b=el('button',undefined,'pay-method');b.type='button';b.setAttribute('role','radio');b.dataset.value=option.value;b.append(invIcon(methodIcons[option.value]||'wallet'),el('span',option.textContent));b.onclick=()=>{method.value=option.value;method.dispatchEvent(new Event('change',{bubbles:true}));};chips.append(b);}
+ chips.addEventListener('keydown',event=>{const list=[...chips.children],at=list.indexOf(document.activeElement);if(at<0||!['ArrowRight','ArrowLeft','ArrowDown','ArrowUp'].includes(event.key))return;event.preventDefault();const next=list[(at+(['ArrowRight','ArrowDown'].includes(event.key)?1:list.length-1))%list.length];next.click();next.focus();});
+ const paintMethods=()=>{for(const b of chips.children){const on=b.dataset.value===method.value;b.setAttribute('aria-checked',String(on));b.tabIndex=on?0:-1;}};
+ // Transferencia o depósito: banco con su logotipo, cuenta receptora (las activas del Centro de Cuentas Bancarias) y referencia.
+ const banks=[...new Set(accounts.map(a=>a.bank))];const bankBox=el('div',undefined,'pay-section pay-bank');form.append(bankBox);
+ const bankGrid=el('div',undefined,'fx-form-grid');const bank=field('bank','Banco de destino',{options:[['','Selecciona…'],...banks.map(b=>[b,b])],into:bankGrid}),account=field('bank_account_id','Cuenta receptora',{options:[['','Elige el banco']],into:bankGrid});bank.closest('.inv-field').hidden=account.closest('.inv-field').hidden=true;
+ const bankChips=el('div',undefined,'pay-banks'),accountList=el('div',undefined,'pay-accounts');bankChips.setAttribute('role','radiogroup');bankChips.setAttribute('aria-label','Banco de destino');accountList.setAttribute('role','radiogroup');accountList.setAttribute('aria-label','Cuenta receptora');
+ for(const name of banks){const chip=el('button',undefined,'pay-bank-chip');chip.type='button';chip.setAttribute('role','radio');chip.dataset.value=name;chip.append(bankLogo(name),el('span',name));chip.onclick=()=>{bank.value=name;bank.dispatchEvent(new Event('change',{bubbles:true}));};bankChips.append(chip);}
+ const bankPart=el('div',undefined,'pay-bank-part');bankPart.append(el('span','Banco de destino','pay-label'),bankChips,el('span','Cuenta receptora','pay-label'),accountList);
+ // Sin cuentas activas no se puede registrar una transferencia: se explica y administración puede ir a registrarlas.
+ const none=el('div',undefined,'pay-empty');none.append(invIcon('triangle-alert'),el('p','No hay cuentas bancarias activas registradas. Registra las cuentas de la empresa en Facturación → Cuentas bancarias para poder recibir transferencias y depósitos.'));
+ if(admin()){const go=invBtn('Abrir Cuentas bancarias','landmark',()=>{dialog.close();invoiceGo('cuentas');});go.classList.add('secondary');none.append(go);}
+ const refGrid=el('div',undefined,'fx-form-grid'),reference=field('reference','N.º de comprobante o referencia',{max:60,into:refGrid});
+ const proofWrap=el('label',undefined,'inv-field pay-proof'),proof=el('input');proof.type='file';proof.name='proof';proof.accept='image/jpeg,image/png,application/pdf';proofWrap.append(el('span','Comprobante bancario (opcional · JPG, PNG o PDF, hasta 5 MB)'),proof);
+ bankBox.append(none,bankPart,bankGrid,refGrid,proofWrap);
+ const fillAccounts=()=>{const list=accounts.filter(a=>a.bank===bank.value);account.replaceChildren(new Option(list.length?'Selecciona…':'Elige el banco',''));for(const a of list)account.add(new Option(a.type_label+' · '+a.number+(a.verified?'':' (sin verificar)'),String(a.id)));if(list.length===1)account.value=String(list[0].id);
+  for(const chip of bankChips.children){const on=chip.dataset.value===bank.value;chip.setAttribute('aria-checked',String(on));chip.tabIndex=on||!bank.value&&chip===bankChips.firstElementChild?0:-1;}
+  accountList.replaceChildren();if(!list.length){accountList.append(el('p',banks.length?'Elige primero el banco.':'—','pay-hint'));return;}
+  for(const a of list){const card=el('button',undefined,'pay-account');card.type='button';card.setAttribute('role','radio');card.dataset.value=String(a.id);const info=el('span',undefined,'pay-account-info');info.append(el('strong',a.type_label+' · '+a.number),el('small',a.holder+(a.verified?'':' · sin verificar')));card.append(bankLogo(a.bank),info);
+   card.onclick=()=>{account.value=String(a.id);paintAccounts();};accountList.append(card);}paintAccounts();};
+ const paintAccounts=()=>{for(const card of accountList.querySelectorAll('.pay-account')){const on=card.dataset.value===account.value;card.setAttribute('aria-checked',String(on));}};
+ bank.addEventListener('change',fillAccounts);if(banks.length===1)bank.value=banks[0];fillAccounts();
+ const extra=el('div',undefined,'fx-form-grid');form.append(extra);
+ const when=field('paid_at','Fecha y hora del pago',{type:'datetime-local',value:payNow(),into:extra});field('note','Observaciones',{max:300,into:extra});
+ const responsible=el('p',undefined,'inv-form-note pay-responsible');responsible.append(invIcon('user'),el('span','Responsable del registro: '+(currentUser?.name||'tú')));form.append(responsible);
  // Pago mixto: hasta cinco formas de pago que deben sumar el monto.
- const mix=el('fieldset',undefined,'inv-group pay-mix'),mlg=el('legend');mlg.append(invIcon('coins'),el('span','Distribución del pago mixto'));mix.append(mlg);const lines=el('div',undefined,'pay-lines'),sumNote=el('p','','pay-mix-sum');mix.append(lines,sumNote);form.append(mix);
- const addLine=(mcode='efectivo')=>{if(lines.childElementCount>=5)return;const row=el('div',undefined,'pay-line'),ms=el('select'),am=el('input'),ac=el('select'),rf=el('input'),rm=button('',()=>{row.remove();paintMix();},'inv-icon-btn');rm.setAttribute('aria-label','Quitar esta forma de pago');rm.append(invIcon('x'));
-  for(const[k,v]of Object.entries(methods).filter(([k])=>k!=='tarjeta'))ms.add(new Option(v,k));ms.value=mcode;ms.setAttribute('aria-label','Forma de pago');am.inputMode='decimal';am.placeholder='0,00';am.setAttribute('aria-label','Importe');ac.add(new Option('Cuenta…',''));for(const a of accounts)ac.add(new Option(a.bank+' · '+a.number,String(a.id)));ac.setAttribute('aria-label','Cuenta receptora');rf.placeholder='Referencia';rf.maxLength=60;rf.setAttribute('aria-label','Referencia');
-  const sync=()=>{const bankish=['transferencia','deposito'].includes(ms.value);ac.hidden=!bankish;rf.hidden=!(bankish||ms.value==='cheque');};ms.addEventListener('change',sync);am.addEventListener('input',paintMix);sync();row.append(ms,am,ac,rf,rm);lines.append(row);paintMix();};
+ const mix=el('fieldset',undefined,'inv-group pay-mix'),mlg=el('legend');mlg.append(invIcon('coins'),el('span','Distribución del pago mixto'));mix.append(mlg);const lines=el('div',undefined,'pay-lines'),sumNote=el('p','','pay-mix-sum');mix.append(lines,sumNote);methodBox.after(mix);
+ const addLine=(mcode='efectivo')=>{if(lines.childElementCount>=5)return;const row=el('div',undefined,'pay-line'),ms=el('select'),am=el('input'),ac=el('select'),rf=el('input'),rm=button('',()=>{row.remove();paintMix();sync();},'inv-icon-btn');rm.setAttribute('aria-label','Quitar esta forma de pago');rm.append(invIcon('x'));
+  for(const[k,v]of Object.entries(methods).filter(([k])=>k!=='tarjeta'))ms.add(new Option(v,k));ms.value=mcode;ms.setAttribute('aria-label','Forma de pago');am.inputMode='decimal';am.placeholder='0,00';am.setAttribute('aria-label','Importe');ac.add(new Option(accounts.length?'Cuenta…':'Sin cuentas registradas',''));for(const a of accounts)ac.add(new Option(a.bank+' · '+a.type_label+' · '+a.number,String(a.id)));ac.setAttribute('aria-label','Cuenta receptora');rf.placeholder='Referencia';rf.maxLength=60;rf.setAttribute('aria-label','Referencia');
+  const lineSync=()=>{const bankish=['transferencia','deposito'].includes(ms.value);ac.hidden=!bankish;rf.hidden=!(bankish||ms.value==='cheque');sync();};ms.addEventListener('change',lineSync);am.addEventListener('input',paintMix);row.append(ms,am,ac,rf,rm);lines.append(row);lineSync();paintMix();};
  const plus=button('',()=>addLine('transferencia'),'secondary inv-btn');plus.append(invIcon('plus'),el('span','Agregar forma de pago'));mix.append(plus);
   const parse=v=>{const t=String(v||'').trim();if(!/^\d{1,7}([.,]\d{1,2})?$/.test(t))return NaN;return Math.round(parseFloat(t.replace(',','.'))*100);};
  function paintMix(){const total=[...lines.children].reduce((s,row)=>s+(parse(row.children[1].value)||0),0),target=parse(amount.value);sumNote.textContent='Suma de las formas de pago: '+equipmentMoney(total)+(Number.isNaN(target)?'':total===target?' · coincide con el monto':' · debe sumar '+equipmentMoney(target));sumNote.dataset.ok=String(total===target);}
- const sync=()=>{const full=type.value==='completo';if(full)amount.value=(limit()/100).toFixed(2).replace('.',',');amount.readOnly=full;const mixed=method.value==='mixto',bankish=['transferencia','deposito'].includes(method.value);
-  mix.hidden=!mixed;bankBox.hidden=!(bankish||method.value==='cheque');bank.closest('.inv-field').hidden=account.closest('.inv-field').hidden=!bankish;if(mixed&&!lines.childElementCount){addLine('efectivo');addLine('transferencia');}paintMix();key=financeKey();};
+ const mixBank=()=>[...lines.children].some(row=>['transferencia','deposito'].includes(row.children[0].value));
+ function sync(){const full=type.value==='completo';if(full)amount.value=(limit()/100).toFixed(2).replace('.',',');amount.readOnly=full;const mixed=method.value==='mixto',bankish=['transferencia','deposito'].includes(method.value);
+  mix.hidden=!mixed;bankBox.hidden=!(bankish||method.value==='cheque'||(mixed&&mixBank()));bankPart.hidden=!bankish||!accounts.length;none.hidden=!(bankish||(mixed&&mixBank()))||accounts.length>0;refGrid.hidden=!(bankish||method.value==='cheque');proofWrap.hidden=!(bankish||(mixed&&mixBank()));
+  if(mixed&&!lines.childElementCount){addLine('efectivo');addLine('transferencia');}paintMix();paintMethods();due.replaceChildren(el('small','Saldo pendiente'),el('b',equipmentMoney(limit())));key=financeKey();}
  for(const node of [type,scope,method])node.addEventListener('change',sync);amount.addEventListener('input',()=>{paintMix();key=financeKey();});sync();
  const save=el('button',undefined,'primary inv-btn');save.type='submit';save.append(invIcon('circle-check'),el('span','Registrar pago'));form.append(msg,invDialogActions(dialog,save));
  form.addEventListener('submit',async event=>{event.preventDefault();clear();if(save.disabled)return;const value=parse(amount.value);
@@ -2861,9 +2895,12 @@ function paymentDialog(order,{canPayUnit,canPayOrder,multiple,whole,unitName}){c
   const body={amount:amount.value.trim(),scope:scope.value||'equipo',note:form.elements.note.value.trim(),paid_at:when.value,request_key:key};let label;
   if(method.value==='mixto'){const items=[...lines.children].map(row=>({method:row.children[0].value,amount:row.children[1].value.trim(),bank_account_id:row.children[2].value,reference:row.children[3].value.trim()}));
    const total=items.reduce((s,i)=>s+(parse(i.amount)||0),0);if(total!==value){fail({message:'Las formas de pago deben sumar el monto del pago.',fields:{}});return;}body.lines=JSON.stringify(items);label='Pago mixto: '+items.map(i=>methods[i.method]+' '+equipmentMoney(parse(i.amount))).join(' + ');}
-  else{body.method=method.value;body.bank_account_id=account.value;body.reference=reference.value.trim();label=methods[method.value]+(account.value?' · '+account.selectedOptions[0].textContent:'');}
-  const before=limit();if(!await askConfirm('¿Registrar este pago?','Orden '+order.code+' · '+(order.client||'')+'\nMonto: '+equipmentMoney(value)+' · '+label+'\nSaldo anterior: '+equipmentMoney(before)+' · Nuevo saldo: '+equipmentMoney(before-value),'Registrar pago'))return;
-  save.disabled=true;try{const result=await api('/api/orders/'+order.id+'/payments',body);dialog.close();toast(result.duplicate?'Este pago ya estaba registrado.':'Pago registrado.','success');await refreshOrderFinance(order.id);}catch(error){save.disabled=false;fail(error);}});}
+  else{if(['transferencia','deposito'].includes(method.value)&&!accounts.length){fail({message:'No hay cuentas bancarias activas registradas para recibir el pago.',fields:{}});return;}
+   if(['transferencia','deposito'].includes(method.value)&&!account.value){fail({message:'Elige la cuenta que recibió el dinero.',fields:{bank_account_id:'Cuenta obligatoria.'}});accountList.querySelector('.pay-account')?.focus();return;}
+   body.method=method.value;body.bank_account_id=account.value;body.reference=reference.value.trim();label=methods[method.value]+(account.value?' · '+account.selectedOptions[0].textContent+' ('+bank.value+')':'');}
+  const file=!proofWrap.hidden&&proof.files[0];if(file&&!['image/jpeg','image/png','application/pdf'].includes(file.type)){fail({message:'El comprobante debe ser JPG, PNG o PDF.',fields:{proof:'Formato no admitido.'}});return;}
+  const before=limit();if(!await askConfirm('¿Registrar este pago?','Orden '+order.code+' · '+(order.client||'')+'\nMonto: '+equipmentMoney(value)+' · '+label+(file?'\nComprobante: '+file.name:'')+'\nSaldo anterior: '+equipmentMoney(before)+' · Nuevo saldo: '+equipmentMoney(before-value),'Registrar pago'))return;
+  save.disabled=true;try{if(file){body.proof_upload_id=await cjUpload(file);body.proof_name=file.name;}const result=await api('/api/orders/'+order.id+'/payments',body);dialog.close();toast(result.duplicate?'Este pago ya estaba registrado.':'Pago registrado.','success');await refreshOrderFinance(order.id);}catch(error){save.disabled=false;fail(error);}});}
 // Voucher de tarjeta (DATAFAST u otro adquirente): solo los últimos cuatro dígitos; nunca CVV, PIN, banda ni número completo.
 async function voucherDialog(source,done){let cards;try{cards=await api('/api/payments/cards');}catch(error){notify(error.message);return;}
  const dialog=invDialog('Registrar voucher de tarjeta',true),{form,msg,field,fail,clear}=invForm('bank-form inv-sheet-form');dialog.append(form);cashGuard(form);form.append(el('p',source.label||'Cobro con tarjeta','inv-form-note'),invRequiredNote());
@@ -3902,9 +3939,11 @@ function renderTracking(){
  tools.setAttribute('role','search');tools.noValidate=true;advanced.id='tracking-advanced';advanced.hidden=true;table.setAttribute('aria-label','Seguimiento de órdenes');
  const head=el('thead'),headRow=el('tr'),titles=['Orden','Cliente','Estado','Último movimiento','Técnico','Acciones'];let sortButton=null;for(const title of titles){const th=el('th',title);th.scope='col';
   // «Último movimiento» ordena el listado: más reciente primero (por omisión) o más antiguo primero. El orden lo aplica el servidor.
-  if(title==='Último movimiento'){th.textContent='';sortButton=button('',()=>{view.sort=view.sort==='antiguo'?'reciente':'antiguo';paintSort();load();},'tracking-sort');sortButton.append(el('span',title),systemIcon('M12 5v14 M6 13l6 6 6-6'));th.append(sortButton);th.dataset.sort='true';}
+  if(title==='Último movimiento'){th.textContent='';sortButton=button('',()=>{view.sort=({prioridad:'reciente',reciente:'antiguo',antiguo:'prioridad'})[view.sort]||'prioridad';paintSort();load();},'tracking-sort');sortButton.append(el('span',title),systemIcon('M12 5v14 M6 13l6 6 6-6'));th.append(sortButton);th.dataset.sort='true';}
   headRow.append(th);}
- const paintSort=()=>{const old=view.sort==='antiguo';sortButton.dataset.direction=old?'asc':'desc';sortButton.closest('th').setAttribute('aria-sort',old?'ascending':'descending');sortButton.title=old?'Ordenado del movimiento más antiguo al más reciente. Pulsa para invertir.':'Ordenado del movimiento más reciente al más antiguo. Pulsa para invertir.';sortButton.setAttribute('aria-label','Último movimiento: '+sortButton.title);};view.sort='reciente';view.stateSeen=new Map();paintSort();head.append(headRow);table.append(head,body);wrap.append(table);
+ // Por omisión, prioridad: urgentes, en espera de aprobación o respuesta, en proceso y listas para entregar (como el Centro de Seguimiento).
+ const paintSort=()=>{const mode=view.sort;sortButton.dataset.direction=mode==='antiguo'?'asc':mode==='reciente'?'desc':'priority';const th=sortButton.closest('th');if(mode==='prioridad')th.removeAttribute('aria-sort');else th.setAttribute('aria-sort',mode==='antiguo'?'ascending':'descending');
+  sortButton.title=({prioridad:'Ordenado por prioridad: urgentes, en espera de aprobación, en proceso y listas para entregar. Pulsa para ordenar por el movimiento más reciente.',reciente:'Ordenado del movimiento más reciente al más antiguo. Pulsa para invertir.',antiguo:'Ordenado del movimiento más antiguo al más reciente. Pulsa para volver al orden por prioridad.'})[mode];sortButton.setAttribute('aria-label','Último movimiento: '+sortButton.title);};view.sort='prioridad';view.stateSeen=new Map();paintSort();head.append(headRow);table.append(head,body);wrap.append(table);
  const search=el('input');search.type='search';search.placeholder='Buscar por orden, cliente, teléfono, serie o modelo';search.setAttribute('aria-label','Buscar en el seguimiento');search.maxLength=80;
  const pick=(label,name)=>{const box=el('label',undefined,'tracking-field'),node=el('select');node.name=name;box.append(el('span',label),node);return [box,node];},[stateBox,statePick]=pick('Estado','status'),[techBox,techPick]=pick('Técnico','technician');
  const dateField=(label,name)=>{const box=el('label',undefined,'tracking-field'),node=el('input');node.type='date';node.name=name;box.append(el('span',label),node);return [box,node];},[fromBox,fromNode]=dateField('Movimiento desde','from'),[toBox,toNode]=dateField('Movimiento hasta','to');
@@ -3982,7 +4021,9 @@ function renderTracking(){
   for(const[key,label]of Object.entries(names)){if(!view[key])continue;const value=key==='status'?statusNames[view.status]||view.status:key==='technician'?(view.technician==='none'?'Sin asignar':data.options.technicians.find(item=>String(item.id)===view.technician)?.name||view.technician):view[key];const chip=button('',()=>{if(key==='q')search.value='';else if(key==='status')statePick.value='';else if(key==='technician')techPick.value='';else if(key==='from')fromNode.value='';else toNode.value='';apply();},'tracking-chip');chip.append(el('span',label+': '+value),systemIcon('M18 6 6 18 M6 6l12 12'));chip.setAttribute('aria-label','Quitar filtro '+label);chips.append(chip);}
   const extraChip=(text,run)=>{const chip=button('',run,'tracking-chip');chip.append(el('span',text),systemIcon('M18 6 6 18 M6 6l12 12'));chip.setAttribute('aria-label','Quitar filtro '+text);chips.append(chip);};
   if(view.phase==='listas')extraChip('Vista: Listas para entregar',()=>setPhase('activas'));if(view.balance)extraChip('Con saldo pendiente',()=>setPhase(view.phase));
-  if(chips.childElementCount>1)chips.append(button('Limpiar todo',reset,'tracking-chip tracking-chip-clear'));chips.hidden=!chips.childElementCount;
+  if(chips.childElementCount>1)chips.append(button('Limpiar todo',reset,'tracking-chip tracking-chip-clear'));
+  // La fila de filtros siempre ocupa su sitio (con la vista actual si no hay filtros): filtrar no mueve los paneles de abajo.
+  if(!chips.childElementCount)chips.append(el('span',({activas:'Vista: órdenes activas',entregadas:'Vista: órdenes entregadas',todas:'Vista: todas las órdenes'})[view.phase]+' · '+({prioridad:'orden por prioridad',reciente:'movimiento más reciente primero',antiguo:'movimiento más antiguo primero'})[view.sort],'tracking-chips-note'));chips.hidden=false;
   // Contadores compactos (fecha del taller) y alerta de cobro: una orden entregada con saldo sigue a la vista hasta que se pague.
   const p=data.phases||{};for(const[key,b]of Object.entries(phaseButtons)){const n=b.querySelector('.tracking-phase-count'),total=p[key]||0;if(n.dataset.count!==String(total)){n.textContent=countText(total);n.dataset.count=String(total);}b.setAttribute('aria-label',b.firstChild.textContent+': '+total);}
   const stat=(label,value,run,title,kind)=>{const b=button('',run,'tracking-stat');b.dataset.kind=kind;b.append(el('strong',String(value)),el('span',label));b.title=title;b.setAttribute('aria-label',label+': '+value+'. '+title);return b;};
@@ -3991,53 +4032,72 @@ function renderTracking(){
   const sign=JSON.stringify([p.activas,p.listas,p.entregadas_hoy,p.entregadas_saldo,p.saldo_cents,view.balance,view.phase]);if(summary.dataset.sign!==sign){summary.dataset.sign=sign;summary.replaceChildren(...items);}
 }
 
- // Lista de altura fija con desplazamiento interno y páginas de 25 órdenes: el panel mide siempre lo mismo (tenga 1 o 500 órdenes)
- // y no desplaza el resto del Inicio. No hay desplazamiento automático: la sincronización actualiza solo las filas que cambiaron,
- // en su sitio, y conserva la posición, la página, la fase, la búsqueda y los filtros.
- const SIZE=25;
+ // Cascada automática: altura fija para unas 4 órdenes (2 en teléfonos) y sin barra visible. Cada orden queda unos 5 s y la lista
+ // avanza una fila con una transición suave; al llegar al final sigue con la primera sin salto (las filas rotan en su sitio, sin
+ // copias). Si todas caben, queda quieta. Se pausa con el cursor encima, con foco o texto seleccionado dentro (buscador, botones),
+ // con ventanas abiertas, con la pestaña oculta y con «reducir movimiento». Un solo temporizador para todo el panel.
+ const SIZE=50,DWELL=5000,GLIDE=850,still=matchMedia('(prefers-reduced-motion:reduce)');
  const filtered=()=>!!(view.q||view.status||view.technician||view.from||view.to||view.balance||view.phase==='listas');
- const query=page=>{const next=new URLSearchParams();for(const key of ['q','status','technician','from','to'])if(view[key])next.set(key,view[key]);next.set('phase',view.phase);if(view.balance)next.set('balance','1');if(view.sort==='antiguo')next.set('sort','antiguo');next.set('page',String(page));next.set('size',String(SIZE));return '/api/tracking?'+next.toString();};
- const interacting=()=>view.hover||view.focus||view.touch||!!document.querySelector('dialog[open]')||(window.UiSelect?.isOpen?.()??false);
- const prevBtn=button('',()=>turn(-1),'secondary tracking-nav'),nextBtn=button('',()=>turn(1),'secondary tracking-nav'),count=el('p',undefined,'tracking-count'),all=button('Ver todas las órdenes',()=>go('orders'),'secondary tracking-all');
- prevBtn.append(systemIcon('m15 18-6-6 6-6'));prevBtn.title='Página anterior';prevBtn.setAttribute('aria-label','Página anterior del seguimiento');nextBtn.append(systemIcon('m9 18 6-6-6-6'));nextBtn.title='Página siguiente';nextBtn.setAttribute('aria-label','Página siguiente del seguimiento');count.setAttribute('aria-live','polite');
- {const nav=el('div',undefined,'tracking-pages');nav.append(prevBtn,nextBtn);foot.append(count,nav,all);}
- view.page=1;wrap.classList.add('tracking-scroll');wrap.tabIndex=0;wrap.setAttribute('role','region');wrap.setAttribute('aria-label','Listado del seguimiento (desplazable)');
- function paintFoot(){const total=view.total,first=total?(view.page-1)*SIZE+1:0,last=Math.min(total,view.page*SIZE),pages=Math.max(1,Math.ceil(total/SIZE));
-  count.textContent=total?(filtered()?'Resultados ':'Órdenes ')+first+(last>first?'–'+last:'')+' de '+total:(filtered()?'Sin resultados':view.phase==='activas'?'Sin órdenes activas':'0 órdenes');
-  prevBtn.disabled=view.page<=1;nextBtn.disabled=view.page>=pages;prevBtn.parentElement.hidden=pages<=1;wrap.dataset.empty=String(!total);}
+ const query=page=>{const next=new URLSearchParams();for(const key of ['q','status','technician','from','to'])if(view[key])next.set(key,view[key]);next.set('phase',view.phase);if(view.balance)next.set('balance','1');if(view.sort!=='reciente')next.set('sort',view.sort);next.set('page',String(page));next.set('size',String(SIZE));return '/api/tracking?'+next.toString();};
+ const selecting=()=>{const sel=document.getSelection?.();return !!sel&&!sel.isCollapsed&&!!sel.anchorNode&&root.contains(sel.anchorNode);};
+ const interacting=()=>view.hover||view.focus||view.touch||selecting()||!!document.querySelector('dialog[open]')||(window.UiSelect?.isOpen?.()??false);
+ const fits=()=>wrap.scrollHeight<=wrap.clientHeight+1;
+ const canRun=()=>!view.busy&&!document.hidden&&!interacting()&&!still.matches&&body.querySelectorAll('.tracking-row').length>1&&!fits();
+ const prevBtn=button('',()=>step(-1,true),'secondary tracking-nav'),nextBtn=button('',()=>step(1,true),'secondary tracking-nav'),count=el('p',undefined,'tracking-count'),mode=el('span',undefined,'tracking-motion'),all=button('Ver todas las órdenes',()=>go('orders'),'secondary tracking-all');
+ prevBtn.append(systemIcon('m18 15-6-6-6 6'));prevBtn.title='Orden anterior';prevBtn.setAttribute('aria-label','Mostrar la orden anterior');nextBtn.append(systemIcon('m6 9 6 6 6-6'));nextBtn.title='Orden siguiente';nextBtn.setAttribute('aria-label','Mostrar la orden siguiente');count.setAttribute('aria-live','polite');mode.setAttribute('aria-live','off');
+ {const nav=el('div',undefined,'tracking-pages');nav.append(prevBtn,nextBtn);foot.append(count,mode,nav,all);}
+ view.page=1;view.offset=0;view.moved=Date.now();wrap.classList.add('tracking-cascade');wrap.tabIndex=0;wrap.setAttribute('role','region');wrap.setAttribute('aria-label','Seguimiento de órdenes en movimiento automático. Flechas arriba y abajo para recorrerlo; se detiene mientras lo usas.');
+ const pages=()=>Math.max(1,Math.ceil(view.total/SIZE));
+ function paintMotion(){const text=!view.total||fits()?'':still.matches?'Movimiento reducido':interacting()?'En pausa':'En movimiento';if(mode.textContent!==text){mode.textContent=text;mode.dataset.state=text?(text==='En movimiento'?'run':'pause'):'';}}
+ function paintFoot(){const total=view.total,n=pages();count.textContent=total?(filtered()?'Resultados: ':'')+total+(total===1?' orden':' órdenes')+(n>1?' · página '+view.page+' de '+n:''):(filtered()?'Sin resultados':view.phase==='activas'?'Sin órdenes activas':'0 órdenes');
+  const moving=total>1&&!fits();prevBtn.disabled=nextBtn.disabled=!moving;prevBtn.parentElement.hidden=!moving;wrap.dataset.empty=String(!total);wrap.dataset.still=String(!moving);paintMotion();}
  function note(row,tr){const before=view.known.get(row.id);
   // Movimiento nuevo desde la última sincronización: resalte discreto; si además cambió el estado, se avisa.
   if(!view.first&&before&&before.event!==row.event_id){tr.classList.add('track-new');if(before.status!==row.status_code){noteStatus(row.id,row.status_code);toast('La orden '+row.code+' pasó a «'+row.status+'».','info',{label:'Ver orden',run:()=>go('orders',new URLSearchParams({id:String(row.id)}))},{title:'Cambio de estado',id:'tracking-'+row.id});}}
   view.known.set(row.id,{event:row.event_id,status:row.status_code});return tr;}
  function empty(){const tr=el('tr'),text=!view.data?.total_orders?'Todavía no hay órdenes registradas.':filtered()?'Ninguna orden coincide con la búsqueda o los filtros.':({activas:'No hay órdenes activas: todas están entregadas.',entregadas:'Todavía no hay órdenes entregadas.'})[view.phase]||'Ninguna orden coincide.',td=el('td',text,'tracking-empty');td.colSpan=titles.length;tr.append(td);return tr;}
- // Repinta por número de orden: las filas sin cambios se conservan (sin parpadeo ni duplicados) y se mantiene el desplazamiento.
- function paintRows(list){const keep=wrap.scrollTop,old=new Map([...body.querySelectorAll('.tracking-row')].map(tr=>[tr.dataset.order,tr]));
+ // Repinta en el orden de los datos (las filas sin cambios se reutilizan: sin parpadeo ni duplicados) y reinicia el recorrido.
+ function paintRows(list){const old=new Map([...body.querySelectorAll('.tracking-row')].map(tr=>[tr.dataset.order,tr]));
   const made=list.map(row=>{const was=old.get(String(row.id));return was&&was.dataset.sign===trackingSign(row)?note(row,was):note(row,rows(row));});if(!made.length)made.push(empty());
-  if(made.length!==body.children.length||made.some((tr,n)=>body.children[n]!==tr))body.replaceChildren(...made);wrap.scrollTop=keep;view.first=false;paintFoot();}
+  if(made.length!==body.children.length||made.some((tr,n)=>body.children[n]!==tr))body.replaceChildren(...made);wrap.scrollTop=0;view.offset=0;view.moved=Date.now();view.first=false;paintFoot();}
  async function fetchPage(token){const data=await api(query(view.page));if(token!==view.token)return null;view.total=data.total;view.data=data;view.page=data.page;trackingStamp=Date.now();return data;}
- // Sincronización: si algo cambió y nadie está interactuando, las filas se actualizan en su sitio; si no, se aplica al terminar.
+ // Sincronización: si algo cambió y nadie está usando el panel, se repinta y el recorrido empieza de nuevo; si no, al terminar.
  async function refresh(){if(view.busy)return;const token=view.token;view.busy=true;
-  try{const data=await fetchPage(token);if(!data)return;paintMeta(data);paintStatus('ok');const shown=[...body.querySelectorAll('.tracking-row')];
-   if(data.rows.length===shown.length&&data.rows.every((row,n)=>shown[n].dataset.order===String(row.id)&&shown[n].dataset.sign===trackingSign(row))){view.stale=null;paintFoot();return;}
+  try{const data=await fetchPage(token);if(!data)return;paintMeta(data);paintStatus('ok');const shown=new Map([...body.querySelectorAll('.tracking-row')].map(tr=>[tr.dataset.order,tr.dataset.sign]));
+   if(data.rows.length===shown.size&&data.rows.every(row=>shown.get(String(row.id))===trackingSign(row))){view.stale=null;paintFoot();return;}
    if(interacting()){view.stale=data.rows;return;}view.stale=null;paintRows(data.rows);}
   catch{paintStatus('error');}finally{view.busy=false;}}
  async function load(keepPage){const token=++view.token;if(!keepPage)view.page=1;view.stale=null;paintStatus('loading');root.dataset.loading='true';
-  try{const data=await fetchPage(token);if(!data||trackingView!==view||!root.isConnected)return;paintMeta(data);body.replaceChildren();wrap.scrollTop=0;paintRows(data.rows);paintStatus('ok');}
+  try{const data=await fetchPage(token);if(!data||trackingView!==view||!root.isConnected)return;paintMeta(data);body.replaceChildren();paintRows(data.rows);paintStatus('ok');}
   catch(error){if(token!==view.token)return;paintStatus('error');const tr=el('tr'),td=el('td',error.message,'tracking-empty');td.colSpan=titles.length;tr.append(td);body.replaceChildren(tr);view.total=0;paintFoot();}
   finally{if(token===view.token)delete root.dataset.loading;}}
- function turn(delta){const pages=Math.max(1,Math.ceil(view.total/SIZE)),next=Math.min(pages,Math.max(1,view.page+delta));if(next===view.page)return;view.page=next;load(true);}
- // Pausas de la sincronización visible: cursor encima, foco dentro, dedo sobre la lista o ventanas abiertas.
- root.addEventListener('pointerenter',event=>{if(event.pointerType!=='touch')view.hover=true;});root.addEventListener('pointerleave',()=>{view.hover=false;});
- root.addEventListener('focusin',()=>{view.focus=true;});root.addEventListener('focusout',()=>{setTimeout(()=>{view.focus=root.contains(document.activeElement);},0);});
- let touchTimer=null;root.addEventListener('touchstart',()=>{view.touch=true;clearTimeout(touchTimer);},{passive:true});const touchEnd=()=>{clearTimeout(touchTimer);touchTimer=setTimeout(()=>{view.touch=false;},4000);};root.addEventListener('touchend',touchEnd,{passive:true});root.addEventListener('touchcancel',touchEnd,{passive:true});
+ // Transición suave (aceleración y frenado); con «reducir movimiento» el cambio es inmediato.
+ const glide=(from,to,span)=>new Promise(resolve=>{if(still.matches||from===to){wrap.scrollTop=to;resolve();return;}const began=performance.now();const frame=now=>{const t=Math.min(1,(now-began)/span),e=t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;wrap.scrollTop=from+(to-from)*e;if(t<1&&wrap.isConnected)requestAnimationFrame(frame);else resolve();};requestAnimationFrame(frame);});
+ async function step(direction,manual){const list=[...body.querySelectorAll('.tracking-row')];if(view.busy||list.length<2||fits())return;view.busy=true;const token=view.token;
+  try{if(direction>0){const first=list[0],height=first.getBoundingClientRect().height;await glide(0,height,manual?420:GLIDE);if(token!==view.token)return;body.append(first);wrap.scrollTop=0;view.offset=(view.offset+1)%list.length;}
+   else{const last=list[list.length-1];body.prepend(last);const height=last.getBoundingClientRect().height;wrap.scrollTop=height;await glide(height,0,manual?420:GLIDE);view.offset=(view.offset-1+list.length)%list.length;}
+   // Recorrido completo de la página: con más de 50 órdenes continúa con la página siguiente y, tras la última, vuelve a la primera.
+   if(direction>0&&view.offset===0&&pages()>1){view.busy=false;view.page=view.page%pages()+1;await load(true);}}
+  finally{view.busy=false;view.moved=Date.now();paintMotion();}}
+ // Recorrido manual sin barra: rueda del ratón y flechas del teclado (una orden por gesto).
+ let wheelAt=0;wrap.addEventListener('wheel',event=>{if(fits()||Math.abs(event.deltaY)<4)return;event.preventDefault();if(Date.now()-wheelAt<450)return;wheelAt=Date.now();step(event.deltaY>0?1:-1,true);},{passive:false});
+ wrap.addEventListener('keydown',event=>{if(event.target!==wrap)return;if(event.key==='ArrowDown'){event.preventDefault();step(1,true);}else if(event.key==='ArrowUp'){event.preventDefault();step(-1,true);}});
+ // Pausas: cursor encima, foco dentro (buscador, botones), dedo sobre la lista, texto seleccionado o ventanas abiertas.
+ const resume=()=>{view.moved=Date.now();paintMotion();};
+ root.addEventListener('pointerenter',event=>{if(event.pointerType!=='touch'){view.hover=true;paintMotion();}});root.addEventListener('pointerleave',()=>{view.hover=false;resume();});
+ root.addEventListener('focusin',()=>{view.focus=true;paintMotion();});root.addEventListener('focusout',()=>{setTimeout(()=>{view.focus=root.contains(document.activeElement);if(!view.focus)resume();},0);});
+ let touchTimer=null;root.addEventListener('touchstart',()=>{view.touch=true;clearTimeout(touchTimer);},{passive:true});const touchEnd=()=>{clearTimeout(touchTimer);touchTimer=setTimeout(()=>{view.touch=false;resume();},4000);};root.addEventListener('touchend',touchEnd,{passive:true});root.addEventListener('touchcancel',touchEnd,{passive:true});
  clearInterval(trackingTimer);let lastSync=Date.now();
- trackingTimer=setInterval(()=>{if(currentModule!=='home'||trackingView!==view||!root.isConnected){clearInterval(trackingTimer);return;}if(document.hidden)return;
+ trackingTimer=setInterval(()=>{if(currentModule!=='home'||trackingView!==view||!root.isConnected){clearInterval(trackingTimer);return;}if(document.hidden){view.moved=Date.now();return;}
   if(view.stale&&!interacting()&&!view.busy){const pending=view.stale;view.stale=null;paintRows(pending);return;}
-  if(Date.now()-lastSync>=30000&&!view.busy){lastSync=Date.now();refresh();}},1000);
+  if(Date.now()-lastSync>=30000&&!view.busy){lastSync=Date.now();refresh();return;}
+  if(interacting()){view.moved=Date.now();paintMotion();return;}
+  if(canRun()&&Date.now()-view.moved>=DWELL)step(1,false);},500);
  // Al volver a la pestaña (p. ej., tras aprobar un presupuesto en otra ventana o desde el teléfono) se sincroniza en el acto, sin esperar 30 s.
  const wake=()=>{if(document.hidden||trackingView!==view||!root.isConnected||view.busy||Date.now()-lastSync<4000)return;lastSync=Date.now();refresh();};
  trackingWake?.abort();trackingWake=new AbortController();document.addEventListener('visibilitychange',wake,{signal:trackingWake.signal});addEventListener('focus',wake,{signal:trackingWake.signal});
- view.refresh=refresh;view.state=()=>({page:view.page,total:view.total,busy:view.busy,phase:view.phase,balance:!!view.balance,paused:interacting()});
+ still.addEventListener?.('change',paintFoot,{signal:trackingWake.signal});
+ view.refresh=refresh;view.step=step;view.state=()=>({page:view.page,total:view.total,busy:view.busy,phase:view.phase,balance:!!view.balance,offset:view.offset,paused:interacting(),moving:canRun(),fits:fits()});
  load();
 }
 function renderActivityRows(root,rows,options={}){

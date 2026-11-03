@@ -1107,6 +1107,13 @@ class Handler(BaseHTTPRequestHandler):
                  '/favicon.ico':'favicon.ico','/static/favicon.ico':'favicon.ico','/static/favicon-16.png':'favicon-16.png','/static/favicon-32.png':'favicon-32.png','/static/logo-firma.png':'logo-firma.png','/static/favicon-48.png':'favicon-48.png',
                  '/apple-touch-icon.png':'apple-touch-icon.png','/apple-touch-icon-precomposed.png':'apple-touch-icon.png','/static/apple-touch-icon.png':'apple-touch-icon.png'}
         # Logotipos de marcas: solo nombres simples dentro de static/brands; si el archivo no existe la interfaz usa un icono genérico.
+        # Logotipos de bancos (static/bancos, procedencia en su README): solo nombres simples en PNG.
+        bank_logo = re.fullmatch(r'/static/bancos/([a-z0-9]+)\.png', path)
+        if bank_logo:
+            file = ROOT / 'static' / 'bancos' / (bank_logo[1][:40] + '.png')
+            if not file.is_file():
+                return self.reply(404, {'error':'Archivo no disponible.'})
+            return self.reply(200, file.read_bytes(), 'image/png')
         brand_logo = re.fullmatch(r'/static/brands/([a-z0-9]+(?:-[a-z0-9]+)*)\.(svg|png)', path)
         if brand_logo:
             file = ROOT / 'static' / 'brands' / (brand_logo[1][:60] + '.' + brand_logo[2])

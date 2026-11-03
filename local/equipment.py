@@ -96,6 +96,12 @@ def payments(c,order_id):
     rows=[dict(r) for r in c.execute("SELECT p.id,p.amount_cents,p.kind,p.method,p.note,p.created_at,p.voided_at,p.void_reason,COALESCE(u.name,'') actor,"+DETAIL_SQL+" FROM order_payments p LEFT JOIN users u ON u.id=p.created_by WHERE p.order_id=? AND p.scope='equipo' ORDER BY p.id",(order_id,))]
     rows+=[dict(r,kind='asignacion') for r in c.execute("SELECT a.id allocation_id,p.id,a.amount_cents,p.method,p.note,a.created_at,p.voided_at,p.void_reason,COALESCE(u.name,'') actor,"+DETAIL_SQL+" FROM order_payment_allocations a JOIN order_payments p ON p.id=a.payment_id LEFT JOIN users u ON u.id=a.created_by WHERE a.order_id=? ORDER BY a.id",(order_id,))]
     for row in rows:row['method_label']=method_label(row['method'],row['method_detail']);row['receipt']='REC-%06d'%row['id']
+    # Transferencia o depósito registrado para conciliar, con su comprobante si se adjuntó (se descarga desde Caja → transferencias).
+    if rows:
+        marks=','.join('?' for _ in rows)
+        links={r['payment_id']:r for r in c.execute('SELECT id,payment_id,file_id,status FROM bank_transfers WHERE payment_id IN ('+marks+')',[row['id'] for row in rows])}
+        for row in rows:
+            found=links.get(row['id']);row['transfer_id']=found['id'] if found else None;row['proof']=bool(found and found['file_id']);row['transfer_status']=found['status'] if found else ''
     return sorted(rows,key=lambda row:row['created_at'])
 
 
@@ -172,6 +178,14 @@ def add_payment(c,order_id,data,user,now):
     mixed=bool(data.get('lines'))
     if mixed and kind=='devolucion':return 400,{'error':'Una devolución se registra con una sola forma de pago.'}
     if mixed and key and len(key)>60:return 400,{'error':'Solicitud no válida. Recarga la página e inténtalo nuevamente.'}
+    if key:
+        # Reintento o doble clic: la misma solicitud devuelve el movimiento ya registrado, antes de validar de nuevo (su referencia
+        # bancaria ya figura registrada y no debe confundirse con un duplicado de otra persona).
+        same=c.execute('SELECT id,order_id,amount_cents,kind,scope,operation_id FROM order_payments WHERE request_key=?',(key+('-1' if mixed else ''),)).fetchone()
+        if same:
+            total=c.execute('SELECT SUM(amount_cents) FROM order_payments WHERE operation_id=?',(same['operation_id'],)).fetchone()[0] if mixed else same['amount_cents']
+            if (same['order_id'],total,same['kind'],same['scope'])!=(target,cents_of(data.get('amount','')),kind,scope):return 409,{'error':'Esta solicitud ya se utilizó para otro movimiento. Recarga la página e inténtalo nuevamente.'}
+            return 200,{'ok':True,'id':same['id'],'duplicate':True,**money(c,order_id)}
     lines,errors=_lines(c,data,kind=='devolucion')
     if lines is None:return 400,{'error':next(iter(errors.values())),'fields':errors}
     cents=sum(l['cents'] for l in lines)
@@ -209,6 +223,13 @@ def add_payment(c,order_id,data,user,now):
     except cash_sessions.CashError as error:
         return error.status,{'error':str(error),'fields':error.fields,'cash_closed':True}
     operation='OP-'+secrets.token_hex(6).upper() if mixed else ''
+    # Comprobante bancario opcional (JPG, PNG o PDF): queda en el archivo central de comprobantes y se enlaza a la transferencia
+    # o el depósito que se registra para conciliar. No sustituye la verificación: el dinero se confirma al conciliar.
+    proof=None;upload=str(data.get('proof_upload_id','') or '')
+    if upload:
+        if kind!='pago' or not any(l['code'] in ('transferencia','deposito') for l in lines):return 400,{'error':'El comprobante se adjunta a pagos por transferencia o depósito.','fields':{'proof':'Solo para transferencia o depósito.'}}
+        try:proof=cash_sessions.store_file(c,user,upload,str(data.get('proof_name','') or 'comprobante'),'transferencia',now)
+        except cash_sessions.CashError as error:return error.status,{'error':str(error),'fields':{'proof':str(error)}}
     ids=[]
     for n,line in enumerate(lines,1):
         method,detail=stored_method(line['code'])
@@ -219,7 +240,7 @@ def add_payment(c,order_id,data,user,now):
         if line['code'] in ('transferencia','deposito') and kind=='pago':
             client=c.execute('SELECT d.client_id FROM orders o JOIN devices d ON d.id=o.device_id WHERE o.id=?',(order_id,)).fetchone()
             banking.register_transfer(c,{'method':line['code'],'bank_account_id':line['account']['id'],'reference':line['reference'],'amount_cents':line['cents'],'paid_at':paid_at,
-                                         'source_kind':'orden','source_id':order_id,'client_id':client['client_id'] if client else ''},user,now,payment_id=pid)
+                                         'source_kind':'orden','source_id':order_id,'client_id':client['client_id'] if client else ''},user,now,payment_id=pid,file_id=proof)
     return 201,{'ok':True,'id':ids[0],'ids':ids,'operation_id':operation,'amount_cents':cents,'kind':kind,'scope':scope,'cash_session_id':session,**money(c,order_id)}
 
 
