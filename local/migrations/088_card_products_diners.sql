@@ -1,0 +1,20 @@
+-- Banco Diners: combinaciones de la tabla DATAFAST 6.2 que la carga de la 076 no incluyó (solo había la tarjeta Diners en estas categorías).
+-- Según la tabla original enviada por administración el 03/11/2026:
+--   Corporativos (B), Empresarial (C) y PYMES (D): Diners, Visa Titanium y Mastercard Titanium.
+--   Minorista (E), Simple (F) y Ampliado (G): Diners, Discover, Visa Titanium y Mastercard.
+-- Solo AÑADE combinaciones (INSERT OR IGNORE: no duplica las existentes); no cambia ningún factor ni borra nada.
+INSERT OR IGNORE INTO card_products(bank,brand,category,group_code,source,updated_at) VALUES ('Banco Diners','Visa Titanium','Corporativa','B','DATAFAST 6.2 (tabla original enviada por administración el 03/11/2026)','2026-11-03T18:30:00-05:00');
+INSERT OR IGNORE INTO card_products(bank,brand,category,group_code,source,updated_at) VALUES ('Banco Diners','Mastercard Titanium','Corporativa','B','DATAFAST 6.2 (tabla original enviada por administración el 03/11/2026)','2026-11-03T18:30:00-05:00');
+INSERT OR IGNORE INTO card_products(bank,brand,category,group_code,source,updated_at) VALUES ('Banco Diners','Visa Titanium','Empresarial','C','DATAFAST 6.2 (tabla original enviada por administración el 03/11/2026)','2026-11-03T18:30:00-05:00');
+INSERT OR IGNORE INTO card_products(bank,brand,category,group_code,source,updated_at) VALUES ('Banco Diners','Mastercard Titanium','Empresarial','C','DATAFAST 6.2 (tabla original enviada por administración el 03/11/2026)','2026-11-03T18:30:00-05:00');
+INSERT OR IGNORE INTO card_products(bank,brand,category,group_code,source,updated_at) VALUES ('Banco Diners','Visa Titanium','PYMES','D','DATAFAST 6.2 (tabla original enviada por administración el 03/11/2026)','2026-11-03T18:30:00-05:00');
+INSERT OR IGNORE INTO card_products(bank,brand,category,group_code,source,updated_at) VALUES ('Banco Diners','Mastercard Titanium','PYMES','D','DATAFAST 6.2 (tabla original enviada por administración el 03/11/2026)','2026-11-03T18:30:00-05:00');
+INSERT OR IGNORE INTO card_products(bank,brand,category,group_code,source,updated_at) VALUES ('Banco Diners','Discover','Minorista','E','DATAFAST 6.2 (tabla original enviada por administración el 03/11/2026)','2026-11-03T18:30:00-05:00');
+INSERT OR IGNORE INTO card_products(bank,brand,category,group_code,source,updated_at) VALUES ('Banco Diners','Visa Titanium','Minorista','E','DATAFAST 6.2 (tabla original enviada por administración el 03/11/2026)','2026-11-03T18:30:00-05:00');
+INSERT OR IGNORE INTO card_products(bank,brand,category,group_code,source,updated_at) VALUES ('Banco Diners','Mastercard','Minorista','E','DATAFAST 6.2 (tabla original enviada por administración el 03/11/2026)','2026-11-03T18:30:00-05:00');
+INSERT OR IGNORE INTO card_products(bank,brand,category,group_code,source,updated_at) VALUES ('Banco Diners','Discover','Simple','F','DATAFAST 6.2 (tabla original enviada por administración el 03/11/2026)','2026-11-03T18:30:00-05:00');
+INSERT OR IGNORE INTO card_products(bank,brand,category,group_code,source,updated_at) VALUES ('Banco Diners','Visa Titanium','Simple','F','DATAFAST 6.2 (tabla original enviada por administración el 03/11/2026)','2026-11-03T18:30:00-05:00');
+INSERT OR IGNORE INTO card_products(bank,brand,category,group_code,source,updated_at) VALUES ('Banco Diners','Mastercard','Simple','F','DATAFAST 6.2 (tabla original enviada por administración el 03/11/2026)','2026-11-03T18:30:00-05:00');
+INSERT OR IGNORE INTO card_products(bank,brand,category,group_code,source,updated_at) VALUES ('Banco Diners','Discover','Ampliado','G','DATAFAST 6.2 (tabla original enviada por administración el 03/11/2026)','2026-11-03T18:30:00-05:00');
+INSERT OR IGNORE INTO card_products(bank,brand,category,group_code,source,updated_at) VALUES ('Banco Diners','Visa Titanium','Ampliado','G','DATAFAST 6.2 (tabla original enviada por administración el 03/11/2026)','2026-11-03T18:30:00-05:00');
+INSERT OR IGNORE INTO card_products(bank,brand,category,group_code,source,updated_at) VALUES ('Banco Diners','Mastercard','Ampliado','G','DATAFAST 6.2 (tabla original enviada por administración el 03/11/2026)','2026-11-03T18:30:00-05:00');

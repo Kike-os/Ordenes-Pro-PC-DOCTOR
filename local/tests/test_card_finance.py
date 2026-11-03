@@ -24,6 +24,9 @@ for brand in ('Visa', 'Mastercard'):
 GROUPS.update({('Banco General Rumiñahui (BGR)', 'Visa', cat): g for cat, g in (('Personal', 'A'), ('Corporativa', 'B'), ('Empresarial', 'C'), ('PYMES', 'D'))})
 GROUPS.update({('Banco del Pacífico', brand, ONE): 'I' for brand in ('Mastercard', 'Visa', 'Pacificard')})
 GROUPS.update({('Banco Guayaquil', brand, ONE): 'J' for brand in ('American Express', 'Visa', 'Mastercard')})
+# Banco Diners: combinaciones de la tabla original que añade la migración 088.
+GROUPS.update({('Banco Diners', brand, cat): g for cat, g in (('Corporativa', 'B'), ('Empresarial', 'C'), ('PYMES', 'D')) for brand in ('Visa Titanium', 'Mastercard Titanium')})
+GROUPS.update({('Banco Diners', brand, cat): g for cat, g in (('Minorista', 'E'), ('Simple', 'F'), ('Ampliado', 'G')) for brand in ('Discover', 'Visa Titanium', 'Mastercard')})
 GYE = {'bank': 'Banco Guayaquil', 'brand': 'Visa', 'category': ONE}
 
 

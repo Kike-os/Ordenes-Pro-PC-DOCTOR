@@ -8,7 +8,7 @@ se guarda igual, con su historial. Sin migración.
 
 Grupos configurados (con combinaciones activas, de los existentes), bancos habilitados, combinaciones banco · marca · categoría, plazos con
 al menos un factor vigente y factores pendientes (por confirmar o sin configurar). Lo calcula `card_finance.factor_table` (`summary`).
-Con los datos actuales: 10 de 10 grupos, 8 bancos, 31 combinaciones, 11 de 11 plazos y ningún factor pendiente.
+Con los datos actuales: 10 de 10 grupos, 8 bancos, 46 combinaciones, 11 de 11 plazos y ningún factor pendiente.
 
 **Grupo J a 36 meses (migración 087, 1.5.233):** quedó pendiente en la 076 porque la cifra no era legible en el texto del PDF. Con la tabla
 original DATAFAST 6.2 enviada por administración el 03/11/2026 se confirmó **26,67 %**. La fila pendiente (sin valor) se completó con la
@@ -47,3 +47,16 @@ del cambio sigue siendo obligatorio y queda en el historial.
 - Navegador con la tabla de la migración en una base temporal (13 comprobaciones): resumen, valores exactos, encabezados y columna fijos,
   filtros, búsqueda, grupos, despliegue con teclado, «Ver factores», simulador ($140,00 + 9 % = $152,60; 2,63 % = $4,01; total $156,61 en
   3 cuotas de $52,20), Editar/Cancelar/Guardar del recargo con persistencia, 1440, 1024, 390 y 320 px sin desbordamiento.
+
+## Verificación con la tabla original (03/11/2026, 1.5.233)
+
+Se comparó la tabla DATAFAST 6.2 enviada por administración con la base, celda por celda: los **110 porcentajes coinciden** (10 grupos × 11
+plazos, con el 26,67 % del grupo J a 36 meses). Faltaban **15 combinaciones de Banco Diners** que la tabla incluye y la 076 no había cargado
+(migración 088, solo añade):
+
+| Categoría (grupo) | Ya estaba | Se añaden |
+| --- | --- | --- |
+| Corporativa (B), Empresarial (C), PYMES (D) | Diners | Visa Titanium, Mastercard Titanium |
+| Minorista (E), Simple (F), Ampliado (G) | Diners | Discover, Visa Titanium, Mastercard |
+
+El asterisco (*) de las categorías corporativas, empresariales y PYMES de la tabla no tiene una nota explicativa en el documento.
