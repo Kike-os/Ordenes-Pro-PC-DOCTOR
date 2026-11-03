@@ -8,6 +8,31 @@
   },
   "releases": [
     {
+      "version": "1.5.227",
+      "date": "2026-11-02T22:46:02-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Caja → Historial y auditoría rediseñado y PDF de transferencias y depósitos corregido",
+      "changes": {
+        "features": [
+          "Historial de caja: indicadores que siguen los filtros (registrados, correctos, con diferencias, entradas y salidas), filtros con Buscar y Limpiar, exportación CSV de los resultados y menú de tres puntos (detalle, PDF, comprobante térmico, movimientos y auditoría)."
+        ],
+        "improvements": [
+          "Caja → Historial y auditoría rediseñado: tabla legible con anchos reales y desplazamiento dentro de su marco (número de cierre y acciones fijos), importes a la derecha, estados con indicador (incluida la marca «Ajustada») y tarjetas por cierre en el teléfono.",
+          "Detalle del cierre con el efectivo del cajón separado de los pagos electrónicos, entradas por concepto, arqueo, ajustes posteriores y auditoría de cada operación."
+        ],
+        "fixes": [
+          "Las entradas del historial de caja ya no mezclan sin aviso efectivo y pagos electrónicos: un depósito (como en CJ-000002) se muestra como electrónico y no altera el efectivo esperado, que era correcto.",
+          "El historial de caja usa las cifras guardadas en cada cierre: un cobro anulado después ya no cambia lo que se ve del cierre original.",
+          "PDF de transferencias y depósitos y reportes del inventario: la línea final ya no tacha la segunda línea de una fila; encabezado en franja, filas alternas, importes a la derecha, método «Depósito» con tilde, fecha local y pie con el módulo correcto."
+        ],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Kike-os: «Sí, publica la 1.5.227» (02/11/2026)"
+    },
+    {
       "version": "1.5.226",
       "date": "2026-11-02T21:57:52-05:00",
       "type": "patch",

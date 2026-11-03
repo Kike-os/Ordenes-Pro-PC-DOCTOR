@@ -4,6 +4,25 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.227 — 2026-11-02 22:46 (UTC-05:00)
+
+Caja → Historial y auditoría rediseñado y PDF de transferencias y depósitos corregido
+
+### Nuevas funcionalidades
+
+- Historial de caja: indicadores que siguen los filtros (registrados, correctos, con diferencias, entradas y salidas), filtros con Buscar y Limpiar, exportación CSV de los resultados y menú de tres puntos (detalle, PDF, comprobante térmico, movimientos y auditoría).
+
+### Mejoras realizadas
+
+- Caja → Historial y auditoría rediseñado: tabla legible con anchos reales y desplazamiento dentro de su marco (número de cierre y acciones fijos), importes a la derecha, estados con indicador (incluida la marca «Ajustada») y tarjetas por cierre en el teléfono.
+- Detalle del cierre con el efectivo del cajón separado de los pagos electrónicos, entradas por concepto, arqueo, ajustes posteriores y auditoría de cada operación.
+
+### Errores corregidos
+
+- Las entradas del historial de caja ya no mezclan sin aviso efectivo y pagos electrónicos: un depósito (como en CJ-000002) se muestra como electrónico y no altera el efectivo esperado, que era correcto.
+- El historial de caja usa las cifras guardadas en cada cierre: un cobro anulado después ya no cambia lo que se ve del cierre original.
+- PDF de transferencias y depósitos y reportes del inventario: la línea final ya no tacha la segunda línea de una fila; encabezado en franja, filas alternas, importes a la derecha, método «Depósito» con tilde, fecha local y pie con el módulo correcto.
+
 ## v1.5.226 — 2026-11-02 21:57 (UTC-05:00)
 
 Documentación al día: secciones publicadas con su versión y pendientes de Facturación revisados (sin cambios en la aplicación)
