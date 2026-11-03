@@ -46,6 +46,17 @@ def masked(identification):
     return number[:2] + '*' * max(0, len(number) - 2) if len(number) >= 6 else ''
 
 
+# Apartado del tipo de equipo (device_authorizations) del que depende cada autorización; el servicio se pide siempre.
+SECTION = {'operating_system': 'os', 'files': 'files', 'data_operations': 'risk'}
+
+
+def items(order):
+    """Autorizaciones que se piden al cliente: las que aplican al tipo de equipo de la orden. Lo que no aplica no se pregunta
+    ni se registra como decisión (queda anotado como «no aplica» en la evidencia)."""
+    applicable = (order.get('authorization_profile') or {}).get('sections')
+    return [item for item in ITEMS if applicable is None or item[0] not in SECTION or SECTION[item[0]] in applicable]
+
+
 def ordered(decisions):
     """Decisiones en el orden en que se presentaron al cliente."""
     return [(key, decisions[key]) for key, _, _ in ITEMS if key in decisions]
@@ -138,7 +149,7 @@ def decision_page(token, order, terms, passkey, errors=None, chosen=None):
                      % (e(terms['title']), e(terms['version']), clauses, ' checked' if chosen.get('terms_accept') else '', e(terms['version']), _alert(errors.get('terms_accept', ''))))
     else:
         parts.append('<p class="auth-hint">Todavía no hay condiciones de servicio publicadas: esta autorización no incluye la aceptación de condiciones.</p>')
-    for key, title, text in ITEMS:
+    for key, title, text in items(order):
         value = chosen.get(key, '')
         parts.append('<fieldset class="auth-item"><legend>%s</legend><p>%s</p><div class="auth-options"><label><input type="radio" name="%s" value="authorized"%s required><span>Autorizo</span></label><label><input type="radio" name="%s" value="denied"%s><span>No autorizo</span></label></div>%s</fieldset>'
                      % (e(title), e(text), key, ' checked' if value == 'authorized' else '', key, ' checked' if value == 'denied' else '', _alert(errors.get(key, ''))))
@@ -153,6 +164,7 @@ def result_page(token, row, order):
     if row['status'] in ('signed', 'rejected'):
         labels = dict((key, title) for key, title, _ in ITEMS)
         lines = ''.join('<div><dt>%s</dt><dd class="auth-%s">%s</dd></div>' % (e(labels.get(key, key)), e(value), 'AUTORIZADO' if value == 'authorized' else 'NO AUTORIZADO') for key, value in ordered(evidence.get('decisions', {})))
+        lines += ''.join('<div><dt>%s</dt><dd class="auth-na">NO APLICA</dd></div>' % e(labels[key]) for key in (evidence.get('device') or {}).get('not_applicable', []))
         when = datetime.fromisoformat(row['signed_at']).astimezone(ECUADOR_TZ).strftime('%d/%m/%Y %H:%M')
         # Esta autorización no aprueba presupuestos: si hay uno pendiente, se indica que se decide desde su propio enlace.
         pending = order.get('pending_quotes') or []
@@ -219,7 +231,7 @@ def handle(c, token, row, order, form, now, origin, send_code, terms):
         if not row['pass_hash'] or not row['verified_at'] or not secrets.compare_digest(digest(passkey), row['pass_hash']) or datetime.fromisoformat(row['verified_at']) + timedelta(minutes=PASS_MINUTES) < now:
             return identify_page(token, order, 'La verificación caducó. Compruebe su identidad de nuevo.'), False
         errors, decisions = {}, {}
-        for key, title, _ in ITEMS:
+        for key, title, _ in items(order):
             if form.get(key) not in ('authorized', 'denied'):
                 errors[key] = 'Elija expresamente «Autorizo» o «No autorizo».'
             else:
@@ -236,6 +248,9 @@ def handle(c, token, row, order, form, now, origin, send_code, terms):
                     'recipient': row['recipient'], 'method': METHOD, 'verified_at': row['verified_at'], 'signed_at': stamp, 'decisions': decisions, 'comment': comment,
                     'terms': {'id': terms['id'], 'version': terms['version'], 'title': terms['title'], 'content_hash': terms['content_hash']} if terms else None,
                     'origin': origin}
+        profile = order.get('authorization_profile')
+        if profile:
+            evidence['device'] = {'type': profile['type_label'], 'category': profile['label'], 'not_applicable': [key for key, _, _ in ITEMS if key in SECTION and SECTION[key] not in profile['sections']]}
         packed = json.dumps(evidence, ensure_ascii=False, sort_keys=True)
         status = 'signed' if decisions['service'] == 'authorized' else 'rejected'
         done = c.execute("UPDATE client_authorizations SET status=?,evidence=?,evidence_hash=?,signed_at=?,pass_hash='' WHERE id=? AND status='pending'", (status, packed, digest(packed), stamp, row['id']))
@@ -273,6 +288,10 @@ def render_pdf(row):
         else:
             fill(left, y - 2, 104, 15, (.70, .12, .16)); fill(left + 1.2, y - .8, 101.6, 12.6, (1, 1, 1)); pdf.text('NO AUTORIZADO', left + 14, y + 1.5, 7.6, True, (.70, .12, .16))
         pdf.text(titles.get(key, key), left + 116, y, 9.6, True, INK); y += 21
+    gone = (evidence.get('device') or {}).get('not_applicable') or []
+    if gone:
+        for line in pdf.wrap('No aplica a ' + evidence['device']['type'].lower() + ' (no se preguntó al cliente): ' + '; '.join(titles[k] for k in gone) + '.', width, 8.6): pdf.text(line, left, y, 8.6, False, GRAY); y += 11.6
+        y += 6
     if evidence.get('comment'):
         y += 4; pdf.text('Observaciones del cliente', left, y, 8, True, GRAY); y += 13
         for line in pdf.wrap(evidence['comment'], width, 9.2): pdf.text(line, left, y, 9.2, False, INK); y += 12.4

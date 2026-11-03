@@ -26,6 +26,9 @@ BLUE=(.08,.25,.47)
 
 def render_receipt(order):
     company=settings()
+    # «dinamico»: autorizaciones según el tipo de equipo y composición compacta. Las órdenes anteriores sin versión corregida se
+    # generan exactamente como se emitieron (misma huella SHA-256 que el comprobante enviado).
+    dynamic=order.get('receipt_layout')=='dinamico';fix=(order.get('receipt_corrections') or [None])[-1] if dynamic else None
     pdf=pydyf.PDF()
     for key,value in [('Title',('Hoja de servicio técnico ' if order.get('_service') else 'Comprobante de recepción ')+order['code']),('Author','PC-DOCTOR S.A.')]:
         pdf.info[key]=pydyf.String(value)
@@ -79,6 +82,8 @@ def render_receipt(order):
             annotation=pydyf.Dictionary({'Type':'/Annot','Subtype':'/Link','Rect':pydyf.Array([left,H-top-size,left+size,H-top]),'Border':pydyf.Array([0,0,0]),'A':pydyf.Dictionary({'S':'/URI','URI':pydyf.String(order['qr_url'])})})
             pdf.add_object(annotation);page['Annots']=pydyf.Array([annotation.reference])
             y=224
+            if fix:
+                text('COMPROBANTE CORREGIDO · REVISIÓN '+str(fix['revision'])+' · '+datetime.fromisoformat(fix['created_at']).astimezone(ECUADOR_TZ).strftime('%d/%m/%Y'),36,219,7.5,BLUE,True);y=236
         else:
             text(order['code']+'  |  Continuación',36,100,10,BLUE,True);y=124
         line(H-85)
@@ -160,28 +165,59 @@ def render_receipt(order):
     if order.get('customer_notes'):item('Observaciones autorizadas de recepción',order['customer_notes'])
     # Autorizaciones del cliente: estado real de cada una. Lo que no se decidió figura como PENDIENTE, nunca como aceptación ni rechazo.
     access=order.get('access_authorization');risk=order.get('destructive_authorization')
-    if access or risk:
-        section('Autorizaciones del cliente')
-        GREEN,RED,GREY=(.05,.40,.25),(.70,.12,.16),(.42,.46,.52)
+    GREEN,RED,GREY=(.05,.40,.25),(.70,.12,.16),(.42,.46,.52)
 
-        def authorization(title,state,detail):
-            """Indicador estático legible también en blanco y negro: relleno oscuro (autorizado), contorno (no autorizado) o gris claro (pendiente)."""
-            nonlocal y
-            lines=wrapped(detail,W-72-150,8.5);height=max(22,14+len(lines)*10.5)+5
-            if y+height>H-100:new_page()
-            label={'authorized':'AUTORIZADO','denied':'NO AUTORIZADO','pending':'PENDIENTE'}[state];left,top,bw,bh=47,y,112,17
-            if state=='authorized':rect(left,top,bw,bh,GREEN);ink=(1,1,1)
-            elif state=='denied':rect(left,top,bw,bh,RED);rect(left+1.3,top+1.3,bw-2.6,bh-2.6,(1,1,1));ink=RED
-            else:rect(left,top,bw,bh,(.90,.92,.94));ink=GREY
-            # Icono vectorial: visto, aspa o guion.
-            stream.set_color_rgb(*ink,stroke=True);stream.set_line_width(1.5);cx,cy=left+11,H-top-bh/2
-            if state=='authorized':stream.move_to(cx-4,cy);stream.line_to(cx-1.2,cy-3);stream.line_to(cx+4.2,cy+3.4)
-            elif state=='denied':stream.move_to(cx-3.4,cy-3.4);stream.line_to(cx+3.4,cy+3.4);stream.move_to(cx-3.4,cy+3.4);stream.line_to(cx+3.4,cy-3.4)
-            else:stream.move_to(cx-3.6,cy);stream.line_to(cx+3.6,cy)
-            stream.stroke();text(label,left+20,top+4.6,7.6,ink,True)
-            text(title,left+bw+11,top,9.5,TEXT,True)
-            for index,content in enumerate(lines):text(content,left+bw+11,top+12.5+index*10.5,8.5,MUTED)
-            y+=height
+    def authorization_height(detail):
+        return max(22,14+len(wrapped(detail,W-72-150,8.5))*10.5)+5
+
+    def authorization(title,state,detail):
+        """Indicador estático legible también en blanco y negro: relleno oscuro (autorizado), contorno (no autorizado), gris claro
+        (pendiente) o contorno gris (no aplica)."""
+        nonlocal y
+        lines=wrapped(detail,W-72-150,8.5);height=max(22,14+len(lines)*10.5)+5
+        if y+height>H-100:new_page()
+        label={'authorized':'AUTORIZADO','denied':'NO AUTORIZADO','pending':'PENDIENTE','not_applicable':'NO APLICA'}[state];left,top,bw,bh=47,y,112,17
+        if state=='authorized':rect(left,top,bw,bh,GREEN);ink=(1,1,1)
+        elif state=='denied':rect(left,top,bw,bh,RED);rect(left+1.3,top+1.3,bw-2.6,bh-2.6,(1,1,1));ink=RED
+        elif state=='not_applicable':rect(left,top,bw,bh,(.70,.73,.77));rect(left+1,top+1,bw-2,bh-2,(1,1,1));ink=GREY
+        else:rect(left,top,bw,bh,(.90,.92,.94));ink=GREY
+        # Icono vectorial: visto, aspa, guion o barra.
+        stream.set_color_rgb(*ink,stroke=True);stream.set_line_width(1.5);cx,cy=left+11,H-top-bh/2
+        if state=='authorized':stream.move_to(cx-4,cy);stream.line_to(cx-1.2,cy-3);stream.line_to(cx+4.2,cy+3.4)
+        elif state=='denied':stream.move_to(cx-3.4,cy-3.4);stream.line_to(cx+3.4,cy+3.4);stream.move_to(cx-3.4,cy+3.4);stream.line_to(cx+3.4,cy-3.4)
+        elif state=='not_applicable':stream.move_to(cx-3,cy-3.6);stream.line_to(cx+3,cy+3.6)
+        else:stream.move_to(cx-3.6,cy);stream.line_to(cx+3.6,cy)
+        stream.stroke();text(label,left+20,top+4.6,7.6,ink,True)
+        text(title,left+bw+11,top,9.5,TEXT,True)
+        for index,content in enumerate(lines):text(content,left+bw+11,top+12.5+index*10.5,8.5,MUTED)
+        y+=height
+
+    def note(content,size=7.5):
+        nonlocal y
+        for part in wrapped(content,W-94,size):
+            if y+10>H-100:new_page()
+            text(part,47,y,size,MUTED);y+=size+2
+    if dynamic:
+        # Solo los apartados que aplican al tipo de equipo; los demás, en una sola fila «NO APLICA». El bloque no se parte entre páginas.
+        import device_authorizations
+        shown,missing=device_authorizations.presentation(order)
+        profile=order.get('authorization_profile') or {}
+        rows=[(title,state,detail) for _,title,state,detail in shown]
+        if missing:rows.append(device_authorizations.not_applicable_text(order,missing)[0:1]+('not_applicable',device_authorizations.not_applicable_text(order,missing)[1]))
+        decided=[proof for proof in (access,risk) if proof]
+        proof=decided[0] if decided and any(state!='pending' for _,state,_ in rows if state!='not_applicable') else None
+        notes=[]
+        if profile.get('exception'):notes.append('El equipo guarda información del cliente: se aplican las autorizaciones de datos.'+((' '+profile['exception_note']) if profile.get('exception_note') else ''))
+        if proof:notes.append('Decisiones expresadas por '+(proof.get('acceptor') or 'el cliente')+' y registradas el '+datetime.fromisoformat(proof['recorded_at']).astimezone(ECUADOR_TZ).strftime('%d/%m/%Y %H:%M:%S')+' (Ecuador) por '+(proof.get('operator') or 'el personal')+'. Confirmación en pantalla ante el técnico; no constituye una firma.')
+        if fix:notes.append('Revisión '+str(fix['revision'])+' del '+datetime.fromisoformat(fix['created_at']).astimezone(ECUADOR_TZ).strftime('%d/%m/%Y %H:%M')+': se muestran solo los apartados que aplican al tipo de equipo. Las decisiones registradas no cambiaron; el comprobante original se conserva (SHA-256 '+fix['original_sha256'][:16]+'…).')
+        total=28+sum(authorization_height(detail) for _,_,detail in rows)+sum(len(wrapped(n,W-94,7.5))*9.5 for n in notes)+4
+        if y+total>H-100 and total<=H-238:new_page()
+        section('Autorizaciones del cliente')
+        for row in rows:authorization(*row)
+        for content in notes:note(content)
+        y+=4
+    elif access or risk:
+        section('Autorizaciones del cliente')
 
         permissions=(access or {}).get('permissions') or {};decision=(access or {}).get('decision')
         def scoped(keys,none):
@@ -233,7 +269,17 @@ def render_receipt(order):
     if terms:
         section('Resumen de condiciones del servicio')
         item('Versión / Vigencia',terms['version']+' / '+terms['effective_date'])
-        for number,paragraph in numbered_paragraphs(terms['compact_text']):item(str(number)+'.',paragraph)
+        if dynamic:
+            # Número y texto en el mismo renglón con sangría francesa: mismo tamaño de letra, sin una línea solo para el número.
+            for number,paragraph in numbered_paragraphs(terms['compact_text']):
+                lines=wrapped(paragraph,W-94-16,9.5)
+                if y+len(lines)*12.5+3>H-100:new_page()
+                text(str(number)+'.',47,y,9.5,TEXT,True)
+                for content in lines:text(content,63,y,9.5,TEXT);y+=12.5
+                y+=3
+            y+=3
+        else:
+            for number,paragraph in numbered_paragraphs(terms['compact_text']):item(str(number)+'.',paragraph)
         if y+110>H-100:new_page()
         section('Aceptación de condiciones')
         accepted=datetime.fromisoformat(order['terms_accepted_at']).astimezone(ECUADOR_TZ)
@@ -241,6 +287,10 @@ def render_receipt(order):
         pair('Mecanismo',order['terms_mechanism_label'],'Registro / Usuario responsable',order['terms_acceptance_id']+' / '+order['terms_operator'])
         item('Consulta segura de esta versión',terms['url'])
         item('Integridad SHA-256',terms['content_hash'])
+        if dynamic:
+            # El título del texto completo no queda solo al pie: necesita espacio para su primera cláusula.
+            first=next(iter(numbered_paragraphs(terms['full_text'])),(1,''))
+            if y+28+len(wrapped(str(first[0])+'. '+first[1],W-94,9))*13+12>H-100:new_page()
         section(terms['title'])
         for number,paragraph in numbered_paragraphs(terms['full_text']):
             lines=wrapped(str(number)+'. '+paragraph,W-94,9)

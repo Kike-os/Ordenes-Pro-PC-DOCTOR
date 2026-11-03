@@ -9732,3 +9732,44 @@ button.pi-option{display:flex;align-items:flex-start;gap:10px;padding:12px;borde
 .bs-actions{display:flex;flex-wrap:wrap;align-items:center;gap:4px 14px}.bs-actions .text-action{display:inline-flex;align-items:center;min-height:32px;padding-top:0;padding-bottom:0}
 .bs-totals{display:grid;gap:6px;margin:10px 0 0}.bs-totals div{display:grid;gap:2px}.bs-totals dt{font-size:12px;opacity:.75}.bs-totals dd{margin:0;font-size:13px;font-weight:600;overflow-wrap:anywhere}
 .bs-add{margin-top:10px;width:100%;justify-content:center;display:inline-flex;align-items:center;gap:8px}
+
+/* 1.5.224 — Autorizaciones según el tipo de equipo: aviso «No aplica», excepción de datos, comprobante corregido y configuración. */
+.access-pro .access-applies{display:grid;gap:8px;margin:0 0 4px;padding:10px 12px;border:1px solid #2b4466;border-radius:10px;background:#0c1830}
+.access-pro .access-applies[hidden]{display:none}
+.access-pro .access-applies-text{margin:0;font-size:12.5px;line-height:1.5;color:#c3d2ea}
+.access-pro .access-exception[hidden],.access-pro .access-exception-note[hidden],.access-pro .access-part[hidden]{display:none}
+.access-pro .access-exception{border-style:dashed;border-color:#4a6488}
+.access-pro .access-exception-note{width:100%;min-width:0;box-sizing:border-box}
+.access-evidence .access-na{color:#c3cbd6;font-size:12.5px}
+.access-evidence .access-record{margin-top:10px}
+.access-evidence .receipt-fix{display:grid;gap:6px;margin-top:12px;padding:10px 12px;border:1px solid #37618d66;border-radius:10px;background:#0d1a33}
+.access-evidence .receipt-fix p{margin:0}
+.access-evidence .receipt-fix-title{font-weight:600;color:#e3edff;font-size:13px}
+.access-evidence .receipt-fix .receipt-actions{display:flex;flex-wrap:wrap;gap:8px}
+.client-auth-list b[data-value=na]{color:#c3cbd6}
+.devauth{display:grid;gap:14px;min-width:0}
+.devauth-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,270px),1fr));gap:12px}
+.devauth-card{display:grid;gap:10px;min-width:0;margin:0;padding:12px 14px;border:1px solid #223a5c;border-radius:14px;background:#0d1730}
+.devauth-head{margin:0}
+.devauth-head input{width:100%;box-sizing:border-box;font-weight:600}
+.devauth-row{display:grid;gap:6px}
+.devauth-row-title{font-size:11.5px;color:#9bb0cf;text-transform:uppercase;letter-spacing:.04em}
+.devauth-chips{display:flex;flex-wrap:wrap;gap:6px}
+body[data-page=dashboard] .devauth .devauth-chip{display:inline-flex;flex-direction:row;align-items:center;gap:7px;margin:0;padding:5px 11px 5px 8px;border:1px solid #2b4466;border-radius:999px;font-size:12.5px;line-height:1.3;cursor:pointer;width:auto}
+body[data-page=dashboard] .devauth .devauth-chip input{flex:none;width:15px;height:15px;min-width:15px;margin:0;padding:0}
+.devauth .devauth-chip span{white-space:nowrap}
+.devauth .devauth-chip:has(input:checked){border-color:#3f7fd0;background:#12305a}
+.devauth .devauth-chip[data-off=true]{opacity:.5;cursor:not-allowed}
+.devauth .devauth-chip:focus-within{outline:2px solid #6ea8ff;outline-offset:2px}
+.devauth-types{margin:0;font-size:12px;color:#9bb0cf;overflow-wrap:anywhere}
+.devauth-map{margin:0;padding:12px 14px;border:1px solid #223a5c;border-radius:14px;min-width:0}
+.devauth-map legend{padding:0 6px;font-size:13px;color:#e3edff}
+.devauth-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,220px),1fr));gap:8px 12px}
+.devauth-assign{display:grid;gap:4px;font-size:12.5px;min-width:0}
+.devauth-assign select{width:100%;min-width:0}
+.devauth-foot{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.devauth-foot input{flex:1 1 260px;min-width:0}
+.devauth-foot .message{flex-basis:100%;margin:0}
+.devauth-history .devauth-change{padding:8px 0;border-top:1px solid #223450}
+.devauth-history .devauth-change p{margin:2px 0 0}
+@media (prefers-reduced-motion:reduce){.devauth-chip{transition:none}}

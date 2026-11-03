@@ -46,7 +46,7 @@ body{margin:0;min-height:100vh;background:#060d1a;color:#e3edff;font-family:syst
 .auth-options input,.auth-check input{flex:none;width:18px;height:18px;margin:2px 0 0;accent-color:#4d8df0}
 .auth-terms-text{max-height:240px;overflow-y:auto;margin-bottom:10px;padding:10px 12px;border:1px solid #1e3252;border-radius:10px;background:#081424;font-size:13px}
 .auth-terms-text p{margin:0 0 9px;color:#cfdcf0}
-.auth-authorized{color:#8ff0bd!important;font-weight:700}.auth-denied{color:#ffb1b8!important;font-weight:700}
+.auth-authorized{color:#8ff0bd!important;font-weight:700}.auth-denied{color:#ffb1b8!important;font-weight:700}.auth-na{color:#c3cbd6!important;font-weight:700}
 .auth-link{display:inline-block;padding:11px 15px;border:1px solid #3b74c4;border-radius:11px;background:#12284a;color:#fff;font-weight:700;text-decoration:none}
 @media(max-width:380px){.auth-options{grid-template-columns:1fr}}
 .auth-done{margin:0;padding:12px 13px;border:1px solid #2f9e6b;border-radius:10px;background:#0f2a22;color:#8ff0bd!important;font-weight:600}

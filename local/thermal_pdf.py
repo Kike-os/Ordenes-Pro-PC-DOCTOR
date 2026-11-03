@@ -159,15 +159,38 @@ def render_thermal(order,copy='cliente'):
         section('FALLA REPORTADA');block(str(order['problem'] or 'No registrado'),8.5,False,1,lead=1.22)
         section('SERVICIO SOLICITADO');pair('Servicio','Diagnóstico técnico de la falla informada');pair('Estado',order['status_label'])
         # Autorización de acceso técnico: obligatoria, con su evidencia, sin añadir consentimientos.
-        section('AUTORIZACIÓN DE ACCESO TÉCNICO')
-        block('Acceso técnico: '+({'authorized':'AUTORIZADO','denied':'NO AUTORIZADO'}[access['decision']] if access else 'No consta autorización'),8.5,True,1.5)
-        if access:
+        import device_authorizations
+        shown,missing=device_authorizations.presentation(order)
+        if order.get('receipt_layout')=='dinamico' and (missing or order.get('receipt_corrections')):
+            # Solo los apartados que aplican al tipo de equipo; lo demás, en una línea «No aplica». Sin descripciones libres ni claves.
+            # Cuando todo aplica (computadoras) el ticket conserva su bloque de siempre.
+            section('AUTORIZACIONES DEL CLIENTE')
+            names={'os':'Sistema operativo','files':'Archivos y respaldos','risk':'Formatear / reinstalar / eliminar'}
+            scopes={'os':('operating_system','signed_in_tests'),'files':('specific_files','backup')}
+            for key,_,state,_ in shown:
+                label={'authorized':'AUTORIZADO','denied':'NO AUTORIZADO','pending':'PENDIENTE'}[state]
+                if key=='risk' and state=='authorized':label='AUTORIZACIÓN ADICIONAL REGISTRADA'
+                block(names[key]+': '+label,8,True,1.5,lead=1.2)
+                granted=[SCOPES[k] for k in scopes.get(key,()) if state=='authorized' and access and access['permissions'].get(k)]
+                if granted:block('Alcance: '+'. '.join(granted)+'.',7.5,gap=1.5,lead=1.2)
+            if missing:
+                title,detail=device_authorizations.not_applicable_text(order,missing)
+                block(title,8,True,1.5,lead=1.2);block(detail,7.5,gap=1.5,lead=1.2)
+            proof=next((p for p in (access,destructive) if p),None)
+            if proof and any(state!='pending' for _,_,state,_ in shown):block('Registrada: '+datetime.fromisoformat(proof['recorded_at']).astimezone(ECUADOR_TZ).strftime('%d/%m/%Y %H:%M')+' · '+proof['operator'],7.5,gap=1.5,lead=1.2)
+            if shown:block('El diagnóstico no autoriza revisar datos privados ni borrar información fuera del alcance acordado.',7.5,gap=1,lead=1.2)
+            fix=(order.get('receipt_corrections') or [None])[-1]
+            if fix:block('Comprobante corregido · revisión '+str(fix['revision'])+' · '+datetime.fromisoformat(fix['created_at']).astimezone(ECUADOR_TZ).strftime('%d/%m/%Y')+'. Las decisiones registradas no cambiaron.',7.5,True,1,lead=1.2)
+        else:
+          section('AUTORIZACIÓN DE ACCESO TÉCNICO')
+          block('Acceso técnico: '+({'authorized':'AUTORIZADO','denied':'NO AUTORIZADO'}[access['decision']] if access else 'No consta autorización'),8.5,True,1.5)
+          if access:
             granted=[label for key,label in SCOPES.items() if access['permissions'].get(key)]
             if granted:block('Alcance autorizado: '+'. '.join(granted)+'.',8,gap=1.5,lead=1.2)
             if access['decision']=='authorized' and access['permissions'].get('files_decision')=='denied':block('Archivos y respaldos: NO AUTORIZADO',8,True,1.5)
             block('Registrada: '+datetime.fromisoformat(access['recorded_at']).astimezone(ECUADOR_TZ).strftime('%d/%m/%Y %H:%M')+' · '+access['operator'],7.5,gap=1.5,lead=1.2)
-        block('Reinstalar / formatear / eliminar: '+({'authorized':'AUTORIZACIÓN ADICIONAL REGISTRADA','denied':'NO AUTORIZADO'}[destructive['decision']] if destructive else 'Sin autorización adicional'),8,True,1.5,lead=1.2)
-        block('El diagnóstico no autoriza revisar datos privados ni borrar información fuera del alcance acordado.',7.5,gap=1,lead=1.2)
+          block('Reinstalar / formatear / eliminar: '+({'authorized':'AUTORIZACIÓN ADICIONAL REGISTRADA','denied':'NO AUTORIZADO'}[destructive['decision']] if destructive else 'Sin autorización adicional'),8,True,1.5,lead=1.2)
+          block('El diagnóstico no autoriza revisar datos privados ni borrar información fuera del alcance acordado.',7.5,gap=1,lead=1.2)
         # 9. Condiciones resumidas: el resumen informa; la versión completa aceptada no cambia y se consulta con el QR.
         section('CONDICIONES DE RECEPCIÓN')
         if terms:block('Versión aceptada '+terms['version']+' · '+datetime.fromisoformat(order['terms_accepted_at']).astimezone(ECUADOR_TZ).strftime('%d/%m/%Y %H:%M'),7.5,True,2)

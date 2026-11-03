@@ -45,6 +45,7 @@ import reports
 import order_search
 import stay
 import technical_access
+import device_authorizations
 import thermal_printing
 import tempfile
 import subprocess
@@ -310,7 +311,14 @@ def order_document(c,oid):
     if row['reception_snapshot']:order.update(json.loads(row['reception_snapshot']))
     order['code']=row['code'] or 'OP-'+str(row['id']).zfill(5);order['email']=row['email'] or ''
     service_terms.attach(c,order);technical_access.attach(c,order);order_workspace.attach(c,order)
+    device_authorizations.attach(c,order,row['type'])
     return order
+
+
+def receipt_suffix(order):
+    """Sufijo del nombre del archivo: «-R2» para la versión corregida de un comprobante; el original conserva su nombre."""
+    fixes=order.get('receipt_corrections') or []
+    return '-R%d'%fixes[-1]['revision'] if fixes and order.get('receipt_layout')=='dinamico' else ''
 
 
 def receipt_mail_status(c,oid):
@@ -490,7 +498,7 @@ def send_authorization_mail(c,oid,user):
     except mail_pro.MailError:ready=False
     if not ready:
         log('not_configured');return {'result':'not_configured'}
-    proof=order.get('access_authorization') or order.get('destructive_authorization');rows=technical_access.summary(order.get('access_authorization'),order.get('destructive_authorization'))
+    proof=order.get('access_authorization') or order.get('destructive_authorization');rows=technical_access.summary(order.get('access_authorization'),order.get('destructive_authorization'),order['authorization_profile']['sections'])
     device=' '.join(part for part in (DEVICE_TYPES.get(order.get('type'),order.get('type') or ''),order.get('brand') or '',order.get('model') or '') if part) or 'Equipo sin especificar'
     when=appointments.datetime.fromisoformat(proof['recorded_at']).astimezone(reception.ECUADOR_TZ).strftime('%d/%m/%Y %H:%M') if proof else now.strftime('%d/%m/%Y %H:%M')
     states={state for _,state,_ in rows};overall='Con operaciones NO AUTORIZADAS' if 'denied' in states else 'Autorizado' if states=={'authorized'} else 'Autorizado parcialmente (hay apartados pendientes)' if 'authorized' in states else 'Pendiente'
@@ -1548,6 +1556,9 @@ class Handler(BaseHTTPRequestHandler):
             if path == '/api/conditions/current':
                 active=service_terms.current(c,reception_now())
                 return self.reply(200,{'terms':({**service_terms.metadata(active),'full_text':active['full_text']} if active else None),'required':terms_required()})
+            if path == '/api/authorization-profiles':
+                if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede consultar esta configuración.'})
+                return self.reply(200,{'groups':device_authorizations.load(c),'device_types':DEVICE_TYPES,'sections':device_authorizations.SECTIONS,'changes':device_authorizations.changes(c)})
             if path == '/api/conditions':
                 if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede consultar el historial de publicación.'})
                 return self.reply(200,service_terms.overview(c,reception_now()))
@@ -1567,7 +1578,7 @@ class Handler(BaseHTTPRequestHandler):
                 # SVG primero: al ordenar por nombre, «marca.png» queda antes y «marca.svg» lo reemplaza.
                 logos = {f.stem:f.name for f in sorted((ROOT / 'static' / 'brands').glob('*')) if f.suffix in ('.svg','.png') and re.fullmatch(r'[a-z0-9]+(?:-[a-z0-9]+)*', f.stem)}
                 import device_brands,device_manufacturers
-                return self.reply(200, {'geo_metadata':GEO_METADATA,'device_types':DEVICE_TYPES,'brands':brands,'brand_logos':logos,'manufacturers':device_brands.catalog(device_manufacturers.configured(),device_manufacturers.statuses())})
+                return self.reply(200, {'geo_metadata':GEO_METADATA,'device_types':DEVICE_TYPES,'brands':brands,'brand_logos':logos,'manufacturers':device_brands.catalog(device_manufacturers.configured(),device_manufacturers.statuses()),'authorization_catalog':device_authorizations.catalog(c)})
             if path.startswith('/api/geo/'):
                 query=parse_qs(urlsplit(self.path).query)
                 get=lambda key:query.get(key,[''])[0][:150]
@@ -1744,6 +1755,9 @@ class Handler(BaseHTTPRequestHandler):
                     service_terms.attach(c,pdf_order)
                     technical_access.attach(c,pdf_order)
                     order_workspace.attach(c,pdf_order)
+                    device_authorizations.attach(c,pdf_order,row['type'])
+                    # Comprobante original (tal como se emitió) de una orden con versión corregida: se conserva y se puede consultar.
+                    if parse_qs(urlsplit(self.path).query).get('original',['0'])[0]=='1' and pdf_order['receipt_corrections']:pdf_order['receipt_layout']='original'
                     if detail[2]=='label.pdf':
                         from label_pdf import dimensions,render_label
                         query=parse_qs(urlsplit(self.path).query)
@@ -1760,8 +1774,8 @@ class Handler(BaseHTTPRequestHandler):
                         copy=parse_qs(urlsplit(self.path).query).get('copy',['cliente'])[0]
                         if copy not in ('cliente','taller','ambas'):return self.reply(400,{'error':'Copia inválida.'})
                         pdf_order['tracking_url']=order_tracking.active(c,row['id'])['url']
-                        return self.reply(200,render_thermal(pdf_order,copy),'application/pdf',filename='TICKET-'+code+'.pdf')
-                    return self.reply(200, render_receipt(pdf_order), 'application/pdf',filename=code+'-COMPROBANTE-DE-RECEPCION.pdf')
+                        return self.reply(200,render_thermal(pdf_order,copy),'application/pdf',filename='TICKET-'+code+receipt_suffix(pdf_order)+'.pdf')
+                    return self.reply(200, render_receipt(pdf_order), 'application/pdf',filename=code+'-COMPROBANTE-DE-RECEPCION'+receipt_suffix(pdf_order)+'.pdf')
                 result = dict(row)
                 import order_tracking
                 result['tracking']=order_tracking.active(c,row['id'])
@@ -1795,6 +1809,7 @@ class Handler(BaseHTTPRequestHandler):
                 service_terms.attach(c,result)
                 technical_access.attach(c,result)
                 order_workspace.attach(c,result)
+                device_authorizations.attach(c,result,row['type'])
                 result['current_problem']=row['problem']
                 result['previous_codes']=[r[0] for r in c.execute('SELECT code FROM order_code_aliases WHERE order_id=? ORDER BY created_at,code',(result['id'],))]
                 # Versión oficial vigente, para consultarla desde órdenes sin aceptación registrada (no implica que esta orden la haya aceptado).
@@ -4423,6 +4438,32 @@ class Handler(BaseHTTPRequestHandler):
                     status,payload=order_workspace.save(c,int(workspace_route[1]),data,user,reception_now())
                     if status==200:audit(c,user['id'],'order_workspace_updated',int(workspace_route[1]))
                     return self.reply(status,payload)
+                if path == '/api/authorization-profiles':
+                    # Configuración por categoría: rige para lo que se registre en adelante; no reescribe autorizaciones ya registradas.
+                    if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede cambiar esta configuración.'})
+                    groups,errors=device_authorizations.save(c,data,user,reception_now())
+                    if errors:return self.reply(400,{'error':next(iter(errors.values())) if len(errors)==1 else 'Revisa la configuración.','fields':errors})
+                    audit(c,user['id'],'authorization_profiles_changed')
+                    return self.reply(200,{'groups':groups,'changes':device_authorizations.changes(c)})
+                correction=re.fullmatch(r'/api/orders/([0-9]+)/receipt-correction',path)
+                if correction:
+                    # Versión corregida del comprobante: solo cambia la presentación de las autorizaciones según el tipo de equipo.
+                    # El original se conserva (se sigue generando igual, con la misma huella) y las decisiones registradas no cambian.
+                    if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
+                    oid=int(correction[1]);reason=' '.join(str(data.get('reason','')).split())[:300]
+                    if len(reason)<10:return self.reply(400,{'error':'Indica el motivo de la corrección.','fields':{'reason':'Mínimo 10 caracteres.'}})
+                    order=order_document(c,oid)
+                    if not order:return self.reply(404,{'error':'Orden no disponible.'})
+                    if not order['receipt_correctable']:return self.reply(409,{'error':'El comprobante de esta orden ya muestra solo las autorizaciones que aplican a su tipo de equipo.'})
+                    from receipt_pdf import render_receipt
+                    now=reception_now();original=hashlib.sha256(render_receipt(order)).hexdigest()
+                    entry={'revision':2,'reason':reason,'original_sha256':original,'created_at':now.isoformat(timespec='seconds'),'actor':user['name']}
+                    corrected=hashlib.sha256(render_receipt(dict(order,receipt_layout='dinamico',receipt_corrections=[entry]))).hexdigest()
+                    c.execute('INSERT INTO receipt_corrections(order_id,revision,reason,original_sha256,corrected_sha256,actor_id,created_at) VALUES (?,?,?,?,?,?,?)',(oid,2,reason,original,corrected,user['id'],entry['created_at']))
+                    label=order['authorization_profile']['type_label']
+                    order_workspace.event(c,oid,user['id'],now,'follow_up','Comprobante corregido (revisión 2): muestra solo las autorizaciones que aplican a '+label.lower()+'. Motivo: '+reason+' El comprobante original se conserva (SHA-256 '+original[:16]+'…) y las decisiones registradas no cambian.')
+                    audit(c,user['id'],'receipt_corrected',oid)
+                    return self.reply(201,{'ok':True,'revision':2,'original_sha256':original,'corrected_sha256':corrected})
                 if path == '/api/conditions':
                     if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede publicar condiciones.'})
                     # Sin número de versión se asigna el siguiente de la serie; la aprobación expresa sigue siendo obligatoria.
@@ -4643,7 +4684,7 @@ class Handler(BaseHTTPRequestHandler):
                     if not row:return self.reply(404,{'error':'Orden no disponible.'})
                     order=dict(row)
                     if row['reception_snapshot']:order.update(json.loads(row['reception_snapshot']))
-                    service_terms.attach(c,order);technical_access.attach(c,order)
+                    service_terms.attach(c,order);technical_access.attach(c,order);device_authorizations.attach(c,order,row['type'])
                     from thermal_pdf import render_thermal
                     import order_tracking
                     copy=str(data.get('copy') or 'cliente')
@@ -4727,15 +4768,20 @@ class Handler(BaseHTTPRequestHandler):
                     return self.reply(status,payload)
                 consent_match=re.fullmatch(r'/api/orders/([0-9]+)/authorizations',path)
                 if consent_match:
-                    oid=int(consent_match[1]);order=c.execute('SELECT o.*,cl.name client FROM orders o JOIN devices d ON d.id=o.device_id JOIN clients cl ON cl.id=d.client_id WHERE o.id=?',(oid,)).fetchone()
+                    oid=int(consent_match[1]);order=c.execute('SELECT o.*,cl.name client,COALESCE(NULLIF(d.kind,\'\'),d.category) type FROM orders o JOIN devices d ON d.id=o.device_id JOIN clients cl ON cl.id=d.client_id WHERE o.id=?',(oid,)).fetchone()
                     if not order:return self.reply(404,{'error':'Orden no disponible.'})
                     key=str(data.get('request_key',''))
                     if not re.fullmatch(r'[A-Za-z0-9-]{16,80}',key):return self.reply(400,{'error':'Identificador de solicitud inválido.'})
                     if c.execute('SELECT 1 FROM order_access_consents WHERE order_id=? AND request_key=?',(oid,key)).fetchone():return self.reply(200,{'ok':True})
                     revision=c.execute('SELECT COALESCE(MAX(id),0) FROM order_access_consents WHERE order_id=?',(oid,)).fetchone()[0]
                     if str(data.get('access_revision',''))!=str(revision):return self.reply(409,{'error':'La autorización cambió. Abre nuevamente el formulario.'})
-                    access,errors=technical_access.validate(data)
+                    # Excepción de datos: la decide el técnico en el mismo formulario; sin el dato se conserva la registrada.
+                    current=device_authorizations.exception(c,oid);flag=data.get('data_exception') if data.get('data_exception') in (True,False) else bool(current and current['enabled'])
+                    profile=device_authorizations.profile(device_authorizations.load(c),order['type'],flag)
+                    access,errors=technical_access.validate(data,profile['sections'])
                     if errors:return self.reply(400,{'error':'Revisa la autorización.','fields':errors})
+                    if access['decision'] is None and access['destructive']=='not_requested' and flag==bool(current and current['enabled']):
+                        return self.reply(400,{'error':'No hay autorizaciones aplicables a este equipo para registrar. Si guarda información del cliente, marca la excepción.'})
                     now=reception_now()
                     if data.get('complete_terms') is True and not order['terms_acceptance_id']:
                         terms=service_terms.current(c,now)
@@ -4744,6 +4790,9 @@ class Handler(BaseHTTPRequestHandler):
                         audit(c,user['id'],'service_terms_accepted_later',oid)
                     technical_access.record(c,oid,user,now,order['client'],access,key)
                     audit(c,user['id'],'technical_access_recorded',oid)
+                    if device_authorizations.set_exception(c,oid,flag,data.get('data_exception_note',''),user,now):
+                        order_workspace.event(c,oid,user['id'],now,'follow_up',('Se registró que el equipo guarda información del cliente: se piden sus autorizaciones de datos.'+((' '+' '.join(str(data.get('data_exception_note','')).split())[:300]) if data.get('data_exception_note') else '')) if flag else 'Se retiró la excepción de datos del equipo; las decisiones registradas se conservan.')
+                        audit(c,user['id'],'data_exception_'+('on' if flag else 'off'),oid)
                     # La decisión queda guardada antes de intentar el aviso: un fallo del correo no la afecta.
                     c.commit();notice=None
                     try:notice=send_authorization_mail(c,oid,user)
@@ -4802,7 +4851,9 @@ class Handler(BaseHTTPRequestHandler):
                             return self.reply(409,{'error':'Las condiciones vigentes han cambiado. Revísalas y registra nuevamente la aceptación.','fields':{'terms_accept':'La versión debe revisarse nuevamente.'}})
                         if data.get('terms_accept') is not True:
                             return self.reply(400,{'error':'Registra la aceptación de las condiciones.','fields':{'terms_accept':'El cliente debe revisar y aceptar las condiciones antes de guardar.'}})
-                    access,access_errors=technical_access.validate(data)
+                    # Solo se piden las autorizaciones que aplican al tipo de equipo (y, si el técnico lo marca, las de un equipo que guarda datos).
+                    profile=device_authorizations.profile(device_authorizations.load(c),fields['type'],data.get('data_exception') is True)
+                    access,access_errors=technical_access.validate(data,profile['sections'])
                     if access_errors:return self.reply(400,{'error':'Registra la decisión de acceso del cliente.','fields':access_errors})
                     client_id=selected['id']
                     tracking,tracking_errors=order_workspace.validate(c,dict(data,problem=fields['problem'],status='pendiente',assigned_to=str(data.get('assigned_to') or user['id']),internal_notes=data.get('additional_notes',''),findings=data.get('initial_diagnosis','')))
@@ -4848,6 +4899,7 @@ class Handler(BaseHTTPRequestHandler):
                         audit(c,user['id'],'service_terms_accepted',oid)
                     technical_access.record(c,oid,user,received,fields['client'],access,request_key or secrets.token_hex(16))
                     audit(c,user['id'],'technical_access_recorded',oid)
+                    if profile['exception']:device_authorizations.set_exception(c,oid,True,data.get('data_exception_note',''),user,received)
                     c.execute('UPDATE orders SET assigned_to=?,priority=?,estimated_delivery=?,findings=?,internal_notes=?,updated_at=? WHERE id=?',(tracking['assigned_to'],tracking['priority'],tracking['estimated_delivery'],tracking['findings'],tracking['internal_notes'],received.isoformat(timespec='microseconds'),oid))
                     order_workspace.event(c,oid,user['id'],received,'created','Recepción registrada.')
                     if linked_appointment:

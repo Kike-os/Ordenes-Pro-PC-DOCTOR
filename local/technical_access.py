@@ -14,10 +14,24 @@ def weak(text):
     return len(text)<15 or len(text.split())<3
 
 
-def validate(data):
-    errors={};decision=data.get('technical_access')
-    if decision not in ('authorized','denied'):errors['technical_access']='Selecciona expresamente si el cliente autoriza o no el acceso técnico.'
-    if data.get('access_confirmed') is not True:errors['access_confirmed']='Confirma que esta decisión fue expresada por el cliente.'
+# Permisos de cada apartado que depende del tipo de equipo (ver device_authorizations).
+SECTION_SCOPES={'os':('operating_system','signed_in_tests'),'files':('specific_files','backup')}
+
+
+def validate(data,applicable=None):
+    """`applicable`: apartados que aplican al tipo de equipo (None: todos, como antes). Lo que no aplica no se pide ni se registra;
+    marcar en ello una autorización es un error. Si no aplica ni el sistema operativo ni los archivos, no se pide la decisión de acceso."""
+    applicable=set(('os','files','risk') if applicable is None else applicable)
+    errors={};decision=data.get('technical_access');needed=bool(applicable&{'os','files'})
+    for section,keys in SECTION_SCOPES.items():
+        if section not in applicable and (any(data.get('access_'+key) is True for key in keys) or (section=='files' and data.get('files_access')=='authorized')):
+            errors['technical_access']='Ese permiso no aplica a este tipo de equipo.'
+    if 'risk' not in applicable and data.get('destructive_action')=='authorized':errors['destructive_action']='El formateo o la eliminación de datos no aplica a este tipo de equipo.'
+    if not needed:
+        decision=None;data={key:value for key,value in data.items() if not key.startswith('access_') and key not in ('technical_access','files_access')}
+    elif 'files' not in applicable:data=dict(data,files_access='')
+    if needed and decision not in ('authorized','denied') and 'technical_access' not in errors:errors['technical_access']='Selecciona expresamente si el cliente autoriza o no el acceso técnico.'
+    if needed and data.get('access_confirmed') is not True:errors['access_confirmed']='Confirma que esta decisión fue expresada por el cliente.'
     permissions={key:data.get('access_'+key) is True for key in SCOPES}
     for key in SCOPES:
         if data.get('access_'+key) not in (None,True,False):errors['technical_access']='Los permisos deben ser opciones explícitas.'
@@ -33,6 +47,7 @@ def validate(data):
     elif files=='authorized' and decision!='authorized':errors['files_access']='El acceso a archivos requiere que el cliente autorice el acceso técnico.'
     elif files=='authorized' and not (permissions['specific_files'] or permissions['backup']):errors['files_access']='Marca qué autoriza el cliente: archivos específicos, respaldo o ambos.'
     destructive=data.get('destructive_action','not_requested')
+    if 'risk' not in applicable and destructive=='denied':destructive='not_requested'  # un rechazo en lo que no aplica no se registra
     if destructive not in ('not_requested','authorized','denied'):errors['destructive_action']='Selecciona una decisión válida para reinstalación o eliminación.'
     destructive_detail=str(data.get('destructive_detail','')).strip()
     if len(destructive_detail)>1000:errors['destructive_detail']='Usa hasta 1000 caracteres.'
@@ -50,7 +65,7 @@ def validate(data):
 
 def record(c,oid,user,now,acceptor,values,key):
     for action,decision,permissions,detail in [('technical',values['decision'],{**values['permissions'],**({'files_decision':values['files']} if values.get('files') else {})},values['justification']),('destructive',values['destructive'],{'reinstall_or_erase':values['destructive']=='authorized',**{key:bool(on) and values['destructive']=='authorized' for key,on in values.get('risk',{}).items()}},values['destructive_detail'])]:
-        if decision=='not_requested':continue
+        if decision in ('not_requested',None):continue
         c.execute('INSERT INTO order_access_consents(order_id,action,decision,permissions,justification,acceptor,recorded_at,actor_id,request_key) VALUES (?,?,?,?,?,?,?,?,?)',(oid,action,decision,json.dumps(permissions,sort_keys=True),detail,acceptor,now.isoformat(timespec='microseconds'),user['id'],key))
 
 
@@ -69,8 +84,15 @@ def attach(c,order):
 STATE_LABELS={'authorized':'AUTORIZADO','denied':'NO AUTORIZADO','pending':'PENDIENTE'}
 
 
-def summary(access,risk):
-    """Estado real de los tres apartados (sistema, archivos, operaciones de riesgo). Lo no decidido es «pending», nunca un rechazo."""
+def summary(access,risk,applicable=None):
+    """Estado real de los tres apartados (sistema, archivos, operaciones de riesgo). Lo no decidido es «pending», nunca un rechazo.
+    Con `applicable` (apartados del tipo de equipo) se omiten los que no aplican, salvo que conste en ellos una autorización expresa."""
+    rows=sections(access,risk)
+    return [rows[key] for key in ('os','files','risk') if applicable is None or key in applicable or rows[key][1]=='authorized']
+
+
+def sections(access,risk):
+    """Los tres apartados por clave: {'os'|'files'|'risk': (título, estado, detalle)}."""
     permissions=(access or {}).get('permissions') or {};decision=(access or {}).get('decision')
     def scoped(keys,none):
         granted=[label for key,label in keys if permissions.get(key)]
@@ -85,4 +107,4 @@ def summary(access,risk):
     if not risk:rows.append(('Formateo, reinstalación y eliminación de datos','pending','No se solicitó autorización para modificar o eliminar datos.'))
     elif risk['decision']=='authorized':rows.append(('Formateo, reinstalación y eliminación de datos','authorized',('Autorización específica del cliente. '+(risk.get('justification') or '')).strip()))
     else:rows.append(('Formateo, reinstalación y eliminación de datos','denied','El cliente rechazó cualquier modificación o eliminación de datos.'))
-    return rows
+    return dict(zip(('os','files','risk'),rows))
