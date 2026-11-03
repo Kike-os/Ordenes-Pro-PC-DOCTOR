@@ -40,8 +40,9 @@ function salesRowsTable(rows,refresh,compact=false){const cols=compact?['Fecha',
  return centerTable(cols,rows.map(r=>{const code=el('div',undefined,'sv-code');code.append(button(r.code,()=>salesOpen(r,refresh),'text-action'),el('small',r.kind_label+(r.detail?' · '+r.detail:'')+(r.delivery==='pendiente'?' · por entregar':''),'ic-muted'));
   const state=invoiceChip(salesTone[r.state],r.state_label),invoice=r.invoice_id?button(r.invoice_number||r.invoice_label,()=>openInvoice(r.invoice_id),'text-action'):el('span','Sin factura','ic-muted');
   if(compact)return centerRow([['Fecha',formatOrderDate(r.at)],['Venta',code],['Cliente',r.client],['Total',centerMoney(r.total_cents)],['Estado',state]]);
-  const menu=centerMenu('Acciones de '+r.code,[['Ver la venta',()=>salesOpen(r,refresh)],r.invoice_id&&['Ver la factura',()=>openInvoice(r.invoice_id)],r.client_id&&['Ver el cliente',()=>{if(typeof openClientQuick==='function')openClientQuick(r.client_id);else go('clients',new URLSearchParams({id:r.client_id}));}]]);
-  return centerRow([['Fecha',formatOrderDate(r.at)],['Venta',code],['Cliente',r.client],['Total',centerMoney(r.total_cents)],['Pagado',r.kind==='inventario'?'—':centerMoney(r.paid_cents)],['Saldo',r.balance_cents?centerMoney(r.balance_cents):'—'],['Estado',state],['Factura',invoice],['Acciones',menu]]);}),'sv-table'+(compact?' sv-compact':''));}
+  const menu=centerMenu('Acciones de '+r.code,[['Imprimir comprobante',()=>salesReceipt(r.kind,r.id)],['Ver la venta',()=>salesOpen(r,refresh)],r.invoice_id&&['Ver la factura',()=>openInvoice(r.invoice_id)],r.client_id&&['Ver el cliente',()=>{if(typeof openClientQuick==='function')openClientQuick(r.client_id);else go('clients',new URLSearchParams({id:r.client_id}));}]]);
+  return centerRow([['Fecha',formatOrderDate(r.at)],['Venta',code],['Cliente',r.client],['Total',centerMoney(r.total_cents)],['Pagado',r.kind==='inventario'?'—':centerMoney(r.paid_cents)],['Saldo',r.balance_cents?centerMoney(r.balance_cents):'—'],['Estado',state],['Factura',invoice],['Acciones',salesActions(r,menu)]]);}),'sv-table'+(compact?' sv-compact':''));}
+function salesActions(r,menu){const box=el('div',undefined,'sv-acts'),print=invIconBtn('Imprimir comprobante de '+r.code,'printer',()=>salesReceipt(r.kind,r.id));print.classList.add('sv-print');box.append(print,menu);return box;}
 
 // ---- Panel ----
 async function salesPanel(panel){const d=await api('/api/sales/dashboard'),today=salesToday(),month=today.slice(0,8)+'01';panel.replaceChildren();
@@ -133,3 +134,45 @@ async function salesReports(panel){const s=salesState,today=salesToday();if(!s.r
 function salesCsv(data){const money=data.group!=='producto',cell=v=>{const t=String(v??'');return /[";\n]/.test(t)?'"'+t.replace(/"/g,'""')+'"':t;},amount=c=>c===null||c===undefined?'':(c/100).toFixed(2).replace('.',',');
  const lines=[[data.group_label,money?'Ventas':'Unidades','Total',...(money?['Cobrado','Saldo']:[])].join(';'),...data.rows.map(g=>[g.label,g.count,amount(g.total_cents),...(money?[amount(g.paid_cents),amount(g.balance_cents)]:[])].map(cell).join(';'))];
  const link=el('a');link.href=URL.createObjectURL(new Blob(['﻿'+lines.join('\n')],{type:'text/csv;charset=utf-8'}));link.download='ventas-'+data.group+'-'+data.from+'-a-'+data.to+'.csv';document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(link.href),2000);}
+
+// ---- Comprobante de venta -------------------------------------------------------------------------------------------------------
+// Ventana «Imprimir comprobante» (como «Imprimir ticket» de las órdenes): vista previa del PDF real, formato (ticket de 80 mm o A4), copia
+// del cliente, del establecimiento o ambas y, si la venta tiene factura electrónica autorizada, su RIDE. Imprimir y descargar usan exactamente
+// el PDF mostrado. Solo lee: reimprimir no crea ventas, cobros, movimientos de caja ni de inventario.
+for(const[k,v]of Object.entries({'loader-circle':'<path d="M21 12a9 9 0 1 1-6.219-8.56"/>','circle-alert':'<circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/>',
+ 'printer':'<path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 9V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v6"/><rect x="6" y="14" width="12" height="8" rx="1"/>',
+ 'download':'<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/>','x':'<path d="M18 6 6 18"/><path d="m6 6 12 12"/>'}))invIcons[k]??=v;
+async function salesReceipt(kind,id){const dialog=invDialog('Imprimir comprobante',true);dialog.classList.add('sr-dialog');const body=el('div',undefined,'inv-body sr');dialog.append(body);
+ const loading=el('p','Cargando…','empty-module');body.append(loading);let s;
+ try{s=await api('/api/sales/receipt/'+kind+'/'+id);}catch(error){loading.textContent=error.message;return;}if(!dialog.isConnected)return;body.replaceChildren();
+ dialog.querySelector('h2').textContent='Imprimir comprobante · '+s.code;let blobUrl='';dialog.addEventListener('close',()=>{if(blobUrl)URL.revokeObjectURL(blobUrl);});
+ const head=el('div',undefined,'sr-head'),who=el('div',undefined,'sr-who');who.append(el('strong',s.code),el('span',s.kind_label+' · '+s.client),el('small',formatOrderDate(s.sold_at)));
+ const money=el('div',undefined,'sr-money');money.append(el('b',centerMoney(s.total_cents)),invoiceChip(salesTone[s.state]||'pendiente',s.state_label));head.append(who,money);body.append(head);
+ const inv=s.invoice,emitted=inv&&inv.status!=='borrador';
+ const note=el('p',inv&&inv.authorized?'Esta venta tiene la factura electrónica '+(inv.number||'')+' autorizada'+(inv.test?' en el ambiente de pruebas (sin validez tributaria)':'')+'. Su representación impresa es el RIDE; el comprobante de venta no es tributario.'
+  :emitted?'Factura electrónica '+(inv.number||'')+' · '+inv.status_label+'. Hasta su autorización solo se imprime el comprobante de venta no tributario.'
+  :'Comprobante de venta no tributario: no es válido como factura.','sr-note');note.dataset.tone=inv&&inv.authorized?'ok':'info';body.append(note);
+ // Opciones: formato en botones de opción y copia en un desplegable (el RIDE no lleva copias).
+ const opts=el('div',undefined,'sr-options'),group=el('fieldset',undefined,'sr-formats');group.append(el('legend','Formato'));let format='termico';
+ const formats=[['termico','Ticket 80 mm','receipt-text'],['a4','A4','file-text'],...(inv&&inv.authorized?[['ride','Factura (RIDE)','badge-check']]:[])];
+ for(const[value,label,icon]of formats){const l=el('label',undefined,'sr-format'),r=el('input');r.type='radio';r.name='sr-format-'+id;r.value=value;r.checked=value===format;
+  r.addEventListener('change',()=>{format=value;copyBox.hidden=value==='ride';load();});l.append(r,invIcon(icon),el('span',label));group.append(l);}
+ const copyBox=el('label',undefined,'inv-field sr-copy'),copy=el('select');for(const[value,label]of [['cliente','Copia del cliente'],['establecimiento','Copia del establecimiento'],['ambas','Ambas copias']])copy.add(new Option(label,value));
+ copy.addEventListener('change',()=>load());copyBox.append(el('span','Copia'),copy);opts.append(group,copyBox);body.append(opts);
+ // Vista previa: URL de objeto temporal (el servidor no permite incrustar sus respuestas). Sin visor de PDF (teléfonos), se omite y los botones siguen.
+ // El ticket de 72 mm se muestra a tamaño natural (zoom fijo); el A4 y el RIDE, al ancho de la ventana.
+ const viewer=navigator.pdfViewerEnabled!==false&&!matchMedia('(max-width:720px)').matches,frame=el('iframe',undefined,'sr-frame'),status=el('p',undefined,'document-status sr-status');status.setAttribute('role','status');
+ frame.title='Vista previa del comprobante '+s.code;frame.hidden=true;body.append(status,frame);
+ const say=(text,state)=>{status.dataset.state=state;status.replaceChildren(invIcon(state==='ready'?'badge-check':state==='error'?'circle-alert':'loader-circle'),el('span',text));};
+ const acts=el('div',undefined,'sr-actions'),print=invBtn('Imprimir','printer',()=>{if(!blobUrl)return;if(viewer&&!frame.hidden){try{frame.contentWindow.focus();frame.contentWindow.print();return;}catch{}}const w=window.open(blobUrl,'_blank');if(w)w.opener=null;else toast('Permite las ventanas emergentes para imprimir.','error');},'primary');
+ const download=el('a',undefined,'secondary inv-btn');download.append(invIcon('download'),el('span','Descargar PDF'));const close=invBtn('Cerrar','x',()=>dialog.close());acts.append(close,download,print);body.append(acts);
+ const url=()=>format==='ride'?'/api/invoicing/'+inv.id+'/ride.pdf':'/api/sales/receipt/'+kind+'/'+id+'.pdf?'+new URLSearchParams({formato:format,copia:copy.value});
+ const name=()=>format==='ride'?'FACTURA-'+(inv.number||s.code)+'.pdf':'COMPROBANTE-'+s.code+(format==='termico'?'-80MM':'')+(copy.value==='establecimiento'?'-ESTABLECIMIENTO':copy.value==='ambas'?'-AMBAS':'')+'.pdf';
+ let version=0;async function load(){const mine=++version;print.disabled=true;download.setAttribute('aria-disabled','true');download.removeAttribute('href');frame.hidden=true;say(format==='ride'?'Generando el RIDE…':'Generando comprobante…','loading');
+  try{const blob=await fetchDocument(url());if(mine!==version||!dialog.open)return;if(!blob.size)throw new Error('El servidor no devolvió un PDF válido.');if(blobUrl)URL.revokeObjectURL(blobUrl);blobUrl=URL.createObjectURL(blob);
+   download.href=blobUrl;download.download=name();download.removeAttribute('aria-disabled');print.disabled=false;
+   if(!viewer){say('Comprobante listo. Este dispositivo no muestra la vista previa: usa Imprimir o Descargar PDF.','ready');return;}
+   let shown=false;const timer=setTimeout(()=>{if(!shown&&mine===version){frame.hidden=true;say('No se pudo mostrar la vista previa. Puedes imprimir o descargar el PDF.','error');}},12000);
+   frame.onload=()=>{if(mine!==version||!frame.src.startsWith('blob:'))return;shown=true;clearTimeout(timer);say(format==='ride'?'RIDE listo':'Comprobante listo · el mismo PDF se imprime y se descarga','ready');};
+   frame.hidden=false;frame.src=blobUrl+'#toolbar=0&navpanes=0&'+(format==='termico'?'zoom=110':'view=FitH');}catch(error){if(mine===version)say(error.message,'error');}}
+ load();}

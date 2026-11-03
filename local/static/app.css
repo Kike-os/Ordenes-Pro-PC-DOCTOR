@@ -9990,3 +9990,34 @@ body[data-page=dashboard] .maintenance-dialog.inv-sheet.inv-dialog.cjd-dialog,bo
 .cjd-ledger>[data-tone=ok] dd{color:#34D399}.cjd-ledger>[data-tone=over] dd{color:#F5B544}.cjd-ledger>[data-tone=short] dd{color:#F87171}
 .cjd-audit tr[data-voided=true] td{color:var(--inv-soft);font-style:italic}
 .cjd .cj-scroll{max-width:100%;overflow-x:auto}
+
+/* Ventas → «Imprimir comprobante» (comprobante de venta no tributario, 80 mm o A4, y RIDE si la factura está autorizada). Solo .sr-* y .sv-acts. */
+body[data-page=dashboard] .maintenance-dialog.inv-sheet.inv-dialog.sr-dialog,body[data-page=dashboard] dialog.inv-sheet.sr-dialog{width:min(860px,calc(100vw - 24px))}
+.sr{display:grid;gap:12px;min-width:0}
+.sr-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px;padding:12px 14px;border:1px solid var(--inv-line);border-radius:12px;background:#0D1729}
+.sr-who{display:grid;gap:2px;min-width:0}.sr-who strong{color:var(--inv-text);font:700 15px/1.3 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;overflow-wrap:anywhere}
+.sr-who span{color:var(--inv-muted);font-size:13px;overflow-wrap:anywhere}.sr-who small{color:var(--inv-soft);font-size:12px}
+.sr-money{display:flex;align-items:center;gap:10px}.sr-money b{color:var(--inv-text);font-size:18px;font-variant-numeric:tabular-nums}
+.sr-note{margin:0;padding:9px 12px;border-radius:10px;border:1px solid #F5B54455;background:#F5B54414;color:#F8D48C;font-size:12.5px;line-height:1.5}
+.sr-note[data-tone=ok]{border-color:#34D39955;background:#34D39914;color:#A7F3D0}
+.sr-options{display:flex;flex-wrap:wrap;align-items:end;gap:10px 16px}
+.sr-formats{display:flex;flex-wrap:wrap;gap:6px;margin:0;padding:0;border:0;min-width:0}
+.sr-formats legend{width:100%;margin-bottom:6px;padding:0;color:var(--inv-muted);font-size:12px;font-weight:650}
+.sr-format{position:relative;display:inline-flex;align-items:center;gap:8px;min-height:40px;margin:0;padding:0 14px;border:1px solid var(--inv-line-2);border-radius:10px;background:#0B1424;color:var(--inv-muted);font-size:13px;font-weight:650;cursor:pointer}
+.sr-format input{position:absolute;opacity:0;pointer-events:none}
+.sr-format:has(input:checked){border-color:#3B82F6;background:#16294a;color:#fff;box-shadow:inset 0 0 0 1px #3B82F6}
+.sr-format:has(input:focus-visible){outline:2px solid var(--inv-blue);outline-offset:2px}
+.sr-format .inv-icon{width:16px;height:16px}
+body[data-page=dashboard] .sr-copy{margin:0;min-width:200px;flex:1 1 200px;max-width:280px}
+body[data-page=dashboard] .sr-copy select{height:40px;margin-top:6px}
+body[data-page=dashboard] .sr-status{display:flex;align-items:center;justify-content:flex-start;gap:8px;margin:0;font-size:12.5px;text-align:left}.sr-status .inv-icon{flex:none;width:16px;height:16px}
+.sr-frame{width:100%;height:min(62vh,640px);border:1px solid var(--inv-line);border-radius:10px;background:#fff}
+.sr-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px}
+.sr-actions a[aria-disabled=true]{pointer-events:none;opacity:.55}
+.sv-acts{display:flex;align-items:center;justify-content:flex-end;gap:6px}
+@media(max-width:720px){
+ .sr-formats{width:100%}.sr-format{flex:1 1 calc(50% - 6px);justify-content:center;padding:0 8px}
+ body[data-page=dashboard] .sr-copy{max-width:none;flex-basis:100%}
+ .sr-actions{display:grid;grid-template-columns:1fr 1fr}.sr-actions>:last-child{grid-column:1/-1;order:-1}
+ .sr-actions>*{justify-content:center}
+}

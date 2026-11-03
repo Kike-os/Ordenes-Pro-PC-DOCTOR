@@ -704,7 +704,7 @@ function licenseSaleDialog(preset={}){
   if(await confirmClose({title:now?'¿Registrar y entregar la venta?':'¿Registrar la venta?',text:lines.map(([a,b])=>a+': '+b).join(' · ')+'. Quedará registrada con fecha, hora y responsable.',keep:'Revisar',discard:now?'Confirmar entrega':'Registrar venta'})!=='discard')throw Object.assign(new Error(''),{cancelled:true});
   const result=await api('/api/licenses/sales',body);dialog.dataset.dirty='';dialog.close();
   const mailPending=now&&body.send_mail&&result.mail!=='sent';
-  toast((now?'Venta '+result.code+' registrada y entregada.':'Venta '+result.code+' registrada. Las licencias quedan reservadas hasta su entrega.')+(mailPending?' El correo está pendiente: comparte el enlace desde la ventana siguiente.':''),mailPending?'warning':'success',null,{title:now?'Venta entregada':'Venta registrada',duration:8000});
+  toast((now?'Venta '+result.code+' registrada y entregada.':'Venta '+result.code+' registrada. Las licencias quedan reservadas hasta su entrega.')+(mailPending?' El correo está pendiente: comparte el enlace desde la ventana siguiente.':''),mailPending?'warning':'success',typeof salesReceipt==='function'?{label:'Imprimir comprobante',run:()=>salesReceipt('licencia',result.sale)}:null,{title:now?'Venta entregada':'Venta registrada',duration:9000});
   if(now)licenseShareLink(result);licenseReloadAll();if(typeof salesReload==='function')salesReload();},'Registrar y entregar');
  dialog.classList.add('license-dialog-wide','license-sale-dialog');return dialog;}
 function licensePayDialog(sale,done){const balance=Math.max(sale.total_cents-sale.paid_cents-(sale.pending_cents||0),0);
@@ -751,7 +751,7 @@ async function licenseSaleView(id,done){let sale;try{sale=await api('/api/licens
   if(open&&sale.balance_cents>sale.pending_cents)actions.append(button('Registrar pago',()=>licensePayDialog(sale,refresh),'secondary'));
   if(sale.delivery_status==='pendiente')actions.append(button('Entregar',()=>licenseSaleDeliverDialog(sale,refresh),'primary'));
   if(sale.delivery_status==='entregado')actions.append(button(sale.link_active?'Nuevo enlace privado':'Enlace vencido: generar nuevo',async()=>{try{licenseShareLink(await api('/api/licenses/sales/'+id,{action:'link',send_mail:false}));}catch(error){toast(error.message,'error');}},'text-action'));
-  actions.append(button('Comprobante',()=>licenseSaleReceipt(sale),'secondary'));
+  actions.append(typeof salesReceipt==='function'?button('Imprimir comprobante',()=>salesReceipt('licencia',sale.id),'secondary'):button('Comprobante',()=>licenseSaleReceipt(sale),'secondary'));
   if(sale.delivery_status==='pendiente')actions.append(button('Cancelar venta',()=>licenseReasonDialog('Cancelar venta '+sale.code,'Las licencias reservadas vuelven al inventario. La venta no se borra: queda como «Cancelado» con el motivo. Si tiene pagos, anúlalos primero.','Cancelar venta',async reason=>{await api('/api/licenses/sales/'+id,{action:'cancel',reason});toast('Venta cancelada.','success');refresh();licenseReloadAll();}),'text-action license-danger'));
   body.append(actions);}
  paint();}

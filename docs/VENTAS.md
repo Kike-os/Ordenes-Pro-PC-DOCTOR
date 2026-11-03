@@ -140,3 +140,34 @@ No modifica tablas existentes.
   - permisos;
   - asignación de licencias sin cobro.
 - Revisión en el navegador con datos ficticios a 1366, 820, 390 y 320 px: teclado, Escape, movimiento reducido y desbordamiento.
+
+## Imprimir comprobante (comprobante de venta no tributario)
+
+Botón **«Imprimir comprobante»** en el historial de ventas (icono de impresora y opción del menú de acciones), en el detalle de la venta
+directa o desde cotización, en el detalle de la venta de licencias (sustituye al comprobante HTML anterior) y en el aviso de venta
+registrada. Sirve para los cuatro tipos del historial: directa, desde cotización, licencias e inventario. Módulo `local/sale_receipt.py`.
+
+- **Ventana** como «Imprimir ticket» de las órdenes: vista previa del PDF real, **formato** (ticket de 80 mm o A4), **copia** (cliente,
+  establecimiento o ambas) y botones **Imprimir**, **Descargar PDF** y **Cerrar**. En teléfonos sin visor de PDF se omite la vista previa y los
+  botones siguen funcionando. Imprimir y descargar usan exactamente el PDF mostrado.
+- **Contenido**: logo original, empresa con RUC y dirección de Facturación › Datos fiscales (si falta, lo dice), número de la venta, fecha y
+  hora, quién atendió, cliente, partidas con cantidad, precio unitario, descuento y total, subtotales por tarifa de IVA, IVA y total (con IVA
+  incluido, con las mismas reglas que la factura), pagos con método, cuenta enmascarada (•••• 2424), referencia y estado, saldo, estado del
+  pago, QR de consulta interna (ruta que exige sesión de administración) y agradecimiento. Las claves de licencias nunca se imprimen.
+- **Documento no tributario**, identificado en el encabezado: «DOCUMENTO NO TRIBUTARIO · NO VÁLIDO COMO FACTURA». Si la venta tiene
+  factura emitida, el comprobante la menciona y aclara que no la sustituye. Con la factura **autorizada**, la ventana ofrece además el
+  **RIDE** (la representación impresa de Facturación, con su clave de acceso y autorización); en el ambiente de pruebas lo indica.
+- **Ticket**: 72 mm útiles de la Epson TM-m30II (204,09 pt), margen de 1 mm, logo monocromo, altura según el contenido (una página por copia,
+  sin hojas en blanco) y QR alineado a 203 ppp. «Ambas copias» son dos páginas iguales.
+- **Reimprimir** solo lee: no crea ventas, cobros, movimientos de caja ni de inventario, facturas ni eventos (lo comprueban las pruebas).
+- Ruta: `GET /api/sales/receipt/<directa|cotizacion|licencia|inventario>/<id>` (resumen) y `…/<id>.pdf?formato=termico|a4&copia=cliente|establecimiento|ambas`.
+  Solo administración, como el resto de Ventas.
+
+**Pruebas:** `test_sale_receipt.py` (venta directa con varios productos y servicios, descuento, IVA 15 % y 0 %, pago mixto, venta pendiente,
+factura autorizada; licencias sin claves y con descuento por partida; inventario con serie; reimpresión sin cambios; permisos) y una prueba de
+navegador con datos ficticios (historial, detalle, menú, formatos, copias, RIDE, imprimir, descargar, cerrar y Escape a 1366, 390 y 320 px).
+Los tickets se procesaron con el controlador real de la Epson (`print-thermal.py --render-only`, sin imprimir) y los QR se leyeron a 203 ppp.
+
+**Hallazgo pendiente (Facturación, no modificado):** `invoicing._license_source` trata el descuento de una venta de licencias como un
+descuento general y bloquea su factura («todavía no se reparte entre las partidas»), aunque ese descuento es la suma de los descuentos por
+partida, ya restados en cada línea.

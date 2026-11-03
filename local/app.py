@@ -2092,6 +2092,17 @@ class Handler(BaseHTTPRequestHandler):
                     if path=='/api/sales/requests':return self.reply(200,{'rows':sales_center.requests(c,f),'status':sales_center.REQUEST_STATUS,'kinds':sales_center.REQUEST_KINDS})
                     found=re.fullmatch(r'/api/sales/requests/([0-9]{1,9})',path)
                     if found:return self.reply(200,sales_center.request_detail(c,found[1]))
+                    # Comprobante de venta (no tributario): resumen para la ventana de impresión y PDF de 80 mm o A4. Solo lee: reimprimir no crea nada.
+                    found=re.fullmatch(r'/api/sales/receipt/(directa|cotizacion|licencia|inventario)/([0-9]{1,9})(\.pdf)?',path)
+                    if found:
+                        import sale_receipt
+                        try:
+                            if not found[3]:return self.reply(200,sale_receipt.summary(c,found[1],found[2]))
+                            link=public_base_url().rstrip('/')+'/api/sales/receipt/%s/%s.pdf'%(found[1],found[2])  # el QR exige sesión de administración
+                            fmt=f.get('formato') or 'termico';copy=f.get('copia') or 'cliente'
+                            d,pdf=sale_receipt.render(c,found[1],found[2],fmt,copy,link,reception_now())
+                            return self.reply(200,pdf,'application/pdf',filename='COMPROBANTE-%s%s.pdf'%(re.sub(r'[^A-Za-z0-9-]','',d['code']),'-80MM' if fmt=='termico' else ''))
+                        except sale_receipt.ReceiptError as error:return self.reply(error.status,{'error':str(error)})
                 except sales_center.SalesError as error:return self.reply(error.status,{'error':str(error),'fields':error.fields})
                 return self.reply(404,{'error':'No encontrado.'})
             if path.startswith('/api/inventory'):

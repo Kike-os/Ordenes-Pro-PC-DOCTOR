@@ -6314,7 +6314,7 @@ async function invoiceComposer(existing=null,done=null,mode='factura',preset={})
    if(how==='draft'){dirty=false;msg.textContent='Borrador guardado ('+(saved.proforma?.code||'')+').';toast('Borrador guardado.','success');done&&done();return;}
    const r=await api('/api/proformas/'+pid,{action:'checkout',payments:JSON.stringify(data.payments),emit:how==='emit'||how==='print'?'1':'',consumer_final:cfc.checked?'1':'',internal_note:internal.value.trim(),units:JSON.stringify(units),request_key:keys.checkout});
    dirty=false;dialog.close();done&&done();if(win){if(r.emit_error)win.close();else win.location.href='/api/invoicing/'+r.invoice_id+'/ride.pdf';}
-   if(r.emit_error)toast('La factura quedó en borrador: '+r.emit_error,'error');else toast(how==='emit'||how==='print'?'Factura '+(r.invoice.number||'')+' emitida en pruebas.':'Factura creada en borrador.','success');openInvoice(r.invoice_id);}
+   if(r.emit_error)toast('La factura quedó en borrador: '+r.emit_error,'error');else toast(how==='emit'||how==='print'?'Factura '+(r.invoice.number||'')+' emitida en pruebas.':'Factura creada en borrador.','success',typeof salesReceipt==='function'?{label:'Imprimir comprobante',run:()=>salesReceipt('directa',pid)}:null,{duration:9000});openInvoice(r.invoice_id);}
   catch(error){win?.close();msg.textContent=error.message;showFields(error.fields);if(error.fields?.confirm_client){otherClient.hidden=false;otherClient.querySelector('input')?.focus();}}finally{busy=false;for(const b of buttons)b.disabled=false;for(const b of [emitB,printB])if(b)b.disabled=!!setup.settings.missing.length;acts.removeAttribute('aria-busy');}}
  (p?pq:fq).focus();}
 // ---- Proformas, pagos y anticipos, vouchers y notas de crédito ----------------------------------------------------------------------
@@ -6342,6 +6342,7 @@ async function proformaDetail(id,done){const dialog=invDialog('Proforma',true),b
  if(d.overlaps?.length)body.append(el('p','También en el presupuesto técnico de la orden: '+d.overlaps.join('; ')+'. Verifica que no se cobren dos veces.','inv-warn'));
  if(d.invoice){const b=button('Ver factura '+(d.invoice.number||'en borrador'),()=>{dialog.close();openInvoice(d.invoice.id);},'secondary');body.append(b);}
  const acts=el('div',undefined,'cj-actions');const pdf=el('a',undefined,'secondary inv-btn');pdf.href='/api/proformas/'+id+'.pdf';pdf.target='_blank';pdf.rel='noopener';pdf.append(invIcon('file-text'),el('span','Generar PDF'));acts.append(pdf);
+ if(p.status==='convertida'&&p.origin!=='orden'&&typeof salesReceipt==='function')acts.prepend(invBtn('Imprimir comprobante','printer',()=>salesReceipt(p.origin==='directa'?'directa':'cotizacion',p.id),'primary'));
  if(d.can_edit)acts.append(invBtn(p.origin==='directa'?'Continuar factura':'Editar','pencil',()=>{dialog.close();p.origin==='directa'?invoiceComposer(d,done):proformaComposer(d,done);}));
  if(p.origin==='directa'&&p.status==='aprobada'&&!d.invoice&&admin())acts.append(invBtn('Continuar factura','receipt-text',()=>{dialog.close();invoiceComposer(d,done);},'primary'));
  if(d.can_send)acts.append(invBtn(p.status==='borrador'||p.status==='modificacion'?'Enviar al cliente':'Generar enlace nuevo','send',async()=>{try{const r=await api('/api/proformas/'+id,{action:'send'});proformaLinkDialog(r.link,p);done&&done();}catch(error){notify(error.message);}},'primary'));
