@@ -200,3 +200,17 @@ Disponible en **Inventario › Proveedores** y en **Facturación › Proveedores
 
 Un proveedor no se puede duplicar por identificación ni, cuando no hay identificación que los distinga, por nombre. Los proveedores no se eliminan: se desactivan y se pueden reactivar. Un mismo producto puede tener varios proveedores, y su ficha los muestra con su último costo.
 
+
+## Repuestos desde la orden técnica (1.5.231)
+
+En el detalle de la orden, administración tiene la sección **«Repuestos del inventario»**: lo ya usado (producto, cantidad, series, fecha y
+responsable), lo reservado para la orden y el botón **«Registrar repuesto usado»**.
+
+- Registra la misma salida que Inventario › Salida con el motivo «uso en orden» (`inventory_center.exit_stock`), ahora sin escribir el
+  código de la orden: una sola salida por producto y orden (índice único), en transacción exclusiva y sin existencias negativas.
+- Si el producto estaba reservado para la orden, la salida consume esa reserva; con serie, la unidad reservada viene marcada.
+- La factura de la orden no vuelve a descontar lo que ya salió por la orden (`invoice_exit`).
+- Solo administración, como el resto del inventario (los técnicos no ven ni registran salidas). Sin productos disponibles, el botón queda
+  desactivado con su explicación.
+- Rutas: `GET /api/orders/<id>/parts` (usado, reservado y disponible) y `POST /api/orders/<id>/parts`.
+- Pruebas: `test_order_parts.py` y una prueba de navegador con datos ficticios (granel, serie reservada, Cancelar, Escape, 1366, 390 y 320 px).

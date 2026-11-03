@@ -2105,6 +2105,13 @@ class Handler(BaseHTTPRequestHandler):
                         except sale_receipt.ReceiptError as error:return self.reply(error.status,{'error':str(error)})
                 except sales_center.SalesError as error:return self.reply(error.status,{'error':str(error),'fields':error.fields})
                 return self.reply(404,{'error':'No encontrado.'})
+            found=re.fullmatch(r'/api/orders/([0-9]{1,9})/parts',path)
+            if found:
+                # Repuestos de la orden (lo usado, lo reservado y lo disponible): solo administración, como el inventario.
+                if user['role']!='administrador':return self.reply(403,{'error':'Solo administración gestiona los repuestos del inventario.'})
+                import inventory_center as center
+                try:return self.reply(200,center.order_parts(c,int(found[1])))
+                except center.InventoryError as error:return self.reply(error.status,{'error':str(error)})
             if path.startswith('/api/inventory'):
                 # Inventario, proveedores y compras: solo administración. Solo lectura en GET.
                 if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede ver el inventario.'})
@@ -3222,6 +3229,25 @@ class Handler(BaseHTTPRequestHandler):
                         c.commit();audit(c,user['id'],'sales_request',rid);return self.reply(200,{'ok':True,'id':rid,**sales_center.request_detail(c,rid)})
                     except sales_center.SalesError as error:
                         c.rollback();return self.reply(error.status,{'error':str(error),'fields':error.fields})
+                found=re.fullmatch(r'/api/orders/([0-9]{1,9})/parts',path)
+                if found:
+                    # Registrar un repuesto usado en la orden: la salida «uso en orden» del inventario (una por producto y orden; consume su reserva
+                    # si la hay). Misma transacción exclusiva que el inventario y mismas reglas: nunca existencias negativas ni dos descuentos.
+                    if user['role']!='administrador':return self.reply(403,{'error':'Solo administración gestiona los repuestos del inventario.'})
+                    import inventory,inventory_center as center
+                    now=reception_now()
+                    try:
+                        c.commit();c.execute('BEGIN IMMEDIATE')
+                        order=c.execute('SELECT id,code FROM orders WHERE id=?',(int(found[1]),)).fetchone()
+                        if not order:c.rollback();return self.reply(404,{'error':'Orden no encontrada.'})
+                        body={k:data.get(k) for k in ('item_id','quantity','unit_ids','reservation_id','request_key','note')}
+                        result=center.exit_stock(c,dict(body,reason='uso_orden',order_code=order['code']),user,now)
+                        c.commit();audit(c,user['id'],'order_part_used',order['id']);c.commit()
+                        return self.reply(200,{'ok':True,'movement_id':result['movement_id'],**center.order_parts(c,order['id'])})
+                    except inventory.InventoryError as error:
+                        c.rollback();return self.reply(error.status,{'error':str(error),'fields':error.fields})
+                    except sqlite3.IntegrityError:
+                        c.rollback();return self.reply(409,{'error':'Esta orden ya registró la salida de ese producto: no se descuenta dos veces.'})
                 if path.startswith('/api/inventory'):
                     # Inventario: cada operación en una transacción exclusiva, para que dos salidas simultáneas no dejen existencias negativas.
                     if user['role']!='administrador':return self.reply(403,{'error':'Solo administración gestiona el inventario.'})

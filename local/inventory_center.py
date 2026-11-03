@@ -949,6 +949,37 @@ def consume_for_order(c, order_id, item_id, amount, user, now, unit_ids=None, re
                           'request_key': request_key or ''}, user, now)
 
 
+def order_parts(c, order_id):
+    """Repuestos de una orden técnica, para registrarlos desde la propia orden: lo ya usado (salidas «uso en orden», una por producto; la
+    factura de la orden no las descuenta otra vez), lo reservado para ella y los productos que todavía se pueden usar (con sus unidades si
+    llevan serie). Solo lee."""
+    order = c.execute('SELECT id,code FROM orders WHERE id=?', (order_id,)).fetchone() if _id(order_id) else None
+    if not order:
+        raise InventoryError('Orden no encontrada.', 404)
+    used = []
+    for m in c.execute("SELECT m.id,m.item_id,m.quantity,m.created_at,g.name product,COALESCE(u.name,'') actor FROM inventory_movements m JOIN inventory_items i ON i.id=m.item_id "
+                       "JOIN catalog_items g ON g.id=i.catalog_id LEFT JOIN users u ON u.id=m.created_by WHERE m.reference_kind='orden' AND m.reference_id=? AND m.reason='uso_orden' "
+                       "AND m.direction=-1 ORDER BY m.id", (order['id'],)):
+        serials = [r[0] for r in c.execute("SELECT COALESCE(NULLIF(u.serial,''),u.internal_code) FROM inventory_movement_units x JOIN inventory_units u ON u.id=x.unit_id WHERE x.movement_id=?",
+                                           (m['id'],))]
+        used.append(dict(m, serials=serials))
+    reserved = [r for r in reservations(c, 'activa') if r['order_id'] == order['id']]
+    done = {m['item_id'] for m in used}
+    held = {r['item_id']: r for r in reserved}
+    available = []
+    for p in products(c):
+        if not p['active'] or p['id'] in done or (p['available'] <= 0 and p['id'] not in held):
+            continue
+        units = []
+        if p['tracking'] == 'serie':
+            own = held[p['id']]['id'] if p['id'] in held else 0
+            units = [dict(u) for u in c.execute("SELECT id,internal_code,serial,reservation_id FROM inventory_units WHERE item_id=? AND (status='disponible' OR reservation_id=?) ORDER BY id",
+                                                (p['id'], own))]
+        available.append({'id': p['id'], 'name': p['name'], 'code': p['code'] or p['sku'] or '', 'tracking': p['tracking'], 'available': p['available'],
+                          'reservation': ({'id': held[p['id']]['id'], 'quantity': held[p['id']]['quantity']} if p['id'] in held else None), 'units': units})
+    return {'order': dict(order), 'used': used, 'reserved': reserved, 'available': available}
+
+
 def invoice_exit(c, invoice_id, user, now):
     """Salida por factura: descuenta solo lo que la orden de origen no consumió ya. Cada línea con producto de inventario sale una vez
     (referencia «factura»); lo consumido en la orden (referencia «orden») se omite. Devuelve lo descontado y lo omitido."""

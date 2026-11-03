@@ -130,8 +130,8 @@ Sigue pendiente:
   desactivada»). Activarla es una decisión administrativa expresa, con el punto de emisión de AZUR confirmado.
 - **Ticket térmico de 80 mm de la factura** (revisar antes `docs/TICKET-TERMICO.md`). Tiene sentido cuando haya emisión real: un ticket
   de una factura de pruebas no tiene validez tributaria.
-- **Consumo automático de repuestos en la orden**: hoy la salida se registra a mano en Inventario con el motivo «uso en orden».
-  `inventory_center.consume_for_order` existe en el servidor, pero ninguna pantalla lo usa todavía.
+- ~~Consumo de repuestos en la orden~~: desde la 1.5.231 se registra en la propia orden (sección «Repuestos del inventario»); ver
+  [INVENTARIO.md](INVENTARIO.md).
 - Confirmar con el contador las formas de pago del SRI (tarjeta de crédito, código 19, o de débito, 16) y el tratamiento de los anticipos.
 
 ## Políticas comerciales y documentos de la factura (publicado en la versión 1.5.207)

@@ -10021,3 +10021,16 @@ body[data-page=dashboard] .sr-status{display:flex;align-items:center;justify-con
  .sr-actions{display:grid;grid-template-columns:1fr 1fr}.sr-actions>:last-child{grid-column:1/-1;order:-1}
  .sr-actions>*{justify-content:center}
 }
+
+/* Orden → Repuestos del inventario (solo .op-*). */
+.order-parts h2 .inv-icon{width:18px;height:18px;margin-right:6px;vertical-align:-3px}
+.op-body{display:grid;gap:10px}
+.op-list{display:grid;gap:6px;margin:0;padding:0;list-style:none}
+.op-list li{display:grid;gap:2px;padding:8px 10px;border:1px solid #1E2D47;border-radius:9px;background:#0B1424}
+.op-list strong{color:#E2E8F0;font-size:13px;overflow-wrap:anywhere}.op-list small{color:#8DA0BC;font-size:12px}
+.op-reserved{margin:0;color:#F5B544;font-size:12.5px}
+.op-add{display:inline-flex;align-items:center;justify-content:center;gap:8px;width:100%}.op-add .inv-icon{width:16px;height:16px}
+.op-note{color:#8DA0BC;font-size:11.5px}
+.op-units{display:grid;gap:6px;margin:0;padding:10px;border:1px solid var(--inv-line,#1E2D47);border-radius:10px}
+.op-units legend{padding:0 4px;color:var(--inv-muted,#94A3B8);font-size:12px;font-weight:650}
+.op-unit{display:flex;align-items:center;gap:8px;margin:0;font-size:13px}.op-unit input{width:18px;height:18px;margin:0}
