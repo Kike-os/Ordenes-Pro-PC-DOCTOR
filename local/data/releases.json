@@ -8,6 +8,26 @@
   },
   "releases": [
     {
+      "version": "1.5.232",
+      "date": "2026-11-03T17:49:20-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Tarjetas y DATAFAST con diseño financiero profesional",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Tarjetas y DATAFAST rediseñado: resumen con datos reales (grupos, bancos, combinaciones, plazos y factores pendientes), tabla de factores con encabezados y meses fijos, fila resaltada, filtros por grupo, plazo y banco y búsqueda de porcentaje.",
+          "Grupos bancarios en tarjetas con logos de bancos, etiquetas por marca, búsqueda, despliegue de combinaciones y acceso directo a sus factores; simulador integrado con desglose completo.",
+          "Recargo comercial con vista de lectura y botones Editar, Guardar cambios (con estado de carga) y Cancelar; sin cambiar factores, combinaciones ni cálculos."
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Kike-os: «Sí, publica 1.5.231 y 1.5.232» (03/11/2026)"
+    },
+    {
       "version": "1.5.231",
       "date": "2026-11-03T17:36:35-05:00",
       "type": "patch",

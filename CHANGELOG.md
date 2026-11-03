@@ -4,6 +4,16 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.232 — 2026-11-03 17:49 (UTC-05:00)
+
+Tarjetas y DATAFAST con diseño financiero profesional
+
+### Mejoras realizadas
+
+- Tarjetas y DATAFAST rediseñado: resumen con datos reales (grupos, bancos, combinaciones, plazos y factores pendientes), tabla de factores con encabezados y meses fijos, fila resaltada, filtros por grupo, plazo y banco y búsqueda de porcentaje.
+- Grupos bancarios en tarjetas con logos de bancos, etiquetas por marca, búsqueda, despliegue de combinaciones y acceso directo a sus factores; simulador integrado con desglose completo.
+- Recargo comercial con vista de lectura y botones Editar, Guardar cambios (con estado de carga) y Cancelar; sin cambiar factores, combinaciones ni cálculos.
+
 ## v1.5.231 — 2026-11-03 17:36 (UTC-05:00)
 
 Repuestos del inventario registrados desde la orden técnica
