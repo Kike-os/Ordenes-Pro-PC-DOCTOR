@@ -4,6 +4,20 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.229 — 2026-11-03 07:53 (UTC-05:00)
+
+Ventas: imprimir comprobante de venta (80 mm y A4) y RIDE de la factura autorizada
+
+### Nuevas funcionalidades
+
+- Ventas: botón «Imprimir comprobante» en el historial, el detalle de la venta (directa, cotización y licencias) y el aviso de venta registrada, con vista previa, ticket de 80 mm o A4, copia del cliente, del establecimiento o ambas, e Imprimir, Descargar PDF y Cerrar.
+- Comprobante de venta no tributario identificado como tal: logo original, datos fiscales, cliente, partidas con precio, descuento e IVA calculados como la factura, pagos con cuenta enmascarada y referencia, estado del pago, QR de consulta interna y agradecimiento; sin claves de licencias.
+
+### Mejoras realizadas
+
+- Con la factura electrónica autorizada, la ventana ofrece su RIDE; mientras tanto, el comprobante aclara que no sustituye a la factura.
+- Ticket de 72 mm útiles para la Epson TM-m30II, logo monocromo y altura según el contenido; reimprimir no crea ventas, cobros ni movimientos.
+
 ## v1.5.228 — 2026-11-03 07:00 (UTC-05:00)
 
 Citas: los botones Cerrar y Cancelar de «Autorización del cliente» vuelven a cerrar la ventana

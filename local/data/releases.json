@@ -8,6 +8,28 @@
   },
   "releases": [
     {
+      "version": "1.5.229",
+      "date": "2026-11-03T07:53:16-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Ventas: imprimir comprobante de venta (80 mm y A4) y RIDE de la factura autorizada",
+      "changes": {
+        "features": [
+          "Ventas: botón «Imprimir comprobante» en el historial, el detalle de la venta (directa, cotización y licencias) y el aviso de venta registrada, con vista previa, ticket de 80 mm o A4, copia del cliente, del establecimiento o ambas, e Imprimir, Descargar PDF y Cerrar.",
+          "Comprobante de venta no tributario identificado como tal: logo original, datos fiscales, cliente, partidas con precio, descuento e IVA calculados como la factura, pagos con cuenta enmascarada y referencia, estado del pago, QR de consulta interna y agradecimiento; sin claves de licencias."
+        ],
+        "improvements": [
+          "Con la factura electrónica autorizada, la ventana ofrece su RIDE; mientras tanto, el comprobante aclara que no sustituye a la factura.",
+          "Ticket de 72 mm útiles para la Epson TM-m30II, logo monocromo y altura según el contenido; reimprimir no crea ventas, cobros ni movimientos."
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Kike-os: «Sí, publica 1.5.229 y 1.5.230» (03/11/2026)"
+    },
+    {
       "version": "1.5.228",
       "date": "2026-11-03T07:00:56-05:00",
       "type": "patch",
