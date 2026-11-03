@@ -4,6 +4,26 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.224 — 2026-11-02 20:26 (UTC-05:00)
+
+Autorizaciones según el tipo de equipo, comprobante corregido de PCD-20261102-0012 y Seguimiento de Órdenes compacto con Activas, Entregadas y Todas
+
+### Nuevas funcionalidades
+
+- Autorizaciones según el tipo de equipo: recepción, enlace del cliente, comprobante A4 y ticket muestran solo lo que aplica (computadoras, impresoras, mouse, teclado, monitor, consolas, HDD/SSD…); «No aplica» se distingue de autorizado, no autorizado y pendiente, y nunca cuenta como consentimiento.
+- Excepción de datos para impresoras multifunción, consolas y routers con memoria; Configuración → Autorizaciones por equipo (solo administración) con categorías, apartados, tipos asignados e historial de cambios con motivo. Nuevos tipos: monitor, mouse, teclado, HDD y SSD.
+- Comprobante corregido en la misma orden (revisión 2, con motivo, responsable y huellas): el original se conserva idéntico al enviado al cliente. Aplicado a PCD-20261102-0012 (impresora Epson L555).
+- Seguimiento de Órdenes del Inicio: fases Activas (por omisión), Entregadas y Todas; contadores de activas, listas para entregar y entregadas hoy; alerta de entregadas con saldo pendiente.
+
+### Mejoras realizadas
+
+- Seguimiento con altura fija, desplazamiento interno y páginas de 25: ya no crece con las órdenes ni desplaza Centro de Seguimiento Técnico y Citas de Hoy; la sincronización conserva posición, fase y filtros, sin desplazamiento automático.
+- Comprobante A4: autorizaciones en un bloque sin cortes, resumen de condiciones más compacto con la misma letra y sin títulos huérfanos al pie.
+
+### Errores corregidos
+
+- El indicador «por cobrar» de Caja ya no excluye las órdenes entregadas con saldo pendiente: entregado no es pagado.
+
 ## v1.5.223 — 2026-11-02 16:56 (UTC-05:00)
 
 Varios presupuestos independientes por orden y Resumen de presupuestos con proformas vinculadas

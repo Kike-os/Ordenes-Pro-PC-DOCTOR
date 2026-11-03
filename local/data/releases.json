@@ -8,6 +8,32 @@
   },
   "releases": [
     {
+      "version": "1.5.224",
+      "date": "2026-11-02T20:26:38-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Autorizaciones según el tipo de equipo, comprobante corregido de PCD-20261102-0012 y Seguimiento de Órdenes compacto con Activas, Entregadas y Todas",
+      "changes": {
+        "features": [
+          "Autorizaciones según el tipo de equipo: recepción, enlace del cliente, comprobante A4 y ticket muestran solo lo que aplica (computadoras, impresoras, mouse, teclado, monitor, consolas, HDD/SSD…); «No aplica» se distingue de autorizado, no autorizado y pendiente, y nunca cuenta como consentimiento.",
+          "Excepción de datos para impresoras multifunción, consolas y routers con memoria; Configuración → Autorizaciones por equipo (solo administración) con categorías, apartados, tipos asignados e historial de cambios con motivo. Nuevos tipos: monitor, mouse, teclado, HDD y SSD.",
+          "Comprobante corregido en la misma orden (revisión 2, con motivo, responsable y huellas): el original se conserva idéntico al enviado al cliente. Aplicado a PCD-20261102-0012 (impresora Epson L555).",
+          "Seguimiento de Órdenes del Inicio: fases Activas (por omisión), Entregadas y Todas; contadores de activas, listas para entregar y entregadas hoy; alerta de entregadas con saldo pendiente."
+        ],
+        "improvements": [
+          "Seguimiento con altura fija, desplazamiento interno y páginas de 25: ya no crece con las órdenes ni desplaza Centro de Seguimiento Técnico y Citas de Hoy; la sincronización conserva posición, fase y filtros, sin desplazamiento automático.",
+          "Comprobante A4: autorizaciones en un bloque sin cortes, resumen de condiciones más compacto con la misma letra y sin títulos huérfanos al pie."
+        ],
+        "fixes": [
+          "El indicador «por cobrar» de Caja ya no excluye las órdenes entregadas con saldo pendiente: entregado no es pagado."
+        ],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Kike-os: «okk corrgie todos los errores y lanza una actualiza estable y profesin"
+    },
+    {
       "version": "1.5.223",
       "date": "2026-11-02T16:56:15-05:00",
       "type": "patch",
