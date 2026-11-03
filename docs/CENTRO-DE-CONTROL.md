@@ -27,7 +27,7 @@ Apache ECharts 5.6.0 (licencia Apache 2.0, gratuita), en un paquete reducido con
 
 Para regenerar el paquete: `npm install echarts@5.6.0 esbuild`, importar `PieChart`, `BarChart`, `LineChart`, `GridComponent`, `TooltipComponent`, `LegendComponent`, `AriaComponent` y `CanvasRenderer` desde `echarts/core`, asignar `window.echarts` y empaquetar con `esbuild --bundle --minify --format=iife`.
 
-## Centro de Configuración y Administración — diseño Enterprise Pro (rama `configuracion-pro`)
+## Centro de Configuración y Administración — diseño Enterprise Pro (publicado en la versión 1.5.187)
 
 - **Estructura:**
   - menú lateral de 288 a 300 px con los 9 apartados de siempre, en texto completo; el activo se marca con un indicador y un resplandor rosados suaves;
@@ -48,7 +48,7 @@ Para regenerar el paquete: `npm install echarts@5.6.0 esbuild`, importar `PieCha
 
 No cambian los endpoints, usuarios, contraseñas, verificación en dos pasos, permisos, correo, horarios, catálogo, condiciones ni la integración de ADI.
 
-## Estado del sistema y corrección del icono gigante (rama `estado-sistema-pro`)
+## Estado del sistema y corrección del icono gigante (publicado en la versión 1.5.188)
 
 **Causa del icono gigante:**
 - `systemIcon()` crea SVG con `viewBox` pero sin ancho ni alto, y la clase `system-icon` solo tenía tamaño en contextos concretos.

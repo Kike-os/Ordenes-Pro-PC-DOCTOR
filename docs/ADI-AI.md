@@ -240,7 +240,7 @@ Solo diseño; no cambian funciones, enlaces, voz, esfera ni colores. Los cuatro 
 
 Causa de los márgenes desiguales: la regla genérica `.adi-panel{padding:10px 12px}` del asistente de redacción también afectaba a esta ventana. Los componentes nuevos de ADI usan prefijos propios (`name-adi-…`) para no compartir clases; una prueba comprueba que cada página conserva `class="adi-panel" id="adi-panel"`.
 
-## Voz natural y conversación continua (rama `adi-voz`, 21/10/2026)
+## Voz natural y conversación continua (21/10/2026, publicado en la versión 1.5.189)
 
 **Diagnóstico previo:**
 - La voz era la del navegador (`speechSynthesis`): depende de las voces instaladas en cada equipo y en Android y Windows suena robótica.

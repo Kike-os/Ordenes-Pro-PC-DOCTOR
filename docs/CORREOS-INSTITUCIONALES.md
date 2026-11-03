@@ -1,4 +1,4 @@
-# Correos institucionales (rama `correos-institucionales`, pendiente de aprobación)
+# Correos institucionales (publicado en la versión 1.5.132)
 
 Requiere la migración 043 (solo tablas nuevas: `mail_archive` y `mail_review_cache`).
 

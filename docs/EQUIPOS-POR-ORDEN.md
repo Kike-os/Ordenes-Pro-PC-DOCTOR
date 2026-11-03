@@ -37,7 +37,7 @@ Desde el detalle de una orden, el equipo se agrega a esa orden (mismo cliente). 
 
 Pruebas: `local/tests/test_equipment.py`.
 
-## Selector de equipos dentro de la orden (rama `selector-equipos`, pendiente de aprobación)
+## Selector de equipos dentro de la orden (publicado en la versión 1.5.131)
 
 «Equipos de esta orden» pasa a ser un selector: cada equipo (E01, E02, E03… sin límite) es una tarjeta compacta que se pulsa entera. Al elegirla, un panel dentro de la misma página muestra sus datos: identificador en la orden, `EQ-…`, características, serie, color, técnico, estado, ingreso, entrega, falla reportada y su presupuesto, pagado y saldo propios.
 

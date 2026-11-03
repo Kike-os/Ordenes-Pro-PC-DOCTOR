@@ -142,7 +142,7 @@ La búsqueda (número, cliente, cédula o RUC, producto) y los filtros de pago y
 
 Nada de esto muestra claves, contraseñas ni credenciales de Microsoft 365. No se borra ni se renumera nada, y no hay migración.
 
-## Tarjeta de Licencias Digitales (rama `licencias-tarjeta`)
+## Tarjeta de Licencias Digitales (publicado en la versión 1.5.188)
 
 **Ventana (administración):**
 - Alto máximo del 90 %; encabezado, búsqueda y pie fijos; solo se desplaza la lista.

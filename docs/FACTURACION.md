@@ -117,15 +117,22 @@ Las migraciones 070 a 072 **solo añaden** tablas, índices, disparadores y dos 
 3. **Base:** no se toca. Si alguna vez hiciera falta volver al estado anterior a la migración, existe el respaldo verificado `~/Respaldos-OrdenesPro/ordenes-pro-nube-AAAAMMDD-HHMMSS.sqlite3`, tomado justo antes de migrar. Restaurarlo exige una autorización expresa, porque se perderían los registros posteriores.
 
 ## Pendiente (no implementado)
-- Firma XAdES-BES y envío al SRI de **certificación**: requiere el certificado .p12, las librerías `cryptography` y `lxml` y una autorización expresa.
-- **Proformas** con PDF y logo, envío por correo o WhatsApp con enlace seguro, aprobación o rechazo por el cliente (últimos 4 dígitos de la cédula y código al correo), con evidencia; y conversión de la proforma aprobada en factura.
-- Notas de crédito, anticipos y abonos.
-- Factura A4 (RIDE en PDF) y ticket térmico de 80 mm (revisar antes `docs/TICKET-TERMICO.md`).
-- Botón de factura en las ventas de licencias, notas de crédito, proformas con aprobación del cliente y envío por Mail Pro.
-- Descontar existencias automáticamente al facturar o al usar repuestos en una orden (hoy la salida se registra a mano).
+Revisado el 02/11/2026 (1.5.226) contra el código. Ya están hechos y salieron de esta lista: envío al SRI de pruebas con la firma de AZUR
+(`azur_invoicing.py`), proformas con enlace privado, aprobación del cliente con evidencia y conversión a factura (`proformas.py`), notas
+de crédito (`credit_notes.py`), anticipos y abonos (Caja), RIDE A4 en PDF y envío al cliente (`invoice_documents.py`), facturación de
+ventas de licencias y la salida automática de inventario al facturar (`inventory_center.invoice_exit`), sin descontar dos veces lo que
+ya salió por la orden.
+
+Sigue pendiente:
+- **Emisión real** (ambiente de producción del SRI): está desactivada a propósito (`invoicing.py` responde «La emisión real está
+  desactivada»). Activarla es una decisión administrativa expresa, con el punto de emisión de AZUR confirmado.
+- **Ticket térmico de 80 mm de la factura** (revisar antes `docs/TICKET-TERMICO.md`). Tiene sentido cuando haya emisión real: un ticket
+  de una factura de pruebas no tiene validez tributaria.
+- **Consumo automático de repuestos en la orden**: hoy la salida se registra a mano en Inventario con el motivo «uso en orden».
+  `inventory_center.consume_for_order` existe en el servidor, pero ninguna pantalla lo usa todavía.
 - Confirmar con el contador las formas de pago del SRI (tarjeta de crédito, código 19, o de débito, 16) y el tratamiento de los anticipos.
 
-## Políticas comerciales y documentos de la factura (rama `politicas-comerciales`)
+## Políticas comerciales y documentos de la factura (publicado en la versión 1.5.207)
 
 **Facturación › Configuración › Políticas Comerciales** administra el documento «Políticas de Venta, Cambios, Devoluciones y Garantías — PC-DOCTOR S.A.».
 

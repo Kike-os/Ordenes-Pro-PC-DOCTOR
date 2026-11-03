@@ -1,4 +1,4 @@
-# Acceso, inactividad y actualizaciones (rama `seguridad-acceso`, pendiente de aprobación)
+# Acceso, inactividad y actualizaciones (publicado en la versión 1.5.129)
 
 Estado: implementado y probado en la rama de pruebas. **No está publicado.** Requiere aplicar antes la migración 041 en producción (con respaldo).
 
@@ -34,7 +34,7 @@ Estado: implementado y probado en la rama de pruebas. **No está publicado.** Re
 
 Pruebas: `local/tests/test_login_security.py` y comprobación en navegador (campos, esperas, verificación silenciosa, aviso de inactividad, expiración, botón «Atrás», ventana de actualizaciones, 390 px).
 
-## Botón «Agendar cita» y aviso de ADI en el acceso (rama `acceso-citas-adi`, pendiente de aprobación)
+## Botón «Agendar cita» y aviso de ADI en el acceso (publicado en la versión 1.5.130)
 
 - **Agendar cita:** enlace compacto (150 × 40 px, azul y cian) centrado bajo la tarjeta de acceso. Abre `/citas`, el agendamiento público que ya existía y al que ADI ya remite; no hay módulo nuevo. Un destello lo recorre cada ocho segundos (se desactiva con «movimiento reducido»).
 - **Aviso de ADI:** tres segundos después de cargar aparece junto a la esfera «¡Hola! Soy ADI, tu asistente virtual de PC-DOCTOR. ¿Necesitas ayuda? ¡Puedes hablar conmigo!». Se puede cerrar, se retira solo a los ocho segundos y al pulsarlo abre el chat existente. Se muestra una vez por visita (pestaña). No abre el chat, no reproduce sonido ni activa el micrófono por su cuenta. No aparece si el chat ya está abierto o si la persona ya está escribiendo sus credenciales.

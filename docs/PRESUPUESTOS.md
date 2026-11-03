@@ -1,4 +1,4 @@
-# Presupuestos profesionales (rama `presupuestos`, pendiente de aprobación)
+# Presupuestos profesionales (publicado en la versión 1.5.131)
 
 Requiere la migración 042 (solo crea tablas nuevas). El presupuesto anterior de cada orden (`order_budget`, `order_budget_lines`) no se modifica al migrar.
 
@@ -50,7 +50,7 @@ Administración puede registrar la decisión cuando el cliente la comunicó por 
 
 Pruebas: `local/tests/test_quotes.py` y recorrido completo en navegador (catálogo, borrador, envío, aprobación parcial con firma a 390 px, resumen en la orden, 320 px).
 
-## Catálogo profesional, descuentos e historial de precios (rama `presupuestos-catalogo`, pendiente de aprobación)
+## Catálogo profesional, descuentos e historial de precios (publicado en la versión 1.5.132)
 
 Requiere la migración 044 (añade columnas a `catalog_items` y `quotes` y crea `catalog_images` y `catalog_price_history`). No hay otro módulo de presupuestos: es el mismo, ampliado.
 

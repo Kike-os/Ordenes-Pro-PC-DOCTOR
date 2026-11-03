@@ -108,7 +108,7 @@ La eliminación definitiva (solo desde la Papelera) usa un modal propio: no se c
 - «Comprimir en ZIP» (en el navegador, sin bibliotecas ni servicios externos): reúne los archivos en `adjuntos-PC-DOCTOR.zip`, comprime solo lo que no viene ya comprimido (no toca JPEG, PDF, ZIP, etc.) y muestra el tamaño original y el final. No reduce calidad ni altera el contenido. No genera RAR (formato propietario).
 - Los adjuntos se guardan con el borrador en el servidor de correo y se recuperan al reabrirlo.
 
-## Bandeja: acciones en su propia columna (rama `correos-adi`, pendiente de aprobación)
+## Bandeja: acciones en su propia columna (publicado en la versión 1.5.130)
 
 Antes, los botones rápidos se dibujaban con posición absoluta encima del asunto y la vista previa al pasar el cursor. Ahora cada fila es una rejilla de tres columnas: selección · remitente, fecha, asunto y vista previa · acciones. Las acciones tienen espacio propio a la derecha y el texto se trunca con puntos suspensivos antes de llegar a ellas.
 

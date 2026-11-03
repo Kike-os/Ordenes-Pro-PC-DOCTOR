@@ -103,7 +103,7 @@ Todos los estados se pintan con una misma píldora de 26 px con icono y texto (`
 
 «No asistió» es distinto de «Cancelada» y se revierte con «Reactivar cita».
 
-## Configuración de la agenda: ventana compacta con pestañas (rama `agenda-config-pro`)
+## Configuración de la agenda: ventana compacta con pestañas (publicado en la versión 1.5.187)
 
 **Antes:** un bloque desplegable dentro de la agenda con todas las secciones abiertas a la vez (unos 4450 px de alto en 1366 × 768), con nombres de servicio cortados («Cambio de pa…»).
 

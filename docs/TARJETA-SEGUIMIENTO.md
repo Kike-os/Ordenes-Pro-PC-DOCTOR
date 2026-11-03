@@ -1,4 +1,4 @@
-# Tarjeta Digital de Seguimiento Técnico (rama `tarjeta-seguimiento`, pendiente de aprobación)
+# Tarjeta Digital de Seguimiento Técnico (publicado en la versión 1.5.130)
 
 Ticket de dos secciones en azul tecnológico, con los datos reales de la orden, un **QR real** y un **código de barras Code 128 real**.
 
@@ -37,7 +37,7 @@ La página pública anterior (`/s/<token>`) pasa a ser esta tarjeta; los enlaces
 
 Pruebas: `local/tests/test_tracking_card.py`.
 
-## Versión compacta (rama `tarjeta-compacta`, pendiente de aprobación)
+## Versión compacta (publicado en la versión 1.5.131)
 
 Tarjeta más estrecha y con menos espacio vacío (400 × 633 px en la vista del cliente), logotipo original más grande (136 px de ancho, sin modificarlo), un icono de trazo fino junto a cada dato, QR de 128 px y código de barras más alto. En 320 px los datos pasan a una columna. Se conservan los datos, las rutas y las funciones.
 

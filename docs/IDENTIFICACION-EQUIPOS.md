@@ -69,7 +69,7 @@ Estados que muestra la ficha: **Identificado** (historial del taller o servicio 
 
 La consulta automática a fabricantes sigue pendiente de credenciales: ninguna integración está activa. Tras la limpieza de registros de prueba del 12/10/2026 el historial propio empieza vacío, así que las primeras series no se reconocerán hasta registrar los equipos.
 
-## Identificación automática, tarjeta y logotipos (rama `identificacion-serie`, 13/10/2026, pendiente de aprobación)
+## Identificación automática, tarjeta y logotipos (13/10/2026, publicado en la versión 1.5.130)
 
 **Qué cambia**
 
@@ -97,7 +97,7 @@ Fuentes: documentación de integradores de la API de Dell (SysAid, Patch My PC, 
 
 **No verificado:** ninguna identificación real contra un fabricante. No hay credenciales, así que no se puede afirmar que Dell, HP ni ninguna otra marca identifique equipos automáticamente. Lo probado es el historial propio, el autocompletado, la asociación al equipo existente, la caché y el comportamiento cuando el servicio falla (con un proveedor simulado). No se obtienen imágenes del modelo ni estado de garantía: dependen de esas mismas API.
 
-## Botón «Identificar equipo» y un servicio por fabricante (rama `identificacion-fabricantes`, 20/10/2026)
+## Botón «Identificar equipo» y un servicio por fabricante (20/10/2026, publicado en la versión 1.5.186)
 
 **Interfaz:**
 - El botón «🔍 Identificar equipo» está en la misma fila que la serie y «Escanear serie», así que no añade altura. En celular «Escanear serie» queda solo con el icono; por debajo de 380 px, también «Identificar equipo».

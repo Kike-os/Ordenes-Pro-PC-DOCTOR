@@ -30,7 +30,7 @@ El panel «Seguimiento de Órdenes» del inicio ya no crece con el número de ó
 
 Pruebas: `local/tests/test_tracking_board.py` (bloques, búsqueda por estado, tamaños de página) y comprobación en navegador con 1, 2, 3, 5, 20, 45 y 100 órdenes.
 
-## Columna «Acciones» sin cortes (rama `acciones-seguimiento`, pendiente de aprobación)
+## Columna «Acciones» sin cortes (publicado en la versión 1.5.132)
 
 **Causa del botón cortado:** la tabla usa columnas de ancho fijo y la de acciones tenía el 15 % para tres botones con texto; al añadirse el de la tarjeta, el último sobresalía de la celda y el contenedor (que recorta para mantener la altura fija) lo cortaba.
 
