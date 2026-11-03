@@ -8,6 +8,24 @@
   },
   "releases": [
     {
+      "version": "1.5.228",
+      "date": "2026-11-03T07:00:56-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Citas: los botones Cerrar y Cancelar de «Autorización del cliente» vuelven a cerrar la ventana",
+      "changes": {
+        "features": [],
+        "improvements": [],
+        "fixes": [
+          "Citas → Autorización del cliente: la X, Cancelar y Escape vuelven a cerrar la ventana. Cerrar o cancelar no registra ninguna aceptación ni cambia la cita, y al reabrir el formulario está limpio; solo mientras se envía la autorización no se puede cerrar."
+        ],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Kike-os: «Sí, publica la 1.5.228» (03/11/2026)"
+    },
+    {
       "version": "1.5.227",
       "date": "2026-11-02T22:46:02-05:00",
       "type": "patch",

@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.228 — 2026-11-03 07:00 (UTC-05:00)
+
+Citas: los botones Cerrar y Cancelar de «Autorización del cliente» vuelven a cerrar la ventana
+
+### Errores corregidos
+
+- Citas → Autorización del cliente: la X, Cancelar y Escape vuelven a cerrar la ventana. Cerrar o cancelar no registra ninguna aceptación ni cambia la cita, y al reabrir el formulario está limpio; solo mientras se envía la autorización no se puede cerrar.
+
 ## v1.5.227 — 2026-11-02 22:46 (UTC-05:00)
 
 Caja → Historial y auditoría rediseñado y PDF de transferencias y depósitos corregido
