@@ -6,7 +6,7 @@ import re
 from datetime import date
 
 import equipment
-from reception import DEVICE_TYPES
+from reception import DEVICE_TYPES, reception_now
 
 PAGE = 8
 # Etapas del flujo real y estados configurados que pertenecen a cada una.
@@ -16,13 +16,22 @@ COUNTERS = (('pending', 'En espera', ('pendiente',)), ('process', 'En proceso', 
             ('ready', 'Listas para entregar', ('listo', 'espera_entrega')), ('done', 'Entregadas', ('entregado',)))
 
 
+# Fases del seguimiento: «Entregado» es el único estado final. Activas = todo lo demás (también lo reabierto por garantía o
+# revisión). Es solo una vista: filtrar nunca cambia el estado de una orden. «Entregado» no es «pagado»: el saldo se sigue cobrando.
+PHASES = {'activas': "o.status!='entregado'", 'entregadas': "o.status='entregado'", 'listas': "o.status IN ('listo','espera_entrega')", 'todas': '1=1'}
+OWED = '(' + equipment.BUDGET + '-' + equipment.PAID + ')>0'
+
+
 class TrackingError(ValueError):
     pass
 
 
 def parse(query):
     arg = lambda name: (query.get(name, [''])[0] or '').strip()
-    filters = {'q': arg('q')[:80], 'status': arg('status'), 'technician': arg('technician'), 'from': arg('from'), 'to': arg('to'), 'sort': arg('sort') or 'reciente'}
+    filters = {'q': arg('q')[:80], 'status': arg('status'), 'technician': arg('technician'), 'from': arg('from'), 'to': arg('to'), 'sort': arg('sort') or 'reciente',
+               'phase': arg('phase') or 'todas', 'balance': arg('balance') == '1'}
+    if filters['phase'] not in PHASES:
+        raise TrackingError('Vista inválida.')
     if filters['sort'] not in ('reciente', 'antiguo'):
         raise TrackingError('Orden inválido.')
     try:
@@ -56,7 +65,9 @@ def build(c, filters):
         raise TrackingError('Estado inválido.')
     totals = {row['status']: row['total'] for row in c.execute('SELECT status,COUNT(*) total FROM orders GROUP BY status')}
     counters = [{'key': key, 'label': label, 'total': sum(totals.get(code, 0) for code in codes), 'status': codes[0] if len(codes) == 1 else ''} for key, label, codes in COUNTERS]
-    where, args = ['1=1'], []
+    where, args = [PHASES[filters.get('phase', 'todas')]], []
+    if filters.get('balance'):
+        where.append(OWED)
     if filters['q']:
         # Orden, cliente, teléfono (con o sin espacios ni guiones), marca, modelo, serie, estado y tipo de equipo.
         where.append("(instr(lower(COALESCE(o.code,'')||' '||cl.name||' '||COALESCE(cl.phone,'')||' '||COALESCE(d.brand,'')||' '||COALESCE(d.model,'')||' '||COALESCE(d.serial,'')||' '||s.label||' '||COALESCE(NULLIF(d.kind,''),d.category,'')),lower(?))>0"
@@ -123,9 +134,16 @@ def build(c, filters):
         # lo cambia el personal; la tabla nunca lo cambia por su cuenta.
         code, _, state = (row.pop('quote') or '').partition('|')
         row['quote'] = {'code': code, 'status': state, 'label': QUOTE_LABELS.get(state, ''), 'stale': state in ('aprobado', 'parcial') and row['status_code'] in ('presupuesto', 'esperando_cliente')} if code and state != 'cancelado' else None
+    # Contadores compactos con la fecha del taller (Ecuador). Las entregadas con saldo siguen visibles como cuentas por cobrar.
+    today = reception_now().date().isoformat()
+    owed = c.execute("SELECT COUNT(*),COALESCE(SUM(" + equipment.BUDGET + '-' + equipment.PAID + "),0) FROM orders o WHERE o.status='entregado' AND " + OWED).fetchone()
+    phases = {'activas': sum(v for k, v in totals.items() if k != 'entregado'), 'entregadas': totals.get('entregado', 0), 'todas': sum(totals.values()),
+              'listas': totals.get('listo', 0) + totals.get('espera_entrega', 0),
+              'entregadas_hoy': c.execute("SELECT COUNT(*) FROM orders WHERE status='entregado' AND substr(COALESCE(delivered_at,''),1,10)=?", (today,)).fetchone()[0],
+              'entregadas_saldo': owed[0], 'saldo_cents': owed[1]}
     people = [{'id': row['id'], 'name': row['name']} for row in c.execute("SELECT id,name FROM users WHERE approval='approved' AND active=1 ORDER BY name COLLATE NOCASE")]
-    return {'counters': counters, 'status_totals': totals, 'total_orders': sum(totals.values()), 'rows': rows, 'total': total, 'page': page, 'pages': pages, 'page_size': size,
-            'filters': {key: filters.get(key, '') for key in ('q', 'status', 'technician', 'from', 'to', 'sort')},
+    return {'counters': counters, 'phases': phases, 'status_totals': totals, 'total_orders': sum(totals.values()), 'rows': rows, 'total': total, 'page': page, 'pages': pages, 'page_size': size,
+            'filters': {key: filters.get(key, '') for key in ('q', 'status', 'technician', 'from', 'to', 'sort', 'phase', 'balance')},
             'options': {'statuses': [{'code': code, 'label': label} for code, label in statuses.items()], 'technicians': people}}
 
 

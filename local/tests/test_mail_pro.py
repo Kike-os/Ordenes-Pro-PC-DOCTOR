@@ -288,7 +288,7 @@ class MailRouteTests(test_app.SecurityTests):
         for expected in ('bgcolor="#ffffff"','border-bottom:3px solid #e03a3e','<td class="op-sig-l" width="2" bgcolor="#e03a3e"','color:#1f2937;white-space:nowrap;">'+sign['name']):self.assertIn(expected,page)
         self.assertLess(page.index('<img '),page.index(sign['name']));self.assertLess(page.index(sign['name']),page.index('<td class="op-sig-l" width="2" bgcolor="#e03a3e"'));self.assertLess(page.index('<td class="op-sig-l" width="2" bgcolor="#e03a3e"'),page.index(sign['phone']))
         # La vista previa usa las mismas medidas y colores, siempre en horizontal: nunca se apila ni oculta el nombre.
-        css=(Path(app.ROOT)/'static'/'app.css').read_text(encoding='utf-8');block=css[css.index('/* ===== Firma corporativa original: la vista previa reproduce exactamente'):]
+        css=(Path(app.ROOT)/'static'/'app.css').read_text(encoding='utf-8');start=css.index('/* ===== Firma corporativa original: la vista previa reproduce exactamente');block=css[start:css.index('/* =====',start+10)]  # solo el bloque de la firma
         for rule in ('flex-direction:row!important','flex-wrap:nowrap!important','background:#ffffff','border-bottom:3px solid #e03a3e','.mail-sign-card>b{flex:0 0 2px!important;width:2px!important','background:#e03a3e','.mail-sign-card .mail-sign-logo img{display:block;width:120px','color:#1f2937!important;white-space:nowrap!important'):self.assertIn(rule,block)
         self.assertNotIn('flex-direction:column',block)
         js=(Path(app.ROOT)/'static'/'app.js').read_text(encoding='utf-8');self.assertIn("logo.src='/static/logo-firma.png'",js);self.assertTrue((Path(app.ROOT)/'static'/'logo-firma.png').is_file())

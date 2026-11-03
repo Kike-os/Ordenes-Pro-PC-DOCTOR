@@ -576,7 +576,8 @@ def indicators(c, now):
         pending_rec += len(d['pending'])
     sales = c.execute("SELECT COUNT(*),COALESCE(SUM(total_cents),0) FROM invoices WHERE status IN ('pendiente','enviado','autorizado') AND substr(emitted_at,1,10)=?", (today,)).fetchone()
     import equipment
-    dues = c.execute('SELECT COALESCE(SUM(MAX(' + equipment.BUDGET + '-' + equipment.PAID + ",0)),0) FROM orders o WHERE o.status!='entregado'").fetchone()[0]
+    # «Entregado» no es «pagado»: una orden entregada con saldo sigue por cobrar hasta que se pague.
+    dues = c.execute('SELECT COALESCE(SUM(MAX(' + equipment.BUDGET + '-' + equipment.PAID + ',0)),0) FROM orders o').fetchone()[0]
     closed = c.execute("SELECT COUNT(*) FROM cash_session_closings WHERE substr(closed_at,1,10)=?", (today,)).fetchone()[0]
     diff = c.execute("SELECT COALESCE(SUM(k.difference_cents),0) FROM cash_session_closings k JOIN cash_sessions s ON s.id=k.session_id WHERE s.status!='anulada'").fetchone()[0]
     transfers = c.execute("SELECT COUNT(*) FROM bank_transfers WHERE status='pendiente'").fetchone()[0]

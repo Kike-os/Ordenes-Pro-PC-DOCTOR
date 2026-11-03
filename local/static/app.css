@@ -9773,3 +9773,39 @@ body[data-page=dashboard] .devauth .devauth-chip input{flex:none;width:15px;heig
 .devauth-history .devauth-change{padding:8px 0;border-top:1px solid #223450}
 .devauth-history .devauth-change p{margin:2px 0 0}
 @media (prefers-reduced-motion:reduce){.devauth-chip{transition:none}}
+
+/* 1.5.224 — Seguimiento de Órdenes del Inicio: altura fija con desplazamiento interno (no crece con las órdenes), fases
+   Activas / Entregadas / Todas, contadores compactos y alerta de entregadas con saldo. */
+.tracking-pro .tracking-bar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 12px;margin:0 0 10px}
+.tracking-pro .tracking-phases{display:inline-flex;gap:2px;padding:3px;border:1px solid #22344f;border-radius:11px;background:#0a1424}
+.tracking-pro .tracking-phase{display:inline-flex;align-items:center;gap:7px;width:auto;min-height:32px;margin:0;padding:4px 12px;border:0;border-radius:8px;background:transparent;color:#a9bcd8;font-size:12.5px;font-weight:600;cursor:pointer}
+.tracking-pro .tracking-phase .stable-count{min-width:26px;padding:1px 6px;border-radius:999px;background:#16263f;color:#d7e4f7;font-size:11px;text-align:center;font-variant-numeric:tabular-nums}
+.tracking-pro .tracking-phase[aria-pressed=true]{background:#183563;color:#fff;box-shadow:inset 0 0 0 1px #3f7fd0}
+.tracking-pro .tracking-phase:focus-visible,.tracking-pro .tracking-stat:focus-visible,.tracking-pro .tracking-due:focus-visible,.tracking-pro .tracking-scroll:focus-visible{outline:2px solid #6ea8ff;outline-offset:2px}
+.tracking-pro .tracking-summary{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.tracking-pro .tracking-stat{display:inline-flex;align-items:baseline;gap:6px;width:auto;min-height:30px;margin:0;padding:4px 10px;border:1px solid #22344f;border-left:3px solid #4d8df0;border-radius:9px;background:#0c1729;color:#9db1cf;font-size:11.5px;cursor:pointer}
+.tracking-pro .tracking-stat strong{color:#fff;font-size:14px;font-variant-numeric:tabular-nums}
+.tracking-pro .tracking-stat[data-kind=ready]{border-left-color:#3dbf87}.tracking-pro .tracking-stat[data-kind=today]{border-left-color:#92a9ca}
+.tracking-pro .tracking-due{display:inline-flex;align-items:center;gap:6px;width:auto;min-height:30px;margin:0;padding:4px 10px;border:1px solid #8a6a2a;border-radius:9px;background:#2a2110;color:#f3d38b;font-size:11.5px;font-weight:600;cursor:pointer}
+.tracking-pro .tracking-due svg{width:14px;height:14px;flex:none}
+.tracking-pro .tracking-due[aria-pressed=true]{box-shadow:0 0 0 2px #f3c67755}
+.tracking-pro .tracking-carousel.tracking-scroll{--track-row:auto;height:380px;overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable}
+.tracking-pro .tracking-scroll .tracking-row>td{padding-top:7px;padding-bottom:7px}
+.tracking-pro .tracking-scroll td.tracking-empty{height:auto;padding:28px 12px;text-align:center}
+@media(max-width:860px){
+ .tracking-pro .tracking-carousel.tracking-scroll{height:440px}
+ .tracking-pro .tracking-scroll .tracking-table .tracking-row{height:auto;overflow:visible}
+ .tracking-pro .tracking-scroll .tracking-row>td{padding-top:0;padding-bottom:0}
+}
+@media(max-width:480px){
+ .tracking-pro .tracking-bar{display:grid;grid-template-columns:minmax(0,1fr)}
+ .tracking-pro .tracking-phases{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}
+ .tracking-pro .tracking-phase{flex-direction:column;justify-content:center;gap:2px;padding:4px 2px;white-space:nowrap;font-size:12px}
+ .tracking-pro .tracking-phase .stable-count{display:inline-block;width:auto;height:auto;min-width:0;min-height:0;padding:0 7px;line-height:1.5;font-size:10.5px}
+ .tracking-pro .tracking-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+ .tracking-pro .tracking-stat{flex-direction:column;align-items:flex-start;gap:0;padding:4px 8px;min-width:0}
+ .tracking-pro .tracking-stat span{font-size:10.5px;line-height:1.25}
+ .tracking-pro .tracking-due{grid-column:1/-1;justify-content:center}
+ .tracking-pro .tracking-carousel.tracking-scroll{height:min(440px,62vh)}
+}
+@media (prefers-reduced-motion:reduce){.tracking-pro .tracking-phase,.tracking-pro .tracking-stat{transition:none}}

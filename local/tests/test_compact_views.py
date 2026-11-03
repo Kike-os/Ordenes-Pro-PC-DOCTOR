@@ -28,7 +28,7 @@ class CompactTrackingTests(unittest.TestCase):
 
     def test_group_rows_show_order_unit_and_overall_state(self):
         self.assertIn("'tracking-unit'",JS);self.assertIn("'tracking-overall'",JS);self.assertIn('row.group.overall.label',JS)
-        self.assertIn('const trackingSign=',JS);self.assertEqual(JS.count('trackingSign(row)'),2)
+        self.assertIn('const trackingSign=',JS);self.assertEqual(JS.count('trackingSign(row)'),3)  # fila, repintado por número de orden y sincronización (1.5.224)
         for code in ('completada','parcial','curso','listos','recibidos'):self.assertIn('.tracking-overall[data-overall='+code+']',CSS)
 
     def test_state_colours_and_compact_layout(self):

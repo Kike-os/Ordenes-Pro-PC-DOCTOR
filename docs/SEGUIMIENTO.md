@@ -135,3 +135,49 @@ Los otros contadores revisados (avisos, ADI, asistencia en vivo, grupos de presu
 - Botones Ver, Historial (con el número real de movimientos), QR e Imprimir.
 - Búsqueda, filtro, ordenación y Escape.
 - Aprobación de un presupuesto reflejada sin recargar.
+
+## Activas, Entregadas y Todas; altura fija (1.5.224)
+
+Esta versión reemplaza el carrusel de la 1.5.127. El panel del Inicio tiene ahora una **altura fija**:
+- **Lista:** 380 px en escritorio y tableta, y 440 px en móvil (como máximo el 62 % de la pantalla). Tiene desplazamiento interno y **páginas de 25 órdenes**.
+- **Tamaño constante:** el panel mide lo mismo con 1 o con 500 órdenes y no desplaza «Centro de Seguimiento Técnico» ni «Citas de Hoy».
+- **Sin desplazamiento automático.** La sincronización (cada 30 s y al volver a la pestaña) cambia solo las filas que cambiaron. Conserva la posición, la página, la fase, la búsqueda y los filtros. Si alguien está interactuando, espera a que termine.
+
+**Fases** (solo cambian lo que se ve; nunca el estado de una orden):
+
+| Fase | Muestra |
+| --- | --- |
+| **Activas** (por omisión) | Toda orden que no está «Entregado», incluidas las reabiertas por garantía o falla recurrente. |
+| **Entregadas** | Las entregadas, para consultarlas. |
+| **Todas** | Activas y entregadas. |
+
+- Se combinan con la búsqueda (orden, cliente, teléfono, serie, modelo) y con los filtros de estado, técnico y fechas.
+- Elegir el estado «Entregado» lleva a Entregadas; cualquier otro estado, a Activas.
+- La fase elegida se recuerda en la pestaña del navegador.
+
+**Contadores compactos** (con la fecha del taller, America/Guayaquil):
+- Activas
+- Listas para entregar (listo y en espera de entrega)
+- Entregadas hoy
+
+Las estadísticas históricas no cambian.
+
+**«Entregado» no es «pagado».** Una orden entregada con saldo:
+- sale de Activas;
+- queda en la alerta «N entregadas con saldo · $…», que filtra exactamente esas órdenes;
+- sigue en el reporte de saldos por cobrar;
+- sigue en el indicador «por cobrar» del resumen de Caja.
+
+El indicador «por cobrar» que calcula el resumen de Caja en el servidor (`cash_sessions.indicators`) **excluía las órdenes entregadas** y sumaba de menos lo pendiente de cobro. Se corrigió. La pantalla de Caja no lo muestra hoy; el reporte de saldos ya era correcto. Al pagar el saldo, la orden sale de la alerta y sigue entregada.
+
+**Reapertura.** Revertir una entrega (solo administración) o pasar a «revisión por falla recurrente» la devuelve a Activas. El cambio queda en el historial y en la auditoría, y no se borra ningún evento.
+
+**Servidor:** `GET /api/tracking` admite:
+- `phase=activas|entregadas|todas|listas`; sin el parámetro, todas, como antes;
+- `balance=1`, solo con saldo pendiente.
+
+Devuelve además `phases`, con los contadores, las entregadas con saldo y su importe.
+
+**Pruebas:**
+- `local/tests/test_tracking_phases.py`;
+- navegador con 55 órdenes ficticias a 1366, 820, 390 y 320 px, con la altura constante de 1 a 55 resultados, las páginas, la alerta de cobro, la sincronización y el teclado.
