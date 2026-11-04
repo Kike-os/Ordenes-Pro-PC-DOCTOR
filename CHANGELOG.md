@@ -4,6 +4,19 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.235 — 2026-11-04 09:00 (UTC-05:00)
+
+Factores DATAFAST con estado real y confirmación administrativa
+
+### Nuevas funcionalidades
+
+- Factores DATAFAST: estados confirmado, verificado sin confirmar, pendiente, sin configurar e inactivo, con recuentos, filtro por estado e historial por factor
+- Factores DATAFAST: confirmación administrativa individual y por lotes con usuario, fecha y hora, y ventana de validación para completar o corregir un porcentaje sin borrar la versión anterior (migración 090, solo añade)
+
+### Errores corregidos
+
+- Factores DATAFAST: la pantalla mostraba siempre una leyenda fija de «Pendiente de confirmar» y «Sin configurar» aunque los 110 factores estaban vigentes; ahora cada factor muestra su estado real guardado
+
 ## v1.5.234 — 2026-11-03 21:48 (UTC-05:00)
 
 Recargo por pago con tarjeta de crédito trasladado al cliente en todos los cobros, como partida con IVA (migración 089, solo añade; aplicada en producción con respaldo previo)

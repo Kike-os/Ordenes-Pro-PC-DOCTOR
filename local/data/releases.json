@@ -8,6 +8,27 @@
   },
   "releases": [
     {
+      "version": "1.5.235",
+      "date": "2026-11-04T09:00:55-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Factores DATAFAST con estado real y confirmación administrativa",
+      "changes": {
+        "features": [
+          "Factores DATAFAST: estados confirmado, verificado sin confirmar, pendiente, sin configurar e inactivo, con recuentos, filtro por estado e historial por factor",
+          "Factores DATAFAST: confirmación administrativa individual y por lotes con usuario, fecha y hora, y ventana de validación para completar o corregir un porcentaje sin borrar la versión anterior (migración 090, solo añade)"
+        ],
+        "improvements": [],
+        "fixes": [
+          "Factores DATAFAST: la pantalla mostraba siempre una leyenda fija de «Pendiente de confirmar» y «Sin configurar» aunque los 110 factores estaban vigentes; ahora cada factor muestra su estado real guardado"
+        ],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Kike-os: «Sí, aplica y publica» (04/11/2026)"
+    },
+    {
       "version": "1.5.234",
       "date": "2026-11-03T21:48:43-05:00",
       "type": "patch",
