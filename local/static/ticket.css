@@ -106,3 +106,33 @@
 .ticket-viewer-bar button:focus-visible{outline:2px solid #93c5fd;outline-offset:2px}.ticket-viewer-zoom{min-width:56px;text-align:center}
 .ticket-viewer-stage{overflow:auto;padding:12px;cursor:grab;touch-action:pan-x pan-y}.ticket-viewer-stage img{display:block;width:100%;max-width:none;height:auto;margin:0 auto}
 @media print{.ticket-evidence,.ticket-viewer{display:none}}
+/* Seguimiento de repuestos (1.5.238), estilo mensajería. Vertical por defecto (teléfono); horizontal desde 640 px. El color nunca va solo:
+   completado = verde con ✓, actual = azul (o el tono de su situación) con punto, pendiente = gris vacío; cada etapa lleva su texto. */
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.ticket-parts{container-type:inline-size;position:relative;left:50%;width:min(760px,calc(100vw - 28px))!important;max-width:none!important;transform:translateX(-50%);--gris:#64748b;--azul:#3b82f6;--amarillo:#eab308;--naranja:#f97316;--verde:#22c55e;--rojo:#ef4444;box-sizing:border-box;width:100%;max-width:760px;margin:18px auto 0;padding:16px;border:1px solid #2c5488;border-radius:18px;background:linear-gradient(165deg,#12305a,#0a1830);color:#e3eeff;font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+.ticket-parts>h2{margin:0 0 12px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:#8fa9cc}
+.tp{display:grid;gap:10px;padding:12px;border:1px solid #2c548888;border-radius:14px;background:#0a1830cc}.tp+.tp{margin-top:10px}
+.tp>header{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 10px}.tp>header strong{font-size:15px;overflow-wrap:anywhere}
+.tp-state,.tp-alert{--t:var(--azul);display:inline-flex;align-items:center;gap:6px;padding:2px 10px;border:1px solid color-mix(in srgb,var(--t) 55%,transparent);border-radius:999px;background:color-mix(in srgb,var(--t) 16%,transparent);color:#fff;font-size:12px;font-weight:700}
+.tp-alert{margin:0;justify-self:start}
+:is(.tp-state,.tp-alert,.tp-steps li)[data-tone=amarillo]{--t:var(--amarillo)}:is(.tp-state,.tp-alert,.tp-steps li)[data-tone=naranja]{--t:var(--naranja)}:is(.tp-state,.tp-alert,.tp-steps li)[data-tone=rojo]{--t:var(--rojo)}
+:is(.tp-state,.tp-alert,.tp-steps li)[data-tone=azul]{--t:var(--azul)}
+.tp-steps{display:grid;gap:0;margin:0;padding:0;list-style:none}
+.tp-steps li{--t:var(--gris);position:relative;display:grid;grid-template-columns:22px 1fr auto;align-items:center;gap:10px;min-height:34px;color:#8fa9cc;font-size:13px}
+.tp-steps li::before{content:"";position:absolute;left:10px;top:-10px;height:20px;width:2px;background:#2c5488}.tp-steps li:first-child::before{display:none}
+.tp-steps li[data-state=done]{--t:var(--verde);color:#e3eeff}.tp-steps li[data-state=done]::before,.tp-steps li[data-state=current]::before{background:var(--verde)}
+.tp-steps li[data-state=current]{color:#fff;font-weight:700}
+.tp-steps i{position:relative;z-index:1;display:grid;place-items:center;width:22px;height:22px;border:2px solid var(--t);border-radius:50%;background:#0a1830;font-style:normal;font-size:12px;font-weight:800;color:#fff;box-sizing:border-box}
+.tp-steps li[data-state=done] i{background:var(--verde)}.tp-steps li[data-state=done] i::after{content:"✓"}
+.tp-steps li[data-state=current] i{background:var(--t);box-shadow:0 0 0 4px color-mix(in srgb,var(--t) 30%,transparent)}.tp-steps li[data-state=current] i::after{content:"";width:6px;height:6px;border-radius:50%;background:#fff}
+.tp-steps time{color:#8fa9cc;font-size:11.5px;font-weight:500}
+.tp-facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:6px 12px;margin:0}.tp-facts dt{font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:#8fa9cc}.tp-facts dd{margin:0;font-size:13px;font-weight:600}
+.tp-msgs{display:grid;gap:6px;margin:0;padding:0;list-style:none}.tp-msgs li{padding:8px 10px;border-left:3px solid var(--azul);border-radius:8px;background:#12305a}.tp-msgs time{font-size:11px;color:#8fa9cc}.tp-msgs p{margin:2px 0 0;font-size:13px;overflow-wrap:anywhere}
+@container (min-width:600px){
+ .tp-steps{grid-template-columns:repeat(8,minmax(0,1fr));align-items:start}
+ .tp-steps li{grid-template-columns:none;justify-items:center;gap:4px;min-height:0;text-align:center;font-size:11.5px}
+ .tp-steps li::before{left:calc(-50% + 11px);right:calc(50% + 11px);top:10px;width:auto;height:2px}
+ .tp-steps time{font-size:10.5px}
+}
+@media(prefers-reduced-motion:no-preference){.tp-steps li[data-state=current] i{transition:box-shadow .3s}}
+@media print{.ticket-parts{left:auto;transform:none;width:100%!important;background:#fff;color:#102744;border-color:#1c3a63}}

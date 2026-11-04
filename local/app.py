@@ -1639,6 +1639,14 @@ class Handler(BaseHTTPRequestHandler):
                 history=[dict(r) for r in c.execute("SELECT o.id,COALESCE(o.code,'OP-'||printf('%05d',o.id)) code,o.created_at,o.received_at,o.delivered_at,o.status status_code,s.label status,o.problem,o.findings,o.recommendations,COALESCE((SELECT name FROM users WHERE id=o.assigned_to),'Sin asignar') responsible FROM orders o JOIN statuses s ON s.code=o.status WHERE o.device_id=? ORDER BY o.id DESC LIMIT 200",(device['id'],))]
                 same=[dict(r) for r in c.execute("SELECT x.id,x.brand,x.model,x.serial,cl.name client,(SELECT COUNT(*) FROM orders o WHERE o.device_id=x.id) orders FROM devices x JOIN clients cl ON cl.id=x.client_id WHERE x.id!=? AND ?!='' AND lower(TRIM(COALESCE(x.serial,'')))=lower(?) ORDER BY x.id LIMIT 20",(device['id'],(device['serial'] or '').strip(),(device['serial'] or '').strip()))]
                 return self.reply(200,{'device':device,'history':history,'duplicates':same,'summary':{'orders':len(history),'delivered':sum(1 for h in history if h['status_code']=='entregado'),'open':sum(1 for h in history if h['status_code']!='entregado'),'first':history[-1]['created_at'] if history else None,'last':history[0]['created_at'] if history else None}})
+            parts_get=re.fullmatch(r'/api/orders/([0-9]+)/part-requests',path)
+            if parts_get:
+                # Pedidos de repuestos de la orden (panel del taller): etapas, historial, asociaciones y opciones para asociar sin duplicar.
+                import order_part_requests  # sin alias: «parts» ya es una variable en otras ramas de do_GET
+                if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
+                oid=int(parts_get[1])
+                if not c.execute('SELECT 1 FROM orders WHERE id=?',(oid,)).fetchone():return self.reply(404,{'error':'Orden no disponible.'})
+                return self.reply(200,{'rows':order_part_requests.listing(c,oid,reception_now().date().isoformat()),**order_part_requests.options(c)})
             followups_get=re.fullmatch(r'/api/orders/([0-9]+)/followups(?:/files/([0-9]+)(/meta|/thumb)?)?',path)
             if followups_get:
                 import order_followups,quotes as quotes_mod  # alias: un «import quotes» aquí ocultaría el módulo en todo do_GET
@@ -4166,6 +4174,20 @@ class Handler(BaseHTTPRequestHandler):
                     pid=c.execute('INSERT INTO order_photos(order_id,position,is_main,mime,size,data,created_by,created_at) VALUES (?,?,?,?,?,?,?,?)',(oid,position,1 if main else 0,'image/jpeg',len(content),base64.b64encode(content).decode('ascii'),user['id'],reception_now().isoformat(timespec='seconds'))).lastrowid
                     audit(c,user['id'],'order_photo_added',oid)
                     return self.reply(201,{'ok':True,'id':pid})
+                parts_post=re.fullmatch(r'/api/orders/([0-9]+)/part-requests(?:/([0-9]+))?',path)
+                if parts_post:
+                    import order_part_requests
+                    oid=int(parts_post[1]);now=reception_now();action=str(data.get('action',''))
+                    try:
+                        if not parts_post[2]:result={'id':order_part_requests.create(c,oid,data,user,now)}
+                        else:
+                            handler={'update':order_part_requests.update,'advance':order_part_requests.advance,'situation':order_part_requests.set_situation}.get(action)
+                            if not handler:return self.reply(400,{'error':'Acción inválida.'})
+                            result=handler(c,oid,int(parts_post[2]),data,user,now)
+                        c.execute('UPDATE orders SET updated_at=?,revision=revision+1 WHERE id=?',(now.isoformat(timespec='microseconds'),oid))
+                        audit(c,user['id'],'order_part_'+(action or 'create'),oid)
+                    except order_part_requests.PartError as error:c.rollback();return self.reply(error.status,{'error':str(error),'fields':error.fields})
+                    c.commit();return self.reply(200,{'ok':True,**result})
                 evidence_post=re.fullmatch(r'/api/orders/([0-9]+)/(uploads|followups/draft|followups/files/([0-9]+))',path)
                 if evidence_post or path=='/api/followups/settings':
                     import order_evidence,order_followups

@@ -142,6 +142,11 @@ def create(c, oid, data, user, now):
         if not owner:
             raise FollowupError('Elige un responsable activo del taller.', 400, {'next_owner_id': 'Responsable no válido.'})
     reminder = 1 if str(data.get('next_reminder', '')) in ('1', 'true') and str(data.get('next_date', '') or '').strip() else 0
+    part = None
+    if str(data.get('part_request_id', '') or '').isdigit():
+        part = c.execute('SELECT id FROM order_part_requests WHERE id=? AND order_id=?', (int(data['part_request_id']), oid)).fetchone()
+        if not part:
+            raise FollowupError('El repuesto no pertenece a esta orden.', 400, {'part_request_id': 'No válido.'})
     visible = 1 if str(data.get('client_visible', '')) in ('1', 'true') and (message or recommendation) else 0
     next_action = _text(data.get('next_action'), 200)
     next_date = str(data.get('next_date', '') or '').strip()
@@ -182,9 +187,10 @@ def create(c, oid, data, user, now):
     order_workspace.event(c, oid, user['id'], now, 'follow_up', summary[:2000])
     history_id = c.execute('SELECT MAX(id) FROM order_history WHERE order_id=?', (oid,)).fetchone()[0]
     fid = c.execute('INSERT INTO order_followups(order_id,history_id,kind,internal_note,client_message,recommendation,client_visible,status_code,next_action,next_date,'
-                    'priority,quote_id,corrects_id,request_key,created_by,created_at,observations,diagnosis,next_owner_id,next_reminder) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+                    'priority,quote_id,corrects_id,request_key,created_by,created_at,observations,diagnosis,next_owner_id,next_reminder,part_request_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
                     (oid, history_id, kind, internal, message, recommendation, visible, order['status'], next_action, next_date, priority, quote['id'] if quote else None,
-                     corrects['id'] if corrects else None, key or None, user['id'], stamp(now), observations, diagnosis, owner['id'] if owner else None, reminder)).lastrowid
+                     corrects['id'] if corrects else None, key or None, user['id'], stamp(now), observations, diagnosis, owner['id'] if owner else None, reminder,
+                     part['id'] if part else None)).lastrowid
     try:
         order_evidence.attach(c, oid, fid, uploads, user, now)
     except order_evidence.EvidenceError as error:
