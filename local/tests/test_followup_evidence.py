@@ -160,6 +160,8 @@ class FollowupEvidenceTests(unittest.TestCase):
         tokens = [self.upload(post, oid, blob(JPEG, 1000), 'f%d.jpg' % i)[1] for i in range(4)]
         four = self.save(post, oid, [{'upload': t, 'visible': ''} for t in tokens], 'evidencia-cuatro-0001')
         self.assertEqual(four['status'], 400);self.assertIn('como máximo 3', four['body']['error'])
+        for wrong in ('0', '11', 'tres'):
+            self.assertEqual(post('/api/followups/settings', max_files=wrong)['status'], 400, wrong)
         self.assertEqual(post('/api/followups/settings', max_files='4')['status'], 200)
         self.assertEqual(self.save(post, oid, [{'upload': t, 'visible': ''} for t in tokens], 'evidencia-cuatro-0002')['status'], 201)
         self.assertEqual(self.request('/api/orders/%d/followups' % oid, cookie=cookie)['body']['limits']['max_files'], 4)

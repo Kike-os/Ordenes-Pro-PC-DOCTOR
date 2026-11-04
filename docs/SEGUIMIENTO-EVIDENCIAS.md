@@ -20,7 +20,7 @@
 
 **Formatos y límites:**
 - Se aceptan JPG, JPEG, PNG, WEBP y PDF, hasta **10 MiB (10.485.760 bytes)** por archivo.
-- El máximo es de 3 archivos por seguimiento. Administración puede cambiarlo de 1 a 10 con `POST /api/followups/settings`.
+- El máximo es de 3 archivos por seguimiento. Administración puede cambiarlo de 1 a 10 desde «Agregar seguimiento» › Evidencias › **Cambiar límite** (1.5.239). El navegador y el servidor rechazan valores fuera de rango.
 
 **Validación:**
 - El tipo real se comprueba por los primeros bytes, no por el nombre, primero en el navegador y luego en el servidor.

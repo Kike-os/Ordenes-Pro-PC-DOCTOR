@@ -3452,6 +3452,13 @@ async function addOrderFollowUp(id,preset={}){ofxIcons();let data;try{data=await
  const vis=el('label',undefined,'inv-cf ofx-switch'),visC=el('input');asSwitch(visC).type='checkbox';visC.name='client_visible';vis.append(visC,el('span','Publicar este mensaje en el seguimiento público de la orden'));s3.append(vis);
  // 4 · Evidencias.
  const s4=section(4,'Evidencias','image','ofx-ev','Hasta '+lim.max_files+' archivos de '+ofxSize(lim.max_bytes)+' cada uno · JPG, PNG, WEBP o PDF. El original se guarda sin reducir.');
+ const limText=()=>'Hasta '+lim.max_files+' archivo'+(lim.max_files===1?'':'s')+' de '+ofxSize(lim.max_bytes)+' cada uno · JPG, PNG, WEBP o PDF. El original se guarda sin reducir.';
+ // Límite de evidencias por seguimiento (1 a 10): solo administración; el servidor lo vuelve a validar y lo aplica a los seguimientos nuevos.
+ if(admin()){const change=button('Cambiar límite',()=>{const d=smallDialog('Límite de evidencias'),f=el('form',undefined,'ofx-prompt'),inp=el('input'),m=el('p','','inv-form-message'),ok=el('button','Guardar límite','primary');
+   inp.type='number';inp.min='1';inp.max='10';inp.required=true;inp.value=String(lim.max_files);inp.inputMode='numeric';inp.setAttribute('aria-label','Máximo de archivos por seguimiento');m.setAttribute('role','alert');ok.type='submit';
+   f.append(el('p','Máximo de archivos por seguimiento, entre 1 y 10. Cada archivo sigue limitado a '+ofxSize(lim.max_bytes)+'.','ofx-note'),inp,m,invDialogActions(d,ok));d.append(f);inp.focus();inp.select();
+   f.onsubmit=async e=>{e.preventDefault();m.textContent='';ok.disabled=true;try{const r=await api('/api/followups/settings',{max_files:inp.value});lim.max_files=r.max_files;s4.querySelector('.ofx-note').textContent=limText();paint();d.close();toast('Límite de evidencias: '+r.max_files+' por seguimiento.','success');}
+    catch(error){m.textContent=error.message;ok.disabled=false;}};},'oh-more ofx-limit');change.setAttribute('aria-label','Cambiar el límite de evidencias por seguimiento');s4.querySelector('h3').append(change);}
  const pick=el('input');pick.type='file';pick.multiple=true;pick.accept='image/jpeg,image/png,image/webp,application/pdf';pick.className='sr-only';pick.id='ofx-files-'+id;
  const drop=el('label',undefined,'ofx-drop');drop.htmlFor=pick.id;drop.tabIndex=0;drop.setAttribute('role','button');drop.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();pick.click();}});drop.append(pick,invIcon('upload'),el('strong','Agregar fotografías o PDF'),el('small','Pulsa aquí o arrastra los archivos'));s4.append(drop);
  const list=el('ul',undefined,'ofx-files');list.setAttribute('aria-live','polite');s4.append(list);const items=[];let saved=false;

@@ -10220,3 +10220,6 @@ body[data-page=dashboard] .maintenance-dialog.inv-sheet.inv-dialog.opr-dialog{wi
 body[data-page=dashboard] .maintenance-dialog.opr-dialog>.dialog-heading{position:static}
 body[data-page=dashboard] .maintenance-dialog.opr-dialog>form.opr-form{display:grid;grid-template-rows:minmax(0,1fr) auto;gap:0;min-height:0;margin:0}
 @media(max-width:600px){body[data-page=dashboard] .maintenance-dialog.inv-sheet.inv-dialog.opr-dialog{width:calc(100vw - 16px);max-width:calc(100vw - 16px);height:calc(100dvh - 16px);max-height:calc(100dvh - 16px)}.opr-acts .inv-btn{flex:1 1 calc(50% - 4px);justify-content:center}}
+
+.ofx-sec>h3 .ofx-limit{margin-left:auto;font-size:12px}
+.ofx-prompt input[type=number]{width:100%;max-width:140px}
