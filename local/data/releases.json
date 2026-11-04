@@ -8,6 +8,32 @@
   },
   "releases": [
     {
+      "version": "1.5.237",
+      "date": "2026-11-04T13:22:51-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "«Agregar seguimiento» profesional y evidencias de 10 MB",
+      "changes": {
+        "features": [
+          "Seguimiento: evidencias de hasta 10 MB (JPG, PNG, WEBP y PDF) guardadas por partes sin reducir el original, con barra de progreso, reintentos, miniatura aparte y visor con zoom",
+          "Seguimiento: mostrar u ocultar al cliente y retirar evidencias con motivo y registro; borrador del seguimiento; diagnóstico, observaciones, responsable y recordatorio de la próxima acción",
+          "Enlace público: evidencias autorizadas con visor del original"
+        ],
+        "improvements": [
+          "Seguimiento: ventana «Agregar seguimiento» rediseñada con cabecera de orden, estado y técnico, secciones diferenciadas (general, interna, cliente, evidencias y próximas acciones), desplazamiento interno y acciones siempre visibles, adaptable a computadora, tableta y teléfono"
+        ],
+        "fixes": [
+          "Seguimiento: la vista detallada del historial se conserva al actualizar la ficha"
+        ],
+        "security": [
+          "Seguimiento: tipo real del archivo y SHA-256 verificados en el servidor; el enlace público solo entrega evidencias visibles y no retiradas de su orden; ADI en modo interno para los campos del taller"
+        ],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Kike-os: «Sí, publica y prueba la carga» (04/11/2026)"
+    },
+    {
       "version": "1.5.236",
       "date": "2026-11-04T09:01:11-05:00",
       "type": "patch",

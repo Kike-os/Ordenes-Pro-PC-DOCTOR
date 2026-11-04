@@ -4,6 +4,28 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.237 — 2026-11-04 13:22 (UTC-05:00)
+
+«Agregar seguimiento» profesional y evidencias de 10 MB
+
+### Nuevas funcionalidades
+
+- Seguimiento: evidencias de hasta 10 MB (JPG, PNG, WEBP y PDF) guardadas por partes sin reducir el original, con barra de progreso, reintentos, miniatura aparte y visor con zoom
+- Seguimiento: mostrar u ocultar al cliente y retirar evidencias con motivo y registro; borrador del seguimiento; diagnóstico, observaciones, responsable y recordatorio de la próxima acción
+- Enlace público: evidencias autorizadas con visor del original
+
+### Mejoras realizadas
+
+- Seguimiento: ventana «Agregar seguimiento» rediseñada con cabecera de orden, estado y técnico, secciones diferenciadas (general, interna, cliente, evidencias y próximas acciones), desplazamiento interno y acciones siempre visibles, adaptable a computadora, tableta y teléfono
+
+### Errores corregidos
+
+- Seguimiento: la vista detallada del historial se conserva al actualizar la ficha
+
+### Actualizaciones de seguridad
+
+- Seguimiento: tipo real del archivo y SHA-256 verificados en el servidor; el enlace público solo entrega evidencias visibles y no retiradas de su orden; ADI en modo interno para los campos del taller
+
 ## v1.5.236 — 2026-11-04 09:01 (UTC-05:00)
 
 Inventario operativo limpio: series por casos y vistas separadas
