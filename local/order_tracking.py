@@ -53,15 +53,30 @@ def lookup(c,token):
         updates=[dict(u,at=stamp(u['at'])) for u in order_followups.public_updates(c,row['id'])]
     except Exception:
         updates=[]  # base anterior al centro de seguimiento
+    try:
+        import order_evidence
+        files=order_evidence.public_files(c,row['id'])
+    except Exception:
+        files=[]  # base anterior a las evidencias por partes
     return {'id':row['id'],'code':row['code'] or 'OP-%05d'%row['id'],'status':row['status'],'status_label':row['status_label'],'received':received,'updated':stamp(row['updated_at']),
-            'device':' · '.join(filter(None,[DEVICE_TYPES.get(kind,''),' '.join(filter(None,[row['brand'],row['model']]))])),'updates':updates}
+            'device':' · '.join(filter(None,[DEVICE_TYPES.get(kind,''),' '.join(filter(None,[row['brand'],row['model']]))])),'updates':updates,'files':files}
 
 
 HEAD='<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><meta name="robots" content="noindex,nofollow"><title>%s | PC-DOCTOR S.A.</title><link rel="icon" href="/favicon.ico?v=2" sizes="48x48"><link rel="stylesheet" href="/static/tracking.css"></head><body><main class="tracking-page"><header><img src="/static/logo-original.png" alt="PC-DOCTOR S.A." width="150"><p>%s</p></header>'
 
 
 def public_page(data,token=''):
-    return card_page(data,'/s/'+token+'/qr.svg' if token else '',True)
+    return card_page(dict(data,token=token),'/s/'+token+'/qr.svg' if token else '',True)
+
+
+def evidence_html(data):
+    """Evidencias autorizadas en el enlace público: miniatura y, al pulsarla, el original (lo arma ticket.js por partes)."""
+    if not data.get('files') or not data.get('token'):return ''
+    e=html.escape;base='/s/'+data['token']+'/files/'
+    items=''.join('<li><button type="button" class="ticket-ev" data-file="%s%d" data-mime="%s" data-name="%s">%s<span>%s</span></button></li>'%(
+        base,f['id'],e(f['mime']),e(f['name']),('<img src="%s%d/thumb" alt="" loading="lazy" width="96" height="96">'%(base,f['id'])) if f['thumb'] else '<b aria-hidden="true">PDF</b>' if f['mime']=='application/pdf' else '<b aria-hidden="true">IMG</b>',
+        e(f['name'])) for f in data['files'])
+    return '</dl><section class="ticket-evidence" aria-label="Evidencias del servicio"><h2>Evidencias del servicio</h2><ul>'+items+'</ul></section><dl class="ticket-facts" hidden>'
 
 
 # Tarjeta Digital de Seguimiento Técnico: ticket de dos secciones (datos de la orden arriba; QR y código de barras abajo).
@@ -88,6 +103,7 @@ def card(data,qr_src,public):
     if data.get('updates'):
         rows+='</dl><section class="ticket-updates" aria-label="Novedades del servicio"><h2>Novedades del servicio</h2><ol>'+''.join(
             '<li><time>%s</time><strong>%s</strong><p>%s</p></li>'%(e(u['at']),e(u['label']),e(u['message']).replace('\n','<br>')) for u in data['updates'])+'</ol></section><dl class="ticket-facts" hidden>'
+    if public:rows+=evidence_html(data)
     code=data['code']
     try:bars=barcode128.svg(code,color='#0b1526',background='#ffffff')
     except barcode128.BarcodeError:bars=''

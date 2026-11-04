@@ -89,3 +89,20 @@
 .ticket-page main{padding:16px 12px 28px}
 @media(max-width:360px){.ticket-top{padding:14px 14px 12px}.ticket-bottom{padding:12px 14px 14px}.ticket-logo{width:112px}.ticket-facts{grid-template-columns:1fr}.ticket-qr{width:136px;height:136px}}
 @media print{.ticket-facts svg{color:#1c4f8f}}
+/* Novedades y evidencias autorizadas del enlace público (1.5.237). El original se abre en un visor con zoom; los PDF, en otra pestaña. */
+.ticket-updates,.ticket-evidence{margin:14px 0 0;padding:12px 0 0;border-top:1px solid #2c548866}
+.ticket-updates h2,.ticket-evidence h2{margin:0 0 8px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#8fa9cc}
+.ticket-updates ol{display:grid;gap:8px;margin:0;padding:0;list-style:none}.ticket-updates li{display:grid;gap:2px;padding:8px 10px;border-radius:10px;background:#0a1830b3}
+.ticket-updates time{font-size:11px;color:#8fa9cc}.ticket-updates strong{font-size:13px}.ticket-updates p{margin:0;font-size:13px;overflow-wrap:anywhere}
+.ticket-evidence ul{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:8px;margin:0;padding:0;list-style:none}
+.ticket-ev{display:grid;gap:4px;width:100%;padding:4px;border:1px solid #2c5488;border-radius:10px;background:#0a1830;color:#e3eeff;font:inherit;font-size:11px;cursor:pointer;text-align:center}
+.ticket-ev:hover{border-color:#5aa9e6}.ticket-ev:focus-visible{outline:2px solid #93c5fd;outline-offset:2px}.ticket-ev[aria-busy=true]{opacity:.6;cursor:progress}
+.ticket-ev img,.ticket-ev b{display:grid;place-items:center;width:100%;height:auto;aspect-ratio:1;object-fit:cover;border-radius:7px;background:#12305a;color:#8fa9cc}
+.ticket-ev span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ticket-viewer{position:fixed;inset:0;z-index:50;display:grid;grid-template-rows:auto 1fr;background:#030812f2}
+.ticket-viewer-bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 12px;background:#0c1f3d;color:#e3eeff;font:600 13px Inter,system-ui,sans-serif}
+.ticket-viewer-bar strong{flex:1 1 160px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ticket-viewer-bar button{min-width:44px;min-height:40px;padding:0 12px;border:1px solid #2c5488;border-radius:9px;background:#12305a;color:#fff;font:inherit;cursor:pointer}
+.ticket-viewer-bar button:focus-visible{outline:2px solid #93c5fd;outline-offset:2px}.ticket-viewer-zoom{min-width:56px;text-align:center}
+.ticket-viewer-stage{overflow:auto;padding:12px;cursor:grab;touch-action:pan-x pan-y}.ticket-viewer-stage img{display:block;width:100%;max-width:none;height:auto;margin:0 auto}
+@media print{.ticket-evidence,.ticket-viewer{display:none}}

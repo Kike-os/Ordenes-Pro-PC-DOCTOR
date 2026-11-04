@@ -130,10 +130,18 @@ def create(c, oid, data, user, now):
     if kind not in KINDS:
         raise FollowupError('Elige el tipo de seguimiento.', 400, {'kind': 'Tipo no válido.'})
     internal = str(data.get('internal_note', '') or '').strip()[:2000]
+    observations = str(data.get('observations', '') or '').strip()[:1500]
+    diagnosis = str(data.get('diagnosis', '') or '').strip()[:1500]
     message = str(data.get('client_message', '') or '').strip()[:1500]
     recommendation = str(data.get('recommendation', '') or '').strip()[:800]
-    if not internal and not message and not recommendation:
+    if not internal and not message and not recommendation and not diagnosis and not observations:
         raise FollowupError('Escribe la descripción técnica o el mensaje para el cliente.', 400, {'internal_note': 'Obligatorio.'})
+    owner = None
+    if str(data.get('next_owner_id', '') or '').isdigit():
+        owner = c.execute("SELECT id FROM users WHERE id=? AND active=1 AND role IN ('administrador','tecnico')", (int(data['next_owner_id']),)).fetchone()
+        if not owner:
+            raise FollowupError('Elige un responsable activo del taller.', 400, {'next_owner_id': 'Responsable no válido.'})
+    reminder = 1 if str(data.get('next_reminder', '')) in ('1', 'true') and str(data.get('next_date', '') or '').strip() else 0
     visible = 1 if str(data.get('client_visible', '')) in ('1', 'true') and (message or recommendation) else 0
     next_action = _text(data.get('next_action'), 200)
     next_date = str(data.get('next_date', '') or '').strip()
@@ -156,17 +164,32 @@ def create(c, oid, data, user, now):
         corrects = c.execute('SELECT id FROM order_followups WHERE id=? AND order_id=?', (int(data['corrects_id']), oid)).fetchone()
         if not corrects:
             raise FollowupError('El seguimiento a corregir no pertenece a esta orden.', 400)
-    files = _files(data.get('files', '[]'))
+    import order_evidence
+    try:
+        items = json.loads(data.get('files', '[]')) if isinstance(data.get('files', '[]'), str) else (data.get('files') or [])
+    except ValueError:
+        raise FollowupError('Adjuntos no válidos.', 400, {'files': 'No válidos.'})
+    if not isinstance(items, list):
+        raise FollowupError('Adjuntos no válidos.', 400, {'files': 'No válidos.'})
+    uploads = order_evidence.uploads_in(items)
+    if len(items) > order_evidence.max_files(c):
+        raise FollowupError('Adjunta como máximo %d archivos por seguimiento.' % order_evidence.max_files(c), 400, {'files': 'Demasiados archivos.'})
+    files = _files([i for i in items if not (isinstance(i, dict) and i.get('upload'))])
     label = KINDS[kind][0]
-    summary = label + (': ' + internal if internal else (': ' + (message or recommendation)))
+    summary = label + (': ' + (internal or diagnosis or observations) if (internal or diagnosis or observations) else (': ' + (message or recommendation)))
     if corrects:
         summary = 'Corrección del seguimiento #%d · %s' % (corrects['id'], summary)
     order_workspace.event(c, oid, user['id'], now, 'follow_up', summary[:2000])
     history_id = c.execute('SELECT MAX(id) FROM order_history WHERE order_id=?', (oid,)).fetchone()[0]
     fid = c.execute('INSERT INTO order_followups(order_id,history_id,kind,internal_note,client_message,recommendation,client_visible,status_code,next_action,next_date,'
-                    'priority,quote_id,corrects_id,request_key,created_by,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+                    'priority,quote_id,corrects_id,request_key,created_by,created_at,observations,diagnosis,next_owner_id,next_reminder) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
                     (oid, history_id, kind, internal, message, recommendation, visible, order['status'], next_action, next_date, priority, quote['id'] if quote else None,
-                     corrects['id'] if corrects else None, key or None, user['id'], stamp(now))).lastrowid
+                     corrects['id'] if corrects else None, key or None, user['id'], stamp(now), observations, diagnosis, owner['id'] if owner else None, reminder)).lastrowid
+    try:
+        order_evidence.attach(c, oid, fid, uploads, user, now)
+    except order_evidence.EvidenceError as error:
+        raise FollowupError(str(error), error.status, error.fields)
+    order_evidence.draft_discard(c, oid, user)
     for f in files:
         c.execute('INSERT INTO order_followup_files(followup_id,order_id,name,mime,size,sha256,visible_to_client,data,created_by,created_at) VALUES (?,?,?,?,?,?,?,?,?,?)',
                   (fid, oid, f['name'], f['mime'], f['size'], f['sha256'], f['visible'], f['data'], user['id'], stamp(now)))
@@ -179,7 +202,7 @@ def _files(raw):
         items = json.loads(raw) if isinstance(raw, str) else (raw or [])
     except ValueError:
         raise FollowupError('Adjuntos no válidos.', 400, {'files': 'No válidos.'})
-    if not isinstance(items, list) or len(items) > MAX_FILES:
+    if not isinstance(items, list) or len(items) > 10:
         raise FollowupError('Adjunta como máximo %d archivos por seguimiento.' % MAX_FILES, 400, {'files': 'Demasiados archivos.'})
     out = []
     for item in items:
@@ -204,16 +227,23 @@ def listing(c, oid):
     """Seguimientos de la orden con sus evidencias (sin contenido) y sus mensajes."""
     rows = [dict(r) for r in c.execute("SELECT f.*,COALESCE(u.name,'') actor,q.code quote_code FROM order_followups f LEFT JOIN users u ON u.id=f.created_by "
                                        "LEFT JOIN quotes q ON q.id=f.quote_id WHERE f.order_id=? ORDER BY f.id DESC", (oid,))]
-    files = {}
-    for r in c.execute('SELECT id,followup_id,name,mime,size,visible_to_client,created_at FROM order_followup_files WHERE order_id=? ORDER BY id', (oid,)):
-        files.setdefault(r['followup_id'], []).append(dict(r))
+    import order_evidence
+    files, state = {}, order_evidence.states(c, oid)
+    for r in c.execute("SELECT id,followup_id,name,mime,size,sha256,visible_to_client,created_at,storage,thumb!='' has_thumb FROM order_followup_files WHERE order_id=? ORDER BY id", (oid,)):
+        st = state[r['id']]
+        files.setdefault(r['followup_id'], []).append(dict(r, visible=bool(st['visible']), retired=bool(st['retired']), retired_reason=st['reason'], changed_at=st['changed_at'],
+                                                           changed_by=st['changed_by'], has_thumb=bool(r['has_thumb'])))
     messages = [dict(r, actor=r['actor'] or '', sources=_loads(r['sources']), status_label=message_label(r['channel'], r['status']))
                 for r in c.execute("SELECT m.id,m.followup_id,m.channel,m.template,m.recipient,m.subject,m.body,m.status,m.provider_id,m.error,m.attempts,m.sources,"
                                    "m.created_at,m.updated_at,u.name actor FROM order_messages m LEFT JOIN users u ON u.id=m.created_by WHERE m.order_id=? ORDER BY m.id DESC", (oid,))]
     for r in rows:
         r.update(kind_label=KINDS.get(r['kind'], (r['kind'],))[0], group=KINDS.get(r['kind'], ('', 'tecnico'))[1], priority_label=PRIORITIES.get(r['priority'], r['priority']),
                  files=files.get(r['id'], []), messages=[m for m in messages if m['followup_id'] == r['id']])
-    return {'followups': rows, 'messages': messages, 'kinds': {k: {'label': v[0], 'group': v[1], 'status': v[2]} for k, v in KINDS.items()}, 'priorities': PRIORITIES,
+    owners = {r[0]: r[1] for r in c.execute('SELECT id,name FROM users')}
+    for r in rows:
+        r['next_owner'] = owners.get(r.get('next_owner_id'), '')
+    return {'followups': rows, 'messages': messages, 'limits': order_evidence.limits(c),
+            'staff': [dict(r) for r in c.execute("SELECT id,name,role FROM users WHERE active=1 AND role IN ('administrador','tecnico') ORDER BY name")], 'kinds': {k: {'label': v[0], 'group': v[1], 'status': v[2]} for k, v in KINDS.items()}, 'priorities': PRIORITIES,
             'templates': TEMPLATES, 'template_for_kind': TEMPLATE_FOR_KIND, 'sources': sources(c, oid), 'whatsapp': whatsapp_status()}
 
 

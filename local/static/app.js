@@ -2518,13 +2518,13 @@ function orderTrackingSection(order){
 const historySeen=new Map();let historyTimer=null,historyCollapsed=false;const HISTORY_RECENT=5;
 function orderHistoryPanel(order){
  const panel=el('section',undefined,'workspace-section order-history');panel.id='order-history';panel.tabIndex=-1;panel.setAttribute('aria-labelledby','order-history-title');
- const state={filter:'all',all:false,rows:[],base:[],msgs:[],fu:new Map(),q:'',detail:false},seen=historySeen.get(order.id),known=seen||new Set();let first=!seen;historySeen.set(order.id,known);
+ const state={filter:'all',all:false,rows:[],base:[],msgs:[],fu:new Map(),q:'',detail:(()=>{try{return sessionStorage.getItem('ordenes-pro:oh-detail')==='1';}catch{return false;}})()},seen=historySeen.get(order.id),known=seen||new Set();let first=!seen;historySeen.set(order.id,known);
  const head=el('header',undefined,'oh-head'),mark=el('span',undefined,'track-icon oh-mark'),titles=el('div',undefined,'oh-titles'),title=el('h2','Historial de la Orden'),meta=el('div',undefined,'oh-meta'),count=el('span','','oh-chip'),sync=el('span','','tracking-status');title.id='order-history-title';mark.append(systemIcon('M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8 M3 3v5h5 M12 7v5l4 2'));titles.append(title,el('p','Registro de estados, intervenciones y seguimiento técnico'));sync.setAttribute('role','status');meta.append(el('span',order.code,'oh-chip oh-code'),count,sync);
  const body=el('div',undefined,'oh-body'),toggle=button('',()=>{historyCollapsed=!historyCollapsed;paintCollapse();},'oh-toggle');body.id='order-history-body';toggle.setAttribute('aria-controls',body.id);head.append(mark,titles,meta,toggle);
  const bar=el('div',undefined,'track-filters'),list=el('ol',undefined,'oh-list'),note=el('p','','track-note'),foot=el('footer',undefined,'oh-foot'),more=button('',()=>{state.all=!state.all;paint();},'oh-more');bar.setAttribute('role','group');bar.setAttribute('aria-label','Filtrar el historial de la orden');
  for(const[key,label]of [['all','Todos'],['status','Estados'],['tecnico','Técnicos'],['autorizacion','Autorizaciones'],['comunicacion','Comunicación'],['incidencia','Incidencias'],['pago','Pagos']]){const chip=button(label,()=>{state.filter=key;state.all=false;paint();},'track-filter');chip.dataset.filter=key;bar.append(chip);}
  const search=el('input');search.type='search';search.placeholder='Buscar en el historial';search.className='oh-search';search.setAttribute('aria-label','Buscar en el historial');search.addEventListener('input',()=>{state.q=search.value.trim().toLowerCase();state.all=false;paint();});
- const detailL=el('label',undefined,'inv-cf oh-detail-toggle'),detailC=el('input');asSwitch(detailC).type='checkbox';detailC.addEventListener('change',()=>{state.detail=detailC.checked;paint();});detailL.append(detailC,el('span','Vista detallada'));bar.append(search,detailL);
+ const detailL=el('label',undefined,'inv-cf oh-detail-toggle'),detailC=el('input');asSwitch(detailC).type='checkbox';detailC.checked=state.detail;detailC.addEventListener('change',()=>{state.detail=detailC.checked;try{sessionStorage.setItem('ordenes-pro:oh-detail',state.detail?'1':'0');}catch{}paint();});detailL.append(detailC,el('span','Vista detallada'));bar.append(search,detailL);
  // Grupo de cada evento: el del seguimiento (si lo tiene) o el del historial (estado, nota o incidencia).
  const groupOf=row=>{if(row.msg)return 'comunicacion';const fu=state.fu.get(row.id);if(fu)return fu.group;if(row.event==='payment')return 'pago';const g=activityKind(row).group;return g==='note'?'tecnico':g==='incident'?'incidencia':g;};
  const textOf=row=>{if(row.msg)return [row.msg.body,row.msg.status_label,row.msg.actor,row.msg.recipient,OF_CHANNEL[row.msg.channel]].join(' ').toLowerCase();const fu=state.fu.get(row.id);return [row.comment,row.status_label,row.actor,fu&&fu.kind_label,fu&&fu.internal_note,fu&&fu.client_message,fu&&fu.recommendation,fu&&fu.next_action].filter(Boolean).join(' ').toLowerCase();};
@@ -2547,8 +2547,10 @@ function orderHistoryPanel(order){
     if(state.detail){if(fu.internal_note){const p=el('p',undefined,'of-internal');p.append(el('b','Interno: '),document.createTextNode(fu.internal_note));main.append(p);}
      if(fu.client_message){const p=el('p',undefined,'of-client');p.append(el('b','Para el cliente: '),document.createTextNode(fu.client_message));main.append(p);}
      if(fu.recommendation){const p=el('p',undefined,'of-client');p.append(el('b','Recomendación: '),document.createTextNode(fu.recommendation));main.append(p);}
-     if(fu.next_action||fu.next_date)main.append(el('p','Próxima acción: '+[fu.next_action,fu.next_date?dashboardDate(fu.next_date):''].filter(Boolean).join(' · '),'oh-detail'));
-     if(fu.files.length){const fl=el('div',undefined,'of-file-links');for(const f of fu.files){const a=el('a',f.name+(f.visible_to_client?' (visible)':' (interno)'));a.href='/api/orders/'+order.id+'/followups/files/'+f.id;a.target='_blank';a.rel='noopener';fl.append(a);}main.append(fl);}
+     if(fu.next_action||fu.next_date)main.append(el('p','Próxima acción: '+[fu.next_action,fu.next_date?dashboardDate(fu.next_date):'',fu.next_owner?'responsable: '+fu.next_owner:'',fu.next_reminder?'con recordatorio':''].filter(Boolean).join(' · '),'oh-detail'));
+     if(fu.diagnosis){const p=el('p',undefined,'of-internal');p.append(el('b','Diagnóstico: '),document.createTextNode(fu.diagnosis));main.append(p);}
+     if(fu.observations){const p=el('p',undefined,'of-internal');p.append(el('b','Observaciones: '),document.createTextNode(fu.observations));main.append(p);}
+     if(fu.files.length)main.append(ofxSavedFiles(order,fu,()=>showOrderDetail(order.id)));
      for(const m of fu.messages)main.append(el('p',OF_CHANNEL[m.channel]+' · '+m.status_label+(m.error?' · '+m.error:'')+' · '+formatOrderDate(m.updated_at),'oh-detail'));}
     else{const t=fu.internal_note||fu.client_message||fu.recommendation;if(t)main.append(el('span',t.slice(0,140)+(t.length>140?'…':''),'oh-detail'));}
     const ra=el('div',undefined,'of-row-acts');ra.append(button('Preparar mensaje',()=>orderMessageComposer(order.id,fu.id),'oh-more'),button('Corregir',()=>addOrderFollowUp(order.id,{kind:fu.kind,corrects_id:fu.id}),'oh-more'));main.append(ra);}
@@ -3394,33 +3396,123 @@ const OF_LOOK={tecnico:['M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-
  autorizacion:['M9 12l2 2 4-4 M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9 9 4.03 9 9z','#F5B544'],comunicacion:['M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z','#A78BFA'],
  incidencia:['M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z M12 9v4 M12 17h.01','#F87171'],pago:['M2 7h20v10H2z M12 12h.01 M6 12h.01 M18 12h.01','#34D399']};
 const OF_CHANNEL={whatsapp:'WhatsApp Business',whatsapp_manual:'WhatsApp (manual)',correo:'Correo',copia:'Texto copiado'};
-async function addOrderFollowUp(id,preset={}){let data;try{data=await api('/api/orders/'+id+'/followups');}catch(error){notify(error.message);return;}
- const dialog=invDialog('Agregar seguimiento · '+data.order.code,true);dialog.classList.add('of-dialog');dialog.dataset.orderId=String(id);const{form,msg,field,fail,clear}=invForm('bank-form inv-sheet-form of-form');dialog.append(form);
- const head=el('div',undefined,'of-meta');for(const[k,v]of [['Fecha y hora',new Date().toLocaleString('es-EC',{timeZone:'America/Guayaquil'})],['Técnico responsable',currentUser?.name||'—'],['Estado actual de la orden',data.order.status_label]]){const x=el('div');x.append(el('small',k),el('strong',v));head.append(x);}form.append(head);
- const grid=el('div',undefined,'fx-form-grid');form.append(grid);
- const kind=field('kind','Tipo de seguimiento',{options:[['','Selecciona…'],...Object.entries(data.kinds).map(([k,v])=>[k,v.label])],into:grid,required:true,value:preset.kind||''});
- field('priority','Prioridad',{options:Object.entries(data.priorities),into:grid,value:'normal'});
- if(data.quotes.length)field('quote_id','Presupuesto relacionado',{options:[['','Ninguno'],...data.quotes.map(q=>[String(q.id),q.code+' · '+q.status_label+(q.quoted_cents?' · '+quoteMoney(q.quoted_cents):'')])],into:grid});
- const suggestion=el('p','','of-hint');form.append(suggestion);kind.addEventListener('change',()=>{const k=data.kinds[kind.value];suggestion.textContent=k&&k.status&&k.status!==data.order.status?'Este tipo suele corresponder al estado «'+(statusNames[k.status]||k.status)+'». El estado de la orden se cambia desde su editor; el seguimiento no lo modifica.':'';});
- const internal=el('fieldset',undefined,'inv-group of-private'),il=el('legend');il.append(invIcon('lock'),el('span','Solo para el taller (nunca se envía ni se publica)'));internal.append(il);form.append(internal);
- field('internal_note','Descripción técnica interna',{area:true,max:2000,into:internal});
- const pub=el('fieldset',undefined,'inv-group of-public'),pl=el('legend');pl.append(invIcon('send'),el('span','Para el cliente'));pub.append(pl);form.append(pub);
- field('client_message','Mensaje destinado al cliente',{area:true,max:1500,into:pub,hint:'Solo lo que se puede comunicar: sin datos internos ni credenciales.'});field('recommendation','Recomendación para el cliente',{area:true,max:800,into:pub,hint:'Opcional. Por ejemplo: «Recomendamos reemplazar la unidad de almacenamiento.»'});
- const vis=el('label',undefined,'inv-cf'),visC=el('input');visC.type='checkbox';visC.name='client_visible';vis.append(visC,el('span','Mostrar este mensaje en el enlace público de seguimiento'));pub.append(vis);
- const ev=el('fieldset',undefined,'inv-group'),el_=el('legend');el_.append(invIcon('file-text'),el('span','Evidencias (máx. 3 · 900 KB c/u · JPG, PNG, WEBP o PDF)'));ev.append(el_);form.append(ev);
- const fileIn=el('input');fileIn.type='file';fileIn.multiple=true;fileIn.accept='image/jpeg,image/png,image/webp,application/pdf';fileIn.setAttribute('aria-label','Adjuntar evidencias');const flist=el('ul',undefined,'of-files');ev.append(fileIn,flist);let picked=[];
- fileIn.addEventListener('change',async()=>{const files=[...fileIn.files];if(files.length+picked.length>3){notify('Máximo 3 archivos por seguimiento.');fileIn.value='';return;}
-  for(const f of files){if(f.size>900000){notify(f.name+' supera 900 KB.');continue;}const dataUrl=await new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(fr.result);fr.readAsDataURL(f);});picked.push({name:f.name,data:dataUrl,visible:false});}fileIn.value='';paintFiles();});
- function paintFiles(){flist.replaceChildren();picked.forEach((f,i)=>{const li=el('li'),c=el('input'),l=el('label',undefined,'inv-cf');c.type='checkbox';c.checked=f.visible;c.addEventListener('change',()=>{f.visible=c.checked;});l.append(c,el('span','Visible para el cliente'));
-  li.append(el('span',f.name,'of-file-name'),l,invIconBtn('Quitar '+f.name,'x',()=>{picked.splice(i,1);paintFiles();}));flist.append(li);});}
- if(preset.corrects_id){const h=el('input');h.type='hidden';h.name='corrects_id';h.value=String(preset.corrects_id);form.append(h,el('p','Corrección del seguimiento #'+preset.corrects_id+': el original se conserva en el historial.','inv-warn'));}
- const next=el('div',undefined,'fx-form-grid');form.append(next);field('next_action','Próxima acción',{max:200,into:next});field('next_date','Fecha de seguimiento prevista',{type:'date',into:next});
- const save=el('button',undefined,'primary inv-btn');save.type='submit';save.append(invIcon('circle-check'),el('span','Guardar seguimiento'));form.append(msg,invDialogActions(dialog,save));const key=cjKey();
- form.addEventListener('submit',async e=>{e.preventDefault();clear();const fd=new FormData(form),body={request_key:key,files:JSON.stringify(picked.map(f=>({name:f.name,data:f.data,visible:f.visible?'1':''})))};
-  for(const[k,v]of fd.entries())body[k]=k==='client_visible'?'1':String(v);save.disabled=true;
-  try{const r=await api('/api/orders/'+id+'/followups',body);dialog.close();toast('Seguimiento registrado.','success');await showOrderDetail(id);
-   if((body.client_message||body.recommendation)&&await askConfirm('¿Preparar un mensaje para el cliente?','Puedes enviarlo por WhatsApp o por correo con una plantilla, revisándolo antes.','Preparar mensaje'))orderMessageComposer(id,r.id);}
-  catch(error){save.disabled=false;fail(error);}});}
+// Evidencias de seguimiento (1.5.237): tipo real por los primeros bytes, SHA-256 del original, carga por partes con progreso y reintento,
+// miniatura aparte (el original no se reduce) y visor con zoom. El servidor vuelve a verificar tamaño, SHA-256 y tipo.
+function ofxIcons(){for(const[k,v]of Object.entries({'upload':'<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/>','image':'<rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.09-3.09a2 2 0 0 0-2.82 0L6 21"/>',
+ 'minus':'<path d="M5 12h14"/>','plus':'<path d="M5 12h14"/><path d="M12 5v14"/>','maximize':'<path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/>',
+ 'clipboard-list':'<rect width="8" height="4" x="8" y="2" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/>'}))invIcons[k]??=v;}
+const OFX_TYPES={'image/jpeg':'JPG','image/png':'PNG','image/webp':'WEBP','application/pdf':'PDF'};
+async function ofxSniff(file){const b=new Uint8Array(await file.slice(0,12).arrayBuffer()),at=(...x)=>x.every((v,i)=>b[i]===v);if(at(0xff,0xd8,0xff))return'image/jpeg';if(at(0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a))return'image/png';if(at(0x25,0x50,0x44,0x46,0x2d))return'application/pdf';
+ if(at(0x52,0x49,0x46,0x46)&&b[8]===0x57&&b[9]===0x45&&b[10]===0x42&&b[11]===0x50)return'image/webp';return'';}
+async function ofxSha(buf){const h=await crypto.subtle.digest('SHA-256',buf);return [...new Uint8Array(h)].map(x=>x.toString(16).padStart(2,'0')).join('');}
+function ofxB64(buf){const a=new Uint8Array(buf);let s='';for(let i=0;i<a.length;i+=0x8000)s+=String.fromCharCode.apply(null,a.subarray(i,i+0x8000));return btoa(s);}
+async function ofxThumb(file){try{const bmp=await createImageBitmap(file),k=Math.min(1,480/Math.max(bmp.width,bmp.height)),cv=document.createElement('canvas');cv.width=Math.max(1,Math.round(bmp.width*k));cv.height=Math.max(1,Math.round(bmp.height*k));cv.getContext('2d').drawImage(bmp,0,0,cv.width,cv.height);bmp.close?.();return cv.toDataURL('image/jpeg',0.82);}catch{return'';}}
+const ofxSize=n=>n>=1048576?(n/1048576).toLocaleString('es-EC',{maximumFractionDigits:1})+' MB':Math.max(1,Math.round(n/1024))+' KB';
+// Original guardado por partes (cada respuesta cabe en una petición): se arma aquí sin reducirlo.
+async function ofxOriginal(base){const meta=await (await fetch(base+'/meta',{credentials:'same-origin'})).json();if(meta.error)throw new Error(meta.error);const parts=[];
+ for(let i=0;i<meta.parts;i++){const r=await fetch(base+'?part='+i,{credentials:'same-origin'});if(!r.ok)throw new Error('No se pudo cargar el archivo.');parts.push(await r.arrayBuffer());}return new Blob(parts,{type:meta.mime});}
+function ofxViewer(name,mime,load){ofxIcons();const d=smallDialog(name);d.classList.add('ofx-viewer');const bar=el('div',undefined,'ofx-vbar'),stage=el('div',undefined,'ofx-stage');stage.tabIndex=0;stage.setAttribute('aria-label','Vista ampliada de '+name);d.append(bar,stage);stage.append(el('p','Cargando el original…','ofx-note'));let src='',z=1,img=null;
+ const zoom=el('span','100 %','ofx-zoom'),set=v=>{z=Math.min(8,Math.max(1,v));if(img)img.style.width=(z*100)+'%';zoom.textContent=Math.round(z*100)+' %';};
+ if(mime!=='application/pdf'){bar.append(invIconBtn('Alejar','minus',()=>set(z/1.5)),zoom,invIconBtn('Acercar','plus',()=>set(z*1.5)),invBtn('Ajustar','maximize',()=>set(1)));
+  stage.addEventListener('wheel',e=>{if(!e.ctrlKey&&!e.metaKey)return;e.preventDefault();set(z*(e.deltaY<0?1.2:1/1.2));},{passive:false});let drag=null;stage.addEventListener('pointerdown',e=>{drag={x:e.clientX,y:e.clientY,l:stage.scrollLeft,t:stage.scrollTop};});
+  stage.addEventListener('pointermove',e=>{if(drag){stage.scrollLeft=drag.l-(e.clientX-drag.x);stage.scrollTop=drag.t-(e.clientY-drag.y);}});addEventListener('pointerup',()=>{drag=null;});}
+ const openTab=invBtn('Abrir en otra pestaña','external-link',()=>{if(src)window.open(src,'_blank','noopener');});openTab.disabled=true;bar.append(openTab);
+ d.addEventListener('close',()=>{if(src)setTimeout(()=>URL.revokeObjectURL(src),60000);});
+ Promise.resolve().then(load).then(blob=>{src=URL.createObjectURL(blob);openTab.disabled=false;if(mime==='application/pdf'){const f=el('iframe');f.src=src;f.title=name;stage.replaceChildren(f);}else{img=el('img');img.src=src;img.alt=name;stage.replaceChildren(img);}})
+  .catch(error=>stage.replaceChildren(el('p',error.message||'No se pudo cargar el archivo.','inv-form-message')));return d;}
+// Ventana «Agregar seguimiento»: cabecera con orden, estado y técnico; secciones General, Interno (nunca se publica), Cliente, Evidencias y
+// Próximas acciones; contenido con desplazamiento interno y acciones siempre visibles. Notificar solo abre la comunicación para revisarla.
+async function addOrderFollowUp(id,preset={}){ofxIcons();let data;try{data=await api('/api/orders/'+id+'/followups');}catch(error){notify(error.message);return;}
+ const o=data.order,lim=data.limits||{max_files:3,max_bytes:10485760};
+ const dialog=invDialog('Agregar seguimiento',true);dialog.classList.add('of-dialog','ofx');dialog.dataset.orderId=String(id);
+ {const heading=dialog.querySelector('.dialog-heading'),h2=heading.querySelector('h2'),titles=el('div',undefined,'cm-titles'),facts=el('p',undefined,'cm-facts'),status=el('span',o.status_label,'cm-status');status.dataset.status=o.status;
+  facts.append(el('span',o.code,'cm-code'),status,el('span','Técnico: '+(o.technician||'Sin asignar'),'cm-client'));h2.replaceWith(titles);titles.append(h2,facts);}
+ const{form,msg,field,fail,clear}=invForm('ofx-form');dialog.append(form);const body=el('div',undefined,'ofx-body'),foot=el('footer',undefined,'ofx-foot');form.append(body,foot);
+ const section=(n,title,glyph,cls='',note='')=>{const s=el('section',undefined,'ofx-sec '+cls),h=el('h3');h.append(el('b',String(n)),invIcon(glyph),el('span',title));s.append(h);if(note)s.append(el('p',note,'ofx-note'));body.append(s);return s;};
+ const grid=into=>{const g=el('div',undefined,'ofx-grid');into.append(g);return g;};
+ const draft=preset.corrects_id?null:data.followup_draft;
+ if(draft){const box=el('div',undefined,'ofx-draft');box.append(invIcon('file-text'),el('span','Tienes un borrador guardado el '+formatOrderDate(draft.updated_at)+'.'),button('Recuperar',()=>{for(const[k,v]of Object.entries(draft.data)){const n=form.elements[k];if(!n)continue;if(n.type==='checkbox')n.checked=v==='1';else n.value=v;n.dispatchEvent(new Event('input',{bubbles:true}));n.dispatchEvent(new Event('change',{bubbles:true}));}box.remove();},'secondary'),
+  button('Descartar',async()=>{try{await api('/api/orders/'+id+'/followups/draft',{action:'discard'});box.remove();}catch(error){notify(error.message);}},'secondary'));body.append(box);}
+ // 1 · Información general.
+ const s1=section(1,'Información general','clipboard-list'),g1=grid(s1);
+ const kind=field('kind','Tipo de seguimiento',{options:[['','Selecciona…'],...Object.entries(data.kinds).map(([k,v])=>[k,v.label])],into:g1,required:true,value:preset.kind||''});
+ field('priority','Prioridad',{options:Object.entries(data.priorities),into:g1,value:'normal'});
+ if(data.quotes.length)field('quote_id','Presupuesto relacionado',{options:[['','Ninguno'],...data.quotes.map(q=>[String(q.id),q.code+' · '+q.status_label+(q.quoted_cents?' · '+quoteMoney(q.quoted_cents):'')])],into:g1});
+ const facts=el('dl',undefined,'ofx-facts'),clock=el('dd');for(const[k,v]of [['Estado de la orden',o.status_label],['Responsable',currentUser?.name||'—'],['Fecha y hora',clock]]){const x=el('div');x.append(el('dt',k),v instanceof Node?v:el('dd',v));facts.append(x);}s1.append(facts);
+ const tick=()=>{clock.textContent=new Date().toLocaleString('es-EC',{timeZone:'America/Guayaquil',dateStyle:'medium',timeStyle:'short'});};tick();const timer=setInterval(tick,30000);
+ const suggestion=el('p','','of-hint');s1.append(suggestion);kind.addEventListener('change',()=>{const k=data.kinds[kind.value];suggestion.textContent=k&&k.status&&k.status!==o.status?'Este tipo suele corresponder al estado «'+(statusNames[k.status]||k.status)+'». El estado de la orden se cambia desde su editor; el seguimiento no lo modifica.':'';});
+ // 2 · Información interna del taller (ADI en modo interno: nunca la convierte en mensaje para el cliente).
+ const s2=section(2,'Información interna del taller','lock','ofx-private','Solo para el taller: nunca se publica ni se envía al cliente.');
+ field('internal_note','Descripción técnica',{area:true,max:2000,into:s2});const g2=grid(s2);field('diagnosis','Diagnóstico',{area:true,max:1500,into:g2});field('observations','Observaciones',{area:true,max:1500,into:g2});
+ // 3 · Comunicación para el cliente.
+ const s3=section(3,'Comunicación para el cliente','send','ofx-public','Solo lo que se puede comunicar: sin datos internos, costos internos ni credenciales.');
+ field('client_message','Mensaje para el cliente',{area:true,max:1500,into:s3});field('recommendation','Recomendaciones',{area:true,max:800,into:s3,hint:'Opcional. Por ejemplo: «Recomendamos reemplazar la unidad de almacenamiento».'});
+ const vis=el('label',undefined,'inv-cf ofx-switch'),visC=el('input');asSwitch(visC).type='checkbox';visC.name='client_visible';vis.append(visC,el('span','Publicar este mensaje en el seguimiento público de la orden'));s3.append(vis);
+ // 4 · Evidencias.
+ const s4=section(4,'Evidencias','image','ofx-ev','Hasta '+lim.max_files+' archivos de '+ofxSize(lim.max_bytes)+' cada uno · JPG, PNG, WEBP o PDF. El original se guarda sin reducir.');
+ const pick=el('input');pick.type='file';pick.multiple=true;pick.accept='image/jpeg,image/png,image/webp,application/pdf';pick.className='sr-only';pick.id='ofx-files-'+id;
+ const drop=el('label',undefined,'ofx-drop');drop.htmlFor=pick.id;drop.tabIndex=0;drop.setAttribute('role','button');drop.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();pick.click();}});drop.append(pick,invIcon('upload'),el('strong','Agregar fotografías o PDF'),el('small','Pulsa aquí o arrastra los archivos'));s4.append(drop);
+ const list=el('ul',undefined,'ofx-files');list.setAttribute('aria-live','polite');s4.append(list);const items=[];let saved=false;
+ const pending=()=>items.some(x=>x.state==='subiendo');
+ function paint(){list.replaceChildren();for(const it of items){const li=el('li'),prev=el('button',undefined,'ofx-thumb');prev.type='button';prev.setAttribute('aria-label','Ver '+it.name);
+   if(it.url){const im=el('img');im.src=it.url;im.alt='';prev.append(im);}else prev.append(el('b',OFX_TYPES[it.mime]||'—'));prev.onclick=()=>ofxViewer(it.name,it.mime,()=>it.file);
+   const info=el('div',undefined,'ofx-finfo');info.append(el('strong',it.name),el('small',ofxSize(it.size)+' · '+(OFX_TYPES[it.mime]||'—')));
+   if(it.state==='subiendo'){const bar=el('progress');bar.max=100;bar.value=it.progress||0;bar.setAttribute('aria-label','Subiendo '+it.name);info.append(bar);}
+   else if(it.state==='error'){const e=el('p',it.error,'ofx-ferr');e.setAttribute('role','alert');info.append(e);}
+   else info.append(el('span','Lista · verificada','ofx-fok'));
+   const acts=el('div',undefined,'ofx-facts-row'),sw=el('label',undefined,'inv-cf'),c=el('input');asSwitch(c).type='checkbox';c.checked=it.visible;c.disabled=it.mime==='application/pdf'&&false;c.onchange=()=>{it.visible=c.checked;};sw.append(c,el('span','Visible para el cliente'));
+   acts.append(sw);if(it.state==='error')acts.append(invBtn('Reintentar','rotate-ccw',()=>upload(it)));acts.append(invIconBtn('Quitar '+it.name,'x',()=>removeItem(it)));li.dataset.state=it.state;li.append(prev,info,acts);list.append(li);}
+  drop.hidden=items.length>=lim.max_files;syncButtons();}
+ async function removeItem(it){it.cancelled=true;items.splice(items.indexOf(it),1);if(it.url)URL.revokeObjectURL(it.url);paint();if(it.token)api('/api/orders/'+id+'/uploads',{action:'cancel',token:it.token}).catch(()=>{});}
+ async function upload(it){it.state='subiendo';it.progress=0;it.error='';paint();
+  try{const buf=await it.file.arrayBuffer(),sha=await ofxSha(buf);if(it.token){api('/api/orders/'+id+'/uploads',{action:'cancel',token:it.token}).catch(()=>{});it.token='';}
+   const st=await api('/api/orders/'+id+'/uploads',{action:'start',name:it.name,size:String(buf.byteLength),sha256:sha});it.token=st.token;
+   for(let i=0;i<st.parts;i++){if(it.cancelled)return;for(let tries=1;;tries++){try{await api('/api/orders/'+id+'/uploads',{action:'part',token:st.token,index:String(i),data:ofxB64(buf.slice(i*st.part_bytes,(i+1)*st.part_bytes))});break;}
+     catch(error){if(tries>=3||it.cancelled)throw error;await new Promise(r=>setTimeout(r,700*tries));}}
+    it.progress=Math.round((i+1)/st.parts*95);const bar=list.children[items.indexOf(it)]?.querySelector('progress');if(bar)bar.value=it.progress;}
+   await api('/api/orders/'+id+'/uploads',{action:'finish',token:st.token,thumb:it.mime==='application/pdf'?'':await ofxThumb(it.file)});it.state='lista';}
+  catch(error){if(it.cancelled)return;it.state='error';it.error=(error.message||'No se pudo subir.')+' Puedes reintentar.';}paint();}
+ async function addFiles(files){const errs=[];for(const f of files){if(items.length>=lim.max_files){errs.push('Máximo '+lim.max_files+' archivos por seguimiento.');break;}
+   const mime=await ofxSniff(f);if(!mime){errs.push(f.name+': solo se admiten JPG, PNG, WEBP o PDF.');continue;}if(f.size>lim.max_bytes){errs.push(f.name+' pesa '+ofxSize(f.size)+': el máximo es '+ofxSize(lim.max_bytes)+'.');continue;}if(!f.size){errs.push(f.name+' está vacío.');continue;}
+   const it={file:f,name:f.name,size:f.size,mime,visible:false,state:'subiendo',url:mime==='application/pdf'?'':URL.createObjectURL(f)};items.push(it);upload(it);}
+  paint();if(errs.length){msg.textContent=errs.join(' ');}}
+ pick.addEventListener('change',()=>{const f=[...pick.files];pick.value='';clear();addFiles(f);});
+ for(const t of ['dragenter','dragover'])drop.addEventListener(t,e=>{e.preventDefault();drop.dataset.over='true';});for(const t of ['dragleave','drop'])drop.addEventListener(t,()=>{delete drop.dataset.over;});
+ drop.addEventListener('drop',e=>{e.preventDefault();clear();addFiles([...(e.dataTransfer?.files||[])]);});
+ // 5 · Próximas acciones.
+ const s5=section(5,'Próximas acciones','calendar'),g5=grid(s5);field('next_action','Próxima actividad',{max:200,into:g5});const nd=field('next_date','Fecha prevista',{type:'date',into:g5});
+ field('next_owner_id','Responsable',{options:[['','Sin asignar'],...(data.staff||[]).map(u=>[String(u.id),u.name])],into:g5});
+ const rem=el('label',undefined,'inv-cf ofx-switch'),remC=el('input');asSwitch(remC).type='checkbox';remC.name='next_reminder';rem.append(remC,el('span','Recordatorio en la fecha prevista'));s5.append(rem);
+ const syncRem=()=>{remC.disabled=!nd.value;if(!nd.value)remC.checked=false;};nd.addEventListener('input',syncRem);nd.addEventListener('change',syncRem);syncRem();
+ if(preset.corrects_id){const h=el('input');h.type='hidden';h.name='corrects_id';h.value=String(preset.corrects_id);form.append(h);s1.append(el('p','Corrección del seguimiento #'+preset.corrects_id+': el original se conserva en el historial.','inv-warn'));}
+ for(const[name,fieldKey]of [['internal_note','internal_notes'],['diagnosis','findings'],['observations','internal_notes'],['client_message','client_message'],['recommendation','client_message']])attachAdi(form.elements[name],fieldKey,{compact:true});
+ // 6 · Acciones.
+ const cancel=invBtn('Cancelar','x',()=>requestModalClose(dialog)),draftB=invBtn('Guardar borrador','file-text',saveDraft),save=el('button',undefined,'primary inv-btn'),notifyB=invBtn('Guardar y notificar','send',()=>submit(true),'primary ofx-notify');
+ save.type='submit';save.append(invIcon('circle-check'),el('span','Guardar'));const state=el('p','','ofx-state');state.setAttribute('aria-live','polite');const acts=el('div',undefined,'ofx-acts');acts.append(cancel,draftB,save,notifyB);foot.append(msg,state,acts);
+ function syncButtons(){const busy=pending();save.disabled=notifyB.disabled=busy||form.getAttribute('aria-busy')==='true';state.textContent=busy?'Subiendo evidencias… espera a que terminen para guardar.':items.some(x=>x.state==='error')?'Hay un archivo con error: reintenta o quítalo.':'';}
+ const values=()=>{const fd=new FormData(form),out={};for(const[k,v]of fd.entries())out[k]=k==='client_visible'||k==='next_reminder'?'1':String(v);return out;};
+ async function saveDraft(){clear();try{await api('/api/orders/'+id+'/followups/draft',values());toast('Borrador guardado (las evidencias no se guardan en el borrador).','success');dialog.dataset.baseline=formSnapshot(form);}catch(error){fail(error);}}
+ const key=cjKey();
+ async function submit(andNotify){clear();if(!form.reportValidity())return;if(items.some(x=>x.state!=='lista')){msg.textContent=pending()?'Espera a que terminen de subir las evidencias.':'Reintenta o quita el archivo con error antes de guardar.';return;}
+  const body={...values(),request_key:key,files:JSON.stringify(items.map(x=>({upload:x.token,visible:x.visible?'1':''})))};
+  form.setAttribute('aria-busy','true');save.disabled=notifyB.disabled=draftB.disabled=true;const label=save.lastChild.textContent;save.lastChild.textContent='Guardando…';
+  try{const r=await api('/api/orders/'+id+'/followups',body);saved=true;delete dialog.dataset.baseline;form.removeAttribute('aria-busy');dialog.close();toast('Seguimiento registrado.','success');await showOrderDetail(id);
+   if(andNotify)orderMessageComposer(id,r.id);else if((body.client_message||body.recommendation)&&await askConfirm('¿Preparar un mensaje para el cliente?','Puedes enviarlo por WhatsApp o por correo con una plantilla, revisándolo antes.','Preparar mensaje'))orderMessageComposer(id,r.id);}
+  catch(error){form.removeAttribute('aria-busy');save.lastChild.textContent=label;draftB.disabled=false;syncButtons();fail(error);}}
+ form.addEventListener('submit',e=>{e.preventDefault();submit(false);});
+ dialog.beforeClose=async()=>!items.length||saved||await confirmClose({title:'¿Cerrar sin guardar?',text:'Las evidencias subidas se descartarán si cierras sin guardar el seguimiento.'})!=='keep';
+ dialog.addEventListener('close',()=>{clearInterval(timer);if(!saved)for(const it of items){it.cancelled=true;if(it.url)URL.revokeObjectURL(it.url);if(it.token)api('/api/orders/'+id+'/uploads',{action:'cancel',token:it.token}).catch(()=>{});}});
+ paint();dialog.dataset.baseline=formSnapshot(form);(preset.kind?form.elements.internal_note:kind).focus();}
+// Evidencias guardadas de un seguimiento (ficha de la orden): miniatura, visor del original, visibilidad y retiro con motivo (sin borrar).
+function ofxSavedFiles(order,fu,reload){ofxIcons();const box=el('ul',undefined,'ofx-saved');for(const f of fu.files){const li=el('li'),base='/api/orders/'+order.id+'/followups/files/'+f.id,prev=el('button',undefined,'ofx-thumb');prev.type='button';prev.setAttribute('aria-label','Ver '+f.name);
+  if(f.has_thumb){const im=el('img');im.src=base+'/thumb';im.alt='';im.loading='lazy';prev.append(im);}else prev.append(el('b',OFX_TYPES[f.mime]||'—'));prev.onclick=()=>ofxViewer(f.name,f.mime,()=>ofxOriginal(base));
+  const info=el('div',undefined,'ofx-finfo');info.append(el('strong',f.name),el('small',ofxSize(f.size)+' · '+(OFX_TYPES[f.mime]||'—')+' · '+(f.retired?'Retirada':f.visible?'Visible para el cliente':'Interna')));
+  if(f.retired)info.append(el('small','Retirada por '+(f.changed_by||'—')+': '+f.retired_reason,'ofx-ferr'));li.dataset.state=f.retired?'retirada':f.visible?'visible':'interna';li.append(prev,info);
+  if(!f.retired){const acts=el('div',undefined,'ofx-facts-row');acts.append(button(f.visible?'Ocultar al cliente':'Mostrar al cliente',async()=>{try{await api(base,{action:'visibility',visible:f.visible?'':'1'});toast(f.visible?'Evidencia oculta para el cliente.':'Evidencia visible para el cliente.','success');reload();}catch(error){notify(error.message);}},'oh-more'),
+   button('Retirar',()=>centerPromptLite('Retirar '+f.name,'La evidencia deja de mostrarse y no se borra: queda en el historial con el motivo.',async reason=>{await api(base,{action:'retire',reason});toast('Evidencia retirada.','success');reload();}),'oh-more'));li.append(acts);}
+  box.append(li);}return box;}
+function centerPromptLite(title,note,run){const d=smallDialog(title),form=el('form',undefined,'ofx-prompt'),area=el('textarea'),m=el('p','','inv-form-message'),ok=el('button','Retirar','primary danger');area.required=true;area.minLength=5;area.maxLength=300;area.rows=3;area.setAttribute('aria-label','Motivo');area.placeholder='Motivo (al menos 5 caracteres)';ok.type='submit';
+ form.append(el('p',note,'ofx-note'),area,m,invDialogActions(d,ok));d.append(form);area.focus();form.onsubmit=async e=>{e.preventDefault();ok.disabled=true;try{await run(area.value.trim());d.close();}catch(error){m.textContent=error.message;ok.disabled=false;}};}
 // Copia al portapapeles con respaldo para navegadores sin permiso; devuelve si de verdad se copió (solo entonces se registra).
 async function copyToClipboard(text){try{await navigator.clipboard.writeText(text);return true;}catch{}const area=el('textarea');area.value=text;area.readOnly=true;area.className='sr-only';document.body.append(area);area.select();let ok=false;try{ok=document.execCommand('copy');}catch{}area.remove();return ok;}
 const CM_MODES=[['auto','Último seguimiento comunicable'],['one','Seleccionar un seguimiento anterior'],['many','Seleccionar varias novedades'],['manual','Preparar mensaje manual']];
@@ -4338,7 +4430,8 @@ function attachNameAdi(input,options={}){if(!input||input.dataset.adi)return;inp
 // Preferencia de este navegador: la corrección automática se puede desactivar desde el propio panel de ADI.
 let adiAutoBlocked=false;const adiAutoOn=()=>{try{return localStorage.getItem('ordenes-pro:adi-auto')!=='0';}catch{return true;}};
 // ADI en todo el sistema: cualquier área de texto que aparezca en pantalla recibe su botón compacto, sin tocar cada módulo.
-function initAdiEverywhere(){if(document.body.dataset.page!=='dashboard'||!currentUser||!['administrador','tecnico'].includes(currentUser.role))return;const known={problem:'problem',technician_notes:'technician_notes',physical_condition:'physical_condition',findings:'findings',internal_notes:'internal_notes',recommendations:'recommendations',comment:'comment'};
+function initAdiEverywhere(){if(document.body.dataset.page!=='dashboard'||!currentUser||!['administrador','tecnico'].includes(currentUser.role))return;const known={problem:'problem',technician_notes:'technician_notes',physical_condition:'physical_condition',findings:'findings',internal_notes:'internal_notes',recommendations:'recommendations',comment:'comment',
+  internal_note:'internal_notes',diagnosis:'findings',observations:'internal_notes',client_message:'client_message',recommendation:'client_message'};
  const consider=area=>{if(area.dataset.adi||area.dataset.noAdi!==undefined||area.hidden||area.readOnly||area.disabled||area.closest('#adi-widget,.adi-assist,.live-compose,[data-no-adi]'))return;const flow=getComputedStyle(area.parentElement);if(flow.display.includes('flex')&&!flow.flexDirection.startsWith('column'))return;attachAdi(area,known[area.name]||'',{compact:true,manualOnly:!!area.closest('[data-adi-manual]')});};
  const scan=root=>{if(root.nodeType!==1)return;if(root.tagName==='TEXTAREA')consider(root);else root.querySelectorAll?.('textarea').forEach(consider);};
  {const isCompany=()=>$('client-form')?.elements.client_type?.value==='empresa';attachNameAdi($('order-client'),{company:isCompany});attachNameAdi($('order-trade_name'),{company:true});}let queued=false;const pending=new Set();
