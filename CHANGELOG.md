@@ -4,6 +4,24 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.236 — 2026-11-04 09:01 (UTC-05:00)
+
+Inventario operativo limpio: series por casos y vistas separadas
+
+### Nuevas funcionalidades
+
+- Inventario: control de series por casos (en existencia, de baja o devuelta, vendida y nueva), reingreso de la misma unidad con su identidad y liberación de serie por administración
+- Inventario: vistas separadas del catálogo (activo, sin existencias, dados de baja, archivado) y de las series, con recuentos
+
+### Errores corregidos
+
+- Inventario: el control de series mostraba por defecto las unidades antiguas dadas de baja y archivadas (AR-000002) como «Protegidas»; ahora la vista por defecto muestra solo lo que está en inventario
+- Inventario: una serie ocupada por una unidad dada de baja bloqueaba un reingreso legítimo con un mensaje genérico, y una serie liberada se volvía a ingresar sin dejar vínculo con su historial
+
+### Actualizaciones de seguridad
+
+- Inventario: la base impide que una unidad en existencia no ocupe su serie (migración 091, solo disparadores)
+
 ## v1.5.235 — 2026-11-04 09:00 (UTC-05:00)
 
 Factores DATAFAST con estado real y confirmación administrativa
