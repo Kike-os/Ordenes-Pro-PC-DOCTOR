@@ -4,6 +4,21 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.238 — 2026-11-04 14:18 (UTC-05:00)
+
+Seguimiento de pedidos de repuestos con línea de tiempo para el cliente
+
+### Nuevas funcionalidades
+
+- Pedidos de repuestos en cada orden: 8 etapas (solicitado, confirmado, preparación, en tránsito, recibido, instalación, finalizado, listo para entrega) con fecha, hora y responsable; solo se avanza a la siguiente y las correcciones son de administración con motivo
+- Repuestos: situaciones de espera, retraso, incidencia de transporte y cancelación con colores, iconos y etiquetas; advertencia interna de pedido vencido; datos del proveedor, pedido, transporte y recepción con historial
+- Enlace público: seguimiento de repuestos tipo mensajería (horizontal en computadora, vertical en teléfono) solo con la información y los mensajes autorizados
+- Repuestos: mensajes por etapa editables con ADI, «Guardar y notificar» con revisión previa y evidencias por repuesto
+
+### Mejoras realizadas
+
+- Repuestos: una línea de compra se asocia a un solo pedido y cambiar de etapa no genera compras, facturas, cobros ni movimientos de inventario
+
 ## v1.5.237 — 2026-11-04 13:22 (UTC-05:00)
 
 «Agregar seguimiento» profesional y evidencias de 10 MB

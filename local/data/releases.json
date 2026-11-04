@@ -8,6 +8,29 @@
   },
   "releases": [
     {
+      "version": "1.5.238",
+      "date": "2026-11-04T14:18:55-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Seguimiento de pedidos de repuestos con línea de tiempo para el cliente",
+      "changes": {
+        "features": [
+          "Pedidos de repuestos en cada orden: 8 etapas (solicitado, confirmado, preparación, en tránsito, recibido, instalación, finalizado, listo para entrega) con fecha, hora y responsable; solo se avanza a la siguiente y las correcciones son de administración con motivo",
+          "Repuestos: situaciones de espera, retraso, incidencia de transporte y cancelación con colores, iconos y etiquetas; advertencia interna de pedido vencido; datos del proveedor, pedido, transporte y recepción con historial",
+          "Enlace público: seguimiento de repuestos tipo mensajería (horizontal en computadora, vertical en teléfono) solo con la información y los mensajes autorizados",
+          "Repuestos: mensajes por etapa editables con ADI, «Guardar y notificar» con revisión previa y evidencias por repuesto"
+        ],
+        "improvements": [
+          "Repuestos: una línea de compra se asocia a un solo pedido y cambiar de etapa no genera compras, facturas, cobros ni movimientos de inventario"
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Kike-os: «si te autorizo» y «Sí, aplica y publica» (04/11/2026)"
+    },
+    {
       "version": "1.5.237",
       "date": "2026-11-04T13:22:51-05:00",
       "type": "patch",
