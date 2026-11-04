@@ -257,7 +257,7 @@ class PurchaseIntakeTests(unittest.TestCase):
         self.assertEqual(self.post(url(u4), action='discard', reason='Intento de baja')['status'], 409)
         self.assertEqual(self.post(url(u4), action='reenter', serial='KNG-4Y', reason='Intento de reingreso')['status'], 409)
         self.assertEqual(self.stock(item), 3)
-        panel = self.request('/api/inventory/serials?q=KNG', cookie=self.cookie)['body']
+        panel = self.request('/api/inventory/serials?q=KNG&view=todas', cookie=self.cookie)['body']  # la vista por defecto solo muestra lo que está en inventario
         locked = {r['serial']: r['lock'] for r in panel['rows']}
         self.assertIn('vendida', locked['KNG-4'])
         self.assertEqual(locked['KNG-1X'], '')

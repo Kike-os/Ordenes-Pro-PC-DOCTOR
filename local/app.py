@@ -2128,7 +2128,9 @@ class Handler(BaseHTTPRequestHandler):
                     now=reception_now()
                     if path=='/api/inventory/center':return self.reply(200,center.dashboard(c,now))
                     if path=='/api/inventory/taxonomy':return self.reply(200,center.taxonomy(c))
-                    if path=='/api/inventory/products':return self.reply(200,{'rows':center.products(c,arg('q'),arg('category'),arg('brand'),arg('state'))})
+                    if path=='/api/inventory/products':
+                        counts={};rows=center.products(c,arg('q'),arg('category'),arg('brand'),arg('state'),arg('view'),counts)
+                        return self.reply(200,{'rows':rows,'counts':counts,'views':center.PRODUCT_VIEWS})
                     found=re.fullmatch(r'/api/inventory/products/([0-9]{1,9})',path)
                     if found:return self.reply(200,{'product':center.product(c,found[1]),'units':center.units(c,found[1]),'reservations':[r for r in center.reservations(c) if r['item_id']==int(found[1])]})
                     if path=='/api/inventory/units':return self.reply(200,{'rows':center.units(c,arg('item'),arg('q'),arg('status')),'statuses':inventory.UNIT_STATUS})
@@ -2177,7 +2179,7 @@ class Handler(BaseHTTPRequestHandler):
                     if found:
                         name,mime,raw=purchase_intake.file_for(c,found[1])
                         return self.reply(200,raw,mime,filename=name)
-                    if path=='/api/inventory/serials':return self.reply(200,purchase_intake.serial_panel(c,arg('q'),arg('state')))
+                    if path=='/api/inventory/serials':return self.reply(200,purchase_intake.serial_panel(c,arg('q'),arg('state'),arg('view')))
                     found=re.fullmatch(r'/api/inventory/items/([0-9]{1,9})/movements',path)
                     if found:return self.reply(200,inventory.movements(c,found[1]))
                     found=re.fullmatch(r'/api/inventory/purchases/([0-9]{1,9})',path)
@@ -3343,6 +3345,8 @@ class Handler(BaseHTTPRequestHandler):
                             elif action=='edit':result={'id':purchase_intake.edit_unit(c,unit_ref,data,user,now)}
                             elif action=='discard':result={'movement':purchase_intake.discard_unit(c,unit_ref,data.get('reason'),user,now)}
                             elif action=='reenter':result={'id':purchase_intake.reenter_unit(c,unit_ref,data,user,now)}
+                            elif action=='restore':result={'movement':purchase_intake.restore_unit(c,unit_ref,data,user,now)}
+                            elif action=='release':result={'id':purchase_intake.release_serial(c,unit_ref,data.get('reason'),user,now)}
                             else:c.rollback();return self.reply(400,{'error':'Acción inválida.'})
                         elif path=='/api/inventory/reservations':
                             import inventory_center as center

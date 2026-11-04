@@ -194,6 +194,42 @@ Revertir registra una salida en el Kardex solo de esa partida, sin afectar el re
 
 Una unidad vendida, consumida, facturada o vinculada a una orden no se puede cambiar; una reservada o con movimientos posteriores no se puede eliminar. Cada cambio guarda quién, cuándo y el dato anterior.
 
+### Casos de una serie al ingresarla (04/11/2026, 1.5.236)
+
+El asistente, las compras y el servidor aplican el mismo criterio (`inventory.serial_history`):
+
+| Caso | La serie la ocupa… | Qué hace el sistema |
+|---|---|---|
+| A | una unidad en existencia (disponible o reservada) | Bloquea e indica la unidad y el producto |
+| B | una unidad dada de baja o devuelta al proveedor | Muestra su historial y pide decidir: **Reingresar** (mismo equipo: misma ficha, mismo código interno, su historial; entrada en el Kardex) o, solo administración, **Liberar serie** (otro equipo o registro erróneo, con motivo) |
+| C | una unidad vendida o consumida | Bloquea: no se crea otra identidad; si el equipo vuelve, devolución del cliente sobre esa unidad |
+| D | nadie | Ingreso normal. Si la serie se liberó antes (reinicialización, archivo, retiro por error o liberación), la unidad nueva queda vinculada a la anterior en su historial |
+
+- Las series liberadas por un lote RI/AR autorizado (27/10/2026: «liberan su serie para el nuevo ingreso») siguen ese criterio: caso D vinculado.
+- Una unidad de una ficha archivada no se reingresa en ella (la ficha quedó fuera de uso por decisión de administración).
+- Los códigos internos nunca se reutilizan.
+- Base de datos (migración 091, solo disparadores): una unidad en existencia con serie escrita debe ocupar esa serie; con el índice único,
+  dos unidades en existencia no pueden compartir serie.
+
+### Vistas separadas
+
+- **Catálogo:** Inventario activo (fichas en uso con existencias) · Sin existencias · Dados de baja (fichas desactivadas) · Historial archivado.
+  Cada ficha está en una sola vista y cada vista muestra su recuento.
+- **Control de series:** por defecto **En inventario**. Vendidas y consumidas, De baja y devueltas, De fichas archivadas, Sin serie e Historial completo
+  se consultan en su vista. Las unidades fuera del inventario ya no aparecen como «Protegidas»: muestran su situación y sus acciones.
+- Selectores de venta y repuestos de órdenes: solo fichas activas y no archivadas (sin cambios: ya era así).
+
+**Producción, auditoría del 04/11/2026 (solo lectura):**
+- AR-000002 archivó las 11 fichas físicas: SSD HIKSEMI (2), RAM DDR4, ADATA SU650, WD Green, WD Blue NVMe, Mushkin, adaptadores CDP, GENIUS NumPad 1000 y 2 mouse.
+- Las 11 están inactivas, con existencias 0 y fuera del catálogo.
+- Sus 9 unidades están de baja con la serie ya liberada.
+- No hay ventas, facturas, cotizaciones, reservas ni garantías asociadas.
+- No hay series duplicadas, existencias descuadradas ni códigos repetidos.
+
+No se borra nada:
+- Unidades, movimientos y fichas tienen disparadores que impiden eliminarlos, porque son el Kardex y la trazabilidad.
+- Ninguna de esas fichas está libre de dependencias.
+
 ## Centro de Proveedores (1.5.220)
 
 Disponible en **Inventario › Proveedores** y en **Facturación › Proveedores**. Muestra indicadores reales, búsqueda por nombre, RUC, cédula, correo o teléfono, filtros, orden y paginación. Su ficha tiene información general, historial de compras, productos suministrados con su historial de costos y documentos.

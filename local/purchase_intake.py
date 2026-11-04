@@ -558,10 +558,13 @@ def unit_lock(c, unit):
         return 'está vinculada a una orden técnica'
     if unit['status'] == 'reservada' or unit['reservation_id']:
         return 'está reservada'
+    if unit['status'] in inventory.OUT_STATUSES:
+        return 'está fuera del inventario (%s): para volver a usarla, reingrésala' % inventory.UNIT_STATUS[unit['status']].lower()
     if unit['status'] != 'disponible':
         return 'ya no está disponible (%s)' % inventory.UNIT_STATUS[unit['status']].lower()
-    moves = c.execute('SELECT COUNT(*) FROM inventory_movement_units WHERE unit_id=?', (unit['id'],)).fetchone()[0]
-    if moves > 1:
+    # Solo cuenta lo posterior a su ingreso vigente (una unidad reingresada conserva su historial anterior).
+    moves = c.execute('SELECT COUNT(*) FROM inventory_movement_units WHERE unit_id=? AND movement_id>?', (unit['id'], unit['entry_movement_id'] or 0)).fetchone()[0]
+    if moves:
         return 'tiene movimientos posteriores a su ingreso'
     return ''
 
@@ -631,28 +634,84 @@ def reenter_unit(c, unit_id, data, user, now):
     return new
 
 
-def serial_panel(c, q='', state=''):
-    """Control de números de serie: unidades con su estado, si se pueden corregir y las que faltan por serie."""
-    where, args = [], []
+def restore_unit(c, unit_id, data, user, now):
+    """Caso B desde la ficha de la unidad: el mismo equipo físico vuelve al inventario con su identidad (mismo código interno, misma ficha,
+    su historial). Entrada de ajuste vinculada a la unidad; su serie vuelve a quedar ocupada. Solo administración, con motivo."""
+    if user['role'] != 'administrador':
+        raise InventoryError('Solo administración reingresa unidades dadas de baja.', 403)
+    unit = _unit(c, unit_id)
+    if unit['status'] not in inventory.OUT_STATUSES:
+        raise InventoryError('Solo se reingresa una unidad dada de baja o devuelta al proveedor.', 409)
+    item = c.execute('SELECT active FROM inventory_items WHERE id=?', (unit['item_id'],)).fetchone()
+    archived = inventory.archive_code(c, unit['item_id'])
+    if not item['active'] or archived:
+        raise InventoryError('La ficha de esta unidad está %s: no se reingresa en una ficha fuera de uso. Si el registro anterior fue un error, libera la serie.'
+                             % ('archivada en ' + archived if archived else 'desactivada'), 409)
+    reason = _reason(data.get('reason'))
+    cost_text = str(data.get('cost', '') or '').strip()
+    cost = inventory.cents(cost_text, 'cost') if cost_text else unit['unit_cost_cents']
+    return inventory.move(c, unit['item_id'], 1, 'ajuste_entrada', '1', '%d.%02d' % divmod(cost, 100), user, now, 'reingreso_unidad', unit['id'],
+                          'Reingreso de %s: %s' % (unit['internal_code'], reason), location=str(data.get('location', '') or '')[:80], restore_units=[unit['id']])
+
+
+def release_serial(c, unit_id, reason, user, now):
+    """Caso B, otro equipo o registro erróneo: libera la serie de una unidad dada de baja o devuelta para que otro registro la use. La unidad
+    conserva su serie escrita, su código y su historial; el nuevo registro queda vinculado. Nunca para vendidas o consumidas (caso C)."""
+    if user['role'] != 'administrador':
+        raise InventoryError('Solo administración libera series.', 403)
+    unit = _unit(c, unit_id)
+    if unit['status'] not in inventory.OUT_STATUSES:
+        raise InventoryError('Solo se libera la serie de una unidad dada de baja o devuelta al proveedor.', 409)
+    if not unit['serial_key']:
+        raise InventoryError('La serie de esta unidad ya está libre.', 409)
+    reason = re.sub(r'\s+', ' ', str(reason or '')).strip()[:300]
+    if len(reason) < 10:
+        raise InventoryError('Indica por qué se libera la serie (al menos 10 caracteres).', fields={'reason': 'Motivo obligatorio.'})
+    c.execute("UPDATE inventory_units SET serial_key='',released_serial=serial,updated_at=?,updated_by=? WHERE id=?", (stamp(now), user['id'], unit['id']))
+    event(c, now, user, 'serie_liberada', 'Serie %s de %s liberada por administración para otro registro: %s' % (unit['serial'], unit['internal_code'], reason), unit['item_id'], unit_id=unit['id'])
+    return unit['id']
+
+
+SERIAL_VIEWS = {'operativas': 'En inventario', 'vendidas': 'Vendidas y consumidas', 'baja': 'De baja y devueltas', 'archivadas': 'De fichas archivadas', 'sin_serie': 'Sin serie registrada',
+                'todas': 'Historial completo'}
+
+
+def serial_panel(c, q='', state='', view=''):
+    """Control de números de serie separado por vista: por defecto, solo lo que está en inventario (en existencia o reservado). Las unidades
+    vendidas, dadas de baja y las de fichas archivadas se consultan en su propia vista, con su historial intacto."""
+    view = view if view in SERIAL_VIEWS else ('sin_serie' if state == 'sin_serie' else 'todas' if state in inventory.UNIT_STATUS else 'operativas')
+    archived = sorted(inventory_archived(c))
+    marks = ','.join(str(int(i)) for i in archived) or '0'
+    scope = {'operativas': "u.status IN ('disponible','reservada')", 'vendidas': "u.status IN ('vendida','consumida')",
+             'baja': "u.status IN ('baja','devuelta') AND u.item_id NOT IN (%s)" % marks, 'archivadas': 'u.item_id IN (%s)' % marks,
+             'sin_serie': "u.serial='' AND u.status IN ('disponible','reservada')", 'todas': '1=1'}
+    counts = {k: c.execute('SELECT COUNT(*) FROM inventory_units u WHERE ' + v).fetchone()[0] for k, v in scope.items()}
+    where, args = [scope[view]], []
     if q:
         key = inventory.serial_key(q)
-        where.append('(u.serial_key LIKE ? OR u.internal_code LIKE ? OR g.name LIKE ?)')
-        args += ['%' + key + '%', '%' + key + '%', '%' + str(q).strip() + '%']
-    if state == 'sin_serie':
-        where.append("u.serial='' AND u.status IN ('disponible','reservada')")
-    elif state in inventory.UNIT_STATUS:
+        where.append("(u.serial_key LIKE ? OR REPLACE(UPPER(u.serial),' ','') LIKE ? OR u.internal_code LIKE ? OR g.name LIKE ?)")
+        args += ['%' + key + '%', '%' + key + '%', '%' + key + '%', '%' + str(q).strip() + '%']
+    if state in inventory.UNIT_STATUS:
         where.append('u.status=?')
         args.append(state)
-    rows = c.execute("SELECT u.*,g.name product,b.name brand,COALESCE(s.name,'') supplier,m.document FROM inventory_units u JOIN inventory_items i ON i.id=u.item_id JOIN catalog_items g ON g.id=i.catalog_id "
+    rows = c.execute("SELECT u.*,g.name product,b.name brand,COALESCE(s.name,'') supplier,m.document,i.active item_active FROM inventory_units u JOIN inventory_items i ON i.id=u.item_id JOIN catalog_items g ON g.id=i.catalog_id "
                      'LEFT JOIN inventory_brands b ON b.id=i.brand_id LEFT JOIN inventory_movements m ON m.id=u.entry_movement_id LEFT JOIN suppliers s ON s.id=m.supplier_id '
                      + ('WHERE ' + ' AND '.join(where) + ' ' if where else '') + 'ORDER BY u.id DESC LIMIT 300', args).fetchall()
     out = []
+    codes = {i: inventory.archive_code(c, i) for i in archived}
     for r in rows:
         lock = unit_lock(c, r)
+        out_of_stock = r['status'] in inventory.OUT_STATUSES
         out.append({'id': r['id'], 'internal_code': r['internal_code'], 'serial': r['serial'], 'product': r['product'], 'brand': r['brand'] or '', 'status': r['status'], 'status_label': inventory.UNIT_STATUS[r['status']],
-                    'location': r['location'], 'supplier': r['supplier'], 'document': r['document'] or '', 'lock': lock, 'serial_lock': serial_lock(r), 'created_at': r['created_at']})
-    missing = c.execute("SELECT COUNT(*) FROM inventory_units WHERE serial='' AND status IN ('disponible','reservada')").fetchone()[0]
-    return {'rows': out, 'missing': missing, 'statuses': inventory.UNIT_STATUS}
+                    'location': r['location'], 'supplier': r['supplier'], 'document': r['document'] or '', 'lock': lock, 'serial_lock': serial_lock(r), 'created_at': r['created_at'],
+                    'archived': codes.get(r['item_id'], ''), 'serial_free': bool(r['serial']) and not r['serial_key'],
+                    'can_restore': out_of_stock and not codes.get(r['item_id']) and bool(r['item_active']), 'can_release': out_of_stock and bool(r['serial_key'])})
+    return {'rows': out, 'missing': counts['sin_serie'], 'statuses': inventory.UNIT_STATUS, 'view': view, 'views': SERIAL_VIEWS, 'counts': counts}
+
+
+def inventory_archived(c):
+    import inventory_center
+    return inventory_center.archived_ids(c)
 
 
 def serial_lock(unit):

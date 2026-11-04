@@ -8,6 +8,7 @@
 - Productos controlados por serie: cada entrada crea sus unidades (código interno único y, si existe, la serie original única) y cada
   salida indica qué unidades salen. Las reservas apartan existencias sin descontarlas.
 - Costo promedio ponderado móvil: cada entrada se promedia con el saldo que queda; las salidas salen al promedio vigente."""
+import json
 import re
 from datetime import date
 
@@ -96,6 +97,61 @@ def clean_serial(serial):
     if text and (len(text) > 60 or not re.fullmatch(r'[\x20-\x7e]+', text)):
         raise InventoryError('Serie no válida: solo letras, números y signos simples (hasta 60).', fields={'serial': 'Serie no válida.'})
     return text
+
+
+OUT_STATUSES = ('baja', 'devuelta')  # fuera del inventario sin venta: pueden volver con su misma identidad
+SERIAL_FIELD = {'activo': 'Serie en existencia.', 'vendida': 'Serie de una unidad vendida.', 'baja': 'Serie con historial: revísalo.'}
+
+
+def archive_code(c, item_id):
+    """Lote de archivo (AR-…) de una ficha archivada, o vacío."""
+    for r in c.execute("SELECT code,items FROM inventory_reinit_batches WHERE code LIKE 'AR-%' ORDER BY id DESC"):
+        try:
+            if item_id in json.loads(r['items']).get('inventory', []):
+                return r['code']
+        except (ValueError, AttributeError):
+            continue
+    return ''
+
+
+def serial_history(c, serial):
+    """Qué significa ingresar esta serie (control de series del 04/11/2026). Mismo criterio en el asistente, las compras y el servidor:
+    A «activo»: la ocupa una unidad en existencia → se bloquea e indica cuál.
+    C «vendida»: la ocupa una unidad vendida o consumida → no se crea otra identidad; si vuelve, devolución del cliente sobre esa unidad.
+    B «baja»: la ocupa una unidad dada de baja o devuelta al proveedor → revisar su historial: reingresar esa misma unidad (misma ficha,
+      mismo código interno) o, con autorización de administración, liberar la serie para otro equipo o por un registro erróneo.
+    D «nueva»: nadie la ocupa. Si una unidad anterior la tuvo y se liberó con autorización (reinicialización, archivo, retiro por error o
+      liberación), se informa en `previous` y la unidad nueva queda vinculada en su historial."""
+    key = serial_key(serial)
+    shown = str(serial or '').strip()
+    if not key:
+        return {'case': 'nueva', 'serial': '', 'unit': None, 'previous': None, 'message': ''}
+    sql = ('SELECT u.id,u.item_id,u.internal_code,u.serial,u.status,i.active item_active,g.name product FROM inventory_units u '
+           'JOIN inventory_items i ON i.id=u.item_id JOIN catalog_items g ON g.id=i.catalog_id ')
+    row = c.execute(sql + 'WHERE u.serial_key=?', (key,)).fetchone()
+
+    def info(r):
+        archived = archive_code(c, r['item_id'])
+        return {'id': r['id'], 'item_id': r['item_id'], 'internal_code': r['internal_code'], 'product': r['product'], 'status': r['status'],
+                'status_label': UNIT_STATUS[r['status']], 'archived': archived, 'item_active': bool(r['item_active']) and not archived}
+    if not row:
+        prev = c.execute(sql + "WHERE u.serial_key='' AND (REPLACE(UPPER(u.serial),' ','')=? OR REPLACE(UPPER(u.released_serial),' ','')=?) ORDER BY u.id DESC LIMIT 1",
+                         (key, key)).fetchone()
+        p = info(prev) if prev else None
+        message = ('La serie %s ya tuvo historial: %s · %s (%s%s). Se registrará como unidad nueva, vinculada a la anterior.'
+                   % (shown, p['internal_code'], p['product'], p['status_label'].lower(), ', archivada en ' + p['archived'] if p['archived'] else '')) if p else ''
+        return {'case': 'nueva', 'serial': shown, 'unit': None, 'previous': p, 'message': message}
+    u = info(row)
+    if row['status'] in ('disponible', 'reservada'):
+        case, message = 'activo', 'La serie %s ya está en inventario: %s · %s (%s).' % (shown, u['internal_code'], u['product'], u['status_label'].lower())
+    elif row['status'] in ('vendida', 'consumida'):
+        case, message = 'vendida', ('La serie %s es de la unidad %s · %s (%s). No se crea otra identidad: si el equipo vuelve, registra la devolución del cliente '
+                                    'sobre esa unidad.' % (shown, u['internal_code'], u['product'], u['status_label'].lower()))
+    else:
+        case, message = 'baja', ('La serie %s pertenece a la unidad %s · %s (%s%s). Revisa su historial: si es el mismo equipo, reingrésalo con su misma identidad; '
+                                 'si es otro equipo o el registro fue un error, administración puede liberar la serie.'
+                                 % (shown, u['internal_code'], u['product'], u['status_label'].lower(), ', archivada en ' + u['archived'] if u['archived'] else ''))
+    return {'case': case, 'serial': shown, 'unit': u, 'previous': None, 'message': message}
 
 
 def serial_owner(c, serial):
@@ -251,7 +307,7 @@ def set_active(c, item_id, active, user, now):
 
 
 def move(c, item_id, direction, reason, qty, cost='0', user=None, now=None, reference_kind='', reference_id=None, note='', request_key=None, serials=None, unit_ids=None,
-         location='', reservation_id=None, unit_values=None, supplier_id=None, document='', tax_rate_bp=0, sale=None):
+         location='', reservation_id=None, unit_values=None, supplier_id=None, document='', tax_rate_bp=0, sale=None, restore_units=None):
     """Registra una entrada (+1) o salida (−1). Las salidas no pueden dejar existencias negativas ni tomar lo reservado para otro.
     Producto con serie: la entrada crea una unidad por cantidad (con las series indicadas; el resto, solo con código interno) y la salida
     exige las unidades que salen. `unit_values` actualiza las unidades que salen (cliente, documento, garantías)."""
@@ -288,18 +344,35 @@ def move(c, item_id, direction, reason, qty, cost='0', user=None, now=None, refe
             if unit['status'] == 'reservada' and (not held or unit['reservation_id'] != held['id']):
                 raise InventoryError('La unidad %s está reservada para otra operación.' % unit['internal_code'], 409, {'units': 'Unidad reservada.'})
             picked.append(unit)
-    entry_serials = []
+    # Caso B: unidades de esta ficha dadas de baja o devueltas que vuelven con su misma identidad (mismo código interno e historial).
+    restored = []
+    if restore_units:
+        if direction != 1 or not serial_item or reason == 'devolucion_cliente':
+            raise InventoryError('Reingreso de unidades no válido.', 400)
+        for unit_id in dict.fromkeys(int(u) for u in restore_units if str(u).isdigit()):
+            unit = c.execute('SELECT * FROM inventory_units WHERE id=? AND item_id=?', (unit_id, row['id'])).fetchone()
+            if not unit or unit['status'] not in OUT_STATUSES:
+                raise InventoryError('La unidad %s no está dada de baja ni devuelta en %s: no se puede reingresar.' % (unit['internal_code'] if unit else unit_id, row['name']), 409, {'units': 'Unidad no válida.'})
+            other = c.execute('SELECT internal_code FROM inventory_units WHERE serial_key=? AND id!=?', (serial_key(unit['serial']), unit_id)).fetchone() if unit['serial'] else None
+            if other:
+                raise InventoryError('La serie %s ya la ocupa %s: no se puede reingresar %s.' % (unit['serial'], other['internal_code'], unit['internal_code']), 409, {'units': 'Serie ocupada.'})
+            restored.append(unit)
+        if len(restored) > amount:
+            raise InventoryError('Hay más unidades por reingresar que la cantidad del ingreso.', fields={'quantity': 'Revisa la cantidad.'})
+    entry_serials, previous = [], {}
     if serial_item and direction == 1 and reason != 'devolucion_cliente':
         entry_serials = [clean_serial(v) for v in (serials or [])]
-        if len(entry_serials) > amount:
-            raise InventoryError('Hay más series (%d) que unidades (%d).' % (len(entry_serials), amount), fields={'quantity': 'Revisa la cantidad.'})
-        keys = [serial_key(v) for v in entry_serials if v]
+        if len(entry_serials) > amount - len(restored):
+            raise InventoryError('Hay más series (%d) que unidades (%d).' % (len(entry_serials), amount - len(restored)), fields={'quantity': 'Revisa la cantidad.'})
+        keys = [serial_key(v) for v in entry_serials if v] + [serial_key(u['serial']) for u in restored if u['serial']]
         if len(keys) != len(set(keys)):
             raise InventoryError('Una serie está repetida en este ingreso.', 409, {'serials': 'Serie repetida.'})
         for value in entry_serials:
-            owner = serial_owner(c, value)
-            if owner:
-                raise InventoryError('La serie %s ya está registrada (%s · %s).' % (value, owner['internal_code'], owner['name']), 409, {'serials': 'Serie duplicada.'})
+            found = serial_history(c, value)
+            if found['case'] != 'nueva':
+                raise InventoryError(found['message'], 409, {'serials': SERIAL_FIELD[found['case']]})
+            if found['previous']:
+                previous[serial_key(value)] = found['previous']
     applied = 0
     if direction == -1:
         history = valuation(c, row['id'])
@@ -314,12 +387,24 @@ def move(c, item_id, direction, reason, qty, cost='0', user=None, now=None, refe
     created = []
     if serial_item and direction == 1 and reason != 'devolucion_cliente':
         place = re.sub(r'\s+', ' ', str(location or row['location'] or '')).strip()[:80]
-        for n in range(amount):
+        for unit in restored:
+            c.execute("UPDATE inventory_units SET status='disponible',serial_key=?,released_serial='',client_id=NULL,order_id=NULL,invoice_id=NULL,document='',sold_at='',delivered_at='',"
+                      "store_warranty_from='',store_warranty_to='',maker_warranty_from='',maker_warranty_to='',exit_movement_id=NULL,reservation_id=NULL,entry_movement_id=?,"
+                      'unit_cost_cents=?,location=?,updated_at=?,updated_by=? WHERE id=?',
+                      (serial_key(unit['serial']), movement, unit_cost or applied, place or unit['location'], stamp(now), user['id'] if user else None, unit['id']))
+            event(c, now, user, 'unidad_reingresada', 'Unidad %s (serie %s) reingresada con su misma identidad: estaba %s.' % (unit['internal_code'], unit['serial'] or 'sin serie', UNIT_STATUS[unit['status']].lower()),
+                  row['id'], unit_id=unit['id'])
+            created.append(unit['id'])
+        for n in range(amount - len(restored)):
             value = entry_serials[n] if n < len(entry_serials) else ''
             unit = c.execute('INSERT INTO inventory_units(item_id,internal_code,serial,serial_key,status,location,unit_cost_cents,entry_movement_id,created_at,created_by,updated_at,updated_by) '
                              "VALUES (?,?,?,?,'disponible',?,?,?,?,?,?,?)", (row['id'], next_code(c, row['category_id']), value, serial_key(value), place, unit_cost or applied, movement,
                                                                             stamp(now), user['id'] if user else None, stamp(now), user['id'] if user else None)).lastrowid
             created.append(unit)
+            before = previous.get(serial_key(value))
+            if before:
+                event(c, now, user, 'serie_con_historial', 'La serie %s estuvo antes en %s · %s (%s%s). Esta unidad es un registro nuevo.' % (value, before['internal_code'], before['product'],
+                      before['status_label'].lower(), ', archivada en ' + before['archived'] if before['archived'] else ''), row['id'], unit_id=unit)
     for unit in picked:
         if direction == 1:  # devolución del cliente: la unidad vuelve a estar disponible; su historial queda en los eventos
             c.execute("UPDATE inventory_units SET status='disponible',client_id=NULL,order_id=NULL,invoice_id=NULL,document='',sold_at='',delivered_at='',store_warranty_from='',store_warranty_to='',"

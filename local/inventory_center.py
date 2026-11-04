@@ -300,8 +300,14 @@ def _category_ids(c, category_id):
     return [category_id and int(category_id)] + [r[0] for r in c.execute('SELECT id FROM inventory_categories WHERE parent_id=?', (int(category_id),))]
 
 
-def products(c, q='', category_id='', brand_id='', state=''):
-    """Catálogo de productos físicos. La búsqueda también encuentra el producto por el código interno o la serie de una de sus unidades."""
+PRODUCT_VIEWS = {'activo': 'Inventario activo', 'sin_existencias': 'Sin existencias', 'baja': 'Dados de baja', 'archivado': 'Historial archivado'}
+
+
+def products(c, q='', category_id='', brand_id='', state='', view='', counts=None):
+    """Catálogo de productos físicos. La búsqueda también encuentra el producto por el código interno o la serie de una de sus unidades.
+    Con `view` (pantalla del catálogo), cada ficha cae en una sola vista: activo (en uso y con existencias), sin existencias (en uso, en 0),
+    dados de baja (desactivadas) o historial archivado; `counts` recibe cuántas hay en cada vista con los mismos filtros. Sin `view` se
+    conserva el criterio anterior (lo usan las órdenes, las ventas y los selectores, que nunca reciben fichas archivadas)."""
     rows = c.execute(PRODUCT_SQL + ' ORDER BY i.active DESC,g.name COLLATE NOCASE').fetchall()
     cats = _category_ids(c, category_id)
     words = [w for w in re.sub(r'\s+', ' ', str(q or '')).lower().split(' ') if w]
@@ -311,10 +317,11 @@ def products(c, q='', category_id='', brand_id='', state=''):
         unit_hits = {r[0] for r in c.execute('SELECT item_id FROM inventory_units WHERE serial_key LIKE ? OR internal_code LIKE ?', ('%' + key + '%', '%' + key + '%'))}
     archived = archived_ids(c)
     out = []
+    view = view if view in PRODUCT_VIEWS else ''
     for r in rows:
-        if r['id'] in archived and state not in ('inactivo', 'archivado'):
+        if not view and r['id'] in archived and state not in ('inactivo', 'archivado'):
             continue  # archivadas: fuera del catálogo activo (siguen en el Kardex, las ventas y las facturas)
-        if state == 'archivado' and r['id'] not in archived:
+        if not view and state == 'archivado' and r['id'] not in archived:
             continue
         if cats and r['category_id'] not in cats:
             continue
@@ -324,6 +331,13 @@ def products(c, q='', category_id='', brand_id='', state=''):
         if words and r['id'] not in unit_hits and not all(w in hay for w in words):
             continue
         item = _product_dict(c, r)
+        if view:
+            item['archived'] = archive_code(c, r['id']) if r['id'] in archived else ''
+            where = 'archivado' if item['archived'] else 'baja' if not item['active'] else 'activo' if item['stock'] > 0 else 'sin_existencias'
+            if counts is not None:
+                counts[where] = counts.get(where, 0) + 1
+            if where != view:
+                continue
         if (state == 'bajo' and not item['low'] or state in inventory.STOCK_STATES and (item['stock_state'] != state or not item['active'])
                 or state == 'inactivo' and item['active'] or state == 'activo' and not item['active'] or state == 'sin_alertas' and item['alerts_enabled']):
             continue
@@ -521,9 +535,9 @@ def correct_cost(c, movement_id, cost, reason, user, now, document='', allow_pur
 # ---- Registrar mercadería e inventario inicial -------------------------------------------------------------------------
 
 def serial_check(c, serial):
-    value = inventory.clean_serial(serial)
-    owner = inventory.serial_owner(c, value)
-    return {'serial': value, 'exists': bool(owner), 'unit': dict(owner) if owner else None}
+    """Caso de la serie antes de agregarla (A en existencia, B de baja o devuelta, C vendida, D nueva; ver inventory.serial_history)."""
+    found = inventory.serial_history(c, inventory.clean_serial(serial))
+    return {**found, 'exists': found['case'] != 'nueva'}
 
 
 def register(c, data, user, now):
@@ -570,12 +584,15 @@ def register(c, data, user, now):
             raise InventoryError('Agrega al menos una unidad (escanea su serie o regístrala solo con código interno).', fields={'units': 'Sin unidades.'})
         if len(units) > MAX_UNITS:
             raise InventoryError('Máximo %d unidades por ingreso.' % MAX_UNITS, fields={'units': 'Demasiadas unidades.'})
-        serials = [str(u.get('serial', '') if isinstance(u, dict) else u or '') for u in units]
-        amount = str(len(serials))
+        # Una unidad marcada «reentry» es el mismo equipo de una unidad de esta ficha dada de baja (caso B): vuelve con su identidad.
+        restore = [int(u['reentry']) for u in units if isinstance(u, dict) and str(u.get('reentry', '')).isdigit()]
+        serials = [str(u.get('serial', '') if isinstance(u, dict) else u or '') for u in units if not (isinstance(u, dict) and str(u.get('reentry', '')).isdigit())]
+        amount = str(len(serials) + len(restore))
     else:
         amount = str(data.get('quantity') or '')
     movement = inventory.move(c, item_id, 1, reason, amount, '%d.%02d' % divmod(cost, 100), user, now, note=_text(data, 'note', 300) or ENTRY_REASONS[reason],
-                              request_key=key, serials=serials, location=_text(data, 'location', 80), supplier_id=supplier_id, document=document, tax_rate_bp=tax)
+                              request_key=key, serials=serials, location=_text(data, 'location', 80), supplier_id=supplier_id, document=document, tax_rate_bp=tax,
+                              restore_units=restore if item['tracking'] == 'serie' else None)
     if _text(data, 'location', 80) and item['tracking'] == 'granel':
         c.execute('UPDATE inventory_items SET location=? WHERE id=?', (_text(data, 'location', 80), item_id))
     return _register_result(c, item_id, movement)
@@ -645,6 +662,13 @@ def unit_detail(c, unit_id):
     out['warranty'] = _unit_warranty(c, row, date.today())
     import purchase_intake
     out['lock'], out['serial_lock'] = purchase_intake.unit_lock(c, row), purchase_intake.serial_lock(row)
+    raw = c.execute('SELECT serial_key FROM inventory_units WHERE id=?', (row['id'],)).fetchone()['serial_key']
+    active = c.execute('SELECT active FROM inventory_items WHERE id=?', (row['item_id'],)).fetchone()['active']
+    out_of_stock = row['status'] in inventory.OUT_STATUSES
+    out['archived'] = inventory.archive_code(c, row['item_id'])
+    out['serial_free'] = bool(row['serial']) and not raw
+    out['can_restore'] = out_of_stock and not out['archived'] and bool(active)
+    out['can_release'] = out_of_stock and bool(raw)
     return out
 
 
@@ -660,9 +684,11 @@ def set_serial(c, unit_id, serial, reason, user, now):
     value = inventory.clean_serial(serial)
     if not value:
         raise InventoryError('Escanea o escribe la serie.', fields={'serial': 'Serie obligatoria.'})
-    owner = inventory.serial_owner(c, value)
-    if owner and owner['id'] != row['id']:
-        raise InventoryError('La serie %s ya está registrada (%s · %s).' % (value, owner['internal_code'], owner['name']), 409, {'serial': 'Serie duplicada.'})
+    if row['status'] in inventory.OUT_STATUSES:
+        raise InventoryError('La unidad está fuera del inventario: reingrésala o libera su serie antes de cambiarla.', 409, {'serial': 'Unidad fuera del inventario.'})
+    found = inventory.serial_history(c, value)
+    if found['unit'] and found['unit']['id'] != row['id']:
+        raise InventoryError(found['message'], 409, {'serial': inventory.SERIAL_FIELD[found['case']]})
     reason = re.sub(r'\s+', ' ', str(reason or '')).strip()[:200]
     if row['serial'] and len(reason) < 5:
         raise InventoryError('Indica el motivo de la corrección de la serie.', fields={'reason': 'Motivo obligatorio.'})
@@ -2163,6 +2189,10 @@ def reinit_batches(c):
 # ---- Archivo de productos físicos (limpieza autorizada del catálogo) ---------------------------------------------------------------
 ARCHIVE_WORD = 'ARCHIVAR'
 PHYSICAL = ('repuesto', 'otro')
+
+
+def archive_code(c, item_id):
+    return inventory.archive_code(c, item_id)
 
 
 def archived_ids(c):
