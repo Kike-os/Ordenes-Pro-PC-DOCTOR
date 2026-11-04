@@ -4,6 +4,16 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.234 — 2026-11-03 21:48 (UTC-05:00)
+
+Recargo por pago con tarjeta de crédito trasladado al cliente en todos los cobros, como partida con IVA (migración 089, solo añade; aplicada en producción con respaldo previo)
+
+### Nuevas funcionalidades
+
+- Recargo por pago con tarjeta de crédito (corriente o diferida) a cargo del cliente en todos los cobros: cotizaciones, venta directa, cobros de órdenes y ventas de licencias, como partida propia con IVA y tomado de la configuración del recargo comercial
+- El recargo se muestra antes de confirmar el cobro y en la factura y el comprobante; se anula junto con su pago y nunca se duplica
+- Ventas de licencias: tipo de tarjeta (crédito o débito) al registrar el pago con tarjeta; la de débito no lleva recargo
+
 ## v1.5.233 — 2026-11-03 18:33 (UTC-05:00)
 
 DATAFAST según la tabla original: factor J a 36 meses (26,67 %) y combinaciones de Banco Diners
