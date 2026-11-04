@@ -8,6 +8,24 @@
   },
   "releases": [
     {
+      "version": "1.5.239",
+      "date": "2026-11-04T14:41:56-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Límite de evidencias configurable desde la ventana de seguimiento",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Seguimiento: administración cambia el límite de evidencias por seguimiento (1 a 10) desde «Agregar seguimiento», con validación en el navegador y en el servidor"
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Kike-os: «hagame lo pendiente y actualiza a la siguiente version» (04/11/2026)"
+    },
+    {
       "version": "1.5.238",
       "date": "2026-11-04T14:18:55-05:00",
       "type": "patch",

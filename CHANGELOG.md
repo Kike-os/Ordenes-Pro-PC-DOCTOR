@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.239 — 2026-11-04 14:41 (UTC-05:00)
+
+Límite de evidencias configurable desde la ventana de seguimiento
+
+### Mejoras realizadas
+
+- Seguimiento: administración cambia el límite de evidencias por seguimiento (1 a 10) desde «Agregar seguimiento», con validación en el navegador y en el servidor
+
 ## v1.5.238 — 2026-11-04 14:18 (UTC-05:00)
 
 Seguimiento de pedidos de repuestos con línea de tiempo para el cliente
