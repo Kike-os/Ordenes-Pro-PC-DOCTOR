@@ -20,7 +20,7 @@ misma versión de la tabla y su nota conserva el estado anterior; un factor pend
   marco (no hace crecer la página). Fila resaltada bajo el cursor, cifras alineadas y líneas discretas.
 - Filtros por **grupo**, **plazo** y **banco** (muestra los grupos que contienen ese banco), **búsqueda de porcentaje** (resalta las
   coincidencias y cuenta cuántas hay) y «Limpiar».
-- «Pendiente de confirmar» y «Sin configurar» se marcan; ningún valor se rellena: un pendiente no se puede usar para cobrar.
+- Cada celda muestra su estado real (ver «Estados y confirmación»); ningún valor se rellena ni se estima.
 
 ## Grupos bancarios
 
@@ -60,3 +60,34 @@ plazos, con el 26,67 % del grupo J a 36 meses). Faltaban **15 combinaciones de B
 | Minorista (E), Simple (F), Ampliado (G) | Diners | Discover, Visa Titanium, Mastercard |
 
 El asterisco (*) de las categorías corporativas, empresariales y PYMES de la tabla no tiene una nota explicativa en el documento.
+
+## Estados y confirmación administrativa (04/11/2026, 1.5.235)
+
+**Origen del aviso:** la pantalla mostraba siempre una leyenda fija («Pendiente de confirmar», «Sin configurar» y «Ningún valor se
+rellena…»), aunque no hubiera ningún factor en esos estados. La auditoría de producción del 04/11/2026 (solo lectura) dio 110 factores
+vigentes, 0 pendientes, 0 sin configurar, sin duplicados, todos de la tabla 6.2 vigente desde el 01/10/2026, y las 46 combinaciones con
+grupo. Cotejo automático con el PDF original: 107 valores coinciden con el texto, I-6 y J-6 coinciden pero el texto los desplaza de
+columna (el 4,59 % de I está impreso en otra línea), y J-36 (26,67 %) se leyó de la imagen.
+
+Estados (los calcula `card_finance.factor_state`; la leyenda muestra los recuentos guardados y filtra la tabla):
+
+| Estado | Significado | ¿Sirve para cobrar? |
+|---|---|---|
+| Confirmado | Administración lo cotejó y confirmó ese mismo porcentaje (con nombre, fecha y hora) | Sí |
+| Verificado · falta confirmar | Cargado de la tabla oficial por migración y cotejado, sin confirmación administrativa registrada | Sí (decisión de administración del 04/11/2026) |
+| Pendiente de confirmar | Sin valor (o en revisión) | No: el servidor rechaza el cobro |
+| Sin configurar | No existe fila para ese grupo y plazo | No |
+| Inactivo | Fuera de su vigencia (`valid_from`/`valid_to`) | No |
+
+Procedimiento (solo administración; el servidor comprueba el permiso, el CSRF, el cotejo marcado y el porcentaje visto):
+- **Confirmar un factor:** pulsar la celda → «Confirmar este valor», marcar el cotejo con la tabla original e indicar el documento.
+- **Confirmar varios:** filtrar (grupo, plazo, banco, estado) → «Confirmar N factores» → la ventana lista cada porcentaje. Si alguno
+  cambió mientras se revisaba, no se confirma ninguno. Los ya confirmados se omiten.
+- **Completar / corregir / configurar:** desde la misma ventana. Un pendiente se completa en su fila. Una corrección deja la fila
+  anterior «reemplazado» (no se borra) y crea la nueva (versión «6.2 · corr. N»). El nuevo valor queda confirmado por quien lo validó.
+- Registro: `card_factor_confirmations` (migración 090, solo añade). No se modifica ni se borra (disparadores). Historial por factor en la ventana.
+- Los cobros, proformas y facturas ya emitidos guardan su propio cálculo: corregir un factor no los altera.
+- El recargo comercial (9 %) sigue separado del factor financiero. «Diferido sin intereses» usa 0 %.
+
+Pruebas: `test_card_factor_confirm.py` cubre estados, bloqueo de pendientes e inactivos, confirmación individual y por lotes, lote con un
+porcentaje desactualizado (no confirma nada), registro inalterable, completar, corregir con historial, proforma emitida intacta y permisos.

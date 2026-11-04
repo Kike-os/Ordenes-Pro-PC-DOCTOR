@@ -82,7 +82,8 @@ class CardFinanceTests(unittest.TestCase):
         self.assertEqual(combos, GROUPS)  # mismas combinaciones autorizadas, cada una en su grupo
         pending = sum(v.split().count('pendiente') for v in EXPECTED.values())
         self.assertEqual(t['summary'], {'groups': len(set(GROUPS.values())), 'groups_total': 10, 'banks': len({b for b, _, _ in GROUPS}), 'combinations': len(GROUPS),
-                                        'months': len(MONTHS), 'months_total': len(MONTHS), 'pending': pending, 'missing': 0})
+                                        'months': len(MONTHS), 'months_total': len(MONTHS), 'pending': pending, 'missing': 0, 'total': 110, 'usable': 110 - pending,
+                                        'states': {'confirmado': 0, 'verificado': 110 - pending, 'pendiente': pending, 'sin_configurar': 0, 'inactivo': 0}})
 
     def test_example_of_140_dollars_with_surcharge_and_deferred_interest(self):
         cookie, _ = self.login()

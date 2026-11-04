@@ -1976,9 +1976,14 @@ class Handler(BaseHTTPRequestHandler):
                 import card_finance
                 q=parse_qs(urlsplit(self.path).query);data={k:(v[0] or '')[:80] for k,v in q.items()};today=reception_now().date().isoformat()
                 try:
-                    if path=='/api/payments/cards':return self.reply(200,{**card_finance.options(c,today),'table':card_finance.factor_table(c),'can_manage':user['role']=='administrador'})
+                    if path=='/api/payments/cards':return self.reply(200,{**card_finance.options(c,today),'table':card_finance.factor_table(c,today),'can_manage':user['role']=='administrador'})
                     if path=='/api/payments/simulate':return self.reply(200,card_finance.simulate(c,data,today))
                     if path=='/api/payments/compare':return self.reply(200,{'rows':card_finance.compare(c,data,today)})
+                    if path=='/api/payments/factors/history':
+                        if user['role']!='administrador':return self.reply(403,{'error':'Solo administración revisa los factores.'})
+                        try:months=int(data.get('months',''))
+                        except ValueError:months=0
+                        return self.reply(200,card_finance.factor_history(c,str(data.get('group','')).upper()[:1],months))
                     if path=='/api/payments/surcharge/history':
                         if user['role']!='administrador':return self.reply(403,{'error':'Solo administración ve el historial del recargo.'})
                         return self.reply(200,{'rows':card_finance.surcharge_history(c)})
@@ -3075,6 +3080,14 @@ class Handler(BaseHTTPRequestHandler):
                     for key,value in values.items():c.execute('INSERT INTO auth_policy VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value',(key,value))
                     audit(c,user['id'],'auth_policy_updated')
                     return self.reply(200,{'ok':True})
+                if path in ('/api/payments/factors/confirm','/api/payments/factors/edit'):
+                    # Factores DATAFAST: confirmación y corrección administrativas, con quién, cuándo y el documento (registro que no se modifica).
+                    if user['role']!='administrador':return self.reply(403,{'error':'Solo administración confirma o corrige los factores.'})
+                    import card_finance
+                    try:result=(card_finance.confirm_factors if path.endswith('/confirm') else card_finance.edit_factor)(c,data,user,reception_now())
+                    except card_finance.CardError as error:return self.reply(error.status,{'error':str(error),'fields':error.fields})
+                    audit(c,user['id'],'card_factors_confirmed' if path.endswith('/confirm') else 'card_factor_edited')
+                    return self.reply(200,{'ok':True,**result})
                 if path=='/api/payments/surcharge':
                     if user['role']!='administrador':return self.reply(403,{'error':'Solo administración configura el recargo comercial.'})
                     import card_finance

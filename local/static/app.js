@@ -5437,36 +5437,99 @@ function cardBrandChip(brand){const chip=el('span',brand,'fxp-brand');chip.datas
 async function invoiceCardSettings(panel){const data=await api('/api/payments/cards'),t=data.table,s=data.surcharge,sum=t.summary||{};panel.replaceChildren();
  panel.append(invSectionHead('Tarjetas y DATAFAST','Factores de diferido con intereses guardados en la base de datos'+(t.source?' ('+t.source.source+', versión '+t.source.version+', vigentes desde '+dashboardDate(t.source.valid_from)+')':'')+'. No representan la comisión del establecimiento.'));
  const wrap=el('div',undefined,'fxp');panel.append(wrap);const codes=Object.keys(t.groups),combos=t.combos||{};
- const pendingTotal=(sum.pending||0)+(sum.missing||0);
+ const st=sum.states||{},stTotal=sum.total||0,blocked=(st.pendiente||0)+(st.sin_configurar||0)+(st.inactivo||0);
+ const stParts=[[st.verificado,'verificado sin confirmar','verificados sin confirmar'],[st.pendiente,'pendiente','pendientes'],[st.sin_configurar,'sin configurar','sin configurar'],[st.inactivo,'inactivo','inactivos']].filter(([n])=>n).map(([n,one,many])=>n+' '+(n===1?one:many));
  wrap.append(invoiceKpis([['layers','Grupos configurados',(sum.groups??codes.length)+' de '+(sum.groups_total??codes.length),'Grupos con combinaciones activas','blue'],['landmark','Bancos habilitados',String(sum.banks??0),'Emisores con combinaciones activas','teal'],
   ['credit-card','Combinaciones bancarias',String(sum.combinations??0),'Banco · marca · categoría','teal'],['calendar','Plazos disponibles',(sum.months??0)+' de '+(sum.months_total??0),'Con al menos un factor vigente','blue'],
-  ['triangle-alert','Factores pendientes',String(pendingTotal),pendingTotal?(sum.pending||0)+' por confirmar · '+(sum.missing||0)+' sin configurar':'Todos configurados',pendingTotal?'amber':'green']]));
+  ['circle-check','Factores confirmados',(st.confirmado||0)+' de '+stTotal,stParts.length?stParts.join(' · '):'Todos confirmados por administración',blocked?'amber':st.verificado?'blue':'green']]));
  // 1 · Tabla de factores.
  const tableCard=invoiceCard('Factores de diferido con intereses','scroll-text','Porcentaje por grupo y plazo · '+codes.length+' grupos · '+t.rows.length+' plazos'),tools=el('div',undefined,'fxp-tools');
  const sel=(label,options)=>{const l=el('label',undefined,'inv-field'),x=el('select');for(const[v,txt]of options)x.add(new Option(txt,v));l.append(el('span',label),x);tools.append(l);return x;};
  const banks=[...new Set(Object.values(combos).flat().map(x=>x.bank))].sort((a,b)=>a.localeCompare(b,'es'));
  const fGroup=sel('Grupo',[['','Todos'],...codes.map(c=>[c,'Grupo '+c])]),fMonths=sel('Plazo',[['','Todos'],...t.rows.map(r=>[String(r.months),r.months+' meses'])]),fBank=sel('Banco',[['','Todos'],...banks.map(b=>[b,b])]);
+ const STATES=t.states||{},stateOrder=['confirmado','verificado','pendiente','sin_configurar','inactivo'];
+ const fState=sel('Estado',[['','Todos'],...stateOrder.map(k=>[k,STATES[k]||k])]);
  const qBox=el('label',undefined,'inv-field fxp-q'),q=el('input');q.type='search';q.inputMode='decimal';q.placeholder='Ej.: 8,45';q.setAttribute('aria-label','Buscar un porcentaje');qBox.append(el('span','Buscar porcentaje'),q);tools.append(qBox);
- const clearB=invBtn('Limpiar','rotate-ccw',()=>{fGroup.value=fMonths.value=fBank.value=q.value='';apply();});tools.append(clearB);
- const legend=el('p',undefined,'fxp-legend');legend.append(el('span','Pendiente de confirmar','fxp-tag'),el('span','Sin configurar','fxp-tag fxp-tag-none'),el('span','Ningún valor se rellena: un pendiente no se puede usar para cobrar.'));
+ const clearB=invBtn('Limpiar','rotate-ccw',()=>{fGroup.value=fMonths.value=fBank.value=fState.value=q.value='';apply();});tools.append(clearB);
+ let bulk=null;if(data.can_manage){bulk=invBtn('Confirmar factores','circle-check',()=>bulkConfirm(),'primary');bulk.classList.add('fxp-bulk-btn');tools.append(bulk);}
+ // Leyenda con los recuentos guardados: cada estado filtra la tabla. Solo aparece lo que existe (nada se rellena ni se estima).
+ const legend=el('div',undefined,'fxp-legend');legend.setAttribute('role','group');legend.setAttribute('aria-label','Estados de los factores');
+ for(const k of stateOrder){const n=st[k]||0;if(!n&&k!=='confirmado'&&k!=='verificado')continue;const b=el('button',undefined,'fxp-state');b.type='button';b.dataset.state=k;b.setAttribute('aria-pressed','false');
+  b.append(el('i'),el('span',STATES[k]||k),el('b',String(n)));b.title='Mostrar solo: '+(STATES[k]||k);b.addEventListener('click',()=>{fState.value=fState.value===k?'':k;apply();});legend.append(b);}
+ legend.append(el('p',blocked?'Pendiente, sin configurar e inactivo no se pueden usar para cobrar.':'Verificado: cargado de la tabla oficial y cotejado; sirve para cobrar mientras administración lo confirma.','fxp-help'));
  const count=el('p','','fxp-count');count.setAttribute('aria-live','polite');
+ const byKey={},fxpWhen=v=>v?new Intl.DateTimeFormat('es-EC',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',timeZone:'America/Guayaquil'}).format(new Date(v)):'';
  const scroll=el('div',undefined,'fxp-scroll'),table=el('table',undefined,'fxp-table'),thead=el('thead'),hr=el('tr'),tbody=el('tbody');scroll.tabIndex=0;scroll.setAttribute('role','region');scroll.setAttribute('aria-label','Factores por grupo y plazo');
  {const th=el('th','Meses');th.scope='col';th.dataset.col='m';hr.append(th);}for(const code of codes){const th=el('th');th.scope='col';th.dataset.group=code;th.append(el('b',code),el('small',(combos[code]||[]).length+' comb.'));th.title='Grupo '+code;hr.append(th);}thead.append(hr);
  for(const r of t.rows){const tr=el('tr');tr.dataset.months=String(r.months);const th=el('th');th.scope='row';th.append(el('b',String(r.months)),el('small','meses'));tr.append(th);
-  for(const code of codes){const f=r.factors[code],td=el('td');td.dataset.group=code;
-   if(!f){td.dataset.state='none';td.append(el('span','—'));td.title='Sin factor configurado para el grupo '+code+' a '+r.months+' meses';}
-   else if(f.status==='pendiente'||f.factor_bp==null){td.dataset.state='pending';td.append(el('span','Pendiente','fxp-tag'));td.title='Pendiente de confirmar con el documento original: no se puede usar todavía';}
-   else{td.dataset.state='ok';td.dataset.text=cardPct(f.factor_bp);td.append(el('span',cardPct(f.factor_bp)));td.title='Grupo '+code+' · '+r.months+' meses · '+cardPct(f.factor_bp);}
+  for(const code of codes){const f=r.factors[code],td=el('td'),state=f?f.state:'sin_configurar';td.dataset.group=code;td.dataset.months=String(r.months);td.dataset.state=state;if(f)byKey[code+'|'+r.months]=f;
+   const label=state==='pendiente'?el('span','Pendiente','fxp-tag'):state==='sin_configurar'?el('span','—'):el('span',cardPct(f.factor_bp));if(f&&f.factor_bp!=null)td.dataset.text=cardPct(f.factor_bp);
+   const tip='Grupo '+code+' · '+r.months+' meses · '+(f&&f.factor_bp!=null?cardPct(f.factor_bp)+' · ':'')+(STATES[state]||state)+(f&&f.confirmed_by?' por '+f.confirmed_by+', '+fxpWhen(f.confirmed_at):'');
+   if(data.can_manage){const b=el('button',undefined,'fxp-cell');b.type='button';b.append(label);b.title=tip;b.setAttribute('aria-label',tip+'. Revisar');b.addEventListener('click',()=>factorDialog(code,r.months,f));td.append(b);}
+   else{td.append(label);td.title=tip;}
    tr.append(td);}tbody.append(tr);}
  table.append(thead,tbody);scroll.append(table);tableCard.append(tools,legend,scroll,count);wrap.append(tableCard);
  const norm=v=>String(v||'').replace(/[%\s]/g,'').replace('.',',');
- function apply(){const g=fGroup.value,m=fMonths.value,b=fBank.value,needle=norm(q.value);const groups=new Set(codes.filter(code=>(!g||code===g)&&(!b||(combos[code]||[]).some(x=>x.bank===b))));
+ function visibleToConfirm(){return [...tbody.querySelectorAll('td[data-state=verificado]')].filter(td=>!td.hidden&&!td.parentElement.hidden&&(!table.classList.contains('fxp-searching')||td.classList.contains('fxp-hit'))).map(td=>byKey[td.dataset.group+'|'+td.dataset.months]).filter(Boolean);}
+ function apply(){const g=fGroup.value,m=fMonths.value,b=fBank.value,sv=fState.value,needle=norm(q.value),filtering=!!needle||!!sv;const groups=new Set(codes.filter(code=>(!g||code===g)&&(!b||(combos[code]||[]).some(x=>x.bank===b))));
   for(const cell of table.querySelectorAll('[data-group]'))cell.hidden=!groups.has(cell.dataset.group);let hits=0,rows=0;
-  for(const tr of tbody.rows){const show=!m||tr.dataset.months===m;tr.hidden=!show;if(show)rows++;for(const td of tr.querySelectorAll('td')){const hit=!!needle&&!td.hidden&&td.dataset.state==='ok'&&norm(td.dataset.text).includes(needle);td.classList.toggle('fxp-hit',hit);if(hit)hits++;}}
-  table.classList.toggle('fxp-searching',!!needle);
-  count.textContent=!groups.size?'Ningún grupo con esos filtros.':(needle?hits+(hits===1?' coincidencia':' coincidencias')+' de «'+q.value.trim()+'» · ':'')+groups.size+(groups.size===1?' grupo':' grupos')+' · '+rows+(rows===1?' plazo':' plazos');
+  for(const tr of tbody.rows){const show=!m||tr.dataset.months===m;tr.hidden=!show;if(show)rows++;for(const td of tr.querySelectorAll('td')){const hit=filtering&&show&&!td.hidden&&(!sv||td.dataset.state===sv)&&(!needle||(!!td.dataset.text&&norm(td.dataset.text).includes(needle)));td.classList.toggle('fxp-hit',hit);if(hit)hits++;}}
+  table.classList.toggle('fxp-searching',filtering);for(const x of legend.querySelectorAll('.fxp-state'))x.setAttribute('aria-pressed',String(x.dataset.state===sv));
+  if(bulk){const n=visibleToConfirm().length;bulk.disabled=!n;bulk.lastChild.textContent=n?'Confirmar '+n+(n===1?' factor':' factores'):'Nada por confirmar';}
+  count.textContent=!groups.size?'Ningún grupo con esos filtros.':(filtering?hits+(hits===1?' factor':' factores')+(sv?' en «'+(STATES[sv]||sv)+'»':'')+(needle?' con «'+q.value.trim()+'»':'')+' · ':'')+groups.size+(groups.size===1?' grupo':' grupos')+' · '+rows+(rows===1?' plazo':' plazos');
   for(const card of grid.querySelectorAll('.fxp-group'))card.dataset.active=String(!!g&&card.dataset.group===g);}
- for(const x of [fGroup,fMonths,fBank])x.addEventListener('change',apply);q.addEventListener('input',apply);
+ for(const x of [fGroup,fMonths,fBank,fState])x.addEventListener('change',apply);q.addEventListener('input',apply);
+ // Ventanas de validación (solo administración): el servidor vuelve a comprobar el permiso, el porcentaje visto y el cotejo marcado.
+ const docRef='Tabla DATAFAST versión '+(t.source?.version||'')+(t.source?.valid_from?', vigente desde '+dashboardDate(t.source.valid_from):'');
+ const reviewBox=(form,text)=>{const box=el('label',undefined,'inv-cf fxp-check'),cb=el('input');cb.type='checkbox';cb.name='checked';cb.required=true;box.append(cb,el('span',text));form.append(box);return cb;};
+ const fxpHistory=(code,months)=>{const det=el('details',undefined,'fxp-hist'),body=el('div',undefined,'fxp-hist-body');det.append(el('summary','Historial de este factor'),body);
+  det.addEventListener('toggle',async()=>{if(!det.open||det.dataset.loaded)return;det.dataset.loaded='1';body.replaceChildren(el('p','Cargando…','fxp-help'));
+   try{const h=await api('/api/payments/factors/history?group='+encodeURIComponent(code)+'&months='+months),list=el('ul',undefined,'fxp-hist-list');
+    for(const x of h.confirmations){const li=el('li');li.append(el('strong',({confirmado:'Confirmado',corregido:'Corregido',completado:'Completado',configurado:'Configurado'})[x.action]+' · '+cardPct(x.factor_bp)+(x.previous_bp!=null?' (antes '+cardPct(x.previous_bp)+')':'')),el('small',x.actor+' · '+fxpWhen(x.confirmed_at)+' · '+x.note));list.append(li);}
+    for(const v of h.versions){const li=el('li');li.dataset.kind='version';li.append(el('strong','Versión '+v.version+' · '+(v.factor_bp!=null?cardPct(v.factor_bp):'sin valor')+' · '+({vigente:'en uso',pendiente:'pendiente',reemplazado:'reemplazada'})[v.status]),el('small','Vigente desde '+dashboardDate(v.valid_from)+(v.note?' · '+v.note:'')));list.append(li);}
+    body.replaceChildren(h.confirmations.length?list:el('p','Sin confirmaciones administrativas todavía.','fxp-help'));if(!h.confirmations.length)body.append(list);}
+   catch(error){delete det.dataset.loaded;body.replaceChildren(el('p',error.message,'inv-form-message'));}});return det;};
+ function factorDialog(code,months,f){const state=f?f.state:'sin_configurar',d=invDialog('Grupo '+code+' · '+months+' meses',true);d.classList.add('fxp-dialog');
+  const head=el('div',undefined,'fxp-dhead'),chip=el('span',STATES[state]||state,'fxp-chip');chip.dataset.state=state;head.append(el('strong',f&&f.factor_bp!=null?cardPct(f.factor_bp):'Sin valor'),chip);d.append(head);
+  const list=combos[code]||[],facts=el('dl',undefined,'fxp-facts');
+  for(const[k,v]of [['Versión de la tabla',f?f.version:'—'],['Vigencia',f?dashboardDate(f.valid_from)+(f.valid_to?' — '+dashboardDate(f.valid_to):' — sin fin'):'—'],['Confirmación',f&&f.confirmed_by?f.confirmed_by+' · '+fxpWhen(f.confirmed_at):'Sin confirmación administrativa'],
+   ['Combinaciones',list.length+' · '+([...new Set(list.map(x=>x.bank))].join(', ')||'ninguna')]]){const x=el('div');x.append(el('dt',k),el('dd',v));facts.append(x);}d.append(facts);
+  if(f&&f.note)d.append(el('p',f.note,'fxp-dnote'));
+  if(state==='verificado'){const{form,msg,field,fail,clear}=invForm('inv-settings fxp-vform');form.append(el('h3','Confirmar este valor'));reviewBox(form,'Cotejé '+cardPct(f.factor_bp)+' con la tabla original de DATAFAST para el grupo '+code+' a '+months+' meses.');
+   field('note','Documento cotejado',{area:true,max:300,required:true,value:'Tabla DATAFAST versión '+f.version+', vigente desde '+dashboardDate(f.valid_from),hint:'Queda registrado con tu nombre, la fecha y la hora.'});
+   const ok=el('button',undefined,'primary inv-btn');ok.type='submit';ok.append(invIcon('circle-check'),el('span','Confirmar este valor'));form.append(msg,ok);
+   form.addEventListener('submit',async ev=>{ev.preventDefault();clear();const fd=new FormData(form);ok.disabled=true;ok.setAttribute('aria-busy','true');
+    try{await api('/api/payments/factors/confirm',{items:f.id+':'+f.factor_bp,checked:fd.get('checked')?'1':'',note:fd.get('note')});d.close();toast('Factor del grupo '+code+' a '+months+' meses confirmado.','success');invoiceCardSettings(panel);}
+    catch(error){fail(error);ok.disabled=false;ok.removeAttribute('aria-busy');}});d.append(form);}
+  const verb=state==='pendiente'?'Completar porcentaje':state==='sin_configurar'?'Configurar porcentaje':'Corregir porcentaje',direct=state==='pendiente'||state==='sin_configurar';
+  const{form:ef,msg:em,field:efield,fail:efail,clear:eclear}=invForm('inv-settings fxp-vform');ef.hidden=!direct;
+  if(!direct){const open=invBtn(verb,'pencil',()=>{ef.hidden=false;open.hidden=true;ef.querySelector('input')?.focus();});open.classList.add('fxp-open-edit');d.append(open);}
+  ef.append(el('h3',verb));const g2=el('div',undefined,'fx-form-grid');ef.append(g2);
+  const pct=efield('percent','Nuevo porcentaje (%)',{mode:'decimal',max:6,required:true,into:g2});efield('version','Versión de la tabla',{max:20,required:true,into:g2,value:f?f.version:(t.source?.version||'')});
+  efield('valid_from','Vigente desde',{type:'date',into:g2,value:f?f.valid_from:(t.source?.valid_from||'')});
+  const preview=el('p','','fxp-help fxp-preview');preview.setAttribute('aria-live','polite');ef.append(preview);
+  pct.addEventListener('input',()=>{const v=pct.value.trim().replace('.',',');preview.textContent=v?'Cambio: '+(f&&f.factor_bp!=null?cardPct(f.factor_bp):'sin valor')+' → '+v+(v.includes('%')?'':' %')+'. Los cobros y proformas ya registrados conservan su cálculo.':'';});
+  reviewBox(ef,'Cotejé el nuevo porcentaje con la tabla original de DATAFAST.');efield('note','Documento y motivo',{area:true,max:300,required:true,hint:f?'La versión anterior no se borra: queda en el historial.':'Queda registrado con tu nombre, la fecha y la hora.'});
+  const save=el('button',undefined,'primary inv-btn');save.type='submit';save.append(invIcon('circle-check'),el('span','Guardar y confirmar'));ef.append(em,save);
+  ef.addEventListener('submit',async ev=>{ev.preventDefault();eclear();const fd=new FormData(ef);save.disabled=true;save.setAttribute('aria-busy','true');
+   try{await api('/api/payments/factors/edit',{group:code,months:String(months),percent:fd.get('percent'),version:fd.get('version'),valid_from:fd.get('valid_from'),expected_id:f?String(f.id):'',checked:fd.get('checked')?'1':'',note:fd.get('note')});
+    d.close();toast('Factor del grupo '+code+' a '+months+' meses guardado y confirmado.','success');invoiceCardSettings(panel);}
+   catch(error){efail(error);save.disabled=false;save.removeAttribute('aria-busy');}});
+  d.append(ef,fxpHistory(code,months));(direct?pct:d.querySelector('.fxp-vform input,.fxp-open-edit'))?.focus();}
+ function bulkConfirm(){const list=visibleToConfirm();if(!list.length)return;
+  const rows=[];for(const td of tbody.querySelectorAll('td[data-state=verificado]')){const f=byKey[td.dataset.group+'|'+td.dataset.months];if(list.includes(f))rows.push([td.dataset.group,Number(td.dataset.months),f]);}
+  rows.sort((a,b)=>a[0].localeCompare(b[0])||a[1]-b[1]);const n=rows.length,d=invDialog('Confirmar '+n+(n===1?' factor':' factores'),true);d.classList.add('fxp-dialog');
+  d.append(el('p','Coteja cada porcentaje con la tabla original de DATAFAST. Solo se confirman los factores verificados que ves con los filtros actuales; si alguno cambió mientras revisabas, no se confirma ninguno.','fxp-dnote'));
+  const box=el('div',undefined,'fxp-scroll fxp-bulk'),tb=el('table',undefined,'fxp-table fxp-bulk-table'),hr2=el('tr'),body=el('tbody');box.tabIndex=0;box.setAttribute('role','region');box.setAttribute('aria-label','Factores por confirmar');
+  for(const x of ['Grupo','Plazo','Porcentaje']){const th=el('th',x);th.scope='col';hr2.append(th);}const th2=el('thead');th2.append(hr2);
+  for(const[code,months,f]of rows){const tr=el('tr');tr.append(el('td','Grupo '+code),el('td',months+' meses'),el('td',cardPct(f.factor_bp)));body.append(tr);}tb.append(th2,body);box.append(tb);d.append(box);
+  const{form,msg,field,fail,clear}=invForm('inv-settings fxp-vform');reviewBox(form,'Cotejé uno por uno estos '+n+' porcentajes con la tabla original de DATAFAST.');
+  field('note','Documento cotejado',{area:true,max:300,required:true,value:docRef,hint:'Cada factor queda registrado con tu nombre, la fecha y la hora.'});
+  const ok=el('button',undefined,'primary inv-btn');ok.type='submit';ok.append(invIcon('circle-check'),el('span','Confirmar '+n+(n===1?' factor':' factores')));form.append(msg,ok);
+  form.addEventListener('submit',async ev=>{ev.preventDefault();clear();const fd=new FormData(form);ok.disabled=true;ok.setAttribute('aria-busy','true');
+   try{const r=await api('/api/payments/factors/confirm',{items:rows.map(([,,f])=>f.id+':'+f.factor_bp).join(','),checked:fd.get('checked')?'1':'',note:fd.get('note')});d.close();
+    toast(r.confirmed+(r.confirmed===1?' factor confirmado':' factores confirmados')+(r.skipped?' · '+r.skipped+' ya estaban confirmados':'')+'.','success');invoiceCardSettings(panel);}
+   catch(error){fail(error);ok.disabled=false;ok.removeAttribute('aria-busy');}});d.append(form);form.querySelector('input')?.focus();}
  // 2 · Grupos bancarios.
  const groupsCard=invoiceCard('Grupos bancarios','landmark','Solo estas combinaciones de banco, marca y categoría se pueden elegir al cobrar'),gTools=el('div',undefined,'fxp-tools');
  const gq=el('input');gq.type='search';gq.placeholder='Buscar banco, marca o categoría';gq.setAttribute('aria-label','Buscar en los grupos bancarios');const gBox=el('label',undefined,'inv-search fxp-gsearch');gBox.append(invIcon('search'),gq);

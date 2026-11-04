@@ -163,28 +163,178 @@ def options(c, today):
     return {'banks': tree, 'factors': factors, 'months': list(MONTHS), 'modes': MODES, 'methods': METHODS, 'surcharge': surcharge_settings(c), 'surcharge_methods': list(SURCHARGE_METHODS)}
 
 
-def factor_table(c):
-    """Tabla de factores vigentes por grupo y plazo, con los bancos de cada grupo (para administración)."""
+STATES = {'confirmado': 'Confirmado', 'verificado': 'Verificado · falta confirmar', 'pendiente': 'Pendiente de confirmar', 'sin_configurar': 'Sin configurar',
+          'inactivo': 'Inactivo'}
+SOURCE = 'DATAFAST · tabla de factores de diferido con intereses'
+
+
+def _last_confirmation(c, factor_id):
+    return c.execute('SELECT * FROM card_factor_confirmations WHERE factor_id=? ORDER BY id DESC LIMIT 1', (factor_id,)).fetchone()
+
+
+def factor_state(row, confirmation, today):
+    """Estado real de un factor guardado. «verificado» (cargado de la tabla oficial, sin confirmación administrativa) sí sirve para cobrar;
+    «pendiente» (sin valor) e «inactivo» (fuera de su vigencia) no. «confirmado» exige que la confirmación sea del mismo porcentaje."""
+    if row is None:
+        return 'sin_configurar'
+    if row['status'] == 'pendiente' or row['factor_bp'] is None:
+        return 'pendiente'
+    if row['valid_from'] > today or (row['valid_to'] and row['valid_to'] < today):
+        return 'inactivo'
+    return 'confirmado' if confirmation and confirmation['factor_bp'] == row['factor_bp'] else 'verificado'
+
+
+def _table_meta(c):
+    """Versión de la tabla que comparten la mayoría de los factores vigentes (una corrección suelta no cambia la versión de la tabla)."""
+    return c.execute("SELECT source,version,valid_from FROM card_factors WHERE status='vigente' GROUP BY source,version,valid_from ORDER BY COUNT(*) DESC,MAX(id) DESC LIMIT 1").fetchone()
+
+
+def factor_table(c, today=None):
+    """Tabla de factores por grupo y plazo con el estado de cada uno y los bancos de cada grupo (para administración)."""
+    today = today or date.today().isoformat()
     groups = {}
     for r in c.execute('SELECT group_code,bank,brand,category FROM card_products WHERE active=1 ORDER BY group_code,bank,brand,category'):
         groups.setdefault(r['group_code'], []).append('%s · %s · %s' % (r['bank'], r['brand'], r['category']))
+    confirmations = {r['factor_id']: r for r in c.execute('SELECT f.* FROM card_factor_confirmations f JOIN (SELECT factor_id,MAX(id) id FROM card_factor_confirmations '
+                                                           'GROUP BY factor_id) last ON last.id=f.id')}
     rows = {}
-    for r in c.execute("SELECT group_code,months,factor_bp,status FROM card_factors WHERE status IN ('vigente','pendiente')"):
-        rows.setdefault(r['months'], {})[r['group_code']] = {'factor_bp': r['factor_bp'], 'status': r['status']}
-    meta = c.execute("SELECT source,version,valid_from FROM card_factors WHERE status='vigente' ORDER BY id DESC LIMIT 1").fetchone()
+    for r in c.execute("SELECT * FROM card_factors WHERE status IN ('vigente','pendiente')"):
+        conf = confirmations.get(r['id'])
+        state = factor_state(r, conf, today)
+        rows.setdefault(r['months'], {})[r['group_code']] = {
+            'id': r['id'], 'factor_bp': r['factor_bp'], 'status': r['status'], 'state': state, 'usable': state in ('confirmado', 'verificado'),
+            'valid_from': r['valid_from'], 'valid_to': r['valid_to'], 'version': r['version'], 'source': r['source'], 'note': r['note'],
+            'confirmed_at': conf['confirmed_at'] if conf and state == 'confirmado' else '', 'confirmed_by': conf['actor'] if conf and state == 'confirmado' else ''}
+    meta = _table_meta(c)
     codes = sorted(r[0] for r in c.execute('SELECT code FROM card_factor_groups'))
     # Combinaciones de cada grupo ya separadas (banco, marca y categoría) y un resumen calculado con lo guardado: nada se estima ni se rellena.
     combos = {code: [] for code in codes}
     for r in c.execute('SELECT group_code,bank,brand,category FROM card_products WHERE active=1 ORDER BY group_code,bank,brand,category'):
         combos.setdefault(r['group_code'], []).append({'bank': r['bank'], 'brand': r['brand'], 'category': r['category']})
     cells = [(m, code, rows.get(m, {}).get(code)) for m in MONTHS for code in codes]
+    states = {key: 0 for key in STATES}
+    for _, _, f in cells:
+        states[f['state'] if f else 'sin_configurar'] += 1
     summary = {'groups': sum(1 for code in codes if combos.get(code)), 'groups_total': len(codes),
                'banks': c.execute('SELECT COUNT(DISTINCT bank) FROM card_products WHERE active=1').fetchone()[0],
-               'combinations': sum(len(v) for v in combos.values()), 'months': len([m for m in MONTHS if any(f and f['status'] == 'vigente' for _, code, f in cells if _ == m)]),
-               'months_total': len(MONTHS), 'pending': sum(1 for _, _, f in cells if f and (f['status'] == 'pendiente' or f['factor_bp'] is None)),
-               'missing': sum(1 for _, _, f in cells if not f)}
-    return {'groups': {code: groups.get(code, []) for code in codes}, 'combos': combos, 'summary': summary,
+               'combinations': sum(len(v) for v in combos.values()), 'months': len([m for m in MONTHS if any(f and f['usable'] for mm, _, f in cells if mm == m)]),
+               'months_total': len(MONTHS), 'total': len(cells), 'states': states, 'usable': states['confirmado'] + states['verificado'],
+               'pending': states['pendiente'], 'missing': states['sin_configurar']}
+    return {'groups': {code: groups.get(code, []) for code in codes}, 'combos': combos, 'summary': summary, 'states': STATES,
             'rows': [{'months': m, 'factors': rows.get(m, {})} for m in MONTHS], 'source': dict(meta) if meta else None}
+
+
+def factor_history(c, group_code, months):
+    """Versiones y confirmaciones de un grupo y plazo, de la más reciente a la más antigua (para la ventana de validación)."""
+    versions = [dict(r) for r in c.execute('SELECT id,factor_bp,status,valid_from,valid_to,version,note,updated_at FROM card_factors WHERE group_code=? AND months=? ORDER BY id DESC',
+                                           (group_code, months))]
+    ids = [v['id'] for v in versions] or [0]
+    marks = ','.join('?' * len(ids))
+    confirmations = [dict(r) for r in c.execute('SELECT id,factor_id,factor_bp,previous_bp,action,note,confirmed_at,actor FROM card_factor_confirmations WHERE factor_id IN (%s) '
+                                                'ORDER BY id DESC LIMIT 50' % marks, ids)]
+    return {'versions': versions, 'confirmations': confirmations}
+
+
+def _review_note(data):
+    if str(data.get('checked', '')) not in ('1', 'true', 'on'):
+        raise CardError('Marca que cotejaste los valores con la tabla original de DATAFAST.', 400, {'checked': 'Confirmación obligatoria.'})
+    note = re.sub(r'\s+', ' ', str(data.get('note', ''))).strip()
+    if len(note) < 5:
+        raise CardError('Indica el documento o el motivo (al menos 5 caracteres).', 400, {'note': 'Documento o motivo obligatorio.'})
+    return note[:300]
+
+
+def confirm_factors(c, data, user, now):
+    """Confirmación administrativa de uno o varios factores vigentes. Cada uno llega con el porcentaje que vio el administrador: si cambió
+    mientras lo revisaba no se confirma nada. Todo se valida antes de escribir. Un factor pendiente no se confirma: primero se completa."""
+    raw = data.get('items', '')
+    pairs = [p for p in (raw.split(',') if isinstance(raw, str) else raw) if str(p).strip()]
+    items = []
+    for pair in pairs:
+        m = re.fullmatch(r'(\d{1,9}):(\d{1,5})', str(pair).strip())
+        if not m:
+            raise CardError('Selección de factores no válida.', 400)
+        items.append((int(m.group(1)), int(m.group(2))))
+    if not items:
+        raise CardError('No hay factores por confirmar en la selección.', 400)
+    if len(items) > 200 or len({fid for fid, _ in items}) != len(items):
+        raise CardError('Selección de factores no válida.', 400)
+    note = _review_note(data)
+    today, stamp = now.date().isoformat(), now.isoformat(timespec='seconds')
+    todo, skipped = [], 0
+    for fid, bp in items:
+        row = c.execute('SELECT * FROM card_factors WHERE id=?', (fid,)).fetchone()
+        if not row or row['status'] not in ('vigente', 'pendiente'):
+            raise CardError('Un factor de la selección fue reemplazado mientras lo revisabas: actualiza la tabla.', 409)
+        label = 'grupo %s a %d meses' % (row['group_code'], row['months'])
+        state = factor_state(row, _last_confirmation(c, fid), today)
+        if state == 'pendiente':
+            raise CardError('El factor del %s está pendiente: primero complétalo con su porcentaje.' % label, 409)
+        if state == 'inactivo':
+            raise CardError('El factor del %s no está vigente en esta fecha.' % label, 409)
+        if row['factor_bp'] != bp:
+            raise CardError('El porcentaje del %s cambió mientras lo revisabas: actualiza la tabla.' % label, 409)
+        if state == 'confirmado':
+            skipped += 1
+        else:
+            todo.append(row)
+    for row in todo:
+        c.execute('INSERT INTO card_factor_confirmations(factor_id,factor_bp,previous_bp,action,note,confirmed_at,confirmed_by,actor) VALUES (?,?,NULL,?,?,?,?,?)',
+                  (row['id'], row['factor_bp'], 'confirmado', note, stamp, user['id'], user['name']))
+    return {'confirmed': len(todo), 'skipped': skipped}
+
+
+def edit_factor(c, data, user, now):
+    """Completa, corrige o configura el factor de un grupo y plazo desde la ventana de validación (solo administración).
+    - Pendiente sin valor: se completa en la misma fila (misma versión de la tabla).
+    - Vigente con otro valor: la fila anterior queda «reemplazado» (no se borra) y se crea una nueva vigente.
+    - Sin fila: se crea vigente.
+    El nuevo valor queda confirmado por quien lo validó. Los cobros ya registrados no se tocan: guardan su propio cálculo."""
+    group = str(data.get('group', '')).strip().upper()
+    if not c.execute('SELECT 1 FROM card_factor_groups WHERE code=?', (group,)).fetchone():
+        raise CardError('Grupo no válido.', 400, {'group': 'Grupo no válido.'})
+    try:
+        months = int(str(data.get('months', '')))
+    except ValueError:
+        months = 0
+    if months not in MONTHS:
+        raise CardError('Plazo no válido.', 400, {'months': 'Plazo no válido.'})
+    bp = _bp(data.get('percent', ''), 'percent', 1, 10000)
+    row = c.execute("SELECT * FROM card_factors WHERE group_code=? AND months=? AND status IN ('vigente','pendiente')", (group, months)).fetchone()
+    if str(row['id'] if row else '') != str(data.get('expected_id', '') or ''):
+        raise CardError('Ese factor cambió mientras lo revisabas: actualiza la tabla.', 409)
+    if row and row['status'] == 'vigente' and row['factor_bp'] == bp:
+        raise CardError('Es el mismo porcentaje guardado: usa «Confirmar este valor».', 400, {'percent': 'Mismo porcentaje.'})
+    meta = _table_meta(c)
+    version = re.sub(r'\s+', ' ', str(data.get('version', '') or '')).strip()[:20] or (row['version'] if row else (meta['version'] if meta else ''))
+    if not re.fullmatch(r'[0-9A-Za-z][0-9A-Za-z .\-]{0,19}', version or ''):
+        raise CardError('Indica la versión de la tabla DATAFAST.', 400, {'version': 'Versión de la tabla (ej.: 6.2).'})
+    valid_from = str(data.get('valid_from', '') or '').strip() or (row['valid_from'] if row else (meta['valid_from'] if meta else now.date().isoformat()))
+    try:
+        valid_from = date.fromisoformat(valid_from).isoformat() if re.fullmatch(r'\d{4}-\d{2}-\d{2}', valid_from) else None
+    except ValueError:
+        valid_from = None
+    if not valid_from:
+        raise CardError('Fecha no válida.', 400, {'valid_from': 'Usa una fecha real con el formato AAAA-MM-DD.'})
+    note = _review_note(data)
+    stamp = now.isoformat(timespec='seconds')
+    if row and row['status'] == 'pendiente' and version == row['version']:
+        c.execute("UPDATE card_factors SET factor_bp=?,status='vigente',valid_from=?,note=?,updated_at=?,updated_by=? WHERE id=? AND status='pendiente'",
+                  (bp, valid_from, note, stamp, user['id'], row['id']))
+        fid, action, previous = row['id'], 'completado', None
+    else:
+        if row:
+            c.execute("UPDATE card_factors SET status='reemplazado',updated_at=?,updated_by=? WHERE id=?", (stamp, user['id'], row['id']))
+        label, n = version, 1
+        while c.execute('SELECT 1 FROM card_factors WHERE group_code=? AND months=? AND version=?', (group, months, label)).fetchone():
+            n += 1
+            label = ('%s · corr. %d' % (version, n - 1))[:40]
+        cur = c.execute("INSERT INTO card_factors(group_code,months,factor_bp,status,valid_from,source,version,note,updated_at,updated_by) VALUES (?,?,?,'vigente',?,?,?,?,?,?)",
+                        (group, months, bp, valid_from, row['source'] if row else SOURCE, label, note, stamp, user['id']))
+        fid, action, previous = cur.lastrowid, 'corregido' if row else 'configurado', row['factor_bp'] if row else None
+    c.execute('INSERT INTO card_factor_confirmations(factor_id,factor_bp,previous_bp,action,note,confirmed_at,confirmed_by,actor) VALUES (?,?,?,?,?,?,?,?)',
+              (fid, bp, previous, action, note, stamp, user['id'], user['name']))
+    return {'id': fid, 'group': group, 'months': months, 'factor_bp': bp, 'action': action}
 
 
 def _bp(value, field, low=0, high=5000):
