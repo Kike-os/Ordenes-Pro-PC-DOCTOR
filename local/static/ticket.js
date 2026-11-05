@@ -12,7 +12,7 @@ document.addEventListener('click',event=>{if(event.target.closest('[data-print]'
  function viewer(list,start){let at=start,src='',z=1,img=null,token=0;const box=mk('div','ticket-viewer'),bar=mk('div','ticket-viewer-bar'),stage=mk('div','ticket-viewer-stage'),title=mk('strong'),count=mk('span','ticket-viewer-zoom');
   const btn=(label,fn,aria)=>{const b=mk('button','',label);b.type='button';if(aria)b.setAttribute('aria-label',aria);b.addEventListener('click',fn);return b;};
   const prev=btn('‹',()=>go(at-1),'Fotografía anterior'),next=btn('›',()=>go(at+1),'Fotografía siguiente'),zoom=mk('span','ticket-viewer-zoom','100 %');
-  const set=v=>{z=Math.min(8,Math.max(1,v));if(img)img.style.width=(z*100)+'%';zoom.textContent=Math.round(z*100)+' %';};
+  const set=v=>{z=Math.min(8,Math.max(1,v));if(img){img.classList.toggle('zoomed',z>1);img.style.width=z>1?(z*100)+'%':'';}zoom.textContent=Math.round(z*100)+' %';};
   bar.append(title,count,prev,next,btn('−',()=>set(z/1.5),'Alejar'),zoom,btn('+',()=>set(z*1.5),'Acercar'),btn('Ajustar',()=>set(1)));const close=btn('Cerrar',()=>done());close.className='ticket-viewer-close';bar.append(close);
   box.setAttribute('role','dialog');box.setAttribute('aria-modal','true');box.append(bar,stage);document.body.append(box);close.focus();
   stage.addEventListener('wheel',e=>{if(!e.ctrlKey&&!e.metaKey)return;e.preventDefault();set(z*(e.deltaY<0?1.2:1/1.2));},{passive:false});

@@ -242,3 +242,35 @@
 }
 @media(max-width:340px){.tw-steps{gap:4px}.tw-steps b{font-size:10.5px}.tw-head .ticket-logo{width:70px}}
 @media print{.ticket-public main{width:100%}.tw-actions,.ticket-viewer,.ticket-evidence{display:none}.tw-body.tw-two{grid-template-columns:1fr 1fr}.tw-sec,.tp{background:#fff;border-color:#c9d6e8;color:#102744}}
+/* Ajuste final responsivo (1.5.242): el mismo diseño, entre 10 y 15 % más compacto. Las columnas dependen del ancho real de la tarjeta
+   (consultas de contenedor), no de la pantalla: dos columnas solo si caben (≥ 820 px de tarjeta). Miniaturas más pequeñas (object-fit:
+   cover) y vista ampliada completa (object-fit: contain). Tipografía con clamp() sin bajar de tamaños legibles. */
+.ticket-public main{padding:16px 12px 30px}
+.ticket-public .ticket.tw{container:tw/inline-size}
+.tw-top{padding:16px clamp(14px,2.4vw,20px) 14px}
+.tw-head{margin-bottom:14px;gap:10px 16px}.tw-head .ticket-logo{width:clamp(76px,9vw,100px);max-height:48px}
+.tw-title h1{font-size:clamp(17px,2.1vw,21px)}.tw-order strong{font-size:clamp(15px,1.9vw,19px)}
+.tw-steps{gap:6px}.tw-steps b{font-size:12.5px}.tw-bar{height:7px}.tw-steps i{width:18px;height:18px;margin-top:3px;font-size:10px}
+.tw-flag{margin:10px 8px 0 0;padding:5px 11px;font-size:12px}
+.tw-facts{margin-top:12px;padding-top:12px;gap:8px 16px}
+.tw-body{gap:12px;padding:0 clamp(12px,2.4vw,20px) 16px}.tw-col{gap:12px}
+.tw-body.tw-two{grid-template-columns:minmax(0,1fr)}
+@container tw (min-width:820px){.tw-body.tw-two{grid-template-columns:minmax(0,.95fr) minmax(0,1.35fr)}}
+.tw-sec{padding:12px 14px;border-radius:14px}.tw-sec>h2{margin-bottom:8px;font-size:11.5px}
+.ticket-updates ol{gap:6px}.ticket-updates li{padding:8px 10px}.ticket-updates strong{font-size:13.5px}.ticket-updates p{font-size:13px}
+.tw-gallery{grid-template-columns:repeat(auto-fill,minmax(clamp(68px,13cqi,84px),1fr));gap:8px}
+.ticket-ev{gap:4px;padding:4px;border-radius:10px;font-size:11.5px}.tw-thumb{border-radius:7px}.tw-thumb img{object-fit:cover}
+.tp{gap:10px;padding:12px;border-radius:14px}.tp+.tp{margin-top:10px}
+.tp-id strong{font-size:15px}.tp-now{gap:8px 14px;padding:10px 12px}.tp-now strong{font-size:14.5px}.tp-now p{font-size:13px}
+.tp-meter{grid-template-columns:repeat(6,16px)}.tp-steps li{min-height:32px}.tp-steps i{width:22px;height:22px}
+.tp-hist ol{gap:8px;margin-top:8px}.tp-facts{gap:4px 12px}
+.tw-codes{grid-template-columns:1fr;justify-items:center;gap:10px 16px;padding:14px clamp(12px,2.4vw,20px) 16px}
+@container tw (min-width:480px){.tw-codes{grid-template-columns:auto minmax(0,1fr);justify-items:stretch}.tw-codes .ticket-qr{justify-self:start}.tw-verify{grid-column:1/-1}}
+@container tw (min-width:760px){.tw-codes{grid-template-columns:auto minmax(0,340px) minmax(0,1fr)}.tw-verify{grid-column:auto}}
+.tw-codes .ticket-qr{width:120px;height:120px}.tw-codes .ticket-barcode{width:100%;max-width:340px;justify-self:center}
+.tw-actions{margin-top:12px}
+/* Vista ampliada: la foto completa a la medida de la pantalla (contain); al acercar, se recorre con desplazamiento. */
+.ticket-viewer-stage{min-height:0}
+.ticket-viewer-stage img{width:100%;height:100%;max-width:none;object-fit:contain}
+.ticket-viewer-stage img.zoomed{height:auto;object-fit:initial}
+@media(max-width:560px){.tw-steps b{font-size:11.5px}.tw-codes .ticket-qr{justify-self:center}}

@@ -86,3 +86,24 @@ Lectura comprobada con un lector independiente sobre capturas de pantalla: a la 
   - rechazo de datos del proveedor;
   - avance sin adelantos;
   - contador de evidencias.
+
+## Ajuste final responsivo (1.5.242)
+
+Es el mismo diseño, entre 10 y 15 % más compacto en márgenes, separaciones, miniaturas y códigos. No se eliminó nada: se conservan el logo, los colores, los estados, el vehículo animado, el historial y las fotos.
+
+**Columnas:** dependen del ancho real de la tarjeta (consultas de contenedor), no de la pantalla.
+- Dos columnas desde 820 px de tarjeta, por ejemplo una tableta horizontal de 1024 px o una computadora.
+- Una columna en una tableta vertical de 768 px y en los teléfonos.
+
+**Fotos:**
+- Las miniaturas miden de 72 a 96 px (`object-fit: cover`) y el número de columnas se ajusta solo.
+- La vista ampliada muestra la foto entera (`object-fit: contain`). Al acercar, se recorre con desplazamiento. El original no se reduce.
+
+**Códigos:**
+- QR de 120 px y código de barras de hasta 340 px.
+- Distribución: en fila en escritorio, en dos niveles en tableta y apilados en el teléfono.
+
+**Pruebas de navegador:**
+- 320 × 640, 375 × 812, 430 × 932, 844 × 390 (teléfono horizontal), 768 × 1024, 1024 × 768, 1024 × 1366, 1366 × 768 y 1920 × 1080.
+- Con historial expandido, varias fotos y varios repuestos.
+- Vehículo en movimiento, detenido y llegado.
