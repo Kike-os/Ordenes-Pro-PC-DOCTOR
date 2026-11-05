@@ -4,6 +4,25 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.240 — 2026-11-04 19:45 (UTC-05:00)
+
+Seguimiento público profesional de reparaciones y repuestos
+
+### Mejoras realizadas
+
+- Seguimiento público: tarjeta más amplia en escritorio con dos columnas (novedades y evidencias | repuestos), una columna en el teléfono, sin recortes ni desplazamiento horizontal entre 320 y 1920 px
+- Seguimiento público: barra de avance por segmentos que solo colorea las etapas completadas (azul, turquesa, verde claro, verde intenso) y avisos de espera que no adelantan el avance
+- Seguimiento público de repuestos: etapas públicas reales (el traslado solo si se registró), colores de azul a verde solo al completarse, historial y estado comprensible
+
+### Errores corregidos
+
+- Seguimiento público: las evidencias antiguas aparecían como «IMG»; ahora muestran la foto real, sin nombres de archivo, con visor que permite pasar de una foto a otra
+- Seguimiento público: ver varias evidencias podía agotar el límite de consultas de la página; ahora tienen su propio contador
+
+### Actualizaciones de seguridad
+
+- Seguimiento público: el cliente nunca ve proveedores, mercados en línea, transportistas, guías ni pedidos; los mensajes que los mencionen se rechazan al guardar y se omiten al mostrar
+
 ## v1.5.239 — 2026-11-04 14:41 (UTC-05:00)
 
 Límite de evidencias configurable desde la ventana de seguimiento

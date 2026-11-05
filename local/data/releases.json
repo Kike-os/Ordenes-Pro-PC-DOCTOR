@@ -8,6 +8,31 @@
   },
   "releases": [
     {
+      "version": "1.5.240",
+      "date": "2026-11-04T19:45:52-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Seguimiento público profesional de reparaciones y repuestos",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Seguimiento público: tarjeta más amplia en escritorio con dos columnas (novedades y evidencias | repuestos), una columna en el teléfono, sin recortes ni desplazamiento horizontal entre 320 y 1920 px",
+          "Seguimiento público: barra de avance por segmentos que solo colorea las etapas completadas (azul, turquesa, verde claro, verde intenso) y avisos de espera que no adelantan el avance",
+          "Seguimiento público de repuestos: etapas públicas reales (el traslado solo si se registró), colores de azul a verde solo al completarse, historial y estado comprensible"
+        ],
+        "fixes": [
+          "Seguimiento público: las evidencias antiguas aparecían como «IMG»; ahora muestran la foto real, sin nombres de archivo, con visor que permite pasar de una foto a otra",
+          "Seguimiento público: ver varias evidencias podía agotar el límite de consultas de la página; ahora tienen su propio contador"
+        ],
+        "security": [
+          "Seguimiento público: el cliente nunca ve proveedores, mercados en línea, transportistas, guías ni pedidos; los mensajes que los mencionen se rechazan al guardar y se omiten al mostrar"
+        ],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Kike-os: «Sí, publica la 1.5.240» (04/11/2026)"
+    },
+    {
       "version": "1.5.239",
       "date": "2026-11-04T14:41:56-05:00",
       "type": "patch",
