@@ -4,6 +4,19 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.245 — 2026-11-04 22:37 (UTC-05:00)
+
+Logistics Pro: envío nacional e internacional en pedidos de repuestos
+
+### Nuevas funcionalidades
+
+- Logistics Pro en pedidos de repuestos: tipo de envío nacional (10 etapas) o internacional (14), país de origen y fecha de despacho; ruta por fases con colores (pedido, transporte aéreo, aduana, distribución nacional, recepción e instalación).
+- Avión SVG durante el tramo aéreo, estado aduanero y vehículo terrestre, siempre según los eventos registrados; incidencias logísticas: retraso, vuelo reprogramado, retención aduanera, documentación pendiente, cambio de transportista, problema de entrega, extraviado y devuelto.
+
+### Mejoras realizadas
+
+- El seguimiento público conserva sus 6 etapas, muestra el traslado una sola vez y no expone datos logísticos internos; los pedidos anteriores siguen con sus 8 etapas.
+
 ## v1.5.244 — 2026-11-04 22:18 (UTC-05:00)
 
 Órdenes y Agenda: paneles compactos con cascada automática
