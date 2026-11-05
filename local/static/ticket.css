@@ -135,35 +135,86 @@
 @keyframes tw-shimmer{to{background-position:-200% 0}}
 .tw-thumb img{width:100%;height:100%;object-fit:cover}.tw-thumb b{font-size:13px}.tw-thumb[data-ready]{background:#12305a}
 .tw-thumb[data-error]::after{content:"Vista previa no disponible";padding:6px;font-size:11px;line-height:1.3}
-/* Repuestos: línea de etapas de azul a verde (solo las completadas); horizontal si hay espacio, vertical en el teléfono. */
-.ticket-parts{container-type:inline-size}
-.tp{display:grid;gap:10px;padding:12px;border:1px solid #2c548888;border-radius:14px;background:#0c1f3dcc}.tp+.tp{margin-top:10px}
-.tp>header{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:6px 10px}.tp>header div{display:grid;gap:2px;min-width:0}
-.tp>header strong{font-size:15px;overflow-wrap:anywhere}.tp>header small{color:#8fa9cc;font-size:12px}.tp-desc{margin:0;color:#dbe8fb;font-size:13.5px;line-height:1.5}
-.tp-state{--t:var(--azul);flex:none;padding:3px 10px;border:1px solid color-mix(in srgb,var(--t) 55%,transparent);border-radius:999px;background:color-mix(in srgb,var(--t) 18%,transparent);color:#fff;font-size:12px;font-weight:700}
-:is(.tp-state,.tp-steps li)[data-tone=amarillo]{--t:var(--amarillo)}:is(.tp-state,.tp-steps li)[data-tone=naranja]{--t:var(--naranja)}:is(.tp-state,.tp-steps li)[data-tone=rojo]{--t:var(--rojo)}
-.tp-state[data-tone=verde]{--t:var(--verde)}.tp-state[data-tone=azul]{--t:var(--azul)}
+/* Repuestos «PC-DOCTOR Pro» (1.5.241). Tokens de etapa: --s0 azul institucional → --s5 verde intenso; pendiente = --neutro. Solo lo
+   completado lleva color. Vehículo SVG: se mueve una vez en «En traslado» (y se detiene si hay novedad), llega y se detiene en «Recibido»;
+   antes del traslado o después de recibir, no aparece. Con movimiento reducido, todo queda estático. Horizontal desde 440 px de panel. */
+.ticket-parts{container-type:inline-size;--s0:#2563eb;--s1:#0ea5e9;--s2:#06b6d4;--s3:#14b8a6;--s4:#4ade80;--s5:#16a34a}
+.tp{display:grid;gap:12px;padding:14px;border:1px solid #2c548888;border-radius:16px;background:linear-gradient(170deg,#0f2747,#0b1a31)}.tp+.tp{margin-top:12px}
+.tp [data-c="0"]{--c:var(--s0)}.tp [data-c="1"]{--c:var(--s1);--cp:var(--s0)}.tp [data-c="2"]{--c:var(--s2);--cp:var(--s1)}.tp [data-c="3"]{--c:var(--s3);--cp:var(--s2)}
+.tp [data-c="4"]{--c:var(--s4);--cp:var(--s3)}.tp [data-c="5"]{--c:var(--s5);--cp:var(--s4)}
+.tp-head{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:6px 10px}.tp-id{display:grid;gap:2px;min-width:0;flex:1 1 200px}
+.tp-id strong{font-size:16px;line-height:1.3;overflow-wrap:anywhere}.tp-id small{color:#8fa9cc;font-size:12.5px;overflow-wrap:anywhere}
+.tp-state{--t:var(--s0);flex:none;max-width:100%;padding:4px 11px;border:1px solid color-mix(in srgb,var(--t) 60%,transparent);border-radius:999px;background:color-mix(in srgb,var(--t) 20%,transparent);color:#fff;font-size:12px;font-weight:700;overflow-wrap:anywhere}
+:is(.tp-state,.tp-now,.tp-steps li,.tp-hist li)[data-tone=amarillo],.tp-hist li[data-tone=espera_confirmacion]{--t:var(--amarillo)}
+:is(.tp-state,.tp-now,.tp-steps li)[data-tone=naranja],.tp-hist li:is([data-tone=retrasado],[data-tone=espera_proveedor]){--t:var(--naranja)}
+:is(.tp-state,.tp-now,.tp-steps li)[data-tone=rojo],.tp-hist li:is([data-tone=incidencia_transporte],[data-tone=cancelado]){--t:var(--rojo)}
+:is(.tp-state,.tp-now)[data-tone=verde]{--t:var(--s5)}:is(.tp-state,.tp-now)[data-tone=azul]{--t:var(--s1)}
+/* Estado actual destacado. */
+.tp-now{--t:var(--s1);display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px 16px;align-items:center;padding:12px 14px;border:1px solid color-mix(in srgb,var(--t) 40%,transparent);border-left:4px solid var(--t);border-radius:12px;background:color-mix(in srgb,var(--t) 9%,#0a1830)}
+.tp-now small{color:#8fa9cc;font-size:11px;letter-spacing:.06em;text-transform:uppercase}.tp-now strong{display:block;margin-top:2px;color:#fff;font-size:15.5px}
+.tp-now p{margin:4px 0 0;color:#dbe8fb;font-size:13.5px;line-height:1.5}
+.tp-meta{display:grid;justify-items:end;gap:4px;text-align:right}.tp-meta small{letter-spacing:0;text-transform:none;font-size:12px}.tp-meta b{color:#fff}
+.tp-meter{display:grid;grid-template-columns:repeat(6,18px);gap:4px}.tp-meter span{height:6px;border-radius:999px;background:var(--neutro)}
+.tp-meter span[data-state=done]{background:var(--c)}.tp-meter span[data-state=current]{background:linear-gradient(90deg,var(--c) 50%,var(--neutro) 50%)}
+/* Línea de etapas: vertical (teléfono) por defecto. */
+.tp-track{position:relative}
 .tp-steps{display:grid;margin:0;padding:0;list-style:none}
-.tp-steps li{--c:var(--azul);position:relative;display:grid;grid-template-columns:22px 1fr auto;align-items:center;gap:10px;min-height:34px;color:#9fb2cc;font-size:13px}
-.tp-steps li[data-c="1"]{--c:#2b93df}.tp-steps li[data-c="2"]{--c:#1aa6c4}.tp-steps li[data-c="3"]{--c:var(--turquesa)}.tp-steps li[data-c="4"]{--c:#22c55e}.tp-steps li[data-c="5"]{--c:var(--verde)}
+.tp-steps li{--c:var(--s0);position:relative;display:grid;grid-template-columns:24px minmax(0,1fr) auto;align-items:center;gap:10px;min-height:36px;color:#9fb2cc;font-size:13px}
 .tp-steps li[data-tone]{--c:var(--t)}
-.tp-steps li::before{content:"";position:absolute;left:10px;top:-10px;width:2px;height:20px;background:var(--neutro)}.tp-steps li:first-child::before{display:none}
-.tp-steps li:is([data-state=done],[data-state=current])::before{background:var(--c)}
-.tp-steps i{position:relative;z-index:1;display:grid;place-items:center;width:22px;height:22px;border:2px solid var(--neutro);border-radius:50%;background:#0c1f3d;font-style:normal;font-size:12px;font-weight:800;color:#fff}
+.tp-steps li::before{content:"";position:absolute;left:11px;top:-11px;width:2px;height:22px;border-radius:2px;background:var(--neutro)}.tp-steps li:first-child::before{display:none}
+.tp-steps li:is([data-state=done],[data-state=current])::before{background:linear-gradient(180deg,var(--cp,var(--c)),var(--c))}
+.tp-steps i{position:relative;z-index:1;display:grid;place-items:center;width:24px;height:24px;box-sizing:border-box;border:2px solid var(--neutro);border-radius:50%;background:#0b1a31;font-style:normal;font-size:12px;font-weight:800;color:#fff}
 .tp-steps li[data-state=done]{color:#e3eeff}.tp-steps li[data-state=done] i{border-color:var(--c);background:var(--c)}.tp-steps li[data-state=done] i::after{content:"✓"}
-.tp-steps li[data-state=current]{color:#fff;font-weight:700}.tp-steps li[data-state=current] i{border-color:var(--c);box-shadow:0 0 0 4px color-mix(in srgb,var(--c) 28%,transparent)}
-.tp-steps li[data-state=current] i::after{content:"";width:7px;height:7px;border-radius:50%;background:var(--c)}
-.tp-steps time{color:#8fa9cc;font-size:11.5px;font-weight:500}
+.tp-steps li[data-state=current]{color:#fff;font-weight:700}.tp-steps li[data-state=current] i{border-color:var(--c);box-shadow:0 0 0 4px color-mix(in srgb,var(--c) 26%,transparent),0 0 14px color-mix(in srgb,var(--c) 55%,transparent)}
+.tp-steps li[data-state=current] i::after{content:"";width:8px;height:8px;border-radius:50%;background:var(--c)}
+.tp-steps li[data-state=skipped] i{border-style:dashed}.tp-steps li[data-state=skipped] i::after{content:"–";color:#8fa9cc}
+.tp-steps time,.tp-steps em{color:#8fa9cc;font-size:11.5px;font-style:normal;font-weight:500}
+.tp-steps li:has(.tp-van-inline){grid-template-columns:24px minmax(0,1fr) auto auto}
+.tp-van-inline{display:block;width:40px;height:24px}.tp-van-inline svg{width:100%;height:100%}
+.tp-vehicle{display:none}
+/* Vehículo SVG (línea de colores de PC-DOCTOR, sin emojis). */
+.tp svg .v-box{fill:#1e4a86;stroke:#7fb2e8;stroke-width:1.2}.tp svg .v-cab{fill:#2563eb;stroke:#93c5fd;stroke-width:1.2}.tp svg .v-win{fill:#bfe3ff;opacity:.85}
+.tp svg .v-band{fill:#14b8a6}.tp svg .v-wheel{fill:#0b1526;stroke:#93c5fd;stroke-width:1.4}.tp svg .v-hub{fill:#93c5fd}
+.tp-van-inline[data-vehicle=stopped] svg .v-cab,.tp-vehicle[data-vehicle=stopped] svg .v-cab{fill:var(--t,#f97316)}
+.v-ok circle{fill:var(--s3)}.v-ok path{fill:none;stroke:#fff;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
 @container (min-width:440px){
- .tp-steps{grid-template-columns:repeat(var(--n,6),minmax(0,1fr));align-items:start}.tp-steps[data-n="5"]{--n:5}
- .tp-steps li{grid-template-columns:none;justify-items:center;gap:4px;min-height:0;text-align:center;font-size:11.5px;line-height:1.25}
- .tp-steps li::before{left:calc(-50% + 11px);right:calc(50% + 11px);top:10px;width:auto;height:2px}
- .tp-steps time{font-size:10.5px}
+ .tp:is([data-vehicle=transit],[data-vehicle=arrived],[data-vehicle=stopped]) .tp-track{padding-top:34px}
+ .tp-steps{grid-template-columns:repeat(6,minmax(0,1fr));align-items:start}
+ .tp-steps li{grid-template-columns:none;justify-items:center;gap:5px;min-height:0;text-align:center;font-size:11.5px;line-height:1.25}
+ .tp-steps li::before{left:calc(-50% + 12px);right:calc(50% + 12px);top:11px;width:auto;height:3px;background:var(--neutro)}
+ .tp-steps li:is([data-state=done],[data-state=current])::before{background:linear-gradient(90deg,var(--cp,var(--c)),var(--c))}
+ .tp-steps time,.tp-steps em{font-size:10.5px}.tp-van-inline{display:none}.tp-steps li:has(.tp-van-inline){grid-template-columns:none}
+ /* El vehículo recorre la línea: centros de etapa en (i + 0,5) / 6 del ancho. */
+ .tp-vehicle{--p:.5;display:block;position:absolute;top:0;left:calc(var(--p) * 100% - 22px);width:44px;height:28px;z-index:2;pointer-events:none}
+ .tp-vehicle svg:first-child{width:44px;height:26px;filter:drop-shadow(0 3px 6px #0009)}
+ .tp-vehicle[data-vehicle=transit]{--p:.5333}.tp-vehicle[data-vehicle=stopped]{--p:.4833}.tp-vehicle[data-vehicle=arrived]{--p:.5833}
+ .tp-vehicle .v-ok{position:absolute;top:-6px;right:-8px;width:18px;height:18px}
 }
+@media(prefers-reduced-motion:no-preference){
+ @container (min-width:440px){
+  .tp-vehicle[data-vehicle=transit]{animation:tp-drive 1.6s cubic-bezier(.45,.05,.25,1) .3s both,tp-idle .6s ease-in-out 1.9s 3}
+  .tp-vehicle[data-vehicle=arrived]{animation:tp-arrive .6s ease-out .2s both}
+  .tp-vehicle[data-vehicle=arrived] .v-ok{animation:tp-pop .45s ease-out .8s both}
+ }
+ .tp-steps li[data-state=current] i{animation:tp-pulse 1.4s ease-out .4s 3}
+ .tp-van-inline[data-vehicle=transit] svg{animation:tp-sway .6s ease-in-out .3s 3}
+ .tp-meter span{transition:background-color .4s ease}
+}
+@keyframes tp-drive{from{left:calc(.4167 * 100% - 22px)}to{left:calc(.5333 * 100% - 22px)}}
+@keyframes tp-arrive{from{left:calc(.5333 * 100% - 22px)}to{left:calc(.5833 * 100% - 22px)}}
+@keyframes tp-idle{50%{transform:translateY(-2px)}}
+@keyframes tp-pop{from{transform:scale(0);opacity:0}70%{transform:scale(1.2);opacity:1}to{transform:scale(1)}}
+@keyframes tp-pulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--c) 55%,transparent)}100%{box-shadow:0 0 0 10px transparent}}
+@keyframes tp-sway{50%{transform:translateX(5px)}}
 .tp-facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:6px 12px;margin:0}.tp-facts dt{font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:#8fa9cc}.tp-facts dd{margin:0;font-size:13px;font-weight:600}
-.tp-hist summary{color:#b9cbe4;font-size:12.5px;cursor:pointer}.tp-hist summary:focus-visible{outline:2px solid #93c5fd;outline-offset:2px;border-radius:6px}
-.tp-hist ol{display:grid;gap:6px;margin:8px 0 0;padding:0;list-style:none}.tp-hist li{display:grid;gap:2px;padding:7px 10px;border-left:3px solid var(--azul);border-radius:8px;background:#12305a}
-.tp-hist time{font-size:11px;color:#8fa9cc}.tp-hist strong{font-size:13px}.tp-hist p{margin:0;font-size:13px;overflow-wrap:anywhere}
+/* Cronología: punto con el color de la etapa; las novedades llevan el tono de su situación. */
+.tp-hist summary{display:flex;align-items:center;gap:8px;color:#b9cbe4;font-size:13px;cursor:pointer}.tp-hist summary b{padding:0 7px;border-radius:999px;background:#ffffff14;font-size:11.5px}
+.tp-hist summary:focus-visible{outline:2px solid #93c5fd;outline-offset:2px;border-radius:6px}
+.tp-hist ol{position:relative;display:grid;gap:10px;margin:10px 0 0;padding:0 0 0 22px;list-style:none}.tp-hist ol::before{content:"";position:absolute;left:6px;top:4px;bottom:4px;width:2px;background:#2c5488}
+.tp-hist li{--c:var(--s0);position:relative;display:grid;gap:2px}.tp-hist li::before{content:"";position:absolute;left:-21px;top:4px;width:12px;height:12px;border-radius:50%;background:var(--t,var(--c));box-shadow:0 0 0 3px #0b1a31}
+.tp-hist time{font-size:11.5px;color:#8fa9cc}.tp-hist strong{font-size:13.5px}.tp-hist span{color:#cfdcf0;font-size:12.5px}
+.tp-hist p{margin:4px 0 0;padding:6px 10px;border-left:3px solid var(--s1);border-radius:6px;background:#12305a;font-size:13px;overflow-wrap:anywhere}
+@media(max-width:560px){.tp-now{grid-template-columns:1fr}.tp-meta{justify-items:start;text-align:left}}
 /* Códigos compactos: QR, código de barras y texto en una fila en escritorio; apilados en el teléfono. Tamaños legibles por cámaras. */
 .tw-codes{grid-template-columns:auto minmax(0,1fr) minmax(0,1fr);gap:12px 18px;align-items:center;padding:16px 24px 18px}
 .tw-codes .ticket-qr{width:132px;height:132px}

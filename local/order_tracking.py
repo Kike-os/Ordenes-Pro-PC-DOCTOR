@@ -135,21 +135,44 @@ def _icon(path):
     return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="%s"/></svg>'%path
 
 
+VAN=('<svg viewBox="0 0 48 28" aria-hidden="true" focusable="false"><path class="v-box" d="M3 7a3 3 0 0 1 3-3h20a3 3 0 0 1 3 3v12H3z"/>'
+     '<path class="v-cab" d="M29 9h8.5a3 3 0 0 1 2.5 1.3l4.2 6.2a3 3 0 0 1 .5 1.7V19H29z"/><path class="v-win" d="M31 11h6l3.4 5H31z"/>'
+     '<rect class="v-band" x="6" y="10" width="17" height="3" rx="1.5"/><circle class="v-wheel" cx="11" cy="21" r="3.6"/><circle class="v-wheel" cx="36" cy="21" r="3.6"/>'
+     '<circle class="v-hub" cx="11" cy="21" r="1.4"/><circle class="v-hub" cx="36" cy="21" r="1.4"/></svg>')
+CHECK='<svg class="v-ok" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><circle cx="10" cy="10" r="9"/><path d="m6 10.2 2.6 2.6L14.2 7"/></svg>'
+
+
 def _parts_section(data):
+    """Seguimiento de repuestos «PC-DOCTOR Pro»: bloque de estado actual, línea de 6 etapas (de azul a verde solo en lo completado), vehículo
+    SVG que solo se mueve con un traslado real registrado y se detiene al llegar, y cronología. Se construye solo con order_part_requests.public."""
     e=html.escape;out=[]
     for p in data.get('parts') or []:
-        steps=''.join('<li data-state="%s" data-c="%d"%s><i aria-hidden="true"></i><span>%s</span><small class="sr-only">%s</small>%s</li>'%(
-            s['state'],s['color'],(' aria-current="step"'+(' data-tone="%s"'%e(p['tone']) if p['situation']!='normal' else '')) if s['state']=='current' else '',e(s['label']),
-            {'done':'completada','current':'etapa actual','pending':'pendiente'}[s['state']],'<time>%s</time>'%e(_when(s['at'],False)) if s['at'] else '') for s in p['steps'])
-        facts=[('Solicitado',_when(p['requested'],False)),('Disponibilidad estimada',_when(p['eta'],False) if p['eta'] else ''),('Recibido en el taller',_when(p['received'],False) if p['received'] else ''),
-               ('Última actualización',_when(p['updated']))]
-        hist=''.join('<li><time>%s</time><strong>%s</strong>%s</li>'%(e(_when(h['at'])),e(h['label']),'<p>%s</p>'%e(h['text']) if h['text'] else '') for h in p['history'])
-        finished=p['steps'][-1]['state']=='done'
-        out.append('<article class="tp" data-situation="%s"><header><div><strong>%s</strong>%s</div><span class="tp-state" data-tone="%s">%s</span></header><p class="tp-desc">%s</p>'
-                   '<ol class="tp-steps" data-n="%d" aria-label="Etapas del repuesto">%s</ol><dl class="tp-facts">%s</dl>%s</article>'%(
-                   e(p['situation']),e(p['name']),'<small>%s</small>'%e(p['brand']) if p['brand'] else '',e(p['tone'] if p['situation']!='normal' else ('verde' if finished else 'azul')),
-                   e(p['status_label']),e(p['description']),len(p['steps']),steps,''.join('<div><dt>%s</dt><dd>%s</dd></div>'%(e(k),e(v)) for k,v in facts if v),
-                   '<details class="tp-hist"><summary>Historial del repuesto (%d)</summary><ol>%s</ol></details>'%(len(p['history']),hist) if hist else ''))
+        tone=p['tone'] if p['situation']!='normal' else ('verde' if p['steps'][-1]['state']=='done' else 'azul')
+        steps=''
+        for s in p['steps']:
+            word={'done':'completada','current':'etapa actual','pending':'pendiente','skipped':'no registrada'}[s['state']]
+            inline=VAN if s['code']=='traslado' and p['vehicle'] in ('transit','stopped') else ''
+            steps+='<li data-state="%s" data-c="%d" data-code="%s"%s><i aria-hidden="true"></i><span>%s</span><small class="sr-only">%s</small>%s%s</li>'%(
+                s['state'],s['color'],e(s['code']),(' aria-current="step"'+(' data-tone="%s"'%e(p['tone']) if p['situation']!='normal' else '')) if s['state']=='current' else '',
+                e(s['label']),e(word),'<time>%s</time>'%e(_when(s['at'],False)) if s['at'] else ('<em>No registrada</em>' if s['state']=='skipped' else ''),
+                '<span class="tp-van-inline" data-vehicle="%s" aria-hidden="true">%s</span>'%(e(p['vehicle']),inline) if inline else '')
+        vehicle=('<span class="tp-vehicle" data-vehicle="%s" aria-hidden="true">%s%s</span>'%(e(p['vehicle']),VAN,CHECK if p['vehicle']=='arrived' else '')) if p['vehicle'] else ''
+        moving={'transit':'El repuesto está en camino hacia nuestro taller.','stopped':'El traslado está detenido por una novedad.','arrived':'El repuesto llegó a nuestro taller.'}.get(p['vehicle'],'')
+        meter=''.join('<span data-state="%s" data-c="%d"></span>'%(s['state'],s['color']) for s in p['steps'])
+        facts=[('Solicitado',_when(p['requested'],False)),('Recibido en el taller',_when(p['received'],False) if p['received'] else ''),
+               ('Disponibilidad estimada',_when(p['eta'],False) if p['eta'] else '')]
+        hist=''.join('<li data-c="%d" data-kind="%s"%s><time>%s</time><strong>%s</strong>%s%s</li>'%(
+            h['color'],e(h['kind']),' data-tone="%s"'%e(h['situation']) if h['kind']=='situacion' else '',e(_when(h['at'])),e(h['label']),
+            '<span>%s</span>'%e(h['detail']) if h.get('detail') else '','<p>%s</p>'%e(h['text']) if h['text'] else '') for h in p['history'])
+        out.append(
+            '<article class="tp" data-situation="%s" data-vehicle="%s"><header class="tp-head"><div class="tp-id"><strong>%s</strong>%s</div><span class="tp-state" data-tone="%s">%s</span></header>'
+            '<div class="tp-now" data-tone="%s"><div><small>Estado actual</small><strong>%s</strong><p>%s</p></div><div class="tp-meta"><div class="tp-meter" role="img" aria-label="%d de %d etapas completadas">%s</div>'
+            '<small><b>%d de %d</b> etapas completadas</small><small>Última actualización: %s</small></div></div>'
+            '<div class="tp-track">%s<ol class="tp-steps" aria-label="Etapas del repuesto">%s</ol></div>%s<dl class="tp-facts">%s</dl>%s</article>'%(
+            e(p['situation']),e(p['vehicle']),e(p['name']),'<small>%s</small>'%e(p['brand']) if p['brand'] else '',e(tone),e(p['status_label']),
+            e(tone),e(p['status_label']),e(p['description']),p['done_count'],p['total'],meter,p['done_count'],p['total'],e(_when(p['updated'])),
+            vehicle,steps,'<p class="sr-only">%s</p>'%e(moving) if moving else '',''.join('<div><dt>%s</dt><dd>%s</dd></div>'%(e(k),e(v)) for k,v in facts if v),
+            '<details class="tp-hist"><summary>Historial del repuesto <b>%d</b></summary><ol>%s</ol></details>'%(len(p['history']),hist) if hist else ''))
     if not out:return ''
     return '<section class="tw-sec ticket-parts" aria-label="Seguimiento de repuestos"><h2>Seguimiento de repuestos</h2>'+''.join(out)+'</section>'
 

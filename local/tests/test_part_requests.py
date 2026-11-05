@@ -168,9 +168,10 @@ class PartRequestTests(unittest.TestCase):
         import order_part_requests as parts
         with app.connect() as c:
             p = parts.public(c, oid)[0]
-            # «En traslado» no aparece hasta que se registre: 5 etapas, sin inventar movimientos.
-            self.assertEqual([s['code'] for s in p['steps']], ['solicitud', 'confirmado', 'recibido', 'instalacion', 'finalizado'])
-            self.assertEqual([s['state'] for s in p['steps']], ['done', 'current', 'pending', 'pending', 'pending'])
+            # Seis etapas siempre visibles; «En traslado» queda pendiente (sin vehículo) hasta que se registre.
+            self.assertEqual([s['code'] for s in p['steps']], ['solicitud', 'confirmado', 'traslado', 'recibido', 'instalacion', 'finalizado'])
+            self.assertEqual([s['state'] for s in p['steps']], ['done', 'current', 'pending', 'pending', 'pending', 'pending'])
+            self.assertEqual((p['vehicle'], p['done_count'], p['total']), ('', 1, 6))
             # Un mensaje antiguo con datos del proveedor (guardado antes de esta revisión) no se muestra.
             c.execute("INSERT INTO order_part_events(request_id,kind,stage,situation,public_note,public,created_at) VALUES (?,'etapa','confirmado','normal','Comprado en Amazon',1,'2026-11-04T10:00:00-05:00')", (rid,))
             c.commit()
@@ -180,11 +181,30 @@ class PartRequestTests(unittest.TestCase):
             p = parts.public(c, oid)[0]
             self.assertEqual([s['code'] for s in p['steps']], ['solicitud', 'confirmado', 'traslado', 'recibido', 'instalacion', 'finalizado'])
             self.assertEqual([s['color'] for s in p['steps']], [0, 1, 2, 3, 4, 5])  # de azul a verde, solo al completarse
+            self.assertEqual((p['vehicle'], [s['state'] for s in p['steps']][:3]), ('transit', ['done', 'done', 'current']))
             self.assertFalse(any('Amazon' in (h['text'] or '') for h in p['history']))
+        # Con una novedad en el traslado, el vehículo se detiene; al recibir, llega y se detiene; después ya no aparece.
+        self.assertEqual(post(url, action='situation', situation='incidencia_transporte', note='Paquete retenido (ficticio)')['status'], 200)
+        with app.connect() as c:
+            self.assertEqual(parts.public(c, oid)[0]['vehicle'], 'stopped')
+        self.assertEqual(post(url, action='advance', stage='recibido')['status'], 200)
+        with app.connect() as c:
+            p = parts.public(c, oid)[0]
+            self.assertEqual((p['vehicle'], p['done_count'], p['steps'][3]['state']), ('arrived', 3, 'current'))
+        self.assertEqual(post(url, action='advance', stage='instalacion')['status'], 200)
+        with app.connect() as c:
+            self.assertEqual(parts.public(c, oid)[0]['vehicle'], '')
+        # Si administración corrige y el repuesto llega sin traslado registrado, el traslado queda «no registrado», nunca completado.
+        other = self.part(post, oid, name='Ventilador')['body']['id']
+        ourl = '/api/orders/%d/part-requests/%d' % (oid, other)
+        self.assertEqual(post(ourl, action='advance', stage='recibido', note='Corrección: el cliente trajo el repuesto (ficticio)')['status'], 200)
+        with app.connect() as c:
+            q = parts.public(c, oid)[1]
+            self.assertEqual(([s['state'] for s in q['steps']], q['vehicle']), (['done', 'done', 'skipped', 'current', 'pending', 'pending'], ''))
         page = self.request('/s/' + self.link(oid))['body']
         for secret in ('Distribuidora Zeta', 'Servientrega', 'GX-778899', 'Amazon', 'eBay'):
             self.assertNotIn(secret, page)
-        self.assertIn('En traslado hacia PC-DOCTOR', page);self.assertIn('Esperando repuesto', page)
+        self.assertIn('En traslado hacia PC-DOCTOR', page);self.assertIn('No registrada', page)  # ambos repuestos ya llegaron: ninguno en espera
 
     def test_order_progress_never_advances_on_waiting_states(self):
         import re

@@ -271,13 +271,17 @@ def options(c):
 PUBLIC_STEPS = (('solicitud', 'Solicitud registrada', ('solicitado',)), ('confirmado', 'Repuesto confirmado', ('confirmado', 'preparacion')),
                 ('traslado', 'En traslado hacia PC-DOCTOR', ('transito',)), ('recibido', 'Recibido en el taller', ('recibido',)),
                 ('instalacion', 'Instalación y pruebas', ('instalacion',)), ('finalizado', 'Proceso finalizado', ('instalado', 'listo')))
+# Descripción breve de cada evento del historial público (coherente con la línea de etapas).
+HISTORY_TEXT = {'solicitado': 'Se registró la solicitud del repuesto.', 'confirmado': 'El repuesto fue confirmado.', 'preparacion': 'El repuesto se prepara para su envío.',
+                'transito': 'El repuesto salió hacia nuestro taller.', 'recibido': 'El repuesto llegó a nuestro taller.', 'instalacion': 'Comenzó la instalación y las pruebas.',
+                'instalado': 'La instalación y las pruebas terminaron.', 'listo': 'El proceso del repuesto finalizó.'}
 HISTORY_LABELS = {'solicitado': 'Solicitud registrada', 'confirmado': 'Repuesto confirmado', 'preparacion': 'En preparación para el envío', 'transito': 'En traslado hacia PC-DOCTOR',
                   'recibido': 'Recibido en el taller', 'instalacion': 'Instalación y pruebas', 'instalado': 'Instalación finalizada', 'listo': 'Proceso finalizado'}
 PUBLIC_SITUATIONS = {'normal': 'Sin novedad', 'espera_confirmacion': 'En espera de confirmación', 'espera_proveedor': 'En espera de disponibilidad', 'retrasado': 'Llegada con retraso',
                      'incidencia_transporte': 'Novedad en el traslado', 'cancelado': 'Pedido cancelado'}
-DESCRIPTIONS = {'solicitud': 'Estamos gestionando la adquisición del repuesto para su equipo.', 'confirmado': 'El repuesto fue confirmado y se prepara para su envío a nuestro taller.',
-                'traslado': 'El repuesto está en camino hacia nuestro taller.', 'recibido': 'El repuesto llegó a nuestro taller y será instalado.',
-                'instalacion': 'Estamos instalando el repuesto y probando el funcionamiento del equipo.', 'finalizado': 'La instalación del repuesto terminó.',
+DESCRIPTIONS = {'solicitud': 'Registramos la solicitud del repuesto y estamos gestionando su adquisición.', 'confirmado': 'El repuesto ha sido confirmado y se encuentra en proceso.',
+                'traslado': 'El repuesto se encuentra en traslado hacia PC-DOCTOR.', 'recibido': 'El repuesto ya fue recibido en nuestro taller y será instalado.',
+                'instalacion': 'Estamos realizando la instalación y las pruebas.', 'finalizado': 'El proceso del repuesto ha finalizado correctamente.',
                 'espera_confirmacion': 'Estamos esperando la confirmación del repuesto. Le informaremos en cuanto la tengamos.',
                 'espera_proveedor': 'El repuesto está en espera de disponibilidad. Le informaremos en cuanto tengamos novedades.',
                 'retrasado': 'La llegada del repuesto presenta un retraso. Le informaremos la nueva fecha cuando esté confirmada.',
@@ -338,22 +342,33 @@ def public(c, oid):
         for e in events:
             if e['kind'] in ('alta', 'etapa'):
                 first.setdefault(e['stage'], e['created_at'])
-        steps = [s for s in PUBLIC_STEPS if s[0] != 'traslado' or 'transito' in first]
-        group = next(i for i, s in enumerate(steps) if r['stage'] in s[2] or (s[0] == 'confirmado' and r['stage'] == 'transito' and 'transito' not in first))
+        # Seis etapas siempre visibles. «En traslado» solo se completa si se registró; si el repuesto llegó sin ese evento (corrección de
+        # administración), queda como «no registrada» y nunca se pinta como completada.
+        steps = PUBLIC_STEPS
+        transit = 'transito' in first
+        group = next(i for i, s in enumerate(steps) if r['stage'] in s[2])
         finished = r['stage'] == 'listo' and r['situation'] != 'cancelado'
-        n = len(steps)
         public_steps = []
         for i, (code, label, stages) in enumerate(steps):
             state = 'done' if i < group or finished else 'current' if i == group else 'pending'
-            at = min((first[x] for x in stages if x in first), default='') if state != 'pending' else ''
-            public_steps.append({'code': code, 'label': label, 'state': state, 'at': at, 'color': round(i * 5 / (n - 1)) if n > 1 else 5})
+            if code == 'traslado' and state == 'done' and not transit:
+                state = 'skipped'
+            at = min((first[x] for x in stages if x in first), default='') if state in ('done', 'current') else ''
+            public_steps.append({'code': code, 'label': label, 'state': state, 'at': at, 'color': i})
+        # Vehículo: solo con un traslado real. En traslado: avanza (o se detiene si hay retraso o incidencia); recibido: llega y se detiene.
+        cancelled = r['situation'] == 'cancelado'
+        vehicle = ('' if cancelled or not transit else 'stopped' if r['stage'] == 'transito' and r['situation'] != 'normal' else 'transit' if r['stage'] == 'transito'
+                   else 'arrived' if r['stage'] == 'recibido' else '')
         history = []
         for e in events:
             label = ('Solicitud registrada' if e['kind'] == 'alta' else HISTORY_LABELS.get(e['stage'], '') if e['kind'] == 'etapa'
                      else PUBLIC_SITUATIONS.get(e['situation'], '') if e['kind'] == 'situacion' else '')
             text = e['public_note'] if e['public'] and e['public_note'] and not leaks(e['public_note'], terms) else ''
             if label or text:
-                history.append({'at': e['created_at'], 'label': label or 'Mensaje del taller', 'text': text})
+                detail = (HISTORY_TEXT['solicitado'] if e['kind'] == 'alta' else HISTORY_TEXT.get(e['stage'], '') if e['kind'] == 'etapa'
+                          else DESCRIPTIONS.get(e['situation'], 'La situación del repuesto volvió a la normalidad.') if e['kind'] == 'situacion' else '')
+                history.append({'at': e['created_at'], 'label': label or 'Mensaje del taller', 'detail': detail, 'text': text,
+                                'color': next((i for i, s in enumerate(steps) if e['stage'] in s[2]), 0), 'kind': e['kind'], 'situation': e['situation']})
         situation = r['situation']
         out.append({'name': _scrub(r['name'], terms) or 'Repuesto', 'brand': _scrub(r['brand'], terms), 'stage': r['stage'], 'situation': situation,
                     'situation_label': PUBLIC_SITUATIONS[situation] if situation != 'normal' else '', 'tone': SITUATIONS[situation][1],
@@ -361,5 +376,6 @@ def public(c, oid):
                     'description': DESCRIPTIONS[situation] if situation != 'normal' else DESCRIPTIONS[steps[group][0]] if not finished else DESCRIPTIONS['finalizado'],
                     'requested': r['created_at'], 'eta': r['eta'] if CODES.index(r['stage']) < CODES.index('recibido') and situation != 'cancelado' else '',
                     'received': r['received_at'], 'updated': events[-1]['created_at'] if events else r['updated_at'], 'steps': public_steps,
-                    'waiting': CODES.index(r['stage']) < CODES.index('recibido') and situation != 'cancelado', 'history': history[::-1][:12]})
+                    'waiting': CODES.index(r['stage']) < CODES.index('recibido') and situation != 'cancelado', 'history': history[::-1][:12],
+                    'vehicle': vehicle, 'done_count': sum(1 for x in public_steps if x['state'] == 'done'), 'total': len(public_steps), 'current_index': group if not finished else len(steps)})
     return out
