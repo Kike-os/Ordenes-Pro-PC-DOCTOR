@@ -10313,3 +10313,54 @@ body[data-page=dashboard] .cascade-pp{width:auto;min-height:32px;margin:0;paddin
 .agenda-holidays .feast-card .feast-state{grid-column:2}.agenda-holidays .feast-date{padding:4px 2px;border-radius:8px}
 @media(max-width:600px){.orders-results .order-table-wrap.orders-cascade,.agenda-table.agenda-cascade{max-height:72dvh}.cascade-ctl{justify-content:flex-start;margin-left:0}}
 @media(prefers-reduced-motion:reduce){.cascade-scroll{scroll-behavior:auto}}
+/* Logistics Pro (1.5.245): ruta por fases del pedido de repuesto. Colores: pedido azul, aéreo cian, aduana ámbar, distribución nacional
+   turquesa, recepción verde claro y servicio verde intenso; lo pendiente, neutro; la fase en curso, con un halo moderado. El avión vuela en
+   su tramo mientras el tránsito aéreo esté registrado (flota con suavidad, no avanza a otra fase); aterriza al registrarse la llegada al país;
+   el vehículo recorre su tramo y se detiene al recibir. Con movimiento reducido, todo queda en su punto real. Solo .opr-route, .opr-phases,
+   .opr-craft y .opr-flow. */
+.opr{--f-pedido:#2563EB;--f-aereo:#06B6D4;--f-aduana:#F59E0B;--f-terrestre:#14B8A6;--f-recepcion:#4ADE80;--f-servicio:#16A34A}
+.opr-meter{grid-template-columns:repeat(var(--n,8),minmax(5px,14px))}
+.opr-track-route{display:grid;gap:10px}
+.opr-route{position:relative;padding-top:36px;container-type:inline-size}
+.opr-phases{display:grid;grid-template-columns:repeat(var(--n),minmax(0,1fr));margin:0;padding:0;list-style:none}
+.opr-phases li{--c:var(--neutro);position:relative;display:grid;justify-items:center;align-content:start;gap:5px;min-width:0;color:#8DA0BC;font-size:11.5px;line-height:1.25;text-align:center}
+.opr-phases li[data-phase=pedido]{--fc:var(--f-pedido)}.opr-phases li[data-phase=aereo]{--fc:var(--f-aereo)}.opr-phases li[data-phase=aduana]{--fc:var(--f-aduana)}
+.opr-phases li[data-phase=terrestre]{--fc:var(--f-terrestre)}.opr-phases li[data-phase=recepcion]{--fc:var(--f-recepcion)}.opr-phases li[data-phase=servicio]{--fc:var(--f-servicio)}
+.opr-phases li:is([data-state=done],[data-state=current]){--c:var(--fc)}
+.opr-phases li[data-tone=amarillo]{--c:#EAB308}.opr-phases li[data-tone=naranja]{--c:#F97316}.opr-phases li[data-tone=rojo]{--c:#EF4444}
+.opr-phases li::before{content:"";position:absolute;top:17px;left:calc(-50% + 20px);right:calc(50% + 20px);height:3px;border-radius:2px;background:var(--neutro)}.opr-phases li:first-child::before{display:none}
+.opr-phases li:is([data-state=done],[data-state=current])::before{background:var(--c)}
+.opr-phases i{display:grid;place-items:center;width:36px;height:36px;box-sizing:border-box;border:2px solid var(--c);border-radius:50%;background:#0A1322;color:var(--c)}.opr-phases i .inv-icon{width:18px;height:18px}
+.opr-phases li[data-state=done] i{background:var(--c);color:#06101F}
+.opr-phases li[data-state=current] i{box-shadow:0 0 0 4px color-mix(in srgb,var(--c) 24%,transparent),0 0 14px color-mix(in srgb,var(--c) 45%,transparent)}
+.opr-phases li[data-state=current] span{color:#fff;font-weight:700}.opr-phases li[data-state=done] span{color:#E2E8F0}
+.opr-craft{position:absolute;top:0;left:calc(var(--p) * 100% - 22px);width:44px;height:28px;z-index:2;pointer-events:none}
+.opr-craft>svg:first-child{width:44px;height:28px;overflow:visible;filter:drop-shadow(0 3px 6px #0009)}
+.opr-craft .p-body{fill:#E0F2FE;stroke:#06B6D4;stroke-width:1.1}.opr-craft .p-win{fill:#0E7490}
+.opr-craft .p-trail{fill:none;stroke:#06B6D4;stroke-width:2;stroke-linecap:round;stroke-dasharray:3 5;opacity:.55}
+.opr-craft[data-mode$=parked] .p-trail,.opr-craft[data-mode=plane-landed] .p-trail{display:none}
+.opr-route .opr-craft:is([data-mode=plane-stopped],[data-mode=truck-stopped]) :is(.p-body,.v-cab){fill:#F97316}
+.opr-route:not(:has(.opr-craft)){padding-top:8px}
+.opr-craft .v-ok{position:absolute;top:-6px;right:-8px;width:17px;height:17px}
+@media(prefers-reduced-motion:no-preference){
+ .opr-craft[data-mode=plane]{animation:opr-fly 2.2s cubic-bezier(.4,.05,.2,1) .2s both,opr-float 3.2s ease-in-out 2.4s infinite}
+ .opr-craft[data-mode=plane] .p-trail{animation:opr-trail 1.2s linear infinite}
+ .opr-craft[data-mode=plane-landed]{animation:opr-land .9s ease-out .2s both}
+ .opr-craft[data-mode=truck]{animation:opr-fly 1.6s cubic-bezier(.45,.05,.25,1) .2s both,opr-bump .6s ease-in-out 1.8s 3}
+ .opr-craft[data-mode=truck-arrived]{animation:opr-fly .6s ease-out .2s both}.opr-craft[data-mode=truck-arrived] .v-ok{animation:opr-pop .45s ease-out .8s both}
+ .opr-phases li[data-state=current] i{animation:opr-pulse 1.4s ease-out .4s 3}
+}
+@keyframes opr-fly{from{left:calc(var(--from) * 100% - 22px)}}
+@keyframes opr-land{from{left:calc(var(--from) * 100% - 22px);transform:translateY(-8px) rotate(-6deg)}to{transform:none}}
+@keyframes opr-float{50%{transform:translateY(-3px)}}
+@keyframes opr-bump{50%{transform:translateY(-2px)}}
+@keyframes opr-trail{to{stroke-dashoffset:-16}}
+/* Etapas logísticas detalladas: chips con el color de la etapa (solo las completadas); «No registrada» si se superó por corrección. */
+.opr-flowbox summary{display:flex;align-items:center;gap:8px;color:#CBD5E1;font-size:12.5px;cursor:pointer}.opr-flowbox summary b{padding:0 7px;border-radius:999px;background:#ffffff14;font-size:11px}
+.opr-flow{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 0;padding:0;list-style:none}
+.opr-flow li{--c:var(--p0);display:inline-flex;align-items:center;gap:6px;min-width:0;padding:4px 9px;border:1px solid #22385A;border-radius:999px;background:#0A1322;color:#8DA0BC;font-size:11.5px}
+.opr-flow li i{width:8px;height:8px;border-radius:50%;background:var(--neutro)}.opr-flow li[data-tone]{--c:var(--t)}
+.opr-flow li[data-state=done]{color:#E2E8F0;border-color:color-mix(in srgb,var(--c) 40%,#22385A)}.opr-flow li[data-state=done] i{background:var(--c)}
+.opr-flow li[data-state=current]{color:#fff;font-weight:700;border-color:var(--c);box-shadow:0 0 0 3px color-mix(in srgb,var(--c) 20%,transparent)}.opr-flow li[data-state=current] i{background:var(--c)}
+.opr-flow li[data-state=skipped]{border-style:dashed}.opr-flow li time,.opr-flow li em{color:#8DA0BC;font-size:10.5px;font-style:normal;font-weight:500}
+@container (max-width:420px){.opr-phases li span{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}.opr-phases i{width:30px;height:30px}.opr-phases li::before{top:14px;left:calc(-50% + 16px);right:calc(50% + 16px)}.opr-route{padding-top:32px}}

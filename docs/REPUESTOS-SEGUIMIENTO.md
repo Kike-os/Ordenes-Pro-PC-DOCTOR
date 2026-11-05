@@ -129,3 +129,58 @@ No hace falta JavaScript. Todo sale de los eventos reales registrados.
 - Con movimiento reducido no hay animaciones.
 
 **Prueba de navegador:** 16 comprobaciones, de 320 a 1920 px, con movimiento reducido.
+
+## Logistics Pro: envío nacional e internacional (1.5.245)
+
+Cada pedido puede definir su **tipo de envío** (`shipping`): nacional o internacional. También puede llevar país de origen y fecha de despacho; el transportista y la guía ya existían. Destino fijo: PC-DOCTOR · Otavalo, Imbabura (Ecuador). Migración `094_part_logistics.sql`: solo añade columnas vacías a `order_part_requests` (`shipping`, `origin_country`, `dispatch_date`, `logistics`, `incident`) y a `order_part_events` (`logistics`, `incident`).
+
+**Etapas detalladas** (`FLOWS` en `order_part_requests.py`):
+- **Internacional (14):** solicitado, confirmado, preparación, despachado en el país de origen, en tránsito internacional, llegada al país de destino, en revisión aduanera, liberado por aduana, en distribución nacional, en ruta hacia Otavalo, recibido, instalación y pruebas, proceso finalizado y listo para entrega.
+- **Nacional (10):** solicitado, confirmado, preparación, despachado, en tránsito nacional, en ruta hacia Otavalo, recibido, instalación y pruebas, proceso finalizado y listo para entrega.
+- Los pasos de traslado se guardan en `logistics`; la etapa general (`stage`) sigue siendo una de las 8 de siempre (`transito` durante todo el traslado). Así, informes, resumen y seguimiento público no cambian.
+- **Reglas:**
+  - Solo se avanza al paso siguiente y cada paso deja su evento con fecha y usuario.
+  - Saltar o retroceder es una corrección de administración con motivo. Un paso superado sin evento queda «No registrado», nunca como completado.
+  - La aduana nunca se marca liberada sin su evento. Si se salta, el estado aduanero dice «Sin registro de liberación aduanera».
+  - Despachado registra `dispatch_date` si estaba vacía.
+- **Pedidos anteriores** (sin tipo): conservan sus 8 etapas, sus etiquetas y su panel. Al definir el tipo durante el traslado, continúan en «Despachado» del nuevo flujo. Durante el traslado, solo administración puede cambiar el tipo de un envío que ya lo tenía.
+
+**Ruta por fases** del panel interno, con colores de fase solo en lo completado y en lo actual:
+
+| Fase | Color | Pasos |
+|---|---|---|
+| Pedido | azul | solicitado a despachado |
+| Transporte aéreo (solo internacional) | cian | tránsito internacional, llegada al país |
+| Aduana (solo internacional) | ámbar | revisión y liberación |
+| Distribución nacional | turquesa | distribución, tránsito nacional, ruta hacia Otavalo |
+| Recepción | verde claro | recibido |
+| Instalación y entrega | verde intenso | instalación, finalizado y listo |
+
+**Vehículo SVG**, siempre según el paso real registrado (`vehicle_mode`):
+- **Avión:**
+  - estacionado al despachar;
+  - vuela durante el tránsito internacional, con estela y un flotado suave;
+  - se detiene, en naranja, con una novedad;
+  - aterriza al registrarse la llegada al país.
+- **En aduana** no hay vehículo; se muestra el estado aduanero.
+- **Vehículo terrestre:**
+  - aparece en la distribución nacional (o al despachar un envío nacional);
+  - se detiene, en naranja, con una novedad;
+  - llega con ✓ al recibirse.
+- Con `prefers-reduced-motion` no hay animaciones: todo queda en su punto real.
+
+**Incidencias logísticas** (`INCIDENTS`, desde «Novedad o retraso»): retraso de transporte, vuelo retrasado o reprogramado, retención aduanera, documentación pendiente, cambio de transportista, problema de entrega, extraviado y devuelto.
+- Cada una se registra con su situación general (tono amarillo, naranja o rojo) y queda en el historial.
+- No avanza la etapa. Al avanzar después, la novedad se resuelve.
+
+**Bloque «Envío»:** tipo, país de origen, destino, despacho, estado aduanero y novedad logística.
+
+**Seguimiento público:**
+- Mantiene sus 6 etapas.
+- El traslado se ve como un solo «En traslado hacia PC-DOCTOR», sin repetirse por cada paso logístico.
+- No muestra país, transportista, guía, aduana, avión ni incidencias internas.
+- Al avanzar, solo el despacho propone un mensaje al cliente; los pasos de vuelo y aduana no.
+
+**Pruebas:**
+- **Unitarias:** `test_part_logistics.py`. Cubren el flujo internacional completo, la aduana sin liberación automática, las incidencias que no avanzan, el flujo nacional, los pedidos anteriores, el permiso del técnico y la ausencia de fugas al público.
+- **Navegador:** 22 comprobaciones con datos ficticios, de 320 a 1920 px, con movimiento reducido. La prueba anterior de repuestos (12 comprobaciones) sigue en verde.
