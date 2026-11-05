@@ -105,7 +105,9 @@ class FollowupEvidenceTests(unittest.TestCase):
             token = c.execute("SELECT token FROM order_tracking_links WHERE order_id=? AND revoked_at=''", (oid,)).fetchone()[0]
             c.commit()
         page = self.request('/s/' + token)['body']
-        self.assertIn('publica.jpg', page);self.assertNotIn('privada.png', page);self.assertNotIn('informe.pdf', page)
+        self.assertEqual(page.count('class="ticket-ev"'), 1)  # solo la autorizada
+        for name in ('publica.jpg', 'privada.png', 'informe.pdf'):
+            self.assertNotIn(name, page)  # el cliente no ve nombres de archivo
         self.assertEqual(self.original(oid, files['publica.jpg']['id'], public=token)[0], 200)
         for name in ('privada.png', 'informe.pdf'):  # ni por enlace directo
             self.assertEqual(self.original(oid, files[name]['id'], public=token)[0], 404)
@@ -122,6 +124,10 @@ class FollowupEvidenceTests(unittest.TestCase):
         hide = post('/api/orders/%d/followups/files/%d' % (oid, files['publica.jpg']['id']), action='visibility', visible='')
         self.assertEqual(hide['status'], 200)
         self.assertEqual(self.original(oid, files['publica.jpg']['id'], public=token)[0], 404)
+        # Ver muchas evidencias no agota el límite de la página de seguimiento (contadores separados).
+        for _ in range(45):
+            self.request('/s/%s/files/%d/meta' % (token, files['privada.png']['id']))
+        self.assertEqual(self.request('/s/' + token)['status'], 200)
         with app.connect() as c:
             self.assertEqual(c.execute('SELECT COUNT(*) FROM order_followup_file_changes').fetchone()[0], 2)
             for sql in ('UPDATE order_followup_file_changes SET visible=1', 'DELETE FROM order_followup_file_changes', 'DELETE FROM order_upload_parts'):

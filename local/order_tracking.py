@@ -71,17 +71,8 @@ HEAD='<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="vie
 
 
 def public_page(data,token=''):
-    return card_page(dict(data,token=token),'/s/'+token+'/qr.svg' if token else '',True)
-
-
-def evidence_html(data):
-    """Evidencias autorizadas en el enlace público: miniatura y, al pulsarla, el original (lo arma ticket.js por partes)."""
-    if not data.get('files') or not data.get('token'):return ''
-    e=html.escape;base='/s/'+data['token']+'/files/'
-    items=''.join('<li><button type="button" class="ticket-ev" data-file="%s%d" data-mime="%s" data-name="%s">%s<span>%s</span></button></li>'%(
-        base,f['id'],e(f['mime']),e(f['name']),('<img src="%s%d/thumb" alt="" loading="lazy" width="96" height="96">'%(base,f['id'])) if f['thumb'] else '<b aria-hidden="true">PDF</b>' if f['mime']=='application/pdf' else '<b aria-hidden="true">IMG</b>',
-        e(f['name'])) for f in data['files'])
-    return '</dl><section class="ticket-evidence" aria-label="Evidencias del servicio"><h2>Evidencias del servicio</h2><ul>'+items+'</ul></section><dl class="ticket-facts" hidden>'
+    page=CARD_HEAD%('<meta http-equiv="refresh" content="180">',html.escape(data['code']))
+    return page.replace('<body class="ticket-page">','<body class="ticket-page ticket-public">',1)+public_card(dict(data,token=token),'/s/'+token+'/qr.svg' if token else '')+'</main></body></html>'
 
 
 # Tarjeta Digital de Seguimiento Técnico: ticket de dos secciones (datos de la orden arriba; QR y código de barras abajo).
@@ -108,7 +99,6 @@ def card(data,qr_src,public):
     if data.get('updates'):
         rows+='</dl><section class="ticket-updates" aria-label="Novedades del servicio"><h2>Novedades del servicio</h2><ol>'+''.join(
             '<li><time>%s</time><strong>%s</strong><p>%s</p></li>'%(e(u['at']),e(u['label']),e(u['message']).replace('\n','<br>')) for u in data['updates'])+'</ol></section><dl class="ticket-facts" hidden>'
-    if public:rows+=evidence_html(data)
     code=data['code']
     try:bars=barcode128.svg(code,color='#0b1526',background='#ffffff')
     except barcode128.BarcodeError:bars=''
@@ -124,37 +114,105 @@ def card(data,qr_src,public):
                'Escanea el código QR para consultar el estado actualizado de la reparación. El código de barras identifica esta orden en el taller.',qr,bars,e(code),e(company['name']),e(company['specialty']),e(company['whatsapp']))
 
 
-def parts_html(data):
-    """Seguimiento de repuestos para el cliente, al estilo de una mensajería: horizontal con espacio, vertical en el teléfono (ticket.css).
-    El color acompaña siempre a un texto y a un icono: completado (verde, ✓), actual (azul o el tono de su situación), pendiente (gris)."""
-    if not data.get('parts'):return ''
-    e=html.escape
-    def when(value,with_time=True):
-        try:return datetime.fromisoformat(value).astimezone(ECUADOR_TZ).strftime('%d/%m/%Y %H:%M' if with_time else '%d/%m/%Y') if 'T' in value else datetime.fromisoformat(value).strftime('%d/%m/%Y')
-        except (TypeError,ValueError):return ''
-    out=[]
-    for p in data['parts']:
-        cancelled=p['situation']=='cancelado'
-        steps=''
-        for i,s in enumerate(p['steps']):
-            state='done' if i<p['stage_index'] or (i==p['stage_index'] and i==len(p['steps'])-1 and not cancelled) else 'current' if i==p['stage_index'] else 'pending'
-            word={'done':'completado','current':'etapa actual','pending':'pendiente'}[state]
-            steps+='<li data-state="%s"%s><i aria-hidden="true"></i><span>%s</span><small class="sr-only">%s</small>%s</li>'%(
-                state,' aria-current="step" data-tone="%s"'%e(p['tone']) if state=='current' else '',e(s['short']),e(word),'<time>%s</time>'%e(when(s['at'],False)) if s['at'] else '')
-        facts=[('Solicitado',when(p['requested'],False)),('Llegada estimada',when(p['eta'],False) if p['eta'] else ''),('Recibido en el taller',when(p['received'],False) if p['received'] else ''),('Última actualización',when(p['updated']))]
-        alert='<p class="tp-alert" data-tone="%s" role="status">%s</p>'%(e(p['tone']),e(p['situation_label'])) if p['situation_label'] else ''
-        msgs=''.join('<li><time>%s</time><p>%s</p></li>'%(e(when(m['at'])),e(m['text'])) for m in p['messages'])
-        out.append('<article class="tp" data-situation="%s"><header><strong>%s</strong><span class="tp-state" data-tone="%s">%s</span></header>%s<ol class="tp-steps" aria-label="Etapas del repuesto">%s</ol>'
-                   '<dl class="tp-facts">%s</dl>%s</article>'%(e(p['situation']),e(p['name']),e(p['tone'] if p['situation']!='normal' else 'azul'),e(p['situation_label'] or p['stage_label']),alert,steps,
-                   ''.join('<div><dt>%s</dt><dd>%s</dd></div>'%(e(k),e(v)) for k,v in facts if v),'<ul class="tp-msgs" aria-label="Mensajes del taller">%s</ul>'%msgs if msgs else ''))
-    return '<section class="ticket-parts" aria-label="Seguimiento de repuestos"><h2>Seguimiento de repuestos</h2>'+''.join(out)+'</section>'
+# ---- Página pública ampliada (1.5.240) ----------------------------------------------------------------------------------------------
+# Misma identidad de la tarjeta (degradado azul, logo original, corte de ticket), más ancha en escritorio y en una columna en el teléfono.
+# La barra de avance tiene un segmento por etapa: solo las completadas llevan su color (azul → turquesa → verde claro → verde intenso); las
+# pendientes quedan neutras. Los estados de espera se muestran como aviso, sin adelantar el avance. Todo sale de datos reales registrados.
+FLAGS={'esperando_cliente':'Esperando su respuesta para continuar','presupuesto':'Presupuesto pendiente de su aprobación','revision_recurrente':'En revisión por falla recurrente'}
+ICONS={'Equipo':'M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v9H4zM2 19h20','Fecha de ingreso':'M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z',
+       'Última actualización':'M12 6v6l4 2M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0z'}
+
+
+def _when(value,with_time=True):
+    try:
+        moment=datetime.fromisoformat(value)
+        return (moment.astimezone(ECUADOR_TZ) if 'T' in value else moment).strftime('%d/%m/%Y %H:%M' if with_time and 'T' in value else '%d/%m/%Y')
+    except (TypeError,ValueError):
+        return ''
+
+
+def _icon(path):
+    return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="%s"/></svg>'%path
+
+
+def _parts_section(data):
+    e=html.escape;out=[]
+    for p in data.get('parts') or []:
+        steps=''.join('<li data-state="%s" data-c="%d"%s><i aria-hidden="true"></i><span>%s</span><small class="sr-only">%s</small>%s</li>'%(
+            s['state'],s['color'],(' aria-current="step"'+(' data-tone="%s"'%e(p['tone']) if p['situation']!='normal' else '')) if s['state']=='current' else '',e(s['label']),
+            {'done':'completada','current':'etapa actual','pending':'pendiente'}[s['state']],'<time>%s</time>'%e(_when(s['at'],False)) if s['at'] else '') for s in p['steps'])
+        facts=[('Solicitado',_when(p['requested'],False)),('Disponibilidad estimada',_when(p['eta'],False) if p['eta'] else ''),('Recibido en el taller',_when(p['received'],False) if p['received'] else ''),
+               ('Última actualización',_when(p['updated']))]
+        hist=''.join('<li><time>%s</time><strong>%s</strong>%s</li>'%(e(_when(h['at'])),e(h['label']),'<p>%s</p>'%e(h['text']) if h['text'] else '') for h in p['history'])
+        finished=p['steps'][-1]['state']=='done'
+        out.append('<article class="tp" data-situation="%s"><header><div><strong>%s</strong>%s</div><span class="tp-state" data-tone="%s">%s</span></header><p class="tp-desc">%s</p>'
+                   '<ol class="tp-steps" data-n="%d" aria-label="Etapas del repuesto">%s</ol><dl class="tp-facts">%s</dl>%s</article>'%(
+                   e(p['situation']),e(p['name']),'<small>%s</small>'%e(p['brand']) if p['brand'] else '',e(p['tone'] if p['situation']!='normal' else ('verde' if finished else 'azul')),
+                   e(p['status_label']),e(p['description']),len(p['steps']),steps,''.join('<div><dt>%s</dt><dd>%s</dd></div>'%(e(k),e(v)) for k,v in facts if v),
+                   '<details class="tp-hist"><summary>Historial del repuesto (%d)</summary><ol>%s</ol></details>'%(len(p['history']),hist) if hist else ''))
+    if not out:return ''
+    return '<section class="tw-sec ticket-parts" aria-label="Seguimiento de repuestos"><h2>Seguimiento de repuestos</h2>'+''.join(out)+'</section>'
+
+
+def _evidence_section(data):
+    files=data.get('files') or []
+    if not files or not data.get('token'):return ''
+    e=html.escape;base='/s/'+data['token']+'/files/';photos=docs=0;items=''
+    for f in files:
+        pdf=f['mime']=='application/pdf'
+        if pdf:docs+=1
+        else:photos+=1
+        label='Documento %d'%docs if pdf else 'Fotografía %d'%photos
+        src=(base+'%d/thumb'%f['id']) if f.get('preview')=='thumb' else (base+'%d?part=0'%f['id']) if f.get('preview')=='original' else ''
+        inner='<img src="%s" alt="" loading="lazy" decoding="async" width="160" height="160">'%e(src) if src else '<b aria-hidden="true">%s</b>'%('PDF' if pdf else 'Foto')
+        items+='<li><button type="button" class="ticket-ev" data-file="%s%d" data-mime="%s" data-name="%s" aria-label="Ver %s"><span class="tw-thumb"%s>%s</span><span>%s</span></button></li>'%(
+            base,f['id'],e(f['mime']),e(label),e(label.lower()),'' if src else ' data-ready',inner,e(label))
+    return '<section class="tw-sec ticket-evidence" aria-label="Evidencias del servicio"><h2>Evidencias del servicio</h2><ul class="tw-gallery">'+items+'</ul></section>'
+
+
+def public_card(data,qr_src):
+    import barcode128
+    company=settings();e=html.escape
+    current=max(0,next((i for i,stage in enumerate(STAGES) if data['status'] in stage[1]),0));done=data['status']=='entregado'
+    steps=''.join('<li data-state="%s" data-stage="%d"%s><span class="tw-bar" aria-hidden="true"></span><i aria-hidden="true"></i><b>%s</b><small>%s</small></li>'%(
+        'done' if i<current or done else 'current' if i==current else 'pending',i+1,' aria-current="step"' if i==current and not done else '',e(label),
+        'Completado' if i<current or done else 'Etapa actual' if i==current else 'Pendiente') for i,(label,_) in enumerate(STAGES))
+    flags=[FLAGS[data['status']]] if data['status'] in FLAGS else []
+    waiting=[p for p in data.get('parts') or [] if p['waiting']]
+    if waiting and not done:flags.append('Esperando repuesto' if len(waiting)==1 else 'Esperando %d repuestos'%len(waiting))
+    facts=[('Equipo',data.get('device') or 'No registrado'),('Fecha de ingreso',data.get('received') or 'No registrada'),('Última actualización',data.get('updated') or 'Sin movimientos')]
+    rows=''.join('<div>%s<span><dt>%s</dt><dd>%s</dd></span></div>'%(_icon(ICONS[k]),e(k),e(v)) for k,v in facts)
+    updates=''
+    if data.get('updates'):
+        updates='<section class="tw-sec ticket-updates" aria-label="Novedades del servicio"><h2>Novedades del servicio</h2><ol>'+''.join(
+            '<li><time>%s</time><strong>%s</strong><p>%s</p></li>'%(e(u['at']),e(u['label']),e(u['message']).replace('\n','<br>')) for u in data['updates'])+'</ol></section>'
+    main=updates+_evidence_section(data);side=_parts_section(data)
+    if not main and not side:main='<section class="tw-sec"><h2>Novedades del servicio</h2><p class="tw-empty">Aún no hay novedades publicadas. Le informaremos cada avance.</p></section>'
+    code=data['code']
+    try:bars=barcode128.svg(code,color='#0b1526',background='#ffffff')
+    except barcode128.BarcodeError:bars=''
+    qr='<img class="ticket-qr" src="%s" width="132" height="132" alt="Código QR del seguimiento de la orden %s">'%(e(qr_src),e(code)) if qr_src else ''
+    now=datetime.now(ECUADOR_TZ).strftime('%d/%m/%Y %H:%M')
+    return ('<article class="ticket tw" data-status="%s"><section class="ticket-top tw-top" aria-label="Datos de la orden">'
+            '<header class="tw-head"><img class="ticket-logo" src="/static/logo-original.png" alt="PC-DOCTOR S.A." width="150"><div class="tw-title"><small>%s</small><h1>Seguimiento de reparación</h1></div>'
+            '<div class="tw-order"><small>Orden de servicio</small><strong>%s</strong><span class="ticket-state" data-status="%s">%s</span></div></header>'
+            '<div class="tw-progress"><h2 class="sr-only">Avance de la reparación</h2><ol class="ticket-steps tw-steps">%s</ol>%s</div><dl class="ticket-facts tw-facts">%s</dl></section>'
+            '<div class="tw-body%s">%s%s</div><div class="ticket-cut" aria-hidden="true"></div>'
+            '<section class="ticket-bottom tw-codes" aria-label="Código de seguimiento">%s<div class="ticket-barcode">%s<span>%s</span></div>'
+            '<div class="tw-verify"><h2>Código de seguimiento</h2><p>Escanea el QR para consultar este seguimiento. El código de barras identifica la orden en el taller.</p></div>'
+            '<footer><strong>%s</strong><span>%s</span><span>WhatsApp %s</span></footer></section></article>'
+            '<div class="tw-actions"><button type="button" data-refresh>Actualizar seguimiento</button><button type="button" data-print>Imprimir o guardar como PDF</button><small>Consultado el %s</small></div>'
+            '<p class="ticket-note">Esta página muestra solo el estado de la reparación. No contiene datos personales.</p>'
+            )%(e(data['status']),e(company['name']),e(code),e(data['status']),e(data['status_label']),steps,
+               ''.join('<p class="tw-flag" role="status">%s</p>'%e(f) for f in flags),rows,' tw-two' if main and side else '','<div class="tw-col">%s</div>'%main if main else '',
+               '<div class="tw-col">%s</div>'%side if side else '',qr,bars,e(code),e(company['name']),e(company['specialty']),e(company['whatsapp']),now)
 
 
 def card_page(data,qr_src,public):
     e=html.escape
     actions='<div class="ticket-actions"><button type="button" data-print>Imprimir o guardar como PDF</button>'+('' if public else '<a href="/#orders?id=%d">Volver a la orden</a>'%data['id'])+'</div>'
     note='<p class="ticket-note">Esta página muestra solo el estado de la reparación. No contiene datos personales.</p>' if public else '<p class="ticket-note">Vista interna con datos del cliente: no la compartas. Para el cliente usa el enlace público de seguimiento.</p>'
-    return CARD_HEAD%('<meta http-equiv="refresh" content="180">' if public else '',e(data['code']))+card(data,qr_src,public)+(parts_html(data) if public else '')+actions+note+'</main></body></html>'
+    return CARD_HEAD%('<meta http-equiv="refresh" content="180">' if public else '',e(data['code']))+card(data,qr_src,public)+actions+note+'</main></body></html>'
 
 
 def staff_data(c,oid):

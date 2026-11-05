@@ -96,7 +96,7 @@ class PartRequestTests(unittest.TestCase):
         post('/api/orders/%d/part-requests/%d' % (oid, rid), action='advance', stage='preparacion', note='Sin mensaje público', public_note='Texto no publicado', publish='')
         page = self.request('/s/' + self.link(oid))['body']
         self.assertIn('Seguimiento de repuestos', page);self.assertIn('Pantalla 15,6', page);self.assertIn('El proveedor confirmó el pedido.', page)
-        self.assertIn('aria-current="step"', page);self.assertIn('Llegada estimada', page)
+        self.assertIn('aria-current="step"', page);self.assertIn('Disponibilidad estimada', page)
         for secret in ('Costo 85', 'PED-998877', 'Servientrega', 'GUIA-112233', 'rastreo.example', 'Confirmó por correo', 'Texto no publicado', 'Placa madre de respaldo'):
             self.assertNotIn(secret, page, secret)
         self.assertNotIn(str(hidden), '')  # el repuesto no visible no aparece (comprobado por su nombre arriba)
@@ -151,6 +151,56 @@ class PartRequestTests(unittest.TestCase):
             c.execute("UPDATE users SET role='tecnico' WHERE id=?", (self.uid,));c.commit()
         self.assertEqual(post(url, action='advance', stage='confirmado')['status'], 200)
         self.assertEqual(post(url, action='advance', stage='solicitado', note='Intento de retroceso del técnico')['status'], 403)
+
+    def test_public_model_shows_only_real_events_and_never_the_supplier(self):
+        cookie, csrf, post, order = self.paid_order(10500, pay=False)
+        oid = order['id']
+        with app.connect() as c:
+            sup = c.execute("INSERT INTO suppliers(name,created_at,updated_at) VALUES ('Distribuidora Zeta','x','x')").lastrowid
+            c.commit()
+        rid = self.part(post, oid, supplier_id=str(sup), carrier='Servientrega', tracking_number='GX-778899')['body']['id']
+        url = '/api/orders/%d/part-requests/%d' % (oid, rid)
+        # Un mensaje público con el mercado, el proveedor, el transporte o la guía se rechaza al guardar.
+        for leak in ('Lo compramos en eBay', 'Viene de Mercado Libre', 'Pedido a Distribuidora Zeta', 'Enviado por servientrega', 'Guía GX-778899'):
+            r = post(url, action='advance', stage='confirmado', public_note=leak, publish='1')
+            self.assertEqual((r['status'], list(r['body'].get('fields', {}))), (400, ['public_note']), leak)
+        self.assertEqual(post(url, action='advance', stage='confirmado', public_note='El repuesto fue confirmado.', publish='1')['status'], 200)
+        import order_part_requests as parts
+        with app.connect() as c:
+            p = parts.public(c, oid)[0]
+            # «En traslado» no aparece hasta que se registre: 5 etapas, sin inventar movimientos.
+            self.assertEqual([s['code'] for s in p['steps']], ['solicitud', 'confirmado', 'recibido', 'instalacion', 'finalizado'])
+            self.assertEqual([s['state'] for s in p['steps']], ['done', 'current', 'pending', 'pending', 'pending'])
+            # Un mensaje antiguo con datos del proveedor (guardado antes de esta revisión) no se muestra.
+            c.execute("INSERT INTO order_part_events(request_id,kind,stage,situation,public_note,public,created_at) VALUES (?,'etapa','confirmado','normal','Comprado en Amazon',1,'2026-11-04T10:00:00-05:00')", (rid,))
+            c.commit()
+        for stage in ('preparacion', 'transito'):
+            self.assertEqual(post(url, action='advance', stage=stage)['status'], 200)
+        with app.connect() as c:
+            p = parts.public(c, oid)[0]
+            self.assertEqual([s['code'] for s in p['steps']], ['solicitud', 'confirmado', 'traslado', 'recibido', 'instalacion', 'finalizado'])
+            self.assertEqual([s['color'] for s in p['steps']], [0, 1, 2, 3, 4, 5])  # de azul a verde, solo al completarse
+            self.assertFalse(any('Amazon' in (h['text'] or '') for h in p['history']))
+        page = self.request('/s/' + self.link(oid))['body']
+        for secret in ('Distribuidora Zeta', 'Servientrega', 'GX-778899', 'Amazon', 'eBay'):
+            self.assertNotIn(secret, page)
+        self.assertIn('En traslado hacia PC-DOCTOR', page);self.assertIn('Esperando repuesto', page)
+
+    def test_order_progress_never_advances_on_waiting_states(self):
+        import re
+        cookie, csrf, post, order = self.paid_order(10500)  # pagada: el sistema no entrega una orden con saldo pendiente
+        oid = order['id']
+        token = self.link(oid)
+        states = lambda: re.findall(r'<li data-state="(\w+)" data-stage', self.request('/s/' + token)['body'])
+        self.assertEqual(states(), ['current', 'pending', 'pending', 'pending'])  # recibida: nada en verde
+        self.request('/api/order-status', {'id': str(oid), 'status': 'presupuesto'}, cookie=cookie, csrf=csrf)
+        page = self.request('/s/' + token)['body']
+        self.assertEqual(states(), ['done', 'current', 'pending', 'pending'])
+        self.assertIn('Presupuesto pendiente de su aprobación', page)
+        self.request('/api/order-status', {'id': str(oid), 'status': 'listo'}, cookie=cookie, csrf=csrf)
+        self.assertEqual(states(), ['done', 'done', 'current', 'pending'])  # listo: aún no es la entrega
+        self.request('/api/order-status', {'id': str(oid), 'status': 'entregado'}, cookie=cookie, csrf=csrf)
+        self.assertEqual(states(), ['done'] * 4)
 
 
 if __name__ == '__main__':

@@ -145,6 +145,8 @@ def create(c, oid, data, user, now):
     rid = c.execute('INSERT INTO order_part_requests(' + ','.join(cols) + ') VALUES (' + ','.join('?' * len(cols)) + ')', vals).lastrowid
     row = _request(c, oid, rid)
     text, public = _message(data)
+    if public:
+        _check_public(c, row, text)
     _event(c, row, 'alta', user, now, note=_text(data, 'note', 1500) or 'Repuesto registrado.', public_note=text, public=public)
     return rid
 
@@ -193,8 +195,10 @@ def advance(c, oid, rid, data, user, now):
         if received > now.date().isoformat():
             raise PartError('La fecha de recepción no puede ser futura.', 400, {'received_at': 'Fecha futura.'})
     situation = 'normal' if want > have else row['situation']  # al avanzar, un retraso o una espera anterior quedan resueltos
-    c.execute('UPDATE order_part_requests SET stage=?,situation=?,received_at=?,updated_at=? WHERE id=?', (target, situation, received, stamp(now), row['id']))
     text, public = _message(data)
+    if public:
+        _check_public(c, row, text)
+    c.execute('UPDATE order_part_requests SET stage=?,situation=?,received_at=?,updated_at=? WHERE id=?', (target, situation, received, stamp(now), row['id']))
     _event(c, row, 'etapa', user, now, note=note or ('Corrección de etapa' if want < have else 'Avanza a: ' + dict((s[0], s[1]) for s in STAGES)[target]),
            public_note=text, public=public, stage=target, situation=situation, changes={'stage': [row['stage'], target]})
     return {'stage': target, 'situation': situation}
@@ -218,8 +222,10 @@ def set_situation(c, oid, rid, data, user, now):
     changes = {'situation': [row['situation'], situation]}
     if eta != row['eta']:
         changes['eta'] = [row['eta'], eta]
-    c.execute('UPDATE order_part_requests SET situation=?,eta=?,updated_at=? WHERE id=?', (situation, eta, stamp(now), row['id']))
     text, public = _message(data)
+    if public:
+        _check_public(c, row, text)
+    c.execute('UPDATE order_part_requests SET situation=?,eta=?,updated_at=? WHERE id=?', (situation, eta, stamp(now), row['id']))
     _event(c, row, 'situacion', user, now, note=note or 'Sin novedad.', public_note=text, public=public, situation=situation, changes=changes)
     return {'situation': situation, 'eta': eta}
 
@@ -260,17 +266,100 @@ def options(c):
             'staff': [dict(r) for r in c.execute("SELECT id,name FROM users WHERE active=1 AND role IN ('administrador','tecnico') ORDER BY name")]}
 
 
+# ---- Vista pública (modelo seguro: solo se construye con campos permitidos; los textos se revisan contra datos del proveedor) -------------
+
+PUBLIC_STEPS = (('solicitud', 'Solicitud registrada', ('solicitado',)), ('confirmado', 'Repuesto confirmado', ('confirmado', 'preparacion')),
+                ('traslado', 'En traslado hacia PC-DOCTOR', ('transito',)), ('recibido', 'Recibido en el taller', ('recibido',)),
+                ('instalacion', 'Instalación y pruebas', ('instalacion',)), ('finalizado', 'Proceso finalizado', ('instalado', 'listo')))
+HISTORY_LABELS = {'solicitado': 'Solicitud registrada', 'confirmado': 'Repuesto confirmado', 'preparacion': 'En preparación para el envío', 'transito': 'En traslado hacia PC-DOCTOR',
+                  'recibido': 'Recibido en el taller', 'instalacion': 'Instalación y pruebas', 'instalado': 'Instalación finalizada', 'listo': 'Proceso finalizado'}
+PUBLIC_SITUATIONS = {'normal': 'Sin novedad', 'espera_confirmacion': 'En espera de confirmación', 'espera_proveedor': 'En espera de disponibilidad', 'retrasado': 'Llegada con retraso',
+                     'incidencia_transporte': 'Novedad en el traslado', 'cancelado': 'Pedido cancelado'}
+DESCRIPTIONS = {'solicitud': 'Estamos gestionando la adquisición del repuesto para su equipo.', 'confirmado': 'El repuesto fue confirmado y se prepara para su envío a nuestro taller.',
+                'traslado': 'El repuesto está en camino hacia nuestro taller.', 'recibido': 'El repuesto llegó a nuestro taller y será instalado.',
+                'instalacion': 'Estamos instalando el repuesto y probando el funcionamiento del equipo.', 'finalizado': 'La instalación del repuesto terminó.',
+                'espera_confirmacion': 'Estamos esperando la confirmación del repuesto. Le informaremos en cuanto la tengamos.',
+                'espera_proveedor': 'El repuesto está en espera de disponibilidad. Le informaremos en cuanto tengamos novedades.',
+                'retrasado': 'La llegada del repuesto presenta un retraso. Le informaremos la nueva fecha cuando esté confirmada.',
+                'incidencia_transporte': 'Se presentó una novedad en el traslado del repuesto y la estamos gestionando.',
+                'cancelado': 'El pedido de este repuesto fue cancelado. Nos comunicaremos con usted para indicarle las alternativas.'}
+# Nombres que nunca deben llegar al cliente: mercados en línea y empresas de transporte (además de los datos de cada pedido).
+PRIVATE_TERMS = ('ebay', 'mercado libre', 'mercadolibre', 'amazon', 'aliexpress', 'alibaba', 'temu', 'shein', 'wish', 'olx', 'servientrega', 'tramaco',
+                 'laar courier', 'laarcourier', 'dhl', 'fedex', 'ups', 'urbano express', 'correos del ecuador', 'courier')
+
+
+def _fold(text):
+    import unicodedata
+    return ''.join(ch for ch in unicodedata.normalize('NFD', str(text or '').lower()) if unicodedata.category(ch) != 'Mn')
+
+
+def private_terms(c, row):
+    """Lo que identifica al proveedor y la logística de un pedido: su proveedor, transportista, guía, pedido y dominio de rastreo."""
+    terms = list(PRIVATE_TERMS)
+    if row['supplier_id']:
+        found = c.execute('SELECT name FROM suppliers WHERE id=?', (row['supplier_id'],)).fetchone()
+        if found:
+            terms.append(found[0])
+    terms += [row['carrier'], row['tracking_number'], row['supplier_order']]
+    host = re.match(r'https://([^/]+)', row['tracking_url'] or '')
+    if host:
+        terms.append(host.group(1).replace('www.', ''))
+    return [t for t in (_fold(x).strip() for x in terms) if len(t) >= 3 or t == 'ups']
+
+
+def leaks(text, terms):
+    folded = _fold(text)
+    return [t for t in terms if re.search(r'(?<![a-z0-9])' + re.escape(t) + r'(?![a-z0-9])', folded)]
+
+
+def _check_public(c, row, text):
+    found = leaks(text, private_terms(c, row)) if text else []
+    if found:
+        raise PartError('El mensaje para el cliente menciona datos del proveedor o del transporte («%s»): quítalos; el cliente solo ve el avance desde PC-DOCTOR.' % found[0],
+                        400, {'public_note': 'Contiene datos del proveedor o del transporte.'})
+
+
+def _scrub(text, terms):
+    out = str(text or '')
+    for t in terms:
+        out = re.sub(r'(?i)(?<![a-z0-9])' + r'\s*'.join(re.escape(w) for w in t.split()) + r'(?![a-z0-9])', '', out)
+    return re.sub(r'\s{2,}', ' ', out).strip(' ·-')
+
+
 def public(c, oid):
-    """Lo único que ve el cliente de cada repuesto visible: sin costos, proveedor, pedido, guía, enlaces ni notas internas."""
+    """Seguimiento de repuestos para el cliente. Se construye solo con campos permitidos (nombre, etapa, fechas, mensajes públicos):
+    nunca costos, proveedor, mercado, compra, pedido, guía, transportista, enlaces ni notas. Los textos se revisan otra vez contra los datos
+    del proveedor y la logística; un mensaje que los contenga no se muestra. La etapa «En traslado» solo aparece si se registró."""
     out = []
     for r in c.execute('SELECT * FROM order_part_requests WHERE order_id=? AND public_visible=1 ORDER BY id', (oid,)).fetchall():
-        events = c.execute('SELECT kind,stage,public_note,public,created_at FROM order_part_events WHERE request_id=? ORDER BY id', (r['id'],)).fetchall()
-        done = {e['stage']: e['created_at'] for e in events if e['kind'] in ('alta', 'etapa')}
-        out.append({'name': ' · '.join(x for x in (r['name'], r['brand']) if x), 'stage': r['stage'], 'stage_index': CODES.index(r['stage']),
-                    'stage_label': dict((s[0], s[1]) for s in STAGES)[r['stage']], 'situation': r['situation'],
-                    'situation_label': SITUATIONS[r['situation']][0] if r['situation'] != 'normal' else '', 'tone': SITUATIONS[r['situation']][1],
-                    'requested': r['created_at'], 'eta': r['eta'] if CODES.index(r['stage']) < CODES.index('recibido') else '', 'received': r['received_at'],
-                    'updated': events[-1]['created_at'] if events else r['updated_at'],
-                    'steps': [{'short': short, 'at': done.get(code, '') if CODES.index(code) <= CODES.index(r['stage']) else ''} for code, _, short in STAGES],
-                    'messages': [{'at': e['created_at'], 'text': e['public_note']} for e in reversed(events) if e['public'] and e['public_note']][:6]})
+        terms = private_terms(c, r)
+        events = c.execute('SELECT kind,stage,situation,public_note,public,created_at FROM order_part_events WHERE request_id=? ORDER BY id', (r['id'],)).fetchall()
+        first = {}
+        for e in events:
+            if e['kind'] in ('alta', 'etapa'):
+                first.setdefault(e['stage'], e['created_at'])
+        steps = [s for s in PUBLIC_STEPS if s[0] != 'traslado' or 'transito' in first]
+        group = next(i for i, s in enumerate(steps) if r['stage'] in s[2] or (s[0] == 'confirmado' and r['stage'] == 'transito' and 'transito' not in first))
+        finished = r['stage'] == 'listo' and r['situation'] != 'cancelado'
+        n = len(steps)
+        public_steps = []
+        for i, (code, label, stages) in enumerate(steps):
+            state = 'done' if i < group or finished else 'current' if i == group else 'pending'
+            at = min((first[x] for x in stages if x in first), default='') if state != 'pending' else ''
+            public_steps.append({'code': code, 'label': label, 'state': state, 'at': at, 'color': round(i * 5 / (n - 1)) if n > 1 else 5})
+        history = []
+        for e in events:
+            label = ('Solicitud registrada' if e['kind'] == 'alta' else HISTORY_LABELS.get(e['stage'], '') if e['kind'] == 'etapa'
+                     else PUBLIC_SITUATIONS.get(e['situation'], '') if e['kind'] == 'situacion' else '')
+            text = e['public_note'] if e['public'] and e['public_note'] and not leaks(e['public_note'], terms) else ''
+            if label or text:
+                history.append({'at': e['created_at'], 'label': label or 'Mensaje del taller', 'text': text})
+        situation = r['situation']
+        out.append({'name': _scrub(r['name'], terms) or 'Repuesto', 'brand': _scrub(r['brand'], terms), 'stage': r['stage'], 'situation': situation,
+                    'situation_label': PUBLIC_SITUATIONS[situation] if situation != 'normal' else '', 'tone': SITUATIONS[situation][1],
+                    'status_label': PUBLIC_SITUATIONS[situation] if situation != 'normal' else ('Proceso finalizado' if finished else steps[group][1]),
+                    'description': DESCRIPTIONS[situation] if situation != 'normal' else DESCRIPTIONS[steps[group][0]] if not finished else DESCRIPTIONS['finalizado'],
+                    'requested': r['created_at'], 'eta': r['eta'] if CODES.index(r['stage']) < CODES.index('recibido') and situation != 'cancelado' else '',
+                    'received': r['received_at'], 'updated': events[-1]['created_at'] if events else r['updated_at'], 'steps': public_steps,
+                    'waiting': CODES.index(r['stage']) < CODES.index('recibido') and situation != 'cancelado', 'history': history[::-1][:12]})
     return out

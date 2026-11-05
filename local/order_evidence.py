@@ -290,9 +290,12 @@ def change(c, oid, file_id, data, user, now):
 def public_files(c, oid):
     """Evidencias que el cliente puede ver: visibles y no retiradas (sin nombres internos más allá del nombre del archivo)."""
     st = states(c, oid)
-    return [{'id': r['id'], 'name': r['name'], 'mime': r['mime'], 'size': r['size'], 'thumb': bool(r['thumb']), 'created_at': r['created_at']}
-            for r in c.execute('SELECT id,name,mime,size,thumb,created_at FROM order_followup_files WHERE order_id=? ORDER BY id', (oid,))
-            if st[r['id']]['visible'] and not st[r['id']]['retired']]
+    rows = c.execute("SELECT f.id,f.name,f.mime,f.size,f.thumb!='' has_thumb,f.created_at,f.storage,COALESCE(u.parts,1) parts FROM order_followup_files f "
+                     'LEFT JOIN order_uploads u ON u.id=f.upload_id WHERE f.order_id=? ORDER BY f.id', (oid,)).fetchall()
+    # Una evidencia anterior (guardada entera, sin miniatura) se muestra con la imagen misma: cabe en una sola respuesta.
+    return [{'id': r['id'], 'name': r['name'], 'mime': r['mime'], 'size': r['size'], 'thumb': bool(r['has_thumb']), 'parts': r['parts'], 'created_at': r['created_at'],
+             'preview': 'thumb' if r['has_thumb'] else 'original' if r['mime'] != 'application/pdf' and r['parts'] == 1 else ''}
+            for r in rows if st[r['id']]['visible'] and not st[r['id']]['retired']]
 
 
 # ---- Borrador del seguimiento -------------------------------------------------------------------------------------------------

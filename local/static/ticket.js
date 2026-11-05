@@ -1,22 +1,31 @@
 'use strict';
-// Tarjeta de seguimiento: botón para imprimir o guardar como PDF con el diálogo del navegador.
-document.addEventListener('click',event=>{if(event.target.closest('[data-print]'))window.print();});
-// Evidencias autorizadas: el original se pide por partes (cada respuesta cabe en una petición) y se arma aquí, sin reducirlo. Fotografías
-// en un visor con zoom (botones, rueda y arrastre); los PDF se abren en una pestaña nueva. Escape cierra el visor.
+// Seguimiento público (1.5.240): imprimir, actualizar, miniaturas con carga y error visibles, y visor de evidencias con navegación.
+// El original se pide por partes (cada respuesta cabe en una petición) y se arma aquí sin reducirlo. Los PDF se abren en otra pestaña.
+document.addEventListener('click',event=>{if(event.target.closest('[data-print]'))window.print();if(event.target.closest('[data-refresh]'))location.reload();});
 (()=>{const mk=(tag,cls,text)=>{const n=document.createElement(tag);if(cls)n.className=cls;if(text)n.textContent=text;return n;};
+ // Miniaturas: se marca la carga (o el error) también si ya ocurrió antes de que corra este script.
+ for(const img of document.querySelectorAll('.tw-thumb img')){const box=img.parentElement,ok=()=>{box.dataset.ready='';},bad=()=>{box.dataset.ready='';box.dataset.error='';img.remove();};
+  if(img.complete){img.naturalWidth?ok():bad();}else{img.addEventListener('load',ok,{once:true});img.addEventListener('error',bad,{once:true});}}
  async function original(url){const meta=await (await fetch(url+'/meta',{credentials:'omit'})).json();if(meta.error)throw new Error(meta.error);const parts=[];
-  for(let i=0;i<meta.parts;i++){const r=await fetch(url+'?part='+i,{credentials:'omit'});if(!r.ok)throw new Error('No se pudo cargar el archivo.');parts.push(await r.arrayBuffer());}
+  for(let i=0;i<meta.parts;i++){const r=await fetch(url+'?part='+i,{credentials:'omit'});if(!r.ok)throw new Error('La imagen no está disponible.');parts.push(await r.arrayBuffer());}
   return new Blob(parts,{type:meta.mime});}
- function viewer(src,name){const box=mk('div','ticket-viewer'),bar=mk('div','ticket-viewer-bar'),stage=mk('div','ticket-viewer-stage'),img=mk('img');img.src=src;img.alt=name;stage.append(img);let z=1;
-  const set=v=>{z=Math.min(8,Math.max(1,v));img.style.width=(z*100)+'%';zoom.textContent=Math.round(z*100)+' %';};
-  const btn=(label,fn)=>{const b=mk('button','',label);b.type='button';b.addEventListener('click',fn);bar.append(b);return b;};
-  btn('−',()=>set(z/1.5));const zoom=mk('span','ticket-viewer-zoom','100 %');bar.append(zoom);btn('+',()=>set(z*1.5));btn('Ajustar',()=>set(1));const close=btn('Cerrar',()=>done());close.className='ticket-viewer-close';
-  bar.prepend(mk('strong','',name));box.setAttribute('role','dialog');box.setAttribute('aria-modal','true');box.setAttribute('aria-label','Evidencia '+name);box.append(bar,stage);document.body.append(box);close.focus();
+ function viewer(list,start){let at=start,src='',z=1,img=null,token=0;const box=mk('div','ticket-viewer'),bar=mk('div','ticket-viewer-bar'),stage=mk('div','ticket-viewer-stage'),title=mk('strong'),count=mk('span','ticket-viewer-zoom');
+  const btn=(label,fn,aria)=>{const b=mk('button','',label);b.type='button';if(aria)b.setAttribute('aria-label',aria);b.addEventListener('click',fn);return b;};
+  const prev=btn('‹',()=>go(at-1),'Fotografía anterior'),next=btn('›',()=>go(at+1),'Fotografía siguiente'),zoom=mk('span','ticket-viewer-zoom','100 %');
+  const set=v=>{z=Math.min(8,Math.max(1,v));if(img)img.style.width=(z*100)+'%';zoom.textContent=Math.round(z*100)+' %';};
+  bar.append(title,count,prev,next,btn('−',()=>set(z/1.5),'Alejar'),zoom,btn('+',()=>set(z*1.5),'Acercar'),btn('Ajustar',()=>set(1)));const close=btn('Cerrar',()=>done());close.className='ticket-viewer-close';bar.append(close);
+  box.setAttribute('role','dialog');box.setAttribute('aria-modal','true');box.append(bar,stage);document.body.append(box);close.focus();
   stage.addEventListener('wheel',e=>{if(!e.ctrlKey&&!e.metaKey)return;e.preventDefault();set(z*(e.deltaY<0?1.2:1/1.2));},{passive:false});
   let drag=null;stage.addEventListener('pointerdown',e=>{drag={x:e.clientX,y:e.clientY,l:stage.scrollLeft,t:stage.scrollTop};});addEventListener('pointerup',()=>{drag=null;});
   stage.addEventListener('pointermove',e=>{if(!drag)return;stage.scrollLeft=drag.l-(e.clientX-drag.x);stage.scrollTop=drag.t-(e.clientY-drag.y);});
-  const key=e=>{if(e.key==='Escape')done();};document.addEventListener('keydown',key);
-  function done(){document.removeEventListener('keydown',key);URL.revokeObjectURL(src);box.remove();}}
- document.addEventListener('click',async event=>{const b=event.target.closest('.ticket-ev');if(!b||b.getAttribute('aria-busy')==='true')return;b.setAttribute('aria-busy','true');
-  try{const blob=await original(b.dataset.file),src=URL.createObjectURL(blob);if(b.dataset.mime==='application/pdf'){window.open(src,'_blank','noopener');setTimeout(()=>URL.revokeObjectURL(src),60000);}else viewer(src,b.dataset.name);}
-  catch(error){alert(error.message||'No se pudo cargar el archivo.');}finally{b.removeAttribute('aria-busy');}});})();
+  async function go(i){if(i<0||i>=list.length)return;at=i;const b=list[i],mine=++token;if(src)URL.revokeObjectURL(src);src='';img=null;set(1);
+   title.textContent=b.dataset.name;count.textContent=(i+1)+' de '+list.length;prev.disabled=i===0;next.disabled=i===list.length-1;box.setAttribute('aria-label',b.dataset.name);stage.replaceChildren(mk('p','','Cargando fotografía…'));
+   try{const blob=await original(b.dataset.file);if(mine!==token)return;src=URL.createObjectURL(blob);img=mk('img');img.alt=b.dataset.name;img.src=src;img.addEventListener('error',()=>stage.replaceChildren(mk('p','','La imagen no está disponible.')),{once:true});stage.replaceChildren(img);}
+   catch(error){if(mine===token)stage.replaceChildren(mk('p','',error.message||'La imagen no está disponible.'));}}
+  const key=e=>{if(e.key==='Escape')done();else if(e.key==='ArrowLeft')go(at-1);else if(e.key==='ArrowRight')go(at+1);};document.addEventListener('keydown',key);
+  function done(){document.removeEventListener('keydown',key);if(src)URL.revokeObjectURL(src);box.remove();list[at]?.focus();}
+  go(start);}
+ document.addEventListener('click',async event=>{const b=event.target.closest('.ticket-ev');if(!b||b.getAttribute('aria-busy')==='true')return;
+  if(b.dataset.mime==='application/pdf'){b.setAttribute('aria-busy','true');try{const blob=await original(b.dataset.file),src=URL.createObjectURL(blob);window.open(src,'_blank','noopener');setTimeout(()=>URL.revokeObjectURL(src),60000);}
+   catch(error){alert(error.message||'El documento no está disponible.');}finally{b.removeAttribute('aria-busy');}return;}
+  const photos=[...document.querySelectorAll('.ticket-ev')].filter(x=>x.dataset.mime!=='application/pdf');viewer(photos,photos.indexOf(b));});})();

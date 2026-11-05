@@ -1388,7 +1388,8 @@ class Handler(BaseHTTPRequestHandler):
             if tracking_file:
                 # Evidencias del enlace público: solo las visibles y no retiradas de la orden de ese enlace (las demás, «no disponible»).
                 import order_tracking,order_evidence
-                if limited(c,'tracking-ip:'+digest(self.client_address[0]),240,300):return self.reply(429,{'error':'Demasiadas consultas. Intenta más tarde.'})
+                # Contador propio: las miniaturas y las partes de los originales no deben agotar el límite de la página de seguimiento.
+                if limited(c,'tracking-files-ip:'+digest(self.client_address[0]),240,300):return self.reply(429,{'error':'Demasiadas consultas. Intenta más tarde.'})
                 found=order_tracking.lookup(c,tracking_file[1])
                 if not found:return self.reply(404,{'error':'Archivo no disponible.'})
                 try:

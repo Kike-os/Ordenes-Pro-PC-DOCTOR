@@ -42,3 +42,47 @@ Pruebas: `local/tests/test_tracking_card.py`.
 Tarjeta más estrecha y con menos espacio vacío (400 × 633 px en la vista del cliente), logotipo original más grande (136 px de ancho, sin modificarlo), un icono de trazo fino junto a cada dato, QR de 128 px y código de barras más alto. En 320 px los datos pasan a una columna. Se conservan los datos, las rutas y las funciones.
 
 Lectura comprobada con un lector independiente sobre capturas de pantalla: a la densidad de un teléfono (2× y 3×) se leen el QR y el código de barras; a densidad 1 (monitor corriente) el QR se lee y el código de barras no, porque cada barra mide menos de 1,5 píxeles. En papel ambos son vectoriales.
+
+## Seguimiento público ampliado (1.5.240)
+
+**Sin cambios:** la tarjeta conserva su identidad (degradado azul, logo original, corte de ticket, QR y código de barras). La vista interna para imprimir (`/tarjeta/<orden>`) no cambia.
+
+**Contenedor:**
+- En escritorio mide hasta 1040 px y en el teléfono, el ancho de la pantalla.
+- En escritorio se organiza en dos columnas: novedades y evidencias a un lado, seguimiento de repuestos al otro. En el teléfono, una sola.
+- Nada usa alturas fijas ni recorta.
+
+**Barra de avance** (Recepción · Diagnóstico y reparación · Listo para retiro · Entrega):
+- Hay un segmento por etapa. Solo las completadas llevan color: azul, turquesa, verde claro y verde intenso. La actual se marca a medias y las pendientes quedan en gris azulado.
+- Se rellena una sola vez en unos 0,5 s y respeta «movimiento reducido».
+- Los estados de espera **no adelantan el avance**: se muestran como aviso. Son «Presupuesto pendiente de su aprobación», «Esperando su respuesta», «En revisión por falla recurrente» y «Esperando repuesto(s)».
+
+**Repuestos (modelo público seguro, `order_part_requests.public`):**
+- **Etapas públicas:** Solicitud registrada, Repuesto confirmado, En traslado hacia PC-DOCTOR, Recibido en el taller, Instalación y pruebas, Proceso finalizado.
+  - La de traslado solo aparece si se registró ese evento.
+  - Solo las completadas se colorean, de azul a verde.
+- **Qué muestra:** descripción del estado real, fechas reales (la disponibilidad estimada solo si existe) e historial público.
+- **Datos del proveedor:** nunca se publican el proveedor, los mercados en línea (eBay, Mercado Libre, Amazon y otros), el transportista, la guía, el pedido ni el dominio de rastreo.
+  - Al guardar, un mensaje público que los mencione se rechaza.
+  - Al mostrar, un mensaje antiguo que los contenga se omite y el nombre se depura.
+
+**Evidencias:**
+- Miniaturas uniformes con indicador de carga y aviso si no cargan.
+- Las fotos antiguas sin miniatura se muestran con la imagen real, en lugar de «IMG».
+- No se muestran nombres de archivo («Fotografía 1», «Documento 1»).
+- El visor tiene navegación anterior y siguiente (botones y flechas), contador y zoom.
+- Contador antiabuso propio de las evidencias: antes compartían el de la página y una orden con varias fotos podía bloquear la consulta.
+
+**Códigos:**
+- QR de 132 px y código de barras de hasta 360 px, en una fila en escritorio y apilados en el teléfono.
+- «Actualizar seguimiento» e «Imprimir». La página se recarga sola cada 3 minutos, siempre con datos reales.
+
+**Pruebas:**
+- **Navegador:** 24 comprobaciones.
+  - Escenarios: recibida, diagnóstico, esperando aprobación, esperando repuestos (3 en estados distintos, uno recibido), lista, entregada, sin evidencias, varias fotos e histórica.
+  - Anchos: 320, 375, 430, 768, 1366 y 1920 px.
+- **Unitarias:**
+  - etapas públicas y colores;
+  - rechazo de datos del proveedor;
+  - avance sin adelantos;
+  - contador de evidencias.
