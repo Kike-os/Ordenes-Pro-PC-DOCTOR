@@ -4,6 +4,24 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.241 — 2026-11-04 20:21 (UTC-05:00)
+
+Seguimiento de repuestos animado «PC-DOCTOR Pro»
+
+### Nuevas funcionalidades
+
+- Seguimiento de repuestos: vehículo SVG animado que solo se mueve con un traslado real registrado, se detiene si hay novedad y llega con marca de confirmación al recibirse
+
+### Mejoras realizadas
+
+- Seguimiento de repuestos «PC-DOCTOR Pro»: seis etapas siempre visibles con colores progresivos de azul a verde solo en las etapas completadas y la etapa actual destacada
+- Seguimiento de repuestos: bloque de estado actual (etapas completadas, última actualización y mensaje claro) y cronología con fecha, hora y descripción de cada cambio
+- Seguimiento de repuestos: horizontal en computadora y vertical en el teléfono, sin superposiciones entre 320 y 1920 px, y sin animaciones con movimiento reducido
+
+### Errores corregidos
+
+- Seguimiento de repuestos: un traslado que no se registró ya no puede verse como completado (se muestra «No registrada»)
+
 ## v1.5.240 — 2026-11-04 19:45 (UTC-05:00)
 
 Seguimiento público profesional de reparaciones y repuestos

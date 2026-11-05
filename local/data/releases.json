@@ -8,6 +8,30 @@
   },
   "releases": [
     {
+      "version": "1.5.241",
+      "date": "2026-11-04T20:21:30-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Seguimiento de repuestos animado «PC-DOCTOR Pro»",
+      "changes": {
+        "features": [
+          "Seguimiento de repuestos: vehículo SVG animado que solo se mueve con un traslado real registrado, se detiene si hay novedad y llega con marca de confirmación al recibirse"
+        ],
+        "improvements": [
+          "Seguimiento de repuestos «PC-DOCTOR Pro»: seis etapas siempre visibles con colores progresivos de azul a verde solo en las etapas completadas y la etapa actual destacada",
+          "Seguimiento de repuestos: bloque de estado actual (etapas completadas, última actualización y mensaje claro) y cronología con fecha, hora y descripción de cada cambio",
+          "Seguimiento de repuestos: horizontal en computadora y vertical en el teléfono, sin superposiciones entre 320 y 1920 px, y sin animaciones con movimiento reducido"
+        ],
+        "fixes": [
+          "Seguimiento de repuestos: un traslado que no se registró ya no puede verse como completado (se muestra «No registrada»)"
+        ],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Kike-os: «actualiza a la version siguiente» (04/11/2026)"
+    },
+    {
       "version": "1.5.240",
       "date": "2026-11-04T19:45:52-05:00",
       "type": "patch",
