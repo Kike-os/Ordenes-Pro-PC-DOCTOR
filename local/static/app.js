@@ -3527,29 +3527,61 @@ function centerPromptLite(title,note,run){const d=smallDialog(title),form=el('fo
 // gris pendiente), su situación, sus datos y su historial. Solo se avanza a la etapa siguiente; saltar o retroceder es una corrección de
 // administración con motivo. Nada se publica ni se envía sin marcarlo; «Guardar y notificar» abre la comunicación para revisarla.
 function orderPartsPanel(order){ofxIcons();const box=el('section',undefined,'opr');box.setAttribute('aria-labelledby','opr-title-'+order.id);let data=null;
- const head=el('header',undefined,'opr-head'),title=el('h3','Pedidos de repuestos');title.id='opr-title-'+order.id;const count=el('span','','opr-count'),add=button('+ Pedido de repuesto',()=>partDialog(null),'secondary');
- head.append(title,count,add);const list=el('div',undefined,'opr-list');list.setAttribute('aria-live','polite');box.append(head,list);
+ const head=el('header',undefined,'opr-head'),htitle=el('div',undefined,'opr-htitle'),hico=el('span',undefined,'opr-ico'),title=el('h3','Pedidos de repuestos');title.id='opr-title-'+order.id;hico.append(invIcon('package'));
+ const count=el('span','','opr-count'),add=invBtn('Pedido de repuesto','plus',()=>partDialog(null),'primary');htitle.append(hico,title,count);const summary=el('div',undefined,'opr-summary');summary.setAttribute('aria-label','Resumen de los pedidos');
+ head.append(htitle,add);const list=el('div',undefined,'opr-list');list.setAttribute('aria-live','polite');box.append(head,summary,list);
  const day=v=>v?dashboardDate(v.slice(0,10)):'';const when=v=>v?formatOrderDate(v):'';
+ // Etiquetas legibles de los cambios de datos del historial (nunca los nombres técnicos de los campos).
+ const FIELD_NAMES={name:'Nombre',brand:'Marca',compatible_model:'Modelo compatible',reference:'Referencia',quantity:'Cantidad',supplier_id:'Proveedor',purchase_item_id:'Línea de compra',inventory_item_id:'Producto del inventario',
+  purchase_date:'Fecha de compra',eta:'Llegada estimada',supplier_order:'Número de pedido',carrier:'Transportista',tracking_number:'Guía',tracking_url:'Enlace de rastreo',received_at:'Recepción',internal_note:'Observaciones internas',
+  technician_id:'Técnico',public_visible:'Visible para el cliente',stage:'Etapa',situation:'Situación'};
+ const OPR_VAN='<svg viewBox="0 0 48 28" aria-hidden="true" focusable="false"><path class="v-box" d="M3 7a3 3 0 0 1 3-3h20a3 3 0 0 1 3 3v12H3z"/><path class="v-cab" d="M29 9h8.5a3 3 0 0 1 2.5 1.3l4.2 6.2a3 3 0 0 1 .5 1.7V19H29z"/><path class="v-win" d="M31 11h6l3.4 5H31z"/><rect class="v-band" x="6" y="10" width="17" height="3" rx="1.5"/><circle class="v-wheel" cx="11" cy="21" r="3.6"/><circle class="v-wheel" cx="36" cy="21" r="3.6"/><circle class="v-hub" cx="11" cy="21" r="1.4"/><circle class="v-hub" cx="36" cy="21" r="1.4"/></svg>';
+ const OPR_OK='<svg class="v-ok" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><circle cx="10" cy="10" r="9"/><path d="m6 10.2 2.6 2.6L14.2 7"/></svg>';
  async function load(){try{data=await api('/api/orders/'+order.id+'/part-requests');paint();}catch(error){list.replaceChildren(el('p',error.message,'inv-form-message'));}}
- function paint(){const rows=data.rows;count.textContent=rows.length?String(rows.length):'';list.replaceChildren();if(!rows.length){list.append(el('p','Sin repuestos solicitados. Registra uno para que el cliente vea su avance en el seguimiento público.','opr-empty'));return;}
+ function paint(){const rows=data.rows;count.textContent=rows.length?String(rows.length):'';list.replaceChildren();summary.replaceChildren();summary.hidden=!rows.length;
+  if(!rows.length){list.append(el('p','Sin repuestos solicitados. Registra uno para que el cliente vea su avance en el seguimiento público.','opr-empty'));return;}
+  // Resumen con los datos guardados: nada se estima.
+  for(const[label,n,tone]of [['Activos',rows.filter(r=>r.situation!=='cancelado'&&r.stage!=='listo').length,'azul'],['En camino',rows.filter(r=>r.stage==='transito'&&r.situation!=='cancelado').length,'turquesa'],
+   ['Con novedad',rows.filter(r=>!['normal','cancelado'].includes(r.situation)).length,'naranja'],['Vencidos',rows.filter(r=>r.overdue).length,'rojo'],['Recibidos o más',rows.filter(r=>r.stage_index>=4&&r.situation!=='cancelado').length,'verde']]){
+   const x=el('div',undefined,'opr-stat');x.dataset.tone=tone;x.dataset.zero=String(!n);x.append(el('strong',String(n)),el('small',label));summary.append(x);}
   for(const r of rows){const card=el('article',undefined,'opr-card');card.dataset.tone=r.tone;card.dataset.situation=r.situation;
-   const top=el('div',undefined,'opr-top'),name=el('div');name.append(el('strong',[r.name,r.brand].filter(Boolean).join(' · ')),el('small',[r.compatible_model,r.reference,r.quantity>1?r.quantity+' unidades':''].filter(Boolean).join(' · ')||'Sin modelo ni referencia'));
+   const done=r.steps.filter((st,i)=>i<r.stage_index||(i===r.stage_index&&i===7&&r.situation!=='cancelado')).length;
+   // Vehículo: solo con un traslado real registrado (igual que en el seguimiento público).
+   const transit=r.events.some(e=>e.kind==='etapa'&&e.stage==='transito'),vehicle=r.situation==='cancelado'||!transit?'':r.stage==='transito'?(r.situation==='normal'?'transit':'stopped'):r.stage==='recibido'?'arrived':'';card.dataset.vehicle=vehicle;
+   const top=el('header',undefined,'opr-top'),id=el('div',undefined,'opr-id'),ico=el('span',undefined,'opr-ico'),name=el('div');ico.append(invIcon('package'));
+   name.append(el('strong',[r.name,r.brand].filter(Boolean).join(' · ')),el('small',[r.compatible_model,r.reference,r.quantity>1?r.quantity+' unidades':''].filter(Boolean).join(' · ')||'Sin modelo ni referencia'));id.append(ico,name);
    const chips=el('div',undefined,'opr-chips'),chip=el('span',r.situation==='normal'?r.stage_label:r.situation_label,'opr-chip');chip.dataset.tone=r.situation==='normal'?(r.stage==='listo'?'verde':'azul'):r.tone;chips.append(chip);
    if(r.overdue){const o=el('span','Vencido: llegada estimada '+day(r.eta),'opr-chip');o.dataset.tone='naranja';chips.append(o);}if(!r.public_visible)chips.append(el('span','No visible para el cliente','opr-chip'));
-   top.append(name,chips);
-   const steps=el('ol',undefined,'opr-steps');steps.setAttribute('aria-label','Etapas de '+r.name);r.steps.forEach((st,i)=>{const li=el('li'),state=i<r.stage_index||(i===r.stage_index&&i===7&&r.situation!=='cancelado')?'done':i===r.stage_index?'current':'pending';li.dataset.state=state;if(state==='current'){li.dataset.tone=r.situation==='normal'?'azul':r.tone;li.setAttribute('aria-current','step');}
-    li.append(el('i'),el('span',st.short),el('small',{done:'completada',current:'etapa actual',pending:'pendiente'}[state],'sr-only'));if(st.at)li.append(el('time',day(st.at)));li.title=st.label+(st.at?' · '+when(st.at):'');steps.append(li);});
-   const facts=el('dl',undefined,'opr-facts');for(const[k,v]of [['Proveedor',r.supplier],['Pedido',r.supplier_order],['Compra',r.purchase_document?r.purchase_document+' ('+r.purchase_status+')':''],['Inventario',r.inventory_name],['Transportista',r.carrier],['Guía',r.tracking_number],
-    ['Llegada estimada',day(r.eta)],['Recibido',day(r.received_at)],['Responsable',r.technician],['Evidencias',r.evidence?String(r.evidence):'']]){if(!v)continue;const x=el('div');x.append(el('dt',k));const dd=el('dd',v);if(k==='Guía'&&r.tracking_url){const a=el('a',v);a.href=r.tracking_url;a.target='_blank';a.rel='noopener noreferrer';dd.replaceChildren(a);}x.append(dd);facts.append(x);}
-   if(r.internal_note)facts.append((()=>{const x=el('div',undefined,'opr-note');x.append(el('dt','Observaciones internas'),el('dd',r.internal_note));return x;})());
-   const acts=el('div',undefined,'opr-acts');const next=data.stages[r.stage_index+1];
+   top.append(id,chips);
+   const next=data.stages[r.stage_index+1],last=r.events[0];
+   const now=el('div',undefined,'opr-now');now.dataset.tone=r.situation==='normal'?(r.stage==='listo'?'verde':'azul'):r.tone;
+   const nowText=el('div');nowText.append(el('small','Estado actual'),el('strong',r.situation==='normal'?r.stage_label:r.stage_label+' · '+r.situation_label),
+    el('p',r.situation==='cancelado'?'Pedido cancelado: ya no cambia de etapa.':r.situation!=='normal'?(last&&last.kind==='situacion'&&last.note?last.note:r.situation_label):next?'Siguiente etapa: '+next.label+'.':'Proceso completo.'));
+   const meta=el('div',undefined,'opr-meta'),meter=el('div',undefined,'opr-meter');meter.setAttribute('role','img');meter.setAttribute('aria-label',done+' de 8 etapas completadas');
+   r.steps.forEach((st,i)=>{const sp=el('span');sp.dataset.c=String(i);sp.dataset.state=i<done?'done':i===r.stage_index?'current':'pending';meter.append(sp);});
+   const dn=el('small');dn.append(el('b',done+' de 8'),document.createTextNode(' etapas completadas'));meta.append(meter,dn,el('small','Actualizado: '+(last?when(last.created_at):'—')));now.append(nowText,meta);
+   const track=el('div',undefined,'opr-track');if(vehicle){const v=el('span',undefined,'opr-vehicle');v.dataset.vehicle=vehicle;v.setAttribute('aria-hidden','true');v.innerHTML=OPR_VAN+(vehicle==='arrived'?OPR_OK:'');track.append(v);}
+   const steps=el('ol',undefined,'opr-steps');steps.setAttribute('aria-label','Etapas de '+r.name);r.steps.forEach((st,i)=>{const li=el('li'),state=i<r.stage_index||(i===r.stage_index&&i===7&&r.situation!=='cancelado')?'done':i===r.stage_index?'current':'pending';li.dataset.state=state;li.dataset.c=String(i);
+    if(state==='current'){li.dataset.tone=r.situation==='normal'?'azul':r.tone;li.setAttribute('aria-current','step');}
+    li.append(el('i'),el('span',st.short),el('small',{done:'completada',current:'etapa actual',pending:'pendiente'}[state],'sr-only'));if(st.at)li.append(el('time',day(st.at)));li.title=st.label+(st.at?' · '+when(st.at):'');steps.append(li);});track.append(steps);
+   // Información en bloques: solo los que tienen datos.
+   const blocks=el('div',undefined,'opr-blocks'),guide=(()=>{if(!r.tracking_number)return '';if(!r.tracking_url)return r.tracking_number;const a=el('a',r.tracking_number);a.href=r.tracking_url;a.target='_blank';a.rel='noopener noreferrer';return a;})();
+   for(const[icon,title,rowsOf]of [['truck','Proveedor y pedido',[['Proveedor',r.supplier],['Número de pedido',r.supplier_order],['Compra',r.purchase_document?r.purchase_document+' ('+r.purchase_status+')':''],['Inventario',r.inventory_name]]],
+    ['send','Transporte',[['Transportista',r.carrier],['Guía',guide],['Llegada estimada',day(r.eta)]]],['calendar','Fechas',[['Solicitado',day(r.created_at)],['Compra',day(r.purchase_date)],['Recibido',day(r.received_at)]]],
+    ['user','Taller',[['Responsable',r.technician],['Evidencias',r.evidence?String(r.evidence):''],['Seguimiento público',r.public_visible?'Visible':'Oculto']]]]){
+    const filled=rowsOf.filter(([,v])=>v);if(!filled.length)continue;const sec=el('section',undefined,'opr-block'),h=el('h4');h.append(invIcon(icon),el('span',title));const dl=el('dl');
+    for(const[k,v]of filled){const x=el('div');x.append(el('dt',k));const dd=el('dd');dd.append(v instanceof Node?v:document.createTextNode(v));x.append(dd);dl.append(x);}sec.append(h,dl);blocks.append(sec);}
+   if(r.internal_note){const sec=el('section',undefined,'opr-block opr-note'),h=el('h4');h.append(invIcon('lock'),el('span','Observaciones internas'));sec.append(h,el('p',r.internal_note));blocks.append(sec);}
+   const acts=el('div',undefined,'opr-acts');
    if(r.situation!=='cancelado'){if(next)acts.append(invBtn('Avanzar a: '+next.short,'chevron-right',()=>stageDialog(r),'primary'));acts.append(invBtn('Novedad o retraso','triangle-alert',()=>situationDialog(r)),invBtn('Editar datos','pencil',()=>partDialog(r)),
      invBtn('Agregar evidencia','image',()=>addOrderFollowUp(order.id,{kind:'repuesto',part_request_id:r.id,part_name:r.name})));}
-   const hist=el('details',undefined,'opr-hist'),ol=el('ol');hist.append(el('summary','Historial ('+r.events.length+')'),ol);
-   for(const e of r.events){const li=el('li');const what={alta:'Alta del repuesto',etapa:'Etapa: '+(data.stages.find(x=>x.code===e.stage)?.label||e.stage),situacion:'Situación: '+(data.situations[e.situation]?.label||e.situation),datos:'Datos actualizados'}[e.kind];
-    li.append(el('strong',what),el('small',when(e.created_at)+' · '+e.actor));if(e.note)li.append(el('p',e.note));if(e.kind==='datos')li.append(el('p',Object.entries(e.changes).map(([k,[a,b]])=>k+': '+(a??'—')+' → '+(b??'—')).join(' · '),'opr-diff'));
+   const hist=el('details',undefined,'opr-hist'),ol=el('ol'),sum=el('summary');sum.append(el('span','Historial'),el('b',String(r.events.length)));hist.append(sum,ol);
+   for(const e of r.events){const li=el('li');li.dataset.kind=e.kind;const ci=data.stages.findIndex(x=>x.code===e.stage);li.dataset.c=String(Math.max(0,ci));if(e.kind==='situacion')li.dataset.tone=data.situations[e.situation]?.tone||'';
+    const what={alta:'Alta del repuesto',etapa:'Etapa: '+(data.stages.find(x=>x.code===e.stage)?.label||e.stage),situacion:'Situación: '+(data.situations[e.situation]?.label||e.situation),datos:'Datos actualizados'}[e.kind];
+    li.append(el('strong',what),el('small',when(e.created_at)+' · '+e.actor));if(e.note)li.append(el('p',e.note));
+    if(e.kind==='datos')li.append(el('p',Object.entries(e.changes).map(([k,[a,b]])=>(FIELD_NAMES[k]||k)+': '+(a===''||a==null?'—':a)+' → '+(b===''||b==null?'—':b)).join(' · '),'opr-diff'));
     if(e.public)li.append(el('p','Publicado para el cliente: '+e.public_note,'opr-public'));ol.append(li);}
-   card.append(top,steps,facts,acts,hist);list.append(card);}}
+   card.append(top,now,track,blocks,acts,hist);list.append(card);}}
  // Ventanas: el texto público sale de las plantillas aprobadas (editable, con ADI en modo cliente); lo interno nunca se copia al cliente.
  function shell(title){const d=invDialog(title,true);d.classList.add('opr-dialog');d.dataset.orderId=String(order.id);const f=invForm('ofx-form opr-form');d.append(f.form);const body=el('div',undefined,'ofx-body'),foot=el('footer',undefined,'ofx-foot');f.form.append(body,foot);return{d,...f,body,foot};}
  function publicBlock(f,into,text,publishDefault){const sec=el('section',undefined,'ofx-sec ofx-public'),h=el('h3');h.append(invIcon('send'),el('span','Mensaje para el cliente'));sec.append(h,el('p','Solo lo que se puede comunicar: sin costos, proveedor, pedido ni guía.','ofx-note'));into.append(sec);

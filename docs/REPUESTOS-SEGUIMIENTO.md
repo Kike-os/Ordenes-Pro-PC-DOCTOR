@@ -105,3 +105,27 @@ No hace falta JavaScript. Todo sale de los eventos reales registrados.
   - los 6 estados, un traslado con novedad, un texto largo, con y sin fecha estimada y varios repuestos;
   - alineación de puntos y etiquetas y posición del vehículo;
   - movimiento reducido y anchos de 320 a 1920 px.
+
+## Panel interno Premium (1.5.243)
+
+«Pedidos de repuestos» de la ficha de la orden, con el mismo lenguaje visual del seguimiento público (`orderPartsPanel` en `app.js`, `.opr*` en `app.css`). Las funciones, las ventanas, las validaciones y los datos no cambian.
+
+**Resumen superior** (de los datos guardados): activos, en camino, con novedad, vencidos y recibidos o más.
+
+**Cada repuesto:**
+- **Cabecera:** icono, nombre, marca, modelo y referencia, más los avisos (estado, vencido, no visible para el cliente).
+- **Estado actual:**
+  - la etapa y la situación;
+  - la siguiente etapa o la novedad registrada;
+  - «N de 8 etapas completadas» con medidor;
+  - la última actualización.
+- **Línea de 8 etapas internas:** colores `--p0` a `--p7`, de azul a verde, solo en lo completado. La actual tiene halo y pulso, que se repite tres veces y para.
+- **Vehículo SVG:** solo con un traslado real registrado. Avanza en «En tránsito», se detiene si hay novedad y llega con ✓ a «Recibido».
+- **Bloques con iconos:** proveedor y pedido, transporte (la guía enlaza al rastreo oficial si existe), fechas, taller y observaciones internas. Un bloque solo aparece si tiene datos.
+- **Cronología:** cada evento con el color de su etapa o el tono de su novedad. Los cambios de datos aparecen con nombres claros, por ejemplo «Transportista: — → Tramaco».
+
+**Disposición:**
+- Horizontal desde 620 px de panel. Vertical en el teléfono, sin vehículo y sin superposiciones.
+- Con movimiento reducido no hay animaciones.
+
+**Prueba de navegador:** 16 comprobaciones, de 320 a 1920 px, con movimiento reducido.

@@ -10223,3 +10223,69 @@ body[data-page=dashboard] .maintenance-dialog.opr-dialog>form.opr-form{display:g
 
 .ofx-sec>h3 .ofx-limit{margin-left:auto;font-size:12px}
 .ofx-prompt input[type=number]{width:100%;max-width:140px}
+
+/* Pedidos de repuestos Premium (1.5.243): panel de gestión con resumen, estado actual destacado, línea de 8 etapas con colores progresivos
+   solo en lo completado (--p0 azul → --p7 verde), vehículo SVG ligado al traslado real (igual que el seguimiento público), información en
+   bloques con iconos y cronología. Horizontal desde 620 px de panel; vertical en el teléfono. Movimiento reducido: estático. Solo .opr*. */
+.opr{--p0:#2563EB;--p1:#1D7FE0;--p2:#0EA5E9;--p3:#06B6D4;--p4:#14B8A6;--p5:#10B981;--p6:#4ADE80;--p7:#16A34A;--neutro:#33496B;gap:12px;padding:14px;border-color:#22385A;background:linear-gradient(170deg,#0F1C33,#0B1424);box-shadow:0 14px 34px -20px #000c}
+.opr [data-c="0"]{--c:var(--p0)}.opr [data-c="1"]{--c:var(--p1);--cp:var(--p0)}.opr [data-c="2"]{--c:var(--p2);--cp:var(--p1)}.opr [data-c="3"]{--c:var(--p3);--cp:var(--p2)}
+.opr [data-c="4"]{--c:var(--p4);--cp:var(--p3)}.opr [data-c="5"]{--c:var(--p5);--cp:var(--p4)}.opr [data-c="6"]{--c:var(--p6);--cp:var(--p5)}.opr [data-c="7"]{--c:var(--p7);--cp:var(--p6)}
+.opr-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 12px}.opr-head>button{margin-left:0}
+.opr-htitle{display:flex;align-items:center;gap:10px;min-width:0}.opr-htitle h3{margin:0;font-size:15.5px}
+.opr-ico{display:grid;place-items:center;flex:none;width:34px;height:34px;border:1px solid #3B82F655;border-radius:10px;background:#3B82F61a;color:#93C5FD}.opr-ico .inv-icon{width:18px;height:18px}
+.opr-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,118px),1fr));gap:8px}
+.opr-stat{--t:var(--p0);display:grid;gap:1px;padding:8px 11px;border:1px solid #1E2D47;border-left:3px solid var(--t);border-radius:10px;background:#0A1322}
+.opr-stat strong{color:#F1F5F9;font-size:18px;font-variant-numeric:tabular-nums}.opr-stat small{color:var(--inv-soft,#7D8DA6);font-size:11.5px}.opr-stat[data-zero=true]{opacity:.6}
+.opr-stat[data-tone=turquesa]{--t:var(--p3)}.opr-stat[data-tone=naranja]{--t:#F97316}.opr-stat[data-tone=rojo]{--t:#EF4444}.opr-stat[data-tone=verde]{--t:var(--p7)}
+.opr-card{gap:12px;padding:14px;border:1px solid #22385A;border-left:4px solid var(--p1);border-radius:14px;background:linear-gradient(170deg,#0E1B30,#0A1322);box-shadow:0 10px 24px -18px #000}
+.opr-top{align-items:flex-start}.opr-top>div.opr-id{display:flex;flex-direction:row;align-items:flex-start;gap:10px;min-width:0;flex:1 1 240px}.opr-id>div{display:grid;gap:2px;min-width:0}
+.opr-id strong{font-size:15px;line-height:1.3;overflow-wrap:anywhere}.opr-id small{color:var(--inv-soft,#7D8DA6);font-size:12px;overflow-wrap:anywhere}
+.opr-chip{white-space:normal;text-align:center}
+.opr-now{--t:var(--p1);display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px 16px;align-items:center;padding:10px 12px;border:1px solid color-mix(in srgb,var(--t) 38%,transparent);border-left:4px solid var(--t);border-radius:12px;background:color-mix(in srgb,var(--t) 8%,#0A1322)}
+.opr-now[data-tone=verde]{--t:var(--p7)}.opr-now[data-tone=amarillo]{--t:#EAB308}.opr-now[data-tone=naranja]{--t:#F97316}.opr-now[data-tone=rojo]{--t:#EF4444}
+.opr-now small{color:var(--inv-soft,#7D8DA6);font-size:11px;letter-spacing:.05em;text-transform:uppercase}.opr-now strong{display:block;margin-top:2px;color:#fff;font-size:14.5px}
+.opr-now p{margin:3px 0 0;color:#CBD5E1;font-size:12.5px;overflow-wrap:anywhere}
+.opr-meta{display:grid;justify-items:end;gap:3px;text-align:right}.opr-meta small{letter-spacing:0;text-transform:none;font-size:11.5px}.opr-meta b{color:#fff}
+.opr-meter{display:grid;grid-template-columns:repeat(8,14px);gap:3px}.opr-meter span{height:6px;border-radius:999px;background:var(--neutro)}
+.opr-meter span[data-state=done]{background:var(--c)}.opr-meter span[data-state=current]{background:linear-gradient(90deg,var(--c) 50%,var(--neutro) 50%)}
+.opr-track{position:relative}
+.opr-steps li{--c:var(--p0)}.opr-steps li[data-tone]:not([data-tone=azul]){--c:var(--t)}
+.opr-steps li::before{background:var(--neutro)}.opr-steps li:is([data-state=done],[data-state=current])::before{background:linear-gradient(180deg,var(--cp,var(--c)),var(--c))}
+.opr-steps i{border-color:var(--neutro);background:#0A1322}
+.opr-steps li[data-state=done] i{border-color:var(--c);background:var(--c)}.opr-steps li[data-state=current] i{border-color:var(--c);background:var(--c)}.opr-steps li[data-state=done]{color:#E2E8F0}
+.opr-steps li[data-state=current] i{box-shadow:0 0 0 4px color-mix(in srgb,var(--c) 26%,transparent),0 0 12px color-mix(in srgb,var(--c) 50%,transparent)}
+.opr-vehicle{display:none}
+.opr svg .v-box{fill:#1E4A86;stroke:#7FB2E8;stroke-width:1.2}.opr svg .v-cab{fill:#2563EB;stroke:#93C5FD;stroke-width:1.2}.opr svg .v-win{fill:#BFE3FF;opacity:.85}
+.opr svg .v-band{fill:#14B8A6}.opr svg .v-wheel{fill:#0B1526;stroke:#93C5FD;stroke-width:1.4}.opr svg .v-hub{fill:#93C5FD}.opr .v-ok circle{fill:var(--p4)}.opr .v-ok path{fill:none;stroke:#fff;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.opr-vehicle[data-vehicle=stopped] svg .v-cab{fill:#F97316}
+.opr-blocks{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr));gap:8px}
+.opr-block{display:grid;align-content:start;gap:6px;min-width:0;padding:9px 11px;border:1px solid #1E2D47;border-radius:10px;background:#0A1322}
+.opr-block h4{display:flex;align-items:center;gap:6px;margin:0;color:#93C5FD;font-size:11.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}.opr-block h4 .inv-icon{width:14px;height:14px}
+.opr-block dl{display:grid;gap:4px;margin:0}.opr-block dl div{display:flex;flex-wrap:wrap;justify-content:space-between;gap:2px 10px}.opr-block dt{color:var(--inv-soft,#7D8DA6);font-size:12px}.opr-block dd{margin:0;color:#E2E8F0;font-size:12.5px;font-weight:600;overflow-wrap:anywhere;text-align:right}
+.opr-block a{color:#7DD3FC}.opr-note{grid-column:1/-1;border-color:#F5B54444;background:#F5B5440a}.opr-note h4{color:#F5B544}.opr-note p{margin:0;color:#E2E8F0;font-size:12.5px;overflow-wrap:anywhere}
+.opr-hist summary{display:flex;align-items:center;gap:8px}.opr-hist summary b{padding:0 7px;border-radius:999px;background:#ffffff14;font-size:11px}
+.opr-hist ol{position:relative;gap:8px;padding-left:20px}.opr-hist ol::before{content:"";position:absolute;left:5px;top:4px;bottom:4px;width:2px;background:#22385A}
+.opr-hist li{--c:var(--p0);position:relative;background:#0F1B30}.opr-hist li::before{content:"";position:absolute;left:-19px;top:9px;width:10px;height:10px;border-radius:50%;background:var(--c);box-shadow:0 0 0 3px #0B1424}
+.opr-hist li[data-tone=amarillo]::before{background:#EAB308}.opr-hist li[data-tone=naranja]::before{background:#F97316}.opr-hist li[data-tone=rojo]::before{background:#EF4444}.opr-hist li[data-kind=datos]::before{background:#64748B}
+@container (min-width:620px){
+ .opr-card:is([data-vehicle=transit],[data-vehicle=arrived],[data-vehicle=stopped]) .opr-track{padding-top:32px}
+ .opr-steps li::before{left:calc(-50% + 10px);right:calc(50% + 10px);top:9px;width:auto;height:3px}
+ .opr-steps li:is([data-state=done],[data-state=current])::before{background:linear-gradient(90deg,var(--cp,var(--c)),var(--c))}
+ /* Vehículo sobre la línea: centros de etapa en (i + 0,5) / 8 del ancho; «En traslado» es la 4.ª etapa y «Recibido», la 5.ª. */
+ .opr-vehicle{--p:.4375;display:block;position:absolute;top:0;left:calc(var(--p) * 100% - 21px);width:42px;height:26px;z-index:2;pointer-events:none}
+ .opr-vehicle svg:first-child{width:42px;height:25px;filter:drop-shadow(0 3px 6px #0009)}
+ .opr-vehicle[data-vehicle=transit]{--p:.525}.opr-vehicle[data-vehicle=stopped]{--p:.49}.opr-vehicle[data-vehicle=arrived]{--p:.5625}
+ .opr-vehicle .v-ok{position:absolute;top:-6px;right:-8px;width:17px;height:17px}
+}
+@media(prefers-reduced-motion:no-preference){
+ @container (min-width:620px){
+  .opr-vehicle[data-vehicle=transit]{animation:opr-drive 1.6s cubic-bezier(.45,.05,.25,1) .3s both}
+  .opr-vehicle[data-vehicle=arrived]{animation:opr-arrive .6s ease-out .2s both}.opr-vehicle[data-vehicle=arrived] .v-ok{animation:opr-pop .45s ease-out .8s both}
+ }
+ .opr-steps li[data-state=current] i{animation:opr-pulse 1.4s ease-out .4s 3}
+}
+@keyframes opr-drive{from{left:calc(.4375 * 100% - 21px)}to{left:calc(.525 * 100% - 21px)}}
+@keyframes opr-arrive{from{left:calc(.525 * 100% - 21px)}to{left:calc(.5625 * 100% - 21px)}}
+@keyframes opr-pop{from{transform:scale(0);opacity:0}70%{transform:scale(1.2);opacity:1}to{transform:scale(1)}}
+@keyframes opr-pulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--c) 55%,transparent)}100%{box-shadow:0 0 0 10px transparent}}
+@media(max-width:600px){.opr{padding:12px}.opr-card{padding:12px}.opr-now{grid-template-columns:1fr}.opr-meta{justify-items:start;text-align:left}.opr-head>button{flex:1 1 100%;justify-content:center}}
