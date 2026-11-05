@@ -4,6 +4,19 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.243 — 2026-11-04 21:27 (UTC-05:00)
+
+Panel interno de pedidos de repuestos Premium
+
+### Nuevas funcionalidades
+
+- Pedidos de repuestos (panel interno): línea de 8 etapas con colores progresivos solo en lo completado y vehículo SVG ligado al traslado real, igual que el seguimiento del cliente
+
+### Mejoras realizadas
+
+- Pedidos de repuestos (panel interno): diseño Premium con resumen de activos, en camino, con novedad, vencidos y recibidos, y estado actual destacado con etapas completadas y siguiente paso
+- Pedidos de repuestos (panel interno): información en bloques con iconos (proveedor y pedido, transporte, fechas, taller, observaciones) y cronología con nombres de campo legibles
+
 ## v1.5.242 — 2026-11-04 20:48 (UTC-05:00)
 
 Ajuste final responsivo del seguimiento público

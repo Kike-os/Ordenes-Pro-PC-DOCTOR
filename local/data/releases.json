@@ -8,6 +8,27 @@
   },
   "releases": [
     {
+      "version": "1.5.243",
+      "date": "2026-11-04T21:27:47-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Panel interno de pedidos de repuestos Premium",
+      "changes": {
+        "features": [
+          "Pedidos de repuestos (panel interno): línea de 8 etapas con colores progresivos solo en lo completado y vehículo SVG ligado al traslado real, igual que el seguimiento del cliente"
+        ],
+        "improvements": [
+          "Pedidos de repuestos (panel interno): diseño Premium con resumen de activos, en camino, con novedad, vencidos y recibidos, y estado actual destacado con etapas completadas y siguiente paso",
+          "Pedidos de repuestos (panel interno): información en bloques con iconos (proveedor y pedido, transporte, fechas, taller, observaciones) y cronología con nombres de campo legibles"
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Kike-os: «Sí, publica la 1.5.243» (04/11/2026)"
+    },
+    {
       "version": "1.5.242",
       "date": "2026-11-04T20:48:58-05:00",
       "type": "patch",
