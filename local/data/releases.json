@@ -8,6 +8,24 @@
   },
   "releases": [
     {
+      "version": "1.5.244",
+      "date": "2026-11-04T22:18:14-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Órdenes y Agenda: paneles compactos con cascada automática",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Órdenes de Reparación y Agenda (vista Lista): paneles compactos de altura controlada con desplazamiento automático lento tipo cascada, interruptor «Movimiento automático» y Pausar/Reanudar; se detiene al pasar el cursor, enfocar, seleccionar o abrir un menú o ventana; apagado por defecto en pantallas táctiles y con movimiento reducido. Feriados: resumen compacto de los próximos 3."
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Kike-os: «Sí, publica la 1.5.244» (04/11/2026)"
+    },
+    {
       "version": "1.5.243",
       "date": "2026-11-04T21:27:47-05:00",
       "type": "patch",

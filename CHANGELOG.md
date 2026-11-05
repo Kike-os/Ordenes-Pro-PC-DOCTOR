@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.244 — 2026-11-04 22:18 (UTC-05:00)
+
+Órdenes y Agenda: paneles compactos con cascada automática
+
+### Mejoras realizadas
+
+- Órdenes de Reparación y Agenda (vista Lista): paneles compactos de altura controlada con desplazamiento automático lento tipo cascada, interruptor «Movimiento automático» y Pausar/Reanudar; se detiene al pasar el cursor, enfocar, seleccionar o abrir un menú o ventana; apagado por defecto en pantallas táctiles y con movimiento reducido. Feriados: resumen compacto de los próximos 3.
+
 ## v1.5.243 — 2026-11-04 21:27 (UTC-05:00)
 
 Panel interno de pedidos de repuestos Premium
