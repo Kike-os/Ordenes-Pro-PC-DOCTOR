@@ -8,6 +8,27 @@
   },
   "releases": [
     {
+      "version": "1.5.242",
+      "date": "2026-11-04T20:48:58-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Ajuste final responsivo del seguimiento público",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Seguimiento público: diseño entre 10 y 15 % más compacto (márgenes, separaciones, tarjetas y códigos) sin cambiar su estilo ni sus funciones",
+          "Seguimiento público: dos columnas solo cuando caben (según el ancho real de la tarjeta) y una columna en tabletas verticales y teléfonos",
+          "Seguimiento público: miniaturas de fotos más pequeñas con columnas automáticas y vista ampliada que muestra la foto completa",
+          "Seguimiento público: QR y código de barras reorganizados en fila, en dos niveles o apilados según el espacio, siempre legibles"
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Kike-os: «actualiza a la version siguiente» (04/11/2026)"
+    },
+    {
       "version": "1.5.241",
       "date": "2026-11-04T20:21:30-05:00",
       "type": "patch",

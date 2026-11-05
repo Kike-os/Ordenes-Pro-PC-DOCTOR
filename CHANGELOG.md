@@ -4,6 +4,17 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.242 — 2026-11-04 20:48 (UTC-05:00)
+
+Ajuste final responsivo del seguimiento público
+
+### Mejoras realizadas
+
+- Seguimiento público: diseño entre 10 y 15 % más compacto (márgenes, separaciones, tarjetas y códigos) sin cambiar su estilo ni sus funciones
+- Seguimiento público: dos columnas solo cuando caben (según el ancho real de la tarjeta) y una columna en tabletas verticales y teléfonos
+- Seguimiento público: miniaturas de fotos más pequeñas con columnas automáticas y vista ampliada que muestra la foto completa
+- Seguimiento público: QR y código de barras reorganizados en fila, en dos niveles o apilados según el espacio, siempre legibles
+
 ## v1.5.241 — 2026-11-04 20:21 (UTC-05:00)
 
 Seguimiento de repuestos animado «PC-DOCTOR Pro»
