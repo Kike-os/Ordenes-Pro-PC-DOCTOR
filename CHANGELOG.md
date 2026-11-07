@@ -4,6 +4,23 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.247 — 2026-11-06 20:48 (UTC-05:00)
+
+Seguimiento de repuestos sin superposiciones, más compacto y coherente, y cancelación con plazo de 24 horas
+
+### Nuevas funcionalidades
+
+- Cancelación con plazo de 24 horas desde el registro del repuesto, comprobado en el servidor: botón «Solicitar cancelación» con tiempo restante que se bloquea solo con candado; ventana de confirmación; la cancelación excepcional de administración queda aparte, con justificación.
+
+### Mejoras realizadas
+
+- Seguimiento de repuestos más compacto: mapa hasta un 35 % más bajo, etapas en cuadrícula uniforme, etiquetas de estado iguales, datos internos marcados, acciones ordenadas y 8 etapas públicas en dos filas en anchos intermedios.
+- Un solo cálculo de avance para el panel y el seguimiento público: mismas etapas completadas (solo con evento real), mismo porcentaje y misma última actualización.
+
+### Errores corregidos
+
+- Seguimiento de repuestos: el camión ya no se superpone al punto de despacho; cada vehículo va en su carril, se detiene antes de cada punto de control y nunca sale del recuadro, en cualquier resolución.
+
 ## v1.5.246 — 2026-11-06 20:07 (UTC-05:00)
 
 Seguimiento de repuestos: ruta animada nacional e internacional, cancelaciones con revisión, reembolsos conciliados y avisos al cliente
