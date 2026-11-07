@@ -8,6 +8,29 @@
   },
   "releases": [
     {
+      "version": "1.5.248",
+      "date": "2026-11-06T22:00:51-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Seguimiento de reparación adaptable, logo más visible e impresión A4 profesional por secciones",
+      "changes": {
+        "features": [
+          "Impresión A4 del seguimiento por secciones (cabecera, equipo, progreso, repuestos con trayectoria estática, avisos, historial, transporte e información técnica), con pie corporativo y «Página n de N» en cada hoja; botón «Imprimir seguimiento A4»."
+        ],
+        "improvements": [
+          "Seguimiento de reparación adaptable: la tarjeta aprovecha el ancho disponible (hasta 1360 px), sin desplazamiento horizontal de 320 a 1920 px, con textos de al menos 12 px, bordes unificados y mapa de ruta proporcionado.",
+          "Logo original de PC-DOCTOR más visible (84 px en escritorio, 64 px en el teléfono) sin modificar el archivo: solo se omite su margen transparente y se conserva la proporción. Cabecera con marca, título, orden, estado y presupuesto."
+        ],
+        "fixes": [],
+        "security": [
+          "Versión interna del seguimiento A4 (cliente, serie, transporte, notas internas, historial y evidencias) solo para administración y técnicos; la versión pública se construye con el mismo modelo seguro del enlace y no incluye datos privados."
+        ],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Kike-os: «actualiza a la versión siguiente» (1.5.248, preparada en rama aislada;"
+    },
+    {
       "version": "1.5.247",
       "date": "2026-11-06T20:48:43-05:00",
       "type": "patch",
@@ -28,7 +51,7 @@
         "performance": []
       },
       "published_by": "Kike-os",
-      "authorized_by": "Kike-os: «si puede actualiza todo en la actualizacion que esta primero» · «haga "
+      "authorized_by": "Kike-os: «si puede actualiza todo en la actualizacion que esta primero» · «haga"
     },
     {
       "version": "1.5.246",

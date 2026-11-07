@@ -4,6 +4,23 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.248 — 2026-11-06 22:00 (UTC-05:00)
+
+Seguimiento de reparación adaptable, logo más visible e impresión A4 profesional por secciones
+
+### Nuevas funcionalidades
+
+- Impresión A4 del seguimiento por secciones (cabecera, equipo, progreso, repuestos con trayectoria estática, avisos, historial, transporte e información técnica), con pie corporativo y «Página n de N» en cada hoja; botón «Imprimir seguimiento A4».
+
+### Mejoras realizadas
+
+- Seguimiento de reparación adaptable: la tarjeta aprovecha el ancho disponible (hasta 1360 px), sin desplazamiento horizontal de 320 a 1920 px, con textos de al menos 12 px, bordes unificados y mapa de ruta proporcionado.
+- Logo original de PC-DOCTOR más visible (84 px en escritorio, 64 px en el teléfono) sin modificar el archivo: solo se omite su margen transparente y se conserva la proporción. Cabecera con marca, título, orden, estado y presupuesto.
+
+### Actualizaciones de seguridad
+
+- Versión interna del seguimiento A4 (cliente, serie, transporte, notas internas, historial y evidencias) solo para administración y técnicos; la versión pública se construye con el mismo modelo seguro del enlace y no incluye datos privados.
+
 ## v1.5.247 — 2026-11-06 20:48 (UTC-05:00)
 
 Seguimiento de repuestos sin superposiciones, más compacto y coherente, y cancelación con plazo de 24 horas
