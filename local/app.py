@@ -4898,6 +4898,7 @@ class Handler(BaseHTTPRequestHandler):
                     # Registro de uso: quién, qué tipo de mejora y consumo. No se guarda el texto.
                     c.execute('INSERT INTO adi_actions(user_id,action,created_at,details) VALUES (?,?,?,?)',(user['id'],'writing_improve',reception_now().isoformat(timespec='seconds'),json.dumps({'mode':mode,'auto':auto,'field':field,'model':result['model'],'tokens_in':result['tokens_in'],'tokens_out':result['tokens_out'],'missing':len(result['missing'])})))
                     answer={'suggestion':result['suggestion'],'missing':result['missing'],'changed':result['changed'],'simple':result['changed'] and adi_ai.is_simple(str(data.get('text','')).strip(),result['suggestion'])}
+                    if result.get('report'):answer.update(report=result['report'],report_label=result.get('report_label',''))
                     if result.get('warnings'):answer['warnings']=result['warnings']
                     return self.reply(200,answer)
                 receipt_route=re.fullmatch(r'/api/orders/([0-9]+)/receipt-mail',path)

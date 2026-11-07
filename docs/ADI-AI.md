@@ -513,3 +513,17 @@ Estos controles no detectan todo lo que un modelo pudiera inventar con palabras 
 
 Rutas: `POST /api/adi/write` con `mode` y, opcionalmente, `order_id`. El uso queda en `adi_actions`, sin guardar el texto.
 
+
+## ADI como asistente técnica: informes, contexto y alertas (1.5.256)
+
+**Cuatro modos.** El asistente de cada campo agrupa sus herramientas en: *Corrección profesional* (ortografía, redacción), *Ampliación técnica* (redacción técnica, ampliar explicación), *Informe técnico completo* y *Comunicación al cliente* (mensaje profesional, resumen). ADI marca y preselecciona la herramienta **Recomendada** según el campo y la cantidad de texto (con menos de 12 palabras no se infla a informe); el técnico puede elegir otra.
+
+**Informes técnicos (11 tipos).** Diagnóstico, mantenimiento, electrónica, BIOS/UEFI, almacenamiento, memoria, refrigeración, impresora, presupuesto, entrega y garantía. Cada tipo tiene su título y sus secciones (incidencia, hallazgos comprobados, posibles causas, intervenciones recomendadas, verificaciones pendientes, conclusión). El tipo se elige en «Tipo de informe» o en *Automático*: primero cuenta el texto del técnico; los datos de la orden solo desempatan.
+
+**Contexto de la orden, depurado.** Con la orden abierta, ADI recibe solo datos técnicos: equipo, falla reportada, estado, inspección física, diagnóstico, recomendaciones, novedades técnicas, repuestos (nombre y etapa) y el presupuesto **sin importes**. Nunca se envían nombre ni contacto del cliente, número de orden, serie, precios ni credenciales escritas en notas (se ocultan). La cabecera real («Orden · Equipo · Serie · Fecha») la agrega el servidor después de la respuesta del modelo.
+
+**Calidad.** Antes de mostrar el resultado se quitan frases repetidas y se renumeran las listas; se avisa cuando el texto afirma trabajos o especificaciones (p. ej. NVMe) que no constan en lo registrado, cuando faltan secciones y cuando faltan datos para un informe completo («Informe preliminar»). El técnico siempre ve la vista previa y decide si aplica la mejora.
+
+**Alertas de atención (solo lectura).** Las alertas del panel de administración suman: presupuesto aprobado con la orden aún en «presupuesto», aprobación sin presupuesto, presupuesto sin diagnóstico, equipo listo sin retiro (más de 5 días), falla recurrente del mismo equipo y repuesto atrasado. Cada una trae una acción sugerida; ninguna cambia la orden.
+
+**Pruebas.** `tests/test_adi_reports.py` usa un modelo simulado (ninguna llamada a proveedores). La calidad del texto con el modelo real solo puede comprobarse en producción, donde está la clave.

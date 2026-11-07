@@ -66,9 +66,49 @@ def alerts(c, now):
         items.append({'tipo': 'sin_movimiento', 'gravedad': 'media', 'texto': '%s (%s) · %s · sin movimiento desde hace %d días · %s' % (o['orden'], o['cliente'], o['equipo'], o['dias_sin_movimiento'], o['estado']), 'enlace': o['enlace']})
     for q in expired:
         items.append({'tipo': 'presupuesto_vencido', 'gravedad': 'media', 'texto': '%s (%s) · venció el %s sin respuesta del cliente' % (q['code'], q['cliente'], _dmy(q['valid_until'])), 'enlace': '#orders?id=%d' % q['oid']})
+    # 1.5.256: inconsistencias y trabajos que requieren atención, con la acción recomendada. Solo lectura: ADI recomienda, nunca cambia ni envía nada.
+    extra = attention(c, today)
+    items += extra
+    items.sort(key=lambda item: {'alta': 0, 'media': 1, 'baja': 2}.get(item['gravedad'], 3))
     return {'total': len(items), 'entregas_vencidas': len(overdue), 'sin_movimiento': len(stale), 'presupuestos_vencidos': len(expired),
+            'inconsistencias': sum(1 for item in extra if item['tipo'] in ('presupuesto_desfasado', 'presupuesto_sin_diagnostico', 'aprobacion_sin_presupuesto')),
             'citas_por_confirmar': requested, 'ordenes_activas_sin_fecha_de_entrega': no_date, 'criterio_sin_movimiento': '%d días o más sin eventos en el historial' % STALE_DAYS,
             'avisos': items[:40]}
+
+
+READY_DAYS = 5  # una orden lista para retirar desde hace 5 días o más se avisa para recordar al cliente
+
+
+def attention(c, today):
+    """Avisos de coherencia y de seguimiento (1.5.256), cada uno con su acción recomendada. Solo datos registrados."""
+    out = []
+    latest = "(SELECT q.status FROM quotes q WHERE q.order_id=o.id AND q.deleted_at='' AND q.status NOT IN ('borrador','cancelado') ORDER BY q.version DESC,q.id DESC LIMIT 1)"
+    for o in _orders(c, "o.status IN ('presupuesto','esperando_cliente') AND " + latest + " IN ('aprobado','parcial')", (), 30, today):
+        out.append({'tipo': 'presupuesto_desfasado', 'gravedad': 'alta', 'texto': '%s (%s) · presupuesto aprobado pero la orden sigue en «%s»' % (o['orden'], o['cliente'], o['estado']),
+                    'accion': 'Actualiza el estado de la orden para continuar con la reparación.', 'enlace': o['enlace']})
+    for o in _orders(c, "o.status='presupuesto' AND " + latest + " IS NULL", (), 30, today):
+        out.append({'tipo': 'aprobacion_sin_presupuesto', 'gravedad': 'alta', 'texto': '%s (%s) · en aprobación de presupuesto, pero no hay un presupuesto enviado' % (o['orden'], o['cliente']),
+                    'accion': 'Prepara y envía el presupuesto al cliente.', 'enlace': o['enlace']})
+    for o in _orders(c, ACTIVE + " AND TRIM(COALESCE(o.findings,''))='' AND " + latest + " IN ('enviado','aprobado','parcial')", (), 30, today):
+        out.append({'tipo': 'presupuesto_sin_diagnostico', 'gravedad': 'media', 'texto': '%s (%s) · tiene presupuesto (%s) pero no tiene diagnóstico registrado' % (o['orden'], o['cliente'], o['presupuesto']),
+                    'accion': 'Registra el diagnóstico técnico que respalda el presupuesto.', 'enlace': o['enlace']})
+    for o in _orders(c, "o.status IN ('listo','espera_entrega')", (), 60, today):
+        if o['dias_sin_movimiento'] is not None and o['dias_sin_movimiento'] >= READY_DAYS:
+            out.append({'tipo': 'listo_sin_retiro', 'gravedad': 'media', 'texto': '%s (%s) · lista para retirar desde hace %d días' % (o['orden'], o['cliente'], o['dias_sin_movimiento']),
+                        'accion': 'Envía un recordatorio de retiro al cliente (desde la orden, con tu revisión).', 'enlace': o['enlace']})
+    for o in _orders(c, "o.status='revision_recurrente'", (), 30, today):
+        out.append({'tipo': 'falla_recurrente', 'gravedad': 'alta', 'texto': '%s (%s) · en revisión por falla recurrente' % (o['orden'], o['cliente']),
+                    'accion': 'Prioriza la revisión y registra el nuevo diagnóstico.', 'enlace': o['enlace']})
+    try:
+        late = c.execute("SELECT r.name,r.eta,o.id,o.code,cl.name cliente FROM order_part_requests r JOIN orders o ON o.id=r.order_id JOIN devices d ON d.id=o.device_id "
+                         "JOIN clients cl ON cl.id=d.client_id WHERE r.situation!='cancelado' AND r.eta!='' AND r.eta<? AND r.stage IN ('solicitado','confirmado','preparacion','transito') "
+                         "ORDER BY r.eta LIMIT 30", (today.isoformat(),)).fetchall()
+    except Exception:
+        late = []
+    for r in late:
+        out.append({'tipo': 'repuesto_atrasado', 'gravedad': 'media', 'texto': '%s (%s) · repuesto «%s» con llegada estimada el %s y aún sin recibir' % (r['code'], r['cliente'], r['name'], _dmy(r['eta'])),
+                    'accion': 'Confirma la nueva fecha con el proveedor y actualiza el seguimiento del repuesto.', 'enlace': '#orders?id=%d' % r['id']})
+    return out
 
 
 def order_detail(c, code, now):

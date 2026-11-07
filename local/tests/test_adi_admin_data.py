@@ -82,7 +82,8 @@ class AdiAdminDataTests(unittest.TestCase):
         with app.connect() as c:
             c.execute("UPDATE quotes SET valid_until=? WHERE id=?", ((today - timedelta(days=1)).isoformat(), quote));c.commit()
         data = self.request('/api/adi/admin/alerts', cookie=cookie)['body']
-        self.assertEqual([item['tipo'] for item in data['avisos']], ['entrega_vencida', 'presupuesto_vencido'])
+        # 1.5.256: la orden con presupuesto enviado y sin diagnóstico registrado también se avisa (inconsistencia).
+        self.assertEqual([item['tipo'] for item in data['avisos']], ['entrega_vencida', 'presupuesto_vencido', 'presupuesto_sin_diagnostico'])
         self.assertIn('3 días de atraso', data['avisos'][0]['texto']);self.assertEqual(data['avisos'][0]['enlace'], '#orders?id=%d' % late['id'])
         # El historial es inmutable: «sin movimiento» se comprueba consultando 10 días después (sin eventos nuevos en la orden que espera).
         with app.connect() as c:

@@ -209,8 +209,11 @@ def unsupported(sources, text):
     claims = []
     for m in DONE.finditer(text):
         verb = fold(m.group(0)).split()
-        root = next((w[:6] for w in verb if w not in ('se', 'fue', 'fueron', 'la', 'las', 'prueba', 'pruebas', 'de', 'del')), '')
-        if root and root not in known and m.group(0).lower() not in claims:
+        word = next((w for w in verb if w not in ('se', 'fue', 'fueron', 'la', 'las', 'prueba', 'pruebas', 'de', 'del')), '')
+        # Raíz del verbo, sin la terminación ni el cambio de vocal (midió → med-, como «medí»): otra forma del mismo verbo no es un dato nuevo.
+        stem = re.sub(r'(?:ieron|aron|ados|adas|idos|idas|ado|ada|ido|ida|io|o)$', '', word)
+        roots = {stem[:4], stem.replace('i', 'e', 1)[:4]} if stem else set()
+        if roots and not any(r in known for r in roots) and m.group(0).lower() not in claims:
             claims.append(m.group(0).lower())
     specs = []
     for m in SPEC_TERMS.finditer(text):

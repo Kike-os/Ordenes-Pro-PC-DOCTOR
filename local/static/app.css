@@ -10653,3 +10653,30 @@ body[data-page=dashboard] .cascade-pp{width:auto;min-height:32px;margin:0;paddin
  .rp-nt-pop{position:static;width:auto;min-width:0;max-width:none;padding:0 0 4px 18px;border:0;box-shadow:none;background:none}
 }
 @media(prefers-reduced-motion:reduce){.rp-nt *{transition:none!important}.rp-focus{animation:none}}
+
+/* 1.5.256 — ADI: cuatro modos agrupados (corrección, ampliación técnica, informe técnico y comunicación al cliente), el recomendado marcado y,
+   en el informe, el tipo de documento. Compacto y legible en el panel lateral y en el teléfono. */
+.adi-tools{display:grid;grid-template-columns:1fr;gap:8px}
+.adi-group{display:grid;gap:5px;min-width:0}
+.adi-group-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 8px}
+.adi-group-head strong{color:#e3e9ff;font-size:12.5px;letter-spacing:.02em}
+.adi-group-head small{color:#9aa6c9;font-size:12px}
+.adi-group-tools{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:5px}
+.adi-tool{position:relative}
+.adi-reco{margin-left:auto;padding:1px 7px;border-radius:999px;background:#8f9bff26;color:#c7ceff;font-size:12px;font-style:normal;font-weight:700;white-space:nowrap}
+.adi-kind{display:grid;gap:4px;margin-top:2px;font-size:12.5px;color:#c9d3f5}
+.adi-kind[hidden]{display:none}
+.adi-kind select{width:100%;min-height:38px;margin:0}
+.adi-kind-label{display:block;margin-bottom:4px;color:#c7ceff}
+@media(max-width:480px){.adi-group-tools{grid-template-columns:1fr}}
+/* Ajuste del menú agrupado: los grupos van uno debajo del otro (no en columnas); dentro de cada grupo, las herramientas en una cuadrícula;
+   la marca «Recomendado» pasa a su propia línea cuando no cabe, para no estrechar el nombre de la herramienta. */
+.adi-assist .adi-tools,.adi-assist .adi-tools[role=radiogroup]{display:grid;grid-template-columns:1fr;gap:9px}
+@media(max-width:560px){.adi-assist .adi-tools{grid-template-columns:1fr}}
+.adi-assist .adi-group-tools{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:6px}
+.adi-assist button.adi-tool{flex-wrap:wrap}
+.adi-assist button.adi-tool>span{flex:1 1 auto;min-width:8ch}
+.adi-assist .adi-reco{flex:none;margin-left:auto}
+.adi-assist .adi-kind select{min-height:38px;height:auto;padding:7px 10px;font-size:13px}
+/* 1.5.256 · el pie fijo del asistente es opaco: lo que se desplaza por debajo (tipo de informe, grupos) ya no se ve encimado al interruptor ni a los botones */
+.adi-assist .adi-foot{background:#0b1528;border-top:1px solid #24365f;box-shadow:0 -8px 14px -8px #020714cc;z-index:1}

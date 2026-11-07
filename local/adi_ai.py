@@ -279,7 +279,9 @@ def improve(text,mode,field='',data=None,report=''):
     guarded=mode in GUARDED_MODES
     kind=''
     if mode=='informe':
-        kind=adi_reports.report_kind(text+' '+' '.join(lines),field,report)
+        # Manda lo que escribe el técnico; los datos de la orden solo deciden el tipo si su texto no da pistas.
+        kind=adi_reports.report_kind(text,field,report)
+        if kind=='diagnostico' and not report and field not in adi_reports.FIELD_REPORT:kind=adi_reports.report_kind(text+' '+' '.join(lines),field,'')
         suggestion,tokens_in,tokens_out=_complete(adi_reports.REPORT_SYSTEM+' '+TRUTH+' '+GLOSSARY,adi_reports.report_prompt(kind,text,lines,label),long=True)
         suggestion=adi_reports.tidy(re.sub(r'</?(?:texto|datos)>','',suggestion))
     else:
