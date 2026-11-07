@@ -208,6 +208,7 @@ def _approve_checks(row, data, note):
 def _close(c, row, cid, note, user, now):
     """Deja el pedido cancelado (definitivo) con su evento en el historial del repuesto."""
     c.execute("UPDATE order_part_requests SET situation='cancelado',incident='',updated_at=? WHERE id=?", (stamp(now), row['id']))
+    parts.order_event(c, row['order_id'], user, now, 'Pedido del repuesto «%s» cancelado por administración: %s' % (row['name'], note))
     parts._event(c, row, 'situacion', user, now, note='Cancelación aprobada: ' + note, situation='cancelado',
                  changes={'situation': [row['incident'] or row['situation'], 'cancelado'], 'cancellation_id': cid}, incident='')
 

@@ -450,3 +450,12 @@
 @media(max-width:340px){.tw-logo{width:56px}.tw-title h1{font-size:18px}}
 /* Trayectoria proporcionada en tarjetas muy anchas: el dibujo no pasa de 920 px y queda centrado (rótulos de ~17 px). */
 .ticket-public .tp .lgx-svg{max-width:920px;margin-inline:auto}
+
+/* 1.5.249 — Próxima etapa destacada y fechas diferenciadas (Real · Confirmada · Estimada): el tipo va escrito, el color solo lo refuerza. */
+.tp-next{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 6px;margin:8px 0 0;padding:6px 10px;border:1px dashed #3f6aa0;border-radius:10px;background:#0b1a3166;font-size:13px;color:#cfe3ff}
+.tp-next span{color:#9db1cf;font-weight:600}.tp-next b{color:#fff}
+.tp-kind{display:inline-flex;align-items:center;margin-left:4px;padding:0 7px;border:1px solid #3fbf8f99;border-radius:999px;color:#c6f5dd;font-size:12px;font-style:normal;font-weight:600;letter-spacing:0;text-transform:none;vertical-align:1px}
+.tp-kind[data-kind=confirmada]{border-color:#5aa9e699;color:#cfe3ff}
+.tp-kind[data-kind=estimada]{border-style:dashed;border-color:#e0b25c99;color:#ffe9b8}
+@media(prefers-reduced-motion:no-preference){.tp-next b{animation:tp-next-in .5s ease-out .2s both}}
+@keyframes tp-next-in{from{opacity:0;transform:translateX(-4px)}}

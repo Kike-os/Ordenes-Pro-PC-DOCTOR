@@ -204,20 +204,24 @@ def _parts_section(data):
         vehicle=('<span class="tp-vehicle" data-vehicle="%s" aria-hidden="true">%s%s</span>'%(e(p['vehicle']),VAN,CHECK if p['vehicle']=='arrived' else '')) if p['vehicle'] else ''
         moving={'transit':'El repuesto está en camino hacia nuestro taller.','stopped':'El traslado está detenido por una novedad.','arrived':'El repuesto llegó a nuestro taller.'}.get(p['vehicle'],'')
         meter=''.join('<span data-state="%s" data-c="%d"></span>'%(s['state'],s['color']) for s in p['steps'])
-        facts=[('Solicitado',_when(p['requested'],False)),('Recibido en el taller',_when(p['received'],False) if p['received'] else ''),
-               ('Disponibilidad estimada',_when(p['eta'],False) if p['eta'] else '')]
+        # Fechas diferenciadas (1.5.249): «Real» = registrada con su evento; «Confirmada» = confirmación del pedido; «Estimada» = previsión del taller.
+        confirmed=next((s['at'] for s in p['steps'] if s['code']=='confirmado' and s['state'] in ('done','current') and s['at']),'')
+        facts=[('Solicitado',_when(p['requested'],False),'real'),('Pedido confirmado',_when(confirmed,False) if confirmed else '','confirmada'),
+               ('Disponibilidad estimada',_when(p['eta'],False) if p['eta'] else '','estimada'),('Recibido en el taller',_when(p['received'],False) if p['received'] else '','real')]
+        nxt=(p.get('progress') or {}).get('next_label','')
         hist=''.join('<li data-c="%d" data-kind="%s"%s><time>%s</time><strong>%s</strong>%s%s</li>'%(
             h['color'],e(h['kind']),' data-tone="%s"'%e(h['situation']) if h['kind']=='situacion' else '',e(_when(h['at'])),e(h['label']),
             '<span>%s</span>'%e(h['detail']) if h.get('detail') else '','<p>%s</p>'%e(h['text']) if h['text'] else '') for h in p['history'])
         out.append(
             '<article class="tp" data-situation="%s" data-vehicle="%s"><header class="tp-head"><div class="tp-id"><strong>%s</strong>%s</div><span class="tp-state" data-tone="%s">%s</span></header>'
-            '<div class="tp-now" data-tone="%s"><div><small>Estado actual</small><strong>%s</strong><p>%s</p></div><div class="tp-meta"><div class="tp-meter" role="img" aria-label="%d de %d etapas completadas">%s</div>'
+            '<div class="tp-now" data-tone="%s"><div><small>Estado actual</small><strong>%s</strong><p>%s</p>%s</div><div class="tp-meta"><div class="tp-meter" role="img" aria-label="%d de %d etapas completadas">%s</div>'
             '<small><b>%d de %d</b> etapas completadas · avance %d %%</small><small>Última actualización: %s</small></div></div>'
             '%s<div class="tp-track"%s>%s<ol class="tp-steps" aria-label="Etapas del repuesto">%s</ol></div>%s<dl class="tp-facts">%s</dl>%s%s</article>'%(
             e(p['situation']),e(p['vehicle']),e(p['name']),'<small>%s</small>'%e(p['brand']) if p['brand'] else '',e(tone),e(p['status_label']),
-            e(tone),e(p['status_label']+(' · '+p['step_label'] if p.get('step_label') else '')),e(p['description']),p['done_count'],p['total'],meter,p['done_count'],p['total'],
+            e(tone),e(p['status_label']+(' · '+p['step_label'] if p.get('step_label') else '')),e(p['description']),
+            '<p class="tp-next"><span>Próxima etapa:</span> <b>%s</b></p>'%e(nxt) if nxt and p['situation']!='cancelado' else '',p['done_count'],p['total'],meter,p['done_count'],p['total'],
             p['progress']['percent'] if p.get('progress') else round(100*p['done_count']/max(1,p['total'])),e(_when(p['updated'])),
-            p.get('map_html') or '',' data-n="%d"'%len(p['steps']),vehicle,steps,'<p class="sr-only">%s</p>'%e(moving) if moving else '',''.join('<div><dt>%s</dt><dd>%s</dd></div>'%(e(k),e(v)) for k,v in facts if v),
+            p.get('map_html') or '',' data-n="%d"'%len(p['steps']),vehicle,steps,'<p class="sr-only">%s</p>'%e(moving) if moving else '',''.join('<div><dt>%s <em class="tp-kind" data-kind="%s">%s</em></dt><dd>%s</dd></div>'%(e(k),kind,{'real':'Real','confirmada':'Confirmada','estimada':'Estimada'}[kind],e(v)) for k,v,kind in facts if v),
             _cancel_block(p,data.get('token','')),
             '<details class="tp-hist"><summary>Historial del repuesto <b>%d</b></summary><ol>%s</ol></details>'%(len(p['history']),hist) if hist else ''))
     if not out:return ''

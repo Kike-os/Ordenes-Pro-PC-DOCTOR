@@ -11,7 +11,7 @@
   Una línea de compra ya registrada se asocia a un solo pedido (índice único): no se duplica el pedido."""
 import json
 import re
-from datetime import date
+from datetime import date, datetime
 
 STAGES = (('solicitado', 'Repuesto solicitado', 'Solicitado'), ('confirmado', 'Pedido confirmado', 'Confirmado'),
           ('preparacion', 'En preparación por el proveedor', 'Preparación'), ('transito', 'En camino / en tránsito', 'En tránsito'),
@@ -337,6 +337,24 @@ def update(c, oid, rid, data, user, now):
     return {'changed': len(changes)}
 
 
+# Hitos del repuesto que también quedan en el historial de la orden (1.5.249): recepción, instalación y pruebas, fin del proceso y cancelación.
+ORDER_EVENTS = {'recibido': 'Repuesto «%s» recibido en el taller.', 'instalacion': 'Repuesto «%s»: comenzó la instalación y las pruebas.',
+                'instalado': 'Repuesto «%s»: instalación y pruebas finalizadas.', 'listo': 'Repuesto «%s»: proceso finalizado; la orden puede continuar hacia la entrega.'}
+
+
+def _dmy(value):
+    try:
+        return datetime.fromisoformat(value).strftime('%d/%m/%Y')
+    except (TypeError, ValueError):
+        return str(value or '')
+
+
+def order_event(c, oid, user, now, text):
+    """Anota el hito en el historial de la orden (evento de seguimiento, con su usuario y fecha). No cambia el estado de la orden."""
+    import order_workspace
+    order_workspace.event(c, oid, user['id'] if user else None, now, 'follow_up', text)
+
+
 def advance(c, oid, rid, data, user, now):
     """Cambia la etapa. Normal: solo a la siguiente. Retroceder o saltar: corrección de administración con motivo."""
     _staff(user)
@@ -375,6 +393,8 @@ def advance(c, oid, rid, data, user, now):
               (coarse, logistics, situation, 1 if want > have else 0, received, dispatch, customs_in, customs_out, stamp(now), row['id']))
     _event(c, row, 'etapa', user, now, note=note or ('Corrección de etapa' if want < have else 'Avanza a: ' + step_label(target, row['shipping'])),
            public_note=text, public=public, stage=coarse, situation=situation, changes={'stage': [fine(row), target]}, logistics=logistics)
+    if want > have and target in ORDER_EVENTS:
+        order_event(c, oid, user, now, ORDER_EVENTS[target] % row['name'] + (' Fecha de recepción: %s.' % _dmy(received) if target == 'recibido' else ''))
     notice = ('despachado' if target == 'transito' else target) if want > have else ''
     return {'stage': coarse, 'logistics': logistics, 'situation': situation, 'notify': [notice, 'etapa:' + notice] if notice in NOTICE_STAGES else None}
 
@@ -419,20 +439,50 @@ def set_situation(c, oid, rid, data, user, now):
     return {'situation': situation, 'incident': incident, 'eta': eta, 'notify': ['retraso', 'retraso:%d' % last] if situation == 'retrasado' else None}
 
 
-def progress(c, r):
-    """Avance común al panel interno y al seguimiento público (una sola lógica): pasos del flujo real del pedido (el detallado si tiene tipo
-    de envío); un paso cuenta como completado solo si quedó atrás Y tiene su evento registrado (un paso saltado por corrección no cuenta).
-    La última actualización es el último evento del repuesto o de su cancelación/reembolso (no los avisos)."""
-    steps = flow(r)
+def stages(r, events):
+    """Etapas visibles del repuesto: UNA sola fuente para el seguimiento público, el panel del taller, el avance y la hoja A4.
+    Una etapa superada solo cuenta como completada si tiene su evento real registrado (alta o etapa); si se superó por una corrección de
+    administración sin ese evento, queda «no registrada» y no suma al avance. `events`: filas con kind, stage, logistics y created_at."""
+    first, fine_first = {}, {}
+    for e in events:
+        if e['kind'] in ('alta', 'etapa'):
+            first.setdefault(e['stage'], e['created_at'])
+            fine_first.setdefault(e['logistics'] or e['stage'], e['created_at'])
+    shipping = r['shipping'] if r['shipping'] in PUBLIC_FLOWS else ''
+    flow_ = PUBLIC_FLOWS[shipping] if shipping else PUBLIC_STEPS
     current = fine(r)
-    idx = steps.index(current) if current in steps else 0
+    key = current if shipping else r['stage']
+    seen = fine_first if shipping else first
+    group = next((i for i, s in enumerate(flow_) if key in s[2]), 0)
     finished = r['stage'] == 'listo' and r['situation'] != 'cancelado'
-    reached = {(e[0] or e[1]) for e in c.execute("SELECT logistics,stage FROM order_part_events WHERE request_id=? AND kind IN ('alta','etapa')", (r['id'],))}
-    done = sum(1 for i, x in enumerate(steps) if (i < idx or finished) and (x in reached or x == 'solicitado'))
+    out = []
+    for i, (code, label, members) in enumerate(flow_):
+        state = 'done' if i < group or finished else 'current' if i == group else 'pending'
+        if state == 'done' and code != 'solicitud' and not any(x in seen for x in members):
+            state = 'skipped'
+        at = min((seen[x] for x in members if x in seen), default='') if state in ('done', 'current') else ''
+        out.append({'code': code, 'label': label, 'state': state, 'at': at, 'color': round(i * 5 / max(1, len(flow_) - 1))})
+    return {'first': first, 'fine_first': fine_first, 'shipping': shipping, 'flow': flow_, 'current': current, 'group': group, 'finished': finished, 'steps': out}
+
+
+def progress(c, r):
+    """Avance común al panel interno, al seguimiento público y a la hoja A4 (una sola lógica, 1.5.249): se cuenta sobre las MISMAS etapas
+    que ve el cliente, así «X de Y etapas» y el porcentaje coinciden en todas las vistas (porcentaje = completadas / total). Solo cuentan
+    las etapas con su evento real. También informa la etapa actual, la siguiente y el paso detallado (para el taller).
+    La última actualización es el último evento del repuesto o de su cancelación/reembolso (no los avisos)."""
+    events = c.execute("SELECT kind,stage,logistics,created_at FROM order_part_events WHERE request_id=? ORDER BY id", (r['id'],)).fetchall()
+    st = stages(r, events)
+    steps = st['steps']
+    done = sum(1 for x in steps if x['state'] == 'done')
+    nxt = next((x['label'] for x in steps if x['state'] == 'pending'), '') if r['situation'] != 'cancelado' else ''
+    fine_steps = flow(r)
+    idx = fine_steps.index(st['current']) if st['current'] in fine_steps else 0
     last = c.execute("SELECT MAX(at) FROM (SELECT created_at at FROM order_part_events WHERE request_id=? UNION ALL "
                      "SELECT created_at FROM order_part_log WHERE request_id=? AND kind!='aviso')", (r['id'], r['id'])).fetchone()[0]
-    return {'done': done, 'total': len(steps), 'percent': round(100 * done / len(steps)), 'current': current,
-            'current_label': step_label(current, r['shipping']), 'updated': last or r['updated_at']}
+    return {'done': done, 'total': len(steps), 'percent': round(100 * done / len(steps)), 'current': st['current'],
+            'current_label': step_label(st['current'], r['shipping']), 'stage_label': steps[st['group']]['label'] if not st['finished'] else steps[-1]['label'],
+            'stage_number': len(steps) if st['finished'] else st['group'] + 1, 'next_label': nxt, 'skipped': sum(1 for x in steps if x['state'] == 'skipped'),
+            'step_number': idx + 1, 'step_total': len(fine_steps), 'updated': last or r['updated_at']}
 
 
 def _overdue(r, today):
@@ -489,6 +539,7 @@ def listing(c, oid, today):
             d['evidence'] = evidence_steps.get(d['code'], 0)
         import part_route
         item['progress'] = progress(c, r)
+        item['stages'] = stages(r, list(reversed(events)))['steps']  # las mismas etapas que ve el cliente (avance común)
         item['map'] = route_map(r['shipping'], current, reached, at, finished, r['situation'], origin_country=r['origin_country'], customs=customs)
         item['map_html'] = part_route.render(item['map'], 'i%d' % r['id'], r['name'])
         item.update(
@@ -611,28 +662,10 @@ def public(c, oid):
     for r in c.execute('SELECT * FROM order_part_requests WHERE order_id=? AND public_visible=1 ORDER BY id', (oid,)).fetchall():
         terms = private_terms(c, r)
         events = c.execute('SELECT kind,stage,situation,public_note,public,created_at,logistics FROM order_part_events WHERE request_id=? ORDER BY id', (r['id'],)).fetchall()
-        first, fine_first = {}, {}
-        for e in events:
-            if e['kind'] in ('alta', 'etapa'):
-                first.setdefault(e['stage'], e['created_at'])
-                fine_first.setdefault(e['logistics'] or e['stage'], e['created_at'])
-        # Etapas siempre visibles. Un traslado solo se completa si se registró; si se superó sin su evento (corrección de administración),
-        # queda como «no registrada» y nunca se pinta como completada.
-        shipping = r['shipping'] if r['shipping'] in PUBLIC_FLOWS else ''
-        steps = PUBLIC_FLOWS[shipping] if shipping else PUBLIC_STEPS
-        current = fine(r)
-        key = current if shipping else r['stage']
-        seen = fine_first if shipping else first
+        st = stages(r, events)
+        first, fine_first, shipping, steps, current, group, finished, public_steps = (st['first'], st['fine_first'], st['shipping'], st['flow'], st['current'], st['group'],
+                                                                                      st['finished'], st['steps'])
         transit = 'transito' in first
-        group = next((i for i, s in enumerate(steps) if key in s[2]), 0)
-        finished = r['stage'] == 'listo' and r['situation'] != 'cancelado'
-        public_steps = []
-        for i, (code, label, stages) in enumerate(steps):
-            state = 'done' if i < group or finished else 'current' if i == group else 'pending'
-            if state == 'done' and code in ('traslado', 'aereo', 'aduana', 'nacional') and not any(x in seen for x in stages):
-                state = 'skipped'
-            at = min((seen[x] for x in stages if x in seen), default='') if state in ('done', 'current') else ''
-            public_steps.append({'code': code, 'label': label, 'state': state, 'at': at, 'color': round(i * 5 / max(1, len(steps) - 1))})
         # Vehículo: solo con un traslado real. En traslado: avanza (o se detiene si hay retraso o incidencia); recibido: llega y se detiene.
         cancelled = r['situation'] == 'cancelado'
         vehicle = ('' if cancelled or not transit or shipping else 'stopped' if r['stage'] == 'transito' and r['situation'] != 'normal' else 'transit' if r['stage'] == 'transito'

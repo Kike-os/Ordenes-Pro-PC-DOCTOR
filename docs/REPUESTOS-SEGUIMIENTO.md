@@ -394,3 +394,37 @@ Los pasos internos menores no generan avisos.
   - bloqueo en vivo sin recargar;
   - candado;
   - movimiento reducido.
+
+## 1.5.249 — Una sola fuente de etapas y avance; hitos en la orden
+
+- **Mismas etapas y mismo avance en todas las vistas.**
+  - `order_part_requests.stages()` calcula las etapas que ve el cliente:
+    - internacional: 8 etapas;
+    - nacional: 6 etapas;
+    - sin tipo de envío: 6 etapas.
+  - `progress()` cuenta sobre esas mismas etapas.
+  - El panel del taller, el seguimiento público y la hoja A4 muestran el mismo «X de Y etapas completadas · avance Z %». El porcentaje es completadas / total.
+  - Antes, el cliente veía «2 de 8 · 29 %» y el panel «4 de 14 · 29 %».
+  - El panel conserva aparte los **pasos logísticos detallados** («4 de 14» y «paso 5 de 14»).
+- **Solo cuenta lo registrado.** Una etapa superada por una corrección de administración, sin su evento real, queda **«No registrada»** y no suma al avance. Esto vale para cualquier etapa, no solo para el traslado.
+- **Próxima etapa.**
+  - El cliente la ve destacada.
+  - El panel muestra el siguiente paso operativo y, si es distinta, la próxima etapa que verá el cliente.
+- **Fechas diferenciadas** en la vista pública:
+  - **Real:** registrada con su evento (solicitud y recepción).
+  - **Confirmada:** confirmación del pedido.
+  - **Estimada:** disponibilidad prevista por el taller.
+  - El tipo de fecha va escrito, no solo indicado con color.
+- **Hitos en el historial de la orden.**
+  - Quedan registrados como evento de seguimiento, con usuario y fecha:
+    - recepción en el taller, con su fecha;
+    - inicio de instalación y pruebas;
+    - instalación y pruebas finalizadas;
+    - proceso finalizado;
+    - cancelación aprobada por administración.
+  - El estado de la orden no cambia.
+  - Un avance rechazado (repetido, fuera de orden o de un pedido cancelado) no deja huella.
+- **Sin cambios:** el inventario sigue sin moverse al recibir un repuesto, como hasta ahora. También se mantienen:
+  - las reglas de cancelación, con plazo de 24 horas comprobado en el servidor;
+  - los avisos, únicos por evento y canal;
+  - la protección del enlace público: un repuesto de otra orden responde «no disponible».

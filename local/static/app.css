@@ -10481,3 +10481,17 @@ body[data-page=dashboard] .cascade-pp{width:auto;min-height:32px;margin:0;paddin
 .opr-acts .opr-locked{border-color:#33507a;background:#0b1a31;color:#9db1cf;cursor:not-allowed;opacity:1}
 .opr-acts .opr-exception{margin-left:0;border-style:dashed}
 .opr-acts .opr-cancel-btn+.opr-exception{margin-left:0}
+
+/* 1.5.249 — Línea del panel con las mismas etapas que el cliente (6 sin tipo de envío): columnas según su número; «no registrada» escrita. */
+@container (min-width:620px){.opr-steps[data-n]{grid-template-columns:repeat(var(--n),minmax(0,1fr))}}
+.opr-steps li[data-skipped] i{border-style:dashed}
+.opr-skip{color:#F5C26B;font-size:11px;font-weight:600}
+/* Vehículo sobre la línea de 6 etapas: sale de «En traslado» (centro 2,5/6) y llega a «Recibido» (3,5/6), sin tapar los puntos de texto. */
+@container (min-width:620px){
+ .opr-track:has(>.opr-steps[data-n="6"]) .opr-vehicle{--p:.4167}
+ .opr-track:has(>.opr-steps[data-n="6"]) .opr-vehicle[data-vehicle=transit]{--p:.5;animation-name:opr-drive6}
+ .opr-track:has(>.opr-steps[data-n="6"]) .opr-vehicle[data-vehicle=stopped]{--p:.4667}
+ .opr-track:has(>.opr-steps[data-n="6"]) .opr-vehicle[data-vehicle=arrived]{--p:.5833;animation-name:opr-arrive6}
+}
+@keyframes opr-drive6{from{left:calc(.4167 * 100% - 21px)}to{left:calc(.5 * 100% - 21px)}}
+@keyframes opr-arrive6{from{left:calc(.5 * 100% - 21px)}to{left:calc(.5833 * 100% - 21px)}}

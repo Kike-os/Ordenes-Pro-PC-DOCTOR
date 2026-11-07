@@ -200,7 +200,9 @@ class PartRequestTests(unittest.TestCase):
         self.assertEqual(post(ourl, action='advance', stage='recibido', note='Corrección: el cliente trajo el repuesto (ficticio)')['status'], 200)
         with app.connect() as c:
             q = parts.public(c, oid)[1]
-            self.assertEqual(([s['state'] for s in q['steps']], q['vehicle']), (['done', 'done', 'skipped', 'current', 'pending', 'pending'], ''))
+            # 1.5.249: ninguna etapa superada sin su evento se pinta como completada (tampoco «Repuesto confirmado»).
+            self.assertEqual(([s['state'] for s in q['steps']], q['vehicle']), (['done', 'skipped', 'skipped', 'current', 'pending', 'pending'], ''))
+            self.assertEqual((q['done_count'], q['progress']['done'], q['progress']['skipped']), (1, 1, 2))
         page = self.request('/s/' + self.link(oid))['body']
         for secret in ('Distribuidora Zeta', 'Servientrega', 'GX-778899', 'Amazon', 'eBay'):
             self.assertNotIn(secret, page)

@@ -138,9 +138,13 @@ def _track(steps):
 
 def _public_part(p):
     pct = p['progress']['percent'] if p.get('progress') else round(100 * p['done_count'] / max(1, p['total']))
-    facts = [('Estado logístico', p['status_label'] + (' · ' + p['step_label'] if p.get('step_label') else '')), ('Tipo de envío', {'nacional': 'Nacional', 'internacional': 'Internacional'}.get(p.get('shipping'), '')),
-             ('Fecha de solicitud', _when(p['requested'], False)), ('Disponibilidad estimada', _when(p['eta'], False) if p.get('eta') else ''),
-             ('Recibido en el taller', _when(p['received'], False) if p.get('received') else ''), ('Última actualización', _when(p['updated'])),
+    confirmed = next((s['at'] for s in p['steps'] if s['code'] == 'confirmado' and s['state'] in ('done', 'current') and s['at']), '')
+    nxt = (p.get('progress') or {}).get('next_label', '') if p['situation'] != 'cancelado' else ''
+    facts = [('Estado logístico', p['status_label'] + (' · ' + p['step_label'] if p.get('step_label') else '')), ('Próxima etapa', nxt),
+             ('Tipo de envío', {'nacional': 'Nacional', 'internacional': 'Internacional'}.get(p.get('shipping'), '')),
+             ('Solicitud (real)', _when(p['requested'], False)), ('Confirmación (confirmada)', _when(confirmed, False) if confirmed else ''),
+             ('Disponibilidad (estimada)', _when(p['eta'], False) if p.get('eta') else ''),
+             ('Recepción (real)', _when(p['received'], False) if p.get('received') else ''), ('Última actualización', _when(p['updated'])),
              ('Avance', '%d de %d etapas · %d\u00a0%%' % (p['done_count'], p['total'], pct))]
     cancel = p.get('cancellation')
     note = '<p class="pa4-alert" data-tone="warn"><b>%s.</b> %s</p>' % (e(cancel['label']), e(cancel['text'])) if cancel else ''
@@ -152,12 +156,13 @@ def _public_part(p):
 def _admin_part(r):
     import order_part_requests as opr
     pct = r['progress']['percent']
-    facts = [('Estado logístico', r['fine_label'] or r['stage_label']), ('Situación', r['situation_label'] if r['situation'] != 'normal' else ''), ('Tipo de envío', r['shipping_label']),
+    nxt = r['progress'].get('next_label', '') if r['situation'] != 'cancelado' else ''
+    facts = [('Estado logístico', r['fine_label'] or r['stage_label']), ('Próxima etapa', nxt), ('Situación', r['situation_label'] if r['situation'] != 'normal' else ''), ('Tipo de envío', r['shipping_label']),
              ('Referencia', r.get('reference')), ('Cantidad', str(r['quantity']) if r.get('quantity') else ''), ('Proveedor', r.get('supplier')),
-             ('Fecha de solicitud', _when(r['created_at'], False)), ('Disponibilidad estimada', _when(r['eta'], False) if r.get('eta') else ''),
-             ('Recibido en el taller', _when(r['received_at'], False) if r.get('received_at') else ''), ('Última actualización', _when(r['progress'].get('updated') or r['updated_at'])),
+             ('Solicitud (real)', _when(r['created_at'], False)), ('Disponibilidad (estimada)', _when(r['eta'], False) if r.get('eta') else ''),
+             ('Recepción (real)', _when(r['received_at'], False) if r.get('received_at') else ''), ('Última actualización', _when(r['progress'].get('updated') or r['updated_at'])),
              ('Avance', '%d de %d etapas · %d\u00a0%%' % (r['progress']['done'], r['progress']['total'], pct)), ('Técnico', r.get('technician'))]
-    steps = [{'label': d['label'], 'state': d['state'], 'at': d['at']} for d in r['detail']]
+    steps = r.get('stages') or [{'label': d['label'], 'state': d['state'], 'at': d['at']} for d in r['detail']]  # las mismas etapas que el cliente
     alerts = ''
     if r.get('incident_label'):
         alerts += '<p class="pa4-alert" data-tone="alert"><b>Incidencia logística:</b> %s</p>' % e(r['incident_label'])

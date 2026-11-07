@@ -262,16 +262,47 @@ class PartCancellationTests(unittest.TestCase):
         r = self.row(cookie, oid, rid)
         with app.connect() as c:
             pub = next(x for x in parts.public(c, oid) if x['id'] == rid)
-        self.assertEqual((r['progress']['done'], r['progress']['total']), (4, 14))
+        # 1.5.249: el avance se cuenta sobre las MISMAS etapas que ve el cliente (8 en internacional); el paso detallado queda aparte.
+        self.assertEqual((r['progress']['done'], r['progress']['total'], r['progress']['percent']), (2, 8, 25))
+        self.assertEqual((r['progress']['step_number'], r['progress']['step_total'], r['progress']['next_label']), (5, 14, 'Proceso de aduana'))
         self.assertEqual(r['progress'], pub['progress'])  # el mismo avance en las dos vistas
-        self.assertEqual(r['progress']['done'], sum(1 for d in r['detail'] if d['state'] == 'done'))
-        self.assertEqual(pub['done_count'], sum(1 for x in pub['steps'] if x['state'] == 'done'))
+        self.assertEqual(r['stages'], pub['steps'])  # las mismas etapas, estados y fechas
+        self.assertEqual(r['progress']['done'], sum(1 for d in r['stages'] if d['state'] == 'done'))
+        self.assertEqual(pub['done_count'], r['progress']['done'])
         self.assertEqual((pub['step_label'], pub['updated']), ('En tránsito internacional', r['progress']['updated']))
         # Una corrección de administración que salta pasos no los cuenta como completados.
         self.assertEqual(post('/api/orders/%d/part-requests/%d' % (oid, rid), action='advance', stage='aduana_liberado', note='Corrección de prueba ficticia')['status'], 200)
         r = self.row(cookie, oid, rid)
-        self.assertEqual(r['progress']['done'], 5)  # llegada y revisión aduanera, sin evento: no cuentan
-        self.assertEqual(r['progress']['done'], sum(1 for d in r['detail'] if d['state'] == 'done'))
+        self.assertEqual((r['progress']['done'], r['progress']['percent']), (3, 38))  # el envío aéreo tiene su evento; la aduana queda en curso
+        self.assertEqual(r['progress']['done'], sum(1 for d in r['stages'] if d['state'] == 'done'))
+
+    def test_part_milestones_are_reflected_in_the_order_history(self):
+        """1.5.249: recepción, instalación, fin del proceso y cancelación quedan en el historial de la orden (con usuario y fecha), sin cambiar
+        el estado de la orden; un avance rechazado no deja huella."""
+        cookie, csrf, post, order = self.paid_order(10500, pay=False)
+        oid = order['id']
+        rid = self.part(post, oid, name='Teclado ficticio', shipping='nacional')['body']['id']
+        with app.connect() as c:
+            status = c.execute('SELECT status FROM orders WHERE id=?', (oid,)).fetchone()[0]
+            base_count = c.execute("SELECT COUNT(*) FROM order_history WHERE order_id=?", (oid,)).fetchone()[0]
+        self.go(post, oid, rid, 'confirmado', 'preparacion', 'despachado', 'transito_nacional', 'ruta_otavalo', 'recibido', 'instalacion', 'instalado', 'listo')
+        self.assertEqual(post('/api/orders/%d/part-requests/%d' % (oid, rid), action='advance', stage='listo')['status'], 409)
+        with app.connect() as c:
+            rows = c.execute("SELECT event,comment,actor_id FROM order_history WHERE order_id=? ORDER BY id", (oid,)).fetchall()[base_count:]
+            self.assertEqual(c.execute('SELECT status FROM orders WHERE id=?', (oid,)).fetchone()[0], status)
+        texts = [r['comment'] for r in rows]
+        self.assertEqual(len(texts), 4, texts)
+        self.assertTrue(texts[0].startswith('Repuesto «Teclado ficticio» recibido en el taller.') and 'Fecha de recepción:' in texts[0])
+        self.assertIn('instalación y las pruebas', texts[1]);self.assertIn('finalizadas', texts[2]);self.assertIn('proceso finalizado', texts[3])
+        self.assertTrue(all(r['event'] == 'follow_up' and r['actor_id'] == self.uid for r in rows))
+        other = self.part(post, oid, name='Cámara ficticia', shipping='nacional')['body']['id']
+        self.go(post, oid, other, 'confirmado')
+        self.assertEqual(post('/api/orders/%d/part-requests/%d' % (oid, other), action='cancel_direct', reason_code='sin_disponibilidad',
+                              note='El proveedor no tiene existencias (ficticio).', confirm_supplier='1')['status'], 200)
+        with app.connect() as c:
+            last = c.execute("SELECT comment FROM order_history WHERE order_id=? ORDER BY id DESC LIMIT 1", (oid,)).fetchone()[0]
+        self.assertIn('Pedido del repuesto «Cámara ficticia» cancelado por administración', last)
+        self.assertEqual(post('/api/orders/%d/part-requests/%d' % (oid, other), action='advance', stage='preparacion')['status'], 409)  # cancelado: ya no cambia
 
     def test_ordinary_requests_only_within_24_hours(self):
         from datetime import timedelta
