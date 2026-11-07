@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.254 — 2026-11-07 16:37 (UTC-05:00)
+
+Seguimiento con resumen y avisos de acabado profesional
+
+### Mejoras realizadas
+
+- Seguimiento de reparación con acabado profesional: bajo la barra, la etapa actual (icono, nombre y estado), la siguiente etapa y el avance «X de 6»; los avisos (falla recurrente, presupuesto, respuesta o repuesto) en tarjeta con icono, título, explicación y etiqueta. En el panel y en el cliente.
+
 ## v1.5.253 — 2026-11-07 16:02 (UTC-05:00)
 
 Comprobación de actualizaciones funcionando de nuevo (registro de versiones de más de 256 KB)

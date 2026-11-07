@@ -8,6 +8,24 @@
   },
   "releases": [
     {
+      "version": "1.5.254",
+      "date": "2026-11-07T16:37:06-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Seguimiento con resumen y avisos de acabado profesional",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Seguimiento de reparación con acabado profesional: bajo la barra, la etapa actual (icono, nombre y estado), la siguiente etapa y el avance «X de 6»; los avisos (falla recurrente, presupuesto, respuesta o repuesto) en tarjeta con icono, título, explicación y etiqueta. En el panel y en el cliente."
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Kike-os: «corrigeme esto hagalo mas profesional y actualiza»"
+    },
+    {
       "version": "1.5.253",
       "date": "2026-11-07T16:02:23-05:00",
       "type": "patch",
