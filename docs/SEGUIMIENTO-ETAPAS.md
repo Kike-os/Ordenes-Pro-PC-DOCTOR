@@ -69,3 +69,17 @@
   - movimiento reducido;
   - hoja A4;
   - ausencia de errores de consola.
+
+## 1.5.254 — Resumen y avisos con acabado profesional
+
+- **Resumen bajo la barra:**
+  - **Etapa actual:** con su icono, su nombre y una etiqueta «En curso», «En espera» o «Proceso completado».
+  - **Siguiente etapa:** con su icono y una flecha que la une a la actual.
+  - **Avance:** «X de 6 etapas», con un medidor.
+  - **Disposición:** en anchos medianos se acomoda en dos columnas y en el teléfono se apila; sin desbordes.
+- **Avisos en tarjeta:** icono propio de cada caso, título, explicación y una etiqueta neutral, que también lee el cliente:
+  - falla recurrente: «En revisión»;
+  - presupuesto: «Pendiente de aprobación»;
+  - respuesta del cliente: «Respuesta pendiente»;
+  - repuesto: «En camino».
+- **Mismo marcado** en el panel y en el seguimiento del cliente. Los datos y la lógica de las etapas no cambian.

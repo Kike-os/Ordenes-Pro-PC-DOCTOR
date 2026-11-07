@@ -121,7 +121,8 @@ class RepairStageTests(unittest.TestCase):
         screen = page.split('<section class="pa4"')[0]
         self.assertEqual(re.findall(r'<li class="rp-step" data-state="(\w+)" data-stage="(\w+)"', screen),
                          [('done', 'recepcion'), ('current', 'diagnostico'), ('pending', 'reparacion'), ('pending', 'pruebas'), ('pending', 'listo'), ('pending', 'entregado')])
-        self.assertIn('Etapa actual:</span> <b>Diagnóstico</b>', screen);self.assertIn('Estado actual', screen)
+        self.assertIn('<small>Etapa actual</small><b>Diagnóstico</b>', screen);self.assertIn('<small>Siguiente etapa</small><b>Reparación</b>', screen)
+        self.assertIn('data-done="1" role="img" aria-label="1 de 6 etapas completadas"', screen);self.assertIn('Estado actual', screen)
         self.assertNotIn('NOTA-INTERNA-SECRETA', page)
         self.assertIn('<noscript><meta http-equiv="refresh" content="180"></noscript>', page)
         detail = self.request('/api/orders/%d' % oid, cookie=cookie)['body']['order']

@@ -26,6 +26,12 @@ ICONS = {
     'package-check': '<path d="m16 16 2 2 4-4"/><path d="M21 10V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l2-1.14"/><path d="m7.5 4.27 9 5.15"/><polyline points="3.29 7 12 12 20.71 7"/><line x1="12" x2="12" y1="22" y2="12"/>',
     'handshake': '<path d="m11 17 2 2a1 1 0 1 0 3-3"/><path d="m14 14 2.5 2.5a1 1 0 1 0 3-3l-3.88-3.88a3 3 0 0 0-4.24 0l-.88.88a1 1 0 1 1-3-3l2.81-2.81a5.79 5.79 0 0 1 7.06-.87l.47.28a2 2 0 0 0 1.42.25L21 4"/><path d="m21 3 1 11h-2"/><path d="M3 3 2 14l6.5 6.5a1 1 0 1 0 3-3"/><path d="M3 4h8"/>',
     'check': '<path d="M20 6 9 17l-5-5"/>',
+    'arrow-right': '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',
+    'rotate-ccw': '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>',
+    'clock': '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+    'message-square': '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
+    'package': '<path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/>',
+    'flag': '<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" x2="4" y1="22" y2="15"/>',
 }
 IN_PROCESS = ('reparacion', 'esperando_cliente', 'presupuesto', 'revision_recurrente', 'diagnostico')
 READY = ('listo', 'espera_entrega')
@@ -33,9 +39,10 @@ READY = ('listo', 'espera_entrega')
 KIND_STAGE = {'recepcion': 0, 'diagnostico': 1, 'presupuesto_enviado': 1, 'esperando_autorizacion': 1, 'presupuesto_rechazado': 1, 'presupuesto_aprobado': 2,
               'reparacion': 2, 'novedad': 2, 'repuesto': 2, 'pruebas': 3, 'finalizado': 4, 'listo_entrega': 4, 'entrega': 5}
 WORD = {'done': 'Completado', 'current': 'En curso', 'warn': 'En espera', 'pending': 'Pendiente'}
-ALERTS = {'presupuesto': ('ambar', 'Presupuesto pendiente de aprobación', 'La reparación continúa cuando se apruebe el presupuesto.'),
-          'esperando_cliente': ('ambar', 'Esperando respuesta del cliente', 'Necesitamos su respuesta para continuar.'),
-          'revision_recurrente': ('ambar', 'Revisión por falla recurrente', 'El equipo volvió a revisión técnica; el historial anterior se conserva.')}
+# Avisos: (tono, título, explicación, icono, etiqueta). La etiqueta es neutral: la lee también el cliente.
+ALERTS = {'presupuesto': ('ambar', 'Presupuesto pendiente de aprobación', 'La reparación continuará cuando se apruebe el presupuesto.', 'clock', 'Pendiente de aprobación'),
+          'esperando_cliente': ('ambar', 'Esperando respuesta del cliente', 'Necesitamos su respuesta para continuar con el servicio.', 'message-square', 'Respuesta pendiente'),
+          'revision_recurrente': ('ambar', 'Revisión por falla recurrente', 'El equipo volvió a revisión técnica. El historial anterior se conserva completo.', 'rotate-ccw', 'En revisión')}
 
 
 def icon(name, cls='rp-ic'):
@@ -122,11 +129,11 @@ def compute(c, oid):
         out.append({'code': code, 'label': label, 'icon': ic, 'state': state, 'at': at, 'word': WORD[state]})
     alerts = []
     if status in ALERTS:
-        tone, title, text = ALERTS[status]
-        alerts.append({'code': status, 'tone': tone, 'title': title, 'text': text})
+        tone, title, text, ic, tag = ALERTS[status]
+        alerts.append({'code': status, 'tone': tone, 'title': title, 'text': text, 'icon': ic, 'tag': tag})
     if parts_waiting and status in IN_PROCESS:
         alerts.append({'code': 'repuesto', 'tone': 'ambar', 'title': 'Esperando repuesto' if parts_waiting == 1 else 'Esperando %d repuestos' % parts_waiting,
-                       'text': 'Puede ver el avance en «Seguimiento de repuestos».'})
+                       'text': 'El avance del envío se muestra en «Seguimiento de repuestos».', 'icon': 'package', 'tag': 'En camino'})
     done = sum(1 for s in out if s['state'] == 'done')
     return {'stages': out, 'current': None if finished else current, 'finished': finished, 'done': done, 'total': len(out),
             'percent': round(100 * done / len(out)), 'status': status, 'status_label': labels.get(status, status), 'alerts': alerts,
@@ -158,9 +165,31 @@ def html(data, when=None):
                   % (s['state'], e(s['code']), ' aria-current="step"' if s['state'] in ('current', 'warn') else '', icon(s['icon']), icon('check', 'rp-ic-ok'),
                      '<span class="rp-line" aria-hidden="true"><i></i></span>' if i < len(data['stages']) - 1 else '', e(s['label']), e(s['word']),
                      '<time> · %s</time>' % e(at) if at else ''))
-    now = data['stages'][data['current']] if data['current'] is not None else data['stages'][-1]
-    alerts = ''.join('<p class="rp-alert" data-tone="%s" role="status"><b>%s.</b> %s</p>' % (e(a['tone']), e(a['title']), e(a['text'])) for a in data['alerts'])
-    return ('<div class="rp" data-current="%s" data-done="%d"><h2 class="sr-only">Avance de la reparación</h2><ol class="rp-steps" aria-label="Etapas de la reparación">%s</ol>'
-            '<p class="rp-now"><span>Etapa actual:</span> <b>%s</b>%s</p>%s</div>'
-            % ('' if data['current'] is None else data['current'], data['done'], items, e(now['label'] if not data['finished'] else 'Entregado'),
-               ' · <span>siguiente: %s</span>' % e(data['next_label']) if data['next_label'] else '', alerts))
+    return ('<div class="rp" data-current="%s" data-done="%d"><h2 class="sr-only">Avance de la reparación</h2><ol class="rp-steps" aria-label="Etapas de la reparación">%s</ol>%s%s</div>'
+            % ('' if data['current'] is None else data['current'], data['done'], items, summary_html(data), alerts_html(data['alerts'])))
+
+
+def summary_html(data):
+    """Resumen profesional bajo la barra: etapa actual (con su icono y estado), siguiente etapa y avance «X de 6»."""
+    import html as h
+    e = h.escape
+    finished = data['finished']
+    now = data['stages'][-1] if finished else data['stages'][data['current']]
+    nxt = data['stages'][data['current'] + 1] if not finished and data['current'] < 5 else None
+    state = 'done' if finished else now['state']
+    word = 'Proceso completado' if finished else {'warn': 'En espera', 'current': 'En curso'}.get(now['state'], now['word'])
+    cur = ('<div class="rp-sum-item" data-kind="now" data-state="%s"><span class="rp-sum-ic">%s</span><span class="rp-sum-txt"><small>Etapa actual</small>'
+           '<b>%s</b></span><em class="rp-sum-badge">%s</em></div>' % (state, icon(now['icon']), e(now['label']), e(word)))
+    nex = ('<span class="rp-sum-arrow" aria-hidden="true">%s</span><div class="rp-sum-item" data-kind="next"><span class="rp-sum-ic">%s</span><span class="rp-sum-txt">'
+           '<small>Siguiente etapa</small><b>%s</b></span></div>' % (icon('arrow-right'), icon(nxt['icon']), e(nxt['label']))) if nxt else ''
+    bar = ('<div class="rp-sum-meter" data-done="%d" role="img" aria-label="%d de %d etapas completadas"><span><small>Avance</small><b>%d de %d etapas</b></span>'
+           '<span class="rp-sum-track"><i></i></span></div>' % (data['done'], data['done'], data['total'], data['done'], data['total']))
+    return '<div class="rp-summary">%s%s%s</div>' % (cur, nex, bar)
+
+
+def alerts_html(alerts):
+    import html as h
+    e = h.escape
+    return ''.join('<div class="rp-alert" data-tone="%s" data-code="%s" role="status"><span class="rp-alert-ic">%s</span><div class="rp-alert-txt"><b>%s</b><p>%s</p></div>'
+                   '<em class="rp-alert-tag">%s</em></div>' % (e(a['tone']), e(a['code']), icon(a.get('icon') or 'flag'), e(a['title']), e(a['text']), e(a.get('tag') or ''))
+                   for a in alerts)
