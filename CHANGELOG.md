@@ -4,6 +4,19 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.252 — 2026-11-07 15:33 (UTC-05:00)
+
+Seguimiento de reparación en 6 etapas con iconos, misma fuente en panel, cliente y A4, y actualización automática
+
+### Nuevas funcionalidades
+
+- Seguimiento de reparación en 6 etapas con iconos (Recepción, Diagnóstico, Reparación, Pruebas técnicas, Listo para retirar, Entregado), fecha y hora reales, colores por estado y animaciones suaves; la misma fuente en el panel, el seguimiento del cliente y la hoja A4.
+- Actualización automática: el seguimiento del cliente y el detalle de la orden se actualizan solos cuando el técnico registra un cambio (consulta liviana cada 30 s de una huella sin datos), sin recargar a mano.
+
+### Mejoras realizadas
+
+- Estados especiales en ámbar: presupuesto pendiente (sin marcar la reparación completa), esperando respuesta, esperando repuesto y revisión por falla recurrente (vuelve a Diagnóstico y conserva el historial). Nunca avanza por tiempo.
+
 ## v1.5.251 — 2026-11-07 15:17 (UTC-05:00)
 
 Teléfono / WhatsApp internacional con selector de país, validación por país y formato E.164

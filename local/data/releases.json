@@ -8,6 +8,27 @@
   },
   "releases": [
     {
+      "version": "1.5.252",
+      "date": "2026-11-07T15:33:17-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Seguimiento de reparación en 6 etapas con iconos, misma fuente en panel, cliente y A4, y actualización automática",
+      "changes": {
+        "features": [
+          "Seguimiento de reparación en 6 etapas con iconos (Recepción, Diagnóstico, Reparación, Pruebas técnicas, Listo para retirar, Entregado), fecha y hora reales, colores por estado y animaciones suaves; la misma fuente en el panel, el seguimiento del cliente y la hoja A4.",
+          "Actualización automática: el seguimiento del cliente y el detalle de la orden se actualizan solos cuando el técnico registra un cambio (consulta liviana cada 30 s de una huella sin datos), sin recargar a mano."
+        ],
+        "improvements": [
+          "Estados especiales en ámbar: presupuesto pendiente (sin marcar la reparación completa), esperando respuesta, esperando repuesto y revisión por falla recurrente (vuelve a Diagnóstico y conserva el historial). Nunca avanza por tiempo."
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Kike-os: «actualiza cuando tod lo que te envie este bien y sin errores le autori"
+    },
+    {
       "version": "1.5.251",
       "date": "2026-11-07T15:17:18-05:00",
       "type": "patch",
