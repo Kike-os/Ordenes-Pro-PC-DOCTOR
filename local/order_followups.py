@@ -653,8 +653,12 @@ def whatsapp_status(env=None):
 
 
 def ecuador_number(phone):
-    """Celular para WhatsApp en formato internacional (las mismas reglas que la pantalla): 09XXXXXXXX, 9XXXXXXXX o 5939XXXXXXXX; los fijos no
-    sirven. Un número con prefijo internacional (+ o 00) se acepta tal cual."""
+    """Número para WhatsApp en formato internacional, solo cifras (1.5.251: cualquier país con phones.whatsapp; Ecuador por defecto). Los fijos
+    no sirven. Si la biblioteca no lo reconoce, se aplican las reglas anteriores (números antiguos ya guardados)."""
+    import phones
+    found = phones.whatsapp(phone)
+    if found:
+        return found
     raw = str(phone or '').strip()
     digits = re.sub(r'\D', '', raw)
     if digits.startswith('00'):

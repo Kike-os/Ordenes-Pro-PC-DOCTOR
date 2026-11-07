@@ -36,7 +36,7 @@ class PickupAndClientsTests(unittest.TestCase):
                 if text:self.assertEqual(result['body']['fields'].get('identification'),text,(kind,number))
                 else:self.assertEqual(result['body']['fields'].get('document_type'),'Selecciona el tipo de identificación.')
             for wrong,field,text in (({'name':'Solonombre'},'name','Ingresa tu nombre y apellidos.'),
-                                     ({'phone':'12345'},'phone','Ingresa un número de contacto válido.'),({'email':'correo@mal'},'email','Ingresa un correo electrónico válido.')):
+                                     ({'phone':'12345'},'phone','El número está incompleto para Ecuador.'),({'email':'correo@mal'},'email','Ingresa un correo electrónico válido.')):
                 result=self.book('0002',**wrong);self.assertEqual((result['status'],result['body']['fields'].get(field)),(400,text),wrong)
             with app.connect() as c:self.assertEqual(c.execute('SELECT COUNT(*) FROM appointments').fetchone()[0],0)
             # Nombre con tildes, ñ y compuesto; teléfono internacional; correo vacío.
@@ -44,7 +44,7 @@ class PickupAndClientsTests(unittest.TestCase):
             self.assertEqual(ok['status'],201,ok['body']);self.assertEqual({'client_id','client_new','client_review'}&set(ok['body']),set())
             with app.connect() as c:
                 client=c.execute('SELECT name,phone,email,identification,origin FROM clients WHERE identification=?',('1710034065',)).fetchone()
-                self.assertEqual(tuple(client),('María José Ñáñez de la Peña','+34 612 345 678','','1710034065','cita'));self.assertEqual((c.execute('SELECT document_type FROM clients WHERE identification=?',('1710034065',)).fetchone()[0],c.execute('SELECT document_type,identification FROM appointments').fetchone()[0]),('cedula','cedula'))
+                self.assertEqual(tuple(client),('María José Ñáñez de la Peña','+34612345678','','1710034065','cita'));self.assertEqual((c.execute('SELECT document_type FROM clients WHERE identification=?',('1710034065',)).fetchone()[0],c.execute('SELECT document_type,identification FROM appointments').fetchone()[0]),('cedula','cedula'))
             # La misma solicitud repetida no crea otra cita ni otro cliente.
             again=self.book('0003',name='María José Ñáñez de la Peña',phone='+34 612 345 678',email='');self.assertEqual((again['status'],again['body'].get('duplicate')),(200,True))
             with app.connect() as c:self.assertEqual((c.execute('SELECT COUNT(*) FROM appointments').fetchone()[0],c.execute("SELECT COUNT(*) FROM clients WHERE origin='cita'").fetchone()[0]),(1,1))

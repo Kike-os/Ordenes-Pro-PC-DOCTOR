@@ -41,4 +41,6 @@ function identificationControl({select,input,count,label,passport,passportMax}){
  // El selector toma la altura y la separación reales del campo numérico, para que ambos queden alineados en cualquier formulario y tamaño de pantalla.
  if(window.ResizeObserver){const group=select.nextElementSibling;new ResizeObserver(()=>{const height=input.offsetHeight;if(height){group.style.setProperty('--seg-height',height+'px');group.style.marginTop=getComputedStyle(input).marginTop;}}).observe(input);}
  refresh();return{refresh,check,kind,limit};}
+// Teléfono de cualquier país (1.5.251): con el campo internacional, las reglas de cada país (libphonenumber-js); sin él, las de Ecuador.
+function validIntlPhone(value){const v=String(value||'').trim();return typeof window.PhoneField?.parse==='function'?!!window.PhoneField.parse(v):validEcuadorPhone(v);}
 function validEcuadorPhone(value){if(!/^[+0-9 ()-]+$/.test(value))return false;return /^(?:09[0-9]{8}|0[2-7][0-9]{7}|\+?593(?:9[0-9]{8}|[2-7][0-9]{7}))$/.test(value.replace(/[ ()-]/g,''));}

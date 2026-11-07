@@ -61,7 +61,7 @@ class ReceptionTests(unittest.TestCase):
             self.assertEqual(result['body']['code'],f'PCD-20261009-{index:04d}')
             detail=self.request('/api/orders/'+str(result['body']['id']),cookie=cookie)['body']['order']
             for key,value in payload.items():
-                if key not in ('client_id','technical_access','access_confirmed','terms_accept'):self.assertEqual(detail[key],value,key)
+                if key not in ('client_id','technical_access','access_confirmed','terms_accept'):self.assertEqual(detail[key],__import__('phones').normalize(value)[0] if key=='phone' else value,key)  # 1.5.251: teléfono en E.164
         with app.connect() as c:self.assertEqual(c.execute('PRAGMA foreign_key_check').fetchall(),[])
 
 

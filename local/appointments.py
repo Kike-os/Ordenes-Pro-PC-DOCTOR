@@ -203,13 +203,15 @@ def conflict(c,fields,staff=False):
 PICKUP='retiro'
 PICKUP_READY=('listo','espera_entrega')
 def phone_key(value):
- """Teléfono reducido a sus dígitos significativos para comparar: 0991234567 y +593 99 123 4567 son el mismo número."""
+ """Teléfono reducido a sus dígitos significativos para comparar: 0991234567 y +593 99 123 4567 son el mismo número (también en otros países)."""
+ import phones
  digits=re.sub(r'\D','',str(value or ''))
+ found=phones.parse(value)
+ if found:return __import__('phonenumbers').national_significant_number(found)
  return digits[3:] if digits.startswith('593') and len(digits)>=11 else digits.lstrip('0')
 def valid_phone(value):
- """Número de contacto válido: formatos de Ecuador, o internacional con prefijo + y entre 8 y 15 dígitos."""
- value=str(value or '').strip()
- return valid_ecuador_phone(value) or bool(re.fullmatch(r'\+[1-9][0-9]{7,14}',re.sub(r'[ ()-]','',value)) and re.fullmatch(r'[+0-9 ()-]+',value))
+ """Número de contacto válido de cualquier país (Ecuador por defecto), con las reglas de cada país (1.5.251: phones)."""
+ return __import__('phones').valid(value)
 def pickup_order(c,fields,client=None):
  """Orden indicada para un retiro. Devuelve (orden, error). El mensaje es el mismo si la orden no existe o si es de otra persona:
  nunca se revela información de otro cliente. Agendar el retiro no entrega el equipo: la entrega se registra aparte en la orden."""
@@ -233,7 +235,8 @@ def validate_booking(data,c,public=False,client=None):
  fields['services']=[dict(row) for row in chosen]
  pickup=fields['service']==PICKUP
  if len(fields['name'])<2 or len(fields['name'])>150 or (public and len([part for part in fields['name'].split() if len(part)>=2])<2):errors['name']='Ingresa tu nombre y apellidos.' if public else 'Indica el nombre completo (2 a 150 caracteres).'
- if not valid_phone(fields['phone']):errors['phone']='Ingresa un número de contacto válido.'
+ if not valid_phone(fields['phone']):errors['phone']=__import__('phones').error(fields['phone']) or 'Ingresa un número de contacto válido.'
+ else:fields['phone']=__import__('phones').normalize(fields['phone'])[0]  # 1.5.251: guardado en E.164
  # Identificación: tipo (cédula o RUC) y número. En la reserva pública es obligatoria; identifica al cliente sin depender del nombre.
  # Si no llega el tipo (citas del personal o clientes antiguos) se deduce de la longitud; nunca se guarda un tipo que no corresponda al número.
  passport=fields['document_type']=='pasaporte'
@@ -404,7 +407,8 @@ def edit(c,row,data,user):
  """Corrige los datos de contacto, equipo y descripción de una cita; fecha y estado se cambian con sus propias acciones."""
  fields={k:str(data.get(k,'')).strip() for k in EDITABLE};errors={}
  if len(fields['name'])<2 or len(fields['name'])>150:errors['name']='Indica el nombre completo (2 a 150 caracteres).'
- if not valid_ecuador_phone(fields['phone']):errors['phone']='Ingresa un número de teléfono válido.'
+ if not valid_phone(fields['phone']):errors['phone']=__import__('phones').error(fields['phone']) or 'Ingresa un número de teléfono válido.'
+ else:fields['phone']=__import__('phones').normalize(fields['phone'])[0]  # 1.5.251: cualquier país, guardado en E.164
  if fields['email'] and (len(fields['email'])>254 or not re.fullmatch(r'[^\s@<>]+@[^\s@<>.]+(?:\.[^\s@<>.]+)+',fields['email'])):errors['email']='Ingresa un correo electrónico válido.'
  if fields['device_type'] not in reception.DEVICE_TYPES:errors['device_type']='Selecciona el tipo de equipo.'
  if len(fields['description'])<3 or len(fields['description'])>1000:errors['description']='Describe brevemente la falla (3 a 1000 caracteres).'

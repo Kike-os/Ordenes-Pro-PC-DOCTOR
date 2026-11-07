@@ -99,8 +99,12 @@ def validate_order(data):
         errors['identification'] = error
     if fields['email'] and not re.fullmatch(r'[^\s@<>]+@[^\s@<>.]+(?:\.[^\s@<>.]+)+', fields['email']):
         errors['email'] = 'Ingresa un correo electrónico válido.'
-    if fields['phone'] and not valid_ecuador_phone(fields['phone']):
-        errors['phone'] = 'Ingresa un móvil 09…, fijo con código de área o +593….'
+    if fields['phone']:
+        # 1.5.251: teléfono de cualquier país (Ecuador por defecto), guardado en formato internacional E.164 (p. ej. +593991234567).
+        import phones
+        normalized, problem = phones.normalize(fields['phone'])
+        if problem:errors['phone'] = problem
+        else:fields['phone'] = normalized
     if fields['serial'] and not re.fullmatch(r'[A-Za-z0-9-]+', fields['serial']):
         errors['serial'] = 'Utiliza letras, números y guiones.'
     if fields['document_type']=='pasaporte':

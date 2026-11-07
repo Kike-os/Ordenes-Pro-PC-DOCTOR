@@ -398,7 +398,7 @@ def set_buyer(c, invoice_id, data, user, now):
         kind = str(data.get('buyer_id_type', ''))
         ident = re.sub(r'\s', '', str(data.get('buyer_id', '')))[:20]
         values = (kind, ident, re.sub(r'\s+', ' ', str(data.get('buyer_name', ''))).strip()[:300], re.sub(r'\s+', ' ', str(data.get('buyer_address', ''))).strip()[:300],
-                  str(data.get('buyer_email', '')).strip()[:300], str(data.get('buyer_phone', '')).strip()[:40], 0)
+                  str(data.get('buyer_email', '')).strip()[:300], __import__('phones').tidy(data.get('buyer_phone', ''), 40), 0)
         if kind == '07':
             raise InvoiceError('Para consumidor final usa la opción «Consumidor final».')
     c.execute('UPDATE invoices SET buyer_id_type=?,buyer_id=?,buyer_name=?,buyer_address=?,buyer_email=?,buyer_phone=?,consumer_final=?,updated_at=? WHERE id=?', (*values, stamp(now), invoice_id))

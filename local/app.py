@@ -1123,10 +1123,17 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         path = urlsplit(self.path).path
-        files = {'/static/label.css':'label.css','/static/tracking.css':'tracking.css','/static/licencias.css':'licencias.css','/static/app.css':'app.css','/static/app.js':'app.js','/static/service-picker.js':'service-picker.js','/static/licenses.js':'licenses.js','/static/inventory.js':'inventory.js','/static/sales.js':'sales.js','/static/reschedule.js':'reschedule.js','/static/form-validation.js':'form-validation.js','/static/appointments.js':'appointments.js','/static/adi-widget.js':'adi-widget.js','/static/adi-orb.js':'adi-orb.js','/static/ui-select.js':'ui-select.js','/static/ticket.css':'ticket.css','/static/seguimiento-a4.css':'seguimiento-a4.css','/static/ticket.js':'ticket.js','/static/quote.css':'quote.css','/static/quote-sign.js':'quote-sign.js','/static/echarts.min.js':'echarts.min.js','/static/logo-original.png':'logo-original.png',
+        files = {'/static/label.css':'label.css','/static/tracking.css':'tracking.css','/static/licencias.css':'licencias.css','/static/app.css':'app.css','/static/app.js':'app.js','/static/service-picker.js':'service-picker.js','/static/licenses.js':'licenses.js','/static/inventory.js':'inventory.js','/static/sales.js':'sales.js','/static/reschedule.js':'reschedule.js','/static/form-validation.js':'form-validation.js','/static/appointments.js':'appointments.js','/static/adi-widget.js':'adi-widget.js','/static/adi-orb.js':'adi-orb.js','/static/ui-select.js':'ui-select.js','/static/ticket.css':'ticket.css','/static/phone-input.js':'phone-input.js','/static/phone-input.css':'phone-input.css','/static/libphonenumber-max.js':'libphonenumber-max.js','/static/seguimiento-a4.css':'seguimiento-a4.css','/static/ticket.js':'ticket.js','/static/quote.css':'quote.css','/static/quote-sign.js':'quote-sign.js','/static/echarts.min.js':'echarts.min.js','/static/logo-original.png':'logo-original.png',
                  '/favicon.ico':'favicon.ico','/static/favicon.ico':'favicon.ico','/static/favicon-16.png':'favicon-16.png','/static/favicon-32.png':'favicon-32.png','/static/logo-firma.png':'logo-firma.png','/static/favicon-48.png':'favicon-48.png',
                  '/apple-touch-icon.png':'apple-touch-icon.png','/apple-touch-icon-precomposed.png':'apple-touch-icon.png','/static/apple-touch-icon.png':'apple-touch-icon.png'}
         # Logotipos de marcas: solo nombres simples dentro de static/brands; si el archivo no existe la interfaz usa un icono genérico.
+        # Banderas del selector de teléfono (1.5.251, country-flag-icons, MIT): solo códigos de país de dos letras en SVG.
+        flag = re.fullmatch(r'/static/flags/([A-Z]{2})\.svg', path)
+        if flag:
+            file = ROOT / 'static' / 'flags' / (flag[1] + '.svg')
+            if not file.is_file():
+                return self.reply(404, {'error':'Archivo no disponible.'})
+            return self.reply(200, file.read_bytes(), 'image/svg+xml')
         # Logotipos de bancos (static/bancos, procedencia en su README): solo nombres simples en PNG.
         bank_logo = re.fullmatch(r'/static/bancos/([a-z0-9]+)\.png', path)
         if bank_logo:
@@ -1997,11 +2004,12 @@ class Handler(BaseHTTPRequestHandler):
                 if path == '/api/clients':
                     # Búsqueda de clientes sin tildes ni mayúsculas y por varias palabras en cualquier orden (nombre, razón social, nombre comercial,
                     # cédula o RUC, teléfonos, correo y ciudad). Los números también se comparan sin espacios ni guiones.
-                    words=[client_registry.fold(word) for word in term.split()][:6] or ['']
+                    words=([__import__('phones').as_query(term)] if __import__('phones').as_query(term) else [client_registry.fold(word) for word in term.split()][:6]) or ['']
                     folded=client_registry.fold_sql(search+"||' '||COALESCE(c.canton,'')")
                     digits="replace(replace(replace(COALESCE(c.phone,'')||' '||c.phone_secondary||' '||c.identification,' ',''),'-',''),'+','')"
                     condition=' WHERE '+' AND '.join('(instr('+folded+',?)>0 OR instr('+digits+',?)>0)' for _ in words)+where
-                    args=[value for word in words for value in (word,word.replace('-','').replace('+','') or word)]+args[1:]
+                    import phones  # 1.5.251: «+593 99…», «0991…» y «991…» encuentran el mismo número
+                    args=[value for word in words for value in (word,phones.search_digits(word) or word)]+args[1:]
                 total = c.execute('SELECT COUNT(*) FROM '+source+condition, args).fetchone()[0]
                 size=50
                 if path=='/api/clients':
@@ -4778,8 +4786,11 @@ class Handler(BaseHTTPRequestHandler):
                         if any(len(v)>(254 if keys[i]=='email' else 30 if keys[i]=='phone' else 150) for i,v in enumerate(values)):
                             return self.reply(400, {'error':'Los campos admiten hasta 150 caracteres.'})
                         if table == 'clients':
-                            if values[1] and not valid_ecuador_phone(values[1]):
-                                return self.reply(400,{'error':'Ingresa un teléfono ecuatoriano válido.','fields':{'phone':'Usa móvil 09…, fijo con código de área o +593….'}})
+                            if values[1]:
+                                import phones  # 1.5.251: cualquier país, guardado en E.164
+                                normalized,problem=phones.normalize(values[1])
+                                if problem:return self.reply(400,{'error':'Revisa el teléfono.','fields':{'phone':problem}})
+                                values[1]=normalized
                             if not values[0] or (values[2] and not re.fullmatch(r'[^\s@]+@[^\s@]+\.[^\s@]+',values[2])):
                                 return self.reply(400, {'error':'Indica un nombre y un correo válido si corresponde.'})
                         elif values[1] not in DEVICE_TYPES or not c.execute('SELECT 1 FROM clients WHERE id=?',(values[0],)).fetchone():

@@ -56,7 +56,9 @@ def near(token, words):
 
 
 def find(c, term, limit=8):
-    tokens = [token for token in fold(term).split() if token][:6]
+    import phones  # 1.5.251: un teléfono escrito en cualquier formato encuentra el número guardado (antiguo o internacional)
+    as_phone = phones.as_query(term)
+    tokens = [as_phone] if as_phone else [phones.as_query(token) or token for token in fold(term).split() if token][:6]
     if not tokens:
         return {'rows': [], 'total': 0, 'fuzzy': False, 'suggestion': ''}
     exact, fuzzy = [], []

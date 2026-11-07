@@ -103,7 +103,7 @@ def _client(c, data):
                 'client_address': (row['address'] or row['main_street'] or '')[:300], 'client_phone': row['phone'] or '', 'client_email': row['email'] or ''}
     text = lambda key, size: re.sub(r'\s+', ' ', str(data.get(key, '') or '')).strip()[:size]
     out = {'client_id': None, 'client_name': text('client_name', 300), 'client_identification': re.sub(r'\s', '', str(data.get('client_identification', '') or ''))[:20],
-           'client_address': text('client_address', 300), 'client_phone': text('client_phone', 40), 'client_email': text('client_email', 200).lower()}
+           'client_address': text('client_address', 300), 'client_phone': __import__('phones').tidy(text('client_phone', 40), 40), 'client_email': text('client_email', 200).lower()}
     errors = {}
     if len(out['client_name']) < 3:
         errors['client_name'] = 'Nombre o razón social del cliente.'

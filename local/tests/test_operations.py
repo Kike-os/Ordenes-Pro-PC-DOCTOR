@@ -25,7 +25,7 @@ class OperationsTests(unittest.TestCase):
         second=self.request('/api/orders',dict(data,client='NO CONFIAR EN ESTE VALOR'),cookie=cookie,csrf=csrf)['body']
         one=self.request('/api/orders/'+str(first['id']),cookie=cookie)['body']['order'];two=self.request('/api/orders/'+str(second['id']),cookie=cookie)['body']['order']
         self.assertEqual(one['client'],'Cliente ficticio');self.assertEqual(two['client'],'Nombre actualizado');self.assertEqual(one['client_id'],two['client_id'])
-        self.assertEqual(self.request('/api/clients/'+cid,cookie=cookie)['body']['client']['phone'],'0997654321')
+        self.assertEqual(self.request('/api/clients/'+cid,cookie=cookie)['body']['client']['phone'],'+593997654321')  # 1.5.251: guardado en E.164
         self.assertEqual(self.request('/api/orders',dict(data,client_id='999'),cookie=cookie,csrf=csrf)['status'],400)
         with app.connect() as c:self.assertEqual(c.execute('SELECT count(*) FROM clients').fetchone()[0],1)
     def test_passport_and_company_validation(self):

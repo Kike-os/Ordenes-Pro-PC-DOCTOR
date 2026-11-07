@@ -1,0 +1,32 @@
+/* Campo internacional «Teléfono / WhatsApp» (1.5.251): selector de país (bandera y prefijo) + número, con el mismo aspecto del campo que
+   reemplaza (colores, borde y radio se copian de él). Lista de países con búsqueda; teclado y foco visibles; adaptable sin desbordes. */
+.pi{position:relative;min-width:0;width:100%}
+.pi-box{display:flex;align-items:stretch;min-height:42px;margin-top:var(--pi-gap,8px);border:1px solid var(--pi-border,#2c405f);border-radius:var(--pi-radius,8px);background:var(--pi-bg,#081221);color:var(--pi-fg,#e0eaff);transition:border-color .2s,box-shadow .2s}
+.pi-box:focus-within{border-color:#4d8df0;box-shadow:0 0 0 3px #4d8df033}
+.pi[data-state=error] .pi-box{border-color:#ef4444}
+.pi[data-state=ok] .pi-box{border-color:#22c55e99}
+.pi-country{display:inline-flex;flex:none;align-items:center;gap:6px;padding:0 9px 0 11px;border-right:1px solid var(--pi-border,#2c405f);border-radius:var(--pi-radius,8px) 0 0 var(--pi-radius,8px);color:inherit;font-size:var(--pi-size,13px);font-weight:600;cursor:pointer;user-select:none}
+.pi-country:hover{background:#ffffff0d}
+.pi-country:focus-visible{outline:2px solid #8bb8ff;outline-offset:-2px}
+.pi-flag{display:block;flex:none;width:22px;height:15px;border-radius:3px;object-fit:cover;box-shadow:0 0 0 1px #0000004d}
+.pi-noflag{display:grid;place-items:center;background:#1d3357;color:#cfe3ff;font-size:9px;font-weight:700;letter-spacing:.04em}
+.pi-code{font-variant-numeric:tabular-nums;white-space:nowrap}
+.pi-chev{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;opacity:.7}
+.pi .pi-box input.pi-number{flex:1 1 auto;min-width:0;width:auto!important;height:auto!important;min-height:0!important;margin:0!important;padding:9px 11px!important;border:0!important;border-radius:0 var(--pi-radius,8px) var(--pi-radius,8px) 0!important;background:transparent!important;color:inherit!important;box-shadow:none!important;outline:0;font-size:var(--pi-size,13px);font-variant-numeric:tabular-nums;letter-spacing:.02em}
+.pi-msg{display:block;min-height:0;margin-top:4px;color:#9db1cf;font-size:12px;line-height:1.35}
+.pi-msg:empty{display:none}
+.pi[data-state=ok] .pi-msg{color:#86efac}
+.pi[data-state=error] .pi-msg{color:#fca5a5}
+.pi-panel{--pi-shift:0px;position:absolute;z-index:80;top:calc(100% + 4px);left:calc(0px - var(--pi-shift));width:max(100%,300px);max-width:calc(100vw - 24px);padding:8px;border:1px solid #2c405f;border-radius:12px;background:#0b1730;color:#e3eeff;box-shadow:0 18px 40px -16px #000c}
+.pi .pi-panel input.pi-search{display:block;width:100%;min-height:38px;margin:0 0 6px;padding:8px 10px;border:1px solid #2c405f;border-radius:8px;background:#081221;color:#e3eeff;font-size:14px}
+.pi .pi-panel input.pi-search:focus{border-color:#4d8df0;outline:0;box-shadow:0 0 0 3px #4d8df033}
+.pi-list{max-height:min(280px,50vh);margin:0;padding:0;overflow-y:auto;overscroll-behavior:contain;list-style:none}
+.pi-opt{display:grid;grid-template-columns:22px minmax(0,1fr) auto;align-items:center;gap:9px;min-height:36px;padding:6px 8px;border-radius:8px;font-size:13.5px;cursor:pointer}
+.pi-opt:hover,.pi-opt.pi-active{background:#16365f}
+.pi-opt[aria-selected=true]{font-weight:700}
+.pi-opt.pi-sep{margin-bottom:6px;box-shadow:0 7px 0 -6px #2c405f}
+.pi-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pi-dial{color:#9db1cf;font-variant-numeric:tabular-nums}
+.pi-empty{padding:10px;color:#9db1cf;font-size:13px}
+@media(max-width:420px){.pi-country{padding:0 7px 0 9px;gap:4px}.pi-panel{width:calc(100vw - 24px)}}
+@media(prefers-reduced-motion:reduce){.pi-box{transition:none}}
