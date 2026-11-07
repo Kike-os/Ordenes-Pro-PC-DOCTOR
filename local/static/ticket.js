@@ -35,3 +35,20 @@ document.addEventListener('click',event=>{if(event.target.closest('[data-print]'
  const set=(m,on)=>{if(on){delete m.dataset.paused;m.querySelector('svg')?.unpauseAnimations?.();}else{m.dataset.paused='';m.querySelector('svg')?.pauseAnimations?.();}};
  if('IntersectionObserver' in window){const seen=new Map();const io=new IntersectionObserver(list=>{for(const e of list){seen.set(e.target,e.isIntersecting);set(e.target,e.isIntersecting&&!document.hidden);}},{rootMargin:'80px'});
   maps.forEach(m=>io.observe(m));document.addEventListener('visibilitychange',()=>maps.forEach(m=>set(m,!document.hidden&&seen.get(m)!==false)));}})();
+// Cancelación de repuestos (1.5.247): ventana de confirmación y plazo de 24 h con la hora del SERVIDOR (no la del equipo). Al vencer, el botón
+// se reemplaza por el aviso con candado sin recargar la página. El servidor vuelve a comprobar el plazo al recibir la solicitud.
+(()=>{const boxes=[...document.querySelectorAll('.tp-cancel[data-deadline]')];if(!boxes.length)return;
+ const fmt=ms=>{const m=Math.floor(ms/60000),h=Math.floor(m/60);return h?h+' h '+String(m%60).padStart(2,'0')+' min':m?m+' min':'menos de 1 min';};
+ for(const box of boxes){const offset=Number(box.dataset.now)-Date.now(),deadline=Number(box.dataset.deadline),limit=()=>Number(box.dataset.deadline)||deadline,left=box.querySelector('[data-left]'),form=box.querySelector('form'),summary=box.querySelector('summary');
+  let dialog=null;
+  if(typeof HTMLDialogElement==='function'){dialog=document.createElement('dialog');dialog.className='tp-dialog';dialog.setAttribute('aria-labelledby','tp-dlg-'+deadline);
+   const head=document.createElement('header'),h=document.createElement('h2'),x=document.createElement('button');h.id='tp-dlg-'+deadline;h.textContent='Solicitar cancelación';x.type='button';x.className='tp-dialog-x';x.setAttribute('aria-label','Cerrar');x.textContent='×';x.addEventListener('click',()=>dialog.close());
+   head.append(h,x);const name=box.closest('.tp')?.querySelector('.tp-id strong')?.textContent||'';const sub=document.createElement('p');sub.className='tp-dialog-sub';sub.textContent=name;
+   const back=document.createElement('button');back.type='button';back.className='tp-dialog-back';back.textContent='Volver sin solicitar';back.addEventListener('click',()=>dialog.close());
+   form.querySelector('.tp-cancel-acts')?.prepend(back);dialog.append(head,sub,form);document.body.append(dialog);
+   summary.addEventListener('click',event=>{event.preventDefault();if(!box.isConnected)return;dialog.showModal();dialog.querySelector('input[name=last4]')?.focus();});
+   dialog.addEventListener('close',()=>summary.focus());}
+  const tick=()=>{const rest=limit()-(Date.now()+offset);if(rest>0){if(left)left.textContent='Quedan '+fmt(rest);return true;}
+   // Plazo vencido: candado y explicación; una ventana abierta se cierra (el servidor rechazaría la solicitud de todos modos).
+   const tpl=box.querySelector('template[data-locked]'),wrap=document.createElement('div');wrap.innerHTML=tpl?tpl.innerHTML:'';if(dialog?.open)dialog.close();dialog?.remove();box.replaceWith(...wrap.childNodes);return false;};
+  if(tick()){const id=setInterval(()=>{if(!tick())clearInterval(id);},15000);}}})();

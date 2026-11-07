@@ -1,6 +1,6 @@
 """Dibujo del mapa de ruta de un repuesto (envío nacional o internacional) a partir de order_part_requests.route_map.
 
-Un solo dibujo para el panel interno y el seguimiento público. SVG escalable (1000 × 190) para pantallas amplias y una lista vertical compacta
+Un solo dibujo para el panel interno y el seguimiento público. SVG escalable (1000 × 158) para pantallas amplias y una lista vertical compacta
 para teléfonos (la elige el CSS con una consulta de contenedor). El vehículo recorre una sola vez, al cargar, el trecho desde el paso anterior
 hasta el paso real registrado (animateMotion sobre el mismo trazo); con «reducir movimiento» se muestra quieto en su punto real. Los puntos
 luminosos solo corren sobre el tramo activo y el CSS los detiene fuera de pantalla. Todo el texto se escapa."""
@@ -52,25 +52,27 @@ def render(route, uid, title=''):
                    % (e(s['kind']), e(s['state']), uid, s['code'], uid, s['code'], '<use class="lgx-flow" href="#lgx-%s-%s"/>' % (uid, s['code']) if moving else ''))
     nodes = ''
     for n in route['nodes']:
-        badge = '<g transform="translate(16 -16)">%s</g>' % CHECK if n['state'] == 'done' else ''
-        nodes += ('<g class="lgx-node" data-state="%s" data-code="%s"%s transform="translate(%s 96)"><circle class="lgx-halo" r="31"/><circle class="lgx-dot" r="22"/>%s%s'
-                  '<text class="lgx-label" y="48">%s</text><text class="lgx-sub" y="70">%s</text><text class="lgx-sub lgx-when" y="90">%s</text></g>'
-                  % (e(n['state']), e(n['code']), ' data-customs="1"' if n['customs'] else '', n['x'], _icon(n['icon']), badge, e(n['label']), e(n['sub']), e(_date(n['at']))))
+        badge = '<g transform="translate(15 -15)">%s</g>' % CHECK if n['state'] == 'done' else ''
+        nodes += ('<g class="lgx-node" data-state="%s" data-code="%s"%s transform="translate(%s 80)"><circle class="lgx-halo" r="27"/><circle class="lgx-dot" r="20"/>%s%s'
+                  '<text class="lgx-label" y="40">%s</text><text class="lgx-sub" y="58">%s</text><text class="lgx-sub lgx-when" y="74">%s</text></g>'
+                  % (e(n['state']), e(n['code']), ' data-customs="1"' if n['customs'] else '', n['x'], _icon(n['icon'], 23), badge, e(n['label']), e(n['sub']), e(_date(n['at']))))
     craft = ''
     if vehicle:
         shape = PLANE if vehicle['kind'] == 'plane' else TRUCK
         arrived = CHECK if vehicle['motion'] == 'arrived' else ''
-        body = '<g class="lgx-float">%s</g>%s' % (shape, '<g transform="translate(0 -24)">%s</g>' % arrived if arrived else '')
+        body = '<g class="lgx-float">%s</g>%s' % (shape, '<g transform="translate(0 -22)">%s</g>' % arrived if arrived else '')
         static = '<g class="lgx-veh-static" transform="translate(%s %s) rotate(%s)">%s</g>' % (vehicle['x'], vehicle['y'], vehicle['angle'], body)
         animated = ''
         if vehicle['animate']:
-            animated = ('<g class="lgx-veh-anim"><g>%s</g><animateMotion begin="0.35s" dur="1.6s" fill="freeze" calcMode="spline" keyTimes="0;1" keySplines=".45 0 .2 1" '
-                        'keyPoints="%s;%s" rotate="%s"><mpath href="#lgx-%s-%s"/></animateMotion></g>'
-                        % (body, vehicle['from'], vehicle['to'], 'auto' if vehicle['kind'] == 'plane' else '0', uid, vehicle['segment']))
+            # El recorrido sigue el mismo trazo; el camión va en su carril (desplazado sobre la línea) dentro del grupo animado.
+            animated = ('<g class="lgx-veh-anim"><g transform="translate(0 %s)">%s</g><animateMotion begin="0s" dur="1.6s" fill="freeze" calcMode="spline" keyTimes="0;1" '
+                        'keySplines=".45 0 .2 1" keyPoints="%s;%s" rotate="%s"><mpath href="#lgx-%s-%s"/></animateMotion></g>'
+                        % (vehicle['lane'], body, vehicle['from'], vehicle['to'], 'auto' if vehicle['kind'] == 'plane' else '0', uid, vehicle['segment']))
         craft = '<g class="lgx-veh" data-kind="%s" data-motion="%s" data-anim="%d">%s%s</g>' % (e(vehicle['kind']), e(vehicle['motion']), 1 if animated else 0, animated, static)
     status = vehicle['text'] + '.' if vehicle else ''
-    svg = ('<svg class="lgx-svg" viewBox="0 0 1000 190" role="img" aria-label="%s" preserveAspectRatio="xMidYMid meet"><defs>%s</defs>%s%s%s</svg>'
-           % (e((title or 'Ruta del envío') + (': ' + status if status else '')), defs, tracks, nodes, craft))
+    svg = ('<svg class="lgx-svg" viewBox="%s" role="img" aria-label="%s" preserveAspectRatio="xMidYMid meet"><defs>%s</defs>%s%s%s</svg>'
+           % ('0 14 1000 144' if route['mode'] == 'internacional' else '0 34 1000 124',  # sin franjas vacías: el nacional no tiene arco
+              e((title or 'Ruta del envío') + (': ' + status if status else '')), defs, tracks, nodes, craft))
     # Lista vertical para teléfonos: nodos y tramos intercalados; el vehículo, junto a su tramo o su punto.
     items = []
     for i, n in enumerate(route['nodes']):

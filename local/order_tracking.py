@@ -144,23 +144,43 @@ VAN=('<svg viewBox="0 0 48 28" aria-hidden="true" focusable="false"><path class=
 CHECK='<svg class="v-ok" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><circle cx="10" cy="10" r="9"/><path d="m6 10.2 2.6 2.6L14.2 7"/></svg>'
 
 
+CIRCLE_X='<svg class="tp-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m15 9-6 6M9 9l6 6"/></svg>'
+CLOCK='<svg class="tp-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>'
+LOCK='<svg class="tp-ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>'
+
+
+def remaining_text(seconds):
+    hours,minutes=divmod(max(0,int(seconds))//60,60)
+    return ('%d h %02d min'%(hours,minutes)) if hours else ('%d min'%minutes if minutes else 'menos de 1 min')
+
+
 def _cancel_block(p,token):
-    """Estado de una cancelación (sin importes ni motivos internos) y, si aún procede, el formulario para solicitarla. La solicitud
-    comprueba los últimos cuatro dígitos de la identificación y queda pendiente de revisión: nunca anula el pedido por sí sola."""
+    """Estado de una cancelación (sin importes ni motivos internos) y, dentro de las 24 h siguientes al registro del repuesto, el botón
+    «Solicitar cancelación» con el tiempo restante. Al vencer el plazo (también sin recargar la página: ticket.js) queda bloqueado con candado.
+    La solicitud comprueba los últimos cuatro dígitos de la identificación y queda pendiente de revisión: nunca anula el pedido por sí sola."""
     import secrets
     e=html.escape;out=''
     x=p.get('cancellation')
     if x:
         out+='<p class="tp-cancel-state" data-status="%s" role="status"><b>%s</b> %s</p>'%(e(x['status']),e(x['label']),e(x['text']))
-    if p.get('can_cancel') and token:
-        out+=('<details class="tp-cancel"><summary>Solicitar cancelación de este repuesto</summary><form method="post" action="/s/%s/repuestos/%d/cancelar" class="tp-cancel-form">'
-              '<p>Su solicitud será revisada por nuestro departamento administrativo y le informaremos el resultado. El pedido no cambia hasta esa revisión. '
-              'Si existen pagos anticipados, administración le indicará el procedimiento que corresponda.</p>'
+    w=p.get('cancel_window') or {}
+    lock=('<p class="tp-cancel-locked" title="%s">%s<span><b>Plazo de cancelación vencido</b><small>Las solicitudes se aceptan durante las 24 horas siguientes al registro '
+          'del repuesto (venció el %s). Si necesita ayuda, comuníquese con el taller.</small></span></p>')
+    if p.get('cancel_expired'):
+        out+=lock%(e('Venció el %s (hora de Ecuador)'%w.get('deadline_text','')),LOCK,e(w.get('deadline_text','')))
+    elif p.get('can_cancel') and token:
+        out+=('<details class="tp-cancel" data-deadline="%d" data-now="%d"><summary>%s<span>Solicitar cancelación</span><em class="tp-left" title="Disponible hasta el %s (hora de Ecuador)">%s'
+              '<span data-left>Quedan %s</span></em></summary><form method="post" action="/s/%s/repuestos/%d/cancelar" class="tp-cancel-form">'
+              '<p class="tp-cancel-phase">'+e(p.get('cancel_note') or '')+'</p>'
+              '<p>Solicitar la cancelación <b>no significa que ya esté aprobada</b>: nuestro departamento administrativo la revisará y le informaremos el resultado. '
+              'El pedido no cambia hasta esa revisión. Si existen pagos anticipados, administración le indicará el procedimiento que corresponda.</p>'
               '<label><span>Últimos 4 dígitos de su cédula o RUC</span><input name="last4" inputmode="numeric" pattern="[0-9]{4}" minlength="4" maxlength="4" autocomplete="off" required></label>'
               '<label><span>Motivo de la cancelación</span><textarea name="reason" minlength="10" maxlength="500" rows="3" required></textarea></label>'
               '<input type="hidden" name="request_key" value="%s"><label class="tp-check"><input type="checkbox" name="confirm" value="1" required>'
-              '<span>Confirmo que deseo solicitar la cancelación de este repuesto.</span></label><button type="submit">Enviar solicitud de cancelación</button></form></details>'
-              )%(e(token),p['id'],'cancel-'+secrets.token_hex(10))
+              '<span>Confirmo que deseo solicitar la cancelación de este repuesto.</span></label><div class="tp-cancel-acts"><button type="submit">Enviar solicitud de cancelación</button></div></form>'
+              '<template data-locked>%s</template></details>'
+              )%(w.get('deadline_ms',0),w.get('now_ms',0),CIRCLE_X,e(w.get('deadline_text','')),CLOCK,e(remaining_text(w.get('remaining',0))),e(token),p['id'],'cancel-'+secrets.token_hex(10),
+                 lock%(e('Venció el %s (hora de Ecuador)'%w.get('deadline_text','')),LOCK,e(w.get('deadline_text',''))))
     return out
 
 
@@ -189,10 +209,11 @@ def _parts_section(data):
         out.append(
             '<article class="tp" data-situation="%s" data-vehicle="%s"><header class="tp-head"><div class="tp-id"><strong>%s</strong>%s</div><span class="tp-state" data-tone="%s">%s</span></header>'
             '<div class="tp-now" data-tone="%s"><div><small>Estado actual</small><strong>%s</strong><p>%s</p></div><div class="tp-meta"><div class="tp-meter" role="img" aria-label="%d de %d etapas completadas">%s</div>'
-            '<small><b>%d de %d</b> etapas completadas</small><small>Última actualización: %s</small></div></div>'
+            '<small><b>%d de %d</b> etapas completadas · avance %d %%</small><small>Última actualización: %s</small></div></div>'
             '%s<div class="tp-track"%s>%s<ol class="tp-steps" aria-label="Etapas del repuesto">%s</ol></div>%s<dl class="tp-facts">%s</dl>%s%s</article>'%(
             e(p['situation']),e(p['vehicle']),e(p['name']),'<small>%s</small>'%e(p['brand']) if p['brand'] else '',e(tone),e(p['status_label']),
-            e(tone),e(p['status_label']),e(p['description']),p['done_count'],p['total'],meter,p['done_count'],p['total'],e(_when(p['updated'])),
+            e(tone),e(p['status_label']+(' · '+p['step_label'] if p.get('step_label') else '')),e(p['description']),p['done_count'],p['total'],meter,p['done_count'],p['total'],
+            p['progress']['percent'] if p.get('progress') else round(100*p['done_count']/max(1,p['total'])),e(_when(p['updated'])),
             p.get('map_html') or '',' data-n="%d"'%len(p['steps']),vehicle,steps,'<p class="sr-only">%s</p>'%e(moving) if moving else '',''.join('<div><dt>%s</dt><dd>%s</dd></div>'%(e(k),e(v)) for k,v in facts if v),
             _cancel_block(p,data.get('token','')),
             '<details class="tp-hist"><summary>Historial del repuesto <b>%d</b></summary><ol>%s</ol></details>'%(len(p['history']),hist) if hist else ''))

@@ -115,7 +115,7 @@ class PartCancellationTests(unittest.TestCase):
         token = self.link(oid)
         page = self.request('/s/' + token)['body']
         page = page.decode() if isinstance(page, bytes) else page
-        self.assertIn('Solicitar cancelación de este repuesto', page)
+        self.assertIn('class="tp-cancel" data-deadline=', page)
         self.assertIn('class="lgx"', page)
         self.assertNotIn('Japón', page)
         action = '/s/%s/repuestos/%d/cancelar' % (token, rid)
@@ -128,7 +128,7 @@ class PartCancellationTests(unittest.TestCase):
         body = ok['body'].decode() if isinstance(ok['body'], bytes) else ok['body']
         self.assertIn('Recibimos su solicitud de cancelación', body)
         self.assertIn('Cancelación solicitada', body)
-        self.assertNotIn('Solicitar cancelación de este repuesto', body)  # una sola abierta
+        self.assertNotIn('class="tp-cancel" data-deadline=', body)  # una sola abierta
         with app.connect() as c:
             x = c.execute('SELECT origin,channel,status,created_by FROM order_part_cancellations').fetchone()
             self.assertEqual(tuple(x), ('cliente', 'enlace', 'solicitada', None))
@@ -235,6 +235,85 @@ class PartCancellationTests(unittest.TestCase):
         self.assertIn('lgx-truck', r['map_html'])
         bad = post('/api/orders/%d/part-requests/%d' % (oid, rid), action='update', customs_in_date='2026-11-05', customs_out_date='2026-11-01')
         self.assertEqual(bad['status'], 400)
+
+    def test_vehicle_never_sits_on_a_checkpoint(self):
+        # En cualquier paso, el centro del vehículo queda a una distancia segura de todos los puntos de control (1.5.247).
+        for shipping, steps in parts.FLOWS.items():
+            for step in steps:
+                for situation in ('normal', 'retrasado'):
+                    m = parts.route_map(shipping, step, set(steps), {}, False, situation)
+                    v = m['vehicle']
+                    if not v:
+                        continue
+                    for x, y in ((v['x'], v['y']), (v['fx'], v['fy'])):
+                        for n in m['nodes']:
+                            gap = ((x - n['x']) ** 2 + (y - v['lane'] - parts.MAP_Y) ** 2) ** .5  # distancia real sobre el trazo (el arco sube)
+                            self.assertGreaterEqual(gap, parts.CLEARANCE - 1, (shipping, step, n['code'], x))
+                            self.assertGreaterEqual(abs(x - n['x']), 20 + 24, (shipping, step, n['code'], x))  # radio del punto + medio vehículo
+                        self.assertTrue(30 <= x <= 970 and 0 <= y <= 158, (shipping, step, x, y))
+                    if v['kind'] == 'truck':
+                        self.assertEqual(v['y'], parts.MAP_Y + parts.LANE)  # carril propio, sobre la línea
+
+    def test_progress_is_shared_and_counts_only_registered_steps(self):
+        cookie, csrf, post, order = self.paid_order(10500, pay=False)
+        oid = order['id']
+        rid = self.part(post, oid, shipping='internacional')['body']['id']
+        self.go(post, oid, rid, 'confirmado', 'preparacion', 'despachado', 'transito_internacional')
+        r = self.row(cookie, oid, rid)
+        with app.connect() as c:
+            pub = next(x for x in parts.public(c, oid) if x['id'] == rid)
+        self.assertEqual((r['progress']['done'], r['progress']['total']), (4, 14))
+        self.assertEqual(r['progress'], pub['progress'])  # el mismo avance en las dos vistas
+        self.assertEqual(r['progress']['done'], sum(1 for d in r['detail'] if d['state'] == 'done'))
+        self.assertEqual(pub['done_count'], sum(1 for x in pub['steps'] if x['state'] == 'done'))
+        self.assertEqual((pub['step_label'], pub['updated']), ('En tránsito internacional', r['progress']['updated']))
+        # Una corrección de administración que salta pasos no los cuenta como completados.
+        self.assertEqual(post('/api/orders/%d/part-requests/%d' % (oid, rid), action='advance', stage='aduana_liberado', note='Corrección de prueba ficticia')['status'], 200)
+        r = self.row(cookie, oid, rid)
+        self.assertEqual(r['progress']['done'], 5)  # llegada y revisión aduanera, sin evento: no cuentan
+        self.assertEqual(r['progress']['done'], sum(1 for d in r['detail'] if d['state'] == 'done'))
+
+    def test_ordinary_requests_only_within_24_hours(self):
+        from datetime import timedelta
+        cookie, csrf, post, order = self.paid_order(10500, pay=False)
+        oid = order['id']
+        url = lambda rid: '/api/orders/%d/part-requests/%d' % (oid, rid)
+        now = app.reception_now().replace(microsecond=0)
+        def made(name, age):
+            rid = self.part(post, oid, name=name)['body']['id']
+            with app.connect() as c:
+                c.execute('UPDATE order_part_requests SET created_at=? WHERE id=?', ((now - age).isoformat(timespec='seconds'), rid));c.commit()
+            return rid
+        early, late, pending = made('Fuente ficticia', timedelta(hours=23, minutes=59)), made('Ventilador ficticio', timedelta(hours=24)), made('Pantalla ficticia', timedelta(hours=20))
+        with patch.object(app, 'reception_now', return_value=now):
+            # A las 23 h 59 min todavía se puede; al cumplirse exactamente 24 h, no (y no se registra nada).
+            self.assertEqual(post(url(early), action='cancel_request', reason='El cliente desiste dentro del plazo (ficticio).')['status'], 200)
+            refused = post(url(late), action='cancel_request', reason='El cliente desiste fuera del plazo (ficticio).')
+            self.assertEqual(refused['status'], 409)
+            self.assertIn('Plazo de cancelación vencido', refused['body']['error'])
+            # Una solicitud hecha a tiempo sigue pudiéndose resolver después de las 24 h.
+            cid = post(url(pending), action='cancel_request', reason='Solicitud dentro del plazo (ficticio).')['body']['cancellation_id']
+        with app.connect() as c:
+            self.assertEqual(c.execute('SELECT COUNT(*) FROM order_part_cancellations WHERE request_id=?', (late,)).fetchone()[0], 0)
+        with patch.object(app, 'reception_now', return_value=now + timedelta(hours=5)):
+            self.assertEqual(post(url(pending), action='cancel_decide', cancellation_id=str(cid), decision='rechazar', note='Revisada después del plazo (ficticio).')['status'], 200)
+            # Excepción de administración, aparte del botón del cliente: sin plazo, con justificación obligatoria.
+            self.assertEqual(post(url(late), action='cancel_direct', reason_code='administrativa', note='corto')['status'], 400)
+            self.assertEqual(post(url(late), action='cancel_direct', reason_code='administrativa', note='Caso excepcional autorizado por gerencia (ficticio).')['status'], 200)
+        self.assertEqual(self.row(cookie, oid, late)['situation'], 'cancelado')
+        self.assertEqual(self.row(cookie, oid, pending)['cancellations'][0]['status'], 'rechazada')  # historial intacto
+        # Enlace público: fuera de plazo se ve el bloqueo con candado y la API rechaza la solicitud.
+        token = self.link(oid)
+        other = made('Teclado ficticio', timedelta(hours=24, minutes=1))
+        page = self.request('/s/' + token)['body']
+        page = page.decode() if isinstance(page, bytes) else page
+        self.assertIn('Plazo de cancelación vencido', page)
+        answer = self.form('/s/%s/repuestos/%d/cancelar' % (token, other), {'last4': '0017', 'reason': 'Fuera del plazo de 24 horas (ficticio).', 'confirm': '1'})
+        self.assertEqual(answer['status'], 409)
+        with app.connect() as c:
+            self.assertEqual(c.execute('SELECT COUNT(*) FROM order_part_cancellations WHERE request_id=?', (other,)).fetchone()[0], 0)
+        r = self.row(cookie, oid, other)
+        self.assertEqual((r['cancel_context']['can_request'], r['cancel_context']['window']['open']), (False, False))
 
 
 if __name__ == '__main__':

@@ -358,3 +358,49 @@
 .tp-meter{grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:16px}
 @container (min-width:440px){.tp-track[data-n="8"] .tp-steps{grid-template-columns:repeat(8,minmax(0,1fr))}.tp-track[data-n] .lgx~.tp-steps{margin-top:2px}}
 .lgx-when{opacity:.85;font-size:14px}
+/* 1.5.247 — Seguimiento público más compacto: menos espacios, etiquetas de estado uniformes, 8 etapas en dos filas de 4 en anchos
+   intermedios (en una sola fila desde 760 px de panel) y botón de cancelación visible. */
+.tw-head{margin-bottom:12px}
+.tw-progress{margin-top:2px}
+.ticket-state,.tw-flag,.tp-state{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:26px;padding:3px 12px;border-radius:999px;font-size:12px;font-weight:700;line-height:1.25}
+.tp{gap:10px;padding:12px}
+.tp-now{padding:10px 12px}
+.tp-head{align-items:center}
+.lgx{padding:2px 2px 0}
+@container (min-width:440px){
+ .tp-track[data-n="8"] .tp-steps{grid-template-columns:repeat(4,minmax(0,1fr));row-gap:12px}
+ .tp-track[data-n="8"] .tp-steps li:nth-child(5)::before{display:none}
+}
+@container (min-width:760px){
+ .tp-track[data-n="8"] .tp-steps{grid-template-columns:repeat(8,minmax(0,1fr))}
+ .tp-track[data-n="8"] .tp-steps li:nth-child(5)::before{display:block}
+}
+.tp-cancel summary{display:inline-flex;align-items:center;gap:8px;margin:8px 10px;padding:7px 14px;border:1px solid #ef444477;border-radius:9px;background:#2a1014;color:#fecaca;list-style:none}
+.tp-cancel summary::-webkit-details-marker{display:none}
+.tp-cancel[open] summary{background:#3b0d12}
+.tp-cancel-phase{padding:8px 10px;border-left:3px solid #f59e0b;border-radius:6px;background:#2a2110;color:#f3d38b!important}
+.tp-cancel-phase:empty{display:none}
+@media(max-width:480px){.tp-cancel summary{display:flex;justify-content:center;margin:8px}.tp-cancel-form button{justify-self:stretch;min-height:44px}}
+/* Botón «Solicitar cancelación» (rojo discreto) con tiempo restante, bloqueo con candado y ventana de confirmación. */
+.tp-ic{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.tp-cancel{border:0;background:none}
+.tp-cancel summary{display:inline-flex;flex-wrap:wrap;align-items:center;gap:8px;margin:2px 0;padding:7px 12px;border:1px solid #f8717166;border-radius:10px;background:#2a1418;color:#fecaca;font-size:13px;font-weight:600;cursor:pointer;transition:background-color .15s,border-color .15s}
+.tp-cancel summary:hover{background:#3a161c;border-color:#f87171aa}
+.tp-cancel summary:focus-visible{outline:2px solid #fca5a5;outline-offset:2px}
+.tp-left{display:inline-flex;align-items:center;gap:5px;padding:1px 8px;border-radius:999px;background:#0b1a31;color:#cfe3ff;font-size:11.5px;font-style:normal;font-weight:600}
+.tp-left .tp-ic{width:13px;height:13px}
+.tp-cancel-locked{display:flex;align-items:flex-start;gap:10px;margin:0;padding:9px 12px;border:1px solid #33507a;border-radius:10px;background:#0b1a31;color:#9db1cf}
+.tp-cancel-locked b{display:block;color:#e3eeff;font-size:13px}.tp-cancel-locked small{display:block;font-size:12px;line-height:1.45}
+.tp-cancel-acts{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end}
+.tp-cancel-form button[type=submit]{background:#7f1d1d;border-color:#f87171;color:#fff}
+.tp-dialog-back{padding:8px 14px;border:1px solid #33507a;border-radius:9px;background:#0b1a31;color:#cfe3ff;font:600 13px/1.2 inherit;cursor:pointer}
+.tp-dialog{width:min(520px,calc(100vw - 24px));max-height:calc(100dvh - 24px);padding:0;border:1px solid #2c5488;border-radius:16px;background:#0a1830;color:#e3eeff;box-shadow:0 24px 60px -20px #000}
+.tp-dialog::backdrop{background:#020812cc}
+.tp-dialog header{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 16px 4px}
+.tp-dialog h2{margin:0;font-size:17px}
+.tp-dialog-sub{margin:0;padding:0 16px 6px;color:#9db1cf;font-size:13px}
+.tp-dialog-x{width:34px;height:34px;border:1px solid #33507a;border-radius:9px;background:#0b1a31;color:#e3eeff;font-size:20px;line-height:1;cursor:pointer}
+.tp-dialog .tp-cancel-form{padding:4px 16px 16px}
+.tp-dialog :focus-visible{outline:2px solid #6ea8ff;outline-offset:2px}
+@media(max-width:480px){.tp-cancel summary{display:flex;justify-content:center}.tp-cancel-acts{display:grid}.tp-cancel-acts button{min-height:44px}}
+@media (prefers-reduced-motion:reduce){.tp-cancel summary{transition:none}}

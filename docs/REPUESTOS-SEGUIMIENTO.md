@@ -325,3 +325,72 @@ Los pasos internos menores no generan avisos.
   - evidencias por etapa y datos nuevos.
 - **`test_part_logistics.py`:** actualizada a la nueva ruta pública.
 - **Navegador:** 27 comprobaciones, de 320 a 1366 px, con movimiento reducido y con el envío real del formulario público.
+
+## Pulido visual, avance común y plazo de cancelación (1.5.247)
+
+### Vehículos sin superposiciones
+
+- **Corrección del error prioritario:** en el envío nacional despachado, el camión aparecía encima del punto de despacho.
+- **Margen de seguridad:** cada tramo tiene un margen (`CLEARANCE`, 58 unidades del lienzo). Al estar despachado, el vehículo queda a la derecha del punto de partida. Al llegar, se detiene **antes** del punto de destino, con ✓.
+- **Carril propio:** el camión va sobre la línea de ruta (`LANE`); el avión, sobre el arco.
+- **Comprobación en el navegador:** se miden las cajas y en ningún paso el vehículo toca un punto de control ni sus textos, ni sale del recuadro.
+- **Recorrido inicial:** empieza sin retardo. Aun con las animaciones en pausa fuera de pantalla, el vehículo nunca aparece fuera de su punto.
+
+### Diseño más compacto
+
+**Mapa:** el lienzo del internacional pasa de 190 a 144 de alto (−24 %) y el nacional, que no tiene arco, a 124 (−35 %).
+
+**Panel interno:**
+- las etapas logísticas forman una cuadrícula uniforme;
+- etiquetas de estado de igual tamaño;
+- marca «Interno» en proveedor, transporte y observaciones;
+- guías y enlaces que no desbordan;
+- acciones ordenadas: «Avanzar» primero y la cancelación al final, en rojo discreto. En el teléfono se muestran en dos columnas.
+
+**Seguimiento público:**
+- menos espacio vertical y etiquetas de estado uniformes;
+- las 8 etapas internacionales van en dos filas de 4 en anchos intermedios y en una sola fila desde 760 px de panel;
+- el estado actual muestra también el paso logístico real, por ejemplo «Envío internacional · En tránsito internacional».
+
+### Un solo avance para las dos vistas
+
+`order_part_requests.progress()` calcula el avance para el panel y para el seguimiento público.
+- **Etapas completadas:** solo las que quedaron atrás **y** tienen su evento. Un paso saltado por corrección no cuenta.
+- **Datos que devuelve:** el porcentaje de avance y la última actualización, que incluye cancelaciones y reembolsos.
+- **Lo que comparten las dos vistas:** el mismo porcentaje y la misma fecha.
+- **Contadores:** el público agrupa las etapas, y cada vista muestra un contador que coincide con lo que marca.
+
+### Cancelación: plazo de 24 horas
+
+**Solicitud ordinaria** (del cliente o del personal en su nombre): solo se acepta mientras `hora del servidor < creación del repuesto + 24 h`.
+- La comparación se hace en tiempo absoluto (UTC) y el plazo se muestra en hora de Ecuador.
+- La API la rechaza fuera de plazo con «Plazo de cancelación vencido…» y no registra nada.
+
+**Botón «Solicitar cancelación»:**
+- icono, rojo discreto y tiempo restante con reloj;
+- el contador usa la hora del servidor; la del equipo no cuenta;
+- al vencer se bloquea solo, sin recargar la página, con candado y una explicación;
+- en el enlace del cliente abre una ventana de confirmación que recuerda que **solicitar no es aprobar**.
+
+**Después del plazo:**
+- las solicitudes anteriores, su historial y las pendientes siguen visibles y se resuelven con normalidad;
+- nada se cancela automáticamente.
+
+**Excepción:** la **Cancelación excepcional** de administración va aparte del botón del cliente. No tiene plazo, exige justificación y queda auditada y notificada al cliente.
+
+### Pruebas
+
+- **Batería:**
+  - margen del vehículo en todos los pasos de ambos flujos;
+  - avance común;
+  - plazo a las 23 h 59 min (se permite) y a las 24 h exactas (se bloquea, sin registro);
+  - rechazo por la API y por el enlace público;
+  - solicitud pendiente resuelta después del plazo;
+  - excepción de administración.
+- **Navegador:** 40 comprobaciones de 320 a 1366 px:
+  - sin superposiciones;
+  - contadores coherentes y el mismo porcentaje en ambas vistas;
+  - ventana de confirmación;
+  - bloqueo en vivo sin recargar;
+  - candado;
+  - movimiento reducido.

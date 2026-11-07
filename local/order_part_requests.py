@@ -79,23 +79,26 @@ def fine(r):
 
 # ---- Mapa de ruta (06/11/2026): mismo modelo para el panel interno y el enlace público. Todo sale del paso real registrado: el vehículo
 # (avión o camión) se ubica en su tramo según ese paso y, al cargar, recorre solo el trecho desde el paso anterior; nunca se simulan
-# kilómetros, ubicación GPS ni avance por el tiempo transcurrido. Lienzo SVG de 1000 × 190 unidades (se escala con el ancho).
-MAP_Y = 96
+# kilómetros, ubicación GPS ni avance por el tiempo transcurrido. Lienzo SVG de 1000 × 158 unidades (se escala con el ancho). El vehículo
+# va en su propio carril y se detiene antes de cada punto de control (margen CLEARANCE): nunca tapa un punto ni sus textos.
+MAP_Y = 80
+CLEARANCE = 58   # distancia mínima (en unidades del lienzo) entre el centro del vehículo y el de un punto de control
+LANE = -24       # carril del camión: sobre la línea de ruta, nunca encima de los puntos ni de sus textos
 MAPS = {
     'internacional': {'nodes': (('origen', 120, ('solicitado', 'confirmado', 'preparacion', 'despachado')), ('ecuador', 520, ('llegada_pais', 'aduana_revision', 'aduana_liberado')),
-                                ('otavalo', 760, ('ruta_otavalo',)), ('taller', 895, ('recibido', 'instalacion', 'instalado', 'listo'))),
-                      'segments': (('air', 'aire', 'M120 96 Q320 -18 520 96', ('despachado', 'transito_internacional')),
-                                   ('road1', 'tierra', 'M520 96 L760 96', ('aduana_liberado', 'distribucion_nacional', 'ruta_otavalo')),
-                                   ('road2', 'tierra', 'M760 96 L895 96', ('recibido',))),
-                      'vehicle': {'despachado': ('plane', 'air', 0.0, 0.03, 'parked'), 'transito_internacional': ('plane', 'air', 0.03, 0.56, 'moving'),
-                                  'llegada_pais': ('plane', 'air', 0.56, 1.0, 'landed'), 'aduana_liberado': ('truck', 'road1', 0.0, 0.02, 'parked'),
-                                  'distribucion_nacional': ('truck', 'road1', 0.02, 0.42, 'moving'), 'ruta_otavalo': ('truck', 'road1', 0.42, 0.86, 'moving'),
+                                ('otavalo', 740, ('ruta_otavalo',)), ('taller', 895, ('recibido', 'instalacion', 'instalado', 'listo'))),
+                      'segments': (('air', 'aire', 'M120 80 Q320 0 520 80', ('despachado', 'transito_internacional')),
+                                   ('road1', 'tierra', 'M520 80 L740 80', ('aduana_liberado', 'distribucion_nacional', 'ruta_otavalo')),
+                                   ('road2', 'tierra', 'M740 80 L895 80', ('recibido',))),
+                      'vehicle': {'despachado': ('plane', 'air', 0.0, 0.0, 'parked'), 'transito_internacional': ('plane', 'air', 0.0, 0.5, 'moving'),
+                                  'llegada_pais': ('plane', 'air', 0.5, 1.0, 'landed'), 'aduana_liberado': ('truck', 'road1', 0.0, 0.0, 'parked'),
+                                  'distribucion_nacional': ('truck', 'road1', 0.0, 0.45, 'moving'), 'ruta_otavalo': ('truck', 'road1', 0.45, 1.0, 'moving'),
                                   'recibido': ('truck', 'road2', 0.0, 1.0, 'arrived')}},
     'nacional': {'nodes': (('origen', 120, ('solicitado', 'confirmado', 'preparacion', 'despachado')), ('otavalo', 690, ('ruta_otavalo',)),
                            ('taller', 895, ('recibido', 'instalacion', 'instalado', 'listo'))),
-                 'segments': (('road1', 'tierra', 'M120 96 L690 96', ('despachado', 'transito_nacional', 'ruta_otavalo')), ('road2', 'tierra', 'M690 96 L895 96', ('recibido',))),
-                 'vehicle': {'despachado': ('truck', 'road1', 0.0, 0.03, 'parked'), 'transito_nacional': ('truck', 'road1', 0.03, 0.5, 'moving'),
-                             'ruta_otavalo': ('truck', 'road1', 0.5, 0.88, 'moving'), 'recibido': ('truck', 'road2', 0.0, 1.0, 'arrived')}}}
+                 'segments': (('road1', 'tierra', 'M120 80 L690 80', ('despachado', 'transito_nacional', 'ruta_otavalo')), ('road2', 'tierra', 'M690 80 L895 80', ('recibido',))),
+                 'vehicle': {'despachado': ('truck', 'road1', 0.0, 0.0, 'parked'), 'transito_nacional': ('truck', 'road1', 0.0, 0.5, 'moving'),
+                             'ruta_otavalo': ('truck', 'road1', 0.5, 1.0, 'moving'), 'recibido': ('truck', 'road2', 0.0, 1.0, 'arrived')}}}
 NODE_TEXT = {'internacional': {'origen': ('Origen', 'globe'), 'ecuador': ('Ecuador · Aduana', 'customs'), 'otavalo': ('Otavalo', 'pin'), 'taller': ('PC-DOCTOR', 'shop')},
              'nacional': {'origen': ('Despacho', 'box'), 'otavalo': ('Otavalo', 'pin'), 'taller': ('PC-DOCTOR', 'shop')}}
 VEHICLE_TEXT = {'parked': 'listo para salir', 'moving': 'en camino', 'stopped': 'detenido por una novedad', 'landed': 'aterrizó en Ecuador', 'arrived': 'llegó a PC-DOCTOR'}
@@ -118,6 +121,22 @@ def _path_point(path, fraction):
     i = next((k for k, v in enumerate(lengths) if v >= goal), len(lengths) - 1)
     a, b = pts[max(0, i - 1)], pts[min(len(pts) - 1, max(1, i))]
     return round(pts[i][0], 1), round(pts[i][1], 1), round(math.degrees(math.atan2(b[1] - a[1], b[0] - a[0])), 1)
+
+
+def _path_length(path):
+    import math
+    nums = [float(x) for x in re.findall(r'-?\d+(?:\.\d+)?', path)]
+    if 'Q' not in path:
+        return math.dist(nums[:2], nums[2:4])
+    (x0, y0, cx, cy, x1, y1) = nums
+    pts = [((1 - t) ** 2 * x0 + 2 * (1 - t) * t * cx + t * t * x1, (1 - t) ** 2 * y0 + 2 * (1 - t) * t * cy + t * t * y1) for t in (i / 200 for i in range(201))]
+    return sum(math.dist(a, b) for a, b in zip(pts, pts[1:]))
+
+
+def _safe(path, fraction):
+    """Fracción del trazo con margen de seguridad: el vehículo nunca queda sobre un punto de control (se detiene antes de llegar)."""
+    margin = min(0.45, CLEARANCE / _path_length(path))
+    return round(margin + max(0.0, min(1.0, fraction)) * (1 - 2 * margin), 4)
 
 
 def route_map(shipping, current, reached, at, finished, situation, public=False, origin_country='', customs=''):
@@ -159,10 +178,13 @@ def route_map(shipping, current, reached, at, finished, situation, public=False,
         if motion == 'moving' and situation != 'normal':
             motion = 'stopped'
         path = next(x['path'] for x in segments if x['code'] == seg)
+        start, end = _safe(path, start), _safe(path, end)
         fx, fy, fa = _path_point(path, start)
         x, y, angle = _path_point(path, end)
+        lane = LANE if kind == 'truck' else 0
+        y, fy = round(y + lane, 1), round(fy + lane, 1)
         vehicle = {'kind': kind, 'segment': seg, 'path': path, 'from': start, 'to': end, 'motion': motion, 'animate': motion in ('moving', 'landed', 'arrived') and end > start,
-                   'x': x, 'y': y, 'angle': angle if kind == 'plane' else 0, 'fx': fx, 'fy': fy,
+                   'x': x, 'y': y, 'angle': angle if kind == 'plane' else 0, 'fx': fx, 'fy': fy, 'lane': lane,
                    'text': ('Avión ' if kind == 'plane' else 'Vehículo de transporte ') + VEHICLE_TEXT[motion]}
     return {'mode': shipping, 'nodes': nodes, 'segments': segments, 'vehicle': vehicle, 'cancelled': cancelled, 'finished': finished,
             'customs_active': shipping == 'internacional' and current == 'aduana_revision' and not cancelled}
@@ -397,6 +419,22 @@ def set_situation(c, oid, rid, data, user, now):
     return {'situation': situation, 'incident': incident, 'eta': eta, 'notify': ['retraso', 'retraso:%d' % last] if situation == 'retrasado' else None}
 
 
+def progress(c, r):
+    """Avance común al panel interno y al seguimiento público (una sola lógica): pasos del flujo real del pedido (el detallado si tiene tipo
+    de envío); un paso cuenta como completado solo si quedó atrás Y tiene su evento registrado (un paso saltado por corrección no cuenta).
+    La última actualización es el último evento del repuesto o de su cancelación/reembolso (no los avisos)."""
+    steps = flow(r)
+    current = fine(r)
+    idx = steps.index(current) if current in steps else 0
+    finished = r['stage'] == 'listo' and r['situation'] != 'cancelado'
+    reached = {(e[0] or e[1]) for e in c.execute("SELECT logistics,stage FROM order_part_events WHERE request_id=? AND kind IN ('alta','etapa')", (r['id'],))}
+    done = sum(1 for i, x in enumerate(steps) if (i < idx or finished) and (x in reached or x == 'solicitado'))
+    last = c.execute("SELECT MAX(at) FROM (SELECT created_at at FROM order_part_events WHERE request_id=? UNION ALL "
+                     "SELECT created_at FROM order_part_log WHERE request_id=? AND kind!='aviso')", (r['id'], r['id'])).fetchone()[0]
+    return {'done': done, 'total': len(steps), 'percent': round(100 * done / len(steps)), 'current': current,
+            'current_label': step_label(current, r['shipping']), 'updated': last or r['updated_at']}
+
+
 def _overdue(r, today):
     return bool(r['eta']) and r['eta'] < today and CODES.index(r['stage']) < CODES.index('recibido') and r['situation'] != 'cancelado'
 
@@ -450,6 +488,7 @@ def listing(c, oid, today):
         for d in detail:
             d['evidence'] = evidence_steps.get(d['code'], 0)
         import part_route
+        item['progress'] = progress(c, r)
         item['map'] = route_map(r['shipping'], current, reached, at, finished, r['situation'], origin_country=r['origin_country'], customs=customs)
         item['map_html'] = part_route.render(item['map'], 'i%d' % r['id'], r['name'])
         item.update(
@@ -624,17 +663,23 @@ def public(c, oid):
             history.append({'at': x['created_at'], 'label': part_cancellations.STATUS.get(x['action'], 'Cancelación'), 'detail': '', 'text': '', 'color': 0, 'kind': 'cancelacion',
                             'situation': 'cancelado' if x['action'] == 'aprobada' else 'espera_confirmacion'})
         history.sort(key=lambda h: h['at'])
+        from reception import reception_now
+        cancel_window = part_cancellations.window(r, reception_now())
+        cancel_allowed = part_cancellations.phase(r) not in ('recibido', 'cancelado') and not part_cancellations.open_for(c, r['id'])
         situation = r['situation']
         out.append({'name': _scrub(r['name'], terms) or 'Repuesto', 'brand': _scrub(r['brand'], terms), 'stage': r['stage'], 'situation': situation,
                     'situation_label': PUBLIC_SITUATIONS[situation] if situation != 'normal' else '', 'tone': SITUATIONS[situation][1],
                     'status_label': PUBLIC_SITUATIONS[situation] if situation != 'normal' else ('Proceso finalizado' if finished else steps[group][1]),
                     'description': DESCRIPTIONS[situation] if situation != 'normal' else (GROUP_TEXT.get(steps[group][0]) or DESCRIPTIONS.get(steps[group][0], '')) if not finished else DESCRIPTIONS['finalizado'],
-                    'id': r['id'], 'shipping': shipping, 'map': route_map(shipping, current, reached, at, finished, situation, public=True) if shipping else None,
+                    'id': r['id'], 'shipping': shipping, 'progress': progress(c, r),
+                    'step_label': FLOW_LABELS.get(current, '') if shipping and current in TRANSIT and situation == 'normal' else '', 'map': route_map(shipping, current, reached, at, finished, situation, public=True) if shipping else None,
                     'map_html': __import__('part_route').render(route_map(shipping, current, reached, at, finished, situation, public=True), 'p%d' % r['id'],
                                                                  _scrub(r['name'], terms) or 'Repuesto') if shipping else '',
-                    'cancellation': cancel, 'can_cancel': part_cancellations.phase(r) not in ('recibido', 'cancelado') and not part_cancellations.open_for(c, r['id']),
+                    'cancellation': cancel, 'cancel_note': part_cancellations.PUBLIC_PHASES.get(part_cancellations.phase(r), ''),
+                    'cancel_window': cancel_window, 'can_cancel': cancel_allowed and cancel_window['open'],
+                    'cancel_expired': cancel_allowed and not cancel_window['open'],
                     'requested': r['created_at'], 'eta': r['eta'] if CODES.index(r['stage']) < CODES.index('recibido') and situation != 'cancelado' else '',
-                    'received': r['received_at'], 'updated': events[-1]['created_at'] if events else r['updated_at'], 'steps': public_steps,
+                    'received': r['received_at'], 'updated': progress(c, r)['updated'], 'steps': public_steps,
                     'waiting': CODES.index(r['stage']) < CODES.index('recibido') and situation != 'cancelado', 'history': history[::-1][:12],
                     'vehicle': vehicle, 'done_count': sum(1 for x in public_steps if x['state'] == 'done'), 'total': len(public_steps), 'current_index': group if not finished else len(steps)})
     return out

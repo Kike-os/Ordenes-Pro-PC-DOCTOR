@@ -16,6 +16,7 @@
 - Todo queda en order_part_log (no se modifica ni se borra)."""
 import json
 import re
+from datetime import datetime, timedelta
 
 import order_part_requests as parts
 from order_part_requests import PartError, stamp
@@ -31,6 +32,27 @@ PHASES = {'sin_compra': 'Sin compra registrada: se puede cancelar de inmediato.'
           'transito': 'En tránsito, aduana o transporte nacional: requiere revisión administrativa antes de aprobar.',
           'recibido': 'Repuesto recibido o instalado: corresponde el procedimiento de devolución, garantía o reclamo, no una cancelación logística.',
           'cancelado': 'El pedido ya está cancelado.'}
+
+
+# Condiciones que el cliente ve antes de solicitar (según el punto real del pedido; nunca prometen reembolsos ni la aprobación).
+PUBLIC_PHASES = {'sin_compra': 'Aún no se ha registrado la compra del repuesto. Su solicitud será revisada por administración antes de confirmarla.',
+                 'comprado': 'El repuesto ya fue adquirido: la cancelación depende de las condiciones del proveedor y la revisará administración.',
+                 'transito': 'El repuesto ya fue despachado y está en traslado: la cancelación requiere una revisión administrativa y puede no ser posible.'}
+
+
+# Plazo de las solicitudes ordinarias (cliente o personal en su nombre): 24 horas exactas desde la creación del pedido de repuesto.
+# Se compara en tiempo absoluto (UTC) con la hora del servidor: la hora del navegador no cuenta. La cancelación excepcional de
+# administración (direct) no tiene plazo, pero exige justificación y queda auditada y notificada.
+WINDOW = timedelta(hours=24)
+
+
+def window(row, now):
+    created = datetime.fromisoformat(row['created_at'])
+    deadline = created + WINDOW
+    from reception import ECUADOR_TZ
+    return {'deadline': deadline.isoformat(timespec='seconds'), 'deadline_text': deadline.astimezone(ECUADOR_TZ).strftime('%d/%m/%Y %H:%M'),
+            'open': now < deadline, 'remaining': max(0, int((deadline - now).total_seconds())),
+            'deadline_ms': int(deadline.timestamp() * 1000), 'now_ms': int(now.timestamp() * 1000)}
 
 
 def _admin(user):
@@ -64,7 +86,7 @@ def _refunded(c, cid):
     return c.execute('SELECT COALESCE(SUM(amount_cents),0) FROM order_part_refunds WHERE cancellation_id=?', (cid,)).fetchone()[0]
 
 
-def context(c, oid, row):
+def context(c, oid, row, now=None):
     """Lo que administración necesita ver antes de decidir: punto del pedido, pagos de la orden y lo vinculado que NO se toca."""
     import equipment
     money = equipment.money(c, oid)
@@ -76,8 +98,10 @@ def context(c, oid, row):
     if c.execute("SELECT 1 FROM invoices WHERE order_id=? AND status='autorizado' LIMIT 1", (oid,)).fetchone():
         warnings.append('La orden tiene una factura electrónica autorizada: no se borra ni se anula aquí; si corresponde, se emite una nota de crédito.')
     state = phase(row)
+    from reception import reception_now
+    limit = window(row, now or reception_now())
     return {'phase': state, 'phase_text': PHASES[state], 'paid_cents': max(0, money['paid_cents']), 'balance_cents': money['balance_cents'], 'warnings': warnings,
-            'can_request': state not in ('recibido', 'cancelado') and not open_for(c, row['id'])}
+            'can_request': state not in ('recibido', 'cancelado') and not open_for(c, row['id']) and limit['open'], 'window': limit}
 
 
 def history(c, rid):
@@ -114,6 +138,11 @@ def request(c, oid, rid, data, user, now, origin='personal'):
         raise PartError(PHASES[state], 409)
     if open_for(c, row['id']):
         raise PartError('Ya hay una solicitud de cancelación pendiente de revisión para este repuesto.', 409)
+    limit = window(row, now)
+    if not limit['open']:
+        raise PartError('Plazo de cancelación vencido: las solicitudes se aceptan durante las 24 horas siguientes al registro del repuesto (venció el %s, hora de Ecuador).'
+                        % limit['deadline_text'] + (' Para un caso excepcional, administración puede registrar una cancelación justificada.' if origin == 'personal' else
+                                                    ' Si necesita ayuda, comuníquese con el taller.'), 409, {'reason': 'Plazo vencido.'})
     reason = re.sub(r'\s+', ' ', str(data.get('reason', '') or '')).strip()[:500]
     if len(reason) < 10:
         raise PartError('Indica el motivo de la cancelación (al menos 10 caracteres).', 400, {'reason': 'Motivo obligatorio.'})
@@ -211,7 +240,8 @@ def decide(c, oid, rid, data, user, now):
 
 
 def direct(c, oid, rid, data, user, now):
-    """Cancelación registrada por administración (proveedor, disponibilidad, importación, duplicado o administrativa): se aprueba al registrarla."""
+    """Cancelación excepcional de administración (proveedor, disponibilidad, importación, duplicado o administrativa): sin el plazo de 24 h
+    de las solicitudes ordinarias, con justificación obligatoria; se aprueba al registrarla, queda auditada y se notifica al cliente."""
     _admin(user)
     row = parts._request(c, oid, rid)
     key = _key(data)
