@@ -312,6 +312,8 @@ def order_document(c,oid):
     order['code']=row['code'] or 'OP-'+str(row['id']).zfill(5);order['email']=row['email'] or ''
     service_terms.attach(c,order);technical_access.attach(c,order);order_workspace.attach(c,order)
     device_authorizations.attach(c,order,row['type'])
+    import repair_stages  # 1.5.252: las mismas 6 etapas del seguimiento público y de la hoja A4
+    order['repair_stages']=repair_stages.compute(c,row['id']);order['repair_signature']=repair_stages.signature(c,row['id'])
     return order
 
 
@@ -1432,6 +1434,14 @@ class Handler(BaseHTTPRequestHandler):
                         name,mime,raw=order_evidence.part(c,found['id'],fid,int(n) if n.isdigit() else -1,public=True)
                 except order_evidence.EvidenceError as error:return self.reply(404,{'error':'Archivo no disponible.'})
                 return self.reply(200,raw,mime,filename=name)
+            tracking_state=re.fullmatch(r'/s/([A-Za-z0-9_-]{1,64})/estado',path)
+            if tracking_state:
+                # Actualización automática del seguimiento (1.5.252): solo una huella opaca del estado; la página se recarga si cambia.
+                import order_tracking,repair_stages
+                if limited(c,'tracking-state-ip:'+digest(self.client_address[0]),90,300):return self.reply(429,{'error':'Demasiadas consultas. Intenta más tarde.'})
+                found=order_tracking.lookup_id(c,tracking_state[1])
+                if not found:return self.reply(404,{'error':'Enlace no disponible.'})
+                return self.reply(200,{'v':repair_stages.signature(c,found)})
             tracking_page=re.fullmatch(r'/s/([A-Za-z0-9_-]{1,64})(/qr\.svg|/barcode\.svg)?',path)
             if tracking_page:
                 import order_tracking
@@ -1680,6 +1690,13 @@ class Handler(BaseHTTPRequestHandler):
                 history=[dict(r) for r in c.execute("SELECT o.id,COALESCE(o.code,'OP-'||printf('%05d',o.id)) code,o.created_at,o.received_at,o.delivered_at,o.status status_code,s.label status,o.problem,o.findings,o.recommendations,COALESCE((SELECT name FROM users WHERE id=o.assigned_to),'Sin asignar') responsible FROM orders o JOIN statuses s ON s.code=o.status WHERE o.device_id=? ORDER BY o.id DESC LIMIT 200",(device['id'],))]
                 same=[dict(r) for r in c.execute("SELECT x.id,x.brand,x.model,x.serial,cl.name client,(SELECT COUNT(*) FROM orders o WHERE o.device_id=x.id) orders FROM devices x JOIN clients cl ON cl.id=x.client_id WHERE x.id!=? AND ?!='' AND lower(TRIM(COALESCE(x.serial,'')))=lower(?) ORDER BY x.id LIMIT 20",(device['id'],(device['serial'] or '').strip(),(device['serial'] or '').strip()))]
                 return self.reply(200,{'device':device,'history':history,'duplicates':same,'summary':{'orders':len(history),'delivered':sum(1 for h in history if h['status_code']=='entregado'),'open':sum(1 for h in history if h['status_code']!='entregado'),'first':history[-1]['created_at'] if history else None,'last':history[0]['created_at'] if history else None}})
+            stages_get=re.fullmatch(r'/api/orders/([0-9]+)/stages',path)
+            if stages_get:
+                # Etapas de la reparación de una orden (1.5.252, panel): la misma fuente que el seguimiento público; con huella para sincronizar.
+                import repair_stages
+                found=repair_stages.compute(c,int(stages_get[1]))
+                if not found:return self.reply(404,{'error':'Orden no disponible.'})
+                return self.reply(200,{**found,'signature':repair_stages.signature(c,int(stages_get[1]))})
             parts_get=re.fullmatch(r'/api/orders/([0-9]+)/part-requests',path)
             if parts_get:
                 # Pedidos de repuestos de la orden (panel del taller): etapas, historial, asociaciones y opciones para asociar sin duplicar.
@@ -1902,6 +1919,8 @@ class Handler(BaseHTTPRequestHandler):
                 import mailing
                 result['mail_history']=mailing.history(c,result['id'])
                 result['mail']=[dict(r) for r in c.execute('SELECT id,subject,correspondent,direction,sent_at,folder,uid FROM mail_links WHERE order_id=? ORDER BY id DESC LIMIT 30',(result['id'],))] if mail_allowed(user) else None
+                import repair_stages  # 1.5.252: las 6 etapas comunes (panel, cliente y hoja A4) y su huella de sincronización
+                result['repair_stages']=repair_stages.compute(c,result['id']);result['repair_signature']=repair_stages.signature(c,result['id'])
                 return self.reply(200, {'order':result})
             if path == '/api/devices/identify':
                 if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})

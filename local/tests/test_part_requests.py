@@ -213,16 +213,17 @@ class PartRequestTests(unittest.TestCase):
         cookie, csrf, post, order = self.paid_order(10500)  # pagada: el sistema no entrega una orden con saldo pendiente
         oid = order['id']
         token = self.link(oid)
-        states = lambda: re.findall(r'<li data-state="(\w+)" data-stage', self.request('/s/' + token)['body'])
-        self.assertEqual(states(), ['current', 'pending', 'pending', 'pending'])  # recibida: nada en verde
+        # 1.5.252: barra de 6 etapas (Recepción · Diagnóstico · Reparación · Pruebas · Listo para retirar · Entregado).
+        states = lambda: re.findall(r'<li class="rp-step" data-state="(\w+)"', self.request('/s/' + token)['body'])
+        self.assertEqual(states(), ['current'] + ['pending'] * 5)  # recibida: nada en verde
         self.request('/api/order-status', {'id': str(oid), 'status': 'presupuesto'}, cookie=cookie, csrf=csrf)
         page = self.request('/s/' + token)['body']
-        self.assertEqual(states(), ['done', 'current', 'pending', 'pending'])
-        self.assertIn('Presupuesto pendiente de su aprobación', page)
+        self.assertEqual(states(), ['done', 'warn'] + ['pending'] * 4)  # presupuesto pendiente: en espera (ámbar), sin avanzar
+        self.assertIn('Presupuesto pendiente de aprobación', page)
         self.request('/api/order-status', {'id': str(oid), 'status': 'listo'}, cookie=cookie, csrf=csrf)
-        self.assertEqual(states(), ['done', 'done', 'current', 'pending'])  # listo: aún no es la entrega
+        self.assertEqual(states(), ['done'] * 4 + ['current', 'pending'])  # listo: aún no es la entrega
         self.request('/api/order-status', {'id': str(oid), 'status': 'entregado'}, cookie=cookie, csrf=csrf)
-        self.assertEqual(states(), ['done'] * 4)
+        self.assertEqual(states(), ['done'] * 6)
 
 
 if __name__ == '__main__':

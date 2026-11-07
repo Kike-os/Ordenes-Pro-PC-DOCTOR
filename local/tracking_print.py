@@ -105,6 +105,16 @@ def _equipment(d, audience, qr_src=''):
 
 
 def _progress(d):
+    """Progreso de la reparación. 1.5.252: las 6 etapas de repair_stages (las mismas del panel y del cliente), con su estado escrito y fecha."""
+    if d.get('repair'):
+        r = d['repair']
+        words = {'done': 'Completado', 'current': 'Etapa actual', 'warn': 'En espera', 'pending': 'Pendiente'}
+        items = ''.join('<li data-state="%s"><i>%s</i><b>%s</b><small>%s%s</small></li>' % (
+            'incident' if s['state'] == 'warn' else s['state'], '✓' if s['state'] == 'done' else i + 1, e(s['label']), words[s['state']],
+            '<br>' + e(_when(s['at'])) if s['at'] else '') for i, s in enumerate(r['stages']))
+        alerts = ''.join('<p class="pa4-alert" data-tone="warn"><b>%s.</b> %s</p>' % (e(a['title']), e(a['text'])) for a in r['alerts'])
+        now = 'Reparación finalizada y entregada.' if r['finished'] else 'Etapa actual: %s.' % r['current_label']
+        return _sec('pa4-c', 'Progreso de reparación', '<ol class="pa4-steps">%s</ol><p class="pa4-now"><b>Estado actual:</b> %s · %s</p>%s' % (items, e(d['status_label']), e(now), alerts))
     status = d['status']
     current = max(0, next((i for i, s in enumerate(STAGES) if status in s[1]), 0))
     done = status == 'entregado'
@@ -300,7 +310,8 @@ def staff_document(c, oid):
     if not d:
         return None
     row = c.execute("SELECT COALESCE(NULLIF(d.kind,''),d.category) category,d.type,d.brand,d.model,d.serial FROM orders o JOIN devices d ON d.id=o.device_id WHERE o.id=?", (oid,)).fetchone()
-    d.update(kind=DEVICE_TYPES.get(row['category'] or row['type'], ''), brand=row['brand'] or '', model=row['model'] or '', serial=row['serial'] or '', budget=budget_label(c, oid))
+    d.update(kind=DEVICE_TYPES.get(row['category'] or row['type'], ''), brand=row['brand'] or '', model=row['model'] or '', serial=row['serial'] or '', budget=budget_label(c, oid),
+             repair=__import__('repair_stages').compute(c, oid))
     names = {r[0]: r[1] for r in c.execute('SELECT id,name FROM users')}
     try:
         import order_part_requests as opr

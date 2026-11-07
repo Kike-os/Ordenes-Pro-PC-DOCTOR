@@ -43,7 +43,9 @@ class TrackingCardTests(unittest.TestCase):
         self.request('/api/order-status',{'id':str(oid),'status':'entregado'},cookie=cookie,csrf=csrf)
         # Pantalla y documento A4 (1.5.248, oculto en pantalla) muestran las mismas cuatro etapas completadas.
         screen,_,paper=self.request('/s/'+token)['body'].partition('<section class="pa4"')
-        self.assertEqual(states(screen),['done']*4);self.assertEqual(states(paper),['done']*4)
+        # 1.5.252: la pantalla usa la barra de 6 etapas (repair_stages); la hoja A4, las mismas 6 etapas.
+        import re as _re
+        self.assertEqual(_re.findall(r'<li class="rp-step" data-state="(\w+)"',screen),['done']*6);self.assertEqual(states(paper),['done']*6)
         # Vista interna para imprimir: exige sesión; el enlace revocado deja de servir y la tarjeta lo dice sin inventar un QR.
         self.assertNotIn('class="ticket"',str(self.request('/tarjeta/%d'%oid)['body']));self.assertIn('Cliente ficticio',self.request('/tarjeta/%d'%oid,cookie=cookie)['body'])
         self.assertEqual(self.request('/api/orders/%d/barcode.svg'%oid)['status'],401);self.assertEqual(self.request('/tarjeta/999999',cookie=cookie)['status'],404)

@@ -52,9 +52,9 @@
 :is(.pa4-steps,.pa4-track) li[data-state=current]::before{background:linear-gradient(90deg,var(--pb),var(--pc))}
 :is(.pa4-steps,.pa4-track) li[data-state=current] i{border-color:var(--pc);background:var(--pcs);color:#075985;box-shadow:0 0 0 .9mm #bae6fd}
 :is(.pa4-steps,.pa4-track) li[data-state=current] :is(b,small){color:#075985;font-weight:700}
-:is(.pa4-steps,.pa4-track) li[data-state=incident]::before{background:var(--red)}
-:is(.pa4-steps,.pa4-track) li[data-state=incident] i{border-color:var(--red);background:#fee2e2;color:var(--red)}
-:is(.pa4-steps,.pa4-track) li[data-state=incident] :is(b,small){color:var(--red);font-weight:700}
+:is(.pa4-steps,.pa4-track) li[data-state=incident]::before{background:linear-gradient(90deg,var(--pb),var(--amber))}
+:is(.pa4-steps,.pa4-track) li[data-state=incident] i{border-color:var(--amber);background:#fef3c7;color:var(--amber)}
+:is(.pa4-steps,.pa4-track) li[data-state=incident] :is(b,small){color:var(--amber);font-weight:700}
 :is(.pa4-steps,.pa4-track) li[data-state=skipped] i{border-style:dashed}
 :is(.pa4-steps,.pa4-track) li[data-state=pending] b{color:var(--muted);font-weight:600}
 .pa4-now{margin:2.5mm 0 0;padding:1.5mm 3mm;border-left:1mm solid var(--pc);border-radius:1.5mm;background:#f0f9ff}

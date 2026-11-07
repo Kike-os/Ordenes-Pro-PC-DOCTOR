@@ -38,6 +38,13 @@ def revoke(c,oid,actor,now):
     return c.execute("UPDATE order_tracking_links SET revoked_at=?,revoked_by=? WHERE order_id=? AND revoked_at=''",(now.isoformat(timespec='seconds'),actor,oid)).rowcount
 
 
+def lookup_id(c,token):
+    """Id de la orden de un enlace activo (o None). Solo para la huella de sincronización: no devuelve datos."""
+    if not TOKEN.fullmatch(token or ''):return None
+    row=c.execute("SELECT order_id FROM order_tracking_links WHERE token=? AND revoked_at=''",(token,)).fetchone()
+    return row[0] if row else None
+
+
 def lookup(c,token):
     if not TOKEN.fullmatch(token or ''):return None
     row=c.execute("""SELECT o.code,o.id,o.status,s.label status_label,o.received_at,o.created_at,o.updated_at,COALESCE(NULLIF(d.kind,''),d.category) category,d.type,d.brand,d.model
@@ -66,6 +73,7 @@ def lookup(c,token):
         parts=[]  # base anterior al seguimiento de repuestos
     return {'id':row['id'],'code':row['code'] or 'OP-%05d'%row['id'],'status':row['status'],'status_label':row['status_label'],'received':received,'updated':stamp(row['updated_at']),
             'device':' · '.join(filter(None,[DEVICE_TYPES.get(kind,''),' '.join(filter(None,[row['brand'],row['model']]))])),'updates':updates,'files':files,'parts':parts,
+            'repair':__import__('repair_stages').compute(c,row['id']),'signature':__import__('repair_stages').signature(c,row['id']),
             'kind':DEVICE_TYPES.get(kind,''),'brand':row['brand'] or '','model':row['model'] or '',**dict(zip(('budget_code','budget'),__import__('tracking_print').budget(c,row['id'])))}
 
 
@@ -74,7 +82,7 @@ HEAD='<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="vie
 
 def public_page(data,token='',notice='',tone='ok'):
     # Con un aviso (resultado de una solicitud del cliente) no se recarga sola: así se puede leer con calma.
-    page=CARD_HEAD%('' if notice else '<meta http-equiv="refresh" content="180">',html.escape(data['code']),A4_CSS)
+    page=CARD_HEAD%('' if notice else '<noscript><meta http-equiv="refresh" content="180"></noscript>',html.escape(data['code']),A4_CSS)
     banner='<p class="tw-notice" data-tone="%s" role="%s">%s</p>'%(tone,'status' if tone=='ok' else 'alert',html.escape(notice)) if notice else ''
     return page.replace('<body class="ticket-page">','<body class="ticket-page ticket-public">',1)+banner+public_card(dict(data,token=token),'/s/'+token+'/qr.svg' if token else '')+__import__('tracking_print').document(data,'public','/s/'+token+'/qr.svg' if token else '')+'</main></body></html>'
 
@@ -124,7 +132,7 @@ def card(data,qr_src,public):
 # La barra de avance tiene un segmento por etapa: solo las completadas llevan su color (azul → turquesa → verde claro → verde intenso); las
 # pendientes quedan neutras. Los estados de espera se muestran como aviso, sin adelantar el avance. Todo sale de datos reales registrados.
 FLAGS={'esperando_cliente':'Esperando su respuesta para continuar','presupuesto':'Presupuesto pendiente de su aprobación','revision_recurrente':'En revisión por falla recurrente'}
-ICONS={'Equipo':'M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v9H4zM2 19h20','Fecha de ingreso':'M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z',
+ICONS={'Estado actual':'M22 12h-4l-3 9L9 3l-3 9H2','Equipo':'M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v9H4zM2 19h20','Fecha de ingreso':'M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z',
        'Última actualización':'M12 6v6l4 2M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0z'}
 
 
@@ -262,7 +270,14 @@ def public_card(data,qr_src):
     flags=[FLAGS[data['status']]] if data['status'] in FLAGS else []
     waiting=[p for p in data.get('parts') or [] if p['waiting']]
     if waiting and not done:flags.append('Esperando repuesto' if len(waiting)==1 else 'Esperando %d repuestos'%len(waiting))
-    facts=[('Equipo',data.get('device') or 'No registrado'),('Fecha de ingreso',data.get('received') or 'No registrada'),('Última actualización',data.get('updated') or 'Sin movimientos')]
+    facts=[('Equipo',data.get('device') or 'No registrado'),('Fecha de ingreso',data.get('received') or 'No registrada'),('Última actualización',data.get('updated') or 'Sin movimientos'),
+           ('Estado actual',data.get('status_label') or '')]
+    # 1.5.252: barra de 6 etapas con iconos (repair_stages, la misma fuente del panel y de la hoja A4); sin ella, la de 4 etapas anterior.
+    import repair_stages
+    if data.get('repair'):
+        progress_html=repair_stages.html(data['repair'],when=lambda v:_when(v))
+    else:
+        progress_html='<h2 class="sr-only">Avance de la reparación</h2><ol class="ticket-steps tw-steps">%s</ol>%s'%(steps,''.join('<p class="tw-flag" role="status">%s</p>'%e(f) for f in flags))
     rows=''.join('<div>%s<span><dt>%s</dt><dd>%s</dd></span></div>'%(_icon(ICONS[k]),e(k),e(v)) for k,v in facts)
     updates=''
     if data.get('updates'):
@@ -279,7 +294,7 @@ def public_card(data,qr_src):
             '<header class="tw-head"><span class="tw-logo"><img class="ticket-logo" src="/static/logo-original.png" alt="PC-DOCTOR S.A." width="2826" height="2049"></span><div class="tw-title"><small>%s</small><h1>Seguimiento de Reparación</h1></div>'
             '<div class="tw-order"><small>Orden de servicio</small><strong>%s</strong><span class="tw-chips"><span class="ticket-state" data-status="%s">%s</span>%s</span>'
             '<button type="button" class="tw-print" data-print>%sImprimir seguimiento A4</button></div></header>'
-            '<div class="tw-progress"><h2 class="sr-only">Avance de la reparación</h2><ol class="ticket-steps tw-steps">%s</ol>%s</div><dl class="ticket-facts tw-facts">%s</dl></section>'
+            '<div class="tw-progress" data-sig="%s">%s</div><dl class="ticket-facts tw-facts">%s</dl></section>'
             '<div class="tw-body%s">%s%s</div><div class="ticket-cut" aria-hidden="true"></div>'
             '<section class="ticket-bottom tw-codes" aria-label="Código de seguimiento">%s<div class="ticket-barcode">%s<span>%s</span></div>'
             '<div class="tw-verify"><h2>Código de seguimiento</h2><p>Escanea el QR para consultar este seguimiento. El código de barras identifica la orden en el taller.</p></div>'
@@ -287,8 +302,7 @@ def public_card(data,qr_src):
             '<div class="tw-actions"><button type="button" data-refresh>Actualizar seguimiento</button><button type="button" data-print>%sImprimir seguimiento A4</button><small>Consultado el %s</small></div>'
             '<p class="ticket-note">Esta página muestra solo el estado de la reparación. No contiene datos personales.</p>'
             )%(e(data['status']),e(company['name']),e(code),e(data['status']),e(data['status_label']),
-               '<span class="tw-budget" data-budget="%s"><small>Presupuesto:</small> %s</span>'%(e(data.get('budget_code','')),e(data['budget'])) if data.get('budget') else '',PRINTER,steps,
-               ''.join('<p class="tw-flag" role="status">%s</p>'%e(f) for f in flags),rows,' tw-two' if main and side else '','<div class="tw-col">%s</div>'%main if main else '',
+               '<span class="tw-budget" data-budget="%s"><small>Presupuesto:</small> %s</span>'%(e(data.get('budget_code','')),e(data['budget'])) if data.get('budget') else '',PRINTER,e(data.get('signature','')),progress_html,rows,' tw-two' if main and side else '','<div class="tw-col">%s</div>'%main if main else '',
                '<div class="tw-col">%s</div>'%side if side else '',qr,bars,e(code),e(company['name']),e(company['specialty']),e(company['whatsapp']),PRINTER,now)
 
 

@@ -59,3 +59,17 @@ document.addEventListener('click',event=>{if(event.target.closest('[data-print]'
  addEventListener('beforeprint',()=>{const t=fmt();if(t)doc.querySelectorAll('[data-printed]').forEach(n=>{n.textContent=t;});if(ready)return;ready=true;
   const code=(doc.dataset.code||'').replace(/[^A-Za-z0-9-]/g,''),sheet=[...document.styleSheets].find(s=>(s.href||'').includes('/static/seguimiento-a4.css'));
   if(code&&sheet){try{sheet.insertRule('@page{@bottom-right{content:"Orden '+code+'\\A Página " counter(page) " de " counter(pages)}}',sheet.cssRules.length);}catch{}}});})();
+// Actualización automática del seguimiento (1.5.252): cada 30 s, con la pestaña visible, se pide solo una huella opaca del estado; si cambió
+// (el técnico avanzó la orden, se aprobó un presupuesto o llegó un repuesto), la página se recarga. No recarga mientras el cliente escribe o
+// tiene una ventana abierta (lo hace al terminar). Sin JavaScript, la página se recarga sola cada 3 minutos.
+(()=>{const box=document.querySelector('.tw-progress[data-sig]'),m=location.pathname.match(/^\/s\/([A-Za-z0-9_-]{1,64})$/);if(!box||!m)return;
+ const sig=box.dataset.sig;let busy=false,pending=false,wait=30000,timer=0;
+ const quiet=()=>!!(document.querySelector('dialog[open],.ticket-viewer')||document.activeElement?.closest('form,details[open]'));
+ const reload=()=>{if(quiet()){pending=true;return;}location.reload();};
+ async function check(){if(document.hidden||busy)return;busy=true;try{const r=await fetch('/s/'+m[1]+'/estado',{credentials:'omit',cache:'no-store'});
+   if(r.ok){wait=30000;const d=await r.json();if(d.v&&d.v!==sig)reload();}else if(r.status===429||r.status>=500)wait=Math.min(wait*2,300000);}catch{wait=Math.min(wait*2,300000);}finally{busy=false;schedule();}}
+ function schedule(){clearTimeout(timer);timer=setTimeout(check,wait);}
+ document.addEventListener('visibilitychange',()=>{if(!document.hidden)check();});
+ document.addEventListener('focusout',()=>setTimeout(()=>{if(pending&&!quiet())location.reload();},300));
+ document.addEventListener('close',()=>{if(pending)setTimeout(reload,300);},true);
+ schedule();})();

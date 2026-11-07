@@ -476,3 +476,56 @@
 }
 @keyframes lgx-blink{50%{opacity:.15}}
 @keyframes lgx-clouds{from{transform:translateX(18px)}to{transform:translateX(-26px)}}
+
+/* 1.5.252 — Seguimiento de reparación en 6 etapas (panel y cliente; marcado de repair_stages / repairBar). Iconos de Lucide. Verde: completado;
+   azul eléctrico: en curso; ámbar: en espera (presupuesto, respuesta, repuesto o falla recurrente); gris: pendiente. El estado siempre va escrito.
+   Transiciones de 300 ms, pulso ligero y finito en la etapa activa, conectores que avanzan y confirmación al completar; sin animaciones con
+   «reducir movimiento». En anchos pequeños (contenedor < 560 px) solo iconos y la etapa actual escrita debajo: sin desbordes ni textos encimados. */
+.rp{--rp-done:#22c55e;--rp-cur:#3b82f6;--rp-warn:#f59e0b;--rp-red:#ef4444;--rp-pend:#33496b;container-type:inline-size;min-width:0}
+.rp-steps{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));margin:0;padding:0;list-style:none}
+.rp-step{--c:var(--rp-pend);position:relative;display:grid;justify-items:center;align-content:start;gap:7px;min-width:0;padding:0 3px;text-align:center}
+.rp-step[data-state=done]{--c:var(--rp-done)}.rp-step[data-state=current]{--c:var(--rp-cur)}.rp-step[data-state=warn]{--c:var(--rp-warn)}
+.rp-node{position:relative;z-index:1;display:grid;place-items:center;width:46px;height:46px;border:2px solid var(--c);border-radius:50%;background:#0c1a33;color:#7f93b1;
+ transition:background-color .3s ease,border-color .3s ease,color .3s ease,box-shadow .3s ease}
+.rp-ic{display:block;width:22px;height:22px}
+.rp-ok{position:absolute;right:-5px;bottom:-5px;display:none;place-items:center;width:19px;height:19px;border-radius:50%;background:var(--rp-done);color:#052e16;box-shadow:0 0 0 2px #0c1a33}
+.rp-ic-ok{display:block;width:12px;height:12px;stroke-width:3.2}
+.rp-line{position:absolute;z-index:0;top:21px;left:calc(50% + 27px);right:calc(-50% + 27px);height:4px;border-radius:99px;background:var(--rp-pend);overflow:hidden}
+.rp-line i{display:block;width:0;height:100%;border-radius:inherit;background:var(--c);transition:width .4s ease}
+.rp-step[data-state=done] .rp-line i{width:100%}
+.rp-step:is([data-state=current],[data-state=warn]) .rp-line i{width:38%;background:linear-gradient(90deg,var(--c),transparent)}
+.rp-text{display:grid;gap:2px;min-width:0}
+.rp-text b{font-size:13px;font-weight:700;line-height:1.25;color:#b9cbe4;overflow-wrap:anywhere}
+.rp-text small{font-size:12px;line-height:1.3;color:#8fa9cc}
+.rp-text time{white-space:nowrap}
+.rp-step[data-state=done] .rp-node{background:#0b2a1c;color:#86efac}.rp-step[data-state=done] .rp-ok{display:grid}.rp-step[data-state=done] .rp-text b{color:#e3eeff}
+.rp-step[data-state=current] .rp-node{background:#0f2a55;color:#dbeafe;box-shadow:0 0 0 4px #3b82f633,0 0 18px -4px #3b82f6}
+.rp-step[data-state=warn] .rp-node{background:#2a2110;color:#fde68a;box-shadow:0 0 0 4px #f59e0b2e}
+.rp-step:is([data-state=current],[data-state=warn]) .rp-text b{color:#fff}
+.rp-step[data-state=current] .rp-text small{color:#93c5fd;font-weight:600}.rp-step[data-state=warn] .rp-text small{color:#fcd34d;font-weight:600}
+.rp-step[data-state=pending] .rp-node{opacity:.8}
+.rp-now{display:flex;flex-wrap:wrap;gap:2px 6px;margin:12px 0 0;font-size:13px;color:#9db1cf}.rp-now b{color:#fff}
+.rp-alert{margin:10px 0 0;padding:9px 12px;border:1px solid #f59e0b55;border-left:4px solid var(--rp-warn);border-radius:10px;background:#2a2110;color:#fde68a;font-size:13px;line-height:1.45}
+.rp-alert b{color:#fff3c4}
+.rp-alert[data-tone=rojo]{border-color:#ef444466;border-left-color:var(--rp-red);background:#2a1014;color:#fecaca}
+@media(prefers-reduced-motion:no-preference){
+ .rp-step:is([data-state=current],[data-state=warn]) .rp-node::after{content:"";position:absolute;inset:-7px;border:2px solid var(--c);border-radius:50%;opacity:0;animation:rp-pulse 2.4s ease-out .5s 5}
+ .rp-step[data-state=done] .rp-line i{animation:rp-fill .45s ease-out both}
+ .rp-step[data-state=done] .rp-ok{animation:rp-pop .4s cubic-bezier(.3,1.6,.5,1) both}
+ .rp-step:nth-child(2) :is(.rp-line i,.rp-ok){animation-delay:.1s}.rp-step:nth-child(3) :is(.rp-line i,.rp-ok){animation-delay:.2s}.rp-step:nth-child(4) :is(.rp-line i,.rp-ok){animation-delay:.3s}
+ .rp-step:nth-child(5) :is(.rp-line i,.rp-ok){animation-delay:.4s}.rp-step:nth-child(6) :is(.rp-line i,.rp-ok){animation-delay:.5s}
+}
+@media(prefers-reduced-motion:reduce){.rp *{animation:none!important;transition:none!important}}
+@keyframes rp-pulse{0%{transform:scale(.88);opacity:.6}100%{transform:scale(1.3);opacity:0}}
+@keyframes rp-fill{from{width:0}}
+@keyframes rp-pop{from{transform:scale(0)}to{transform:scale(1)}}
+@container (max-width:560px){
+ .rp-node{width:38px;height:38px}.rp-ic{width:19px;height:19px}
+ .rp-line{top:17px;left:calc(50% + 22px);right:calc(-50% + 22px);height:3px}
+ .rp-text,.rp-text>*,.rp-text time{position:absolute;width:1px;height:1px;margin:0;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+ .rp-now{justify-content:center;text-align:center}
+}
+@container (max-width:340px){.rp-node{width:34px;height:34px}.rp-ic{width:17px;height:17px}.rp-line{top:15px;left:calc(50% + 20px);right:calc(-50% + 20px)}.rp-ok{width:16px;height:16px;right:-4px;bottom:-4px}}
+/* Tarjetas de datos: cuatro (equipo, ingreso, última actualización y estado actual) en una fila cuando caben. */
+@container tw (min-width:820px){.ticket-public .tw-facts{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.ticket-public .tw-progress .rp{margin-top:4px}
