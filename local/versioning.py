@@ -130,15 +130,20 @@ def overview(registry=None):
             'categories': CATEGORIES, 'types': TYPES, 'remote_configured': bool(registry_url())}
 
 
+# Tamaño máximo del registro publicado. El historial crece con cada versión (≈1,3 KB): el límite anterior de 256 KB se superó en 1.5.252 y la
+# comprobación quedaba en «Error de comprobación». 2 MB deja margen para muchos años y sigue acotando lo que se descarga.
+MAX_REGISTRY_BYTES = 2 * 1024 * 1024
+
+
 def fetch_published(url):
     if not url.startswith('https://'):
         raise RegistryError('El registro de versiones publicado debe consultarse por HTTPS.')
     try:
         with urlopen(Request(url, headers={'User-Agent': 'OrdenesPro-versiones'}), timeout=6) as response:
-            raw = response.read(262145)
+            raw = response.read(MAX_REGISTRY_BYTES + 1)
     except (OSError, URLError, ValueError):
         raise RegistryError('No se pudo consultar el registro de versiones publicado. Inténtalo más tarde.')
-    if len(raw) > 262144:
+    if len(raw) > MAX_REGISTRY_BYTES:
         raise RegistryError('El registro de versiones publicado no es válido.')
     try:
         return validate(json.loads(raw.decode('utf-8')))
