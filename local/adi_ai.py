@@ -17,9 +17,10 @@ MODES={
  'simple':('Resumir mensaje','Resúmelo en una comunicación breve y directa, sin perder ningún dato. Máximo 55 palabras.'),
  'redaccion':('Mejorar redacción','Mejora la claridad y la gramática manteniendo el mismo contenido, extensión parecida y tono neutro.'),
  'ortografia':('Corregir ortografía','Corrige únicamente ortografía, tildes, puntuación y mayúsculas. No cambies palabras, orden ni estilo.'),
+ 'informe':('Informe técnico completo','Informe técnico estructurado según el tipo de documento (adi_reports).'),
 }
 # Herramientas que interpretan el texto con la terminología del taller y pasan por los controles contra datos inventados.
-GUARDED_MODES=('tecnica','cliente','ampliar','simple')
+GUARDED_MODES=('tecnica','cliente','ampliar','simple','informe')
 FIELDS={'problem':'Falla reportada por el cliente','technician_notes':'Observaciones de recepción','physical_condition':'Inspección física','findings':'Diagnóstico técnico','internal_notes':'Observaciones del técnico',
  'recommendations':'Recomendaciones técnicas','comment':'Seguimiento técnico','work':'Trabajos realizados (informe de reparación)','budget':'Presupuesto o cotización','delivery':'Informe de entrega',
  'appointment':'Descripción de la falla en una cita','notes':'Observaciones','client_message':'Mensaje para el cliente','mail':'Correo para el cliente','warranty':'Condiciones de garantía','service':'Descripción de un producto o servicio','reply':'Respuesta de atención al cliente'}
@@ -95,8 +96,13 @@ def save_correction(c,data):
 
 def status(c):
     name=provider()
+    import adi_reports
     return {'provider':name,'configured':bool(name),'enabled':enabled(c),'available':bool(name) and enabled(c),'model':model() if name else '','correction':correction(c),
-            'modes':[{'code':code,'label':label} for code,(label,_) in MODES.items()],'internal_fields':list(INTERNAL_FIELDS)}
+            'modes':[{'code':code,'label':label} for code,(label,_) in MODES.items()],'internal_fields':list(INTERNAL_FIELDS),
+            # 1.5.255: los cuatro modos que ve el técnico, el tipo de informe y el modo recomendado por campo.
+            'groups':[{'code':code,'label':label,'hint':hint,'modes':list(modes)} for code,label,hint,modes in adi_reports.GROUPS],
+            'report_types':[{'code':code,'label':label} for code,label in adi_reports.REPORT_LABELS.items()],
+            'recommend':{field:adi_reports.recommend(field,'x '*30) for field in FIELDS}}
 
 
 def _post(url,payload,headers):
@@ -113,16 +119,17 @@ def _post(url,payload,headers):
         raise AdiError('proveedor','El proveedor de IA devolvió una respuesta que no se pudo leer.') from None
 
 
-def _complete(system,user):
-    """Texto generado y consumo en tokens. Lanza AdiError si no hay proveedor o falla."""
+def _complete(system,user,long=False):
+    """Texto generado y consumo en tokens. Lanza AdiError si no hay proveedor o falla. `long`: informes (más salida permitida)."""
     name=provider()
     if name=='anthropic':
-        data=_post('https://api.anthropic.com/v1/messages',{'model':model(),'max_tokens':1500,'system':system,'messages':[{'role':'user','content':user}]},
+        # Claude Opus 5.5 razona siempre y ese razonamiento cuenta en max_tokens: margen suficiente para que la respuesta no quede cortada.
+        data=_post('https://api.anthropic.com/v1/messages',{'model':model(),'max_tokens':8000 if long else 4000,'system':system,'messages':[{'role':'user','content':user}]},
                    {'x-api-key':os.environ['ANTHROPIC_API_KEY'].strip(),'anthropic-version':'2023-06-01'})
         text=''.join(part.get('text','') for part in data.get('content',[]) if isinstance(part,dict) and part.get('type')=='text');usage=data.get('usage') or {}
         return text.strip(),int(usage.get('input_tokens') or 0),int(usage.get('output_tokens') or 0)
     if name=='openai':
-        data=_post('https://api.openai.com/v1/responses',{'model':model(),'instructions':system,'input':user,'max_output_tokens':1500},{'Authorization':'Bearer '+openai_key()})
+        data=_post('https://api.openai.com/v1/responses',{'model':model(),'instructions':system,'input':user,'max_output_tokens':2600 if long else 1500},{'Authorization':'Bearer '+openai_key()})
         parts=[part.get('text','') for item in data.get('output',[]) if item.get('type')=='message' for part in item.get('content',[]) if part.get('type')=='output_text'];usage=data.get('usage') or {}
         return ' '.join(parts).strip(),int(usage.get('input_tokens') or 0),int(usage.get('output_tokens') or 0)
     raise AdiError('configuracion','ADI no tiene un proveedor de IA configurado en el servidor.',503)
@@ -187,6 +194,8 @@ MESSAGE_SYSTEM=("Eres el asistente técnico de PC-DOCTOR, taller de servicio té
  "Devuelve solo los párrafos del cuerpo, sin comillas, sin títulos, sin listas y sin explicaciones. Conserva carácter por carácter modelos, series, códigos y mediciones. "
  "Ejemplo. Anotaciones: «Laptop HP pantalla rota, hay que cambiar, no sirve». Cuerpo: «Le informamos que su computadora portátil HP presenta daños físicos en el panel de visualización, los cuales afectan su funcionamiento.\n\nComo solución técnica, recomendamos sustituir la pantalla por un componente compatible con las especificaciones del fabricante, con el objetivo de restablecer correctamente la visualización del equipo.» "
  +GLOSSARY)
+CONCISE=("Calidad: no repitas ideas, síntomas ni recomendaciones; ordena la información en secuencia lógica (síntoma, hallazgo, causa probable, acción); "
+ "usa terminología técnica precisa sin confundir componentes ni tecnologías; más profundidad técnica, no más extensión.")
 MESSAGE_TASK='Redacta el mensaje con lenguaje profesional, explicando lo técnico de forma fácil de comprender. Máximo 110 palabras, en uno a tres párrafos breves.'
 MESSAGE_WORDS=110
 CLAIMS=re.compile(r"\b(?:hemos\s+\w+(?:ado|ido)|reemplazamos|sustituimos|cambiamos|reparamos|instalamos|soldamos|limpiamos|actualizamos|formateamos|realizamos|comprobamos|verificamos|garant[ií]a|d[ií]as?\s+h[aá]biles?|ma[nñ]ana|horas?)\b",re.I)
@@ -249,27 +258,50 @@ def professional_message(note,data=None):
     body=re.sub(r'</?(?:anotaciones|datos|borrador)>','',body).strip().strip('«»"').strip()
     if not body:raise AdiError('proveedor','El proveedor de IA no devolvió ningún mensaje.')
     warnings=_guard('\n'.join(lines+[note]),body)
+    import adi_reports
+    body,removed=adi_reports.dedupe(body)
+    if removed:warnings.append('ADI quitó %d frase%s repetida%s.'%(removed,'' if removed==1 else 's','' if removed==1 else 's'))
     missing=missing_tokens(note,body)
     if missing:warnings.append('ADI omitió estos datos de tus anotaciones: %s.'%', '.join(missing))
     if len(body.split())>MESSAGE_WORDS*1.3:warnings.append('El mensaje quedó más largo de lo previsto: puedes usar «Resumir mensaje».')
     return {'body':body[:LIMIT],'warnings':warnings,'model':model(),'tokens_in':tokens_in,'tokens_out':tokens_out}
 
 
-def improve(text,mode,field='',data=None):
+def improve(text,mode,field='',data=None,report=''):
     text=str(text or '').strip()
     if mode=='mensaje' or mode not in MODES:raise AdiError('modo','Selecciona un tipo de mejora válido.',400)
     if mode=='cliente' and field in INTERNAL_FIELDS:raise AdiError('interno','Este campo es de uso interno: no se redacta como explicación para el cliente.',400)
     if not text:raise AdiError('vacio','Escribe primero el texto que quieres mejorar.',400)
     if len(text)>LIMIT:raise AdiError('largo','El texto admite hasta %d caracteres por consulta.'%LIMIT,400)
+    import adi_reports
     label=FIELDS.get(field,'Texto de la orden')
     lines=['%s: %s'%(k,v) for k,v in (data or {}).items() if v]
     guarded=mode in GUARDED_MODES
-    prompt='Campo: %s.\nTarea: %s\n'%(label,MODES[mode][1])+('<datos>\n%s\n</datos>\n'%'\n'.join(lines) if lines else '')+'<texto>\n%s\n</texto>'%text
-    suggestion,tokens_in,tokens_out=_complete(SYSTEM+(' '+TRUTH+' '+GLOSSARY if guarded else ''),prompt)
-    suggestion=re.sub(r'^\s*<texto>\s*|\s*</texto>\s*$','',suggestion).strip()
+    kind=''
+    if mode=='informe':
+        kind=adi_reports.report_kind(text+' '+' '.join(lines),field,report)
+        suggestion,tokens_in,tokens_out=_complete(adi_reports.REPORT_SYSTEM+' '+TRUTH+' '+GLOSSARY,adi_reports.report_prompt(kind,text,lines,label),long=True)
+        suggestion=adi_reports.tidy(re.sub(r'</?(?:texto|datos)>','',suggestion))
+    else:
+        prompt='Campo: %s.\nTarea: %s\n'%(label,MODES[mode][1])+('<datos>\n%s\n</datos>\n'%'\n'.join(lines) if lines else '')+'<texto>\n%s\n</texto>'%text
+        suggestion,tokens_in,tokens_out=_complete(SYSTEM+(' '+TRUTH+' '+GLOSSARY+' '+CONCISE if guarded else ''),prompt)
+        suggestion=re.sub(r'^\s*<texto>\s*|\s*</texto>\s*$','',suggestion).strip()
     if not suggestion:raise AdiError('proveedor','El proveedor de IA no devolvió ninguna sugerencia.')
     warnings=_guard('\n'.join(lines+[text]),suggestion) if guarded else []
-    return {'suggestion':suggestion[:LIMIT*2],'missing':missing_tokens(text,suggestion),'changed':suggestion!=text,'model':model(),'tokens_in':tokens_in,'tokens_out':tokens_out,'warnings':warnings}
+    if guarded:
+        # Motor de calidad (1.5.255): repeticiones fuera, y aviso de trabajos, pruebas o especificaciones que no están registrados.
+        suggestion,removed=adi_reports.dedupe(suggestion)
+        if removed:warnings.append('ADI quitó %d frase%s repetida%s.'%(removed,'' if removed==1 else 's','' if removed==1 else 's'))
+        claims,specs=adi_reports.unsupported('\n'.join(lines+[text]),suggestion)
+        if claims:warnings.append('Estas afirmaciones no constan como realizadas o comprobadas: %s. Confírmalas o cámbialas a recomendación.'%', '.join(claims))
+        if specs:warnings.append('Especificaciones que no están en tus anotaciones ni en la orden: %s. Confírmalas o quítalas.'%', '.join(specs))
+    if mode=='informe':
+        absent=adi_reports.missing_sections(kind,suggestion)
+        if absent:warnings.append('Al informe le faltan secciones: %s. Puedes regenerarlo.'%', '.join(absent))
+        pending=adi_reports.pending_data(data) if data is not None else ['datos de la orden (abre el informe desde una orden para usarlos)']
+        if pending:warnings.append('Informe preliminar: no hay %s registrado%s en la orden.'%(', '.join(pending),'s' if len(pending)>1 else ''))
+    return {'suggestion':suggestion[:LIMIT*2],'missing':missing_tokens(text,suggestion),'changed':suggestion!=text,'model':model(),'tokens_in':tokens_in,'tokens_out':tokens_out,'warnings':warnings,
+            'report':kind,'report_label':adi_reports.REPORT_LABELS.get(kind,'')}
 
 
 # Revisión del nombre en la reserva pública de citas. Nunca cambia nada por su cuenta: devuelve una propuesta que el cliente acepta o descarta.

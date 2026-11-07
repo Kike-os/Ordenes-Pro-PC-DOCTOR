@@ -4863,7 +4863,12 @@ class Handler(BaseHTTPRequestHandler):
                     context=None;text=str(data.get('text','') or '');order_ref=str(data.get('order_id','') or '');letter=text.lstrip().lower().startswith('estimad')
                     if mode=='mensaje' and not rules['professional']:return self.reply(403,{'error':'Las mejoras de redacción con ADI están desactivadas en Configuración.','kind':'desactivado'})
                     try:
-                        if not auto and mode in ('mensaje',)+adi_ai.GUARDED_MODES and order_ref.isdigit():
+                        if not auto and mode=='informe' and order_ref.isdigit():
+                            # Informe técnico (1.5.255): contexto técnico completo de la orden, depurado (sin cliente, contacto, serie ni precios).
+                            import adi_reports
+                            context=adi_reports.order_context(c,int(order_ref))
+                            if not context:return self.reply(404,{'error':'Orden no disponible.'})
+                        elif not auto and mode in ('mensaje',)+adi_ai.GUARDED_MODES and order_ref.isdigit():
                             ids=lambda key:[int(x) for x in str(data.get(key,'') or '').split(',') if x.isdigit()][:20]
                             selection=str(data.get('selection','') or 'auto')
                             context=order_followups.ai_request(c,int(order_ref),None if selection=='auto' else [] if selection=='manual' else ids('followup_ids'),ids('history_ids') if selection=='ids' else [],str(data.get('order_recommendations',''))=='1',str(data.get('findings',''))=='1')
@@ -4879,8 +4884,9 @@ class Handler(BaseHTTPRequestHandler):
                             wrapped=order_followups.ai_wrap(c,int(order_ref) if context else None,ai_template,done['body'],cost_choice,link['url'] if link['active'] else '')
                             result=dict(done,suggestion=wrapped['body'],missing=[],changed=True,warnings=done['warnings']+wrapped['warnings'])
                         else:
-                            result=adi_ai.improve(text,mode,field,context['data'] if context else None)
-                            if letter and context:
+                            result=adi_ai.improve(text,mode,field,context['data'] if context else None,str(data.get('report','') or '')[:20])
+                            if mode=='informe' and context and context.get('header'):result=dict(result,suggestion=__import__('adi_reports').with_header(result['suggestion'],context['header']))
+                            if letter and context and mode!='informe':
                                 link=order_tracking_active(c,int(order_ref))
                                 wrapped=order_followups.ai_wrap(c,int(order_ref),ai_template,result['suggestion'],cost_choice,link['url'] if link['active'] else '')
                                 result=dict(result,suggestion=wrapped['body'],warnings=result['warnings']+wrapped['warnings'])
