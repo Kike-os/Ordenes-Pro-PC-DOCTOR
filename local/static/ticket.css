@@ -459,3 +459,20 @@
 .tp-kind[data-kind=estimada]{border-style:dashed;border-color:#e0b25c99;color:#ffe9b8}
 @media(prefers-reduced-motion:no-preference){.tp-next b{animation:tp-next-in .5s ease-out .2s both}}
 @keyframes tp-next-in{from{opacity:0;transform:translateX(-4px)}}
+
+/* 1.5.250 — Vehículos 3D corporativos (furgoneta y avión de carga con el logo original). Las luces de emergencia solo se encienden con una
+   novedad (y parpadean sin movimiento reducido); las nubes acompañan solo un vuelo en curso, se desplazan lentamente y se detienen fuera de
+   pantalla o con «reducir movimiento». En el teléfono, el vehículo de la lista vertical es algo mayor para que se reconozca. */
+.lgx-logo{overflow:hidden}
+.lgx-hazard{opacity:0}
+.lgx-veh[data-motion=stopped] .lgx-hazard{opacity:1}
+.lgx-warn{filter:drop-shadow(0 1px 2px #0008)}
+.lgx-clouds path{fill:#dbeafe;opacity:.13}
+.lgx-mini{width:58px;height:34px}
+.lgx-veh .lgx-van,.lgx-veh .lgx-plane-3d{filter:drop-shadow(0 2px 3px #00000059)}
+@media (prefers-reduced-motion:no-preference){
+ .lgx-veh[data-motion=stopped] .lgx-hazard{animation:lgx-blink 1.1s steps(2,jump-none) infinite}
+ .lgx-clouds{animation:lgx-clouds 14s ease-in-out infinite alternate}
+}
+@keyframes lgx-blink{50%{opacity:.15}}
+@keyframes lgx-clouds{from{transform:translateX(18px)}to{transform:translateX(-26px)}}

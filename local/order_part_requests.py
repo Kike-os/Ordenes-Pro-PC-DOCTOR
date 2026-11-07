@@ -82,8 +82,8 @@ def fine(r):
 # kilómetros, ubicación GPS ni avance por el tiempo transcurrido. Lienzo SVG de 1000 × 158 unidades (se escala con el ancho). El vehículo
 # va en su propio carril y se detiene antes de cada punto de control (margen CLEARANCE): nunca tapa un punto ni sus textos.
 MAP_Y = 80
-CLEARANCE = 58   # distancia mínima (en unidades del lienzo) entre el centro del vehículo y el de un punto de control
-LANE = -24       # carril del camión: sobre la línea de ruta, nunca encima de los puntos ni de sus textos
+CLEARANCE = {'truck': 68, 'plane': 80}   # distancia mínima (unidades del lienzo) entre el centro del vehículo y el de un punto de control (1.5.250: vehículos más grandes)
+LANE = -22       # carril de la furgoneta: sobre la línea de ruta, nunca encima de los puntos ni de sus textos
 MAPS = {
     'internacional': {'nodes': (('origen', 120, ('solicitado', 'confirmado', 'preparacion', 'despachado')), ('ecuador', 520, ('llegada_pais', 'aduana_revision', 'aduana_liberado')),
                                 ('otavalo', 740, ('ruta_otavalo',)), ('taller', 895, ('recibido', 'instalacion', 'instalado', 'listo'))),
@@ -118,9 +118,10 @@ def _path_point(path, fraction):
     for a, b in zip(pts, pts[1:]):
         lengths.append(lengths[-1] + math.dist(a, b))
     goal = max(0.0, min(1.0, fraction)) * lengths[-1]
-    i = next((k for k, v in enumerate(lengths) if v >= goal), len(lengths) - 1)
-    a, b = pts[max(0, i - 1)], pts[min(len(pts) - 1, max(1, i))]
-    return round(pts[i][0], 1), round(pts[i][1], 1), round(math.degrees(math.atan2(b[1] - a[1], b[0] - a[0])), 1)
+    i = max(1, next((k for k, v in enumerate(lengths) if v >= goal), len(lengths) - 1))
+    a, b = pts[i - 1], pts[i]
+    t = (goal - lengths[i - 1]) / ((lengths[i] - lengths[i - 1]) or 1)  # interpolación exacta entre muestras (antes, la muestra más cercana)
+    return (round(a[0] + (b[0] - a[0]) * t, 1), round(a[1] + (b[1] - a[1]) * t, 1), round(math.degrees(math.atan2(b[1] - a[1], b[0] - a[0])), 1))
 
 
 def _path_length(path):
@@ -133,9 +134,9 @@ def _path_length(path):
     return sum(math.dist(a, b) for a, b in zip(pts, pts[1:]))
 
 
-def _safe(path, fraction):
+def _safe(path, fraction, kind='truck'):
     """Fracción del trazo con margen de seguridad: el vehículo nunca queda sobre un punto de control (se detiene antes de llegar)."""
-    margin = min(0.45, CLEARANCE / _path_length(path))
+    margin = min(0.45, CLEARANCE[kind] / _path_length(path))
     return round(margin + max(0.0, min(1.0, fraction)) * (1 - 2 * margin), 4)
 
 
@@ -178,13 +179,13 @@ def route_map(shipping, current, reached, at, finished, situation, public=False,
         if motion == 'moving' and situation != 'normal':
             motion = 'stopped'
         path = next(x['path'] for x in segments if x['code'] == seg)
-        start, end = _safe(path, start), _safe(path, end)
+        start, end = _safe(path, start, kind), _safe(path, end, kind)
         fx, fy, fa = _path_point(path, start)
         x, y, angle = _path_point(path, end)
         lane = LANE if kind == 'truck' else 0
         y, fy = round(y + lane, 1), round(fy + lane, 1)
         vehicle = {'kind': kind, 'segment': seg, 'path': path, 'from': start, 'to': end, 'motion': motion, 'animate': motion in ('moving', 'landed', 'arrived') and end > start,
-                   'x': x, 'y': y, 'angle': angle if kind == 'plane' else 0, 'fx': fx, 'fy': fy, 'lane': lane,
+                   'x': x, 'y': y, 'angle': angle if kind == 'plane' else 0, 'fx': fx, 'fy': fy, 'lane': lane, 'distance': round((end - start) * _path_length(path), 1),
                    'text': ('Avión ' if kind == 'plane' else 'Vehículo de transporte ') + VEHICLE_TEXT[motion]}
     return {'mode': shipping, 'nodes': nodes, 'segments': segments, 'vehicle': vehicle, 'cancelled': cancelled, 'finished': finished,
             'customs_active': shipping == 'internacional' and current == 'aduana_revision' and not cancelled}

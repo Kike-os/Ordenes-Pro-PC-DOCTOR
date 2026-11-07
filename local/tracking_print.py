@@ -79,7 +79,7 @@ def _header(d, audience):
     meta = [('Orden de servicio', d['code']), ('Fecha de impresión', datetime.now(ECUADOR_TZ).strftime('%d/%m/%Y %H:%M')), ('Estado general', d['status_label'])]
     rows = ''.join('<div><dt>%s</dt><dd%s>%s</dd></div>' % (e(k), ' class="pa4-mono"' if i == 0 else ' data-printed' if i == 1 else '', e(v)) for i, (k, v) in enumerate(meta))
     return ('<header class="pa4-head"><span class="pa4-logo"><img src="/static/logo-original.png" alt="PC-DOCTOR S.A." width="2826" height="2049"></span>'
-            '<div class="pa4-title"><strong>%s</strong><h1>Seguimiento de reparación</h1><small>Documento de seguimiento técnico%s</small></div><dl class="pa4-meta">%s</dl></header>'
+            '<div class="pa4-title"><strong>%s</strong><h1>Seguimiento de Reparación</h1><small>Documento de seguimiento técnico%s</small></div><dl class="pa4-meta">%s</dl></header>'
             % (e(settings()['name']), ' · uso interno del taller' if audience == 'admin' else '', rows))
 
 

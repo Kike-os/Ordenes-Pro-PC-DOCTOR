@@ -43,7 +43,7 @@ class TrackingPrintTests(unittest.TestCase):
         doc = self.a4(page)
         self.assertTrue(doc)
         self.assertIn('/static/seguimiento-a4.css', page)
-        for text in ('Seguimiento de reparación', 'Información del equipo', 'Progreso de reparación', 'Seguimiento de repuestos', 'Observaciones y avisos',
+        for text in ('Seguimiento de Reparación', 'Información del equipo', 'Progreso de reparación', 'Seguimiento de repuestos', 'Observaciones y avisos',
                      'Historial de seguimiento', 'Información de transporte', order['code'], 'Pantalla 15,6', 'Estado del presupuesto', 'Aprobado', 'data-audience="public"',
                      'logo-original.png', 'Próxima etapa:'):
             self.assertIn(text, doc, text)

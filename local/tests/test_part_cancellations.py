@@ -248,8 +248,9 @@ class PartCancellationTests(unittest.TestCase):
                     for x, y in ((v['x'], v['y']), (v['fx'], v['fy'])):
                         for n in m['nodes']:
                             gap = ((x - n['x']) ** 2 + (y - v['lane'] - parts.MAP_Y) ** 2) ** .5  # distancia real sobre el trazo (el arco sube)
-                            self.assertGreaterEqual(gap, parts.CLEARANCE - 1, (shipping, step, n['code'], x))
-                            self.assertGreaterEqual(abs(x - n['x']), 20 + 24, (shipping, step, n['code'], x))  # radio del punto + medio vehículo
+                            self.assertGreaterEqual(gap, parts.CLEARANCE[v['kind']] - 1, (shipping, step, n['code'], x))
+                            # radio del punto + medio vehículo (1.5.250: furgoneta de 67 y avión de 83 unidades de largo)
+                            self.assertGreaterEqual(abs(x - n['x']), 20 + {'truck': 34, 'plane': 40}[v['kind']], (shipping, step, n['code'], x))
                         self.assertTrue(30 <= x <= 970 and 0 <= y <= 158, (shipping, step, x, y))
                     if v['kind'] == 'truck':
                         self.assertEqual(v['y'], parts.MAP_Y + parts.LANE)  # carril propio, sobre la línea

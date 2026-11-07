@@ -83,7 +83,7 @@ def public_page(data,token='',notice='',tone='ok'):
 # Las etapas salen del estado real de la orden; una etapa futura nunca se marca como completada.
 STAGES=(('Recepción',('pendiente',)),('Diagnóstico y reparación',('reparacion','esperando_cliente','presupuesto','revision_recurrente')),('Listo para retiro',('listo','espera_entrega')),('Entrega',('entregado',)))
 A4_CSS='<link rel="stylesheet" href="/static/seguimiento-a4.css">'
-CARD_HEAD='<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><meta name="robots" content="noindex,nofollow">%s<title>Seguimiento de reparación %s | PC-DOCTOR S.A.</title><link rel="icon" href="/favicon.ico?v=2" sizes="48x48"><link rel="stylesheet" href="/static/ticket.css">%s<script defer src="/static/ticket.js"></script></head><body class="ticket-page"><main>'
+CARD_HEAD='<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><meta name="robots" content="noindex,nofollow">%s<title>Seguimiento de Reparación %s | PC-DOCTOR S.A.</title><link rel="icon" href="/favicon.ico?v=2" sizes="48x48"><link rel="stylesheet" href="/static/ticket.css">%s<script defer src="/static/ticket.js"></script></head><body class="ticket-page"><main>'
 
 
 def card(data,qr_src,public):
@@ -109,7 +109,7 @@ def card(data,qr_src,public):
     except barcode128.BarcodeError:bars=''
     qr='<img class="ticket-qr" src="%s" width="140" height="140" alt="Código QR del seguimiento de la orden %s">'%(e(qr_src),e(code)) if qr_src else '<p class="ticket-noqr">Sin enlace público activo. Genéralo desde la orden para obtener el código QR.</p>'
     return ('<article class="ticket" data-status="%s"><section class="ticket-top" aria-label="Datos de la orden">'
-            '<header class="ticket-head"><img class="ticket-logo" src="/static/logo-original.png" alt="PC-DOCTOR S.A." width="150"><div><small>%s</small><h1>Seguimiento de reparación</h1></div></header>'
+            '<header class="ticket-head"><img class="ticket-logo" src="/static/logo-original.png" alt="PC-DOCTOR S.A." width="150"><div><small>%s</small><h1>Seguimiento de Reparación</h1></div></header>'
             '<div class="ticket-order"><div><small>Orden de servicio</small><strong>%s</strong></div><span class="ticket-state" data-status="%s">%s</span></div>'
             '<div class="ticket-progress" role="img" aria-label="Avance: %s"><span data-progress="%d"></span></div><ol class="ticket-steps">%s</ol><dl class="ticket-facts">%s</dl></section>'
             '<div class="ticket-cut" aria-hidden="true"></div>'
@@ -140,10 +140,15 @@ def _icon(path):
     return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="%s"/></svg>'%path
 
 
-VAN=('<svg viewBox="0 0 48 28" aria-hidden="true" focusable="false"><path class="v-box" d="M3 7a3 3 0 0 1 3-3h20a3 3 0 0 1 3 3v12H3z"/>'
-     '<path class="v-cab" d="M29 9h8.5a3 3 0 0 1 2.5 1.3l4.2 6.2a3 3 0 0 1 .5 1.7V19H29z"/><path class="v-win" d="M31 11h6l3.4 5H31z"/>'
-     '<rect class="v-band" x="6" y="10" width="17" height="3" rx="1.5"/><circle class="v-wheel" cx="11" cy="21" r="3.6"/><circle class="v-wheel" cx="36" cy="21" r="3.6"/>'
-     '<circle class="v-hub" cx="11" cy="21" r="1.4"/><circle class="v-hub" cx="36" cy="21" r="1.4"/></svg>')
+def _van():
+    """Furgoneta 3D de PC-DOCTOR (1.5.250), la misma del mapa de ruta, con el logo original; id únicos por dibujo."""
+    import itertools,part_route
+    global _VAN_N
+    _VAN_N=globals().get('_VAN_N',itertools.count(1))
+    u='tv%d'%next(_VAN_N)
+    return '<svg viewBox="-36 -22 72 38" aria-hidden="true" focusable="false"><defs>%s</defs>%s</svg>'%(part_route.vehicle_defs(u),part_route.van(u))
+
+
 CHECK='<svg class="v-ok" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><circle cx="10" cy="10" r="9"/><path d="m6 10.2 2.6 2.6L14.2 7"/></svg>'
 
 
@@ -196,12 +201,12 @@ def _parts_section(data):
         steps=''
         for s in p['steps']:
             word={'done':'completada','current':'etapa actual','pending':'pendiente','skipped':'no registrada'}[s['state']]
-            inline=VAN if s['code']=='traslado' and p['vehicle'] in ('transit','stopped') else ''
+            inline=_van() if s['code']=='traslado' and p['vehicle'] in ('transit','stopped') else ''
             steps+='<li data-state="%s" data-c="%d" data-code="%s"%s><i aria-hidden="true"></i><span>%s</span><small class="sr-only">%s</small>%s%s</li>'%(
                 s['state'],s['color'],e(s['code']),(' aria-current="step"'+(' data-tone="%s"'%e(p['tone']) if p['situation']!='normal' else '')) if s['state']=='current' else '',
                 e(s['label']),e(word),'<time>%s</time>'%e(_when(s['at'],False)) if s['at'] else ('<em>No registrada</em>' if s['state']=='skipped' else ''),
                 '<span class="tp-van-inline" data-vehicle="%s" aria-hidden="true">%s</span>'%(e(p['vehicle']),inline) if inline else '')
-        vehicle=('<span class="tp-vehicle" data-vehicle="%s" aria-hidden="true">%s%s</span>'%(e(p['vehicle']),VAN,CHECK if p['vehicle']=='arrived' else '')) if p['vehicle'] else ''
+        vehicle=('<span class="tp-vehicle" data-vehicle="%s" aria-hidden="true">%s%s</span>'%(e(p['vehicle']),_van(),CHECK if p['vehicle']=='arrived' else '')) if p['vehicle'] else ''
         moving={'transit':'El repuesto está en camino hacia nuestro taller.','stopped':'El traslado está detenido por una novedad.','arrived':'El repuesto llegó a nuestro taller.'}.get(p['vehicle'],'')
         meter=''.join('<span data-state="%s" data-c="%d"></span>'%(s['state'],s['color']) for s in p['steps'])
         # Fechas diferenciadas (1.5.249): «Real» = registrada con su evento; «Confirmada» = confirmación del pedido; «Estimada» = previsión del taller.
@@ -271,7 +276,7 @@ def public_card(data,qr_src):
     qr='<img class="ticket-qr" src="%s" width="132" height="132" alt="Código QR del seguimiento de la orden %s">'%(e(qr_src),e(code)) if qr_src else ''
     now=datetime.now(ECUADOR_TZ).strftime('%d/%m/%Y %H:%M')
     return ('<article class="ticket tw" data-status="%s"><section class="ticket-top tw-top" aria-label="Datos de la orden">'
-            '<header class="tw-head"><span class="tw-logo"><img class="ticket-logo" src="/static/logo-original.png" alt="PC-DOCTOR S.A." width="2826" height="2049"></span><div class="tw-title"><small>%s</small><h1>Seguimiento de reparación</h1></div>'
+            '<header class="tw-head"><span class="tw-logo"><img class="ticket-logo" src="/static/logo-original.png" alt="PC-DOCTOR S.A." width="2826" height="2049"></span><div class="tw-title"><small>%s</small><h1>Seguimiento de Reparación</h1></div>'
             '<div class="tw-order"><small>Orden de servicio</small><strong>%s</strong><span class="tw-chips"><span class="ticket-state" data-status="%s">%s</span>%s</span>'
             '<button type="button" class="tw-print" data-print>%sImprimir seguimiento A4</button></div></header>'
             '<div class="tw-progress"><h2 class="sr-only">Avance de la reparación</h2><ol class="ticket-steps tw-steps">%s</ol>%s</div><dl class="ticket-facts tw-facts">%s</dl></section>'

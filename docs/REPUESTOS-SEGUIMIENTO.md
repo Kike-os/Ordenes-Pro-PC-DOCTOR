@@ -428,3 +428,27 @@ Los pasos internos menores no generan avisos.
   - las reglas de cancelación, con plazo de 24 horas comprobado en el servidor;
   - los avisos, únicos por evento y canal;
   - la protección del enlace público: un repuesto de otra orden responde «no disponible».
+
+## 1.5.250 — Vehículos 3D corporativos (furgoneta y avión de carga)
+
+- **Dibujo:** los mismos componentes de antes (`part_route.van` y `part_route.plane`, usados por el mapa, la lista del teléfono, la línea sin tipo de envío del panel y del cliente, y la hoja A4).
+  - Estilo 3D semirrealista en SVG: degradados, brillos, vidrios con reflejo, aros con radios, sombra al suelo.
+  - Colores de PC-DOCTOR: blanco y plata con azul marino y rojo.
+  - **Furgoneta:** puertas y manijas, espejo, faro y luz trasera, parachoques y luces de emergencia.
+  - **Avión de carga en tres cuartos:** fuselaje, ventanillas y compuerta de carga, ala y estabilizador en perspectiva, turbina con toma de aire, cola corporativa y tren de aterrizaje.
+- **Logo original:** es el archivo `static/logo-original.png`, insertado tal cual en la carrocería y el fuselaje.
+  - Un SVG anidado solo deja fuera su margen transparente y conserva la proporción real del dibujo (2102 × 1596).
+  - No se redibuja, no se recolorea ni se deforma.
+  - Su tamaño queda limitado por el del vehículo dentro del mapa: unos 20 px en escritorio en la furgoneta y unos 12 px en el avión.
+- **Animaciones**, solo del tramo real registrado (no se inventan posiciones ni tiempos), con una duración de 2,4 s una sola vez al cargar:
+  - **Furgoneta:** arranque suave, aceleración y frenado progresivo. Las ruedas giran según la distancia recorrida y hay suspensión durante el trayecto. Se detiene y, al llegar a PC-DOCTOR, aparece la confirmación.
+  - **Avión:** despega con el tren abajo y lo recoge en el ascenso, con nubes que se desplazan durante el vuelo. Al aterrizar en Ecuador despliega el tren antes de tocar tierra.
+  - **Con una novedad:** el vehículo se detiene con un aviso ámbar y luces de emergencia, sin animación.
+- **Rendimiento y accesibilidad:**
+  - Las animaciones son SMIL y CSS, sin librerías ni recursos externos.
+  - Se pausan fuera de pantalla y con la pestaña oculta.
+  - Con «reducir movimiento» se ve el vehículo quieto en su punto real.
+  - Si el navegador no anima, el dibujo estático sigue mostrando el estado.
+- **Separación:** los vehículos son más grandes, así que la distancia mínima a los puntos de control pasa a 68 unidades (furgoneta) y 80 (avión). La posición se interpola exacta sobre el trazo. Ningún vehículo tapa puntos ni textos.
+- **Título:** la página del cliente ahora dice «Seguimiento de Reparación».
+- **Validación:** se hizo en la vista previa local (mismo código, base temporal con datos ficticios). El entorno Preview de Vercel comparte la base de datos de producción, así que no se usó para no tocar datos reales.
