@@ -1,0 +1,155 @@
+/* Seguimiento de reparación en hoja A4 (1.5.248). Informe técnico por secciones: cabecera corporativa, equipo, progreso, repuestos con su
+   trayectoria estática, avisos, historial, transporte e información técnica. Fondo blanco, azul corporativo con celeste y gris; los estados
+   siempre llevan texto (no solo color). Todo va bajo .pa4 o .pa4-page: no afecta a otras pantallas. En la página pública el documento queda
+   oculto en pantalla y es lo único que se imprime; en la vista interna (/tarjeta/<id>/a4) se ve como una hoja de vista previa. */
+@page{size:A4 portrait;margin:12mm;
+ @bottom-left{content:"PC-DOCTOR S.A. · Calle Bolívar #608 y García Moreno, junto al Banco Pichincha\A Otavalo, Imbabura, Ecuador · WhatsApp +593 98 746 0591 · ecuadorpcdoctor.com";white-space:pre;font:8pt/1.35 Arial,Helvetica,sans-serif;color:#475569;vertical-align:middle}
+ @bottom-right{content:"Página " counter(page) " de " counter(pages);white-space:pre;text-align:right;font:8pt/1.35 Arial,Helvetica,sans-serif;color:#475569;vertical-align:middle}
+}
+.pa4{--pb:#1c4f8f;--pb2:#1d4ed8;--pc:#0ea5e9;--pcs:#e0f2fe;--pg:#94a3b8;--pgs:#e2e8f0;--line:#cbd5e1;--ink:#111827;--muted:#475569;--red:#b91c1c;--amber:#b45309;--green:#15803d;
+ display:block;color:var(--ink);background:#fff;font:9.5pt/1.42 Arial,Inter,"Helvetica Neue",Helvetica,sans-serif;text-align:left;print-color-adjust:exact;-webkit-print-color-adjust:exact}
+.pa4,.pa4 *{box-sizing:border-box}
+.pa4 h2{break-after:avoid;margin:0 0 2.2mm;padding-bottom:1.1mm;border-bottom:.3mm solid var(--line);color:var(--pb);font-size:10.5pt;line-height:1.25;letter-spacing:.06em;text-transform:uppercase}
+.pa4-sec,.pa4-parts{margin-top:4.5mm}
+.pa4-keep,.pa4-part,.pa4-foot{break-inside:avoid;page-break-inside:avoid}
+.pa4-small{margin:2mm 0 0;color:var(--muted);font-size:8.5pt}
+.pa4-mono{font-family:"JetBrains Mono",Consolas,"Courier New",monospace;letter-spacing:.02em}
+
+/* A · Cabecera corporativa: logo original (archivo sin modificar; solo se omite su margen transparente), título y datos de la orden. */
+.pa4-head{display:grid;grid-template-columns:30mm minmax(0,1fr) auto;align-items:center;gap:5mm;min-height:25mm;padding-bottom:3mm;border-bottom:.8mm solid var(--pb)}
+.pa4-logo{display:block;width:29mm;aspect-ratio:2102/1596;overflow:hidden}
+.pa4-logo img{display:block;width:134.4%;max-width:none;height:auto;margin:-6.04% 0 0 -14.78%}
+.pa4-title{min-width:0}
+.pa4-title strong{display:block;color:var(--pb);font-size:9.5pt;letter-spacing:.14em;text-transform:uppercase}
+.pa4-title h1{margin:.6mm 0 .4mm;color:var(--ink);font-size:16pt;line-height:1.15;letter-spacing:.01em;text-transform:uppercase}
+.pa4-title small{display:block;color:var(--muted);font-size:9pt}
+.pa4-meta{display:grid;gap:1mm;margin:0;text-align:right}
+.pa4-meta dt{color:var(--muted);font-size:7.5pt;letter-spacing:.06em;text-transform:uppercase}
+.pa4-meta dd{margin:0;font-size:9.5pt;font-weight:700}.pa4-meta dd.pa4-mono{color:var(--pb);font-size:11pt}
+
+/* B · Información del equipo: dos columnas. */
+.pa4-cols{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 7mm;padding:2mm 4mm;border:.3mm solid var(--line);border-radius:2.5mm}
+.pa4-dl{margin:0}
+/* Etiquetas alineadas en su propia columna (al ancho de la más larga) sin partirse en dos líneas. */
+.pa4-cols .pa4-dl{display:grid;grid-template-columns:max-content minmax(0,1fr);column-gap:3.5mm;align-content:start}
+.pa4-cols .pa4-dl div{display:contents}
+.pa4-cols .pa4-dl :is(dt,dd){padding:1mm 0;border-bottom:.2mm dotted var(--line)}
+.pa4-cols .pa4-dl div:last-child>*{border-bottom:0}
+.pa4-dl dt{color:var(--muted);font-size:8.5pt}.pa4-dl dd{margin:0;font-weight:700;overflow-wrap:anywhere}
+
+/* C · Progreso de reparación y etapas del repuesto: línea horizontal con círculos numerados; el estado también va escrito. */
+.pa4-steps,.pa4-track{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);margin:0;padding:0;list-style:none}
+.pa4-steps li,.pa4-track li{position:relative;display:grid;justify-items:center;align-content:start;gap:.8mm;padding:0 1mm;text-align:center}
+.pa4-steps li::before,.pa4-track li::before{content:"";position:absolute;top:3.1mm;left:-50%;right:50%;height:.8mm;background:var(--pgs)}
+.pa4-track li::before{top:2.35mm;height:.6mm}
+.pa4-steps li:first-child::before,.pa4-track li:first-child::before{display:none}
+.pa4-steps i,.pa4-track i{position:relative;z-index:1;display:grid;place-items:center;width:7mm;height:7mm;border:.5mm solid var(--pg);border-radius:50%;background:#fff;color:var(--muted);font-size:9pt;font-style:normal;font-weight:700}
+.pa4-track i{width:5.4mm;height:5.4mm;font-size:8pt}
+.pa4-steps b{font-size:9.5pt;line-height:1.2}.pa4-track b{font-size:8.5pt;line-height:1.2}
+.pa4-steps small,.pa4-track small{color:var(--muted);font-size:8pt;line-height:1.25}
+:is(.pa4-steps,.pa4-track) li[data-state=done]::before{background:var(--pb)}
+:is(.pa4-steps,.pa4-track) li[data-state=done] i{border-color:var(--pb);background:var(--pb);color:#fff}
+:is(.pa4-steps,.pa4-track) li[data-state=current]::before{background:linear-gradient(90deg,var(--pb),var(--pc))}
+:is(.pa4-steps,.pa4-track) li[data-state=current] i{border-color:var(--pc);background:var(--pcs);color:#075985;box-shadow:0 0 0 .9mm #bae6fd}
+:is(.pa4-steps,.pa4-track) li[data-state=current] :is(b,small){color:#075985;font-weight:700}
+:is(.pa4-steps,.pa4-track) li[data-state=incident]::before{background:var(--red)}
+:is(.pa4-steps,.pa4-track) li[data-state=incident] i{border-color:var(--red);background:#fee2e2;color:var(--red)}
+:is(.pa4-steps,.pa4-track) li[data-state=incident] :is(b,small){color:var(--red);font-weight:700}
+:is(.pa4-steps,.pa4-track) li[data-state=skipped] i{border-style:dashed}
+:is(.pa4-steps,.pa4-track) li[data-state=pending] b{color:var(--muted);font-weight:600}
+.pa4-now{margin:2.5mm 0 0;padding:1.5mm 3mm;border-left:1mm solid var(--pc);border-radius:1.5mm;background:#f0f9ff}
+
+/* D · Repuestos: un bloque por repuesto que no se parte entre hojas; trayectoria del mapa en versión estática para papel. */
+.pa4-parts>h2{margin-bottom:0}
+.pa4-part{margin-top:2.6mm;padding:2.6mm 3.6mm;border:.3mm solid var(--line);border-left:1.2mm solid var(--pb);border-radius:2.5mm}
+.pa4-part[data-tone=rojo]{border-left-color:var(--red)}.pa4-part:is([data-tone=amarillo],[data-tone=naranja]){border-left-color:var(--amber)}.pa4-part[data-tone=verde]{border-left-color:var(--green)}
+.pa4-part>header{display:flex;align-items:flex-start;justify-content:space-between;gap:4mm}
+.pa4-part h3{margin:0;font-size:11pt;line-height:1.25}.pa4-part header small{display:block;color:var(--muted);font-size:9pt}
+.pa4-chip{flex:none;padding:.7mm 2.6mm;border:.3mm solid var(--pb);border-radius:99px;color:var(--pb);font-size:8.5pt;font-weight:700}
+.pa4-chip[data-tone=rojo]{border-color:var(--red);color:var(--red)}.pa4-chip:is([data-tone=amarillo],[data-tone=naranja]){border-color:var(--amber);color:var(--amber)}.pa4-chip[data-tone=verde]{border-color:var(--green);color:var(--green)}
+.pa4-desc{margin:.6mm 0 1.6mm;color:var(--muted)}
+.pa4-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(30mm,1fr));gap:1.4mm 4mm;margin:0 0 1.8mm}
+.pa4-grid dt{font-size:8pt;letter-spacing:.03em;text-transform:uppercase}.pa4-grid dd{font-size:9.5pt}
+.pa4-route{margin:0 0 2mm}
+.pa4 .lgx{--lc:var(--pb2);--lg:var(--green);--la:var(--amber);--ln:#94a3b8;--lt:var(--ink);--lm:var(--muted);padding:1mm 1mm 0;border:.3mm solid var(--line);border-radius:2.5mm;background:#fff}
+.pa4 .lgx *{animation:none!important;transition:none!important}
+.pa4 .lgx-svg{display:block!important}.pa4 .lgx-list{display:none!important}
+.pa4 .lgx-veh-anim,.pa4 .lgx-flow{display:none}.pa4 .lgx-veh[data-anim="1"] .lgx-veh-static{display:inline}
+.pa4 .lgx-base{stroke:var(--pgs)}
+.pa4 .lgx-seg[data-state=active] .lgx-fill{opacity:.7}
+.pa4 .lgx-dot{fill:#fff;stroke:var(--pg)}
+.pa4 .lgx-icon{stroke:#64748b}
+.pa4 .lgx-node[data-state=pending]{opacity:.75}
+.pa4 .lgx-node[data-state=done] .lgx-dot{fill:#dbeafe;stroke:var(--pb2)}
+.pa4 .lgx-node[data-state=current] .lgx-dot{fill:var(--pcs);stroke:var(--pc)}
+.pa4 .lgx-node[data-state=current] .lgx-halo{stroke:var(--pc);opacity:.55}
+.pa4 .lgx-node:is([data-state=done],[data-state=current]) .lgx-icon{stroke:#0b2a5b}
+.pa4 .lgx-node[data-customs="1"][data-state=current] .lgx-dot{fill:#fef3c7;stroke:var(--amber)}
+.pa4 .lgx-ok circle{fill:var(--green);stroke:#fff}.pa4 .lgx-ok path{stroke:#fff}
+.pa4 .lgx-plane{fill:var(--pb);stroke:#0b2a44}
+.pa4 .lgx[data-cancelled="1"] .lgx-svg{filter:grayscale(1);opacity:.6}
+
+/* E · Observaciones y avisos: el tipo de aviso va escrito; el color solo lo refuerza. */
+.pa4-notes{display:grid;gap:1.2mm;margin:0;padding:0;list-style:none}
+.pa4-notes li,.pa4-alert{margin:0;padding:1.4mm 3mm;border:.3mm solid var(--line);border-left:1mm solid var(--pc);border-radius:1.5mm;background:#f8fafc;break-inside:avoid}
+.pa4-alert{margin-top:1.5mm}
+:is(.pa4-notes li,.pa4-alert)[data-tone=warn]{border-left-color:var(--amber);background:#fffbeb}
+:is(.pa4-notes li,.pa4-alert)[data-tone=alert]{border-left-color:var(--red);background:#fef2f2}
+:is(.pa4-notes li,.pa4-alert)[data-tone=ok]{border-left-color:var(--green);background:#f0fdf4}
+:is(.pa4-notes li,.pa4-alert)[data-tone=muted]{border-left-color:var(--pg)}
+
+/* G · H · I · Tablas: continúan en la hoja siguiente con su encabezado repetido; ninguna fila se parte. */
+.pa4-table table{width:100%;border-collapse:collapse;font-size:9pt}
+.pa4-table thead{display:table-header-group}
+.pa4-table tr{break-inside:avoid;page-break-inside:avoid}
+.pa4-table th{padding:1.4mm 2mm;border-bottom:.45mm solid var(--pb);background:#eff6ff;color:var(--pb);font-size:8pt;letter-spacing:.04em;text-align:left;text-transform:uppercase}
+.pa4-table td{padding:1.4mm 2mm;border-bottom:.2mm solid var(--line);vertical-align:top;overflow-wrap:anywhere}
+.pa4-table td:first-child{width:29mm;white-space:nowrap}
+.pa4-table td b{display:block}.pa4-table td small{display:block;color:var(--muted);font-size:8.5pt}
+.pa4-g td:last-child{width:26mm;font-weight:700}
+.pa4-table tr:is([data-state=pending],[data-state=skipped]) td{color:var(--muted)}
+.pa4-table tr:is([data-state=pending],[data-state=skipped]) td:last-child{font-weight:600}
+
+/* F · Códigos (QR y código de barras, junto al equipo en la primera hoja) y cierre. El pie con la numeración va en cada hoja, en el margen. */
+.pa4-cols:has(.pa4-codes){grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr) 38mm}
+.pa4-codes{display:grid;justify-items:center;align-content:center;gap:1.2mm;padding-left:4mm;border-left:.2mm solid var(--line)}
+.pa4-qr{display:block;width:21mm;height:21mm}
+.pa4-bars{display:grid;justify-items:center;gap:.6mm;width:100%}.pa4-bars svg{display:block;width:100%;height:9mm}.pa4-bars span{font:600 8pt/1.2 "JetBrains Mono",Consolas,monospace;letter-spacing:.08em}
+.pa4-foot{margin-top:4mm;padding-top:2mm;border-top:.6mm solid var(--pb)}
+.pa4-foot p{margin:0}.pa4-company{margin-top:.8mm!important;color:var(--muted);font-size:8pt}.pa4-company strong{color:var(--pb)}
+
+/* Página pública: el documento no se ve en pantalla; al imprimir, es lo único que sale (sin botones, formularios ni animaciones). */
+@media screen{.ticket-public .pa4{display:none}}
+@media print{
+ body.ticket-public{background:#fff!important;color:#111827}
+ body.ticket-public>:not(main),.ticket-public main>:not(.pa4){display:none!important}
+ .ticket-public main{width:auto!important;max-width:none!important;margin:0!important;padding:0!important}
+}
+
+/* Vista interna: hoja A4 de vista previa con barra de acciones (no se imprime). */
+.pa4-page{margin:0;min-height:100vh;background:#dfe6ef;color:#111827;font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+.pa4-page main{padding:14px 12px 40px}
+.pa4-bar{position:sticky;top:8px;z-index:2;display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;max-width:210mm;margin:0 auto 12px;padding:10px 12px;border-radius:12px;background:#0c1f3d;color:#e3eeff;box-shadow:0 10px 24px -14px #0f172a}
+.pa4-bar button,.pa4-bar a{display:inline-flex;align-items:center;gap:7px;min-height:40px;padding:8px 14px;border:1px solid #5083b8;border-radius:10px;background:#24558d;color:#fff;font-family:inherit;font-size:14px;font-weight:600;line-height:1.2;text-decoration:none;cursor:pointer}
+.pa4-bar a{background:transparent}
+.pa4-bar button:hover{background:#2b63a3}.pa4-bar a:hover{background:#12305a}
+.pa4-bar :focus-visible{outline:2px solid #a8dcff;outline-offset:2px}
+.pa4-bar small{flex:1 1 220px;color:#b9cbe4;font-size:12.5px}
+.pa4-ic{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.pa4-page .pa4{width:min(100%,210mm);margin:0 auto;padding:12mm;border-radius:4px;box-shadow:0 14px 34px -16px #0f172a80}
+@media screen and (max-width:700px){
+ .pa4-page main{padding:10px 8px 28px}
+ .pa4-page .pa4{padding:14px 12px;font-size:12px}
+ .pa4-page .pa4-head{grid-template-columns:auto minmax(0,1fr)}.pa4-page .pa4-meta{grid-column:1/-1;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));text-align:left}
+ .pa4-page .pa4-logo{width:22mm}
+ .pa4-page .pa4-cols{grid-template-columns:1fr}
+ .pa4-page .pa4-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .pa4-page .pa4-track{grid-auto-flow:row;grid-template-columns:repeat(4,minmax(0,1fr));row-gap:3mm}.pa4-page .pa4-track li::before{display:none}
+ .pa4-page .pa4-table{overflow-x:auto}.pa4-page .pa4-table table{min-width:520px}
+ .pa4-page .pa4-cols:has(.pa4-codes){grid-template-columns:1fr}.pa4-page .pa4-codes{grid-template-columns:auto minmax(0,1fr);padding:2mm 0 0;border-left:0;border-top:.2mm solid var(--line)}
+}
+@media print{
+ .pa4-page{min-height:0;background:#fff}.pa4-page main{padding:0}.pa4-bar{display:none!important}
+ .pa4-page .pa4{width:auto;padding:0;border-radius:0;box-shadow:none}
+}
+@media (prefers-reduced-motion:reduce){.pa4-bar *{transition:none}}

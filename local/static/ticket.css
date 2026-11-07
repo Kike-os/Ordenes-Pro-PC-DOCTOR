@@ -404,3 +404,49 @@
 .tp-dialog :focus-visible{outline:2px solid #6ea8ff;outline-offset:2px}
 @media(max-width:480px){.tp-cancel summary{display:flex;justify-content:center}.tp-cancel-acts{display:grid}.tp-cancel-acts button{min-height:44px}}
 @media (prefers-reduced-motion:reduce){.tp-cancel summary{transition:none}}
+
+/* 1.5.248 — Seguimiento público adaptable: aprovecha el ancho disponible (hasta 1360 px de tarjeta), logotipo original más visible (el archivo
+   no cambia: solo se deja de mostrar su margen transparente, con la proporción real del dibujo, 2102 × 1596), cabecera con jerarquía (marca,
+   título, orden, estado y presupuesto) e impresión A4 desde la cabecera. Textos de al menos 12 px y bordes redondeados unificados. */
+.ticket-public main{width:min(100%,1400px)}
+.ticket-public .ticket.tw{max-width:1360px}
+.tw-actions,.ticket-public .ticket-note,.tw-notice{max-width:1360px}
+.tw-head{grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:10px 20px}
+.tw-logo{display:block;flex:none;width:clamp(64px,6.4vw,84px);aspect-ratio:2102/1596;overflow:hidden}
+.tw-head .tw-logo .ticket-logo{display:block;width:134.4%;max-width:none;height:auto;max-height:none;margin:-6.04% 0 0 -14.78%;object-fit:fill}
+.tw-title small{font-size:12px;letter-spacing:.14em}
+.tw-title h1{font-size:clamp(19px,2.1vw,25px);letter-spacing:-.2px}
+.tw-order{gap:5px}
+.tw-order small{font-size:12px}
+.tw-order strong{font-size:clamp(15px,1.45vw,18px);color:#dbeafe}
+.tw-chips{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:6px}
+.tw-budget{display:inline-flex;align-items:center;gap:5px;min-height:26px;padding:3px 12px;border:1px solid #5aa9e6;border-radius:999px;background:#2f6fc433;color:#dff0ff;font-size:12px;font-weight:700;line-height:1.25}
+.tw-budget small{font-weight:600;color:inherit;opacity:.85;letter-spacing:0;text-transform:none}
+.tw-budget:is([data-budget=enviado],[data-budget=modificacion]){border-color:#e0b25c;background:#e0b25c26;color:#ffe9b8}
+.tw-budget:is([data-budget=aprobado],[data-budget=parcial]){border-color:#3fbf8f;background:#3fbf8f2e;color:#c6f5dd}
+.tw-budget[data-budget=rechazado]{border-color:#f87171;background:#ef44442b;color:#fecaca}
+.tw-print,.tw-actions button[data-print]{gap:7px}
+.tw-print{display:inline-flex;align-items:center;justify-content:center;min-height:38px;margin-top:2px;padding:7px 13px;border:1px solid #5083b8;border-radius:10px;background:#16365f;color:#fff;font-family:inherit;font-size:13px;font-weight:600;line-height:1.2;cursor:pointer}
+.tw-print:hover{background:#24558d}.tw-print:focus-visible{outline:2px solid #93c5fd;outline-offset:2px}
+.tw-print .pa4-ic,.tw-actions .pa4-ic{width:17px;height:17px;flex:none;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+/* Legibilidad: ningún texto informativo por debajo de 12 px. */
+.ticket-public :is(.ticket-bottom footer strong,.ticket-facts dt,.tw-sec>h2,.tw-steps small,.ticket-updates time,.tp-now small,.tp-meta small,.tp-steps time,.tp-steps em,.tp-facts dt,.tp-hist time,.tp-left,.ticket-ev,
+ .lgx-li small,.lgx-leg,.ticket-bottom footer,.tw-verify p,.tw-actions small,.tw-thumb[data-error]::after){font-size:12px}
+.ticket-public+.ticket-note,.ticket-public .ticket-note{font-size:12px}
+.ticket-public .tp-steps li{font-size:12.5px}
+.ticket-public .tp-hist summary b{font-size:12px}
+.ticket-public .tw-steps b{font-size:13px}
+@container (min-width:440px){.ticket-public .tp-steps li{font-size:12px}.ticket-public :is(.tp-steps time,.tp-steps em){font-size:12px}}
+/* Bordes unificados: tarjetas 14 px, bloques internos 10 px, chips redondos. */
+.ticket-public :is(.tw-sec,.tp,.lgx){border-radius:14px}
+.ticket-public :is(.tp-now,.tp-cancel-state,.tp-cancel-locked,.ticket-updates li,.tp-hist p){border-radius:10px}
+@media(max-width:560px){
+ .tw-head{grid-template-columns:auto minmax(0,1fr);gap:10px 12px}
+ .tw-logo{width:64px}
+ .tw-order{grid-template-columns:minmax(0,1fr) auto}
+ .tw-chips{justify-content:flex-start;grid-column:1/-1}
+ .tw-order .tw-print{grid-column:1/-1;justify-self:stretch}
+}
+@media(max-width:340px){.tw-logo{width:56px}.tw-title h1{font-size:18px}}
+/* Trayectoria proporcionada en tarjetas muy anchas: el dibujo no pasa de 920 px y queda centrado (rótulos de ~17 px). */
+.ticket-public .tp .lgx-svg{max-width:920px;margin-inline:auto}

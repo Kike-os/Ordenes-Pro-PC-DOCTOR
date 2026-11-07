@@ -1123,7 +1123,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         path = urlsplit(self.path).path
-        files = {'/static/label.css':'label.css','/static/tracking.css':'tracking.css','/static/licencias.css':'licencias.css','/static/app.css':'app.css','/static/app.js':'app.js','/static/service-picker.js':'service-picker.js','/static/licenses.js':'licenses.js','/static/inventory.js':'inventory.js','/static/sales.js':'sales.js','/static/reschedule.js':'reschedule.js','/static/form-validation.js':'form-validation.js','/static/appointments.js':'appointments.js','/static/adi-widget.js':'adi-widget.js','/static/adi-orb.js':'adi-orb.js','/static/ui-select.js':'ui-select.js','/static/ticket.css':'ticket.css','/static/ticket.js':'ticket.js','/static/quote.css':'quote.css','/static/quote-sign.js':'quote-sign.js','/static/echarts.min.js':'echarts.min.js','/static/logo-original.png':'logo-original.png',
+        files = {'/static/label.css':'label.css','/static/tracking.css':'tracking.css','/static/licencias.css':'licencias.css','/static/app.css':'app.css','/static/app.js':'app.js','/static/service-picker.js':'service-picker.js','/static/licenses.js':'licenses.js','/static/inventory.js':'inventory.js','/static/sales.js':'sales.js','/static/reschedule.js':'reschedule.js','/static/form-validation.js':'form-validation.js','/static/appointments.js':'appointments.js','/static/adi-widget.js':'adi-widget.js','/static/adi-orb.js':'adi-orb.js','/static/ui-select.js':'ui-select.js','/static/ticket.css':'ticket.css','/static/seguimiento-a4.css':'seguimiento-a4.css','/static/ticket.js':'ticket.js','/static/quote.css':'quote.css','/static/quote-sign.js':'quote-sign.js','/static/echarts.min.js':'echarts.min.js','/static/logo-original.png':'logo-original.png',
                  '/favicon.ico':'favicon.ico','/static/favicon.ico':'favicon.ico','/static/favicon-16.png':'favicon-16.png','/static/favicon-32.png':'favicon-32.png','/static/logo-firma.png':'logo-firma.png','/static/favicon-48.png':'favicon-48.png',
                  '/apple-touch-icon.png':'apple-touch-icon.png','/apple-touch-icon-precomposed.png':'apple-touch-icon.png','/static/apple-touch-icon.png':'apple-touch-icon.png'}
         # Logotipos de marcas: solo nombres simples dentro de static/brands; si el archivo no existe la interfaz usa un icono genérico.
@@ -1456,6 +1456,16 @@ class Handler(BaseHTTPRequestHandler):
             user, _ = self.session(c)
             if path in ('/', '/login') or re.fullmatch(r'/orders/[^/]{1,80}',path):
                 return self.page('dashboard.html' if user else 'login.html')
+            staff_a4=re.fullmatch(r'/tarjeta/([0-9]{1,12})/a4',path)
+            if staff_a4:
+                # Seguimiento A4 con la información interna (1.5.248): solo administración y técnicos, como los paneles de repuestos y seguimientos.
+                if not user:return self.page('login.html')
+                if user['role'] not in ('administrador','tecnico'):return self.reply(404,{'error':'Página no disponible.'})
+                import order_tracking,tracking_print
+                oid=int(staff_a4[1])
+                page=tracking_print.staff_page(c,oid,'/api/orders/%d/tracking-qr.png'%oid if order_tracking.active(c,oid)['active'] else '')
+                if not page:return self.reply(404,{'error':'Orden no disponible.'})
+                return self.reply(200,page,'text/html; charset=utf-8')
             staff_card=re.fullmatch(r'/tarjeta/([0-9]{1,12})',path)
             if staff_card:
                 # Tarjeta de seguimiento para imprimir o guardar como PDF, con los datos internos: exige sesión.
@@ -1798,7 +1808,7 @@ class Handler(BaseHTTPRequestHandler):
                     # Tarjeta Digital de Seguimiento Técnico: el mismo fragmento que se imprime, con los datos actuales de la orden.
                     import order_tracking
                     link=order_tracking.active(c,row['id'])
-                    return self.reply(200,{'html':order_tracking.card(order_tracking.staff_data(c,row['id']),'/api/orders/%d/tracking-qr.png'%row['id'] if link['active'] else '',False),'code':code,'public_url':link['url'],'active':link['active'],'print_url':'/tarjeta/%d'%row['id']})
+                    return self.reply(200,{'html':order_tracking.card(order_tracking.staff_data(c,row['id']),'/api/orders/%d/tracking-qr.png'%row['id'] if link['active'] else '',False),'code':code,'public_url':link['url'],'active':link['active'],'print_url':'/tarjeta/%d'%row['id'],'print_a4_url':'/tarjeta/%d/a4'%row['id']})
                 if detail[2]=='tracking-qr.png':
                     # QR del enlace público de seguimiento vigente: el mismo enlace que se copia y que imprime el ticket.
                     import order_tracking

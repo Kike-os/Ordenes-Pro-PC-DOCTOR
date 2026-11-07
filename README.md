@@ -56,6 +56,7 @@ Inicio como centro de operaciones, con navegación superior, búsqueda, contador
 - Seguimiento de Órdenes del Inicio: altura fija con desplazamiento interno y páginas, fases Activas (por omisión) / Entregadas / Todas, contadores del día y alerta de entregadas con saldo pendiente. Ver [seguimiento](docs/SEGUIMIENTO.md).
 - Registrar pago: formas de pago con icono, bancos con su logotipo, cuentas del catálogo central, comprobante bancario adjunto y aviso cuando no hay cuentas. Ver [registrar pago](docs/REGISTRAR-PAGO.md).
 - Seguimiento de repuestos: ruta animada nacional (camión) e internacional (avión, aduana y camión) según los eventos reales, cancelaciones con revisión de administración (también solicitadas por el cliente desde su enlace), reembolsos conciliados con devoluciones reales y avisos automáticos al cliente. Ver [seguimiento de repuestos](docs/REPUESTOS-SEGUIMIENTO.md).
+- Seguimiento de reparación adaptable (logo original más visible, cabecera con estado del presupuesto) e impresión A4 por secciones, pública e interna. Ver [seguimiento A4](docs/SEGUIMIENTO-A4.md).
 - Configuración: perfil del administrador, cuentas y estado del correo. No expone secretos ni modifica roles desde la interfaz.
 
 Los técnicos pueden recibir equipos y consultar órdenes/comprobantes; la edición de registros, estados y configuración requiere administración. Todos los POST nuevos conservan validación de sesión, origen y CSRF, consultas parametrizadas y auditoría. No se cambió el esquema ni se eliminaron datos.

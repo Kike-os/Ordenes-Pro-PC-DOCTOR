@@ -52,3 +52,10 @@ document.addEventListener('click',event=>{if(event.target.closest('[data-print]'
    // Plazo vencido: candado y explicación; una ventana abierta se cierra (el servidor rechazaría la solicitud de todos modos).
    const tpl=box.querySelector('template[data-locked]'),wrap=document.createElement('div');wrap.innerHTML=tpl?tpl.innerHTML:'';if(dialog?.open)dialog.close();dialog?.remove();box.replaceWith(...wrap.childNodes);return false;};
   if(tick()){const id=setInterval(()=>{if(!tick())clearInterval(id);},15000);}}})();
+// Seguimiento A4 (1.5.248): al imprimir se anota la hora de impresión (Ecuador) y el pie de cada hoja suma el número de orden a la numeración
+// «Página n de N» (regla @page de seguimiento-a4.css). Si el navegador no admite esos márgenes de página, el cierre del documento ya lleva los datos.
+(()=>{const doc=document.querySelector('.pa4');if(!doc)return;let ready=false;
+ const fmt=()=>{try{return new Intl.DateTimeFormat('es-EC',{timeZone:'America/Guayaquil',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date()).replace(',','');}catch{return '';}};
+ addEventListener('beforeprint',()=>{const t=fmt();if(t)doc.querySelectorAll('[data-printed]').forEach(n=>{n.textContent=t;});if(ready)return;ready=true;
+  const code=(doc.dataset.code||'').replace(/[^A-Za-z0-9-]/g,''),sheet=[...document.styleSheets].find(s=>(s.href||'').includes('/static/seguimiento-a4.css'));
+  if(code&&sheet){try{sheet.insertRule('@page{@bottom-right{content:"Orden '+code+'\\A Página " counter(page) " de " counter(pages)}}',sheet.cssRules.length);}catch{}}});})();

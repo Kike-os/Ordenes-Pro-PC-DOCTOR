@@ -1,7 +1,8 @@
 """Seguimiento público de una orden mediante un enlace aleatorio y revocable.
 
 El enlace no contiene datos de la orden ni del cliente. La página pública muestra solo número de orden, estado,
-equipo (tipo, marca y modelo) y fechas; nunca nombre, identificación, teléfono, serie, falla, notas ni importes.
+equipo (tipo, marca y modelo), fechas y estado del presupuesto (sin importes); nunca nombre, identificación, teléfono, serie, falla,
+notas ni importes. Desde 1.5.248 incluye, oculto en pantalla, el mismo contenido en hoja A4 para imprimir (tracking_print, versión pública).
 El `qr_url` histórico de cada orden no se modifica.
 """
 from datetime import datetime
@@ -64,7 +65,8 @@ def lookup(c,token):
     except Exception:
         parts=[]  # base anterior al seguimiento de repuestos
     return {'id':row['id'],'code':row['code'] or 'OP-%05d'%row['id'],'status':row['status'],'status_label':row['status_label'],'received':received,'updated':stamp(row['updated_at']),
-            'device':' · '.join(filter(None,[DEVICE_TYPES.get(kind,''),' '.join(filter(None,[row['brand'],row['model']]))])),'updates':updates,'files':files,'parts':parts}
+            'device':' · '.join(filter(None,[DEVICE_TYPES.get(kind,''),' '.join(filter(None,[row['brand'],row['model']]))])),'updates':updates,'files':files,'parts':parts,
+            'kind':DEVICE_TYPES.get(kind,''),'brand':row['brand'] or '','model':row['model'] or '',**dict(zip(('budget_code','budget'),__import__('tracking_print').budget(c,row['id'])))}
 
 
 HEAD='<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><meta name="robots" content="noindex,nofollow"><title>%s | PC-DOCTOR S.A.</title><link rel="icon" href="/favicon.ico?v=2" sizes="48x48"><link rel="stylesheet" href="/static/tracking.css"></head><body><main class="tracking-page"><header><img src="/static/logo-original.png" alt="PC-DOCTOR S.A." width="150"><p>%s</p></header>'
@@ -72,15 +74,16 @@ HEAD='<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="vie
 
 def public_page(data,token='',notice='',tone='ok'):
     # Con un aviso (resultado de una solicitud del cliente) no se recarga sola: así se puede leer con calma.
-    page=CARD_HEAD%('' if notice else '<meta http-equiv="refresh" content="180">',html.escape(data['code']))
+    page=CARD_HEAD%('' if notice else '<meta http-equiv="refresh" content="180">',html.escape(data['code']),A4_CSS)
     banner='<p class="tw-notice" data-tone="%s" role="%s">%s</p>'%(tone,'status' if tone=='ok' else 'alert',html.escape(notice)) if notice else ''
-    return page.replace('<body class="ticket-page">','<body class="ticket-page ticket-public">',1)+banner+public_card(dict(data,token=token),'/s/'+token+'/qr.svg' if token else '')+'</main></body></html>'
+    return page.replace('<body class="ticket-page">','<body class="ticket-page ticket-public">',1)+banner+public_card(dict(data,token=token),'/s/'+token+'/qr.svg' if token else '')+__import__('tracking_print').document(data,'public','/s/'+token+'/qr.svg' if token else '')+'</main></body></html>'
 
 
 # Tarjeta Digital de Seguimiento Técnico: ticket de dos secciones (datos de la orden arriba; QR y código de barras abajo).
 # Las etapas salen del estado real de la orden; una etapa futura nunca se marca como completada.
 STAGES=(('Recepción',('pendiente',)),('Diagnóstico y reparación',('reparacion','esperando_cliente','presupuesto','revision_recurrente')),('Listo para retiro',('listo','espera_entrega')),('Entrega',('entregado',)))
-CARD_HEAD='<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><meta name="robots" content="noindex,nofollow">%s<title>Seguimiento de reparación %s | PC-DOCTOR S.A.</title><link rel="icon" href="/favicon.ico?v=2" sizes="48x48"><link rel="stylesheet" href="/static/ticket.css"><script defer src="/static/ticket.js"></script></head><body class="ticket-page"><main>'
+A4_CSS='<link rel="stylesheet" href="/static/seguimiento-a4.css">'
+CARD_HEAD='<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><meta name="robots" content="noindex,nofollow">%s<title>Seguimiento de reparación %s | PC-DOCTOR S.A.</title><link rel="icon" href="/favicon.ico?v=2" sizes="48x48"><link rel="stylesheet" href="/static/ticket.css">%s<script defer src="/static/ticket.js"></script></head><body class="ticket-page"><main>'
 
 
 def card(data,qr_src,public):
@@ -237,6 +240,9 @@ def _evidence_section(data):
     return '<section class="tw-sec ticket-evidence" aria-label="Evidencias del servicio"><h2>Evidencias del servicio</h2><ul class="tw-gallery">'+items+'</ul></section>'
 
 
+from tracking_print import PRINTER
+
+
 def public_card(data,qr_src):
     import barcode128
     company=settings();e=html.escape
@@ -261,25 +267,27 @@ def public_card(data,qr_src):
     qr='<img class="ticket-qr" src="%s" width="132" height="132" alt="Código QR del seguimiento de la orden %s">'%(e(qr_src),e(code)) if qr_src else ''
     now=datetime.now(ECUADOR_TZ).strftime('%d/%m/%Y %H:%M')
     return ('<article class="ticket tw" data-status="%s"><section class="ticket-top tw-top" aria-label="Datos de la orden">'
-            '<header class="tw-head"><img class="ticket-logo" src="/static/logo-original.png" alt="PC-DOCTOR S.A." width="150"><div class="tw-title"><small>%s</small><h1>Seguimiento de reparación</h1></div>'
-            '<div class="tw-order"><small>Orden de servicio</small><strong>%s</strong><span class="ticket-state" data-status="%s">%s</span></div></header>'
+            '<header class="tw-head"><span class="tw-logo"><img class="ticket-logo" src="/static/logo-original.png" alt="PC-DOCTOR S.A." width="2826" height="2049"></span><div class="tw-title"><small>%s</small><h1>Seguimiento de reparación</h1></div>'
+            '<div class="tw-order"><small>Orden de servicio</small><strong>%s</strong><span class="tw-chips"><span class="ticket-state" data-status="%s">%s</span>%s</span>'
+            '<button type="button" class="tw-print" data-print>%sImprimir seguimiento A4</button></div></header>'
             '<div class="tw-progress"><h2 class="sr-only">Avance de la reparación</h2><ol class="ticket-steps tw-steps">%s</ol>%s</div><dl class="ticket-facts tw-facts">%s</dl></section>'
             '<div class="tw-body%s">%s%s</div><div class="ticket-cut" aria-hidden="true"></div>'
             '<section class="ticket-bottom tw-codes" aria-label="Código de seguimiento">%s<div class="ticket-barcode">%s<span>%s</span></div>'
             '<div class="tw-verify"><h2>Código de seguimiento</h2><p>Escanea el QR para consultar este seguimiento. El código de barras identifica la orden en el taller.</p></div>'
             '<footer><strong>%s</strong><span>%s</span><span>WhatsApp %s</span></footer></section></article>'
-            '<div class="tw-actions"><button type="button" data-refresh>Actualizar seguimiento</button><button type="button" data-print>Imprimir o guardar como PDF</button><small>Consultado el %s</small></div>'
+            '<div class="tw-actions"><button type="button" data-refresh>Actualizar seguimiento</button><button type="button" data-print>%sImprimir seguimiento A4</button><small>Consultado el %s</small></div>'
             '<p class="ticket-note">Esta página muestra solo el estado de la reparación. No contiene datos personales.</p>'
-            )%(e(data['status']),e(company['name']),e(code),e(data['status']),e(data['status_label']),steps,
+            )%(e(data['status']),e(company['name']),e(code),e(data['status']),e(data['status_label']),
+               '<span class="tw-budget" data-budget="%s"><small>Presupuesto:</small> %s</span>'%(e(data.get('budget_code','')),e(data['budget'])) if data.get('budget') else '',PRINTER,steps,
                ''.join('<p class="tw-flag" role="status">%s</p>'%e(f) for f in flags),rows,' tw-two' if main and side else '','<div class="tw-col">%s</div>'%main if main else '',
-               '<div class="tw-col">%s</div>'%side if side else '',qr,bars,e(code),e(company['name']),e(company['specialty']),e(company['whatsapp']),now)
+               '<div class="tw-col">%s</div>'%side if side else '',qr,bars,e(code),e(company['name']),e(company['specialty']),e(company['whatsapp']),PRINTER,now)
 
 
 def card_page(data,qr_src,public):
     e=html.escape
     actions='<div class="ticket-actions"><button type="button" data-print>Imprimir o guardar como PDF</button>'+('' if public else '<a href="/#orders?id=%d">Volver a la orden</a>'%data['id'])+'</div>'
     note='<p class="ticket-note">Esta página muestra solo el estado de la reparación. No contiene datos personales.</p>' if public else '<p class="ticket-note">Vista interna con datos del cliente: no la compartas. Para el cliente usa el enlace público de seguimiento.</p>'
-    return CARD_HEAD%('<meta http-equiv="refresh" content="180">' if public else '',e(data['code']))+card(data,qr_src,public)+actions+note+'</main></body></html>'
+    return CARD_HEAD%('<meta http-equiv="refresh" content="180">' if public else '',e(data['code']),'')+card(data,qr_src,public)+actions+note+'</main></body></html>'
 
 
 def staff_data(c,oid):
