@@ -4,6 +4,22 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.246 — 2026-11-06 20:07 (UTC-05:00)
+
+Seguimiento de repuestos: ruta animada nacional e internacional, cancelaciones con revisión, reembolsos conciliados y avisos al cliente
+
+### Nuevas funcionalidades
+
+- Seguimiento de repuestos con ruta animada: nacional con camión e internacional con avión, aduana iluminada y camión para el tramo final; el vehículo sale solo del paso real registrado, recorre una vez el trecho al cargar y se detiene con una novedad. En teléfonos, lista vertical.
+- Seguimiento público con etapas propias por tipo de envío (vuelo, aduana y traslado a Otavalo), sin país, transportista, guía ni proveedor, y estado de la cancelación sin importes.
+- Cancelación de repuestos: el cliente la solicita desde su enlace (últimos 4 dígitos) o el personal en su nombre; la decide administración con reglas según la etapa (sin compra, comprado, en traslado; recibido va a devolución o garantía). Nunca se anula sola.
+- Reembolsos de cancelaciones conciliados con devoluciones reales de la orden (pendiente, parcial, completado), sin tocar compras, inventario, facturas ni caja; bitácora que no se borra.
+- Avisos automáticos al cliente por correo (y WhatsApp Business cuando esté configurado) solo en eventos relevantes, uno por evento, con estado real, reintento controlado e interruptor de administración.
+
+### Mejoras realizadas
+
+- Datos del envío internacional (transportista y guía nacionales, fechas de aduana registradas con el evento real) y evidencias asociadas a la etapa en que se registraron.
+
 ## v1.5.245 — 2026-11-04 22:37 (UTC-05:00)
 
 Logistics Pro: envío nacional e internacional en pedidos de repuestos
