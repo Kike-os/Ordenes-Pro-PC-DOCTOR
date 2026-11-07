@@ -8,6 +8,27 @@
   },
   "releases": [
     {
+      "version": "1.5.251",
+      "date": "2026-11-07T15:17:18-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Teléfono / WhatsApp internacional con selector de país, validación por país y formato E.164",
+      "changes": {
+        "features": [
+          "Teléfono / WhatsApp internacional: selector de país con bandera, prefijo y búsqueda (Ecuador +593 por defecto) en recepción, clientes, citas, facturación y proformas; validación con las reglas de cada país (libphonenumber) y guardado en formato E.164."
+        ],
+        "improvements": [
+          "WhatsApp y búsqueda: enlaces con el número internacional normalizado, sin prefijo duplicado (los fijos no se usan); un teléfono escrito en formato antiguo o internacional encuentra al mismo cliente u orden.",
+          "Números antiguos intactos: se interpretan al leerlos y se guardan en E.164 solo al editar la ficha; un texto no interpretable se conserva y se pide revisarlo."
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Kike-os: «actualiza cuando tod lo que te envie este bien y sin errores le autori"
+    },
+    {
       "version": "1.5.250",
       "date": "2026-11-07T00:59:48-05:00",
       "type": "patch",

@@ -4,6 +4,19 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.251 — 2026-11-07 15:17 (UTC-05:00)
+
+Teléfono / WhatsApp internacional con selector de país, validación por país y formato E.164
+
+### Nuevas funcionalidades
+
+- Teléfono / WhatsApp internacional: selector de país con bandera, prefijo y búsqueda (Ecuador +593 por defecto) en recepción, clientes, citas, facturación y proformas; validación con las reglas de cada país (libphonenumber) y guardado en formato E.164.
+
+### Mejoras realizadas
+
+- WhatsApp y búsqueda: enlaces con el número internacional normalizado, sin prefijo duplicado (los fijos no se usan); un teléfono escrito en formato antiguo o internacional encuentra al mismo cliente u orden.
+- Números antiguos intactos: se interpretan al leerlos y se guardan en E.164 solo al editar la ficha; un texto no interpretable se conserva y se pide revisarlo.
+
 ## v1.5.250 — 2026-11-07 00:59 (UTC-05:00)
 
 Vehículos 3D corporativos en el seguimiento logístico y título «Seguimiento de Reparación»
