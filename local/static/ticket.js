@@ -73,3 +73,11 @@ document.addEventListener('click',event=>{if(event.target.closest('[data-print]'
  document.addEventListener('focusout',()=>setTimeout(()=>{if(pending&&!quiet())location.reload();},300));
  document.addEventListener('close',()=>{if(pending)setTimeout(reload,300);},true);
  schedule();})();
+// Barra única de avisos (1.5.255): en pantallas estrechas «Avisos (N)» abre la lista; Escape o un toque fuera la cierran. En escritorio la
+// fila está siempre visible. Un repuesto lleva a su tarjeta; varios se abren como lista (details) sin JavaScript.
+(()=>{for(const bar of document.querySelectorAll('.rp-nt')){const t=bar.querySelector('.rp-nt-toggle'),list=bar.querySelector('.rp-nt-list');if(!t||!list)continue;
+ const set=open=>{bar.dataset.open=open?'true':'false';t.setAttribute('aria-expanded',String(open));if(open)list.querySelector('a,summary,button')?.focus();};
+ t.addEventListener('click',()=>set(t.getAttribute('aria-expanded')!=='true'));
+ bar.addEventListener('keydown',e=>{if(e.key==='Escape'&&bar.dataset.open==='true'){e.stopPropagation();set(false);t.focus();}});
+ document.addEventListener('pointerdown',e=>{if(bar.dataset.open==='true'&&!bar.contains(e.target))set(false);},true);
+ for(const a of bar.querySelectorAll('a[href^="#tp-"]'))a.addEventListener('click',()=>{set(false);const card=document.querySelector(a.getAttribute('href'));if(card){card.classList.remove('rp-focus');void card.offsetWidth;card.classList.add('rp-focus');setTimeout(()=>card.classList.remove('rp-focus'),1800);}});}})();

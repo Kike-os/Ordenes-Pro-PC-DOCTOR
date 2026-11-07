@@ -31,6 +31,12 @@ ICONS = {
     'clock': '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
     'message-square': '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
     'package': '<path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/>',
+    'bell': '<path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/><path d="M3.26 15.33A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.67C19.41 13.96 18 12.5 18 8A6 6 0 0 0 6 8c0 4.5-1.41 5.96-2.74 7.33"/>',
+    'plane': '<path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/>',
+    'truck': '<path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M15 18H9"/><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14"/><circle cx="17" cy="18" r="2"/><circle cx="7" cy="18" r="2"/>',
+    'x-circle': '<circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/>',
+    'clipboard-list': '<rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/>',
+    'chevron-down': '<path d="m6 9 6 6 6-6"/>',
     'flag': '<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" x2="4" y1="22" y2="15"/>',
 }
 IN_PROCESS = ('reparacion', 'esperando_cliente', 'presupuesto', 'revision_recurrente', 'diagnostico')
@@ -69,8 +75,94 @@ def _second(value):
         return datetime.min.replace(tzinfo=timezone.utc)
 
 
-def compute(c, oid):
-    """Etapas de la orden `oid` (o None si no existe)."""
+# ---- Barra única de avisos (1.5.255) ------------------------------------------------------------------------------------------------------
+# Un aviso por presupuesto vigente, por estado especial y por repuesto (varios repuestos se agrupan en un solo aviso con su lista).
+# Tono = color semántico; el texto siempre dice el estado. El destino abre el presupuesto o el seguimiento del repuesto (panel) o su tarjeta (cliente).
+QUOTE_NOTICE = {'enviado': ('ambar', 'Presupuesto pendiente'), 'modificacion': ('ambar', 'Presupuesto en revisión'), 'aprobado': ('verde', 'Presupuesto aprobado'),
+                'parcial': ('violeta', 'Aprobado parcialmente'), 'rechazado': ('rojo', 'Presupuesto rechazado')}
+STATUS_NOTICE = {'esperando_cliente': ('ambar', 'message-square', 'Respuesta pendiente', 'Necesitamos su respuesta para continuar con el servicio.'),
+                 'revision_recurrente': ('ambar', 'rotate-ccw', 'Falla recurrente', 'El equipo volvió a revisión técnica; el historial anterior se conserva.')}
+TONE_RANK = {'rojo': 0, 'naranja': 1, 'ambar': 2, 'violeta': 3, 'celeste': 4, 'azul': 5, 'verde': 6}
+
+
+def part_notice(r):
+    """(tono, icono, estado) de un pedido de repuesto según su paso real; None si ya terminó (instalado o listo)."""
+    if r['situation'] == 'cancelado':
+        return 'rojo', 'x-circle', 'Pedido cancelado'
+    stage, step, ship = r['stage'], r['logistics'] or r['stage'], r['shipping'] or ''
+    if stage in ('instalado', 'listo'):
+        return None
+    if stage == 'instalacion':
+        return 'violeta', 'wrench', 'Instalación en proceso'
+    if stage == 'recibido':
+        return 'verde', 'package-check', 'Repuesto recibido'
+    if stage == 'solicitado':
+        tone, ic, text = 'azul', 'clipboard-list', 'Solicitud registrada'
+    elif stage in ('confirmado', 'preparacion'):
+        tone, ic, text = 'ambar', 'clock', 'Esperando despacho'
+    elif step in ('llegada_pais', 'aduana_revision'):
+        tone, ic, text = 'naranja', 'shield-check', 'En aduana de Ecuador'
+    elif step in ('aduana_liberado', 'distribucion_nacional', 'ruta_otavalo'):
+        tone, ic, text = 'azul', 'truck', 'En camino a Otavalo'
+    elif ship == 'internacional' or step == 'transito_internacional':
+        tone, ic, text = 'celeste', 'plane', 'En tránsito internacional'
+    elif ship == 'nacional' or step in ('transito_nacional', 'despachado'):
+        tone, ic, text = 'azul', 'truck', 'En tránsito nacional'
+    else:
+        tone, ic, text = 'azul', 'truck', 'Repuesto en camino'
+    if r['situation'] in ('retrasado', 'incidencia_transporte', 'espera_proveedor', 'espera_confirmacion'):
+        tone = 'naranja' if r['situation'] in ('retrasado', 'incidencia_transporte') else 'ambar'
+        text += {'retrasado': ' · con retraso', 'incidencia_transporte': ' · novedad en el traslado', 'espera_proveedor': ' · en espera de disponibilidad',
+                 'espera_confirmacion': ' · en espera de confirmación'}[r['situation']]
+    return tone, ic, text
+
+
+def notices(c, oid, status, public=False):
+    """Avisos de la orden, de mayor a menor prioridad (rojo → verde). Solo datos registrados; nada se calcula por tiempo."""
+    out = []
+    if status != 'entregado':
+        try:
+            import quotes
+            q = c.execute("SELECT id,code,status FROM quotes WHERE order_id=? AND deleted_at='' AND status NOT IN ('borrador','cancelado') ORDER BY version DESC,id DESC LIMIT 1", (oid,)).fetchone()
+        except Exception:
+            q = None
+        if q and q['status'] in QUOTE_NOTICE and not (q['status'] in ('aprobado', 'parcial', 'rechazado') and status in ('listo', 'espera_entrega')):
+            tone, label = QUOTE_NOTICE[q['status']]
+            out.append({'kind': 'quote', 'code': q['status'], 'tone': tone, 'icon': 'clock' if tone == 'ambar' else 'clipboard-check' if tone in ('verde', 'violeta') else 'x-circle',
+                        'label': label, 'detail': quotes.STATUS.get(q['status'], label) + ('' if public else ' · ' + q['code']), 'target': None if public else {'type': 'quote', 'id': q['id']}})
+        if status == 'presupuesto' and not (q and q['status'] in QUOTE_NOTICE):
+            out.append({'kind': 'status', 'code': status, 'tone': 'ambar', 'icon': 'clock', 'label': 'Presupuesto pendiente', 'detail': 'Aprobación de presupuesto pendiente.', 'target': None})
+        if status in STATUS_NOTICE:
+            tone, ic, label, detail = STATUS_NOTICE[status]
+            out.append({'kind': 'status', 'code': status, 'tone': tone, 'icon': ic, 'label': label, 'detail': detail, 'target': None})
+    try:
+        import order_part_requests as opr
+        rows = c.execute("SELECT * FROM order_part_requests WHERE order_id=?" + (" AND public_visible=1" if public else '') + " ORDER BY id", (oid,)).fetchall()
+    except Exception:
+        rows = []
+    items = []
+    for r in rows:
+        found = part_notice(r)
+        if not found or (status == 'entregado' and r['situation'] == 'cancelado'):
+            continue
+        tone, ic, text = found
+        name = r['name']
+        if public:
+            name = opr._scrub(r['name'], opr.private_terms(c, r)) or 'Repuesto'
+        items.append({'id': r['id'], 'name': name, 'tone': tone, 'icon': ic, 'label': text})
+    if len(items) == 1:
+        p = items[0]
+        out.append({'kind': 'part', 'code': 'repuesto', 'tone': p['tone'], 'icon': p['icon'], 'label': p['label'], 'detail': p['name'], 'target': {'type': 'part', 'id': p['id']}, 'items': items})
+    elif items:
+        top = min(items, key=lambda p: TONE_RANK.get(p['tone'], 9))
+        out.append({'kind': 'part', 'code': 'repuestos', 'tone': top['tone'], 'icon': 'package', 'label': 'Repuestos (%d)' % len(items),
+                    'detail': '; '.join('%s: %s' % (p['name'], p['label']) for p in items), 'target': {'type': 'parts'}, 'items': items})
+    out.sort(key=lambda n: TONE_RANK.get(n['tone'], 9))
+    return out
+
+
+def compute(c, oid, public=False):
+    """Etapas de la orden `oid` (o None si no existe). `public`: avisos solo con lo que ve el cliente."""
     o = c.execute('SELECT id,status,received_at,created_at,delivered_at,updated_at,revision FROM orders WHERE id=?', (oid,)).fetchone()
     if not o:
         return None
@@ -135,7 +227,7 @@ def compute(c, oid):
         alerts.append({'code': 'repuesto', 'tone': 'ambar', 'title': 'Esperando repuesto' if parts_waiting == 1 else 'Esperando %d repuestos' % parts_waiting,
                        'text': 'El avance del envío se muestra en «Seguimiento de repuestos».', 'icon': 'package', 'tag': 'En camino'})
     done = sum(1 for s in out if s['state'] == 'done')
-    return {'stages': out, 'current': None if finished else current, 'finished': finished, 'done': done, 'total': len(out),
+    return {'notices': notices(c, oid, status, public), 'stages': out, 'current': None if finished else current, 'finished': finished, 'done': done, 'total': len(out),
             'percent': round(100 * done / len(out)), 'status': status, 'status_label': labels.get(status, status), 'alerts': alerts,
             'current_label': out[current]['label'] if not finished else 'Entregado', 'next_label': out[current + 1]['label'] if not finished and current < 5 else ''}
 
@@ -166,7 +258,32 @@ def html(data, when=None):
                      '<span class="rp-line" aria-hidden="true"><i></i></span>' if i < len(data['stages']) - 1 else '', e(s['label']), e(s['word']),
                      '<time> · %s</time>' % e(at) if at else ''))
     return ('<div class="rp" data-current="%s" data-done="%d"><h2 class="sr-only">Avance de la reparación</h2><ol class="rp-steps" aria-label="Etapas de la reparación">%s</ol>%s%s</div>'
-            % ('' if data['current'] is None else data['current'], data['done'], items, summary_html(data), alerts_html(data['alerts'])))
+            % ('' if data['current'] is None else data['current'], data['done'], items, summary_html(data), notices_html(data.get('notices') or [])))
+
+
+def notices_html(items, uid='rp'):
+    """Barra única de avisos (cliente): una fila compacta; en el teléfono, «Avisos (N)» abre la lista. Un repuesto lleva a su tarjeta;
+    varios repuestos se agrupan en un desplegable con acceso a cada uno. Sin avisos activos, no ocupa espacio."""
+    import html as h
+    e = h.escape
+    if not items:
+        return ''
+    lis = ''
+    for n in items:
+        chip = '%s<span>%s</span>' % (icon(n['icon'], 'rp-nt-ic'), e(n['label']))
+        if n['kind'] == 'part' and len(n.get('items') or []) > 1:
+            sub = ''.join('<li><a class="rp-nt-sub" data-tone="%s" href="#tp-%d">%s<span><b>%s</b><small>%s</small></span></a></li>'
+                          % (e(p['tone']), p['id'], icon(p['icon'], 'rp-nt-ic'), e(p['name']), e(p['label'])) for p in n['items'])
+            lis += ('<li><details class="rp-nt-group"><summary class="rp-nt-item" data-tone="%s" title="%s">%s%s</summary><ul class="rp-nt-pop">%s</ul></details></li>'
+                    % (e(n['tone']), e(n['detail']), chip, icon('chevron-down', 'rp-nt-chev'), sub))
+        elif n.get('target') and n['target'].get('type') == 'part':
+            lis += '<li><a class="rp-nt-item" data-tone="%s" href="#tp-%d" title="%s">%s</a></li>' % (e(n['tone']), n['target']['id'], e(n['detail']), chip)
+        else:
+            lis += '<li><span class="rp-nt-item" data-tone="%s" title="%s">%s</span></li>' % (e(n['tone']), e(n['detail']), chip)
+    count = len(items)
+    return ('<div class="rp-nt" data-count="%d"><button type="button" class="rp-nt-toggle" aria-expanded="false" aria-controls="%s-nt">%s<span>Avisos (%d)</span>%s</button>'
+            '<span class="rp-nt-head" aria-hidden="true">%s<span>Avisos (%d)</span></span><ul class="rp-nt-list" id="%s-nt" aria-label="Avisos de la orden">%s</ul></div>'
+            % (count, uid, icon('bell', 'rp-nt-ic'), count, icon('chevron-down', 'rp-nt-chev'), icon('bell', 'rp-nt-ic'), count, uid, lis))
 
 
 def summary_html(data):

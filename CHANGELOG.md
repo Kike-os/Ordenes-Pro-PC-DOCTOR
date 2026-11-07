@@ -4,6 +4,18 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.255 — 2026-11-07 17:46 (UTC-05:00)
+
+Barra única de avisos compacta e interactiva en el seguimiento
+
+### Nuevas funcionalidades
+
+- Avisos interactivos: el presupuesto abre el presupuesto real de la orden y cada repuesto su seguimiento; varios repuestos se agrupan con acceso individual; el pedido cancelado se muestra aparte, en rojo.
+
+### Mejoras realizadas
+
+- Seguimiento: las tarjetas de aviso se reemplazan por una barra única de 34–36 px («Avisos (N) | Presupuesto… | Repuesto…») con colores por estado real; en el teléfono, «Avisos (N)» abre un panel compacto. Sin avisos, no ocupa espacio.
+
 ## v1.5.254 — 2026-11-07 16:37 (UTC-05:00)
 
 Seguimiento con resumen y avisos de acabado profesional

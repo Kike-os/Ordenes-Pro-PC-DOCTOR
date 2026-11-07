@@ -83,3 +83,43 @@
   - respuesta del cliente: «Respuesta pendiente»;
   - repuesto: «En camino».
 - **Mismo marcado** en el panel y en el seguimiento del cliente. Los datos y la lógica de las etapas no cambian.
+
+## 1.5.255 — Barra única de avisos
+
+- **Qué reemplaza:** las tarjetas de aviso, que ocupaban varias filas, pasan a ser una sola barra horizontal de 34–36 px, debajo del resumen de la etapa actual. Ejemplo: `🔔 Avisos (2) | ⏱ Presupuesto pendiente | 📦 Repuesto en camino` (iconos de Lucide).
+- **Presupuesto:** muestra el estado real de la versión vigente.
+
+  | Estado | Color |
+  |---|---|
+  | Pendiente | ámbar |
+  | Aprobado | verde |
+  | Aprobado parcialmente | violeta |
+  | Rechazado | rojo |
+  | En revisión | ámbar |
+
+  Si la orden está en «Aprobación de presupuesto» y no hay presupuesto registrado, aparece «Presupuesto pendiente».
+- **Estados especiales:** «Respuesta pendiente» y «Falla recurrente», en ámbar.
+- **Repuestos:** cada pedido con su paso real.
+
+  | Paso | Color e icono |
+  |---|---|
+  | Solicitud registrada | azul |
+  | Esperando despacho | ámbar |
+  | En tránsito internacional | celeste, avión |
+  | En tránsito nacional | azul, camión |
+  | En aduana de Ecuador | naranja |
+  | En camino a Otavalo | azul, camión |
+  | Repuesto recibido | verde |
+  | Instalación en proceso | violeta |
+  | Pedido cancelado | rojo; estado alternativo, no forma parte de la progresión |
+
+  Con retraso o con novedad, en naranja y escrito. Un repuesto ya instalado deja de avisarse.
+- **Varios repuestos:** se agrupan en «Repuestos (N)», que abre la lista con el estado de cada uno y acceso individual a su seguimiento.
+- **Acciones:**
+  - En el panel, «Presupuesto» abre el presupuesto real de la orden, con el flujo de aprobación de siempre; nada se modifica.
+  - En el panel, un repuesto lleva a su tarjeta de seguimiento y la resalta.
+  - En la página del cliente, un repuesto lleva a su tarjeta. El presupuesto interno no se abre: el cliente lo recibe por su propio enlace.
+- **Orden de prioridad:** rojo, naranja, ámbar, violeta, celeste, azul y verde. Sin avisos activos, la barra no aparece y no deja espacio vacío.
+- **Teléfonos** (contenedor de menos de 560 px): un botón «Avisos (N)» de 40 px abre un panel compacto. Escape o un toque fuera lo cierran, sin desplazamiento horizontal.
+- **Actualización:** usa la sincronización existente (la huella de 30 s); no agrega consultas. La línea de etapas no se mueve al actualizarse.
+- **Fuente:** `repair_stages.notices` (servidor). El cliente solo ve repuestos públicos, con su nombre depurado.

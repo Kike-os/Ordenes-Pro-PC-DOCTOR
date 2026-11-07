@@ -73,7 +73,7 @@ def lookup(c,token):
         parts=[]  # base anterior al seguimiento de repuestos
     return {'id':row['id'],'code':row['code'] or 'OP-%05d'%row['id'],'status':row['status'],'status_label':row['status_label'],'received':received,'updated':stamp(row['updated_at']),
             'device':' · '.join(filter(None,[DEVICE_TYPES.get(kind,''),' '.join(filter(None,[row['brand'],row['model']]))])),'updates':updates,'files':files,'parts':parts,
-            'repair':__import__('repair_stages').compute(c,row['id']),'signature':__import__('repair_stages').signature(c,row['id']),
+            'repair':__import__('repair_stages').compute(c,row['id'],public=True),'signature':__import__('repair_stages').signature(c,row['id']),
             'kind':DEVICE_TYPES.get(kind,''),'brand':row['brand'] or '','model':row['model'] or '',**dict(zip(('budget_code','budget'),__import__('tracking_print').budget(c,row['id'])))}
 
 
@@ -226,11 +226,11 @@ def _parts_section(data):
             h['color'],e(h['kind']),' data-tone="%s"'%e(h['situation']) if h['kind']=='situacion' else '',e(_when(h['at'])),e(h['label']),
             '<span>%s</span>'%e(h['detail']) if h.get('detail') else '','<p>%s</p>'%e(h['text']) if h['text'] else '') for h in p['history'])
         out.append(
-            '<article class="tp" data-situation="%s" data-vehicle="%s"><header class="tp-head"><div class="tp-id"><strong>%s</strong>%s</div><span class="tp-state" data-tone="%s">%s</span></header>'
+            '<article class="tp" id="tp-%d" data-situation="%s" data-vehicle="%s"><header class="tp-head"><div class="tp-id"><strong>%s</strong>%s</div><span class="tp-state" data-tone="%s">%s</span></header>'
             '<div class="tp-now" data-tone="%s"><div><small>Estado actual</small><strong>%s</strong><p>%s</p>%s</div><div class="tp-meta"><div class="tp-meter" role="img" aria-label="%d de %d etapas completadas">%s</div>'
             '<small><b>%d de %d</b> etapas completadas · avance %d %%</small><small>Última actualización: %s</small></div></div>'
             '%s<div class="tp-track"%s>%s<ol class="tp-steps" aria-label="Etapas del repuesto">%s</ol></div>%s<dl class="tp-facts">%s</dl>%s%s</article>'%(
-            e(p['situation']),e(p['vehicle']),e(p['name']),'<small>%s</small>'%e(p['brand']) if p['brand'] else '',e(tone),e(p['status_label']),
+            p['id'],e(p['situation']),e(p['vehicle']),e(p['name']),'<small>%s</small>'%e(p['brand']) if p['brand'] else '',e(tone),e(p['status_label']),
             e(tone),e(p['status_label']+(' · '+p['step_label'] if p.get('step_label') else '')),e(p['description']),
             '<p class="tp-next"><span>Próxima etapa:</span> <b>%s</b></p>'%e(nxt) if nxt and p['situation']!='cancelado' else '',p['done_count'],p['total'],meter,p['done_count'],p['total'],
             p['progress']['percent'] if p.get('progress') else round(100*p['done_count']/max(1,p['total'])),e(_when(p['updated'])),

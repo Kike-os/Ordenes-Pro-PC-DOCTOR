@@ -8,6 +8,26 @@
   },
   "releases": [
     {
+      "version": "1.5.255",
+      "date": "2026-11-07T17:46:06-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Barra única de avisos compacta e interactiva en el seguimiento",
+      "changes": {
+        "features": [
+          "Avisos interactivos: el presupuesto abre el presupuesto real de la orden y cada repuesto su seguimiento; varios repuestos se agrupan con acceso individual; el pedido cancelado se muestra aparte, en rojo."
+        ],
+        "improvements": [
+          "Seguimiento: las tarjetas de aviso se reemplazan por una barra única de 34–36 px («Avisos (N) | Presupuesto… | Repuesto…») con colores por estado real; en el teléfono, «Avisos (N)» abre un panel compacto. Sin avisos, no ocupa espacio."
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Kike-os: «actualiza» · «Sí, publícala ahora»"
+    },
+    {
       "version": "1.5.254",
       "date": "2026-11-07T16:37:06-05:00",
       "type": "patch",

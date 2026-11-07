@@ -573,3 +573,49 @@
  .rp-summary{grid-template-columns:1fr;gap:10px}.rp-sum-meter{padding-top:8px;border-top:1px solid #2c548866}
  .rp-alert{grid-template-columns:auto minmax(0,1fr)}.rp-alert-tag{grid-column:2;justify-self:start}
 }
+
+/* 1.5.255 — Barra única de avisos: reemplaza las tarjetas de aviso por una fila de 34 px (presupuesto, estados especiales y repuestos). Colores
+   semánticos discretos con el estado siempre escrito; cada aviso abre lo suyo. Con un contenedor estrecho (< 560 px), «Avisos (N)» abre la lista. */
+.rp-nt{position:relative;display:flex;align-items:center;gap:6px;min-height:34px;margin:10px 0 0;padding:3px 6px 3px 10px;border:1px solid #2c548866;border-radius:8px;background:#0b1a33}
+.rp-nt-head{display:inline-flex;flex:none;align-items:center;gap:6px;padding-right:10px;border-right:1px solid #2c548866;color:#cfe3ff;font-size:12.5px;font-weight:700;white-space:nowrap}
+.rp-nt-head .rp-nt-ic,.rp-nt-toggle .rp-nt-ic{color:#93c5fd}
+.rp-nt-toggle{display:none}
+.rp-nt-ic{display:block;flex:none;width:15px;height:15px}
+.rp-nt-chev{display:block;flex:none;width:14px;height:14px;opacity:.7;transition:transform .25s ease}
+.rp-nt-list{display:flex;flex-wrap:wrap;align-items:center;gap:2px;min-width:0;margin:0;padding:0;list-style:none}
+.rp-nt-list>li{display:flex;align-items:center;min-width:0}
+.rp-nt-list>li+li::before{content:"";align-self:center;width:1px;height:16px;margin-right:2px;background:#2c548866}
+.rp-nt-item{--t:#60a5fa;display:inline-flex;align-items:center;gap:6px;min-height:26px;padding:3px 9px;border:1px solid transparent;border-radius:6px;background:transparent;color:#dbe8fb;
+ font-family:inherit;font-size:12.5px;font-weight:600;line-height:1.2;white-space:nowrap;text-decoration:none;cursor:default;transition:background-color .3s ease,border-color .3s ease,color .3s ease}
+.rp-nt-item .rp-nt-ic{color:var(--t)}
+:is(a,button,summary).rp-nt-item{cursor:pointer}
+:is(a,button,summary).rp-nt-item:hover{background:color-mix(in srgb,var(--t) 14%,transparent);border-color:color-mix(in srgb,var(--t) 40%,transparent);color:#fff}
+:is(.rp-nt-item,.rp-nt-toggle,.rp-nt-sub):focus-visible{outline:2px solid #8bb8ff;outline-offset:1px}
+:is(.rp-nt-item,.rp-nt-sub)[data-tone=ambar]{--t:#f59e0b}:is(.rp-nt-item,.rp-nt-sub)[data-tone=verde]{--t:#22c55e}:is(.rp-nt-item,.rp-nt-sub)[data-tone=rojo]{--t:#f87171}
+:is(.rp-nt-item,.rp-nt-sub)[data-tone=violeta]{--t:#a78bfa}:is(.rp-nt-item,.rp-nt-sub)[data-tone=azul]{--t:#60a5fa}:is(.rp-nt-item,.rp-nt-sub)[data-tone=celeste]{--t:#38bdf8}
+:is(.rp-nt-item,.rp-nt-sub)[data-tone=naranja]{--t:#fb923c}
+.rp-nt-group{position:relative}
+.rp-nt-group>summary{list-style:none}.rp-nt-group>summary::-webkit-details-marker{display:none}
+.rp-nt-group[open]>summary .rp-nt-chev{transform:rotate(180deg)}
+.rp-nt-pop{position:absolute;z-index:30;top:calc(100% + 6px);left:0;width:max-content;min-width:250px;max-width:min(340px,calc(100vw - 32px));margin:0;padding:6px;list-style:none;
+ border:1px solid #2c5488;border-radius:10px;background:#0b1730;box-shadow:0 14px 30px -14px #000c}
+.rp-nt-sub{--t:#60a5fa;display:grid;grid-template-columns:16px minmax(0,1fr);align-items:center;gap:8px;width:100%;min-height:38px;padding:6px 8px;border:0;border-radius:8px;
+ background:none;color:#e3eeff;font:inherit;text-align:left;text-decoration:none;cursor:pointer}
+.rp-nt-sub .rp-nt-ic{color:var(--t)}.rp-nt-sub:hover{background:#16365f}
+.rp-nt-sub b{display:block;font-size:13px;font-weight:600;overflow-wrap:anywhere}.rp-nt-sub small{display:block;color:var(--t);font-size:12px;font-weight:600}
+.rp-focus{animation:rp-focus 1.8s ease-out}
+@keyframes rp-focus{0%,40%{box-shadow:0 0 0 3px #3b82f6aa}100%{box-shadow:0 0 0 0 transparent}}
+@container (max-width:560px){
+ .rp-nt{display:block;min-height:0;padding:0;border:0;background:none}
+ .rp-nt-head{display:none}
+ .rp-nt-toggle{display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:6px 12px;border:1px solid #2c548866;border-radius:8px;background:#0b1a33;color:#e3eeff;
+  font-family:inherit;font-size:13px;font-weight:700;cursor:pointer}
+ .rp-nt-toggle[aria-expanded=true] .rp-nt-chev{transform:rotate(180deg)}
+ .rp-nt-list{position:absolute;z-index:30;top:calc(100% + 6px);left:0;right:0;display:none;flex-direction:column;align-items:stretch;gap:2px;padding:6px;
+  border:1px solid #2c5488;border-radius:10px;background:#0b1730;box-shadow:0 14px 30px -14px #000c}
+ .rp-nt[data-open=true] .rp-nt-list{display:flex}
+ .rp-nt-list>li{display:block}.rp-nt-list>li+li::before{display:none}
+ .rp-nt-item{display:flex;width:100%;min-height:40px;white-space:normal}
+ .rp-nt-pop{position:static;width:auto;min-width:0;max-width:none;padding:0 0 4px 18px;border:0;box-shadow:none;background:none}
+}
+@media(prefers-reduced-motion:reduce){.rp-nt *{transition:none!important}.rp-focus{animation:none}}
