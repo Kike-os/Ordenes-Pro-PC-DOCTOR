@@ -29,3 +29,9 @@ document.addEventListener('click',event=>{if(event.target.closest('[data-print]'
   if(b.dataset.mime==='application/pdf'){b.setAttribute('aria-busy','true');try{const blob=await original(b.dataset.file),src=URL.createObjectURL(blob);window.open(src,'_blank','noopener');setTimeout(()=>URL.revokeObjectURL(src),60000);}
    catch(error){alert(error.message||'El documento no está disponible.');}finally{b.removeAttribute('aria-busy');}return;}
   const photos=[...document.querySelectorAll('.ticket-ev')].filter(x=>x.dataset.mime!=='application/pdf');viewer(photos,photos.indexOf(b));});})();
+// Mapa de ruta de repuestos (1.5.246): las animaciones continuas (puntos luminosos, halo y vehículo en marcha) se pausan fuera de pantalla
+// y con la pestaña oculta; el SVG también detiene sus animaciones. Sin soporte del navegador, quedan como están.
+(()=>{const maps=[...document.querySelectorAll('.lgx')];if(!maps.length)return;
+ const set=(m,on)=>{if(on){delete m.dataset.paused;m.querySelector('svg')?.unpauseAnimations?.();}else{m.dataset.paused='';m.querySelector('svg')?.pauseAnimations?.();}};
+ if('IntersectionObserver' in window){const seen=new Map();const io=new IntersectionObserver(list=>{for(const e of list){seen.set(e.target,e.isIntersecting);set(e.target,e.isIntersecting&&!document.hidden);}},{rootMargin:'80px'});
+  maps.forEach(m=>io.observe(m));document.addEventListener('visibilitychange',()=>maps.forEach(m=>set(m,!document.hidden&&seen.get(m)!==false)));}})();

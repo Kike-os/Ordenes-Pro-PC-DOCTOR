@@ -46,14 +46,18 @@ class PartLogisticsTests(unittest.TestCase):
         self.assertEqual([d['state'] for d in r['detail']][:11], ['done'] * 10 + ['current'])
         self.assertTrue(all(d['at'] for d in r['detail'][:11]))
         self.assertEqual(r['dispatch_date'], app.reception_now().date().isoformat())
-        # Seguimiento público: sus 6 etapas, sin país, transportista, guía, avión ni aduana.
+        # Seguimiento público (1.5.246): el envío internacional tiene su propia ruta (vuelo, aduana y traslado a Otavalo), pero nunca el país,
+        # el transportista, la guía ni el proveedor.
         page = self.request('/s/' + self.link(oid))['body']
-        for secret in ('Estados Unidos', 'DHL', 'aduana', 'Aduana', 'avión', 'tránsito internacional'):
+        for secret in ('Estados Unidos', 'DHL'):
             self.assertNotIn(secret, page, secret)
+        self.assertIn('Proceso de aduana', page)
         with app.connect() as c:
             p = parts.public(c, oid)[0]
-            self.assertEqual(([s['code'] for s in p['steps']], p['vehicle']), (['solicitud', 'confirmado', 'traslado', 'recibido', 'instalacion', 'finalizado'], 'arrived'))
-            self.assertEqual(sum(1 for h in p['history'] if h['label'] == 'En traslado hacia PC-DOCTOR'), 1)  # el traslado, una sola vez
+            self.assertEqual(([s['code'] for s in p['steps']], p['vehicle'], p['map']['mode']),
+                             (['solicitud', 'confirmado', 'aereo', 'aduana', 'nacional', 'recibido', 'instalacion', 'finalizado'], '', 'internacional'))
+            self.assertEqual([n['sub'] for n in p['map']['nodes']][0], 'Envío internacional')  # sin el país de origen
+            self.assertEqual(sum(1 for h in p['history'] if h['label'] == 'Llegada a Ecuador'), 1)  # cada paso real, una sola vez
 
     def test_customs_is_never_released_without_its_event_and_incidents_do_not_advance(self):
         cookie, csrf, post, order = self.paid_order(10500, pay=False)

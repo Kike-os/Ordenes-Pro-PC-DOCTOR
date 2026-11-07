@@ -70,9 +70,11 @@ def lookup(c,token):
 HEAD='<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><meta name="robots" content="noindex,nofollow"><title>%s | PC-DOCTOR S.A.</title><link rel="icon" href="/favicon.ico?v=2" sizes="48x48"><link rel="stylesheet" href="/static/tracking.css"></head><body><main class="tracking-page"><header><img src="/static/logo-original.png" alt="PC-DOCTOR S.A." width="150"><p>%s</p></header>'
 
 
-def public_page(data,token=''):
-    page=CARD_HEAD%('<meta http-equiv="refresh" content="180">',html.escape(data['code']))
-    return page.replace('<body class="ticket-page">','<body class="ticket-page ticket-public">',1)+public_card(dict(data,token=token),'/s/'+token+'/qr.svg' if token else '')+'</main></body></html>'
+def public_page(data,token='',notice='',tone='ok'):
+    # Con un aviso (resultado de una solicitud del cliente) no se recarga sola: así se puede leer con calma.
+    page=CARD_HEAD%('' if notice else '<meta http-equiv="refresh" content="180">',html.escape(data['code']))
+    banner='<p class="tw-notice" data-tone="%s" role="%s">%s</p>'%(tone,'status' if tone=='ok' else 'alert',html.escape(notice)) if notice else ''
+    return page.replace('<body class="ticket-page">','<body class="ticket-page ticket-public">',1)+banner+public_card(dict(data,token=token),'/s/'+token+'/qr.svg' if token else '')+'</main></body></html>'
 
 
 # Tarjeta Digital de Seguimiento Técnico: ticket de dos secciones (datos de la orden arriba; QR y código de barras abajo).
@@ -142,6 +144,26 @@ VAN=('<svg viewBox="0 0 48 28" aria-hidden="true" focusable="false"><path class=
 CHECK='<svg class="v-ok" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><circle cx="10" cy="10" r="9"/><path d="m6 10.2 2.6 2.6L14.2 7"/></svg>'
 
 
+def _cancel_block(p,token):
+    """Estado de una cancelación (sin importes ni motivos internos) y, si aún procede, el formulario para solicitarla. La solicitud
+    comprueba los últimos cuatro dígitos de la identificación y queda pendiente de revisión: nunca anula el pedido por sí sola."""
+    import secrets
+    e=html.escape;out=''
+    x=p.get('cancellation')
+    if x:
+        out+='<p class="tp-cancel-state" data-status="%s" role="status"><b>%s</b> %s</p>'%(e(x['status']),e(x['label']),e(x['text']))
+    if p.get('can_cancel') and token:
+        out+=('<details class="tp-cancel"><summary>Solicitar cancelación de este repuesto</summary><form method="post" action="/s/%s/repuestos/%d/cancelar" class="tp-cancel-form">'
+              '<p>Su solicitud será revisada por nuestro departamento administrativo y le informaremos el resultado. El pedido no cambia hasta esa revisión. '
+              'Si existen pagos anticipados, administración le indicará el procedimiento que corresponda.</p>'
+              '<label><span>Últimos 4 dígitos de su cédula o RUC</span><input name="last4" inputmode="numeric" pattern="[0-9]{4}" minlength="4" maxlength="4" autocomplete="off" required></label>'
+              '<label><span>Motivo de la cancelación</span><textarea name="reason" minlength="10" maxlength="500" rows="3" required></textarea></label>'
+              '<input type="hidden" name="request_key" value="%s"><label class="tp-check"><input type="checkbox" name="confirm" value="1" required>'
+              '<span>Confirmo que deseo solicitar la cancelación de este repuesto.</span></label><button type="submit">Enviar solicitud de cancelación</button></form></details>'
+              )%(e(token),p['id'],'cancel-'+secrets.token_hex(10))
+    return out
+
+
 def _parts_section(data):
     """Seguimiento de repuestos «PC-DOCTOR Pro»: bloque de estado actual, línea de 6 etapas (de azul a verde solo en lo completado), vehículo
     SVG que solo se mueve con un traslado real registrado y se detiene al llegar, y cronología. Se construye solo con order_part_requests.public."""
@@ -168,10 +190,11 @@ def _parts_section(data):
             '<article class="tp" data-situation="%s" data-vehicle="%s"><header class="tp-head"><div class="tp-id"><strong>%s</strong>%s</div><span class="tp-state" data-tone="%s">%s</span></header>'
             '<div class="tp-now" data-tone="%s"><div><small>Estado actual</small><strong>%s</strong><p>%s</p></div><div class="tp-meta"><div class="tp-meter" role="img" aria-label="%d de %d etapas completadas">%s</div>'
             '<small><b>%d de %d</b> etapas completadas</small><small>Última actualización: %s</small></div></div>'
-            '<div class="tp-track">%s<ol class="tp-steps" aria-label="Etapas del repuesto">%s</ol></div>%s<dl class="tp-facts">%s</dl>%s</article>'%(
+            '%s<div class="tp-track"%s>%s<ol class="tp-steps" aria-label="Etapas del repuesto">%s</ol></div>%s<dl class="tp-facts">%s</dl>%s%s</article>'%(
             e(p['situation']),e(p['vehicle']),e(p['name']),'<small>%s</small>'%e(p['brand']) if p['brand'] else '',e(tone),e(p['status_label']),
             e(tone),e(p['status_label']),e(p['description']),p['done_count'],p['total'],meter,p['done_count'],p['total'],e(_when(p['updated'])),
-            vehicle,steps,'<p class="sr-only">%s</p>'%e(moving) if moving else '',''.join('<div><dt>%s</dt><dd>%s</dd></div>'%(e(k),e(v)) for k,v in facts if v),
+            p.get('map_html') or '',' data-n="%d"'%len(p['steps']),vehicle,steps,'<p class="sr-only">%s</p>'%e(moving) if moving else '',''.join('<div><dt>%s</dt><dd>%s</dd></div>'%(e(k),e(v)) for k,v in facts if v),
+            _cancel_block(p,data.get('token','')),
             '<details class="tp-hist"><summary>Historial del repuesto <b>%d</b></summary><ol>%s</ol></details>'%(len(p['history']),hist) if hist else ''))
     if not out:return ''
     return '<section class="tw-sec ticket-parts" aria-label="Seguimiento de repuestos"><h2>Seguimiento de repuestos</h2>'+''.join(out)+'</section>'

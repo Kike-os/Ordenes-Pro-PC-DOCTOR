@@ -184,3 +184,144 @@ Cada pedido puede definir su **tipo de envío** (`shipping`): nacional o interna
 **Pruebas:**
 - **Unitarias:** `test_part_logistics.py`. Cubren el flujo internacional completo, la aduana sin liberación automática, las incidencias que no avanzan, el flujo nacional, los pedidos anteriores, el permiso del técnico y la ausencia de fugas al público.
 - **Navegador:** 22 comprobaciones con datos ficticios, de 320 a 1920 px, con movimiento reducido. La prueba anterior de repuestos (12 comprobaciones) sigue en verde.
+
+## Ruta animada, cancelaciones y avisos (1.5.246)
+
+### Mapa de ruta
+
+Un solo dibujo (`part_route.py`) a partir de un único modelo (`order_part_requests.route_map`), para el panel interno y para el seguimiento público.
+
+| Envío | Puntos | Tramos |
+|---|---|---|
+| **Internacional** | Origen (el país solo en el panel interno) · Ecuador y aduana · Otavalo · PC-DOCTOR | Vuelo internacional (arco punteado), traslado terrestre y llegada |
+| **Nacional** | Despacho · Otavalo · PC-DOCTOR | Traslado terrestre y llegada |
+
+**El vehículo sale solo del paso real registrado.** Nunca se simulan kilómetros, GPS ni avance por el tiempo:
+
+| Paso | Vehículo |
+|---|---|
+| Despachado | Avión (internacional) o camión (nacional) detenido en el origen |
+| Tránsito internacional | Avión en el arco, a mitad del vuelo |
+| Llegada al país | Avión aterrizando en Ecuador |
+| Revisión aduanera | Sin vehículo; el punto de la aduana se ilumina en ámbar |
+| Liberado por aduana | El avión se sustituye por el camión |
+| Distribución nacional y ruta hacia Otavalo | Camión en el tramo terrestre |
+| Recibido | El camión llega a PC-DOCTOR con ✓ |
+| Instalación en adelante | Sin vehículo; el taller queda iluminado |
+
+**Novedades y cancelación:**
+- Con una novedad, el vehículo se detiene en naranja.
+- Cancelado: sin vehículo y con la ruta atenuada.
+
+**Animación:**
+- **Al cargar:** el vehículo recorre una sola vez el trecho desde el paso anterior (`animateMotion`, 1,6 s, curva suave).
+- **Tramo activo:** puntos luminosos.
+- **Etapa actual:** pulso suave.
+- **Etapa completada:** confirmación ✓ al aparecer.
+
+**Rendimiento y accesibilidad:**
+- Las animaciones continuas se pausan fuera de pantalla y con la pestaña oculta (`IntersectionObserver` y `pauseAnimations`).
+- Con `prefers-reduced-motion`, nada se mueve y el vehículo queda quieto en su punto real.
+
+**Disposición:**
+- **Escritorio y tableta:** ruta horizontal en SVG escalable.
+- **Teléfono** (contenedor de menos de 560 px): lista vertical compacta, con el vehículo junto a su tramo.
+
+**Pedidos anteriores sin tipo de envío:** conservan su línea de 8 etapas y su vehículo de siempre.
+
+### Seguimiento público
+
+| Envío | Etapas |
+|---|---|
+| **Internacional** (8) | Solicitud · Confirmado · Envío internacional · Proceso de aduana · Traslado hacia Otavalo · Recibido · Instalación · Finalizado |
+| **Nacional** (6) | El traslado se llama «Traslado nacional hacia Otavalo» |
+| **Anterior** | Sus 6 etapas de siempre |
+
+**Lo que se publica:**
+- la ruta y la aduana;
+- cada paso real del traslado, una sola vez.
+
+**Lo que nunca se publica:**
+- el país de origen;
+- el transportista, la guía y el proveedor;
+- costos y notas internas.
+
+**Cancelación en el enlace del cliente:**
+- Se ve su estado y su fecha, sin importes ni motivos internos.
+- Mientras procede, aparece «Solicitar cancelación de este repuesto».
+
+### Cancelaciones (`part_cancellations.py`)
+
+**Solicitud:**
+- La hace el cliente desde su enlace. Comprueba los últimos 4 dígitos de su cédula o RUC y tiene un límite de intentos por enlace y por IP.
+- También la puede registrar el personal en nombre del cliente (teléfono, presencial, correo o WhatsApp).
+- **Una solicitud nunca anula el pedido.** Queda «solicitada» (o «en revisión») hasta que administración la aprueba o la rechaza con justificación.
+- Solo hay una abierta a la vez, y mientras esté abierta no se avanza de etapa.
+
+**Cancelaciones de administración:** proveedor, falta de disponibilidad, problema de importación, pedido duplicado y administrativa. «Novedad → Pedido cancelado» queda reservado a administración y pasa por aquí.
+
+**Reglas según el punto del pedido:**
+
+| Punto | Regla |
+|---|---|
+| Sin compra | Se puede aprobar de inmediato |
+| Comprado | Exige confirmar que se revisaron los compromisos con el proveedor |
+| En tránsito, aduana o transporte nacional | Exige la revisión administrativa del envío |
+| Recibido o instalado | No se cancela por aquí: corresponde devolución, garantía o reclamo |
+
+**Al aprobar:**
+- El pedido queda «Pedido cancelado» (definitivo), con su evento en el historial.
+- No se tocan compras, inventario, reservas, ventas, facturas autorizadas (se corrigen con nota de crédito) ni caja. La ventana lo advierte cuando hay algo vinculado.
+
+**Reembolsos:**
+- El estado del reembolso va aparte del estado logístico.
+- Administración indica el importe a devolver, que no puede superar lo pagado en la orden.
+- Cada reembolso es una **devolución real de la orden**: se registra en ese momento (pasa por caja) o se vincula una ya registrada, una sola vez.
+- El estado (pendiente, parcial o completado) sale de esas devoluciones. Nada se reembolsa automáticamente.
+
+**Historial:** todo queda en `order_part_log`, que no se modifica ni se borra, y se muestra junto con el historial del repuesto.
+
+### Avisos automáticos al cliente (`part_notices.py`)
+
+**Eventos que generan aviso:**
+- confirmado, despachado, llegada a Ecuador, ingreso y liberación de aduana, recibido y listo;
+- retraso;
+- cancelación solicitada, aprobada o rechazada;
+- reembolso.
+
+Los pasos internos menores no generan avisos.
+
+**Reglas:**
+- **Un aviso por evento y canal.** Una clave única impide duplicados, aunque se corrija hacia atrás y se vuelva a avanzar.
+- **Correo:** solo con un correo válido y si el cliente no pidió dejar de recibir correos.
+- **WhatsApp Business:** solo si está configurado con su plantilla aprobada. Hoy no lo está, así que queda «omitido» con el motivo.
+- **«Enviado»** significa aceptado por el servidor de correo o por WhatsApp, nunca «entregado».
+- **Comunicación de la orden:** cada envío queda registrado allí (`order_messages`).
+- **Reintento controlado:** un aviso fallido se reintenta con el botón del pedido o con la tarea diaria, hasta 3 intentos, con el mismo texto.
+- **Interruptor:** administración apaga o enciende los avisos desde el panel («Avisos automáticos al cliente»). Están encendidos por omisión.
+- **Personal:** en Notificaciones ve las solicitudes de cancelación pendientes y los avisos fallidos.
+
+### Datos y evidencias
+
+- **Nuevos datos del pedido:**
+  - transportista nacional y guía nacional;
+  - fechas de ingreso y liberación de aduana, que se registran solas con el evento real si están vacías.
+- En el internacional, el transportista y la guía se presentan como «Transporte internacional» y «Número de seguimiento».
+- Cada evidencia del repuesto queda asociada a la etapa en la que se registró (`order_followups.part_step`) y se cuenta junto a esa etapa.
+- **Migración `095_part_cancellations.sql`:**
+  - añade columnas vacías;
+  - añade las tablas `order_part_cancellations`, `order_part_refunds`, `order_part_log` y `order_part_notices`, protegidas contra borrado.
+- **Pedidos existentes:** sin cambios.
+
+### Pruebas
+
+- **`test_part_cancellations.py`:**
+  - modelo del mapa por paso;
+  - cancelaciones del personal y del cliente;
+  - reglas por etapa;
+  - permisos y bitácora inalterable;
+  - reembolsos con devoluciones reales;
+  - avisos únicos, opt-out, fallo con reintento y apagado;
+  - evidencias por etapa y datos nuevos.
+- **`test_part_logistics.py`:** actualizada a la nueva ruta pública.
+- **Navegador:** 27 comprobaciones, de 320 a 1366 px, con movimiento reducido y con el envío real del formulario público.

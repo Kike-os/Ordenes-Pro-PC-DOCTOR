@@ -315,6 +315,24 @@ def order_document(c,oid):
     return order
 
 
+def part_notice_mail(c,oid,to,subject,body):
+    """Correo de un aviso de repuesto: el envío institucional de siempre (archivo, seguimiento de entrega y vínculo con la orden)."""
+    send_institutional(c,'repuesto',subject,to,subject,body,oid,None,review=False)
+
+
+def part_notify(c,rid,notice,now):
+    """Avisos automáticos de un evento ya guardado. Un fallo del canal nunca deshace lo registrado: queda «fallido» para reintentar."""
+    import part_notices
+    try:
+        row=c.execute('SELECT * FROM order_part_requests WHERE id=?',(rid,)).fetchone()
+        ids=part_notices.emit(c,row,notice[0],notice[1],now);c.commit()
+        if ids:part_notices.deliver(c,ids,now,part_notice_mail);c.commit()
+    except Exception as error:
+        print('part-notice',type(error).__name__,flush=True)
+        try:c.rollback()
+        except Exception:pass
+
+
 def receipt_suffix(order):
     """Sufijo del nombre del archivo: «-R2» para la versión corregida de un comprobante; el original conserva su nombre."""
     fixes=order.get('receipt_corrections') or []
@@ -1216,6 +1234,11 @@ class Handler(BaseHTTPRequestHandler):
                 # Inasistencias: registra las vencidas y envía los avisos pendientes (también lo hace la actividad del personal cada 5 minutos).
                 try:no_show_tick(c,now,force=True)
                 except Exception as error:print('no-show cron',type(error).__name__,flush=True)
+                # Avisos de repuestos fallidos: reintento controlado (hasta 3 intentos, el mismo texto).
+                try:
+                    import part_notices
+                    part_notices.retry_failed(c,now,part_notice_mail);c.commit()
+                except Exception as error:print('part-notices cron',type(error).__name__,flush=True)
                 # Licencias Pro: avisos internos y correos de renovación a clientes (una vez al día, hora de Ecuador).
                 try:license_notices_tick(c,now)
                 except Exception as error:print('license-notices cron',type(error).__name__,flush=True)
@@ -2733,6 +2756,38 @@ class Handler(BaseHTTPRequestHandler):
                     audit(c,None,'quote_client_'+status,quote['order_id'])
                 c.commit()
             return self.reply(200,page,'text/html; charset=utf-8')
+        # Solicitud de cancelación de un repuesto desde el enlace de seguimiento: comprueba los últimos cuatro dígitos de la identificación
+        # del cliente, con límite de intentos. Queda pendiente de revisión de administración: nunca anula el pedido por sí sola.
+        part_cancel=re.fullmatch(r'/s/([A-Za-z0-9_-]{1,64})/repuestos/([0-9]{1,9})/cancelar',urlsplit(self.path).path)
+        if part_cancel:
+            import order_tracking,order_part_requests,part_cancellations
+            try:length=int(self.headers.get('Content-Length','0') or 0)
+            except ValueError:length=0
+            if length<=0 or length>8000:return self.reply(400,{'error':'Solicitud inválida.'})
+            form={key:values[0] for key,values in parse_qs(self.rfile.read(length).decode('utf-8','replace'),keep_blank_values=True).items()}
+            token=part_cancel[1]
+            with connect() as c:
+                if limited(c,'part-cancel:'+digest(token),8,3600) or limited(c,'part-cancel-ip:'+digest(self.client_address[0]),20,3600):
+                    return self.reply(429,{'error':'Demasiados intentos. Comuníquese con el taller.'})
+                found=order_tracking.lookup(c,token)
+                if not found:return self.reply(404,{'error':'Enlace no disponible.'})
+                page=lambda text,tone='ok',status=200:self.reply(status,order_tracking.public_page(order_tracking.lookup(c,token),token,text,tone),'text/html; charset=utf-8')
+                client=c.execute('SELECT cl.identification FROM orders o JOIN devices d ON d.id=o.device_id JOIN clients cl ON cl.id=d.client_id WHERE o.id=?',(found['id'],)).fetchone()
+                digits=re.sub(r'\D','',str(client['identification'] if client else ''))
+                if len(digits)<4 or not hmac.compare_digest(re.sub(r'\D','',form.get('last4',''))[:4],digits[-4:]):
+                    return page('Los dígitos no coinciden con la identificación registrada en la orden. No se registró la solicitud.','error',400)
+                if form.get('confirm')!='1':return page('Marque la confirmación para enviar la solicitud.','error',400)
+                visible=c.execute('SELECT 1 FROM order_part_requests WHERE id=? AND order_id=? AND public_visible=1',(int(part_cancel[2]),found['id'])).fetchone()
+                if not visible:return page('Repuesto no disponible.','error',404)
+                now=reception_now()
+                try:
+                    cid,new=part_cancellations.request(c,found['id'],int(part_cancel[2]),{'reason':form.get('reason',''),'request_key':form.get('request_key','')},None,now,origin='cliente')
+                    c.execute('UPDATE orders SET updated_at=?,revision=revision+1 WHERE id=?',(now.isoformat(timespec='microseconds'),found['id']));audit(c,None,'order_part_cancel_requested',found['id'])
+                except order_part_requests.PartError as error:
+                    c.rollback();return page(str(error),'error',error.status)
+                c.commit()
+                if new:part_notify(c,int(part_cancel[2]),['cancelacion_solicitada','cancelacion_solicitada:%d'%cid],now)
+                return page('Recibimos su solicitud de cancelación. Nuestro departamento administrativo la revisará y le informaremos el resultado. El pedido no cambia hasta esa revisión.')
         authorize_post=re.fullmatch(r'/autorizar/([A-Za-z0-9_-]{20,80})',urlsplit(self.path).path)
         if authorize_post:
             import client_authorization
@@ -4175,20 +4230,50 @@ class Handler(BaseHTTPRequestHandler):
                     pid=c.execute('INSERT INTO order_photos(order_id,position,is_main,mime,size,data,created_by,created_at) VALUES (?,?,?,?,?,?,?,?)',(oid,position,1 if main else 0,'image/jpeg',len(content),base64.b64encode(content).decode('ascii'),user['id'],reception_now().isoformat(timespec='seconds'))).lastrowid
                     audit(c,user['id'],'order_photo_added',oid)
                     return self.reply(201,{'ok':True,'id':pid})
+                if path=='/api/part-notices/settings':
+                    import part_notices,order_part_requests
+                    if data.get('auto') not in (True,False):return self.reply(400,{'error':'Valor inválido.'})
+                    try:part_notices.set_enabled(c,data['auto'],user)
+                    except order_part_requests.PartError as error:return self.reply(error.status,{'error':str(error)})
+                    audit(c,user['id'],'part_notices_auto_'+('on' if data['auto'] else 'off'));c.commit()
+                    return self.reply(200,{'ok':True,'auto':data['auto']})
                 parts_post=re.fullmatch(r'/api/orders/([0-9]+)/part-requests(?:/([0-9]+))?',path)
                 if parts_post:
-                    import order_part_requests
+                    import order_part_requests,part_cancellations,part_notices
                     oid=int(parts_post[1]);now=reception_now();action=str(data.get('action',''))
                     try:
                         if not parts_post[2]:result={'id':order_part_requests.create(c,oid,data,user,now)}
+                        elif action=='notices_retry':
+                            # Reintento controlado de los avisos fallidos de este repuesto (el mismo texto; hasta 3 intentos).
+                            if user['role']!='administrador':return self.reply(403,{'error':'Solo administración reintenta los avisos.'})
+                            order_part_requests._request(c,oid,int(parts_post[2]));c.commit()
+                            sent=part_notices.retry_failed(c,now,part_notice_mail,int(parts_post[2]));c.commit()
+                            return self.reply(200,{'ok':True,'sent':len(sent)})
                         else:
-                            handler={'update':order_part_requests.update,'advance':order_part_requests.advance,'situation':order_part_requests.set_situation}.get(action)
+                            rid=int(parts_post[2])
+                            def cancel_request(c,oid,rid,data,user,now):
+                                cid,new=part_cancellations.request(c,oid,rid,data,user,now)
+                                return {'cancellation_id':cid,'notify':['cancelacion_solicitada','cancelacion_solicitada:%d'%cid] if new else None}
+                            def cancel_decide(c,oid,rid,data,user,now):
+                                out=part_cancellations.decide(c,oid,rid,data,user,now)
+                                return {**out,'notify':['cancelacion_'+out['status'],'cancelacion_%s:%d'%(out['status'],out['cancellation_id'])]}
+                            def cancel_direct(c,oid,rid,data,user,now):
+                                out=part_cancellations.direct(c,oid,rid,data,user,now)
+                                return {**out,'notify':None if out.get('duplicate') else ['cancelacion_aprobada','cancelacion_aprobada:%d'%out['cancellation_id']]}
+                            def refund(c,oid,rid,data,user,now):
+                                out=part_cancellations.refund(c,oid,rid,data,user,now)
+                                return {**out,'notify':['reembolso','reembolso:%d'%out['refund_id']] if out.get('refund_id') else None}
+                            handler={'update':order_part_requests.update,'advance':order_part_requests.advance,'situation':order_part_requests.set_situation,
+                                     'cancel_request':cancel_request,'cancel_review':lambda *a:{'cancellation_id':part_cancellations.review(*a)},'cancel_decide':cancel_decide,
+                                     'cancel_direct':cancel_direct,'refund':refund}.get(action)
                             if not handler:return self.reply(400,{'error':'Acción inválida.'})
-                            result=handler(c,oid,int(parts_post[2]),data,user,now)
+                            result=handler(c,oid,rid,data,user,now)
                         c.execute('UPDATE orders SET updated_at=?,revision=revision+1 WHERE id=?',(now.isoformat(timespec='microseconds'),oid))
                         audit(c,user['id'],'order_part_'+(action or 'create'),oid)
                     except order_part_requests.PartError as error:c.rollback();return self.reply(error.status,{'error':str(error),'fields':error.fields})
-                    c.commit();return self.reply(200,{'ok':True,**result})
+                    c.commit();notice=result.pop('notify',None)
+                    if notice:part_notify(c,int(parts_post[2]),notice,now)
+                    return self.reply(200,{'ok':True,**result})
                 evidence_post=re.fullmatch(r'/api/orders/([0-9]+)/(uploads|followups/draft|followups/files/([0-9]+))',path)
                 if evidence_post or path=='/api/followups/settings':
                     import order_evidence,order_followups

@@ -274,3 +274,87 @@
 .ticket-viewer-stage img{width:100%;height:100%;max-width:none;object-fit:contain}
 .ticket-viewer-stage img.zoomed{height:auto;object-fit:initial}
 @media(max-width:560px){.tw-steps b{font-size:11.5px}.tw-codes .ticket-qr{justify-self:center}}
+
+/* 1.5.246 — Mapa de ruta del repuesto (nacional o internacional), común al panel interno y al seguimiento público. Escritorio: SVG
+   escalable; teléfono (contenedor de menos de 560 px): lista vertical. Solo lo completado y lo actual se iluminan. El vehículo recorre una vez
+   el trecho real; los puntos luminosos corren solo sobre el tramo activo y se detienen fuera de pantalla y con «reducir movimiento». */
+.lgx{--lc:#22d3ee;--lg:#4ade80;--la:#f59e0b;--ln:#33507a;--lt:#e3eeff;--lm:#9db1cf;container-type:inline-size;position:relative;min-width:0;padding:6px 4px 2px;border:1px solid #2c548855;border-radius:14px;background:radial-gradient(ellipse at 30% 0%,#12305a66,transparent 60%),#081426}
+.lgx-svg{display:block;width:100%;height:auto;overflow:visible}
+.lgx-list{display:none;margin:0;padding:4px 6px;list-style:none;gap:2px}
+@container (max-width:560px){.lgx-svg{display:none}.lgx-list{display:grid}}
+.lgx-base{fill:none;stroke:#1d3357;stroke-width:7;stroke-linecap:round}
+.lgx-seg[data-kind=aire] .lgx-base{stroke-dasharray:2 14;stroke-width:5}
+.lgx-fill{fill:none;stroke:var(--lc);stroke-width:4;stroke-linecap:round;opacity:0;transition:opacity .6s ease}
+.lgx-seg[data-state=done] .lgx-fill{opacity:.95}
+.lgx-seg[data-kind=aire][data-state=done] .lgx-fill{stroke-dasharray:10 9}
+.lgx-seg[data-state=active] .lgx-fill{opacity:.45;stroke-dasharray:6 10}
+.lgx-flow{fill:none;stroke:#a5f3fc;stroke-width:4.5;stroke-linecap:round;stroke-dasharray:.5 26;animation:lgx-dots 1.5s linear infinite}
+@keyframes lgx-dots{to{stroke-dashoffset:-26.5}}
+.lgx-dot{fill:#0d1730;stroke:var(--ln);stroke-width:2.5}
+.lgx-halo{fill:none;stroke:none}
+.lgx-icon{fill:none;stroke:var(--lm);stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke}
+.lgx-label{fill:var(--lt);font:600 19px/1 Inter,system-ui,sans-serif;text-anchor:middle}
+.lgx-sub{fill:var(--lm);font:400 15px/1 Inter,system-ui,sans-serif;text-anchor:middle}
+.lgx-node[data-state=pending]{opacity:.55}
+.lgx-node[data-state=done] .lgx-dot{fill:#0b3a4a;stroke:var(--lc)}
+.lgx-node[data-state=done] .lgx-icon,.lgx-node[data-state=current] .lgx-icon{stroke:#e0fbff}
+.lgx-node[data-state=current] .lgx-dot{fill:#0f3a66;stroke:#60a5fa}
+.lgx-node[data-state=current] .lgx-halo{stroke:#60a5fa;stroke-width:3;opacity:.5;transform-box:fill-box;transform-origin:center;animation:lgx-pulse 2.4s ease-in-out infinite}
+.lgx-node[data-customs="1"][data-state=current] .lgx-dot{fill:#3b2a07;stroke:var(--la)}
+.lgx-node[data-customs="1"][data-state=current] .lgx-halo{stroke:var(--la)}
+.lgx-node[data-code=taller][data-state=done] .lgx-dot,.lgx-node[data-code=taller][data-state=current] .lgx-dot{stroke:var(--lg)}
+@keyframes lgx-pulse{0%,100%{transform:scale(.9);opacity:.15}50%{transform:scale(1.12);opacity:.6}}
+.lgx-ok circle{fill:var(--lg);stroke:#062014;stroke-width:2}
+.lgx-ok path{fill:none;stroke:#062014;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+.lgx-node[data-state=done] .lgx-ok{transform-box:fill-box;transform-origin:center;animation:lgx-pop .5s cubic-bezier(.3,1.6,.5,1) both}
+@keyframes lgx-pop{from{transform:scale(0)}to{transform:scale(1)}}
+.lgx-plane{fill:#e0fbff;stroke:#0b2a44;stroke-width:1.2}
+.lgx-t-box{fill:#1d4ed8;stroke:#0b2a44;stroke-width:1.2}.lgx-t-cab{fill:#22d3ee;stroke:#0b2a44;stroke-width:1.2}.lgx-t-win{fill:#0b2a44}.lgx-t-wheel{fill:#0b1526;stroke:#9db1cf;stroke-width:1.6}
+.lgx-veh[data-motion=stopped] .lgx-plane,.lgx-veh[data-motion=stopped] .lgx-t-box{fill:#f97316}
+.lgx-veh[data-motion=moving] .lgx-float{animation:lgx-float 2.6s ease-in-out infinite alternate}
+.lgx-veh[data-kind=truck][data-motion=moving] .lgx-float{animation-name:lgx-road;animation-duration:.5s}
+@keyframes lgx-float{from{transform:translateY(-2px)}to{transform:translateY(2px)}}
+@keyframes lgx-road{from{transform:translateY(0)}to{transform:translateY(-1px)}}
+.lgx-veh[data-anim="1"] .lgx-veh-static{display:none}
+.lgx[data-cancelled="1"] .lgx-svg{filter:grayscale(1);opacity:.5}
+.lgx[data-paused] *{animation-play-state:paused!important}
+.lgx-li{display:grid;grid-template-columns:30px minmax(0,1fr);align-items:center;gap:10px;padding:6px 4px}
+.lgx-li svg{width:30px;height:30px;border-radius:50%;background:#0d1730;box-shadow:inset 0 0 0 2px var(--ln)}
+.lgx-li[data-state=done] svg{background:#0b3a4a;box-shadow:inset 0 0 0 2px var(--lc)}
+.lgx-li[data-state=current] svg{background:#0f3a66;box-shadow:inset 0 0 0 2px #60a5fa,0 0 0 4px #60a5fa33}
+.lgx-li[data-customs="1"][data-state=current] svg{box-shadow:inset 0 0 0 2px var(--la),0 0 0 4px #f59e0b33}
+.lgx-li[data-state=pending]{opacity:.6}
+.lgx-li .lgx-icon{stroke:#e0fbff}
+.lgx-li b{display:block;font-size:13.5px;color:var(--lt)}.lgx-li small{display:block;font-size:12px;color:var(--lm)}
+.lgx-leg{display:flex;align-items:center;gap:8px;min-height:22px;margin-left:14px;padding:2px 0 2px 16px;border-left:3px dotted var(--ln);font-size:12px;color:var(--lm)}
+.lgx-leg[data-state=done]{border-left:3px solid var(--lc)}
+.lgx-leg[data-state=active]{border-left:3px solid #60a5fa;color:#cfe3ff}
+.lgx-mini{width:40px;height:24px;flex:none}
+.lgx-leg[data-motion=stopped] .lgx-plane,.lgx-leg[data-motion=stopped] .lgx-t-box{fill:#f97316}
+@media (prefers-reduced-motion:reduce){
+ .lgx *{animation:none!important;transition:none!important}
+ .lgx-veh-anim{display:none}
+ .lgx-veh[data-anim="1"] .lgx-veh-static{display:inline}
+}
+/* Cancelación solicitada desde el seguimiento: estado y formulario compacto; aviso de resultado arriba de la tarjeta. */
+.tp-track[data-n] .lgx{margin-bottom:12px}
+.tp-cancel-state{margin:0;padding:9px 12px;border:1px solid #f59e0b55;border-left:4px solid #f59e0b;border-radius:10px;background:#2a2110;color:#f3d38b;font-size:13px;line-height:1.45}
+.tp-cancel-state[data-status=aprobada]{border-color:#ef444455;border-left-color:#ef4444;background:#2a1014;color:#fecaca}
+.tp-cancel-state[data-status=rechazada]{border-color:#60a5fa55;border-left-color:#60a5fa;background:#0f2240;color:#cfe3ff}
+.tp-cancel{border:1px solid #2c548866;border-radius:12px;background:#0a1830}
+.tp-cancel summary{cursor:pointer;padding:9px 12px;font-size:13px;font-weight:600;color:#cfe3ff}
+.tp-cancel-form{display:grid;gap:10px;padding:0 12px 12px}
+.tp-cancel-form p{margin:0;font-size:12.5px;color:#9db1cf;line-height:1.5}
+.tp-cancel-form label{display:grid;gap:4px;font-size:12.5px;color:#c2d3ec}
+.tp-cancel-form input:not([type=checkbox]),.tp-cancel-form textarea{width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid #2c5488;border-radius:8px;background:#06101f;color:#e3eeff;font:inherit}
+.tp-cancel-form .tp-check{display:flex;align-items:flex-start;gap:8px}
+.tp-cancel-form button{justify-self:start;padding:8px 14px;border:1px solid #ef4444;border-radius:9px;background:#3b0d12;color:#fecaca;font:600 13px/1.2 inherit;cursor:pointer}
+.tp-cancel-form :focus-visible,.tp-cancel summary:focus-visible{outline:2px solid #6ea8ff;outline-offset:2px}
+.tw-notice{max-width:1100px;margin:12px auto 0;padding:10px 14px;border-radius:12px;border:1px solid #22c55e66;background:#0b2a1a;color:#bbf7d0;font-size:14px}
+.tw-notice[data-tone=error]{border-color:#ef444466;background:#2a1014;color:#fecaca}
+@media print{.tp-cancel,.tw-notice{display:none}.lgx{background:#fff;border-color:#c9d6e8}}
+
+/* 1.5.246 — etapas públicas con 8 pasos (envío internacional) y medidor flexible. */
+.tp-meter{grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:16px}
+@container (min-width:440px){.tp-track[data-n="8"] .tp-steps{grid-template-columns:repeat(8,minmax(0,1fr))}.tp-track[data-n] .lgx~.tp-steps{margin-top:2px}}
+.lgx-when{opacity:.85;font-size:14px}

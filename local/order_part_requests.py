@@ -77,10 +77,103 @@ def fine(r):
     return r['stage']
 
 
+# ---- Mapa de ruta (06/11/2026): mismo modelo para el panel interno y el enlace público. Todo sale del paso real registrado: el vehículo
+# (avión o camión) se ubica en su tramo según ese paso y, al cargar, recorre solo el trecho desde el paso anterior; nunca se simulan
+# kilómetros, ubicación GPS ni avance por el tiempo transcurrido. Lienzo SVG de 1000 × 190 unidades (se escala con el ancho).
+MAP_Y = 96
+MAPS = {
+    'internacional': {'nodes': (('origen', 120, ('solicitado', 'confirmado', 'preparacion', 'despachado')), ('ecuador', 520, ('llegada_pais', 'aduana_revision', 'aduana_liberado')),
+                                ('otavalo', 760, ('ruta_otavalo',)), ('taller', 895, ('recibido', 'instalacion', 'instalado', 'listo'))),
+                      'segments': (('air', 'aire', 'M120 96 Q320 -18 520 96', ('despachado', 'transito_internacional')),
+                                   ('road1', 'tierra', 'M520 96 L760 96', ('aduana_liberado', 'distribucion_nacional', 'ruta_otavalo')),
+                                   ('road2', 'tierra', 'M760 96 L895 96', ('recibido',))),
+                      'vehicle': {'despachado': ('plane', 'air', 0.0, 0.03, 'parked'), 'transito_internacional': ('plane', 'air', 0.03, 0.56, 'moving'),
+                                  'llegada_pais': ('plane', 'air', 0.56, 1.0, 'landed'), 'aduana_liberado': ('truck', 'road1', 0.0, 0.02, 'parked'),
+                                  'distribucion_nacional': ('truck', 'road1', 0.02, 0.42, 'moving'), 'ruta_otavalo': ('truck', 'road1', 0.42, 0.86, 'moving'),
+                                  'recibido': ('truck', 'road2', 0.0, 1.0, 'arrived')}},
+    'nacional': {'nodes': (('origen', 120, ('solicitado', 'confirmado', 'preparacion', 'despachado')), ('otavalo', 690, ('ruta_otavalo',)),
+                           ('taller', 895, ('recibido', 'instalacion', 'instalado', 'listo'))),
+                 'segments': (('road1', 'tierra', 'M120 96 L690 96', ('despachado', 'transito_nacional', 'ruta_otavalo')), ('road2', 'tierra', 'M690 96 L895 96', ('recibido',))),
+                 'vehicle': {'despachado': ('truck', 'road1', 0.0, 0.03, 'parked'), 'transito_nacional': ('truck', 'road1', 0.03, 0.5, 'moving'),
+                             'ruta_otavalo': ('truck', 'road1', 0.5, 0.88, 'moving'), 'recibido': ('truck', 'road2', 0.0, 1.0, 'arrived')}}}
+NODE_TEXT = {'internacional': {'origen': ('Origen', 'globe'), 'ecuador': ('Ecuador · Aduana', 'customs'), 'otavalo': ('Otavalo', 'pin'), 'taller': ('PC-DOCTOR', 'shop')},
+             'nacional': {'origen': ('Despacho', 'box'), 'otavalo': ('Otavalo', 'pin'), 'taller': ('PC-DOCTOR', 'shop')}}
+VEHICLE_TEXT = {'parked': 'listo para salir', 'moving': 'en camino', 'stopped': 'detenido por una novedad', 'landed': 'aterrizó en Ecuador', 'arrived': 'llegó a PC-DOCTOR'}
+
+
+def _path_point(path, fraction):
+    """Punto (x, y) y ángulo de la tangente a la fracción `fraction` de la longitud del trazo (recta o curva cuadrática)."""
+    import math
+    nums = [float(x) for x in re.findall(r'-?\d+(?:\.\d+)?', path)]
+    if 'Q' in path:
+        (x0, y0, cx, cy, x1, y1) = nums
+        pts = [((1 - t) ** 2 * x0 + 2 * (1 - t) * t * cx + t * t * x1, (1 - t) ** 2 * y0 + 2 * (1 - t) * t * cy + t * t * y1) for t in (i / 200 for i in range(201))]
+    else:
+        (x0, y0, x1, y1) = nums
+        pts = [(x0 + (x1 - x0) * i / 200, y0 + (y1 - y0) * i / 200) for i in range(201)]
+    lengths = [0.0]
+    for a, b in zip(pts, pts[1:]):
+        lengths.append(lengths[-1] + math.dist(a, b))
+    goal = max(0.0, min(1.0, fraction)) * lengths[-1]
+    i = next((k for k, v in enumerate(lengths) if v >= goal), len(lengths) - 1)
+    a, b = pts[max(0, i - 1)], pts[min(len(pts) - 1, max(1, i))]
+    return round(pts[i][0], 1), round(pts[i][1], 1), round(math.degrees(math.atan2(b[1] - a[1], b[0] - a[0])), 1)
+
+
+def route_map(shipping, current, reached, at, finished, situation, public=False, origin_country='', customs=''):
+    """Mapa del envío: nodos (origen, Ecuador y aduana, Otavalo, PC-DOCTOR), tramos (aéreo y terrestre) y vehículo. Vacío sin tipo de envío."""
+    if shipping not in MAPS:
+        return None
+    spec, steps = MAPS[shipping], FLOWS[shipping]
+    idx = steps.index(current) if current in steps else 0
+    cancelled = situation == 'cancelado'
+    nodes = []
+    for code, x, covered in spec['nodes']:
+        pos = [steps.index(m) for m in covered]
+        state = 'done' if finished or idx > max(pos) else 'current' if min(pos) <= idx <= max(pos) else 'pending'
+        if code == 'otavalo' and state == 'current' and current != 'ruta_otavalo':
+            state = 'pending'
+        label, icon = NODE_TEXT[shipping][code]
+        sub = ''
+        if code == 'origen':
+            sub = ('Envío internacional' if public or not origin_country else origin_country) if shipping == 'internacional' else 'Envío nacional'
+        elif code == 'ecuador':
+            sub = customs if not public else ({'aduana_revision': 'En proceso de aduana', 'llegada_pais': 'Llegada al país'}.get(current)
+                                              or ('Liberado por aduana' if 'aduana_liberado' in reached else ''))
+        elif code == 'otavalo':
+            sub = 'Imbabura'
+        elif code == 'taller':
+            sub = 'Recibido' if 'recibido' in reached else 'Destino final'
+        first = next((at.get(m) for m in covered if at.get(m)), '')
+        nodes.append({'code': code, 'x': x, 'label': label, 'sub': sub, 'icon': icon, 'state': state, 'at': first if state != 'pending' else '',
+                      'customs': code == 'ecuador' and current in ('llegada_pais', 'aduana_revision')})
+    segments = []
+    for code, kind, path, covered in spec['segments']:
+        pos = [steps.index(m) for m in covered]
+        state = 'done' if finished or idx > max(pos) else 'active' if min(pos) <= idx <= max(pos) else 'pending'
+        segments.append({'code': code, 'kind': kind, 'path': path, 'state': state})
+    vehicle = None
+    found = spec['vehicle'].get(current)
+    if found and not cancelled and not finished:
+        kind, seg, start, end, motion = found
+        if motion == 'moving' and situation != 'normal':
+            motion = 'stopped'
+        path = next(x['path'] for x in segments if x['code'] == seg)
+        fx, fy, fa = _path_point(path, start)
+        x, y, angle = _path_point(path, end)
+        vehicle = {'kind': kind, 'segment': seg, 'path': path, 'from': start, 'to': end, 'motion': motion, 'animate': motion in ('moving', 'landed', 'arrived') and end > start,
+                   'x': x, 'y': y, 'angle': angle if kind == 'plane' else 0, 'fx': fx, 'fy': fy,
+                   'text': ('Avión ' if kind == 'plane' else 'Vehículo de transporte ') + VEHICLE_TEXT[motion]}
+    return {'mode': shipping, 'nodes': nodes, 'segments': segments, 'vehicle': vehicle, 'cancelled': cancelled, 'finished': finished,
+            'customs_active': shipping == 'internacional' and current == 'aduana_revision' and not cancelled}
+
+
 FIELDS = {'name': ('Nombre del repuesto', 160), 'brand': ('Marca', 80), 'compatible_model': ('Modelo compatible', 120), 'reference': ('Código o referencia', 80),
           'supplier_order': ('Número de pedido', 60), 'carrier': ('Empresa transportista', 80), 'tracking_number': ('Número de guía', 80),
-          'tracking_url': ('Enlace de rastreo', 300), 'internal_note': ('Observaciones internas', 1500), 'origin_country': ('País de origen', 60)}
-DATES = {'purchase_date': 'Fecha de compra', 'eta': 'Fecha estimada de llegada', 'received_at': 'Fecha de recepción', 'dispatch_date': 'Fecha de despacho'}
+          'tracking_url': ('Enlace de rastreo', 300), 'internal_note': ('Observaciones internas', 1500), 'origin_country': ('País de origen', 60),
+          'national_carrier': ('Transportista nacional', 80), 'national_tracking': ('Guía nacional', 80)}
+DATES = {'purchase_date': 'Fecha de compra', 'eta': 'Fecha estimada de llegada', 'received_at': 'Fecha de recepción', 'dispatch_date': 'Fecha de despacho',
+         'customs_in_date': 'Fecha de ingreso a aduana', 'customs_out_date': 'Fecha de liberación de aduana'}
 LINKS = {'supplier_id': 'Proveedor', 'purchase_item_id': 'Línea de compra', 'inventory_item_id': 'Producto del inventario', 'technician_id': 'Técnico responsable'}
 
 
@@ -136,6 +229,8 @@ def _values(c, oid, data, current=None):
         raise PartError('Tipo de envío no válido.', 400, {'shipping': 'Nacional o internacional.'})
     if out['purchase_date'] and out['eta'] and out['eta'] < out['purchase_date']:
         raise PartError('La fecha estimada no puede ser anterior a la compra.', 400, {'eta': 'Anterior a la compra.'})
+    if out['customs_in_date'] and out['customs_out_date'] and out['customs_out_date'] < out['customs_in_date']:
+        raise PartError('La liberación de aduana no puede ser anterior al ingreso.', 400, {'customs_out_date': 'Anterior al ingreso.'})
     for key in LINKS:
         raw = str(data.get(key, '') or '').strip()
         out[key] = int(raw) if raw.isdigit() else None
@@ -251,20 +346,34 @@ def advance(c, oid, rid, data, user, now):
     if public:
         _check_public(c, row, text)
     dispatch = row['dispatch_date'] or (now.date().isoformat() if target == 'despachado' else '')
-    c.execute("UPDATE order_part_requests SET stage=?,logistics=?,situation=?,incident=CASE WHEN ? THEN '' ELSE incident END,received_at=?,dispatch_date=?,updated_at=? WHERE id=?",
-              (coarse, logistics, situation, 1 if want > have else 0, received, dispatch, stamp(now), row['id']))
+    # Fechas de aduana: se registran solas con el evento real (si estaban vacías); nunca se suponen sin él.
+    customs_in = row['customs_in_date'] or (now.date().isoformat() if target == 'aduana_revision' and want > have else '')
+    customs_out = row['customs_out_date'] or (now.date().isoformat() if target == 'aduana_liberado' and want > have else '')
+    c.execute("UPDATE order_part_requests SET stage=?,logistics=?,situation=?,incident=CASE WHEN ? THEN '' ELSE incident END,received_at=?,dispatch_date=?,customs_in_date=?,customs_out_date=?,updated_at=? WHERE id=?",
+              (coarse, logistics, situation, 1 if want > have else 0, received, dispatch, customs_in, customs_out, stamp(now), row['id']))
     _event(c, row, 'etapa', user, now, note=note or ('Corrección de etapa' if want < have else 'Avanza a: ' + step_label(target, row['shipping'])),
            public_note=text, public=public, stage=coarse, situation=situation, changes={'stage': [fine(row), target]}, logistics=logistics)
-    return {'stage': coarse, 'logistics': logistics, 'situation': situation}
+    notice = ('despachado' if target == 'transito' else target) if want > have else ''
+    return {'stage': coarse, 'logistics': logistics, 'situation': situation, 'notify': [notice, 'etapa:' + notice] if notice in NOTICE_STAGES else None}
+
+
+NOTICE_STAGES = ('confirmado', 'despachado', 'llegada_pais', 'aduana_revision', 'aduana_liberado', 'recibido', 'listo')
 
 
 def set_situation(c, oid, rid, data, user, now):
-    """Registra una espera, un retraso, una incidencia o la cancelación (con motivo) y, si se confirmó, la nueva fecha estimada."""
+    """Registra una espera, un retraso o una incidencia (con motivo) y, si se confirmó, la nueva fecha estimada. La cancelación pasa por
+    part_cancellations (la decide administración y queda en su registro)."""
     _staff(user)
     row = _request(c, oid, rid)
     if row['situation'] == 'cancelado':
         raise PartError('El pedido ya está cancelado.', 409)
     situation = str(data.get('situation', ''))
+    if situation == 'cancelado':
+        import part_cancellations
+        if user['role'] != 'administrador':
+            raise PartError('La cancelación la decide administración: registra una solicitud de cancelación para que la revise.', 403)
+        result = part_cancellations.direct(c, oid, rid, {**data, 'reason_code': data.get('reason_code') or 'administrativa', 'confirm_supplier': '1', 'confirm_transit': '1'}, user, now)
+        return {'situation': 'cancelado', **result, 'notify': ['cancelacion_aprobada', 'cancelacion_aprobada:%d' % result['cancellation_id']]}
     incident = ''
     if situation in INCIDENTS:
         incident, situation = situation, INCIDENTS[situation][1]
@@ -284,7 +393,8 @@ def set_situation(c, oid, rid, data, user, now):
         _check_public(c, row, text)
     c.execute('UPDATE order_part_requests SET situation=?,incident=?,eta=?,updated_at=? WHERE id=?', (situation, incident, eta, stamp(now), row['id']))
     _event(c, row, 'situacion', user, now, note=note or 'Sin novedad.', public_note=text, public=public, situation=situation, changes=changes, incident=incident)
-    return {'situation': situation, 'incident': incident, 'eta': eta}
+    last = c.execute('SELECT MAX(id) FROM order_part_events WHERE request_id=?', (row['id'],)).fetchone()[0]
+    return {'situation': situation, 'incident': incident, 'eta': eta, 'notify': ['retraso', 'retraso:%d' % last] if situation == 'retrasado' else None}
 
 
 def _overdue(r, today):
@@ -335,6 +445,18 @@ def listing(c, oid, today):
             customs = ({'documentacion_pendiente': 'Documentación requerida', 'retencion_aduanera': 'Retención aduanera'}.get(r['incident'])
                        or {'llegada_pais': 'Llegada al país · pendiente de revisión', 'aduana_revision': 'En proceso aduanero'}.get(current)
                        or ('Liberado por aduana' if 'aduana_liberado' in reached else 'Sin registro de liberación aduanera'))
+        import part_cancellations, part_notices
+        evidence_steps = {x['part_step']: x['n'] for x in c.execute("SELECT part_step,COUNT(*) n FROM order_followups WHERE part_request_id=? AND part_step!='' GROUP BY part_step", (r['id'],))}
+        for d in detail:
+            d['evidence'] = evidence_steps.get(d['code'], 0)
+        import part_route
+        item['map'] = route_map(r['shipping'], current, reached, at, finished, r['situation'], origin_country=r['origin_country'], customs=customs)
+        item['map_html'] = part_route.render(item['map'], 'i%d' % r['id'], r['name'])
+        item.update(
+                    cancellations=part_cancellations.history(c, r['id']), cancel_context=part_cancellations.context(c, oid, r), notices=part_notices.listing(c, r['id']),
+                    log=[dict(x) for x in c.execute('SELECT kind,action,note,origin,actor_id,created_at FROM order_part_log WHERE request_id=? ORDER BY id DESC', (r['id'],))])
+        for x in item['log']:
+            x['actor'] = names.get(x['actor_id'], 'Cliente' if x['origin'] == 'cliente' else 'Sistema')
         item.update(fine=current, fine_label=step_label(current, r['shipping']), detail=detail, route=route, vehicle_mode=vehicle, customs=customs, incident_label=incident,
                     shipping_label={'nacional': 'Nacional', 'internacional': 'Internacional'}.get(r['shipping'], 'Sin definir'))
         item.update(stage_label=dict((s[0], s[1]) for s in STAGES)[r['stage']], stage_index=CODES.index(r['stage']), situation_label=SITUATIONS[r['situation']][0],
@@ -355,7 +477,9 @@ def options(c):
             'suppliers': [dict(r) for r in c.execute('SELECT id,name FROM suppliers WHERE active=1 ORDER BY name')], 'purchase_lines': lines,
             'inventory': [dict(r) for r in c.execute('SELECT i.id,g.name FROM inventory_items i JOIN catalog_items g ON g.id=i.catalog_id WHERE i.active=1 ORDER BY g.name LIMIT 500')],
             'staff': [dict(r) for r in c.execute("SELECT id,name FROM users WHERE active=1 AND role IN ('administrador','tecnico') ORDER BY name")],
-            'flows': {k: [{'code': x, 'label': step_label(x, k)} for x in v] for k, v in FLOWS.items()}, 'incidents': {k: {'label': v[0], 'situation': v[1]} for k, v in INCIDENTS.items()}}
+            'flows': {k: [{'code': x, 'label': step_label(x, k)} for x in v] for k, v in FLOWS.items()}, 'incidents': {k: {'label': v[0], 'situation': v[1]} for k, v in INCIDENTS.items()},
+            'cancel_reasons': __import__('part_cancellations').REASONS, 'cancel_channels': __import__('part_cancellations').CHANNELS,
+            'notices_enabled': __import__('part_notices').enabled(c), 'whatsapp': __import__('order_followups').whatsapp_status()}
 
 
 # ---- Vista pública (modelo seguro: solo se construye con campos permitidos; los textos se revisan contra datos del proveedor) -------------
@@ -363,6 +487,24 @@ def options(c):
 PUBLIC_STEPS = (('solicitud', 'Solicitud registrada', ('solicitado',)), ('confirmado', 'Repuesto confirmado', ('confirmado', 'preparacion')),
                 ('traslado', 'En traslado hacia PC-DOCTOR', ('transito',)), ('recibido', 'Recibido en el taller', ('recibido',)),
                 ('instalacion', 'Instalación y pruebas', ('instalacion',)), ('finalizado', 'Proceso finalizado', ('instalado', 'listo')))
+# Envíos con tipo definido: etapas públicas propias (el internacional muestra el vuelo y la aduana; el nacional, el traslado terrestre).
+PUBLIC_FLOWS = {
+    'internacional': (('solicitud', 'Solicitud registrada', ('solicitado',)), ('confirmado', 'Repuesto confirmado', ('confirmado', 'preparacion')),
+                      ('aereo', 'Envío internacional', ('despachado', 'transito_internacional', 'llegada_pais')), ('aduana', 'Proceso de aduana', ('aduana_revision', 'aduana_liberado')),
+                      ('nacional', 'Traslado hacia Otavalo', ('distribucion_nacional', 'ruta_otavalo')), ('recibido', 'Recibido en el taller', ('recibido',)),
+                      ('instalacion', 'Instalación y pruebas', ('instalacion',)), ('finalizado', 'Proceso finalizado', ('instalado', 'listo'))),
+    'nacional': (('solicitud', 'Solicitud registrada', ('solicitado',)), ('confirmado', 'Repuesto confirmado', ('confirmado', 'preparacion')),
+                 ('traslado', 'Traslado nacional hacia Otavalo', ('despachado', 'transito_nacional', 'ruta_otavalo')), ('recibido', 'Recibido en el taller', ('recibido',)),
+                 ('instalacion', 'Instalación y pruebas', ('instalacion',)), ('finalizado', 'Proceso finalizado', ('instalado', 'listo')))}
+FLOW_TEXT = {'despachado': 'El repuesto fue despachado hacia PC-DOCTOR.', 'transito_internacional': 'El repuesto viaja hacia Ecuador.', 'llegada_pais': 'El repuesto llegó a Ecuador.',
+             'aduana_revision': 'El repuesto ingresó al proceso de aduana.', 'aduana_liberado': 'El repuesto fue liberado de aduana.',
+             'distribucion_nacional': 'El repuesto continúa su traslado dentro de Ecuador.', 'ruta_otavalo': 'El repuesto está en ruta hacia Otavalo.',
+             'transito_nacional': 'El repuesto está en traslado nacional.'}
+FLOW_LABELS = {'despachado': 'Repuesto despachado', 'transito_internacional': 'En tránsito internacional', 'llegada_pais': 'Llegada a Ecuador',
+               'aduana_revision': 'En proceso de aduana', 'aduana_liberado': 'Liberado de aduana', 'distribucion_nacional': 'Traslado nacional',
+               'ruta_otavalo': 'En ruta hacia Otavalo', 'transito_nacional': 'En tránsito nacional'}
+GROUP_TEXT = {'aereo': 'El repuesto está en su envío internacional hacia Ecuador.', 'aduana': 'El repuesto se encuentra en el proceso de aduana en Ecuador.',
+              'nacional': 'El repuesto continúa su traslado hacia Otavalo.', 'traslado': 'El repuesto está en traslado nacional hacia PC-DOCTOR.'}
 # Descripción breve de cada evento del historial público (coherente con la línea de etapas).
 HISTORY_TEXT = {'solicitado': 'Se registró la solicitud del repuesto.', 'confirmado': 'El repuesto fue confirmado.', 'preparacion': 'El repuesto se prepara para su envío.',
                 'transito': 'El repuesto salió hacia nuestro taller.', 'recibido': 'El repuesto llegó a nuestro taller.', 'instalacion': 'Comenzó la instalación y las pruebas.',
@@ -396,7 +538,7 @@ def private_terms(c, row):
         found = c.execute('SELECT name FROM suppliers WHERE id=?', (row['supplier_id'],)).fetchone()
         if found:
             terms.append(found[0])
-    terms += [row['carrier'], row['tracking_number'], row['supplier_order']]
+    terms += [row['carrier'], row['tracking_number'], row['supplier_order'], row['national_carrier'], row['national_tracking']]
     host = re.match(r'https://([^/]+)', row['tracking_url'] or '')
     if host:
         terms.append(host.group(1).replace('www.', ''))
@@ -429,49 +571,68 @@ def public(c, oid):
     out = []
     for r in c.execute('SELECT * FROM order_part_requests WHERE order_id=? AND public_visible=1 ORDER BY id', (oid,)).fetchall():
         terms = private_terms(c, r)
-        events = c.execute('SELECT kind,stage,situation,public_note,public,created_at FROM order_part_events WHERE request_id=? ORDER BY id', (r['id'],)).fetchall()
-        first = {}
+        events = c.execute('SELECT kind,stage,situation,public_note,public,created_at,logistics FROM order_part_events WHERE request_id=? ORDER BY id', (r['id'],)).fetchall()
+        first, fine_first = {}, {}
         for e in events:
             if e['kind'] in ('alta', 'etapa'):
                 first.setdefault(e['stage'], e['created_at'])
-        # Seis etapas siempre visibles. «En traslado» solo se completa si se registró; si el repuesto llegó sin ese evento (corrección de
-        # administración), queda como «no registrada» y nunca se pinta como completada.
-        steps = PUBLIC_STEPS
+                fine_first.setdefault(e['logistics'] or e['stage'], e['created_at'])
+        # Etapas siempre visibles. Un traslado solo se completa si se registró; si se superó sin su evento (corrección de administración),
+        # queda como «no registrada» y nunca se pinta como completada.
+        shipping = r['shipping'] if r['shipping'] in PUBLIC_FLOWS else ''
+        steps = PUBLIC_FLOWS[shipping] if shipping else PUBLIC_STEPS
+        current = fine(r)
+        key = current if shipping else r['stage']
+        seen = fine_first if shipping else first
         transit = 'transito' in first
-        group = next(i for i, s in enumerate(steps) if r['stage'] in s[2])
+        group = next((i for i, s in enumerate(steps) if key in s[2]), 0)
         finished = r['stage'] == 'listo' and r['situation'] != 'cancelado'
         public_steps = []
         for i, (code, label, stages) in enumerate(steps):
             state = 'done' if i < group or finished else 'current' if i == group else 'pending'
-            if code == 'traslado' and state == 'done' and not transit:
+            if state == 'done' and code in ('traslado', 'aereo', 'aduana', 'nacional') and not any(x in seen for x in stages):
                 state = 'skipped'
-            at = min((first[x] for x in stages if x in first), default='') if state in ('done', 'current') else ''
-            public_steps.append({'code': code, 'label': label, 'state': state, 'at': at, 'color': i})
+            at = min((seen[x] for x in stages if x in seen), default='') if state in ('done', 'current') else ''
+            public_steps.append({'code': code, 'label': label, 'state': state, 'at': at, 'color': round(i * 5 / max(1, len(steps) - 1))})
         # Vehículo: solo con un traslado real. En traslado: avanza (o se detiene si hay retraso o incidencia); recibido: llega y se detiene.
         cancelled = r['situation'] == 'cancelado'
-        vehicle = ('' if cancelled or not transit else 'stopped' if r['stage'] == 'transito' and r['situation'] != 'normal' else 'transit' if r['stage'] == 'transito'
+        vehicle = ('' if cancelled or not transit or shipping else 'stopped' if r['stage'] == 'transito' and r['situation'] != 'normal' else 'transit' if r['stage'] == 'transito'
                    else 'arrived' if r['stage'] == 'recibido' else '')
+        reached = set(fine_first)
+        at = {k: v for k, v in fine_first.items()}
         history = []
         last_stage = None
         for e in events:
-            # Los pasos logísticos internos (despacho, vuelo, aduana…) son, para el cliente, un solo «En traslado»: no se repiten.
-            if e['kind'] == 'etapa' and e['stage'] == last_stage and not (e['public'] and e['public_note']):
+            step = (e['logistics'] or e['stage']) if shipping else e['stage']
+            # Sin tipo de envío, los pasos logísticos internos son, para el cliente, un solo «En traslado»: no se repiten.
+            if e['kind'] == 'etapa' and step == last_stage and not (e['public'] and e['public_note']):
                 continue
             if e['kind'] in ('alta', 'etapa'):
-                last_stage = e['stage']
-            label = ('Solicitud registrada' if e['kind'] == 'alta' else HISTORY_LABELS.get(e['stage'], '') if e['kind'] == 'etapa'
+                last_stage = step
+            label = ('Solicitud registrada' if e['kind'] == 'alta' else (FLOW_LABELS.get(step) if shipping else None) or HISTORY_LABELS.get(e['stage'], '') if e['kind'] == 'etapa'
                      else PUBLIC_SITUATIONS.get(e['situation'], '') if e['kind'] == 'situacion' else '')
             text = e['public_note'] if e['public'] and e['public_note'] and not leaks(e['public_note'], terms) else ''
             if label or text:
-                detail = (HISTORY_TEXT['solicitado'] if e['kind'] == 'alta' else HISTORY_TEXT.get(e['stage'], '') if e['kind'] == 'etapa'
+                detail = (HISTORY_TEXT['solicitado'] if e['kind'] == 'alta' else (FLOW_TEXT.get(step) if shipping else None) or HISTORY_TEXT.get(e['stage'], '') if e['kind'] == 'etapa'
                           else DESCRIPTIONS.get(e['situation'], 'La situación del repuesto volvió a la normalidad.') if e['kind'] == 'situacion' else '')
                 history.append({'at': e['created_at'], 'label': label or 'Mensaje del taller', 'detail': detail, 'text': text,
-                                'color': next((i for i, s in enumerate(steps) if e['stage'] in s[2]), 0), 'kind': e['kind'], 'situation': e['situation']})
+                                'color': next((round(i * 5 / max(1, len(steps) - 1)) for i, s in enumerate(steps) if step in s[2]), 0), 'kind': e['kind'], 'situation': e['situation']})
+        # Cancelación: estado y fecha (sin importes ni motivos internos), en el historial y en el estado actual.
+        import part_cancellations
+        cancel = part_cancellations.public_state(c, r['id'])
+        for x in c.execute("SELECT action,created_at FROM order_part_log WHERE request_id=? AND kind='cancelacion' ORDER BY id", (r['id'],)):
+            history.append({'at': x['created_at'], 'label': part_cancellations.STATUS.get(x['action'], 'Cancelación'), 'detail': '', 'text': '', 'color': 0, 'kind': 'cancelacion',
+                            'situation': 'cancelado' if x['action'] == 'aprobada' else 'espera_confirmacion'})
+        history.sort(key=lambda h: h['at'])
         situation = r['situation']
         out.append({'name': _scrub(r['name'], terms) or 'Repuesto', 'brand': _scrub(r['brand'], terms), 'stage': r['stage'], 'situation': situation,
                     'situation_label': PUBLIC_SITUATIONS[situation] if situation != 'normal' else '', 'tone': SITUATIONS[situation][1],
                     'status_label': PUBLIC_SITUATIONS[situation] if situation != 'normal' else ('Proceso finalizado' if finished else steps[group][1]),
-                    'description': DESCRIPTIONS[situation] if situation != 'normal' else DESCRIPTIONS[steps[group][0]] if not finished else DESCRIPTIONS['finalizado'],
+                    'description': DESCRIPTIONS[situation] if situation != 'normal' else (GROUP_TEXT.get(steps[group][0]) or DESCRIPTIONS.get(steps[group][0], '')) if not finished else DESCRIPTIONS['finalizado'],
+                    'id': r['id'], 'shipping': shipping, 'map': route_map(shipping, current, reached, at, finished, situation, public=True) if shipping else None,
+                    'map_html': __import__('part_route').render(route_map(shipping, current, reached, at, finished, situation, public=True), 'p%d' % r['id'],
+                                                                 _scrub(r['name'], terms) or 'Repuesto') if shipping else '',
+                    'cancellation': cancel, 'can_cancel': part_cancellations.phase(r) not in ('recibido', 'cancelado') and not part_cancellations.open_for(c, r['id']),
                     'requested': r['created_at'], 'eta': r['eta'] if CODES.index(r['stage']) < CODES.index('recibido') and situation != 'cancelado' else '',
                     'received': r['received_at'], 'updated': events[-1]['created_at'] if events else r['updated_at'], 'steps': public_steps,
                     'waiting': CODES.index(r['stage']) < CODES.index('recibido') and situation != 'cancelado', 'history': history[::-1][:12],

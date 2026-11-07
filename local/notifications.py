@@ -254,6 +254,21 @@ def build(c, user, now, mail_access=False, hidden=False):
             items.append({'key':'proforma:%d:%s:%s'%(row['id'],row['status'],row['decided_at'][:19]),'kind':'success' if row['status'] in ('aprobada','parcial') else 'warning','icon':'budget','title':title+' · '+row['code'],
                           'detail':(row['client_name'] or 'Cliente')+(' · orden '+row['order_code'] if row['order_code'] else '')+'. El estado técnico de la orden no cambia.','at':row['decided_at'],
                           'href':'#orders?id='+str(row['order_id']) if row['order_id'] else '#invoicing?proforma='+str(row['id']),'group':'event'})
+        # Solicitudes de cancelación de repuestos pendientes de decisión (las decide administración) y avisos al cliente que fallaron.
+        try:
+            pending = c.execute("SELECT x.id,x.status,x.origin,x.created_at,r.name,r.order_id,o.code FROM order_part_cancellations x JOIN order_part_requests r ON r.id=x.request_id "
+                                "JOIN orders o ON o.id=r.order_id WHERE x.status IN ('solicitada','en_revision') ORDER BY x.id DESC LIMIT 12").fetchall()
+            failed = c.execute("SELECT COUNT(*) FROM order_part_notices WHERE status='fallido'").fetchone()[0]
+        except Exception:
+            pending, failed = [], 0
+        for row in pending if admin else []:
+            items.append({'key': 'part-cancel:%d:%s' % (row['id'], row['status']), 'kind': 'warning', 'icon': 'alert',
+                          'title': 'Solicitud de cancelación de repuesto' + (' del cliente' if row['origin'] == 'cliente' else '') + ' · ' + row['code'],
+                          'detail': row['name'] + (' · en revisión' if row['status'] == 'en_revision' else ' · pendiente de revisión') + '. El pedido no cambia hasta la decisión.',
+                          'at': row['created_at'], 'href': '#orders?id=' + str(row['order_id']), 'group': 'event'})
+        if admin:
+            alert('part-notices', failed, 'alert', 'warning', plural(failed, 'aviso de repuesto no se pudo enviar', 'avisos de repuestos no se pudieron enviar'),
+                  'Revisa el canal y reintenta desde el pedido de repuesto.', '#orders')
         start = appointments.stamp(appointments.datetime.combine(now.date(), appointments.time.min, appointments.TZ))
         end = appointments.stamp(appointments.datetime.combine(now.date() + appointments.timedelta(days=1), appointments.time.min, appointments.TZ))
         todays = count("SELECT COUNT(*) FROM appointments WHERE deleted_at IS NULL AND starts_at>=? AND starts_at<? AND status IN ('solicitada','confirmada','reprogramada')", start, end)
