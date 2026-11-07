@@ -8,6 +8,28 @@
   },
   "releases": [
     {
+      "version": "1.5.250",
+      "date": "2026-11-07T00:59:48-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Vehículos 3D corporativos en el seguimiento logístico y título «Seguimiento de Reparación»",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Seguimiento logístico: furgoneta y avión de carga rediseñados en 3D corporativo (blanco y plata con azul marino y rojo), con el logo original de PC-DOCTOR sin modificar en la carrocería y el fuselaje; mismos vehículos en el panel, el cliente y la hoja A4.",
+          "Animaciones solo del tramo real: arranque y frenado suaves, ruedas que giran según la distancia, suspensión, confirmación al llegar; el avión recoge y despliega el tren de aterrizaje y vuela con nubes. Pausa fuera de pantalla y respeto a «reducir movimiento».",
+          "Título del seguimiento del cliente: «Seguimiento de Reparación»."
+        ],
+        "fixes": [
+          "Mapa de ruta: posición exacta del vehículo sobre el trazo (antes se redondeaba a la muestra más cercana) y mayor distancia a los puntos de control para que los vehículos más grandes nunca tapen puntos ni textos."
+        ],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Kike-os: «Actualiza a la version siguite con estas mejoras» · «autorizado» (1.5."
+    },
+    {
       "version": "1.5.249",
       "date": "2026-11-06T22:44:14-05:00",
       "type": "patch",

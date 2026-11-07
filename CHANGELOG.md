@@ -4,6 +4,20 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.250 — 2026-11-07 00:59 (UTC-05:00)
+
+Vehículos 3D corporativos en el seguimiento logístico y título «Seguimiento de Reparación»
+
+### Mejoras realizadas
+
+- Seguimiento logístico: furgoneta y avión de carga rediseñados en 3D corporativo (blanco y plata con azul marino y rojo), con el logo original de PC-DOCTOR sin modificar en la carrocería y el fuselaje; mismos vehículos en el panel, el cliente y la hoja A4.
+- Animaciones solo del tramo real: arranque y frenado suaves, ruedas que giran según la distancia, suspensión, confirmación al llegar; el avión recoge y despliega el tren de aterrizaje y vuela con nubes. Pausa fuera de pantalla y respeto a «reducir movimiento».
+- Título del seguimiento del cliente: «Seguimiento de Reparación».
+
+### Errores corregidos
+
+- Mapa de ruta: posición exacta del vehículo sobre el trazo (antes se redondeaba a la muestra más cercana) y mayor distancia a los puntos de control para que los vehículos más grandes nunca tapen puntos ni textos.
+
 ## v1.5.249 — 2026-11-06 22:44 (UTC-05:00)
 
 Repuestos con una sola fuente de etapas y avance, próxima etapa, fechas diferenciadas e hitos en la orden
