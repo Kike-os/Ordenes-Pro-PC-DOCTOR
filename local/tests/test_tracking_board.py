@@ -126,7 +126,8 @@ class TrackingCarouselPagesTests(unittest.TestCase):
         self.assertEqual([row['id'] for row in old['rows']],[row['id'] for row in reversed(recent['rows'])])
         self.assertEqual(get('sort=cualquiera')['status'],400)
         # Teléfono del cliente y número de serie viajan con la fila; se puede buscar por serie.
-        row=recent['rows'][0];self.assertEqual((row['phone'],row['serial']),('0991234567','SERIE-001'))
+        row=recent['rows'][0];self.assertEqual((row['phone'],row['serial']),('+593991234567','SERIE-001'))  # 1.5.251: teléfono en E.164
+        for typed in ('0991234567','099 123 4567','+593 99 123 4567'):self.assertGreaterEqual(get('q='+__import__('urllib.parse').parse.quote(typed))['body']['total'],1,typed)
         found=get('q=serie-002')['body'];self.assertEqual((found['total'],found['rows'][0]['id']),(1,ids[2]))
         # Las etapas reflejan solo el estado real: una orden en espera no aparenta estar en reparación, y revertir el estado revierte la etapa.
         waiting=next(r for r in recent['rows'] if r['id']==ids[0]);self.assertEqual([stage['state'] for stage in waiting['stages']],['current','pending','pending','pending'])

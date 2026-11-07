@@ -80,7 +80,8 @@ def build(c, filters):
         # Orden, cliente, teléfono (con o sin espacios ni guiones), marca, modelo, serie, estado y tipo de equipo.
         where.append("(instr(lower(COALESCE(o.code,'')||' '||cl.name||' '||COALESCE(cl.phone,'')||' '||COALESCE(d.brand,'')||' '||COALESCE(d.model,'')||' '||COALESCE(d.serial,'')||' '||s.label||' '||COALESCE(NULLIF(d.kind,''),d.category,'')),lower(?))>0"
                      " OR (length(?)>=6 AND instr(replace(replace(replace(COALESCE(cl.phone,''),' ',''),'-',''),'+',''),?)>0))")
-        digits = re.sub(r'\D', '', filters['q'])
+        import phones  # 1.5.251: «099 123 4567» y «+593 99…» encuentran el mismo número (formato antiguo o E.164)
+        digits = phones.as_query(filters['q']) or re.sub(r'\D', '', filters['q'])
         args.extend([filters['q'], digits, digits or '-'])
     if filters['status']:
         where.append('o.status=?')
