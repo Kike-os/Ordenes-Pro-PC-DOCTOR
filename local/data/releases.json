@@ -8,6 +8,29 @@
   },
   "releases": [
     {
+      "version": "1.5.249",
+      "date": "2026-11-06T22:44:14-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Repuestos con una sola fuente de etapas y avance, próxima etapa, fechas diferenciadas e hitos en la orden",
+      "changes": {
+        "features": [
+          "Recepción, instalación y pruebas, fin del proceso y cancelación aprobada de cada repuesto quedan en el historial de la orden, con usuario y fecha, sin cambiar el estado de la orden."
+        ],
+        "improvements": [
+          "Seguimiento de repuestos: próxima etapa destacada para el cliente y fechas diferenciadas (Real · Confirmada · Estimada); el panel indica el siguiente paso y la próxima etapa del cliente."
+        ],
+        "fixes": [
+          "Repuestos: el panel, el seguimiento público y la hoja A4 muestran las mismas etapas y el mismo avance («2 de 8 · 25 %»); antes el cliente veía 8 etapas y el panel 14 con un porcentaje común que no cuadraba. El detalle de 14 pasos queda aparte en el panel.",
+          "Repuestos: ninguna etapa superada sin su evento real se muestra como completada; queda «No registrada» y no suma al avance (antes solo el traslado)."
+        ],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Kike-os: «esta autorizado» (1.5.249)"
+    },
+    {
       "version": "1.5.248",
       "date": "2026-11-06T22:00:51-05:00",
       "type": "patch",

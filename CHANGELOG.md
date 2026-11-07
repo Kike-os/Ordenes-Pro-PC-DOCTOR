@@ -4,6 +4,23 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.249 — 2026-11-06 22:44 (UTC-05:00)
+
+Repuestos con una sola fuente de etapas y avance, próxima etapa, fechas diferenciadas e hitos en la orden
+
+### Nuevas funcionalidades
+
+- Recepción, instalación y pruebas, fin del proceso y cancelación aprobada de cada repuesto quedan en el historial de la orden, con usuario y fecha, sin cambiar el estado de la orden.
+
+### Mejoras realizadas
+
+- Seguimiento de repuestos: próxima etapa destacada para el cliente y fechas diferenciadas (Real · Confirmada · Estimada); el panel indica el siguiente paso y la próxima etapa del cliente.
+
+### Errores corregidos
+
+- Repuestos: el panel, el seguimiento público y la hoja A4 muestran las mismas etapas y el mismo avance («2 de 8 · 25 %»); antes el cliente veía 8 etapas y el panel 14 con un porcentaje común que no cuadraba. El detalle de 14 pasos queda aparte en el panel.
+- Repuestos: ninguna etapa superada sin su evento real se muestra como completada; queda «No registrada» y no suma al avance (antes solo el traslado).
+
 ## v1.5.248 — 2026-11-06 22:00 (UTC-05:00)
 
 Seguimiento de reparación adaptable, logo más visible e impresión A4 profesional por secciones
