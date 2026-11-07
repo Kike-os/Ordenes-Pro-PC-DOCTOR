@@ -8,6 +8,24 @@
   },
   "releases": [
     {
+      "version": "1.5.253",
+      "date": "2026-11-07T16:02:23-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Comprobación de actualizaciones funcionando de nuevo (registro de versiones de más de 256 KB)",
+      "changes": {
+        "features": [],
+        "improvements": [],
+        "fixes": [
+          "Estado de actualizaciones: dejaba de comprobar («Error de comprobación») porque el registro publicado de versiones superó los 256 KB que se leían; ahora se leen hasta 2 MB y una prueba avisa con tiempo si el registro se acerca al límite."
+        ],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Kike-os: «corrigme esta actualizacion que funcione bien»"
+    },
+    {
       "version": "1.5.252",
       "date": "2026-11-07T15:33:17-05:00",
       "type": "patch",

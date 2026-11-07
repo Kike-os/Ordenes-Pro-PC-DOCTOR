@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.253 — 2026-11-07 16:02 (UTC-05:00)
+
+Comprobación de actualizaciones funcionando de nuevo (registro de versiones de más de 256 KB)
+
+### Errores corregidos
+
+- Estado de actualizaciones: dejaba de comprobar («Error de comprobación») porque el registro publicado de versiones superó los 256 KB que se leían; ahora se leen hasta 2 MB y una prueba avisa con tiempo si el registro se acerca al límite.
+
 ## v1.5.252 — 2026-11-07 15:33 (UTC-05:00)
 
 Seguimiento de reparación en 6 etapas con iconos, misma fuente en panel, cliente y A4, y actualización automática
