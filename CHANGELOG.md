@@ -4,6 +4,19 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.256 — 2026-11-07 18:26 (UTC-05:00)
+
+ADI como asistente técnica: informes por tipo con contexto depurado, revisión de calidad y alertas de atención (sin migración)
+
+### Nuevas funcionalidades
+
+- ADI: informe técnico completo con 11 tipos (diagnóstico, mantenimiento, electrónica, BIOS/UEFI, almacenamiento, memoria, refrigeración, impresora, presupuesto, entrega y garantía), secciones propias y cabecera real de la orden agregada por el servidor.
+- Alertas de ADI para administración: presupuesto desfasado, aprobación sin presupuesto, presupuesto sin diagnóstico, equipo listo sin retiro, falla recurrente y repuesto atrasado, cada una con su acción sugerida (solo lectura).
+
+### Mejoras realizadas
+
+- ADI: herramientas agrupadas en 4 modos con la recomendada preseleccionada; contexto técnico de la orden sin datos del cliente, serie ni precios; quita repeticiones y avisa trabajos o especificaciones no registrados y datos faltantes.
+
 ## v1.5.255 — 2026-11-07 17:46 (UTC-05:00)
 
 Barra única de avisos compacta e interactiva en el seguimiento
