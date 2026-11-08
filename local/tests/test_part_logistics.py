@@ -27,7 +27,7 @@ class PartLogisticsTests(unittest.TestCase):
         rid = self.part(post, oid, shipping='internacional', origin_country='Estados Unidos', carrier='DHL Express', tracking_number='DHL-123')['body']['id']
         url = '/api/orders/%d/part-requests/%d' % (oid, rid)
         r = self.row(cookie, oid, rid)
-        self.assertEqual((len(r['detail']), r['shipping_label'], [p['code'] for p in r['route']]), (14, 'Internacional', ['pedido', 'aereo', 'aduana', 'terrestre', 'recepcion', 'servicio']))
+        self.assertEqual((len(r['detail']), r['shipping_label'], [p['code'] for p in r['route']]), (15, 'Internacional', ['pedido', 'aereo', 'aduana', 'terrestre', 'recepcion', 'servicio']))  # 1.5.261: + «En camino al punto de embarque» (opcional)
         self.assertEqual(post(url, action='advance', stage='transito_internacional')['status'], 400)  # sin saltos (el administrador necesita motivo)
         seen = {}
         for step in INTL:

@@ -108,6 +108,8 @@ def part_notice(r):
         tone, ic, text = 'naranja', 'shield-check', 'En aduana de Ecuador'
     elif step in ('aduana_liberado', 'distribucion_nacional', 'ruta_otavalo'):
         tone, ic, text = 'azul', 'truck', 'En camino a Otavalo'
+    elif step == 'transito_origen':
+        tone, ic, text = 'celeste', 'truck', 'En camino al punto de embarque'
     elif ship == 'internacional' or step == 'transito_internacional':
         tone, ic, text = 'celeste', 'plane', 'En tránsito internacional'
     elif ship == 'nacional' or step in ('transito_nacional', 'despachado'):

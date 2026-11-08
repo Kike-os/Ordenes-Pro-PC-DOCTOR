@@ -22,6 +22,7 @@ CODES = [s[0] for s in STAGES]
 SITUATIONS = {'normal': ('Sin novedad', 'azul'), 'espera_confirmacion': ('En espera de confirmación', 'amarillo'), 'espera_proveedor': ('En espera del proveedor', 'naranja'),
               'retrasado': ('Retrasado', 'naranja'), 'incidencia_transporte': ('Incidencia de transporte', 'rojo'), 'cancelado': ('Pedido cancelado', 'rojo')}
 MESSAGES = {
+    'transito_origen': 'Su repuesto fue despachado por el proveedor y se encuentra en camino al punto de embarque en el país de origen. Le informaremos cuando inicie el traslado internacional.',
     'solicitado': 'Estimado cliente: le informamos que hemos iniciado la gestión de adquisición del repuesto necesario para su equipo. Podrá consultar las actualizaciones desde el enlace de seguimiento de su orden.',
     'confirmado': 'Le comunicamos que el proveedor ha confirmado el pedido del repuesto solicitado. Continuaremos informándole sobre su proceso de entrega.',
     'preparacion': 'El proveedor está preparando el repuesto solicitado para su envío. Le informaremos cuando se encuentre en camino.',
@@ -38,17 +39,19 @@ MESSAGES = {
 }
 # ---- Logistics Pro (05/11/2026): pasos detallados del traslado según el tipo de envío. La etapa general (stage) sigue con sus 8 valores:
 # cada paso del traslado cuenta como «transito» para el seguimiento público (6 etapas) y para los pedidos anteriores (sin tipo de envío).
-FLOWS = {'internacional': ('solicitado', 'confirmado', 'preparacion', 'despachado', 'transito_internacional', 'llegada_pais', 'aduana_revision', 'aduana_liberado',
+FLOWS = {'internacional': ('solicitado', 'confirmado', 'preparacion', 'despachado', 'transito_origen', 'transito_internacional', 'llegada_pais', 'aduana_revision', 'aduana_liberado',
                            'distribucion_nacional', 'ruta_otavalo', 'recibido', 'instalacion', 'instalado', 'listo'),
          'nacional': ('solicitado', 'confirmado', 'preparacion', 'despachado', 'transito_nacional', 'ruta_otavalo', 'recibido', 'instalacion', 'instalado', 'listo')}
-TRANSIT = ('despachado', 'transito_internacional', 'llegada_pais', 'aduana_revision', 'aduana_liberado', 'distribucion_nacional', 'ruta_otavalo', 'transito_nacional')
+# 1.5.261: pasos opcionales (no todos los envíos los tienen): se pueden usar o saltar sin que sea una corrección; si se saltan, no figuran.
+OPTIONAL = ('transito_origen',)
+TRANSIT = ('despachado', 'transito_origen', 'transito_internacional', 'llegada_pais', 'aduana_revision', 'aduana_liberado', 'distribucion_nacional', 'ruta_otavalo', 'transito_nacional')
 STEP_LABELS = {'solicitado': 'Pedido solicitado', 'confirmado': 'Pedido confirmado', 'preparacion': 'Preparación del repuesto', 'despachado': 'Despachado en el país de origen',
-               'transito_internacional': 'En tránsito internacional', 'llegada_pais': 'Llegada al país de destino', 'aduana_revision': 'En revisión aduanera',
+               'transito_origen': 'En camino al punto de embarque', 'transito_internacional': 'En tránsito internacional', 'llegada_pais': 'Llegada al país de destino', 'aduana_revision': 'En revisión aduanera',
                'aduana_liberado': 'Liberado por aduana', 'distribucion_nacional': 'En distribución nacional', 'ruta_otavalo': 'En ruta hacia Otavalo',
                'transito_nacional': 'En tránsito nacional', 'recibido': 'Recibido en PC-DOCTOR', 'instalacion': 'Instalación y pruebas', 'instalado': 'Proceso finalizado',
                'listo': 'Listo para entrega'}
 NATIONAL_LABELS = {'despachado': 'Despachado'}
-PHASES = {'internacional': (('pedido', 'Pedido', 'box', ('solicitado', 'confirmado', 'preparacion')), ('aereo', 'Transporte aéreo', 'plane', ('despachado', 'transito_internacional')),
+PHASES = {'internacional': (('pedido', 'Pedido', 'box', ('solicitado', 'confirmado', 'preparacion')), ('aereo', 'Transporte aéreo', 'plane', ('despachado', 'transito_origen', 'transito_internacional')),
                             ('aduana', 'Aduana', 'customs', ('llegada_pais', 'aduana_revision', 'aduana_liberado')), ('terrestre', 'Distribución nacional', 'truck', ('distribucion_nacional', 'ruta_otavalo')),
                             ('recepcion', 'Recepción', 'check', ('recibido',)), ('servicio', 'Instalación y entrega', 'wrench', ('instalacion', 'instalado', 'listo'))),
           'nacional': (('pedido', 'Pedido', 'box', ('solicitado', 'confirmado', 'preparacion')), ('terrestre', 'Transporte terrestre', 'truck', ('despachado', 'transito_nacional', 'ruta_otavalo')),
@@ -85,12 +88,12 @@ MAP_Y = 80
 CLEARANCE = {'truck': 68, 'plane': 80}   # distancia mínima (unidades del lienzo) entre el centro del vehículo y el de un punto de control (1.5.250: vehículos más grandes)
 LANE = -22       # carril de la furgoneta: sobre la línea de ruta, nunca encima de los puntos ni de sus textos
 MAPS = {
-    'internacional': {'nodes': (('origen', 120, ('solicitado', 'confirmado', 'preparacion', 'despachado')), ('ecuador', 520, ('llegada_pais', 'aduana_revision', 'aduana_liberado')),
+    'internacional': {'nodes': (('origen', 120, ('solicitado', 'confirmado', 'preparacion', 'despachado', 'transito_origen')), ('ecuador', 520, ('llegada_pais', 'aduana_revision', 'aduana_liberado')),
                                 ('otavalo', 740, ('ruta_otavalo',)), ('taller', 895, ('recibido', 'instalacion', 'instalado', 'listo'))),
-                      'segments': (('air', 'aire', 'M120 80 Q320 0 520 80', ('despachado', 'transito_internacional')),
+                      'segments': (('air', 'aire', 'M120 80 Q320 0 520 80', ('despachado', 'transito_origen', 'transito_internacional')),
                                    ('road1', 'tierra', 'M520 80 L740 80', ('aduana_liberado', 'distribucion_nacional', 'ruta_otavalo')),
                                    ('road2', 'tierra', 'M740 80 L895 80', ('recibido',))),
-                      'vehicle': {'despachado': ('plane', 'air', 0.0, 0.0, 'parked'), 'transito_internacional': ('plane', 'air', 0.0, 0.5, 'moving'),
+                      'vehicle': {'despachado': ('plane', 'air', 0.0, 0.0, 'parked'), 'transito_origen': ('plane', 'air', 0.0, 0.0, 'parked'), 'transito_internacional': ('plane', 'air', 0.0, 0.5, 'moving'),
                                   'llegada_pais': ('plane', 'air', 0.5, 1.0, 'landed'), 'aduana_liberado': ('truck', 'road1', 0.0, 0.0, 'parked'),
                                   'distribucion_nacional': ('truck', 'road1', 0.0, 0.45, 'moving'), 'ruta_otavalo': ('truck', 'road1', 0.45, 1.0, 'moving'),
                                   'recibido': ('truck', 'road2', 0.0, 1.0, 'arrived')}},
@@ -370,7 +373,8 @@ def advance(c, oid, rid, data, user, now):
     note = _text(data, 'note', 1500)
     if want == have:
         raise PartError('El repuesto ya está en esa etapa.', 409)
-    if want != have + 1:
+    normal = want == have + 1 or (want > have and all(steps[k] in OPTIONAL for k in range(have + 1, want)))
+    if not normal:
         if user['role'] != 'administrador':
             raise PartError('Solo se avanza a la etapa siguiente. Saltar o retroceder es una corrección de administración.', 403)
         if len(note) < 10:
@@ -476,7 +480,10 @@ def progress(c, r):
     steps = st['steps']
     done = sum(1 for x in steps if x['state'] == 'done')
     nxt = next((x['label'] for x in steps if x['state'] == 'pending'), '') if r['situation'] != 'cancelado' else ''
-    fine_steps = flow(r)
+    fine_steps = list(flow(r))
+    full = fine_steps.index(st['current']) if st['current'] in fine_steps else 0
+    reached = {e['logistics'] or e['stage'] for e in events if e['kind'] in ('alta', 'etapa')}
+    fine_steps = [x for i, x in enumerate(fine_steps) if not (x in OPTIONAL and x not in reached and i < full)]  # opcional saltado: no cuenta
     idx = fine_steps.index(st['current']) if st['current'] in fine_steps else 0
     last = c.execute("SELECT MAX(at) FROM (SELECT created_at at FROM order_part_events WHERE request_id=? UNION ALL "
                      "SELECT created_at FROM order_part_log WHERE request_id=? AND kind!='aviso')", (r['id'], r['id'])).fetchone()[0]
@@ -516,6 +523,7 @@ def listing(c, oid, today):
         for d in detail:
             if d['state'] == 'done' and d['code'] not in reached and d['code'] not in ('solicitado',):
                 d['state'] = 'skipped'  # superado por una corrección de administración, sin evento propio: nunca se pinta como completado
+        detail = [d for d in detail if not (d['code'] in OPTIONAL and d['state'] in ('done', 'skipped') and d['code'] not in reached)]  # opcional no usado
         route = []
         if r['shipping']:
             for code, label, icon, members in PHASES[r['shipping']]:
@@ -526,7 +534,7 @@ def listing(c, oid, today):
         moving = r['situation'] == 'normal'
         vehicle = ''
         if r['situation'] != 'cancelado' and r['shipping']:
-            vehicle = {'despachado': 'plane-parked' if r['shipping'] == 'internacional' else 'truck-parked', 'transito_internacional': 'plane' if moving else 'plane-stopped',
+            vehicle = {'despachado': 'plane-parked' if r['shipping'] == 'internacional' else 'truck-parked', 'transito_origen': 'plane-parked', 'transito_internacional': 'plane' if moving else 'plane-stopped',
                        'llegada_pais': 'plane-landed', 'distribucion_nacional': 'truck' if moving else 'truck-stopped', 'ruta_otavalo': 'truck' if moving else 'truck-stopped',
                        'transito_nacional': 'truck' if moving else 'truck-stopped', 'recibido': 'truck-arrived'}.get(current, '')
         customs = ''
@@ -581,17 +589,17 @@ PUBLIC_STEPS = (('solicitud', 'Solicitud registrada', ('solicitado',)), ('confir
 # Envíos con tipo definido: etapas públicas propias (el internacional muestra el vuelo y la aduana; el nacional, el traslado terrestre).
 PUBLIC_FLOWS = {
     'internacional': (('solicitud', 'Solicitud registrada', ('solicitado',)), ('confirmado', 'Repuesto confirmado', ('confirmado', 'preparacion')),
-                      ('aereo', 'Envío internacional', ('despachado', 'transito_internacional', 'llegada_pais')), ('aduana', 'Proceso de aduana', ('aduana_revision', 'aduana_liberado')),
+                      ('aereo', 'Envío internacional', ('despachado', 'transito_origen', 'transito_internacional', 'llegada_pais')), ('aduana', 'Proceso de aduana', ('aduana_revision', 'aduana_liberado')),
                       ('nacional', 'Traslado hacia Otavalo', ('distribucion_nacional', 'ruta_otavalo')), ('recibido', 'Recibido en el taller', ('recibido',)),
                       ('instalacion', 'Instalación y pruebas', ('instalacion',)), ('finalizado', 'Proceso finalizado', ('instalado', 'listo'))),
     'nacional': (('solicitud', 'Solicitud registrada', ('solicitado',)), ('confirmado', 'Repuesto confirmado', ('confirmado', 'preparacion')),
                  ('traslado', 'Traslado nacional hacia Otavalo', ('despachado', 'transito_nacional', 'ruta_otavalo')), ('recibido', 'Recibido en el taller', ('recibido',)),
                  ('instalacion', 'Instalación y pruebas', ('instalacion',)), ('finalizado', 'Proceso finalizado', ('instalado', 'listo')))}
-FLOW_TEXT = {'despachado': 'El repuesto fue despachado hacia PC-DOCTOR.', 'transito_internacional': 'El repuesto viaja hacia Ecuador.', 'llegada_pais': 'El repuesto llegó a Ecuador.',
+FLOW_TEXT = {'despachado': 'El repuesto fue despachado hacia PC-DOCTOR.', 'transito_origen': 'El repuesto viaja dentro del país de origen hacia el punto de embarque.', 'transito_internacional': 'El repuesto viaja hacia Ecuador.', 'llegada_pais': 'El repuesto llegó a Ecuador.',
              'aduana_revision': 'El repuesto ingresó al proceso de aduana.', 'aduana_liberado': 'El repuesto fue liberado de aduana.',
              'distribucion_nacional': 'El repuesto continúa su traslado dentro de Ecuador.', 'ruta_otavalo': 'El repuesto está en ruta hacia Otavalo.',
              'transito_nacional': 'El repuesto está en traslado nacional.'}
-FLOW_LABELS = {'despachado': 'Repuesto despachado', 'transito_internacional': 'En tránsito internacional', 'llegada_pais': 'Llegada a Ecuador',
+FLOW_LABELS = {'despachado': 'Repuesto despachado', 'transito_origen': 'En camino al punto de embarque', 'transito_internacional': 'En tránsito internacional', 'llegada_pais': 'Llegada a Ecuador',
                'aduana_revision': 'En proceso de aduana', 'aduana_liberado': 'Liberado de aduana', 'distribucion_nacional': 'Traslado nacional',
                'ruta_otavalo': 'En ruta hacia Otavalo', 'transito_nacional': 'En tránsito nacional'}
 GROUP_TEXT = {'aereo': 'El repuesto está en su envío internacional hacia Ecuador.', 'aduana': 'El repuesto se encuentra en el proceso de aduana en Ecuador.',

@@ -452,3 +452,14 @@ Los pasos internos menores no generan avisos.
 - **Separación:** los vehículos son más grandes, así que la distancia mínima a los puntos de control pasa a 68 unidades (furgoneta) y 80 (avión). La posición se interpola exacta sobre el trazo. Ningún vehículo tapa puntos ni textos.
 - **Título:** la página del cliente ahora dice «Seguimiento de Reparación».
 - **Validación:** se hizo en la vista previa local (mismo código, base temporal con datos ficticios). El entorno Preview de Vercel comparte la base de datos de producción, así que no se usó para no tocar datos reales.
+
+## Etapa «En camino al punto de embarque» (1.5.261)
+
+En los envíos internacionales, el repuesto suele viajar primero dentro del país de origen (por ejemplo, con USPS hacia el casillero o el punto de embarque) y después sale en avión. Para ese tramo se añadió el paso opcional **«En camino al punto de embarque»**, entre «Despachado en el país de origen» y «En tránsito internacional».
+
+- **Es opcional:** desde «Despachado» se puede pasar directo a «En tránsito internacional» sin que cuente como corrección, también para los técnicos.
+- **Si se salta:** no aparece en el detalle ni cuenta en «paso X de Y».
+- **Para el cliente:** su mensaje sugerido dice «… se encuentra en camino al punto de embarque en el país de origen…». En el mapa el avión sigue en tierra, en el origen.
+- **Avisos:** no genera correo al cliente, porque es un paso logístico menor.
+
+Caso que lo motivó: PCD-20261031-0011 (08/11/2026). Las notas de USPS («centro de distribución de Coppell») se registraron en «Preparación» y «Confirmado» por falta de esta opción.
