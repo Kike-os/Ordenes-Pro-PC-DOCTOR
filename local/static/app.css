@@ -10680,3 +10680,106 @@ body[data-page=dashboard] .cascade-pp{width:auto;min-height:32px;margin:0;paddin
 .adi-assist .adi-kind select{min-height:38px;height:auto;padding:7px 10px;font-size:13px}
 /* 1.5.256 · el pie fijo del asistente es opaco: lo que se desplaza por debajo (tipo de informe, grupos) ya no se ve encimado al interruptor ni a los botones */
 .adi-assist .adi-foot{background:#0b1528;border-top:1px solid #24365f;box-shadow:0 -8px 14px -8px #020714cc;z-index:1}
+/* ===== 1.5.257 · Estados de reparación: selector, tarjeta de estado, línea de tiempo, auditoría y mensaje con ADI (acotado a .sp-*) ===== */
+.status-label[data-status=diagnostico]{background:#0f2447;border-color:#3b74c9;color:#9cc7ff}
+.status-label[data-status=esperando_repuesto]{background:#2c1607;border-color:#c46a1f;color:#ffbf85}
+.status-label[data-status=pruebas]{background:#082636;border-color:#1f8fbf;color:#8fdcff}
+.tracking-state>.status-label[data-status=diagnostico]{--ts-line:#3b74c9;--ts-bg:#0f2447;--ts-ink:#9cc7ff}
+.tracking-state>.status-label[data-status=esperando_repuesto]{--ts-line:#c46a1f;--ts-bg:#2c1607;--ts-ink:#ffbf85}
+.tracking-state>.status-label[data-status=pruebas]{--ts-line:#1f8fbf;--ts-bg:#082636;--ts-ink:#8fdcff}
+.equip-state[data-status=diagnostico]{border-color:#3b74c999;background:#0f2447;color:#b5d5ff}.equip-state[data-status=esperando_repuesto]{border-color:#c46a1f99;background:#2c1607;color:#ffcf9f}
+.equip-state[data-status=pruebas]{border-color:#1f8fbf99;background:#082636;color:#aee6ff}
+.oh-item[data-status=diagnostico],.tracking-item[data-status=diagnostico]{--tk:#60a5fa;--tk-soft:#60a5fa2b}.oh-item[data-status=esperando_repuesto],.tracking-item[data-status=esperando_repuesto]{--tk:#fb923c;--tk-soft:#fb923c2b}
+.oh-item[data-status=pruebas],.tracking-item[data-status=pruebas]{--tk:#38bdf8;--tk-soft:#38bdf82b}
+:is(.sp-trigger,.sp-opt,.sp-chip,.sp-card,.sp-line li){--t:#60a5fa}
+:is(.sp-trigger,.sp-opt,.sp-chip,.sp-card,.sp-line li)[data-tone=gris]{--t:#94a3b8}:is(.sp-trigger,.sp-opt,.sp-chip,.sp-card,.sp-line li)[data-tone=azul]{--t:#60a5fa}
+:is(.sp-trigger,.sp-opt,.sp-chip,.sp-card,.sp-line li)[data-tone=indigo]{--t:#818cf8}:is(.sp-trigger,.sp-opt,.sp-chip,.sp-card,.sp-line li)[data-tone=ambar]{--t:#f59e0b}
+:is(.sp-trigger,.sp-opt,.sp-chip,.sp-card,.sp-line li)[data-tone=violeta]{--t:#a78bfa}:is(.sp-trigger,.sp-opt,.sp-chip,.sp-card,.sp-line li)[data-tone=naranja]{--t:#fb923c}
+:is(.sp-trigger,.sp-opt,.sp-chip,.sp-card,.sp-line li)[data-tone=rojo]{--t:#f87171}:is(.sp-trigger,.sp-opt,.sp-chip,.sp-card,.sp-line li)[data-tone=celeste]{--t:#38bdf8}
+:is(.sp-trigger,.sp-opt,.sp-chip,.sp-card,.sp-line li)[data-tone=turquesa]{--t:#2dd4bf}:is(.sp-trigger,.sp-opt,.sp-chip,.sp-card,.sp-line li)[data-tone=verde]{--t:#22c55e}
+:is(.sp-trigger,.sp-opt,.sp-chip,.sp-card,.sp-line li)[data-tone=cierre]{--t:#7dd3fc}
+/* Botón del selector: compacto, con el color del estado actual */
+button.sp-trigger{display:inline-flex;align-items:center;gap:8px;width:100%;max-width:100%;min-height:38px;margin:0;padding:6px 10px;border:1px solid color-mix(in srgb,var(--t) 50%,#24365f);border-radius:10px;background:linear-gradient(90deg,color-mix(in srgb,var(--t) 14%,#0d192c),#0d192c);color:#e7efff;font-size:13px;font-weight:700;text-align:left;cursor:pointer;transition:border-color .15s,box-shadow .15s}
+button.sp-trigger>.system-icon:first-child{flex:none;width:17px;height:17px;color:var(--t)}
+.sp-trigger-label{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+button.sp-trigger .sp-chev{flex:none;width:15px;height:15px;color:#9fb4d6;transition:transform .15s}
+button.sp-trigger[aria-expanded=true] .sp-chev{transform:rotate(180deg)}
+button.sp-trigger:hover:not(:disabled){border-color:var(--t)}button.sp-trigger:focus-visible{outline:2px solid var(--t);outline-offset:2px}
+button.sp-trigger:disabled{opacity:.65;cursor:progress}
+/* Lista flotante: posición fija, altura limitada con desplazamiento interno (no estira la ventana ni la tarjeta) */
+.sp-pop{position:fixed;z-index:2147483000;display:flex;flex-direction:column;min-height:0;border:1px solid #2f4a8a;border-radius:12px;background:#0b1528;box-shadow:0 18px 40px #020714d9,0 0 0 1px #7f8fe01f;overflow:hidden;color:#e7efff}
+.sp-search{display:flex;align-items:center;gap:8px;margin:0;padding:8px 10px;border-bottom:1px solid #1d2f52}
+.sp-search .system-icon{flex:none;width:15px;height:15px;color:#8fa9cc}
+.sp-search input{flex:1 1 auto;min-width:0;min-height:32px;margin:0;padding:4px 6px;border:0;border-radius:6px;background:transparent;color:#fff;font-size:13.5px}
+.sp-search input:focus{outline:none;box-shadow:none}.sp-search:focus-within{background:#0f1d36}
+.sp-list{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:4px 6px 8px}
+.sp-group-head{margin:8px 6px 4px;color:#8fa9cc;font-size:10.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase}
+.sp-opt{display:flex;align-items:center;gap:9px;min-height:38px;padding:6px 8px;border-radius:8px;cursor:pointer;font-size:13px;color:#dbe6f8}
+.sp-opt[hidden],.sp-group[hidden]{display:none}
+.sp-opt-ic{display:grid;place-items:center;flex:none;width:26px;height:26px;border-radius:8px;background:color-mix(in srgb,var(--t) 16%,transparent);color:var(--t);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--t) 40%,transparent)}
+.sp-opt-ic .system-icon{width:15px;height:15px}
+.sp-opt-label{flex:1 1 auto;min-width:0}
+.sp-opt.is-active{background:#15284a;color:#fff;box-shadow:inset 3px 0 0 var(--t)}
+.sp-opt[aria-selected=true]{color:#fff;font-weight:700}
+.sp-tag{flex:none;padding:2px 7px;border:1px solid #2f4a8a;border-radius:999px;color:#b9c8ff;font-size:10.5px;font-style:normal;font-weight:700}
+.sp-tag-now{border-color:color-mix(in srgb,var(--t) 60%,transparent);color:var(--t)}
+.sp-empty{margin:10px 12px 12px;color:#9fb4d6;font-size:12.5px}
+/* Chip de estado (auditoría, diálogos) */
+.sp-chip{display:inline-flex;align-items:center;gap:5px;max-width:100%;padding:2px 8px 2px 6px;border:1px solid color-mix(in srgb,var(--t) 45%,transparent);border-radius:999px;background:color-mix(in srgb,var(--t) 13%,transparent);color:#e7efff;font-size:12px;font-weight:700;line-height:1.5}
+.sp-chip .system-icon{flex:none;width:13px;height:13px;color:var(--t)}.sp-chip>span{min-width:0;overflow-wrap:anywhere}
+/* Tarjeta «Estado de la reparación» */
+.workspace-section.sp-card{display:grid;gap:10px;border-top:3px solid var(--t)}
+.sp-card-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px}.sp-card-head h2{margin:0}
+.sp-kind{padding:2px 9px;border:1px solid color-mix(in srgb,var(--t) 50%,transparent);border-radius:999px;color:var(--t);font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase}
+.sp-now{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid color-mix(in srgb,var(--t) 35%,transparent);border-radius:11px;background:linear-gradient(90deg,color-mix(in srgb,var(--t) 14%,#0c1729),#0c1729 80%)}
+.sp-now-ic{display:grid;place-items:center;flex:none;width:36px;height:36px;border-radius:10px;background:color-mix(in srgb,var(--t) 18%,transparent);color:var(--t)}.sp-now-ic .system-icon{width:19px;height:19px}
+.sp-now small{display:block;color:#8fa9cc;font-size:11px;letter-spacing:.04em;text-transform:uppercase}.sp-now strong{display:block;color:#fff;font-size:15px;line-height:1.3;overflow-wrap:anywhere}
+.sp-facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 12px;margin:0}
+.sp-facts dt{color:#8fa9cc;font-size:11px;letter-spacing:.03em;text-transform:uppercase}.sp-facts dd{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:2px 0 0;color:#e7efff;font-size:13px;font-weight:600;overflow-wrap:anywhere}
+.sp-confirm{padding:1px 7px;border:1px solid #f59e0b66;border-radius:999px;color:#fbbf24;font-size:10.5px;font-style:normal;font-weight:700}.sp-confirm.is-ok{border-color:#22c55e66;color:#4ade80}
+/* Línea de tiempo compacta (desplazable en horizontal si no cabe) */
+.sp-line{display:flex;gap:0;margin:0;padding:2px 0 4px;list-style:none;overflow-x:auto;scrollbar-width:thin}
+.sp-line li{position:relative;display:flex;flex-direction:column;align-items:center;gap:4px;flex:1 0 74px;min-width:74px;padding:0 3px;text-align:center}
+.sp-line li+li::before{content:"";position:absolute;top:13px;right:calc(50% + 15px);width:calc(100% - 30px);border-top:2px solid #2c4a7a}
+.sp-dot{display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:color-mix(in srgb,var(--t) 16%,#0c1729);color:var(--t);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--t) 45%,transparent)}
+.sp-dot .system-icon{width:14px;height:14px}
+.sp-line li>span:last-child{display:grid;gap:1px}.sp-line b{color:#dbe6f8;font-size:11px;line-height:1.25;overflow-wrap:anywhere}.sp-line time{color:#8fa9cc;font-size:10.5px}
+.sp-line li[aria-current=step] .sp-dot{box-shadow:inset 0 0 0 2px var(--t),0 0 0 3px color-mix(in srgb,var(--t) 22%,transparent)}.sp-line li[aria-current=step] b{color:#fff}
+/* Acciones */
+.sp-tools{display:grid;gap:8px}.sp-change{display:grid;gap:4px}.sp-change-label{color:#8fa9cc;font-size:11px;letter-spacing:.03em;text-transform:uppercase}
+button.sp-adi{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:36px}button.sp-adi .system-icon{width:16px;height:16px}
+/* Auditoría */
+.sp-audit{border-top:1px solid #1d2f52;padding-top:8px}.sp-audit>summary{cursor:pointer;color:#b9c8ff;font-size:12.5px;font-weight:700}
+.sp-audit ul{display:grid;gap:8px;margin:8px 0 0;padding:0;list-style:none;max-height:320px;overflow-y:auto}
+.sp-audit li{display:grid;gap:3px;padding:8px 9px;border:1px solid #1d2f52;border-radius:9px;background:#0b1528}
+.sp-audit-top{display:flex;flex-wrap:wrap;align-items:center;gap:5px}.sp-arrow{color:#8fa9cc}.sp-audit-start{color:#8fa9cc;font-size:12px}
+.sp-audit small{color:#8fa9cc;font-size:11.5px}.sp-audit-reason,.sp-audit-notice{margin:0;color:#c9d7ee;font-size:12px;overflow-wrap:anywhere}
+.sp-ntag{display:inline-block;margin:0 4px 0 0;padding:0 6px;border:1px solid #2f4a8a;border-radius:999px;font-style:normal;font-size:11px}
+.sp-ntag[data-state=enviado]{border-color:#22c55e66;color:#4ade80}.sp-ntag[data-state=fallido]{border-color:#ef444466;color:#f87171}.sp-ntag[data-state=omitido]{color:#9fb4d6}.sp-ntag[data-state=pendiente]{border-color:#f59e0b66;color:#fbbf24}
+.sp-auto{display:flex;align-items:flex-start;gap:8px;margin:10px 0 0;color:#c9d7ee;font-size:12px}.sp-auto input{flex:none;width:16px;height:16px;min-height:0;margin:1px 0 0;accent-color:#7f8fe0}
+/* Editor: fecha confirmada */
+.sp-confirm-field{display:flex;align-items:center;gap:8px;margin:-2px 0 4px;color:#c9d7ee;font-size:12.5px}.sp-confirm-field input{flex:none;width:16px;height:16px;min-height:0;margin:0;accent-color:#7f8fe0}
+.sp-confirm-field:has(input:disabled){opacity:.6}
+/* Diálogos: motivo, cambio de estado y mensaje con ADI */
+.sp-reason-to,.sp-msg-now{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:0 0 8px;color:#c9d7ee;font-size:13px}
+.sp-dialog-body{display:grid;gap:10px;padding:4px 2px}
+.sp-msg{display:grid;gap:10px}.sp-seg{display:flex;flex-wrap:wrap;gap:6px;margin:0;padding:0;border:0}.sp-seg legend{margin-bottom:4px;color:#8fa9cc;font-size:12px}
+.sp-seg label{display:inline-flex;align-items:center;gap:6px;min-height:36px;padding:4px 12px;border:1px solid #2f4a8a;border-radius:999px;cursor:pointer;color:#dbe6f8;font-size:13px}
+.sp-seg label:has(input:checked){border-color:#7f8fe0;background:#1a2a55;color:#fff}.sp-seg input{width:15px;height:15px;min-height:0;margin:0;accent-color:#7f8fe0}
+.sp-seg label:has(input:focus-visible){outline:2px solid #7f8fe0;outline-offset:2px}
+.sp-msg button[type=submit]{display:inline-flex;align-items:center;justify-content:center;gap:7px;justify-self:start}.sp-msg button[type=submit] .system-icon{width:16px;height:16px}
+.sp-msg-out{display:grid;gap:8px;padding-top:8px;border-top:1px solid #1d2f52}.sp-msg-out[hidden]{display:none}
+.sp-msg-source{margin:0;color:#b9c8ff;font-size:12.5px;font-weight:700}.sp-msg-out textarea{width:100%;min-height:180px;resize:vertical;font-size:13.5px;line-height:1.5}
+.sp-msg-warn{display:grid;gap:4px;margin:0;padding-left:18px;color:#fbbf24;font-size:12.5px}.sp-msg-warn:empty{display:none}.sp-msg-hint{color:#8fa9cc;font-size:12px}
+@media(max-width:560px){.sp-facts{grid-template-columns:1fr 1fr}.sp-line li{flex-basis:66px;min-width:66px}.sp-msg-out .delivery-actions{display:grid;grid-template-columns:1fr}.sp-msg button[type=submit]{justify-self:stretch}}
+@media(max-width:360px){.sp-facts{grid-template-columns:1fr}}
+@media(prefers-reduced-motion:no-preference){.sp-pop{animation:sp-in .14s ease-out both}@keyframes sp-in{from{opacity:0;transform:translateY(-3px)}to{opacity:1;transform:none}}.sp-pop[data-side=up]{animation-name:sp-in-up}@keyframes sp-in-up{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}}
+.sp-pop.sp-inline{position:static;width:100%;max-height:min(55vh,380px);margin-top:6px;box-shadow:none}
+/* Ajustes tras la revisión visual: el buscador no se estira con las reglas globales de label; la línea de tiempo es vertical y compacta. */
+.sp-pop>.sp-search{flex:none;height:auto;min-height:0}
+.sp-pop>.sp-empty{flex:none}
+.sp-card .sp-line{flex-direction:column;gap:0;padding:2px 0;overflow:visible}
+.sp-card .sp-line li{flex-direction:row;align-items:center;gap:9px;flex:none;min-width:0;padding:3px 0;text-align:left}
+.sp-card .sp-line li+li::before{top:-7px;right:auto;left:13px;width:0;height:14px;border-top:0;border-left:2px solid #2c4a7a}
+.sp-card .sp-line li>span:last-child{display:flex;flex-wrap:wrap;align-items:baseline;gap:0 8px;min-width:0}
+.sp-card .sp-line b{font-size:12.5px}.sp-card .sp-line time{font-size:11.5px}

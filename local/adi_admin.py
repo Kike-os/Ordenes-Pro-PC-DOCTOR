@@ -183,7 +183,7 @@ TOOLS = [
      'parameters': {'type': 'object', 'additionalProperties': False, 'required': [], 'properties': {}}},
     {'type': 'function', 'name': 'buscar_ordenes', 'strict': True, 'description': 'Lista órdenes reales filtradas por estado y/o texto (número de orden, cliente, marca o modelo).',
      'parameters': {'type': 'object', 'additionalProperties': False, 'required': ['estado', 'texto'],
-                    'properties': {'estado': {'type': ['string', 'null'], 'enum': ['activas', 'pendiente', 'reparacion', 'esperando_cliente', 'presupuesto', 'listo', 'espera_entrega', 'entregado', 'revision_recurrente', None]},
+                    'properties': {'estado': {'type': ['string', 'null'], 'enum': ['activas', 'pendiente', 'diagnostico', 'reparacion', 'esperando_cliente', 'presupuesto', 'esperando_repuesto', 'pruebas', 'listo', 'espera_entrega', 'entregado', 'revision_recurrente', None]},
                                    'texto': {'type': ['string', 'null'], 'description': 'Cliente, número de orden, marca o modelo; null para no filtrar.'}}}},
     {'type': 'function', 'name': 'detalle_orden', 'strict': True, 'description': 'Detalle de una orden por su número (PCD-AAAAMMDD-NNNN): estado, presupuestos, autorización, cobro y últimos movimientos.',
      'parameters': {'type': 'object', 'additionalProperties': False, 'required': ['codigo'], 'properties': {'codigo': {'type': 'string'}}}},
@@ -196,7 +196,8 @@ TOOLS = [
 ]
 
 STATUS_FILTERS = {'activas': ACTIVE, 'pendiente': "o.status='pendiente'", 'reparacion': "o.status='reparacion'", 'esperando_cliente': "o.status='esperando_cliente'", 'presupuesto': "o.status='presupuesto'",
-                  'listo': "o.status='listo'", 'espera_entrega': "o.status='espera_entrega'", 'entregado': "o.status='entregado'", 'revision_recurrente': "o.status='revision_recurrente'"}
+                  'listo': "o.status='listo'", 'espera_entrega': "o.status='espera_entrega'", 'entregado': "o.status='entregado'", 'revision_recurrente': "o.status='revision_recurrente'",
+                  'diagnostico': "o.status='diagnostico'", 'esperando_repuesto': "o.status='esperando_repuesto'", 'pruebas': "o.status='pruebas'"}
 
 
 def run_tool(c, now, name, raw):

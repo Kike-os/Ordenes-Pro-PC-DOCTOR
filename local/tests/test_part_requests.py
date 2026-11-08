@@ -215,7 +215,7 @@ class PartRequestTests(unittest.TestCase):
         token = self.link(oid)
         # 1.5.252: barra de 6 etapas (Recepción · Diagnóstico · Reparación · Pruebas · Listo para retirar · Entregado).
         states = lambda: re.findall(r'<li class="rp-step" data-state="(\w+)"', self.request('/s/' + token)['body'])
-        self.assertEqual(states(), ['current'] + ['pending'] * 5)  # recibida: nada en verde
+        self.assertEqual(states(), ['done', 'current'] + ['pending'] * 4)  # 1.5.257: presupuesto aprobado → diagnóstico (no se marca reparación)
         self.request('/api/order-status', {'id': str(oid), 'status': 'presupuesto'}, cookie=cookie, csrf=csrf)
         page = self.request('/s/' + token)['body']
         self.assertEqual(states(), ['done', 'warn'] + ['pending'] * 4)  # presupuesto pendiente: en espera (ámbar), sin avanzar

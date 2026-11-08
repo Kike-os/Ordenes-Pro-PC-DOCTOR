@@ -21,7 +21,7 @@ class TrackingBoardTests(unittest.TestCase):
         board=self.request('/api/tracking',cookie=cookie)['body']
         # Una sola tarjeta por orden, primero la de actividad más reciente; cada una con su último movimiento real.
         self.assertEqual([row['id'] for row in board['rows']],[b,a,quiet]);self.assertEqual(board['total'],3)
-        first=board['rows'][1];self.assertEqual((first['status_code'],first['status_label'],first['previous_label'],first['client'],first['brand']),('listo','Listo para entregar','Procesando','Cliente ficticio','HP'))
+        first=board['rows'][1];self.assertEqual((first['status_code'],first['status_label'],first['previous_label'],first['client'],first['brand']),('listo','Listo para entregar','Reparación en proceso','Cliente ficticio','HP'))
         self.assertGreaterEqual(first['events'],5);self.assertTrue(first['actor'])
         # Contadores calculados con los registros reales.
         self.assertEqual({item['key']:item['total'] for item in board['counters']},{'pending':1,'process':0,'waiting':0,'ready':1,'done':1})

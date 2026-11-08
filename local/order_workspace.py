@@ -2,7 +2,8 @@
 from datetime import date
 from decimal import Decimal, InvalidOperation
 
-STATUSES={'pendiente':'En espera','reparacion':'Procesando','revision_recurrente':'En revisión por falla recurrente','esperando_cliente':'Esperando respuesta del cliente','presupuesto':'Aprobación de presupuesto','espera_entrega':'En espera de entrega','listo':'Listo para entregar','entregado':'Entregado'}
+# 1.5.257: once estados desde la fuente única (repair_status); los códigos anteriores no cambian.
+from repair_status import LABELS as STATUSES
 RECURRENT='revision_recurrente'
 BUDGET_KEYS=('labor','parts','services','digital')
 
@@ -58,6 +59,10 @@ def attach(c,order):
     order['responsible']=actor['name'] if actor else 'Sin asignar'
     order['history']=history(c,order['id'])
     order['recurrences']=recurrences(c,order['id'])
+    # 1.5.257: auditoría de estados (con avisos y resultados), línea de tiempo y siguientes pasos sugeridos.
+    import repair_status
+    order['status_audit']=repair_status.audit(c,order['id']);order['status_timeline']=repair_status.timeline(c,order['id'])
+    order['status_next']=repair_status.suggestions(c,order['id']);order['status_notices_auto']=repair_status.enabled(c)
     row=c.execute('SELECT * FROM order_budget WHERE order_id=?',(order['id'],)).fetchone()
     order['budget']={k+'_cents':row[k+'_cents'] if row else 0 for k in BUDGET_KEYS}
     order['budget']['total_cents']=sum(order['budget'].values())
@@ -96,6 +101,8 @@ def validate(c,data):
             if date.fromisoformat(value).isoformat()!=value:raise ValueError()
         except ValueError:errors['estimated_delivery']='Indica una fecha válida.'
     fields['estimated_delivery']=value
+    # La fecha estimada solo se muestra al cliente cuando el taller la confirma (1.5.257).
+    fields['estimated_confirmed']=1 if value and str(data.get('estimated_confirmed','')).lower() in ('1','true','on') else 0
     for key in BUDGET_KEYS:
         try:
             amount=Decimal(str(data.get(key,'0')))
@@ -135,12 +142,16 @@ def save(c,oid,data,user,now):
         import equipment
         state=equipment.money(c,oid);paid=state['paid_cents'];total=state['budget_cents'] if locked else sum(fields[k+'_cents'] for k in BUDGET_KEYS)
         if total>paid:return 409,{'error':'No se puede entregar: este equipo tiene un saldo pendiente de '+equipment.usd(total-paid)+'. Registra el pago antes de entregarlo.','balance':True}
+    import repair_status
+    if fields['status']!=row['status']:
+        problem=repair_status.check(c,oid,row['status'],fields['status'],fields['comment'])
+        if problem:return 400,{'error':problem,'fields':{'comment':problem}}
     # Falla recurrente: el motivo (comentario) es obligatorio y el técnico responsable es el asignado en este guardado.
     note=''
     if fields['status']==RECURRENT and row['status']!=RECURRENT:
         note,problem=recurrence(c,oid,row['status'],fields['comment'],fields['assigned_to'],user,now)
         if problem:return 400,{'error':problem,'fields':{'comment':problem}}
-    keys=('problem','status','priority','assigned_to','estimated_delivery','internal_notes','recommendations','findings')
+    keys=('problem','status','priority','assigned_to','estimated_delivery','estimated_confirmed','internal_notes','recommendations','findings')
     c.execute('UPDATE orders SET '+','.join(k+'=?' for k in keys)+',updated_at=?,revision=revision+1 WHERE id=?',(*(fields[k] for k in keys),now.isoformat(timespec='microseconds'),oid))
     from maintenance import transition
     planned=transition(c,oid,row['status'],fields['status'],now)
@@ -157,4 +168,5 @@ def save(c,oid,data,user,now):
     # Si la edición cambió el estado, el registro lo dice de forma explícita para que sirva como auditoría.
     changed=row['status']!=fields['status']
     event(c,oid,user['id'],now,'status' if changed else 'updated',note or fields['comment'] or (transition_comment(row['status'],fields['status']) if changed else 'Seguimiento técnico actualizado.'))
-    return 200,{'ok':True}
+    if changed:repair_status.log(c,oid,row['status'],fields['status'],user['id'],fields['comment'],'edicion','',now)
+    return 200,{'ok':True,'status_changed':changed}

@@ -55,8 +55,8 @@ class QuoteStateTests(unittest.TestCase):
         sent = [n for n in self.notes() if ':enviado:' in n['key']]
         self.assertEqual(len(sent), 1)
         self.assertIn('Esperando respuesta del cliente', sent[0]['detail'])
-        # Estado técnico y comercial separados: la orden sigue en «En espera».
-        self.assertEqual(self.request('/api/orders/%d' % order['id'], cookie=self.cookie)['body']['order']['status'], 'pendiente')
+        # 1.5.257: enviar un presupuesto que requiere autorización deja la orden «Pendiente de aprobación de presupuesto» (evento real).
+        self.assertEqual(self.request('/api/orders/%d' % order['id'], cookie=self.cookie)['body']['order']['status'], 'presupuesto')
 
     def test_failed_mail_is_not_recorded_as_sent(self):
         def boom(config, message, recipients):
@@ -74,8 +74,8 @@ class QuoteStateTests(unittest.TestCase):
         order, quote, result = self.quote('000003', order_status='presupuesto')
         self.assertEqual(self.answer(result['link'], ['aprobado', 'aprobado'])['status'], 200)
         detail = self.request('/api/orders/%d' % order['id'], cookie=self.cookie)['body']['order']
-        self.assertEqual(detail['status'], 'reparacion')
-        self.assertTrue(any('aprobado por el cliente' in h['comment'] and 'Procesando' in h['comment'] for h in detail['history']))
+        self.assertEqual(detail['status'], 'diagnostico')  # 1.5.257: se habilita continuar; la reparación se marca cuando comience
+        self.assertTrue(any('aprobado por el cliente' in h['comment'] and 'Diagnóstico en proceso' in h['comment'] for h in detail['history']))
         with app.connect() as c:
             row = quotes.get(c, quote)
             self.assertEqual((row['status'], row['decided_by']), ('aprobado', 'cliente'))
@@ -108,7 +108,7 @@ class QuoteStateTests(unittest.TestCase):
         with app.connect() as c:
             allowed = quotes.authorized(c, order['id'])
         self.assertEqual([i['description'] for i in allowed['items']], ['Servicio ficticio'])
-        self.assertEqual(self.request('/api/orders/%d' % order['id'], cookie=self.cookie)['body']['order']['status'], 'reparacion')
+        self.assertEqual(self.request('/api/orders/%d' % order['id'], cookie=self.cookie)['body']['order']['status'], 'diagnostico')
         self.assertTrue(any(n['title'].startswith('Presupuesto aprobado parcialmente') for n in self.notes()))
 
 

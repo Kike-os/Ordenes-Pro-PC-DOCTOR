@@ -619,3 +619,29 @@
  .rp-nt-pop{position:static;width:auto;min-width:0;max-width:none;padding:0 0 4px 18px;border:0;box-shadow:none;background:none}
 }
 @media(prefers-reduced-motion:reduce){.rp-nt *{transition:none!important}.rp-focus{animation:none}}
+/* 1.5.257 · Estado actual para el cliente (explicación, acción pendiente, última actualización y fecha confirmada) e historial del estado.
+   El color identifica el tipo: etapa normal, espera o incidencia; el texto siempre dice el estado. */
+.tw-state{--t:#60a5fa;display:grid;grid-template-columns:auto minmax(0,1fr);gap:12px;align-items:start;margin:0 0 12px;padding:14px 16px;border:1px solid color-mix(in srgb,var(--t) 38%,transparent);border-left:4px solid var(--t);border-radius:14px;background:linear-gradient(90deg,color-mix(in srgb,var(--t) 13%,#0a1830),#0a1830 75%);color:#e7efff}
+.tw-state[data-tone=gris]{--t:#94a3b8}.tw-state[data-tone=azul]{--t:#60a5fa}.tw-state[data-tone=indigo]{--t:#818cf8}.tw-state[data-tone=ambar]{--t:#f59e0b}.tw-state[data-tone=violeta]{--t:#a78bfa}
+.tw-state[data-tone=naranja]{--t:#fb923c}.tw-state[data-tone=rojo]{--t:#f87171}.tw-state[data-tone=celeste]{--t:#38bdf8}.tw-state[data-tone=turquesa]{--t:#2dd4bf}.tw-state[data-tone=verde]{--t:#22c55e}.tw-state[data-tone=cierre]{--t:#7dd3fc}
+.tw-state-ic{display:grid;place-items:center;width:42px;height:42px;border-radius:12px;background:color-mix(in srgb,var(--t) 18%,transparent);color:var(--t);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--t) 45%,transparent)}
+.tw-state-ic .rp-ic{width:22px;height:22px}
+.tw-state-txt{min-width:0}.tw-state-kicker{margin:0 0 2px;color:var(--t);font-size:11px;font-weight:800;letter-spacing:.07em;text-transform:uppercase}
+.tw-state h2{margin:0 0 6px;color:#cfdcf2;font-size:15px;font-weight:600;line-height:1.3}.tw-state h2 b{color:#fff;font-weight:800}
+.tw-state-txt>p:not(.tw-state-kicker):not(.tw-state-action){margin:0;color:#c9d7ee;font-size:13.5px;line-height:1.55}
+.tw-state-action{display:flex;gap:8px;align-items:flex-start;margin:10px 0 0;padding:8px 10px;border:1px solid color-mix(in srgb,var(--t) 45%,transparent);border-radius:10px;background:color-mix(in srgb,var(--t) 12%,transparent);color:#fff;font-size:13px;font-weight:600}
+.tw-state-aic{flex:none;width:16px;height:16px;margin-top:1px;color:var(--t)}
+.tw-state-meta{display:flex;flex-wrap:wrap;gap:6px 18px;margin:10px 0 0}.tw-state-meta div{min-width:0}.tw-state-meta dt{color:#8fa9cc;font-size:11px;letter-spacing:.04em;text-transform:uppercase}
+.tw-state-meta dd{margin:1px 0 0;color:#fff;font-size:13px;font-weight:700}
+.tw-hist ol{display:grid;gap:0;margin:0;padding:0;list-style:none}
+.tw-hist li{--t:#60a5fa;position:relative;display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;align-items:center;padding:6px 0}
+.tw-hist li+li::before{content:"";position:absolute;left:13px;top:-6px;height:12px;border-left:2px solid #2c5488}
+.tw-hist li[data-tone=gris]{--t:#94a3b8}.tw-hist li[data-tone=indigo]{--t:#818cf8}.tw-hist li[data-tone=ambar]{--t:#f59e0b}.tw-hist li[data-tone=violeta]{--t:#a78bfa}.tw-hist li[data-tone=naranja]{--t:#fb923c}
+.tw-hist li[data-tone=rojo]{--t:#f87171}.tw-hist li[data-tone=celeste]{--t:#38bdf8}.tw-hist li[data-tone=turquesa]{--t:#2dd4bf}.tw-hist li[data-tone=verde]{--t:#22c55e}.tw-hist li[data-tone=cierre]{--t:#7dd3fc}
+.tw-hist-ic{display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:color-mix(in srgb,var(--t) 16%,#0a1830);color:var(--t);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--t) 45%,transparent)}
+.tw-hist-ic .rp-ic{width:15px;height:15px}
+.tw-hist li>span:last-child{display:flex;flex-wrap:wrap;gap:2px 10px;align-items:baseline;min-width:0}.tw-hist b{color:#e7efff;font-size:13.5px}.tw-hist time{color:#9fb4d6;font-size:12px}
+.tw-hist li:first-child b{color:#fff}
+@media(max-width:420px){.tw-state{grid-template-columns:1fr;gap:8px;padding:12px}.tw-state-ic{width:36px;height:36px}.tw-state h2{font-size:14.5px}}
+@media(prefers-reduced-motion:no-preference){.tw-state{animation:tw-state-in .35s ease-out both}@keyframes tw-state-in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}}
+@media print{.tw-state{background:#fff;color:#102744;border-color:#c9d6e8}.tw-state h2,.tw-state h2 b,.tw-state-txt>p,.tw-state-meta dd,.tw-state-action{color:#102744}.tw-hist b{color:#102744}}

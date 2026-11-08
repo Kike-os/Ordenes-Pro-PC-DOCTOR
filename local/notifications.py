@@ -214,6 +214,18 @@ def build(c, user, now, mail_access=False, hidden=False):
             try:fresh=(now-appointments.datetime.fromisoformat(row['updated_at'])).total_seconds()<172800
             except (ValueError,TypeError):fresh=False
             if fresh:items.append({'key':'ready:order:%d:%s'%(row['id'],row['updated_at'][:19]),'kind':'success','icon':'ready','title':'Equipo listo para entregar · '+row['code'],'detail':row['client']+' · '+(' '.join(x for x in (row['brand'],row['model']) if x) or 'equipo'),'at':row['updated_at'],'href':'#deliveries','action':'Ver entregas','sound':True,'group':'event'})
+        # 1.5.257: repuesto recibido en el taller (últimas 72 h): aviso al técnico responsable de la orden (y a administración).
+        try:
+            for row in c.execute("SELECT r.id,r.name,r.updated_at,o.id oid,o.code,o.assigned_to FROM order_part_requests r JOIN orders o ON o.id=r.order_id "
+                                 "WHERE r.stage='recibido' AND r.situation!='cancelado' AND o.status!='entregado' ORDER BY r.updated_at DESC LIMIT 12"):
+                if not admin and row['assigned_to'] != user['id']:
+                    continue
+                try:fresh=(now-appointments.datetime.fromisoformat(row['updated_at'])).total_seconds()<259200
+                except (ValueError,TypeError):fresh=False
+                if fresh:items.append({'key':'part-received:%d:%s'%(row['id'],row['updated_at'][:19]),'kind':'success','icon':'ready','title':'Repuesto recibido · '+row['code'],
+                                       'detail':'«%s» llegó al taller. Puedes continuar con la orden.'%(row['name'] or 'Repuesto')[:80],'at':row['updated_at'],'href':'#orders?id=%d'%row['oid'],'group':'event'})
+        except Exception as error:
+            print('repuestos avisos', type(error).__name__, flush=True)
         alert('ready', ready, 'ready', 'warning', plural(ready, 'equipo pendiente de entrega', 'equipos pendientes de entrega'), 'Coordina el retiro o la entrega.', '#deliveries')
         # Presupuestos de las últimas 48 h: enviados (solo si el correo salió de verdad) y decididos. La aprobación no inicia ningún trabajo.
         try:

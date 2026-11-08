@@ -322,6 +322,24 @@ def part_notice_mail(c,oid,to,subject,body):
     send_institutional(c,'repuesto',subject,to,subject,body,oid,None,review=False)
 
 
+def status_notice_mail(c,oid,to,subject,body):
+    """Correo de un aviso de estado (1.5.257): el mismo envío institucional que los avisos de repuestos."""
+    send_institutional(c,'estado',subject,to,subject,body,oid,None,review=False)
+
+
+def status_notify(c,oid,now):
+    """Envía los avisos de estado pendientes de la orden, después de confirmar el cambio. Un fallo del canal nunca deshace el cambio:
+    el aviso queda «fallido» para reintentar (tarea diaria)."""
+    import repair_status
+    try:
+        c.commit();ids=repair_status.pending_ids(c,oid)
+        if ids:repair_status.deliver(c,ids,now,status_notice_mail);c.commit()
+    except Exception as error:
+        print('status-notice',type(error).__name__,flush=True)
+        try:c.rollback()
+        except Exception:pass
+
+
 def part_notify(c,rid,notice,now):
     """Avisos automáticos de un evento ya guardado. Un fallo del canal nunca deshace lo registrado: queda «fallido» para reintentar."""
     import part_notices
@@ -1248,6 +1266,12 @@ class Handler(BaseHTTPRequestHandler):
                     import part_notices
                     part_notices.retry_failed(c,now,part_notice_mail);c.commit()
                 except Exception as error:print('part-notices cron',type(error).__name__,flush=True)
+                # Avisos de cambios de estado pendientes o fallidos (1.5.257): envío y reintento controlado (hasta 3 intentos).
+                try:
+                    import repair_status
+                    ids=repair_status.pending_ids(c)
+                    if ids:repair_status.deliver(c,ids,now,status_notice_mail);c.commit()
+                except Exception as error:print('status-notices cron',type(error).__name__,flush=True)
                 # Licencias Pro: avisos internos y correos de renovación a clientes (una vez al día, hora de Ecuador).
                 try:license_notices_tick(c,now)
                 except Exception as error:print('license-notices cron',type(error).__name__,flush=True)
@@ -1799,7 +1823,7 @@ class Handler(BaseHTTPRequestHandler):
                 matches.sort(key=lambda item:item[:3])
                 return self.reply(200,{'rows':[item[3] for item in matches[:8]],'more':len(matches)>8})
             if path == '/api/order-options':
-                return self.reply(200, {'statuses':order_workspace.STATUSES,'users':[dict(r) for r in c.execute('SELECT id,name FROM users WHERE active=1 ORDER BY name')]})
+                return self.reply(200, {'statuses':order_workspace.STATUSES,'status_catalog':__import__('repair_status').catalog(),'users':[dict(r) for r in c.execute('SELECT id,name FROM users WHERE active=1 ORDER BY name')]})
             photo = re.fullmatch(r'/api/order-photo/([0-9]+)', path)
             if photo:
                 # Evidencia de recepción: solo con sesión; se entrega como imagen JPEG ya validada al guardarla.
@@ -2375,7 +2399,7 @@ class Handler(BaseHTTPRequestHandler):
                 except reports.ReportError as error:return self.reply(400,{'error':str(error)})
                 return self.reply(200,equipment.receivables(c,finance_filters['from'],finance_filters['to']))
             if path == '/api/reports':
-                counts = [dict(r) for r in c.execute("SELECT s.code,s.label,COUNT(o.id) total FROM statuses s LEFT JOIN orders o ON o.status=s.code GROUP BY s.code ORDER BY CASE s.code WHEN 'pendiente' THEN 1 WHEN 'reparacion' THEN 2 WHEN 'esperando_cliente' THEN 3 WHEN 'presupuesto' THEN 4 WHEN 'espera_entrega' THEN 5 WHEN 'listo' THEN 6 ELSE 7 END")]
+                counts = [dict(r) for r in c.execute("SELECT s.code,s.label,COUNT(o.id) total FROM statuses s LEFT JOIN orders o ON o.status=s.code GROUP BY s.code ORDER BY CASE s.code WHEN 'pendiente' THEN 1 WHEN 'diagnostico' THEN 2 WHEN 'reparacion' THEN 3 WHEN 'presupuesto' THEN 4 WHEN 'esperando_cliente' THEN 5 WHEN 'esperando_repuesto' THEN 6 WHEN 'revision_recurrente' THEN 7 WHEN 'pruebas' THEN 8 WHEN 'espera_entrega' THEN 9 WHEN 'listo' THEN 10 ELSE 11 END")]
                 # Centro de Control Técnico: indicadores calculados con las órdenes reales; «group» devuelve las órdenes de un segmento.
                 report_query=parse_qs(urlsplit(self.path).query);today=reception_now().date()
                 try:
@@ -2659,7 +2683,7 @@ class Handler(BaseHTTPRequestHandler):
                 counts={r['code']:r['total'] for r in c.execute('SELECT s.code,COUNT(o.id) total FROM statuses s LEFT JOIN orders o ON o.status=s.code GROUP BY s.code')}
                 source='orders o JOIN devices d ON d.id=o.device_id JOIN clients c ON c.id=d.client_id JOIN statuses s ON s.code=o.status'
                 columns='o.id,o.code,o.status status_code,s.label status,o.updated_at,o.estimated_delivery,c.name client,c.phone,d.brand,d.model'
-                attention=[dict(r) for r in c.execute("SELECT "+columns+" FROM "+source+" WHERE o.status IN ('esperando_cliente','presupuesto','espera_entrega','listo','revision_recurrente') OR (o.estimated_delivery!='' AND o.estimated_delivery<? AND o.status!='entregado') ORDER BY CASE o.status WHEN 'esperando_cliente' THEN 1 WHEN 'presupuesto' THEN 2 WHEN 'espera_entrega' THEN 3 WHEN 'listo' THEN 4 ELSE 5 END,o.estimated_delivery,o.id LIMIT 8",(today,))]
+                attention=[dict(r) for r in c.execute("SELECT "+columns+" FROM "+source+" WHERE o.status IN ('esperando_cliente','presupuesto','esperando_repuesto','espera_entrega','listo','revision_recurrente') OR (o.estimated_delivery!='' AND o.estimated_delivery<? AND o.status!='entregado') ORDER BY CASE o.status WHEN 'esperando_cliente' THEN 1 WHEN 'presupuesto' THEN 2 WHEN 'espera_entrega' THEN 3 WHEN 'listo' THEN 4 ELSE 5 END,o.estimated_delivery,o.id LIMIT 8",(today,))]
                 deliveries=[dict(r) for r in c.execute("SELECT "+columns+" FROM "+source+" WHERE o.status!='entregado' AND (o.estimated_delivery>=? OR o.status IN ('listo','espera_entrega')) ORDER BY CASE WHEN o.estimated_delivery='' THEN 1 ELSE 0 END,o.estimated_delivery,o.id LIMIT 5",(today,))]
                 scheduled=[r for r in maintenance.rows(c) if r['state'] in ('scheduled','appointment')][:5]
                 today_start=appointments.stamp(appointments.datetime.combine(now.date(),appointments.time.min,appointments.TZ));tomorrow=appointments.stamp(appointments.datetime.combine(now.date()+appointments.timedelta(days=1),appointments.time.min,appointments.TZ))
@@ -2792,6 +2816,7 @@ class Handler(BaseHTTPRequestHandler):
                     order_workspace.event(c,quote['order_id'],None,now,'follow_up','Presupuesto '+quote['code']+': '+{'aprobado':'aprobado por el cliente','parcial':'aprobado parcialmente por el cliente','rechazado':'rechazado por el cliente','modificacion':'el cliente solicitó una modificación'}[status]+'.')
                     audit(c,None,'quote_client_'+status,quote['order_id'])
                 c.commit()
+                if status:status_notify(c,quote['order_id'],now)
             return self.reply(200,page,'text/html; charset=utf-8')
         # Solicitud de cancelación de un repuesto desde el enlace de seguimiento: comprueba los últimos cuatro dígitos de la identificación
         # del cliente, con límite de intentos. Queda pendiente de revisión de administración: nunca anula el pedido por sí sola.
@@ -4305,11 +4330,18 @@ class Handler(BaseHTTPRequestHandler):
                                      'cancel_direct':cancel_direct,'refund':refund}.get(action)
                             if not handler:return self.reply(400,{'error':'Acción inválida.'})
                             result=handler(c,oid,rid,data,user,now)
+                        # 1.5.257: eventos reales del repuesto que cambian el estado de la orden (pedido, recepción, instalación).
+                        import repair_status
+                        if not parts_post[2]:repair_status.auto(c,oid,'part_requested',now,user['id'])
+                        elif action=='advance' and str(data.get('stage',''))=='recibido':repair_status.auto(c,oid,'part_received',now,user['id'])
+                        elif action=='advance' and str(data.get('stage',''))=='instalacion':repair_status.auto(c,oid,'part_installing',now,user['id'])
+                        elif action in ('cancel_direct','cancel_decide'):repair_status.auto(c,oid,'part_received',now,user['id'],'Pedido de repuesto cancelado: no quedan repuestos en espera.')
                         c.execute('UPDATE orders SET updated_at=?,revision=revision+1 WHERE id=?',(now.isoformat(timespec='microseconds'),oid))
                         audit(c,user['id'],'order_part_'+(action or 'create'),oid)
                     except order_part_requests.PartError as error:c.rollback();return self.reply(error.status,{'error':str(error),'fields':error.fields})
                     c.commit();notice=result.pop('notify',None)
                     if notice:part_notify(c,int(parts_post[2]),notice,now)
+                    status_notify(c,oid,now)
                     return self.reply(200,{'ok':True,**result})
                 evidence_post=re.fullmatch(r'/api/orders/([0-9]+)/(uploads|followups/draft|followups/files/([0-9]+))',path)
                 if evidence_post or path=='/api/followups/settings':
@@ -4333,6 +4365,22 @@ class Handler(BaseHTTPRequestHandler):
                                 result=order_evidence.change(c,oid,int(evidence_post[3]),data,user,now);audit(c,user['id'],'order_evidence_change',oid)
                     except (order_evidence.EvidenceError,order_followups.FollowupError) as error:c.commit();return self.reply(error.status,{'error':str(error),'fields':error.fields})
                     c.commit();return self.reply(200,{'ok':True,**result})
+                # 1.5.257: mensaje de seguimiento según el estado real (ADI con datos depurados o la explicación del estado). No se envía nada.
+                status_message=re.fullmatch(r'/api/orders/([0-9]+)/status-message',path)
+                if status_message:
+                    import status_messages
+                    if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
+                    if limited(c,'adi-write:'+str(user['id']),limit=60,window=3600):return self.reply(429,{'error':'Alcanzaste el límite de mensajes por hora. Intenta más tarde.'})
+                    try:result=status_messages.compose(c,int(status_message[1]),str(data.get('channel','')),str(data.get('note','') or ''),str(data.get('ai','1'))!='0')
+                    except status_messages.MessageError as error:return self.reply(error.status,{'error':str(error)})
+                    audit(c,user['id'],'status_message_composed',int(status_message[1]))
+                    return self.reply(200,result)
+                if path=='/api/status-notices/settings':
+                    import repair_status
+                    try:repair_status.set_enabled(c,bool(data.get('auto')),user)
+                    except repair_status.StatusError as error:return self.reply(error.status,{'error':str(error)})
+                    audit(c,user['id'],'status_notices_'+('enabled' if data.get('auto') else 'disabled'))
+                    return self.reply(200,{'ok':True,'auto':bool(data.get('auto'))})
                 followup_post=re.fullmatch(r'/api/orders/([0-9]+)/(followups|messages)',path)
                 if followup_post:
                     import order_followups
@@ -4341,6 +4389,7 @@ class Handler(BaseHTTPRequestHandler):
                     try:
                         if followup_post[2]=='followups':
                             c.commit();c.execute('BEGIN IMMEDIATE');fid=order_followups.create(c,oid,data,user,now);audit(c,user['id'],'order_followup',oid);c.commit()
+                            status_notify(c,oid,now)
                             return self.reply(201,{'ok':True,'id':fid})
                         action=str(data.get('action',''))
                         if action=='compose':
@@ -4591,6 +4640,7 @@ class Handler(BaseHTTPRequestHandler):
                             status=quotes.decide(c,found,{**{i:'aprobado' for i in approved},**{i:'rechazado' for i in rejected-approved}},now,user,note='Registrado por el personal: '+note[:300])
                             order_workspace.event(c,found['order_id'],user['id'],now,'follow_up','Presupuesto '+found['code']+': decisión registrada por el personal ('+quotes.STATUS[status].lower()+').')
                             audit(c,user['id'],'quote_staff_'+status,found['order_id'])
+                            status_notify(c,found['order_id'],now)
                             return self.reply(200,{'ok':True,'quote':quotes.detail(c,quotes.get(c,found['id']))})
                         if action=='notify_decision':
                             # Reenvía al cliente la confirmación de lo autorizado (con el comprobante). Solo presupuestos decididos; nunca reabre la decisión.
@@ -4628,6 +4678,7 @@ class Handler(BaseHTTPRequestHandler):
                             try:
                                 token=quotes.send(c,quotes.get(c,found['id']),email,user,now);link=public_base_url().rstrip('/')+'/presupuesto/'+token
                                 order_workspace.event(c,found['order_id'],user['id'],now,'follow_up','Presupuesto '+found['code']+' enviado al cliente para su aprobación.')
+                                __import__('repair_status').auto(c,found['order_id'],'quote_sent',now,user['id'])  # 1.5.257: espera la aprobación
                                 audit(c,user['id'],'quote_sent',found['order_id'])
                                 # El presupuesto queda enviado y su enlace creado antes de intentar el correo: si el envío falla, el enlace se puede compartir por otro medio.
                                 c.commit();result='not_configured'
@@ -4699,6 +4750,7 @@ class Handler(BaseHTTPRequestHandler):
                     if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede editar órdenes.'})
                     status,payload=order_workspace.save(c,int(workspace_route[1]),data,user,reception_now())
                     if status==200:audit(c,user['id'],'order_workspace_updated',int(workspace_route[1]))
+                    if status==200 and payload.get('status_changed'):status_notify(c,int(workspace_route[1]),reception_now())
                     return self.reply(status,payload)
                 if path == '/api/authorization-profiles':
                     # Configuración por categoría: rige para lo que se registre en adelante; no reescribe autorizaciones ya registradas.
@@ -4770,6 +4822,12 @@ class Handler(BaseHTTPRequestHandler):
                         # Revertir una entrega reabre el contador de permanencia: solo administración, y queda auditado.
                         reverted=old=='entregado' and status!='entregado'
                         if reverted and user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede revertir una entrega registrada.'})
+                        # 1.5.257: sin cambio ni comentario no se registra nada (evita duplicados); transiciones incompatibles piden motivo.
+                        import repair_status
+                        if old==status and not comment:return self.reply(200,{'ok':True,'unchanged':True})
+                        problem=repair_status.check(c,int(oid),old,status,comment)
+                        if problem:return self.reply(400,{'error':problem,'fields':{'comment':problem}})
+                        reason=comment
                         # Falla recurrente: misma orden, motivo obligatorio y técnico responsable (el indicado o el asignado). Queda registrada aparte.
                         if status==order_workspace.RECURRENT and old!=status:
                             technician=str(data.get('technician',''))
@@ -4794,8 +4852,10 @@ class Handler(BaseHTTPRequestHandler):
                             if booked:planned['appointment']=booked;order_workspace.event(c,int(oid),user['id'],now,'maintenance','Cita de mantenimiento preventivo generada automáticamente ('+booked['public_code']+').')
                         # Sin cambio real ni comentario no hay nada que auditar; con cambio, el registro nombra la transición.
                         if old!=status or comment:order_workspace.event(c,int(oid),user['id'],now,'status' if old!=status else 'follow_up',comment or order_workspace.transition_comment(old,status))
+                        if old!=status:repair_status.log(c,int(oid),old,status,user['id'],reason,'manual','',now)
                         audit(c,user['id'],'order_status_updated',int(oid))
                         if reverted:audit(c,user['id'],'delivery_reverted',int(oid))
+                        if old!=status:status_notify(c,int(oid),now)
                         # La previsión de mantenimiento creada por la entrega viaja en la respuesta para avisar al instante.
                         if planned:return self.reply(200,{'ok':True,'maintenance':planned})
                     else:
@@ -5164,6 +5224,8 @@ class Handler(BaseHTTPRequestHandler):
                     c.execute('UPDATE orders SET qr_url=? WHERE id=?',(order_url(code),oid))
                     import order_tracking
                     order_tracking.create(c,oid,user['id'],received)
+                    import repair_status  # 1.5.257: la orden nace «En espera de diagnóstico» y la auditoría lo registra
+                    repair_status.log(c,oid,'','pendiente',user['id'],'','orden_registrada','',received)
                     c.execute('UPDATE orders SET reception_snapshot=? WHERE id=?',(json.dumps(fields,ensure_ascii=False),oid))
                     if terms:
                         c.execute('UPDATE orders SET terms_document_id=?,terms_acceptance_id=?,terms_accepted_at=?,terms_mechanism=?,terms_acceptor=?,terms_actor_id=? WHERE id=?',

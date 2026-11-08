@@ -489,18 +489,19 @@ WAITING_ORDER = ('presupuesto', 'esperando_cliente')  # estados de la orden que 
 
 
 def sync_order(c, quote, status, now):
-    """Estado técnico de la orden tras la decisión. Solo si la orden esperaba esa decisión («Aprobación de presupuesto» o «Esperando respuesta
-    del cliente»): con algo aprobado pasa a «Procesando»; si se rechazó todo, queda donde estaba para que el taller decida.
-    Nunca toca «Listo», «En espera de entrega» ni «Entregado», y nunca marca el equipo como reparado."""
+    """Estado de la orden tras la decisión. Solo si la orden esperaba esa decisión («Pendiente de aprobación de presupuesto» o «Esperando
+    respuesta del cliente»). 1.5.257: con algo aprobado se HABILITA continuar (vuelve a la etapa anterior a la espera, o a «Esperando
+    repuesto» si falta uno), sin marcar que la reparación comenzó; la reparación se marca cuando realmente empieza. Si se rechazó todo,
+    queda donde estaba para que el taller decida. Nunca toca «Listo», «En espera de entrega» ni «Entregado»."""
     import order_workspace
+    import repair_status
     row = c.execute('SELECT o.status,s.label FROM orders o JOIN statuses s ON s.code=o.status WHERE o.id=?', (quote['order_id'],)).fetchone()
     if not row or row['status'] not in WAITING_ORDER:
         return False
     who = 'por el cliente' if not str(c.execute('SELECT decided_by FROM quotes WHERE id=?', (quote['id'],)).fetchone()[0]).startswith('personal') else '(decisión registrada por el personal)'
     if status in ('aprobado', 'parcial'):
-        c.execute("UPDATE orders SET status='reparacion',updated_at=?,revision=revision+1 WHERE id=?", (now.isoformat(timespec='microseconds'), quote['order_id']))
-        order_workspace.event(c, quote['order_id'], None, now, 'status', 'Presupuesto ' + quote['code'] + ' ' + ('aprobado' if status == 'aprobado' else 'aprobado parcialmente') +
-                              ' ' + who + ': el equipo pasa de «' + row['label'] + '» a «Procesando». Solo se ejecutan los servicios aprobados.')
+        repair_status.auto(c, quote['order_id'], 'quote_approved', now, None, 'Presupuesto ' + quote['code'] + ' ' + ('aprobado' if status == 'aprobado' else 'aprobado parcialmente') +
+                           ' ' + who + ': el proceso puede continuar; la reparación se marca cuando comience. Solo se ejecutan los servicios aprobados.')
         return True
     order_workspace.event(c, quote['order_id'], None, now, 'follow_up', 'Presupuesto ' + quote['code'] + ' rechazado: no se autoriza ningún servicio. Definir con el cliente la devolución del equipo.')
     return False
@@ -684,7 +685,7 @@ def authorized(c, order_id):
     return {'code': code, 'items': items} if items else None
 
 
-PROCESSING = ('reparacion', 'revision_recurrente', 'listo', 'espera_entrega', 'entregado')  # la orden ya pasó a trabajarse (o más allá)
+PROCESSING = ('reparacion', 'revision_recurrente', 'pruebas', 'listo', 'espera_entrega', 'entregado')  # la orden ya pasó a trabajarse (o más allá)
 
 
 def authorization(c, order_id, order_status=''):
@@ -707,11 +708,11 @@ def authorization(c, order_id, order_status=''):
         note = decided['detail'].split('Registrado por el personal: ', 1)[1][:300]
     sent = c.execute("SELECT MIN(created_at) FROM quote_events WHERE quote_id=? AND event='enviado'", (head['id'],)).fetchone()[0] or head['sent_at']
     opened = c.execute("SELECT MIN(verified_at) FROM quote_links WHERE quote_id=? AND verified_at!=''", (head['id'],)).fetchone()[0] or ''
-    working = c.execute("SELECT occurred_at FROM order_history WHERE order_id=? AND event='status' AND status_label='Procesando' AND occurred_at>=? ORDER BY id LIMIT 1", (order_id, head['decided_at'])).fetchone()
+    working = c.execute("SELECT occurred_at FROM order_history WHERE order_id=? AND event='status' AND status_label IN ('Procesando','Reparación en proceso') AND occurred_at>=? ORDER BY id LIMIT 1", (order_id, head['decided_at'])).fetchone()
     steps = [{'key': 'enviado', 'label': 'Enviado', 'done': bool(sent), 'at': sent or ''},
              {'key': 'revision', 'label': 'En revisión', 'done': bool(opened), 'at': opened, 'note': '' if opened else ('El cliente no abrió el enlace: la decisión la registró el personal.' if staff else '')},
              {'key': 'aprobado', 'label': 'Aprobado parcialmente' if head['status'] == 'parcial' else 'Aprobado', 'done': head['status'] in ('aprobado', 'parcial'), 'at': head['decided_at']},
-             {'key': 'procesando', 'label': 'Procesando', 'done': bool(working) or order_status in PROCESSING, 'at': working['occurred_at'] if working else ''}]
+             {'key': 'procesando', 'label': 'Reparación iniciada', 'done': bool(working) or order_status in PROCESSING, 'at': working['occurred_at'] if working else ''}]
     codes = list(dict.fromkeys(item['quote_code'] for item in items))
     history = []
     for row in [r for h in heads(c, order_id) for r in chain(c, h)]:

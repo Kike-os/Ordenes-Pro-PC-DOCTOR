@@ -201,6 +201,11 @@ def create(c, oid, data, user, now):
         c.execute('INSERT INTO order_followup_files(followup_id,order_id,name,mime,size,sha256,visible_to_client,data,created_by,created_at) VALUES (?,?,?,?,?,?,?,?,?,?)',
                   (fid, oid, f['name'], f['mime'], f['size'], f['sha256'], f['visible'], f['data'], user['id'], stamp(now)))
     c.execute('UPDATE orders SET updated_at=?,revision=revision+1 WHERE id=?', (now.isoformat(timespec='microseconds'), oid))
+    # 1.5.257: un seguimiento técnico real (diagnóstico, reparación, repuesto, pruebas, finalizado) mueve el estado si corresponde. Una
+    # corrección de un seguimiento anterior no mueve nada.
+    if not corrects:
+        import repair_status
+        repair_status.auto(c, oid, 'followup:' + kind, now, user['id'])
     return fid
 
 

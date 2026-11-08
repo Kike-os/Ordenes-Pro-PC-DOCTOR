@@ -40,7 +40,7 @@ class RepairStageTests(unittest.TestCase):
         self.assertEqual(states, ['current', 'pending', 'pending', 'pending', 'pending', 'pending'])
         self.assertTrue(d['stages'][0]['at'])
         self.assertEqual([s['icon'] for s in d['stages']], ['clipboard-check', 'scan-search', 'wrench', 'shield-check', 'package-check', 'handshake'])
-        self.status(cookie, csrf, oid, 'reparacion')  # 2. en proceso, sin seguimiento técnico: diagnóstico
+        self.status(cookie, csrf, oid, 'diagnostico')  # 2. diagnóstico en proceso (1.5.257: estado propio)
         self.assertEqual(self.view(oid)[0], ['done', 'current', 'pending', 'pending', 'pending', 'pending'])
         self.follow(oid, 'diagnostico')
         states, d = self.view(oid)
@@ -115,7 +115,7 @@ class RepairStageTests(unittest.TestCase):
     def test_public_page_panel_and_a4_share_the_same_stages_without_internal_notes(self):
         cookie, csrf, data, order = self.create()
         oid = order['id']
-        self.status(cookie, csrf, oid, 'reparacion');self.follow(oid, 'diagnostico', 'NOTA-INTERNA-SECRETA')
+        self.status(cookie, csrf, oid, 'diagnostico');self.follow(oid, 'diagnostico', 'NOTA-INTERNA-SECRETA')
         token = self.request('/api/orders/%d/tracking-card' % oid, cookie=cookie)['body']['public_url'].rsplit('/', 1)[1]
         page = self.request('/s/' + token)['body']
         screen = page.split('<section class="pa4"')[0]

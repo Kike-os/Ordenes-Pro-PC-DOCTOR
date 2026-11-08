@@ -629,13 +629,13 @@ class SecurityTests(unittest.TestCase):
         self.assertEqual(post('reparacion',comment='Se limpió el ventilador.'),200)
         self.assertEqual(post('espera_entrega'),200)
         rows=self.request('/api/activity?order=%d'%order,cookie=cookie)['body']['rows']
-        self.assertEqual([(r['event'],r['previous_label'],r['status_label']) for r in rows],[('status','Procesando','En espera de entrega'),('follow_up','Procesando','Procesando'),('status','En espera','Procesando'),('created',None,'En espera')])
-        self.assertEqual(rows[0]['comment'],'Estado cambiado de «Procesando» a «En espera de entrega».')
+        self.assertEqual([(r['event'],r['previous_label'],r['status_label']) for r in rows],[('status','Reparación en proceso','En espera de entrega'),('follow_up','Reparación en proceso','Reparación en proceso'),('status','En espera de diagnóstico','Reparación en proceso'),('created',None,'En espera de diagnóstico')])
+        self.assertEqual(rows[0]['comment'],'Estado cambiado de «Reparación en proceso» a «En espera de entrega».')
         self.assertEqual(rows[1]['comment'],'Se limpió el ventilador.')
         detail=self.request('/api/orders/%d'%order,cookie=cookie)['body']['order']
         self.assertEqual([r['id'] for r in detail['history']],[r['id'] for r in rows])
-        self.assertEqual(detail['history'][0]['previous_label'],'Procesando')
-        self.assertEqual(self.request('/api/activity?recent=1',cookie=cookie)['body']['rows'][0]['previous_label'],'Procesando')
+        self.assertEqual(detail['history'][0]['previous_label'],'Reparación en proceso')
+        self.assertEqual(self.request('/api/activity?recent=1',cookie=cookie)['body']['rows'][0]['previous_label'],'Reparación en proceso')
         self.assertEqual(self.request('/api/activity?order=x',cookie=cookie)['status'],400)
         self.assertEqual(self.request('/api/activity?order=%d'%order)['status'],401)
 
@@ -649,7 +649,7 @@ class SecurityTests(unittest.TestCase):
         self.assertEqual(found['serial'],'SN-ABC123')
         self.assertEqual(len(found['matches']),1)
         match=found['matches'][0]
-        self.assertEqual((match['brand'],match['model'],match['orders'],match['last_order']['id'],match['last_order']['status']),('Lenovo','ThinkPad T14',1,first,'En espera'))
+        self.assertEqual((match['brand'],match['model'],match['orders'],match['last_order']['id'],match['last_order']['status']),('Lenovo','ThinkPad T14',1,first,'En espera de diagnóstico'))
         self.assertEqual(self.request('/api/devices/identify?serial=SN-ABC12',cookie=cookie)['body']['matches'],[])
         for bad in ('abc','%27%20OR%201%3D1','serie%25'):self.assertEqual(self.request('/api/devices/identify?serial='+bad,cookie=cookie)['status'],400)
 

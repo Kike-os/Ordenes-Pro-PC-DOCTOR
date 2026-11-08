@@ -113,7 +113,7 @@ class AdiAdminDataTests(unittest.TestCase):
         with patch.dict(app.os.environ, KEY), patch.object(adi, '_post', side_effect=fake):
             first = self.request('/api/adi/admin', {'message': '¿Qué está atrasado?'}, cookie=cookie, csrf=csrf)['body']
         self.assertEqual(first['source'], 'ia')
-        self.assertEqual(first['answer'], 'Atrasada: %s (3 días). Estado: Procesando.' % late['code'])
+        self.assertEqual(first['answer'], 'Atrasada: %s (3 días). Estado: Reparación en proceso.' % late['code'])
         self.assertEqual(fake.outputs[0]['entregas_vencidas'], 1)
         self.assertIn('Abrir ' + late['code'], [link['label'] for link in first['links']])
         self.assertIn('administrador', fake.calls[0]['instructions']);self.assertIn('No ofrezcas un asesor humano', fake.calls[0]['instructions'])

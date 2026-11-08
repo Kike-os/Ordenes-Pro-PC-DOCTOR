@@ -39,7 +39,9 @@ ICONS = {
     'chevron-down': '<path d="m6 9 6 6 6-6"/>',
     'flag': '<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" x2="4" y1="22" y2="15"/>',
 }
-IN_PROCESS = ('reparacion', 'esperando_cliente', 'presupuesto', 'revision_recurrente', 'diagnostico')
+IN_PROCESS = ('reparacion', 'esperando_cliente', 'presupuesto', 'revision_recurrente', 'diagnostico', 'esperando_repuesto', 'pruebas')
+# 1.5.257: etapa mínima que demuestra el propio estado (los seguimientos registrados pueden adelantarla dentro del tramo «en proceso»).
+FLOOR = {'diagnostico': 1, 'presupuesto': 1, 'esperando_cliente': 1, 'revision_recurrente': 1, 'reparacion': 2, 'esperando_repuesto': 2, 'pruebas': 3}
 READY = ('listo', 'espera_entrega')
 # Seguimiento técnico registrado → etapa que demuestra (los de comunicación, pago o incidencia no mueven la etapa).
 KIND_STAGE = {'recepcion': 0, 'diagnostico': 1, 'presupuesto_enviado': 1, 'esperando_autorizacion': 1, 'presupuesto_rechazado': 1, 'presupuesto_aprobado': 2,
@@ -48,7 +50,8 @@ WORD = {'done': 'Completado', 'current': 'En curso', 'warn': 'En espera', 'pendi
 # Avisos: (tono, título, explicación, icono, etiqueta). La etiqueta es neutral: la lee también el cliente.
 ALERTS = {'presupuesto': ('ambar', 'Presupuesto pendiente de aprobación', 'La reparación continuará cuando se apruebe el presupuesto.', 'clock', 'Pendiente de aprobación'),
           'esperando_cliente': ('ambar', 'Esperando respuesta del cliente', 'Necesitamos su respuesta para continuar con el servicio.', 'message-square', 'Respuesta pendiente'),
-          'revision_recurrente': ('ambar', 'Revisión por falla recurrente', 'El equipo volvió a revisión técnica. El historial anterior se conserva completo.', 'rotate-ccw', 'En revisión')}
+          'revision_recurrente': ('ambar', 'Revisión por falla recurrente', 'El equipo volvió a revisión técnica. El historial anterior se conserva completo.', 'rotate-ccw', 'En revisión'),
+          'esperando_repuesto': ('naranja', 'Esperando repuesto', 'El servicio continuará cuando llegue el componente solicitado.', 'package', 'En espera')}
 
 
 def icon(name, cls='rp-ic'):
@@ -81,7 +84,8 @@ def _second(value):
 QUOTE_NOTICE = {'enviado': ('ambar', 'Presupuesto pendiente'), 'modificacion': ('ambar', 'Presupuesto en revisión'), 'aprobado': ('verde', 'Presupuesto aprobado'),
                 'parcial': ('violeta', 'Aprobado parcialmente'), 'rechazado': ('rojo', 'Presupuesto rechazado')}
 STATUS_NOTICE = {'esperando_cliente': ('ambar', 'message-square', 'Respuesta pendiente', 'Necesitamos su respuesta para continuar con el servicio.'),
-                 'revision_recurrente': ('ambar', 'rotate-ccw', 'Falla recurrente', 'El equipo volvió a revisión técnica; el historial anterior se conserva.')}
+                 'revision_recurrente': ('ambar', 'rotate-ccw', 'Falla recurrente', 'El equipo volvió a revisión técnica; el historial anterior se conserva.'),
+                 'esperando_repuesto': ('naranja', 'package', 'Esperando repuesto', 'El servicio continuará cuando llegue el componente solicitado.')}
 TONE_RANK = {'rojo': 0, 'naranja': 1, 'ambar': 2, 'violeta': 3, 'celeste': 4, 'azul': 5, 'verde': 6}
 
 
@@ -157,6 +161,8 @@ def notices(c, oid, status, public=False):
         top = min(items, key=lambda p: TONE_RANK.get(p['tone'], 9))
         out.append({'kind': 'part', 'code': 'repuestos', 'tone': top['tone'], 'icon': 'package', 'label': 'Repuestos (%d)' % len(items),
                     'detail': '; '.join('%s: %s' % (p['name'], p['label']) for p in items), 'target': {'type': 'parts'}, 'items': items})
+    if items:  # con repuestos a la vista, su aviso ya dice el paso real: no se repite «Esperando repuesto»
+        out = [n for n in out if not (n['kind'] == 'status' and n['code'] == 'esperando_repuesto')]
     out.sort(key=lambda n: TONE_RANK.get(n['tone'], 9))
     return out
 
@@ -169,7 +175,8 @@ def compute(c, oid, public=False):
     labels = {r[0]: r[1] for r in c.execute('SELECT code,label FROM statuses')}
     status = o['status']
     history = [dict(r) for r in c.execute("SELECT occurred_at,event,status_label FROM order_history WHERE order_id=? ORDER BY occurred_at,id", (oid,))]
-    code_of = {v: k for k, v in labels.items()}
+    import repair_status
+    code_of = {**repair_status.LEGACY, **{v: k for k, v in labels.items()}}  # también las etiquetas anteriores a 1.5.257
     # Inicio de la última revisión por falla recurrente: lo anterior queda en el historial, pero la etapa operativa se cuenta desde ahí.
     since = ''
     if status == 'revision_recurrente':
@@ -194,7 +201,7 @@ def compute(c, oid, public=False):
     elif status in READY:
         current, finished = 4, False
     elif status in IN_PROCESS:
-        current, finished = (1 if status == 'revision_recurrente' and not evidence else min(3, max(1, evidence))), False
+        current, finished = (1 if status == 'revision_recurrente' and not evidence else min(3, max(FLOOR.get(status, 1), evidence))), False
     else:  # pendiente (en espera)
         current, finished = 0, False
     dates = {0: _iso(o['received_at']) or _iso(o['created_at']), 5: _iso(o['delivered_at'])}
@@ -223,7 +230,7 @@ def compute(c, oid, public=False):
     if status in ALERTS:
         tone, title, text, ic, tag = ALERTS[status]
         alerts.append({'code': status, 'tone': tone, 'title': title, 'text': text, 'icon': ic, 'tag': tag})
-    if parts_waiting and status in IN_PROCESS:
+    if parts_waiting and status in IN_PROCESS and status != 'esperando_repuesto':
         alerts.append({'code': 'repuesto', 'tone': 'ambar', 'title': 'Esperando repuesto' if parts_waiting == 1 else 'Esperando %d repuestos' % parts_waiting,
                        'text': 'El avance del envío se muestra en «Seguimiento de repuestos».', 'icon': 'package', 'tag': 'En camino'})
     done = sum(1 for s in out if s['state'] == 'done')

@@ -21,10 +21,10 @@ from reception import DEVICE_TYPES, ECUADOR_TZ
 ADDRESS = 'Calle Bolívar #608 y García Moreno, junto al Banco Pichincha'
 CITY = 'Otavalo, Imbabura, Ecuador'
 SITE = 'ecuadorpcdoctor.com'
-STAGES = (('Recepción', ('pendiente',)), ('Diagnóstico y reparación', ('reparacion', 'esperando_cliente', 'presupuesto', 'revision_recurrente')),
+STAGES = (('Recepción', ('pendiente',)), ('Diagnóstico y reparación', ('diagnostico', 'reparacion', 'esperando_cliente', 'presupuesto', 'esperando_repuesto', 'revision_recurrente', 'pruebas')),
           ('Listo para retiro', ('listo', 'espera_entrega')), ('Entrega', ('entregado',)))
 FLAGS = {'esperando_cliente': 'Esperando su respuesta para continuar con la reparación.', 'presupuesto': 'Presupuesto pendiente de su aprobación.',
-         'revision_recurrente': 'Equipo en revisión por falla recurrente.'}
+         'revision_recurrente': 'Equipo en revisión por falla recurrente.', 'esperando_repuesto': 'Esperando la llegada de un repuesto.'}
 STEP_WORD = {'done': 'Completado', 'current': 'En curso', 'pending': 'Pendiente', 'skipped': 'No registrada'}
 HISTORY_EVENTS = {'created': 'Orden recibida', 'status': 'Cambio de estado', 'follow_up': 'Seguimiento técnico', 'maintenance': 'Mantenimiento', 'proforma': 'Proforma comercial'}
 e = html.escape

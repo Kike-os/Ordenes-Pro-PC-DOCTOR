@@ -10,9 +10,10 @@ from reception import DEVICE_TYPES, reception_now
 
 PAGE = 8
 # Etapas del flujo real y estados configurados que pertenecen a cada una.
-STAGES = (('Recibido', ('pendiente',)), ('En proceso', ('reparacion', 'esperando_cliente', 'presupuesto', 'revision_recurrente')), ('Listo', ('listo', 'espera_entrega')), ('Entregado', ('entregado',)))
-# Contadores superiores, calculados con los estados configurados (no existe un estado «diagnóstico» propio).
-COUNTERS = (('pending', 'En espera', ('pendiente',)), ('process', 'En proceso', ('reparacion', 'revision_recurrente')), ('waiting', 'Esperando respuesta', ('esperando_cliente', 'presupuesto')),
+STAGES = (('Recibido', ('pendiente',)), ('En proceso', ('diagnostico', 'reparacion', 'esperando_cliente', 'presupuesto', 'esperando_repuesto', 'revision_recurrente', 'pruebas')), ('Listo', ('listo', 'espera_entrega')), ('Entregado', ('entregado',)))
+# Contadores superiores, calculados con los estados configurados (1.5.257: diagnóstico, pruebas y espera de repuesto incluidos).
+COUNTERS = (('pending', 'En espera', ('pendiente',)), ('process', 'En proceso', ('diagnostico', 'reparacion', 'revision_recurrente', 'pruebas')),
+            ('waiting', 'En espera de cliente o repuesto', ('esperando_cliente', 'presupuesto', 'esperando_repuesto')),
             ('ready', 'Listas para entregar', ('listo', 'espera_entrega')), ('done', 'Entregadas', ('entregado',)))
 
 
@@ -26,7 +27,7 @@ OWED = '(' + equipment.BUDGET + '-' + equipment.PAID + ')>0'
 # mismo criterio del Centro de Seguimiento Técnico, lo que espera aprobación o respuesta, lo que está en proceso y lo listo
 # para entregar; luego lo recién recibido y, al final, lo entregado. Dentro de cada grupo, el movimiento más reciente primero.
 PRIORITY_ORDER = (" ORDER BY CASE o.priority WHEN 'urgente' THEN 0 WHEN 'alta' THEN 1 ELSE 2 END,"
-                  " CASE o.status WHEN 'presupuesto' THEN 0 WHEN 'esperando_cliente' THEN 0 WHEN 'reparacion' THEN 1 WHEN 'revision_recurrente' THEN 1"
+                  " CASE o.status WHEN 'presupuesto' THEN 0 WHEN 'esperando_cliente' THEN 0 WHEN 'esperando_repuesto' THEN 1 WHEN 'reparacion' THEN 1 WHEN 'revision_recurrente' THEN 1 WHEN 'diagnostico' THEN 1 WHEN 'pruebas' THEN 1"
                   " WHEN 'listo' THEN 2 WHEN 'espera_entrega' THEN 2 WHEN 'pendiente' THEN 3 ELSE 4 END, COALESCE(h.id,0) DESC, o.id DESC")
 
 

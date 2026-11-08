@@ -14,7 +14,7 @@ from corporate import settings
 from reception import DEVICE_TYPES,ECUADOR_TZ,public_base_url
 
 TOKEN=re.compile(r'[A-Za-z0-9_-]{22}')
-PHASES=(('Recibido',('pendiente',)),('En proceso',('reparacion','esperando_cliente','presupuesto','revision_recurrente')),('Listo',('listo','espera_entrega')),('Entregado',('entregado',)))
+PHASES=(('Recibido',('pendiente',)),('En proceso',('diagnostico','reparacion','esperando_cliente','presupuesto','esperando_repuesto','revision_recurrente','pruebas')),('Listo',('listo','espera_entrega')),('Entregado',('entregado',)))
 
 
 def url(token):
@@ -73,7 +73,7 @@ def lookup(c,token):
         parts=[]  # base anterior al seguimiento de repuestos
     return {'id':row['id'],'code':row['code'] or 'OP-%05d'%row['id'],'status':row['status'],'status_label':row['status_label'],'received':received,'updated':stamp(row['updated_at']),
             'device':' · '.join(filter(None,[DEVICE_TYPES.get(kind,''),' '.join(filter(None,[row['brand'],row['model']]))])),'updates':updates,'files':files,'parts':parts,
-            'repair':__import__('repair_stages').compute(c,row['id'],public=True),'signature':__import__('repair_stages').signature(c,row['id']),
+            'state':__import__('repair_status').public(c,row['id']),            'repair':__import__('repair_stages').compute(c,row['id'],public=True),'signature':__import__('repair_stages').signature(c,row['id']),
             'kind':DEVICE_TYPES.get(kind,''),'brand':row['brand'] or '','model':row['model'] or '',**dict(zip(('budget_code','budget'),__import__('tracking_print').budget(c,row['id'])))}
 
 
@@ -89,7 +89,7 @@ def public_page(data,token='',notice='',tone='ok'):
 
 # Tarjeta Digital de Seguimiento Técnico: ticket de dos secciones (datos de la orden arriba; QR y código de barras abajo).
 # Las etapas salen del estado real de la orden; una etapa futura nunca se marca como completada.
-STAGES=(('Recepción',('pendiente',)),('Diagnóstico y reparación',('reparacion','esperando_cliente','presupuesto','revision_recurrente')),('Listo para retiro',('listo','espera_entrega')),('Entrega',('entregado',)))
+STAGES=(('Recepción',('pendiente',)),('Diagnóstico y reparación',('diagnostico','reparacion','esperando_cliente','presupuesto','esperando_repuesto','revision_recurrente','pruebas')),('Listo para retiro',('listo','espera_entrega')),('Entrega',('entregado',)))
 A4_CSS='<link rel="stylesheet" href="/static/seguimiento-a4.css">'
 CARD_HEAD='<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><meta name="robots" content="noindex,nofollow">%s<title>Seguimiento de Reparación %s | PC-DOCTOR S.A.</title><link rel="icon" href="/favicon.ico?v=2" sizes="48x48"><link rel="stylesheet" href="/static/ticket.css">%s<script defer src="/static/ticket.js"></script></head><body class="ticket-page"><main>'
 
@@ -131,7 +131,7 @@ def card(data,qr_src,public):
 # Misma identidad de la tarjeta (degradado azul, logo original, corte de ticket), más ancha en escritorio y en una columna en el teléfono.
 # La barra de avance tiene un segmento por etapa: solo las completadas llevan su color (azul → turquesa → verde claro → verde intenso); las
 # pendientes quedan neutras. Los estados de espera se muestran como aviso, sin adelantar el avance. Todo sale de datos reales registrados.
-FLAGS={'esperando_cliente':'Esperando su respuesta para continuar','presupuesto':'Presupuesto pendiente de su aprobación','revision_recurrente':'En revisión por falla recurrente'}
+FLAGS={'esperando_cliente':'Esperando su respuesta para continuar','presupuesto':'Presupuesto pendiente de su aprobación','revision_recurrente':'Revisión por falla recurrente','esperando_repuesto':'Esperando repuesto'}
 ICONS={'Estado actual':'M22 12h-4l-3 9L9 3l-3 9H2','Equipo':'M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v9H4zM2 19h20','Fecha de ingreso':'M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z',
        'Última actualización':'M12 6v6l4 2M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0z'}
 
@@ -279,11 +279,12 @@ def public_card(data,qr_src):
     else:
         progress_html='<h2 class="sr-only">Avance de la reparación</h2><ol class="ticket-steps tw-steps">%s</ol>%s'%(steps,''.join('<p class="tw-flag" role="status">%s</p>'%e(f) for f in flags))
     rows=''.join('<div>%s<span><dt>%s</dt><dd>%s</dd></span></div>'%(_icon(ICONS[k]),e(k),e(v)) for k,v in facts)
+    state_html,history_html=state_section(data.get('state'))
     updates=''
     if data.get('updates'):
         updates='<section class="tw-sec ticket-updates" aria-label="Novedades del servicio"><h2>Novedades del servicio</h2><ol>'+''.join(
             '<li><time>%s</time><strong>%s</strong><p>%s</p></li>'%(e(u['at']),e(u['label']),e(u['message']).replace('\n','<br>')) for u in data['updates'])+'</ol></section>'
-    main=updates+_evidence_section(data);side=_parts_section(data)
+    main=updates+_evidence_section(data)+history_html;side=_parts_section(data)
     if not main and not side:main='<section class="tw-sec"><h2>Novedades del servicio</h2><p class="tw-empty">Aún no hay novedades publicadas. Le informaremos cada avance.</p></section>'
     code=data['code']
     try:bars=barcode128.svg(code,color='#0b1526',background='#ffffff')
@@ -294,7 +295,7 @@ def public_card(data,qr_src):
             '<header class="tw-head"><span class="tw-logo"><img class="ticket-logo" src="/static/logo-original.png" alt="PC-DOCTOR S.A." width="2826" height="2049"></span><div class="tw-title"><small>%s</small><h1>Seguimiento de Reparación</h1></div>'
             '<div class="tw-order"><small>Orden de servicio</small><strong>%s</strong><span class="tw-chips"><span class="ticket-state" data-status="%s">%s</span>%s</span>'
             '<button type="button" class="tw-print" data-print>%sImprimir seguimiento A4</button></div></header>'
-            '<div class="tw-progress" data-sig="%s">%s</div><dl class="ticket-facts tw-facts">%s</dl></section>'
+            '%s<div class="tw-progress" data-sig="%s">%s</div><dl class="ticket-facts tw-facts">%s</dl></section>'
             '<div class="tw-body%s">%s%s</div><div class="ticket-cut" aria-hidden="true"></div>'
             '<section class="ticket-bottom tw-codes" aria-label="Código de seguimiento">%s<div class="ticket-barcode">%s<span>%s</span></div>'
             '<div class="tw-verify"><h2>Código de seguimiento</h2><p>Escanea el QR para consultar este seguimiento. El código de barras identifica la orden en el taller.</p></div>'
@@ -302,8 +303,27 @@ def public_card(data,qr_src):
             '<div class="tw-actions"><button type="button" data-refresh>Actualizar seguimiento</button><button type="button" data-print>%sImprimir seguimiento A4</button><small>Consultado el %s</small></div>'
             '<p class="ticket-note">Esta página muestra solo el estado de la reparación. No contiene datos personales.</p>'
             )%(e(data['status']),e(company['name']),e(code),e(data['status']),e(data['status_label']),
-               '<span class="tw-budget" data-budget="%s"><small>Presupuesto:</small> %s</span>'%(e(data.get('budget_code','')),e(data['budget'])) if data.get('budget') else '',PRINTER,e(data.get('signature','')),progress_html,rows,' tw-two' if main and side else '','<div class="tw-col">%s</div>'%main if main else '',
+               '<span class="tw-budget" data-budget="%s"><small>Presupuesto:</small> %s</span>'%(e(data.get('budget_code','')),e(data['budget'])) if data.get('budget') else '',PRINTER,state_html,e(data.get('signature','')),progress_html,rows,' tw-two' if main and side else '','<div class="tw-col">%s</div>'%main if main else '',
                '<div class="tw-col">%s</div>'%side if side else '',qr,bars,e(code),e(company['name']),e(company['specialty']),e(company['whatsapp']),PRINTER,now)
+
+
+def state_section(state):
+    """1.5.257: «Estado actual» para el cliente (explicación clara, acción pendiente, última actualización y fecha estimada solo si está
+    confirmada) e historial de los cambios de estado. Sin notas, motivos, proveedores ni costos: solo etiquetas y fechas."""
+    if not state:return '',''
+    import repair_stages
+    e=html.escape
+    meta=['<div><dt>Última actualización</dt><dd>%s</dd></div>'%e(_when(state['updated']) or 'Sin movimientos')]
+    if state['estimated']:
+        meta.append('<div><dt>Fecha estimada de entrega</dt><dd>%s</dd></div>'%e(datetime.fromisoformat(state['estimated']).strftime('%d/%m/%Y')))
+    action='<p class="tw-state-action" role="note">%s<span>%s</span></p>'%(repair_stages.icon('bell','tw-state-aic'),e(state['action'])) if state['action'] else ''
+    card=('<section class="tw-state" data-tone="%s" data-kind="%s" aria-labelledby="tw-state-title"><span class="tw-state-ic">%s</span><div class="tw-state-txt">'
+          '<p class="tw-state-kicker">%s</p><h2 id="tw-state-title">Estado actual: <b>%s</b></h2><p>%s</p>%s<dl class="tw-state-meta">%s</dl></div></section>')%(
+          e(state['tone']),e(state['kind']),repair_stages.icon(state['icon']),e(state['kind_label']),e(state['label']),e(state['text']),action,''.join(meta))
+    items=''.join('<li data-tone="%s"><span class="tw-hist-ic">%s</span><span><b>%s</b><time>%s</time></span></li>'%(
+        e(h['tone']),repair_stages.icon(h['icon']),e(h['label']),e(_when(h['at']))) for h in reversed(state['history']))
+    history='<section class="tw-sec tw-hist" aria-label="Historial del estado"><h2>Historial del estado</h2><ol>%s</ol></section>'%items if items else ''
+    return card,history
 
 
 def card_page(data,qr_src,public):

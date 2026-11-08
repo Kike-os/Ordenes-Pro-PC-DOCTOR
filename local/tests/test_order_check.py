@@ -31,7 +31,7 @@ class OrderCheckTests(unittest.TestCase):
         self.assertEqual(verify(ghost['body']['token'],secret)['status'],400)
         self.assertEqual(verify(real['body']['token'],'000000' if secret!='000000' else '111111')['status'],400)
         found=verify(real['body']['token'],secret)
-        self.assertEqual((found['status'],found['body']['order']['code'],found['body']['order']['status']),(200,code,'En espera'))
+        self.assertEqual((found['status'],found['body']['order']['code'],found['body']['order']['status']),(200,code,'En espera de diagnóstico'))
         # Sin datos personales en la respuesta, y el código es de un solo uso.
         self.assertFalse({'client','name','email','phone','identification','id'}&set(found['body']['order']));self.assertNotIn('Cliente ficticio',str(found['body']))
         self.assertEqual(verify(real['body']['token'],secret)['status'],400)

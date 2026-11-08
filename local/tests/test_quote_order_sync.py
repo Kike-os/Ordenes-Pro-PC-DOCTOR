@@ -104,9 +104,10 @@ class QuoteOrderSyncTests(unittest.TestCase):
         self.assertEqual(self.request('/api/orders/%d/quote'%order['id'],cookie=cookie)['body']['versions'][0]['status_label'],'Esperando aprobación')
         self.decide(path,passkey,items,['aprobado']*3);self.decide(path,passkey,items,['aprobado']*3)  # enlace repetido
         view=self.order(order['id'],cookie)
-        self.assertEqual((view['status'],view['status_label']),('reparacion','Procesando'))
-        moves=[h for h in self.history(order['id']) if h[0]=='status']
-        self.assertEqual(len(moves),1);self.assertIn('aprobado por el cliente',moves[0][1]);self.assertIn('«Esperando respuesta del cliente» a «Procesando»',moves[0][1])
+        # 1.5.257: aprobar habilita continuar (vuelve a la etapa técnica), pero no marca que la reparación comenzó.
+        self.assertEqual((view['status'],view['status_label']),('diagnostico','Diagnóstico en proceso'))
+        moves=[h for h in self.history(order['id']) if h[0]=='status' and 'aprobado' in h[1]]  # 1.5.257: el envío también deja su cambio de estado
+        self.assertEqual(len(moves),1);self.assertIn('aprobado por el cliente',moves[0][1]);self.assertIn('«Esperando respuesta del cliente» a «Diagnóstico en proceso»',moves[0][1]);self.assertIn('la reparación se marca cuando comience',moves[0][1])
         # Persistencia: una conexión nueva (como tras reiniciar el servidor) lee lo mismo de la base de datos.
         with app.connect() as c:
             self.assertEqual(len(quotes.authorized(c,order['id'])['items']),3)
@@ -153,8 +154,8 @@ class QuoteOrderSyncTests(unittest.TestCase):
         self.assertTrue(steps['enviado']['done'] and steps['enviado']['at'])
         self.assertEqual((steps['revision']['done'],steps['revision']['at']),(False,''))  # sin apertura registrada: no se inventa
         self.assertIn('personal',steps['revision']['note'])
-        self.assertEqual(steps['aprobado']['at'],info['decided_at']);self.assertTrue(steps['procesando']['done'] and steps['procesando']['at'])
-        self.assertEqual(view['status_label'],'Procesando')
+        self.assertEqual(steps['aprobado']['at'],info['decided_at']);self.assertEqual((steps['procesando']['label'],steps['procesando']['done']),('Reparación iniciada',False))  # 1.5.257: aprobar no inicia la reparación
+        self.assertEqual(view['status_label'],'Diagnóstico en proceso')
         self.assertTrue(any(e['event']=='aprobado' and 'Registrado por el personal' in e['detail'] for e in info['history']))
         products=[i for i in view['authorized_items'] if i['category']!='servicio']
         self.assertTrue(all('reference' in i and 'base_cents' in i and 'tax_cents' in i for i in view['authorized_items']));self.assertTrue(products)
