@@ -4,6 +4,20 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.259 — 2026-11-07 22:36 (UTC-05:00)
+
+Avisos al cliente verdaderos y sin repetir, y correcciones de seguridad y diseño en Mail Pro (sin migración)
+
+### Mejoras realizadas
+
+- Al cambiar a mano a un estado que avisa al cliente, el panel pregunta «Cambiar y avisar», «Cambiar sin avisar» o «Cancelar» (también en Gestión técnica). Cada omisión queda en la auditoría con su motivo.
+- Mail Pro: no se adjuntan ni envían archivos ejecutables o de guion; los recibidos se marcan «Riesgo» y piden confirmación antes de descargarse. Los nombres largos de adjuntos conservan su extensión.
+
+### Errores corregidos
+
+- Avisos automáticos de estado: no se envía «presupuesto pendiente» si no hay un presupuesto realmente pendiente o el cliente lo recibió hace menos de 72 h, ni «esperando repuesto» sin pedido activo; como máximo un aviso cada 10 minutos por orden.
+- Mail Pro: en el teléfono los campos CC y CCO ocupan todo el ancho y desaparece el botón vacío junto a «Orden» del redactor.
+
 ## v1.5.258 — 2026-11-07 21:41 (UTC-05:00)
 
 Fechas sin doble punto al final de las frases (sin migración)
