@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.258 — 2026-11-07 21:41 (UTC-05:00)
+
+Fechas sin doble punto al final de las frases (sin migración)
+
+### Errores corregidos
+
+- Las fechas al final de una frase ya no muestran doble punto («09:21 p. m..»): Centro de Entrega (consulta IMAP), importación de clientes, borrador de seguimiento, verificación del enlace del presupuesto y vencimiento de autorizaciones.
+
 ## v1.5.257 — 2026-11-07 20:32 (UTC-05:00)
 
 Estados de reparación detallados: once estados, cambios automáticos por eventos reales, auditoría, avisos y vista pública clara (con migración 096)

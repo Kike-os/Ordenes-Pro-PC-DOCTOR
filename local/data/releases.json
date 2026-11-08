@@ -8,6 +8,24 @@
   },
   "releases": [
     {
+      "version": "1.5.258",
+      "date": "2026-11-07T21:41:13-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Fechas sin doble punto al final de las frases (sin migración)",
+      "changes": {
+        "features": [],
+        "improvements": [],
+        "fixes": [
+          "Las fechas al final de una frase ya no muestran doble punto («09:21 p. m..»): Centro de Entrega (consulta IMAP), importación de clientes, borrador de seguimiento, verificación del enlace del presupuesto y vencimiento de autorizaciones."
+        ],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Kike-os: «si» (publicar la corrección del doble punto)"
+    },
+    {
       "version": "1.5.257",
       "date": "2026-11-07T20:32:42-05:00",
       "type": "patch",
