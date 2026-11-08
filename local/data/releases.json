@@ -8,6 +8,27 @@
   },
   "releases": [
     {
+      "version": "1.5.260",
+      "date": "2026-11-07T23:06:47-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Mail Pro: sin responder, conversaciones, etiquetas, asunto propuesto y resumen con ADI (con migración 097)",
+      "changes": {
+        "features": [
+          "Mail Pro: «Sin responder» con contador y días de espera, que reúne los correos de clientes de los últimos 30 días todavía sin respuesta (sin automáticos ni propios). Responder o «Marcar como respondido» los quita de la lista.",
+          "Mail Pro: vista por conversaciones, que agrupa respuestas y reenvíos de un mismo asunto, con la lista de mensajes en el lector y acceso a cada uno.",
+          "Mail Pro: etiquetas internas (Urgente, Cliente, Proveedor, Facturación y las que cree administración), que se ponen desde el lector y filtran la bandeja.",
+          "ADI en Mail Pro: propone el asunto a partir del mensaje y resume una conversación (Resumen, Puntos clave, Pendiente) ocultando antes los datos personales. Todo editable; nada se envía ni se guarda."
+        ],
+        "improvements": [],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Kike-os: «si te autorizo» · «publica cuando termine»"
+    },
+    {
       "version": "1.5.259",
       "date": "2026-11-07T22:36:20-05:00",
       "type": "patch",

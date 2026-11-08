@@ -4,6 +4,17 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.260 — 2026-11-07 23:06 (UTC-05:00)
+
+Mail Pro: sin responder, conversaciones, etiquetas, asunto propuesto y resumen con ADI (con migración 097)
+
+### Nuevas funcionalidades
+
+- Mail Pro: «Sin responder» con contador y días de espera, que reúne los correos de clientes de los últimos 30 días todavía sin respuesta (sin automáticos ni propios). Responder o «Marcar como respondido» los quita de la lista.
+- Mail Pro: vista por conversaciones, que agrupa respuestas y reenvíos de un mismo asunto, con la lista de mensajes en el lector y acceso a cada uno.
+- Mail Pro: etiquetas internas (Urgente, Cliente, Proveedor, Facturación y las que cree administración), que se ponen desde el lector y filtran la bandeja.
+- ADI en Mail Pro: propone el asunto a partir del mensaje y resume una conversación (Resumen, Puntos clave, Pendiente) ocultando antes los datos personales. Todo editable; nada se envía ni se guarda.
+
 ## v1.5.259 — 2026-11-07 22:36 (UTC-05:00)
 
 Avisos al cliente verdaderos y sin repetir, y correcciones de seguridad y diseño en Mail Pro (sin migración)
