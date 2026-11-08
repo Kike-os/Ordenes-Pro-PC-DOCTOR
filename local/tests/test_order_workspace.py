@@ -28,18 +28,18 @@ class WorkspaceTests(unittest.TestCase):
         with patch.object(app,'reception_now',return_value=datetime.fromisoformat('2026-10-09T23:59:59-05:00')):oid=self.create(cookie,csrf)
         options=self.request('/api/order-options',cookie=cookie)['body']
         self.assertEqual(options['statuses'],order_workspace.STATUSES)
-        self.assertEqual(len(options['statuses']),8)
+        self.assertEqual(len(options['statuses']),11)  # 1.5.257: + diagnóstico, esperando repuesto y pruebas
         for state,label in options['statuses'].items():
             r=self.request('/api/order-status',{'id':str(oid),'status':state,'comment':'Prueba de '+label},cookie=cookie,csrf=csrf)
             self.assertEqual(r['status'],200,r)
         order=self.request('/api/orders/'+str(oid),cookie=cookie)['body']['order']
-        self.assertEqual(len(order['history']),10)  # incluye la cita de mantenimiento generada al entregar y la revisión recurrente
+        self.assertEqual(len(order['history']),13)  # incluye la cita de mantenimiento generada al entregar, la revisión recurrente y los 3 estados de la 1.5.257
         self.assertEqual(order['history'][0]['actor_id'],self.uid)
         for query,total in [('status=entregado',1),('active=1',0),('from=2026-10-09&to=2026-10-09',1),('from=2026-10-10',0),('client=NO-EXISTE',0),('equipment=NO-EXISTE',0)]:
             self.assertEqual(self.request('/api/orders?'+query,cookie=cookie)['body']['total'],total)
         self.assertEqual(self.request('/api/orders?from=bad',cookie=cookie)['status'],400)
         self.assertEqual(self.request('/api/orders?from=2026-10-10&to=2026-10-09',cookie=cookie)['status'],400)
-        self.assertEqual(self.request('/api/orders?status=diagnostico',cookie=cookie)['status'],400)
+        self.assertEqual(self.request('/api/orders?status=inventado',cookie=cookie)['status'],400)  # 1.5.257: «diagnostico» ya es un estado válido
         with app.connect() as c:
             with self.assertRaises(sqlite3.IntegrityError):c.execute("UPDATE order_history SET comment='editado'")
 
@@ -90,7 +90,7 @@ class WorkspaceTests(unittest.TestCase):
                     row=c.execute('SELECT code,qr_url,status FROM orders').fetchone()
                     self.assertEqual(tuple(row),('LEGACY-1','https://example.invalid/original','reparacion'))
                     self.assertEqual(c.execute('SELECT status_label FROM order_history').fetchone()[0],'En diagnóstico')
-                    self.assertEqual(c.execute('SELECT count(*) FROM statuses').fetchone()[0],8)  # 7 originales + «En revisión por falla recurrente»
+                    self.assertEqual(c.execute('SELECT count(*) FROM statuses').fetchone()[0],11)  # 7 originales + «Revisión por falla recurrente» + 3 de la 1.5.257
                     self.assertEqual(c.execute('PRAGMA foreign_key_check').fetchall(),[])
 
     def test_order_search_includes_customer_contacts_equipment_and_valid_page(self):

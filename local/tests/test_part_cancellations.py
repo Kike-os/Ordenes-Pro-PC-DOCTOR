@@ -290,7 +290,12 @@ class PartCancellationTests(unittest.TestCase):
         self.assertEqual(post('/api/orders/%d/part-requests/%d' % (oid, rid), action='advance', stage='listo')['status'], 409)
         with app.connect() as c:
             rows = c.execute("SELECT event,comment,actor_id FROM order_history WHERE order_id=? ORDER BY id", (oid,)).fetchall()[base_count:]
-            self.assertEqual(c.execute('SELECT status FROM orders WHERE id=?', (oid,)).fetchone()[0], status)
+            final = c.execute('SELECT status FROM orders WHERE id=?', (oid,)).fetchone()[0]
+        # 1.5.257: pedir el repuesto deja la orden «Esperando repuesto»; recibirlo la devuelve a su etapa e instalarlo marca la reparación.
+        self.assertEqual((status, final), ('esperando_repuesto', 'reparacion'))
+        moves = [r['comment'] for r in rows if r['event'] == 'status']
+        self.assertEqual(len(moves), 2, moves);self.assertIn('«Esperando repuesto»', moves[0]);self.assertIn('«Reparación en proceso»', moves[1])
+        rows = [r for r in rows if r['event'] == 'follow_up']
         texts = [r['comment'] for r in rows]
         self.assertEqual(len(texts), 4, texts)
         self.assertTrue(texts[0].startswith('Repuesto «Teclado ficticio» recibido en el taller.') and 'Fecha de recepción:' in texts[0])
@@ -301,7 +306,7 @@ class PartCancellationTests(unittest.TestCase):
         self.assertEqual(post('/api/orders/%d/part-requests/%d' % (oid, other), action='cancel_direct', reason_code='sin_disponibilidad',
                               note='El proveedor no tiene existencias (ficticio).', confirm_supplier='1')['status'], 200)
         with app.connect() as c:
-            last = c.execute("SELECT comment FROM order_history WHERE order_id=? ORDER BY id DESC LIMIT 1", (oid,)).fetchone()[0]
+            last = c.execute("SELECT comment FROM order_history WHERE order_id=? AND event='follow_up' ORDER BY id DESC LIMIT 1", (oid,)).fetchone()[0]
         self.assertIn('Pedido del repuesto «Cámara ficticia» cancelado por administración', last)
         self.assertEqual(post('/api/orders/%d/part-requests/%d' % (oid, other), action='advance', stage='preparacion')['status'], 409)  # cancelado: ya no cambia
 

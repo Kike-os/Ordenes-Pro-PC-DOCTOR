@@ -90,8 +90,9 @@ class QuoteFlowTests(unittest.TestCase):
         self.assertEqual((detail['status'],detail['decided_by'],detail['totals']['quoted'],detail['totals']['approved'],detail['totals']['rejected']),('parcial','cliente',7000,4500,2500))
         self.assertEqual([item['status'] for item in detail['items']],['aprobado','rechazado','aprobado']);self.assertEqual((detail['acceptance']['signer_name'],detail['acceptance']['signed']),('Cliente Ficticio',True))
         order_now=self.request('/api/orders/%d'%order['id'],cookie=cookie)['body'];order_now=order_now.get('order',order_now)
-        # Lo aprobado pasa al total a cobrar de la orden; el estado de la orden no cambia por la aprobación.
-        self.assertEqual((order_now['status'],order_now['budget']['total_cents'],order_now['money']['balance_cents']),('pendiente',4500,4500))
+        # Lo aprobado pasa al total a cobrar de la orden. 1.5.257: el envío dejó la orden pendiente de aprobación y la aprobación habilita
+        # continuar («Diagnóstico en proceso»), sin marcar la reparación como iniciada.
+        self.assertEqual((order_now['status'],order_now['budget']['total_cents'],order_now['money']['balance_cents']),('diagnostico',4500,4500))
         with app.connect() as c:
             self.assertTrue(quotes.evidence_ok(c,quote))
             evidence=json.loads(c.execute('SELECT evidence FROM quote_acceptances').fetchone()[0]);self.assertEqual((evidence['signer'],evidence['totals']['approved'],[i['decision'] for i in evidence['items']]),('Cliente Ficticio',4500,['aprobado','rechazado','aprobado']))
@@ -131,7 +132,7 @@ class QuoteFlowTests(unittest.TestCase):
         three=post('/api/quotes/%d'%two,action='version')['body']['id'];post('/api/quotes/%d'%three,action='save',items=[line]);post('/api/quotes/%d'%three,action='send')
         only=self.request('/api/quotes/%d'%three,cookie=cookie)['body']['quote']['items'][0]['id']
         blocked=post('/api/quotes/%d'%three,action='decide',approved=str(only),note='Aprobó en el local');self.assertEqual(blocked['status'],409);self.assertIn('pagos registrados',blocked['body']['error'])
-        with app.connect() as c:self.assertEqual(c.execute("SELECT COUNT(*) FROM order_history WHERE order_id=? AND comment LIKE 'Presupuesto%'",(order['id'],)).fetchone()[0],5)
+        with app.connect() as c:self.assertEqual(c.execute("SELECT COUNT(*) FROM order_history WHERE order_id=? AND comment LIKE 'Presupuesto%' AND event!='status'",(order['id'],)).fetchone()[0],5)  # 1.5.257: sin contar los cambios de estado
 
 
 if __name__=='__main__':unittest.main()

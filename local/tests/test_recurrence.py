@@ -45,7 +45,7 @@ class RecurrenceTests(unittest.TestCase):
             with self.assertRaises(Exception):
                 c.execute('DELETE FROM order_recurrences')
         row = next(r for r in self.request('/api/tracking', cookie=self.cookie)['body']['rows'] if r['id'] == oid)
-        self.assertEqual((row['recurrences'], row['status'], [s['state'] for s in row['stages']][1]), (2, 'En revisión por falla recurrente', 'current'))
+        self.assertEqual((row['recurrences'], row['status'], [s['state'] for s in row['stages']][1]), (2, 'Revisión por falla recurrente', 'current'))
         # Continúa con los estados normales hasta la entrega.
         for value in ('reparacion', 'listo', 'entregado'):
             self.assertEqual(self.status(oid, value)['status'], 200)

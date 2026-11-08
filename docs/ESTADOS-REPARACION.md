@@ -27,7 +27,7 @@ Fuente única: `local/repair_status.py`. La usan el panel, el seguimiento públi
 | Orden registrada | — | En espera de diagnóstico |
 | Seguimiento «Diagnóstico técnico» | En espera de diagnóstico | Diagnóstico en proceso |
 | Presupuesto enviado al cliente | Etapas técnicas, espera de repuesto o de respuesta | Pendiente de aprobación |
-| Presupuesto aprobado (total o parcial) | Pendiente de aprobación o esperando respuesta | La etapa anterior a la espera, o «Esperando repuesto» si falta un repuesto. **No marca la reparación como iniciada.** |
+| Presupuesto aprobado (total o parcial) | Pendiente de aprobación o esperando respuesta | La etapa anterior a la espera («Diagnóstico en proceso» si estaba en espera de diagnóstico), o «Esperando repuesto» si falta un repuesto. **No marca la reparación como iniciada.** |
 | Repuesto solicitado | En espera, diagnóstico, reparación o revisión | Esperando repuesto |
 | Repuesto recibido o cancelado (sin otros en camino) | Esperando repuesto | La etapa anterior a la espera. Además se avisa al técnico responsable. |
 | Instalación del repuesto o seguimiento «Reparación» | En espera, diagnóstico o esperando repuesto | Reparación en proceso |
