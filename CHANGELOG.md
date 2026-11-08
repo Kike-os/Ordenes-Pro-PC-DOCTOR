@@ -4,6 +4,21 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.257 — 2026-11-07 20:32 (UTC-05:00)
+
+Estados de reparación detallados: once estados, cambios automáticos por eventos reales, auditoría, avisos y vista pública clara (con migración 096)
+
+### Nuevas funcionalidades
+
+- Seguimiento de reparaciones con 11 estados: se suman Diagnóstico en proceso, Esperando repuesto y Pruebas técnicas y control de calidad; cada estado tiene icono, color y tipo (etapa, espera, incidencia o cierre). Las órdenes y el historial anteriores se conservan.
+- Cambios de estado automáticos solo por eventos reales: diagnóstico, envío y aprobación del presupuesto (sin marcar la reparación como iniciada), pedido, recepción e instalación de repuestos, y fin de trabajos con paso a pruebas. Al recibir un repuesto se avisa al técnico.
+
+### Mejoras realizadas
+
+- Selector de estados con buscador, grupos, teclado y Escape, que no tapa ni estira la ventana. Tarjeta de estado con responsable, prioridad, fecha confirmada, última actualización, línea de tiempo y auditoría de cada cambio con sus avisos.
+- El seguimiento público muestra el estado actual con una explicación clara, la última actualización, la fecha estimada solo si está confirmada y el historial, sin datos internos. ADI redacta mensajes para WhatsApp o correo, editables y sin envío automático.
+- Avisos al cliente solo en cambios relevantes (presupuesto, respuesta, repuesto, revisión recurrente y listo), uno por canal y sin repetir en 72 h, con su resultado real en la auditoría. Administración puede desactivarlos.
+
 ## v1.5.256 — 2026-11-07 18:26 (UTC-05:00)
 
 ADI como asistente técnica: informes por tipo con contexto depurado, revisión de calidad y alertas de atención (sin migración)
