@@ -64,6 +64,16 @@ Fuente única: `local/repair_status.py`. La usan el panel, el seguimiento públi
   - los avisos fallidos se reintentan en la tarea diaria, hasta 3 intentos.
 - **Desactivar:** administración puede apagar los avisos automáticos desde la auditoría de la orden.
 
+### Reglas añadidas en la 1.5.259
+
+Se añadieron después de comprobar en producción correos duplicados o erróneos:
+
+- **«Presupuesto pendiente»:** solo se avisa si hay un presupuesto realmente enviado y pendiente de aprobación, y si el cliente no lo recibió con su enlace en las últimas 72 horas.
+- **«Esperando repuesto»:** solo se avisa si hay un pedido de repuesto activo.
+- **Cambios seguidos:** como máximo un aviso cada 10 minutos por orden, así corregir un estado no envía dos correos.
+- **Confirmación del personal:** en un cambio manual hacia un estado que avisa, el panel pregunta «Cambiar y avisar», «Cambiar sin avisar» o «Cancelar». En «Gestión técnica» hay una casilla equivalente.
+- **Registro:** cada omisión queda en la auditoría con su motivo.
+
 ## Vista para el cliente
 
 El seguimiento público muestra:

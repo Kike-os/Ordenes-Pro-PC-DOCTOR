@@ -8,6 +8,7 @@ import json
 import re
 import sqlite3
 import unittest
+from datetime import timedelta
 from unittest.mock import patch
 
 import mail_pro
@@ -134,7 +135,8 @@ class RepairStatusFlow(unittest.TestCase):
             rows = [tuple(r) for r in c.execute("SELECT event,channel,status FROM order_status_notices WHERE order_id=? AND channel='correo' ORDER BY id", (oid,))]
         self.assertEqual(rows, [('listo', 'correo', 'enviado'), ('listo', 'correo', 'omitido')])
         audit = self.request('/api/orders/%d' % oid, cookie=cookie)['body']['order']['status_audit']
-        self.assertEqual(audit[0]['notices'][0]['status'], 'omitido');self.assertIn('72 horas', audit[0]['notices'][0]['detail'])
+        # 1.5.259: un segundo aviso dentro de 10 minutos se omite (corrección rápida de un estado = un solo correo).
+        self.assertEqual(audit[0]['notices'][0]['status'], 'omitido');self.assertIn('10 minutos', audit[0]['notices'][0]['detail'])
         # Administración puede apagar los avisos automáticos: no se genera ninguno.
         self.assertEqual(post('/api/status-notices/settings', auto=False)['status'], 200)
         post('/api/order-status', id=str(oid), status='esperando_cliente')
@@ -206,6 +208,43 @@ class RepairStatusFlow(unittest.TestCase):
         self.assertEqual(post('/api/orders/%d/status-message' % oid, channel='fax')['status'], 400)
         with app.connect() as c:  # redactar no envía nada
             self.assertEqual(c.execute("SELECT COUNT(*) FROM order_messages WHERE order_id=? AND template='estado'", (oid,)).fetchone()[0], 0)
+
+
+class RepairStatusNotices259(unittest.TestCase):
+    """1.5.259: los avisos deben ser verdaderos y no repetirse. Casos reales de producción: «presupuesto pendiente» con el presupuesto ya
+    aprobado, aviso de presupuesto a quien ya lo recibió con su enlace y dos correos en 11 s al corregir un estado."""
+    Base = parts.PartRequestTests
+    setUpClass = classmethod(Base.setUpClass.__func__)
+    setUp, tearDown, request, login, order_data = Base.setUp, Base.tearDown, Base.request, Base.login, Base.order_data
+    form, prepare, paid_order, configure, part, link = Base.form, Base.prepare, Base.paid_order, Base.configure, Base.part, Base.link
+
+    def notes(self, oid):
+        with app.connect() as c:
+            return [(r['event'], r['status'], r['detail']) for r in c.execute("SELECT event,status,detail FROM order_status_notices WHERE order_id=? AND channel='correo' ORDER BY id", (oid,))]
+
+    def test_notices_must_be_true_and_not_repeated(self):
+        cookie, csrf, post, order = self.paid_order(10500, pay=False)  # presupuesto ya aprobado
+        oid = order['id']
+        self.link(oid)
+        sent = []
+        with patch.object(mail_pro, 'configured', return_value=True), patch.object(mail_pro, 'settings', return_value=MAIL), \
+                patch.object(mail_pro, 'deliver', side_effect=lambda config, message, recipients: sent.append(message) or {}):
+            post('/api/order-status', id=str(oid), status='presupuesto')  # sin presupuesto pendiente: el aviso no sería cierto
+            self.assertEqual(sent, []);self.assertIn('no sería cierto', self.notes(oid)[-1][2])
+            post('/api/order-status', id=str(oid), status='esperando_repuesto', comment='El cliente traerá el repuesto (ficticio).')  # sin pedido activo
+            self.assertEqual(sent, []);self.assertIn('pedido de repuesto activo', self.notes(oid)[-1][2])
+            post('/api/order-status', id=str(oid), status='listo', notify='0')  # el personal elige no avisar
+            self.assertEqual(sent, []);self.assertIn('eligió no avisar', self.notes(oid)[-1][2])
+            post('/api/order-status', id=str(oid), status='esperando_cliente')
+            self.assertEqual(len(sent), 1)
+            post('/api/order-status', id=str(oid), status='listo')  # 11 s después: un solo correo
+            self.assertEqual(len(sent), 1);self.assertIn('10 minutos', self.notes(oid)[-1][2])
+        # Presupuesto realmente pendiente, pero recibido hace poco con su enlace: tampoco se repite.
+        with app.connect() as c:
+            c.execute("UPDATE quotes SET status='enviado',sent_at=? WHERE order_id=?", (app.reception_now().isoformat(timespec='seconds'), oid));c.commit()
+            import repair_status
+            self.assertIn('menos de 72 horas', repair_status.skip_reason(c, oid, 'presupuesto', 'manual', app.reception_now() + timedelta(hours=1)))
+            self.assertEqual(repair_status.skip_reason(c, oid, 'presupuesto', 'manual', app.reception_now() + timedelta(hours=80)), '')
 
 
 if __name__ == '__main__':

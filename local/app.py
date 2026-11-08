@@ -1823,7 +1823,7 @@ class Handler(BaseHTTPRequestHandler):
                 matches.sort(key=lambda item:item[:3])
                 return self.reply(200,{'rows':[item[3] for item in matches[:8]],'more':len(matches)>8})
             if path == '/api/order-options':
-                return self.reply(200, {'statuses':order_workspace.STATUSES,'status_catalog':__import__('repair_status').catalog(),'users':[dict(r) for r in c.execute('SELECT id,name FROM users WHERE active=1 ORDER BY name')]})
+                return self.reply(200, {'statuses':order_workspace.STATUSES,'status_catalog':__import__('repair_status').catalog(),'status_notices_auto':__import__('repair_status').enabled(c),'users':[dict(r) for r in c.execute('SELECT id,name FROM users WHERE active=1 ORDER BY name')]})
             photo = re.fullmatch(r'/api/order-photo/([0-9]+)', path)
             if photo:
                 # Evidencia de recepción: solo con sesión; se entrega como imagen JPEG ya validada al guardarla.
@@ -4852,7 +4852,7 @@ class Handler(BaseHTTPRequestHandler):
                             if booked:planned['appointment']=booked;order_workspace.event(c,int(oid),user['id'],now,'maintenance','Cita de mantenimiento preventivo generada automáticamente ('+booked['public_code']+').')
                         # Sin cambio real ni comentario no hay nada que auditar; con cambio, el registro nombra la transición.
                         if old!=status or comment:order_workspace.event(c,int(oid),user['id'],now,'status' if old!=status else 'follow_up',comment or order_workspace.transition_comment(old,status))
-                        if old!=status:repair_status.log(c,int(oid),old,status,user['id'],reason,'manual','',now)
+                        if old!=status:repair_status.log(c,int(oid),old,status,user['id'],reason,'manual','',now,str(data.get('notify','1'))!='0')  # 1.5.259: el personal puede no avisar
                         audit(c,user['id'],'order_status_updated',int(oid))
                         if reverted:audit(c,user['id'],'delivery_reverted',int(oid))
                         if old!=status:status_notify(c,int(oid),now)

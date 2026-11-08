@@ -74,6 +74,7 @@ NOTICE = {
 }
 SETTING = 'status_notices_auto'
 REPEAT_HOURS = 72
+QUIET_MINUTES = 10  # 1.5.259: entre dos avisos de la misma orden (evita dos correos seguidos al corregir un estado)
 MAX_ATTEMPTS = 3
 
 
@@ -121,17 +122,17 @@ def check(c, oid, old, new, reason=''):
     return ''
 
 
-def log(c, oid, old, new, actor, reason, source, detail, now):
+def log(c, oid, old, new, actor, reason, source, detail, now, notify=True):
     """Registro de auditoría del cambio y avisos al cliente (pendientes de envío; se envían tras confirmar la transacción)."""
     cur = c.execute('INSERT INTO order_status_log(order_id,from_status,to_status,actor_id,reason,source,detail,created_at) VALUES (?,?,?,?,?,?,?,?)',
                     (oid, old or '', new, actor, str(reason or '')[:2000], source, str(detail or '')[:500], now.isoformat(timespec='microseconds')))
     lid = cur.lastrowid
     if old != new:
-        emit(c, oid, lid, new, source, now)
+        emit(c, oid, lid, new, source, now, notify)
     return lid
 
 
-def change(c, oid, new, now, actor=None, reason='', source='manual', detail=''):
+def change(c, oid, new, now, actor=None, reason='', source='manual', detail='', notify=True):
     """Cambia el estado por un evento real: orden, historial y auditoría en la misma transacción. Sin cambio real, no hace nada."""
     import order_workspace
     row = c.execute('SELECT status FROM orders WHERE id=?', (oid,)).fetchone()
@@ -141,7 +142,7 @@ def change(c, oid, new, now, actor=None, reason='', source='manual', detail=''):
     c.execute('UPDATE orders SET status=?,updated_at=?,revision=revision+1 WHERE id=?', (new, now.isoformat(timespec='microseconds'), oid))
     text = (detail + ' ' if detail else '') + 'El estado pasa de «%s» a «%s».' % (LABELS.get(old, old), LABELS[new])
     order_workspace.event(c, oid, actor, now, 'status', text)
-    return log(c, oid, old, new, actor, reason, source, detail, now)
+    return log(c, oid, old, new, actor, reason, source, detail, now, notify)
 
 
 def _back(c, oid, wait):
@@ -201,16 +202,40 @@ def _recent(c, oid, event, now):
     return False
 
 
-def emit(c, oid, lid, new, source, now):
+def skip_reason(c, oid, new, source, now, notify=True):
+    """Motivo por el que NO se avisa al cliente de este cambio ('' si corresponde avisar). 1.5.259: el aviso debe ser verdadero y útil:
+    sin presupuesto realmente pendiente o sin pedido de repuesto activo no se avisa, y no se envían dos correos seguidos."""
+    if not notify:
+        return 'El personal eligió no avisar al cliente en este cambio.'
+    if source == 'quote_sent':
+        return 'El cliente recibe el presupuesto con su enlace de aprobación; no se envía otro aviso.'
+    if new == 'presupuesto':
+        quote = c.execute("SELECT status,sent_at FROM quotes WHERE order_id=? AND deleted_at='' AND status NOT IN ('borrador','cancelado') ORDER BY version DESC,id DESC LIMIT 1",
+                          (oid,)).fetchone()
+        if not quote or quote['status'] != 'enviado':
+            return 'No hay un presupuesto enviado pendiente de aprobación: el aviso no sería cierto.'
+        try:
+            fresh = (now - datetime.fromisoformat(quote['sent_at'])).total_seconds() < REPEAT_HOURS * 3600
+        except (TypeError, ValueError):
+            fresh = False
+        if fresh:
+            return 'El cliente recibió el presupuesto con su enlace hace menos de %d horas.' % REPEAT_HOURS
+    if new == 'esperando_repuesto' and not waiting_parts(c, oid):
+        return 'No hay un pedido de repuesto activo: el aviso no sería cierto.'
+    since = (now - timedelta(minutes=QUIET_MINUTES)).isoformat(timespec='seconds')
+    if c.execute("SELECT 1 FROM order_status_notices WHERE order_id=? AND status IN ('pendiente','enviado') AND created_at>=? LIMIT 1", (oid, since)).fetchone():
+        return 'Hubo otro aviso al cliente hace menos de %d minutos: se evita un correo seguido. Si hace falta, envíalo desde «Comunicación».' % QUIET_MINUTES
+    if _recent(c, oid, new, now):
+        return 'Ya se avisó al cliente de este estado en las últimas %d horas.' % REPEAT_HOURS
+    return ''
+
+
+def emit(c, oid, lid, new, source, now, notify=True):
     """Registra los avisos de un cambio relevante (uno por canal). Devuelve los id pendientes de enviar."""
     if new not in NOTICE or not enabled(c):
         return []
     import part_notices
-    skip_all = ''
-    if source == 'quote_sent':
-        skip_all = 'El cliente recibe el presupuesto con su enlace de aprobación; no se envía otro aviso.'
-    elif _recent(c, oid, new, now):
-        skip_all = 'Ya se avisó al cliente de este estado en las últimas %d horas.' % REPEAT_HOURS
+    skip_all = skip_reason(c, oid, new, source, now, notify)
     out = []
     for channel, _recipient, skip in part_notices._channels(c, oid):
         reason = skip_all or skip

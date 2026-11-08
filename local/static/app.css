@@ -10783,3 +10783,11 @@ button.sp-adi{display:inline-flex;align-items:center;justify-content:center;gap:
 .sp-card .sp-line li+li::before{top:-7px;right:auto;left:13px;width:0;height:14px;border-top:0;border-left:2px solid #2c4a7a}
 .sp-card .sp-line li>span:last-child{display:flex;flex-wrap:wrap;align-items:baseline;gap:0 8px;min-width:0}
 .sp-card .sp-line b{font-size:12.5px}.sp-card .sp-line time{font-size:11.5px}
+/* ===== 1.5.259 · Mail Pro y avisos ===== */
+/* CC y CCO en el teléfono: la regla de escritorio (primera columna de 64 px) dejaba los campos en un cuadro diminuto. */
+@media(max-width:760px){.rcpt-field:not(:has(.rcpt-book)){grid-template-columns:minmax(0,1fr)}}
+.sp-confirm-field[hidden]{display:none}
+.sp-notice-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px}
+@media(max-width:480px){.sp-notice-actions{display:grid;grid-template-columns:1fr}.sp-notice-actions .primary{order:-1}}
+/* Adjuntos potencialmente peligrosos (ejecutables, guiones): se marcan antes de descargarlos. */
+.mail-attach-danger{display:inline-flex;align-items:center;gap:4px;margin-left:6px;padding:1px 7px;border:1px solid #ef444466;border-radius:999px;background:#2a1014;color:#fca5a5;font-size:11px;font-weight:700}

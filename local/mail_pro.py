@@ -312,8 +312,20 @@ def clean_addresses(value):
 
 
 def safe_filename(name):
-    name = re.sub(r'[\x00-\x1f/\\:*?"<>|]+', '_', str(name or '')).strip(' .')
-    return (name or 'adjunto')[:120]
+    name = re.sub(r'[\x00-\x1f/\\:*?"<>|]+', '_', str(name or '')).strip(' .') or 'adjunto'
+    if len(name) > 120:  # 1.5.259: al recortar se conserva la extensión («informe…pdf» seguía siendo un PDF)
+        stem, dot, ext = name.rpartition('.')
+        name = (stem[:120 - len(ext) - 1] + '.' + ext) if dot and stem and 0 < len(ext) <= 10 else name[:120]
+    return name
+
+
+# 1.5.259: tipos ejecutables o de guion. No se envían (Gmail y Outlook los rechazan y son un riesgo) y, si llegan, se marcan antes de descargarlos.
+DANGEROUS = {'exe', 'com', 'bat', 'cmd', 'scr', 'pif', 'msi', 'msp', 'cpl', 'dll', 'js', 'jse', 'vbs', 'vbe', 'wsf', 'wsh', 'ps1', 'psm1', 'hta', 'jar',
+             'lnk', 'reg', 'iso', 'img', 'vhd', 'vhdx', 'apk', 'appx', 'msix', 'sh', 'scf', 'url', 'chm', 'gadget', 'application'}
+
+
+def dangerous(name):
+    return str(name or '').rsplit('.', 1)[-1].lower() in DANGEROUS if '.' in str(name or '') else False
 
 
 def refresh_capabilities(client):
@@ -703,7 +715,7 @@ def read_message(client, folder, uid, mark_seen=True):
             payload = part.get_payload(decode=True) or b''
             if disposition == 'inline' and kind.startswith('image/') and not filename:
                 continue
-            attachments.append({'part': index, 'name': safe_filename(filename or 'adjunto'), 'type': kind[:100], 'size': len(payload)})
+            attachments.append({'part': index, 'name': safe_filename(filename or 'adjunto'), 'type': kind[:100], 'size': len(payload), 'dangerous': dangerous(filename)})
             continue
         try:
             content = part.get_content()
@@ -1088,6 +1100,8 @@ def build_message(config, data, signature=''):
             message.get_payload()[1].add_related(logo, 'image', logo_kind, cid=cid, disposition='inline')
     total = 0
     for item in data.get('attachments') or []:
+        if dangerous(item.get('name')):
+            raise MailError('configuracion', 'Por seguridad no se envían archivos ejecutables o de guion («%s»). Los servidores de correo los rechazan; compártelo por otro medio.' % safe_filename(item.get('name'))[:80])
         try:
             content = base64.b64decode(str(item.get('data', '')), validate=True)
         except Exception:

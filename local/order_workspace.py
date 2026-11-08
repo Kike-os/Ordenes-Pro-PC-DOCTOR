@@ -168,5 +168,5 @@ def save(c,oid,data,user,now):
     # Si la edición cambió el estado, el registro lo dice de forma explícita para que sirva como auditoría.
     changed=row['status']!=fields['status']
     event(c,oid,user['id'],now,'status' if changed else 'updated',note or fields['comment'] or (transition_comment(row['status'],fields['status']) if changed else 'Seguimiento técnico actualizado.'))
-    if changed:repair_status.log(c,oid,row['status'],fields['status'],user['id'],fields['comment'],'edicion','',now)
+    if changed:repair_status.log(c,oid,row['status'],fields['status'],user['id'],fields['comment'],'edicion','',now,str(data.get('notify','1'))!='0')
     return 200,{'ok':True,'status_changed':changed}
