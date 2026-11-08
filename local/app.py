@@ -2469,6 +2469,9 @@ class Handler(BaseHTTPRequestHandler):
                     if arg('now')=='1' and limited(c,'mail-storage:'+str(user['id']),limit=30,window=300):return self.reply(429,{'error':'Espera un momento antes de volver a actualizar el almacenamiento.'})
                     storage=notifications.mail_storage(c,reception_now(),0 if arg('now')=='1' else 60)
                     return self.reply(200,{key:storage.get(key) for key in ('state','used','limit','source','checked','stale','detail','cpanel','failed')})
+                if path=='/api/mail/labels':
+                    import mail_features
+                    return self.reply(200,{'labels':mail_features.labels(c),'colors':mail_features.COLORS})
                 try:
                     client=mail_pro.open_imap()
                     if path=='/api/mail/overview':
@@ -2477,12 +2480,30 @@ class Handler(BaseHTTPRequestHandler):
                     if path=='/api/mail/messages':
                         try:page=max(1,int(arg('page') or '1'))
                         except ValueError:return self.reply(400,{'error':'Página inválida.'})
-                        uids=mail_pro.search(client,folder['id'],arg('q'),arg('flagged')=='1',arg('unread')=='1')
+                        import mail_features
+                        now_mail=reception_now();account=mail_pro.settings()['username'];pending_view=arg('pendientes')=='1'
+                        uids=mail_pro.search(client,folder['id'],arg('q'),arg('flagged')=='1',arg('unread')=='1',pending_view,mail_features.since(now_mail) if pending_view else '',account if pending_view else '')
                         if arg('attach')=='1':
                             # IMAP no busca por adjuntos: se revisa la estructura de los 300 mensajes más recientes del resultado.
                             uids=[row['uid'] for row in mail_pro.summaries(client,uids[:300],previews=False) if row['attachments']]
+                        # 1.5.260: pendientes de respuesta (sin automáticos ni propios), por etiqueta y conversaciones. Se revisan los 300 más recientes.
+                        threads=None;waiting={}
+                        if pending_view or arg('label').isdigit() or arg('threads')=='1':
+                            scan=mail_pro.summaries(client,uids[:mail_features.SCAN],previews=False)
+                            if pending_view:
+                                scan=mail_features.pending(scan,account,now_mail);waiting={r['uid']:r['waiting_days'] for r in scan}
+                            if arg('label').isdigit():
+                                wanted=mail_features.tagged(c,int(arg('label')));scan=[r for r in scan if r['message_id'] in wanted]
+                            if arg('threads')=='1':threads={g['uid']:g['thread'] for g in mail_features.group_threads(scan)}
+                            uids=[r['uid'] for r in scan if threads is None or r['uid'] in threads]
                         rows=mail_pro.summaries(client,uids[(page-1)*mail_pro.PAGE:page*mail_pro.PAGE])
-                        return self.reply(200,{'rows':rows,'total':len(uids),'page':page,'pages':max(1,(len(uids)+mail_pro.PAGE-1)//mail_pro.PAGE),'folder':folder,'uidvalidity':getattr(mail_pro.search,'uidvalidity',0)})
+                        marks=mail_features.of(c,[r['message_id'] for r in rows])
+                        for r in rows:
+                            r['labels']=marks.get(r['message_id'],[])
+                            if threads is not None:r['thread']=threads.get(r['uid'])
+                            if r['uid'] in waiting:r['waiting_days']=waiting[r['uid']]
+                        return self.reply(200,{'rows':rows,'total':len(uids),'page':page,'pages':max(1,(len(uids)+mail_pro.PAGE-1)//mail_pro.PAGE),'folder':folder,'uidvalidity':getattr(mail_pro.search,'uidvalidity',0),
+                                               'scan_limit':mail_features.SCAN if (pending_view or arg('label').isdigit() or arg('threads')=='1') else None})
                     if not arg('uid').isdigit():return self.reply(400,{'error':'Mensaje no válido.'})
                     if path=='/api/mail/message':
                         message=mail_pro.read_message(client,folder['id'],int(arg('uid')))
@@ -2908,7 +2929,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(403, {'error':'Solicitud no autorizada.'})
             path = urlsplit(self.path).path
             workspace_post=bool(re.fullmatch(r'/api/orders/[0-9]+/workspace',path));quote_json=bool(re.fullmatch(r'/api/quotes/[0-9]+',path))
-            max_body=3900000 if re.fullmatch(r'/api/orders/[0-9]+/followups',path) else 3700000 if re.fullmatch(r'/api/orders/[0-9]+/uploads',path) else 1500000 if path in ('/api/inventory/purchases/xml','/api/inventory/purchases/from-xml') else 1700000 if path in ('/api/cash/upload','/api/files/upload') else 65536 if path.startswith('/api/proformas') or path.startswith('/api/caja/') or re.fullmatch(r'/api/orders/[0-9]+/payments',path) or path=='/api/credit-notes' else 9000000 if path in ('/api/clients/import/preview','/api/clients/import/commit','/api/inventory/import/preview','/api/inventory/import/commit') else 200000 if path in ('/api/inventory/register','/api/invoicing/policies') else 1700000 if path=='/api/public/adi/listen' else 6000000 if path in ('/api/mail/send','/api/mail/draft') else 100000 if path in ('/api/conditions','/api/order-draft','/api/conditions/draft','/api/conditions/compare') else 3200000 if path in ('/api/licenses/new','/api/licenses/units','/api/licenses/units/bulk','/api/licenses/check','/api/licenses/products','/api/licenses/products/duplicate','/api/licenses/sales') or re.fullmatch(r'/api/licenses/sales/[0-9]+',path) else 900000 if re.fullmatch(r'/api/orders/[0-9]+/photos',path) or path in ('/api/profile/photo','/api/mail/signature') or re.fullmatch(r'/api/catalog/[0-9]+/image',path) else (65536 if workspace_post or quote_json else 16384)
+            max_body=3900000 if re.fullmatch(r'/api/orders/[0-9]+/followups',path) else 3700000 if re.fullmatch(r'/api/orders/[0-9]+/uploads',path) else 1500000 if path in ('/api/inventory/purchases/xml','/api/inventory/purchases/from-xml') else 1700000 if path in ('/api/cash/upload','/api/files/upload') else 65536 if path.startswith('/api/proformas') or path.startswith('/api/caja/') or re.fullmatch(r'/api/orders/[0-9]+/payments',path) or path=='/api/credit-notes' else 9000000 if path in ('/api/clients/import/preview','/api/clients/import/commit','/api/inventory/import/preview','/api/inventory/import/commit') else 200000 if path in ('/api/inventory/register','/api/invoicing/policies') else 1700000 if path=='/api/public/adi/listen' else 6000000 if path in ('/api/mail/send','/api/mail/draft') else 100000 if path in ('/api/conditions','/api/order-draft','/api/conditions/draft','/api/conditions/compare') else 3200000 if path in ('/api/licenses/new','/api/licenses/units','/api/licenses/units/bulk','/api/licenses/check','/api/licenses/products','/api/licenses/products/duplicate','/api/licenses/sales') or re.fullmatch(r'/api/licenses/sales/[0-9]+',path) else 900000 if re.fullmatch(r'/api/orders/[0-9]+/photos',path) or path in ('/api/profile/photo','/api/mail/signature') or re.fullmatch(r'/api/catalog/[0-9]+/image',path) else (65536 if workspace_post or quote_json or path=='/api/mail/subject' else 16384)
             length = int(self.headers.get('Content-Length', '0'))
             if length <= 0 or length > max_body:
                 return self.reply(400, {'error':'Solicitud inválida.'})
@@ -3774,7 +3795,29 @@ class Handler(BaseHTTPRequestHandler):
                     # Las operaciones de correo esperan a un servidor externo (IMAP/SMTP): se libera antes la base para no bloquear otros guardados.
                     c.commit()
                     client=None
+                    if path in ('/api/mail/labels','/api/mail/label','/api/mail/subject'):
+                        import mail_features
+                        try:
+                            if path=='/api/mail/labels':
+                                lid=mail_features.save_label(c,data,user,reception_now());audit(c,user['id'],'mail_label_'+('deleted' if lid is None else 'created'))
+                                return self.reply(200,{'ok':True,'id':lid,'labels':mail_features.labels(c)})
+                            if path=='/api/mail/label':
+                                return self.reply(200,{'ok':True,'labels':mail_features.tag(c,data,user,reception_now())})
+                            if limited(c,'adi-write:'+str(user['id']),limit=60,window=3600):return self.reply(429,{'error':'Alcanzaste el límite de consultas a ADI por hora. Intenta más tarde.'})
+                            return self.reply(200,mail_features.suggest_subject(c,str(data.get('body',''))[:20000],str(data.get('order_code',''))))
+                        except mail_features.FeatureError as error:return self.reply(error.status,{'error':str(error)})
                     try:
+                        if path=='/api/mail/summary':
+                            # Resumen con ADI de un mensaje o una conversación (hasta 8 mensajes). Se lee sin marcar como leído; nada se guarda.
+                            import mail_features
+                            uids=[int(v) for v in str(data.get('uids','')).split(',') if v.strip().isdigit()][:mail_features.SUMMARY_MESSAGES]
+                            if not uids:return self.reply(400,{'error':'Elige un mensaje o una conversación.'})
+                            if limited(c,'adi-write:'+str(user['id']),limit=60,window=3600):return self.reply(429,{'error':'Alcanzaste el límite de consultas a ADI por hora. Intenta más tarde.'})
+                            client=mail_pro.open_imap();folder,_=mail_pro.resolve(client,str(data.get('folder','')))
+                            messages=sorted((mail_pro.read_message(client,folder['id'],uid,mark_seen=False) for uid in uids),key=lambda m:m.get('date') or '')
+                            try:result=mail_features.summarize(c,messages,mail_pro.settings()['username'])
+                            except mail_features.FeatureError as error:return self.reply(error.status,{'error':str(error)})
+                            audit(c,user['id'],'mail_summary');return self.reply(200,result)
                         if path=='/api/mail/batch':
                             # Acciones sobre mensajes seleccionados: indicadores y movimientos reales en el servidor IMAP.
                             uids=[int(v) for v in str(data.get('uids','')).split(',') if v.strip().isdigit()]

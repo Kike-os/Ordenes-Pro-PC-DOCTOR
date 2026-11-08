@@ -580,13 +580,20 @@ def newer(client, last_uid, limit=20):
     return summaries(client, uids, previews=False)
 
 
-def search(client, folder, query='', flagged=False, unread=False):
+def search(client, folder, query='', flagged=False, unread=False, unanswered=False, since='', exclude_from=''):
     code, data = client.select(quoted(folder), readonly=True)
     if code != 'OK':
         raise MailError('servidor', 'No se pudo abrir la carpeta.')
     validity = client.response('UIDVALIDITY')[1]
     search.uidvalidity = int(validity[0]) if validity and validity[0] else 0
     criteria = (['FLAGGED'] if flagged else []) + (['UNSEEN'] if unread else [])
+    # 1.5.260: pendientes de respuesta. Fecha IMAP fija («7-Nov-2026») y dirección validada: nada del usuario entra al comando.
+    if unanswered:
+        criteria += ['UNANSWERED', 'UNDELETED', 'UNDRAFT']
+    if since and re.fullmatch(r'\d{1,2}-[A-Z][a-z]{2}-\d{4}', since):
+        criteria += ['SINCE', since]
+    if exclude_from and ADDRESS.fullmatch(exclude_from):
+        criteria += ['NOT', 'FROM', '"%s"' % exclude_from]
     query = query.strip()[:120]
     if query:
         # El texto de búsqueda viaja como literal: no puede alterar el comando IMAP.
@@ -824,7 +831,8 @@ def attachment(client, folder, uid, index):
 
 
 def set_flag(client, folder, uid, action):
-    change = {'seen': ('+FLAGS', '(\\Seen)'), 'unseen': ('-FLAGS', '(\\Seen)'), 'star': ('+FLAGS', '(\\Flagged)'), 'unstar': ('-FLAGS', '(\\Flagged)')}.get(action)
+    change = {'seen': ('+FLAGS', '(\\Seen)'), 'unseen': ('-FLAGS', '(\\Seen)'), 'star': ('+FLAGS', '(\\Flagged)'), 'unstar': ('-FLAGS', '(\\Flagged)'),
+              'answered': ('+FLAGS', '(\\Answered)'), 'unanswered': ('-FLAGS', '(\\Answered)')}.get(action)
     if not change:
         raise MailError('configuracion', 'Acción no válida.')
     code, _ = client.select(quoted(folder), readonly=False)
