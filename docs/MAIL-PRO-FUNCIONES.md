@@ -21,7 +21,14 @@ El código está en `local/mail_features.py`; las rutas, en `local/app.py`.
 
 - **Dónde se guardan:** en la base de datos (migración `097_mail_labels.sql`), por Message-ID. El mensaje conserva sus etiquetas aunque cambie de carpeta.
 - **Etiquetas iniciales:** Urgente, Cliente, Proveedor y Facturación.
-- **Quién las gestiona:** solo administración puede crear o eliminar etiquetas. Al eliminar una, se quita de los mensajes, pero los correos no cambian.
+- **Quién las gestiona:** solo administración puede crear, editar (nombre y color) o eliminar etiquetas.
+  - Editar conserva los mensajes asociados.
+  - No se permiten nombres repetidos.
+  - Eliminar pide confirmación; la etiqueta se quita de los mensajes, pero los correos no cambian.
+- **Sección del panel lateral (1.5.264):**
+  - encabezado con icono, contador total, «+» para crear y «Editar etiquetas»;
+  - se contrae o expande y recuerda el estado en el navegador;
+  - lista con desplazamiento propio y nombres que no se recortan.
 - **Cómo se usan:**
   - se ponen o quitan desde el lector, con «Etiquetas»;
   - en escritorio se filtra desde el panel lateral;
@@ -41,6 +48,13 @@ El código está en `local/mail_features.py`; las rutas, en `local/app.py`.
   - sin ADI disponible no hay resumen, para no inventarlo;
   - el resumen no se guarda ni se envía;
   - se avisa si menciona datos que no estaban en los correos.
+
+## Distribución (Mail Pro Premium 3.1, 1.5.264)
+
+- **Escritorio:** los tres paneles usan todo el ancho y llegan al fondo de la ventana, sin desplazamiento horizontal. Columnas: panel izquierdo de 250 a 280 px, lista de unos dos quintos del resto y lector con lo demás.
+- **Lista:** se desplaza por su cuenta y conserva la posición al abrir un mensaje y volver, o al actualizar.
+- **Tableta:** el panel izquierdo queda contraído.
+- **Móvil:** la carpeta, la lista y el lector se muestran por turnos.
 
 ## Pruebas
 

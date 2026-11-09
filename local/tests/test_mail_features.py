@@ -90,6 +90,17 @@ class MailFeatureRoutes(test_app.SecurityTests):
         made = self.post('/api/mail/labels', action='create', name='Garantía', color='ambar')
         self.assertEqual(made['status'], 200);self.assertEqual(self.post('/api/mail/labels', action='create', name='garantía', color='ambar')['status'], 409)
         self.assertEqual(self.post('/api/mail/labels', action='create', name='X', color='azul')['status'], 400)
+        # 1.5.264: editar nombre y color conserva las asociaciones; el nombre no puede repetirse y el identificador debe existir.
+        edited = self.post('/api/mail/labels', action='update', id=str(urgent), name='Urgente cliente', color='violeta')
+        self.assertEqual(edited['status'], 200, edited['body'])
+        after = {l['id']: l for l in self.get('/api/mail/labels')['body']['labels']}
+        self.assertEqual((after[urgent]['name'], after[urgent]['color'], after[urgent]['total']), ('Urgente cliente', 'violeta', 1))
+        self.assertEqual(self.get('/api/mail/messages?folder=INBOX&label=%d' % urgent)['body']['rows'][0]['labels'], [urgent])
+        self.assertEqual(self.post('/api/mail/labels', action='update', id=str(urgent), name='garantía', color='rojo')['status'], 409)
+        self.assertEqual(self.post('/api/mail/labels', action='update', id=str(urgent), name='URGENTE CLIENTE', color='rojo')['status'], 200)  # su propio nombre sí
+        self.assertEqual(self.post('/api/mail/labels', action='update', id='99999', name='Otra', color='azul')['status'], 404)
+        self.assertEqual(self.post('/api/mail/labels', action='update', id='abc', name='Otra', color='azul')['status'], 404)
+        self.assertEqual(self.post('/api/mail/labels', action='update', id=str(urgent), name='Y', color='azul')['status'], 400)
         self.assertEqual(self.post('/api/mail/labels', action='delete', id=str(urgent))['status'], 200)
         with app.connect() as c:
             self.assertEqual(c.execute('SELECT COUNT(*) FROM mail_message_labels WHERE label_id=?', (urgent,)).fetchone()[0], 0)
@@ -120,6 +131,7 @@ class MailFeatureRoutes(test_app.SecurityTests):
         with app.connect() as c:
             c.execute("UPDATE users SET role='tecnico' WHERE id=(SELECT id FROM users ORDER BY id LIMIT 1)");c.commit()
         self.assertEqual(self.post('/api/mail/labels', action='create', name='Técnica', color='azul')['status'], 403)
+        self.assertEqual(self.post('/api/mail/labels', action='update', id='1', name='Técnica', color='azul')['status'], 403)
 
 
 for name in [name for name in dir(test_app.SecurityTests) if name.startswith('test_')]:

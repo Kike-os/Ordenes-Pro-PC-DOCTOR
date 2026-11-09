@@ -3807,7 +3807,7 @@ class Handler(BaseHTTPRequestHandler):
                         import mail_features
                         try:
                             if path=='/api/mail/labels':
-                                lid=mail_features.save_label(c,data,user,reception_now());audit(c,user['id'],'mail_label_'+('deleted' if lid is None else 'created'))
+                                lid=mail_features.save_label(c,data,user,reception_now());audit(c,user['id'],'mail_label_'+('deleted' if lid is None else 'updated' if str(data.get('action'))=='update' else 'created'))
                                 return self.reply(200,{'ok':True,'id':lid,'labels':mail_features.labels(c)})
                             if path=='/api/mail/label':
                                 return self.reply(200,{'ok':True,'labels':mail_features.tag(c,data,user,reception_now())})

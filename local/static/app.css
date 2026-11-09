@@ -10979,3 +10979,126 @@ canvas.rx-canvas{display:block;width:100%;height:auto;touch-action:none;cursor:c
 .rx-photo-add select{min-height:38px;height:38px;padding:4px 10px;font-size:13px}
 .rx-photo-add .order-photo-add{min-height:38px}
 section.rx-photos .rx-photo-add select{min-height:38px;height:38px}
+/* ===== 1.5.264 · Mail Pro Premium 3.1: dimensiones, distribución y etiquetas (acotado a Mail Pro) ===== */
+/* Cabecera del módulo más compacta en Mail Pro: más altura útil para los tres paneles. */
+#view-module:has(.mail-v2)>.back-link{margin-bottom:8px}
+#view-module:has(.mail-v2) .module-heading{margin-bottom:12px;padding-bottom:0}
+#view-module:has(.mail-v2) .module-heading h1{font-size:26px;line-height:1.15;margin:2px 0 2px}
+#view-module:has(.mail-v2) .module-heading p{margin:0;font-size:13px}
+#view-module:has(.mail-v2) .module-heading .eyebrow{margin:0}
+/* Escritorio: panel izquierdo 250–280 px; la lista y el lector se reparten el resto (≈40 % / 60 %). */
+@media(min-width:1181px){.mail-shell.mail-v2{grid-template-columns:clamp(250px,17vw,280px) minmax(320px,2fr) minmax(0,3fr);max-width:none}
+ .mail-shell.mail-v2[data-side=collapsed]{grid-template-columns:64px minmax(320px,2fr) minmax(0,3fr)}}
+.mail-shell.mail-v2>*{min-width:0}
+.mail-v2 :is(.mail-side,.mail-list-pane,.mail-reader){border-radius:12px}
+/* Panel izquierdo: se desplaza entero; las carpetas se ven completas y las etiquetas tienen su propia zona con desplazamiento interno. */
+@media(min-width:861px){.mail-v2:not([data-side=collapsed]) .mail-side{overflow:hidden auto;scrollbar-width:thin}
+ .mail-v2 .mail-folders{flex:0 0 auto;min-height:0;overflow:visible}
+ .mail-v2 .mail-labels{display:flex;flex-direction:column;flex:1 1 auto;min-height:170px;margin:4px 0 2px;overflow:hidden}
+ .mail-v2 .mail-labels[data-open=false]{flex:0 0 auto;min-height:0}
+ .mail-v2 .mail-labels-list{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;padding-right:2px}
+ .mail-v2 .mail-side-foot{flex:0 0 auto}}
+.mail-v2 .mail-account{align-items:flex-start;height:auto;min-height:44px}
+.mail-v2 .mail-account>span{min-width:0}
+.mail-v2 .mail-account strong{display:block;white-space:normal;overflow-wrap:anywhere;font-size:12px;line-height:1.3}
+.mail-labels-head{display:flex;align-items:center;gap:4px;padding:0 0 6px;border-bottom:1px solid #1e3050;margin-bottom:4px}
+button.mail-labels-toggle{display:flex;align-items:center;gap:8px;flex:1 1 auto;min-width:0;min-height:32px;padding:4px 6px;border:0;border-radius:8px;background:transparent;color:#9fb4d6;text-align:left;cursor:pointer}
+button.mail-labels-toggle:hover{background:#12223d}button.mail-labels-toggle:focus-visible{outline:2px solid #7f8fe0;outline-offset:1px}
+button.mail-labels-toggle .system-icon{flex:none;width:15px;height:15px}
+button.mail-labels-toggle strong{color:#b9c8e6;font-size:11px;font-weight:800;letter-spacing:.07em;text-transform:uppercase}
+.mail-labels-total{padding:0 6px;border-radius:999px;background:#1a2a55;color:#c7d2fe;font-size:10.5px;font-weight:800;line-height:1.6}
+.mail-labels-chev{margin-left:auto;transition:transform .2s ease}.mail-labels[data-open=false] .mail-labels-chev{transform:rotate(-90deg)}
+.mail-labels-head .mail-tool{width:30px;height:30px;min-height:0;flex:none}
+.mail-labels-list[hidden]{display:none}
+.mail-labels-list{display:grid;gap:2px;align-content:start}
+button.mail-label-item{display:grid;grid-template-columns:18px minmax(0,1fr) auto;align-items:center;gap:8px;width:100%;min-height:34px;padding:5px 8px;border:1px solid transparent;border-radius:9px;background:transparent;color:#cfdcf2;font-size:13px;font-weight:600;text-align:left;transition:background-color .2s ease,border-color .2s ease}
+button.mail-label-item .mail-label-icon{width:16px;height:16px;color:var(--lc)}
+.mail-label-name{min-width:0;overflow-wrap:anywhere;line-height:1.3;white-space:normal}
+.mail-label-total{min-width:22px;padding:0 6px;border-radius:999px;background:#ffffff0d;color:#9fb4d6;font-size:11px;font-weight:700;text-align:center;line-height:1.7}
+button.mail-label-item:hover{background:#12223d}button.mail-label-item:focus-visible{outline:2px solid var(--lc);outline-offset:1px}
+button.mail-label-item[aria-pressed=true]{border-color:color-mix(in srgb,var(--lc) 55%,transparent);background:color-mix(in srgb,var(--lc) 14%,#0c1729);color:#fff}
+button.mail-label-item[aria-pressed=true] .mail-label-total{background:color-mix(in srgb,var(--lc) 28%,transparent);color:#fff}
+/* Panel contraído y tabletas: el panel es una columna de iconos; las etiquetas se eligen como pastillas en los filtros. */
+.mail-v2[data-side=collapsed] .mail-labels{display:none}
+.mail-v2[data-side=collapsed] button.mail-filter.mail-filter-label{display:inline-flex;align-items:center;gap:6px}
+@media(max-width:1180px){.mail-v2 .mail-labels{display:none}button.mail-filter.mail-filter-label{display:inline-flex;align-items:center;gap:6px}}
+/* Celular: Mail Pro ocupa la altura útil; la lista y el lector se desplazan por dentro (se alterna entre carpetas, lista y lector). */
+@media(max-width:860px){.mail-shell.mail-v2,.mail-shell.mail-v2[data-side=collapsed]{height:var(--mail-h,600px)}
+ .mail-v2[data-view=list] .mail-list-pane{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
+ .mail-v2[data-view=list] .mail-list{flex:1 1 auto;min-height:0;max-height:none;overflow-y:auto}
+ .mail-v2[data-view=reader] .mail-reader{flex:1 1 auto;min-height:0}}
+/* Gestión de etiquetas: editar nombre y color, eliminar con confirmación. */
+dialog.mail-labels-dialog{width:min(620px,calc(100vw - 20px))}
+.mail-labels-list-admin{display:grid;gap:6px;margin:10px 0 0;padding:0;list-style:none;max-height:min(52vh,420px);overflow-y:auto}
+.mail-labels-list-admin li{display:grid;grid-template-columns:12px minmax(0,1fr) 110px auto auto auto;align-items:center;gap:8px;padding:6px 8px;border:1px solid #1e3050;border-radius:9px}
+.mail-labels-list-admin input,.mail-labels-list-admin select{min-height:32px;padding:3px 8px;font-size:12.5px;min-width:0}
+.mail-labels-list-admin small{color:#8fa9cc;font-size:11.5px;white-space:nowrap}
+.mail-labels-list-admin button{min-height:32px;padding:3px 10px;font-size:12px}
+button.mail-danger-text{border-color:#ef444466;color:#fca5a5}
+@media(max-width:560px){.mail-labels-list-admin li{grid-template-columns:12px minmax(0,1fr) 100px;grid-template-areas:"d n c" "s s s" "a b x"}.mail-labels-list-admin li>i{grid-area:d}.mail-labels-list-admin li>input{grid-area:n}.mail-labels-list-admin li>select{grid-area:c}.mail-labels-list-admin li>small{grid-area:s}}
+@media(prefers-reduced-motion:reduce){.mail-labels-chev,button.mail-label-item{transition:none}}
+/* La barra principal (13 secciones + Asistencia) no cabía entre 1200 y 1520 px y desbordaba la página: relleno algo menor en ese rango. */
+@media(min-width:1200px) and (max-width:1520px){.premium-header nav>a{padding:0 8px}.premium-header nav{gap:2px}.premium-header .assistance-menu summary{padding:0 8px}}
+
+/* 1200–1299 px: el mismo formato compacto que 1000–1199 (sin iconos en la barra); si no, la barra desbordaba la página. */
+@media(min-width:1200px) and (max-width:1299px){.premium-header nav>a{padding:0 6px}.premium-header nav>a>.field-icon{display:none}.premium-header .assistance-menu summary>.field-icon{display:none}}
+/* Mail Pro: «Volver al inicio» repite «Inicio» del menú; sin él, los paneles ganan altura (en el celular ya estaba oculto). */
+body[data-page=dashboard] #view-module:has(.mail-v2)>.back-link{display:none!important}  /* la regla general del enlace usa !important */
+.mail-tag{max-width:min(240px,100%);text-overflow:ellipsis}
+@media(max-width:860px){.mail-v2 .mail-list-pane>:not(.mail-list){flex:0 0 auto}}
+/* 1.5.264 · Inspección física: corrección estructural y categorías premium.
+   Causa del espacio vacío: los checkbox ocultos de .check-chip (position:absolute) tomaban el diálogo como bloque contenedor porque
+   ni el chip ni .reception-scroll estaban posicionados; quedaban por debajo del diálogo, agrandaban su área desplazable y, al
+   enfocarlos, el diálogo entero se desplazaba (pie a media altura y hueco debajo). Ahora el chip y el área de contenido los contienen. */
+#order-dialog .reception-scroll{position:relative}
+#order-dialog .check-chip{position:relative}
+#order-dialog .check-chip input{inset:0;pointer-events:none}
+.rx-insp{container:rx-insp/inline-size}
+.rx-zones{grid-template-columns:1fr;gap:10px}
+@container rx-insp (min-width:470px){.rx-zones{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@container rx-insp (min-width:760px){.rx-zones{grid-template-columns:repeat(3,minmax(0,1fr))}}
+details.rx-zone{border-radius:12px;border-color:#1f3556;background:linear-gradient(180deg,#0c1a30,#0a1527);transition:border-color .2s,box-shadow .2s,background-color .2s}
+details.rx-zone>summary::before{content:none}
+details.rx-zone>summary{gap:10px;min-height:48px;padding:8px 12px;border-radius:12px;font-size:13px}
+details.rx-zone>summary:hover{background:#10223d}
+details.rx-zone>summary:focus-visible{outline:2px solid #8bb8ff;outline-offset:2px}
+.rx-zone-ic{flex:none;display:inline-grid;place-items:center;width:30px;height:30px;border-radius:9px;background:#13284a;color:#8fb6ff}
+.rx-zone-ic .system-icon{width:17px;height:17px}
+details.rx-zone>summary>.rx-zone-title{flex:1 1 auto;min-width:0;overflow-wrap:anywhere;line-height:1.3}
+.rx-count{min-width:24px;line-height:1.75}
+.rx-count[data-zero=true]{background:#1a2b47;color:#8ea6c8}
+.rx-zone-chev{flex:none;width:16px;height:16px;color:#8fa9cc;transition:transform .2s ease}
+details.rx-zone[open]>summary .rx-zone-chev{transform:rotate(180deg)}
+details.rx-zone[open]{border-color:#2f4a8a;background:#0d1b31}
+details.rx-zone[data-damaged=true]{border-color:#b7791f;box-shadow:inset 3px 0 0 #f59e0b}
+details.rx-zone[data-damaged=true] .rx-zone-ic{background:#f59e0b22;color:#fbbf24}
+details.rx-zone[open]>.rx-chips{animation:rx-open .2s ease-out}
+details.rx-zone .rx-chips{display:grid;grid-template-columns:1fr;gap:6px;padding:4px 10px 10px}
+#order-dialog details.rx-zone .check-chip{display:flex;width:100%;min-height:40px;padding:8px 12px;border-radius:10px;white-space:normal;line-height:1.35}
+#order-dialog details.rx-zone .check-chip span{min-width:0;overflow-wrap:anywhere}
+#order-dialog details.rx-zone .check-chip span::before{width:16px;height:16px}
+#order-dialog .rx-none{min-height:40px}
+.rx-summary{display:grid;gap:6px;margin-top:4px;padding:12px 14px;border:1px solid #23395a;border-radius:12px;background:#0b1729}
+.rx-summary-head{margin:0;color:#e3eeff;font-size:13px}
+.rx-summary ul{margin:0;padding-left:18px;display:grid;gap:3px;color:#c8d7ee;font-size:12.5px;line-height:1.45}
+.rx-summary li{overflow-wrap:anywhere}
+.rx-summary .rx-help{margin:0;color:#8ea6c8;font-size:12px}
+.rx-summary-note{color:#7f98b9;font-size:11px}
+@keyframes rx-open{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){details.rx-zone,details.rx-zone .rx-zone-chev{transition:none}details.rx-zone[open]>.rx-chips{animation:none}}
+details.rx-zone>summary>.rx-zone-ic{flex:0 0 30px}
+#order-dialog details.rx-zone .check-chip span{display:flex;align-items:flex-start;gap:9px}
+#order-dialog details.rx-zone .check-chip span::before{flex:none;margin:1px 0 0}
+/* El formulario se ajusta al interior real del diálogo (antes igualaba su max-height sin descontar el borde y sobraban 2 px desplazables). */
+#order-dialog.wizard-dialog[open]{display:flex;flex-direction:column}
+#order-dialog.wizard-dialog>form{flex:1 1 auto;min-height:0;max-height:none}
+/* Diálogo de etiquetas: ancho propio (la regla general de diálogos lo reducía) y cada etiqueta en dos filas, sin recortar el nombre. */
+dialog.reception-dialog.maintenance-dialog.mail-labels-dialog{width:min(640px,calc(100vw - 20px));max-width:none}
+.mail-labels-list-admin li{grid-template-columns:12px minmax(0,1fr) auto auto 128px;grid-template-areas:none;row-gap:6px}
+.mail-labels-list-admin li>i{grid-area:auto;grid-row:1;grid-column:1}
+.mail-labels-list-admin li>input{grid-area:auto;grid-row:1;grid-column:2/5}
+.mail-labels-list-admin li>select{grid-area:auto;grid-row:1;grid-column:5}
+.mail-labels-list-admin li>small{grid-area:auto;grid-row:2;grid-column:2;justify-self:start}
+.mail-labels-list-admin li>button:nth-of-type(1){grid-row:2;grid-column:3}
+.mail-labels-list-admin li>button:nth-of-type(2){grid-row:2;grid-column:4/6;justify-self:start}
+@media(max-width:560px){.mail-labels-list-admin li{grid-template-columns:12px minmax(0,1fr) auto auto}.mail-labels-list-admin li>select{grid-row:2;grid-column:2/5}.mail-labels-list-admin li>small{grid-row:3;grid-column:2/5}.mail-labels-list-admin li>button:nth-of-type(1){grid-row:4;grid-column:2;justify-self:end}.mail-labels-list-admin li>button:nth-of-type(2){grid-row:4;grid-column:3/5}}

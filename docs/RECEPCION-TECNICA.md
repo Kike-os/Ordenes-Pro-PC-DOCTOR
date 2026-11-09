@@ -12,6 +12,15 @@ El código está en `local/reception_details.py`, las rutas en `local/app.py` y 
 - **Texto del comprobante:** lo marcado se escribe en «Estado físico» como «Inspección inicial: …», que es lo que va al comprobante y a la hoja A4.
 - **Revisión antes de guardar:** el técnico puede corregir o ampliar ese texto. La confirmación muestra exactamente lo que se guardará.
 
+### Formulario de inspección (1.5.264)
+
+- **Corrección estructural:** las casillas ocultas de cada condición (posición absoluta) tomaban el diálogo como referencia. Agrandaban su área desplazable y, al enfocarlas, el diálogo entero se movía: el pie quedaba a media altura con un hueco vacío debajo. Ahora el chip y el área de contenido las contienen, y el formulario se ajusta al interior real del diálogo. Solo se desplaza el contenido; la cabecera, los pasos y el pie con «Anterior / Siguiente» quedan siempre visibles.
+- **Categorías:** cada una muestra un icono, su nombre completo, un contador de condiciones marcadas y un botón para expandir o contraer. Las que tienen daños llevan una marca ámbar.
+- **Persistencia:** las categorías abiertas y lo marcado se conservan al expandir o contraer y al usar «Anterior / Siguiente». Marcar o desmarcar no mueve la vista.
+- **Resumen en vivo:** debajo de las categorías aparece «Condiciones identificadas: N», con la lista de condiciones por su nombre original. Es informativo y no es un diagnóstico.
+- **Columnas según el ancho del formulario:** tres, dos o una. Las animaciones se desactivan con «movimiento reducido».
+- **Datos:** no cambian condiciones, códigos ni identificadores guardados, ni el servidor o la base de datos.
+
 ## Cargador
 
 **Estados:** no entregado, buen estado aparente, con daños y pendiente de revisión técnica.

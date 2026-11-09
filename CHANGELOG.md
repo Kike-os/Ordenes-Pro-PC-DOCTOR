@@ -4,6 +4,23 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## Sin publicar
+
+### Nuevas funcionalidades
+
+- Inspección física: resumen en vivo «Condiciones identificadas: N» con los nombres originales de cada condición marcada (informativo, no es un diagnóstico).
+- Mail Pro: sección «Etiquetas» con icono, contador, «+», edición de nombre y color (conserva los mensajes asociados), eliminación con confirmación, contraer/expandir y lista con desplazamiento propio.
+
+### Mejoras realizadas
+
+- Inspección física: cada categoría muestra icono, nombre completo, contador y botón de expandir o contraer, con marca ámbar si hay daños. Lo marcado y lo abierto se conservan al navegar; 3, 2 o 1 columnas según el ancho; respeta el movimiento reducido.
+- Mail Pro Premium 3.1: los tres paneles usan todo el ancho y alto sin desplazamiento horizontal; la cuenta no se recorta; la lista se desplaza sola y conserva su posición al volver de un mensaje; tableta con panel contraído y móvil por vistas.
+
+### Errores corregidos
+
+- Recepción: el formulario de inspección ya no deja opciones comprimidas arriba ni un hueco vacío bajo el pie. Las casillas ocultas agrandaban el diálogo y lo desplazaban; ahora solo se desplaza el contenido y «Anterior / Siguiente» queda siempre visible.
+- Mail Pro: al poner una etiqueta, el foco vuelve al menú y Escape lo cierra aunque el foco haya salido; el diálogo de etiquetas usa su ancho completo y no recorta los nombres.
+
 ## v1.5.263 — 2026-11-09 09:05 (UTC-05:00)
 
 Fotos por accesorio: la zona ofrece el cargador y cada accesorio recibido (sin migración)

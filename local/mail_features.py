@@ -120,6 +120,15 @@ def save_label(c, data, user, now):
         raise FeatureError('El nombre de la etiqueta debe tener entre 2 y 30 caracteres.')
     if color not in COLORS:
         raise FeatureError('Color no válido.')
+    if action == 'update':
+        # 1.5.264: renombrar o cambiar el color; los mensajes conservan la etiqueta (se guarda por id).
+        lid = str(data.get('id', ''))
+        if not lid.isdigit() or not c.execute('SELECT 1 FROM mail_labels WHERE id=?', (lid,)).fetchone():
+            raise FeatureError('Etiqueta no disponible.', 404)
+        if c.execute('SELECT 1 FROM mail_labels WHERE lower(name)=lower(?) AND id<>?', (name, lid)).fetchone():
+            raise FeatureError('Ya existe una etiqueta con ese nombre.', 409)
+        c.execute('UPDATE mail_labels SET name=?,color=? WHERE id=?', (name, color, lid))
+        return int(lid)
     if c.execute('SELECT 1 FROM mail_labels WHERE lower(name)=lower(?)', (name,)).fetchone():
         raise FeatureError('Ya existe una etiqueta con ese nombre.', 409)
     if c.execute('SELECT COUNT(*) FROM mail_labels').fetchone()[0] >= 30:
