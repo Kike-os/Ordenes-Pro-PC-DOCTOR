@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.261 — 2026-11-09 08:00 (UTC-05:00)
+
+Repuestos: etapa opcional «En camino al punto de embarque» (sin migración)
+
+### Mejoras realizadas
+
+- Pedidos de repuestos internacionales: nueva etapa opcional «En camino al punto de embarque» para el tramo dentro del país de origen (p. ej., USPS hacia el casillero). Se puede usar o saltar; si se salta no figura ni cuenta en el avance.
+
 ## v1.5.260 — 2026-11-07 23:06 (UTC-05:00)
 
 Mail Pro: sin responder, conversaciones, etiquetas, asunto propuesto y resumen con ADI (con migración 097)
