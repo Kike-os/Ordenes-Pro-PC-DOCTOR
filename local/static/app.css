@@ -11211,3 +11211,21 @@ body[data-page=dashboard] #notify-panel.ncp>footer svg{width:16px;height:16px;fl
 #notify-panel.ncp .ncp-ghead{align-items:center}
 @media(max-width:600px){body[data-page=dashboard] #notify-panel.ncp{left:12px!important;right:12px!important;width:auto!important;max-width:none}}
 @media(max-width:360px){body[data-page=dashboard] #notify-panel.ncp>header strong{white-space:normal;font-size:14px}}
+
+/* 1.5.267 · Reingreso de equipos: botón «Reingresar equipo» (ficha, lista, historial del cliente) y aviso en la orden nueva. */
+.reentry-action{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:32px;padding:0 12px;font-size:12.5px;white-space:nowrap}
+.reentry-action svg{width:15px;height:15px;flex:none}
+.reentry-action:disabled{opacity:.55;cursor:not-allowed}
+.device-card .device-card-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin:12px 0 4px}
+.device-card .device-card-actions small{font-size:12px;color:#9bb0cf}
+.equip-card>.reentry-action{justify-self:start}
+.reentry-note{display:flex;align-items:center;gap:12px;margin:0 0 14px;padding:12px 14px;border:1px solid #3ddc9766;border-radius:12px;background:linear-gradient(180deg,#0f2537,#0b1a2b);color:#e3eeff;min-width:0}
+.reentry-note-icon{display:grid;place-items:center;flex:none;width:34px;height:34px;border-radius:10px;background:#3ddc971f;color:#6ee7b7}
+.reentry-note-icon svg{width:18px;height:18px}
+.reentry-note>div:not(.reentry-note-actions){display:grid;gap:3px;min-width:0;flex:1 1 auto}
+.reentry-note strong{font-size:14px;color:#e3eeff;overflow-wrap:anywhere}
+.reentry-note span{font-size:12.5px;line-height:1.45;color:#a9bdd8;overflow-wrap:anywhere}
+.reentry-note-actions{display:flex;flex-wrap:wrap;gap:8px;flex:none}
+.reentry-note-actions button{min-height:32px;padding:0 12px;font-size:12.5px;white-space:nowrap}
+@media(max-width:720px){.reentry-note{flex-wrap:wrap}.reentry-note-actions{width:100%}.reentry-note-actions button{flex:1 1 140px}}
+@media(max-width:520px){.devices-pro .device-actions .reentry-action{flex:1}.equip-card>.reentry-action{justify-self:stretch}}

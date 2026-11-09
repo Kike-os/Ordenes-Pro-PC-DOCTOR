@@ -1708,7 +1708,7 @@ class Handler(BaseHTTPRequestHandler):
             device_detail=re.fullmatch(r'/api/devices/([0-9]+)',path)
             if device_detail:
                 # Ficha del equipo con su historial técnico: todas las órdenes del dispositivo, de la más reciente a la más antigua. Solo lectura.
-                device=c.execute("SELECT d.id,d.client_id,COALESCE(NULLIF(d.kind,''),d.category) type,d.brand,d.model,d.serial,d.color,c.name client,c.phone,c.identification FROM devices d JOIN clients c ON c.id=d.client_id WHERE d.id=?",(int(device_detail[1]),)).fetchone()
+                device=c.execute("SELECT d.id,d.code,d.client_id,COALESCE(NULLIF(d.kind,''),d.category) type,d.brand,d.model,d.serial,d.color,c.name client,c.phone,c.identification FROM devices d JOIN clients c ON c.id=d.client_id WHERE d.id=?",(int(device_detail[1]),)).fetchone()
                 if not device:return self.reply(404,{'error':'Equipo no disponible.'})
                 device=dict(device)
                 history=[dict(r) for r in c.execute("SELECT o.id,COALESCE(o.code,'OP-'||printf('%05d',o.id)) code,o.created_at,o.received_at,o.delivered_at,o.status status_code,s.label status,o.problem,o.findings,o.recommendations,COALESCE((SELECT name FROM users WHERE id=o.assigned_to),'Sin asignar') responsible FROM orders o JOIN statuses s ON s.code=o.status WHERE o.device_id=? ORDER BY o.id DESC LIMIT 200",(device['id'],))]
@@ -1968,6 +1968,10 @@ class Handler(BaseHTTPRequestHandler):
                 result['mail']=[dict(r) for r in c.execute('SELECT id,subject,correspondent,direction,sent_at,folder,uid FROM mail_links WHERE order_id=? ORDER BY id DESC LIMIT 30',(result['id'],))] if mail_allowed(user) else None
                 import repair_stages  # 1.5.252: las 6 etapas comunes (panel, cliente y hoja A4) y su huella de sincronización
                 result['repair_stages']=repair_stages.compute(c,result['id']);result['repair_signature']=repair_stages.signature(c,result['id'])
+                # 1.5.267 · Reingreso: cuántas atenciones tiene el mismo equipo y cuál fue la anterior a esta orden (solo lectura; cada orden
+                # conserva sus propios pagos, presupuesto, diagnóstico y documentos).
+                previous=c.execute("SELECT o.id,COALESCE(o.code,'OP-'||printf('%05d',o.id)) code,o.status status_code,s.label status,o.received_at,o.created_at,o.delivered_at,o.problem FROM orders o JOIN statuses s ON s.code=o.status WHERE o.device_id=? AND o.id<? ORDER BY o.id DESC LIMIT 1",(result['device_id'],result['id'])).fetchone()
+                result['device_visits']={'count':c.execute('SELECT COUNT(*) FROM orders WHERE device_id=?',(result['device_id'],)).fetchone()[0],'previous':dict(previous) if previous else None}
                 return self.reply(200, {'order':result})
             if path == '/api/devices/identify':
                 if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
@@ -1982,6 +1986,11 @@ class Handler(BaseHTTPRequestHandler):
             if path in ('/api/orders', '/api/clients', '/api/devices'):
                 query = parse_qs(urlsplit(self.path).query)
                 term = query.get('q', [''])[0][:150]
+                if path in ('/api/orders','/api/devices'):
+                    # 1.5.267: un teléfono en cualquier formato («099 123 4567», «0991234567») encuentra el número guardado como +593…
+                    # (sus cifras significativas siempre están contenidas en el texto original, así que no se pierde ninguna coincidencia).
+                    import phones
+                    term = phones.as_query(term) or term
                 try:
                     page = max(1, int(query.get('page', ['1'])[0]))
                 except ValueError:
@@ -2036,7 +2045,7 @@ class Handler(BaseHTTPRequestHandler):
                     source = 'devices d JOIN clients c ON c.id=d.client_id'
                     duplicate_sql="(SELECT COUNT(*) FROM devices x WHERE x.id!=d.id AND TRIM(COALESCE(d.serial,''))!='' AND lower(TRIM(COALESCE(x.serial,'')))=lower(TRIM(d.serial)))"
                     columns = "d.id,d.client_id,c.name client,COALESCE(NULLIF(d.kind,''),d.category) type,d.brand,d.model,d.serial,d.color,(SELECT COUNT(*) FROM orders o WHERE o.device_id=d.id) orders,(SELECT o.status FROM orders o WHERE o.device_id=d.id ORDER BY o.id DESC LIMIT 1) last_status,(SELECT o.created_at FROM orders o WHERE o.device_id=d.id ORDER BY o.id DESC LIMIT 1) last_at,"+duplicate_sql+" duplicates"
-                    search = "c.name||' '||COALESCE(c.identification,'')||' '||COALESCE(d.brand,'')||' '||COALESCE(d.model,'')||' '||COALESCE(d.serial,'')"
+                    search = "c.name||' '||COALESCE(c.identification,'')||' '||COALESCE(c.phone,'')||' '||COALESCE(c.phone_secondary,'')||' '||COALESCE(d.code,'')||' '||COALESCE(d.brand,'')||' '||COALESCE(d.model,'')||' '||COALESCE(d.serial,'')"
                     where, ordering = '', 'd.id DESC'
                     device_kind=query.get('type',[''])[0]
                     if device_kind:
@@ -5280,10 +5289,22 @@ class Handler(BaseHTTPRequestHandler):
                         if c.execute('SELECT client_id FROM devices WHERE id=?',(group_main['device_id'],)).fetchone()['client_id']!=selected['id']:
                             return self.reply(409,{'error':'La orden seleccionada pertenece a otro cliente.','fields':{'client_id':'El equipo debe ser del mismo cliente de la orden.'}})
                     # Equipo existente: se conserva su identidad e historial; sus características salen del registro, no del formulario.
-                    existing_device=None;device_ref=str(data.get('device_id',''))
+                    existing_device=None;linked_device='';device_ref=str(data.get('device_id',''))
                     if device_ref:
                         existing_device=c.execute("SELECT d.*,COALESCE(NULLIF(d.kind,''),d.category) kind_code FROM devices d WHERE d.id=? AND d.client_id=?",(int(device_ref),selected['id'])).fetchone() if device_ref.isdigit() else None
                         if not existing_device:return self.reply(404,{'error':'El equipo seleccionado no pertenece a este cliente.'})
+                    elif data.get('new_unit')!='1' and str(data.get('serial','')).strip():
+                        # 1.5.267 · Reingreso por serie: si el cliente ya tiene un equipo con esa serie, la visita nueva se vincula a ese
+                        # registro maestro (no se duplica) aunque el formulario traiga otro color o el modelo abreviado. Una marca distinta
+                        # indica un posible error de serie y se pide verificar; un ingreso abierto del mismo equipo no admite otro.
+                        import device_lookup,device_brands
+                        existing_device=c.execute("SELECT d.*,COALESCE(NULLIF(d.kind,''),d.category) kind_code FROM devices d WHERE d.client_id=? AND COALESCE(d.serial,'')!='' AND upper(replace(d.serial,' ',''))=? ORDER BY d.id LIMIT 1",(selected['id'],device_lookup.normalize(data.get('serial'))[:150])).fetchone()
+                        if existing_device:
+                            typed=device_brands.slug(str(data.get('brand','')).strip());stored=device_brands.slug((existing_device['brand'] or '').strip())
+                            if typed and stored and typed!=stored:
+                                return self.reply(409,{'error':'Ese número de serie ya pertenece al equipo '+(existing_device['code'] or 'registrado')+' ('+' '.join(filter(None,[existing_device['brand'],existing_device['model']]))+') de este cliente. Verifica la serie o selecciónalo como equipo existente.','fields':{'serial':'Serie registrada con otra marca: verifica el equipo.'}})
+                            linked_device=existing_device['code'] or ''
+                    if existing_device:
                         busy=c.execute("SELECT COALESCE(code,'OP-'||printf('%05d',id)) code FROM orders WHERE device_id=? AND status!='entregado' ORDER BY id DESC LIMIT 1",(existing_device['id'],)).fetchone()
                         if busy:return self.reply(409,{'error':'El equipo '+(existing_device['code'] or '')+' ya tiene un ingreso abierto ('+busy['code']+'). Entrégalo antes de registrar otro ingreso.'})
                         incoming.update({'type':existing_device['kind_code'],'brand':existing_device['brand'] or '','model':existing_device['model'] or '','serial':existing_device['serial'] or '','color':existing_device['color'] or ''})
@@ -5390,7 +5411,7 @@ class Handler(BaseHTTPRequestHandler):
                     try:
                         if client_authorization_auto(c):client_link=send_client_authorization(c,oid,user)[1];client_link.pop('url',None)
                     except Exception as error:print('client-authorization auto',type(error).__name__,flush=True)
-                    return self.reply(201, {'ok':True,'id':oid,'code':code,'receipt_mail':receipt,'authorization_mail':notice,'client_authorization':client_link})
+                    return self.reply(201, {'ok':True,'id':oid,'code':code,'receipt_mail':receipt,'authorization_mail':notice,'client_authorization':client_link,**({'linked_device':linked_device} if linked_device else {})})
             return self.reply(404, {'error':'Recurso no disponible.'})
         except (ValueError, json.JSONDecodeError):
             self.reply(400, {'error':'Solicitud inválida.'})
