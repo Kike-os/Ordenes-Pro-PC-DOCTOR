@@ -49,8 +49,15 @@ class ReceptionRules(unittest.TestCase):
         merged = rd.merge_condition('Inspección inicial: algo viejo.\nEl cliente indica que se cayó.', details)
         self.assertEqual(merged.split('\n'), [rd.inspection_text(details), rd.NO_CHARGER_NOTE, 'El cliente indica que se cayó.'])
         self.assertEqual(rd.merge_condition(merged, details), merged)  # componer dos veces no duplica
-        self.assertEqual(rd.photo_filename('PCD-20261109-0001', 'HP', '240 G7', 'Pantalla', 1), 'PCD-20261109-0001_HP_240-G7_Pantalla_01.jpg')
-        self.assertEqual(rd.photo_filename('PCD-20261109-0001', 'Lenovo', 'ThinkPad T14 «Gen 2»', 'Tornillos, tapas y gomas', 12), 'PCD-20261109-0001_Lenovo_ThinkPad-T14-Gen-2_Tornillos-tapas-y-gomas_12.jpg')
+        # 1.5.265: orden, equipo unido, categoría, tema y secuencia (como en los ejemplos del pedido de ADI Premium 4.0)
+        self.assertEqual(rd.photo_filename('PCD-20261109-0001', 'HP', '240 G7', 'Frontal', 1, 'Recepción'), 'PCD-20261109-0001_HP-240-G7_Recepcion_Frontal_01.jpg')
+        self.assertEqual(rd.photo_filename('PCD-20261109-0001', 'HP', '240 G7', 'Pantalla con rayas', 2, 'Diagnóstico'), 'PCD-20261109-0001_HP-240-G7_Diagnostico_Pantalla-Con-Rayas_02.jpg')
+        self.assertEqual(rd.photo_filename('PCD-20261109-0001', 'HP', '240 G7', '', 4, 'Reparación'), 'PCD-20261109-0001_HP-240-G7_Reparacion_04.jpg')
+        self.assertEqual(rd.photo_filename('PCD-20261109-0001', 'Lenovo', 'ThinkPad T14 «Gen 2»', 'Tornillos, tapas y gomas', 12), 'PCD-20261109-0001_Lenovo-ThinkPad-T14-Gen-2_Tornillos-Tapas-y-Gomas_12.jpg')
+        self.assertEqual(rd.photo_filename('PCD-1', '', '', '', 3), 'PCD-1_General_03.jpg')  # sin datos suficientes: genérico, sin inventar daños
+        self.assertEqual(rd.safe_filename('C:\\fotos\\Pantalla rota «lado izq».HEIC', 'jpg'), 'Pantalla-rota-lado-izq.jpg')
+        self.assertEqual((rd.safe_filename('../../etc/passwd', 'pdf'), rd.safe_filename('***', 'jpg')), ('passwd.pdf', ''))
+        self.assertEqual(rd.unique_filename('a_01.jpg', ['A_01.jpg', 'a_01-2.jpg']), 'a_01-3.jpg')
 
 
 class ReceptionRoutes(test_app.SecurityTests):
@@ -76,6 +83,33 @@ class ReceptionRoutes(test_app.SecurityTests):
         options = self.request('/api/reception-options', cookie=cookie)['body']
         self.assertIn('reception_catalog', options);self.assertEqual(options['reception_catalog']['no_charger_note'], rd.NO_CHARGER_NOTE)
 
+    def test_photo_names_suggested_edited_unique_and_original_kept(self):
+        cookie, csrf = self.login()
+        oid = self.create(cookie, csrf, {'damages': [{'code': 'sin_danos'}]}, key='rx-0010', brand='HP', model='240 G7')['body']['id']
+        code = self.request('/api/orders/%d' % oid, cookie=cookie)['body']['order']['code']
+        post = lambda **body: self.request('/api/orders/%d/photos' % oid, body, cookie=cookie, csrf=csrf)
+        hint = self.request('/api/orders/%d/photo-name?category=reparacion&subject=Bisagra%%20izquierda' % oid, cookie=cookie)
+        self.assertEqual(hint['body']['filename'], code + '_HP-240-G7_Reparacion_Bisagra-Izquierda_01.jpg')
+        self.assertEqual(self.request('/api/orders/%d/photo-name' % oid)['status'], 401)
+        auto = post(data=base64.b64encode(JPEG).decode(), category='reparacion', subject='Bisagra izquierda', original_name='C:\\Users\\x\\IMG_2044.HEIC')
+        self.assertEqual(auto['body']['filename'], hint['body']['filename'])
+        edited = post(data=base64.b64encode(JPEG).decode(), category='recepcion', filename='Frontal equipo.png', original_name='DSC0001.jpg')
+        self.assertEqual(edited['body']['filename'], 'Frontal-equipo.jpg')  # extensión real: la foto es JPEG
+        again = post(data=base64.b64encode(JPEG).decode(), category='recepcion', filename='frontal-EQUIPO')
+        self.assertEqual(again['body']['filename'], 'frontal-EQUIPO-2.jpg')  # nunca reemplaza un archivo anterior
+        personal = post(data=base64.b64encode(JPEG).decode(), category='recepcion', filename='Cliente ficticio frontal')
+        self.assertEqual(personal['status'], 400);self.assertIn('nombre del cliente', personal['body']['error'])
+        self.assertEqual(post(data=base64.b64encode(JPEG).decode(), category='recepcion', filename='**')['status'], 400)
+        renamed = post(action='meta', photo_id=str(edited['body']['id']), category='recepcion', subject='', note='', filename='Vista frontal')
+        self.assertEqual((renamed['status'], renamed['body']['filename']), (200, 'Vista-frontal.jpg'))
+        clash = post(action='meta', photo_id=str(edited['body']['id']), category='recepcion', subject='', note='', filename=auto['body']['filename'])
+        self.assertTrue(clash['body']['filename'].endswith('-2.jpg'))
+        photos = {p['id']: p for p in self.request('/api/orders/%d' % oid, cookie=cookie)['body']['order']['photos']}
+        self.assertEqual(photos[auto['body']['id']]['original_name'], 'IMG_2044.HEIC')
+        self.assertEqual(photos[edited['body']['id']]['original_name'], 'DSC0001.jpg')
+        nxt = self.request('/api/orders/%d/photo-name?category=entrega' % oid, cookie=cookie)['body']['filename']
+        self.assertEqual(nxt, code + '_HP-240-G7_Entrega_04.jpg')  # secuencia de la orden: el siguiente número libre
+
     def test_photos_have_metadata_marked_copy_and_deletions_keep_history(self):
         cookie, csrf = self.login()
         oid = self.create(cookie, csrf, {'damages': [{'code': 'sin_danos'}]}, key='rx-0003', brand='HP', model='240 G7')['body']['id']
@@ -83,9 +117,9 @@ class ReceptionRoutes(test_app.SecurityTests):
         first = post(data=base64.b64encode(JPEG).decode(), category='recepcion', subject='Pantalla', note='Rayón vertical', main=True, annotated=base64.b64encode(MARKED).decode())
         self.assertEqual(first['status'], 201, first['body'])
         code = self.request('/api/orders/%d' % oid, cookie=cookie)['body']['order']['code']
-        self.assertEqual(first['body']['filename'], code + '_HP_240-G7_Pantalla_01.jpg')
+        self.assertEqual(first['body']['filename'], code + '_HP-240-G7_Recepcion_Pantalla_01.jpg')
         second = post(data=base64.b64encode(JPEG).decode(), category='diagnostico', subject='Pantalla')
-        self.assertTrue(second['body']['filename'].endswith('_Pantalla_02.jpg'))
+        self.assertTrue(second['body']['filename'].endswith('_HP-240-G7_Diagnostico_Pantalla_02.jpg'))
         pid = first['body']['id']
         self.assertEqual(self.request('/api/order-photo/%d' % pid, cookie=cookie)['body'], JPEG)  # el original no cambia
         self.assertEqual(self.request('/api/order-photo/%d?marcas=1' % pid, cookie=cookie)['body'], MARKED)  # la copia marcada aparte

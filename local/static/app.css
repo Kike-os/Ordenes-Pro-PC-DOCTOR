@@ -11102,3 +11102,59 @@ dialog.reception-dialog.maintenance-dialog.mail-labels-dialog{width:min(640px,ca
 .mail-labels-list-admin li>button:nth-of-type(1){grid-row:2;grid-column:3}
 .mail-labels-list-admin li>button:nth-of-type(2){grid-row:2;grid-column:4/6;justify-self:start}
 @media(max-width:560px){.mail-labels-list-admin li{grid-template-columns:12px minmax(0,1fr) auto auto}.mail-labels-list-admin li>select{grid-row:2;grid-column:2/5}.mail-labels-list-admin li>small{grid-row:3;grid-column:2/5}.mail-labels-list-admin li>button:nth-of-type(1){grid-row:4;grid-column:2;justify-self:end}.mail-labels-list-admin li>button:nth-of-type(2){grid-row:4;grid-column:3/5}}
+/* 1.5.265 · ADI Premium 4.0: panel «Adi — Asistencia inteligente», revisión de mensajes y nombres de archivos. */
+.adio-panel{margin:14px 0 4px;padding:14px 16px;border:1px solid #24406b;border-radius:14px;background:linear-gradient(180deg,#0d1c33,#0a1628);display:grid;gap:12px;min-width:0}
+.adio-head{display:flex;align-items:center;gap:12px;min-width:0}
+.adio-mark{flex:none;display:grid;place-items:center;width:38px;height:38px;border-radius:11px;background:linear-gradient(135deg,#2f6fe0,#7c4ddb);color:#fff;box-shadow:0 6px 16px #2f6fe033}
+.adio-mark .system-icon{width:20px;height:20px}
+.adio-titles{flex:1 1 auto;min-width:0}.adio-titles h2{margin:0;font-size:15px;color:#e6efff;outline:none}.adio-titles small{display:block;margin-top:2px;color:#8fa6c6;font-size:11.5px;line-height:1.4}
+.adio-counts{display:flex;gap:6px;flex:none}
+.adio-count{display:inline-grid;place-items:center;min-width:26px;height:24px;padding:0 8px;border-radius:999px;font-size:12px;font-weight:800}
+.adio-count[data-priority=alta]{background:#ef444426;color:#fca5a5}.adio-count[data-priority=media]{background:#f59e0b26;color:#fbbf24}.adio-count[data-priority=info]{background:#3b82f626;color:#93c5fd}
+.adio-tools{display:flex;flex-wrap:wrap;gap:6px}
+button.adio-tool{display:inline-flex;align-items:center;gap:7px;min-height:36px;padding:6px 12px;border:1px solid #2a4570;border-radius:10px;background:#0f2140;color:#d6e4fb;font-size:12.5px;font-weight:600;transition:background-color .18s,border-color .18s}
+button.adio-tool:hover{background:#15305a;border-color:#4b75b3}button.adio-tool:focus-visible{outline:2px solid #8bb8ff;outline-offset:2px}
+button.adio-tool .system-icon{width:16px;height:16px;color:#93b8ff;flex:none}button.adio-tool[aria-expanded=true]{border-color:#4d8df0;background:#17366a}
+.adio-body{display:grid;gap:12px;min-width:0}
+.adio-group h3{margin:0 0 6px;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#8fa6c6}
+.adio-group ul{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,330px),1fr));gap:8px}
+.adio-rec{--adi-tone:#3b82f6;display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 10px;padding:10px 12px;border:1px solid #213a60;border-left:3px solid var(--adi-tone);border-radius:12px;background:#0b1830;animation:adio-in .2s ease-out;min-width:0}
+.adio-rec[data-priority=alta]{--adi-tone:#ef4444}.adio-rec[data-priority=media]{--adi-tone:#f59e0b}
+.adio-rec-ic{display:grid;place-items:center;width:30px;height:30px;border-radius:9px;background:color-mix(in srgb,var(--adi-tone) 18%,transparent);color:var(--adi-tone)}.adio-rec-ic .system-icon{width:16px;height:16px}
+.adio-rec-text{min-width:0}.adio-rec-text strong{display:block;font-size:13px;color:#e6efff;line-height:1.35}
+.adio-rec-reason{margin:3px 0 0;font-size:12px;color:#b9c8e6;line-height:1.45;overflow-wrap:anywhere}.adio-rec-action{margin:3px 0 0;font-size:11.5px;color:#8fa6c6;line-height:1.4}
+.adio-rec-acts{grid-column:2;display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-top:4px}
+.adio-rec-acts button.secondary{min-height:32px;padding:4px 12px;font-size:12px}
+button.adio-dismiss{display:inline-grid;place-items:center;width:32px;height:32px;min-height:0;margin-left:auto;padding:0;border:1px solid #2a4063;border-radius:9px;background:transparent;color:#8fa6c6}
+button.adio-dismiss:hover{color:#fca5a5;border-color:#7f1d1d}button.adio-dismiss .system-icon{width:15px;height:15px}
+.adio-empty{display:flex;align-items:center;gap:8px;margin:0;color:#9fdcbc;font-size:12.5px}.adio-empty .system-icon{width:16px;height:16px;flex:none}
+.adio-restore{justify-self:start;font-size:12px}
+.adio-extra{display:grid;gap:8px;padding:12px;border:1px solid #23395a;border-radius:12px;background:#0b1729;min-width:0}
+.adio-pay-head{display:flex;align-items:center;gap:8px;color:#e6efff;font-size:13px}.adio-pay-head .system-icon{width:16px;height:16px;color:#93b8ff}
+.adio-pay-state{margin-left:auto;padding:2px 9px;border-radius:999px;background:#1a2b47;color:#cfe0ff;font-size:11.5px;font-weight:700}
+.adio-pay-state[data-state=pagado]{background:#10b98126;color:#6ee7b7}.adio-pay-state[data-state=parcial],.adio-pay-state[data-state=pendiente]{background:#f59e0b26;color:#fbbf24}
+.adio-values{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:0}
+.adio-values div{min-width:0;padding:8px 10px;border:1px solid #1e3050;border-radius:10px;background:#0d1b31}.adio-values dt{font-size:11px;color:#8fa6c6}.adio-values dd{margin:2px 0 0;font-size:15px;font-weight:800;color:#e6efff;overflow-wrap:anywhere}
+.adio-moves{list-style:none;margin:0;padding:0;display:grid;gap:4px}
+.adio-moves li{display:flex;flex-wrap:wrap;gap:4px 12px;padding:6px 8px;border-radius:8px;background:#0d1b31;color:#b9c8e6;font-size:12px}.adio-moves strong{color:#e6efff}.adio-moves em{color:#fbbf24;font-style:normal;font-weight:700}
+.adio-note{margin:0;color:#8fa6c6;font-size:11.5px;line-height:1.45}
+.adio-pay-actions{display:flex;flex-wrap:wrap;gap:8px}.adio-pay-actions button{min-height:36px;display:inline-flex;align-items:center;gap:6px}.adio-pay-actions .system-icon{width:15px;height:15px}
+.adio-focus{outline:2px solid #8b5cf6;outline-offset:3px;border-radius:12px}
+.adio-check{margin-top:8px;padding:8px 10px;border:1px solid #2a3f66;border-radius:10px;background:#0b1729;font-size:12px}
+.adio-check-head{display:flex;align-items:center;gap:6px;margin:0 0 5px;color:#b9c8ff;font-weight:700}.adio-check-head .system-icon{width:14px;height:14px}
+.adio-check ul{list-style:none;margin:0;padding:0;display:grid;gap:4px}.adio-check li{display:flex;align-items:flex-start;gap:6px;line-height:1.4}
+.adio-check li .system-icon,.adio-check-ok .system-icon{flex:none;width:14px;height:14px;margin-top:2px}
+.adio-check-warn{color:#fcd34d}.adio-check-tip{color:#bcd3f5}.adio-check-ok{display:flex;gap:6px;margin:0;color:#9fdcbc}
+.adio-dialog{width:min(640px,calc(100vw - 20px))}.adio-pay-msg{display:grid;gap:10px}.adio-dialog textarea{width:100%;box-sizing:border-box}
+textarea.adio-report{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px;line-height:1.5;white-space:pre-wrap}
+@keyframes adio-in{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){.adio-rec{animation:none}button.adio-tool{transition:none}}
+@media(max-width:600px){.adio-panel{padding:12px;gap:10px}.adio-tools{display:grid;grid-template-columns:1fr 1fr}button.adio-tool{justify-content:flex-start;min-height:40px}.adio-tools>button:last-child:nth-child(odd){grid-column:1/-1}.adio-values dd{font-size:13.5px}.adio-head{align-items:flex-start}}
+@media(max-width:360px){.adio-tools{grid-template-columns:1fr}.adio-values{grid-template-columns:1fr}.adio-counts{display:none}}
+/* Fotos: zona, nombre sugerido (editable) y nombre original */
+.rx-photo-add{flex-wrap:wrap}.rx-photo-add select{flex:0 1 auto}.rx-photo-add input.rx-photo-name{flex:1 1 220px;min-width:0;min-height:38px;height:38px;padding:4px 10px;font-size:13px}
+.rx-photo-name-hint{display:block;margin-top:4px;color:#8fa6c6;font-size:11.5px;overflow-wrap:anywhere}
+.ofx-fname-row{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:6px;margin-top:4px}.ofx-fname-row span{font-size:11px;color:#8fa6c6}.ofx-fname-row input{min-height:30px;padding:3px 8px;font-size:12px;min-width:0}
+@media(max-width:480px){.ofx-fname-row{grid-template-columns:1fr}}
+/* Panel de ADI en pantallas anchas: los grupos de prioridad lado a lado (sin columnas vacías). */
+@media(min-width:1100px){.adio-body{grid-template-columns:repeat(auto-fit,minmax(300px,1fr));align-items:start}.adio-body>.adio-empty,.adio-body>.adio-restore{grid-column:1/-1}.adio-group ul{grid-template-columns:1fr}}

@@ -198,8 +198,12 @@ def create(c, oid, data, user, now):
         raise FollowupError(str(error), error.status, error.fields)
     order_evidence.draft_discard(c, oid, user)
     for f in files:
-        c.execute('INSERT INTO order_followup_files(followup_id,order_id,name,mime,size,sha256,visible_to_client,data,created_by,created_at) VALUES (?,?,?,?,?,?,?,?,?,?)',
-                  (fid, oid, f['name'], f['mime'], f['size'], f['sha256'], f['visible'], f['data'], user['id'], stamp(now)))
+        try:
+            name = order_evidence.evidence_name(c, oid, fid, f['mime'], f.get('custom', ''))
+        except order_evidence.EvidenceError as error:
+            raise FollowupError(str(error), error.status, error.fields)
+        c.execute('INSERT INTO order_followup_files(followup_id,order_id,name,mime,size,sha256,visible_to_client,data,created_by,created_at,original_name) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
+                  (fid, oid, name, f['mime'], f['size'], f['sha256'], f['visible'], f['data'], user['id'], stamp(now), f['name']))
     c.execute('UPDATE orders SET updated_at=?,revision=revision+1 WHERE id=?', (now.isoformat(timespec='microseconds'), oid))
     # 1.5.257: un seguimiento técnico real (diagnóstico, reparación, repuesto, pruebas, finalizado) mueve el estado si corresponde. Una
     # corrección de un seguimiento anterior no mueve nada.
@@ -231,7 +235,8 @@ def _files(raw):
             raise FollowupError('Cada archivo puede pesar como máximo 900 KB.', 400, {'files': 'Archivo demasiado grande.'})
         name = re.sub(r'[^\w .()-]', '', str(item.get('name', '') or 'evidencia'))[:80] or 'evidencia'
         out.append({'name': name, 'mime': mime, 'size': len(raw_bytes), 'sha256': hashlib.sha256(raw_bytes).hexdigest(),
-                    'visible': 1 if str(item.get('visible', '')) in ('1', 'true') else 0, 'data': base64.b64encode(raw_bytes).decode()})
+                    'visible': 1 if str(item.get('visible', '')) in ('1', 'true') else 0, 'data': base64.b64encode(raw_bytes).decode(),
+                    'custom': str(item.get('filename', '') or '')[:160]})
     return out
 
 
@@ -241,7 +246,7 @@ def listing(c, oid):
                                        "LEFT JOIN quotes q ON q.id=f.quote_id WHERE f.order_id=? ORDER BY f.id DESC", (oid,))]
     import order_evidence
     files, state = {}, order_evidence.states(c, oid)
-    for r in c.execute("SELECT id,followup_id,name,mime,size,sha256,visible_to_client,created_at,storage,thumb!='' has_thumb FROM order_followup_files WHERE order_id=? ORDER BY id", (oid,)):
+    for r in c.execute("SELECT id,followup_id,name,original_name,mime,size,sha256,visible_to_client,created_at,storage,thumb!='' has_thumb FROM order_followup_files WHERE order_id=? ORDER BY id", (oid,)):
         st = state[r['id']]
         files.setdefault(r['followup_id'], []).append(dict(r, visible=bool(st['visible']), retired=bool(st['retired']), retired_reason=st['reason'], changed_at=st['changed_at'],
                                                            changed_by=st['changed_by'], has_thumb=bool(r['has_thumb'])))

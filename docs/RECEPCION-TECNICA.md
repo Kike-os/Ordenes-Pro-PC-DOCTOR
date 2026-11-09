@@ -40,7 +40,13 @@ El código está en `local/reception_details.py`, las rutas en `local/app.py` y 
 - **Categorías:** recepción, diagnóstico, reparación y entrega.
 - **Datos de cada foto:** zona o pieza y observación.
 - **Zona de la foto (1.5.263):** además de las zonas de inspección, se puede elegir el cargador y **cada accesorio recibido** por su nombre (por ejemplo, «Mouse y receptor USB»), para fotografiar un accesorio concreto cuando hace falta.
-- **Nombre descriptivo:** sigue el formato `PCD-20261109-0001_HP_240-G7_Pantalla_01.jpg`, y la foto se descarga con ese nombre.
+- **Nombre descriptivo (1.5.265):** sigue el formato `PCD-20261109-0001_HP-240-G7_Recepcion_Frontal_01.jpg`, y la foto se descarga con ese nombre.
+  - El nombre se compone de: orden, equipo, categoría, zona o pieza, y un número que sigue la secuencia de la orden.
+  - ADI lo sugiere al elegir la categoría y la zona. Se puede escribir otro, al subir la foto o después, desde la vista ampliada.
+  - El nombre se limpia de acentos y caracteres especiales, lleva la extensión real (`.jpg`), nunca repite el de otra foto de la orden (agrega `-2`, `-3`…) y no admite el nombre del cliente.
+  - El nombre original del archivo se guarda solo como dato («Archivo original»).
+  - Sin datos suficientes, el nombre es genérico (`…_General_03.jpg`): nunca se inventan daños.
+  - Las fotos anteriores conservan su nombre.
 - **Fecha, hora y técnico:** quedan registrados.
 - **Marcar daños:** las marcas, con lápiz o círculo en rojo o amarillo, se guardan en una **copia**. El original no cambia y sigue siendo la evidencia; la vista ampliada alterna entre los dos.
 - **Eliminar:** solo administración, con motivo obligatorio. La foto deja de verse en la orden, pero **se conserva** en el historial de evidencias con quién, cuándo y por qué.

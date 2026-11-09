@@ -4,6 +4,19 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## Sin publicar
+
+### Nuevas funcionalidades
+
+- ADI Premium 4.0: panel «Adi — Asistencia inteligente» en cada orden. Muestra recomendaciones con datos registrados, agrupadas por prioridad, cada una con su motivo verificable, la acción y un acceso a su sección. Botones: Generar mensaje, Revisar pendientes, Consultar pagos, Ver seguimiento y Preparar informe.
+- ADI revisa los mensajes al cliente con los datos de la orden: avisa si el texto dice listo sin estarlo, si un importe no coincide, si dice que no hay saldo, si cita vencimientos inexistentes o repuestos o aduana sin registrar, y sugiere lo que falta.
+- Recordatorio de pago con valores reales (total, abonado y saldo), sin vencimientos inventados y con aviso si ya hubo uno en 72 h. Se envía por Comunicación con la plantilla «pago»; ADI no registra pagos.
+
+### Mejoras realizadas
+
+- Nombres de fotos y evidencias: PCD-…_HP-240-G7_Recepcion_Frontal_01.jpg, con etapa del repuesto si aplica. ADI sugiere el nombre y se puede editar; nunca se repite ni admite el nombre del cliente, lleva la extensión real y el nombre original queda como dato.
+- Recomendaciones informativas de ADI: se pueden descartar sin cambiar datos y vuelven solo si cambian sus datos (migración 099: dos columnas y una tabla nuevas, sin tocar datos existentes).
+
 ## v1.5.264 — 2026-11-09 10:13 (UTC-05:00)
 
 Mail Pro Premium 3.1 (distribución a pantalla completa y etiquetas editables) y corrección del formulario de inspección (sin hueco vacío, categorías con contador y resumen en vivo)

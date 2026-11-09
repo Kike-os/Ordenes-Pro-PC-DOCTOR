@@ -197,10 +197,82 @@ def _slug(text, limit=24):
     text = unicodedata.normalize('NFD', str(text or ''))
     text = ''.join(ch for ch in text if unicodedata.category(ch) != 'Mn')
     text = re.sub(r'[^A-Za-z0-9]+', '-', text).strip('-')
+    if len(text) > limit and '-' in text[:limit + 1]:
+        return text[:limit + 1].rsplit('-', 1)[0].strip('-')  # sin partir una palabra
     return text[:limit].strip('-')
 
 
-def photo_filename(code, brand, model, subject, number):
-    """PCD-20261109-0001_HP_240-G7_Pantalla_01.jpg (sin acentos ni espacios; solo letras, números y guiones)."""
-    parts = [_slug(code, 40) or 'orden', _slug(brand, 20), _slug(model, 24), _slug(subject, 24) or 'General']
-    return '_'.join(p for p in parts if p) + '_%02d.jpg' % max(1, int(number))
+def photo_filename(code, brand, model, subject, number, category='', ext='jpg'):
+    """Nombre descriptivo (1.5.265): PCD-20261109-0001_HP-240-G7_Recepcion_Frontal_01.jpg.
+
+    Orden, equipo (marca y modelo unidos), categoría o etapa, tema de la foto y un número secuencial. Sin acentos ni espacios: solo letras,
+    números, guiones y guiones bajos. No lleva nombre, contacto ni identificación del cliente."""
+    device = '-'.join(p for p in (_slug(brand, 20), _slug(model, 24)) if p)
+    small = {'y', 'e', 'o', 'u', 'de', 'del', 'la', 'el', 'los', 'las', 'a'}
+    title = lambda slug: '-'.join(w if i and w.lower() in small else w[:1].upper() + w[1:] for i, w in enumerate(slug.split('-')))
+    cat, sub = title(_slug(category, 40)), title(_slug(subject, 32))
+    label = '_'.join(x for x in (cat, sub if sub.lower() != cat.lower() else '') if x) or 'General'
+    parts = [_slug(code, 40) or 'orden', device, label]
+    return '_'.join(p for p in parts if p) + '_%02d.%s' % (max(1, int(number)), ext)
+
+
+SAFE_NAME = re.compile(r'[^A-Za-z0-9_-]+')
+
+
+def safe_filename(name, ext):
+    """Nombre escrito por el usuario, seguro para guardar: sin ruta, sin acentos ni caracteres especiales, con la extensión REAL del archivo
+    (la que indica su contenido, no la que se escribió). '' si no queda nada utilizable."""
+    import unicodedata
+    base = str(name or '').replace('\\', '/').split('/')[-1].strip()
+    base = re.sub(r'\.(jpe?g|png|webp|pdf|heic|gif)$', '', base, flags=re.I)
+    base = unicodedata.normalize('NFD', base)
+    base = ''.join(ch for ch in base if unicodedata.category(ch) != 'Mn')
+    base = re.sub(r'-{2,}', '-', SAFE_NAME.sub('-', base)).strip('-_.')[:110].strip('-_')
+    return base + '.' + ext if base else ''
+
+
+def personal_terms(client):
+    """Partes del nombre del cliente (de 4 letras o más) que no deben aparecer en un nombre de archivo."""
+    words = [_slug(w).lower() for w in str(client or '').split()]
+    return [w for w in words if len(w) >= 4]
+
+
+def unique_filename(name, taken):
+    """Devuelve `name` o, si ya existe (sin distinguir mayúsculas), la misma base con -2, -3…; nunca reemplaza un archivo anterior."""
+    used = {str(t).lower() for t in taken if t}
+    if name.lower() not in used:
+        return name
+    base, dot, ext = name.rpartition('.')
+    for n in range(2, 1000):
+        candidate = '%s-%d.%s' % (base, n, ext)
+        if candidate.lower() not in used:
+            return candidate
+    raise ValueError('Demasiados archivos con el mismo nombre.')
+
+
+class NameError_(ValueError):
+    """Nombre de archivo no aceptado (mensaje para el usuario)."""
+
+
+def original_name(value):
+    """Nombre del archivo tal como lo eligió el usuario, solo como metadato (sin ruta ni caracteres de control; máximo 160)."""
+    name = str(value or '').replace('\\', '/').split('/')[-1]
+    return re.sub(r'[\x00-\x1f\x7f<>"]', '', name).strip()[:160]
+
+
+def photo_name(c, oid, category, subject, custom='', exclude=None):
+    """Nombre definitivo de una foto de la orden: el escrito por el usuario (seguro) o el sugerido; nunca repetido en la orden.
+    El número es la secuencia de fotos de la orden (las retiradas cuentan: un número no se reutiliza)."""
+    info = c.execute("SELECT o.code,d.brand,d.model,cl.name client FROM orders o JOIN devices d ON d.id=o.device_id JOIN clients cl ON cl.id=d.client_id WHERE o.id=?", (oid,)).fetchone()
+    taken = [r[0] for r in c.execute('SELECT filename FROM order_photos WHERE order_id=? AND id!=?', (oid, exclude or 0))]
+    if str(custom or '').strip():
+        name = safe_filename(custom, 'jpg')
+        if not name or len(name) < 8:
+            raise NameError_('Escribe un nombre de al menos 3 letras o números para la foto.')
+        low = name.lower()
+        if any(term in low for term in personal_terms(info['client'])):
+            raise NameError_('No incluyas el nombre del cliente en el nombre del archivo: usa la orden, el equipo y lo que muestra la foto.')
+        return unique_filename(name, taken)
+    number = c.execute('SELECT COUNT(*) FROM order_photos WHERE order_id=? AND id!=?', (oid, exclude or 0)).fetchone()[0] + 1
+    title = PHOTO_CATEGORIES.get(category, '')
+    return unique_filename(photo_filename(info['code'] or 'OP-%05d' % oid, info['brand'], info['model'], subject, number, title), taken)

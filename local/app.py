@@ -1721,6 +1721,23 @@ class Handler(BaseHTTPRequestHandler):
                 found=repair_stages.compute(c,int(stages_get[1]))
                 if not found:return self.reply(404,{'error':'Orden no disponible.'})
                 return self.reply(200,{**found,'signature':repair_stages.signature(c,int(stages_get[1]))})
+            adi_get=re.fullmatch(r'/api/orders/([0-9]+)/adi',path)
+            if adi_get:
+                # 1.5.265: panel «Adi — Asistencia inteligente» de la orden (solo lectura, con los datos registrados).
+                import adi_order
+                if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
+                try:return self.reply(200,adi_order.panel(c,int(adi_get[1]),user,reception_now().replace(tzinfo=None)))
+                except adi_order.AdiOrderError as error:return self.reply(error.status,{'error':str(error)})
+            photo_name_get=re.fullmatch(r'/api/orders/([0-9]+)/photo-name',path)
+            if photo_name_get:
+                # 1.5.265: nombre descriptivo sugerido para una foto (el mismo que aplicará el servidor si no se escribe otro).
+                import reception_details
+                if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
+                oid=int(photo_name_get[1]);query=parse_qs(urlsplit(self.path).query)
+                if not c.execute('SELECT 1 FROM orders WHERE id=?',(oid,)).fetchone():return self.reply(404,{'error':'Orden no disponible.'})
+                category=query.get('category',[''])[0];category=category if category in reception_details.PHOTO_CATEGORIES else 'recepcion'
+                subject=re.sub(r'\s+',' ',query.get('subject',[''])[0]).strip()[:40]
+                return self.reply(200,{'filename':reception_details.photo_name(c,oid,category,subject)})
             parts_get=re.fullmatch(r'/api/orders/([0-9]+)/part-requests',path)
             if parts_get:
                 # Pedidos de repuestos de la orden (panel del taller): etapas, historial, asociaciones y opciones para asociar sin duplicar.
@@ -1942,7 +1959,7 @@ class Handler(BaseHTTPRequestHandler):
                 # Versión oficial vigente, para consultarla desde órdenes sin aceptación registrada (no implica que esta orden la haya aceptado).
                 active_terms=service_terms.current(c,reception_now());result['terms_current']=service_terms.metadata(active_terms) if active_terms else None
                 # 1.5.262: categoría, zona, observación, nombre descriptivo, quién y cuándo, copia con marcas; las eliminadas quedan en el historial.
-                photo_cols="p.id,p.is_main,p.position,p.size,p.created_at,p.category,p.subject,p.note,p.filename,p.annotated!='' annotated,p.annotated_at,COALESCE(u.name,'') author,p.deleted_at,p.delete_reason,COALESCE(x.name,'') deleted_by_name"
+                photo_cols="p.id,p.is_main,p.position,p.size,p.created_at,p.category,p.subject,p.note,p.filename,p.original_name,p.annotated!='' annotated,p.annotated_at,COALESCE(u.name,'') author,p.deleted_at,p.delete_reason,COALESCE(x.name,'') deleted_by_name"
                 photo_rows=[dict(r) for r in c.execute('SELECT '+photo_cols+' FROM order_photos p LEFT JOIN users u ON u.id=p.created_by LEFT JOIN users x ON x.id=p.deleted_by WHERE p.order_id=? ORDER BY p.is_main DESC,p.position,p.id',(result['id'],))]
                 result['photos']=[r for r in photo_rows if not r['deleted_at']];result['photos_deleted']=[r for r in photo_rows if r['deleted_at']] if user['role']=='administrador' else []
                 result['reception']=__import__('reception_details').loads(result.get('reception_details'))
@@ -4344,6 +4361,13 @@ class Handler(BaseHTTPRequestHandler):
                             audit(c,user['id'],'order_photo_deleted',oid)
                         elif action=='meta':
                             category,subject,note=meta();c.execute('UPDATE order_photos SET category=?,subject=?,note=? WHERE id=?',(category,subject,note,target['id']));audit(c,user['id'],'order_photo_meta',oid)
+                            # 1.5.265: cambiar el nombre del archivo (seguro, único en la orden y sin datos del cliente). El original guardado no cambia.
+                            if str(data.get('filename','')).strip():
+                                try:new_name=reception_details.photo_name(c,oid,category,subject,str(data.get('filename')),exclude=target['id'])
+                                except reception_details.NameError_ as error:return self.reply(400,{'error':str(error),'fields':{'filename':str(error)}})
+                                old=c.execute('SELECT filename FROM order_photos WHERE id=?',(target['id'],)).fetchone()[0]
+                                if new_name!=old:c.execute('UPDATE order_photos SET filename=? WHERE id=?',(new_name,target['id']));audit(c,user['id'],'order_photo_renamed',oid)
+                                return self.reply(200,{'ok':True,'filename':new_name})
                         elif action=='annotate':
                             # Las marcas se guardan en una COPIA: el original no cambia y sigue siendo la evidencia.
                             marked=jpeg('data')
@@ -4360,14 +4384,15 @@ class Handler(BaseHTTPRequestHandler):
                     except ValueError:position=0
                     main=data.get('main') is True
                     category,subject,note=meta()
-                    info=c.execute("SELECT o.code,d.brand,d.model FROM orders o JOIN devices d ON d.id=o.device_id WHERE o.id=?",(oid,)).fetchone()
-                    number=c.execute("SELECT COUNT(*) FROM order_photos WHERE order_id=? AND lower(subject)=lower(?)",(oid,subject)).fetchone()[0]+1
-                    filename=reception_details.photo_filename(info['code'] or 'OP-%05d'%oid,info['brand'],info['model'],subject or reception_details.PHOTO_CATEGORIES[category],number)
+                    # 1.5.265: nombre descriptivo sugerido o el que escribió el usuario (seguro, único y sin datos del cliente); el nombre original
+                    # del archivo se guarda solo como metadato.
+                    try:filename=reception_details.photo_name(c,oid,category,subject,str(data.get('filename','') or ''))
+                    except reception_details.NameError_ as error:return self.reply(400,{'error':str(error),'fields':{'filename':str(error)}})
                     if main:c.execute('UPDATE order_photos SET is_main=0 WHERE order_id=?',(oid,))
                     stamp_photo=reception_now().isoformat(timespec='seconds')
-                    pid=c.execute('INSERT INTO order_photos(order_id,position,is_main,mime,size,data,created_by,created_at,category,subject,note,filename,annotated,annotated_by,annotated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+                    pid=c.execute('INSERT INTO order_photos(order_id,position,is_main,mime,size,data,created_by,created_at,category,subject,note,filename,annotated,annotated_by,annotated_at,original_name) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
                                   (oid,position,1 if main else 0,'image/jpeg',len(content),base64.b64encode(content).decode('ascii'),user['id'],stamp_photo,category,subject,note,filename,
-                                   base64.b64encode(marked).decode('ascii') if marked else '',user['id'] if marked else None,stamp_photo if marked else '')).lastrowid
+                                   base64.b64encode(marked).decode('ascii') if marked else '',user['id'] if marked else None,stamp_photo if marked else '',reception_details.original_name(data.get('original_name','')))).lastrowid
                     audit(c,user['id'],'order_photo_added',oid)
                     return self.reply(201,{'ok':True,'id':pid,'filename':filename})
                 if path=='/api/part-notices/settings':
@@ -4444,6 +4469,31 @@ class Handler(BaseHTTPRequestHandler):
                     except (order_evidence.EvidenceError,order_followups.FollowupError) as error:c.commit();return self.reply(error.status,{'error':str(error),'fields':error.fields})
                     c.commit();return self.reply(200,{'ok':True,**result})
                 # 1.5.257: mensaje de seguimiento según el estado real (ADI con datos depurados o la explicación del estado). No se envía nada.
+                adi_post=re.fullmatch(r'/api/orders/([0-9]+)/adi',path)
+                if adi_post:
+                    # 1.5.265: acciones del panel de ADI. Ninguna cambia la orden: revisar un texto, preparar un recordatorio o un informe y
+                    # descartar una recomendación informativa (solo para este usuario). Lo preparado se revisa y se envía por los flujos de siempre.
+                    import adi_order
+                    if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
+                    oid=int(adi_post[1]);action=str(data.get('action',''));now_adi=reception_now().replace(tzinfo=None)
+                    if limited(c,'adi-order:'+str(user['id']),limit=600,window=3600):return self.reply(429,{'error':'Demasiadas solicitudes a ADI. Intenta en unos minutos.'})
+                    ctx=adi_order.context(c,oid)
+                    if not ctx:return self.reply(404,{'error':'Orden no disponible.'})
+                    try:
+                        if action=='check':
+                            channel=str(data.get('channel','whatsapp'));return self.reply(200,adi_order.check_message(ctx,str(data.get('text',''))[:6000],channel if channel in ('whatsapp','correo') else 'whatsapp'))
+                        if action=='dismiss':
+                            adi_order.dismiss(c,oid,user,str(data.get('key',''))[:60],str(data.get('fingerprint',''))[:64],now_adi);audit(c,user['id'],'adi_recommendation_dismissed',oid)
+                            return self.reply(200,adi_order.panel(c,oid,user,now_adi))
+                        if action=='restore':
+                            c.execute('DELETE FROM adi_dismissals WHERE order_id=? AND user_id=?',(oid,user['id']));audit(c,user['id'],'adi_recommendations_restored',oid)
+                            return self.reply(200,adi_order.panel(c,oid,user,now_adi))
+                        if action=='payment_message':
+                            result=adi_order.payment_message(c,oid,ctx,now_adi);audit(c,user['id'],'adi_payment_message_prepared',oid);return self.reply(200,result)
+                        if action=='report':
+                            audit(c,user['id'],'adi_report_prepared',oid);return self.reply(200,{'report':adi_order.report(ctx,adi_order.recommendations(ctx,now_adi))})
+                    except adi_order.AdiOrderError as error:return self.reply(error.status,{'error':str(error)})
+                    return self.reply(400,{'error':'Acción no válida.'})
                 status_message=re.fullmatch(r'/api/orders/([0-9]+)/status-message',path)
                 if status_message:
                     import status_messages

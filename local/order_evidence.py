@@ -183,15 +183,45 @@ def cancel(c, oid, data, user):
     return {'cancelled': True}
 
 
+def evidence_name(c, oid, fid, mime, custom='', taken=()):
+    """Nombre descriptivo de una evidencia (1.5.265): PCD-…_HP-240-G7_Diagnostico-Tecnico_01.jpg, o para un repuesto
+    PCD-…_HP-240-G7_Repuesto-03-Pantalla_Recibido_02.jpg (la etapa registrada en el seguimiento). Con `custom`, el nombre que escribió
+    el usuario, seguro y con la extensión real del archivo. Nunca repite un nombre de la orden ni lleva datos del cliente."""
+    import reception_details as rd
+    import order_followups
+    import order_part_requests as opr
+    info = c.execute("SELECT o.code,d.brand,d.model,cl.name client FROM orders o JOIN devices d ON d.id=o.device_id JOIN clients cl ON cl.id=d.client_id WHERE o.id=?", (oid,)).fetchone()
+    ext = EXTENSIONS.get(mime, ('bin',))[0]
+    used = [r[0] for r in c.execute('SELECT name FROM order_followup_files WHERE order_id=?', (oid,))] + list(taken)
+    if str(custom or '').strip():
+        name = rd.safe_filename(custom, ext)
+        if not name or len(name) < len(ext) + 4:
+            raise EvidenceError('Escribe un nombre de al menos 3 letras o números para cada archivo.', 400, {'files': 'Nombre no válido.'})
+        if any(term in name.lower() for term in rd.personal_terms(info['client'])):
+            raise EvidenceError('No incluyas el nombre del cliente en el nombre del archivo.', 400, {'files': 'Nombre con datos personales.'})
+        return rd.unique_filename(name, used)
+    f = c.execute('SELECT kind,part_request_id,part_step FROM order_followups WHERE id=?', (fid,)).fetchone()
+    topic, label = '', order_followups.KINDS.get(f['kind'], ('Evidencia',))[0] if f else 'Evidencia'
+    if f and f['part_request_id']:
+        part = c.execute('SELECT name FROM order_part_requests WHERE id=?', (f['part_request_id'],)).fetchone()
+        short = dict((s[0], s[2]) for s in opr.STAGES)
+        label = 'Repuesto %02d %s' % (f['part_request_id'], rd._slug(part['name'] if part else '', 20))
+        topic = opr.STEP_LABELS.get(f['part_step']) or short.get(f['part_step'], '')
+    number = len(used) + 1
+    return rd.unique_filename(rd.photo_filename(info['code'] or 'OP-%05d' % oid, info['brand'], info['model'], topic, number, label, ext), used)
+
+
 def attach(c, oid, fid, items, user, now):
     """Convierte cargas verificadas en evidencias del seguimiento `fid` (en la misma transacción que el seguimiento)."""
     for item in items:
         row = _upload(c, oid, item['upload'], user)
         if row['status'] != 'lista':
             raise EvidenceError('Un archivo todavía no terminó de subir o ya se usó.', 409, {'files': 'Carga incompleta.'})
-        file_id = c.execute('INSERT INTO order_followup_files(followup_id,order_id,name,mime,size,sha256,visible_to_client,data,created_by,created_at,storage,upload_id,thumb) '
-                            "VALUES (?,?,?,?,?,?,?,'',?,?,'partes',?,?)",
-                            (fid, oid, row['name'], row['mime'], row['size'], row['sha256'], item['visible'], user['id'], stamp(now), row['id'], row['thumb'])).lastrowid
+        # 1.5.265: nombre descriptivo (o el escrito por el usuario); el nombre con el que llegó el archivo queda como metadato.
+        name = evidence_name(c, oid, fid, row['mime'], item.get('filename', ''))
+        file_id = c.execute('INSERT INTO order_followup_files(followup_id,order_id,name,mime,size,sha256,visible_to_client,data,created_by,created_at,storage,upload_id,thumb,original_name) '
+                            "VALUES (?,?,?,?,?,?,?,'',?,?,'partes',?,?,?)",
+                            (fid, oid, name, row['mime'], row['size'], row['sha256'], item['visible'], user['id'], stamp(now), row['id'], row['thumb'], row['name'])).lastrowid
         c.execute("UPDATE order_uploads SET status='usada',file_id=? WHERE id=?", (file_id, row['id']))
 
 
@@ -200,7 +230,7 @@ def uploads_in(items):
     out = []
     for item in items:
         if isinstance(item, dict) and item.get('upload'):
-            out.append({'upload': str(item['upload']), 'visible': 1 if str(item.get('visible', '')) in ('1', 'true') else 0})
+            out.append({'upload': str(item['upload']), 'visible': 1 if str(item.get('visible', '')) in ('1', 'true') else 0, 'filename': str(item.get('filename', '') or '')[:160]})
     return out
 
 
