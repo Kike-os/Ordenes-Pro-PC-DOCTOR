@@ -64,6 +64,7 @@ class MailFeatureRoutes(test_app.SecurityTests):
                 'read_message': lambda client, folder, uid, mark_seen=True: dict(self.msgs[int(uid)], text=self.msgs[int(uid)].get('text', 'Texto'))}
         for name, value in fake.items():
             stack.enter_context(patch.object(mail_pro, name, value))
+        stack.enter_context(patch.object(app, 'reception_now', lambda: NOW))  # días de espera calculados con una fecha fija (no la del reloj)
         self.cookie, self.csrf = self.login()
 
     def get(self, path):
