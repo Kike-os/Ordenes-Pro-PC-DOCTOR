@@ -96,7 +96,8 @@ class FollowupEvidenceTests(unittest.TestCase):
         _, gone = self.upload(post, oid, blob(PDF, 3000), 'informe.pdf')
         made = self.save(post, oid, [{'upload': pub, 'visible': '1'}, {'upload': priv, 'visible': ''}, {'upload': gone, 'visible': '1'}], 'evidencia-publica-0001')
         self.assertEqual(made['status'], 201, made['body'])
-        files = {f['name']: f for f in self.request('/api/orders/%d/followups' % oid, cookie=cookie)['body']['followups'][0]['files']}
+        # 1.5.265: cada evidencia se guarda con un nombre descriptivo; el nombre con el que llegó queda en original_name.
+        files = {f['original_name']: f for f in self.request('/api/orders/%d/followups' % oid, cookie=cookie)['body']['followups'][0]['files']}
         retire = post('/api/orders/%d/followups/files/%d' % (oid, files['informe.pdf']['id']), action='retire', reason='Informe equivocado (ficticio)')
         self.assertEqual(retire['status'], 200, retire['body'])
         with app.connect() as c:
