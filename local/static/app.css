@@ -10845,3 +10845,58 @@ button.mail-filter.mail-filter-label{display:none}
 @media(max-width:860px){button.mail-filter.mail-filter-label{display:inline-flex;align-items:center;gap:6px}}
 button.mail-filter.mail-filter-label .mail-label-dot{width:8px;height:8px}
 @media(min-width:861px){.mail-v2:not([data-side=collapsed]) .mail-side{overflow:hidden auto;scrollbar-width:thin}.mail-v2 .mail-labels{flex:0 0 auto;min-height:0;overflow:visible}.mail-v2 .mail-side-foot{flex:0 0 auto}}
+/* ===== 1.5.262 · Command Center Premium 3.0 (Centro de Operaciones): seis tarjetas de estado y cabecera. Acotado a #operations-states y .operations-heading ===== */
+body[data-page=dashboard] #operations-states.cc-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:14px;margin:0 0 20px}
+body[data-page=dashboard] .cc-card{--t:#94a3b8;position:relative;display:grid;grid-template-rows:auto auto auto auto;align-content:start;gap:8px;min-width:0;min-height:0;margin:0;padding:14px 14px 12px;
+ border:1px solid color-mix(in srgb,var(--t) 38%,#1c2c48);border-radius:14px;background:radial-gradient(120% 90% at 0% 0%,color-mix(in srgb,var(--t) 13%,transparent),transparent 60%),linear-gradient(165deg,#0f1d33,#0a1528 70%);
+ box-shadow:0 10px 24px #02071466,inset 0 1px 0 #ffffff0d,0 0 0 1px color-mix(in srgb,var(--t) 8%,transparent);color:#e7efff;text-align:left;cursor:pointer;overflow:hidden;
+ transition:transform .2s ease,border-color .2s ease,box-shadow .2s ease}
+body[data-page=dashboard] .cc-card::after{content:"";position:absolute;left:12px;right:12px;bottom:0;height:3px;border-radius:3px 3px 0 0;background:linear-gradient(90deg,transparent,var(--t),transparent);box-shadow:0 0 12px var(--t);opacity:.9}
+body[data-page=dashboard] .cc-card[data-status=pendiente]{--t:#94a3b8}body[data-page=dashboard] .cc-card[data-status=reparacion]{--t:#3b82f6}
+body[data-page=dashboard] .cc-card[data-status=esperando_cliente]{--t:#f59e0b}body[data-page=dashboard] .cc-card[data-status=presupuesto]{--t:#a78bfa}
+body[data-page=dashboard] .cc-card[data-status=listo]{--t:#10b981}body[data-page=dashboard] .cc-card[data-status=entregado]{--t:#2dd4bf}
+body[data-page=dashboard] .cc-top{display:flex;align-items:center;gap:10px;min-width:0}
+body[data-page=dashboard] .cc-icon{display:grid;place-items:center;flex:none;width:40px;height:40px;border-radius:11px;background:color-mix(in srgb,var(--t) 16%,#0b1528);color:var(--t);
+ box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--t) 45%,transparent),0 0 14px color-mix(in srgb,var(--t) 22%,transparent);transition:box-shadow .2s ease}
+body[data-page=dashboard] .cc-icon .system-icon{width:21px;height:21px}
+body[data-page=dashboard] .cc-title{min-width:0;color:#dbe6f8;font-size:12.5px;font-weight:700;line-height:1.3;overflow-wrap:break-word;hyphens:auto}
+body[data-page=dashboard] .cc-count{display:block;color:#fff;font-size:30px;font-weight:800;line-height:1;letter-spacing:-.02em;font-variant-numeric:tabular-nums;text-shadow:0 0 18px color-mix(in srgb,var(--t) 35%,transparent)}
+body[data-page=dashboard] .cc-sep{display:block;height:1px;background:linear-gradient(90deg,color-mix(in srgb,var(--t) 35%,transparent),#ffffff0f 70%,transparent)}
+body[data-page=dashboard] .cc-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;min-width:0}
+body[data-page=dashboard] .cc-hint{min-width:0;color:#9fb4d6;font-size:11.5px;font-weight:600;line-height:1.3}
+body[data-page=dashboard] .cc-card[data-late=true] .cc-hint{color:#fbbf24}
+body[data-page=dashboard] .cc-arrow{display:grid;place-items:center;flex:none;width:28px;height:28px;border-radius:50%;border:1px solid color-mix(in srgb,var(--t) 45%,transparent);
+ background:color-mix(in srgb,var(--t) 12%,transparent);color:var(--t);transition:transform .2s ease,background-color .2s ease}
+body[data-page=dashboard] .cc-arrow .system-icon{width:14px;height:14px}
+body[data-page=dashboard] .cc-card:hover{transform:translateY(-2px);border-color:color-mix(in srgb,var(--t) 70%,#1c2c48);box-shadow:0 14px 30px #02071480,0 0 0 1px color-mix(in srgb,var(--t) 25%,transparent),0 0 22px color-mix(in srgb,var(--t) 16%,transparent)}
+body[data-page=dashboard] .cc-card:hover .cc-icon{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--t) 70%,transparent),0 0 22px color-mix(in srgb,var(--t) 40%,transparent)}
+body[data-page=dashboard] .cc-card:hover .cc-arrow{transform:translateX(3px);background:color-mix(in srgb,var(--t) 24%,transparent)}
+body[data-page=dashboard] .cc-card:focus-visible{outline:2px solid var(--t);outline-offset:3px}
+body[data-page=dashboard] .cc-card:active,body[data-page=dashboard] .cc-card[data-active=true]{border-color:var(--t);box-shadow:0 0 0 2px color-mix(in srgb,var(--t) 55%,transparent),0 0 26px color-mix(in srgb,var(--t) 28%,transparent),0 12px 28px #02071480}
+body[data-page=dashboard] .cc-card.cc-bump .cc-count{animation:cc-bump .5s ease-out}
+@keyframes cc-bump{0%{transform:scale(1)}40%{transform:scale(1.08)}100%{transform:scale(1)}}
+/* Cabecera: kicker, título, subtítulo, fecha y acciones con iconos (mismos botones). */
+body[data-page=dashboard] .operations-heading{gap:16px 24px}
+body[data-page=dashboard] .operations-heading-tools{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:10px 12px}
+body[data-page=dashboard] .operations-actions{display:flex;flex-wrap:wrap;gap:8px}
+body[data-page=dashboard] .operations-actions button{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:40px;padding:8px 14px;border-radius:11px;font-size:13px;font-weight:700;white-space:nowrap}
+body[data-page=dashboard] .operations-actions button .system-icon{flex:none;width:17px;height:17px}
+body[data-page=dashboard] .operations-actions button.primary{box-shadow:0 8px 20px #2563eb40}
+@media(max-width:1279px){body[data-page=dashboard] #operations-states.cc-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:899px){body[data-page=dashboard] #operations-states.cc-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}}
+@media(max-width:600px){body[data-page=dashboard] .cc-card{padding:12px 12px 10px;gap:6px;border-radius:12px}body[data-page=dashboard] .cc-icon{width:34px;height:34px;border-radius:10px}
+ body[data-page=dashboard] .cc-icon .system-icon{width:18px;height:18px}body[data-page=dashboard] .cc-count{font-size:25px}body[data-page=dashboard] .cc-title{font-size:12px}
+ body[data-page=dashboard] .cc-arrow{width:26px;height:26px}body[data-page=dashboard] .operations-heading-tools{justify-content:flex-start;width:100%}
+ body[data-page=dashboard] .operations-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));width:100%}body[data-page=dashboard] .operations-actions button{padding:8px 6px;font-size:12px;white-space:normal;text-align:center}}
+@media(max-width:400px){body[data-page=dashboard] .operations-actions{grid-template-columns:1fr}body[data-page=dashboard] .operations-actions button{justify-content:flex-start;padding:8px 12px}}
+@media(max-width:359px){body[data-page=dashboard] #operations-states.cc-grid{grid-template-columns:1fr}}
+@media(prefers-reduced-motion:reduce){body[data-page=dashboard] .cc-card,body[data-page=dashboard] .cc-arrow,body[data-page=dashboard] .cc-icon{transition:none}
+ body[data-page=dashboard] .cc-card:hover{transform:none}body[data-page=dashboard] .cc-card:hover .cc-arrow{transform:none}body[data-page=dashboard] .cc-card.cc-bump .cc-count{animation:none}}
+body[data-page=dashboard] .operations-heading{flex-wrap:wrap}
+body[data-page=dashboard] .operations-heading>div:first-child{flex:1 1 360px;min-width:0}
+body[data-page=dashboard] .operations-heading-tools{flex:0 1 auto;min-width:0;max-width:100%}
+@media(max-width:1180px){body[data-page=dashboard] .operations-heading-tools{flex:1 1 100%;justify-content:space-between}}
+/* Contadores alineados: el título ocupa siempre el alto de tres líneas (el más largo, «Pendiente de aprobación de presupuesto»). */
+body[data-page=dashboard] .cc-top{min-height:49px;align-items:center}
+body[data-page=dashboard] .cc-title{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden}
+@media(max-width:600px){body[data-page=dashboard] .operations-heading>div:first-child{flex:none;width:100%}body[data-page=dashboard] .cc-top{min-height:44px}}
