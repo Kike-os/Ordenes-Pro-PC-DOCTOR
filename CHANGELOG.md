@@ -4,6 +4,24 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.262 — 2026-11-09 08:44 (UTC-05:00)
+
+Command Center Premium 3.0, recepción técnica estructurada y evidencia fotográfica con historial (con migración 098)
+
+### Nuevas funcionalidades
+
+- Centro de Operaciones: Command Center Premium con seis tarjetas de estado (icono iluminado, contador real animado, indicador y flecha) que abren Órdenes con su filtro; el retraso solo se muestra con una fecha estimada registrada.
+- Recepción técnica: inspección física por zonas según el tipo de equipo, con ubicación de cada daño y «Sin daños visibles» excluyente; control del cargador (estado, daños, marca, potencia, voltaje y serie) con nota automática si no se entrega.
+- Evidencia fotográfica: categorías (recepción, diagnóstico, reparación, entrega), zona y observación por foto, nombres descriptivos (PCD-…_HP_240-G7_Pantalla_01.jpg), autor y fecha, y marcas de daños sobre una copia sin alterar el original.
+
+### Mejoras realizadas
+
+- Accesorios recibidos con cantidad, estado aparente y observación (incluidos los personalizados). Todo se compone en el texto del comprobante, que el técnico revisa y puede corregir antes de guardar.
+
+### Errores corregidos
+
+- Eliminar una foto de evidencia ya no la borra: queda en el historial con quién, cuándo y por qué (solo administración y con motivo).
+
 ## v1.5.261 — 2026-11-09 08:00 (UTC-05:00)
 
 Repuestos: etapa opcional «En camino al punto de embarque» (sin migración)

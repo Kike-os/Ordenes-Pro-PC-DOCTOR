@@ -8,6 +8,30 @@
   },
   "releases": [
     {
+      "version": "1.5.262",
+      "date": "2026-11-09T08:44:02-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Command Center Premium 3.0, recepción técnica estructurada y evidencia fotográfica con historial (con migración 098)",
+      "changes": {
+        "features": [
+          "Centro de Operaciones: Command Center Premium con seis tarjetas de estado (icono iluminado, contador real animado, indicador y flecha) que abren Órdenes con su filtro; el retraso solo se muestra con una fecha estimada registrada.",
+          "Recepción técnica: inspección física por zonas según el tipo de equipo, con ubicación de cada daño y «Sin daños visibles» excluyente; control del cargador (estado, daños, marca, potencia, voltaje y serie) con nota automática si no se entrega.",
+          "Evidencia fotográfica: categorías (recepción, diagnóstico, reparación, entrega), zona y observación por foto, nombres descriptivos (PCD-…_HP_240-G7_Pantalla_01.jpg), autor y fecha, y marcas de daños sobre una copia sin alterar el original."
+        ],
+        "improvements": [
+          "Accesorios recibidos con cantidad, estado aparente y observación (incluidos los personalizados). Todo se compone en el texto del comprobante, que el técnico revisa y puede corregir antes de guardar."
+        ],
+        "fixes": [
+          "Eliminar una foto de evidencia ya no la borra: queda en el historial con quién, cuándo y por qué (solo administración y con motivo)."
+        ],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Kike-os: «haga y actualiza toddo junto»"
+    },
+    {
       "version": "1.5.261",
       "date": "2026-11-09T08:00:35-05:00",
       "type": "patch",
