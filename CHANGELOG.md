@@ -4,7 +4,9 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
-## Sin publicar
+## v1.5.265 — 2026-11-09 14:39 (UTC-05:00)
+
+ADI Premium 4.0: asistencia inteligente por orden con datos registrados, revisión de mensajes, recordatorio de pago real y nombres descriptivos de fotos y evidencias (migración 099)
 
 ### Nuevas funcionalidades
 

@@ -1,19 +1,35 @@
 {
   "unreleased": {
-    "features": [
-      "ADI Premium 4.0: panel «Adi — Asistencia inteligente» en cada orden. Muestra recomendaciones con datos registrados, agrupadas por prioridad, cada una con su motivo verificable, la acción y un acceso a su sección. Botones: Generar mensaje, Revisar pendientes, Consultar pagos, Ver seguimiento y Preparar informe.",
-      "ADI revisa los mensajes al cliente con los datos de la orden: avisa si el texto dice listo sin estarlo, si un importe no coincide, si dice que no hay saldo, si cita vencimientos inexistentes o repuestos o aduana sin registrar, y sugiere lo que falta.",
-      "Recordatorio de pago con valores reales (total, abonado y saldo), sin vencimientos inventados y con aviso si ya hubo uno en 72 h. Se envía por Comunicación con la plantilla «pago»; ADI no registra pagos."
-    ],
-    "improvements": [
-      "Nombres de fotos y evidencias: PCD-…_HP-240-G7_Recepcion_Frontal_01.jpg, con etapa del repuesto si aplica. ADI sugiere el nombre y se puede editar; nunca se repite ni admite el nombre del cliente, lleva la extensión real y el nombre original queda como dato.",
-      "Recomendaciones informativas de ADI: se pueden descartar sin cambiar datos y vuelven solo si cambian sus datos (migración 099: dos columnas y una tabla nuevas, sin tocar datos existentes)."
-    ],
+    "features": [],
+    "improvements": [],
     "fixes": [],
     "security": [],
     "performance": []
   },
   "releases": [
+    {
+      "version": "1.5.265",
+      "date": "2026-11-09T14:39:32-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "ADI Premium 4.0: asistencia inteligente por orden con datos registrados, revisión de mensajes, recordatorio de pago real y nombres descriptivos de fotos y evidencias (migración 099)",
+      "changes": {
+        "features": [
+          "ADI Premium 4.0: panel «Adi — Asistencia inteligente» en cada orden. Muestra recomendaciones con datos registrados, agrupadas por prioridad, cada una con su motivo verificable, la acción y un acceso a su sección. Botones: Generar mensaje, Revisar pendientes, Consultar pagos, Ver seguimiento y Preparar informe.",
+          "ADI revisa los mensajes al cliente con los datos de la orden: avisa si el texto dice listo sin estarlo, si un importe no coincide, si dice que no hay saldo, si cita vencimientos inexistentes o repuestos o aduana sin registrar, y sugiere lo que falta.",
+          "Recordatorio de pago con valores reales (total, abonado y saldo), sin vencimientos inventados y con aviso si ya hubo uno en 72 h. Se envía por Comunicación con la plantilla «pago»; ADI no registra pagos."
+        ],
+        "improvements": [
+          "Nombres de fotos y evidencias: PCD-…_HP-240-G7_Recepcion_Frontal_01.jpg, con etapa del repuesto si aplica. ADI sugiere el nombre y se puede editar; nunca se repite ni admite el nombre del cliente, lleva la extensión real y el nombre original queda como dato.",
+          "Recomendaciones informativas de ADI: se pueden descartar sin cambiar datos y vuelven solo si cambian sus datos (migración 099: dos columnas y una tabla nuevas, sin tocar datos existentes)."
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Kike-os: «Sí, publica al estar en verde» / «publica»"
+    },
     {
       "version": "1.5.264",
       "date": "2026-11-09T10:13:39-05:00",
