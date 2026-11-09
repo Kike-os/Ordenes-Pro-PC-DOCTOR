@@ -4,7 +4,9 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
-## Sin publicar
+## v1.5.266 — 2026-11-09 15:06 (UTC-05:00)
+
+Centro de notificaciones Premium Compact: categorías, tarjetas legibles, scroll interno, encabezado y pie fijos, teclado y móvil
 
 ### Mejoras realizadas
 

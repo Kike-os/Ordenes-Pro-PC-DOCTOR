@@ -1,17 +1,33 @@
 {
   "unreleased": {
     "features": [],
-    "improvements": [
-      "Centro de notificaciones Premium Compact: ventana más amplia (radio de 14 px), encabezado y pie fijos, insignias «sin leer» y «en total», scroll interno delgado y avisos agrupados por categoría: Órdenes, Presupuestos, Pagos, Seguimientos, Citas, Licencias y Sistema.",
-      "Notificaciones: cada aviso es una tarjeta legible con título y detalle en dos líneas (texto completo al pasar el cursor), hora, acento por prioridad y «Sin leer» visible sin depender del color. Muestra 3 por categoría con «Ver más»; teclado (Enter y Escape)."
-    ],
-    "fixes": [
-      "Notificaciones: textos cortados y tarjetas que se salían de la ventana. Antes solo se veían 3 categorías; ahora aparecen todas las que tienen novedades. En móvil la ventana queda dentro de la pantalla con botones apilados."
-    ],
+    "improvements": [],
+    "fixes": [],
     "security": [],
     "performance": []
   },
   "releases": [
+    {
+      "version": "1.5.266",
+      "date": "2026-11-09T15:06:05-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Centro de notificaciones Premium Compact: categorías, tarjetas legibles, scroll interno, encabezado y pie fijos, teclado y móvil",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Centro de notificaciones Premium Compact: ventana más amplia (radio de 14 px), encabezado y pie fijos, insignias «sin leer» y «en total», scroll interno delgado y avisos agrupados por categoría: Órdenes, Presupuestos, Pagos, Seguimientos, Citas, Licencias y Sistema.",
+          "Notificaciones: cada aviso es una tarjeta legible con título y detalle en dos líneas (texto completo al pasar el cursor), hora, acento por prioridad y «Sin leer» visible sin depender del color. Muestra 3 por categoría con «Ver más»; teclado (Enter y Escape)."
+        ],
+        "fixes": [
+          "Notificaciones: textos cortados y tarjetas que se salían de la ventana. Antes solo se veían 3 categorías; ahora aparecen todas las que tienen novedades. En móvil la ventana queda dentro de la pantalla con botones apilados."
+        ],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Kike-os: «actualiza ala siguiente version»"
+    },
     {
       "version": "1.5.265",
       "date": "2026-11-09T14:39:32-05:00",
