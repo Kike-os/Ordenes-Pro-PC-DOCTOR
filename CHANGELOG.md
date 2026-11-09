@@ -4,7 +4,9 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
-## Sin publicar
+## v1.5.264 — 2026-11-09 10:13 (UTC-05:00)
+
+Mail Pro Premium 3.1 (distribución a pantalla completa y etiquetas editables) y corrección del formulario de inspección (sin hueco vacío, categorías con contador y resumen en vivo)
 
 ### Nuevas funcionalidades
 
