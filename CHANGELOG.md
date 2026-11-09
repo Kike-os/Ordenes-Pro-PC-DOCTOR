@@ -4,6 +4,17 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## Sin publicar
+
+### Mejoras realizadas
+
+- Centro de notificaciones Premium Compact: ventana más amplia (radio de 14 px), encabezado y pie fijos, insignias «sin leer» y «en total», scroll interno delgado y avisos agrupados por categoría: Órdenes, Presupuestos, Pagos, Seguimientos, Citas, Licencias y Sistema.
+- Notificaciones: cada aviso es una tarjeta legible con título y detalle en dos líneas (texto completo al pasar el cursor), hora, acento por prioridad y «Sin leer» visible sin depender del color. Muestra 3 por categoría con «Ver más»; teclado (Enter y Escape).
+
+### Errores corregidos
+
+- Notificaciones: textos cortados y tarjetas que se salían de la ventana. Antes solo se veían 3 categorías; ahora aparecen todas las que tienen novedades. En móvil la ventana queda dentro de la pantalla con botones apilados.
+
 ## v1.5.265 — 2026-11-09 14:39 (UTC-05:00)
 
 ADI Premium 4.0: asistencia inteligente por orden con datos registrados, revisión de mensajes, recordatorio de pago real y nombres descriptivos de fotos y evidencias (migración 099)
