@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.263 — 2026-11-09 09:05 (UTC-05:00)
+
+Fotos por accesorio: la zona ofrece el cargador y cada accesorio recibido (sin migración)
+
+### Mejoras realizadas
+
+- Evidencia fotográfica: la zona de cada foto ofrece el cargador y cada accesorio recibido por su nombre (p. ej., «Mouse y receptor USB»), para fotografiar un accesorio concreto cuando hace falta.
+
 ## v1.5.262 — 2026-11-09 08:44 (UTC-05:00)
 
 Command Center Premium 3.0, recepción técnica estructurada y evidencia fotográfica con historial (con migración 098)
