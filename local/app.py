@@ -271,7 +271,7 @@ def verify_captcha(c, token):
     return word>>(32-CAPTCHA_BITS)==0
 
 
-ORDER_PHOTO_LIMIT=8
+ORDER_PHOTO_LIMIT=12  # 1.5.262: fotos activas por orden (recepción, diagnóstico, reparación y entrega); las eliminadas se conservan aparte
 
 
 def adi_public_state(conv):
@@ -1679,7 +1679,7 @@ class Handler(BaseHTTPRequestHandler):
                 # SVG primero: al ordenar por nombre, «marca.png» queda antes y «marca.svg» lo reemplaza.
                 logos = {f.stem:f.name for f in sorted((ROOT / 'static' / 'brands').glob('*')) if f.suffix in ('.svg','.png') and re.fullmatch(r'[a-z0-9]+(?:-[a-z0-9]+)*', f.stem)}
                 import device_brands,device_manufacturers
-                return self.reply(200, {'geo_metadata':GEO_METADATA,'device_types':DEVICE_TYPES,'brands':brands,'brand_logos':logos,'manufacturers':device_brands.catalog(device_manufacturers.configured(),device_manufacturers.statuses()),'authorization_catalog':device_authorizations.catalog(c)})
+                return self.reply(200, {'reception_catalog':__import__('reception_details').catalog(),'geo_metadata':GEO_METADATA,'device_types':DEVICE_TYPES,'brands':brands,'brand_logos':logos,'manufacturers':device_brands.catalog(device_manufacturers.configured(),device_manufacturers.statuses()),'authorization_catalog':device_authorizations.catalog(c)})
             if path.startswith('/api/geo/'):
                 query=parse_qs(urlsplit(self.path).query)
                 get=lambda key:query.get(key,[''])[0][:150]
@@ -1827,7 +1827,9 @@ class Handler(BaseHTTPRequestHandler):
             photo = re.fullmatch(r'/api/order-photo/([0-9]+)', path)
             if photo:
                 # Evidencia de recepción: solo con sesión; se entrega como imagen JPEG ya validada al guardarla.
-                row = c.execute('SELECT data FROM order_photos WHERE id=?', (int(photo[1]),)).fetchone()
+                row = c.execute('SELECT data,annotated,deleted_at FROM order_photos WHERE id=?', (int(photo[1]),)).fetchone()
+                if row and row['deleted_at'] and user['role']!='administrador':row=None  # eliminada: solo administración la ve en el historial
+                if row and parse_qs(urlsplit(self.path).query).get('marcas',[''])[0]=='1' and row['annotated']:return self.reply(200,base64.b64decode(row['annotated']),'image/jpeg')
                 if not row:
                     return self.reply(404, {'error':'Foto no disponible.'})
                 return self.reply(200, base64.b64decode(row['data']), 'image/jpeg')
@@ -1939,7 +1941,11 @@ class Handler(BaseHTTPRequestHandler):
                 result['previous_codes']=[r[0] for r in c.execute('SELECT code FROM order_code_aliases WHERE order_id=? ORDER BY created_at,code',(result['id'],))]
                 # Versión oficial vigente, para consultarla desde órdenes sin aceptación registrada (no implica que esta orden la haya aceptado).
                 active_terms=service_terms.current(c,reception_now());result['terms_current']=service_terms.metadata(active_terms) if active_terms else None
-                result['photos']=[dict(r) for r in c.execute('SELECT id,is_main,position,size,created_at FROM order_photos WHERE order_id=? ORDER BY is_main DESC,position,id',(result['id'],))]
+                # 1.5.262: categoría, zona, observación, nombre descriptivo, quién y cuándo, copia con marcas; las eliminadas quedan en el historial.
+                photo_cols="p.id,p.is_main,p.position,p.size,p.created_at,p.category,p.subject,p.note,p.filename,p.annotated!='' annotated,p.annotated_at,COALESCE(u.name,'') author,p.deleted_at,p.delete_reason,COALESCE(x.name,'') deleted_by_name"
+                photo_rows=[dict(r) for r in c.execute('SELECT '+photo_cols+' FROM order_photos p LEFT JOIN users u ON u.id=p.created_by LEFT JOIN users x ON x.id=p.deleted_by WHERE p.order_id=? ORDER BY p.is_main DESC,p.position,p.id',(result['id'],))]
+                result['photos']=[r for r in photo_rows if not r['deleted_at']];result['photos_deleted']=[r for r in photo_rows if r['deleted_at']] if user['role']=='administrador' else []
+                result['reception']=__import__('reception_details').loads(result.get('reception_details'))
                 import mailing
                 result['mail_history']=mailing.history(c,result['id'])
                 result['mail']=[dict(r) for r in c.execute('SELECT id,subject,correspondent,direction,sent_at,folder,uid FROM mail_links WHERE order_id=? ORDER BY id DESC LIMIT 30',(result['id'],))] if mail_allowed(user) else None
@@ -2931,7 +2937,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(403, {'error':'Solicitud no autorizada.'})
             path = urlsplit(self.path).path
             workspace_post=bool(re.fullmatch(r'/api/orders/[0-9]+/workspace',path));quote_json=bool(re.fullmatch(r'/api/quotes/[0-9]+',path))
-            max_body=3900000 if re.fullmatch(r'/api/orders/[0-9]+/followups',path) else 3700000 if re.fullmatch(r'/api/orders/[0-9]+/uploads',path) else 1500000 if path in ('/api/inventory/purchases/xml','/api/inventory/purchases/from-xml') else 1700000 if path in ('/api/cash/upload','/api/files/upload') else 65536 if path.startswith('/api/proformas') or path.startswith('/api/caja/') or re.fullmatch(r'/api/orders/[0-9]+/payments',path) or path=='/api/credit-notes' else 9000000 if path in ('/api/clients/import/preview','/api/clients/import/commit','/api/inventory/import/preview','/api/inventory/import/commit') else 200000 if path in ('/api/inventory/register','/api/invoicing/policies') else 1700000 if path=='/api/public/adi/listen' else 6000000 if path in ('/api/mail/send','/api/mail/draft') else 100000 if path in ('/api/conditions','/api/order-draft','/api/conditions/draft','/api/conditions/compare') else 3200000 if path in ('/api/licenses/new','/api/licenses/units','/api/licenses/units/bulk','/api/licenses/check','/api/licenses/products','/api/licenses/products/duplicate','/api/licenses/sales') or re.fullmatch(r'/api/licenses/sales/[0-9]+',path) else 900000 if re.fullmatch(r'/api/orders/[0-9]+/photos',path) or path in ('/api/profile/photo','/api/mail/signature') or re.fullmatch(r'/api/catalog/[0-9]+/image',path) else (65536 if workspace_post or quote_json or path=='/api/mail/subject' else 16384)
+            max_body=3900000 if re.fullmatch(r'/api/orders/[0-9]+/followups',path) else 3700000 if re.fullmatch(r'/api/orders/[0-9]+/uploads',path) else 1500000 if path in ('/api/inventory/purchases/xml','/api/inventory/purchases/from-xml') else 1700000 if path in ('/api/cash/upload','/api/files/upload') else 65536 if path.startswith('/api/proformas') or path.startswith('/api/caja/') or re.fullmatch(r'/api/orders/[0-9]+/payments',path) or path=='/api/credit-notes' else 9000000 if path in ('/api/clients/import/preview','/api/clients/import/commit','/api/inventory/import/preview','/api/inventory/import/commit') else 200000 if path in ('/api/inventory/register','/api/invoicing/policies') else 1700000 if path=='/api/public/adi/listen' else 6000000 if path in ('/api/mail/send','/api/mail/draft') else 100000 if path in ('/api/conditions','/api/order-draft','/api/conditions/draft','/api/conditions/compare') else 3200000 if path in ('/api/licenses/new','/api/licenses/units','/api/licenses/units/bulk','/api/licenses/check','/api/licenses/products','/api/licenses/products/duplicate','/api/licenses/sales') or re.fullmatch(r'/api/licenses/sales/[0-9]+',path) else 1700000 if re.fullmatch(r'/api/orders/[0-9]+/photos',path) or path in ('/api/profile/photo','/api/mail/signature') or re.fullmatch(r'/api/catalog/[0-9]+/image',path) else (65536 if workspace_post or quote_json or path=='/api/mail/subject' else 16384)
             length = int(self.headers.get('Content-Length', '0'))
             if length <= 0 or length > max_body:
                 return self.reply(400, {'error':'Solicitud inválida.'})
@@ -4315,28 +4321,55 @@ class Handler(BaseHTTPRequestHandler):
                     if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
                     if not c.execute('SELECT 1 FROM orders WHERE id=?',(oid,)).fetchone():return self.reply(404,{'error':'Orden no disponible.'})
                     action=str(data.get('action','add'))
-                    if action in ('delete','main'):
+                    import reception_details
+                    def jpeg(field):
+                        try:content=base64.b64decode(str(data.get(field,'')),validate=True)
+                        except Exception:return None
+                        # Solo JPEG real (cabecera y cierre), del tamaño que produce la reducción en el navegador.
+                        return content if content[:3]==b'\xff\xd8\xff' and content[-2:]==b'\xff\xd9' and 200<=len(content)<=600000 else None
+                    meta=lambda:(str(data.get('category','recepcion')) if str(data.get('category','recepcion')) in reception_details.PHOTO_CATEGORIES else 'recepcion',
+                                 re.sub(r'\s+',' ',str(data.get('subject',''))).strip()[:40],re.sub(r'\s+',' ',str(data.get('note',''))).strip()[:300])
+                    if action in ('delete','main','meta','annotate'):
                         if not str(data.get('photo_id','')).isdigit():return self.reply(400,{'error':'Foto no válida.'})
-                        target=c.execute('SELECT id FROM order_photos WHERE id=? AND order_id=?',(int(data['photo_id']),oid)).fetchone()
+                        target=c.execute("SELECT id,is_main FROM order_photos WHERE id=? AND order_id=? AND deleted_at=''",(int(data['photo_id']),oid)).fetchone()
                         if not target:return self.reply(404,{'error':'Foto no disponible.'})
+                        now_photo=reception_now().isoformat(timespec='seconds')
                         if action=='delete':
+                            # 1.5.262: la evidencia nunca se borra: queda en el historial con quién, cuándo y por qué (solo administración).
                             if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede eliminar evidencia de una orden.'})
-                            c.execute('DELETE FROM order_photos WHERE id=?',(target['id'],));audit(c,user['id'],'order_photo_deleted',oid)
+                            reason=re.sub(r'\s+',' ',str(data.get('reason',''))).strip()
+                            if len(reason)<5:return self.reply(400,{'error':'Indica el motivo de la eliminación (al menos 5 caracteres).','fields':{'reason':'Motivo obligatorio.'}})
+                            c.execute('UPDATE order_photos SET deleted_at=?,deleted_by=?,delete_reason=?,is_main=0 WHERE id=?',(now_photo,user['id'],reason[:300],target['id']))
+                            if target['is_main']:c.execute("UPDATE order_photos SET is_main=1 WHERE id=(SELECT id FROM order_photos WHERE order_id=? AND deleted_at='' ORDER BY position,id LIMIT 1)",(oid,))
+                            audit(c,user['id'],'order_photo_deleted',oid)
+                        elif action=='meta':
+                            category,subject,note=meta();c.execute('UPDATE order_photos SET category=?,subject=?,note=? WHERE id=?',(category,subject,note,target['id']));audit(c,user['id'],'order_photo_meta',oid)
+                        elif action=='annotate':
+                            # Las marcas se guardan en una COPIA: el original no cambia y sigue siendo la evidencia.
+                            marked=jpeg('data')
+                            if not marked:return self.reply(400,{'error':'La copia con marcas no se pudo leer.'})
+                            c.execute('UPDATE order_photos SET annotated=?,annotated_by=?,annotated_at=? WHERE id=?',(base64.b64encode(marked).decode('ascii'),user['id'],now_photo,target['id']));audit(c,user['id'],'order_photo_marked',oid)
                         else:
-                            c.execute('UPDATE order_photos SET is_main=(id=?) WHERE order_id=?',(target['id'],oid));audit(c,user['id'],'order_photo_main',oid)
+                            c.execute("UPDATE order_photos SET is_main=(id=?) WHERE order_id=? AND deleted_at=''",(target['id'],oid));audit(c,user['id'],'order_photo_main',oid)
                         return self.reply(200,{'ok':True})
-                    if c.execute('SELECT COUNT(*) FROM order_photos WHERE order_id=?',(oid,)).fetchone()[0]>=ORDER_PHOTO_LIMIT:return self.reply(409,{'error':'La orden ya tiene el máximo de '+str(ORDER_PHOTO_LIMIT)+' fotos.'})
-                    try:content=base64.b64decode(str(data.get('data','')),validate=True)
-                    except Exception:return self.reply(400,{'error':'La foto no se pudo leer.'})
-                    # Solo JPEG real (cabecera y cierre), del tamaño que produce la reducción en el navegador.
-                    if not (content[:3]==b'\xff\xd8\xff' and content[-2:]==b'\xff\xd9') or not 200<=len(content)<=600000:return self.reply(400,{'error':'Formato de foto no admitido o tamaño excesivo.'})
+                    if c.execute("SELECT COUNT(*) FROM order_photos WHERE order_id=? AND deleted_at=''",(oid,)).fetchone()[0]>=ORDER_PHOTO_LIMIT:return self.reply(409,{'error':'La orden ya tiene el máximo de '+str(ORDER_PHOTO_LIMIT)+' fotos.'})
+                    content=jpeg('data')
+                    if not content:return self.reply(400,{'error':'Formato de foto no admitido o tamaño excesivo.'})
+                    marked=jpeg('annotated') if data.get('annotated') else None
                     try:position=max(0,min(99,int(str(data.get('position','0')))))
                     except ValueError:position=0
                     main=data.get('main') is True
+                    category,subject,note=meta()
+                    info=c.execute("SELECT o.code,d.brand,d.model FROM orders o JOIN devices d ON d.id=o.device_id WHERE o.id=?",(oid,)).fetchone()
+                    number=c.execute("SELECT COUNT(*) FROM order_photos WHERE order_id=? AND lower(subject)=lower(?)",(oid,subject)).fetchone()[0]+1
+                    filename=reception_details.photo_filename(info['code'] or 'OP-%05d'%oid,info['brand'],info['model'],subject or reception_details.PHOTO_CATEGORIES[category],number)
                     if main:c.execute('UPDATE order_photos SET is_main=0 WHERE order_id=?',(oid,))
-                    pid=c.execute('INSERT INTO order_photos(order_id,position,is_main,mime,size,data,created_by,created_at) VALUES (?,?,?,?,?,?,?,?)',(oid,position,1 if main else 0,'image/jpeg',len(content),base64.b64encode(content).decode('ascii'),user['id'],reception_now().isoformat(timespec='seconds'))).lastrowid
+                    stamp_photo=reception_now().isoformat(timespec='seconds')
+                    pid=c.execute('INSERT INTO order_photos(order_id,position,is_main,mime,size,data,created_by,created_at,category,subject,note,filename,annotated,annotated_by,annotated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+                                  (oid,position,1 if main else 0,'image/jpeg',len(content),base64.b64encode(content).decode('ascii'),user['id'],stamp_photo,category,subject,note,filename,
+                                   base64.b64encode(marked).decode('ascii') if marked else '',user['id'] if marked else None,stamp_photo if marked else '')).lastrowid
                     audit(c,user['id'],'order_photo_added',oid)
-                    return self.reply(201,{'ok':True,'id':pid})
+                    return self.reply(201,{'ok':True,'id':pid,'filename':filename})
                 if path=='/api/part-notices/settings':
                     import part_notices,order_part_requests
                     if data.get('auto') not in (True,False):return self.reply(400,{'error':'Valor inválido.'})
@@ -5207,6 +5240,14 @@ class Handler(BaseHTTPRequestHandler):
                     incoming.update({k:personal.get(k,'') for k in client_registry.PERSONAL})
                     incoming['client']=personal['name']
                     fields, errors = validate_order(incoming)
+                    # 1.5.262: inspección por zonas, cargador y accesorios. Los textos de siempre se componen para el comprobante y la hoja A4.
+                    import reception_details
+                    reception_extra,detail_errors=reception_details.parse(data.get('reception_details'),fields.get('type'))
+                    errors.update(detail_errors)
+                    if reception_extra:
+                        fields['accessories']=(reception_details.accessories_text(reception_extra) or fields['accessories'])[:2000]
+                        fields['physical_condition']=reception_details.merge_condition(fields['physical_condition'],reception_extra)
+                        if fields['physical_condition']:errors.pop('physical_condition',None) if 'physical_condition' not in detail_errors else None
                     client_errors={k:v for k,v in errors.items() if k in client_registry.PERSONAL or k=='client'}
                     if client_errors:return self.reply(400,{'error':'Completa la ficha del cliente antes de recibir el equipo.','fields':{'client_id':'La ficha del cliente necesita identificación, contacto y ubicación válidos.'},'client_fields':client_errors})
                     if errors:
@@ -5269,6 +5310,7 @@ class Handler(BaseHTTPRequestHandler):
                     c.execute('UPDATE orders SET qr_url=? WHERE id=?',(order_url(code),oid))
                     import order_tracking
                     order_tracking.create(c,oid,user['id'],received)
+                    if reception_extra:c.execute('UPDATE orders SET reception_details=? WHERE id=?',(reception_details.dumps(reception_extra),oid))
                     import repair_status  # 1.5.257: la orden nace «En espera de diagnóstico» y la auditoría lo registra
                     repair_status.log(c,oid,'','pendiente',user['id'],'','orden_registrada','',received)
                     c.execute('UPDATE orders SET reception_snapshot=? WHERE id=?',(json.dumps(fields,ensure_ascii=False),oid))

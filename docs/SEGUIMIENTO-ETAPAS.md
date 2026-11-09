@@ -123,3 +123,29 @@
 - **Teléfonos** (contenedor de menos de 560 px): un botón «Avisos (N)» de 40 px abre un panel compacto. Escape o un toque fuera lo cierran, sin desplazamiento horizontal.
 - **Actualización:** usa la sincronización existente (la huella de 30 s); no agrega consultas. La línea de etapas no se mueve al actualizarse.
 - **Fuente:** `repair_stages.notices` (servidor). El cliente solo ve repuestos públicos, con su nombre depurado.
+
+## Command Center Premium 3.0 (1.5.262)
+
+El Centro de Operaciones muestra seis tarjetas, en el orden original:
+
+1. En espera de diagnóstico
+2. Reparación en proceso
+3. Esperando respuesta del cliente
+4. Pendiente de aprobación de presupuesto
+5. Listo para entregar
+6. Entregado
+
+**Contenido de cada tarjeta:**
+
+- icono iluminado y nombre completo;
+- contador real, que se anima solo cuando cambia;
+- indicador descriptivo;
+- flecha circular;
+- línea inferior del color del estado.
+
+**Comportamiento:**
+
+- **Navegación:** la tarjeta y la flecha abren Órdenes con el filtro de su estado.
+- **Retrasos:** el indicador cambia a «N con entrega vencida» solo si hay una fecha estimada registrada y vencida.
+- **Disposición:** 6 columnas en escritorio amplio, 3 en pantallas medianas, 2 en tableta y celular, y 1 por debajo de 360 px.
+- **Movimiento reducido:** se respeta.

@@ -177,26 +177,7 @@ def merge_condition(text, details):
     text = str(text or '').strip()
     lines = [l for l in text.split('\n') if not l.startswith('Inspección inicial:') and not l.startswith('Cargador:') and l.strip() != NO_CHARGER_NOTE]
     head = [x for x in (inspection_text(details), charger_text(details)) if x]
-    return '\n'.join(head + [l for l in lines if l.strip()]).strip()[:4000]
-
-
-def summary(details, device=''):
-    """Resumen profesional de recepción, solo con lo registrado (para revisar antes de guardar)."""
-    if not details:
-        return ''
-    parts = []
-    lead = 'Se recibe ' + (device.strip() + '.' if device.strip() else 'el equipo.')
-    parts.append(lead)
-    insp = inspection_text(details)
-    if insp:
-        parts.append(insp.replace('Inspección inicial: ', 'En la inspección visual se observa: ' if 'sin daños' not in insp else 'En la inspección visual: '))
-    ch = charger_text(details)
-    if ch:
-        parts.append(ch)
-    acc = accessories_text(details)
-    parts.append('Accesorios recibidos: ' + acc + '.' if acc else 'No se recibieron accesorios adicionales.')
-    parts.append('El estado descrito es el observado al ingreso; el funcionamiento se verificará durante el diagnóstico.')
-    return ' '.join(parts)
+    return '\n'.join(head + [l for l in lines if l.strip()]).strip()[:2000]
 
 
 def dumps(details):

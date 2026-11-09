@@ -494,8 +494,11 @@ class SecurityTests(unittest.TestCase):
         image=self.request(f'/api/order-photo/{second}',cookie=cookie);self.assertEqual(image['body'],jpeg)
         # Cambiar la principal y eliminar; el número de orden y sus datos no cambian.
         self.assertEqual(self.request(f'/api/orders/{oid}/photos',{'action':'main','photo_id':str(second)},cookie=cookie,csrf=csrf)['status'],200)
-        self.assertEqual(self.request(f'/api/orders/{oid}/photos',{'action':'delete','photo_id':str(first['body']['id'])},cookie=cookie,csrf=csrf)['status'],200)
+        # 1.5.262: eliminar exige motivo y la foto queda en el historial de evidencias (no se borra de la base).
+        self.assertEqual(self.request(f'/api/orders/{oid}/photos',{'action':'delete','photo_id':str(first['body']['id'])},cookie=cookie,csrf=csrf)['status'],400)
+        self.assertEqual(self.request(f'/api/orders/{oid}/photos',{'action':'delete','photo_id':str(first['body']['id']),'reason':'Foto repetida'},cookie=cookie,csrf=csrf)['status'],200)
         after=self.request(f'/api/orders/{oid}',cookie=cookie)['body']['order']
+        self.assertEqual([p['id'] for p in after['photos_deleted']],[first['body']['id']])
         self.assertEqual(([(p['id'],p['is_main']) for p in after['photos']],after['code']),([(second,1)],created['body']['code']))
         for i in range(app.ORDER_PHOTO_LIMIT-1):self.assertEqual(self.request(f'/api/orders/{oid}/photos',dict(body,main=False),cookie=cookie,csrf=csrf)['status'],201)
         self.assertEqual(self.request(f'/api/orders/{oid}/photos',dict(body,main=False),cookie=cookie,csrf=csrf)['status'],409)
