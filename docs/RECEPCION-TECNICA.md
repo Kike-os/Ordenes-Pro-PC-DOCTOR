@@ -30,6 +30,7 @@ El código está en `local/reception_details.py`, las rutas en `local/app.py` y 
 
 - **Categorías:** recepción, diagnóstico, reparación y entrega.
 - **Datos de cada foto:** zona o pieza y observación.
+- **Zona de la foto (1.5.263):** además de las zonas de inspección, se puede elegir el cargador y **cada accesorio recibido** por su nombre (por ejemplo, «Mouse y receptor USB»), para fotografiar un accesorio concreto cuando hace falta.
 - **Nombre descriptivo:** sigue el formato `PCD-20261109-0001_HP_240-G7_Pantalla_01.jpg`, y la foto se descarga con ese nombre.
 - **Fecha, hora y técnico:** quedan registrados.
 - **Marcar daños:** las marcas, con lápiz o círculo en rojo o amarillo, se guardan en una **copia**. El original no cambia y sigue siendo la evidencia; la vista ampliada alterna entre los dos.

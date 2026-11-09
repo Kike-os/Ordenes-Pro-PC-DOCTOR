@@ -1553,7 +1553,7 @@ function paintOrderPhotos(){
   tile.addEventListener('dragover',event=>{if(event.dataTransfer.types.includes('text/plain')){event.preventDefault();tile.classList.add('drop-target');}});tile.addEventListener('dragleave',()=>tile.classList.remove('drop-target'));
   tile.addEventListener('drop',event=>{const from=event.dataTransfer.getData('text/plain');if(from===''||event.dataTransfer.files.length)return;event.preventDefault();event.stopPropagation();move(+from,index);});
   if(photo.annotated)tile.append(el('span','Con marcas','rx-photo-marked'));
-  const meta=el('div',undefined,'rx-tile-meta'),subj=el('select'),note=el('input');for(const x of rxPhotoSubjects())subj.add(new Option(x,x==='General'?'':x));subj.value=photo.subject||'';subj.setAttribute('aria-label','Zona o pieza de la foto '+(index+1));subj.onchange=()=>{photo.subject=subj.value;};
+  const meta=el('div',undefined,'rx-tile-meta'),subj=el('select'),note=el('input');for(const x of rxPhotoSubjects(rxSerialize()))subj.add(new Option(x,x==='General'?'':x));subj.value=photo.subject||'';subj.setAttribute('aria-label','Zona o pieza de la foto '+(index+1));subj.onchange=()=>{photo.subject=subj.value;};
   note.maxLength=300;note.placeholder='Observación';note.value=photo.note||'';note.setAttribute('aria-label','Observación de la foto '+(index+1));note.oninput=()=>{photo.note=note.value;};meta.append(subj,note);
   tile.append(bar,meta);grid.append(tile);});
  for(let i=0;i<orderPhotoBusy;i++){const wait=el('div',undefined,'photo-tile photo-loading');wait.append(el('span','Procesando…'));grid.append(wait);}
@@ -1602,6 +1602,7 @@ function rxRender(){const cat=rxCat(),fam=rxFamily(),box=$('order-inspection-chi
   grid.append(det);}
  if(chargerBox){chargerBox.hidden=!rxChargerApplies();if(!chargerBox.hidden)rxRenderCharger(chargerBox);}
  if(accBox)rxRenderAccessories(accBox);}
+const rxPhotosRefresh=()=>{if($('order-photo-grid')&&orderPhotos.length)paintOrderPhotos();};
 function rxRenderCharger(root){const cat=rxCat(),ch=rx.charger;root.replaceChildren();const head=el('div',undefined,'rx-head');head.append(systemIcon(RX_ICONS.charger),el('strong','Cargador'));root.append(head);
  const seg=el('div',undefined,'rx-seg');seg.setAttribute('role','radiogroup');seg.setAttribute('aria-label','Estado del cargador');
  for(const[code,label]of Object.entries(cat.charger_status)){const lab=el('label',undefined,'rx-opt'),input=el('input');input.type='radio';input.name='rx-charger-status';input.value=code;input.checked=ch.status===code;lab.dataset.code=code;lab.append(input,el('span',label));input.onchange=()=>{ch.status=code;rxCompose();rxRender();root.querySelector('input[value="'+code+'"]')?.focus();};seg.append(lab);}
@@ -1621,6 +1622,7 @@ function rxRenderAccessories(root){const cat=rxCat();root.replaceChildren();cons
   const remove=button('',()=>{rx.acc.delete(key);rxCompose();rxRenderAccessories(root);},'icon-button rx-remove');remove.setAttribute('aria-label','Quitar '+a.label);remove.title='Quitar';remove.append(systemIcon(RX_ICONS.x));
   row.append(name,qty,state,note,remove);list.append(row);}
  if(rx.acc.size)root.append(list);
+ if(typeof rxPhotosRefresh==='function')rxPhotosRefresh();  // las fotos ofrecen cada accesorio recibido como zona
  const addRow=el('div',undefined,'rx-add'),custom=el('input'),add=button('',()=>{const label=custom.value.trim().replace(/\s+/g,' ').slice(0,60);if(label.length<2){custom.focus();return;}rx.acc.set('otro-'+(++rx.custom),{code:'otro',label,qty:1,state:'buen_estado',note:''});custom.value='';rxCompose();rxRenderAccessories(root);root.querySelector('.rx-add input')?.focus();},'secondary');
  custom.maxLength=60;custom.placeholder='Otro accesorio (p. ej., base refrigerante)';custom.setAttribute('aria-label','Agregar otro accesorio');custom.addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();add.click();}});add.append(systemIcon(RX_ICONS.plus),el('span','Agregar'));addRow.append(custom,add);root.append(addRow);}
 // Detalle de la orden: inspección registrada al ingreso (solo lectura).
@@ -1816,7 +1818,8 @@ function renderOrderSummary(){
 // Fotos de recepción en el detalle de la orden: galería, ampliación y gestión.
 // ---- Evidencia fotográfica (1.5.262): categoría, zona, observación, marcas sobre una COPIA (el original no cambia) e historial sin borrados ----
 const RX_PHOTO_ICONS={mark:'M12 20h9 M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z',download:'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4 M7 10l5 5 5-5 M12 15V3',undo:'M9 14 4 9l5-5 M4 9h10.5a5.5 5.5 0 0 1 0 11H11',circle:'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z',pen:'M12 20h9 M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z'};
-function rxPhotoSubjects(){const cat=rxCat(),out=['General'];if(cat){for(const z of cat.zones)if(z.code!=='general')out.push(z.title);out.push('Cargador','Accesorios');}return out;}
+// Zona o pieza de la foto: zonas de inspección, el cargador y cada accesorio recibido por su nombre (fotos por accesorio cuando hace falta).
+function rxPhotoSubjects(details){const cat=rxCat(),out=['General'];if(cat){for(const z of cat.zones)if(z.code!=='general')out.push(z.title);out.push('Cargador');}for(const a of details?.accessories||[])if(a.label&&!out.includes(a.label))out.push(a.label);out.push('Accesorios');return out;}
 // Editor de marcas: dibuja sobre una copia de la imagen (lápiz o círculo, deshacer, borrar). Devuelve un JPEG nuevo o null si se cancela.
 function rxAnnotate(source,title='Marcar daños'){return new Promise(async resolve=>{
  let bitmap;try{const blob=source instanceof Blob?source:await (await fetch(source,{credentials:'same-origin'})).blob();bitmap=await createImageBitmap(blob);}catch{toast('No se pudo abrir la foto para marcarla.','error');resolve(null);return;}
@@ -1847,7 +1850,7 @@ function orderPhotoSection(order){
  const view=photo=>{const dialog=smallDialog((cats[photo.category]||'Foto')+' · '+order.code);dialog.classList.add('photo-viewer','rx-viewer');let marked=false;const image=el('img');const src=()=>'/api/order-photo/'+photo.id+(marked?'?marcas=1':'');image.src=src();image.alt=(photo.subject||cats[photo.category]||'Foto')+' de la orden '+order.code;
   const toggle=photo.annotated?button('Ver copia marcada',()=>{marked=!marked;image.src=src();toggle.textContent=marked?'Ver original':'Ver copia marcada';},'secondary'):null;
   const facts=el('dl',undefined,'rx-photo-facts'),fact=(k,v)=>{if(!v)return;const r=el('div');r.append(el('dt',k),el('dd',v));facts.append(r);};fact('Archivo',photo.filename||'—');fact('Registrada',formatOrderDate(photo.created_at)+(photo.author?' · '+photo.author:''));if(photo.annotated)fact('Copia marcada',formatOrderDate(photo.annotated_at));
-  const form=el('form',undefined,'rx-photo-meta'),cat=el('select'),subject=el('select'),note=el('textarea');for(const[c,l]of Object.entries(cats))cat.add(new Option(l,c));cat.value=photo.category||'recepcion';for(const s of rxPhotoSubjects())subject.add(new Option(s,s==='General'?'':s));if(photo.subject&&![...subject.options].some(o=>o.value===photo.subject))subject.add(new Option(photo.subject,photo.subject));subject.value=photo.subject||'';note.rows=2;note.maxLength=300;note.value=photo.note||'';note.placeholder='Observación de la foto';
+  const form=el('form',undefined,'rx-photo-meta'),cat=el('select'),subject=el('select'),note=el('textarea');for(const[c,l]of Object.entries(cats))cat.add(new Option(l,c));cat.value=photo.category||'recepcion';for(const s of rxPhotoSubjects(order.reception))subject.add(new Option(s,s==='General'?'':s));if(photo.subject&&![...subject.options].some(o=>o.value===photo.subject))subject.add(new Option(photo.subject,photo.subject));subject.value=photo.subject||'';note.rows=2;note.maxLength=300;note.value=photo.note||'';note.placeholder='Observación de la foto';
   const lab=(t,n)=>{const l=el('label',undefined,'rx-field');l.append(el('span',t),n);return l;};const saveMeta=el('button','Guardar datos','secondary');saveMeta.type='submit';form.append(lab('Categoría',cat),lab('Zona o pieza',subject),lab('Observación',note),saveMeta);
   form.onsubmit=async event=>{event.preventDefault();saveMeta.disabled=true;try{await api('/api/orders/'+order.id+'/photos',{action:'meta',photo_id:String(photo.id),category:cat.value,subject:subject.value,note:note.value});toast('Datos de la foto guardados.','success');dialog.close();renderRoute();}catch(error){toast(error.message,'error');saveMeta.disabled=false;}};
   const row=el('div',undefined,'photo-viewer-actions');
