@@ -246,6 +246,14 @@ QUOTE_WORDS = re.compile(r'presupuesto|cotizaci[oó]n|aprobaci[oó]n|aprobar|aut
 BALANCE_WORDS = re.compile(r'saldo|pago|pendiente de pago|abono|valor pendiente', re.I)
 
 
+# «Le avisaremos cuando su equipo esté listo para retirar» habla del futuro: no afirma que ya esté listo (1.5.267).
+FUTURE_LEAD = re.compile(r'\b(cuando|en cuanto|apenas|una vez que|hasta que|tan pronto (como)?)\b[^.!?\n,:;]{0,40}$', re.I)
+
+
+def _says_ready(text):
+    return any(not FUTURE_LEAD.search(text[max(0, m.start() - 60):m.start()]) for m in READY_TEXT.finditer(text))
+
+
 def _cents_of_text(raw):
     text = raw.replace(' ', '')
     if ',' in text:
@@ -264,7 +272,7 @@ def check_message(ctx, text, channel='whatsapp'):
     warnings, suggestions = [], []
     status, money, quote = ctx['status'], ctx['money'] or {}, ctx['quote']
     ready = status in ('listo', 'espera_entrega', 'entregado')
-    if READY_TEXT.search(text) and not ready:
+    if _says_ready(text) and not ready:
         warnings.append('El mensaje dice que el equipo está listo o terminado, pero la orden está en «%s».' % ctx['status_label'])
     for code in set(ORDER_CODE.findall(text)):
         if code != ctx['code'] and not code.startswith(ctx['code'] + '-'):

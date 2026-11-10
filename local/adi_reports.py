@@ -240,7 +240,7 @@ def pending_data(data):
 TECH_KINDS = ('recepcion', 'diagnostico', 'novedad', 'repuesto', 'reparacion', 'pruebas', 'finalizado', 'listo_entrega', 'entrega', 'incidencia')
 
 
-def order_context(c, oid):
+def order_context(c, oid, for_client=False):
     """{'data': datos técnicos depurados para la IA, 'names': nombres a ocultar, 'header': cabecera real del informe}.
     Viajan: equipo, falla reportada, estado, diagnóstico, inspección, recomendaciones, seguimientos técnicos (mensaje y nota técnica,
     depurados), repuestos (nombre y etapa) y presupuesto (estado y descripción de cada ítem, sin importes). No viajan: nombre del cliente,
@@ -266,10 +266,14 @@ def order_context(c, oid):
     except Exception:
         hidden, kinds = set(), {}
     lines = []
+    internal = 0
     for f in c.execute("SELECT id,kind,internal_note,client_message,recommendation,created_at FROM order_followups WHERE order_id=? ORDER BY id", (oid,)):
         if f['id'] in hidden or f['kind'] not in TECH_KINDS:
             continue
-        parts = [clean(x) for x in (f['client_message'], f['internal_note'], f['recommendation']) if str(x or '').strip()]
+        # for_client=True (mensajes para el cliente, 1.5.267): la nota interna de un seguimiento no viaja; solo se cuenta para avisarlo.
+        if for_client and str(f['internal_note'] or '').strip():
+            internal += 1
+        parts = [clean(x) for x in ((f['client_message'], f['recommendation']) if for_client else (f['client_message'], f['internal_note'], f['recommendation'])) if str(x or '').strip()]
         if parts:
             lines.append('%s (%s): %s' % (kinds.get(f['kind'], (f['kind'],))[0], str(f['created_at'])[:10], ' '.join(parts)))
     data['Seguimientos técnicos registrados'] = '\n'.join(lines[-12:])
@@ -292,7 +296,7 @@ def order_context(c, oid):
     from reception import reception_now
     header = 'Orden: %s · Equipo: %s%s · Fecha: %s' % (o['code'] or 'OP-%05d' % o['id'], device or 'sin especificar', ' · Serie: %s' % o['serial'] if (o['serial'] or '').strip() else '',
                                                          reception_now().strftime('%d/%m/%Y'))
-    return {'data': {k: v for k, v in data.items() if v}, 'names': names, 'header': header}
+    return {'data': {k: v for k, v in data.items() if v}, 'names': names, 'header': header, 'internal_notes': internal}
 
 
 def with_header(report, header):

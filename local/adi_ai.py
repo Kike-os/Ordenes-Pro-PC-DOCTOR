@@ -248,13 +248,16 @@ def _guard(sources,body):
     return warnings
 
 
-def professional_message(note,data=None):
-    """Cuerpo del mensaje al cliente a partir de las anotaciones y los datos técnicos ya depurados. Nada se envía desde aquí."""
+def professional_message(note,data=None,task=None,words=None):
+    """Cuerpo del mensaje al cliente a partir de las anotaciones y los datos técnicos ya depurados. Nada se envía desde aquí.
+
+    task (1.5.267): la tarea del mensaje va aparte de las anotaciones. Antes viajaba mezclada con ellas y el control de omisiones tomaba sus
+    cifras («Máximo 70 palabras») como datos del técnico que ADI había «omitido». Ahora solo se controla lo que escribió el técnico."""
     note=str(note or '').strip();data=data or {}
     if len(note)>LIMIT:raise AdiError('largo','El texto admite hasta %d caracteres por consulta.'%LIMIT,400)
-    if not note and not data.get('Novedades registradas') and not data.get('Recomendaciones registradas'):raise AdiError('vacio','Escribe la novedad del equipo o elige un seguimiento comunicable.',400)
+    if not task and not note and not data.get('Novedades registradas') and not data.get('Recomendaciones registradas'):raise AdiError('vacio','Escribe la novedad del equipo o elige un seguimiento comunicable.',400)
     lines=['%s: %s'%(k,v) for k,v in data.items() if v]
-    body,tokens_in,tokens_out=_complete(MESSAGE_SYSTEM,'Tarea: %s\n<datos>\n%s\n</datos>\n<anotaciones>\n%s\n</anotaciones>'%(MESSAGE_TASK,'\n'.join(lines),note))
+    body,tokens_in,tokens_out=_complete(MESSAGE_SYSTEM,'Tarea: %s\n<datos>\n%s\n</datos>\n<anotaciones>\n%s\n</anotaciones>'%(task or MESSAGE_TASK,'\n'.join(lines),note))
     body=re.sub(r'</?(?:anotaciones|datos|borrador)>','',body).strip().strip('«»"').strip()
     if not body:raise AdiError('proveedor','El proveedor de IA no devolvió ningún mensaje.')
     warnings=_guard('\n'.join(lines+[note]),body)
@@ -263,7 +266,7 @@ def professional_message(note,data=None):
     if removed:warnings.append('ADI quitó %d frase%s repetida%s.'%(removed,'' if removed==1 else 's','' if removed==1 else 's'))
     missing=missing_tokens(note,body)
     if missing:warnings.append('ADI omitió estos datos de tus anotaciones: %s.'%', '.join(missing))
-    if len(body.split())>MESSAGE_WORDS*1.3:warnings.append('El mensaje quedó más largo de lo previsto: puedes usar «Resumir mensaje».')
+    if len(body.split())>(words or MESSAGE_WORDS)*1.3:warnings.append('El mensaje quedó más largo de lo previsto: puedes usar «Resumir mensaje».')
     return {'body':body[:LIMIT],'warnings':warnings,'model':model(),'tokens_in':tokens_in,'tokens_out':tokens_out}
 
 

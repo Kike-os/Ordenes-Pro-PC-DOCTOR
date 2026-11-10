@@ -2851,23 +2851,74 @@ function orderStatusCard(order){
   card.append(det);}
  return card;}
 // Mensaje de seguimiento con ADI (WhatsApp o correo): datos reales y depurados de la orden; el técnico lo revisa y edita. Nada se envía desde aquí:
-// «Continuar en Comunicación» abre el envío habitual de la orden con el texto ya escrito.
+// «Enviar» comprueba el saldo y abre la comunicación habitual de la orden con el texto ya escrito (allí se confirma y se registra el resultado real).
+// 1.5.267 · ADI Smart Follow-Up 4.0: información de la orden y estado financiero confirmado (sin IA, al abrir), canal e indicaciones, opciones
+// (pago confirmado, avances, fecha registrada, tono) y el mensaje en un editor amplio. El saldo lo escribe el sistema con el importe exacto.
+const SFU_TONES={pendiente:'ambar',parcial:'ambar',pagado:'verde',credito:'azul',sin_cargos:'gris'};
+function sfuMoneyChip(fin){const chip=el('span',undefined,'sfu-chip');if(!fin){chip.dataset.tone='rojo';chip.textContent='Pago no verificado';return chip;}chip.dataset.tone=SFU_TONES[fin.state]||'gris';chip.textContent=fin.balance_cents>0?'Saldo '+fin.balance:fin.state_label||'Sin saldo';return chip;}
 function statusMessageDialog(order){
- const dialog=smallDialog('Mensaje de seguimiento · '+displayCode(order));dialog.classList.add('sp-msg-dialog');
- const form=el('form',undefined,'sp-msg');form.noValidate=true;const now=el('p',undefined,'sp-msg-now');now.append(el('span','Estado actual: '),statusChip(order.status,order.status_label));
- const channels=el('fieldset',undefined,'sp-seg');channels.append(el('legend','Canal'));for(const[value,label]of [['whatsapp','WhatsApp'],['correo','Correo electrónico']]){const opt=el('label'),radio=el('input');radio.type='radio';radio.name='channel';radio.value=value;radio.checked=value==='whatsapp';opt.append(radio,el('span',label));channels.append(opt);}
- const note=el('textarea');note.rows=2;note.maxLength=600;note.placeholder='Opcional: indicación para ADI (p. ej., «mencionar que se cambió la pasta térmica»)';const noteBox=el('label',undefined,'delivery-field');noteBox.append(el('span','Indicación para ADI'),note);
- const go=el('button','Generar mensaje','primary');go.type='submit';go.prepend(systemIcon(adiSpark));
- const out=el('div',undefined,'sp-msg-out');out.hidden=true;const source=el('p',undefined,'sp-msg-source');const text=el('textarea');text.rows=10;text.maxLength=4000;text.setAttribute('aria-label','Mensaje para revisar y editar');const warn=el('ul',undefined,'sp-msg-warn');
- const actions=el('div',undefined,'delivery-actions'),copy=button('Copiar',async()=>{try{await navigator.clipboard.writeText(text.value);toast('Mensaje copiado.','success');}catch{text.select();toast('Selecciona y copia el texto.','info');}},'secondary'),cont=button('Continuar en Comunicación',()=>{const body=text.value.trim();dialog.close();orderMessageComposer(order.id,null,body);},'primary');
- actions.append(copy,cont);const check=adiMessageCheck(order.id,text,()=>form.elements.channel.value);out.append(source,warn,text,check,el('small','Revisa y edita el mensaje antes de enviarlo. Nada se envía desde esta ventana.','sp-msg-hint'),actions);
- const error=el('small',undefined,'delivery-error');error.setAttribute('role','alert');
- form.append(now,channels,noteBox,error,go,out);dialog.append(form);
- form.addEventListener('submit',async event=>{event.preventDefault();error.textContent='';go.disabled=true;go.setAttribute('aria-busy','true');
-  try{const data=await api('/api/orders/'+order.id+'/status-message',{channel:form.elements.channel.value,note:note.value.trim()});
-   source.textContent=(data.source==='adi'?'Redactado por ADI con los datos registrados':'Plantilla del estado real')+' · '+data.channel_label;text.value=data.body;warn.replaceChildren(...(data.warnings||[]).map(w=>el('li',w)));out.hidden=false;check.runNow();text.focus();}
-  catch(problem){error.textContent=problem.message;}finally{go.disabled=false;go.removeAttribute('aria-busy');}});
- setTimeout(()=>form.querySelector('input[name=channel]:checked')?.focus(),30);}
+ const dialog=smallDialog('Mensaje de seguimiento');dialog.classList.add('sp-msg-dialog','sfu-dialog');dialog.setAttribute('aria-describedby','sfu-facts');
+ const heading=dialog.querySelector('.dialog-heading'),facts=el('p',undefined,'sfu-facts');facts.id='sfu-facts';const moneySlot=el('span',undefined,'sfu-money-slot');moneySlot.append(el('span','Comprobando pagos…','sfu-chip'));
+ facts.append(el('span',displayCode(order),'sfu-code'),statusChip(order.status,order.status_label),moneySlot);heading.querySelector('h2').after(facts);
+ const form=el('form',undefined,'sfu');form.noValidate=true;const body=el('div',undefined,'sfu-body'),side=el('div',undefined,'sfu-side'),main=el('section',undefined,'sfu-main');main.setAttribute('aria-labelledby','sfu-main-title');body.append(side,main);
+ const card=(title,glyph,cls='')=>{const box=el('section',undefined,'sfu-card '+cls),h=el('h3');h.append(systemIcon(glyph),el('span',title));box.append(h);side.append(box);return box;};
+ // A. Información de la orden
+ const info=card('Información de la orden','M3 5h18v11H3z M8 20h8 M12 16v4'),dl=el('dl',undefined,'sfu-dl'),row=(k,v)=>{const d=el('div');d.append(el('dt',k),v instanceof Node?v:el('dd',v));dl.append(d);return d;};
+ const device=[receptionOptions?.device_types?.[order.type]||order.type,[order.brand,order.model].filter(Boolean).join(' ')].filter(Boolean).join(' · ')||'Sin datos del equipo';
+ row('Equipo',device);row('Orden',displayCode(order));const statusDd=el('dd');statusDd.append(statusChip(order.status,order.status_label));row('Estado técnico',statusDd);const payDd=el('dd','Comprobando…');row('Estado de pago',payDd);
+ const money=el('dl',undefined,'sfu-money');money.hidden=true;const notes=el('ul',undefined,'sfu-notes');info.append(dl,money,notes);
+ // B. Comunicación
+ const comm=card('Comunicación','M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z'),channels=el('fieldset',undefined,'sfu-seg');channels.append(el('legend','Canal'));
+ for(const[value,label,glyph]of [['whatsapp','WhatsApp','M7.9 20A9 9 0 1 0 4 16.1L2 22z'],['correo','Correo','M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z m18 3-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7']]){const opt=el('label'),radio=el('input');radio.type='radio';radio.name='channel';radio.value=value;radio.checked=value==='whatsapp';opt.append(radio,systemIcon(glyph),el('span',label));channels.append(opt);}
+ const note=el('textarea');note.rows=2;note.maxLength=600;note.placeholder='Opcional: p. ej., «mencionar que se cambió la pasta térmica»';note.id='sfu-note';const noteBox=el('label',undefined,'sfu-field');noteBox.htmlFor='sfu-note';noteBox.append(el('span','Indicaciones adicionales para ADI'),note);comm.append(channels,noteBox);
+ // C. Opciones inteligentes
+ const opts=card('Opciones inteligentes',adiSpark),sw=(label,hint)=>{const s=AppSwitch({label,hint,className:'sfu-switch'});opts.append(s.wrap);return s;};
+ const optPay=sw('Incluir información de pago confirmada','Solo con saldo pendiente registrado.'),optProgress=sw('Incluir avances técnicos','Diagnóstico, seguimientos y trabajos registrados.'),optDate=sw('Incluir fecha de entrega','Solo si está registrada y corresponde.');optProgress.input.checked=true;
+ const tone=el('select');tone.id='sfu-tone';for(const[v,l]of [['profesional','Profesional (predeterminado)'],['formal','Formal'],['cercano','Cercano']])tone.add(new Option(l,v));const toneBox=el('label',undefined,'sfu-field sfu-tone');toneBox.htmlFor='sfu-tone';toneBox.append(el('span','Tono del mensaje'),tone);opts.append(toneBox);
+ const go=el('button','Generar mensaje','primary sfu-go');go.type='submit';go.prepend(systemIcon(adiSpark));side.append(go);
+ // D. Mensaje generado
+ const mh=el('header',undefined,'sfu-main-head'),mt=el('h3');mt.id='sfu-main-title';mt.append(systemIcon('M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5z M14 2v6h6 M16 13H8 M16 17H8 M10 9H8'),el('span','Mensaje generado'));
+ const source=el('small','','sfu-source'),regen=button('',()=>form.requestSubmit(),'secondary sfu-regen');regen.append(systemIcon('M3 12a9 9 0 0 1 15-6.7L21 8 M21 3v5h-5 M21 12a9 9 0 0 1-15 6.7L3 16 M3 21v-5h5'),el('span','Regenerar'));regen.hidden=true;mh.append(mt,source,regen);
+ const empty=el('div',undefined,'sfu-empty');const goMain=button('',()=>form.requestSubmit(),'primary sfu-go-main');goMain.append(systemIcon(adiSpark),el('span','Generar mensaje'));empty.append(systemIcon(adiSpark),el('p','Elige el canal y las opciones, y pulsa «Generar mensaje». ADI revisará el estado de la reparación y el estado financiero confirmado de la orden.'),goMain);
+ const out=el('div',undefined,'sp-msg-out sfu-out');out.hidden=true;const review=el('ul',undefined,'sfu-review');review.setAttribute('aria-label','Revisión de ADI');const stale=el('p','','sfu-stale');stale.hidden=true;stale.setAttribute('role','status');
+ const text=el('textarea',undefined,'sfu-text');text.maxLength=4000;text.setAttribute('aria-label','Mensaje para revisar y editar');text.spellcheck=true;const count=el('small','','sfu-count');
+ const check=adiMessageCheck(order.id,text,()=>form.elements.channel.value);out.append(review,stale,text,check);main.append(mh,empty,out);
+ const error=el('p',undefined,'sfu-error');error.setAttribute('role','alert');
+ // Pie fijo: acciones siempre visibles.
+ const foot=el('footer',undefined,'sfu-foot'),hint=el('small','Revisa y edita el mensaje. El envío se confirma en la comunicación de la orden y allí queda registrado su resultado real.','sfu-hint');
+ const copy=button('',async()=>{try{await navigator.clipboard.writeText(text.value);toast('Mensaje copiado.','success');}catch{text.select();toast('Selecciona y copia el texto.','info');}},'secondary');copy.append(systemIcon('M8 8h12v12H8z M4 16V4h12'),el('span','Copiar'));
+ const send=button('',()=>sendNow(),'primary sfu-send');const sendLabel=el('span','Enviar por WhatsApp');send.append(systemIcon(ADI_ICONS.send),sendLabel);copy.disabled=send.disabled=true;
+ foot.append(hint,count,copy,send);form.append(body,error,foot);dialog.append(form);
+ let state={fingerprint:'',generatedWith:'',finance:null};
+ const optionKey=()=>JSON.stringify([form.elements.channel.value,optPay.input.checked,optProgress.input.checked,optDate.input.checked,tone.value]);
+ const paintCount=()=>{count.textContent=text.value.length+' / 4000';};text.addEventListener('input',paintCount);
+ const paintStale=()=>{const changed=state.generatedWith&&state.generatedWith!==optionKey();stale.hidden=!changed;stale.textContent=changed?'Cambiaste el canal o las opciones: pulsa «Regenerar» para actualizar el mensaje.':'';};
+ const paintChannel=()=>{sendLabel.textContent=form.elements.channel.value==='correo'?'Enviar por correo':'Enviar por WhatsApp';paintStale();};
+ for(const input of [...form.elements.channel,optPay.input,optProgress.input,optDate.input,tone])input.addEventListener('change',()=>{paintChannel();});
+ const paintNotes=list=>notes.replaceChildren(...(list||[]).map(n=>{const li=el('li',n.text);li.dataset.level=n.level;return li;}));
+ function paintFinance(fin,list,options){state.finance=fin;moneySlot.replaceChildren(sfuMoneyChip(fin));payDd.replaceChildren(sfuMoneyChip(fin));
+  money.replaceChildren();money.hidden=!fin;if(fin){const add=(k,v,strong)=>{const d=el('div');d.append(el('dt',k),el(strong?'dd':'dd',v));if(strong)d.dataset.strong='true';money.append(d);};add(fin.scope==='orden'?'Total de la orden':'Total del servicio',fin.total);add('Pagos y anticipos'+(fin.payments?' ('+fin.payments+')':''),fin.paid);add('Saldo pendiente',fin.balance,true);if(fin.credit_cents)add('Saldo a favor',fin.credit);if(fin.pending_transfers)add('Transferencias por confirmar',fin.pending);}
+  paintNotes(list);if(options){const pay=!!options.payment_available;optPay.input.disabled=!pay;if(!pay)optPay.input.checked=false;optPay.wrap.title=pay?'':'No hay un saldo pendiente confirmado para informar.';
+   const dated=!!options.date_available;optDate.input.disabled=!dated;if(!dated)optDate.input.checked=false;optDate.wrap.querySelector('.app-check-text small')?.replaceChildren(dated?'Fecha registrada: '+options.date_value+'.':'Sin fecha estimada vigente registrada.');}}
+ // Al abrir: estado financiero y opciones con los datos reales (sin IA y sin enviar nada).
+ (async()=>{try{const data=await api('/api/orders/'+order.id+'/status-message',{action:'verify',fingerprint:'',text:''});if(!dialog.isConnected)return;paintFinance(data.finance,data.notes,data.options);optPay.input.checked=!!data.options.payment;optDate.input.checked=!!data.options.date_available;}
+  catch(problem){if(dialog.isConnected)paintFinance(null,[{level:'warn',text:'No se pudo verificar el estado financiero de esta orden.'}],{payment_available:false,date_available:false});}})();
+ form.addEventListener('submit',async event=>{event.preventDefault();error.textContent='';go.disabled=regen.disabled=goMain.disabled=true;go.setAttribute('aria-busy','true');main.setAttribute('aria-busy','true');
+  try{const data=await api('/api/orders/'+order.id+'/status-message',{channel:form.elements.channel.value,note:note.value.trim(),include_payment:optPay.input.checked,include_progress:optProgress.input.checked,include_date:optDate.input.checked,tone:tone.value});
+   source.textContent=(data.source==='adi'?'Redactado por ADI con los datos registrados':'Plantilla del estado real')+' · '+data.channel_label;text.value=data.body;paintCount();
+   paintFinance(data.finance,data.finance_notes,data.options);optPay.input.checked=!!data.options.payment;optDate.input.checked=!!data.options.date;
+   const items=[...(data.review||[]),...(data.warnings||[]).map(w=>({level:'warn',text:w}))];review.replaceChildren(...items.map(n=>{const li=el('li');li.dataset.level=n.level;li.append(systemIcon(n.level==='warn'?ADI_ICONS.alert:ADI_ICONS.lightbulb),el('span',n.text));return li;}));
+   state={fingerprint:data.finance?.fingerprint||'',generatedWith:optionKey(),finance:data.finance};empty.hidden=true;out.hidden=false;regen.hidden=false;copy.disabled=send.disabled=false;paintStale();check.runNow();text.focus({preventScroll:true});text.setSelectionRange(0,0);text.scrollTop=0;}
+  catch(problem){error.textContent=problem.message;}finally{go.disabled=regen.disabled=goMain.disabled=false;go.removeAttribute('aria-busy');main.removeAttribute('aria-busy');}});
+ // Envío: el saldo se vuelve a comprobar; si cambió desde que se generó el texto, se pide actualizar el mensaje antes de continuar.
+ async function sendNow(){const value=text.value.trim();if(!value){error.textContent='Escribe o genera el mensaje antes de enviarlo.';text.focus();return;}error.textContent='';send.disabled=true;
+  try{const data=await api('/api/orders/'+order.id+'/status-message',{action:'verify',fingerprint:state.fingerprint,text:value});paintFinance(data.finance,data.notes,null);
+   if(!data.ok){error.replaceChildren(el('span',data.problems.join(' ')),button('Actualizar mensaje',()=>form.requestSubmit(),'secondary sfu-refresh'));return;}
+   const channel=form.elements.channel.value,label=channel==='correo'?'correo electrónico':'WhatsApp';
+   const answer=await confirmClose({title:'¿Continuar con el envío por '+label+'?',text:'Se abrirá la comunicación de la orden '+displayCode(order)+' con este mensaje. Allí revisas el destinatario y confirmas el envío; solo se marca como enviado cuando el servicio lo confirma.',keep:'Revisar de nuevo',discard:'Continuar al envío',icon:ADI_ICONS.send,plain:true});
+   if(answer!=='discard')return;dialog.close();orderMessageComposer(order.id,null,value,'',channel);}
+  catch(problem){error.textContent=problem.message;}finally{send.disabled=false;}}
+ paintChannel();setTimeout(()=>form.querySelector('input[name=channel]:checked')?.focus(),30);}
 // ---- ADI Premium 4.0 (1.5.265): asistencia de la orden con los datos registrados ---------------------------------------------------
 // Solo sugiere: no cambia estados, pagos ni registros y no envía nada. Cada acción abre el flujo de siempre (presupuesto, pagos, repuestos,
 // seguimiento, comunicación) con sus permisos y confirmaciones. Las recomendaciones informativas se pueden descartar (solo para quien las ve);
@@ -4281,7 +4332,7 @@ async function copyToClipboard(text){try{await navigator.clipboard.writeText(tex
 const CM_MODES=[['auto','Último seguimiento comunicable'],['one','Seleccionar un seguimiento anterior'],['many','Seleccionar varias novedades'],['manual','Preparar mensaje manual']];
 // Ventana «Comunicación con el cliente»: recupera el último seguimiento comunicable de la orden (nunca su nota interna), arma el borrador con
 // la plantilla y deja revisar, editar y comunicar. Abrir WhatsApp o copiar quedan registrados como lo que son, nunca como «enviado».
-async function orderMessageComposer(id,followupId=null,preset='',presetTemplate=''){let data;try{data=await api('/api/orders/'+id+'/followups');}catch(error){notify(error.message);return;}
+async function orderMessageComposer(id,followupId=null,preset='',presetTemplate='',presetChannel=''){let data;try{data=await api('/api/orders/'+id+'/followups');}catch(error){notify(error.message);return;}
  const o=data.order,src=data.sources,keyOf=s=>s.type+':'+s.id,byKey=new Map(src.map(s=>[keyOf(s),s]));
  const dialog=invDialog('Comunicación con el cliente',true);dialog.classList.add('cm-dialog');dialog.dataset.orderId=String(id);
  {const heading=dialog.querySelector('.dialog-heading'),h2=heading.querySelector('h2'),titles=el('div',undefined,'cm-titles'),facts=el('p',undefined,'cm-facts'),status=el('span',o.status_label,'cm-status');status.dataset.status=o.status;
@@ -4402,7 +4453,7 @@ async function orderMessageComposer(id,followupId=null,preset='',presetTemplate=
  (whatsappNumber(o.phone).ok||!o.email?radios.whatsapp:radios.correo).checked=true;
  // Un borrador guardado se recupera tal como quedó, con sus seguimientos, plantilla, canal y destinatario.
  if(draft){const known=draft.sources.filter(x=>byKey.has(keyOf(x)));chosen.clear();for(const x of known){chosen.add(keyOf(x));if(x.type==='history')confirmed.add(keyOf(x));}mode.value=known.length>1?'many':known.length?'one':'manual';(radios[draft.channel]||radios.whatsapp).checked=true;if(draft.recipient)(draft.channel==='correo'?email:phone).value=draft.recipient;}
- paintSources();paintLatest();if(draft&&draft.template){tpl.value=draft.template;tplTouched=true;}else if(!draft&&!start&&!src.length)tpl.value='estado';if(presetTemplate&&data.templates?.[presetTemplate]){tpl.value=presetTemplate;tplTouched=true;}paintChannel();view(false);await regenerate(true,draft);if(draft)toast('Se recuperó tu borrador guardado de esta orden.','info');if(preset){generated='';text.value=preset;used=[];warn.replaceChildren();fit();paintState();paintPreview();}text.focus({preventScroll:true});text.setSelectionRange(0,0);main.scrollTop=0;}
+ paintSources();paintLatest();if(draft&&draft.template){tpl.value=draft.template;tplTouched=true;}else if(!draft&&!start&&!src.length)tpl.value='estado';if(presetTemplate&&data.templates?.[presetTemplate]){tpl.value=presetTemplate;tplTouched=true;}if(presetChannel&&radios[presetChannel])radios[presetChannel].checked=true;paintChannel();view(false);await regenerate(true,draft);if(draft)toast('Se recuperó tu borrador guardado de esta orden.','info');if(preset){generated='';text.value=preset;used=[];warn.replaceChildren();fit();paintState();paintPreview();}text.focus({preventScroll:true});text.setSelectionRange(0,0);main.scrollTop=0;}
 let documentPreviewVersion=0,documentBlobUrl='';
 async function fetchDocument(url){const response=await fetch(url,{credentials:'same-origin'});if(!response.ok){let message='No se pudo generar el documento.';try{message=(await response.json()).error||message;}catch{}throw new Error(message);}return response.blob();}
 async function showDocumentPreview(id,kind='receipt'){

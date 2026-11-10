@@ -4507,8 +4507,15 @@ class Handler(BaseHTTPRequestHandler):
                 if status_message:
                     import status_messages
                     if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
+                    if data.get('action')=='verify':
+                        # 1.5.267: comprobación del saldo antes de enviar (solo lectura; no consume el límite de redacción).
+                        if limited(c,'status-verify:'+str(user['id']),limit=600,window=3600):return self.reply(429,{'error':'Demasiadas comprobaciones. Intenta en unos minutos.'})
+                        if not c.execute('SELECT 1 FROM orders WHERE id=?',(int(status_message[1]),)).fetchone():return self.reply(404,{'error':'Orden no disponible.'})
+                        return self.reply(200,status_messages.verify(c,int(status_message[1]),str(data.get('fingerprint','') or '')[:64],str(data.get('text','') or '')[:4000]))
                     if limited(c,'adi-write:'+str(user['id']),limit=60,window=3600):return self.reply(429,{'error':'Alcanzaste el límite de mensajes por hora. Intenta más tarde.'})
-                    try:result=status_messages.compose(c,int(status_message[1]),str(data.get('channel','')),str(data.get('note','') or ''),str(data.get('ai','1'))!='0')
+                    flag=lambda key:None if data.get(key) is None else data.get(key) is True or str(data.get(key))=='1'
+                    options={'payment':flag('include_payment'),'progress':flag('include_progress'),'date':flag('include_date'),'tone':str(data.get('tone','') or '')[:20]}
+                    try:result=status_messages.compose(c,int(status_message[1]),str(data.get('channel','')),str(data.get('note','') or ''),str(data.get('ai','1'))!='0',options)
                     except status_messages.MessageError as error:return self.reply(error.status,{'error':str(error)})
                     audit(c,user['id'],'status_message_composed',int(status_message[1]))
                     return self.reply(200,result)

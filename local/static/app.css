@@ -11229,3 +11229,60 @@ body[data-page=dashboard] #notify-panel.ncp>footer svg{width:16px;height:16px;fl
 .reentry-note-actions button{min-height:32px;padding:0 12px;font-size:12.5px;white-space:nowrap}
 @media(max-width:720px){.reentry-note{flex-wrap:wrap}.reentry-note-actions{width:100%}.reentry-note-actions button{flex:1 1 140px}}
 @media(max-width:520px){.devices-pro .device-actions .reentry-action{flex:1}.equip-card>.reentry-action{justify-self:stretch}}
+
+/* 1.5.267 · ADI Smart Follow-Up 4.0: ventana «Mensaje de seguimiento» Premium Compact. Un solo desplazamiento (el cuerpo) y pie fijo. */
+dialog.sfu-dialog.maintenance-dialog,body[data-page=dashboard] dialog.sfu-dialog.maintenance-dialog{width:min(1080px,calc(100vw - 32px));max-width:none;max-height:min(860px,calc(100dvh - 32px));padding:0;overflow:hidden;border-radius:16px;border-color:#2c4468}
+dialog.sfu-dialog[open]{display:flex;flex-direction:column}
+.sfu-dialog>.dialog-heading{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;padding:14px 18px;margin:0;border-bottom:1px solid #1d2f52;background:linear-gradient(180deg,#10223b,#0c1a2e)}
+.sfu-dialog>.dialog-heading h2{margin:0;font-size:17px;line-height:1.3}
+.sfu-dialog>.dialog-heading>button{margin-left:auto}
+.sfu-facts{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:0;order:1;flex-basis:100%}
+.sfu-code{font:700 12px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace;padding:4px 8px;border-radius:999px;background:#13284a;border:1px solid #2b4a78;color:#cfe0ff}
+.sfu-chip{display:inline-flex;align-items:center;gap:5px;padding:4px 9px;border-radius:999px;font-size:12px;font-weight:700;border:1px solid #2b4a78;background:#11243f;color:#c9d7ee;white-space:nowrap}
+.sfu-chip[data-tone=ambar]{background:#3a2a0a;border-color:#a1741f;color:#fcd38a}.sfu-chip[data-tone=verde]{background:#0d2e22;border-color:#2f8a63;color:#86efc0}
+.sfu-chip[data-tone=azul]{background:#0f2747;border-color:#3b6fb3;color:#a9cdff}.sfu-chip[data-tone=rojo]{background:#3a1218;border-color:#b4434f;color:#ffb3bb}.sfu-chip[data-tone=gris]{background:#152238;border-color:#334a6b;color:#b4c3da}
+.sfu-dialog form.sfu{display:flex;flex-direction:column;flex:1 1 auto;min-height:0;margin:0}
+.sfu-body{flex:1 1 auto;min-height:0;overflow:auto;display:grid;grid-template-columns:minmax(300px,360px) minmax(0,1fr);gap:14px;padding:14px 18px;scrollbar-width:thin;scrollbar-color:#34507a transparent}
+.sfu-side{display:grid;gap:10px;align-content:start;min-width:0}
+.sfu-card{display:grid;gap:8px;padding:12px;border:1px solid #23395c;border-radius:12px;background:#0d1b31;min-width:0}
+.sfu-card h3,.sfu-main-head h3{display:flex;align-items:center;gap:7px;margin:0;font-size:13px;font-weight:800;letter-spacing:0;text-transform:none;color:#e6efff}
+.sfu-card h3 svg,.sfu-main-head h3 svg{width:16px;height:16px;color:#7fb0ff;flex:none}
+.sfu-dl,.sfu-money{display:grid;gap:4px;margin:0}
+.sfu-dl>div,.sfu-money>div{display:flex;justify-content:space-between;align-items:center;gap:10px;min-width:0;font-size:12.5px}
+.sfu-dl dt,.sfu-money dt{color:#8fa9cc;flex:none}.sfu-dl dd,.sfu-money dd{margin:0;color:#e3eeff;text-align:right;min-width:0;overflow-wrap:anywhere}
+.sfu-money{padding:8px 10px;border-radius:10px;background:#0a1628;border:1px solid #1d2f52}
+.sfu-money>div[data-strong]{padding-top:4px;border-top:1px dashed #2b4268}.sfu-money>div[data-strong] dd{font-weight:800;color:#fcd38a}
+.sfu-notes,.sfu-review{list-style:none;display:grid;gap:5px;margin:0;padding:0}.sfu-notes:empty,.sfu-review:empty{display:none}
+.sfu-notes li{font-size:12px;line-height:1.4;padding:6px 8px;border-radius:8px;background:#0f2038;color:#b9c8e2;border-left:3px solid #3b6fb3}
+.sfu-notes li[data-level=warn]{background:#2b200b;color:#fcd38a;border-left-color:#d79b2b}
+.sfu-review li{display:flex;gap:7px;align-items:flex-start;font-size:12.5px;line-height:1.4;padding:7px 9px;border-radius:9px;background:#0f2038;color:#c4d3ea}
+.sfu-review li svg{width:15px;height:15px;flex:none;margin-top:1px;color:#7fb0ff}.sfu-review li[data-level=warn]{background:#2b200b;color:#fcd38a}.sfu-review li[data-level=warn] svg{color:#f2b84b}
+.sfu-seg{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:0;padding:0;border:0;min-width:0}.sfu-seg legend{margin-bottom:5px;color:#8fa9cc;font-size:12px}
+.sfu-seg label{position:relative;display:flex;align-items:center;justify-content:center;gap:6px;min-height:38px;padding:0 8px;border:1px solid #2b4268;border-radius:10px;background:#0b182c;color:#c9d7ee;font-size:12.5px;font-weight:700;cursor:pointer;transition:border-color .2s ease,background .2s ease}
+.sfu-seg label svg{width:15px;height:15px}.sfu-seg input{position:absolute;inset:0;opacity:0;margin:0;cursor:pointer}
+.sfu-seg label:has(input:checked){border-color:#4f8fff;background:#13305a;color:#fff;box-shadow:inset 0 0 0 1px #4f8fff55}
+.sfu-seg label:has(input:focus-visible){outline:2px solid #7fb0ff;outline-offset:2px}
+.sfu-field{display:grid;gap:5px;font-size:12px;color:#8fa9cc}.sfu-field textarea,.sfu-field select{width:100%;font-size:13px}.sfu-field textarea{resize:vertical;min-height:58px}
+.sfu-card .sfu-switch{margin:0}.sfu-card .sfu-switch .app-check-text small{font-size:11.5px}
+.sfu-card .sfu-switch:has(input:disabled){opacity:.6}
+.sfu-go{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:42px;width:100%}.sfu-go svg{width:16px;height:16px}
+.sfu-main{display:flex;flex-direction:column;gap:8px;min-width:0;min-height:0;padding:12px;border:1px solid #23395c;border-radius:12px;background:#0d1b31}
+.sfu-main-head{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px}.sfu-source{color:#9db7e6;font-size:12px;font-weight:700;flex:1 1 auto;min-width:0}
+.sfu-regen{display:inline-flex;align-items:center;gap:6px;min-height:32px;padding:0 11px;font-size:12.5px}.sfu-regen svg{width:14px;height:14px}
+.sfu-empty{flex:1 1 auto;display:grid;place-items:center;align-content:center;gap:10px;min-height:220px;padding:20px;border:1px dashed #2b4268;border-radius:10px;text-align:center;color:#8fa9cc;font-size:13px;line-height:1.5}
+.sfu-empty svg{width:28px;height:28px;color:#7fb0ff}.sfu-empty p{margin:0;max-width:420px}.sfu-empty[hidden]{display:none}
+.sfu-out{display:flex;flex-direction:column;gap:8px;flex:1 1 auto;min-height:0}.sfu-out[hidden]{display:none}
+.sfu-text{width:100%;flex:1 1 auto;min-height:300px;resize:vertical;font-size:13.5px;line-height:1.55;padding:12px;border-radius:10px}
+.sfu-stale{margin:0;padding:7px 9px;border-radius:9px;background:#13284a;color:#cfe0ff;font-size:12.5px}
+.sfu-error{margin:0 18px;color:#ffb3bb;font-size:12.5px;display:flex;flex-wrap:wrap;align-items:center;gap:8px}.sfu-error:empty{display:none}.sfu-error:not(:empty){padding:8px 0 0}
+.sfu-foot{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;padding:12px 18px;border-top:1px solid #1d2f52;background:#0b1628;flex:none}
+.sfu-hint{flex:1 1 260px;min-width:0;color:#8fa9cc;font-size:12px;line-height:1.4}.sfu-count{color:#7f96b8;font-size:11.5px;font-variant-numeric:tabular-nums}
+.sfu-foot button{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:40px;padding:0 14px}.sfu-foot button svg{width:15px;height:15px}
+@media(max-width:860px){.sfu-body{grid-template-columns:1fr}.sfu-text{min-height:260px}}
+@media(max-width:600px){dialog.sfu-dialog.maintenance-dialog,body[data-page=dashboard] dialog.sfu-dialog.maintenance-dialog{width:calc(100vw - 16px);max-height:calc(100dvh - 16px);border-radius:14px}
+ .sfu-dialog>.dialog-heading{padding:12px 14px}.sfu-body{padding:12px;gap:10px}.sfu-foot{padding:10px 12px}.sfu-hint{flex-basis:100%}.sfu-foot button{flex:1 1 0}.sfu-error{margin:0 12px}}
+@media(max-width:360px){.sfu-seg{grid-template-columns:1fr}.sfu-dl>div,.sfu-money>div{flex-wrap:wrap}}
+@media(prefers-reduced-motion:reduce){dialog.sfu-dialog{animation:none}.sfu-seg label{transition:none}}
+dialog.sfu-dialog textarea.sfu-text{max-height:none;min-height:260px}
+@media(min-width:861px){dialog.sfu-dialog .sfu-body{overflow:hidden;grid-template-rows:minmax(0,1fr)}dialog.sfu-dialog .sfu-side{overflow-y:auto;min-height:0;padding-right:4px;scrollbar-width:thin;scrollbar-color:#34507a transparent}dialog.sfu-dialog .sfu-main{min-height:0}dialog.sfu-dialog textarea.sfu-text{resize:none}}
+.sfu-go-main{display:inline-flex;align-items:center;gap:7px;min-height:40px;padding:0 16px}.sfu-go-main svg{width:16px!important;height:16px!important;color:inherit!important}
