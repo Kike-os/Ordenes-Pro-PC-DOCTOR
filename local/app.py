@@ -1482,6 +1482,13 @@ class Handler(BaseHTTPRequestHandler):
                 active=service_terms.current(c,reception_now())
                 if not active:return self.reply(404,{'error':'Las condiciones vigentes aún no han sido publicadas.'})
                 return self.reply(200,service_terms.public_page(active),'text/html; charset=utf-8')
+            signed_public=re.fullmatch(r'/conditions/([a-f0-9]{32})/firmado\.pdf',path)
+            if signed_public:
+                # 1.5.271: original firmado electrónicamente de una versión publicada, tal como se recibió (documento público, sin datos personales).
+                import conditions_signed
+                found=conditions_signed.file(c,terms_id=signed_public[1])
+                if not found:return self.reply(404,{'error':'Esta versión no tiene un original firmado.'})
+                return self.reply(200,found[1],'application/pdf',filename='CONDICIONES DE RECEPCIÓN Y SERVICIOS (firmado).pdf')
             terms_pdf=re.fullmatch(r'/conditions/([a-f0-9]{32})\.pdf',path)
             if terms_pdf:
                 # PDF oficial de una versión publicada: mismo contenido público que la página, sin datos personales.
@@ -1493,7 +1500,9 @@ class Handler(BaseHTTPRequestHandler):
             if public_terms:
                 row=c.execute('SELECT * FROM service_terms WHERE id=?',(public_terms[1],)).fetchone()
                 if not row:return self.reply(404,{'error':'Versión de condiciones no disponible.'})
-                return self.reply(200,service_terms.public_page(row),'text/html; charset=utf-8')
+                import conditions_signed
+                signed=conditions_signed.latest(c,row['id'])
+                return self.reply(200,service_terms.public_page(row,signed if signed and signed['verified'] in ('valida','no_verificable') else None),'text/html; charset=utf-8')
             user, _ = self.session(c)
             if path in ('/', '/login') or re.fullmatch(r'/orders/[^/]{1,80}',path):
                 return self.page('dashboard.html' if user else 'login.html')
@@ -1663,6 +1672,13 @@ class Handler(BaseHTTPRequestHandler):
             if path == '/api/conditions':
                 if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede consultar el historial de publicación.'})
                 return self.reply(200,service_terms.overview(c,reception_now()))
+            signed_file=re.fullmatch(r'/api/conditions/signed/([0-9]{1,9})\.pdf',path)
+            if signed_file:
+                if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
+                import conditions_signed
+                found=conditions_signed.file(c,rid=int(signed_file[1]))
+                if not found:return self.reply(404,{'error':'Original firmado no encontrado.'})
+                return self.reply(200,found[1],'application/pdf',filename=found[0])
             terms_compare=re.fullmatch(r'/api/conditions/compare/([0-9a-f]{32})',path)
             if terms_compare:
                 # Diferencias de una versión publicada frente a la inmediatamente anterior.
@@ -2982,7 +2998,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(403, {'error':'Solicitud no autorizada.'})
             path = urlsplit(self.path).path
             workspace_post=bool(re.fullmatch(r'/api/orders/[0-9]+/workspace',path));quote_json=bool(re.fullmatch(r'/api/quotes/[0-9]+',path))
-            max_body=3900000 if re.fullmatch(r'/api/orders/[0-9]+/followups',path) else 3700000 if re.fullmatch(r'/api/orders/[0-9]+/uploads',path) else 1500000 if path in ('/api/inventory/purchases/xml','/api/inventory/purchases/from-xml') else 1700000 if path in ('/api/cash/upload','/api/files/upload') else 65536 if path.startswith('/api/proformas') or path.startswith('/api/caja/') or re.fullmatch(r'/api/orders/[0-9]+/payments',path) or path=='/api/credit-notes' else 9000000 if path in ('/api/clients/import/preview','/api/clients/import/commit','/api/inventory/import/preview','/api/inventory/import/commit') else 200000 if path in ('/api/inventory/register','/api/invoicing/policies') else 1700000 if path=='/api/public/adi/listen' else 6000000 if path in ('/api/mail/send','/api/mail/draft') else 100000 if path in ('/api/conditions','/api/order-draft','/api/conditions/draft','/api/conditions/compare') else 3200000 if path in ('/api/licenses/new','/api/licenses/units','/api/licenses/units/bulk','/api/licenses/check','/api/licenses/products','/api/licenses/products/duplicate','/api/licenses/sales') or re.fullmatch(r'/api/licenses/sales/[0-9]+',path) else 1700000 if re.fullmatch(r'/api/orders/[0-9]+/photos',path) or path in ('/api/profile/photo','/api/mail/signature') or re.fullmatch(r'/api/catalog/[0-9]+/image',path) else (65536 if workspace_post or quote_json or path=='/api/mail/subject' else 16384)
+            max_body=4200000 if re.fullmatch(r'/api/conditions/[0-9a-f]{32}/signed',path) else 3900000 if re.fullmatch(r'/api/orders/[0-9]+/followups',path) else 3700000 if re.fullmatch(r'/api/orders/[0-9]+/uploads',path) else 1500000 if path in ('/api/inventory/purchases/xml','/api/inventory/purchases/from-xml') else 1700000 if path in ('/api/cash/upload','/api/files/upload') else 65536 if path.startswith('/api/proformas') or path.startswith('/api/caja/') or re.fullmatch(r'/api/orders/[0-9]+/payments',path) or path=='/api/credit-notes' else 9000000 if path in ('/api/clients/import/preview','/api/clients/import/commit','/api/inventory/import/preview','/api/inventory/import/commit') else 200000 if path in ('/api/inventory/register','/api/invoicing/policies') else 1700000 if path=='/api/public/adi/listen' else 6000000 if path in ('/api/mail/send','/api/mail/draft') else 100000 if path in ('/api/conditions','/api/order-draft','/api/conditions/draft','/api/conditions/compare') else 3200000 if path in ('/api/licenses/new','/api/licenses/units','/api/licenses/units/bulk','/api/licenses/check','/api/licenses/products','/api/licenses/products/duplicate','/api/licenses/sales') or re.fullmatch(r'/api/licenses/sales/[0-9]+',path) else 1700000 if re.fullmatch(r'/api/orders/[0-9]+/photos',path) or path in ('/api/profile/photo','/api/mail/signature') or re.fullmatch(r'/api/catalog/[0-9]+/image',path) else (65536 if workspace_post or quote_json or path=='/api/mail/subject' else 16384)
             length = int(self.headers.get('Content-Length', '0'))
             if length <= 0 or length > max_body:
                 return self.reply(400, {'error':'Solicitud inválida.'})
@@ -4961,6 +4977,20 @@ class Handler(BaseHTTPRequestHandler):
                     if errors:return self.reply(400,{'error':next(iter(errors.values())) if len(errors)==1 else 'Revisa los datos de publicación.','fields':errors})
                     audit(c,user['id'],'service_terms_published')
                     return self.reply(201,{'ok':True,'id':tid,'version':c.execute('SELECT version FROM service_terms WHERE id=?',(tid,)).fetchone()[0]})
+                signed_post=re.fullmatch(r'/api/conditions/([0-9a-f]{32})/signed',path)
+                if signed_post:
+                    # 1.5.271: cargar (administración) o volver a verificar el original firmado de una versión publicada. Nada se firma aquí.
+                    import conditions_signed
+                    if user['role']!='administrador':return self.reply(403,{'error':'Solo administración gestiona los originales firmados.'})
+                    try:
+                        if data.get('action')=='verify':
+                            rid=str(data.get('id',''))
+                            if not rid.isdigit():return self.reply(400,{'error':'Original no válido.'})
+                            return self.reply(200,conditions_signed.reverify(c,int(rid)))
+                        result=conditions_signed.upload(c,signed_post[1],data.get('filename',''),data.get('content',''),user,reception_now())
+                        if not result['duplicate']:audit(c,user['id'],'conditions_signed_uploaded',result['id'])
+                        return self.reply(201,result)
+                    except conditions_signed.SignedError as error:return self.reply(error.status,{'error':str(error)})
                 if path in ('/api/conditions/draft','/api/conditions/draft/discard','/api/conditions/compare'):
                     # Borrador de trabajo y comparación con la versión vigente. Guardar un borrador nunca publica nada.
                     if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})

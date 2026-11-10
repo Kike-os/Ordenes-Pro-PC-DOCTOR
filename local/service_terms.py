@@ -101,10 +101,10 @@ def attach(c,order):
     return order
 
 
-def public_page(row):
+def public_page(row,signed=None):
     escape=html.escape
     items=''.join('<li value="'+str(k['number'])+'">'+''.join('<p>'+(escape(k['title'])+'<br>' if k['title'] and i==0 else '')+escape(p).replace('\n','<br>')+'</p>' for i,p in enumerate(k['paragraphs']))+'</li>' for k in clauses(row['full_text']))
-    return '''<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><title>Condiciones de servicio | PC-DOCTOR S.A.</title><link rel="icon" href="/favicon.ico?v=2" sizes="48x48"><link rel="icon" type="image/png" sizes="16x16" href="/static/favicon-16.png?v=2"><link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32.png?v=2"><link rel="icon" type="image/png" sizes="48x48" href="/static/favicon-48.png?v=2"><link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png?v=2"><link rel="stylesheet" href="/static/app.css"></head><body data-page="conditions"><main class="conditions-document"><header><img src="/static/logo-original.png" alt="Logotipo oficial PC-DOCTOR" width="2826" height="2049"><div><span class="eyebrow">PC-DOCTOR S.A.</span><h1>'''+escape(row['title'])+'''</h1></div></header><p class="conditions-version">Versión '''+escape(row['version'])+''' · Vigente desde '''+escape(row['effective_date'])+'''</p><ol>'''+items+'''</ol><footer><p>Documento público de consulta. Este enlace no muestra datos personales ni el estado de reparaciones.</p><p class="conditions-hash">SHA-256: '''+escape(row['content_hash'])+'''</p></footer></main></body></html>'''
+    return '''<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><title>Condiciones de servicio | PC-DOCTOR S.A.</title><link rel="icon" href="/favicon.ico?v=2" sizes="48x48"><link rel="icon" type="image/png" sizes="16x16" href="/static/favicon-16.png?v=2"><link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32.png?v=2"><link rel="icon" type="image/png" sizes="48x48" href="/static/favicon-48.png?v=2"><link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png?v=2"><link rel="stylesheet" href="/static/app.css"></head><body data-page="conditions"><main class="conditions-document"><header><img src="/static/logo-original.png" alt="Logotipo oficial PC-DOCTOR" width="2826" height="2049"><div><span class="eyebrow">PC-DOCTOR S.A.</span><h1>'''+escape(row['title'])+'''</h1></div></header><p class="conditions-version">Versión '''+escape(row['version'])+''' · Vigente desde '''+escape(row['effective_date'])+'''</p><ol>'''+items+'''</ol>'''+(('<p class="conditions-signed"><a href="/conditions/'+escape(row['id'])+'/firmado.pdf">Descargar el original firmado electrónicamente (PDF)</a> · Firmado por '+escape(signed['signer'])+'</p>') if signed else '')+'''<footer><p>Documento público de consulta. Este enlace no muestra datos personales ni el estado de reparaciones.</p><p class="conditions-hash">SHA-256: '''+escape(row['content_hash'])+'''</p></footer></main></body></html>'''
 
 
 def required():
@@ -190,7 +190,14 @@ def overview(c,now):
     active=current(c,now);rows=[]
     for row in c.execute("SELECT t.*,COALESCE(u.name,'') publisher,ch.previous_id,ch.note,ch.added,ch.removed,ch.changed FROM service_terms t LEFT JOIN users u ON u.id=t.published_by LEFT JOIN service_terms_changes ch ON ch.terms_id=t.id ORDER BY t.published_at DESC"):
         item=metadata(row);item.update(publisher=row['publisher'],previous_id=row['previous_id'],note=row['note'] or '',changes=None if row['added'] is None else {'added':row['added'],'removed':row['removed'],'changed':row['changed']},
-                                       current=bool(active and row['id']==active['id']),scheduled=row['effective_date']>now.date().isoformat());rows.append(item)
+                                       current=bool(active and row['id']==active['id']),scheduled=row['effective_date']>now.date().isoformat())
+        # 1.5.271: estado documental (vigente, aprobado o sustituido) y su original firmado electrónicamente, si se cargó.
+        try:
+            import conditions_signed
+            item.update(conditions_signed.state(item,conditions_signed.latest(c,row['id'])),signed_history=conditions_signed.history(c,row['id']))
+        except Exception:
+            item.update(state='vigente' if item['current'] else 'sustituido',signed=False,signature=None,signed_history=[])
+        rows.append(item)
     pending=draft(c)
     return {'rows':rows,'current':({**metadata(active),'full_text':active['full_text'],'compact_text':active['compact_text']} if active else None),'next_version':next_version(c,now.date()),'today':now.date().isoformat(),
             'draft':({**pending,'diff':compare(active['full_text'] if active else '',pending['full_text']),'compact_changed':bool(active) and pending['compact_text']!=active['compact_text']} if pending else None)}

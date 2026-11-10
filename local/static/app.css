@@ -11543,3 +11543,14 @@ button.ex-view{min-height:30px;padding:3px 10px;font-size:12px}
 .opr-card .opr-notices-v2 .opr-notice-side{grid-column:3;grid-row:1}
 .opr-card .opr-notices-v2 .opr-notice-detail{grid-column:1/-1}
 @media(max-width:600px){.opr-card .opr-notices-v2 .opr-notice-side{grid-column:2;grid-row:auto}.opr-card .opr-notices-v2 .opr-notice-main>small,.opr-card .opr-notices-v2 .opr-notice-main>p{grid-column:2}}
+
+/* 1.5.271 · Condiciones: estado documental y original firmado electrónicamente de cada versión. */
+.terms-signed{display:grid;gap:8px;margin:8px 0;padding:10px 12px;border:1px solid #23395c;border-radius:12px;background:#0b1527}
+.terms-signed-head{display:flex;flex-wrap:wrap;gap:6px}
+.terms-chip{display:inline-flex;align-items:center;padding:2px 9px;border-radius:999px;font-size:11.5px;font-weight:700;border:1px solid #334a6b;background:#152238;color:#b4c3da}
+.terms-chip[data-tone=verde]{background:#0d2e22;border-color:#2f8a6366;color:#86efc0}.terms-chip[data-tone=azul]{background:#0f2747;border-color:#3b6fb366;color:#a9cdff}.terms-chip[data-tone=ambar]{background:#3a2a0a;border-color:#a1741f88;color:#fcd38a}
+.terms-signed-facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:6px 14px;margin:0}
+.terms-signed-facts div{display:grid;gap:1px;min-width:0}.terms-signed-facts dt{font-size:11px;color:#7f93b3}.terms-signed-facts dd{margin:0;font-size:12.5px;color:#e2e8f0;overflow-wrap:anywhere}
+.terms-signed-note{margin:0;font-size:11.5px;line-height:1.45;color:#9fb3d1}
+.terms-signed>button{justify-self:start;display:inline-flex;align-items:center;gap:6px}.terms-signed button svg{width:15px;height:15px}
+.terms-signed .receipt-actions button{display:inline-flex;align-items:center;gap:6px}
