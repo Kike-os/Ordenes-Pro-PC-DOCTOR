@@ -4,6 +4,28 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.267 — 2026-11-09 19:52 (UTC-05:00)
+
+Reingreso de equipos sin reabrir la orden anterior, ADI Smart Follow-Up 4.0 con saldo confirmado y ADI Premium Smart Bar 5.0 compacta
+
+### Nuevas funcionalidades
+
+- Reingreso de equipos: botón «Reingresar equipo» en la orden entregada, la ficha y la lista de equipos y el historial del cliente. Abre una orden nueva con el mismo equipo; la anterior no se reabre y conserva sus pagos, presupuesto, diagnóstico, documentos y fechas de ingreso y entrega.
+- Orden de reingreso: aviso con la atención anterior del equipo, acceso a esa orden y al historial técnico, donde figuran ambas atenciones.
+- ADI Smart Follow-Up 4.0: el mensaje de seguimiento incluye el saldo pendiente confirmado con el importe exacto (y los abonos), sin mencionar cobros si la orden está pagada, sin cargos o no verificable. Con transferencias por confirmar no se incluye por defecto.
+- Mensaje de seguimiento: antes de enviar se comprueba el saldo; si cambió desde que se generó el texto, se pide actualizarlo. Envío con confirmación por la comunicación de la orden, que registra el resultado real. Opciones: pago, avances, fecha registrada y tono.
+
+### Mejoras realizadas
+
+- Ventana «Mensaje de seguimiento» Premium Compact: orden, estado técnico y de pago en el encabezado; información, comunicación y opciones a la izquierda y editor amplio a la derecha; revisión de contradicciones y datos faltantes; pie fijo; móvil sin desbordes.
+- ADI Premium Smart Bar 5.0: «Adi — Asistencia inteligente» pasa a una barra de unos 56 px con contador y la recomendación principal; se despliega con las cinco herramientas y filas compactas con referencia, valor y detalle. Recuerda si la dejas abierta.
+- Smart Bar: el rojo queda solo para lo crítico verificable (repuesto vencido o con incidencia, saldo que impide entregar un equipo listo). Novedades con un efecto breve sin abrir el panel; teclado (Enter y Escape) y movimiento reducido.
+
+### Errores corregidos
+
+- Reingreso: el mismo equipo (misma serie y datos) podía recibir un segundo ingreso con el primero aún abierto; ahora se bloquea, igual que al elegir «Equipo existente». Equipos y órdenes se buscan por teléfono en cualquier formato y por código EQ, y la ficha del equipo muestra su código.
+- ADI: el aviso «omitió datos de tus anotaciones» tomaba cifras de las instrucciones internas (p. ej., «70»). Las notas internas ya no se usan en mensajes al cliente; se avisa cuántas quedaron fuera. «Cuando esté listo» ya no se toma como «está listo».
+
 ## v1.5.266 — 2026-11-09 15:06 (UTC-05:00)
 
 Centro de notificaciones Premium Compact: categorías, tarjetas legibles, scroll interno, encabezado y pie fijos, teclado y móvil
