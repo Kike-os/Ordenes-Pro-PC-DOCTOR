@@ -8,6 +8,28 @@
   },
   "releases": [
     {
+      "version": "1.5.275",
+      "date": "2026-11-10T18:53:51-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "WhatsApp Business oficial para los avisos al cliente, con autorización, estados reales y reintentos controlados",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Avisos al cliente por WhatsApp con la API oficial de Meta: cola propia con siete estados (pendiente, enviando, enviado, entregado, leído, fallido y omitido), autorización del cliente registrada, plantilla por evento o general, sin duplicados, reintentos automáticos solo ante errores temporales y botón «Reintentar envío» solo cuando procede.",
+          "Eventos por WhatsApp: orden registrada, diagnóstico, presupuesto (pendiente, aprobado o rechazado), reparación iniciada y finalizada, equipo listo y entregado, recordatorios de entrega, repuestos (solicitado, enviado, recibido, cancelado y demás) y citas (registrada, confirmada, reprogramada y cancelada). El correo y Mail Pro no cambian.",
+          "Configuración → Integraciones → WhatsApp Business (solo administración): estado de conexión, comprobación de credenciales, permisos, plantillas y webhook desde el servidor, eventos activables, envío de prueba a un número autorizado, historial de envíos y errores con su solución."
+        ],
+        "fixes": [
+          "WhatsApp Business: causa real del aviso «no está configurado» identificada (el servidor no tiene las credenciales de Meta). Ya no se registran avisos «omitidos» por falta de configuración: el panel explica qué falta y cómo completarlo. Graph API pasa a la versión vigente v26.0 (la v21.0 se retira el 21/01/2027)."
+        ],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Kike-os: «Actualiza a la versión siguiente» (instrucciones de WhatsApp Business)"
+    },
+    {
       "version": "1.5.274",
       "date": "2026-11-10T09:10:56-05:00",
       "type": "patch",

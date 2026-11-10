@@ -4,6 +4,20 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.275 — 2026-11-10 18:53 (UTC-05:00)
+
+WhatsApp Business oficial para los avisos al cliente, con autorización, estados reales y reintentos controlados
+
+### Mejoras realizadas
+
+- Avisos al cliente por WhatsApp con la API oficial de Meta: cola propia con siete estados (pendiente, enviando, enviado, entregado, leído, fallido y omitido), autorización del cliente registrada, plantilla por evento o general, sin duplicados, reintentos automáticos solo ante errores temporales y botón «Reintentar envío» solo cuando procede.
+- Eventos por WhatsApp: orden registrada, diagnóstico, presupuesto (pendiente, aprobado o rechazado), reparación iniciada y finalizada, equipo listo y entregado, recordatorios de entrega, repuestos (solicitado, enviado, recibido, cancelado y demás) y citas (registrada, confirmada, reprogramada y cancelada). El correo y Mail Pro no cambian.
+- Configuración → Integraciones → WhatsApp Business (solo administración): estado de conexión, comprobación de credenciales, permisos, plantillas y webhook desde el servidor, eventos activables, envío de prueba a un número autorizado, historial de envíos y errores con su solución.
+
+### Errores corregidos
+
+- WhatsApp Business: causa real del aviso «no está configurado» identificada (el servidor no tiene las credenciales de Meta). Ya no se registran avisos «omitidos» por falta de configuración: el panel explica qué falta y cómo completarlo. Graph API pasa a la versión vigente v26.0 (la v21.0 se retira el 21/01/2027).
+
 ## v1.5.274 — 2026-11-10 09:10 (UTC-05:00)
 
 Firma empresarial a color también en el ticket, con el blanco y negro optimizado como opción
