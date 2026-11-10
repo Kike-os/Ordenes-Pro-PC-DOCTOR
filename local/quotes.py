@@ -778,6 +778,11 @@ def decide(c, quote, decisions, now, user=None, actor='', note=''):
     c.execute("UPDATE quote_links SET revoked_at=? WHERE quote_id=? AND revoked_at=''", (stamp, quote['id']))
     sync_budget(c, quote)
     sync_order(c, quote, status, now)
+    try:  # 1.5.275: aviso por WhatsApp Business de la decisión (cola propia; nunca impide registrarla)
+        import whatsapp_business
+        whatsapp_business.on_quote(c, quote, status, now)
+    except Exception as error:
+        print('whatsapp-quote', type(error).__name__, flush=True)
     if status in ('aprobado', 'parcial'):
         # Licencias digitales con inventario: se reservan unidades concretas (sin revelar credenciales). Un borrador no descuenta nada.
         import licenses

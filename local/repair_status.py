@@ -231,7 +231,13 @@ def skip_reason(c, oid, new, source, now, notify=True):
 
 
 def emit(c, oid, lid, new, source, now, notify=True):
-    """Registra los avisos de un cambio relevante (uno por canal). Devuelve los id pendientes de enviar."""
+    """Registra los avisos de un cambio relevante (uno por canal). Devuelve los id pendientes de enviar.
+    1.5.275: WhatsApp va por su propia cola (whatsapp_business), con sus ajustes y sin depender del correo."""
+    try:
+        import whatsapp_business
+        whatsapp_business.on_status(c, oid, lid, new, source, now, notify)
+    except Exception as error:  # un problema de WhatsApp nunca impide registrar el cambio de estado
+        print('whatsapp-status', type(error).__name__, flush=True)
     if new not in NOTICE or not enabled(c):
         return []
     import part_notices
@@ -268,7 +274,9 @@ def deliver(c, ids, now, send_mail):
         if not n or n['status'] not in ('pendiente', 'fallido') or n['attempts'] >= MAX_ATTEMPTS:
             continue
         subject, body = text_for(c, n['order_id'], n['event'])
-        channel = dict((ch, (rec, skip)) for ch, rec, skip in part_notices._channels(c, n['order_id']))[n['channel']]
+        channel = dict((ch, (rec, skip)) for ch, rec, skip in part_notices._channels(c, n['order_id'])).get(n['channel'])
+        if channel is None:  # avisos de WhatsApp anteriores a 1.5.275: ahora van por la cola de WhatsApp Business
+            continue
         if channel[1]:
             c.execute("UPDATE order_status_notices SET status='omitido',detail=?,updated_at=? WHERE id=?", (channel[1], stamp(now), nid))
             continue

@@ -74,19 +74,23 @@ def _channels(c, oid):
         except mail_pro.MailError:
             ready = False
         mail = (email, '' if ready else 'El correo del sistema no está configurado.')
-    status = order_followups.whatsapp_status()
-    number = order_followups.ecuador_number(who['phone'])
-    whatsapp = (number, '' if status['configured'] and status['template'] and number else
-                'WhatsApp Business no está configurado.' if not status['configured'] else 'Falta la plantilla aprobada de WhatsApp Business.' if not status['template']
-                else 'El cliente no tiene un celular válido.')
-    return (('correo',) + mail, ('whatsapp',) + whatsapp)
+    # 1.5.275: WhatsApp Business tiene su propia cola (whatsapp_business), con autorización del cliente, plantillas por evento y estados de
+    # entrega; aquí queda solo el correo, con las mismas reglas de siempre.
+    return (('correo',) + mail,)
 
 
 def emit(c, row, event, key, now):
     """Registra los avisos de un evento (uno por canal; repetido, no crea otro). Devuelve los id pendientes de enviar."""
-    if event not in EVENTS or not enabled(c):
+    if event not in EVENTS:
         return []
     if not row['public_visible'] and event not in ALWAYS:
+        return []
+    try:  # WhatsApp: cola y ajustes propios (no depende del interruptor del correo) y nunca impide el aviso por correo
+        import whatsapp_business
+        whatsapp_business.on_part(c, row, event, key, now)
+    except Exception as error:
+        print('whatsapp-part', type(error).__name__, flush=True)
+    if not enabled(c):
         return []
     out = []
     for channel, recipient, skip in _channels(c, row['order_id']):
@@ -120,7 +124,9 @@ def deliver(c, ids, now, send_mail):
             continue
         row = c.execute('SELECT * FROM order_part_requests WHERE id=?', (n['request_id'],)).fetchone()
         subject, body = text_for(c, row, n['event'])
-        channel = dict((ch, (rec, skip)) for ch, rec, skip in _channels(c, row['order_id']))[n['channel']]
+        channel = dict((ch, (rec, skip)) for ch, rec, skip in _channels(c, row['order_id'])).get(n['channel'])
+        if channel is None:  # avisos de WhatsApp anteriores a 1.5.275: ahora van por la cola de WhatsApp Business
+            continue
         if channel[1]:
             c.execute("UPDATE order_part_notices SET status='omitido',detail=?,updated_at=? WHERE id=?", (channel[1], stamp(now), nid))
             continue

@@ -382,6 +382,7 @@ def create(c,data,user=None):
  evidence=authorize(c,aid,terms,data.get('id_last4'),'personal' if user else 'en_linea',user)
  if initial=='confirmada':c.execute("UPDATE appointments SET status='confirmada' WHERE id=?",(aid,))
  if initial=='confirmada' and fields['email'] and data.get('communications_consent') is True:c.execute("INSERT OR IGNORE INTO appointment_notifications(appointment_id,generation,event,channel,result,created_at) VALUES (?,1,'confirmation','email','pending',?)",(aid,created))
+ if data.get('communications_consent') is True:whatsapp_notice(c,aid,'confirmation' if initial=='confirmada' else 'registered',1)
  if fields['document_type']:c.execute('UPDATE appointments SET document_type=? WHERE id=?',(fields['document_type'],aid))
  if fields.get('pickup'):
   c.execute('UPDATE appointments SET pickup_order_id=? WHERE id=?',(fields['pickup']['id'],aid))
@@ -401,6 +402,7 @@ def reschedule(c,row,start,user):
  if oldstatus=='no_asistio':c.execute('UPDATE appointments SET reschedules=reschedules+1,reschedule_origin=? WHERE id=?',('personal' if user else 'cliente',row['id']))
  c.execute('INSERT INTO appointment_events(appointment_id,actor_id,event,old_start,new_start,old_status,new_status,created_at) VALUES (?,?,?,?,?,?,?,?)',(row['id'],user['id'] if user else None,'rescheduled',old,stamp(start),oldstatus,'reprogramada',created))
  if row['email'] and row['communications_consent']:c.execute("INSERT OR IGNORE INTO appointment_notifications(appointment_id,generation,event,channel,result,created_at) VALUES (?,?,'rescheduled','email','pending',?)",(row['id'],generation,created))
+ if row['communications_consent']:whatsapp_notice(c,row['id'],'rescheduled',generation)
  return {'ok':True,'starts_at':stamp(start)}
 EDITABLE=('name','phone','email','device_type','brand','model','description','notes')
 def edit(c,row,data,user):
@@ -481,8 +483,15 @@ def create_for_maintenance(c,mid,user=None):
 def admin_rows(c,start,end):
  return [dict(r) for r in c.execute("SELECT a.*,COALESCE(NULLIF(a.services_summary,''),s.label) service_label,u.name technician,(SELECT code FROM orders WHERE id=a.pickup_order_id) pickup_code,(SELECT authorization_id FROM appointment_authorizations WHERE appointment_id=a.id) authorization_id FROM appointments a JOIN appointment_services s ON s.code=a.service_code LEFT JOIN users u ON u.id=a.technician_id WHERE a.deleted_at IS NULL AND a.starts_at>=? AND a.starts_at<? ORDER BY a.starts_at,a.id",(start,end))]
 
+def whatsapp_notice(c,aid,event,generation):
+ """1.5.275: aviso por WhatsApp Business (cola propia; requiere la autorización de comunicaciones marcada al reservar). Nunca impide la cita."""
+ try:
+  import whatsapp_business
+  whatsapp_business.on_appointment(c,aid,event,generation,now())
+ except Exception as error:print('whatsapp-appointment',type(error).__name__,flush=True)
 def queue_notice(c,row,event,generation=None):
  """Encola un correo al cliente (confirmación o cancelación) solo si dejó correo y autorizó comunicaciones."""
+ whatsapp_notice(c,row['id'],event,generation or row['generation'])
  if row['email'] and row['communications_consent']:c.execute("INSERT OR IGNORE INTO appointment_notifications(appointment_id,generation,event,channel,result,created_at) VALUES (?,?,?,'email','pending',?)",(row['id'],generation or row['generation'],event,stamp(now())))
 def detail(c,aid,full=False):
  """Cita con su servicio, técnico, cliente vinculado e historial de modificaciones."""

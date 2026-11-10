@@ -552,7 +552,7 @@ def listing(c, oid, today):
         item['map'] = route_map(r['shipping'], current, reached, at, finished, r['situation'], origin_country=r['origin_country'], customs=customs)
         item['map_html'] = part_route.render(item['map'], 'i%d' % r['id'], r['name'])
         item.update(
-                    cancellations=part_cancellations.history(c, r['id']), cancel_context=part_cancellations.context(c, oid, r), notices=part_notices.listing(c, r['id']),
+                    cancellations=part_cancellations.history(c, r['id']), cancel_context=part_cancellations.context(c, oid, r), notices=part_notices.listing(c, r['id']), wa_notices=__import__('whatsapp_business').for_part(c, r['id']),
                     log=[dict(x) for x in c.execute('SELECT kind,action,note,origin,actor_id,created_at FROM order_part_log WHERE request_id=? ORDER BY id DESC', (r['id'],))])
         for x in item['log']:
             x['actor'] = names.get(x['actor_id'], 'Cliente' if x['origin'] == 'cliente' else 'Sistema')
@@ -578,7 +578,8 @@ def options(c):
             'staff': [dict(r) for r in c.execute("SELECT id,name FROM users WHERE active=1 AND role IN ('administrador','tecnico') ORDER BY name")],
             'flows': {k: [{'code': x, 'label': step_label(x, k)} for x in v] for k, v in FLOWS.items()}, 'incidents': {k: {'label': v[0], 'situation': v[1]} for k, v in INCIDENTS.items()},
             'cancel_reasons': __import__('part_cancellations').REASONS, 'cancel_channels': __import__('part_cancellations').CHANNELS,
-            'notices_enabled': __import__('part_notices').enabled(c), 'whatsapp': __import__('order_followups').whatsapp_status()}
+            'notices_enabled': __import__('part_notices').enabled(c), 'whatsapp': __import__('order_followups').whatsapp_status(),
+            'wa': {'ready': __import__('whatsapp_business').ready(), 'auto': __import__('whatsapp_business').settings(c)['auto']}}
 
 
 # ---- Vista pública (modelo seguro: solo se construye con campos permitidos; los textos se revisan contra datos del proveedor) -------------

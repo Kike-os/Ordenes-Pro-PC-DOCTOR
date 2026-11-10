@@ -653,7 +653,7 @@ def message_sources(c, oid, data):
 def whatsapp_config(env=None):
     env = os.environ if env is None else env
     return {'token': env.get('WHATSAPP_TOKEN', '').strip(), 'phone_id': env.get('WHATSAPP_PHONE_NUMBER_ID', '').strip(),
-            'secret': env.get('WHATSAPP_APP_SECRET', '').strip(), 'verify': env.get('WHATSAPP_VERIFY_TOKEN', '').strip(), 'version': env.get('WHATSAPP_API_VERSION', 'v21.0').strip(),
+            'secret': env.get('WHATSAPP_APP_SECRET', '').strip(), 'verify': env.get('WHATSAPP_VERIFY_TOKEN', '').strip(), 'version': env.get('WHATSAPP_API_VERSION', '').strip() or 'v26.0',
             'template': env.get('WHATSAPP_TEMPLATE_NAME', '').strip(), 'template_lang': env.get('WHATSAPP_TEMPLATE_LANG', 'es').strip() or 'es'}
 
 
@@ -747,7 +747,8 @@ def webhook_verify(params, env=None):
 
 
 def webhook_status(c, raw, signature, now, env=None):
-    """Avisos de Meta: solo con firma válida (X-Hub-Signature-256) se actualiza el estado a entregado, leído o error. Nunca retrocede."""
+    """Avisos de Meta: solo con firma válida (X-Hub-Signature-256) se actualiza el estado a entregado, leído o error. Nunca retrocede.
+    1.5.275: la ruta pública usa whatsapp_business.webhook (misma firma), que además actualiza la cola de avisos y registra las bajas."""
     cfg = whatsapp_config(env)
     expected = 'sha256=' + hmac.new(cfg['secret'].encode(), raw, hashlib.sha256).hexdigest() if cfg['secret'] else ''
     if not expected or not hmac.compare_digest(expected, signature or ''):
@@ -756,6 +757,11 @@ def webhook_status(c, raw, signature, now, env=None):
         payload = json.loads(raw.decode('utf-8'))
     except ValueError:
         return 0
+    return apply_statuses(c, payload, now)
+
+
+def apply_statuses(c, payload, now):
+    """Estados de entrega y lectura de un aviso de Meta YA verificado, aplicados a la comunicación de la orden (order_messages)."""
     order = {'enviado': 1, 'entregado': 2, 'leido': 3}
     names = {'sent': 'enviado', 'delivered': 'entregado', 'read': 'leido', 'failed': 'error'}
     changed = 0
@@ -763,7 +769,7 @@ def webhook_status(c, raw, signature, now, env=None):
         for change in entry.get('changes', []) or []:
             for st in (change.get('value', {}) or {}).get('statuses', []) or []:
                 new = names.get(st.get('status', ''))
-                row = c.execute('SELECT id,status FROM order_messages WHERE provider_id=?', (str(st.get('id', '')),)).fetchone() if new else None
+                row = c.execute('SELECT id,status FROM order_messages WHERE provider_id=?', (str(st.get('id', '')),)).fetchone() if new and st.get('id') else None
                 if not row:
                     continue
                 # Un fallo solo cuenta mientras el mensaje figura como enviado: nunca deshace un «entregado» o «leído» ya confirmado.

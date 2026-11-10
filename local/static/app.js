@@ -2058,8 +2058,8 @@ function renderSettings(data){
  const root=$('module-content');root.replaceChildren();const params=routeState().params,shell=el('div',undefined,'config-shell'),nav=el('nav',undefined,'config-nav'),panes=el('div',undefined,'config-panes');nav.setAttribute('aria-label','Categorías de configuración');
  const gear='M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0';
  const titleIcon=el('span',undefined,'system-title-icon');titleIcon.append(systemIcon(gear));$('module-title').prepend(titleIcon);
- const icons={signature:'m21 17-2.156-1.868A.5.5 0 0 0 18 15.5v.5a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1c0-2.545-3.991-3.97-8.5-4a1 1 0 0 0 0 5c4.153 0 4.745-11.295 5.708-13.5a2.5 2.5 0 1 1 3.31 3.284 M3 21h18',adi:'M12 3l1.9 5.8L20 10l-6.1 1.2L12 17l-1.9-5.8L4 10l6.1-1.2z M19 3v4 M17 5h4 M5 17v4 M3 19h4',catalog:'M4 4h6v6H4z M14 4h6v6h-6z M4 14h6v6H4z M17 14v6 M14 17h6',profile:'M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2 M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0',security:systemIcons.security,users:'M18 21a8 8 0 0 0-16 0 M15 8a5 5 0 1 1-10 0 5 5 0 0 1 10 0 M22 20c0-3.37-2-6.5-4-8a5 5 0 0 0-.45-8.3',services:'M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z M3 7l9 6 9-6',hours:'M12 6v6l4 2 M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z',policies:'M7 11V7a5 5 0 0 1 10 0v4 M5 11h14a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2z',terms:'M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z M14 2v4a2 2 0 0 0 2 2h4 M10 9H8 M16 13H8 M16 17H8',devauth:'M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z M9 12l2 2 4-4',status:'M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2'};
- const pending=(data.requests||[]).filter(request=>request.approval==='pending').length,tabs=[['profile','Mi perfil'],['security','Seguridad y sesiones'],['users','Gestión de Usuarios y Accesos'],['services','Correo y servicios'],['adi','Personalidad y Voz de ADI'],['hours','Horarios y Disponibilidad'],['catalog','Catálogo de productos y servicios'],['policies','Políticas de acceso'],['terms','Condiciones del servicio'],['signature','Firma electrónica'],['devauth','Autorizaciones por equipo'],['status','Estado del sistema']],sections={};
+ const icons={signature:'m21 17-2.156-1.868A.5.5 0 0 0 18 15.5v.5a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1c0-2.545-3.991-3.97-8.5-4a1 1 0 0 0 0 5c4.153 0 4.745-11.295 5.708-13.5a2.5 2.5 0 1 1 3.31 3.284 M3 21h18',adi:'M12 3l1.9 5.8L20 10l-6.1 1.2L12 17l-1.9-5.8L4 10l6.1-1.2z M19 3v4 M17 5h4 M5 17v4 M3 19h4',catalog:'M4 4h6v6H4z M14 4h6v6h-6z M4 14h6v6H4z M17 14v6 M14 17h6',profile:'M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2 M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0',security:systemIcons.security,users:'M18 21a8 8 0 0 0-16 0 M15 8a5 5 0 1 1-10 0 5 5 0 0 1 10 0 M22 20c0-3.37-2-6.5-4-8a5 5 0 0 0-.45-8.3',services:'M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z M3 7l9 6 9-6',hours:'M12 6v6l4 2 M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z',policies:'M7 11V7a5 5 0 0 1 10 0v4 M5 11h14a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2z',terms:'M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z M14 2v4a2 2 0 0 0 2 2h4 M10 9H8 M16 13H8 M16 17H8',devauth:'M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z M9 12l2 2 4-4',status:'M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2',integrations:'M12 22v-5 M9 8V2 M15 8V2 M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8z'};
+ const pending=(data.requests||[]).filter(request=>request.approval==='pending').length,tabs=[['profile','Mi perfil'],['security','Seguridad y sesiones'],['users','Gestión de Usuarios y Accesos'],['services','Correo y servicios'],['adi','Personalidad y Voz de ADI'],['hours','Horarios y Disponibilidad'],['catalog','Catálogo de productos y servicios'],['policies','Políticas de acceso'],['terms','Condiciones del servicio'],['signature','Firma electrónica'],...(admin()?[['integrations','Integraciones']]:[]),['devauth','Autorizaciones por equipo'],['status','Estado del sistema']],sections={};
  const pane=(key,title,lead)=>{const section=el('section',undefined,'data-panel config-pane');section.dataset.pane=key;section.hidden=true;section.id='config-'+key;section.setAttribute('aria-labelledby','config-title-'+key);const head=el('header'),h=el('h2',title);h.id='config-title-'+key;h.tabIndex=-1;head.append(h);if(lead)head.append(el('p',lead));section.append(head);sections[key]=section;panes.append(section);return section;};
  const facts=entries=>{const list=el('dl',undefined,'config-facts');for(const[label,value,state]of entries){const row=el('div'),dd=el('dd');if(value instanceof Node)dd.append(value);else dd.textContent=value;if(state)dd.dataset.state=state;row.append(el('dt',label),dd);list.append(row);}return list;};
  const pill=(text,state)=>{const node=el('span',text,'config-pill');node.dataset.state=state;return node;};
@@ -2191,6 +2191,8 @@ function renderSettings(data){
  // Condiciones del servicio y estado
  const terms=pane('terms','Condiciones del servicio','Publicación y consulta de las condiciones que acepta el cliente.');renderTermsSettings(terms);
  {const signature=pane('signature','Firma electrónica','Firma empresarial visual en los documentos y diferencia con la firma electrónica de los PDF.');renderSignatureSettings(signature);}
+ // 1.5.275 · Integraciones → WhatsApp Business (solo administración).
+ if(admin()){const integ=pane('integrations','Integraciones · WhatsApp Business','Conexión oficial con Meta para los avisos al cliente: credenciales, webhook, plantillas, eventos, envío de prueba e historial.');renderWhatsAppSettings(integ);}
  renderAuthorizationProfiles(pane('devauth','Autorizaciones por equipo','Qué autorizaciones de acceso y datos se piden según el tipo de equipo. Rige para lo que se registre en adelante: no cambia decisiones ya registradas.'));
  // Estado del sistema: tarjetas compactas con datos reales (configuración, último diagnóstico de ADI AutoCare y registro de versiones).
  const status=pane('status','Estado del sistema','Datos reales de esta instalación: acceso, seguridad, usuarios, solicitudes y actualizaciones.');
@@ -3358,7 +3360,7 @@ function renderOrderDetail(root,order){
  const reentry=reentryNote(order);root.append(head,progressBox,...(reentry?[reentry]:[]),actions);if(adiCard)root.append(adiCard);
  const layout=el('div',undefined,'workspace-layout');const main=el('div',undefined,'workspace-main'),aside=el('aside',undefined,'workspace-side');main.append(orderSection('Datos del cliente',[['Nombre / Razón social',order.client],['Teléfono / WhatsApp',order.phone],['Cédula o RUC',order.identification],['Correo electrónico',order.email],['Ubicación',[order.province,order.canton,order.parish,order.city].filter(Boolean).join(' · ')],['Dirección',order.address],['Referencia',order.location_reference],...(order.reception_phone!==undefined||order.reception_email!==undefined?[['Contacto al recibir el equipo',[order.reception_phone!==undefined?'Teléfono: '+(order.reception_phone||'no registrado'):'',order.reception_email!==undefined?'Correo: '+(order.reception_email||'no registrado'):''].filter(Boolean).join(' · ')+' (la ficha del cliente se actualizó después)']]:[])]),orderSection('Datos del equipo',[['Tipo de equipo',receptionOptions?.device_types?.[order.type]||order.type],['Marca y modelo',[order.brand,order.model].filter(Boolean).join(' ')],['Número de serie',order.serial],['Identificador del equipo',order.device_code],...(order.unit_code?[['Equipo en la orden',order.unit_code]]:[]),['Color',order.color],['Accesorios recibidos',order.accessories],['Estado físico',order.physical_condition]]),orderSection('Motivo de ingreso',[['Falla reportada al recibir',order.problem],['Descripción de trabajo actual',order.current_problem||order.problem]]),orderSection('Nota interna',[['Observaciones de recepción',order.technician_notes],['Observaciones del técnico',order.internal_notes],['Recomendaciones',order.recommendations],['Hallazgos internos',order.findings]]));
  main.prepend(equipmentGroupSection(order));{let rxs=receptionDetailSection(order);if(!rxs&&order.reception&&!rxCat()){rxs=el('section',undefined,'workspace-section rx-detail');loadReceptionOptions().then(()=>{const real=receptionDetailSection(order);if(real)rxs.replaceWith(real);else rxs.remove();}).catch(()=>rxs.remove());}if(rxs)main.append(rxs);}main.append(orderPhotoSection(order));main.append(orderPartsPanel(order));main.append(orderHistoryPanel(order));
- aside.append(orderStatusCard(order));  // 1.5.257: estado, responsable, prioridad, entrega, última actualización, línea de tiempo, auditoría y ADI
+ aside.append(orderStatusCard(order));if(['administrador','tecnico'].includes(currentUser?.role))aside.append(orderClientNoticesCard(order));  // 1.5.275: avisos al cliente por WhatsApp · 1.5.257: estado, responsable, prioridad, entrega, última actualización, línea de tiempo, auditoría y ADI
  aside.append(quoteSection(order),...(admin()?[proformaOrderSection(order),orderPartsSection(order)]:[]),paymentsSection(order));
  // WhatsApp: mensajes preparados con los datos de la orden; se abren en WhatsApp para enviarlos desde allí.
  
@@ -4480,25 +4482,16 @@ function orderPartsPanel(order){ofxIcons();const box=el('section',undefined,'opr
     blocks.append(sec);}
    // 1.5.269 · Avisos al cliente: tarjeta de ancho completo con el estado REAL de cada aviso (un omitido nunca se muestra como enviado),
    // su canal, fecha y hora, el motivo de un fallo u omisión, el detalle y el reintento controlado (solo fallidos, con intentos disponibles).
-   {const notices=r.notices||[],sec=el('section',undefined,'opr-block opr-notices opr-notices-v2'),h=el('h4'),STATUS={pendiente:'Pendiente',enviado:'Enviado',fallido:'Fallido',omitido:'Omitido'};
+   // 1.5.275: los avisos de WhatsApp vienen de su propia cola (siete estados); los de correo y los registros anteriores se conservan tal cual.
+   {const notices=[...(r.wa_notices||[]),...(r.notices||[])].sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at))),sec=el('section',undefined,'opr-block opr-notices opr-notices-v2'),h=el('h4'),STATUS=WAN_LABELS;
     h.append(invIcon('send'),el('span','Avisos al cliente'));const counts=el('div',undefined,'opr-notice-counts');
-    for(const st of ['enviado','omitido','fallido','pendiente']){const n=notices.filter(x=>x.status===st).length;if(!n)continue;const c=el('span',n+' '+STATUS[st].toLowerCase()+(n>1?'s':''),'opr-notice-count');c.dataset.status=st;counts.append(c);}h.append(counts);sec.append(h);
-    const wa=data.whatsapp||{},waReady=!!(wa.configured&&wa.template);
-    if(!waReady&&notices.some(n=>n.channel==='whatsapp')){const hint=el('div',undefined,'opr-wa-hint');hint.append(invIcon('triangle-alert'),el('p','WhatsApp Business no está configurado'+(wa.configured&&!wa.template?' (falta la plantilla aprobada)':'')+': los avisos por WhatsApp quedan «omitidos» y no se envían. Los avisos por correo no se ven afectados.'));
-     if(admin()){const go=button('Revisar configuración',()=>{location.hash='#settings?tab=services';},'secondary');hint.append(go);}sec.append(hint);}
+    h.append(waCounts(notices));sec.append(h);
+    const wa=data.wa||{};
+    if(!wa.ready)sec.append(waInactiveHint('WhatsApp Business no está configurado en el servidor: los avisos por WhatsApp no se envían. Los avisos por correo no se ven afectados.',true));
+    else if(!wa.auto)sec.append(waInactiveHint('Los envíos automáticos por WhatsApp están desactivados.',true));
     if(!notices.length)sec.append(el('p',data.notices_enabled?'Todavía no hay avisos para este repuesto: se envían solo en eventos relevantes.':'Los avisos automáticos al cliente están desactivados.','opr-notice-empty'));
-    else{const ul=el('ul',undefined,'opr-notice-list');
-     for(const n of notices){const li=el('li');li.dataset.status=n.status;const dot=el('i');const main=el('div',undefined,'opr-notice-main'),meta=el('small');meta.append(invIcon(n.channel==='correo'?'mail':'message-circle'),document.createTextNode((n.channel==='correo'?'Correo':'WhatsApp')+' · '+when(n.updated_at)));main.append(el('strong',n.label),meta);
-      if(n.detail&&n.status!=='enviado')main.append(el('p',(n.status==='omitido'?'Motivo: ':'Error: ')+n.detail,'opr-notice-reason'));
-      const pill=el('b',STATUS[n.status]||n.status,'opr-notice-pill'),more=button('',()=>{const open=det.hidden;det.hidden=!open;more.setAttribute('aria-expanded',String(open));li.dataset.open=String(open);},'opr-notice-more');more.append(el('span','Detalles'),systemIcon('m6 9 6 6 6-6'));more.setAttribute('aria-expanded','false');
-      const det=el('dl',undefined,'opr-notice-detail');det.hidden=true;det.id='opr-n-'+r.id+'-'+n.id;more.setAttribute('aria-controls',det.id);
-      for(const[k,v]of [['Evento',n.label],['Canal',n.channel==='correo'?'Correo electrónico':'WhatsApp Business'],['Estado',STATUS[n.status]||n.status],['Registrado',when(n.created_at)],['Última actualización',when(n.updated_at)],['Intentos',String(n.attempts||0)],['Motivo o respuesta',n.detail||(n.status==='enviado'?'Aceptado por el servicio de envío.':'—')]]){const d=el('div');d.append(el('dt',k),el('dd',v));det.append(d);}
-      if(n.message_id){const d=el('div'),link=button('Ver en la comunicación de la orden',()=>orderMessageComposer(order.id),'text-action');d.append(el('dt','Registro'),link);det.append(d);}
-      const side=el('div',undefined,'opr-notice-side');side.append(pill,more);li.append(dot,main,side,det);ul.append(li);}
-     sec.append(ul);
-     // Compacto: los 4 más recientes; el resto, a pedido.
-     if(notices.length>4){const extra=[...ul.children].slice(4);extra.forEach(li=>li.hidden=true);const all=button('Ver todos los avisos ('+notices.length+')',()=>{const show=extra[0].hidden;extra.forEach(li=>li.hidden=!show);all.textContent=show?'Ver solo los recientes':'Ver todos los avisos ('+notices.length+')';all.setAttribute('aria-expanded',String(show));},'text-action opr-more');all.setAttribute('aria-expanded','false');sec.append(all);}}
-    const retry=notices.filter(n=>n.status==='fallido'&&n.attempts<3);
+    else sec.append(waNoticeList(notices,{prefix:'p'+r.id,orderId:order.id,onChange:load,label:'Avisos al cliente de este repuesto'}));
+    const retry=(r.notices||[]).filter(n=>n.status==='fallido'&&n.attempts<3);
     if(admin()&&retry.length){const b=invBtn('Reintentar '+(retry.length===1?'el aviso fallido':'los '+retry.length+' avisos fallidos'),'rotate-ccw',async()=>{if(!await askConfirm('¿Reintentar el envío?','Se intentará de nuevo '+(retry.length===1?'el aviso fallido':'cada aviso fallido')+' por su mismo canal. Los omitidos no se reenvían y solo se marcan como enviados si el servicio lo confirma.'))return;b.disabled=true;try{const out=await api('/api/orders/'+order.id+'/part-requests/'+r.id,{action:'notices_retry'});toast(out.sent?'Avisos reenviados: '+out.sent+'.':'Ningún aviso se pudo enviar todavía.',out.sent?'success':'error');await load();}catch(error){b.disabled=false;toast(error.message,'error');}});sec.append(b);}
     if(notices.length||data.notices_enabled)blocks.append(sec);}
    const hist=el('details',undefined,'opr-hist'),ol=el('ol'),sum=el('summary');sum.append(el('span','Historial'),el('b',String(r.events.length)));hist.append(sum,ol);
@@ -7994,3 +7987,173 @@ async function cashHistory(panel){panel.replaceChildren(el('p','Cargando…','em
  const list=el('ul',undefined,'inv-list');for(const r of data.rows){const li=el('li'),row=button('',()=>{cashState.tab='dia';cashState.day=r.day;cashState.user=r.user_id===currentUser.id?'':String(r.user_id);if(currentModule==='invoicing'){invoiceState.tab='caja';renderInvoicing();}else legacyCash();},'inv-row cash-hist-row');const who=el('div',undefined,'inv-row-who');who.append(el('strong',dashboardDate(r.day)+' · '+r.person),el('small','Esperado '+quoteMoney(r.expected_cash_cents)+' · contado '+quoteMoney(r.counted_cash_cents)+(r.difference_cents?' · diferencia '+quoteMoney(r.difference_cents):'')));
   const sums=el('div',undefined,'cash-hist-sums');for(const[k,v]of Object.entries(r.deposit_summary))if(v&&k!=='anulado')sums.append(invoiceChip({pendiente:'pendiente',depositado:'enviado',conciliado:'autorizado'}[k],depositStates[k]+' '+quoteMoney(v)));if(!sums.childElementCount)sums.append(invoiceChip('pendiente','Sin depósitos'));
   row.append(who,sums);row.setAttribute('aria-label','Abrir la caja de '+r.person+' del '+dashboardDate(r.day));li.append(row);list.append(li);}panel.append(list);}
+
+// ===== 1.5.275 · WhatsApp Business (API oficial de Meta) =====================================================================================
+// Lista «Avisos al cliente» Premium Compacta: siete estados reales (pendiente, enviando, enviado, entregado, leído, fallido, omitido), icono,
+// canal, fecha y hora, intentos y detalle desplegable. El botón «Reintentar envío» aparece solo cuando el servidor dice que procede.
+const WAN_ICONS={pendiente:'M12 6v6l4 2 M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z',enviando:'M21 12a9 9 0 1 1-6.219-8.56',enviado:'M20 6 9 17l-5-5',
+ entregado:'M18 6 7 17l-5-5 M22 10l-7.5 7.5L13 16',leido:'M2.06 12.35a1 1 0 0 1 0-.7 10.75 10.75 0 0 1 19.88 0 1 1 0 0 1 0 .7 10.75 10.75 0 0 1-19.88 0 M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z',
+ fallido:'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z M15 9l-6 6 M9 9l6 6',omitido:'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z M8 12h8'};
+const WAN_LABELS={pendiente:'Pendiente',enviando:'Enviando',enviado:'Enviado',entregado:'Entregado',leido:'Leído',fallido:'Fallido',omitido:'Omitido'};
+const WAN_CHANNEL={whatsapp:'M7.9 20A9 9 0 1 0 4 16.1L2 22Z',correo:'M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z M3 7l9 6 9-6'};
+const WAN_RETRY='M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8 M3 3v5h5';
+function wanIcon(path,cls){const s=systemIcon(path);if(cls)s.classList.add(cls);return s;}
+function wanWhen(value){return value?formatOrderDate(value):'—';}
+function waNoticeList(items,opts={}){
+ const wrap=el('div',undefined,'wan'),ul=el('ul',undefined,'wan-list');ul.setAttribute('aria-label',opts.label||'Avisos al cliente');
+ const limit=opts.limit||4;
+ for(const n of items){const wa=n.channel==='whatsapp',status=n.status,li=el('li',undefined,'wan-item');li.dataset.status=status;li.dataset.channel=n.channel;
+  const ic=el('span',undefined,'wan-state');ic.append(wanIcon(WAN_ICONS[status]||WAN_ICONS.pendiente));
+  const main=el('div',undefined,'wan-main'),title=el('strong',n.label+(opts.withOrder&&n.order_code?' · '+n.order_code:''));const meta=el('small',undefined,'wan-meta');
+  meta.append(wanIcon(WAN_CHANNEL[n.channel]||WAN_CHANNEL.correo),el('span',(wa?'WhatsApp':'Correo')+' · '+wanWhen(n.updated_at||n.created_at)));
+  if(n.attempts)meta.append(el('span',' · '+n.attempts+(n.attempts===1?' intento':' intentos')));main.append(title,meta);
+  if(n.detail&&['fallido','omitido'].includes(status))main.append(el('p',(status==='omitido'?'Motivo: ':'Error: ')+n.detail,'wan-reason'));
+  else if(status==='pendiente'&&n.next_attempt_at)main.append(el('p','Programado para '+wanWhen(n.next_attempt_at),'wan-reason wan-soft'));
+  const pill=el('b',n.status_label||WAN_LABELS[status]||status,'wan-pill');
+  const det=el('dl',undefined,'wan-detail');det.hidden=true;det.id='wan-'+(opts.prefix||'x')+'-'+n.channel+'-'+n.id;
+  const more=button('',()=>{const open=det.hidden;det.hidden=!open;more.setAttribute('aria-expanded',String(open));li.dataset.open=String(open);},'wan-more');more.append(el('span','Detalles'),wanIcon('m6 9 6 6 6-6'));more.setAttribute('aria-expanded','false');more.setAttribute('aria-controls',det.id);more.setAttribute('aria-label','Detalles de '+n.label);
+  const rows=[['Evento',n.label],['Canal',wa?'WhatsApp Business':'Correo electrónico'],['Estado',WAN_LABELS[status]||status],['Registrado',wanWhen(n.created_at)]];
+  if(wa){if(n.sent_at)rows.push(['Aceptado por WhatsApp',wanWhen(n.sent_at)]);if(n.delivered_at)rows.push(['Entregado',wanWhen(n.delivered_at)]);if(n.read_at)rows.push(['Leído',wanWhen(n.read_at)]);
+   if(n.recipient)rows.push(['Destinatario',n.recipient]);if(n.template)rows.push(['Plantilla',n.template+(n.template_lang?' ('+n.template_lang+')':'')]);if((n.params||[]).length)rows.push(['Datos enviados',n.params.join(' · ')]);
+   if(n.next_attempt_at&&status==='fallido')rows.push(['Próximo intento automático',wanWhen(n.next_attempt_at)]);if(n.error_code)rows.push(['Código de Meta',n.error_code]);}
+  else rows.push(['Última actualización',wanWhen(n.updated_at)]);
+  rows.push(['Intentos',String(n.attempts||0)],['Motivo o respuesta',n.detail||(['enviado','entregado','leido'].includes(status)?'Aceptado por el servicio de envío.':'—')]);
+  if(wa&&n.preview)rows.push(['Resumen del aviso',n.preview]);
+  for(const[k,v]of rows){const d=el('div');d.append(el('dt',k),el('dd',v));det.append(d);}
+  if(n.message_id&&opts.orderId){const d=el('div'),link=button('Ver en la comunicación de la orden',()=>orderMessageComposer(opts.orderId),'text-action');d.append(el('dt','Registro'),link);det.append(d);}
+  const side=el('div',undefined,'wan-side');side.append(pill);
+  if(wa&&n.can_retry){const r=button('',async()=>{if(!await askConfirm(status==='omitido'?'¿Enviar el aviso ahora?':'¿Reintentar el envío?','Se enviará por WhatsApp la plantilla aprobada al número registrado del cliente. Solo figura como enviado si WhatsApp lo acepta.','Enviar'))return;r.disabled=true;
+    try{const out=await api('/api/whatsapp/outbox/'+n.id+'/retry',{});const st=out.item.status;toast(['enviado','entregado','leido'].includes(st)?'WhatsApp aceptó el aviso.':st==='fallido'?'No se pudo enviar: '+out.item.detail:'Aviso actualizado: '+(WAN_LABELS[st]||st)+'.',['enviado','entregado','leido'].includes(st)?'success':'error');opts.onChange?.();}
+    catch(error){r.disabled=false;toast(error.message,'error');}},'wan-retry');r.append(wanIcon(WAN_RETRY),el('span',status==='omitido'?'Enviar ahora':'Reintentar envío'));side.append(r);}
+  side.append(more);li.append(ic,main,side,det);ul.append(li);}
+ wrap.append(ul);
+ if(items.length>limit){const extra=[...ul.children].slice(limit);extra.forEach(li=>li.hidden=true);const all=button('Ver todos los avisos ('+items.length+')',()=>{const show=extra[0].hidden;extra.forEach(li=>li.hidden=!show);all.textContent=show?'Ver solo los recientes':'Ver todos los avisos ('+items.length+')';all.setAttribute('aria-expanded',String(show));},'text-action wan-all');all.setAttribute('aria-expanded','false');wrap.append(all);}
+ return wrap;}
+function waCounts(items){const box=el('div',undefined,'wan-counts');for(const st of ['enviado','entregado','leido','pendiente','enviando','fallido','omitido']){const n=items.filter(x=>x.status===st).length;if(!n)continue;const c=el('span',n+' '+WAN_LABELS[st].toLowerCase(),'wan-count');c.dataset.status=st;box.append(c);}return box;}
+function waInactiveHint(text,showLink){const hint=el('div',undefined,'wan-hint');hint.append(wanIcon('M12 9v4 M12 17h.01 M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z'),el('p',text));
+ if(showLink&&admin()){const go=button('Configurar WhatsApp',()=>{location.hash='#settings?tab=integrations';},'secondary');hint.append(go);}return hint;}
+
+// Tarjeta «Avisos al cliente» de la orden: autorización del cliente, envío manual y todos los avisos de WhatsApp de la orden.
+function orderClientNoticesCard(order){
+ const card=el('section',undefined,'workspace-section wan-card');card.setAttribute('aria-labelledby','wan-title-'+order.id);
+ const head=el('div',undefined,'wan-head'),h=el('h2');h.id='wan-title-'+order.id;h.append(wanIcon(WAN_CHANNEL.whatsapp),el('span','Avisos al cliente'));head.append(h);
+ const body=el('div',undefined,'wan-body');body.append(el('p','Cargando avisos…','wan-soft'));card.append(head,body);
+ const load=async()=>{let d;try{d=await api('/api/orders/'+order.id+'/whatsapp');}catch(error){body.replaceChildren(el('p',error.message,'wan-soft'));return;}
+  head.querySelector('.wan-counts')?.remove();if(d.items.length)head.append(waCounts(d.items));body.replaceChildren();
+  if(!d.ready)body.append(waInactiveHint('WhatsApp Business no está configurado en el servidor: los avisos por WhatsApp no se envían. Los avisos por correo funcionan igual.',true));
+  else if(!d.auto)body.append(waInactiveHint('Los envíos automáticos por WhatsApp están desactivados. Puedes enviar un aviso manual desde aquí.',true));
+  // Autorización del cliente
+  const c=d.consent||{},cons=el('div',undefined,'wan-consent');cons.dataset.state=c.state||'sin_registro';
+  const ctext=el('div');ctext.append(el('small','Autorización para WhatsApp'),el('strong',c.state==='aceptado'?'Autorizado':c.state==='rechazado'?'No desea avisos':'Sin registrar'));
+  if(c.recorded_at)ctext.append(el('span',(c.source_label||'')+' · '+wanWhen(c.recorded_at),'wan-soft'));
+  ctext.append(el('span',d.valid_number?'Número: '+d.number:'El cliente no tiene un celular válido para WhatsApp.','wan-soft'));
+  cons.append(wanIcon(c.state==='aceptado'?'M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z M9 12l2 2 4-4':'M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z'),ctext);
+  if(d.valid_number){const rec=button(c.state==='sin_registro'?'Registrar respuesta':'Actualizar respuesta',()=>waConsentDialog(order,d,load),'secondary wan-btn');cons.append(rec);}
+  body.append(cons);
+  // Envío manual (p. ej., «Diagnóstico terminado»)
+  if(d.ready&&c.state==='aceptado'&&d.valid_number){const row=el('div',undefined,'wan-manual'),lab=el('label'),sel=el('select');lab.append(el('span','Enviar un aviso por WhatsApp'),sel);
+   for(const ev of d.manual_events)sel.add(new Option(ev.label,ev.code));sel.value='diagnostico_terminado';
+   const send=button('',async()=>{const label=sel.options[sel.selectedIndex].text;if(!await askConfirm('¿Enviar «'+label+'»?','Se enviará la plantilla aprobada de WhatsApp a '+d.number+'. Un mismo aviso se envía una sola vez por día.','Enviar'))return;send.disabled=true;
+    try{const out=await api('/api/orders/'+order.id+'/whatsapp/send',{event:sel.value});const last=out.items.find(i=>i.event===sel.value);toast(last&&['enviado','entregado','leido'].includes(last.status)?'WhatsApp aceptó el aviso.':'El aviso quedó «'+(WAN_LABELS[last?.status]||'registrado')+'»: '+(last?.detail||''),last&&['enviado','entregado','leido'].includes(last.status)?'success':'error');await load();}
+    catch(error){toast(error.message,'error');}finally{send.disabled=false;}},'primary wan-btn');send.append(wanIcon(WAN_CHANNEL.whatsapp),el('span','Enviar'));row.append(lab,send);body.append(row);}
+  if(d.items.length)body.append(waNoticeList(d.items,{prefix:'o'+order.id,orderId:order.id,onChange:load,label:'Avisos de WhatsApp de la orden'}));
+  else body.append(el('p',d.ready?'Todavía no hay avisos por WhatsApp para esta orden.':'Sin avisos por WhatsApp registrados.','wan-soft'));};
+ load();return card;}
+
+function waConsentDialog(order,d,done){const dialog=smallDialog('Autorización de WhatsApp · '+displayCode(order));dialog.classList.add('wan-dialog');
+ const form=el('form',undefined,'wan-form');form.noValidate=true;
+ const fs=el('fieldset',undefined,'wan-choice');fs.append(el('legend','Respuesta del cliente'));const radio=(value,text)=>{const l=el('label'),i=el('input');i.type='radio';i.name='decision';i.value=value;l.append(i,el('span',text));fs.append(l);return i;};
+ const yes=radio('aceptado','Autoriza recibir avisos de su orden por WhatsApp'),no=radio('rechazado','No desea recibir avisos por WhatsApp');
+ const src=el('label'),sel=el('select');src.append(el('span','¿Cómo lo indicó?'),sel);sel.add(new Option('Selecciona…',''));for(const[k,v]of Object.entries(d.consent_sources))sel.add(new Option(v,k));
+ const note=el('label'),txt=el('input');txt.maxLength=300;txt.placeholder='Opcional: p. ej., «lo confirmó al dejar el equipo»';note.append(el('span','Nota'),txt);
+ const conf=el('label',undefined,'wan-confirm'),box=el('input');box.type='checkbox';conf.append(box,el('span','Confirmo que el cliente autorizó expresamente que PC-DOCTOR le envíe avisos de su orden por WhatsApp al '+d.number+'.'));conf.hidden=true;
+ const err=el('p',undefined,'wan-error');err.setAttribute('role','alert');
+ fs.addEventListener('change',()=>{conf.hidden=!yes.checked;});
+ const ok=el('button','Guardar','primary');ok.type='submit';const cancel=button('Cancelar',()=>dialog.close(),'secondary');const actions=el('div',undefined,'dialog-actions');actions.append(cancel,ok);
+ form.append(el('p','Registra solo lo que el cliente dijo realmente. Cada respuesta queda en un historial que no se modifica.','wan-soft'),fs,src,note,conf,err,actions);dialog.append(form);
+ form.addEventListener('submit',async e=>{e.preventDefault();err.textContent='';const decision=yes.checked?'aceptado':no.checked?'rechazado':'';
+  if(!decision){err.textContent='Elige la respuesta del cliente.';return;}if(!sel.value){err.textContent='Indica cómo dio el cliente su respuesta.';sel.focus();return;}if(decision==='aceptado'&&!box.checked){err.textContent='Confirma la autorización expresa del cliente.';box.focus();return;}
+  ok.disabled=true;try{await api('/api/orders/'+order.id+'/whatsapp/consent',{decision,source:sel.value,detail:txt.value,confirm:box.checked});toast(decision==='aceptado'?'Autorización registrada.':'Se registró que el cliente no desea avisos por WhatsApp.','success');dialog.close();done();}
+  catch(error){err.textContent=error.message;ok.disabled=false;}});
+ yes.focus();}
+
+// Configuración → Integraciones → WhatsApp Business (solo administración; el servidor lo vuelve a comprobar).
+async function renderWhatsAppSettings(pane){
+ const root=el('div',undefined,'wab');pane.append(root);root.append(el('p','Cargando…','wan-soft'));
+ const STATE={sin_configurar:['Sin configurar','error'],sin_comprobar:['Credenciales cargadas · sin comprobar','warn'],conectado:['Conectado','ok'],error:['Con errores','error']};
+ const ok='M20 6 9 17l-5-5',bad='M18 6 6 18 M6 6l12 12',warn='M12 9v4 M12 17h.01 M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z';
+ const card=(title,glyph,lead)=>{const s=el('section',undefined,'wab-card'),h=el('h3');h.append(wanIcon(glyph),el('span',title));s.append(h);if(lead)s.append(el('p',lead,'wan-soft'));root.append(s);return s;};
+ let data;
+ const load=async()=>{try{data=await api('/api/whatsapp');}catch(error){root.replaceChildren(el('p',error.message,'wan-soft'));return;}paint();};
+ const paint=()=>{root.replaceChildren();const st=STATE[data.state]||STATE.sin_configurar,s=data.settings;
+  // 1. Estado de la conexión
+  {const c=card('Estado de la conexión',WAN_CHANNEL.whatsapp),row=el('div',undefined,'wab-status'),pill=el('span',st[0],'wab-pill');pill.dataset.state=st[1];row.append(pill);
+   const ph=data.check?.phone||{};if(ph.display_phone_number)row.append(el('span',ph.display_phone_number+(ph.verified_name?' · '+ph.verified_name:'')+(ph.quality_rating?' · calidad '+ph.quality_rating:''),'wan-soft'));
+   if(data.check?.checked_at)row.append(el('span','Última comprobación: '+wanWhen(data.check.checked_at),'wan-soft'));c.append(row);
+   const acts=el('div',undefined,'wab-actions'),chk=button('',async()=>{chk.disabled=true;try{await api('/api/whatsapp/check',{});toast('Comprobación terminada.','success');await load();}catch(error){toast(error.message,'error');chk.disabled=false;}},'primary');chk.append(wanIcon(WAN_RETRY),el('span','Comprobar conexión'));chk.disabled=!data.ready;if(!data.ready)chk.title='Primero completa las credenciales en el servidor.';
+   const proc=button('Procesar cola ahora',async()=>{proc.disabled=true;try{const out=await api('/api/whatsapp/process',{});toast(out.processed?'Avisos procesados: '+out.processed+'.':'No hay avisos pendientes por enviar.','success');await load();}catch(error){toast(error.message,'error');proc.disabled=false;}},'secondary');proc.disabled=!data.ready;acts.append(chk,proc);c.append(acts);
+   if(!data.ready)c.append(waInactiveHint('Causa del aviso «WhatsApp Business no está configurado»: el servidor no tiene las credenciales de Meta. Complétalas como se indica abajo; mientras tanto, ningún aviso se envía por WhatsApp y el correo funciona igual.',false));}
+  // 2. Configuración del servidor
+  {const c=card('Credenciales del servidor','M7 11V7a5 5 0 0 1 10 0v4 M5 11h14a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2z','Se guardan solo como variables de entorno del servidor (Vercel → Settings → Environment Variables → Production) y nunca se muestran aquí. Después de agregarlas, vuelve a desplegar.');
+   const ul=el('ul',undefined,'wab-reqs');for(const r of data.requirements){const li=el('li');li.dataset.state=r.present?'ok':r.required?'error':'optional';li.append(wanIcon(r.present?ok:r.required?bad:'M8 12h8'));
+    const t=el('div');const top=el('strong',r.label);t.append(top,el('code',r.key));if(r.hint)t.append(el('span',(r.kind==='id'?'Configurado: ':'Valor: ')+r.hint,'wan-soft'));else if(r.present)t.append(el('span','Configurado (valor oculto).','wan-soft'));
+    if(!r.present)t.append(el('small',r.how));li.append(t);ul.append(li);}c.append(ul);
+   const v=data.version;c.append(el('p','Graph API: '+v.version+(v.expires?' · Meta la retira el '+v.expires:'')+(v.outdated?' · conviene usar '+v.current:''),'wan-soft'));}
+  // 3. Resultado de la comprobación
+  if(data.check){const c=card('Resultado de la comprobación','M9 11l3 3L22 4 M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11'),ul=el('ul',undefined,'wab-steps');
+   for(const step of data.check.steps){const li=el('li');li.dataset.state=step.state;li.append(wanIcon(step.state==='ok'?ok:step.state==='warn'?warn:bad));const t=el('div');t.append(el('strong',step.label),el('span',step.text));if(step.solution)t.append(el('small','Solución: '+step.solution));li.append(t);ul.append(li);}c.append(ul);}
+  // 4. Webhook
+  {const c=card('Webhook de estados y mensajes','M18 16.98h-5.99c-1.1 0-1.95.94-2.48 1.9A4 4 0 0 1 2 17c.01-.7.2-1.4.57-2 M6 17l3.13-5.78c.53-.97.1-2.18-.5-3.1a4 4 0 1 1 6.89-4.06 M12 6l3.13 5.73C15.66 12.7 16.9 13 18 13a4 4 0 0 1 0 8','En Meta: WhatsApp → Configuración → Webhook. Pega esta URL, escribe el mismo token de verificación del servidor y suscribe el campo «messages».');
+   const urlRow=el('div',undefined,'wab-url'),inp=el('input');inp.readOnly=true;inp.value=data.webhook.url;inp.setAttribute('aria-label','URL de devolución del webhook');const copy=button('Copiar',async()=>{try{await navigator.clipboard.writeText(inp.value);toast('URL copiada.','success');}catch{inp.select();}},'secondary');urlRow.append(inp,copy);c.append(urlRow);
+   const dl=el('dl',undefined,'wab-facts'),fact=(k,v)=>{const d=el('div');d.append(el('dt',k),el('dd',v));dl.append(d);};
+   fact('Token de verificación',data.webhook.verify_token?'Configurado':'Falta WHATSAPP_VERIFY_TOKEN');fact('Firma (App Secret)',data.webhook.app_secret?'Configurada':'Falta WHATSAPP_APP_SECRET');
+   fact('Último aviso firmado de Meta',data.webhook.last_event?wanWhen(data.webhook.last_event):'Ninguno todavía');fact('Avisos rechazados por firma no válida',String(data.webhook.rejected.count||0));c.append(dl);}
+  // 5. Plantillas y eventos
+  const approved=(data.check?.templates||[]).filter(t=>t.status==='APPROVED');
+  const list=el('datalist');list.id='wab-templates';for(const t of approved)list.append(new Option(t.name+' · '+t.language+' · '+t.variables+' variables',t.name));root.append(list);
+  {const c=card('Plantillas de mensajes','M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z M14 2v4a2 2 0 0 0 2 2h4 M10 9H8 M16 13H8 M16 17H8','Meta exige plantillas aprobadas para avisar fuera de una conversación. Cada evento usa su propia plantilla o, si no tiene, la plantilla general.');
+   const grid=el('div',undefined,'wab-grid'),field=(label,value,hint,list)=>{const l=el('label'),i=el('input');i.value=value||'';i.maxLength=120;if(list)i.setAttribute('list',list);l.append(el('span',label),i);if(hint)l.append(el('small',hint));grid.append(l);return i;};
+   const gName=field('Plantilla general',s.general_template,'Variables: {{1}} '+data.general_params[0]+', {{2}} '+data.general_params[1]+', {{3}} '+data.general_params[2]+'.','wab-templates'),gLang=field('Idioma',s.general_lang,'p. ej., es o es_EC');c.append(grid);
+   if(data.check?.templates?.length){const det=el('details',undefined,'wab-tpls'),sum=el('summary','Plantillas en Meta ('+data.check.templates.length+')');det.append(sum);const ul=el('ul');for(const t of data.check.templates){const li=el('li');li.dataset.state=t.status==='APPROVED'?'ok':'warn';li.append(el('strong',t.name),el('span',t.language+' · '+t.category+' · '+t.status+' · '+t.variables+' variables','wan-soft'));if(t.body)li.append(el('small',t.body));ul.append(li);}det.append(ul);c.append(det);}
+   else c.append(el('p',data.ready?'Pulsa «Comprobar conexión» para consultar las plantillas de la cuenta.':'Las plantillas se consultan cuando las credenciales estén configuradas.','wan-soft'));
+   // Eventos
+   const ev=card('Eventos de notificación','M10.268 21a2 2 0 0 0 3.464 0 M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326','Cada aviso exige la autorización del cliente, se envía una sola vez y se comprueba que siga siendo cierto antes de salir.');
+   const inputs={};let group='';const table=el('div',undefined,'wab-events');
+   for(const e of data.events){if(e.group!==group){group=e.group;table.append(el('h4',e.group_label,'wab-group'));}
+    const row=el('div',undefined,'wab-event'),sw=el('input');sw.type='checkbox';asSwitch(sw);sw.checked=s.events[e.code].on;sw.setAttribute('aria-label','Activar «'+e.label+'»');
+    const txt=el('div');txt.append(el('strong',e.label),el('small',e.when+' Variables propias: '+e.params.map((p,i)=>'{{'+(i+1)+'}} '+p).join(', ')+'.'));
+    const tpl=el('input');tpl.value=s.events[e.code].template;tpl.placeholder=s.general_template?'General: '+s.general_template:'Plantilla';tpl.setAttribute('list','wab-templates');tpl.setAttribute('aria-label','Plantilla de «'+e.label+'»');tpl.maxLength=120;
+    const lang=el('input');lang.value=s.events[e.code].lang;lang.placeholder=s.general_lang||'es';lang.setAttribute('aria-label','Idioma de «'+e.label+'»');lang.maxLength=8;lang.className='wab-lang';
+    row.append(sw,txt,tpl,lang);table.append(row);inputs[e.code]={sw,tpl,lang};}
+   ev.append(table);
+   const save=button('Guardar plantillas y eventos',async()=>{save.disabled=true;const events={};for(const[k,v]of Object.entries(inputs))events[k]={on:v.sw.checked,template:v.tpl.value.trim(),lang:v.lang.value.trim()};
+    try{await api('/api/whatsapp/settings',{general_template:gName.value.trim(),general_lang:gLang.value.trim(),events});toast('Configuración de WhatsApp guardada.','success');await load();}
+    catch(error){toast(error.message+(error.fields?' '+Object.values(error.fields).join(' '):''),'error');save.disabled=false;}},'primary');ev.append(save);}
+  // 6. Envíos automáticos y recordatorios
+  {const c=card('Envíos automáticos','M13 2 3 14h9l-1 8 10-12h-9l1-8z','Apagados por defecto. Actívalos después de comprobar la conexión y hacer un envío de prueba. El correo no depende de este ajuste.');
+   const sw=AppSwitch({label:'Enviar avisos automáticos por WhatsApp',hint:'Solo a clientes que autorizaron WhatsApp, con plantilla aprobada.',className:'wab-switch'});sw.input.checked=!!s.auto;sw.input.disabled=!data.ready;
+   sw.input.onchange=async()=>{const want=sw.input.checked;if(want&&!await askConfirm('¿Activar los envíos automáticos?','Desde ahora se enviarán avisos reales por WhatsApp a los clientes que autorizaron recibirlos, en los eventos activados.','Activar')){sw.input.checked=false;return;}
+    sw.input.disabled=true;try{await api('/api/whatsapp/settings',{auto:want});toast(want?'Envíos automáticos activados.':'Envíos automáticos desactivados.','success');await load();}catch(error){sw.input.checked=!want;sw.input.disabled=false;toast(error.message+(error.fields?.auto?' '+error.fields.auto:''),'error');}};
+   c.append(sw.wrap);const days=el('label',undefined,'wab-days'),d=el('input');d.value=(s.reminder_days||[]).join(', ');d.inputMode='numeric';d.maxLength=12;days.append(el('span','Recordatorio de entrega (días en «Listo para entregar»)'),d);
+   const dsave=button('Guardar',async()=>{const list=d.value.split(/[ ,;]+/).filter(Boolean).map(Number);try{await api('/api/whatsapp/settings',{reminder_days:list});toast('Plazos guardados.','success');await load();}catch(error){toast(error.message+(error.fields?.reminder_days?' '+error.fields.reminder_days:''),'error');}},'secondary');
+   const drow=el('div',undefined,'wab-inline');drow.append(days,dsave);c.append(drow);}
+  // 7. Envío de prueba
+  {const c=card('Envío de prueba','M22 2 11 13 M22 2l-7 20-4-9-9-4z','Solo al número autorizado que guardes aquí, nunca a un cliente. Por defecto usa «hello_world» (en_US), la plantilla de ejemplo que Meta crea en cada cuenta.');
+   const grid=el('div',undefined,'wab-grid'),num=el('input'),nl=el('label');num.type='tel';num.value=s.test_number?'+'+s.test_number:'';num.autocomplete='off';nl.append(el('span','Número autorizado para pruebas'),num);
+   const tl=el('label'),tp=el('input');tp.value=s.test_template;tp.setAttribute('list','wab-templates');tl.append(el('span','Plantilla de prueba'),tp);const ll=el('label'),lg=el('input');lg.value=s.test_lang;lg.maxLength=8;ll.append(el('span','Idioma'),lg);grid.append(nl,tl,ll);c.append(grid);
+   const keep=button('Guardar número y plantilla',async()=>{try{await api('/api/whatsapp/settings',{test_number:num.value,test_template:tp.value.trim(),test_lang:lg.value.trim()});toast('Datos de prueba guardados.','success');await load();}catch(error){toast(error.message+(error.fields?' '+Object.values(error.fields).join(' '):''),'error');}},'secondary');
+   const conf=el('label',undefined,'wan-confirm'),box=el('input');box.type='checkbox';conf.append(box,el('span','Confirmo que este número pertenece a PC-DOCTOR o a una persona que autorizó recibir la prueba.'));
+   const send=button('',async()=>{if(!box.checked){toast('Confirma que el número de prueba está autorizado.','error');box.focus();return;}send.disabled=true;try{const out=await api('/api/whatsapp/test',{confirm:true});const it=out.item;toast(['enviado','entregado','leido'].includes(it.status)?'WhatsApp aceptó el mensaje de prueba.':'La prueba no se envió: '+it.detail,['enviado','entregado','leido'].includes(it.status)?'success':'error');await load();}catch(error){toast(error.message,'error');send.disabled=false;}},'primary');
+   send.append(wanIcon('M22 2 11 13 M22 2l-7 20-4-9-9-4z'),el('span','Enviar prueba'));send.disabled=!data.ready||!s.test_number;const acts=el('div',undefined,'wab-actions');acts.append(keep,send);c.append(conf,acts);}
+  // 8. Historial de envíos
+  {const c=card('Historial de envíos','M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8 M3 3v5h5 M12 7v5l4 2'),bar=el('div',undefined,'wab-inline'),fl=el('label'),f=el('select');fl.append(el('span','Estado'),f);f.add(new Option('Todos',''));for(const[k,v]of Object.entries(WAN_LABELS))f.add(new Option(v,k));bar.append(fl);c.append(bar);
+   const box=el('div',undefined,'wab-history');c.append(box);let page=0;
+   const loadHist=async()=>{box.replaceChildren(el('p','Cargando…','wan-soft'));try{const h=await api('/api/whatsapp/history?status='+encodeURIComponent(f.value)+'&page='+page);box.replaceChildren();if(!h.rows.length){box.append(el('p','No hay envíos con este filtro.','wan-soft'));return;}
+     box.append(waNoticeList(h.rows,{prefix:'h',withOrder:true,limit:50,onChange:loadHist,label:'Historial de envíos por WhatsApp'}));
+     if(h.total>50){const nav=el('div',undefined,'wab-actions'),prev=button('Anteriores',()=>{page=Math.max(0,page-1);loadHist();},'secondary'),next=button('Siguientes',()=>{page++;loadHist();},'secondary');prev.disabled=page===0;next.disabled=(page+1)*50>=h.total;nav.append(prev,el('span','Página '+(page+1)+' de '+Math.ceil(h.total/50),'wan-soft'),next);box.append(nav);}}
+    catch(error){box.replaceChildren(el('p',error.message,'wan-soft'));}};
+   f.onchange=()=>{page=0;loadHist();};loadHist();}
+  // 9. Errores técnicos y soluciones
+  {const c=card('Errores técnicos y soluciones','M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3 M12 17h.01'),det=el('details',undefined,'wab-tpls'),sum=el('summary','Códigos de error de Meta ('+data.errors.length+')');det.append(sum);const ul=el('ul');
+   for(const e of data.errors){const li=el('li');li.dataset.state=e.permanent?'warn':'ok';li.append(el('strong',e.code),el('span',(e.permanent?'No se reintenta solo':'Reintento automático')+' · '+e.text,'wan-soft'));ul.append(li);}det.append(ul);c.append(det);}};
+ await load();}

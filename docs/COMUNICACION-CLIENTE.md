@@ -85,9 +85,11 @@ Variables de entorno (en Vercel, nunca en el código):
 | --- | --- |
 | `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID` | Activan el envío. |
 | `WHATSAPP_APP_SECRET`, `WHATSAPP_VERIFY_TOKEN` | Permiten verificar y recibir los avisos de entrega y lectura. |
-| `WHATSAPP_API_VERSION` | Opcional. Por defecto `v21.0`. |
+| `WHATSAPP_API_VERSION` | Opcional. Por defecto `v26.0` desde la 1.5.275 (la `v21.0` se retira el 21/01/2027). |
 | `WHATSAPP_TEMPLATE_NAME`, `WHATSAPP_TEMPLATE_LANG` | Opcionales (idioma `es` por defecto). Definen la plantilla aprobada para escribir fuera de la ventana de 24 horas. Debe tener dos variables: `{{1}}` = nombre del cliente y `{{2}}` = número de orden. |
 
 La dirección de avisos que se configura en Meta es `https://<dominio>/api/public/whatsapp/webhook`.
 
 Sin estas variables, la ventana solo ofrece «Abrir WhatsApp», que queda registrado como apertura manual.
+
+> **1.5.275:** los avisos automáticos por WhatsApp (estados, repuestos, presupuestos, citas y recordatorios) pasan a su propia cola, con autorización del cliente, plantillas por evento, siete estados y reintentos según el tipo de error. Esta ventana de comunicación manual no cambia. Configuración y puesta en marcha: [WHATSAPP-BUSINESS.md](WHATSAPP-BUSINESS.md).

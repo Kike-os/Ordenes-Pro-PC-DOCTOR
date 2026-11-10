@@ -184,7 +184,10 @@ class PartCancellationTests(unittest.TestCase):
             self.go(post, oid, rid, 'despachado')
             with app.connect() as c:
                 rows = [tuple(r) for r in c.execute('SELECT event,channel,status FROM order_part_notices ORDER BY id')]
-            self.assertEqual(rows, [('confirmado', 'correo', 'enviado'), ('confirmado', 'whatsapp', 'omitido'), ('despachado', 'correo', 'enviado'), ('despachado', 'whatsapp', 'omitido')])
+            # 1.5.275: WhatsApp va por su propia cola; sin credenciales ni envíos activados no se registra nada por ese canal.
+            self.assertEqual(rows, [('confirmado', 'correo', 'enviado'), ('despachado', 'correo', 'enviado')])
+            with app.connect() as c:
+                self.assertEqual(c.execute('SELECT COUNT(*) FROM whatsapp_outbox').fetchone()[0], 0)
             self.assertEqual(len(sent), 2)
             text = sent[-1].get_body(preferencelist=('plain',)).get_content()
             self.assertIn('fue despachado', text)

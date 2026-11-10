@@ -1280,6 +1280,11 @@ class Handler(BaseHTTPRequestHandler):
                     ids=repair_status.pending_ids(c)
                     if ids:repair_status.deliver(c,ids,now,status_notice_mail);c.commit()
                 except Exception as error:print('status-notices cron',type(error).__name__,flush=True)
+                # WhatsApp Business (1.5.275): recordatorios de entrega y avisos pendientes o con reintento programado.
+                try:
+                    import whatsapp_business
+                    whatsapp_business.tick(c,now,force=True);c.commit()
+                except Exception as error:print('whatsapp cron',type(error).__name__,flush=True)
                 # Licencias Pro: avisos internos y correos de renovación a clientes (una vez al día, hora de Ecuador).
                 try:license_notices_tick(c,now)
                 except Exception as error:print('license-notices cron',type(error).__name__,flush=True)
@@ -1445,8 +1450,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(200,client_authorization.start_page(c,authorize_page[1],found,document),'text/html; charset=utf-8')
             # Seguimiento público por enlace aleatorio: respuesta idéntica para enlaces inexistentes o revocados.
             if path=='/api/public/whatsapp/webhook':
-                import order_followups
-                answer=order_followups.webhook_verify({k:v[0] for k,v in parse_qs(urlsplit(self.path).query).items()})
+                import whatsapp_business
+                answer=whatsapp_business.verify({k:v[0] for k,v in parse_qs(urlsplit(self.path).query).items()})
                 return self.reply(200,answer,'text/plain; charset=utf-8') if answer is not None else self.reply(403,{'error':'No autorizado.'})
             tracking_file=re.fullmatch(r'/s/([A-Za-z0-9_-]{1,64})/files/([0-9]{1,9})(/meta|/thumb)?',path)
             if tracking_file:
@@ -1634,6 +1639,20 @@ class Handler(BaseHTTPRequestHandler):
                 try:after=max(0,int(parse_qs(urlsplit(self.path).query).get('after',['0'])[0]))
                 except ValueError:after=0
                 return self.reply(200,live_support.detail(c,conv,after,appointments.stamp(appointments.now())))
+            # 1.5.275 · WhatsApp Business: configuración e historial (solo administración) y avisos de una orden (administración y técnicos).
+            if path=='/api/whatsapp':
+                import whatsapp_business
+                if user['role']!='administrador':return self.reply(403,{'error':'Acceso no permitido.'})
+                return self.reply(200,whatsapp_business.overview(c,os.getenv('APP_URL','http://127.0.0.1:8010')))
+            if path=='/api/whatsapp/history':
+                import whatsapp_business
+                if user['role']!='administrador':return self.reply(403,{'error':'Acceso no permitido.'})
+                return self.reply(200,whatsapp_business.history(c,{k:v[0] for k,v in parse_qs(urlsplit(self.path).query).items()}))
+            wa_order=re.fullmatch(r'/api/orders/([0-9]+)/whatsapp',path)
+            if wa_order:
+                import whatsapp_business
+                try:return self.reply(200,whatsapp_business.for_order(c,int(wa_order[1]),user))
+                except whatsapp_business.WhatsAppError as error:return self.reply(error.status,{'error':str(error)})
             if path == '/api/me':
                 prefs=c.execute('SELECT value FROM system_state WHERE key=?',('mail_prefs:'+str(user['id']),)).fetchone() if mail_allowed(user) else None
                 lang=c.execute('SELECT value FROM system_state WHERE key=?',('ui_lang:'+str(user['id']),)).fetchone()
@@ -2833,14 +2852,16 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         if urlsplit(self.path).path=='/api/public/whatsapp/webhook':
             # Avisos de entrega y lectura de WhatsApp Business: solo cuentan con la firma de Meta (X-Hub-Signature-256).
-            import order_followups
+            # 1.5.275: también actualiza la cola de avisos y registra las bajas («BAJA», «STOP») que escribe el cliente.
+            import whatsapp_business
             try:length=int(self.headers.get('Content-Length','0') or 0)
             except ValueError:length=0
             if length<=0 or length>200000:return self.reply(400,{'error':'Solicitud inválida.'})
             raw=self.rfile.read(length)
             with connect() as c:
-                changed=order_followups.webhook_status(c,raw,self.headers.get('X-Hub-Signature-256',''),reception_now());c.commit()
-            return self.reply(200,{'ok':True,'changed':changed})
+                changed=whatsapp_business.webhook(c,raw,self.headers.get('X-Hub-Signature-256',''),reception_now());c.commit()
+            if changed<0:return self.reply(403,{'error':'No autorizado.'})
+            return self.reply(200,{'ok':True})
         optout_post=re.fullmatch(r'/baja/([A-Za-z0-9_-]{16,64})',urlsplit(self.path).path)
         if optout_post:
             import campaigns
@@ -3037,7 +3058,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(400, {'error':'Solicitud inválida.'})
             data = json.loads(self.rfile.read(length))
             appointment_config_post=path=='/api/appointments/config'
-            if not isinstance(data, dict) or any(not isinstance(v,(str,bool)) and not (quote_json and k=='items' and isinstance(v,list)) and not (workspace_post and ((k=='lines' and isinstance(v,list)) or (k=='revision' and type(v) is int))) and not (appointment_config_post and ((k in ('hours','services','staff_hours') and isinstance(v,list)) or (k in ('holiday','new_service') and isinstance(v,dict)))) and not (path=='/api/business-hours' and k in ('hours','closures','request_limits') and isinstance(v,list)) and not (path=='/api/licenses/sales' and ((k=='items' and isinstance(v,list)) or (k=='payment' and isinstance(v,dict)))) and not (path=='/api/licenses/products/adjust' and k=='unit_ids' and isinstance(v,list) and len(v)<=500) and not (path in ('/api/licenses/new','/api/licenses/units/bulk','/api/licenses/check') and k=='rows' and isinstance(v,list) and len(v)<=licenses.MAX_BULK) for k,v in data.items()):
+            if not isinstance(data, dict) or any(not isinstance(v,(str,bool)) and not (quote_json and k=='items' and isinstance(v,list)) and not (workspace_post and ((k=='lines' and isinstance(v,list)) or (k=='revision' and type(v) is int))) and not (appointment_config_post and ((k in ('hours','services','staff_hours') and isinstance(v,list)) or (k in ('holiday','new_service') and isinstance(v,dict)))) and not (path=='/api/business-hours' and k in ('hours','closures','request_limits') and isinstance(v,list)) and not (path=='/api/licenses/sales' and ((k=='items' and isinstance(v,list)) or (k=='payment' and isinstance(v,dict)))) and not (path=='/api/licenses/products/adjust' and k=='unit_ids' and isinstance(v,list) and len(v)<=500) and not (path in ('/api/licenses/new','/api/licenses/units/bulk','/api/licenses/check') and k=='rows' and isinstance(v,list) and len(v)<=licenses.MAX_BULK) and not (path=='/api/whatsapp/settings' and ((k=='events' and isinstance(v,dict) and len(v)<=60) or (k=='reminder_days' and isinstance(v,list) and len(v)<=3))) for k,v in data.items()):
                 return self.reply(400, {'error':'Datos inválidos.'})
             path = urlsplit(self.path).path
             with connect() as c:
@@ -3087,6 +3108,7 @@ class Handler(BaseHTTPRequestHandler):
                         now=appointments.stamp(appointments.now());c.execute("UPDATE appointments SET status='cancelada',updated_at=? WHERE id=?",(now,row['id']))
                         c.execute("INSERT INTO appointment_events(appointment_id,event,old_start,old_status,new_status,created_at) VALUES (?,'cancelled',?,?,?,?)",(row['id'],row['starts_at'],row['status'],'cancelada',now))
                         if row['email'] and row['communications_consent']:c.execute("INSERT OR IGNORE INTO appointment_notifications(appointment_id,generation,event,channel,result,created_at) VALUES (?,?,'cancelled','email','pending',?)",(row['id'],row['generation'],now))
+                        if row['communications_consent']:appointments.whatsapp_notice(c,row['id'],'cancelled',row['generation'])
                         appointment_mail.send(c,row['id'],'cancelled');return self.reply(200,{'ok':True,'status':'cancelada'})
                     if data.get('action')=='reschedule':
                         if row['status'] in ('cancelada','completada','no_asistio'):return self.reply(409,{'error':'La cita ya está cerrada y no se puede reprogramar desde este enlace.'})
@@ -4371,6 +4393,10 @@ class Handler(BaseHTTPRequestHandler):
                     # Lo llama el navegador solo tras actividad real (teclado, clics, navegación) o al pulsar «Continuar sesión».
                     c.execute('UPDATE sessions SET last_activity=? WHERE token_hash=?',(int(time.time()),digest(token)))
                     no_show_tick(c,reception_now())
+                    try:
+                        import whatsapp_business
+                        whatsapp_business.tick(c,reception_now());c.commit()
+                    except Exception as error:print('whatsapp-tick',type(error).__name__,flush=True)
                     return self.reply(200,{'ok':True,'idle_seconds':IDLE_SECONDS,'warning_seconds':IDLE_WARNING})
                 if path=='/api/maintenance/reminders':
                     import maintenance_reminders
@@ -4593,6 +4619,40 @@ class Handler(BaseHTTPRequestHandler):
                     except status_messages.MessageError as error:return self.reply(error.status,{'error':str(error)})
                     audit(c,user['id'],'status_message_composed',int(status_message[1]))
                     return self.reply(200,result)
+                if path.startswith('/api/whatsapp/') or re.fullmatch(r'/api/orders/[0-9]+/whatsapp/(consent|send)',path):
+                    import whatsapp_business
+                    now=reception_now()
+                    try:
+                        if path=='/api/whatsapp/settings':
+                            result=whatsapp_business.save_settings(c,data,user);audit(c,user['id'],'whatsapp_settings');c.commit()
+                            return self.reply(200,{'settings':result})
+                        if path=='/api/whatsapp/check':
+                            if user['role']!='administrador':return self.reply(403,{'error':'Acceso no permitido.'})
+                            if limited(c,'whatsapp-check:%d'%user['id'],6,300):return self.reply(429,{'error':'Espera unos minutos antes de volver a comprobar.'})
+                            result=whatsapp_business.check(c,now,os.getenv('APP_URL','http://127.0.0.1:8010'));audit(c,user['id'],'whatsapp_check');c.commit()
+                            return self.reply(200,{'check':result})
+                        if path=='/api/whatsapp/test':
+                            row=whatsapp_business.send_test(c,data,user,now);audit(c,user['id'],'whatsapp_test',row['id']);c.commit()
+                            return self.reply(200,{'item':whatsapp_business.item(c,row)})
+                        if path=='/api/whatsapp/process':
+                            if user['role']!='administrador':return self.reply(403,{'error':'Acceso no permitido.'})
+                            rows=whatsapp_business.tick(c,now,force=True);c.commit()
+                            return self.reply(200,{'processed':len(rows)})
+                        retry_match=re.fullmatch(r'/api/whatsapp/outbox/([0-9]+)/retry',path)
+                        if retry_match:
+                            row=whatsapp_business.retry(c,int(retry_match[1]),user,now);audit(c,user['id'],'whatsapp_retry',row['id']);c.commit()
+                            return self.reply(200,{'item':whatsapp_business.item(c,row)})
+                        order_match=re.fullmatch(r'/api/orders/([0-9]+)/whatsapp/(consent|send)',path)
+                        if order_match:
+                            oid=int(order_match[1])
+                            if order_match[2]=='consent':
+                                state=whatsapp_business.consent_for_order(c,oid,data,user,now);audit(c,user['id'],'whatsapp_consent_'+state['state'],oid);c.commit()
+                            else:
+                                row=whatsapp_business.send_manual(c,oid,str(data.get('event','')),user,now);audit(c,user['id'],'whatsapp_manual',oid);c.commit()
+                            return self.reply(200,whatsapp_business.for_order(c,oid,user))
+                    except whatsapp_business.WhatsAppError as error:
+                        c.rollback();return self.reply(error.status,{'error':str(error),'fields':getattr(error,'fields',{})})
+                    return self.reply(404,{'error':'Recurso no disponible.'})
                 if path=='/api/status-notices/settings':
                     import repair_status
                     try:repair_status.set_enabled(c,bool(data.get('auto')),user)
