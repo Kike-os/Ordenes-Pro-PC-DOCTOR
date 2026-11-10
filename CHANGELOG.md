@@ -4,6 +4,24 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.271 — 2026-11-10 00:26 (UTC-05:00)
+
+Condiciones con una numeración por cláusula y cortes de página profesionales, original firmado electrónicamente por versión y firma empresarial visual configurable por documento
+
+### Nuevas funcionalidades
+
+- Condiciones: original firmado electrónicamente por versión. Se guarda intacto, se verifica (integridad, firma RSA, firmante, certificado y sello de tiempo) y se comprueba que sea de esa versión exacta. Estado documental, «Verificar integridad» y descarga pública del original.
+- Firma empresarial visual (Configuración → Firma electrónica): imagen original intacta con versiones y vista previa, activación por documento (ticket, comprobante, hoja de servicio, presupuesto, proforma, garantías, recibo), tamaño y posición, y ticket de 80 mm en blanco y negro.
+
+### Errores corregidos
+
+- Condiciones: cada cláusula lleva un solo número; los párrafos de continuación ya no se numeran como cláusulas nuevas («2. La orden documentará…»). En el PDF el título no queda solo al pie, no hay líneas sueltas y una cláusula extensa continúa en la página siguiente.
+- Avisos al cliente: estado y «Detalles» alineados con el título en cada aviso; la fecha y el motivo usan todo el ancho.
+
+### Actualizaciones de seguridad
+
+- La firma visual lleva siempre la leyenda «No constituye firma electrónica de este documento» y ningún PDF con la imagen se presenta como firmado. Solo administración la carga o cambia, con auditoría; los originales firmados no se modifican nunca.
+
 ## v1.5.270 — 2026-11-09 21:59 (UTC-05:00)
 
 Detalle de la orden Executive Compact 5.0: comunicaciones con estado de entrega real, seguimiento del cliente, autorizaciones y permanencia en un panel compacto de dos columnas

@@ -8,6 +8,30 @@
   },
   "releases": [
     {
+      "version": "1.5.271",
+      "date": "2026-11-10T00:26:25-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Condiciones con una numeración por cláusula y cortes de página profesionales, original firmado electrónicamente por versión y firma empresarial visual configurable por documento",
+      "changes": {
+        "features": [
+          "Condiciones: original firmado electrónicamente por versión. Se guarda intacto, se verifica (integridad, firma RSA, firmante, certificado y sello de tiempo) y se comprueba que sea de esa versión exacta. Estado documental, «Verificar integridad» y descarga pública del original.",
+          "Firma empresarial visual (Configuración → Firma electrónica): imagen original intacta con versiones y vista previa, activación por documento (ticket, comprobante, hoja de servicio, presupuesto, proforma, garantías, recibo), tamaño y posición, y ticket de 80 mm en blanco y negro."
+        ],
+        "improvements": [],
+        "fixes": [
+          "Condiciones: cada cláusula lleva un solo número; los párrafos de continuación ya no se numeran como cláusulas nuevas («2. La orden documentará…»). En el PDF el título no queda solo al pie, no hay líneas sueltas y una cláusula extensa continúa en la página siguiente.",
+          "Avisos al cliente: estado y «Detalles» alineados con el título en cada aviso; la fecha y el motivo usan todo el ancho."
+        ],
+        "security": [
+          "La firma visual lleva siempre la leyenda «No constituye firma electrónica de este documento» y ningún PDF con la imagen se presenta como firmado. Solo administración la carga o cambia, con auditoría; los originales firmados no se modifican nunca."
+        ],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Kike-os: «actualiza cuando termine» y «publica» (1.5.271, batería en verde; migr"
+    },
+    {
       "version": "1.5.270",
       "date": "2026-11-09T21:59:12-05:00",
       "type": "patch",
