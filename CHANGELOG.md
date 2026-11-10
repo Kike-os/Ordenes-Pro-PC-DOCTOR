@@ -4,6 +4,16 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.269 — 2026-11-09 21:14 (UTC-05:00)
+
+Seguimiento logístico Premium 4.0: pasos compactos, tarjetas sin huecos, códigos copiables y avisos al cliente con estado real (animación del recorrido intacta)
+
+### Mejoras realizadas
+
+- Seguimiento de repuestos: «Pasos logísticos detallados» Premium Compact, con número, indicador de completado, actual o pendiente y fecha alineada. El resumen muestra los completados reales y el paso actual. La animación del recorrido no cambia.
+- Seguimiento de repuestos: Envío, Proveedor y pedido, Transporte, Fechas y Taller se reparten las filas sin huecos ni tarjetas aisladas. Los códigos largos se ven completos y se copian con un botón. Las observaciones internas tienen borde ámbar y «Ver más».
+- Avisos al cliente: tarjeta de ancho completo con resumen, canal, fecha y hora, estado real (un omitido nunca figura como enviado), motivo y detalles. Reintento de fallidos con confirmación y explicación cuando WhatsApp Business no está configurado.
+
 ## v1.5.268 — 2026-11-09 20:41 (UTC-05:00)
 
 Limpieza segura del catálogo: eliminar productos inactivos sin historial, archivar los protegidos, selección múltiple y filtros por estado y tipo

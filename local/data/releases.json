@@ -8,6 +8,26 @@
   },
   "releases": [
     {
+      "version": "1.5.269",
+      "date": "2026-11-09T21:14:02-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Seguimiento logístico Premium 4.0: pasos compactos, tarjetas sin huecos, códigos copiables y avisos al cliente con estado real (animación del recorrido intacta)",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Seguimiento de repuestos: «Pasos logísticos detallados» Premium Compact, con número, indicador de completado, actual o pendiente y fecha alineada. El resumen muestra los completados reales y el paso actual. La animación del recorrido no cambia.",
+          "Seguimiento de repuestos: Envío, Proveedor y pedido, Transporte, Fechas y Taller se reparten las filas sin huecos ni tarjetas aisladas. Los códigos largos se ven completos y se copian con un botón. Las observaciones internas tienen borde ámbar y «Ver más».",
+          "Avisos al cliente: tarjeta de ancho completo con resumen, canal, fecha y hora, estado real (un omitido nunca figura como enviado), motivo y detalles. Reintento de fallidos con confirmación y explicación cuando WhatsApp Business no está configurado."
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Kike-os: «si autrorizo» (1.5.269, batería en verde; sin migración)"
+    },
+    {
       "version": "1.5.268",
       "date": "2026-11-09T20:41:28-05:00",
       "type": "patch",
