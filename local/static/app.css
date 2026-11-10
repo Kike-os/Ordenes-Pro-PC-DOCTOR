@@ -11554,3 +11554,28 @@ button.ex-view{min-height:30px;padding:3px 10px;font-size:12px}
 .terms-signed-note{margin:0;font-size:11.5px;line-height:1.45;color:#9fb3d1}
 .terms-signed>button{justify-self:start;display:inline-flex;align-items:center;gap:6px}.terms-signed button svg{width:15px;height:15px}
 .terms-signed .receipt-actions button{display:inline-flex;align-items:center;gap:6px}
+
+/* 1.5.271 · Configuración → Firma electrónica (firma empresarial visual). */
+.bsig{display:grid;gap:12px}
+.bsig-intro{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid #a1741f66;border-radius:12px;background:#1a1508}.bsig-intro>svg{width:18px;height:18px;flex:none;color:#f5b544;margin-top:2px}
+.bsig-intro strong{color:#fcd38a;font-size:13px}.bsig-intro p{margin:4px 0 0;color:#f3e2bd;font-size:12.5px;line-height:1.5}
+.bsig-cols{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-items:start}.bsig-cols>div{display:grid;gap:12px;min-width:0}
+.bsig-card{display:grid;gap:10px;padding:12px 14px;border:1px solid #23395c;border-radius:12px;background:#0c172b;min-width:0}
+.bsig-card h3{display:flex;align-items:center;gap:8px;margin:0;font-size:13.5px;color:#e6efff}.bsig-card h3 svg{width:16px;height:16px;color:#93c5fd}
+.bsig-figure{margin:0;padding:10px;border-radius:10px;background:#fff;display:grid;place-items:center}.bsig-figure img{max-width:100%;max-height:220px;height:auto}
+.bsig-facts{display:grid;gap:4px;margin:0}.bsig-facts div{display:grid;grid-template-columns:120px minmax(0,1fr);gap:8px;font-size:12px}.bsig-facts dt{color:#7f93b3}.bsig-facts dd{margin:0;color:#e2e8f0;overflow-wrap:anywhere}
+.bsig-card>button,.bsig-card>a{justify-self:start;display:inline-flex;align-items:center;gap:6px}.bsig-card button svg{width:15px;height:15px}
+.bsig-staged{display:grid;gap:8px;padding:10px;border:1px dashed #3b6fb3;border-radius:10px}.bsig-staged img{max-width:100%;max-height:200px;background:#fff;border-radius:8px;padding:6px;justify-self:start}.bsig-staged small{color:#9fb3d1}
+.bsig-actions{display:flex;flex-wrap:wrap;gap:8px}
+.bsig-docs{display:grid;gap:6px}.bsig-docs .app-check{margin:0}
+.bsig-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.bsig-range,.bsig-select{display:grid;gap:4px;font-size:12px;color:#9fb3d1}.bsig-range input{width:100%}.bsig-range b{color:#e6efff;font-size:12.5px}.bsig-select select{width:100%}
+button.bsig-save{justify-self:start;min-height:40px}
+.bsig-ticket{margin:0;display:grid;gap:6px;justify-items:center;padding:10px;border-radius:10px;background:#fff}.bsig-ticket img{width:min(100%,272px);image-rendering:pixelated}.bsig-ticket figcaption{color:#334155;font-size:11.5px;text-align:center}
+.bsig-versions{list-style:none;margin:0;padding:0;display:grid;gap:6px}.bsig-versions li{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 10px;border:1px solid #1f3354;border-radius:10px;background:#0b1527}
+.bsig-versions li div{display:grid;gap:2px;min-width:0}.bsig-versions strong{font-size:12.5px;color:#e6efff}.bsig-versions small{font-size:11.5px;color:#9db1cf;overflow-wrap:anywhere}
+@media(max-width:900px){.bsig-cols{grid-template-columns:1fr}}
+@media(max-width:600px){.bsig-grid{grid-template-columns:1fr}.bsig-facts div{grid-template-columns:1fr}.bsig-versions li{flex-direction:column;align-items:stretch}.bsig-card>button,.bsig-card>a{justify-self:stretch;justify-content:center;min-height:40px}}
+.bsig-docs .app-check,.bsig-card .app-switch{display:flex!important;align-items:center;gap:10px;margin:0}
+.bsig-docs .app-check .app-check-text,.bsig-card .app-switch .app-check-text{display:grid;gap:1px}
+.bsig-docs .app-check-text small{font-size:11px;color:#8fa6c6}
