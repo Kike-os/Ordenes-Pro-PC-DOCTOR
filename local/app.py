@@ -203,6 +203,9 @@ def digest(value):
     return hashlib.sha256(value.encode()).hexdigest()
 
 
+UI_LANGUAGES = ('es-EC', 'en-US')  # idiomas de la interfaz (1.5.273); español de Ecuador por defecto
+
+
 def audit(c, user_id, action, entity_id=None):
     c.execute('INSERT INTO audit(user_id,action,entity_id,created_at) VALUES (?,?,?,?)', (user_id, action, entity_id, int(time.time())))
 
@@ -1148,7 +1151,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         path = urlsplit(self.path).path
-        files = {'/static/label.css':'label.css','/static/tracking.css':'tracking.css','/static/licencias.css':'licencias.css','/static/app.css':'app.css','/static/app.js':'app.js','/static/service-picker.js':'service-picker.js','/static/licenses.js':'licenses.js','/static/inventory.js':'inventory.js','/static/sales.js':'sales.js','/static/reschedule.js':'reschedule.js','/static/form-validation.js':'form-validation.js','/static/appointments.js':'appointments.js','/static/adi-widget.js':'adi-widget.js','/static/adi-orb.js':'adi-orb.js','/static/ui-select.js':'ui-select.js','/static/ticket.css':'ticket.css','/static/phone-input.js':'phone-input.js','/static/phone-input.css':'phone-input.css','/static/libphonenumber-max.js':'libphonenumber-max.js','/static/seguimiento-a4.css':'seguimiento-a4.css','/static/ticket.js':'ticket.js','/static/quote.css':'quote.css','/static/quote-sign.js':'quote-sign.js','/static/echarts.min.js':'echarts.min.js','/static/logo-original.png':'logo-original.png',
+        files = {'/static/label.css':'label.css','/static/tracking.css':'tracking.css','/static/licencias.css':'licencias.css','/static/app.css':'app.css','/static/app.js':'app.js','/static/i18n.js':'i18n.js','/static/service-picker.js':'service-picker.js','/static/licenses.js':'licenses.js','/static/inventory.js':'inventory.js','/static/sales.js':'sales.js','/static/reschedule.js':'reschedule.js','/static/form-validation.js':'form-validation.js','/static/appointments.js':'appointments.js','/static/adi-widget.js':'adi-widget.js','/static/adi-orb.js':'adi-orb.js','/static/ui-select.js':'ui-select.js','/static/ticket.css':'ticket.css','/static/phone-input.js':'phone-input.js','/static/phone-input.css':'phone-input.css','/static/libphonenumber-max.js':'libphonenumber-max.js','/static/seguimiento-a4.css':'seguimiento-a4.css','/static/ticket.js':'ticket.js','/static/quote.css':'quote.css','/static/quote-sign.js':'quote-sign.js','/static/echarts.min.js':'echarts.min.js','/static/logo-original.png':'logo-original.png',
                  '/favicon.ico':'favicon.ico','/static/favicon.ico':'favicon.ico','/static/favicon-16.png':'favicon-16.png','/static/favicon-32.png':'favicon-32.png','/static/logo-firma.png':'logo-firma.png','/static/favicon-48.png':'favicon-48.png',
                  '/apple-touch-icon.png':'apple-touch-icon.png','/apple-touch-icon-precomposed.png':'apple-touch-icon.png','/static/apple-touch-icon.png':'apple-touch-icon.png'}
         # Logotipos de marcas: solo nombres simples dentro de static/brands; si el archivo no existe la interfaz usa un icono genérico.
@@ -1633,7 +1636,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(200,live_support.detail(c,conv,after,appointments.stamp(appointments.now())))
             if path == '/api/me':
                 prefs=c.execute('SELECT value FROM system_state WHERE key=?',('mail_prefs:'+str(user['id']),)).fetchone() if mail_allowed(user) else None
-                return self.reply(200, {'idle':None if user['remember'] else {'seconds':IDLE_SECONDS,'warning':IDLE_WARNING},'user':dict(user,photo=profile_photo_stamp(c,user['id']),mail=mail_allowed(user),mail_prefs=json.loads(prefs['value']) if prefs else None,mail_signature=mail_signature_card(c) if mail_allowed(user) else None,storage='cloud' if remote_db.configured() else 'local'),'server_time':time.time()})
+                lang=c.execute('SELECT value FROM system_state WHERE key=?',('ui_lang:'+str(user['id']),)).fetchone()
+                return self.reply(200, {'idle':None if user['remember'] else {'seconds':IDLE_SECONDS,'warning':IDLE_WARNING},'user':dict(user,lang=lang['value'] if lang and lang['value'] in UI_LANGUAGES else None,photo=profile_photo_stamp(c,user['id']),mail=mail_allowed(user),mail_prefs=json.loads(prefs['value']) if prefs else None,mail_signature=mail_signature_card(c) if mail_allowed(user) else None,storage='cloud' if remote_db.configured() else 'local'),'server_time':time.time()})
             if path == '/api/deliveries':
                 # Próximas Entregas: solo equipos terminados (listos o en espera de retiro) y entregas recientes; nunca órdenes en reparación.
                 if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
@@ -3345,6 +3349,12 @@ class Handler(BaseHTTPRequestHandler):
                     return self.reply(401, {'error':'Inicia sesión para continuar.'})
                 if not hmac.compare_digest(self.headers.get('X-CSRF-Token',''), user['csrf']):
                     return self.reply(403, {'error':'La sesión de seguridad no es válida. Recarga la página.'})
+                if path=='/api/me/language':
+                    # Idioma de la interfaz de la propia cuenta (1.5.273): solo valores conocidos; se sincroniza entre equipos.
+                    lang=str(data.get('lang',''))
+                    if lang not in UI_LANGUAGES:return self.reply(400,{'error':'Idioma no disponible.'})
+                    c.execute("INSERT INTO system_state VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",('ui_lang:'+str(user['id']),lang));audit(c,user['id'],'ui_language')
+                    return self.reply(200,{'ok':True,'lang':lang})
                 if path=='/api/auth/policy':
                     if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede configurar la seguridad.'})
                     bounds={'lockout_seconds':(900,86400),'session_hours':(1,8),'remember_days':(1,30),'password_min':(6,128)}
