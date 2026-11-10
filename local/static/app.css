@@ -11527,3 +11527,19 @@ button.ex-view{min-height:30px;padding:3px 10px;font-size:12px}
 @media(prefers-reduced-motion:reduce){.ex-card,.ex-body,.ex-inner,.ex-chev svg,.ex-comm{transition:none}}
 .ex-panel{align-items:start}.ex-col{display:grid;gap:10px;align-content:start;min-width:0}
 .ex-comm-side .ex-chip{white-space:normal;max-width:100%;text-align:left;line-height:1.3}
+/* 1.5.271 · Avisos al cliente: estado y «Detalles» juntos a la derecha, alineados con el título; punto a la altura del título. */
+.opr-card .opr-notices-v2 .opr-notice-list>li{grid-template-columns:10px minmax(0,1fr) auto;align-items:start}
+.opr-card .opr-notices-v2 .opr-notice-list>li>i{margin-top:11px}
+.opr-notice-main{padding-top:4px}
+.opr-notice-side{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:nowrap}
+.opr-card .opr-notices-v2 .opr-notice-side .opr-notice-pill{align-self:center;margin:0}
+.opr-card .opr-notices-v2 .opr-notice-side button.opr-notice-more{min-height:28px;padding:3px 9px}
+@media(max-width:600px){.opr-card .opr-notices-v2 .opr-notice-list>li{grid-template-columns:10px minmax(0,1fr)}.opr-notice-side{grid-column:2;justify-content:flex-start}.opr-card .opr-notices-v2 .opr-notice-side button.opr-notice-more{min-height:36px}}
+.opr-card .opr-notices-v2 .opr-notice-list>li{row-gap:2px}
+.opr-card .opr-notices-v2 .opr-notice-main{display:contents}
+.opr-card .opr-notices-v2 .opr-notice-main>strong{grid-column:2;grid-row:1;align-self:center;padding-top:0}
+.opr-card .opr-notices-v2 .opr-notice-main>small,.opr-card .opr-notices-v2 .opr-notice-main>p{grid-column:2/-1}
+.opr-card .opr-notices-v2 .opr-notice-list>li>i{grid-row:1;align-self:center;margin-top:0}
+.opr-card .opr-notices-v2 .opr-notice-side{grid-column:3;grid-row:1}
+.opr-card .opr-notices-v2 .opr-notice-detail{grid-column:1/-1}
+@media(max-width:600px){.opr-card .opr-notices-v2 .opr-notice-side{grid-column:2;grid-row:auto}.opr-card .opr-notices-v2 .opr-notice-main>small,.opr-card .opr-notices-v2 .opr-notice-main>p{grid-column:2}}

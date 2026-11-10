@@ -4397,7 +4397,7 @@ function orderPartsPanel(order){ofxIcons();const box=el('section',undefined,'opr
       const det=el('dl',undefined,'opr-notice-detail');det.hidden=true;det.id='opr-n-'+r.id+'-'+n.id;more.setAttribute('aria-controls',det.id);
       for(const[k,v]of [['Evento',n.label],['Canal',n.channel==='correo'?'Correo electrónico':'WhatsApp Business'],['Estado',STATUS[n.status]||n.status],['Registrado',when(n.created_at)],['Última actualización',when(n.updated_at)],['Intentos',String(n.attempts||0)],['Motivo o respuesta',n.detail||(n.status==='enviado'?'Aceptado por el servicio de envío.':'—')]]){const d=el('div');d.append(el('dt',k),el('dd',v));det.append(d);}
       if(n.message_id){const d=el('div'),link=button('Ver en la comunicación de la orden',()=>orderMessageComposer(order.id),'text-action');d.append(el('dt','Registro'),link);det.append(d);}
-      li.append(dot,main,pill,more,det);ul.append(li);}
+      const side=el('div',undefined,'opr-notice-side');side.append(pill,more);li.append(dot,main,side,det);ul.append(li);}
      sec.append(ul);
      // Compacto: los 4 más recientes; el resto, a pedido.
      if(notices.length>4){const extra=[...ul.children].slice(4);extra.forEach(li=>li.hidden=true);const all=button('Ver todos los avisos ('+notices.length+')',()=>{const show=extra[0].hidden;extra.forEach(li=>li.hidden=!show);all.textContent=show?'Ver solo los recientes':'Ver todos los avisos ('+notices.length+')';all.setAttribute('aria-expanded',String(show));},'text-action opr-more');all.setAttribute('aria-expanded','false');sec.append(all);}}
