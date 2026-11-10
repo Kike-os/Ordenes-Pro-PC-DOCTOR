@@ -4,6 +4,20 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.272 — 2026-11-10 07:29 (UTC-05:00)
+
+Firma empresarial a color en documentos digitales y monocroma solo para el ticket térmico, con bloque de recepción compacto y aviso de legibilidad del QR
+
+### Nuevas funcionalidades
+
+- Ticket digital: la orden ofrece el ticket de recepción en PDF con la firma empresarial a color, para enviar o archivar. El ticket que se imprime en la Epson sigue en blanco y negro con una representación monocroma generada solo para la impresora.
+- Configuración → Firma electrónica: aviso compacto «Firma visual empresarial» con detalle desplegable, vista previa con el original a color y «Formato de salida» (A4 a color, ticket digital a color, ticket térmico en blanco y negro). Avisa solo si el QR de la firma quedaría demasiado pequeño para leerse.
+
+### Errores corregidos
+
+- Firma empresarial a todo color en los PDF A4 (comprobante, hoja de servicio, presupuesto, proforma, garantía, recibo de pago): original con su transparencia y resolución, sin suavizado, para que el QR, el nombre y el sello verde se vean como en la imagen cargada. El PNG original no se convierte ni se modifica.
+- Ticket: «Firma y constancia de recepción» más compacto, con líneas finas en dos columnas. La firma del cliente queda libre a la izquierda y la firma empresarial va sobre «Recibido por / PC-DOCTOR S.A.» (hasta 33 mm), sin partir el nombre ni superponerse. Opción «Debajo de las firmas, más grande».
+
 ## v1.5.271 — 2026-11-10 00:26 (UTC-05:00)
 
 Condiciones con una numeración por cláusula y cortes de página profesionales, original firmado electrónicamente por versión y firma empresarial visual configurable por documento
