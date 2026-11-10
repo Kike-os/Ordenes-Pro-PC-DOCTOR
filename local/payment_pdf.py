@@ -123,5 +123,6 @@ def render(order, payment, account, methods, generated):
             pdf.text(line, LEFT + 2, y, 7.2, False, GRAY)
             y += 9.5
         y += 3
+    pdf.business_signature('pago', y + 4, H - 44, left=LEFT, right=LEFT + width)
     pdf.text(company['name'] + ' · WhatsApp ' + company['whatsapp'] + ' · ' + company['website'], LEFT + 2, H - 30, 7, False, GRAY)
     return pdf.finish()

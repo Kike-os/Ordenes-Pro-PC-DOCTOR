@@ -329,5 +329,11 @@ def render(quote, order, link=None):
             for row in wrap('Decisión registrada por el personal del taller el ' + _stamp(quote['decided_at']) + '. No consta firma del cliente en este documento.', W - 2 * M, 9):
                 text(row, M, state['y'], 9, False, INK)
                 state['y'] += 12
+
+    def next_page():
+        footer()
+        page()
+        return state['y']
+    state['y'] = pdf.business_signature('presupuesto', state['y'] + 8, H - 58, next_page, left=M, right=W - M)
     footer()
     return pdf.finish()

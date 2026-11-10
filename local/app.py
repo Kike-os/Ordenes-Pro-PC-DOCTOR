@@ -97,6 +97,11 @@ def connect():
     return c
 
 
+# 1.5.271: los generadores de PDF leen la firma visual empresarial con su propia conexión (no reciben la base de datos).
+import business_signature as _business_signature
+_business_signature.CONNECT=connect
+
+
 def make_backup():
     """Copia completa de la base antes de un cambio masivo. Devuelve el nombre del archivo o falla sin modificar nada."""
     DATA.mkdir(mode=0o700, parents=True, exist_ok=True)
@@ -1669,6 +1674,27 @@ class Handler(BaseHTTPRequestHandler):
             if path == '/api/authorization-profiles':
                 if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede consultar esta configuración.'})
                 return self.reply(200,{'groups':device_authorizations.load(c),'device_types':DEVICE_TYPES,'sections':device_authorizations.SECTIONS,'changes':device_authorizations.changes(c)})
+            if path.startswith('/api/business-signature'):
+                # 1.5.271 · Firma empresarial visual: solo administración. Es una imagen de identificación, no una firma electrónica.
+                import business_signature
+                if user['role']!='administrador':return self.reply(403,{'error':'Solo administración gestiona la firma empresarial.'})
+                bs_query=parse_qs(urlsplit(self.path).query)
+                try:
+                    if path=='/api/business-signature':return self.reply(200,business_signature.overview(c))
+                    if path=='/api/business-signature/preview.pdf':
+                        target=bs_query.get('doc',['a4'])[0]
+                        return self.reply(200,business_signature.preview_pdf(c,'ticket' if target=='ticket' else 'a4'),'application/pdf',filename='vista-previa-firma-'+('ticket' if target=='ticket' else 'a4')+'.pdf')
+                    bs_file=re.fullmatch(r'/api/business-signature/([0-9]{1,9})/(original|ticket\.png)',path)
+                    if bs_file:
+                        if bs_file[2]=='original':
+                            found=business_signature.original(c,int(bs_file[1]))
+                            if not found:return self.reply(404,{'error':'Versión no encontrada.'})
+                            return self.reply(200,found[1],found[0],filename=found[2])
+                        width=bs_query.get('w',['48'])[0]
+                        if not width.isdigit() or int(width) not in business_signature.TICKET_WIDTHS:return self.reply(400,{'error':'Ancho no válido.'})
+                        return self.reply(200,business_signature.thermal_preview(c,int(bs_file[1]),int(width)),'image/png')
+                except business_signature.SignatureError as error:return self.reply(error.status,{'error':str(error)})
+                return self.reply(404,{'error':'No encontrado.'})
             if path == '/api/conditions':
                 if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede consultar el historial de publicación.'})
                 return self.reply(200,service_terms.overview(c,reception_now()))
@@ -2998,7 +3024,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(403, {'error':'Solicitud no autorizada.'})
             path = urlsplit(self.path).path
             workspace_post=bool(re.fullmatch(r'/api/orders/[0-9]+/workspace',path));quote_json=bool(re.fullmatch(r'/api/quotes/[0-9]+',path))
-            max_body=4200000 if re.fullmatch(r'/api/conditions/[0-9a-f]{32}/signed',path) else 3900000 if re.fullmatch(r'/api/orders/[0-9]+/followups',path) else 3700000 if re.fullmatch(r'/api/orders/[0-9]+/uploads',path) else 1500000 if path in ('/api/inventory/purchases/xml','/api/inventory/purchases/from-xml') else 1700000 if path in ('/api/cash/upload','/api/files/upload') else 65536 if path.startswith('/api/proformas') or path.startswith('/api/caja/') or re.fullmatch(r'/api/orders/[0-9]+/payments',path) or path=='/api/credit-notes' else 9000000 if path in ('/api/clients/import/preview','/api/clients/import/commit','/api/inventory/import/preview','/api/inventory/import/commit') else 200000 if path in ('/api/inventory/register','/api/invoicing/policies') else 1700000 if path=='/api/public/adi/listen' else 6000000 if path in ('/api/mail/send','/api/mail/draft') else 100000 if path in ('/api/conditions','/api/order-draft','/api/conditions/draft','/api/conditions/compare') else 3200000 if path in ('/api/licenses/new','/api/licenses/units','/api/licenses/units/bulk','/api/licenses/check','/api/licenses/products','/api/licenses/products/duplicate','/api/licenses/sales') or re.fullmatch(r'/api/licenses/sales/[0-9]+',path) else 1700000 if re.fullmatch(r'/api/orders/[0-9]+/photos',path) or path in ('/api/profile/photo','/api/mail/signature') or re.fullmatch(r'/api/catalog/[0-9]+/image',path) else (65536 if workspace_post or quote_json or path=='/api/mail/subject' else 16384)
+            max_body=4200000 if re.fullmatch(r'/api/conditions/[0-9a-f]{32}/signed',path) else 2900000 if path=='/api/business-signature' else 3900000 if re.fullmatch(r'/api/orders/[0-9]+/followups',path) else 3700000 if re.fullmatch(r'/api/orders/[0-9]+/uploads',path) else 1500000 if path in ('/api/inventory/purchases/xml','/api/inventory/purchases/from-xml') else 1700000 if path in ('/api/cash/upload','/api/files/upload') else 65536 if path.startswith('/api/proformas') or path.startswith('/api/caja/') or re.fullmatch(r'/api/orders/[0-9]+/payments',path) or path=='/api/credit-notes' else 9000000 if path in ('/api/clients/import/preview','/api/clients/import/commit','/api/inventory/import/preview','/api/inventory/import/commit') else 200000 if path in ('/api/inventory/register','/api/invoicing/policies') else 1700000 if path=='/api/public/adi/listen' else 6000000 if path in ('/api/mail/send','/api/mail/draft') else 100000 if path in ('/api/conditions','/api/order-draft','/api/conditions/draft','/api/conditions/compare') else 3200000 if path in ('/api/licenses/new','/api/licenses/units','/api/licenses/units/bulk','/api/licenses/check','/api/licenses/products','/api/licenses/products/duplicate','/api/licenses/sales') or re.fullmatch(r'/api/licenses/sales/[0-9]+',path) else 1700000 if re.fullmatch(r'/api/orders/[0-9]+/photos',path) or path in ('/api/profile/photo','/api/mail/signature') or re.fullmatch(r'/api/catalog/[0-9]+/image',path) else (65536 if workspace_post or quote_json or path=='/api/mail/subject' else 16384)
             length = int(self.headers.get('Content-Length', '0'))
             if length <= 0 or length > max_body:
                 return self.reply(400, {'error':'Solicitud inválida.'})
@@ -4977,6 +5003,18 @@ class Handler(BaseHTTPRequestHandler):
                     if errors:return self.reply(400,{'error':next(iter(errors.values())) if len(errors)==1 else 'Revisa los datos de publicación.','fields':errors})
                     audit(c,user['id'],'service_terms_published')
                     return self.reply(201,{'ok':True,'id':tid,'version':c.execute('SELECT version FROM service_terms WHERE id=?',(tid,)).fetchone()[0]})
+                if path=='/api/business-signature':
+                    import business_signature
+                    if user['role']!='administrador':return self.reply(403,{'error':'Solo administración gestiona la firma empresarial.'})
+                    try:
+                        if data.get('action')=='upload':
+                            result=business_signature.upload(c,data.get('filename',''),data.get('content',''),user,reception_now(),audit)
+                            return self.reply(201,dict(result,overview=business_signature.overview(c)))
+                        if data.get('action')=='settings':
+                            business_signature.update(c,data,user,audit)
+                            return self.reply(200,business_signature.overview(c))
+                    except business_signature.SignatureError as error:return self.reply(error.status,{'error':str(error)})
+                    return self.reply(400,{'error':'Operación no válida.'})
                 signed_post=re.fullmatch(r'/api/conditions/([0-9a-f]{32})/signed',path)
                 if signed_post:
                     # 1.5.271: cargar (administración) o volver a verificar el original firmado de una versión publicada. Nada se firma aquí.

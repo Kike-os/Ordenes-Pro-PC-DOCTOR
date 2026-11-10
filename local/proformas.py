@@ -909,6 +909,7 @@ def pdf(c, pid, now, staff_url=''):
         a = d['acceptance']
         y = room(y + 6, 14)
         doc.text('Decisión del cliente: %s · %s · %s · %s · huella %s' % (a['decision'], a['signer_name'], a['method'], _dt(a['created_at']), a['evidence_hash'][:16]), L, y, 7.6, False, GRAY)
+    y = doc.c.business_signature('proforma', y + 10, bottom, continuation, left=L, right=L + W)
     doc.footer('PROFORMA COMERCIAL — DOCUMENTO SIN VALIDEZ TRIBUTARIA', margin=L)
     return doc.finish()
 

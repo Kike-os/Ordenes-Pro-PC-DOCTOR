@@ -219,6 +219,11 @@ def render_thermal(order,copy='cliente'):
             lines=wrap_to(label,7,False,half)
             for row,(line,_) in enumerate(lines):ops.append(('text',line,y+3+row*8.5,7,False,False,left+(half-text_width(line,7))/2,half,False))
         y+=3+8.5*max(len(wrap_to(label,7,False,half)) for label in ('Firma del cliente','Recibido por '+company['name']))+3
+        # 1.5.271: firma visual empresarial (si administración la activó para el ticket), en blanco y negro al ancho configurado, con su
+        # leyenda: es una imagen de identificación, no una firma electrónica.
+        if signature:
+            sig_w,sig_h=business_signature.size_pt(signature,True);ops.append(('firma',y+2,sig_w,sig_h));y+=sig_h+4
+            block(business_signature.CAPTION,6.5,False,1,True)
         # Code 128 para localizar la orden en el taller.
         ops.append(('rule',y));y+=5
         ops.append(('barcode',y,bars,unit,total));y+=BAR_HEIGHT+4
@@ -226,6 +231,8 @@ def render_thermal(order,copy='cliente'):
         block(company['thanks'],8,True,0.5,True);block(company['support_email'],7,center=True,gap=0)
         return ops,y+6,link_box
 
+    import business_signature
+    signature=business_signature.for_doc('ticket')
     for copy_label in COPIES[copy]:
         ops,height,link_box=compose(copy_label)
         stream=pydyf.Stream(compress=True);pdf.add_object(stream);stream.set_color_rgb(0,0,0)
@@ -259,6 +266,8 @@ def render_thermal(order,copy='cliente'):
                     for col,dark in enumerate(values):
                         if dark:stream.rectangle(left+(col+4)*qunit,height-top-(row+5)*qunit,qunit,qunit)
                 stream.fill()
+            elif op[0]=='firma':
+                business_signature.draw(pdf,stream,resources,height,(W-op[2])/2,op[1],signature,thermal=True)
             elif op[0]=='barcode':
                 _,top,widths,bunit,span=op;left=snap((W-span)/2)+10*bunit
                 for i,width in enumerate(widths):

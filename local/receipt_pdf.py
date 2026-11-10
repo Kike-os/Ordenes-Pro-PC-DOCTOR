@@ -350,4 +350,14 @@ def render_receipt(order):
         # La línea de versión cabe en el margen previo al pie; no justifica una página adicional.
         if y+14>H-78:new_page()
         text('Versión del documento: '+policies['version']+' · Integridad SHA-256: '+policies['sha256'][:32]+'…',47,y+2,7,MUTED)
+    # 1.5.271: firma visual empresarial al final (si administración la activó para este documento), con su leyenda: es una imagen de
+    # identificación, no una firma electrónica.
+    import business_signature
+    signature=business_signature.for_doc('servicio' if order.get('_service') else 'comprobante')
+    if signature:
+        sig_w,sig_h=business_signature.size_pt(signature);box=max(sig_w,230);caption=wrapped(business_signature.CAPTION,box,6.5)
+        if y+10+sig_h+6+len(caption)*8.5>H-78:new_page()
+        x=business_signature.x_for(signature,47,W-47);business_signature.draw(pdf,stream,resources,H,x,y+10,signature);y+=10+sig_h+6
+        tx=max(47,min(x if signature['align']=='izquierda' else x+(sig_w-box)/2 if signature['align']=='centro' else x+sig_w-box,W-47-box))
+        for line in caption:text(line,tx,y,6.5,MUTED);y+=8.5
     output=io.BytesIO();pdf.write(output);return output.getvalue()

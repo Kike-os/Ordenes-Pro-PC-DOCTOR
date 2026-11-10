@@ -555,6 +555,14 @@ def warranty_pdf(c, invoice_id):
             pages, y = pages + 1, 120
         layout.append((pages, y, entry, h))
         y += h + 8
+    # 1.5.271: firma visual (si está activada para certificados): en la última página o en una nueva si no cabe.
+    import business_signature
+    sig_spot = None
+    if business_signature.for_doc('garantia'):
+        need = business_signature.size_pt(business_signature.for_doc('garantia'))[1] + 30
+        if y + need > A4[1] - 80:
+            pages, y = pages + 1, 120
+        sig_spot = (pages, y + 4)
     for number in range(1, pages + 1):
         page.pdf.page()
         page.rect(0, 0, page.w, 100, fill=(.96, .97, .99), stroke=None)
@@ -573,6 +581,8 @@ def warranty_pdf(c, invoice_id):
             for text, size, bold in entry:
                 page.pdf.text(page.pdf.wrap(text, right - left - 20, size)[0], left + 10, yy, size, bold, BLUE if size == 10 else INK)
                 yy += size + 4
+        if sig_spot and sig_spot[0] == number:
+            page.pdf.business_signature('garantia', sig_spot[1], A4[1] - 60, left=left, right=right)
         test = inv['environment'] != '2' or inv['status'] != 'autorizado'
         _footer(page, number, pages, 'FACTURA DE PRUEBA — SIN VALIDEZ TRIBUTARIA' if test else '')
     return page.pdf.finish()

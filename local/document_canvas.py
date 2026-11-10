@@ -50,5 +50,21 @@ class Canvas:
             for col,dark in enumerate(items):
                 if dark:self.stream.rectangle(x+(col+4)*unit,self.h-y-(row+5)*unit,unit+.01,unit+.01)
         self.stream.fill();annotation=pydyf.Dictionary({'Type':'/Annot','Subtype':'/Link','Rect':pydyf.Array([x,self.h-y-size,x+size,self.h-y]),'Border':pydyf.Array([0,0,0]),'A':pydyf.Dictionary({'S':'/URI','URI':pydyf.String(url)})});self.pdf.add_object(annotation);self.current['Annots']=pydyf.Array([annotation.reference])
+    def business_signature(self, kind, y, bottom, new_page=None, left=42, right=None, sig=None):
+        """1.5.271 · Bloque de firma visual empresarial (si administración la activó para este tipo de documento), con su leyenda:
+        es una imagen de identificación, no una firma electrónica. Si no cabe, usa new_page() (que devuelve el nuevo y) o no se dibuja.
+        Devuelve el y siguiente."""
+        import business_signature as bs
+        sig=sig or bs.for_doc(kind)
+        if not sig:return y
+        right=self.w-42 if right is None else right
+        w,h=bs.size_pt(sig);box=max(w,230);lines=self.wrap(bs.CAPTION,box,6.5);need=h+6+len(lines)*8.5
+        if y+need>bottom:
+            if not new_page:return y
+            y=new_page()
+        x=bs.x_for(sig,left,right);bs.draw(self.pdf,self.stream,self.resources,self.h,x,y,sig);y+=h+5
+        tx=min(max(left,x+(w-box)/2 if sig['align']=='centro' else x if sig['align']=='izquierda' else x+w-box),right-box)
+        for line in lines:self.text(line,tx,y,6.5,False,GRAY);y+=8.5
+        return y
     def finish(self):
         result=io.BytesIO();self.pdf.write(result);return result.getvalue()
