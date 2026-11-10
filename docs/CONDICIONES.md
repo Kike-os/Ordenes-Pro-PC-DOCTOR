@@ -49,3 +49,62 @@ Configuración → Condiciones del servicio.
 - **Historial**: cada versión guarda fecha y hora, responsable, motivo y recuento de párrafos cambiados (tabla `service_terms_changes`); «Ver cambios» muestra sus diferencias frente a la anterior. Las versiones publicadas siguen siendo inmutables.
 - **Órdenes**: cada orden nueva queda ligada a la versión vigente en el momento de la aceptación, con fecha, hora, responsable y evidencia; publicar después no altera las órdenes anteriores, y sus PDF y tickets siguen usando su versión.
 - **Rutas**: `GET /api/conditions` (resumen, solo administración), `POST /api/conditions` (publicar), `POST /api/conditions/draft`, `/draft/discard`, `/compare` y `GET /api/conditions/compare/<id>`. Migración 039.
+
+## Cláusulas, cortes de página y original firmado (1.5.271)
+
+- **Una numeración por cláusula:**
+  - Un bloque «N. Título» con su texto debajo abre una cláusula. Los párrafos siguientes, separados por una línea vacía y sin título, son su **continuación** y no reciben otro número.
+  - Antes, cada párrafo se numeraba como una cláusula nueva, por ejemplo «2. La orden documentará…».
+  - El texto guardado no cambia; las versiones publicadas de un párrafo por cláusula, como la 2026.10.1, se ven igual.
+  - Lo mismo se aplica en el PDF A4, el comprobante A4 y la página pública.
+- **Cortes de página:**
+  - El título de una cláusula nunca queda solo al pie: viaja con al menos dos líneas de su texto.
+  - Ninguna página empieza ni termina un párrafo con una línea suelta.
+  - Una cláusula extensa continúa en la página siguiente, en lugar de rechazarse.
+  - Los párrafos de una misma cláusula se separan de forma uniforme.
+- **Original firmado electrónicamente** (Configuración → Condiciones del servicio, en cada versión):
+  - **Carga (solo administración):** se carga el PDF firmado fuera de Órdenes Pro (PAdES, Security Data o FirmaEC). Se guarda **tal cual** se recibió, con su SHA-256, y nunca se modifica ni se vuelve a firmar.
+  - **Comprobaciones al cargar:**
+    - que tenga una firma `/ByteRange`;
+    - que la firma cubra todo el archivo;
+    - que la huella del contenido coincida con la firma;
+    - la firma RSA con el certificado incluido;
+    - que el PDF corresponda **a esa versión exacta**: debe contener su número y la huella del texto.
+  - **Firmas no válidas o de otra versión:** se rechazan.
+  - **Cadena de confianza y revocación:** no se comprueban en el sistema; se indica siempre y deben verificarse en FirmaEC o en Adobe.
+  - **Datos que se muestran:** firmante, emisor, vigencia del certificado, fecha de firma y sello de tiempo, además de «Verificar integridad» y la descarga.
+  - **Descarga pública:** `/conditions/<id>/firmado.pdf`; la página pública enlaza al original firmado.
+  - **Registro:** tabla `service_terms_signed` (migración 101), inmutable y con historial.
+- **Estados documentales:**
+  - borrador → aprobado y publicado → **firmado electrónicamente**, si tiene original firmado → vigente → sustituido;
+  - publicar y firmar son pasos distintos;
+  - la versión de un documento no es la versión de la aplicación;
+  - las aceptaciones de órdenes anteriores no cambian.
+- **Verificación del original de la versión 2026.10.1:** firmado por ENRIQUE CARLOS MARTINEZ GOMEZ con un certificado de UANATACA CA2 2016 (válido del 01/07/2024 al 01/07/2027), el 09/11/2026 a las 22:53, con sello de tiempo. La integridad está verificada.
+
+## Firma empresarial visual (1.5.271)
+
+Se configura en **Configuración → Firma electrónica**, solo por administración.
+
+- **La imagen:**
+  - Se carga una imagen PNG o JPEG y se guarda **intacta**: nombre, QR, colores y proporciones se conservan, con su SHA-256 y su versión. Las versiones anteriores se conservan.
+  - Se ve una vista previa antes de guardar.
+  - Cada carga y cada cambio de configuración quedan en la auditoría.
+- **Activación por documento:**
+  - Está desactivada por defecto.
+  - Puede activarse en el ticket de 80 mm, el comprobante A4, la hoja de servicio, los presupuestos, las proformas, los certificados de garantía y los recibos de pago.
+  - Los comprobantes de entrega y los pedidos de repuestos todavía no existen como PDF y aparecen como no disponibles.
+- **Tamaño y posición:**
+  - Ancho en A4 de 25 a 90 mm, con alineación configurable.
+  - Ancho en el ticket de 30 a 72 mm.
+  - Se coloca al final del contenido, sin superponerse y en una página nueva si no cabe. En el ticket va en «Firma y constancia de recepción».
+- **Ticket de 80 mm:**
+  - Representación en blanco y negro derivada al vuelo: promedio por área y umbral, para que el QR conserve bordes nítidos y la transparencia salga en blanco.
+  - Se puede omitir en el ticket.
+  - El original no se toca.
+- **No es una firma electrónica:**
+  - Cada documento lleva la leyenda «Firma visual de identificación de PC-DOCTOR S.A. · No constituye firma electrónica de este documento».
+  - Ningún PDF con la imagen se presenta como firmado (no se añaden `/ByteRange` ni `/Sig`).
+  - El QR de la imagen pertenece a la firma original y no verifica el documento nuevo.
+  - Para firmar digitalmente un PDF nuevo hace falta un procedimiento criptográfico independiente.
+- **Vistas previas** en A4 y en ticket de 80 mm, sin datos de clientes.
