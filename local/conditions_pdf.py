@@ -6,7 +6,7 @@ import hashlib
 from datetime import date
 from document_canvas import Canvas,BLUE,GRAY,INK
 from corporate import settings
-from service_terms import numbered_paragraphs
+from service_terms import clauses
 
 TITLE='CONDICIONES DE RECEPCIÓN Y SERVICIOS'
 FILE_NAME='CONDICIONES DE RECEPCIÓN Y SERVICIOS.pdf'
@@ -57,18 +57,36 @@ def render_conditions(document):
             pdf.text(TITLE+' (continuación)',LEFT,96,9,True,BLUE);y=118
 
     page()
-    for number,paragraph in numbered_paragraphs(document['full_text']):
-        heading,_,body=paragraph.partition('\n')
-        if not body.strip():heading,body='',paragraph
-        lines=pdf.wrap(body.strip(),width-14,9.6);height=(22 if heading else 0)+len(lines)*12.8+8
-        if height>560:raise ValueError('Divide la cláusula para que no se corte en impresión.')
-        if y+height>BOTTOM:page()
+    LINE,MIN=12.8,2  # interlineado y mínimo de líneas que quedan juntas (sin viudas ni huérfanas)
+
+    def room():
+        return int((BOTTOM-y)//LINE)
+
+    for clause in clauses(document['full_text']):
+        number,heading=clause['number'],clause['title']
+        blocks=[pdf.wrap(p,width-14,9.6) for p in clause['paragraphs']]
+        # El título nunca queda solo al pie: viaja con al menos dos líneas de su texto (keep-with-next).
+        if y+(23 if heading else 0)+min(MIN,len(blocks[0]))*LINE>BOTTOM:page()
         if heading:
             # Encabezado de apartado: banda clara, filete y número en recuadro; legible también sin color.
             fill(LEFT,y,width,19,(.93,.95,.98));fill(LEFT,y,3,19,BLUE);fill(LEFT+9,y+3,15,13,BLUE)
-            label=str(number);pdf.text(label,LEFT+16.5-pdf_width(label,8.5,True)/2,y+5.2,8.5,True,(1,1,1));pdf.text(heading.strip().upper(),LEFT+31,y+5,9.6,True,BLUE);y+=23
-        for index,line in enumerate(lines):
-            pdf.text(line if heading or index else str(number)+'. '+line,LEFT+7,y,9.6,False,INK);y+=12.8
+            label=str(number);pdf.text(label,LEFT+16.5-pdf_width(label,8.5,True)/2,y+5.2,8.5,True,(1,1,1));pdf.text(heading.upper(),LEFT+31,y+5,9.6,True,BLUE);y+=23
+        for b,lines in enumerate(blocks):
+            if b:y+=5  # separación uniforme entre párrafos de la misma cláusula
+            i=0
+            while i<len(lines):
+                left=len(lines)-i;fit=room()
+                # Sin línea huérfana al pie ni viuda al comienzo de la página siguiente; una cláusula extensa continúa en otra página.
+                if left<=fit:take=left
+                else:
+                    take=fit
+                    if left-take<MIN:take=left-MIN  # deja al menos dos líneas para la página siguiente
+                    if take<MIN:page();continue  # no cabe ni el mínimo: el párrafo empieza en la página siguiente
+                for k in range(i,i+take):
+                    line=lines[k]
+                    pdf.text(line if heading or b or k else str(number)+'. '+line,LEFT+7,y,9.6,False,INK);y+=LINE
+                i+=take
+                if i<len(lines):page()
         y+=7
     # Cierre: cómo se acepta y a qué queda vinculada la aceptación. Sin firmas ni consentimientos impresos.
     closing=[('ACEPTACIÓN Y VERSIÓN',True),*((line,False) for line in pdf.wrap('La aceptación del cliente se registra por separado en cada orden de recepción y queda vinculada a esta versión exacta y a su huella. Este documento no contiene firmas ni consentimientos.',width-18,8.2)),

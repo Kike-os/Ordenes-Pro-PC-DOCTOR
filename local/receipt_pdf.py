@@ -12,7 +12,7 @@ import pydyf
 import segno
 from reception import DEVICE_TYPES, ECUADOR_TZ
 from document_logo import pdf_image
-from service_terms import numbered_paragraphs
+from service_terms import numbered_paragraphs,clauses
 from corporate import settings
 
 WIDTHS=json.loads((ROOT/'data/helvetica-widths.json').read_text())
@@ -289,15 +289,17 @@ def render_receipt(order):
         item('Integridad SHA-256',terms['content_hash'])
         if dynamic:
             # El título del texto completo no queda solo al pie: necesita espacio para su primera cláusula.
-            first=next(iter(numbered_paragraphs(terms['full_text'])),(1,''))
-            if y+28+len(wrapped(str(first[0])+'. '+first[1],W-94,9))*13+12>H-100:new_page()
+            first=next(iter(clauses(terms['full_text'])),{'number':1,'title':'','paragraphs':['']})
+            if y+28+len(wrapped(str(first['number'])+'. '+(first['title']+'\n' if first['title'] else '')+first['paragraphs'][0],W-94,9))*13+12>H-100:new_page()
         section(terms['title'])
-        for number,paragraph in numbered_paragraphs(terms['full_text']):
-            lines=wrapped(str(number)+'. '+paragraph,W-94,9)
-            height=len(lines)*13+12
-            if y+height>H-100:new_page()
-            for content in lines:text(content,47,y,9,TEXT);y+=13
-            y+=12
+        # 1.5.271: cada cláusula lleva su número una sola vez; sus párrafos de continuación no se numeran.
+        for clause in clauses(terms['full_text']):
+            for index,paragraph in enumerate(clause['paragraphs']):
+                lines=wrapped((str(clause['number'])+'. '+(clause['title']+'\n' if clause['title'] else '') if index==0 else '')+paragraph,W-94,9)
+                height=len(lines)*13+(12 if index==len(clause['paragraphs'])-1 else 5)
+                if y+height>H-100:new_page()
+                for content in lines:text(content,47,y,9,TEXT);y+=13
+                y+=12 if index==len(clause['paragraphs'])-1 else 5
     else:
         if order.get('_service'):
             item('Condiciones / aceptación','No registradas; no se atribuye aceptación retroactiva.')

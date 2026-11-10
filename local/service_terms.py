@@ -16,6 +16,28 @@ def paragraphs(text):
     return [p.strip() for p in re.split(r'\n\s*\n',text.strip()) if p.strip()]
 
 
+# 1.5.271 · Cláusulas: «N. Título» en la primera línea y su texto debajo abren una cláusula; los párrafos siguientes sin título son su
+# continuación y NO reciben otro número (antes cada párrafo separado por una línea vacía se numeraba como cláusula nueva: «2. La orden…»).
+# Un párrafo numerado sin título (formato del texto compacto) sigue siendo una cláusula propia. El texto no se modifica.
+CLAUSE_HEADING = re.compile(r'^(\d{1,3})[.)]\s+([^\n]{1,100})\n(.+)$', re.S)
+NUMBERED = re.compile(r'^(\d{1,3})[.)]\s+(.*)$', re.S)
+
+
+def clauses(text):
+    """[{'number', 'title', 'paragraphs'}] en el orden del texto."""
+    out = []
+    for p in paragraphs(text):
+        h = CLAUSE_HEADING.match(p)
+        if h and not h[2].rstrip().endswith(('.', ':', ';', ',')):
+            out.append({'number': int(h[1]), 'title': h[2].strip(), 'paragraphs': [h[3].strip()]})
+        elif out and out[-1]['title']:
+            out[-1]['paragraphs'].append(p)
+        else:
+            m = NUMBERED.match(p)
+            out.append({'number': int(m[1]) if m else len(out) + 1, 'title': '', 'paragraphs': [(m[2] if m else p).strip()]})
+    return out
+
+
 def numbered_paragraphs(text):
     for index,paragraph in enumerate(paragraphs(text),1):
         match=re.match(r'^(\d{1,3})[.)]\s+(.*)$',paragraph,re.S)
@@ -81,7 +103,7 @@ def attach(c,order):
 
 def public_page(row):
     escape=html.escape
-    items=''.join('<li value="'+str(number)+'"><p>'+escape(p).replace('\n','<br>')+'</p></li>' for number,p in numbered_paragraphs(row['full_text']))
+    items=''.join('<li value="'+str(k['number'])+'">'+''.join('<p>'+(escape(k['title'])+'<br>' if k['title'] and i==0 else '')+escape(p).replace('\n','<br>')+'</p>' for i,p in enumerate(k['paragraphs']))+'</li>' for k in clauses(row['full_text']))
     return '''<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><title>Condiciones de servicio | PC-DOCTOR S.A.</title><link rel="icon" href="/favicon.ico?v=2" sizes="48x48"><link rel="icon" type="image/png" sizes="16x16" href="/static/favicon-16.png?v=2"><link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32.png?v=2"><link rel="icon" type="image/png" sizes="48x48" href="/static/favicon-48.png?v=2"><link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png?v=2"><link rel="stylesheet" href="/static/app.css"></head><body data-page="conditions"><main class="conditions-document"><header><img src="/static/logo-original.png" alt="Logotipo oficial PC-DOCTOR" width="2826" height="2049"><div><span class="eyebrow">PC-DOCTOR S.A.</span><h1>'''+escape(row['title'])+'''</h1></div></header><p class="conditions-version">Versión '''+escape(row['version'])+''' · Vigente desde '''+escape(row['effective_date'])+'''</p><ol>'''+items+'''</ol><footer><p>Documento público de consulta. Este enlace no muestra datos personales ni el estado de reparaciones.</p><p class="conditions-hash">SHA-256: '''+escape(row['content_hash'])+'''</p></footer></main></body></html>'''
 
 
