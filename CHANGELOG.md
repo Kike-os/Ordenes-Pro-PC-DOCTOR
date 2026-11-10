@@ -4,6 +4,18 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.274 — 2026-11-10 09:10 (UTC-05:00)
+
+Firma empresarial a color también en el ticket, con el blanco y negro optimizado como opción
+
+### Mejoras realizadas
+
+- Configuración → Firma electrónica: «Ticket a color» en la vista previa con la explicación de la impresora térmica, y opción «Color en el ticket» que conserva el blanco y negro optimizado para quien lo prefiera.
+
+### Errores corregidos
+
+- Ticket: la firma empresarial sale a color por defecto en el PDF del ticket, la vista previa, la descarga y el correo, y se envía a color a la impresora. La Epson térmica solo tiene tinta negra y la imprime en tonos de negro; el QR sigue nítido. El PNG original no se modifica.
+
 ## v1.5.273 — 2026-11-10 08:45 (UTC-05:00)
 
 Inicio de sesión bilingüe en español e inglés con preferencia guardada en el navegador y en la cuenta
