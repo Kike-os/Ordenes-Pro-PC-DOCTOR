@@ -108,3 +108,20 @@ Se configura en **Configuración → Firma electrónica**, solo por administraci
   - El QR de la imagen pertenece a la firma original y no verifica el documento nuevo.
   - Para firmar digitalmente un PDF nuevo hace falta un procedimiento criptográfico independiente.
 - **Vistas previas** en A4 y en ticket de 80 mm, sin datos de clientes.
+
+## Firma empresarial a color y ticket térmico (1.5.272)
+
+- **Color en lo digital:**
+  - Los PDF A4 (comprobante, hoja de servicio, presupuesto, proforma, garantía y recibo de pago) y el nuevo **Ticket digital** de la orden (`/api/orders/<id>/thermal.pdf?modo=digital`) usan el original a color, con su transparencia y su resolución original, sin suavizado (`Interpolate false`), para que el QR conserve bordes nítidos.
+  - El nombre, el QR y el sello verde «Time Stamping Security Data» se ven como en la imagen cargada.
+- **Monocromo solo para imprimir:**
+  - La representación en blanco y negro se genera al vuelo únicamente para el ticket térmico que se envía a la Epson (botón «Imprimir ticket» e impresión directa).
+  - El PNG original nunca se convierte ni se reescribe; las versiones, los documentos ya emitidos y los PDF firmados no cambian.
+- **Bloque «Firma y constancia de recepción» compacto:**
+  - Dos columnas con líneas finas: «Firma del cliente» a la izquierda (espacio libre, nunca ocupado por la imagen) y «Recibido por / PC-DOCTOR S.A.» a la derecha, sin partir el nombre.
+  - En el ticket, la disposición por defecto es **«Junto a "Recibido por" (compacto)»**: la imagen ocupa como máximo 33 mm dentro de la columna derecha, sobre su línea.
+  - **«Debajo de las firmas, más grande»** la coloca centrada bajo ambas firmas con el ancho configurado (30 a 72 mm).
+  - **«Omitir en el ticket»** no la imprime. El valor antiguo «bn» de la 1.5.271 se interpreta como la disposición compacta.
+- **Legibilidad del QR:** la configuración detecta el QR de la imagen por sus patrones de esquina y avisa solo si un módulo quedaría por debajo de 3 puntos de impresora en el ticket o de 0,33 mm en A4. Si no hay aviso, no se muestra nada.
+- **Vista previa compacta:** original a color sin cambios y «Formato de salida» con PDF A4 a color, ticket digital a color y simulación del ticket térmico en blanco y negro, cada uno con su PDF de muestra sin datos de clientes (`preview.pdf?doc=a4|ticket-digital|ticket`).
+- El aviso amarillo resume que la imagen identifica visualmente a PC-DOCTOR S.A. y no sustituye una firma electrónica criptográfica; el detalle queda en «Ver información sobre firmas electrónicas».

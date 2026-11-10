@@ -20,9 +20,15 @@ DOCS = {'ticket': 'Ticket de recepción (80 mm)', 'comprobante': 'Comprobante de
 # Documentos pedidos que todavía no existen como PDF en Órdenes Pro: se muestran, pero no se pueden activar.
 UNAVAILABLE = {'entrega': 'Comprobantes de entrega', 'repuestos': 'Documentos de pedidos de repuestos'}
 CAPTION = 'Firma visual de identificación de PC-DOCTOR S.A. · No constituye firma electrónica de este documento.'
-DEFAULTS = {'enabled': False, 'version_id': None, 'docs': {k: False for k in DOCS}, 'a4_width_mm': 50, 'ticket_width_mm': 48, 'align': 'derecha', 'ticket_mode': 'bn'}
+DEFAULTS = {'enabled': False, 'version_id': None, 'docs': {k: False for k in DOCS}, 'a4_width_mm': 50, 'ticket_width_mm': 48, 'align': 'derecha', 'ticket_mode': 'columna'}
 A4_WIDTHS = range(25, 91)
 TICKET_WIDTHS = range(30, 73)  # área útil del rollo de 80 mm: 72 mm
+# 1.5.272 · Ticket: «columna» = en el espacio «Recibido por PC-DOCTOR S.A.» (junto a la firma del cliente, ancho máximo de la columna);
+# «ancho» = debajo de ambas firmas, al ancho configurado (para un QR más grande); «omitir» = sin firma visual en el ticket.
+TICKET_MODES = {'columna': 'Junto a «Recibido por» (compacto)', 'ancho': 'Debajo de las firmas, más grande', 'omitir': 'Omitir en el ticket'}
+TICKET_COLUMN_MM = 33  # media columna del área útil de 72 mm
+MIN_QR_DOTS = 3  # puntos de impresora por módulo del QR por debajo de los cuales la lectura no es fiable
+MIN_QR_MM = 0.33  # tamaño mínimo de módulo en A4
 DOTS_PER_MM = 8  # Epson TM-m30II: 203 ppp
 MAX_BYTES = 2_000_000
 PT_PER_MM = 72 / 25.4
@@ -45,6 +51,8 @@ def settings(c):
             saved = json.loads(row['value'] if hasattr(row, 'keys') else row[0])
             data.update({k: v for k, v in saved.items() if k in DEFAULTS and k != 'docs'})
             data['docs'].update({k: bool(v) for k, v in (saved.get('docs') or {}).items() if k in DOCS})
+            if data['ticket_mode'] == 'bn':  # 1.5.271: «imprimir en blanco y negro» ahora es la disposición compacta en columna
+                data['ticket_mode'] = 'columna'
         except (ValueError, TypeError, AttributeError):
             pass
     return data
@@ -79,7 +87,7 @@ def update(c, data, user, audit):
             raise SignatureError('Alineación no válida.')
         current['align'] = data['align']
     if 'ticket_mode' in data:
-        if data['ticket_mode'] not in ('bn', 'omitir'):
+        if data['ticket_mode'] not in TICKET_MODES:
             raise SignatureError('Opción del ticket no válida.')
         current['ticket_mode'] = data['ticket_mode']
     if 'version_id' in data:
@@ -239,7 +247,14 @@ def versions(c):
 def overview(c):
     data = settings(c)
     rows = versions(c)
-    return {'settings': data, 'versions': rows, 'current': next((v for v in rows if v['id'] == data['version_id']), None),
+    check = {'qr_detected': False, 'warnings': []}
+    if data['version_id']:
+        try:
+            check = legibility(preview_sig(c))
+        except Exception:
+            pass
+    return {'settings': data, 'versions': rows, 'current': next((v for v in rows if v['id'] == data['version_id']), None), 'legibility': check,
+            'ticket_modes': TICKET_MODES, 'ticket_column_mm': TICKET_COLUMN_MM,
             'docs': [{'key': k, 'label': v, 'available': True, 'enabled': data['docs'].get(k, False)} for k, v in DOCS.items()] +
                     [{'key': k, 'label': v, 'available': False, 'enabled': False} for k, v in UNAVAILABLE.items()],
             'caption': CAPTION, 'limits': {'a4': [A4_WIDTHS.start, A4_WIDTHS.stop - 1], 'ticket': [TICKET_WIDTHS.start, TICKET_WIDTHS.stop - 1]}}
@@ -252,17 +267,88 @@ def original(c, vid):
 
 # ---- Representaciones de impresión ------------------------------------------------------------------------------------------------
 
-@lru_cache(maxsize=8)
-def _image(vid, sha):
-    """Datos de una versión listos para dibujar (se cachean por versión y huella)."""
-    with CONNECT() as c:
-        row = c.execute('SELECT mime,data,width,height,rgb,alpha FROM business_signature_versions WHERE id=?', (vid,)).fetchone()
+_IMAGES = {}
+
+
+def _image(vid, sha, c=None):
+    """Datos de una versión listos para dibujar (se cachean por versión y huella; una ausencia no se cachea). c permite leer con la
+    conexión en curso (p. ej. justo después de cargarla, antes de confirmar la transacción)."""
+    key = (vid, sha)
+    if key in _IMAGES:
+        return _IMAGES[key]
+    if c is None:
+        with CONNECT() as conn:
+            row = conn.execute('SELECT mime,data,width,height,rgb,alpha FROM business_signature_versions WHERE id=? AND sha256=?', (vid, sha)).fetchone()
+    else:
+        row = c.execute('SELECT mime,data,width,height,rgb,alpha FROM business_signature_versions WHERE id=? AND sha256=?', (vid, sha)).fetchone()
     if not row:
         return None
     if row['mime'] == 'image/jpeg':
         comps = _jpeg_size(bytes(row['data']))[2]
-        return {'kind': 'jpeg', 'w': row['width'], 'h': row['height'], 'jpeg': bytes(row['data']), 'comps': comps}
-    return {'kind': 'png', 'w': row['width'], 'h': row['height'], 'rgb': zlib.decompress(row['rgb']), 'alpha': zlib.decompress(row['alpha']) if row['alpha'] else None}
+        image = {'kind': 'jpeg', 'w': row['width'], 'h': row['height'], 'jpeg': bytes(row['data']), 'comps': comps}
+    else:
+        image = {'kind': 'png', 'w': row['width'], 'h': row['height'], 'rgb': zlib.decompress(row['rgb']), 'alpha': zlib.decompress(row['alpha']) if row['alpha'] else None}
+    while len(_IMAGES) >= 8:
+        _IMAGES.pop(next(iter(_IMAGES)))
+    _IMAGES[key] = image
+    return image
+
+
+def qr_module_px(image):
+    """Tamaño en píxeles de un módulo del QR de la imagen (por sus patrones de esquina 1:1:3:1:1), o None si no se detecta un QR."""
+    w, h = image['w'], image['h']
+    if image['kind'] != 'png':
+        return None
+    rgb, alpha = image['rgb'], image['alpha']
+    found = []
+    for y in range(0, h, max(1, h // 120)):
+        runs, last, start = [], None, 0
+        for x in range(w):
+            i = y * w + x
+            lum = (rgb[3 * i] * 299 + rgb[3 * i + 1] * 587 + rgb[3 * i + 2] * 114) // 1000
+            a = alpha[i] if alpha else 255
+            dark = (lum * a + 255 * (255 - a)) // 255 < 128
+            if dark != last:
+                if last is not None:
+                    runs.append((last, x - start))
+                last, start = dark, x
+        runs.append((last, w - start))
+        for k in range(len(runs) - 4):
+            seq = runs[k:k + 5]
+            if not seq[0][0] or [d for d, _ in seq] != [True, False, True, False, True]:
+                continue
+            unit = sum(n for _, n in seq) / 7
+            if unit >= 1 and all(abs(n - e * unit) <= unit * .6 for (_, n), e in zip(seq, (1, 1, 3, 1, 1))):
+                found.append(unit)
+    if len(found) < 3:
+        return None
+    found.sort()
+    return found[len(found) // 2]
+
+
+def ticket_width_pt(sig):
+    """Ancho de la firma en el ticket según la disposición elegida (en columna nunca supera media columna)."""
+    mm = sig['ticket_width_mm'] if sig.get('ticket_mode') == 'ancho' else min(sig['ticket_width_mm'], TICKET_COLUMN_MM)
+    return mm * PT_PER_MM
+
+
+def legibility(sig):
+    """Avisos solo cuando el QR de la imagen quedaría demasiado pequeño (ticket o A4). Lista vacía si todo está bien o no hay QR."""
+    image = sig['image']
+    module = qr_module_px(image)
+    out = {'qr_detected': bool(module), 'warnings': []}
+    if not module:
+        return out
+    if sig.get('ticket_mode') != 'omitir':
+        dots = module * (ticket_width_pt(sig) / PT_PER_MM * DOTS_PER_MM) / image['w']
+        out['ticket_dots'] = round(dots, 1)
+        if dots < MIN_QR_DOTS:
+            out['warnings'].append('En el ticket cada módulo del QR mide %.1f puntos de impresora: puede no leerse. Usa «Debajo de las firmas, más grande» con más ancho, u omite la firma en el ticket.' % dots)
+    a4_mm = module * sig['a4_width_mm'] / image['w']
+    out['a4_module_mm'] = round(a4_mm, 2)
+    if a4_mm < MIN_QR_MM:
+        out['warnings'].append('En A4 cada módulo del QR mide %.2f mm: aumenta el ancho en documentos A4 para que se pueda leer.' % a4_mm)
+    return out
 
 
 def thermal_bitmap(image, dots):
@@ -292,7 +378,9 @@ def thermal_bitmap(image, dots):
 @lru_cache(maxsize=8)
 def _thermal(vid, sha, dots):
     image = _image(vid, sha)
-    return thermal_bitmap(image, dots) if image and image['kind'] == 'png' else None
+    if not image or image['kind'] != 'png':
+        raise SignatureError('Sin imagen PNG para el ticket.', 404)  # se lanza (no se cachea) en vez de devolver None
+    return thermal_bitmap(image, dots)
 
 
 def for_doc(kind):
@@ -327,7 +415,7 @@ def _xobject(pdf, sig, thermal=False):
         return cache[key]
     image = sig['image']
     if thermal and image['kind'] == 'png':
-        tw, th, gray = _thermal(sig['vid'], sig['sha'], sig['ticket_width_mm'] * DOTS_PER_MM)
+        tw, th, gray = _thermal(sig['vid'], sig['sha'], round(ticket_width_pt(sig) / PT_PER_MM * DOTS_PER_MM))
         stream = pydyf.Stream([gray], extra={'Type': '/XObject', 'Subtype': '/Image', 'Width': tw, 'Height': th, 'ColorSpace': '/DeviceGray',
                                              'BitsPerComponent': 8, 'Interpolate': 'false'}, compress=True)
         pdf.add_object(stream)
@@ -337,7 +425,8 @@ def _xobject(pdf, sig, thermal=False):
         stream = pydyf.Stream([image['jpeg']], extra={'Type': '/XObject', 'Subtype': '/Image', 'Width': image['w'], 'Height': image['h'],
                                                       'ColorSpace': '/DeviceRGB' if image['comps'] == 3 else '/DeviceGray', 'BitsPerComponent': 8, 'Filter': '/DCTDecode'})
     else:
-        extra = {'Type': '/XObject', 'Subtype': '/Image', 'Width': image['w'], 'Height': image['h'], 'ColorSpace': '/DeviceRGB', 'BitsPerComponent': 8, 'Interpolate': 'true'}
+        # Sin suavizado: los bordes del QR quedan nítidos al ampliar o reducir. Compresión sin pérdida (Flate).
+        extra = {'Type': '/XObject', 'Subtype': '/Image', 'Width': image['w'], 'Height': image['h'], 'ColorSpace': '/DeviceRGB', 'BitsPerComponent': 8, 'Interpolate': 'false'}
         if image['alpha']:
             mask = pydyf.Stream([image['alpha']], extra={'Type': '/XObject', 'Subtype': '/Image', 'Width': image['w'], 'Height': image['h'],
                                                          'ColorSpace': '/DeviceGray', 'BitsPerComponent': 8}, compress=True)
@@ -351,12 +440,13 @@ def _xobject(pdf, sig, thermal=False):
 
 def size_pt(sig, thermal=False):
     """(ancho, alto) en puntos al ancho configurado, conservando la proporción."""
-    width = (sig['ticket_width_mm'] if thermal else sig['a4_width_mm']) * PT_PER_MM
+    width = ticket_width_pt(sig) if thermal else sig['a4_width_mm'] * PT_PER_MM
     return width, width * sig['image']['h'] / sig['image']['w']
 
 
-def draw(pdf, stream, resources, page_h, x, y, sig, thermal=False):
-    """Dibuja la imagen con su borde superior en y (medido desde arriba). Devuelve su alto en puntos."""
+def draw(pdf, stream, resources, page_h, x, y, sig, thermal=False, width=None):
+    """Dibuja la imagen con su borde superior en y (medido desde arriba). Devuelve su alto en puntos. thermal=True usa la representación
+    en blanco y negro para la impresora; si no, el original a color. width fija el ancho (el alto conserva la proporción)."""
     import pydyf
     obj, _, _ = _xobject(pdf, sig, thermal)
     xobjects = resources.get('XObject')
@@ -365,6 +455,8 @@ def draw(pdf, stream, resources, page_h, x, y, sig, thermal=False):
         resources['XObject'] = xobjects
     xobjects['FirmaVisual' + ('T' if thermal else '')] = obj.reference
     w, h = size_pt(sig, thermal)
+    if width:
+        w, h = width, width * sig['image']['h'] / sig['image']['w']
     stream.push_state()
     stream.set_matrix(w, 0, 0, h, x, page_h - y - h)
     stream.draw_x_object('FirmaVisual' + ('T' if thermal else ''))
@@ -385,7 +477,10 @@ def preview_sig(c):
     if not data['version_id']:
         raise SignatureError('Carga primero la imagen de la firma.', 409)
     row = c.execute('SELECT id,sha256 FROM business_signature_versions WHERE id=?', (data['version_id'],)).fetchone()
-    return dict(data, kind='preview', image=_image(row['id'], row['sha256']), vid=row['id'], sha=row['sha256'])
+    image = _image(row['id'], row['sha256'], c) if row else None
+    if not image:
+        raise SignatureError('Carga primero la imagen de la firma.', 409)
+    return dict(data, kind='preview', image=image, vid=row['id'], sha=row['sha256'])
 
 
 def preview_pdf(c, target):
@@ -394,19 +489,19 @@ def preview_pdf(c, target):
     import pydyf
     from document_canvas import Canvas, BLUE, GRAY
     sig = preview_sig(c)
-    if target == 'ticket':
-        if sig['image']['kind'] == 'png' or True:
-            width = 72 * PT_PER_MM
-            w, h = size_pt(sig, True)
-            pdf = Canvas(width, h + 70, 'Vista previa · firma visual en ticket de 80 mm', mono=True)
-            pdf.page()
-            pdf.text('VISTA PREVIA · TICKET 80 MM', 6, 8, 7.5, True)
-            draw(pdf.pdf, pdf.stream, pdf.resources, pdf.h, (width - w) / 2, 22, sig, thermal=True)
-            y = 22 + h + 4
-            for line in pdf.wrap(CAPTION, width - 12, 6.5):
-                pdf.text(line, 6, y, 6.5)
-                y += 8
-            return pdf.finish()
+    if target in ('ticket', 'ticket-digital'):
+        thermal = target == 'ticket' and sig['image']['kind'] == 'png'
+        width = 72 * PT_PER_MM
+        w, h = size_pt(sig, True)
+        pdf = Canvas(width, h + 74, 'Vista previa · firma visual en ticket (' + ('impresión térmica' if thermal else 'digital a color') + ')', mono=thermal)
+        pdf.page()
+        pdf.text('VISTA PREVIA · ' + ('TICKET TÉRMICO (BLANCO Y NEGRO)' if thermal else 'TICKET DIGITAL (COLOR)'), 6, 8, 7, True)
+        draw(pdf.pdf, pdf.stream, pdf.resources, pdf.h, (width - w) / 2, 22, sig, thermal=thermal)
+        y = 22 + h + 4
+        for line in pdf.wrap(CAPTION, width - 12, 5.8):
+            pdf.text(line, 6, y, 5.8)
+            y += 7.5
+        return pdf.finish()
     pdf = Canvas(595.28, 841.89, 'Vista previa · firma visual en documentos A4')
     pdf.page()
     pdf.logo(42, 26, 60)

@@ -39,7 +39,9 @@ LOGO_PX=416  # Dos píxeles por punto de impresora para conservar el detalle del
 BAR_HEIGHT=13*72/25.4  # Alto del Code 128: 13 mm, suficiente para el lector y más corto que antes.
 
 
-def render_thermal(order,copy='cliente'):
+def render_thermal(order,copy='cliente',digital=False):
+    """Ticket de recepción. digital=True: para ver o compartir en pantalla (firma visual a color); si no, para la impresora térmica
+    (firma visual en blanco y negro, derivada sin tocar el original)."""
     company=settings();pdf=pydyf.PDF();pdf.info['Title']=pydyf.String('TICKET-'+order['code']);pdf.info['Author']=pydyf.String(company['name'])
     fonts={}
     for key,name in [('F1','Helvetica'),('F2','Helvetica-Bold')]:
@@ -213,17 +215,20 @@ def render_thermal(order,copy='cliente'):
         # 11. Firma y constancia de recepción.
         section('FIRMA Y CONSTANCIA DE RECEPCIÓN')
         block(company['name']+' recibió el equipo descrito el '+received.strftime('%d/%m/%Y')+' a las '+received.strftime('%H:%M')+'.',7.5,gap=0,lead=1.2)
-        y+=24;half=(INNER-8)/2
-        for index,label in enumerate(('Firma del cliente','Recibido por '+company['name'])):
+        # 1.5.272: dos columnas compactas. Izquierda, el espacio para la firma del cliente (nunca se reemplaza); derecha, «Recibido por»
+        # con la firma visual empresarial encima de su línea (si está activada). «PC-DOCTOR S.A.» va en su propio renglón, sin partirse.
+        half=(INNER-8)/2;column=bool(signature) and signature['ticket_mode']=='columna'
+        sig_w,sig_h=business_signature.size_pt(signature,True) if signature else (0,0)
+        y+=max(20,sig_h+3) if column else 20
+        if column:ops.append(('firma',y-sig_h-2,sig_w,sig_h,M+half+8+(half-sig_w)/2))
+        for index,(label,name) in enumerate((('Firma del cliente',''),('Recibido por',company['name']))):
             left=M+index*(half+8);ops.append(('line',y,left,left+half))
-            lines=wrap_to(label,7,False,half)
-            for row,(line,_) in enumerate(lines):ops.append(('text',line,y+3+row*8.5,7,False,False,left+(half-text_width(line,7))/2,half,False))
-        y+=3+8.5*max(len(wrap_to(label,7,False,half)) for label in ('Firma del cliente','Recibido por '+company['name']))+3
-        # 1.5.271: firma visual empresarial (si administración la activó para el ticket), en blanco y negro al ancho configurado, con su
-        # leyenda: es una imagen de identificación, no una firma electrónica.
-        if signature:
-            sig_w,sig_h=business_signature.size_pt(signature,True);ops.append(('firma',y+2,sig_w,sig_h));y+=sig_h+4
-            block(business_signature.CAPTION,6.5,False,1,True)
+            ops.append(('text',label,y+2.5,6.8,False,False,left+(half-text_width(label,6.8))/2,half,False))
+            if name:ops.append(('text',name,y+10.5,7,True,False,left+(half-text_width(name,7,True))/2,half,False))
+        y+=20
+        if signature and not column:ops.append(('firma',y,sig_w,sig_h,(W-sig_w)/2));y+=sig_h+3
+        # Leyenda: es una imagen de identificación, no una firma electrónica.
+        if signature:block(business_signature.CAPTION,5.8,False,1,True)
         # Code 128 para localizar la orden en el taller.
         ops.append(('rule',y));y+=5
         ops.append(('barcode',y,bars,unit,total));y+=BAR_HEIGHT+4
@@ -257,7 +262,7 @@ def render_thermal(order,copy='cliente'):
             elif op[0]=='rule':
                 stream.set_line_width(.5);stream.move_to(M,height-op[1]);stream.line_to(W-M,height-op[1]);stream.stroke()
             elif op[0]=='line':
-                stream.set_line_width(.6);stream.move_to(op[2],height-op[1]);stream.line_to(op[3],height-op[1]);stream.stroke()
+                stream.set_line_width(.4);stream.move_to(op[2],height-op[1]);stream.line_to(op[3],height-op[1]);stream.stroke()
             elif op[0]=='logo':
                 _,top,width,tall=op;stream.push_state();stream.set_matrix(width,0,0,tall,(W-width)/2,height-top-tall);stream.draw_x_object('Logo');stream.pop_state()
             elif op[0]=='qr':
@@ -267,7 +272,8 @@ def render_thermal(order,copy='cliente'):
                         if dark:stream.rectangle(left+(col+4)*qunit,height-top-(row+5)*qunit,qunit,qunit)
                 stream.fill()
             elif op[0]=='firma':
-                business_signature.draw(pdf,stream,resources,height,(W-op[2])/2,op[1],signature,thermal=True)
+                # En pantalla, el original a color; para la impresora térmica, su representación en blanco y negro.
+                business_signature.draw(pdf,stream,resources,height,op[4],op[1],signature,thermal=not digital,width=op[2])
             elif op[0]=='barcode':
                 _,top,widths,bunit,span=op;left=snap((W-span)/2)+10*bunit
                 for i,width in enumerate(widths):

@@ -1683,7 +1683,8 @@ class Handler(BaseHTTPRequestHandler):
                     if path=='/api/business-signature':return self.reply(200,business_signature.overview(c))
                     if path=='/api/business-signature/preview.pdf':
                         target=bs_query.get('doc',['a4'])[0]
-                        return self.reply(200,business_signature.preview_pdf(c,'ticket' if target=='ticket' else 'a4'),'application/pdf',filename='vista-previa-firma-'+('ticket' if target=='ticket' else 'a4')+'.pdf')
+                        target=target if target in ('a4','ticket','ticket-digital') else 'a4'
+                        return self.reply(200,business_signature.preview_pdf(c,target),'application/pdf',filename='vista-previa-firma-'+target+'.pdf')
                     bs_file=re.fullmatch(r'/api/business-signature/([0-9]{1,9})/(original|ticket\.png)',path)
                     if bs_file:
                         if bs_file[2]=='original':
@@ -1957,10 +1958,12 @@ class Handler(BaseHTTPRequestHandler):
                     if detail[2]=='thermal.pdf':
                         from thermal_pdf import render_thermal
                         import order_tracking
-                        copy=parse_qs(urlsplit(self.path).query).get('copy',['cliente'])[0]
+                        ticket_query=parse_qs(urlsplit(self.path).query);copy=ticket_query.get('copy',['cliente'])[0]
                         if copy not in ('cliente','taller','ambas'):return self.reply(400,{'error':'Copia inválida.'})
                         pdf_order['tracking_url']=order_tracking.active(c,row['id'])['url']
-                        return self.reply(200,render_thermal(pdf_order,copy),'application/pdf',filename='TICKET-'+code+receipt_suffix(pdf_order)+'.pdf')
+                        # 1.5.272: «modo=digital» para ver o compartir (firma visual a color); sin él, el ticket para la impresora térmica.
+                        digital=ticket_query.get('modo',[''])[0]=='digital'
+                        return self.reply(200,render_thermal(pdf_order,copy,digital),'application/pdf',filename='TICKET-'+code+('-DIGITAL' if digital else '')+receipt_suffix(pdf_order)+'.pdf')
                     return self.reply(200, render_receipt(pdf_order), 'application/pdf',filename=code+'-COMPROBANTE-DE-RECEPCION'+receipt_suffix(pdf_order)+'.pdf')
                 result = dict(row)
                 import order_tracking

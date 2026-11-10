@@ -126,3 +126,11 @@ Orden: logo compacto (20 mm) y datos del taller · título y copia · número de
 - Ancho: el área imprimible real de la TM-m30II en papel de 80 mm (72 mm = 576 puntos a 203 ppp), sin reducir el PDF; longitud variable según el contenido (≈ 323 mm con datos largos, antes ≈ 360 mm). Texto PDF real (no imagen), títulos en negrita, texto secundario de 7–8,5 pt.
 - Comprobado: una página por copia, ningún carácter fuera de márgenes, los dos QR y el Code 128 leídos con `zbarimg` a 203 ppp, procesamiento completo por el controlador Epson (`--render-only`, con corte). Título del PDF y nombre del archivo: `TICKET-<orden>`.
 - El resumen de condiciones es informativo: no modifica las condiciones legales aceptadas, que se consultan completas con el QR.
+
+## Firma empresarial en el ticket (1.5.272)
+
+- El ticket que se imprime sigue siendo blanco y negro: la firma empresarial (si está activada para el ticket) se imprime con una representación monocroma a 8 puntos por milímetro, derivada al vuelo del original, que no cambia.
+- El bloque «Firma y constancia de recepción» es más compacto: líneas de 0,4 pt, «Firma del cliente» libre a la izquierda y la firma empresarial (hasta 33 mm) sobre «Recibido por / PC-DOCTOR S.A.» a la derecha, o centrada debajo de ambas si se elige «Debajo de las firmas, más grande».
+- **Ticket digital:** la orden ofrece el mismo ticket en PDF con la firma a color, para enviar o archivar; no se envía a la impresora.
+- Pendiente del taller: imprimir una prueba en la Epson y comprobar con un lector que el QR de la firma se lee. Si la configuración muestra el aviso de legibilidad, usar la disposición más grande u omitirla en el ticket.
+

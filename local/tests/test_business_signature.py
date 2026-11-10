@@ -57,7 +57,7 @@ class BusinessSignatureTests(unittest.TestCase):
 
     def setUp(self):
         test_app.SecurityTests.setUp(self)
-        bs._image.cache_clear()
+        bs._IMAGES.clear()
         bs._thermal.cache_clear()
         self.cookie, self.csrf = self.login()
 
@@ -156,9 +156,57 @@ class BusinessSignatureTests(unittest.TestCase):
         self.post(action='settings', docs='{"presupuesto": false, "pago": true}')
         self.assertNotIn(b'FirmaVisual', quote_pdf());self.assertIn(b'/FirmaVisual', receipt())
 
+    def test_digital_ticket_is_in_color_and_print_ticket_is_monochrome(self):
+        import re
+        order = self.request('/api/orders', self.order_data({'request_key': 'business-signature-0003'}), cookie=self.cookie, csrf=self.csrf)['body']
+        png = signature_png()
+        self.upload(png)
+        self.post(action='settings', enabled=True, docs='{"ticket": true}')
+        printed = self.request('/api/orders/%d/thermal.pdf' % order['id'], cookie=self.cookie)['body']
+        digital = self.request('/api/orders/%d/thermal.pdf?modo=digital' % order['id'], cookie=self.cookie)['body']
+        image = lambda pdf, name: re.search(rb'/Subtype\s*/Image[^>]*?/Width\s+(\d+)[^>]*?/Height\s+(\d+)[^>]*?/ColorSpace\s*/(\w+)', pdf)
+        self.assertIn(b'/FirmaVisualT', printed);self.assertNotIn(b'/FirmaVisualT', digital);self.assertIn(b'/FirmaVisual ', digital.replace(b'/FirmaVisual\n', b'/FirmaVisual '))
+        self.assertIn(b'/SMask', digital)  # original a color con su transparencia
+        self.assertIn(b'/Width 600', digital);self.assertIn(b'/Height 200', digital)  # resolución original, sin reducir
+        self.assertIn(b'/Interpolate false', digital)
+        with app.connect() as c:  # el original almacenado no cambia
+            self.assertEqual(bytes(c.execute('SELECT data FROM business_signature_versions').fetchone()[0]), png)
+
+    def test_compact_reception_block_keeps_customer_space_and_no_overlap(self):
+        import re
+        order = self.request('/api/orders', self.order_data({'request_key': 'business-signature-0004'}), cookie=self.cookie, csrf=self.csrf)['body']
+        self.upload(signature_png())
+        self.post(action='settings', enabled=True, docs='{"ticket": true}')
+        stream = pdf_signature.page_text(self.request('/api/orders/%d/thermal.pdf' % order['id'], cookie=self.cookie)['body']).decode('latin-1')
+        m = re.search(r'q\s+([\d.]+) 0 0 ([\d.]+) ([\d.]+) ([\d.]+) cm\s*/FirmaVisualT Do', stream)
+        self.assertIsNotNone(m)
+        w, h, x, y = map(float, m.groups())
+        texts = [(float(tx), float(ty), t) for tx, ty, t in re.findall(r'1 0 0 1 ([\d.]+) ([\d.]+) Tm\s*\(((?:\\.|[^\\)])*)\)\s*Tj', stream)]
+        labels = {t: (tx, ty) for tx, ty, t in texts if t in ('Firma del cliente', 'Recibido por', 'PC-DOCTOR S.A.')}
+        self.assertEqual(set(labels), {'Firma del cliente', 'Recibido por', 'PC-DOCTOR S.A.'})  # el nombre no se parte
+        page_w = 72 * 72 / 25.4
+        self.assertGreater(x, page_w / 2 - 5)  # en la columna derecha: el espacio de la firma del cliente queda libre
+        self.assertLess(labels['Firma del cliente'][0], page_w / 2)
+        for tx, ty, t in texts:  # ningún texto dentro del recuadro de la imagen
+            self.assertFalse(x - 1 < tx < x + w and y < ty + 4 < y + h, t)
+
+    def test_qr_legibility_warns_only_when_too_small(self):
+        self.upload(signature_png())
+        with app.connect() as c:
+            sig = bs.preview_sig(c)
+        self.assertAlmostEqual(bs.qr_module_px(sig['image']), 6, delta=.6)
+        compact = bs.legibility(dict(sig, ticket_mode='columna', ticket_width_mm=48, a4_width_mm=50))
+        self.assertTrue(any('ticket' in w for w in compact['warnings']));self.assertFalse(any('A4' in w for w in compact['warnings']))
+        wide = bs.legibility(dict(sig, ticket_mode='ancho', ticket_width_mm=64, a4_width_mm=50))
+        self.assertEqual(wide['warnings'], [])
+        self.assertTrue(any('A4' in w for w in bs.legibility(dict(sig, ticket_mode='omitir', a4_width_mm=25))['warnings']))
+        with app.connect() as c:
+            c.execute("INSERT INTO system_state(key,value) VALUES ('business_signature','{\"ticket_mode\": \"bn\"}') ON CONFLICT(key) DO UPDATE SET value=excluded.value");c.commit()
+            self.assertEqual(bs.settings(c)['ticket_mode'], 'columna')  # valor de la 1.5.271
+
     def test_previews_and_jpeg(self):
         self.upload(signature_png())
-        for doc in ('a4', 'ticket'):
+        for doc in ('a4', 'ticket', 'ticket-digital'):
             got = self.request('/api/business-signature/preview.pdf?doc=' + doc, cookie=self.cookie)
             self.assertEqual(got['status'], 200);self.assertIn(b'FirmaVisual', got['body'])
         jpeg = b'\xff\xd8\xff\xc0\x00\x11\x08\x00\x40\x00\xc8\x03\x01\x22\x00\x02\x11\x01\x03\x11\x01\xff\xd9'
