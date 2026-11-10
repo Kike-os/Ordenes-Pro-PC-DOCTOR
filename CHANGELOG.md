@@ -4,6 +4,19 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.273 — 2026-11-10 08:45 (UTC-05:00)
+
+Inicio de sesión bilingüe en español e inglés con preferencia guardada en el navegador y en la cuenta
+
+### Nuevas funcionalidades
+
+- Inicio de sesión bilingüe: selector «Seleccione su idioma / Select your language» con Español (Ecuador) e English (EE. UU.), banderas, resaltado azul y verificación. Traduce al instante la pantalla de acceso, la recuperación y el restablecimiento de contraseña, la verificación en dos pasos, las validaciones y los mensajes del servidor.
+- El idioma se guarda en el navegador y en la cuenta, y se sincroniza entre equipos. Se cambia desde el menú de cuenta o Configuración → Mi perfil. En inglés: navegación principal, menú de cuenta, versión y estabilidad del sistema. Los demás módulos siguen en español mientras se completa su traducción.
+
+### Mejoras realizadas
+
+- Base de traducción ampliable (catálogos es-EC y en-US). Los datos de clientes, códigos, números de serie y documentos emitidos nunca se traducen. Sin cambios en la autenticación, la recuperación de contraseña, «Recordar mi sesión», ADI ni la reserva de citas.
+
 ## v1.5.272 — 2026-11-10 07:29 (UTC-05:00)
 
 Firma empresarial a color en documentos digitales y monocroma solo para el ticket térmico, con bloque de recepción compacto y aviso de legibilidad del QR
