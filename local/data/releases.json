@@ -8,6 +8,27 @@
   },
   "releases": [
     {
+      "version": "1.5.270",
+      "date": "2026-11-09T21:59:12-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Detalle de la orden Executive Compact 5.0: comunicaciones con estado de entrega real, seguimiento del cliente, autorizaciones y permanencia en un panel compacto de dos columnas",
+      "changes": {
+        "features": [
+          "Comunicaciones: un solo historial (correo del sistema, buzón y WhatsApp) con filtros por canal, «Ver correo», historial completo y «Revisado por ADI». Estado real de cada correo: Registrado, Enviado al servidor, Entregado (con confirmación), Fallido o Rebotado con su motivo."
+        ],
+        "improvements": [
+          "Detalle de la orden Executive Compact: comunicaciones, seguimiento del cliente, autorizaciones y permanencia pasan a un panel de dos columnas con módulos plegables y resumen visible. Se abren solos solo ante un problema verificable (correo fallido o permanencia vencida).",
+          "Seguimiento del cliente con QR compacto ampliable y las acciones de siempre; autorizaciones técnica y digital en un módulo con resumen de su estado; permanencia con días, barra, PDF y plazo. Mismos permisos, enlaces y registros; móvil sin desbordes."
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Kike-os: «Sí, publica (Recomendado)» (1.5.270, batería en verde; sin migración)"
+    },
+    {
       "version": "1.5.269",
       "date": "2026-11-09T21:14:02-05:00",
       "type": "patch",

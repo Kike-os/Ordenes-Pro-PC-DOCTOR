@@ -4,6 +4,19 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.270 — 2026-11-09 21:59 (UTC-05:00)
+
+Detalle de la orden Executive Compact 5.0: comunicaciones con estado de entrega real, seguimiento del cliente, autorizaciones y permanencia en un panel compacto de dos columnas
+
+### Nuevas funcionalidades
+
+- Comunicaciones: un solo historial (correo del sistema, buzón y WhatsApp) con filtros por canal, «Ver correo», historial completo y «Revisado por ADI». Estado real de cada correo: Registrado, Enviado al servidor, Entregado (con confirmación), Fallido o Rebotado con su motivo.
+
+### Mejoras realizadas
+
+- Detalle de la orden Executive Compact: comunicaciones, seguimiento del cliente, autorizaciones y permanencia pasan a un panel de dos columnas con módulos plegables y resumen visible. Se abren solos solo ante un problema verificable (correo fallido o permanencia vencida).
+- Seguimiento del cliente con QR compacto ampliable y las acciones de siempre; autorizaciones técnica y digital en un módulo con resumen de su estado; permanencia con días, barra, PDF y plazo. Mismos permisos, enlaces y registros; móvil sin desbordes.
+
 ## v1.5.269 — 2026-11-09 21:14 (UTC-05:00)
 
 Seguimiento logístico Premium 4.0: pasos compactos, tarjetas sin huecos, códigos copiables y avisos al cliente con estado real (animación del recorrido intacta)
