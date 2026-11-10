@@ -2966,16 +2966,31 @@ async function adiReportDialog(order){let data;try{data=await api('/api/orders/'
  const dialog=smallDialog('Informe de situación · '+displayCode(order));dialog.classList.add('adio-dialog');const text=el('textarea',undefined,'adio-report');text.readOnly=true;text.rows=16;text.value=data.report;text.setAttribute('aria-label','Informe de situación');
  const actions=el('div',undefined,'delivery-actions');actions.append(button('Copiar',async()=>{try{await navigator.clipboard.writeText(text.value);toast('Informe copiado.','success');}catch{text.select();toast('Selecciona y copia el texto.','info');}},'primary'));
  dialog.append(el('p','Resumen interno con lo registrado y lo pendiente. No contiene conclusiones técnicas nuevas.','adio-note'),text,actions);setTimeout(()=>text.focus({preventScroll:true}),30);}
+// 1.5.267 · ADI Premium Smart Bar 5.0: barra compacta (≈56 px) con Adi, el contador de pendientes y la recomendación más importante; al
+// pulsarla se despliega el cajón con las cinco herramientas y las recomendaciones en filas compactas (referencia real, valor registrado y
+// acción). Contraída por defecto salvo que haya algo crítico verificable; recuerda la preferencia de quien la usa y nunca se abre sola al
+// actualizarse. El rojo solo marca lo crítico (repuesto vencido o con incidencia, saldo que impide entregar un equipo listo).
+const ADIO_PREF='adio-expanded';
+const adioPref=()=>{try{return localStorage.getItem(ADIO_PREF);}catch{return null;}};
+const adioSavePref=open=>{try{localStorage.setItem(ADIO_PREF,open?'1':'0');}catch{}};
+const ADIO_SEVERITY={critica:'Crítica',alta:'Prioridad alta',media:'Pendiente',info:'Informativa'};
 function adiOrderPanel(order,partAction){
- const card=el('section',undefined,'workspace-section adio-panel');card.setAttribute('aria-labelledby','adio-panel-title');
- const head=el('header',undefined,'adio-head'),mark=el('span',undefined,'adio-mark');mark.append(systemIcon(adiSpark));const titles=el('div',undefined,'adio-titles'),h=el('h2','Adi — Asistencia inteligente');h.id='adio-panel-title';
- titles.append(h,el('small','Sugerencias con los datos registrados de la orden. Nada se modifica ni se envía solo.'));const counts=el('div',undefined,'adio-counts');head.append(mark,titles,counts);
- const tools=el('div',undefined,'adio-tools');tools.setAttribute('role','toolbar');tools.setAttribute('aria-label','Acciones de ADI');
- const body=el('div',undefined,'adio-body'),extra=el('div',undefined,'adio-extra');extra.hidden=true;card.append(head,tools,body,extra);let data=null,loading=false;
+ const card=el('section',undefined,'workspace-section adio-panel adio-bar');card.setAttribute('aria-labelledby','adio-panel-title');
+ const drawerId='adio-drawer-'+order.id,toggle=el('button',undefined,'adio-bar-toggle');toggle.type='button';toggle.setAttribute('aria-controls',drawerId);toggle.setAttribute('aria-expanded','false');
+ const mark=el('span',undefined,'adio-mark');mark.append(systemIcon(adiSpark));const titles=el('span',undefined,'adio-titles'),h=el('strong','Adi');h.id='adio-panel-title';titles.append(h,el('small','Asistencia inteligente'));
+ const badge=el('span','0','adio-badge');badge.setAttribute('aria-hidden','true');const summary=el('span','ADI está revisando la orden…','adio-summary');const live=el('span','','sr-only');live.setAttribute('aria-live','polite');
+ const chev=el('span',undefined,'adio-chev');chev.append(systemIcon('m6 9 6 6 6-6'));toggle.append(mark,titles,badge,summary,chev);
+ const drawer=el('div',undefined,'adio-drawer');drawer.id=drawerId;drawer.setAttribute('role','region');drawer.setAttribute('aria-labelledby','adio-panel-title');const inner=el('div',undefined,'adio-drawer-inner'),pad=el('div',undefined,'adio-drawer-pad');inner.append(pad);drawer.append(inner);
+ const tools=el('div',undefined,'adio-tools');tools.setAttribute('role','toolbar');tools.setAttribute('aria-label','Herramientas de ADI');
+ const body=el('div',undefined,'adio-body'),extra=el('div',undefined,'adio-extra');extra.hidden=true;pad.append(tools,extra,body,el('p','Sugerencias con los datos registrados de la orden. Nada se modifica ni se envía solo.','adio-foot'));
+ card.append(toggle,live,drawer);let data=null,loading=false,expanded=false,seen=null;
+ const setOpen=(open,remember)=>{expanded=open;card.dataset.expanded=String(open);toggle.setAttribute('aria-expanded',String(open));drawer.inert=!open;if(remember)adioSavePref(open);};
+ toggle.addEventListener('click',()=>setOpen(!expanded,true));
+ drawer.addEventListener('keydown',event=>{if(event.key==='Escape'&&expanded&&!event.defaultPrevented){event.stopPropagation();setOpen(false,true);toggle.focus();}});
  const tool=(label,icon,run)=>{const b=button('',run,'adio-tool');b.append(systemIcon(icon),el('span',label));tools.append(b);return b;};
  const section=sel=>adiScroll(document.querySelector(sel));
  const goTo=(rec)=>{const t=rec.target;
-  if(t==='parts'){const id=+(rec.key.match(/(\d+)$/)||[])[1];if(rec.button==='Generar mensaje'&&id){partAction(id);return;}if(id){partAction(id);return;}section('.opr');return;}
+  if(t==='parts'){const id=+(rec.key.match(/(\d+)$/)||[])[1];if(id){partAction(id);return;}section('.opr');return;}
   if(t==='quote'){if(rec.button==='Generar mensaje'){statusMessageDialog(order);return;}section('.budget-module')||section('.budget-panels');return;}
   if(t==='messages'){statusMessageDialog(order);return;}if(t==='payments'){showPayments(true);return;}
   if(t==='followups'){if(rec.button==='Registrar seguimiento'&&['administrador','tecnico'].includes(currentUser?.role)){addOrderFollowUp(order.id);return;}section('#order-history');return;}
@@ -2985,7 +3000,7 @@ function adiOrderPanel(order,partAction){
  const payTool=tool('Consultar pagos',ADI_ICONS.wallet,()=>showPayments(false));payTool.setAttribute('aria-expanded','false');payTool.setAttribute('aria-controls','adio-extra-'+order.id);extra.id='adio-extra-'+order.id;
  tool('Ver seguimiento',ADI_ICONS.route,()=>section('#order-history')||section('.order-progress-box'));
  tool('Preparar informe',ADI_ICONS.report,()=>adiReportDialog(order));
- function showPayments(force){const open=force||extra.hidden;extra.hidden=!open;payTool.setAttribute('aria-expanded',String(open));if(!open||!data)return;const p=data.payments;extra.replaceChildren();
+ function showPayments(force){if(!expanded)setOpen(true,false);const open=force||extra.hidden;extra.hidden=!open;payTool.setAttribute('aria-expanded',String(open));if(!open||!data)return;const p=data.payments;extra.replaceChildren();
   const top=el('div',undefined,'adio-pay-head');top.append(systemIcon(ADI_ICONS.wallet),el('strong','Pagos de la orden'),el('span',p.state_label||'Sin cargos registrados','adio-pay-state'));top.lastChild.dataset.state=p.state;extra.append(top);
   const dl=el('dl',undefined,'adio-values');for(const[k,v]of [['Total',p.total],['Pagado',p.paid],['Saldo pendiente',p.balance]]){const d=el('div');d.append(el('dt',k),el('dd',v));dl.append(d);}extra.append(dl);
   if(p.order)extra.append(el('p','Orden completa (todos los equipos): total '+p.order.total+' · pagado '+p.order.paid+' · saldo '+p.order.balance+'.','adio-note'));
@@ -2993,23 +3008,34 @@ function adiOrderPanel(order,partAction){
   if(p.movements.length){const ul=el('ul',undefined,'adio-moves');for(const m of p.movements){const li=el('li');li.append(el('span',m.date),el('strong',(m.kind==='devolucion'?'− ':'')+m.amount),el('span',[m.method,m.receipt].filter(Boolean).join(' · ')));if(m.pending)li.append(el('em','Por confirmar'));ul.append(li);}extra.append(ul);}
   else extra.append(el('p','No hay pagos registrados.','adio-note'));
   extra.append(el('p',p.note+' Sin fecha de vencimiento registrada.','adio-note'));
-  const acts=el('div',undefined,'adio-pay-actions'),toPay=button('Ir a Pagos',()=>section('.equip-pay'),'secondary');acts.append(toPay);if(p.balance_cents>0){const rem=button('Preparar recordatorio de pago',()=>adiPaymentDialog(order),'primary');rem.prepend(systemIcon(adiSpark));acts.append(rem);}extra.append(acts);
-  if(force)adiScroll(extra);}
- function recItem(r){const li=el('li',undefined,'adio-rec');li.dataset.priority=r.priority;const ic=el('span',undefined,'adio-rec-ic');ic.append(systemIcon(ADI_ICONS[r.icon]||adiSpark));
-  const txt=el('div',undefined,'adio-rec-text');txt.append(el('strong',r.title),el('p',r.reason,'adio-rec-reason'),el('p',r.action,'adio-rec-action'));const acts=el('div',undefined,'adio-rec-acts');
-  if(r.button){const b=button(r.button,()=>goTo(r),'secondary');acts.append(b);}
+  const acts=el('div',undefined,'adio-pay-actions'),toPay=button('Ir a Pagos',()=>section('.equip-pay'),'secondary');acts.append(toPay);if(p.balance_cents>0){const rem=button('Preparar recordatorio de pago',()=>adiPaymentDialog(order),'primary');rem.prepend(systemIcon(adiSpark));acts.append(rem);}extra.append(acts);}
+ // Fila compacta: icono, título y descripción breve, referencia real y valor registrado, acción contextual; el detalle se despliega en la fila.
+ function recItem(r,fresh){const li=el('li',undefined,'adio-rec');li.dataset.priority=r.priority;li.dataset.severity=r.severity||r.priority;if(fresh)li.dataset.fresh='true';
+  const ic=el('span',undefined,'adio-rec-ic');ic.append(systemIcon(ADI_ICONS[r.icon]||adiSpark));const sev=el('span',ADIO_SEVERITY[r.severity||r.priority]||r.priority_label,'adio-sev');
+  const txt=el('div',undefined,'adio-rec-text'),more=el('button',undefined,'adio-rec-title');more.type='button';more.setAttribute('aria-expanded','false');more.append(el('strong',r.title),sev);
+  const reason=el('p',r.reason,'adio-rec-reason'),detail=el('p',r.action,'adio-rec-action');detail.hidden=true;detail.id='adio-d-'+order.id+'-'+r.key;more.setAttribute('aria-controls',detail.id);
+  more.addEventListener('click',()=>{const open=detail.hidden;detail.hidden=!open;more.setAttribute('aria-expanded',String(open));li.dataset.open=String(open);});
+  const meta=el('div',undefined,'adio-rec-meta');if(r.ref)meta.append(el('span',r.ref,'adio-ref'));if(r.value)meta.append(el('span',r.value,'adio-val'));txt.append(more,reason,detail);if(meta.childElementCount)txt.append(meta);
+  const acts=el('div',undefined,'adio-rec-acts');if(r.button){const b=button(r.button,()=>goTo(r),'secondary');acts.append(b);}
   if(r.dismissible){const x=button('',async()=>{x.disabled=true;try{data=await api('/api/orders/'+order.id+'/adi',{action:'dismiss',key:r.key,fingerprint:r.fingerprint});paint();toast('Recomendación descartada. Volverá a mostrarse si cambian sus datos.','info');}catch(error){x.disabled=false;toast(error.message,'error');}},'adio-dismiss');x.append(systemIcon(ADI_ICONS.x));x.setAttribute('aria-label','Descartar «'+r.title+'»');x.title='Descartar (solo informativa)';acts.append(x);}
   li.append(ic,txt,acts);return li;}
- function paint(){counts.replaceChildren();body.replaceChildren();if(!data)return;
-  for(const g of data.groups){if(!g.count)continue;const chip=el('span',String(g.count),'adio-count');chip.dataset.priority=g.priority;chip.title=g.label;chip.setAttribute('aria-label',g.count+' '+g.label.toLowerCase());counts.append(chip);}
-  if(!data.recommendations.length){const ok=el('p',undefined,'adio-empty');ok.append(systemIcon(ADI_ICONS.ok),el('span','Sin pendientes según los datos registrados de la orden.'));body.append(ok);}
-  else for(const g of data.groups){if(!g.count)continue;const grp=el('div',undefined,'adio-group');grp.dataset.priority=g.priority;grp.append(el('h3',g.label+' · '+g.count));const ul=el('ul');for(const r of data.recommendations.filter(x=>x.priority===g.priority))ul.append(recItem(r));grp.append(ul);body.append(grp);}
+ function paint(){body.replaceChildren();if(!data)return;const recs=data.recommendations,total=recs.length,top=recs[0],crit=data.critical||0;
+  const keys=new Set(recs.map(r=>r.key+':'+r.fingerprint)),fresh=seen?recs.filter(r=>!seen.has(r.key+':'+r.fingerprint)):[];
+  const before=badge.textContent;badge.textContent=String(total);badge.dataset.tone=crit?'critica':recs.some(r=>r.priority==='alta')?'alta':total?'media':'ok';badge.hidden=!total;
+  card.dataset.tone=badge.dataset.tone;summary.replaceChildren();if(!total){summary.append(el('span','Sin pendientes según los datos registrados de la orden.','adio-sum-ok'));}else{summary.append(el('b',top.title));const ref=[top.ref,top.value].filter(Boolean).join(' · ');if(ref)summary.append(el('span',ref,'adio-sum-ref'));if(total>1)summary.append(el('span','+'+(total-1)+' más','adio-sum-more'));}
+  toggle.setAttribute('aria-label','Adi, asistencia inteligente: '+(total?total+(total===1?' acción pendiente':' acciones pendientes')+(crit?', '+crit+(crit===1?' crítica':' críticas'):'')+'. Más importante: '+top.title:'sin pendientes')+'. '+(expanded?'Contraer':'Desplegar')+' el panel.');
+  // Novedad: el contador y el icono reaccionan una sola vez, sin abrir el panel ni mover la página.
+  if(seen&&(fresh.length||before!==String(total))){for(const node of [badge,mark]){node.classList.remove('adio-bump');void node.offsetWidth;node.classList.add('adio-bump');}if(fresh.length)live.textContent='ADI: '+fresh.length+(fresh.length===1?' recomendación nueva':' recomendaciones nuevas')+'.';}
+  if(!total){const ok=el('p',undefined,'adio-empty');ok.append(systemIcon(ADI_ICONS.ok),el('span','Sin pendientes según los datos registrados de la orden.'));body.append(ok);}
+  else{const ul=el('ul',undefined,'adio-list');ul.setAttribute('aria-label','Recomendaciones de ADI');const fk=new Set(fresh.map(r=>r.key));for(const r of recs)ul.append(recItem(r,fk.has(r.key)));body.append(ul);}
   if(data.dismissed){const again=button('Mostrar descartadas ('+data.dismissed+')',async()=>{try{data=await api('/api/orders/'+order.id+'/adi',{action:'restore'});paint();}catch(error){toast(error.message,'error');}},'text-action adio-restore');body.append(again);}
-  if(!extra.hidden)showPayments(true);}
- async function load(announce){if(loading)return;loading=true;card.setAttribute('aria-busy','true');try{const next=await api('/api/orders/'+order.id+'/adi');const changed=!data||next.signature!==data.signature||next.dismissed!==data.dismissed;data=next;if(changed||announce)paint();
-   if(announce)toast(data.recommendations.length?data.recommendations.length+(data.recommendations.length===1?' pendiente':' pendientes')+' según los datos registrados.':'Sin pendientes según los datos registrados.','info',undefined,{title:'ADI revisó la orden',id:'adi-review'});}
-  catch(error){if(!data){body.replaceChildren(el('p',error.message,'adio-empty'));}}finally{loading=false;card.removeAttribute('aria-busy');}}
- body.append(el('p','ADI está revisando la orden…','adio-empty'));load(false);card.refresh=()=>load(false);return card;}
+  seen=keys;if(!extra.hidden)showPayments(true);}
+ async function load(announce){if(loading)return;loading=true;card.setAttribute('aria-busy','true');try{const next=await api('/api/orders/'+order.id+'/adi');const changed=!data||next.signature!==data.signature||next.dismissed!==data.dismissed;const first=!data;data=next;
+   if(first){const pref=adioPref();setOpen(pref===null?(data.critical||0)>0:pref==='1',false);}
+   if(changed||announce)paint();
+   if(announce){if(!expanded)setOpen(true,false);toast(data.recommendations.length?data.recommendations.length+(data.recommendations.length===1?' pendiente':' pendientes')+' según los datos registrados.':'Sin pendientes según los datos registrados.','info',undefined,{title:'ADI revisó la orden',id:'adi-review'});}}
+  catch(error){if(!data){summary.textContent=error.message;body.replaceChildren(el('p',error.message,'adio-empty'));}}finally{loading=false;card.removeAttribute('aria-busy');}}
+ setOpen(false,false);body.append(el('p','ADI está revisando la orden…','adio-empty'));load(false);card.refresh=()=>load(false);return card;}
 const orderSectionGlyphs={'Datos del cliente':'user','Datos del equipo':'laptop','Motivo de ingreso':'wrench','Nota interna':'doc','Seguimiento':'clock','Presupuesto':'sliders'};
 // Icono del equipo según el tipo guardado en la orden (nunca al azar): el mismo tipo muestra siempre el mismo icono en recepción, listado y detalle.
 const deviceGlyphs={mouse:'M12 2a7 7 0 0 0-7 7v6a7 7 0 0 0 14 0V9a7 7 0 0 0-7-7z M12 6v4',keyboard:'M4 5h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z M6 9h.01 M10 9h.01 M14 9h.01 M18 9h.01 M8 13h.01 M12 13h.01 M16 13h.01 M7 16h10',drive:'M22 12H2 M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z M6 16h.01 M10 16h.01',tablet:'M6 2h12a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z M12 18h.01',phone:'M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z M12 18h.01',router:'M4 14h16a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2z M6.01 18H6 M10.01 18H10 M15 10v4 M17.84 7.17a4 4 0 0 0-5.66 0 M20.66 4.34a8 8 0 0 0-11.31 0',server:'M4 2h16a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z M4 14h16a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2z M6 6h.01 M6 18h.01',laptop:'M20 16V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v9m16 0H4m16 0 1.28 2.55a1 1 0 0 1-.9 1.45H3.62a1 1 0 0 1-.9-1.45L4 16',desktop:'M2 4h12v9H2z M5 17h6 M8 13v4 M18 4h4v16h-4z M20 8h.01 M20 12h.01',monitor:'M2 3h20v14H2z M8 21h8 M12 17v4',mini:'M9 2v2 M15 2v2 M9 20v2 M15 20v2 M2 9h2 M2 15h2 M20 9h2 M20 15h2 M6 4h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z M9 9h6v6H9z',printer:'M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2 M6 9V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v6 M6 14h12v8H6z',gamepad:'M6 11h4 M8 9v4 M15 12h.01 M18 10h.01 M17.32 5H6.68a4 4 0 0 0-3.978 3.59c-.006.052-.01.101-.017.152C2.604 9.416 2 14.456 2 16a3 3 0 0 0 3 3c1 0 1.5-.5 2-1l1.414-1.414A2 2 0 0 1 9.828 16h4.344a2 2 0 0 1 1.414.586L17 18c.5.5 1 1 2 1a3 3 0 0 0 3-3c0-1.545-.604-6.584-.685-7.258-.007-.05-.011-.1-.017-.151A4 4 0 0 0 17.32 5z',gaming:'M20 16V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v9m16 0H4m16 0 1.28 2.55a1 1 0 0 1-.9 1.45H3.62a1 1 0 0 1-.9-1.45L4 16 M12.5 7.5 10 11h4l-2.5 3.5',generic:'M3 3h18v18H3z M11 9h4a2 2 0 0 0 2-2V3 M9 9a2 2 0 1 0 0-4 2 2 0 0 0 0 4z M7 21v-4a2 2 0 0 1 2-2h4 M15 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4z'};

@@ -101,9 +101,12 @@ def context(c, oid):
 
 # ---- Recomendaciones ---------------------------------------------------------------------------------------------------------------------
 
-def _rec(key, priority, icon, title, reason, action, target, fingerprint, button='', dismissible=None):
+def _rec(key, priority, icon, title, reason, action, target, fingerprint, button='', dismissible=None, ref='', value='', critical=False):
+    """ref y value (1.5.267, Smart Bar): referencia real (orden, presupuesto o repuesto) y valor registrado. critical: solo lo que bloquea o ya
+    venció según un dato registrado (repuesto con fecha vencida o incidencia, saldo que impide entregar un equipo listo); el rojo es para eso."""
     return {'key': key, 'priority': priority, 'priority_label': PRIORITY_LABELS[priority], 'icon': icon, 'title': title, 'reason': reason, 'action': action,
-            'target': target, 'button': button, 'fingerprint': fingerprint, 'dismissible': priority == 'info' if dismissible is None else dismissible}
+            'target': target, 'button': button, 'fingerprint': fingerprint, 'dismissible': priority == 'info' if dismissible is None else dismissible,
+            'ref': ref, 'value': value, 'severity': 'critica' if critical else priority}
 
 
 def recommendations(ctx, now=None):
@@ -116,23 +119,24 @@ def recommendations(ctx, now=None):
     if status in ('pendiente', 'diagnostico') and not ctx['findings'] and not ctx['diagnosis_followups']:
         out.append(_rec('diagnostico', 'media', 'scan-search', 'Diagnóstico técnico pendiente',
                         'La orden está en «%s»%s y no tiene un diagnóstico registrado.' % (ctx['status_label'], ' desde el ' + since if since else ''),
-                        'Registrar el diagnóstico en un seguimiento técnico antes de informar al cliente.', 'followups', _fp(status, since), 'Registrar seguimiento'))
+                        'Registrar el diagnóstico en un seguimiento técnico antes de informar al cliente.', 'followups', _fp(status, since), 'Registrar seguimiento', ref=ctx['code']))
     # Presupuesto
     if quote and quote['status'] == 'borrador' and not delivered:
         out.append(_rec('presupuesto_borrador', 'media', 'file-pen', 'Presupuesto en borrador sin enviar',
                         'El presupuesto %s está en borrador por %s.' % (quote['code'], usd(quote['quoted_cents'])),
-                        'Revisarlo y enviarlo al cliente para su aprobación.', 'quote', _fp(quote['id'], quote['status'], quote['quoted_cents']), 'Abrir presupuesto'))
+                        'Revisarlo y enviarlo al cliente para su aprobación.', 'quote', _fp(quote['id'], quote['status'], quote['quoted_cents']), 'Abrir presupuesto',
+                        ref=quote['code'], value=usd(quote['quoted_cents'])))
     if quote and quote['status'] in ('enviado', 'modificacion') and not delivered:
         what = 'pidió una revisión del' if quote['status'] == 'modificacion' else 'no ha aprobado el'
         out.append(_rec('presupuesto_aprobacion', 'alta', 'clipboard-list', 'Presupuesto pendiente de aprobación',
                         'El cliente %s presupuesto %s (%s)%s.' % (what, quote['code'], usd(quote['quoted_cents']), ', enviado el ' + _day(quote['sent_at']) if quote['sent_at'] else ''),
                         'Solicitar la aprobación con el diagnóstico y el valor registrado. Todavía no corresponde informar que la reparación está terminada.',
-                        'quote', _fp(quote['id'], quote['status'], quote['sent_at']), 'Generar mensaje'))
+                        'quote', _fp(quote['id'], quote['status'], quote['sent_at']), 'Generar mensaje', ref=quote['code'], value=usd(quote['quoted_cents'])))
     # Cliente pendiente de respuesta
     if status == 'esperando_cliente':
         out.append(_rec('respuesta_cliente', 'alta', 'message-square', 'Cliente pendiente de respuesta',
                         'La orden espera una respuesta del cliente%s.' % (' desde el ' + since if since else ''),
-                        'Contactar al cliente para obtener la confirmación o la información pendiente.', 'messages', _fp(status, since), 'Generar mensaje'))
+                        'Contactar al cliente para obtener la confirmación o la información pendiente.', 'messages', _fp(status, since), 'Generar mensaje', ref=ctx['code']))
     # Repuestos
     for p in parts:
         if p['situation'] == 'cancelado':
@@ -148,20 +152,21 @@ def recommendations(ctx, now=None):
             out.append(_rec('repuesto_%d' % p['id'], 'alta' if late or p['situation'] in ('retrasado', 'incidencia_transporte') else 'media', 'package',
                             'Repuesto solicitado sin recepción', reason,
                             'Confirmar con el proveedor y actualizar la etapa cuando haya un avance real.', 'parts',
-                            _fp(p['id'], p['step'], p['situation'], p['eta'], late), 'Ver repuesto'))
+                            _fp(p['id'], p['step'], p['situation'], p['eta'], late), 'Ver repuesto', ref=p['name'],
+                            critical=late or p['situation'] in ('retrasado', 'incidencia_transporte')))
         elif p['stage'] == 'recibido':
             out.append(_rec('repuesto_instalar_%d' % p['id'], 'media', 'package-check', 'Repuesto recibido: instalación pendiente',
                             'El repuesto «%s» figura como recibido en el taller.' % p['name'], 'Registrar la instalación cuando comience.', 'parts',
-                            _fp(p['id'], p['step']), 'Ver repuesto'))
+                            _fp(p['id'], p['step']), 'Ver repuesto', ref=p['name']))
         if not p['notified'] and p['stage'] != 'solicitado' and not delivered:
             out.append(_rec('repuesto_aviso_%d' % p['id'], 'info', 'send', 'Avance del repuesto sin comunicar',
                             'La etapa «%s» del repuesto «%s» no tiene un aviso enviado al cliente después del cambio.' % (p['step_label'], p['name']),
-                            'Informar el avance al cliente si corresponde.', 'parts', _fp(p['id'], p['step'], p['changed_at']), 'Generar mensaje'))
+                            'Informar el avance al cliente si corresponde.', 'parts', _fp(p['id'], p['step'], p['changed_at']), 'Generar mensaje', ref=p['name']))
     # Reparación en curso
     if status in ('reparacion', 'revision_recurrente'):
         out.append(_rec('reparacion', 'info', 'wrench', 'Reparación pendiente de finalizar',
                         'La orden está en «%s»%s.' % (ctx['status_label'], ' desde el ' + since if since else ''),
-                        'Registrar las pruebas o el cierre técnico cuando terminen los trabajos.', 'followups', _fp(status, since), 'Registrar seguimiento'))
+                        'Registrar las pruebas o el cierre técnico cuando terminen los trabajos.', 'followups', _fp(status, since), 'Registrar seguimiento', ref=ctx['code']))
     # Pagos
     balance = money.get('balance_cents', 0)
     if balance > 0 and not delivered:
@@ -170,29 +175,30 @@ def recommendations(ctx, now=None):
                         'Total %s · pagado %s · saldo %s.' % (usd(money['budget_cents']), usd(money['paid_cents']), usd(balance))
                         + (' El equipo está listo: la entrega requiere registrar el pago.' if ready else ''),
                         'Informar el saldo al cliente. El pago se registra solo al recibirlo, desde Pagos.', 'payments',
-                        _fp(money['budget_cents'], money['paid_cents'], status in ('listo', 'espera_entrega')), 'Consultar pagos'))
+                        _fp(money['budget_cents'], money['paid_cents'], status in ('listo', 'espera_entrega')), 'Consultar pagos', ref=ctx['code'], value=usd(balance),
+                        critical=ready))
     if ctx['pending_transfers']['count']:
         out.append(_rec('transferencias', 'media', 'landmark', 'Transferencias por confirmar',
                         '%d transferencia(s) o depósito(s) por %s aún sin confirmar en Caja.' % (ctx['pending_transfers']['count'], usd(ctx['pending_transfers']['cents'])),
                         'Confirmar en Caja → transferencias que el dinero llegó a la cuenta.', 'payments',
-                        _fp(ctx['pending_transfers']['count'], ctx['pending_transfers']['cents']), 'Consultar pagos'))
+                        _fp(ctx['pending_transfers']['count'], ctx['pending_transfers']['cents']), 'Consultar pagos', ref=ctx['code'], value=usd(ctx['pending_transfers']['cents'])))
     # Listo para entrega
     if status in ('listo', 'espera_entrega'):
         told = ctx['last_message'] and ctx['status_since'] and str(ctx['last_message']['created_at']) >= str(ctx['status_since'])
         out.append(_rec('entrega', 'media' if not told else 'info', 'package-check', 'Equipo listo para entrega',
                         'La orden está en «%s»%s%s.' % (ctx['status_label'], ' desde el ' + since if since else '',
                                                         '; ya se comunicó al cliente el ' + _day(ctx['last_message']['created_at']) if told else '; no hay un mensaje al cliente después de ese cambio'),
-                        'Coordinar el retiro con el cliente' + (' y el pago del saldo.' if balance > 0 else '.'), 'messages', _fp(status, since, bool(told)), 'Generar mensaje'))
+                        'Coordinar el retiro con el cliente' + (' y el pago del saldo.' if balance > 0 else '.'), 'messages', _fp(status, since, bool(told)), 'Generar mensaje', ref=ctx['code']))
     # Documentación
     if not ctx['terms_accepted'] and not delivered:
         out.append(_rec('condiciones', 'info', 'file-check', 'Condiciones del servicio sin aceptación registrada',
                         'La orden no tiene una aceptación de las condiciones del servicio registrada.',
-                        'Compartir las condiciones con el cliente. ADI no registra aceptaciones.', 'terms', _fp(ctx['terms_accepted']), 'Ver condiciones'))
+                        'Compartir las condiciones con el cliente. ADI no registra aceptaciones.', 'terms', _fp(ctx['terms_accepted']), 'Ver condiciones', ref=ctx['code']))
     if not ctx['photos'].get('recepcion') and status in ('pendiente', 'diagnostico'):
         out.append(_rec('fotos_recepcion', 'info', 'camera', 'Sin fotos de recepción',
                         'La orden no tiene fotografías de la categoría «Recepción».',
-                        'Agregar fotos del estado en que se recibió el equipo.', 'photos', _fp(sorted(ctx['photos'].items())), 'Ver fotos'))
-    out.sort(key=lambda r: PRIORITIES.index(r['priority']))
+                        'Agregar fotos del estado en que se recibió el equipo.', 'photos', _fp(sorted(ctx['photos'].items())), 'Ver fotos', ref=ctx['code']))
+    out.sort(key=lambda r: (r['severity'] != 'critica', PRIORITIES.index(r['priority'])))
     return out
 
 
@@ -388,4 +394,5 @@ def panel(c, oid, user, now=None):
     visible = [r for r in recs if (r['key'], r['fingerprint']) not in hidden]
     return {'code': ctx['code'], 'status': ctx['status'], 'status_label': ctx['status_label'], 'recommendations': visible,
             'dismissed': len(recs) - len(visible), 'payments': payments_summary(ctx), 'signature': _fp([(r['key'], r['fingerprint']) for r in recs]),
-            'groups': [{'priority': p, 'label': PRIORITY_LABELS[p], 'count': sum(1 for r in visible if r['priority'] == p)} for p in PRIORITIES]}
+            'groups': [{'priority': p, 'label': PRIORITY_LABELS[p], 'count': sum(1 for r in visible if r['priority'] == p)} for p in PRIORITIES],
+            'critical': sum(1 for r in visible if r['severity'] == 'critica')}

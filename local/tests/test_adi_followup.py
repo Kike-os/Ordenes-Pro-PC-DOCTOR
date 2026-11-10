@@ -206,6 +206,25 @@ class SmartFollowUpTests(unittest.TestCase):
         self.assertTrue([w for w in got['warnings'] if 'reemplazamos' in w.lower()], got['warnings'])
 
 
+    # ---- Smart Bar 5.0: referencia, valor y severidad verificable ------------------------------------------------------------------
+    def test_smart_bar_rows_carry_reference_value_and_only_verified_criticals(self):
+        oid, order = self.order(10500)
+        cookie, csrf = self.login()
+        panel = lambda: self.request('/api/orders/%d/adi' % oid, cookie=cookie)['body']
+        self.set_status(oid, 'reparacion', findings='Disco dañado (ficticio)')
+        data = panel()
+        saldo = next(r for r in data['recommendations'] if r['key'] == 'saldo')
+        self.assertEqual((saldo['ref'], saldo['value'], saldo['severity']), (order['code'], '$105,00', 'media'))
+        self.assertEqual(data['critical'], 0)
+        self.assertFalse([r for r in data['recommendations'] if r['severity'] == 'critica'])
+        # Listo con saldo: la entrega queda bloqueada por un dato registrado → crítica (y primera).
+        self.set_status(oid, 'listo')
+        data = panel()
+        self.assertEqual((data['recommendations'][0]['key'], data['recommendations'][0]['severity'], data['critical']), ('saldo', 'critica', 1))
+        self.pay(oid, '105,00')
+        self.assertEqual(panel()['critical'], 0)
+
+
 class ReadyPhraseTests(unittest.TestCase):
     def test_future_ready_phrase_is_not_a_claim(self):
         import adi_order
