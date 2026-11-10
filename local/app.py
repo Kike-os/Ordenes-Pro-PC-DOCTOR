@@ -2674,9 +2674,23 @@ class Handler(BaseHTTPRequestHandler):
                 category=query.get('category',[''])[0]
                 logos={f.stem:f.name for f in sorted((ROOT/'static'/'brands').glob('*')) if f.suffix in ('.svg','.png') and re.fullmatch(r'[a-z0-9]+(?:-[a-z0-9]+)*',f.stem)}
                 names={name.lower() for name,*_ in quotes.INITIAL}|{name.lower() for name,*_ in quotes.ADDITIONS};present={r['name'].lower() for r in c.execute('SELECT name FROM catalog_items')}
-                return self.reply(200,{'rows':quotes.catalog(c,query.get('q',[''])[0][:80],query.get('all',[''])[0]!='1',category if category in quotes.CATEGORIES else ''),'categories':quotes.CATEGORIES,'price_modes':quotes.PRICE_MODES,
+                catalog_rows=quotes.catalog(c,query.get('q',[''])[0][:80],query.get('all',[''])[0]!='1',category if category in quotes.CATEGORIES else '')
+                if query.get('all',[''])[0]=='1':
+                    # 1.5.268: archivado (fuera del catálogo operativo) y referencias que impiden eliminarlo, para filtrar y avisar en la lista.
+                    import catalog_cleanup
+                    gone,refs=catalog_cleanup.archived_ids(c),catalog_cleanup.reference_counts(c)
+                    here={r[0] for r in c.execute("SELECT id FROM catalog_items WHERE COALESCE(archived_at,'')!=''")}
+                    for row in catalog_rows:row['archived']=row['id'] in gone;row['archived_here']=row['id'] in here;row['refs']=refs.get(row['id'],0)
+                    catalog_rows=[r for r in catalog_rows if not r['archived'] or user['role']=='administrador']
+                else:
+                    import catalog_cleanup
+                    gone=catalog_cleanup.archived_ids(c);catalog_rows=[r for r in catalog_rows if r['id'] not in gone]
+                return self.reply(200,{'rows':catalog_rows,'categories':quotes.CATEGORIES,'price_modes':quotes.PRICE_MODES,
                     'tax_rate_bp':quotes.tax_rate(c),'link_days':quotes.link_days(c),'can_edit':user['role']=='administrador','brand_logos':logos,'initial_missing':len(names-present),'icons':quotes.catalog_icons.catalog(),
                     'priorities':{key:{'label':label,'color':color} for key,(label,color,_) in quotes.PRIORITIES.items()},'license_stock':licenses.stock(c,reception_now())})
+            if path=='/api/catalog/removals':
+                if user['role']!='administrador':return self.reply(403,{'error':'Acceso no permitido.'})
+                return self.reply(200,{'rows':__import__('catalog_cleanup').history(c)})
             catalog_extra=re.fullmatch(r'/api/catalog/([0-9]{1,9})/(image|history)',path)
             if catalog_extra:
                 if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
@@ -4717,6 +4731,17 @@ class Handler(BaseHTTPRequestHandler):
                         result=quotes.seed_initial(c,user,reception_now());extra=quotes.seed_additions(c,user,reception_now());thermal=quotes.seed_thermal(c,user,reception_now());more=quotes.seed_batch(c,quotes.FORMAT_BACKUP,user,reception_now());thermal={key:thermal[key]+more[key] for key in ('created','existing','total')};extra={**extra,'created':extra['created']+thermal['created'],'existing':extra['existing']+thermal['existing'],'total':extra['total']+thermal['total']};audit(c,user['id'],'catalog_seeded')
                         return self.reply(200,{'ok':True,'created':result['created']+extra['created'],'updated':extra['updated'],'existing':result['existing']+extra['existing'],'total':result['total']+extra['total']})
                     except quotes.QuoteError as error:return self.reply(error.status,{'error':str(error),'fields':error.fields})
+                if path=='/api/catalog/cleanup':
+                    # 1.5.268 · Limpieza segura: revisión individual de cada producto; solo se elimina lo inactivo y sin referencias.
+                    import catalog_cleanup
+                    if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede eliminar o archivar productos del catálogo.'})
+                    try:
+                        if data.get('action')=='review':return self.reply(200,catalog_cleanup.review(c,data.get('ids')))
+                        if limited(c,'catalog-cleanup:'+str(user['id']),limit=60,window=3600):return self.reply(429,{'error':'Demasiadas operaciones. Intenta más tarde.'})
+                        c.commit();c.execute('BEGIN IMMEDIATE')
+                        result=catalog_cleanup.apply(c,data,user,reception_now(),audit);c.commit()
+                        return self.reply(200,result)
+                    except catalog_cleanup.CleanupError as error:return self.reply(error.status,{'error':str(error)})
                 if path in ('/api/catalog','/api/catalog/tax'):
                     # Catálogo de servicios y productos: solo administración. Cambiar un precio no altera los presupuestos ya emitidos.
                     if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede modificar el catálogo.'})
@@ -4726,6 +4751,8 @@ class Handler(BaseHTTPRequestHandler):
                                 days=quotes.set_link_days(c,data.get('link_days',''));audit(c,user['id'],'quote_link_days_updated');return self.reply(200,{'ok':True,'link_days':days})
                             rate=quotes.set_tax_rate(c,data.get('tax',''));audit(c,user['id'],'quote_tax_updated');return self.reply(200,{'ok':True,'tax_rate_bp':rate})
                         item=quotes.save_catalog_item(c,data,user,reception_now());audit(c,user['id'],'catalog_item_saved',item)
+                        # 1.5.268: activar un producto archivado desde el catálogo lo devuelve al catálogo operativo.
+                        c.execute("UPDATE catalog_items SET archived_at='',archived_by=NULL WHERE id=? AND available=1 AND COALESCE(archived_at,'')!=''",(item,))
                         return self.reply(200,{'ok':True,'id':item})
                     except quotes.QuoteError as error:return self.reply(error.status,{'error':str(error),'fields':error.fields})
                 quote_route=re.fullmatch(r'/api/(?:orders/([0-9]+)/quote|quotes/([0-9]+))',path)
