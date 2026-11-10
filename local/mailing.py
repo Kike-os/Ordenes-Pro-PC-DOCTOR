@@ -203,10 +203,43 @@ LABELS = {'receipt': 'Comprobante de recepción', 'client_authorization': 'Autor
 STATUS = {'preparado': 'Preparado', 'enviado': 'Enviado', 'error': 'Error de envío'}
 
 
+# 1.5.270 · Estado de entrega para el resumen de comunicaciones: sale SOLO de lo registrado (la copia archivada y su seguimiento por
+# destinatario, vinculado por archive_id; los rebotes ya llegan relacionados con el mensaje original por su Message-ID). Nada se deduce.
+DELIVERY = {'registrado': 'Registrado', 'servidor': 'Enviado al servidor', 'entregado': 'Entregado', 'fallido': 'Fallido', 'desconocido': 'Estado desconocido'}
+
+
+def delivery_state(archive_status, deliveries):
+    """(categoría, etiqueta) de un correo: registrado, enviado al servidor, entregado (con confirmación real), fallido o desconocido."""
+    states = [d['status'] for d in deliveries]
+    if 'rebotado' in states:
+        return 'fallido', 'Rebotado'
+    if 'fallido' in states or archive_status == 'error':
+        return 'fallido', 'Fallido'
+    if 'desconocido' in states:
+        return 'desconocido', DELIVERY['desconocido']
+    if 'demorado' in states:
+        return 'servidor', 'Entrega demorada'
+    if states and all(s == 'entregado' for s in states):
+        return 'entregado', DELIVERY['entregado']
+    if any(s in ('enviado', 'entregado', 'abierto') for s in states) or (archive_status == 'enviado' and not states):
+        return 'servidor', DELIVERY['servidor']
+    return 'registrado', DELIVERY['registrado']
+
+
 def history(c, order_id):
     """Correos de la orden, del más reciente al más antiguo. «Enviado» significa que el servidor de correo aceptó el mensaje."""
     rows = [dict(r) for r in c.execute('SELECT id,kind,recipient,subject,attachments,status,adi,detail,created_at,sent_at FROM mail_archive WHERE order_id=? ORDER BY id DESC LIMIT 100', (order_id,))]
+    found = {}
+    if rows:
+        try:
+            marks = ','.join('?' * len(rows))
+            for d in c.execute('SELECT archive_id,recipient,status,code,reason,event_at,updated_at FROM mail_deliveries WHERE archive_id IN (' + marks + ') ORDER BY id', [r['id'] for r in rows]):
+                found.setdefault(d['archive_id'], []).append({k: d[k] for k in ('recipient', 'status', 'code', 'reason', 'event_at', 'updated_at')})
+        except Exception:  # instalaciones sin seguimiento de entregas: se informa solo el estado de la copia archivada
+            found = {}
     for row in rows:
         row['kind_label'] = LABELS.get(row['kind'], 'Notificación')
         row['status_label'] = STATUS[row['status']]
+        row['deliveries'] = found.get(row['id'], [])
+        row['delivery'], row['delivery_label'] = delivery_state(row['status'], row['deliveries'])
     return rows

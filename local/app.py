@@ -1965,6 +1965,11 @@ class Handler(BaseHTTPRequestHandler):
                 result['reception']=__import__('reception_details').loads(result.get('reception_details'))
                 import mailing
                 result['mail_history']=mailing.history(c,result['id'])
+                # 1.5.270: mensajes de la orden por canales que no son correo (WhatsApp Business, WhatsApp manual, texto copiado), con su
+                # estado real. Los correos ya figuran en mail_history (su copia archivada): no se repiten aquí.
+                if user['role'] in ('administrador','tecnico'):
+                    import order_followups
+                    result['messages']=[dict(r,status_label=order_followups.message_label(r['channel'],r['status'])) for r in c.execute("SELECT id,channel,template,recipient,status,error,attempts,created_at,updated_at FROM order_messages WHERE order_id=? AND channel!='correo' ORDER BY id DESC LIMIT 100",(result['id'],))]
                 result['mail']=[dict(r) for r in c.execute('SELECT id,subject,correspondent,direction,sent_at,folder,uid FROM mail_links WHERE order_id=? ORDER BY id DESC LIMIT 30',(result['id'],))] if mail_allowed(user) else None
                 import repair_stages  # 1.5.252: las 6 etapas comunes (panel, cliente y hoja A4) y su huella de sincronización
                 result['repair_stages']=repair_stages.compute(c,result['id']);result['repair_signature']=repair_stages.signature(c,result['id'])
