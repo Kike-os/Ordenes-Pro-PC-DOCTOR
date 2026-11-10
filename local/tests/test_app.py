@@ -695,6 +695,10 @@ class SecurityTests(unittest.TestCase):
     def test_device_source_is_saved_and_same_device_is_not_duplicated(self):
         cookie,csrf=self.login();base={'client':'Prueba','problem':'Prueba','brand':'HP','model':'ProBook 440','serial':'5CD-1234'}
         first=self.request('/api/orders',self.order_data(dict(base,identity_source='historial',request_key='device-source-request-0001')),cookie=cookie,csrf=csrf)['body']['id']
+        # 1.5.267: el mismo equipo con un ingreso abierto no admite otro; entregado, el reingreso reutiliza su registro.
+        busy=self.request('/api/orders',self.order_data(dict(base,serial='5cd-1234',request_key='device-source-request-0009')),cookie=cookie,csrf=csrf)
+        self.assertEqual(busy['status'],409);self.assertIn('ingreso abierto',busy['body']['error'])
+        with app.connect() as c:c.execute("UPDATE orders SET status='entregado' WHERE id=?",(first,));c.commit()
         second=self.request('/api/orders',self.order_data(dict(base,serial='5cd-1234',identity_source='<script>',request_key='device-source-request-0002')),cookie=cookie,csrf=csrf)['body']['id']
         third=self.request('/api/orders',self.order_data(dict(base,model='ProBook 450',identity_source='otra cosa',request_key='device-source-request-0003')),cookie=cookie,csrf=csrf)['body']['id']
         self.assertEqual(len({first,second,third}),3)

@@ -118,3 +118,61 @@ Mientras se escribe un mensaje para el cliente, ADI lo compara con la orden. Fun
 
 - **Unitarias y de rutas:** `local/tests/test_adi_order.py` y `local/tests/test_reception_details.py`, con datos ficticios y base temporal.
 - **Navegador:** 1920, 1366, 1024, 768, 390 y 320 px, más teclado y movimiento reducido.
+
+## ADI Premium Smart Bar 5.0 (1.5.267)
+
+El panel pasa a ser una **barra compacta** de unos 56 px dentro del detalle de la orden:
+
+- Muestra el icono y el nombre de Adi, el **contador** de pendientes y la **recomendación más importante** (título, referencia y valor), con «+N más».
+- Al pulsarla (o con Enter) se despliega el cajón con las cinco herramientas (Generar mensaje, Revisar pendientes, Consultar pagos, Ver seguimiento y Preparar informe) y las recomendaciones en **filas compactas**: icono, título, prioridad, descripción breve, referencia real (orden, presupuesto o repuesto), valor registrado y acción. El título de cada fila abre su detalle sin salir de la orden. Escape contrae el cajón y devuelve el foco a la barra.
+- **Prioridad:** el rojo queda reservado para lo **crítico verificable**: un repuesto con la fecha estimada vencida o con retraso o incidencia registrados, o un saldo que impide entregar un equipo listo. «Prioridad alta» se muestra en ámbar, «Pendiente» en azul e «Informativa» en gris.
+- **Apertura:**
+  - La barra empieza contraída, salvo que haya algo crítico.
+  - Si la persona la abre o la cierra, esa preferencia se recuerda en su navegador.
+  - Nunca se abre sola al actualizarse.
+  - Una novedad hace un efecto breve en el contador y el icono y se anuncia a los lectores de pantalla, sin mover la página.
+- Transiciones de 180–240 ms; con «reducir movimiento» no hay animaciones.
+- Cada recomendación añade `ref`, `value` y `severity` (`critica`, `alta`, `media` o `info`); el panel informa `critical`, la cantidad de críticas. Las huellas no cambian, así que los descartes siguen vigentes.
+
+## ADI Smart Follow-Up 4.0: mensaje de seguimiento (1.5.267)
+
+Ventana «Mensaje de seguimiento» (`statusMessageDialog`, `status_messages.py`):
+
+- **Estado financiero confirmado** al abrir la ventana, sin usar la IA:
+  - Valores: total, pagos y anticipos, saldo, saldo a favor y transferencias por confirmar.
+  - Fuente: los registros existentes (`equipment.finance` a través de `adi_order.context`). Si la orden tiene varios equipos, se usa el saldo de toda la orden.
+  - Nada se calcula a partir del texto.
+- **Párrafo de pago:**
+  - Lo escribe el sistema con el importe exacto: «Adicionalmente, le informamos que [, considerando los abonos registrados por $X,] su orden registra un saldo pendiente de $Y. Agradecemos su colaboración para completar el pago correspondiente antes del retiro de su equipo.».
+  - La IA nunca recibe importes.
+  - Se incluye por defecto solo con un saldo pendiente confirmado. Si hay transferencias por confirmar, el operador debe incluirlo expresamente.
+  - Si la orden está pagada, tiene saldo a favor o no tiene cargos, el mensaje no menciona cobros.
+  - Si los datos financieros no se pueden verificar, aparece el aviso interno «No se pudo verificar el estado financiero de esta orden.» y el mensaje no habla de dinero.
+- **Opciones:**
+  - Incluir el pago confirmado.
+  - Incluir los avances técnicos: diagnóstico, seguimientos comunicables y trabajos realizados.
+  - Incluir la fecha de entrega: solo si está registrada, no pasó y el equipo aún no está listo.
+  - Tono: profesional (predeterminado), formal o cercano.
+- **Reglas por estado:** la IA recibe qué puede decir según el estado real. Por ejemplo, en pruebas no puede decir que el equipo está listo, y en presupuesto ningún trabajo figura como realizado. Las afirmaciones de trabajos sin registro se señalan como avisos.
+- **Anotaciones:**
+  - Las notas internas de los seguimientos ya no viajan a la IA; la ventana indica cuántas quedaron fuera.
+  - El aviso «ADI omitió estos datos de tus anotaciones» ahora solo revisa lo que escribió el técnico. Antes tomaba como anotaciones las cifras de las instrucciones internas, como «Máximo 70 palabras».
+  - La revisión de mensajes ya no toma «cuando su equipo esté listo» como si el equipo estuviera listo.
+- **Revisión del contexto:**
+  - Avisa si falta el diagnóstico y el equipo ya está en reparación o en una etapa posterior.
+  - Avisa si la orden figura lista pero tiene repuestos sin instalar o trabajos aprobados sin marcar como realizados.
+  - Avisa si la orden espera un repuesto y no hay ninguno registrado.
+  - Avisa si el último seguimiento dice «terminado» y el estado no coincide, o si la fecha estimada ya pasó.
+  - Avisa de un recordatorio de pago enviado en las últimas 72 horas y de un mensaje al cliente en las últimas 24 horas.
+- **Antes de enviar:**
+  - `POST /api/orders/<id>/status-message` con `action: "verify"` compara la huella financiera del momento en que se generó el texto y el importe que aparece en el mensaje.
+  - Si algo cambió, la ventana pide «Actualizar mensaje».
+  - Si todo coincide, pide confirmación y abre la comunicación de la orden con el texto y el canal elegidos. Allí se confirma el destinatario, se envía y se registra el resultado real. Nada se marca como enviado sin la confirmación del servicio.
+- **Diseño:**
+  - En el encabezado: número de orden, estado técnico y estado de pago.
+  - Columna izquierda: información de la orden, comunicación y opciones.
+  - Columna derecha: el editor amplio.
+  - Las acciones quedan en un pie fijo.
+  - En el celular se apila en una sola columna sin desplazamiento horizontal.
+
+Pruebas: `local/tests/test_adi_followup.py` cubre los casos de pago (sin pagos, anticipo, parciales, pagado, sin cargos, no verificable, transferencia por confirmar, saldo que cambia), los estados (diagnóstico, reparación, pruebas, listo), los canales WhatsApp y correo, las anotaciones, las contradicciones y la severidad del Smart Bar.

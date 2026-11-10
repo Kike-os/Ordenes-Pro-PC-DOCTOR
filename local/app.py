@@ -5300,17 +5300,6 @@ class Handler(BaseHTTPRequestHandler):
                     if device_ref:
                         existing_device=c.execute("SELECT d.*,COALESCE(NULLIF(d.kind,''),d.category) kind_code FROM devices d WHERE d.id=? AND d.client_id=?",(int(device_ref),selected['id'])).fetchone() if device_ref.isdigit() else None
                         if not existing_device:return self.reply(404,{'error':'El equipo seleccionado no pertenece a este cliente.'})
-                    elif data.get('new_unit')!='1' and str(data.get('serial','')).strip():
-                        # 1.5.267 · Reingreso por serie: si el cliente ya tiene un equipo con esa serie, la visita nueva se vincula a ese
-                        # registro maestro (no se duplica) aunque el formulario traiga otro color o el modelo abreviado. Una marca distinta
-                        # indica un posible error de serie y se pide verificar; un ingreso abierto del mismo equipo no admite otro.
-                        import device_lookup,device_brands
-                        existing_device=c.execute("SELECT d.*,COALESCE(NULLIF(d.kind,''),d.category) kind_code FROM devices d WHERE d.client_id=? AND COALESCE(d.serial,'')!='' AND upper(replace(d.serial,' ',''))=? ORDER BY d.id LIMIT 1",(selected['id'],device_lookup.normalize(data.get('serial'))[:150])).fetchone()
-                        if existing_device:
-                            typed=device_brands.slug(str(data.get('brand','')).strip());stored=device_brands.slug((existing_device['brand'] or '').strip())
-                            if typed and stored and typed!=stored:
-                                return self.reply(409,{'error':'Ese número de serie ya pertenece al equipo '+(existing_device['code'] or 'registrado')+' ('+' '.join(filter(None,[existing_device['brand'],existing_device['model']]))+') de este cliente. Verifica la serie o selecciónalo como equipo existente.','fields':{'serial':'Serie registrada con otra marca: verifica el equipo.'}})
-                            linked_device=existing_device['code'] or ''
                     if existing_device:
                         busy=c.execute("SELECT COALESCE(code,'OP-'||printf('%05d',id)) code FROM orders WHERE device_id=? AND status!='entregado' ORDER BY id DESC LIMIT 1",(existing_device['id'],)).fetchone()
                         if busy:return self.reply(409,{'error':'El equipo '+(existing_device['code'] or '')+' ya tiene un ingreso abierto ('+busy['code']+'). Entrégalo antes de registrar otro ingreso.'})
@@ -5359,6 +5348,13 @@ class Handler(BaseHTTPRequestHandler):
                     same=c.execute("SELECT id FROM devices WHERE client_id=? AND COALESCE(NULLIF(kind,''),category)=? AND COALESCE(brand,'')=? AND COALESCE(model,'')=? AND COALESCE(color,'')=? AND COALESCE(serial,'')!='' AND upper(replace(serial,' ',''))=? ORDER BY id LIMIT 1",
                         (client_id,fields['type'],fields['brand'],fields['model'],fields['color'],device_lookup.normalize(fields['serial']))).fetchone() if fields['serial'] and not existing_device else None
                     if existing_device:same=existing_device
+                    elif same:
+                        # 1.5.267: el mismo equipo (misma serie y características) se reutiliza sin duplicar su registro, pero con un ingreso
+                        # abierto no admite otro (la misma regla que «Seleccionar equipo existente»). Con otras características no se fusiona:
+                        # queda como equipo aparte, señalado como «Serie repetida» para revisarlo con el cliente.
+                        busy=c.execute("SELECT COALESCE(o.code,'OP-'||printf('%05d',o.id)) code,d.code device FROM orders o JOIN devices d ON d.id=o.device_id WHERE o.device_id=? AND o.status!='entregado' ORDER BY o.id DESC LIMIT 1",(same['id'],)).fetchone()
+                        if busy:return self.reply(409,{'error':'El equipo '+(busy['device'] or '')+' ya tiene un ingreso abierto ('+busy['code']+'). Entrégalo antes de registrar otro ingreso.'})
+                        linked_device=c.execute('SELECT code FROM devices WHERE id=?',(same['id'],)).fetchone()[0] or ''
                     elif data.get('new_unit')=='1':
                         # «Agregar equipo similar» registra una unidad física distinta: nunca se fusiona con otra; una serie ya registrada se rechaza.
                         clash=c.execute("SELECT code FROM devices WHERE client_id=? AND COALESCE(serial,'')!='' AND upper(replace(serial,' ',''))=? LIMIT 1",(client_id,device_lookup.normalize(fields['serial']))).fetchone() if fields['serial'] else None

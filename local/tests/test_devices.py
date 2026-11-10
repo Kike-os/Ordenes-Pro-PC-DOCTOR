@@ -30,7 +30,9 @@ class DevicesTests(unittest.TestCase):
         printers=self.request('/api/devices?type=impresora',cookie=cookie)['body'];self.assertEqual([row['id'] for row in printers['rows']],[devices[1]])
         self.assertEqual(self.request('/api/devices?type=x',cookie=cookie)['status'],400)
         self.assertEqual(self.request('/api/devices?q='+quote('HIST-0002')+'&type=impresora',cookie=cookie)['body']['total'],1)
-        # Ficha: datos del equipo y todas sus órdenes, de la más reciente a la más antigua.
+        # Ficha: datos del equipo y todas sus órdenes, de la más reciente a la más antigua. La segunda visita llega después de la
+        # entrega (1.5.267: con un ingreso abierto, el mismo equipo no admite otro).
+        with app.connect() as c:c.execute("UPDATE orders SET status='entregado' WHERE id=?",(ids[0],));c.commit()
         again=self.request('/api/orders',self.order_data({'type':'portatil','brand':'HP','model':'Equipo 0','serial':'HIST-0001','problem':'Segunda visita','request_key':'devices-history-order-004'}),cookie=cookie,csrf=csrf)
         self.assertEqual(again['status'],201,again)
         with app.connect() as c:target=c.execute('SELECT device_id FROM orders WHERE id=?',(again['body']['id'],)).fetchone()[0]

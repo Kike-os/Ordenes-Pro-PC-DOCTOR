@@ -94,28 +94,33 @@ class ReentryTests(unittest.TestCase):
 
     def test_reentry_by_serial_without_selecting_the_device_reuses_master_record(self):
         old,before,_,_=self.delivered_and_paid('0101',months=3)
-        # El recepcionista escribe la serie a mano, con otro color y el modelo abreviado: el equipo es el mismo (misma serie y cliente).
-        new=self.receive('0102',serial='5cd reing 0001'.replace(' ','-').upper(),color='Plata',model='ProBook',problem='Teclado falla')
+        # El recepcionista escribe la serie a mano (minúsculas) con los mismos datos: se reutiliza el registro maestro.
+        new=self.receive('0102',serial=SERIAL.lower(),problem='Teclado falla')
         self.assertIn(new['status'],(200,201))
+        self.assertTrue(new['body']['linked_device'].startswith('EQ-'))
         with app.connect() as c:
             self.assertEqual(c.execute("SELECT COUNT(*) FROM devices WHERE upper(replace(serial,' ',''))=?",(SERIAL,)).fetchone()[0],1)
-            row=c.execute('SELECT o.device_id,d.color,d.model FROM orders o JOIN devices d ON d.id=o.device_id WHERE o.id=?',(new['body']['id'],)).fetchone()
-            # El registro maestro no se reescribe con lo tecleado.
-            self.assertEqual((row['device_id'],row['color'],row['model']),(before['device_id'],'Gris','ProBook 450'))
+            self.assertEqual(c.execute('SELECT device_id FROM orders WHERE id=?',(new['body']['id'],)).fetchone()[0],before['device_id'])
             self.assertEqual(dict(c.execute('SELECT * FROM orders WHERE id=?',(old,)).fetchone()),before)
-        self.assertIn('linked_device',new['body']);self.assertTrue(new['body']['linked_device'].startswith('EQ-'))
 
     def test_serial_with_open_order_is_not_received_twice(self):
         first=self.receive('0201')['body']
-        again=self.receive('0202',color='Negro')
+        again=self.receive('0202')
         self.assertEqual(again['status'],409);self.assertIn('ingreso abierto',again['body']['error']);self.assertIn(first['code'],again['body']['error'])
         with app.connect() as c:self.assertEqual(c.execute('SELECT COUNT(*) FROM orders').fetchone()[0],1)
 
-    def test_same_serial_with_another_brand_asks_to_verify(self):
-        self.delivered_and_paid('0301')
-        clash=self.receive('0302',brand='Lenovo',model='ThinkPad')
-        self.assertEqual(clash['status'],409);self.assertIn('serial',clash['body']['fields'])
-        with app.connect() as c:self.assertEqual(c.execute('SELECT COUNT(*) FROM devices').fetchone()[0],1)
+    def test_same_serial_with_other_characteristics_is_not_merged(self):
+        # Regla del sistema: con otra marca, modelo o color no se fusiona sola; queda aparte y señalada como «Serie repetida».
+        old,before,payments,_=self.delivered_and_paid('0301')
+        other=self.receive('0302',brand='Lenovo',model='ThinkPad')
+        self.assertIn(other['status'],(200,201));self.assertNotIn('linked_device',other['body'])
+        with app.connect() as c:
+            self.assertEqual(c.execute('SELECT COUNT(*) FROM devices').fetchone()[0],2)
+            self.assertEqual(dict(c.execute('SELECT * FROM orders WHERE id=?',(old,)).fetchone()),before)
+        clash=self.request('/api/devices/identify?serial='+SERIAL,cookie=self.cookie)['body']
+        self.assertTrue(clash['conflict'])
+        rows=self.request('/api/devices?duplicates=1',cookie=self.cookie)['body']['rows']
+        self.assertEqual(len(rows),2)
 
     def test_same_serial_for_another_client_stays_separate(self):
         old,before,payments,_=self.delivered_and_paid('0401')
