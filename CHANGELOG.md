@@ -4,6 +4,24 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.268 — 2026-11-09 20:41 (UTC-05:00)
+
+Limpieza segura del catálogo: eliminar productos inactivos sin historial, archivar los protegidos, selección múltiple y filtros por estado y tipo
+
+### Nuevas funcionalidades
+
+- Catálogo: «Eliminar» (Trash2) en productos inactivos. Antes de ejecutar, revisa presupuestos de órdenes, proformas y ventas, facturas, licencias, inventario (movimientos, compras, garantías) e historial de precios. Solo elimina lo que no tiene historial; lo demás se puede conservar archivado.
+- Catálogo: selección múltiple con «Seleccionar todos los visibles» y «Eliminar seleccionados». Resumen previo de cuántos se eliminan, cuántos se conservan archivados y cuántos activos no se tocan; cada producto se revisa por separado.
+- Catálogo: filtros por estado (Todos, Activos, Inactivos, Archivados) y tipo (Productos, Repuestos y componentes, Servicios, Licencias, Seguridad), combinables con la búsqueda. Por defecto, el catálogo operativo sin archivados; «Restaurar» y «Registro de limpieza».
+
+### Mejoras realizadas
+
+- Catálogo Premium Compact: acciones en línea, logo junto al nombre, estados diferenciados (Activo, Inactivo, Archivado, «Con historial») y tarjetas compactas en tabletas y celulares, sin desbordes.
+
+### Actualizaciones de seguridad
+
+- Catálogo: eliminar o archivar solo lo hace administración (comprobado en el servidor) y con confirmación. Cada operación queda en un registro inmutable (producto, código, resultado, usuario y fecha) y en la auditoría. Facturas, ventas y movimientos de inventario no se modifican.
+
 ## v1.5.267 — 2026-11-09 19:52 (UTC-05:00)
 
 Reingreso de equipos sin reabrir la orden anterior, ADI Smart Follow-Up 4.0 con saldo confirmado y ADI Premium Smart Bar 5.0 compacta
