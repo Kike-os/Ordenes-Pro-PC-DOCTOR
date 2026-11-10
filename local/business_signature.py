@@ -20,11 +20,14 @@ DOCS = {'ticket': 'Ticket de recepción (80 mm)', 'comprobante': 'Comprobante de
 # Documentos pedidos que todavía no existen como PDF en Órdenes Pro: se muestran, pero no se pueden activar.
 UNAVAILABLE = {'entrega': 'Comprobantes de entrega', 'repuestos': 'Documentos de pedidos de repuestos'}
 CAPTION = 'Firma visual de identificación de PC-DOCTOR S.A. · No constituye firma electrónica de este documento.'
-DEFAULTS = {'enabled': False, 'version_id': None, 'docs': {k: False for k in DOCS}, 'a4_width_mm': 50, 'ticket_width_mm': 48, 'align': 'derecha', 'ticket_mode': 'columna'}
+DEFAULTS = {'enabled': False, 'version_id': None, 'docs': {k: False for k in DOCS}, 'a4_width_mm': 50, 'ticket_width_mm': 48, 'align': 'derecha', 'ticket_mode': 'columna', 'ticket_print': 'color'}
 A4_WIDTHS = range(25, 91)
 TICKET_WIDTHS = range(30, 73)  # área útil del rollo de 80 mm: 72 mm
 # 1.5.272 · Ticket: «columna» = en el espacio «Recibido por PC-DOCTOR S.A.» (junto a la firma del cliente, ancho máximo de la columna);
 # «ancho» = debajo de ambas firmas, al ancho configurado (para un QR más grande); «omitir» = sin firma visual en el ticket.
+# 1.5.274: el ticket lleva la firma a color (también el que se envía a la Epson, que la imprime en tonos de negro). El blanco y negro
+# optimizado (umbral por áreas, QR más nítido) queda como opción.
+TICKET_PRINT = {'color': 'A color (original sin convertir)', 'mono': 'Blanco y negro optimizado para la impresora térmica'}
 TICKET_MODES = {'columna': 'Junto a «Recibido por» (compacto)', 'ancho': 'Debajo de las firmas, más grande', 'omitir': 'Omitir en el ticket'}
 TICKET_COLUMN_MM = 33  # media columna del área útil de 72 mm
 MIN_QR_DOTS = 3  # puntos de impresora por módulo del QR por debajo de los cuales la lectura no es fiable
@@ -86,6 +89,10 @@ def update(c, data, user, audit):
         if data['align'] not in ('izquierda', 'centro', 'derecha'):
             raise SignatureError('Alineación no válida.')
         current['align'] = data['align']
+    if 'ticket_print' in data:
+        if data['ticket_print'] not in TICKET_PRINT:
+            raise SignatureError('Opción de impresión del ticket no válida.')
+        current['ticket_print'] = data['ticket_print']
     if 'ticket_mode' in data:
         if data['ticket_mode'] not in TICKET_MODES:
             raise SignatureError('Opción del ticket no válida.')
@@ -254,7 +261,7 @@ def overview(c):
         except Exception:
             pass
     return {'settings': data, 'versions': rows, 'current': next((v for v in rows if v['id'] == data['version_id']), None), 'legibility': check,
-            'ticket_modes': TICKET_MODES, 'ticket_column_mm': TICKET_COLUMN_MM,
+            'ticket_modes': TICKET_MODES, 'ticket_print_modes': TICKET_PRINT, 'ticket_column_mm': TICKET_COLUMN_MM,
             'docs': [{'key': k, 'label': v, 'available': True, 'enabled': data['docs'].get(k, False)} for k, v in DOCS.items()] +
                     [{'key': k, 'label': v, 'available': False, 'enabled': False} for k, v in UNAVAILABLE.items()],
             'caption': CAPTION, 'limits': {'a4': [A4_WIDTHS.start, A4_WIDTHS.stop - 1], 'ticket': [TICKET_WIDTHS.start, TICKET_WIDTHS.stop - 1]}}
@@ -490,12 +497,12 @@ def preview_pdf(c, target):
     from document_canvas import Canvas, BLUE, GRAY
     sig = preview_sig(c)
     if target in ('ticket', 'ticket-digital'):
-        thermal = target == 'ticket' and sig['image']['kind'] == 'png'
+        thermal = target == 'ticket' and sig['ticket_print'] == 'mono' and sig['image']['kind'] == 'png'
         width = 72 * PT_PER_MM
         w, h = size_pt(sig, True)
-        pdf = Canvas(width, h + 74, 'Vista previa · firma visual en ticket (' + ('impresión térmica' if thermal else 'digital a color') + ')', mono=thermal)
+        pdf = Canvas(width, h + 74, 'Vista previa · firma visual en ticket (' + ('blanco y negro' if thermal else 'a color') + ')', mono=thermal)
         pdf.page()
-        pdf.text('VISTA PREVIA · ' + ('TICKET TÉRMICO (BLANCO Y NEGRO)' if thermal else 'TICKET DIGITAL (COLOR)'), 6, 8, 7, True)
+        pdf.text('VISTA PREVIA · ' + ('TICKET EN BLANCO Y NEGRO' if thermal else 'TICKET A COLOR'), 6, 8, 7, True)
         draw(pdf.pdf, pdf.stream, pdf.resources, pdf.h, (width - w) / 2, 22, sig, thermal=thermal)
         y = 22 + h + 4
         for line in pdf.wrap(CAPTION, width - 12, 5.8):

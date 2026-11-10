@@ -125,3 +125,10 @@ Se configura en **Configuración → Firma electrónica**, solo por administraci
 - **Legibilidad del QR:** la configuración detecta el QR de la imagen por sus patrones de esquina y avisa solo si un módulo quedaría por debajo de 3 puntos de impresora en el ticket o de 0,33 mm en A4. Si no hay aviso, no se muestra nada.
 - **Vista previa compacta:** original a color sin cambios y «Formato de salida» con PDF A4 a color, ticket digital a color y simulación del ticket térmico en blanco y negro, cada uno con su PDF de muestra sin datos de clientes (`preview.pdf?doc=a4|ticket-digital|ticket`).
 - El aviso amarillo resume que la imagen identifica visualmente a PC-DOCTOR S.A. y no sustituye una firma electrónica criptográfica; el detalle queda en «Ver información sobre firmas electrónicas».
+
+## Ticket a color (1.5.274)
+
+- Por decisión de administración, el ticket de 80 mm lleva la firma empresarial **a color** por defecto: el PDF del ticket, su vista previa, la descarga y el correo. También se envía a color a la impresora.
+- La Epson TM-m30 es térmica y solo tiene tinta negra. En el papel imprime la imagen en tonos de negro, con trama de puntos. Comprobado con Ghostscript a 203 dpi y 1 bit, sin imprimir: el QR sigue nítido en negro.
+- El blanco y negro optimizado de la 1.5.271/272 (umbral por áreas) se conserva como opción: **Configuración → Firma electrónica → Color en el ticket → Blanco y negro optimizado para la impresora térmica**.
+- El PNG original nunca se modifica.

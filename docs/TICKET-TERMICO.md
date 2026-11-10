@@ -133,4 +133,4 @@ Orden: logo compacto (20 mm) y datos del taller · título y copia · número de
 - El bloque «Firma y constancia de recepción» es más compacto: líneas de 0,4 pt, «Firma del cliente» libre a la izquierda y la firma empresarial (hasta 33 mm) sobre «Recibido por / PC-DOCTOR S.A.» a la derecha, o centrada debajo de ambas si se elige «Debajo de las firmas, más grande».
 - **Ticket digital:** la orden ofrece el mismo ticket en PDF con la firma a color, para enviar o archivar; no se envía a la impresora.
 - Pendiente del taller: imprimir una prueba en la Epson y comprobar con un lector que el QR de la firma se lee. Si la configuración muestra el aviso de legibilidad, usar la disposición más grande u omitirla en el ticket.
-
+- **1.5.274:** la firma empresarial va a color también en el ticket que se imprime. La impresora la reproduce en tonos de negro, y el blanco y negro optimizado queda como opción en Configuración → Firma electrónica. El logo y el resto del ticket no cambian.

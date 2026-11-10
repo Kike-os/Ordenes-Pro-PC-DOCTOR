@@ -273,7 +273,7 @@ def render_thermal(order,copy='cliente',digital=False):
                 stream.fill()
             elif op[0]=='firma':
                 # En pantalla, el original a color; para la impresora térmica, su representación en blanco y negro.
-                business_signature.draw(pdf,stream,resources,height,op[4],op[1],signature,thermal=not digital,width=op[2])
+                business_signature.draw(pdf,stream,resources,height,op[4],op[1],signature,thermal=not digital and signature.get('ticket_print')=='mono',width=op[2])
             elif op[0]=='barcode':
                 _,top,widths,bunit,span=op;left=snap((W-span)/2)+10*bunit
                 for i,width in enumerate(widths):

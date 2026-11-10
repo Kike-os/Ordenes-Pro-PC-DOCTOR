@@ -124,7 +124,7 @@ class BusinessSignatureTests(unittest.TestCase):
         ticket = get('/api/orders/%d/thermal.pdf' % order['id'])['body']
         receipt = get('/api/orders/%d/receipt.pdf' % order['id'])['body']
         service = get('/api/orders/%d/service.pdf' % order['id'])['body']
-        self.assertIn(b'/FirmaVisualT', ticket);self.assertIn(b'/FirmaVisual', receipt);self.assertNotIn(b'FirmaVisual', service)
+        self.assertIn(b'/FirmaVisual', ticket);self.assertNotIn(b'/FirmaVisualT', ticket);self.assertIn(b'/FirmaVisual', receipt);self.assertNotIn(b'FirmaVisual', service)
         for pdf in (ticket, receipt):
             self.assertIn('Firma visual de identificación de PC-DOCTOR S.A. · No constituye'.encode('cp1252'), texts(pdf))
             self.assertNotIn(b'/ByteRange', pdf);self.assertNotIn(b'/Sig', pdf)
@@ -156,7 +156,7 @@ class BusinessSignatureTests(unittest.TestCase):
         self.post(action='settings', docs='{"presupuesto": false, "pago": true}')
         self.assertNotIn(b'FirmaVisual', quote_pdf());self.assertIn(b'/FirmaVisual', receipt())
 
-    def test_digital_ticket_is_in_color_and_print_ticket_is_monochrome(self):
+    def test_ticket_is_in_color_by_default_and_monochrome_only_when_chosen(self):
         import re
         order = self.request('/api/orders', self.order_data({'request_key': 'business-signature-0003'}), cookie=self.cookie, csrf=self.csrf)['body']
         png = signature_png()
@@ -165,7 +165,14 @@ class BusinessSignatureTests(unittest.TestCase):
         printed = self.request('/api/orders/%d/thermal.pdf' % order['id'], cookie=self.cookie)['body']
         digital = self.request('/api/orders/%d/thermal.pdf?modo=digital' % order['id'], cookie=self.cookie)['body']
         image = lambda pdf, name: re.search(rb'/Subtype\s*/Image[^>]*?/Width\s+(\d+)[^>]*?/Height\s+(\d+)[^>]*?/ColorSpace\s*/(\w+)', pdf)
-        self.assertIn(b'/FirmaVisualT', printed);self.assertNotIn(b'/FirmaVisualT', digital);self.assertIn(b'/FirmaVisual ', digital.replace(b'/FirmaVisual\n', b'/FirmaVisual '))
+        for pdf in (printed, digital):  # 1.5.274: a color por defecto, también el que va a la impresora
+            self.assertNotIn(b'/FirmaVisualT', pdf);self.assertIn(b'/FirmaVisual', pdf);self.assertIn(b'/SMask', pdf)
+            self.assertIn(b'/Width 600', pdf);self.assertIn(b'/ColorSpace /DeviceRGB', pdf)
+        self.assertEqual(self.post(action='settings', ticket_print='gris')['status'], 400)
+        self.assertEqual(self.post(action='settings', ticket_print='mono')['status'], 200)
+        mono = self.request('/api/orders/%d/thermal.pdf' % order['id'], cookie=self.cookie)['body']
+        self.assertIn(b'/FirmaVisualT', mono)  # blanco y negro optimizado, solo si se elige
+        self.assertNotIn(b'/FirmaVisualT', self.request('/api/orders/%d/thermal.pdf?modo=digital' % order['id'], cookie=self.cookie)['body'])
         self.assertIn(b'/SMask', digital)  # original a color con su transparencia
         self.assertIn(b'/Width 600', digital);self.assertIn(b'/Height 200', digital)  # resolución original, sin reducir
         self.assertIn(b'/Interpolate false', digital)
@@ -177,8 +184,9 @@ class BusinessSignatureTests(unittest.TestCase):
         order = self.request('/api/orders', self.order_data({'request_key': 'business-signature-0004'}), cookie=self.cookie, csrf=self.csrf)['body']
         self.upload(signature_png())
         self.post(action='settings', enabled=True, docs='{"ticket": true}')
+        with app.connect() as c:self.assertEqual(bs.settings(c)['ticket_print'], 'color')
         stream = pdf_signature.page_text(self.request('/api/orders/%d/thermal.pdf' % order['id'], cookie=self.cookie)['body']).decode('latin-1')
-        m = re.search(r'q\s+([\d.]+) 0 0 ([\d.]+) ([\d.]+) ([\d.]+) cm\s*/FirmaVisualT Do', stream)
+        m = re.search(r'q\s+([\d.]+) 0 0 ([\d.]+) ([\d.]+) ([\d.]+) cm\s*/FirmaVisualT? Do', stream)
         self.assertIsNotNone(m)
         w, h, x, y = map(float, m.groups())
         texts = [(float(tx), float(ty), t) for tx, ty, t in re.findall(r'1 0 0 1 ([\d.]+) ([\d.]+) Tm\s*\(((?:\\.|[^\\)])*)\)\s*Tj', stream)]
