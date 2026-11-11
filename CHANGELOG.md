@@ -4,6 +4,23 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.278 — 2026-11-11 13:23 (UTC-05:00)
+
+Módulo PQRS Premium Bilingüe: peticiones, quejas, reclamos y sugerencias con seguimiento
+
+### Nuevas funcionalidades
+
+- PQRS para clientes: página pública /pqrs (sin iniciar sesión, en español e inglés) para presentar peticiones, quejas, reclamos y sugerencias, con número único PQRS-AAAA-NNNN, adjuntos (fotografías o PDF de hasta 10 MB, comprobados por su contenido), relación con una orden solo si coincide la identificación del cliente y seguimiento privado donde el cliente ve el estado y puede responder.
+- Apartado PQRS en Órdenes Pro: bandeja con indicadores de tiempos de respuesta, filtros por estado, tipo, sede, prioridad y fechas, asignación de responsable, prioridad, respuestas al cliente, notas internas, cierre con resolución y reapertura, adjuntos, historial, avisos por correo con reintento, exportación CSV e impresión A4. Administración ve todas; un técnico, solo las asignadas.
+
+### Mejoras realizadas
+
+- Inicio de sesión: botón «PQRS» junto a «Agendar cita», en la misma fila en escritorio y apilados en celulares. Avisos al cliente por correo en su idioma y por WhatsApp Business cuando el cliente lo autoriza y la integración está configurada; las PQRS nuevas o asignadas aparecen en el centro de notificaciones.
+
+### Actualizaciones de seguridad
+
+- PQRS: validación en el servidor, límites por conexión contra el abuso, enlace de seguimiento firmado, adjuntos guardados de forma privada y nunca ejecutados, permisos por rol en el servidor y conservación sin borrado del caso, su historial y sus adjuntos.
+
 ## v1.5.277 — 2026-11-11 08:20 (UTC-05:00)
 
 Agenda de Citas bilingüe: todo el agendamiento en el idioma elegido (Español o English)

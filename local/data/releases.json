@@ -8,6 +8,29 @@
   },
   "releases": [
     {
+      "version": "1.5.278",
+      "date": "2026-11-11T13:23:31-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Módulo PQRS Premium Bilingüe: peticiones, quejas, reclamos y sugerencias con seguimiento",
+      "changes": {
+        "features": [
+          "PQRS para clientes: página pública /pqrs (sin iniciar sesión, en español e inglés) para presentar peticiones, quejas, reclamos y sugerencias, con número único PQRS-AAAA-NNNN, adjuntos (fotografías o PDF de hasta 10 MB, comprobados por su contenido), relación con una orden solo si coincide la identificación del cliente y seguimiento privado donde el cliente ve el estado y puede responder.",
+          "Apartado PQRS en Órdenes Pro: bandeja con indicadores de tiempos de respuesta, filtros por estado, tipo, sede, prioridad y fechas, asignación de responsable, prioridad, respuestas al cliente, notas internas, cierre con resolución y reapertura, adjuntos, historial, avisos por correo con reintento, exportación CSV e impresión A4. Administración ve todas; un técnico, solo las asignadas."
+        ],
+        "improvements": [
+          "Inicio de sesión: botón «PQRS» junto a «Agendar cita», en la misma fila en escritorio y apilados en celulares. Avisos al cliente por correo en su idioma y por WhatsApp Business cuando el cliente lo autoriza y la integración está configurada; las PQRS nuevas o asignadas aparecen en el centro de notificaciones."
+        ],
+        "fixes": [],
+        "security": [
+          "PQRS: validación en el servidor, límites por conexión contra el abuso, enlace de seguimiento firmado, adjuntos guardados de forma privada y nunca ejecutados, permisos por rol en el servidor y conservación sin borrado del caso, su historial y sus adjuntos."
+        ],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Kike-os: módulo PQRS (instrucciones v1.5.276 → siguiente versión; decisiones de "
+    },
+    {
       "version": "1.5.277",
       "date": "2026-11-11T08:20:14-05:00",
       "type": "patch",
@@ -27,7 +50,7 @@
         "performance": []
       },
       "published_by": "Kike-os",
-      "authorized_by": "Kike-os: corrección bilingüe de la Agenda de Citas («Actualiza cuando corrija a "
+      "authorized_by": "Kike-os: corrección bilingüe de la Agenda de Citas («Actualiza cuando corrija a"
     },
     {
       "version": "1.5.276",
