@@ -4,6 +4,20 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.277 — 2026-11-11 08:20 (UTC-05:00)
+
+Agenda de Citas bilingüe: todo el agendamiento en el idioma elegido (Español o English)
+
+### Mejoras realizadas
+
+- Agenda de Citas bilingüe: las cuatro etapas, ayudas, validaciones (las mismas reglas de cédula, RUC, pasaporte, teléfono y correo), servicios y equipos, disponibilidad, feriados, fecha y hora, resumen, confirmación y el pie con los horarios oficiales cambian al instante entre Español y English sin perder lo escrito. ?lang=en o ?lang=es abre la página en ese idioma.
+- La cita guarda el idioma en que se reservó (las existentes quedan en español) y la ficha interna lo indica. Las condiciones del servicio siguen publicadas en español y la página lo avisa en inglés; la evidencia de aceptación no cambia.
+
+### Errores corregidos
+
+- Agenda de Citas: con English elegido, «Book an Appointment» abría el formulario completamente en español. La página no cargaba el sistema de idiomas; ahora usa el mismo idioma que el inicio y ADI, sin un segundo selector.
+- Agenda de Citas a 320 px: el formulario y la esfera de ADI ya no se salen de la pantalla ni crean desplazamiento horizontal; «Tax ID (RUC)» cabe completo.
+
 ## v1.5.276 — 2026-11-11 07:23 (UTC-05:00)
 
 ADI bilingüe: responde en el idioma elegido (Español o English) y cambia al instante
