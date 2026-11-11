@@ -68,7 +68,7 @@ class LanguageTests(unittest.TestCase):
         wanted = {'brand.tagline': ('Sistema de Gestión de Reparaciones', 'Repair Management System'), 'login.user': ('Usuario o correo electrónico', 'Username or Email'),
                   'login.password': ('Contraseña', 'Password'), 'login.remember': ('Recordar mi sesión', 'Remember me'),
                   'login.forgot': ('¿Olvidaste tu contraseña?', 'Forgot your password?'), 'login.submit': ('Iniciar sesión', 'Sign In'),
-                  'login.book': ('Agendar cita', 'Book an Appointment'), 'version.title': ('Versión del sistema', 'System Version'), 'version.news': ('Actualizaciones del sistema', 'System Updates')}
+                  'login.book': ('Agendar cita', 'Book Appointment'), 'version.title': ('Versión del sistema', 'System Version'), 'version.news': ('Actualizaciones del sistema', 'System Updates')}
         for key, (spanish, english) in wanted.items():
             self.assertEqual((es[key], en[key]), (spanish, english), key)
         for phrase, english in (("'Sistema actualizado':'System Up to Date'", None), ("'En observación':'Under Observation'", None)):

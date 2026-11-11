@@ -2588,6 +2588,8 @@ if(document.querySelector('.stability-slot,#release-chip')){loadStability();clea
 // Acceso: «Versión del sistema». El estado se pide al servidor, que compara la versión desplegada con el registro publicado; nunca se
 // muestra «Sistema actualizado» sin esa comprobación. Si el servidor ya ejecuta otra versión que la de esta página, se pide recargar.
 {const box=document.getElementById('system-version');if(box){
+ // 1.5.280 · Panel compacto: la fila muestra versión y estado reales; «Detalles» despliega fecha, actualizaciones y estabilidad.
+ {const toggle=document.getElementById('system-version-toggle'),more=document.getElementById('system-version-more');if(toggle&&more)toggle.addEventListener('click',()=>{const open=more.hidden;more.hidden=!open;toggle.setAttribute('aria-expanded',String(open));box.classList.toggle('is-open',open);});}
  const label=box.querySelector('.system-version-label'),retry=document.getElementById('system-version-retry'),reload=document.getElementById('system-version-reload'),news=document.getElementById('system-version-news');let info=null;
  const setTag=value=>{if(value){box.dataset.tagSrc=value;box.dataset.tag=T(value);}else{delete box.dataset.tag;delete box.dataset.tagSrc;}};
  const paintVersion=(state,text)=>{box.dataset.state=state;delete label.dataset.i18n;I18N.text(label,text);retry.hidden=state!=='error';if(state==='checking'||state==='error'||state==='updated'){setTag('');reload.hidden=true;}};
@@ -2604,13 +2606,15 @@ if(document.querySelector('.stability-slot,#release-chip')){loadStability();clea
     paintVersion('available','Nueva versión v'+info.version+' lista · recarga para usarla');setTag('Nueva versión');reload.hidden=false;return;}
    reload.hidden=true;setTag('');
    const when=hour(info.checked_at);I18N.attr(label,'title','Última comprobación: '+day(info.checked_at)+', '+when+(info.build?' · compilación '+info.build:''));
-   if(info.state==='updated')paintVersion('updated','Sistema actualizado'+(when?' · comprobado a las '+when:''));
+   // Fila compacta: estado real; la hora de la última comprobación va en «Detalles» (también en el título del estado).
+   const checked=document.getElementById('system-version-checked');if(checked)I18N.text(checked,when?'Última comprobación: '+day(info.checked_at)+', '+when:'');
+   if(info.state==='updated')paintVersion('updated','Sistema actualizado');
    else if(info.state==='important'){paintVersion('important','Actualización importante en publicación: v'+info.latest);setTag('Importante');}
    else if(info.state==='available'){paintVersion('available','Nueva versión en publicación: v'+info.latest);setTag('Nueva versión');}
    else paintVersion('error','No se pudo comprobar si hay actualizaciones');}
   catch{paintVersion('error','No se pudo comprobar si hay actualizaciones');}}
  retry.addEventListener('click',()=>checkVersion(true));reload.addEventListener('click',()=>location.reload());
- document.addEventListener('i18n:change',()=>{if(box.dataset.tagSrc)box.dataset.tag=T(box.dataset.tagSrc);if(info&&info.version===box.dataset.version&&info.state==='updated'){const when=hour(info.checked_at);paintVersion('updated','Sistema actualizado'+(when?' · comprobado a las '+when:''));}});
+ document.addEventListener('i18n:change',()=>{if(box.dataset.tagSrc)box.dataset.tag=T(box.dataset.tagSrc);if(info&&info.version===box.dataset.version&&info.state==='updated'){const when=hour(info.checked_at),checked=document.getElementById('system-version-checked');if(checked)I18N.text(checked,when?'Última comprobación: '+day(info.checked_at)+', '+when:'');paintVersion('updated','Sistema actualizado');}});
  const glyphs={features:'M12 3l1.9 5.8a2 2 0 0 0 1.3 1.3L21 12l-5.8 1.9a2 2 0 0 0-1.3 1.3L12 21l-1.9-5.8a2 2 0 0 0-1.3-1.3L3 12l5.8-1.9a2 2 0 0 0 1.3-1.3z',improvements:'M3 17l6-6 4 4 8-8 M15 7h6v6',fixes:'M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z',security:'M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z M9 12l2 2 4-4',performance:'M13 2 3 14h9l-1 8 10-12h-9z'};
  const icon=path=>{const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox','0 0 24 24');svg.setAttribute('aria-hidden','true');const node=document.createElementNS(svg.namespaceURI,'path');node.setAttribute('d',path);svg.append(node);return svg;};
  const make=(tag,text,name)=>{const node=document.createElement(tag);if(text!==undefined)node.textContent=T(text);if(name)node.className=name;return node;};

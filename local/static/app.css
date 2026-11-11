@@ -12019,3 +12019,84 @@ body[data-page=pqrs] .ui-select-option{min-height:42px;padding:9px 14px;border-r
 .pqrs-site-row input{margin:0}
 .pqrs-site-code{font-size:11.5px;color:#8ea2c2;white-space:nowrap}
 @media(max-width:520px){.pqrs-site-row{grid-template-columns:minmax(0,1fr) auto}.pqrs-site-code{grid-column:1/-1;order:3}}
+/* ===== 1.5.280 · Inicio de sesión PREMIUM COMPACTO. Misma tarjeta y mismas funciones, con menos altura: logotipo original a 108 px
+   (solo tamaño por CSS), subtítulo en una línea, selector de idioma de una fila, aviso legal desplegable (el © queda visible), versión
+   compacta con «Detalles» y los accesos públicos dentro de la tarjeta. Sin overflow:hidden ni posiciones absolutas: en pantallas bajas
+   la página se desplaza con naturalidad. ===== */
+body[data-page=login] .access-shell{min-height:100svh;padding:max(12px,env(safe-area-inset-top)) 12px max(16px,env(safe-area-inset-bottom));display:grid;place-items:center;align-content:center;overflow:visible}
+body[data-page=login] .access-shell .access-card{width:calc(100% - 24px);max-width:412px;margin:0 auto;padding:18px 22px 18px;border-radius:18px;display:flex;flex-direction:column;gap:12px}
+body[data-page=login] .access-shell .access-card>*{margin-top:0;margin-bottom:0}
+body[data-page=login] .access-shell .brand{display:grid;justify-items:center;gap:2px;margin:0;text-align:center}
+body[data-page=login] .access-shell .brand .original-logo{width:clamp(88px,26vw,108px);height:auto;max-height:none;margin:0 auto 6px;object-fit:contain}
+body[data-page=login] .access-shell .brand h1{margin:0;font-size:clamp(1.45rem,1.2rem + 1vw,1.7rem);line-height:1.12;letter-spacing:-.3px}
+body[data-page=login] .access-shell .brand .brand-sub{display:flex;flex-wrap:wrap;justify-content:center;align-items:baseline;gap:0 2px;margin:2px 0 0;font-size:12px;line-height:1.35;color:#8fa5c4}
+body[data-page=login] .access-shell .brand .brand-sub .brand-company{margin:0;font-size:11.5px;font-weight:700;letter-spacing:.12em;color:#b8c9e4}
+body[data-page=login] .access-shell .brand .brand-sub .brand-tagline{margin:0;font-size:12px;color:#8fa5c4}
+body[data-page=login] .access-shell .brand .brand-sep{color:#5d7398}
+body[data-page=login] .access-shell .lang-pick{margin:0;padding:4px;border-radius:12px}
+body[data-page=login] .access-shell .lang-pick .lang-title{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+body[data-page=login] .access-shell .lang-pick .lang-options{gap:4px}
+body[data-page=login] .access-shell .lang-pick .lang-option{min-height:38px;padding:6px 10px;border-radius:9px;font-size:13.5px}
+body[data-page=login] .access-shell #login-form{margin:0}
+body[data-page=login] .access-shell #login-form .form-options{margin:0 0 12px}
+body[data-page=login] .access-shell .primary.submit{transition:filter .18s ease,box-shadow .18s ease,transform .15s ease}
+body[data-page=login] .access-shell .primary.submit:hover:not(:disabled){filter:brightness(1.08);box-shadow:0 10px 26px -14px #3a80df}
+body[data-page=login] .access-shell .primary.submit:focus-visible{outline:2px solid #8bb8ff;outline-offset:3px}
+/* Aviso legal compacto */
+body[data-page=login] .access-shell .access-card .login-ip{display:grid;gap:4px;margin:0;padding:10px 0 0;border-top:1px solid #1f3352}
+body[data-page=login] .access-shell .login-ip-more summary{display:flex;align-items:center;gap:8px;min-height:32px;padding:2px 4px;border-radius:8px;list-style:none;cursor:pointer;color:#9bbef5}
+body[data-page=login] .access-shell .login-ip-more summary::-webkit-details-marker{display:none}
+body[data-page=login] .access-shell .login-ip-more summary:hover{background:#0f1d33}
+body[data-page=login] .access-shell .login-ip-more summary:focus-visible{outline:2px solid #8bb8ff;outline-offset:2px}
+body[data-page=login] .access-shell .login-ip-more summary strong{flex:1;font-size:10.5px;line-height:1.3;letter-spacing:.08em;text-transform:uppercase;color:#9bbef5}
+body[data-page=login] .access-shell .login-ip-more .login-ip-icon{flex:none;display:grid;place-items:center;width:22px;height:22px;margin:0}
+body[data-page=login] .access-shell .login-ip-more .login-ip-icon svg{width:16px;height:16px}
+body[data-page=login] .access-shell .login-chevron{flex:none;width:16px;height:16px;color:#8fa5c4;transition:transform .18s ease}
+body[data-page=login] .access-shell .login-ip-more[open] .login-chevron{transform:rotate(180deg)}
+body[data-page=login] .access-shell .login-ip-more .login-ip-text{padding:4px 6px 2px 34px}
+body[data-page=login] .access-shell .login-ip-more .login-ip-text p{margin:0;font-size:11.5px;line-height:1.45;color:#a9bcd8}
+body[data-page=login] .access-shell .login-ip>small{padding-left:34px;font-size:10.5px;line-height:1.3;color:#7f93b3}
+/* Versión compacta */
+body[data-page=login] .access-shell .access-card .system-version{display:grid;gap:6px;margin:0;padding:8px 10px;border-radius:12px}
+body[data-page=login] .access-shell .system-version-main{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px}
+body[data-page=login] .access-shell .system-version-icon{width:28px;height:28px;border-radius:8px;flex:none}
+body[data-page=login] .access-shell .system-version-text{display:flex;align-items:center}
+body[data-page=login] .access-shell .system-version-number strong{font-size:14px}
+body[data-page=login] .access-shell .system-version-status{flex:1 1 140px;min-width:0;margin:0;font-size:12px;line-height:1.35}
+body[data-page=login] .access-shell .system-version-toggle{position:relative;display:inline-flex;align-items:center;gap:4px;min-height:30px;margin-left:auto;padding:4px 8px;border:1px solid #2f4a70;border-radius:8px;background:transparent;color:#9bbef5;font-size:12px;font-weight:600;transition:border-color .18s,background .18s}
+body[data-page=login] .access-shell .system-version-toggle:hover{border-color:#69a7ff;background:#0f1d33}
+body[data-page=login] .access-shell .system-version-toggle:focus-visible{outline:2px solid #8bb8ff;outline-offset:2px}
+body[data-page=login] .access-shell .system-version-toggle[aria-expanded=true] .login-chevron{transform:rotate(180deg)}
+body[data-page=login] .access-shell .system-version:has(.system-version-unread:not([hidden])) .system-version-toggle::after{content:"";position:absolute;top:-3px;right:-3px;width:8px;height:8px;border-radius:50%;background:#3fd8d0;box-shadow:0 0 0 2px #0b1526}
+body[data-page=login] .access-shell .system-version-quick{display:flex;flex-wrap:wrap;gap:6px}
+body[data-page=login] .access-shell .system-version-quick:not(:has(button:not([hidden]))){display:none}
+body[data-page=login] .access-shell .system-version-more{display:grid;gap:6px;padding:6px 0 2px;border-top:1px solid #1f3352;animation:login-more .18s ease-out}
+body[data-page=login] .access-shell .system-version-more[hidden]{display:none}
+body[data-page=login] .access-shell .system-version-more .system-version-date{font-size:12px;color:#8fa5c4}
+body[data-page=login] .access-shell .system-version-more .system-version-actions{margin:0;padding:0}
+body[data-page=login] .access-shell .system-version-more #stability-login{margin:0;padding:0}
+@keyframes login-more{from{opacity:0;transform:translateY(-3px)}to{opacity:1;transform:none}}
+/* Accesos públicos dentro de la tarjeta */
+body[data-page=login] .access-shell .access-card .login-public{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;width:100%;max-width:none;margin:0;padding:0}
+body[data-page=login] .access-shell .access-card .login-public :is(.login-book,.login-pqrs){width:auto;min-width:0;min-height:48px;margin:0;padding:6px 12px;font-size:13.5px;justify-content:center}
+body[data-page=login] .access-shell .access-card .login-pqrs-text small{font-size:10px;line-height:1.2}
+@media(max-width:380px){body[data-page=login] .access-shell .access-card .login-public{grid-template-columns:minmax(0,1fr)}body[data-page=login] .access-shell .access-card .login-pqrs-text{align-items:center;text-align:center}}
+@media(max-width:480px){body[data-page=login] .access-shell .access-card{width:100%;padding:16px 15px}body[data-page=login] .access-shell{padding-left:12px;padding-right:12px}}
+@media(prefers-reduced-motion:reduce){body[data-page=login] .access-shell :is(.login-chevron,.system-version-toggle,.primary.submit){transition:none}body[data-page=login] .access-shell .system-version-more{animation:none}}
+/* Ajustes Premium Compacto: el fondo de circuitos (decorativo) no ensancha la página en móvil; aviso legal en una columna; fila de versión alineada. */
+body[data-page=login]{overflow-x:clip}
+body[data-page=login] .login-circuits{position:fixed;inset:0;overflow:hidden;pointer-events:none}
+body[data-page=login] .access-shell .access-card .login-ip{grid-template-columns:minmax(0,1fr);grid-template-areas:none}
+body[data-page=login] .access-shell .access-card .login-ip>*{grid-column:1;grid-row:auto}
+body[data-page=login] .access-shell .access-card .system-version-main{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px}
+body[data-page=login] .access-shell .access-card .system-version-text{display:flex;align-items:center;gap:0;margin:0}
+body[data-page=login] .access-shell .access-card .system-version-number{display:inline-flex;align-items:center;padding:0}
+body[data-page=login] .access-shell .access-card .system-version-status{display:flex;align-items:center;gap:6px;flex:1 1 170px}
+body[data-page=login] .access-shell .system-version-more .system-version-checked{font-size:12px;color:#8fa5c4}
+body[data-page=login] .access-shell .system-version-more .system-version-checked:empty{display:none}
+body[data-page=login] .access-shell .access-card .system-version-status{flex:1 1 auto}
+body[data-page=login] .access-shell .brand .original-logo{margin-bottom:2px}
+@media(max-width:480px){body[data-page=login] .access-shell .access-card .system-version-icon{display:none}body[data-page=login] .access-shell .access-card .system-version-main{flex-wrap:nowrap}body[data-page=login] .access-shell .access-card .system-version-status{min-width:0}body[data-page=login] .access-shell .access-card .system-version-label{overflow-wrap:anywhere}}
+/* Logotipo original sin filtros (se quita el halo azul anterior): solo cambia su tamaño. */
+body[data-page=login] .access-shell .brand .original-logo{filter:none}
+@media(max-width:400px){body[data-page=login] .access-shell .brand .brand-sub{flex-direction:column;align-items:center;gap:1px}body[data-page=login] .access-shell .brand .brand-sep{display:none}}
