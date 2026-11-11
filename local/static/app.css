@@ -12100,3 +12100,17 @@ body[data-page=login] .access-shell .brand .original-logo{margin-bottom:2px}
 /* Logotipo original sin filtros (se quita el halo azul anterior): solo cambia su tamaño. */
 body[data-page=login] .access-shell .brand .original-logo{filter:none}
 @media(max-width:400px){body[data-page=login] .access-shell .brand .brand-sub{flex-direction:column;align-items:center;gap:1px}body[data-page=login] .access-shell .brand .brand-sep{display:none}}
+/* ===== 1.5.281 · Barra superior: «Asistencia» con la misma tipografía que los demás elementos. Causa: es un <details>/<summary>, no un
+   enlace; no recibía los estilos de «nav a» y su texto heredaba la regla global «nav span» (19 px, peso 400, altura de línea normal).
+   Se aplican los valores del propio componente de navegación (12 px, peso 500, altura de línea 1.2, separación de 8 px). ===== */
+.premium-header .assistance-menu summary{display:flex;align-items:center;gap:8px;min-height:40px;padding:0 8px;font-family:inherit;font-size:12px;font-weight:500;line-height:1.2;letter-spacing:normal;color:#91a9ca;transition:background .2s,color .2s,border-color .2s}
+.premium-header .assistance-menu summary>span{font-size:inherit;font-weight:inherit;line-height:inherit;white-space:nowrap}
+.premium-header .assistance-menu summary>.field-icon{display:block;flex:none;width:14px;height:14px;stroke-width:2;transition:transform .2s,color .2s}
+.premium-header .assistance-menu[open] summary>.field-icon{transform:rotate(180deg)}
+.premium-header .assistance-menu summary:hover,.premium-header .assistance-menu[open] summary{background:#14273e;color:#c4ddff}
+/* Activo: si la página abierta es una de sus opciones, «Asistencia» se resalta como los demás módulos. */
+.premium-header .assistance-menu:has(a[aria-current=page]) summary{color:#acd0ff;background:#153152;border-color:#2a4e78;box-shadow:inset 0 -2px #4c83c880}
+.premium-header nav .assistance-links a,.premium-header nav .assistance-links a span{font-size:12px;font-weight:500;line-height:1.2}
+@media(prefers-reduced-motion:reduce){.premium-header .assistance-menu summary,.premium-header .assistance-menu summary>.field-icon{transition:none}}
+/* Mismo tamaño que los enlaces en cada pantalla: 13 px en el menú desplegable (menos de 1000 px) y 12 px en la barra de escritorio. */
+@media(max-width:999px){.premium-header .assistance-menu summary,.premium-header nav .assistance-links a,.premium-header nav .assistance-links a span{font-size:13px}}
