@@ -4,6 +4,20 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.276 — 2026-11-11 07:23 (UTC-05:00)
+
+ADI bilingüe: responde en el idioma elegido (Español o English) y cambia al instante
+
+### Mejoras realizadas
+
+- ADI bilingüe: encabezado, saludo, estados, accesos rápidos, consulta de reparación, reserva en el chat, avisos, errores, horas y accesibilidad cambian al instante entre Español y English, sin recargar; la elección se conserva y se sincroniza entre pestañas de acceso.
+- Respuestas en inglés también sin IA disponible (horarios, agenda, licencias del catálogo, contacto) y voz en el idioma elegido (voz natural, transcripción y voz del navegador). Cambiar de idioma no borra ni reescribe la conversación: las respuestas nuevas llegan en el idioma recién elegido.
+
+### Errores corregidos
+
+- ADI respondía en español aunque se eligiera English: el chat no seguía el idioma de la interfaz, no enviaba el idioma con los mensajes y la IA tenía la instrucción fija de hablar español. Ahora el idioma viaja con cada mensaje, el servidor lo valida (solo es-EC o en-US) y redacta él mismo la instrucción de idioma.
+- Chat de ADI: Escape devuelve el foco a la esfera también junto a la tarjeta de acceso, y a 320 px el estado y los botones del pie ya no quedan cortados.
+
 ## v1.5.275 — 2026-11-10 18:53 (UTC-05:00)
 
 WhatsApp Business oficial para los avisos al cliente, con autorización, estados reales y reintentos controlados
