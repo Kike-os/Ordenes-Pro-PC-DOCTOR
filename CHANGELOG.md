@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.281 — 2026-11-11 18:20 (UTC-05:00)
+
+Barra superior uniforme: «Asistencia» con la misma tipografía que el resto del menú
+
+### Errores corregidos
+
+- Barra superior: «Asistencia» aparecía más grande que los demás elementos del menú. Ahora usa la misma letra, tamaño, peso y altura (12 px en escritorio, 13 px en el menú de tableta y móvil), con la flecha alineada que gira al abrir y resaltado activo cuando la página abierta es una de sus opciones.
+
 ## v1.5.280 — 2026-11-11 14:31 (UTC-05:00)
 
 Rediseño Premium Compacto del inicio de sesión

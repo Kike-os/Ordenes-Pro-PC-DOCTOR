@@ -8,6 +8,24 @@
   },
   "releases": [
     {
+      "version": "1.5.281",
+      "date": "2026-11-11T18:20:18-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Barra superior uniforme: «Asistencia» con la misma tipografía que el resto del menú",
+      "changes": {
+        "features": [],
+        "improvements": [],
+        "fixes": [
+          "Barra superior: «Asistencia» aparecía más grande que los demás elementos del menú. Ahora usa la misma letra, tamaño, peso y altura (12 px en escritorio, 13 px en el menú de tableta y móvil), con la flecha alineada que gira al abrir y resaltado activo cuando la página abierta es una de sus opciones."
+        ],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Kike-os: corrección del menú superior y aprobación expresa de publicación de la "
+    },
+    {
       "version": "1.5.280",
       "date": "2026-11-11T14:31:58-05:00",
       "type": "patch",
@@ -25,7 +43,7 @@
         "performance": []
       },
       "published_by": "Kike-os",
-      "authorized_by": "Kike-os: rediseño Premium Compacto del inicio de sesión y aprobación expresa de "
+      "authorized_by": "Kike-os: rediseño Premium Compacto del inicio de sesión y aprobación expresa de"
     },
     {
       "version": "1.5.279",
