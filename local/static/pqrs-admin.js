@@ -31,7 +31,7 @@ async function list(box){const query=new URLSearchParams(Object.entries(state).f
  const bar=el('form',undefined,'pqrs-filters');bar.noValidate=true;const field=(label,node)=>{const l=el('label',undefined,'pqrs-filter-field');l.append(el('span',label),node);return l;};
  const q=el('input');q.type='search';q.placeholder='Código, cliente, correo, asunto u orden';q.value=state.q;q.maxLength=80;
  const sel=(options,value)=>{const s=el('select');for(const[k,v]of options)s.append(new Option(v,k));s.value=value;return s;};
- const category=sel([['','Todos los tipos'],...Object.entries(CATEGORY).map(([k,v])=>[k,v[0]])],state.category),site=sel([['','Todas las sedes'],...data.sites.map(s=>[s,s])],state.site),
+ const category=sel([['','Todos los tipos'],...Object.entries(CATEGORY).map(([k,v])=>[k,v[0]])],state.category),site=sel([['','Todas las sedes'],...data.sites.map(s=>[s.code,s.name])],state.site),
   priority=sel([['','Todas las prioridades'],...Object.entries(PRIORITY)],state.priority),from=el('input'),to=el('input');from.type=to.type='date';from.value=state.from;to.value=state.to;
  bar.append(field('Buscar',q),field('Tipo',category),field('Sede',site),field('Prioridad',priority),field('Desde',from),field('Hasta',to));
  const apply=button('Aplicar filtros',()=>bar.requestSubmit(),'primary');apply.type='submit';const clear=button('Limpiar',()=>{Object.assign(state,{status:'abiertas',category:'',site:'',priority:'',q:'',from:'',to:'',page:1});list(box);});
@@ -55,13 +55,17 @@ async function exportCsv(query){try{const response=await fetch('/api/pqrs/export
   const blob=await response.blob(),url=URL.createObjectURL(blob),a=el('a');a.href=url;a.download='pqrs-'+new Date().toISOString().slice(0,10)+'.csv';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),2000);}
  catch(error){notify(error.message);}}
 
-function sitesDialog(done){const dialog=smallDialog('Sedes o establecimientos');const form=el('form',undefined,'pqrs-sites');const area=el('textarea');area.rows=6;area.maxLength=2000;
- const msg=el('p','','field-error');form.append(el('p','Una sede por línea. Aparecen en el formulario público de PQRS; si hay una sola, se elige sola.','config-note'),area,msg);
- const save=button('Guardar sedes',()=>form.requestSubmit(),'primary');save.type='submit';const row=el('div',undefined,'pqrs-dialog-actions');row.append(save);form.append(row);dialog.append(form);
- api('/api/pqrs/settings').then(s=>{area.value=s.sites.join('\n');area.focus();}).catch(e=>msg.textContent=e.message);
- form.addEventListener('submit',async event=>{event.preventDefault();save.disabled=true;try{await api('/api/pqrs/settings',{sites:area.value});dialog.close();notify('Sedes guardadas.',true);done&&done();}catch(e){msg.textContent=e.fields?.sites||e.message;save.disabled=false;}});}
+// Sedes: cada fila conserva su identificador interno; cambiar el nombre no duplica la sede ni altera las PQRS registradas.
+function sitesDialog(done){const dialog=smallDialog('Sedes o establecimientos');const form=el('form',undefined,'pqrs-sites');form.noValidate=true;const rows=el('div',undefined,'pqrs-site-rows');
+ const msg=el('p','','field-error');const addRow=(site={code:'',name:''})=>{const row=el('div',undefined,'pqrs-site-row');row.dataset.code=site.code;const input=el('input');input.maxLength=80;input.value=site.name;input.setAttribute('aria-label','Nombre de la sede');
+  const tag=el('small',site.code?'Identificador: '+site.code:'Nueva','pqrs-site-code');const remove=button('Quitar',()=>{row.remove();},'secondary');remove.setAttribute('aria-label','Quitar la sede '+(site.name||'nueva'));row.append(input,tag,remove);rows.append(row);return input;};
+ form.append(el('p','El nombre se muestra igual en español y en inglés. Cambiarlo conserva la sede y sus PQRS; no se puede quitar una sede que ya tiene PQRS.','config-note'),rows,button('Añadir sede',()=>addRow().focus()),msg);
+ const save=button('Guardar sedes',()=>form.requestSubmit(),'primary');save.type='submit';const actions=el('div',undefined,'pqrs-dialog-actions');actions.append(save);form.append(actions);dialog.append(form);
+ api('/api/pqrs/settings').then(s=>{for(const site of s.sites)addRow(site);rows.querySelector('input')?.focus();}).catch(e=>msg.textContent=e.message);
+ form.addEventListener('submit',async event=>{event.preventDefault();const sites=[...rows.children].map(r=>({code:r.dataset.code,name:r.querySelector('input').value.trim()})).filter(x=>x.name);
+  if(!sites.length){msg.textContent='Indica al menos una sede.';return;}save.disabled=true;
+  try{await api('/api/pqrs/settings',{sites:JSON.stringify(sites)});dialog.close();notify('Sedes guardadas.',true);done&&done();}catch(e){msg.textContent=e.fields?.sites||e.message;save.disabled=false;}});}
 
-// Impresión A4: se imprime una copia limpia del contenido (sin menús, botones ni campos), con encabezado de la empresa y fecha.
 function printView(scope){document.getElementById('pqrs-print')?.remove();const sheet=el('div');sheet.id='pqrs-print';
  const head=el('header',undefined,'pqrs-print-head');const logo=new Image();logo.src='/static/logo-original.png';logo.alt='PC-DOCTOR S.A.';head.append(logo,el('div'));head.lastChild.append(el('strong','PC-DOCTOR S.A. · PQRS'),el('small','Impreso el '+when(new Date().toISOString())+' por '+(currentUser?.name||'')));
  const copy=scope.cloneNode(true);copy.querySelectorAll('button,select,textarea,input,form,.pqrs-tools,.pqrs-status-filter,.pqrs-pager,.pqrs-control,.pqrs-back').forEach(n=>n.remove());sheet.append(head,copy);document.body.append(sheet);document.body.classList.add('pqrs-printing');

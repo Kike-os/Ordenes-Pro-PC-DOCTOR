@@ -20,7 +20,7 @@ class PqrsTests(unittest.TestCase):
     _w=vars(wab.WhatsAppBusinessTests);session=_w['session'];order=_w['order'];technician=_w['technician'];enable=_w['enable']
 
     def form(self,key='0001',**extra):
-        return dict({'category':'queja','name':'Cliente Ficticio Prueba','email':'cliente@example.invalid','phone':'0991234567','site':'Matriz',
+        return dict({'category':'queja','name':'Cliente Ficticio Prueba','email':'cliente@example.invalid','phone':'0991234567','site':'matriz',
                      'subject':'Demora en la entrega','description':'El equipo no se entregó en la fecha indicada (texto ficticio de prueba).',
                      'privacy_consent':True,'whatsapp_consent':False,'request_key':'pqrs-prueba-solicitud-'+key,'locale':'es-EC'},**extra)
 
@@ -41,7 +41,7 @@ class PqrsTests(unittest.TestCase):
         page=self.request('/pqrs')['body'];page=page if isinstance(page,str) else page.decode()
         self.assertIn('data-i18n-public',page);self.assertLess(page.index('/static/i18n.js'),page.index('/static/pqrs.js'))
         options=self.request('/api/public/pqrs/options')['body']
-        self.assertEqual((options['categories'],options['sites'],options['max_files'],options['max_bytes']),(['peticion','queja','reclamo','sugerencia'],['Matriz'],3,10*1024*1024))
+        self.assertEqual((options['categories'],options['sites'],options['max_files'],options['max_bytes']),(['peticion','queja','reclamo','sugerencia'],[{'code':'matriz','name':'PC-DOCTOR MATRIZ OTAVALO'}],3,10*1024*1024))
         year=app.reception_now().year
         first=self.submit();second=self.submit(key='0002',category='sugerencia',locale='en-US')
         self.assertEqual((first['code'],second['code']),('PQRS-%d-0001'%year,'PQRS-%d-0002'%year))
@@ -164,6 +164,27 @@ class PqrsTests(unittest.TestCase):
         self.assertEqual(rows[self.case(plain['code'])['id']],('pqrs_recibida','omitido','consentimiento'))
         self.assertEqual(rows[self.case(wanted['code'])['id']],('pqrs_recibida','pendiente',''))
         self.assertEqual(tuple(consent),('aceptado','formulario'))
+
+    def test_sites_keep_their_internal_code_when_renamed(self):
+        made=self.submit(key='0070');cid=self.case(made['code'])['id']
+        self.assertEqual(self.case(made['code'])['site'],'matriz')  # el caso guarda el identificador, no el nombre
+        cookie,csrf,post=self.session()
+        self.assertEqual(self.request('/api/pqrs/%d'%cid,cookie=cookie)['body']['site'],'PC-DOCTOR MATRIZ OTAVALO')
+        self.assertEqual(self.request('/api/public/pqrs/track',{'code':made['code'],'token':made['token']})['body']['site'],'PC-DOCTOR MATRIZ OTAVALO')
+        # Configuración anterior (solo nombres) y casos que guardaron el nombre: siguen funcionando, sin duplicar la sede.
+        with app.connect() as c:
+            c.execute("INSERT INTO system_state(key,value) VALUES ('pqrs_settings','{\"sites\": [\"Matriz\"]}') ON CONFLICT(key) DO UPDATE SET value=excluded.value");c.commit()
+        self.assertEqual(self.request('/api/public/pqrs/options')['body']['sites'],[{'code':'matriz','name':'Matriz'}])
+        renamed=post('/api/pqrs/settings',sites=json.dumps([{'code':'matriz','name':'PC-DOCTOR MATRIZ OTAVALO'},{'code':'','name':'Sucursal Ficticia Ibarra'}]))
+        self.assertEqual(renamed['status'],200,renamed['body'])
+        self.assertEqual(renamed['body']['sites'],[{'code':'matriz','name':'PC-DOCTOR MATRIZ OTAVALO'},{'code':'sucursal-ficticia-ibarra','name':'Sucursal Ficticia Ibarra'}])
+        listed=self.request('/api/pqrs?site=matriz&status=',cookie=cookie)['body']
+        self.assertEqual([r['site'] for r in listed['rows']],['PC-DOCTOR MATRIZ OTAVALO'])
+        self.assertEqual(post('/api/pqrs/settings',sites=json.dumps([{'code':'sucursal-ficticia-ibarra','name':'Sucursal Ficticia Ibarra'}]))['status'],409)  # tiene PQRS: no se quita
+        self.assertEqual(post('/api/pqrs/settings',sites=json.dumps([{'code':'matriz','name':'A'},{'code':'','name':'a'}]))['status'],400)  # nombres repetidos
+        other=self.submit(key='0071',site='sucursal-ficticia-ibarra');self.assertEqual(self.case(other['code'])['site'],'sucursal-ficticia-ibarra')
+        self.assertEqual(self.request('/api/public/pqrs',self.form(key='0072',site='sede-inexistente'))['body']['fields'].keys()>={'site'},True)
+        with app.connect() as c:self.assertEqual(c.execute('SELECT COUNT(*) FROM pqrs_cases').fetchone()[0],2)
 
 
 if __name__=='__main__':

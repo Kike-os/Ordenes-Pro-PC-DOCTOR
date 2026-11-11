@@ -20,9 +20,14 @@ async function api(url,data){let response;try{response=await fetch(url,{method:d
 const form=$('pqrs-form'),message=form.querySelector('.appointment-message'),submit=$('pqrs-submit'),done=$('pqrs-done');
 let options={max_files:3,max_bytes:10485760,part_bytes:2621440,sites:[]},draft=randomId(16),requestKey='pqrs-'+randomId(20),busy=false;
 const files=[];// {file,token,state:'subiendo'|'lista'|'error',progress,error,thumb,url}
-function paintSites(){const select=form.elements.site,keep=select.value;select.replaceChildren(tx(new Option('',''),options.sites.length>1?'Elige la sede':'Cargando…'));for(const site of options.sites)select.add(new Option(site,site));
- if(options.sites.length===1)select.value=options.sites[0];else if(options.sites.includes(keep))select.value=keep;}
-api('/api/public/pqrs/options').then(data=>{options=data;paintSites();}).catch(error=>tx(message,error.message));
+// Sede: el valor es el identificador interno y el texto, su nombre propio (igual en ambos idiomas). Mientras carga, el campo lo indica.
+const siteBox=form.elements.site.closest('.pqrs-select');let sitesLoaded=false;
+function paintSites(){const select=form.elements.site,keep=select.value;const first=tx(new Option('',''),!sitesLoaded?'Cargando…':options.sites.length>1?'Elige la sede':'Cargando…');first.disabled=sitesLoaded&&options.sites.length>1;
+ select.replaceChildren(...(options.sites.length===1?[]:[first]));for(const site of options.sites)select.add(new Option(site.name,site.code));
+ if(options.sites.length===1)select.value=options.sites[0].code;else if(options.sites.some(x=>x.code===keep))select.value=keep;else select.value='';
+ if(siteBox)siteBox.dataset.state=sitesLoaded?'ready':'loading';select.disabled=!sitesLoaded;}
+paintSites();
+api('/api/public/pqrs/options').then(data=>{options=data;sitesLoaded=true;paintSites();}).catch(error=>{tx(message,error.message);if(siteBox)siteBox.dataset.state='error';});
 const hint=name=>form.querySelector('[data-error="'+name+'"]');
 function showErrors(errors){form.querySelectorAll('[aria-invalid]').forEach(n=>n.removeAttribute('aria-invalid'));form.querySelectorAll('.appointment-error').forEach(n=>tx(n,''));
  for(const[name,text]of Object.entries(errors||{})){const box=hint(name);if(box)tx(box,text);const input=name==='category'?form.querySelector('input[name=category]'):name==='files'?$('pqrs-file-input'):form.elements[name];

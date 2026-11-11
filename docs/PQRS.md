@@ -4,7 +4,7 @@ Canal oficial para que los clientes presenten peticiones, quejas, reclamos y sug
 
 ## Decisiones de administración (11/11/2026)
 
-- **Sedes:** lista configurable. Al principio solo existe «Matriz»; con una sola sede, el formulario la deja elegida.
+- **Sedes:** lista configurable. La sede inicial es **PC-DOCTOR MATRIZ OTAVALO** (identificador interno `matriz`); con una sola sede, el formulario la deja elegida. Desde la 1.5.279 cada sede tiene un identificador fijo y un nombre visible: los casos guardan el identificador, el nombre se muestra igual en español y en inglés, renombrar no duplica la sede ni altera las PQRS, y una sede con PQRS no se puede quitar. Las configuraciones antiguas (solo nombres) siguen funcionando.
 - **Permisos:**
   - Administración ve y gestiona todas las PQRS.
   - Un técnico solo ve y responde las que tiene asignadas. No puede cerrar, reabrir, asignar, cambiar la prioridad ni exportar.

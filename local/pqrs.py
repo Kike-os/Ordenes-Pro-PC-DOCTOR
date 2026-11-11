@@ -39,7 +39,9 @@ MAX_BYTES = 10 * 1024 * 1024
 PART_BYTES = 2_621_440
 THUMB_BYTES = 300_000
 SETTINGS_KEY = 'pqrs_settings'
-DEFAULTS = {'sites': ['Matriz']}
+# Sedes (1.5.279): identificador interno fijo + nombre visible. Los casos guardan el identificador; renombrar una sede no cambia
+# ni duplica nada. El nombre es un nombre propio: se muestra igual en español y en inglés.
+DEFAULTS = {'sites': [{'code': 'matriz', 'name': 'PC-DOCTOR MATRIZ OTAVALO'}]}
 EMAIL_RE = re.compile(r'[^\s@<>]+@[^\s@<>.]+(?:\.[^\s@<>.]+)+')
 CONTROL = re.compile(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]')
 FIRST_RESPONSE_HOURS = 48  # indicador interno: casos abiertos sin primera respuesta pasado este plazo
@@ -73,29 +75,88 @@ def label(table, key, lang):
 
 
 # ---- Configuración ------------------------------------------------------------------------------------------------------------
+def slug(text):
+    import unicodedata
+    plain = ''.join(ch for ch in unicodedata.normalize('NFD', str(text or '').casefold()) if not unicodedata.combining(ch))
+    return re.sub(r'[^a-z0-9]+', '-', plain).strip('-')[:40] or 'sede'
+
+
+def _site_list(raw):
+    """Lista guardada → [{'code','name'}]. Acepta el formato anterior (solo nombres): el identificador sale del nombre."""
+    out, seen = [], set()
+    for item in raw if isinstance(raw, list) else []:
+        if isinstance(item, dict):
+            code, name = slug(item.get('code') or item.get('name')), clean(item.get('name'), 80)
+        else:
+            code, name = slug(item), clean(item, 80)
+        if name and code not in seen:
+            out.append({'code': code, 'name': name})
+            seen.add(code)
+    return out
+
+
 def settings(c):
     row = c.execute('SELECT value FROM system_state WHERE key=?', (SETTINGS_KEY,)).fetchone()
-    data = dict(DEFAULTS)
+    data = {'sites': [dict(x) for x in DEFAULTS['sites']]}
     if row:
         try:
-            saved = json.loads(row['value'])
-            if isinstance(saved.get('sites'), list) and saved['sites']:
-                data['sites'] = [str(x) for x in saved['sites']]
+            sites = _site_list(json.loads(row['value']).get('sites'))
+            if sites:
+                data['sites'] = sites
         except (ValueError, TypeError, AttributeError):
             pass
     return data
 
 
+def site_code(c, value):
+    """Identificador de una sede a partir de su identificador o de su nombre (también de casos anteriores que guardaron el nombre)."""
+    value = str(value or '').strip()
+    for site in settings(c)['sites']:
+        if value.casefold() in (site['code'], site['name'].casefold()) or slug(value) == site['code']:
+            return site['code']
+    return ''
+
+
+def site_name(c, value, sites=None):
+    """Nombre visible vigente de la sede guardada en un caso (identificador o nombre antiguo); si ya no existe, el valor guardado."""
+    value = str(value or '')
+    for site in sites if sites is not None else settings(c)['sites']:
+        if value.casefold() in (site['code'], site['name'].casefold()) or slug(value) == site['code']:
+            return site['name']
+    return value
+
+
 def save_settings(c, data, user, now):
     if user['role'] != 'administrador':
         raise PqrsError('Acceso no permitido.', 403)
-    raw = str(data.get('sites', ''))
-    sites, seen = [], set()
-    for line in raw.split('\n'):
-        name = clean(line, 80)
-        if name and name.casefold() not in seen:
-            sites.append(name)
-            seen.add(name.casefold())
+    try:
+        rows = json.loads(str(data.get('sites', '[]')))
+    except ValueError:
+        rows = None
+    if not isinstance(rows, list):
+        raise PqrsError('Lista de sedes no válida.', 400, {'sites': 'Lista de sedes no válida.'})
+    current = {x['code'] for x in settings(c)['sites']}
+    sites, codes, names = [], set(), set()
+    for row in rows[:25]:
+        if not isinstance(row, dict):
+            continue
+        name = clean(row.get('name'), 80)
+        if not name:
+            continue
+        if name.casefold() in names:
+            raise PqrsError('Hay dos sedes con el mismo nombre.', 400, {'sites': 'Hay dos sedes con el mismo nombre.'})
+        code = str(row.get('code') or '')
+        if code not in current:
+            code, n = slug(name), 2
+            while code in codes or code in current:
+                code, n = slug(name)[:36] + '-' + str(n), n + 1
+        sites.append({'code': code, 'name': name})
+        codes.add(code)
+        names.add(name.casefold())
+    for gone in current - codes:
+        if c.execute('SELECT 1 FROM pqrs_cases WHERE lower(site)=? LIMIT 1', (gone,)).fetchone() or any(
+                c.execute('SELECT 1 FROM pqrs_cases WHERE lower(site)=lower(?) LIMIT 1', (x['name'],)).fetchone() for x in settings(c)['sites'] if x['code'] == gone):
+            raise PqrsError('No se puede quitar una sede que ya tiene PQRS registradas. Puedes cambiarle el nombre.', 409, {'sites': 'No se puede quitar una sede que ya tiene PQRS registradas. Puedes cambiarle el nombre.'})
     if not sites:
         raise PqrsError('Indica al menos una sede.', 400, {'sites': 'Indica al menos una sede.'})
     if len(sites) > 20:
@@ -294,8 +355,8 @@ def validate(c, data):
         errors['phone'] = 'Ingresa un número de contacto válido.'
     fields['phone'] = (phones.normalize(phone)[0] or phone) if phone else ''
     sites = settings(c)['sites']
-    fields['site'] = clean(data.get('site'), 80) or (sites[0] if len(sites) == 1 else '')
-    if fields['site'] not in sites:
+    fields['site'] = site_code(c, clean(data.get('site'), 80)) or (sites[0]['code'] if len(sites) == 1 and not clean(data.get('site'), 80) else '')
+    if not fields['site']:
         errors['site'] = 'Elige la sede o establecimiento.'
     fields['subject'] = clean(data.get('subject'), 150)
     if len(fields['subject']) < 5:
@@ -511,7 +572,7 @@ def public_view(c, code, token):
     for ev in c.execute("SELECT kind,body,new_value,created_at FROM pqrs_events WHERE case_id=? AND public=1 ORDER BY id", (row['id'],)):
         timeline.append({'kind': ev['kind'], 'body': ev['body'] if ev['kind'] in ('respuesta', 'mensaje_cliente', 'cierre', 'reapertura') else '',
                          'status': ev['new_value'] if ev['kind'] in ('creada', 'estado', 'cierre', 'reapertura') else '', 'at': ev['created_at']})
-    return {'code': row['code'], 'category': row['category'], 'status': row['status'], 'site': row['site'], 'subject': row['subject'], 'created_at': row['created_at'],
+    return {'code': row['code'], 'category': row['category'], 'status': row['status'], 'site': site_name(c, row['site']), 'subject': row['subject'], 'created_at': row['created_at'],
             'updated_at': row['updated_at'], 'language': row['language'], 'timeline': timeline, 'can_reply': row['status'] != 'cerrada',
             'files': c.execute("SELECT COUNT(*) FROM pqrs_uploads WHERE case_id=? AND status='usada'", (row['id'],)).fetchone()[0]}
 
@@ -582,8 +643,8 @@ def _filters(user, params):
         where.append('p.category=?')
         args.append(get('category'))
     if get('site'):
-        where.append('p.site=?')
-        args.append(get('site')[:80])
+        where.append('(lower(p.site)=lower(?) OR lower(p.site)=lower(?))')
+        args += [get('site')[:80], params.get('_site_name', '')]
     if get('priority') in PRIORITIES:
         where.append('p.priority=?')
         args.append(get('priority'))
@@ -605,6 +666,9 @@ def _filters(user, params):
 
 def list_cases(c, user, params, now):
     _staff(user)
+    sites = settings(c)['sites']
+    params = dict(params)
+    params['_site_name'] = next((x['name'] for x in sites if x['code'] == str(params.get('site', ''))), '')
     where, args = _filters(user, params)
     try:
         page = max(1, int(str(params.get('page', '1'))))
@@ -615,9 +679,11 @@ def list_cases(c, user, params, now):
                                        'p.first_response_at,p.closed_at,u.name assigned_name FROM pqrs_cases p LEFT JOIN users u ON u.id=p.assigned_to WHERE ' + where +
                                        " ORDER BY CASE p.status WHEN 'recibida' THEN 0 WHEN 'cerrada' THEN 2 ELSE 1 END, CASE p.priority WHEN 'urgente' THEN 0 WHEN 'alta' THEN 1 WHEN 'normal' THEN 2 ELSE 3 END, p.id DESC LIMIT 25 OFFSET ?",
                                        args + [(page - 1) * 25])]
+    for row in rows:
+        row['site'] = site_name(c, row['site'], sites)
     scope = ('p.assigned_to=?', (user['id'],)) if user['role'] != 'administrador' else ('1=1', ())
     return {'rows': rows, 'total': total, 'page': page, 'pages': max(1, -(-total // 25)), 'metrics': metrics(c, now, scope[0].replace('p.', ''), scope[1]),
-            'sites': settings(c)['sites'], 'admin': user['role'] == 'administrador'}
+            'sites': sites, 'admin': user['role'] == 'administrador'}
 
 
 def new_count(c, user):
@@ -633,6 +699,7 @@ def detail(c, user, cid):
     row.pop('track_hash', None)
     row.pop('request_key', None)
     row.pop('ip_hash', None)
+    row['site'] = site_name(c, row['site'])
     row['assigned_name'] = (c.execute('SELECT name FROM users WHERE id=?', (row['assigned_to'],)).fetchone() or {'name': ''})['name'] if row['assigned_to'] else ''
     if row['order_id']:
         order = c.execute('SELECT id,code FROM orders WHERE id=?', (row['order_id'],)).fetchone()
@@ -771,6 +838,9 @@ def file_part(c, user, cid, fid, idx):
 def export_csv(c, user, params):
     if user['role'] != 'administrador':
         raise PqrsError('Acceso no permitido.', 403)
+    sites = settings(c)['sites']
+    params = dict(params)
+    params['_site_name'] = next((x['name'] for x in sites if x['code'] == str(params.get('site', ''))), '')
     where, args = _filters(user, params)
     out = io.StringIO()
     writer = csv.writer(out)
@@ -778,7 +848,7 @@ def export_csv(c, user, params):
                      'Responsable', 'Recibida', 'Primera respuesta', 'Cerrada'])
     for r in c.execute('SELECT p.*,u.name assigned_name FROM pqrs_cases p LEFT JOIN users u ON u.id=p.assigned_to WHERE ' + where + ' ORDER BY p.id', args):
         cells = [r['code'], CATEGORY_LABELS[r['category']][0], STATUS_LABELS[r['status']][0], PRIORITY_LABELS[r['priority']], r['language'], r['name'], r['email'], r['phone'],
-                 r['site'], r['subject'], r['order_code'], 'Sí' if r['order_verified'] else 'No', r['assigned_name'] or '', r['created_at'], r['first_response_at'], r['closed_at']]
+                 site_name(c, r['site'], sites), r['subject'], r['order_code'], 'Sí' if r['order_verified'] else 'No', r['assigned_name'] or '', r['created_at'], r['first_response_at'], r['closed_at']]
         # Una celda que empieza por =, +, - o @ se abriría como fórmula en una hoja de cálculo: se antepone un apóstrofo.
         writer.writerow(["'" + str(x) if str(x)[:1] in ('=', '+', '-', '@') else x for x in cells])
     return '﻿' + out.getvalue()
