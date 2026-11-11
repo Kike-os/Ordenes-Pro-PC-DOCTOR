@@ -94,11 +94,15 @@ EVENTS = {
     'cita_confirmada': ('Cita confirmada', 'cita', 'su cita {ref} quedó confirmada para el {cuando}', 'Cuando la cita queda confirmada.', True),
     'cita_reprogramada': ('Cita reprogramada', 'cita', 'su cita {ref} fue reprogramada para el {cuando}', 'Cuando la cita cambia de fecha u hora.', True),
     'cita_cancelada': ('Cita cancelada', 'cita', 'su cita {ref} del {cuando} fue cancelada', 'Cuando la cita se cancela.', True),
+    # 1.5.278 · PQRS: solo si el cliente marcó la autorización de WhatsApp en el formulario.
+    'pqrs_recibida': ('PQRS recibida', 'pqrs', 'registramos su {tipo} con el número {ref}; le responderemos por correo y por este medio', 'Cuando el cliente envía una PQRS.', True),
+    'pqrs_actualizada': ('Actualización de la PQRS', 'pqrs', 'su solicitud {ref} está ahora «{estado}»', 'Cuando cambia el estado de la PQRS (incluido el cierre).', True),
+    'pqrs_respondida': ('Respuesta a la PQRS', 'pqrs', 'respondimos su solicitud {ref}; puede leer la respuesta en su correo o en el enlace de seguimiento', 'Cuando el personal responde al cliente.', True),
 }
-GROUPS = {'orden': 'Órdenes de reparación', 'repuesto': 'Repuestos', 'cita': 'Citas'}
+GROUPS = {'orden': 'Órdenes de reparación', 'repuesto': 'Repuestos', 'cita': 'Citas', 'pqrs': 'PQRS'}
 # Datos que recibe la plantilla propia de cada evento ({{1}}, {{2}}, {{3}}).
 PARAMS = {'orden': ('Nombre del cliente', 'Número de orden', 'Equipo'), 'repuesto': ('Nombre del cliente', 'Número de orden', 'Repuesto'),
-          'cita': ('Nombre del cliente', 'Código de la cita', 'Fecha y hora')}
+          'cita': ('Nombre del cliente', 'Código de la cita', 'Fecha y hora'), 'pqrs': ('Nombre del cliente', 'Código PQRS', 'Estado')}
 GENERAL_PARAMS = ('Nombre del cliente', 'Número de orden o de cita', 'Texto del aviso')
 # Estado de la orden → evento de WhatsApp.
 STATUS_EVENTS = {'diagnostico': 'diagnostico', 'presupuesto': 'presupuesto_pendiente', 'esperando_cliente': 'esperando_cliente', 'esperando_repuesto': 'esperando_repuesto',
@@ -391,8 +395,15 @@ def _when(value):
     return moment.strftime('%d/%m/%Y a las %H:%M')
 
 
-def subject(c, event, order_id=None, part_request_id=None, appointment_id=None):
+def subject(c, event, order_id=None, part_request_id=None, appointment_id=None, pqrs_id=None):
     """Destinatario y datos reales del aviso: dict con phone, client_id, name, ref, equipo/repuesto/cuando y order_id."""
+    if pqrs_id:
+        import pqrs
+        p = c.execute('SELECT * FROM pqrs_cases WHERE id=?', (pqrs_id,)).fetchone()
+        if not p:
+            return None
+        return {'phone': p['phone'], 'client_id': p['client_id'], 'name': p['name'], 'ref': p['code'], 'order_id': None, 'pqrs': dict(p),
+                'tipo': pqrs.CATEGORY_LABELS[p['category']][0].lower(), 'estado': pqrs.STATUS_LABELS[p['status']][0]}
     if appointment_id:
         a = c.execute('SELECT * FROM appointments WHERE id=?', (appointment_id,)).fetchone()
         if not a:
@@ -418,10 +429,11 @@ def compose(event, info, cfg):
     """Plantilla, idioma, variables y texto legible. Usa la plantilla propia del evento o, si no hay, la plantilla general."""
     label, group = EVENTS[event][0], EVENTS[event][1]
     ev = cfg['events'][event]
-    phrase = EVENTS[event][2].format(equipo=info.get('equipo', ''), repuesto='«%s»' % info.get('repuesto', ''), ref=info.get('ref', ''), cuando=info.get('cuando', ''))
+    phrase = EVENTS[event][2].format(equipo=info.get('equipo', ''), repuesto='«%s»' % info.get('repuesto', ''), ref=info.get('ref', ''), cuando=info.get('cuando', ''),
+                                     tipo=info.get('tipo', ''), estado=info.get('estado', ''))
     preview = '%s: %s.' % (_first(info['name']), phrase[0].upper() + phrase[1:])
     if ev['template']:
-        third = {'orden': info.get('equipo', ''), 'repuesto': info.get('repuesto', ''), 'cita': info.get('cuando', '')}[group]
+        third = {'orden': info.get('equipo', ''), 'repuesto': info.get('repuesto', ''), 'cita': info.get('cuando', ''), 'pqrs': info.get('estado', '')}[group]
         return {'template': ev['template'], 'lang': ev['lang'] or cfg['general_lang'] or 'es', 'params': [_first(info['name']), info.get('ref', ''), third],
                 'preview': preview, 'label': label}
     if cfg['general_template']:
@@ -438,7 +450,12 @@ def blockers(c, event, info, cfg, env=None):
     if not number:
         return 'telefono', 'El cliente no tiene un celular válido para WhatsApp.'
     consent = consent_state(c, number)
-    if event.startswith('cita_'):
+    if event.startswith('pqrs_'):
+        if consent['state'] == 'rechazado':
+            return 'consentimiento', 'El cliente pidió no recibir avisos por WhatsApp.'
+        if not (info.get('pqrs') or {}).get('whatsapp_consent'):
+            return 'consentimiento', 'El cliente no autorizó avisos por WhatsApp en el formulario PQRS.'
+    elif event.startswith('cita_'):
         appointment = info.get('appointment') or {}
         if consent['state'] == 'rechazado':
             return 'consentimiento', 'El cliente pidió no recibir avisos por WhatsApp.'
@@ -466,7 +483,7 @@ def _repeated(c, event, order_id, appointment_id, now):
     return ''
 
 
-def enqueue(c, event, key, now, order_id=None, part_request_id=None, appointment_id=None, source='', delay=0, actor=None, manual=False, env=None):
+def enqueue(c, event, key, now, order_id=None, part_request_id=None, appointment_id=None, source='', delay=0, actor=None, manual=False, env=None, pqrs_id=None):
     """Registra un aviso (uno por clave). Automático: solo con los envíos activados y el evento habilitado; si no, no se crea nada.
     Devuelve el id pendiente de enviar, o None (omitido, repetido o desactivado)."""
     if event not in EVENTS:
@@ -474,7 +491,7 @@ def enqueue(c, event, key, now, order_id=None, part_request_id=None, appointment
     cfg = settings(c)
     if not manual and (not cfg['auto'] or not ready(env) or not cfg['events'][event]['on']):
         return None
-    info = subject(c, event, order_id, part_request_id, appointment_id)
+    info = subject(c, event, order_id, part_request_id, appointment_id, pqrs_id)
     if not info:
         return None
     kind, reason = blockers(c, event, info, cfg, env)
@@ -486,10 +503,10 @@ def enqueue(c, event, key, now, order_id=None, part_request_id=None, appointment
     msg = compose(event, info, cfg)
     status = 'omitido' if reason else 'pendiente'
     cur = c.execute('INSERT INTO whatsapp_outbox(dedupe_key,event,source,order_id,client_id,appointment_id,part_request_id,recipient,template,template_lang,params,preview,'
-                    'status,detail,reason_kind,next_attempt_at,created_by,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(dedupe_key) DO NOTHING',
+                    'status,detail,reason_kind,next_attempt_at,created_by,created_at,updated_at,pqrs_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(dedupe_key) DO NOTHING',
                     (key[:120], event, source[:40], info['order_id'], info.get('client_id'), appointment_id, part_request_id, number_for(info['phone']), msg['template'],
                      msg['lang'], json.dumps(msg['params'], ensure_ascii=False), msg['preview'], status, reason, kind,
-                     '' if reason else stamp(now + timedelta(minutes=delay)), actor, stamp(now), stamp(now)))
+                     '' if reason else stamp(now + timedelta(minutes=delay)), actor, stamp(now), stamp(now), pqrs_id))
     if not cur.rowcount:
         return None
     return None if reason else cur.lastrowid
@@ -667,7 +684,7 @@ def send_one(c, nid, now, env=None):
     reason = still_true(c, row)
     kind = 'cambio' if reason else ''
     if not reason and row['source'] != 'prueba':
-        info = subject(c, row['event'], row['order_id'], row['part_request_id'], row['appointment_id'])
+        info = subject(c, row['event'], row['order_id'], row['part_request_id'], row['appointment_id'], row['pqrs_id'])
         if not info:
             kind, reason = 'datos', 'La orden o la cita ya no está disponible.'
         else:
@@ -746,7 +763,7 @@ def can_retry(c, row, env=None):
     if row['status'] == 'fallido':
         return not row['permanent'] or row['reason_kind'] in RETRIABLE_BY_HAND
     if row['status'] == 'omitido' and row['reason_kind'] in ('consentimiento', 'plantilla', 'config', 'telefono'):
-        info = subject(c, row['event'], row['order_id'], row['part_request_id'], row['appointment_id'])
+        info = subject(c, row['event'], row['order_id'], row['part_request_id'], row['appointment_id'], row['pqrs_id'])
         return bool(info) and not still_true(c, row) and blockers(c, row['event'], info, settings(c), env) == ('', '')
     return False
 
@@ -759,7 +776,7 @@ def retry(c, nid, user, now, env=None):
         raise WhatsAppError('Aviso no disponible.', 404)
     if not can_retry(c, row, env):
         raise WhatsAppError('Este aviso no se puede reintentar: revisa el motivo indicado.', 409)
-    info = subject(c, row['event'], row['order_id'], row['part_request_id'], row['appointment_id'])
+    info = subject(c, row['event'], row['order_id'], row['part_request_id'], row['appointment_id'], row['pqrs_id'])
     msg = compose(row['event'], info, settings(c))
     c.execute("UPDATE whatsapp_outbox SET status='pendiente',permanent=0,reason_kind='',next_attempt_at=?,template=?,template_lang=?,params=?,recipient=?,"
               'detail=?,updated_at=? WHERE id=?', (stamp(now), msg['template'], msg['lang'], json.dumps(msg['params'], ensure_ascii=False), number_for(info['phone']),

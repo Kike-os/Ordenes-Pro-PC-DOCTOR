@@ -382,6 +382,12 @@ def build(c, user, now, mail_access=False, hidden=False):
             items.append({'key': 'event:' + str(row['id']), 'kind': kind, 'icon': icon, 'title': row['code'] + ' · ' + label,
                           'detail': ' · '.join(part for part in (text, row['actor']) if part), 'at': row['occurred_at'], 'href': '#orders?id=' + str(row['order_id']), 'group': 'event'})
     read = {row['key'] for row in c.execute('SELECT key FROM notification_reads WHERE user_id=?', (user['id'],))}
+    # PQRS (1.5.278): administración ve cada PQRS nueva; un técnico, las que tiene asignadas.
+    try:
+        import pqrs
+        items += pqrs.notifications(c, user, now)
+    except Exception as error:
+        print('pqrs avisos', type(error).__name__, flush=True)
     # Avisos ocultos por esta persona: no se borran; se consultan aparte («Ver ocultas») y se pueden volver a mostrar.
     concealed = {row['key'] for row in c.execute('SELECT key FROM notification_hidden WHERE user_id=?', (user['id'],))}
     items = [item for item in items if (item['key'] in concealed) == hidden]

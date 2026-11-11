@@ -90,6 +90,7 @@
 - versión, estado y estabilidad del sistema;
 - asistente ADI público: interfaz, respuestas, voz, consulta de reparación y reserva en el chat (1.5.276);
 - Agenda de Citas pública `/citas`: las cuatro etapas, validaciones, disponibilidad, confirmación y pie (1.5.277);
+- PQRS públicas `/pqrs` y `/pqrs/seguimiento`, botón «PQRS» del inicio y correos al cliente en su idioma (1.5.278; ver `docs/PQRS.md`). `i18n.bind()` enlaza los textos de una plantilla a su traducción;
 - ventana de actualizaciones (las notas de cada versión se publican en español);
 - navegación principal;
 - menú de cuenta;

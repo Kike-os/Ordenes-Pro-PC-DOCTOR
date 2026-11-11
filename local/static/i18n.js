@@ -20,14 +20,14 @@ const CATALOG={
   'ip.text':'Órdenes Pro es un sistema desarrollado para uso exclusivo de PC-DOCTOR S.A. Se prohíbe su reproducción, distribución, comercialización, modificación o acceso no autorizado al código fuente.',
   'ip.rights':'© 2026 PC-DOCTOR S.A. | Todos los derechos reservados.',
   'version.title':'Versión del sistema','version.view':'Ver las actualizaciones del sistema','version.checking':'Comprobando actualizaciones…','version.news':'Actualizaciones del sistema',
-  'version.retry':'Reintentar','version.reload':'Recargar página','login.book':'Agendar cita',
+  'version.retry':'Reintentar','version.reload':'Recargar página','login.book':'Agendar cita','login.pqrs':'PQRS','login.pqrs_sub':'Peticiones, quejas, reclamos y sugerencias','login.public':'Atención al cliente',
   'forgot.doc':'Recuperar acceso | Órdenes Pro','forgot.title':'Recuperar acceso','forgot.intro':'Introduce tu correo para solicitar un enlace seguro de restablecimiento.',
   'forgot.email':'Correo electrónico','forgot.email_ph':'nombre@empresa.com','forgot.submit':'Enviar enlace de recuperación','auth.back':'Volver a iniciar sesión',
   'reset.doc':'Nueva contraseña | Órdenes Pro','reset.title':'Crear nueva contraseña','reset.intro':'Utiliza al menos {n} caracteres. Puedes usar una frase larga y tu gestor de contraseñas.',
   'reset.password':'Nueva contraseña','reset.strength':'Fortaleza estimada de contraseña','reset.strength_hint':'Fortaleza estimada; prioriza longitud y palabras poco predecibles.',
   'reset.repeat':'Confirmar contraseña','reset.submit':'Guardar contraseña',
   'nav.main':'Navegación principal','nav.home':'Inicio','nav.orders':'Órdenes','nav.clients':'Clientes','nav.devices':'Equipos','nav.reports':'Reportes','nav.settings':'Configuración',
-  'nav.appointments':'Citas','nav.sales':'Ventas','nav.licenses':'Licencias','nav.invoicing':'Facturación','nav.inventory':'Inventario','nav.mail':'Correo','nav.system':'Sistema',
+  'nav.appointments':'Citas','nav.pqrs':'PQRS','nav.sales':'Ventas','nav.licenses':'Licencias','nav.invoicing':'Facturación','nav.inventory':'Inventario','nav.mail':'Correo','nav.system':'Sistema',
   'nav.assistance':'Asistencia','nav.live':'Atención en vivo','nav.adi':'ADI administrativa',
   'account.open':'Abrir menú de cuenta','account.logout':'Cerrar sesión','account.notifications':'Notificaciones','account.loading':'Cargando…',
   'notify.title':'Centro de notificaciones','notify.read':'Marcar todas como leídas','notify.history':'Ver el historial',
@@ -44,14 +44,14 @@ const CATALOG={
   'ip.text':'Órdenes Pro is a system developed for the exclusive use of PC-DOCTOR S.A. Reproduction, distribution, commercialization, modification or unauthorized access to the source code is prohibited.',
   'ip.rights':'© 2026 PC-DOCTOR S.A. | All rights reserved.',
   'version.title':'System Version','version.view':'View system updates','version.checking':'Checking for updates…','version.news':'System Updates',
-  'version.retry':'Retry','version.reload':'Reload page','login.book':'Book an Appointment',
+  'version.retry':'Retry','version.reload':'Reload page','login.book':'Book an Appointment','login.pqrs':'PQRS','login.pqrs_sub':'Requests, complaints, claims and suggestions','login.public':'Customer support',
   'forgot.doc':'Recover access | Órdenes Pro','forgot.title':'Recover access','forgot.intro':'Enter your email to request a secure reset link.',
   'forgot.email':'Email','forgot.email_ph':'name@company.com','forgot.submit':'Send recovery link','auth.back':'Back to sign in',
   'reset.doc':'New password | Órdenes Pro','reset.title':'Create a new password','reset.intro':'Use at least {n} characters. You can use a long passphrase and your password manager.',
   'reset.password':'New password','reset.strength':'Estimated password strength','reset.strength_hint':'Estimated strength; favor length and unpredictable words.',
   'reset.repeat':'Confirm password','reset.submit':'Save password',
   'nav.main':'Main navigation','nav.home':'Home','nav.orders':'Orders','nav.clients':'Clients','nav.devices':'Devices','nav.reports':'Reports','nav.settings':'Settings',
-  'nav.appointments':'Appointments','nav.sales':'Sales','nav.licenses':'Licenses','nav.invoicing':'Invoicing','nav.inventory':'Inventory','nav.mail':'Mail','nav.system':'System',
+  'nav.appointments':'Appointments','nav.pqrs':'PQRS','nav.sales':'Sales','nav.licenses':'Licenses','nav.invoicing':'Invoicing','nav.inventory':'Inventory','nav.mail':'Mail','nav.system':'System',
   'nav.assistance':'Assistance','nav.live':'Live support','nav.adi':'Administrative ADI',
   'account.open':'Open account menu','account.logout':'Sign out','account.notifications':'Notifications','account.loading':'Loading…',
   'notify.title':'Notification center','notify.read':'Mark all as read','notify.history':'View history',
@@ -329,6 +329,45 @@ Object.assign(PHRASES,{
  // Tipos de equipo de la agenda que faltaban
  'Notebook':'Notebook','Mini PC':'Mini PC','All-in-One':'All-in-One','Tablet':'Tablet','Monitor':'Monitor','Mouse':'Mouse'
 });
+// 1.5.278 · PQRS: página pública, seguimiento, validaciones y mensajes del servidor. Los datos del cliente y los códigos no se traducen.
+Object.assign(PHRASES,{
+ 'PQRS':'PQRS','Volver a la página principal':'Back to the home page','Inicio':'Home','PC-DOCTOR S.A. · ATENCIÓN AL CLIENTE':'PC-DOCTOR S.A. · CUSTOMER SUPPORT',
+ 'Canal oficial para presentar peticiones, quejas, reclamos y sugerencias relacionadas con nuestros servicios.':'Official channel to submit requests, complaints, claims and suggestions about our services.',
+ 'Tu opinión es importante para nosotros. Comparte tu experiencia y nuestro equipo te ayudará a encontrar una solución.':'Your opinion matters to us. Share your experience and our team will help you find a solution.',
+ 'Consultar estado':'Track Request','Tipo de solicitud':'Request type','Petición':'Request','Queja':'Complaint','Reclamo':'Claim','Sugerencia':'Suggestion',
+ 'Solicitudes de información o servicios.':'Requests for information or services.','Inconformidades relacionadas con la atención recibida.':'Dissatisfaction with the service received.',
+ 'Solicitudes de revisión o solución de problemas.':'Requests to review or solve a problem.','Propuestas para mejorar nuestros servicios.':'Proposals to improve our services.',
+ 'Nombres y apellidos completos':'Full Name','Correo electrónico':'Email Address','Sede o establecimiento':'Location','Elige la sede':'Choose the location',
+ 'Número de orden de reparación (opcional)':'Repair order number (optional)','Identificación del titular de la orden (opcional)':'ID of the order holder (optional)',
+ 'Solo para relacionar tu solicitud con la orden. Por seguridad, no mostramos datos de la orden.':'Only used to link your request to the order. For security, we do not show order details.',
+ 'Asunto':'Subject','Descripción detallada de la solicitud':'Detailed description of your request','Archivos adjuntos (opcional)':'Attachments (optional)','Adjuntar archivos':'Attach files',
+ 'Hasta 3 archivos: fotografías (JPG, PNG, WEBP) o PDF de hasta 10 MB cada uno.':'Up to 3 files: photos (JPG, PNG, WEBP) or PDF, up to 10 MB each.',
+ 'He leído y acepto la':'I have read and accept the','política de privacidad y tratamiento de datos personales':'privacy and personal data processing policy',
+ 'Autorizo recibir avisos de esta solicitud por WhatsApp. (Opcional)':'I authorize receiving updates about this request by WhatsApp. (Optional)',
+ 'Enviar solicitud':'Submit Request','Enviando…':'Sending…','Listo':'Ready','No se pudo adjuntar':'Could not attach','Subiendo…':'Uploading…','Quitar archivo':'Remove file',
+ 'Solicitud recibida correctamente':'Request Successfully Received','Número de seguimiento':'Tracking number','Enlace privado de seguimiento':'Private tracking link','Copiar enlace':'Copy link','Enlace copiado':'Link copied',
+ 'Tipo':'Type','Recibida':'Received','Guarda este enlace: es privado y te permite consultar el estado y responder a nuestro equipo. También lo enviamos a tu correo.':'Keep this link: it is private and lets you check the status and reply to our team. We also sent it to your email.',
+ 'Esta solicitud ya estaba registrada; no se creó un duplicado.':'This request was already registered; no duplicate was created.','Registrar otra solicitud':'Submit another request','Nueva solicitud':'New request',
+ 'Escribe el número de seguimiento y el código privado que recibiste al registrar tu solicitud.':'Enter the tracking number and the private code you received when you submitted your request.',
+ 'Código privado de seguimiento':'Private tracking code','Escribe el número de seguimiento y el código privado.':'Enter the tracking number and the private code.',
+ 'En revisión':'Under review','Asignada':'Assigned','Esperando información del cliente':'Waiting for your information','En proceso de solución':'Resolution in progress','Respondida':'Answered','Cerrada':'Closed',
+ 'Última actualización':'Last update','Historial de la solicitud':'Request history','Solicitud recibida':'Request received','Cambio de estado':'Status change','Respuesta de PC-DOCTOR S.A.':'Response from PC-DOCTOR S.A.',
+ 'Tu mensaje':'Your message','Solicitud cerrada':'Request closed','Solicitud reabierta':'Request reopened','Responder o aportar información':'Reply or add information','Enviar mensaje':'Send Message',
+ 'Esta solicitud está cerrada. Si necesitas ayuda, registra una nueva solicitud.':'This request is closed. If you need help, submit a new request.',
+ 'Revisa los datos marcados.':'Check the highlighted fields.','Elige el tipo de solicitud.':'Choose the request type.','Ingresa tus nombres y apellidos completos.':'Enter your full name.',
+ 'Elige la sede o establecimiento.':'Choose the location.','Escribe un asunto (mínimo 5 caracteres).':'Enter a subject (at least 5 characters).','Describe tu solicitud con al menos 20 caracteres.':'Describe your request in at least 20 characters.',
+ 'Revisa el número de identificación.':'Check the ID number.','Acepta la política de privacidad y tratamiento de datos personales.':'Accept the privacy and personal data processing policy.',
+ 'Espera a que terminen de subirse los archivos.':'Wait for the files to finish uploading.','Puedes adjuntar hasta 3 archivos.':'You can attach up to 3 files.','Escribe tu mensaje.':'Write your message.',
+ 'El archivo está vacío.':'The file is empty.','Cada archivo puede pesar como máximo 10 MB.':'Each file can be up to 10 MB.','Solo se admiten fotografías (JPG, PNG, WEBP) y documentos PDF.':'Only photos (JPG, PNG, WEBP) and PDF documents are accepted.',
+ 'Carga no válida. Vuelve a adjuntar el archivo.':'Invalid upload. Attach the file again.','La carga no existe o expiró. Vuelve a adjuntar el archivo.':'The upload does not exist or has expired. Attach the file again.',
+ 'Una parte del archivo llegó dañada. Reintenta.':'Part of the file arrived damaged. Try again.','Una parte del archivo llegó incompleta. Reintenta.':'Part of the file arrived incomplete. Try again.',
+ 'Faltan partes del archivo. Reintenta.':'Parts of the file are missing. Try again.','El archivo no coincide con lo que se envió.':'The file does not match what was sent.','Esta carga ya terminó.':'This upload has already finished.',
+ 'Un archivo adjunto no terminó de subirse. Vuelve a adjuntarlo.':'An attachment did not finish uploading. Attach it again.','Demasiados archivos. Intenta más tarde.':'Too many files. Try again later.',
+ 'Demasiadas consultas. Intenta más tarde.':'Too many lookups. Try again later.','Demasiados mensajes. Intenta más tarde.':'Too many messages. Try again later.',
+ 'No encontramos una PQRS con esos datos. Revisa el código y el enlace de seguimiento.':'We could not find a request with those details. Check the code and the tracking link.',
+ 'Esta PQRS está cerrada. Si necesitas ayuda, registra una nueva solicitud.':'This request is closed. If you need help, submit a new request.',
+ 'Atención al cliente':'Customer support','Archivos adjuntos':'Attachments','Zona horaria: America/Guayaquil':'Time zone: America/Guayaquil'
+});
 const pl=(n,one,many)=>String(n)==='1'?one:many;
 const MONTHS=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 const PATTERNS=[
@@ -426,7 +465,15 @@ function locale(){return LANGS[lang].html;}
 // known(): si hay traducción para un texto en español. english(): su versión en inglés aunque el idioma activo sea español (búsquedas).
 function english(text){if(typeof text!=='string'||!text)return text;const keep=lang;lang='en-US';try{return tr(text);}finally{lang=keep;}}
 function known(text){return typeof text==='string'&&english(text)!==text;}
-window.i18n={get lang(){return lang;},LANGS,DEFAULT,t,tr,text,attr,apply,set,pending,clearPending,locale,english,known};
+// bind() (1.5.278): enlaza los textos conocidos de una plantilla (nodos de texto y atributos) a su original en español, sin tocar
+// la estructura ni los valores de los campos. skip: selector de zonas que se traducen por su cuenta (p. ej. el chat de ADI).
+function bind(root,skip){if(!root)return;const reject=skip?skip+',script,style,svg':'script,style,svg';
+ const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT,{acceptNode:n=>n.parentElement?.closest(reject)?NodeFilter.FILTER_REJECT:n.nodeValue.trim()&&known(n.nodeValue.trim())?NodeFilter.FILTER_ACCEPT:NodeFilter.FILTER_SKIP}),found=[];
+ while(walker.nextNode())found.push(walker.currentNode);
+ for(const node of found){const value=node.nodeValue,trimmed=value.trim(),parent=node.parentElement;if(parent.tagName==='OPTION'||parent.childNodes.length===1&&!parent.children.length){text(parent,trimmed);continue;}
+  const span=document.createElement('span');span.dataset.i18nSrc=trimmed;span.textContent=tr(trimmed);const lead=value.match(/^\s*/)[0],tail=value.match(/\s*$/)[0];node.replaceWith(...[lead,span,tail].filter(Boolean));}
+ for(const el of root.querySelectorAll('[placeholder],[aria-label],[title],img[alt]'))if(!skip||!el.closest(skip))for(const name of ['placeholder','aria-label','title','alt']){const value=el.getAttribute(name);if(value&&known(value))attr(el,name,value);}}
+window.i18n={get lang(){return lang;},LANGS,DEFAULT,t,tr,text,attr,apply,set,pending,clearPending,locale,english,known,bind};
 // Aplicar lo antes posible: con inglés, la tarjeta de acceso se oculta hasta traducirla (máximo 1,2 s, para no dejarla oculta si algo falla).
 const html=document.documentElement;html.lang=LANGS[lang].html;html.dataset.lang=lang;
 if(lang!==DEFAULT){html.classList.add('i18n-pending');setTimeout(()=>html.classList.remove('i18n-pending'),1200);}

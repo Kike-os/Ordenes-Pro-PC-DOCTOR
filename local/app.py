@@ -1151,7 +1151,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         path = urlsplit(self.path).path
-        files = {'/static/label.css':'label.css','/static/tracking.css':'tracking.css','/static/licencias.css':'licencias.css','/static/app.css':'app.css','/static/app.js':'app.js','/static/i18n.js':'i18n.js','/static/service-picker.js':'service-picker.js','/static/licenses.js':'licenses.js','/static/inventory.js':'inventory.js','/static/sales.js':'sales.js','/static/reschedule.js':'reschedule.js','/static/form-validation.js':'form-validation.js','/static/appointments.js':'appointments.js','/static/adi-widget.js':'adi-widget.js','/static/adi-orb.js':'adi-orb.js','/static/ui-select.js':'ui-select.js','/static/ticket.css':'ticket.css','/static/phone-input.js':'phone-input.js','/static/phone-input.css':'phone-input.css','/static/libphonenumber-max.js':'libphonenumber-max.js','/static/seguimiento-a4.css':'seguimiento-a4.css','/static/ticket.js':'ticket.js','/static/quote.css':'quote.css','/static/quote-sign.js':'quote-sign.js','/static/echarts.min.js':'echarts.min.js','/static/logo-original.png':'logo-original.png',
+        files = {'/static/label.css':'label.css','/static/tracking.css':'tracking.css','/static/licencias.css':'licencias.css','/static/app.css':'app.css','/static/app.js':'app.js','/static/i18n.js':'i18n.js','/static/service-picker.js':'service-picker.js','/static/licenses.js':'licenses.js','/static/inventory.js':'inventory.js','/static/sales.js':'sales.js','/static/reschedule.js':'reschedule.js','/static/form-validation.js':'form-validation.js','/static/appointments.js':'appointments.js','/static/pqrs.js':'pqrs.js','/static/pqrs-admin.js':'pqrs-admin.js','/static/adi-widget.js':'adi-widget.js','/static/adi-orb.js':'adi-orb.js','/static/ui-select.js':'ui-select.js','/static/ticket.css':'ticket.css','/static/phone-input.js':'phone-input.js','/static/phone-input.css':'phone-input.css','/static/libphonenumber-max.js':'libphonenumber-max.js','/static/seguimiento-a4.css':'seguimiento-a4.css','/static/ticket.js':'ticket.js','/static/quote.css':'quote.css','/static/quote-sign.js':'quote-sign.js','/static/echarts.min.js':'echarts.min.js','/static/logo-original.png':'logo-original.png',
                  '/favicon.ico':'favicon.ico','/static/favicon.ico':'favicon.ico','/static/favicon-16.png':'favicon-16.png','/static/favicon-32.png':'favicon-32.png','/static/logo-firma.png':'logo-firma.png','/static/favicon-48.png':'favicon-48.png',
                  '/apple-touch-icon.png':'apple-touch-icon.png','/apple-touch-icon-precomposed.png':'apple-touch-icon.png','/static/apple-touch-icon.png':'apple-touch-icon.png'}
         # Logotipos de marcas: solo nombres simples dentro de static/brands; si el archivo no existe la interfaz usa un icono genérico.
@@ -1184,6 +1184,9 @@ class Handler(BaseHTTPRequestHandler):
         with connect() as c:
             if path == '/citas':
                 return self.page('appointments.html')
+            if path in ('/pqrs','/pqrs/seguimiento'):
+                # 1.5.278 · PQRS públicas: formulario y seguimiento (la misma página; el script elige la vista por la ruta).
+                return self.page('pqrs.html')
             if re.fullmatch(r'/reagendar/[A-Za-z0-9_-]{20,80}',path) or path=='/reagendar':
                 # Página pública de reagendamiento: los datos de la cita se piden por la API con el token (nunca en la URL de la página).
                 return self.page('reschedule.html')
@@ -1201,6 +1204,9 @@ class Handler(BaseHTTPRequestHandler):
                 company=corporate.settings();content=(ROOT/'templates'/'privacy.html').read_text()
                 for key,value in (('company',company['name']),('whatsapp',company['whatsapp']),('support_email',company['support_email'])):content=content.replace('{{'+key+'}}',html.escape(value,quote=True))
                 return self.reply(200,content,'text/html; charset=utf-8')
+            if path == '/api/public/pqrs/options':
+                import pqrs
+                return self.reply(200,pqrs.options(c))
             if path == '/api/public/hours':
                 # Horarios vigentes para las páginas públicas: los mismos que usa ADI.
                 import business_hours
@@ -1641,6 +1647,27 @@ class Handler(BaseHTTPRequestHandler):
                 try:after=max(0,int(parse_qs(urlsplit(self.path).query).get('after',['0'])[0]))
                 except ValueError:after=0
                 return self.reply(200,live_support.detail(c,conv,after,appointments.stamp(appointments.now())))
+            # 1.5.278 · PQRS en el panel: administración, todas; técnicos, solo las asignadas (lo decide pqrs.py, no la interfaz).
+            if path=='/api/pqrs' or path.startswith('/api/pqrs/'):
+                import pqrs
+                query={k:v[0] for k,v in parse_qs(urlsplit(self.path).query).items()}
+                try:
+                    if path=='/api/pqrs':return self.reply(200,pqrs.list_cases(c,user,query,reception_now()))
+                    if path=='/api/pqrs/count':return self.reply(200,{'new':pqrs.new_count(c,user)})
+                    if path=='/api/pqrs/settings':
+                        if user['role']!='administrador':return self.reply(403,{'error':'Acceso no permitido.'})
+                        return self.reply(200,pqrs.settings(c))
+                    if path=='/api/pqrs/export.csv':
+                        text=pqrs.export_csv(c,user,query);audit(c,user['id'],'pqrs_exported');c.commit()
+                        return self.reply(200,text,'text/csv; charset=utf-8',filename='pqrs-'+reception_now().strftime('%Y%m%d')+'.csv')
+                    found=re.fullmatch(r'/api/pqrs/([0-9]+)(?:/files/([0-9]+)(?:/([0-9]+))?)?',path)
+                    if not found:return self.reply(404,{'error':'No encontrado.'})
+                    cid=int(found[1])
+                    if found[3] is not None:return self.reply(200,pqrs.file_part(c,user,cid,int(found[2]),int(found[3])))
+                    if found[2]:return self.reply(200,pqrs.file_meta(c,user,cid,int(found[2])))
+                    return self.reply(200,pqrs.detail(c,user,cid))
+                except pqrs.PqrsError as error:
+                    return self.reply(error.status,{'error':str(error),'fields':error.fields})
             # 1.5.275 · WhatsApp Business: configuración e historial (solo administración) y avisos de una orden (administración y técnicos).
             if path=='/api/whatsapp':
                 import whatsapp_business
@@ -3054,7 +3081,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(403, {'error':'Solicitud no autorizada.'})
             path = urlsplit(self.path).path
             workspace_post=bool(re.fullmatch(r'/api/orders/[0-9]+/workspace',path));quote_json=bool(re.fullmatch(r'/api/quotes/[0-9]+',path))
-            max_body=4200000 if re.fullmatch(r'/api/conditions/[0-9a-f]{32}/signed',path) else 2900000 if path=='/api/business-signature' else 3900000 if re.fullmatch(r'/api/orders/[0-9]+/followups',path) else 3700000 if re.fullmatch(r'/api/orders/[0-9]+/uploads',path) else 1500000 if path in ('/api/inventory/purchases/xml','/api/inventory/purchases/from-xml') else 1700000 if path in ('/api/cash/upload','/api/files/upload') else 65536 if path.startswith('/api/proformas') or path.startswith('/api/caja/') or re.fullmatch(r'/api/orders/[0-9]+/payments',path) or path=='/api/credit-notes' else 9000000 if path in ('/api/clients/import/preview','/api/clients/import/commit','/api/inventory/import/preview','/api/inventory/import/commit') else 200000 if path in ('/api/inventory/register','/api/invoicing/policies') else 1700000 if path=='/api/public/adi/listen' else 6000000 if path in ('/api/mail/send','/api/mail/draft') else 100000 if path in ('/api/conditions','/api/order-draft','/api/conditions/draft','/api/conditions/compare') else 3200000 if path in ('/api/licenses/new','/api/licenses/units','/api/licenses/units/bulk','/api/licenses/check','/api/licenses/products','/api/licenses/products/duplicate','/api/licenses/sales') or re.fullmatch(r'/api/licenses/sales/[0-9]+',path) else 1700000 if re.fullmatch(r'/api/orders/[0-9]+/photos',path) or path in ('/api/profile/photo','/api/mail/signature') or re.fullmatch(r'/api/catalog/[0-9]+/image',path) else (65536 if workspace_post or quote_json or path=='/api/mail/subject' else 16384)
+            max_body=3700000 if path=='/api/public/pqrs/upload/part' else 65536 if path in ('/api/public/pqrs','/api/public/pqrs/reply') or re.fullmatch(r'/api/pqrs/[0-9]+',path) else 4200000 if re.fullmatch(r'/api/conditions/[0-9a-f]{32}/signed',path) else 2900000 if path=='/api/business-signature' else 3900000 if re.fullmatch(r'/api/orders/[0-9]+/followups',path) else 3700000 if re.fullmatch(r'/api/orders/[0-9]+/uploads',path) else 1500000 if path in ('/api/inventory/purchases/xml','/api/inventory/purchases/from-xml') else 1700000 if path in ('/api/cash/upload','/api/files/upload') else 65536 if path.startswith('/api/proformas') or path.startswith('/api/caja/') or re.fullmatch(r'/api/orders/[0-9]+/payments',path) or path=='/api/credit-notes' else 9000000 if path in ('/api/clients/import/preview','/api/clients/import/commit','/api/inventory/import/preview','/api/inventory/import/commit') else 200000 if path in ('/api/inventory/register','/api/invoicing/policies') else 1700000 if path=='/api/public/adi/listen' else 6000000 if path in ('/api/mail/send','/api/mail/draft') else 100000 if path in ('/api/conditions','/api/order-draft','/api/conditions/draft','/api/conditions/compare') else 3200000 if path in ('/api/licenses/new','/api/licenses/units','/api/licenses/units/bulk','/api/licenses/check','/api/licenses/products','/api/licenses/products/duplicate','/api/licenses/sales') or re.fullmatch(r'/api/licenses/sales/[0-9]+',path) else 1700000 if re.fullmatch(r'/api/orders/[0-9]+/photos',path) or path in ('/api/profile/photo','/api/mail/signature') or re.fullmatch(r'/api/catalog/[0-9]+/image',path) else (65536 if workspace_post or quote_json or path=='/api/mail/subject' else 16384)
             length = int(self.headers.get('Content-Length', '0'))
             if length <= 0 or length > max_body:
                 return self.reply(400, {'error':'Solicitud inválida.'})
@@ -3227,6 +3254,37 @@ class Handler(BaseHTTPRequestHandler):
                     if conv['mode']=='human':return self.reply(200,{'ok':True,'mode':'human','state':adi_public_state(conv)})  # Ya solicitada: no se duplica el registro.
                     now=appointments.stamp(appointments.now());c.execute("UPDATE adi_conversations SET mode='human',assigned_to=NULL,updated_at=? WHERE id=?",(now,conv['id']));c.execute("INSERT INTO adi_messages(conversation_id,author,content,created_at) VALUES (?,'client','El cliente solicita atención humana.',?)",(conv['id'],now))
                     return self.reply(200,{'ok':True,'mode':'human','state':'waiting'})
+                if path=='/api/public/pqrs' or path.startswith('/api/public/pqrs/'):
+                    # 1.5.278 · PQRS públicas. Límites por conexión contra el abuso; los errores no revelan si una orden o un caso existen.
+                    import pqrs
+                    ip=digest(self.client_address[0]);now=reception_now()
+                    try:
+                        if path=='/api/public/pqrs':
+                            if limited(c,'pqrs-ip:'+ip,6,3600):return self.reply(429,{'error':'Demasiadas solicitudes. Intenta más tarde.'})
+                            result=pqrs.create(c,data,now,ip)
+                            duplicate=bool(result.get('duplicate'));cid=result.pop('id',None)
+                            if not duplicate:audit(c,None,'pqrs_created',cid)
+                            c.commit()
+                            # El correo sale después de guardar el caso: si falla, la PQRS sigue registrada y el fallo queda anotado.
+                            if cid:
+                                for nid in pqrs.pending_ids(c,cid):pqrs.deliver(c,nid,public_base_url())
+                            return self.reply(200 if duplicate else 201,result)
+                        if path=='/api/public/pqrs/upload/start':
+                            if limited(c,'pqrs-upload:'+ip,15,3600):return self.reply(429,{'error':'Demasiados archivos. Intenta más tarde.'})
+                            return self.reply(200,pqrs.upload_start(c,data,now,ip))
+                        if path=='/api/public/pqrs/upload/part':return self.reply(200,pqrs.upload_part(c,data))
+                        if path=='/api/public/pqrs/upload/finish':return self.reply(200,pqrs.upload_finish(c,data))
+                        if path=='/api/public/pqrs/upload/cancel':return self.reply(200,pqrs.upload_cancel(c,data))
+                        if path=='/api/public/pqrs/track':
+                            if limited(c,'pqrs-track:'+ip,30,900):return self.reply(429,{'error':'Demasiadas consultas. Intenta más tarde.'})
+                            return self.reply(200,pqrs.public_view(c,data.get('code'),data.get('token')))
+                        if path=='/api/public/pqrs/reply':
+                            if limited(c,'pqrs-reply:'+ip,10,3600):return self.reply(429,{'error':'Demasiados mensajes. Intenta más tarde.'})
+                            result=pqrs.client_reply(c,data.get('code'),data.get('token'),data.get('message'),now);audit(c,None,'pqrs_client_message')
+                            return self.reply(200,result)
+                        return self.reply(404,{'error':'No encontrado.'})
+                    except pqrs.PqrsError as error:
+                        return self.reply(error.status,{'error':str(error),'fields':error.fields})
                 if path == '/api/captcha':
                     if captcha_mode()!='local':return self.reply(404,{'error':'Verificación no disponible.'})
                     if limited(c,'captcha-ip:'+digest(self.client_address[0]),limit=40,window=600):
@@ -4624,6 +4682,18 @@ class Handler(BaseHTTPRequestHandler):
                     except status_messages.MessageError as error:return self.reply(error.status,{'error':str(error)})
                     audit(c,user['id'],'status_message_composed',int(status_message[1]))
                     return self.reply(200,result)
+                if path=='/api/pqrs/settings' or re.fullmatch(r'/api/pqrs/[0-9]+',path):
+                    import pqrs
+                    now=reception_now()
+                    try:
+                        if path=='/api/pqrs/settings':
+                            result=pqrs.save_settings(c,data,user,now);audit(c,user['id'],'pqrs_settings');return self.reply(200,result)
+                        cid=int(path.rsplit('/',1)[1])
+                        ids=pqrs.act(c,user,cid,data,now);audit(c,user['id'],'pqrs_'+str(data.get('action',''))[:20],cid);c.commit()
+                        for nid in ids:pqrs.deliver(c,nid,public_base_url())
+                        return self.reply(200,pqrs.detail(c,user,cid))
+                    except pqrs.PqrsError as error:
+                        c.rollback();return self.reply(error.status,{'error':str(error),'fields':error.fields})
                 if path.startswith('/api/whatsapp/') or re.fullmatch(r'/api/orders/[0-9]+/whatsapp/(consent|send)',path):
                     import whatsapp_business
                     now=reception_now()
