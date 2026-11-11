@@ -4,6 +4,15 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.279 — 2026-11-11 14:02 (UTC-05:00)
+
+Selector de sede de PQRS: nombre oficial PC-DOCTOR MATRIZ OTAVALO y tipografía uniforme
+
+### Errores corregidos
+
+- PQRS: la sede se muestra con su nombre oficial «PC-DOCTOR MATRIZ OTAVALO» (igual en español e inglés) y conserva su identificador interno; renombrar una sede no la duplica ni altera las PQRS registradas, y una sede con PQRS no se puede quitar.
+- PQRS: el selector de sede usaba la lista nativa del navegador, con otra tipografía; ahora usa el menú desplegable de Órdenes Pro, con icono de establecimiento, estados de carga, foco y apertura, y la misma letra, tamaño y color que el resto de los campos. En inglés: «Branch or location».
+
 ## v1.5.278 — 2026-11-11 13:23 (UTC-05:00)
 
 Módulo PQRS Premium Bilingüe: peticiones, quejas, reclamos y sugerencias con seguimiento
