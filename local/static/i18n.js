@@ -138,9 +138,113 @@ const PHRASES={
  'Primera versión registrada':'First registered version','Nuevas funcionalidades':'New features','Mejoras realizadas':'Improvements made','Errores corregidos':'Bugs fixed',
  'Actualizaciones de seguridad':'Security updates','Optimización del rendimiento':'Performance optimization'
 };
+// 1.5.276 · ADI (chat flotante): textos fijos del asistente, sus estados, la voz, la consulta de reparación y la reserva en el chat, y los
+// mensajes del servidor que muestra. Las respuestas de ADI no pasan por aquí: el servidor ya las redacta en el idioma elegido.
+Object.assign(PHRASES,{
+ // Encabezado, estados y controles
+ 'ADI · Asistente Inteligente':'ADI · Intelligent Assistant','ADI · Asistente de PC-DOCTOR':'ADI · PC-DOCTOR Assistant','Abrir asistente ADI':'Open ADI assistant',
+ 'ADI disponible':'ADI available','Preparando respuesta…':'Preparing response…','Contactando con soporte técnico…':'Contacting Technical Support…','Esperando a un asesor':'Waiting for an advisor',
+ 'Asesor conectado':'Advisor connected','Conversación finalizada':'Conversation ended','Sin conexión. Reintentando…':'Offline. Reconnecting…','Escuchando…':'Listening…','ADI está hablando':'ADI is speaking',
+ 'ADI · Disponible para ayudarte':'ADI · Available to help you','Sin conexión · reintentando':'Offline · reconnecting',
+ 'Solicitud enviada: esperando a soporte técnico':'Request sent: waiting for Technical Support','Contactando…':'Connecting…','Contactar soporte técnico':'Contact Technical Support',
+ 'Un asesor se unió a la conversación.':'An advisor joined the conversation.','El asesor finalizó la conversación. Si escribes de nuevo, ADI continuará atendiéndote.':'The advisor ended the conversation. If you write again, ADI will continue assisting you.',
+ 'ADI continúa con la conversación.':'ADI is continuing the conversation.','Asesor':'Advisor','Copiar respuesta':'Copy response','Copiado':'Copied',
+ 'No se pudo copiar. Selecciona el texto y cópialo manualmente.':'Could not copy. Select the text and copy it manually.','Conexión restablecida.':'Connection restored.','Sin conexión con ADI.':'No connection with ADI.',
+ 'Enviando…':'Sending…','ADI está procesando tu consulta':'ADI is processing your request','ADI está procesando tu consulta…':'ADI is processing your request…','Hoy':'Today','Ayer':'Yesterday',
+ 'Más opciones':'More options','Opciones':'Options','Minimizar el chat':'Minimize chat','Minimizar':'Minimize','Cerrar el chat':'Close chat','Efectos de sonido':'Sound effects','Animaciones de la esfera':'Orb animations',
+ 'Mensajes':'Messages','Consultas frecuentes':'Frequent questions','Acciones rápidas':'Quick actions','Escribe un mensaje':'Type a message','Escribe tu mensaje…':'Type your message…',
+ 'Enviar mensaje':'Send Message','Enviar (Enter)':'Send (Enter)','Comenzar conversación':'Start Conversation','Hablar con ADI':'Talk to ADI','Opciones sugeridas':'Suggested options',
+ 'Comprar licencias':'Buy Licenses','Servicios técnicos':'Technical Services','Agendar cita':'Book Appointment','Consultar reparación':'Check Repair Status','Hablar con un asesor':'Talk to an Advisor',
+ '¿Qué licencias tienen disponibles?':'What licenses do you have available?','¿Qué servicios técnicos ofrecen?':'What technical services do you offer?','Hola, necesito hablar con un asesor.':'Hello, I need to speak with an advisor.',
+ 'Solicitud registrada. Te avisaremos aquí cuando un asesor tome la conversación.':'Request registered. We will let you know here when an advisor takes the conversation.',
+ 'El cliente solicita atención humana.':'The customer requests human assistance.','Cerrar el aviso de ADI':'Close the ADI notice','la Agenda de Citas':'the Appointment Scheduler',
+ 'Este es el chat de atención a clientes. La consulta de órdenes, presupuestos, citas y licencias con ADI está disponible para administración.':'This is the customer service chat. Querying orders, quotes, appointments and licenses with ADI is available to administrators.',
+ // Saludos
+ '¡Hola! Soy ADI, tu asistente virtual de PC-DOCTOR S.A. Estoy aquí para ayudarte con citas, servicios técnicos y consultas sobre tus reparaciones. ¿En qué puedo ayudarte hoy?':"Hello! I'm ADI, your virtual assistant at PC-DOCTOR S.A. I'm here to help you book appointments, explore our technical services, and check the status of your repairs. How can I assist you today?",
+ 'Hola, soy ADI, la asistente virtual de PC-DOCTOR S.A. Puedo orientarte sobre servicios, citas, horarios y el estado de tu orden.':"Hello, I'm ADI, the virtual assistant at PC-DOCTOR S.A. I can guide you on services, appointments, hours and the status of your order.",
+ '¡Hola! Soy ADI, tu asistente virtual de PC-DOCTOR. ¿Necesitas ayuda? ¡Puedes hablar conmigo!':"Hi! I'm ADI, your virtual assistant at PC-DOCTOR. Need help? You can talk to me!",
+ 'Bienvenido a Órdenes Pro. Soy Adi, tu asistente virtual. ¿En qué puedo ayudarte?':"Welcome to Órdenes Pro. I'm Adi, your virtual assistant. How can I help you?",
+ 'Hola, bienvenido a PC-DOCTOR S.A. Soy ADI, tu asistente virtual de Órdenes Pro. Estoy aquí para ayudarte con tus órdenes de reparación, citas técnicas y consultas.':"Hello, welcome to PC-DOCTOR S.A. I'm ADI, your Órdenes Pro virtual assistant. I'm here to help you with your repair orders, technical appointments and questions.",
+ 'Así sonaré a esta velocidad.':'This is how I will sound at this speed.',
+ // Voz
+ 'Detener la voz de ADI':'Stop ADI’s voice','Detener el micrófono':'Stop the microphone','Voz de ADI activada. Pulsa para silenciarla':'ADI voice on. Press to mute it',
+ 'Voz de ADI desactivada. Pulsa para que lea sus respuestas':'ADI voice off. Press to have responses read aloud','Voz de ADI':'ADI voice','Velocidad de voz':'Voice speed','Velocidad de la voz de ADI':'ADI voice speed',
+ 'Escuchar muestra de voz':'Play voice sample','femenina':'female','masculina':'male',
+ 'El micrófono está bloqueado. Permite su uso en el candado de la barra de direcciones y vuelve a intentarlo.':'The microphone is blocked. Allow it from the lock icon in the address bar and try again.',
+ 'No se encontró ningún micrófono conectado.':'No connected microphone was found.','No escuché nada. Pulsa el micrófono y habla de nuevo.':'I didn’t hear anything. Press the microphone and speak again.',
+ 'No hay conexión para el reconocimiento de voz. Revisa tu internet.':'There is no connection for speech recognition. Check your internet.',
+ 'Este navegador no permite hablar con ADI. Usa Chrome, Edge o Safari, o escribe tu mensaje.':'This browser does not support talking to ADI. Use Chrome, Edge or Safari, or type your message.',
+ 'ADI te está escuchando…':'ADI is listening…','No se pudo iniciar el micrófono. Inténtalo de nuevo.':'Could not start the microphone. Try again.',
+ 'Conversación por voz':'Voice conversation','Finalizar':'End','Silenciar el micrófono':'Mute the microphone','Activar el micrófono':'Unmute the microphone','Finalizar la conversación por voz':'End the voice conversation',
+ 'Micrófono en pausa':'Microphone paused','ADI está hablando · habla para interrumpirla':'ADI is speaking · speak to interrupt','Procesando…':'Processing…','Te escucho…':'I’m listening…',
+ 'Escuchando · habla cuando quieras':'Listening · speak whenever you like','Puedes seguir escribiendo.':'You can keep typing.',
+ 'El micrófono está bloqueado. Permite su uso en el candado de la barra de direcciones para conversar con ADI.':'The microphone is blocked. Allow it from the lock icon in the address bar to talk with ADI.',
+ 'No se pudo usar el micrófono. Puedes escribir tu mensaje.':'Could not use the microphone. You can type your message.',
+ // Consulta de reparación
+ 'Escribe el número de orden de tu comprobante. Enviaremos un código de verificación al correo registrado en la orden.':'Enter the order number from your receipt. We will send a verification code to the email registered on the order.',
+ 'Enviar código':'Send Code','Número de orden':'Order number','Escribe el código de 6 dígitos.':'Enter the 6-digit code.','Escribe el número de orden.':'Enter the order number.','Verificando…':'Verifying…',
+ 'Enviando el código…':'Sending the code…','Código de 6 dígitos':'6-digit code','Código de verificación':'Verification code','Verificar código':'Verify Code',
+ 'Pendiente':'Pending','En diagnóstico':'In diagnosis','Diagnóstico en proceso':'Diagnosis in progress','En reparación':'In repair','Listo para entrega':'Ready for pickup','Entregado':'Delivered',
+ 'En espera de entrega':'Awaiting pickup','Esperando respuesta del cliente':'Waiting for customer response','Esperando repuesto':'Waiting for part','Aprobación de presupuesto':'Quote approval',
+ 'Pruebas técnicas y control de calidad':'Technical testing and quality control','En revisión por falla recurrente':'Under review for a recurring fault',
+ // Reserva en el chat
+ 'Reservar una cita':'Book an Appointment','Cargando servicios y horarios…':'Loading services and times…','Puedes reservar en /citas o pedir un asesor.':'You can book at /citas or ask for an advisor.',
+ 'Selecciona el servicio':'Select the service','Selecciona el tipo de licencia':'Select the license type','Elige servicio y fecha':'Choose service and date','Cédula':'ID card (cédula)','Pasaporte':'Passport',
+ 'Selecciona el equipo':'Select the device','Tipo de licencia':'License type','Servicio':'Service','Fecha':'Date','Hora disponible':'Available time','Nombre y apellidos':'Full name','Identificación':'Identification',
+ 'Número':'Number','Teléfono':'Phone','Correo (opcional)':'Email (optional)','Tipo de equipo':'Device type','Marca y modelo (opcional)':'Brand and model (optional)','Motivo o problema':'Reason or issue',
+ 'Observaciones (opcional)':'Notes (optional)','He leído el':'I have read the','y autorizo el uso de estos datos para gestionar esta cita.':'and authorize the use of this data to manage this appointment.',
+ 'aviso de privacidad':'privacy notice','Acepto expresamente los':'I expressly accept the','términos y condiciones del servicio':'terms and conditions of service','vigentes.':'currently in force.',
+ 'Autorizo comunicaciones sobre esta cita por correo o WhatsApp (opcional).':'I authorize communications about this appointment by email or WhatsApp (optional).',
+ 'Últimos 4 dígitos de tu identificación':'Last 4 digits of your ID',
+ 'No hay condiciones vigentes publicadas: la cita no puede confirmarse en línea ahora. Pide un asesor.':'There are no published terms in force: the appointment cannot be confirmed online right now. Ask for an advisor.',
+ 'Atrás':'Back','Continuar':'Continue','Cancelar':'Cancel','Cerrar':'Close','Consultando horarios…':'Checking times…','Selecciona la hora':'Select the time','Sin horas libres ese día':'No open times that day',
+ 'Modalidad: retiro del equipo en el taller.':'Mode: device pickup at the shop.','Modalidad: atención presencial en el taller. Si ya eres cliente, te reconocemos por tu identificación.':'Mode: in-person service at the shop. If you are already a customer, we recognize you by your ID.',
+ 'el servicio':'the service','el tipo de licencia':'the license type','la fecha':'the date','la hora':'the time','tu nombre y apellidos':'your full name','tu identificación':'your ID','tu teléfono':'your phone',
+ 'el tipo de equipo':'the device type','el motivo':'the reason','Servicio y horario':'Service and time','Tus datos':'Your details','Confirmación':'Confirmation','Confirmar cita':'Confirm Appointment',
+ 'Fecha y hora':'Date and time','Cliente':'Customer','Contacto':'Contact','Equipo':'Device','Motivo':'Reason','Reserva cancelada. No se registró ninguna cita.':'Booking cancelled. No appointment was registered.',
+ 'Para confirmar, acepta el aviso de privacidad y los términos y condiciones.':'To confirm, accept the privacy notice and the terms and conditions.','Escribe los últimos 4 dígitos de tu identificación.':'Enter the last 4 digits of your ID.',
+ 'Guardando tu cita…':'Saving your appointment…','Guarda tu código: lo necesitarás para consultar o cambiar la cita.':'Save your code: you will need it to check or change the appointment.',
+ 'El taller confirmará tu solicitud. Guarda tu código.':'The shop will confirm your request. Save your code.','No se registró la cita.':'The appointment was not registered.',
+ // Servicios de la agenda, tipos de equipo y licencias (valores de fábrica; los que administración cree después se muestran tal como se escribieron)
+ 'Diagnóstico técnico':'Technical diagnosis','Reparación de portátiles':'Laptop repair','Reparación de computadoras':'Computer repair','Mantenimiento preventivo':'Preventive maintenance',
+ 'Mantenimiento correctivo':'Corrective maintenance','Programación y recuperación de BIOS':'BIOS programming and recovery','Reparación electrónica':'Electronic repair','Servicio para impresoras':'Printer service',
+ 'Otros servicios técnicos':'Other technical services','Retiro de Equipos':'Equipment pickup','Servicio de Administración Remota':'Remote administration service','Compra de licencia de software':'Software license purchase',
+ 'Instalación y configuración de antivirus':'Antivirus installation and setup','Eliminación de virus y malware':'Virus and malware removal','Recuperación y respaldo de datos':'Data recovery and backup',
+ 'Cambio de pantallas':'Screen replacement','Reparación de bisagras':'Hinge repair','Configuración de redes y Wi-Fi':'Network and Wi-Fi setup','Instalación de Windows y otros sistemas operativos':'Windows and operating system installation',
+ 'Mantenimiento de consolas PlayStation':'PlayStation console maintenance','Actualización de BIOS':'BIOS update','Recuperación de contraseña de BIOS':'BIOS password recovery','Reparación de BIOS corrupta':'Corrupted BIOS repair','Desbloqueo de BIOS':'BIOS unlock',
+ 'Portátil (Laptop)':'Laptop','Portátil Gaming':'Gaming laptop','Impresora':'Printer','PC de escritorio':'Desktop PC','Consolas':'Consoles','Celular':'Cell phone','Router / equipo de red':'Router / network device',
+ 'Servidor':'Server','Teclado':'Keyboard','Disco duro (HDD)':'Hard drive (HDD)','Unidad SSD':'SSD drive','Otro equipo':'Other device',
+ 'Windows 10 y Windows 11':'Windows 10 and Windows 11','Antivirus Kaspersky, ESET NOD32, McAfee, Norton y otros':'Antivirus Kaspersky, ESET NOD32, McAfee, Norton and others','Otras licencias de software':'Other software licenses',
+ // Mensajes del servidor que muestra el chat
+ 'Sin conexión. Tu mensaje sigue en el editor.':'Offline. Your message is still in the editor.','No se pudo conectar con ADI. Inténtalo de nuevo.':'Could not connect to ADI. Try again.',
+ 'No se pudo enviar el mensaje.':'Unable to send message.','Espera un momento antes de enviar otro mensaje.':'Please wait a moment before sending another message.',
+ 'Escribe un mensaje de hasta 3000 caracteres.':'Write a message of up to 3000 characters.','Inicia una conversación con ADI primero.':'Start a conversation with ADI first.',
+ 'Escribe el número de orden que consta en tu comprobante.':'Enter the order number shown on your receipt.','Demasiadas solicitudes de código. Espera unos minutos e inténtalo de nuevo.':'Too many code requests. Wait a few minutes and try again.',
+ 'La consulta en línea no está disponible en este momento. Puedes solicitar un asesor.':'Online lookup is not available right now. You can request an advisor.',
+ 'Demasiados intentos. Espera unos minutos e inténtalo de nuevo.':'Too many attempts. Wait a few minutes and try again.','El código no es correcto o ya caducó. Revisa el correo o solicita uno nuevo.':'The code is incorrect or has expired. Check your email or request a new one.',
+ 'Demasiadas solicitudes de voz. Espera unos minutos.':'Too many voice requests. Wait a few minutes.','La voz natural no está disponible ahora. ADI usa la voz del navegador.':'Natural voice is not available right now. ADI is using the browser voice.',
+ 'La grabación es demasiado larga. Habla en frases más cortas.':'The recording is too long. Speak in shorter sentences.','Grabación no válida.':'Invalid recording.',
+ 'OpenAI alcanzó su límite de uso. ADI usa la voz del navegador por ahora.':'The voice service reached its usage limit. ADI is using the browser voice for now.',
+ 'No se pudo conectar con OpenAI. ADI usa la voz del navegador por ahora.':'Could not connect to the voice service. ADI is using the browser voice for now.',
+ 'Acepta los términos y condiciones para confirmar la cita.':'Accept the terms and conditions to confirm the appointment.','Confirma el aviso de privacidad para registrar la cita.':'Confirm the privacy notice to register the appointment.',
+ 'Describe brevemente la falla (3 a 1000 caracteres).':'Briefly describe the fault (3 to 1000 characters).','El RUC debe contener exactamente 13 dígitos.':'The RUC must contain exactly 13 digits.',
+ 'Ese horario no está disponible. Consulta otros espacios.':'That time is not available. Check other times.','Indica el nombre completo (2 a 150 caracteres).':'Enter the full name (2 to 150 characters).',
+ 'Ingresa tu nombre y apellidos.':'Enter your full name.','Ingresa tu número de identificación para continuar.':'Enter your ID number to continue.','Ingresa un correo electrónico válido.':'Enter a valid email address.',
+ 'Ingresa un número de pasaporte válido: de 5 a 20 letras y números, sin espacios.':'Enter a valid passport number: 5 to 20 letters and numbers, no spaces.',
+ 'Las condiciones se actualizaron. Revisa la versión vigente y vuelve a aceptarla.':'The terms were updated. Review the current version and accept it again.',
+ 'No hay condiciones del servicio vigentes: la cita no puede autorizarse en este momento.':'There are no service terms in force: the appointment cannot be authorized right now.',
+ 'Revisa la longitud de marca, modelo u observaciones.':'Check the length of brand, model or notes.','Selecciona el tipo de equipo.':'Select the device type.','Selecciona el tipo de identificación.':'Select the ID type.',
+ 'Selecciona el tipo de licencia.':'Select the license type.','Selecciona si autorizas comunicaciones de la cita.':'Select whether you authorize appointment communications.',
+ 'Reintentar':'Retry','Orden':'Order','Estado':'Status','Ingreso':'Received','Entrega estimada':'Estimated delivery','Seguimiento completo':'Full tracking','Cita registrada':'Appointment registered',
+ 'Cita confirmada correctamente. Su aceptación ha sido registrada con fecha, hora e identificador de autorización.':'Appointment confirmed successfully. Your acceptance has been recorded with date, time and authorization ID.',
+ 'Solicitud registrada. Su aceptación ha sido registrada con fecha, hora e identificador de autorización; le avisaremos cuando la cita quede confirmada.':'Request registered. Your acceptance has been recorded with date, time and authorization ID; we will let you know when the appointment is confirmed.'
+});
 const pl=(n,one,many)=>String(n)==='1'?one:many;
 const MONTHS=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 const PATTERNS=[
+ // ADI (1.5.276)
+ [/^Si el número corresponde a una orden con correo registrado, acabamos de enviar un código de 6 dígitos a ese correo\. Caduca en (\d+) minutos\.$/,m=>'If the number matches an order with a registered email, we just sent a 6-digit code to that email. It expires in '+m[1]+' minutes.'],
+ [/^Ese día es (.+)\.$/,m=>'That day is '+m[1]+'.'],
  [/^Has alcanzado el máximo de (\d+) caracteres\.$/,m=>'You have reached the maximum of '+m[1]+' characters.'],
  [/^Usa al menos (\d+) caracteres\.$/,m=>'Use at least '+m[1]+' characters.'],
  [/^Usa una contraseña de (\d+) a (\d+) caracteres\.$/,m=>'Use a password of '+m[1]+' to '+m[2]+' characters.'],
@@ -210,4 +314,7 @@ const ready=()=>{try{apply();}finally{html.classList.remove('i18n-pending');}};
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',ready,{once:true});else ready();
 // Selector de idioma en las páginas de acceso (botones .lang-option[data-lang]).
 document.addEventListener('click',event=>{const button=event.target.closest?.('.lang-option[data-lang]');if(!button||button.closest('[data-lang-account]'))return;set(button.dataset.lang,{account:'pending'});});
+// 1.5.276 · Otras pestañas de las páginas públicas (acceso, recuperación) siguen el idioma elegido en cualquiera de ellas, sin recargar.
+// En el panel manda el idioma guardado en la cuenta, por eso allí no se sigue el cambio de otra pestaña.
+if(typeof addEventListener==='function')addEventListener('storage',event=>{if(event.key!==KEY||!LANGS[event.newValue]||event.newValue===lang||document.body?.dataset.page==='dashboard')return;set(event.newValue);});
 })();

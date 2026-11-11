@@ -29,6 +29,8 @@ SENSITIVITY = {'baja': 0.06, 'media': 0.04, 'alta': 0.025}
 DEFAULTS = {'voice': 'coral', 'speed': 1.0, 'style': 'calido', 'continuous': True, 'sensitivity': 'media', 'silence_ms': 900, 'daily_minutes': 30, 'premium': True,
             'greeting': '¡Bienvenido a PC-DOCTOR S.A.! Soy ADI, tu asistente virtual. Estoy aquí para ayudarte con nuestros servicios, reparaciones, '
                         'presupuestos y citas. ¿En qué puedo ayudarte hoy?'}
+# 1.5.276 · Con English elegido en la interfaz: saludo hablado fijo en inglés (el saludo configurado está en español).
+GREETING_EN = "Hello! I'm ADI, your virtual assistant at PC-DOCTOR S.A. I'm here to help you book appointments, explore our technical services, and check the status of your repairs. How can I assist you today?"
 SAMPLE = 'Hola, gracias por comunicarte con PC-DOCTOR S.A. Soy ADI. Con gusto te ayudo a revisar tu equipo, agendar una cita o conocer nuestros servicios.'
 VOCABULARY = 'PC-DOCTOR, ADI, Órdenes Pro, Lenovo, HP, Dell, ASUS, Acer, MSI, ThinkPad, IdeaPad, Latitude, BIOS, Windows, SSD, RAM, pasta térmica, mantenimiento, presupuesto, cita'
 
@@ -143,11 +145,30 @@ def _money(match):
     return words + (' con ' + cents.lstrip('0') + ' centavos' if cents and cents.strip('0') else '')
 
 
-def speech_text(text):
+def _speech_en(value):
+    """Versión hablada en inglés: mismas limpiezas, con el nombre de la empresa y los importes como se dicen en inglés."""
+    value = re.sub(r'https?://\S+', 'the link shown', value)
+    value = re.sub(r'(?:\border\s+)?PCD-\d{8}-0*(\d+)', r'order \1', value, flags=re.I)
+    # «S.A.» seguido de otra frase conserva el punto final, para que la voz haga la pausa.
+    value = re.sub(r'PC[\s\-‑–]*DOCTOR(\s*,?\s*S\.?\s?A\.?)?', lambda m: 'P C Doctor' + ((', S A' + ('.' if re.match(r'\s*($|[A-Z¿¡])', m.string[m.end():]) else '')) if m.group(1) else ''), value, flags=re.I)
+    value = re.sub(r'\bADI\b', 'Adi', value)
+    value = re.sub(r'[«»"“”*_#`~|]', '', value)
+    value = re.sub(r'\s*[·•–—]\s*', ', ', value)
+    value = re.sub(r'\s{2,}', ' ', value).strip()
+    if len(value) > MAX_SPEECH_CHARS:
+        cut = value[:MAX_SPEECH_CHARS]
+        end = max(cut.rfind('. '), cut.rfind('? '), cut.rfind('! '))
+        value = (cut[:end + 1] if end > 120 else cut.rsplit(' ', 1)[0] + '.') + ' The full details are in the chat.'
+    return value
+
+
+def speech_text(text, lang='es-EC'):
     """Versión hablada de una respuesta: sin enlaces ni listas técnicas, con el nombre de la empresa, los importes y los códigos
     pronunciables, y breve (el texto completo sigue en pantalla)."""
     lines = [line for line in str(text or '').splitlines() if line.strip() and '/citas?' not in line and not line.strip().startswith('http')]
     value = ' '.join(lines)
+    if lang == 'en-US':
+        return _speech_en(value)
     value = re.sub(r'https?://\S+', 'el enlace indicado', value)
     value = re.sub(r'(?:\borden\s+)?PCD-\d{8}-0*(\d+)', r'orden \1', value, flags=re.I)
     value = re.sub(r'PC[\s\-‑–]*DOCTOR(\s*,?\s*S\.?\s?A\.?)?', lambda m: 'Pe ce dóctor' + (', ese a' if m.group(1) else ''), value, flags=re.I)
@@ -165,14 +186,18 @@ def speech_text(text):
     return value
 
 
-def instructions(cfg):
+def instructions(cfg, lang='es-EC'):
     pace = 'un poco más pausado de lo normal' if cfg['speed'] < 0.95 else 'un poco más ágil de lo normal' if cfg['speed'] > 1.05 else 'natural'
     return ('Eres ADI, la asistente virtual de PC-DOCTOR S.A., un taller de servicio técnico de computadoras en Ecuador. '
             'Habla en español latinoamericano neutro, con voz femenina adulta y un tono ' + STYLES[cfg['style']] + '. '
             'Usa entonación humana, pausas breves entre ideas y variaciones naturales de expresión; nunca suenes como si leyeras de forma mecánica. '
             'Haz una pausa ligera después del saludo y antes de cada pregunta, y sube suavemente la entonación al preguntar. '
             'Ritmo ' + pace + '. Pronuncia «Pe ce dóctor» como el nombre de la empresa, las marcas (Lenovo, HP, Dell, ASUS, Acer, MSI) y los términos técnicos '
-            'como se dicen en Latinoamérica, y los importes con claridad.')
+            'como se dicen en Latinoamérica, y los importes con claridad.') if lang != 'en-US' else (
+            'You are ADI, the virtual assistant of PC-DOCTOR S.A., a computer repair shop in Ecuador. Speak natural, professional American English '
+            'with an adult female voice and a warm, friendly, attentive tone. Use human intonation and brief pauses between ideas; never sound robotic. '
+            'Pace: ' + ('slightly slower than usual' if cfg['speed'] < 0.95 else 'slightly brisker than usual' if cfg['speed'] > 1.05 else 'natural') + '. '
+            'Say “P C Doctor” as the company name; pronounce brands (Lenovo, HP, Dell, ASUS, Acer, MSI) and amounts in US dollars clearly.')
 
 
 # ---- OpenAI ------------------------------------------------------------------------------------------------------------
@@ -197,21 +222,21 @@ def _request(url, data, headers, binary=False):
 _cache = {}
 
 
-def synthesize(c, now, text, cfg=None, count=True):
+def synthesize(c, now, text, cfg=None, count=True, lang='es-EC'):
     """Audio MP3 de `text` con la voz configurada. Devuelve (bytes, segundos estimados). Las frases repetidas (saludo, muestras) se reutilizan."""
     cfg = cfg or settings(c)
     if not configured():
         raise VoiceError('configuracion', 'La voz de OpenAI no está configurada en el servidor.')
-    spoken = speech_text(text)
+    spoken = speech_text(text, lang)
     if not spoken:
         raise VoiceError('vacio', 'No hay nada que leer.', 400)
     seconds = max(1.0, len(spoken) / 14.0 / max(cfg['speed'], 0.5))
-    key = (cfg['voice'], cfg['style'], cfg['speed'], spoken)
+    key = (cfg['voice'], cfg['style'], cfg['speed'], lang, spoken)
     cached = _cache.get(key)
     if cached and cached[0] > time.time():
         return cached[1], seconds
     audio = _request('https://api.openai.com/v1/audio/speech',
-                     json.dumps({'model': TTS_MODEL, 'voice': cfg['voice'], 'input': spoken, 'instructions': instructions(cfg), 'response_format': 'mp3'}).encode(),
+                     json.dumps({'model': TTS_MODEL, 'voice': cfg['voice'], 'input': spoken, 'instructions': instructions(cfg, lang), 'response_format': 'mp3'}).encode(),
                      {'Content-Type': 'application/json'}, binary=True)
     if not audio or len(audio) < 100:
         raise VoiceError('proveedor', 'OpenAI no devolvió audio.')
@@ -223,7 +248,7 @@ def synthesize(c, now, text, cfg=None, count=True):
     return audio, seconds
 
 
-def transcribe(c, now, audio, mime, duration_ms):
+def transcribe(c, now, audio, mime, duration_ms, lang='es-EC'):
     """Texto de lo que dijo el cliente (español). El audio no se guarda en ningún sitio."""
     if not configured():
         raise VoiceError('configuracion', 'La transcripción de OpenAI no está configurada en el servidor.')
@@ -232,7 +257,10 @@ def transcribe(c, now, audio, mime, duration_ms):
     extension = 'mp4' if 'mp4' in mime else 'ogg' if 'ogg' in mime else 'wav' if 'wav' in mime else 'webm'
     boundary = '----adi' + secrets.token_hex(12)
     parts = []
-    for name, value in (('model', STT_MODEL), ('language', 'es'), ('response_format', 'json'), ('prompt', 'Conversación con la asistente de un taller de computadoras. Vocabulario: ' + VOCABULARY + '.')):
+    english = lang == 'en-US'
+    prompt = ('Conversation with the assistant of a computer repair shop. Vocabulary: PC-DOCTOR, ADI, Órdenes Pro, Lenovo, HP, Dell, ASUS, Acer, MSI, ThinkPad, BIOS, Windows, SSD, RAM, thermal paste, maintenance, quote, appointment.'
+              if english else 'Conversación con la asistente de un taller de computadoras. Vocabulario: ' + VOCABULARY + '.')
+    for name, value in (('model', STT_MODEL), ('language', 'en' if english else 'es'), ('response_format', 'json'), ('prompt', prompt)):
         parts.append(('--%s\r\nContent-Disposition: form-data; name="%s"\r\n\r\n%s\r\n' % (boundary, name, value)).encode())
     parts.append(('--%s\r\nContent-Disposition: form-data; name="file"; filename="voz.%s"\r\nContent-Type: %s\r\n\r\n' % (boundary, extension, mime or 'audio/webm')).encode() + audio + b'\r\n')
     parts.append(('--%s--\r\n' % boundary).encode())

@@ -11735,3 +11735,12 @@ button.wan-more svg,button.wan-retry svg{width:14px;height:14px;transition:trans
  .wan-item,button.wan-more svg,button.wan-retry svg{transition:none}
  .wan-item[data-status=enviando] .wan-state svg{animation:none}
 }
+/* 1.5.276 · ADI bilingüe: al cambiar de idioma, las etiquetas del chat aparecen con un fundido breve (sin moverse). Con movimiento reducido no hay animación. */
+#adi-widget.adi-relabel :is(.adi-panel header strong,#adi-status,.adi-quick button,.adi-human,.adi-welcome,.adi-start,#adi-input){animation:adi-relabel .22s ease-out}
+@keyframes adi-relabel{from{opacity:.35}to{opacity:1}}
+@media(prefers-reduced-motion:reduce){#adi-widget.adi-relabel :is(.adi-panel header strong,#adi-status,.adi-quick button,.adi-human,.adi-welcome,.adi-start,#adi-input){animation:none}}
+/* 1.5.276 · Pantallas muy estrechas (320 px): el estado del chat pasa a una segunda línea en vez de cortarse con puntos suspensivos. */
+@media(max-width:360px){#adi-widget.adi-v2 #adi-status,#adi-widget.adi-v2 .adi-panel>header #adi-status{white-space:normal;overflow:visible;text-overflow:clip}}
+/* 1.5.276 · 320–360 px: el chat se compacta (como ya ocurre en pantallas bajas) para que el pie («Contactar soporte técnico» y
+   «Consultar reparación») quepa dentro del panel en ambos idiomas. No cambia colores ni la esfera. */
+@media(max-width:360px){#adi-widget.adi-v2 .adi-quick{gap:6px;padding-top:8px}#adi-widget.adi-v2 .adi-quick button,#adi-widget.adi-v2 .adi-foot>*,#adi-widget.adi-v2 .adi-foot .adi-human{min-height:32px}#adi-widget.adi-v2 .adi-messages{min-height:56px}#adi-widget.adi-v2 .adi-panel>header strong{font-size:12.5px}}

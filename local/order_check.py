@@ -64,4 +64,6 @@ def verify(c, token, code, now):
     except ValueError:
         pass
     device = ' '.join(part for part in (DEVICE_TYPES.get(order['type'], ''), order['brand'] or '', order['model'] or '') if part)
-    return {'id': order['id'], 'code': order['code'], 'status': order['status_label'], 'status_code': order['status'], 'device': device, 'received': received, 'estimated': estimated, 'tracking_url': link['url'] if link['active'] else ''}
+    # device_label y device_name (1.5.276): el chat muestra el tipo de equipo en el idioma elegido; marca y modelo no se traducen.
+    return {'id': order['id'], 'code': order['code'], 'status': order['status_label'], 'status_code': order['status'], 'device': device,
+            'device_label': DEVICE_TYPES.get(order['type'], ''), 'device_name': ' '.join(part for part in (order['brand'] or '', order['model'] or '') if part), 'received': received, 'estimated': estimated, 'tracking_url': link['url'] if link['active'] else ''}

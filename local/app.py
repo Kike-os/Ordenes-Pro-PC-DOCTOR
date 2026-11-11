@@ -3130,7 +3130,8 @@ class Handler(BaseHTTPRequestHandler):
                     conv=c.execute('SELECT id FROM adi_conversations WHERE token_hash=?',(digest(token),)).fetchone() if token else None
                     try:
                         if path=='/api/public/adi/speech':
-                            if data.get('kind')=='greeting':text=adi_voice.settings(c)['greeting']
+                            voice_lang=adi.language(data.get('locale'))
+                            if data.get('kind')=='greeting':text=adi_voice.GREETING_EN if adi.english(voice_lang) else adi_voice.settings(c)['greeting']
                             else:
                                 # Solo se pronuncian respuestas de ADI o del asesor guardadas en la conversación de este navegador.
                                 mid=str(data.get('message_id',''))
@@ -3138,12 +3139,12 @@ class Handler(BaseHTTPRequestHandler):
                                 if not row:return self.reply(404,{'error':'Mensaje no disponible.'})
                                 text=row['content']
                             # Se confirma antes de la llamada a OpenAI: Turso cancela una transacción que queda inactiva mientras se genera el audio.
-                            c.commit();audio,seconds=adi_voice.synthesize(c,now,text);return self.reply(200,{'ok':True,'mime':'audio/mpeg','audio':adi_voice.encode(audio),'seconds':round(seconds,1)})
+                            c.commit();audio,seconds=adi_voice.synthesize(c,now,text,lang=voice_lang);return self.reply(200,{'ok':True,'mime':'audio/mpeg','audio':adi_voice.encode(audio),'seconds':round(seconds,1)})
                         try:audio=base64.b64decode(str(data.get('audio','')),validate=True)
                         except ValueError:return self.reply(400,{'error':'Grabación no válida.'})
                         mime=str(data.get('mime','audio/webm'))[:60];duration=int(str(data.get('duration_ms','0')) or 0) if str(data.get('duration_ms','0')).isdigit() else 0
                         if duration<300:return self.reply(200,{'ok':True,'text':''})
-                        c.commit();return self.reply(200,{'ok':True,'text':adi_voice.transcribe(c,now,audio,mime,duration)})
+                        c.commit();return self.reply(200,{'ok':True,'text':adi_voice.transcribe(c,now,audio,mime,duration,lang=adi.language(data.get('locale')))})
                     except adi_voice.VoiceError as error:
                         print('adi-voice',error.kind,flush=True);return self.reply(error.status,{'error':str(error),'fallback':True})
                 if path == '/api/public/adi/order/request':
@@ -3198,16 +3199,18 @@ class Handler(BaseHTTPRequestHandler):
                         # Una conversación finalizada se reanuda con ADI cuando el cliente vuelve a escribir; el historial se conserva.
                         c.execute("UPDATE adi_conversations SET mode='adi',assigned_to=NULL,updated_at=? WHERE id=?",(now,conv['id']));conv=c.execute('SELECT * FROM adi_conversations WHERE id=?',(conv['id'],)).fetchone()
                     c.execute("INSERT INTO adi_messages(conversation_id,author,content,created_at) VALUES (?,'client',?,?)",(conv['id'],text,now))
-                    answer='Un asesor de PC-DOCTOR S.A. revisará tu solicitud.' if conv['mode']=='human' and not conv['assigned_to'] else None  # Con un asesor conectado, ADI no interviene.
+                    # Idioma elegido en la interfaz (1.5.276): solo es-EC o en-US, validado aquí; cualquier otro valor responde en español.
+                    lang=adi.language(data.get('locale'));en=adi.english(lang)
+                    answer=(adi.WAITING_ADVISOR_EN if en else adi.WAITING_ADVISOR) if conv['mode']=='human' and not conv['assigned_to'] else None  # Con un asesor conectado, ADI no interviene.
                     context=None;session={}
                     # El estado de una orden no se entrega por el chat: exige el código temporal enviado al correo registrado.
-                    if conv['mode']=='adi' and re.search(r'\b'+reception.ORDER_CODE_PATTERN,text,re.I):answer=adi.ORDER_CHECK_HINT
+                    if conv['mode']=='adi' and re.search(r'\b'+reception.ORDER_CODE_PATTERN,text,re.I):answer=adi.ORDER_CHECK_HINT_EN if en else adi.ORDER_CHECK_HINT
                     if answer is None and conv['mode']=='adi':
                         # El mensaje del cliente queda guardado antes de consultar a la IA, para no retener la base durante la espera.
-                        c.commit();answer=adi.reply(c,text,context=context,conversation_id=conv['id'],session=session)
+                        c.commit();answer=adi.reply(c,text,context=context,conversation_id=conv['id'],session=session,lang=lang)
                     if answer:
                         c.execute("INSERT INTO adi_messages(conversation_id,author,content,created_at) VALUES (?,'adi',?,?)",(conv['id'],answer,now));c.execute('UPDATE adi_conversations SET updated_at=? WHERE id=?',(now,conv['id']))
-                    response={'ok':True,'conversation_id':conv['id'],'mode':conv['mode'],'state':adi_public_state(conv),'messages':[dict(r) for r in c.execute("SELECT id,author,content,created_at FROM adi_messages WHERE conversation_id=? AND id>(SELECT COALESCE(MAX(id),0)-2 FROM adi_messages WHERE conversation_id=?) ORDER BY id",(conv['id'],conv['id']))]}
+                    response={'ok':True,'conversation_id':conv['id'],'mode':conv['mode'],'state':adi_public_state(conv),'locale':lang,'messages':[dict(r) for r in c.execute("SELECT id,author,content,created_at FROM adi_messages WHERE conversation_id=? AND id>(SELECT COALESCE(MAX(id),0)-2 FROM adi_messages WHERE conversation_id=?) ORDER BY id",(conv['id'],conv['id']))]}
                     # Acción propuesta por ADI (abrir el formulario de reserva del chat) y accesos rápidos según el tema; nunca escriben nada.
                     if session.get('action'):response['action']=session['action']
                     if session.get('suggestions'):response['suggestions']=session['suggestions']
