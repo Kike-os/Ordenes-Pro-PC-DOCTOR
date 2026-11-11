@@ -189,8 +189,8 @@ Object.assign(PHRASES,{
  'Pruebas técnicas y control de calidad':'Technical testing and quality control','En revisión por falla recurrente':'Under review for a recurring fault',
  // Reserva en el chat
  'Reservar una cita':'Book an Appointment','Cargando servicios y horarios…':'Loading services and times…','Puedes reservar en /citas o pedir un asesor.':'You can book at /citas or ask for an advisor.',
- 'Selecciona el servicio':'Select the service','Selecciona el tipo de licencia':'Select the license type','Elige servicio y fecha':'Choose service and date','Cédula':'ID card (cédula)','Pasaporte':'Passport',
- 'Selecciona el equipo':'Select the device','Tipo de licencia':'License type','Servicio':'Service','Fecha':'Date','Hora disponible':'Available time','Nombre y apellidos':'Full name','Identificación':'Identification',
+ 'Selecciona el servicio':'Select the service','Selecciona el tipo de licencia':'Select the license type','Elige servicio y fecha':'Choose service and date','Cédula':'National ID','Pasaporte':'Passport',
+ 'Selecciona el equipo':'Select the device','Tipo de licencia':'License type','Servicio':'Service','Fecha':'Date','Hora disponible':'Available time','Nombre y apellidos':'Full Name','Identificación':'Identification',
  'Número':'Number','Teléfono':'Phone','Correo (opcional)':'Email (optional)','Tipo de equipo':'Device type','Marca y modelo (opcional)':'Brand and model (optional)','Motivo o problema':'Reason or issue',
  'Observaciones (opcional)':'Notes (optional)','He leído el':'I have read the','y autorizo el uso de estos datos para gestionar esta cita.':'and authorize the use of this data to manage this appointment.',
  'aviso de privacidad':'privacy notice','Acepto expresamente los':'I expressly accept the','términos y condiciones del servicio':'terms and conditions of service','vigentes.':'currently in force.',
@@ -200,8 +200,8 @@ Object.assign(PHRASES,{
  'Atrás':'Back','Continuar':'Continue','Cancelar':'Cancel','Cerrar':'Close','Consultando horarios…':'Checking times…','Selecciona la hora':'Select the time','Sin horas libres ese día':'No open times that day',
  'Modalidad: retiro del equipo en el taller.':'Mode: device pickup at the shop.','Modalidad: atención presencial en el taller. Si ya eres cliente, te reconocemos por tu identificación.':'Mode: in-person service at the shop. If you are already a customer, we recognize you by your ID.',
  'el servicio':'the service','el tipo de licencia':'the license type','la fecha':'the date','la hora':'the time','tu nombre y apellidos':'your full name','tu identificación':'your ID','tu teléfono':'your phone',
- 'el tipo de equipo':'the device type','el motivo':'the reason','Servicio y horario':'Service and time','Tus datos':'Your details','Confirmación':'Confirmation','Confirmar cita':'Confirm Appointment',
- 'Fecha y hora':'Date and time','Cliente':'Customer','Contacto':'Contact','Equipo':'Device','Motivo':'Reason','Reserva cancelada. No se registró ninguna cita.':'Booking cancelled. No appointment was registered.',
+ 'el tipo de equipo':'the device type','el motivo':'the reason','Servicio y horario':'Service and time','Tus datos':'Your Information','Confirmación':'Confirmation','Confirmar cita':'Confirm Appointment',
+ 'Fecha y hora':'Date & Time','Cliente':'Customer','Contacto':'Contact','Equipo':'Device','Motivo':'Reason','Reserva cancelada. No se registró ninguna cita.':'Booking cancelled. No appointment was registered.',
  'Para confirmar, acepta el aviso de privacidad y los términos y condiciones.':'To confirm, accept the privacy notice and the terms and conditions.','Escribe los últimos 4 dígitos de tu identificación.':'Enter the last 4 digits of your ID.',
  'Guardando tu cita…':'Saving your appointment…','Guarda tu código: lo necesitarás para consultar o cambiar la cita.':'Save your code: you will need it to check or change the appointment.',
  'El taller confirmará tu solicitud. Guarda tu código.':'The shop will confirm your request. Save your code.','No se registró la cita.':'The appointment was not registered.',
@@ -239,12 +239,126 @@ Object.assign(PHRASES,{
  'Cita confirmada correctamente. Su aceptación ha sido registrada con fecha, hora e identificador de autorización.':'Appointment confirmed successfully. Your acceptance has been recorded with date, time and authorization ID.',
  'Solicitud registrada. Su aceptación ha sido registrada con fecha, hora e identificador de autorización; le avisaremos cuando la cita quede confirmada.':'Request registered. Your acceptance has been recorded with date, time and authorization ID; we will let you know when the appointment is confirmed.'
 });
+// 1.5.277 · Agenda de Citas pública (/citas): las cuatro etapas, ayudas, validaciones, disponibilidad, confirmación, pie y mensajes del
+// servidor. Los datos escritos por el cliente, los códigos de cita y el texto legal de las condiciones no se traducen.
+Object.assign(PHRASES,{
+ 'Agendamiento de Citas Técnicas | PC-DOCTOR S.A.':'Technical Service Appointment Booking | PC-DOCTOR S.A.',
+ 'Servicio técnico especializado':'Specialized technical service','PC-DOCTOR S.A. · AGENDA EN LÍNEA':'PC-DOCTOR S.A. · ONLINE BOOKING',
+ 'Agendamiento de Citas Técnicas':'Technical Service Appointment Booking',
+ 'Selecciona el servicio, el equipo y el horario que mejor se adapte a tus necesidades.':'Select the service, device, and appointment time that best suits your needs.',
+ 'Tu equipo':'Your Device','Los campos marcados con':'Fields marked with','son obligatorios':'are required','Los campos marcados con * son obligatorios.':'Fields marked with * are required.',
+ 'revisa la escritura del nombre':'reviews how the name is written','Tipo de identificación':'Identification Type','RUC':'Tax ID (RUC)','Número de cédula':'National ID Number',
+ 'Número de RUC':'Tax ID (RUC) Number','Número de pasaporte':'Passport Number','10 dígitos, sin guiones ni espacios.':'10 digits, without hyphens or spaces.',
+ '13 dígitos, sin guiones ni espacios.':'13 digits, without hyphens or spaces.','De 5 a 20 letras y números, tal como aparece en tu pasaporte.':'5 to 20 letters and numbers, exactly as shown on your passport.',
+ 'Teléfono / WhatsApp':'Phone / WhatsApp','Correo electrónico (opcional)':'Email Address (Optional)','Cargando…':'Loading…','Selecciona el Servicio':'Select the Service','Marca':'Brand',
+ 'Modelo (si lo conoces)':'Model (if known)','Número de orden de servicio (opcional)':'Service order number (optional)',
+ 'Si lo indicas, comprobamos que el equipo esté listo. Agendar el retiro no entrega el equipo: la entrega se registra en el taller.':'If you provide it, we check that the device is ready. Booking a pickup does not hand over the device: delivery is recorded at the shop.',
+ 'Descripción breve del problema o mantenimiento':'Brief description of the issue or maintenance','Observaciones del retiro (opcional)':'Pickup notes (optional)',
+ 'Fecha disponible':'Available Date','Primero selecciona servicio y fecha':'First select a service and date','Observaciones adicionales (opcional)':'Additional notes (optional)',
+ 'y autorizo el uso de estos datos para gestionar esta cita. *':'and authorize the use of this data to manage this appointment. *',
+ 'Autorizo comunicaciones sobre esta cita por correo electrónico o WhatsApp. (Opcional)':'I authorize communications about this appointment by email or WhatsApp. (Optional)',
+ 'Autorización de la cita':'Appointment Authorization','Últimos 4 dígitos de su cédula *':'Last 4 digits of your ID *',
+ 'Se comparan con la identificación ingresada para registrar su aceptación. No constituyen una firma electrónica.':'They are compared with the ID you entered to record your acceptance. They are not an electronic signature.',
+ 'Las condiciones del servicio están publicadas en español.':'The terms of service are published in Spanish.',
+ 'Anterior':'Previous','Siguiente':'Next','Confirmar y autorizar cita':'Confirm and Authorize Appointment','Aviso de privacidad':'Privacy notice',
+ 'Zona horaria: America/Guayaquil · Confirmación sujeta a disponibilidad del horario':'Time zone: America/Guayaquil · Confirmation subject to time availability',
+ 'Cerrar la reserva y volver al inicio':'Close the booking and return home','Pasos de la reserva':'Booking steps','Progreso de la reserva':'Booking progress',
+ 'ADI revisa cómo está escrito tu nombre':'ADI reviews how your name is written','Sugerencia de ADI':'ADI suggestion','Escribe la marca, por ejemplo Lenovo':'Type the brand, for example Lenovo',
+ 'Marcas sugeridas':'Suggested brands','Por ejemplo, PCD-20261013-0001':'For example, PCD-20261013-0001','Logotipo oficial PC-DOCTOR':'Official PC-DOCTOR logo',
+ // Disponibilidad y fecha
+ 'Buscando disponibilidad…':'Checking availability…','Selecciona una hora':'Select a time','No hay horarios disponibles':'No times available','No se pudo cargar la disponibilidad':'Could not load availability',
+ 'Horarios de atención en hora de Ecuador.':'Times shown in Ecuador time.','No hay espacios ese día. Prueba otra fecha.':'No openings that day. Try another date.',
+ 'Sin conexión con la agenda · reintentando. No se confirmará ninguna reserva hasta recuperar la conexión.':'No connection to the scheduler · reconnecting. No booking will be confirmed until the connection is restored.',
+ // ADI en el nombre
+ 'Entendido':'Got it','Escribe primero tu nombre y apellidos para que ADI pueda revisarlos.':'First type your full name so ADI can review it.',
+ 'ADI no encontró errores evidentes en tu nombre. Comprueba que coincida con tu documento de identificación.':'ADI found no obvious errors in your name. Check that it matches your ID document.',
+ 'Original':'Original','Sugerencia':'Suggestion','Aplicar sugerencia':'Apply suggestion','Conservar original':'Keep original',
+ 'Te recomendamos revisar la escritura de tu nombre antes de continuar.':'We recommend reviewing how your name is written before continuing.',
+ 'Aplícala solo si coincide con tu documento de identificación.':'Apply it only if it matches your ID document.',
+ 'ADI no está disponible en este momento. Puedes continuar con tu reserva.':'ADI is not available right now. You can continue with your booking.',
+ 'ADI ya revisó varios nombres desde esta conexión. Puedes continuar con tu reserva e intentarlo más tarde.':'ADI has already reviewed several names from this connection. You can continue with your booking and try again later.',
+ // Validación del formulario (las reglas no cambian: solo el texto)
+ 'Ingresa un número de contacto válido.':'Please enter a valid contact number.','Selecciona al menos un servicio.':'Select at least one service.',
+ 'Describe brevemente el problema o mantenimiento.':'Briefly describe the issue or maintenance.','Describe brevemente el problema (mínimo 3 caracteres).':'Briefly describe the issue (at least 3 characters).',
+ 'Revisa el número de orden: solo letras, números y guiones.':'Check the order number: letters, numbers and hyphens only.','Selecciona una fecha.':'Select a date.',
+ 'Selecciona un horario disponible.':'Select an available time.','Ingresa los últimos 4 dígitos de tu cédula.':'Enter the last 4 digits of your ID.','Ingresa exactamente 4 dígitos numéricos.':'Enter exactly 4 numeric digits.',
+ 'Hay datos pendientes por completar. Revisa los campos marcados en rojo.':'Some information is still missing. Check the fields marked in red.',
+ 'Algunos datos necesitan corrección. Verifica la información señalada.':'Some information needs correcting. Check the highlighted fields.',
+ 'No pudimos completar la operación. Comprueba tu conexión e inténtalo nuevamente.':'We could not complete the operation. Check your connection and try again.',
+ 'El servidor devolvió una respuesta inválida.':'The server returned an invalid response.','No se pudo completar la solicitud.':'The request could not be completed.',
+ 'El número de cédula no es válido. Revisa los dígitos ingresados.':'Please enter a valid Ecuadorian national ID number. Check the digits entered.',
+ 'La cédula debe contener exactamente 10 dígitos.':'The national ID must contain exactly 10 digits.','Los dos primeros dígitos de la cédula no corresponden a una provincia.':'The first two digits of the national ID do not match a province.',
+ 'El tercer dígito no corresponde a una cédula ecuatoriana.':'The third digit does not match an Ecuadorian national ID.','El RUC debe terminar en su número de establecimiento (por ejemplo, 001).':'The RUC must end with its establishment number (for example, 001).',
+ 'El tercer dígito no corresponde a ningún tipo de RUC.':'The third digit does not match any RUC type.','Los dos primeros dígitos del RUC no corresponden a una provincia.':'The first two digits of the RUC do not match a province.',
+ 'Los diez primeros dígitos del RUC no forman una cédula válida. Revisa los dígitos ingresados.':'The first ten digits of the RUC are not a valid national ID. Check the digits entered.',
+ 'No pudimos comprobar el dígito verificador de este RUC. Confirma que esté escrito correctamente.':'We could not verify the check digit of this RUC. Confirm that it is written correctly.',
+ 'Ingresa 10 dígitos para cédula o 13 para RUC, sin letras ni símbolos.':'Enter 10 digits for a national ID or 13 for a RUC, without letters or symbols.',
+ 'Ingresa un pasaporte válido: de 3 a 30 letras, números o guiones.':'Enter a valid passport: 3 to 30 letters, numbers or hyphens.',
+ 'Ingresa un pasaporte de 3 a 30 letras, números o guiones.':'Enter a passport of 3 to 30 letters, numbers or hyphens.','Completa este campo.':'Complete this field.',
+ 'Escribe solo números, espacios y el prefijo «+».':'Use only numbers, spaces and the “+” prefix.','El código de país no existe.':'The country code does not exist.','Escribe solo números.':'Use numbers only.',
+ 'Buscar país o prefijo':'Search country or code','Países':'Countries','Número sin el prefijo':'Number without the country code','Sin resultados':'No results',
+ 'Ingresa un número de teléfono válido.':'Please enter a valid phone number.','Usa 10 dígitos para cédula o 13 para RUC, según el tipo seleccionado.':'Use 10 digits for a national ID or 13 for a RUC, according to the selected type.',
+ 'Selecciona cédula ecuatoriana o RUC ecuatoriano.':'Select an Ecuadorian national ID or RUC.','Selecciona un tipo de equipo válido.':'Select a valid device type.','Recarga el formulario e intenta de nuevo.':'Reload the form and try again.',
+ 'Utiliza letras, números y guiones.':'Use letters, numbers and hyphens.','Ingresa exactamente 4 dígitos numéricos: los últimos de la cédula (o del pasaporte).':'Enter exactly 4 numeric digits: the last ones of your national ID (or passport).',
+ 'Cada servicio se elige una sola vez.':'Each service can be selected only once.','Selecciona un servicio disponible.':'Select an available service.','Selecciona un servicio.':'Select a service.',
+ 'El retiro de equipos se agenda por separado, sin otros servicios.':'Equipment pickup is booked separately, without other services.',
+ 'La duración total de los servicios supera la jornada: divídelos en varias citas.':'The total duration of the services exceeds the workday: split them into several appointments.',
+ 'Selecciona una fecha y una hora disponibles de la lista.':'Select an available date and time from the list.','Fecha no válida.':'Invalid date.','Elige una fecha entre mañana y los próximos 90 días.':'Choose a date between tomorrow and the next 90 days.',
+ 'Servicio no disponible.':'Service not available.','Revisa los datos de la cita.':'Check the appointment details.','Esta solicitud ya fue registrada.':'This request has already been registered.',
+ 'Actualiza el formulario e inténtalo nuevamente.':'Refresh the form and try again.','Demasiadas solicitudes. Intenta más tarde.':'Too many requests. Try again later.',
+ 'Esta orden ya figura como entregada. Si necesitas ayuda, contáctanos por WhatsApp.':'This order is already marked as delivered. If you need help, contact us on WhatsApp.',
+ 'No encontramos una orden con ese número asociada a tus datos. Verifícalo o deja el campo vacío.':'We could not find an order with that number linked to your details. Check it or leave the field empty.',
+ 'Tu equipo todavía no está listo para el retiro. Te avisaremos en cuanto puedas pasar a retirarlo; por ahora no es posible agendar el retiro de esta orden.':'Your device is not ready for pickup yet. We will let you know as soon as you can pick it up; for now it is not possible to book a pickup for this order.',
+ // Selector de servicios y licencias
+ 'Buscar servicio':'Search service','Servicios disponibles':'Available services','No hay servicios que coincidan con la búsqueda.':'No services match your search.',
+ 'Tipo de licencia *':'License type *','Observaciones de la licencia (opcional)':'License notes (optional)','Por ejemplo, número de equipos o versión que necesitas':'For example, number of devices or version you need',
+ 'Diagnóstico y reparación':'Diagnosis and repair','Mantenimiento':'Maintenance','BIOS':'BIOS','Software, sistemas y licencias':'Software, systems and licenses','Redes y asistencia remota':'Networks and remote assistance','Otros servicios':'Other services',
+ // Resumen y confirmación
+ 'Nombre':'Name','Servicios':'Services','Orden a retirar':'Order to pick up','Observaciones':'Notes','Descripción':'Description','Sin indicar':'Not provided',
+ 'Guardando tu reserva…':'Saving your booking…','Appointment Successfully Booked':'Appointment Successfully Booked','Tu cita técnica se ha agendado correctamente':'Appointment Successfully Booked',
+ 'Solicitud de cita registrada':'Appointment Request Registered','Código de tu cita':'Your appointment code','Hora':'Time','Confirmada':'Confirmed',
+ 'Solicitada: el taller confirmará el horario':'Requested: the shop will confirm the time','Autorización':'Authorization','Aceptada':'Accepted',
+ 'Guarda este código: lo necesitarás para consultar o cancelar tu cita. No se creó una orden de reparación; el equipo técnico la registrará cuando reciba físicamente el equipo.':'Keep this code: you will need it to check or cancel your appointment. No repair order was created; the technical team will register it when it physically receives the device.',
+ 'Reservar otra cita':'Book another appointment','Cancelar esta cita':'Cancel this appointment','¿Cancelar esta cita?':'Cancel this appointment?','Se liberará el horario reservado.':'The reserved time slot will be released.',
+ 'Mantener la cita':'Keep the appointment','Cancelar la cita':'Cancel the appointment','Cita cancelada':'Appointment cancelled','La cita fue cancelada. Puedes reservar otra cuando lo necesites.':'The appointment was cancelled. You can book another one whenever you need.',
+ 'Esta solicitud ya estaba registrada; no se creó una cita duplicada.':'This request was already registered; no duplicate appointment was created.',
+ '¿Salir sin completar tu reserva?':'Leave without completing your booking?','Los datos que escribiste se perderán.':'The information you entered will be lost.','Continuar reservando':'Continue booking','Descartar y salir':'Discard and leave',
+ 'Modelo sin indicar':'Model not provided','Tipo de equipo sin indicar':'Device type not provided','No hay una cita válida con ese enlace.':'There is no valid appointment for that link.',
+ // Pie: horarios oficiales
+ 'Atención presencial':'In-person service','Solicitudes de cita en línea':'Online appointment requests',
+ // Tipos de equipo de la agenda que faltaban
+ 'Notebook':'Notebook','Mini PC':'Mini PC','All-in-One':'All-in-One','Tablet':'Tablet','Monitor':'Monitor','Mouse':'Mouse'
+});
 const pl=(n,one,many)=>String(n)==='1'?one:many;
 const MONTHS=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 const PATTERNS=[
  // ADI (1.5.276)
  [/^Si el número corresponde a una orden con correo registrado, acabamos de enviar un código de 6 dígitos a ese correo\. Caduca en (\d+) minutos\.$/,m=>'If the number matches an order with a registered email, we just sent a 6-digit code to that email. It expires in '+m[1]+' minutes.'],
+ // Agenda de Citas (1.5.277)
+ [/^Ese espacio no está disponible\.(?: Próximo espacio libre: (?:(\d{2})\/(\d{2}) )?(\d{1,2}:\d{2}) ([ap])\. m\.\.)?$/,m=>'That time is not available.'+(m[3]?' Next open time: '+(m[1]?m[2]+'/'+m[1]+' ':'')+m[3]+' '+m[4].toUpperCase()+'M.':'')],
+ [/^Ese día es feriado \((.+)\) y el taller no atiende\. Elige otra fecha\.$/,m=>'That day is a holiday ('+m[1]+') and the shop is closed. Choose another date.'],
+ [/^Ese día es feriado \((.+)\): se atiende en horario especial\. Horarios en hora de Ecuador\.$/,m=>'That day is a holiday ('+m[1]+'): special hours apply. Times shown in Ecuador time.'],
+ [/^Ese día es feriado \((.+)\); verifica el horario de atención\. Horarios en hora de Ecuador\.$/,m=>'That day is a holiday ('+m[1]+'); check the opening hours. Times shown in Ecuador time.'],
+ [/^Ese día es feriado \((.+)\) y ya no quedan espacios\. Prueba otra fecha\.$/,m=>'That day is a holiday ('+m[1]+') and there are no openings left. Try another date.'],
+ [/^Seleccionamos el siguiente horario libre \((.+)\)\. Revísalo y confirma de nuevo\.$/,m=>'We selected the next open time ('+m[1].replace(/ ([ap])\. m\./,(x,a)=>' '+a.toUpperCase()+'M')+'). Review it and confirm again.'],
+ [/^La hora que habías elegido \((.+)\) acaba de ocuparse\. Elige otra de la lista actualizada\.$/,m=>'The time you had chosen ('+m[1]+') has just been taken. Choose another one from the updated list.'],
+ [/^En línea · disponibilidad (actualizada|comprobada) a las (.+)$/,m=>'Online · availability '+(m[1]==='actualizada'?'updated':'checked')+' at '+m[2]],
+ [/^El horario seleccionado ya no está disponible\.(?: Puede agendar su cita (?:a las|el) (?:(\d{2})\/(\d{2}) )?(\d{1,2}:\d{2}) ([ap])\. m\. o seleccionar otro horario\.)?(.*)$/,m=>'The selected time is no longer available.'+(m[3]?' You can book your appointment '+(m[1]?'on '+m[2]+'/'+m[1]+' ':'')+'at '+m[3]+' '+m[4].toUpperCase()+'M or choose another time.':'')+(m[5]&&!m[3]?(m[5].trim()==='Ese día no quedan espacios: elija otra fecha.'?' There are no openings left that day: choose another date.':' '+m[5].trim()):'')],
+ // Genérico de ADI (después de los de feriado, que son más específicos)
  [/^Ese día es (.+)\.$/,m=>'That day is '+m[1]+'.'],
+ [/^ADI dejó elegido el (\d{2})\/(\d{2}) a las (\d{2}:\d{2}) \(hora de Ecuador\)\. Completa tus datos para confirmar la cita; la reserva no está hecha todavía\.$/,m=>'ADI selected '+m[2]+'/'+m[1]+' at '+m[3]+' (Ecuador time). Complete your details to confirm the appointment; the booking is not made yet.'],
+ [/^El horario propuesto \((\d{2})\/(\d{2}) a las (\d{2}:\d{2})\) ya no se puede reservar en línea\. Elige otra fecha en el paso «Fecha y hora»\.$/,m=>'The proposed time ('+m[2]+'/'+m[1]+' at '+m[3]+') can no longer be booked online. Choose another date in the “Date & Time” step.'],
+ [/^El (\d{2})\/(\d{2}) a las (\d{2}:\d{2}) acaba de ocuparse\. En el paso «Fecha y hora» verás los horarios que siguen libres ese día\.$/,m=>m[2]+'/'+m[1]+' at '+m[3]+' has just been taken. In the “Date & Time” step you will see the times still open that day.'],
+ [/^El número está incompleto para (.+)\.$/,m=>'The number is incomplete for '+m[1]+'.'],[/^El número tiene dígitos de más para (.+)\.$/,m=>'The number has too many digits for '+m[1]+'.'],
+ [/^El número no es válido para (.+)\.$/,m=>'The number is not valid for '+m[1]+'.'],
+ [/^Número válido · (.+?)( · celular| · teléfono fijo \(no sirve para WhatsApp\))?$/,m=>'Valid number · '+m[1]+(m[2]===' · celular'?' · mobile':m[2]?' · landline (cannot be used for WhatsApp)':'')],
+ [/^País del teléfono: (.+)\. Cambiar país$/,m=>'Phone country: '+m[1]+'. Change country'],
+ [/^Puedes elegir uno o varios servicios \(hasta (\d+)\)\.$/,m=>'You can choose one or more services (up to '+m[1]+').'],
+ [/^(\d+) servicios? · duración estimada (.+?)( · máximo (\d+) servicios por cita)?$/,m=>m[1]+' '+pl(m[1],'service','services')+' · estimated duration '+m[2]+(m[3]?' · maximum '+m[4]+' services per appointment':'')],
+ [/^Elige hasta (\d+) servicios por cita\.$/,m=>'Choose up to '+m[1]+' services per appointment.'],
+ [/^Logotipo de (.+)$/,m=>m[1]+' logo'],
+ [/^ \(versión (.+)\)$/,m=>' (version '+m[1]+')'],
+ [/^ \(no hay una versión vigente: la cita no puede autorizarse en línea\)$/,m=>' (there is no version in force: the appointment cannot be authorized online)'],
  [/^Has alcanzado el máximo de (\d+) caracteres\.$/,m=>'You have reached the maximum of '+m[1]+' characters.'],
  [/^Usa al menos (\d+) caracteres\.$/,m=>'Use at least '+m[1]+' characters.'],
  [/^Usa una contraseña de (\d+) a (\d+) caracteres\.$/,m=>'Use a password of '+m[1]+' to '+m[2]+' characters.'],
@@ -274,7 +388,10 @@ const PATTERNS=[
  [/^(?:Faltan|Falta) (.+)\.$/,m=>m[0].replace(/^Faltan |^Falta /,'').replace(/ de seguimiento/,' of observation').replace(/ verificaciones correctas/,' successful checks').replace(/ verificación correcta/,' successful check').replace(/ y /,' and ').replace(/\.$/,'')+' remaining.'],
  [/^«Versión estable» exige (\d+) verificaciones correctas y (\d+) h de seguimiento sin incidencias\. .*$/,m=>'“Stable version” requires '+m[1]+' successful checks and '+m[2]+' h of observation without issues. The server checks three times a day (01:00, 09:00 and 17:00) and when this indicator is consulted. The tests only read information.']
 ];
-function read(){try{const value=localStorage.getItem(KEY);if(LANGS[value])return value;}catch{}return DEFAULT;}
+// ?lang=en-US (o en, es, es-EC) en la dirección elige el idioma y lo guarda como preferencia manual: sirve para abrir la Agenda de Citas
+// en una pestaña nueva o desde un enlace con el idioma ya elegido. Sin parámetro manda la preferencia guardada; si no hay, español.
+function fromQuery(){try{const raw=new URLSearchParams(location.search).get('lang');if(!raw)return null;const value={en:'en-US','en-us':'en-US',es:'es-EC','es-ec':'es-EC'}[raw.toLowerCase()];return value||null;}catch{return null;}}
+function read(){const asked=fromQuery();if(asked){try{localStorage.setItem(KEY,asked);}catch{}return asked;}try{const value=localStorage.getItem(KEY);if(LANGS[value])return value;}catch{}return DEFAULT;}
 let lang=read();
 function t(key,vars){const table=CATALOG[lang]||CATALOG[DEFAULT];let text=table[key]??CATALOG[DEFAULT][key]??key;if(vars)for(const[name,value]of Object.entries(vars))text=text.split('{'+name+'}').join(String(value));return text;}
 function tr(text){
@@ -306,7 +423,10 @@ function remember(next,options){if(options.account==='pending'){try{localStorage
 function pending(){try{const value=localStorage.getItem(PENDING);return LANGS[value]?value:null;}catch{return null;}}
 function clearPending(){try{localStorage.removeItem(PENDING);}catch{}}
 function locale(){return LANGS[lang].html;}
-window.i18n={get lang(){return lang;},LANGS,DEFAULT,t,tr,text,attr,apply,set,pending,clearPending,locale};
+// known(): si hay traducción para un texto en español. english(): su versión en inglés aunque el idioma activo sea español (búsquedas).
+function english(text){if(typeof text!=='string'||!text)return text;const keep=lang;lang='en-US';try{return tr(text);}finally{lang=keep;}}
+function known(text){return typeof text==='string'&&english(text)!==text;}
+window.i18n={get lang(){return lang;},LANGS,DEFAULT,t,tr,text,attr,apply,set,pending,clearPending,locale,english,known};
 // Aplicar lo antes posible: con inglés, la tarjeta de acceso se oculta hasta traducirla (máximo 1,2 s, para no dejarla oculta si algo falla).
 const html=document.documentElement;html.lang=LANGS[lang].html;html.dataset.lang=lang;
 if(lang!==DEFAULT){html.classList.add('i18n-pending');setTimeout(()=>html.classList.remove('i18n-pending'),1200);}

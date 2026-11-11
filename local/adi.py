@@ -32,9 +32,7 @@ WAITING_ADVISOR_EN='A PC-DOCTOR S.A. advisor will review your request.'
 # El navegador solo envía el código del idioma elegido en la interfaz. El servidor lo valida contra la lista cerrada y redacta él mismo
 # la instrucción para la IA: nunca se reenvía texto de instrucciones llegado del navegador. Cualquier otro valor → español de Ecuador.
 LANGUAGES=('es-EC','en-US')
-def language(value):
- value=str(value or '').strip().casefold()
- return 'en-US' if value in ('en-us','en','en_us') else 'es-EC'
+def language(value):return appointments.ui_language(value)  # la misma validación que la Agenda de Citas
 def english(lang):return language(lang)=='en-US'
 PUBLIC_ENGLISH=("IDIOMA OBLIGATORIO: la persona eligió English (en-US) en Órdenes Pro. Responde SIEMPRE en inglés de Estados Unidos, natural y profesional, "
 "aunque el cliente escriba en español u otro idioma, salvo que pida expresamente otro idioma o una traducción. Los mensajes anteriores de la conversación pueden estar en español: continúa igualmente en inglés. "
@@ -542,7 +540,6 @@ def fallback(c,text,session=None):
 # Solo se usan con English elegido y sin IA disponible. Mismos datos reales que las respuestas en español (agenda, horarios, catálogo,
 # contacto): ningún precio, plazo ni diagnóstico inventado. Los nombres propios de productos y la configuración escrita por
 # administración (mensajes libres) no se traducen automáticamente: se usan frases fijas equivalentes.
-DAYS_EN=('Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday')
 SERVICES_EN={'diagnostico':'technical diagnosis','portatiles':'laptop repair','computadoras':'computer repair','mantenimiento':'preventive maintenance','correctivo':'corrective maintenance',
  'bios':'BIOS programming and recovery','electronica':'electronic repair','impresoras':'printer service','otros':'other technical services','retiro':'equipment pickup','remota':'remote administration service',
  'licencia':'software license purchase','antivirus':'antivirus installation and setup','virus':'virus and malware removal','datos':'data recovery and backup','pantallas':'screen replacement',
@@ -555,28 +552,13 @@ def clock_en(value):
 def date_en(day):return day[5:7]+'/'+day[8:10]
 def service_en(row):return SERVICES_EN.get(row['code']) or row['label']
 
-def _groups(items,key):
- groups=[]
- for item in items:
-  value=key(item)
-  if value is None:continue
-  if groups and groups[-1][2]==value and groups[-1][1]==item['weekday']-1:groups[-1][1]=item['weekday']
-  else:groups.append([item['weekday'],item['weekday'],value])
- return [(DAYS_EN[a] if a==b else DAYS_EN[a]+' to '+DAYS_EN[b],value) for a,b,value in groups]
-
 def hours_facts_en(c,now=None):
+ """Horarios en inglés para ADI: los mismos que muestra la Agenda de Citas (business_hours.public_en)."""
  import business_hours
  from reception import ECUADOR_TZ
  from datetime import datetime
- now=(now or datetime.now(ECUADOR_TZ)).astimezone(ECUADOR_TZ);config=business_hours.get(c);state=business_hours.status(config,now)
- presencial='; '.join(days+' from '+clock_en(span[0])+' to '+clock_en(span[1]) for days,span in _groups(sorted(config['hours'],key=lambda h:h['weekday']),lambda h:(h['start'],h['end']) if h['enabled'] else None))
- if state['open']:status='Open now · closes at '+clock_en(state['closes'])
- elif state.get('opens'):
-  opens=datetime.fromisoformat(state['opens']);offset=(opens.date()-now.date()).days
-  status='Closed now · opens '+('today' if offset==0 else 'tomorrow' if offset==1 else 'on '+DAYS_EN[opens.weekday()]+' '+opens.strftime('%m/%d'))+' at '+clock_en(opens.strftime('%H:%M'))
- else:status='Closed'
- limits='; '.join(days+' until '+clock_en(until) for days,until in _groups(config['request_limits'],lambda h:h['until'])) if config.get('request_limits_enabled') else ''
- return {'presencial':presencial,'status':status,'limits':limits,'virtual':bool(config['virtual_enabled'])}
+ info=business_hours.public_en(c,now or datetime.now(ECUADOR_TZ))
+ return {'presencial':info['presencial'],'status':info['status']['label'],'limits':info['request_limits'],'virtual':info['virtual']}
 
 def hours_answer_en(c,now=None,topic=''):
  facts=hours_facts_en(c,now)

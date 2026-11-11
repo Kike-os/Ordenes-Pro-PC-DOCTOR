@@ -1204,7 +1204,9 @@ class Handler(BaseHTTPRequestHandler):
             if path == '/api/public/hours':
                 # Horarios vigentes para las páginas públicas: los mismos que usa ADI.
                 import business_hours
-                return self.reply(200,business_hours.public(c,reception_now()))
+                now=reception_now();info=business_hours.public(c,now)
+                info['en']=business_hours.public_en(c,now)  # 1.5.277: la Agenda de Citas los muestra en inglés con English elegido
+                return self.reply(200,info)
             if path == '/api/public/versions':
                 # Historial público de versiones (las mismas notas que ya muestra /novedades), por páginas. Sin datos técnicos ni credenciales.
                 try:releases=versioning.load()['releases']

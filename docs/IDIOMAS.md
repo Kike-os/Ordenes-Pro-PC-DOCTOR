@@ -1,4 +1,4 @@
-# Idiomas de la interfaz (1.5.273 · ADI desde 1.5.276)
+# Idiomas de la interfaz (1.5.273 · ADI desde 1.5.276 · Agenda de Citas desde 1.5.277)
 
 Órdenes Pro admite **Español (Ecuador, `es-EC`)**, predeterminado, e **Inglés (Estados Unidos, `en-US`)**.
 
@@ -45,9 +45,38 @@
   - Solo se traducen las etiquetas fijas y los botones de horario.
   - Las respuestas nuevas llegan en el idioma recién elegido.
   - No hay traducción automática del historial.
-- **Agenda de Citas pública (`/citas`).** Todavía no es bilingüe: ahí ADI sigue en español para no mezclar idiomas en la misma página.
+- **Agenda de Citas pública (`/citas`).** Bilingüe desde la 1.5.277: ADI y el formulario comparten el idioma.
 - **Modo administración del panel.** Las respuestas con datos del taller siguen en español; la interfaz del chat sí cambia.
 - **Pruebas:** `tests/test_adi_language.py`.
+
+## Agenda de Citas bilingüe (1.5.277)
+
+**Causa:** `templates/appointments.html` no cargaba `i18n.js` y sus textos, los de `appointments.js` y los mensajes del servidor estaban escritos solo en español. El botón «Book an Appointment» del acceso sí estaba traducido, pero llevaba a una página sin sistema de idiomas.
+
+**Ahora:**
+- **Idioma.** La página carga `i18n.js` sin `defer`, antes de sus scripts, y usa la misma preferencia que el acceso y ADI (`localStorage`). No hay un segundo selector.
+  - Con English elegido, el contenido se oculta un instante hasta quedar traducido, sin parpadeo en español.
+  - `?lang=en` o `?lang=es` en la dirección fija el idioma y lo guarda: sirve para enlaces o pestañas nuevas.
+  - Sin preferencia válida, español.
+  - Un cambio hecho en otra pestaña de acceso se aplica al instante.
+- **Qué se traduce.**
+  - Las cuatro etapas y el indicador de pasos.
+  - Etiquetas, ayudas y opciones.
+  - Servicios y categorías de fábrica, tipos de equipo y licencias, con buscador también en inglés.
+  - Países del teléfono.
+  - Validaciones del navegador y del servidor, con las mismas reglas de cédula, RUC, pasaporte, teléfono y correo.
+  - Disponibilidad y feriados.
+  - Fecha elegida escrita en el idioma activo, con horas AM/PM en inglés; el valor enviado sigue siendo `HH:MM`.
+  - Resumen, diálogos y confirmación.
+  - Pie con los horarios oficiales.
+- **Cómo se traduce.** Los textos de la plantilla se enlazan a su original en español al cargar (`i18n.known()`). Cambiar de idioma no borra ni altera lo escrito.
+- **Horarios.** `/api/public/hours` incluye `en`, calculado por `business_hours.public_en()` con la misma configuración, zona horaria (`America/Guayaquil`) y cierres que la versión en español. ADI usa la misma función.
+- **Componentes compartidos.** `service-picker.js` (opción `i18n`) y `phone-input.js` (atributo `data-i18n-public` en `<body>`) solo traducen en la Agenda pública. En el panel del personal siguen en español.
+- **Idioma de la cita.** La reserva envía `locale`; el servidor lo valida (`appointments.ui_language()`: `es-EC` o `en-US`) y lo guarda en `appointments.language` (migración `103_appointment_language.sql`, aditiva; las citas existentes quedan en `es-EC`). La ficha interna muestra «Idioma de la reserva» cuando es inglés.
+  - No cambian estados, autorización, notificaciones ni calendario.
+- **Condiciones.** El texto legal sigue publicado solo en español, y la evidencia de aceptación (versión, SHA-256, últimos 4 dígitos, canal) no cambia. En inglés, la casilla está traducida y un aviso indica que las condiciones están en español.
+- **Pendiente.** El correo y el WhatsApp de la cita siguen en español: sus plantillas no tienen versión inglesa. El idioma guardado permite añadirla sin volver a preguntar.
+- **Pruebas:** `tests/test_appointments_language.py`.
 
 ## Alcance actual (pendiente de completar)
 
@@ -60,6 +89,7 @@
 - aviso de propiedad intelectual;
 - versión, estado y estabilidad del sistema;
 - asistente ADI público: interfaz, respuestas, voz, consulta de reparación y reserva en el chat (1.5.276);
+- Agenda de Citas pública `/citas`: las cuatro etapas, validaciones, disponibilidad, confirmación y pie (1.5.277);
 - ventana de actualizaciones (las notas de cada versión se publican en español);
 - navegación principal;
 - menú de cuenta;
@@ -77,7 +107,8 @@
 - garantías;
 - PC-DOCTOR Mail Pro;
 - configuración y avisos;
-- Agenda de Citas pública (`/citas`);
+- correos y avisos por WhatsApp de las citas;
+- página de reagendamiento por enlace (`/reagendar`);
 - respuestas del modo administración de ADI.
 
 El soporte bilingüe completo no se da por terminado hasta entonces.

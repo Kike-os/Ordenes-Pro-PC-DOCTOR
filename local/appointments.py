@@ -350,6 +350,9 @@ def save_services(c,aid,fields):
  if len(parts)>1 or any(row['code']==LICENSE for row in fields['services']):c.execute('UPDATE appointments SET services_summary=? WHERE id=?',(' + '.join(parts)[:500],aid))
 def service_items(c,aid):
  return [dict(r) for r in c.execute('SELECT position,service_code,label,duration_minutes,detail FROM appointment_service_items WHERE appointment_id=? ORDER BY position',(aid,))]
+def ui_language(value):
+ """Idioma de la interfaz pública validado en el servidor: solo es-EC o en-US; cualquier otro valor (o ninguno) es español."""
+ return 'en-US' if str(value or '').strip().casefold() in ('en-us','en','en_us') else 'es-EC'
 def create(c,data,user=None):
  key=str(data.get('request_key','')).strip()
  if key and c.execute('SELECT 1 FROM appointments WHERE deleted_at IS NULL AND request_key=?',(key,)).fetchone():return 409,{'error':'Esta solicitud ya fue registrada.'}
@@ -377,6 +380,8 @@ def create(c,data,user=None):
  # Se guarda primero como solicitud; pasa a confirmada solo después de registrar la autorización (la base lo exige).
  cursor=c.execute("INSERT INTO appointments(public_code,manage_token_hash,client_id,technician_id,customer_name,identification,phone,email,device_type,brand,model,service_code,description,notes,starts_at,duration_minutes,status,privacy_consent,communications_consent,created_at,updated_at,request_key) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?,?,?)",(public,token_hash(token),client_id,technician,fields['name'],fields['identification'],fields['phone'],fields['email'],fields['device_type'],fields['brand'],fields['model'],primary,fields['description'],fields['notes'],stamp(start),duration,'solicitada',int(data.get('communications_consent') is True),created,created,key or None))
  aid=cursor.lastrowid
+ # Idioma de la reserva pública (1.5.277), validado: solo es-EC o en-US. Las citas que registra el personal quedan en español.
+ if not user:c.execute('UPDATE appointments SET language=? WHERE id=?',(ui_language(data.get('locale')),aid))
  save_services(c,aid,fields)
  c.execute("INSERT INTO appointment_events(appointment_id,actor_id,event,new_start,new_status,created_at) VALUES (?,?,?,?,?,?)",(aid,user['id'] if user else None,'created',stamp(start),initial,created))
  evidence=authorize(c,aid,terms,data.get('id_last4'),'personal' if user else 'en_linea',user)

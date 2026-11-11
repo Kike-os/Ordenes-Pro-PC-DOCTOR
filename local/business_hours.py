@@ -143,3 +143,56 @@ def public(c, now):
             'closures': [item for item in config['closures'] if item['date'] >= now.astimezone(ECUADOR_TZ).date().isoformat()][:10],
             'today': DAYS[now.astimezone(ECUADOR_TZ).weekday()], 'now': now.astimezone(ECUADOR_TZ).strftime('%H:%M'),
             'request_limits': limits_text(config), 'requests_open': requests_open(config, now)[0], 'requests_notice': requests_open(config, now)[1]}
+
+
+# ---- Inglés (1.5.277) ----------------------------------------------------------------------------------------------------------
+# Los mismos horarios y estados, redactados en inglés para las páginas públicas con English elegido (Agenda de Citas y ADI). No cambian
+# horarios ni reglas: se calculan con la misma configuración, la misma zona horaria (America/Guayaquil) y los mismos cierres.
+DAYS_EN = ('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday')
+VIRTUAL_EN = 'Virtual assistance is available 24/7 through ADI, our intelligent assistant.'
+
+
+def clock_en(value):
+    hour, minute = (int(part) for part in value.split(':'))
+    return '%d:%02d %s' % (hour % 12 or 12, minute, 'AM' if hour < 12 else 'PM')
+
+
+def _groups_en(items, key):
+    groups = []
+    for item in items:
+        value = key(item)
+        if value is None:
+            continue
+        if groups and groups[-1][2] == value and groups[-1][1] == item['weekday'] - 1:
+            groups[-1][1] = item['weekday']
+        else:
+            groups.append([item['weekday'], item['weekday'], value])
+    return [(DAYS_EN[a] if a == b else DAYS_EN[a] + ' to ' + DAYS_EN[b], value) for a, b, value in groups]
+
+
+def public_en(c, now, config=None):
+    """Versión en inglés de `public`: estado, horario presencial, hora límite de solicitudes, aviso del día y atención virtual.
+    Los mensajes libres que escribe administración (atención virtual, notas de cierres) no se traducen automáticamente: la atención
+    virtual usa una frase fija equivalente y las notas de cierre se muestran tal como se escribieron."""
+    config = config or get(c)
+    local = now.astimezone(ECUADOR_TZ)
+    state = status(config, now)
+    presencial = '; '.join(days + ' from ' + clock_en(span[0]) + ' to ' + clock_en(span[1])
+                           for days, span in _groups_en(sorted(config['hours'], key=lambda h: h['weekday']), lambda h: (h['start'], h['end']) if h['enabled'] else None))
+    if state['open']:
+        label = 'Open now · closes at ' + clock_en(state['closes'])
+    elif state.get('opens'):
+        opens = datetime.fromisoformat(state['opens'])
+        offset = (opens.date() - local.date()).days
+        label = 'Closed now · opens ' + ('today' if offset == 0 else 'tomorrow' if offset == 1 else 'on ' + DAYS_EN[opens.weekday()] + ' ' + opens.strftime('%m/%d')) + ' at ' + clock_en(opens.strftime('%H:%M'))
+    else:
+        label = 'Closed'
+    limits = '; '.join(days + ' until ' + clock_en(until) for days, until in _groups_en(config['request_limits'], lambda h: h['until'])) if config.get('request_limits_enabled') else ''
+    open_now, _ = requests_open(config, now)
+    notice = ''
+    if not open_now:
+        until = next(item['until'] for item in config['request_limits'] if item['weekday'] == local.weekday())
+        notice = 'Today, online appointment requests are accepted until ' + clock_en(until) + '. You can send yours starting tomorrow; ADI is still available for your questions.'
+    return {'status': {'open': state['open'], 'label': label}, 'presencial': presencial, 'request_limits': limits, 'requests_notice': notice,
+            'virtual_message': VIRTUAL_EN if config['virtual_enabled'] else '', 'virtual': bool(config['virtual_enabled'])}
+

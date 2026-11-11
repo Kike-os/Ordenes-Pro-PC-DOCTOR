@@ -11744,3 +11744,15 @@ button.wan-more svg,button.wan-retry svg{width:14px;height:14px;transition:trans
 /* 1.5.276 · 320–360 px: el chat se compacta (como ya ocurre en pantallas bajas) para que el pie («Contactar soporte técnico» y
    «Consultar reparación») quepa dentro del panel en ambos idiomas. No cambia colores ni la esfera. */
 @media(max-width:360px){#adi-widget.adi-v2 .adi-quick{gap:6px;padding-top:8px}#adi-widget.adi-v2 .adi-quick button,#adi-widget.adi-v2 .adi-foot>*,#adi-widget.adi-v2 .adi-foot .adi-human{min-height:32px}#adi-widget.adi-v2 .adi-messages{min-height:56px}#adi-widget.adi-v2 .adi-panel>header strong{font-size:12.5px}}
+/* 1.5.277 · Agenda de Citas bilingüe: con English elegido, el contenido se muestra ya traducido (sin parpadeo en español). */
+html.i18n-pending .appointment-public-main,html.i18n-pending .appointment-brand small{visibility:hidden}
+.appointment-terms-lang{display:block;margin-top:6px;font-size:12px;line-height:1.45;color:#9fb4d6}
+#booking-date-text:empty{display:none}
+/* Selector del tipo de identificación: «Tax ID (RUC)» cabe completo en tableta y móvil (sin puntos suspensivos). */
+.booking-id .seg-control button{padding:0 6px}
+/* El halo decorativo de la esfera de ADI sobresalía del borde derecho a 320 px y creaba desplazamiento horizontal en la Agenda (también en español). */
+body[data-page="appointments"]{overflow-x:clip}
+/* 320–640 px: la columna única de la Agenda no se ensancha por su contenido (antes medía 328 px dentro de una tarjeta de 250 y desplazaba
+   la página y la esfera de ADI), y los botones del tipo de identificación pueden partir línea en vez de cortarse. */
+@media(max-width:640px){body[data-page=appointments] .appointment-form-grid,.booking-id{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:400px){.booking-id .seg-control button{white-space:normal;text-overflow:clip;padding:4px;line-height:1.15;font-size:12.5px}}
