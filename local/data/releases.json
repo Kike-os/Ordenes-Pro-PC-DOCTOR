@@ -8,6 +8,26 @@
   },
   "releases": [
     {
+      "version": "1.5.280",
+      "date": "2026-11-11T14:31:58-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Rediseño Premium Compacto del inicio de sesión",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Inicio de sesión PREMIUM COMPACTO: tarjeta más baja que cabe entera en 1366×768, subtítulo en una línea, idioma en una fila, aviso legal desplegable (texto completo y © visibles), versión compacta con «Detalles» y los botones «Agendar cita» y «PQRS» dentro de la tarjeta, del mismo tamaño."
+        ],
+        "fixes": [
+          "Inicio de sesión: «Agendar cita» y «PQRS» ya no quedan fuera de la pantalla; el fondo decorativo no ensancha la página en teléfonos; el logotipo original solo cambia de tamaño (sin halo). En inglés: «Book Appointment»."
+        ],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Kike-os: rediseño Premium Compacto del inicio de sesión y aprobación expresa de "
+    },
+    {
       "version": "1.5.279",
       "date": "2026-11-11T14:02:35-05:00",
       "type": "patch",

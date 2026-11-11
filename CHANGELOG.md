@@ -4,6 +4,18 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.280 — 2026-11-11 14:31 (UTC-05:00)
+
+Rediseño Premium Compacto del inicio de sesión
+
+### Mejoras realizadas
+
+- Inicio de sesión PREMIUM COMPACTO: tarjeta más baja que cabe entera en 1366×768, subtítulo en una línea, idioma en una fila, aviso legal desplegable (texto completo y © visibles), versión compacta con «Detalles» y los botones «Agendar cita» y «PQRS» dentro de la tarjeta, del mismo tamaño.
+
+### Errores corregidos
+
+- Inicio de sesión: «Agendar cita» y «PQRS» ya no quedan fuera de la pantalla; el fondo decorativo no ensancha la página en teléfonos; el logotipo original solo cambia de tamaño (sin halo). En inglés: «Book Appointment».
+
 ## v1.5.279 — 2026-11-11 14:02 (UTC-05:00)
 
 Selector de sede de PQRS: nombre oficial PC-DOCTOR MATRIZ OTAVALO y tipografía uniforme
