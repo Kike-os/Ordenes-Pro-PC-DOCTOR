@@ -903,6 +903,10 @@ def accept(c, quote, link, form, order, now, origin):
         c.execute("UPDATE quote_links SET revoked_at=? WHERE id=?", (stamp, link['id']))
         event(c, quote['id'], 'modificacion', 'El cliente solicitó una modificación: ' + comment, now, actor='Cliente')
         return 'modificacion'
+    if quote['valid_until'] and quote['valid_until'] < now.date().isoformat():
+        # Decisión de administración (12/11/2026): vencida la vigencia, el cliente ya no aprueba ni rechaza; puede pedir una versión actualizada.
+        raise QuoteError('La vigencia de este presupuesto terminó el %s: ya no se puede aprobar ni rechazar. Solicita una versión actualizada.'
+                         % date.fromisoformat(quote['valid_until']).strftime('%d/%m/%Y'), 409, {'expired': 'Presupuesto vencido.'})
     decisions = {item['id']: form.get('decision_%d' % item['id'], '') for item in items}
     errors = {}
     if any(value not in ('aprobado', 'rechazado', 'pendiente') for value in decisions.values()):
@@ -957,7 +961,8 @@ def _shell(title, body):
 
 
 def missing_page():
-    return _shell('Enlace no disponible', '<section class="tracking-card"><h1>Enlace no disponible</h1><p>Este enlace de presupuesto no existe, venció o fue reemplazado por una versión más reciente. Comunícate con el taller.</p></section>')
+    import quote_page
+    return quote_page.missing_page()
 
 
 def _summary_block(quote, order):
@@ -967,12 +972,9 @@ def _summary_block(quote, order):
     return '<small>PRESUPUESTO</small><h1>%s</h1><p class="quote-device">Orden %s · %s</p>' % (e(quote['code']), e(order['code']), e(device))
 
 
-def identify_page(token, quote, order, error=''):
-    import html
-    return _shell('Presupuesto ' + quote['code'], '<section class="tracking-card quote-card">%s<form class="auth-form" method="post" action="/presupuesto/%s" autocomplete="off">%s'
-                  '<p class="auth-step">Paso 1 de 2 · Comprueba tu identidad</p><label for="last4">Escribe los <strong>últimos cuatro dígitos</strong> de tu cédula o RUC</label>'
-                  '<input id="last4" name="last4" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" required autofocus><button class="quote-primary" type="submit">Ver mi presupuesto</button></form></section>'
-                  % (_summary_block(quote, order), html.escape(token), '<p class="quote-error" role="alert">%s</p>' % html.escape(error) if error else ''))
+def identify_page(token, quote, order, error='', now=None):
+    import quote_page
+    return quote_page.identify_page(token, quote, order, error, now)
 
 
 def bank_for(c, quote):
@@ -1001,42 +1003,9 @@ def bank_html(account):
             '<p class="quote-bank-note" data-copy-status role="status"></p></section>') % (rows, e(account['copy_text'], quote=True))
 
 
-def decision_page(token, passkey, quote, order, items, errors=None, form=None, bank=''):
-    import html
-    e, errors, form = html.escape, errors or {}, form or {}
-    summary = totals(items, quote['tax_rate_bp'], quote['discount_bp'])
-    rows = ''
-    for item in items:
-        if item['status'] == 'cancelado':
-            continue
-        chosen = form.get('decision_%d' % item['id'], '')
-        rows += ('<fieldset class="quote-item"><legend>%s%s</legend>%s<p class="quote-amount">%s%s · <strong>%s</strong>%s</p>'
-                 '<label><input type="radio" name="decision_%d" value="aprobado"%s required> Apruebo este servicio</label>'
-                 '<label><input type="radio" name="decision_%d" value="rechazado"%s> No lo apruebo</label>'
-                 '<label><input type="radio" name="decision_%d" value="pendiente"%s> Lo decidiré después</label></fieldset>'
-                 ) % (_icon(item), e(item['description']), _priority(item), '%d × ' % item['quantity'] if item['quantity'] > 1 else '', e(usd(item['unit_cents'])), e(usd(net(item['quantity'] * item['unit_cents'], quote['discount_bp']))), '' if item['taxed'] else ' <small>(tarifa 0 %)</small>',
-                      item['id'], ' checked' if chosen == 'aprobado' else '', item['id'], ' checked' if chosen == 'rechazado' else '', item['id'], ' checked' if chosen == 'pendiente' else '')
-    problem = lambda key: '<p class="quote-error" role="alert">%s</p>' % e(errors[key]) if errors.get(key) else ''
-    rate = quote['tax_rate_bp'] / 100
-    conditions = ''.join('<li>%s%s</li>' % ('<strong>%s.</strong> ' % e(title.rstrip('.')) if title else '', e(body)) for title, body in clauses(quote['conditions'] or CONDITIONS))
-    body = ('<section class="tracking-card quote-card">%s<p class="quote-valid">%s</p>'
-            '<form class="auth-form quote-form" method="post" action="/presupuesto/%s" autocomplete="off"><input type="hidden" name="passkey" value="%s">'
-            '<p class="auth-step">Paso 2 de 2 · Revisa y decide cada servicio</p><div class="quote-bulk"><button type="button" data-quote-all="aprobado">Aprobar todo</button><button type="button" data-quote-all="rechazado">Rechazar todo</button></div>%s%s'
-            '<dl class="quote-totals">%s<div><dt>Subtotal con IVA %g %%</dt><dd>%s</dd></div><div><dt>Subtotal tarifa 0 %%</dt><dd>%s</dd></div><div><dt>IVA %g %%</dt><dd>%s</dd></div><div class="quote-total"><dt>Total cotizado</dt><dd>%s</dd></div>'
-            '<div class="quote-chosen"><dt>Total que apruebas</dt><dd data-quote-approved>—</dd></div></dl>' + bank.replace('%', '%%') +
-            '<h2>Condiciones de autorización</h2><ul class="quote-conditions">%s</ul>'
-            '<label for="name">Nombre completo de quien autoriza</label><input id="name" name="name" maxlength="120" value="%s" required>%s'
-            '<label for="comment">Observaciones (opcional)</label><textarea id="comment" name="comment" rows="2" maxlength="600">%s</textarea>%s'
-            '<p class="quote-sign-label">Firma con el dedo o el ratón dentro del recuadro</p><div class="quote-sign" data-quote-sign><canvas width="1000" height="300" aria-label="Recuadro de firma"></canvas><button type="button" data-quote-clear>Borrar firma</button></div><input type="hidden" name="signature" value="">%s'
-            '%s<label class="quote-accept"><input type="checkbox" name="accept"%s required> He leído los importes y las condiciones, y confirmo mi decisión sobre cada servicio.</label>%s'
-            '<button class="quote-primary" type="submit" name="action" value="decide">Confirmar mi decisión</button>'
-            '<button class="quote-secondary" type="submit" name="action" value="change" formnovalidate>Solicitar una modificación</button></form>'
-            '<p class="quote-pdf"><a href="/presupuesto/%s/documento.pdf?k=%s">Descargar el presupuesto en PDF</a></p></section>'
-            ) % (_summary_block(quote, order), 'Válido hasta el ' + e(date.fromisoformat(quote['valid_until']).strftime('%d/%m/%Y')) if quote['valid_until'] else 'Sin fecha límite indicada', e(token), e(passkey), problem('items'), rows,
-                 ('<div><dt>%s (%g %%)</dt><dd>− %s</dd></div>' % (e(DISCOUNTS[quote['discount_bp']]), quote['discount_bp'] / 100, e(usd(summary['discount']))) if quote['discount_bp'] else ''), rate, e(usd(summary['base_taxed'])), e(usd(summary['base_zero'])), rate, e(usd(summary['tax'])), e(usd(summary['quoted'])), conditions, e(form.get('name', '')), problem('name'), e(form.get('comment', '')), problem('comment'), problem('signature'),
-                 ('<div class="quote-document" data-quote-document><p class="quote-sign-label">Documento de identidad</p><p class="quote-document-note">%s</p><input type="file" accept="image/png,image/jpeg,image/webp,application/pdf" aria-label="Foto o PDF de tu documento de identidad"><input type="hidden" name="id_document" value=""><small data-quote-document-status>Formatos: foto (JPG, PNG, WebP) o PDF, hasta 700 KB. Solo se exige si apruebas algún servicio.</small></div>%s' % (e(DOCUMENT_NOTICE), problem('id_document'))) if quote.get('require_id') else '',
-                 ' checked' if form.get('accept') == 'on' else '', problem('accept'), e(token), e(passkey))
-    return _shell('Presupuesto ' + quote['code'], body)
+def decision_page(token, passkey, quote, order, items, errors=None, form=None, bank='', extra=None, now=None):
+    import quote_page
+    return quote_page.decision_page(token, passkey, quote, order, items, errors, form, bank, extra, now)
 
 
 def _icon(item):
@@ -1048,44 +1017,37 @@ def _priority(item):
     return '<span class="quote-priority" data-priority="%s">%s</span>' % (item['priority'], PRIORITIES[item['priority']][0]) if item.get('priority') else ''
 
 
-def result_page(token, quote, order, items, bank=''):
-    import html
-    e = html.escape
-    summary = totals(items, quote['tax_rate_bp'], quote['discount_bp'])
-    lines = ''.join('<li data-status="%s"><span>%s%s</span><strong>%s</strong><em>%s</em></li>' % (e(item['status']), e(item['description']), (' ' + _priority(item)) if item.get('priority') else '', e(usd(net(item['quantity'] * item['unit_cents'], quote['discount_bp']))), e('Por decidir' if item['status'] == 'pendiente' and quote['status'] in DECIDED else ITEM_STATUS[item['status']])) for item in items if item['status'] != 'cancelado')
-    waiting = quote['status'] in DECIDED and summary['pending'] > 0
-    message = {'modificacion': 'Recibimos tu solicitud de modificación. El taller revisará el presupuesto y te enviará una nueva versión.', 'rechazado': 'Registramos que no apruebas este presupuesto. No se ejecutará ningún trabajo sin tu autorización.',
-               'cancelado': 'Este presupuesto fue cancelado por el taller.'}.get(quote['status'], 'Registramos tu decisión. El taller ejecutará únicamente los servicios aprobados y te avisará del avance.')
-    if waiting:
-        message = 'Registramos tu decisión. Solo se ejecutarán los servicios aprobados. Los que dejaste por decidir (%s) no se realizarán por ahora: el taller te enviará un nuevo presupuesto con ellos.' % usd(summary['pending'])
-    extra = '<dl class="quote-totals"><div><dt>Total cotizado</dt><dd>%s</dd></div><div class="quote-total"><dt>Total aprobado</dt><dd>%s</dd></div><div><dt>Importe rechazado</dt><dd>%s</dd></div></dl>' % (e(usd(summary['quoted'])), e(usd(summary['approved'])), e(usd(summary['rejected']))) if quote['status'] in ('aprobado', 'parcial', 'rechazado') else ''
-    # Datos bancarios solo si queda algo aprobado por pagar (no en rechazados, cancelados ni modificaciones).
-    payable = bank if quote['status'] in ('aprobado', 'parcial') else ''
-    return _shell('Presupuesto ' + quote['code'], '<section class="tracking-card quote-card">%s<p class="tracking-state quote-state" data-status="%s">%s</p><p>%s</p><ul class="quote-result">%s</ul>%s%s</section>' % (_summary_block(quote, order), e(quote['status']), e(STATUS[quote['status']]), e(message), lines, extra, payable))
+def result_page(token, quote, order, items, bank='', extra=None, now=None):
+    import quote_page
+    return quote_page.result_page(token, quote, order, items, bank, extra, now)
 
 
 def handle(c, token, quote, link, order, form, now, origin):
     """Atiende el formulario del enlace. Devuelve (página HTML, estado nuevo o None)."""
+    import quote_page
     items = items_of(c, quote['id'])
+    extra = quote_page.extras(c, items)
+    bank = lambda: bank_html(bank_for(c, quote))
     if quote['status'] != 'enviado' or not link['usable']:
-        return (result_page(token, quote, order, items, bank_html(bank_for(c, quote))) if quote['status'] != 'enviado' else missing_page()), None
+        return (result_page(token, quote, order, items, bank(), extra, now) if quote['status'] != 'enviado' else missing_page()), None
     passkey = str(form.get('passkey', ''))
     if not passkey:
         # Paso 1: comprobación de identidad. Al acertar se emite una llave de un solo uso para el paso 2 (treinta minutos).
         if not verify(c, link, order.get('identification'), form.get('last4'), now):
-            return identify_page(token, quote, order, 'Los dígitos no coinciden con la identificación registrada.'), None
+            return identify_page(token, quote, order, 'Los dígitos no coinciden con la identificación registrada.', now), None
         passkey = secrets.token_urlsafe(24)
         c.execute('UPDATE quote_links SET verified_at=?,passkey_hash=?,failed=0 WHERE id=?', (now.isoformat(timespec='seconds'), digest(passkey), link['id']))
-        return decision_page(token, passkey, quote, order, items, bank=bank_html(bank_for(c, quote))), None
+        return decision_page(token, passkey, quote, order, items, bank=bank(), extra=extra, now=now), None
     if not valid_passkey(link, passkey, now):
-        return identify_page(token, quote, order, 'La comprobación de identidad caducó. Vuelve a escribir los cuatro dígitos.'), None
+        return identify_page(token, quote, order, 'La comprobación de identidad caducó. Vuelve a escribir los cuatro dígitos.', now), None
     try:
         status = accept(c, quote, link, form, order, now, origin)
     except QuoteError as error:
         if not error.fields:
-            return identify_page(token, quote, order, str(error)), None
-        return decision_page(token, passkey, quote, order, items, error.fields, form, bank_html(bank_for(c, quote))), None
-    return result_page(token, get(c, quote['id']), order, items_of(c, quote['id']), bank_html(bank_for(c, quote))), status
+            return identify_page(token, quote, order, str(error), now), None
+        fields = dict(error.fields, expired=str(error)) if 'expired' in error.fields else error.fields
+        return decision_page(token, passkey, quote, order, items, fields, form, bank(), extra, now), None
+    return result_page(token, get(c, quote['id']), order, items_of(c, quote['id']), bank(), extra, now), status
 
 
 def valid_passkey(link, passkey, now):

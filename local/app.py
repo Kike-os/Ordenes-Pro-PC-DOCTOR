@@ -1151,7 +1151,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         path = urlsplit(self.path).path
-        files = {'/static/label.css':'label.css','/static/tracking.css':'tracking.css','/static/licencias.css':'licencias.css','/static/app.css':'app.css','/static/app.js':'app.js','/static/i18n.js':'i18n.js','/static/service-picker.js':'service-picker.js','/static/licenses.js':'licenses.js','/static/inventory.js':'inventory.js','/static/sales.js':'sales.js','/static/reschedule.js':'reschedule.js','/static/form-validation.js':'form-validation.js','/static/appointments.js':'appointments.js','/static/pqrs.js':'pqrs.js','/static/pqrs-admin.js':'pqrs-admin.js','/static/adi-widget.js':'adi-widget.js','/static/adi-orb.js':'adi-orb.js','/static/ui-select.js':'ui-select.js','/static/ticket.css':'ticket.css','/static/phone-input.js':'phone-input.js','/static/phone-input.css':'phone-input.css','/static/libphonenumber-max.js':'libphonenumber-max.js','/static/seguimiento-a4.css':'seguimiento-a4.css','/static/ticket.js':'ticket.js','/static/quote.css':'quote.css','/static/quote-sign.js':'quote-sign.js','/static/echarts.min.js':'echarts.min.js','/static/logo-original.png':'logo-original.png',
+        files = {'/static/label.css':'label.css','/static/tracking.css':'tracking.css','/static/licencias.css':'licencias.css','/static/app.css':'app.css','/static/app.js':'app.js','/static/i18n.js':'i18n.js','/static/service-picker.js':'service-picker.js','/static/licenses.js':'licenses.js','/static/inventory.js':'inventory.js','/static/sales.js':'sales.js','/static/reschedule.js':'reschedule.js','/static/form-validation.js':'form-validation.js','/static/appointments.js':'appointments.js','/static/pqrs.js':'pqrs.js','/static/pqrs-admin.js':'pqrs-admin.js','/static/adi-widget.js':'adi-widget.js','/static/adi-orb.js':'adi-orb.js','/static/ui-select.js':'ui-select.js','/static/ticket.css':'ticket.css','/static/phone-input.js':'phone-input.js','/static/phone-input.css':'phone-input.css','/static/libphonenumber-max.js':'libphonenumber-max.js','/static/seguimiento-a4.css':'seguimiento-a4.css','/static/ticket.js':'ticket.js','/static/quote.css':'quote.css','/static/quote-sign.js':'quote-sign.js','/static/quote-premium.css':'quote-premium.css','/static/quote-premium.js':'quote-premium.js','/static/echarts.min.js':'echarts.min.js','/static/logo-original.png':'logo-original.png',
                  '/favicon.ico':'favicon.ico','/static/favicon.ico':'favicon.ico','/static/favicon-16.png':'favicon-16.png','/static/favicon-32.png':'favicon-32.png','/static/logo-firma.png':'logo-firma.png','/static/favicon-48.png':'favicon-48.png',
                  '/apple-touch-icon.png':'apple-touch-icon.png','/apple-touch-icon-precomposed.png':'apple-touch-icon.png','/static/apple-touch-icon.png':'apple-touch-icon.png'}
         # Logotipos de marcas: solo nombres simples dentro de static/brands; si el archivo no existe la interfaz usa un icono genérico.
@@ -1428,13 +1428,21 @@ class Handler(BaseHTTPRequestHandler):
                     return self.reply(200,proformas.pdf(c,row['id'],now),'application/pdf',filename=__import__('document_style').filename('PROFORMA',row['code']))
                 if not link['usable']:return self.reply(200 if row['status'] in ('aprobada','parcial','rechazada','modificacion','convertida') else 404,proformas.result_page(row,row['status']) if row['status'] in ('aprobada','parcial','rechazada','modificacion','convertida') else proformas.missing_page(),'text/html; charset=utf-8')
                 return self.reply(200,proformas.identify_page(proforma_page[1],row),'text/html; charset=utf-8')
-            quote_page=re.fullmatch(r'/presupuesto/([A-Za-z0-9_-]{30,80})(/documento\.pdf)?',path)
+            quote_page=re.fullmatch(r'/presupuesto/([A-Za-z0-9_-]{30,80})(/documento\.pdf|/imagen/([0-9]{1,9}))?',path)
             if quote_page:
                 # Presupuesto por enlace privado: identidad con los últimos cuatro dígitos antes de mostrar importes; el PDF exige esa comprobación o una decisión ya registrada.
                 if limited(c,'quote-ip:'+digest(self.client_address[0]),60,300):return self.reply(429,{'error':'Demasiadas consultas. Intenta más tarde.'})
                 now=reception_now();quote,link=quotes.lookup(c,quote_page[1],now)
                 if not quote:return self.reply(404,quotes.missing_page(),'text/html; charset=utf-8')
                 document=order_document(c,quote['order_id'])
+                if quote_page[3]:
+                    # Fotografía del catálogo de una partida DE ESTE presupuesto, con la misma comprobación que el PDF (1.5.282).
+                    if quote['status']=='enviado' and not (link['usable'] and quotes.valid_passkey(link,parse_qs(urlsplit(self.path).query).get('k',[''])[0],now)):return self.reply(404,{'error':'Sin imagen.'})
+                    if quote['status'] in ('borrador','cancelado','modificacion'):return self.reply(404,{'error':'Sin imagen.'})
+                    owned=c.execute("SELECT 1 FROM quote_items WHERE quote_id=? AND catalog_id=? AND status!='cancelado'",(quote['id'],int(quote_page[3]))).fetchone()
+                    picture=c.execute('SELECT mime,data FROM catalog_images WHERE item_id=?',(int(quote_page[3]),)).fetchone() if owned else None
+                    if not picture:return self.reply(404,{'error':'Sin imagen.'})
+                    return self.reply(200,bytes(picture['data']),picture['mime'])
                 if quote_page[2]:
                     if quote['status']=='enviado' and not (link['usable'] and quotes.valid_passkey(link,parse_qs(urlsplit(self.path).query).get('k',[''])[0],now)):return self.reply(404,quotes.missing_page(),'text/html; charset=utf-8')
                     if quote['status'] in ('borrador','cancelado','modificacion'):return self.reply(404,quotes.missing_page(),'text/html; charset=utf-8')
@@ -1442,9 +1450,11 @@ class Handler(BaseHTTPRequestHandler):
                     number=re.sub(r'\D','',str(document.get('identification') or ''))
                     live=quotes.active_link(c,quote,quote_page[1],now)
                     return self.reply(200,quote_pdf.render(quotes.detail(c,quote),dict(document,identification=number[:2]+'*'*max(0,len(number)-2) if number else ''),dict(live,url=public_base_url().rstrip('/')+'/presupuesto/'+quote_page[1]) if live else None),'application/pdf',filename=quote['code']+'-PRESUPUESTO.pdf')
-                if quote['status']!='enviado':return self.reply(200,quotes.result_page(quote_page[1],quote,document,quotes.items_of(c,quote['id']),quotes.bank_html(quotes.bank_for(c,quote))),'text/html; charset=utf-8')
+                if quote['status']!='enviado':
+                    rows=quotes.items_of(c,quote['id'])
+                    return self.reply(200,quotes.result_page(quote_page[1],quote,document,rows,quotes.bank_html(quotes.bank_for(c,quote)),__import__('quote_page').extras(c,rows),now),'text/html; charset=utf-8')
                 if not link['usable']:return self.reply(404,quotes.missing_page(),'text/html; charset=utf-8')
-                return self.reply(200,quotes.identify_page(quote_page[1],quote,document),'text/html; charset=utf-8')
+                return self.reply(200,quotes.identify_page(quote_page[1],quote,document,'',now),'text/html; charset=utf-8')
             authorize_page=re.fullmatch(r'/autorizar/([A-Za-z0-9_-]{20,80})(/comprobante\.pdf)?',path)
             if authorize_page:
                 import client_authorization

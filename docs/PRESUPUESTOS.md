@@ -385,3 +385,71 @@ El panel se adapta al ancho real en el que está (columna lateral en escritorio 
 - subtotal $126,39, IVA $18,96 y total $145,35;
 - sin firma del cliente;
 - orden en «Procesando».
+
+## Página de aprobación Premium compacta (1.5.282)
+
+El enlace privado `/presupuesto/<token>` se rediseñó por completo. Las reglas, los campos del formulario y la evidencia guardada son los mismos que antes; las proformas no cambian y siguen usando `quote.css`.
+
+**Archivos:**
+- `local/quote_page.py`: páginas de enlace no disponible, identidad, decisión, presupuesto vencido y resultado.
+- `local/static/quote-premium.css` y `local/static/quote-premium.js`: estilos y comportamiento de esta página.
+- `quotes.identify_page`, `decision_page`, `result_page` y `missing_page` delegan en `quote_page`.
+
+**Cabecera:**
+- Logotipo original, solo escalado, con «PC-DOCTOR S.A.» y «Servicio Técnico Especializado».
+- Botón de WhatsApp al número configurado en los datos corporativos.
+
+**Tarjeta del presupuesto:**
+- Número, con botón para copiarlo.
+- Orden vinculada, equipo, fecha de emisión (envío) y fecha de vencimiento.
+- Estado y barra de vigencia calculada con las fechas reales: vigente, por vencer (3 días o menos), vence hoy o vencido.
+- No muestra importes antes de comprobar la identidad.
+
+**Pasos:** Identidad → Decisión → Confirmación.
+
+**Partidas:**
+- Se muestran en el orden que fijó el taller.
+- Cada tarjeta lleva categoría, nombre y descripción técnica (la de la línea o, si no tiene, la del catálogo).
+- Marca, referencia, licencia y equipos del catálogo, cuando existen.
+- Prioridad, solo si está registrada.
+- Fotografía del catálogo, cuando existe. Se sirve por `/presupuesto/<token>/imagen/<id>`, solo si el producto pertenece a ese presupuesto y con la misma comprobación de identidad que el PDF.
+- Cantidad, precio unitario, importe final e indicación «IVA x % incluido» o «Tarifa 0 %».
+
+**Decisión por partida:**
+- Tres opciones grandes y excluyentes: «Aprobar este servicio», «No lo apruebo» y «Lo decidiré después».
+- «Aprobar todo» y «Rechazar todo» actualizan cada tarjeta. Nada se registra hasta pulsar «Confirmar decisiones».
+
+**Resumen económico:**
+- Subtotal gravado, subtotal 0 %, IVA y **total cotizado**, que es fijo.
+- Lo seleccionado: conteos, subtotales, IVA aprobado y total seleccionado para aprobación.
+- Avance «N de M servicios decididos».
+- Ver o descargar el PDF existente e imprimir en A4 con fondo claro.
+
+**Cálculo:** cada tarjeta lleva el importe neto, la base y el IVA que calcula el servidor (`quotes.split`, con la tarifa guardada en el presupuesto). El navegador solo los suma, así que no duplica ni recalcula impuestos. Ante un error de validación, el servidor conserva la selección y su total.
+
+**Confirmación:**
+- Resumen de lo que se autoriza, se rechaza y queda pendiente, con el importe autorizado. Lo pendiente nunca cuenta como aprobado.
+- Condiciones (desplegables), nombre, observaciones, firma, documento de identidad si el taller lo pidió y aceptación expresa.
+- El botón se bloquea al enviar para evitar duplicados; el servidor también lo impide.
+
+**Vigencia (decisión de administración del 12/11/2026):**
+- Vencida la fecha «Válido hasta», el cliente ya **no puede aprobar ni rechazar**; el servidor lo rechaza en `quotes.accept`.
+- La página muestra el presupuesto como «Vencido» y permite pedir una versión actualizada o escribir por WhatsApp.
+- El registro de una decisión por el personal no cambia.
+
+**Diseño adaptable:**
+- **Escritorio:** partidas a la izquierda y resumen fijo a la derecha.
+- **Tableta y móvil:** una columna, con barra inferior «Total seleccionado · Revisar y confirmar».
+- Sin desplazamiento horizontal, con botones táctiles de 44 px o más.
+- Respeta el movimiento reducido y no usa estilos ni guiones en línea (CSP).
+
+**Pruebas:**
+- `local/tests/test_quote_premium.py` cubre:
+  - un servicio y varios;
+  - aprobación total, parcial y rechazo total;
+  - partidas pendientes;
+  - importes por partida iguales a los del servidor;
+  - presupuesto vencido;
+  - doble confirmación y enlace inválido;
+  - fotografía protegida y persistencia en la orden.
+- En navegador se probaron 1440, 1024, 768, 390 y 320 px.
