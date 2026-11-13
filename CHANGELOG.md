@@ -4,6 +4,19 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.282 — 2026-11-12 21:37 (UTC-05:00)
+
+Aprobación de presupuestos Premium compacta
+
+### Mejoras realizadas
+
+- Aprobación de presupuestos rediseñada (Premium compacto): tarjeta con número copiable, orden, equipo, fechas, estado y vigencia; servicios con descripción, datos técnicos, prioridad y foto del catálogo; tres opciones por servicio, aprobar o rechazar todo y resumen antes de confirmar. Adaptada a PC, tableta y móvil.
+- Resumen económico del presupuesto: el total cotizado no cambia y el total seleccionado suma importes, bases e IVA calculados por el servidor para cada partida, sin recalcular impuestos. Vista e impresión A4, PDF y consulta por WhatsApp.
+
+### Actualizaciones de seguridad
+
+- Presupuestos: vencida la fecha de vigencia, el cliente ya no puede aprobar ni rechazar (lo bloquea el servidor) y puede pedir una versión actualizada. La foto de cada partida solo se entrega si pertenece a ese presupuesto y tras comprobar la identidad.
+
 ## v1.5.281 — 2026-11-11 18:20 (UTC-05:00)
 
 Barra superior uniforme: «Asistencia» con la misma tipografía que el resto del menú

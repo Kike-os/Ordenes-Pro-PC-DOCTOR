@@ -8,6 +8,27 @@
   },
   "releases": [
     {
+      "version": "1.5.282",
+      "date": "2026-11-12T21:37:23-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Aprobación de presupuestos Premium compacta",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Aprobación de presupuestos rediseñada (Premium compacto): tarjeta con número copiable, orden, equipo, fechas, estado y vigencia; servicios con descripción, datos técnicos, prioridad y foto del catálogo; tres opciones por servicio, aprobar o rechazar todo y resumen antes de confirmar. Adaptada a PC, tableta y móvil.",
+          "Resumen económico del presupuesto: el total cotizado no cambia y el total seleccionado suma importes, bases e IVA calculados por el servidor para cada partida, sin recalcular impuestos. Vista e impresión A4, PDF y consulta por WhatsApp."
+        ],
+        "fixes": [],
+        "security": [
+          "Presupuestos: vencida la fecha de vigencia, el cliente ya no puede aprobar ni rechazar (lo bloquea el servidor) y puede pedir una versión actualizada. La foto de cada partida solo se entrega si pertenece a ese presupuesto y tras comprobar la identidad."
+        ],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Kike-os: rediseño Premium de aprobación de presupuestos (regla de vencidos, acen"
+    },
+    {
       "version": "1.5.281",
       "date": "2026-11-11T18:20:18-05:00",
       "type": "patch",
@@ -23,7 +44,7 @@
         "performance": []
       },
       "published_by": "Kike-os",
-      "authorized_by": "Kike-os: corrección del menú superior y aprobación expresa de publicación de la "
+      "authorized_by": "Kike-os: corrección del menú superior y aprobación expresa de publicación de la"
     },
     {
       "version": "1.5.280",
