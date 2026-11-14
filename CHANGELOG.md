@@ -4,6 +4,15 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.283 — 2026-11-13 19:54 (UTC-05:00)
+
+Reloj y clima estilo Apple Weather
+
+### Mejoras realizadas
+
+- Encabezado: reloj y clima con estilo Apple Weather en el mismo espacio de antes (305 × 56 px, sin cambiar la altura ni mover el logotipo, los menús o las notificaciones). Tarjetas de cristal azul oscuro, esfera analógica con la hora real de Ecuador y números que no se mueven.
+- Clima: doce iconos con volumen suave (sol, luna, nubes, lluvia, llovizna, tormenta, niebla, nieve, viento y no disponible), animaciones sutiles que respetan el movimiento reducido y la descripción completa; mismos datos de MET Norway para Otavalo y mismo detalle al pulsar.
+
 ## v1.5.282 — 2026-11-12 21:37 (UTC-05:00)
 
 Aprobación de presupuestos Premium compacta

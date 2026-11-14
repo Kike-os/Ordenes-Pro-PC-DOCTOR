@@ -8,6 +8,25 @@
   },
   "releases": [
     {
+      "version": "1.5.283",
+      "date": "2026-11-13T19:54:47-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Reloj y clima estilo Apple Weather",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Encabezado: reloj y clima con estilo Apple Weather en el mismo espacio de antes (305 × 56 px, sin cambiar la altura ni mover el logotipo, los menús o las notificaciones). Tarjetas de cristal azul oscuro, esfera analógica con la hora real de Ecuador y números que no se mueven.",
+          "Clima: doce iconos con volumen suave (sol, luna, nubes, lluvia, llovizna, tormenta, niebla, nieve, viento y no disponible), animaciones sutiles que respetan el movimiento reducido y la descripción completa; mismos datos de MET Norway para Otavalo y mismo detalle al pulsar."
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Kike-os: rediseño Premium Apple Weather del reloj y clima (mismo espacio del enc"
+    },
+    {
       "version": "1.5.282",
       "date": "2026-11-12T21:37:23-05:00",
       "type": "patch",
