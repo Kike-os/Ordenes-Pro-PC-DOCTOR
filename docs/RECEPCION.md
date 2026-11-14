@@ -46,6 +46,21 @@ El clima usa la API real **MET Norway Locationforecast**, con atribución, icono
 
 Fuentes: https://api.met.no/doc/locationforecast/HowTO y https://api.met.no/
 
+### Reloj y clima estilo Apple Weather (1.5.283)
+
+Es un rediseño visual. Los datos y el comportamiento no cambian:
+- el reloj se sincroniza con el servidor y usa la zona America/Guayaquil;
+- el clima sale de `/api/weather` (MET Norway), con caché y reintentos;
+- los paneles de detalle y los avisos de cambio de clima funcionan igual.
+
+- **Mismo espacio:** con 1000 px o más, el área mide 305,2 × 56,2 px, igual que antes: reloj de 136 px, 10 px de separación y clima de 159,2 px. No cambian la altura del encabezado ni la posición del logotipo, los menús, la cuenta o las notificaciones; se comprobó midiendo antes y después de 320 a 1920 px. Por debajo de 1000 px ambos pasan al menú desplegable, en una fila, y por debajo de 380 px uno debajo de otro.
+- **Tarjetas:** son de cristal azul oscuro, con borde sutil, brillo superior y sombra suave. Los números son tabulares, así que la hora no se mueve al cambiar los segundos.
+- **Reloj:** muestra una esfera analógica con las manecillas en la hora real de Ecuador; el segundero es naranja. La hora digital va con segundos y debajo «Ecuador · UTC−05:00». Las manecillas se giran desde el guion (CSSOM), sin estilos en línea en el HTML.
+- **Clima:** los iconos están hechos con capas de color, sombra y brillo, que dan volumen suave sin imágenes ni degradados. Hay doce estados: soleado, despejado de noche, nublado, parcialmente nublado de día y de noche, lluvia, llovizna, tormenta, niebla, nieve, viento y no disponible. «Parcialmente nublado» cabe completo.
+- **Animaciones:** son sutiles (brillo del sol, nubes, gotas, relámpago) y se desactivan con movimiento reducido.
+- **Sin servicio meteorológico:** se muestra «Sin datos · Clima no disponible», sin romper el diseño.
+- **Archivos:** `local/templates/dashboard.html` (esfera del reloj), `local/static/app.js` (`weatherArt` y `paintClockHands`) y `local/static/app.css` (bloque «1.5.283»).
+
 ## Producción y dependencias
 
 El aviso de evaluación se oculta únicamente si APP_ENV=production, PRODUCTION_ENABLED=true, APP_URL es HTTPS y SESSION_SECURE=true. El cambio no certifica ni despliega el hosting. La instalación local continúa identificada como evaluación.
