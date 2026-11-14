@@ -61,6 +61,29 @@ Es un rediseño visual. Los datos y el comportamiento no cambian:
 - **Sin servicio meteorológico:** se muestra «Sin datos · Clima no disponible», sin romper el diseño.
 - **Archivos:** `local/templates/dashboard.html` (esfera del reloj), `local/static/app.js` (`weatherArt` y `paintClockHands`) y `local/static/app.css` (bloque «1.5.283»).
 
+### Iconos animados Meteocons (1.5.284)
+
+- **Biblioteca:** el clima usa los iconos oficiales **Meteocons** de Bas Milius, variante «fill», del paquete npm `@meteocons/svg` 0.1.0, con licencia MIT.
+  - Están en `local/static/meteocons/fill/`: 26 SVG copiados sin cambios, con su propia animación SMIL. No es un efecto simulado con CSS.
+  - La licencia está en `local/static/meteocons/meteocons-MIT.txt`.
+  - No se añadió ninguna dependencia: se sirven como archivos propios.
+- **Mapeo explícito:** `weather.METEOCONS` asigna a cada uno de los 41 `symbol_code` oficiales de MET Norway su icono de día y de noche.
+  - La noche se toma del sufijo `_night` que fija el proveedor.
+  - Con viento de 10 m/s o más, y sin precipitación ni niebla, el icono es «wind», igual que la descripción.
+  - Un código desconocido nunca recibe un icono inventado.
+  - `/api/weather` añade `symbol` y `meteocon`.
+- **Presentación:** el icono se carga como `<img>` dentro de un `<picture>`. Así no hay choques de identificadores entre SVG ni guiones.
+  - El `<img>` solo se reemplaza cuando cambia el icono, de modo que la animación continúa entre actualizaciones.
+  - Con movimiento reducido se usa la misma figura sin animación, que está en `local/static/meteocons/estatico/`.
+  - Sin datos del proveedor se muestra el icono discreto propio (nube tachada) y «Sin datos», porque el «N/A» de Meteocons no se lee sobre azul oscuro.
+  - Si un icono no carga, se usan los iconos de la 1.5.283.
+- **Actualización:** cada 10 minutos, igual que la caché del servidor. Hay un solo juego de intervalos.
+  - En tableta y móvil, el clima se pide también al abrir el menú. Antes podía tardar hasta un minuto en aparecer si el menú se abría justo después de cargar la página.
+  - La lectura desactualizada sigue marcada con el punto ámbar.
+- **Mismo espacio:** el área mide 305,2 × 56,2 px y el icono, de 40 px, se centra sobre su hueco de 32 px. La comparación con las medidas originales, de 320 a 1920 px, no muestra ningún cambio.
+- **Ruta:** `/static/meteocons/(fill|estatico)/<nombre>.svg`, solo con nombres simples, en caché del navegador durante 7 días; la versión va en `?v=`.
+- **Pruebas:** `local/tests/test_meteocons.py`.
+
 ## Producción y dependencias
 
 El aviso de evaluación se oculta únicamente si APP_ENV=production, PRODUCTION_ENABLED=true, APP_URL es HTTPS y SESSION_SECURE=true. El cambio no certifica ni despliega el hosting. La instalación local continúa identificada como evaluación.

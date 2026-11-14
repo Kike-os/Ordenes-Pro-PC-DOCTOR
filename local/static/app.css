@@ -12182,3 +12182,8 @@ body[data-page=login] .access-shell .brand .original-logo{filter:none}
 @keyframes wx-soft-flash{0%,86%,100%{opacity:1}89%{opacity:.25}92%{opacity:1}95%{opacity:.4}}
 .popover-icon{position:relative;display:grid;place-items:center;width:48px;height:48px;flex:0 0 48px}
 @media(prefers-reduced-motion:reduce){#header-status>button,#header-status .cf-s{transition:none}:is(#weather-icon,.popover-icon) *{animation:none!important}}
+/* ===== 1.5.284 · Iconos animados Meteocons «fill» en el clima del encabezado (mismo espacio: 305,2 × 56,2 px) =====
+   El hueco del icono sigue midiendo 32 px; la imagen de 40 px se centra sobre él sin ocupar más sitio (sus figuras dejan margen interno). */
+#header-status #weather-icon .mc{position:absolute;left:50%;top:50%;display:block;width:40px;height:40px;transform:translate(-50%,-50%);pointer-events:none}
+#header-status #weather-icon .mc-img,.popover-icon .mc-img{display:block;width:100%;height:100%;max-width:none;object-fit:contain;filter:drop-shadow(0 2px 3px #0008)}
+.popover-icon .mc{display:block;width:56px;height:56px}

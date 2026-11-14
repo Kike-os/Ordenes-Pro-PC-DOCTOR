@@ -1156,6 +1156,15 @@ class Handler(BaseHTTPRequestHandler):
                  '/apple-touch-icon.png':'apple-touch-icon.png','/apple-touch-icon-precomposed.png':'apple-touch-icon.png','/static/apple-touch-icon.png':'apple-touch-icon.png'}
         # Logotipos de marcas: solo nombres simples dentro de static/brands; si el archivo no existe la interfaz usa un icono genérico.
         # Banderas del selector de teléfono (1.5.251, country-flag-icons, MIT): solo códigos de país de dos letras en SVG.
+        # Iconos del clima Meteocons «fill» (MIT, static/meteocons/meteocons-MIT.txt): animados (SMIL) o quietos para movimiento reducido.
+        # Solo nombres simples de la carpeta; se guardan en caché del navegador (el nombre cambia con ?v= al publicar otra versión).
+        meteocon = re.fullmatch(r'/static/meteocons/(fill|estatico)/([a-z0-9-]{2,60})\.svg', path)
+        if meteocon:
+            file = ROOT / 'static' / 'meteocons' / meteocon[1] / (meteocon[2] + '.svg')
+            if not file.is_file():
+                return self.reply(404, {'error':'Archivo no disponible.'})
+            self.cache_policy = 'public, max-age=604800'
+            return self.reply(200, file.read_bytes(), 'image/svg+xml')
         flag = re.fullmatch(r'/static/flags/([A-Z]{2})\.svg', path)
         if flag:
             file = ROOT / 'static' / 'flags' / (flag[1] + '.svg')
