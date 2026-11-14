@@ -4,6 +4,15 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.284 — 2026-11-13 20:47 (UTC-05:00)
+
+Clima con Meteocons animados
+
+### Mejoras realizadas
+
+- Clima del encabezado con iconos Meteocons animados (variante fill, licencia MIT): sol, luna, nubes, llovizna, lluvia, tormenta, niebla, nieve y viento cambian solos según el código real de MET Norway para Otavalo, de día y de noche, en el mismo espacio de antes.
+- Clima: actualización cada 10 minutos sin solicitudes repetidas, la animación continúa entre lecturas, versión quieta con movimiento reducido y, en tableta y móvil, el clima aparece al abrir el menú sin esperar.
+
 ## v1.5.283 — 2026-11-13 19:54 (UTC-05:00)
 
 Reloj y clima estilo Apple Weather

@@ -8,6 +8,25 @@
   },
   "releases": [
     {
+      "version": "1.5.284",
+      "date": "2026-11-13T20:47:20-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Clima con Meteocons animados",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Clima del encabezado con iconos Meteocons animados (variante fill, licencia MIT): sol, luna, nubes, llovizna, lluvia, tormenta, niebla, nieve y viento cambian solos según el código real de MET Norway para Otavalo, de día y de noche, en el mismo espacio de antes.",
+          "Clima: actualización cada 10 minutos sin solicitudes repetidas, la animación continúa entre lecturas, versión quieta con movimiento reducido y, en tableta y móvil, el clima aparece al abrir el menú sin esperar."
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Kike-os: iconos Meteocons Animated Fill con datos reales de Otavalo y autorizaci"
+    },
+    {
       "version": "1.5.283",
       "date": "2026-11-13T19:54:47-05:00",
       "type": "patch",
