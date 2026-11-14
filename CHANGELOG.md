@@ -4,6 +4,18 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.285 — 2026-11-13 21:38 (UTC-05:00)
+
+Versiones reemplazadas en el enlace del presupuesto
+
+### Mejoras realizadas
+
+- Presupuestos: una versión decidida a la que siguió otra más reciente avisa cuál es la vigente. Pruebas de regresión: una aprobación nunca pasa a cancelada, el enlace antiguo no admite decisiones y el total de la orden no suma versiones.
+
+### Errores corregidos
+
+- Presupuestos: el enlace de una versión que el taller reemplazó por otra ya no dice «cancelado por el taller» ni muestra servicios pendientes; indica la versión vigente con su estado real (por ejemplo, aprobada con su total autorizado) y deja sus servicios «Sin efecto».
+
 ## v1.5.284 — 2026-11-13 20:47 (UTC-05:00)
 
 Clima con Meteocons animados

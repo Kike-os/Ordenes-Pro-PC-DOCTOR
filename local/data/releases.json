@@ -8,6 +8,26 @@
   },
   "releases": [
     {
+      "version": "1.5.285",
+      "date": "2026-11-13T21:38:17-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Versiones reemplazadas en el enlace del presupuesto",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Presupuestos: una versión decidida a la que siguió otra más reciente avisa cuál es la vigente. Pruebas de regresión: una aprobación nunca pasa a cancelada, el enlace antiguo no admite decisiones y el total de la orden no suma versiones."
+        ],
+        "fixes": [
+          "Presupuestos: el enlace de una versión que el taller reemplazó por otra ya no dice «cancelado por el taller» ni muestra servicios pendientes; indica la versión vigente con su estado real (por ejemplo, aprobada con su total autorizado) y deja sus servicios «Sin efecto»."
+        ],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Kike-os: auditoría y corrección de PCD-20261031-0010-P3 y autorización expresa d"
+    },
+    {
       "version": "1.5.284",
       "date": "2026-11-13T20:47:20-05:00",
       "type": "patch",
