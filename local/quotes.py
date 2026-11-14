@@ -728,6 +728,37 @@ def authorization(c, order_id, order_status=''):
             'steps': steps, 'history': history[:60]}
 
 
+def successor(c, quote):
+    """Versión vigente que reemplazó a este presupuesto (misma serie), o None. Solo si consta el evento «Sustituido por la versión Pn»
+    que registra create(): una cancelación manual NO tiene sucesora. Solo lectura: no cambia ningún estado (1.5.285)."""
+    if quote['status'] != 'cancelado':
+        return None
+    if not c.execute("SELECT 1 FROM quote_events WHERE quote_id=? AND event='cancelado' AND detail LIKE 'Sustituido por la versión P%'", (quote['id'],)).fetchone():
+        return None
+    series = quote['series'] if 'series' in quote.keys() else 1
+    row = c.execute("SELECT * FROM quotes WHERE order_id=? AND series=? AND version>? AND deleted_at='' ORDER BY version DESC LIMIT 1", (quote['order_id'], series, quote['version'])).fetchone()
+    if not row:
+        return None
+    row = dict(row)
+    summary = totals(items_of(c, row['id']), row['tax_rate_bp'], row['discount_bp'])
+    return {'code': row['code'], 'status': row['status'], 'label': STATUS[row['status']], 'decided_at': row['decided_at'], 'approved': summary['approved'], 'quoted': summary['quoted']}
+
+
+def newer(c, quote):
+    """Versión posterior de la misma serie que el cliente ya recibió (enviada o decidida), para un presupuesto ya decidido. Las
+    continuaciones con solo lo pendiente (continues_id) no reemplazan nada. Solo lectura (1.5.285)."""
+    if quote['status'] not in DECIDED:
+        return None
+    series = quote['series'] if 'series' in quote.keys() else 1
+    row = c.execute("SELECT * FROM quotes WHERE order_id=? AND series=? AND version>? AND deleted_at='' AND continues_id IS NULL AND status IN ('enviado','modificacion','aprobado','parcial','rechazado') ORDER BY version DESC LIMIT 1",
+                    (quote['order_id'], series, quote['version'])).fetchone()
+    if not row:
+        return None
+    row = dict(row)
+    summary = totals(items_of(c, row['id']), row['tax_rate_bp'], row['discount_bp'])
+    return {'code': row['code'], 'status': row['status'], 'label': STATUS[row['status']], 'decided_at': row['decided_at'], 'approved': summary['approved'], 'quoted': summary['quoted']}
+
+
 def set_execution(c, quote, item_id, value, user, now):
     """Avance de una partida aprobada (pendiente, en proceso, realizado). No cambia importes, pagos ni el estado del equipo."""
     if value not in EXECUTION:
@@ -1017,9 +1048,9 @@ def _priority(item):
     return '<span class="quote-priority" data-priority="%s">%s</span>' % (item['priority'], PRIORITIES[item['priority']][0]) if item.get('priority') else ''
 
 
-def result_page(token, quote, order, items, bank='', extra=None, now=None):
+def result_page(token, quote, order, items, bank='', extra=None, now=None, replaced_by=None, newer_version=None):
     import quote_page
-    return quote_page.result_page(token, quote, order, items, bank, extra, now)
+    return quote_page.result_page(token, quote, order, items, bank, extra, now, replaced_by, newer_version)
 
 
 def handle(c, token, quote, link, order, form, now, origin):
@@ -1029,7 +1060,7 @@ def handle(c, token, quote, link, order, form, now, origin):
     extra = quote_page.extras(c, items)
     bank = lambda: bank_html(bank_for(c, quote))
     if quote['status'] != 'enviado' or not link['usable']:
-        return (result_page(token, quote, order, items, bank(), extra, now) if quote['status'] != 'enviado' else missing_page()), None
+        return (result_page(token, quote, order, items, bank(), extra, now, successor(c, quote), newer(c, quote)) if quote['status'] != 'enviado' else missing_page()), None
     passkey = str(form.get('passkey', ''))
     if not passkey:
         # Paso 1: comprobación de identidad. Al acertar se emite una llave de un solo uso para el paso 2 (treinta minutos).

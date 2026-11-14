@@ -453,3 +453,44 @@ El enlace privado `/presupuesto/<token>` se rediseñó por completo. Las reglas,
   - doble confirmación y enlace inválido;
   - fotografía protegida y persistencia en la orden.
 - En navegador se probaron 1440, 1024, 768, 390 y 320 px.
+
+## Versiones reemplazadas en el enlace del cliente (1.5.285)
+
+### Caso revisado
+
+Se revisó **PCD-20261031-0010-P3** el 13/11/2026, en solo lectura sobre la base de producción.
+- **P3 no fue aprobado.** El cliente comprobó su identidad a las 19:00 del 02/11/2026, pero no decidió.
+- **Reemplazo por P4.** A las 19:12 el taller creó la versión P4. `quotes.create()` canceló P3 con el evento «Sustituido por la versión P4», que es el comportamiento previsto.
+- **P4 sí se aprobó.** El cliente aprobó P4 a las 19:17, con firma y evidencia, por $195,00.
+
+No hubo ninguna pérdida ni cambio indebido de datos, y no se modificó ningún registro.
+
+### Qué fallaba
+
+Al abrir el enlace antiguo de P3, la página decía «Este presupuesto fue cancelado por el taller» y mostraba las partidas como «Pendiente», sin indicar que existía una versión vigente y aprobada.
+
+### Corrección
+
+- **Versión reemplazada:**
+  - `quotes.successor()` localiza la versión vigente de la misma serie. Solo lo hace cuando consta el evento de sustitución y nunca en una cancelación manual.
+  - La página muestra «Versión reemplazada», la versión vigente con su estado real, la fecha de decisión y el total autorizado.
+  - Las partidas aparecen «Sin efecto», y la vigencia como «Sin vigencia: versión reemplazada».
+- **Versión decidida seguida de otra:**
+  - Un presupuesto decidido al que siguió otra versión enviada o decidida de la misma serie muestra el aviso «Hay una versión más reciente» (`quotes.newer()`).
+  - Las continuaciones que solo contienen lo pendiente no cuentan como reemplazo.
+- **Cancelación manual:** mantiene su mensaje, con las partidas «Sin efecto».
+
+### Reglas que ya se cumplían y que ahora cubren pruebas
+
+- Una aprobación nunca pasa a cancelada: `cancel()` la rechaza y `create()` solo cancela versiones «enviado» o «modificacion».
+- El enlace de una versión reemplazada no admite decisiones.
+- El estado de ejecución de cada partida no cambia el estado del presupuesto.
+- El total de la orden toma la última versión decidida de cada serie, sin sumar versiones.
+
+### Revisión de producción (solo lectura)
+
+- Ningún presupuesto cancelado tiene aceptación, fecha de decisión ni partidas aprobadas.
+- 4 cancelaciones por sustitución y 1 manual.
+- Un caso, PCD-20261102-0012, tiene P1 y P2 aprobadas. El total de la orden es solo el de P2, y ahora el enlace de P1 avisa de la versión vigente.
+
+**Pruebas:** `local/tests/test_quote_replaced.py`.

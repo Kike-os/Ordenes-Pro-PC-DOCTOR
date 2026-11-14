@@ -1461,7 +1461,7 @@ class Handler(BaseHTTPRequestHandler):
                     return self.reply(200,quote_pdf.render(quotes.detail(c,quote),dict(document,identification=number[:2]+'*'*max(0,len(number)-2) if number else ''),dict(live,url=public_base_url().rstrip('/')+'/presupuesto/'+quote_page[1]) if live else None),'application/pdf',filename=quote['code']+'-PRESUPUESTO.pdf')
                 if quote['status']!='enviado':
                     rows=quotes.items_of(c,quote['id'])
-                    return self.reply(200,quotes.result_page(quote_page[1],quote,document,rows,quotes.bank_html(quotes.bank_for(c,quote)),__import__('quote_page').extras(c,rows),now),'text/html; charset=utf-8')
+                    return self.reply(200,quotes.result_page(quote_page[1],quote,document,rows,quotes.bank_html(quotes.bank_for(c,quote)),__import__('quote_page').extras(c,rows),now,quotes.successor(c,quote),quotes.newer(c,quote)),'text/html; charset=utf-8')
                 if not link['usable']:return self.reply(404,quotes.missing_page(),'text/html; charset=utf-8')
                 return self.reply(200,quotes.identify_page(quote_page[1],quote,document,'',now),'text/html; charset=utf-8')
             authorize_page=re.fullmatch(r'/autorizar/([A-Za-z0-9_-]{20,80})(/comprobante\.pdf)?',path)

@@ -15,7 +15,7 @@ from urllib.parse import quote as urlquote
 import quotes
 
 E = html.escape
-ASSET = '282'  # versión de los estáticos (evita cachés antiguas al publicar)
+ASSET = '285'  # versión de los estáticos (evita cachés antiguas al publicar)
 
 ICONS = {
     'copy': '<rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>',
@@ -132,8 +132,10 @@ def hero(quote, order, now=None, state_label=None):
     device = ' '.join(part for part in (order.get('brand') or '', order.get('model') or '') if part) or 'Equipo'
     vig = validity(quote, now)
     status = quote['status']
+    if status == 'cancelado':  # 1.5.285: un presupuesto cancelado o reemplazado ya no tiene vigencia que contar
+        vig = {'state': 'expired', 'label': 'Sin vigencia: ' + ('versión reemplazada' if state_label == 'Reemplazado' else 'presupuesto cancelado'), 'total': 0, 'left': 0}
     label = state_label or ('Vencido' if status == 'enviado' and vig['state'] == 'expired' else quotes.STATUS[status])
-    tone = 'expired' if label == 'Vencido' else status
+    tone = 'expired' if label == 'Vencido' else 'replaced' if label == 'Reemplazado' else status
     issued = _day(quote.get('sent_at')) or _day(quote.get('created_at'))
     bar = ('<progress class="qp-vig-bar" max="%d" value="%d" aria-label="Días de vigencia restantes">%d de %d días</progress>' % (vig['total'], vig['left'], vig['left'], vig['total'])) if vig['total'] else ''
     facts = [('Orden vinculada', order.get('code') or '—'), ('Equipo', device), ('Emitido', issued or '—'), ('Válido hasta', _day(quote.get('valid_until')) or 'Sin fecha límite')]
@@ -341,8 +343,11 @@ def expired_page(token, passkey, quote, order, rows, errors, form, now):
     return shell('Presupuesto ' + quote['code'], body)
 
 
-def result_page(token, quote, order, items, bank='', extra=None, now=None):
-    """Pantalla final con las decisiones registradas (también al volver a abrir el enlace)."""
+def result_page(token, quote, order, items, bank='', extra=None, now=None, replaced_by=None, newer_version=None):
+    """Pantalla final con las decisiones registradas (también al volver a abrir el enlace).
+    1.5.285: una versión reemplazada por otra más reciente lo dice y muestra el estado real de esa versión; sus partidas quedan «Sin efecto»."""
+    if quote['status'] == 'cancelado' and replaced_by:
+        return replaced_page(token, quote, order, items, extra, now, replaced_by)
     rows = lines(quote, items, extra)
     summary = quotes.totals(items, quote['tax_rate_bp'], quote['discount_bp'])
     waiting = quote['status'] in quotes.DECIDED and summary['pending'] > 0
@@ -364,7 +369,8 @@ def result_page(token, quote, order, items, bank='', extra=None, now=None):
     if decided:
         lists = '<div class="qp-review">%s%s%s</div>' % (block('aprobado', 'Autorizados', 'check'), block('rechazado', 'Rechazados', 'x'), block('pendiente', 'Por decidir', 'clock'))
     else:
-        lists = '<ul class="qp-result-list">%s</ul>' % ''.join('<li><span>%s</span><strong>%s</strong><em>%s</em></li>' % (E(row['name']), E(quotes.usd(row['net'])), E(quotes.ITEM_STATUS[row['status']])) for row in rows)
+        void = quote['status'] == 'cancelado'  # en un presupuesto cancelado ninguna partida sigue pendiente de decisión
+        lists = '<ul class="qp-result-list">%s</ul>' % ''.join('<li><span>%s</span><strong>%s</strong><em>%s</em></li>' % (E(row['name']), E(quotes.usd(row['net'])), E('Sin efecto' if void else quotes.ITEM_STATUS[row['status']])) for row in rows)
     totals = ''
     if decided:
         totals = ('<dl class="qp-dl"><div><dt>Total cotizado</dt><dd>%s</dd></div><div class="qp-dl-total qp-dl-chosen"><dt>Total aprobado</dt><dd>%s</dd></div>'
@@ -373,8 +379,46 @@ def result_page(token, quote, order, items, bank='', extra=None, now=None):
     pdf = '/presupuesto/%s/documento.pdf' % E(token, quote=True)
     actions = ('<div class="qp-btn-row qp-noprint"><a class="qp-btn qp-btn-ghost" href="%s" target="_blank" rel="noopener">%s<span>Ver PDF</span></a><a class="qp-btn qp-btn-ghost" href="%s" download>%s<span>Descargar PDF</span></a>'
                '<button type="button" class="qp-btn qp-btn-ghost" data-qp-print hidden>%s<span>Imprimir</span></button></div>') % (pdf, icon('file-text'), pdf, icon('download'), icon('printer')) if quote['status'] in quotes.DECIDED else ''
-    payable = bank if quote['status'] in ('aprobado', 'parcial') else ''
-    body = ('%s%s<section class="qp-panel qp-result" aria-labelledby="qp-result-title"><div class="qp-notice" data-tone="%s">%s<div><h2 id="qp-result-title">%s</h2><p>%s</p>%s</div></div>%s%s%s</section>%s'
+    payable = bank if quote['status'] in ('aprobado', 'parcial') and not newer_version else ''
+    newer_html = ''
+    if newer_version:
+        # 1.5.285: esta decisión sigue registrada, pero el taller envió después una versión más reciente que es la vigente.
+        nv = newer_version
+        state = REPLACED_STATE.get(nv['status'], nv['label'])
+        amount = ('Total autorizado ' + quotes.usd(nv['approved'])) if nv['status'] in ('aprobado', 'parcial') else ('Total cotizado ' + quotes.usd(nv['quoted']))
+        newer_html = ('<div class="qp-notice qp-newer" data-tone="info">%s<div><h3>Hay una versión más reciente</h3><p>La versión vigente es la %s · %s · %s. '
+                    'Lo que decidiste aquí sigue registrado; para pagos y trabajos vale la versión vigente.</p></div></div>') % (icon('info'), E(nv['code']), E(state), E(amount))
+    body = ('%s%s<section class="qp-panel qp-result" aria-labelledby="qp-result-title"><div class="qp-notice" data-tone="%s">%s<div><h2 id="qp-result-title">%s</h2><p>%s</p>%s</div></div>%s%s%s%s</section>%s'
             ) % (hero(quote, order, now), steps(4) if decided else '', tone, icon('circle-check' if tone == 'ok' else 'info'), E(quotes.STATUS[quote['status']]), E(message),
-                 ('<p class="qp-muted">Decisión registrada el %s%s.</p>' % (E(when), (' a las ' + E(hour)) if hour else '')) if when and decided else '', lists, totals, actions, payable)
+                 ('<p class="qp-muted">Decisión registrada el %s%s.</p>' % (E(when), (' a las ' + E(hour)) if hour else '')) if when and decided else '', newer_html, lists, totals, actions, payable)
     return shell('Presupuesto ' + quote['code'], body)
+
+
+REPLACED_STATE = {'borrador': 'En preparación', 'enviado': 'Esperando tu aprobación', 'aprobado': 'Aprobado', 'parcial': 'Aprobado parcialmente',
+                  'rechazado': 'Rechazado', 'modificacion': 'Revisión solicitada', 'cancelado': 'Cancelado'}
+
+
+def replaced_page(token, quote, order, items, extra, now, new):
+    """Enlace de una versión que el taller reemplazó por otra (create() la cancela con «Sustituido por la versión Pn»). No es una
+    cancelación del trabajo: se indica la versión vigente y su estado real. Esta versión no se aprobó; sus partidas quedan sin efecto."""
+    rows = lines(quote, items, extra)
+    state = REPLACED_STATE.get(new['status'], new['label'])
+    when = _day(new.get('decided_at'))
+    hour = (new.get('decided_at') or '')[11:16]
+    decided = new['status'] in quotes.DECIDED
+    facts = [('Versión vigente', new['code']), ('Estado', state)]
+    if decided and when:
+        facts.append(('Decisión registrada', when + ((' a las ' + hour) if hour else '')))
+    if new['status'] in ('aprobado', 'parcial'):
+        facts.append(('Total autorizado', quotes.usd(new['approved'])))
+    elif new['status'] in ('enviado', 'borrador', 'modificacion'):
+        facts.append(('Total cotizado', quotes.usd(new['quoted'])))
+    advice = ('Lo que decidiste en esa versión es lo que vale; este enlace ya no admite decisiones.' if decided else
+              'Revisa el correo más reciente del taller para abrir la versión vigente, o escríbenos por WhatsApp.')
+    body = ('%s<section class="qp-panel qp-result" aria-labelledby="qp-result-title"><div class="qp-notice" data-tone="info">%s<div><h2 id="qp-result-title">Versión reemplazada</h2>'
+            '<p>El taller actualizó este presupuesto con una versión más reciente, la %s. Esta versión ya no está vigente y no se aprobó: sus servicios quedan sin efecto. %s</p></div></div>'
+            '<dl class="qp-dl qp-replaced">%s</dl><ul class="qp-result-list">%s</ul></section>'
+            ) % (hero(quote, order, now, 'Reemplazado'), icon('info'), E(new['code']), E(advice),
+                 ''.join('<div><dt>%s</dt><dd>%s</dd></div>' % (E(k), E(v)) for k, v in facts),
+                 ''.join('<li><span>%s</span><strong>%s</strong><em>Sin efecto</em></li>' % (E(row['name']), E(quotes.usd(row['net']))) for row in rows))
+    return shell('Presupuesto ' + quote['code'], body, wa_text='Hola PC-DOCTOR, tengo una consulta sobre el presupuesto %s (orden %s).' % (new['code'], order.get('code', '')))
