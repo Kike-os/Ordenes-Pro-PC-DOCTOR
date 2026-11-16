@@ -4,6 +4,19 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.286 — 2026-11-16 14:41 (UTC-05:00)
+
+Citas y órdenes con cédula o RUC
+
+### Mejoras realizadas
+
+- Enlace de mantenimiento: si el cliente ya confirmó la fecha, lo indica y no repite la confirmación.
+
+### Errores corregidos
+
+- Citas y órdenes con cédula o RUC: la misma persona se reconoce con cualquiera de los dos documentos (RUC de persona natural = cédula + establecimiento). La cita se enlaza a su ficha sin crear clientes duplicados y el retiro con número de orden acepta el otro documento.
+- Los 4 dígitos al confirmar una cita con RUC aceptan los de la cédula o los del RUC; un documento ya registrado no se vuelve a rechazar al agendar ni al recibir el equipo; no se puede registrar dos veces a la misma persona con su cédula y su RUC.
+
 ## v1.5.285 — 2026-11-13 21:38 (UTC-05:00)
 
 Versiones reemplazadas en el enlace del presupuesto
