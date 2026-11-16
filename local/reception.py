@@ -75,6 +75,27 @@ def document_check(value, kind=''):
     return '', ('' if check < 10 and check == int(value[position]) else 'No pudimos comprobar el dígito verificador de este RUC. Confirma que esté escrito correctamente.')
 
 
+def natural_ruc(value):
+    """RUC de persona natural: 13 dígitos, tercer dígito 0-5 y establecimiento distinto de 000 (su cédula son los 10 primeros)."""
+    value = re.sub(r'\s+', '', str(value or ''))
+    return bool(re.fullmatch(r'[0-9]{13}', value)) and value[2] in '012345' and int(value[10:]) > 0
+
+
+def identity_base(value):
+    """Cédula común de una cédula o de un RUC de persona natural; '' para RUC de sociedades, pasaportes u otros (1.5.286)."""
+    value = re.sub(r'\s+', '', str(value or ''))
+    return value if re.fullmatch(r'[0-9]{10}', value) else value[:10] if natural_ruc(value) else ''
+
+
+def same_identity(a, b):
+    """Misma persona: el mismo número, o una cédula y el RUC de persona natural que la contiene (cédula + establecimiento).
+    Un RUC de sociedad o de entidad pública solo coincide consigo mismo."""
+    a, b = re.sub(r'\s+', '', str(a or '')), re.sub(r'\s+', '', str(b or ''))
+    if not a or not b:
+        return False
+    return a == b or (bool(identity_base(a)) and identity_base(a) == identity_base(b))
+
+
 def document_error(value, kind='', strict=False):
     """Error de una cédula o RUC (vacío si es aceptable). Con `strict`, un RUC cuyo dígito verificador no se puede comprobar también es error."""
     error, notice = document_check(value, kind)

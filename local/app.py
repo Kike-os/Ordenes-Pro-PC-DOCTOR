@@ -5582,6 +5582,7 @@ class Handler(BaseHTTPRequestHandler):
                         fields['accessories']=(reception_details.accessories_text(reception_extra) or fields['accessories'])[:2000]
                         fields['physical_condition']=reception_details.merge_condition(fields['physical_condition'],reception_extra)
                         if fields['physical_condition']:errors.pop('physical_condition',None) if 'physical_condition' not in detail_errors else None
+                    if errors.get('identification') and fields.get('identification')==(selected['identification'] or ''):errors.pop('identification')  # 1.5.286: su documento registrado no se vuelve a rechazar
                     client_errors={k:v for k,v in errors.items() if k in client_registry.PERSONAL or k=='client'}
                     if client_errors:return self.reply(400,{'error':'Completa la ficha del cliente antes de recibir el equipo.','fields':{'client_id':'La ficha del cliente necesita identificación, contacto y ubicación válidos.'},'client_fields':client_errors})
                     if errors:

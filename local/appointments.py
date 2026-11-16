@@ -221,7 +221,7 @@ def pickup_order(c,fields,client=None):
  if not re.fullmatch(r'[A-Z0-9-]{4,40}',code):return None,unknown
  row=c.execute("SELECT o.id,o.code,o.status,cl.id client_id,cl.identification,cl.phone FROM orders o JOIN devices d ON d.id=o.device_id JOIN clients cl ON cl.id=d.client_id WHERE upper(o.code)=?",(reception.current_order_code(c,code).upper(),)).fetchone()
  if not row:return None,unknown
- same=(client is not None and client['id']==row['client_id']) or (fields['identification'] and row['identification'] and fields['identification']==row['identification']) or (not row['identification'] and phone_key(fields['phone']) and phone_key(fields['phone'])==phone_key(row['phone']))
+ same=(client is not None and client['id']==row['client_id']) or (fields['identification'] and row['identification'] and reception.same_identity(fields['identification'],row['identification'])) or (not row['identification'] and phone_key(fields['phone']) and phone_key(fields['phone'])==phone_key(row['phone']))
  if not same:return None,unknown
  if row['status']=='entregado':return None,'Esta orden ya figura como entregada. Si necesitas ayuda, contáctanos por WhatsApp.'
  if row['status'] not in PICKUP_READY:return None,'Tu equipo todavía no está listo para el retiro. Te avisaremos en cuanto puedas pasar a retirarlo; por ahora no es posible agendar el retiro de esta orden.'
@@ -250,7 +250,10 @@ def validate_booking(data,c,public=False,client=None):
   if not re.fullmatch(r'[A-Z0-9-]{5,20}',fields['identification']) or not re.search(r'[0-9]',fields['identification']):errors['identification']='Ingresa un número de pasaporte válido: de 5 a 20 letras y números, sin espacios.'
  elif not fields['identification'].isdigit() or (kind=='cedula' and len(fields['identification'])!=10) or (kind=='ruc' and len(fields['identification'])!=13) or not kind:
   errors['identification']='El RUC debe contener exactamente 13 dígitos.' if (fields['document_type']=='ruc' or (not fields['document_type'] and len(fields['identification'])>10)) else 'La cédula debe contener exactamente 10 dígitos.'
- elif reception.document_error(fields['identification'],kind):errors['identification']=reception.document_error(fields['identification'],kind)
+ elif reception.document_error(fields['identification'],kind) and not (c is not None and c.execute('SELECT 1 FROM clients WHERE identification=?',(fields['identification'],)).fetchone()):
+  # 1.5.286: un documento ya registrado en una ficha no se vuelve a rechazar (por ejemplo, un RUC emitido por el SRI que no cumple la
+  # regla de la cédula): el cliente agenda con el mismo documento con el que fue registrado. Uno nuevo sí debe ser válido.
+  errors['identification']=reception.document_error(fields['identification'],kind)
  fields['document_type']=kind if fields['identification'] and 'identification' not in errors else ''
  if pickup and not fields['description']:fields['description']='Retiro de equipo'
  if not pickup:fields['order_code']=''
@@ -275,12 +278,22 @@ def validate_booking(data,c,public=False,client=None):
   if problem:errors['order_code']=problem
   fields['pickup']=found
  return fields,errors,start
+def equivalent_client(c,identification):
+ """Cliente registrado con la identificación equivalente (cédula ↔ RUC de persona natural), o None. Si hay varias fichas, la más antigua."""
+ base=reception.identity_base(identification)
+ if not base:return None
+ rows=[r for r in c.execute("SELECT * FROM clients WHERE identification=? OR (length(identification)=13 AND substr(identification,1,10)=?) ORDER BY id",(base,base)) if reception.same_identity(r['identification'],identification)]
+ return rows[0] if rows else None
 def lookup_client(c,identification,phone,email):
  """Cliente existente para una cita y cómo se encontró: (cliente, 'identificacion' | 'contacto') o (None, 'ambiguo' | '').
  La identificación manda. Por teléfono o correo solo se enlaza si no contradice la identificación: cuando el contacto coincide con
  un cliente que tiene OTRA cédula o RUC, no se enlaza ni se fusiona nada; se devuelve 'ambiguo' para que una persona lo revise."""
  if identification:
   row=c.execute('SELECT * FROM clients WHERE identification=? ORDER BY id LIMIT 1',(identification,)).fetchone()
+  if row:return row,'identificacion'
+  # 1.5.286: la misma persona puede estar registrada con su cédula o con su RUC de persona natural (cédula + establecimiento).
+  # Se enlaza a esa ficha (sin cambiarle ningún dato) en lugar de crear un cliente duplicado.
+  row=equivalent_client(c,identification)
   if row:return row,'identificacion'
  found=None;key=phone_key(phone)
  if key and len(key)>=7:
@@ -309,7 +322,9 @@ def last4_error(value,identification='',kind=''):
  # Cédula: sus 4 últimos dígitos. RUC de persona natural: la cédula son sus 10 primeros dígitos. RUC de sociedad o sin identificación: solo el formato.
  # Pasaporte: los 4 últimos dígitos que contenga el número.
  expected=re.sub(r'[^0-9]','',digits)[-4:] if kind=='pasaporte' else digits[-4:] if kind=='cedula' and re.fullmatch(r'[0-9]{10}',digits) else digits[6:10] if kind=='ruc' and re.fullmatch(r'[0-9]{13}',digits) and digits[2] in '012345' else ''
- if expected and value!=expected:return 'Los 4 dígitos no coinciden con la identificación ingresada.'
+ # 1.5.286: con RUC de persona natural vale tanto el final de su cédula como el final del RUC (lo que el cliente tenga a mano).
+ accepted={expected,digits[-4:]} if expected and kind=='ruc' else {expected}
+ if expected and value not in accepted:return 'Los 4 dígitos no coinciden con la identificación ingresada.' if kind!='ruc' else 'Los 4 dígitos no coinciden: escribe los últimos 4 de tu cédula o de tu RUC.'
  return ''
 def authorization_errors(c,data,identification='',kind=''):
  """Errores de la autorización (casilla, versión de condiciones y 4 dígitos) y la versión vigente."""

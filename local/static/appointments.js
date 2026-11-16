@@ -76,7 +76,7 @@ function validateAppointment(step){const errors={},only=step===undefined?null:ST
  if(has('time')&&(!slots.value||slots.disabled))need('time','Selecciona un horario disponible.');
  if(has('privacy_consent')&&!form.elements.privacy_consent.checked)need('privacy_consent','Confirma el aviso de privacidad para registrar la cita.');
  if(has('terms_accept')&&!form.elements.terms_accept.checked)need('terms_accept','Acepta los términos y condiciones para confirmar la cita.');
- if(has('id_last4')){if(!form.elements.id_last4.value)need('id_last4','Ingresa los últimos 4 dígitos de tu cédula.');else if(!last4Ok())errors.id_last4='Ingresa exactamente 4 dígitos numéricos.';}
+ if(has('id_last4')){if(!form.elements.id_last4.value)need('id_last4','Ingresa los últimos 4 dígitos de tu cédula o RUC.');else if(!last4Ok())errors.id_last4='Ingresa exactamente 4 dígitos numéricos.';}
  Object.defineProperty(errors,'missing',{value:missing,enumerable:false});return errors;}
 // Aviso general, breve y específico: faltan datos, o hay datos que corregir.
 const errorSummary=errors=>Object.keys(errors).length?(errors.missing&&errors.missing.size?'Hay datos pendientes por completar. Revisa los campos marcados en rojo.':'Algunos datos necesitan corrección. Verifica la información señalada.'):'';

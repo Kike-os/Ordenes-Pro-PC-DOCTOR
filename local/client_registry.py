@@ -63,6 +63,11 @@ def save(c,data,user):
     if oid and user['role']!='administrador' and not c.execute('SELECT 1 FROM clients WHERE id=? AND needs_review=1',(oid,)).fetchone():return 403,{'error':'Solo administración puede editar fichas.'}
     duplicate=c.execute('SELECT id,name FROM clients WHERE identification=? AND id!=? ORDER BY id LIMIT 1',(fields['identification'],oid or -1)).fetchone()
     if duplicate:return 409,{'error':'Ya existe un cliente con esta identificación. Selecciona su ficha.','existing_id':duplicate['id'],'fields':{'identification':'Esta identificación ya está registrada.'}}
+    # 1.5.286: la misma persona con su cédula o con su RUC de persona natural (cédula + establecimiento) no se registra dos veces.
+    from reception import identity_base, same_identity
+    base=identity_base(fields['identification'])
+    twin=next((r for r in c.execute("SELECT id,name,identification FROM clients WHERE id!=? AND (identification=? OR (length(identification)=13 AND substr(identification,1,10)=?)) ORDER BY id",(oid or -1,base,base)) if same_identity(r['identification'],fields['identification'])),None) if base else None
+    if twin:return 409,{'error':'Esta persona ya está registrada con su %s (%s). Selecciona su ficha; si necesitas facturar con el otro documento, actualízalo en esa ficha.'%('RUC' if len(twin['identification'])==13 else 'cédula',twin['identification']),'existing_id':twin['id'],'fields':{'identification':'La misma persona ya tiene una ficha con su %s.'%('RUC' if len(twin['identification'])==13 else 'cédula')}}
     key=fields['document_type']+':'+fields['identification']
     if oid:
         if not c.execute('SELECT 1 FROM clients WHERE id=?',(oid,)).fetchone():return 404,{'error':'Cliente no disponible.'}

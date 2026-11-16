@@ -38,3 +38,34 @@ Directorio y administración de clientes de PC-DOCTOR S.A. El rediseño de la 1.
 - **Ficha rápida lateral:** datos y contacto, equipos, historial de órdenes, licencias adquiridas, ventas de licencias, pagos registrados (órdenes y licencias, solo administración) y documentos vinculados (comprobantes de cada orden), con los botones Editar, Crear orden, Vender licencia (abre la venta con el cliente ya elegido, sin orden técnica) y Ver historial. Se abre y cierra sin perder la búsqueda.
 - **Fecha de registro:** las altas nuevas (desde la ficha o desde una cita) guardan su fecha de registro; las fichas existentes no se modifican, y las que no tienen fecha no aparecen al filtrar por fecha.
 - Sin cambios en los datos: no se elimina ni modifica ningún cliente; la identificación repetida se sigue rechazando y los permisos de técnico y administración se mantienen.
+
+## Cédula y RUC de la misma persona en órdenes y citas (1.5.286)
+
+Una persona natural puede estar registrada con su **cédula** (10 dígitos) o con su **RUC** (13 dígitos). El RUC está formado por su cédula más el número de establecimiento, por ejemplo `001`. Desde esta versión se reconoce como la misma persona con cualquiera de los dos documentos (`reception.same_identity`). Un RUC de sociedad o de entidad pública solo coincide consigo mismo.
+
+### Causas encontradas
+
+Se revisaron en solo lectura los datos de producción el 16/11/2026.
+
+1. **Citas.** `appointments.lookup_client` buscaba la identificación exacta. Si el cliente agendaba con el otro documento, el teléfono o el correo coincidían con su ficha pero la identificación no, y se creaba un **cliente duplicado**. La cita quedaba así separada de su ficha y de sus equipos.
+2. **Retiro con número de orden.** `appointments.pickup_order` también comparaba la identificación exacta y respondía «No encontramos una orden…».
+3. **Los 4 dígitos con RUC de persona natural.** Solo se aceptaban los de la cédula que contiene el RUC. Quien escribía los 4 últimos del RUC recibía «Los 4 dígitos no coinciden».
+4. **RUC registrados que no cumplen la regla de la cédula.** Un RUC ya registrado cuyos 10 primeros dígitos no pasan esa regla bloqueaba al cliente: no podía agendar citas ni recibir equipos. En producción hay 1 caso.
+5. **Fichas de clientes.** `client_registry.save` solo detectaba como duplicado la identificación exacta. En producción hay 5 personas con una ficha con cédula y otra con RUC.
+
+### Corrección
+
+1. **Enlace de la cita:** se vincula a la ficha existente con el documento equivalente, sin cambiarle ningún dato y sin crear un duplicado.
+2. **Retiro:** acepta el documento equivalente. Una orden de otra persona sigue recibiendo el mismo mensaje que una inexistente.
+3. **Los 4 dígitos con RUC de persona natural:** valen los de la cédula o los del RUC. La etiqueta del formulario dice «cédula o RUC».
+4. **Documentos ya registrados:** no se vuelven a rechazar, ni al agendar ni al recibir el equipo. Un documento nuevo sí debe ser válido.
+5. **Fichas de clientes:** registrar el documento equivalente de una persona ya registrada devuelve 409 con su ficha (`existing_id`), en lugar de crear un duplicado.
+6. **Enlace seguro del mantenimiento** (sin cédula ni RUC): si el cliente ya confirmó, muestra «Ya confirmó esta fecha el…» y no ofrece otra vez la confirmación. Confirmar dos veces deja una sola respuesta.
+
+### Pendiente de administración
+
+Las 5 personas con dos fichas no se fusionaron automáticamente: no se modifican datos existentes. Conviene revisarlas una por una y unificarlas a mano si corresponde.
+
+### Pruebas
+
+`local/tests/test_identity_appointments.py`. Con el código anterior, 5 de las 6 pruebas fallan y 1 da error; con la corrección pasan las 6.

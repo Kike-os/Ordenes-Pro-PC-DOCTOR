@@ -111,6 +111,10 @@ def missing_page():
 def lookup(c, token):
     for row in maintenance.rows(c):
         if row['unsubscribe_token'] == token:
+            row = dict(row)
+            # 1.5.286: última respuesta del cliente para mostrar su estado real (y no ofrecer otra vez la misma confirmación).
+            last = c.execute('SELECT action,note,created_at,handled_at FROM maintenance_responses WHERE maintenance_id=? ORDER BY id DESC LIMIT 1', (row['id'],)).fetchone()
+            row['last_response'] = dict(last) if last else None
             return row
     return None
 
@@ -130,8 +134,15 @@ def page(row, token, notice='', error=''):
     if row['state'] not in ('scheduled', 'appointment'):
         return _page('Mantenimiento preventivo', head + '<p>Este mantenimiento ya no está pendiente. Si necesita atención, comuníquese con el taller.</p></section>')
     alert = '<p class="auth-alert" role="alert">%s</p>' % e(error) if error else ''
+    last = row.get('last_response') or {}
+    confirmed = last.get('action') == 'confirm'
+    if confirmed:
+        when_done = datetime.fromisoformat(last['created_at']).astimezone(ECUADOR_TZ).strftime('%d/%m/%Y a las %H:%M')
+        alert += '<p class="auth-done" role="status">Ya confirmó esta fecha el %s. El taller le contactará si hace falta algún ajuste.</p>' % e(when_done)
+    elif last.get('action') == 'reschedule' and not last.get('handled_at'):
+        alert += '<p class="auth-hint">Recibimos su pedido de otro horario; el taller le contactará para acordarlo.</p>'
     form = lambda action, label, extra='', cls='': '<form method="post" action="/mantenimiento/%s" class="auth-form"><input type="hidden" name="action" value="%s">%s<button type="submit"%s>%s</button></form>' % (e(token), action, extra, ' class="%s"' % cls if cls else '', e(label))
-    body = head + alert + form('confirm', 'Confirmar esta fecha') \
+    body = head + alert + ('' if confirmed else form('confirm', 'Confirmar esta fecha')) \
         + form('reschedule', 'Solicitar otro horario', '<label for="note">¿Qué día y hora le conviene? (opcional)</label><textarea id="note" name="note" maxlength="300" rows="2"></textarea>', 'auth-secondary') \
         + (form('decline', 'No deseo recibir recordatorios', '', 'auth-secondary') if row['consent'] != 'declined' else '<p class="auth-hint">Ya no recibe recordatorios de este mantenimiento.</p>') + '</section>'
     return _page('Mantenimiento preventivo', body)
