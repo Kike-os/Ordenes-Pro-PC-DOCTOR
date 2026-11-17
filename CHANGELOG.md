@@ -4,6 +4,21 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## Sin publicar
+
+### Nuevas funcionalidades
+
+- Centro de Control Operativo: panel «Gestionar pendiente» que resuelve desde el centro con las acciones reales de cada módulo: estado, responsable, observación y entrega de órdenes; confirmar (con autorización del cliente), reprogramar, cancelar con motivo y contactar citas; decisión, recordatorio y cancelación de presupuestos; etapa, fecha e incidencias de repuestos; PQRS.
+- Alertas del sistema: reconocer, silenciar temporalmente (nunca un fallo activo) y registrar la resolución; incidencias de ADI AutoCare en revisión o resueltas desde el panel. Pestaña «Actividad» con acciones, cambios de estado, gestión, lecturas y errores o reintentos de correo, con persona, fecha y hora, filtros y CSV.
+
+### Mejoras realizadas
+
+- Diseño Premium Compact 3.0: indicadores que filtran (críticos, urgentes, vencidos, requieren decisión, sin ver, silenciadas), prioridad «Crítico», orden por antigüedad y última actividad, acciones rápidas al pasar el cursor, observaciones internas y recordatorios por registro, filtros conservados en la sesión y textos en español e inglés.
+
+### Actualizaciones de seguridad
+
+- Cada acción se valida en el servidor con los permisos de su módulo, con confirmación en las sensibles, bloqueo contra el doble clic y auditoría. Nada de lo que añade el centro da por resuelto un pendiente: sale de la bandeja solo cuando su módulo lo cierra. La cancelación de una cita puede registrar su motivo.
+
 ## v1.5.287 — 2026-11-17 08:27 (UTC-05:00)
 
 Centro de notificaciones y pendientes 2.0

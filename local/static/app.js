@@ -208,7 +208,7 @@ const statusNames={pendiente:'En espera de diagnóstico',diagnostico:'Diagnósti
 // Etiquetas que guardó el historial con versiones anteriores: se reconocen sin reescribirlas.
 const statusLegacy={'En espera':'pendiente','Pendiente':'pendiente','Procesando':'reparacion','En reparación':'reparacion','En diagnóstico':'diagnostico','Aprobación de presupuesto':'presupuesto','En revisión por falla recurrente':'revision_recurrente','Listo para entrega':'listo'};
 function statusCodeOf(label){return Object.keys(statusNames).find(key=>statusNames[key]===label)||statusLegacy[label]||'';}
-const moduleInfo={pqrs:['PQRS','Peticiones, quejas, reclamos y sugerencias de clientes: bandeja, seguimiento, respuestas y tiempos de atención'],sales:['Centro de Ventas','Ventas de productos, servicios y licencias, cotizaciones, pedidos comerciales, cobros y reportes'],cash:['Caja','Cierre diario por usuario y depósitos en las cuentas bancarias de la empresa'],inventory:['Centro de Inventario','Productos, unidades con serie, Kardex, licencias digitales y garantías de PC-DOCTOR S.A.'],invoicing:['Facturación','Facturas, caja, compras, proveedores y cuentas bancarias, integrados con órdenes, presupuestos, pagos y el Centro de Inventario'],licenses:['Licencias Pro — Control de Vigencia y Renovaciones','Inventario, entregas, activaciones, vencimientos y renovaciones de licencias'],notices:['Centro de notificaciones y pendientes','Lo que requiere tu acción en cada módulo y el historial de avisos'],orders:['Órdenes de Reparación','Gestione, consulte y dé seguimiento al estado de los equipos recibidos'],clients:['Gestión de Clientes','Directorio y administración de clientes de PC-DOCTOR S.A.'],devices:['Equipos','Registro y consulta de computadoras y portátiles.'],reports:['CENTRO DE CONTROL TÉCNICO','Monitoreo de órdenes, productividad e indicadores operativos en tiempo real'],maintenance:['Próximos Mantenimientos','Mantenimientos preventivos programados para equipos entregados'],deliveries:['Próximas Entregas','Control de equipos listos, pendientes y programados para entrega.'],activity:['Seguimiento de órdenes','Actividad y movimientos del taller: cambios de estado, seguimientos e incidencias.'],settings:['Centro de Configuración y Administración','Gestiona tu perfil, seguridad, usuarios y preferencias del sistema.'],appointments:['Agenda de Citas','Gestiona y da seguimiento a todas las citas de servicio técnico.'],live:['Centro de Atención en Tiempo Real','Gestión de conversaciones activas, asistencia de ADI y atención del personal.'],adi:['ADI — Centro de Inteligencia Administrativa','Asistente inteligente de PC-DOCTOR S.A. · Gestión y análisis del taller'],mail:['PC-DOCTOR Mail Pro','Correo empresarial integrado con clientes y órdenes.'],system:['Centro de Actualizaciones','Gestión de versiones, historial de cambios y estado del sistema.']};
+const moduleInfo={pqrs:['PQRS','Peticiones, quejas, reclamos y sugerencias de clientes: bandeja, seguimiento, respuestas y tiempos de atención'],sales:['Centro de Ventas','Ventas de productos, servicios y licencias, cotizaciones, pedidos comerciales, cobros y reportes'],cash:['Caja','Cierre diario por usuario y depósitos en las cuentas bancarias de la empresa'],inventory:['Centro de Inventario','Productos, unidades con serie, Kardex, licencias digitales y garantías de PC-DOCTOR S.A.'],invoicing:['Facturación','Facturas, caja, compras, proveedores y cuentas bancarias, integrados con órdenes, presupuestos, pagos y el Centro de Inventario'],licenses:['Licencias Pro — Control de Vigencia y Renovaciones','Inventario, entregas, activaciones, vencimientos y renovaciones de licencias'],notices:['Centro de notificaciones y pendientes','Centro de Control Operativo: lo que requiere tu acción, cómo resolverlo desde aquí y la actividad del equipo'],orders:['Órdenes de Reparación','Gestione, consulte y dé seguimiento al estado de los equipos recibidos'],clients:['Gestión de Clientes','Directorio y administración de clientes de PC-DOCTOR S.A.'],devices:['Equipos','Registro y consulta de computadoras y portátiles.'],reports:['CENTRO DE CONTROL TÉCNICO','Monitoreo de órdenes, productividad e indicadores operativos en tiempo real'],maintenance:['Próximos Mantenimientos','Mantenimientos preventivos programados para equipos entregados'],deliveries:['Próximas Entregas','Control de equipos listos, pendientes y programados para entrega.'],activity:['Seguimiento de órdenes','Actividad y movimientos del taller: cambios de estado, seguimientos e incidencias.'],settings:['Centro de Configuración y Administración','Gestiona tu perfil, seguridad, usuarios y preferencias del sistema.'],appointments:['Agenda de Citas','Gestiona y da seguimiento a todas las citas de servicio técnico.'],live:['Centro de Atención en Tiempo Real','Gestión de conversaciones activas, asistencia de ADI y atención del personal.'],adi:['ADI — Centro de Inteligencia Administrativa','Asistente inteligente de PC-DOCTOR S.A. · Gestión y análisis del taller'],mail:['PC-DOCTOR Mail Pro','Correo empresarial integrado con clientes y órdenes.'],system:['Centro de Actualizaciones','Gestión de versiones, historial de cambios y estado del sistema.']};
 function el(tag,text,className){const node=document.createElement(tag);if(text!==undefined)node.textContent=text;if(className)node.className=className;return node;}
 function button(text,action,className='secondary'){const b=el('button',text,className);b.type='button';b.addEventListener('click',action);return b;}
 function notify(text,success=false){const box=$('dashboard-message');box.textContent='';box.classList.toggle('success',success);if(text)toast(text,success?'success':'error');}
@@ -345,10 +345,12 @@ function ncpCategory(item){const key=item.key||'',icon=item.icon||'',base=notice
 // Centro de Actividad (Executive Inbox): resumen real, pestañas, búsqueda, filas compactas y panel de detalles en la propia página.
 const noticeDatabase='M21 5c0 1.66-4.03 3-9 3S3 6.66 3 5s4.03-3 9-3 9 1.34 9 3z M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5 M3 12c0 1.66 4.03 3 9 3s9-1.34 9-3';
 const noticeCritical=item=>/^(storage:|backup:)/.test(item.key||'');
-// 1.5.287 · Centro de notificaciones y pendientes 2.0 (Premium Compact).
+// 1.5.288 · Centro de Control Operativo (Premium Compact 3.0), sobre el Centro de notificaciones y pendientes 2.0 (1.5.287).
 // «Pendientes» sale de /api/pending: condiciones reales de cada módulo, que desaparecen solo cuando se resuelven en su origen.
-// «Notificaciones» es el historial informativo de siempre (/api/notifications). Son conceptos separados: visto/no visto (lectura),
-// visible/oculto (solo notificaciones), pendiente/en proceso (estado del registro) y normal/importante/urgente (prioridad calculada).
+// «Gestionar pendiente» abre un panel lateral con su actividad, su gestión y las acciones permitidas: cada acción usa el endpoint de su
+// módulo (mismos permisos, validaciones y auditoría); el centro solo añade observaciones, recordatorios y la gestión de alertas.
+// Conceptos separados: visto/no visto (lectura), visible/oculto (solo notificaciones), pendiente/en proceso (estado del registro),
+// normal/importante/urgente/crítico (prioridad calculada) y resuelto (lo decide el módulo de origen: entonces sale de la bandeja).
 const PC2_MODULES={orders:{label:'Órdenes',long:'Órdenes pendientes',icon:NCP_CATS.orders.icon,due:'Entrega'},
  appointments:{label:'Citas',long:'Citas por confirmar',icon:NCP_CATS.appointments.icon,due:'Cita'},
  quotes:{label:'Presupuestos',long:'Presupuestos por aprobar',icon:NCP_CATS.quotes.icon,due:'Vigente hasta'},
@@ -356,131 +358,348 @@ const PC2_MODULES={orders:{label:'Órdenes',long:'Órdenes pendientes',icon:NCP_
  messages:{label:'Mensajes',long:'Mensajes por responder',icon:NCP_CATS.chat.icon,due:'Plazo'},
  licenses:{label:'Licencias',long:'Licencias por vencer',icon:NCP_CATS.licenses.icon,due:'Vence'},
  alerts:{label:'Alertas',long:'Alertas del sistema',icon:'M21.73 18l-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3 M12 9v4 M12 17h.01',due:'Fecha'}};
-const PC2_PRIORITY={urgente:'Urgente',importante:'Importante',normal:'Normal'},PC2_STATE={pendiente:'Pendiente',en_proceso:'En proceso'},PC2_RANK={urgente:0,importante:1,normal:2};
+const PC2_PRIORITY={critico:'Crítico',urgente:'Urgente',importante:'Importante',normal:'Normal'},PC2_STATE={pendiente:'Pendiente',en_proceso:'En proceso'},PC2_RANK={critico:0,urgente:1,importante:2,normal:3};
+const PC3_ICON={open:'M15 3h6v6 M10 14 21 3 M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6',check:'M20 6 9 17l-5-5',status:'M22 11.08V12a10 10 0 1 1-5.93-9.14 M22 4 12 14.01l-3-3',
+ user:'M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2 M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z',note:'M12 20h9 M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z',
+ truck:'M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2 M15 18H9 M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.62l-3.48-4.35A1 1 0 0 0 17.52 8H14 M7 20a2 2 0 1 0 0-4 2 2 0 0 0 0 4z M17 20a2 2 0 1 0 0-4 2 2 0 0 0 0 4z',
+ calendar:'M8 2v4 M16 2v4 M3 10h18 M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z',x:'M18 6 6 18 M6 6l12 12',
+ phone:'M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z',
+ chat:'M7.9 20A9 9 0 1 0 4 16.1L2 22z',mail:'M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z M22 6l-10 7L2 6',next:'M5 12h14 M12 5l7 7-7 7',
+ alert:'M12 9v4 M12 17h.01 M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z',
+ silence:'M8.7 3A6 6 0 0 1 18 8a21.3 21.3 0 0 0 .6 5 M17 17H3s3-2 3-9a4.67 4.67 0 0 1 .3-1.7 M10.3 21a1.94 1.94 0 0 0 3.4 0 M2 2l20 20',
+ ack:'M9 12l2 2 4-4 M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10',reply:'M9 17 4 12l5-5 M20 18v-2a4 4 0 0 0-4-4H4',clock:'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z M12 6v6l4 2',
+ download:'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4 M7 10l5 5 5-5 M12 15V3',manage:'M4 21v-7 M4 10V3 M12 21v-9 M12 8V3 M20 21v-5 M20 12V3 M1 14h6 M9 8h6 M17 16h6',
+ eye:'M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z',history:'M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8 M3 3v5h5 M12 7v5l4 2',
+ refresh:'M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8 M21 3v5h-5 M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16 M8 16H3v5'};
 const pc2Day=value=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/Guayaquil'}).format(value);
+const pc3Locale=()=>(typeof I18N.locale==='function'&&I18N.locale())||'es-EC';
 // Fecha de vencimiento legible: «Hoy 10:00», «Mañana», «Vencido hace 2 días»… (las fechas sin hora se toman a mediodía de Ecuador).
 function pc2Due(item){if(!item.due)return '';const timed=item.due.length>10,date=new Date(timed?item.due:item.due+'T12:00:00-05:00');if(Number.isNaN(date.getTime()))return '';
- const diff=Math.round((new Date(pc2Day(date)+'T12:00:00Z')-new Date(pc2Day(new Date(Date.now()+clockOffset))+'T12:00:00Z'))/86400000),time=timed?' '+new Intl.DateTimeFormat('es-EC',{timeZone:'America/Guayaquil',hour:'2-digit',minute:'2-digit'}).format(date):'';
- if(diff<0)return 'Vencido hace '+(-diff)+(diff===-1?' día':' días');if(diff===0)return (item.overdue?'Vencido hoy':'Hoy')+time;if(diff===1)return 'Mañana'+time;
- return new Intl.DateTimeFormat('es-EC',{timeZone:'America/Guayaquil',day:'2-digit',month:'short'}).format(date).replace('.','')+time;}
-const pc2Plural=(n,one,many)=>n+' '+(n===1?one:many);
+ const diff=Math.round((new Date(pc2Day(date)+'T12:00:00Z')-new Date(pc2Day(new Date(Date.now()+clockOffset))+'T12:00:00Z'))/86400000),time=timed?' '+new Intl.DateTimeFormat(pc3Locale(),{timeZone:'America/Guayaquil',hour:'2-digit',minute:'2-digit'}).format(date):'';
+ if(diff<0)return T('Vencido hace')+' '+(-diff)+' '+T(diff===-1?'día':'días');if(diff===0)return T(item.overdue?'Vencido hoy':'Hoy')+time;if(diff===1)return T('Mañana')+time;
+ return new Intl.DateTimeFormat(pc3Locale(),{timeZone:'America/Guayaquil',day:'2-digit',month:'short'}).format(date).replace('.','')+time;}
+const pc2Plural=(n,one,many)=>n+' '+T(n===1?one:many);
+function pc3When(value,short){if(!value)return T('Sin fecha');const timed=value.length>10,date=new Date(timed?value:value+'T12:00:00-05:00');if(Number.isNaN(date.getTime()))return T('Sin fecha');
+ return new Intl.DateTimeFormat(pc3Locale(),{timeZone:'America/Guayaquil',day:'2-digit',month:'short',...(short?{}:{year:'numeric'}),...(timed?{hour:'2-digit',minute:'2-digit'}:{})}).format(date);}
+// Número para WhatsApp: celulares de Ecuador (09…) se pasan a 593…; otros números internacionales se usan tal cual.
+const pc3Whatsapp=raw=>{const d=String(raw||'').replace(/\D/g,'');if(d.length<9)return '';return d.startsWith('593')?d:d.startsWith('0')?'593'+d.slice(1):d;};
 async function renderNotices(){
- const root=$('module-content'),params=routeState().params,prefsKey='ordenes-pro:pendientes:'+(currentUser?.username||'');
+ const root=$('module-content'),params=routeState().params,who=currentUser?.username||'',admin=currentUser?.role==='administrador';
+ const prefsKey='ordenes-pro:pendientes:'+who,filterKey='ordenes-pro:pendientes-filtros:'+who,FILTERS=['module','priority','status','owner','from','to','q','unseen','quick'];
  let prefs={view:'pending',sort:'urgency'};try{prefs=Object.assign(prefs,JSON.parse(localStorage.getItem(prefsKey)||'{}'));}catch{}
- const remember=()=>{try{localStorage.setItem(prefsKey,JSON.stringify({view:state.view,sort:state.sort}));}catch{}};
- const wanted=params.get('vista');
- const state={view:wanted==='notificaciones'?'history':wanted==='pendientes'?'pending':prefs.view==='history'?'history':'pending',sort:['urgency','due','recent'].includes(prefs.sort)?prefs.sort:'urgency',
-  module:PC2_MODULES[params.get('modulo')]?params.get('modulo'):'',priority:'',status:'',owner:'',from:'',to:'',q:'',unseen:false,open:''};
- let pending=null,rev='',timer=null,fails=0,loadedAt=null,fresh=new Set(),loading=false;
- const wrap=el('div',undefined,'pc2'),head=el('header',undefined,'pc2-head'),headline=el('div',undefined,'pc2-headline'),live=el('p',undefined,'pc2-live'),refreshBtn=button('',()=>refresh(true),'pc2-refresh');
- refreshBtn.setAttribute('aria-label','Actualizar ahora');refreshBtn.title='Actualizar ahora';refreshBtn.append(systemIcon('M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8 M21 3v5h-5 M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16 M8 16H3v5'));
+ let kept={};try{kept=JSON.parse(sessionStorage.getItem(filterKey)||'{}')||{};}catch{}
+ const VIEWS={pendientes:'pending',notificaciones:'history',actividad:'activity'},ROUTE={pending:'pendientes',history:'notificaciones',activity:'actividad'};
+ const state={view:VIEWS[params.get('vista')]||(ROUTE[prefs.view]?prefs.view:'pending'),sort:['urgency','due','age','activity'].includes(prefs.sort)?prefs.sort:'urgency',
+  module:'',priority:'',status:'',owner:'',from:'',to:'',q:'',unseen:false,quick:''};
+ // Los filtros se mantienen al volver al centro durante la sesión del navegador (no entre equipos ni después de cerrar la pestaña).
+ for(const key of FILTERS)if(key in kept&&typeof kept[key]===typeof state[key])state[key]=kept[key];
+ if(PC2_MODULES[params.get('modulo')])state.module=params.get('modulo');
+ const remember=()=>{try{localStorage.setItem(prefsKey,JSON.stringify({view:state.view,sort:state.sort}));sessionStorage.setItem(filterKey,JSON.stringify(Object.fromEntries(FILTERS.map(k=>[k,state[k]]))));}catch{}};
+ let pending=null,rev='',timer=null,fails=0,loadedAt=null,fresh=new Set(),loading=false,again=false,drawer=null;const lastKpi={};
+ const wrap=el('div',undefined,'pc2 pc3'),head=el('header',undefined,'pc2-head'),brand=el('div',undefined,'pc3-brand'),headline=el('div',undefined,'pc2-headline'),live=el('p',undefined,'pc2-live'),refreshBtn=button('',()=>refresh(true),'pc2-refresh');
+ refreshBtn.setAttribute('aria-label',T('Actualizar ahora'));refreshBtn.title=T('Actualizar ahora');refreshBtn.append(systemIcon(PC3_ICON.refresh));
  const announce=el('p','','sr-only');announce.setAttribute('aria-live','polite');
- head.append(headline,live,refreshBtn,announce);
- const cards=el('div',undefined,'pc2-cards');cards.setAttribute('role','group');cards.setAttribute('aria-label','Resumen de pendientes por módulo');
- const views=el('div',undefined,'pc2-views');views.setAttribute('role','tablist');views.setAttribute('aria-label','Vista del centro');
- const pendingTab=button('',()=>setView('pending'),'pc2-view'),historyTab=button('',()=>setView('history'),'pc2-view');
- for(const[tab,id]of [[pendingTab,'pc2-pending'],[historyTab,'pc2-history']]){tab.setAttribute('role','tab');tab.setAttribute('aria-controls',id);tab.id=id+'-tab';}
- views.append(pendingTab,historyTab);
- views.addEventListener('keydown',event=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;event.preventDefault();setView(state.view==='pending'?'history':'pending');(state.view==='pending'?pendingTab:historyTab).focus();});
- const pendingPanel=el('section',undefined,'pc2-panel'),historyPanel=el('section',undefined,'pc2-panel');pendingPanel.id='pc2-pending';historyPanel.id='pc2-history';
- pendingPanel.setAttribute('role','tabpanel');pendingPanel.setAttribute('aria-labelledby','pc2-pending-tab');historyPanel.setAttribute('role','tabpanel');historyPanel.setAttribute('aria-labelledby','pc2-history-tab');
- wrap.append(head,cards,views,pendingPanel,historyPanel);root.replaceChildren(wrap);
+ const mark=el('span',undefined,'pc3-mark');mark.append(systemIcon(PC3_ICON.manage));mark.title=T('Centro de Control Operativo');brand.append(mark,headline);
+ head.append(brand,live,refreshBtn,announce);
+ const kpis=el('div',undefined,'pc3-kpis');kpis.setAttribute('role','group');kpis.setAttribute('aria-label',T('Indicadores de atención'));
+ const cards=el('div',undefined,'pc2-cards');cards.setAttribute('role','group');cards.setAttribute('aria-label',T('Resumen de pendientes por módulo'));
+ const views=el('div',undefined,'pc2-views');views.setAttribute('role','tablist');views.setAttribute('aria-label',T('Vista del centro'));
+ const tabs={pending:button('',()=>setView('pending'),'pc2-view'),history:button('',()=>setView('history'),'pc2-view'),activity:button('',()=>setView('activity'),'pc2-view')};
+ const panels={pending:el('section',undefined,'pc2-panel'),history:el('section',undefined,'pc2-panel'),activity:el('section',undefined,'pc2-panel')};
+ for(const key of Object.keys(tabs)){const id='pc2-'+key;tabs[key].setAttribute('role','tab');tabs[key].setAttribute('aria-controls',id);tabs[key].id=id+'-tab';panels[key].id=id;panels[key].setAttribute('role','tabpanel');panels[key].setAttribute('aria-labelledby',id+'-tab');views.append(tabs[key]);}
+ views.addEventListener('keydown',event=>{const order=Object.keys(tabs),at=order.indexOf(state.view);let next=null;if(event.key==='ArrowRight')next=order[(at+1)%order.length];else if(event.key==='ArrowLeft')next=order[(at+order.length-1)%order.length];else if(event.key==='Home')next=order[0];else if(event.key==='End')next=order[order.length-1];if(!next)return;event.preventDefault();setView(next);tabs[next].focus();});
+ wrap.append(head,kpis,cards,views,panels.pending,panels.history,panels.activity);root.replaceChildren(wrap);
  // ---- Pendientes: barra de búsqueda, filtros y lista ----
- const tools=el('div',undefined,'pc2-tools'),search=el('input'),filterToggle=button('',()=>{const open=filters.hidden;filters.hidden=!open;filterToggle.setAttribute('aria-expanded',String(open));},'pc2-filter-toggle'),sortLabel=el('label',undefined,'pc2-sort'),sort=el('select');
- search.type='search';search.maxLength=80;search.placeholder='Buscar cliente, orden, código o detalle';search.setAttribute('aria-label','Buscar en los pendientes');
- filterToggle.setAttribute('aria-expanded','false');filterToggle.setAttribute('aria-controls','pc2-filters');filterToggle.append(systemIcon('M22 3H2l8 9.46V19l4 2v-8.54z'),el('span','Filtros'),el('b','','pc2-filter-count'));
- for(const[value,label]of [['urgency','Urgencia'],['due','Fecha de vencimiento'],['recent','Más recientes']]){const o=el('option',label);o.value=value;sort.append(o);}sort.value=state.sort;sortLabel.append(el('span','Ordenar por'),sort);
+ const pendingPanel=panels.pending,tools=el('div',undefined,'pc2-tools'),search=el('input'),filterToggle=button('',()=>{const open=filters.hidden;filters.hidden=!open;filterToggle.setAttribute('aria-expanded',String(open));},'pc2-filter-toggle'),sortLabel=el('label',undefined,'pc2-sort'),sort=el('select');
+ search.type='search';search.maxLength=80;search.placeholder=T('Buscar cliente, orden, código o detalle');search.setAttribute('aria-label',T('Buscar en los pendientes'));search.value=state.q;
+ filterToggle.setAttribute('aria-controls','pc2-filters');filterToggle.append(systemIcon('M22 3H2l8 9.46V19l4 2v-8.54z'),el('span',T('Filtros')),el('b','','pc2-filter-count'));
+ for(const[value,label]of [['urgency','Urgencia'],['due','Fecha de vencimiento'],['age','Antigüedad'],['activity','Última actividad']]){const o=el('option',T(label));o.value=value;sort.append(o);}sort.value=state.sort;sortLabel.append(el('span',T('Ordenar por')),sort);
  tools.append(search,filterToggle,sortLabel);
  const filters=el('div',undefined,'pc2-filters');filters.id='pc2-filters';filters.hidden=!matchMedia('(min-width: 901px)').matches;filterToggle.setAttribute('aria-expanded',String(!filters.hidden));
- const pick=(label,options,key)=>{const box=el('label',undefined,'pc2-field'),select=el('select');box.append(el('span',label),select);const fill=list=>{const keep=state[key];select.replaceChildren();for(const[value,text]of list){const o=el('option',text);o.value=value;select.append(o);}select.value=list.some(x=>x[0]===keep)?keep:'';state[key]=select.value;};fill(options);select.onchange=()=>{state[key]=select.value;paintPending();};box.fill=fill;filters.append(box);return box;};
- const fPriority=pick('Prioridad',[['','Todas'],['urgente','Urgente'],['importante','Importante'],['normal','Normal']],'priority');
- const fStatus=pick('Estado',[['','Todos'],['pendiente','Pendiente'],['en_proceso','En proceso']],'status');
- const fModule=pick('Módulo',[['','Todos']],'module');
- const fOwner=pick('Responsable',[['','Todos']],'owner');
- const dateField=(label,key)=>{const box=el('label',undefined,'pc2-field'),input=el('input');input.type='date';box.append(el('span',label),input);input.onchange=()=>{state[key]=input.value;paintPending();};filters.append(box);return input;};
+ const pick=(label,options,key)=>{const box=el('label',undefined,'pc2-field'),select=el('select');box.append(el('span',T(label)),select);// Al crear la página las listas de módulo y responsable aún no tienen opciones: el filtro guardado se conserva hasta que llegan los datos.
+ const fill=(list,initial)=>{const keep=state[key];select.replaceChildren();for(const[value,text]of list){const o=el('option',text);o.value=value;select.append(o);}if(list.some(x=>x[0]===keep))select.value=keep;else{select.value='';if(!initial)state[key]='';}};fill(options,true);select.onchange=()=>{state[key]=select.value;remember();paintPending();};box.fill=fill;filters.append(box);return box;};
+ const fPriority=pick('Prioridad',[['',T('Todas')],...Object.entries(PC2_PRIORITY).map(([k,v])=>[k,T(v)])],'priority');
+ const fStatus=pick('Estado',[['',T('Todos')],['pendiente',T('Pendiente')],['en_proceso',T('En proceso')],['silenciada',T('Silenciada')]],'status');
+ const fModule=pick('Módulo',[['',T('Todos')]],'module');
+ const fOwner=pick('Responsable',[['',T('Todos')]],'owner');
+ const dateField=(label,key)=>{const box=el('label',undefined,'pc2-field'),input=el('input');input.type='date';input.value=state[key];box.append(el('span',T(label)),input);input.onchange=()=>{state[key]=input.value;remember();paintPending();};filters.append(box);return input;};
  const fFrom=dateField('Desde','from'),fTo=dateField('Hasta','to');
- const unseenBox=el('label',undefined,'pc2-check'),unseen=el('input');unseen.type='checkbox';unseenBox.append(unseen,el('span','Solo no vistos'));unseen.onchange=()=>{state.unseen=unseen.checked;paintPending();};filters.append(unseenBox);
- const clear=button('Limpiar filtros',()=>{Object.assign(state,{priority:'',status:'',module:'',owner:'',from:'',to:'',q:'',unseen:false});search.value='';fFrom.value='';fTo.value='';unseen.checked=false;for(const f of [fPriority,fStatus,fModule,fOwner])f.querySelector('select').value='';paintPending();search.focus();},'text-action pc2-clear');filters.append(clear);
- const count=el('p','','pc2-count'),list=el('ul',undefined,'pc2-list');list.setAttribute('aria-label','Pendientes');
- const seeAll=button('',()=>markSeen(visibleRows().filter(i=>!i.read).map(i=>i.key)),'pc2-seen-all');seeAll.append(systemIcon('M18 6 7 17l-5-5 M22 10l-7.5 7.5L13 16'),el('span','Marcar como vistos'));
+ const unseenBox=el('label',undefined,'pc2-check'),unseen=el('input');unseen.type='checkbox';unseen.checked=state.unseen;unseenBox.append(unseen,el('span',T('Solo no vistos')));unseen.onchange=()=>{state.unseen=unseen.checked;remember();paintPending();};filters.append(unseenBox);
+ const clear=button(T('Limpiar filtros'),()=>{Object.assign(state,{priority:'',status:'',module:'',owner:'',from:'',to:'',q:'',unseen:false,quick:''});search.value='';fFrom.value='';fTo.value='';unseen.checked=false;for(const f of [fPriority,fStatus,fModule,fOwner])f.querySelector('select').value='';remember();paintKpis();paintPending();search.focus();},'text-action pc2-clear');filters.append(clear);
+ const count=el('p','','pc2-count'),list=el('ul',undefined,'pc2-list');list.setAttribute('aria-label',T('Pendientes'));count.setAttribute('aria-live','polite');
+ const seeAll=button('',()=>markSeen(visibleRows().filter(i=>!i.read).map(i=>i.key)),'pc2-seen-all');seeAll.append(systemIcon('M18 6 7 17l-5-5 M22 10l-7.5 7.5L13 16'),el('span',T('Marcar como vistos')));
  const countBar=el('div',undefined,'pc2-countbar');countBar.append(count,seeAll);
  pendingPanel.append(tools,filters,countBar,list);
- search.oninput=()=>{state.q=search.value.trim().toLowerCase();paintPending();};sort.onchange=()=>{state.sort=sort.value;remember();paintPending();};
+ let typing=null;search.oninput=()=>{clearTimeout(typing);typing=setTimeout(()=>{state.q=search.value.trim().toLowerCase();remember();paintPending();},150);};sort.onchange=()=>{state.sort=sort.value;remember();paintPending();};
  // Estado de carga: esqueleto con la misma altura que las tarjetas reales (sin saltos al llegar los datos).
- function skeleton(){cards.replaceChildren(...Array.from({length:7},()=>el('div',undefined,'pc2-card pc2-skel')));list.replaceChildren(...Array.from({length:4},()=>el('li',undefined,'pc2-item pc2-skel')));count.textContent='Cargando pendientes…';seeAll.hidden=true;}
- function failed(error){list.replaceChildren();const box=el('li',undefined,'pc2-state pc2-error');box.append(systemIcon('M12 9v4 M12 17h.01 M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z'),el('strong','No se pudieron cargar los pendientes'),el('p',error?.message||'Revisa la conexión. Se reintentará automáticamente.'),button('Reintentar ahora',()=>refresh(true),'secondary'));list.append(box);count.textContent='';cards.replaceChildren();seeAll.hidden=true;}
- function setLive(kind){live.dataset.state=kind;const time=loadedAt?new Intl.DateTimeFormat('es-EC',{timeZone:'America/Guayaquil',hour:'2-digit',minute:'2-digit'}).format(loadedAt):'';
-  live.replaceChildren(el('i'),el('span',kind==='ok'?'En vivo · actualizado '+time:kind==='error'?'Sin conexión · reintento automático'+(time?' · datos de las '+time:''):'Actualizando…'));}
- function paintHead(){const t=pending.totals;headline.replaceChildren(el('strong',t.count?pc2Plural(t.count,'pendiente','pendientes'):'Todo al día'),el('span',t.count?[t.urgent?pc2Plural(t.urgent,'urgente','urgentes'):'',t.overdue?pc2Plural(t.overdue,'vencido','vencidos'):'',t.unread?pc2Plural(t.unread,'sin ver','sin ver'):''].filter(Boolean).join(' · ')||'Nada urgente ni vencido':'No hay acciones pendientes en tus módulos'));
-  pendingTab.replaceChildren(el('span','Pendientes'),el('b',String(t.count)));pendingTab.setAttribute('aria-label','Pendientes: '+t.count);}
- function paintCards(){cards.replaceChildren();cards.dataset.count=String(pending.modules.length);for(const key of pending.modules){const info=PC2_MODULES[key],box=pending.summary[key],card=button('',()=>{state.module=state.module===key?'':key;fModule.querySelector('select').value=state.module;if(state.view!=='pending')setView('pending');paintPending();},'pc2-card');
-   card.dataset.module=key;card.dataset.empty=String(!box.count);if(box.urgent)card.dataset.urgent='true';card.setAttribute('aria-pressed',String(state.module===key));
-   const icon=el('span',undefined,'pc2-card-icon');icon.append(systemIcon(info.icon));const sub=box.count?[box.urgent?pc2Plural(box.urgent,'urgente','urgentes'):'',box.overdue?pc2Plural(box.overdue,'vencido','vencidos'):''].filter(Boolean).join(' · ')||'Sin urgencias':'Al día';
-   card.append(icon,el('strong',String(box.count),'pc2-card-num'),el('span',info.long,'pc2-card-label'),el('small',sub,'pc2-card-sub'));
-   if(box.unread)card.append(el('em',box.unread+' sin ver','pc2-card-new'));
-   card.setAttribute('aria-label',info.long+': '+box.count+(box.urgent?', '+box.urgent+' urgentes':'')+(box.overdue?', '+box.overdue+' vencidos':'')+(state.module===key?'. Filtro activo':'. Filtrar'));cards.append(card);}}
+ function skeleton(){kpis.replaceChildren(...Array.from({length:5},()=>el('div',undefined,'pc3-kpi pc2-skel')));cards.replaceChildren(...Array.from({length:7},()=>el('div',undefined,'pc2-card pc2-skel')));list.replaceChildren(...Array.from({length:4},()=>el('li',undefined,'pc2-item pc2-skel')));count.textContent=T('Cargando pendientes…');seeAll.hidden=true;}
+ function failed(error){list.replaceChildren();const box=el('li',undefined,'pc2-state pc2-error');box.append(systemIcon(PC3_ICON.alert),el('strong',T('No se pudieron cargar los pendientes')),el('p',error?.message||T('Revisa la conexión. Se reintentará automáticamente.')),button(T('Reintentar ahora'),()=>refresh(true),'secondary'));list.append(box);count.textContent='';cards.replaceChildren();kpis.replaceChildren();seeAll.hidden=true;}
+ function setLive(kind){live.dataset.state=kind;const time=loadedAt?new Intl.DateTimeFormat(pc3Locale(),{timeZone:'America/Guayaquil',hour:'2-digit',minute:'2-digit'}).format(loadedAt):'';
+  live.replaceChildren(el('i'),el('span',kind==='ok'?T('En vivo · actualizado')+' '+time:kind==='error'?T('Sin conexión · reintento automático')+(time?' · '+T('datos de las')+' '+time:''):T('Actualizando…')));}
+ function paintHead(){const t=pending.totals,attention=t.count-(t.silenced||0);headline.replaceChildren(el('strong',t.count?pc2Plural(attention,'pendiente activo','pendientes activos'):T('Todo al día')),el('span',t.count?[t.critical?pc2Plural(t.critical,'crítico','críticos'):'',t.urgent?pc2Plural(t.urgent,'requiere atención inmediata','requieren atención inmediata'):'',t.decision?pc2Plural(t.decision,'requiere una decisión','requieren una decisión'):''].filter(Boolean).join(' · ')||T('Nada urgente ni vencido'):T('No hay acciones pendientes en tus módulos')));
+  tabs.pending.replaceChildren(el('span',T('Pendientes')),el('b',String(t.count)));tabs.pending.setAttribute('aria-label',T('Pendientes')+': '+t.count);}
+ // Indicadores: atajos de filtro que muestran primero lo que requiere una decisión. Un número que cambia se resalta un instante.
+ const QUICK={critical:{label:'Críticos',test:i=>i.priority==='critico',total:t=>t.critical||0},urgent:{label:'Urgentes',test:i=>['critico','urgente'].includes(i.priority)&&!i.silenced,total:t=>t.urgent},
+  overdue:{label:'Vencidos',test:i=>i.overdue,total:t=>t.overdue},decision:{label:'Requieren decisión',test:i=>i.decision&&!i.silenced,total:t=>t.decision||0},
+  unseen:{label:'Sin ver',test:i=>!i.read,total:t=>t.unread},silenced:{label:'Silenciadas',test:i=>!!i.silenced,total:t=>t.silenced||0}};
+ function paintKpis(){if(!pending)return;const t=pending.totals;kpis.replaceChildren();for(const[key,q]of Object.entries(QUICK)){const n=q.total(t);if((key==='silenced'||key==='critical')&&!n&&state.quick!==key)continue;
+   const b=button('',()=>{state.quick=state.quick===key?'':key;remember();if(state.view!=='pending')setView('pending');paintKpis();paintPending();},'pc3-kpi'),num=el('strong',String(n));
+   b.dataset.kpi=key;b.dataset.zero=String(!n);b.setAttribute('aria-pressed',String(state.quick===key));if(lastKpi[key]!==undefined&&lastKpi[key]!==n)num.classList.add('pc3-bump');lastKpi[key]=n;
+   b.append(num,el('span',T(q.label)));b.setAttribute('aria-label',T(q.label)+': '+n+(state.quick===key?'. '+T('Filtro activo'):''));kpis.append(b);}}
+ function paintCards(){cards.replaceChildren();cards.dataset.count=String(pending.modules.length);for(const key of pending.modules){const info=PC2_MODULES[key],box=pending.summary[key],card=button('',()=>{state.module=state.module===key?'':key;fModule.querySelector('select').value=state.module;remember();if(state.view!=='pending')setView('pending');paintPending();},'pc2-card');
+   card.dataset.module=key;card.dataset.empty=String(!box.count);if(box.urgent)card.dataset.urgent='true';if(box.critical)card.dataset.critical='true';card.setAttribute('aria-pressed',String(state.module===key));
+   const icon=el('span',undefined,'pc2-card-icon');icon.append(systemIcon(info.icon));const sub=box.count?[box.critical?pc2Plural(box.critical,'crítico','críticos'):'',box.urgent-box.critical>0?pc2Plural(box.urgent-box.critical,'urgente','urgentes'):'',box.overdue?pc2Plural(box.overdue,'vencido','vencidos'):'',box.silenced?pc2Plural(box.silenced,'silenciada','silenciadas'):''].filter(Boolean).join(' · ')||T('Sin urgencias'):T('Al día');
+   card.append(icon,el('strong',String(box.count),'pc2-card-num'),el('span',T(info.long),'pc2-card-label'),el('small',sub,'pc2-card-sub'));
+   if(box.unread)card.append(el('em',box.unread+' '+T('sin ver'),'pc2-card-new'));
+   card.setAttribute('aria-label',T(info.long)+': '+box.count+(box.urgent?', '+box.urgent+' '+T('urgentes'):'')+(box.overdue?', '+box.overdue+' '+T('vencidos'):'')+'. '+T(state.module===key?'Filtro activo':'Filtrar'));cards.append(card);}}
  function refDay(item){const v=item.due||item.at;if(!v)return '';const d=new Date(v.length>10?v:v+'T12:00:00-05:00');return Number.isNaN(d.getTime())?'':pc2Day(d);}
- function visibleRows(){if(!pending)return [];const q=state.q;let rows=pending.items.filter(i=>(!state.module||i.module===state.module)&&(!state.priority||i.priority===state.priority)&&(!state.status||i.state===state.status)&&(!state.owner||i.responsible===state.owner)&&(!state.unseen||!i.read)&&(!state.from||refDay(i)>=state.from)&&(!state.to||(refDay(i)&&refDay(i)<=state.to))&&(!q||[i.title,i.detail,i.client,i.responsible,i.waiting].join(' ').toLowerCase().includes(q)));
-  const time=v=>{const d=new Date(v&&v.length>10?v:(v||'')+'T12:00:00-05:00');return Number.isNaN(d.getTime())?Infinity:d.getTime();};
-  if(state.sort==='due')rows=[...rows].sort((a,b)=>(time(a.due)-time(b.due))||(PC2_RANK[a.priority]-PC2_RANK[b.priority]));
-  else if(state.sort==='recent')rows=[...rows].sort((a,b)=>(time(b.at)===Infinity?-Infinity:time(b.at))-(time(a.at)===Infinity?-Infinity:time(a.at)));
+ const time=v=>{const d=new Date(v&&v.length>10?v:(v||'')+'T12:00:00-05:00');return Number.isNaN(d.getTime())?null:d.getTime();};
+ function visibleRows(){if(!pending)return [];const q=state.q,quick=QUICK[state.quick];
+  let rows=pending.items.filter(i=>(!quick||quick.test(i))&&(!state.module||i.module===state.module)&&(!state.priority||i.priority===state.priority)&&(!state.status||(state.status==='silenciada'?!!i.silenced:i.state===state.status&&!i.silenced))&&(!state.owner||i.responsible===state.owner)&&(!state.unseen||!i.read)&&(!state.from||refDay(i)>=state.from)&&(!state.to||(refDay(i)&&refDay(i)<=state.to))&&(!q||[i.title,i.detail,i.client,i.responsible,i.waiting,(i.ref&&i.ref.code)||''].join(' ').toLowerCase().includes(q)));
+  const asc=(a,b,key)=>{const x=time(a[key]),y=time(b[key]);return (x===null)-(y===null)||(x??0)-(y??0);};
+  if(state.sort==='due')rows=[...rows].sort((a,b)=>asc(a,b,'due')||(PC2_RANK[a.priority]-PC2_RANK[b.priority]));
+  else if(state.sort==='age')rows=[...rows].sort((a,b)=>asc(a,b,'created')||asc(a,b,'at'));
+  else if(state.sort==='activity')rows=[...rows].sort((a,b)=>-asc(a,b,'activity')||0);
   return rows;}
  function paintPending(){if(!pending)return;
-  fModule.fill([['','Todos'],...pending.modules.map(m=>[m,PC2_MODULES[m].label])]);fOwner.fill([['','Todos'],...pending.responsibles.map(p=>[p.name,p.name])]);
-  const active=['priority','status','module','owner','from','to'].filter(k=>state[k]).length+(state.unseen?1:0);filterToggle.querySelector('b').textContent=active?String(active):'';clear.hidden=!active&&!state.q;
+  fModule.fill([['',T('Todos')],...pending.modules.map(m=>[m,T(PC2_MODULES[m].label)])]);fOwner.fill([['',T('Todos')],...pending.responsibles.map(p=>[p.name,p.name])]);
+  const active=['priority','status','module','owner','from','to'].filter(k=>state[k]).length+(state.unseen?1:0);filterToggle.querySelector('b').textContent=active?String(active):'';clear.hidden=!active&&!state.q&&!state.quick;
   cards.querySelectorAll('.pc2-card').forEach(card=>card.setAttribute('aria-pressed',String(card.dataset.module===state.module)));
-  const rows=visibleRows(),unseenRows=rows.filter(i=>!i.read).length;count.textContent=rows.length===pending.items.length?pc2Plural(rows.length,'pendiente','pendientes'):rows.length+' de '+pc2Plural(pending.items.length,'pendiente','pendientes');seeAll.hidden=!unseenRows;
+  const rows=visibleRows(),unseenRows=rows.filter(i=>!i.read).length;count.textContent=(rows.length===pending.items.length?pc2Plural(rows.length,'pendiente','pendientes'):rows.length+' '+T('de')+' '+pc2Plural(pending.items.length,'pendiente','pendientes'))+(state.quick?' · '+T(QUICK[state.quick].label):'');seeAll.hidden=!unseenRows;
   const focusKey=document.activeElement?.closest?.('.pc2-item')?.dataset.key;list.replaceChildren();
-  if(!rows.length){const box=el('li',undefined,'pc2-state');if(pending.items.length){box.append(systemIcon('M22 3H2l8 9.46V19l4 2v-8.54z'),el('strong','Ningún pendiente con estos filtros'),el('p','Cambia los filtros o la búsqueda para ver el resto.'),button('Limpiar filtros',()=>clear.click(),'secondary'));}
-   else{box.classList.add('pc2-done');box.append(systemIcon('M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0 M9 12l2 2 4-4'),el('strong','Todo al día'),el('p','No hay órdenes, citas, presupuestos, repuestos ni mensajes que requieran tu acción.'));}list.append(box);return;}
+  if(!rows.length){const box=el('li',undefined,'pc2-state');if(pending.items.length){box.append(systemIcon('M22 3H2l8 9.46V19l4 2v-8.54z'),el('strong',T('Ningún pendiente con estos filtros')),el('p',T('Cambia los filtros o la búsqueda para ver el resto.')),button(T('Limpiar filtros'),()=>clear.click(),'secondary'));}
+   else{box.classList.add('pc2-done');box.append(systemIcon('M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0 M9 12l2 2 4-4'),el('strong',T('Todo al día')),el('p',T('No hay órdenes, citas, presupuestos, repuestos ni mensajes que requieran tu acción.')));}list.append(box);return;}
   for(const item of rows)list.append(pendingRow(item));
-  if(focusKey)list.querySelector('.pc2-item[data-key="'+CSS.escape(focusKey)+'"] .pc2-more')?.focus({preventScroll:true});
+  if(focusKey)list.querySelector('.pc2-item[data-key="'+CSS.escape(focusKey)+'"] .pc3-manage')?.focus({preventScroll:true});
   fresh.clear();}
  function go(item,href){if(!item.read)markSeen([item.key],true);location.hash=href.slice(1);}
- function pendingRow(item){const info=PC2_MODULES[item.module]||PC2_MODULES.alerts,li=el('li',undefined,'pc2-item'),icon=el('span',undefined,'pc2-ic'),main=el('div',undefined,'pc2-main'),top=el('div',undefined,'pc2-top'),title=el('strong',item.title,'pc2-title'),chips=el('span',undefined,'pc2-chips'),meta=el('p',undefined,'pc2-meta'),side=el('div',undefined,'pc2-side'),acts=el('div',undefined,'pc2-actions');
-  li.dataset.key=item.key;li.dataset.module=item.module;li.dataset.priority=item.priority;if(!item.read)li.dataset.unread='true';if(item.overdue)li.dataset.overdue='true';if(fresh.has(item.key))li.classList.add('pc2-new');
+ function pendingRow(item){const info=PC2_MODULES[item.module]||PC2_MODULES.alerts,li=el('li',undefined,'pc2-item'),icon=el('span',undefined,'pc2-ic'),main=el('div',undefined,'pc2-main'),top=el('div',undefined,'pc2-top'),title=el('strong',item.title,'pc2-title'),chips=el('span',undefined,'pc2-chips'),meta=el('p',undefined,'pc2-meta'),side=el('div',undefined,'pc2-side'),acts=el('div',undefined,'pc2-actions'),quick=el('div',undefined,'pc3-quick');
+  li.dataset.key=item.key;li.dataset.entity=item.entity;li.dataset.module=item.module;li.dataset.priority=item.priority;if(!item.read)li.dataset.unread='true';if(item.overdue)li.dataset.overdue='true';if(item.silenced)li.dataset.silenced='true';if(fresh.has(item.key))li.classList.add('pc2-new');
   icon.append(systemIcon(info.icon));title.title=item.title;
   const chip=(text,kind)=>{const c=el('span',text,'pc2-chip');c.dataset.kind=kind;chips.append(c);};
-  if(item.priority!=='normal')chip(PC2_PRIORITY[item.priority],item.priority);chip(PC2_STATE[item.state]||item.state,item.state);if(!item.read)chip('Nuevo','nuevo');
+  if(item.priority!=='normal')chip(T(PC2_PRIORITY[item.priority]),item.priority);chip(T(PC2_STATE[item.state]||item.state),item.state);
+  if(item.decision&&!item.silenced)chip(T('Requiere decisión'),'decision');if(!item.read)chip(T('Nuevo'),'nuevo');
+  if(item.silenced)chip(T('Silenciada hasta')+' '+pc3When(item.silenced,true),'silencio');if(item.ack&&!item.silenced)chip(T('Reconocida'),'reconocida');
+  if(item.reminder)chip(item.reminder_due?T('Recordatorio para hoy'):T('Recordatorio')+' '+pc3When(item.reminder,true),'recordatorio');if(item.notes)chip(pc2Plural(item.notes,'nota','notas'),'nota');
   top.append(title,chips);
-  for(const part of [item.client,item.detail,item.responsible?'Resp.: '+item.responsible:''].filter(Boolean)){if(meta.childElementCount)meta.append(el('i','·','pc2-dot'));meta.append(el('span',part));}
+  for(const part of [item.client,item.detail,item.responsible?T('Resp.')+': '+item.responsible:''].filter(Boolean)){if(meta.childElementCount)meta.append(el('i','·','pc2-dot'));meta.append(el('span',part));}
   main.append(top,meta);if(item.waiting)main.append(el('p',item.waiting,'pc2-wait'));
-  const due=pc2Due(item);if(due){const t=el('time',(info.due?info.due+': ':'')+due,'pc2-due');t.dateTime=item.due;if(item.overdue)t.dataset.overdue='true';side.append(t);}
-  else if(item.at){const t=el('time',relativeTime(item.at)||formatOrderDate(item.at),'pc2-due pc2-at');t.dateTime=item.at;t.title=formatOrderDate(item.at);side.append(t);}
-  item.actions.forEach((a,n)=>{const b=button('',()=>go(item,a.href),n?'pc2-act pc2-act-alt':'pc2-act');b.append(el('span',a.label));if(!n)b.append(systemIcon('M5 12h14 M12 5l7 7-7 7'));b.setAttribute('aria-label',a.label+': '+item.title);acts.append(b);});
-  if(!item.read){const seen=button('',()=>markSeen([item.key]),'pc2-icon-btn');seen.title='Marcar como visto (no lo resuelve)';seen.setAttribute('aria-label','Marcar como visto: '+item.title);seen.append(systemIcon('M20 6 9 17l-5-5'));acts.append(seen);}
-  const detailId='pc2-d-'+item.key.replace(/[^A-Za-z0-9_-]/g,'_'),more=button('',()=>{state.open=state.open===item.key?'':item.key;const open=state.open===item.key;more.setAttribute('aria-expanded',String(open));detail.hidden=!open;li.dataset.open=String(open);},'pc2-icon-btn pc2-more');
-  more.setAttribute('aria-expanded',String(state.open===item.key));more.setAttribute('aria-controls',detailId);more.setAttribute('aria-label','Ver detalle: '+item.title);more.title='Ver detalle';more.append(systemIcon('m6 9 6 6 6-6'));acts.append(more);
-  side.append(acts);
-  const detail=el('dl',undefined,'pc2-detail');detail.id=detailId;detail.hidden=state.open!==item.key;li.dataset.open=String(state.open===item.key);
-  for(const[label,value]of [['Módulo',info.long],['Estado',PC2_STATE[item.state]||item.state],['Prioridad',PC2_PRIORITY[item.priority]],[info.due||'Vencimiento',item.due?formatOrderDate(item.due.length>10?item.due:item.due+'T12:00:00-05:00'):'Sin fecha'],['Registrado o actualizado',item.at?formatOrderDate(item.at):'Sin fecha'],['Cliente',item.client||'—'],['Responsable',item.responsible||'—'],['Lectura',item.read?'Visto':'Sin ver'],['Se resuelve cuando',item.resolves||'Cambia la condición en su módulo']]){const row=el('div');row.append(el('dt',label),el('dd',value));detail.append(row);}
-  if(item.href){const full=button('',()=>go(item,item.href),'text-action pc2-full');full.append(el('span','Abrir detalle completo'),systemIcon('M7 17 17 7 M7 7h10v10'));const row=el('div',undefined,'pc2-detail-link');row.append(full);detail.append(row);}
-  li.append(icon,main,side,detail);return li;}
- async function markSeen(keys,silent=false){if(!keys.length)return;try{await api('/api/notifications/read',{keys:keys.join(',')});for(const item of pending.items)if(keys.includes(item.key))item.read=true;
+  const due=pc2Due(item);if(due){const t=el('time',T(info.due)+': '+due,'pc2-due');t.dateTime=item.due;if(item.overdue)t.dataset.overdue='true';side.append(t);}
+  else if(item.at){const t=el('time',relativeTime(item.at)||pc3When(item.at),'pc2-due pc2-at');t.dateTime=item.at;t.title=pc3When(item.at);side.append(t);}
+  // Acciones rápidas (al pasar el cursor o con el foco; siempre visibles en pantallas táctiles) y el botón principal «Gestionar».
+  if(item.href){const open=button('',()=>go(item,item.href),'pc2-icon-btn');open.title=T('Abrir en su módulo');open.setAttribute('aria-label',T('Abrir en su módulo')+': '+item.title);open.append(systemIcon(PC3_ICON.open));quick.append(open);}
+  if(!item.read){const seen=button('',()=>markSeen([item.key]),'pc2-icon-btn');seen.title=T('Marcar como visto (no lo resuelve)');seen.setAttribute('aria-label',T('Marcar como visto')+': '+item.title);seen.append(systemIcon(PC3_ICON.check));quick.append(seen);}
+  const manage=button('',event=>openDrawer(item,event.currentTarget),'pc2-act pc3-manage');manage.append(systemIcon(PC3_ICON.manage),el('span',T('Gestionar')));manage.setAttribute('aria-label',T('Gestionar pendiente')+': '+item.title);manage.setAttribute('aria-haspopup','dialog');
+  acts.append(quick,manage);side.append(acts);
+  li.append(icon,main,side);return li;}
+ async function markSeen(keys,silent=false){if(!keys.length||!pending)return;try{await api('/api/notifications/read',{keys:keys.join(',')});for(const item of pending.items)if(keys.includes(item.key))item.read=true;
    for(const m of Object.values(pending.summary))m.unread=0;for(const item of pending.items)if(!item.read)pending.summary[item.module].unread++;pending.totals.unread=pending.items.filter(i=>!i.read).length;
-   if(!silent){paintHead();paintCards();paintPending();}document.dispatchEvent(new CustomEvent('notices:changed'));}catch(error){if(!silent)toast(error.message,'error');}}
- // ---- Actualización: consulta liviana cada 45 s (como la campana) con la pestaña visible; si no hay cambios el servidor responde «sin cambios».
+   if(!silent){paintHead();paintKpis();paintCards();paintPending();}document.dispatchEvent(new CustomEvent('notices:changed'));}catch(error){if(!silent)toast(error.message,'error');}}
+ // ---- Actualización: consulta liviana cada 45 s con la pestaña visible; si no hay cambios el servidor responde «sin cambios».
  // Ante un fallo se reintenta con espera progresiva (30 s → 5 min) y se conservan los últimos datos mostrados.
- async function refresh(force=false){clearTimeout(timer);if(!wrap.isConnected){stop();return;}if(document.hidden&&!force){schedule();return;}if(loading)return;loading=true;if(!pending)skeleton();setLive('loading');refreshBtn.disabled=true;
+ async function refresh(force=false){clearTimeout(timer);if(!wrap.isConnected){stop();return;}if(document.hidden&&!force){schedule();return;}if(loading){if(force)again=true;return;}loading=true;if(!pending)skeleton();setLive('loading');refreshBtn.disabled=true;
   try{const data=await api('/api/pending'+(rev&&!force?'?since='+encodeURIComponent(rev):''));if(!wrap.isConnected)return;fails=0;loadedAt=new Date();
    if(!data.unchanged){const before=pending?new Set(pending.items.map(i=>i.key)):null;pending=data;rev=data.rev;
-    if(before){fresh=new Set(data.items.filter(i=>!before.has(i.key)).map(i=>i.key));if(fresh.size)announce.textContent=fresh.size===1?'Hay 1 pendiente nuevo.':'Hay '+fresh.size+' pendientes nuevos.';}
-    paintHead();paintCards();paintPending();}
-   setLive('ok');if(state.view==='history')historyView.reload();}
+    if(before){fresh=new Set(data.items.filter(i=>!before.has(i.key)).map(i=>i.key));if(fresh.size)announce.textContent=fresh.size===1?T('Hay 1 pendiente nuevo.'):T('Hay')+' '+fresh.size+' '+T('pendientes nuevos.');}
+    paintHead();paintKpis();paintCards();paintPending();}
+   setLive('ok');if(state.view==='history')historyView.reload();if(force&&state.view==='activity')activity.reload();}
   catch(error){fails++;if(!pending)failed(error);setLive('error');}
-  finally{loading=false;refreshBtn.disabled=false;schedule();}}
+  finally{loading=false;refreshBtn.disabled=false;if(again){again=false;refresh(true);}else schedule();}}
  function schedule(){clearTimeout(timer);if(!wrap.isConnected)return;timer=setTimeout(refresh,fails?Math.min(300000,30000*2**Math.min(fails,4)):45000);}
- const onVisible=()=>{if(!document.hidden)refresh();},onChanged=()=>historyView.reload(),onOnline=()=>refresh(true);
- function stop(){clearTimeout(timer);document.removeEventListener('visibilitychange',onVisible);document.removeEventListener('notices:changed',onChanged);removeEventListener('online',onOnline);}
- document.addEventListener('visibilitychange',onVisible);document.addEventListener('notices:changed',onChanged);addEventListener('online',onOnline);
+ const onVisible=()=>{if(!document.hidden)refresh();},onChanged=()=>historyView.reload(),onOnline=()=>refresh(true),onHash=()=>{if(drawer)drawer.dialog.close();if(!wrap.isConnected)stop();},onLang=()=>{if(wrap.isConnected){stop();renderNotices();}};
+ function stop(){clearTimeout(timer);document.removeEventListener('visibilitychange',onVisible);document.removeEventListener('notices:changed',onChanged);removeEventListener('online',onOnline);removeEventListener('hashchange',onHash);document.removeEventListener('i18n:change',onLang);}
+ document.addEventListener('visibilitychange',onVisible);document.addEventListener('notices:changed',onChanged);addEventListener('online',onOnline);addEventListener('hashchange',onHash);document.addEventListener('i18n:change',onLang);
+ // ---- Panel «Gestionar pendiente»: diálogo lateral (foco atrapado, Escape cierra, el foco vuelve al botón que lo abrió) ----
+ function drawerBusy(on){if(!drawer)return;drawer.busy=on;drawer.dialog.toggleAttribute('aria-busy',on);}
+ async function openDrawer(item,opener){if(drawer)drawer.dialog.close();
+  const dialog=el('dialog',undefined,'pc3-drawer'),dhead=el('header',undefined,'pc3-dhead'),body=el('div',undefined,'pc3-dbody'),foot=el('footer',undefined,'pc3-dfoot');
+  dialog.dataset.module=item.module;dialog.setAttribute('aria-labelledby','pc3-drawer-title');dialog.append(dhead,body,foot);document.body.append(dialog);
+  const d={dialog,item,entity:item.entity,opener,busy:false,data:null};drawer=d;
+  dialog.addEventListener('cancel',event=>{if(d.busy)event.preventDefault();});
+  dialog.addEventListener('click',event=>{if(event.target===dialog&&!d.busy)dialog.close();});
+  // Al cerrar, el foco vuelve al botón que lo abrió; si la lista se repintó (o el pendiente cambió de estado), a la fila del mismo registro.
+  dialog.addEventListener('close',()=>{dialog.remove();if(drawer===d)drawer=null;if(opener?.isConnected){opener.focus();return;}const back=list.querySelector('.pc2-item[data-entity="'+CSS.escape(d.entity)+'"] .pc3-manage')||list.querySelector('.pc3-manage')||tabs.pending;back.focus();});
+  paintDrawerHead(d,item);body.replaceChildren(...Array.from({length:4},()=>el('div',undefined,'pc3-skel-line pc2-skel')));dialog.showModal();dhead.querySelector('.icon-button')?.focus();
+  if(!item.read)await markSeen([item.key],true);   // abrir la gestión es consultar el aviso; no lo resuelve
+  await loadDrawer(d);}
+ // El encabezado se crea una vez y después solo se actualiza su texto: así el foco (por ejemplo, en «Cerrar») no se pierde al recargar.
+ function paintDrawerHead(d,item){const info=PC2_MODULES[item.module]||PC2_MODULES.alerts,dhead=d.dialog.querySelector('.pc3-dhead');
+  if(!dhead.childElementCount){const icon=el('span',undefined,'pc2-ic'),text=el('div',undefined,'pc3-dtitle'),h=el('h2');h.id='pc3-drawer-title';text.append(el('small'),h);const close=closeIcon(()=>{if(!d.busy)d.dialog.close();});close.setAttribute('aria-label',T('Cerrar el panel'));dhead.append(icon,text,close);}
+  dhead.querySelector('.pc2-ic').replaceChildren(systemIcon(info.icon));dhead.querySelector('small').textContent=T('Gestionar pendiente')+' · '+T(info.long);dhead.querySelector('h2').textContent=item.title;}
+ async function loadDrawer(d){if(!d||drawer!==d)return;const body=d.dialog.querySelector('.pc3-dbody');
+  try{const data=await api('/api/pending/item?key='+encodeURIComponent(d.entity));if(drawer!==d)return;d.data=data;d.item=data.item;await paintDrawer(d);}
+  catch(error){if(drawer!==d)return;if(error.status===404){resolvedDrawer(d);return;}const box=el('div',undefined,'pc2-state pc2-error');box.append(systemIcon(PC3_ICON.alert),el('strong',T('No se pudo cargar el detalle')),el('p',error.message),button(T('Reintentar'),()=>loadDrawer(d),'secondary'));body.replaceChildren(box);}}
+ // Pendiente que ya no existe: se resolvió en su módulo (por esta acción o por otra persona). Sale de la bandeja; la trazabilidad queda.
+ function resolvedDrawer(d){const body=d.dialog.querySelector('.pc3-dbody'),box=el('div',undefined,'pc2-state pc2-done pc3-resolved');
+  box.append(systemIcon('M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0 M9 12l2 2 4-4'),el('strong',T('Pendiente resuelto')),el('p',T('Ya no requiere acción: su módulo de origen lo cerró. El registro y su historial se conservan en el módulo y en «Actividad».')));
+  const row=el('div',undefined,'pc3-form-actions');row.append(button(T('Ver actividad'),()=>{d.dialog.close();setView('activity');},'secondary'),button(T('Cerrar'),()=>d.dialog.close(),'primary'));box.append(row);
+  body.replaceChildren(box);d.dialog.querySelector('.pc3-dfoot').replaceChildren();row.lastChild.focus();}
+ async function afterAction(d,text){if(text)toast(text,'success');document.dispatchEvent(new CustomEvent('notices:changed'));await refresh(true);if(drawer===d)await loadDrawer(d);}
+ // Formularios compactos dentro del panel: uno abierto a la vez, validación antes de confirmar, bloqueo contra el doble clic.
+ function section(title,cls){const s=el('section',undefined,'pc3-sec'+(cls?' '+cls:''));s.append(el('h3',T(title)));return s;}
+ const fld=(form,label,input,hint)=>{const box=el('label',undefined,'pc3-field');box.append(el('span',T(label)),input);if(hint)box.append(el('small',T(hint)));form.append(box);return input;};
+ const area=(max,placeholder)=>{const t=el('textarea');t.maxLength=max;t.rows=3;if(placeholder)t.placeholder=T(placeholder);return t;};
+ const choose=(options,value)=>{const s=el('select');for(const[v,text]of options){const o=el('option',text);o.value=v;s.append(o);}if(value!==undefined&&value!==null)s.value=String(value);return s;};
+ const dateInput=(value,min)=>{const i=el('input');i.type='date';if(value)i.value=value;if(min)i.min=min;return i;};
+ const hint=(parent,text)=>parent.append(el('p',T(text),'pc3-hint'));
+ function opForm(d,parent,label,{icon,tone,build,validate,confirm,submit,submitLabel}){const box=el('div',undefined,'pc3-op'),toggle=button('',()=>{const open=form.hidden;d.dialog.querySelectorAll('.pc3-form:not([hidden])').forEach(f=>{f.hidden=true;f.previousElementSibling?.setAttribute('aria-expanded','false');});form.hidden=!open;toggle.setAttribute('aria-expanded',String(open));if(open)form.querySelector('select,input,textarea')?.focus();},'pc3-op-btn');
+  toggle.setAttribute('aria-expanded','false');if(tone)toggle.dataset.tone=tone;toggle.append(systemIcon(icon||PC3_ICON.next),el('span',T(label)));
+  const form=el('form',undefined,'pc3-form'),msg=el('p','','pc3-msg'),row=el('div',undefined,'pc3-form-actions');form.hidden=true;form.noValidate=true;msg.setAttribute('role','alert');
+  const fields=build(form)||{},cancel=button(T('Cancelar'),()=>{form.hidden=true;toggle.setAttribute('aria-expanded','false');toggle.focus();},'secondary'),save=el('button',T(submitLabel||'Guardar'),tone==='danger'?'danger pc3-save':'primary pc3-save');save.type='submit';
+  row.append(cancel,save);form.append(msg,row);
+  form.onsubmit=async event=>{event.preventDefault();if(save.disabled||d.busy)return;msg.textContent='';const problem=validate&&validate(fields);if(problem){msg.textContent=problem;return;}
+   if(confirm&&!(await confirm(fields)))return;const label=save.textContent;save.disabled=cancel.disabled=true;save.textContent=T('Guardando…');form.setAttribute('aria-busy','true');drawerBusy(true);
+   try{const text=await submit(fields);drawerBusy(false);if(text!==false)await afterAction(d,text);}
+   catch(error){msg.textContent=error.message||T('No se pudo completar la operación.');if(error.status===409||error.status===404)refresh(true);}
+   finally{drawerBusy(false);if(save.isConnected){save.disabled=cancel.disabled=false;save.textContent=label;form.removeAttribute('aria-busy');}}};
+  box.append(toggle,form);parent.append(box);return box;}
+ function opButton(d,parent,label,run,{icon,tone,confirm}={}){const b=button('',async()=>{if(b.disabled||d.busy)return;if(confirm&&(await confirmClose({keep:T('Volver'),...confirm}))!=='discard')return;b.disabled=true;b.setAttribute('aria-busy','true');drawerBusy(true);
+   try{const text=await run();drawerBusy(false);if(text!==false)await afterAction(d,text);}catch(error){toast(error.message||T('No se pudo completar la operación.'),'error');if(error.status===409||error.status===404)refresh(true);}finally{drawerBusy(false);if(b.isConnected){b.disabled=false;b.removeAttribute('aria-busy');}}},'pc3-op-btn');
+  if(tone)b.dataset.tone=tone;b.append(systemIcon(icon||PC3_ICON.next),el('span',T(label)));parent.append(b);return b;}
+ function opLink(d,parent,label,href,icon){const a=el('a',undefined,'pc3-op-btn pc3-link');a.href=href;a.append(systemIcon(icon||PC3_ICON.open),el('span',T(label)));
+  if(href.startsWith('#'))a.addEventListener('click',()=>{if(!d.item.read)markSeen([d.item.key],true);});else{a.target='_blank';a.rel='noopener noreferrer';}parent.append(a);return a;}
+ const sure=(title,text,discard,danger)=>confirmClose({title:T(title),text:T(text),keep:T('Volver'),discard:T(discard),danger,plain:!danger}).then(answer=>answer==='discard');
+ const centerAction=(data)=>api('/api/pending/action',data);
+ // Acciones por módulo. Cada una llama al endpoint real; el servidor vuelve a validar permisos, estado y datos.
+ const MODULE_ACTIONS={
+  orders(d,box,item,ctx){const id=item.ref.order_id;opLink(d,box,'Abrir orden','#orders?id='+id);
+   if(ctx.statuses){opForm(d,box,'Actualizar estado',{icon:PC3_ICON.status,build:f=>{f.append(el('p',T('Estado actual')+': '+ctx.status_label,'pc3-hint'));const status=fld(f,'Nuevo estado',choose(ctx.statuses.filter(s=>s.code!==ctx.status).map(s=>[s.code,s.label])));const comment=fld(f,'Comentario (queda en el historial)',area(2000));const box2=el('label',undefined,'pc2-check pc3-check'),notify=el('input');notify.type='checkbox';notify.checked=true;box2.append(notify,el('span',T('Avisar al cliente del cambio')));f.append(box2);return{status,comment,notify};},
+     confirm:x=>x.status.value!=='entregado'||sure('¿Registrar la entrega?','La orden se marcará como entregada y saldrá de los pendientes. El servidor comprueba antes que no tenga saldo pendiente.','Registrar entrega'),
+     submit:async x=>{const out=await api('/api/order-status',{id:String(id),status:x.status.value,comment:x.comment.value.trim(),notify:x.notify.checked?'1':'0'});return out.unchanged?T('La orden ya tenía ese estado.'):T('Estado de la orden actualizado.');}});}
+   else hint(box,'El cambio de estado lo registra administración desde la orden.');
+   if(ctx.staff)opForm(d,box,'Asignar responsable',{icon:PC3_ICON.user,build:f=>({tech:fld(f,'Responsable',choose([['',T('Sin asignar')],...ctx.staff.map(s=>[String(s.id),s.name])],ctx.assigned_to||''))}),
+     submit:async x=>{const out=await centerAction({action:'assign',order_id:String(id),technician:x.tech.value,revision:String(ctx.revision)});return out.unchanged?T('La orden ya tenía ese responsable.'):T('Responsable asignado.');}});
+   opForm(d,box,'Registrar observación técnica',{icon:PC3_ICON.note,build:f=>({comment:fld(f,'Observación técnica',area(2000),'Queda en el historial de la orden con tu nombre, fecha y hora.')}),validate:x=>x.comment.value.trim().length<3?T('Escribe la observación técnica.'):'',
+     submit:async x=>{await api('/api/orders/'+id+'/follow-up',{comment:x.comment.value.trim()});return T('Observación registrada en la orden.');}});
+   if(['listo','espera_entrega'].includes(ctx.status)){opLink(d,box,'Coordinar entrega','#deliveries',PC3_ICON.truck);
+    if(ctx.statuses&&ctx.status==='listo')opButton(d,box,'Pasar a «En espera de entrega»',async()=>{await api('/api/order-status',{id:String(id),status:'espera_entrega',comment:'',notify:'1'});return T('La orden quedó en espera de entrega.');},{icon:PC3_ICON.status});
+    if(ctx.statuses)opButton(d,box,'Registrar entrega (resuelve el pendiente)',async()=>{await api('/api/order-status',{id:String(id),status:'entregado',comment:'',notify:'1'});return T('Entrega registrada. La orden salió de los pendientes.');},
+     {icon:PC3_ICON.check,tone:'ok',confirm:{title:T('¿Registrar la entrega?'),text:T('La orden se marcará como entregada y saldrá de los pendientes. El servidor comprueba antes que no tenga saldo pendiente.'),discard:T('Registrar entrega'),plain:true}});}
+   else hint(box,'Se resuelve al registrar la entrega: mientras el equipo siga en proceso no puede darse por resuelta.');},
+  async appointments(d,box,item){const id=item.ref.appointment_id;let row;try{row=(await api('/api/appointments/'+id)).appointment;}catch(error){hint(box,error.message);return;}
+   const done=()=>afterAction(d,null);
+   opButton(d,box,'Confirmar cita',async()=>{if(row.authorization){await api('/api/appointments/'+id,{action:'confirmada'});return T('Cita confirmada.');}authorizeAppointment(row,done);return false;},{icon:PC3_ICON.check,tone:'ok'});
+   if(!row.authorization)hint(box,'Confirmar exige registrar la aceptación expresa del cliente y los últimos 4 dígitos de su documento.');
+   opButton(d,box,'Reprogramar fecha y hora',async()=>{rescheduleAppointment(row,done);return false;},{icon:PC3_ICON.calendar});
+   opForm(d,box,'Cancelar con motivo',{icon:PC3_ICON.x,tone:'danger',submitLabel:'Cancelar cita',build:f=>({reason:fld(f,'Motivo de la cancelación',area(300),'Queda en el historial de la cita; no se envía al cliente.')}),
+     validate:x=>x.reason.value.trim().length<5?T('Indica el motivo (al menos 5 caracteres).'):'',
+     confirm:()=>sure('¿Cancelar esta cita?','La cita se marcará como cancelada y su horario quedará disponible. Si el cliente autorizó los avisos, recibirá la cancelación. El historial se conserva.','Cancelar cita',true),
+     submit:async x=>{await api('/api/appointments/'+id,{action:'cancelada',reason:x.reason.value.trim()});return T('Cita cancelada.');}});
+   const contact=el('div',undefined,'pc3-contact'),wa=pc3Whatsapp(row.phone);
+   if(row.phone){const a=el('a',undefined,'pc3-op-btn pc3-link');a.href='tel:'+String(row.phone).replace(/[^\d+]/g,'');a.append(systemIcon(PC3_ICON.phone),el('span',T('Llamar')+' · '+row.phone));contact.append(a);}
+   if(wa)opLink(d,contact,'WhatsApp','https://wa.me/'+wa,PC3_ICON.chat);
+   if(row.email){const a=el('a',undefined,'pc3-op-btn pc3-link');a.href='mailto:'+row.email;a.append(systemIcon(PC3_ICON.mail),el('span',T('Correo')));contact.append(a);}
+   if(contact.childElementCount){box.append(el('h4',T('Contactar al cliente'),'pc3-sub'),contact);}else hint(box,'La cita no tiene teléfono ni correo registrados.');
+   if(item.ref.past){box.append(el('h4',T('Registrar resultado'),'pc3-sub'));const res=el('div',undefined,'pc3-contact');
+    opButton(d,res,'No asistió',async()=>{await api('/api/appointments/'+id,{action:'no_asistio'});return T('Cita marcada como «No asistió».');},{icon:PC3_ICON.x,confirm:{title:T('¿Marcar «No asistió»?'),text:T('La cita se cerrará como inasistencia. Se conserva el historial.'),discard:T('Marcar «No asistió»'),plain:true}});
+    opButton(d,res,'Atendida (completada)',async()=>{await api('/api/appointments/'+id,{action:'completada'});return T('Cita registrada como completada.');},{icon:PC3_ICON.check,confirm:{title:T('¿Registrar la cita como completada?'),text:T('Solo si el cliente fue atendido. Se conserva el historial.'),discard:T('Registrar completada'),plain:true}});box.append(res);}
+   opLink(d,box,'Abrir en la Agenda','#appointments?appointment='+id,PC3_ICON.calendar);},
+  async quotes(d,box,item){const id=item.ref.quote_id,order=item.ref.order_id;opLink(d,box,'Consultar presupuesto','#orders?id='+order);let q;try{q=(await api('/api/quotes/'+id)).quote;}catch(error){hint(box,error.message);return;}
+   const open=(q.items||[]).filter(i=>i.status==='pendiente');
+   if(q.status==='enviado'&&open.length){
+    opForm(d,box,'Registrar decisión del cliente',{icon:PC3_ICON.check,build:f=>{const choice=fld(f,'Decisión que comunicó el cliente',choose([['aprobado',T('Aprueba todas las partidas pendientes')],['rechazado',T('Rechaza todas las partidas pendientes')]]));const note=fld(f,'¿Cómo la comunicó? (obligatorio)',area(300,'Por ejemplo: aprobó por teléfono'));hint(f,'Para aprobar solo algunas partidas, ábrelo en la orden.');return{choice,note};},
+      validate:x=>x.note.value.trim().length<5?T('Indica cómo comunicó el cliente su decisión (al menos 5 caracteres).'):'',
+      confirm:()=>sure('¿Registrar la decisión del cliente?','Registra solo una decisión que el cliente comunicó realmente. Queda con tu nombre, fecha y hora en el historial del presupuesto.','Registrar decisión'),
+      submit:async x=>{const ids=open.map(i=>i.id).join(',');await api('/api/quotes/'+id,{action:'decide',approved:x.choice.value==='aprobado'?ids:'',rejected:x.choice.value==='rechazado'?ids:'',note:x.note.value.trim()});return T('Decisión registrada.');}});
+    opButton(d,box,'Enviar recordatorio al cliente',async()=>{await api('/api/quotes/'+id,{action:'send'});return T('Presupuesto reenviado al cliente con un enlace nuevo.');},{icon:PC3_ICON.mail,confirm:{title:T('¿Reenviar el presupuesto?'),text:T('El cliente recibirá por correo un enlace nuevo para revisarlo y aprobarlo; el enlace anterior deja de funcionar.'),discard:T('Reenviar'),plain:true}});}
+   else if(q.status==='modificacion')hint(box,'El cliente pidió cambios: prepara una versión nueva del presupuesto desde la orden.');
+   if(!['aprobado','parcial','cancelado','rechazado'].includes(q.status))opForm(d,box,'Cancelar presupuesto',{icon:PC3_ICON.x,tone:'danger',submitLabel:'Cancelar presupuesto',build:f=>({reason:fld(f,'Motivo',area(300))}),
+     validate:x=>x.reason.value.trim().length<5?T('Indica el motivo (al menos 5 caracteres).'):'',confirm:()=>sure('¿Cancelar este presupuesto?','El enlace del cliente dejará de funcionar. El presupuesto y su historial se conservan.','Cancelar presupuesto',true),
+     submit:async x=>{await api('/api/quotes/'+id,{action:'cancel',reason:x.reason.value.trim()});return T('Presupuesto cancelado.');}});},
+  parts(d,box,item,ctx){const order=item.ref.order_id,rid=item.ref.request_id,url='/api/orders/'+order+'/part-requests/'+rid;opLink(d,box,'Consultar seguimiento','#orders?id='+order);
+   if(item.ref.cancellation_id){hint(box,'La solicitud de cancelación la decide administración desde el seguimiento del repuesto, con su motivo y, si corresponde, el reembolso.');return;}
+   const pub=(f)=>fld(f,'Informar al cliente (opcional)',area(1500),'Se publica en el seguimiento de la orden. No incluyas datos privados.');
+   if(ctx.next)opForm(d,box,'Registrar nueva etapa',{icon:PC3_ICON.next,submitLabel:T('Avanzar a')+' «'+ctx.next_label+'»',build:f=>{hint(f,T('Etapa actual')+': '+ctx.stage_label+' → '+ctx.next_label);return{note:fld(f,'Nota interna (opcional)',area(1500)),pub:pub(f)};},
+     submit:async x=>{await api(url,{action:'advance',stage:ctx.next,note:x.note.value.trim(),public_note:x.pub.value.trim(),publish:x.pub.value.trim()?'1':'0'});return T('Etapa del repuesto actualizada.');}});
+   if(!ctx.received)opForm(d,box,'Actualizar fecha estimada',{icon:PC3_ICON.calendar,build:f=>({eta:fld(f,'Nueva llegada estimada',dateInput(ctx.eta)),note:fld(f,'Motivo o fuente (opcional)',area(1500))}),validate:x=>!x.eta.value?T('Indica la fecha estimada.'):'',
+     submit:async x=>{const out=await api(url,{action:'update',eta:x.eta.value,note:x.note.value.trim()||T('Fecha estimada actualizada desde el Centro de Control.')});return out.changed?T('Fecha estimada actualizada.'):T('La fecha estimada ya era esa.');}});
+   opForm(d,box,ctx.situation&&ctx.situation!=='normal'?'Resolver o actualizar incidencia':'Registrar incidencia',{icon:PC3_ICON.alert,build:f=>({situation:fld(f,'Situación',choose(ctx.situations.map(s=>[s.code,s.label]),ctx.situation||'normal')),note:fld(f,'Motivo (obligatorio salvo «Sin novedad»)',area(1500)),eta:ctx.received?null:fld(f,'Nueva fecha estimada (opcional)',dateInput('')),pub:pub(f)}),
+     submit:async x=>{await api(url,{action:'situation',situation:x.situation.value,note:x.note.value.trim(),eta:x.eta?x.eta.value:'',public_note:x.pub.value.trim(),publish:x.pub.value.trim()?'1':'0'});return T('Situación del repuesto registrada.');}});},
+  messages(d,box,item,ctx){const ref=item.ref;
+   if(ref.kind==='pqrs'){opLink(d,box,'Ver caso completo','#pqrs?id='+ref.pqrs_id,PC3_ICON.chat);
+    opForm(d,box,'Responder al cliente',{icon:PC3_ICON.reply,submitLabel:'Enviar respuesta',build:f=>({body:fld(f,'Respuesta para el cliente',area(5000),'Se envía por correo y queda en el historial de la PQRS.'),after:fld(f,'Estado después de responder',choose([['respondida',T('Respondida')],['esperando_cliente',T('Esperando al cliente')],['en_solucion',T('En solución')]]))}),
+      validate:x=>x.body.value.trim().length<2?T('Escribe la respuesta para el cliente.'):'',confirm:()=>sure('¿Enviar la respuesta al cliente?','El cliente la recibirá por correo y quedará en el historial de la PQRS.','Enviar respuesta'),
+      submit:async x=>{await api('/api/pqrs/'+ref.pqrs_id,{action:'reply',body:x.body.value.trim(),status:x.after.value});return T('Respuesta registrada y enviada al cliente.');}});
+    if(ctx.staff)opForm(d,box,'Asignar responsable',{icon:PC3_ICON.user,build:f=>({user:fld(f,'Responsable',choose([['',T('Sin asignar')],...ctx.staff.map(s=>[String(s.id),s.name])],ctx.assigned_to||''))}),
+      submit:async x=>{await api('/api/pqrs/'+ref.pqrs_id,{action:'assign',user_id:x.user.value});return T('Responsable de la PQRS actualizado.');}});}
+   else if(ref.kind==='chat'){opLink(d,box,'Responder en Atención en vivo','#live',PC3_ICON.chat);hint(box,'La conversación completa y la respuesta en tiempo real están en Atención en vivo. Se resuelve cuando alguien la toma, la abre o la cierra.');}
+   else{opLink(d,box,'Gestionar respuesta','#maintenance?order='+ref.order_id,PC3_ICON.calendar);hint(box,'Se resuelve al marcar la respuesta como gestionada en Mantenimientos.');}},
+  licenses(d,box,item){const r=item.ref,facts=el('dl',undefined,'pc3-facts pc3-facts-mini');for(const[l,v]of [['Producto',r.product],['Código',r.code||'—'],['Vencimiento',pc3When(r.expires_at)],['Días restantes',String(r.days_left)]]){const row=el('div');row.append(el('dt',T(l)),el('dd',v));facts.append(row);}box.append(facts);
+   opLink(d,box,'Consultar o renovar en Licencias Pro','#licenses');hint(box,'La alerta se actualiza sola: desaparece en cuanto la renovación queda registrada en Licencias Pro. Para volver a revisarla otro día, programa un recordatorio.');},
+  alerts(d,box,item,ctx){const facts=el('dl',undefined,'pc3-facts pc3-facts-mini');for(const[l,v]of [['Origen',ctx.source||'—'],['Gravedad',T(ctx.severity||'—')],['Detectada',pc3When(item.at)],['Detalle técnico',item.detail||'—']]){const row=el('div');row.append(el('dt',T(l)),el('dd',v));facts.append(row);}box.append(facts);
+   if(item.href)opLink(d,box,'Abrir en su módulo',item.href);
+   if(ctx.incident){opButton(d,box,'Pasar la incidencia a «En revisión»',async()=>{await api('/api/autocare/incident',{code:ctx.incident,status:'en_revision',note:'Revisión iniciada desde el Centro de Control.'});return T('Incidencia en revisión en ADI AutoCare.');},{icon:PC3_ICON.ack});
+    opForm(d,box,'Resolver la incidencia en AutoCare',{icon:PC3_ICON.check,tone:'ok',build:f=>({note:fld(f,'¿Cómo se resolvió?',area(300),'Queda en el historial de la incidencia. Si el error vuelve a ocurrir, se reabre sola.')}),validate:x=>x.note.value.trim().length<5?T('Indica cómo se resolvió la incidencia.'):'',
+      confirm:()=>sure('¿Marcar la incidencia como resuelta?','Hazlo solo si la causa se corrigió. Si el error vuelve a ocurrir, la incidencia se reabre automáticamente.','Marcar resuelta'),
+      submit:async x=>{await api('/api/autocare/incident',{code:ctx.incident,status:'resuelta',note:x.note.value.trim()});return T('Incidencia resuelta en ADI AutoCare.');}});}
+   opForm(d,box,item.ack?'Volver a reconocer':'Reconocer alerta',{icon:PC3_ICON.ack,submitLabel:'Reconocer',build:f=>({body:fld(f,'Nota (opcional)',area(500,'Por ejemplo: lo reviso hoy'))}),submit:async x=>{await centerAction({action:'ack',key:item.key,body:x.body.value.trim()});return T('Alerta reconocida: queda en proceso y sigue visible hasta resolverse.');}});
+   if(ctx.can_silence)opForm(d,box,'Silenciar temporalmente',{icon:PC3_ICON.silence,submitLabel:'Silenciar',build:f=>({hours:fld(f,'Durante',choose([['1','1 h'],['4','4 h'],['8','8 h'],['24','24 h'],['72','3 '+T('días')]],'4')),body:fld(f,'Motivo',area(500),'La alerta sigue en la lista, fuera de los urgentes, y vuelve sola al terminar el plazo.')}),
+     validate:x=>x.body.value.trim().length<5?T('Indica el motivo del silencio (al menos 5 caracteres).'):'',submit:async x=>{await centerAction({action:'silence',key:item.key,hours:x.hours.value,body:x.body.value.trim()});return T('Alerta silenciada temporalmente.');}});
+   else hint(box,'Fallo activo: no se puede silenciar. Permanece visible hasta que el sistema confirme que se resolvió.');
+   opForm(d,box,'Registrar resolución',{icon:PC3_ICON.note,build:f=>({body:fld(f,'¿Qué se hizo?',area(1500),'La alerta sale de la bandeja cuando el sistema deja de detectar la condición.')}),validate:x=>x.body.value.trim().length<10?T('Describe la resolución (al menos 10 caracteres).'):'',
+     submit:async x=>{await centerAction({action:'resolve',key:item.key,body:x.body.value.trim()});return T('Resolución registrada. La alerta saldrá cuando el sistema confirme que la condición ya no existe.');}});}};
+ async function paintDrawer(d){const{item,history,notes,context:ctx,managed}=d.data,info=PC2_MODULES[item.module]||PC2_MODULES.alerts;paintDrawerHead(d,item);d.dialog.dataset.module=item.module;
+  const body=d.dialog.querySelector('.pc3-dbody'),foot=d.dialog.querySelector('.pc3-dfoot');
+  const status=el('div',undefined,'pc3-status'),chip=(text,kind)=>{const c=el('span',text,'pc2-chip');c.dataset.kind=kind;status.append(c);};
+  chip(T(PC2_PRIORITY[item.priority]),item.priority);chip(T(PC2_STATE[item.state]||item.state),item.state);chip(T(item.read?'Visto':'Sin ver'),item.read?'visto':'nuevo');if(item.decision&&!item.silenced)chip(T('Requiere decisión'),'decision');
+  if(item.silenced)chip(T('Silenciada hasta')+' '+pc3When(item.silenced,true),'silencio');if(item.reminder)chip(T('Recordatorio')+' '+pc3When(item.reminder,true),'recordatorio');
+  const facts=el('dl',undefined,'pc3-facts');
+  for(const[label,value]of [['Cliente o entidad',item.client||'—'],['Responsable',item.responsible||'—'],['Situación',item.waiting||'—'],[T(info.due||'Vencimiento'),item.due?pc3When(item.due)+(item.overdue?' · '+T('vencido'):''):T('Sin fecha')],['Creado',pc3When(item.created||'')],['Última actividad',pc3When(item.activity||item.at)]]){const row=el('div');row.append(el('dt',T(label)),el('dd',value));facts.append(row);}
+  const extra=[];if(item.ack)extra.push(T('Reconocida por')+' '+item.ack.by+' · '+pc3When(item.ack.at)+(item.ack.body?' · '+item.ack.body:''));if(item.resolution)extra.push(T('Resolución registrada por')+' '+item.resolution.by+' · '+pc3When(item.resolution.at)+' · '+item.resolution.body);
+  const resolves=el('p',undefined,'pc3-resolves');resolves.append(el('strong',T('Se resuelve cuando')+': '),document.createTextNode(item.resolves||T('Cambia la condición en su módulo.')));
+  const actions=section('Acciones','pc3-actions-sec'),ops=el('div',undefined,'pc3-ops');actions.append(ops);
+  // Observaciones internas y recordatorio: solo para el equipo; nunca se muestran al cliente ni resuelven el pendiente.
+  const notesSec=section('Observaciones internas'),notesList=el('ul',undefined,'pc3-notes');
+  if(!managed)hint(notesSec,'Las observaciones internas estarán disponibles cuando se aplique la actualización de la base de datos.');
+  else{for(const n of notes){const li=el('li');li.append(el('p',n.body),el('small',(n.actor||T('Sistema'))+' · '+pc3When(n.created_at)));notesList.append(li);}if(!notes.length)notesList.append(el('li',T('Sin observaciones todavía.'),'pc3-empty'));notesSec.append(notesList);
+   opForm(d,notesSec,'Añadir observación',{icon:PC3_ICON.note,build:f=>({body:fld(f,'Observación interna',area(1500),'Visible solo para el equipo. No resuelve el pendiente.')}),validate:x=>x.body.value.trim().length<3?T('Escribe la observación (al menos 3 caracteres).'):'',
+     submit:async x=>{const out=await centerAction({action:'note',key:item.entity,body:x.body.value.trim()});return out.duplicate?T('Esa observación ya estaba registrada.'):T('Observación guardada.');}});
+   opForm(d,notesSec,item.reminder?'Cambiar recordatorio':'Programar recordatorio',{icon:PC3_ICON.clock,build:f=>{const today=pc2Day(new Date(Date.now()+clockOffset));return{date:fld(f,'Fecha',dateInput(item.reminder||'',today)),body:fld(f,'Motivo (opcional)',area(300))};},validate:x=>!x.date.value?T('Indica la fecha del recordatorio.'):'',
+     submit:async x=>{await centerAction({action:'remind',key:item.entity,date:x.date.value,body:x.body.value.trim()});return T('Recordatorio programado.');}});}
+  const historySec=section('Historial de actividad'),timeline=el('ol',undefined,'pc3-timeline');
+  for(const e of history){const li=el('li');li.dataset.kind=e.kind;li.append(el('time',pc3When(e.at)),el('strong',e.actor||T('Sistema')),el('p',e.text));timeline.append(li);}
+  if(!history.length)timeline.append(el('li',T('Sin actividad registrada todavía.'),'pc3-empty'));historySec.append(timeline);
+  body.replaceChildren(status,facts,...extra.map(t=>el('p',t,'pc3-ack')),resolves,actions,notesSec,historySec);
+  const builder=MODULE_ACTIONS[item.module];if(builder){ops.append(el('p',T('Cargando acciones…'),'pc3-hint'));const holder=el('div');try{await builder(d,holder,item,ctx||{});}catch(error){holder.replaceChildren(el('p',error.message,'pc3-hint'));}ops.replaceChildren(...holder.childNodes);}
+  foot.replaceChildren();if(item.href){const go2=button('',()=>{d.dialog.close();go(item,item.href);},'secondary');go2.append(el('span',T('Abrir detalle completo')),systemIcon(PC3_ICON.open));foot.append(go2);}foot.append(button(T('Cerrar'),()=>{if(!d.busy)d.dialog.close();},'primary'));}
  // ---- Notificaciones: historial informativo con lectura y ocultación por persona ----
- const historyView=noticeHistory(historyPanel,unread=>{historyTab.replaceChildren(el('span','Notificaciones'),...(unread?[el('b',String(unread))]:[]));historyTab.setAttribute('aria-label','Notificaciones'+(unread?': '+unread+' sin leer':''));});
- function setView(view){state.view=view;remember();pendingTab.setAttribute('aria-selected',String(view==='pending'));historyTab.setAttribute('aria-selected',String(view==='history'));pendingTab.tabIndex=view==='pending'?0:-1;historyTab.tabIndex=view==='history'?0:-1;
-  pendingPanel.hidden=view!=='pending';historyPanel.hidden=view!=='history';if(view==='history')historyView.reload();
-  const next=new URLSearchParams(routeState().params);next.set('vista',view==='history'?'notificaciones':'pendientes');replaceRoute(next);}
- const replaceRoute=next=>{try{window.history.replaceState(null,'','/#notices?'+next.toString());}catch{}};
- pendingTab.replaceChildren(el('span','Pendientes'));historyTab.replaceChildren(el('span','Notificaciones'));
- setView(state.view==='history'?'history':'pending');await refresh(true);
+ const historyView=noticeHistory(panels.history,unread=>{tabs.history.replaceChildren(el('span',T('Notificaciones')),...(unread?[el('b',String(unread))]:[]));tabs.history.setAttribute('aria-label',T('Notificaciones')+(unread?': '+unread+' '+T('sin leer'):''));});
+ // ---- Actividad: lo que hizo el equipo (acciones, cambios de estado, gestión, lecturas, errores y reintentos), con filtros y CSV ----
+ const activity=activityView(panels.activity,admin);
+ function setView(view){state.view=view;remember();for(const[key,tab]of Object.entries(tabs)){tab.setAttribute('aria-selected',String(key===view));tab.tabIndex=key===view?0:-1;panels[key].hidden=key!==view;}
+  if(view==='history')historyView.reload();if(view==='activity')activity.open();
+  const next=new URLSearchParams(routeState().params);next.set('vista',ROUTE[view]);try{window.history.replaceState(null,'','/#notices?'+next.toString());}catch{}}
+ tabs.pending.replaceChildren(el('span',T('Pendientes')));tabs.history.replaceChildren(el('span',T('Notificaciones')));tabs.activity.replaceChildren(el('span',T('Actividad')));
+ setView(state.view);await refresh(true);
+}
+// Centro de actividad (1.5.288): consulta bajo demanda (no se actualiza sola, para no consumir recursos); exporta lo filtrado en CSV.
+function activityView(root,admin){
+ const state={module:'',kind:'',user:'',from:'',to:'',q:''};let loaded=false,seq=0,data=null;
+ const bar=el('div',undefined,'pc3-afilters'),list=el('ol',undefined,'pc3-log'),summary=el('p','','pc2-count');summary.setAttribute('aria-live','polite');
+ const pick=(label,key,options)=>{const box=el('label',undefined,'pc2-field'),s=el('select');box.append(el('span',T(label)),s);s.fill=opts=>{const keep=state[key];s.replaceChildren();for(const[v,t]of opts){const o=el('option',t);o.value=v;s.append(o);}s.value=opts.some(o=>o[0]===keep)?keep:'';};s.fill(options);s.onchange=()=>{state[key]=s.value;load();};bar.append(box);return s;};
+ const fModule=pick('Módulo','module',[['',T('Todos')],...Object.entries(PC2_MODULES).map(([k,v])=>[k,T(v.label)])]);
+ const KINDS={accion:'Acción',estado:'Cambio de estado',gestion:'Gestión del centro',lectura:'Notificación leída',error:'Error o reintento'};
+ const fKind=pick('Tipo','kind',[['',T('Todos')],...Object.entries(KINDS).map(([k,v])=>[k,T(v)])]);
+ const fUser=admin?pick('Persona','user',[['',T('Todo el equipo')]]):null;
+ const date=(label,key)=>{const box=el('label',undefined,'pc2-field'),i=el('input');i.type='date';box.append(el('span',T(label)),i);i.onchange=()=>{state[key]=i.value;load();};bar.append(box);return i;};
+ const fFrom=date('Desde','from'),fTo=date('Hasta','to');
+ const sbox=el('label',undefined,'pc2-field pc3-asearch'),search=el('input');search.type='search';search.maxLength=80;search.placeholder=T('Buscar persona, acción o código');sbox.append(el('span',T('Buscar')),search);bar.append(sbox);
+ let typing=null;search.oninput=()=>{clearTimeout(typing);typing=setTimeout(()=>{state.q=search.value.trim();load();},350);};
+ const csv=el('a',undefined,'pc3-op-btn pc3-link pc3-csv');csv.append(systemIcon(PC3_ICON.download),el('span',T('Exportar CSV')));csv.setAttribute('download','');bar.append(csv);
+ root.replaceChildren(bar,summary,list);
+ const query=()=>{const p=new URLSearchParams();for(const[k,v]of Object.entries(state))if(v)p.set(k,v);return p.toString();};
+ async function load(){const mine=++seq;csv.href='/api/pending/activity.csv'+(query()?'?'+query():'');list.setAttribute('aria-busy','true');if(!data)list.replaceChildren(...Array.from({length:5},()=>el('li',undefined,'pc3-log-skel pc2-skel')));summary.textContent=T('Cargando actividad…');
+  try{const out=await api('/api/pending/activity'+(query()?'?'+query():''));if(mine!==seq)return;data=out;loaded=true;
+   if(!state.from)fFrom.value=out.from;if(!state.to)fTo.value=out.to;if(fUser)fUser.fill([['',T('Todo el equipo')],...out.people.map(p=>[String(p.id),p.name])]);
+   summary.textContent=out.total>out.rows.length?out.rows.length+' '+T('de')+' '+out.total+' '+T('registros (los más recientes)'):pc2Plural(out.rows.length,'registro','registros')+' · '+pc3When(out.from)+' – '+pc3When(out.to);paint(out.rows);}
+  catch(error){if(mine!==seq)return;summary.textContent='';const box=el('li',undefined,'pc2-state pc2-error');box.append(systemIcon(PC3_ICON.alert),el('strong',T('No se pudo cargar la actividad')),el('p',error.message),button(T('Reintentar'),()=>load(),'secondary'));list.replaceChildren(box);}
+  finally{if(mine===seq)list.removeAttribute('aria-busy');}}
+ function paint(rows){list.replaceChildren();if(!rows.length){const box=el('li',undefined,'pc2-state');box.append(systemIcon(PC3_ICON.history),el('strong',T('Sin actividad en este período')),el('p',T('Cambia las fechas o los filtros.')));list.append(box);return;}
+  for(const r of rows){const li=el('li',undefined,'pc3-log-row'),when=el('time',pc3When(r.at)),main=el('div',undefined,'pc3-log-main'),chips=el('span',undefined,'pc2-chips');li.dataset.kind=r.kind;if(r.module)li.dataset.module=r.module;when.dateTime=r.at;
+   if(r.module&&PC2_MODULES[r.module]){const c=el('span',T(PC2_MODULES[r.module].label),'pc2-chip');c.dataset.kind='modulo';chips.append(c);}const k=el('span',T(KINDS[r.kind]||r.kind),'pc2-chip');k.dataset.kind=r.kind;chips.append(k);
+   main.append(el('strong',r.text),chips);if(r.detail)main.append(el('p',r.detail));const by=el('span',r.actor||T('Sistema'),'pc3-log-actor');li.append(when,by,main);
+   if(r.href){const go=el('a',undefined,'pc2-icon-btn');go.href=r.href;go.title=T('Abrir');go.setAttribute('aria-label',T('Abrir')+': '+r.text);go.append(systemIcon(PC3_ICON.open));li.append(go);}list.append(li);}}
+ return {open(){if(!loaded)load();},reload(){if(loaded)load();}};
 }
 // Historial de notificaciones (antes «Centro de Actividad»): mismas reglas de lectura y ocultación, con filtros de prioridad, estado,
 // módulo, fecha y orden. La prioridad de un aviso sale de su tipo (error → urgente, advertencia → importante, el resto normal).

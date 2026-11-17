@@ -94,14 +94,16 @@ class PendingCenterTests(unittest.TestCase):
         self.assertEqual(len(data['items']), len({i['key'] for i in data['items']}))  # sin duplicados
         for item in data['items']:
             self.assertIn(item['state'], ('pendiente', 'en_proceso'))
-            self.assertIn(item['priority'], ('normal', 'importante', 'urgente'))
+            self.assertIn(item['priority'], ('normal', 'importante', 'urgente', 'critico'))
             for target in [item['href']] + [a['href'] for a in item['actions']]:
                 self.assertRegex(target, ROUTES)
         quote = next(i for i in data['items'] if i['title'].endswith('PCD-F-P1'))
         self.assertEqual((quote['priority'], quote['overdue'], quote['href']), ('urgente', True, '#orders?id=%d' % waiting))
         self.assertEqual(next(i for i in data['items'] if i['key'] == 'pending:orders:%d:reparacion' % late)['state'], 'en_proceso')
-        # Lo urgente y vencido va primero.
-        self.assertEqual(data['items'][0]['priority'], 'urgente')
+        # Lo crítico (fallos del sistema) va primero; después, lo urgente y vencido.
+        self.assertIn(data['items'][0]['priority'], ('critico', 'urgente'))
+        self.assertTrue(all(i['module'] == 'alerts' for i in data['items'] if i['priority'] == 'critico'))
+        self.assertEqual(next(i for i in data['items'] if i['priority'] != 'critico')['priority'], 'urgente')
         # Las solicitudes coinciden con el contador del inicio (que solo cuenta las futuras) más la vencida, que se marca aparte.
         self.assertEqual(self.request('/api/dashboard', cookie=cookie)['body']['pending_appointments'], 5)
 

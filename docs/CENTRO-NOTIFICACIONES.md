@@ -148,3 +148,48 @@ Confirmar una cita se hace en la Agenda, porque exige registrar la autorización
 - alcance por técnico;
 - respuesta «sin cambios»;
 - lista completa de solicitudes de cita.
+
+## 1.5.288 · Centro de Control Operativo
+
+**Gestionar pendiente.** Cada fila tiene el botón «Gestionar», que abre un panel lateral (diálogo modal: el foco queda dentro, Escape lo cierra y el foco vuelve a la fila). Muestra la identificación, el cliente o la entidad, el estado, la prioridad, el responsable, la fecha de creación y de vencimiento, la última actividad, cuándo se resuelve, el historial del registro de origen, las observaciones internas y las acciones permitidas.
+
+**Las acciones son las de cada módulo.** El panel llama a los mismos endpoints que usan Órdenes, Agenda, Presupuestos, Repuestos, PQRS y ADI AutoCare. El servidor vuelve a comprobar permisos, estado y datos en cada acción:
+
+| Módulo | Acciones en el panel | Endpoint |
+|---|---|---|
+| Órdenes | Actualizar estado y responsable (administración). Observación técnica. Pasar a «En espera de entrega». Registrar la entrega, con comprobación de saldo. | `/api/order-status`, `/api/pending/action` (`assign`), `/api/orders/{id}/follow-up` |
+| Citas | Confirmar, con la autorización real del cliente: aceptación y 4 dígitos. Reprogramar. Cancelar con motivo. Llamar, WhatsApp o correo. Registrar el resultado si ya pasó la hora. | `/api/appointments/{id}` |
+| Presupuestos | Registrar la decisión que comunicó el cliente, con nota obligatoria. Reenviar con un enlace nuevo como recordatorio. Cancelar con motivo. | `/api/quotes/{id}` |
+| Repuestos | Avanzar a la etapa siguiente. Actualizar la fecha estimada. Registrar o resolver una incidencia. Informar al cliente en el seguimiento. | `/api/orders/{id}/part-requests/{rid}` |
+| Mensajes | Responder una PQRS por correo. Asignarla (administración). Enlaces a Atención en vivo y a Mantenimientos. | `/api/pqrs/{id}` |
+| Licencias | Consultar o renovar en Licencias Pro. Recordatorio. | — |
+| Alertas | Reconocer. Silenciar 1–72 h con motivo, solo advertencias. Registrar la resolución. Incidencias de AutoCare: pasar «En revisión» o «Resuelta». | `/api/pending/action`, `/api/autocare/incident` |
+
+**Resuelto ≠ visto ≠ gestionado.**
+- Un pendiente sale de la bandeja solo cuando su módulo de origen lo cierra. Entonces el panel muestra «Pendiente resuelto», y su trazabilidad queda en el módulo y en «Actividad».
+- Ni la observación, ni el recordatorio, ni el reconocimiento, ni el silencio, ni la resolución registrada de una alerta lo resuelven.
+- Un fallo activo («Crítico»: errores del sistema, almacenamiento y respaldos) no se puede silenciar.
+
+**Registro de gestión (`pending_notes`, migración 105).**
+- Es de solo anexado: observaciones, reconocimientos, silencios, recordatorios y resoluciones registradas.
+- Se ancla al registro de origen (`orders:12`, `appointments:5`…), no al estado. Por eso una observación sigue con la orden aunque cambie de estado.
+- Si la tabla todavía no existe en la base, el centro sigue funcionando y avisa de que esas funciones requieren la actualización de la base.
+- Una repetición idéntica en 15 s se ignora, para evitar el doble clic.
+
+**Actividad (`/api/pending/activity`).** Reúne:
+- las acciones auditadas de los módulos;
+- los cambios de estado de órdenes;
+- la gestión del centro;
+- las lecturas;
+- en administración, los envíos de correo fallidos y sus reintentos, sin destinatario.
+
+Administración ve a todo el equipo; un técnico, solo lo suyo. Se puede filtrar por módulo, tipo, persona, fechas y texto (por defecto, los últimos 30 días, hasta 500 filas). Se exporta a CSV con las fórmulas neutralizadas. La pestaña no se actualiza sola, para no hacer consultas innecesarias.
+
+**Diseño Premium Compact 3.0.**
+- Indicadores que filtran: críticos, urgentes, vencidos, requieren decisión, sin ver y silenciadas.
+- Tarjetas por módulo más bajas.
+- Orden por urgencia, vencimiento, antigüedad o última actividad.
+- Acciones rápidas al pasar el cursor; siempre visibles en pantallas táctiles.
+- Filtros conservados durante la sesión del navegador.
+- Textos en español e inglés.
+- Sin animaciones con movimiento reducido.

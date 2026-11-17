@@ -5,8 +5,11 @@ Reglas (separadas a propósito):
   pendiente desaparece solo cuando cambia su condición (la cita se confirma, el presupuesto se decide, la orden se entrega…).
 - Leído / No leído: usa notification_reads, igual que las notificaciones. Marcar como visto no resuelve nada.
 - Visible / Oculto: los pendientes no se pueden ocultar (ocultar es solo para notificaciones informativas).
-- Normal / Importante / Urgente: prioridad calculada con fechas y estados reales (vencimientos, plazos, prioridad de la orden).
-Este módulo solo lee: no escribe en la base ni cambia ningún registro.
+- Normal / Importante / Urgente / Crítico: prioridad calculada con fechas y estados reales (vencimientos, plazos, prioridad de la orden);
+  «Crítico» queda reservado a fallos graves del sistema (errores activos, almacenamiento y respaldos).
+- Gestión (1.5.288): observaciones internas, reconocimientos, silencios temporales y recordatorios viven en pending_notes (solo anexado).
+  Se muestran junto al pendiente, pero ninguno lo resuelve; un fallo activo (crítico) no se puede silenciar.
+Este módulo solo lee: no escribe en la base ni cambia ningún registro (las escrituras están en pending_actions).
 """
 import hashlib
 import json
@@ -18,7 +21,8 @@ import appointments
 MODULES = {'orders': 'Órdenes pendientes', 'appointments': 'Citas por confirmar', 'quotes': 'Presupuestos por aprobar', 'parts': 'Repuestos en seguimiento',
            'messages': 'Mensajes por responder', 'licenses': 'Licencias por vencer', 'alerts': 'Alertas del sistema'}
 ADMIN_ONLY = ('licenses', 'alerts')
-RANK = {'urgente': 0, 'importante': 1, 'normal': 2}
+RANK = {'critico': 0, 'urgente': 1, 'importante': 2, 'normal': 3}
+NOTE_KINDS = {'nota': 'Observación interna', 'reconocida': 'Alerta reconocida', 'silenciada': 'Alerta silenciada', 'recordatorio': 'Recordatorio programado', 'resolucion': 'Resolución registrada'}
 ORDER_PROGRESS = ('diagnostico', 'reparacion', 'pruebas', 'revision_recurrente', 'esperando_repuesto')
 ORDER_WAITING = {'pendiente': 'Por iniciar el diagnóstico', 'diagnostico': 'Diagnóstico en curso', 'reparacion': 'Reparación en curso', 'pruebas': 'Pruebas de calidad',
                  'revision_recurrente': 'Revisión por falla recurrente', 'esperando_repuesto': 'Espera un repuesto', 'presupuesto': 'Espera la aprobación del cliente',
@@ -53,7 +57,8 @@ def _iso(value):
 
 def _item(module, key, title, **extra):
     base = {'key': 'pending:' + module + ':' + key, 'module': module, 'title': title, 'detail': '', 'client': '', 'responsible': '', 'responsible_id': None,
-            'state': 'pendiente', 'priority': 'normal', 'due': '', 'overdue': False, 'at': '', 'href': '', 'actions': [], 'waiting': '', 'resolves': ''}
+            'state': 'pendiente', 'priority': 'normal', 'due': '', 'overdue': False, 'at': '', 'href': '', 'actions': [], 'waiting': '', 'resolves': '',
+            'created': '', 'decision': False, 'ref': {}}
     base.update(extra)
     return base
 
@@ -76,7 +81,8 @@ def _orders(c, user, now, mine):
                          responsible=r['tech'] or 'Sin asignar', responsible_id=r['assigned_to'], state='en_proceso' if r['status'] in ORDER_PROGRESS else 'pendiente',
                          priority=priority, due=due.isoformat() if due else '', overdue=overdue, at=_iso(r['updated_at']) or _iso(r['received_at']) or _iso(r['created_at']),
                          href=actions[0]['href'], actions=actions, waiting=ORDER_WAITING.get(r['status'], r['status_label']),
-                         resolves='Desaparece cuando la orden se entrega al cliente.'))
+                         resolves='Desaparece cuando la orden se entrega al cliente.', created=_iso(r['received_at']) or _iso(r['created_at']),
+                         decision=r['status'] in ('pendiente', 'listo', 'espera_entrega') or overdue, ref={'order_id': r['id'], 'code': r['code'], 'status': r['status']}))
     return out
 
 
@@ -94,7 +100,8 @@ def _appointments(c, user, now, mine):
                          responsible=r['tech'] or 'Sin asignar', responsible_id=r['technician_id'], priority=priority, due=_iso(r['starts_at']), overdue=hours < 0,
                          at=_iso(r['created_at']), href=href, actions=[{'label': 'Confirmar o gestionar', 'href': href}],
                          waiting='Fecha pasada sin confirmar: reprográmala o ciérrala' if hours < 0 else 'Confirmar con el cliente (registra su autorización)',
-                         resolves='Desaparece al confirmar, reprogramar, cancelar o eliminar la cita en la Agenda.'))
+                         resolves='Desaparece al confirmar, reprogramar, cancelar o eliminar la cita en la Agenda.', created=_iso(r['created_at']), decision=True,
+                         ref={'appointment_id': r['id'], 'code': r['public_code'], 'starts_at': r['starts_at'], 'past': hours < 0}))
     return out
 
 
@@ -106,9 +113,10 @@ def _quotes(c, user, now, mine):
     out = []
     for r in rows:
         href = '#orders?id=%d' % r['order_id']
-        common = dict(client=r['client'], responsible=r['tech'] or 'Sin asignar', responsible_id=r['assigned_to'], href=href, actions=[{'label': 'Revisar presupuesto', 'href': href}])
+        common = dict(client=r['client'], responsible=r['tech'] or 'Sin asignar', responsible_id=r['assigned_to'], href=href, actions=[{'label': 'Revisar presupuesto', 'href': href}],
+                      created=_iso(r['sent_at']) or _iso(r['updated_at']), ref={'quote_id': r['id'], 'order_id': r['order_id'], 'code': r['code'], 'status': r['status']})
         if r['status'] == 'modificacion':
-            out.append(_item('quotes', '%d:modificacion' % r['id'], 'El cliente pide cambios · ' + r['code'], detail='Revisión solicitada por el cliente', priority='importante',
+            out.append(_item('quotes', '%d:modificacion' % r['id'], 'El cliente pide cambios · ' + r['code'], detail='Revisión solicitada por el cliente', priority='importante', decision=True,
                              at=_iso(r['updated_at']), waiting='Preparar una versión nueva del presupuesto', resolves='Desaparece al enviar una versión nueva o cancelar el presupuesto.', **common))
             continue
         valid = _day(r['valid_until'])
@@ -117,7 +125,7 @@ def _quotes(c, user, now, mine):
         late = bool(sent and (now - sent).days >= 3)
         priority = 'urgente' if expired else 'importante' if (valid and valid <= today + timedelta(days=2)) or late else 'normal'
         out.append(_item('quotes', '%d:enviado' % r['id'], 'Presupuesto por aprobar · ' + r['code'], detail='Vigencia vencida: el cliente ya no puede decidir' if expired else 'Enviado al cliente',
-                         priority=priority, due=valid.isoformat() if valid else '', overdue=expired, at=_iso(r['sent_at']) or _iso(r['updated_at']),
+                         priority=priority, due=valid.isoformat() if valid else '', overdue=expired, at=_iso(r['sent_at']) or _iso(r['updated_at']), decision=expired,
                          waiting='Crear una versión nueva o llamar al cliente' if expired else 'Espera la decisión del cliente',
                          resolves='Desaparece cuando el cliente decide o el taller lo reemplaza o cancela.', **common))
     return out
@@ -128,7 +136,7 @@ def _parts(c, user, now, mine, admin):
     today = now.date()
     stages, situations = {s[0]: s[2] for s in parts.STAGES}, parts.SITUATIONS
     tech = '' if admin else ' AND (r.technician_id=? OR o.assigned_to=? OR o.assigned_to IS NULL)'
-    rows = c.execute("SELECT r.id,r.name,r.stage,r.situation,r.eta,r.updated_at,r.order_id,COALESCE(o.code,'OP-'||printf('%05d',o.id)) code,COALESCE(r.technician_id,o.assigned_to) owner,"
+    rows = c.execute("SELECT r.id,r.name,r.stage,r.situation,r.eta,r.updated_at,r.created_at,r.order_id,COALESCE(o.code,'OP-'||printf('%05d',o.id)) code,COALESCE(r.technician_id,o.assigned_to) owner,"
                      "cl.name client,u.name tech FROM order_part_requests r JOIN orders o ON o.id=r.order_id JOIN devices d ON d.id=o.device_id JOIN clients cl ON cl.id=d.client_id "
                      "LEFT JOIN users u ON u.id=COALESCE(r.technician_id,o.assigned_to) WHERE r.situation!='cancelado' AND r.stage NOT IN ('instalado','listo') AND o.status!='entregado'" + tech + " ORDER BY r.id",
                      () if admin else (user['id'], user['id'])).fetchall()
@@ -145,7 +153,9 @@ def _parts(c, user, now, mine, admin):
                          state='pendiente' if r['stage'] == 'recibido' else 'en_proceso', priority=priority, due=eta.isoformat() if eta and r['stage'] in PART_BEFORE_ARRIVAL else '',
                          overdue=late, at=_iso(r['updated_at']), href=href, actions=[{'label': 'Ver seguimiento', 'href': href}],
                          waiting='Recibido: instalar y continuar la orden' if r['stage'] == 'recibido' else 'Llegada estimada vencida: consulta al proveedor' if late else 'Seguimiento del pedido',
-                         resolves='Desaparece cuando el repuesto queda instalado, se cancela el pedido o se entrega la orden.'))
+                         resolves='Desaparece cuando el repuesto queda instalado, se cancela el pedido o se entrega la orden.', created=_iso(r['created_at']),
+                         decision=r['stage'] == 'recibido' or late or r['situation'] == 'incidencia_transporte',
+                         ref={'order_id': r['order_id'], 'request_id': r['id'], 'code': r['code'], 'stage': r['stage'], 'situation': r['situation'], 'eta': r['eta'] or ''}))
     if admin:
         for r in c.execute("SELECT x.id,x.status,x.origin,x.created_at,r.name,r.order_id,COALESCE(o.code,'OP-'||printf('%05d',o.id)) code,cl.name client FROM order_part_cancellations x "
                            "JOIN order_part_requests r ON r.id=x.request_id JOIN orders o ON o.id=r.order_id JOIN devices d ON d.id=o.device_id JOIN clients cl ON cl.id=d.client_id "
@@ -153,7 +163,8 @@ def _parts(c, user, now, mine, admin):
             href = '#orders?id=%d' % r['order_id']
             out.append(_item('parts', 'cancel:%d:%s' % (r['id'], r['status']), 'Cancelación de repuesto por decidir · ' + r['code'], detail=(r['name'] or 'Repuesto')[:80] + (' · pedida por el cliente' if r['origin'] == 'cliente' else ''),
                              client=r['client'], responsible='Administración', state='en_proceso' if r['status'] == 'en_revision' else 'pendiente', priority='importante', at=_iso(r['created_at']),
-                             href=href, actions=[{'label': 'Revisar solicitud', 'href': href}], waiting='Decisión de administración', resolves='Desaparece al aprobar o rechazar la solicitud.'))
+                             href=href, actions=[{'label': 'Revisar solicitud', 'href': href}], waiting='Decisión de administración', resolves='Desaparece al aprobar o rechazar la solicitud.',
+                             created=_iso(r['created_at']), decision=True, ref={'order_id': r['order_id'], 'cancellation_id': r['id'], 'code': r['code']}))
     return out
 
 
@@ -167,14 +178,16 @@ def _messages(c, user, now, admin):
             out.append(_item('messages', 'chat:%d:%s' % (r['id'], 'asesor' if waiting else 'nueva'), ('Cliente espera a un asesor' if waiting else 'Conversación nueva sin revisar') + ' · #%d' % r['id'],
                              detail='Atención en vivo', client=r['client'] or 'Visitante del chat', responsible='Sin asignar', priority='urgente' if waiting else 'importante', at=_iso(r['updated_at']),
                              href='#live', actions=[{'label': 'Responder conversación', 'href': '#live'}], waiting='Responder en Atención en vivo',
-                             resolves='Desaparece cuando alguien toma o abre la conversación, o se cierra.'))
+                             resolves='Desaparece cuando alguien toma o abre la conversación, o se cierra.', created=_iso(r['updated_at']), decision=True,
+                             ref={'conversation_id': r['id'], 'kind': 'chat'}))
         labels = {'confirm': 'Confirma su mantenimiento', 'reschedule': 'Pide otra fecha para su mantenimiento', 'decline': 'No desea el mantenimiento'}
         for r in c.execute("SELECT x.id,x.action,x.created_at,m.order_id,COALESCE(o.code,'OP-'||printf('%05d',o.id)) code,cl.name client FROM maintenance_responses x JOIN maintenance m ON m.id=x.maintenance_id "
                            "JOIN orders o ON o.id=m.order_id JOIN devices d ON d.id=o.device_id JOIN clients cl ON cl.id=d.client_id WHERE x.handled_at='' ORDER BY x.id").fetchall():
             href = '#maintenance?order=%d' % r['order_id']
             out.append(_item('messages', 'maintenance:%d' % r['id'], labels.get(r['action'], 'Respuesta de mantenimiento') + ' · ' + r['code'], detail='Respuesta por enlace seguro', client=r['client'],
                              responsible='Sin asignar', priority='importante' if r['action'] == 'reschedule' else 'normal', at=_iso(r['created_at']), href=href,
-                             actions=[{'label': 'Gestionar respuesta', 'href': href}], waiting='Revisar y registrar la gestión', resolves='Desaparece al marcar la respuesta como gestionada.'))
+                             actions=[{'label': 'Gestionar respuesta', 'href': href}], waiting='Revisar y registrar la gestión', resolves='Desaparece al marcar la respuesta como gestionada.',
+                             created=_iso(r['created_at']), decision=True, ref={'order_id': r['order_id'], 'response_id': r['id'], 'kind': 'maintenance', 'code': r['code']}))
     try:
         import pqrs
         if admin:
@@ -196,7 +209,8 @@ def _messages(c, user, now, admin):
                          client=r['name'], responsible=r['tech'] or 'Sin asignar', responsible_id=r['assigned_to'], state='pendiente' if r['status'] == 'recibida' else 'en_proceso',
                          priority=priority, due=limit.isoformat(timespec='seconds') if limit else '', overdue=late, at=_iso(r['updated_at']) or _iso(r['created_at']), href=href,
                          actions=[{'label': 'Responder PQRS', 'href': href}], waiting='Primera respuesta pendiente' if not r['first_response_at'] else 'Solución en curso',
-                         resolves='Desaparece cuando la PQRS se responde, espera al cliente o se cierra.'))
+                         resolves='Desaparece cuando la PQRS se responde, espera al cliente o se cierra.', created=_iso(r['created_at']),
+                         decision=not r['first_response_at'], ref={'pqrs_id': r['id'], 'code': r['code'], 'status': r['status'], 'kind': 'pqrs'}))
     return out
 
 
@@ -210,7 +224,8 @@ def _licenses(c, now):
         out.append(_item('licenses', '%d:%s' % (u['id'], u['expires_at']), 'Licencia por vencer · ' + (u['product'] or 'Licencia')[:60], detail=text + (' · ' + u['code'] if u['code'] else ''),
                          client=u['client'] or 'Sin cliente', responsible='Administración', priority=priority, due=u['expires_at'], overdue=days < 0, at=_iso(u['expires_at']),
                          href='#licenses', actions=[{'label': 'Consultar licencia', 'href': '#licenses'}], waiting='Ofrecer la renovación al cliente',
-                         resolves='Desaparece cuando la licencia se renueva o deja de estar vigente en Licencias Pro.'))
+                         resolves='Desaparece cuando la licencia se renueva o deja de estar vigente en Licencias Pro.', decision=days <= 7,
+                         ref={'unit_id': u['id'], 'code': u['code'] or '', 'expires_at': u['expires_at'], 'days_left': days, 'product': u['product'] or ''}))
     return out
 
 
@@ -220,11 +235,87 @@ def _alerts(notices):
         if not SYSTEM_ALERT.match(n['key']) or n.get('kind') not in ('warning', 'error'):
             continue
         critical = n['kind'] == 'error' or n['key'].startswith(('storage:', 'backup:'))
+        recurrent = re.match(r'autocare:recurrent:([A-Za-z0-9_-]{1,20}):', n['key'])
         # Se conserva la clave del aviso: leerlo aquí o en Notificaciones es lo mismo, pero ocultarlo no lo quita de los pendientes.
-        out.append(dict(_item('alerts', '', n['title'], detail=n.get('detail', ''), responsible='Administración', priority='urgente' if critical else 'importante', at=n.get('at', ''),
+        out.append(dict(_item('alerts', '', n['title'], detail=n.get('detail', ''), responsible='Administración', priority='critico' if critical else 'importante', at=n.get('at', ''),
                               href=n.get('href', ''), actions=[{'label': 'Abrir detalle', 'href': n.get('href', '')}] if n.get('href') else [],
-                              waiting='Revisar la causa', resolves='Desaparece cuando la condición deja de existir en su módulo.'), key=n['key']))
+                              waiting='Fallo activo: revisar la causa' if critical else 'Revisar la causa', resolves='Desaparece cuando la condición deja de existir en su módulo.',
+                              created=n.get('at', ''), decision=critical,
+                              ref={'severity': 'Crítica' if critical else 'Advertencia', 'source': n['key'].split(':', 1)[0], 'incident': recurrent[1] if recurrent else '',
+                                   'can_silence': not critical}), key=n['key']))
     return out
+
+
+def entity(item):
+    """Registro de origen del pendiente (no cambia con su estado): ancla de las observaciones, reconocimientos y recordatorios."""
+    ref, module = item.get('ref') or {}, item['module']
+    if module == 'orders':
+        return 'orders:%d' % ref['order_id']
+    if module == 'appointments':
+        return 'appointments:%d' % ref['appointment_id']
+    if module == 'quotes':
+        return 'quotes:%d' % ref['quote_id']
+    if module == 'parts':
+        return 'parts:cancel:%d' % ref['cancellation_id'] if ref.get('cancellation_id') else 'parts:%d' % ref['request_id']
+    if module == 'messages':
+        ident = ref.get('pqrs_id') or ref.get('conversation_id') or ref.get('response_id')
+        return 'messages:%s:%s' % (ref.get('kind', ''), ident)
+    if module == 'licenses':
+        return 'licenses:%d' % ref['unit_id']
+    return item['key']
+
+
+def notes(c, entities=None, since=None):
+    """Registro de gestión (pending_notes) con el nombre de quien actuó. None si la tabla todavía no existe en esta base."""
+    sql, args = ("SELECT n.id,n.key,n.module,n.kind,n.body,n.until,n.created_at,n.user_id,COALESCE(u.name,'') actor FROM pending_notes n "
+                 "LEFT JOIN users u ON u.id=n.user_id"), []
+    where = []
+    if entities is not None:
+        entities = list(entities)[:400]
+        if not entities:
+            return []
+        where.append('n.key IN (' + ','.join('?' * len(entities)) + ')')
+        args += entities
+    if since:
+        where.append('n.created_at>=?')
+        args.append(since)
+    try:
+        return [dict(r) for r in c.execute(sql + (' WHERE ' + ' AND '.join(where) if where else '') + ' ORDER BY n.id', args)]
+    except Exception as error:
+        if 'pending_notes' in str(error):
+            return None
+        raise
+
+
+def _overlay(c, items, now):
+    """Aplica la gestión registrada sin resolver nada: un reconocimiento o una resolución registrada pasan la alerta a «En proceso»;
+    un silencio vigente (solo advertencias) la deja fuera de los urgentes; un recordatorio muestra su fecha. Devuelve si la tabla existe."""
+    found = notes(c, {i['entity'] for i in items})
+    if found is None:
+        return False
+    by = {}
+    for n in found:
+        by.setdefault(n['key'], []).append(n)
+    stamp, today = now.isoformat(timespec='seconds'), now.date().isoformat()
+    for item in items:
+        rows = by.get(item['entity'], [])
+        item['notes'] = sum(1 for n in rows if n['kind'] == 'nota')
+        last = {n['kind']: n for n in rows}
+        ack, silence, reminder, resolution = last.get('reconocida'), last.get('silenciada'), last.get('recordatorio'), last.get('resolucion')
+        if ack:
+            item['ack'] = {'by': ack['actor'], 'at': ack['created_at'], 'body': ack['body']}
+        if resolution:
+            item['resolution'] = {'by': resolution['actor'], 'at': resolution['created_at'], 'body': resolution['body']}
+        if item['module'] == 'alerts' and (ack or resolution):
+            item['state'] = 'en_proceso'
+            if resolution:
+                item['waiting'] = 'Resolución registrada: sigue activa hasta que el sistema confirme que la condición desapareció'
+        if silence and silence['until'] > stamp and (item.get('ref') or {}).get('can_silence'):
+            item['silenced'] = silence['until']
+        if reminder and reminder['until'] >= today:
+            item['reminder'] = reminder['until']
+            item['reminder_due'] = reminder['until'] <= today
+    return True
 
 
 def build(c, user, now, notices=()):
@@ -253,19 +344,28 @@ def build(c, user, now, notices=()):
     read = {row['key'] for row in c.execute('SELECT key FROM notification_reads WHERE user_id=?', (user['id'],))}
     for item in items:
         item['read'] = item['key'] in read
-    items.sort(key=lambda i: (RANK[i['priority']], not i['overdue'], i['due'] or '9999', i['at']))
+        item['entity'] = entity(item)
+        item['activity'] = item['at']
+        item.setdefault('notes', 0)
+    managed = _overlay(c, items, now)
+    items.sort(key=lambda i: (RANK[i['priority']] + (2 if i.get('silenced') else 0), not i['decision'], not i['overdue'], i['due'] or '9999', i['at']))
     modules = [m for m in MODULES if admin or m not in ADMIN_ONLY]
-    summary = {m: {'label': MODULES[m], 'count': 0, 'urgent': 0, 'overdue': 0, 'unread': 0} for m in modules}
+    summary = {m: {'label': MODULES[m], 'count': 0, 'critical': 0, 'urgent': 0, 'overdue': 0, 'unread': 0, 'silenced': 0} for m in modules}
+    attention = lambda i: not i.get('silenced')
     for item in items:
         box = summary[item['module']]
         box['count'] += 1
-        box['urgent'] += item['priority'] == 'urgente'
+        box['critical'] += item['priority'] == 'critico'
+        box['urgent'] += item['priority'] in ('critico', 'urgente') and attention(item)
         box['overdue'] += item['overdue']
         box['unread'] += not item['read']
+        box['silenced'] += bool(item.get('silenced'))
     people = sorted({(i['responsible_id'] or 0, i['responsible']) for i in items if i['responsible']}, key=lambda p: p[1].lower())
-    payload = {'items': items, 'summary': summary, 'modules': modules, 'responsibles': [{'id': p[0], 'name': p[1]} for p in people],
-               'totals': {'count': len(items), 'urgent': sum(1 for i in items if i['priority'] == 'urgente'), 'overdue': sum(1 for i in items if i['overdue']),
-                          'unread': sum(1 for i in items if not i['read'])}}
+    payload = {'items': items, 'summary': summary, 'modules': modules, 'responsibles': [{'id': p[0], 'name': p[1]} for p in people], 'managed': managed,
+               'totals': {'count': len(items), 'critical': sum(1 for i in items if i['priority'] == 'critico'),
+                          'urgent': sum(1 for i in items if i['priority'] in ('critico', 'urgente') and attention(i)), 'overdue': sum(1 for i in items if i['overdue']),
+                          'unread': sum(1 for i in items if not i['read']), 'decision': sum(1 for i in items if i['decision'] and attention(i)),
+                          'silenced': sum(1 for i in items if i.get('silenced'))}}
     payload['rev'] = hashlib.sha1(json.dumps(payload, sort_keys=True, ensure_ascii=False).encode()).hexdigest()[:16]
     payload['generated_at'] = now.isoformat(timespec='seconds')
     return payload
@@ -273,3 +373,196 @@ def build(c, user, now, notices=()):
 
 def keys(c, user, now, notices=()):
     return {item['key'] for item in build(c, user, now, notices)['items']}
+
+
+def find(c, user, now, wanted, notices=()):
+    """El pendiente visible para esta persona por su clave o su registro de origen; None si no existe o no le corresponde verlo."""
+    return next((i for i in build(c, user, now, notices)['items'] if wanted in (i['key'], i['entity'])), None)
+
+
+def _event(at, actor, text, kind='evento'):
+    return {'at': _iso(at) or str(at or ''), 'actor': actor or 'Sistema', 'text': str(text or '').strip()[:600], 'kind': kind}
+
+
+def _history(c, item, admin):
+    """Actividad reciente del registro de origen (lo que ya muestra cada módulo), normalizada: fecha, persona y texto."""
+    ref, module, out = item.get('ref') or {}, item['module'], []
+    if module == 'orders' or (module in ('quotes', 'parts') and ref.get('order_id') and not ref.get('quote_id') and not ref.get('request_id')):
+        for r in c.execute("SELECT h.occurred_at,h.event,h.status_label,h.comment,u.name actor FROM order_history h LEFT JOIN users u ON u.id=h.actor_id WHERE h.order_id=? ORDER BY h.id DESC LIMIT 25", (ref['order_id'],)):
+            out.append(_event(r['occurred_at'], r['actor'], (r['comment'] or r['status_label'] or r['event']), 'estado' if r['event'] == 'status' else 'evento'))
+    elif module == 'appointments':
+        labels = appointments.STATUSES
+        for r in c.execute("SELECT e.event,e.old_status,e.new_status,e.old_start,e.new_start,e.created_at,e.detail,u.name actor FROM appointment_events e LEFT JOIN users u ON u.id=e.actor_id "
+                           "WHERE e.appointment_id=? ORDER BY e.id DESC LIMIT 25", (ref['appointment_id'],)):
+            if r['new_status'] and r['new_status'] != r['old_status']:
+                text = 'Estado: %s → %s' % (labels.get(r['old_status'], r['old_status'] or 'nueva'), labels.get(r['new_status'], r['new_status']))
+            elif r['new_start'] and r['new_start'] != r['old_start']:
+                text = 'Reprogramada: %s → %s' % (r['old_start'][:16].replace('T', ' '), r['new_start'][:16].replace('T', ' '))
+            else:
+                text = r['event']
+            out.append(_event(r['created_at'], r['actor'], text + (' · ' + r['detail'] if r['detail'] else ''), 'estado' if r['new_status'] != r['old_status'] else 'evento'))
+    elif module == 'quotes':
+        for r in c.execute("SELECT e.event,e.detail,e.created_at,COALESCE(u.name,NULLIF(e.actor,''),'') actor FROM quote_events e LEFT JOIN users u ON u.id=e.actor_id WHERE e.quote_id=? ORDER BY e.id DESC LIMIT 25", (ref['quote_id'],)):
+            out.append(_event(r['created_at'], r['actor'], r['detail'] or r['event']))
+    elif module == 'parts' and ref.get('request_id'):
+        for r in c.execute("SELECT e.kind,e.note,e.public_note,e.public,e.created_at,u.name actor FROM order_part_events e LEFT JOIN users u ON u.id=e.created_by WHERE e.request_id=? ORDER BY e.id DESC LIMIT 25", (ref['request_id'],)):
+            out.append(_event(r['created_at'], r['actor'], (r['note'] or r['kind']) + (' · Aviso al cliente: ' + r['public_note'] if r['public'] and r['public_note'] else ''), 'estado' if r['kind'] in ('etapa', 'situacion') else 'evento'))
+    elif module == 'messages' and ref.get('kind') == 'pqrs':
+        for r in c.execute("SELECT e.kind,e.body,e.old_value,e.new_value,e.public,e.created_at,u.name actor FROM pqrs_events e LEFT JOIN users u ON u.id=e.actor_id WHERE e.case_id=? ORDER BY e.id DESC LIMIT 25", (ref['pqrs_id'],)):
+            text = r['body'] if r['kind'] in ('respuesta', 'nota', 'mensaje_cliente') else '%s: %s → %s' % (r['kind'].capitalize(), r['old_value'] or '—', r['new_value'] or r['body'] or '—')
+            out.append(_event(r['created_at'], r['actor'] or ('Cliente' if r['kind'] == 'mensaje_cliente' else ''), text, 'estado' if r['kind'] == 'estado' else 'evento'))
+    elif module == 'licenses' and admin:
+        for r in c.execute("SELECT e.event,e.detail,e.created_at,COALESCE(u.name,NULLIF(e.actor,''),'') actor FROM license_events e LEFT JOIN users u ON u.id=e.actor_id WHERE e.unit_id=? ORDER BY e.id DESC LIMIT 25", (ref['unit_id'],)):
+            out.append(_event(r['created_at'], r['actor'], r['detail'] or r['event']))
+    return out
+
+
+def _context(c, user, item, now):
+    """Datos mínimos para las acciones del panel. Los permisos reales los vuelve a comprobar cada endpoint al ejecutar."""
+    admin, ref, module = user['role'] == 'administrador', item.get('ref') or {}, item['module']
+    ctx = {'admin': admin}
+    staff = lambda: [{'id': r['id'], 'name': r['name']} for r in c.execute("SELECT id,name FROM users WHERE active=1 AND role IN ('administrador','tecnico') ORDER BY name")]
+    if module == 'orders':
+        row = c.execute('SELECT o.status,o.revision,o.assigned_to,o.estimated_delivery,s.label FROM orders o JOIN statuses s ON s.code=o.status WHERE o.id=?', (ref['order_id'],)).fetchone()
+        ctx.update(status=row['status'], status_label=row['label'], revision=row['revision'], assigned_to=row['assigned_to'], estimated_delivery=row['estimated_delivery'])
+        if admin:
+            ctx['statuses'] = [{'code': r['code'], 'label': r['label']} for r in c.execute('SELECT code,label FROM statuses ORDER BY rowid')]
+            ctx['staff'] = staff()
+    elif module == 'parts' and ref.get('request_id'):
+        import order_part_requests as parts
+        row = c.execute('SELECT * FROM order_part_requests WHERE id=?', (ref['request_id'],)).fetchone()
+        steps = parts.flow(row)
+        here = steps.index(parts.fine(row)) if parts.fine(row) in steps else -1
+        nxt = steps[here + 1] if 0 <= here < len(steps) - 1 else ''
+        ctx.update(stage=parts.fine(row), stage_label=parts.step_label(parts.fine(row), row['shipping']), next=nxt, next_label=parts.step_label(nxt, row['shipping']) if nxt else '',
+                   situation=row['incident'] or row['situation'], eta=row['eta'] or '', received=parts.CODES.index(row['stage']) >= parts.CODES.index('recibido'),
+                   situations=[{'code': k, 'label': v[0]} for k, v in parts.SITUATIONS.items() if k != 'cancelado'] +
+                   [{'code': k, 'label': v[0]} for k, v in getattr(parts, 'INCIDENTS', {}).items()])
+    elif module == 'messages' and ref.get('kind') == 'pqrs':
+        import pqrs
+        row = c.execute('SELECT status,assigned_to FROM pqrs_cases WHERE id=?', (ref['pqrs_id'],)).fetchone()
+        allowed = [s for s in pqrs.STATUSES if s != 'cerrada'] if admin else list(pqrs.TECH_STATUSES)
+        ctx.update(status=row['status'], assigned_to=row['assigned_to'], statuses=[{'code': k, 'label': pqrs.STATUS_LABELS[k][0]} for k in allowed])
+        if admin:
+            ctx['staff'] = staff()
+    elif module == 'alerts':
+        ctx.update(can_silence=bool(ref.get('can_silence')), incident=ref.get('incident', ''), severity=ref.get('severity', ''), source=ref.get('source', ''))
+    return ctx
+
+
+def detail(c, user, now, wanted, notices=()):
+    """Panel «Gestionar pendiente»: el pendiente, su actividad en el módulo de origen, su registro de gestión y los datos para actuar."""
+    item = find(c, user, now, wanted, notices)
+    if not item:
+        return None
+    admin = user['role'] == 'administrador'
+    try:
+        history = _history(c, item, admin)
+    except Exception as error:
+        print('pendientes historial', item['module'], type(error).__name__, flush=True)
+        history = []
+    managed = notes(c, [item['entity']])
+    log = [dict(_event(n['created_at'], n['actor'], NOTE_KINDS[n['kind']] + (': ' + n['body'] if n['body'] else '') + (' (hasta ' + n['until'][:16].replace('T', ' ') + ')' if n['until'] else ''), 'gestion'),
+                note_kind=n['kind']) for n in (managed or [])]
+    history = sorted(history + log, key=lambda e: e['at'], reverse=True)[:40]
+    return {'item': item, 'history': history, 'notes': [dict(n, label=NOTE_KINDS[n['kind']]) for n in reversed(managed or []) if n['kind'] == 'nota'],
+            'managed': managed is not None, 'context': _context(c, user, item, now)}
+
+
+# ---- Centro de actividad: lo que hizo el equipo, con persona, fecha y hora exactas. Solo lectura. ----
+AUDIT_LABELS = {
+    'order_status_updated': ('orders', 'Estado de la orden actualizado'), 'order_follow_up': ('orders', 'Observación técnica registrada'),
+    'order_assigned': ('orders', 'Responsable de la orden asignado'), 'order_workspace_updated': ('orders', 'Seguimiento técnico de la orden actualizado'),
+    'delivery_reverted': ('orders', 'Entrega revertida'), 'delivery_balance_authorized': ('orders', 'Entrega con saldo autorizada'),
+    'appointment_confirmada': ('appointments', 'Cita confirmada'), 'appointment_cancelada': ('appointments', 'Cita cancelada'), 'appointment_reschedule': ('appointments', 'Cita reprogramada'),
+    'appointment_completada': ('appointments', 'Cita completada'), 'appointment_no_asistio': ('appointments', 'Cita marcada «No asistió»'), 'appointment_presente': ('appointments', 'Cliente en atención'),
+    'appointment_edit': ('appointments', 'Cita editada'), 'appointment_delete': ('appointments', 'Cita eliminada'), 'appointment_authorized': ('appointments', 'Autorización del cliente registrada'),
+    'appointment_reactivated': ('appointments', 'Cita reactivada'), 'appointment_created': ('appointments', 'Cita registrada por el personal'),
+    'quote_sent': ('quotes', 'Presupuesto enviado al cliente'), 'quote_cancelled': ('quotes', 'Presupuesto cancelado'), 'quote_staff_aprobado': ('quotes', 'Aprobación registrada por el personal'),
+    'quote_staff_parcial': ('quotes', 'Aprobación parcial registrada por el personal'), 'quote_staff_rechazado': ('quotes', 'Rechazo registrado por el personal'),
+    'quote_decision_notified': ('quotes', 'Confirmación de la decisión enviada'), 'quote_created': ('quotes', 'Presupuesto creado'),
+    'order_part_advance': ('parts', 'Etapa del repuesto actualizada'), 'order_part_situation': ('parts', 'Situación del repuesto registrada'), 'order_part_update': ('parts', 'Datos del repuesto actualizados'),
+    'order_part_create': ('parts', 'Repuesto solicitado'), 'order_part_cancel_decide': ('parts', 'Cancelación de repuesto decidida'), 'order_part_cancel_direct': ('parts', 'Repuesto cancelado'),
+    'order_part_notices_retry': ('parts', 'Reintento de avisos del repuesto'),
+    'autocare_check': ('alerts', 'Comprobación de AutoCare repetida'), 'autocare_incident_resuelta': ('alerts', 'Incidencia de AutoCare resuelta'),
+    'autocare_incident_en_revision': ('alerts', 'Incidencia de AutoCare en revisión'), 'autocare_diagnose': ('alerts', 'Diagnóstico de AutoCare ejecutado'),
+    'pqrs_reply': ('messages', 'Respuesta enviada a una PQRS'), 'pqrs_assign': ('messages', 'PQRS asignada'), 'pqrs_status': ('messages', 'Estado de PQRS actualizado'),
+    'pqrs_note': ('messages', 'Nota interna en una PQRS'), 'pqrs_close': ('messages', 'PQRS cerrada'),
+    'pending_note': ('', 'Observación interna registrada'), 'pending_ack': ('alerts', 'Alerta reconocida'), 'pending_silence': ('alerts', 'Alerta silenciada temporalmente'),
+    'pending_reminder': ('', 'Recordatorio programado'), 'pending_resolution': ('alerts', 'Resolución de alerta registrada'),
+}
+ACTIVITY_KINDS = {'accion': 'Acción', 'gestion': 'Gestión del centro', 'estado': 'Cambio de estado', 'lectura': 'Notificación leída', 'error': 'Error o reintento'}
+
+
+def activity(c, user, now, params):
+    """Historial del centro: acciones auditadas, cambios de estado de órdenes, gestión registrada y lecturas. Administración ve todo el
+    equipo; un técnico, solo lo que hizo él. Filtros: módulo, tipo, persona, desde, hasta y texto. Máximo 500 filas."""
+    admin = user['role'] == 'administrador'
+    get = lambda key: str(params.get(key, '') or '').strip()
+    start, end = get('from') or (now.date() - timedelta(days=30)).isoformat(), get('to') or now.date().isoformat()
+    try:
+        date.fromisoformat(start), date.fromisoformat(end)
+    except ValueError:
+        raise ValueError('Indica fechas válidas.')
+    if start > end:
+        raise ValueError('La fecha inicial es posterior a la final.')
+    who = int(get('user')) if admin and get('user').isdigit() else None if admin else user['id']
+    lo = datetime.combine(date.fromisoformat(start), datetime.min.time(), appointments.TZ)
+    hi = datetime.combine(date.fromisoformat(end) + timedelta(days=1), datetime.min.time(), appointments.TZ)
+    rows = []
+    person = ' AND a.user_id=?' if who else ''
+    names = list(AUDIT_LABELS)
+    for r in c.execute("SELECT a.action,a.entity_id,a.created_at,a.user_id,COALESCE(u.name,'') actor FROM audit a LEFT JOIN users u ON u.id=a.user_id WHERE a.created_at>=? AND a.created_at<? AND a.action IN (" +
+                       ','.join('?' * len(names)) + ")" + person + " ORDER BY a.id DESC LIMIT 600", (int(lo.timestamp()), int(hi.timestamp()), *names, *((who,) if who else ()))):
+        module, label = AUDIT_LABELS[r['action']]
+        ref = r['entity_id']
+        href = ('#orders?id=%d' % ref if module in ('orders', 'quotes', 'parts') else '#appointments?appointment=%d' % ref if module == 'appointments' else
+                '#pqrs?id=%d' % ref if r['action'].startswith('pqrs_') else '') if ref and not r['action'].startswith('pending_') else ''
+        rows.append({'at': _iso(r['created_at']), 'actor': r['actor'] or 'Sistema', 'module': module or 'orders', 'kind': 'gestion' if r['action'].startswith('pending_') else 'accion',
+                     'text': label, 'detail': '', 'ref': ('Registro %d' % ref) if ref else '', 'href': href})
+    for r in c.execute("SELECT l.from_status,l.to_status,l.created_at,l.order_id,COALESCE(o.code,'') code,COALESCE(u.name,'') actor,f.label from_label,t.label to_label FROM order_status_log l "
+                       "JOIN orders o ON o.id=l.order_id LEFT JOIN users u ON u.id=l.actor_id LEFT JOIN statuses f ON f.code=l.from_status LEFT JOIN statuses t ON t.code=l.to_status "
+                       "WHERE l.created_at>=? AND l.created_at<?" + (' AND l.actor_id=?' if who else '') + " ORDER BY l.id DESC LIMIT 400",
+                       (lo.isoformat(), hi.isoformat(), *((who,) if who else ()))):
+        rows.append({'at': _iso(r['created_at']), 'actor': r['actor'] or 'Sistema', 'module': 'orders', 'kind': 'estado', 'text': 'Orden ' + r['code'] + ': ' + (r['from_label'] or r['from_status'] or 'nueva') + ' → ' + (r['to_label'] or r['to_status']),
+                     'detail': '', 'ref': r['code'], 'href': '#orders?id=%d' % r['order_id']})
+    managed = notes(c, None, lo.isoformat(timespec='seconds')) or []
+    for n in managed:
+        if n['created_at'] >= hi.isoformat(timespec='seconds') or (who and n['user_id'] != who):
+            continue
+        rows.append({'at': n['created_at'], 'actor': n['actor'] or 'Sistema', 'module': n['module'], 'kind': 'gestion', 'text': NOTE_KINDS[n['kind']], 'detail': n['body'],
+                     'ref': n['key'], 'href': ''})
+    for r in c.execute("SELECT r.key,r.read_at,COALESCE(u.name,'') actor FROM notification_reads r LEFT JOIN users u ON u.id=r.user_id WHERE r.read_at>=? AND r.read_at<?" + (' AND r.user_id=?' if who else '') + " ORDER BY r.read_at DESC LIMIT 300",
+                       (lo.isoformat(), hi.isoformat(), *((who,) if who else ()))):
+        module = r['key'].split(':')[1] if r['key'].startswith('pending:') else 'alerts' if SYSTEM_ALERT.match(r['key']) else ''
+        rows.append({'at': _iso(r['read_at']) or r['read_at'], 'actor': r['actor'], 'module': module, 'kind': 'lectura', 'text': 'Marcado como visto', 'detail': '', 'ref': r['key'][:120], 'href': ''})
+    if admin and not who:
+        try:
+            # Envíos fallidos o rebotados y sus reintentos (sin el destinatario: el detalle completo está en Correo).
+            for r in c.execute("SELECT kind,status,reason,retry_of,created_at FROM mail_deliveries WHERE created_at>=? AND created_at<? AND (status IN ('fallido','rebotado') OR retry_of IS NOT NULL) ORDER BY id DESC LIMIT 150",
+                               (lo.isoformat(), hi.isoformat())):
+                retry = r['retry_of'] is not None
+                rows.append({'at': _iso(r['created_at']) or r['created_at'], 'actor': 'Sistema', 'module': 'alerts', 'kind': 'error',
+                             'text': ('Reintento de envío de correo' if retry else 'Envío de correo no completado') + ' (' + str(r['kind']) + ')',
+                             'detail': ('Estado: ' + r['status'] + '. ' if retry else '') + str(r['reason'] or '')[:300], 'ref': '', 'href': '#mail'})
+        except Exception as error:
+            print('actividad correos', type(error).__name__, flush=True)
+    module, kind, q = get('module'), get('kind'), get('q').lower()[:80]
+    rows = [r for r in rows if (not module or r['module'] == module) and (not kind or r['kind'] == kind) and (not q or q in ' '.join((r['actor'], r['text'], r['detail'], r['ref'])).lower())]
+    rows.sort(key=lambda r: r['at'], reverse=True)
+    people = [{'id': r['id'], 'name': r['name']} for r in c.execute("SELECT id,name FROM users WHERE role IN ('administrador','tecnico') ORDER BY name")] if admin else []
+    return {'rows': rows[:500], 'total': len(rows), 'from': start, 'to': end, 'people': people, 'kinds': ACTIVITY_KINDS, 'modules': MODULES}
+
+
+def activity_csv(rows):
+    """CSV para hoja de cálculo (UTF-8 con BOM). Las celdas que empiezan con = + - @ se neutralizan para que no se ejecuten como fórmulas."""
+    import csv
+    import io
+    out = io.StringIO()
+    out.write('\ufeff')
+    writer = csv.writer(out)
+    safe = lambda v: "'" + v if v[:1] in ('=', '+', '-', '@', '\t', '\r') else v
+    writer.writerow(['Fecha y hora', 'Persona', 'Módulo', 'Tipo', 'Acción', 'Detalle', 'Referencia'])
+    for r in rows:
+        writer.writerow([safe(str(x)) for x in (r['at'].replace('T', ' ')[:19], r['actor'], MODULES.get(r['module'], r['module']), ACTIVITY_KINDS.get(r['kind'], r['kind']), r['text'], r['detail'], r['ref'])])
+    return out.getvalue()

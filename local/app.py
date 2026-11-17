@@ -2578,6 +2578,21 @@ class Handler(BaseHTTPRequestHandler):
                 result=pending_center.build(c,user,now,notices)
                 if parse_qs(urlsplit(self.path).query).get('since',[''])[0]==result['rev']:return self.reply(200,{'unchanged':True,'rev':result['rev'],'generated_at':result['generated_at']})
                 return self.reply(200,result)
+            if path in ('/api/pending/item','/api/pending/activity','/api/pending/activity.csv'):
+                # 1.5.288 · Centro de Control: detalle para «Gestionar pendiente» e historial de actividad (solo lectura; CSV opcional).
+                if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
+                now=reception_now();query={k:v[0][:120] for k,v in parse_qs(urlsplit(self.path).query).items()}
+                if path=='/api/pending/item':
+                    notices=notifications.build(c,user,now,mail_allowed(user),None,limit=None)['items'] if user['role']=='administrador' else ()
+                    found=pending_center.detail(c,user,now,query.get('key',''),notices)
+                    if not found:return self.reply(404,{'error':'Este pendiente ya no está disponible: puede que se haya resuelto en su módulo.','resolved':True})
+                    return self.reply(200,found)
+                try:result=pending_center.activity(c,user,now,query)
+                except ValueError as error:return self.reply(400,{'error':str(error)})
+                if path.endswith('.csv'):
+                    audit(c,user['id'],'pending_activity_export');c.commit()
+                    return self.reply(200,pending_center.activity_csv(result['rows']).encode('utf-8'),'text/csv; charset=utf-8',filename='actividad-centro-%s-%s.csv'%(result['from'],result['to']))
+                return self.reply(200,result)
             if path == '/api/notifications':
                 result=notifications.build(c,user,reception_now(),mail_allowed(user),parse_qs(urlsplit(self.path).query).get('hidden',[''])[0]=='1')
                 # Versión que ejecuta el servidor: permite avisar a una pestaña que quedó abierta con una versión anterior.
@@ -4138,6 +4153,13 @@ class Handler(BaseHTTPRequestHandler):
                         return self.reply(400 if error.kind=='configuracion' else 502,{'error':str(error),'kind':error.kind})
                     finally:
                         if client is not None:mail_pro.close_imap(client)
+                if path=='/api/pending/action':
+                    # 1.5.288 · Acciones propias del centro (nota, recordatorio, alertas, responsable). Lo demás usa el endpoint de su módulo.
+                    import pending_actions
+                    now=reception_now();notices=notifications.build(c,user,now,mail_allowed(user),None,limit=None)['items'] if user['role']=='administrador' else ()
+                    try:result=pending_actions.run(c,user,now,data,notices,audit)
+                    except pending_actions.ActionError as error:c.rollback();return self.reply(error.status,{'error':str(error),'fields':error.fields})
+                    return self.reply(200,result)
                 if path=='/api/notifications/hide':
                     keys=[key for key in str(data.get('keys','')).split(',') if key][:60]
                     if not keys:return self.reply(400,{'error':'Indica el aviso.'})
@@ -4403,7 +4425,9 @@ class Handler(BaseHTTPRequestHandler):
                         maintenance.appointment_changed(c,row['id'],action,reception_now())
                         if action=='confirmada' and row['status']=='solicitada':payload_mail=appointment_mail.send(c,row['id'],'confirmation')
                         elif action=='cancelada':payload_mail=appointment_mail.send(c,row['id'],'cancelled')
-                        c.execute('INSERT INTO appointment_events(appointment_id,actor_id,event,old_start,new_start,old_status,new_status,created_at) VALUES (?,?,?,?,?,?,?,?)',(row['id'],user['id'],'status',row['starts_at'],row['starts_at'],row['status'],action,now));status=200;payload={'ok':True}
+                        # 1.5.288: la cancelación puede llevar su motivo (queda en el historial de la cita, no se envía al cliente).
+                        reason=re.sub(r'\s+',' ',str(data.get('reason','') or '')).strip()[:300] if action=='cancelada' else ''
+                        c.execute('INSERT INTO appointment_events(appointment_id,actor_id,event,old_start,new_start,old_status,new_status,created_at,detail) VALUES (?,?,?,?,?,?,?,?,?)',(row['id'],user['id'],'status',row['starts_at'],row['starts_at'],row['status'],action,now,('Motivo: '+reason) if reason else ''));status=200;payload={'ok':True}
                     else:return self.reply(400,{'error':'Acción de cita inválida.'})
                     if status==200:audit(c,user['id'],'appointment_'+str(action),row['id'])
                     return self.reply(status,payload)
