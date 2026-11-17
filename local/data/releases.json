@@ -1,18 +1,34 @@
 {
   "unreleased": {
-    "features": [
-      "Centro de notificaciones y pendientes 2.0: tarjetas con contadores reales (órdenes, citas por confirmar, presupuestos por aprobar, repuestos, mensajes, licencias por vencer y alertas del sistema), vista «Pendientes» con filtros por prioridad, estado, módulo, responsable, fecha y cliente, orden por urgencia, vencimiento o fecha, y acciones directas a cada registro."
-    ],
-    "improvements": [
-      "Los pendientes se calculan desde su módulo de origen y desaparecen solo al resolverse allí; visto, oculto, estado y prioridad son independientes. Actualización en vivo cada 45 s con respuesta «sin cambios», reintento progresivo sin conexión y estados de carga, vacío y error."
-    ],
-    "fixes": [
-      "Avisos de citas: se listan todas las solicitudes por confirmar (antes un límite de 8 mezclaba citas confirmadas y dejaba solicitudes fuera) y las confirmadas solo como novedad durante 48 h; «marcar como leído» y «ocultar» funcionan también más allá de los 40 primeros avisos."
-    ],
+    "features": [],
+    "improvements": [],
+    "fixes": [],
     "security": [],
     "performance": []
   },
   "releases": [
+    {
+      "version": "1.5.287",
+      "date": "2026-11-17T08:27:23-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Centro de notificaciones y pendientes 2.0",
+      "changes": {
+        "features": [
+          "Centro de notificaciones y pendientes 2.0: tarjetas con contadores reales (órdenes, citas por confirmar, presupuestos por aprobar, repuestos, mensajes, licencias por vencer y alertas del sistema), vista «Pendientes» con filtros por prioridad, estado, módulo, responsable, fecha y cliente, orden por urgencia, vencimiento o fecha, y acciones directas a cada registro."
+        ],
+        "improvements": [
+          "Los pendientes se calculan desde su módulo de origen y desaparecen solo al resolverse allí; visto, oculto, estado y prioridad son independientes. Actualización en vivo cada 45 s con respuesta «sin cambios», reintento progresivo sin conexión y estados de carga, vacío y error."
+        ],
+        "fixes": [
+          "Avisos de citas: se listan todas las solicitudes por confirmar (antes un límite de 8 mezclaba citas confirmadas y dejaba solicitudes fuera) y las confirmadas solo como novedad durante 48 h; «marcar como leído» y «ocultar» funcionan también más allá de los 40 primeros avisos."
+        ],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Kike-os: rediseño del Centro de notificaciones y pendientes 2.0; autorizó la pub"
+    },
     {
       "version": "1.5.286",
       "date": "2026-11-16T14:41:10-05:00",
