@@ -4,7 +4,9 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
-## Sin publicar
+## v1.5.288 — 2026-11-17 14:23 (UTC-05:00)
+
+Centro de Control Operativo: gestionar y resolver pendientes con las acciones reales de cada módulo
 
 ### Nuevas funcionalidades
 

@@ -1,19 +1,35 @@
 {
   "unreleased": {
-    "features": [
-      "Centro de Control Operativo: panel «Gestionar pendiente» que resuelve desde el centro con las acciones reales de cada módulo: estado, responsable, observación y entrega de órdenes; confirmar (con autorización del cliente), reprogramar, cancelar con motivo y contactar citas; decisión, recordatorio y cancelación de presupuestos; etapa, fecha e incidencias de repuestos; PQRS.",
-      "Alertas del sistema: reconocer, silenciar temporalmente (nunca un fallo activo) y registrar la resolución; incidencias de ADI AutoCare en revisión o resueltas desde el panel. Pestaña «Actividad» con acciones, cambios de estado, gestión, lecturas y errores o reintentos de correo, con persona, fecha y hora, filtros y CSV."
-    ],
-    "improvements": [
-      "Diseño Premium Compact 3.0: indicadores que filtran (críticos, urgentes, vencidos, requieren decisión, sin ver, silenciadas), prioridad «Crítico», orden por antigüedad y última actividad, acciones rápidas al pasar el cursor, observaciones internas y recordatorios por registro, filtros conservados en la sesión y textos en español e inglés."
-    ],
+    "features": [],
+    "improvements": [],
     "fixes": [],
-    "security": [
-      "Cada acción se valida en el servidor con los permisos de su módulo, con confirmación en las sensibles, bloqueo contra el doble clic y auditoría. Nada de lo que añade el centro da por resuelto un pendiente: sale de la bandeja solo cuando su módulo lo cierra. La cancelación de una cita puede registrar su motivo."
-    ],
+    "security": [],
     "performance": []
   },
   "releases": [
+    {
+      "version": "1.5.288",
+      "date": "2026-11-17T14:23:46-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Centro de Control Operativo: gestionar y resolver pendientes con las acciones reales de cada módulo",
+      "changes": {
+        "features": [
+          "Centro de Control Operativo: panel «Gestionar pendiente» que resuelve desde el centro con las acciones reales de cada módulo: estado, responsable, observación y entrega de órdenes; confirmar (con autorización del cliente), reprogramar, cancelar con motivo y contactar citas; decisión, recordatorio y cancelación de presupuestos; etapa, fecha e incidencias de repuestos; PQRS.",
+          "Alertas del sistema: reconocer, silenciar temporalmente (nunca un fallo activo) y registrar la resolución; incidencias de ADI AutoCare en revisión o resueltas desde el panel. Pestaña «Actividad» con acciones, cambios de estado, gestión, lecturas y errores o reintentos de correo, con persona, fecha y hora, filtros y CSV."
+        ],
+        "improvements": [
+          "Diseño Premium Compact 3.0: indicadores que filtran (críticos, urgentes, vencidos, requieren decisión, sin ver, silenciadas), prioridad «Crítico», orden por antigüedad y última actividad, acciones rápidas al pasar el cursor, observaciones internas y recordatorios por registro, filtros conservados en la sesión y textos en español e inglés."
+        ],
+        "fixes": [],
+        "security": [
+          "Cada acción se valida en el servidor con los permisos de su módulo, con confirmación en las sensibles, bloqueo contra el doble clic y auditoría. Nada de lo que añade el centro da por resuelto un pendiente: sale de la bandeja solo cuando su módulo lo cierra. La cancelación de una cita puede registrar su motivo."
+        ],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Kike-os"
+    },
     {
       "version": "1.5.287",
       "date": "2026-11-17T08:27:23-05:00",
