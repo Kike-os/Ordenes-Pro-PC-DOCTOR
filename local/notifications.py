@@ -154,8 +154,11 @@ def quota_level(quota):
     return min(100, round(quota['used'] * 100 / quota['limit']))
 
 
-def build(c, user, now, mail_access=False, hidden=False):
-    """Lista ordenada de la más reciente a la más antigua. Solo incluye lo que este usuario puede ver."""
+def build(c, user, now, mail_access=False, hidden=False, limit=40):
+    """Lista ordenada de la más reciente a la más antigua. Solo incluye lo que este usuario puede ver.
+
+    hidden: False (visibles), True (ocultas) o None (todas: lo usan los pendientes, a los que ocultar un aviso no les afecta).
+    limit: cuántas se devuelven; None devuelve todas (para validar claves al marcar u ocultar)."""
     today = now.date().isoformat()
     stamp = now.isoformat(timespec='seconds')
     staff = user['role'] in ('administrador', 'tecnico')
@@ -288,7 +291,11 @@ def build(c, user, now, mail_access=False, hidden=False):
         requested = count("SELECT COUNT(*) FROM appointments WHERE deleted_at IS NULL AND status='solicitada' AND starts_at>=?", appointments.stamp(now))
         alert('requested', requested, 'calendar', 'warning', plural(requested, 'cita por confirmar', 'citas por confirmar'), 'Solicitudes recibidas desde la agenda en línea.', '#appointments?estado=solicitada')
         # Una notificación por cita (clave única por id): cliente, servicio, fecha y hora, con acceso directo a la cita.
-        for row in c.execute("SELECT a.id,a.public_code,a.customer_name,a.starts_at,a.created_at,a.status,COALESCE(NULLIF(a.services_summary,''),s.label) service FROM appointments a JOIN appointment_services s ON s.code=a.service_code WHERE a.deleted_at IS NULL AND a.status IN ('solicitada','confirmada') ORDER BY a.id DESC LIMIT 8"):
+        # 1.5.287: todas las solicitudes por confirmar (antes el LIMIT 8 mezclaba confirmadas y dejaba fuera solicitudes) y las citas
+        # confirmadas solo como novedad durante 48 h desde su registro (antes seguían apareciendo indefinidamente).
+        recent_cut = appointments.stamp(now - appointments.timedelta(hours=48))
+        for row in c.execute("SELECT a.id,a.public_code,a.customer_name,a.starts_at,a.created_at,a.status,COALESCE(NULLIF(a.services_summary,''),s.label,a.service_code) service FROM appointments a LEFT JOIN appointment_services s ON s.code=a.service_code "
+                             "WHERE a.deleted_at IS NULL AND (a.status='solicitada' OR (a.status='confirmada' AND a.created_at>=?)) ORDER BY a.id DESC LIMIT 60", (recent_cut,)):
             when = appointments.datetime.fromisoformat(row['starts_at']).astimezone(appointments.TZ).strftime('%d/%m/%Y %H:%M')
             pending = row['status'] == 'solicitada'
             items.append({'key': 'appointment:' + str(row['id']), 'kind': 'warning' if pending else 'info', 'icon': 'calendar',
@@ -390,7 +397,8 @@ def build(c, user, now, mail_access=False, hidden=False):
         print('pqrs avisos', type(error).__name__, flush=True)
     # Avisos ocultos por esta persona: no se borran; se consultan aparte («Ver ocultas») y se pueden volver a mostrar.
     concealed = {row['key'] for row in c.execute('SELECT key FROM notification_hidden WHERE user_id=?', (user['id'],))}
-    items = [item for item in items if (item['key'] in concealed) == hidden]
+    if hidden is not None:
+        items = [item for item in items if (item['key'] in concealed) == hidden]
     for item in items:
         item['read'] = item['key'] in read
         item['hideable'] = not CRITICAL.match(item['key'])
@@ -398,7 +406,7 @@ def build(c, user, now, mail_access=False, hidden=False):
     alerts = [item for item in items if item['group'] == 'alert']
     rest = sorted((item for item in items if item['group'] != 'alert'), key=lambda item: item['at'], reverse=True)
     ordered = alerts + rest
-    shown = ordered[:40]
+    shown = ordered if limit is None else ordered[:limit]
     return {'items': shown, 'unread': sum(1 for item in shown if not item['read']), 'total': len(shown), 'hidden_count': len(concealed)}
 
 
@@ -411,7 +419,7 @@ def hide(c, user, keys, now, restore=False):
     if restore:
         for key in keys:c.execute('DELETE FROM notification_hidden WHERE user_id=? AND key=?', (user['id'], key))
         return len(keys)
-    valid = {item['key'] for item in build(c, user, now, True)['items'] if item['hideable']}
+    valid = {item['key'] for item in build(c, user, now, True, limit=None)['items'] if item['hideable']}  # los pendientes no se ocultan
     chosen = [key for key in keys if KEY.fullmatch(key) and key in valid]
     for key in chosen:
         c.execute('INSERT OR IGNORE INTO notification_hidden(user_id,key,hidden_at) VALUES (?,?,?)', (user['id'], key, now.isoformat(timespec='seconds')))
@@ -422,8 +430,13 @@ def hide(c, user, keys, now, restore=False):
 
 def mark(c, user, keys, now):
     """Marca como leídas solo claves que hoy pertenecen a las notificaciones de este usuario."""
-    valid = {item['key'] for item in build(c, user, now, True)['items']}
-    chosen = valid if keys is None else {key for key in keys if KEY.fullmatch(key) and key in valid}
+    notices = build(c, user, now, True, None, limit=None)['items']
+    valid = {item['key'] for item in notices}
+    if keys is not None and user['role'] in ('administrador', 'tecnico') and any(key.startswith('pending:') for key in keys):
+        # Marcar un pendiente como visto no lo resuelve: solo deja de mostrarse como «Nuevo».
+        import pending_center
+        valid |= pending_center.keys(c, user, now, notices)
+    chosen = {key for key in valid if not key.startswith('pending:')} if keys is None else {key for key in keys if KEY.fullmatch(key) and key in valid}
     for key in chosen:
         c.execute('INSERT OR IGNORE INTO notification_reads(user_id,key,read_at) VALUES (?,?,?)', (user['id'], key, now.isoformat(timespec='seconds')))
     c.execute("DELETE FROM notification_reads WHERE user_id=? AND read_at<?", (user['id'], (now - appointments.timedelta(days=120)).isoformat(timespec='seconds')))

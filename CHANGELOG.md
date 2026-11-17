@@ -4,6 +4,20 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## Sin publicar
+
+### Nuevas funcionalidades
+
+- Centro de notificaciones y pendientes 2.0: tarjetas con contadores reales (órdenes, citas por confirmar, presupuestos por aprobar, repuestos, mensajes, licencias por vencer y alertas del sistema), vista «Pendientes» con filtros por prioridad, estado, módulo, responsable, fecha y cliente, orden por urgencia, vencimiento o fecha, y acciones directas a cada registro.
+
+### Mejoras realizadas
+
+- Los pendientes se calculan desde su módulo de origen y desaparecen solo al resolverse allí; visto, oculto, estado y prioridad son independientes. Actualización en vivo cada 45 s con respuesta «sin cambios», reintento progresivo sin conexión y estados de carga, vacío y error.
+
+### Errores corregidos
+
+- Avisos de citas: se listan todas las solicitudes por confirmar (antes un límite de 8 mezclaba citas confirmadas y dejaba solicitudes fuera) y las confirmadas solo como novedad durante 48 h; «marcar como leído» y «ocultar» funcionan también más allá de los 40 primeros avisos.
+
 ## v1.5.286 — 2026-11-16 14:41 (UTC-05:00)
 
 Citas y órdenes con cédula o RUC
