@@ -4,6 +4,16 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.298 — 2026-11-18 14:58 (UTC-05:00)
+
+Presupuesto premium
+
+### Mejoras realizadas
+
+- Presupuestos: ventana rediseñada. En escritorio, área de trabajo y panel «Resumen económico» que se mantiene visible al desplazarse (estado, partidas y unidades, descuento, subtotales, IVA y Total cotizado destacado). En tableta y móvil, una columna: partidas → resumen → configuración → historial.
+- Presupuestos: cabecera con estado, IVA incluido, fecha de creación y aviso «Cambios sin guardar»; partidas compactas con su tipo, duplicar y eliminar con confirmación, y «Con descuento» por partida; estado vacío con acceso al catálogo y a la línea libre; tarjeta «Configuración del presupuesto».
+- Presupuestos: «Vista previa (PDF)» del borrador guardado desde el panel lateral; las observaciones se rotulan como visibles para el cliente. Cálculos, estados, permisos y presupuestos guardados sin cambios.
+
 ## v1.5.297 — 2026-11-18 14:28 (UTC-05:00)
 
 Acceso a la Cobertura PC-DOCTOR desde Presupuestos

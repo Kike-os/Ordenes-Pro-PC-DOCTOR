@@ -8,6 +8,26 @@
   },
   "releases": [
     {
+      "version": "1.5.298",
+      "date": "2026-11-18T14:58:30-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Presupuesto premium",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Presupuestos: ventana rediseñada. En escritorio, área de trabajo y panel «Resumen económico» que se mantiene visible al desplazarse (estado, partidas y unidades, descuento, subtotales, IVA y Total cotizado destacado). En tableta y móvil, una columna: partidas → resumen → configuración → historial.",
+          "Presupuestos: cabecera con estado, IVA incluido, fecha de creación y aviso «Cambios sin guardar»; partidas compactas con su tipo, duplicar y eliminar con confirmación, y «Con descuento» por partida; estado vacío con acceso al catálogo y a la línea libre; tarjeta «Configuración del presupuesto».",
+          "Presupuestos: «Vista previa (PDF)» del borrador guardado desde el panel lateral; las observaciones se rotulan como visibles para el cliente. Cálculos, estados, permisos y presupuestos guardados sin cambios."
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Administración (autorización expresa en la sesión)"
+    },
+    {
       "version": "1.5.297",
       "date": "2026-11-18T14:28:00-05:00",
       "type": "patch",
