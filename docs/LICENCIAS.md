@@ -483,3 +483,33 @@ Las perpetuas y las que están sin activar no muestran porcentajes ni fechas inv
 - El servidor rechaza registrar dos veces la misma vigencia (doble clic, reintento o dos personas a la vez).
 - Al prolongar la misma clave, solo actualiza si el vencimiento sigue siendo el que se leyó, de modo que otra renovación simultánea no se pisa.
 - El historial de renovaciones nunca se sobrescribe.
+
+## 1.5.295 · Menús flotantes, resumen de la licencia y acciones de entrega y movimientos
+
+**Menú «⋯» que se cortaba (corregido).** La lista de opciones ya no se dibuja dentro de la tabla o la tarjeta, que tienen desplazamiento propio y la recortaban.
+- **Dónde se coloca:** en una capa flotante sobre la página o, si hay una ventana abierta, dentro de ella, para quedar por encima.
+- **Cómo se adapta:**
+  - mide el espacio disponible y abre hacia abajo o hacia arriba;
+  - nunca sale de la pantalla: si no cabe, tiene desplazamiento interno;
+  - sigue al botón al desplazar la página;
+  - se cierra con Escape (y devuelve el foco al botón), con Tab o con un clic fuera.
+- **Dónde se probó:** en las últimas filas y en la última tarjeta, a 1366, 1024, 390 y 320 px.
+- Vale para todos los menús de Licencias Pro: inventario, catálogo y tarjetas.
+
+**Panel lateral «Detalle de licencia».** Incluye un resumen con:
+- el código;
+- el cliente y su identificación (cédula o RUC);
+- las fechas de activación y vencimiento;
+- los días restantes;
+- el porcentaje de vigencia sobre el período contratado (sin porcentaje en las perpetuas o sin activar);
+- los dispositivos autorizados.
+
+Se suma a lo que ya mostraba: estados, ciclo de vida, seguimiento de la renovación, renovaciones anteriores, observaciones e historial. Todo sale de los datos guardados.
+
+**Acciones.**
+- *Gestionar entrega*: abre la venta (pagos, entrega y enlace privado), la tarjeta de la entrega o, si no hay ninguna, la pestaña Entregas.
+- *Consultar movimientos*: los movimientos del producto.
+
+Se suman a ver detalles, enviar información, renovar, historial, editar (si no está entregada) y anular o registrar devolución, que siguen pidiendo motivo y confirmación.
+
+**Grupos por cliente.** Se abren con una animación suave, salvo con movimiento reducido.

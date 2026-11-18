@@ -4,6 +4,16 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## Sin publicar
+
+### Mejoras realizadas
+
+- Licencias: panel lateral con resumen de código, cliente e identificación, activación, vencimiento, días restantes, porcentaje de vigencia y dispositivos autorizados; nuevas acciones «Gestionar entrega» (venta, tarjeta de entrega o Entregas) y «Consultar movimientos»; grupos por cliente que se abren con animación suave.
+
+### Errores corregidos
+
+- Licencias: el menú de opciones «⋯» ya no queda cortado por la tabla ni oculto tras otras tarjetas; ahora flota sobre la página, abre hacia arriba o hacia abajo según el espacio, sigue al botón al desplazar y se cierra con Escape, Tab o un clic fuera, también en las últimas filas y en móvil.
+
 ## v1.5.294 — 2026-11-18 08:24 (UTC-05:00)
 
 Prórrogas del plazo de retiro

@@ -12682,3 +12682,20 @@ body[data-page=dashboard] dialog.ext-dialog{width:min(560px,calc(100vw - 24px))}
 @media(prefers-reduced-motion:reduce){.ext-opt{transition:none}}
 .ext-form{gap:8px 10px}.ext-form .ext-field{margin:0;padding:0}.ext-form .ext-field>span{margin:0}
 body[data-page=dashboard] dialog.ext-dialog .ext-form{padding-bottom:2px}
+
+/* ===== 1.5.295 · Licencias: menú flotante, resumen del panel lateral y grupos animados ===== */
+.license-menu-list.license-menu-float{position:fixed;top:0;left:0;right:auto;bottom:auto;z-index:2147483000;max-width:min(320px,calc(100vw - 16px));overflow-y:auto;overscroll-behavior:contain;transform-origin:top right}
+.license-menu-list.license-menu-float[data-up=true]{transform-origin:bottom right}
+.license-summary{display:grid;gap:10px;padding:12px;border:1px solid #1f3352;border-radius:12px;background:linear-gradient(180deg,#0e1b31,#0a1526)}
+.license-summary dl{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px 14px;margin:0}
+.license-summary dl div{display:grid;gap:1px;min-width:0}.license-summary dt{font-size:10.5px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:#7f93b1}.license-summary dd{margin:0;font-size:13px;color:#e3edff;overflow-wrap:anywhere}
+.license-summary-meter{display:grid;gap:4px}.license-summary-label{font-size:10.5px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:#7f93b1}
+.license-group-card .license-inv-scroll.is-group{animation:license-group-open .2s ease-out}
+@keyframes license-group-open{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+.license-group-head .system-icon:first-child{transition:transform .15s}
+@media(prefers-reduced-motion:reduce){.license-group-card .license-inv-scroll.is-group,.license-menu-list.license-menu-float{animation:none}}
+body[data-page=dashboard] dialog.license-drawer .license-summary{display:grid;grid-template-columns:minmax(0,1fr);gap:10px}
+body[data-page=dashboard] dialog.license-drawer .license-summary>dl{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px 14px;margin:0}
+body[data-page=dashboard] dialog.license-drawer .license-summary>dl>div{display:grid;gap:1px;min-width:0;margin:0;padding:0}
+body[data-page=dashboard] dialog.license-drawer .license-summary-meter{display:grid;gap:4px;padding-top:8px;border-top:1px solid #16263f}
+body[data-page=dashboard] dialog.license-drawer .license-summary-meter .license-meter{width:100%}

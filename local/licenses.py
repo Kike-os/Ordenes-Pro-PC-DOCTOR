@@ -1209,7 +1209,7 @@ def card(c,delivery_id,private=False,now=None):
 def units(c,now,product_id=None,status='',query='',state='',date_from='',date_to='',client_id=None,field=''):
     today=now.date();soon=display_settings(c)['soon_days']
     sql=("SELECT u.id,u.code,u.product_id,i.name product,i.brand,u.kind,u.edition,u.license_type,u.manufacturer,u.version,u.devices,u.term,u.purchased_at,u.activated_at,u.expires_at,u.activated,u.notes,"
-         "u.download_url,u.instructions,u.status,u.reserved_at,u.delivered_at,u.created_at,u.renewed_from,u.renewed_to,u.seat,u.batch_id,"
+         "u.download_url,u.instructions,u.status,u.reserved_at,u.delivered_at,u.delivery_id,u.created_at,u.renewed_from,u.renewed_to,u.seat,u.batch_id,"
          "q.code quote_code,COALESCE(o.code,'') order_code,u.order_id,u.client_id,COALESCE(cl.name,'') client,COALESCE(cl.identification,'') client_identification,COALESCE(cl.document_type,'') client_document_type,b.supplier batch_supplier,b.invoice,b.unit_cost_cents,"
          "(SELECT 1 FROM license_receipts r WHERE r.batch_id=u.batch_id) has_receipt,p.validity_mode,p.duration,p.duration_months,COALESCE(p.activation_method,'') activation_method,(SELECT 1 FROM license_files f WHERE f.unit_id=u.id) has_file,(SELECT COUNT(*) FROM license_renewals n WHERE n.unit_id=u.id) renewals,"
          "(SELECT s.code FROM license_sales s WHERE s.id=u.sale_id) sale_code,(SELECT s.payment_status FROM license_sales s WHERE s.id=u.sale_id) sale_payment,u.sale_id "
