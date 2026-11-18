@@ -1,4 +1,5 @@
 """Notificaciones del panel: se derivan de datos reales y su lectura se guarda por usuario."""
+import hashlib
 import json
 import re
 import appointments
@@ -402,6 +403,11 @@ def build(c, user, now, mail_access=False, hidden=False, limit=40):
     for item in items:
         item['read'] = item['key'] in read
         item['hideable'] = not CRITICAL.match(item['key'])
+        # 1.5.289 · Eventos equivalentes (mismo título y mismo detalle: por ejemplo, la copia de «Autorización registrada — Orden N.º …» que
+        # llega varias veces al buzón) comparten «thread»: la interfaz los agrupa con su cantidad y permite desplegarlos. No se borra ninguno;
+        # los avisos de situación (alertas) no se agrupan y cada uno conserva su lectura y su ocultación.
+        if item.get('group') != 'alert':
+            item['thread'] = 't' + hashlib.sha1((item['title'] + '\n' + (item.get('detail') or '')).encode()).hexdigest()[:12]
     items.sort(key=lambda item: (item['group'] != 'alert', ), reverse=False)
     alerts = [item for item in items if item['group'] == 'alert']
     rest = sorted((item for item in items if item['group'] != 'alert'), key=lambda item: item['at'], reverse=True)

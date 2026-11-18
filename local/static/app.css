@@ -12391,3 +12391,41 @@ body[data-page=dashboard] dialog.pc3-drawer:not([open]){display:none}
  .pc3-dhead,.pc3-dbody,.pc3-dfoot{padding-left:12px;padding-right:12px}.pc3-dfoot>*{flex:1 1 auto}}
 @media(max-width:380px){.pc3-facts{grid-template-columns:minmax(0,1fr)}.pc3-afilters{grid-template-columns:minmax(0,1fr)}.pc3-mark{display:none}.pc3-contact{grid-template-columns:minmax(0,1fr)}}
 @media(prefers-reduced-motion:reduce){.pc3-drawer[open],.pc3-form,.pc3-bump{animation:none}.pc3-quick,.pc3-kpi,.pc3-op-btn{transition:none}}
+
+/* ===== 1.5.289 · Centro de Notificaciones y Pendientes Premium 3.0 =====
+   Acotado a .pc3 / .pc3-drawer / .pc3-rules. Secciones, barra de resolución del panel, estados operativos, grupos de avisos y reglas. */
+.pc3-kpi[data-kpi=active]{--k:#cfe0f7}.pc3-kpi[data-kpi=resolved]{--k:#45cdaa}.pc3-kpi[data-kpi=postponed]{--k:#9bb0cf}
+.pc3-sections{display:flex;flex-wrap:wrap;gap:6px;min-width:0}
+.pc3-section{display:inline-flex;align-items:center;gap:7px;min-height:36px;padding:6px 12px;border:1px solid #223450;border-radius:12px;background:#0a1424;color:#b8c8de;font-size:12.5px;font-weight:650;cursor:pointer;transition:border-color .15s,background .15s,color .15s}
+.pc3-section b{min-width:20px;padding:1px 6px;border-radius:999px;background:#13233b;color:#dbe8fb;font-size:11.5px;text-align:center;font-variant-numeric:tabular-nums}
+.pc3-section:hover{border-color:#3e7cd5;color:#eef3ff;transform:none}
+.pc3-section[aria-pressed=true]{border-color:#3e7cd5;background:#12233d;color:#fff;box-shadow:inset 0 0 0 1px #3e7cd5}
+.pc3-section[data-section=hot][aria-pressed=true]{border-color:#ff5c69;box-shadow:inset 0 0 0 1px #ff5c69}
+.pc3-more{justify-self:center;min-height:40px;margin-top:4px}
+.pc2-chip[data-kind=espera_cliente]{border-color:#2f4f7a;color:#9fc3ff}.pc2-chip[data-kind=espera_tercero]{border-color:#6a4a22;color:#ffc58f}
+.pc2-chip[data-kind=pospuesto]{border-color:#3a4b66;background:#0f1a2b;color:#b8c8de}.pc2-chip[data-kind=grupo]{border-color:#2f4566;color:#cfe0f7;font-variant-numeric:tabular-nums}
+.pc2-chip[data-kind=resuelto]{border-color:#1f5548;color:#7fe0c4}.pc2-chip[data-kind=cancelado]{border-color:#4a3a3d;color:#c9a9ad}
+.pc3 .pc2-item[data-state=pospuesto]{opacity:.8}
+/* Barra de resolución del panel: Resolver | Asignar | Posponer | Abrir módulo | Registrar seguimiento */
+.pc3-dbar{display:grid;grid-template-columns:repeat(auto-fit,minmax(104px,1fr));gap:6px;padding:8px;border:1px solid #1b2b44;border-radius:12px;background:#0a1424}
+.pc3-dtool{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:40px;padding:6px 8px;border:1px solid #223450;border-radius:10px;background:#0f1d33;color:#dbe8fb;font-size:12.5px;font-weight:650;cursor:pointer;transition:border-color .15s,background .15s}
+.pc3-dtool svg{width:15px;height:15px;color:var(--tone)}.pc3-dtool[data-tone=ok]{border-color:#1f5548}.pc3-dtool[data-tone=ok] svg{color:#45cdaa}
+.pc3-dtool:hover:not(:disabled){border-color:var(--tone);background:#12233d;transform:none}
+.pc3-dtool:disabled{opacity:.45;cursor:not-allowed}
+.pc3-diag dd{white-space:pre-wrap}
+/* Notificaciones: grupos de avisos equivalentes */
+.pc3-count{margin-left:4px;vertical-align:middle}
+.activity-row.pc3-sub{margin-left:22px;border-style:dashed;opacity:.92}
+.pc3-expand svg{transition:transform .15s}
+/* Reglas de urgencia (administración) */
+dialog.pc3-rules .pc3-rules-form{border:0;padding:0;background:transparent;animation:none}
+dialog.pc3-rules input[type=number]{width:100%;min-height:44px}
+dialog.pc3-rules input[aria-invalid=true]{border-color:#ff7a83}
+.pc3-rules-btn svg{width:16px;height:16px}
+@media(max-width:640px){
+ .pc3-sections{flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px;scrollbar-width:thin}
+ .pc3-section{flex:0 0 auto}
+ .pc3-dbar{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .activity-row.pc3-sub{margin-left:10px}
+}
+@media(prefers-reduced-motion:reduce){.pc3-section,.pc3-dtool,.pc3-expand svg{transition:none}}

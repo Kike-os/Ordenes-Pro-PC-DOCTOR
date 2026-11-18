@@ -193,3 +193,86 @@ Administración ve a todo el equipo; un técnico, solo lo suyo. Se puede filtrar
 - Filtros conservados durante la sesión del navegador.
 - Textos en español e inglés.
 - Sin animaciones con movimiento reducido.
+
+## 1.5.289 · Centro de Notificaciones y Pendientes Premium 3.0 y flujo de resolución de órdenes
+
+**Indicadores.**
+- Pendientes activos: quita el filtro rápido.
+- Críticos, Urgentes, Vencidos, Requieren decisión y Sin ver.
+- Solucionados hoy: abre «Solucionadas» con la fecha de hoy.
+- Silenciadas y Pospuestos solo aparecen cuando existen.
+
+Todos salen de los registros reales.
+
+**Secciones de «Pendientes».** Se combinan con los filtros y la búsqueda; la búsqueda incluye el correo del cliente.
+- *Requieren mi atención*: lo asignado a mí o sin responsable. Quedan fuera los pendientes silenciados, los pospuestos y los que esperan al cliente o a un tercero, salvo que requieran una decisión.
+- *Críticas y urgentes*.
+- *Pendientes de decisión*.
+- *Asignadas a otros usuarios*.
+- *En seguimiento*: en proceso, en espera, pospuesto, reconocido, con recordatorio o con responsable asignado.
+- *Todos*.
+
+La lista se muestra de 60 en 60 («Mostrar más»). La sincronización periódica conserva la posición de lectura.
+
+**Estados operativos.** Se calculan desde el registro de origen y la gestión, y son distintos del estado de la orden:
+
+| Estado | Cuándo |
+|---|---|
+| Pendiente / En proceso | Según el registro. |
+| En espera de cliente | Presupuesto enviado y vigente, o la orden espera aprobación o respuesta del cliente. |
+| En espera de tercero | Repuesto pedido o en tránsito sin incidencia, o la orden espera un repuesto. |
+| Pospuesto | Aplazamiento vigente. |
+
+Si el plazo venció, deja de considerarse «en espera»: hay que actuar. Resuelto y Cancelado están en «Solucionadas».
+
+**Prioridades y reglas.**
+- Las prioridades se muestran como Crítica, Alta, Media y Baja. Las claves internas no cambian.
+- Administración ajusta los umbrales de «Reglas de urgencia»: entrega de órdenes, horas para citas, vigencia y respuesta de presupuestos, llegada de repuestos y vencimiento de licencias.
+- Se guardan en `system_state` (`pending_rules`), validados por rango y por coherencia (el umbral de prioridad media no puede ser menor que el de alta).
+- Los valores iniciales son los criterios anteriores. No cambian ningún registro.
+- El plazo de primera respuesta de las PQRS lo sigue fijando su módulo.
+
+**Panel de resolución.** La barra *Resolver | Asignar | Posponer | Abrir módulo | Registrar seguimiento* lleva a la acción real de cada caso. Abre el formulario o enfoca el botón, pero no ejecuta nada por sí sola. Si un destino no existe para ese pendiente, el botón aparece desactivado con su motivo.
+
+Acciones de **órdenes**:
+- Falla reportada, diagnóstico y recomendaciones a la vista.
+- *Registrar o actualizar diagnóstico*: solo administración, igual que «Editar orden». Usa `/api/pending/action` `diagnosis` con control de revisión y cambia solo `findings` y `recommendations`, nunca importes ni presupuesto. Queda en el historial y en la auditoría (`order_workspace_updated`).
+- Presupuestos asociados con su estado.
+- *Registrar seguimiento técnico* (`/api/orders/{id}/follow-up`).
+- *Actualizar estado*: `/api/order-status` con `from_status`. Si otra persona cambió el estado mientras tanto, responde 409 y no lo pisa.
+- Responsable y entrega, con comprobación de saldo.
+
+Un presupuesto solo se aprueba por el enlace del cliente o con la decisión registrada por el personal con nota de cómo la comunicó.
+
+Acciones de **alertas**:
+- *Comprobar recuperación*: vuelve a evaluar la condición en el servidor. Solo sale de la bandeja si ya no se detecta.
+- Incidencias de entrega de correo: reenviar a una dirección corregida o marcarlas revisadas, con los endpoints de Mail Pro.
+
+**Responsable del seguimiento y aplazamiento (`pending_tracking`, migración 106, solo anexado con disparadores que impiden editar o borrar).**
+- *Asignar* (administración) o *Tomar* (un técnico, si el pendiente no tiene responsable).
+  - Solo a personas que ya ven ese pendiente: asignar no amplía permisos.
+  - Las órdenes y las PQRS se asignan en su módulo. Para las órdenes, el centro anota además la fecha y quién asignó.
+  - Si la orden cambia de responsable en su módulo, manda la orden.
+- *Posponer*: desde mañana y hasta 90 días, con motivo. Nunca un fallo crítico. Vuelve solo al llegar la fecha o con *Reanudar*.
+- Sin la migración, el centro sigue funcionando y lo indica.
+
+**Solucionadas (`/api/pending/resolved`).** Lo que su módulo cerró, con persona, fecha y hora:
+- órdenes entregadas;
+- citas confirmadas o cerradas;
+- presupuestos decididos o cancelados;
+- repuestos instalados o cancelados, y cancelaciones decididas;
+- PQRS respondidas o cerradas;
+- respuestas de mantenimiento gestionadas;
+- licencias renovadas;
+- incidencias de AutoCare resueltas.
+
+Varias acciones sobre el mismo registro en un día cuentan una vez. Administración ve al equipo; un técnico, lo suyo. Por defecto muestra los últimos 7 días, hasta 92 días por consulta, en páginas de 100.
+
+**Duplicados.**
+- *Notificaciones*: las que tienen el mismo título y detalle comparten `thread` y se agrupan con «×N» y un botón para desplegarlas. Por ejemplo, las copias de «Autorización registrada — Orden N.º …» o «Aviso de autorización enviado…» de una misma orden. Se marcan como leídas u ocultas juntas, y nada se borra. Los avisos de distintas órdenes o distintos eventos no se agrupan.
+- *Alertas*: las iguales forman un solo pendiente con su cantidad. Cada aviso original conserva su lectura.
+
+**Historial (antes «Actividad»).**
+- Carga progresiva de 100 en 100; el CSV exporta hasta 2000 filas.
+- Ya no repite la gestión del centro (antes aparecía en el registro y en la auditoría).
+- La ruta `#notices?vista=actividad` sigue funcionando.

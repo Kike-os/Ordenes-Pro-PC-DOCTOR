@@ -358,7 +358,8 @@ const PC2_MODULES={orders:{label:'Órdenes',long:'Órdenes pendientes',icon:NCP_
  messages:{label:'Mensajes',long:'Mensajes por responder',icon:NCP_CATS.chat.icon,due:'Plazo'},
  licenses:{label:'Licencias',long:'Licencias por vencer',icon:NCP_CATS.licenses.icon,due:'Vence'},
  alerts:{label:'Alertas',long:'Alertas del sistema',icon:'M21.73 18l-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3 M12 9v4 M12 17h.01',due:'Fecha'}};
-const PC2_PRIORITY={critico:'Crítico',urgente:'Urgente',importante:'Importante',normal:'Normal'},PC2_STATE={pendiente:'Pendiente',en_proceso:'En proceso'},PC2_RANK={critico:0,urgente:1,importante:2,normal:3};
+// 1.5.289: prioridades Crítica / Alta / Media / Baja (mismas reglas de cálculo) y estados operativos del pendiente, distintos del estado de la orden.
+const PC2_PRIORITY={critico:'Crítica',urgente:'Alta',importante:'Media',normal:'Baja'},PC2_STATE={pendiente:'Pendiente',en_proceso:'En proceso',espera_cliente:'En espera de cliente',espera_tercero:'En espera de tercero',pospuesto:'Pospuesto'},PC2_RANK={critico:0,urgente:1,importante:2,normal:3};
 const PC3_ICON={open:'M15 3h6v6 M10 14 21 3 M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6',check:'M20 6 9 17l-5-5',status:'M22 11.08V12a10 10 0 1 1-5.93-9.14 M22 4 12 14.01l-3-3',
  user:'M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2 M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z',note:'M12 20h9 M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z',
  truck:'M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2 M15 18H9 M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.62l-3.48-4.35A1 1 0 0 0 17.52 8H14 M7 20a2 2 0 1 0 0-4 2 2 0 0 0 0 4z M17 20a2 2 0 1 0 0-4 2 2 0 0 0 0 4z',
@@ -385,51 +386,58 @@ function pc3When(value,short){if(!value)return T('Sin fecha');const timed=value.
 const pc3Whatsapp=raw=>{const d=String(raw||'').replace(/\D/g,'');if(d.length<9)return '';return d.startsWith('593')?d:d.startsWith('0')?'593'+d.slice(1):d;};
 async function renderNotices(){
  const root=$('module-content'),params=routeState().params,who=currentUser?.username||'',admin=currentUser?.role==='administrador';
- const prefsKey='ordenes-pro:pendientes:'+who,filterKey='ordenes-pro:pendientes-filtros:'+who,FILTERS=['module','priority','status','owner','from','to','q','unseen','quick'];
+ const prefsKey='ordenes-pro:pendientes:'+who,filterKey='ordenes-pro:pendientes-filtros:'+who,FILTERS=['module','priority','status','owner','from','to','q','unseen','quick','section'];
  let prefs={view:'pending',sort:'urgency'};try{prefs=Object.assign(prefs,JSON.parse(localStorage.getItem(prefsKey)||'{}'));}catch{}
  let kept={};try{kept=JSON.parse(sessionStorage.getItem(filterKey)||'{}')||{};}catch{}
- const VIEWS={pendientes:'pending',notificaciones:'history',actividad:'activity'},ROUTE={pending:'pendientes',history:'notificaciones',activity:'actividad'};
+ const VIEWS={pendientes:'pending',solucionadas:'resolved',notificaciones:'history',historial:'activity',actividad:'activity'},ROUTE={pending:'pendientes',resolved:'solucionadas',history:'notificaciones',activity:'historial'};
  const state={view:VIEWS[params.get('vista')]||(ROUTE[prefs.view]?prefs.view:'pending'),sort:['urgency','due','age','activity'].includes(prefs.sort)?prefs.sort:'urgency',
-  module:'',priority:'',status:'',owner:'',from:'',to:'',q:'',unseen:false,quick:''};
+  module:'',priority:'',status:'',owner:'',from:'',to:'',q:'',unseen:false,quick:'',section:'all'};
  // Los filtros se mantienen al volver al centro durante la sesión del navegador (no entre equipos ni después de cerrar la pestaña).
  for(const key of FILTERS)if(key in kept&&typeof kept[key]===typeof state[key])state[key]=kept[key];
  if(PC2_MODULES[params.get('modulo')])state.module=params.get('modulo');
  const remember=()=>{try{localStorage.setItem(prefsKey,JSON.stringify({view:state.view,sort:state.sort}));sessionStorage.setItem(filterKey,JSON.stringify(Object.fromEntries(FILTERS.map(k=>[k,state[k]]))));}catch{}};
- let pending=null,rev='',timer=null,fails=0,loadedAt=null,fresh=new Set(),loading=false,again=false,drawer=null;const lastKpi={};
+ let pending=null,rev='',timer=null,fails=0,loadedAt=null,fresh=new Set(),loading=false,again=false,drawer=null,shown=60;const lastKpi={};
  const wrap=el('div',undefined,'pc2 pc3'),head=el('header',undefined,'pc2-head'),brand=el('div',undefined,'pc3-brand'),headline=el('div',undefined,'pc2-headline'),live=el('p',undefined,'pc2-live'),refreshBtn=button('',()=>refresh(true),'pc2-refresh');
  refreshBtn.setAttribute('aria-label',T('Actualizar ahora'));refreshBtn.title=T('Actualizar ahora');refreshBtn.append(systemIcon(PC3_ICON.refresh));
  const announce=el('p','','sr-only');announce.setAttribute('aria-live','polite');
  const mark=el('span',undefined,'pc3-mark');mark.append(systemIcon(PC3_ICON.manage));mark.title=T('Centro de Control Operativo');brand.append(mark,headline);
  head.append(brand,live,refreshBtn,announce);
+ if(admin){const rulesBtn=button('',()=>openRules(),'pc2-refresh pc3-rules-btn');rulesBtn.setAttribute('aria-label',T('Reglas de urgencia'));rulesBtn.title=T('Reglas de urgencia');rulesBtn.append(systemIcon(PC3_ICON.manage));head.insertBefore(rulesBtn,refreshBtn);}
  const kpis=el('div',undefined,'pc3-kpis');kpis.setAttribute('role','group');kpis.setAttribute('aria-label',T('Indicadores de atención'));
  const cards=el('div',undefined,'pc2-cards');cards.setAttribute('role','group');cards.setAttribute('aria-label',T('Resumen de pendientes por módulo'));
  const views=el('div',undefined,'pc2-views');views.setAttribute('role','tablist');views.setAttribute('aria-label',T('Vista del centro'));
- const tabs={pending:button('',()=>setView('pending'),'pc2-view'),history:button('',()=>setView('history'),'pc2-view'),activity:button('',()=>setView('activity'),'pc2-view')};
- const panels={pending:el('section',undefined,'pc2-panel'),history:el('section',undefined,'pc2-panel'),activity:el('section',undefined,'pc2-panel')};
+ const tabs={pending:button('',()=>setView('pending'),'pc2-view'),resolved:button('',()=>setView('resolved'),'pc2-view'),history:button('',()=>setView('history'),'pc2-view'),activity:button('',()=>setView('activity'),'pc2-view')};
+ const panels={pending:el('section',undefined,'pc2-panel'),resolved:el('section',undefined,'pc2-panel'),history:el('section',undefined,'pc2-panel'),activity:el('section',undefined,'pc2-panel')};
  for(const key of Object.keys(tabs)){const id='pc2-'+key;tabs[key].setAttribute('role','tab');tabs[key].setAttribute('aria-controls',id);tabs[key].id=id+'-tab';panels[key].id=id;panels[key].setAttribute('role','tabpanel');panels[key].setAttribute('aria-labelledby',id+'-tab');views.append(tabs[key]);}
  views.addEventListener('keydown',event=>{const order=Object.keys(tabs),at=order.indexOf(state.view);let next=null;if(event.key==='ArrowRight')next=order[(at+1)%order.length];else if(event.key==='ArrowLeft')next=order[(at+order.length-1)%order.length];else if(event.key==='Home')next=order[0];else if(event.key==='End')next=order[order.length-1];if(!next)return;event.preventDefault();setView(next);tabs[next].focus();});
- wrap.append(head,kpis,cards,views,panels.pending,panels.history,panels.activity);root.replaceChildren(wrap);
+ wrap.append(head,kpis,cards,views,panels.pending,panels.resolved,panels.history,panels.activity);root.replaceChildren(wrap);
  // ---- Pendientes: barra de búsqueda, filtros y lista ----
  const pendingPanel=panels.pending,tools=el('div',undefined,'pc2-tools'),search=el('input'),filterToggle=button('',()=>{const open=filters.hidden;filters.hidden=!open;filterToggle.setAttribute('aria-expanded',String(open));},'pc2-filter-toggle'),sortLabel=el('label',undefined,'pc2-sort'),sort=el('select');
- search.type='search';search.maxLength=80;search.placeholder=T('Buscar cliente, orden, código o detalle');search.setAttribute('aria-label',T('Buscar en los pendientes'));search.value=state.q;
+ search.type='search';search.maxLength=80;search.placeholder=T('Buscar cliente, orden, correo, código o detalle');search.setAttribute('aria-label',T('Buscar en los pendientes'));search.value=state.q;
  filterToggle.setAttribute('aria-controls','pc2-filters');filterToggle.append(systemIcon('M22 3H2l8 9.46V19l4 2v-8.54z'),el('span',T('Filtros')),el('b','','pc2-filter-count'));
  for(const[value,label]of [['urgency','Urgencia'],['due','Fecha de vencimiento'],['age','Antigüedad'],['activity','Última actividad']]){const o=el('option',T(label));o.value=value;sort.append(o);}sort.value=state.sort;sortLabel.append(el('span',T('Ordenar por')),sort);
  tools.append(search,filterToggle,sortLabel);
+ // 1.5.289 · Secciones: lo que requiere mi atención, críticas y urgentes, decisiones, lo asignado a otras personas, lo que está en seguimiento.
+ const SECTIONS={all:{label:'Todos',test:()=>true},mine:{label:'Requieren mi atención',test:i=>i.mine},hot:{label:'Críticas y urgentes',test:i=>['critico','urgente'].includes(i.priority)},
+  decision:{label:'Pendientes de decisión',test:i=>i.decision&&!i.silenced&&!i.postponed},others:{label:'Asignadas a otros usuarios',test:i=>i.others},followup:{label:'En seguimiento',test:i=>i.followup}};
+ if(!SECTIONS[state.section])state.section='all';
+ const sections=el('div',undefined,'pc3-sections');sections.setAttribute('role','group');sections.setAttribute('aria-label',T('Secciones'));
  const filters=el('div',undefined,'pc2-filters');filters.id='pc2-filters';filters.hidden=!matchMedia('(min-width: 901px)').matches;filterToggle.setAttribute('aria-expanded',String(!filters.hidden));
  const pick=(label,options,key)=>{const box=el('label',undefined,'pc2-field'),select=el('select');box.append(el('span',T(label)),select);// Al crear la página las listas de módulo y responsable aún no tienen opciones: el filtro guardado se conserva hasta que llegan los datos.
  const fill=(list,initial)=>{const keep=state[key];select.replaceChildren();for(const[value,text]of list){const o=el('option',text);o.value=value;select.append(o);}if(list.some(x=>x[0]===keep))select.value=keep;else{select.value='';if(!initial)state[key]='';}};fill(options,true);select.onchange=()=>{state[key]=select.value;remember();paintPending();};box.fill=fill;filters.append(box);return box;};
  const fPriority=pick('Prioridad',[['',T('Todas')],...Object.entries(PC2_PRIORITY).map(([k,v])=>[k,T(v)])],'priority');
- const fStatus=pick('Estado',[['',T('Todos')],['pendiente',T('Pendiente')],['en_proceso',T('En proceso')],['silenciada',T('Silenciada')]],'status');
+ const fStatus=pick('Estado',[['',T('Todos')],...Object.entries(PC2_STATE).map(([k,v])=>[k,T(v)]),['silenciada',T('Silenciada')]],'status');
  const fModule=pick('Módulo',[['',T('Todos')]],'module');
  const fOwner=pick('Responsable',[['',T('Todos')]],'owner');
  const dateField=(label,key)=>{const box=el('label',undefined,'pc2-field'),input=el('input');input.type='date';input.value=state[key];box.append(el('span',T(label)),input);input.onchange=()=>{state[key]=input.value;remember();paintPending();};filters.append(box);return input;};
  const fFrom=dateField('Desde','from'),fTo=dateField('Hasta','to');
  const unseenBox=el('label',undefined,'pc2-check'),unseen=el('input');unseen.type='checkbox';unseen.checked=state.unseen;unseenBox.append(unseen,el('span',T('Solo no vistos')));unseen.onchange=()=>{state.unseen=unseen.checked;remember();paintPending();};filters.append(unseenBox);
- const clear=button(T('Limpiar filtros'),()=>{Object.assign(state,{priority:'',status:'',module:'',owner:'',from:'',to:'',q:'',unseen:false,quick:''});search.value='';fFrom.value='';fTo.value='';unseen.checked=false;for(const f of [fPriority,fStatus,fModule,fOwner])f.querySelector('select').value='';remember();paintKpis();paintPending();search.focus();},'text-action pc2-clear');filters.append(clear);
+ const clear=button(T('Limpiar filtros'),()=>{Object.assign(state,{priority:'',status:'',module:'',owner:'',from:'',to:'',q:'',unseen:false,quick:'',section:'all'});search.value='';fFrom.value='';fTo.value='';unseen.checked=false;for(const f of [fPriority,fStatus,fModule,fOwner])f.querySelector('select').value='';remember();paintKpis();paintPending();search.focus();},'text-action pc2-clear');filters.append(clear);
  const count=el('p','','pc2-count'),list=el('ul',undefined,'pc2-list');list.setAttribute('aria-label',T('Pendientes'));count.setAttribute('aria-live','polite');
  const seeAll=button('',()=>markSeen(visibleRows().filter(i=>!i.read).map(i=>i.key)),'pc2-seen-all');seeAll.append(systemIcon('M18 6 7 17l-5-5 M22 10l-7.5 7.5L13 16'),el('span',T('Marcar como vistos')));
  const countBar=el('div',undefined,'pc2-countbar');countBar.append(count,seeAll);
- pendingPanel.append(tools,filters,countBar,list);
+ const moreBtn=button('',()=>{shown+=60;paintPending();},'secondary pc3-more');moreBtn.hidden=true;
+ pendingPanel.append(sections,tools,filters,countBar,list,moreBtn);
  let typing=null;search.oninput=()=>{clearTimeout(typing);typing=setTimeout(()=>{state.q=search.value.trim().toLowerCase();remember();paintPending();},150);};sort.onchange=()=>{state.sort=sort.value;remember();paintPending();};
  // Estado de carga: esqueleto con la misma altura que las tarjetas reales (sin saltos al llegar los datos).
  function skeleton(){kpis.replaceChildren(...Array.from({length:5},()=>el('div',undefined,'pc3-kpi pc2-skel')));cards.replaceChildren(...Array.from({length:7},()=>el('div',undefined,'pc2-card pc2-skel')));list.replaceChildren(...Array.from({length:4},()=>el('li',undefined,'pc2-item pc2-skel')));count.textContent=T('Cargando pendientes…');seeAll.hidden=true;}
@@ -439,12 +447,14 @@ async function renderNotices(){
  function paintHead(){const t=pending.totals,attention=t.count-(t.silenced||0);headline.replaceChildren(el('strong',t.count?pc2Plural(attention,'pendiente activo','pendientes activos'):T('Todo al día')),el('span',t.count?[t.critical?pc2Plural(t.critical,'crítico','críticos'):'',t.urgent?pc2Plural(t.urgent,'requiere atención inmediata','requieren atención inmediata'):'',t.decision?pc2Plural(t.decision,'requiere una decisión','requieren una decisión'):''].filter(Boolean).join(' · ')||T('Nada urgente ni vencido'):T('No hay acciones pendientes en tus módulos')));
   tabs.pending.replaceChildren(el('span',T('Pendientes')),el('b',String(t.count)));tabs.pending.setAttribute('aria-label',T('Pendientes')+': '+t.count);}
  // Indicadores: atajos de filtro que muestran primero lo que requiere una decisión. Un número que cambia se resalta un instante.
- const QUICK={critical:{label:'Críticos',test:i=>i.priority==='critico',total:t=>t.critical||0},urgent:{label:'Urgentes',test:i=>['critico','urgente'].includes(i.priority)&&!i.silenced,total:t=>t.urgent},
-  overdue:{label:'Vencidos',test:i=>i.overdue,total:t=>t.overdue},decision:{label:'Requieren decisión',test:i=>i.decision&&!i.silenced,total:t=>t.decision||0},
-  unseen:{label:'Sin ver',test:i=>!i.read,total:t=>t.unread},silenced:{label:'Silenciadas',test:i=>!!i.silenced,total:t=>t.silenced||0}};
- function paintKpis(){if(!pending)return;const t=pending.totals;kpis.replaceChildren();for(const[key,q]of Object.entries(QUICK)){const n=q.total(t);if((key==='silenced'||key==='critical')&&!n&&state.quick!==key)continue;
-   const b=button('',()=>{state.quick=state.quick===key?'':key;remember();if(state.view!=='pending')setView('pending');paintKpis();paintPending();},'pc3-kpi'),num=el('strong',String(n));
-   b.dataset.kpi=key;b.dataset.zero=String(!n);b.setAttribute('aria-pressed',String(state.quick===key));if(lastKpi[key]!==undefined&&lastKpi[key]!==n)num.classList.add('pc3-bump');lastKpi[key]=n;
+ // 1.5.289: «Activos» quita el filtro rápido; «Solucionados hoy» abre la pestaña Solucionadas. Silenciadas y pospuestas solo aparecen si existen.
+ const QUICK={active:{label:'Pendientes activos',test:()=>true,total:t=>t.count},critical:{label:'Críticos',test:i=>i.priority==='critico',total:t=>t.critical||0},urgent:{label:'Urgentes',test:i=>['critico','urgente'].includes(i.priority)&&!i.silenced&&!i.postponed,total:t=>t.urgent},
+  overdue:{label:'Vencidos',test:i=>i.overdue,total:t=>t.overdue},decision:{label:'Requieren decisión',test:i=>i.decision&&!i.silenced&&!i.postponed,total:t=>t.decision||0},
+  resolved:{label:'Solucionados hoy',test:()=>true,total:t=>t.resolved_today??0},unseen:{label:'Sin ver',test:i=>!i.read,total:t=>t.unread},silenced:{label:'Silenciadas',test:i=>!!i.silenced,total:t=>t.silenced||0},
+  postponed:{label:'Pospuestos',test:i=>!!i.postponed,total:t=>t.postponed||0}};
+ function paintKpis(){if(!pending)return;const t=pending.totals;kpis.replaceChildren();for(const[key,q]of Object.entries(QUICK)){const n=q.total(t);if(['silenced','critical','postponed'].includes(key)&&!n&&state.quick!==key)continue;if(key==='resolved'&&t.resolved_today==null)continue;
+   const b=button('',()=>{if(key==='resolved'){setView('resolved');resolvedView.today();return;}state.quick=key==='active'||state.quick===key?'':key;remember();if(state.view!=='pending')setView('pending');paintKpis();paintPending();},'pc3-kpi'),num=el('strong',String(n));
+   b.dataset.kpi=key;b.dataset.zero=String(!n);b.setAttribute('aria-pressed',String(key==='active'?!state.quick:key==='resolved'?state.view==='resolved':state.quick===key));if(lastKpi[key]!==undefined&&lastKpi[key]!==n)num.classList.add('pc3-bump');lastKpi[key]=n;
    b.append(num,el('span',T(q.label)));b.setAttribute('aria-label',T(q.label)+': '+n+(state.quick===key?'. '+T('Filtro activo'):''));kpis.append(b);}}
  function paintCards(){cards.replaceChildren();cards.dataset.count=String(pending.modules.length);for(const key of pending.modules){const info=PC2_MODULES[key],box=pending.summary[key],card=button('',()=>{state.module=state.module===key?'':key;fModule.querySelector('select').value=state.module;remember();if(state.view!=='pending')setView('pending');paintPending();},'pc2-card');
    card.dataset.module=key;card.dataset.empty=String(!box.count);if(box.urgent)card.dataset.urgent='true';if(box.critical)card.dataset.critical='true';card.setAttribute('aria-pressed',String(state.module===key));
@@ -454,33 +464,40 @@ async function renderNotices(){
    card.setAttribute('aria-label',T(info.long)+': '+box.count+(box.urgent?', '+box.urgent+' '+T('urgentes'):'')+(box.overdue?', '+box.overdue+' '+T('vencidos'):'')+'. '+T(state.module===key?'Filtro activo':'Filtrar'));cards.append(card);}}
  function refDay(item){const v=item.due||item.at;if(!v)return '';const d=new Date(v.length>10?v:v+'T12:00:00-05:00');return Number.isNaN(d.getTime())?'':pc2Day(d);}
  const time=v=>{const d=new Date(v&&v.length>10?v:(v||'')+'T12:00:00-05:00');return Number.isNaN(d.getTime())?null:d.getTime();};
- function visibleRows(){if(!pending)return [];const q=state.q,quick=QUICK[state.quick];
-  let rows=pending.items.filter(i=>(!quick||quick.test(i))&&(!state.module||i.module===state.module)&&(!state.priority||i.priority===state.priority)&&(!state.status||(state.status==='silenciada'?!!i.silenced:i.state===state.status&&!i.silenced))&&(!state.owner||i.responsible===state.owner)&&(!state.unseen||!i.read)&&(!state.from||refDay(i)>=state.from)&&(!state.to||(refDay(i)&&refDay(i)<=state.to))&&(!q||[i.title,i.detail,i.client,i.responsible,i.waiting,(i.ref&&i.ref.code)||''].join(' ').toLowerCase().includes(q)));
+ function visibleRows(){if(!pending)return [];const q=state.q,quick=QUICK[state.quick],section=SECTIONS[state.section]||SECTIONS.all;
+  let rows=pending.items.filter(i=>section.test(i)&&(!quick||quick.test(i))&&(!state.module||i.module===state.module)&&(!state.priority||i.priority===state.priority)&&(!state.status||(state.status==='silenciada'?!!i.silenced:i.state===state.status&&!i.silenced))&&(!state.owner||i.responsible===state.owner)&&(!state.unseen||!i.read)&&(!state.from||refDay(i)>=state.from)&&(!state.to||(refDay(i)&&refDay(i)<=state.to))&&(!q||[i.title,i.detail,i.client,i.responsible,i.waiting,(i.ref&&i.ref.code)||'',i.search||''].join(' ').toLowerCase().includes(q)));
   const asc=(a,b,key)=>{const x=time(a[key]),y=time(b[key]);return (x===null)-(y===null)||(x??0)-(y??0);};
   if(state.sort==='due')rows=[...rows].sort((a,b)=>asc(a,b,'due')||(PC2_RANK[a.priority]-PC2_RANK[b.priority]));
   else if(state.sort==='age')rows=[...rows].sort((a,b)=>asc(a,b,'created')||asc(a,b,'at'));
   else if(state.sort==='activity')rows=[...rows].sort((a,b)=>-asc(a,b,'activity')||0);
   return rows;}
- function paintPending(){if(!pending)return;
+ function paintSections(){sections.replaceChildren();for(const[key,sec]of Object.entries(SECTIONS)){const n=pending?pending.items.filter(sec.test).length:0,b=button('',()=>{state.section=key;shown=60;remember();paintPending();},'pc3-section');
+   b.dataset.section=key;b.setAttribute('aria-pressed',String(state.section===key));b.append(el('span',T(sec.label)),el('b',String(n)));b.setAttribute('aria-label',T(sec.label)+': '+n);sections.append(b);}}
+ function paintPending(keepPlace){if(!pending)return;paintSections();
+  // Al sincronizar en segundo plano no se mueve la lectura: se conserva la fila que estaba arriba en pantalla.
+  let anchor=null,anchorTop=0;if(keepPlace){for(const row of list.querySelectorAll('.pc2-item')){const top=row.getBoundingClientRect().top;if(top>=0){anchor=row.dataset.entity;anchorTop=top;break;}}}
   fModule.fill([['',T('Todos')],...pending.modules.map(m=>[m,T(PC2_MODULES[m].label)])]);fOwner.fill([['',T('Todos')],...pending.responsibles.map(p=>[p.name,p.name])]);
-  const active=['priority','status','module','owner','from','to'].filter(k=>state[k]).length+(state.unseen?1:0);filterToggle.querySelector('b').textContent=active?String(active):'';clear.hidden=!active&&!state.q&&!state.quick;
+  const active=['priority','status','module','owner','from','to'].filter(k=>state[k]).length+(state.unseen?1:0);filterToggle.querySelector('b').textContent=active?String(active):'';clear.hidden=!active&&!state.q&&!state.quick&&state.section==='all';
   cards.querySelectorAll('.pc2-card').forEach(card=>card.setAttribute('aria-pressed',String(card.dataset.module===state.module)));
-  const rows=visibleRows(),unseenRows=rows.filter(i=>!i.read).length;count.textContent=(rows.length===pending.items.length?pc2Plural(rows.length,'pendiente','pendientes'):rows.length+' '+T('de')+' '+pc2Plural(pending.items.length,'pendiente','pendientes'))+(state.quick?' · '+T(QUICK[state.quick].label):'');seeAll.hidden=!unseenRows;
+  const rows=visibleRows(),unseenRows=rows.filter(i=>!i.read).length;count.textContent=(rows.length===pending.items.length?pc2Plural(rows.length,'pendiente','pendientes'):rows.length+' '+T('de')+' '+pc2Plural(pending.items.length,'pendiente','pendientes'))+(state.section!=='all'?' · '+T(SECTIONS[state.section].label):'')+(state.quick?' · '+T(QUICK[state.quick].label):'');seeAll.hidden=!unseenRows;
   const focusKey=document.activeElement?.closest?.('.pc2-item')?.dataset.key;list.replaceChildren();
   if(!rows.length){const box=el('li',undefined,'pc2-state');if(pending.items.length){box.append(systemIcon('M22 3H2l8 9.46V19l4 2v-8.54z'),el('strong',T('Ningún pendiente con estos filtros')),el('p',T('Cambia los filtros o la búsqueda para ver el resto.')),button(T('Limpiar filtros'),()=>clear.click(),'secondary'));}
    else{box.classList.add('pc2-done');box.append(systemIcon('M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0 M9 12l2 2 4-4'),el('strong',T('Todo al día')),el('p',T('No hay órdenes, citas, presupuestos, repuestos ni mensajes que requieran tu acción.')));}list.append(box);return;}
-  for(const item of rows)list.append(pendingRow(item));
+  moreBtn.hidden=rows.length<=shown;moreBtn.textContent=T('Mostrar más')+' ('+(rows.length-Math.min(shown,rows.length))+')';
+  for(const item of rows.slice(0,shown))list.append(pendingRow(item));
+  if(anchor){const row=list.querySelector('.pc2-item[data-entity="'+CSS.escape(anchor)+'"]');if(row){const delta=row.getBoundingClientRect().top-anchorTop;if(Math.abs(delta)>1)window.scrollBy(0,delta);}}
   if(focusKey)list.querySelector('.pc2-item[data-key="'+CSS.escape(focusKey)+'"] .pc3-manage')?.focus({preventScroll:true});
   fresh.clear();}
  function go(item,href){if(!item.read)markSeen([item.key],true);location.hash=href.slice(1);}
  function pendingRow(item){const info=PC2_MODULES[item.module]||PC2_MODULES.alerts,li=el('li',undefined,'pc2-item'),icon=el('span',undefined,'pc2-ic'),main=el('div',undefined,'pc2-main'),top=el('div',undefined,'pc2-top'),title=el('strong',item.title,'pc2-title'),chips=el('span',undefined,'pc2-chips'),meta=el('p',undefined,'pc2-meta'),side=el('div',undefined,'pc2-side'),acts=el('div',undefined,'pc2-actions'),quick=el('div',undefined,'pc3-quick');
-  li.dataset.key=item.key;li.dataset.entity=item.entity;li.dataset.module=item.module;li.dataset.priority=item.priority;if(!item.read)li.dataset.unread='true';if(item.overdue)li.dataset.overdue='true';if(item.silenced)li.dataset.silenced='true';if(fresh.has(item.key))li.classList.add('pc2-new');
+  li.dataset.key=item.key;li.dataset.entity=item.entity;li.dataset.module=item.module;li.dataset.priority=item.priority;li.dataset.state=item.state;if(!item.read)li.dataset.unread='true';if(item.overdue)li.dataset.overdue='true';if(item.silenced)li.dataset.silenced='true';if(fresh.has(item.key))li.classList.add('pc2-new');
   icon.append(systemIcon(info.icon));title.title=item.title;
   const chip=(text,kind)=>{const c=el('span',text,'pc2-chip');c.dataset.kind=kind;chips.append(c);};
   if(item.priority!=='normal')chip(T(PC2_PRIORITY[item.priority]),item.priority);chip(T(PC2_STATE[item.state]||item.state),item.state);
   if(item.decision&&!item.silenced)chip(T('Requiere decisión'),'decision');if(!item.read)chip(T('Nuevo'),'nuevo');
   if(item.silenced)chip(T('Silenciada hasta')+' '+pc3When(item.silenced,true),'silencio');if(item.ack&&!item.silenced)chip(T('Reconocida'),'reconocida');
   if(item.reminder)chip(item.reminder_due?T('Recordatorio para hoy'):T('Recordatorio')+' '+pc3When(item.reminder,true),'recordatorio');if(item.notes)chip(pc2Plural(item.notes,'nota','notas'),'nota');
+  if(item.postponed)chip(T('Hasta')+' '+pc3When(item.postponed.until,true),'pospuesto');if(item.ref&&item.ref.count>1)chip('×'+item.ref.count,'grupo');
   top.append(title,chips);
   for(const part of [item.client,item.detail,item.responsible?T('Resp.')+': '+item.responsible:''].filter(Boolean)){if(meta.childElementCount)meta.append(el('i','·','pc2-dot'));meta.append(el('span',part));}
   main.append(top,meta);if(item.waiting)main.append(el('p',item.waiting,'pc2-wait'));
@@ -492,7 +509,8 @@ async function renderNotices(){
   const manage=button('',event=>openDrawer(item,event.currentTarget),'pc2-act pc3-manage');manage.append(systemIcon(PC3_ICON.manage),el('span',T('Gestionar')));manage.setAttribute('aria-label',T('Gestionar pendiente')+': '+item.title);manage.setAttribute('aria-haspopup','dialog');
   acts.append(quick,manage);side.append(acts);
   li.append(icon,main,side);return li;}
- async function markSeen(keys,silent=false){if(!keys.length||!pending)return;try{await api('/api/notifications/read',{keys:keys.join(',')});for(const item of pending.items)if(keys.includes(item.key))item.read=true;
+ async function markSeen(keys,silent=false){if(!keys.length||!pending)return;// Un pendiente que agrupa avisos equivalentes se marca entero (cada aviso original conserva su lectura).
+  keys=[...new Set(keys.flatMap(k=>{const it=pending.items.find(i=>i.key===k);return it&&it.ref&&Array.isArray(it.ref.keys)?it.ref.keys:[k];}))];try{await api('/api/notifications/read',{keys:keys.join(',')});for(const item of pending.items)if(keys.includes(item.key))item.read=true;
    for(const m of Object.values(pending.summary))m.unread=0;for(const item of pending.items)if(!item.read)pending.summary[item.module].unread++;pending.totals.unread=pending.items.filter(i=>!i.read).length;
    if(!silent){paintHead();paintKpis();paintCards();paintPending();}document.dispatchEvent(new CustomEvent('notices:changed'));}catch(error){if(!silent)toast(error.message,'error');}}
  // ---- Actualización: consulta liviana cada 45 s con la pestaña visible; si no hay cambios el servidor responde «sin cambios».
@@ -501,14 +519,16 @@ async function renderNotices(){
   try{const data=await api('/api/pending'+(rev&&!force?'?since='+encodeURIComponent(rev):''));if(!wrap.isConnected)return;fails=0;loadedAt=new Date();
    if(!data.unchanged){const before=pending?new Set(pending.items.map(i=>i.key)):null;pending=data;rev=data.rev;
     if(before){fresh=new Set(data.items.filter(i=>!before.has(i.key)).map(i=>i.key));if(fresh.size)announce.textContent=fresh.size===1?T('Hay 1 pendiente nuevo.'):T('Hay')+' '+fresh.size+' '+T('pendientes nuevos.');}
-    paintHead();paintKpis();paintCards();paintPending();}
-   setLive('ok');if(state.view==='history')historyView.reload();if(force&&state.view==='activity')activity.reload();}
+    paintHead();paintKpis();paintCards();paintPending(!force);
+    // Cambios de otra persona sobre el pendiente abierto: el panel se actualiza si no hay una operación en curso ni un formulario abierto.
+    if(drawer&&!drawer.busy&&!force&&!drawer.dialog.querySelector('.pc3-form:not([hidden])')&&!drawer.dialog.querySelector('.pc3-dbody').contains(document.activeElement))loadDrawer(drawer);}
+   setLive('ok');if(state.view==='history')historyView.reload();if(force&&state.view==='activity')activity.reload();if(force&&state.view==='resolved')resolvedView.reload();}
   catch(error){fails++;if(!pending)failed(error);setLive('error');}
   finally{loading=false;refreshBtn.disabled=false;if(again){again=false;refresh(true);}else schedule();}}
  function schedule(){clearTimeout(timer);if(!wrap.isConnected)return;timer=setTimeout(refresh,fails?Math.min(300000,30000*2**Math.min(fails,4)):45000);}
- const onVisible=()=>{if(!document.hidden)refresh();},onChanged=()=>historyView.reload(),onOnline=()=>refresh(true),onHash=()=>{if(drawer)drawer.dialog.close();if(!wrap.isConnected)stop();},onLang=()=>{if(wrap.isConnected){stop();renderNotices();}};
- function stop(){clearTimeout(timer);document.removeEventListener('visibilitychange',onVisible);document.removeEventListener('notices:changed',onChanged);removeEventListener('online',onOnline);removeEventListener('hashchange',onHash);document.removeEventListener('i18n:change',onLang);}
- document.addEventListener('visibilitychange',onVisible);document.addEventListener('notices:changed',onChanged);addEventListener('online',onOnline);addEventListener('hashchange',onHash);document.addEventListener('i18n:change',onLang);
+ const onVisible=()=>{if(!document.hidden)refresh();},onChanged=()=>historyView.reload(),onOnline=()=>refresh(true),onOffline=()=>setLive('error'),onHash=()=>{if(drawer)drawer.dialog.close();if(!wrap.isConnected)stop();},onLang=()=>{if(wrap.isConnected){stop();renderNotices();}};
+ function stop(){clearTimeout(timer);document.removeEventListener('visibilitychange',onVisible);document.removeEventListener('notices:changed',onChanged);removeEventListener('online',onOnline);removeEventListener('offline',onOffline);removeEventListener('hashchange',onHash);document.removeEventListener('i18n:change',onLang);}
+ document.addEventListener('visibilitychange',onVisible);document.addEventListener('notices:changed',onChanged);addEventListener('online',onOnline);addEventListener('offline',onOffline);addEventListener('hashchange',onHash);document.addEventListener('i18n:change',onLang);
  // ---- Panel «Gestionar pendiente»: diálogo lateral (foco atrapado, Escape cierra, el foco vuelve al botón que lo abrió) ----
  function drawerBusy(on){if(!drawer)return;drawer.busy=on;drawer.dialog.toggleAttribute('aria-busy',on);}
  async function openDrawer(item,opener){if(drawer)drawer.dialog.close();
@@ -542,7 +562,7 @@ async function renderNotices(){
  const choose=(options,value)=>{const s=el('select');for(const[v,text]of options){const o=el('option',text);o.value=v;s.append(o);}if(value!==undefined&&value!==null)s.value=String(value);return s;};
  const dateInput=(value,min)=>{const i=el('input');i.type='date';if(value)i.value=value;if(min)i.min=min;return i;};
  const hint=(parent,text)=>parent.append(el('p',T(text),'pc3-hint'));
- function opForm(d,parent,label,{icon,tone,build,validate,confirm,submit,submitLabel}){const box=el('div',undefined,'pc3-op'),toggle=button('',()=>{const open=form.hidden;d.dialog.querySelectorAll('.pc3-form:not([hidden])').forEach(f=>{f.hidden=true;f.previousElementSibling?.setAttribute('aria-expanded','false');});form.hidden=!open;toggle.setAttribute('aria-expanded',String(open));if(open)form.querySelector('select,input,textarea')?.focus();},'pc3-op-btn');
+ function opForm(d,parent,label,{icon,tone,build,validate,confirm,submit,submitLabel,op}){const box=el('div',undefined,'pc3-op'),toggle=button('',()=>{const open=form.hidden;d.dialog.querySelectorAll('.pc3-form:not([hidden])').forEach(f=>{f.hidden=true;f.previousElementSibling?.setAttribute('aria-expanded','false');});form.hidden=!open;toggle.setAttribute('aria-expanded',String(open));if(open)form.querySelector('select,input,textarea')?.focus();},'pc3-op-btn');
   toggle.setAttribute('aria-expanded','false');if(tone)toggle.dataset.tone=tone;toggle.append(systemIcon(icon||PC3_ICON.next),el('span',T(label)));
   const form=el('form',undefined,'pc3-form'),msg=el('p','','pc3-msg'),row=el('div',undefined,'pc3-form-actions');form.hidden=true;form.noValidate=true;msg.setAttribute('role','alert');
   const fields=build(form)||{},cancel=button(T('Cancelar'),()=>{form.hidden=true;toggle.setAttribute('aria-expanded','false');toggle.focus();},'secondary'),save=el('button',T(submitLabel||'Guardar'),tone==='danger'?'danger pc3-save':'primary pc3-save');save.type='submit';
@@ -552,7 +572,7 @@ async function renderNotices(){
    try{const text=await submit(fields);drawerBusy(false);if(text!==false)await afterAction(d,text);}
    catch(error){msg.textContent=error.message||T('No se pudo completar la operación.');if(error.status===409||error.status===404)refresh(true);}
    finally{drawerBusy(false);if(save.isConnected){save.disabled=cancel.disabled=false;save.textContent=label;form.removeAttribute('aria-busy');}}};
-  box.append(toggle,form);parent.append(box);return box;}
+  if(op)box.dataset.op=op;box.append(toggle,form);parent.append(box);return box;}
  function opButton(d,parent,label,run,{icon,tone,confirm}={}){const b=button('',async()=>{if(b.disabled||d.busy)return;if(confirm&&(await confirmClose({keep:T('Volver'),...confirm}))!=='discard')return;b.disabled=true;b.setAttribute('aria-busy','true');drawerBusy(true);
    try{const text=await run();drawerBusy(false);if(text!==false)await afterAction(d,text);}catch(error){toast(error.message||T('No se pudo completar la operación.'),'error');if(error.status===409||error.status===404)refresh(true);}finally{drawerBusy(false);if(b.isConnected){b.disabled=false;b.removeAttribute('aria-busy');}}},'pc3-op-btn');
   if(tone)b.dataset.tone=tone;b.append(systemIcon(icon||PC3_ICON.next),el('span',T(label)));parent.append(b);return b;}
@@ -562,23 +582,31 @@ async function renderNotices(){
  const centerAction=(data)=>api('/api/pending/action',data);
  // Acciones por módulo. Cada una llama al endpoint real; el servidor vuelve a validar permisos, estado y datos.
  const MODULE_ACTIONS={
-  orders(d,box,item,ctx){const id=item.ref.order_id;opLink(d,box,'Abrir orden','#orders?id='+id);
-   if(ctx.statuses){opForm(d,box,'Actualizar estado',{icon:PC3_ICON.status,build:f=>{f.append(el('p',T('Estado actual')+': '+ctx.status_label,'pc3-hint'));const status=fld(f,'Nuevo estado',choose(ctx.statuses.filter(s=>s.code!==ctx.status).map(s=>[s.code,s.label])));const comment=fld(f,'Comentario (queda en el historial)',area(2000));const box2=el('label',undefined,'pc2-check pc3-check'),notify=el('input');notify.type='checkbox';notify.checked=true;box2.append(notify,el('span',T('Avisar al cliente del cambio')));f.append(box2);return{status,comment,notify};},
+  orders(d,box,item,ctx){const id=item.ref.order_id;opLink(d,box,'Abrir orden','#orders?id='+id).dataset.op='open';
+   // 1.5.289 · Diagnóstico y presupuestos asociados, a la vista; el diagnóstico se registra con control de revisión (solo administración).
+   const diag=el('dl',undefined,'pc3-facts pc3-facts-mini pc3-diag');for(const[l,v]of [['Falla reportada',ctx.problem||'—'],['Diagnóstico',ctx.findings||T('Sin diagnóstico registrado')],['Recomendaciones',ctx.recommendations||'—']]){const row=el('div');row.append(el('dt',T(l)),el('dd',v));diag.append(row);}box.append(diag);
+   if(ctx.statuses)opForm(d,box,ctx.findings?'Actualizar diagnóstico':'Registrar diagnóstico',{icon:PC3_ICON.note,build:f=>{const findings=fld(f,'Diagnóstico',area(4000),'Queda en el historial de la orden con tu nombre, fecha y hora.');findings.value=ctx.findings||'';const rec=fld(f,'Recomendaciones (opcional)',area(4000));rec.value=ctx.recommendations||'';return{findings,rec};},
+     validate:x=>!x.findings.value.trim()?T('Escribe el diagnóstico.'):'',
+     submit:async x=>{const out=await centerAction({action:'diagnosis',order_id:String(id),revision:String(ctx.revision),findings:x.findings.value.trim(),recommendations:x.rec.value.trim()});return out.unchanged?T('El diagnóstico no tenía cambios.'):T('Diagnóstico registrado en la orden.');}}).dataset.op='diagnosis';
+   if(ctx.quotes&&ctx.quotes.length){const qs=el('div',undefined,'pc3-contact');for(const q of ctx.quotes){const a=opLink(d,qs,q.code+' · '+T(q.status==='enviado'?'Enviado al cliente':q.status==='aprobado'?'Aprobado':q.status==='parcial'?'Aprobado parcialmente':q.status==='rechazado'?'Rechazado':q.status==='cancelado'?'Cancelado':q.status==='modificacion'?'El cliente pide cambios':'Borrador'),'#orders?id='+id,PC3_ICON.open);a.title=T('Consultar presupuesto');}box.append(el('h4',T('Presupuestos de la orden'),'pc3-sub'),qs);
+    hint(box,'Un presupuesto solo se aprueba con la decisión del cliente: por su enlace o registrada por el personal con nota de cómo la comunicó.');}
+   const delivery=['listo','espera_entrega'].includes(ctx.status)&&ctx.statuses;
+   if(ctx.statuses){const statusForm=opForm(d,box,'Actualizar estado',{icon:PC3_ICON.status,build:f=>{f.append(el('p',T('Estado actual de la orden')+': '+ctx.status_label,'pc3-hint'));const status=fld(f,'Nuevo estado',choose(ctx.statuses.filter(s=>s.code!==ctx.status).map(s=>[s.code,s.label])));const comment=fld(f,'Comentario (queda en el historial)',area(2000));const box2=el('label',undefined,'pc2-check pc3-check'),notify=el('input');notify.type='checkbox';notify.checked=true;box2.append(notify,el('span',T('Avisar al cliente del cambio')));f.append(box2);return{status,comment,notify};},
      confirm:x=>x.status.value!=='entregado'||sure('¿Registrar la entrega?','La orden se marcará como entregada y saldrá de los pendientes. El servidor comprueba antes que no tenga saldo pendiente.','Registrar entrega'),
-     submit:async x=>{const out=await api('/api/order-status',{id:String(id),status:x.status.value,comment:x.comment.value.trim(),notify:x.notify.checked?'1':'0'});return out.unchanged?T('La orden ya tenía ese estado.'):T('Estado de la orden actualizado.');}});}
+     submit:async x=>{const out=await api('/api/order-status',{id:String(id),status:x.status.value,comment:x.comment.value.trim(),notify:x.notify.checked?'1':'0',from_status:ctx.status});return out.unchanged?T('La orden ya tenía ese estado.'):T('Estado de la orden actualizado.');}});statusForm.dataset.op=delivery?'status':'resolve';}
    else hint(box,'El cambio de estado lo registra administración desde la orden.');
-   if(ctx.staff)opForm(d,box,'Asignar responsable',{icon:PC3_ICON.user,build:f=>({tech:fld(f,'Responsable',choose([['',T('Sin asignar')],...ctx.staff.map(s=>[String(s.id),s.name])],ctx.assigned_to||''))}),
-     submit:async x=>{const out=await centerAction({action:'assign',order_id:String(id),technician:x.tech.value,revision:String(ctx.revision)});return out.unchanged?T('La orden ya tenía ese responsable.'):T('Responsable asignado.');}});
-   opForm(d,box,'Registrar observación técnica',{icon:PC3_ICON.note,build:f=>({comment:fld(f,'Observación técnica',area(2000),'Queda en el historial de la orden con tu nombre, fecha y hora.')}),validate:x=>x.comment.value.trim().length<3?T('Escribe la observación técnica.'):'',
-     submit:async x=>{await api('/api/orders/'+id+'/follow-up',{comment:x.comment.value.trim()});return T('Observación registrada en la orden.');}});
+   if(ctx.staff)opForm(d,box,'Asignar responsable',{icon:PC3_ICON.user,build:f=>({tech:fld(f,'Responsable',choose([['',T('Sin asignar')],...ctx.staff.map(s=>[String(s.id),s.name])],ctx.assigned_to||'')),body:fld(f,'Comentario (opcional)',area(300))}),
+     submit:async x=>{const out=await centerAction({action:'assign',order_id:String(id),technician:x.tech.value,revision:String(ctx.revision),body:x.body.value.trim()});return out.unchanged?T('La orden ya tenía ese responsable.'):T('Responsable asignado.');}}).dataset.op='assign';
+   opForm(d,box,'Registrar seguimiento técnico',{icon:PC3_ICON.note,build:f=>({comment:fld(f,'Seguimiento o acción de reparación',area(2000),'Queda en el historial de la orden con tu nombre, fecha y hora.')}),validate:x=>x.comment.value.trim().length<3?T('Escribe el seguimiento.'):'',
+     submit:async x=>{await api('/api/orders/'+id+'/follow-up',{comment:x.comment.value.trim()});return T('Seguimiento registrado en la orden.');}}).dataset.op='follow';
    if(['listo','espera_entrega'].includes(ctx.status)){opLink(d,box,'Coordinar entrega','#deliveries',PC3_ICON.truck);
-    if(ctx.statuses&&ctx.status==='listo')opButton(d,box,'Pasar a «En espera de entrega»',async()=>{await api('/api/order-status',{id:String(id),status:'espera_entrega',comment:'',notify:'1'});return T('La orden quedó en espera de entrega.');},{icon:PC3_ICON.status});
-    if(ctx.statuses)opButton(d,box,'Registrar entrega (resuelve el pendiente)',async()=>{await api('/api/order-status',{id:String(id),status:'entregado',comment:'',notify:'1'});return T('Entrega registrada. La orden salió de los pendientes.');},
-     {icon:PC3_ICON.check,tone:'ok',confirm:{title:T('¿Registrar la entrega?'),text:T('La orden se marcará como entregada y saldrá de los pendientes. El servidor comprueba antes que no tenga saldo pendiente.'),discard:T('Registrar entrega'),plain:true}});}
+    if(ctx.statuses&&ctx.status==='listo')opButton(d,box,'Pasar a «En espera de entrega»',async()=>{await api('/api/order-status',{id:String(id),status:'espera_entrega',comment:'',notify:'1',from_status:ctx.status});return T('La orden quedó en espera de entrega.');},{icon:PC3_ICON.status});
+    if(ctx.statuses)opButton(d,box,'Registrar entrega (resuelve el pendiente)',async()=>{await api('/api/order-status',{id:String(id),status:'entregado',comment:'',notify:'1',from_status:ctx.status});return T('Entrega registrada. La orden salió de los pendientes.');},
+     {icon:PC3_ICON.check,tone:'ok',confirm:{title:T('¿Registrar la entrega?'),text:T('La orden se marcará como entregada y saldrá de los pendientes. El servidor comprueba antes que no tenga saldo pendiente.'),discard:T('Registrar entrega'),plain:true}}).dataset.op='resolve';}
    else hint(box,'Se resuelve al registrar la entrega: mientras el equipo siga en proceso no puede darse por resuelta.');},
   async appointments(d,box,item){const id=item.ref.appointment_id;let row;try{row=(await api('/api/appointments/'+id)).appointment;}catch(error){hint(box,error.message);return;}
    const done=()=>afterAction(d,null);
-   opButton(d,box,'Confirmar cita',async()=>{if(row.authorization){await api('/api/appointments/'+id,{action:'confirmada'});return T('Cita confirmada.');}authorizeAppointment(row,done);return false;},{icon:PC3_ICON.check,tone:'ok'});
+   opButton(d,box,'Confirmar cita',async()=>{if(row.authorization){await api('/api/appointments/'+id,{action:'confirmada'});return T('Cita confirmada.');}authorizeAppointment(row,done);return false;},{icon:PC3_ICON.check,tone:'ok'}).dataset.op='resolve';
    if(!row.authorization)hint(box,'Confirmar exige registrar la aceptación expresa del cliente y los últimos 4 dígitos de su documento.');
    opButton(d,box,'Reprogramar fecha y hora',async()=>{rescheduleAppointment(row,done);return false;},{icon:PC3_ICON.calendar});
    opForm(d,box,'Cancelar con motivo',{icon:PC3_ICON.x,tone:'danger',submitLabel:'Cancelar cita',build:f=>({reason:fld(f,'Motivo de la cancelación',area(300),'Queda en el historial de la cita; no se envía al cliente.')}),
@@ -597,7 +625,7 @@ async function renderNotices(){
   async quotes(d,box,item){const id=item.ref.quote_id,order=item.ref.order_id;opLink(d,box,'Consultar presupuesto','#orders?id='+order);let q;try{q=(await api('/api/quotes/'+id)).quote;}catch(error){hint(box,error.message);return;}
    const open=(q.items||[]).filter(i=>i.status==='pendiente');
    if(q.status==='enviado'&&open.length){
-    opForm(d,box,'Registrar decisión del cliente',{icon:PC3_ICON.check,build:f=>{const choice=fld(f,'Decisión que comunicó el cliente',choose([['aprobado',T('Aprueba todas las partidas pendientes')],['rechazado',T('Rechaza todas las partidas pendientes')]]));const note=fld(f,'¿Cómo la comunicó? (obligatorio)',area(300,'Por ejemplo: aprobó por teléfono'));hint(f,'Para aprobar solo algunas partidas, ábrelo en la orden.');return{choice,note};},
+    opForm(d,box,'Registrar decisión del cliente',{icon:PC3_ICON.check,op:'resolve',build:f=>{const choice=fld(f,'Decisión que comunicó el cliente',choose([['aprobado',T('Aprueba todas las partidas pendientes')],['rechazado',T('Rechaza todas las partidas pendientes')]]));const note=fld(f,'¿Cómo la comunicó? (obligatorio)',area(300,'Por ejemplo: aprobó por teléfono'));hint(f,'Para aprobar solo algunas partidas, ábrelo en la orden.');return{choice,note};},
       validate:x=>x.note.value.trim().length<5?T('Indica cómo comunicó el cliente su decisión (al menos 5 caracteres).'):'',
       confirm:()=>sure('¿Registrar la decisión del cliente?','Registra solo una decisión que el cliente comunicó realmente. Queda con tu nombre, fecha y hora en el historial del presupuesto.','Registrar decisión'),
       submit:async x=>{const ids=open.map(i=>i.id).join(',');await api('/api/quotes/'+id,{action:'decide',approved:x.choice.value==='aprobado'?ids:'',rejected:x.choice.value==='rechazado'?ids:'',note:x.note.value.trim()});return T('Decisión registrada.');}});
@@ -609,7 +637,7 @@ async function renderNotices(){
   parts(d,box,item,ctx){const order=item.ref.order_id,rid=item.ref.request_id,url='/api/orders/'+order+'/part-requests/'+rid;opLink(d,box,'Consultar seguimiento','#orders?id='+order);
    if(item.ref.cancellation_id){hint(box,'La solicitud de cancelación la decide administración desde el seguimiento del repuesto, con su motivo y, si corresponde, el reembolso.');return;}
    const pub=(f)=>fld(f,'Informar al cliente (opcional)',area(1500),'Se publica en el seguimiento de la orden. No incluyas datos privados.');
-   if(ctx.next)opForm(d,box,'Registrar nueva etapa',{icon:PC3_ICON.next,submitLabel:T('Avanzar a')+' «'+ctx.next_label+'»',build:f=>{hint(f,T('Etapa actual')+': '+ctx.stage_label+' → '+ctx.next_label);return{note:fld(f,'Nota interna (opcional)',area(1500)),pub:pub(f)};},
+   if(ctx.next)opForm(d,box,ctx.next==='recibido'?'Registrar llegada del repuesto':'Registrar nueva etapa',{icon:PC3_ICON.next,op:'resolve',submitLabel:T('Avanzar a')+' «'+ctx.next_label+'»',build:f=>{hint(f,T('Etapa actual')+': '+ctx.stage_label+' → '+ctx.next_label);return{note:fld(f,'Nota interna (opcional)',area(1500)),pub:pub(f)};},
      submit:async x=>{await api(url,{action:'advance',stage:ctx.next,note:x.note.value.trim(),public_note:x.pub.value.trim(),publish:x.pub.value.trim()?'1':'0'});return T('Etapa del repuesto actualizada.');}});
    if(!ctx.received)opForm(d,box,'Actualizar fecha estimada',{icon:PC3_ICON.calendar,build:f=>({eta:fld(f,'Nueva llegada estimada',dateInput(ctx.eta)),note:fld(f,'Motivo o fuente (opcional)',area(1500))}),validate:x=>!x.eta.value?T('Indica la fecha estimada.'):'',
      submit:async x=>{const out=await api(url,{action:'update',eta:x.eta.value,note:x.note.value.trim()||T('Fecha estimada actualizada desde el Centro de Control.')});return out.changed?T('Fecha estimada actualizada.'):T('La fecha estimada ya era esa.');}});
@@ -617,17 +645,25 @@ async function renderNotices(){
      submit:async x=>{await api(url,{action:'situation',situation:x.situation.value,note:x.note.value.trim(),eta:x.eta?x.eta.value:'',public_note:x.pub.value.trim(),publish:x.pub.value.trim()?'1':'0'});return T('Situación del repuesto registrada.');}});},
   messages(d,box,item,ctx){const ref=item.ref;
    if(ref.kind==='pqrs'){opLink(d,box,'Ver caso completo','#pqrs?id='+ref.pqrs_id,PC3_ICON.chat);
-    opForm(d,box,'Responder al cliente',{icon:PC3_ICON.reply,submitLabel:'Enviar respuesta',build:f=>({body:fld(f,'Respuesta para el cliente',area(5000),'Se envía por correo y queda en el historial de la PQRS.'),after:fld(f,'Estado después de responder',choose([['respondida',T('Respondida')],['esperando_cliente',T('Esperando al cliente')],['en_solucion',T('En solución')]]))}),
+    opForm(d,box,'Responder al cliente',{icon:PC3_ICON.reply,op:'resolve',submitLabel:'Enviar respuesta',build:f=>({body:fld(f,'Respuesta para el cliente',area(5000),'Se envía por correo y queda en el historial de la PQRS.'),after:fld(f,'Estado después de responder',choose([['respondida',T('Respondida')],['esperando_cliente',T('Esperando al cliente')],['en_solucion',T('En solución')]]))}),
       validate:x=>x.body.value.trim().length<2?T('Escribe la respuesta para el cliente.'):'',confirm:()=>sure('¿Enviar la respuesta al cliente?','El cliente la recibirá por correo y quedará en el historial de la PQRS.','Enviar respuesta'),
       submit:async x=>{await api('/api/pqrs/'+ref.pqrs_id,{action:'reply',body:x.body.value.trim(),status:x.after.value});return T('Respuesta registrada y enviada al cliente.');}});
-    if(ctx.staff)opForm(d,box,'Asignar responsable',{icon:PC3_ICON.user,build:f=>({user:fld(f,'Responsable',choose([['',T('Sin asignar')],...ctx.staff.map(s=>[String(s.id),s.name])],ctx.assigned_to||''))}),
+    if(ctx.staff)opForm(d,box,'Asignar responsable',{icon:PC3_ICON.user,op:'assign',build:f=>({user:fld(f,'Responsable',choose([['',T('Sin asignar')],...ctx.staff.map(s=>[String(s.id),s.name])],ctx.assigned_to||''))}),
       submit:async x=>{await api('/api/pqrs/'+ref.pqrs_id,{action:'assign',user_id:x.user.value});return T('Responsable de la PQRS actualizado.');}});}
-   else if(ref.kind==='chat'){opLink(d,box,'Responder en Atención en vivo','#live',PC3_ICON.chat);hint(box,'La conversación completa y la respuesta en tiempo real están en Atención en vivo. Se resuelve cuando alguien la toma, la abre o la cierra.');}
-   else{opLink(d,box,'Gestionar respuesta','#maintenance?order='+ref.order_id,PC3_ICON.calendar);hint(box,'Se resuelve al marcar la respuesta como gestionada en Mantenimientos.');}},
+   else if(ref.kind==='chat'){opLink(d,box,'Responder en Atención en vivo','#live',PC3_ICON.chat).dataset.op='resolve';hint(box,'La conversación completa y la respuesta en tiempo real están en Atención en vivo. Se resuelve cuando alguien la toma, la abre o la cierra.');}
+   else{opLink(d,box,'Gestionar respuesta','#maintenance?order='+ref.order_id,PC3_ICON.calendar).dataset.op='resolve';hint(box,'Se resuelve al marcar la respuesta como gestionada en Mantenimientos.');}},
   licenses(d,box,item){const r=item.ref,facts=el('dl',undefined,'pc3-facts pc3-facts-mini');for(const[l,v]of [['Producto',r.product],['Código',r.code||'—'],['Vencimiento',pc3When(r.expires_at)],['Días restantes',String(r.days_left)]]){const row=el('div');row.append(el('dt',T(l)),el('dd',v));facts.append(row);}box.append(facts);
-   opLink(d,box,'Consultar o renovar en Licencias Pro','#licenses');hint(box,'La alerta se actualiza sola: desaparece en cuanto la renovación queda registrada en Licencias Pro. Para volver a revisarla otro día, programa un recordatorio.');},
-  alerts(d,box,item,ctx){const facts=el('dl',undefined,'pc3-facts pc3-facts-mini');for(const[l,v]of [['Origen',ctx.source||'—'],['Gravedad',T(ctx.severity||'—')],['Detectada',pc3When(item.at)],['Detalle técnico',item.detail||'—']]){const row=el('div');row.append(el('dt',T(l)),el('dd',v));facts.append(row);}box.append(facts);
+   opLink(d,box,'Consultar o renovar en Licencias Pro','#licenses').dataset.op='resolve';hint(box,'La alerta se actualiza sola: desaparece en cuanto la renovación queda registrada en Licencias Pro. Para volver a revisarla otro día, programa un recordatorio.');},
+  alerts(d,box,item,ctx){const facts=el('dl',undefined,'pc3-facts pc3-facts-mini');for(const[l,v]of [['Origen',ctx.source||'—'],['Gravedad',T(ctx.severity||'—')],['Detectada',pc3When(item.at)],['Detalle técnico',item.detail||'—'],...(ctx.count>1?[['Avisos agrupados',String(ctx.count)]]:[])]){const row=el('div');row.append(el('dt',T(l)),el('dd',v));facts.append(row);}box.append(facts);
    if(item.href)opLink(d,box,'Abrir en su módulo',item.href);
+   // 1.5.289 · Confirmar la recuperación: vuelve a evaluar la condición en el servidor. Solo sale de la bandeja si ya no se detecta.
+   const check=button('',async()=>{if(check.disabled||d.busy)return;check.disabled=true;check.setAttribute('aria-busy','true');try{await api('/api/pending/item?key='+encodeURIComponent(item.key));toast(T('La condición sigue activa: la alerta se mantiene hasta que el sistema deje de detectarla.'),'info');}
+    catch(error){if(error.status===404){toast(T('Recuperación confirmada: el sistema ya no detecta la condición.'),'success');await refresh(true);if(drawer===d)resolvedDrawer(d);return;}toast(error.message||T('No se pudo comprobar.'),'error');}finally{if(check.isConnected){check.disabled=false;check.removeAttribute('aria-busy');}}},'pc3-op-btn');
+   check.dataset.tone='ok';check.dataset.op='resolve';check.append(systemIcon(PC3_ICON.refresh),el('span',T('Comprobar recuperación')));box.append(check);
+   if(ctx.delivery_id){opForm(d,box,'Reenviar a una dirección corregida',{icon:PC3_ICON.mail,submitLabel:'Reenviar',build:f=>{const to=el('input');to.type='email';to.maxLength=254;to.value=ctx.recipient||'';return{to:fld(f,'Correo del destinatario',to,'Se envía un intento nuevo vinculado al original, que se conserva con su motivo de fallo.')};},
+     validate:x=>!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(x.to.value.trim())?T('Indica un correo válido.'):'',confirm:()=>sure('¿Reenviar el correo?','Se enviará de nuevo el mismo mensaje a la dirección indicada.','Reenviar'),
+     submit:async x=>{await api('/api/mail/deliveries/resend',{id:String(ctx.delivery_id),recipient:x.to.value.trim(),confirm:true});return T('Correo reenviado. El seguimiento de la entrega continúa en Mail Pro.');}});
+    opButton(d,box,'Marcar la incidencia de entrega como revisada',async()=>{await api('/api/mail/deliveries/resolve',{id:String(ctx.delivery_id)});return T('Incidencia de entrega revisada.');},{icon:PC3_ICON.ack,confirm:{title:T('¿Marcar la incidencia como revisada?'),text:T('El envío conserva su estado y su motivo de fallo; solo deja de figurar como incidencia pendiente.'),discard:T('Marcar revisada'),plain:true}});}
    if(ctx.incident){opButton(d,box,'Pasar la incidencia a «En revisión»',async()=>{await api('/api/autocare/incident',{code:ctx.incident,status:'en_revision',note:'Revisión iniciada desde el Centro de Control.'});return T('Incidencia en revisión en ADI AutoCare.');},{icon:PC3_ICON.ack});
     opForm(d,box,'Resolver la incidencia en AutoCare',{icon:PC3_ICON.check,tone:'ok',build:f=>({note:fld(f,'¿Cómo se resolvió?',area(300),'Queda en el historial de la incidencia. Si el error vuelve a ocurrir, se reabre sola.')}),validate:x=>x.note.value.trim().length<5?T('Indica cómo se resolvió la incidencia.'):'',
       confirm:()=>sure('¿Marcar la incidencia como resuelta?','Hazlo solo si la causa se corrigió. Si el error vuelve a ocurrir, la incidencia se reabre automáticamente.','Marcar resuelta'),
@@ -638,44 +674,88 @@ async function renderNotices(){
    else hint(box,'Fallo activo: no se puede silenciar. Permanece visible hasta que el sistema confirme que se resolvió.');
    opForm(d,box,'Registrar resolución',{icon:PC3_ICON.note,build:f=>({body:fld(f,'¿Qué se hizo?',area(1500),'La alerta sale de la bandeja cuando el sistema deja de detectar la condición.')}),validate:x=>x.body.value.trim().length<10?T('Describe la resolución (al menos 10 caracteres).'):'',
      submit:async x=>{await centerAction({action:'resolve',key:item.key,body:x.body.value.trim()});return T('Resolución registrada. La alerta saldrá cuando el sistema confirme que la condición ya no existe.');}});}};
- async function paintDrawer(d){const{item,history,notes,context:ctx,managed}=d.data,info=PC2_MODULES[item.module]||PC2_MODULES.alerts;paintDrawerHead(d,item);d.dialog.dataset.module=item.module;
+ async function paintDrawer(d){const{item,history,notes,context:ctx,managed,tracked}=d.data,info=PC2_MODULES[item.module]||PC2_MODULES.alerts;paintDrawerHead(d,item);d.dialog.dataset.module=item.module;
   const body=d.dialog.querySelector('.pc3-dbody'),foot=d.dialog.querySelector('.pc3-dfoot');
   const status=el('div',undefined,'pc3-status'),chip=(text,kind)=>{const c=el('span',text,'pc2-chip');c.dataset.kind=kind;status.append(c);};
-  chip(T(PC2_PRIORITY[item.priority]),item.priority);chip(T(PC2_STATE[item.state]||item.state),item.state);chip(T(item.read?'Visto':'Sin ver'),item.read?'visto':'nuevo');if(item.decision&&!item.silenced)chip(T('Requiere decisión'),'decision');
-  if(item.silenced)chip(T('Silenciada hasta')+' '+pc3When(item.silenced,true),'silencio');if(item.reminder)chip(T('Recordatorio')+' '+pc3When(item.reminder,true),'recordatorio');
+  chip(T(PC2_PRIORITY[item.priority]),item.priority);chip(T(PC2_STATE[item.state]||item.state),item.state);chip(T(item.read?'Visto':'Sin ver'),item.read?'visto':'nuevo');if(item.decision&&!item.silenced&&!item.postponed)chip(T('Requiere decisión'),'decision');
+  if(item.silenced)chip(T('Silenciada hasta')+' '+pc3When(item.silenced,true),'silencio');if(item.reminder)chip(T('Recordatorio')+' '+pc3When(item.reminder,true),'recordatorio');if(item.postponed)chip(T('Pospuesto hasta')+' '+pc3When(item.postponed.until,true),'pospuesto');
+  // 1.5.289 · Barra de resolución: lleva a la acción real de cada caso (no ejecuta nada por sí sola: abre el formulario o enfoca el botón).
+  const bar=el('div',undefined,'pc3-dbar');bar.setAttribute('role','toolbar');bar.setAttribute('aria-label',T('Acciones del pendiente'));
+  const jump=op=>{const target=d.dialog.querySelector('[data-op="'+op+'"]');if(!target)return false;const toggle=target.classList.contains('pc3-op')?target.querySelector('.pc3-op-btn'):target;
+   if(target.classList.contains('pc3-op')&&target.querySelector('.pc3-form').hidden)toggle.click();else toggle.focus();target.scrollIntoView({block:'nearest',behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});return true;};
+  const tool=(label,icon,op,fallback)=>{const b=button('',()=>{if(!jump(op)&&fallback)fallback();},'pc3-dtool');b.dataset.tool=op;b.append(systemIcon(icon),el('span',T(label)));bar.append(b);return b;};
+  const openModule=()=>{if(item.href){d.dialog.close();go(item,item.href);}};
+  tool('Resolver',PC3_ICON.check,'resolve',openModule).dataset.tone='ok';tool('Asignar',PC3_ICON.user,'assign');tool('Posponer',PC3_ICON.clock,'postpone');
+  if(item.href){const b=button('',openModule,'pc3-dtool');b.dataset.tool='open';b.append(systemIcon(PC3_ICON.open),el('span',T('Abrir módulo')));bar.append(b);}
+  tool('Registrar seguimiento',PC3_ICON.note,'follow');
   const facts=el('dl',undefined,'pc3-facts');
-  for(const[label,value]of [['Cliente o entidad',item.client||'—'],['Responsable',item.responsible||'—'],['Situación',item.waiting||'—'],[T(info.due||'Vencimiento'),item.due?pc3When(item.due)+(item.overdue?' · '+T('vencido'):''):T('Sin fecha')],['Creado',pc3When(item.created||'')],['Última actividad',pc3When(item.activity||item.at)]]){const row=el('div');row.append(el('dt',T(label)),el('dd',value));facts.append(row);}
+  const owner=(item.responsible||'—')+(item.assigned?' · '+T('asignado por')+' '+(item.assigned.by||T('Sistema'))+' · '+pc3When(item.assigned.at):'');
+  const rows=[['Cliente o entidad',item.client||'—'],...(item.ref&&item.ref.code?[['Código',item.ref.code]]:[]),...(item.module==='orders'&&ctx.status_label?[['Estado de la orden',ctx.status_label]]:[]),['Estado del pendiente',T(PC2_STATE[item.state]||item.state)],['Responsable',owner],...(item.module_responsible?[['Técnico en el módulo',item.module_responsible]]:[]),
+   ['Situación',item.waiting||'—'],[T(info.due||'Vencimiento'),item.due?pc3When(item.due)+(item.overdue?' · '+T('vencido'):''):T('Sin fecha')],['Creado',pc3When(item.created||'')],['Tiempo pendiente',item.created?(relativeTime(item.created)||pc3When(item.created)):'—'],['Última actividad',pc3When(item.activity||item.at)]];
+  for(const[label,value]of rows){const row=el('div');row.append(el('dt',T(label)),el('dd',value));facts.append(row);}
   const extra=[];if(item.ack)extra.push(T('Reconocida por')+' '+item.ack.by+' · '+pc3When(item.ack.at)+(item.ack.body?' · '+item.ack.body:''));if(item.resolution)extra.push(T('Resolución registrada por')+' '+item.resolution.by+' · '+pc3When(item.resolution.at)+' · '+item.resolution.body);
+  if(item.postponed)extra.push(T('Pospuesto por')+' '+(item.postponed.by||T('Sistema'))+' · '+pc3When(item.postponed.at)+' · '+item.postponed.body);
   const resolves=el('p',undefined,'pc3-resolves');resolves.append(el('strong',T('Se resuelve cuando')+': '),document.createTextNode(item.resolves||T('Cambia la condición en su módulo.')));
   const actions=section('Acciones','pc3-actions-sec'),ops=el('div',undefined,'pc3-ops');actions.append(ops);
+  // Responsable del seguimiento y aplazamiento (no cambian el registro de origen ni lo resuelven).
+  const track=section('Responsable y seguimiento');
+  if(!tracked)hint(track,'El responsable del seguimiento y «Posponer» estarán disponibles cuando se aplique la actualización de la base de datos.');
+  else{
+   if(ctx.follow_owner&&ctx.assignees)opForm(d,track,'Asignar responsable del seguimiento',{icon:PC3_ICON.user,op:'assign',build:f=>{hint(f,'Solo puedes elegir a quien ya tiene acceso a este pendiente. No cambia el técnico del registro.');return{user:fld(f,'Responsable',choose([['',T('Sin asignar')],...ctx.assignees.map(p=>[String(p.id),p.name])],item.assigned?(item.responsible_id||''):'')),body:fld(f,'Comentario (opcional)',area(300))};},
+     submit:async x=>{const out=await centerAction({action:'assign',key:item.entity,user:x.user.value,body:x.body.value.trim()});return out.unchanged?T('Ya tenía ese responsable.'):T('Responsable del seguimiento asignado.');}});
+   else if(ctx.can_take)opButton(d,track,'Tomar este pendiente',async()=>{await centerAction({action:'take',key:item.entity});return T('Ahora eres responsable del seguimiento.');},{icon:PC3_ICON.user}).dataset.op='assign';
+   else if(!ctx.follow_owner&&!ctx.admin)hint(track,'El responsable se asigna en su módulo (administración).');
+   if(item.postponed)opButton(d,track,'Reanudar ahora',async()=>{await centerAction({action:'resume',key:item.entity});return T('Pendiente reanudado.');},{icon:PC3_ICON.next}).dataset.op='postpone';
+   else if(ctx.can_postpone)opForm(d,track,'Posponer hasta una fecha',{icon:PC3_ICON.clock,op:'postpone',submitLabel:'Posponer',build:f=>{const now=new Date(Date.now()+clockOffset),min=pc2Day(new Date(now.getTime()+86400000)),max=pc2Day(new Date(now.getTime()+90*86400000));const date=dateInput('',min);date.max=max;
+     return{date:fld(f,'Hasta',date,'Sale de «Requieren mi atención» hasta esa fecha y vuelve sola. No lo resuelve.'),body:fld(f,'Motivo',area(300,'Por ejemplo: el cliente viaja hasta el lunes'))};},
+     validate:x=>!x.date.value?T('Indica hasta qué fecha se pospone.'):x.body.value.trim().length<5?T('Indica el motivo (al menos 5 caracteres).'):'',
+     submit:async x=>{await centerAction({action:'postpone',key:item.entity,date:x.date.value,body:x.body.value.trim()});return T('Pendiente pospuesto.');}});
+   else hint(track,'Un fallo crítico no se puede posponer: se mantiene visible hasta que se resuelva.');}
   // Observaciones internas y recordatorio: solo para el equipo; nunca se muestran al cliente ni resuelven el pendiente.
   const notesSec=section('Observaciones internas'),notesList=el('ul',undefined,'pc3-notes');
   if(!managed)hint(notesSec,'Las observaciones internas estarán disponibles cuando se aplique la actualización de la base de datos.');
   else{for(const n of notes){const li=el('li');li.append(el('p',n.body),el('small',(n.actor||T('Sistema'))+' · '+pc3When(n.created_at)));notesList.append(li);}if(!notes.length)notesList.append(el('li',T('Sin observaciones todavía.'),'pc3-empty'));notesSec.append(notesList);
-   opForm(d,notesSec,'Añadir observación',{icon:PC3_ICON.note,build:f=>({body:fld(f,'Observación interna',area(1500),'Visible solo para el equipo. No resuelve el pendiente.')}),validate:x=>x.body.value.trim().length<3?T('Escribe la observación (al menos 3 caracteres).'):'',
+   opForm(d,notesSec,'Añadir observación',{icon:PC3_ICON.note,op:item.module==='orders'?'':'follow',build:f=>({body:fld(f,'Observación interna',area(1500),'Visible solo para el equipo. No resuelve el pendiente.')}),validate:x=>x.body.value.trim().length<3?T('Escribe la observación (al menos 3 caracteres).'):'',
      submit:async x=>{const out=await centerAction({action:'note',key:item.entity,body:x.body.value.trim()});return out.duplicate?T('Esa observación ya estaba registrada.'):T('Observación guardada.');}});
    opForm(d,notesSec,item.reminder?'Cambiar recordatorio':'Programar recordatorio',{icon:PC3_ICON.clock,build:f=>{const today=pc2Day(new Date(Date.now()+clockOffset));return{date:fld(f,'Fecha',dateInput(item.reminder||'',today)),body:fld(f,'Motivo (opcional)',area(300))};},validate:x=>!x.date.value?T('Indica la fecha del recordatorio.'):'',
      submit:async x=>{await centerAction({action:'remind',key:item.entity,date:x.date.value,body:x.body.value.trim()});return T('Recordatorio programado.');}});}
   const historySec=section('Historial de actividad'),timeline=el('ol',undefined,'pc3-timeline');
   for(const e of history){const li=el('li');li.dataset.kind=e.kind;li.append(el('time',pc3When(e.at)),el('strong',e.actor||T('Sistema')),el('p',e.text));timeline.append(li);}
   if(!history.length)timeline.append(el('li',T('Sin actividad registrada todavía.'),'pc3-empty'));historySec.append(timeline);
-  body.replaceChildren(status,facts,...extra.map(t=>el('p',t,'pc3-ack')),resolves,actions,notesSec,historySec);
+  body.replaceChildren(status,bar,facts,...extra.map(t=>el('p',t,'pc3-ack')),resolves,actions,track,notesSec,historySec);
   const builder=MODULE_ACTIONS[item.module];if(builder){ops.append(el('p',T('Cargando acciones…'),'pc3-hint'));const holder=el('div');try{await builder(d,holder,item,ctx||{});}catch(error){holder.replaceChildren(el('p',error.message,'pc3-hint'));}ops.replaceChildren(...holder.childNodes);}
+  // Herramientas sin destino en este pendiente: se desactivan con su motivo (no aparentan funcionar).
+  for(const b of bar.querySelectorAll('.pc3-dtool[data-tool]')){const op=b.dataset.tool;if(op==='open'||op==='resolve')continue;if(!d.dialog.querySelector('[data-op="'+op+'"]')){b.disabled=true;b.title=T(op==='assign'?'Sin permiso para asignar este pendiente':op==='postpone'?'No se puede posponer':'No disponible');}}
+  if(!d.dialog.querySelector('[data-op="resolve"]')&&!item.href){const b=bar.querySelector('[data-tool="resolve"]');b.disabled=true;b.title=T('Se resuelve en su módulo');}
   foot.replaceChildren();if(item.href){const go2=button('',()=>{d.dialog.close();go(item,item.href);},'secondary');go2.append(el('span',T('Abrir detalle completo')),systemIcon(PC3_ICON.open));foot.append(go2);}foot.append(button(T('Cerrar'),()=>{if(!d.busy)d.dialog.close();},'primary'));}
  // ---- Notificaciones: historial informativo con lectura y ocultación por persona ----
  const historyView=noticeHistory(panels.history,unread=>{tabs.history.replaceChildren(el('span',T('Notificaciones')),...(unread?[el('b',String(unread))]:[]));tabs.history.setAttribute('aria-label',T('Notificaciones')+(unread?': '+unread+' '+T('sin leer'):''));});
  // ---- Actividad: lo que hizo el equipo (acciones, cambios de estado, gestión, lecturas, errores y reintentos), con filtros y CSV ----
  const activity=activityView(panels.activity,admin);
+ // ---- Solucionadas: lo que dejó de ser pendiente (quién, cuándo y cómo), leído de los historiales de cada módulo ----
+ const resolvedView=resolvedList(panels.resolved,admin);
+ // ---- Reglas de vencimiento y urgencia (administración): cambian cómo se priorizan los pendientes, no los registros ----
+ async function openRules(){const rules=(pending&&pending.rules)||null;if(!rules){toast(T('Espera a que carguen los pendientes.'),'info');return;}
+  const dialog=smallDialog(T('Reglas de urgencia'));dialog.classList.add('pc3-rules');const form=el('form',undefined,'pc3-form pc3-rules-form'),msg=el('p','','pc3-msg');msg.setAttribute('role','alert');form.noValidate=true;
+  hint(form,'Definen cuándo un pendiente pasa a prioridad Alta o Media. No cambian órdenes, citas ni presupuestos. El plazo de primera respuesta de las PQRS lo fija su módulo.');
+  const SPEC={orders_soon_days:['Órdenes: prioridad media si la entrega estimada es dentro de (días)',0,14],appointments_urgent_hours:['Citas sin confirmar: prioridad alta si faltan (horas)',1,168],appointments_important_hours:['Citas sin confirmar: prioridad media si faltan (horas)',1,336],
+   quotes_soon_days:['Presupuestos: prioridad media si la vigencia termina dentro de (días)',0,30],quotes_follow_days:['Presupuestos: prioridad media si el cliente no responde en (días)',1,30],parts_soon_days:['Repuestos: prioridad media si la llegada estimada es dentro de (días)',0,30],
+   licenses_urgent_days:['Licencias: prioridad alta si vencen dentro de (días)',0,60],licenses_important_days:['Licencias: prioridad media si vencen dentro de (días)',0,90]};
+  const inputs={};for(const[key,[label,min,max]]of Object.entries(SPEC)){const i=el('input');i.type='number';i.min=min;i.max=max;i.step=1;i.inputMode='numeric';i.value=String(rules[key]);i.name=key;inputs[key]=fld(form,label,i);}
+  const row=el('div',undefined,'pc3-form-actions'),reset=button(T('Valores por defecto'),async()=>{if(!(await sure('¿Volver a los valores por defecto?','Se aplican los criterios originales del centro.','Restablecer')))return;await save({reset:true});},'secondary'),ok=el('button',T('Guardar reglas'),'primary');ok.type='submit';row.append(reset,ok);form.append(msg,row);dialog.append(form);
+  async function save(payload){if(ok.disabled)return;ok.disabled=reset.disabled=true;msg.textContent='';try{const out=await api('/api/pending/rules',payload);toast(T('Reglas de urgencia guardadas.'),'success');dialog.close();await refresh(true);return out;}
+   catch(error){msg.textContent=error.message;for(const key of Object.keys(error.fields||{})){if(inputs[key])inputs[key].setAttribute('aria-invalid','true');}}finally{ok.disabled=reset.disabled=false;}}
+  form.onsubmit=event=>{event.preventDefault();for(const i of Object.values(inputs))i.removeAttribute('aria-invalid');save(Object.fromEntries(Object.entries(inputs).map(([k,i])=>[k,i.value.trim()])));};inputs.orders_soon_days.focus();}
  function setView(view){state.view=view;remember();for(const[key,tab]of Object.entries(tabs)){tab.setAttribute('aria-selected',String(key===view));tab.tabIndex=key===view?0:-1;panels[key].hidden=key!==view;}
-  if(view==='history')historyView.reload();if(view==='activity')activity.open();
+  if(view==='history')historyView.reload();if(view==='activity')activity.open();if(view==='resolved')resolvedView.open();
   const next=new URLSearchParams(routeState().params);next.set('vista',ROUTE[view]);try{window.history.replaceState(null,'','/#notices?'+next.toString());}catch{}}
- tabs.pending.replaceChildren(el('span',T('Pendientes')));tabs.history.replaceChildren(el('span',T('Notificaciones')));tabs.activity.replaceChildren(el('span',T('Actividad')));
+ tabs.pending.replaceChildren(el('span',T('Pendientes')));tabs.resolved.replaceChildren(el('span',T('Solucionadas')));tabs.history.replaceChildren(el('span',T('Notificaciones')));tabs.activity.replaceChildren(el('span',T('Historial')));
  setView(state.view);await refresh(true);
 }
 // Centro de actividad (1.5.288): consulta bajo demanda (no se actualiza sola, para no consumir recursos); exporta lo filtrado en CSV.
 function activityView(root,admin){
- const state={module:'',kind:'',user:'',from:'',to:'',q:''};let loaded=false,seq=0,data=null;
- const bar=el('div',undefined,'pc3-afilters'),list=el('ol',undefined,'pc3-log'),summary=el('p','','pc2-count');summary.setAttribute('aria-live','polite');
+ const state={module:'',kind:'',user:'',from:'',to:'',q:''};let loaded=false,seq=0,data=null,page=1,count=0;
+ const bar=el('div',undefined,'pc3-afilters'),list=el('ol',undefined,'pc3-log'),summary=el('p','','pc2-count'),more=button(T('Cargar más'),()=>load(page+1),'secondary pc3-more');summary.setAttribute('aria-live','polite');more.hidden=true;
  const pick=(label,key,options)=>{const box=el('label',undefined,'pc2-field'),s=el('select');box.append(el('span',T(label)),s);s.fill=opts=>{const keep=state[key];s.replaceChildren();for(const[v,t]of opts){const o=el('option',t);o.value=v;s.append(o);}s.value=opts.some(o=>o[0]===keep)?keep:'';};s.fill(options);s.onchange=()=>{state[key]=s.value;load();};bar.append(box);return s;};
  const fModule=pick('Módulo','module',[['',T('Todos')],...Object.entries(PC2_MODULES).map(([k,v])=>[k,T(v.label)])]);
  const KINDS={accion:'Acción',estado:'Cambio de estado',gestion:'Gestión del centro',lectura:'Notificación leída',error:'Error o reintento'};
@@ -686,30 +766,56 @@ function activityView(root,admin){
  const sbox=el('label',undefined,'pc2-field pc3-asearch'),search=el('input');search.type='search';search.maxLength=80;search.placeholder=T('Buscar persona, acción o código');sbox.append(el('span',T('Buscar')),search);bar.append(sbox);
  let typing=null;search.oninput=()=>{clearTimeout(typing);typing=setTimeout(()=>{state.q=search.value.trim();load();},350);};
  const csv=el('a',undefined,'pc3-op-btn pc3-link pc3-csv');csv.append(systemIcon(PC3_ICON.download),el('span',T('Exportar CSV')));csv.setAttribute('download','');bar.append(csv);
- root.replaceChildren(bar,summary,list);
+ root.replaceChildren(bar,summary,list,more);
  const query=()=>{const p=new URLSearchParams();for(const[k,v]of Object.entries(state))if(v)p.set(k,v);return p.toString();};
- async function load(){const mine=++seq;csv.href='/api/pending/activity.csv'+(query()?'?'+query():'');list.setAttribute('aria-busy','true');if(!data)list.replaceChildren(...Array.from({length:5},()=>el('li',undefined,'pc3-log-skel pc2-skel')));summary.textContent=T('Cargando actividad…');
-  try{const out=await api('/api/pending/activity'+(query()?'?'+query():''));if(mine!==seq)return;data=out;loaded=true;
+ async function load(n=1){const mine=++seq;csv.href='/api/pending/activity.csv'+(query()?'?'+query():'');list.setAttribute('aria-busy','true');if(!data)list.replaceChildren(...Array.from({length:5},()=>el('li',undefined,'pc3-log-skel pc2-skel')));summary.textContent=T('Cargando actividad…');
+  try{const q=query()+(n>1?(query()?'&':'')+'page='+n:'');const out=await api('/api/pending/activity'+(q?'?'+q:''));if(mine!==seq)return;data=out;loaded=true;page=out.page||1;count=n>1?count+out.rows.length:out.rows.length;more.hidden=!out.more;
    if(!state.from)fFrom.value=out.from;if(!state.to)fTo.value=out.to;if(fUser)fUser.fill([['',T('Todo el equipo')],...out.people.map(p=>[String(p.id),p.name])]);
-   summary.textContent=out.total>out.rows.length?out.rows.length+' '+T('de')+' '+out.total+' '+T('registros (los más recientes)'):pc2Plural(out.rows.length,'registro','registros')+' · '+pc3When(out.from)+' – '+pc3When(out.to);paint(out.rows);}
+   summary.textContent=out.total>count?count+' '+T('de')+' '+out.total+' '+T('registros (los más recientes)'):pc2Plural(out.total,'registro','registros')+' · '+pc3When(out.from)+' – '+pc3When(out.to);paint(out.rows,n>1);}
   catch(error){if(mine!==seq)return;summary.textContent='';const box=el('li',undefined,'pc2-state pc2-error');box.append(systemIcon(PC3_ICON.alert),el('strong',T('No se pudo cargar la actividad')),el('p',error.message),button(T('Reintentar'),()=>load(),'secondary'));list.replaceChildren(box);}
   finally{if(mine===seq)list.removeAttribute('aria-busy');}}
- function paint(rows){list.replaceChildren();if(!rows.length){const box=el('li',undefined,'pc2-state');box.append(systemIcon(PC3_ICON.history),el('strong',T('Sin actividad en este período')),el('p',T('Cambia las fechas o los filtros.')));list.append(box);return;}
+ function paint(rows,append){if(!append)list.replaceChildren();if(!append&&!rows.length){const box=el('li',undefined,'pc2-state');box.append(systemIcon(PC3_ICON.history),el('strong',T('Sin actividad en este período')),el('p',T('Cambia las fechas o los filtros.')));list.append(box);return;}
   for(const r of rows){const li=el('li',undefined,'pc3-log-row'),when=el('time',pc3When(r.at)),main=el('div',undefined,'pc3-log-main'),chips=el('span',undefined,'pc2-chips');li.dataset.kind=r.kind;if(r.module)li.dataset.module=r.module;when.dateTime=r.at;
    if(r.module&&PC2_MODULES[r.module]){const c=el('span',T(PC2_MODULES[r.module].label),'pc2-chip');c.dataset.kind='modulo';chips.append(c);}const k=el('span',T(KINDS[r.kind]||r.kind),'pc2-chip');k.dataset.kind=r.kind;chips.append(k);
    main.append(el('strong',r.text),chips);if(r.detail)main.append(el('p',r.detail));const by=el('span',r.actor||T('Sistema'),'pc3-log-actor');li.append(when,by,main);
    if(r.href){const go=el('a',undefined,'pc2-icon-btn');go.href=r.href;go.title=T('Abrir');go.setAttribute('aria-label',T('Abrir')+': '+r.text);go.append(systemIcon(PC3_ICON.open));li.append(go);}list.append(li);}}
  return {open(){if(!loaded)load();},reload(){if(loaded)load();}};
 }
+// 1.5.289 · Solucionadas: pendientes que su módulo cerró (resuelto o cancelado), con quién y cuándo. Bajo demanda y por páginas de 100.
+function resolvedList(root,admin){
+ const state={module:'',outcome:'',user:'',from:'',to:'',q:''};let loaded=false,seq=0,page=1,rows=[];
+ const bar=el('div',undefined,'pc3-afilters'),list=el('ol',undefined,'pc3-log pc3-solved'),summary=el('p','','pc2-count'),more=button(T('Cargar más'),()=>load(page+1),'secondary pc3-more');summary.setAttribute('aria-live','polite');more.hidden=true;
+ const pick=(label,key,options)=>{const box=el('label',undefined,'pc2-field'),s=el('select');box.append(el('span',T(label)),s);s.fill=opts=>{const keep=state[key];s.replaceChildren();for(const[v,t]of opts){const o=el('option',t);o.value=v;s.append(o);}s.value=opts.some(o=>o[0]===keep)?keep:'';};s.fill(options);s.onchange=()=>{state[key]=s.value;load(1);};bar.append(box);return s;};
+ pick('Módulo','module',[['',T('Todos')],...Object.entries(PC2_MODULES).map(([k,v])=>[k,T(v.label)])]);pick('Resultado','outcome',[['',T('Todos')],['resuelto',T('Resuelto')],['cancelado',T('Cancelado')]]);
+ const fUser=admin?pick('Persona','user',[['',T('Todo el equipo')]]):null;
+ const date=(label,key)=>{const box=el('label',undefined,'pc2-field'),i=el('input');i.type='date';box.append(el('span',T(label)),i);i.onchange=()=>{state[key]=i.value;load(1);};bar.append(box);return i;};
+ const fFrom=date('Desde','from'),fTo=date('Hasta','to');
+ const sbox=el('label',undefined,'pc2-field pc3-asearch'),search=el('input');search.type='search';search.maxLength=80;search.placeholder=T('Buscar cliente, código o persona');sbox.append(el('span',T('Buscar')),search);bar.append(sbox);
+ let typing=null;search.oninput=()=>{clearTimeout(typing);typing=setTimeout(()=>{state.q=search.value.trim();load(1);},350);};
+ root.replaceChildren(bar,summary,list,more);
+ const query=n=>{const p=new URLSearchParams();for(const[k,v]of Object.entries(state))if(v)p.set(k,v);if(n>1)p.set('page',String(n));return p.toString();};
+ async function load(n=1){const mine=++seq;list.setAttribute('aria-busy','true');if(n===1&&!rows.length)list.replaceChildren(...Array.from({length:4},()=>el('li',undefined,'pc3-log-skel pc2-skel')));summary.textContent=T('Cargando solucionadas…');
+  try{const out=await api('/api/pending/resolved'+(query(n)?'?'+query(n):''));if(mine!==seq)return;loaded=true;page=out.page;rows=n===1?out.rows:rows.concat(out.rows);
+   if(!state.from)fFrom.value=out.from;if(!state.to)fTo.value=out.to;if(fUser)fUser.fill([['',T('Todo el equipo')],...out.people.map(p=>[String(p.id),p.name])]);
+   summary.textContent=pc2Plural(out.total,'pendiente solucionado','pendientes solucionados')+' · '+pc3When(out.from)+' – '+pc3When(out.to)+(out.more?' · '+T('mostrando')+' '+rows.length:'');more.hidden=!out.more;paint(n>1?out.rows:rows,n>1);}
+  catch(error){if(mine!==seq)return;summary.textContent='';more.hidden=true;const box=el('li',undefined,'pc2-state pc2-error');box.append(systemIcon(PC3_ICON.alert),el('strong',T('No se pudieron cargar las solucionadas')),el('p',error.message),button(T('Reintentar'),()=>load(n),'secondary'));list.replaceChildren(box);}
+  finally{if(mine===seq)list.removeAttribute('aria-busy');}}
+ function paint(chunk,append){if(!append)list.replaceChildren();if(!append&&!chunk.length){const box=el('li',undefined,'pc2-state');box.append(systemIcon(PC3_ICON.check),el('strong',T('Nada solucionado en este período')),el('p',T('Cambia las fechas o los filtros. Aquí aparece lo que cada módulo cerró: entregas, confirmaciones, decisiones, instalaciones, respuestas y renovaciones.')));list.append(box);return;}
+  for(const r of chunk){const li=el('li',undefined,'pc3-log-row'),when=el('time',pc3When(r.at)),main=el('div',undefined,'pc3-log-main'),chips=el('span',undefined,'pc2-chips');li.dataset.kind=r.outcome;if(r.module)li.dataset.module=r.module;when.dateTime=r.at;
+   if(PC2_MODULES[r.module]){const c=el('span',T(PC2_MODULES[r.module].label),'pc2-chip');c.dataset.kind='modulo';chips.append(c);}const k=el('span',T(r.outcome==='cancelado'?'Cancelado':'Resuelto'),'pc2-chip');k.dataset.kind=r.outcome;chips.append(k);
+   main.append(el('strong',r.title),chips);if(r.detail)main.append(el('p',r.detail));li.append(when,el('span',r.actor||T('Sistema'),'pc3-log-actor'),main);
+   if(r.href){const go=el('a',undefined,'pc2-icon-btn');go.href=r.href;go.title=T('Abrir');go.setAttribute('aria-label',T('Abrir')+': '+r.title);go.append(systemIcon(PC3_ICON.open));li.append(go);}list.append(li);}}
+ return {open(){if(!loaded)load(1);},reload(){if(loaded)load(1);},today(){const d=pc2Day(new Date(Date.now()+clockOffset));state.from=state.to=d;fFrom.value=fTo.value=d;load(1);}};
+}
 // Historial de notificaciones (antes «Centro de Actividad»): mismas reglas de lectura y ocultación, con filtros de prioridad, estado,
 // módulo, fecha y orden. La prioridad de un aviso sale de su tipo (error → urgente, advertencia → importante, el resto normal).
 function noticeHistory(root,onUnread){
- const state={tab:'all',q:'',from:'',selected:'',priority:'',sort:'recent'};let data=null,known=null,busy=false;
+ const state={tab:'all',q:'',from:'',selected:'',priority:'',sort:'recent'};let data=null,known=null,busy=false;const openThreads=new Set();
  const bar=el('div',undefined,'activity-bar pc2-hbar'),tabs=el('div',undefined,'activity-tabs'),search=el('input'),from=el('input'),prio=el('select'),order=el('select'),readAll=button('',()=>mark(null),'secondary activity-readall'),hiddenButton=button('Ver ocultas',()=>showHidden(),'text-action activity-hidden-open');
  const risk=el('div',undefined,'activity-risk'),layout=el('div',undefined,'activity-layout'),list=el('div',undefined,'activity-list'),detail=el('aside',undefined,'activity-detail'),note=el('p','','track-note'),summary=el('p','','activity-count pc2-hcount');
  summary.setAttribute('aria-live','polite');tabs.setAttribute('role','group');tabs.setAttribute('aria-label','Filtrar por módulo o lectura');search.type='search';search.placeholder='Buscar cliente, código o texto';search.maxLength=80;search.setAttribute('aria-label','Buscar en las notificaciones');
  from.type='date';from.title='Desde la fecha';from.setAttribute('aria-label','Desde la fecha');
- for(const[v,t]of [['','Toda prioridad'],['urgente','Urgente'],['importante','Importante'],['normal','Normal']]){const o=el('option',t);o.value=v;prio.append(o);}prio.setAttribute('aria-label','Prioridad');
+ for(const[v,t]of [['','Toda prioridad'],['urgente','Alta'],['importante','Media'],['normal','Baja']]){const o=el('option',t);o.value=v;prio.append(o);}prio.setAttribute('aria-label','Prioridad');
  for(const[v,t]of [['recent','Más recientes'],['urgency','Urgencia']]){const o=el('option',t);o.value=v;order.append(o);}order.setAttribute('aria-label','Ordenar notificaciones');
  readAll.append(systemIcon('M18 6 7 17l-5-5 M22 10l-7.5 7.5L13 16'),el('span','Marcar todo como leído'));
  detail.hidden=true;detail.setAttribute('aria-label','Detalle del aviso');detail.tabIndex=-1;
@@ -741,17 +847,29 @@ function noticeHistory(root,onUnread){
   let rows=items.filter(item=>test(item)&&(!state.q||(item.title+' '+(item.detail||'')).toLowerCase().includes(state.q))&&(!state.from||pc2Day(new Date(item.at))>=state.from)&&(!state.priority||priorityOf(item)===state.priority)).sort((a,b)=>new Date(b.at)-new Date(a.at));
   if(state.sort==='urgency')rows=rows.sort((a,b)=>(PC2_RANK[priorityOf(a)]-PC2_RANK[priorityOf(b)])||(a.read-b.read)||(new Date(b.at)-new Date(a.at)));
   readAll.disabled=!data.unread;readAll.lastChild.textContent=data.unread?'Marcar todas como leídas':'Todo está leído';summary.textContent=data.unread+' sin leer · '+(data.total??items.length)+' en total'+(data.hidden_count?' · '+data.hidden_count+' oculta'+(data.hidden_count===1?'':'s'):'')+'. Marcar como leído u ocultar no cambia la orden, la cita ni el presupuesto.';
+  // Un repintado (sincronización, lectura, despliegue) no saca el foco del botón donde estaba: vuelve al mismo botón de la misma fila.
+  const focusRow=document.activeElement?.closest?.('.activity-row')?.dataset.key,focusCls=focusRow?[...document.activeElement.classList].map(c=>'.'+CSS.escape(c)).join(''):'';
   note.textContent=rows.length?(rows.length===1?'1 aviso':rows.length+' avisos')+' en esta vista':'';list.replaceChildren();
   if(!rows.length){const empty=el('div',undefined,'notify-empty');empty.append(systemIcon('M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0 M9 12l2 2 4-4'),el('strong',state.tab==='unread'||!items.length?'No tienes notificaciones sin leer':'Nada que mostrar con este filtro'),el('p',items.length?'Cambia de filtro, limpia la búsqueda o revisa las ocultas.':'Aquí aparecerán licencias, órdenes, citas, correos y avisos del sistema.'));list.append(empty);showDetail(null);return;}
   let previous='';const grouped=(state.tab==='all'||state.tab==='unread')&&state.sort==='recent';
-  for(const item of grouped?[...rows].sort((a,b)=>(['mail','chat','orders','system','alerts'].indexOf(noticeCategory(a))-['mail','chat','orders','system','alerts'].indexOf(noticeCategory(b)))||(new Date(b.at)-new Date(a.at))):rows){const category=noticeCategory(item);
-   if(grouped&&category!==previous){previous=category;list.append(el('h3',noticeCategories[category].label,'activity-group'));}
-   const row=el('article',undefined,'activity-row'),icon=el('span',undefined,'nc-icon'),open=button('',()=>showDetail(item),'activity-open'),when=el('time',relativeTime(item.at)||formatOrderDate(item.at)),goButton=button('',()=>openModule(item),'activity-go');row.dataset.key=item.key;row.dataset.cat=category;row.dataset.priority=priorityOf(item);if(!item.read)row.dataset.unread='true';if(noticeCritical(item))row.dataset.critical='true';row.setAttribute('aria-current',String(item.key===state.selected));
+  const ordered=grouped?[...rows].sort((a,b)=>(['mail','chat','orders','system','alerts'].indexOf(noticeCategory(a))-['mail','chat','orders','system','alerts'].indexOf(noticeCategory(b)))||(new Date(b.at)-new Date(a.at))):rows;
+  // 1.5.289 · Avisos equivalentes (mismo título y detalle) se muestran juntos con su cantidad; al desplegar se ven todos. Nada se elimina.
+  const threads=new Map();for(const item of ordered)if(item.thread){if(!threads.has(item.thread))threads.set(item.thread,[]);threads.get(item.thread).push(item);}
+  const placed=new Set();
+  for(const item of ordered){if(placed.has(item.key))continue;const family=item.thread&&threads.get(item.thread).length>1?threads.get(item.thread):[item];for(const x of family)placed.add(x.key);
+   const category=noticeCategory(item);if(grouped&&category!==previous){previous=category;list.append(el('h3',noticeCategories[category].label,'activity-group'));}
+   paintRow(item,family);if(family.length>1&&openThreads.has(item.thread))for(const x of family.slice(1))paintRow(x,[x],true);}
+  function paintRow(item,family,sub){const keys=family.map(x=>x.key).join(','),unread=family.filter(x=>!x.read).length,category=noticeCategory(item);
+   const row=el('article',undefined,'activity-row'+(sub?' pc3-sub':'')),icon=el('span',undefined,'nc-icon'),open=button('',()=>showDetail(item),'activity-open'),when=el('time',relativeTime(item.at)||formatOrderDate(item.at)),goButton=button('',()=>openModule(item),'activity-go');row.dataset.key=item.key;row.dataset.cat=category;row.dataset.priority=priorityOf(item);if(unread)row.dataset.unread='true';if(noticeCritical(item))row.dataset.critical='true';row.setAttribute('aria-current',String(item.key===state.selected));
    if(known&&!known.has(item.key))row.classList.add('track-new');
    icon.append(systemIcon(iconOf(item)));open.append(el('strong',item.title),el('small',item.detail||noticeCategories[category].label));open.setAttribute('aria-label',(item.read?'':'Sin leer. ')+(priorityOf(item)!=='normal'?PC2_PRIORITY[priorityOf(item)]+'. ':'')+item.title+'. Ver detalle');when.dateTime=item.at;when.title=formatOrderDate(item.at);goButton.setAttribute('aria-label','Abrir: '+item.title);goButton.title='Abrir en su módulo';goButton.append(systemIcon('M5 12h14 M12 5l7 7-7 7'));row.append(icon,open,when);
-   if(!item.read){const done=button('',()=>mark(item.key),'activity-go');done.setAttribute('aria-label','Marcar como leída: '+item.title);done.title='Marcar como leída';done.append(systemIcon('M20 6 9 17l-5-5'));row.append(done);}
-   if(item.hideable){const hideButton=button('',()=>hide(item.key),'activity-go');hideButton.setAttribute('aria-label','Ocultar: '+item.title);hideButton.title='Ocultar (no lo elimina)';hideButton.append(systemIcon('M9.88 9.88a3 3 0 1 0 4.24 4.24 M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68 M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61 M2 2l20 20'));row.append(hideButton);}row.append(goButton);list.append(row);}
+   if(family.length>1){const n=el('span','×'+family.length,'pc2-chip pc3-count');n.dataset.kind='grupo';n.title=family.length+' '+T('avisos equivalentes');open.querySelector('strong').append(' ',n);
+    const more=button('',()=>{if(openThreads.has(item.thread))openThreads.delete(item.thread);else openThreads.add(item.thread);paint();list.querySelector('.activity-row[data-key="'+CSS.escape(item.key)+'"] .pc3-expand')?.focus();},'activity-go pc3-expand');
+    const opened=openThreads.has(item.thread);more.setAttribute('aria-expanded',String(opened));more.setAttribute('aria-label',T(opened?'Contraer':'Ver los')+' '+family.length+' '+T('avisos equivalentes'));more.title=more.getAttribute('aria-label');more.append(systemIcon(opened?'M18 15l-6-6-6 6':'M6 9l6 6 6-6'));row.append(more);}
+   if(unread){const done=button('',()=>mark(keys),'activity-go');done.setAttribute('aria-label','Marcar como leída: '+item.title+(family.length>1?' ('+family.length+')':''));done.title='Marcar como leída';done.append(systemIcon('M20 6 9 17l-5-5'));row.append(done);}
+   if(family.every(x=>x.hideable)){const hideButton=button('',()=>hide(keys),'activity-go');hideButton.setAttribute('aria-label','Ocultar: '+item.title);hideButton.title='Ocultar (no lo elimina)';hideButton.append(systemIcon('M9.88 9.88a3 3 0 1 0 4.24 4.24 M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68 M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61 M2 2l20 20'));row.append(hideButton);}row.append(goButton);list.append(row);}
   known=new Set(items.map(item=>item.key));
+  if(focusRow){const row=list.querySelector('.activity-row[data-key="'+CSS.escape(focusRow)+'"]');(row&&(focusCls&&row.querySelector(focusCls)||row.querySelector('.activity-open')))?.focus({preventScroll:true});}
   const current=rows.find(item=>item.key===state.selected);if(state.selected&&!current)showDetail(null);else if(current)showDetail(current);}
  search.oninput=()=>{state.q=search.value.trim().toLowerCase();paint();};from.onchange=()=>{state.from=from.value;paint();};prio.onchange=()=>{state.priority=prio.value;paint();};order.onchange=()=>{state.sort=order.value;paint();};
  const onKey=event=>{if(!root.isConnected){document.removeEventListener('keydown',onKey,true);return;}if(event.key==='Escape'&&state.selected&&!root.hidden&&!document.querySelector('dialog[open]')){event.stopPropagation();const key=state.selected;showDetail(null);list.querySelector('.activity-row[data-key="'+CSS.escape(key)+'"] .activity-open')?.focus();}};document.addEventListener('keydown',onKey,true);

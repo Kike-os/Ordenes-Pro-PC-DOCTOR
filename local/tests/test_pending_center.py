@@ -11,6 +11,7 @@ import test_app  # primero: ruta de importación y base temporal
 import app
 import appointments
 import notifications
+import pending_center
 
 ROUTES = re.compile(r'#(orders\?id=\d+|appointments\?appointment=\d+|deliveries|pqrs\?id=\d+|live|licenses|maintenance\?order=\d+|system(\?autocare=1)?|settings\?tab=\w+|mail.*|invoicing.*)$')
 
@@ -93,7 +94,7 @@ class PendingCenterTests(unittest.TestCase):
         self.assertEqual(mine, {'pending:appointments:%d' % a for a in asked})
         self.assertEqual(len(data['items']), len({i['key'] for i in data['items']}))  # sin duplicados
         for item in data['items']:
-            self.assertIn(item['state'], ('pendiente', 'en_proceso'))
+            self.assertIn(item['state'], tuple(pending_center.STATES))
             self.assertIn(item['priority'], ('normal', 'importante', 'urgente', 'critico'))
             for target in [item['href']] + [a['href'] for a in item['actions']]:
                 self.assertRegex(target, ROUTES)

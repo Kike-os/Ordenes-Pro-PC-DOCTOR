@@ -2575,10 +2575,10 @@ class Handler(BaseHTTPRequestHandler):
                 # 1.5.287 · Centro de pendientes: solo personal; cada técnico ve lo suyo y lo sin asignar. «since» evita reenviar lo mismo.
                 if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
                 now=reception_now();notices=notifications.build(c,user,now,mail_allowed(user),None,limit=None)['items'] if user['role']=='administrador' else ()
-                result=pending_center.build(c,user,now,notices)
+                result=pending_center.build(c,user,now,notices,resolved_today=True)
                 if parse_qs(urlsplit(self.path).query).get('since',[''])[0]==result['rev']:return self.reply(200,{'unchanged':True,'rev':result['rev'],'generated_at':result['generated_at']})
                 return self.reply(200,result)
-            if path in ('/api/pending/item','/api/pending/activity','/api/pending/activity.csv'):
+            if path in ('/api/pending/item','/api/pending/activity','/api/pending/activity.csv','/api/pending/resolved'):
                 # 1.5.288 · Centro de Control: detalle para «Gestionar pendiente» e historial de actividad (solo lectura; CSV opcional).
                 if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
                 now=reception_now();query={k:v[0][:120] for k,v in parse_qs(urlsplit(self.path).query).items()}
@@ -2587,7 +2587,10 @@ class Handler(BaseHTTPRequestHandler):
                     found=pending_center.detail(c,user,now,query.get('key',''),notices)
                     if not found:return self.reply(404,{'error':'Este pendiente ya no está disponible: puede que se haya resuelto en su módulo.','resolved':True})
                     return self.reply(200,found)
-                try:result=pending_center.activity(c,user,now,query)
+                try:
+                    # 1.5.289 · Solucionadas: lo que dejó de ser pendiente, con quién y cuándo (historiales de cada módulo).
+                    if path=='/api/pending/resolved':return self.reply(200,pending_center.resolved(c,user,now,query))
+                    result=pending_center.activity(c,user,now,query,paged=not path.endswith('.csv'))
                 except ValueError as error:return self.reply(400,{'error':str(error)})
                 if path.endswith('.csv'):
                     audit(c,user['id'],'pending_activity_export');c.commit()
@@ -4153,6 +4156,12 @@ class Handler(BaseHTTPRequestHandler):
                         return self.reply(400 if error.kind=='configuracion' else 502,{'error':str(error),'kind':error.kind})
                     finally:
                         if client is not None:mail_pro.close_imap(client)
+                if path=='/api/pending/rules':
+                    # 1.5.289 · Reglas de vencimiento y urgencia por tipo de tarea (solo administración; auditado).
+                    import pending_actions
+                    try:result=pending_actions.save_rules(c,user,data,audit)
+                    except pending_actions.ActionError as error:c.rollback();return self.reply(error.status,{'error':str(error),'fields':error.fields})
+                    return self.reply(200,result)
                 if path=='/api/pending/action':
                     # 1.5.288 · Acciones propias del centro (nota, recordatorio, alertas, responsable). Lo demás usa el endpoint de su módulo.
                     import pending_actions
@@ -5262,6 +5271,8 @@ class Handler(BaseHTTPRequestHandler):
                         if len(comment)>2000:return self.reply(400,{'error':'El comentario admite hasta 2000 caracteres.'})
                         now=reception_now()
                         old=c.execute('SELECT status FROM orders WHERE id=?',(oid,)).fetchone()[0]
+                        # 1.5.289: quien envía el estado que estaba viendo («from_status») no pisa un cambio hecho por otra persona mientras tanto.
+                        if data.get('from_status') not in (None,'') and str(data.get('from_status'))!=old:return self.reply(409,{'error':'Otra persona cambió el estado de esta orden. Se recargaron los datos: revisa y vuelve a intentarlo.','current':old})
                         # Revertir una entrega reabre el contador de permanencia: solo administración, y queda auditado.
                         reverted=old=='entregado' and status!='entregado'
                         if reverted and user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede revertir una entrega registrada.'})
