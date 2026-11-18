@@ -1,17 +1,33 @@
 {
   "unreleased": {
     "features": [],
-    "improvements": [
-      "Licencias por cliente: tarjeta compacta con nombre o razón social, cédula o RUC identificado, total, activas, próximas a vencer, vencidas y próximo vencimiento; expandir o contraer cada cliente o todos (se recuerda), orden por vencimiento, cliente o creación, filtro por fabricante y logotipo del fabricante en la tabla.",
-      "Vigencia por colores en una barra proporcional al período contratado: verde, amarillo (30 días o menos), naranja (15 o menos), rojo (vencida), azul (reservada) y gris (perpetua o sin activar, sin porcentajes ni fechas inventadas). Encabezado con total, activas, próximas a vencer, vencidas, reservadas y renovaciones pendientes, que se actualizan tras cada operación sin recargar la página."
-    ],
+    "improvements": [],
     "fixes": [],
-    "security": [
-      "Renovaciones de licencias sin duplicados: el servidor rechaza registrar dos veces la misma vigencia y solo prolonga una licencia si su vencimiento sigue siendo el que se leyó, de modo que dos renovaciones simultáneas no se pisan; el historial nunca se sobrescribe."
-    ],
+    "security": [],
     "performance": []
   },
   "releases": [
+    {
+      "version": "1.5.293",
+      "date": "2026-11-18T07:28:31-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Licencias Digitales Enterprise 3.0: inventario por cliente y vigencia por colores",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Licencias por cliente: tarjeta compacta con nombre o razón social, cédula o RUC identificado, total, activas, próximas a vencer, vencidas y próximo vencimiento; expandir o contraer cada cliente o todos (se recuerda), orden por vencimiento, cliente o creación, filtro por fabricante y logotipo del fabricante en la tabla.",
+          "Vigencia por colores en una barra proporcional al período contratado: verde, amarillo (30 días o menos), naranja (15 o menos), rojo (vencida), azul (reservada) y gris (perpetua o sin activar, sin porcentajes ni fechas inventadas). Encabezado con total, activas, próximas a vencer, vencidas, reservadas y renovaciones pendientes, que se actualizan tras cada operación sin recargar la página."
+        ],
+        "fixes": [],
+        "security": [
+          "Renovaciones de licencias sin duplicados: el servidor rechaza registrar dos veces la misma vigencia y solo prolonga una licencia si su vencimiento sigue siendo el que se leyó, de modo que dos renovaciones simultáneas no se pisan; el historial nunca se sobrescribe."
+        ],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Administración (encargo del 2026-11-18: versión siguiente validada en Preview)"
+    },
     {
       "version": "1.5.292",
       "date": "2026-11-17T23:36:25-05:00",

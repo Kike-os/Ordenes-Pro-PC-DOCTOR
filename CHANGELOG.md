@@ -4,7 +4,9 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
-## Sin publicar
+## v1.5.293 — 2026-11-18 07:28 (UTC-05:00)
+
+Licencias Digitales Enterprise 3.0: inventario por cliente y vigencia por colores
 
 ### Mejoras realizadas
 
