@@ -4,6 +4,20 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## Sin publicar
+
+### Nuevas funcionalidades
+
+- Acciones rápidas en el catálogo de licencias: Vender (abre la venta con el producto agregado), Reservar (venta pendiente de entrega: las claves quedan reservadas para el cliente), Detalles (ficha lateral del producto con todas sus acciones) y Editar; se desactivan con su motivo cuando no hay stock.
+
+### Mejoras realizadas
+
+- Catálogo de licencias Premium Compact 3.0: tres vistas (tarjetas compactas uniformes a 4 columnas, lista empresarial ordenable y galería) con la imagen original de cada producto, nombre completo, fabricante, duración, precio de venta, estado y existencias en barra segmentada con las cifras de disponibles, reservadas, vendidas y vencidas; costo oculto salvo con el control global.
+
+### Errores corregidos
+
+- La lista del catálogo de licencias se desplaza dentro de su caja en pantallas medianas y móviles en lugar de ensanchar la página.
+
 ## v1.5.291 — 2026-11-17 22:14 (UTC-05:00)
 
 Licencias Digitales Premium Enterprise 3.0 y costo de compra protegido

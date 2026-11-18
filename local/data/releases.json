@@ -1,8 +1,14 @@
 {
   "unreleased": {
-    "features": [],
-    "improvements": [],
-    "fixes": [],
+    "features": [
+      "Acciones rápidas en el catálogo de licencias: Vender (abre la venta con el producto agregado), Reservar (venta pendiente de entrega: las claves quedan reservadas para el cliente), Detalles (ficha lateral del producto con todas sus acciones) y Editar; se desactivan con su motivo cuando no hay stock."
+    ],
+    "improvements": [
+      "Catálogo de licencias Premium Compact 3.0: tres vistas (tarjetas compactas uniformes a 4 columnas, lista empresarial ordenable y galería) con la imagen original de cada producto, nombre completo, fabricante, duración, precio de venta, estado y existencias en barra segmentada con las cifras de disponibles, reservadas, vendidas y vencidas; costo oculto salvo con el control global."
+    ],
+    "fixes": [
+      "La lista del catálogo de licencias se desplaza dentro de su caja en pantallas medianas y móviles en lugar de ensanchar la página."
+    ],
     "security": [],
     "performance": []
   },

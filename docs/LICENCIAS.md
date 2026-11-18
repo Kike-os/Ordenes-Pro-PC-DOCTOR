@@ -408,3 +408,31 @@ Cada alerta lleva a donde se resuelve. Las incidencias se resuelven desde el pro
 **Diseño.**
 - Catálogo a 4 columnas en monitores amplios (3 en portátil, 2 en tableta, 1 en móvil), con nombres completos sin recorte.
 - Indicadores compactos en 8 columnas (4 en pantallas medianas y 2 en móvil).
+
+## 1.5.292 · Catálogo de licencias Premium Compact 3.0
+
+Rediseño de la presentación del catálogo («Productos y catálogo»). No cambia datos, reglas ni funciones: usa los mismos datos reales y las mismas acciones.
+
+**Tres vistas.** La elección se recuerda en el navegador; las preferencias anteriores «Tarjetas» y «Tabla» pasan a «Tarjetas» y «Lista».
+- **Tarjetas compactas.** Uniformes, en 4 columnas en monitores amplios (3 en portátil, 1 en móvil). Cada tarjeta muestra:
+  - la imagen original del producto;
+  - el nombre completo, el fabricante y la modalidad;
+  - el estado (Disponible, Stock bajo, Agotado, Desactivado o Sin configurar), con un acento de color;
+  - el precio de venta y el costo oculto;
+  - duración, dispositivos y activación;
+  - las existencias;
+  - las acciones rápidas.
+- **Lista empresarial.** Tabla ordenable por producto, fabricante, duración, precio, cada cifra de existencias y estado, con el costo enmascarado y las acciones en la misma fila. Se desplaza dentro de su caja y nunca ensancha la página.
+- **Galería.** La imagen del producto en grande, el estado, el precio, cuántas hay disponibles, las existencias y las acciones con iconos.
+
+**Existencias reorganizadas, sin perder información.** Una barra segmentada proporcional y las cuatro cifras: disponibles, reservadas, vendidas y vencidas. Una cifra que cambia se resalta un instante.
+
+**Costo.** Sigue oculto por defecto; el control global «Mostrar costo» lo muestra solo a personal autorizado y el servidor lo vuelve a comprobar (1.5.291). Con el costo visible se muestra también el margen.
+
+**Acciones rápidas (funcionales).**
+- *Vender*: abre la venta de licencias con el producto ya agregado (una unidad).
+- *Reservar*: la misma venta, pendiente de entrega. Las claves quedan reservadas al registrarla, para su cliente, con la validación de disponibilidad del servidor.
+- Vender y Reservar se desactivan con su motivo cuando no hay stock, el producto está desactivado o falta configurarlo.
+- *Detalles*: ficha lateral del producto, con datos comerciales, existencias y todas sus acciones (ver licencias, agregar o ajustar stock, historial, duplicar y activar o desactivar).
+- *Editar*: la edición de siempre.
+- *⋯*: el resto de las acciones existentes.
