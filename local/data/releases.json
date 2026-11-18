@@ -1,18 +1,34 @@
 {
   "unreleased": {
-    "features": [
-      "Acciones rápidas en el catálogo de licencias: Vender (abre la venta con el producto agregado), Reservar (venta pendiente de entrega: las claves quedan reservadas para el cliente), Detalles (ficha lateral del producto con todas sus acciones) y Editar; se desactivan con su motivo cuando no hay stock."
-    ],
-    "improvements": [
-      "Catálogo de licencias Premium Compact 3.0: tres vistas (tarjetas compactas uniformes a 4 columnas, lista empresarial ordenable y galería) con la imagen original de cada producto, nombre completo, fabricante, duración, precio de venta, estado y existencias en barra segmentada con las cifras de disponibles, reservadas, vendidas y vencidas; costo oculto salvo con el control global."
-    ],
-    "fixes": [
-      "La lista del catálogo de licencias se desplaza dentro de su caja en pantallas medianas y móviles en lugar de ensanchar la página."
-    ],
+    "features": [],
+    "improvements": [],
+    "fixes": [],
     "security": [],
     "performance": []
   },
   "releases": [
+    {
+      "version": "1.5.292",
+      "date": "2026-11-17T23:36:25-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Catálogo de licencias Premium Compact 3.0",
+      "changes": {
+        "features": [
+          "Acciones rápidas en el catálogo de licencias: Vender (abre la venta con el producto agregado), Reservar (venta pendiente de entrega: las claves quedan reservadas para el cliente), Detalles (ficha lateral del producto con todas sus acciones) y Editar; se desactivan con su motivo cuando no hay stock."
+        ],
+        "improvements": [
+          "Catálogo de licencias Premium Compact 3.0: tres vistas (tarjetas compactas uniformes a 4 columnas, lista empresarial ordenable y galería) con la imagen original de cada producto, nombre completo, fabricante, duración, precio de venta, estado y existencias en barra segmentada con las cifras de disponibles, reservadas, vendidas y vencidas; costo oculto salvo con el control global."
+        ],
+        "fixes": [
+          "La lista del catálogo de licencias se desplaza dentro de su caja en pantallas medianas y móviles en lugar de ensanchar la página."
+        ],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Administración (encargo del 2026-11-17: versión siguiente validada en Preview)"
+    },
     {
       "version": "1.5.291",
       "date": "2026-11-17T22:14:11-05:00",
