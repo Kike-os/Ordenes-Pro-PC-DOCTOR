@@ -259,16 +259,33 @@ def _messages(c, user, now, admin):
 
 def _licenses(c, now, R):
     import licenses
+    import license_control
     out = []
+    today = now.date().isoformat()
     for u in licenses.expiring(c, now, 500):
         days = u['days_left']
+        # 1.5.290 · Seguimiento comercial del ciclo: un rechazo registrado cierra el pendiente (queda en «Solucionadas»); aceptar no
+        # renueva nada: pide registrar la renovación con su fecha efectiva.
+        cyc = license_control.cycle(c, {'id': u['id'], 'expires_at': u['expires_at'], 'renewed_to': u['renewed_to']})
+        if cyc['status'] in ('rechazado', 'completado'):
+            continue
+        follow = cyc['status']
+        recontact = bool(cyc['next_contact'] and cyc['next_contact'] <= today)
         priority = 'urgente' if days <= R['licenses_urgent_days'] else 'importante' if days <= R['licenses_important_days'] else 'normal'
+        if recontact and priority == 'normal':
+            priority = 'importante'
         text = 'Vencida hace %d día%s' % (-days, '' if days == -1 else 's') if days < 0 else 'Vence hoy' if days == 0 else 'Vence en %d día%s' % (days, '' if days == 1 else 's')
-        out.append(_item('licenses', '%d:%s' % (u['id'], u['expires_at']), 'Licencia por vencer · ' + (u['product'] or 'Licencia')[:60], detail=text + (' · ' + u['code'] if u['code'] else ''),
+        waiting = ('El cliente aceptó: registra la renovación con su fecha efectiva' if follow == 'aceptado' else 'Volver a contactar hoy' if recontact else
+                   'Esperando la respuesta del cliente' if follow == 'esperando_respuesta' else 'Cliente contactado: registra su respuesta' if follow == 'contactado' else
+                   'Ofrecer la renovación al cliente')
+        href = '#licenses?unidad=%d' % u['id']
+        out.append(_item('licenses', '%d:%s' % (u['id'], u['expires_at']), 'Licencia por vencer · ' + (u['product'] or 'Licencia')[:60], detail=text + (' · ' + u['code'] if u['code'] else '') + ' · ' + cyc['status_label'],
                          client=u['client'] or 'Sin cliente', responsible='Administración', priority=priority, due=u['expires_at'], overdue=days < 0, at=_iso(u['expires_at']),
-                         href='#licenses', actions=[{'label': 'Consultar licencia', 'href': '#licenses'}], waiting='Ofrecer la renovación al cliente',
-                         resolves='Desaparece cuando la licencia se renueva o deja de estar vigente en Licencias Pro.', decision=days <= R['licenses_urgent_days'],
-                         ref={'unit_id': u['id'], 'code': u['code'] or '', 'expires_at': u['expires_at'], 'days_left': days, 'product': u['product'] or ''}))
+                         href=href, actions=[{'label': 'Gestionar renovación', 'href': href}], waiting=waiting,
+                         resolves='Desaparece cuando la renovación queda registrada en Licencias Pro, o cuando se registra que el cliente la rechazó.',
+                         decision=days <= R['licenses_urgent_days'] or follow == 'aceptado' or recontact,
+                         ref={'unit_id': u['id'], 'code': u['code'] or '', 'expires_at': u['expires_at'], 'days_left': days, 'product': u['product'] or '', 'followup': follow,
+                              'followup_label': cyc['status_label'], 'next_contact': cyc['next_contact'] or ''}))
     return out
 
 
@@ -433,7 +450,8 @@ def _stage(item):
     if item.get('postponed'):
         return 'pospuesto'
     if not item['overdue']:
-        if (module == 'orders' and ref.get('status') in ('presupuesto', 'esperando_cliente')) or (module == 'quotes' and ref.get('status') == 'enviado'):
+        if (module == 'orders' and ref.get('status') in ('presupuesto', 'esperando_cliente')) or (module == 'quotes' and ref.get('status') == 'enviado') or \
+                (module == 'licenses' and ref.get('followup') == 'esperando_respuesta' and not item['decision']):
             return 'espera_cliente'
         if (module == 'orders' and ref.get('status') == 'esperando_repuesto') or (module == 'parts' and ref.get('stage') in PART_BEFORE_ARRIVAL and ref.get('situation') != 'incidencia_transporte'):
             return 'espera_tercero'
@@ -837,7 +855,15 @@ def resolved(c, user, now, params):
     def license_rows():
         for r in c.execute("SELECT e.unit_id,e.created_at,e.actor_id,COALESCE(u.name,NULLIF(e.actor,''),'') actor,e.detail FROM license_events e LEFT JOIN users u ON u.id=e.actor_id "
                            "WHERE e.event='renovada' AND e.created_at>=? AND e.created_at<? ORDER BY e.id DESC LIMIT 200", (a, b)):
-            add(r['created_at'], 'licenses', 'resuelto', 'Licencia renovada', (r['detail'] or '')[:160], r['actor'], r['actor_id'], '#licenses', 'licenses:%s' % r['unit_id'])
+            add(r['created_at'], 'licenses', 'resuelto', 'Licencia renovada', (r['detail'] or '')[:160], r['actor'], r['actor_id'], '#licenses?unidad=%s' % r['unit_id'], 'licenses:%s' % r['unit_id'])
+        try:
+            for r in c.execute("SELECT f.unit_id,f.created_at,f.user_id,COALESCE(us.name,'') actor,f.note,u.code FROM license_followups f JOIN license_units u ON u.id=f.unit_id "
+                               "LEFT JOIN users us ON us.id=f.user_id WHERE f.status='rechazado' AND f.created_at>=? AND f.created_at<? ORDER BY f.id DESC LIMIT 200", (a, b)):
+                add(r['created_at'], 'licenses', 'cancelado', 'Renovación rechazada por el cliente · ' + (r['code'] or ''), (r['note'] or '')[:160], r['actor'], r['user_id'],
+                    '#licenses?unidad=%s' % r['unit_id'], 'licenses:%s' % r['unit_id'])
+        except Exception as error:
+            if 'license_followups' not in str(error):
+                raise
 
     def alert_rows():
         for r in c.execute("SELECT a.entity_id,a.created_at,a.user_id,COALESCE(u.name,'') actor FROM audit a LEFT JOIN users u ON u.id=a.user_id WHERE a.action='autocare_incident_resuelta' "

@@ -583,6 +583,31 @@ Object.assign(PHRASES,{
  'pendiente solucionado':'solved item',
  'pendientes solucionados':'solved items'
 });
+// 1.5.290 · Licencias Pro Premium 4.0 en el Centro de Control: «Gestionar renovación» y seguimiento comercial.
+Object.assign(PHRASES,{
+ 'Gestionar renovación':'Manage renewal',
+ 'Registrar seguimiento comercial':'Log sales follow-up',
+ 'Seguimiento':'Follow-up',
+ 'Próximo contacto':'Next contact',
+ 'Contactado':'Contacted',
+ 'Esperando respuesta':'Awaiting reply',
+ 'Aceptado':'Accepted',
+ 'Presencial':'In person',
+ 'Otro':'Other',
+ 'Nota':'Note',
+ 'Próximo contacto (opcional)':'Next contact (optional)',
+ 'Sin contactar':'Not contacted',
+ 'Canal':'Channel',
+ 'Qué se habló (sin claves ni contraseñas)':'What was discussed (no keys or passwords)',
+ 'Aceptar no renueva la licencia: la vigencia se actualiza al registrar la renovación con su fecha efectiva. Rechazar cierra el pendiente.':'Accepting does not renew the license: validity is updated when the renewal is recorded with its effective date. Rejecting closes the pending item.',
+ 'Indica por qué canal se contactó al cliente.':'Choose the channel used to contact the client.',
+ '¿Registrar que el cliente rechazó la renovación?':'Record that the client rejected the renewal?',
+ 'El pendiente se cerrará y quedará en «Solucionadas» como cancelado. El historial se conserva.':'The pending item will close and appear in “Solved” as cancelled. The history is kept.',
+ 'Registrar rechazo':'Record rejection',
+ 'Ese seguimiento ya estaba registrado.':'That follow-up was already recorded.',
+ 'Seguimiento de la renovación registrado.':'Renewal follow-up recorded.',
+ 'La renovación (nueva vigencia, clave, costo y precio) se registra en el expediente de la licencia.':'The renewal (new validity, key, cost and price) is recorded in the license file.'
+});
 const PATTERNS=[
  // ADI (1.5.276)
  [/^Si el número corresponde a una orden con correo registrado, acabamos de enviar un código de 6 dígitos a ese correo\. Caduca en (\d+) minutos\.$/,m=>'If the number matches an order with a registered email, we just sent a 6-digit code to that email. It expires in '+m[1]+' minutes.'],

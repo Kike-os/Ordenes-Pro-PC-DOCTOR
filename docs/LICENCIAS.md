@@ -287,3 +287,68 @@ Rediseño estructural del catálogo inspirado en Quantro (composición y jerarqu
 - **Pruebas:**
   - `test_catalog_cache.py`.
   - En navegador, 22 comprobaciones: esqueleto, cabecera, barra, tarjetas, logotipos, estados e inventario frente a los registros, información comercial, credenciales ocultas, menú, filtros, tabla con filtros conservados, orden, acciones, preferencia recordada, actualización sin parpadeo, caché e imagen reemplazada, 1024, 768, 390 y 320 px, movimiento reducido y ausencia de errores de JavaScript.
+
+## 1.5.290 · Licencias Pro Premium 4.0
+
+**Auditoría previa (Producción, solo lectura, 2026-11-17).** 51 licencias: 32 disponibles, 10 entregadas, 1 reservada y 8 anuladas.
+- Sin incoherencias.
+- Ninguna activa sin fecha.
+- Ninguna entrega sin cliente.
+- Ninguna clave duplicada.
+- Ningún aviso repetido.
+- Ningún vencimiento distinto del que dictan las reglas del producto.
+- Ventas y unidades cuadran.
+
+No se corrigió ningún registro: la versión solo añade tablas.
+
+**Tres estados separados** (`license_control.axes`), para que no se contradigan:
+- *Inventario*: disponible, reservada, entregada, anulada o vencida sin vender.
+- *Activación*: sin activar, activada o no aplica (en inventario).
+- *Vigencia*: vigente, próxima a vencer, vencida, renovada, perpetua, sin fecha aplicable o anulada.
+
+Semáforo: verde vigente, amarillo próxima a vencer, rojo vencida y gris sin activar o sin fecha aplicable. El margen de «próxima a vencer» sigue siendo el configurable del panel (30 días por defecto).
+
+**Renovaciones (pestaña nueva).** Muestra las licencias entregadas que vencen en los próximos 90 días (o el margen configurado, si es mayor) o ya vencieron, y las renovadas en los últimos 30 días.
+- Estados comerciales por ciclo (licencia + fecha de vencimiento): sin contactar, contactado, esperando respuesta, aceptado, rechazado y completado.
+- *Completado* no se guarda: lo da la renovación registrada.
+- Validaciones:
+  - contactar exige canal;
+  - aceptar o rechazar exigen nota;
+  - el próximo contacto es desde hoy y dentro de un año;
+  - repetir lo mismo en 15 s no duplica.
+- **Aceptar no cambia la vigencia.** La vigencia solo cambia con «Renovar» y su fecha efectiva (`licenses.renew`, sin cambios).
+- `license_followups` (migración 107) es de solo anexado. Los ciclos anteriores se conservan.
+- Avisos internos configurables: 30, 15, 7 y 1 días antes y el día del vencimiento (`system_state` `license_alert_days`). Siguen siendo uno por licencia, vencimiento y anticipación.
+- Los avisos por correo al cliente siguen en «Notificaciones de renovación», con su activación y la baja voluntaria del cliente.
+- Desde aquí no se envía nada automáticamente: «Contactar» abre el teléfono, WhatsApp o el correo de quien gestiona.
+
+**Expediente en panel lateral** (`/api/licenses/units/{id}/dossier`, sin credenciales). Incluye:
+- los tres estados con semáforo y el tiempo restante;
+- las acciones según el estado;
+- el seguimiento de la renovación con contacto y registro;
+- datos de producto, comerciales y de activación;
+- credenciales enmascaradas, que se muestran una a una y con registro, como antes;
+- instrucciones;
+- dispositivos registrados;
+- renovaciones anteriores;
+- historial cronológico.
+
+Se abre también con `#licenses?unidad=ID`.
+
+**Dispositivos registrados (`license_devices`).**
+- Se respeta el número de dispositivos permitidos.
+- No se repite un equipo activo, y no se admite un equipo de otro cliente.
+- No se borran: se retiran con motivo, quién y cuándo, y no se editan.
+
+**Reportes (pestaña nueva).** Disponibles, asignadas, activas, próximos vencimientos, vencidas, renovaciones realizadas, renovaciones pendientes, más vendidos, ingresos por renovaciones y clientes con varias licencias.
+- Tabla con totales, exportación CSV (fórmulas neutralizadas y auditada) e impresión A4 con el logo original.
+- «Ingresos por renovaciones» suma solo los **pagos confirmados** de ventas de licencias de renovación. El precio anotado en la renovación se muestra aparte y no se cuenta como cobro.
+
+**Centro de Control.**
+- Las licencias por vencer muestran su estado comercial y el botón **Gestionar renovación**, que abre el expediente.
+- En el panel del centro se registra el seguimiento comercial.
+- «Esperando respuesta» pasa a *En espera de cliente*.
+- «Aceptado» y la fecha de «volver a contactar» piden una decisión.
+- Un rechazo registrado cierra el pendiente y queda en «Solucionadas» como cancelado.
+
+**Búsqueda global.** En la barra del módulo se busca por código, producto, cliente, cédula o RUC, orden, venta, proveedor o factura, y por la clave mediante su huella, sin mostrarla.

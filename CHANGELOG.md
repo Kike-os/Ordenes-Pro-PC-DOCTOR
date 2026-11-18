@@ -4,6 +4,22 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## Sin publicar
+
+### Nuevas funcionalidades
+
+- Licencias Pro Premium 4.0: pestaña Renovaciones con seguimiento comercial por ciclo (sin contactar, contactado, esperando respuesta, aceptado, rechazado y completado), canal, nota y próximo contacto; aceptar no cambia la vigencia, que solo se actualiza al registrar la renovación con su fecha efectiva.
+- Expediente de cada licencia en panel lateral: inventario, activación y vigencia separados con semáforo, tiempo restante, contacto (llamar, WhatsApp, correo, sin envíos automáticos), dispositivos registrados con límite y retiro con motivo, renovaciones anteriores e historial. Se abre desde el Centro de Control con «Gestionar renovación».
+- Reportes de licencias: disponibles, asignadas, activas, próximos vencimientos, vencidas, renovaciones realizadas y pendientes, más vendidos, ingresos por renovaciones (solo pagos confirmados) y clientes con varias licencias, con CSV e impresión A4.
+
+### Mejoras realizadas
+
+- Búsqueda global en Licencias Pro; avisos internos de vencimiento configurables (30, 15, 7, 1 días y el día, sin duplicados); en el Centro de Control las licencias muestran su estado comercial y un rechazo registrado cierra el pendiente y queda en Solucionadas.
+
+### Actualizaciones de seguridad
+
+- El seguimiento de renovaciones y los dispositivos son de solo anexado (no se editan ni borran; los equipos se retiran con motivo); el expediente y los reportes nunca incluyen credenciales; todo queda en el historial y la auditoría, solo para administración.
+
 ## v1.5.289 — 2026-11-17 20:07 (UTC-05:00)
 
 Centro de Notificaciones y Pendientes Premium 3.0 y flujo de resolución de órdenes

@@ -1365,8 +1365,10 @@ def tick(c,now):
     """Avisos de 30, 15, 7 y 1 días antes y del día del vencimiento: uno por licencia, fecha y anticipación (sin duplicados), con su
     registro en el historial. Las perpetuas y las que aún no tienen vencimiento (sin activar) no generan avisos. Devuelve los nuevos."""
     expire(c,now);new=[]
+    import license_control
+    chosen=sorted(license_control.alert_days(c))   # 1.5.290: anticipaciones configurables (por defecto 30, 15, 7, 1 y el día)
     for unit in expiring(c,now,limit=2000):
-        days=unit['days_left'];threshold=next((t for t in reversed(ALERT_DAYS) if days<=t),None) if days>=0 else 0
+        days=unit['days_left'];threshold=next((t for t in chosen if days<=t),None) if days>=0 else (0 if 0 in chosen else None)
         if threshold is None:continue
         if c.execute('INSERT OR IGNORE INTO license_alerts(unit_id,expires_at,days,created_at) VALUES (?,?,?,?)',(unit['id'],unit['expires_at'],threshold,stamp(now))).rowcount:
             text='Vence hoy' if days==0 else 'Vencida el %s'%unit['expires_at'] if days<0 else 'Vence en %d día%s (%s)'%(days,'' if days==1 else 's',unit['expires_at'])

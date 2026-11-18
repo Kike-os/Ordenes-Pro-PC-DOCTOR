@@ -12429,3 +12429,89 @@ dialog.pc3-rules input[aria-invalid=true]{border-color:#ff7a83}
  .activity-row.pc3-sub{margin-left:10px}
 }
 @media(prefers-reduced-motion:reduce){.pc3-section,.pc3-dtool,.pc3-expand svg{transition:none}}
+
+/* ===== 1.5.290 · Licencias Pro Premium 4.0 =====
+   Acotado a .licenses, .license-drawer y las clases license-* nuevas. Mismo tema oscuro y logo original. */
+.licenses .licenses-actions{align-items:center}
+.license-finder{display:flex;align-items:center;gap:8px;flex:1 1 280px;min-width:0;margin-left:auto;padding:0 12px;border:1px solid #2a3f60;border-radius:12px;background:#0b1626;transition:border-color .15s}
+.license-finder:focus-within{border-color:#3e7cd5}.license-finder svg{flex:0 0 auto;width:16px;height:16px;color:#7f93b1}
+.license-finder input{flex:1 1 auto;min-width:0;min-height:42px;border:0;background:transparent;color:#eaf2ff;outline:none}
+/* Expediente en panel lateral */
+body[data-page=dashboard] dialog.maintenance-dialog.license-dialog.license-drawer{position:fixed;inset:0 0 0 auto;width:min(680px,100%);max-width:100%;height:100dvh;max-height:100dvh;margin:0;border-radius:16px 0 0 16px;border-right:0;overflow:auto;overscroll-behavior:contain;animation:license-slide .22s ease-out}
+body[data-page=dashboard] dialog.license-drawer::backdrop{background:#020712a6;backdrop-filter:blur(3px)}
+body[data-page=dashboard] dialog.license-drawer .dialog-heading{position:sticky;top:-18px;z-index:2;margin:-18px -20px 12px;padding:14px 20px;background:linear-gradient(180deg,#0f1d33,#0b1526);border-bottom:1px solid #1b2b44}
+body[data-page=dashboard] dialog.license-drawer .license-detail-grid{grid-template-columns:minmax(0,1fr)}
+@keyframes license-slide{from{transform:translateX(24px);opacity:.4}to{transform:none;opacity:1}}
+.license-axes{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}
+.license-axis{position:relative;display:grid;gap:2px;padding:9px 12px;border:1px solid #1f3352;border-radius:12px;background:#0a1424;min-width:0}
+.license-axis small{font-size:10.5px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:#7f93b1}.license-axis strong{font-size:13.5px;color:#e3edff}
+.license-axis[data-kind=val]{padding-left:28px}.license-axis[data-kind=val] .license-light{position:absolute;left:11px;top:15px}
+.license-light{display:inline-block;flex:0 0 auto;width:10px;height:10px;margin-right:6px;border-radius:50%;background:#64748b;box-shadow:0 0 0 3px #64748b26;vertical-align:middle}
+.license-light[data-light=verde]{background:#22c55e;box-shadow:0 0 0 3px #22c55e2e}.license-light[data-light=amarillo]{background:#facc15;box-shadow:0 0 0 3px #facc152e}
+.license-light[data-light=rojo]{background:#ef4444;box-shadow:0 0 0 3px #ef44442e}
+.license-follow{display:inline-flex;align-items:center;padding:2px 9px;border:1px solid #2f4566;border-radius:999px;background:#0f1a2b;color:#cfe0f7;font-size:11.5px;font-weight:700;white-space:nowrap}
+.license-follow[data-status=contactado]{border-color:#2f4f7a;color:#9fc3ff}.license-follow[data-status=esperando_respuesta]{border-color:#6d5a22;color:#f3d48f}
+.license-follow[data-status=aceptado]{border-color:#1f5548;color:#7fe0c4}.license-follow[data-status=rechazado]{border-color:#5a2a31;color:#ffb3b9}.license-follow[data-status=completado]{border-color:#1f5548;background:#0d2620;color:#7fe0c4}
+.license-cycle-top{display:flex;flex-wrap:wrap;align-items:center;gap:8px}.license-next{color:#f3d48f;font-size:12.5px;font-weight:650}
+.license-contact{display:flex;flex-wrap:wrap;gap:6px}.license-contact-btn{display:inline-flex;align-items:center;gap:6px;min-height:40px;text-decoration:none}.license-contact-btn svg{width:15px;height:15px}
+.license-cycle-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:10px;border:1px solid #1f3352;border-radius:12px;background:#0a1424}
+.license-cycle-form label{display:grid;gap:4px;min-width:0}.license-cycle-form label>span{font-size:11px;font-weight:700;color:#9bb0cf}.license-cycle-form .wide{grid-column:1/-1}
+.license-cycle-form :is(select,input,textarea){width:100%;min-width:0;min-height:42px}
+.license-form-actions{display:flex;justify-content:flex-end}.license-form-error{grid-column:1/-1;margin:0;color:#ff9aa1;font-size:12.5px}.license-form-error:empty{display:none}
+.license-follow-list li{display:block}
+.license-device-list{display:grid;gap:6px;margin:0;padding:0;list-style:none}
+.license-device-list li{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 10px;border:1px solid #1f3352;border-radius:10px;background:#0a1424}
+.license-device-list li>div{display:grid;gap:2px;min-width:0}.license-device-list small{color:#8fa5c4;overflow-wrap:anywhere}.license-device-list li[data-removed=true]{opacity:.65;border-style:dashed}
+.license-inline-form{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}.license-inline-form input{flex:1 1 160px;min-width:0;min-height:40px}
+/* Renovaciones */
+.license-renew-head{display:grid;gap:4px}
+.license-follow-chips{display:flex;flex-wrap:wrap;gap:6px}
+.license-follow-chip{display:inline-flex;align-items:center;gap:7px;min-height:36px;padding:6px 12px;border:1px solid #223450;border-radius:12px;background:#0a1424;color:#b8c8de;font-size:12.5px;font-weight:650;cursor:pointer;transition:border-color .15s,background .15s}
+.license-follow-chip b{min-width:20px;padding:1px 6px;border-radius:999px;background:#13233b;color:#dbe8fb;text-align:center;font-variant-numeric:tabular-nums}
+.license-follow-chip[aria-pressed=true]{border-color:#3e7cd5;background:#12233d;color:#fff;box-shadow:inset 0 0 0 1px #3e7cd5}
+.license-alert-days{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 12px;border:1px solid #1f3352;border-radius:12px;background:#0a1424;font-size:12.5px;color:#b8c8de}
+.license-day{display:inline-flex;align-items:center;gap:5px;min-height:36px}
+.license-renew-list{display:grid;gap:8px}
+.license-renew-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border:1px solid #1f3352;border-left:3px solid #3e7cd5;border-radius:12px;background:#0b1626}
+.license-renew-row[data-status=aceptado]{border-left-color:#45cdaa}.license-renew-row[data-status=esperando_respuesta]{border-left-color:#facc15}.license-renew-row[data-status=completado]{border-left-color:#22c55e;opacity:.85}
+.license-renew-main{display:grid;gap:4px;min-width:0}.license-renew-title{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;min-width:0}.license-renew-title strong{overflow-wrap:anywhere}
+.license-code{font-family:ui-monospace,monospace;font-size:12px;color:#8fa5c4}
+.license-renew-facts{display:flex;flex-wrap:wrap;gap:4px 14px;margin:0;font-size:12.5px;color:#b8c8de}
+.license-renew-side{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end}
+.license-empty{display:grid;justify-items:center;gap:8px;padding:28px 16px;border:1px dashed #2a3f60;border-radius:14px;text-align:center;color:#b8c8de}
+.license-empty svg{width:28px;height:28px;color:#7fb2ff}.license-empty strong{color:#eef3ff;font-size:15px}.license-empty p{margin:0;max-width:560px}
+.license-empty-actions{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+/* Reportes */
+.license-report-kinds{display:flex;flex-wrap:wrap;gap:6px}
+.license-report-kind{min-height:36px;padding:6px 12px;border:1px solid #223450;border-radius:12px;background:#0a1424;color:#b8c8de;font-size:12.5px;font-weight:650;cursor:pointer}
+.license-report-kind[aria-pressed=true]{border-color:#3e7cd5;background:#12233d;color:#fff;box-shadow:inset 0 0 0 1px #3e7cd5}
+.license-report-dates{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:12.5px;color:#b8c8de}.license-report-dates input{min-height:40px}
+.license-report-tools{display:flex;flex-wrap:wrap;gap:8px}.license-report-tools :is(a,button){display:inline-flex;align-items:center;gap:6px;min-height:40px;text-decoration:none}.license-report-tools svg{width:15px;height:15px}
+.license-report-sheet{display:grid;gap:10px;min-width:0}
+.license-report-head{display:flex;align-items:center;gap:12px}.license-report-head img{width:120px;height:auto}.license-report-head div{display:grid;gap:2px}.license-report-head small{color:#8fa5c4}
+.license-report-totals{display:flex;flex-wrap:wrap;gap:8px;margin:0}.license-report-totals div{padding:8px 12px;border:1px solid #1f3352;border-radius:10px;background:#0a1424}
+.license-report-totals dt{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#7f93b1}.license-report-totals dd{margin:0;font-size:15px;font-weight:700;color:#e3edff}
+.license-report-table{overflow-x:auto;border:1px solid #1f3352;border-radius:12px}
+.license-report-table table{width:100%;border-collapse:collapse;font-size:12.5px}
+.license-report-table th{position:sticky;top:0;padding:8px 10px;background:#0f1d33;color:#9bb0cf;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.3px;white-space:nowrap}
+.license-report-table td{padding:7px 10px;border-top:1px solid #16263f;color:#e3edff;vertical-align:top}
+.license-report-link{cursor:pointer}.license-report-link:hover td,.license-report-link:focus td{background:#12233d}
+.license-empty-line{margin:0;color:#8fa5c4}
+@media(max-width:640px){
+ body[data-page=dashboard] dialog.maintenance-dialog.license-dialog.license-drawer{width:100%;border-radius:0;padding:14px 14px}
+ body[data-page=dashboard] dialog.license-drawer .dialog-heading{top:-14px;margin:-14px -14px 12px;padding:12px 14px}
+ .license-cycle-form{grid-template-columns:minmax(0,1fr)}
+ .license-renew-row{flex-direction:column;align-items:stretch}.license-renew-side{justify-content:stretch}.license-renew-side button{flex:1 1 auto}
+ .license-finder{flex-basis:100%;margin-left:0}
+}
+@media(prefers-reduced-motion:reduce){body[data-page=dashboard] dialog.license-drawer{animation:none}.license-finder,.license-follow-chip{transition:none}}
+/* Impresión A4 del reporte: solo la hoja del reporte, en blanco y negro legible. */
+@media print{
+ @page{size:A4;margin:14mm}
+ body.license-printing *{visibility:hidden!important}
+ body.license-printing .license-report-sheet,body.license-printing .license-report-sheet *{visibility:visible!important}
+ body.license-printing .license-report-sheet{position:absolute;inset:0 auto auto 0;width:100%;color:#000;background:#fff}
+ body.license-printing .license-report-sheet :is(td,th,dd,dt,small,strong){color:#000!important;background:#fff!important}
+ body.license-printing .license-report-table{overflow:visible;border-color:#999}body.license-printing .license-report-table td{border-top:1px solid #ccc}
+ body.license-printing .license-report-totals div{border-color:#999;background:#fff}
+}

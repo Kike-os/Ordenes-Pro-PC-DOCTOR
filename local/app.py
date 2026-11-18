@@ -2776,6 +2776,18 @@ class Handler(BaseHTTPRequestHandler):
                         audit(c,user['id'],'licenses_exported');c.commit()
                         return self.reply(200,licenses.export_csv(rows),'text/csv; charset=utf-8',filename='licencias-ordenes-pro.csv')
                     if path=='/api/licenses/deliveries':return self.reply(200,licenses.deliveries(c,now))
+                    # 1.5.290 · Licencias Pro Premium 4.0: renovaciones (seguimiento comercial), expediente y reportes. Sin credenciales.
+                    import license_control
+                    if path=='/api/licenses/renewals':return self.reply(200,license_control.pipeline(c,now))
+                    dossier_route=re.fullmatch(r'/api/licenses/units/([0-9]{1,9})/dossier',path)
+                    if dossier_route:return self.reply(200,license_control.dossier(c,int(dossier_route[1]),now))
+                    report_route=re.fullmatch(r'/api/licenses/reports/([a-z]{1,20})(\.csv)?',path)
+                    if report_route:
+                        found=license_control.report(c,now,report_route[1],{k:arg(k)[:20] for k in ('from','to','product')})
+                        if report_route[2]:
+                            audit(c,user['id'],'license_report_exported');c.commit()
+                            return self.reply(200,license_control.report_csv(found).encode('utf-8'),'text/csv; charset=utf-8',filename='licencias-'+report_route[1]+'.csv')
+                        return self.reply(200,dict(found,reports=license_control.REPORTS))
                     if path=='/api/licenses/duplicates':
                         # Informe de solo lectura: no modifica ningún registro ni incluye credenciales; la consulta queda en la auditoría.
                         report=licenses.duplicate_review(c,now);audit(c,user['id'],'license_duplicate_review');c.commit();return self.reply(200,report)
@@ -4876,6 +4888,9 @@ class Handler(BaseHTTPRequestHandler):
                             result=licenses.adjust_stock(c,data,user,now);audit(c,user['id'],'license_stock_adjusted',int(data.get('item_id') or 0));return self.reply(200,dict(result,ok=True))
                         if path=='/api/licenses/settings':
                             saved=licenses.save_display(c,data,user,now);audit(c,user['id'],'license_settings_saved');return self.reply(200,{'ok':True,'display':saved})
+                        if path=='/api/licenses/alert-days':
+                            import license_control
+                            saved=license_control.save_alert_days(c,data,user,now);audit(c,user['id'],'license_alert_days_saved');return self.reply(200,{'ok':True,'alert_days':saved})
                         if path=='/api/licenses/optout':
                             cid=str(data.get('client_id',''))
                             if not cid.isdigit() or not c.execute('SELECT 1 FROM clients WHERE id=?',(int(cid),)).fetchone():return self.reply(404,{'error':'Cliente no disponible.'})
@@ -4952,6 +4967,12 @@ class Handler(BaseHTTPRequestHandler):
                                 result=send_license_mail(c,'license_info',data_,user['id'])
                                 licenses.event(c,'informacion_enviada',now,'Información de la licencia enviada al cliente por correo (sin credenciales): %s.'%result['label'],unit,data_['product_id'],client=data_['client_id'],user=user)
                                 audit(c,user['id'],'license_info_sent',unit);return self.reply(200,{'ok':result['status']=='enviado','result':result})
+                            elif action in ('followup','device_add','device_remove'):
+                                # 1.5.290 · Seguimiento comercial de la renovación y equipos registrados (solo anexado; con historial y auditoría).
+                                import license_control
+                                result=(license_control.record_followup if action=='followup' else license_control.add_device if action=='device_add' else license_control.remove_device)(c,unit,data,user,now)
+                                if not result.get('duplicate'):audit(c,user['id'],'license_'+action,unit)
+                                return self.reply(200,result)
                             else:return self.reply(400,{'error':'Acción no válida.'})
                             audit(c,user['id'],'license_'+action,unit);return self.reply(200,{'ok':True})
                         private_pdf=re.fullmatch(r'/api/licenses/deliveries/([0-9]{1,9})/private-pdf',path)
