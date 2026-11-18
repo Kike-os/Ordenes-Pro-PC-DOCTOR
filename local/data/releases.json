@@ -8,6 +8,26 @@
   },
   "releases": [
     {
+      "version": "1.5.297",
+      "date": "2026-11-18T14:28:00-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Acceso a la Cobertura PC-DOCTOR desde Presupuestos",
+      "changes": {
+        "features": [],
+        "improvements": [],
+        "fixes": [
+          "Presupuestos: el botón «Cobertura PC-DOCTOR» aparece en cada partida de repuesto también mientras el presupuesto o la partida no están guardados (antes solo aparecía al guardar y volver a abrir). Si falta guardar, ofrece «Guardar borrador y continuar» (no se envía al cliente) y abre el panel de esa partida.",
+          "Cobertura PC-DOCTOR: si el estado no se puede consultar, el botón sigue visible y lo indica; al cerrar el panel el foco vuelve al botón de la partida.",
+          "Presupuestos: el selector de versiones de la cabecera ya no desborda la ventana en pantallas de 320 px."
+        ],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Administración (autorización expresa en la sesión)"
+    },
+    {
       "version": "1.5.296",
       "date": "2026-11-18T09:30:06-05:00",
       "type": "patch",

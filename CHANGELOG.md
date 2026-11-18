@@ -4,6 +4,16 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.297 — 2026-11-18 14:28 (UTC-05:00)
+
+Acceso a la Cobertura PC-DOCTOR desde Presupuestos
+
+### Errores corregidos
+
+- Presupuestos: el botón «Cobertura PC-DOCTOR» aparece en cada partida de repuesto también mientras el presupuesto o la partida no están guardados (antes solo aparecía al guardar y volver a abrir). Si falta guardar, ofrece «Guardar borrador y continuar» (no se envía al cliente) y abre el panel de esa partida.
+- Cobertura PC-DOCTOR: si el estado no se puede consultar, el botón sigue visible y lo indica; al cerrar el panel el foco vuelve al botón de la partida.
+- Presupuestos: el selector de versiones de la cabecera ya no desborda la ventana en pantallas de 320 px.
+
 ## v1.5.296 — 2026-11-18 09:30 (UTC-05:00)
 
 Cobertura Empresarial de Repuestos PC-DOCTOR
