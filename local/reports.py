@@ -103,14 +103,16 @@ def _orders(c):
 
 
 def _stay_overdue(c, orders):
-    """Órdenes sin entregar que superaron el plazo de permanencia vigente."""
+    """Órdenes sin entregar que superaron el plazo de permanencia vigente (el original o el de su prórroga vigente, 1.5.294)."""
+    import order_extensions
+    extended = order_extensions.live_map(c)
     import stay
     config, now = stay.settings(c), datetime.now(ECUADOR_TZ)
     late = []
     for order in orders:
         if order['status'] == 'entregado':
             continue
-        info = stay.compute(dict(order, status_code=order['status']), now, config)
+        info = stay.compute(dict(order, status_code=order['status']), now, config, extended.get(order['id']))
         if info and info['level'] == 'overdue':
             late.append(order)
     return late

@@ -4,6 +4,21 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## Sin publicar
+
+### Nuevas funcionalidades
+
+- Prórrogas del plazo de retiro: desde la permanencia de la orden, administración otorga 3, 7, 15, 30 días o una fecha personalizada con resumen previo (fecha original, vigente, días adicionales y nueva fecha), motivo, observaciones y responsable; ampliar o revocar con motivo; historial que nunca se sobrescribe y auditoría.
+- Avisos de prórroga: interno al equipo, al cliente por correo (con resultado y reintento seguro sin duplicar) y por WhatsApp Business con su consentimiento y plantilla; recordatorios configurables antes del nuevo plazo (desactivados por defecto) y prórrogas por vencer o vencidas en el Centro de Control.
+
+### Mejoras realizadas
+
+- Con una prórroga vigente, la permanencia muestra «Prórroga vigente hasta …» y los vencidos, informes y avisos automáticos de permanencia usan la nueva fecha (día límite completo, hora de Ecuador); no cambia el estado de reparación ni ningún cobro.
+
+### Actualizaciones de seguridad
+
+- Prórrogas solo para administración y órdenes no entregadas, con control de concurrencia (el plazo vigente visto debe seguir siendo el mismo), sin duplicados por doble clic y con datos protegidos en la base (no se editan ni se borran).
+
 ## v1.5.293 — 2026-11-18 07:28 (UTC-05:00)
 
 Licencias Digitales Enterprise 3.0: inventario por cliente y vigencia por colores

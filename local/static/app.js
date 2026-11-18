@@ -3201,15 +3201,16 @@ function renderOrderCards(root,rows){
 // con esa misma fecha, sin contadores propios. Una orden entregada queda fija en su tiempo total.
 const stayGlyphs={ok:'M21.801 10A10 10 0 1 1 17 3.335 M9 11l3 3L22 4',notice:'M12 6v6l4 2 M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z',near:'M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z M12 9v4 M12 17h.01',overdue:'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z M12 8v4 M12 16h.01'};
 const stayLabels={ok:'Dentro del plazo',notice:'Recordatorio preventivo',near:'Próximo al vencimiento',overdue:'Plazo administrativo vencido'};
+// 1.5.294: con prórroga vigente el nivel lo calcula el servidor por fecha (día límite completo, Ecuador).
 function stayNow(info){
- if(!info||info.closed)return info;const seconds=Math.max(0,Math.floor((Date.now()-new Date(info.started_at).getTime())/1000));if(!Number.isFinite(seconds))return info;
+ if(!info||info.closed||info.extended_to)return info;const seconds=Math.max(0,Math.floor((Date.now()-new Date(info.started_at).getTime())/1000));if(!Number.isFinite(seconds))return info;
  const days=Math.floor(seconds/86400),step=info.thresholds||{},level=days>=info.limit?'overdue':days>=(step.near??Infinity)?'near':days>=(step.notice??Infinity)?'notice':'ok';
  return {...info,days,hours:Math.floor(seconds%86400/3600),remaining:Math.max(0,info.limit-days),exceeded:Math.max(0,days-info.limit),percent:Math.min(100,Math.round(seconds*100/(info.limit*86400))),level,label:stayLabels[level]};
 }
 function plural(count,one,many){return count+' '+(count===1?one:many);}
 function paintStay(node){
  const info=stayNow(node.stayInfo);node.replaceChildren();if(!info){node.dataset.level='none';node.append(el('span','Sin fecha de ingreso','order-stay-empty'));return;}
- node.dataset.level=info.level;node.dataset.closed=String(!!info.closed);node.title=info.closed?'Entregado: el contador está detenido':info.label+' · plazo de '+info.limit+' días';
+ node.dataset.level=info.level;node.dataset.closed=String(!!info.closed);node.dataset.extended=String(!!info.extended_to);node.title=info.closed?'Entregado: el contador está detenido':info.label+' · plazo de '+info.limit+' días';
  const top=el('span',undefined,'order-stay-top'),icon=el('span',undefined,'order-stay-icon');icon.setAttribute('aria-hidden','true');icon.append(systemIcon(info.closed?statusGlyphs.entregado:stayGlyphs[info.level]));
  top.append(icon,el('b',plural(info.days,'día','días')),el('small',info.closed?(info.exceeded?plural(info.exceeded,'día','días')+' sobre el plazo':'total en taller'):info.exceeded?'vencido hace '+plural(info.exceeded,'día','días'):'restan '+plural(info.remaining,'día','días')));
  const bar=el('progress',undefined,'order-stay-bar');bar.max=100;bar.value=info.percent;bar.setAttribute('aria-label','Permanencia: '+info.percent+' % del plazo de '+info.limit+' días');
@@ -3226,9 +3227,77 @@ function appendStay(root,order){
  else{fact('Transcurrido',plural(info.days,'día','días')+' y '+plural(info.hours,'hora','horas'));fact(info.exceeded?'Días sobre el plazo':'Días restantes',String(info.exceeded||info.remaining));}
  if(order.stay_reminders?.length){const log=el('ul',undefined,'order-stay-log');log.setAttribute('aria-label','Avisos de permanencia enviados');for(const item of order.stay_reminders){const row=el('li'),mark=el('b',item.result==='sent'?'Enviado':item.result==='failed'?'No enviado':'En proceso');mark.dataset.result=item.result;row.append(el('span','Aviso del día '+item.stage+' · '+formatOrderDate(item.created_at)),mark);row.title=item.recipient+(item.message_id?' · '+item.message_id:'');log.append(row);}section.append(log);}
  section.append(list,documentAction('Informe de permanencia (PDF)','document','/api/orders/'+order.id+'/stay.pdf'));
+ if(!info.closed){const box=el('div',undefined,'ext-box');box.append(el('p','Cargando prórrogas…','ext-hint'));section.append(box);extensionBlock(box,order);}
  if(admin())section.append(button('Configurar plazo',()=>openStaySettings(order.stay_settings||{}),'secondary'));
  section.append(el('small','El contador se detiene solo al entregar el equipo. Superar el plazo genera avisos internos: el estado de la orden nunca cambia por sí solo.','order-stay-note'));root.append(section);
 }
+// ===== 1.5.294 · Prórrogas del plazo de retiro (Premium Compact 2.0) =====
+// Plazo original y vigente, «Otorgar prórroga» (solo administración y órdenes elegibles), historial que nunca se sobrescribe, avisos al
+// cliente con su resultado y reintento seguro, y revocación con motivo. No cambia el estado de reparación ni ningún cobro.
+const extDay=v=>{if(!v)return '—';const[y,m,d]=String(v).slice(0,10).split('-');return d+'/'+m+'/'+y;};
+const extAddDays=(iso,n)=>{const d=new Date(iso+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10);};
+const extDiff=(a,b)=>Math.round((new Date(b+'T12:00:00Z')-new Date(a+'T12:00:00Z'))/86400000);
+const extNoticeLabel={pendiente:'Pendiente',enviando:'Enviando',enviado:'Enviado',error:'No enviado',omitido:'No enviado (omitido)',en_cola:'En cola de WhatsApp'};
+async function extensionBlock(box,order){let info;try{info=await api('/api/orders/'+order.id+'/extension');}catch(error){box.replaceChildren(el('p',error.message,'ext-hint'));return;}
+ box.replaceChildren();const head=el('div',undefined,'ext-head'),facts=el('dl',undefined,'ext-facts');
+ const chip=el('span',info.extension?(info.overdue?'Prórroga vencida':'Prórroga vigente'):info.overdue?'Plazo vencido':'Sin prórroga','ext-chip');chip.dataset.state=info.extension?(info.overdue?'late':'live'):info.overdue?'late':'none';
+ head.append(el('strong','Plazo de retiro'),chip);
+ for(const[l,v]of [['Fecha original',extDay(info.original_due)],['Fecha vigente',extDay(info.due)+(info.days_left===null?'':info.overdue?' · vencida hace '+plural(-info.days_left,'día','días'):' · '+plural(info.days_left,'día restante','días restantes'))]]){const d=el('div');d.append(el('dt',l),el('dd',v));facts.append(d);}
+ box.append(head,facts);
+ if(info.can_manage&&info.eligible){const b=button('',()=>openExtensionDialog(order,info,()=>extensionBlock(box,order)),'primary ext-grant');b.append(systemIcon('M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z M12 6v6l4 2 M19 3v4 M17 5h4'),el('span',info.extension?'Ampliar o cambiar prórroga':'Otorgar prórroga'));box.append(b);}
+ else if(!info.eligible&&info.reason)box.append(el('p',info.reason,'ext-hint'));
+ if(info.history.length){const list=el('ol',undefined,'ext-history');list.setAttribute('aria-label','Historial de prórrogas');
+  for(const h of info.history){const li=el('li');li.dataset.status=h.status;const top=el('div',undefined,'ext-h-top');top.append(el('strong',extDay(h.previous_due)+' → '+extDay(h.new_due)+' (+'+plural(h.days,'día','días')+')'),el('span',h.status_label,'ext-chip'));top.lastChild.dataset.state=h.status==='vigente'?'live':'none';
+   li.append(top,el('small',h.reason_label+(h.reason?' — '+h.reason:'')+' · Autoriza: '+h.authorized_by+' · '+(h.created_name||'Sistema')+', '+formatOrderDate(h.created_at)));
+   if(h.notes)li.append(el('small',h.notes));if(h.status!=='vigente'&&h.closed_at)li.append(el('small',(h.status==='revocada'?'Revocada':'Reemplazada')+' por '+(h.closed_name||'Sistema')+', '+formatOrderDate(h.closed_at)+(h.close_reason?' · '+h.close_reason:'')));
+   if(h.notices.length){const ul=el('ul',undefined,'ext-notices');for(const n of h.notices){const row=el('li');const st=el('b',extNoticeLabel[n.status]||n.status);st.dataset.status=n.status;row.append(el('span',(n.kind==='recordatorio'?'Recordatorio ('+plural(n.stage,'día','días')+' antes)':'Aviso de prórroga')+' · '+(n.channel==='correo'?'Correo':'WhatsApp')),st);
+     if(n.detail)row.title=n.detail;if(n.status==='omitido'||n.status==='error'){row.append(el('small',n.detail||''));}
+     if(info.can_manage&&n.channel==='correo'&&n.status==='error'&&n.attempts<5){const retry=button('Reintentar',async()=>{if(retry.disabled)return;retry.disabled=true;try{const out=await api('/api/orders/'+order.id+'/extension',{action:'retry',notice:String(n.id)});toast(out.result==='enviado'?'Aviso reenviado al cliente.':'No se pudo enviar. Revisa el correo del sistema.',out.result==='enviado'?'success':'error');extensionBlock(box,order);}catch(error){toast(error.message,'error');retry.disabled=false;}},'text-action');row.append(retry);}
+     ul.append(row);}li.append(ul);}
+   if(info.can_manage&&h.status==='vigente'){const rv=button('Revocar',async()=>{const reason=await extensionReason('Revocar la prórroga hasta el '+extDay(h.new_due),'El plazo vuelve a la prórroga o al plazo anterior. Queda en el historial con tu motivo.');if(!reason)return;
+     try{await api('/api/orders/'+order.id+'/extension',{action:'revoke',extension:String(h.id),reason});toast('Prórroga revocada.','success');refreshOrderAfterExtension(order);extensionBlock(box,order);}catch(error){toast(error.message,'error');extensionBlock(box,order);}},'text-action license-danger');li.append(rv);}
+   list.append(li);}box.append(list);}
+ if(info.can_manage){const cfg=button('Recordatorios de prórroga',()=>openExtensionSettings(info.settings),'text-action');box.append(cfg);}}
+function refreshOrderAfterExtension(order){document.dispatchEvent(new CustomEvent('notices:changed'));const chipNode=document.querySelector('.order-stay');if(chipNode)api('/api/orders/'+order.id).then(fresh=>{if(fresh.stay){chipNode.stayInfo=fresh.stay;paintStay(chipNode);}}).catch(()=>{});}
+function extensionReason(title,text){return new Promise(resolve=>{const d=smallDialog(title);d.classList.add('ext-dialog');const form=el('form',undefined,'ext-form'),msg=el('p','','ext-msg'),area=el('textarea');area.maxLength=300;area.rows=3;area.required=true;area.setAttribute('aria-label','Motivo');
+ const ok=el('button','Confirmar','danger');ok.type='submit';const cancel=button('Volver',()=>{d.close();},'secondary');const row=el('div',undefined,'ext-actions');row.append(cancel,ok);form.append(el('p',text,'ext-hint'),area,msg,row);d.append(form);let done=false;
+ form.onsubmit=e=>{e.preventDefault();if(area.value.trim().length<5){msg.textContent='Indica el motivo (al menos 5 caracteres).';return;}done=true;const v=area.value.trim();d.close();resolve(v);};d.addEventListener('close',()=>{if(!done)resolve('');});area.focus();});}
+function openExtensionDialog(order,info,done){const d=smallDialog(info.extension?'Ampliar o cambiar la prórroga':'Otorgar prórroga');d.classList.add('ext-dialog');d.setAttribute('aria-describedby','ext-summary');
+ const form=el('form',undefined,'ext-form'),msg=el('p','','ext-msg');msg.setAttribute('role','alert');form.noValidate=true;
+ form.append(el('p','Orden '+order.code+' · el nuevo plazo se cuenta desde '+(info.overdue?'hoy (el plazo vigente ya venció)':'la fecha vigente')+'. No cambia el estado de reparación ni ningún cobro.','ext-hint'));
+ const opts=el('div',undefined,'ext-options');opts.setAttribute('role','radiogroup');opts.setAttribute('aria-label','Días adicionales');let pick='7';
+ const custom=el('input');custom.type='date';custom.min=extAddDays(info.base,1);custom.max=extAddDays(info.base,info.max_days);custom.setAttribute('aria-label','Fecha personalizada');custom.hidden=true;
+ for(const v of [...info.presets.map(String),'fecha']){const b=button(v==='fecha'?'Fecha':'+'+v+' días',()=>{pick=v;for(const x of opts.children)x.setAttribute('aria-checked',String(x.dataset.v===v));custom.hidden=v!=='fecha';if(v==='fecha')custom.focus();paint();},'ext-opt');b.dataset.v=v;b.setAttribute('role','radio');b.setAttribute('aria-checked',String(v===pick));opts.append(b);}
+ form.append(opts,custom);
+ const summary=el('dl',undefined,'ext-summary');summary.id='ext-summary';summary.setAttribute('aria-live','polite');form.append(summary);
+ const field=(label,node,cls='')=>{const box=el('label',undefined,'ext-field'+(cls?' '+cls:''));box.append(el('span',label),node);form.append(box);return node;};
+ const reason=el('select');for(const[k,v]of Object.entries(info.reasons))reason.add(new Option(v,k));field('Motivo',reason);
+ const detail=el('input');detail.maxLength=300;detail.placeholder='Detalle del motivo (obligatorio si eliges «Otro motivo»)';field('Detalle',detail,'wide');
+ const notes=el('textarea');notes.maxLength=1000;notes.rows=2;field('Observaciones (internas)',notes,'wide');
+ const who=el('input');who.maxLength=120;who.value=currentUser?.name||'';field('Responsable de la autorización',who);
+ const ok=info.channels.filter(c=>c.ok).map(c=>c.channel==='correo'?'correo':'WhatsApp');const notifyBox=el('label',undefined,'ext-check'),notify=el('input');notify.type='checkbox';notify.checked=!!ok.length&&info.settings?.notify_client!==false;notify.disabled=!ok.length;
+ notifyBox.append(notify,el('span',ok.length?'Avisar al cliente ('+ok.join(' y ')+')':'Sin canales para avisar al cliente'));form.append(notifyBox);
+ const off=info.channels.filter(c=>!c.ok);if(off.length)form.append(el('small',off.map(c=>(c.channel==='correo'?'Correo: ':'WhatsApp: ')+c.why).join(' · '),'ext-hint'));
+ const row=el('div',undefined,'ext-actions'),cancel=button('Cancelar',()=>requestModalClose(d),'secondary'),save=el('button','Confirmar prórroga','primary');save.type='submit';row.append(cancel,save);form.append(msg,row);d.append(form);
+ function target(){if(pick==='fecha')return custom.value||'';return extAddDays(info.base,parseInt(pick,10));}
+ function paint(){summary.replaceChildren();const t=target(),days=t?extDiff(info.base,t):null;for(const[l,v]of [['Fecha original',extDay(info.original_due)],['Fecha vigente',extDay(info.due)],['Días adicionales',days&&days>0?'+'+plural(days,'día','días'):'—'],['Nueva fecha',t?extDay(t):'Elige una fecha']]){const r=el('div');r.append(el('dt',l),el('dd',v));if(l==='Nueva fecha')r.dataset.key='new';summary.append(r);}save.disabled=!t||days<=0;}
+ custom.addEventListener('input',paint);paint();
+ form.onsubmit=async event=>{event.preventDefault();if(save.disabled||d.dataset.busy)return;msg.textContent='';
+  if(reason.value==='otro'&&detail.value.trim().length<5){msg.textContent='Describe el motivo (al menos 5 caracteres).';detail.focus();return;}if(who.value.trim().length<3){msg.textContent='Indica quién autoriza la prórroga.';who.focus();return;}
+  d.dataset.busy='1';save.disabled=true;save.textContent='Guardando…';
+  try{const body={action:'grant',expected_due:info.due,reason_code:reason.value,reason:detail.value.trim(),notes:notes.value.trim(),authorized_by:who.value.trim(),notify_client:notify.checked&&!notify.disabled};if(pick==='fecha')body.date=custom.value;else body.days=pick;
+   const out=await api('/api/orders/'+order.id+'/extension',body);delete d.dataset.dirty;d.close();
+   const mail=(out.mail||[]);toast(out.duplicate?'Esa prórroga ya estaba registrada.':'Prórroga otorgada hasta el '+extDay(out.extension.new_due)+'.'+(mail.includes('error')?' El correo al cliente no se pudo enviar: puedes reintentarlo.':mail.includes('enviado')?' Se avisó al cliente por correo.':''),mail.includes('error')?'warning':'success');
+   refreshOrderAfterExtension(order);done&&done();}
+  catch(error){msg.textContent=error.message;if(error.status===409){done&&done();}}finally{delete d.dataset.busy;if(save.isConnected){save.textContent='Confirmar prórroga';paint();}}};
+ opts.querySelector('[aria-checked=true]')?.focus();}
+function openExtensionSettings(current){const d=smallDialog('Recordatorios de prórroga');d.classList.add('ext-dialog');const form=el('form',undefined,'ext-form'),msg=el('p','','ext-msg');
+ const onBox=el('label',undefined,'ext-check'),on=el('input');on.type='checkbox';on.checked=!!current?.reminders;onBox.append(on,el('span','Enviar recordatorios por correo antes del nuevo plazo'));
+ const days=el('input');days.value=(current?.reminder_days||[3,1]).join(', ');days.setAttribute('aria-label','Días antes del vencimiento');const lab=el('label',undefined,'ext-field');lab.append(el('span','Días antes (de 1 a 4 valores entre 1 y 30)'),days);
+ const nBox=el('label',undefined,'ext-check'),notify=el('input');notify.type='checkbox';notify.checked=current?.notify_client!==false;nBox.append(notify,el('span','Ofrecer avisar al cliente al otorgar una prórroga'));
+ const row=el('div',undefined,'ext-actions'),save=el('button','Guardar','primary');save.type='submit';row.append(button('Cancelar',()=>d.close(),'secondary'),save);
+ form.append(el('p','Los recordatorios se envían como mucho una vez por prórroga y anticipación, en horario diurno. Quedan desactivados hasta que los actives.','ext-hint'),onBox,lab,nBox,msg,row);d.append(form);
+ form.onsubmit=async e=>{e.preventDefault();if(save.disabled)return;save.disabled=true;msg.textContent='';try{await api('/api/extensions/settings',{reminders:on.checked,reminder_days:days.value,notify_client:notify.checked});toast('Configuración guardada.','success');d.close();}catch(error){msg.textContent=error.message;}finally{save.disabled=false;}};}
 function openStaySettings(current){
  const d=smallDialog('Plazo de permanencia'),form=el('form',undefined,'stay-settings');form.noValidate=true;
  d.append(el('p','Días naturales contados desde la fecha de ingreso. Se aplica al cálculo de todas las órdenes; no modifica ningún registro.','stay-intro'));

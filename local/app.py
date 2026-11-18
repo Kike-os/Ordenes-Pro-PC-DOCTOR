@@ -731,6 +731,27 @@ def send_verification_code(recipient,code,minutes,where,context=''):
     mail_pro.deliver(config,verification_mail.build(config,recipient,code,minutes,where,context),[recipient])
 
 
+def extension_deliver(recipient,subject,body,order_id=None):
+    """Aviso de prórroga por el correo del sistema (plantilla institucional, archivado y vinculado a la orden); devuelve el Message-ID."""
+    with connect() as archive:
+        return send_institutional(archive,'prorroga','Prórroga del plazo de retiro',recipient,subject,body,order_id)['message_id']
+
+
+def extension_reminders_tick(c,now):
+    """Recordatorios antes del nuevo plazo de una prórroga (solo si administración los activó), sin tarea programada: como mucho cada diez
+    minutos, en horario diurno y por tandas pequeñas. Cada aviso se registra una sola vez por prórroga y anticipación."""
+    import order_extensions
+    if not 8<=now.hour<19 or not order_extensions.ready(c) or not order_extensions.settings(c)['reminders']:return
+    last=c.execute("SELECT value FROM system_state WHERE key='extension_reminders_tick'").fetchone()
+    if last and last['value']>(now-appointments.timedelta(minutes=10)).isoformat(timespec='seconds'):return
+    c.execute("INSERT INTO system_state(key,value) VALUES ('extension_reminders_tick',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",(now.isoformat(timespec='seconds'),));c.commit()
+    try:
+        if not mail_pro.configured():return
+        ids=order_extensions.plan_reminders(c,now);c.commit()
+        for nid in ids[:3]:order_extensions.send_mail(c,nid,now,extension_deliver)
+    except Exception as error:print('extension-reminders',type(error).__name__,flush=True)
+
+
 def stay_reminders_tick(c,now):
     """Avisos de permanencia sin tarea programada: como mucho cada diez minutos, en horario diurno y por tandas pequeñas."""
     import stay_reminders
@@ -2003,7 +2024,8 @@ class Handler(BaseHTTPRequestHandler):
                 if detail[2]=='stay.pdf':
                     # Informe de permanencia: fechas registradas de ingreso y entrega frente al plazo vigente.
                     import stay_pdf
-                    info=stay.compute(dict(row,status_code=row['status']),reception_now(),stay.settings(c))
+                    import order_extensions
+                    info=stay.compute(dict(row,status_code=row['status']),reception_now(),stay.settings(c),order_extensions.live_map(c).get(row['id']))
                     if not info:return self.reply(404,{'error':'La orden no tiene fecha de ingreso registrada.'})
                     return self.reply(200,stay_pdf.render(dict(row,code=code),info,stay.delivery(c,row['id']),reception_now()),'application/pdf',filename=code+'-PERMANENCIA.pdf')
                 if detail[2] in ('receipt.pdf','thermal.pdf','service.pdf','label.pdf'):
@@ -2056,7 +2078,8 @@ class Handler(BaseHTTPRequestHandler):
                 result['authorization_mail']=authorization_mail_status(c,row['id'])
                 import client_authorization
                 result['client_authorization']=client_authorization.summary(c,row['id']);result['client_authorization_auto']=client_authorization_auto(c)
-                result['stay']=stay.compute(dict(result,status_code=result['status']),reception_now(),stay.settings(c));result['stay_settings']=stay.settings(c);result['stay_delivery']=stay.delivery(c,row['id']) if result['status']=='entregado' else None
+                import order_extensions
+                result['stay']=stay.compute(dict(result,status_code=result['status']),reception_now(),stay.settings(c),order_extensions.live_map(c).get(result['id']));result['stay_settings']=stay.settings(c);result['stay_delivery']=stay.delivery(c,row['id']) if result['status']=='entregado' else None
                 import stay_reminders
                 result['stay_reminders']=stay_reminders.for_order(c,row['id'])
                 result.pop('request_key', None)
@@ -2223,7 +2246,9 @@ class Handler(BaseHTTPRequestHandler):
                 if path == '/api/orders':
                     # Permanencia en taller: calculada en el servidor con las fechas guardadas de ingreso y entrega.
                     stay_config=stay.settings(c);stay_now=reception_now()
-                    for item in rows:item['stay']=stay.compute(item,stay_now,stay_config)
+                    import order_extensions
+                    stay_ext=order_extensions.live_map(c)
+                    for item in rows:item['stay']=stay.compute(item,stay_now,stay_config,stay_ext.get(item['id']))
                     # Estado financiero de cada equipo, con la misma fuente que la tarjeta del detalle (equipment.summary).
                     for item in rows:item['finance']=equipment.summary(item.pop('budget_cents'),item.pop('paid_cents'))
                 if path == '/api/clients':
@@ -2544,6 +2569,14 @@ class Handler(BaseHTTPRequestHandler):
                 import business_hours
                 config=business_hours.get(c)
                 return self.reply(200,{'config':config,'defaults':business_hours.DEFAULTS,'summary':business_hours.public(c,reception_now()),'agenda':adi.schedule_text(appointments.settings(c)['hours']),'can_edit':user['role']=='administrador'})
+            extension_get=re.fullmatch(r'/api/orders/([0-9]+)/extension',path)
+            if extension_get:
+                # 1.5.294 · Prórroga del plazo de retiro: plazo original y vigente, elegibilidad, canales de aviso e historial (solo personal).
+                if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
+                import order_extensions
+                try:info=order_extensions.state(c,int(extension_get[1]),reception_now())
+                except order_extensions.ExtensionError as error:return self.reply(error.status,{'error':str(error)})
+                return self.reply(200,dict(info,history=order_extensions.history(c,int(extension_get[1])),can_manage=user['role']=='administrador'))
             if path == '/api/stay/reminders':
                 if user['role']!='administrador':return self.reply(403,{'error':'Acceso no permitido.'})
                 import stay_reminders
@@ -2911,7 +2944,7 @@ class Handler(BaseHTTPRequestHandler):
                 if path=='/api/maintenance':
                     import maintenance_reminders
                     return self.reply(200,{'rows':maintenance.rows(c),'today':today,'profiles':{k:v[0] for k,v in maintenance.PROFILES.items()},'reminders':maintenance_reminders.status(c,now.date())})
-                if path=='/api/dashboard':maintenance_reminders_tick(c,now);stay_reminders_tick(c,now)
+                if path=='/api/dashboard':maintenance_reminders_tick(c,now);stay_reminders_tick(c,now);extension_reminders_tick(c,now)
                 activity_query=parse_qs(urlsplit(self.path).query) if path=='/api/activity' else {}
                 # Historial de una sola orden: la misma fuente que el seguimiento del inicio.
                 if activity_query.get('order',[''])[0]:
@@ -4861,6 +4894,33 @@ class Handler(BaseHTTPRequestHandler):
                             return self.reply(200,{'ok':True})
                         return self.reply(400,{'error':'Acción inválida.'})
                     except order_followups.FollowupError as error:
+                        c.rollback();return self.reply(error.status,{'error':str(error),'fields':error.fields})
+                extension_post=re.fullmatch(r'/api/orders/([0-9]+)/extension',path)
+                if extension_post or path=='/api/extensions/settings':
+                    # 1.5.294 · Prórrogas: otorgar (o reemplazar), revocar, reintentar un aviso por correo y configurar recordatorios. Solo administración.
+                    import order_extensions
+                    now=reception_now();action=str(data.get('action',''))
+                    try:
+                        if path=='/api/extensions/settings':
+                            if user['role']!='administrador':return self.reply(403,{'error':'Solo administración configura las prórrogas.'})
+                            saved=order_extensions.save_settings(c,data);audit(c,user['id'],'order_extension_settings');return self.reply(200,{'ok':True,'settings':saved})
+                        oid=int(extension_post[1])
+                        if not order_extensions.ready(c):return self.reply(503,{'error':'Esta función necesita una actualización de la base de datos que todavía no se aplicó.'})
+                        if action=='grant':
+                            ext=order_extensions.grant(c,oid,data,user,now)
+                            if ext.get('duplicate'):return self.reply(200,{'ok':True,'duplicate':True,'extension':ext})
+                            notify=data.get('notify_client') is not False and order_extensions.settings(c)['notify_client']
+                            ids=order_extensions.queue_notices(c,ext,now,notify)
+                            audit(c,user['id'],'order_extension_granted',oid);c.commit()
+                            # El correo sale después de confirmar la prórroga: si falla, la prórroga queda y el aviso se puede reintentar.
+                            results=[order_extensions.send_mail(c,nid,now,extension_deliver) for nid in ids]
+                            return self.reply(200,{'ok':True,'extension':ext,'mail':results})
+                        if action=='revoke':
+                            out=order_extensions.revoke(c,oid,data,user,now);audit(c,user['id'],'order_extension_revoked',oid);return self.reply(200,out)
+                        if action=='retry':
+                            out=order_extensions.retry(c,oid,data,user,now,extension_deliver);audit(c,user['id'],'order_extension_notice_retry',oid);return self.reply(200,out)
+                        return self.reply(400,{'error':'Acción no válida.'})
+                    except order_extensions.ExtensionError as error:
                         c.rollback();return self.reply(error.status,{'error':str(error),'fields':error.fields})
                 follow_route=re.fullmatch(r'/api/orders/([0-9]+)/follow-up',path)
                 if follow_route:

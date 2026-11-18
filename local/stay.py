@@ -58,8 +58,9 @@ def level_for(days, config):
     return 'overdue' if days >= config['limit'] else 'near' if days >= config['near'] else 'notice' if days >= config['notice'] else 'ok'
 
 
-def compute(order, now, config):
-    """Permanencia de una orden. «order» necesita received_at o created_at, status y delivered_at."""
+def compute(order, now, config, due=None):
+    """Permanencia de una orden. «order» necesita received_at o created_at, status y delivered_at.
+    1.5.294 · «due» (AAAA-MM-DD): fecha límite de una prórroga vigente; el plazo efectivo pasa a ser ese día completo en Ecuador."""
     start = _moment(order.get('received_at')) or _moment(order.get('created_at'))
     if not start:
         return None
@@ -67,17 +68,37 @@ def compute(order, now, config):
     end = delivered or now.astimezone(ECUADOR_TZ)
     seconds = max(0, int((end - start).total_seconds()))
     days, hours = seconds // 86400, (seconds % 86400) // 3600
+    if due and not delivered:
+        return _extended(start, end, seconds, days, hours, due, config)
     return {'started_at': start.isoformat(timespec='seconds'), 'ended_at': delivered.isoformat(timespec='seconds') if delivered else '', 'closed': bool(delivered),
             'days': days, 'hours': hours, 'limit': config['limit'], 'remaining': max(0, config['limit'] - days), 'exceeded': max(0, days - config['limit']),
             'percent': min(100, round(seconds * 100 / (config['limit'] * 86400))), 'level': level_for(days, config), 'label': LEVELS[level_for(days, config)], 'thresholds': {'notice': config['notice'], 'near': config['near']}}
 
 
+def _extended(start, end, seconds, days, hours, due, config):
+    """Permanencia con prórroga vigente: el plazo es el día «due» completo (vence al terminar ese día en Ecuador)."""
+    from datetime import date, timedelta
+    limit_day = date.fromisoformat(str(due)[:10])
+    deadline = datetime.combine(limit_day + timedelta(days=1), datetime.min.time(), ECUADOR_TZ)
+    total = max(1, int((deadline - start).total_seconds()))
+    left = (limit_day - end.date()).days
+    limit = max(1, (limit_day - start.date()).days + 1)
+    level = 'overdue' if end >= deadline else 'near' if left <= 3 else 'ok'
+    label = 'Prórroga vencida' if level == 'overdue' else 'Prórroga vigente hasta ' + limit_day.strftime('%d/%m/%Y')
+    return {'started_at': start.isoformat(timespec='seconds'), 'ended_at': '', 'closed': False, 'days': days, 'hours': hours, 'limit': limit,
+            'remaining': max(0, left + 1) if level != 'overdue' else 0, 'exceeded': max(0, (end.date() - limit_day).days), 'percent': min(100, round(seconds * 100 / total)),
+            'level': level, 'label': label, 'thresholds': {'notice': max(1, limit - 7), 'near': max(1, limit - 3)}, 'extended_to': limit_day.isoformat(),
+            'original_limit': config['limit']}
+
+
 def overdue(c, now, config):
-    """Órdenes sin entregar que ya superaron el plazo, de la más antigua a la más reciente."""
+    """Órdenes sin entregar que ya superaron el plazo (el original o el de su prórroga vigente), de la más antigua a la más reciente."""
+    import order_extensions
+    extended = order_extensions.live_map(c)
     out = []
     for row in c.execute("SELECT o.id,COALESCE(o.code,'OP-'||printf('%05d',o.id)) code,o.status,o.created_at,o.received_at,o.delivered_at,cl.name client FROM orders o JOIN devices d ON d.id=o.device_id JOIN clients cl ON cl.id=d.client_id WHERE o.status!='entregado' ORDER BY o.id"):
         item = dict(row)
-        info = compute(item, now, config)
+        info = compute(item, now, config, extended.get(item['id']))
         if info and info['level'] == 'overdue':
             out.append(dict(id=item['id'], code=item['code'], client=item['client'], **info))
     return out

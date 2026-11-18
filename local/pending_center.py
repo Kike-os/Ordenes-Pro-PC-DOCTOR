@@ -124,6 +124,20 @@ def _orders(c, user, now, mine, R):
                          resolves='Desaparece cuando la orden se entrega al cliente.', created=_iso(r['received_at']) or _iso(r['created_at']),
                          decision=r['status'] in ('pendiente', 'listo', 'espera_entrega') or overdue, ref={'order_id': r['id'], 'code': r['code'], 'status': r['status']},
                          search=r['email']))
+    # 1.5.294 · Prórrogas del plazo de retiro que vencen en los próximos días o ya vencieron sin retiro: acceso directo a la orden.
+    import order_extensions
+    for x in order_extensions.pending_items(c, now):
+        if user['role'] != 'administrador' and x['assigned_to'] not in (None, user['id']):
+            continue
+        late = x['left'] < 0
+        href = '#orders?id=%d' % x['order_id']
+        out.append(_item('orders', 'prorroga:%d' % x['id'], ('Prórroga vencida · ' if late else 'Prórroga por vencer · ') + x['code'],
+                         detail='Plazo de retiro hasta el %s' % date.fromisoformat(x['new_due']).strftime('%d/%m/%Y'), client=x['client'], responsible=x['tech'] or 'Sin asignar',
+                         responsible_id=x['assigned_to'], priority='urgente' if late or x['left'] <= 1 else 'importante', due=x['new_due'], overdue=late,
+                         at=now.isoformat(timespec='seconds'), href=href, actions=[{'label': 'Abrir orden', 'href': href}],
+                         waiting='Coordinar el retiro con el cliente' if not late else 'El plazo ampliado venció: coordinar el retiro o revisar la prórroga',
+                         resolves='Desaparece cuando la orden se entrega, la prórroga se revoca o se otorga un plazo mayor.', created=x['new_due'],
+                         decision=late, ref={'order_id': x['order_id'], 'code': x['code'], 'status': 'prorroga', 'extension_id': x['id']}))
     return out
 
 

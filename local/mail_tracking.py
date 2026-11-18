@@ -29,7 +29,7 @@ FINAL = ('entregado', 'rebotado', 'fallido')
 FILTERS = {'enviados': ('enviado',), 'entregados': ('entregado',), 'pendientes': ('cola', 'enviando'), 'demorados': ('demorado',), 'rebotados': ('rebotado',), 'fallidos': ('fallido',)}
 INCIDENTS = ('demorado', 'rebotado', 'fallido', 'desconocido')
 STAGE_EVENTS = {'conexion': ('conectando', 'Conectando SMTP'), 'autenticacion': ('autenticado', 'Autenticado'), 'transmision': ('transmitiendo', 'Transmitiendo'), 'aceptado': ('aceptado', 'Aceptado por el servidor'), 'error': ('error_etapa', 'Error')}
-KINDS = {'receipt': 'Comprobante de recepción', 'client_authorization': 'Autorización de servicio', 'authorization_notice': 'Aviso interno de autorización', 'quote': 'Presupuesto',
+KINDS = {'prorroga': 'Prórroga del plazo de retiro', 'receipt': 'Comprobante de recepción', 'client_authorization': 'Autorización de servicio', 'authorization_notice': 'Aviso interno de autorización', 'quote': 'Presupuesto',
          'payment_receipt': 'Recibo de pago', 'stay': 'Aviso de equipo listo / permanencia', 'maintenance': 'Recordatorio de mantenimiento', 'appointment': 'Cita técnica', 'manual': 'Mensaje de Mail Pro', 'campaign': 'Comunicado a clientes', 'invoice': 'Factura y documentos comerciales'}
 # Fallos del proveedor (no del destinatario): conexión, nombre, TLS, credenciales o servidor.
 PROVIDER = ('red', 'dns', 'tls', 'credenciales', 'servidor', 'conexion', 'temporal')

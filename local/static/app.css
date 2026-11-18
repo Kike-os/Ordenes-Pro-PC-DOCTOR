@@ -12645,3 +12645,40 @@ body[data-page=dashboard] dialog.license-drawer .license-detail-grid{grid-templa
 .license-group-table tbody tr{transition:background .15s}.license-group-table tbody tr:hover{background:#0f1d33}
 @media(max-width:700px){.license-group-head{flex-wrap:wrap}.license-group-stats{justify-content:flex-start;margin-left:28px;width:100%}}
 @media(prefers-reduced-motion:reduce){.license-group-table tbody tr{transition:none}}
+
+/* ===== 1.5.294 · Prórrogas del plazo de retiro (Premium Compact 2.0) =====
+   Acotado a .ext-* y al indicador de permanencia con prórroga. Tema oscuro y logo intactos. */
+.order-stay[data-extended=true]{border-color:#1f5548}.order-stay[data-extended=true] .order-stay-level{color:#7fe0c4}
+.ext-box{display:grid;gap:8px;margin:10px 0;padding:10px 12px;border:1px solid #1f3352;border-radius:12px;background:#0a1424}
+.ext-head{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}.ext-head strong{font-size:13.5px;color:#eef3ff}
+.ext-chip{display:inline-flex;align-items:center;padding:2px 9px;border:1px solid #2f4566;border-radius:999px;font-size:11.5px;font-weight:700;color:#cfe0f7;background:#0f1a2b;white-space:nowrap}
+.ext-chip[data-state=live]{border-color:#1f5548;color:#7fe0c4;background:#0d2620}.ext-chip[data-state=late]{border-color:#7a2d36;color:#fca5a5;background:#2a1117}
+.ext-facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:6px;margin:0}
+.ext-facts div{display:grid;gap:1px;padding:6px 8px;border-radius:8px;background:#0b1626}.ext-facts dt{font-size:10.5px;font-weight:700;letter-spacing:.3px;text-transform:uppercase;color:#7f93b1}.ext-facts dd{margin:0;font-size:12.5px;color:#e3edff}
+.ext-grant{display:inline-flex;align-items:center;gap:6px;justify-self:start;min-height:40px}.ext-grant svg{width:16px;height:16px}
+.ext-hint{margin:0;font-size:12px;line-height:1.45;color:#8fa5c4}
+.ext-history{display:grid;gap:6px;margin:0;padding:0;list-style:none}
+.ext-history>li{display:grid;gap:3px;padding:8px 10px;border:1px solid #1f3352;border-left:3px solid #34507d;border-radius:10px;background:#0b1626}
+.ext-history>li[data-status=vigente]{border-left-color:#45cdaa}.ext-history>li[data-status=revocada]{border-left-color:#ef4444;opacity:.85}.ext-history>li[data-status=reemplazada]{opacity:.8}
+.ext-h-top{display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap}.ext-h-top strong{font-size:12.5px;color:#eef3ff}
+.ext-history small{font-size:11.5px;color:#8fa5c4;overflow-wrap:anywhere}
+.ext-notices{display:grid;gap:3px;margin:2px 0 0;padding:0;list-style:none}.ext-notices li{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:11.5px;color:#b8c8de}
+.ext-notices b{padding:1px 7px;border-radius:999px;font-size:10.5px;background:#13233b;color:#cfe0f7}.ext-notices b[data-status=enviado]{color:#7fe0c4;background:#0d2620}.ext-notices b[data-status=error]{color:#fca5a5;background:#2a1117}.ext-notices b[data-status=omitido]{color:#9bb0cf}
+/* Ventana Premium Compact 2.0 */
+body[data-page=dashboard] dialog.ext-dialog{width:min(560px,calc(100vw - 24px))}
+.ext-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.ext-form>p,.ext-form>.ext-options,.ext-form>input[type=date],.ext-form>.ext-summary,.ext-form>.ext-check,.ext-form>small,.ext-form>.ext-msg,.ext-form>.ext-actions,.ext-form>textarea,.ext-field.wide{grid-column:1/-1}
+.ext-options{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}
+.ext-opt{min-height:44px;padding:6px;border:1px solid #2a3f60;border-radius:10px;background:#0f1d33;color:#dbe8fb;font-size:13px;font-weight:700;cursor:pointer;transition:border-color .15s,background .15s}
+.ext-opt[aria-checked=true]{border-color:#3e7cd5;background:#12233d;color:#fff;box-shadow:inset 0 0 0 1px #3e7cd5}.ext-opt:hover{border-color:#3e7cd5;transform:none}
+.ext-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin:0;padding:8px;border:1px solid #1f3352;border-radius:12px;background:#0a1424}
+.ext-summary div{display:grid;gap:1px;min-width:0}.ext-summary dt{font-size:10px;font-weight:700;letter-spacing:.3px;text-transform:uppercase;color:#7f93b1}.ext-summary dd{margin:0;font-size:13px;color:#e3edff}
+.ext-summary div[data-key=new] dd{color:#7fe0c4;font-weight:800}
+.ext-field{display:grid;gap:4px;min-width:0}.ext-field>span{font-size:11px;font-weight:700;color:#9bb0cf}.ext-field :is(input,select,textarea),.ext-form textarea,.ext-form input[type=date]{width:100%;min-width:0;min-height:42px}
+.ext-check{display:flex;align-items:center;gap:8px;font-size:12.5px;color:#cfe0f7}
+.ext-msg{margin:0;color:#ff9aa1;font-size:12.5px}.ext-msg:empty{display:none}
+.ext-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}.ext-actions button{min-height:42px}
+@media(max-width:560px){.ext-form{grid-template-columns:minmax(0,1fr)}.ext-options{grid-template-columns:repeat(3,minmax(0,1fr))}.ext-summary{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(prefers-reduced-motion:reduce){.ext-opt{transition:none}}
+.ext-form{gap:8px 10px}.ext-form .ext-field{margin:0;padding:0}.ext-form .ext-field>span{margin:0}
+body[data-page=dashboard] dialog.ext-dialog .ext-form{padding-bottom:2px}

@@ -24,8 +24,13 @@ def pending(c, now, config):
     out = []
     rows = c.execute("SELECT o.id,COALESCE(o.code,'OP-'||printf('%05d',o.id)) code,o.status,o.created_at,o.received_at,o.delivered_at,d.brand,d.model,cl.name client,cl.email "
                      "FROM orders o JOIN devices d ON d.id=o.device_id JOIN clients cl ON cl.id=d.client_id WHERE o.status!='entregado' ORDER BY o.id").fetchall()
+    import order_extensions
+    extended = order_extensions.live_map(c)
     for row in rows:
         item = dict(row)
+        # 1.5.294 · Con una prórroga vigente no se envían los avisos de permanencia: rigen los recordatorios de la prórroga.
+        if item['id'] in extended:
+            continue
         info = stay.compute(item, now, config)
         stage = stage_for(info['days'], config) if info else None
         if stage is None or not MAIL.fullmatch((item['email'] or '').strip()):

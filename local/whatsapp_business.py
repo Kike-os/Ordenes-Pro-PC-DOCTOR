@@ -77,6 +77,9 @@ EVENTS = {
     'entregado': ('Equipo entregado', 'orden', 'registramos la entrega de su equipo {equipo}. Gracias por confiar en PC-DOCTOR', 'Cuando la orden pasa a «Entregado».', True),
     'recordatorio_entrega': ('Recordatorio de entrega', 'orden', 'su equipo {equipo} está listo y espera su retiro en nuestro local',
                              'A los días configurados en «Listo para entregar» sin retiro (una vez por plazo). También desde la orden.', True),
+    # 1.5.294 · Prórroga del plazo de retiro: la envía administración al otorgarla (orden con consentimiento y plantilla aprobada).
+    'prorroga_retiro': ('Prórroga del plazo de retiro', 'orden', 'ampliamos hasta el {cuando} el plazo para retirar su equipo {equipo}',
+                        'Al otorgar una prórroga del plazo de retiro desde la orden (si se elige avisar al cliente).', True),
     'repuesto_solicitado': ('Repuesto solicitado', 'repuesto', 'el repuesto {repuesto} para su orden {ref} fue solicitado y confirmado', 'Cuando el pedido del repuesto queda confirmado.', True),
     'repuesto_enviado': ('Repuesto enviado', 'repuesto', 'el repuesto {repuesto} para su orden {ref} fue despachado hacia PC-DOCTOR', 'Cuando el repuesto se despacha.', True),
     'repuesto_en_pais': ('Repuesto en Ecuador', 'repuesto', 'el repuesto {repuesto} para su orden {ref} llegó a Ecuador', 'Cuando el repuesto llega al país.', True),
@@ -418,6 +421,11 @@ def subject(c, event, order_id=None, part_request_id=None, appointment_id=None, 
     if not o:
         return None
     out = {'phone': o['phone'], 'client_id': o['client_id'], 'name': o['client'], 'ref': o['code'], 'equipo': _device(o), 'order_id': o['id'], 'status': o['status']}
+    if event == 'prorroga_retiro':
+        ext = c.execute("SELECT new_due FROM order_extensions WHERE order_id=? AND status='vigente' ORDER BY id DESC LIMIT 1", (o['id'],)).fetchone()
+        if not ext:
+            return None
+        out['cuando'] = datetime.fromisoformat(ext['new_due']).strftime('%d/%m/%Y')
     if part_request_id:
         import order_part_requests as parts
         row = c.execute('SELECT * FROM order_part_requests WHERE id=?', (part_request_id,)).fetchone()
@@ -433,7 +441,7 @@ def compose(event, info, cfg):
                                      tipo=info.get('tipo', ''), estado=info.get('estado', ''))
     preview = '%s: %s.' % (_first(info['name']), phrase[0].upper() + phrase[1:])
     if ev['template']:
-        third = {'orden': info.get('equipo', ''), 'repuesto': info.get('repuesto', ''), 'cita': info.get('cuando', ''), 'pqrs': info.get('estado', '')}[group]
+        third = info.get('cuando', '') if event == 'prorroga_retiro' else {'orden': info.get('equipo', ''), 'repuesto': info.get('repuesto', ''), 'cita': info.get('cuando', ''), 'pqrs': info.get('estado', '')}[group]
         return {'template': ev['template'], 'lang': ev['lang'] or cfg['general_lang'] or 'es', 'params': [_first(info['name']), info.get('ref', ''), third],
                 'preview': preview, 'label': label}
     if cfg['general_template']:

@@ -1,9 +1,16 @@
 {
   "unreleased": {
-    "features": [],
-    "improvements": [],
+    "features": [
+      "Prórrogas del plazo de retiro: desde la permanencia de la orden, administración otorga 3, 7, 15, 30 días o una fecha personalizada con resumen previo (fecha original, vigente, días adicionales y nueva fecha), motivo, observaciones y responsable; ampliar o revocar con motivo; historial que nunca se sobrescribe y auditoría.",
+      "Avisos de prórroga: interno al equipo, al cliente por correo (con resultado y reintento seguro sin duplicar) y por WhatsApp Business con su consentimiento y plantilla; recordatorios configurables antes del nuevo plazo (desactivados por defecto) y prórrogas por vencer o vencidas en el Centro de Control."
+    ],
+    "improvements": [
+      "Con una prórroga vigente, la permanencia muestra «Prórroga vigente hasta …» y los vencidos, informes y avisos automáticos de permanencia usan la nueva fecha (día límite completo, hora de Ecuador); no cambia el estado de reparación ni ningún cobro."
+    ],
     "fixes": [],
-    "security": [],
+    "security": [
+      "Prórrogas solo para administración y órdenes no entregadas, con control de concurrencia (el plazo vigente visto debe seguir siendo el mismo), sin duplicados por doble clic y con datos protegidos en la base (no se editan ni se borran)."
+    ],
     "performance": []
   },
   "releases": [
