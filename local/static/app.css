@@ -5314,7 +5314,7 @@ dialog.quote-dialog{width:min(860px,calc(100% - 20px))}
 .quote-editor{display:grid;gap:14px;margin-top:14px}
 .quote-editor-head{display:flex;align-items:center;flex-wrap:wrap;gap:10px 14px}.quote-editor-head>div{display:grid;gap:2px;margin-right:auto;min-width:0}
 .quote-editor-head strong{font:650 15px/1.3 ui-monospace,Menlo,Consolas,monospace;color:#fff;overflow-wrap:anywhere}.quote-editor-head small{font-size:12.5px;color:#9db1cf}
-.quote-editor-head select{width:auto;margin:0}
+.quote-editor-head select{width:auto;max-width:100%;min-width:0;margin:0;text-overflow:ellipsis}
 .quote-rows{display:grid;gap:10px}
 .quote-row{display:grid;gap:8px;padding:12px;border:1px solid #2c4468;border-radius:12px;background:#0c192d}
 .quote-row textarea{margin:0;min-height:54px;resize:vertical}

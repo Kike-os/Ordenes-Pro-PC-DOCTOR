@@ -55,7 +55,7 @@ Todo queda en el historial financiero de la cobertura (solo anexado) y en la aud
 
 ## Dónde está
 
-- **Presupuesto de la orden:** botón «Cobertura PC-DOCTOR» en cada partida de **repuesto** ya guardada. Abre el panel de la cobertura con:
+- **Presupuesto de la orden:** botón «Cobertura PC-DOCTOR» en cada partida de **repuesto** (categoría «Repuestos y componentes»), también en presupuestos nuevos o partidas sin guardar (1.5.297). Si la partida aún no está guardada, el botón ofrece «Guardar borrador y continuar» (no se envía al cliente) y luego abre el panel. Si el estado no se puede consultar, el botón sigue visible y lo indica. Abre el panel de la cobertura con:
   - estados;
   - cifras internas;
   - proveedor;

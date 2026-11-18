@@ -4528,6 +4528,8 @@ async function openQuoteEditor(order,quoteId,opts={}){const dialog=smallDialog(o
   const toCents=text=>{const clean=String(text).trim().replace(',','.');return /^\d{1,6}(\.\d{1,2})?$/.test(clean)?Math.round(parseFloat(clean)*100):null;};
   const discountPick=el('select'),netOf=line=>line-Math.floor((line*(+discountPick.value)+5000)/10000);
   const recount=()=>{const t={base_taxed:0,base_zero:0,tax:0,quoted:0,gross:0,discount:0,discount_bp:+discountPick.value};for(const row of rows){const unit=toCents(row.price.value),quantity=parseInt(row.quantity.value,10);if(unit===null||!(quantity>=1))continue;const full=unit*quantity,line=netOf(full),[base,tax]=split(line,row.taxed.checked);t.gross+=full;t.discount+=full-line;t.quoted+=line;t.tax+=tax;t[row.taxed.checked?'base_taxed':'base_zero']+=base;row.total.textContent=quoteMoney(full);}paintTotals(t);};
+  // Cobertura PC-DOCTOR (1.5.297): cada fila se registra al crearse, también las nuevas y las que cambian a «Repuestos y componentes».
+  const coverHosts=[];let coverPaint=()=>{};
   const addRow=item=>{const top=el('div',undefined,'quote-row-top'),mark=el('span',undefined,'quote-row-icon'),priority=el('select'),box=el('div',undefined,'quote-row'),description=el('textarea'),category=el('select'),quantity=el('input'),price=el('input'),taxed=el('input'),total=el('strong','$0,00','quote-row-total'),remove=button('',()=>{rows.splice(rows.indexOf(row),1);box.remove();recount();},'secondary quote-row-remove'),tax=el('label',undefined,'quote-row-tax');
    description.rows=2;description.maxLength=300;description.value=item.description||'';description.placeholder='Descripción del servicio o producto';description.setAttribute('aria-label','Descripción');for(const[code,label]of Object.entries(categories))category.add(new Option(label,code));category.value=item.category||'servicio';category.setAttribute('aria-label','Categoría');
    quantity.type='number';quantity.min='1';quantity.max='999';quantity.value=String(item.quantity||1);quantity.setAttribute('aria-label','Cantidad');price.inputMode='decimal';price.value=item.unit_cents!==undefined?(item.unit_cents/100).toFixed(2):'';price.placeholder='0.00';price.setAttribute('aria-label','Precio unitario con IVA incluido, en USD');price.dataset.adi='off';
@@ -4546,8 +4548,8 @@ async function openQuoteEditor(order,quoteId,opts={}){const dialog=smallDialog(o
    const wrapField=(label,node,name)=>{const box2=el(node.tagName==='LABEL'?'div':'label',undefined,'quote-field'+(name?' quote-field-'+name:''));box2.append(el('span',label),node);return box2;},sum=el('div',undefined,'quote-field quote-field-total');sum.append(el('span','Total'),total);
    const nameCategory=()=>{category.title=category.selectedOptions[0]?.textContent||'';};category.addEventListener('change',nameCategory);nameCategory();priority.title='Clasificación de la partida (informativa)';
    top.replaceChildren(mark,wrapField('Clasificación',priority,'priority'));if(item.tax_pending){const warn=el('span','IVA por confirmar','quote-row-warn');warn.title='Confirma en el catálogo si el precio incluye IVA antes de enviar el presupuesto';top.append(warn);}top.append(remove);
-   const fields=el('div',undefined,'quote-row-fields');fields.append(wrapField('Categoría',category,'category'),wrapField('Cantidad',quantity,'quantity'),wrapField('Precio unitario',price,'price'),wrapField('IVA',tax,'tax'),sum);box.append(top,wrapField('Descripción del producto o servicio',description,'description'),fields);list.append(box);rows.push(row);paintMark();recount();return row;};
-  const coverHosts=quote.items.map(item=>({item,node:addRow(item).box}));
+   const fields=el('div',undefined,'quote-row-fields');fields.append(wrapField('Categoría',category,'category'),wrapField('Cantidad',quantity,'quantity'),wrapField('Precio unitario',price,'price'),wrapField('IVA',tax,'tax'),sum);box.append(top,wrapField('Descripción del producto o servicio',description,'description'),fields);list.append(box);rows.push(row);paintMark();recount();coverHosts.push({item,node:box,category:()=>category.value});category.addEventListener('change',()=>coverPaint());coverPaint();return row;};
+  for(const item of quote.items)addRow(item);
   const picker=el('div',undefined,'quote-picker'),pickButton=button('Agregar producto, servicio o repuesto',()=>openCatalogPicker(categories,item=>{addRow({catalog_id:item.id,description:item.name+(item.description?' — '+item.description:''),category:item.category,quantity:1,unit_cents:item.price_cents,taxed:item.taxed,icon:item.icon,tax_pending:item.tax_pending});toast('«'+item.name+'» agregado al presupuesto.','success',undefined,{id:'quote-add-'+item.id});},id=>rows.filter(row=>row.catalog_id===id).reduce((sum,row)=>sum+(Number(row.quantity?.value)||1),0),pickButton),'primary');pickButton.prepend(systemIcon('M4 4h6v6H4z M14 4h6v6h-6z M4 14h6v6H4z M17 14v6 M14 17h6'));pickButton.setAttribute('aria-haspopup','dialog');
   picker.append(pickButton,button('+ Línea libre',()=>addRow({}).description.focus(),'secondary'));
   const extra=el('div',undefined,'quote-extra'),valid=el('input'),notes=el('textarea');valid.type='date';valid.value=quote.valid_until||'';valid.min=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Guayaquil'}).format(new Date());notes.rows=2;notes.maxLength=1500;notes.value=quote.notes||'';notes.placeholder='Observaciones para el cliente (opcional)';
@@ -4597,11 +4599,14 @@ async function openQuoteEditor(order,quoteId,opts={}){const dialog=smallDialog(o
    // Cancelar presupuesto: cambia el estado de un presupuesto ya guardado. No es «salir sin guardar», por eso va aparte.
    // Anular: cambia el estado de un presupuesto ya guardado y lo conserva en el historial. No es «salir sin guardar», por eso va aparte.
    if(quote.id){danger=el('div',undefined,'quote-danger-zone');const kill=button('Anular presupuesto',async()=>{if(await confirmClose({title:'¿Anular el presupuesto '+quote.code+'?',text:'Quedará registrado como anulado y ya no se podrá editar ni enviar. El enlace enviado al cliente, si existe, dejará de servir. El registro y su historial se conservan; podrás crear otra versión después.',keep:'Conservar presupuesto',discard:'Anular presupuesto',danger:true})!=='discard')return;kill.disabled=true;try{await api('/api/quotes/'+quote.id,{action:'cancel'});dialog.beforeClose=null;toast('Presupuesto '+quote.code+' anulado.','success');refreshOrder();reload();}catch(error){status.textContent=error.message;kill.disabled=false;}},'secondary quote-danger');kill.prepend(systemIcon('M4.9 4.9l14.2 14.2 M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0'));danger.append(el('small','La anulación conservará el registro del presupuesto en el historial.'),kill);}}
-  body.append(list,picker,extra,totalsBox);if(danger)body.append(danger);footBar.append(status,actions);recount();baseline=snapshot();quoteCoverageAttach(quote,coverHosts,dirty);
+  body.append(list,picker,extra,totalsBox);if(danger)body.append(danger);footBar.append(status,actions);recount();baseline=snapshot();
+  // Guardar y continuar: la cobertura se vincula a una partida guardada; tras guardar se reabre el presupuesto con el panel de esa partida.
+  const coverSave=async host=>{if(working)return;const index=rows.findIndex(r=>r.box===host.node);status.textContent='';lock(true);try{if(!await persist()){lock(false);return;}baseline=snapshot();toast('Borrador guardado.','success');refreshOrder();dialog.beforeClose=null;dialog.close();openQuoteEditor(order,quote.id,{coverFor:index});}catch(error){status.textContent=error.field?'Revisa la partida señalada.':error.message;lock(false);}};
+  coverPaint=quoteCoverageAttach(quote,coverHosts,{isDirty:dirty,ensureSaved:coverSave,autoOpen:opts.coverFor});
  }else{
   // Enviado, decidido o cancelado: solo lectura, con el estado de cada ítem.
   const list=el('ul',undefined,'quote-items'),coverHosts=[];for(const item of quote.items){const li=el('li'),copy=el('span');coverHosts.push({item,node:copy});li.dataset.status=item.status;{const name=el('strong',(item.quantity>1?item.quantity+' × ':'')+item.description),mark=el('i',undefined,'quote-row-icon');mark.append(catalogIconNode(item.icon));name.prepend(mark);copy.append(name);const tag=priorityBadge(item.priority);if(tag)copy.append(tag);}copy.append(el('small',item.category_label+' · '+quoteMoney(item.unit_cents)+(item.taxed?'':' · tarifa 0 %')));li.append(copy,el('b',quoteMoney(item.net_cents??item.line_cents)),quoteBadge(item.status,item.status_label));list.append(li);}
-  body.append(list);paintTotals(quote.totals);body.append(totalsBox);if(quote.status!=='cancelado')quoteCoverageAttach(quote,coverHosts,null);
+  body.append(list);paintTotals(quote.totals);body.append(totalsBox);if(quote.status!=='cancelado')quoteCoverageAttach(quote,coverHosts,{autoOpen:opts.coverFor});
   if(quote.notes)body.append(el('p','Observaciones: '+quote.notes,'quote-note'));
   if(quote.acceptance)body.append(el('p',(quote.acceptance.signed?'Firmado por ':'Decisión de ')+quote.acceptance.signer_name+' el '+formatOrderDate(quote.acceptance.created_at)+'. '+quote.acceptance.method+'. La firma es un trazo manuscrito digitalizado, no una firma electrónica certificada.','quote-note'));
   else if(quote.decided_at)body.append(el('p','Decisión registrada por el personal el '+formatOrderDate(quote.decided_at)+'; no consta firma del cliente.','quote-note'));
@@ -4620,20 +4625,38 @@ async function openQuoteEditor(order,quoteId,opts={}){const dialog=smallDialog(o
  const log=el('details',undefined,'quote-log activity-fold'),logTitle=el('summary');logTitle.append(systemIcon('M3 12a9 9 0 1 0 3-6.7L3 8 M3 3v5h5 M12 7v5l3 2'),el('span','Historial de actividad'),el('b',String(quote.events.length)));log.append(logTitle);if(quote.events.length)log.append(quoteTimeline(quote));else log.append(el('p',fresh?'Todavía no hay actividad: el presupuesto no se ha guardado.':'Sin movimientos registrados.','system-muted'));if(!fresh&&quote.status!=='cancelado'&&quote.bank_enabled)body.append(quoteBankBlock(quote));body.append(log);}
 // ---- Cobertura PC-DOCTOR (1.5.296): PC-DOCTOR financia la compra de un repuesto; el cliente sigue viendo y pagando el precio de su presupuesto. ----
 // Autorizar no mueve dinero; cada pago al proveedor es un egreso de caja creado en el servidor. El técnico ve estados, nunca costos ni pagos.
-const covTone={solicitada:'amber',autorizada:'green',rechazada:'gray',cancelada:'gray',pendiente:'amber',parcial:'amber',pagado:'green',comprado:'blue',recibido:'green'};
+const covTone={error:'red',revisar:'amber',solicitada:'amber',autorizada:'green',rechazada:'gray',cancelada:'gray',pendiente:'amber',parcial:'amber',pagado:'green',comprado:'blue',recibido:'green'};
 function covChip(code,label){const chip=el('span',label,'cov-chip');chip.dataset.tone=covTone[code]||'gray';return chip;}
 function covLive(rows,item){const same=rows.filter(r=>r.line_position===item.position&&r.line_description===item.description);return same.find(r=>['solicitada','autorizada'].includes(r.status))||same[0]||null;}
-// Agrega a cada partida de repuesto ya guardada su botón «Cobertura PC-DOCTOR» con el estado. `isDirty`: el borrador tiene cambios sin guardar.
-async function quoteCoverageAttach(quote,hosts,isDirty){if(!quote.id||!hosts.some(h=>h.item.category==='repuesto'&&h.item.id))return;
- let data;try{data=await api('/api/quotes/'+quote.id+'/coverage');}catch{return;}if(!data.ready)return;
- const paint=fresh=>{if(fresh)data=fresh;for(const{item,node}of hosts){if(item.category!=='repuesto'||!item.id||!node.isConnected)continue;node.querySelector(':scope > .cov-line')?.remove();
-  const cov=covLive(data.rows,item),line=el('div',undefined,'cov-line'),open=invBtn(cov?'Cobertura PC-DOCTOR':'Cobertura PC-DOCTOR','shield-check',()=>{if(isDirty&&isDirty()){toast('Guarda el borrador antes de configurar la cobertura de esta partida.','error');return;}openCoveragePanel(quote,item,cov,data,async()=>{try{paint(await api('/api/quotes/'+quote.id+'/coverage'));}catch{}});},'secondary cov-open');
-  open.setAttribute('aria-haspopup','dialog');open.title='Cobertura interna de PC-DOCTOR para este repuesto (no aparece en los documentos del cliente)';line.append(open);
-  if(cov){line.append(covChip(cov.status,cov.status_label));if(cov.status==='autorizada')line.append(covChip(cov.purchase_status,cov.purchase_label),covChip(cov.payment_status,cov.payment_label));if(cov.review)line.append(covChip('revisar','Revisar'));}
+// Botón «Cobertura PC-DOCTOR» en cada partida de repuesto (1.5.297): visible también en presupuestos y partidas sin guardar, y nunca
+// desaparece en silencio si la consulta falla. Sin guardar ofrece «Guardar borrador y continuar». Devuelve la función que repinta.
+function quoteCoverageAttach(quote,hosts,{isDirty=null,ensureSaved=null,autoOpen=null}={}){
+ let data=null,state=quote.id?'loading':'nuevo';
+ const catOf=h=>h.category?h.category():h.item.category,saved=h=>!!(quote.id&&h.item.id&&catOf(h)===h.item.category);
+ const fetchData=async()=>{try{data=await api('/api/quotes/'+quote.id+'/coverage');state=data.ready?'ok':'off';}catch{state='error';}};
+ const open=async h=>{
+  if(!saved(h)||(isDirty&&isDirty())){if(!ensureSaved){toast('Guarda el presupuesto antes de configurar la cobertura de esta partida.','error');return;}
+   const pick=await confirmClose({title:'Guardar antes de configurar la cobertura',text:(quote.id?'La cobertura se vincula a una partida guardada. Se guardará el borrador con los cambios actuales':'Este presupuesto todavía no existe en el sistema. Se guardará como borrador')+' (no se envía al cliente) y se abrirá la Cobertura PC-DOCTOR de esta partida.',keep:'Volver al presupuesto',discard:'Guardar borrador y continuar',plain:true});
+   if(pick==='discard')ensureSaved(h);return;}
+  if(state!=='ok'){await fetchData();paint();}
+  if(state==='off'){toast('La Cobertura PC-DOCTOR todavía no está disponible en este servidor.','error');return;}
+  if(state!=='ok'){toast('No se pudo consultar la cobertura. Revisa la conexión e inténtalo de nuevo.','error');return;}
+  // Al cerrar el panel, el foco vuelve al botón de la misma partida (se repinta tras cada acción, por eso se busca de nuevo).
+  openCoveragePanel(quote,h.item,covLive(data.rows,h.item),data,async()=>{await fetchData();paint();},()=>h.node.querySelector(':scope > .cov-line .cov-open')?.focus());};
+ const paint=()=>{for(const h of hosts){const node=h.node;node.querySelector(':scope > .cov-line')?.remove();if(!node.isConnected||catOf(h)!=='repuesto')continue;
+  const line=el('div',undefined,'cov-line'),btn=invBtn('Cobertura PC-DOCTOR','shield-check',()=>open(h),'secondary cov-open');
+  btn.setAttribute('aria-haspopup','dialog');btn.title='Cobertura interna de PC-DOCTOR para este repuesto (no aparece en los documentos del cliente)';line.append(btn);
+  const cov=state==='ok'&&saved(h)?covLive(data.rows,h.item):null;
+  if(!saved(h))line.append(covChip('borrador',quote.id&&h.item.id?'Cambio sin guardar':'Partida sin guardar'));
+  else if(state==='error')line.append(covChip('error','Estado no disponible'));
+  else if(cov){line.append(covChip(cov.status,cov.status_label));if(cov.status==='autorizada')line.append(covChip(cov.purchase_status,cov.purchase_label),covChip(cov.payment_status,cov.payment_label));if(cov.review)line.append(covChip('revisar','Revisar'));}
+  else if(state==='ok')line.append(covChip('sin','Sin cobertura'));
   node.append(line);}};
- paint();}
+ paint();
+ if(quote.id)fetchData().then(()=>{paint();if(autoOpen!=null){const h=hosts.find(x=>x.item.position===autoOpen&&catOf(x)==='repuesto');if(h&&h.node.isConnected)open(h);}});
+ return paint;}
 // Panel Premium Compact de la cobertura de una partida.
-async function openCoveragePanel(quote,item,cov,meta,done){const dialog=invDialog('Cobertura PC-DOCTOR',true),body=el('div',undefined,'inv-body cov-panel');dialog.classList.add('cov-dialog');dialog.append(body);
+async function openCoveragePanel(quote,item,cov,meta,done,onClose){const dialog=invDialog('Cobertura PC-DOCTOR',true),body=el('div',undefined,'inv-body cov-panel');if(onClose)dialog.addEventListener('close',onClose,{once:true});dialog.classList.add('cov-dialog');dialog.append(body);
  const sale=item.line_cents??item.unit_cents*item.quantity,head=el('header',undefined,'cov-head'),copy=el('div');copy.append(el('strong',(item.quantity>1?item.quantity+' × ':'')+item.description),el('small',quote.code+' · precio al cliente '+quoteMoney(sale)));head.append(invIcon('shield-check'),copy);
  const note=el('p','El cliente sigue viendo y pagando '+quoteMoney(sale)+'. Costos, proveedor, pagos y margen son internos: no aparecen en el presupuesto, su enlace, el PDF, los recibos ni el portal.','cov-note');
  let d=null;const reload=async()=>{if(!cov)return;try{d=(await api('/api/coverage/'+cov.id)).coverage;}catch(error){body.replaceChildren(head,el('p',error.message,'empty-module'));return;}render();done();};
