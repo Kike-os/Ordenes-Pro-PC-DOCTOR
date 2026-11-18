@@ -1,16 +1,32 @@
 {
   "unreleased": {
     "features": [],
-    "improvements": [
-      "Licencias: panel lateral con resumen de código, cliente e identificación, activación, vencimiento, días restantes, porcentaje de vigencia y dispositivos autorizados; nuevas acciones «Gestionar entrega» (venta, tarjeta de entrega o Entregas) y «Consultar movimientos»; grupos por cliente que se abren con animación suave."
-    ],
-    "fixes": [
-      "Licencias: el menú de opciones «⋯» ya no queda cortado por la tabla ni oculto tras otras tarjetas; ahora flota sobre la página, abre hacia arriba o hacia abajo según el espacio, sigue al botón al desplazar y se cierra con Escape, Tab o un clic fuera, también en las últimas filas y en móvil."
-    ],
+    "improvements": [],
+    "fixes": [],
     "security": [],
     "performance": []
   },
   "releases": [
+    {
+      "version": "1.5.295",
+      "date": "2026-11-18T08:53:03-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Licencias: menús flotantes y resumen de la licencia",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Licencias: panel lateral con resumen de código, cliente e identificación, activación, vencimiento, días restantes, porcentaje de vigencia y dispositivos autorizados; nuevas acciones «Gestionar entrega» (venta, tarjeta de entrega o Entregas) y «Consultar movimientos»; grupos por cliente que se abren con animación suave."
+        ],
+        "fixes": [
+          "Licencias: el menú de opciones «⋯» ya no queda cortado por la tabla ni oculto tras otras tarjetas; ahora flota sobre la página, abre hacia arriba o hacia abajo según el espacio, sigue al botón al desplazar y se cierra con Escape, Tab o un clic fuera, también en las últimas filas y en móvil."
+        ],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Administración (encargo del 2026-11-18: versión siguiente validada en Preview)"
+    },
     {
       "version": "1.5.294",
       "date": "2026-11-18T08:24:52-05:00",

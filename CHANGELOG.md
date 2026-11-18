@@ -4,7 +4,9 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
-## Sin publicar
+## v1.5.295 — 2026-11-18 08:53 (UTC-05:00)
+
+Licencias: menús flotantes y resumen de la licencia
 
 ### Mejoras realizadas
 
