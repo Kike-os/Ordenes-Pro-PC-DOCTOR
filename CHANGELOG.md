@@ -4,7 +4,9 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
-## Sin publicar
+## v1.5.296 — 2026-11-18 09:30 (UTC-05:00)
+
+Cobertura Empresarial de Repuestos PC-DOCTOR
 
 ### Nuevas funcionalidades
 
