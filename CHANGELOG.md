@@ -4,6 +4,19 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## Sin publicar
+
+### Nuevas funcionalidades
+
+- Cobertura Empresarial de Repuestos PC-DOCTOR: en cada partida de repuesto del presupuesto, la empresa puede cubrir total o parcialmente el costo de compra. El cliente sigue viendo y pagando el precio de su presupuesto; costos, proveedor, pagos y margen no aparecen en sus documentos.
+- Estados separados de cobertura (solicitada, autorizada, rechazada, cancelada), compra (pendiente, comprado, recibido) y pago al proveedor (pendiente, parcial, pagado). Autorizar no mueve dinero; cada pago crea un egreso de caja «Compra de repuestos — Cobertura PC-DOCTOR» sin duplicados y sin superar lo cubierto.
+- Recepción del repuesto con una sola entrada de inventario a su costo real; reversos de pago solo por administración y con motivo (anulación o ingreso compensatorio); historial financiero y auditoría.
+- Caja › Coberturas: panel financiero con total cubierto, obligaciones pendientes, pagado a proveedores, recibidos, margen estimado y compras del mes, con filtros y exportación CSV. Liquidación interna en A4 y ticket de 80 mm.
+
+### Actualizaciones de seguridad
+
+- Costos, proveedor, pagos y margen de la cobertura solo para administración, comprobado en el servidor; el técnico solo solicita y consulta estados.
+
 ## v1.5.295 — 2026-11-18 08:53 (UTC-05:00)
 
 Licencias: menús flotantes y resumen de la licencia

@@ -12699,3 +12699,28 @@ body[data-page=dashboard] dialog.license-drawer .license-summary>dl{display:grid
 body[data-page=dashboard] dialog.license-drawer .license-summary>dl>div{display:grid;gap:1px;min-width:0;margin:0;padding:0}
 body[data-page=dashboard] dialog.license-drawer .license-summary-meter{display:grid;gap:4px;padding-top:8px;border-top:1px solid #16263f}
 body[data-page=dashboard] dialog.license-drawer .license-summary-meter .license-meter{width:100%}
+
+/* 1.5.296 · Cobertura PC-DOCTOR (interno): botón por partida de repuesto, panel Premium Compact y panel financiero en Caja. Acotado a .cov-* */
+.cov-line{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:8px;min-width:0}
+.cov-line .cov-open{min-height:32px;padding:4px 10px;font-size:12.5px}
+.cov-chip{display:inline-flex;align-items:center;padding:2px 9px;border-radius:999px;font-size:11.5px;font-weight:700;white-space:nowrap;--c:#94A3B8;color:var(--c);background:color-mix(in srgb,var(--c) 14%,transparent);border:1px solid color-mix(in srgb,var(--c) 35%,transparent)}
+.cov-chip[data-tone=green]{--c:#10B981}.cov-chip[data-tone=amber]{--c:#F59E0B}.cov-chip[data-tone=blue]{--c:#3B82F6}.cov-chip[data-tone=red]{--c:#EF4444}
+.cov-dialog .cov-panel{display:grid;gap:12px;min-width:0}
+.cov-head{display:flex;align-items:center;gap:10px;min-width:0}.cov-head>svg{flex:none;width:26px;height:26px;color:#3B82F6}
+.cov-head div{display:grid;gap:2px;min-width:0}.cov-head strong{overflow-wrap:anywhere}.cov-head small{color:var(--muted)}
+.cov-note{margin:0;font-size:12.5px;color:var(--muted);line-height:1.45}
+.cov-review{margin:0;padding:8px 10px;border-radius:8px;font-size:12.5px;background:color-mix(in srgb,#F59E0B 14%,transparent);border:1px solid color-mix(in srgb,#F59E0B 40%,transparent)}
+.cov-private{margin:0;font-size:12.5px;overflow-wrap:anywhere}
+.cov-states,.cov-actions{display:flex;flex-wrap:wrap;gap:6px;min-width:0}
+.cov-title{margin:4px 0 0;font-size:14px}
+.cov-figures{display:grid;grid-template-columns:repeat(auto-fit,minmax(122px,1fr));gap:8px;margin:0}
+.cov-figures div{padding:9px 11px;border-radius:10px;border:1px solid var(--line);min-width:0}
+.cov-figures dt{font-size:11.5px;color:var(--muted)}.cov-figures dd{margin:2px 0 0;font-size:16px;font-weight:800;overflow-wrap:anywhere}
+.cov-figures [data-tone=blue] dd{color:#3B82F6}.cov-figures [data-tone=green] dd{color:#10B981}.cov-figures [data-tone=amber] dd{color:#D97706}.cov-figures [data-tone=red] dd{color:#EF4444}
+.cov-preview{margin:0;font-size:12.5px;font-weight:600;color:#3B82F6}
+.cov-section{display:grid;gap:6px;min-width:0}
+.cov-log ul{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:8px}.cov-log li{display:grid;gap:2px;font-size:12.5px}.cov-log small{color:var(--muted)}
+.cov-filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;align-items:end;margin:12px 0}
+.cov-filters>button{min-height:40px}
+@media (max-width:520px){.cov-figures{grid-template-columns:1fr 1fr}.cov-figures dd{font-size:14.5px}.cov-actions .inv-btn{flex:1 1 140px;justify-content:center}}
+@media (prefers-reduced-motion:reduce){.cov-dialog *{transition:none!important;animation:none!important}}

@@ -2916,6 +2916,27 @@ class Handler(BaseHTTPRequestHandler):
                 if not paper:return self.reply(404,{'error':'Este presupuesto no tiene documento adjunto.'})
                 audit(c,user['id'],'quote_identity_viewed',paper['order_id']);c.commit()
                 return self.reply(200,bytes(paper['data']),paper['mime'],filename=paper['code']+'-IDENTIDAD.'+{'image/png':'png','image/jpeg':'jpg','image/webp':'webp','application/pdf':'pdf'}[paper['mime']])
+            coverage_get=re.fullmatch(r'/api/quotes/([0-9]+)/coverage|/api/coverage/([0-9]+)(/pdf|/ticket)?|/api/coverage/(dashboard)(\.csv)?',path)
+            if coverage_get:
+                # 1.5.296 · Cobertura PC-DOCTOR: el técnico solo recibe estados; costos, proveedor, pagos y margen son de administración.
+                import part_coverage
+                if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
+                try:
+                    if coverage_get[1]:return self.reply(200,part_coverage.for_quote(c,user,int(coverage_get[1])))
+                    if coverage_get[4]:
+                        board=part_coverage.dashboard(c,user,{k:v[0] for k,v in parse_qs(urlsplit(self.path).query).items()},reception_now())
+                        if coverage_get[5]:
+                            audit(c,user['id'],'coverage_exported');c.commit()
+                            return self.reply(200,part_coverage.dashboard_csv(board),'text/csv; charset=utf-8',filename='coberturas-pc-doctor-'+reception_now().strftime('%Y%m%d')+'.csv')
+                        return self.reply(200,board)
+                    if coverage_get[3]:
+                        if user['role']!='administrador':return self.reply(403,{'error':'Solo administración consulta la liquidación interna.'})
+                        import coverage_report
+                        pdf=coverage_report.render(c,user,int(coverage_get[2]),coverage_get[3]=='/ticket',reception_now())
+                        audit(c,user['id'],'coverage_report_viewed',int(coverage_get[2]));c.commit()
+                        return self.reply(200,pdf,'application/pdf',filename='COBERTURA-%s-INTERNA%s.pdf'%(coverage_get[2],'-80MM' if coverage_get[3]=='/ticket' else ''))
+                    return self.reply(200,{'coverage':part_coverage.detail(c,user,int(coverage_get[2]))})
+                except part_coverage.CoverageError as error:return self.reply(error.status,{'error':str(error),'fields':error.fields})
             quote_get=re.fullmatch(r'/api/(?:orders/([0-9]+)/quote|quotes/([0-9]+)(/pdf)?)',path)
             if quote_get:
                 if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
@@ -5106,6 +5127,35 @@ class Handler(BaseHTTPRequestHandler):
                         c.execute("UPDATE catalog_items SET archived_at='',archived_by=NULL WHERE id=? AND available=1 AND COALESCE(archived_at,'')!=''",(item,))
                         return self.reply(200,{'ok':True,'id':item})
                     except quotes.QuoteError as error:return self.reply(error.status,{'error':str(error),'fields':error.fields})
+                coverage_post=re.fullmatch(r'/api/quotes/([0-9]+)/coverage|/api/coverage/([0-9]+)',path)
+                if coverage_post:
+                    # 1.5.296 · Cobertura PC-DOCTOR. Autorizar no mueve dinero; pagar crea el egreso de caja en esta misma transacción.
+                    import part_coverage
+                    import cash_sessions
+                    if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
+                    now=reception_now();action=str(data.get('action',''))
+                    try:
+                        if coverage_post[1]:
+                            cid=part_coverage.request(c,user,int(coverage_post[1]),data,now);audit(c,user['id'],'coverage_requested',cid)
+                            return self.reply(201,{'ok':True,'id':cid,'coverage':part_coverage.detail(c,user,cid)})
+                        cid=int(coverage_post[2]);extra={}
+                        if action=='authorize':part_coverage.authorize(c,user,cid,data,now)
+                        elif action=='update':part_coverage.update(c,user,cid,data,now)
+                        elif action in ('reject','cancel'):part_coverage.close(c,user,cid,data,now,'rechazada' if action=='reject' else 'cancelada')
+                        elif action=='purchase':part_coverage.purchase(c,user,cid,data,now)
+                        elif action=='receive':extra['inventory_movement_id']=part_coverage.receive(c,user,cid,data,now)
+                        elif action=='pay':
+                            if not part_coverage.can_pay(c,user):return self.reply(403,{'error':'Registran pagos al proveedor administración o quien tiene la caja abierta.'})
+                            upload=str(data.get('upload_id','') or '')
+                            same=c.execute('SELECT 1 FROM part_coverage_payments WHERE request_key=?',(str(data.get('request_key','')),)).fetchone()
+                            file_id=cash_sessions.store_file(c,user,upload,str(data.get('file_name','') or ''),'egreso',now) if upload and not same else None
+                            extra=part_coverage.pay(c,user,cid,data,now,file_id)
+                        elif action=='reverse':extra=part_coverage.reverse(c,user,data.get('payment_id'),data,now,cid)
+                        else:return self.reply(400,{'error':'Acción inválida.'})
+                        audit(c,user['id'],'coverage_'+action,cid)
+                        return self.reply(200,{'ok':True,**extra,'coverage':part_coverage.detail(c,user,cid)})
+                    except (part_coverage.CoverageError,cash_sessions.CashError) as error:
+                        c.rollback();return self.reply(error.status,{'error':str(error),'fields':error.fields})
                 quote_route=re.fullmatch(r'/api/(?:orders/([0-9]+)/quote|quotes/([0-9]+))',path)
                 if quote_route:
                     if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})

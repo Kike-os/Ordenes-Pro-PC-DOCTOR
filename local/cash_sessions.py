@@ -33,7 +33,9 @@ IN_KINDS = {'venta_directa': 'Venta directa', 'cobro_factura': 'Cobro de factura
 OUT_KINDS = {'gasto_operativo': 'Gasto operativo', 'pago_proveedor': 'Pago a proveedor', 'devolucion': 'Devolución de dinero', 'reembolso': 'Reembolso autorizado',
              'nota_credito': 'Pago mediante nota de crédito', 'devolucion_anticipo': 'Devolución de anticipo', 'retencion': 'Retención aplicada',
              'retiro': 'Retiro de efectivo', 'salida_extraordinaria': 'Salida extraordinaria', 'gasto_menor': 'Gasto menor', 'deposito_banco': 'Depósito de efectivo en el banco',
-             'otro_egreso': 'Otro egreso autorizado'}
+             'otro_egreso': 'Otro egreso autorizado', 'cobertura_repuesto': 'Compra de repuestos — Cobertura PC-DOCTOR'}
+# Egresos que solo nacen de su módulo (vinculados a su registro); no se eligen en el formulario manual de caja.
+LINKED_OUT = ('cobertura_repuesto',)
 # Egresos que solo administración puede registrar (autorización administrativa expresa).
 ADMIN_OUT = ('reembolso', 'devolucion', 'devolucion_anticipo', 'retiro', 'salida_extraordinaria', 'nota_credito')
 MAX_QTY = 100000
@@ -540,7 +542,7 @@ def state(c, user, now):
                      'last': {'id': last['id'], 'code': 'CJ-%06d' % last['id'], 'status': last['status'], 'status_label': STATUS[last['status']]} if last else None,
                      'pending_fund': pending_fund(c, r['id'])})
     users = [dict(u) for u in c.execute("SELECT id,name FROM users WHERE active=1 AND role IN ('administrador','tecnico') ORDER BY name")] if is_admin(user) else []
-    return {'registers': regs, 'shifts': list(SHIFTS), 'suggested_shift': suggested_shift(now), 'denominations': denominations(c), 'in_kinds': IN_KINDS, 'out_kinds': OUT_KINDS, 'admin_out': list(ADMIN_OUT), 'methods': METHODS,
+    return {'registers': regs, 'shifts': list(SHIFTS), 'suggested_shift': suggested_shift(now), 'denominations': denominations(c), 'in_kinds': IN_KINDS, 'out_kinds': {k: v for k, v in OUT_KINDS.items() if k not in LINKED_OUT}, 'admin_out': list(ADMIN_OUT), 'methods': METHODS,
             'accounts': banking.listing(c, active_only=True), 'users': users, 'incidents': incidents(c), 'can_admin': is_admin(user), 'me': user['id'],
             'me_name': user['name'], 'next_code': 'CJ-%06d' % next_id(c, 'cash_sessions'), 'indicators': indicators(c, now), **{k: v for k, v in settings(c).items() if k != 'updated_at'}}
 
@@ -594,7 +596,7 @@ def indicators(c, now):
 
 # ---- Movimientos ----------------------------------------------------------------------------------------------------------
 
-def add_movement(c, user, data, now, file_id=None):
+def add_movement(c, user, data, now, file_id=None, linked=False):
     s = _session(c, data.get('session_id'))
     if not (is_admin(user) or s['cashier_id'] == user['id']):
         raise CashError('Solo el cajero de esta sesión o administración registran movimientos.', 403)
@@ -614,6 +616,8 @@ def add_movement(c, user, data, now, file_id=None):
     kind = str(data.get('kind', ''))
     if kind not in kinds:
         raise CashError('Elige el tipo.', 400, {'kind': 'Tipo no válido.'})
+    if direction == 'egreso' and kind in LINKED_OUT and not linked:
+        raise CashError('Este egreso se registra desde su módulo (Cobertura PC-DOCTOR del presupuesto).', 400, {'kind': 'Tipo no válido.'})
     if direction == 'egreso' and kind in ADMIN_OUT and not is_admin(user):
         raise CashError('Este egreso requiere autorización administrativa: debe registrarlo administración.', 403, {'kind': 'Requiere administración.'})
     method = str(data.get('method', ''))

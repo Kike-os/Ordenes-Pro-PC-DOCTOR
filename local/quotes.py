@@ -601,8 +601,11 @@ def save(c, quote, data, user, now):
             raise QuoteError('Solo administración puede solicitar el documento de identidad.', 403)
         c.execute('UPDATE quotes SET require_id=? WHERE id=?', (1 if data['require_id'] else 0, quote['id']))
         event(c, quote['id'], 'identidad', 'Documento de identidad %s para la aprobación.' % ('solicitado' if data['require_id'] else 'ya no solicitado'), now, user)
+    import part_coverage
+    kept = part_coverage.before_save(c, quote['id'])   # coberturas PC-DOCTOR de estas partidas: se vuelven a enlazar tras recrearlas
     c.execute('DELETE FROM quote_items WHERE quote_id=?', (quote['id'],))
     c.executemany('INSERT INTO quote_items(quote_id,position,catalog_id,description,category,quantity,unit_cents,taxed,priority) VALUES (?,?,?,?,?,?,?,?,?)', [(quote['id'], *row) for row in clean])
+    part_coverage.after_save(c, quote['id'], kept, user, now)
     c.execute("UPDATE quotes SET valid_until=?,notes=?,status='borrador',updated_at=? WHERE id=?", (valid, notes, now.isoformat(timespec='seconds'), quote['id']))
     event(c, quote['id'], 'guardado', 'Borrador guardado con %d %s. Total cotizado: %s.' % (len(clean), 'ítem' if len(clean) == 1 else 'ítems', usd(sum(net(row[4] * row[5], discount) for row in clean))), now, user)
 
@@ -859,6 +862,8 @@ def cancel(c, quote, user, now, reason=''):
     c.execute("UPDATE quotes SET status='cancelado',updated_at=? WHERE id=?", (stamp, quote['id']))
     c.execute("UPDATE quote_links SET revoked_at=? WHERE quote_id=? AND revoked_at=''", (stamp, quote['id']))
     event(c, quote['id'], 'cancelado', 'Presupuesto cancelado.' + (' Motivo: ' + reason[:300] if reason else ''), now, user)
+    import part_coverage
+    part_coverage.on_quote_cancel(c, quote['id'], user, now)   # sin compra ni pagos: se cancela; con compra o pagos: queda para revisión
 
 
 # --- Aprobación del cliente por enlace privado ------------------------------------------------------------------------
