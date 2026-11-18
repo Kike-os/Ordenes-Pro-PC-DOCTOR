@@ -12724,3 +12724,75 @@ body[data-page=dashboard] dialog.license-drawer .license-summary-meter .license-
 .cov-filters>button{min-height:40px}
 @media (max-width:520px){.cov-figures{grid-template-columns:1fr 1fr}.cov-figures dd{font-size:14.5px}.cov-actions .inv-btn{flex:1 1 140px;justify-content:center}}
 @media (prefers-reduced-motion:reduce){.cov-dialog *{transition:none!important;animation:none!important}}
+/* ---- 1.5.298 · Presupuesto premium: área de trabajo (70 %) y resumen económico fijo (30 %); una columna en tableta y móvil ---- */
+body[data-page=dashboard] dialog.quote-dialog.quote-pro{width:min(1240px,calc(100vw - 24px))}
+.quote-pro .quote-editor{gap:16px}
+.quote-pro .qp-main{display:grid;gap:14px;min-width:0;align-content:start}
+.quote-pro .qp-side{min-width:0}
+@media(min-width:1000px){
+ .quote-pro .quote-editor{grid-template-columns:minmax(0,7fr) minmax(280px,3fr);align-items:start}
+ .quote-pro .qp-side{position:sticky;top:0;z-index:1}
+}
+@media(max-width:999px){
+ /* Partidas → resumen → configuración → historial, sin perder información. */
+ .quote-pro .qp-main{display:contents}
+ .quote-pro .quote-editor>*,.quote-pro .qp-main>*{order:3}
+ .quote-pro .qp-main>:is(.quote-fresh,.quote-mail-failed){order:0}
+ .quote-pro .qp-main>.qp-items{order:1}
+ .quote-pro .quote-editor>.qp-side{order:2}
+}
+/* Cabecera: etiquetas compactas y aviso de cambios sin guardar */
+.quote-pro .qp-meta{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.quote-pro .qp-tag{display:inline-flex;align-items:center;min-height:24px;padding:2px 10px;border:1px solid #2c4468;border-radius:999px;background:#0f1e34;color:#b8cae4;font-size:11.5px;font-weight:600;white-space:nowrap}
+.quote-pro .qp-dirty{border-color:#8a6a2c;background:#2a2110;color:#f3d79b}
+.quote-pro .qp-dirty[hidden]{display:none}
+/* Secciones y tarjetas */
+.quote-pro :is(.qp-items,.qp-config,.qp-card){display:grid;gap:12px;padding:14px;border:1px solid #243a5c;border-radius:14px;background:#0a1628}
+.quote-pro .qp-section-head{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.quote-pro :is(.qp-section-head h3,.qp-config>h3){margin:0;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#a9bdd8}
+.quote-pro .qp-count{font-size:12px;font-weight:600;color:#9db1cf;font-variant-numeric:tabular-nums}
+.quote-pro .qp-items .quote-rows{gap:10px}
+.quote-pro .qp-items .quote-picker{padding:0;border:0;background:none}
+.quote-pro .qp-config .quote-extra{margin:0}
+.quote-pro .qp-hint{display:block;margin-top:5px;font-size:11.5px;font-weight:400;line-height:1.4;color:#9db1cf}
+/* Partidas compactas: tipo, clasificación, duplicar y eliminar en una sola franja */
+.quote-pro .quote-row{gap:8px;padding:10px 12px;border-radius:12px;transition:border-color .18s ease,background-color .18s ease}
+.quote-pro .quote-row:focus-within{border-color:#3d6ea6}
+.quote-pro .quote-row-top{align-items:center;gap:8px}
+.quote-pro .quote-row-top .quote-field-priority{flex:0 1 170px}
+.quote-pro .quote-row-top .quote-field-priority>span:first-child{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.quote-pro .qp-kind{margin-left:auto;display:inline-flex;align-items:center;min-height:24px;padding:2px 10px;border-radius:999px;font-size:11.5px;font-weight:700;color:var(--k);background:color-mix(in srgb,var(--k) 14%,transparent);border:1px solid color-mix(in srgb,var(--k) 40%,transparent)}
+.quote-pro .quote-row{--k:#94A3B8}.quote-pro .quote-row[data-category=servicio]{--k:#38BDF8}.quote-pro .quote-row[data-category=repuesto]{--k:#F59E0B}.quote-pro .quote-row[data-category=licencia]{--k:#A78BFA}.quote-pro .quote-row[data-category=seguridad]{--k:#10B981}
+.quote-pro .quote-row-top :is(.quote-row-dup,.quote-row-remove){width:36px;min-height:36px;margin:0;padding:0;display:grid;place-items:center;border-radius:10px}
+.quote-pro .quote-row-top .quote-row-remove{margin-left:0}
+.quote-pro .quote-row-top :is(.quote-row-dup,.quote-row-remove) svg{width:15px;height:15px}
+.quote-pro .quote-row textarea{min-height:44px}
+.quote-pro .qp-net{display:block;font-size:11px;font-weight:600;color:#aef0d2;font-variant-numeric:tabular-nums;white-space:nowrap}
+.quote-pro .qp-net:empty{display:none}
+/* Estado vacío */
+.quote-pro .qp-empty{display:grid;justify-items:center;gap:6px;padding:22px 14px;border:1px dashed #37618d;border-radius:12px;text-align:center}
+.quote-pro .qp-empty[hidden],.quote-pro .quote-rows[hidden]{display:none}
+.quote-pro .qp-empty-icon{display:grid;place-items:center;width:46px;height:46px;border-radius:14px;background:#10233c;color:#a8dcff}
+.quote-pro .qp-empty-icon svg{width:24px;height:24px}
+.quote-pro .qp-empty strong{font-size:14.5px;color:#e3eeff}.quote-pro .qp-empty p{margin:0;font-size:12.5px;color:#9db1cf}
+.quote-pro .qp-empty button{display:inline-flex;align-items:center;gap:8px;min-height:40px;margin-top:6px}.quote-pro .qp-empty button svg{width:16px;height:16px}
+/* Resumen económico */
+.quote-pro .qp-summary{gap:10px;background:linear-gradient(180deg,#0d1d33,#0a1628)}
+.quote-pro .qp-side-count{margin:0;font-size:12.5px;color:#b8cae4;font-variant-numeric:tabular-nums}
+.quote-pro .qp-summary .quote-editor-totals{justify-self:stretch;min-width:0;margin:0;padding:0;border:0;background:none;gap:7px}
+.quote-pro .qp-summary .quote-editor-totals dd{font-variant-numeric:tabular-nums}
+.quote-pro .qp-summary .quote-editor-totals [data-kind=total]{margin-top:4px;padding:10px 12px;border:1px solid #2f5a8c;border-radius:12px;background:#0f2742;align-items:baseline}
+.quote-pro .qp-summary .quote-editor-totals [data-kind=total] dt{font-size:13px}
+.quote-pro .qp-summary .quote-editor-totals [data-kind=total] dd{font-size:22px;letter-spacing:-.01em}
+.quote-pro .qp-side-note{margin:0;font-size:11.5px;line-height:1.45;color:#8fa6c4}
+.quote-pro .qp-preview{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:40px;padding:0 14px;border:1px solid #37618d;border-radius:10px;background:#16304f;color:#e3eeff;font-size:13px;font-weight:650;text-decoration:none;transition:background-color .18s ease,border-color .18s ease}
+.quote-pro .qp-preview:hover{background:#1b3b60}.quote-pro .qp-preview:focus-visible{outline:2px solid #7cc4ff;outline-offset:2px}
+.quote-pro .qp-preview svg{width:16px;height:16px}
+.quote-pro .qp-items .quote-items{margin:0}
+@media(max-width:720px){.quote-pro :is(.qp-items,.qp-config,.qp-card){padding:12px}.quote-pro .qp-kind{margin-left:0}.quote-pro .quote-row-top{flex-wrap:wrap}.quote-pro .quote-row-top .quote-field-priority{flex:1 1 140px}}
+@media(prefers-reduced-motion:reduce){.quote-pro :is(.quote-row,.qp-preview){transition:none}}
+.quote-pro .qp-empty-actions{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-top:6px}.quote-pro .qp-empty-actions button{margin:0}
+.quote-pro .quote-picker[hidden]{display:none}
+@media(max-width:860px){.quote-pro .qp-config .quote-extra label:has(textarea){grid-column:1/-1}}
+@media(max-width:560px){.quote-pro .quote-row{border-top:3px solid color-mix(in srgb,var(--k) 75%,transparent)}.quote-pro .qp-kind{display:none}.quote-pro .quote-row-top{flex-wrap:nowrap}.quote-pro .quote-row-top .quote-field-priority{flex:1 1 0;min-width:0}.quote-pro .quote-row-top .quote-field-priority select{font-size:14px}}
+@media(max-width:560px){.quote-pro .quote-row-top:has(.quote-row-warn){flex-wrap:wrap}}

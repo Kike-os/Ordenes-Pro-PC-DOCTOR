@@ -494,3 +494,57 @@ Al abrir el enlace antiguo de P3, la página decía «Este presupuesto fue cance
 - Un caso, PCD-20261102-0012, tiene P1 y P2 aprobadas. El total de la orden es solo el de P2, y ahora el enlace de P1 avisa de la versión vigente.
 
 **Pruebas:** `local/tests/test_quote_replaced.py`.
+
+## Rediseño premium de la ventana Presupuesto (1.5.298)
+
+Solo cambia la presentación y la organización. Los cálculos, estados, permisos, endpoints y datos guardados no cambiaron. Los presupuestos ya registrados se abren igual.
+
+- **Dos columnas en escritorio (desde 1000 px):**
+  - **Área de trabajo:** partidas, buscador del catálogo, línea libre, tarjeta «Configuración del presupuesto» e historial.
+  - **Panel «Resumen económico»:** se mantiene visible al desplazarse. Muestra:
+    - estado;
+    - número de partidas y unidades;
+    - descuento autorizado, subtotales e IVA;
+    - **Total cotizado** destacado.
+
+    También ofrece la «Vista previa (PDF)» del borrador guardado. Si hay cambios sin guardar, avisa de que el PDF muestra lo guardado.
+- **Tableta y móvil:** una sola columna, en el orden partidas → resumen → configuración → historial.
+- **Cabecera:**
+  - número;
+  - cliente;
+  - estado;
+  - «IVA … % incluido en los precios»;
+  - fecha de creación;
+  - la etiqueta **«Cambios sin guardar»** mientras haya ediciones pendientes.
+- **Partidas compactas:**
+  - Tipo de partida identificado por color (servicio, repuesto, licencia, seguridad, producto).
+  - **Duplicar**, que inserta la copia debajo, sin vínculo de cobertura.
+  - **Eliminar**, que pide confirmación cuando la partida tiene descripción o ya estaba guardada.
+  - Con descuento autorizado, cada partida muestra «Con descuento $…».
+  - En los repuestos, el botón «Cobertura PC-DOCTOR» (ver `docs/COBERTURA-REPUESTOS.md`).
+- **Estado vacío:** «Aún no has agregado partidas al presupuesto», con accesos al catálogo y a la línea libre.
+- **Configuración del presupuesto:**
+  - vigencia;
+  - descuento autorizado (solo administración);
+  - **observaciones para el cliente**, rotuladas como visibles en su presupuesto y su PDF, para no escribir ahí datos internos;
+  - solicitud del documento de identidad.
+- **Acciones solo en el pie, sin duplicados en el panel:**
+  - Principal: «Guardar y enviar al cliente».
+  - Secundaria: «Guardar borrador».
+  - Precaución: «Empezar de cero» y «Salir sin guardar».
+
+  Mientras se guarda o envía, todo queda bloqueado: un doble clic no repite la operación.
+
+Comprobado con clics reales y datos ficticios:
+- crear y agregar desde el catálogo y como línea libre;
+- editar cantidad, duplicar y eliminar;
+- descuento;
+- guardar y recuperar, con el mismo total que el servidor;
+- vista previa en PDF;
+- historial;
+- enviar con doble clic (un solo envío);
+- Escape con cambios;
+- permisos del técnico;
+- cobertura completa.
+
+Se probó en 1440, 820, 390 y 320 px.
