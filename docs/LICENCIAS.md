@@ -436,3 +436,50 @@ Rediseño de la presentación del catálogo («Productos y catálogo»). No camb
 - *Detalles*: ficha lateral del producto, con datos comerciales, existencias y todas sus acciones (ver licencias, agregar o ajustar stock, historial, duplicar y activar o desactivar).
 - *Editar*: la edición de siempre.
 - *⋯*: el resto de las acciones existentes.
+
+## 1.5.293 · Licencias Digitales Enterprise 3.0: inventario por cliente y vigencia por colores
+
+**Encabezado.** Ocho indicadores con datos reales; cada uno filtra.
+- Total de licencias, con el detalle de productos y vendidas.
+- Activas (incluye las perpetuas activadas).
+- Próximas a vencer, dentro del margen configurado (30 días por defecto).
+- Vencidas.
+- Reservadas.
+- Renovaciones pendientes: ciclos del seguimiento comercial sin renovar ni rechazar. Lleva a «Renovaciones».
+- Disponibles.
+- Agotados o con stock bajo.
+
+Tras cada operación (renovar, activar, anular…) los indicadores y la lista se recalculan sin recargar la página y sin perder la posición de lectura.
+
+**Por cliente.** Cada cliente tiene una tarjeta compacta con:
+- el nombre o la razón social;
+- el documento identificado: «Cédula», «RUC» o «Pasaporte», según el tipo guardado; si falta, se deduce (13 dígitos → RUC, 10 → cédula);
+- el total de licencias, las activas, las próximas a vencer, las vencidas y las que están en revisión;
+- el próximo vencimiento.
+
+Se puede expandir o contraer cada cliente o todos. La selección y el orden se recuerdan durante la sesión del navegador. Orden: vencimiento más cercano, nombre del cliente o fecha de creación.
+
+**Tabla.** Columnas: código, producto y fabricante (con el logotipo del producto o de la marca con procedencia documentada en `static/brands`), estado, vigencia, vencimiento y acciones.
+
+**Vigencia.** Barra proporcional a los días restantes del período contratado, según la duración del producto; los días se calculan en el servidor con la fecha de Ecuador.
+
+| Color | Cuándo |
+|---|---|
+| Verde | Vigencia normal |
+| Amarillo | 30 días o menos |
+| Naranja | 15 días o menos |
+| Rojo | Vencida |
+| Azul | Reservada |
+| Gris | Perpetua o sin activar |
+
+Las perpetuas y las que están sin activar no muestran porcentajes ni fechas inventadas.
+
+**Acciones.** Botones compactos con descripción emergente: ver detalles, enviar información, renovar, editar, historial, registrar devolución y anular. El resto queda en «Más opciones». Las irreversibles piden confirmación y motivo, como antes.
+- Una licencia **entregada** no se edita (regla existente, protegida en la base). Se corrige con su flujo: devolución, renovación, reemplazo o incidencia.
+
+**Filtro nuevo:** fabricante. Se suma a la búsqueda por cliente, cédula o RUC, producto o código, y a los filtros de estado y fechas de vencimiento.
+
+**Renovaciones sin duplicados.**
+- El servidor rechaza registrar dos veces la misma vigencia (doble clic, reintento o dos personas a la vez).
+- Al prolongar la misma clave, solo actualiza si el vencimiento sigue siendo el que se leyó, de modo que otra renovación simultánea no se pisa.
+- El historial de renovaciones nunca se sobrescribe.

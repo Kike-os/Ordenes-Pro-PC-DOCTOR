@@ -2776,14 +2776,14 @@ class Handler(BaseHTTPRequestHandler):
                         product=arg('product');client=arg('client')
                         rows=licenses.units(c,now,int(product) if product.isdigit() else None,arg('status'),arg('q')[:120],arg('state'),arg('from')[:10],arg('to')[:10],int(client) if client.isdigit() else None,arg('field'))
                         # 1.5.291 · Etapa del ciclo de vida, tres estados y filtros por etapa, proveedor, tipo y modalidad.
-                        rows=license_control.filter_units(license_control.enrich(c,rows,now),{k:arg(k)[:60] for k in ('etapa','proveedor','tipo','modalidad')})
+                        rows=license_control.filter_units(license_control.enrich(c,rows,now),{k:arg(k)[:60] for k in ('etapa','proveedor','tipo','modalidad','fabricante')})
                         return send(200,{'rows':rows,'stages':license_control.STAGES,'suppliers':sorted({r['batch_supplier'] for r in licenses.units(c,now) if r['batch_supplier']})})
                     stock_route=re.fullmatch(r'/api/licenses/products/([0-9]{1,9})/stock',path)
                     if stock_route:return send(200,licenses.stock_detail(c,int(stock_route[1]),now))
                     if path=='/api/licenses/units/export.csv':
                         # Exportación ordinaria: los mismos filtros (o la selección) y nunca claves, seriales, usuarios ni contraseñas.
                         product=arg('product');rows=licenses.units(c,now,int(product) if product.isdigit() else None,arg('status'),arg('q')[:120],arg('state'),arg('from')[:10],arg('to')[:10],None,arg('field'))
-                        rows=license_control.filter_units(license_control.enrich(c,rows,now),{k:arg(k)[:60] for k in ('etapa','proveedor','tipo','modalidad')})
+                        rows=license_control.filter_units(license_control.enrich(c,rows,now),{k:arg(k)[:60] for k in ('etapa','proveedor','tipo','modalidad','fabricante')})
                         chosen={int(x) for x in arg('ids').split(',') if x.isdigit()}
                         if chosen:rows=[r for r in rows if r['id'] in chosen]
                         audit(c,user['id'],'licenses_exported');c.commit()

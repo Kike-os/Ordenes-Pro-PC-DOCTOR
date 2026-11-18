@@ -4,6 +4,17 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## Sin publicar
+
+### Mejoras realizadas
+
+- Licencias por cliente: tarjeta compacta con nombre o razón social, cédula o RUC identificado, total, activas, próximas a vencer, vencidas y próximo vencimiento; expandir o contraer cada cliente o todos (se recuerda), orden por vencimiento, cliente o creación, filtro por fabricante y logotipo del fabricante en la tabla.
+- Vigencia por colores en una barra proporcional al período contratado: verde, amarillo (30 días o menos), naranja (15 o menos), rojo (vencida), azul (reservada) y gris (perpetua o sin activar, sin porcentajes ni fechas inventadas). Encabezado con total, activas, próximas a vencer, vencidas, reservadas y renovaciones pendientes, que se actualizan tras cada operación sin recargar la página.
+
+### Actualizaciones de seguridad
+
+- Renovaciones de licencias sin duplicados: el servidor rechaza registrar dos veces la misma vigencia y solo prolonga una licencia si su vencimiento sigue siendo el que se leyó, de modo que dos renovaciones simultáneas no se pisan; el historial nunca se sobrescribe.
+
 ## v1.5.292 — 2026-11-17 23:36 (UTC-05:00)
 
 Catálogo de licencias Premium Compact 3.0

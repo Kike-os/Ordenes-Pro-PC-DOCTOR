@@ -909,6 +909,9 @@ def renew(c,unit_id,data,user,now):
     manual=_date(data.get('expires_at'),'expires_at')
     expires=manual or add_months(date.fromisoformat(start),MONTHS.get(duration,custom)).isoformat()
     if expires<=start:raise LicenseError('El nuevo vencimiento debe ser posterior al inicio.',fields={'expires_at':'Revisa la fecha.'})
+    # 1.5.293 · Sin renovaciones duplicadas: la misma vigencia ya registrada (doble clic, reintento o dos personas a la vez) no se repite.
+    if c.execute('SELECT 1 FROM license_renewals WHERE unit_id=? AND starts_at=? AND expires_at=?',(unit_id,start,expires)).fetchone():
+        raise LicenseError('Esta renovación ya está registrada (misma vigencia del %s al %s). Revisa el historial antes de repetirla.'%(start,expires),409)
     cost=_cents(data.get('cost'),'cost','el costo');price=_cents(data.get('price'),'price','el precio de venta')
     values=_clean_secret(data,required=False);new_unit=None
     if values:
@@ -922,7 +925,9 @@ def renew(c,unit_id,data,user,now):
                             'Renovación de '+unit['code'],user['id'],stamp(now),stamp(now))).lastrowid
         c.execute('UPDATE license_units SET renewed_to=?,updated_at=? WHERE id=?',(new_unit,stamp(now),unit_id))
     else:
-        c.execute('UPDATE license_units SET expires_at=?,updated_at=? WHERE id=?',(expires,stamp(now),unit_id))
+        # Control de concurrencia: solo se prolonga si el vencimiento sigue siendo el que se leyó (otra renovación simultánea no se pisa).
+        if c.execute('UPDATE license_units SET expires_at=?,updated_at=? WHERE id=? AND expires_at=? AND renewed_to IS NULL',(expires,stamp(now),unit_id,unit['expires_at'])).rowcount!=1:
+            raise LicenseError('Otra persona actualizó esta licencia mientras tanto. Vuelve a abrirla y revisa su vigencia.',409)
     renewal=c.execute('INSERT INTO license_renewals(unit_id,new_unit_id,client_id,previous_expires_at,starts_at,expires_at,duration,duration_months,cost_cents,price_cents,key_changed,notes,created_by,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
                       (unit_id,new_unit,unit['client_id'],unit['expires_at'],start,expires,duration,custom,cost,price,1 if new_unit else 0,_text(data,'notes',300,'Las observaciones'),user['id'],stamp(now))).lastrowid
     detail='Renovada: nueva vigencia del %s al %s%s.'%(start,expires,' con una clave nueva' if new_unit else '')+(' Costo %s, precio %s.'%(usd(cost),usd(price)) if cost is not None or price is not None else '')
@@ -1205,7 +1210,7 @@ def units(c,now,product_id=None,status='',query='',state='',date_from='',date_to
     today=now.date();soon=display_settings(c)['soon_days']
     sql=("SELECT u.id,u.code,u.product_id,i.name product,i.brand,u.kind,u.edition,u.license_type,u.manufacturer,u.version,u.devices,u.term,u.purchased_at,u.activated_at,u.expires_at,u.activated,u.notes,"
          "u.download_url,u.instructions,u.status,u.reserved_at,u.delivered_at,u.created_at,u.renewed_from,u.renewed_to,u.seat,u.batch_id,"
-         "q.code quote_code,COALESCE(o.code,'') order_code,u.order_id,u.client_id,COALESCE(cl.name,'') client,COALESCE(cl.identification,'') client_identification,b.supplier batch_supplier,b.invoice,b.unit_cost_cents,"
+         "q.code quote_code,COALESCE(o.code,'') order_code,u.order_id,u.client_id,COALESCE(cl.name,'') client,COALESCE(cl.identification,'') client_identification,COALESCE(cl.document_type,'') client_document_type,b.supplier batch_supplier,b.invoice,b.unit_cost_cents,"
          "(SELECT 1 FROM license_receipts r WHERE r.batch_id=u.batch_id) has_receipt,p.validity_mode,p.duration,p.duration_months,COALESCE(p.activation_method,'') activation_method,(SELECT 1 FROM license_files f WHERE f.unit_id=u.id) has_file,(SELECT COUNT(*) FROM license_renewals n WHERE n.unit_id=u.id) renewals,"
          "(SELECT s.code FROM license_sales s WHERE s.id=u.sale_id) sale_code,(SELECT s.payment_status FROM license_sales s WHERE s.id=u.sale_id) sale_payment,u.sale_id "
          "FROM license_units u JOIN catalog_items i ON i.id=u.product_id LEFT JOIN license_products p ON p.item_id=u.product_id LEFT JOIN quotes q ON q.id=u.quote_id LEFT JOIN orders o ON o.id=u.order_id "

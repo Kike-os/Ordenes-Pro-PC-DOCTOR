@@ -1,9 +1,14 @@
 {
   "unreleased": {
     "features": [],
-    "improvements": [],
+    "improvements": [
+      "Licencias por cliente: tarjeta compacta con nombre o razón social, cédula o RUC identificado, total, activas, próximas a vencer, vencidas y próximo vencimiento; expandir o contraer cada cliente o todos (se recuerda), orden por vencimiento, cliente o creación, filtro por fabricante y logotipo del fabricante en la tabla.",
+      "Vigencia por colores en una barra proporcional al período contratado: verde, amarillo (30 días o menos), naranja (15 o menos), rojo (vencida), azul (reservada) y gris (perpetua o sin activar, sin porcentajes ni fechas inventadas). Encabezado con total, activas, próximas a vencer, vencidas, reservadas y renovaciones pendientes, que se actualizan tras cada operación sin recargar la página."
+    ],
     "fixes": [],
-    "security": [],
+    "security": [
+      "Renovaciones de licencias sin duplicados: el servidor rechaza registrar dos veces la misma vigencia y solo prolonga una licencia si su vencimiento sigue siendo el que se leyó, de modo que dos renovaciones simultáneas no se pisan; el historial nunca se sobrescribe."
+    ],
     "performance": []
   },
   "releases": [

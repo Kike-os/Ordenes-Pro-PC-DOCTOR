@@ -473,7 +473,9 @@ def enrich(c, rows, now):
 
 def filter_units(rows, params):
     get = lambda k: str(params.get(k, '') or '').strip()
-    etapa, supplier, kind, modality = get('etapa'), get('proveedor').lower(), get('tipo'), get('modalidad')
+    etapa, supplier, kind, modality, maker = get('etapa'), get('proveedor').lower(), get('tipo'), get('modalidad'), get('fabricante').lower()
+    if maker:
+        rows = [r for r in rows if maker in ((r.get('manufacturer') or '') + ' ' + (r.get('brand') or '')).lower()]
     if etapa:
         rows = [r for r in rows if r['stage'] == etapa or (etapa == 'vendidas' and r['stage'] in ('vendida', 'entregada', 'activada', 'renovada') or
                                                           (etapa == 'vendidas' and r['stage'] == 'vencida' and r['status'] == 'entregada'))
@@ -504,6 +506,16 @@ def indicators(c, now):
            'agotados': sum(1 for p in products if p.get('available') and free(p) == 0),
            'stock_bajo': sum(1 for p in products if p.get('available') and 0 < free(p) <= LOW_STOCK),
            'low_stock': LOW_STOCK}
+    # 1.5.293 · Encabezado del inventario: total, activas, próximas a vencer (margen configurable, 30 días por defecto) y renovaciones
+    # pendientes (ciclos sin renovar ni rechazar del seguimiento comercial).
+    out.update(total=sum(1 for r in rows if r['status'] != 'anulada'),
+               activas=sum(1 for r in rows if r['status'] == 'entregada' and r['activated'] and not r.get('renewed_to') and r['axes']['validity'] in ('vigente', 'por_vencer', 'perpetua')),
+               soon_days=licenses.display_settings(c)['soon_days'])
+    try:
+        out['renovaciones_pendientes'] = sum(1 for r in pipeline(c, now)['rows'] if r['cycle']['status'] not in ('completado', 'rechazado'))
+    except Exception as error:
+        print('indicadores renovaciones', type(error).__name__, flush=True)
+        out['renovaciones_pendientes'] = None
     return out
 
 
