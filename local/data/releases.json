@@ -1,23 +1,39 @@
 {
   "unreleased": {
-    "features": [
-      "Centro Premium 3.0: secciones Requieren mi atención, Críticas y urgentes, Pendientes de decisión, Asignadas a otros y En seguimiento; pestaña Solucionadas (quién resolvió cada pendiente, cuándo y cómo, según el historial de su módulo) e indicadores Pendientes activos y Solucionados hoy.",
-      "Panel de resolución con barra Resolver, Asignar, Posponer, Abrir módulo y Registrar seguimiento. Órdenes: diagnóstico y recomendaciones con control de revisión, presupuestos asociados, seguimiento técnico, cambio de estado y entrega. Responsable del seguimiento con fecha y autor; posponer hasta una fecha con motivo y reanudar.",
-      "Estados operativos del pendiente (Pendiente, En proceso, En espera de cliente, En espera de tercero, Pospuesto), separados del estado de la orden. Prioridades Crítica, Alta, Media y Baja con reglas de vencimiento y urgencia por tipo de tarea configurables por administración (valores iniciales: los criterios de siempre)."
-    ],
-    "improvements": [
-      "Notificaciones equivalentes (por ejemplo, las copias repetidas de Autorización registrada de una misma orden) se agrupan con su cantidad y se despliegan; alertas iguales forman un solo pendiente. Búsqueda por correo del cliente, carga progresiva de pendientes, actividad y solucionadas, y la sincronización no mueve la lectura.",
-      "Alertas: Comprobar recuperación vuelve a evaluar la condición en el servidor; las incidencias de entrega de correo se reenvían a una dirección corregida o se marcan revisadas desde el panel."
-    ],
-    "fixes": [
-      "Historial del centro: cada observación, recordatorio o gestión de alerta aparecía dos veces (registro y auditoría); ahora una sola. El foco ya no se pierde al sincronizar o desplegar notificaciones."
-    ],
-    "security": [
-      "Asignar un responsable solo es posible a quien ya tiene acceso a ese pendiente (no amplía permisos); el cambio de estado desde el panel rechaza pisar un cambio simultáneo; el registro de seguimiento es de solo anexado (no se edita ni se borra) y todo queda auditado. Nada de esto aprueba presupuestos ni resuelve un pendiente por sí solo."
-    ],
+    "features": [],
+    "improvements": [],
+    "fixes": [],
+    "security": [],
     "performance": []
   },
   "releases": [
+    {
+      "version": "1.5.289",
+      "date": "2026-11-17T20:07:40-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Centro de Notificaciones y Pendientes Premium 3.0 y flujo de resolución de órdenes",
+      "changes": {
+        "features": [
+          "Centro Premium 3.0: secciones Requieren mi atención, Críticas y urgentes, Pendientes de decisión, Asignadas a otros y En seguimiento; pestaña Solucionadas (quién resolvió cada pendiente, cuándo y cómo, según el historial de su módulo) e indicadores Pendientes activos y Solucionados hoy.",
+          "Panel de resolución con barra Resolver, Asignar, Posponer, Abrir módulo y Registrar seguimiento. Órdenes: diagnóstico y recomendaciones con control de revisión, presupuestos asociados, seguimiento técnico, cambio de estado y entrega. Responsable del seguimiento con fecha y autor; posponer hasta una fecha con motivo y reanudar.",
+          "Estados operativos del pendiente (Pendiente, En proceso, En espera de cliente, En espera de tercero, Pospuesto), separados del estado de la orden. Prioridades Crítica, Alta, Media y Baja con reglas de vencimiento y urgencia por tipo de tarea configurables por administración (valores iniciales: los criterios de siempre)."
+        ],
+        "improvements": [
+          "Notificaciones equivalentes (por ejemplo, las copias repetidas de Autorización registrada de una misma orden) se agrupan con su cantidad y se despliegan; alertas iguales forman un solo pendiente. Búsqueda por correo del cliente, carga progresiva de pendientes, actividad y solucionadas, y la sincronización no mueve la lectura.",
+          "Alertas: Comprobar recuperación vuelve a evaluar la condición en el servidor; las incidencias de entrega de correo se reenvían a una dirección corregida o se marcan revisadas desde el panel."
+        ],
+        "fixes": [
+          "Historial del centro: cada observación, recordatorio o gestión de alerta aparecía dos veces (registro y auditoría); ahora una sola. El foco ya no se pierde al sincronizar o desplegar notificaciones."
+        ],
+        "security": [
+          "Asignar un responsable solo es posible a quien ya tiene acceso a ese pendiente (no amplía permisos); el cambio de estado desde el panel rechaza pisar un cambio simultáneo; el registro de seguimiento es de solo anexado (no se edita ni se borra) y todo queda auditado. Nada de esto aprueba presupuestos ni resuelve un pendiente por sí solo."
+        ],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Administración (aprobación expresa en la sesión del 2026-11-17)"
+    },
     {
       "version": "1.5.288",
       "date": "2026-11-17T14:23:46-05:00",

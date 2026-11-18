@@ -4,7 +4,9 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
-## Sin publicar
+## v1.5.289 — 2026-11-17 20:07 (UTC-05:00)
+
+Centro de Notificaciones y Pendientes Premium 3.0 y flujo de resolución de órdenes
 
 ### Nuevas funcionalidades
 
