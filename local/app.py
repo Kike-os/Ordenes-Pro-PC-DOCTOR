@@ -1151,6 +1151,7 @@ class Handler(BaseHTTPRequestHandler):
         self.reply(200, content, 'text/html; charset=utf-8')
 
     def do_GET(self):
+        self.hide_costs=False   # 1.5.291: se decide en cada petición (una conexión puede atender varias)
         path = urlsplit(self.path).path
         files = {'/static/label.css':'label.css','/static/tracking.css':'tracking.css','/static/licencias.css':'licencias.css','/static/app.css':'app.css','/static/app.js':'app.js','/static/i18n.js':'i18n.js','/static/service-picker.js':'service-picker.js','/static/licenses.js':'licenses.js','/static/inventory.js':'inventory.js','/static/sales.js':'sales.js','/static/reschedule.js':'reschedule.js','/static/form-validation.js':'form-validation.js','/static/appointments.js':'appointments.js','/static/pqrs.js':'pqrs.js','/static/pqrs-admin.js':'pqrs-admin.js','/static/adi-widget.js':'adi-widget.js','/static/adi-orb.js':'adi-orb.js','/static/ui-select.js':'ui-select.js','/static/ticket.css':'ticket.css','/static/phone-input.js':'phone-input.js','/static/phone-input.css':'phone-input.css','/static/libphonenumber-max.js':'libphonenumber-max.js','/static/seguimiento-a4.css':'seguimiento-a4.css','/static/ticket.js':'ticket.js','/static/quote.css':'quote.css','/static/quote-sign.js':'quote-sign.js','/static/quote-premium.css':'quote-premium.css','/static/quote-premium.js':'quote-premium.js','/static/echarts.min.js':'echarts.min.js','/static/logo-original.png':'logo-original.png',
                  '/favicon.ico':'favicon.ico','/static/favicon.ico':'favicon.ico','/static/favicon-16.png':'favicon-16.png','/static/favicon-32.png':'favicon-32.png','/static/logo-firma.png':'logo-firma.png','/static/favicon-48.png':'favicon-48.png',
@@ -2747,17 +2748,25 @@ class Handler(BaseHTTPRequestHandler):
                 # «Mis licencias» de la ficha del cliente: el personal ve sus licencias (sin credenciales); las acciones son de administración.
                 if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
                 cid=int(client_licenses[1]);now=reception_now()
+                import license_control
+                self.hide_costs=not license_control.reveal_costs(c,user,parse_qs(urlsplit(self.path).query).get('costos',[''])[0]=='1',audit)
                 rows=licenses.units(c,now,client_id=cid)
                 for row in rows:row['renewal_history']=licenses.renewals(c,row['id'])
                 import license_mail
-                return self.reply(200,{'rows':rows,'states':licenses.STATES,'can_manage':user['role']=='administrador','notices_off':license_mail.opted_out(c,cid)})
+                payload={'rows':rows,'states':licenses.STATES,'can_manage':user['role']=='administrador','notices_off':license_mail.opted_out(c,cid)}
+                return self.reply(200,license_control.strip_costs(payload) if self.hide_costs else payload)
             if path.startswith('/api/licenses'):
                 # Licencias Pro: solo administración. Las credenciales nunca salen en estas consultas.
                 if user['role']!='administrador':return self.reply(403,{'error':'Solo administración accede a Licencias Pro.'})
                 query=parse_qs(urlsplit(self.path).query);now=reception_now();arg=lambda key:query.get(key,[''])[0]
+                # 1.5.291 · El costo de compra (y el margen) solo viaja si un usuario autorizado lo pide con «Mostrar costo»; la consulta queda auditada.
+                import license_control
+                self.hide_costs=not license_control.reveal_costs(c,user,arg('costos')=='1',audit)
+                # Todas las respuestas de este bloque salen por aquí: sin costos ni márgenes salvo que se hayan autorizado (independiente del adaptador).
+                send=lambda status,body,*rest,**extra:self.reply(status,license_control.strip_costs(body) if self.hide_costs and isinstance(body,dict) else body,*rest,**extra)
                 try:
                     if path=='/api/licenses':
-                        return self.reply(200,{'products':licenses.products(c,now),'dashboard':licenses.dashboard(c,now),'expiring':licenses.expiring(c,now,30),'kinds':licenses.KINDS,'lines':licenses.LINES,'models':licenses.MODELS,
+                        return send(200,{'indicators':license_control.indicators(c,now),'costs_visible':not self.hide_costs,'can_view_costs':license_control.costs_allowed(user),'products':licenses.products(c,now),'dashboard':licenses.dashboard(c,now),'expiring':licenses.expiring(c,now,30),'kinds':licenses.KINDS,'lines':licenses.LINES,'models':licenses.MODELS,
                                                'durations':licenses.DURATIONS,'validity':licenses.VALIDITY,'statuses':licenses.STATUSES,'states':licenses.STATES,'fields':licenses.FIELDS,'field_labels':licenses.FIELD_LABELS,
                                                'secret_labels':licenses.SECRET_LABELS,'max_bulk':licenses.MAX_BULK,'activation':licenses.ACTIVATION,'activation_fields':licenses.ACTIVATION_FIELDS,'activation_required':licenses.ACTIVATION_REQUIRED,
                                                'file_types':sorted(licenses.FILE_TYPES),'file_limit':licenses.FILE_LIMIT,'duplicate_reason_min':licenses.DUPLICATE_REASON_MIN,
@@ -2765,66 +2774,70 @@ class Handler(BaseHTTPRequestHandler):
                                                'brand_logos':{f.stem:f.name for f in sorted((ROOT/'static'/'brands').glob('*')) if f.suffix in ('.svg','.png') and re.fullmatch(r'[a-z0-9]+(?:-[a-z0-9]+)*',f.stem)},'contact':licenses.CONTACT,'link_hours':licenses.LINK_HOURS,'display':licenses.display_settings(c)})
                     if path=='/api/licenses/units':
                         product=arg('product');client=arg('client')
-                        return self.reply(200,{'rows':licenses.units(c,now,int(product) if product.isdigit() else None,arg('status'),arg('q')[:120],arg('state'),arg('from')[:10],arg('to')[:10],int(client) if client.isdigit() else None,arg('field'))})
+                        rows=licenses.units(c,now,int(product) if product.isdigit() else None,arg('status'),arg('q')[:120],arg('state'),arg('from')[:10],arg('to')[:10],int(client) if client.isdigit() else None,arg('field'))
+                        # 1.5.291 · Etapa del ciclo de vida, tres estados y filtros por etapa, proveedor, tipo y modalidad.
+                        rows=license_control.filter_units(license_control.enrich(c,rows,now),{k:arg(k)[:60] for k in ('etapa','proveedor','tipo','modalidad')})
+                        return send(200,{'rows':rows,'stages':license_control.STAGES,'suppliers':sorted({r['batch_supplier'] for r in licenses.units(c,now) if r['batch_supplier']})})
                     stock_route=re.fullmatch(r'/api/licenses/products/([0-9]{1,9})/stock',path)
-                    if stock_route:return self.reply(200,licenses.stock_detail(c,int(stock_route[1]),now))
+                    if stock_route:return send(200,licenses.stock_detail(c,int(stock_route[1]),now))
                     if path=='/api/licenses/units/export.csv':
                         # Exportación ordinaria: los mismos filtros (o la selección) y nunca claves, seriales, usuarios ni contraseñas.
                         product=arg('product');rows=licenses.units(c,now,int(product) if product.isdigit() else None,arg('status'),arg('q')[:120],arg('state'),arg('from')[:10],arg('to')[:10],None,arg('field'))
+                        rows=license_control.filter_units(license_control.enrich(c,rows,now),{k:arg(k)[:60] for k in ('etapa','proveedor','tipo','modalidad')})
                         chosen={int(x) for x in arg('ids').split(',') if x.isdigit()}
                         if chosen:rows=[r for r in rows if r['id'] in chosen]
                         audit(c,user['id'],'licenses_exported');c.commit()
-                        return self.reply(200,licenses.export_csv(rows),'text/csv; charset=utf-8',filename='licencias-ordenes-pro.csv')
-                    if path=='/api/licenses/deliveries':return self.reply(200,licenses.deliveries(c,now))
+                        return send(200,licenses.export_csv(rows),'text/csv; charset=utf-8',filename='licencias-ordenes-pro.csv')
+                    if path=='/api/licenses/deliveries':return send(200,licenses.deliveries(c,now))
                     # 1.5.290 · Licencias Pro Premium 4.0: renovaciones (seguimiento comercial), expediente y reportes. Sin credenciales.
                     import license_control
-                    if path=='/api/licenses/renewals':return self.reply(200,license_control.pipeline(c,now))
+                    if path=='/api/licenses/renewals':return send(200,license_control.pipeline(c,now))
                     dossier_route=re.fullmatch(r'/api/licenses/units/([0-9]{1,9})/dossier',path)
-                    if dossier_route:return self.reply(200,license_control.dossier(c,int(dossier_route[1]),now))
+                    if dossier_route:return send(200,license_control.dossier(c,int(dossier_route[1]),now))
                     report_route=re.fullmatch(r'/api/licenses/reports/([a-z]{1,20})(\.csv)?',path)
                     if report_route:
-                        found=license_control.report(c,now,report_route[1],{k:arg(k)[:20] for k in ('from','to','product')})
+                        found=license_control.report(c,now,report_route[1],dict({k:arg(k)[:20] for k in ('from','to','product')},costs_visible=not self.hide_costs))
                         if report_route[2]:
                             audit(c,user['id'],'license_report_exported');c.commit()
-                            return self.reply(200,license_control.report_csv(found).encode('utf-8'),'text/csv; charset=utf-8',filename='licencias-'+report_route[1]+'.csv')
-                        return self.reply(200,dict(found,reports=license_control.REPORTS))
+                            return send(200,license_control.report_csv(found).encode('utf-8'),'text/csv; charset=utf-8',filename='licencias-'+report_route[1]+'.csv')
+                        return send(200,dict(found,reports=license_control.REPORTS))
                     if path=='/api/licenses/duplicates':
                         # Informe de solo lectura: no modifica ningún registro ni incluye credenciales; la consulta queda en la auditoría.
-                        report=licenses.duplicate_review(c,now);audit(c,user['id'],'license_duplicate_review');c.commit();return self.reply(200,report)
+                        report=licenses.duplicate_review(c,now);audit(c,user['id'],'license_duplicate_review');c.commit();return send(200,report)
                     if path=='/api/licenses/order-info':
-                        info=licenses.order_info(c,arg('code')[:40]);return self.reply(200,info) if info else self.reply(404,{'error':'No existe una orden con ese número.'})
+                        info=licenses.order_info(c,arg('code')[:40]);return send(200,info) if info else self.reply(404,{'error':'No existe una orden con ese número.'})
                     if path=='/api/licenses/history':
-                        unit=arg('unit');product=arg('product');return self.reply(200,{'rows':licenses.history(c,300,int(unit) if unit.isdigit() else None,int(product) if product.isdigit() else None),'renewals':licenses.renewals(c,int(unit)) if unit.isdigit() else []})
+                        unit=arg('unit');product=arg('product');return send(200,{'rows':licenses.history(c,300,int(unit) if unit.isdigit() else None,int(product) if product.isdigit() else None),'renewals':licenses.renewals(c,int(unit)) if unit.isdigit() else []})
                     if path=='/api/licenses/notices':
                         import license_mail
-                        return self.reply(200,{'settings':license_mail.settings(c),'rows':license_mail.history(c),'mail_ready':mail_pro.configured(),'stages':license_mail.STAGES,
+                        return send(200,{'settings':license_mail.settings(c),'rows':license_mail.history(c),'mail_ready':mail_pro.configured(),'stages':license_mail.STAGES,
                                                'optout':[dict(r) for r in c.execute('SELECT o.client_id,cl.name,o.created_at FROM license_notice_optout o JOIN clients cl ON cl.id=o.client_id ORDER BY cl.name')]})
                     receipt_route=re.fullmatch(r'/api/licenses/batches/([0-9]{1,9})/receipt',path)
                     if receipt_route:
                         found=c.execute('SELECT name,mime,data FROM license_receipts WHERE batch_id=?',(int(receipt_route[1]),)).fetchone()
-                        if not found:return self.reply(404,{'error':'Sin comprobante.'})
+                        if not found:return send(404,{'error':'Sin comprobante.'})
                         audit(c,user['id'],'license_receipt_viewed',int(receipt_route[1]))
-                        return self.reply(200,bytes(found['data']),found['mime'],filename=found['name'])
+                        return send(200,bytes(found['data']),found['mime'],filename=found['name'])
                     events_route=re.fullmatch(r'/api/licenses/deliveries/([0-9]{1,9})/events',path)
-                    if events_route:return self.reply(200,{'rows':licenses.delivery_events(c,int(events_route[1]))})
+                    if events_route:return send(200,{'rows':licenses.delivery_events(c,int(events_route[1]))})
                     card_route=re.fullmatch(r'/api/licenses/deliveries/([0-9]{1,9})/card(\.pdf)?',path)
                     if card_route:
                         found=licenses.card(c,int(card_route[1]),private=False,now=now)
                         if card_route[2]:
                             # PDF público: nunca lleva credenciales (card() sin private no las incluye).
                             import license_card_pdf
-                            return self.reply(200,license_card_pdf.render(found),'application/pdf',filename='TARJETA-LICENCIAS-'+re.sub(r'[^A-Za-z0-9-]+','-',found['client'] or 'CLIENTE')[:40]+'.pdf')
-                        return self.reply(200,found)
+                            return send(200,license_card_pdf.render(found),'application/pdf',filename='TARJETA-LICENCIAS-'+re.sub(r'[^A-Za-z0-9-]+','-',found['client'] or 'CLIENTE')[:40]+'.pdf')
+                        return send(200,found)
                     if path=='/api/licenses/sales':
-                        return self.reply(200,{'rows':license_sales.sales(c,arg('q')[:120],arg('payment'),arg('delivery')),'methods':license_sales.METHODS,'payment_labels':license_sales.PAYMENT,'delivery_labels':license_sales.DELIVERY})
+                        return send(200,{'rows':license_sales.sales(c,arg('q')[:120],arg('payment'),arg('delivery')),'methods':license_sales.METHODS,'payment_labels':license_sales.PAYMENT,'delivery_labels':license_sales.DELIVERY})
                     sale_route=re.fullmatch(r'/api/licenses/sales/([0-9]{1,9})',path)
-                    if sale_route:return self.reply(200,license_sales.detail(c,int(sale_route[1]),now))
+                    if sale_route:return send(200,license_sales.detail(c,int(sale_route[1]),now))
                     payment_receipt=re.fullmatch(r'/api/licenses/payments/([0-9]{1,9})/receipt',path)
                     if payment_receipt:
                         found=license_sales.receipt_file(c,int(payment_receipt[1]))
-                        if not found:return self.reply(404,{'error':'Sin comprobante.'})
+                        if not found:return send(404,{'error':'Sin comprobante.'})
                         audit(c,user['id'],'license_payment_receipt_viewed',int(payment_receipt[1]))
-                        return self.reply(200,bytes(found['data']),found['mime'],filename=found['name'])
+                        return send(200,bytes(found['data']),found['mime'],filename=found['name'])
                 except licenses.LicenseError as error:return self.reply(error.status,dict(error.extra,error=str(error),fields=error.fields))
                 return self.reply(404,{'error':'No encontrado.'})
             if path == '/api/catalog':
@@ -2936,6 +2949,7 @@ class Handler(BaseHTTPRequestHandler):
         return self.reply(404, {'error':'Recurso no disponible.'})
 
     def do_POST(self):
+        self.hide_costs=False
         if urlsplit(self.path).path=='/api/public/whatsapp/webhook':
             # Avisos de entrega y lectura de WhatsApp Business: solo cuentan con la firma de Meta (X-Hub-Signature-256).
             # 1.5.275: también actualiza la cola de avisos y registra las bajas («BAJA», «STOP») que escribe el cliente.
@@ -4967,10 +4981,11 @@ class Handler(BaseHTTPRequestHandler):
                                 result=send_license_mail(c,'license_info',data_,user['id'])
                                 licenses.event(c,'informacion_enviada',now,'Información de la licencia enviada al cliente por correo (sin credenciales): %s.'%result['label'],unit,data_['product_id'],client=data_['client_id'],user=user)
                                 audit(c,user['id'],'license_info_sent',unit);return self.reply(200,{'ok':result['status']=='enviado','result':result})
-                            elif action in ('followup','device_add','device_remove'):
-                                # 1.5.290 · Seguimiento comercial de la renovación y equipos registrados (solo anexado; con historial y auditoría).
+                            elif action in ('followup','device_add','device_remove','incident_open','incident_resolve','replace'):
+                                # 1.5.290 · Seguimiento comercial de la renovación y equipos registrados; 1.5.291 · incidencias y reemplazo atómico.
                                 import license_control
-                                result=(license_control.record_followup if action=='followup' else license_control.add_device if action=='device_add' else license_control.remove_device)(c,unit,data,user,now)
+                                result={'followup':license_control.record_followup,'device_add':license_control.add_device,'device_remove':license_control.remove_device,
+                                        'incident_open':license_control.open_incident,'incident_resolve':license_control.resolve_incident,'replace':license_control.replace_unit}[action](c,unit,data,user,now)
                                 if not result.get('duplicate'):audit(c,user['id'],'license_'+action,unit)
                                 return self.reply(200,result)
                             else:return self.reply(400,{'error':'Acción no válida.'})

@@ -286,6 +286,15 @@ def _licenses(c, now, R):
                          decision=days <= R['licenses_urgent_days'] or follow == 'aceptado' or recontact,
                          ref={'unit_id': u['id'], 'code': u['code'] or '', 'expires_at': u['expires_at'], 'days_left': days, 'product': u['product'] or '', 'followup': follow,
                               'followup_label': cyc['status_label'], 'next_contact': cyc['next_contact'] or ''}))
+    # 1.5.291 · Alertas operativas de licencias: stock bajo o agotado, reservas detenidas, ventas pagadas sin entregar, activaciones
+    # por confirmar e incidencias abiertas. Cada una desaparece cuando cambia su condición en Licencias Pro o en Ventas.
+    for a in license_control.center_alerts(c, now):
+        label = {'stock': 'Registrar licencias', 'reserva': 'Abrir licencia', 'venta': 'Entregar en Ventas', 'activacion': 'Abrir licencia', 'incidencia': 'Resolver incidencia'}[a['kind']]
+        out.append(_item('licenses', '%s:%d' % (a['kind'], a['id']), a['title'], detail=a['detail'], client=a.get('client', ''), responsible='Administración', priority=a['priority'],
+                         at=_iso(a['at']) if a['at'] else now.isoformat(timespec='seconds'), href=a['href'], actions=[{'label': label, 'href': a['href']}], waiting=a['waiting'],
+                         resolves=a['resolves'], created=_iso(a['at']) if a['at'] else '', decision=a['decision'],
+                         ref={'alert': a['kind'], 'alert_id': a['id'], 'unit_id': a.get('unit_id') or (a['id'] if a['kind'] in ('reserva', 'activacion') else None),
+                              'product_id': a['id'] if a['kind'] == 'stock' else None, 'sale_id': a['id'] if a['kind'] == 'venta' else None, 'code': ''}))
     return out
 
 
@@ -333,6 +342,8 @@ def entity(item):
         ident = ref.get('pqrs_id') or ref.get('conversation_id') or ref.get('response_id')
         return 'messages:%s:%s' % (ref.get('kind', ''), ident)
     if module == 'licenses':
+        if ref.get('alert'):
+            return 'licenses:%s:%s' % (ref['alert'], ref['alert_id'])
         return 'licenses:%d' % ref['unit_id']
     return item['key']
 

@@ -608,6 +608,16 @@ Object.assign(PHRASES,{
  'Seguimiento de la renovación registrado.':'Renewal follow-up recorded.',
  'La renovación (nueva vigencia, clave, costo y precio) se registra en el expediente de la licencia.':'The renewal (new validity, key, cost and price) is recorded in the license file.'
 });
+// 1.5.291 · Alertas de licencias en el Centro de Control.
+Object.assign(PHRASES,{
+ 'Registrar licencias en el inventario':'Add licenses to inventory',
+ 'Abrir licencia':'Open license',
+ 'Entregar en Ventas':'Deliver in Sales',
+ 'Resolver incidencia':'Resolve incident',
+ 'Describe la solución (al menos 10 caracteres).':'Describe the solution (at least 10 characters).',
+ 'Incidencia resuelta.':'Incident resolved.',
+ 'Queda en el historial de la licencia. Si la clave no sirve, ábrela y usa «Reemplazar».':'It is kept in the license history. If the key does not work, open it and use “Replace”.'
+});
 const PATTERNS=[
  // ADI (1.5.276)
  [/^Si el número corresponde a una orden con correo registrado, acabamos de enviar un código de 6 dígitos a ese correo\. Caduca en (\d+) minutos\.$/,m=>'If the number matches an order with a registered email, we just sent a 6-digit code to that email. It expires in '+m[1]+' minutes.'],

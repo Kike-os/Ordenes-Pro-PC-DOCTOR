@@ -4,6 +4,25 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## Sin publicar
+
+### Nuevas funcionalidades
+
+- Licencias Digitales Enterprise 3.0: indicadores de productos, disponibles, reservadas, vendidas, activadas, próximas a vencer, vencidas y agotados o stock bajo, que filtran; ciclo de vida Disponible, Reservada, Vendida, Entregada, Activada y Vencida; vencimiento real o estimado claramente diferenciados.
+- Incidencias de activación con resolución registrada y reemplazo atómico por otra licencia disponible del mismo producto (la anterior queda anulada y enlazada). Alertas en el Centro de Control por stock bajo o agotado, reservas detenidas, ventas pagadas sin entregar, activaciones por confirmar e incidencias.
+
+### Mejoras realizadas
+
+- Catálogo de licencias a 4 columnas en monitores amplios con nombres completos; filtros de inventario por ciclo de vida, proveedor, tipo y modalidad (también en la exportación); reportes de ventas (completadas, en curso, anuladas), costos y márgenes y rotación de inventario.
+
+### Errores corregidos
+
+- La ficha del cliente enviaba a técnicos el costo del lote y el costo de las renovaciones de sus licencias; ya no los recibe. La protección del costo se aplica en las rutas, de modo que vale igual en el servidor local y en Vercel.
+
+### Actualizaciones de seguridad
+
+- Costo de compra protegido: oculto por defecto (••••••) con botón de ojo; el servidor solo lo envía a administración cuando lo pide expresamente (auditado), y nunca a técnicos, tampoco en la ficha del cliente; con el costo oculto se ocultan el margen y el reporte de márgenes, y editar no lo borra.
+
 ## v1.5.290 — 2026-11-17 21:03 (UTC-05:00)
 
 Licencias Pro Premium 4.0: renovaciones, expediente, dispositivos y reportes

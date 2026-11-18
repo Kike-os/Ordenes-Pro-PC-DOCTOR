@@ -25,7 +25,38 @@ VALIDITY = {'vigente': 'Vigente', 'por_vencer': 'Próxima a vencer', 'vencida': 
             'sin_fecha': 'Sin fecha aplicable', 'anulada': 'Anulada'}
 # Semáforo: verde activa, amarillo próxima a vencer, rojo vencida, gris sin activar o sin fecha aplicable.
 LIGHT = {'vigente': 'verde', 'por_vencer': 'amarillo', 'vencida': 'rojo'}
-WINDOW_DAYS = 90   # el seguimiento comercial muestra lo que vence dentro de este margen (o ya venció) y lo gestionado en el ciclo
+WINDOW_DAYS = 90
+# 1.5.291 · Costo de compra protegido. Roles que pueden consultarlo (hoy, solo administración; los técnicos no lo reciben nunca).
+COST_ROLES = ('administrador',)
+COST_KEYS = frozenset({'purchase_cents', 'purchase_price', 'unit_cost_cents', 'cost_cents', 'margin_cents', 'margin_pct', 'cost_total_cents', 'cost', 'margin',
+                       'margin_total', 'cost_total'})
+
+
+def costs_allowed(user):
+    return bool(user) and user.get('role') in COST_ROLES if isinstance(user, dict) else bool(user) and user['role'] in COST_ROLES
+
+
+def strip_costs(value):
+    """Copia sin costos ni márgenes (en cualquier nivel). Se aplica a las respuestas cuando el costo no se pidió o no está autorizado."""
+    if isinstance(value, dict):
+        return {k: strip_costs(v) for k, v in value.items() if k not in COST_KEYS}
+    if isinstance(value, list):
+        return [strip_costs(v) for v in value]
+    return value
+
+
+def reveal_costs(c, user, asked, audit=None):
+    """True si se deben enviar los costos: solo si se piden expresamente y la persona está autorizada. Cada consulta queda en la
+    auditoría (como mucho una vez cada 10 minutos por persona, para no llenarla con las recargas de la misma pantalla)."""
+    if not asked or not costs_allowed(user):
+        return False
+    if audit:
+        import time
+        recent = c.execute("SELECT 1 FROM audit WHERE user_id=? AND action='license_costs_viewed' AND created_at>=? LIMIT 1", (user['id'], int(time.time()) - 600)).fetchone()
+        if not recent:
+            audit(c, user['id'], 'license_costs_viewed')
+            c.commit()
+    return True   # el seguimiento comercial muestra lo que vence dentro de este margen (o ya venció) y lo gestionado en el ciclo
 
 
 def _has(c, table):
@@ -265,14 +296,20 @@ def dossier(c, unit_id, now):
     rows = [r for r in licenses.units(c, now) if r['id'] == unit_id]
     if not rows:
         raise LicenseError('Licencia no disponible.', 404)
-    row = with_axes(c, rows, now)[0]
+    row = enrich(c, rows, now)[0]
+    sale = c.execute('SELECT code,created_at,payment_status,delivery_status FROM license_sales WHERE id=?', (row['sale_id'],)).fetchone() if row.get('sale_id') else None
+    row['sale'] = dict(sale) if sale else None
+    row['sold_at'] = (sale['created_at'] if sale else '') or row.get('delivered_at') or ''
     client = c.execute("SELECT name,COALESCE(phone,'') phone,COALESCE(email,'') email FROM clients WHERE id=?", (row['client_id'],)).fetchone() if row['client_id'] else None
     contact = _contact({'client_phone': client['phone'], 'client_email': client['email']}) if client else {}
     devs = devices(c, unit_id)
     return {'unit': row, 'cycle': cycle(c, row) if row['status'] == 'entregada' and row['expires_at'] else None, 'followups': followups(c, unit_id),
             'devices': devs, 'devices_active': sum(1 for d in devs if not d['removed_at']), 'renewals': licenses.renewals(c, unit_id),
-            'history': licenses.history(c, 60, unit_id), 'contact': contact, 'statuses': FOLLOW, 'channels': CHANNELS,
-            'ready': {'followups': _has(c, 'license_followups'), 'devices': _has(c, 'license_devices')}}
+            'history': licenses.history(c, 60, unit_id), 'contact': contact, 'statuses': FOLLOW, 'channels': CHANNELS, 'stages': STAGES,
+            'incidents': incidents(c, unit_id), 'incident_kinds': INCIDENT_KINDS,
+            'can_replace': row['status'] in ('entregada', 'reservada') and not row.get('renewed_to') and c.execute(
+                "SELECT 1 FROM license_units WHERE product_id=? AND status='disponible' AND id!=? AND (expires_at='' OR expires_at>=?) LIMIT 1", (row['product_id'], unit_id, now.date().isoformat())).fetchone() is not None,
+            'ready': {'followups': _has(c, 'license_followups'), 'devices': _has(c, 'license_devices'), 'incidents': _has(c, 'license_incidents')}}
 
 
 # ---- Reportes ----
@@ -299,6 +336,10 @@ def report(c, now, kind, params):
     CONFIRMADOS de ventas de licencias de renovación; el precio anotado en la renovación se muestra aparte y no se cuenta como cobro."""
     if kind not in REPORTS:
         raise LicenseError('Reporte no válido.', 404)
+    if kind in ('ventas', 'margenes', 'rotacion'):
+        if kind in COST_REPORTS and not params.get('costs_visible'):
+            raise LicenseError('Este reporte muestra costos: pulsa «Mostrar costo» para consultarlo (solo personal autorizado).', 403)
+        return enterprise_report(c, now, kind, params, {'kind': kind, 'title': REPORTS[kind], 'generated_at': stamp(now), 'totals': {}, 'cost_report': kind in COST_REPORTS})
     today, soon = now.date(), licenses.display_settings(c)['soon_days']
     product = str(params.get('product', '') or '')
     out = {'kind': kind, 'title': REPORTS[kind], 'generated_at': stamp(now), 'totals': {}}
@@ -379,3 +420,278 @@ def report_csv(data):
     for label, value in data['totals'].items():
         writer.writerow([label, value])
     return buf.getvalue()
+
+
+# ===== 1.5.291 · Licencias Digitales Premium Enterprise 3.0 =====
+LOW_STOCK = 2   # mismo umbral que el catálogo: con 2 o menos disponibles, «stock bajo»
+# Ciclo de vida (validado por las acciones del servidor): Disponible → Reservada → Vendida → Entregada → Activada → Vencida,
+# con Renovada y Anulada (cancelada, revocada o reemplazada). Una licencia agotada en stock NO es una licencia vencida.
+STAGES = {'disponible': 'Disponible', 'reservada': 'Reservada', 'vendida': 'Vendida', 'entregada': 'Entregada', 'activada': 'Activada', 'vencida': 'Vencida',
+          'renovada': 'Renovada', 'anulada': 'Anulada'}
+INCIDENT_KINDS = {'activacion': 'Error de activación', 'clave_invalida': 'Clave inválida o rechazada', 'dispositivos': 'Límite de dispositivos', 'cliente': 'Solicitud del cliente', 'otro': 'Otra incidencia'}
+
+
+def stage(row, today):
+    status = row['status']
+    if status == 'anulada':
+        return 'anulada'
+    if row.get('renewed_to'):
+        return 'renovada'
+    if status == 'vencida':
+        return 'vencida'
+    if status == 'disponible':
+        return 'disponible'
+    if status == 'reservada':
+        return 'vendida' if row.get('sale_payment') == 'pagado' else 'reservada'
+    if row.get('expires_at') and row['expires_at'] < today.isoformat():
+        return 'vencida'
+    return 'activada' if row.get('activated') else 'entregada'
+
+
+def expiry_info(c, row, today):
+    """Vencimiento real (registrado) o estimado (si se activara hoy), claramente diferenciados. Nunca se guarda una estimación."""
+    if row.get('expires_at'):
+        return {'kind': 'real', 'date': row['expires_at']}
+    if row.get('duration') == 'perpetua':
+        return {'kind': 'no_aplica', 'date': ''}
+    if row['status'] in ('entregada', 'reservada') and not row.get('activated') and (row.get('validity_mode') or 'activacion') == 'activacion':
+        months = licenses.months_of({'duration': row.get('duration'), 'duration_months': row.get('duration_months')})
+        if months:
+            return {'kind': 'estimada', 'date': licenses.add_months(today, months).isoformat()}
+    return {'kind': 'pendiente', 'date': ''}
+
+
+def enrich(c, rows, now):
+    """Añade a cada unidad sus tres estados, su etapa del ciclo de vida y el tipo de vencimiento."""
+    with_axes(c, rows, now)
+    for row in rows:
+        row['stage'] = stage(row, now.date())
+        row['stage_label'] = STAGES[row['stage']]
+        row['expiry'] = expiry_info(c, row, now.date())
+    return rows
+
+
+def filter_units(rows, params):
+    get = lambda k: str(params.get(k, '') or '').strip()
+    etapa, supplier, kind, modality = get('etapa'), get('proveedor').lower(), get('tipo'), get('modalidad')
+    if etapa:
+        rows = [r for r in rows if r['stage'] == etapa or (etapa == 'vendidas' and r['stage'] in ('vendida', 'entregada', 'activada', 'renovada') or
+                                                          (etapa == 'vendidas' and r['stage'] == 'vencida' and r['status'] == 'entregada'))
+                or (etapa == 'activadas' and r['activated'] and r['status'] == 'entregada' and r['stage'] != 'anulada')
+                or (etapa == 'por_vencer' and r['axes']['validity'] == 'por_vencer')]
+    if supplier:
+        rows = [r for r in rows if supplier in (r.get('batch_supplier') or '').lower()]
+    if kind:
+        rows = [r for r in rows if r['kind'] == kind]
+    if modality:
+        rows = [r for r in rows if (r.get('duration') == 'perpetua') == (modality == 'perpetua')]
+    return rows
+
+
+def indicators(c, now):
+    """Indicadores superiores calculados de la base: productos, disponibles, reservadas, vendidas, activadas, por vencer, vencidas y
+    productos agotados o con stock bajo (agotado ≠ vencido)."""
+    rows = enrich(c, licenses.units(c, now), now)
+    products = [p for p in licenses.products(c, now) if p.get('managed')]
+    free = lambda p: (p.get('stock') or {}).get('disponible', 0)
+    out = {'productos': len(products),
+           'disponibles': sum(1 for r in rows if r['stage'] == 'disponible'),
+           'reservadas': sum(1 for r in rows if r['stage'] == 'reservada'),
+           'vendidas': sum(1 for r in rows if r['stage'] in ('vendida', 'entregada', 'activada', 'renovada') or (r['stage'] == 'vencida' and r['status'] == 'entregada')),
+           'activadas': sum(1 for r in rows if r['activated'] and r['status'] == 'entregada'),
+           'por_vencer': sum(1 for r in rows if r['axes']['validity'] == 'por_vencer' and r['status'] == 'entregada'),
+           'vencidas': sum(1 for r in rows if r['stage'] == 'vencida'),
+           'agotados': sum(1 for p in products if p.get('available') and free(p) == 0),
+           'stock_bajo': sum(1 for p in products if p.get('available') and 0 < free(p) <= LOW_STOCK),
+           'low_stock': LOW_STOCK}
+    return out
+
+
+# ---- Incidencias y reemplazos ----
+def incidents(c, unit_id=None, status=None):
+    if not _has(c, 'license_incidents'):
+        return []
+    sql, args = ("SELECT x.*,COALESCE(a.name,'') opened_name,COALESCE(b.name,'') resolved_name,u.code,COALESCE(r.code,'') replacement_code,i.name product,COALESCE(cl.name,'') client "
+                 "FROM license_incidents x JOIN license_units u ON u.id=x.unit_id JOIN catalog_items i ON i.id=u.product_id LEFT JOIN clients cl ON cl.id=u.client_id "
+                 "LEFT JOIN license_units r ON r.id=x.replacement_unit_id LEFT JOIN users a ON a.id=x.opened_by LEFT JOIN users b ON b.id=x.resolved_by WHERE 1=1", [])
+    if unit_id is not None:
+        sql += ' AND x.unit_id=?'
+        args.append(unit_id)
+    if status:
+        sql += ' AND x.status=?'
+        args.append(status)
+    return [dict(r, kind_label=INCIDENT_KINDS[r['kind']]) for r in c.execute(sql + ' ORDER BY x.id DESC LIMIT 300', args)]
+
+
+def _clean(data, key, low, high, label):
+    value = re.sub(r'\s+', ' ', str(data.get(key, '') or '')).strip()
+    if not low <= len(value) <= high:
+        raise LicenseError('Indica %s (%d a %d caracteres).' % (label, low, high), fields={key: 'Obligatorio.'})
+    return value
+
+
+def open_incident(c, unit_id, data, user, now):
+    _ready(c, 'license_incidents')
+    unit = licenses.unit_row(c, unit_id)
+    if unit['status'] not in ('entregada', 'reservada'):
+        raise LicenseError('Las incidencias se registran sobre licencias asignadas o entregadas.', 409)
+    kind = str(data.get('kind', ''))
+    if kind not in INCIDENT_KINDS:
+        raise LicenseError('Elige el tipo de incidencia.', fields={'kind': 'Tipo no válido.'})
+    detail = _clean(data, 'detail', 10, 1000, 'qué ocurrió')
+    if c.execute("SELECT 1 FROM license_incidents WHERE unit_id=? AND status='abierta' AND kind=? AND detail=?", (unit_id, kind, detail)).fetchone():
+        return {'ok': True, 'duplicate': True, 'incidents': incidents(c, unit_id)}
+    iid = c.execute('INSERT INTO license_incidents(unit_id,kind,detail,opened_by,opened_at) VALUES (?,?,?,?,?)', (unit_id, kind, detail, user['id'], stamp(now))).lastrowid
+    licenses.event(c, 'incidencia', now, 'Incidencia abierta (%s): %s' % (INCIDENT_KINDS[kind], detail[:300]), unit_id, unit['product_id'], order=unit['order_id'], client=unit['client_id'], user=user)
+    return {'ok': True, 'id': iid, 'incidents': incidents(c, unit_id)}
+
+
+def resolve_incident(c, unit_id, data, user, now):
+    _ready(c, 'license_incidents')
+    unit = licenses.unit_row(c, unit_id)
+    raw = str(data.get('incident', '') or '')
+    row = c.execute('SELECT * FROM license_incidents WHERE id=? AND unit_id=?', (int(raw), unit_id)).fetchone() if raw.isdigit() else None
+    if not row:
+        raise LicenseError('Incidencia no encontrada.', 404)
+    if row['status'] == 'resuelta':
+        return {'ok': True, 'duplicate': True, 'incidents': incidents(c, unit_id)}
+    resolution = _clean(data, 'resolution', 10, 1000, 'cómo se resolvió')
+    c.execute("UPDATE license_incidents SET status='resuelta',resolution=?,resolved_by=?,resolved_at=? WHERE id=? AND status='abierta'", (resolution, user['id'], stamp(now), row['id']))
+    licenses.event(c, 'incidencia_resuelta', now, 'Incidencia resuelta (%s): %s' % (INCIDENT_KINDS[row['kind']], resolution[:300]), unit_id, unit['product_id'], order=unit['order_id'], client=unit['client_id'], user=user)
+    return {'ok': True, 'incidents': incidents(c, unit_id)}
+
+
+def replace_unit(c, unit_id, data, user, now):
+    """Reemplazo de una licencia asignada o entregada por otra DISPONIBLE del mismo producto (clave inválida, error de activación…).
+    Atómico: la nueva se toma solo si sigue disponible (dos personas no pueden usar la misma) y la anterior queda anulada, sin volver al
+    inventario. La nueva hereda cliente, orden, venta y entrega; la incidencia queda resuelta con el enlace entre ambas."""
+    _ready(c, 'license_incidents')
+    old = licenses.unit_row(c, unit_id)
+    if old['status'] not in ('entregada', 'reservada'):
+        raise LicenseError('Solo se reemplaza una licencia asignada o entregada.', 409)
+    if old['renewed_to']:
+        raise LicenseError('Esta licencia ya fue renovada con otra clave: gestiona la vigente.', 409)
+    reason = _clean(data, 'reason', 10, 500, 'el motivo del reemplazo')
+    raw = str(data.get('incident', '') or '')
+    incident = c.execute("SELECT * FROM license_incidents WHERE id=? AND unit_id=? AND status='abierta'", (int(raw), unit_id)).fetchone() if raw.isdigit() else None
+    if raw and not incident:
+        raise LicenseError('La incidencia indicada no está abierta en esta licencia.', 409)
+    today = now.date().isoformat()
+    for candidate in c.execute("SELECT id,code FROM license_units WHERE product_id=? AND status='disponible' AND id!=? AND (expires_at='' OR expires_at>=?) ORDER BY id LIMIT 5",
+                               (old['product_id'], unit_id, today)).fetchall():
+        taken = c.execute("UPDATE license_units SET status=?,quote_id=?,quote_item_id=?,order_id=?,client_id=?,delivery_id=?,sale_id=?,sale_item_id=?,reserved_at=?,delivered_at=?,"
+                          "notes=?,updated_at=? WHERE id=? AND status='disponible'",
+                          (old['status'], old['quote_id'], old['quote_item_id'], old['order_id'], old['client_id'], old['delivery_id'], old['sale_id'], old['sale_item_id'],
+                           old['reserved_at'] or stamp(now), stamp(now) if old['status'] == 'entregada' else '', 'Reemplazo de ' + old['code'], stamp(now), candidate['id'])).rowcount
+        if taken == 1:
+            break
+    else:
+        raise LicenseError('No hay otra licencia disponible de este producto. Registra una nueva en el inventario y vuelve a intentarlo.', 409)
+    if c.execute("UPDATE license_units SET status='anulada',updated_at=? WHERE id=? AND status=?", (stamp(now), unit_id, old['status'])).rowcount != 1:
+        raise LicenseError('Otra persona cambió esta licencia mientras tanto. Vuelve a abrirla.', 409)
+    text = 'Reemplazada por %s. Motivo: %s' % (candidate['code'], reason[:300])
+    licenses.event(c, 'reemplazada', now, text, unit_id, old['product_id'], order=old['order_id'], client=old['client_id'], user=user)
+    licenses.event(c, 'reemplazo', now, 'Reemplaza a %s para el mismo cliente. Motivo: %s' % (old['code'], reason[:300]), candidate['id'], old['product_id'], order=old['order_id'], client=old['client_id'], user=user)
+    if incident:
+        c.execute("UPDATE license_incidents SET status='resuelta',resolution=?,replacement_unit_id=?,resolved_by=?,resolved_at=? WHERE id=? AND status='abierta'",
+                  (text, candidate['id'], user['id'], stamp(now), incident['id']))
+    else:
+        c.execute("INSERT INTO license_incidents(unit_id,kind,detail,status,resolution,replacement_unit_id,opened_by,opened_at,resolved_by,resolved_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
+                  (unit_id, str(data.get('kind') or 'clave_invalida') if str(data.get('kind') or '') in INCIDENT_KINDS else 'clave_invalida', reason, 'resuelta', text, candidate['id'],
+                   user['id'], stamp(now), user['id'], stamp(now)))
+    return {'ok': True, 'new_unit_id': candidate['id'], 'new_code': candidate['code']}
+
+
+# ---- Alertas para el Centro de Control ----
+def center_alerts(c, now, R=None):
+    """Pendientes operativos de licencias (además de los vencimientos): stock bajo o agotado, reservas detenidas, ventas pagadas sin
+    entregar, entregadas sin activar e incidencias abiertas. Cada uno desaparece cuando su condición deja de existir."""
+    today = now.date()
+    out = []
+    for p in licenses.products(c, now):
+        if not p.get('managed') or not p.get('available'):
+            continue
+        free = (p.get('stock') or {}).get('disponible', 0)
+        if free <= LOW_STOCK:
+            out.append({'kind': 'stock', 'id': p['id'], 'title': ('Licencias agotadas · ' if free == 0 else 'Stock bajo de licencias · ') + p['name'][:60],
+                        'detail': '%d disponible%s%s' % (free, '' if free == 1 else 's', ' · %d por cubrir' % p['pending'] if p.get('pending') else ''),
+                        'priority': 'urgente' if free == 0 and p.get('pending') else 'importante' if free == 0 else 'normal', 'at': '', 'href': '#licenses?producto=%d' % p['id'],
+                        'waiting': 'Registrar nuevas licencias en el inventario', 'resolves': 'Desaparece cuando hay más de %d licencias disponibles del producto (o se desactiva).' % LOW_STOCK,
+                        'decision': free == 0 and bool(p.get('pending'))})
+    for r in c.execute("SELECT u.id,u.code,u.reserved_at,i.name product,COALESCE(cl.name,'') client FROM license_units u JOIN catalog_items i ON i.id=u.product_id LEFT JOIN clients cl ON cl.id=u.client_id "
+                       "LEFT JOIN license_sales s ON s.id=u.sale_id WHERE u.status='reservada' AND (u.sale_id IS NULL OR s.payment_status!='pagado') AND u.reserved_at!='' AND u.reserved_at<? ORDER BY u.reserved_at LIMIT 100",
+                       (stamp(now - timedelta(days=3)),)):
+        out.append({'kind': 'reserva', 'id': r['id'], 'title': 'Reserva de licencia pendiente · ' + r['code'], 'detail': r['product'][:60] + ' · reservada desde ' + r['reserved_at'][:10],
+                    'client': r['client'], 'priority': 'importante', 'at': r['reserved_at'], 'href': '#licenses?unidad=%d' % r['id'], 'waiting': 'Confirmar la venta o liberar la reserva',
+                    'resolves': 'Desaparece cuando la licencia se vende, se entrega o se libera.', 'decision': True})
+    for r in c.execute("SELECT s.id,s.code,s.created_at,COALESCE(cl.name,'') client,(SELECT COUNT(*) FROM license_units u WHERE u.sale_id=s.id AND u.status='reservada') waiting "
+                       "FROM license_sales s LEFT JOIN clients cl ON cl.id=s.client_id WHERE s.payment_status='pagado' AND s.delivery_status='pendiente' ORDER BY s.id LIMIT 100"):
+        out.append({'kind': 'venta', 'id': r['id'], 'title': 'Licencias vendidas sin entregar · ' + r['code'], 'detail': '%d licencia%s pagada%s por entregar' % (r['waiting'], '' if r['waiting'] == 1 else 's', '' if r['waiting'] == 1 else 's'),
+                    'client': r['client'], 'priority': 'urgente', 'at': r['created_at'], 'href': '#sales', 'waiting': 'Entregar la licencia al cliente por un canal autorizado',
+                    'resolves': 'Desaparece cuando la venta queda entregada o se cancela.', 'decision': True})
+    for r in c.execute("SELECT u.id,u.code,u.delivered_at,i.name product,COALESCE(cl.name,'') client FROM license_units u JOIN catalog_items i ON i.id=u.product_id LEFT JOIN clients cl ON cl.id=u.client_id "
+                       "LEFT JOIN license_products p ON p.item_id=u.product_id WHERE u.status='entregada' AND u.activated=0 AND u.renewed_to IS NULL AND u.delivered_at!='' AND u.delivered_at<? "
+                       "AND COALESCE(p.activation_method,'')!='archivo' ORDER BY u.delivered_at LIMIT 100", (stamp(now - timedelta(days=7)),)):
+        out.append({'kind': 'activacion', 'id': r['id'], 'title': 'Activación sin confirmar · ' + r['code'], 'detail': r['product'][:60] + ' · entregada el ' + r['delivered_at'][:10],
+                    'client': r['client'], 'priority': 'normal', 'at': r['delivered_at'], 'href': '#licenses?unidad=%d' % r['id'], 'waiting': 'Confirmar con el cliente si la activó',
+                    'resolves': 'Desaparece al confirmar la activación (o al anular o reemplazar la licencia).', 'decision': False})
+    for x in incidents(c, status='abierta'):
+        out.append({'kind': 'incidencia', 'id': x['id'], 'unit_id': x['unit_id'], 'title': 'Incidencia de licencia · ' + x['code'], 'detail': x['kind_label'] + ' · ' + x['detail'][:80],
+                    'client': x['client'], 'priority': 'urgente' if x['kind'] in ('activacion', 'clave_invalida') else 'importante', 'at': x['opened_at'], 'href': '#licenses?unidad=%d' % x['unit_id'],
+                    'waiting': 'Resolver la incidencia o reemplazar la licencia', 'resolves': 'Desaparece cuando la incidencia se registra como resuelta (o la licencia se reemplaza).', 'decision': True})
+    return out
+
+
+# ---- Reportes empresariales (ventas, costos y márgenes, rotación) ----
+REPORTS.update({'ventas': 'Ventas de licencias', 'margenes': 'Costos y márgenes', 'rotacion': 'Rotación de inventario'})
+COST_REPORTS = ('margenes',)
+
+
+def enterprise_report(c, now, kind, params, out):
+    start, end = _range(now, params)
+    hi = (date.fromisoformat(end) + timedelta(days=1)).isoformat()
+    out.update({'from': start, 'to': end})
+    if kind == 'ventas':
+        rows = [dict(r) for r in c.execute("SELECT s.code,s.created_at,COALESCE(cl.name,'') client,s.payment_status,s.delivery_status,s.total_cents,"
+                                           "(SELECT COALESCE(SUM(p.amount_cents),0) FROM license_sale_payments p WHERE p.sale_id=s.id AND p.status='confirmado') paid FROM license_sales s "
+                                           "LEFT JOIN clients cl ON cl.id=s.client_id WHERE s.created_at>=? AND s.created_at<? ORDER BY s.id DESC", (start, hi))]
+        group = lambda r: 'Anulada' if r['payment_status'] == 'cancelado' or r['delivery_status'] == 'cancelado' else 'Completada' if r['payment_status'] == 'pagado' and r['delivery_status'] == 'entregado' else 'En curso (reserva o pago pendiente)'
+        out['columns'] = [('date', 'Fecha'), ('code', 'Venta'), ('client', 'Cliente'), ('group', 'Situación'), ('total', 'Total'), ('paid', 'Cobrado (confirmado)')]
+        out['rows'] = [{'date': r['created_at'][:10], 'code': r['code'], 'client': r['client'] or '—', 'group': group(r), 'total': licenses.usd(r['total_cents']), 'paid': licenses.usd(r['paid'])} for r in rows]
+        sums = {}
+        for r in rows:
+            g = group(r)
+            sums[g] = sums.get(g, 0) + (r['paid'] if g != 'Anulada' else r['total_cents'])
+        out['totals'] = {'Ventas completadas (cobrado)': licenses.usd(sums.get('Completada', 0)), 'En curso (cobrado hasta hoy)': licenses.usd(sums.get('En curso (reserva o pago pendiente)', 0)),
+                         'Anuladas (no se cuentan como ingreso)': licenses.usd(sums.get('Anulada', 0))}
+        return out
+    if kind == 'margenes':
+        # Solo ventas completadas: precio cobrado de cada partida frente al costo real de las licencias entregadas (costo del lote o del producto).
+        rows = [dict(r) for r in c.execute("SELECT it.product_name product,SUM(it.quantity) qty,SUM(it.unit_price_cents*it.quantity-it.discount_cents) revenue,"
+                                           "(SELECT COALESCE(SUM(COALESCE(b.unit_cost_cents,lp.purchase_cents,0)),0) FROM license_units u LEFT JOIN license_batches b ON b.id=u.batch_id "
+                                           " LEFT JOIN license_products lp ON lp.item_id=u.product_id JOIN license_sale_items it2 ON it2.id=u.sale_item_id JOIN license_sales s2 ON s2.id=it2.sale_id "
+                                           " WHERE u.status='entregada' AND it2.product_id=it.product_id AND s2.payment_status='pagado' AND s2.delivery_status='entregado' AND s2.created_at>=? AND s2.created_at<?) cost "
+                                           "FROM license_sale_items it JOIN license_sales s ON s.id=it.sale_id WHERE s.payment_status='pagado' AND s.delivery_status='entregado' AND s.created_at>=? AND s.created_at<? "
+                                           "GROUP BY it.product_id,it.product_name ORDER BY revenue DESC", (start, hi, start, hi))]
+        out['columns'] = [('product', 'Producto'), ('qty', 'Unidades'), ('revenue', 'Vendido'), ('cost', 'Costo'), ('margin', 'Margen'), ('margin_pct', 'Margen %')]
+        out['rows'] = [{'product': r['product'], 'qty': r['qty'], 'revenue': licenses.usd(r['revenue']), 'cost': licenses.usd(r['cost']), 'margin': licenses.usd(r['revenue'] - r['cost']),
+                        'margin_pct': ('%.1f %%' % ((r['revenue'] - r['cost']) * 100 / r['revenue'])) if r['revenue'] else '—'} for r in rows]
+        rev, cost = sum(r['revenue'] for r in rows), sum(r['cost'] for r in rows)
+        out['totals'] = {'Vendido (ventas completadas)': licenses.usd(rev), 'Costo': licenses.usd(cost), 'Margen': licenses.usd(rev - cost)}
+        return out
+    # Rotación: por producto, disponibles hoy, vendidas o entregadas en el período y días promedio en inventario hasta la venta.
+    rows = []
+    for p in licenses.products(c, now):
+        if not p.get('managed'):
+            continue
+        sold = c.execute("SELECT COUNT(*),AVG(julianday(substr(COALESCE(NULLIF(u.delivered_at,''),u.reserved_at),1,10))-julianday(substr(u.created_at,1,10))) FROM license_units u "
+                         "WHERE u.product_id=? AND u.status IN ('entregada','reservada') AND substr(COALESCE(NULLIF(u.delivered_at,''),u.reserved_at),1,10)>=? AND substr(COALESCE(NULLIF(u.delivered_at,''),u.reserved_at),1,10)<=?",
+                         (p['id'], start, end)).fetchone()
+        free = (p.get('stock') or {}).get('disponible', 0)
+        rows.append({'product': p['name'], 'free': free, 'sold': sold[0], 'days': '%.0f' % sold[1] if sold[1] is not None else '—',
+                     'cover': ('%.1f' % (free / sold[0])) if sold[0] else '—', 'state': 'Agotado' if free == 0 else 'Stock bajo' if free <= LOW_STOCK else 'Disponible'})
+    rows.sort(key=lambda r: -r['sold'])
+    out['columns'] = [('product', 'Producto'), ('free', 'Disponibles'), ('sold', 'Vendidas en el período'), ('days', 'Días promedio en inventario'), ('cover', 'Cobertura (stock / ventas)'), ('state', 'Stock')]
+    out['rows'] = rows
+    out['totals'] = {'Productos': len(rows), 'Vendidas en el período': sum(r['sold'] for r in rows)}
+    return out

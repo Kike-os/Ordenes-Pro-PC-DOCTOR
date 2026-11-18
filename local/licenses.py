@@ -264,7 +264,8 @@ def _product_settings(data,product=None):
     kind='antivirus' if line=='antivirus' else (product.get('kind') if product.get('kind') in KINDS else 'otro')
     return {'activation_method':method,'kind':kind,'line':line,'model':model,'duration':duration,'duration_months':custom,'validity_mode':validity,'shared_seats':int(seats),
             'edition':_text(data,'edition',120,'La versión o edición'),'supplier':_text(data,'supplier',120,'El proveedor'),
-            'purchase_cents':_cents(data.get('purchase_price'),'purchase_price','el costo de adquisición'),'term':DURATIONS[duration] if duration!='personalizada' else '%d meses'%custom,'devices':_devices(data.get('devices'))}
+            # 1.5.291: con el costo oculto la ventana no lo envía; entonces se conserva el guardado (ocultar nunca lo borra).
+            'purchase_cents':_cents(data.get('purchase_price'),'purchase_price','el costo de adquisición') if 'purchase_price' in data or not product else product.get('purchase_cents'),'term':DURATIONS[duration] if duration!='personalizada' else '%d meses'%custom,'devices':_devices(data.get('devices'))}
 
 
 def _store_settings(c,item_id,s,user,now):

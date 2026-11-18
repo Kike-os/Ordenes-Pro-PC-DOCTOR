@@ -155,7 +155,7 @@ class LicenseControlTests(unittest.TestCase):
         unit, _ = self.delivered(10)
         self.delivered(300, name='Cliente ficticio de licencias')
         for kind in license_control.REPORTS:
-            out = self.get('/api/licenses/reports/' + kind)
+            out = self.get('/api/licenses/reports/' + kind + ('?costos=1' if kind in license_control.COST_REPORTS else ''))   # el de costos exige mostrarlos (1.5.291)
             self.assertEqual(out['status'], 200, (kind, out['body']))
         upcoming = self.get('/api/licenses/reports/proximas')['body']
         self.assertEqual([r['id'] for r in upcoming['rows']], [unit])

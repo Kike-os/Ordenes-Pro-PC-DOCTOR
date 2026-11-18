@@ -352,3 +352,59 @@ Se abre también con `#licenses?unidad=ID`.
 - Un rechazo registrado cierra el pendiente y queda en «Solucionadas» como cancelado.
 
 **Búsqueda global.** En la barra del módulo se busca por código, producto, cliente, cédula o RUC, orden, venta, proveedor o factura, y por la clave mediante su huella, sin mostrarla.
+
+## 1.5.291 · Licencias Digitales Premium Enterprise 3.0 y costo de compra protegido
+
+**Costo de compra protegido.**
+- Oculto por defecto: se muestra «••••••».
+- El botón con el ojo («Mostrar costo») lo pide al servidor con `costos=1`.
+  - Solo lo recibe administración (`license_control.COST_ROLES`). Los técnicos no lo reciben nunca, ni siquiera en la ficha del cliente.
+  - Cada consulta queda en la auditoría (`license_costs_viewed`, como mucho una vez cada 10 minutos por persona).
+- Sin esa petición, el servidor **quita** de la respuesta costo, margen y cualquier dato que permita deducirlos. No es solo ocultarlos en la pantalla.
+  - Rutas afectadas: `GET /api/licenses*` y `/api/clients/{id}/licenses`.
+  - La protección se aplica en las propias rutas (`send`), así que vale igual en el servidor local y en Vercel (`wsgi_app`).
+- El precio de venta sigue visible.
+- Con el costo oculto, editar un producto no envía el campo, y el servidor conserva el costo guardado. Nunca se borra de la base.
+- El reporte «Costos y márgenes» y su CSV exigen mostrar el costo.
+
+**Indicadores superiores (`license_control.indicators`).** Productos registrados, disponibles, reservadas, vendidas, activadas, próximas a vencer, vencidas y agotados o con stock bajo (2 o menos disponibles).
+- Cada uno filtra: el inventario por etapa o el catálogo por disponibilidad.
+- «Agotado» es un dato del producto y nunca se confunde con «vencida».
+
+**Ciclo de vida.**
+- *Disponible → Reservada → Vendida (venta pagada, sin entregar) → Entregada → Activada → Vencida*, además de *Renovada* y *Anulada*.
+- Se calcula de los datos reales; las acciones del servidor siguen validando cada paso.
+- El expediente muestra el ciclo y las fechas de adquisición, venta y activación.
+- El vencimiento puede ser:
+  - **real**: el registrado;
+  - **estimado**: «si se activa hoy», que nunca se guarda;
+  - **pendiente** o **no aplica** (perpetua).
+
+**Incidencias y reemplazos (`license_incidents`, migración 108).**
+- Se registran errores de activación, claves inválidas, límite de dispositivos o solicitudes del cliente, y se resuelven con su explicación.
+- **Reemplazar** toma de forma atómica otra licencia *disponible* del mismo producto (`UPDATE … WHERE status='disponible'`). Así, dos personas no pueden usar la misma.
+  - La nueva hereda cliente, orden, venta y entrega.
+  - La anterior queda anulada y no vuelve al inventario.
+  - La incidencia queda resuelta con el enlace entre ambas.
+- La tabla no permite borrar filas, cambiar los datos de origen ni resolver dos veces.
+- **Reversión de la migración:** mientras `license_incidents` no tenga filas, basta con `DROP TABLE license_incidents` y quitar `108_license_incidents.sql` de `migrations`.
+
+**Centro de Control.** Además de los vencimientos, muestra:
+- productos con stock bajo o agotado;
+- reservas detenidas más de 3 días;
+- ventas pagadas sin entregar;
+- licencias entregadas hace más de 7 días sin activación confirmada (salvo las que se activan con archivo);
+- incidencias abiertas.
+
+Cada alerta lleva a donde se resuelve. Las incidencias se resuelven desde el propio panel. Asignar responsable y posponer funcionan como en el resto del centro. Cada alerta desaparece cuando cambia su condición real.
+
+**Filtros y reportes.**
+- Inventario: filtros por ciclo de vida, proveedor, tipo y modalidad. La exportación respeta esos filtros y nunca incluye claves.
+- Reportes nuevos:
+  - *Ventas*: completadas, en curso y anuladas, con lo cobrado confirmado;
+  - *Costos y márgenes*: solo ventas completadas, con el costo real del lote o del producto;
+  - *Rotación de inventario*: disponibles, vendidas en el período, días promedio en inventario y cobertura.
+
+**Diseño.**
+- Catálogo a 4 columnas en monitores amplios (3 en portátil, 2 en tableta, 1 en móvil), con nombres completos sin recorte.
+- Indicadores compactos en 8 columnas (4 en pantallas medianas y 2 en móvil).

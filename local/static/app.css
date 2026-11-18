@@ -12515,3 +12515,39 @@ body[data-page=dashboard] dialog.license-drawer .license-detail-grid{grid-templa
  body.license-printing .license-report-table{overflow:visible;border-color:#999}body.license-printing .license-report-table td{border-top:1px solid #ccc}
  body.license-printing .license-report-totals div{border-color:#999;background:#fff}
 }
+
+/* ===== 1.5.291 · Licencias Digitales Premium Enterprise 3.0 y costo protegido =====
+   Acotado a .licenses, .license-drawer, .lcat-* y las clases license-* nuevas. Tema oscuro y logo original intactos. */
+.licenses .license-indicators{grid-template-columns:repeat(8,minmax(0,1fr))}
+.licenses .license-indicators .license-stat{flex-direction:column;align-items:flex-start;gap:2px;min-height:58px;padding:8px 10px;transition:border-color .15s,background .15s}
+.licenses .license-indicators .license-stat strong{font-size:20px;line-height:1.1;font-variant-numeric:tabular-nums}
+.licenses .license-indicators .license-stat span{font-size:11.5px;line-height:1.25;color:#b8c8de}
+.licenses .license-indicators .license-stat[aria-pressed=true]{background:#12233d;box-shadow:inset 0 0 0 1px #3e7cd5}
+.licenses .license-indicators .license-stat[data-zero=true] strong{color:#5e7290}
+.licenses .license-stat[data-state=productos]{--license-color:#7fb2ff}.licenses .license-stat[data-state=vendida]{--license-color:#45cdaa}.licenses .license-stat[data-state=agotado]{--license-color:#ffa45e}
+@media(max-width:1280px){.licenses .license-indicators{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media(max-width:520px){.licenses .license-indicators{grid-template-columns:repeat(2,minmax(0,1fr))}}
+/* Catálogo: 4 columnas en monitores amplios y nombres completos (sin recorte). */
+@media(min-width:1360px){.lcat-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media(min-width:900px) and (max-width:1359px){.lcat-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(min-width:601px) and (max-width:899px){.lcat-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.lcat-grid .lcat-name{display:block;-webkit-line-clamp:unset;overflow:visible}
+.lcat-cost{display:flex;align-items:center;gap:6px;flex-wrap:wrap;color:#8fa5c4;font-variant-numeric:tabular-nums}
+/* Botón del ojo (mostrar u ocultar el costo) */
+.license-cost-toggle{display:inline-flex;align-items:center;gap:6px;min-height:40px}.license-cost-toggle svg{width:16px;height:16px}
+.license-cost-toggle[aria-pressed=true]{border-color:#f3c677;color:#f3d48f}
+.license-eye{display:inline-grid;place-items:center;width:28px;height:28px;min-height:28px;padding:0;border:1px solid #2a3f60;border-radius:8px;background:#0b1626;color:#9bb0cf;cursor:pointer}
+.license-eye svg{width:14px;height:14px}.license-eye:hover{border-color:#3e7cd5;color:#fff;transform:none}.license-eye[aria-pressed=true]{color:#f3d48f;border-color:#6d5a22}
+/* Ciclo de vida y fechas del expediente */
+.license-stepper{display:flex;flex-wrap:wrap;gap:4px;margin:0;padding:0;list-style:none;counter-reset:step}
+.license-stepper li{position:relative;flex:1 1 90px;padding:6px 8px 6px 22px;border:1px solid #1f3352;border-radius:10px;background:#0a1424;color:#7f93b1;font-size:11.5px;font-weight:650;min-width:0}
+.license-stepper li::before{content:'';position:absolute;left:8px;top:50%;width:7px;height:7px;margin-top:-3.5px;border-radius:50%;background:#34507d}
+.license-stepper li[data-state=done]{color:#b8c8de}.license-stepper li[data-state=done]::before{background:#45cdaa}
+.license-stepper li[data-state=now]{border-color:#3e7cd5;background:#12233d;color:#fff}.license-stepper li[data-state=now]::before{background:#7fb2ff;box-shadow:0 0 0 3px #7fb2ff33}
+.license-stepper li[data-special=anulada]{border-color:#5a2a31;color:#ffb3b9}.license-stepper li[data-special=renovada]{border-color:#1f5548;color:#7fe0c4}
+.license-dates{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin:0}
+.license-dates div{display:grid;gap:2px;padding:8px 10px;border:1px solid #1f3352;border-radius:10px;background:#0a1424;min-width:0}
+.license-dates dt{font-size:10.5px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:#7f93b1}.license-dates dd{margin:0;font-size:12.5px;color:#e3edff;overflow-wrap:anywhere}
+.license-dates div[data-kind=estimada]{border-style:dashed}.license-dates div[data-kind=estimada] dd{color:#f3d48f}
+.license-incidents .license-inline-form select{min-height:40px;max-width:100%}
+@media(prefers-reduced-motion:reduce){.licenses .license-indicators .license-stat{transition:none}}

@@ -652,7 +652,15 @@ async function renderNotices(){
       submit:async x=>{await api('/api/pqrs/'+ref.pqrs_id,{action:'assign',user_id:x.user.value});return T('Responsable de la PQRS actualizado.');}});}
    else if(ref.kind==='chat'){opLink(d,box,'Responder en Atención en vivo','#live',PC3_ICON.chat).dataset.op='resolve';hint(box,'La conversación completa y la respuesta en tiempo real están en Atención en vivo. Se resuelve cuando alguien la toma, la abre o la cierra.');}
    else{opLink(d,box,'Gestionar respuesta','#maintenance?order='+ref.order_id,PC3_ICON.calendar).dataset.op='resolve';hint(box,'Se resuelve al marcar la respuesta como gestionada en Mantenimientos.');}},
-  licenses(d,box,item){const r=item.ref,facts=el('dl',undefined,'pc3-facts pc3-facts-mini');for(const[l,v]of [['Producto',r.product],['Código',r.code||'—'],['Vencimiento',pc3When(r.expires_at)],['Días restantes',String(r.days_left)],['Seguimiento',T(r.followup_label||'Sin contactar')],...(r.next_contact?[['Próximo contacto',pc3When(r.next_contact)]]:[])]){const row=el('div');row.append(el('dt',T(l)),el('dd',v));facts.append(row);}box.append(facts);
+  licenses(d,box,item){const r=item.ref;
+   // 1.5.291 · Alertas operativas de licencias (stock, reservas, ventas sin entregar, activaciones e incidencias): «Abrir» lleva al lugar
+   // donde se resuelve y la incidencia se puede resolver aquí; la alerta sale sola cuando su condición deja de existir.
+   if(r.alert){const labels={stock:'Registrar licencias en el inventario',reserva:'Abrir licencia',venta:'Entregar en Ventas',activacion:'Abrir licencia',incidencia:'Abrir licencia'};
+    opLink(d,box,labels[r.alert]||'Abrir',item.href||'#licenses',PC3_ICON.open).dataset.op=r.alert==='incidencia'?'':'resolve';
+    if(r.alert==='incidencia'&&r.unit_id)opForm(d,box,'Resolver incidencia',{icon:PC3_ICON.check,tone:'ok',op:'resolve',build:f=>({text:fld(f,'¿Cómo se resolvió?',area(1000),'Queda en el historial de la licencia. Si la clave no sirve, ábrela y usa «Reemplazar».')}),
+      validate:x=>x.text.value.trim().length<10?T('Describe la solución (al menos 10 caracteres).'):'',submit:async x=>{await api('/api/licenses/units/'+r.unit_id,{action:'incident_resolve',incident:String(r.alert_id),resolution:x.text.value.trim()});return T('Incidencia resuelta.');}});
+    hint(box,item.resolves||'');return;}
+   const facts=el('dl',undefined,'pc3-facts pc3-facts-mini');for(const[l,v]of [['Producto',r.product],['Código',r.code||'—'],['Vencimiento',pc3When(r.expires_at)],['Días restantes',String(r.days_left)],['Seguimiento',T(r.followup_label||'Sin contactar')],...(r.next_contact?[['Próximo contacto',pc3When(r.next_contact)]]:[])]){const row=el('div');row.append(el('dt',T(l)),el('dd',v));facts.append(row);}box.append(facts);
    // 1.5.290 · «Gestionar renovación» abre el expediente de la licencia en Licencias Pro (contacto, seguimiento, renovación e historial).
    opLink(d,box,'Gestionar renovación',item.href||'#licenses',PC3_ICON.open).dataset.op='resolve';
    opForm(d,box,'Registrar seguimiento comercial',{icon:PC3_ICON.reply,build:f=>{const status=fld(f,'Estado',choose([['contactado',T('Contactado')],['esperando_respuesta',T('Esperando respuesta')],['aceptado',T('Aceptado')],['rechazado',T('Rechazado')]],r.followup==='sin_contactar'?'contactado':r.followup));
