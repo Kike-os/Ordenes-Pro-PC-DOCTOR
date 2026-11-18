@@ -4,7 +4,9 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
-## Sin publicar
+## v1.5.290 — 2026-11-17 21:03 (UTC-05:00)
+
+Licencias Pro Premium 4.0: renovaciones, expediente, dispositivos y reportes
 
 ### Nuevas funcionalidades
 

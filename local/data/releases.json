@@ -1,20 +1,36 @@
 {
   "unreleased": {
-    "features": [
-      "Licencias Pro Premium 4.0: pestaña Renovaciones con seguimiento comercial por ciclo (sin contactar, contactado, esperando respuesta, aceptado, rechazado y completado), canal, nota y próximo contacto; aceptar no cambia la vigencia, que solo se actualiza al registrar la renovación con su fecha efectiva.",
-      "Expediente de cada licencia en panel lateral: inventario, activación y vigencia separados con semáforo, tiempo restante, contacto (llamar, WhatsApp, correo, sin envíos automáticos), dispositivos registrados con límite y retiro con motivo, renovaciones anteriores e historial. Se abre desde el Centro de Control con «Gestionar renovación».",
-      "Reportes de licencias: disponibles, asignadas, activas, próximos vencimientos, vencidas, renovaciones realizadas y pendientes, más vendidos, ingresos por renovaciones (solo pagos confirmados) y clientes con varias licencias, con CSV e impresión A4."
-    ],
-    "improvements": [
-      "Búsqueda global en Licencias Pro; avisos internos de vencimiento configurables (30, 15, 7, 1 días y el día, sin duplicados); en el Centro de Control las licencias muestran su estado comercial y un rechazo registrado cierra el pendiente y queda en Solucionadas."
-    ],
+    "features": [],
+    "improvements": [],
     "fixes": [],
-    "security": [
-      "El seguimiento de renovaciones y los dispositivos son de solo anexado (no se editan ni borran; los equipos se retiran con motivo); el expediente y los reportes nunca incluyen credenciales; todo queda en el historial y la auditoría, solo para administración."
-    ],
+    "security": [],
     "performance": []
   },
   "releases": [
+    {
+      "version": "1.5.290",
+      "date": "2026-11-17T21:03:45-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Licencias Pro Premium 4.0: renovaciones, expediente, dispositivos y reportes",
+      "changes": {
+        "features": [
+          "Licencias Pro Premium 4.0: pestaña Renovaciones con seguimiento comercial por ciclo (sin contactar, contactado, esperando respuesta, aceptado, rechazado y completado), canal, nota y próximo contacto; aceptar no cambia la vigencia, que solo se actualiza al registrar la renovación con su fecha efectiva.",
+          "Expediente de cada licencia en panel lateral: inventario, activación y vigencia separados con semáforo, tiempo restante, contacto (llamar, WhatsApp, correo, sin envíos automáticos), dispositivos registrados con límite y retiro con motivo, renovaciones anteriores e historial. Se abre desde el Centro de Control con «Gestionar renovación».",
+          "Reportes de licencias: disponibles, asignadas, activas, próximos vencimientos, vencidas, renovaciones realizadas y pendientes, más vendidos, ingresos por renovaciones (solo pagos confirmados) y clientes con varias licencias, con CSV e impresión A4."
+        ],
+        "improvements": [
+          "Búsqueda global en Licencias Pro; avisos internos de vencimiento configurables (30, 15, 7, 1 días y el día, sin duplicados); en el Centro de Control las licencias muestran su estado comercial y un rechazo registrado cierra el pendiente y queda en Solucionadas."
+        ],
+        "fixes": [],
+        "security": [
+          "El seguimiento de renovaciones y los dispositivos son de solo anexado (no se editan ni borran; los equipos se retiran con motivo); el expediente y los reportes nunca incluyen credenciales; todo queda en el historial y la auditoría, solo para administración."
+        ],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Administración (aprobación expresa en la sesión del 2026-11-17)"
+    },
     {
       "version": "1.5.289",
       "date": "2026-11-17T20:07:40-05:00",
