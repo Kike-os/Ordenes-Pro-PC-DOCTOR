@@ -4,7 +4,9 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
-## Sin publicar
+## v1.5.291 — 2026-11-17 22:14 (UTC-05:00)
+
+Licencias Digitales Premium Enterprise 3.0 y costo de compra protegido
 
 ### Nuevas funcionalidades
 
