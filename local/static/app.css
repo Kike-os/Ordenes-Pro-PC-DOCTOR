@@ -12845,7 +12845,7 @@ body[data-page=dashboard] dialog.quote-dialog.quote-pro{width:min(1440px,calc(10
 .quote-pro .quote-row textarea{field-sizing:content;min-height:42px;max-height:140px}
 .quote-pro .qp-thead{display:none}
 .quote-pro .quote-row-tax{display:flex;align-items:center;gap:6px;margin:0;font-size:11.5px;color:#b8cae4}
-@container qpitems (min-width:930px){
+@container qpitems (min-width:905px){
  .quote-pro .qp-thead:not([hidden]){display:grid;grid-template-columns:30px minmax(150px,1fr) 118px 58px 100px 86px 90px 104px 80px;gap:8px;padding:0 13px 2px;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#8fa6c4}
  .quote-pro .qp-thead span:nth-child(n+4){text-align:right}.quote-pro .qp-thead span:nth-child(3){text-align:left}.quote-pro .qp-thead span:last-child{text-align:center}.quote-pro .qp-thead span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
  .quote-pro .quote-row{grid-template-columns:30px minmax(150px,1fr) 118px 58px 100px 86px 90px 104px 80px;grid-template-areas:"num desc type qty price disc covv total acts" ". cov cov cov cov cov cov cov cov";gap:4px 8px;padding:10px 12px}
@@ -12966,5 +12966,147 @@ body[data-page=dashboard] .maintenance-dialog.inv-sheet.inv-dialog.cov-drawer{wi
 @media(prefers-reduced-motion:reduce){.quote-pro .quote-row textarea{transition:none}}
 @media(max-width:520px){body[data-page=dashboard] dialog.cov-drawer .cov-foot .cov-close{display:none!important}}
 /* Tabla: ADI solo con su icono para dejar sitio a la clasificación (su nombre accesible es «Mejorar este texto con ADI»). */
-@container qpitems (min-width:930px){.quote-pro .quote-row .qp-c-desc .adi-button span{display:none}.quote-pro .quote-row .qp-c-desc .adi-button{padding-left:8px;padding-right:8px}}
+@container qpitems (min-width:905px){.quote-pro .quote-row .qp-c-desc .adi-button span{display:none}.quote-pro .quote-row .qp-c-desc .adi-button{padding-left:8px;padding-right:8px}}
 .quote-pro .qp-orphans{display:grid;gap:6px;padding-top:8px;border-top:1px solid #1d3352}.quote-pro .qp-orphans h4{margin:0;font-size:12px;color:#f3d79b}
+/* ===================================================================================================================================
+   1.5.303 · Presupuesto Premium Enterprise (diseño aprobado): azul marino con detalles azules y rosados. Acotado a .quote-pro.
+   =================================================================================================================================== */
+.quote-pro{--qp-bg:#08111f;--qp-card:#0b1628;--qp-line:#1e3354;--qp-line2:#2a4570;--qp-text:#e8f0ff;--qp-soft:#9fb3d1;--qp-blue:#3b82f6;--qp-blue2:#60a5fa;--qp-pink:#ec4899;--qp-pink2:#ff5c93;--qp-green:#22c55e}
+body[data-page=dashboard] dialog.quote-dialog.quote-pro{width:min(1680px,calc(100vw - 24px));background:linear-gradient(180deg,#0a1426,#08111f 40%)}
+@media(min-width:1500px){.quote-pro .quote-editor{grid-template-columns:minmax(0,1fr) minmax(360px,28%)}}
+.quote-pro .qp-ico{width:16px;height:16px;flex:none}
+/* Título de la ventana */
+.quote-pro>.dialog-heading{gap:14px;align-items:center}
+.quote-pro .qp-title-icon{display:grid;place-items:center;width:46px;height:46px;flex:none;border-radius:13px;border:1px solid #2f5f9e;background:linear-gradient(160deg,#12305a,#0b1a31);color:#7cc4ff}
+.quote-pro .qp-title-icon .qp-ico{width:24px;height:24px}
+.quote-pro .qp-title{display:grid;gap:2px;flex:1;min-width:0}.quote-pro .qp-title h2{margin:0;font-size:22px;letter-spacing:-.01em}
+.quote-pro .qp-subtitle{margin:0;font-size:13px;color:var(--qp-soft)}
+/* Tarjeta del presupuesto */
+.quote-pro .quote-editor-head{display:flex;flex-wrap:wrap;align-items:center;gap:12px 22px;margin:0 18px;padding:14px 18px;border:1px solid var(--qp-line);border-radius:14px;background:var(--qp-card)}
+.quote-pro .qp-id{display:grid;gap:4px;padding-right:22px;border-right:1px solid var(--qp-line);min-width:0}
+.quote-pro .qp-code{display:flex;align-items:center;gap:8px}.quote-pro .qp-code strong{font-size:19px;letter-spacing:.01em;color:var(--qp-text)}
+.quote-pro .qp-copy{display:grid;place-items:center;width:30px;height:30px;padding:0;border:0;border-radius:8px;background:transparent;color:var(--qp-soft)}
+.quote-pro .qp-copy:hover{transform:none;background:#13233d;color:var(--qp-text)}.quote-pro .qp-copy:focus-visible{outline:2px solid #7cc4ff;outline-offset:1px}
+.quote-pro .qp-client{display:flex;align-items:center;gap:6px;margin:0;font-size:13px;color:var(--qp-soft);min-width:0}.quote-pro .qp-client b{color:var(--qp-text);font-weight:700}
+.quote-pro .qp-client span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--qp-text)}
+.quote-pro .qp-meta{display:flex;flex-wrap:wrap;gap:10px;margin:0}
+.quote-pro .qp-tag{display:inline-flex;align-items:center;gap:8px;min-height:36px;padding:4px 14px;border:1px solid var(--qp-line2);border-radius:10px;background:#0d1a2e;color:var(--qp-text);font-size:13px;font-weight:600}
+.quote-pro .qp-tag-iva{border-color:#2f6fd0;background:#0f2346;color:#cfe3ff}.quote-pro .qp-tag-iva .qp-ico{color:#7cc4ff}
+.quote-pro .qp-dirty{border-color:#b7791f;background:#2a2110;color:#f6d38f}
+/* Secciones y tarjetas */
+.quote-pro :is(.qp-items,.qp-config,.qp-card){border-color:var(--qp-line);border-radius:16px;background:var(--qp-card)}
+.quote-pro .qp-section-head{gap:10px;justify-content:flex-start}
+.quote-pro .qp-section-head .qp-count,.quote-pro .qp-section-head>.quote-badge{margin-left:auto}
+.quote-pro :is(.qp-section-head h3,.qp-card-head h3){font-size:15.5px;font-weight:700;letter-spacing:0;text-transform:none;color:var(--qp-text)}
+.quote-pro .qp-head-icon{display:grid;place-items:center;width:32px;height:32px;flex:none;border-radius:10px;background:#10233c;color:#7cc4ff}
+.quote-pro .qp-head-icon .qp-ico{width:18px;height:18px}
+.quote-pro .qp-items>.qp-section-head{padding-bottom:12px;border-bottom:1px solid var(--qp-line)}
+/* Partidas (filas) */
+.quote-pro .quote-row{background:#0a1424;border:1px solid var(--qp-line);border-radius:12px;box-shadow:inset 3px 0 0 var(--k)}
+.quote-pro .quote-row[data-category=repuesto]{--k:#f5b52a}
+.quote-pro .qp-c-type>.qp-kind{display:none}
+.quote-pro .qp-num{min-width:32px;height:32px;border:1px solid var(--qp-line2);border-radius:9px;background:#0d1a2e;font-size:13px}
+.quote-pro .qp-c-desc{display:grid;grid-template-columns:36px minmax(0,1fr) auto;grid-auto-flow:row;gap:4px 10px;align-items:start}
+.quote-pro .qp-c-desc>.quote-row-icon{grid-column:1;grid-row:1/span 2;display:grid;place-items:center;width:36px;height:36px;border:1px solid var(--qp-line2);border-radius:10px;background:#0d1a2e;color:#7cc4ff}
+.quote-pro .qp-c-desc>.quote-field-description>span:first-child{grid-column:2/-1}
+.quote-pro .qp-c-desc>.quote-field-description>textarea{grid-column:2}
+.quote-pro .qp-c-desc .adi-bar{grid-column:3;align-self:start;justify-self:end}
+.quote-pro .qp-c-desc .adi-panel{grid-column:1/-1}
+.quote-pro .quote-row textarea{margin:0;min-height:38px;max-height:44px;padding:3px 6px;border:1px solid transparent;border-radius:8px;background:transparent;color:var(--qp-text);font-size:13px;font-weight:600;line-height:1.38;resize:none;overflow:hidden}
+.quote-pro .quote-row textarea:hover{border-color:var(--qp-line)}
+.quote-pro .quote-row textarea:focus{max-height:220px;overflow:auto;background:#0d1a2e;border-color:#3d6ea6}
+.quote-pro .quote-row :is(select,input:not([type=checkbox])){border-color:var(--qp-line2);border-radius:9px;background:#0d1a2e;color:var(--qp-text)}
+.quote-pro .qp-disc-pct{display:inline-block;margin-top:2px;padding:0 7px;border-radius:999px;background:#3a1328;color:#ff9ec4;font-size:11px;font-weight:700}
+.quote-pro .qp-disc-value:not(.qp-disc-none){color:#ff7aa8}
+.quote-pro .qp-cov-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;width:100%;min-height:36px;padding:4px 10px;border:1px solid #2f5f9e;border-radius:10px;background:#0d1d35;color:#dbe8ff;font-size:12px;font-weight:800;letter-spacing:.02em;white-space:nowrap}
+.quote-pro .qp-cov-btn:hover{transform:none;background:#13294a;border-color:var(--qp-blue)}.quote-pro .qp-cov-btn .qp-ico{color:#9cc7ff}
+.quote-pro .qp-cov-btn:focus-visible{outline:2px solid #7cc4ff;outline-offset:2px}
+.quote-pro .qp-c-total .quote-row-total{font-size:15px;font-weight:800;color:var(--qp-text)}
+.quote-pro .qp-c-total .qp-net{display:none}
+.quote-pro .qp-c-acts .quote-row-remove{border-color:#7f1d1d;color:#f87171;background:#1c0d14}.quote-pro .qp-c-acts .quote-row-remove:hover{background:#2a0f19}
+/* Segunda línea: etiquetas de la cobertura y herramientas de la partida */
+.quote-pro .qp-c-sub{grid-area:sub;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 12px;min-width:0}
+.quote-pro .qp-row-chips,.quote-pro .qp-cov-chips{display:flex;flex-wrap:wrap;align-items:center;gap:6px;min-width:0}
+.quote-pro .qp-row-chips .cov-chip,.quote-pro .qp-chip{display:inline-flex;align-items:center;gap:5px;min-height:24px;padding:2px 10px;border-radius:999px;font-size:11.5px;font-weight:700;white-space:nowrap}
+.quote-pro .qp-row-chips .cov-chip[data-tone=green]::before{content:'';width:12px;height:12px;border-radius:50%;background:radial-gradient(circle,#0b1628 0 30%,transparent 32%),#22c55e}
+.quote-pro .qp-chip[hidden]{display:none}
+.quote-pro .qp-chip-gift{border:1px solid #2f5f9e;background:#0d1d35;color:#bcd8ff}
+.quote-pro .qp-chip-disc{border:1px solid #6b3a8a;background:#1e1230;color:#e3c6ff}
+.quote-pro .qp-chip-pay{border:1px solid #9d174d;background:#2a0d1c;color:#ff9ec4}.quote-pro .qp-chip-pay .qp-ico{width:13px;height:13px;color:#ff5c93}
+.quote-pro .qp-c-sub .qp-row-meta{flex:0 1 auto;display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0}
+.quote-pro .qp-c-sub .quote-row-tax{font-size:11.5px;color:var(--qp-soft)}
+.quote-pro .qp-c-sub .qp-row-meta .quote-field-priority{flex:0 0 150px}
+.quote-pro .quote-row .qp-c-sub .qp-row-meta select{min-height:30px;font-size:12px}
+/* Tarjetas: tabla con 9 columnas desde 905 px de área de partidas (suma real de los anchos mínimos) */
+.quote-pro .quote-row{grid-template-columns:auto minmax(0,1fr) minmax(0,1fr) auto;grid-template-areas:"num desc desc acts" "type type type type" "qty qty price price" "disc disc covv covv" "total total total total" "sub sub sub sub"}
+@container qpitems (min-width:905px){
+ .quote-pro .qp-thead:not([hidden]){grid-template-columns:34px minmax(160px,1fr) 110px 54px 92px 84px 112px 92px 78px;gap:7px;padding:0 13px 4px}
+ .quote-pro .qp-thead span:nth-child(7){text-align:center}
+ .quote-pro .quote-row{grid-template-columns:34px minmax(160px,1fr) 110px 54px 92px 84px 112px 92px 78px;grid-template-areas:"num desc type qty price disc covv total acts" ". sub sub sub sub sub sub sub sub";gap:8px 7px;padding:10px 12px;align-items:center}
+ .quote-pro .qp-c-desc{align-self:start}
+ .quote-pro .qp-c-num{padding-top:0;align-self:start}
+ .quote-pro .quote-row :is(select,input:not([type=checkbox])){min-height:36px}
+ .quote-pro .qp-c-qty input{text-align:center}
+ .quote-pro .qp-c-disc{text-align:center}.quote-pro .qp-c-disc .quote-field-discount{justify-items:center}
+ .quote-pro .qp-c-total .quote-row-total{line-height:36px}
+ .quote-pro .qp-c-acts{gap:6px}
+ .quote-pro .quote-row-tax{justify-content:flex-start}
+}
+/* Panel lateral */
+.quote-pro .qp-card-head{display:flex;align-items:center;gap:10px}
+.quote-pro .qp-summary{background:linear-gradient(180deg,#0c1a30,#0a1426 70%)}
+.quote-pro .qp-summary .quote-editor-totals [data-kind=no] dd{color:#ff7aa8}
+.quote-pro .qp-summary .quote-editor-totals [data-kind=total]{margin-top:6px;padding:12px 16px;border:1px solid #9d174d;border-radius:12px;background:linear-gradient(90deg,#0f2342,#2a0f2b 120%);box-shadow:0 0 0 1px #ec489922 inset,0 10px 30px #ec48991a}
+.quote-pro .qp-summary .quote-editor-totals [data-kind=total] dt{font-size:15px;font-weight:700;color:var(--qp-text)}
+.quote-pro .qp-summary .quote-editor-totals [data-kind=total] dd{font-size:26px;font-weight:800;color:var(--qp-pink2)}
+.quote-pro .qp-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));margin:0;border:1px solid var(--qp-line);border-radius:12px;background:#0a1424;overflow:hidden}
+.quote-pro .qp-stats[hidden]{display:none}
+.quote-pro .qp-stat{display:grid;align-content:start;gap:4px;min-width:0;padding:12px 14px}
+.quote-pro .qp-stat+.qp-stat{border-left:1px solid var(--qp-line)}
+.quote-pro .qp-stat dt{font-size:12px;color:var(--qp-soft)}.quote-pro .qp-stat dd{margin:0;font-size:20px;font-weight:800;color:var(--qp-text);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.quote-pro .qp-stat[data-tone=blue] dd{color:var(--qp-blue2)}.quote-pro .qp-stat[data-tone=pink] dd{color:var(--qp-pink2)}
+.quote-pro .qp-concepts-card .qp-stat[data-tone=pink]{margin:6px;border:1px solid #9d174d;border-radius:10px;background:linear-gradient(160deg,#2a0d1c,#170b18)}
+.quote-pro .qp-concepts-card .qp-stat[data-tone=pink] dt{color:#ffd1e3;font-weight:700}
+.quote-pro .qp-info-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 18px}
+.quote-pro .qp-info-list div{display:grid;grid-template-columns:auto 1fr;align-items:center;gap:10px}
+.quote-pro .qp-info-list dd{text-align:left;font-weight:700}.quote-pro .qp-info-list dd .quote-badge{font-size:11.5px}
+.quote-pro .qp-quick{border-top-color:var(--qp-line)}
+/* Pie: «Guardar y enviar al cliente» en degradado rosado */
+.quote-pro .quote-foot .quote-send{border-color:#ec4899;background:linear-gradient(90deg,#be185d,#ec4899);color:#fff;box-shadow:0 8px 24px #ec489933}
+.quote-pro .quote-foot .quote-send:hover{background:linear-gradient(90deg,#9d174d,#db2777)}
+.quote-pro .quote-foot .quote-send:focus-visible{outline:2px solid #ff9ec4;outline-offset:2px}
+@media(max-width:999px){.quote-pro .quote-editor-head{margin:0 12px}.quote-pro .qp-id{border-right:0;padding-right:0}}
+@media(max-width:560px){.quote-pro .qp-stats{grid-template-columns:1fr 1fr}.quote-pro .qp-stat+.qp-stat{border-left:0}.quote-pro .qp-stat:last-child{grid-column:1/-1}.quote-pro .qp-info-list{grid-template-columns:1fr}.quote-pro .qp-tag{min-height:32px;padding:3px 10px;font-size:12px}.quote-pro .qp-title h2{font-size:19px}.quote-pro .qp-subtitle{display:none}}
+@media(prefers-reduced-motion:reduce){.quote-pro .quote-foot .quote-send{transition:none}}
+/* 1.5.303 · Ajustes tras comparar con el diseño */
+.quote-pro .quote-row .qp-c-desc>.quote-field-description>textarea{grid-column:2}
+.quote-pro .quote-row .qp-c-desc>.quote-field-description>span:first-child{grid-column:2/-1}
+.quote-pro .quote-row .qp-c-desc>.quote-field-description>.adi-panel{grid-column:1/-1}
+.quote-pro .quote-row .qp-c-desc>.quote-row-icon{grid-row:auto}
+.quote-pro .quote-row .qp-c-desc .adi-button{min-height:28px;padding:2px 8px}
+.quote-pro .quote-row .qp-c-desc .adi-button span{display:none}
+.quote-pro .qp-thead span{text-transform:none;letter-spacing:0;font-size:12.5px;font-weight:700;color:var(--qp-soft)}
+.quote-pro .quote-row .qp-c-sub .qp-row-meta select{min-height:30px;height:30px;padding:2px 26px 2px 10px}
+/* Precio con «$» delante, como en el diseño (el campo sigue admitiendo 45.78 o 45,78) */
+.quote-pro .qp-c-price .quote-field-price{position:relative}
+.quote-pro .qp-c-price .quote-field-price::after{content:'$';position:absolute;left:11px;bottom:0;line-height:36px;font-size:13px;font-weight:700;color:var(--qp-soft);pointer-events:none}
+.quote-pro .qp-c-price .quote-field-price input{padding-left:22px}
+/* Tarjetas (tableta y móvil): número y acciones arriba; la descripción, en su propia línea a todo el ancho */
+.quote-pro .quote-row{grid-template-areas:"num . . acts" "desc desc desc desc" "type type type type" "qty qty price price" "disc disc covv covv" "total total total total" "sub sub sub sub"}
+.quote-pro .quote-row textarea{max-height:64px}
+@container qpitems (min-width:905px){.quote-pro .quote-row{grid-template-areas:"num desc type qty price disc covv total acts" ". sub sub sub sub sub sub sub sub"}.quote-pro .quote-row textarea{max-height:44px}}
+/* Columnas más ajustadas: más espacio para la descripción a 1366 px (suma de mínimos ≈ 860 px con bordes) */
+@container qpitems (min-width:870px){
+ .quote-pro .qp-thead:not([hidden]),.quote-pro .quote-row{grid-template-columns:34px minmax(160px,1fr) 100px 52px 88px 80px 106px 88px 78px;column-gap:6px}
+ .quote-pro .quote-row{grid-template-areas:"num desc type qty price disc covv total acts" ". sub sub sub sub sub sub sub sub";padding:10px 12px;align-items:center}
+ .quote-pro .qp-thead:not([hidden]){display:grid;padding:0 13px 4px}
+ .quote-pro .quote-row .quote-field>span:first-child{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+ .quote-pro .qp-c-type{display:grid;grid-area:type}.quote-pro .qp-c-type>.quote-field{grid-area:auto}
+ .quote-pro .quote-row textarea{max-height:44px}
+ .quote-pro .qp-cov-btn{padding:4px 6px;font-size:11.5px}
+}
+/* Panel lateral estrecho: estadísticas en dos columnas y etiquetas de estado sin saltar de línea */
+.quote-pro .qp-side{container:qpside/inline-size}
+.quote-pro .qp-card-head{flex-wrap:nowrap}.quote-pro .qp-card-head h3{min-width:0;flex:1}.quote-pro .qp-card-head>.quote-badge{margin-left:auto;flex:none}
+@container qpside (max-width:380px){.quote-pro .qp-stats{grid-template-columns:1fr 1fr}.quote-pro .qp-stat:last-child{grid-column:1/-1;border-left:0;border-top:1px solid var(--qp-line)}.quote-pro .qp-stat dd{font-size:18px}.quote-pro .qp-info-list{grid-template-columns:1fr}}
+@container qpitems (min-width:870px){.quote-pro .qp-thead:not([hidden]),.quote-pro .quote-row{grid-template-columns:34px minmax(160px,1fr) 112px 52px 86px 78px 100px 84px 76px}.quote-pro .qp-cov-btn{gap:4px;padding:4px 4px}}

@@ -617,3 +617,26 @@ La tabla tiene nueve columnas:
 
 - **Cuándo se usa la tabla:** solo cuando el área de partidas mide al menos 930 px, que es lo que suman los anchos mínimos. Con menos espacio, las partidas son tarjetas. Así se corrigió el tramo en que los importes se encimaban o quedaban ocultos.
 - **Importes:** siempre en una línea y alineados. Si alguno no cupiera, se recorta con «…» y su valor completo queda en la descripción emergente.
+
+## Diseño Premium Enterprise aprobado (1.5.303)
+
+Sigue la imagen de referencia aprobada por el usuario, con datos reales del sistema. Usa azul marino con detalles azules y rosados, solo dentro de la ventana de Presupuesto.
+
+- **Cabecera:** icono, título «Presupuesto» y subtítulo. Debajo, una tarjeta con el número del presupuesto y su botón «Copiar», el cliente, y etiquetas con icono: IVA incluido, fecha de creación, «Válido hasta» y «Cambios sin guardar».
+- **Partidas del presupuesto:** tabla con Nº · icono y descripción · Tipo · Cant. · Precio unit. ($) · Descuento (importe y %) · Cobertura · Total cliente · Acciones.
+  - La columna Cobertura es el botón «PC-DOCTOR».
+  - Para eliminar hay una papelera roja.
+  - Debajo de cada partida aparecen etiquetas: estado de la cobertura (Comercial / Interna), «Beneficio PC-DOCTOR: −$X», «Descuento autorizado: N %» y «Cliente paga: $Y».
+  - A la derecha de esas etiquetas quedan «Lleva IVA» y la clasificación.
+  - La descripción se ve como texto (se edita al pulsarla) y ADI queda como un icono.
+  - La tabla aparece desde 870 px de área de partidas. Con menos espacio, las partidas son tarjetas, con la descripción a todo el ancho.
+- **Panel lateral:**
+  - **Resumen económico:** termina en «Total cotizado al cliente», destacado en rosado.
+  - **Beneficio y cobertura:** beneficio PC-DOCTOR, % de beneficio y lo que paga el cliente.
+  - **Información del presupuesto:** número, creado, estado, válido hasta, versión y vista previa del PDF.
+  - **Gastos internos de la orden:** costo interno de las partidas cubiertas, otros gastos (conceptos) y el total. Solo administración ve estos importes.
+- **Pie:** «Guardar y enviar al cliente» en degradado rosado.
+- **Lo que se mantiene igual:** cálculos, permisos, configuración, historial, documentos y cobertura.
+- **Lo que no se reprodujo de la imagen:**
+  - La etiqueta «Autorizado para próxima versión», porque no corresponde a ningún dato del sistema.
+  - El descuento por partida. El descuento sigue siendo el autorizado para todo el presupuesto (0, 3 o 5 %) y se muestra en cada partida.
