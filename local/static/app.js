@@ -4611,7 +4611,7 @@ async function openQuoteEditor(order,quoteId,opts={}){const dialog=smallDialog(o
   onRecount=()=>{const units=rows.reduce((sum,row)=>sum+(parseInt(row.quantity.value,10)||0),0),text=rows.length?rows.length+(rows.length===1?' partida · ':' partidas · ')+units+(units===1?' unidad':' unidades'):'Sin partidas';empty.hidden=rows.length>0;list.hidden=!rows.length;picker.hidden=!rows.length;countTag.textContent=text;side.count(text);paintDirty();};
   recount();baseline=snapshot();paintDirty();for(const type of ['input','change'])body.addEventListener(type,paintDirty);
   // Guardar y continuar: la cobertura se vincula a una partida guardada; tras guardar se reabre el presupuesto con el panel de esa partida.
-  const coverSave=async host=>{if(working)return;const index=rows.findIndex(r=>r.box===host.node);status.textContent='';lock(true);try{if(!await persist()){lock(false);return;}baseline=snapshot();toast('Borrador guardado.','success');refreshOrder();dialog.beforeClose=null;dialog.close();openQuoteEditor(order,quote.id,{coverFor:index});}catch(error){status.textContent=error.field?'Revisa la partida señalada.':error.message;lock(false);}};
+  const coverSave=async host=>{if(working)return;const index=rows.findIndex(r=>r.box===host.node);status.textContent='';lock(true);try{if(!await persist()){lock(false);return;}baseline=snapshot();toast('Borrador guardado.','success');refreshOrder();dialog.beforeClose=null;dialog.close();openQuoteEditor(order,quote.id,{coverFor:index});}catch(error){status.textContent=error.field?'Revisa la partida señalada.':error.message;toast('No se pudo guardar el borrador: '+(error.field?'revisa la partida señalada.':error.message)+' Tus datos siguen en pantalla.','error');lock(false);}};
   coverPaint=quoteCoverageAttach(quote,coverHosts,{isDirty:dirty,ensureSaved:coverSave,autoOpen:opts.coverFor});
  }else{
   // Enviado, decidido o cancelado: solo lectura, con el estado de cada ítem.
@@ -4644,33 +4644,39 @@ function quoteSide(quote,totalsBox,isDirty){const side=el('aside',undefined,'qp-
  side.append(card);return {node:side,count:text=>{count.textContent=text;}};}
 // ---- Cobertura PC-DOCTOR (1.5.296): PC-DOCTOR financia la compra de un repuesto; el cliente sigue viendo y pagando el precio de su presupuesto. ----
 // Autorizar no mueve dinero; cada pago al proveedor es un egreso de caja creado en el servidor. El técnico ve estados, nunca costos ni pagos.
-const covTone={error:'red',revisar:'amber',solicitada:'amber',autorizada:'green',rechazada:'gray',cancelada:'gray',pendiente:'amber',parcial:'amber',pagado:'green',comprado:'blue',recibido:'green'};
+const covTone={cargando:'blue',error:'red',revisar:'amber',solicitada:'amber',autorizada:'green',rechazada:'gray',cancelada:'gray',pendiente:'amber',parcial:'amber',pagado:'green',comprado:'blue',recibido:'green'};
 function covChip(code,label){const chip=el('span',label,'cov-chip');chip.dataset.tone=covTone[code]||'gray';return chip;}
 function covLive(rows,item){const same=rows.filter(r=>r.line_position===item.position&&r.line_description===item.description);return same.find(r=>['solicitada','autorizada'].includes(r.status))||same[0]||null;}
 // Botón «Cobertura PC-DOCTOR» en cada partida de repuesto (1.5.297): visible también en presupuestos y partidas sin guardar, y nunca
 // desaparece en silencio si la consulta falla. Sin guardar ofrece «Guardar borrador y continuar». Devuelve la función que repinta.
 function quoteCoverageAttach(quote,hosts,{isDirty=null,ensureSaved=null,autoOpen=null}={}){
- let data=null,state=quote.id?'loading':'nuevo';
+ let data=null,state=quote.id?'loading':'nuevo',opening=false;
  const catOf=h=>h.category?h.category():h.item.category,saved=h=>!!(quote.id&&h.item.id&&catOf(h)===h.item.category);
  const fetchData=async()=>{try{data=await api('/api/quotes/'+quote.id+'/coverage');state=data.ready?'ok':'off';}catch{state='error';}};
- const open=async h=>{
+ // Un doble clic o dos pulsaciones seguidas no abren dos confirmaciones ni dos paneles.
+ const open=async h=>{if(opening)return;opening=true;try{await openNow(h);}finally{opening=false;}};
+ const openNow=async h=>{
   if(!saved(h)||(isDirty&&isDirty())){if(!ensureSaved){toast('Guarda el presupuesto antes de configurar la cobertura de esta partida.','error');return;}
-   const pick=await confirmClose({title:'Guardar antes de configurar la cobertura',text:(quote.id?'La cobertura se vincula a una partida guardada. Se guardará el borrador con los cambios actuales':'Este presupuesto todavía no existe en el sistema. Se guardará como borrador')+' (no se envía al cliente) y se abrirá la Cobertura PC-DOCTOR de esta partida.',keep:'Volver al presupuesto',discard:'Guardar borrador y continuar',plain:true});
-   if(pick==='discard')ensureSaved(h);return;}
-  if(state!=='ok'){await fetchData();paint();}
+   const pick=await confirmClose({title:'Guardar presupuesto para gestionar cobertura',text:'Para administrar la cobertura empresarial de este repuesto, es necesario guardar primero el presupuesto como borrador. Este proceso no enviará ninguna notificación al cliente.',keep:'Cancelar',discard:'Guardar borrador y continuar',plain:true});
+   if(pick==='discard')await ensureSaved(h);return;}
+  if(state!=='ok'){const btn=coverButton(h);btn?.setAttribute('aria-busy','true');state='loading';paint();await fetchData();paint();}
   if(state==='off'){toast('La Cobertura PC-DOCTOR todavía no está disponible en este servidor.','error');return;}
   if(state!=='ok'){toast('No se pudo consultar la cobertura. Revisa la conexión e inténtalo de nuevo.','error');return;}
   // Al cerrar el panel, el foco vuelve al botón de la misma partida (se repinta tras cada acción, por eso se busca de nuevo).
-  openCoveragePanel(quote,h.item,covLive(data.rows,h.item),data,async()=>{await fetchData();paint();},()=>h.node.querySelector(':scope > .cov-line .cov-open')?.focus());};
- const paint=()=>{for(const h of hosts){const node=h.node;node.querySelector(':scope > .cov-line')?.remove();if(!node.isConnected||catOf(h)!=='repuesto')continue;
+  await openCoveragePanel(quote,h.item,covLive(data.rows,h.item),data,async()=>{await fetchData();paint();},()=>coverButton(h)?.focus());};
+ // En el editor el botón va en la franja de acciones de la partida (junto a duplicar y eliminar); en la vista de solo lectura, bajo la partida.
+ const coverButton=h=>h.node.querySelector('.cov-line .cov-open');
+ const paint=()=>{for(const h of hosts){const node=h.node;node.querySelector(':scope > .cov-line, :scope > .quote-row-top > .cov-line')?.remove();if(!node.isConnected||catOf(h)!=='repuesto')continue;
   const line=el('div',undefined,'cov-line'),btn=invBtn('Cobertura PC-DOCTOR','shield-check',()=>open(h),'secondary cov-open');
   btn.setAttribute('aria-haspopup','dialog');btn.title='Cobertura interna de PC-DOCTOR para este repuesto (no aparece en los documentos del cliente)';line.append(btn);
   const cov=state==='ok'&&saved(h)?covLive(data.rows,h.item):null;
   if(!saved(h))line.append(covChip('borrador',quote.id&&h.item.id?'Cambio sin guardar':'Partida sin guardar'));
+  else if(state==='loading'){btn.setAttribute('aria-busy','true');line.append(covChip('cargando','Consultando…'));}
   else if(state==='error')line.append(covChip('error','Estado no disponible'));
   else if(cov){line.append(covChip(cov.status,cov.status_label));if(cov.status==='autorizada')line.append(covChip(cov.purchase_status,cov.purchase_label),covChip(cov.payment_status,cov.payment_label));if(cov.review)line.append(covChip('revisar','Revisar'));}
   else if(state==='ok')line.append(covChip('sin','Sin cobertura'));
-  node.append(line);}};
+  line.setAttribute('role','group');line.setAttribute('aria-label','Cobertura PC-DOCTOR de esta partida');
+  (node.querySelector(':scope > .quote-row-top')||node).append(line);}};
  paint();
  if(quote.id)fetchData().then(()=>{paint();if(autoOpen!=null){const h=hosts.find(x=>x.item.position===autoOpen&&catOf(x)==='repuesto');if(h&&h.node.isConnected)open(h);}});
  return paint;}
@@ -4685,7 +4691,7 @@ async function openCoveragePanel(quote,item,cov,meta,done,onClose){const dialog=
   const cost=field('cost','Costo real del repuesto (USD)',{mode:'decimal',max:12,value:values.cost_cents?(values.cost_cents/100).toFixed(2):'',required:true,hint:'Lo que cobra el proveedor. No se muestra al cliente.'});
   const sup=admin?field('supplier_id','Proveedor',{options:[['','Selecciona…'],...(values.suppliers||[]).map(s=>[String(s.id),s.name])],value:values.supplier_id?String(values.supplier_id):'',required:true}):null;
   if(admin&&extra?.authorizer)field('authorized_name','Autorizado por',{max:120,value:values.authorized_name||'',hint:'Si lo dejas vacío, figura tu nombre.'});
-  field('notes','Observaciones privadas',{area:true,max:1000,value:values.notes||''});
+  field('notes','Motivo de la cobertura y observaciones internas',{area:true,max:1000,value:values.notes||'',hint:'Solo lo ve el personal autorizado. No se muestra al cliente.'});
   const preview=el('p','','cov-preview');preview.setAttribute('aria-live','polite');f.append(preview);
   const sync=()=>{percent.closest('.inv-field').hidden=mode.value!=='parcial';const c=invCents(cost.value),pct=mode.value==='parcial'?parseInt(percent.value,10):100;
    preview.textContent=Number.isFinite(c)&&c>0&&pct>=1&&pct<=100?'PC-DOCTOR cubre '+quoteMoney(Math.max(1,Math.round(c*pct/100)))+' del costo'+(admin?' · margen bruto estimado '+cjMoney(sale-c):'')+'. Autorizar no registra salidas de caja.':'';};
@@ -4700,11 +4706,15 @@ async function openCoveragePanel(quote,item,cov,meta,done,onClose){const dialog=
    f=form({suppliers:meta.suppliers},admin,admin?'Autorizar cobertura':'Solicitar cobertura',data=>ask(data,admin),{secondary:only,authorizer:admin});body.append(f);if(!admin)body.append(el('p','Administración revisará el costo y el proveedor antes de autorizarla.','cov-note'));return;}
   const states=el('div',undefined,'cov-states');states.append(covChip(d.status,d.status_label),covChip(d.purchase_status,d.purchase_label),covChip(d.payment_status,d.payment_label));if(!d.linked)states.append(covChip('revisar','Partida sin vínculo'));body.append(states);
   if(d.review)body.append(el('p',d.review,'cov-review'));
-  if(d.cost_cents===undefined){body.append(el('p',d.status==='solicitada'?'Solicitud enviada: falta la autorización de administración.':'Solo administración consulta costos, proveedor, pagos y margen.','cov-note'));
+  const factList=pairs=>{const list=el('dl',undefined,'inv-facts fx-facts cov-facts');for(const[k,v]of pairs){const x=el('div');x.append(el('dt',k),el('dd',v));list.append(x);}return list;};
+  const requested=d.requested_name?d.requested_name+(d.requested_at?' · '+formatOrderDate(d.requested_at):''):(d.requested_at?formatOrderDate(d.requested_at):'—'),authorized=d.authorized_name?d.authorized_name+' · '+formatOrderDate(d.authorized_at):d.status==='solicitada'?'Pendiente':'—';
+  if(d.cost_cents===undefined){body.append(factList([['Cantidad',String(item.quantity)],['Solicitó',requested],['Autorizó',authorized],['Compra',d.purchase_label],['Recepción',d.received_at?formatOrderDate(d.received_at):'—']]));
+   body.append(el('p',d.status==='solicitada'?'Solicitud enviada: falta la autorización de administración.':'Solo administración consulta costos, proveedor, pagos y margen.','cov-note'));
    if(d.can_pay&&d.status==='autorizada')body.append(invBtn('Registrar pago al proveedor','arrow-up-from-line',()=>coveragePay(d,reload),'primary'));return;}
   const figures=el('dl',undefined,'cov-figures');for(const[label,value,tone]of [['Precio al cliente',quoteMoney(d.sale_cents)],['Costo real',quoteMoney(d.cost_cents)],['Cobertura',d.percent+' %'],['Cubierto por PC-DOCTOR',quoteMoney(d.covered_cents),'blue'],['Pagado al proveedor',quoteMoney(d.paid_cents),'green'],['Pendiente con el proveedor',quoteMoney(d.pending_cents),d.pending_cents&&d.status==='autorizada'?'amber':''],['Margen bruto estimado',cjMoney(d.margin_cents),d.margin_cents<0?'red':'']]){const x=el('div');if(tone)x.dataset.tone=tone;x.append(el('dt',label),el('dd',value));figures.append(x);}body.append(figures);
-  const facts=el('dl',undefined,'inv-facts fx-facts cov-facts');for(const[k,v]of [['Proveedor',d.supplier||'Sin indicar'],['Factura o documento',d.supplier_document||'—'],['Autorizó',d.authorized_name?d.authorized_name+' · '+formatOrderDate(d.authorized_at):'Pendiente'],['Orden',d.order_code],['Recepción',d.received_at?formatOrderDate(d.received_at)+(d.inventory_movement_id?' · entrada de inventario':''):'—']]){const x=el('div');x.append(el('dt',k),el('dd',v));facts.append(x);}body.append(facts);
-  if(d.notes)body.append(el('p','Observaciones privadas: '+d.notes,'cov-private'));
+  body.append(factList([['Cantidad',String(d.quantity||item.quantity)],['Proveedor',d.supplier||'Sin indicar'],['Factura o documento',d.supplier_document||'—'],['Solicitó',requested],['Autorizó',authorized],['Orden',d.order_code],
+   ['Compra',d.purchased_at?'Comprado el '+formatOrderDate(d.purchased_at):d.purchase_label],['Recepción',d.received_at?formatOrderDate(d.received_at):'—'],['Movimiento de inventario',d.inventory_movement_id?'MOV-'+d.inventory_movement_id:d.received_at?'Sin entrada: la partida no es un artículo de inventario':'—']]));
+  if(d.notes)body.append(el('p','Motivo y observaciones internas: '+d.notes,'cov-private'));
   const acts=el('div',undefined,'cov-actions');
   if(d.status==='solicitada'){body.append(el('h3','Autorizar la solicitud','cov-title'),form({...d,suppliers:d.suppliers},true,'Autorizar cobertura',async data=>{await api('/api/coverage/'+d.id,{...data,action:'authorize',revision:String(d.revision)});toast('Cobertura autorizada. No se registró ninguna salida de caja.','success');await reload();},{authorizer:true}));
    acts.append(invBtn('Rechazar','circle-x',()=>cashReasonAction('Rechazar la cobertura','La solicitud queda rechazada con su motivo en el historial.','/api/coverage/'+d.id,{action:'reject'},'reason',reload)));}
@@ -4716,9 +4726,9 @@ async function openCoveragePanel(quote,item,cov,meta,done,onClose){const dialog=
    if(!d.paid_cents&&d.purchase_status==='pendiente')acts.append(invBtn('Cancelar cobertura','circle-x',()=>cashReasonAction('Cancelar la cobertura','Solo sin compra ni pagos vigentes. El registro y su historial se conservan.','/api/coverage/'+d.id,{action:'cancel'},'reason',reload)));}
   for(const[label,suffix,icon]of [['Liquidación A4','pdf','file-text'],['Ticket 80 mm','ticket','printer']]){const a=el('a',undefined,'secondary inv-btn');a.href='/api/coverage/'+d.id+'/'+suffix;a.target='_blank';a.rel='noopener';a.title='Documento interno: no se entrega al cliente';a.append(invIcon(icon),el('span',label));acts.append(a);}
   body.append(acts);
-  if(d.payments?.length){const rows=d.payments.map(p=>cjRow([['Fecha',formatOrderDate(p.paid_at)],['Importe',quoteMoney(p.amount_cents)],['Método',d.methods[p.method]||p.method],['Documento',p.supplier_document],['Caja','CJM-'+p.cash_movement_id],['Registró',p.paid_name],['Estado',covChip(p.status==='revertido'?'cancelada':'pagado',p.status==='revertido'?'Revertido':'Registrado')],
+  if(d.payments?.length){const rows=d.payments.map(p=>cjRow([['Fecha',formatOrderDate(p.paid_at)],['Importe',quoteMoney(p.amount_cents)],['Forma de pago',d.methods[p.method]||p.method],['Documento',p.supplier_document],['Movimiento de caja','CJM-'+p.cash_movement_id],['Registró',p.paid_name],['Estado',covChip(p.status==='revertido'?'cancelada':'pagado',p.status==='revertido'?'Revertido':'Registrado')],
     ['',p.status==='registrado'?invBtn('Revertir','rotate-ccw',()=>cashReasonAction('Revertir el pago al proveedor','Si la caja del pago sigue abierta, el egreso se anula; si ya se cerró, se registra un ingreso compensatorio en tu caja abierta. Nada se borra.','/api/coverage/'+d.id,{action:'reverse',payment_id:String(p.id)},'reason',reload)):(p.reverse_reason?el('small',p.reverse_reason):'')]]));
-   const box=el('section',undefined,'cov-section');box.append(el('h3','Pagos al proveedor','cov-title'),cjTable(['Fecha','Importe','Método','Documento','Caja','Registró','Estado',''],rows,'cov-table'));body.append(box);}
+   const box=el('section',undefined,'cov-section');box.append(el('h3','Pagos al proveedor','cov-title'),cjTable(['Fecha','Importe','Forma de pago','Documento','Movimiento de caja','Registró','Estado',''],rows,'cov-table'));body.append(box);}
   if(d.events?.length){const log=el('details',undefined,'cov-log activity-fold'),sum=el('summary');sum.append(invIcon('clock'),el('span','Historial financiero'),el('b',String(d.events.length)));log.append(sum);const ul=el('ul');for(const e of d.events){const li=el('li');li.append(el('strong',e.detail),el('small',formatOrderDate(e.created_at)+' · '+e.actor));ul.append(li);}log.append(ul);body.append(log);}};
  if(cov)await reload();else render();}
 // Formularios cortos de la cobertura (compra, recepción). fields: [nombre, etiqueta, máximo, obligatorio, área].

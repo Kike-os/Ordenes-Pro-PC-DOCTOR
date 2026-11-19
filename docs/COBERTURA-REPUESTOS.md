@@ -62,6 +62,23 @@ Todo queda en el historial financiero de la cobertura (solo anexado) y en la aud
   - acciones;
   - pagos;
   - historial.
+
+  Desde la 1.5.299:
+  - **Ubicación del botón.** Está en la franja de acciones de la partida, en su propia línea bajo «Duplicar» y «Eliminar», con los mismos estados en todos los anchos.
+  - **Confirmación sin guardar.** Se titula «Guardar presupuesto para gestionar cobertura». Sus botones son «Cancelar» y «Guardar borrador y continuar». Guardar no envía correos, WhatsApp ni avisos.
+  - **Varios clics.** Un doble clic no abre dos ventanas ni guarda dos veces.
+  - **Fallo al guardar.** Muestra un aviso y deja los datos en pantalla.
+  - **Mientras consulta.** Muestra «Consultando…».
+  - **Datos del panel:**
+    - cantidad;
+    - quién solicitó (y cuándo);
+    - quién autorizó;
+    - fecha de compra;
+    - recepción;
+    - movimiento de inventario (`MOV-n`);
+    - motivo de la cobertura (interno);
+    - forma de pago y movimiento de caja (`CJM-n`) de cada pago.
+  - **Vista del técnico.** Ve el mismo seguimiento sin cifras: cantidad, solicitó, autorizó, compra y recepción.
 - **Facturación › Caja › Coberturas** (administración). Panel con indicadores:
   - total cubierto;
   - autorizadas sin pagar;

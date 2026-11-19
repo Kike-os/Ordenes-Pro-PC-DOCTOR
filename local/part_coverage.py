@@ -113,6 +113,11 @@ def _supplier(c, raw, required=False):
     return dict(row)
 
 
+def _user_name(c, user_id):
+    row = c.execute('SELECT name FROM users WHERE id=?', (user_id,)).fetchone() if user_id else None
+    return row['name'] if row else ''
+
+
 def view(c, cov, user, full=None):
     """Cobertura para la interfaz. Sin permisos financieros (técnicos) no lleva costo, proveedor, pagos, notas ni margen."""
     full = is_admin(user) if full is None else full
@@ -121,7 +126,7 @@ def view(c, cov, user, full=None):
             'linked': cov['quote_item_id'] is not None, 'status': cov['status'], 'status_label': STATUS[cov['status']], 'purchase_status': cov['purchase_status'],
             'purchase_label': PURCHASE[cov['purchase_status']], 'payment_status': payment_state(cov['covered_cents'], paid), 'payment_label': PAYMENT[payment_state(cov['covered_cents'], paid)],
             'review': cov['review'], 'requested_at': cov['requested_at'], 'authorized_at': cov['authorized_at'], 'authorized_name': cov['authorized_name'], 'revision': cov['revision'],
-            'received_at': cov['received_at']}
+            'received_at': cov['received_at'], 'requested_name': _user_name(c, cov['requested_by'])}
     if not full:
         return base
     supplier = c.execute('SELECT name FROM suppliers WHERE id=?', (cov['supplier_id'],)).fetchone() if cov['supplier_id'] else None

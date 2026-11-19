@@ -141,6 +141,11 @@ class PartCoverageTests(unittest.TestCase):
         self.assertEqual(made['status'], 201, made['body'])
         cid = made['body']['id']
         self.assertEqual(made['body']['coverage']['status'], 'solicitada')   # el técnico solicita; no autoriza aunque lo pida
+        # 1.5.299: el seguimiento indica quién la solicitó (dato no financiero, visible también para el técnico).
+        with app.connect() as c:
+            asker = c.execute('SELECT u.name FROM part_coverages p JOIN users u ON u.id=p.requested_by WHERE p.id=?', (cid,)).fetchone()[0]
+        self.assertEqual(made['body']['coverage']['requested_name'], asker)
+        self.assertEqual(self.request('/api/coverage/%d' % cid, cookie=self.cookie)['body']['coverage']['requested_name'], asker)
         self.assertFalse(leaks(made['body']))
         self.assertFalse(leaks(self.request('/api/quotes/%d/coverage' % quote, cookie=tcookie)['body']))
         self.assertFalse(leaks(self.request('/api/coverage/%d' % cid, cookie=tcookie)['body']))

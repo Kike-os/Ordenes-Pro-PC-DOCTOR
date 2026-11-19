@@ -12796,3 +12796,12 @@ body[data-page=dashboard] dialog.quote-dialog.quote-pro{width:min(1240px,calc(10
 @media(max-width:860px){.quote-pro .qp-config .quote-extra label:has(textarea){grid-column:1/-1}}
 @media(max-width:560px){.quote-pro .quote-row{border-top:3px solid color-mix(in srgb,var(--k) 75%,transparent)}.quote-pro .qp-kind{display:none}.quote-pro .quote-row-top{flex-wrap:nowrap}.quote-pro .quote-row-top .quote-field-priority{flex:1 1 0;min-width:0}.quote-pro .quote-row-top .quote-field-priority select{font-size:14px}}
 @media(max-width:560px){.quote-pro .quote-row-top:has(.quote-row-warn){flex-wrap:wrap}}
+/* 1.5.299 · Cobertura PC-DOCTOR en la franja de acciones de la partida de repuesto (junto a duplicar y eliminar). Acotado a .quote-pro */
+.quote-pro .quote-row-top:has(>.cov-line){flex-wrap:wrap}
+.quote-pro .quote-row-top>.cov-line{flex:1 1 100%;margin:0;gap:6px;padding-top:8px;border-top:1px dashed color-mix(in srgb,var(--k) 30%,transparent)}
+.quote-pro .quote-row-top>.cov-line .cov-open{display:inline-flex;align-items:center;gap:6px;min-height:36px;padding:4px 12px;border-radius:10px;border-color:color-mix(in srgb,#3B82F6 55%,var(--line,#2a3f5c));background:color-mix(in srgb,#3B82F6 12%,transparent);transition:background-color .18s ease,border-color .18s ease}
+.quote-pro .quote-row-top>.cov-line .cov-open:hover{background:color-mix(in srgb,#3B82F6 22%,transparent)}
+.quote-pro .quote-row-top>.cov-line .cov-open:focus-visible{outline:2px solid #7cc4ff;outline-offset:2px}
+.quote-pro .cov-open[aria-busy=true] svg{animation:qp-cov-pulse 1s ease-in-out infinite}
+@keyframes qp-cov-pulse{50%{opacity:.35}}
+@media(prefers-reduced-motion:reduce){.quote-pro .quote-row-top>.cov-line .cov-open{transition:none}.quote-pro .cov-open[aria-busy=true] svg{animation:none}}
