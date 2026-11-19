@@ -8,6 +8,26 @@
   },
   "releases": [
     {
+      "version": "1.5.305",
+      "date": "2026-11-19T09:31:48-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Gastos internos de la orden (Premium Compact)",
+      "changes": {
+        "features": [
+          "Gastos internos de la orden en tres secciones: resumen financiero (costo interno registrado, otros gastos, total y valor cubierto por PC-DOCTOR), registro de gastos con categoría, fecha, responsable y comprobante opcional, con editar y anular, y coberturas empresariales con revisar y revocar."
+        ],
+        "improvements": [],
+        "fixes": [
+          "Gastos internos: la tarjeta se actualiza al gestionar una cobertura desde el botón PC-DOCTOR de una partida (antes quedaba con datos viejos hasta reabrir el presupuesto); los textos largos se ajustan dentro de la tarjeta y los campos del gasto tienen etiqueta y validación."
+        ],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Administración (autorización expresa en la sesión)"
+    },
+    {
       "version": "1.5.304",
       "date": "2026-11-19T08:29:36-05:00",
       "type": "patch",

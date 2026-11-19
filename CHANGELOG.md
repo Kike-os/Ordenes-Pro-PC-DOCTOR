@@ -4,6 +4,18 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.305 — 2026-11-19 09:31 (UTC-05:00)
+
+Gastos internos de la orden (Premium Compact)
+
+### Nuevas funcionalidades
+
+- Gastos internos de la orden en tres secciones: resumen financiero (costo interno registrado, otros gastos, total y valor cubierto por PC-DOCTOR), registro de gastos con categoría, fecha, responsable y comprobante opcional, con editar y anular, y coberturas empresariales con revisar y revocar.
+
+### Errores corregidos
+
+- Gastos internos: la tarjeta se actualiza al gestionar una cobertura desde el botón PC-DOCTOR de una partida (antes quedaba con datos viejos hasta reabrir el presupuesto); los textos largos se ajustan dentro de la tarjeta y los campos del gasto tienen etiqueta y validación.
+
 ## v1.5.304 — 2026-11-19 08:29 (UTC-05:00)
 
 Panel derecho Premium de Presupuestos
