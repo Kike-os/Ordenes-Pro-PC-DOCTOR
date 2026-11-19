@@ -161,6 +161,8 @@ def render(quote, order, link=None):
     table_head()
     for item in quote['items']:
         lines = wrap(item['description'] + ('' if item['taxed'] else ' (tarifa 0 %)'), room, 9)
+        if item.get('benefit_cents'):   # cobertura comercial: transparente en el documento del cliente
+            lines += wrap('Beneficio PC-DOCTOR%s: -%s (incluido en la columna Descuento)' % ((' · ' + item['benefit_reason']) if item.get('benefit_reason') else '', quotes.usd(item['benefit_cents'])), room, 9)
         priority = quotes.PRIORITIES.get(item.get('priority') or '')
         height = max(11.5 * len(lines) + (13 if priority else 0), 20)
         if need(height + 12):
@@ -204,8 +206,12 @@ def render(quote, order, link=None):
     # --- Resumen económico ---
     totals, rate = quote['totals'], quote['tax_rate_bp'] / 100
     rows = []
+    if totals.get('discount_bp') or totals.get('benefit'):
+        rows.append(('Importe original', quotes.usd(totals['gross']), False))
     if totals.get('discount_bp'):
-        rows += [('Importe original', quotes.usd(totals['gross']), False), ('Descuento autorizado (%g %%)' % (totals['discount_bp'] / 100), '-' + quotes.usd(totals['discount']), False)]
+        rows.append(('Descuento autorizado (%g %%)' % (totals['discount_bp'] / 100), '-' + quotes.usd(totals['discount']), False))
+    if totals.get('benefit'):
+        rows.append(('Beneficio PC-DOCTOR', '-' + quotes.usd(totals['benefit']), False))
     rows += [('Subtotal gravado', quotes.usd(totals['base_taxed']), False), ('Subtotal tarifa 0 %', quotes.usd(totals['base_zero']), False), ('IVA %g %%' % rate, quotes.usd(totals['tax']), False)]
     after = []
     if decided:

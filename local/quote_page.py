@@ -184,14 +184,15 @@ def lines(quote, items, extra=None):
     for item in items:
         if item['status'] == 'cancelado':
             continue
-        amount = quotes.net(item['quantity'] * item['unit_cents'], quote['discount_bp'])
+        before = quotes.net(item['quantity'] * item['unit_cents'], quote['discount_bp'])
+        amount = quotes.line_net(item, quote['discount_bp'])
         base, tax = quotes.split(amount, item['taxed'], quote['tax_rate_bp'])
         name, _, detail = item['description'].partition(' — ')
         info = extra.get(item.get('catalog_id')) or {}
         if not detail.strip() and (info.get('description') or '').strip() and info['description'].strip().lower() != name.strip().lower():
             detail = info['description']
         tech = [(label, (info.get(key) or '').strip()) for key, label in (('brand', 'Marca'), ('code', 'Referencia'), ('license_term', 'Licencia'), ('devices', 'Equipos'))]
-        out.append(dict(item, name=name.strip() or item['description'], detail=detail.strip(), net=amount, base=base, tax=tax, tech=[pair for pair in tech if pair[1]],
+        out.append(dict(item, name=name.strip() or item['description'], detail=detail.strip(), net=amount, before=before, benefit=before - amount, base=base, tax=tax, tech=[pair for pair in tech if pair[1]],
                         image=bool(info.get('image')), group=item['category'] if item['category'] in dict(GROUPS) else 'otro'))
     return out
 
@@ -220,7 +221,9 @@ def _price(row, quote):
     each = ('%d × %s' % (row['quantity'], quotes.usd(row['unit_cents']))) if row['quantity'] > 1 else 'Cantidad: 1'
     tax_note = ('IVA %g %% incluido' % rate) if row['taxed'] and quote['tax_rate_bp'] else 'Tarifa 0 %'
     discount = ' · con descuento' if quote['discount_bp'] else ''
-    return '<div class="qp-price"><span class="qp-price-each">%s</span><strong>%s</strong><small>%s%s</small></div>' % (E(each), E(quotes.usd(row['net'])), E(tax_note), E(discount))
+    # Beneficio PC-DOCTOR (cobertura comercial): precio, beneficio e importe final, a la vista y sin ocultar nada.
+    gift = (' · precio %s − Beneficio PC-DOCTOR%s %s' % (quotes.usd(row['before']), (' (' + row['benefit_reason'] + ')') if row.get('benefit_reason') else '', quotes.usd(row['benefit']))) if row.get('benefit') else ''
+    return '<div class="qp-price"><span class="qp-price-each">%s</span><strong>%s</strong><small>%s%s%s</small></div>' % (E(each), E(quotes.usd(row['net'])), E(tax_note), E(discount), E(gift))
 
 
 def _item(row, quote, token, key, chosen=None, choose=True):
@@ -252,6 +255,8 @@ def _quoted_block(quote, items):
     rows = [('Subtotal gravado con IVA %g %%' % rate, quotes.usd(total['base_taxed'])), ('Subtotal tarifa 0 %', quotes.usd(total['base_zero']))]
     if quote['discount_bp']:
         rows.append(('%s (%g %%) aplicado' % (quotes.DISCOUNTS[quote['discount_bp']], quote['discount_bp'] / 100), '− ' + quotes.usd(total['discount'])))
+    if total.get('benefit'):
+        rows.append(('Beneficio PC-DOCTOR aplicado', '− ' + quotes.usd(total['benefit'])))
     rows.append(('IVA %g %%' % rate, quotes.usd(total['tax'])))
     return ('<dl class="qp-dl">%s<div class="qp-dl-total"><dt>Total cotizado</dt><dd>%s</dd></div></dl>'
             % (''.join('<div><dt>%s</dt><dd>%s</dd></div>' % (E(k), E(v)) for k, v in rows), E(quotes.usd(total['quoted']))))

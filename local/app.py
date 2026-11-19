@@ -2916,6 +2916,11 @@ class Handler(BaseHTTPRequestHandler):
                 if not paper:return self.reply(404,{'error':'Este presupuesto no tiene documento adjunto.'})
                 audit(c,user['id'],'quote_identity_viewed',paper['order_id']);c.commit()
                 return self.reply(200,bytes(paper['data']),paper['mime'],filename=paper['code']+'-IDENTIDAD.'+{'image/png':'png','image/jpeg':'jpg','image/webp':'webp','application/pdf':'pdf'}[paper['mime']])
+            if path=='/api/coverage/reasons':
+                # 1.5.301 · Catálogo de motivos de cobertura: el personal ve los activos; administración, todos (para configurarlos).
+                import part_coverage
+                if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
+                return self.reply(200,{'reasons':part_coverage.reasons(c,user['role']=='administrador'),'ready':part_coverage.universal(c)})
             coverage_get=re.fullmatch(r'/api/quotes/([0-9]+)/coverage|/api/coverage/([0-9]+)(/pdf|/ticket)?|/api/coverage/(dashboard)(\.csv)?',path)
             if coverage_get:
                 # 1.5.296 · Cobertura PC-DOCTOR: el técnico solo recibe estados; costos, proveedor, pagos y margen son de administración.
@@ -5127,6 +5132,13 @@ class Handler(BaseHTTPRequestHandler):
                         c.execute("UPDATE catalog_items SET archived_at='',archived_by=NULL WHERE id=? AND available=1 AND COALESCE(archived_at,'')!=''",(item,))
                         return self.reply(200,{'ok':True,'id':item})
                     except quotes.QuoteError as error:return self.reply(error.status,{'error':str(error),'fields':error.fields})
+                if path=='/api/coverage/reasons':
+                    import part_coverage
+                    try:
+                        code=part_coverage.save_reason(c,user,data,reception_now());audit(c,user['id'],'coverage_reason_saved')
+                        return self.reply(200,{'ok':True,'code':code,'reasons':part_coverage.reasons(c,True)})
+                    except part_coverage.CoverageError as error:
+                        c.rollback();return self.reply(error.status,{'error':str(error),'fields':error.fields})
                 coverage_post=re.fullmatch(r'/api/quotes/([0-9]+)/coverage|/api/coverage/([0-9]+)',path)
                 if coverage_post:
                     # 1.5.296 · Cobertura PC-DOCTOR. Autorizar no mueve dinero; pagar crea el egreso de caja en esta misma transacción.

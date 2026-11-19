@@ -588,3 +588,13 @@ El pliego pedía igualar una imagen de referencia, pero la imagen no llegó. El 
   - API de cobertura.
 
   No hay migraciones.
+
+## Beneficio PC-DOCTOR en el presupuesto (1.5.301)
+
+Una cobertura comercial autorizada resta el «Beneficio PC-DOCTOR» del importe de la partida. Se ve así en cada lugar:
+- **Editor:** nota en la fila y fila en el resumen.
+- **Página del cliente:** precio, beneficio con su motivo e importe final.
+- **PDF:** línea bajo la descripción y «Beneficio PC-DOCTOR» en el resumen.
+- **Factura:** descuento de la línea.
+
+Solo se aplica en presupuestos editables. Detalle en [COBERTURA-REPUESTOS.md](COBERTURA-REPUESTOS.md).

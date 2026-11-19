@@ -63,7 +63,8 @@ class PartCoverageTests(unittest.TestCase):
         return opened['body']['session_id']
 
     def authorized(self, quote, sup, cost='95,00', mode='total', percent=''):
-        made = self.post('/api/quotes/%d/coverage' % quote, position='1', cost=cost, mode=mode, percent=percent, supplier_id=str(sup), notes='Nota interna ficticia')
+        made = self.post('/api/quotes/%d/coverage' % quote, position='1', cost=cost, mode=mode, percent=percent, supplier_id=str(sup), notes='Nota interna ficticia',
+                         reason_code='garantia')
         self.assertEqual(made['status'], 201, made['body'])
         cid = made['body']['id']
         ok = self.post('/api/coverage/%d' % cid, action='authorize', revision=str(made['body']['coverage']['revision']), authorized_name='Gerencia ficticia')
@@ -137,7 +138,7 @@ class PartCoverageTests(unittest.TestCase):
         _, quote, sup, _ = self.setup_quote()
         tcookie, tcsrf = self.tech()
         tpost = lambda path, **body: self.request(path, body, cookie=tcookie, csrf=tcsrf)
-        made = tpost('/api/quotes/%d/coverage' % quote, position='1', cost='95', mode='total', supplier_id=str(sup), authorize=True)
+        made = tpost('/api/quotes/%d/coverage' % quote, position='1', cost='95', mode='total', supplier_id=str(sup), authorize=True, reason_code='garantia')
         self.assertEqual(made['status'], 201, made['body'])
         cid = made['body']['id']
         self.assertEqual(made['body']['coverage']['status'], 'solicitada')   # el técnico solicita; no autoriza aunque lo pida
@@ -301,14 +302,18 @@ class PartCoverageTests(unittest.TestCase):
         with app.connect() as c:
             self.assertEqual(c.execute("SELECT COUNT(*) FROM audit WHERE action IN ('coverage_exported','coverage_report_viewed')").fetchone()[0], 3)
 
-    def test_only_spare_part_lines_and_one_live_coverage_per_line(self):
+    def test_any_priced_line_and_one_live_coverage_per_line_and_modality(self):
+        # 1.5.301: también los servicios admiten cobertura (antes solo los repuestos); una viva por partida y modalidad.
         _, quote, sup, _ = self.setup_quote()
-        self.assertEqual(self.post('/api/quotes/%d/coverage' % quote, position='0', cost='10', mode='total')['status'], 409)   # servicio
-        self.assertEqual(self.post('/api/quotes/%d/coverage' % quote, position='9', cost='10', mode='total')['status'], 404)
-        self.assertEqual(self.post('/api/quotes/%d/coverage' % quote, position='1', cost='0', mode='total')['status'], 400)
-        self.assertEqual(self.post('/api/quotes/%d/coverage' % quote, position='1', cost='95', mode='parcial', percent='150')['status'], 400)
+        self.assertEqual(self.post('/api/quotes/%d/coverage' % quote, position='0', cost='10', mode='total', reason_code='garantia')['status'], 201)   # servicio
+        self.assertEqual(self.post('/api/quotes/%d/coverage' % quote, position='9', cost='10', mode='total', reason_code='garantia')['status'], 404)
+        self.assertEqual(self.post('/api/quotes/%d/coverage' % quote, position='1', cost='0', mode='total', reason_code='garantia')['status'], 400)
+        self.assertEqual(self.post('/api/quotes/%d/coverage' % quote, position='1', cost='95', mode='parcial', percent='150', reason_code='garantia')['status'], 400)
+        self.assertEqual(self.post('/api/quotes/%d/coverage' % quote, position='1', cost='95', mode='total')['status'], 400)   # sin motivo
         self.authorized(quote, sup)
-        self.assertEqual(self.post('/api/quotes/%d/coverage' % quote, position='1', cost='95', mode='total')['status'], 409)
+        self.assertEqual(self.post('/api/quotes/%d/coverage' % quote, position='1', cost='95', mode='total', reason_code='garantia')['status'], 409)
+        # El presupuesto ya está aprobado: la cobertura comercial (que cambia lo que paga el cliente) no se admite; hace falta una versión nueva.
+        self.assertEqual(self.post('/api/quotes/%d/coverage' % quote, position='1', modality='comercial', mode='total', reason_code='garantia')['status'], 409)
         self.assertEqual(self.request('/api/quotes/%d/coverage' % quote)['status'], 401)
 
 

@@ -154,14 +154,29 @@ def net(line_cents, discount_bp):
     return line_cents - (line_cents * discount_bp + 5000) // 10000
 
 
+def benefit(line_cents, item):
+    """Beneficio PC-DOCTOR (cobertura comercial autorizada, 1.5.301) sobre el importe ya descontado de la línea. 0 si no tiene."""
+    bp = item.get('benefit_bp') or 0
+    return (line_cents * bp + 5000) // 10000 if bp else 0
+
+
+def line_net(item, discount_bp):
+    """Importe final de una partida para el cliente: precio × cantidad, menos el descuento autorizado, menos el Beneficio PC-DOCTOR.
+    Es el único cálculo que usan los totales, la página y el PDF del cliente, la aprobación, el saldo de la orden y la factura."""
+    line = net(item['quantity'] * item['unit_cents'], discount_bp)
+    return line - benefit(line, item)
+
+
 def totals(items, rate_bp, discount_bp=0):
     """Importes cotizado, aprobado, rechazado y pendiente, con el desglose de base e IVA de lo cotizado y de lo aprobado.
     Con descuento, todos los importes son netos; `gross` y `discount` muestran el valor antes del descuento y lo descontado."""
     result = {'gross': 0, 'discount': 0, 'discount_bp': discount_bp, 'quoted': 0, 'approved': 0, 'rejected': 0, 'pending': 0, 'cancelled': 0, 'base_taxed': 0, 'base_zero': 0, 'tax': 0, 'approved_base_taxed': 0, 'approved_base_zero': 0, 'approved_tax': 0,
               'count': {'aprobado': 0, 'rechazado': 0, 'pendiente': 0, 'cancelado': 0}}
+    result['benefit'] = 0
     for item in items:
         full = item['quantity'] * item['unit_cents']
-        line = net(full, discount_bp)
+        before = net(full, discount_bp)
+        line = before - benefit(before, item)
         base, tax = split(line, item['taxed'], rate_bp)
         status = item.get('status', 'pendiente')
         result['count'][status] += 1
@@ -169,7 +184,8 @@ def totals(items, rate_bp, discount_bp=0):
             result['cancelled'] += line
             continue
         result['gross'] += full
-        result['discount'] += full - line
+        result['discount'] += full - before
+        result['benefit'] += before - line
         result['quoted'] += line
         result['tax'] += tax
         result['base_taxed' if item['taxed'] else 'base_zero'] += base
@@ -429,6 +445,11 @@ def items_of(c, quote_id):
         # Icono: el del elemento del catálogo (ligado a su identificador); en una línea libre, el propuesto para su categoría y descripción.
         row['icon'] = catalog_icons.valid(row.pop('catalog_icon')) if row['catalog_id'] and row['catalog_icon'] else catalog_icons.guess(row['category'], row['description'])
         row['priority_label'] = PRIORITIES[row['priority']][0] if row['priority'] else ''
+    # Beneficio PC-DOCTOR: cobertura comercial autorizada y enlazada a esta partida (posición y descripción).
+    found = __import__('part_coverage').benefits(c, quote_id) if rows else {}
+    for row in rows:
+        bp, why = found.get((row['position'], row['description']), (0, ''))
+        row['benefit_bp'], row['benefit_reason'] = bp, why
     return rows
 
 
@@ -446,7 +467,8 @@ def detail(c, quote):
     link = c.execute("SELECT created_at,expires_at,verified_at FROM quote_links WHERE quote_id=? AND revoked_at='' ORDER BY id DESC LIMIT 1", (quote['id'],)).fetchone()
     for item in items:
         item['line_cents'] = item['quantity'] * item['unit_cents']
-        item['net_cents'] = net(item['line_cents'], quote['discount_bp'])
+        item['net_cents'] = line_net(item, quote['discount_bp'])
+        item['benefit_cents'] = benefit(net(item['line_cents'], quote['discount_bp']), item)
         item['status_label'] = ITEM_STATUS[item['status']]
         item['category_label'] = CATEGORIES[item['category']]
         item['execution_label'] = EXECUTION[item['execution']]
@@ -607,7 +629,7 @@ def save(c, quote, data, user, now):
     c.executemany('INSERT INTO quote_items(quote_id,position,catalog_id,description,category,quantity,unit_cents,taxed,priority) VALUES (?,?,?,?,?,?,?,?,?)', [(quote['id'], *row) for row in clean])
     part_coverage.after_save(c, quote['id'], kept, user, now)
     c.execute("UPDATE quotes SET valid_until=?,notes=?,status='borrador',updated_at=? WHERE id=?", (valid, notes, now.isoformat(timespec='seconds'), quote['id']))
-    event(c, quote['id'], 'guardado', 'Borrador guardado con %d %s. Total cotizado: %s.' % (len(clean), 'ítem' if len(clean) == 1 else 'ítems', usd(sum(net(row[4] * row[5], discount) for row in clean))), now, user)
+    event(c, quote['id'], 'guardado', 'Borrador guardado con %d %s. Total cotizado: %s.' % (len(clean), 'ítem' if len(clean) == 1 else 'ítems', usd(totals(items_of(c, quote['id']), quote['tax_rate_bp'], discount)['quoted'])), now, user)
 
 
 def send(c, quote, recipient, user, now):
@@ -652,7 +674,7 @@ def approved_lines(c, quote):
         acceptance = c.execute('SELECT signer_name,signature FROM quote_acceptances WHERE quote_id=?', (row['id'],)).fetchone()
         for item in items_of(c, row['id']):
             if item['status'] == 'aprobado':
-                line = net(item['quantity'] * item['unit_cents'], row['discount_bp'])
+                line = line_net(item, row['discount_bp'])
                 base, tax = split(line, item['taxed'], row['tax_rate_bp'])  # misma regla por línea que los totales del presupuesto
                 ref = c.execute('SELECT code,brand FROM catalog_items WHERE id=?', (item['catalog_id'],)).fetchone() if item['catalog_id'] else None
                 result.append(dict(item, quote_id=row['id'], quote_code=row['code'], approved_at=row['decided_at'], net_cents=line, base_cents=base, tax_cents=tax, reference=(ref['code'] or '') if ref else '', brand=(ref['brand'] or '') if ref else '', category_label=CATEGORIES[item['category']],
@@ -800,7 +822,7 @@ def decide(c, quote, decisions, now, user=None, actor='', note=''):
     previous += sum(line['net_cents'] for head in heads(c, quote['order_id']) if head['series'] != series for line in approved_lines(c, head))  # otros presupuestos aprobados
     import equipment
     paid = equipment.money(c, quote['order_id'])['paid_cents']  # pagos netos del equipo: la misma fuente que el saldo
-    approved_total = previous + sum(net(item['quantity'] * item['unit_cents'], quote['discount_bp']) for item in items if decisions[item['id']] == 'aprobado')
+    approved_total = previous + sum(line_net(item, quote['discount_bp']) for item in items if decisions[item['id']] == 'aprobado')
     if paid > approved_total:
         raise QuoteError('La orden ya tiene pagos registrados por %s, más que el total aprobado (%s). Revisa los pagos antes de registrar esta decisión.' % (usd(paid), usd(approved_total)), 409)
     for item in items:

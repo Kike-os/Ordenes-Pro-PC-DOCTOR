@@ -107,3 +107,45 @@ Migración `110_part_coverage.sql`. Solo crea tablas nuevas y vacías:
 - `part_coverage_events`.
 
 También crea sus índices y protecciones contra borrado y modificación. No cambia presupuestos, caja ni inventario existentes.
+
+## Cobertura Empresarial universal: cualquier partida y dos modalidades (1.5.301)
+
+«Cobertura PC-DOCTOR» ya no es solo para repuestos. Aparece en cualquier partida con importe:
+- servicios, diagnósticos y BIOS/UEFI;
+- mano de obra y mantenimientos;
+- productos y repuestos;
+- licencias;
+- líneas libres.
+
+No hace falta reclasificar un servicio como repuesto. El panel se llama **Cobertura Empresarial PC-DOCTOR**. Cada partida puede tener una cobertura viva de cada modalidad; por ejemplo, un repuesto en garantía puede tener exonerado el precio y, además, asumido su costo.
+
+| | Costo interno | Comercial al cliente |
+|---|---|---|
+| Qué asume PC-DOCTOR | El costo del proveedor o el costo operativo del servicio | Parte o todo el **precio** de la partida |
+| Lo que paga el cliente | El precio de su presupuesto, sin cambios | El precio menos el «Beneficio PC-DOCTOR» |
+| Documentos del cliente | Sin datos internos | Muestran el precio, el beneficio (con su motivo) y el importe final, en la página, el PDF y el resumen |
+| Factura | Sin cambios | El beneficio viaja como **descuento de la línea**; el IVA se calcula sobre el importe final |
+| Dinero | Autorizar no mueve caja. Cada pago real es un egreso de caja | No crea cobros, pagos, ingresos ni egresos |
+| Cuándo | En cualquier presupuesto | Solo con el presupuesto en borrador o en revisión. En uno enviado o aprobado no se aplica, modifica ni retira: se crea una versión nueva |
+
+- **Bienes y servicios:**
+  - **Bienes** (repuestos, productos, licencias, seguridad): tienen compra, recepción, entrada de inventario y pago al proveedor.
+  - **Servicios:** su seguimiento muestra la ejecución de la partida y los «costos asociados», que son opcionales. El pago se registra solo si existe un costo real, como un prestador externo, y necesita a quién se le paga.
+- **Motivos:** el motivo es obligatorio. El catálogo es configurable en Caja › Coberturas › «Motivos de cobertura»: se pueden agregar, renombrar, marcar si exigen descripción y desactivar, pero no borrar. Motivos de fábrica:
+  - Garantía de reparación.
+  - Compensación por inconvenientes.
+  - Error técnico interno.
+  - Atención comercial.
+  - Cortesía empresarial.
+  - Retrabajo sin cargo.
+  - Reposición de producto.
+  - Otro motivo justificado.
+
+  «Compensación», «Error técnico interno» y «Otro» exigen una descripción interna.
+- **Cálculo único:** `quotes.line_net` resta del precio el descuento autorizado y luego el beneficio. Lo usan los totales, la página y el PDF del cliente, la aprobación, el saldo de la orden y la factura. Una cobertura comercial solo resta mientras está autorizada y enlazada a su partida. Si el precio cambia en el borrador, el beneficio se recalcula con el mismo porcentaje.
+- **Permisos (comprobados en el servidor):**
+  - **Técnico:** solicita cualquiera de las dos modalidades, pero no autoriza (403). Nunca ve costos, proveedor, pagos ni margen. Sí ve el beneficio comercial, porque figura en el documento del cliente.
+  - **Administración:** autoriza, modifica, retira y configura los motivos.
+- **Historial y auditoría:** cada solicitud, autorización, cambio y retiro queda en el historial de la cobertura. El beneficio comercial también queda en el historial del presupuesto.
+- **Compatibilidad:** la migración `111_coverage_universal.sql` solo agrega columnas con valor por defecto, un índice y la tabla de motivos. Las coberturas existentes quedan como «costo interno», con sus pagos, inventario e historial intactos.
+- **Tratamiento tributario:** el beneficio se factura como descuento de la línea, la forma estándar de un descuento en la factura electrónica. Si en algún caso corresponde otro tratamiento (por ejemplo, una nota de crédito sobre una factura ya emitida, o la normativa sobre transferencias gratuitas), debe confirmarlo el contador. El sistema no emite notas de crédito automáticas por una cobertura.
