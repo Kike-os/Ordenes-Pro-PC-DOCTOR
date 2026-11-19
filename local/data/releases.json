@@ -8,6 +8,25 @@
   },
   "releases": [
     {
+      "version": "1.5.303",
+      "date": "2026-11-19T00:54:49-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Presupuesto Premium Enterprise (diseño aprobado)",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Presupuestos: diseño Premium Enterprise aprobado. Tabla de partidas con icono, precio, descuento, botón PC-DOCTOR en la columna Cobertura y Total cliente, con etiquetas de cobertura, beneficio, descuento y «Cliente paga» bajo cada partida, sin superposiciones ni textos cortados.",
+          "Presupuestos: panel lateral con Resumen económico (Total cotizado al cliente destacado), Beneficio y cobertura (beneficio, % y lo que paga el cliente), Información del presupuesto y Gastos internos de la orden (costo interno, otros gastos y total); cabecera con número copiable, cliente y etiquetas."
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Administración (autorización expresa en la sesión)"
+    },
+    {
       "version": "1.5.302",
       "date": "2026-11-18T23:59:07-05:00",
       "type": "patch",

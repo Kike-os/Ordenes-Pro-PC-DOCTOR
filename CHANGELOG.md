@@ -4,6 +4,15 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.303 — 2026-11-19 00:54 (UTC-05:00)
+
+Presupuesto Premium Enterprise (diseño aprobado)
+
+### Mejoras realizadas
+
+- Presupuestos: diseño Premium Enterprise aprobado. Tabla de partidas con icono, precio, descuento, botón PC-DOCTOR en la columna Cobertura y Total cliente, con etiquetas de cobertura, beneficio, descuento y «Cliente paga» bajo cada partida, sin superposiciones ni textos cortados.
+- Presupuestos: panel lateral con Resumen económico (Total cotizado al cliente destacado), Beneficio y cobertura (beneficio, % y lo que paga el cliente), Información del presupuesto y Gastos internos de la orden (costo interno, otros gastos y total); cabecera con número copiable, cliente y etiquetas.
+
 ## v1.5.302 — 2026-11-18 23:59 (UTC-05:00)
 
 Cobertura Empresarial Enterprise 3.0 y tabla de partidas corregida
