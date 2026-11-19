@@ -2921,7 +2921,7 @@ class Handler(BaseHTTPRequestHandler):
                 import part_coverage
                 if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
                 return self.reply(200,{'reasons':part_coverage.reasons(c,user['role']=='administrador'),'ready':part_coverage.universal(c)})
-            coverage_get=re.fullmatch(r'/api/quotes/([0-9]+)/coverage|/api/coverage/([0-9]+)(/pdf|/ticket)?|/api/coverage/(dashboard)(\.csv)?',path)
+            coverage_get=re.fullmatch(r'/api/quotes/([0-9]+)/coverage|/api/coverage/([0-9]+)(/pdf|/ticket|/file)?|/api/coverage/(dashboard)(\.csv)?',path)
             if coverage_get:
                 # 1.5.296 · Cobertura PC-DOCTOR: el técnico solo recibe estados; costos, proveedor, pagos y margen son de administración.
                 import part_coverage
@@ -2934,6 +2934,9 @@ class Handler(BaseHTTPRequestHandler):
                             audit(c,user['id'],'coverage_exported');c.commit()
                             return self.reply(200,part_coverage.dashboard_csv(board),'text/csv; charset=utf-8',filename='coberturas-pc-doctor-'+reception_now().strftime('%Y%m%d')+'.csv')
                         return self.reply(200,board)
+                    if coverage_get[3]=='/file':   # 1.5.305 · comprobante de un gasto interno (administración o quien lo registró)
+                        name,mime,raw=part_coverage.file_for(c,user,int(coverage_get[2]))
+                        return self.reply(200,raw,mime,filename=name)
                     if coverage_get[3]:
                         if user['role']!='administrador':return self.reply(403,{'error':'Solo administración consulta la liquidación interna.'})
                         import coverage_report

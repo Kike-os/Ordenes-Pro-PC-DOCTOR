@@ -186,3 +186,39 @@ No hace falta reclasificar un servicio como repuesto. El panel se llama **Cobert
 - **Pagos:** el pago exige saber a quién se le paga. Si falta el proveedor o prestador, el panel lo indica en lugar de ofrecer el botón.
 - **Partidas renombradas.** Si cambia solo el texto de una partida cubierta (misma posición, tipo y precio), la cobertura se conserva con la descripción nueva. Antes quedaba sin vínculo y había que crear otra, como pasó en PCD-20261110-0017-P1. Si cambia el precio o el tipo, queda para revisión y deja de restar.
 - **Migración `112_coverage_amounts_concepts.sql`:** solo agrega dos columnas con valor por defecto.
+
+## Gastos internos de la orden: Premium Compact (1.5.305)
+
+La tarjeta «Gastos internos de la orden» del presupuesto tiene tres secciones.
+
+1. **Resumen financiero.** Separa lo que cuesta de lo que se regala:
+   - **Costo interno registrado:** costo real de las partidas con cobertura interna autorizada.
+   - **Otros gastos:** gastos internos de la orden autorizados.
+   - **Total de gastos internos.**
+   - **Valor cubierto por PC-DOCTOR:** beneficio comercial que el cliente deja de pagar.
+
+   El técnico ve el valor cubierto, pero no los costos.
+2. **Registro de gastos.**
+   - El botón «+ Registrar gasto» abre el panel lateral con estos campos, todos con etiqueta visible:
+     - concepto;
+     - **categoría** (Transporte y envíos, Servicio de terceros, Materiales e insumos, Mano de obra externa, Herramientas y equipos, Otro gasto);
+     - **fecha del gasto** (no futura ni de hace más de un año);
+     - **comprobante opcional** (JPG, PNG o PDF de hasta 5 MB, en el mismo almacén de comprobantes de Caja);
+     - motivo, tipo de cobertura y costo.
+   - El historial muestra concepto, categoría, fecha, responsable, importe (solo administración), estado y pago.
+   - Acciones de cada gasto:
+     - **Abrir/editar:** corrige concepto, categoría, fecha o comprobante; queda en el historial.
+     - **Comprobante:** solo lo descargan administración y quien registró el gasto.
+     - **Anular:** solo administración, con motivo y sin pagos vigentes. Nunca se borra.
+   - Un doble clic no duplica el registro ni el egreso de Caja.
+3. **Coberturas empresariales.** Cada cobertura en curso de una partida, comercial o de costo interno, muestra:
+   - precio al cliente;
+   - porcentaje y valor de la cobertura;
+   - costo real (solo administración);
+   - estado, y «Por revisar» si perdió su partida.
+
+   Desde ahí se puede **Revisar**, que abre el panel, o **Revocar/Rechazar**, que pide confirmación y motivo y conserva el registro.
+
+- **Arreglo de refresco:** gestionar una cobertura desde el botón «PC-DOCTOR» de una partida ahora refresca la tarjeta, que antes no se actualizaba hasta reabrir el presupuesto.
+- **Textos largos:** se ajustan dentro de la tarjeta (hasta tres líneas, con el texto completo como descripción emergente). La lista tiene desplazamiento propio.
+- **Migración `113_internal_expense_details.sql`:** solo agrega tres columnas: `expense_kind`, `expense_date` y `file_id`.

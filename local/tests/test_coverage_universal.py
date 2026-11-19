@@ -187,7 +187,7 @@ class UniversalCoverageTests(unittest.TestCase):
         order, quote, sup = self.draft('0109')
         before = self.quote(quote)['totals']['quoted']
         made = self.post('/api/quotes/%d/coverage' % quote, scope='concepto', concept='Transporte ficticio del equipo', cost='12', mode='total', reason_code='atencion_comercial',
-                         supplier_id=str(sup), authorize=True)
+                         supplier_id=str(sup), authorize=True, expense_kind='transporte')
         self.assertEqual(made['status'], 201, made['body'])
         cov = made['body']['coverage']
         self.assertEqual((cov['scope'], cov['modality'], cov['status'], cov['covered_cents'], cov['goods'], cov['linked']), ('concepto', 'interna', 'autorizada', 1200, False, True))
@@ -235,6 +235,34 @@ class UniversalCoverageTests(unittest.TestCase):
         self.assertEqual((back['body']['coverage']['payment_status'], back['body']['coverage']['payment_label']), ('reembolsado', 'Reembolsado'))
         done = self.post('/api/coverage/%d' % cid, action='cancel', reason='Prueba ficticia de revocación')
         self.assertEqual((done['status'], done['body']['coverage']['status_label']), (200, 'Revocada'))
+
+
+    # ---- 1.5.305 · Gastos internos: categoría, fecha, comprobante y edición ----
+    def test_internal_expense_category_date_and_edit(self):
+        _, quote, sup = self.draft('0112')
+        base = dict(scope='concepto', concept='Envío ficticio del equipo', cost='14.50', mode='total', reason_code='atencion_comercial')
+        self.assertEqual(self.post('/api/quotes/%d/coverage' % quote, **base)['status'], 400)                                  # sin categoría
+        self.assertEqual(self.post('/api/quotes/%d/coverage' % quote, expense_kind='inventada', **base)['status'], 400)
+        self.assertEqual(self.post('/api/quotes/%d/coverage' % quote, expense_kind='transporte', expense_date='2999-01-01', **base)['status'], 400)  # futura
+        made = self.post('/api/quotes/%d/coverage' % quote, expense_kind='transporte', expense_date='', authorize=True, **base)
+        self.assertEqual(made['status'], 201, made['body'])
+        cov = made['body']['coverage']
+        self.assertEqual((cov['expense_kind'], cov['expense_kind_label'], cov['has_file'], cov['covered_cents']), ('transporte', 'Transporte y envíos', False, 1450))
+        self.assertEqual(len(cov['expense_date']), 10)                                                                    # sin fecha: la del registro
+        self.assertEqual(self.request('/api/coverage/%d/file' % cov['id'], cookie=self.cookie)['status'], 404)            # sin comprobante
+        # Corregir concepto, categoría y fecha queda en el historial; el importe no cambia si no se toca.
+        done = self.post('/api/coverage/%d' % cov['id'], action='update', revision=str(cov['revision']), concept='Envío ficticio con mensajería', expense_kind='terceros',
+                         expense_date=cov['expense_date'], cost='14.50', mode='total', reason_code='atencion_comercial')
+        self.assertEqual(done['status'], 200, done['body'])
+        cov = done['body']['coverage']
+        self.assertEqual((cov['line_description'], cov['expense_kind'], cov['covered_cents']), ('Envío ficticio con mensajería', 'terceros', 1450))
+        self.assertTrue(any('categoría Servicio de terceros' in e['detail'] and 'concepto' in e['detail'] for e in cov['events']))
+        # El técnico ve el gasto (categoría y fecha) pero nunca su importe; no descarga comprobantes ajenos.
+        tcookie, _ = self.tech()
+        seen = self.request('/api/coverage/%d' % cov['id'], cookie=tcookie)['body']['coverage']
+        self.assertEqual(seen['expense_kind'], 'terceros')
+        self.assertFalse(test_part_coverage.leaks({'coverage': seen}))
+        self.assertEqual(self.request('/api/coverage/%d/file' % cov['id'], cookie=tcookie)['status'], 404)
 
 
 if __name__ == '__main__':

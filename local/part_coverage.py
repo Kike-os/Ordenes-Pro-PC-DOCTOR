@@ -36,6 +36,9 @@ PAYMENT = {'pendiente': 'Pago pendiente', 'parcial': 'Parcialmente pagado', 'pag
 CASH_KIND = 'cobertura_repuesto'
 MODALITY = {'interna': 'Cobertura de costo interno', 'comercial': 'Cobertura comercial al cliente'}
 EDITABLE_QUOTE = ('borrador', 'modificacion')
+# 1.5.305 · Categorías de los gastos internos de la orden (no son partidas ni se cobran al cliente).
+EXPENSE_KINDS = {'transporte': 'Transporte y envíos', 'terceros': 'Servicio de terceros', 'materiales': 'Materiales e insumos', 'mano_obra': 'Mano de obra externa',
+                 'herramientas': 'Herramientas y equipos', 'otro': 'Otro gasto'}
 # Motivos de fábrica (también los crea la migración 111). La lista vigente vive en coverage_reasons y la configura administración.
 DEFAULT_REASONS = [('garantia', 'Garantía de reparación', 0), ('compensacion', 'Compensación por inconvenientes', 1), ('error_interno', 'Error técnico interno', 1),
                    ('atencion_comercial', 'Atención comercial', 0), ('cortesia', 'Cortesía empresarial', 0), ('retrabajo', 'Retrabajo sin cargo', 0),
@@ -178,6 +181,49 @@ def refunded(c, cov_id):
     return c.execute("SELECT 1 FROM part_coverage_payments WHERE coverage_id=? AND status='revertido'", (cov_id,)).fetchone() is not None
 
 
+def details_ready(c):
+    """Migración 113 aplicada (categoría, fecha y comprobante de los gastos internos)."""
+    return 'expense_kind' in {r[1] for r in c.execute('PRAGMA table_info(part_coverages)')}
+
+
+def _expense(c, user, data, now, current=None):
+    """Categoría, fecha y comprobante opcional de un gasto interno. La fecha no puede ser futura ni anterior a un año."""
+    if not details_ready(c):
+        return {}
+    kind = str(data.get('expense_kind', (current or {}).get('expense_kind') or '') or '').strip()
+    if kind not in EXPENSE_KINDS:
+        raise CoverageError('Elige la categoría del gasto.', fields={'expense_kind': 'Obligatoria.'})
+    day = str(data.get('expense_date', (current or {}).get('expense_date') or '') or '').strip()
+    if day:
+        try:
+            when = datetime.fromisoformat(day).date()
+        except ValueError:
+            raise CoverageError('Indica una fecha válida del gasto.', fields={'expense_date': 'Fecha inválida.'})
+        today = now.date() if hasattr(now, 'date') else datetime.now().date()
+        if when > today or when < today - timedelta(days=366):
+            raise CoverageError('La fecha del gasto no puede ser futura ni de hace más de un año.', fields={'expense_date': 'Fuera de rango.'})
+        day = when.isoformat()
+    out = {'expense_kind': kind, 'expense_date': day}
+    upload = str(data.get('upload_id', '') or '')
+    if upload:
+        try:
+            out['file_id'] = cash_sessions.store_file(c, user, upload, str(data.get('file_name', '') or ''), 'egreso', now)
+        except cash_sessions.CashError as error:
+            raise CoverageError(str(error), error.status, {'file': str(error)})
+    return out
+
+
+def file_for(c, user, cov_id):
+    """Comprobante de un gasto interno: administración o quien lo registró."""
+    cov = _row(c, cov_id)
+    if not cov.get('file_id') or not (is_admin(user) or cov['requested_by'] == user['id']):
+        raise CoverageError('Comprobante no disponible.', 404)
+    f = c.execute('SELECT name,mime,data FROM payment_files WHERE id=?', (cov['file_id'],)).fetchone()
+    if not f:
+        raise CoverageError('Comprobante no disponible.', 404)
+    return f['name'], f['mime'], bytes(f['data'])
+
+
 def amounts_ready(c):
     """Migración 112 aplicada (importe fijo y gastos internos de la orden)."""
     return 'scope' in {r[1] for r in c.execute('PRAGMA table_info(part_coverages)')}
@@ -217,6 +263,9 @@ def view(c, cov, user, full=None):
                 scope='concepto' if concept else 'partida', fixed_cents=cov.get('fixed_cents') or 0)
     if concept:
         base['linked'] = True   # un gasto interno de la orden no depende de ninguna partida
+        kind = cov.get('expense_kind') or ''
+        base.update(expense_kind=kind, expense_kind_label=EXPENSE_KINDS.get(kind, ''), expense_date=cov.get('expense_date') or (cov['requested_at'] or '')[:10],
+                    has_file=bool(cov.get('file_id')) and (is_admin(user) or cov['requested_by'] == user['id']))   # solo quien puede abrirlo
     if modality == 'comercial':
         # Precio, porcentaje y beneficio figuran en el documento del cliente: no son datos internos.
         base.update(sale_cents=cov['sale_cents'], percent=cov['percent'], benefit_cents=cov['covered_cents'], client_cents=max(0, cov['cost_cents'] - cov['covered_cents']), base_cents=cov['cost_cents'])
@@ -239,7 +288,7 @@ def for_quote(c, user, quote_id):
     rows = [view(c, dict(r), user) for r in c.execute('SELECT * FROM part_coverages WHERE quote_id=? ORDER BY line_position,id', (quote['id'],))]
     out = {'ready': True, 'rows': rows, 'can_manage': is_admin(user), 'can_pay': can_pay(c, user), 'universal': universal(c), 'reasons': reasons(c),
            'quote_status': quote['status'], 'quote_editable': quote['status'] in EDITABLE_QUOTE, 'modalities': MODALITY, 'order_code': quote['order_code'],
-           'concepts': amounts_ready(c) and universal(c)}
+           'concepts': amounts_ready(c) and universal(c), 'expense_kinds': EXPENSE_KINDS if details_ready(c) else {}}
     if is_admin(user):
         out['suppliers'] = [dict(r) for r in c.execute('SELECT id,name FROM suppliers WHERE active=1 ORDER BY name')]
     return out
@@ -381,11 +430,15 @@ def _request_concept(c, user, quote, data, now):
     if c.execute("SELECT 1 FROM part_coverages WHERE quote_id=? AND scope='concepto' AND line_description=? AND status IN ('solicitada','autorizada')", (quote['id'], concept)).fetchone():
         raise CoverageError('Ya hay un gasto interno «%s» en curso en este presupuesto.' % concept, 409, {'concept': 'Repetido.'})
     position = -1 - c.execute("SELECT COUNT(*) FROM part_coverages WHERE quote_id=? AND scope='concepto'", (quote['id'],)).fetchone()[0]
+    extra = _expense(c, user, data, now)
     cid = c.execute("INSERT INTO part_coverages(quote_id,order_id,quote_item_id,line_position,line_description,catalog_id,quantity,sale_cents,cost_cents,percent,covered_cents,supplier_id,"
                     "status,notes,requested_by,requested_at,updated_at,modality,reason_code,fixed_cents,scope) VALUES (?,?,NULL,?,?,NULL,1,0,?,?,?,?,'solicitada',?,?,?,?,'interna',?,?,'concepto')",
                     (quote['id'], quote['order_id'], position, concept, cost, percent, covered, supplier['id'] if supplier else None, notes, user['id'], stamp(now), stamp(now), code,
                      _fixed(c, data, None, covered))).lastrowid
-    event(c, cid, 'solicitada', 'Gasto interno de la orden solicitado: %s · costo %s · %s a cargo de PC-DOCTOR · motivo %s.' % (concept, usd(cost), usd(covered), reason_label(c, code)), user, now)
+    if extra:
+        c.execute('UPDATE part_coverages SET expense_kind=?,expense_date=?,file_id=? WHERE id=?', (extra['expense_kind'], extra['expense_date'], extra.get('file_id'), cid))
+    event(c, cid, 'solicitada', 'Gasto interno de la orden solicitado: %s%s · costo %s · %s a cargo de PC-DOCTOR · motivo %s%s.' % (
+        concept, (' (' + EXPENSE_KINDS[extra['expense_kind']] + ')') if extra else '', usd(cost), usd(covered), reason_label(c, code), ' · con comprobante' if extra.get('file_id') else ''), user, now)
     if is_admin(user) and data.get('authorize') is True:
         authorize(c, user, cid, dict(data, revision='0'), now)
     return cid
@@ -506,6 +559,26 @@ def update(c, user, cov_id, data, now):
     changes = []
     if code != (cov.get('reason_code') or ''):
         changes.append('motivo ' + (reason_label(c, code) or 'sin indicar'))
+    concept_sets = {}
+    if cov.get('scope') == 'concepto':
+        if 'concept' in data:
+            text = _text(data, 'concept', 120, 3, 'el concepto del gasto')
+            if text != cov['line_description']:
+                if c.execute("SELECT 1 FROM part_coverages WHERE quote_id=? AND scope='concepto' AND line_description=? AND id<>? AND status IN ('solicitada','autorizada')", (cov['quote_id'], text, cov['id'])).fetchone():
+                    raise CoverageError('Ya hay un gasto interno «%s» en curso en este presupuesto.' % text, 409, {'concept': 'Repetido.'})
+                concept_sets['line_description'] = text
+                changes.append('concepto «%s» → «%s»' % (cov['line_description'][:50], text[:50]))
+        extra = _expense(c, user, data, now, cov)
+        if extra:
+            if extra['expense_kind'] != (cov.get('expense_kind') or ''):
+                concept_sets['expense_kind'] = extra['expense_kind']
+                changes.append('categoría ' + EXPENSE_KINDS[extra['expense_kind']])
+            if extra['expense_date'] != (cov.get('expense_date') or ''):
+                concept_sets['expense_date'] = extra['expense_date']
+                changes.append('fecha del gasto ' + (extra['expense_date'] or 'sin indicar'))
+            if extra.get('file_id'):
+                concept_sets['file_id'] = extra['file_id']
+                changes.append('comprobante ' + ('reemplazado' if cov.get('file_id') else 'adjuntado'))
     if cost != cov['cost_cents']:
         changes.append('costo %s → %s' % (usd(cov['cost_cents']), usd(cost)))
     if covered != cov['covered_cents'] and percent == cov['percent']:
@@ -521,6 +594,8 @@ def update(c, user, cov_id, data, now):
     c.execute('UPDATE part_coverages SET cost_cents=?,percent=?,covered_cents=?,supplier_id=?,notes=?,revision=revision+1,updated_at=?' + (',reason_code=?' if universal(c) else '') +
               (',fixed_cents=?' if amounts_ready(c) else '') + ' WHERE id=? AND revision=?',
               [cost, percent, covered, supplier['id'] if supplier else None, notes, stamp(now)] + ([code] if universal(c) else []) + ([_fixed(c, data, cov, covered)] if amounts_ready(c) else []) + [cov['id'], cov['revision']])
+    if concept_sets:
+        c.execute('UPDATE part_coverages SET ' + ','.join(k + '=?' for k in concept_sets) + ' WHERE id=?', list(concept_sets.values()) + [cov['id']])
     if commercial and cov['status'] == 'autorizada':
         __import__('quotes').event(c, cov['quote_id'], 'cobertura', 'Beneficio PC-DOCTOR modificado en «%s»: %s.' % (cov['line_description'][:80], '; '.join(changes)), now, user)
     event(c, cov['id'], 'editada', 'Cobertura actualizada: ' + '; '.join(changes) + '.', user, now)

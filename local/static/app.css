@@ -13150,3 +13150,44 @@ body[data-page=dashboard] dialog.quote-dialog.quote-pro{width:min(1680px,calc(10
 .quote-pro .qp-info-number{display:inline-flex;align-items:center;gap:4px;flex-wrap:wrap;justify-content:flex-end}
 /* Las tarjetas del panel no quedan detrás del pie de acciones */
 .quote-pro .quote-editor{padding-bottom:18px}
+/* ===================================================================================================================================
+   1.5.305 · Gastos internos de la orden (Premium Compact): resumen financiero, registro de gastos y coberturas empresariales.
+   Los textos largos se ajustan dentro de la tarjeta (nunca la desbordan) y los importes quedan alineados a la derecha. Acotado a .quote-pro.
+   =================================================================================================================================== */
+.quote-pro .qp-concepts-card{gap:14px}
+.quote-pro .qp-int-block{display:grid;gap:10px;min-width:0;padding-top:12px;border-top:1px solid var(--qp-line)}
+.quote-pro .qp-concepts-card>.qp-int-block:first-of-type{padding-top:0;border-top:0}
+.quote-pro .qp-int-block h4{margin:0;font-size:13px;font-weight:700;color:var(--qp-text)}
+.quote-pro .qp-int-stats{grid-template-columns:1fr 1fr}
+.quote-pro .qp-int-stats .qp-stat:nth-child(2n){border-left:1px solid var(--qp-line)}
+.quote-pro .qp-int-stats .qp-stat:nth-child(n+3){border-top:1px solid var(--qp-line)}
+.quote-pro .qp-int-stats .qp-stat:nth-child(3){border-left:0}
+.quote-pro .qp-concepts-card .qp-int-stats .qp-stat[data-tone=pink]{margin:0;border-radius:0;border-width:1px 0 0 0;border-color:var(--qp-line);background:linear-gradient(160deg,#2a0d1c,#170b18)}
+.quote-pro .qp-int-stats .qp-stat dd{font-size:18px;white-space:normal;overflow-wrap:anywhere}
+.quote-pro .qp-int-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.quote-pro .qp-concept-add{display:inline-flex;align-items:center;gap:6px;min-height:36px;padding:4px 12px;border-radius:10px;font-size:12.5px;font-weight:700}
+.quote-pro .qp-exp-list{list-style:none;margin:0;padding:0;display:grid;gap:8px;max-height:340px;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin}
+.quote-pro .qp-exp{display:grid;gap:6px;min-width:0;padding:10px 12px;border:1px solid var(--qp-line);border-radius:12px;background:#0a1424}
+.quote-pro .qp-exp-top{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;gap:10px}
+.quote-pro .qp-exp-top strong{min-width:0;font-size:13px;line-height:1.35;color:var(--qp-text);overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.quote-pro .qp-exp-amount{white-space:nowrap;font-size:14px;color:var(--qp-text);font-variant-numeric:tabular-nums}
+.quote-pro .qp-exp-meta{margin:0;font-size:11.5px;color:var(--qp-soft);overflow-wrap:anywhere}
+.quote-pro .qp-exp-chips,.quote-pro .qp-exp-acts{display:flex;flex-wrap:wrap;gap:6px;min-width:0}
+.quote-pro .qp-exp-chips .cov-chip{white-space:normal}
+.quote-pro .qp-mini{display:inline-flex;align-items:center;justify-content:center;min-height:32px;padding:3px 10px;border-radius:9px;font-size:12px;font-weight:700}
+.quote-pro .qp-link{border:1px solid var(--qp-line2);background:#0d1a2e;color:#cfe3ff;text-decoration:none}.quote-pro .qp-link:hover{background:#13233d}
+.quote-pro .qp-danger{border-color:#7f1d1d;color:#fca5a5;background:#1c0d14}.quote-pro .qp-danger:hover{background:#2a0f19}
+.quote-pro .qp-kind-tag{white-space:nowrap;padding:1px 8px;border-radius:999px;border:1px solid var(--qp-line2);font-size:11px;font-weight:700;color:var(--qp-soft)}
+.quote-pro .qp-cov-figs{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:6px;margin:0}
+.quote-pro .qp-cov-figs div{display:grid;gap:1px;min-width:0;padding:6px 8px;border:1px solid #16263f;border-radius:9px;background:#0b1628}
+.quote-pro .qp-cov-figs dt{font-size:11px;color:var(--qp-soft)}.quote-pro .qp-cov-figs dd{margin:0;font-size:13px;font-weight:800;color:var(--qp-text);overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+.quote-pro .qp-cov-figs [data-tone=blue] dd{color:var(--qp-blue2)}
+.quote-pro .qp-concepts-card .qp-orphans{display:none}
+@container qpside (max-width:300px){.quote-pro .qp-int-stats{grid-template-columns:1fr}.quote-pro .qp-int-stats .qp-stat{border-left:0!important}.quote-pro .qp-int-stats .qp-stat+.qp-stat{border-top:1px solid var(--qp-line)}}
+.cov-drawer .cov-file{justify-self:start}
+/* Resumen financiero de gastos internos: siempre 2 × 2 (la regla general del panel estrecho estiraba la última cifra) */
+.quote-pro .qp-concepts-card .qp-int-stats{grid-template-columns:1fr 1fr}
+.quote-pro .qp-concepts-card .qp-int-stats .qp-stat{grid-column:auto;border-left:0;border-top:0}
+.quote-pro .qp-concepts-card .qp-int-stats .qp-stat:nth-child(2n){border-left:1px solid var(--qp-line)}
+.quote-pro .qp-concepts-card .qp-int-stats .qp-stat:nth-child(n+3){border-top:1px solid var(--qp-line)}
+@container qpside (max-width:300px){.quote-pro .qp-concepts-card .qp-int-stats{grid-template-columns:1fr}.quote-pro .qp-concepts-card .qp-int-stats .qp-stat:nth-child(2n){border-left:0}.quote-pro .qp-concepts-card .qp-int-stats .qp-stat+.qp-stat{border-top:1px solid var(--qp-line)}}
