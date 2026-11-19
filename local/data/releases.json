@@ -8,6 +8,25 @@
   },
   "releases": [
     {
+      "version": "1.5.306",
+      "date": "2026-11-19T14:30:03-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Barra superior estable al recargar",
+      "changes": {
+        "features": [],
+        "improvements": [],
+        "fixes": [
+          "Barra superior: al recargar (F5 o Ctrl + R) la versión, el buscador, el reloj y el clima ya no se montan sobre el logotipo ni el usuario en tableta y móvil; la barra mantiene su altura durante la carga y nada cambia de sitio al llegar los datos.",
+          "Barra superior: esqueletos de carga en lugar de valores provisionales falsos («Clima no disponible», «PC», «Cargando…»); el nombre largo se recorta con «…» y se ve completo en un tooltip; la tarjeta del clima ya no pega el texto al borde y los avisos no tapan el menú de cuenta."
+        ],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Administración (autorización expresa en la sesión)"
+    },
+    {
       "version": "1.5.305",
       "date": "2026-11-19T09:31:48-05:00",
       "type": "patch",

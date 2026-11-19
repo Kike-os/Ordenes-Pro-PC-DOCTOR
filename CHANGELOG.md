@@ -4,6 +4,15 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.306 — 2026-11-19 14:30 (UTC-05:00)
+
+Barra superior estable al recargar
+
+### Errores corregidos
+
+- Barra superior: al recargar (F5 o Ctrl + R) la versión, el buscador, el reloj y el clima ya no se montan sobre el logotipo ni el usuario en tableta y móvil; la barra mantiene su altura durante la carga y nada cambia de sitio al llegar los datos.
+- Barra superior: esqueletos de carga en lugar de valores provisionales falsos («Clima no disponible», «PC», «Cargando…»); el nombre largo se recorta con «…» y se ve completo en un tooltip; la tarjeta del clima ya no pega el texto al borde y los avisos no tapan el menú de cuenta.
+
 ## v1.5.305 — 2026-11-19 09:31 (UTC-05:00)
 
 Gastos internos de la orden (Premium Compact)
