@@ -4,6 +4,24 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.302 — 2026-11-18 23:59 (UTC-05:00)
+
+Cobertura Empresarial Enterprise 3.0 y tabla de partidas corregida
+
+### Nuevas funcionalidades
+
+- Cobertura Empresarial Enterprise 3.0: panel unificado con resumen financiero (precio comercial, cobertura, saldo del cliente, costo interno, gasto reconocido y saldo interno), pestañas Gestión, Seguimiento, Pagos y gastos e Historial, estados independientes (autorización, pago interno, ejecución y recepción) y pie fijo.
+- Cobertura por importe fijo (además de total y parcial) y gastos internos de la orden (transporte, terceros…) que PC-DOCTOR asume sin cobrarlos al cliente.
+
+### Mejoras realizadas
+
+- Presupuestos: columna Cobertura propia y Total con el importe final a cargo del cliente; tipos con nombre corto; descripciones largas en hasta tres líneas que se amplían al editar.
+
+### Errores corregidos
+
+- Presupuestos: los importes de la tabla de partidas ya no se enciman ni quedan ocultos; la tabla aparece solo cuando sus columnas caben y los botones de duplicar y eliminar no invaden los importes.
+- Cobertura PC-DOCTOR: corregir el texto de una partida cubierta conserva su cobertura (antes quedaba sin vínculo y había que crear otra); las coberturas que perdieron su partida se listan en el presupuesto para revisarlas y revocarlas.
+
 ## v1.5.301 — 2026-11-18 22:06 (UTC-05:00)
 
 Cobertura Empresarial PC-DOCTOR universal con dos modalidades

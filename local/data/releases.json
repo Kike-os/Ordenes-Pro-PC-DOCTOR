@@ -8,6 +8,30 @@
   },
   "releases": [
     {
+      "version": "1.5.302",
+      "date": "2026-11-18T23:59:07-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Cobertura Empresarial Enterprise 3.0 y tabla de partidas corregida",
+      "changes": {
+        "features": [
+          "Cobertura Empresarial Enterprise 3.0: panel unificado con resumen financiero (precio comercial, cobertura, saldo del cliente, costo interno, gasto reconocido y saldo interno), pestañas Gestión, Seguimiento, Pagos y gastos e Historial, estados independientes (autorización, pago interno, ejecución y recepción) y pie fijo.",
+          "Cobertura por importe fijo (además de total y parcial) y gastos internos de la orden (transporte, terceros…) que PC-DOCTOR asume sin cobrarlos al cliente."
+        ],
+        "improvements": [
+          "Presupuestos: columna Cobertura propia y Total con el importe final a cargo del cliente; tipos con nombre corto; descripciones largas en hasta tres líneas que se amplían al editar."
+        ],
+        "fixes": [
+          "Presupuestos: los importes de la tabla de partidas ya no se enciman ni quedan ocultos; la tabla aparece solo cuando sus columnas caben y los botones de duplicar y eliminar no invaden los importes.",
+          "Cobertura PC-DOCTOR: corregir el texto de una partida cubierta conserva su cobertura (antes quedaba sin vínculo y había que crear otra); las coberturas que perdieron su partida se listan en el presupuesto para revisarlas y revocarlas."
+        ],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Administración (autorización expresa en la sesión)"
+    },
+    {
       "version": "1.5.301",
       "date": "2026-11-18T22:06:49-05:00",
       "type": "patch",
