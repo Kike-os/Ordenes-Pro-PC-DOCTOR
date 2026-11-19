@@ -30,9 +30,9 @@ from datetime import datetime, timedelta
 
 import cash_sessions
 
-STATUS = {'solicitada': 'Solicitada', 'autorizada': 'Autorizada', 'rechazada': 'Rechazada', 'cancelada': 'Cancelada'}
+STATUS = {'solicitada': 'Pendiente de aprobación', 'autorizada': 'Autorizada', 'rechazada': 'Rechazada', 'cancelada': 'Revocada'}
 PURCHASE = {'pendiente': 'Compra pendiente', 'comprado': 'Comprado al proveedor', 'recibido': 'Recibido en el taller'}
-PAYMENT = {'pendiente': 'Pago pendiente', 'parcial': 'Pago parcial', 'pagado': 'Pagado'}
+PAYMENT = {'pendiente': 'Pago pendiente', 'parcial': 'Parcialmente pagado', 'pagado': 'Pagado', 'reembolsado': 'Reembolsado'}
 CASH_KIND = 'cobertura_repuesto'
 MODALITY = {'interna': 'Cobertura de costo interno', 'comercial': 'Cobertura comercial al cliente'}
 EDITABLE_QUOTE = ('borrador', 'modificacion')
@@ -102,8 +102,9 @@ def benefits(c, quote_id):
     Es la única fuente del «Beneficio PC-DOCTOR» que restan quotes.line_net, los totales, la aprobación, el saldo y la factura."""
     if not universal(c):
         return {}
-    return {(r['line_position'], r['line_description']): (r['percent'] * 100, reason_label(c, r['reason_code']) or 'Beneficio PC-DOCTOR')
-            for r in c.execute("SELECT line_position,line_description,percent,reason_code FROM part_coverages WHERE quote_id=? AND modality='comercial' AND status='autorizada' "
+    fixed = ',fixed_cents' if amounts_ready(c) else ',0 fixed_cents'
+    return {(r['line_position'], r['line_description']): (r['percent'] * 100, reason_label(c, r['reason_code']) or 'Beneficio PC-DOCTOR', r['fixed_cents'])
+            for r in c.execute("SELECT line_position,line_description,percent,reason_code" + fixed + " FROM part_coverages WHERE quote_id=? AND modality='comercial' AND status='autorizada' "
                                'AND quote_item_id IS NOT NULL', (quote_id,))}
 
 
@@ -168,8 +169,18 @@ def paid_cents(c, cov_id):
     return c.execute("SELECT COALESCE(SUM(amount_cents),0) FROM part_coverage_payments WHERE coverage_id=? AND status='registrado'", (cov_id,)).fetchone()[0]
 
 
-def payment_state(covered, paid):
-    return 'pagado' if paid >= covered else 'parcial' if paid > 0 else 'pendiente'
+def payment_state(covered, paid, refunded=False):
+    """Pagado / parcial / pendiente según lo pagado vigente; «reembolsado» si todo lo pagado se revirtió."""
+    return 'pagado' if paid >= covered else 'parcial' if paid > 0 else 'reembolsado' if refunded else 'pendiente'
+
+
+def refunded(c, cov_id):
+    return c.execute("SELECT 1 FROM part_coverage_payments WHERE coverage_id=? AND status='revertido'", (cov_id,)).fetchone() is not None
+
+
+def amounts_ready(c):
+    """Migración 112 aplicada (importe fijo y gastos internos de la orden)."""
+    return 'scope' in {r[1] for r in c.execute('PRAGMA table_info(part_coverages)')}
 
 
 def _supplier(c, raw, required=False):
@@ -195,13 +206,17 @@ def view(c, cov, user, full=None):
     paid = paid_cents(c, cov['id'])
     base = {'id': cov['id'], 'quote_id': cov['quote_id'], 'order_id': cov['order_id'], 'line_position': cov['line_position'], 'line_description': cov['line_description'],
             'linked': cov['quote_item_id'] is not None, 'status': cov['status'], 'status_label': STATUS[cov['status']], 'purchase_status': cov['purchase_status'],
-            'purchase_label': PURCHASE[cov['purchase_status']], 'payment_status': payment_state(cov['covered_cents'], paid), 'payment_label': PAYMENT[payment_state(cov['covered_cents'], paid)],
+            'purchase_label': PURCHASE[cov['purchase_status']], 'payment_status': payment_state(cov['covered_cents'], paid, refunded(c, cov['id'])), 'payment_label': PAYMENT[payment_state(cov['covered_cents'], paid, refunded(c, cov['id']))],
             'review': cov['review'], 'requested_at': cov['requested_at'], 'authorized_at': cov['authorized_at'], 'authorized_name': cov['authorized_name'], 'revision': cov['revision'],
             'received_at': cov['received_at'], 'requested_name': _user_name(c, cov['requested_by'])}
     modality = cov.get('modality') or 'interna'
     category = c.execute('SELECT category FROM quote_items WHERE id=?', (cov['quote_item_id'],)).fetchone() if cov['quote_item_id'] else None
+    concept = cov.get('scope') == 'concepto'
     base.update(modality=modality, modality_label=MODALITY[modality], reason_code=cov.get('reason_code') or '', reason_label=reason_label(c, cov.get('reason_code')),
-                category=category['category'] if category else '', goods=is_goods(category['category']) if category else True)
+                category='concepto' if concept else category['category'] if category else '', goods=False if concept else is_goods(category['category']) if category else True,
+                scope='concepto' if concept else 'partida', fixed_cents=cov.get('fixed_cents') or 0)
+    if concept:
+        base['linked'] = True   # un gasto interno de la orden no depende de ninguna partida
     if modality == 'comercial':
         # Precio, porcentaje y beneficio figuran en el documento del cliente: no son datos internos.
         base.update(sale_cents=cov['sale_cents'], percent=cov['percent'], benefit_cents=cov['covered_cents'], client_cents=max(0, cov['cost_cents'] - cov['covered_cents']), base_cents=cov['cost_cents'])
@@ -223,7 +238,8 @@ def for_quote(c, user, quote_id):
         return {'ready': False, 'rows': []}
     rows = [view(c, dict(r), user) for r in c.execute('SELECT * FROM part_coverages WHERE quote_id=? ORDER BY line_position,id', (quote['id'],))]
     out = {'ready': True, 'rows': rows, 'can_manage': is_admin(user), 'can_pay': can_pay(c, user), 'universal': universal(c), 'reasons': reasons(c),
-           'quote_status': quote['status'], 'quote_editable': quote['status'] in EDITABLE_QUOTE, 'modalities': MODALITY}
+           'quote_status': quote['status'], 'quote_editable': quote['status'] in EDITABLE_QUOTE, 'modalities': MODALITY, 'order_code': quote['order_code'],
+           'concepts': amounts_ready(c) and universal(c)}
     if is_admin(user):
         out['suppliers'] = [dict(r) for r in c.execute('SELECT id,name FROM suppliers WHERE active=1 ORDER BY name')]
     return out
@@ -322,9 +338,25 @@ def _editable_for_commercial(quote):
                             'Para un presupuesto ya enviado o aprobado, crea una nueva versión.', 409)
 
 
+def _fixed(c, data, current, covered):
+    """Importe fijo guardado (0 si la cobertura es por porcentaje)."""
+    if not amounts_ready(c):
+        if str(data.get('mode', '')) == 'importe':
+            raise CoverageError('La cobertura por importe necesita una actualización de la base de datos que todavía no se aplicó.', 503)
+        return 0
+    mode = str(data.get('mode', '') or ('importe' if current and current.get('fixed_cents') else ''))
+    return covered if mode == 'importe' else 0
+
+
 def _amounts(data, sale_cents, current=None, commercial_base=None):
     """Costo, porcentaje e importe cubierto. En la comercial, la base es el importe de la línea para el cliente y lo cubierto es el beneficio."""
     cost = commercial_base if commercial_base is not None else _cents(data.get('cost', current['cost_cents'] / 100 if current else ''), 'cost', 'el costo real')
+    if str(data.get('mode', '') or ('importe' if current and current.get('fixed_cents') else '')) == 'importe':
+        amount = _cents(data.get('amount', current['fixed_cents'] / 100 if current and current.get('fixed_cents') else ''), 'amount', 'el importe cubierto')
+        if amount > cost:
+            raise CoverageError('El importe cubierto (%s) no puede superar %s (%s).' % (usd(amount), 'el importe de la partida' if commercial_base is not None else 'el costo', usd(cost)),
+                                fields={'amount': 'Supera el importe elegible.'})
+        return cost, max(1, min(100, round(amount * 100 / cost))), amount
     mode = str(data.get('mode', '') or ('total' if not current or current['percent'] == 100 else 'parcial'))
     if mode == 'total':
         percent = 100
@@ -335,6 +367,28 @@ def _amounts(data, sale_cents, current=None, commercial_base=None):
         percent = int(raw)
     covered = max(1, round(cost * percent / 100))
     return cost, percent, covered
+
+
+def _request_concept(c, user, quote, data, now):
+    """Gasto interno de la orden que no es una partida del presupuesto (transporte, gastos de terceros…): siempre de costo interno, no
+    cambia lo que paga el cliente y no crea cobros. Se paga, como cualquier costo, con un egreso real cuando ocurre."""
+    if not amounts_ready(c) or not universal(c):
+        raise CoverageError('Los gastos internos de la orden necesitan una actualización de la base de datos que todavía no se aplicó.', 503)
+    concept = _text(data, 'concept', 120, 3, 'el concepto del gasto')
+    cost, percent, covered = _amounts(data, 0)
+    supplier = _supplier(c, data.get('supplier_id'))
+    code, notes = _reason(c, data)
+    if c.execute("SELECT 1 FROM part_coverages WHERE quote_id=? AND scope='concepto' AND line_description=? AND status IN ('solicitada','autorizada')", (quote['id'], concept)).fetchone():
+        raise CoverageError('Ya hay un gasto interno «%s» en curso en este presupuesto.' % concept, 409, {'concept': 'Repetido.'})
+    position = -1 - c.execute("SELECT COUNT(*) FROM part_coverages WHERE quote_id=? AND scope='concepto'", (quote['id'],)).fetchone()[0]
+    cid = c.execute("INSERT INTO part_coverages(quote_id,order_id,quote_item_id,line_position,line_description,catalog_id,quantity,sale_cents,cost_cents,percent,covered_cents,supplier_id,"
+                    "status,notes,requested_by,requested_at,updated_at,modality,reason_code,fixed_cents,scope) VALUES (?,?,NULL,?,?,NULL,1,0,?,?,?,?,'solicitada',?,?,?,?,'interna',?,?,'concepto')",
+                    (quote['id'], quote['order_id'], position, concept, cost, percent, covered, supplier['id'] if supplier else None, notes, user['id'], stamp(now), stamp(now), code,
+                     _fixed(c, data, None, covered))).lastrowid
+    event(c, cid, 'solicitada', 'Gasto interno de la orden solicitado: %s · costo %s · %s a cargo de PC-DOCTOR · motivo %s.' % (concept, usd(cost), usd(covered), reason_label(c, code)), user, now)
+    if is_admin(user) and data.get('authorize') is True:
+        authorize(c, user, cid, dict(data, revision='0'), now)
+    return cid
 
 
 def request(c, user, quote_id, data, now):
@@ -348,6 +402,8 @@ def request(c, user, quote_id, data, now):
         raise CoverageError('Presupuesto no disponible.', 404)
     if quote['status'] in ('cancelado', 'rechazado'):
         raise CoverageError('El presupuesto está %s: no admite coberturas nuevas.' % quote['status'], 409)
+    if str(data.get('scope', '')) == 'concepto':
+        return _request_concept(c, user, quote, data, now)
     item = _line(c, quote, data.get('position'))
     if not universal(c) and item['category'] != 'repuesto':
         raise CoverageError('Esta función necesita una actualización de la base de datos que todavía no se aplicó.', 503)
@@ -368,6 +424,10 @@ def request(c, user, quote_id, data, now):
     if universal(c):
         cols += ['modality', 'reason_code']
         vals += [modality, code]
+    fixed = _fixed(c, data, None, covered)
+    if fixed:
+        cols.append('fixed_cents')
+        vals.append(fixed)
     cid = c.execute('INSERT INTO part_coverages(%s) VALUES (%s)' % (','.join(cols), ','.join('?' * len(cols))), vals).lastrowid
     why = (' · motivo ' + reason_label(c, code)) if code else ''
     if modality == 'comercial':
@@ -399,8 +459,8 @@ def authorize(c, user, cov_id, data, now):
     supplier = None if commercial else _supplier(c, data.get('supplier_id', cov['supplier_id']), required=goods)
     code, notes = _reason(c, data, cov)
     name = _text(data, 'authorized_name', 120, 0, 'quién autoriza') or user['name']
-    sets = "status='autorizada',cost_cents=?,percent=?,covered_cents=?,supplier_id=?,notes=?,authorized_by=?,authorized_name=?,authorized_at=?,revision=revision+1,updated_at=?" + (',reason_code=?' if universal(c) else '')
-    args = [cost, percent, covered, supplier['id'] if supplier else None, notes, user['id'], name, stamp(now), stamp(now)] + ([code] if universal(c) else [])
+    sets = "status='autorizada',cost_cents=?,percent=?,covered_cents=?,supplier_id=?,notes=?,authorized_by=?,authorized_name=?,authorized_at=?,revision=revision+1,updated_at=?" + (',reason_code=?' if universal(c) else '') + (',fixed_cents=?' if amounts_ready(c) else '')
+    args = [cost, percent, covered, supplier['id'] if supplier else None, notes, user['id'], name, stamp(now), stamp(now)] + ([code] if universal(c) else []) + ([_fixed(c, data, cov, covered)] if amounts_ready(c) else [])
     if c.execute('UPDATE part_coverages SET ' + sets + " WHERE id=? AND revision=? AND status='solicitada'", args + [cov['id'], cov['revision']]).rowcount != 1:
         raise CoverageError('Otra persona cambió esta cobertura mientras tanto. Vuelve a abrirla.', 409)
     why = (' · motivo ' + reason_label(c, code)) if code else ''
@@ -414,6 +474,8 @@ def authorize(c, user, cov_id, data, now):
 
 
 def _goods_of(c, cov):
+    if cov.get('scope') == 'concepto':
+        return False
     row = c.execute('SELECT category FROM quote_items WHERE id=?', (cov['quote_item_id'],)).fetchone() if cov['quote_item_id'] else None
     return is_goods(row['category']) if row else True
 
@@ -446,6 +508,8 @@ def update(c, user, cov_id, data, now):
         changes.append('motivo ' + (reason_label(c, code) or 'sin indicar'))
     if cost != cov['cost_cents']:
         changes.append('costo %s → %s' % (usd(cov['cost_cents']), usd(cost)))
+    if covered != cov['covered_cents'] and percent == cov['percent']:
+        changes.append('importe cubierto %s → %s' % (usd(cov['covered_cents']), usd(covered)))
     if percent != cov['percent']:
         changes.append('cobertura %d %% → %d %%' % (cov['percent'], percent))
     if (supplier['id'] if supplier else None) != cov['supplier_id']:
@@ -454,8 +518,9 @@ def update(c, user, cov_id, data, now):
         changes.append('observaciones privadas actualizadas')
     if not changes:
         return False
-    c.execute('UPDATE part_coverages SET cost_cents=?,percent=?,covered_cents=?,supplier_id=?,notes=?,revision=revision+1,updated_at=?' + (',reason_code=?' if universal(c) else '') + ' WHERE id=? AND revision=?',
-              [cost, percent, covered, supplier['id'] if supplier else None, notes, stamp(now)] + ([code] if universal(c) else []) + [cov['id'], cov['revision']])
+    c.execute('UPDATE part_coverages SET cost_cents=?,percent=?,covered_cents=?,supplier_id=?,notes=?,revision=revision+1,updated_at=?' + (',reason_code=?' if universal(c) else '') +
+              (',fixed_cents=?' if amounts_ready(c) else '') + ' WHERE id=? AND revision=?',
+              [cost, percent, covered, supplier['id'] if supplier else None, notes, stamp(now)] + ([code] if universal(c) else []) + ([_fixed(c, data, cov, covered)] if amounts_ready(c) else []) + [cov['id'], cov['revision']])
     if commercial and cov['status'] == 'autorizada':
         __import__('quotes').event(c, cov['quote_id'], 'cobertura', 'Beneficio PC-DOCTOR modificado en «%s»: %s.' % (cov['line_description'][:80], '; '.join(changes)), now, user)
     event(c, cov['id'], 'editada', 'Cobertura actualizada: ' + '; '.join(changes) + '.', user, now)
@@ -639,18 +704,31 @@ def before_save(c, quote_id):
     """Antes de recrear las partidas de un borrador: las coberturas vigentes de ese presupuesto (para volver a enlazarlas)."""
     if not ready(c):
         return []
-    return [dict(r) for r in c.execute("SELECT id,line_position,line_description,percent" + (",modality" if universal(c) else "") +
-                                         " FROM part_coverages WHERE quote_id=? AND status IN ('solicitada','autorizada')", (quote_id,))]
+    return [dict(r) for r in c.execute("SELECT id,line_position,line_description,percent,quote_item_id" + (",modality" if universal(c) else "") + (",fixed_cents" if amounts_ready(c) else "") +
+                                         " FROM part_coverages WHERE quote_id=? AND status IN ('solicitada','autorizada')" + (" AND scope='partida'" if amounts_ready(c) else ""), (quote_id,))]
 
 
-def after_save(c, quote_id, kept, user, now):
+def after_save(c, quote_id, kept, user, now, old=None):
     """Vuelve a enlazar cada cobertura con su partida (misma descripción; primero en la misma posición). Si la partida desapareció o quedó
     sin importe, la cobertura queda sin vínculo y marcada para revisión: nunca se borra. Una comercial sin vínculo deja de restar beneficio."""
     quote = c.execute('SELECT discount_bp FROM quotes WHERE id=?', (quote_id,)).fetchone()
+    old = old or {}
     for cov in kept:
         items = [dict(r) for r in c.execute("SELECT id,position,category,description,unit_cents,quantity FROM quote_items WHERE quote_id=? AND description=?" +
                                               ('' if universal(c) else " AND category='repuesto'"), (quote_id, cov['line_description']))]
         match = next((i for i in items if i['position'] == cov['line_position']), items[0] if items else None)
+        if not match and cov['quote_item_id'] and old.get(cov['quote_item_id']):
+            # Solo cambió el texto (1.5.302): misma posición, mismo tipo y mismo precio que la partida cubierta. Se conserva la cobertura
+            # con la descripción nueva, salvo que esa partida ya tenga otra cobertura viva de la misma modalidad.
+            was = old[cov['quote_item_id']]
+            same = c.execute('SELECT id,position,category,description,unit_cents,quantity FROM quote_items WHERE quote_id=? AND position=? AND category=? AND unit_cents=?',
+                             (quote_id, cov['line_position'], was['category'], was['unit_cents'])).fetchone()
+            taken = same and c.execute("SELECT 1 FROM part_coverages WHERE quote_id=? AND line_position=? AND line_description=? AND id<>? AND status IN ('solicitada','autorizada')" +
+                                       (" AND modality=?" if universal(c) else ""), (quote_id, same['position'], same['description'], cov['id']) + ((cov.get('modality') or 'interna',) if universal(c) else ())).fetchone()
+            if same and not taken:
+                match = dict(same)
+                c.execute('UPDATE part_coverages SET line_description=? WHERE id=?', (match['description'], cov['id']))
+                event(c, cov['id'], 'editada', 'La partida cambió de texto («%s» → «%s»); se conserva la cobertura.' % (cov['line_description'][:60], match['description'][:60]), user, now)
         if match and match['unit_cents'] * match['quantity'] <= 0:
             match = None
         if match:
@@ -658,7 +736,8 @@ def after_save(c, quote_id, kept, user, now):
                       (match['id'], match['position'], match['unit_cents'] * match['quantity'], match['quantity'], stamp(now), cov['id']))
             if cov.get('modality') == 'comercial':
                 base = _line_base(dict(quote), match)
-                c.execute('UPDATE part_coverages SET cost_cents=?,covered_cents=? WHERE id=?', (base, max(1, round(base * cov['percent'] / 100)), cov['id']))
+                covered = min(cov['fixed_cents'], base) if cov.get('fixed_cents') else max(1, round(base * cov['percent'] / 100))
+                c.execute('UPDATE part_coverages SET cost_cents=?,covered_cents=? WHERE id=?', (base, max(1, covered), cov['id']))
         else:
             c.execute("UPDATE part_coverages SET quote_item_id=NULL,review=?,revision=revision+1,updated_at=? WHERE id=?",
                       ('La partida cubierta cambió o se quitó del presupuesto: revisa la cobertura.', stamp(now), cov['id']))

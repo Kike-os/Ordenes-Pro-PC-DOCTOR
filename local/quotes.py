@@ -156,6 +156,9 @@ def net(line_cents, discount_bp):
 
 def benefit(line_cents, item):
     """Beneficio PC-DOCTOR (cobertura comercial autorizada, 1.5.301) sobre el importe ya descontado de la línea. 0 si no tiene."""
+    fixed = item.get('benefit_fixed') or 0
+    if fixed:   # cobertura por importe (1.5.302): nunca más que el importe de la línea
+        return min(fixed, line_cents)
     bp = item.get('benefit_bp') or 0
     return (line_cents * bp + 5000) // 10000 if bp else 0
 
@@ -448,8 +451,8 @@ def items_of(c, quote_id):
     # Beneficio PC-DOCTOR: cobertura comercial autorizada y enlazada a esta partida (posición y descripción).
     found = __import__('part_coverage').benefits(c, quote_id) if rows else {}
     for row in rows:
-        bp, why = found.get((row['position'], row['description']), (0, ''))
-        row['benefit_bp'], row['benefit_reason'] = bp, why
+        bp, why, fixed = found.get((row['position'], row['description']), (0, '', 0))
+        row['benefit_bp'], row['benefit_reason'], row['benefit_fixed'] = bp, why, fixed
     return rows
 
 
@@ -625,9 +628,10 @@ def save(c, quote, data, user, now):
         event(c, quote['id'], 'identidad', 'Documento de identidad %s para la aprobación.' % ('solicitado' if data['require_id'] else 'ya no solicitado'), now, user)
     import part_coverage
     kept = part_coverage.before_save(c, quote['id'])   # coberturas PC-DOCTOR de estas partidas: se vuelven a enlazar tras recrearlas
+    old = {r['id']: dict(r) for r in c.execute('SELECT id,category,unit_cents FROM quote_items WHERE quote_id=?', (quote['id'],))}
     c.execute('DELETE FROM quote_items WHERE quote_id=?', (quote['id'],))
     c.executemany('INSERT INTO quote_items(quote_id,position,catalog_id,description,category,quantity,unit_cents,taxed,priority) VALUES (?,?,?,?,?,?,?,?,?)', [(quote['id'], *row) for row in clean])
-    part_coverage.after_save(c, quote['id'], kept, user, now)
+    part_coverage.after_save(c, quote['id'], kept, user, now, old)
     c.execute("UPDATE quotes SET valid_until=?,notes=?,status='borrador',updated_at=? WHERE id=?", (valid, notes, now.isoformat(timespec='seconds'), quote['id']))
     event(c, quote['id'], 'guardado', 'Borrador guardado con %d %s. Total cotizado: %s.' % (len(clean), 'ítem' if len(clean) == 1 else 'ítems', usd(totals(items_of(c, quote['id']), quote['tax_rate_bp'], discount)['quoted'])), now, user)
 
@@ -675,6 +679,7 @@ def approved_lines(c, quote):
         for item in items_of(c, row['id']):
             if item['status'] == 'aprobado':
                 line = line_net(item, row['discount_bp'])
+                item['benefit_cents'] = net(item['quantity'] * item['unit_cents'], row['discount_bp']) - line
                 base, tax = split(line, item['taxed'], row['tax_rate_bp'])  # misma regla por línea que los totales del presupuesto
                 ref = c.execute('SELECT code,brand FROM catalog_items WHERE id=?', (item['catalog_id'],)).fetchone() if item['catalog_id'] else None
                 result.append(dict(item, quote_id=row['id'], quote_code=row['code'], approved_at=row['decided_at'], net_cents=line, base_cents=base, tax_cents=tax, reference=(ref['code'] or '') if ref else '', brand=(ref['brand'] or '') if ref else '', category_label=CATEGORIES[item['category']],

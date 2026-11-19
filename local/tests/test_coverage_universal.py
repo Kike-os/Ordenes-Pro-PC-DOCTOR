@@ -163,5 +163,79 @@ class UniversalCoverageTests(unittest.TestCase):
         self.assertEqual(self.quote(quote)['totals']['benefit'], 0)
 
 
+    # ---- 1.5.302 · Enterprise 3.0 ----
+    def test_fixed_amount_commercial_and_internal(self):
+        _, quote, sup = self.draft('0108')
+        # Comercial por importe: $10,00 de beneficio sobre los $45,00 del servicio; nunca más que la línea.
+        self.assertEqual(self.post('/api/quotes/%d/coverage' % quote, position='0', modality='comercial', mode='importe', amount='50', reason_code='garantia')['status'], 400)
+        cid, cov = self.cover(quote, 0, modality='comercial', mode='importe', amount='10', reason_code='garantia', authorize=True)
+        self.assertEqual((cov['benefit_cents'], cov['client_cents'], cov['fixed_cents']), (1000, 3500, 1000))
+        self.assertEqual(self.quote(quote)['items'][0]['net_cents'], 3500)
+        # Si el precio de la línea baja por debajo del importe, el beneficio se limita a la línea (el cliente nunca queda en negativo).
+        items = [{'description': BIOS, 'category': 'servicio', 'quantity': 1, 'unit_cents': 800, 'taxed': True},
+                 {'description': 'Pantalla ficticia 15,6"', 'category': 'repuesto', 'quantity': 1, 'unit_cents': 15000, 'taxed': False}]
+        self.assertEqual(self.post('/api/quotes/%d' % quote, action='save', items=items)['status'], 200)
+        self.assertEqual(self.quote(quote)['items'][0]['net_cents'], 0)
+        # Costo interno por importe: $60,00 de los $95,00 del proveedor.
+        _, internal = self.cover(quote, 1, modality='interna', cost='95', mode='importe', amount='60', supplier_id=str(sup), reason_code='garantia', authorize=True)
+        self.assertEqual((internal['covered_cents'], internal['cost_cents'], internal['fixed_cents']), (6000, 9500, 6000))
+        self.assertEqual(self.post('/api/quotes/%d/coverage' % quote, position='0', modality='interna', cost='95', mode='importe', amount='96', reason_code='garantia')['status'], 400)  # más que el costo
+        self.assertEqual(self.post('/api/quotes/%d/coverage' % quote, position='1', modality='interna', cost='95', mode='importe', amount='50', reason_code='garantia')['status'], 409)  # ya hay una viva
+        self.assertEqual(self.cash_out(), [])
+
+    def test_internal_concept_of_the_order_never_charges_the_client(self):
+        order, quote, sup = self.draft('0109')
+        before = self.quote(quote)['totals']['quoted']
+        made = self.post('/api/quotes/%d/coverage' % quote, scope='concepto', concept='Transporte ficticio del equipo', cost='12', mode='total', reason_code='atencion_comercial',
+                         supplier_id=str(sup), authorize=True)
+        self.assertEqual(made['status'], 201, made['body'])
+        cov = made['body']['coverage']
+        self.assertEqual((cov['scope'], cov['modality'], cov['status'], cov['covered_cents'], cov['goods'], cov['linked']), ('concepto', 'interna', 'autorizada', 1200, False, True))
+        self.assertEqual(self.quote(quote)['totals']['quoted'], before)          # el cliente no paga nada por un gasto interno
+        self.assertEqual(self.post('/api/coverage/%d' % cov['id'], action='purchase', supplier_document='X')['status'], 409)
+        self.assertEqual(self.post('/api/quotes/%d/coverage' % quote, scope='concepto', concept='Transporte ficticio del equipo', cost='5', mode='total', reason_code='garantia')['status'], 409)
+        self.assertEqual(self.post('/api/quotes/%d/coverage' % quote, scope='concepto', concept='', cost='5', mode='total', reason_code='garantia')['status'], 400)
+        # Guardar el borrador no lo marca para revisión (no depende de ninguna partida) y se paga como cualquier costo, una sola vez.
+        self.assertEqual(self.post('/api/quotes/%d' % quote, action='save', items=self.quote(quote)['items'])['status'], 200)
+        detail = self.request('/api/coverage/%d' % cov['id'], cookie=self.cookie)['body']['coverage']
+        self.assertEqual(detail['review'], '')
+        self.open_cash()
+        for _ in range(2):
+            paid = self.post('/api/coverage/%d' % cov['id'], action='pay', amount='12', method='efectivo', supplier_document='GT-1', request_key='pago-concepto-00000001')
+            self.assertEqual(paid['status'], 200, paid['body'])
+        self.assertEqual(len(self.cash_out()), 1)
+
+    def test_renamed_line_keeps_its_coverage_instead_of_orphaning_it(self):
+        # Caso real (PCD-20261110-0017-P1): se acortó el texto de una partida cubierta y la cobertura quedó sin vínculo.
+        _, quote, _ = self.draft('0110')
+        cid, _ = self.cover(quote, 1, modality='comercial', mode='total', reason_code='garantia', authorize=True)
+        items = [{'description': BIOS, 'category': 'servicio', 'quantity': 1, 'unit_cents': 4500, 'taxed': True},
+                 {'description': 'Pantalla 15,6" (texto corregido)', 'category': 'repuesto', 'quantity': 1, 'unit_cents': 15000, 'taxed': False}]
+        self.assertEqual(self.post('/api/quotes/%d' % quote, action='save', items=items)['status'], 200)
+        cov = self.request('/api/coverage/%d' % cid, cookie=self.cookie)['body']['coverage']
+        self.assertEqual((cov['linked'], cov['review'], cov['line_description']), (True, '', 'Pantalla 15,6" (texto corregido)'))
+        self.assertEqual(self.quote(quote)['items'][1]['net_cents'], 0)            # el beneficio sigue aplicado una sola vez
+        # Otro precio: ya no es la misma partida, la cobertura queda para revisión y deja de restar.
+        items[1] = dict(items[1], description='Otra pantalla ficticia', unit_cents=17000)
+        self.assertEqual(self.post('/api/quotes/%d' % quote, action='save', items=items)['status'], 200)
+        cov = self.request('/api/coverage/%d' % cid, cookie=self.cookie)['body']['coverage']
+        self.assertFalse(cov['linked'])
+        self.assertEqual(self.quote(quote)['items'][1]['net_cents'], 17000)
+
+    def test_status_vocabulary_revoked_and_refunded(self):
+        _, quote, sup = self.draft('0111')
+        cid, cov = self.cover(quote, 1, modality='interna', cost='95', mode='total', supplier_id=str(sup), reason_code='garantia')
+        self.assertEqual(cov['status_label'], 'Pendiente de aprobación')
+        self.assertEqual(self.post('/api/coverage/%d' % cid, action='authorize', revision=str(cov['revision']))['status'], 200)
+        self.open_cash()
+        paid = self.post('/api/coverage/%d' % cid, action='pay', amount='95', method='efectivo', supplier_document='F-1', request_key='pago-reembolso-0000001')
+        self.assertEqual(paid['status'], 200, paid['body'])
+        back = self.post('/api/coverage/%d' % cid, action='reverse', payment_id=str(paid['body']['payment_id']), reason='Prueba ficticia de reembolso del proveedor')
+        self.assertEqual(back['status'], 200, back['body'])
+        self.assertEqual((back['body']['coverage']['payment_status'], back['body']['coverage']['payment_label']), ('reembolsado', 'Reembolsado'))
+        done = self.post('/api/coverage/%d' % cid, action='cancel', reason='Prueba ficticia de revocación')
+        self.assertEqual((done['status'], done['body']['coverage']['status_label']), (200, 'Revocada'))
+
+
 if __name__ == '__main__':
     unittest.main()

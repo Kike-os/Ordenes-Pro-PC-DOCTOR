@@ -258,7 +258,7 @@ class PartCoverageTests(unittest.TestCase):
         self.assertEqual(self.post('/api/coverage/%d' % cid, action='reverse', payment_id=str(pid), reason='corto')['status'], 400)
         done = self.post('/api/coverage/%d' % cid, action='reverse', payment_id=str(pid), reason='Factura del proveedor anulada')
         self.assertEqual(done['status'], 200, done['body'])
-        self.assertEqual(done['body']['coverage']['payment_status'], 'pendiente')
+        self.assertEqual(done['body']['coverage']['payment_status'], 'reembolsado')   # 1.5.302: todo lo pagado se revirtió
         with app.connect() as c:
             self.assertTrue(c.execute('SELECT voided_at FROM cash_movements WHERE id=?', (paid['body']['cash_movement_id'],)).fetchone()[0])
             self.assertEqual(c.execute('SELECT status FROM part_coverage_payments WHERE id=?', (pid,)).fetchone()[0], 'revertido')

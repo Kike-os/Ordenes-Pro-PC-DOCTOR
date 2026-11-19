@@ -149,3 +149,40 @@ No hace falta reclasificar un servicio como repuesto. El panel se llama **Cobert
 - **Historial y auditoría:** cada solicitud, autorización, cambio y retiro queda en el historial de la cobertura. El beneficio comercial también queda en el historial del presupuesto.
 - **Compatibilidad:** la migración `111_coverage_universal.sql` solo agrega columnas con valor por defecto, un índice y la tabla de motivos. Las coberturas existentes quedan como «costo interno», con sus pagos, inventario e historial intactos.
 - **Tratamiento tributario:** el beneficio se factura como descuento de la línea, la forma estándar de un descuento en la factura electrónica. Si en algún caso corresponde otro tratamiento (por ejemplo, una nota de crédito sobre una factura ya emitida, o la normativa sobre transferencias gratuitas), debe confirmarlo el contador. El sistema no emite notas de crédito automáticas por una cobertura.
+
+## Enterprise 3.0: panel unificado, importe fijo y gastos internos de la orden (1.5.302)
+
+- **Panel unificado por partida.** «Cobertura Empresarial PC-DOCTOR» muestra en una sola vista las dos modalidades.
+  - **Cabecera fija:** nombre de la partida, presupuesto, orden y estado de autorización de cada modalidad.
+  - **Resumen financiero:** separa sin mezclar:
+    - A. Precio comercial.
+    - B. Cobertura PC-DOCTOR (porcentaje o importe).
+    - E. Saldo a cargo del cliente.
+    - C. Costo interno real.
+    - Gasto reconocido.
+    - Saldo interno pendiente.
+
+    El beneficio comercial (por ejemplo, $150,00) nunca se confunde con el gasto real (por ejemplo, $95,00).
+  - **Pestañas:**
+    - **Gestión:** un bloque por modalidad, con «Aplicar cobertura comercial» o «Registrar costo interno», Autorizar, Rechazar, Editar, Revocar y Nueva solicitud.
+    - **Seguimiento:** estados independientes.
+    - **Pagos y gastos:** los egresos reales de Caja, con reverso.
+    - **Historial:** las dos modalidades, en solo lectura.
+  - **Pie fijo:** Liquidación A4, Ticket 80 mm y Cerrar.
+- **Estados (vocabulario del pliego; los códigos del servidor no cambian):**
+  - **Autorización:** Sin solicitar, Pendiente de aprobación, Autorizada, Rechazada y Revocada (antes «Cancelada»).
+  - **Pago interno:** No aplicable, Sin registrar (servicio sin pagos), Pendiente, Parcialmente pagado, Pagado y Reembolsado (todo lo pagado se revirtió).
+  - **Ejecución:** la de la partida (Pendiente, En proceso o Completada), o Cancelada si el presupuesto se anuló o la partida se rechazó.
+  - **Recepción:** No aplicable (servicios y conceptos), Pendiente de recepción o Recibido.
+
+  Una cobertura autorizada nunca figura como pagada.
+- **Importe fijo.** Además de total y parcial (%), una cobertura puede ser de un **importe en USD** (columna `fixed_cents`). Nunca supera lo elegible: el importe de la partida en la comercial y el costo en la interna. Si luego baja el precio de la partida, el beneficio se limita a ella y el cliente nunca queda en negativo.
+- **Gastos internos de la orden** (columna `scope='concepto'`):
+  - Son costos que no son partidas del presupuesto (transporte, gastos de terceros) y que PC-DOCTOR asume.
+  - Se registran desde la tarjeta «Gastos internos de la orden» del presupuesto.
+  - Son siempre de costo interno: no cambian lo que paga el cliente ni aparecen en sus documentos.
+  - Se pagan como cualquier costo, con un egreso real y una sola vez por solicitud.
+  - Guardar el presupuesto no los marca para revisión.
+- **Pagos:** el pago exige saber a quién se le paga. Si falta el proveedor o prestador, el panel lo indica en lugar de ofrecer el botón.
+- **Partidas renombradas.** Si cambia solo el texto de una partida cubierta (misma posición, tipo y precio), la cobertura se conserva con la descripción nueva. Antes quedaba sin vínculo y había que crear otra, como pasó en PCD-20261110-0017-P1. Si cambia el precio o el tipo, queda para revisión y deja de restar.
+- **Migración `112_coverage_amounts_concepts.sql`:** solo agrega dos columnas con valor por defecto.

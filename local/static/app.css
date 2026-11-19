@@ -12814,10 +12814,14 @@ body[data-page=dashboard] dialog.quote-dialog.quote-pro{width:min(1440px,calc(10
 .quote-pro .quote-rows{counter-reset:qprow}
 .quote-pro .qp-items .quote-rows{display:grid;gap:8px}
 .quote-pro .quote-row-top:empty{display:none}
-.quote-pro .quote-row{counter-increment:qprow;display:grid;grid-template-columns:auto minmax(0,1fr) minmax(0,1fr) auto;grid-template-areas:"num kind kind acts" "desc desc desc desc" "type type type type" "qty qty price price" "disc disc total total" "cov cov cov cov";gap:10px;align-items:start;box-shadow:inset 3px 0 0 color-mix(in srgb,var(--k) 80%,transparent)}
+.quote-pro .quote-row{counter-increment:qprow;display:grid;grid-template-columns:auto minmax(0,1fr) minmax(0,1fr) auto;grid-template-areas:"num kind kind acts" "desc desc desc desc" "type type type type" "qty qty price price" "disc disc covv covv" "total total total total" "cov cov cov cov";gap:10px;align-items:start;box-shadow:inset 3px 0 0 color-mix(in srgb,var(--k) 80%,transparent)}
 .quote-pro .qp-cell{min-width:0}
 .quote-pro .qp-c-num{grid-area:num;display:flex;align-items:center;gap:6px}.quote-pro .qp-c-desc{grid-area:desc}.quote-pro .qp-c-type{display:contents}.quote-pro .qp-c-type>.quote-field{grid-area:type}.quote-pro .qp-c-type>.qp-kind{grid-area:kind;align-self:center}
-.quote-pro .qp-c-qty{grid-area:qty}.quote-pro .qp-c-price{grid-area:price;display:grid;gap:6px}.quote-pro .qp-c-disc{grid-area:disc}.quote-pro .qp-c-total{grid-area:total}
+.quote-pro .qp-c-qty{grid-area:qty}.quote-pro .qp-c-price{grid-area:price;display:grid;gap:6px}.quote-pro .qp-c-disc{grid-area:disc}.quote-pro .qp-c-covv{grid-area:covv}.quote-pro .qp-c-total{grid-area:total}
+/* Importes: siempre en una línea, alineados y sin invadir la columna vecina (si no caben, se recortan con «…» y el valor completo queda en la descripción emergente). */
+.quote-pro :is(.qp-disc-value,.quote-row-total){display:block;min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-variant-numeric:tabular-nums}
+.quote-pro .qp-cover-value{color:#7cc4ff}.quote-pro .qp-cover-value.qp-disc-none{color:#6f84a3}
+.quote-pro .qp-c-covv .quote-field-cover{display:grid;gap:4px}
 .quote-pro .qp-c-acts{grid-area:acts;display:flex;gap:6px;justify-content:flex-end}
 .quote-pro .quote-row>.cov-line{grid-area:cov;margin:0;padding-top:8px;border-top:1px dashed color-mix(in srgb,var(--k) 30%,transparent)}
 .quote-pro .qp-num{display:grid;place-items:center;min-width:26px;height:26px;padding:0 6px;border-radius:8px;background:#10233c;color:#cfe0f7;font-size:12px;font-weight:700;font-variant-numeric:tabular-nums}
@@ -12841,19 +12845,20 @@ body[data-page=dashboard] dialog.quote-dialog.quote-pro{width:min(1440px,calc(10
 .quote-pro .quote-row textarea{field-sizing:content;min-height:42px;max-height:140px}
 .quote-pro .qp-thead{display:none}
 .quote-pro .quote-row-tax{display:flex;align-items:center;gap:6px;margin:0;font-size:11.5px;color:#b8cae4}
-@container qpitems (min-width:820px){
- .quote-pro .qp-thead:not([hidden]){display:grid;grid-template-columns:34px minmax(160px,1fr) 140px 68px 108px 84px 104px 80px;gap:8px;padding:0 13px 2px;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#8fa6c4}
- .quote-pro .qp-thead span:nth-child(n+4){text-align:right}.quote-pro .qp-thead span:nth-child(3){text-align:left}.quote-pro .qp-thead span:last-child{text-align:center}
- .quote-pro .quote-row{grid-template-columns:34px minmax(160px,1fr) 140px 68px 108px 84px 104px 80px;grid-template-areas:"num desc type qty price disc total acts" ". cov cov cov cov cov cov cov";gap:4px 8px;padding:10px 12px}
+@container qpitems (min-width:930px){
+ .quote-pro .qp-thead:not([hidden]){display:grid;grid-template-columns:30px minmax(150px,1fr) 118px 58px 100px 86px 90px 104px 80px;gap:8px;padding:0 13px 2px;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#8fa6c4}
+ .quote-pro .qp-thead span:nth-child(n+4){text-align:right}.quote-pro .qp-thead span:nth-child(3){text-align:left}.quote-pro .qp-thead span:last-child{text-align:center}.quote-pro .qp-thead span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ .quote-pro .quote-row{grid-template-columns:30px minmax(150px,1fr) 118px 58px 100px 86px 90px 104px 80px;grid-template-areas:"num desc type qty price disc covv total acts" ". cov cov cov cov cov cov cov cov";gap:4px 8px;padding:10px 12px}
  .quote-pro .quote-row .quote-field>span:first-child{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
  .quote-pro .qp-c-num{flex-direction:column;align-items:center;padding-top:6px}
  .quote-pro .qp-c-type{display:grid;grid-area:type;gap:6px}.quote-pro .qp-c-type>.quote-field{grid-area:auto}.quote-pro .qp-c-type .qp-kind{display:none}
  .quote-pro .quote-row :is(select,input:not([type=checkbox])){min-height:40px;margin:0}
  .quote-pro .qp-c-qty input,.quote-pro .qp-c-price input{text-align:right;font-variant-numeric:tabular-nums}
  .quote-pro .qp-c-price .quote-row-tax{justify-content:flex-end}
- .quote-pro .qp-c-disc,.quote-pro .qp-c-total{text-align:right}
+ .quote-pro .qp-c-disc,.quote-pro .qp-c-covv,.quote-pro .qp-c-total{text-align:right}
  .quote-pro .quote-field-discount,.quote-pro .qp-c-total .quote-field-total{justify-items:end}
  .quote-pro .qp-c-total .quote-row-total{line-height:40px;font-size:15px}
+ .quote-pro .qp-c-total .qp-net{max-width:100%;overflow:hidden;text-overflow:ellipsis;color:#8fa6c4;font-weight:500}
  .quote-pro .qp-c-acts{justify-content:center;padding-top:2px}
 }
 @media(max-width:560px){.quote-pro .quote-row{border-top:0}.quote-pro .qp-kind{display:inline-flex}}
@@ -12914,3 +12919,52 @@ body[data-page=dashboard] .maintenance-dialog.cov-drawer::backdrop{background:#0
 .cov-reason-add{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}.cov-reason-add input{margin:0}
 @media(max-width:560px){.cov-reason-list li{grid-template-columns:1fr 1fr}.cov-reason-list li>input{grid-column:1/-1}.cov-reason-list li>.inv-btn{grid-column:1/-1;justify-content:center}.cov-reason-add{grid-template-columns:1fr}}
 @media(prefers-reduced-motion:reduce){.cov-drawer .cov-mode{transition:none}}
+/* 1.5.302 · Cobertura Empresarial Enterprise 3.0: resumen financiero uniforme, 4 pestañas, bloques por modalidad, estados independientes
+   y pie fijo. Acotado a .cov-drawer y a la tarjeta de gastos internos del presupuesto (.qp-concepts*). Mismos colores corporativos. */
+body[data-page=dashboard] .maintenance-dialog.inv-sheet.inv-dialog.cov-drawer{width:min(520px,100vw)}
+@media(min-width:1400px){body[data-page=dashboard] dialog.quote-dialog.quote-pro.qp-with-drawer{width:min(1440px,calc(100vw - 550px))}}
+.cov-drawer .cov-ent{gap:14px;padding-bottom:18px}
+.cov-drawer .cov-ent-head{align-items:flex-start}.cov-drawer .cov-ent-head>svg{margin-top:2px}
+.cov-drawer .cov-ent-head .cov-states{margin-top:6px}
+.cov-drawer .cov-summary{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.cov-drawer .cov-summary div{display:grid;align-content:start;gap:2px;min-height:64px;padding:9px 10px;border-radius:12px;background:#0b1424;border-color:#24375A}
+.cov-drawer .cov-summary dt{font-size:11px;line-height:1.25}
+.cov-drawer .cov-summary dd{font-size:15px;line-height:1.25;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.cov-drawer .cov-tabs-4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.cov-drawer .cov-tabs-4 .cov-tab{padding:6px 4px;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cov-drawer .cov-block{display:grid;gap:10px;padding:12px;border:1px solid #24375A;border-radius:14px;background:#0a1322}
+.cov-drawer .cov-block-head{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.cov-drawer .cov-block-head h3{margin:0;font-size:14px}
+.cov-drawer .cov-block-note{margin:0;font-size:12px;color:#8fa6c4}
+.cov-drawer .cov-block .cov-facts{margin:0}
+.cov-drawer .cov-start{justify-self:start}
+.cov-drawer .cov-danger{color:#fca5a5;border-color:#7f1d1d}
+.cov-drawer .cov-states-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.cov-drawer .cov-state{display:grid;align-content:start;gap:5px;padding:10px 12px;border:1px solid #24375A;border-radius:12px;background:#0b1424;min-width:0}
+.cov-drawer .cov-state h4{margin:0;font-size:12px;color:#a9bdd8;font-weight:700}
+.cov-drawer .cov-state .cov-chip{justify-self:start}
+.cov-drawer .cov-state small{font-size:11.5px;color:var(--muted);overflow-wrap:anywhere}
+.cov-drawer .cov-foot{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px;padding:10px 16px;border-top:1px solid #24375A;background:#0d182b}
+.cov-drawer .cov-foot .inv-btn,.cov-drawer .cov-foot button{min-height:40px}
+.cov-drawer .cov-foot .cov-close{margin-left:auto}
+@media(max-width:520px){.cov-drawer .cov-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.cov-drawer .cov-states-grid{grid-template-columns:1fr}.cov-drawer .cov-tabs-4{grid-template-columns:repeat(2,minmax(0,1fr))}.cov-drawer .cov-foot{padding:10px 12px}.cov-drawer .cov-foot>*{flex:1 1 auto;justify-content:center}}
+/* Gastos internos de la orden (panel lateral del presupuesto) */
+.quote-pro .qp-concepts-card h3{margin:0;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#a9bdd8}
+.quote-pro .qp-concepts{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.quote-pro .qp-concept{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;min-height:40px;padding:6px 10px;border:1px solid #24375A;border-radius:10px;background:#0b1424;color:#e3eeff;font-size:12.5px;text-align:left}
+.quote-pro .qp-concept:hover{transform:none;border-color:#3d6ea6}.quote-pro .qp-concept span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.quote-pro .qp-concept-add{justify-self:start}
+/* 1.5.302 · Ajustes tras la revisión visual */
+.cov-drawer .cov-ent-head .cov-states{display:flex;flex-wrap:wrap;gap:6px}
+.cov-drawer .cov-ent-head strong{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+@media(max-width:520px){.cov-drawer .cov-foot .cov-close{display:none}.cov-drawer .cov-foot{flex-wrap:nowrap}.cov-drawer .cov-foot>*{flex:1 1 0;min-width:0;padding-left:8px;padding-right:8px}}
+/* Descripciones largas: hasta tres líneas en la tabla; al editar, se amplía para leer y corregir el texto completo. */
+.quote-pro .quote-row textarea{max-height:76px;transition:max-height .18s ease}
+.quote-pro .quote-row textarea:focus{max-height:220px}
+.quote-pro .quote-row .qp-row-meta .quote-field-priority{flex:1 1 auto;min-width:0}
+.quote-pro .quote-row .qp-row-meta select{width:100%;padding:4px 24px 4px 8px}
+@media(prefers-reduced-motion:reduce){.quote-pro .quote-row textarea{transition:none}}
+@media(max-width:520px){body[data-page=dashboard] dialog.cov-drawer .cov-foot .cov-close{display:none!important}}
+/* Tabla: ADI solo con su icono para dejar sitio a la clasificación (su nombre accesible es «Mejorar este texto con ADI»). */
+@container qpitems (min-width:930px){.quote-pro .quote-row .qp-c-desc .adi-button span{display:none}.quote-pro .quote-row .qp-c-desc .adi-button{padding-left:8px;padding-right:8px}}
+.quote-pro .qp-orphans{display:grid;gap:6px;padding-top:8px;border-top:1px solid #1d3352}.quote-pro .qp-orphans h4{margin:0;font-size:12px;color:#f3d79b}

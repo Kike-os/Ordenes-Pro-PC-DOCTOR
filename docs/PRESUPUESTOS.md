@@ -598,3 +598,22 @@ Una cobertura comercial autorizada resta el «Beneficio PC-DOCTOR» del importe 
 - **Factura:** descuento de la línea.
 
 Solo se aplica en presupuestos editables. Detalle en [COBERTURA-REPUESTOS.md](COBERTURA-REPUESTOS.md).
+
+## Tabla de partidas con columna Cobertura (1.5.302)
+
+La tabla tiene nueve columnas:
+
+| Columna | Contenido |
+|---|---|
+| Nº | Número de la partida |
+| Descripción | Hasta tres líneas; se amplía al editar |
+| Tipo | Nombre corto: Servicio, Repuesto, Licencia, Seguridad, Producto |
+| Cant. | Cantidad |
+| Precio unit. | Con su casilla «Lleva IVA» |
+| Descuento | Descuento ordinario |
+| Cobertura | Beneficio PC-DOCTOR |
+| Total | Importe final a cargo del cliente, con «de $X» cuando difiere del precio por la cantidad |
+| Acciones | Duplicar y eliminar |
+
+- **Cuándo se usa la tabla:** solo cuando el área de partidas mide al menos 930 px, que es lo que suman los anchos mínimos. Con menos espacio, las partidas son tarjetas. Así se corrigió el tramo en que los importes se encimaban o quedaban ocultos.
+- **Importes:** siempre en una línea y alineados. Si alguno no cupiera, se recorta con «…» y su valor completo queda en la descripción emergente.
