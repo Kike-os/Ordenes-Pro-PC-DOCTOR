@@ -548,3 +548,43 @@ Comprobado con clics reales y datos ficticios:
 - cobertura completa.
 
 Se probó en 1440, 820, 390 y 320 px.
+
+## Presupuesto internacional: tabla de partidas y panel lateral de cobertura (1.5.300)
+
+El pliego pedía igualar una imagen de referencia, pero la imagen no llegó. El diseño sigue la descripción escrita del pliego y conserva los colores corporativos: azul marino, acentos azules y rojo de PC-DOCTOR. No se usa magenta.
+
+- **Partidas en tabla.** Cuando el área de partidas tiene sitio (unos 820 px de ancho), cada partida es una fila con estas columnas:
+  - Nº;
+  - Descripción, con su clasificación y ADI en la misma línea;
+  - Tipo;
+  - Cantidad;
+  - Precio unitario, con «Lleva IVA»;
+  - Descuento;
+  - Total;
+  - Acciones (duplicar y eliminar).
+
+  Con menos espacio, las mismas celdas forman una tarjeta con sus etiquetas visibles. La decisión la toma una consulta de contenedor, no el ancho de la pantalla. El número de partida es un contador CSS: se reordena solo al duplicar o eliminar.
+- **Descuento por partida.** La columna muestra lo que el descuento autorizado resta a cada partida. Es el mismo cálculo que el del servidor. El resumen muestra siempre la fila «Descuentos».
+- **Cobertura PC-DOCTOR.** Es la última línea de cada partida de repuesto, a todo el ancho, y nunca aparece en los servicios.
+- **Panel financiero.**
+  - «Resumen económico».
+  - Tarjeta «Información del presupuesto»: número, estado, versión, creado y válido hasta.
+  - «Acciones rápidas» con la vista previa del PDF guardado.
+- **Cabecera.** Suma la etiqueta «Válido hasta» cuando hay fecha. Los presupuestos sin guardar se muestran como «Nuevo presupuesto».
+- **Panel lateral de cobertura.** Se desliza desde la derecha y no abre otra página. Tiene tres pestañas, accesibles con las flechas, Inicio y Fin:
+  - **Gestión:** cifras internas (solo administración), solicitud, autorización y acciones.
+  - **Seguimiento:** las cuatro etapas son independientes y ninguna se marca como hecha si está pendiente.
+    1. Solicitud y autorización.
+    2. Compra.
+    3. Recepción, con su entrada `MOV-n`.
+    4. Pago al proveedor, con lo pagado, el saldo y la tabla de pagos.
+  - **Historial:** solo lectura, con acción, estado anterior → nuevo, detalle, fecha y responsable.
+
+  Desde 1400 px, el presupuesto se corre a la izquierda y quedan tres zonas a la vista: partidas, resumen y cobertura. En pantallas menores el panel se superpone. Al cerrarlo, el presupuesto recupera su ancho y el foco vuelve al botón de la partida.
+- **Lo que no cambió:**
+  - cálculos;
+  - permisos (el técnico no ve costos, proveedor, pagos ni margen, y el servidor le niega autorizar);
+  - envíos, aprobación, PDF, ADI e historial del presupuesto;
+  - API de cobertura.
+
+  No hay migraciones.

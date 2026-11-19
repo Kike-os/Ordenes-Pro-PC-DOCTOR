@@ -12796,12 +12796,103 @@ body[data-page=dashboard] dialog.quote-dialog.quote-pro{width:min(1240px,calc(10
 @media(max-width:860px){.quote-pro .qp-config .quote-extra label:has(textarea){grid-column:1/-1}}
 @media(max-width:560px){.quote-pro .quote-row{border-top:3px solid color-mix(in srgb,var(--k) 75%,transparent)}.quote-pro .qp-kind{display:none}.quote-pro .quote-row-top{flex-wrap:nowrap}.quote-pro .quote-row-top .quote-field-priority{flex:1 1 0;min-width:0}.quote-pro .quote-row-top .quote-field-priority select{font-size:14px}}
 @media(max-width:560px){.quote-pro .quote-row-top:has(.quote-row-warn){flex-wrap:wrap}}
-/* 1.5.299 · Cobertura PC-DOCTOR en la franja de acciones de la partida de repuesto (junto a duplicar y eliminar). Acotado a .quote-pro */
-.quote-pro .quote-row-top:has(>.cov-line){flex-wrap:wrap}
-.quote-pro .quote-row-top>.cov-line{flex:1 1 100%;margin:0;gap:6px;padding-top:8px;border-top:1px dashed color-mix(in srgb,var(--k) 30%,transparent)}
-.quote-pro .quote-row-top>.cov-line .cov-open{display:inline-flex;align-items:center;gap:6px;min-height:36px;padding:4px 12px;border-radius:10px;border-color:color-mix(in srgb,#3B82F6 55%,var(--line,#2a3f5c));background:color-mix(in srgb,#3B82F6 12%,transparent);transition:background-color .18s ease,border-color .18s ease}
-.quote-pro .quote-row-top>.cov-line .cov-open:hover{background:color-mix(in srgb,#3B82F6 22%,transparent)}
-.quote-pro .quote-row-top>.cov-line .cov-open:focus-visible{outline:2px solid #7cc4ff;outline-offset:2px}
+/* 1.5.300 · Presupuesto internacional: tabla de partidas, panel financiero con información y Cobertura PC-DOCTOR como panel lateral.
+   Acotado a .quote-pro (presupuesto) y .cov-drawer (panel de cobertura). Mismos colores corporativos: azul marino, acentos azules, verde
+   para lo completado, ámbar para lo pendiente y rojo para lo crítico. */
+body[data-page=dashboard] dialog.quote-dialog.quote-pro{width:min(1440px,calc(100vw - 24px));transition:width .2s ease,margin .2s ease}
+@media(min-width:1000px){.quote-pro .quote-editor{grid-template-columns:minmax(0,1fr) minmax(280px,320px)}}
+.quote-pro .qp-side{display:grid;gap:12px;align-content:start}
+/* Información del presupuesto y acciones rápidas */
+.quote-pro .qp-info h3{margin:0;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#a9bdd8}
+.quote-pro .qp-info-list{display:grid;gap:6px;margin:0}
+.quote-pro .qp-info-list div{display:flex;justify-content:space-between;gap:10px;font-size:12.5px;min-width:0}
+.quote-pro .qp-info-list dt{color:#8fa6c4}.quote-pro .qp-info-list dd{margin:0;color:#e3eeff;font-weight:600;text-align:right;overflow-wrap:anywhere}
+.quote-pro .qp-quick{display:grid;gap:8px;padding-top:10px;border-top:1px solid #1d3352}
+.quote-pro .qp-quick h4{margin:0;font-size:11.5px;font-weight:700;color:#8fa6c4}
+/* Partidas: tarjeta compacta por defecto; tabla cuando el área de partidas tiene sitio (consulta de contenedor, no de pantalla). */
+.quote-pro .qp-items{container:qpitems/inline-size}
+.quote-pro .quote-rows{counter-reset:qprow}
+.quote-pro .qp-items .quote-rows{display:grid;gap:8px}
+.quote-pro .quote-row-top:empty{display:none}
+.quote-pro .quote-row{counter-increment:qprow;display:grid;grid-template-columns:auto minmax(0,1fr) minmax(0,1fr) auto;grid-template-areas:"num kind kind acts" "desc desc desc desc" "type type type type" "qty qty price price" "disc disc total total" "cov cov cov cov";gap:10px;align-items:start;box-shadow:inset 3px 0 0 color-mix(in srgb,var(--k) 80%,transparent)}
+.quote-pro .qp-cell{min-width:0}
+.quote-pro .qp-c-num{grid-area:num;display:flex;align-items:center;gap:6px}.quote-pro .qp-c-desc{grid-area:desc}.quote-pro .qp-c-type{display:contents}.quote-pro .qp-c-type>.quote-field{grid-area:type}.quote-pro .qp-c-type>.qp-kind{grid-area:kind;align-self:center}
+.quote-pro .qp-c-qty{grid-area:qty}.quote-pro .qp-c-price{grid-area:price;display:grid;gap:6px}.quote-pro .qp-c-disc{grid-area:disc}.quote-pro .qp-c-total{grid-area:total}
+.quote-pro .qp-c-acts{grid-area:acts;display:flex;gap:6px;justify-content:flex-end}
+.quote-pro .quote-row>.cov-line{grid-area:cov;margin:0;padding-top:8px;border-top:1px dashed color-mix(in srgb,var(--k) 30%,transparent)}
+.quote-pro .qp-num{display:grid;place-items:center;min-width:26px;height:26px;padding:0 6px;border-radius:8px;background:#10233c;color:#cfe0f7;font-size:12px;font-weight:700;font-variant-numeric:tabular-nums}
+.quote-pro .qp-num::before{content:counter(qprow)}
+.quote-pro .qp-c-type .qp-kind{margin:0;justify-self:start}
+.quote-pro .qp-row-meta{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:0;grid-column:1;min-width:0}
+/* Descripción compacta: clasificación (izquierda) y ADI (derecha) comparten la línea bajo el texto. */
+.quote-pro .qp-c-desc{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-auto-flow:row dense;gap:6px 8px;align-items:center}
+.quote-pro .qp-c-desc>.quote-field-description{display:contents}
+.quote-pro .qp-c-desc>.quote-field-description>:not(.adi-bar){grid-column:1/-1}
+.quote-pro .qp-c-desc .adi-bar{grid-column:2;margin:0;justify-self:end}
+.quote-pro .qp-row-meta .quote-field-priority{flex:0 1 180px}
+.quote-pro .qp-row-meta .quote-field-priority>span:first-child{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.quote-pro .quote-row .qp-row-meta select{min-height:32px;padding:4px 30px 4px 10px;font-size:12px}
+.quote-pro .qp-c-acts :is(.quote-row-dup,.quote-row-remove){width:36px;min-height:36px;margin:0;padding:0;display:grid;place-items:center;border-radius:10px}
+.quote-pro .qp-c-acts :is(.quote-row-dup,.quote-row-remove) svg{width:15px;height:15px}
+.quote-pro .quote-field-discount{display:grid;gap:4px}
+.quote-pro .qp-disc-value{font-size:14px;font-weight:700;color:#f3a6ad;font-variant-numeric:tabular-nums;line-height:40px}.quote-pro .qp-disc-value.qp-disc-none{color:#6f84a3;font-weight:600}
+.quote-pro .qp-c-total .quote-field-total{justify-items:end}
+.quote-pro .qp-c-total .quote-row-total{font-variant-numeric:tabular-nums;justify-self:end}.quote-pro .qp-c-total .qp-net{justify-self:end}
+.quote-pro .quote-row textarea{field-sizing:content;min-height:42px;max-height:140px}
+.quote-pro .qp-thead{display:none}
+.quote-pro .quote-row-tax{display:flex;align-items:center;gap:6px;margin:0;font-size:11.5px;color:#b8cae4}
+@container qpitems (min-width:820px){
+ .quote-pro .qp-thead:not([hidden]){display:grid;grid-template-columns:34px minmax(160px,1fr) 140px 68px 108px 84px 104px 80px;gap:8px;padding:0 13px 2px;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#8fa6c4}
+ .quote-pro .qp-thead span:nth-child(n+4){text-align:right}.quote-pro .qp-thead span:nth-child(3){text-align:left}.quote-pro .qp-thead span:last-child{text-align:center}
+ .quote-pro .quote-row{grid-template-columns:34px minmax(160px,1fr) 140px 68px 108px 84px 104px 80px;grid-template-areas:"num desc type qty price disc total acts" ". cov cov cov cov cov cov cov";gap:4px 8px;padding:10px 12px}
+ .quote-pro .quote-row .quote-field>span:first-child{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+ .quote-pro .qp-c-num{flex-direction:column;align-items:center;padding-top:6px}
+ .quote-pro .qp-c-type{display:grid;grid-area:type;gap:6px}.quote-pro .qp-c-type>.quote-field{grid-area:auto}.quote-pro .qp-c-type .qp-kind{display:none}
+ .quote-pro .quote-row :is(select,input:not([type=checkbox])){min-height:40px;margin:0}
+ .quote-pro .qp-c-qty input,.quote-pro .qp-c-price input{text-align:right;font-variant-numeric:tabular-nums}
+ .quote-pro .qp-c-price .quote-row-tax{justify-content:flex-end}
+ .quote-pro .qp-c-disc,.quote-pro .qp-c-total{text-align:right}
+ .quote-pro .quote-field-discount,.quote-pro .qp-c-total .quote-field-total{justify-items:end}
+ .quote-pro .qp-c-total .quote-row-total{line-height:40px;font-size:15px}
+ .quote-pro .qp-c-acts{justify-content:center;padding-top:2px}
+}
+@media(max-width:560px){.quote-pro .quote-row{border-top:0}.quote-pro .qp-kind{display:inline-flex}}
 .quote-pro .cov-open[aria-busy=true] svg{animation:qp-cov-pulse 1s ease-in-out infinite}
 @keyframes qp-cov-pulse{50%{opacity:.35}}
-@media(prefers-reduced-motion:reduce){.quote-pro .quote-row-top>.cov-line .cov-open{transition:none}.quote-pro .cov-open[aria-busy=true] svg{animation:none}}
+.quote-pro .quote-row>.cov-line .cov-open{display:inline-flex;align-items:center;gap:6px;min-height:36px;padding:4px 12px;border-radius:10px;border-color:color-mix(in srgb,#3B82F6 55%,#2a3f5c);background:color-mix(in srgb,#3B82F6 12%,transparent);transition:background-color .18s ease,border-color .18s ease}
+.quote-pro .quote-row>.cov-line .cov-open:hover{background:color-mix(in srgb,#3B82F6 22%,transparent)}
+.quote-pro .cov-line .cov-open:focus-visible{outline:2px solid #7cc4ff;outline-offset:2px}
+/* Tres zonas: con el panel de cobertura abierto en pantallas anchas, el presupuesto se corre a la izquierda y deja sitio al panel. */
+@media(min-width:1400px){body[data-page=dashboard] dialog.quote-dialog.quote-pro.qp-with-drawer{margin-left:12px;width:min(1440px,calc(100vw - 500px))}}
+/* Panel lateral de cobertura (drawer) */
+body[data-page=dashboard] .maintenance-dialog.inv-sheet.inv-dialog.cov-drawer{position:fixed;inset:0 0 0 auto;margin:0;width:min(470px,100vw);max-width:100vw;height:100dvh;max-height:100dvh;display:flex;flex-direction:column;border-radius:16px 0 0 16px;border-right:0;animation:cov-drawer-in .2s ease-out;overflow:hidden}
+body[data-page=dashboard] .maintenance-dialog.cov-drawer::backdrop{background:#04091266;backdrop-filter:none}
+@media(min-width:1400px){body[data-page=dashboard] .maintenance-dialog.cov-drawer::backdrop{background:transparent}}
+@keyframes cov-drawer-in{from{transform:translateX(24px);opacity:0}to{transform:none;opacity:1}}
+.cov-drawer .cov-panel{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;align-content:start}
+.cov-drawer .cov-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;padding:4px;border:1px solid #24375A;border-radius:12px;background:#0b1424;position:sticky;top:-1px;z-index:1}
+.cov-drawer .cov-tab{min-height:36px;padding:6px 8px;border:0;border-radius:9px;background:transparent;color:#9fb0c8;font-size:13px;font-weight:650;transition:background-color .18s ease,color .18s ease}
+.cov-drawer .cov-tab:hover{transform:none;color:#e3eeff;background:#13213a}
+.cov-drawer .cov-tab[aria-selected=true]{background:#1d3b66;color:#fff;box-shadow:inset 0 0 0 1px #3B82F655}
+.cov-drawer .cov-tab:focus-visible{outline:2px solid #7cc4ff;outline-offset:1px}
+.cov-drawer .cov-view{display:grid;gap:12px;min-width:0}.cov-drawer .cov-view:focus-visible{outline:2px solid #7cc4ff55;outline-offset:4px;border-radius:8px}
+.cov-drawer .cov-figures{grid-template-columns:repeat(2,minmax(0,1fr))}
+.cov-drawer .cov-facts{grid-template-columns:repeat(2,minmax(0,1fr))}
+.cov-stages{list-style:none;margin:0;padding:0;display:grid;gap:0}
+.cov-stage{position:relative;display:grid;grid-template-columns:30px minmax(0,1fr);gap:10px;padding:0 0 14px}
+.cov-stage:not(:last-child)::before{content:'';position:absolute;left:14px;top:30px;bottom:2px;width:2px;background:#24375A}
+.cov-stage[data-state=done]:not(:last-child)::before{background:#10B98166}
+.cov-stage-mark{display:grid;place-items:center;width:30px;height:30px;border-radius:50%;border:2px solid #3a5072;background:#0b1424;color:#9fb0c8;font-size:12.5px;font-weight:800}
+.cov-stage[data-state=done] .cov-stage-mark{border-color:#10B981;background:#10B9811f;color:#34d399}
+.cov-stage[data-state=pending] .cov-stage-mark,.cov-stage[data-state=partial] .cov-stage-mark{border-color:#F59E0B;color:#fbbf24}
+.cov-stage[data-state=stopped] .cov-stage-mark{border-color:#EF4444;color:#f87171}
+.cov-stage-copy{display:grid;gap:3px;min-width:0;padding-top:4px}
+.cov-stage-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px}
+.cov-stage-head strong{font-size:13.5px}.cov-stage-copy small{font-size:12px;color:var(--muted);overflow-wrap:anywhere}
+.cov-history{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.cov-history li{display:grid;gap:3px;padding:9px 11px;border:1px solid #24375A;border-radius:10px;background:#0b1424}
+.cov-history-head{display:flex;flex-wrap:wrap;justify-content:space-between;gap:6px}.cov-history-head strong{font-size:13px}
+.cov-history-change{font-size:11.5px;font-weight:700;color:#93c5fd}
+.cov-history p{margin:0;font-size:12.5px;overflow-wrap:anywhere}.cov-history small{font-size:11.5px;color:var(--muted)}
+@media(max-width:520px){.cov-drawer .cov-facts,.cov-drawer .cov-figures{grid-template-columns:1fr 1fr}body[data-page=dashboard] .maintenance-dialog.inv-sheet.inv-dialog.cov-drawer{border-radius:0;border-left:0}}
+@media(prefers-reduced-motion:reduce){body[data-page=dashboard] dialog.quote-dialog.quote-pro,.cov-drawer,.cov-drawer .cov-tab,.quote-pro .quote-row>.cov-line .cov-open{transition:none;animation:none}.quote-pro .cov-open[aria-busy=true] svg{animation:none}}

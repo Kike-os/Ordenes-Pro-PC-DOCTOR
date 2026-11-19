@@ -79,6 +79,13 @@ Todo queda en el historial financiero de la cobertura (solo anexado) y en la aud
     - motivo de la cobertura (interno);
     - forma de pago y movimiento de caja (`CJM-n`) de cada pago.
   - **Vista del técnico.** Ve el mismo seguimiento sin cifras: cantidad, solicitó, autorizó, compra y recepción.
+
+  Desde la 1.5.300 la cobertura se abre en un panel lateral con tres pestañas, sin otra página:
+  - **Gestión.** Cifras, solicitud, autorización y acciones.
+  - **Seguimiento.** Las cuatro etapas independientes y los pagos.
+  - **Historial.** Solo lectura, con el estado anterior y el nuevo.
+
+  En pantallas de 1400 px o más, el presupuesto queda a la izquierda. Detalle en [PRESUPUESTOS.md](PRESUPUESTOS.md).
 - **Facturación › Caja › Coberturas** (administración). Panel con indicadores:
   - total cubierto;
   - autorizadas sin pagar;
