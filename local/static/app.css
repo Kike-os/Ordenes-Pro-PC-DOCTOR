@@ -13191,3 +13191,48 @@ body[data-page=dashboard] dialog.quote-dialog.quote-pro{width:min(1680px,calc(10
 .quote-pro .qp-concepts-card .qp-int-stats .qp-stat:nth-child(2n){border-left:1px solid var(--qp-line)}
 .quote-pro .qp-concepts-card .qp-int-stats .qp-stat:nth-child(n+3){border-top:1px solid var(--qp-line)}
 @container qpside (max-width:300px){.quote-pro .qp-concepts-card .qp-int-stats{grid-template-columns:1fr}.quote-pro .qp-concepts-card .qp-int-stats .qp-stat:nth-child(2n){border-left:0}.quote-pro .qp-concepts-card .qp-int-stats .qp-stat+.qp-stat{border-top:1px solid var(--qp-line)}}
+
+/* ===== 1.5.306 · Barra superior estable al recargar (F5 / Ctrl + R) =====
+   Causa: en tableta y móvil, app.js (≈2 MB, sin caché) mueve al menú desplegable la versión, el buscador, el reloj y el clima. Mientras se
+   descarga, esos elementos quedaban en su sitio de escritorio y se montaban sobre el logotipo y el usuario (la barra pasaba de 76 a 103 px).
+   Ahora el CSS los oculta en esa posición provisional, sin esperar al script, y los textos provisionales falsos («Clima no disponible»,
+   «PC», «Cargando…», «--:--:--») se sustituyen por esqueletos del mismo tamaño que el dato real. */
+@media(max-width:999px){
+ .premium-header .header-utilities>#release-chip,.premium-header .header-utilities>#header-status{display:none}
+ .premium-header #header-menu-toggle[aria-expanded=false]+.header-drawer{display:none}
+}
+@media(max-width:860px){.premium-header .header-utilities>#global-search{display:none}}
+/* Esqueletos de carga: ocupan la misma altura de línea que el texto final, así que nada cambia de tamaño al llegar el dato. */
+.premium-header #user-name:empty::before,.premium-header #user-role:empty::before,#header-status #live-clock:empty::before,#header-status #weather-temperature:empty::before{
+ content:"";display:block;border-radius:4px;background:linear-gradient(90deg,#1b2d48 0%,#2a4670 45%,#1b2d48 90%);background-size:220% 100%;animation:hdr-skeleton 1.5s ease-in-out infinite}
+.premium-header #user-name:empty::before{width:96px;height:9px;margin:3.3px 0}
+.premium-header #user-role:empty::before{width:70px;height:8px;margin:3.15px 0}
+#header-status #live-clock:empty::before{width:84px;height:10px;margin:2.76px 0}
+#header-status #weather-temperature:empty::before{width:46px;height:12px;margin:2.4px 0}
+.premium-header .user-area .avatar:empty{background:linear-gradient(90deg,#1b2d48 0%,#2a4670 45%,#1b2d48 90%);background-size:220% 100%;animation:hdr-skeleton 1.5s ease-in-out infinite}
+#header-status .header-weather.weather-loading #weather-condition{color:#8ea6c8}
+@keyframes hdr-skeleton{from{background-position:110% 0}to{background-position:-110% 0}}
+/* Escritorio con nombre visible: el bloque nombre/rol mide siempre lo mismo (el máximo que ya tenía el nombre), para que el buscador, el
+   reloj y el clima no se desplacen cuando llega el nombre real. Si no cabe, se recorta con «…» y el nombre completo sale en el tooltip. */
+@media(min-width:1250px){.premium-header .user-area .account-label{flex:0 0 125px;width:125px}}
+.premium-header .user-area .account-label #user-role{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* Clima: las tres líneas (temperatura, estado, ciudad) dejaban «Otavalo, Ecuador» pegado al borde inferior de la tarjeta de 46 px. */
+#header-status .header-weather strong{line-height:1.05}
+#header-status #weather-condition{line-height:1.2}
+#header-status small#weather-city{line-height:1.15}
+@media(prefers-reduced-motion:reduce){.premium-header #user-name:empty::before,.premium-header #user-role:empty::before,#header-status #live-clock:empty::before,#header-status #weather-temperature:empty::before,.premium-header .user-area .avatar:empty{animation:none}}
+/* Escritorio: los módulos visibles dependen del rol (Ventas, Licencias, Facturación… solo administración). Hasta conocerlo, la fila del
+   menú conserva su hueco pero no se dibuja, para que «Sistema» y «Asistencia» no salten de sitio; después aparece con un fundido breve. */
+@media(min-width:1000px){
+ .premium-header:not(.identity-ready) .header-drawer nav{visibility:hidden}
+ .premium-header.identity-ready .header-drawer nav{animation:hdr-fade .22s ease-out}
+}
+@keyframes hdr-fade{from{opacity:0}to{opacity:1}}
+/* Chip de versión: el estado ocupa siempre el ancho de la etiqueta más larga («En observación»), así «Comprobando» → estado real no
+   empuja el buscador, el reloj ni el clima. */
+@media(min-width:1281px){.premium-header #release-chip .release-stability-text{display:inline-block;min-width:105px}}
+@media(prefers-reduced-motion:reduce){.premium-header.identity-ready .header-drawer nav{animation:none}}
+/* Los avisos flotantes (p. ej. «Tienes 4 notificaciones sin leer», que aparece bajo la campana al recargar) quedaban encima del menú de
+   cuenta abierto y tapaban el nombre y el rol. Mientras el menú de cuenta o el de notificaciones está abierto, los avisos se apartan. */
+body[data-page=dashboard]:has(#account-panel:not([hidden]),#notify-panel:not([hidden])) #toast-region{opacity:0;visibility:hidden;transition:opacity .15s,visibility 0s .15s}
+@media(prefers-reduced-motion:reduce){body[data-page=dashboard] #toast-region{transition:none}}

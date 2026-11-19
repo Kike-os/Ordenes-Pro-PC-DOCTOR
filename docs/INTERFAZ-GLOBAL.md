@@ -31,3 +31,23 @@ Se convirtieron 17 avisos: plantilla y descarte de correo, eliminar foto, cierre
 ## Avisos de validación y error
 
 Los mensajes de formulario comparten un aviso compacto (clase `message` en las ventanas del panel y `appointment-message` en la reserva pública): ancho según su texto, icono, rojo suave para errores y verde para confirmaciones, con animación breve y sin animación con «reducir movimiento». Las notificaciones flotantes siguen pasando por `toast()` / `notify()`, que ya evitan duplicados. Si no hay conexión, cualquier operación responde «No pudimos completar la operación. Comprueba tu conexión e inténtalo nuevamente.» en lugar del error técnico del navegador.
+
+## Barra superior estable al recargar (1.5.306)
+
+**Causa del texto encimado al pulsar F5 o Ctrl + R.** En tableta y móvil (menos de 1000 px), `app.js` mueve al menú desplegable el indicador de versión, el buscador (hasta 860 px), el reloj y el clima (`initHeaderNavigation` → `adapt()` y `initReleaseChip` → `placeChip()`). Ese archivo pesa unos 2 MB y se sirve con `Cache-Control: no-store`, así que se descarga en cada recarga. Mientras llegaba, esos elementos seguían en su posición de escritorio y el CSS móvil no los ocultaba: se montaban sobre el logotipo y el usuario, y la barra medía 103 px en lugar de 76 px. Al terminar la carga saltaban a su sitio.
+
+**Corrección (solo CSS y plantilla, sin cambiar funciones):**
+
+- Por debajo de 1000 px, los elementos que todavía están en la posición de escritorio se ocultan por CSS y el menú desplegable cerrado no se dibuja, sin esperar al script.
+- Los textos provisionales falsos («Clima no disponible», las iniciales «PC», «Cargando…», «--:--:--») se sustituyen por esqueletos que ocupan exactamente la altura de línea del dato real.
+- El clima muestra «Cargando clima…» (`weather-loading`, `aria-busy`) hasta recibir la respuesta. Si el servicio falla, muestra «Sin datos · Clima no disponible», como antes.
+- En escritorio, la fila de módulos reserva su hueco y aparece con un fundido breve cuando se conoce el rol: los módulos de administración ya no empujan «Sistema» y «Asistencia».
+- El estado del chip de versión ocupa siempre el ancho de «En observación», y el bloque nombre/rol mide siempre 125 px. Así, el buscador, el reloj y el clima no se desplazan cuando llegan los datos.
+- La campana ya viene en la plantilla; el script no la duplica.
+- Nombre del usuario: se recorta con «…» y el nombre completo con el rol aparece en un tooltip solo cuando no cabe, o cuando en pantallas estrechas solo se ve el avatar (`accountTip()`, que se recalcula al cambiar el tamaño).
+- Clima: las tres líneas de la tarjeta se ajustaron para que «Otavalo, Ecuador» no toque el borde inferior.
+- Mientras el menú de cuenta o el de notificaciones está abierto, los avisos flotantes (por ejemplo, «Tienes 4 notificaciones sin leer») se apartan para no tapar el nombre y el rol.
+
+**Caché tras publicar.** `app.css` y `app.js` se sirven con `no-store`, así que después de un despliegue el navegador nunca combina una plantilla nueva con estilos o scripts antiguos.
+
+**Comprobación.** Recarga normal y forzada, y red lenta (350 ms de latencia, de 250 a 700 KB/s), en 1920, 1440, 1366, 1280, 1100, 1024, 860, 768, 390 y 320 px. Resultado: barra de 117 px en escritorio y 76 px en tableta y móvil durante toda la carga, desplazamiento de diseño (CLS) igual a 0 en la barra, sin solapes, sin textos cortados, sin desplazamiento horizontal y sin errores de consola.
