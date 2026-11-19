@@ -8,6 +8,26 @@
   },
   "releases": [
     {
+      "version": "1.5.300",
+      "date": "2026-11-18T20:47:59-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Presupuesto internacional: tabla de partidas y panel lateral de cobertura",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Presupuestos: las partidas se muestran como tabla (Nº, Descripción, Tipo, Cantidad, Precio unitario, Descuento, Total y Acciones) cuando hay espacio y como tarjetas compactas en tableta y móvil; la columna Descuento muestra lo que el descuento autorizado resta a cada partida.",
+          "Presupuestos: el resumen económico muestra siempre «Descuentos» y suma la tarjeta «Información del presupuesto» (número, estado, versión, creación y validez) con las acciones rápidas; la cabecera indica «Válido hasta» cuando hay fecha.",
+          "Cobertura PC-DOCTOR: se abre en un panel lateral sin salir del presupuesto, con pestañas Gestión, Seguimiento (solicitud y autorización, compra, recepción y pago, cada una con su propio estado) e Historial de solo lectura con el estado anterior y el nuevo. Desde 1400 px quedan a la vista presupuesto, resumen y cobertura; al cerrar, el foco vuelve al botón de la partida."
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Administración (autorización expresa en la sesión)"
+    },
+    {
       "version": "1.5.299",
       "date": "2026-11-18T19:18:19-05:00",
       "type": "patch",

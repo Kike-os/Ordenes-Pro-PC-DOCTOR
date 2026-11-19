@@ -4,6 +4,16 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.300 — 2026-11-18 20:47 (UTC-05:00)
+
+Presupuesto internacional: tabla de partidas y panel lateral de cobertura
+
+### Mejoras realizadas
+
+- Presupuestos: las partidas se muestran como tabla (Nº, Descripción, Tipo, Cantidad, Precio unitario, Descuento, Total y Acciones) cuando hay espacio y como tarjetas compactas en tableta y móvil; la columna Descuento muestra lo que el descuento autorizado resta a cada partida.
+- Presupuestos: el resumen económico muestra siempre «Descuentos» y suma la tarjeta «Información del presupuesto» (número, estado, versión, creación y validez) con las acciones rápidas; la cabecera indica «Válido hasta» cuando hay fecha.
+- Cobertura PC-DOCTOR: se abre en un panel lateral sin salir del presupuesto, con pestañas Gestión, Seguimiento (solicitud y autorización, compra, recepción y pago, cada una con su propio estado) e Historial de solo lectura con el estado anterior y el nuevo. Desde 1400 px quedan a la vista presupuesto, resumen y cobertura; al cerrar, el foco vuelve al botón de la partida.
+
 ## v1.5.299 — 2026-11-18 19:18 (UTC-05:00)
 
 Cobertura PC-DOCTOR integrada en el Presupuesto premium
