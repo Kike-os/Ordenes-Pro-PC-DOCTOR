@@ -640,3 +640,24 @@ Sigue la imagen de referencia aprobada por el usuario, con datos reales del sist
 - **Lo que no se reprodujo de la imagen:**
   - La etiqueta «Autorizado para próxima versión», porque no corresponde a ningún dato del sistema.
   - El descuento por partida. El descuento sigue siendo el autorizado para todo el presupuesto (0, 3 o 5 %) y se muestra en cada partida.
+
+## Panel derecho Premium: importes siempre visibles (1.5.304)
+
+**Causa corregida.** Las filas del «Resumen económico» se distribuían en una sola línea con espacio fijo entre concepto e importe, y además heredaban dos estilos del diseño anterior: alineación a la derecha y un ancho mínimo de 340 px. Con importes grandes en un panel estrecho, el importe salía por el borde derecho de la tarjeta. Ahora cada fila se reparte en dos columnas: el concepto se ajusta en varias líneas si hace falta y el importe nunca se parte ni se sale. Lo mismo vale para «Información del presupuesto» y para las cifras de «Beneficio y cobertura».
+
+- **Ancho del panel:**
+
+  | Ancho de pantalla | Panel |
+  |---|---|
+  | Desde 1440 px | Entre 400 y 500 px |
+  | De 1000 a 1439 px | Entre 300 y 340 px |
+  | Menos de 1000 px | Debajo de las partidas |
+
+- **Resumen económico:** filas con separadores e importes alineados a la derecha. El total, «Total cotizado al cliente», va en una tarjeta con acento magenta y, si el panel es estrecho, se apila en dos líneas.
+- **Beneficio y cobertura:**
+  - beneficio PC-DOCTOR, % de beneficio y lo que paga el cliente;
+  - **estado de autorización**: autorizadas, pendientes de aprobación y por revisar;
+  - estados de carga («Consultando coberturas…») y de error.
+- **Información del presupuesto:** número con «Copiar», estado, versión, fecha y hora de creación y validez, completos a una columna.
+- **Sin desplazamiento horizontal:** a 320 px quedaba un sobrante de 2 px por redondeo de bordes; el editor ya no se desplaza horizontalmente.
+- **Lo que no cambió:** cálculos, reglas tributarias, cobertura y permisos.

@@ -13110,3 +13110,43 @@ body[data-page=dashboard] dialog.quote-dialog.quote-pro{width:min(1680px,calc(10
 .quote-pro .qp-card-head{flex-wrap:nowrap}.quote-pro .qp-card-head h3{min-width:0;flex:1}.quote-pro .qp-card-head>.quote-badge{margin-left:auto;flex:none}
 @container qpside (max-width:380px){.quote-pro .qp-stats{grid-template-columns:1fr 1fr}.quote-pro .qp-stat:last-child{grid-column:1/-1;border-left:0;border-top:1px solid var(--qp-line)}.quote-pro .qp-stat dd{font-size:18px}.quote-pro .qp-info-list{grid-template-columns:1fr}}
 @container qpitems (min-width:870px){.quote-pro .qp-thead:not([hidden]),.quote-pro .quote-row{grid-template-columns:34px minmax(160px,1fr) 112px 52px 86px 78px 100px 84px 76px}.quote-pro .qp-cov-btn{gap:4px;padding:4px 4px}}
+/* ===================================================================================================================================
+   1.5.304 · Panel derecho de Presupuestos: ancho adaptable (400–500 px con espacio), importes siempre visibles y alineados, textos
+   completos. Causa corregida: las filas del resumen eran flexibles con «gap» fijo y heredaban de la versión anterior «justify-self:end»
+   y «min-width:340px»; con importes grandes en un panel estrecho, el importe salía por el borde derecho. Ahora cada fila es una cuadrícula
+   «concepto (se ajusta) | importe (no se parte)». Acotado a .quote-pro.
+   =================================================================================================================================== */
+@media(min-width:1000px){.quote-pro .quote-editor{grid-template-columns:minmax(0,1fr) minmax(300px,340px)}}
+@media(min-width:1440px){.quote-pro .quote-editor{grid-template-columns:minmax(0,1fr) clamp(400px,29vw,500px)}}
+.quote-pro .quote-editor{overflow-x:clip}   /* el redondeo de bordes a 320 px no debe crear desplazamiento horizontal */
+.quote-pro .qp-side{min-width:0}
+.quote-pro .qp-side .qp-card{min-width:0;padding:16px}
+.quote-pro .qp-card-head h3{overflow-wrap:anywhere}
+/* Resumen económico */
+.quote-pro .qp-summary .quote-editor-totals{display:grid;gap:0;width:100%;min-width:0;justify-self:stretch}
+.quote-pro .qp-summary .quote-editor-totals div{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:baseline;gap:4px 14px;padding:7px 0;border-bottom:1px solid #16263f;font-size:13.5px}
+.quote-pro .qp-summary .quote-editor-totals div:last-of-type{border-bottom:0}
+.quote-pro .qp-summary .quote-editor-totals dt{min-width:0;overflow-wrap:anywhere;color:var(--qp-soft)}
+.quote-pro .qp-summary .quote-editor-totals dd{margin:0;white-space:nowrap;text-align:right;font-weight:700;color:var(--qp-text);font-variant-numeric:tabular-nums}
+.quote-pro .qp-summary .quote-editor-totals [data-kind=no] dd{color:#ff7aa8}
+.quote-pro .qp-summary .quote-editor-totals [data-kind=total]{grid-template-columns:minmax(0,1fr) auto;margin-top:10px;padding:14px 16px;border:1px solid #be185d;border-radius:14px;background:linear-gradient(110deg,#101f3b 0%,#1d1236 55%,#3a0f2e 100%);box-shadow:inset 0 0 0 1px #ec489922,0 12px 30px #ec489924}
+.quote-pro .qp-summary .quote-editor-totals [data-kind=total] dt{font-size:15px;font-weight:700;color:var(--qp-text)}
+.quote-pro .qp-summary .quote-editor-totals [data-kind=total] dd{font-size:clamp(20px,2.1vw,27px);font-weight:800;color:var(--qp-pink2)}
+@container qpside (max-width:330px){.quote-pro .qp-summary .quote-editor-totals [data-kind=total]{grid-template-columns:1fr}.quote-pro .qp-summary .quote-editor-totals [data-kind=total] dd{text-align:left}}
+/* Beneficio y cobertura */
+.quote-pro .qp-gift .qp-stats{grid-template-columns:repeat(3,minmax(0,1fr))}
+.quote-pro .qp-stat dd{white-space:nowrap}
+@container qpside (max-width:420px){.quote-pro .qp-stats{grid-template-columns:1fr 1fr}.quote-pro .qp-gift .qp-stats{grid-template-columns:1fr 1fr}.quote-pro .qp-stat:last-child{grid-column:1/-1;border-left:0;border-top:1px solid var(--qp-line)}.quote-pro .qp-stat dd{font-size:19px}}
+@container qpside (max-width:300px){.quote-pro .qp-stats,.quote-pro .qp-gift .qp-stats{grid-template-columns:1fr}.quote-pro .qp-stat+.qp-stat{border-left:0;border-top:1px solid var(--qp-line)}}
+.quote-pro .qp-auth{display:flex;flex-wrap:wrap;align-items:center;gap:6px;min-width:0}
+.quote-pro .qp-auth-label{width:100%;font-size:12px;font-weight:700;color:var(--qp-soft)}
+.quote-pro .qp-auth .cov-chip{white-space:normal}
+/* Información del presupuesto: lista completa a una columna, sin cortes */
+.quote-pro .qp-info-list,.quote-pro .qp-side .qp-info-list{display:grid;grid-template-columns:1fr;gap:0}
+.quote-pro .qp-info-list div{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid #16263f}
+.quote-pro .qp-info-list div:last-child{border-bottom:0}
+.quote-pro .qp-info-list dt{font-size:13px;color:var(--qp-soft)}
+.quote-pro .qp-info-list dd{margin:0;justify-self:end;text-align:right;font-weight:700;color:var(--qp-text);overflow-wrap:anywhere;min-width:0}
+.quote-pro .qp-info-number{display:inline-flex;align-items:center;gap:4px;flex-wrap:wrap;justify-content:flex-end}
+/* Las tarjetas del panel no quedan detrás del pie de acciones */
+.quote-pro .quote-editor{padding-bottom:18px}
