@@ -4,6 +4,19 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.301 — 2026-11-18 22:06 (UTC-05:00)
+
+Cobertura Empresarial PC-DOCTOR universal con dos modalidades
+
+### Nuevas funcionalidades
+
+- Cobertura Empresarial PC-DOCTOR para cualquier partida con importe (servicios, diagnósticos, BIOS/UEFI, mano de obra, productos, repuestos, licencias y líneas libres), con dos modalidades separadas: costo interno (PC-DOCTOR asume el costo; el cliente paga su precio) y comercial al cliente (Beneficio PC-DOCTOR que reduce el importe de la partida).
+- Beneficio PC-DOCTOR transparente para el cliente: precio, beneficio con su motivo e importe final en el presupuesto, el PDF y el resumen; en la factura viaja como descuento de la línea, con el IVA sobre el importe final. Solo se aplica en presupuestos en borrador o en revisión.
+
+### Mejoras realizadas
+
+- Catálogo configurable de motivos de cobertura (obligatorio al solicitar), selector de modalidad en el panel, seguimiento según el tipo de partida (bienes: compra, recepción y pago; servicios: ejecución y costos asociados opcionales) y panel de Caja con modalidad, motivo y total de beneficios comerciales.
+
 ## v1.5.300 — 2026-11-18 20:47 (UTC-05:00)
 
 Presupuesto internacional: tabla de partidas y panel lateral de cobertura
