@@ -4,6 +4,16 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.299 — 2026-11-18 19:18 (UTC-05:00)
+
+Cobertura PC-DOCTOR integrada en el Presupuesto premium
+
+### Mejoras realizadas
+
+- Presupuestos: el botón «Cobertura PC-DOCTOR» va en la franja de acciones de cada partida de repuesto, bajo «Duplicar» y «Eliminar», en todos los anchos; aparece en cuanto se agrega el repuesto, muestra «Consultando…» mientras carga y sigue visible si la consulta falla.
+- Presupuestos: en un presupuesto sin guardar, la cobertura pide «Guardar presupuesto para gestionar cobertura» (Cancelar / Guardar borrador y continuar); guarda el borrador sin avisar al cliente y abre el panel de esa partida. Un doble clic no guarda dos veces; si el guardado falla, avisa y conserva los datos.
+- Cobertura PC-DOCTOR: el panel muestra cantidad, quién solicitó y autorizó (con fecha), fecha de compra, recepción, movimiento de inventario MOV-n, motivo interno, forma de pago y movimiento de caja de cada pago. El técnico ve el mismo seguimiento sin costos, proveedor, pagos ni margen.
+
 ## v1.5.298 — 2026-11-18 14:58 (UTC-05:00)
 
 Presupuesto premium
