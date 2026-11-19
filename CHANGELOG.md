@@ -4,6 +4,18 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.304 — 2026-11-19 08:29 (UTC-05:00)
+
+Panel derecho Premium de Presupuestos
+
+### Mejoras realizadas
+
+- Presupuestos: panel derecho Premium de 400 a 500 px cuando hay espacio, total al cliente en tarjeta magenta, Beneficio y cobertura con el estado de autorización de las coberturas (con carga y error) e Información del presupuesto completa con botón para copiar el número.
+
+### Errores corregidos
+
+- Presupuestos: los importes del Resumen económico ya no se cortan ni salen por el borde derecho del panel (cada fila separa concepto e importe; el importe nunca se parte), y el editor ya no se desplaza horizontalmente en pantallas de 320 px.
+
 ## v1.5.303 — 2026-11-19 00:54 (UTC-05:00)
 
 Presupuesto Premium Enterprise (diseño aprobado)

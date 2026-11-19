@@ -8,6 +8,26 @@
   },
   "releases": [
     {
+      "version": "1.5.304",
+      "date": "2026-11-19T08:29:36-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Panel derecho Premium de Presupuestos",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Presupuestos: panel derecho Premium de 400 a 500 px cuando hay espacio, total al cliente en tarjeta magenta, Beneficio y cobertura con el estado de autorización de las coberturas (con carga y error) e Información del presupuesto completa con botón para copiar el número."
+        ],
+        "fixes": [
+          "Presupuestos: los importes del Resumen económico ya no se cortan ni salen por el borde derecho del panel (cada fila separa concepto e importe; el importe nunca se parte), y el editor ya no se desplaza horizontalmente en pantallas de 320 px."
+        ],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Administración (autorización expresa en la sesión)"
+    },
+    {
       "version": "1.5.303",
       "date": "2026-11-19T00:54:49-05:00",
       "type": "patch",
