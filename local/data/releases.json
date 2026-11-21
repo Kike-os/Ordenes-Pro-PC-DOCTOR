@@ -8,6 +8,26 @@
   },
   "releases": [
     {
+      "version": "1.5.307",
+      "date": "2026-11-21T17:44:16-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Premium Animated Icons 3.0 (fase 1)",
+      "changes": {
+        "features": [
+          "Premium Animated Icons 3.0 (fase 1): componente único de iconos animados sobre Lucide, con microinteracciones breves al pasar el cursor, pulsar, seleccionar y en los avisos de éxito o error; sin animaciones en bucle y sin movimiento con «reducir movimiento» activado."
+        ],
+        "improvements": [
+          "Estados de orden con la misma identidad de color en toda la plataforma (cliente en ámbar, aprobación en violeta, reparación en azul, listo en verde, entregado en turquesa) y el indicador de saldo pendiente con icono propio, no solo color."
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Administración (autorización expresa en la sesión)"
+    },
+    {
       "version": "1.5.306",
       "date": "2026-11-19T14:30:03-05:00",
       "type": "patch",

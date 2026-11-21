@@ -4,6 +4,18 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.307 — 2026-11-21 17:44 (UTC-05:00)
+
+Premium Animated Icons 3.0 (fase 1)
+
+### Nuevas funcionalidades
+
+- Premium Animated Icons 3.0 (fase 1): componente único de iconos animados sobre Lucide, con microinteracciones breves al pasar el cursor, pulsar, seleccionar y en los avisos de éxito o error; sin animaciones en bucle y sin movimiento con «reducir movimiento» activado.
+
+### Mejoras realizadas
+
+- Estados de orden con la misma identidad de color en toda la plataforma (cliente en ámbar, aprobación en violeta, reparación en azul, listo en verde, entregado en turquesa) y el indicador de saldo pendiente con icono propio, no solo color.
+
 ## v1.5.306 — 2026-11-19 14:30 (UTC-05:00)
 
 Barra superior estable al recargar
