@@ -80,10 +80,42 @@ Es la misma identidad de color en las tarjetas del Centro de Operaciones, en el 
 
 ## Fases
 
-1. **1.5.307:** componente, capa de microinteracciones, navegación y barra, estados de orden e indicador de pago.
-2. Órdenes, Presupuestos, Cobertura, Caja y Gastos internos.
-3. Clientes, Equipos, Citas, Inventario, Repuestos, Licencias y Facturación.
-4. PQRS, Notificaciones, Correo, Atención, Reportes, Configuración y portal público, con la revisión de las animaciones infinitas sin utilidad. El fondo tecnológico y el orbe de ADI forman parte de la identidad y se conservan.
+1. **1.5.307:** componente, capa de microinteracciones, navegación y barra, colores de estado de orden e indicador de pago.
+2. **1.5.308 (fases 2, 3 y 4 juntas):** auditoría completa de todos los módulos internos y del portal público. La fase 2 (Órdenes, Presupuestos, Cobertura, Caja y Gastos internos) no necesitó cambios: ya usaba `systemIcon()`. Por eso las tres fases se publicaron en una sola versión.
+
+### Qué se corrigió en la 1.5.308
+
+- **Botones de documentos de la orden** (Comprobante de recepción, Imprimir ticket, Ticket digital, Etiqueta, Hoja de servicio, Descargar PDF, Condiciones, Compartir condiciones, Gestión técnica): `orderActionIcon()` usa ahora `animatedIcon()`, con los mismos trazados. Conservan su realce propio al pasar el cursor, sin duplicar movimiento, y reciben la pulsación común.
+- **Repuestos y envíos:** `rpIcon()` entra en el sistema común (`pa-icon`). La flecha se desliza, el chevrón baja y la campana se balancea.
+- **Portal público:**
+  - los pasos de «Agendar cita» y el chip de ADI;
+  - «Consultar estado», «Enviar solicitud» y el enlace de vuelta del seguimiento en PQRS;
+  - los chevrones del acceso;
+  - el desplegable del prefijo telefónico (`phone-input.js`).
+
+  Todos usan ahora la clase `pa-icon`.
+- **Animaciones en bucle revisadas.** El latido de «En vivo» (Centro de notificaciones) y la luz de estabilidad que «respira» (Sistema y ventana de estabilidad) avisan de algo real, así que se conservan con tres pulsos al aparecer o al cambiar de estado; después el color sigue indicando el estado. Se conservan sin cambios, como parte de la identidad:
+  - el fondo tecnológico, incluidas las señales y los nodos del acceso, que se detienen por completo con «reducir movimiento»;
+  - el orbe de ADI.
+
+### Auditoría (`iconaudit.mjs`)
+
+Recorre cada módulo y ventana y busca:
+
+- botones o enlaces con solo icono y sin nombre accesible;
+- iconos de control que no usan el sistema común;
+- iconos recortados o fuera de su control;
+- iconos desalineados con su texto (más de 2,5 px);
+- animaciones infinitas visibles sin un proceso real.
+
+Antes de usarla se comprobó que detecta fallos inyectados a propósito.
+
+Resultado de la 1.5.308, a 1440 y 390 px, sin ningún hallazgo:
+
+- **Rutas internas:** Órdenes; detalle de orden; editor de presupuesto en borrador y aprobado; Facturación; Caja; Clientes; Equipos; Citas; Inventario; Licencias; Ventas; PQRS; Notificaciones; Correo; Atención; Reportes; Configuración; Sistema; ADI; Mantenimientos; Actividad; Entregas; Inicio.
+- **Portal público:** acceso, citas, PQRS, seguimiento de PQRS, registro y recuperación.
+
+La única excepción, intencionada, es el fondo animado del acceso.
 
 ## Comprobación (fase 1)
 

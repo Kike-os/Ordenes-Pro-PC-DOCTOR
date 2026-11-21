@@ -38,7 +38,7 @@
   const wrap=mk('div','pi'),box=mk('div','pi-box'),pick=mk('span','pi-country'),code=mk('span','pi-code'),num=mk('input','pi-number'),msg=mk('small','pi-msg');
   // El selector de país no es un control «etiquetable»: así la etiqueta del formulario sigue nombrando al número (y el clic en ella lo enfoca).
   pick.setAttribute('role','button');pick.tabIndex=0;pick.setAttribute('aria-haspopup','listbox');pick.setAttribute('aria-expanded','false');pick.setAttribute('aria-controls',id+'-list');
-  const chevron=document.createElementNS('http://www.w3.org/2000/svg','svg');chevron.setAttribute('viewBox','0 0 24 24');chevron.setAttribute('aria-hidden','true');chevron.classList.add('pi-chev');chevron.innerHTML='<path d="m6 9 6 6 6-6"/>';
+  const chevron=document.createElementNS('http://www.w3.org/2000/svg','svg');chevron.setAttribute('viewBox','0 0 24 24');chevron.setAttribute('aria-hidden','true');chevron.classList.add('pi-chev','pa-icon');chevron.dataset.motion='drop';chevron.innerHTML='<path d="m6 9 6 6 6-6"/>';
   num.type='tel';num.inputMode='tel';num.autocomplete='tel-national';num.maxLength=24;num.spellcheck=false;
   if(source.id){num.id=source.id;source.id=source.id+'-e164';}
   for(const a of ['aria-describedby','aria-label','aria-labelledby','title'])if(source.hasAttribute(a))num.setAttribute(a,source.getAttribute(a));

@@ -13289,3 +13289,11 @@ svg.pa-icon[data-state=success]{color:#34d399}svg.pa-icon[data-state=error]{colo
 .tracking-item[data-status=listo],.oh-item[data-status=listo]{--tk:#22c55e;--tk-soft:#22c55e24}
 .tracking-item[data-status=entregado],.oh-item[data-status=entregado]{--tk:#2dd4bf;--tk-soft:#2dd4bf24}
 .status-label[data-status=entregado]{background:#0e2a2c;border-color:#2f7f78;color:#9be8dc;--ts-line:#2f7f78;--ts-bg:#0e2a2c;--ts-ink:#7fe6d6}
+
+/* ===== 1.5.308 · Premium Animated Icons 3.0 (fases 2–4) =====
+   Animaciones en bucle sin fin revisadas: el latido de «En vivo» (Centro de notificaciones) y la luz de estabilidad «respirando» (Sistema y
+   ventana de estabilidad) avisan de algo real, así que se conservan, pero con tres pulsos al aparecer o al cambiar de estado; después el color
+   sigue indicando el estado sin moverse. El fondo tecnológico y el orbe de ADI forman parte de la identidad y no cambian. */
+.pc2-live[data-state=ok] i{animation-iteration-count:3}
+.stability-dialog:is([data-state=observing],[data-state=verifying]) .stability-light{animation-iteration-count:3}
+.autocare[data-general=degraded] .autocare-light,.autocare[data-general=critical] .autocare-light{animation-iteration-count:3}
