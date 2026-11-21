@@ -4,6 +4,15 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.308 — 2026-11-21 18:21 (UTC-05:00)
+
+Premium Animated Icons 3.0 (fases 2 a 4)
+
+### Mejoras realizadas
+
+- Premium Animated Icons 3.0 (fases 2 a 4): los iconos de documentos de la orden, Repuestos y el portal público (citas, PQRS, acceso y prefijo telefónico) usan el sistema común de iconos animados; todos los módulos se auditaron en escritorio y móvil sin iconos sin nombre, cortados ni desalineados.
+- Animaciones en bucle revisadas: el latido de «En vivo» y la luz de estabilidad avisan con tres pulsos y luego el color indica el estado; el fondo tecnológico y el orbe de ADI se conservan.
+
 ## v1.5.307 — 2026-11-21 17:44 (UTC-05:00)
 
 Premium Animated Icons 3.0 (fase 1)
