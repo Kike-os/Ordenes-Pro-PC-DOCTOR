@@ -13236,3 +13236,56 @@ body[data-page=dashboard] dialog.quote-dialog.quote-pro{width:min(1680px,calc(10
    cuenta abierto y tapaban el nombre y el rol. Mientras el menú de cuenta o el de notificaciones está abierto, los avisos se apartan. */
 body[data-page=dashboard]:has(#account-panel:not([hidden]),#notify-panel:not([hidden])) #toast-region{opacity:0;visibility:hidden;transition:opacity .15s,visibility 0s .15s}
 @media(prefers-reduced-motion:reduce){body[data-page=dashboard] #toast-region{transition:none}}
+
+/* ===== 1.5.307 · Premium Animated Icons 3.0 (fase 1): capa común de microinteracciones =====
+   Se aplica a los iconos Lucide del sistema (.pa-icon de animatedIcon/systemIcon/operationIcon, .field-icon de las plantillas, .inv-icon de
+   Inventario) cuando están dentro de un control (botón, enlace, pestaña, opción, summary). El control va en :where() (no suma especificidad): las reglas compiten solo por el icono y la pulsación, escrita después, gana al hover. Solo animaciones de un disparo con translate, scale y
+   rotate: se suman a los transform propios de cada módulo (giro de chevrones…) sin pisarlos, no cambian dimensiones ni empujan el texto, y
+   duran 160–250 ms. No hay bucles: el giro continuo queda reservado a un proceso real (data-state=loading, data-busy, aria-busy).
+   Con «reducir movimiento» no se mueve nada (todo va dentro de prefers-reduced-motion: no-preference). */
+:root{--pa-ease:cubic-bezier(.22,.8,.32,1)}
+svg.pa-icon[data-size="14"]{width:14px;height:14px}svg.pa-icon[data-size="16"]{width:16px;height:16px}svg.pa-icon[data-size="18"]{width:18px;height:18px}
+svg.pa-icon[data-size="20"]{width:20px;height:20px}svg.pa-icon[data-size="22"]{width:22px;height:22px}svg.pa-icon[data-size="24"]{width:24px;height:24px}
+svg.pa-icon[data-size]{flex:none}
+svg.pa-icon[data-tone=gris]{color:#94a3b8}svg.pa-icon[data-tone=azul]{color:#60a5fa}svg.pa-icon[data-tone=ambar]{color:#f59e0b}svg.pa-icon[data-tone=violeta]{color:#a78bfa}
+svg.pa-icon[data-tone=verde]{color:#22c55e}svg.pa-icon[data-tone=turquesa]{color:#2dd4bf}svg.pa-icon[data-tone=rojo]{color:#f87171}
+@media(prefers-reduced-motion:no-preference){
+ /* Hover: movimiento suave según el tipo de icono (solo con ratón o lápiz; en pantallas táctiles no hay hover). */
+ @media(hover:hover){
+  :where(button,a[href],summary,[role=button],[role=tab],[role=menuitem],[role=option]):where(:not(:disabled,[aria-disabled=true],[data-busy],[aria-busy=true],.premium-header nav a)):where(:hover)>svg:is(.pa-icon,.field-icon,.inv-icon):not([data-still=true],[data-motion=none],[data-state=loading],.clock-face,.wx-art),:where(button,a[href],summary,[role=button],[role=tab],[role=menuitem],[role=option]):where(:not(:disabled,[aria-disabled=true],[data-busy],[aria-busy=true],.premium-header nav a)):where(:hover)>span>svg:is(.pa-icon,.field-icon,.inv-icon):not([data-still=true],[data-motion=none],[data-state=loading],.clock-face,.wx-art),:where(button,a[href],summary,[role=button],[role=tab],[role=menuitem],[role=option]):where(:not(:disabled,[aria-disabled=true],[data-busy],[aria-busy=true],.premium-header nav a)):where(:hover)>span>span>svg:is(.pa-icon,.field-icon,.inv-icon):not([data-still=true],[data-motion=none],[data-state=loading],.clock-face,.wx-art){animation:pa-nudge .22s var(--pa-ease) 1}
+  :where(button,a[href],summary,[role=button],[role=tab],[role=menuitem],[role=option]):where(:not(:disabled,[aria-disabled=true],[data-busy],[aria-busy=true],.premium-header nav a)):where(:hover)>svg.pa-icon[data-motion=slide],:where(button,a[href],summary,[role=button],[role=tab],[role=menuitem],[role=option]):where(:not(:disabled,[aria-disabled=true],[data-busy],[aria-busy=true],.premium-header nav a)):where(:hover)>span>svg.pa-icon[data-motion=slide],:where(button,a[href],summary,[role=button],[role=tab],[role=menuitem],[role=option]):where(:not(:disabled,[aria-disabled=true],[data-busy],[aria-busy=true],.premium-header nav a)):where(:hover)>span>span>svg.pa-icon[data-motion=slide]{animation:pa-slide .24s var(--pa-ease) 1}
+  :where(button,a[href],summary,[role=button],[role=tab],[role=menuitem],[role=option]):where(:not(:disabled,[aria-disabled=true],[data-busy],[aria-busy=true],.premium-header nav a)):where(:hover)>svg.pa-icon[data-motion=drop],:where(button,a[href],summary,[role=button],[role=tab],[role=menuitem],[role=option]):where(:not(:disabled,[aria-disabled=true],[data-busy],[aria-busy=true],.premium-header nav a)):where(:hover)>span>svg.pa-icon[data-motion=drop],:where(button,a[href],summary,[role=button],[role=tab],[role=menuitem],[role=option]):where(:not(:disabled,[aria-disabled=true],[data-busy],[aria-busy=true],.premium-header nav a)):where(:hover)>span>span>svg.pa-icon[data-motion=drop]{animation:pa-drop .22s var(--pa-ease) 1}
+  :where(button,a[href],summary,[role=button],[role=tab],[role=menuitem],[role=option]):where(:not(:disabled,[aria-disabled=true],[data-busy],[aria-busy=true],.premium-header nav a)):where(:hover)>svg.pa-icon[data-motion=turn],:where(button,a[href],summary,[role=button],[role=tab],[role=menuitem],[role=option]):where(:not(:disabled,[aria-disabled=true],[data-busy],[aria-busy=true],.premium-header nav a)):where(:hover)>span>svg.pa-icon[data-motion=turn],:where(button,a[href],summary,[role=button],[role=tab],[role=menuitem],[role=option]):where(:not(:disabled,[aria-disabled=true],[data-busy],[aria-busy=true],.premium-header nav a)):where(:hover)>span>span>svg.pa-icon[data-motion=turn]{animation:pa-turn .24s var(--pa-ease) 1}
+  :where(button,a[href],summary,[role=button],[role=tab],[role=menuitem],[role=option]):where(:not(:disabled,[aria-disabled=true],[data-busy],[aria-busy=true],.premium-header nav a)):where(:hover)>svg.pa-icon[data-motion=spin],:where(button,a[href],summary,[role=button],[role=tab],[role=menuitem],[role=option]):where(:not(:disabled,[aria-disabled=true],[data-busy],[aria-busy=true],.premium-header nav a)):where(:hover)>span>svg.pa-icon[data-motion=spin],:where(button,a[href],summary,[role=button],[role=tab],[role=menuitem],[role=option]):where(:not(:disabled,[aria-disabled=true],[data-busy],[aria-busy=true],.premium-header nav a)):where(:hover)>span>span>svg.pa-icon[data-motion=spin]{animation:pa-spin-once .45s var(--pa-ease) 1}
+  :where(button,a[href],summary,[role=button],[role=tab],[role=menuitem],[role=option]):where(:not(:disabled,[aria-disabled=true],[data-busy],[aria-busy=true],.premium-header nav a)):where(:hover)>svg.pa-icon[data-motion=ring],:where(button,a[href],summary,[role=button],[role=tab],[role=menuitem],[role=option]):where(:not(:disabled,[aria-disabled=true],[data-busy],[aria-busy=true],.premium-header nav a)):where(:hover)>span>svg.pa-icon[data-motion=ring],:where(button,a[href],summary,[role=button],[role=tab],[role=menuitem],[role=option]):where(:not(:disabled,[aria-disabled=true],[data-busy],[aria-busy=true],.premium-header nav a)):where(:hover)>span>span>svg.pa-icon[data-motion=ring]{animation:pa-ring .5s ease-in-out 1;transform-origin:50% 12%}
+  /* La navegación principal queda fuera (:not): conserva su propio realce aprobado (desplazamiento y brillo). */
+ }
+ /* Click: respuesta breve al presionar. */
+ :where(button,a[href],summary,[role=button],[role=tab],[role=menuitem],[role=option]):where(:not(:disabled,[aria-disabled=true],[data-busy],[aria-busy=true],.premium-header nav a)):where(:active)>svg:is(.pa-icon,.field-icon,.inv-icon):not([data-still=true],[data-state=loading],.clock-face,.wx-art),:where(button,a[href],summary,[role=button],[role=tab],[role=menuitem],[role=option]):where(:not(:disabled,[aria-disabled=true],[data-busy],[aria-busy=true],.premium-header nav a)):where(:active)>span>svg:is(.pa-icon,.field-icon,.inv-icon):not([data-still=true],[data-state=loading],.clock-face,.wx-art),:where(button,a[href],summary,[role=button],[role=tab],[role=menuitem],[role=option]):where(:not(:disabled,[aria-disabled=true],[data-busy],[aria-busy=true],.premium-header nav a)):where(:active)>span>span>svg:is(.pa-icon,.field-icon,.inv-icon):not([data-still=true],[data-state=loading],.clock-face,.wx-art){animation:pa-press .16s ease-out 1}
+ /* Selección: el icono del elemento que pasa a estar seleccionado da un pulso único (el color lo cambia cada módulo). */
+ :where([aria-current=page],[aria-current=true],[aria-selected=true],[aria-pressed=true])>svg:is(.pa-icon,.field-icon,.inv-icon):not([data-still=true],.clock-face,.wx-art),:where([aria-current=page],[aria-current=true],[aria-selected=true],[aria-pressed=true])>span>svg:is(.pa-icon,.field-icon,.inv-icon):not([data-still=true],.clock-face,.wx-art){animation:pa-select .24s var(--pa-ease) 1}
+ /* Éxito y error: una sola vez al aparecer (avisos y cualquier icono con data-state). */
+ svg.pa-icon[data-state=success],.toast[data-kind=success] .toast-icon svg{animation:pa-success .32s var(--pa-ease) 1}
+ svg.pa-icon[data-state=error],.toast[data-kind=error] .toast-icon svg{animation:pa-error .3s ease-in-out 1}
+ /* Carga: giro continuo solo mientras el código marca un proceso real. */
+ svg.pa-icon[data-state=loading]{animation:pa-loading .8s linear infinite}
+}
+svg.pa-icon[data-state=success]{color:#34d399}svg.pa-icon[data-state=error]{color:#f87171}
+@keyframes pa-nudge{0%{translate:0 0;scale:1}45%{translate:0 -1.5px;scale:1.08}100%{translate:0 0;scale:1}}
+@keyframes pa-slide{0%{translate:0 0}45%{translate:3px 0}100%{translate:0 0}}
+@keyframes pa-drop{0%{translate:0 0}45%{translate:0 2px}100%{translate:0 0}}
+@keyframes pa-turn{from{rotate:0deg}to{rotate:90deg}}
+@keyframes pa-spin-once{from{rotate:0deg}to{rotate:360deg}}
+@keyframes pa-ring{0%,100%{rotate:0deg}20%{rotate:14deg}40%{rotate:-11deg}60%{rotate:7deg}80%{rotate:-3deg}}
+@keyframes pa-press{0%{scale:1}40%{scale:.86}100%{scale:1}}
+@keyframes pa-select{0%{scale:.82}60%{scale:1.12}100%{scale:1}}
+@keyframes pa-success{0%{scale:.6;opacity:.35}60%{scale:1.14;opacity:1}100%{scale:1;opacity:1}}
+@keyframes pa-error{0%,100%{translate:0 0}25%{translate:-2px 0}50%{translate:2px 0}75%{translate:-1px 0}}
+@keyframes pa-loading{to{rotate:360deg}}
+/* Indicador financiero: icono propio (cartera o check) en lugar del punto de color, para no depender solo del color. */
+.finance-badge svg.pa-icon{flex:none;width:13px;height:13px}
+/* Identidad de color de los estados (igual que las tarjetas del Centro de Operaciones): Listo para entregar en verde y Entregado en
+   turquesa también en Seguimiento de Órdenes y en la etiqueta de estado de las listas. */
+.tracking-item[data-status=listo],.oh-item[data-status=listo]{--tk:#22c55e;--tk-soft:#22c55e24}
+.tracking-item[data-status=entregado],.oh-item[data-status=entregado]{--tk:#2dd4bf;--tk-soft:#2dd4bf24}
+.status-label[data-status=entregado]{background:#0e2a2c;border-color:#2f7f78;color:#9be8dc;--ts-line:#2f7f78;--ts-bg:#0e2a2c;--ts-ink:#7fe6d6}
