@@ -1214,24 +1214,6 @@ class Handler(BaseHTTPRequestHandler):
             content_type = 'image/png' if file.suffix == '.png' else 'image/x-icon' if file.suffix == '.ico' else ('text/css; charset=utf-8' if file.suffix == '.css' else 'text/javascript; charset=utf-8')
             return self.reply(200, file.read_bytes(), content_type)
         with connect() as c:
-            if path == '/api/backups/onedrive/callback':
-                # 1.5.309 · Vuelta desde Microsoft tras vincular OneDrive. La valida el «state» (aleatorio, de un solo uso, 10 minutos y
-                # ligado al administrador que la inició). La página vuelve a Configuración desde el propio sitio, donde la sesión sí viaja.
-                import onedrive_backup
-                query=parse_qs(urlsplit(self.path).query);ok=False
-                if query.get('error'):message=onedrive_backup.explain(query.get('error',[''])[0][:80],query.get('error_description',[''])[0][:300])+' No se guardó nada.'
-                else:
-                    try:
-                        link=onedrive_backup.finish_link(c,query.get('state',[''])[0],query.get('code',[''])[0]);ok=True
-                        audit(c,link['linked_by'],'onedrive_linked');message='OneDrive quedó vinculado con la cuenta '+link['account']+'.'
-                    except onedrive_backup.BackupError as error:message=str(error)
-                target='/#settings?tab=backups&onedrive='+('ok' if ok else 'error')
-                page=('<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
-                      '<meta http-equiv="refresh" content="3;url='+html.escape(target)+'"><title>Respaldos en OneDrive · Órdenes Pro</title>'
-                      '<link rel="stylesheet" href="/static/app.css"></head><body class="auth-page onedrive-return"><main class="onedrive-return-card" role="status">'
-                      '<h1>'+('OneDrive vinculado' if ok else 'No se pudo vincular OneDrive')+'</h1><p>'+html.escape(message)+'</p>'
-                      '<p><a class="primary" href="'+html.escape(target)+'">Volver a Configuración → Respaldos</a></p></main></body></html>')
-                return self.reply(200 if ok else 400,page,'text/html; charset=utf-8')
             if path == '/citas':
                 return self.page('appointments.html')
             if path in ('/pqrs','/pqrs/seguimiento'):
@@ -1319,14 +1301,6 @@ class Handler(BaseHTTPRequestHandler):
                         campaigns.process(c,campaign,now,owner,lambda conn,subject,text,title,email,actor,private:send_institutional(conn,'campaign',title,email,subject,text,None,actor,review=False,private=private)['archive_id'],budget=8)
                 except Exception as error:print('campaigns cron',type(error).__name__,flush=True)
                 return self.reply(200,{'ok':True})
-            if path == '/api/cron/backup':
-                # 1.5.310 · Respaldo diario en OneDrive (vercel.json, 07:00 UTC = 02:00 Ecuador), en una función propia de hasta 300 s.
-                # Solo responde a la llamada autenticada de la plataforma (CRON_SECRET). Sin OneDrive listo anota por qué no se hizo.
-                expected=os.getenv('CRON_SECRET','')
-                if not expected or not hmac.compare_digest(self.headers.get('Authorization',''),'Bearer '+expected):return self.reply(404,{'error':'No encontrado.'})
-                import onedrive_backup
-                outcome=onedrive_backup.scheduled(c)
-                return self.reply(200,{'ok':outcome.get('status')!='error'})
             if path == '/api/cron/reminders':
                 # Con CRON_SECRET definido solo responde a la llamada autenticada de la plataforma. No envía nada si los avisos están apagados.
                 expected=os.getenv('CRON_SECRET','')
@@ -2589,9 +2563,10 @@ class Handler(BaseHTTPRequestHandler):
                 try:return self.reply(200,autocare.service_detail(c,autocare_service[1],reception_now()))
                 except LookupError as error:return self.reply(404,{'error':str(error)})
             if path == '/api/backups':
+                # 1.5.311 · Respaldos en MEGA: estado que informa el agente del equipo de la oficina, historial, órdenes y pendientes.
                 if user['role']!='administrador':return self.reply(403,{'error':'Solo administración gestiona los respaldos.'})
-                import onedrive_backup
-                return self.reply(200,onedrive_backup.overview(c,True))
+                import backups
+                return self.reply(200,backups.overview(c))
             if path == '/api/system':
                 try:return self.reply(200, versioning.overview())
                 except versioning.RegistryError as error:return self.reply(500,{'error':str(error)})
@@ -3613,34 +3588,18 @@ class Handler(BaseHTTPRequestHandler):
                     for key,value in values.items():c.execute('INSERT INTO auth_policy VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value',(key,value))
                     audit(c,user['id'],'auth_policy_updated')
                     return self.reply(200,{'ok':True})
-                if path in ('/api/backups/onedrive/connect','/api/backups/onedrive/disconnect','/api/backups/run','/api/backups/onedrive/app'):
-                    # 1.5.309 · Respaldos en OneDrive: vincular, desvincular y pedir respaldo, verificación o restauración aislada.
+                if path=='/api/backups/request':
+                    # 1.5.311 · Órdenes del panel al agente de respaldos (MEGA): respaldo ahora, verificar, restaurar aislado, descargar,
+                    # espacio, carpeta y reintentar. El agente las ejecuta en el equipo de la oficina; el servidor nunca toca la cuenta MEGA.
                     if user['role']!='administrador':return self.reply(403,{'error':'Solo administración gestiona los respaldos.'})
-                    import onedrive_backup
-                    try:
-                        if path.endswith('/connect'):
-                            url=onedrive_backup.start_link(c,user['id']);audit(c,user['id'],'onedrive_link_started')
-                            return self.reply(200,{'ok':True,'url':url})
-                        if path.endswith('/app'):
-                            # Paso 1 del asistente: datos de la aplicación de Microsoft; el secreto se guarda cifrado y nunca se devuelve.
-                            if str(data.get('action',''))=='clear':
-                                onedrive_backup.clear_app_config(c);audit(c,user['id'],'onedrive_app_cleared')
-                            else:
-                                onedrive_backup.save_app_config(c,data,user['id']);audit(c,user['id'],'onedrive_app_saved')
-                            return self.reply(200,{'ok':True,'backups':onedrive_backup.overview(c,True)})
-                        if path.endswith('/disconnect'):
-                            onedrive_backup.unlink(c);audit(c,user['id'],'onedrive_unlinked')
-                            return self.reply(200,{'ok':True,'backups':onedrive_backup.overview(c,True)})
-                        kind=str(data.get('kind','respaldo'))
-                        if kind=='restauracion' and str(data.get('confirm',''))!='RESTAURAR':
-                            return self.reply(400,{'error':'Escribe RESTAURAR para confirmar la restauración de prueba.'})
-                        audit(c,user['id'],'backup_requested_'+kind);c.commit()
-                        try:run=onedrive_backup.request_run(c,user['id'],kind,str(data.get('file',''))[:120])
-                        except onedrive_backup.BackupError as error:
-                            return self.reply(error.status,{'error':str(error),'backups':onedrive_backup.overview(c,True)})
-                        return self.reply(200,{'ok':True,'run':run,'backups':onedrive_backup.overview(c,True)})
-                    except onedrive_backup.BackupError as error:
-                        return self.reply(error.status,{'error':str(error),'fields':getattr(error,'fields',{})})
+                    import backups
+                    action=str(data.get('action',''));file=str(data.get('file',''))[:120]
+                    if action=='restaurar' and str(data.get('confirm',''))!='RESTAURAR':
+                        return self.reply(400,{'error':'Escribe RESTAURAR para confirmar la restauración en un entorno aislado.'})
+                    try:entry=backups.request(c,user['id'],action,file)
+                    except backups.BackupError as error:return self.reply(error.status,{'error':str(error)})
+                    audit(c,user['id'],'backup_request_'+action)
+                    return self.reply(202,{'ok':True,'request':entry,'backups':backups.overview(c)})
                 if path in ('/api/payments/factors/confirm','/api/payments/factors/edit'):
                     # Factores DATAFAST: confirmación y corrección administrativas, con quién, cuándo y el documento (registro que no se modifica).
                     if user['role']!='administrador':return self.reply(403,{'error':'Solo administración confirma o corrige los factores.'})

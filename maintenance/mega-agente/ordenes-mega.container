@@ -1,0 +1,17 @@
+# Quadlet de Podman (usuario, sin privilegios): contenedor con MEGAcmd oficial, siempre encendido. Lo instala instalar.sh.
+[Unit]
+Description=MEGAcmd oficial para los respaldos de Órdenes Pro
+After=network-online.target
+
+[Container]
+Image=localhost/ordenes-mega:2.7.1
+ContainerName=ordenes-mega
+Volume=%h/.local/share/ordenes-pro/mega-sesion:/root/.megaCmd:Z
+Volume=%h/Respaldos-OrdenesPro/mega-intercambio:%h/Respaldos-OrdenesPro/mega-intercambio:Z
+
+[Service]
+Restart=always
+RestartSec=20
+
+[Install]
+WantedBy=default.target

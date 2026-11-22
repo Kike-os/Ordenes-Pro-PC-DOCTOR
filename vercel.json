@@ -1,14 +1,6 @@
 {
   "rewrites": [
     {
-      "source": "/api/backups/run",
-      "destination": "/api/backup?__path=/api/backups/run"
-    },
-    {
-      "source": "/api/cron/backup",
-      "destination": "/api/backup?__path=/api/cron/backup"
-    },
-    {
       "source": "/(.*)",
       "destination": "/api/index?__path=/$1"
     }
@@ -16,9 +8,6 @@
   "functions": {
     "api/index.py": {
       "maxDuration": 30
-    },
-    "api/backup.py": {
-      "maxDuration": 300
     }
   },
   "crons": [
@@ -33,10 +22,6 @@
     {
       "path": "/api/cron/stability-night",
       "schedule": "0 22 * * *"
-    },
-    {
-      "path": "/api/cron/backup",
-      "schedule": "0 7 * * *"
     }
   ]
 }

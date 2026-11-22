@@ -1,0 +1,18 @@
+[Unit]
+Description=Agente de respaldos de Órdenes Pro (MEGA): estado, órdenes del panel, reintentos y pruebas semanales
+After=network-online.target ordenes-mega.service
+Wants=ordenes-mega.service
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+WorkingDirectory=/home/admin-red/Work/Ordenes-Pro-PC-DOCTOR
+Environment=PATH=/home/admin-red/.local/share/mise/installs/node/26.10.0/bin:/usr/local/bin:/usr/bin
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/home/admin-red/.local/share/mise/installs/node/26.10.0/bin/vercel env run -e production -- /home/admin-red/.local/share/ordenes-pro/venv/bin/python maintenance/backup-cloud.py --agente
+Restart=always
+RestartSec=30
+UMask=0077
+
+[Install]
+WantedBy=default.target
