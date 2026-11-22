@@ -329,6 +329,24 @@ class WhatsAppBusinessTests(unittest.TestCase):
             self.assertEqual((history['total'], history['rows'][0]['event'], history['counts']['enviado']), (1, 'prueba', 1))
             self.assertNotIn('593987654321', json.dumps(history))  # el número se muestra enmascarado
 
+    def test_custom_test_template_sends_sample_parameters_and_rejects_sender_number(self):
+        cookie, csrf, post = self.session()
+        with patch.dict(app.os.environ, FAKE):
+            post('/api/whatsapp/settings', test_number='0980000000', test_template='pcdoctor_aviso', test_lang='es')
+            post('/api/whatsapp/check')
+            same_number = post('/api/whatsapp/test', confirm=True)
+            self.assertEqual(same_number['status'], 400, same_number['body'])
+            self.assertIn('distinto', same_number['body']['error'].lower())
+            self.assertEqual(self.meta.sends(), [])
+            post('/api/whatsapp/settings', test_number='0987654321')
+            got = post('/api/whatsapp/test', confirm=True)
+            self.assertEqual((got['status'], got['body']['item']['status']), (200, 'enviado'), got['body'])
+            payload = self.meta.sends()[0][3]
+            self.assertEqual((payload['to'], payload['template']['name'], payload['template']['language']['code']),
+                             ('593987654321', 'pcdoctor_aviso', 'es'))
+            params = [p['text'] for p in payload['template']['components'][0]['parameters']]
+            self.assertEqual(params, ['Prueba PC-DOCTOR', 'PRUEBA-0001', 'Mensaje de prueba de PC-DOCTOR.'])
+
     def test_delivery_reminders_once_per_term(self):
         cookie, csrf, post = self.session()
         with patch.dict(app.os.environ, FAKE):
