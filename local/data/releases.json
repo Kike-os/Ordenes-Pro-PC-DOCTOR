@@ -8,6 +8,26 @@
   },
   "releases": [
     {
+      "version": "1.5.313",
+      "date": "2026-11-22T00:15:21-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Respaldo completo en Google Drive",
+      "changes": {
+        "features": [
+          "Respaldo completo en Google Drive: además de la base (con fotos, documentos y firmas) guarda el código con su versión, la configuración y credenciales cifradas, las tareas programadas, las dependencias y las instrucciones para reconstruir Órdenes Pro; botón «Crear respaldo completo ahora» con progreso, fecha, tamaño y resultado."
+        ],
+        "improvements": [
+          "Restauración de prueba completa: arranca el sistema restaurado en un entorno aislado, sin red de salida ni credenciales, y comprueba sesión, órdenes, clientes, catálogo y el PDF de una orden; el panel muestra qué contiene cada respaldo y nunca lo llama completo si falta algo."
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Administración (autorización expresa en la sesión)"
+    },
+    {
       "version": "1.5.312",
       "date": "2026-11-21T22:55:29-05:00",
       "type": "patch",

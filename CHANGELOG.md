@@ -4,6 +4,18 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.313 — 2026-11-22 00:15 (UTC-05:00)
+
+Respaldo completo en Google Drive
+
+### Nuevas funcionalidades
+
+- Respaldo completo en Google Drive: además de la base (con fotos, documentos y firmas) guarda el código con su versión, la configuración y credenciales cifradas, las tareas programadas, las dependencias y las instrucciones para reconstruir Órdenes Pro; botón «Crear respaldo completo ahora» con progreso, fecha, tamaño y resultado.
+
+### Mejoras realizadas
+
+- Restauración de prueba completa: arranca el sistema restaurado en un entorno aislado, sin red de salida ni credenciales, y comprueba sesión, órdenes, clientes, catálogo y el PDF de una orden; el panel muestra qué contiene cada respaldo y nunca lo llama completo si falta algo.
+
 ## v1.5.312 — 2026-11-21 22:55 (UTC-05:00)
 
 Respaldos en Google Drive
