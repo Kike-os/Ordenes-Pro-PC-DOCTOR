@@ -15,6 +15,7 @@ from unittest.mock import patch
 import test_part_requests as parts
 import app
 import whatsapp_business as wa
+import whatsapp_adi
 
 FAKE = {'WHATSAPP_TOKEN': 'token-ficticio-NO-REAL-9f8e7d6c', 'WHATSAPP_PHONE_NUMBER_ID': '100000000001234', 'WHATSAPP_BUSINESS_ACCOUNT_ID': '200000000005678',
         'WHATSAPP_APP_SECRET': 'secreto-ficticio-app', 'WHATSAPP_VERIFY_TOKEN': 'verificacion-ficticia-xyz'}
@@ -381,6 +382,52 @@ class WhatsAppBusinessTests(unittest.TestCase):
             msg = wa.compose('cita_confirmada', info, settings)
             self.assertEqual(msg['params'][:2], ['Cliente', 'CITA-0001'])
             self.assertIn('12/11/2026', msg['params'][2])
+
+    def test_inbound_message_gets_one_adi_reply_and_duplicates_are_ignored(self):
+        env = dict(FAKE, WHATSAPP_ADI_AUTO_REPLY='true')
+        payload = {'entry': [{'changes': [{'value': {'messages': [
+            {'id': 'wamid.INBOUND-FICTICIO-1', 'from': '593991234567', 'type': 'text', 'text': {'body': '¿Qué servicios técnicos ofrecen?'}}
+        ]}}]}]}
+        raw = json.dumps(payload).encode()
+        signature = 'sha256=' + hmac.new(FAKE['WHATSAPP_APP_SECRET'].encode(), raw, hashlib.sha256).hexdigest()
+        with patch.dict(app.os.environ, env), patch.object(whatsapp_adi.adi, 'reply', return_value='Atendemos equipos de cómputo e impresoras.'):
+            with app.connect() as c:
+                result = whatsapp_adi.handle(c, raw, signature, app.reception_now(), env)
+                self.assertEqual(result, {'processed': 1, 'sent': 1})
+                duplicate = whatsapp_adi.handle(c, raw, signature, app.reception_now(), env)
+                self.assertEqual(duplicate, {'processed': 0, 'sent': 0})
+                saved = c.execute("SELECT status,provider_id FROM whatsapp_adi_inbound WHERE wa_message_id='wamid.INBOUND-FICTICIO-1'").fetchone()
+                messages = c.execute("SELECT author,content FROM adi_messages ORDER BY id").fetchall()
+            self.assertEqual((saved['status'], saved['provider_id']), ('enviado', 'wamid.FICTICIO1'))
+            self.assertEqual([row['author'] for row in messages], ['client', 'adi'])
+            self.assertEqual(messages[-1]['content'], 'Atendemos equipos de cómputo e impresoras.')
+            self.assertEqual(self.meta.sends()[0][3]['to'], '593991234567')
+            self.assertEqual(self.meta.sends()[0][3]['payload'] if 'payload' in self.meta.sends()[0][3] else self.meta.sends()[0][3]['type'], 'text')
+
+    def test_inbound_baja_is_never_sent_to_adi_or_replied_to(self):
+        env = dict(FAKE, WHATSAPP_ADI_AUTO_REPLY='true')
+        payload = {'entry': [{'changes': [{'value': {'messages': [
+            {'id': 'wamid.INBOUND-BAJA', 'from': '593991234567', 'type': 'text', 'text': {'body': 'BAJA'}}
+        ]}}]}]}
+        raw = json.dumps(payload).encode()
+        signature = 'sha256=' + hmac.new(FAKE['WHATSAPP_APP_SECRET'].encode(), raw, hashlib.sha256).hexdigest()
+        with patch.dict(app.os.environ, env), patch.object(whatsapp_adi.adi, 'reply') as reply:
+            with app.connect() as c:
+                result = whatsapp_adi.handle(c, raw, signature, app.reception_now(), env)
+            self.assertEqual(result, {'processed': 0, 'sent': 0})
+            reply.assert_not_called()
+            self.assertEqual(self.meta.sends(), [])
+
+    def test_inbound_ai_replies_are_disabled_without_server_flag(self):
+        payload = {'entry': [{'changes': [{'value': {'messages': [
+            {'id': 'wamid.INBOUND-DISABLED', 'from': '593991234567', 'type': 'text', 'text': {'body': 'Hola'}}
+        ]}}]}]}
+        raw = json.dumps(payload).encode()
+        signature = 'sha256=' + hmac.new(FAKE['WHATSAPP_APP_SECRET'].encode(), raw, hashlib.sha256).hexdigest()
+        with patch.dict(app.os.environ, FAKE, clear=True), app.connect() as c:
+            result = whatsapp_adi.handle(c, raw, signature, app.reception_now(), FAKE)
+        self.assertEqual(result, {'processed': 0, 'sent': 0})
+        self.assertEqual(self.meta.sends(), [])
 
 
 if __name__ == '__main__':
