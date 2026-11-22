@@ -402,7 +402,8 @@ class WhatsAppBusinessTests(unittest.TestCase):
             self.assertEqual([row['author'] for row in messages], ['client', 'adi'])
             self.assertEqual(messages[-1]['content'], 'Atendemos equipos de cómputo e impresoras.')
             self.assertEqual(self.meta.sends()[0][3]['to'], '593991234567')
-            self.assertEqual(self.meta.sends()[0][3]['payload'] if 'payload' in self.meta.sends()[0][3] else self.meta.sends()[0][3]['type'], 'text')
+            self.assertEqual(self.meta.sends()[0][3]['type'], 'text')
+            self.assertEqual(self.meta.sends()[0][3]['text']['body'], 'Atendemos equipos de cómputo e impresoras.')
 
     def test_inbound_baja_is_never_sent_to_adi_or_replied_to(self):
         env = dict(FAKE, WHATSAPP_ADI_AUTO_REPLY='true')
