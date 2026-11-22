@@ -1,0 +1,32 @@
+{
+  // Entorno de DESARROLLO de Órdenes Pro en GitHub Codespaces. No es producción.
+  // Imagen predeterminada de Codespaces: ya trae Python, Node y Git, arranca rápido y GitHub no la cuenta
+  // en el almacenamiento de la cuota gratuita. Ver docs/CODESPACES.md.
+  "name": "Órdenes Pro · desarrollo",
+  "image": "mcr.microsoft.com/devcontainers/universal:2",
+
+  // Máquina más pequeña (2 núcleos): gasta 2 horas-núcleo por hora y alcanza de sobra para el proyecto.
+  "hostRequirements": { "cpus": 2 },
+
+  // Base local vacía en local/var/ (separada de producción) y dependencias de Python.
+  "postCreateCommand": "bash .devcontainer/preparar.sh",
+
+  // Los puertos de Codespaces son privados por defecto: solo tu cuenta de GitHub puede abrirlos. No los hagas públicos.
+  "forwardPorts": [8010, 8011],
+  "portsAttributes": {
+    "8010": { "label": "Órdenes Pro · VS Code de escritorio", "onAutoForward": "notify" },
+    "8011": { "label": "Órdenes Pro · navegador (github.dev)", "onAutoForward": "notify" }
+  },
+
+  "containerEnv": { "ORDENES_ENTORNO": "codespaces" },
+
+  "customizations": {
+    "vscode": {
+      "extensions": ["ms-python.python"],
+      "settings": {
+        "files.autoSave": "afterDelay",
+        "files.autoSaveDelay": 1000
+      }
+    }
+  }
+}
