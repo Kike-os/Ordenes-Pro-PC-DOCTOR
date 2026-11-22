@@ -8,6 +8,26 @@
   },
   "releases": [
     {
+      "version": "1.5.312",
+      "date": "2026-11-21T22:55:29-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Respaldos en Google Drive",
+      "changes": {
+        "features": [
+          "Respaldos en Google Drive: el propio servidor guarda cada día a las 02:00 (con reintentos a las 04:00 y 07:00) una copia cifrada en PC-DOCTOR S.A./Órdenes Pro/Respaldos Base de Datos, sin depender de la oficina ni de Podman, y la verifica con el SHA-256 de Google, descargándola y restaurándola aislada."
+        ],
+        "improvements": [
+          "Configuración → Respaldos · Google Drive: conectar con Google (sin pedir la contraseña en Órdenes Pro), verificar conexión, crear carpeta, respaldo ahora, verificar integridad, restauración de prueba, espacio, historial y alertas; solo indica «Protegido» tras un respaldo verificado. Se retira MEGA."
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Administración (autorización expresa en la sesión)"
+    },
+    {
       "version": "1.5.311",
       "date": "2026-11-21T22:01:33-05:00",
       "type": "patch",

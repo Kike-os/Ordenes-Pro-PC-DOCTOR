@@ -4,6 +4,18 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.312 — 2026-11-21 22:55 (UTC-05:00)
+
+Respaldos en Google Drive
+
+### Nuevas funcionalidades
+
+- Respaldos en Google Drive: el propio servidor guarda cada día a las 02:00 (con reintentos a las 04:00 y 07:00) una copia cifrada en PC-DOCTOR S.A./Órdenes Pro/Respaldos Base de Datos, sin depender de la oficina ni de Podman, y la verifica con el SHA-256 de Google, descargándola y restaurándola aislada.
+
+### Mejoras realizadas
+
+- Configuración → Respaldos · Google Drive: conectar con Google (sin pedir la contraseña en Órdenes Pro), verificar conexión, crear carpeta, respaldo ahora, verificar integridad, restauración de prueba, espacio, historial y alertas; solo indica «Protegido» tras un respaldo verificado. Se retira MEGA.
+
 ## v1.5.311 — 2026-11-21 22:01 (UTC-05:00)
 
 Respaldos en MEGA Cloud
