@@ -4,6 +4,18 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.311 — 2026-11-21 22:01 (UTC-05:00)
+
+Respaldos en MEGA Cloud
+
+### Nuevas funcionalidades
+
+- Respaldos en MEGA Cloud: un agente en el equipo de la oficina, con la herramienta oficial de MEGA, guarda cada día a las 02:00 una copia cifrada en PC-DOCTOR S.A./Ordenes Pro/Respaldos Base de Datos y la verifica descargándola y restaurándola aislada; si MEGA o internet fallan, queda pendiente y se reintenta sola.
+
+### Mejoras realizadas
+
+- Configuración → Respaldos: estado del agente, conexión y espacio de MEGA, último respaldo local y en MEGA, pendientes, órdenes (respaldo ahora, verificar, descargar, restaurar aislado, reintentar) e historial. Se retira la integración con Microsoft OneDrive; la copia local se mantiene.
+
 ## v1.5.310 — 2026-11-21 20:39 (UTC-05:00)
 
 Asistente de OneDrive y respaldo en el servidor
