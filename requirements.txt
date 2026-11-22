@@ -1,2 +1,4 @@
 # Dependencias que instala Vercel; deben coincidir con local/requirements.txt.
 argon2-cffi>=23.1.0,<26
+# Cifrado AES-256-GCM de los respaldos en Google Drive (1.5.312), hecho en el servidor.
+cryptography>=43,<47

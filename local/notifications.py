@@ -324,10 +324,10 @@ def build(c, user, now, mail_access=False, hidden=False, limit=40):
             items.append({'key': 'storage:local', 'kind': 'warning', 'icon': 'status', 'title': 'Esta instalación usa una base de datos local', 'detail': 'Lo que registres aquí queda solo en este equipo, no en la base central en la nube.', 'at': stamp, 'href': '#system', 'group': 'alert'})
         else:
             try:
-                # 1.5.311 · Alertas de respaldo separadas y reales: atrasado (sin respaldo VERIFICADO en 30 h), último respaldo en MEGA
-                # fallido, pendientes sin subir, MEGA desconectado, agente sin señal y espacio casi lleno. Se retiran solas al corregirse.
-                import backups
-                for alert_item in backups.alerts(c, now):
+                # 1.5.312 · Alertas de respaldo separadas y reales: atrasado (sin respaldo VERIFICADO en 30 h), último respaldo en Google
+                # Drive fallido, conexión vencida, sin copia en la nube y espacio casi lleno. Se retiran solas al corregirse.
+                import gdrive_backup
+                for alert_item in gdrive_backup.alerts(c, now):
                     items.append(dict(alert_item, icon='status', at=stamp, href='#settings?tab=backups', group='alert'))
             except Exception:
                 pass

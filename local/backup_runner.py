@@ -1,10 +1,10 @@
-"""Motor de respaldos de Órdenes Pro y AGENTE MEGA (1.5.311). Corre en el equipo de la oficina (maintenance/backup-cloud.py).
+"""Motor de respaldos de Órdenes Pro (1.5.312): copia consistente, cifrado, verificación y Google Drive (en el servidor).
 
 Procedimiento: el esquema y todas las filas de la base central se leen dentro de UNA transacción de lectura (instantánea consistente) y
-se escriben en una base SQLite nueva, comprobada con integrity_check, foreign_key_check y el recuento de cada tabla. Esa copia queda en el
-equipo (copia local independiente) y, comprimida y cifrada (AES-256-GCM), pasa a la cola de PENDIENTES en disco. Desde ahí se sube a MEGA
-con MEGAcmd OFICIAL, se DESCARGA de nuevo, se compara el SHA-256, se descifra y se restaura en una base aislada: solo entonces cuenta
-como respaldada en MEGA. Si MEGA o internet fallan, sigue pendiente y se reintenta. Nunca se registran datos de clientes: solo recuentos."""
+se escriben en una base SQLite nueva, comprobada con integrity_check, foreign_key_check y el recuento de cada tabla. Para Google Drive se
+comprime (gzip) y se cifra (AES-256-GCM con BACKUP_ENCRYPTION_KEY), se sube, se compara con el SHA-256 que calcula Google, se DESCARGA,
+se descifra y se restaura en una base aislada: solo entonces cuenta como respaldado. La copia local del equipo de la oficina
+(maintenance/backup-cloud.py) es independiente. Nunca se registran datos de clientes: solo recuentos."""
 import base64
 import gzip
 import hashlib
@@ -13,8 +13,6 @@ import os
 import secrets
 import shutil
 import sqlite3
-import shlex
-import subprocess
 import tempfile
 import time
 from datetime import datetime, timedelta, timezone
@@ -214,7 +212,7 @@ def encryption_key():
     except ValueError:
         key = b''
     if len(key) != 32:
-        raise KeyMissing('Falta la clave de cifrado de los respaldos (BACKUP_ENCRYPTION_KEY o el archivo ~/.config/ordenes-pro/backup.key en el equipo del agente). Sin ella no se cifra ni se recupera ningún respaldo.')
+        raise KeyMissing('Falta la clave de cifrado de los respaldos (BACKUP_ENCRYPTION_KEY en el servidor, o ~/.config/ordenes-pro/backup.key en el equipo). Sin ella no se cifra ni se recupera ningún respaldo.')
     return key
 
 
@@ -251,408 +249,140 @@ def restore_check(blob, expected_sha=None):
 
 
 
-# ================================================================ AGENTE MEGA (MEGAcmd oficial)
-REMOTE = '/' + 'PC-DOCTOR S.A./Ordenes Pro/Respaldos Base de Datos'
-DEFAULT_EXCHANGE = Path.home() / 'Respaldos-OrdenesPro' / 'mega-intercambio'
-AGENT_VERSION = '1.5.311'
-
-
-def exchange_dir():
-    """Carpeta compartida con el contenedor de MEGAcmd (misma ruta dentro y fuera). Persistente: sobrevive a reinicios y cortes."""
-    folder = Path(os.getenv('MEGA_EXCHANGE_DIR', str(DEFAULT_EXCHANGE)))
-    for sub in ('', 'pendientes', 'verificacion'):
-        (folder / sub).mkdir(parents=True, exist_ok=True)
-        os.chmod(folder / sub, 0o700)
-    return folder
-
-
-class MegaError(RuntimeError):
-    pass
-
-
-class Mega:
-    """Llamadas a MEGAcmd. Por defecto dentro del contenedor «ordenes-mega» (paquete oficial de MEGA para Ubuntu 24.04).
-    Nunca recibe ni guarda la contraseña: usa la sesión iniciada una vez en el equipo con mega-login."""
-
-    def __init__(self, prefix=None):
-        self.prefix = shlex.split(prefix if prefix is not None else os.getenv('MEGA_CMD', 'podman exec ordenes-mega'))
-
-    def run(self, command, *args, timeout=900, check=True):
-        try:
-            done = subprocess.run(self.prefix + [command, *args], capture_output=True, text=True, timeout=timeout)
-        except FileNotFoundError:
-            raise MegaError('MEGAcmd no está instalado o el contenedor «ordenes-mega» no existe en este equipo.') from None
-        except subprocess.TimeoutExpired:
-            raise MegaError(command + ' no respondió a tiempo (conexión lenta o caída).') from None
-        text = (done.stdout or '') + (done.stderr or '')
-        if check and done.returncode != 0:
-            raise MegaError(command + ' falló (código %d): %s' % (done.returncode, ' '.join(text.split())[:200]))
-        return done.returncode, text
-
-    def whoami(self):
-        """Cuenta con sesión iniciada, None si no hay sesión. Un fallo de red NO se confunde con «sin sesión»: se informa tal cual."""
-        import re
-        code, text = self.run('mega-whoami', check=False, timeout=60)
-        found = re.search(r'[\w.+-]+@[\w-]+(\.[\w-]+)+', text)
-        if code == 0 and found:
-            return found.group(0)
-        if re.search(r'not logged in|no.*sesi', text, re.I):
-            return None
-        raise MegaError('Sin conexión con MEGA: ' + ' '.join(text.split())[:180])
-
-    def space(self):
-        import re
-        code, text = self.run('mega-df', check=False, timeout=120)
-        found = re.search(r'USED STORAGE:\s*(\d+)\s+[\d.,]+%\s+of\s+(\d+)', text)
-        return {'used': int(found[1]), 'total': int(found[2])} if code == 0 and found else None
-
-    def mkdir(self, path):
-        self.run('mega-mkdir', '-p', path, check=False, timeout=120)
-        if self.run('mega-ls', path, check=False, timeout=120)[0] != 0:
-            raise MegaError('No se pudo crear la carpeta ' + path + ' en MEGA.')
-
-    def ls(self, path):
-        code, text = self.run('mega-ls', path, check=False, timeout=120)
-        if code != 0:
-            raise MegaError('No se pudo leer la carpeta de respaldos en MEGA.')
-        return [line.strip() for line in text.splitlines() if line.strip()]
-
-    def put(self, local, remote_dir):
-        self.run('mega-put', str(local), remote_dir.rstrip('/') + '/', timeout=1800)
-
-    def get(self, remote, local_dir):
-        self.run('mega-get', remote, str(local_dir) + '/', timeout=1800)
-
-    def trash(self, remote):
-        """A la papelera de MEGA (recuperable allí), nunca borrado definitivo."""
-        self.run('mega-mv', remote, '//bin/', timeout=300)
-
-    def export(self, remote):
-        import re
-        code, text = self.run('mega-export', '-a', '-f', remote, timeout=300)
-        found = re.search(r'https://mega\.nz/\S+', text)
-        if not found:
-            raise MegaError('MEGA no devolvió el enlace de descarga.')
-        return found.group(0)
-
-    def unexport(self, remote):
-        self.run('mega-export', '-d', remote, check=False, timeout=300)
-
-
-def _pending(folder):
-    items = []
-    for meta in sorted((folder / 'pendientes').glob('*.json')):
-        try:
-            data = json.loads(meta.read_text())
-        except ValueError:
-            continue
-        if (folder / 'pendientes' / data.get('file', '')).exists():
-            items.append(data)
-    return items
-
-
-def _save_meta(folder, data):
-    path = folder / 'pendientes' / (data['file'] + '.json')
-    path.write_text(json.dumps(data, ensure_ascii=False))
-    os.chmod(path, 0o600)
-
-
-def daily(local_folder, trigger='programado', user_id=None, mega=None):
-    """Respaldo completo: copia local verificada + archivo cifrado en la cola de pendientes + intento de subida a MEGA."""
+# ================================================================ GOOGLE DRIVE (en el servidor)
+def _start(kind, trigger, user_id=None, file=''):
+    """Comprueba la configuración ANTES de registrar nada y toma el bloqueo. Errores con explicación para el panel."""
     import app
-    folder = exchange_dir()
+    import gdrive_backup as gd
     encryption_key()
-    result = backup(local_folder)
-    source = Path(local_folder) / result['file']
-    moment = datetime.fromisoformat(result['at'])
-    name = od.file_name(moment)
-    blob = encrypt(source.read_bytes())
-    target = folder / 'pendientes' / name
-    old_mask = os.umask(0o077)
-    try:
-        target.write_bytes(blob)
-    finally:
-        os.umask(old_mask)
     with app.connect() as c:
-        run = od.new_run('respaldo', trigger, 'mega', user_id, name)
-        run.update(status='pendiente', file=name, bytes=len(blob), raw_bytes=result['bytes'], sha256=digest(blob), tier=od.tier(moment), runner='equipo-local',
-                   source_sha256=result['sha256'], error='Pendiente de subir a MEGA.')
+        problem = gd.not_ready(c)
+        if problem:
+            raise gd.BackupError(problem, 409)
+        run = od.new_run(kind, trigger, 'gdrive', user_id, file)
+        run.update(runner='servidor' if os.getenv('VERCEL') else 'equipo-local')
+        if not od.acquire_lock(c, run['id']):
+            raise gd.BackupError('Ya hay un respaldo o una verificación en curso. Espera a que termine.', 409)
         od.save_run(c, run)
-    _save_meta(folder, {'file': name, 'run': run['id'], 'sha256': run['sha256'], 'bytes': len(blob), 'created_at': run['started_at'],
-                        'counts': {'clients': result['clients'], 'orders': result['orders']}, 'tables': result['tables'], 'attempts': 0, 'last_error': ''})
-    upload_pending(mega)
-    with app.connect() as c:
-        return next((item for item in od.runs(c) if item['id'] == run['id']), run)
-
-
-def upload_pending(mega=None):
-    """Sube, verifica y confirma cada pendiente (el más antiguo primero). Sin MEGA o sin internet, quedan pendientes con su motivo."""
-    import app
-    mega = mega or Mega()
-    folder = exchange_dir()
-    pending = _pending(folder)
-    if not pending:
-        return {'uploaded': 0, 'pending': 0}
-    owner = 'agente-' + secrets.token_hex(4)
-    with app.connect() as c:
-        if not od.acquire_lock(c, owner):
-            return {'uploaded': 0, 'pending': len(pending), 'busy': True}
-    uploaded = 0
-    try:
-        account = None
-        try:
-            account = mega.whoami()
-            if not account:
-                raise MegaError('MEGA desconectado: el agente no tiene sesión iniciada.')
-            space = mega.space()
-            need = sum(item['bytes'] for item in pending)
-            if space and space['total'] - space['used'] < need * 2:
-                raise MegaError('Espacio insuficiente en MEGA para subir %d respaldo(s).' % len(pending))
-            mega.mkdir(REMOTE)
-        except MegaError as error:
-            _mark_failed(folder, pending, str(error))
-            return {'uploaded': 0, 'pending': len(pending), 'error': str(error)}
-        for item in pending:
-            try:
-                _upload_one(mega, folder, item)
-                uploaded += 1
-            except (MegaError, RuntimeError, OSError) as error:
-                _mark_failed(folder, [item], str(error))
-        if uploaded:
-            _apply_retention(mega)
-        return {'uploaded': uploaded, 'pending': len(_pending(folder))}
-    finally:
-        with app.connect() as c:
-            od.release_lock(c, owner)
-
-
-def _mark_failed(folder, items, reason):
-    import app
-    with app.connect() as c:
-        for item in items:
-            item['attempts'] = int(item.get('attempts', 0)) + 1
-            item['last_error'] = reason[:240]
-            item['last_try'] = od.stamp()
-            _save_meta(folder, item)
-            run = next((r for r in od.runs(c) if r.get('id') == item.get('run')), None)
-            if run:
-                # No se oculta: queda pendiente con el motivo real; solo un fallo de integridad del archivo subido es «error».
-                run.update(status='error' if 'no coincide' in reason or 'descifrar' in reason else 'pendiente', error=reason[:240], attempts=item['attempts'])
-                od.save_run(c, run)
-
-
-def _upload_one(mega, folder, item):
-    import app
-    local = folder / 'pendientes' / item['file']
-    remote = REMOTE + '/' + item['file']
-    if item['file'] not in mega.ls(REMOTE):
-        mega.put(local, REMOTE)
-    # Verificación real: se descarga lo que quedó en MEGA, se compara el SHA-256, se descifra y se restaura en una base aislada.
-    with tempfile.TemporaryDirectory(prefix='verificacion-', dir=folder / 'verificacion') as temp:
-        mega.get(remote, temp)
-        copy = Path(temp) / item['file']
-        if not copy.exists():
-            raise MegaError('La descarga de comprobación desde MEGA no trajo el archivo.')
-        blob = copy.read_bytes()
-    if digest(blob) != item['sha256']:
-        mega.trash(remote)
-        raise RuntimeError('El archivo en MEGA no coincide (SHA-256) con el subido; se envió a la papelera y se volverá a subir.')
-    sha, restored = restore_check(blob, item['sha256'])
-    if restored['counts'].get('clients', 0) != item['counts'].get('clients') or restored['counts'].get('orders', 0) != item['counts'].get('orders'):
-        raise RuntimeError('La base restaurada desde MEGA no tiene los mismos recuentos que la copia original.')
-    with app.connect() as c:
-        run = next((r for r in od.runs(c) if r.get('id') == item.get('run')), None) or od.new_run('respaldo', 'programado', 'mega', None, item['file'])
-        run.update(status='correcto', verified=True, verify=_summary(restored), verified_at=od.stamp(), finished_at=od.stamp(), error='', remote=remote, runner='equipo-local')
-        od.save_run(c, run)
-        od.keep_legacy(c)
-        od.set_state(c, 'cloud_backup', {'ok': True, 'at': run.get('started_at') or od.stamp(), 'bytes': item['bytes'], 'sha256': item['sha256'],
-                                         'clients': item['counts'].get('clients', 0), 'orders': item['counts'].get('orders', 0), 'destination': 'mega'})
-        c.commit()
-    local.unlink(missing_ok=True)
-    (folder / 'pendientes' / (item['file'] + '.json')).unlink(missing_ok=True)
-
-
-def _apply_retention(mega):
-    names = [name for name in mega.ls(REMOTE) if name.startswith(od.PREFIX) and name.endswith(od.SUFFIX)]
-    for name in od.retention(names):
-        mega.trash(REMOTE + '/' + name)
-
-
-def verify_remote(file, kind='verificacion', user_id=None, mega=None):
-    """Verificación o restauración de prueba de un respaldo de MEGA: descarga, SHA-256, descifrado y restauración aislada."""
-    import app
-    mega = mega or Mega()
-    folder = exchange_dir()
-    with app.connect() as c:
-        source = next((r for r in od.runs(c) if r.get('destination') == 'mega' and r.get('kind') == 'respaldo' and r.get('status') == 'correcto' and r.get('file') == file), None)
-        run = od.new_run(kind, 'manual' if user_id else 'programado', 'mega', user_id, file)
-        run['runner'] = 'equipo-local'
-        od.save_run(c, run)
-    try:
-        if not source:
-            raise RuntimeError('No hay un respaldo de MEGA verificado con ese nombre en el historial.')
-        with tempfile.TemporaryDirectory(prefix='verificacion-', dir=folder / 'verificacion') as temp:
-            mega.get(REMOTE + '/' + file, temp)
-            blob = (Path(temp) / file).read_bytes()
-        sha, restored = restore_check(blob, source.get('sha256'))
-        run.update(status='correcto', verified=True, verify=_summary(restored), bytes=len(blob), sha256=sha, finished_at=od.stamp(), source=source['id'])
-    except Exception as error:
-        run.update(status='error', error=(type(error).__name__ + ': ' + str(error))[:240], finished_at=od.stamp())
-    with app.connect() as c:
-        od.save_run(c, run)
-    if run['status'] != 'correcto':
-        raise RuntimeError(run['error'])
     return run
 
 
-def prepare_download(file, mega=None):
-    """Enlace de MEGA del archivo CIFRADO, válido 24 h (después el agente lo retira). Sin la clave no se puede abrir."""
+def _finish(run, error=None):
     import app
-    mega = mega or Mega()
-    link = mega.export(REMOTE + '/' + file)
+    import gdrive_backup as gd
     with app.connect() as c:
-        items = [item for item in (od.get_state(c, 'mega_downloads', []) or []) if item.get('file') != file]
-        items.insert(0, {'file': file, 'link': link, 'created_at': od.stamp(), 'expires_at': (od.now() + timedelta(hours=24)).isoformat(timespec='seconds')})
-        od.set_state(c, 'mega_downloads', items[:10])
-        c.commit()
-    return link
+        if error is not None:
+            run.update(status='error', finished_at=od.stamp(), error=str(error)[:300] if isinstance(error, gd.BackupError) else (type(error).__name__ + ': ' + str(error))[:300])
+        else:
+            run.update(status='correcto', finished_at=od.stamp())
+        od.save_run(c, run)
+        od.release_lock(c, run['id'])
 
 
-def expire_downloads(mega=None):
+def drive_backup(trigger='programado', user_id=None):
+    """Copia consistente → comprobación → gzip + AES-256-GCM → subida a Google Drive → comparación con el SHA-256 que calcula
+    Google → nueva DESCARGA → descifrado → restauración aislada con los mismos recuentos. Solo entonces es válido."""
     import app
-    mega = mega or Mega()
-    with app.connect() as c:
-        items = od.get_state(c, 'mega_downloads', []) or []
-        keep = []
-        for item in items:
-            if (item.get('expires_at') or '') <= od.stamp():
-                mega.unexport(REMOTE + '/' + item['file'])
+    import gdrive_backup as gd
+    run = _start('respaldo', trigger, user_id)
+    try:
+        moment = od.now()
+        with tempfile.TemporaryDirectory(prefix='ordenes-respaldo-') as folder:
+            target = Path(folder) / 'base.sqlite3'
+            remote, tables, check = snapshot(target)
+            raw = target.read_bytes()
+        blob = encrypt(raw)
+        name = od.file_name(moment)
+        sha = digest(blob)
+        run.update(file=name, raw_bytes=len(raw), bytes=len(blob), sha256=sha, tier=od.tier(moment))
+        with app.connect() as c:
+            od.save_run(c, run)
+            token = gd.access_token(c)
+            link = od.get_state(c, 'gdrive_link') or {}
+        folder_id = link.get('folder_id') or gd.ensure_folder(token)['id']
+        try:
+            item = gd.upload(token, folder_id, name, blob, sha)
+        except gd.GoogleError as error:
+            if error.http_status == 404:
+                # La carpeta se borró desde Drive: se vuelve a crear y se reintenta una vez.
+                folder_id = gd.ensure_folder(token)['id']
+                item = gd.upload(token, folder_id, name, blob, sha)
             else:
-                keep.append(item)
-        if len(keep) != len(items):
-            od.set_state(c, 'mega_downloads', keep)
+                raise
+        run['remote_id'] = item['id']
+        # 1) Google confirma que existe y su SHA-256 coincide; 2) se descarga y se restaura aislada.
+        info = gd.file_info(token, item['id'])
+        if info.get('trashed') or int(info.get('size', -1)) != len(blob):
+            raise RuntimeError('Google Drive no muestra el archivo completo tras la subida.')
+        if info.get('sha256Checksum') and info['sha256Checksum'].lower() != sha:
+            gd.trash(token, item['id'])
+            raise RuntimeError('El SHA-256 que calcula Google no coincide con el del archivo subido; se envió a la papelera.')
+        got, restored = restore_check(gd.download(token, item['id']), sha)
+        if restored['counts'] != remote:
+            raise RuntimeError('La base restaurada desde Google Drive no tiene el mismo número de filas que la central.')
+        run.update(verified=True, verify=_summary(restored), verified_at=od.stamp(), google_sha256=info.get('sha256Checksum', ''))
+        with app.connect() as c:
+            od.keep_legacy(c)
+            od.set_state(c, 'cloud_backup', {'ok': True, 'at': run['started_at'], 'bytes': len(blob), 'sha256': sha, 'clients': remote.get('clients', 0), 'orders': remote.get('orders', 0), 'destination': 'gdrive'})
+            link = od.get_state(c, 'gdrive_link') or {}
+            link['folder_id'] = folder_id
+            try:
+                link['quota'] = gd.drive_about(token).get('storageQuota') or link.get('quota')
+            except Exception:
+                pass
+            od.set_state(c, 'gdrive_link', link)
             c.commit()
+        # Conservación 30/12/12 solo sobre respaldos de Órdenes Pro; lo que sobra va a la papelera de Google Drive.
+        existing = gd.list_backups(token, folder_id)
+        doomed = set(od.retention([entry['name'] for entry in existing]))
+        removed = 0
+        for entry in existing:
+            if entry['name'] in doomed and entry['name'] != name:
+                gd.trash(token, entry['id'])
+                removed += 1
+        run['retention'] = {'kept': len(existing) - removed, 'removed': removed}
+        _finish(run)
+        return run
+    except BaseException as error:
+        _finish(run, error)
+        raise
 
 
-def heartbeat(mega=None, full=True, error=''):
-    """Estado real que ve el panel: señal del agente, sesión de MEGA, espacio, carpeta y pendientes."""
+def drive_verify(kind, file, trigger='manual', user_id=None):
+    """«Verificar integridad» y «Restauración de prueba»: el archivo existe en Drive, su SHA-256 coincide, se descarga y se restaura aislado."""
     import app
-    import socket
-    mega = mega or Mega()
-    folder = exchange_dir()
-    with app.connect() as c:
-        state = od.get_state(c, 'mega_agent', {}) or {}
-    state.update(seen_at=od.stamp(), host=socket.gethostname(), version=AGENT_VERSION, folder=REMOTE,
-                 schedule='Todos los días a las 02:00 (hora de Ecuador) y reintentos cada hora', last_error=error or state.get('last_error', ''))
-    state['pending'] = [{key: item.get(key) for key in ('file', 'bytes', 'created_at', 'attempts', 'last_error', 'last_try')} for item in _pending(folder)]
-    if full:
-        try:
-            account = mega.whoami()
-            state['connected'] = bool(account)
-            state['account'] = account or ''
-            if account:
-                state['space'] = mega.space() or state.get('space')
-                try:
-                    mega.ls(REMOTE)
-                    state['folder_ok'] = True
-                except MegaError:
-                    state['folder_ok'] = False
-            code, text = mega.run('mega-version', check=False, timeout=60)
-            state['mega_version'] = ' '.join(text.split())[:60] if code == 0 else state.get('mega_version', '')
-            state['last_error'] = error
-        except MegaError as problem:
-            state.update(connected=False, last_error=str(problem)[:240])
-    with app.connect() as c:
-        od.set_state(c, 'mega_agent', state)
-        c.commit()
-    return state
+    import gdrive_backup as gd
+    run = _start(kind, trigger, user_id, file)
+    try:
+        with app.connect() as c:
+            history = od.runs(c)
+            token = gd.access_token(c)
+            link = od.get_state(c, 'gdrive_link') or {}
+        source = next((item for item in history if item.get('destination') == 'gdrive' and item.get('kind') == 'respaldo' and item.get('status') == 'correcto' and item.get('file') == file), None)
+        if not source:
+            raise RuntimeError('No hay un respaldo de Google Drive verificado con ese nombre en el historial.')
+        entry = next((f for f in gd.list_backups(token, link.get('folder_id') or gd.ensure_folder(token)['id']) if f['name'] == file), None)
+        if not entry:
+            raise RuntimeError('El respaldo ya no está en la carpeta de Google Drive (¿se eliminó o está en la papelera?).')
+        info = gd.file_info(token, entry['id'])
+        if info.get('sha256Checksum') and info['sha256Checksum'].lower() != source.get('sha256'):
+            raise RuntimeError('El SHA-256 del archivo en Google Drive no coincide con el registrado al subirlo.')
+        sha, restored = restore_check(gd.download(token, entry['id']), source.get('sha256'))
+        run.update(bytes=int(entry.get('size') or 0), sha256=sha, verified=True, verify=_summary(restored), verified_at=od.stamp(), source=source['id'])
+        _finish(run)
+        return run
+    except BaseException as error:
+        _finish(run, error)
+        raise
 
 
-def handle_requests(local_folder, mega=None):
-    """Atiende las órdenes del panel (una a la vez) y anota el resultado real."""
-    import app
-    mega = mega or Mega()
-    with app.connect() as c:
-        items = od.requests(c)
-        todo = [item for item in reversed(items) if item.get('status') == 'pendiente']
-    for item in todo:
-        _set_request(item['id'], status='en_curso')
-        try:
-            action = item['action']
-            if action == 'respaldo':
-                run = daily(local_folder, 'manual', item.get('requested_by'), mega)
-                result = 'Respaldo ' + run['file'] + (' subido a MEGA y verificado.' if run['status'] == 'correcto' else ' guardado y pendiente de subir: ' + (run.get('error') or ''))
-            elif action in ('verificar', 'restaurar'):
-                run = verify_remote(item['file'], 'verificacion' if action == 'verificar' else 'restauracion', item.get('requested_by'), mega)
-                result = 'Correcto: SHA-256 coincide y la base se restauró aislada (%s tablas).' % run['verify']['tables']
-            elif action == 'descargar':
-                prepare_download(item['file'], mega)
-                result = 'Enlace de descarga preparado (válido 24 h). El archivo está cifrado.'
-            elif action == 'carpeta':
-                mega.mkdir(REMOTE)
-                result = 'Carpeta ' + REMOTE + ' lista en MEGA.'
-            elif action == 'reintentar':
-                done = upload_pending(mega)
-                result = 'Subidos %d; pendientes %d.' % (done.get('uploaded', 0), done.get('pending', 0)) + (' ' + done['error'] if done.get('error') else '')
-            else:
-                state = heartbeat(mega)
-                space = state.get('space') or {}
-                result = ('Conectado como ' + state['account'] + (' · %.1f de %.1f GB usados' % (space['used'] / 1e9, space['total'] / 1e9) if space.get('total') else '')) if state.get('connected') else 'MEGA desconectado: ' + (state.get('last_error') or 'sin sesión iniciada.')
-            # Primero el estado real (pendientes, espacio) y después la orden como hecha: el panel nunca ve un estado anterior.
-            heartbeat(mega)
-            _set_request(item['id'], status='hecho', result=result)
-        except Exception as error:
-            heartbeat(mega)
-            _set_request(item['id'], status='error', result=(str(error) or type(error).__name__)[:240])
-
-
-def _set_request(request_id, **changes):
-    import app
-    with app.connect() as c:
-        items = od.requests(c)
-        for item in items:
-            if item['id'] == request_id:
-                item.update(changes)
-                if changes.get('status') in ('hecho', 'error'):
-                    item['finished_at'] = od.stamp()
-        od.set_state(c, 'backup_requests', items)
-        c.commit()
-
-
-def weekly_restore_test(mega=None):
-    """Prueba periódica: una vez por semana se descarga y restaura aislado el respaldo de MEGA más reciente."""
+def weekly_restore_test():
+    """Prueba periódica: una vez por semana se descarga y restaura aislado el respaldo de Google Drive más reciente."""
     import app
     with app.connect() as c:
         items = od.runs(c)
     week = (od.now() - timedelta(days=7)).isoformat(timespec='seconds')
     if any(item.get('kind') == 'restauracion' and item.get('status') == 'correcto' and (item.get('finished_at') or '') > week for item in items):
         return None
-    latest = next((item for item in items if item.get('destination') == 'mega' and item.get('kind') == 'respaldo' and item.get('status') == 'correcto'), None)
-    return verify_remote(latest['file'], 'restauracion', None, mega) if latest else None
-
-
-def serve(local_folder, mega=None, cycles=None, pause=30):
-    """Servicio del agente: señal y órdenes del panel cada 30 s; reintento de pendientes cada hora; prueba de restauración semanal."""
-    mega = mega or Mega()
-    last_retry = last_full = 0.0
-    count = 0
-    while cycles is None or count < cycles:
-        count += 1
-        moment = time.time()
-        try:
-            heartbeat(mega, full=moment - last_full > 300)
-            if moment - last_full > 300:
-                last_full = moment
-            handle_requests(local_folder, mega)
-            if moment - last_retry > 3600:
-                last_retry = moment
-                upload_pending(mega)
-                expire_downloads(mega)
-                try:
-                    weekly_restore_test(mega)
-                except Exception:
-                    pass
-        except Exception as error:
-            print('agente:', type(error).__name__, str(error)[:200], flush=True)
-        if cycles is None or count < cycles:
-            time.sleep(pause)
+    latest = next((item for item in items if item.get('destination') == 'gdrive' and item.get('kind') == 'respaldo' and item.get('status') == 'correcto'), None)
+    return drive_verify('restauracion', latest['file'], 'programado') if latest else None

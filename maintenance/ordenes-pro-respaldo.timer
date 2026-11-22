@@ -1,8 +1,8 @@
 [Unit]
-Description=Respaldo diario de Órdenes Pro (02:00 hora de Ecuador; si el equipo estaba apagado, al encenderlo)
+Description=Copia local diaria de Órdenes Pro (03:00 hora de Ecuador; si el equipo estaba apagado, al encenderlo)
 
 [Timer]
-OnCalendar=*-*-* 02:00:00 America/Guayaquil
+OnCalendar=*-*-* 03:00:00 America/Guayaquil
 Persistent=true
 RandomizedDelaySec=120
 

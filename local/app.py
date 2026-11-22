@@ -1214,6 +1214,24 @@ class Handler(BaseHTTPRequestHandler):
             content_type = 'image/png' if file.suffix == '.png' else 'image/x-icon' if file.suffix == '.ico' else ('text/css; charset=utf-8' if file.suffix == '.css' else 'text/javascript; charset=utf-8')
             return self.reply(200, file.read_bytes(), content_type)
         with connect() as c:
+            if path == '/api/backups/google/callback':
+                # 1.5.312 · Vuelta desde Google tras conectar Google Drive. La valida el «state» (aleatorio, de un solo uso, 10 minutos y
+                # ligado al administrador que la inició). La página vuelve a Configuración desde el propio sitio, donde la sesión sí viaja.
+                import gdrive_backup
+                query=parse_qs(urlsplit(self.path).query);ok=False
+                if query.get('error'):message=gdrive_backup.explain(query.get('error',[''])[0][:80],query.get('error_description',[''])[0][:300])+' No se guardó nada.'
+                else:
+                    try:
+                        link=gdrive_backup.finish_link(c,query.get('state',[''])[0],query.get('code',[''])[0]);ok=True
+                        audit(c,link['linked_by'],'gdrive_linked');message='Google Drive quedó conectado con la cuenta '+link['account']+'. Carpeta: '+gdrive_backup.FOLDER+'.'
+                    except gdrive_backup.BackupError as error:message=str(error)
+                target='/#settings?tab=backups&gdrive='+('ok' if ok else 'error')
+                page=('<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+                      '<meta http-equiv="refresh" content="3;url='+html.escape(target)+'"><title>Respaldos en Google Drive · Órdenes Pro</title>'
+                      '<link rel="stylesheet" href="/static/app.css"></head><body class="auth-page onedrive-return"><main class="onedrive-return-card" role="status">'
+                      '<h1>'+('Google Drive conectado' if ok else 'No se pudo conectar Google Drive')+'</h1><p>'+html.escape(message)+'</p>'
+                      '<p><a class="primary" href="'+html.escape(target)+'">Volver a Configuración → Respaldos</a></p></main></body></html>')
+                return self.reply(200 if ok else 400,page,'text/html; charset=utf-8')
             if path == '/citas':
                 return self.page('appointments.html')
             if path in ('/pqrs','/pqrs/seguimiento'):
@@ -1301,6 +1319,14 @@ class Handler(BaseHTTPRequestHandler):
                         campaigns.process(c,campaign,now,owner,lambda conn,subject,text,title,email,actor,private:send_institutional(conn,'campaign',title,email,subject,text,None,actor,review=False,private=private)['archive_id'],budget=8)
                 except Exception as error:print('campaigns cron',type(error).__name__,flush=True)
                 return self.reply(200,{'ok':True})
+            if path in ('/api/cron/backup','/api/cron/backup-reintento-1','/api/cron/backup-reintento-2'):
+                # 1.5.312 · Respaldo diario en Google Drive (vercel.json: 07:00 UTC = 02:00 Ecuador) y reintentos (04:00 y 07:00), en una
+                # función propia de hasta 300 s. Solo responde a la plataforma (CRON_SECRET). Sin Google Drive listo anota por qué no se hizo.
+                expected=os.getenv('CRON_SECRET','')
+                if not expected or not hmac.compare_digest(self.headers.get('Authorization',''),'Bearer '+expected):return self.reply(404,{'error':'No encontrado.'})
+                import gdrive_backup
+                outcome=gdrive_backup.scheduled(c,1 if path=='/api/cron/backup' else int(path[-1])+1)
+                return self.reply(200,{'ok':outcome.get('status')!='error'})
             if path == '/api/cron/reminders':
                 # Con CRON_SECRET definido solo responde a la llamada autenticada de la plataforma. No envía nada si los avisos están apagados.
                 expected=os.getenv('CRON_SECRET','')
@@ -2563,10 +2589,10 @@ class Handler(BaseHTTPRequestHandler):
                 try:return self.reply(200,autocare.service_detail(c,autocare_service[1],reception_now()))
                 except LookupError as error:return self.reply(404,{'error':str(error)})
             if path == '/api/backups':
-                # 1.5.311 · Respaldos en MEGA: estado que informa el agente del equipo de la oficina, historial, órdenes y pendientes.
+                # 1.5.312 · Respaldos en Google Drive (ejecutados por el servidor): estado, historial, espacio y próximos respaldos.
                 if user['role']!='administrador':return self.reply(403,{'error':'Solo administración gestiona los respaldos.'})
-                import backups
-                return self.reply(200,backups.overview(c))
+                import gdrive_backup
+                return self.reply(200,gdrive_backup.overview(c))
             if path == '/api/system':
                 try:return self.reply(200, versioning.overview())
                 except versioning.RegistryError as error:return self.reply(500,{'error':str(error)})
@@ -3588,18 +3614,39 @@ class Handler(BaseHTTPRequestHandler):
                     for key,value in values.items():c.execute('INSERT INTO auth_policy VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value',(key,value))
                     audit(c,user['id'],'auth_policy_updated')
                     return self.reply(200,{'ok':True})
-                if path=='/api/backups/request':
-                    # 1.5.311 · Órdenes del panel al agente de respaldos (MEGA): respaldo ahora, verificar, restaurar aislado, descargar,
-                    # espacio, carpeta y reintentar. El agente las ejecuta en el equipo de la oficina; el servidor nunca toca la cuenta MEGA.
+                if path.startswith('/api/backups/'):
+                    # 1.5.312 · Respaldos en Google Drive: asistente (cliente OAuth), conectar/desconectar, verificar conexión, crear carpeta,
+                    # respaldo ahora, verificar integridad y restauración de prueba (aislada). Todo en el servidor; nunca se pide la contraseña de Google.
                     if user['role']!='administrador':return self.reply(403,{'error':'Solo administración gestiona los respaldos.'})
-                    import backups
-                    action=str(data.get('action',''));file=str(data.get('file',''))[:120]
-                    if action=='restaurar' and str(data.get('confirm',''))!='RESTAURAR':
-                        return self.reply(400,{'error':'Escribe RESTAURAR para confirmar la restauración en un entorno aislado.'})
-                    try:entry=backups.request(c,user['id'],action,file)
-                    except backups.BackupError as error:return self.reply(error.status,{'error':str(error)})
-                    audit(c,user['id'],'backup_request_'+action)
-                    return self.reply(202,{'ok':True,'request':entry,'backups':backups.overview(c)})
+                    import gdrive_backup
+                    try:
+                        if path=='/api/backups/google/app':
+                            if str(data.get('action',''))=='clear':gdrive_backup.clear_app_config(c);audit(c,user['id'],'gdrive_app_cleared')
+                            else:gdrive_backup.save_app_config(c,data,user['id']);audit(c,user['id'],'gdrive_app_saved')
+                            return self.reply(200,{'ok':True,'backups':gdrive_backup.overview(c)})
+                        if path=='/api/backups/google/connect':
+                            url=gdrive_backup.start_link(c,user['id']);audit(c,user['id'],'gdrive_link_started')
+                            return self.reply(200,{'ok':True,'url':url})
+                        if path=='/api/backups/google/disconnect':
+                            gdrive_backup.unlink(c);audit(c,user['id'],'gdrive_unlinked')
+                            return self.reply(200,{'ok':True,'backups':gdrive_backup.overview(c)})
+                        if path=='/api/backups/google/check':
+                            gdrive_backup.check_connection(c);audit(c,user['id'],'gdrive_checked')
+                            return self.reply(200,{'ok':True,'backups':gdrive_backup.overview(c)})
+                        if path=='/api/backups/google/folder':
+                            gdrive_backup.create_folder(c);audit(c,user['id'],'gdrive_folder')
+                            return self.reply(200,{'ok':True,'backups':gdrive_backup.overview(c)})
+                        if path=='/api/backups/run':
+                            kind=str(data.get('kind','respaldo'))
+                            if kind=='restauracion' and str(data.get('confirm',''))!='RESTAURAR':
+                                return self.reply(400,{'error':'Escribe RESTAURAR para confirmar la restauración de prueba (aislada).'})
+                            audit(c,user['id'],'backup_requested_'+kind);c.commit()
+                            try:run=gdrive_backup.request_run(c,user['id'],kind,str(data.get('file',''))[:120])
+                            except gdrive_backup.BackupError as error:return self.reply(error.status,{'error':str(error),'backups':gdrive_backup.overview(c)})
+                            return self.reply(200,{'ok':True,'run':run,'backups':gdrive_backup.overview(c)})
+                        return self.reply(404,{'error':'No encontrado.'})
+                    except gdrive_backup.BackupError as error:
+                        return self.reply(error.status,{'error':str(error),'fields':getattr(error,'fields',{}),'backups':gdrive_backup.overview(c)})
                 if path in ('/api/payments/factors/confirm','/api/payments/factors/edit'):
                     # Factores DATAFAST: confirmación y corrección administrativas, con quién, cuándo y el documento (registro que no se modifica).
                     if user['role']!='administrador':return self.reply(403,{'error':'Solo administración confirma o corrige los factores.'})

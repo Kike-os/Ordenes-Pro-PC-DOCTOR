@@ -2735,7 +2735,7 @@ function renderSettings(data){
  const terms=pane('terms','Condiciones del servicio','Publicación y consulta de las condiciones que acepta el cliente.');renderTermsSettings(terms);
  {const signature=pane('signature','Firma electrónica','Firma empresarial visual en los documentos y diferencia con la firma electrónica de los PDF.');renderSignatureSettings(signature);}
  // 1.5.275 · Integraciones → WhatsApp Business (solo administración).
- if(admin()){const bk=pane('backups','Respaldos · MEGA Cloud','Copia diaria cifrada de la base central a las 02:00 (hora de Ecuador), subida a MEGA y verificada restaurándola en un entorno aislado.');renderBackupSettings(bk);}
+ if(admin()){const bk=pane('backups','Respaldos · Google Drive','Copia diaria cifrada de la base central a las 02:00 (hora de Ecuador), hecha por el servidor, subida a Google Drive y verificada restaurándola en un entorno aislado.');renderBackupSettings(bk);}
  if(admin()){const integ=pane('integrations','Integraciones · WhatsApp Business','Conexión oficial con Meta para los avisos al cliente: credenciales, webhook, plantillas, eventos, envío de prueba e historial.');renderWhatsAppSettings(integ);}
  renderAuthorizationProfiles(pane('devauth','Autorizaciones por equipo','Qué autorizaciones de acceso y datos se piden según el tipo de equipo. Rige para lo que se registre en adelante: no cambia decisiones ya registradas.'));
  // Estado del sistema: tarjetas compactas con datos reales (configuración, último diagnóstico de ADI AutoCare y registro de versiones).
@@ -9070,65 +9070,87 @@ function waConsentDialog(order,d,done){const dialog=smallDialog('Autorización d
  yes.focus();}
 
 // Configuración → Integraciones → WhatsApp Business (solo administración; el servidor lo vuelve a comprobar).
-/* ===== 1.5.311 · Configuración → Respaldos (MEGA Cloud) · Premium Compact 2.0 =====
-   El agente del equipo de la oficina (MEGAcmd oficial) hace la copia, la cifra, la sube, la descarga de nuevo y la restaura aislada; el
-   panel muestra el estado REAL que informa y le deja órdenes (se atienden en menos de un minuto). Estados separados: agente, conexión
-   MEGA, almacenamiento, último respaldo local, último respaldo MEGA verificado, próximo respaldo y pendientes de subir. La sesión de
-   MEGA solo existe en el equipo del agente: este panel nunca pide ni guarda la contraseña. Solo administración. */
+/* ===== 1.5.312 · Configuración → Respaldos (Google Drive) · Premium Compact =====
+   El SERVIDOR hace el respaldo (02:00 y reintentos a las 04:00 y 07:00, o al pulsar «Realizar respaldo ahora»): copia consistente,
+   cifrado, subida a Google Drive, comparación con el SHA-256 que calcula Google, nueva descarga y restauración aislada. Este panel nunca
+   pide ni recibe la contraseña de Google (se inicia sesión en la página de Google) y nunca vuelve a mostrar el secreto del cliente OAuth.
+   No se dice «protegido» hasta que exista un respaldo subido y verificado. Solo administración. */
 async function renderBackupSettings(pane){
- const body=el('div',undefined,'bk');pane.append(body);let timer=0;
- const size=n=>!n?'—':n>=1073741824?(n/1073741824).toFixed(2).replace('.',',')+' GB':n>=1048576?(n/1048576).toFixed(1).replace('.',',')+' MB':Math.max(1,Math.round(n/1024))+' KB';
+ const body=el('div',undefined,'bk');pane.append(body);let last=null;
+ const size=n=>{n=Number(n)||0;return !n?'—':n>=1073741824?(n/1073741824).toFixed(2).replace('.',',')+' GB':n>=1048576?(n/1048576).toFixed(1).replace('.',',')+' MB':Math.max(1,Math.round(n/1024))+' KB';};
  const when=v=>v?formatOrderDate(v):'—';
  const pill=(text,state)=>{const p=el('span',text,'bk-pill');p.dataset.state=state;return p;};
- const runState={pendiente:['Pendiente de subir','run'],en_curso:['En ejecución','run'],correcto:['Correcto','ok'],error:['Error','err']};
- const reqState={pendiente:['En cola','run'],en_curso:['En ejecución','run'],hecho:['Hecho','ok'],error:['Error','err']};
- const kinds={respaldo:'Respaldo',verificacion:'Verificación',restauracion:'Restauración de prueba'};
- const dest={mega:'MEGA',equipo:'Copia local de la oficina',onedrive:'OneDrive (retirado)'};
- const ask=async(action,file,btn)=>{
-  if(action==='restaurar'){const typed=await askText('Restaurar en entorno aislado','Se descargará «'+file+'» de MEGA y se restaurará en una base AISLADA para comprobarlo: integridad, claves y recuentos. La base de producción no se modifica. Escribe RESTAURAR para continuar.','','Restaurar en entorno aislado',12);if(typed===null||typed===undefined)return;if(String(typed).trim().toUpperCase()!=='RESTAURAR'){toast('Escribe RESTAURAR para confirmar.','warning');return;}}
-  if(btn)btn.disabled=true;
-  try{const r=await api('/api/backups/request',{action,file:file||'',confirm:action==='restaurar'?'RESTAURAR':''});paint(r.backups);toast('Orden enviada al agente de respaldos: «'+r.backups.actions[action]+'». Se atiende en menos de un minuto.','success');}
-  catch(error){toast(error.message,'error');if(btn)btn.disabled=false;}
+ const runState={en_curso:['En ejecución','run'],correcto:['Correcto','ok'],error:['Error','err'],pendiente:['Pendiente','run'],retirado:['No subido (proveedor retirado)','idle']};
+ const kinds={respaldo:'Respaldo',verificacion:'Verificación de integridad',restauracion:'Restauración de prueba'};
+ const dest={gdrive:'Google Drive',equipo:'Copia local de la oficina',mega:'MEGA (retirado)',onedrive:'OneDrive (retirado)'};
+ const busyAll=on=>body.querySelectorAll('.bk-actions button,.bk-run-tools button,.bk-step-body>button').forEach(b=>{if(on)b.disabled=true;});
+ const call=async(btn,label,path,payload,ok)=>{const text=btn.lastChild.textContent;btn.setAttribute('aria-busy','true');btn.lastChild.textContent=label;busyAll(true);
+  try{const r=await api(path,payload||{});paint(r.backups);if(ok)toast(typeof ok==='function'?ok(r):ok,'success');return r;}
+  catch(error){toast(error.message,'error');if(error.data&&error.data.backups)paint(error.data.backups);else await load();}
+  finally{btn.removeAttribute('aria-busy');if(btn.isConnected)btn.lastChild.textContent=text;}};
+ const run=async(kind,file,btn)=>{
+  if(kind==='restauracion'){const typed=await askText('Restauración de prueba','Se descargará «'+file+'» de Google Drive y se restaurará en una base AISLADA para comprobarla: integridad, claves y recuentos. La base de producción no se modifica. Escribe RESTAURAR para continuar.','','Restaurar en entorno aislado',12);if(typed===null||typed===undefined)return;if(String(typed).trim().toUpperCase()!=='RESTAURAR'){toast('Escribe RESTAURAR para confirmar.','warning');return;}}
+  await call(btn,kind==='respaldo'?'Respaldando… (hasta 5 min)':'Comprobando…','/api/backups/run',{kind,file:file||'',confirm:kind==='restauracion'?'RESTAURAR':''},r=>{const v=r.run.verify||{};return kind==='respaldo'?'Respaldo guardado en Google Drive y verificado: '+size(r.run.bytes)+', SHA-256 confirmado por Google y '+(v.tables||0)+' tablas restauradas sin errores.':kind==='verificacion'?'Integridad correcta: el archivo existe en Google Drive, su SHA-256 coincide y se restauró aislado.':'Restauración de prueba correcta: '+(v.tables||0)+' tablas, '+(v.clients||0)+' clientes y '+(v.orders||0)+' órdenes, sin errores.';});
  };
  const card=(title,icon,state,lines)=>{const box=el('section',undefined,'bk-stat');box.dataset.state=state||'';const head=el('header');head.append(animatedIcon(icon,{size:18}),el('span',title));box.append(head);for(const line of lines)if(line)box.append(line instanceof Node?line:el('small',line));return box;};
- function paint(d){clearTimeout(timer);body.replaceChildren();
-  const a=d.agent,online=a&&a.online,connected=a&&a.connected,space=a&&a.space,pending=(a&&a.pending)||[],netDown=!!(a&&!connected&&/Sin conexión con MEGA/.test(a.last_error||''));
-  // 1. Estado
+ function paint(d){last=d;body.replaceChildren();
+  const link=d.link,app=d.app,gd=d.last_drive,local=d.last_local,quota=(link&&link.quota)||{};
+  // 0. Estado de protección: solo «protegido» con un respaldo subido Y verificado.
+  const banner=el('div',undefined,'bk-banner');banner.dataset.state=d.protected?'ok':'err';banner.setAttribute('role','status');
+  banner.append(animatedIcon(d.protected?'M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z M9 12l2 2 4-4':'alert',{size:20}),el('span',d.protected?'Protegido en Google Drive: último respaldo subido y verificado el '+when(gd.finished_at)+'.':'Todavía no hay ningún respaldo subido y verificado en Google Drive: los datos NO están protegidos en la nube'+(local?' (solo existe la copia local de la oficina).':'.')));
+  body.append(banner);
+  // 1. Estados separados
   const stats=el('div',undefined,'bk-stats');
-  stats.append(card('Agente de respaldos','M20 16V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v9m16 0H4m16 0 1.28 2.55a1 1 0 0 1-.9 1.45H3.62a1 1 0 0 1-.9-1.45L4 16',!a?'off':online?'ok':'err',[pill(!a?'Sin instalar':online?'Conectado':'Sin señal',!a?'off':online?'ok':'err'),a?('Equipo '+(a.host||'')+' · última señal '+when(a.seen_at)):'Se instala una vez en el equipo de la oficina (guía abajo).']));
-  stats.append(card('Conexión MEGA','M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z',!a?'off':connected?'ok':'err',[pill(!a?'Sin agente':connected?'Conectado':netDown?'Sin conexión':'Sin sesión',!a?'off':connected?'ok':'err'),connected?a.account:netDown?'El equipo no llega a MEGA (internet o servicio caído). Los respaldos quedan pendientes y se reintentan solos.':(a?'Inicia sesión en MEGA en el equipo de la oficina (guía abajo).':''),a&&a.folder_ok===false?'La carpeta de respaldos todavía no existe.':'']));
-  const used=space&&space.total?space.used/space.total:0,bar=el('div',undefined,'bk-bar');bar.setAttribute('role','meter');bar.setAttribute('aria-valuemin','0');bar.setAttribute('aria-valuemax','100');bar.setAttribute('aria-valuenow',String(Math.round(used*100)));bar.setAttribute('aria-label','Espacio usado en MEGA');const fill=el('i');fill.style.width=Math.min(100,Math.round(used*100))+'%';bar.dataset.level=used>=.9?'err':used>=.75?'warn':'ok';bar.append(fill);
-  stats.append(card('Almacenamiento MEGA','M12 2C7 2 3 3.8 3 6v12c0 2.2 4 4 9 4s9-1.8 9-4V6c0-2.2-4-4-9-4z M3 6c0 2.2 4 4 9 4s9-1.8 9-4',space?(used>=.9?'err':'ok'):'off',space?[el('strong',size(space.used)+' de '+size(space.total)),bar,Math.round(used*100)+' % usado']:[pill('Sin datos','off'),'Se consulta al conectar MEGA.']));
-  const loc=d.last_local;stats.append(card('Último respaldo local correcto','M20 6 9 17l-5-5',loc?'ok':'off',loc?[el('strong',when(loc.finished_at)),size(loc.bytes)+(loc.verified?' · verificado':'')+' · equipo de la oficina']:[pill('Ninguno','off')]));
-  const mg=d.last_mega;stats.append(card('Último respaldo MEGA verificado','M9 12l2 2 4-4 M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z',mg?'ok':'off',mg?[el('strong',when(mg.finished_at)),size(mg.bytes)+' · descargado y restaurado aislado']:[pill('Ninguno todavía','off'),'Nada cuenta como respaldado en MEGA hasta verificarlo.']));
-  stats.append(card('Próximo respaldo programado','M12 6v6l4 2 M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z','',[el('strong',when(d.next_run)),'A las 02:00 (hora de Ecuador) en el equipo de la oficina, sin depender del navegador. Si el equipo está apagado, se hace al encenderlo.']));
-  const pend=card('Pendientes de subir','M12 13v8 M4 14.9A7 7 0 1 1 15.7 8h1.8a4.5 4.5 0 0 1 2.5 8.2 M8 17l4-4 4 4',pending.length?'err':'ok',[pill(pending.length?pending.length+' pendiente'+(pending.length>1?'s':''):'Ninguno',pending.length?'err':'ok'),pending.length?'Guardados cifrados en el equipo; se reintentan cada hora.':'Todo lo generado está subido y verificado.']);
-  if(pending.length){const ul=el('ul',undefined,'bk-pending');for(const p of pending){const li=el('li');li.append(el('span',p.file,'bk-run-file'),el('small',size(p.bytes)+' · '+(p.attempts||0)+' intento(s)'+(p.last_error?' · '+p.last_error:'')));ul.append(li);}pend.append(ul);}
-  stats.append(pend);
+  stats.append(card('Base central','M12 2C7 2 3 3.8 3 6v12c0 2.2 4 4 9 4s9-1.8 9-4V6c0-2.2-4-4-9-4z M3 6c0 2.2 4 4 9 4s9-1.8 9-4','ok',[pill('Disponible','ok'),d.central.engine]));
+  stats.append(card('Copia local de la oficina','M20 16V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v9m16 0H4m16 0 1.28 2.55a1 1 0 0 1-.9 1.45H3.62a1 1 0 0 1-.9-1.45L4 16',local?'ok':'off',local?[el('strong',when(local.finished_at)),size(local.bytes)+(local.verified?' · verificada':'')+' · independiente de la nube']:[pill('Sin copias','off')]));
+  const conn=!d.configured?['Sin configurar','off','Completa el asistente de abajo.']:!link?['Sin conectar','off','Paso 2: conecta tu cuenta de Google.']:link.status==='vencida'?['Conexión vencida','err',link.error||'Vuelve a conectar Google Drive.']:['Conectado','ok',link.account||''];
+  stats.append(card('Google Drive','M7.71 3.5 1.15 15l3.43 5.95h13.09L22.85 12 16.3 3.5zM8.6 3.5l6.55 11.5H1.15 M15.15 15H22.8',conn[1],[pill(conn[0],conn[1]),conn[2],link&&link.checked_at?'Comprobado '+when(link.checked_at):'']));
+  const used=quota.limit?Number(quota.usage)/Number(quota.limit):0,bar=el('div',undefined,'bk-bar');bar.setAttribute('role','meter');bar.setAttribute('aria-valuemin','0');bar.setAttribute('aria-valuemax','100');bar.setAttribute('aria-valuenow',String(Math.round(used*100)));bar.setAttribute('aria-label','Espacio usado en Google Drive');const fill=el('i');fill.style.width=Math.min(100,Math.round(used*100))+'%';bar.dataset.level=used>=.9?'err':used>=.75?'warn':'ok';bar.append(fill);
+  stats.append(card('Espacio en Google Drive','M12 2C7 2 3 3.8 3 6v12c0 2.2 4 4 9 4s9-1.8 9-4V6c0-2.2-4-4-9-4z M3 6c0 2.2 4 4 9 4s9-1.8 9-4',quota.limit?(used>=.9?'err':'ok'):'off',quota.limit?[el('strong',size(quota.usage)+' de '+size(quota.limit)),bar,Math.round(used*100)+' % usado']:[pill('Sin datos','off'),'Se consulta al conectar o al pulsar «Verificar conexión».']));
+  stats.append(card('Último respaldo correcto en Drive','M9 12l2 2 4-4 M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z',gd?'ok':'off',gd?[el('strong',when(gd.finished_at)),size(gd.bytes)+' · SHA-256 confirmado por Google · restaurado aislado']:[pill('Ninguno todavía','off'),'Nada cuenta como respaldado hasta subirlo y verificarlo.']));
+  const cron=d.cron;stats.append(card('Próximos respaldos','M12 6v6l4 2 M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z','',[el('strong',when(d.next_run)),'Cada día a las 02:00 (hora de Ecuador), en el servidor; si falla, reintentos a las '+d.retry_hours.map(h=>String(h).padStart(2,'0')+':00').join(' y ')+'.',cron?'Última ejecución programada: '+when(cron.at)+' · '+({correcto:'correcta',error:'con error',omitido:'no se hizo',innecesario:'no hacía falta'}[cron.status]||cron.status)+(cron.status!=='correcto'&&cron.status!=='innecesario'&&cron.detail?' — '+cron.detail:''):'']));
+  const att=d.last_attempt,failed=att&&att.status==='error';
+  stats.append(card('Pendiente y errores','M12 9v4 M12 17h.01 M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z',failed?'err':d.next_retry?'run':'ok',[pill(failed?'Último intento con error':d.next_retry?'Respaldo de hoy pendiente':'Sin pendientes',failed?'err':d.next_retry?'run':'ok'),failed?(att.error||''):'',d.next_retry?'Próximo reintento automático: '+when(d.next_retry)+'. También puedes pulsar «Realizar respaldo ahora».':'']));
   body.append(stats);
   // 2. Acciones
-  const ready=a&&online,actions=el('div',undefined,'bk-actions');
-  const act=(label,action,icon,primary)=>{const b=button(label,()=>ask(action,'',b),primary?'primary':'secondary');b.prepend(animatedIcon(icon,{size:16}));b.disabled=!ready;if(!ready)b.title=!a?'Primero instala el agente en el equipo de la oficina.':'El agente no tiene señal (equipo apagado o sin internet).';actions.append(b);return b;};
-  act('Realizar respaldo ahora','respaldo','M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16 M8 16H3v5 M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8 M21 3v5h-5',true);
-  act('Verificar conexión y espacio','espacio','M22 12h-4l-3 9L9 3l-3 9H2');
-  act('Crear carpeta de respaldos','carpeta','M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z M12 10v6 M9 13h6');
-  const retry=act('Reintentar subidas pendientes','reintentar','M12 13v8 M4 14.9A7 7 0 1 1 15.7 8h1.8a4.5 4.5 0 0 1 2.5 8.2 M8 17l4-4 4 4');retry.disabled=retry.disabled||!pending.length;
+  const actions=el('div',undefined,'bk-actions'),connected=link&&link.status==='vinculado',ready=!d.ready&&!d.busy;
+  const act=(label,icon,primary,fn,enabled,why)=>{const b=button(label,()=>fn(b),primary?'primary':'secondary');b.prepend(animatedIcon(icon,{size:16}));b.disabled=!enabled;if(!enabled&&why)b.title=why;actions.append(b);return b;};
+  act('Realizar respaldo ahora','M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16 M8 16H3v5 M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8 M21 3v5h-5',true,b=>run('respaldo','',b),ready,d.ready||'Hay una operación en curso.');
+  act('Verificar conexión','M22 12h-4l-3 9L9 3l-3 9H2',false,b=>call(b,'Comprobando…','/api/backups/google/check',{},r=>'Conexión correcta con '+(r.backups.link.account||'Google Drive')+'.'),!!connected,'Conecta Google Drive primero.');
+  act('Crear carpeta','M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z M12 10v6 M9 13h6',false,b=>call(b,'Creando…','/api/backups/google/folder',{},'Carpeta '+d.folder+' lista en Google Drive.'),!!connected,'Conecta Google Drive primero.');
+  act('Verificar integridad','M9 12l2 2 4-4 M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z',false,b=>run('verificacion',gd.file,b),ready&&!!gd,gd?(d.ready||''):'Todavía no hay un respaldo en Google Drive.');
+  act('Restauración de prueba','M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8 M3 3v5h5 M12 7v5l4 2',false,b=>run('restauracion',gd.file,b),ready&&!!gd,gd?(d.ready||''):'Todavía no hay un respaldo en Google Drive.');
   body.append(actions);
-  // 3. Guía de conexión (solo si falta algo)
-  if(!a||(!connected&&!netDown)){const guide=el('section',undefined,'bk-wizard');guide.append(el('h3',!a?'Instalar el agente de respaldos y conectar MEGA':'Conectar tu cuenta MEGA'));
-   const ol=el('ol',undefined,'bk-steps');
-   const steps=!a?['En el equipo de la oficina, una sola vez: sudo pacman -S --needed podman','En la carpeta del proyecto: bash maintenance/mega-agente/instalar.sh (crea el contenedor con MEGAcmd oficial y los servicios automáticos).','Inicia sesión en MEGA en una terminal de ese equipo: podman exec -it ordenes-mega mega-login tu-correo@ejemplo.com (la contraseña la escribes solo ahí; nunca pasa por Órdenes Pro).','Vuelve aquí: el agente aparecerá «Conectado» en menos de un minuto. Pulsa «Crear carpeta de respaldos» y «Realizar respaldo ahora».']:['En una terminal del equipo de la oficina: podman exec -it ordenes-mega mega-login tu-correo@ejemplo.com','Escribe la contraseña de MEGA solo en esa terminal (y el código de verificación si tienes la doble autenticación activada).','En menos de un minuto el estado cambiará a «Conectado» y se subirán los respaldos pendientes.'];
-   for(const t of steps)ol.append(el('li',t));guide.append(ol,el('p','Si el servidor central deja de funcionar, un respaldo en MEGA no sustituye la operación sin conexión del sistema: sirve para recuperar los datos.','bk-note'));body.append(guide);}
-  // 4. Descargas preparadas
-  if((d.downloads||[]).length){const box=el('section',undefined,'bk-history');box.append(el('h3','Descargas preparadas (24 h)'));const ul=el('ul',undefined,'bk-runs');for(const x of d.downloads){const li=el('li',undefined,'bk-run');const link=el('a',x.file,'bk-run-file');link.href=x.link;link.target='_blank';link.rel='noopener noreferrer';li.append(link,el('small','Disponible hasta '+when(x.expires_at)+'. El archivo está cifrado: se abre con la clave de respaldos y el comando --descifrar.'));ul.append(li);}box.append(ul);body.append(box);}
-  // 5. Órdenes al agente
-  if((d.requests||[]).length){const box=el('section',undefined,'bk-history');box.append(el('h3','Órdenes al agente'));const ul=el('ul',undefined,'bk-runs');for(const q of d.requests){const li=el('li',undefined,'bk-run');li.dataset.state=(reqState[q.status]||['','idle'])[1];const main=el('div',undefined,'bk-run-main');main.append(el('strong',d.actions[q.action]||q.action),el('span',when(q.finished_at||q.requested_at),'bk-run-when'));const meta=el('div',undefined,'bk-run-meta');meta.append(pill((reqState[q.status]||[q.status])[0],(reqState[q.status]||['','idle'])[1]));if(q.file)meta.append(el('span',q.file,'bk-run-file'));li.append(main,meta);if(q.result)li.append(el('p',q.result,q.status==='error'?'bk-run-error':'bk-note'));ul.append(li);}box.append(ul);body.append(box);}
-  // 6. Datos
+  if(d.ready)body.append(el('p','Para respaldar falta: '+d.ready,'bk-note bk-note-warn'));
+  // 3. Asistente
+  const wiz=el('section',undefined,'bk-wizard');wiz.append(el('h3','Conectar Google Drive'));
+  const step=(n,title,state,content)=>{const s=el('div',undefined,'bk-step');s.dataset.state=state;const h=el('div',undefined,'bk-step-head');h.append(el('span',state==='ok'?'✓':String(n),'bk-step-n'),el('strong',title));s.append(h);if(content)s.append(content);wiz.append(s);};
+  const s1=el('div',undefined,'bk-step-body');
+  if(app&&app.source==='servidor')s1.append(el('p','El cliente OAuth está definido en las variables del servidor ('+app.client_id+').','bk-note'));
+  else{const guide=el('details',undefined,'bk-guide');guide.open=!d.configured;guide.append(el('summary','Cómo crear el cliente OAuth en Google Cloud (una sola vez, unos 10 minutos, gratis, sin tarjeta)'));
+   const ol=el('ol');for(const t of ['Abre https://console.cloud.google.com con tu cuenta de Google y crea un proyecto llamado «Órdenes Pro Respaldos».','APIs y servicios → Biblioteca → «Google Drive API» → Habilitar.','Pantalla de consentimiento de OAuth (Google Auth Platform): tipo «Externo», nombre «Órdenes Pro Respaldos», tu correo de asistencia; en Acceso a los datos añade el permiso …/auth/drive.file. En Público, pulsa «Publicar app» (estado En producción) para que el acceso no caduque a los 7 días.','Clientes → Crear cliente → «Aplicación web». En «URI de redireccionamiento autorizados» añade exactamente: '+d.redirect_uri,'Copia el «ID de cliente» y el «Secreto del cliente» y pégalos abajo.'])ol.append(el('li',t));guide.append(ol);s1.append(guide);
+   const form=el('form',undefined,'bk-form');form.noValidate=true;const field=(name,label,input,hint)=>{const w=el('label',undefined,'bk-field');w.append(el('span',label),input);if(hint)w.append(el('small',hint));input.name=name;form.append(w);return input;};
+   const cid=field('client_id','ID de cliente',el('input'),'Termina en .apps.googleusercontent.com');cid.value=app?.client_id||'';cid.autocomplete='off';cid.spellcheck=false;
+   const sec=field('client_secret','Secreto del cliente',el('input'),app&&app.has_secret?'Guardado cifrado el '+when(app.saved_at)+'. Déjalo en blanco para conservarlo.':'Se guarda cifrado en el servidor y nunca se vuelve a mostrar.');sec.type='password';sec.autocomplete='new-password';sec.spellcheck=false;
+   const save=button('Guardar cliente OAuth',async()=>{form.querySelectorAll('.bk-field-error').forEach(x=>x.remove());save.disabled=true;
+     try{const r=await api('/api/backups/google/app',{client_id:cid.value.trim(),client_secret:sec.value});sec.value='';paint(r.backups);toast('Cliente OAuth guardado. Ahora conecta Google Drive (paso 2).','success');}
+     catch(error){for(const[k,m]of Object.entries(error.fields||{})){const input=form.elements[k];if(input)input.closest('label').append(el('small',m,'bk-field-error'));}toast(error.message,'error');}
+     finally{save.disabled=false;}},'primary');form.append(save);s1.append(form);}
+  step(1,'Cliente OAuth de Google Cloud',d.configured?'ok':'todo',s1);
+  const s2=el('div',undefined,'bk-step-body');
+  if(connected){s2.append(el('p','Conectado con '+(link.account||'tu cuenta de Google')+' desde '+when(link.linked_at)+'. Carpeta: '+d.folder+'. Permiso: solo los archivos que crea Órdenes Pro (drive.file).','bk-note'));const off=button('Desconectar',async()=>{if(!await askConfirm('Desconectar Google Drive','Se borra el acceso guardado. Los respaldos ya subidos se quedan en tu Google Drive y la copia local de la oficina sigue funcionando.','Desconectar',true))return;try{paint((await api('/api/backups/google/disconnect',{})).backups);}catch(error){toast(error.message,'error');}},'secondary');s2.append(off);}
+  else{const go_=button(link?'Volver a conectar Google Drive':'Conectar Google Drive',async()=>{go_.disabled=true;try{const r=await api('/api/backups/google/connect',{});location.assign(r.url);}catch(error){toast(error.message,'error');go_.disabled=false;}},'primary');go_.prepend(animatedIcon('M7.71 3.5 1.15 15l3.43 5.95h13.09L22.85 12 16.3 3.5zM8.6 3.5l6.55 11.5H1.15 M15.15 15H22.8',{size:16}));go_.disabled=!d.configured;if(!d.configured)go_.title='Primero completa el paso 1.';
+   s2.append(el('p','Te llevará a Google para elegir tu cuenta y permitir el acceso. La contraseña solo se escribe en la página de Google. Se creará la carpeta '+d.folder+'.','bk-note'),go_);}
+  step(2,'Conectar Google Drive',connected?'ok':d.configured?'todo':'locked',s2);
+  const s3=el('div',undefined,'bk-step-body');s3.append(el('p',gd?'Primer respaldo subido y verificado el '+when(gd.finished_at)+'.':'Pulsa «Realizar respaldo ahora» (arriba). El sistema solo se considera protegido cuando el respaldo se sube, Google confirma su SHA-256 y se restaura aislado sin errores.','bk-note'));
+  step(3,'Primer respaldo y verificación real',gd?'ok':connected?'todo':'locked',s3);
+  body.append(wiz);
+  // 4. Datos
   const facts=el('dl',undefined,'bk-facts');const fact=(k,v)=>{const row=el('div');row.append(el('dt',k),el('dd',v));facts.append(row);};
-  fact('Carpeta en MEGA',d.folder);fact('Herramienta','MEGAcmd oficial de MEGA (contenedor en el equipo de la oficina)'+(a&&a.mega_version?' · '+a.mega_version:''));fact('Cifrado','AES-256-GCM con clave propia antes de subir; comprimido con gzip');
-  fact('Verificación','Tras subirlo se descarga de nuevo, se compara el SHA-256 y se restaura en una base aislada; además, una prueba de restauración cada semana');fact('Conservación','30 diarios, 12 semanales y 12 mensuales; lo que sobra va a la papelera de MEGA');fact('Sin conexión','Si MEGA o internet fallan, el respaldo cifrado queda pendiente en el equipo y se reintenta cada hora y al encender');
+  fact('Carpeta en Google Drive',d.folder);fact('Permiso','drive.file: Órdenes Pro solo ve los archivos y carpetas que crea; nada más de tu Drive');fact('Cifrado','AES-256-GCM con clave propia antes de subir; comprimido con gzip');
+  fact('Verificación','Google confirma el SHA-256, se descarga de nuevo y se restaura en una base aislada; restauración de prueba automática cada semana');fact('Conservación','30 diarios, 12 semanales y 12 mensuales; lo que sobra va a la papelera de Google Drive (recuperable 30 días)');fact('Copia independiente','El equipo de la oficina guarda además su copia local diaria (03:00)');
   body.append(facts);
-  // 7. Historial
+  // 5. Historial
   const hist=el('section',undefined,'bk-history');hist.append(el('h3','Historial de respaldos'));
   if(!(d.runs||[]).length)hist.append(el('p','Todavía no hay respaldos registrados.','bk-empty'));
   else{const list=el('ul',undefined,'bk-runs');for(const r of d.runs){const li=el('li',undefined,'bk-run');li.dataset.state=(runState[r.status]||['','idle'])[1];
@@ -9138,12 +9160,12 @@ async function renderBackupSettings(pane){
     if(r.verified&&r.verify)meta.append(el('span','Verificado'+(r.verify.tables?' · '+r.verify.tables+' tablas':'')+' · '+(r.verify.clients||0)+' clientes · '+(r.verify.orders||0)+' órdenes','bk-run-ok'));
     if(r.file||r.sha256){const f=el('span',r.file||('SHA-256 '+r.sha256.slice(0,16)+'…'),'bk-run-file');f.title=(r.file||'')+(r.sha256?' · SHA-256 '+r.sha256:'');meta.append(f);}
     li.append(main,meta);if(r.error&&r.status!=='correcto')li.append(el('p',r.error,r.status==='error'?'bk-run-error':'bk-note'));
-    if(r.destination==='mega'&&r.kind==='respaldo'&&r.status==='correcto'&&r.file){const tools=el('div',undefined,'bk-run-tools');const v=button('Verificar',()=>ask('verificar',r.file,v),'secondary');const dl=button('Descargar',()=>ask('descargar',r.file,dl),'secondary');const rs=button('Restaurar en entorno aislado',()=>ask('restaurar',r.file,rs),'secondary');v.disabled=dl.disabled=rs.disabled=!ready;tools.append(v,dl,rs);li.append(tools);}
+    if(r.destination==='gdrive'&&r.kind==='respaldo'&&r.status==='correcto'&&r.file){const tools=el('div',undefined,'bk-run-tools');const v=button('Verificar integridad',()=>run('verificacion',r.file,v),'secondary');const rs=button('Restauración de prueba',()=>run('restauracion',r.file,rs),'secondary');v.disabled=rs.disabled=!ready;tools.append(v,rs);li.append(tools);}
     list.append(li);}hist.append(list);}
   body.append(hist);
-  if((d.requests||[]).some(q=>q.status==='pendiente'||q.status==='en_curso')||pending.length)timer=setTimeout(()=>{if(pane.isConnected)load();},10000);
  }
  async function load(){try{paint(await api('/api/backups'));}catch(error){body.replaceChildren(el('p',error.message,'bk-empty'));}}
+ const back=new URLSearchParams(routeState().params).get('gdrive');if(back==='ok')toast('Google Drive quedó conectado. Ahora pulsa «Realizar respaldo ahora» para el primer respaldo verificado.','success');else if(back==='error')toast('No se pudo conectar Google Drive. El motivo se mostró en la página de retorno.','error');
  await load();
 }
 async function renderWhatsAppSettings(pane){
