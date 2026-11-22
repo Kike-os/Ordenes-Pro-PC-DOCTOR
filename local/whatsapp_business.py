@@ -35,6 +35,8 @@ MAX_AUTO = 5                      # intentos automáticos (solo errores temporal
 MAX_TOTAL = 10                    # tope absoluto, contando los reintentos manuales
 BACKOFF = (2, 10, 30, 120)        # minutos entre intentos automáticos
 LOCK_SECONDS = 120
+MAX_MONTHLY_WA_MESSAGES = 200  # límite conservador para los envíos desde Órdenes Pro
+MAX_MONTHLY_ADI_REPLIES = 100  # limita también llamadas automáticas a ADI/OpenAI
 AUTO_DELAY = 3                    # minutos de gracia en los avisos de estado: una corrección rápida no llega al cliente
 REPEAT_HOURS = 72
 ONCE = ('orden_registrada', 'diagnostico', 'reparacion_iniciada', 'reparacion_finalizada', 'entregado')  # una sola vez por orden
@@ -683,9 +685,27 @@ def _record_message(c, row, provider, now):
         return None
 
 
+def monthly_outbound_count(c, now):
+    """Cuenta conservadoramente los mensajes de este mes: cola (incluidos fallidos) y respuestas ADI reservadas/enviadas."""
+    start = stamp(now.replace(day=1, hour=0, minute=0, second=0, microsecond=0))
+    outbox = c.execute("SELECT COUNT(*) FROM whatsapp_outbox WHERE created_at>=? AND status IN ('pendiente','enviando','enviado','entregado','leido','fallido')", (start,)).fetchone()[0]
+    replies = c.execute("SELECT COUNT(*) FROM whatsapp_adi_inbound WHERE received_at>=? AND status IN ('generando','enviando','enviado','fallido')", (start,)).fetchone()[0]
+    return int(outbox or 0) + int(replies or 0)
+
+
+def monthly_adi_reply_count(c, now):
+    start = stamp(now.replace(day=1, hour=0, minute=0, second=0, microsecond=0))
+    return int(c.execute("SELECT COUNT(*) FROM whatsapp_adi_inbound WHERE received_at>=? AND status IN ('generando','enviando','enviado','fallido')", (start,)).fetchone()[0] or 0)
+
+
 def send_one(c, nid, now, env=None):
     """Envía un aviso ya reclamado o reclamable. Devuelve la fila actualizada (dict) o None si otro proceso lo tiene."""
     if not _claim(c, nid, now):
+        return None
+    if monthly_outbound_count(c, now) >= MAX_MONTHLY_WA_MESSAGES:
+        c.execute("UPDATE whatsapp_outbox SET status='omitido',detail=?,reason_kind='limite',locked_until='',next_attempt_at='',updated_at=? WHERE id=?",
+                  ('Se alcanzó el límite mensual de seguridad de %d mensajes de WhatsApp.' % MAX_MONTHLY_WA_MESSAGES, stamp(now), nid))
+        return dict(c.execute('SELECT * FROM whatsapp_outbox WHERE id=?', (nid,)).fetchone())
         return None
     row = c.execute('SELECT * FROM whatsapp_outbox WHERE id=?', (nid,)).fetchone()
     cfg = settings(c)
@@ -823,6 +843,8 @@ def send_test(c, data, user, now, env=None):
     if not ready(env):
         raise WhatsAppError('Completa primero las credenciales de WhatsApp Business en el servidor.', 409)
     cfg = settings(c)
+    if monthly_outbound_count(c, now) >= MAX_MONTHLY_WA_MESSAGES:
+        raise WhatsAppError('Se alcanzó el límite mensual de seguridad de %d mensajes de WhatsApp.' % MAX_MONTHLY_WA_MESSAGES, 429)
     if not cfg['test_number']:
         raise WhatsAppError('Guarda primero el número autorizado para pruebas.', 400)
     if data.get('confirm') is not True:

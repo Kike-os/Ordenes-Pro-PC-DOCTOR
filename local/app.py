@@ -3051,9 +3051,19 @@ class Handler(BaseHTTPRequestHandler):
             except ValueError:length=0
             if length<=0 or length>200000:return self.reply(400,{'error':'Solicitud inválida.'})
             raw=self.rfile.read(length)
+            signature=self.headers.get('X-Hub-Signature-256','')
             with connect() as c:
-                changed=whatsapp_business.webhook(c,raw,self.headers.get('X-Hub-Signature-256',''),reception_now());c.commit()
+                changed=whatsapp_business.webhook(c,raw,signature,reception_now());c.commit()
             if changed<0:return self.reply(403,{'error':'No autorizado.'})
+            # ADI procesa solo mensajes entrantes, con la firma validada y el interruptor de servidor activo.
+            import whatsapp_adi
+            if whatsapp_adi.enabled():
+                try:
+                    with connect() as c:
+                        whatsapp_adi.handle(c,raw,signature,reception_now());c.commit()
+                except Exception as error:
+                    # No guardar el contenido del cliente ni provocar reintentos duplicados de Meta.
+                    print('whatsapp-adi-webhook',type(error).__name__,flush=True)
             return self.reply(200,{'ok':True})
         optout_post=re.fullmatch(r'/baja/([A-Za-z0-9_-]{16,64})',urlsplit(self.path).path)
         if optout_post:
