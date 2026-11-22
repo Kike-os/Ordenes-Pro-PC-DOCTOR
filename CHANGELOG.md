@@ -4,6 +4,18 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.310 — 2026-11-21 20:39 (UTC-05:00)
+
+Asistente de OneDrive y respaldo en el servidor
+
+### Mejoras realizadas
+
+- Respaldos en OneDrive: asistente en Configuración → Respaldos para conectar la cuenta (personal, familiar o de empresa) sin tocar archivos del servidor; el respaldo diario de las 02:00 y «Realizar respaldo ahora» los ejecuta el propio servidor, verificados descargándolos y restaurándolos aislados.
+
+### Errores corregidos
+
+- Respaldos: el panel separa la base central, la copia local de la oficina, la sincronización y OneDrive; la copia de 37,8 MB del equipo aparece en el historial con sus datos reales; sin OneDrive conectado nunca se muestra un respaldo en la nube y los botones explican qué falta.
+
 ## v1.5.309 — 2026-11-21 19:19 (UTC-05:00)
 
 Respaldos automáticos en Microsoft OneDrive

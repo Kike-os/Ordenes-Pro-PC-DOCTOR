@@ -8,6 +8,26 @@
   },
   "releases": [
     {
+      "version": "1.5.310",
+      "date": "2026-11-21T20:39:32-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Asistente de OneDrive y respaldo en el servidor",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Respaldos en OneDrive: asistente en Configuración → Respaldos para conectar la cuenta (personal, familiar o de empresa) sin tocar archivos del servidor; el respaldo diario de las 02:00 y «Realizar respaldo ahora» los ejecuta el propio servidor, verificados descargándolos y restaurándolos aislados."
+        ],
+        "fixes": [
+          "Respaldos: el panel separa la base central, la copia local de la oficina, la sincronización y OneDrive; la copia de 37,8 MB del equipo aparece en el historial con sus datos reales; sin OneDrive conectado nunca se muestra un respaldo en la nube y los botones explican qué falta."
+        ],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Administración (autorización expresa en la sesión)"
+    },
+    {
       "version": "1.5.309",
       "date": "2026-11-21T19:19:40-05:00",
       "type": "patch",
