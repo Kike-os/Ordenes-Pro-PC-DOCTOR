@@ -324,10 +324,11 @@ def build(c, user, now, mail_access=False, hidden=False, limit=40):
             items.append({'key': 'storage:local', 'kind': 'warning', 'icon': 'status', 'title': 'Esta instalación usa una base de datos local', 'detail': 'Lo que registres aquí queda solo en este equipo, no en la base central en la nube.', 'at': stamp, 'href': '#system', 'group': 'alert'})
         else:
             try:
-                last = _state(c, 'cloud_backup')
-                age = (now - appointments.datetime.fromisoformat(last['at'])).total_seconds() if last and last.get('ok') else None
-                if age is None or age > 48 * 3600:
-                    items.append({'key': 'backup:late:' + today, 'kind': 'warning', 'icon': 'status', 'title': 'Respaldo de la base central atrasado', 'detail': ('El último respaldo correcto es del ' + last['at'][:10] + '.') if last and last.get('ok') else 'Todavía no se registra ningún respaldo correcto.', 'at': stamp, 'href': '#system', 'group': 'alert'})
+                # 1.5.309 · Alertas de respaldo separadas y reales: atrasado (sin respaldo VERIFICADO en 30 h), último respaldo en
+                # OneDrive fallido y conexión vencida. Desaparecen solas cuando un respaldo nuevo queda verificado o se vuelve a vincular.
+                import onedrive_backup
+                for alert_item in onedrive_backup.alerts(c, now):
+                    items.append(dict(alert_item, icon='status', at=stamp, href='#settings?tab=backups', group='alert'))
             except Exception:
                 pass
         chats = c.execute("SELECT COALESCE(SUM(last_seen_admin='' AND EXISTS(SELECT 1 FROM adi_messages m WHERE m.conversation_id=ac.id AND m.author='client')),0) FROM adi_conversations ac").fetchone()[0]

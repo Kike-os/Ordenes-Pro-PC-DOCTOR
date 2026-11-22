@@ -1214,6 +1214,24 @@ class Handler(BaseHTTPRequestHandler):
             content_type = 'image/png' if file.suffix == '.png' else 'image/x-icon' if file.suffix == '.ico' else ('text/css; charset=utf-8' if file.suffix == '.css' else 'text/javascript; charset=utf-8')
             return self.reply(200, file.read_bytes(), content_type)
         with connect() as c:
+            if path == '/api/backups/onedrive/callback':
+                # 1.5.309 · Vuelta desde Microsoft tras vincular OneDrive. La valida el «state» (aleatorio, de un solo uso, 10 minutos y
+                # ligado al administrador que la inició). La página vuelve a Configuración desde el propio sitio, donde la sesión sí viaja.
+                import onedrive_backup
+                query=parse_qs(urlsplit(self.path).query);ok=False
+                if query.get('error'):message='Microsoft no autorizó la vinculación ('+query.get('error',[''])[0][:60]+'). No se guardó nada.'
+                else:
+                    try:
+                        link=onedrive_backup.finish_link(c,query.get('state',[''])[0],query.get('code',[''])[0]);ok=True
+                        audit(c,link['linked_by'],'onedrive_linked');message='OneDrive quedó vinculado con la cuenta '+link['account']+'.'
+                    except onedrive_backup.BackupError as error:message=str(error)
+                target='/#settings?tab=backups&onedrive='+('ok' if ok else 'error')
+                page=('<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+                      '<meta http-equiv="refresh" content="3;url='+html.escape(target)+'"><title>Respaldos en OneDrive · Órdenes Pro</title>'
+                      '<link rel="stylesheet" href="/static/app.css"></head><body class="auth-page onedrive-return"><main class="onedrive-return-card" role="status">'
+                      '<h1>'+('OneDrive vinculado' if ok else 'No se pudo vincular OneDrive')+'</h1><p>'+html.escape(message)+'</p>'
+                      '<p><a class="primary" href="'+html.escape(target)+'">Volver a Configuración → Respaldos</a></p></main></body></html>')
+                return self.reply(200 if ok else 400,page,'text/html; charset=utf-8')
             if path == '/citas':
                 return self.page('appointments.html')
             if path in ('/pqrs','/pqrs/seguimiento'):
@@ -2562,6 +2580,10 @@ class Handler(BaseHTTPRequestHandler):
                 import autocare
                 try:return self.reply(200,autocare.service_detail(c,autocare_service[1],reception_now()))
                 except LookupError as error:return self.reply(404,{'error':str(error)})
+            if path == '/api/backups':
+                if user['role']!='administrador':return self.reply(403,{'error':'Solo administración gestiona los respaldos.'})
+                import onedrive_backup
+                return self.reply(200,onedrive_backup.overview(c,True))
             if path == '/api/system':
                 try:return self.reply(200, versioning.overview())
                 except versioning.RegistryError as error:return self.reply(500,{'error':str(error)})
@@ -3583,6 +3605,25 @@ class Handler(BaseHTTPRequestHandler):
                     for key,value in values.items():c.execute('INSERT INTO auth_policy VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value',(key,value))
                     audit(c,user['id'],'auth_policy_updated')
                     return self.reply(200,{'ok':True})
+                if path in ('/api/backups/onedrive/connect','/api/backups/onedrive/disconnect','/api/backups/run'):
+                    # 1.5.309 · Respaldos en OneDrive: vincular, desvincular y pedir respaldo, verificación o restauración aislada.
+                    if user['role']!='administrador':return self.reply(403,{'error':'Solo administración gestiona los respaldos.'})
+                    import onedrive_backup
+                    try:
+                        if path.endswith('/connect'):
+                            url=onedrive_backup.start_link(c,user['id']);audit(c,user['id'],'onedrive_link_started')
+                            return self.reply(200,{'ok':True,'url':url})
+                        if path.endswith('/disconnect'):
+                            onedrive_backup.unlink(c);audit(c,user['id'],'onedrive_unlinked')
+                            return self.reply(200,{'ok':True,'backups':onedrive_backup.overview(c,True)})
+                        kind=str(data.get('kind','respaldo'))
+                        if kind=='restauracion' and str(data.get('confirm',''))!='RESTAURAR':
+                            return self.reply(400,{'error':'Escribe RESTAURAR para confirmar la restauración de prueba.'})
+                        run=onedrive_backup.request_run(c,user['id'],kind,str(data.get('file',''))[:120])
+                        audit(c,user['id'],'backup_requested_'+kind)
+                        return self.reply(202,{'ok':True,'run':run,'backups':onedrive_backup.overview(c,True)})
+                    except onedrive_backup.BackupError as error:
+                        return self.reply(error.status,{'error':str(error)})
                 if path in ('/api/payments/factors/confirm','/api/payments/factors/edit'):
                     # Factores DATAFAST: confirmación y corrección administrativas, con quién, cuándo y el documento (registro que no se modifica).
                     if user['role']!='administrador':return self.reply(403,{'error':'Solo administración confirma o corrige los factores.'})
