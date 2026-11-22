@@ -4,7 +4,9 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
-## Sin publicar
+## v1.5.314 — 2026-11-22 11:25 (UTC-05:00)
+
+Centro de Respaldos Premium 2.0
 
 ### Mejoras realizadas
 
