@@ -7,7 +7,7 @@ sin IA, sin Google Drive y sin facturación. Producción sigue en Vercel y la ba
 
 | Archivo | Para qué |
 |---|---|
-| `devcontainer.json` | Imagen predeterminada de Codespaces (Python, Node, Git), máquina de 2 núcleos, puertos 8010 y 8011 privados. |
+| `devcontainer.json` | Imagen ligera de Python 3.12 con Node 22, máquina de 2 núcleos, puertos 8010 y 8011 privados. |
 | `preparar.sh` | Se ejecuta al crear el Codespace: instala dependencias y crea la base local vacía. Se detiene si encuentra `TURSO_*`. |
 | `iniciar-codespace.sh` | Inicia la app (`--crear-admin` crea el administrador de pruebas, `--pruebas` ejecuta las pruebas). Retira las variables de servicios reales. |
 | `servidor-navegador.py` | La misma aplicación en el puerto 8011 para usarla desde el navegador (`https://…-8011.app.github.dev`). |
@@ -18,7 +18,7 @@ a tu Windows como `http://localhost:8010`; desde el navegador la dirección es `
 ## Cuota gratuita (cuenta personal GitHub Free)
 
 - **120 horas-núcleo** de cómputo al mes: con la máquina de 2 núcleos son **60 horas** de Codespace encendido.
-- **15 GB-mes** de almacenamiento (cuenta aunque el Codespace esté detenido; la imagen predeterminada no cuenta).
+- **15 GB-mes** de almacenamiento (cuenta aunque el Codespace esté detenido; este entorno ocupa unos pocos GB).
 - La cuota se renueva cada mes. Consumo: github.com/settings/billing/usage.
 - Protección contra cobros: sin método de pago y con el presupuesto de Codespaces en **US$0 con «Usage blocked»**.
   Al agotarse la cuota GitHub **bloquea** Codespaces; no cobra. No borres ese presupuesto ni agregues método de pago.

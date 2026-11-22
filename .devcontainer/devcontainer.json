@@ -1,9 +1,12 @@
 {
   // Entorno de DESARROLLO de Órdenes Pro en GitHub Codespaces. No es producción.
-  // Imagen predeterminada de Codespaces: ya trae Python, Node y Git, arranca rápido y GitHub no la cuenta
-  // en el almacenamiento de la cuota gratuita. Ver docs/CODESPACES.md.
+  // Imagen ligera de Python 3.12 (la misma versión mayor que usa Vercel) + Node para `node --check`.
+  // La imagen «universal» (~10 GB) se quedó construyendo más de 25 minutos. Ver docs/CODESPACES.md.
   "name": "Órdenes Pro · desarrollo",
-  "image": "mcr.microsoft.com/devcontainers/universal:2",
+  "image": "mcr.microsoft.com/devcontainers/python:1-3.12-bookworm",
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": { "version": "22" }
+  },
 
   // Máquina más pequeña (2 núcleos): gasta 2 horas-núcleo por hora y alcanza de sobra para el proyecto.
   "hostRequirements": { "cpus": 2 },
