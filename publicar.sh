@@ -4,6 +4,14 @@
 set -euo pipefail
 cd -- "$(dirname -- "${BASH_SOURCE[0]}")"
 
+# Solo se publica desde main: en otra rama el arreglo no llegaría a producción.
+rama="$(git branch --show-current)"
+if [[ "$rama" != "main" ]]; then
+    printf 'No se publicó nada: estás en la rama "%s" y producción solo se actualiza desde main.\n' "${rama:-(sin rama)}"
+    printf 'Cámbiate antes de hacer el arreglo con:\n  git checkout main && git pull\n'
+    exit 1
+fi
+
 if [[ -n "$(git status --porcelain)" ]]; then
     printf 'Verificando antes de publicar…\n'
     python -m unittest discover -s local/tests
