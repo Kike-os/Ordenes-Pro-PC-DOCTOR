@@ -830,10 +830,25 @@ def send_test(c, data, user, now, env=None):
     recent = c.execute("SELECT 1 FROM whatsapp_outbox WHERE source='prueba' AND created_at>=? LIMIT 1", (stamp(now - timedelta(seconds=60)),)).fetchone()
     if recent:
         raise WhatsAppError('Espera un minuto entre envíos de prueba.', 429)
+    # La API no puede entregar un mensaje al mismo número que lo envía.
+    code, answer = call('GET', config(env)['phone_id'], env, query={'fields': 'display_phone_number'})
+    sender = number_for((answer or {}).get('display_phone_number', '')) if code == 200 else ''
+    if sender and sender == cfg['test_number']:
+        raise WhatsAppError('El número autorizado para la prueba debe ser distinto del número de WhatsApp Business que envía. Guarda otro número de WhatsApp autorizado.', 400)
     template = cfg['test_template'] or 'hello_world'
+    language = cfg['test_lang'] or 'en_US'
+    selected = next((t for t in (last_check(c) or {}).get('templates', [])
+                     if t.get('name') == template and t.get('language') == language), None)
+    if template != 'hello_world' and (not selected or selected.get('status') != 'APPROVED'):
+        raise WhatsAppError('Vuelve a comprobar la conexión y elige una plantilla aprobada en ese idioma.', 409)
+    params = []
+    if selected and selected.get('status') == 'APPROVED':
+        samples = ['Prueba PC-DOCTOR', 'PRUEBA-0001', 'Mensaje de prueba de PC-DOCTOR.']
+        count = int(selected.get('variables') or 0)
+        params = [samples[i] if i < len(samples) else 'Dato de prueba %d' % (i + 1) for i in range(count)]
     nid = c.execute("INSERT INTO whatsapp_outbox(dedupe_key,event,source,recipient,template,template_lang,params,preview,status,next_attempt_at,created_by,created_at,updated_at) "
                     "VALUES (?,?,?,?,?,?,?,?,'pendiente',?,?,?,?)", ('prueba:%s' % now.strftime('%Y%m%d%H%M%S%f'), 'prueba', 'prueba', cfg['test_number'], template,
-                                                                   cfg['test_lang'] or 'en_US', '[]', 'Mensaje de prueba con la plantilla «%s».' % template, stamp(now),
+                                                                   language, json.dumps(params, ensure_ascii=False), 'Mensaje de prueba con la plantilla «%s».' % template, stamp(now),
                                                                    user['id'], stamp(now), stamp(now))).lastrowid
     c.commit()
     rows = process(c, now, [nid], env=env)
