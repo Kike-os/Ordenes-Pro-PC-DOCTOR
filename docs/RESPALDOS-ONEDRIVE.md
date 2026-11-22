@@ -1,164 +1,144 @@
-# Respaldos automáticos en Microsoft OneDrive (1.5.309)
+# Respaldos automáticos en Microsoft OneDrive (1.5.309 · 1.5.310)
 
-## Por qué saltó «Respaldo de la base central atrasado»
+## Auditoría (21/11/2026)
 
-El respaldo lo generaba solo el equipo de la oficina (MI-DATA-CENTER), con el temporizador `ordenes-pro-respaldo.timer` a las 02:30. Su registro muestra lo siguiente:
+### Por qué saltó «Respaldo de la base central atrasado»
 
-- Respaldos correctos el 17, el 18 y el 19 de noviembre de 2026.
-- Ninguna ejecución el 20 ni el 21, porque **el equipo estuvo apagado**. El siguiente arranque fue el 21 a las 16:37.
-- Al encender, el temporizador recuperó la ejecución perdida (`Persistent=true`) y a las 16:44 terminó un respaldo correcto: 39,7 MB, 202 clientes y 23 órdenes.
+El respaldo dependía del equipo de la oficina (MI-DATA-CENTER), con el temporizador `ordenes-pro-respaldo.timer` a las 02:30. Su registro muestra:
 
-No había credenciales vencidas ni errores de almacenamiento o de conexión. La causa era que **el respaldo dependía de que un único equipo estuviera encendido**.
+- copias correctas los días 17, 18 y 19;
+- el equipo **apagado** del 19 al 21;
+- el 21 a las 16:37, al encenderlo, recuperó la copia perdida (`Persistent=true`) y terminó bien.
 
-**Corrección definitiva:** el respaldo principal lo genera ahora GitHub Actions en la nube, a las 02:00 de Ecuador, aunque la oficina esté apagada. El equipo de la oficina sigue haciendo su propia copia independiente cuando está encendido.
+No había credenciales vencidas ni errores de almacenamiento o de conexión.
 
-## Cómo funciona
+### El respaldo de 37,8 MB y el historial vacío
 
-| Pieza | Dónde corre | Qué hace |
+Es la copia de la oficina del 21/11 a las 16:37 (39 665 664 bytes, 202 clientes y 23 órdenes). La hizo el guion anterior, que solo dejaba un resumen (`system_state.cloud_backup`) y no el historial nuevo. Por eso el indicador lo mostraba y el historial salía vacío.
+
+**Comprobación del archivo** (`~/Respaldos-OrdenesPro/ordenes-pro-nube-20261121-163742.sqlite3`):
+
+- su SHA-256 coincide con el registrado al crearlo;
+- restaurado en un entorno aislado pasa `integrity_check`, con 0 errores de claves foráneas;
+- contiene 219 tablas, 11 213 filas, 202 clientes y 23 órdenes, las 23 vinculadas a su cliente.
+
+**Cómo se unificó el historial, sin inventar registros:**
+
+- La copia que solo constaba en el resumen aparece como «registro anterior» con sus datos reales. Antes de sobrescribir el resumen se guarda en el historial.
+- Cada copia nueva de la oficina incorpora una sola vez las líneas `OK` de su registro real (`respaldos.log`). Las líneas `ERROR` nunca se convierten en respaldos.
+
+### Estado encontrado
+
+| Elemento | Situación |
+|---|---|
+| Tareas de Vercel | Avisos y estabilidad, protegidas con `CRON_SECRET`; ninguna de respaldo |
+| Equipo de la oficina | Copia diaria a las 02:30; funciona cuando el equipo está encendido |
+| GitHub Actions (1.5.309) | Necesitaba un token de Turso que no se puede copiar desde producción. **Sustituido** por la tarea del servidor; el flujo y sus secretos se retiraron |
+| Claves en Vercel | `ONEDRIVE_TOKEN_KEY` y `BACKUP_ENCRYPTION_KEY` cargadas en Production como sensibles |
+| Microsoft | Sin aplicación registrada: la cuenta es personal y Microsoft exige un directorio de Azure gratuito para registrar aplicaciones |
+
+## Cómo funciona desde la 1.5.310
+
+| Pieza | Dónde | Qué hace |
 |---|---|---|
-| Generador (`maintenance/backup-cloud.py --modo …`) | GitHub Actions (`.github/workflows/respaldo.yml`), 07:00 UTC = 02:00 Ecuador | Copia la base central, la verifica, la cifra, la sube, la descarga de nuevo y la restaura en una base aislada |
-| Vinculación y panel | La aplicación (Vercel) | OAuth 2.0 con Microsoft, token guardado cifrado, panel Configuración → Respaldos y botones que piden trabajo al generador |
-| Copia independiente | Equipo de la oficina (`ordenes-pro-respaldo.timer`, 02:30) | Copia SQLite local verificada, conserva 30; recupera la ejecución al encender |
+| Respaldo diario en OneDrive | **Servidor**: tarea programada de Vercel `/api/cron/backup` a las 07:00 UTC, es decir a las 02:00 de Ecuador | Copia la base, la verifica, la cifra, la sube, la descarga y la restaura aislada. No depende del navegador ni de ningún equipo |
+| «Realizar respaldo ahora» y «Verificar respaldo» | **Servidor**, misma función | Igual que el anterior, en el momento |
+| Función de respaldos | `api/backup.py`, con un plazo propio de **300 s** | El resto de la aplicación sigue en `api/index.py` con 30 s |
+| Copia local independiente | Equipo de la oficina, a las 02:30 | Copia SQLite verificada; conserva 30 |
+| Motor | `local/backup_runner.py` | Lo usan el servidor y el guion de la oficina |
 
 ### Procedimiento de cada respaldo
 
-1. **Bloqueo.** Solo puede haber un respaldo a la vez. Se garantiza con un bloqueo en la base, que caduca solo a los 45 minutos si el proceso muere, y con el grupo de concurrencia de GitHub.
-2. **Copia consistente.** Copiar el archivo de la base no basta. El esquema y todas las filas se leen dentro de **una sola transacción de lectura**, una instantánea, y se escriben en una base SQLite nueva. Si esa transacción no se sostiene, se copia sin ella, se vuelven a contar las filas al terminar y, si alguna tabla cambió durante la copia, se repite. Hay hasta 3 intentos.
-3. **Comprobación local:** `integrity_check`, `foreign_key_check` y el número de filas de cada tabla, igual que en la base central.
-4. **Compresión y cifrado.** Se comprime con gzip y se cifra con **AES-256-GCM** y la clave `BACKUP_ENCRYPTION_KEY`. El cifrado autenticado detecta cualquier alteración del archivo.
-5. **Nombre automático:** `ordenes-pro-AAAAMMDD-HHMMSS-<diario|semanal|mensual>.sqlite.gz.enc`.
-6. **Subida por partes** con Microsoft Graph a `PC-DOCTOR S.A./Ordenes Pro/Respaldos Base de Datos`. Las carpetas se crean si faltan, y nunca se reemplaza un archivo existente (`conflictBehavior: fail`). Microsoft confirma el tamaño final.
-7. **Verificación real.** El archivo **se descarga de nuevo** desde OneDrive, se compara su **SHA-256** con el calculado antes de subirlo, se descifra y se **restaura en una base aislada**. Esa base debe pasar la integridad, las claves foráneas y los mismos recuentos que la central. Solo entonces el respaldo cuenta como válido y se actualiza el estado de salud. Que el archivo exista no basta.
-8. **Retención** (abuelo-padre-hijo, sobre las fechas): se conservan 30 diarios, 12 semanales y 12 mensuales. Lo que sobra va a la **papelera de OneDrive**, no se borra definitivamente. Solo se tocan archivos de Órdenes Pro de esa carpeta; el resto de archivos, incluso de la misma carpeta, nunca se toca.
-9. **Registro.** Cada ejecución queda en el historial (`system_state.backup_runs`, sin migración de esquema) con:
-   - fecha, operación y destino;
-   - archivo, tamaño cifrado y sin cifrar, y SHA-256;
-   - estado, resultado de la verificación y error, si lo hubo.
+1. **Comprobación previa.** Si falta algo (aplicación de Microsoft, conexión o clave), el respaldo no se hace y se explica el motivo. **Nunca se anota un respaldo en la nube que no ocurrió.**
+2. **Bloqueo.** No puede haber dos respaldos a la vez; el bloqueo caduca solo a los 45 minutos si el proceso muere.
+3. **Copia consistente.** El esquema y todas las filas se leen dentro de **una sola transacción de lectura**. Si esa transacción no se sostiene, se copia sin ella con doble recuento y se repite si algo cambió durante la copia. Hay hasta 3 intentos.
+4. **Comprobación de la copia:** `integrity_check`, `foreign_key_check` y el recuento de cada tabla.
+5. **Compresión y cifrado:** gzip y **AES-256-GCM** con `BACKUP_ENCRYPTION_KEY`.
+6. **Nombre automático:** `ordenes-pro-AAAAMMDD-HHMMSS-<diario|semanal|mensual>.sqlite.gz.enc`.
+7. **Subida por partes** con Microsoft Graph a `PC-DOCTOR S.A./Ordenes Pro/Respaldos Base de Datos`. La carpeta se crea si falta y nunca se reemplaza un archivo existente.
+8. **Verificación real.** El archivo **se descarga de nuevo**, se compara su **SHA-256**, se descifra y se **restaura en una base aislada** con los mismos recuentos que la central. Solo entonces es válido.
+9. **Retención 30/12/12** sobre las fechas. Lo que sobra va a la **papelera** de OneDrive. Los archivos ajenos nunca se tocan.
+10. **Registro.** Cada respaldo queda en el historial con fecha, tipo, destino, archivo, tamaño, SHA-256, estado, verificación y error. La última ejecución programada queda en `backup_cron`, también cuando se omite por falta de configuración.
 
-**Reintentos:** las llamadas a Microsoft, GitHub y la base se repiten hasta 3 o 4 veces ante fallos de red, 429 y 5xx, respetando `Retry-After`.
+### Panel (Configuración → Respaldos, solo administración)
 
-### Alertas (centro de notificaciones, solo administración)
+- **Estados separados:**
+  - base central;
+  - copia local de la oficina;
+  - sincronización con el servidor;
+  - Microsoft OneDrive, con su último respaldo en la nube;
+  - próximo respaldo programado, con el resultado de la última ejecución.
 
-| Alerta | Cuándo aparece | Cuándo desaparece |
-|---|---|---|
-| Respaldo de la base central atrasado | No hay un respaldo **correcto y verificado**, de OneDrive o de la oficina, en las últimas 30 h (un día más margen por los retrasos de GitHub) | En cuanto se verifica un respaldo nuevo |
-| Falló el último respaldo en OneDrive | El último respaldo de OneDrive terminó en error | Con el siguiente respaldo correcto |
-| Conexión con OneDrive vencida | Microsoft rechaza el acceso guardado (contraseña cambiada, acceso revocado, más de 90 días sin uso) | Al volver a vincular la cuenta |
-| Respaldos sin copia en OneDrive | La aplicación de Microsoft está configurada, pero no hay ninguna cuenta vinculada | Al vincular la cuenta |
+  La copia de la oficina **nunca** se presenta como respaldo en la nube.
+- **Asistente en tres pasos:**
+  1. **Datos de la aplicación registrada en Microsoft:** Id. de aplicación, tipo de cuenta y secreto.
+     - Tipos de cuenta: Personal o Familiar (`consumers`), Empresa (directorio concreto) o Personal y empresa (`common`).
+     - El secreto se envía una vez y el servidor lo guarda **cifrado** con `ONEDRIVE_TOKEN_KEY`; nunca vuelve al navegador. Si se deja en blanco al editar, se conserva.
+     - Las variables `MS_CLIENT_ID`, `MS_CLIENT_SECRET` y `MS_TENANT_ID`, si existen, tienen prioridad sobre lo guardado.
+  2. **Conectar Microsoft OneDrive:** OAuth 2.0 con PKCE y un `state` de un solo uso, válido 10 minutos. Los errores de Microsoft se explican en claro (secreto incorrecto, tipo de cuenta, dirección de retorno, permiso denegado). La carpeta se crea automáticamente.
+  3. **Respaldo de prueba y verificación**, con los botones habilitados solo cuando todo está listo. Si están desactivados, el panel dice por qué.
+- **Historial unificado**, con «Verificar» y «Restaurar respaldo» en cada respaldo de OneDrive. Restaurar pide escribir `RESTAURAR`, se hace en una **base aislada** y **no toca producción**.
 
-Las alertas de errores reales nunca se ocultan.
+### Alertas (centro de notificaciones)
 
-### Seguridad
+| Alerta | Cuándo |
+|---|---|
+| Respaldo de la base central atrasado | No hay un respaldo **verificado**, de OneDrive o de la oficina, en 30 h. Se retira sola con el siguiente respaldo verificado |
+| Falló el último respaldo en OneDrive | El último respaldo de OneDrive terminó en error |
+| Conexión con OneDrive vencida | Microsoft rechazó el acceso guardado |
+| Respaldos sin copia en OneDrive | La aplicación está configurada, pero no hay ninguna cuenta conectada |
 
-- **OAuth 2.0 con PKCE** y un `state` aleatorio de un solo uso, válido 10 minutos y ligado al administrador que inició la vinculación. La vuelta desde Microsoft no depende de la cookie de sesión, que es `SameSite=Strict`; la página de retorno vuelve a Configuración desde el propio sitio.
-- **Permisos delegados:** `offline_access`, `User.Read` y `Files.ReadWrite`, solo sobre el OneDrive de la cuenta que se vincula. Microsoft 365 empresa no admite un permiso menor (`Files.ReadWrite.AppFolder` es solo para cuentas personales). El código solo usa la carpeta de respaldos.
-- **Token de actualización:** se guarda **cifrado** en la base (`od1:`, HMAC-SHA256 en modo contador más etiqueta HMAC, el mismo esquema que los demás secretos del sistema) con `ONEDRIVE_TOKEN_KEY`. Si Microsoft lo rota, se guarda el nuevo. El navegador nunca lo recibe y no aparece en registros ni respuestas.
-- **Separación de claves:**
-  - la clave que cifra los respaldos (`BACKUP_ENCRYPTION_KEY`) está **solo en GitHub** y en tu copia offline, nunca en Vercel;
-  - Vercel solo puede pedir respaldos, nunca descifrarlos.
-- **Permisos y registro:** solo administración ve el panel y ejecuta acciones, con CSRF y auditoría (`onedrive_link_started`, `onedrive_linked`, `onedrive_unlinked`, `backup_requested_*`).
+## Lo que falta para que funcione en producción
 
-## Configuración inicial (la hace administración, una sola vez)
+1. **Publicar la 1.5.310**, con tu autorización.
+2. **Registrar la aplicación en Microsoft.**
+   - Con cuenta personal hace falta antes **activar la cuenta gratuita de Azure** (https://azure.microsoft.com/free), con verificación por SMS y tarjeta, sin cargo. Así se crea tu directorio.
+   - Después, en https://portal.azure.com → Registros de aplicaciones → Nuevo registro:
+     - **Tipos de cuenta:** *Solo cuentas personales de Microsoft*.
+     - **URI de redirección (Web):** `https://ordenes-pro.vercel.app/api/backups/onedrive/callback`.
+     - **Permisos delegados de Microsoft Graph:** `offline_access`, `User.Read` y `Files.ReadWrite`.
+     - **Secreto de cliente:** 24 meses.
 
-> No pegues ninguno de estos valores en el chat. Se cargan directamente en el portal de Microsoft, en Vercel y en GitHub.
+   El asistente del panel muestra la misma guía.
+3. **En el panel:** paso 1 (pegar el Id. y el secreto), paso 2 (Conectar) y paso 3 (Realizar respaldo ahora).
 
-### 1. Registrar la aplicación en Microsoft Entra ID (unos 10 minutos)
+**Copia offline de la clave de los respaldos:** el archivo `~/CLAVE-RESPALDOS-ORDENES-PRO.txt` (permisos 600) contiene `BACKUP_ENCRYPTION_KEY`. Guárdala en un gestor de contraseñas y borra el archivo: sin ella no se puede recuperar ningún respaldo de OneDrive.
 
-1. Entra en <https://entra.microsoft.com> con la cuenta de administrador de Microsoft 365.
-2. Ve a **Identidad → Aplicaciones → Registros de aplicaciones → Nuevo registro**.
-3. Rellena el registro:
-   - **Nombre:** `Órdenes Pro Respaldos`.
-   - **Tipos de cuenta admitidos:** *Solo las cuentas de este directorio organizativo (inquilino único)*.
-   - **URI de redirección:** tipo *Web*, con el valor `https://ordenes-pro.vercel.app/api/backups/onedrive/callback`.
-4. En **Información general**, copia el **Id. de aplicación (cliente)** y el **Id. de directorio (inquilino)**.
-5. En **Certificados y secretos → Nuevo secreto de cliente**, elige 24 meses y copia el **Valor**. Solo se muestra una vez.
-6. En **Permisos de API → Agregar un permiso → Microsoft Graph → Permisos delegados**, marca `offline_access`, `User.Read` y `Files.ReadWrite`. Si tu directorio lo exige, pulsa además *Conceder consentimiento de administrador*.
+## Recuperar
 
-### 2. Generar las dos claves (en tu equipo)
+- **Desde el panel:** «Restaurar respaldo», una restauración de prueba aislada.
+- **Datos de un respaldo:** se descarga de OneDrive y se ejecuta:
 
-Ejecuta este comando dos veces; cada salida es una clave distinta:
+  ```bash
+  BACKUP_ENCRYPTION_KEY=… python maintenance/backup-cloud.py --descifrar archivo.sqlite.gz.enc --salida restaurada.sqlite3
+  ```
 
-```bash
-python -c "import base64,secrets;print(base64.b64encode(secrets.token_bytes(32)).decode())"
-```
-
-- La primera es `ONEDRIVE_TOKEN_KEY`.
-- La segunda es `BACKUP_ENCRYPTION_KEY`. **Guarda una copia offline**, por ejemplo en tu gestor de contraseñas o impresa en la caja fuerte. Sin ella no se puede recuperar ningún respaldo.
-
-### 3. Token de GitHub para «Realizar respaldo ahora»
-
-En GitHub ve a **Settings → Developer settings → Fine-grained tokens → Generate new token** y configúralo así:
-
-- **Repository access:** solo `Ordenes-Pro-PC-DOCTOR`.
-- **Permissions → Actions:** *Read and write*.
-- **Caducidad:** un año.
-
-Copia el token.
-
-### 4. Token de Turso para el generador
-
-Desde Vercel, en **Storage / Marketplace → Turso → abrir el panel de Turso**, entra en la base `ordenes-pro-db` y crea un **token de base de datos** nuevo y propio para los respaldos, de modo que pueda revocarse sin afectar a la aplicación. Copia también la URL de la base (`libsql://…`).
-
-### 5. Cargar los valores
-
-| Dónde | Variable o secreto | Valor |
-|---|---|---|
-| Vercel → Settings → Environment Variables (solo **Production**) | `MS_CLIENT_ID` | Id. de aplicación (paso 1.4) |
-| | `MS_CLIENT_SECRET` | Valor del secreto de cliente (paso 1.5) |
-| | `MS_TENANT_ID` | Id. de directorio (paso 1.4) |
-| | `ONEDRIVE_TOKEN_KEY` | primera clave (paso 2) |
-| | `GITHUB_BACKUP_TOKEN` | token de GitHub (paso 3) |
-| GitHub → repositorio → Settings → Secrets and variables → Actions | `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN` | paso 4 |
-| | `BACKUP_ENCRYPTION_KEY` | segunda clave (paso 2) |
-| | `ONEDRIVE_TOKEN_KEY` | **la misma** primera clave |
-| | `MS_CLIENT_ID`, `MS_CLIENT_SECRET`, `MS_TENANT_ID` | los del paso 1 |
-
-Después hay que redesplegar la aplicación para que Vercel cargue las variables.
-
-### 6. Vincular y probar
-
-1. Entra en **Configuración → Respaldos → Vincular OneDrive** e inicia sesión con la cuenta de Microsoft 365 donde quieres guardar los respaldos.
-2. Pulsa **Realizar respaldo ahora**. En unos minutos el historial mostrará «Correcto · Verificado» y el archivo aparecerá en OneDrive.
-
-## Restaurar
-
-- **Desde el panel, «Restaurar respaldo»:** pide escribir `RESTAURAR` y restaura el respaldo elegido en una **base aislada**, para comprobar integridad, claves y recuentos. **La base de producción no se modifica.** El resultado queda en el historial.
-- **Recuperar los datos de un respaldo:**
-  1. Descarga el archivo de OneDrive.
-  2. Ejecuta, con la clave en el entorno:
-
-     ```bash
-     BACKUP_ENCRYPTION_KEY=… python maintenance/backup-cloud.py --descifrar archivo.sqlite.gz.enc --salida restaurada.sqlite3
-     ```
-
-  El comando nunca sobrescribe un archivo existente e informa de la verificación.
-- **Volver a poner en marcha producción desde un respaldo** solo se hace por decisión administrativa expresa y sin destruir la base actual:
-  1. Crea una base **nueva** en Turso a partir del archivo restaurado (`turso db create <nombre> --from-file restaurada.sqlite3`).
+  Nunca sobrescribe.
+- **Volver a poner producción desde un respaldo:** solo por decisión administrativa expresa.
+  1. Crea una base **nueva** en Turso desde el archivo restaurado.
   2. Verifícala.
   3. Cambia `TURSO_DATABASE_URL` y `TURSO_AUTH_TOKEN` en Vercel.
 
-  La base anterior se conserva intacta para auditoría. El panel no hace este cambio.
+  La base anterior se conserva.
 
 ## Pruebas
 
-- `local/tests/test_onedrive_backup.py`: 12 escenarios con Microsoft, OneDrive y GitHub **simulados** en 127.0.0.1, sin cuentas reales ni internet.
-  - Vinculación con PKCE y `state` de un solo uso, caducado o falsificado.
-  - Token cifrado y rotado.
-  - Respaldo cifrado, subido, descargado y restaurado.
-  - Verificación y restauración aislada pedidas desde el panel.
-  - Detección de un archivo alterado.
-  - Retención 30/12/12 sin tocar archivos ajenos.
-  - Bloqueo contra ejecuciones simultáneas.
-  - Acceso revocado, con conexión vencida y alertas separadas.
-  - Alerta de atraso que solo se apaga con un respaldo verificado.
-  - Permisos, CSRF y auditoría.
-  - Copia local de la oficina.
-  - Recuperación con `--descifrar`.
-
-  Las pruebas de cifrado necesitan `cryptography`, que es una dependencia del generador.
-- Prueba de navegador del panel en 1440, 1024, 768, 390 y 320 px:
-  - indicadores, historial y acciones;
-  - restauración con confirmación y Escape;
-  - bloqueo mientras hay una operación en curso;
-  - página de retorno con error;
-  - sin desbordes ni errores de consola.
+- **`local/tests/test_onedrive_backup.py`:** 18 escenarios con Microsoft y OneDrive **simulados**, sin cuentas reales ni internet:
+  - el asistente: validación, secreto cifrado y nunca devuelto, y prioridad de las variables del servidor;
+  - cambio de aplicación, que obliga a volver a conectar;
+  - cuenta personal (`consumers`) con PKCE;
+  - errores de Microsoft explicados;
+  - permisos y CSRF;
+  - respaldo bloqueado con motivo hasta que todo está listo;
+  - respaldo del servidor cifrado, subido, descargado y restaurado;
+  - tarea programada con `CRON_SECRET` que nunca anota un respaldo en la nube sin OneDrive;
+  - falta de la clave de cifrado;
+  - verificación y restauración aislada, con detección de un archivo alterado;
+  - retención 30/12/12;
+  - bloqueo contra ejecuciones simultáneas;
+  - acceso revocado;
+  - historial unificado con el registro real de la oficina y la copia anterior conservada;
+  - alerta de atraso;
+  - desconexión;
+  - recuperación con `--descifrar`.
+- **Prueba de navegador:** 15 comprobaciones del recorrido completo, desde «Sin configurar» hasta el respaldo verificado, con Microsoft simulado, en 1440, 1024, 768, 390 y 320 px, sin errores de consola.

@@ -13332,3 +13332,22 @@ svg.pa-icon[data-state=success]{color:#34d399}svg.pa-icon[data-state=error]{colo
 .onedrive-return-card{max-width:460px;padding:24px;border:1px solid #2c405c;border-radius:14px;background:#0f1c30;text-align:center}
 .onedrive-return-card h1{margin:0 0 8px;font-size:20px}.onedrive-return-card p{margin:0 0 14px;line-height:1.5}
 .bk-actions button:disabled,.bk-run-tools button:disabled{opacity:.5;cursor:not-allowed;filter:saturate(.6)}
+/* ===== 1.5.310 · Asistente de Microsoft OneDrive (Configuración → Respaldos) ===== */
+.bk-wizard{display:grid;gap:10px;padding:14px;border:1px solid #2c405c;border-radius:12px;background:#0c1828;min-width:0}
+.bk-wizard>h3{margin:0;font-size:14px;color:#eef3ff}
+.bk-step{display:grid;gap:8px;padding:12px;border:1px solid #23364f;border-radius:10px;background:#0f1c30;min-width:0}
+.bk-step[data-state=ok]{border-color:#22c55e55}.bk-step[data-state=locked]{opacity:.75}
+.bk-step-head{display:flex;align-items:center;gap:10px;min-width:0}
+.bk-step-head strong{font-size:13.5px;color:#eef3ff;overflow-wrap:anywhere}
+.bk-step-n{display:grid;place-items:center;flex:none;width:24px;height:24px;border-radius:50%;background:#1b3150;color:#cfe0f8;font-size:12px;font-weight:700}
+.bk-step[data-state=ok] .bk-step-n{background:#166534;color:#dcfce7}
+.bk-step-body{display:grid;gap:10px;min-width:0;padding-left:34px}
+.bk-note{margin:0;font-size:12.5px;line-height:1.5;color:#b7c8e2;overflow-wrap:anywhere}.bk-note-warn{color:#fcd9a5}
+.bk-guide summary{cursor:pointer;font-size:12.5px;color:#9cc7ff}.bk-guide ol{margin:8px 0 0;padding-left:18px;display:grid;gap:4px;font-size:12.5px;line-height:1.5;color:#c9d6ea;overflow-wrap:anywhere}
+.bk-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:10px 12px;align-items:start}
+.bk-field{display:grid;gap:4px;min-width:0;font-size:12px;color:#9bb0cf}.bk-field>span{font-weight:600;color:#cfe0f8}
+.bk-field input,.bk-field select{min-width:0;width:100%}.bk-field small{font-size:11.5px;color:#8fa6c6;overflow-wrap:anywhere}
+.bk-field-error{color:#fecaca!important}
+.bk-form>button{justify-self:start;align-self:end}
+@media(max-width:520px){.bk-step-body{padding-left:0}.bk-form>button{justify-self:stretch}}
+.bk-step-body>button{justify-self:start}

@@ -9070,68 +9070,103 @@ function waConsentDialog(order,d,done){const dialog=smallDialog('Autorización d
  yes.focus();}
 
 // Configuración → Integraciones → WhatsApp Business (solo administración; el servidor lo vuelve a comprobar).
-/* ===== 1.5.309 · Configuración → Respaldos (Microsoft OneDrive) =====
-   Estado de la conexión, último respaldo correcto y verificado, próximo respaldo, historial con tamaño, estado y verificación, y las
-   acciones «Realizar respaldo ahora», «Verificar respaldo» y «Restaurar respaldo» (restauración de PRUEBA en un entorno aislado: la base
-   de producción no se toca). Solo administración; el servidor vuelve a comprobar el rol y el token CSRF en cada acción. */
+/* ===== 1.5.310 · Configuración → Respaldos: asistente de Microsoft OneDrive y estados separados =====
+   Cuatro estados independientes (base central, copia local de la oficina, sincronización con el servidor y OneDrive): la copia de la
+   oficina NUNCA se presenta como respaldo en la nube. Asistente en tres pasos: 1) datos de la aplicación registrada en Microsoft (el
+   secreto se envía una vez y el servidor lo guarda cifrado; jamás vuelve al navegador), 2) «Conectar Microsoft OneDrive» (OAuth 2.0)
+   y 3) respaldo de prueba, que se ejecuta en el servidor y se verifica descargándolo y restaurándolo aislado. Solo administración. */
 async function renderBackupSettings(pane){
- const body=el('div',undefined,'bk');pane.append(body);let timer=0;
+ const body=el('div',undefined,'bk');pane.append(body);
  const size=n=>!n?'—':n>=1048576?(n/1048576).toFixed(1).replace('.',',')+' MB':Math.max(1,Math.round(n/1024))+' KB';
  const when=v=>v?formatOrderDate(v):'—';
  const pill=(text,state)=>{const p=el('span',text,'bk-pill');p.dataset.state=state;return p;};
  const runState={solicitado:['Solicitado','run'],en_curso:['En ejecución','run'],correcto:['Correcto','ok'],error:['Error','err']};
  const kinds={respaldo:'Respaldo',verificacion:'Verificación',restauracion:'Restauración de prueba'};
- const dest={onedrive:'OneDrive',equipo:'Equipo de la oficina'};
- const act=async(label,fn,btn)=>{if(btn)btn.disabled=true;try{const r=await fn();if(r&&r.backups)paint(r.backups);else await load();return r;}catch(error){toast(error.message,'error',undefined,{title:label});}finally{if(btn)btn.disabled=false;}};
- const request=(kind,file,btn)=>act(kinds[kind],async()=>{let confirm='';
-   if(kind==='restauracion'){const typed=await askText('Restaurar respaldo','Se restaurará «'+file+'» en una base AISLADA para comprobarlo: integridad, claves y recuentos. La base de producción no se modifica. Escribe RESTAURAR para continuar.','','Restaurar en entorno aislado',12);if(typed===null||typed===undefined)return null;confirm=String(typed).trim().toUpperCase();if(confirm!=='RESTAURAR'){toast('Escribe RESTAURAR para confirmar.','warning');return null;}}
-   const r=await api('/api/backups/run',{kind,file:file||'',confirm});toast(kind==='respaldo'?'Respaldo solicitado. Se generará, cifrará, subirá y verificará en unos minutos.':kind==='verificacion'?'Verificación solicitada: se descargará el respaldo y se comprobará restaurándolo aislado.':'Restauración de prueba solicitada en un entorno aislado.','success');return r;},btn);
- function paint(d){clearTimeout(timer);body.replaceChildren();
-  const link=d.link,good=d.last_good,running=(d.runs||[]).find(r=>r.status==='solicitado'||r.status==='en_curso');
-  // 1. Indicadores
+ const dest={onedrive:'OneDrive',equipo:'Copia local de la oficina'};
+ let last=null;
+ const run=async(kind,file,btn)=>{
+  if(kind==='restauracion'){const typed=await askText('Restaurar respaldo','Se restaurará «'+file+'» en una base AISLADA para comprobarlo: integridad, claves y recuentos. La base de producción no se modifica. Escribe RESTAURAR para continuar.','','Restaurar en entorno aislado',12);if(typed===null||typed===undefined)return;if(String(typed).trim().toUpperCase()!=='RESTAURAR'){toast('Escribe RESTAURAR para confirmar.','warning');return;}}
+  const label=btn.textContent;btn.disabled=true;btn.setAttribute('aria-busy','true');btn.lastChild.textContent=kind==='respaldo'?'Respaldando… (hasta 5 min)':'Verificando…';
+  body.querySelectorAll('.bk-actions button,.bk-run-tools button').forEach(b=>b.disabled=true);
+  try{const r=await api('/api/backups/run',{kind,file:file||'',confirm:kind==='restauracion'?'RESTAURAR':''});paint(r.backups);
+   const v=r.run.verify||{};toast(kind==='respaldo'?'Respaldo guardado en OneDrive y verificado: '+size(r.run.bytes)+', '+(v.tables||0)+' tablas restauradas sin errores.':'Verificación correcta: el archivo de OneDrive coincide (SHA-256) y se restauró aislado sin errores.','success',undefined,{title:kinds[kind]});}
+  catch(error){toast(error.message,'error',undefined,{title:kinds[kind]+' no realizado'});await load();}
+  finally{btn.removeAttribute('aria-busy');}
+ };
+ function card(title,icon,state,lines){const box=el('section',undefined,'bk-stat');box.dataset.state=state||'';const head=el('header');head.append(animatedIcon(icon,{size:18}),el('span',title));box.append(head);for(const line of lines)box.append(line instanceof Node?line:el('small',line));return box;}
+ function paint(d){last=d;body.replaceChildren();
+  const link=d.link,app=d.app,od=d.last_onedrive,office=d.office;
+  // 1. Estados separados
   const stats=el('div',undefined,'bk-stats');
-  const stat=(label,value,sub,state,icon)=>{const box=el('section',undefined,'bk-stat');box.dataset.state=state||'';const head=el('header');head.append(animatedIcon(icon,{size:18}),el('span',label));box.append(head,value instanceof Node?value:el('strong',value),el('small',sub||''));stats.append(box);return box;};
-  const conn=!d.configured?['Sin configurar','off','Falta registrar la aplicación de Microsoft en el servidor.']:!link?['Sin vincular','off','Vincula la cuenta de Microsoft 365 para guardar copias en la nube.']:link.status==='vencida'?['Conexión vencida','err',link.error||'Vuelve a vincular la cuenta.']:['Conectado','ok',(link.account||'')+(link.linked_at?' · desde '+when(link.linked_at):'')];
-  stat('Microsoft OneDrive',pill(conn[0],conn[1]),conn[2],conn[1],'M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z');
-  stat('Último respaldo correcto',good?when(good.finished_at):'Ninguno',good?(dest[good.destination]||'')+' · '+size(good.bytes)+(good.verified?' · verificado':''):'Todavía no hay un respaldo verificado.',good?'ok':'err','M20 6 9 17l-5-5');
-  stat('Próximo respaldo',when(d.next_run),'Automático, todos los días a las 02:00 (hora de Ecuador).','','M12 6v6l4 2 M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z');
-  stat('Estado actual',running?pill(runState[running.status][0],'run'):pill('En espera','idle'),running?(kinds[running.kind]||'')+' · '+when(running.requested_at):'Sin operaciones en curso.',running?'run':'','M22 12h-4l-3 9L9 3l-3 9H2');
+  stats.append(card('Base central','M12 2C7 2 3 3.8 3 6v12c0 2.2 4 4 9 4s9-1.8 9-4V6c0-2.2-4-4-9-4z M3 6c0 2.2 4 4 9 4s9-1.8 9-4 M3 12c0 2.2 4 4 9 4s9-1.8 9-4','ok',[pill('Disponible','ok'),d.central.engine]));
+  stats.append(card('Copia local de la oficina','M20 16V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v9m16 0H4m16 0 1.28 2.55a1 1 0 0 1-.9 1.45H3.62a1 1 0 0 1-.9-1.45L4 16',office?'ok':'off',office?[el('strong',when(office.finished_at)),size(office.bytes)+(office.verified?' · verificada':'')+' · cada día a las 02:30 si el equipo está encendido']:[pill('Sin copias registradas','off'),'Se hace en el equipo de la oficina a las 02:30.']));
+  const online=navigator.onLine;stats.append(card('Sincronización con el servidor','M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16 M8 16H3v5 M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8 M21 3v5h-5',online?'ok':'err',[pill(online?'Conectado':'Sin conexión',online?'ok':'err'),online?'Los cambios se guardan directamente en la base central.':'Este equipo no tiene conexión con el servidor.']));
+  const odState=!d.configured?['Sin configurar','off','Completa el asistente de abajo.']:!link?['Sin conectar','off','Paso 2: conecta tu cuenta de Microsoft.']:link.status==='vencida'?['Conexión vencida','err',link.error||'Vuelve a conectar la cuenta.']:['Conectado','ok',(link.account||'')];
+  stats.append(card('Microsoft OneDrive','M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z',odState[1],[pill(odState[0],odState[1]),odState[2],od?'Último respaldo en la nube: '+when(od.finished_at)+' · '+size(od.bytes)+' · verificado':'Todavía no hay ningún respaldo en OneDrive.']));
+  const cron=d.cron;stats.append(card('Próximo respaldo programado','M12 6v6l4 2 M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z','',[el('strong',when(d.next_run)),'Lo ejecuta el servidor a las 02:00 (hora de Ecuador), sin depender de ningún equipo.',...(cron?['Última ejecución programada: '+when(cron.at)+' · '+({correcto:'correcta',error:'con error',omitido:'no se hizo'}[cron.status]||cron.status)+(cron.status!=='correcto'&&cron.detail?' — '+cron.detail:'')]:[])]));
   body.append(stats);
-  // 2. Acciones
-  const actions=el('div',undefined,'bk-actions');
-  if(d.configured){
-   if(!link||link.status==='vencida'){const b=button(link?'Volver a vincular OneDrive':'Vincular OneDrive',()=>act('Vincular OneDrive',async()=>{const r=await api('/api/backups/onedrive/connect',{});location.assign(r.url);return null;},b),'primary');b.prepend(animatedIcon('M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71 M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71',{size:16}));actions.append(b);}
-   else{const b=button('Desvincular',async()=>{if(!await askConfirm('Desvincular OneDrive','Se borra el acceso guardado. Los respaldos ya subidos se quedan en tu OneDrive y la copia del equipo sigue funcionando.','Desvincular',true))return;act('Desvincular',()=>api('/api/backups/onedrive/disconnect',{}),b);},'secondary');actions.append(b);}
+  // 2. Asistente
+  const wiz=el('section',undefined,'bk-wizard');wiz.append(el('h3','Asistente de Microsoft OneDrive'));
+  const step=(n,title,state,content)=>{const s=el('div',undefined,'bk-step');s.dataset.state=state;const h=el('div',undefined,'bk-step-head');h.append(el('span',state==='ok'?'✓':String(n),'bk-step-n'),el('strong',title));s.append(h);if(content)s.append(content);wiz.append(s);return s;};
+  // Paso 1
+  const s1=el('div',undefined,'bk-step-body');
+  if(app&&app.source==='servidor'){s1.append(el('p','La aplicación está definida en las variables del servidor (Id. '+app.client_id+'). No se cambia desde aquí.','bk-note'));}
+  else{
+   const guide=el('details',undefined,'bk-guide');guide.append(el('summary','Cómo registrar la aplicación en Microsoft (una sola vez, unos 10 minutos)'));
+   const ol=el('ol');for(const t of ['Abre https://entra.microsoft.com (cuenta de empresa) o https://portal.azure.com (cuenta personal; Microsoft exige un directorio de Azure gratuito para registrar aplicaciones).','Registros de aplicaciones → Nuevo registro. Nombre: «Órdenes Pro Respaldos». Tipos de cuenta: «Solo cuentas personales de Microsoft» para OneDrive personal o familiar; «Cuentas de este directorio» para empresa; o ambas.','URI de redirección, tipo Web: '+d.redirect_uri,'Copia el «Id. de aplicación (cliente)» y, si es de empresa, el «Id. de directorio (inquilino)».','Certificados y secretos → Nuevo secreto de cliente (24 meses) → copia el «Valor».','Permisos de API → Microsoft Graph → Permisos delegados: offline_access, User.Read y Files.ReadWrite.'])ol.append(el('li',t));
+   guide.append(ol);s1.append(guide);
+   const form=el('form',undefined,'bk-form');form.noValidate=true;
+   const field=(name,label,input,hint)=>{const w=el('label',undefined,'bk-field');w.append(el('span',label),input);if(hint)w.append(el('small',hint));input.name=name;form.append(w);return input;};
+   const cid=field('client_id','Id. de aplicación (cliente)',el('input'),'Formato 12345678-abcd-…');cid.value=app?.client_id||'';cid.autocomplete='off';cid.spellcheck=false;
+   const type=field('account_type','Tipo de cuenta de OneDrive',el('select'));for(const[k,v]of Object.entries(d.account_types)){const o=new Option(v,k);type.append(o);}type.value=app?.account_type||'personal';
+   const ten=field('tenant_id','Id. de directorio (inquilino) de la empresa',el('input'),'Solo para cuentas de empresa.');ten.value=app&&app.account_type==='empresa'?app.tenant:'';ten.autocomplete='off';
+   const tenWrap=ten.closest('label');const sync=()=>{tenWrap.hidden=type.value!=='empresa';};type.addEventListener('change',sync);sync();
+   const sec=field('client_secret','Secreto de cliente («Valor»)',el('input'),app&&app.has_secret?'Guardado cifrado el '+when(app.saved_at)+'. Déjalo en blanco para conservarlo.':'Se guarda cifrado en el servidor y nunca se vuelve a mostrar.');sec.type='password';sec.autocomplete='new-password';sec.spellcheck=false;
+   const save=button('Guardar datos de la aplicación',async()=>{form.querySelectorAll('.bk-field-error').forEach(x=>x.remove());save.disabled=true;
+     try{const r=await api('/api/backups/onedrive/app',{client_id:cid.value.trim(),account_type:type.value,tenant_id:ten.value.trim(),client_secret:sec.value});sec.value='';paint(r.backups);toast('Datos de la aplicación guardados. Ahora conecta tu cuenta de OneDrive (paso 2).','success');}
+     catch(error){for(const[k,m]of Object.entries(error.fields||{})){const input=form.elements[k];if(input)input.closest('label').append(el('small',m,'bk-field-error'));}toast(error.message,'error');}
+     finally{save.disabled=false;}},'primary');save.type='button';form.append(save);
+   s1.append(form);
   }
-  const now=button('Realizar respaldo ahora',()=>request('respaldo','',now),'primary');now.prepend(animatedIcon('M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16 M8 16H3v5 M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8 M21 3v5h-5',{size:16}));
-  const lastOd=d.last_onedrive,check=button('Verificar respaldo',()=>request('verificacion',lastOd.file,check),'secondary');check.prepend(animatedIcon('M9 12l2 2 4-4 M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z',{size:16}));
-  const blocked=!link||link.status!=='vinculado'||!d.dispatch||!!running;now.disabled=blocked;check.disabled=blocked||!lastOd;
-  if(!d.dispatch&&link)now.title=check.title='Falta GITHUB_BACKUP_TOKEN en el servidor para pedir respaldos al generador.';
-  actions.append(now,check);body.append(actions);
-  // 3. Datos de la configuración
+  step(1,'Datos de la aplicación registrada en Microsoft',d.configured?'ok':'todo',s1);
+  // Paso 2
+  const s2=el('div',undefined,'bk-step-body');
+  if(link&&link.status==='vinculado'){s2.append(el('p','Conectado con '+(link.account||'la cuenta')+' desde '+when(link.linked_at)+'. Carpeta: '+d.folder,'bk-note'));const off=button('Desconectar',async()=>{if(!await askConfirm('Desconectar OneDrive','Se borra el acceso guardado. Los respaldos ya subidos se quedan en tu OneDrive y la copia de la oficina sigue funcionando.','Desconectar',true))return;try{paint((await api('/api/backups/onedrive/disconnect',{})).backups);}catch(error){toast(error.message,'error');}},'secondary');s2.append(off);}
+  else{const connect=button(link?'Volver a conectar Microsoft OneDrive':'Conectar Microsoft OneDrive',async()=>{connect.disabled=true;try{const r=await api('/api/backups/onedrive/connect',{});location.assign(r.url);}catch(error){toast(error.message,'error');connect.disabled=false;}},'primary');connect.prepend(animatedIcon('M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z',{size:16}));connect.disabled=!d.configured;if(!d.configured)connect.title='Primero completa el paso 1.';
+   s2.append(el('p','Te llevará a Microsoft para iniciar sesión con la cuenta donde quieres guardar los respaldos y aceptar el permiso. Se creará la carpeta '+d.folder+'.','bk-note'),connect);}
+  step(2,'Conectar Microsoft OneDrive',link&&link.status==='vinculado'?'ok':d.configured?'todo':'locked',s2);
+  // Paso 3
+  const s3=el('div',undefined,'bk-step-body');
+  if(d.ready)s3.append(el('p','Todavía no se puede respaldar: '+d.ready,'bk-note bk-note-warn'));
+  const actions=el('div',undefined,'bk-actions');
+  const now=button('Realizar respaldo ahora',()=>run('respaldo','',now),'primary');now.prepend(animatedIcon('M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16 M8 16H3v5 M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8 M21 3v5h-5',{size:16}));
+  const check=button('Verificar respaldo',()=>run('verificacion',od.file,check),'secondary');check.prepend(animatedIcon('M9 12l2 2 4-4 M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z',{size:16}));
+  now.disabled=!!d.ready||d.busy;check.disabled=!!d.ready||d.busy||!od;if(d.ready)now.title=check.title=d.ready;else if(!od)check.title='Todavía no hay un respaldo en OneDrive que verificar.';
+  actions.append(now,check);s3.append(actions);
+  step(3,'Respaldo de prueba y verificación',od?'ok':d.ready?'locked':'todo',s3);
+  body.append(wiz);
+  // 3. Datos
   const facts=el('dl',undefined,'bk-facts');const fact=(k,v)=>{const row=el('div');row.append(el('dt',k),el('dd',v));facts.append(row);};
-  fact('Carpeta en OneDrive',d.folder);fact('Permisos solicitados',d.scopes.join(', ')+' (solo el OneDrive de la cuenta vinculada)');fact('Cifrado','AES-256-GCM con clave propia, antes de subir; comprimido con gzip');
+  fact('Carpeta en OneDrive',d.folder);fact('Permisos solicitados',d.scopes.join(', ')+' (solo el OneDrive de la cuenta conectada)');fact('Cifrado','AES-256-GCM con clave propia, antes de subir; comprimido con gzip');
   fact('Conservación','30 diarios, 12 semanales y 12 mensuales; lo que sobra va a la papelera de OneDrive');fact('Verificación','Se descarga de nuevo, se compara el SHA-256 y se restaura en una base aislada antes de darlo por válido');
-  fact('Copia independiente','El equipo de la oficina guarda además su propia copia diaria cuando está encendido');
-  if(!d.configured)fact('Pendiente en el servidor','Registrar la aplicación de Microsoft y cargar MS_CLIENT_ID, MS_CLIENT_SECRET, MS_TENANT_ID y ONEDRIVE_TOKEN_KEY (guía en docs/RESPALDOS-ONEDRIVE.md). Dirección de retorno: '+(d.redirect_uri||''));
   body.append(facts);
-  // 4. Historial
+  // 4. Historial unificado
   const hist=el('section',undefined,'bk-history');hist.append(el('h3','Historial de respaldos'));
-  if(!(d.runs||[]).length)hist.append(el('p','Todavía no hay respaldos registrados con el nuevo sistema.','bk-empty'));
+  if(!(d.runs||[]).length)hist.append(el('p','Todavía no hay respaldos registrados.','bk-empty'));
   else{const list=el('ul',undefined,'bk-runs');for(const r of d.runs){const li=el('li',undefined,'bk-run');li.dataset.state=(runState[r.status]||['','idle'])[1];
-    const main=el('div',undefined,'bk-run-main');const title=el('strong',(kinds[r.kind]||r.kind)+' · '+(dest[r.destination]||r.destination));main.append(title,el('span',when(r.finished_at||r.started_at||r.requested_at),'bk-run-when'));
+    const main=el('div',undefined,'bk-run-main');main.append(el('strong',(kinds[r.kind]||r.kind)+' · '+(dest[r.destination]||r.destination)+(r.legacy?' · registro anterior':r.imported?' · registro de la oficina':'')),el('span',when(r.finished_at||r.started_at||r.requested_at),'bk-run-when'));
     const meta=el('div',undefined,'bk-run-meta');meta.append(pill((runState[r.status]||[r.status])[0],(runState[r.status]||['','idle'])[1]));
     if(r.bytes)meta.append(el('span',size(r.bytes),'bk-run-size'));
-    if(r.verified&&r.verify)meta.append(el('span','Verificado · '+r.verify.tables+' tablas · '+r.verify.clients+' clientes · '+r.verify.orders+' órdenes','bk-run-ok'));
-    if(r.file){const f=el('span',r.file,'bk-run-file');f.title=r.file+(r.sha256?' · SHA-256 '+r.sha256:'');meta.append(f);}
+    if(r.verified&&r.verify)meta.append(el('span','Verificado'+(r.verify.tables?' · '+r.verify.tables+' tablas':'')+' · '+(r.verify.clients||0)+' clientes · '+(r.verify.orders||0)+' órdenes','bk-run-ok'));
+    if(r.file||r.sha256){const f=el('span',r.file||('SHA-256 '+r.sha256.slice(0,16)+'…'),'bk-run-file');f.title=(r.file||'')+(r.sha256?' · SHA-256 '+r.sha256:'');meta.append(f);}
     li.append(main,meta);if(r.error)li.append(el('p',r.error,'bk-run-error'));
-    if(r.destination==='onedrive'&&r.kind==='respaldo'&&r.status==='correcto'&&r.file){const tools=el('div',undefined,'bk-run-tools');const v=button('Verificar',()=>request('verificacion',r.file,v),'secondary');const rs=button('Restaurar respaldo',()=>request('restauracion',r.file,rs),'secondary');v.disabled=rs.disabled=blocked;tools.append(v,rs);li.append(tools);}
+    if(r.destination==='onedrive'&&r.kind==='respaldo'&&r.status==='correcto'&&r.file){const tools=el('div',undefined,'bk-run-tools');const v=button('Verificar',()=>run('verificacion',r.file,v),'secondary');const rs=button('Restaurar respaldo',()=>run('restauracion',r.file,rs),'secondary');v.disabled=rs.disabled=!!d.ready||d.busy;tools.append(v,rs);li.append(tools);}
     list.append(li);}hist.append(list);}
   body.append(hist);
-  if(running)timer=setTimeout(()=>{if(pane.isConnected)load();},15000);
  }
  async function load(){try{paint(await api('/api/backups'));}catch(error){body.replaceChildren(el('p',error.message,'bk-empty'));}}
- const back=new URLSearchParams(routeState().params).get('onedrive');if(back==='ok')toast('OneDrive quedó vinculado.','success');else if(back==='error')toast('No se pudo vincular OneDrive. Revisa el detalle en la página de retorno.','error');
+ const back=new URLSearchParams(routeState().params).get('onedrive');if(back==='ok')toast('OneDrive quedó conectado. Ya puedes hacer el respaldo de prueba (paso 3).','success');else if(back==='error')toast('No se pudo conectar OneDrive. El motivo se mostró en la página de retorno.','error');
+ addEventListener('online',()=>{if(pane.isConnected&&last)paint(last);});addEventListener('offline',()=>{if(pane.isConnected&&last)paint(last);});
  await load();
 }
 async function renderWhatsAppSettings(pane){
