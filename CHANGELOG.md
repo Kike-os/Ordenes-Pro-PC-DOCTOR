@@ -4,6 +4,18 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.309 — 2026-11-21 19:19 (UTC-05:00)
+
+Respaldos automáticos en Microsoft OneDrive
+
+### Nuevas funcionalidades
+
+- Respaldos automáticos en Microsoft OneDrive: copia diaria cifrada a las 02:00 generada en la nube aunque la oficina esté apagada, verificada descargándola y restaurándola en un entorno aislado, con conservación de 30 diarios, 12 semanales y 12 mensuales y panel en Configuración → Respaldos.
+
+### Errores corregidos
+
+- Alerta «Respaldo atrasado»: la causa era que el respaldo dependía del equipo de la oficina encendido (apagado del 19 al 21 de noviembre). Ahora solo cuenta un respaldo verificado, y hay alertas separadas para respaldo fallido y conexión con OneDrive vencida.
+
 ## v1.5.308 — 2026-11-21 18:21 (UTC-05:00)
 
 Premium Animated Icons 3.0 (fases 2 a 4)

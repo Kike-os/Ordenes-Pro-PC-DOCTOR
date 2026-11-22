@@ -8,6 +8,26 @@
   },
   "releases": [
     {
+      "version": "1.5.309",
+      "date": "2026-11-21T19:19:40-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Respaldos automáticos en Microsoft OneDrive",
+      "changes": {
+        "features": [
+          "Respaldos automáticos en Microsoft OneDrive: copia diaria cifrada a las 02:00 generada en la nube aunque la oficina esté apagada, verificada descargándola y restaurándola en un entorno aislado, con conservación de 30 diarios, 12 semanales y 12 mensuales y panel en Configuración → Respaldos."
+        ],
+        "improvements": [],
+        "fixes": [
+          "Alerta «Respaldo atrasado»: la causa era que el respaldo dependía del equipo de la oficina encendido (apagado del 19 al 21 de noviembre). Ahora solo cuenta un respaldo verificado, y hay alertas separadas para respaldo fallido y conexión con OneDrive vencida."
+        ],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Administración (autorización expresa en la sesión)"
+    },
+    {
       "version": "1.5.308",
       "date": "2026-11-21T18:21:24-05:00",
       "type": "patch",
