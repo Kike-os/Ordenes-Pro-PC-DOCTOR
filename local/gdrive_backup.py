@@ -406,7 +406,7 @@ def list_backups(token, folder_id):
         if page:
             params['pageToken'] = page
         data = _json(http('GET', api_base() + '/drive/v3/files?' + urllib.parse.urlencode(params), token=token))
-        items += [f for f in data.get('files', []) if f.get('name', '').startswith(bk.PREFIX) and f['name'].endswith(bk.SUFFIX)]
+        items += [f for f in data.get('files', []) if f.get('name', '').startswith(bk.PREFIX) and f['name'].endswith(bk.SUFFIXES)]
         page = data.get('nextPageToken')
         if not page:
             return sorted(items, key=lambda f: f['name'])
@@ -447,7 +447,7 @@ def request_run(c, user_id, kind, file=''):
     """Respaldo, verificación de integridad o restauración de prueba, ejecutados en el servidor (función de hasta 300 s)."""
     if kind not in bk.RUN_KINDS:
         raise BackupError('Operación de respaldo no válida.', 400)
-    if kind != 'respaldo' and not any(item.get('file') == file and item.get('status') == 'correcto' and item.get('destination') == 'gdrive' for item in bk.runs(c)):
+    if kind != 'respaldo' and not any(item.get('file') == file and item.get('status') in ('correcto', 'incompleto') and item.get('destination') == 'gdrive' for item in bk.runs(c)):
         raise BackupError('Elige un respaldo de Google Drive verificado del historial.', 400)
     problem = not_ready(c)
     if problem:
@@ -470,7 +470,7 @@ def request_run(c, user_id, kind, file=''):
 
 def verified_today(c, moment=None):
     moment = moment or bk.now()
-    return any(item.get('destination') == 'gdrive' and item.get('kind') == 'respaldo' and item.get('status') == 'correcto' and item.get('verified')
+    return any(item.get('destination') == 'gdrive' and item.get('kind') == 'respaldo' and item.get('status') in ('correcto', 'incompleto') and item.get('verified')
                and (item.get('finished_at') or '')[:10] == moment.date().isoformat() for item in bk.runs(c))
 
 
@@ -531,14 +531,18 @@ def overview(c):
         history.sort(key=lambda item: item.get('requested_at') or item.get('finished_at') or '', reverse=True)
         if not local or entry['finished_at'] > (local.get('finished_at') or ''):
             local = entry
-    drive_ok = next((item for item in items if item.get('destination') == 'gdrive' and item.get('kind') == 'respaldo' and item.get('status') == 'correcto' and item.get('verified')), None)
+    drive_ok = next((item for item in items if item.get('destination') == 'gdrive' and item.get('kind') == 'respaldo' and item.get('status') == 'correcto' and item.get('verified') and (item.get('complete') or not item.get('full'))), None)
+    full_ok = next((item for item in items if item.get('destination') == 'gdrive' and item.get('kind') == 'respaldo' and item.get('status') == 'correcto' and item.get('complete')), None)
+    running = next((item for item in items if item.get('status') == 'en_curso'), None)
+    restore = next((item for item in items if item.get('destination') == 'gdrive' and item.get('kind') == 'restauracion' and item.get('status') in ('correcto', 'error')), None)
     last_drive = next((item for item in items if item.get('destination') == 'gdrive' and item.get('kind') == 'respaldo'), None)
     public_link = {key: link.get(key) for key in ('status', 'account', 'name', 'linked_at', 'checked_at', 'error', 'folder', 'quota')} if link else None
     import remote_db
     return {'configured': configured(c), 'ready': not_ready(c), 'link': public_link, 'folder': FOLDER, 'scope': SCOPE,
             'app': {'source': config['source'], 'client_id': config['client_id'], 'saved_at': config.get('saved_at', ''), 'has_secret': True} if config else ({'source': 'panel', 'client_id': saved.get('client_id', ''), 'has_secret': False} if saved else None),
             'central': {'engine': 'Turso (libSQL), base central en la nube' if remote_db.configured() else 'SQLite local de este equipo', 'remote': remote_db.configured()},
-            'last_local': local, 'last_drive': drive_ok, 'last_attempt': last_drive, 'protected': bool(drive_ok), 'cron': bk.get_state(c, 'backup_cron'),
+            'last_local': local, 'last_drive': drive_ok, 'last_full': full_ok, 'last_attempt': last_drive, 'running': running, 'last_restore': restore,
+            'protected': bool(drive_ok), 'complete': bool(full_ok), 'cron': bk.get_state(c, 'backup_cron'),
             'next_run': bk.next_run().isoformat(timespec='seconds'), 'next_retry': next_retry(c), 'retry_hours': list(RETRY_HOURS),
             'busy': bool((bk.get_state(c, 'backup_lock') or {}).get('until', '') > bk.stamp()), 'keep': bk.KEEP, 'runs': history[:60],
             'redirect_uri': redirect_uri()}
@@ -556,9 +560,12 @@ def alerts(c, moment=None):
     if age is None or age > bk.LATE_HOURS:
         out.append({'key': 'backup:late:' + moment.date().isoformat(), 'kind': 'warning', 'title': 'Respaldo de la base central atrasado',
                     'detail': ('El último respaldo correcto y verificado es del ' + good['finished_at'][:10] + '.') if good else 'Todavía no se registra ningún respaldo correcto y verificado.'})
-    latest = next((item for item in bk.runs(c) if item.get('destination') == 'gdrive' and item.get('kind') == 'respaldo' and item.get('status') in ('correcto', 'error')), None)
+    latest = next((item for item in bk.runs(c) if item.get('destination') == 'gdrive' and item.get('kind') == 'respaldo' and item.get('status') in ('correcto', 'error', 'incompleto')), None)
     if latest and latest['status'] == 'error':
         out.append({'key': 'backup:failed:' + latest['id'], 'kind': 'warning', 'title': 'Falló el último respaldo en Google Drive', 'detail': (latest.get('error') or 'Error sin detalle.')[:180]})
+    elif latest and latest['status'] == 'incompleto':
+        out.append({'key': 'backup:incomplete:' + latest['id'], 'kind': 'warning', 'title': 'El último respaldo no es completo',
+                    'detail': 'La base quedó respaldada y verificada, pero ' + (latest.get('error') or 'falta una parte').replace('Falta: ', 'falta: ')[:170]})
     link = bk.get_state(c, 'gdrive_link')
     if link and link.get('status') == 'vencida':
         out.append({'key': 'backup:expired:' + (link.get('checked_at') or '')[:10], 'kind': 'warning', 'title': 'Conexión con Google Drive vencida',

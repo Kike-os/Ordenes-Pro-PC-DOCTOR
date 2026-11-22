@@ -449,6 +449,93 @@ class GoogleDriveBackupTests(unittest.TestCase):
         self.assertEqual(panel['last_local']['destination'], 'equipo')
         self.assertFalse(panel['protected'], 'una copia local no es «protegido en la nube»')
 
+    # ---- respaldo COMPLETO (1.5.313) ----
+    @unittest.skipUnless(HAS_CRYPTO, 'necesita cryptography')
+    def test_full_backup_contains_database_files_code_configuration_and_instructions(self):
+        import backup_runner
+        cookie, csrf, _ = self.connect()
+        with patch.dict(os.environ, {'SMTP_PASSWORD': 'clave-smtp-ficticia', 'MFA_ENCRYPTION_KEY': 'clave-mfa-ficticia'}):
+            r = self.backup(cookie, csrf)
+        self.assertEqual(r['status'], 200, r['body'])
+        run = r['body']['run']
+        self.assertEqual(run['status'], 'correcto')
+        self.assertTrue(run['complete'] and run['full'])
+        self.assertTrue(run['file'].endswith('-completo.tar.gz.enc'))
+        self.assertGreater(run['verify']['files_checked'], 1000, 'cada archivo de código se comprueba tras descargarlo')
+        blob = next(self.g.blobs[f['id']] for f in self.g.files.values() if f['name'] == run['file'])
+        import tempfile
+        from pathlib import Path
+        with tempfile.TemporaryDirectory() as tmp:
+            sha, info = backup_runner.inspect_archive(blob, run['sha256'], extract_to=tmp)
+            root = Path(tmp)
+            self.assertTrue(info['completo'], info['faltantes'])
+            manifest = json.loads((root / 'manifiesto.json').read_text())
+            for rel in ('codigo/local/app.py', 'codigo/local/static/app.js', 'codigo/local/static/logo-original.png', 'codigo/vercel.json', 'codigo/requirements.txt',
+                        'codigo/maintenance/backup-cloud.py', 'codigo/docs/RESPALDOS-GOOGLE-DRIVE.md', 'codigo/local/data/releases.json', 'base/ordenes-pro.sqlite3', 'LEEME-RESTAURAR.md'):
+                self.assertTrue((root / rel).exists(), rel)
+            self.assertFalse(any(p.name.endswith('.sqlite3') for p in (root / 'codigo').rglob('*')), 'no mete bases de datos locales en el código')
+            env = json.loads((root / 'configuracion' / 'variables-entorno.json').read_text())
+            self.assertEqual(env['SMTP_PASSWORD'], 'clave-smtp-ficticia', 'las credenciales viajan, cifradas dentro del archivo')
+            self.assertIn('MFA_ENCRYPTION_KEY', env)
+            self.assertNotIn('BACKUP_ENCRYPTION_KEY', env, 'la clave de descifrado nunca va dentro de lo que protege')
+            self.assertEqual(manifest['clave_huella'], hashlib.sha256(base64.b64decode(os.environ['BACKUP_ENCRYPTION_KEY'])).hexdigest()[:16])
+            self.assertEqual(manifest['version'], manifest['version'] and manifest['version'])
+            self.assertTrue(manifest['tareas_programadas'], 'incluye las tareas programadas de vercel.json')
+            self.assertIn('turso db create', (root / 'LEEME-RESTAURAR.md').read_text())
+        self.assertNotIn(b'clave-smtp-ficticia', blob, 'nada de la configuración se lee sin la clave')
+        panel = r['body']['backups']
+        self.assertTrue(panel['complete'])
+        self.assertEqual(panel['last_full']['file'], run['file'])
+
+    @unittest.skipUnless(HAS_CRYPTO, 'necesita cryptography')
+    def test_backup_missing_a_part_is_never_called_complete(self):
+        import backup_runner
+        cookie, csrf, _ = self.connect()
+        with patch.object(backup_runner, 'REQUIRED_CODE', backup_runner.REQUIRED_CODE + ('local/archivo-que-falta.py',)):
+            r = self.backup(cookie, csrf)
+        run = r['body']['run']
+        self.assertEqual(run['status'], 'incompleto')
+        self.assertIn('archivo-que-falta', run['error'])
+        self.assertFalse(r['body']['backups']['complete'])
+        self.assertIn('El último respaldo no es completo', self.titles())
+        self.assertNotIn('Respaldo de la base central atrasado', self.titles(), 'la base sí quedó respaldada y verificada')
+
+    @unittest.skipUnless(HAS_CRYPTO, 'necesita cryptography')
+    def test_isolated_test_restore_starts_the_restored_system_and_checks_main_functions(self):
+        cookie, csrf, _ = self.connect()
+        run = self.backup(cookie, csrf)['body']['run']
+        r = self.request('/api/backups/run', {'kind': 'restauracion', 'file': run['file'], 'confirm': 'RESTAURAR'}, cookie=cookie, csrf=csrf)
+        self.assertEqual(r['status'], 200, r['body'])
+        functional = r['body']['run']['verify']['functional']
+        self.assertTrue(functional['correcto'], functional)
+        for path in ('/api/me', '/api/orders', '/api/clients', '/api/catalog', '/api/system', '/'):
+            self.assertEqual(functional['pruebas'][path]['status'], 200, path)
+        self.assertEqual(r['body']['backups']['last_restore']['id'], r['body']['run']['id'])
+        with app.connect() as c:
+            self.assertEqual(c.execute("SELECT COUNT(*) FROM sessions WHERE user_agent='restauracion-de-prueba'").fetchone()[0] if 'user_agent' in [x[1] for x in c.execute('PRAGMA table_info(sessions)')] else 0, 0, 'producción no se toca')
+
+    @unittest.skipUnless(HAS_CRYPTO, 'necesita cryptography')
+    def test_manual_recovery_extracts_the_full_backup_into_a_new_folder(self):
+        import importlib.util
+        import tempfile
+        from pathlib import Path
+        cookie, csrf, _ = self.connect()
+        run = self.backup(cookie, csrf)['body']['run']
+        blob = next(self.g.blobs[f['id']] for f in self.g.files.values() if f['name'] == run['file'])
+        spec = importlib.util.spec_from_file_location('backup_cloud', Path(__file__).resolve().parents[2] / 'maintenance' / 'backup-cloud.py')
+        worker = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(worker)
+        with tempfile.TemporaryDirectory() as tmp:
+            enc = Path(tmp) / run['file']
+            enc.write_bytes(blob)
+            out = Path(tmp) / 'restaurado'
+            with patch('sys.argv', ['backup-cloud.py', '--descifrar-completo', str(enc), '--salida', str(out)]):
+                worker.main()
+            self.assertTrue((out / 'base' / 'ordenes-pro.sqlite3').exists())
+            self.assertTrue((out / 'codigo' / 'local' / 'app.py').exists())
+            with patch('sys.argv', ['backup-cloud.py', '--descifrar-completo', str(enc), '--salida', str(out)]), self.assertRaises(SystemExit):
+                worker.main()
+
     def test_late_alert_clears_only_with_a_verified_backup(self):
         self.assertIn('Respaldo de la base central atrasado', self.titles())
         with app.connect() as c:

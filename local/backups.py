@@ -7,13 +7,15 @@ from datetime import datetime, timedelta, timezone
 
 ECUADOR = timezone(timedelta(hours=-5))
 PREFIX = 'ordenes-pro-'
-SUFFIX = '.sqlite.gz.enc'
+SUFFIX = '.sqlite.gz.enc'                 # respaldos anteriores (solo la base)
+FULL_SUFFIX = '-completo.tar.gz.enc'      # respaldo completo (1.5.313): base + código + configuración + instrucciones
+SUFFIXES = (SUFFIX, FULL_SUFFIX)
 SCHEDULE_HOUR = 2                      # 02:00, hora de Ecuador
 LATE_HOURS = 30                        # un respaldo diario + margen
 SPACE_WARN = 0.9                       # aviso con el 90 % del espacio de la nube ocupado
 KEEP = {'diario': 30, 'semanal': 12, 'mensual': 12}
 MAX_RUNS = 200
-RUN_KINDS = {'respaldo': 'Respaldo', 'verificacion': 'Verificación', 'restauracion': 'Restauración de prueba'}
+RUN_KINDS = {'respaldo': 'Respaldo completo', 'verificacion': 'Verificación de integridad', 'restauracion': 'Restauración de prueba'}
 
 
 class BackupError(Exception):
@@ -90,8 +92,8 @@ def tier(moment):
     return 'diario'
 
 
-def file_name(moment):
-    return PREFIX + moment.strftime('%Y%m%d-%H%M%S') + '-' + tier(moment) + SUFFIX
+def file_name(moment, full=False):
+    return PREFIX + moment.strftime('%Y%m%d-%H%M%S') + '-' + tier(moment) + (FULL_SUFFIX if full else SUFFIX)
 
 
 def moment_of(name):
@@ -104,7 +106,7 @@ def moment_of(name):
 def retention(names):
     """Abuelo-padre-hijo sobre las fechas: el último respaldo de cada uno de los 30 días, 12 semanas y 12 meses más recientes con
     respaldo. Devuelve los nombres que sobran; nunca incluye archivos ajenos a Órdenes Pro."""
-    dated = sorted(((moment_of(n), n) for n in names if n.startswith(PREFIX) and n.endswith(SUFFIX) and moment_of(n)), reverse=True)
+    dated = sorted(((moment_of(n), n) for n in names if n.startswith(PREFIX) and n.endswith(SUFFIXES) and moment_of(n)), reverse=True)
     keep = set()
     for key, limit in ((lambda m: m.date(), KEEP['diario']), (lambda m: m.isocalendar()[:2], KEEP['semanal']), (lambda m: (m.year, m.month), KEEP['mensual'])):
         seen = []
@@ -128,7 +130,8 @@ def next_run(moment=None):
 # ---------------------------------------------------------------- estado para el panel
 def last_good(c):
     """Último respaldo CORRECTO Y VERIFICADO (restaurado en una base aislada), de la nube o de la copia local de la oficina."""
-    good = [item for item in runs(c) if item.get('kind') == 'respaldo' and item.get('status') == 'correcto' and item.get('verified')]
+    # «incompleto» = base verificada pero falta otra parte (código o configuración): la base SÍ está respaldada.
+    good = [item for item in runs(c) if item.get('kind') == 'respaldo' and item.get('status') in ('correcto', 'incompleto') and item.get('verified')]
     if good:
         return max(good, key=lambda item: item.get('finished_at') or '')
     legacy = get_state(c, 'cloud_backup')

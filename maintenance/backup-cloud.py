@@ -7,7 +7,8 @@ oficina es independiente: si la nube falla, sigue habiendo una copia local verif
 Uso (desde la raíz del proyecto, con las variables de producción):
     vercel env run -e production -- python maintenance/backup-cloud.py           # copia local (temporizador ordenes-pro-respaldo, 03:00)
     python maintenance/backup-cloud.py --verify <archivo>                          # prueba de restauración local en un entorno aislado
-    python maintenance/backup-cloud.py --descifrar <archivo.enc> --salida <base.sqlite3>  # recuperar un respaldo de Google Drive (con la clave)
+    python maintenance/backup-cloud.py --descifrar <archivo.enc> --salida <base.sqlite3>  # recuperar un respaldo antiguo (solo la base)
+    python maintenance/backup-cloud.py --descifrar-completo <archivo-completo.tar.gz.enc> --salida <carpeta-nueva>  # respaldo completo
 
 Nunca imprime datos de clientes: solo recuentos. Solo lee la base de producción; escribe únicamente el historial de respaldos.
 """
@@ -30,9 +31,24 @@ def main():
     parser.add_argument('--verify', type=Path)
     parser.add_argument('--descifrar', type=Path)
     parser.add_argument('--salida', type=Path)
+    parser.add_argument('--descifrar-completo', type=Path)
     args = parser.parse_args()
     if args.verify:
         print(json.dumps(verify(args.verify), ensure_ascii=False))
+        return
+    if args.descifrar_completo:
+        # Respaldo COMPLETO: descifra, comprueba la huella de cada archivo y extrae base, código, configuración e instrucciones.
+        import backup_runner
+        if not args.salida or args.salida.exists():
+            raise SystemExit('Indica con --salida una carpeta NUEVA (nunca se sobrescribe nada).')
+        old_mask = os.umask(0o077)
+        try:
+            args.salida.mkdir(parents=True)
+            sha, inspected = backup_runner.inspect_archive(args.descifrar_completo.read_bytes(), extract_to=args.salida)
+        finally:
+            os.umask(old_mask)
+        print(json.dumps({'completo': inspected['completo'], 'faltantes': inspected['faltantes'], 'archivos_comprobados': inspected.get('files_checked', 0),
+                          'variables': inspected.get('env_vars', 0), 'base': _summary(inspected['db']), 'carpeta': str(args.salida)}, ensure_ascii=False))
         return
     if args.descifrar:
         if not args.salida or args.salida.exists():

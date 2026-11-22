@@ -1,12 +1,10 @@
-# Solo se despliegan api/ y el código de local/; nunca datos, respaldos ni material de revisión.
+# Se despliega el proyecto (api/, local/, maintenance/, docs/ y pruebas) para que el respaldo completo guarde todo el código (1.5.313);
+# nunca datos, respaldos, claves ni material de revisión.
 /revision
 /tmp
 /output
-/docs
-/maintenance
 /Ordenes-Pro-PC-DOCTOR
 /local/var
-/local/tests
 /local/.env
 *.zip
 *.sqlite3

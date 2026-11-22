@@ -1,4 +1,6 @@
-# Respaldos automáticos en Google Drive (1.5.312)
+# Respaldos automáticos en Google Drive (1.5.312 · respaldo completo desde la 1.5.313)
+
+> **Desde la 1.5.313 cada respaldo es COMPLETO:** base, archivos, código desplegado, configuración y credenciales cifradas, tareas programadas, dependencias e instrucciones de restauración. Ver [RESTAURACION-COMPLETA.md](RESTAURACION-COMPLETA.md). Antes de la 1.5.313 solo se guardaba la base de datos.
 
 Sustituye a MEGA Cloud (1.5.311) y a Microsoft OneDrive (1.5.309 y 1.5.310). **El respaldo lo hace el propio servidor**: no necesita Podman, ni agentes, ni que la computadora de la oficina esté encendida.
 

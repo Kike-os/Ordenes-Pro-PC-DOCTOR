@@ -13365,3 +13365,14 @@ svg.pa-icon[data-state=success]{color:#34d399}svg.pa-icon[data-state=error]{colo
 .bk-banner{display:flex;align-items:flex-start;gap:10px;padding:12px 14px;border:1px solid;border-radius:12px;font-size:13px;line-height:1.5;overflow-wrap:anywhere}
 .bk-banner[data-state=ok]{border-color:#22c55e66;background:#0f2a1f;color:#bbf7d0}.bk-banner[data-state=err]{border-color:#f59e0b66;background:#2a2112;color:#fde6b8}
 .bk-banner svg{flex:none;margin-top:1px}
+/* ===== 1.5.313 · Respaldo completo: progreso y contenido ===== */
+.bk-progress{display:grid;gap:8px;padding:12px 14px;border:1px solid #2b4c7e;border-radius:12px;background:#0d1d36}
+.bk-progress strong{font-size:13.5px;color:#cfe3ff}
+.bk-progress ol,.bk-checks{display:grid;gap:5px;margin:0;padding:0;list-style:none}
+.bk-progress li,.bk-checks li{position:relative;padding-left:22px;font-size:12.5px;line-height:1.45;color:#9bb0cf;overflow-wrap:anywhere}
+.bk-progress li::before,.bk-checks li::before{content:"";position:absolute;left:4px;top:5px;width:9px;height:9px;border-radius:50%;background:#33475f}
+.bk-progress li[data-state=ok],.bk-checks li[data-state=ok]{color:#d8f5e3}.bk-progress li[data-state=ok]::before,.bk-checks li[data-state=ok]::before{background:#22c55e}
+.bk-progress li[data-state=run]{color:#eef3ff;font-weight:600}.bk-progress li[data-state=run]::before{background:#60a5fa;box-shadow:0 0 0 3px #60a5fa33}
+.bk-checks li[data-state=err]{color:#fecaca}.bk-checks li[data-state=err]::before{background:#f87171}
+@media(prefers-reduced-motion:no-preference){.bk-progress li[data-state=run]::before{animation:bk-pulse 1.2s ease-in-out infinite}}
+@keyframes bk-pulse{50%{box-shadow:0 0 0 6px #60a5fa11}}
