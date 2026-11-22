@@ -21,7 +21,7 @@ def _text(msg):
              (msg.get('button') or {}).get('text') or
              ((msg.get('interactive') or {}).get('button_reply') or {}).get('title') or
              ((msg.get('interactive') or {}).get('list_reply') or {}).get('title') or '')
-    return re.sub(r'\\s+', ' ', str(value)).strip()[:3000]
+    return re.sub(r'\s+', ' ', str(value)).strip()[:3000]
 
 
 def _signature_ok(raw, signature, secret):
@@ -64,7 +64,7 @@ def handle(c, raw, signature, now, env=None):
                 if not isinstance(msg, dict):
                     continue
                 text = _text(msg)
-                number = re.sub(r'\\D', '', str(msg.get('from', '')))
+                number = re.sub(r'\D', '', str(msg.get('from', '')))
                 message_id = str(msg.get('id', '')).strip()
                 if not text or not number or not message_id:
                     continue
