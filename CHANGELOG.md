@@ -4,6 +4,13 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## Sin publicar
+
+### Mejoras realizadas
+
+- Centro de Respaldos Premium 2.0: Configuración → Respaldos se organiza en cuatro secciones (Estado general, Supervisión, Acciones y Auditoría) con datos reales del servidor y estados correcto, ejecutándose, advertencia, error y pendiente; confirmación antes de crear un respaldo.
+- Auditoría de respaldos: contadores de los últimos 30 días, historial con fecha, duración y tamaño de cada operación, filtros, descarga en CSV, verificación SHA-256 y restauración de prueba visibles. Sin cambios en el respaldo, Google Drive, cifrado ni tareas programadas.
+
 ## v1.5.313 — 2026-11-22 00:15 (UTC-05:00)
 
 Respaldo completo en Google Drive
