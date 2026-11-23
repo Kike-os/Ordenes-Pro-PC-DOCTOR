@@ -124,3 +124,4 @@ Después de agregarlas hay que **volver a desplegar**. Los valores nunca se mues
 - El webhook solo acepta avisos con una firma `X-Hub-Signature-256` válida. Los rechazados se cuentan y se muestran en el panel.
 - La configuración, la comprobación, el envío de prueba y el historial son solo para administración. La autorización del cliente, el envío manual y el reintento desde la orden son para administración y técnicos. Todas estas acciones quedan en la auditoría.
 - Las pruebas automáticas usan una API de Meta simulada y nunca envían mensajes reales.
+- Las respuestas automáticas de ADI no informan sobre una orden sin verificar antes la identidad con un código enviado al teléfono autorizado (1.5.315). Ver `docs/WHATSAPP-IDENTIDAD.md`.

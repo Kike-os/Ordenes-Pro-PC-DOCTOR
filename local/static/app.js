@@ -4010,7 +4010,7 @@ function renderOrderDetail(root,order){
  const reentry=reentryNote(order);root.append(head,progressBox,...(reentry?[reentry]:[]),actions);if(adiCard)root.append(adiCard);
  const layout=el('div',undefined,'workspace-layout');const main=el('div',undefined,'workspace-main'),aside=el('aside',undefined,'workspace-side');main.append(orderSection('Datos del cliente',[['Nombre / Razón social',order.client],['Teléfono / WhatsApp',order.phone],['Cédula o RUC',order.identification],['Correo electrónico',order.email],['Ubicación',[order.province,order.canton,order.parish,order.city].filter(Boolean).join(' · ')],['Dirección',order.address],['Referencia',order.location_reference],...(order.reception_phone!==undefined||order.reception_email!==undefined?[['Contacto al recibir el equipo',[order.reception_phone!==undefined?'Teléfono: '+(order.reception_phone||'no registrado'):'',order.reception_email!==undefined?'Correo: '+(order.reception_email||'no registrado'):''].filter(Boolean).join(' · ')+' (la ficha del cliente se actualizó después)']]:[])]),orderSection('Datos del equipo',[['Tipo de equipo',receptionOptions?.device_types?.[order.type]||order.type],['Marca y modelo',[order.brand,order.model].filter(Boolean).join(' ')],['Número de serie',order.serial],['Identificador del equipo',order.device_code],...(order.unit_code?[['Equipo en la orden',order.unit_code]]:[]),['Color',order.color],['Accesorios recibidos',order.accessories],['Estado físico',order.physical_condition]]),orderSection('Motivo de ingreso',[['Falla reportada al recibir',order.problem],['Descripción de trabajo actual',order.current_problem||order.problem]]),orderSection('Nota interna',[['Observaciones de recepción',order.technician_notes],['Observaciones del técnico',order.internal_notes],['Recomendaciones',order.recommendations],['Hallazgos internos',order.findings]]));
  main.prepend(equipmentGroupSection(order));{let rxs=receptionDetailSection(order);if(!rxs&&order.reception&&!rxCat()){rxs=el('section',undefined,'workspace-section rx-detail');loadReceptionOptions().then(()=>{const real=receptionDetailSection(order);if(real)rxs.replaceWith(real);else rxs.remove();}).catch(()=>rxs.remove());}if(rxs)main.append(rxs);}main.append(orderPhotoSection(order));main.append(orderPartsPanel(order));main.append(orderHistoryPanel(order));
- aside.append(orderStatusCard(order));if(['administrador','tecnico'].includes(currentUser?.role))aside.append(orderClientNoticesCard(order));  // 1.5.275: avisos al cliente por WhatsApp · 1.5.257: estado, responsable, prioridad, entrega, última actualización, línea de tiempo, auditoría y ADI
+ aside.append(orderStatusCard(order));if(['administrador','tecnico'].includes(currentUser?.role))aside.append(orderClientNoticesCard(order));if(currentUser?.role==='administrador')aside.append(orderIdentityCard(order));  // 1.5.275: avisos al cliente por WhatsApp · 1.5.257: estado, responsable, prioridad, entrega, última actualización, línea de tiempo, auditoría y ADI
  aside.append(quoteSection(order),...(admin()?[proformaOrderSection(order),orderPartsSection(order)]:[]),paymentsSection(order));
  // WhatsApp: mensajes preparados con los datos de la orden; se abren en WhatsApp para enviarlos desde allí.
  
@@ -9052,6 +9052,54 @@ function orderClientNoticesCard(order){
   else body.append(el('p',d.ready?'Todavía no hay avisos por WhatsApp para esta orden.':'Sin avisos por WhatsApp registrados.','wan-soft'));};
  load();return card;}
 
+// Tarjeta «Verificación de identidad · WhatsApp» (solo administración): ADI solo informa sobre la orden tras verificar con un código
+// enviado al teléfono autorizado. Muestra el estado, los contactos autorizados (solo los dos últimos dígitos), la última verificación,
+// las sesiones, los intentos fallidos, las alertas y la auditoría; permite agregar o revocar contactos y revocar el acceso. Nunca muestra
+// ni pide códigos. El servidor vuelve a comprobar el rol y registra cada acción.
+function orderIdentityCard(order){
+ const card=el('section',undefined,'workspace-section wan-card wid-card');card.setAttribute('aria-labelledby','wid-title-'+order.id);
+ const head=el('div',undefined,'wan-head'),h=el('h2');h.id='wid-title-'+order.id;h.append(wanIcon('M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z M9 12l2 2 4-4'),el('span','Verificación de identidad · WhatsApp'));head.append(h);
+ const body=el('div',undefined,'wan-body');body.append(el('p','Cargando verificación…','wan-soft'));card.append(head,body);
+ const pill=(text,state)=>{const p=el('span',text,'wid-pill');p.dataset.state=state;return p;};
+ const list=(items,render,empty)=>{if(!items.length)return el('p',empty,'wan-soft');const ul=el('ul',undefined,'wid-list');for(const it of items)ul.append(render(it));return ul;};
+ const paint=d=>{body.replaceChildren();head.querySelector('.wid-pill')?.remove();
+  head.append(d.state==='verificada'?pill('Verificada ahora','ok'):d.state==='verificada_antes'?pill('Sin sesión activa','idle'):pill('Sin verificar','idle'));
+  if(!d.enabled)body.append(waInactiveHint('WhatsApp Business no está configurado en el servidor: ADI no puede verificar identidades por WhatsApp.',true));
+  else if(!d.otp_template)body.append(waInactiveHint('Falta la plantilla de autenticación del código en Configuración → Integraciones → WhatsApp. Sin ella ADI no envía códigos ni revela información.',true));
+  for(const a of d.alerts){const al=el('div',undefined,'wid-alert');al.setAttribute('role','status');al.append(wanIcon('M12 9v4 M12 17h.01 M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z'),el('span',a.label+(a.detail?' · '+a.detail:'')+(a.created_at?' · '+wanWhen(a.created_at):'')));body.append(al);}
+  const facts=el('dl',undefined,'wid-facts');const fact=(k,v)=>{const r=el('div');r.append(el('dt',k),el('dd',v));facts.append(r);};
+  fact('Teléfono del titular',d.titular.valid?'Termina en ••'+d.titular.tail:'Sin celular válido para WhatsApp');fact('Última verificación',d.last_verification?wanWhen(d.last_verification):'Nunca');
+  fact('Reglas','Código de 6 dígitos · '+d.rules.code_minutes+' min · '+d.rules.attempts+' intentos · sesión de '+d.rules.idle_minutes+' min sin actividad');body.append(facts);
+  // Contactos autorizados
+  const ch=el('div',undefined,'wid-sub');ch.append(el('h3','Contactos autorizados'));const add=button('Agregar contacto',()=>identityContactDialog(order,paint),'secondary wan-btn');ch.append(add);body.append(ch);
+  body.append(list(d.contacts,c=>{const li=el('li');li.dataset.state=c.revoked_at?'off':'ok';const t=el('div');t.append(el('strong',c.name+' · ••'+c.tail+(c.relation?' · '+c.relation:'')),el('small',(c.revoked_at?'Revocado '+wanWhen(c.revoked_at)+(c.revoked_by?' por '+c.revoked_by:'')+' · '+c.revoke_reason:'Autorizado '+wanWhen(c.created_at)+(c.created_by?' por '+c.created_by:''))),el('small','Comprobación: '+c.evidence));li.append(t);
+   if(!c.revoked_at){const r=button('Revocar',async()=>{const reason=await askText('Revocar contacto autorizado','Motivo de la revocación (queda en la auditoría). Se cerrarán las sesiones abiertas de esta orden.','','Revocar',200);if(reason===null||reason===undefined)return;r.disabled=true;
+     try{paint(await api('/api/orders/'+order.id+'/identity/contacts/'+c.id+'/revoke',{reason:String(reason)}));toast('Contacto revocado. Las sesiones de la orden se cerraron.','success');}catch(error){toast(error.message,'error');r.disabled=false;}},'secondary wan-btn');r.setAttribute('aria-label','Revocar a '+c.name);li.append(r);}
+   return li;},'Solo el titular. Los contactos adicionales los registra administración tras comprobar la autorización.'));
+  // Sesiones
+  const sh=el('div',undefined,'wid-sub');sh.append(el('h3','Sesiones de ADI'));const active=d.sessions.some(s=>s.active);
+  const rev=button('Revocar acceso',async()=>{if(!await askConfirm('Revocar el acceso verificado','Se cierran las sesiones abiertas y se anulan los códigos pendientes de esta orden. Para volver a consultar, la persona deberá verificarse de nuevo.','Revocar acceso',true))return;rev.disabled=true;
+   try{paint(await api('/api/orders/'+order.id+'/identity/revoke',{}));toast('Acceso revocado.','success');}catch(error){toast(error.message,'error');rev.disabled=false;}},'secondary wan-btn');rev.disabled=!active;if(!active)rev.title='No hay sesiones activas.';sh.append(rev);body.append(sh);
+  body.append(list(d.sessions.slice(0,6),s=>{const li=el('li');li.dataset.state=s.active?'ok':'off';const t=el('div');t.append(el('strong',s.who),el('small',s.state+' · desde '+wanWhen(s.created_at)+' · última actividad '+wanWhen(s.last_activity)+(s.revoked_by?' · '+s.revoked_by:'')));li.append(t);return li;},'Todavía no hay sesiones verificadas.'));
+  const more=(title,items,empty)=>{const det=el('details',undefined,'wid-more');det.append(el('summary',title+' ('+items.length+')'),list(items,e=>{const li=el('li');li.dataset.state=e.kind==='verificado'?'ok':'warn';const t=el('div');t.append(el('strong',e.label),el('small',wanWhen(e.created_at)+(e.detail?' · '+e.detail:'')));li.append(t);return li;},empty));return det;};
+  body.append(more('Intentos fallidos',d.failed,'Sin intentos fallidos.'),more('Auditoría de contactos y accesos',d.audit,'Sin cambios registrados.'));};
+ const load=async()=>{try{paint(await api('/api/orders/'+order.id+'/identity'));}catch(error){body.replaceChildren(el('p',error.message,'wan-soft'));}};
+ load();return card;}
+
+function identityContactDialog(order,done){const dialog=smallDialog('Contacto autorizado · '+displayCode(order));dialog.classList.add('wan-dialog');
+ const form=el('form',undefined,'wan-form');form.noValidate=true;
+ const field=(label,input,hint)=>{const l=el('label');l.append(el('span',label),input);if(hint)l.append(el('small',hint,'wan-soft'));form.append(l);return input;};
+ const name=field('Nombre completo',Object.assign(el('input'),{maxLength:120,autocomplete:'off',name:'name'}));
+ const phone=field('Celular (WhatsApp)',Object.assign(el('input'),{maxLength:30,inputMode:'tel',autocomplete:'off',name:'phone'}),'Recibirá los códigos de verificación de esta orden.');
+ const relation=field('Relación con el titular',Object.assign(el('input'),{maxLength:60,placeholder:'Opcional: p. ej., hija, empresa, asistente',name:'relation'}));
+ const evidence=field('Cómo se comprobó la autorización',Object.assign(el('textarea'),{maxLength:300,rows:3,name:'evidence',placeholder:'p. ej., el titular lo autorizó en el local presentando su cédula y el comprobante'}));
+ const conf=el('label',undefined,'wan-confirm'),box=el('input');box.type='checkbox';conf.append(box,el('span','Confirmo que la identidad y la autorización del titular se comprobaron siguiendo el procedimiento aprobado por PC-DOCTOR.'));form.append(conf);
+ const err=el('p',undefined,'wan-error');err.setAttribute('role','alert');const ok=el('button','Guardar','primary');ok.type='submit';const cancel=button('Cancelar',()=>dialog.close(),'secondary');const actions=el('div',undefined,'dialog-actions');actions.append(cancel,ok);
+ form.prepend(el('p','Las sesiones abiertas y los códigos pendientes de la orden se anulan al guardar. ADI nunca agrega ni cambia teléfonos.','wan-soft'));form.append(err,actions);dialog.append(form);name.focus();
+ form.addEventListener('submit',async e=>{e.preventDefault();err.textContent='';ok.disabled=true;
+  try{const d=await api('/api/orders/'+order.id+'/identity/contacts',{name:name.value,phone:phone.value,relation:relation.value,evidence:evidence.value,confirm:box.checked});toast('Contacto autorizado registrado.','success');dialog.close();done(d);}
+  catch(error){const f=error.fields||(error.data&&error.data.fields)||{};err.textContent=Object.values(f)[0]||error.message;const first=Object.keys(f)[0];if(first)(form.elements[first]||box).focus();ok.disabled=false;}});}
+
 function waConsentDialog(order,d,done){const dialog=smallDialog('Autorización de WhatsApp · '+displayCode(order));dialog.classList.add('wan-dialog');
  const form=el('form',undefined,'wan-form');form.noValidate=true;
  const fs=el('fieldset',undefined,'wan-choice');fs.append(el('legend','Respuesta del cliente'));const radio=(value,text)=>{const l=el('label'),i=el('input');i.type='radio';i.name='decision';i.value=value;l.append(i,el('span',text));fs.append(l);return i;};
@@ -9290,7 +9338,7 @@ async function renderWhatsAppSettings(pane){
   const list=el('datalist');list.id='wab-templates';for(const t of approved)list.append(new Option(t.name+' · '+t.language+' · '+t.variables+' variables',t.name));root.append(list);
   {const c=card('Plantillas de mensajes','M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z M14 2v4a2 2 0 0 0 2 2h4 M10 9H8 M16 13H8 M16 17H8','Meta exige plantillas aprobadas para avisar fuera de una conversación. Cada evento usa su propia plantilla o, si no tiene, la plantilla general.');
    const grid=el('div',undefined,'wab-grid'),field=(label,value,hint,list)=>{const l=el('label'),i=el('input');i.value=value||'';i.maxLength=120;if(list)i.setAttribute('list',list);l.append(el('span',label),i);if(hint)l.append(el('small',hint));grid.append(l);return i;};
-   const gName=field('Plantilla general',s.general_template,'Variables: {{1}} '+data.general_params[0]+', {{2}} '+data.general_params[1]+', {{3}} '+data.general_params[2]+'.','wab-templates'),gLang=field('Idioma',s.general_lang,'p. ej., es o es_EC');c.append(grid);
+   const gName=field('Plantilla general',s.general_template,'Variables: {{1}} '+data.general_params[0]+', {{2}} '+data.general_params[1]+', {{3}} '+data.general_params[2]+'.','wab-templates'),gLang=field('Idioma',s.general_lang,'p. ej., es o es_EC');const oName=field('Plantilla del código de verificación',s.otp_template,'Categoría AUTENTICACIÓN en Meta: {{1}} = código de 6 dígitos y botón «Copiar código». ADI la usa para verificar la identidad antes de informar sobre una orden; sin ella no envía códigos ni revela nada.','wab-templates'),oLang=field('Idioma del código',s.otp_lang,'p. ej., es');c.append(grid);
    if(data.check?.templates?.length){const det=el('details',undefined,'wab-tpls'),sum=el('summary','Plantillas en Meta ('+data.check.templates.length+')');det.append(sum);const ul=el('ul');for(const t of data.check.templates){const li=el('li');li.dataset.state=t.status==='APPROVED'?'ok':'warn';li.append(el('strong',t.name),el('span',t.language+' · '+t.category+' · '+t.status+' · '+t.variables+' variables','wan-soft'));if(t.body)li.append(el('small',t.body));ul.append(li);}det.append(ul);c.append(det);}
    else c.append(el('p',data.ready?'Pulsa «Comprobar conexión» para consultar las plantillas de la cuenta.':'Las plantillas se consultan cuando las credenciales estén configuradas.','wan-soft'));
    // Eventos
@@ -9304,7 +9352,7 @@ async function renderWhatsAppSettings(pane){
     row.append(sw,txt,tpl,lang);table.append(row);inputs[e.code]={sw,tpl,lang};}
    ev.append(table);
    const save=button('Guardar plantillas y eventos',async()=>{save.disabled=true;const events={};for(const[k,v]of Object.entries(inputs))events[k]={on:v.sw.checked,template:v.tpl.value.trim(),lang:v.lang.value.trim()};
-    try{await api('/api/whatsapp/settings',{general_template:gName.value.trim(),general_lang:gLang.value.trim(),events});toast('Configuración de WhatsApp guardada.','success');await load();}
+    try{await api('/api/whatsapp/settings',{general_template:gName.value.trim(),general_lang:gLang.value.trim(),otp_template:oName.value.trim(),otp_lang:oLang.value.trim(),events});toast('Configuración de WhatsApp guardada.','success');await load();}
     catch(error){toast(error.message+(error.fields?' '+Object.values(error.fields).join(' '):''),'error');save.disabled=false;}},'primary');ev.append(save);}
   // 6. Envíos automáticos y recordatorios
   {const c=card('Envíos automáticos','M13 2 3 14h9l-1 8 10-12h-9l1-8z','Apagados por defecto. Actívalos después de comprobar la conexión y hacer un envío de prueba. El correo no depende de este ajuste.');

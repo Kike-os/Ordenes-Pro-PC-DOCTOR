@@ -4,6 +4,21 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## Sin publicar
+
+### Nuevas funcionalidades
+
+- Verificación de identidad en la orden (solo administración): contactos autorizados con su comprobación, última verificación, sesiones, intentos fallidos, alertas, auditoría y botones para revocar; plantilla de autenticación del código en Integraciones → WhatsApp.
+
+### Errores corregidos
+
+- La prueba de enlaces de reserva de ADI espera ahora la URL completa de la agenda, como se cambió a propósito para que los enlaces funcionen en WhatsApp.
+
+### Actualizaciones de seguridad
+
+- ADI solo informa sobre una orden por WhatsApp después de verificar la identidad con un código de 6 dígitos enviado al teléfono autorizado (titular o contacto registrado por administración): 5 minutos, 3 intentos, un solo uso, guardado solo como HMAC y sesión de 15 minutos sin actividad.
+- Sin verificación ADI no revela titular, equipo, fechas, importes ni enlaces; otra orden exige otra verificación; cambiar contactos o el teléfono del titular anula sesiones y códigos; el código y los datos de la orden no entran en el historial que viaja a la IA; ADI nunca cambia un teléfono.
+
 ## v1.5.314 — 2026-11-22 11:25 (UTC-05:00)
 
 Centro de Respaldos Premium 2.0

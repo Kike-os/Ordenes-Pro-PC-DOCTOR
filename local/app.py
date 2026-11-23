@@ -1750,6 +1750,12 @@ class Handler(BaseHTTPRequestHandler):
                 import whatsapp_business
                 try:return self.reply(200,whatsapp_business.for_order(c,int(wa_order[1]),user))
                 except whatsapp_business.WhatsAppError as error:return self.reply(error.status,{'error':str(error)})
+            identity_order=re.fullmatch(r'/api/orders/([0-9]+)/identity',path)
+            if identity_order:
+                # Verificación de identidad por WhatsApp (contactos autorizados, sesiones, intentos y alertas). Solo administración.
+                import whatsapp_identity
+                try:return self.reply(200,whatsapp_identity.overview(c,int(identity_order[1]),user,reception_now()))
+                except whatsapp_identity.IdentityError as error:return self.reply(error.status,{'error':str(error)})
             if path == '/api/me':
                 prefs=c.execute('SELECT value FROM system_state WHERE key=?',('mail_prefs:'+str(user['id']),)).fetchone() if mail_allowed(user) else None
                 lang=c.execute('SELECT value FROM system_state WHERE key=?',('ui_lang:'+str(user['id']),)).fetchone()
@@ -4950,6 +4956,22 @@ class Handler(BaseHTTPRequestHandler):
                     except whatsapp_business.WhatsAppError as error:
                         c.rollback();return self.reply(error.status,{'error':str(error),'fields':getattr(error,'fields',{})})
                     return self.reply(404,{'error':'Recurso no disponible.'})
+                identity_post=re.fullmatch(r'/api/orders/([0-9]+)/identity/(contacts|revoke|contacts/([0-9]+)/revoke)',path)
+                if identity_post:
+                    # Contactos autorizados y revocación del acceso verificado por WhatsApp: solo administración, con auditoría. ADI nunca cambia teléfonos.
+                    import whatsapp_identity
+                    oid=int(identity_post[1]);now=reception_now()
+                    try:
+                        if identity_post[2]=='contacts':
+                            cid=whatsapp_identity.add_contact(c,oid,data,user,now);audit(c,user['id'],'identity_contact_added',oid)
+                        elif identity_post[2]=='revoke':
+                            n=whatsapp_identity.revoke_sessions(c,oid,user,now);audit(c,user['id'],'identity_sessions_revoked',oid)
+                        else:
+                            whatsapp_identity.revoke_contact(c,oid,int(identity_post[3]),data,user,now);audit(c,user['id'],'identity_contact_revoked',oid)
+                        c.commit()
+                    except whatsapp_identity.IdentityError as error:
+                        c.rollback();return self.reply(error.status,{'error':str(error),'fields':error.fields})
+                    return self.reply(200,whatsapp_identity.overview(c,oid,user,now))
                 if path=='/api/status-notices/settings':
                     import repair_status
                     try:repair_status.set_enabled(c,bool(data.get('auto')),user)

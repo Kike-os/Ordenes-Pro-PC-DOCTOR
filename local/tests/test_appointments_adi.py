@@ -70,7 +70,7 @@ class AppointmentAndAdiTests(unittest.TestCase):
    offered=adi.next_slots(c);answer=adi.reply(c,'Quiero agendar una cita');before=c.execute('SELECT COUNT(*) FROM appointments').fetchone()[0]
    if offered:
     for item in offered:
-     self.assertRegex(item['enlace'],r'^/citas\?fecha=\d{4}-\d{2}-\d{2}&hora=\d{2}:\d{2}&servicio=[a-z0-9_-]+$');self.assertIn(item['enlace'],answer)
+     self.assertRegex(item['enlace'],r'^https?://[^/\s]+/citas\?fecha=\d{4}-\d{2}-\d{2}&hora=\d{2}:\d{2}&servicio=[a-z0-9_-]+$');self.assertIn(item['enlace'],answer)
      self.assertIn(item['hora'],[slot['time'] for slot in appointments.available_slots(c,item['fecha'],item['enlace'].rsplit('=',1)[1])])
    with patch.object(adi,'ask',return_value='Con gusto te ayudo a reservar.'):
     written=adi.reply(c,'Necesito un turno para revisar mi laptop')

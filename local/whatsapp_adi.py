@@ -7,6 +7,7 @@ import re
 
 import adi
 import whatsapp_business as wa
+import whatsapp_identity
 
 
 def enabled(env=None):
@@ -97,24 +98,36 @@ def handle(c, raw, signature, now, env=None):
                     c.commit()
                     continue
 
+                # Consultas sobre una orden: primero la verificación de identidad (whatsapp_identity). Sin ella ADI no revela nada de la orden.
+                # El historial guarda «[código de verificación]» y un resumen neutro, nunca el código ni los datos de la orden (también viaja a la IA).
+                try:
+                    turn = whatsapp_identity.respond(c, conv['token_hash'], number, text, now, env)
+                except Exception as error:
+                    print('whatsapp-identity', type(error).__name__, flush=True)
+                    turn = {'answer': whatsapp_identity.THIRD_PARTY, 'log_client': None, 'log_answer': None}
                 now_text = wa.stamp(now)
                 c.execute("INSERT INTO adi_messages(conversation_id,author,content,created_at) VALUES (?,'client',?,?)",
-                          (conv['id'], text, now_text))
+                          (conv['id'], (turn['log_client'] if turn and turn['log_client'] else text), now_text))
                 c.execute("UPDATE adi_conversations SET last_seen_client=?,updated_at=? WHERE id=?",
                           (now_text, now_text, conv['id']))
                 c.execute("UPDATE whatsapp_adi_inbound SET status='generando',conversation_id=? WHERE wa_message_id=?",
                           (conv['id'], message_id))
                 c.commit()
 
-                try:
-                    answer = str(adi.reply(c, text, conversation_id=conv['id'], session={}, lang='es-EC') or '').strip()[:3000]
-                    if not answer:
-                        raise RuntimeError('adi_empty_reply')
-                except Exception as error:
-                    c.execute("UPDATE whatsapp_adi_inbound SET status='fallido',detail=? WHERE wa_message_id=?",
-                              ('ADI no pudo preparar una respuesta (' + type(error).__name__ + ').', message_id))
-                    c.commit()
-                    continue
+                if turn:
+                    answer = str(turn['answer'])[:3000]
+                    logged = str(turn['log_answer'] if turn['log_answer'] is not None else turn['answer'])[:3000]
+                else:
+                    try:
+                        answer = str(adi.reply(c, text, conversation_id=conv['id'], session={}, lang='es-EC') or '').strip()[:3000]
+                        if not answer:
+                            raise RuntimeError('adi_empty_reply')
+                    except Exception as error:
+                        c.execute("UPDATE whatsapp_adi_inbound SET status='fallido',detail=? WHERE wa_message_id=?",
+                                  ('ADI no pudo preparar una respuesta (' + type(error).__name__ + ').', message_id))
+                        c.commit()
+                        continue
+                    logged = answer
 
                 c.execute('BEGIN IMMEDIATE')
                 if wa.monthly_outbound_count(c, now) >= wa.MAX_MONTHLY_WA_MESSAGES:
@@ -139,7 +152,7 @@ def handle(c, raw, signature, now, env=None):
                 if provider:
                     stamp = wa.stamp(now)
                     c.execute("INSERT INTO adi_messages(conversation_id,author,content,created_at) VALUES (?,'adi',?,?)",
-                              (conv['id'], answer, stamp))
+                              (conv['id'], logged, stamp))
                     c.execute('UPDATE adi_conversations SET updated_at=? WHERE id=?', (stamp, conv['id']))
                     c.execute("UPDATE whatsapp_adi_inbound SET status='enviado',provider_id=?,replied_at=?,detail='' WHERE wa_message_id=?",
                               (provider, stamp, message_id))

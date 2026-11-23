@@ -235,7 +235,7 @@ def version_info(env=None):
 
 # ---- Ajustes (system_state; sin secretos) ------------------------------------------------------------------------------------------
 DEFAULTS = {'auto': False, 'general_template': '', 'general_lang': 'es', 'test_number': '', 'test_template': 'hello_world', 'test_lang': 'en_US',
-            'reminder_days': [3, 7], 'events': {}}
+            'reminder_days': [3, 7], 'events': {}, 'otp_template': '', 'otp_lang': 'es'}
 
 
 def settings(c):
@@ -286,6 +286,11 @@ def save_settings(c, data, user, env=None):
         cur['test_template'] = template(data['test_template'], 'test_template') or 'hello_world'
     if 'test_lang' in data:
         cur['test_lang'] = lang(data['test_lang'], 'test_lang', 'en_US')
+    # Plantilla de AUTENTICACIÓN aprobada en Meta para el código de verificación de identidad (whatsapp_identity): {{1}} = código y botón «Copiar código».
+    if 'otp_template' in data:
+        cur['otp_template'] = template(data['otp_template'], 'otp_template')
+    if 'otp_lang' in data:
+        cur['otp_lang'] = lang(data['otp_lang'], 'otp_lang', 'es')
     if 'test_number' in data:
         raw = str(data['test_number'] or '').strip()
         number = number_for(raw) if raw else ''
@@ -690,7 +695,9 @@ def monthly_outbound_count(c, now):
     start = stamp(now.replace(day=1, hour=0, minute=0, second=0, microsecond=0))
     outbox = c.execute("SELECT COUNT(*) FROM whatsapp_outbox WHERE created_at>=? AND status IN ('pendiente','enviando','enviado','entregado','leido','fallido')", (start,)).fetchone()[0]
     replies = c.execute("SELECT COUNT(*) FROM whatsapp_adi_inbound WHERE received_at>=? AND status IN ('generando','enviando','enviado','fallido')", (start,)).fetchone()[0]
-    return int(outbox or 0) + int(replies or 0)
+    # Códigos de verificación de identidad (cada reto intenta un envío, salvo los que no llegaron a salir por falta de plantilla o límite).
+    codes = c.execute("SELECT COUNT(*) FROM wa_identity_challenges WHERE created_at>=? AND NOT (status='envio_fallido' AND send_detail LIKE 'Falta configurar%')", (start,)).fetchone()[0]
+    return int(outbox or 0) + int(replies or 0) + int(codes or 0)
 
 
 def monthly_adi_reply_count(c, now):
