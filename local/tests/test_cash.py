@@ -168,6 +168,9 @@ class CashTests(unittest.TestCase):
         chosen = post('/api/invoicing/%d' % draft['id'], action='bank', bank_account_id=str(account['id']))['body']
         self.assertEqual(chosen['bank_account']['number'], '1234567890')
         post('/api/invoicing/settings', **test_invoicing.SETTINGS)
+        # Al activar la facturación (producción) se fija antes el último secuencial del sistema anterior.
+        point = '%s-%s' % (test_invoicing.SETTINGS['establishment'], test_invoicing.SETTINGS['emission_point'])
+        self.assertEqual(post('/api/invoicing/sequence-start', point=point, last_number='275', confirm='FIJAR SECUENCIAL')['status'], 200)
         post('/api/invoicing/%d' % draft['id'], action='emit', confirm='1')
         with app.connect() as c:
             xml = c.execute('SELECT xml_unsigned FROM invoices WHERE id=?', (draft['id'],)).fetchone()[0]

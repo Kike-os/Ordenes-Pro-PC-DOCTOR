@@ -8,6 +8,7 @@ Reglas que se aplican SIEMPRE en el servidor (la interfaz solo las refleja):
 - Los precios del catálogo y de los presupuestos ya incluyen el IVA: la base y el impuesto se descomponen por línea de forma exacta.
 - Un comprobante emitido no se modifica (disparadores en la base) y todo queda en un historial inmutable."""
 import json
+import os
 import sqlite3
 import re
 from datetime import datetime
@@ -24,12 +25,26 @@ PAYMENT_CODES = {'efectivo': '01', 'transferencia': '20', 'deposito': '20', 'tar
 PAYMENT_LABELS = {'01': 'Sin utilización del sistema financiero', '16': 'Tarjeta de débito', '19': 'Tarjeta de crédito', '20': 'Otros con utilización del sistema financiero'}
 CREDIT_LABEL = 'Saldo pendiente (venta a crédito)'
 TEST_ENVIRONMENT = '1'
+PRODUCTION_ENVIRONMENT = '2'
 # MODO DE PRUEBAS del centro de Facturación Electrónica (hasta la firma electrónica y la autorización de activación real):
 # - todo lo que se registre (facturas, cajas, depósitos, inventario, compras, proveedores, cuentas) queda en las tablas propias del
 #   módulo, que se vaciarán con respaldo previo al activarlo; ningún registro existente se modifica;
 # - los clientes no ven ningún cambio: los datos bancarios no aparecen en la página ni en el PDF del presupuesto;
 # - solo administración usa el módulo, incluida la caja.
-TEST_MODE = True
+
+
+def production_requested(env=None):
+    """Ambiente de PRODUCCIÓN solo con las DOS variables del servidor: FACTURACION_AMBIENTE=produccion y AZUR_PRODUCCION_AUTORIZADA=SI.
+    Aun así, emitir exige además el bloqueo de emisión abierto por administración (emission_lock) y el secuencial inicial fijado."""
+    env = os.environ if env is None else env
+    return env.get('FACTURACION_AMBIENTE', '').strip().lower() == 'produccion' and env.get('AZUR_PRODUCCION_AUTORIZADA', '').strip() == 'SI'
+
+
+TEST_MODE = not production_requested()
+
+
+def active_environment():
+    return TEST_ENVIRONMENT if TEST_MODE else PRODUCTION_ENVIRONMENT
 
 
 class InvoiceError(ValueError):
@@ -63,6 +78,12 @@ def settings(c):
     row['regime_label'] = REGIMES.get(row['regime'], 'Sin definir')
     row['missing'] = missing_settings(row)
     row['test_mode'] = TEST_MODE
+    import emission_lock
+    row['emission_lock'] = emission_lock.status(c)
+    if not TEST_MODE:
+        row['emission'] = {'environment': PRODUCTION_ENVIRONMENT, 'environment_label': 'Producción (SRI)', 'real_enabled': True,
+                           'note': 'PRODUCCIÓN: los comprobantes emitidos aquí son reales y tienen validez tributaria.'}
+        return row
     row['emission'] = {'environment': TEST_ENVIRONMENT, 'environment_label': 'Pruebas (SRI)', 'real_enabled': False,
                        'note': 'Todo lo que se registre aquí es de prueba: no cambia clientes, órdenes, presupuestos ni pagos. Solo se envía al SRI de pruebas a través de AZUR si confirmas «Enviar al SRI (AZUR pruebas)»; nunca a producción.'}
     return row
@@ -289,7 +310,7 @@ def event(c, invoice_id, name, detail, now, user=None, actor=''):
 # ---- Borrador, comprador y emisión -----------------------------------------------------------------------------------------
 
 def current(c, kind, source_id):
-    return c.execute("SELECT * FROM invoices WHERE source_kind=? AND source_id=? AND environment=? AND status!='descartado'", (kind, source_id, TEST_ENVIRONMENT)).fetchone()
+    return c.execute("SELECT * FROM invoices WHERE source_kind=? AND source_id=? AND environment=? AND status!='descartado'", (kind, source_id, active_environment())).fetchone()
 
 
 def eligibility(c, kind, source_id):
@@ -334,7 +355,7 @@ def draft(c, kind, source_id, user, now):
     cfg = settings(c)
     invoice_id = c.execute('INSERT INTO invoices(status,environment,source_kind,source_id,order_id,quote_id,license_sale_id,client_id,buyer_id_type,buyer_id,buyer_name,buyer_address,buyer_email,buyer_phone,'
                            'subtotal_cents,discount_cents,tax_cents,total_cents,establishment,emission_point,created_by,created_at,updated_at,financing) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
-                           ('borrador', TEST_ENVIRONMENT, kind, source_id, found['order_id'], found['quote_id'], found['license_sale_id'], found['client_id'], buyer['buyer_id_type'], buyer['buyer_id'],
+                           ('borrador', active_environment(), kind, source_id, found['order_id'], found['quote_id'], found['license_sale_id'], found['client_id'], buyer['buyer_id_type'], buyer['buyer_id'],
                             buyer['buyer_name'], buyer['buyer_address'], buyer['buyer_email'], buyer['buyer_phone'], t['subtotal_cents'], t['discount_cents'], t['tax_cents'], t['total_cents'],
                             cfg['establishment'], cfg['emission_point'], user['id'], stamp(now), stamp(now), found.get('financing', '{}'))).lastrowid
     _write_lines(c, invoice_id, found['lines'])
@@ -415,11 +436,15 @@ def _get(c, invoice_id):
     return row
 
 
-def emit(c, invoice_id, user, now, environment=TEST_ENVIRONMENT):
+def emit(c, invoice_id, user, now, environment=None):
     """Confirma el borrador: comprueba todo de nuevo en el servidor, asigna el secuencial y la clave de acceso y genera el XML.
     Solo en ambiente de pruebas. La firma y el envío al SRI de pruebas son la etapa siguiente (falta el certificado)."""
-    if environment != TEST_ENVIRONMENT:
-        raise InvoiceError('La emisión real está desactivada: solo se permite el ambiente de pruebas del SRI.', 403)
+    environment = environment or active_environment()
+    if environment != active_environment():
+        raise InvoiceError('El ambiente pedido no es el ambiente activo del servidor (%s).' % ENVIRONMENTS[active_environment()], 403)
+    import emission_lock
+    if emission_lock.is_locked(c):
+        raise InvoiceError(str(emission_lock.EmissionLocked('Emitir (asignar secuencial)')), 423)
     before = _get(c, invoice_id)
     refresh(c, invoice_id, now)
     inv = dict(_get(c, invoice_id))
@@ -440,6 +465,8 @@ def emit(c, invoice_id, user, now, environment=TEST_ENVIRONMENT):
     if inv['total_cents'] <= 0:
         raise InvoiceError('La factura no tiene importe.', 409)
     key = (environment, cfg['establishment'], cfg['emission_point'], '01')
+    if environment == PRODUCTION_ENVIRONMENT and not c.execute('SELECT 1 FROM invoice_sequences WHERE environment=? AND establishment=? AND emission_point=? AND doc_type=?', key).fetchone():
+        raise InvoiceError('Falta fijar el último secuencial emitido con el sistema anterior en %s-%s (producción): sin ese dato se repetirían números.' % key[1:3], 409)
     c.execute('INSERT OR IGNORE INTO invoice_sequences(environment,establishment,emission_point,doc_type,last_number) VALUES (?,?,?,?,0)', key)
     c.execute('UPDATE invoice_sequences SET last_number=last_number+1 WHERE environment=? AND establishment=? AND emission_point=? AND doc_type=?', key)
     sequential = c.execute('SELECT last_number FROM invoice_sequences WHERE environment=? AND establishment=? AND emission_point=? AND doc_type=?', key).fetchone()[0]
@@ -456,7 +483,8 @@ def emit(c, invoice_id, user, now, environment=TEST_ENVIRONMENT):
     xml = sri_xml.invoice_xml(cfg, inv, items, payments)
     c.execute("UPDATE invoices SET status='pendiente',environment=?,establishment=?,emission_point=?,sequential=?,access_key=?,issue_date=?,xml_unsigned=?,emitted_by=?,emitted_at=?,updated_at=? WHERE id=?",
               (environment, cfg['establishment'], cfg['emission_point'], sequential, access, issue.isoformat(), xml, user['id'], stamp(now), stamp(now), invoice_id))
-    event(c, invoice_id, 'emitido', 'Factura %s preparada en ambiente de PRUEBAS (clave de acceso %s). Pendiente de firma electrónica y envío al SRI de pruebas.' % (number(inv), access), now, user)
+    event(c, invoice_id, 'emitido', ('Factura %s preparada en ambiente de PRUEBAS (clave de acceso %s). Pendiente de firma electrónica y envío al SRI de pruebas.' if environment == TEST_ENVIRONMENT
+                                     else 'Factura %s preparada en PRODUCCIÓN (clave de acceso %s). Pendiente de envío al SRI a través de AZUR.') % (number(inv), access), now, user)
     # Políticas comerciales vigentes al emitir: quedan asociadas a esta factura y no cambian después.
     import invoice_documents
     invoice_documents.attach_policies(c, invoice_id, now)
@@ -659,4 +687,42 @@ def dashboard(c, now):
                                                  'documents': sum(by_env[env].values())} for env in ENVIRONMENTS},
             'monthly': [{'month': key, 'test_cents': monthly[key]['1'], 'real_cents': monthly[key]['2']} for key in months],
             'has_monthly': any(v['1'] or v['2'] for v in monthly.values()), 'recent': recent, 'attention': attention[:8], 'attention_total': len(attention),
-            'settings': {'test_mode': TEST_MODE, 'missing': cfg['missing'], 'environment': ENVIRONMENTS[TEST_ENVIRONMENT]}}
+            'settings': {'test_mode': TEST_MODE, 'missing': cfg['missing'], 'environment': ENVIRONMENTS[active_environment()]}}
+
+
+SEQUENCE_CONFIRM = 'FIJAR SECUENCIAL'
+
+
+def production_sequence(c):
+    """Último secuencial de PRODUCCIÓN registrado para el punto de emisión de los Datos fiscales (None si aún no se fijó)."""
+    cfg = settings(c)
+    row = c.execute("SELECT last_number FROM invoice_sequences WHERE environment=? AND establishment=? AND emission_point=? AND doc_type='01'",
+                    (PRODUCTION_ENVIRONMENT, cfg['establishment'], cfg['emission_point'])).fetchone()
+    return {'point': '%s-%s' % (cfg['establishment'], cfg['emission_point']), 'last_number': row[0] if row else None,
+            'next_number': row[0] + 1 if row else None, 'confirm_text': SEQUENCE_CONFIRM}
+
+
+def set_production_start(c, user, data, now):
+    """Fija el ÚLTIMO secuencial de facturas emitido con el sistema anterior en el punto de emisión de los Datos fiscales, para que
+    Órdenes Pro continúe en el siguiente. Solo administración, con confirmación escrita, y solo mientras Órdenes Pro no haya emitido
+    ninguna factura de producción en ese punto (después, el contador lo lleva el sistema y no se toca)."""
+    if not user or user['role'] != 'administrador':
+        raise InvoiceError('Solo administración fija el secuencial inicial.', 403)
+    if str(data.get('confirm', '')).strip().upper() != SEQUENCE_CONFIRM:
+        raise InvoiceError('Escribe %s para confirmar.' % SEQUENCE_CONFIRM, 400)
+    cfg = settings(c)
+    point = '%s-%s' % (cfg['establishment'], cfg['emission_point'])
+    if str(data.get('point', '')).strip() != point:
+        raise InvoiceError('El punto de emisión indicado no coincide con los Datos fiscales (%s).' % point, 409)
+    raw = str(data.get('last_number', '')).strip()
+    if not re.fullmatch(r'[0-9]{1,9}', raw):
+        raise InvoiceError('El último secuencial debe ser un número de 1 a 9 dígitos.', 400)
+    last = int(raw)
+    used = c.execute("SELECT COUNT(*) FROM invoices WHERE environment=? AND establishment=? AND emission_point=? AND sequential IS NOT NULL",
+                     (PRODUCTION_ENVIRONMENT, cfg['establishment'], cfg['emission_point'])).fetchone()[0]
+    if used:
+        raise InvoiceError('Órdenes Pro ya emitió facturas de producción en %s: el secuencial ya no se cambia.' % point, 409)
+    key = (PRODUCTION_ENVIRONMENT, cfg['establishment'], cfg['emission_point'], '01')
+    c.execute('INSERT OR IGNORE INTO invoice_sequences(environment,establishment,emission_point,doc_type,last_number) VALUES (?,?,?,?,0)', key)
+    c.execute('UPDATE invoice_sequences SET last_number=? WHERE environment=? AND establishment=? AND emission_point=? AND doc_type=?', (last, *key))
+    return production_sequence(c)

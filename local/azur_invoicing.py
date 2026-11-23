@@ -28,6 +28,12 @@ def log(c, invoice_id, action, result, code='', detail='', http_status=None, req
               (invoice_id, action, request_key, http_status, result, code[:60], detail[:600], user['id'] if user else None, stamp(now)))
 
 
+def _locked(c, action):
+    import emission_lock
+    if emission_lock.is_locked(c):
+        raise invoicing.InvoiceError(str(emission_lock.EmissionLocked(action)), 423)
+
+
 def point(env=None):
     env = os.environ if env is None else env
     return env.get('AZUR_PUNTO_EMISION', '').strip()
@@ -46,9 +52,13 @@ def readiness(c, env=None):
         problems.append('El punto de emisión de AZUR (%s) no coincide con los Datos fiscales de Órdenes Pro (%s): se evita así un choque de numeración.' % (expected, mine))
     if cfg['missing']:
         problems.append('Faltan datos fiscales: ' + ', '.join(cfg['missing']) + '.')
+    wanted = 'pruebas' if invoicing.TEST_MODE else 'produccion'
+    if st.get('environment') and st['environment'] != wanted:
+        problems.append('La credencial de AZUR es de %s pero el servidor está en %s: deben coincidir.' % (st['environment'], wanted))
     recent = [dict(r) for r in c.execute('SELECT o.id,o.invoice_id,o.action,o.result,o.code,o.detail,o.http_status,o.created_at,COALESCE(u.name,\'Sistema\') actor '
                                          'FROM azur_operations o LEFT JOIN users u ON u.id=o.actor_id ORDER BY o.id DESC LIMIT 30')]
-    return dict(st, ready=not problems, problems=problems, point=expected, fiscal_point=mine, test_mode=invoicing.TEST_MODE, operations=recent)
+    import emission_lock
+    return dict(st, ready=not problems, problems=problems, emission_lock=emission_lock.status(c, env), production_sequence=invoicing.production_sequence(c), point=expected, fiscal_point=mine, test_mode=invoicing.TEST_MODE, operations=recent)
 
 
 def payload(c, invoice_id):
@@ -90,12 +100,13 @@ def send(c, invoice_id, user, now, env=None):
     """Envía al SRI a través de AZUR una factura ya emitida en pruebas. Idempotente: si ya se envió, consulta en lugar de reenviar."""
     if user['role'] != 'administrador':
         raise invoicing.InvoiceError('Solo administración envía comprobantes al SRI.', 403)
+    _locked(c, 'Enviar al SRI (AZUR)')
     ready = readiness(c, env)
     if not ready['ready']:
         raise invoicing.InvoiceError('La integración con AZUR no está lista: ' + ' '.join(ready['problems']), 409)
     inv = _row(c, invoice_id)
-    if inv['environment'] != invoicing.TEST_ENVIRONMENT:
-        raise invoicing.InvoiceError('Solo se envían comprobantes del ambiente de pruebas.', 403)
+    if inv['environment'] != invoicing.active_environment():
+        raise invoicing.InvoiceError('Este comprobante es de otro ambiente que el activo del servidor: no se envía.', 403)
     if inv['status'] == 'borrador':
         raise invoicing.InvoiceError('Primero emite la factura en Órdenes Pro (asigna el secuencial).', 409)
     if inv['provider'] == 'azur' and inv['status'] in ('enviado', 'autorizado'):
@@ -140,15 +151,16 @@ def send(c, invoice_id, user, now, env=None):
         invoicing.event(c, invoice_id, 'azur_error', 'AZUR no aceptó el envío: %s' % error, now, user)
         c.commit()
         raise invoicing.InvoiceError(str(error), 502 if error.retryable else 409)
-    if az.environment_of_key(access) != '1':
-        # Defensa: el punto de emisión de AZUR debe ser de PRUEBAS. Si la clave dice producción se detiene todo y se avisa.
-        log(c, invoice_id, 'enviar', 'error', 'ambiente_produccion', 'AZUR devolvió una clave de PRODUCCIÓN (%s): revisa el punto de emisión en AZUR.' % access, 200, key, user, now)
-        invoicing.event(c, invoice_id, 'azur_alerta', 'ALERTA: AZUR emitió en ambiente de PRODUCCIÓN (clave %s). El punto de emisión configurado no es de pruebas.' % access, now, user)
+    if az.environment_of_key(access) != inv['environment']:
+        # Defensa: la clave que devuelve AZUR debe ser del MISMO ambiente que el comprobante. Si no, se detiene todo y se avisa.
+        log(c, invoice_id, 'enviar', 'error', 'ambiente_distinto', 'AZUR devolvió una clave de otro ambiente (%s): revisa el punto de emisión en AZUR.' % access, 200, key, user, now)
+        invoicing.event(c, invoice_id, 'azur_alerta', 'ALERTA: AZUR emitió en un ambiente distinto al del comprobante (clave %s).' % access, now, user)
         c.commit()
-        raise invoicing.InvoiceError('AZUR emitió en PRODUCCIÓN: el punto de emisión configurado no es de pruebas. Se detuvo la integración; revisa AZUR.', 409)
+        raise invoicing.InvoiceError('AZUR emitió en %s pero el comprobante es de %s: es un ambiente distinto. Se detuvo la integración; revisa AZUR.' % (
+            invoicing.ENVIRONMENTS.get(az.environment_of_key(access), '?').upper(), invoicing.ENVIRONMENTS.get(inv['environment'], '?').upper()), 409)
     previous = inv['access_key']
     c.execute("UPDATE invoices SET access_key=?,status='enviado',provider_state=0,updated_at=? WHERE id=?", (access, stamp(now), invoice_id))
-    log(c, invoice_id, 'enviar', 'ok', 'creado', 'AZUR recibió el comprobante y lo envió al SRI de pruebas (clave %s).' % access, 200, key, user, now)
+    log(c, invoice_id, 'enviar', 'ok', 'creado', 'AZUR recibió el comprobante y lo envió al SRI (%s, clave %s).' % (invoicing.ENVIRONMENTS.get(inv['environment'], ''), access), 200, key, user, now)
     invoicing.event(c, invoice_id, 'azur_enviado', 'Enviado al SRI de pruebas a través de AZUR (firma de AZUR). Clave de acceso %s%s.' % (
         access, (' (la clave de control local era %s)' % previous) if previous and previous != access else ''), now, user)
     c.commit()
@@ -213,7 +225,7 @@ def sync(c, invoice_id, user, now, env=None, live=False, quiet=False):
     c.execute('UPDATE invoices SET ' + ','.join(k + '=?' for k in updates) + ' WHERE id=?', (*updates.values(), invoice_id))
     log(c, invoice_id, 'consultar', 'ok' if code == 4 else 'error' if code in az.FINAL_REJECTED else 'pendiente', str(code), label + ('. ' + ' '.join(errors) if errors else ''), 200, '', user, now)
     if newly:
-        invoicing.event(c, invoice_id, 'autorizado', 'AUTORIZADA por el SRI (ambiente de PRUEBAS) · número %s · %s.' % (updates['authorization_number'], updates['authorized_at']), now, user)
+        invoicing.event(c, invoice_id, 'autorizado', 'AUTORIZADA por el SRI (%s) · número %s · %s.' % (invoicing.ENVIRONMENTS.get(inv['environment'], ''), updates['authorization_number'], updates['authorized_at']), now, user)
     elif code in az.FINAL_REJECTED and updates.get('status') == 'rechazado':
         invoicing.event(c, invoice_id, 'rechazado', '%s: %s' % (label, ' '.join(errors) or 'sin detalle'), now, user)
     c.commit()
@@ -254,6 +266,7 @@ def annul(c, invoice_id, user, now, data, env=None):
     comprueba que ya consta anulada y se refleja. Nunca se anula automáticamente."""
     if user['role'] != 'administrador':
         raise invoicing.InvoiceError('Solo administración anula comprobantes.', 403)
+    _locked(c, 'Anular')
     if str(data.get('confirm', '')).strip() != 'ANULAR':
         raise invoicing.InvoiceError('Escribe ANULAR para confirmar.', 400, {'confirm': 'Confirmación obligatoria.'})
     reason = re.sub(r'\s+', ' ', str(data.get('reason', '') or '')).strip()

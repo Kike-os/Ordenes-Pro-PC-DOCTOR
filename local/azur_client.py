@@ -68,6 +68,10 @@ def _guard(cfg):
 def _request(cfg, method, path, key='credential', body=None, query=None, idem=''):
     """Llamada a AZUR. Devuelve (estado HTTP, dict). Los errores nunca incluyen la credencial ni el cuerpo enviado."""
     _guard(cfg)
+    if method == 'POST' and re.search(r'/(factura/emision|anular|reprocesar)$', path):
+        import emission_lock
+        if emission_lock.env_locked():
+            raise AzurError(emission_lock.BANNER + ': no se emite, anula ni reprocesa en AZUR.', 'emision_bloqueada')
     secret = cfg['emission'] if key == 'emission' else cfg['credential']
     if not secret:
         raise AzurError('Falta configurar la credencial de AZUR (%s).' % ('AZUR_API_KEY_EMISION' if key == 'emission' else 'AZUR_CREDENCIAL'), 'sin_credencial')

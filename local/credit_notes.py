@@ -43,8 +43,8 @@ def create(c, invoice_id, data, user, now):
         raise CreditNoteError('Factura no encontrada.', 404)
     if inv['status'] not in EMITTED:
         raise CreditNoteError('Solo una factura emitida admite nota de crédito; un borrador se descarta.', 409)
-    if inv['environment'] != invoicing.TEST_ENVIRONMENT:
-        raise CreditNoteError('La emisión real está desactivada.', 403)
+    if inv['environment'] != invoicing.active_environment():
+        raise CreditNoteError('La factura es de otro ambiente (%s) que el activo del servidor.' % invoicing.ENVIRONMENTS.get(inv['environment'], inv['environment']), 403)
     reason = re.sub(r'\s+', ' ', str(data.get('reason', '') or '')).strip()
     if not 5 <= len(reason) <= 300:
         raise CreditNoteError('Indica el motivo de la nota de crédito.', 400, {'reason': 'Motivo de 5 a 300 caracteres.'})
@@ -87,22 +87,22 @@ def create(c, invoice_id, data, user, now):
     if cfg['missing']:
         raise CreditNoteError('Faltan datos fiscales en la configuración: ' + ', '.join(cfg['missing']) + '.', 409)
     subtotal, tax_total = sum(r['base_cents'] for r in rows), sum(r['tax_cents'] for r in rows)
-    seq_key = (invoicing.TEST_ENVIRONMENT, cfg['establishment'], cfg['emission_point'], '04')
+    seq_key = (inv['environment'], cfg['establishment'], cfg['emission_point'], '04')
     c.execute('INSERT OR IGNORE INTO invoice_sequences(environment,establishment,emission_point,doc_type,last_number) VALUES (?,?,?,?,0)', seq_key)
     c.execute('UPDATE invoice_sequences SET last_number=last_number+1 WHERE environment=? AND establishment=? AND emission_point=? AND doc_type=?', seq_key)
     sequential = c.execute('SELECT last_number FROM invoice_sequences WHERE environment=? AND establishment=? AND emission_point=? AND doc_type=?', seq_key).fetchone()[0]
     issue = now.date()
-    access = sri_xml.access_key(issue, '04', cfg['ruc'], invoicing.TEST_ENVIRONMENT, cfg['establishment'], cfg['emission_point'], sequential)
+    access = sri_xml.access_key(issue, '04', cfg['ruc'], inv['environment'], cfg['establishment'], cfg['emission_point'], sequential)
     stamp = now.isoformat(timespec='seconds')
     note_id = c.execute('INSERT INTO credit_notes(invoice_id,status,environment,scope,reason,subtotal_cents,tax_cents,total_cents,establishment,emission_point,sequential,access_key,issue_date,'
                         "created_by,created_at,emitted_by,emitted_at,request_key) VALUES (?,'borrador',?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                        (invoice_id, invoicing.TEST_ENVIRONMENT, 'total' if all(wanted.get(i, 0) == q for i, q in remaining.items() if q > 0) else 'parcial', reason, subtotal, tax_total,
+                        (invoice_id, inv['environment'], 'total' if all(wanted.get(i, 0) == q for i, q in remaining.items() if q > 0) else 'parcial', reason, subtotal, tax_total,
                          subtotal + tax_total, cfg['establishment'], cfg['emission_point'], sequential, access, issue.isoformat(), user['id'], stamp, user['id'], stamp, key or None)).lastrowid
     for r in rows:
         c.execute('INSERT INTO credit_note_items(credit_note_id,invoice_item_id,code,description,quantity,unit_price_micros,discount_cents,base_cents,tax_code,tax_rate_bp,tax_cents,total_cents) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',
                   (note_id, r['invoice_item_id'], r['code'], r['description'], r['quantity'], r['unit_price_micros'], r['discount_cents'], r['base_cents'], r['tax_code'], r['tax_rate_bp'], r['tax_cents'], r['total_cents']))
     inv_data = dict(inv, number=invoicing.number(inv), issue_date_sri='/'.join(reversed(inv['issue_date'].split('-'))))
-    note = {'environment': invoicing.TEST_ENVIRONMENT, 'access_key': access, 'establishment': cfg['establishment'], 'emission_point': cfg['emission_point'], 'sequential': sequential,
+    note = {'environment': inv['environment'], 'access_key': access, 'establishment': cfg['establishment'], 'emission_point': cfg['emission_point'], 'sequential': sequential,
             'issue_date_sri': issue.strftime('%d/%m/%Y'), 'subtotal_cents': subtotal, 'total_cents': subtotal + tax_total, 'reason': reason}
     xml = sri_xml.credit_note_xml(cfg, note, inv_data, rows)
     c.execute("UPDATE credit_notes SET status='pendiente',xml_unsigned=? WHERE id=?", (xml, note_id))

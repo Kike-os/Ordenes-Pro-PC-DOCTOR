@@ -424,7 +424,8 @@ def send_institutional(c,kind,title,recipient,subject,body,order_id=None,actor=N
 def invoice_autosend(c,invoice_id,user,now):
     """Al autorizarse una factura se envían su RIDE y su XML desde la cuenta de facturación. En PRUEBAS solo a la dirección de prueba
     configurada (nunca al cliente). Un fallo del correo no cambia la autorización: queda registrado y se puede reenviar."""
-    import invoice_documents as docs,invoicing
+    import invoice_documents as docs,invoicing,emission_lock
+    if emission_lock.is_locked(c):return {'sent':False,'error':emission_lock.BANNER}
     kind='prueba' if invoicing.TEST_MODE else 'cliente'
     deliver=lambda kind_,title,to,subject,body,files:send_institutional(c,kind_,title,to,subject,body,None,user['id'] if user else None,attachments=files,review=False,account='facturacion')
     try:
@@ -1356,8 +1357,8 @@ class Handler(BaseHTTPRequestHandler):
                 except Exception as error:print('license-notices cron',type(error).__name__,flush=True)
                 # Facturas enviadas a AZUR que siguen pendientes: se consulta su estado (nunca se reenvían); al autorizarse se envía el correo.
                 try:
-                    import azur_invoicing
-                    if azur_invoicing.readiness(c)['ready']:
+                    import azur_invoicing,emission_lock
+                    if not emission_lock.is_locked(c) and azur_invoicing.readiness(c)['ready']:
                         for invoice_id in azur_invoicing.pending(c):
                             if azur_invoicing.sync(c,invoice_id,None,now,quiet=True).get('newly_authorized'):invoice_autosend(c,invoice_id,None,now)
                 except Exception as error:print('azur cron',type(error).__name__,flush=True)
@@ -2532,6 +2533,9 @@ class Handler(BaseHTTPRequestHandler):
                         import inventory
                         return self.reply(200,{**invoicing.dashboard(c,reception_now()),'inventory_alerts':inventory.alert_count(c)})
                     if path=='/api/invoicing/settings':return self.reply(200,{'settings':invoicing.settings(c),'regimes':invoicing.REGIMES})
+                    if path=='/api/invoicing/emission-lock':
+                        import emission_lock
+                        return self.reply(200,emission_lock.status(c))
                     if path=='/api/invoicing/azur':
                         import azur_invoicing
                         return self.reply(200,azur_invoicing.readiness(c))
@@ -3990,6 +3994,21 @@ class Handler(BaseHTTPRequestHandler):
                             elif action=='settings':result={'settings':docs.save_settings(c,data,user,now)}
                             else:c.rollback();return self.reply(400,{'error':'Acción inválida.'})
                             c.commit();audit(c,user['id'],'sales_policy_'+action);return self.reply(200,{'ok':True,**result,**docs.policies(c)})
+                        if path=='/api/invoicing/sequence-start':
+                            # Último secuencial del sistema anterior (producción): solo administración, con confirmación y antes de la primera emisión real.
+                            import invoicing
+                            try:result=invoicing.set_production_start(c,user,data,now)
+                            except invoicing.InvoiceError as error:return self.reply(error.status,{'error':str(error)})
+                            audit(c,user['id'],'invoice_sequence_start %s last=%s'%(result['point'],result['last_number']));c.commit()
+                            return self.reply(200,result)
+                        if path=='/api/invoicing/emission-lock':
+                            # Bloqueo de emisión (1.5.319): cerrar siempre; abrir solo administración, con confirmación escrita y motivo.
+                            import emission_lock
+                            try:result=emission_lock.set_state(c,user,data,now)
+                            except PermissionError as error:return self.reply(403,{'error':str(error)})
+                            except ValueError as error:return self.reply(400,{'error':str(error)})
+                            audit(c,user['id'],'emission_lock_'+('closed' if result['db_locked'] else 'opened'));c.commit()
+                            return self.reply(200,result)
                         found=re.fullmatch(r'/api/invoicing/([0-9]{1,9})/send',path)
                         if found:
                             kind=str(data.get('kind',''))

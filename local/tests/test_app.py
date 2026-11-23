@@ -38,10 +38,13 @@ class SecurityTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.paths = patch.multiple(app, DATA=Path(self.temp.name), DB=Path(self.temp.name)/'test.sqlite3')
         self.paths.start()
-        self.env = patch.dict(app.os.environ, {'APP_URL':'http://127.0.0.1:8010','SESSION_SECURE':'false','MAIL_IMAP_HOST':'','MAIL_SMTP_HOST':'','MAIL_USERNAME':'','MAIL_PASSWORD':'','SMTP_HOST':'','SMTP_FROM':'','ANTHROPIC_API_KEY':'','OPENAI_API_KEY':''})
+        self.env = patch.dict(app.os.environ, {'APP_URL':'http://127.0.0.1:8010','SESSION_SECURE':'false','MAIL_IMAP_HOST':'','MAIL_SMTP_HOST':'','MAIL_USERNAME':'','MAIL_PASSWORD':'','SMTP_HOST':'','SMTP_FROM':'','ANTHROPIC_API_KEY':'','OPENAI_API_KEY':'','FACTURACION_EMISION_BLOQUEADA':'NO'})
         self.env.start()
         app.migrate()
         with app.connect() as c:
+            # Las pruebas del flujo de facturación usan un AZUR simulado y una base temporal: el bloqueo de emisión se abre solo aquí.
+            # test_emission_lock comprueba que, cerrado, el servidor rechaza emitir, enviar, anular y los correos.
+            c.execute('UPDATE invoicing_emission_lock SET locked=0 WHERE id=1')
             c.execute('UPDATE cash_settings SET require_open=0 WHERE id=1')  # las pruebas de caja la activan (test_cash_rules)
             self.uid = c.execute('INSERT INTO users(username,email,name,password_hash,role,created_at) VALUES (?,?,?,?,?,?)',('demo','demo@example.invalid','Persona de prueba',self.hash,'administrador',int(time.time()))).lastrowid
             if self.__class__.__name__!='ServiceTermsTests':

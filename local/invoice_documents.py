@@ -635,6 +635,9 @@ def send(c, invoice_id, kind, user, now, deliver, recipient=''):
     - «prueba»: a la dirección de prueba configurada; cualquier factura emitida, marcada como PRUEBA y sin validez tributaria.
     `deliver(kind_mail, title, recipient, subject, body, attachments)` es el envío institucional (archiva, sigue la entrega y lanza el error)."""
     import mail_pro
+    import emission_lock
+    if emission_lock.is_locked(c):
+        raise DocumentError(str(emission_lock.EmissionLocked('Enviar documentos de factura por correo')), 423)
     data = invoicing.detail(c, invoice_id)
     inv = data['invoice']
     authorized = inv['status'] == 'autorizado' and inv['environment'] == '2' and not invoicing.TEST_MODE
