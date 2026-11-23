@@ -4,6 +4,22 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.321 — 2026-11-23 14:05 (UTC-05:00)
+
+Atención humana real por WhatsApp
+
+### Nuevas funcionalidades
+
+- Atención humana real por WhatsApp: «ASESOR» crea una solicitud con código ATN-…, prioridad por urgencia (viaje, queja, espera), ADI deja de responder y el asesor contesta desde el Centro de Atención con la respuesta enviada por WhatsApp; aceptar, transferir y cerrar avisan al cliente.
+
+### Mejoras realizadas
+
+- Consulta verificada de órdenes por WhatsApp: diagnóstico publicado, presupuesto con su estado, repuestos y opción SOLICITAR una actualización; el panel de WhatsApp indica si las respuestas automáticas de ADI están activas.
+
+### Errores corregidos
+
+- ADI ya no puede afirmar que transfirió a un asesor sin registrarlo; los mensajes del cliente con un asesor activo ya no se descartan; la respuesta del asesor ahora llega por WhatsApp; una solicitud nueva figura como esperando en el Centro de Atención.
+
 ## v1.5.320 — 2026-11-23 09:45 (UTC-05:00)
 
 Facturación: retirar documentos de prueba

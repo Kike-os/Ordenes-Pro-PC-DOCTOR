@@ -8,6 +8,28 @@
   },
   "releases": [
     {
+      "version": "1.5.321",
+      "date": "2026-11-23T14:05:27-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Atención humana real por WhatsApp",
+      "changes": {
+        "features": [
+          "Atención humana real por WhatsApp: «ASESOR» crea una solicitud con código ATN-…, prioridad por urgencia (viaje, queja, espera), ADI deja de responder y el asesor contesta desde el Centro de Atención con la respuesta enviada por WhatsApp; aceptar, transferir y cerrar avisan al cliente."
+        ],
+        "improvements": [
+          "Consulta verificada de órdenes por WhatsApp: diagnóstico publicado, presupuesto con su estado, repuestos y opción SOLICITAR una actualización; el panel de WhatsApp indica si las respuestas automáticas de ADI están activas."
+        ],
+        "fixes": [
+          "ADI ya no puede afirmar que transfirió a un asesor sin registrarlo; los mensajes del cliente con un asesor activo ya no se descartan; la respuesta del asesor ahora llega por WhatsApp; una solicitud nueva figura como esperando en el Centro de Atención."
+        ],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Administración (autorización expresa en la sesión)"
+    },
+    {
       "version": "1.5.320",
       "date": "2026-11-23T09:45:43-05:00",
       "type": "patch",
