@@ -173,6 +173,35 @@ class InvoiceFlowTests(unittest.TestCase):
             with self.assertRaises(Exception):  # la base impide una segunda factura vigente para la misma operación
                 c.execute("INSERT INTO invoices(source_kind,source_id,environment,created_at,updated_at) VALUES ('orden',?,'1','x','x')", (order['id'],))
 
+    def test_retire_emitted_test_document_without_deleting_or_affecting_real_numbering(self):
+        cookie, csrf, post, order = self.paid_order(8599, key='retiro')
+        self.configure(post)
+        inv = post('/api/invoicing/draft', kind='orden', id=str(order['id']))['body']['invoice']
+        path = '/api/invoicing/%d' % inv['id']
+        self.assertEqual(post(path, action='retire_test', reason='Prueba')['status'], 409)   # un borrador se descarta, no se retira
+        done = post(path, action='emit', confirm='1')['body']['invoice']
+        self.assertEqual((done['status'], done['number']), ('pendiente', '001-001-000000001'))
+        self.assertEqual(post(path, action='retire_test', reason='')['status'], 400)       # motivo obligatorio
+        retired = post(path, action='retire_test', reason='Documento de prueba antes de facturar en real')
+        self.assertEqual(retired['status'], 200, retired['body'])
+        self.assertEqual(retired['body']['invoice']['status'], 'descartado')
+        self.assertIn('retirado_prueba', [e['event'] for e in retired['body']['events']])
+        self.assertEqual(post(path, action='retire_test', reason='Otra vez')['status'], 409)   # solo una vez
+        listed = self.request('/api/invoicing', cookie=cookie)['body']
+        self.assertNotIn(inv['id'], [r['id'] for r in listed['rows']])                      # ya no cuenta en la lista ni en los indicadores
+        self.assertEqual(listed['counts']['pendiente'], 0)
+        with app.connect() as c:
+            self.assertTrue(c.execute('SELECT 1 FROM invoices WHERE id=?', (inv['id'],)).fetchone())   # no se borra nada
+            self.assertTrue(c.execute("SELECT 1 FROM audit WHERE action='invoice_test_retired'").fetchone())
+            # El ambiente real tiene su propio contador: la primera factura real seguiría siendo la 000000001.
+            self.assertIsNone(c.execute("SELECT last_number FROM invoice_sequences WHERE environment='2'").fetchone())
+            # Un documento de producción nunca se retira con esta acción.
+            c.execute("UPDATE invoices SET environment='2',status='pendiente' WHERE id=?", (inv['id'],));c.commit()
+        self.assertEqual(post(path, action='retire_test', reason='No debe permitirse')['status'], 409)
+        with app.connect() as c:
+            c.execute("UPDATE users SET role='tecnico' WHERE id=?", (self.uid,));c.commit()
+        self.assertEqual(post(path, action='retire_test', reason='Sin permiso')['status'], 403)
+
 
 if __name__ == '__main__':
     unittest.main()

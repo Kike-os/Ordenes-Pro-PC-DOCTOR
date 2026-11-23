@@ -494,6 +494,33 @@ def discard(c, invoice_id, user, now, reason=''):
         event(c, invoice_id, 'inventario', 'Los productos de la venta volvieron al inventario.', now, user)
 
 
+def retire_test(c, invoice_id, user, now, reason=''):
+    """Retira un documento EMITIDO EN PRUEBAS (ambiente 1, pendiente o rechazado) para empezar limpio: queda «descartado» (deja de contar
+    en indicadores, listas y pendientes), lo vendido vuelve al inventario y el historial lo explica. No borra ningún registro. Nunca se
+    aplica a un documento del ambiente de producción ni a uno enviado o autorizado."""
+    if not user or user['role'] != 'administrador':
+        raise InvoiceError('Solo administración retira documentos de prueba.', 403)
+    inv = _get(c, invoice_id)
+    if inv['environment'] != TEST_ENVIRONMENT:
+        raise InvoiceError('Solo se retiran documentos del ambiente de pruebas.', 409)
+    if inv['status'] not in ('pendiente', 'rechazado'):
+        raise InvoiceError('Solo se retira un documento de prueba pendiente o rechazado. Un borrador se descarta; uno enviado o autorizado no se modifica.', 409)
+    if c.execute("SELECT 1 FROM credit_notes WHERE invoice_id=? AND status!='descartado'", (invoice_id,)).fetchone():
+        raise InvoiceError('Tiene una nota de crédito vigente: descártala antes de retirar el documento.', 409)
+    reason = re.sub(r'\s+', ' ', str(reason or '')).strip()
+    if len(reason) < 5:
+        raise InvoiceError('Indica el motivo.', 400, {'reason': 'Indica el motivo (por ejemplo, «documento de prueba antes de facturar en real»).'})
+    c.execute("UPDATE invoices SET status='descartado',updated_at=? WHERE id=?", (stamp(now), invoice_id))
+    event(c, invoice_id, 'retirado_prueba', ('Documento de prueba retirado (sin validez tributaria). ' + reason)[:500], now, user)
+    import inventory_center
+    try:
+        returned = inventory_center.sale_return(c, invoice_id, user, now, 'Devolución por documento de prueba retirado %s' % invoice_id)
+    except inventory_center.InventoryError as error:
+        raise InvoiceError('No se pudo devolver al inventario lo vendido: %s' % error, 409)
+    if returned:
+        event(c, invoice_id, 'inventario', 'Los productos de la venta volvieron al inventario.', now, user)
+
+
 def detail(c, invoice_id):
     inv = dict(_get(c, invoice_id))
     items = [dict(r) for r in c.execute('SELECT * FROM invoice_items WHERE invoice_id=? ORDER BY position', (invoice_id,))]
@@ -579,7 +606,7 @@ def summary(c, counts):
 
 
 ENVIRONMENTS = {'1': 'Pruebas', '2': 'Producción'}
-EVENT_LABELS = {'creado': 'Borrador creado', 'comprador': 'Comprador actualizado', 'emitido': 'Emitida en pruebas', 'descartado': 'Borrador descartado',
+EVENT_LABELS = {'creado': 'Borrador creado', 'comprador': 'Comprador actualizado', 'emitido': 'Emitida en pruebas', 'descartado': 'Borrador descartado', 'retirado_prueba': 'Documento de prueba retirado',
                 'cuenta_bancaria': 'Cuenta bancaria'}
 
 

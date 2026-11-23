@@ -4030,6 +4030,9 @@ class Handler(BaseHTTPRequestHandler):
                             if action=='discard':
                                 invoicing.discard(c,invoice_id,user,now,str(data.get('reason','')));audit(c,user['id'],'invoice_discarded',invoice_id)
                                 return self.reply(200,invoicing.detail(c,invoice_id))
+                            if action=='retire_test':
+                                invoicing.retire_test(c,invoice_id,user,now,str(data.get('reason','')));audit(c,user['id'],'invoice_test_retired',invoice_id)
+                                return self.reply(200,invoicing.detail(c,invoice_id))
                             return self.reply(400,{'error':'Acción inválida.'})
                         return self.reply(404,{'error':'No encontrado.'})
                     except invoicing.InvoiceError as error:
