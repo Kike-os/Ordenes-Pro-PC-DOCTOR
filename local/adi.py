@@ -371,8 +371,8 @@ def _dot(text):
  return text if text.endswith('.') else text+'.'
 
 def agenda_url():
- """URL pública de la Agenda de Citas configurada para este despliegue."""
- return reception.public_base_url().rstrip('/')+'/citas'
+ """URL canónica pública de la Agenda de Citas de Órdenes Pro."""
+ return 'https://ordenes-pro.ecuadorpcdoctor.com/citas'
 
 def hours_facts(c,now=None):
  """Horarios vigentes leídos del sistema en cada consulta: atención presencial (y si está abierta ahora), franjas de la Agenda de Citas y atención virtual."""
@@ -474,7 +474,15 @@ def reply(c,text,admin=False,context=None,conversation_id=None,session=None,lang
  # Si el cliente quiere una cita, la respuesta termina con los próximos horarios realmente libres como botones de reserva.
  # Se añaden aquí, desde la agenda, para que no dependan de lo que redacte el modelo.
  if not admin and isinstance(context,dict) and isinstance(context.get('proximos_espacios_libres_en_la_agenda'),list) and '/citas?fecha=' not in answer:
-  answer=answer.rstrip()+('\nNext available times (tap one to book it):\n' if english(lang) else '\nPróximos horarios libres (toca uno para reservarlo):\n')+'\n'.join(item['enlace'] for item in context['proximos_espacios_libres_en_la_agenda'])
+  answer=re.sub(r'https?://(?:www\\.)?pcdoctor\\.com\\.ec/citas/?',agenda_url(),answer,flags=re.I)
+  slots=context['proximos_espacios_libres_en_la_agenda']
+  if slots:
+   heading='\\nAvailable appointment times (select a link):\\n' if english(lang) else '\\nHorarios disponibles (elige un enlace):\\n'
+   lines=[]
+   for item in slots:
+    label=('Book ' if english(lang) else 'Reservar ')+item['texto']
+    lines.append(label+': '+item['enlace'])
+   answer=answer.rstrip()+heading+'\\n'.join(lines)
  return answer
 
 DAYS=('lunes','martes','miércoles','jueves','viernes','sábado','domingo')
