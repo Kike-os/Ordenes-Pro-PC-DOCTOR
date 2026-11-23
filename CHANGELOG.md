@@ -4,7 +4,9 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
-## Sin publicar
+## v1.5.315 — 2026-11-23 08:37 (UTC-05:00)
+
+Verificación de identidad por WhatsApp para ADI
 
 ### Nuevas funcionalidades
 
