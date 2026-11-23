@@ -1161,7 +1161,13 @@ def overview(c, base_url='', env=None):
     last = c.execute("SELECT value FROM system_state WHERE key='whatsapp_webhook_last'").fetchone()
     check_data = last_check(c)
     state = 'sin_configurar' if not ready(env) else ('conectado' if check_data and check_data.get('ok') else 'error' if check_data else 'sin_comprobar')
-    return {'state': state, 'ready': ready(env), 'requirements': requirements(env), 'version': version_info(env), 'settings': settings(c), 'check': check_data,
+    # Respuestas automáticas de ADI (WHATSAPP_ADI_AUTO_REPLY) y mensajes entrantes de los últimos 7 días, sin contenido ni números.
+    import whatsapp_adi
+    since = stamp(datetime.now(__import__('zoneinfo').ZoneInfo('America/Guayaquil')) - timedelta(days=7))
+    inbound = {r[0]: r[1] for r in c.execute('SELECT status,COUNT(*) FROM whatsapp_adi_inbound WHERE received_at>=? GROUP BY status', (since,))}
+    last_in = c.execute('SELECT MAX(received_at) FROM whatsapp_adi_inbound').fetchone()[0] or ''
+    adi_info = {'auto_reply': whatsapp_adi.enabled(env), 'inbound_7d': inbound, 'last_inbound': last_in}
+    return {'adi': adi_info, 'state': state, 'ready': ready(env), 'requirements': requirements(env), 'version': version_info(env), 'settings': settings(c), 'check': check_data,
             'webhook': {'url': base_url.rstrip('/') + '/api/public/whatsapp/webhook', 'verify_token': bool(cfg['verify']), 'app_secret': bool(cfg['secret']),
                         'last_event': last['value'] if last else '', 'rejected': json.loads(rejected['value']) if rejected else {'count': 0, 'last': ''}},
             'events': [{'code': k, 'label': v[0], 'group': v[1], 'group_label': GROUPS[v[1]], 'when': v[3], 'auto': v[4], 'params': PARAMS[v[1]]} for k, v in EVENTS.items()],

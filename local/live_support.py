@@ -19,9 +19,12 @@ def summary(c):
     - new_conversations: atendida por ADI y con mensajes del cliente que el personal aún no ha visto.
     Además devuelve las atenciones que requieren acción, de la que más tiempo lleva esperando a la más reciente."""
     counts={'new_conversations':0,'waiting':0,'transferred':0};pending=[]
+    import whatsapp_handoff as handoff
+    # Una solicitud de atención sin aceptar espera al personal aunque el último mensaje sea la confirmación de ADI (1.5.321).
+    unattended={r[0] for r in c.execute("SELECT conversation_id FROM adi_handoffs WHERE status='pendiente'")} if handoff.installed(c) else set()
     for row in c.execute(LIST_SQL+"WHERE v.mode!='closed' ORDER BY v.updated_at"):
         if not row['total']:continue
-        if row['mode']=='human':kind='waiting' if row['last_author']=='client' else 'transferred'
+        if row['mode']=='human':kind='waiting' if row['last_author']=='client' or row['id'] in unattended else 'transferred'
         elif row['unread'] or (row['last_seen_admin']=='' and row['last_author'] is not None):kind='new_conversations'
         else:continue
         counts[kind]+=1
@@ -34,7 +37,19 @@ def summary(c):
 def rows(c,scope='active'):
     if scope=='closed':sql=LIST_SQL+"WHERE v.mode='closed' ORDER BY v.updated_at DESC LIMIT 30"
     else:sql=LIST_SQL+"WHERE v.mode!='closed' ORDER BY v.updated_at DESC LIMIT 100"
-    return [dict(r) for r in c.execute(sql)]
+    out=[dict(r) for r in c.execute(sql)]
+    import whatsapp_handoff as handoff
+    if out and handoff.installed(c):
+        ids=[r['id'] for r in out];marks=','.join('?'*len(ids))
+        cases={r['conversation_id']:r for r in c.execute("SELECT conversation_id,code,priority,status FROM adi_handoffs WHERE status IN ('pendiente','asignada') AND conversation_id IN ("+marks+")",ids)}
+        wa={r[0] for r in c.execute('SELECT conversation_id FROM whatsapp_conversations WHERE conversation_id IN ('+marks+')',ids)}
+        for r in out:
+            case=cases.get(r['id'])
+            r.update(channel='whatsapp' if r['id'] in wa else 'web',case_code=case['code'] if case else '',case_priority=case['priority'] if case else '',case_status=case['status'] if case else '')
+        if scope!='closed':  # las urgentes primero, luego alta; dentro de cada nivel, el orden de siempre
+            rank={'urgente':0,'alta':1}
+            out.sort(key=lambda r:rank.get(r.get('case_priority'),2))
+    return out
 
 
 def detail(c,conv,after,now):
@@ -52,23 +67,49 @@ def detail(c,conv,after,now):
             for code in ORDER_CODE.findall(row['content']):
                 code=code.upper()
                 if code not in mentioned and c.execute('SELECT 1 FROM orders WHERE code=?',(reception.current_order_code(c,code),)).fetchone():mentioned.append(code)
-    return {'conversation':info,'messages':messages,'client':dict(client) if client else None,'order':dict(order) if order else None,'actions':actions,'mentioned':mentioned[:3]}
+    import whatsapp_handoff as handoff
+    try:moment=reception.reception_now();attention=handoff.for_conversation(c,conv['id'],moment)
+    except Exception:attention=None
+    if attention and handoff.installed(c):
+        failed={r['message_id']:r['detail'] for r in c.execute("SELECT message_id,detail FROM whatsapp_operator_sends WHERE conversation_id=? AND status='fallido'",(conv['id'],))}
+        for m in messages:
+            if m['id'] in failed:m['whatsapp_failed']=failed[m['id']] or 'WhatsApp no aceptó el mensaje.'
+    staff=[dict(r) for r in c.execute("SELECT id,name FROM users WHERE active=1 AND role IN ('administrador','tecnico') ORDER BY name")]
+    return {'conversation':info,'messages':messages,'client':dict(client) if client else None,'order':dict(order) if order else None,'actions':actions,'mentioned':mentioned[:3],
+            'attention':attention,'staff':staff}
 
 
-def act(c,conv,user,data,now):
-    action=data.get('action');details=''
+def act(c,conv,user,data,now,moment=None):
+    """Acciones del personal. En las conversaciones de WhatsApp (1.5.321) la respuesta sale por WhatsApp, la solicitud de atención
+    (adi_handoffs) se acepta, transfiere o cierra y el cliente recibe el aviso; si WhatsApp no acepta el mensaje, se informa."""
+    import whatsapp_handoff as handoff
+    if moment is None:
+        moment=reception.reception_now()
+    action=data.get('action');details='';extra={}
     if action=='reply':
         content=str(data.get('message','')).strip()
         if not content or len(content)>3000:return 400,{'error':'Escribe una respuesta de hasta 3000 caracteres.'}
         if conv['mode']=='closed':return 409,{'error':'La conversación está cerrada. Reábrela para responder.'}
-        c.execute("INSERT INTO adi_messages(conversation_id,author,author_id,content,created_at) VALUES (?,'operator',?,?,?)",(conv['id'],user['id'],content,now))
+        mid=c.execute("INSERT INTO adi_messages(conversation_id,author,author_id,content,created_at) VALUES (?,'operator',?,?,?)",(conv['id'],user['id'],content,now)).lastrowid
         c.execute("UPDATE adi_conversations SET mode='human',assigned_to=?,updated_at=? WHERE id=?",(user['id'],now,conv['id']))
-        return 200,{'ok':True}
-    if action in ('takeover','resume','close','reopen'):
+        handoff.on_staff_action(c,conv['id'],'reply',user,moment)
+        sent,detail=handoff.send_text(c,conv['id'],content,moment,message_id=mid)
+        if sent is not None:extra['whatsapp']={'sent':bool(sent),'detail':detail}
+        return 200,dict({'ok':True},**extra)
+    if action=='transfer':
+        target=str(data.get('user_id',''))
+        row=c.execute("SELECT id,name FROM users WHERE id=? AND active=1 AND role IN ('administrador','tecnico')",(int(target),)).fetchone() if target.isdigit() else None
+        if not row:return 404,{'error':'Elige una persona activa del personal.'}
+        if conv['mode']=='closed':return 409,{'error':'La conversación está cerrada.'}
+        c.execute("UPDATE adi_conversations SET mode='human',assigned_to=?,updated_at=? WHERE id=?",(row['id'],now,conv['id']))
+        handoff.on_staff_action(c,conv['id'],'transfer',user,moment,target=row['id']);details='Transferida a '+row['name']
+    elif action in ('takeover','resume','close','reopen'):
         if action=='reopen' and conv['mode']!='closed':return 409,{'error':'La conversación ya está abierta.'}
         if action!='reopen' and conv['mode']=='closed':return 409,{'error':'La conversación está cerrada.'}
         mode={'takeover':'human','resume':'adi','close':'closed','reopen':'human'}[action]
         c.execute('UPDATE adi_conversations SET mode=?,assigned_to=?,updated_at=? WHERE id=?',(mode,user['id'] if mode=='human' else None,now,conv['id']))
+        note=handoff.on_staff_action(c,conv['id'],action,user,moment)
+        if note:extra['warning']=note
     elif action=='link':
         if data.get('clear') is True:
             c.execute('UPDATE adi_conversations SET client_id=NULL,order_id=NULL WHERE id=?',(conv['id'],));details='Vínculo retirado'
@@ -84,4 +125,4 @@ def act(c,conv,user,data,now):
         else:return 400,{'error':'Indica una orden o un cliente para vincular.'}
     else:return 400,{'error':'Acción de conversación inválida.'}
     c.execute('INSERT INTO adi_actions(conversation_id,user_id,action,created_at,details) VALUES (?,?,?,?,?)',(conv['id'],user['id'],'conversation_'+action,now,details))
-    return 200,{'ok':True}
+    return 200,dict({'ok':True},**extra)

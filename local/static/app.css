@@ -13506,3 +13506,9 @@ details.bk-wizard{padding:12px 14px}
 .sysmig-note{margin:0;font-size:12.5px;line-height:1.5;color:#9bb0cf;overflow-wrap:anywhere}.sysmig-warn{color:#fcd9a5}
 .sysmig-body>button{justify-self:start}
 @media(max-width:520px){.sysmig-body>button{justify-self:stretch}}
+/* ===== Centro de Atención · solicitudes de atención humana por WhatsApp. Acotado a .live-. ===== */
+.live-priority{display:inline-flex;align-items:center;gap:6px;padding:1px 9px;border-radius:999px;font-size:11.5px;font-weight:700;border:1px solid color-mix(in srgb,var(--p) 55%,transparent);background:color-mix(in srgb,var(--p) 16%,transparent);color:#eef3ff}
+.live-priority::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--p)}
+.live-priority[data-level=urgente]{--p:#f87171}.live-priority[data-level=alta]{--p:#f59e0b}.live-priority[data-level=normal]{--p:#94a3b8}
+.live-warn{display:block;margin:4px 0 0;font-size:11.5px;line-height:1.4;color:#fecaca;overflow-wrap:anywhere}
+.live-transfer{display:flex;flex-wrap:wrap;gap:6px;align-items:center;min-width:0}.live-transfer select{flex:1 1 140px;min-width:0;margin:0}

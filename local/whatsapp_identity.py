@@ -205,16 +205,56 @@ def facts(c, order_id):
     note = c.execute("SELECT client_message FROM order_followups WHERE order_id=? AND client_visible=1 AND trim(client_message)!='' ORDER BY id DESC LIMIT 1",
                      (order_id,)).fetchone()
     device = ' '.join(x for x in (DEVICE_TYPES.get(order['type'], ''), order['brand'] or '', order['model'] or '') if x)
+    clean = lambda text, n=400: re.sub(r'\s+', ' ', str(text or '')).strip()[:n]
     lines = ['Orden: ' + order['code'], 'Estado: ' + order['label']]
     if device:
         lines.append('Equipo: ' + device)
-    if last:
-        lines.append('Última actualización: ' + (_when(last) or str(last)[:16]))
-    if note:
-        lines.append('Observaciones: ' + re.sub(r'\s+', ' ', note['client_message']).strip()[:400])
+    # Diagnóstico publicado para el cliente (nunca la nota interna del técnico).
+    diag = c.execute("SELECT client_message FROM order_followups WHERE order_id=? AND client_visible=1 AND kind='diagnostico' AND trim(client_message)!='' ORDER BY id DESC LIMIT 1",
+                     (order_id,)).fetchone()
+    if diag:
+        lines.append('Diagnóstico: ' + clean(diag['client_message']))
+    if note and (not diag or note['client_message'] != diag['client_message']):
+        lines.append('Último avance: ' + clean(note['client_message']))
+    # Presupuesto enviado al cliente: estado de aprobación y total (los borradores no se muestran).
+    try:
+        import quotes
+        q = c.execute("SELECT id,code,status,tax_rate_bp,COALESCE(discount_bp,0) discount_bp FROM quotes WHERE order_id=? AND COALESCE(deleted_at,'')='' AND status NOT IN ('borrador','cancelado') "
+                      "ORDER BY id DESC LIMIT 1", (order_id,)).fetchone()
+        if q:
+            items = [dict(r) for r in c.execute('SELECT * FROM quote_items WHERE quote_id=? ORDER BY position', (q['id'],))]
+            tot = quotes.totals(items, q['tax_rate_bp'], q['discount_bp'])
+            amount = tot['approved'] if q['status'] in ('aprobado', 'parcial') else tot['quoted']
+            lines.append('Presupuesto %s: %s · %s' % (q['code'] or '', quotes.STATUS.get(q['status'], q['status']), quotes.usd(amount)))
+    except Exception:
+        pass
+    # Repuestos: etapa registrada de cada uno.
+    try:
+        import order_part_requests as parts
+        stage = {k: short for k, _, short in parts.STAGES}
+        rows = c.execute("SELECT name,stage FROM order_part_requests WHERE order_id=? AND COALESCE(stage,'')!='' ORDER BY id", (order_id,)).fetchall()
+        if rows:
+            lines.append('Repuestos: ' + '; '.join(clean(r['name'], 60) + ' (' + stage.get(r['stage'], r['stage']) + ')' for r in rows[:5]))
+    except Exception:
+        pass
     if order['estimated_delivery'] and order['status'] != 'entregado':
         lines.append('Entrega estimada: ' + (_when(order['estimated_delivery']) or order['estimated_delivery']))
+    if last:
+        lines.append('Última actualización: ' + (_when(last) or str(last)[:16]))
+    if not diag and not note:
+        lines.append('\nTodavía no hay una actualización técnica publicada para tu orden. Si quieres, escribe SOLICITAR y pediremos al técnico que te informe.')
     return '\n'.join(lines)
+
+
+UPDATE_REQUEST = re.compile(r'^(solicitar|solicitar actualizacion|pedir actualizacion|quiero (una )?actualizacion|que me informen)[.! ]*$', re.I)
+
+
+def active_order(c, conv, now, env=None):
+    """Orden de la sesión verificada vigente de la conversación (o None)."""
+    if not installed(c):
+        return None
+    row = active_session(c, conv, now, env)
+    return row['order_id'] if row else None
 
 
 # ---- flujo de la conversación -----------------------------------------------------------------------------------------------------

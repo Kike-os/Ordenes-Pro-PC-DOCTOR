@@ -3438,6 +3438,10 @@ class Handler(BaseHTTPRequestHandler):
                     if not conv:return self.reply(404,{'error':'Inicia una conversación con ADI primero.'})
                     if conv['mode']=='human':return self.reply(200,{'ok':True,'mode':'human','state':adi_public_state(conv)})  # Ya solicitada: no se duplica el registro.
                     now=appointments.stamp(appointments.now());c.execute("UPDATE adi_conversations SET mode='human',assigned_to=NULL,updated_at=? WHERE id=?",(now,conv['id']));c.execute("INSERT INTO adi_messages(conversation_id,author,content,created_at) VALUES (?,'client','El cliente solicita atención humana.',?)",(conv['id'],now))
+                    try:
+                        import whatsapp_handoff
+                        if whatsapp_handoff.installed(c):whatsapp_handoff.request(c,conv['id'],reception_now(),'Solicitud desde el chat web',channel='web')
+                    except Exception as error:print('web-handoff',type(error).__name__,flush=True)
                     return self.reply(200,{'ok':True,'mode':'human','state':'waiting'})
                 if path=='/api/public/pqrs' or path.startswith('/api/public/pqrs/'):
                     # 1.5.278 · PQRS públicas. Límites por conexión contra el abuso; los errores no revelan si una orden o un caso existen.
@@ -4681,7 +4685,7 @@ class Handler(BaseHTTPRequestHandler):
                     if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
                     conv=c.execute('SELECT * FROM adi_conversations WHERE id=?',(int(live_action[1]),)).fetchone()
                     if not conv:return self.reply(404,{'error':'Conversación no disponible.'})
-                    status,payload=live_support.act(c,conv,user,data,appointments.stamp(appointments.now()))
+                    status,payload=live_support.act(c,conv,user,data,appointments.stamp(appointments.now()),reception_now())
                     if status==200:audit(c,user['id'],'adi_conversation_'+str(data.get('action')),conv['id'])
                     return self.reply(status,payload)
                 if path == '/api/logout':

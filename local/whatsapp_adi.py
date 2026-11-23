@@ -8,6 +8,7 @@ import re
 import adi
 import whatsapp_business as wa
 import whatsapp_identity
+import whatsapp_handoff
 
 
 def enabled(env=None):
@@ -92,19 +93,66 @@ def handle(c, raw, signature, now, env=None):
                     continue
 
                 conv = _conversation(c, number, cfg['secret'], now)
+                staff = whatsapp_handoff.installed(c)
+                if staff:
+                    whatsapp_handoff.remember(c, conv['id'], number, now)  # para que la respuesta del asesor salga por WhatsApp
                 if conv['mode'] == 'human':
+                    # Con un asesor ADI no responde, pero el mensaje SÍ se guarda para que el personal lo vea; la urgencia sube la prioridad.
+                    if staff:
+                        stamp_in = wa.stamp(now)
+                        c.execute("INSERT INTO adi_messages(conversation_id,author,content,created_at) VALUES (?,'client',?,?)", (conv['id'], text, stamp_in))
+                        c.execute('UPDATE adi_conversations SET last_seen_client=?,updated_at=? WHERE id=?', (stamp_in, stamp_in, conv['id']))
+                        level, labels, _ = whatsapp_handoff.signals(c, text)
+                        whatsapp_handoff.request(c, conv['id'], now, 'Mensaje del cliente con un asesor', level, labels)
                     c.execute("UPDATE whatsapp_adi_inbound SET status='omitido',conversation_id=?,detail=? WHERE wa_message_id=?",
-                              (conv['id'], 'La conversación está asignada a un asesor.', message_id))
+                              (conv['id'], 'La conversación está con un asesor: el mensaje queda para el personal.', message_id))
                     c.commit()
                     continue
 
                 # Consultas sobre una orden: primero la verificación de identidad (whatsapp_identity). Sin ella ADI no revela nada de la orden.
                 # El historial guarda «[código de verificación]» y un resumen neutro, nunca el código ni los datos de la orden (también viaja a la IA).
-                try:
-                    turn = whatsapp_identity.respond(c, conv['token_hash'], number, text, now, env)
-                except Exception as error:
-                    print('whatsapp-identity', type(error).__name__, flush=True)
-                    turn = {'answer': whatsapp_identity.THIRD_PARTY, 'log_client': None, 'log_answer': None}
+                turn = None
+                c.commit()  # la conversación y el registro de idempotencia quedan guardados: un fallo posterior solo deshace la solicitud
+                if staff:
+                    # Atención humana REAL: se confirma al cliente solo después de guardar la solicitud. Una queja o una espera larga también la crean.
+                    level, labels, escalate = whatsapp_handoff.signals(c, text)
+                    update_order = None
+                    if whatsapp_identity.UPDATE_REQUEST.match(whatsapp_identity.fold(text)):
+                        try:
+                            update_order = whatsapp_identity.active_order(c, conv['token_hash'], now, env)
+                        except Exception:
+                            update_order = None
+                    if update_order:
+                        try:
+                            row, created = whatsapp_handoff.request(c, conv['id'], now, 'Solicitud de actualización técnica', level, labels, order_id=update_order)
+                            c.commit()
+                            turn = {'answer': 'Listo. Pedí al técnico una actualización de tu orden (solicitud %s). Te responderemos por este chat en cuanto la publique.' % row['code'],
+                                    'log_client': None, 'log_answer': None}
+                        except Exception as error:
+                            c.rollback()
+                            print('whatsapp-handoff', type(error).__name__, flush=True)
+                            turn = {'answer': 'No pude registrar la solicitud de actualización en este momento. Inténtalo de nuevo en unos minutos.', 'log_client': None, 'log_answer': None}
+                    elif whatsapp_handoff.wants_human(text) or escalate:
+                        try:
+                            row, created = whatsapp_handoff.request(c, conv['id'], now, 'Solicitud del cliente' if whatsapp_handoff.wants_human(text) else 'Escalada por ' + ', '.join(labels),
+                                                                    level, labels)
+                            c.commit()
+                            turn = {'answer': whatsapp_handoff.confirmation(row, created), 'log_client': None, 'log_answer': None}
+                        except Exception as error:
+                            c.rollback()
+                            print('whatsapp-handoff', type(error).__name__, flush=True)
+                            turn = {'answer': 'No pude registrar tu solicitud de atención en este momento. Por favor, inténtalo de nuevo en unos minutos o llámanos; '
+                                              'no quiero decirte que te transferí sin haberlo hecho.', 'log_client': None, 'log_answer': None}
+                elif whatsapp_handoff.wants_human(text):
+                    # Sin la migración 116 no hay transferencia real: se dice con claridad, nunca se deja que la IA la «confirme».
+                    turn = {'answer': 'En este momento no puedo transferirte a un asesor por este chat. Por favor, comunícate con PC-DOCTOR S.A. por teléfono '
+                                      'o visítanos en el local; disculpa las molestias.', 'log_client': None, 'log_answer': None}
+                if turn is None:
+                    try:
+                        turn = whatsapp_identity.respond(c, conv['token_hash'], number, text, now, env)
+                    except Exception as error:
+                        print('whatsapp-identity', type(error).__name__, flush=True)
+                        turn = {'answer': whatsapp_identity.THIRD_PARTY, 'log_client': None, 'log_answer': None}
                 now_text = wa.stamp(now)
                 c.execute("INSERT INTO adi_messages(conversation_id,author,content,created_at) VALUES (?,'client',?,?)",
                           (conv['id'], (turn['log_client'] if turn and turn['log_client'] else text), now_text))
