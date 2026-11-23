@@ -696,7 +696,9 @@ def monthly_outbound_count(c, now):
     outbox = c.execute("SELECT COUNT(*) FROM whatsapp_outbox WHERE created_at>=? AND status IN ('pendiente','enviando','enviado','entregado','leido','fallido')", (start,)).fetchone()[0]
     replies = c.execute("SELECT COUNT(*) FROM whatsapp_adi_inbound WHERE received_at>=? AND status IN ('generando','enviando','enviado','fallido')", (start,)).fetchone()[0]
     # Códigos de verificación de identidad (cada reto intenta un envío, salvo los que no llegaron a salir por falta de plantilla o límite).
-    codes = c.execute("SELECT COUNT(*) FROM wa_identity_challenges WHERE created_at>=? AND NOT (status='envio_fallido' AND send_detail LIKE 'Falta configurar%')", (start,)).fetchone()[0]
+    # Si la migración 115 aún no está aplicada (Vercel no ejecuta migraciones), la tabla no existe y no hay códigos que contar: los envíos siguen.
+    codes = c.execute("SELECT COUNT(*) FROM wa_identity_challenges WHERE created_at>=? AND NOT (status='envio_fallido' AND send_detail LIKE 'Falta configurar%')", (start,)).fetchone()[0] \
+        if c.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='wa_identity_challenges'").fetchone() else 0
     return int(outbox or 0) + int(replies or 0) + int(codes or 0)
 
 

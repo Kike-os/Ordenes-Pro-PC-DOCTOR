@@ -299,6 +299,30 @@ class WhatsAppIdentityTests(unittest.TestCase):
         for call in self.meta.calls:
             self.assertTrue(call[1].startswith('https://graph.facebook.com/'))   # solo la API simulada
 
+    def test_15_missing_migration_keeps_whatsapp_working_and_reveals_nothing(self):
+        # Producción: Vercel no ejecuta migraciones. Sin las tablas de la 115 los envíos de WhatsApp siguen funcionando, ADI responde lo
+        # demás con normalidad y las consultas de órdenes no revelan nada. Las tablas se eliminan dentro de una transacción que se deshace.
+        user = {'id': 1, 'role': 'administrador'}
+        with app.connect() as c:
+            c.execute('BEGIN IMMEDIATE')
+            for table in ('wa_identity_state', 'wa_identity_sessions', 'wa_identity_challenges', 'wa_identity_events', 'order_authorized_contacts'):
+                c.execute('DROP TABLE ' + table)
+            try:
+                self.assertFalse(identity.installed(c))
+                self.assertIsInstance(wa.monthly_outbound_count(c, self.now), int)
+                self.assertIsNone(identity.respond(c, 'conv-sin-migracion', TITULAR, '¿Qué horario tienen?', self.now, ENV))
+                for text in ('¿Cómo va mi laptop?', self.code):
+                    turn = identity.respond(c, 'conv-sin-migracion', TITULAR, text, self.now, ENV)
+                    self.assertEqual(turn['answer'], identity.DENIED)
+                    self.assertPrivate(turn['answer'])
+                with self.assertRaises(identity.IdentityError) as caught:
+                    identity.overview(c, self.oid, user, self.now, ENV)
+                self.assertEqual(caught.exception.status, 503)
+            finally:
+                c.rollback()
+        with app.connect() as c:
+            self.assertTrue(identity.installed(c))
+
 
 if __name__ == '__main__':
     unittest.main()

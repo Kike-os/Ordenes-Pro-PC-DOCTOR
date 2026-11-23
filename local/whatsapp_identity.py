@@ -56,6 +56,15 @@ class IdentityError(Exception):
         self.status, self.fields = status, fields or {}
 
 
+NOT_INSTALLED = ('La verificación de identidad todavía no está instalada en la base de datos (falta aplicar la migración 115_whatsapp_identity.sql). '
+                 'Mientras tanto ADI no envía códigos ni revela información de órdenes.')
+
+
+def installed(c):
+    """Las tablas de la migración 115 existen. En producción Vercel no ejecuta migraciones: hasta aplicarla, el flujo no revela nada."""
+    return c.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN ('wa_identity_state','wa_identity_challenges','wa_identity_sessions','wa_identity_events','order_authorized_contacts')").fetchone()[0] == 5
+
+
 # ---- utilidades -------------------------------------------------------------------------------------------------------------------
 def _iso(now):
     return wa.stamp(now)
@@ -334,6 +343,9 @@ def respond(c, conv, sender, text, now, env=None):
     raw = re.sub(r'\s+', ' ', str(text or '')).strip()
     q = fold(raw)
     code = find_order_code(raw)
+    if not installed(c):
+        # Sin las tablas no hay verificación posible: las consultas de órdenes no revelan nada y el resto sigue con ADI.
+        return _reply(DENIED) if code or ORDER_INTENT.search(q) else None
     state = _state(c, conv)
     if state and state['updated_at'] < _ago(now, minutes=30):  # una verificación a medias no queda abierta indefinidamente
         _clear_state(c, conv)
@@ -403,9 +415,11 @@ def respond(c, conv, sender, text, now, env=None):
 
 
 # ---- administración ----------------------------------------------------------------------------------------------------------------
-def _admin(user):
+def _admin(user, c=None):
     if not user or wa._role(user) != 'administrador':
         raise IdentityError('Solo administración gestiona la verificación de identidad.', 403)
+    if c is not None and not installed(c):
+        raise IdentityError(NOT_INSTALLED, 503)
 
 
 def _expired(row, now):
@@ -423,7 +437,7 @@ END_LABELS = {'inactividad': 'Vencida por inactividad', 'tiempo_maximo': 'Vencid
 
 
 def overview(c, order_id, user, now, env=None):
-    _admin(user)
+    _admin(user, c)
     row = _order(c, order_id)
     if not row:
         raise IdentityError('Orden no encontrada.', 404)
@@ -464,7 +478,7 @@ def invalidate(c, order_id, reason, now, user_id=None, kind='contactos_modificad
 
 
 def add_contact(c, order_id, data, user, now, env=None):
-    _admin(user)
+    _admin(user, c)
     row = _order(c, order_id)
     if not row:
         raise IdentityError('Orden no encontrada.', 404)
@@ -493,7 +507,7 @@ def add_contact(c, order_id, data, user, now, env=None):
 
 
 def revoke_contact(c, order_id, contact_id, data, user, now):
-    _admin(user)
+    _admin(user, c)
     reason = re.sub(r'\s+', ' ', str(data.get('reason', '') or '')).strip()
     if not 3 <= len(reason) <= 200:
         raise IdentityError('Indica el motivo de la revocación.', 400, {'reason': 'Indica el motivo de la revocación.'})
@@ -506,7 +520,7 @@ def revoke_contact(c, order_id, contact_id, data, user, now):
 
 
 def revoke_sessions(c, order_id, user, now):
-    _admin(user)
+    _admin(user, c)
     if not _order(c, order_id):
         raise IdentityError('Orden no encontrada.', 404)
     return invalidate(c, order_id, 'Administración revocó el acceso verificado por WhatsApp.', now, user['id'], kind='sesiones_revocadas')
