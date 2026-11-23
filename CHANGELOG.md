@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.320 — 2026-11-23 09:45 (UTC-05:00)
+
+Facturación: retirar documentos de prueba
+
+### Mejoras realizadas
+
+- Facturación: un documento emitido en pruebas (sin validez tributaria) puede retirarse desde su detalle, solo por administración y con motivo; deja de contar en el panel, lo vendido vuelve al inventario y no se borra ni se envía nada. No afecta a la numeración real.
+
 ## v1.5.319 — 2026-11-23 09:41 (UTC-05:00)
 
 WhatsApp: avisos interrumpidos
