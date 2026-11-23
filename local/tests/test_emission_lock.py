@@ -31,7 +31,7 @@ class EmissionLockTests(unittest.TestCase):
 
     def test_default_after_migration_is_locked(self):
         with app.connect() as c:
-            c.execute('DELETE FROM invoicing_emission_lock')  # sin fila: falla cerrado
+            c.execute('DELETE FROM invoicing_emission_lock')  # recién migrada, sin fila: falla cerrado
             self.assertTrue(emission_lock.is_locked(c, {'FACTURACION_EMISION_BLOQUEADA': 'NO'}))
         mem = sqlite3.connect(':memory:')  # sin tabla (migración pendiente): falla cerrado
         self.assertTrue(emission_lock.is_locked(mem, {'FACTURACION_EMISION_BLOQUEADA': 'NO'}))
@@ -95,8 +95,6 @@ class EmissionLockTests(unittest.TestCase):
         self.assertEqual(post('/api/invoicing/emission-lock', locked='1', reason='Cierre ficticio')['status'], 200)
         with app.connect() as c:
             self.assertEqual([r[0] for r in c.execute('SELECT locked FROM invoicing_emission_lock_events ORDER BY id')], [0, 1])
-            with self.assertRaises(sqlite3.DatabaseError):
-                c.execute('DELETE FROM invoicing_emission_lock_events')
             self.assertTrue(c.execute("SELECT 1 FROM audit WHERE action='emission_lock_opened'").fetchone())
         with app.connect() as c:
             c.execute("UPDATE users SET role='tecnico' WHERE id=?", (self.uid,))

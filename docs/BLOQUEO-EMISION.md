@@ -31,7 +31,7 @@ Para emitir hacen falta las dos abiertas.
 - Cerrar: `{"locked": "1", "reason": "…"}`, siempre permitido.
 - Abrir: `{"locked": "0", "confirm": "HABILITAR EMISION", "reason": "motivo de 10 a 300 caracteres"}`.
 
-Cada cambio queda en `invoicing_emission_lock_events` (no se puede modificar ni borrar) y en la auditoría (`emission_lock_opened` /
+Cada cambio queda en `invoicing_emission_lock_events` (el sistema solo agrega registros) y en la auditoría general (`emission_lock_opened` /
 `emission_lock_closed`). `GET /api/invoicing/emission-lock` devuelve el estado.
 
 Abrir el bloqueo **no** activa la emisión real: siguen vigentes el modo de pruebas (`TEST_MODE`) y el rechazo de credenciales de producción

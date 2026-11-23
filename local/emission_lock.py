@@ -36,6 +36,14 @@ def _row(c):
     return row
 
 
+def _table(c):
+    try:
+        c.execute('SELECT 1 FROM invoicing_emission_lock LIMIT 1').fetchone()
+        return True
+    except sqlite3.Error:
+        return False
+
+
 def db_locked(c):
     row = _row(c)
     return True if row is None else bool(row[0])
@@ -53,7 +61,7 @@ def check(c, action='', env=None):
 def status(c, env=None):
     row = _row(c)
     return {'locked': is_locked(c, env), 'banner': BANNER if is_locked(c, env) else '', 'env_locked': env_locked(env),
-            'db_locked': db_locked(c), 'table_ready': row is not None, 'reason': row[1] if row else 'migración 117 pendiente: se trata como bloqueado.',
+            'db_locked': db_locked(c), 'table_ready': _table(c), 'reason': row[1] if row else ('Configuración en curso: emisión y envío bloqueados.' if _table(c) else 'Migración 117 pendiente: se trata como bloqueado.'),
             'changed_at': row[3] if row else '', 'confirm_text': CONFIRM_OPEN}
 
 
@@ -61,8 +69,9 @@ def set_state(c, user, data, now, env=None):
     """Abre o cierra el bloqueo en la base. Cerrar siempre se permite a administración; abrir exige confirmación escrita y motivo."""
     if not user or user['role'] != 'administrador':
         raise PermissionError('Solo administración cambia el bloqueo de emisión.')
-    if _row(c) is None:
+    if not _table(c):
         raise ValueError('Falta aplicar la migración 117 (bloqueo de emisión).')
+    c.execute("INSERT OR IGNORE INTO invoicing_emission_lock(id,locked,reason,changed_at) VALUES (1,1,'','')")
     lock = str(data.get('locked', '1')) != '0'
     reason = re.sub(r'\s+', ' ', str(data.get('reason', '') or '')).strip()
     if not lock:

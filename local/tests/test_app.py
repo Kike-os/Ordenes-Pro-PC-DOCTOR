@@ -44,7 +44,7 @@ class SecurityTests(unittest.TestCase):
         with app.connect() as c:
             # Las pruebas del flujo de facturación usan un AZUR simulado y una base temporal: el bloqueo de emisión se abre solo aquí.
             # test_emission_lock comprueba que, cerrado, el servidor rechaza emitir, enviar, anular y los correos.
-            c.execute('UPDATE invoicing_emission_lock SET locked=0 WHERE id=1')
+            c.execute("INSERT OR REPLACE INTO invoicing_emission_lock(id,locked,reason,changed_at) VALUES (1,0,'','')")
             c.execute('UPDATE cash_settings SET require_open=0 WHERE id=1')  # las pruebas de caja la activan (test_cash_rules)
             self.uid = c.execute('INSERT INTO users(username,email,name,password_hash,role,created_at) VALUES (?,?,?,?,?,?)',('demo','demo@example.invalid','Persona de prueba',self.hash,'administrador',int(time.time()))).lastrowid
             if self.__class__.__name__!='ServiceTermsTests':
