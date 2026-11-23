@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.319 — 2026-11-23 09:41 (UTC-05:00)
+
+WhatsApp: avisos interrumpidos
+
+### Mejoras realizadas
+
+- WhatsApp: un aviso interrumpido en «Enviando» (sin respuesta de Meta) puede marcarse como no enviado desde el historial, solo por administración, con motivo y auditoría; no envía nada.
+
 ## v1.5.318 — 2026-11-23 09:22 (UTC-05:00)
 
 Corrección: migraciones desde Sistema
