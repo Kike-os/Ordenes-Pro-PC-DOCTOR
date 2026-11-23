@@ -441,6 +441,10 @@ def slot_answer(c,text,now=None,lang='es-EC'):
 def reply(c,text,admin=False,context=None,conversation_id=None,session=None,lang='es-EC'):
  """Respuesta de ADI. `session` (si se pasa un diccionario) recibe la acción propuesta (formulario de reserva) y las sugerencias del chat."""
  if session is not None:session.update(c=c,conversation_id=conversation_id,action=None,topics=set())
+ # En el chat web, una petición clara para agendar abre el formulario real; no depende de que el modelo recuerde invocar la acción.
+ if not admin and session is not None and session.get('channel')=='web' and re.search(r'\\b(quiero|deseo|necesito|quisiera|me gustaria|ayudame a|ayudarme a|agendar|reservar|book|schedule)\\b.{0,60}\\b(cita|turno|appointment)\\b',plain(text)):
+  run_tool(session,'ofrecer_reserva','{"servicio":null,"fecha":null,"hora":null}')
+  return 'Te abro el formulario de reserva. Elige el servicio, la fecha y una hora disponible; completa tus datos y confirma. La cita queda registrada cuando recibas el código.'
  if admin:
   factual=admin_answer(c,text)
   if factual:return factual
