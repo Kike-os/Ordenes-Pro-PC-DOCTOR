@@ -13492,3 +13492,17 @@ details.bk-wizard{padding:12px 14px}
 .wid-more summary{cursor:pointer;font-size:12.5px;color:#9cc7ff}.wid-more[open] summary{margin-bottom:6px}
 @media(max-width:420px){.wid-list li{flex-direction:column;align-items:stretch}.wid-list li>button{align-self:flex-start}}
 .wid-list small{display:block;margin:0;line-height:1.4}
+/* ===== Sistema → Migraciones de la base de datos (solo administración). Acotado a .sysmig. ===== */
+.sysmig{display:grid;gap:10px;min-width:0;margin-top:14px}
+.sysmig h2{margin:0;font-size:15px}
+.sysmig-body{display:grid;gap:8px;min-width:0}
+.sysmig-state{display:flex;align-items:center;gap:8px;margin:0;font-size:13px;font-weight:650;color:#eef3ff}
+.sysmig-state::before{content:"";flex:none;width:9px;height:9px;border-radius:50%;background:var(--c,#22c55e)}
+.sysmig-state[data-state=warn]{--c:#f59e0b}
+.sysmig-list{display:grid;gap:6px;margin:0;padding:0;list-style:none}
+.sysmig-list li{display:grid;gap:2px;min-width:0;padding:7px 10px;border:1px solid #1f3354;border-left:3px solid var(--c,#22c55e);border-radius:9px;background:#0b1527}
+.sysmig-list li[data-state=err]{--c:#f87171}
+.sysmig-list strong{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#eef3ff;overflow-wrap:anywhere}.sysmig-list small{display:block;font-size:11.5px;color:#9bb0cf;overflow-wrap:anywhere}
+.sysmig-note{margin:0;font-size:12.5px;line-height:1.5;color:#9bb0cf;overflow-wrap:anywhere}.sysmig-warn{color:#fcd9a5}
+.sysmig-body>button{justify-self:start}
+@media(max-width:520px){.sysmig-body>button{justify-self:stretch}}

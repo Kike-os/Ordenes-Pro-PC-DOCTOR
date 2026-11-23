@@ -2599,6 +2599,11 @@ class Handler(BaseHTTPRequestHandler):
                 if user['role']!='administrador':return self.reply(403,{'error':'Solo administración gestiona los respaldos.'})
                 import gdrive_backup
                 return self.reply(200,gdrive_backup.overview(c))
+            if path == '/api/system/migrations':
+                # Migraciones pendientes de la base central (1.5.317): solo administración. Vercel no las aplica al desplegar.
+                import db_migrations
+                if user['role']!='administrador':return self.reply(403,{'error':'Solo administración consulta las migraciones.'})
+                return self.reply(200,db_migrations.status(c,reception_now()))
             if path == '/api/system':
                 try:return self.reply(200, versioning.overview())
                 except versioning.RegistryError as error:return self.reply(500,{'error':str(error)})
@@ -4972,6 +4977,15 @@ class Handler(BaseHTTPRequestHandler):
                     except whatsapp_identity.IdentityError as error:
                         c.rollback();return self.reply(error.status,{'error':str(error),'fields':error.fields})
                     return self.reply(200,whatsapp_identity.overview(c,oid,user,now))
+                if path=='/api/system/migrations/apply':
+                    # Solo migraciones aditivas (crear tablas o índices nuevos), con respaldo verificado reciente y confirmación escrita.
+                    import db_migrations
+                    try:result=db_migrations.apply(c,user,reception_now(),data.get('confirm',''))
+                    except db_migrations.MigrationError as error:
+                        c.rollback();return self.reply(error.status,{'error':str(error),'migrations':db_migrations.status(c,reception_now())})
+                    audit(c,user['id'],'migrations_applied');c.commit()
+                    print('migrations-applied',','.join(result['applied']),'lost:',','.join(result['lost']) or '-',flush=True)
+                    return self.reply(200,result)
                 if path=='/api/status-notices/settings':
                     import repair_status
                     try:repair_status.set_enabled(c,bool(data.get('auto')),user)

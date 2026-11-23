@@ -1456,6 +1456,27 @@ function autocareIncidentDialog(item,status,text,needNote,box){
  form.append(el('p',item.service+' · '+item.description,'autocare-note'),note,msg,save);dialog.append(form);note.focus();
  form.onsubmit=async event=>{event.preventDefault();if(needNote&&note.value.trim().length<5){msg.textContent='Indica cómo se resolvió la incidencia.';note.focus();return;}save.disabled=true;
   try{await api('/api/autocare/incident',{code:item.code,status,note:note.value.trim()});dialog.close();toast('Incidencia '+item.code+' actualizada. Queda registrado quién y cuándo.','success');renderAutoCare(box);}catch(error){msg.textContent=error.message;save.disabled=false;}};}
+// Migraciones de la base central (1.5.317, solo administración). Vercel no aplica migraciones al desplegar: desde aquí el servidor aplica
+// solo las aditivas (crear tablas o índices nuevos), con un respaldo verificado de las últimas 24 h y escribiendo APLICAR. El servidor
+// vuelve a comprobar el rol, el respaldo y cada sentencia, y registra la acción en la auditoría.
+function systemMigrationsCard(){
+ const card=el('section',undefined,'data-panel sysmig');card.setAttribute('aria-labelledby','sysmig-title');const h=el('h2','Migraciones de la base de datos');h.id='sysmig-title';
+ const body=el('div',undefined,'sysmig-body');body.append(el('p','Consultando…','sysmig-note'));card.append(h,body);
+ const when=v=>v?formatOrderDate(v):'—';
+ const paint=d=>{body.replaceChildren();
+  const state=el('p',undefined,'sysmig-state');state.dataset.state=d.pending.length?'warn':'ok';state.setAttribute('role','status');
+  state.textContent=d.pending.length?d.pending.length+' migración(es) pendiente(s) · '+d.applied+' de '+d.total+' aplicadas':'Todas las migraciones están aplicadas ('+d.applied+' de '+d.total+').';body.append(state);
+  if(d.pending.length){const ul=el('ul',undefined,'sysmig-list');for(const m of d.pending){const li=el('li');li.dataset.state=m.additive?'ok':'err';li.append(el('strong',m.name),el('small',m.reason));ul.append(li);}body.append(ul);}
+  const b=d.backup;body.append(el('p',b?'Último respaldo verificado: '+when(b.finished_at)+' ('+({gdrive:'Google Drive',equipo:'copia de la oficina'}[b.destination]||b.destination||'respaldo')+').':'Sin respaldo verificado registrado.','sysmig-note'));
+  if(d.backup_problem)body.append(el('p',d.backup_problem+' Crea un respaldo completo en Configuración → Respaldos antes de aplicar.','sysmig-note sysmig-warn'));
+  if(d.pending.length){const go=button('Aplicar migraciones pendientes',async()=>{const typed=await askText('Aplicar migraciones','Se aplicarán '+d.applicable.join(', ')+' en la base central. Solo crean tablas o índices nuevos y no modifican datos. Escribe APLICAR para continuar.','','Aplicar',10);if(typed===null||typed===undefined)return;
+    go.disabled=true;go.setAttribute('aria-busy','true');try{const r=await api('/api/system/migrations/apply',{confirm:String(typed)});toast(r.applied.length?'Migraciones aplicadas: '+r.applied.join(', ')+(r.lost.length?'. Revisa: '+r.lost.join(', ')+' tiene(n) menos filas.':'. Ninguna tabla perdió datos.'):'No se aplicó ninguna migración.',r.lost.length?'warning':'success');paint(r.status);}
+    catch(error){toast(error.message,'error');try{paint(await api('/api/system/migrations'));}catch{go.disabled=false;go.removeAttribute('aria-busy');}}},'primary');
+   go.disabled=!d.ready;if(!d.ready)go.title=d.backup_problem||'No hay migraciones aplicables desde aquí.';body.append(go);}
+  body.append(el('p','Solo se aplican desde aquí las migraciones que crean tablas o índices nuevos. Las demás requieren un procedimiento manual con respaldo.','sysmig-note'));};
+ api('/api/system/migrations').then(paint).catch(error=>body.replaceChildren(el('p',error.message,'sysmig-note')));
+ return card;}
+
 function renderSystem(data){
  const root=$('module-content');root.replaceChildren();const wrap=el('div',undefined,'system-module'),installed=data.installed;
  const heading=$('module-title'),badgeIcon=el('span',undefined,'system-title-icon');badgeIcon.append(systemIcon(systemIcons.check));heading.prepend(badgeIcon);
@@ -1505,7 +1526,7 @@ function renderSystem(data){
   data.releases.forEach((release,index)=>{const row=systemRelease(release,data,index===0);row.style.setProperty('--row-delay',Math.min(index,8)*40+'ms');if(index>=6)row.hidden=true;list.append(row);});list.addEventListener('versiontoggle',sync);
   tools.append(el('span',data.releases.length===1?'1 versión publicada':data.releases.length+' versiones publicadas','system-muted'),toggleAll);timeline.append(tools,list);
   if(data.releases.length>6){const more=button('Ver versiones anteriores ('+(data.releases.length-6)+')',()=>{rows().forEach(row=>row.hidden=false);more.remove();sync();},'version-more');timeline.append(more);}sync();}else timeline.append(el('p','Todavía no hay versiones publicadas.','empty-module'));
- wrap.append(top,result,timeline);root.append(wrap);paintCheck();
+ wrap.append(top,result,timeline);if(admin())wrap.append(systemMigrationsCard());root.append(wrap);paintCheck();
  if(currentUser?.role==='administrador'){const care=el('section',undefined,'autocare');wrap.prepend(care);renderAutoCare(care);}
 }
 // PC-DOCTOR Mail Pro: el buzón se lee en vivo desde el servidor de correo; el navegador nunca recibe credenciales.
