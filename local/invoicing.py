@@ -64,7 +64,7 @@ def settings(c):
     row['missing'] = missing_settings(row)
     row['test_mode'] = TEST_MODE
     row['emission'] = {'environment': TEST_ENVIRONMENT, 'environment_label': 'Pruebas (SRI)', 'real_enabled': False,
-                       'note': 'Todo lo que se registre aquí es de prueba: no cambia clientes, órdenes, presupuestos ni pagos, y no se envía nada al SRI.'}
+                       'note': 'Todo lo que se registre aquí es de prueba: no cambia clientes, órdenes, presupuestos ni pagos. Solo se envía al SRI de pruebas a través de AZUR si confirmas «Enviar al SRI (AZUR pruebas)»; nunca a producción.'}
     return row
 
 
