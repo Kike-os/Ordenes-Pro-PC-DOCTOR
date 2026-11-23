@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.318 — 2026-11-23 09:22 (UTC-05:00)
+
+Corrección: migraciones desde Sistema
+
+### Errores corregidos
+
+- Aplicar migraciones desde Sistema fallaba en la base central con un error temporal genérico: el recuento de filas ya no consulta tablas internas del proveedor, no retiene la base y, si la base rechaza una migración, se muestra el motivo real sin dejar nada a medias.
+
 ## v1.5.317 — 2026-11-23 09:11 (UTC-05:00)
 
 Migraciones desde Sistema
