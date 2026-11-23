@@ -805,6 +805,32 @@ def can_retry(c, row, env=None):
     return False
 
 
+def interrupted(row, now=None):
+    """Envío interrumpido: quedó en «enviando» sin respuesta de Meta y su bloqueo ya venció. No se reenvía solo (no se sabe si Meta lo aceptó)."""
+    from zoneinfo import ZoneInfo
+    now = now or datetime.now(ZoneInfo('America/Guayaquil'))
+    return row['status'] == 'enviando' and not row['provider_id'] and (row['locked_until'] or '') < stamp(now)
+
+
+def dismiss_interrupted(c, nid, user, now, reason):
+    """Administración marca como NO enviado un envío interrumpido (p. ej., cortado antes de llegar a Meta). Nunca envía nada."""
+    if not user or _role(user) != 'administrador':
+        raise WhatsAppError('Solo administración puede marcar un envío interrumpido.', 403)
+    row = c.execute('SELECT * FROM whatsapp_outbox WHERE id=?', (nid,)).fetchone()
+    if not row:
+        raise WhatsAppError('Aviso no disponible.', 404)
+    if not interrupted(row, now):
+        raise WhatsAppError('Solo se puede marcar un aviso que quedó interrumpido en «Enviando».', 409)
+    reason = _text(reason, 200)
+    if len(reason) < 5:
+        err = WhatsAppError('Indica el motivo.', 400)
+        err.fields = {'reason': 'Indica el motivo (por ejemplo, «se cortó antes de llegar a Meta»).'}
+        raise err
+    c.execute("UPDATE whatsapp_outbox SET status='omitido',reason_kind='interrumpido',locked_until='',next_attempt_at='',detail=?,updated_at=? WHERE id=?",
+              ('Envío interrumpido marcado como no enviado por %s: %s' % (_field(user, 'name') or 'administración', reason), stamp(now), nid))
+    return dict(c.execute('SELECT * FROM whatsapp_outbox WHERE id=?', (nid,)).fetchone())
+
+
 def retry(c, nid, user, now, env=None):
     if not user or _role(user) not in ('administrador', 'tecnico'):
         raise WhatsAppError('Acceso no permitido.', 403)
@@ -1075,7 +1101,7 @@ def item(c, row, env=None):
             'params': params, 'preview': row['preview'], 'source': row['source'], 'order_id': row['order_id'], 'part_request_id': row['part_request_id'],
             'appointment_id': row['appointment_id'], 'created_at': row['created_at'], 'updated_at': row['updated_at'], 'sent_at': row['sent_at'],
             'delivered_at': row['delivered_at'], 'read_at': row['read_at'], 'provider': bool(row['provider_id']), 'message_id': row['message_id'],
-            'can_retry': can_retry(c, row, env)}
+            'can_retry': can_retry(c, row, env), 'interrupted': interrupted(row)}
 
 
 def _mask_phone(number):

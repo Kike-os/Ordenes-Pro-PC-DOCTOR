@@ -323,6 +323,34 @@ class WhatsAppIdentityTests(unittest.TestCase):
         with app.connect() as c:
             self.assertTrue(identity.installed(c))
 
+    def test_16_interrupted_send_can_be_marked_not_sent_without_sending(self):
+        # Un aviso que quedó en «enviando» sin respuesta de Meta (p. ej., cortado antes de la llamada) solo lo marca administración, sin enviar nada.
+        with app.connect() as c:
+            past = wa.stamp(self.now - timedelta(minutes=10))
+            future = wa.stamp(self.now + timedelta(minutes=10))
+            stuck = c.execute("INSERT INTO whatsapp_outbox(dedupe_key,event,status,order_id,locked_until,created_at,updated_at) VALUES ('prueba-interrumpido','listo','enviando',?,?,?,?)",
+                              (self.oid, past, past, past)).lastrowid
+            busy = c.execute("INSERT INTO whatsapp_outbox(dedupe_key,event,status,order_id,locked_until,created_at,updated_at) VALUES ('prueba-en-curso','listo','enviando',?,?,?,?)",
+                             (self.oid, future, past, past)).lastrowid
+            c.commit()
+        sends = len(self.meta.sends())
+        history = self.request('/api/whatsapp/history', cookie=self.cookie)['body']['rows']
+        self.assertTrue(next(r for r in history if r['id'] == stuck)['interrupted'])
+        self.assertFalse(next(r for r in history if r['id'] == busy)['interrupted'])
+        self.assertEqual(self.post('/api/whatsapp/outbox/%d/dismiss' % stuck, reason='')['status'], 400)
+        self.assertEqual(self.post('/api/whatsapp/outbox/%d/dismiss' % busy, reason='Se cortó antes de llegar a Meta')['status'], 409)
+        done = self.post('/api/whatsapp/outbox/%d/dismiss' % stuck, reason='Se cortó antes de llegar a Meta')
+        self.assertEqual(done['status'], 200, done['body'])
+        self.assertEqual(done['body']['item']['status'], 'omitido')
+        self.assertIn('Se cortó antes de llegar a Meta', done['body']['item']['detail'])
+        self.assertEqual(len(self.meta.sends()), sends)   # no se envió nada
+        with app.connect() as c:
+            self.assertTrue(c.execute("SELECT 1 FROM audit WHERE action='whatsapp_dismiss_interrupted'").fetchone())
+            c.execute("UPDATE users SET role='tecnico'")
+            c.commit()
+        cookie, csrf = self.login()
+        self.assertEqual(self.request('/api/whatsapp/outbox/%d/dismiss' % busy, {'reason': 'Motivo de prueba'}, cookie=cookie, csrf=csrf)['status'], 403)
+
 
 if __name__ == '__main__':
     unittest.main()

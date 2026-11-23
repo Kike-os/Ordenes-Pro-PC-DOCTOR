@@ -4946,6 +4946,10 @@ class Handler(BaseHTTPRequestHandler):
                             if user['role']!='administrador':return self.reply(403,{'error':'Acceso no permitido.'})
                             rows=whatsapp_business.tick(c,now,force=True);c.commit()
                             return self.reply(200,{'processed':len(rows)})
+                        dismiss_match=re.fullmatch(r'/api/whatsapp/outbox/([0-9]+)/dismiss',path)
+                        if dismiss_match:
+                            row=whatsapp_business.dismiss_interrupted(c,int(dismiss_match[1]),user,now,str(data.get('reason','')));audit(c,user['id'],'whatsapp_dismiss_interrupted',row['id']);c.commit()
+                            return self.reply(200,{'item':whatsapp_business.item(c,row)})
                         retry_match=re.fullmatch(r'/api/whatsapp/outbox/([0-9]+)/retry',path)
                         if retry_match:
                             row=whatsapp_business.retry(c,int(retry_match[1]),user,now);audit(c,user['id'],'whatsapp_retry',row['id']);c.commit()
