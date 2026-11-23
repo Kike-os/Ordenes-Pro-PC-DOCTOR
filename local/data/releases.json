@@ -8,6 +8,26 @@
   },
   "releases": [
     {
+      "version": "1.5.317",
+      "date": "2026-11-23T09:11:50-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Migraciones desde Sistema",
+      "changes": {
+        "features": [
+          "Sistema → Migraciones de la base de datos (solo administración): muestra las migraciones pendientes y aplica desde el servidor las que solo crean tablas o índices nuevos, con respaldo verificado de las últimas 24 h, confirmación escrita, comprobación de que ninguna tabla pierde filas y auditoría."
+        ],
+        "improvements": [],
+        "fixes": [
+          "La incidencia «Conectividad con la base de datos» de la 1.5.315 se debía a la migración 115 sin aplicar en producción; ahora se aplica desde Sistema."
+        ],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Administración (autorización expresa en la sesión)"
+    },
+    {
       "version": "1.5.316",
       "date": "2026-11-23T09:03:10-05:00",
       "type": "patch",

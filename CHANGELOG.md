@@ -4,6 +4,18 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.317 — 2026-11-23 09:11 (UTC-05:00)
+
+Migraciones desde Sistema
+
+### Nuevas funcionalidades
+
+- Sistema → Migraciones de la base de datos (solo administración): muestra las migraciones pendientes y aplica desde el servidor las que solo crean tablas o índices nuevos, con respaldo verificado de las últimas 24 h, confirmación escrita, comprobación de que ninguna tabla pierde filas y auditoría.
+
+### Errores corregidos
+
+- La incidencia «Conectividad con la base de datos» de la 1.5.315 se debía a la migración 115 sin aplicar en producción; ahora se aplica desde Sistema.
+
 ## v1.5.316 — 2026-11-23 09:03 (UTC-05:00)
 
 Corrección: WhatsApp sin la migración 115
