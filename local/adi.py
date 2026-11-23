@@ -474,15 +474,15 @@ def reply(c,text,admin=False,context=None,conversation_id=None,session=None,lang
  # Si el cliente quiere una cita, la respuesta termina con los próximos horarios realmente libres como botones de reserva.
  # Se añaden aquí, desde la agenda, para que no dependan de lo que redacte el modelo.
  if not admin and isinstance(context,dict) and isinstance(context.get('proximos_espacios_libres_en_la_agenda'),list) and '/citas?fecha=' not in answer:
-  answer=re.sub(r'https?://(?:www\\.)?pcdoctor\\.com\\.ec/citas/?',agenda_url(),answer,flags=re.I)
+  answer=re.sub(r'https?://(?:www\.)?pcdoctor\.com\.ec/citas/?',agenda_url(),answer,flags=re.I)
   slots=context['proximos_espacios_libres_en_la_agenda']
   if slots:
-   heading='\\nAvailable appointment times (select a link):\\n' if english(lang) else '\\nHorarios disponibles (elige un enlace):\\n'
+   heading='\nAvailable appointment times (select a link):\n' if english(lang) else '\nHorarios disponibles (elige un enlace):\n'
    lines=[]
    for item in slots:
     label=('Book ' if english(lang) else 'Reservar ')+item['texto']
     lines.append(label+': '+item['enlace'])
-   answer=answer.rstrip()+heading+'\\n'.join(lines)
+   answer=answer.rstrip()+heading+'\n'.join(lines)
  return answer
 
 DAYS=('lunes','martes','miércoles','jueves','viernes','sábado','domingo')
