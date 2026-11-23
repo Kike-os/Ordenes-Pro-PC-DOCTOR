@@ -96,6 +96,26 @@ class DbMigrationsTests(unittest.TestCase):
         self.assertEqual(again['status'], 409)
         self.assertIn('No hay migraciones pendientes', again['body']['error'])
 
+    def test_database_error_is_explained_and_leaves_nothing_half_applied(self):
+        import shutil
+        from unittest.mock import patch
+        self.unapply_115()
+        self.verified_backup()
+        with tempfile.TemporaryDirectory() as folder:
+            shutil.copytree(app.ROOT / 'migrations', Path(folder) / 'migrations')
+            # Parece aditiva (pasa el análisis) pero la base la rechaza al ejecutarla.
+            (Path(folder) / 'migrations' / '999_rota.sql').write_text('CREATE TABLE IF NOT EXISTS tabla_rota(a);\nCREATE INDEX IF NOT EXISTS indice_roto ON tabla_inexistente(a);')
+            cookie, csrf = self.session()
+            with patch.object(db_migrations, 'ROOT', Path(folder)):
+                got = self.request('/api/system/migrations/apply', {'confirm': 'APLICAR'}, cookie=cookie, csrf=csrf)
+            self.assertEqual(got['status'], 502, got['body'])
+            self.assertIn('999_rota.sql', got['body']['error'])
+            self.assertIn('Antes se aplicaron: ' + M115, got['body']['error'])
+        with app.connect() as c:
+            self.assertTrue(c.execute('SELECT 1 FROM migrations WHERE name=?', (M115,)).fetchone())
+            self.assertFalse(c.execute("SELECT 1 FROM migrations WHERE name='999_rota.sql'").fetchone())
+            self.assertFalse(c.execute("SELECT 1 FROM sqlite_master WHERE name='tabla_rota'").fetchone())   # nada a medias
+
     def test_only_administration(self):
         self.unapply_115()
         self.verified_backup()

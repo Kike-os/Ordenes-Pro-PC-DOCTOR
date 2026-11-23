@@ -117,12 +117,28 @@ def status(c, now):
             'backup_hours': BACKUP_HOURS, 'ready': bool(applicable) and not problem}
 
 
+INTERNAL = ('sqlite_', 'libsql_', '_litestream', '_cf_', '_turso')
+
+
 def _counts(c):
-    tables = [row[0] for row in c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name")]
-    if not tables:
-        return {}
-    sql = ' UNION ALL '.join("SELECT '%s',COUNT(*) FROM \"%s\"" % (t, t) for t in tables if re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]*', t))
-    return {row[0]: int(row[1]) for row in c.execute(sql)}
+    """Filas por tabla. Excluye las tablas internas del motor o del proveedor (Turso/libSQL) y cuenta por grupos; si un grupo falla,
+    cuenta tabla por tabla y omite solo la que no se pueda leer (queda en «unreadable»)."""
+    import sqlite3
+    tables = [row[0] for row in c.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
+              if re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]*', row[0]) and not row[0].lower().startswith(INTERNAL)]
+    out, unreadable = {}, []
+    for start in range(0, len(tables), 25):
+        group = tables[start:start + 25]
+        try:
+            out.update({row[0]: int(row[1]) for row in c.execute(' UNION ALL '.join("SELECT '%s',COUNT(*) FROM \"%s\"" % (t, t) for t in group))})
+        except sqlite3.Error:
+            for t in group:
+                try:
+                    out[t] = int(c.execute('SELECT COUNT(*) FROM "%s"' % t).fetchone()[0])
+                except sqlite3.Error:
+                    unreadable.append(t)
+    out['__unreadable__'] = unreadable
+    return out
 
 
 def apply(c, user, now, confirm):
@@ -136,8 +152,9 @@ def apply(c, user, now, confirm):
     if not info['applicable']:
         blocked = next((i for i in info['pending'] if not i['additive']), None)
         raise MigrationError(('No hay migraciones aplicables desde aquí. ' + blocked['name'] + ': ' + blocked['reason']) if blocked else 'No hay migraciones pendientes.', 409)
+    import sqlite3
+    c.commit()  # libera la transacción de la petición: el recuento y las migraciones no retienen la base
     before = _counts(c)
-    c.commit()
     done = []
     for name in info['applicable']:
         path = ROOT / 'migrations' / name
@@ -146,8 +163,15 @@ def apply(c, user, now, confirm):
             break
         if c.execute('SELECT 1 FROM migrations WHERE name=?', (name,)).fetchone():
             continue
-        c.executescript('BEGIN IMMEDIATE;\n' + path.read_text(encoding='utf-8') + "\nINSERT INTO migrations VALUES ('" + name.replace("'", "''") + "');\nCOMMIT;")
+        try:
+            c.executescript('BEGIN IMMEDIATE;\n' + path.read_text(encoding='utf-8') + "\nINSERT INTO migrations VALUES ('" + name.replace("'", "''") + "');\nCOMMIT;")
+        except sqlite3.Error as error:
+            # La transacción se descarta entera: la migración no queda a medias. Se informa el motivo real (sin datos ni credenciales).
+            detail = re.sub(r'\s+', ' ', str(error))[:220]
+            raise MigrationError('La base de datos no aceptó ' + name + ' (' + type(error).__name__ + ': ' + detail + '). No se aplicó nada de esa migración.'
+                                 + (' Antes se aplicaron: ' + ', '.join(done) + '.' if done else ''), 502) from None
         done.append(name)
     after = _counts(c)
+    skipped = sorted(set(before.pop('__unreadable__', [])) | set(after.pop('__unreadable__', [])))
     lost = [t for t, n in before.items() if t not in VOLATILE and (t not in after or after[t] < n)]
-    return {'applied': done, 'lost': lost, 'tables_before': len(before), 'tables_after': len(after), 'status': status(c, now)}
+    return {'applied': done, 'lost': lost, 'unreadable': skipped, 'tables_before': len(before), 'tables_after': len(after), 'status': status(c, now)}
