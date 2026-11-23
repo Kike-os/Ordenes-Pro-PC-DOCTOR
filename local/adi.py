@@ -18,7 +18,7 @@ SYSTEM_PUBLIC=("Eres ADI, asistente virtual de PC-DOCTOR S.A. Habla español lat
 "No inventes diagnósticos, precios, garantías, fechas de entrega ni avances. Para esos asuntos solicita revisión del taller. "
 "No solicites contraseñas ni números completos de tarjetas. Nunca reveles claves, seriales, contraseñas, costos internos ni datos de otros clientes. "
 "Los horarios vienen SIEMPRE en el contexto validado de cada mensaje: usa únicamente esos datos, distingue atención presencial, hora límite para solicitar citas y atención virtual, y no menciones ningún otro horario. "
-"No puedes reservar, reprogramar ni confirmar citas por tu cuenta: el cliente completa y confirma la reserva en el formulario del chat o en /citas, y solo ofreces horas libres que haya devuelto la agenda.")
+"No puedes reservar, reprogramar ni confirmar citas por tu cuenta: el cliente completa y confirma la reserva en el formulario del chat o en la agenda. Al compartir una cita, usa exclusivamente la URL exacta `url_agenda_citas` y los enlaces `enlace` recibidos en el contexto; nunca inventes dominios, no uses `pcdoctor.com.ec` y no entregues rutas relativas como `/citas?...`. Presenta cada opción libre con su enlace completo en una línea propia.")
 SYSTEM_ADMIN=("Eres ADI, asistente administrativa de PC-DOCTOR S.A. Responde en español de forma clara. "
 "Usa solamente los datos reales que aparecen en el contexto. No ejecutes cambios, envíos ni escrituras. "
 "Para una modificación indica que debe confirmarla y ejecutarla un usuario autorizado.")
@@ -39,7 +39,7 @@ PUBLIC_ENGLISH=("IDIOMA OBLIGATORIO: la persona eligió English (en-US) en Órde
 "El contexto validado y los resultados de las herramientas están en español: tradúcelos al responder, sin cambiar su contenido. "
 "No traduzcas PC-DOCTOR S.A., Órdenes Pro, ADI, marcas, modelos, nombres comerciales de productos, números de orden, códigos, series ni enlaces. "
 "Los precios están en dólares estadounidenses (USD): conserva el importe exacto y escribe el separador decimal con punto ($12,50 → $12.50; $1.250,00 → $1,250.00). "
-"Escribe las fechas como mes/día y las horas con AM/PM. Al usar las herramientas, pasa los nombres de servicios tal como aparecen en español en el contexto.")
+"Escribe las fechas como mes/día y las horas con AM/PM. Al usar las herramientas, pasa los nombres de servicios tal como aparecen en español en el contexto. Para reservar, usa únicamente la URL completa `url_agenda_citas` y los enlaces `enlace` del contexto; nunca inventes un dominio ni entregues rutas relativas.")
 def public_system(lang):
  """Instrucciones de ADI para la conversación pública en el idioma elegido (validado en el servidor)."""
  if not english(lang):return SYSTEM_PUBLIC
@@ -370,6 +370,10 @@ def catalog_prices(c,text,limit=25):
 def _dot(text):
  return text if text.endswith('.') else text+'.'
 
+def agenda_url():
+ """URL pública de la Agenda de Citas configurada para este despliegue."""
+ return reception.public_base_url().rstrip('/')+'/citas'
+
 def hours_facts(c,now=None):
  """Horarios vigentes leídos del sistema en cada consulta: atención presencial (y si está abierta ahora), franjas de la Agenda de Citas y atención virtual."""
  import business_hours
@@ -381,13 +385,13 @@ def hours_facts(c,now=None):
  return {'zona_horaria':'America/Guayaquil (Ecuador)','hoy':info['today'],'hora_actual':info['now'],'atencion_presencial':info['presencial'] or 'sin horario presencial configurado','estado_presencial_ahora':info['status']['label'],
          'cierres_extraordinarios':[item['date']+(' ('+item['note']+')' if item['note'] else '') for item in info['closures']],
          'solicitud_de_citas':(_dot('Las solicitudes de cita en línea se reciben: '+limits)+' Esa hora límite es para enviar la solicitud; no significa que haya técnicos atendiendo hasta entonces.') if limits else 'Las solicitudes de cita en línea se reciben a cualquier hora.',
-         'citas':'Las citas se atienden dentro del horario presencial y solo en las horas que la agenda tenga libres; se reservan y confirman en /citas.',
+         'citas':'Las citas se atienden dentro del horario presencial y solo en las horas que la agenda tenga libres; se reservan y confirman en '+agenda_url()+'.','url_agenda_citas':agenda_url(),
          'atencion_virtual':info['virtual_message'] or 'No disponible','asesores_humanos':'Los asesores responden en el horario de atención presencial; fuera de ese horario la solicitud queda registrada.'}
 
 def booking_link(day,hour,service):
  """Enlace interno que abre la Agenda de Citas con fecha, hora y servicio ya elegidos. El chat lo muestra como botón «Reservar…».
  No reserva nada: el cliente completa sus datos y consentimientos en /citas, y la disponibilidad se vuelve a comprobar al confirmar."""
- return '/citas?fecha=%s&hora=%s&servicio=%s'%(day,hour,service)
+ return agenda_url()+'?fecha=%s&hora=%s&servicio=%s'%(day,hour,service)
 
 def next_slots(c,limit=3):
  """Próximas horas realmente libres en la agenda (el mismo cálculo que usa la página de reservas), para un diagnóstico o el primer servicio activo."""
@@ -431,7 +435,7 @@ def slot_answer(c,text,now=None,lang='es-EC'):
  except ValueError:free=[]
  if hour in free:return 'El '+label+' está libre en este momento para '+service['label'].lower()+'. Toca para reservarlo:\n'+booking_link(day,hour,service['code'])+'\nCompletarás tus datos en la Agenda de Citas; la cita queda confirmada cuando el sistema te muestra su código.'
  options=appointments.alternatives(c,day,service['code'],hour,False,3) or appointments.alternatives(c,day,service['code'],'',False,3)
- if options:return 'El '+label+' no está disponible. Opciones libres más próximas (toca una para reservarla):\n'+'\n'.join(booking_link(item['date'],item['time'],service['code']) for item in options)+'\nTambién puedes elegir otra fecha en /citas.'
+ if options:return 'El '+label+' no está disponible. Opciones libres más próximas (toca una para reservarla):\n'+'\n'.join(booking_link(item['date'],item['time'],service['code']) for item in options)+'\nTambién puedes elegir otra fecha en '+agenda_url()+'.'
  return 'El '+label+' no está disponible y no veo espacios libres en los próximos días. Un asesor puede ayudarte: usa «Contactar soporte técnico».'
 
 def reply(c,text,admin=False,context=None,conversation_id=None,session=None,lang='es-EC'):
@@ -450,7 +454,7 @@ def reply(c,text,admin=False,context=None,conversation_id=None,session=None,lang
  # Los horarios vigentes viajan siempre como contexto validado: ADI no usa horarios escritos de memoria.
  if not admin:
   try:
-   context=dict(context or {},horarios_vigentes=hours_facts(c),conocimiento_comercial=commercial_knowledge(c))
+   context=dict(context or {},horarios_vigentes=hours_facts(c),url_agenda_citas=agenda_url(),conocimiento_comercial=commercial_knowledge(c))
    # Precios: solo los registrados en el catálogo (con IVA incluido); ADI no calcula ni promete otros.
    if re.search(r'precio|cu[aá]nto|cuesta|costo|valor|tarifa|cobr|servicio|price|cost|how much|fee|charge|service',plain(text)):context['precios_registrados_iva_incluido']=catalog_prices(c,text)
    # Horas libres solo cuando se habla de una cita (no al preguntar por licencias «disponibles»).
@@ -511,9 +515,9 @@ def fallback(c,text,session=None):
   # Solo se ofrecen horas que la agenda tiene libres en este momento; la reserva se confirma en /citas, que vuelve a comprobarlas.
   slots=next_slots(c)
   free=' Próximos espacios libres para '+slots[0]['servicio'].lower()+': '+_dot('; '.join(item['texto'] for item in slots)) if slots else ' En este momento no veo espacios libres en los próximos días.'
-  return 'Puedes reservar tu cita en línea en /citas: elige el servicio, la fecha y una hora disponible.'+free+' La cita queda confirmada cuando el sistema te muestra su código.'
+  return 'Puedes reservar tu cita en línea en '+agenda_url()+': elige el servicio, la fecha y una hora disponible.'+free+' La cita queda confirmada cuando el sistema te muestra su código.'
  if has('precio','costo','cuanto cuesta','cuanto vale','cuanto sale','cotiza','presupuesto','tarifa') or words&{'valor','vale','cobran'}:
-  return 'El valor depende de la revisión técnica del equipo, por eso no puedo darte un precio por este medio. Puedes agendar un diagnóstico en /citas o pedir que un asesor te contacte con el botón «Contactar soporte técnico».'
+  return 'El valor depende de la revisión técnica del equipo, por eso no puedo darte un precio por este medio. Puedes agendar un diagnóstico en '+agenda_url()+' o pedir que un asesor te contacte con el botón «Contactar soporte técnico».'
  if has('garantia'):
   return 'Las condiciones de garantía dependen del servicio realizado y constan en las condiciones de tu orden. Un asesor puede confirmarte tu caso: usa «Contactar soporte técnico».'
  if has('horario','abren','abierto','atienden','domingo','sabado','feriado') or words&{'hora','horas'}:
@@ -526,7 +530,7 @@ def fallback(c,text,session=None):
   return 'Con gusto. Pulsa «Contactar soporte técnico» y una persona del equipo continuará la conversación en este mismo chat.'
  if has('servicio','reparacion','reparar','arreglar','diagnostico','mantenimiento','bios','impresora','laptop','portatil','computadora','formatear','virus','pantalla','lento','no enciende','no prende') or words&{'pc'}:
   services=', '.join(item['label'].lower() for item in cfg['services'] if item.get('active',1))
-  return company['name']+' ofrece diagnóstico y reparación de portátiles, computadoras e impresoras, mantenimiento preventivo, programación de BIOS y reparación electrónica.'+(' En la agenda puedes reservar: '+services+'.' if services else '')+' El diagnóstico exacto requiere revisar el equipo; reserva en /citas.'
+  return company['name']+' ofrece diagnóstico y reparación de portátiles, computadoras e impresoras, mantenimiento preventivo, programación de BIOS y reparación electrónica.'+(' En la agenda puedes reservar: '+services+'.' if services else '')+' El diagnóstico exacto requiere revisar el equipo; reserva en '+agenda_url()+'.'
  if words&{'gracias','agradezco','genial','perfecto','excelente'}:
   return 'Con gusto. Si necesitas algo más, aquí estoy.'
  if words&{'adios','chao','chau'} or has('hasta luego','nos vemos'):
@@ -558,13 +562,13 @@ def hours_facts_en(c,now=None):
  from reception import ECUADOR_TZ
  from datetime import datetime
  info=business_hours.public_en(c,now or datetime.now(ECUADOR_TZ))
- return {'presencial':info['presencial'],'status':info['status']['label'],'limits':info['request_limits'],'virtual':info['virtual']}
+ return {'presencial':info['presencial'],'status':info['status']['label'],'limits':info['request_limits'],'virtual':info['virtual'],'url_agenda_citas':agenda_url()}
 
 def hours_answer_en(c,now=None,topic=''):
  facts=hours_facts_en(c,now)
  inperson=('In-person service (Ecuador time): '+facts['presencial']+'.' if facts['presencial'] else 'In-person service hours are not configured.')+' '+facts['status']+'.'
  requests=('Online appointment requests are accepted '+facts['limits']+'. That deadline is for sending the request; it does not mean technicians are available until then.') if facts['limits'] else 'Online appointment requests are accepted at any time.'
- appointments_text='Appointments are handled during in-person hours, only at times the schedule shows as available; they are booked and confirmed at /citas.'
+ appointments_text='Appointments are handled during in-person hours, only at times the schedule shows as available; they are booked and confirmed at '+agenda_url()+'.'
  virtual='Virtual assistance is available 24/7 through ADI, our intelligent assistant.'
  if topic=='virtual':return (virtual if facts['virtual'] else 'Virtual assistance is not active right now.')+' '+inperson
  if topic=='solicitud':return requests+' '+appointments_text
@@ -576,7 +580,7 @@ def slot_answer_en(c,day,hour,service):
  except ValueError:free=[]
  if hour in free:return label+' is currently available for '+service_en(service)+'. Tap to book it:\n'+booking_link(day,hour,service['code'])+'\nYou will enter your details in the Appointment Scheduler; the appointment is confirmed when the system shows you its code.'
  options=appointments.alternatives(c,day,service['code'],hour,False,3) or appointments.alternatives(c,day,service['code'],'',False,3)
- if options:return label+' is not available. Closest open times (tap one to book it):\n'+'\n'.join(booking_link(item['date'],item['time'],service['code']) for item in options)+'\nYou can also choose another date at /citas.'
+ if options:return label+' is not available. Closest open times (tap one to book it):\n'+'\n'.join(booking_link(item['date'],item['time'],service['code']) for item in options)+'\nYou can also choose another date at '+agenda_url()+'.'
  return label+' is not available and I do not see open times in the coming days. An advisor can help you: use “Contact Technical Support”.'
 
 def fallback_en(c,text,session=None):
@@ -606,9 +610,9 @@ def fallback_en(c,text,session=None):
   slots=next_slots(c)
   service=c.execute("SELECT code,label FROM appointment_services WHERE active=1 ORDER BY (code='diagnostico') DESC,rowid LIMIT 1").fetchone()
   free=(' Next open times for '+service_en(service)+': '+'; '.join(date_en(item['fecha'])+' at '+clock_en(item['hora']) for item in slots)+'.') if slots and service else ' I do not see open times in the coming days right now.'
-  return 'You can book your appointment online at /citas: choose the service, the date and an available time.'+free+' The appointment is confirmed when the system shows you its code.'
+  return 'You can book your appointment online at '+agenda_url()+': choose the service, the date and an available time.'+free+' The appointment is confirmed when the system shows you its code.'
  if has('price','cost','how much','quote','estimate','fee','precio','costo','cuanto','presupuesto','tarifa'):
-  return 'The cost depends on the technical inspection of the device, so I cannot give you a price here. You can book a diagnosis at /citas or ask an advisor to contact you with the “Contact Technical Support” button.'
+  return 'The cost depends on the technical inspection of the device, so I cannot give you a price here. You can book a diagnosis at '+agenda_url()+' or ask an advisor to contact you with the “Contact Technical Support” button.'
  if has('warranty','guarantee','garantia'):
   return 'Warranty terms depend on the service performed and are stated in your order conditions. An advisor can confirm your case: use “Contact Technical Support”.'
  if has('hour','open','close','schedule','sunday','saturday','holiday','horario','abren','atienden'):return hours_answer_en(c)
@@ -620,7 +624,7 @@ def fallback_en(c,text,session=None):
   return 'Of course. Tap “Contact Technical Support” and a member of our team will continue the conversation in this same chat.'
  if has('service','repair','fix','diagnos','maintenance','bios','printer','laptop','computer','format','virus','screen','slow','turn on','boot','servicio','reparacion','reparar','mantenimiento') or words&{'pc'}:
   services=', '.join(service_en(item) for item in appointments.settings(c)['services'] if item.get('active',1))
-  return company['name']+' offers diagnosis and repair of laptops, computers and printers, preventive maintenance, BIOS programming and electronic repair.'+(' In the scheduler you can book: '+services+'.' if services else '')+' An exact diagnosis requires inspecting the device; book at /citas.'
+  return company['name']+' offers diagnosis and repair of laptops, computers and printers, preventive maintenance, BIOS programming and electronic repair.'+(' In the scheduler you can book: '+services+'.' if services else '')+' An exact diagnosis requires inspecting the device; book at '+agenda_url()+'.'
  if words&{'thanks','thank','great','perfect','excellent','gracias','perfecto','excelente'}:return 'You are welcome. If you need anything else, I am here.'
  if words&{'bye','goodbye','adios','chao'} or has('see you','hasta luego'):return 'Thank you for contacting '+company['name']+'. Have a great day.'
  if words&{'hello','hi','hey','greetings','hola','buenas'} or has('good morning','good afternoon','good evening'):
