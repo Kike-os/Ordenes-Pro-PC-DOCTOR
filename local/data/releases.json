@@ -8,6 +8,24 @@
   },
   "releases": [
     {
+      "version": "1.5.316",
+      "date": "2026-11-23T09:03:10-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Corrección: WhatsApp sin la migración 115",
+      "changes": {
+        "features": [],
+        "improvements": [],
+        "fixes": [
+          "La 1.5.315 dependía de la migración 115, que Vercel no aplica: sin ella el conteo mensual de WhatsApp fallaba y con él los envíos. Ahora, mientras falte la migración, WhatsApp funciona igual, ADI no revela nada de las órdenes y el panel indica que falta aplicarla."
+        ],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Administración (autorización expresa en la sesión)"
+    },
+    {
       "version": "1.5.315",
       "date": "2026-11-23T08:37:58-05:00",
       "type": "patch",

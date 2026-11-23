@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.316 — 2026-11-23 09:03 (UTC-05:00)
+
+Corrección: WhatsApp sin la migración 115
+
+### Errores corregidos
+
+- La 1.5.315 dependía de la migración 115, que Vercel no aplica: sin ella el conteo mensual de WhatsApp fallaba y con él los envíos. Ahora, mientras falte la migración, WhatsApp funciona igual, ADI no revela nada de las órdenes y el panel indica que falta aplicarla.
+
 ## v1.5.315 — 2026-11-23 08:37 (UTC-05:00)
 
 Verificación de identidad por WhatsApp para ADI
