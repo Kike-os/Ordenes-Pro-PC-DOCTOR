@@ -194,5 +194,28 @@ class WhatsAppHandoffTests(ident.WhatsAppIdentityTests):
         self.assertIn(conv, [r['id'] for r in rows])                                       # el personal lo ve en el panel
 
 
+    # Mensajes omitidos por el límite ANTES de la corrección: administración los pasa al personal; no se envía nada al cliente.
+    def test_h21_recover_missed_messages_for_staff(self):
+        with app.connect() as c:
+            for n, who in enumerate((TITULAR, TITULAR, STRANGER)):
+                c.execute("INSERT INTO whatsapp_adi_inbound(wa_message_id,sender,status,received_at,detail) VALUES (?,?,'omitido',?,?)",
+                          ('wamid.PERDIDO-%d' % n, who, '2026-11-24T13:0%d:00-05:00' % n, 'Límite mensual de seguridad de respuestas ADI alcanzado.'))
+            c.commit()
+        self.assertEqual(self.request('/api/adi/live', cookie=self.cookie)['body']['missed'], 3)
+        before = len(self.meta.sends())
+        self.assertEqual(self.request('/api/adi/live/settings', {'action': 'recover_missed', 'confirm': 'no'}, cookie=self.cookie, csrf=self.csrf)['status'], 400)
+        got = self.request('/api/adi/live/settings', {'action': 'recover_missed', 'confirm': 'PASAR'}, cookie=self.cookie, csrf=self.csrf)
+        self.assertEqual((got['status'], got['body']['recovered'], got['body']['pending']), (200, 3, 0))
+        self.assertEqual(len(self.meta.sends()), before)                          # nada sale a Meta
+        for who, notes in ((TITULAR, 2), (STRANGER, 1)):
+            conv = self.conv_id(who)
+            self.assertEqual(self.case(conv)['priority'], 'alta')
+            with app.connect() as c:
+                texts = [r[0] for r in c.execute("SELECT content FROM adi_messages WHERE conversation_id=? AND author='client'", (conv,))]
+            self.assertEqual(len([t for t in texts if 'Su texto no se guardó' in t]), notes)
+        again = self.request('/api/adi/live/settings', {'action': 'recover_missed', 'confirm': 'PASAR'}, cookie=self.cookie, csrf=self.csrf)['body']
+        self.assertEqual(again['recovered'], 0)                                       # idempotente
+
+
 if __name__ == '__main__':
     unittest.main()

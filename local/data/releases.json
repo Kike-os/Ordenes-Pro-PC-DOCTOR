@@ -8,6 +8,24 @@
   },
   "releases": [
     {
+      "version": "1.5.338",
+      "date": "2026-11-24T13:35:09-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Recuperación de mensajes de WhatsApp omitidos por el límite mensual",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Centro de Atención: administración puede pasar al personal los mensajes de WhatsApp que llegaron con el límite mensual alcanzado (antes de 1.5.337). Se crea una conversación por cliente en «Esperan asesor», con la hora; no se envía nada al cliente."
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Administración (autorización expresa en la sesión)"
+    },
+    {
       "version": "1.5.337",
       "date": "2026-11-24T13:27:48-05:00",
       "type": "patch",

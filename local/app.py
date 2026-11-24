@@ -1732,7 +1732,7 @@ class Handler(BaseHTTPRequestHandler):
                 import support_sessions
                 result=live_support.rows(c,arg_live('scope','active'),arg_live('filter'),arg_live('channel'))
                 return self.reply(200,{'rows':result,'server_time':appointments.stamp(appointments.now()),'filters':live_support.FILTERS,'metrics':live_support.metrics(c),
-                                       'support':{'installed':support_sessions.installed(c),'settings':support_sessions.settings(c)}})
+                                       'support':{'installed':support_sessions.installed(c),'settings':support_sessions.settings(c)},'missed':__import__('whatsapp_adi').missed(c) if user['role']=='administrador' else 0})
             if path == '/api/adi/live/settings':
                 import support_sessions
                 if user['role']!='administrador':return self.reply(403,{'error':'Solo administración configura el centro de atención.'})
@@ -4875,6 +4875,12 @@ class Handler(BaseHTTPRequestHandler):
                         if action=='save':support_sessions.save_settings(c,data,user,now_ls);audit(c,user['id'],'live_support_settings')
                         elif action=='activate':result=support_sessions.activate(c,user,now_ls,data.get('confirm'));audit(c,user['id'],'live_support_activated');c.commit();return self.reply(200,result)
                         elif action=='deactivate':support_sessions.deactivate(c,user,now_ls);audit(c,user['id'],'live_support_deactivated')
+                        elif action=='recover_missed':
+                            import whatsapp_adi
+                            if str(data.get('confirm','')).strip().upper()!='PASAR':return self.reply(400,{'error':'Escribe PASAR para confirmar.'})
+                            try:result=whatsapp_adi.recover_missed(c,now_ls)
+                            except ValueError as error:return self.reply(409,{'error':str(error)})
+                            audit(c,user['id'],'whatsapp_missed_recovered',result['recovered']);c.commit();return self.reply(200,result)
                         else:return self.reply(400,{'error':'Acción no válida.'})
                     except support_sessions.SupportError as error:return self.reply(error.status,{'error':str(error)})
                     c.commit();return self.reply(200,{'installed':support_sessions.installed(c),'settings':support_sessions.settings(c),'simulation':support_sessions.simulate_activation(c,now_ls)})

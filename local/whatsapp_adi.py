@@ -71,6 +71,37 @@ def _keep_for_staff(c, number, text, message_id, secret, now, reason):
         return None
 
 
+MISSED_SQL = "FROM whatsapp_adi_inbound WHERE status='omitido' AND conversation_id IS NULL AND detail LIKE 'Límite mensual%'"
+
+
+def missed(c):
+    """Mensajes que llegaron con el límite mensual alcanzado ANTES de 1.5.337: no tienen conversación ni texto guardado."""
+    try:
+        return int(c.execute('SELECT COUNT(*) ' + MISSED_SQL).fetchone()[0] or 0)
+    except Exception:
+        return 0
+
+
+def recover_missed(c, now, env=None):
+    """Los pasa al personal: una conversación por cliente con una nota de cuándo escribió y una solicitud de atención de prioridad alta.
+    No envía nada al cliente. El texto original no se guardó en su momento: la nota lo dice con claridad."""
+    secret = wa.config(env)['secret']
+    if not secret:
+        raise ValueError('WhatsApp no está configurado.')
+    rows = c.execute('SELECT wa_message_id,sender,received_at ' + MISSED_SQL + ' ORDER BY received_at').fetchall()
+    done = 0
+    for r in rows:
+        when = str(r['received_at'])[:16].replace('T', ' ')
+        note = ('[Mensaje recibido el %s, cuando ADI había alcanzado el límite mensual de WhatsApp. Su texto no se guardó: '
+                'escribe al cliente para retomar la consulta.]' % when)
+        conv_id = _keep_for_staff(c, r['sender'], note, r['wa_message_id'], secret, now, 'Límite mensual (mensaje recuperado).')
+        if conv_id:
+            c.execute('UPDATE whatsapp_adi_inbound SET conversation_id=?,detail=? WHERE wa_message_id=?',
+                      (conv_id, 'Límite mensual de seguridad alcanzado. Recuperado para el personal el %s.' % wa.stamp(now)[:16].replace('T', ' '), r['wa_message_id']))
+            done += 1
+    return {'recovered': done, 'pending': missed(c)}
+
+
 def handle(c, raw, signature, now, env=None):
     """Procesa mensajes entrantes solo con la función activada y una firma Meta válida."""
     cfg = wa.config(env)

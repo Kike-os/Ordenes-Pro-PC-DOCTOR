@@ -14040,3 +14040,4 @@ button.mc-kpi:hover{border-color:var(--mc)!important}button.mc-kpi:focus-visible
 .control-kpis.mc-kpis,.mc-fin-grid.mc-kpis{grid-template-columns:repeat(4,minmax(0,1fr))!important}
 @media (max-width:1180px){.control-kpis.mc-kpis,.mc-fin-grid.mc-kpis{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
 @media (max-width:460px){.control-kpis.mc-kpis,.mc-fin-grid.mc-kpis{grid-template-columns:1fr!important}}
+.live-missed{margin:12px 0 4px}

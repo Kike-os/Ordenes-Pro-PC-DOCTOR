@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.338 — 2026-11-24 13:35 (UTC-05:00)
+
+Recuperación de mensajes de WhatsApp omitidos por el límite mensual
+
+### Mejoras realizadas
+
+- Centro de Atención: administración puede pasar al personal los mensajes de WhatsApp que llegaron con el límite mensual alcanzado (antes de 1.5.337). Se crea una conversación por cliente en «Esperan asesor», con la hora; no se envía nada al cliente.
+
 ## v1.5.337 — 2026-11-24 13:27 (UTC-05:00)
 
 WhatsApp sin mensajes perdidos por el límite mensual, límites ampliados y reportes de facturación
