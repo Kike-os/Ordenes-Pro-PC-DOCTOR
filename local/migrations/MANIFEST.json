@@ -119,5 +119,6 @@
  "119_payment_commitments.sql": "e933c86e6c0de60f711cf31581baf45f317f7d95d1d255120bba061a242db8a3",
  "120_financial_rates.sql": "08232a8ed1838b728d4bbb13823e2b2abe18272b4457c23e2d2b3a757470558b",
  "121_collection_flags.sql": "5671742b456f00832c6f08ce8cdb77bfb3224956108773c2bec63ad21af185ae",
- "122_migration_ledger.sql": "ced7e5ad38fd8aea74c5d4df53108b43b6d4d98e4cf481dc043370c66e8a3928"
+ "122_migration_ledger.sql": "ced7e5ad38fd8aea74c5d4df53108b43b6d4d98e4cf481dc043370c66e8a3928",
+ "123_support_sessions.sql": "1a563e2fd73591a98e6d7aad3b16b6df17de1c4431428bdd9944e305a6970e42"
 }

@@ -13895,3 +13895,24 @@ body[data-page=dashboard] .fxb-pager select{height:30px!important;min-height:30p
 .cc31 .cc-state{white-space:normal;max-width:100%;line-height:1.25}
 .sfu-recipient{display:grid;gap:2px;padding:8px 10px;border:1px solid #23395c;border-radius:10px;background:#0b172b;font-size:12px;color:#dbe6f7;min-width:0}
 .sfu-recipient strong{font-size:11.5px;color:#9fb4d4}.sfu-recipient small{font-size:11.5px;color:#b9c8e2;overflow-wrap:anywhere}
+/* ADI Live Support Center 4.0 (solo .live-timer, .live-countdown, .live-metric, .live-settings y relacionados). */
+.live-timer{display:grid;gap:3px;margin:6px 0;padding:8px 10px;border-radius:10px;border:1px solid #23395c;background:#0b172b;transition:background-color .3s ease,border-color .3s ease}
+.live-timer strong{font-size:12.5px;color:#e6efff}.live-timer small{font-size:11.5px;color:#9fb4d4}
+.live-timer-bar{display:block;height:5px;border-radius:999px;background:#16263f;overflow:hidden}.live-timer-bar i{display:block;height:100%;background:#34d399;transition:width .6s linear,background-color .3s ease}
+.live-timer[data-tone=amarillo]{border-color:#7a5a12}.live-timer[data-tone=amarillo] .live-timer-bar i{background:#fbbf24}
+.live-timer[data-tone=rojo]{border-color:#7a2a2f;background:#2d1215}.live-timer[data-tone=rojo] .live-timer-bar i{background:#f87171}
+.live-timer[data-tone=gris] .live-timer-bar i{background:#64748b}
+.live-countdown{font-size:11px;font-weight:700;padding:1px 7px;border-radius:999px;background:#0d2a20;color:#86efac}
+.live-countdown[data-tone=amarillo]{background:#2b200b;color:#fde68a}.live-countdown[data-tone=rojo]{background:#2d1215;color:#fca5a5}
+.live-channel-tag{font-size:10.5px;padding:1px 6px;border-radius:999px;background:#16263f;color:#9fb4d4}
+.live-channel{min-height:32px;font-size:12px;max-width:100%}
+.live-metric{display:grid;gap:2px;padding:9px 11px;border-radius:10px;border:1px solid #23395c;border-top:3px solid var(--ag,#7fb0ff);background:#0b172b}
+.live-metric strong{font-size:17px;color:#fff}.live-metric small{font-size:11.5px;color:#9fb4d4}
+.live-internal{border-style:dashed!important;background:#1c1638!important}.live-internal header b{color:#c4b5fd}
+.live-settings{width:min(640px,calc(100vw - 32px))}.live-settings-body{display:grid;gap:12px}
+.live-settings-state{margin:0;padding:8px 10px;border-radius:10px;background:#2b200b;color:#fde68a;font-size:12.5px}.live-settings-state[data-on=true]{background:#0d2a20;color:#86efac}
+.live-settings-form{display:grid;gap:8px}.live-field{display:grid;gap:4px;font-size:12px;color:#9fb4d4}.live-field input,.live-field textarea{width:100%}.live-field small{font-size:11px}
+.live-check{display:flex;gap:8px;align-items:flex-start;font-size:12.5px;color:#dbe6f7}
+.live-sim{display:grid;gap:6px;padding:10px 12px;border:1px solid #23395c;border-radius:10px;background:#0b172b}.live-sim h3{margin:0;font-size:13px}.live-sim p,.live-sim small,.live-sim li{font-size:12px;color:#c4d3ea;margin:0}
+.live-sim ul{margin:0;padding-left:16px;display:grid;gap:3px}
+@media (prefers-reduced-motion:reduce){.live-timer,.live-timer-bar i{transition:none}}

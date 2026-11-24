@@ -55,7 +55,9 @@ comparar el diseño con ellas.
 
 ## ADI Live Support Center 4.0
 
-- [ ] En cola: cierre automático a los 8 minutos en el servidor, bandeja inteligente, contador, atención humana y configuración.
+- [x] Cierre automático a los 8 minutos en el servidor, bandeja con filtros, contador, pausa, notas internas y configuración con simulación (1.5.333, migración 123).
+- [ ] **[Administración]** Activar el cierre automático en producción después de revisar la simulación.
+- [ ] **[Administración]** Si se quieren avisos proactivos por WhatsApp al minuto 7: autorizar un programador externo por minuto (`/api/cron/live-support`).
 
 ## Premium Billing Center 4.0
 
