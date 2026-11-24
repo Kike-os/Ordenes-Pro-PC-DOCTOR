@@ -8,6 +8,26 @@
   },
   "releases": [
     {
+      "version": "1.5.326",
+      "date": "2026-11-24T01:59:42-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "ADI 3.0 fase 1 (comunicación inteligente) y Epson Precision Print 4.2",
+      "changes": {
+        "features": [
+          "ADI Enterprise AI 3.0 · fase 1: análisis integral de la orden (filtrado, sin notas internas, costos ni credenciales), 21 motivos de mensaje según los datos registrados, control previo al envío de 12 puntos (horario de cobranza L-V 08:00-19:00 sin feriados, una gestión diaria, privacidad, consentimiento) y gestión de retrasos atribuibles a PC-DOCTOR."
+        ],
+        "improvements": [
+          "Epson Precision Print 4.2: ticket de factura con página de 80 mm y contenido centrado en 68 mm (58 mm: 44 mm), tamaños de letra definidos, logotipo de 24 mm, columnas alineadas, altura según el contenido sin espacio final, Code 128 legible en partes junto al QR y muestra de calibración con datos ficticios."
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Administración (autorización expresa en la sesión)"
+    },
+    {
       "version": "1.5.325",
       "date": "2026-11-24T01:10:04-05:00",
       "type": "patch",
