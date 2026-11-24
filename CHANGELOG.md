@@ -4,6 +4,18 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.326 — 2026-11-24 01:59 (UTC-05:00)
+
+ADI 3.0 fase 1 (comunicación inteligente) y Epson Precision Print 4.2
+
+### Nuevas funcionalidades
+
+- ADI Enterprise AI 3.0 · fase 1: análisis integral de la orden (filtrado, sin notas internas, costos ni credenciales), 21 motivos de mensaje según los datos registrados, control previo al envío de 12 puntos (horario de cobranza L-V 08:00-19:00 sin feriados, una gestión diaria, privacidad, consentimiento) y gestión de retrasos atribuibles a PC-DOCTOR.
+
+### Mejoras realizadas
+
+- Epson Precision Print 4.2: ticket de factura con página de 80 mm y contenido centrado en 68 mm (58 mm: 44 mm), tamaños de letra definidos, logotipo de 24 mm, columnas alineadas, altura según el contenido sin espacio final, Code 128 legible en partes junto al QR y muestra de calibración con datos ficticios.
+
 ## v1.5.325 — 2026-11-24 01:10 (UTC-05:00)
 
 Centro de impresión: obtener el RIDE de AZUR de facturas ya autorizadas
