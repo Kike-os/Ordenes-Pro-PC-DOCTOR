@@ -2565,6 +2565,11 @@ class Handler(BaseHTTPRequestHandler):
                     found=re.fullmatch(r'/api/invoicing/policies/([0-9]{1,9})\.pdf',path)
                     if found:
                         policy=docs._policy(c,found[1]);return self.reply(200,docs.policy_pdf(policy),'application/pdf',filename='POLITICAS-%s-%s%s.pdf'%(policy['code'],policy['version'],'-BORRADOR' if policy['status']=='borrador' else ''))
+                    if path=='/api/invoicing/ticket-calibration.pdf':
+                        # Epson Precision Print 4.2: muestra de calibración con datos FICTICIOS (no es una factura ni consume secuenciales).
+                        import invoice_ticket
+                        fmt=arg('format') if arg('format') in invoice_ticket.FORMATS else '80'
+                        return self.reply(200,invoice_ticket.render(invoice_ticket.calibration_data(),fmt,calibration=True),'application/pdf',filename='CALIBRACION-TICKET-%sMM.pdf'%fmt)
                     found=re.fullmatch(r'/api/invoicing/([0-9]{1,9})/print-center',path)
                     if found:
                         # Centro de impresión: formatos compatibles, preferencias del usuario e historial. Solo lectura.

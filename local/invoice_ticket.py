@@ -1,11 +1,19 @@
-"""PC-DOCTOR — Tech Retail Invoice 4.0: factura electrónica en ticket térmico de 80 mm (72 mm útiles) o 58 mm (48 mm útiles) a 203 dpi.
+"""PC-DOCTOR — Tech Retail Thermal Edition 4.2 · Epson Precision Print: factura electrónica en ticket térmico a 203 dpi.
+
+80 mm (Epson TM-m30 / TM-m30II): página PDF de 80 mm de ancho con el contenido centrado en 68 mm (72 mm imprimibles menos 2 mm de seguridad
+por lado). 58 mm: página de 58 mm con 44 mm de contenido (48 mm imprimibles). La página mide exactamente el ancho del papel para que el
+controlador no aplique los márgenes físicos dos veces; la altura se calcula con el contenido real (sin alto fijo ni espacio al final, solo
+el avance mínimo para el corte).
 
 Solo REPRESENTA un comprobante ya emitido: no emite, no consume secuenciales, no cambia pagos, caja, inventario ni el estado tributario, y no
-envía nada. Los importes salen tal cual de la factura registrada (partidas, impuestos y formas de pago); nada se recalcula ni se redondea
-de otra forma. Blanco y negro, logotipo original convertido a escala de grises (sin redibujarlo), una página de altura variable por copia.
-La clave de acceso va completa en texto y en un QR (en 72 o 48 mm un Code 128 de 49 dígitos solo cabe a un punto por módulo y el lector no lo
-lee de forma fiable: falló en 4 de cada 10 claves; por eso no se imprime. El RIDE A4 conserva su Code 128). Nunca imprime credenciales, contraseñas ni
-claves de activación. Mientras no esté autorizada por el SRI en producción, cada copia lo dice: no es un comprobante válido."""
+envía nada. Los importes salen tal cual de la factura registrada; nada se recalcula. Blanco y negro, logotipo original en escala de grises
+(sin redibujarlo). Tipografía Helvetica (métricas de Arial): texto 8 pt, secundario 7,5, secciones 8,5, título 10, número 9, total 12,
+pie y clave 7,5; interlineado 1,2; negrita solo en encabezados, número, estado e importes principales.
+
+Clave de acceso: completa en texto, en QR y en Code 128 REAL dividido en partes (80 mm: 2 partes de 24 y 25 dígitos; 58 mm: 3 partes), con
+módulos de 2 puntos y zona de silencio de 10 módulos. Un solo Code 128 de 49 dígitos solo cabe a 1 punto por módulo (el lector falló en 4 de
+cada 10 claves); a 2 puntos mide 85 mm y no cabe en el cabezal de 72 mm. El RIDE A4 conserva su Code 128 único. Nunca imprime credenciales.
+Mientras no esté autorizada por el SRI en producción, cada copia lo dice: no es un comprobante válido."""
 import io
 import sys
 from datetime import datetime
@@ -15,6 +23,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent / 'vendor'))
 import pydyf
 import segno
 
+from code128 import widths as barcode_widths
+
 from corporate import settings as corporate
 from document_logo import pixels as logo_pixels
 from receipt_pdf import WIDTHS
@@ -22,10 +32,16 @@ from reception import ECUADOR_TZ
 
 MM = 72 / 25.4
 DOT = 72 / 203
-FORMATS = {'80': {'width': 72 * MM, 'logo_mm': 20, 'base': 8.2, 'label': 'Ticket térmico 80 mm'},
-           '58': {'width': 48 * MM, 'logo_mm': 15, 'base': 7.2, 'label': 'Ticket térmico 58 mm'}}
-MARGIN = 1 * MM
-BAR_HEIGHT = 10 * MM
+SIZES80 = {'body': 8, 'small': 7.5, 'section': 8.5, 'title': 10, 'number': 9, 'total': 12, 'footer': 7.5, 'key': 7.5, 'brand': 10}
+SIZES58 = {'body': 7, 'small': 6.5, 'section': 7.5, 'title': 9, 'number': 8, 'total': 11, 'footer': 6.5, 'key': 6.5, 'brand': 9}
+FORMATS = {'80': {'page': 80 * MM, 'content': 68 * MM, 'logo_mm': 24, 'sizes': SIZES80, 'parts': (24, 25), 'label': 'Ticket térmico 80 mm'},
+           '58': {'page': 58 * MM, 'content': 44 * MM, 'logo_mm': 18, 'sizes': SIZES58, 'parts': (16, 16, 17), 'label': 'Ticket térmico 58 mm'}}
+LEAD = 1.2
+MODULE_DOTS = 2           # módulo del Code 128: 2 puntos = 0,25 mm (1 punto no es legible de forma fiable)
+QUIET = 10                # zona de silencio en módulos, a cada lado
+BAR_HEIGHT = 8 * MM
+TOP = 1.5 * MM
+CUT_FEED = 2 * MM         # avance mínimo bajo el pie; el corte automático lo añade la impresora
 STATUS_TEXT = {'autorizado': 'AUTORIZADA POR EL SRI', 'pendiente': 'PENDIENTE DE AUTORIZACIÓN', 'enviado': 'ENVIADA AL SRI · EN ESPERA',
                'rechazado': 'RECHAZADA POR EL SRI', 'borrador': 'BORRADOR'}
 FOOTER = ('Gracias por confiar en PC-DOCTOR.', 'Tecnología que inspira confianza.')
@@ -98,14 +114,27 @@ def data_for(c, invoice_id):
     return {'invoice': inv, 'fiscal': fiscal, 'items': detail['items'], 'payments': detail['payments'], 'groups': groups, 'reference': reference}
 
 
-def render(data, fmt='80', copies=1):
-    """PDF del ticket. `copies` páginas idénticas (1 a 5), cada una de altura variable."""
+def key_parts(key, fmt='80'):
+    """Partes de la clave de acceso para el Code 128 (en orden). Unidas forman la clave completa."""
+    out, i = [], 0
+    for n in FORMATS[fmt]['parts']:
+        out.append(key[i:i + n])
+        i += n
+    if i < len(key):
+        out[-1] += key[i:]
+    return [part for part in out if part]
+
+
+def render(data, fmt='80', copies=1, calibration=False):
+    """PDF del ticket. `copies` páginas idénticas (1 a 5), cada una de altura variable. `calibration` añade marcas de 68 mm (o 44 mm) y de
+    los bordes del área imprimible para medir los márgenes reales en papel (solo para la muestra con datos ficticios)."""
     if fmt not in FORMATS:
         raise TicketError('Formato de ticket no válido.', 400)
     copies = max(1, min(5, int(copies or 1)))
     spec = FORMATS[fmt]
-    W, base = spec['width'], spec['base']
-    inner = W - 2 * MARGIN
+    W, inner, S = spec['page'], spec['content'], spec['sizes']
+    X0 = (W - inner) / 2
+    X1 = X0 + inner
     inv, fiscal, company = data['invoice'], data['fiscal'], corporate()
     pdf = pydyf.PDF()
     pdf.info['Title'] = pydyf.String('FACTURA-' + (inv.get('number') or str(inv['id'])))
@@ -115,7 +144,7 @@ def render(data, fmt='80', copies=1):
         font = pydyf.Dictionary({'Type': '/Font', 'Subtype': '/Type1', 'BaseFont': '/' + name, 'Encoding': '/WinAnsiEncoding'})
         pdf.add_object(font)
         fonts[key] = font.reference
-    logo_px = 416 if fmt == '80' else 320
+    logo_px = 480 if fmt == '80' else 360
     logo_w, logo_h, rgb, alpha, _ = logo_pixels(logo_px)
     gray = bytes(min(255, round((.2126 * rgb[i * 3] + .7152 * rgb[i * 3 + 1] + .0722 * rgb[i * 3 + 2]) * a / 255 + 255 - a)) for i, a in enumerate(alpha))
     logo = pydyf.Stream([gray], extra={'Type': '/XObject', 'Subtype': '/Image', 'Width': logo_w, 'Height': logo_h, 'ColorSpace': '/DeviceGray',
@@ -153,64 +182,77 @@ def render(data, fmt='80', copies=1):
 
     key = inv['access_key']
     qr = list(segno.make_qr(key, error='m').matrix)
-    qr_unit = next((n * DOT for n in (4, 3, 2) if (len(qr) + 8) * n * DOT <= inner * .7), 2 * DOT)
+    qr_unit = next((n * DOT for n in (5, 4, 3, 2) if (len(qr) + 8) * n * DOT <= inner * .5), 2 * DOT)
     qr_size = (len(qr) + 8) * qr_unit
+    parts = key_parts(key, fmt)
+    bars = []
+    for part in parts:
+        widths = barcode_widths(part)
+        span = (sum(widths) + 2 * QUIET) * MODULE_DOTS * DOT
+        if span > W:
+            raise TicketError('La clave de acceso no cabe en Code 128 en este ancho.', 500)
+        bars.append((part, widths, span))
     valid = inv['status'] == 'autorizado' and inv['environment'] == '2'
 
     def compose():
-        ops, y = [], 4
+        ops, y = [], TOP
 
-        def text(value, size=None, font='F1', center=False, gap=1.5, lead=1.22, x=None, width=None):
+        def text(value, size, font='F1', center=False, gap=1.2, x=None, width=None):
             nonlocal y
-            size = size or base
-            x = MARGIN if x is None else x
-            width = inner - (x - MARGIN) if width is None else width
+            x = X0 if x is None else x
+            width = X1 - x if width is None else width
             for line in wrap(value, size, font, width):
                 ops.append(('text', line, y, size, font, (W - width_of(line, size, font)) / 2 if center else x))
-                y += size * lead
+                y += size * LEAD
             y += gap
 
-        def row(left, right, size=None, font='F1', rfont=None, gap=1.2):
-            """Etiqueta a la izquierda e importe alineado a la derecha (números tabulares de Helvetica)."""
+        def row(left, right, size, font='F1', rfont=None, gap=.8):
+            """Concepto a la izquierda (con salto de línea natural) e importe alineado a la derecha, en cifras tabulares."""
             nonlocal y
-            size = size or base
             rfont = rfont or font
             rw = width_of(right, size, rfont)
-            lines = wrap(left, size, font, inner - rw - 6)
-            for n, line in enumerate(lines):
-                ops.append(('text', line, y, size, font, MARGIN))
+            for n, line in enumerate(wrap(left, size, font, inner - rw - 6)):
+                ops.append(('text', line, y, size, font, X0))
                 if n == 0:
-                    ops.append(('text', right, y, size, rfont, W - MARGIN - rw))
-                y += size * 1.22
+                    ops.append(('text', right, y, size, rfont, X1 - rw))
+                y += size * LEAD
             y += gap
 
-        def rule(gap=4, heavy=False):
+        def columns(values, size, font='F1', gap=.6):
+            """Cantidad, precio unitario e importe en columnas fijas alineadas a la derecha."""
             nonlocal y
-            y += 1
+            edges = (X0 + inner * .22, X0 + inner * .62, X1)
+            for value, edge in zip(values, edges):
+                ops.append(('text', value, y, size, font, edge - width_of(value, size, font)))
+            y += size * LEAD + gap
+
+        def rule(gap=3, heavy=False):
+            nonlocal y
+            y += 1.5
             ops.append(('rule', y, .8 if heavy else .4))
             y += gap
 
         def heading(value):
-            text(value.upper(), base - .6, 'F2', gap=1.2)
+            text(value.upper(), S['section'], 'F2', gap=1)
 
-        # 1 · Encabezado empresarial (logo original, nombre comercial y datos fiscales registrados)
+        # 1 · Encabezado empresarial: logo original centrado (24 mm en 80 mm) y datos fiscales registrados
         logo_w_pt = spec['logo_mm'] * MM
         logo_h_pt = logo_w_pt * logo_h / logo_w
         ops.append(('logo', y, logo_w_pt, logo_h_pt))
-        y += logo_h_pt + 4
+        y += logo_h_pt + 2.5
         trade = (fiscal.get('trade_name') or company['name'] or '').strip()
-        text(trade, base + 2.6, 'F2', center=True, gap=1)
+        text(trade, S['brand'], 'F2', center=True, gap=.6)
         if fiscal.get('legal_name') and fiscal['legal_name'].strip().upper() != trade.upper():
-            text(fiscal['legal_name'], base - .4, 'F2', center=True, gap=1)
-        text('RUC ' + (fiscal.get('ruc') or '—'), base, 'F2', center=True, gap=1.5)
+            text(fiscal['legal_name'], S['small'], center=True, gap=.4)
+        text('RUC ' + (fiscal.get('ruc') or '—'), S['body'], center=True, gap=.8)
         if fiscal.get('head_office_address'):
-            text('Matriz: ' + fiscal['head_office_address'], base - 1, center=True, gap=.6)
+            text('Matriz: ' + fiscal['head_office_address'], S['small'], center=True, gap=.4)
         branch = (fiscal.get('branch_address') or '').strip()
         if branch and branch != (fiscal.get('head_office_address') or '').strip():
-            text('Establecimiento: ' + branch, base - 1, center=True, gap=.6)
-        contact = ' · '.join(x for x in (company.get('whatsapp', ''), company.get('support_email', '')) if x)
-        if contact:
-            text(contact, base - 1.4, center=True, gap=.8)
+            text('Establecimiento: ' + branch, S['small'], center=True, gap=.4)
+        for contact in (company.get('whatsapp', ''), company.get('support_email', '')):
+            if contact:
+                text(contact, S['small'], center=True, gap=.2)
         tax = ['Obligado a llevar contabilidad: ' + ('SÍ' if str(fiscal.get('keeps_accounts', '')).upper() in ('SI', 'SÍ', '1', 'TRUE') else 'NO')]
         if fiscal.get('regime', '').startswith('rimpe'):
             tax.append('CONTRIBUYENTE ' + fiscal.get('regime_label', '').upper())
@@ -219,86 +261,91 @@ def render(data, fmt='80', copies=1):
         if (fiscal.get('withholding_agent') or '').strip():
             tax.append('Agente de retención: ' + fiscal['withholding_agent'].strip())
         for line in tax:
-            text(line, base - 1.6, center=True, gap=.4)
+            text(line, S['small'], center=True, gap=.2)
 
         # 2 · Identificación tributaria
-        rule(5, heavy=True)
-        text('FACTURA ELECTRÓNICA', base + 2, 'F2', center=True, gap=1)
-        text('No. ' + (inv.get('number') or ''), base + 1.4, 'F2', center=True, gap=3)
-        row('Emisión', when(inv.get('emitted_at') or inv.get('issue_date')))
+        rule(3, heavy=True)
+        text('FACTURA ELECTRÓNICA', S['title'], 'F2', center=True, gap=.4)
+        text('No. ' + (inv.get('number') or ''), S['number'], 'F2', center=True, gap=2)
+        row('Emisión', when(inv.get('emitted_at') or inv.get('issue_date')), S['small'])
         if inv.get('authorized_at'):
-            row('Autorización', when(inv['authorized_at']))
-        row('Ambiente', 'Producción' if inv['environment'] == '2' else 'Pruebas')
-        row('Tipo de emisión', 'Normal')
-        row('Estado', STATUS_TEXT.get(inv['status'], inv['status'].upper()), font='F1', rfont='F2')
+            row('Autorización', when(inv['authorized_at']), S['small'])
+        row('Ambiente', 'Producción' if inv['environment'] == '2' else 'Pruebas', S['small'])
+        row('Tipo de emisión', 'Normal', S['small'])
+        row('Estado', STATUS_TEXT.get(inv['status'], inv['status'].upper()), S['small'], rfont='F2')
         if not valid:
             y += 1
             text('DOCUMENTO DE PRUEBA — SIN VALIDEZ TRIBUTARIA' if inv['environment'] == '1' else 'NO AUTORIZADA POR EL SRI — SIN VALIDEZ TRIBUTARIA',
-                 base - .4, 'F2', center=True, gap=1)
+                 S['body'], 'F2', center=True, gap=.6)
 
         # 3 · Cliente
         rule()
         heading('Cliente')
-        text('CONSUMIDOR FINAL' if inv.get('consumer_final') else (inv.get('buyer_name') or '—'), base, 'F2', gap=.6)
+        text('CONSUMIDOR FINAL' if inv.get('consumer_final') else (inv.get('buyer_name') or '—'), S['body'], gap=.3)
         if not inv.get('consumer_final') and inv.get('buyer_id'):
-            text(('RUC ' if len(inv['buyer_id']) == 13 else 'CI ') + inv['buyer_id'], base - .6, gap=.6)
+            text(('RUC ' if len(inv['buyer_id']) == 13 else 'CI ') + inv['buyer_id'], S['small'], gap=.3)
         if (inv.get('buyer_address') or '').strip() and not inv.get('consumer_final'):
-            text('Dirección: ' + inv['buyer_address'].strip(), base - 1, gap=.6)
+            text('Dirección: ' + inv['buyer_address'].strip(), S['small'], gap=.3)
         if data.get('reference'):
-            text('%s: %s' % data['reference'], base - 1, gap=.6)
+            text('%s: %s' % data['reference'], S['small'], gap=.3)
 
-        # 4 · Productos y servicios
+        # 4 · Detalle: descripción completa y debajo cantidad, precio unitario e importe en columnas
         rule()
         heading('Detalle')
+        columns(('Cant.', 'P. unit.', 'Importe'), S['small'], 'F2', gap=.8)
         for item in data['items']:
-            text(item['description'], base - .2, 'F2', gap=.4)
-            row('%s × %s' % (qty(item['quantity']), unit_price(item['unit_price_micros'])), money(int(item['base_cents']) + int(item['discount_cents'] or 0)), base - .8, gap=.2)
+            text(item['description'], S['body'], gap=.2)
+            columns((qty(item['quantity']), unit_price(item['unit_price_micros']), money(int(item['base_cents']) + int(item['discount_cents'] or 0))), S['small'])
             if int(item['discount_cents'] or 0):
-                row('Descuento', money(-int(item['discount_cents'])), base - .8, gap=.2)
-            y += 1.6
+                row('Descuento', money(-int(item['discount_cents'])), S['small'], gap=.2)
+            y += 1.2
 
-        # 6 · Resumen económico (los valores del comprobante, sin recalcular)
+        # 5 · Resumen económico (valores del comprobante, sin recalcular)
         rule()
         for rate in sorted(data['groups'], reverse=True):
             label = 'Subtotal IVA %s%%' % ('%g' % (rate / 100)) if rate else 'Subtotal 0%'
-            row(label, money(data['groups'][rate]['base']))
-        row('Subtotal sin impuestos', money(inv['subtotal_cents']))
+            row(label, money(data['groups'][rate]['base']), S['body'])
+        row('Subtotal sin impuestos', money(inv['subtotal_cents']), S['body'])
         if int(inv.get('discount_cents') or 0):
-            row('Descuentos', money(inv['discount_cents']))
+            row('Descuentos', money(inv['discount_cents']), S['body'])
         for rate in sorted(data['groups'], reverse=True):
             if rate and data['groups'][rate]['tax']:
-                row('IVA %s%%' % ('%g' % (rate / 100)), money(data['groups'][rate]['tax']))
+                row('IVA %s%%' % ('%g' % (rate / 100)), money(data['groups'][rate]['tax']), S['body'])
         y += 1
         ops.append(('rule', y, .8))
-        y += 3
-        row('TOTAL', money(inv['total_cents']), base + 4, 'F2', gap=2)
+        y += 2.5
+        row('TOTAL', money(inv['total_cents']), S['total'], 'F2', gap=1.2)
 
-        # 7 · Pago (formas registradas en la factura; nunca se marca «pagada» sin un pago confirmado)
+        # 6 · Pago (formas registradas en la factura; nunca se marca «pagada» sin un pago confirmado)
         if data['payments']:
             rule()
             heading('Forma de pago')
             for p in data['payments']:
-                row(p.get('label') or p.get('method') or '—', money(p['amount_cents']), base - .6, gap=.4)
+                row(p.get('label') or p.get('method') or '—', money(p['amount_cents']), S['body'], gap=.3)
 
-        # 8 · Autorización electrónica
+        # 7 · Autorización electrónica: clave completa en texto, Code 128 en partes y QR
         rule()
         heading('Clave de acceso')
-        groups = ' '.join(key[i:i + 10] for i in range(0, len(key), 10))
-        text(groups, base - (1.4 if W > 50 * MM else 1.9), 'F3', center=True, gap=1)
+        text(' '.join(key[i:i + 10] for i in range(0, len(key), 10)), S['key'], 'F3', center=True, gap=.8)
         if inv.get('authorization_number') and inv['authorization_number'] != key:
-            text('Autorización: ' + inv['authorization_number'], base - 1.6, center=True, gap=1)
-        y += 1
+            text('Autorización: ' + inv['authorization_number'], S['small'], center=True, gap=.8)
+        first = 1
+        for n, (part, widths, span) in enumerate(bars, 1):
+            ops.append(('barcode', y, widths, span))
+            y += BAR_HEIGHT + 1.5
+            text('Código de barras %d de %d · dígitos %d a %d' % (n, len(bars), first, first + len(part) - 1), S['small'] - .5, center=True, gap=1.8)
+            first += len(part)
         ops.append(('qr', y, qr_size, qr_unit, qr))
-        y += qr_size + 1
-        text('Verifica la validez en ' + SRI_PORTAL, base - 1.6, center=True, gap=1)
+        y += qr_size
+        text('QR con la clave completa. Verifica la validez en ' + SRI_PORTAL, S['small'], center=True, gap=.6)
 
-        # 9 · Pie corporativo
-        rule()
-        text(FOOTER[0], base - .2, 'F2', center=True, gap=.4)
-        text(FOOTER[1], base - 1, center=True, gap=1)
-        text(PORTAL, base - 1.6, center=True, gap=.4)
-        text('Powered by Órdenes Pro', base - 2, center=True, gap=0)
-        return ops, y + 8
+        # 8 · Pie corporativo centrado
+        rule(2.5)
+        text(FOOTER[0], S['footer'], center=True, gap=.2)
+        text(FOOTER[1], S['footer'], center=True, gap=.2)
+        text(PORTAL, S['footer'], center=True, gap=.2)
+        text('Powered by Órdenes Pro', S['footer'] - .5, center=True, gap=0)
+        return ops, y + CUT_FEED
 
     for _ in range(copies):
         ops, height = compose()
@@ -316,8 +363,8 @@ def render(data, fmt='80', copies=1):
                 stream.end_text()
             elif kind == 'rule':
                 stream.set_line_width(op[2])
-                stream.move_to(MARGIN, height - op[1])
-                stream.line_to(W - MARGIN, height - op[1])
+                stream.move_to(X0, height - op[1])
+                stream.line_to(X1, height - op[1])
                 stream.stroke()
             elif kind == 'logo':
                 _, top, lw, lh = op
@@ -327,11 +374,12 @@ def render(data, fmt='80', copies=1):
                 stream.pop_state()
             elif kind == 'barcode':
                 _, top, widths, span = op
-                left = snap((W - span) / 2) + 10 * DOT
+                module = MODULE_DOTS * DOT
+                left = snap((W - span) / 2) + QUIET * module
                 for i, w in enumerate(widths):
                     if i % 2 == 0:
-                        stream.rectangle(left, height - top - BAR_HEIGHT, w * DOT, BAR_HEIGHT)
-                    left += w * DOT
+                        stream.rectangle(left, height - top - BAR_HEIGHT, w * module, BAR_HEIGHT)
+                    left += w * module
                 stream.fill()
             elif kind == 'qr':
                 _, top, size, unit, cells = op
@@ -341,9 +389,37 @@ def render(data, fmt='80', copies=1):
                         if dark:
                             stream.rectangle(left + (col + 4) * unit, height - top - (r + 5) * unit, unit, unit)
                 stream.fill()
+        if calibration:
+            # Marcas de la muestra de calibración: bordes del contenido (68/44 mm) y del área imprimible (72/48 mm), arriba y abajo.
+            printable = (72 if fmt == '80' else 48) * MM
+            stream.set_line_width(.3)
+            for xs, length in (((X0, X1), 4 * MM), (((W - printable) / 2, (W + printable) / 2), 2 * MM)):
+                for x in xs:
+                    for top in (0, height - length):
+                        stream.move_to(x, height - top)
+                        stream.line_to(x, height - top - length)
+            stream.stroke()
         page = pydyf.Dictionary({'Type': '/Page', 'Parent': pdf.pages.reference, 'MediaBox': pydyf.Array([0, 0, W, height]), 'Resources': resources,
                                  'Contents': stream.reference})
         pdf.add_page(page)
     out = io.BytesIO()
     pdf.write(out)
     return out.getvalue()
+
+
+def calibration_data():
+    """Datos FICTICIOS para la muestra de calibración: no corresponden a ninguna factura ni consumen secuenciales."""
+    import random
+    rnd = random.Random(4242)
+    key = ''.join(rnd.choice('0123456789') for _ in range(49))
+    items = [{'description': 'Mantenimiento preventivo de laptop (muestra de calibración, dato ficticio)', 'quantity': 1, 'unit_price_micros': 25_000_000,
+              'base_cents': 2500, 'discount_cents': 0, 'tax_rate_bp': 1500, 'tax_cents': 375},
+             {'description': 'Cambio de pasta térmica de alto rendimiento con limpieza de ventilador y revisión de temperaturas', 'quantity': 2,
+              'unit_price_micros': 7_500_000, 'base_cents': 1350, 'discount_cents': 150, 'tax_rate_bp': 1500, 'tax_cents': 203}]
+    inv = {'id': 0, 'number': '000-000-000000000', 'access_key': key, 'status': 'borrador', 'environment': '1', 'issue_date': '2026-01-01',
+           'consumer_final': False, 'buyer_name': 'CLIENTE DE MUESTRA CON UN NOMBRE MUY LARGO PARA PROBAR EL SALTO DE LÍNEA', 'buyer_id': '9999999999',
+           'buyer_address': 'Dirección ficticia de prueba', 'subtotal_cents': 3850, 'discount_cents': 150, 'tax_cents': 578, 'total_cents': 4428}
+    fiscal = {'trade_name': 'PC-DOCTOR', 'legal_name': 'MUESTRA DE CALIBRACIÓN', 'ruc': '0000000000000', 'head_office_address': 'Dirección de muestra',
+              'keeps_accounts': 'NO', 'regime': ''}
+    return {'invoice': inv, 'fiscal': fiscal, 'items': items, 'payments': [{'label': 'Efectivo (muestra)', 'amount_cents': 4428}],
+            'groups': {1500: {'base': 3850, 'tax': 578}}, 'reference': ('Muestra', 'SIN VALIDEZ')}

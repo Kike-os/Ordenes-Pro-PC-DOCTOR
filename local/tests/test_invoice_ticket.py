@@ -62,26 +62,63 @@ class InvoiceTicketTests(unittest.TestCase):
         self.assertEqual(self.snapshot(), before)                                                 # imprimir no emite ni cambia nada
 
     @unittest.skipUnless(TOOLS, 'pdftoppm y zbarimg no están instalados')
-    def test_access_key_qr_readable_at_203_dpi_for_many_keys(self):
-        """La clave de acceso se lee siempre en el QR (30 claves al azar en 80 y 58 mm, más la de una factura emitida). No hay Code 128 en el
-        ticket: a un punto por módulo el lector solo lo leía en 6 de cada 10 claves."""
+    def test_access_key_barcode_parts_and_qr_readable_at_203_dpi(self):
+        """Epson Precision Print 4.2: la clave completa se lee en el QR y en el Code 128 dividido en partes (80 mm: 2; 58 mm: 3) con módulos de
+        2 puntos, en 30 claves al azar más la de una factura emitida. Unidas en orden, las partes forman la clave."""
         import random
         cookie, csrf, post, inv = self.emitted(key='lector')
         with app.connect() as c:
             data = invoice_ticket.data_for(c, inv['id'])
-        keys = [inv['access_key']] + [''.join(random.Random(n).choice('0123456789') for _ in range(49)) for n in range(29)]
-        for fmt in ('80', '58'):
+        keys = [inv['access_key']]
+        for n in range(29):
+            rnd = random.Random(n)
+            keys.append(''.join(rnd.choice('0123456789') for _ in range(49)))
+        for fmt, count in (('80', 2), ('58', 3)):
             read = 0
             for key in keys:
+                parts = invoice_ticket.key_parts(key, fmt)
+                self.assertEqual((''.join(parts), len(parts)), (key, count))
                 data['invoice']['access_key'] = key
                 with tempfile.TemporaryDirectory() as folder:
                     path = Path(folder) / 't.pdf'
                     path.write_bytes(invoice_ticket.render(data, fmt))
                     subprocess.run(['pdftoppm', '-r', '203', '-gray', '-png', str(path), str(Path(folder) / 'p')], check=True)
                     found = subprocess.run(['zbarimg', '-q'] + [str(p) for p in sorted(Path(folder).glob('p*.png'))], capture_output=True, text=True).stdout
-                self.assertNotIn('CODE-128', found)
-                read += ('QR-Code:' + key) in found
+                codes = sorted(line.split(':', 1)[1] for line in found.splitlines() if line.startswith('CODE-128:'))
+                read += codes == sorted(parts) and ('QR-Code:' + key) in found
             self.assertEqual(read, len(keys), fmt)
+
+    def test_epson_geometry_sizes_and_no_trailing_space(self):
+        """Página del ancho del papel (80/58 mm) con contenido centrado de 68/44 mm, altura según el contenido y sin espacio al final."""
+        import re as _re
+        data = invoice_ticket.calibration_data()
+        for fmt, page_mm, content_mm in (('80', 80, 68), ('58', 58, 44)):
+            pdf = invoice_ticket.render(data, fmt)
+            box = [float(v) for v in _re.search(rb'/MediaBox \[0 0 ([\d.]+) ([\d.]+)\]', pdf).groups()]
+            self.assertAlmostEqual(box[0], page_mm * 72 / 25.4, places=2)
+            spec = invoice_ticket.FORMATS[fmt]
+            self.assertAlmostEqual(spec['content'], content_mm * 72 / 25.4, places=2)
+            one = invoice_ticket.render(dict(data, items=data['items'][:1]), fmt)
+            short = float(_re.search(rb'/MediaBox \[0 0 [\d.]+ ([\d.]+)\]', one).group(1))
+            self.assertLess(short, box[1])                                                     # la altura sigue al contenido
+            if shutil.which('pdftoppm'):
+                with tempfile.TemporaryDirectory() as folder:
+                    path = Path(folder) / 't.pdf'
+                    path.write_bytes(pdf)
+                    subprocess.run(['pdftoppm', '-r', '203', '-gray', '-singlefile', str(path), str(Path(folder) / 'p')], check=True)
+                    raw = (Path(folder) / 'p.pgm').read_bytes()
+                    head = raw.split(maxsplit=4)
+                    width, height = int(head[1]), int(head[2])
+                    pixels = head[4][-width * height:]
+                    dark_rows = [r for r in range(height) if min(pixels[r * width:(r + 1) * width]) < 128]
+                    self.assertLessEqual((height - 1 - dark_rows[-1]) * 25.4 / 203, 3.0, fmt)       # como mucho ~2 mm de avance bajo el pie
+                    cols = [min(pixels[r * width + col] for r in dark_rows) < 128 for col in range(width)]
+                    left, right = cols.index(True), width - 1 - cols[::-1].index(True)
+                    margin = (page_mm - content_mm) / 2
+                    self.assertGreaterEqual(left * 25.4 / 203, margin - .3, fmt)                   # tinta dentro del ancho seguro
+                    self.assertLessEqual(right * 25.4 / 203, page_mm - margin + .3, fmt)
+                    self.assertAlmostEqual((left + right) / 2 * 25.4 / 203, page_mm / 2, delta=1.0)  # centrado
+            self.assertEqual(spec['sizes']['body'], 8 if fmt == '80' else 7)
 
     def test_long_descriptions_multiple_items_and_long_names(self):
         cookie, csrf, post, order = self.paid_order(100, key='largo')

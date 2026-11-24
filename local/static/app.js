@@ -8008,7 +8008,9 @@ async function printCenter(invoiceId,number,initial){const dialog=invDialog('Cen
  const remember=el('label',undefined,'pcx-remember'),rem=el('input');rem.type='checkbox';remember.append(rem,el('span','Usar como formato predeterminado'));
  const hint=el('p',undefined,'pcx-hint');const hist=el('section',undefined,'pcx-history');
  const url=()=>{const f=d.formats.find(x=>x.key===fmt);return f&&f.available?(fmt==='80'||fmt==='58'?'/api/invoicing/'+invoiceId+'/ticket.pdf?format='+fmt+'&copies='+copies:d.urls[fmt]):'';};
- const paintHint=()=>{hint.replaceChildren();if(fmt==='80'||fmt==='58'){hint.append(invIcon('printer'),el('span',(fmt==='80'?'Optimizado para Epson TM-m30II · 203 dpi · 72 mm útiles del rollo de 80 mm.':'Rollo de 58 mm · 48 mm útiles a 203 dpi.')+' En el diálogo elige la impresora térmica, papel en rollo, escala 100 % y sin márgenes.'));}
+ const paintHint=()=>{hint.replaceChildren();if(fmt==='80'||fmt==='58'){const cal=el('a','Muestra de calibración','pcx-cal');cal.href='/api/invoicing/ticket-calibration.pdf?format='+fmt;cal.target='_blank';cal.rel='noopener';
+   const tx=el('span',(fmt==='80'?'Epson TM-m30 · 203 dpi · página de 80 mm con el contenido centrado en 68 mm.':'Rollo de 58 mm · 203 dpi · contenido centrado en 44 mm.')+' En el diálogo: impresora térmica, papel en rollo de '+fmt+' mm, márgenes «Ninguno» y escala 100 % (tamaño real). Si queda papel en blanco al final, activa en el controlador de Epson la reducción de papel del margen inferior. ');
+   tx.append(cal,document.createTextNode(' (datos ficticios, con marcas para medir los márgenes reales).'));hint.append(invIcon('printer'),tx);}
   else hint.append(invIcon('file-text'),el('span',fmt==='azur'?'Documento original generado por AZUR: no se modifica.':'Representación A4 del sistema con los datos de la factura. El RIDE original de AZUR se conserva aparte.'));};
  const paint=()=>{list.querySelectorAll('[role=radio]').forEach(b=>{const on=b.dataset.key===fmt;b.setAttribute('aria-checked',String(on));b.tabIndex=on?0:-1;});
   copiesWrap.hidden=!(fmt==='80'||fmt==='58');paintHint();const u=url();printB.disabled=downB.disabled=!u;loadPreview(u);};

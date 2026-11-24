@@ -13679,3 +13679,4 @@ body[data-page=dashboard] .fxb-pager select{height:30px!important;min-height:30p
 .sfu-pre li[data-level=warn]{border-left-color:#d79b2b;background:#2b200b}.sfu-pre li[data-level=warn] svg{color:#f2b84b}
 .sfu-pre li[data-level=block]{border-left-color:#e05a5a;background:#2d1215}.sfu-pre li[data-level=block] svg{color:#ff8c8c}
 .sfu-pre li span{display:grid;gap:2px;min-width:0}.sfu-pre li strong{font-size:12.5px;color:#e6efff}.sfu-pre li small{font-size:12px;line-height:1.4;color:#c4d3ea;overflow-wrap:anywhere}
+.pcx-hint .pcx-cal{color:#93C5FD;font-weight:700;text-decoration:underline;text-underline-offset:2px}.pcx-hint .pcx-cal:focus-visible{outline:2px solid #7fb0ff;outline-offset:2px;border-radius:3px}
