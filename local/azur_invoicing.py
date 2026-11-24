@@ -161,7 +161,7 @@ def send(c, invoice_id, user, now, env=None):
     previous = inv['access_key']
     c.execute("UPDATE invoices SET access_key=?,status='enviado',provider_state=0,updated_at=? WHERE id=?", (access, stamp(now), invoice_id))
     log(c, invoice_id, 'enviar', 'ok', 'creado', 'AZUR recibió el comprobante y lo envió al SRI (%s, clave %s).' % (invoicing.ENVIRONMENTS.get(inv['environment'], ''), access), 200, key, user, now)
-    invoicing.event(c, invoice_id, 'azur_enviado', 'Enviado al SRI de pruebas a través de AZUR (firma de AZUR). Clave de acceso %s%s.' % (
+    invoicing.event(c, invoice_id, 'azur_enviado', 'Enviado al SRI (%s) a través de AZUR (firma de AZUR). Clave de acceso %s%s.' % (invoicing.ENVIRONMENTS.get(inv['environment'], ''), 
         access, (' (la clave de control local era %s)' % previous) if previous and previous != access else ''), now, user)
     c.commit()
     try:

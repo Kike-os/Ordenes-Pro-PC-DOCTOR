@@ -603,19 +603,68 @@ def receipts(c, inv):
     return out
 
 
-def listing(c, status='', q=''):
+SORTS = {'numero': 'i.environment {d}, i.establishment {d}, i.emission_point {d}, i.sequential {d}, i.id {d}', 'fecha': "COALESCE(NULLIF(i.issue_date,''),substr(i.created_at,1,10)) {d}, i.id {d}",
+         'total': 'i.total_cents {d}, i.id {d}', 'cliente': 'lower(i.buyer_name) {d}, i.id {d}', 'estado': 'i.status {d}, i.id {d}'}
+PER_PAGE = (10, 25, 50, 100)
+DATE = re.compile(r'\d{4}-\d{2}-\d{2}')
+
+
+def listing(c, status='', q='', date_from='', date_to='', sort='', direction='', page=0, per_page=25, environment=''):
+    """Lista de comprobantes (solo lectura) con filtros por estado, texto (cliente, identificación, orden, proforma, venta o clave de
+    acceso), fechas de emisión (o de creación si aún no tiene) y ambiente; orden por columna y paginación. Los descartados no aparecen."""
     where, args = ["i.status!='descartado'" if not status else 'i.status=?'], [] if not status else [status]
     if q:
-        where.append("instr(lower(i.buyer_name||' '||i.buyer_id||' '||COALESCE(o.code,'')||' '||COALESCE(s.code,'')||' '||COALESCE(i.access_key,'')),lower(?))>0")
+        where.append("instr(lower(i.buyer_name||' '||i.buyer_id||' '||COALESCE(o.code,'')||' '||COALESCE(s.code,'')||' '||COALESCE(i.access_key,'')||' '||"
+                     "COALESCE((SELECT code FROM proformas WHERE id=i.source_id AND i.source_kind='proforma'),'')||' '||printf('%s-%s-%09d',i.establishment,i.emission_point,COALESCE(i.sequential,0))),lower(?))>0")
         args.append(q[:80])
+    day = "COALESCE(NULLIF(i.issue_date,''),substr(i.created_at,1,10))"
+    if DATE.fullmatch(str(date_from or '')):
+        where.append(day + '>=?'); args.append(date_from)
+    if DATE.fullmatch(str(date_to or '')):
+        where.append(day + '<=?'); args.append(date_to)
+    if environment in ENVIRONMENTS:
+        where.append('i.environment=?'); args.append(environment)
+    base = ' FROM invoices i LEFT JOIN orders o ON o.id=i.order_id LEFT JOIN license_sales s ON s.id=i.license_sale_id WHERE ' + ' AND '.join(where)
+    total = c.execute('SELECT COUNT(*)' + base, args).fetchone()[0]
+    per_page = per_page if per_page in PER_PAGE else 25
+    pages = max(1, -(-total // per_page))
+    page = min(max(0, int(page or 0)), pages - 1)
+    order = SORTS.get(sort, SORTS['fecha']).format(d='ASC' if direction == 'asc' else 'DESC')
     rows = [dict(r) for r in c.execute("SELECT i.*,o.code order_code,s.code sale_code,CASE WHEN i.source_kind='proforma' THEN (SELECT code FROM proformas WHERE id=i.source_id) "
-                                      "WHEN i.source_kind='venta_inventario' THEN 'INV-'||i.source_id END other_code FROM invoices i LEFT JOIN orders o ON o.id=i.order_id LEFT JOIN license_sales s ON s.id=i.license_sale_id WHERE "
-                                      + ' AND '.join(where) + ' ORDER BY i.id DESC LIMIT 200', args)]
+                                      "WHEN i.source_kind='venta_inventario' THEN 'INV-'||i.source_id END other_code" + base + ' ORDER BY ' + order + ' LIMIT ? OFFSET ?',
+                                      args + [per_page, page * per_page])]
     out = [{'id': r['id'], 'number': number(r), 'status': r['status'], 'status_label': STATUS[r['status']], 'buyer_name': r['buyer_name'], 'buyer_id': r['buyer_id'],
             'consumer_final': bool(r['consumer_final']), 'total_cents': r['total_cents'], 'reference': r['other_code'] or r['order_code'] or r['sale_code'] or '', 'source_kind': r['source_kind'],
-            'order_id': r['order_id'], 'created_at': r['created_at'], 'issue_date': r['issue_date'], 'environment': r['environment'], 'has_xml': bool(r['access_key'])} for r in rows]
+            'order_id': r['order_id'], 'created_at': r['created_at'], 'issue_date': r['issue_date'], 'environment': r['environment'], 'has_xml': bool(r['access_key']),
+            'access_key': r['access_key'] or '', 'has_authorized_xml': bool(r['xml_authorized']), 'provider': r['provider'] or '', 'has_email': bool((r['buyer_email'] or '').strip()),
+            'has_phone': bool((r['buyer_phone'] or '').strip()), 'authorized_at': r['authorized_at'] or ''} for r in rows]
     counts = {code: c.execute('SELECT COUNT(*) FROM invoices WHERE status=?', (code,)).fetchone()[0] for code in STATUS if code != 'descartado'}
-    return {'rows': out, 'counts': counts, 'statuses': {k: v for k, v in STATUS.items() if k != 'descartado'}, 'settings': settings(c), 'summary': summary(c, counts)}
+    return {'rows': out, 'counts': counts, 'statuses': {k: v for k, v in STATUS.items() if k != 'descartado'}, 'settings': settings(c), 'summary': summary(c, counts),
+            'page': page, 'pages': pages, 'total': total, 'per_page': per_page, 'sort': sort if sort in SORTS else 'fecha', 'direction': 'asc' if direction == 'asc' else 'desc'}
+
+
+def stats(c, now, date_from='', date_to=''):
+    """Indicadores por período (solo lectura; no genera documentos): hoy, mes en curso y el rango pedido. «Facturado» suma lo emitido sin
+    rechazo (pendiente, enviado, autorizado) en el ambiente vigente (producción si la emisión real está activa; si no, pruebas)."""
+    env = active_environment()
+    day = "COALESCE(NULLIF(issue_date,''),substr(created_at,1,10))"
+
+    def block(start, end):
+        out = {'from': start, 'to': end, 'billed_cents': 0, 'documents': 0, 'counts': {code: 0 for code in STATUS if code != 'descartado'}}
+        for r in c.execute('SELECT status,COUNT(*) n,COALESCE(SUM(total_cents),0) total FROM invoices WHERE environment=? AND status!=\'descartado\' AND ' + day + '>=? AND ' + day + '<=? GROUP BY status',
+                           (env, start, end)):
+            out['counts'][r['status']] = r['n']
+            out['documents'] += r['n']
+            if r['status'] in ('pendiente', 'enviado', 'autorizado'):
+                out['billed_cents'] += r['total']
+        return out
+    today = now.date().isoformat()
+    month = now.date().replace(day=1).isoformat()
+    start = date_from if DATE.fullmatch(str(date_from or '')) else month
+    end = date_to if DATE.fullmatch(str(date_to or '')) else today
+    if start > end:
+        start, end = end, start
+    return {'environment': env, 'environment_label': ENVIRONMENTS[env], 'today': block(today, today), 'month': block(month, today), 'range': block(start, end)}
 
 
 def summary(c, counts):

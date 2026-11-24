@@ -2528,7 +2528,12 @@ class Handler(BaseHTTPRequestHandler):
                 try:
                     if path=='/api/invoicing':
                         import inventory
-                        return self.reply(200,{**invoicing.listing(c,arg('status') if arg('status') in invoicing.STATUS else '',arg('q')),'inventory_alerts':inventory.alert_count(c)})
+                        try:page=int(arg('page') or 0);per=int(arg('per') or 25)
+                        except ValueError:page,per=0,25
+                        return self.reply(200,{**invoicing.listing(c,arg('status') if arg('status') in invoicing.STATUS else '',arg('q'),arg('from'),arg('to'),arg('sort'),arg('dir'),page,per,arg('env')),'inventory_alerts':inventory.alert_count(c)})
+                    if path=='/api/invoicing/stats':
+                        # Indicadores por período (solo lectura): hoy, mes en curso y el rango elegido. No genera documentos tributarios.
+                        return self.reply(200,invoicing.stats(c,reception_now(),arg('from'),arg('to')))
                     if path=='/api/invoicing/dashboard':
                         import inventory
                         return self.reply(200,{**invoicing.dashboard(c,reception_now()),'inventory_alerts':inventory.alert_count(c)})

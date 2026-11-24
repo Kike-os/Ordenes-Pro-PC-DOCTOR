@@ -8659,6 +8659,7 @@ body[data-page=dashboard] .inv-table :is(th:last-child,td.inv-row-acts){text-ali
 .inv-soon li .inv-icon{width:15px;height:15px;color:var(--inv-soft)}.inv-soon li em{padding:1px 7px;border-radius:999px;background:#D946A81f;color:#F0ABDB;font-size:10.5px;font-style:normal;font-weight:700;white-space:nowrap}
 /* Avisos, chips y estados. */
 .inv-warn{margin:0;padding:10px 12px;border:1px solid #F5B5444d;border-radius:10px;background:#F5B54414;color:#FCD98A;font-size:12.5px;line-height:1.45}
+.inv-ok{margin:0;padding:10px 12px;border:1px solid #34D3994d;border-radius:10px;background:#34D39914;color:#A7F3D0;font-size:12.5px;line-height:1.45}
 .inv-warn-action{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px}.inv-warn-action>span{flex:1 1 240px}.inv-warn-action>.inv-icon{width:18px;height:18px;color:var(--inv-amber)}
 .inv-chip{--c:#94a3b8;display:inline-flex;align-items:center;gap:6px;justify-self:start;padding:2px 9px;border:1px solid color-mix(in srgb,var(--c) 45%,transparent);border-radius:999px;background:color-mix(in srgb,var(--c) 13%,transparent);color:var(--c);font-size:11px;font-weight:700;white-space:nowrap}
 .inv-chip::before{content:'';width:6px;height:6px;border-radius:50%;background:currentColor}

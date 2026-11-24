@@ -202,6 +202,44 @@ class InvoiceFlowTests(unittest.TestCase):
             c.execute("UPDATE users SET role='tecnico' WHERE id=?", (self.uid,));c.commit()
         self.assertEqual(post(path, action='retire_test', reason='Sin permiso')['status'], 403)
 
+    def test_listing_filters_sort_pagination_and_period_stats_are_read_only(self):
+        cookie, csrf, post, order = self.paid_order(1000, key='lista-1')
+        self.configure(post)
+        ids = []
+        for n, cents in enumerate((1000, 2500, 4000)):
+            if n:
+                cookie, csrf, post, order = self.paid_order(cents, key='lista-%d' % (n + 1))
+            inv = post('/api/invoicing/draft', kind='orden', id=str(order['id']))['body']['invoice']
+            if n < 2:
+                post('/api/invoicing/%d' % inv['id'], action='emit', confirm='1')
+            ids.append(inv['id'])
+        with app.connect() as c:
+            before = c.execute('SELECT COUNT(*),COALESCE(SUM(total_cents),0),(SELECT COUNT(*) FROM invoice_events) FROM invoices').fetchone()
+        get = lambda q: self.request('/api/invoicing?' + q, cookie=cookie)['body']
+        page = get('per=10&page=0&sort=total&dir=asc')
+        self.assertEqual((page['total'], page['pages'], page['per_page']), (3, 1, 10))
+        self.assertEqual([r['total_cents'] for r in page['rows']], [1000, 2500, 4000])
+        self.assertEqual([r['total_cents'] for r in get('sort=total&dir=desc')['rows']], [4000, 2500, 1000])
+        self.assertEqual(len(get('per=10&status=pendiente')['rows']), 2)
+        self.assertEqual(get('per=10&status=borrador')['rows'][0]['id'], ids[2])
+        emitted = get('status=pendiente')['rows'][0]
+        self.assertTrue(re.fullmatch(r'\d{49}', emitted['access_key']))
+        self.assertEqual(len(get('q=' + emitted['number'])['rows']), 1)                                   # búsqueda por número
+        today = app.reception_now().date().isoformat()
+        self.assertEqual(get('from=' + today + '&to=' + today)['total'], 3)
+        self.assertEqual(get('from=2001-01-01&to=2001-12-31')['total'], 0)
+        tiny = self.request('/api/invoicing?per=10&page=99', cookie=cookie)['body']
+        self.assertEqual(tiny['page'], 0)                                                                   # página fuera de rango
+        stats = self.request('/api/invoicing/stats', cookie=cookie)['body']
+        self.assertEqual(stats['environment'], '1')
+        self.assertEqual((stats['today']['billed_cents'], stats['today']['counts']['pendiente'], stats['today']['counts']['borrador']), (3500, 2, 1))
+        self.assertEqual(stats['month']['billed_cents'], 3500)
+        self.assertEqual(self.request('/api/invoicing/stats?from=2001-01-01&to=2001-01-31', cookie=cookie)['body']['range']['documents'], 0)
+        with app.connect() as c:
+            self.assertEqual(tuple(c.execute('SELECT COUNT(*),COALESCE(SUM(total_cents),0),(SELECT COUNT(*) FROM invoice_events) FROM invoices').fetchone()), tuple(before))   # nada cambia
+            c.execute("UPDATE users SET role='tecnico' WHERE id=?", (self.uid,));c.commit()
+        self.assertEqual(self.request('/api/invoicing/stats', cookie=cookie)['status'], 403)
+
 
 if __name__ == '__main__':
     unittest.main()
