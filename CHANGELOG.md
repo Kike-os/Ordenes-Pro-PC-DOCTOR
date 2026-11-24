@@ -4,6 +4,16 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## Sin publicar
+
+### Nuevas funcionalidades
+
+- ADI Executive Intelligence 5.0: nuevo espacio de trabajo con historial (favoritas, archivadas, por fecha), estado verificado del servicio, tarjetas en vivo, Insights verificables, sugerencias según los datos reales, accesos por departamento, tablas con gráfico, exportar, imprimir, calificar, regenerar y pantalla completa.
+
+### Mejoras realizadas
+
+- ADI administrativa consulta finanzas, facturación, cartera, atención a clientes, repuestos, inventario e infraestructura con permisos validados en el servidor, solo lectura, con pasos y fuentes reales y sin guardar contraseñas ni tokens.
+
 ## v1.5.338 — 2026-11-24 13:35 (UTC-05:00)
 
 Recuperación de mensajes de WhatsApp omitidos por el límite mensual

@@ -1714,7 +1714,8 @@ class Handler(BaseHTTPRequestHandler):
                 import adi_ai
                 import adi_exec
                 return self.reply(200,{'enabled':bool(adi_ai.openai_key()),'message':'ADI responde consultas operativas desde datos autorizados.','live':adi.snapshot(c,reception_now()),'service':adi_exec.service(c,reception_now()),
-                                       'user':{'first_name':(user['name'] or '').split(' ')[0]},'history_ready':adi_exec.installed(c)})
+                                       'user':{'first_name':(user['name'] or '').split(' ')[0]},'history_ready':adi_exec.installed(c),
+                                       'extra':{'transfers_pending':c.execute("SELECT COUNT(*) FROM bank_transfers WHERE status='pendiente'").fetchone()[0]}})
             if path == '/api/adi/admin/insights':
                 # ADI Intelligence Insights: recomendaciones verificables (solo lectura). Solo administración.
                 if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede usar la asistente administrativa.'})
