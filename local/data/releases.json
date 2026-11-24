@@ -8,6 +8,24 @@
   },
   "releases": [
     {
+      "version": "1.5.325",
+      "date": "2026-11-24T01:10:04-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Centro de impresión: obtener el RIDE de AZUR de facturas ya autorizadas",
+      "changes": {
+        "features": [],
+        "improvements": [],
+        "fixes": [
+          "Centro de impresión: botón «Obtener RIDE de AZUR» en facturas autorizadas sin RIDE guardado. Si falta el id interno de AZUR, se busca por clave de acceso solo para leer el PDF y los XML (consulta de lectura): no emite, no envía, no consume secuenciales ni modifica la factura."
+        ],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Administración (autorización expresa en la sesión)"
+    },
+    {
       "version": "1.5.324",
       "date": "2026-11-24T01:04:52-05:00",
       "type": "patch",

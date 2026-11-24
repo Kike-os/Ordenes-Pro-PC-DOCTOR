@@ -7990,6 +7990,11 @@ async function printCenter(invoiceId,number,initial){const dialog=invDialog('Cen
  for(const f of d.formats){const b=button('',()=>{if(!f.available)return;fmt=f.key;paint();},'pcx-format');b.setAttribute('role','radio');b.dataset.key=f.key;
   const ic=el('span',undefined,'pcx-format-ic');ic.append(invIcon(f.thermal?'receipt-text':'file-text'));const tx=el('span',undefined,'pcx-format-tx');tx.append(el('strong',f.label),el('small',f.available?(f.thermal?'Térmica · blanco y negro':'PDF A4'):f.reason));b.append(ic,tx);
   if(!f.available){b.setAttribute('aria-disabled','true');b.title=f.reason;}list.append(b);}
+ // RIDE de AZUR no guardado en una factura autorizada: se puede pedir a AZUR (solo lectura del PDF y XML; no emite, no envía, no modifica la factura).
+ const fetchAzur=d.formats.find(f=>f.key==='azur'&&f.fetchable)?invBtn('Obtener RIDE de AZUR','download',async()=>{fetchAzur.disabled=true;
+   try{const r=await api('/api/invoicing/'+invoiceId,{action:'azur_files'});const got=(r.azur&&r.azur.files)||{};
+    if('pdf' in got){toast('RIDE de AZUR guardado.','success');dialog.close();printCenter(invoiceId,number,'azur');return;}
+    toast('AZUR no devolvió el RIDE de esta factura todavía. Inténtalo más tarde.','info');}catch(error){toast(error.message,'error');}fetchAzur.disabled=false;}):null;
  list.addEventListener('keydown',event=>{if(!['ArrowDown','ArrowUp','ArrowRight','ArrowLeft'].includes(event.key))return;event.preventDefault();const opts=d.formats.filter(f=>f.available);if(!opts.length)return;
   const i=opts.findIndex(f=>f.key===fmt),n=opts[(i+(event.key==='ArrowDown'||event.key==='ArrowRight'?1:opts.length-1))%opts.length];fmt=n.key;paint();list.querySelector('[data-key="'+fmt+'"]').focus();});
  copiesIn.addEventListener('change',()=>{copies=Math.max(1,Math.min(5,parseInt(copiesIn.value,10)||1));copiesIn.value=String(copies);paint();});
@@ -8002,7 +8007,7 @@ async function printCenter(invoiceId,number,initial){const dialog=invDialog('Cen
  const paintHistory=h=>{hist.replaceChildren(el('h4','Historial de impresión'));if(!h.installed){hist.append(el('p','El historial se activará al aplicar la migración 118.','pcx-muted'));return;}
   if(!h.rows.length){hist.append(el('p','Todavía no se ha impreso ni descargado esta factura.','pcx-muted'));return;}
   const ul=el('ul');for(const r of h.rows.slice(0,8)){const li=el('li');li.append(el('strong',r.action+' · '+r.format+(r.copies>1?' · '+r.copies+' copias':'')),el('small',formatOrderDate(r.at)+' · '+r.user+' · '+r.result));ul.append(li);}hist.append(ul);};
- side.append(sub,list,copiesWrap,remember,hint);const actions=el('div',undefined,'pcx-actions');actions.append(downB,printB);side.append(actions,hist);
+ side.append(sub,list);if(fetchAzur){fetchAzur.classList.add('pcx-fetch');side.append(fetchAzur);}side.append(copiesWrap,remember,hint);const actions=el('div',undefined,'pcx-actions');actions.append(downB,printB);side.append(actions,hist);
  body.replaceChildren(side,view);paintHistory(d.history);paint();list.querySelector('[aria-checked=true]')?.focus();}
 
 function invoicesPanel(panel,data){const filtered=!!(invoiceState.q||invoiceState.status||invoiceState.from||invoiceState.to);

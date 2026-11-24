@@ -164,6 +164,34 @@ class InvoiceTicketTests(unittest.TestCase):
             c.commit()
         self.assertTrue(fm()['azur'])                                                              # sin depender de provider_id
 
+    def test_azur_ride_fetched_by_access_key_without_touching_the_invoice(self):
+        """Autorizada sin id interno de AZUR: se busca por clave de acceso solo para leer el PDF; la factura no cambia. AZUR simulado."""
+        import base64
+        from unittest.mock import patch
+        import azur_invoicing
+        cookie, csrf, post, inv = self.emitted(key='azur-fetch')
+        with app.connect() as c:
+            c.execute("UPDATE invoices SET provider='azur',status='autorizado',provider_id=NULL WHERE id=?", (inv['id'],))
+            c.commit()
+            before = tuple(c.execute('SELECT * FROM invoices WHERE id=?', (inv['id'],)).fetchone())
+        fmts = lambda: {f['key']: f for f in self.request('/api/invoicing/%d/print-center' % inv['id'], cookie=cookie)['body']['formats']}
+        self.assertTrue(fmts()['azur']['fetchable'])
+        pdf = base64.b64encode(b'%PDF-1.4 ficticio').decode()
+        with patch.object(azur_invoicing.az, 'find_invoice', return_value=987) as find, \
+             patch.object(azur_invoicing.az, 'document', side_effect=lambda cfg, doc, kind: pdf if kind == 'pdf' else '') as doc, \
+             patch.object(azur_invoicing.az, 'config', return_value={}):
+            with app.connect() as c:
+                got = azur_invoicing.fetch_files(c, inv['id'], {}, app.reception_now())
+                c.commit()
+        find.assert_called_once_with({}, inv['access_key'])
+        self.assertTrue(all(call.args[1] == 987 for call in doc.call_args_list))
+        self.assertIn('pdf', got)
+        with app.connect() as c:
+            self.assertEqual(tuple(c.execute('SELECT * FROM invoices WHERE id=?', (inv['id'],)).fetchone()), before)
+        f = fmts()['azur']
+        self.assertTrue(f['available'])
+        self.assertFalse(f['fetchable'])
+
     def test_print_log_without_migration_keeps_working(self):
         import print_center
         cookie, csrf, post, inv = self.emitted(key='sin-118')

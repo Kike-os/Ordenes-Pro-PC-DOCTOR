@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.325 — 2026-11-24 01:10 (UTC-05:00)
+
+Centro de impresión: obtener el RIDE de AZUR de facturas ya autorizadas
+
+### Errores corregidos
+
+- Centro de impresión: botón «Obtener RIDE de AZUR» en facturas autorizadas sin RIDE guardado. Si falta el id interno de AZUR, se busca por clave de acceso solo para leer el PDF y los XML (consulta de lectura): no emite, no envía, no consume secuenciales ni modifica la factura.
+
 ## v1.5.324 — 2026-11-24 01:04 (UTC-05:00)
 
 Centro de impresión: RIDE de AZUR disponible cuando está guardado; ticket con QR legible

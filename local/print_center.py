@@ -26,7 +26,7 @@ def installed(c):
 
 def formats_for(c, invoice_id):
     """Formatos disponibles para la factura y, si no, el motivo. Un borrador no se imprime: no tiene número ni clave de acceso."""
-    inv = c.execute('SELECT id,status,access_key,provider,provider_id,environment FROM invoices WHERE id=?', (invoice_id,)).fetchone()
+    inv = c.execute('SELECT id,status,access_key,provider,environment FROM invoices WHERE id=?', (invoice_id,)).fetchone()
     if not inv:
         raise PrintError('Factura no encontrada.', 404)
     emitted = bool(inv['access_key'])
@@ -37,7 +37,8 @@ def formats_for(c, invoice_id):
     # El RIDE de AZUR existe cuando su PDF quedó guardado al autorizarse (invoice_provider_files), no por tener o no provider_id.
     has_azur = emitted and bool(c.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='invoice_provider_files'").fetchone()) and \
         bool(c.execute("SELECT 1 FROM invoice_provider_files WHERE invoice_id=? AND kind='pdf'", (invoice_id,)).fetchone())
-    out.append({'key': 'azur', 'label': FORMATS['azur'], 'available': has_azur, 'thermal': False,
+    fetchable = not has_azur and inv['provider'] == 'azur' and inv['status'] == 'autorizado'
+    out.append({'key': 'azur', 'label': FORMATS['azur'], 'available': has_azur, 'thermal': False, 'fetchable': fetchable,
                 'reason': '' if has_azur else (why or 'Todavía no hay RIDE de AZUR guardado para esta factura (se guarda al autorizarse por AZUR).')})
     return out
 

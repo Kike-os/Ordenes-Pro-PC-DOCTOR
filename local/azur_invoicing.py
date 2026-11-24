@@ -237,9 +237,21 @@ def fetch_files(c, invoice_id, cfg, now, user=None):
     """PDF del RIDE de AZUR y XML firmado y autorizado. Un fallo aquí no cambia el estado: se puede volver a pedir."""
     inv = _row(c, invoice_id)
     got = {}
+    doc_id = inv['provider_id']
+    if not doc_id and inv['access_key']:
+        # Factura autorizada por consulta de clave de acceso, sin id interno de AZUR: se busca solo para leer sus documentos (consulta GET;
+        # no se guarda en la factura ni la modifica).
+        try:
+            doc_id = az.find_invoice(cfg, inv['access_key'])
+        except az.AzurError as error:
+            log(c, invoice_id, 'documentos', 'error', error.code, str(error), error.status, '', user, now)
+            return got
+        if not doc_id:
+            log(c, invoice_id, 'documentos', 'error', 'no_encontrada', 'AZUR no devolvió esta factura al buscarla por su clave de acceso.', 404, '', user, now)
+            return got
     for kind in ('pdf', 'xml_autorizado', 'xml_firmado'):
         try:
-            content = az.document(cfg, inv['provider_id'], kind) if inv['provider_id'] else ''
+            content = az.document(cfg, doc_id, kind) if doc_id else ''
         except az.AzurError as error:
             log(c, invoice_id, 'documento_' + kind, 'error', error.code, str(error), error.status, '', user, now)
             continue
