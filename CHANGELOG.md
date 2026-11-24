@@ -4,11 +4,21 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
-## Sin publicar
+## v1.5.337 — 2026-11-24 13:27 (UTC-05:00)
+
+WhatsApp sin mensajes perdidos por el límite mensual, límites ampliados y reportes de facturación
 
 ### Nuevas funcionalidades
 
 - Facturación: reporte con los filtros de la lista y nuevo filtro por forma de pago; facturado frente a cobrado, por cobrar, año en curso frente al anterior y notas de crédito, por ambiente. Exportación a Excel, CSV y PDF con auditoría.
+
+### Mejoras realizadas
+
+- WhatsApp: límites mensuales de seguridad ampliados por administración a 300 respuestas de ADI y 500 envíos en total.
+
+### Errores corregidos
+
+- WhatsApp: al alcanzar el límite mensual, ADI dejaba de responder y el mensaje del cliente se perdía sin aparecer en el Centro de Atención. Ahora se guarda y pasa a «Esperan asesor» con prioridad alta, sin enviar nada.
 
 ## v1.5.336 — 2026-11-24 12:24 (UTC-05:00)
 

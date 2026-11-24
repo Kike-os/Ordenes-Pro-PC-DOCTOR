@@ -59,6 +59,12 @@ comparar el diseño con ellas.
 - [ ] **[Administración]** Activar el cierre automático en producción después de revisar la simulación.
 - [ ] **[Administración]** Si se quieren avisos proactivos por WhatsApp al minuto 7: autorizar un programador externo por minuto (`/api/cron/live-support`).
 
+## WhatsApp: límite mensual (1.5.337)
+
+- [x] Causa de «ADI no responde» el 24/11/2026: se llegó al límite de seguridad de 100 respuestas automáticas al mes y los mensajes siguientes quedaban «omitidos», fuera del panel. Ahora el mensaje se guarda y pasa a «Esperan asesor» con prioridad alta.
+- [x] Límites subidos por decisión de administración: 300 respuestas de ADI y 500 envíos de WhatsApp al mes.
+- [ ] Los mensajes omitidos antes de 1.5.337 no guardaron su texto. Si se quiere contactar a esos clientes, revisarlo con administración.
+
 ## Premium Billing Center 4.0
 
 - [x] Centro de impresión (1.5.323 a 1.5.326).

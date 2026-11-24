@@ -1,14 +1,34 @@
 {
   "unreleased": {
-    "features": [
-      "Facturación: reporte con los filtros de la lista y nuevo filtro por forma de pago; facturado frente a cobrado, por cobrar, año en curso frente al anterior y notas de crédito, por ambiente. Exportación a Excel, CSV y PDF con auditoría."
-    ],
+    "features": [],
     "improvements": [],
     "fixes": [],
     "security": [],
     "performance": []
   },
   "releases": [
+    {
+      "version": "1.5.337",
+      "date": "2026-11-24T13:27:48-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "WhatsApp sin mensajes perdidos por el límite mensual, límites ampliados y reportes de facturación",
+      "changes": {
+        "features": [
+          "Facturación: reporte con los filtros de la lista y nuevo filtro por forma de pago; facturado frente a cobrado, por cobrar, año en curso frente al anterior y notas de crédito, por ambiente. Exportación a Excel, CSV y PDF con auditoría."
+        ],
+        "improvements": [
+          "WhatsApp: límites mensuales de seguridad ampliados por administración a 300 respuestas de ADI y 500 envíos en total."
+        ],
+        "fixes": [
+          "WhatsApp: al alcanzar el límite mensual, ADI dejaba de responder y el mensaje del cliente se perdía sin aparecer en el Centro de Atención. Ahora se guarda y pasa a «Esperan asesor» con prioridad alta, sin enviar nada."
+        ],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Administración (autorización expresa en la sesión)"
+    },
     {
       "version": "1.5.336",
       "date": "2026-11-24T12:24:42-05:00",
