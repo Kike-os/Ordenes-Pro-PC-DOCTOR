@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.329 — 2026-11-24 06:39 (UTC-05:00)
+
+Encabezado sin desplazamiento horizontal a 1300-1520 px
+
+### Errores corregidos
+
+- Encabezado: el menú de administración ya no desborda la pantalla entre 1300 y 1520 px de ancho (antes aparecía un desplazamiento horizontal, p. ej. en pantallas de 1366 px).
+
 ## v1.5.328 — 2026-11-24 06:36 (UTC-05:00)
 
 Premium Invoice View 5.0 y Smart Fiscal Status 5.0

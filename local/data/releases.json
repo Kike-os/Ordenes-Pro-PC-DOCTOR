@@ -8,6 +8,24 @@
   },
   "releases": [
     {
+      "version": "1.5.329",
+      "date": "2026-11-24T06:39:26-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Encabezado sin desplazamiento horizontal a 1300-1520 px",
+      "changes": {
+        "features": [],
+        "improvements": [],
+        "fixes": [
+          "Encabezado: el menú de administración ya no desborda la pantalla entre 1300 y 1520 px de ancho (antes aparecía un desplazamiento horizontal, p. ej. en pantallas de 1366 px)."
+        ],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Administración (autorización expresa en la sesión)"
+    },
+    {
       "version": "1.5.328",
       "date": "2026-11-24T06:36:43-05:00",
       "type": "patch",
