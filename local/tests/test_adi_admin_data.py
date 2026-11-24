@@ -117,7 +117,8 @@ class AdiAdminDataTests(unittest.TestCase):
         self.assertEqual(fake.outputs[0]['entregas_vencidas'], 1)
         self.assertIn('Abrir ' + late['code'], [link['label'] for link in first['links']])
         self.assertIn('administrador', fake.calls[0]['instructions']);self.assertIn('No ofrezcas un asesor humano', fake.calls[0]['instructions'])
-        self.assertEqual({tool['name'] for tool in fake.calls[0]['tools']}, {'resumen_taller', 'trabajos_atrasados', 'buscar_ordenes', 'detalle_orden', 'presupuestos', 'citas', 'licencias'})
+        self.assertEqual({tool['name'] for tool in fake.calls[0]['tools']}, {'resumen_taller', 'trabajos_atrasados', 'buscar_ordenes', 'detalle_orden', 'presupuestos', 'citas', 'licencias',
+                                                                     'finanzas', 'facturacion', 'cartera', 'atencion_clientes', 'repuestos', 'inventario_bajo', 'infraestructura', 'recomendaciones'})
         second = FakeModel([], lambda outs: 'Sigue igual.')
         with patch.dict(app.os.environ, KEY), patch.object(adi, '_post', side_effect=second):
             self.request('/api/adi/admin', {'message': '¿Y esa orden?', 'conversation_id': str(first['conversation']['id'])}, cookie=cookie, csrf=csrf)

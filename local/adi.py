@@ -108,12 +108,12 @@ def order_rows(c,where,args=(),limit=8):
 
 def order_line(r):return f"{r['code']} · {r['name']} · {' '.join(x for x in (r['brand'],r['model']) if x) or 'equipo sin especificar'}"
 
-def admin_reply(c,text,now,history=()):
+def admin_reply(c,text,now,history=(),user=None):
  """Respuesta administrativa con enlaces a los módulos. Solo lectura: nunca ejecuta cambios. Con IA: herramientas de consulta sobre los
  datos reales (adi_admin); sin IA o si falla: respuestas por datos según las palabras de la consulta."""
  import adi_admin
- smart=adi_admin.ask(c,text,now,history)
- if smart:return {'answer':smart['answer'],'links':adi_admin.links_for(c,smart['answer'],smart['tools']),'source':'ia'}
+ smart=adi_admin.ask(c,text,now,history,user)
+ if smart:return {'answer':smart['answer'],'links':adi_admin.links_for(c,smart['answer'],smart['tools']),'source':'ia','tools':smart['tools']}
  q=plain(text);live=snapshot(c,now);today=now.date().isoformat();link=lambda label,href:{'label':label,'href':href}
  has=lambda *keys:any(k in q for k in keys)
  match=re.search(r'(?:PCD-\d{8}-\d{4,}|OP-\d{4,})(?:-E\d{2})?',text,re.I)

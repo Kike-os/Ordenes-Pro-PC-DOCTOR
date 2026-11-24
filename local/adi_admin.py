@@ -200,15 +200,19 @@ STATUS_FILTERS = {'activas': ACTIVE, 'pendiente': "o.status='pendiente'", 'repar
                   'diagnostico': "o.status='diagnostico'", 'esperando_repuesto': "o.status='esperando_repuesto'", 'pruebas': "o.status='pruebas'"}
 
 
-def run_tool(c, now, name, raw):
+def run_tool(c, now, name, raw, user=None):
     """Ejecuta una herramienta de solo lectura con argumentos validados. Nunca lanza al modelo un error interno."""
     import adi
+    import adi_exec
     try:
         args = json.loads(raw or '{}')
     except ValueError:
         return {'error': 'argumentos_no_validos'}
     if not isinstance(args, dict):
         return {'error': 'argumentos_no_validos'}
+    executive = adi_exec.run(c, now, name, args, user)
+    if executive is not None:
+        return executive
     try:
         if name == 'resumen_taller':
             live = adi.snapshot(c, now)
@@ -253,10 +257,14 @@ SYSTEM = ("Eres ADI, la asistente interna de administración de PC-DOCTOR S.A. H
           "Usa únicamente lo que devuelven las herramientas: si un dato no aparece, di que no consta; nunca lo inventes ni lo estimes. "
           "No ejecutas cambios, envíos ni escrituras: si te piden modificar algo, indica en qué módulo se hace. "
           "No ofrezcas un asesor humano ni hables de compras o reservas de clientes: el usuario es del taller. "
-          "Fechas en formato día/mes/año y hora de Ecuador; importes en dólares tal como vienen.")
+          "Fechas en formato día/mes/año y hora de Ecuador; importes en dólares tal como vienen. "
+          "También consultas finanzas, facturación, cartera, atención a clientes, repuestos, inventario, infraestructura y recomendaciones con sus herramientas. "
+          "Si una herramienta devuelve sin_permiso o no_disponible, dilo así y no des datos. Distingue siempre lo facturado de lo cobrado. "
+          "Para comparar varias filas usa una tabla Markdown breve (máximo 12 filas); para un resumen, viñetas cortas con un título en negrita. "
+          "No muestres razonamientos internos.")
 
 
-def ask(c, text, now, history=()):
+def ask(c, text, now, history=(), user=None):
     """Respuesta con IA y herramientas de solo lectura. None si la IA no está configurada o falla (se usa la respuesta por datos)."""
     import adi
     import adi_ai
@@ -267,24 +275,29 @@ def ask(c, text, now, history=()):
         return None
     model = os.getenv('OPENAI_MODEL', 'gpt-4.1-mini')
     instructions = SYSTEM + ' Hoy es ' + now.strftime('%d/%m/%Y %H:%M') + ' (Ecuador).'
-    payload = {'model': model, 'instructions': instructions, 'input': list(history) + [{'role': 'user', 'content': text[:2000]}], 'tools': TOOLS, 'max_output_tokens': 700}
+    import adi_exec
+    tools = TOOLS + [t for t in adi_exec.TOOLS if adi_exec.allowed(user, t['name'])]   # solo las que el usuario puede usar
+    payload = {'model': model, 'instructions': instructions, 'input': list(history) + [{'role': 'user', 'content': text[:2000]}], 'tools': tools, 'max_output_tokens': 1100}
     used = []
     try:
         for _ in range(adi.MAX_TOOL_ROUNDS + 1):
             data = adi._post(key, payload)
             calls = [item for item in data.get('output', []) if item.get('type') == 'function_call']
             if not calls:
-                answer = adi._text_of(data)[:4000]
+                answer = adi._text_of(data)[:6000]
+                adi_exec.record_service(c, bool(answer), now, '' if answer else 'respuesta vacía')
                 return {'answer': answer, 'tools': used} if answer else None
             outputs = []
             for call in calls:
                 used.append(call.get('name'))
-                outputs.append({'type': 'function_call_output', 'call_id': call.get('call_id'), 'output': json.dumps(run_tool(c, now, call.get('name'), call.get('arguments')), ensure_ascii=False, default=str)[:14000]})
-            payload = {'model': model, 'instructions': instructions, 'previous_response_id': data.get('id'), 'input': outputs, 'tools': TOOLS, 'max_output_tokens': 700}
-        answer = adi._text_of(data)[:4000]
+                outputs.append({'type': 'function_call_output', 'call_id': call.get('call_id'), 'output': json.dumps(run_tool(c, now, call.get('name'), call.get('arguments'), user), ensure_ascii=False, default=str)[:14000]})
+            payload = {'model': model, 'instructions': instructions, 'previous_response_id': data.get('id'), 'input': outputs, 'tools': tools, 'max_output_tokens': 1100}
+        answer = adi._text_of(data)[:6000]
+        adi_exec.record_service(c, bool(answer), now, '' if answer else 'respuesta vacía')
         return {'answer': answer, 'tools': used} if answer else None
     except (OSError, ValueError, KeyError, urllib.error.URLError) as error:
         print('adi-admin-ia', type(error).__name__, flush=True)
+        adi_exec.record_service(c, False, now, type(error).__name__)
         return None
 
 
@@ -295,7 +308,10 @@ def links_for(c, text, used):
         row = c.execute('SELECT id FROM orders WHERE code=?', (code,)).fetchone()
         if row:
             out.append({'label': 'Abrir ' + code, 'href': '#orders?id=%d' % row['id']})
-    extra = {'citas': ('Agenda de Citas', '#appointments'), 'licencias': ('Licencias', '#licenses'), 'trabajos_atrasados': ('Órdenes activas', '#orders?active=1'),
+    extra = {'finanzas': ('Reportes', '#reports'), 'facturacion': ('Facturación', '#invoicing'), 'cartera': ('Cartera', '#invoicing?tab=cartera'),
+             'atencion_clientes': ('Centro de Atención', '#live'), 'repuestos': ('Órdenes en espera de repuesto', '#orders?status=esperando_repuesto'),
+             'inventario_bajo': ('Inventario', '#inventory'), 'infraestructura': ('Sistema', '#system'), 'recomendaciones': ('Órdenes activas', '#orders?active=1'),
+             'citas': ('Agenda de Citas', '#appointments'), 'licencias': ('Licencias', '#licenses'), 'trabajos_atrasados': ('Órdenes activas', '#orders?active=1'),
              'buscar_ordenes': ('Órdenes', '#orders?active=1'), 'presupuestos': ('Órdenes', '#orders?active=1')}
     for name in dict.fromkeys(used or []):
         if name in extra and extra[name][1] not in [x['href'] for x in out]:

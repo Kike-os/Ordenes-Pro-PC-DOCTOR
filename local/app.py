@@ -1712,7 +1712,14 @@ class Handler(BaseHTTPRequestHandler):
             if path == '/api/adi/admin':
                 if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede usar la asistente administrativa.'})
                 import adi_ai
-                return self.reply(200,{'enabled':bool(adi_ai.openai_key()),'message':'ADI responde consultas operativas desde datos autorizados.','live':adi.snapshot(c,reception_now())})
+                import adi_exec
+                return self.reply(200,{'enabled':bool(adi_ai.openai_key()),'message':'ADI responde consultas operativas desde datos autorizados.','live':adi.snapshot(c,reception_now()),'service':adi_exec.service(c,reception_now()),
+                                       'user':{'first_name':(user['name'] or '').split(' ')[0]},'history_ready':adi_exec.installed(c)})
+            if path == '/api/adi/admin/insights':
+                # ADI Intelligence Insights: recomendaciones verificables (solo lectura). Solo administración.
+                if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede usar la asistente administrativa.'})
+                import adi_exec
+                return self.reply(200,adi_exec.insights(c,reception_now()))
             adi_conversation=re.fullmatch(r'/api/adi/conversations(?:/([0-9]+))?',path)
             if adi_conversation:
                 if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede usar la asistente administrativa.'})
@@ -1720,12 +1727,28 @@ class Handler(BaseHTTPRequestHandler):
                     # Cada conversación solo es visible para quien la creó.
                     row=c.execute('SELECT id,title,created_at,updated_at FROM adi_admin_conversations WHERE id=? AND user_id=?',(int(adi_conversation[1]),user['id'])).fetchone()
                     if not row:return self.reply(404,{'error':'Conversación no disponible.'})
+                    import adi_exec
                     messages=[{'id':m['id'],'role':m['role'],'content':m['content'],'links':json.loads(m['links'] or '[]'),'created_at':m['created_at']} for m in c.execute('SELECT * FROM adi_admin_messages WHERE conversation_id=? ORDER BY id',(row['id'],))]
-                    return self.reply(200,{'conversation':dict(row),'messages':messages})
-                term=parse_qs(urlsplit(self.path).query).get('q',[''])[0].strip()[:100]
-                if term:rows=c.execute("SELECT DISTINCT v.id,v.title,v.updated_at FROM adi_admin_conversations v LEFT JOIN adi_admin_messages m ON m.conversation_id=v.id WHERE v.user_id=? AND (instr(lower(v.title),lower(?))>0 OR instr(lower(m.content),lower(?))>0) ORDER BY v.updated_at DESC LIMIT 40",(user['id'],term,term))
-                else:rows=c.execute('SELECT id,title,updated_at FROM adi_admin_conversations WHERE user_id=? ORDER BY updated_at DESC LIMIT 40',(user['id'],))
-                return self.reply(200,{'rows':[dict(r) for r in rows]})
+                    flags={'favorite':False,'archived':False}
+                    if adi_exec.installed(c):
+                        metas={r['message_id']:r for r in c.execute('SELECT * FROM adi_admin_meta WHERE message_id IN (SELECT id FROM adi_admin_messages WHERE conversation_id=?)',(row['id'],))}
+                        rates={r['message_id']:r['rating'] for r in c.execute('SELECT message_id,rating FROM adi_admin_feedback WHERE user_id=? AND message_id IN (SELECT id FROM adi_admin_messages WHERE conversation_id=?)',(user['id'],row['id']))}
+                        for m in messages:
+                            meta=metas.get(m['id'])
+                            if meta:m.update(steps=json.loads(meta['steps']),sources=json.loads(meta['sources']),consulted_at=meta['consulted_at'])
+                            if m['id'] in rates:m['rating']=rates[m['id']]
+                        f=c.execute('SELECT favorite,archived FROM adi_admin_flags WHERE conversation_id=?',(row['id'],)).fetchone()
+                        if f:flags={'favorite':bool(f['favorite']),'archived':bool(f['archived'])}
+                    return self.reply(200,{'conversation':dict(row,**flags),'messages':messages})
+                import adi_exec
+                qs=parse_qs(urlsplit(self.path).query);term=qs.get('q',[''])[0].strip()[:100];view=qs.get('view',['recientes'])[0]
+                ready=adi_exec.installed(c)
+                cols='v.id,v.title,v.updated_at'+(',COALESCE(f.favorite,0) favorite,COALESCE(f.archived,0) archived' if ready else ',0 favorite,0 archived')
+                join=' LEFT JOIN adi_admin_flags f ON f.conversation_id=v.id' if ready else ''
+                cond=' AND COALESCE(f.archived,0)=1' if ready and view=='archivadas' else ' AND COALESCE(f.favorite,0)=1 AND COALESCE(f.archived,0)=0' if ready and view=='favoritas' else (' AND COALESCE(f.archived,0)=0' if ready else '')
+                if term:rows=c.execute('SELECT DISTINCT '+cols+' FROM adi_admin_conversations v'+join+' LEFT JOIN adi_admin_messages m ON m.conversation_id=v.id WHERE v.user_id=? AND (instr(lower(v.title),lower(?))>0 OR instr(lower(m.content),lower(?))>0)'+cond+' ORDER BY v.updated_at DESC LIMIT 60',(user['id'],term,term))
+                else:rows=c.execute('SELECT '+cols+' FROM adi_admin_conversations v'+join+' WHERE v.user_id=?'+cond+' ORDER BY v.updated_at DESC LIMIT 80',(user['id'],))
+                return self.reply(200,{'rows':[dict(r,favorite=bool(r['favorite']),archived=bool(r['archived'])) for r in rows],'view':view,'history_ready':ready})
             if path == '/api/adi/live':
                 if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
                 q_live=parse_qs(urlsplit(self.path).query);arg_live=lambda k,d='':(q_live.get(k,[d])[0] or d)[:30]
@@ -4811,7 +4834,20 @@ class Handler(BaseHTTPRequestHandler):
                     if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede usar la asistente administrativa.'})
                     row=c.execute('SELECT id FROM adi_admin_conversations WHERE id=? AND user_id=?',(int(adi_manage[1]),user['id'])).fetchone()
                     if not row:return self.reply(404,{'error':'Conversación no disponible.'})
+                    import adi_exec
+                    if data.get('action') in ('favorite','archive'):
+                        if not adi_exec.installed(c):return self.reply(409,{'error':'Falta aplicar la migración 125 (Sistema → Migraciones).'})
+                        if not isinstance(data.get('value'),bool):return self.reply(400,{'error':'Datos inválidos.'})
+                        col='favorite' if data['action']=='favorite' else 'archived'
+                        c.execute('INSERT INTO adi_admin_flags(conversation_id,'+col+',updated_at) VALUES (?,?,?) ON CONFLICT(conversation_id) DO UPDATE SET '+col+'=excluded.'+col+',updated_at=excluded.updated_at',(row['id'],int(data['value']),reception_now().isoformat(timespec='seconds')))
+                        audit(c,user['id'],'adi_conversation_'+col,row['id']);return self.reply(200,{'ok':True,col:data['value']})
                     if data.get('action')=='delete':
+                        if adi_exec.installed(c):
+                            ids=[r[0] for r in c.execute('SELECT id FROM adi_admin_messages WHERE conversation_id=?',(row['id'],))]
+                            for part in range(0,len(ids),400):
+                                chunk=ids[part:part+400];marks=','.join('?'*len(chunk))
+                                c.execute('DELETE FROM adi_admin_meta WHERE message_id IN ('+marks+')',chunk);c.execute('DELETE FROM adi_admin_feedback WHERE message_id IN ('+marks+')',chunk)
+                            c.execute('DELETE FROM adi_admin_flags WHERE conversation_id=?',(row['id'],))
                         c.execute('DELETE FROM adi_admin_messages WHERE conversation_id=?',(row['id'],));c.execute('DELETE FROM adi_admin_conversations WHERE id=?',(row['id'],))
                         audit(c,user['id'],'adi_conversation_deleted')
                         return self.reply(200,{'ok':True})
@@ -4848,24 +4884,49 @@ class Handler(BaseHTTPRequestHandler):
                         print('adi-voice',error.kind,flush=True);return self.reply(error.status,{'error':str(error),'fallback':True})
                 if path == '/api/adi/admin':
                     if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede usar la asistente administrativa.'})
-                    prompt=str(data.get('message','')).strip()
+                    import adi_exec
+                    # Nunca se guardan ni se envían a la IA contraseñas, claves o tokens que el usuario escriba por error.
+                    prompt=adi_exec.redact(str(data.get('message','')).strip())
                     if not prompt or len(prompt)>2000:return self.reply(400,{'error':'Escribe una consulta de hasta 2000 caracteres.'})
-                    # Contexto de la conversación administrativa (solo la de este usuario) para que ADI entienda «¿y la segunda?».
-                    chosen_id=str(data.get('conversation_id',''))
-                    history=[{'role':'user' if r['role']=='user' else 'assistant','content':str(r['content'])[:1500]} for r in reversed(c.execute("SELECT m.role,m.content FROM adi_admin_messages m JOIN adi_admin_conversations v ON v.id=m.conversation_id WHERE v.id=? AND v.user_id=? ORDER BY m.id DESC LIMIT 10",(chosen_id,user['id'])).fetchall())] if chosen_id.isdigit() else []
-                    c.commit()  # la consulta a la IA puede tardar: no se deja abierta la transacción de la sesión
-                    result=adi.admin_reply(c,prompt,reception_now(),history);answer=result['answer']
-                    c.execute('INSERT INTO adi_actions(user_id,action,created_at,details) VALUES (?,?,?,?)',(user['id'],'admin_query',appointments.stamp(appointments.now()),prompt[:500]))
-                    stamp=reception_now().isoformat(timespec='seconds');chosen=str(data.get('conversation_id',''))
+                    regenerate=data.get('regenerate') is True
+                    chosen=str(data.get('conversation_id',''))
                     conversation=c.execute('SELECT id,title FROM adi_admin_conversations WHERE id=? AND user_id=?',(chosen,user['id'])).fetchone() if chosen.isdigit() else None
                     if chosen and not conversation:return self.reply(404,{'error':'Conversación no disponible.'})
+                    if regenerate and not conversation:return self.reply(400,{'error':'No hay una respuesta que regenerar.'})
+                    # Contexto de la conversación (solo la de este usuario) para que ADI entienda «¿y la segunda?». Al regenerar se omite la última respuesta.
+                    past=c.execute('SELECT m.id,m.role,m.content FROM adi_admin_messages m WHERE m.conversation_id=? ORDER BY m.id DESC LIMIT 11',(conversation['id'],)).fetchall() if conversation else []
+                    if regenerate:
+                        if len(past)<2 or past[0]['role']!='adi' or past[1]['role']!='user':return self.reply(400,{'error':'No hay una respuesta que regenerar.'})
+                        prompt=past[1]['content'];past=past[2:]
+                    history=[{'role':'user' if r['role']=='user' else 'assistant','content':str(r['content'])[:1500]} for r in reversed(past[:10])]
+                    c.commit()  # la consulta a la IA puede tardar: no se deja abierta la transacción de la sesión
+                    now_q=reception_now();result=adi.admin_reply(c,prompt,now_q,history,user);answer=result['answer']
+                    meta=adi_exec.meta(result.get('tools') or [],now_q)
+                    if not meta['steps']:meta['steps']=['Revisando registros'];meta['sources']=['Órdenes y agenda (respuesta por datos)']
+                    c.execute('INSERT INTO adi_actions(user_id,action,created_at,details) VALUES (?,?,?,?)',(user['id'],'admin_regenerate' if regenerate else 'admin_query',appointments.stamp(appointments.now()),prompt[:500]))
+                    stamp=reception_now().isoformat(timespec='seconds')
                     if not conversation:
                         title=re.sub(r'\s+',' ',prompt)[:60]
                         conversation={'id':c.execute('INSERT INTO adi_admin_conversations(user_id,title,created_at,updated_at) VALUES (?,?,?,?)',(user['id'],title,stamp,stamp)).lastrowid,'title':title}
-                    c.execute("INSERT INTO adi_admin_messages(conversation_id,role,content,created_at) VALUES (?,'user',?,?)",(conversation['id'],prompt,stamp))
-                    c.execute("INSERT INTO adi_admin_messages(conversation_id,role,content,links,created_at) VALUES (?,'adi',?,?,?)",(conversation['id'],answer,json.dumps(result.get('links',[]),ensure_ascii=False),stamp))
+                    user_mid=None
+                    if not regenerate:user_mid=c.execute("INSERT INTO adi_admin_messages(conversation_id,role,content,created_at) VALUES (?,'user',?,?)",(conversation['id'],prompt,stamp)).lastrowid
+                    mid=c.execute("INSERT INTO adi_admin_messages(conversation_id,role,content,links,created_at) VALUES (?,'adi',?,?,?)",(conversation['id'],answer,json.dumps(result.get('links',[]),ensure_ascii=False),stamp)).lastrowid
+                    if adi_exec.installed(c):c.execute('INSERT INTO adi_admin_meta(message_id,steps,sources,consulted_at,origin) VALUES (?,?,?,?,?)',(mid,json.dumps(meta['steps'],ensure_ascii=False),json.dumps(meta['sources'],ensure_ascii=False),meta['consulted_at'],result.get('source','datos')))
                     c.execute('UPDATE adi_admin_conversations SET updated_at=? WHERE id=?',(stamp,conversation['id']))
-                    return self.reply(200,{'answer':answer,'links':result.get('links',[]),'source':result.get('source','datos'),'live':adi.snapshot(c,reception_now()),'ai_enabled':bool(os.getenv('OPENAI_API_KEY')),'conversation':{'id':conversation['id'],'title':conversation['title']},'created_at':stamp})
+                    return self.reply(200,{'answer':answer,'links':result.get('links',[]),'source':result.get('source','datos'),'live':adi.snapshot(c,reception_now()),'ai_enabled':bool(os.getenv('OPENAI_API_KEY')),
+                                           'conversation':{'id':conversation['id'],'title':conversation['title']},'created_at':stamp,'message_id':mid,'user_message_id':user_mid,'prompt':prompt,
+                                           'steps':meta['steps'],'sources':meta['sources'],'consulted_at':meta['consulted_at'],'service':adi_exec.service(c,reception_now())})
+                if path == '/api/adi/admin/feedback':
+                    if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede usar la asistente administrativa.'})
+                    import adi_exec
+                    if not adi_exec.installed(c):return self.reply(409,{'error':'Falta aplicar la migración 125 (Sistema → Migraciones).'})
+                    mid=str(data.get('message_id',''));rating=str(data.get('rating',''))
+                    if not mid.isdigit() or rating not in ('1','-1','0'):return self.reply(400,{'error':'Datos inválidos.'})
+                    own=c.execute("SELECT m.id FROM adi_admin_messages m JOIN adi_admin_conversations v ON v.id=m.conversation_id WHERE m.id=? AND m.role='adi' AND v.user_id=?",(int(mid),user['id'])).fetchone()
+                    if not own:return self.reply(404,{'error':'Respuesta no disponible.'})
+                    if rating=='0':c.execute('DELETE FROM adi_admin_feedback WHERE message_id=?',(own['id'],))
+                    else:c.execute('INSERT INTO adi_admin_feedback(message_id,user_id,rating,created_at) VALUES (?,?,?,?) ON CONFLICT(message_id) DO UPDATE SET rating=excluded.rating,created_at=excluded.created_at',(own['id'],user['id'],int(rating),reception_now().isoformat(timespec='seconds')))
+                    return self.reply(200,{'ok':True,'rating':int(rating)})
                 if path=='/api/adi/live/settings':
                     # ADI Live Support — Configuración (solo administración). Activar exige la palabra ACTIVAR y cierra en silencio lo antiguo.
                     import support_sessions
