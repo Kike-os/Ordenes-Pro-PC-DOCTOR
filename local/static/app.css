@@ -13691,3 +13691,21 @@ body[data-page=dashboard] .fxb-pager select{height:30px!important;min-height:30p
 .sfu-commit-acts{display:flex;flex-wrap:wrap;gap:6px}.sfu-commit-acts button{font-size:12px;min-height:32px}
 .sfu-commit-dialog{width:min(520px,calc(100vw - 32px))}.sfu-commit-form{display:grid;gap:10px}
 .sfu-commit-form input,.sfu-commit-form select,.sfu-commit-form textarea{width:100%;font-size:13px}
+/* ADI 3.0 · fase 3: simulador de intereses y tasas legales (solo en sus diálogos). */
+.sfu-int-dialog{width:min(640px,calc(100vw - 32px))}
+.sfu-int-banner{margin:0 0 10px;padding:8px 10px;border-radius:9px;background:#2b200b;color:#fcd38a;font-size:12.5px;line-height:1.45;border-left:3px solid #d79b2b}
+.sfu-int-stop{margin:0;padding:8px 10px;border-radius:9px;background:#2d1215;color:#ffc1c1;font-size:12.5px;line-height:1.45}
+.sfu-int-out{display:grid;gap:10px;margin-bottom:12px;min-width:0}
+.sfu-int-sum{display:grid;gap:4px;margin:0}.sfu-int-sum>div{display:flex;justify-content:space-between;gap:10px;font-size:12.5px;border-bottom:1px dashed #1c2f4d;padding:3px 0}
+.sfu-int-sum dt{color:#8fa9cc}.sfu-int-sum dd{margin:0;text-align:right;color:#dbe6f7;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+.sfu-int-sum>div[data-strong=true] dd{font-weight:800;color:#fff}
+.sfu-int-wrap{overflow-x:auto;max-width:100%}.sfu-int-table{width:100%;border-collapse:collapse;font-size:12px;font-variant-numeric:tabular-nums}
+.sfu-int-table th,.sfu-int-table td{padding:5px 6px;border-bottom:1px solid #1c2f4d;text-align:right;white-space:nowrap}.sfu-int-table th{color:#8fa9cc;font-weight:700}
+.sfu-int-row{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:end}
+@media (max-width:520px){.sfu-int-row{grid-template-columns:1fr}}
+.sfu-rates{display:grid;gap:10px;min-width:0}.sfu-rates h4{margin:6px 0 0;font-size:12.5px;color:#e6efff}
+.sfu-rate-list{list-style:none;display:grid;gap:6px;margin:0;padding:0}.sfu-rate-list li{display:grid;gap:4px;padding:8px 10px;border:1px solid #23395c;border-radius:10px;background:#0b172b}
+.sfu-rate-list p{margin:0;display:flex;flex-wrap:wrap;gap:4px;align-items:center;font-size:12.5px;color:#dbe6f7}.sfu-rate-list small{font-size:11.5px;color:#8fa9cc;overflow-wrap:anywhere}
+.sfu-rate-list a{color:#93C5FD}
+.sfu-int-periods{list-style:none;display:grid;gap:5px;margin:0;padding:0}.sfu-int-periods li{display:grid;gap:2px;padding:7px 9px;border-radius:9px;background:#0f2038;font-size:12px;font-variant-numeric:tabular-nums}
+.sfu-int-periods strong{color:#e6efff}.sfu-int-periods span{color:#b9c8e2}

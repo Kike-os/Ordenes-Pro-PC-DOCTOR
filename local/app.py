@@ -2520,6 +2520,12 @@ class Handler(BaseHTTPRequestHandler):
                     if found:return self.reply(200,inventory.purchase_detail(c,found[1]))
                 except inventory.InventoryError as error:return self.reply(error.status,{'error':str(error),'fields':error.fields})
                 return self.reply(404,{'error':'No encontrado.'})
+            if path=='/api/finance/rates':
+                # ADI 3.0 · fase 3: Configuración financiera — Tasas legales Ecuador (solo administración, solo lectura en GET).
+                import interest_engine as ie
+                if user['role']!='administrador':return self.reply(403,{'error':'Acceso no permitido.'})
+                return self.reply(200,{'installed':ie.installed(c),'rates':ie.rates(c),'policy':ie.policy(c),'mode':ie.mode(c),'modes':ie.MODES,'kinds':ie.KINDS,
+                                       'source':ie.BCE_SOURCE,'note':ie.LEGAL_NOTE,'message':'' if ie.installed(c) else ie.NOT_INSTALLED})
             if path.startswith('/api/invoicing'):
                 # Facturación electrónica: solo administración. Solo lectura en GET.
                 if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede usar la facturación electrónica.'})
@@ -4962,6 +4968,30 @@ class Handler(BaseHTTPRequestHandler):
                             audit(c,user['id'],'adi_report_prepared',oid);return self.reply(200,{'report':adi_order.report(ctx,adi_order.recommendations(ctx,now_adi))})
                     except adi_order.AdiOrderError as error:return self.reply(error.status,{'error':str(error)})
                     return self.reply(400,{'error':'Acción no válida.'})
+                if path=='/api/finance/rates':
+                    import interest_engine as ie
+                    if user['role']!='administrador':return self.reply(403,{'error':'Acceso no permitido.'})
+                    action=str(data.get('action',''));now_r=reception_now()
+                    try:
+                        if action=='add':rid=ie.add_rate(c,data,user,now_r);audit(c,user['id'],'financial_rate_added',rid)
+                        elif action in ('validate','annul'):
+                            rid=int(data.get('id') or 0);ie.set_rate_status(c,rid,'validada' if action=='validate' else 'anulada',data.get('note'),user);audit(c,user['id'],'financial_rate_'+action,rid)
+                        elif action=='policy':ie.save_policy(c,data);audit(c,user['id'],'interest_policy_saved')
+                        elif action=='mode':ie.set_mode(c,str(data.get('mode','')))
+                        else:return self.reply(400,{'error':'Acción no válida.'})
+                    except ie.InterestError as error:return self.reply(error.status,{'error':str(error),'fields':error.fields})
+                    c.commit();return self.reply(200,{'installed':ie.installed(c),'rates':ie.rates(c),'policy':ie.policy(c),'mode':ie.mode(c),'modes':ie.MODES,'kinds':ie.KINDS,
+                                                      'source':ie.BCE_SOURCE,'note':ie.LEGAL_NOTE,'message':''})
+                interest_match=re.fullmatch(r'/api/orders/([0-9]+)/interest-sim',path)
+                if interest_match:
+                    # Simulador de intereses: estimado sin efectos (no se guarda, no cambia saldos y no se comunica al cliente).
+                    import interest_engine as ie
+                    if user['role']!='administrador':return self.reply(403,{'error':'Solo administración simula intereses.'})
+                    oid=int(interest_match[1])
+                    if not c.execute('SELECT 1 FROM orders WHERE id=?',(oid,)).fetchone():return self.reply(404,{'error':'Orden no disponible.'})
+                    try:result=ie.for_order(c,oid,reception_now().date(),data)
+                    except ie.InterestError as error:return self.reply(error.status,{'error':str(error)})
+                    audit(c,user['id'],'interest_simulated',oid);return self.reply(200,result)
                 commitments_match=re.fullmatch(r'/api/orders/([0-9]+)/commitments',path)
                 if commitments_match:
                     # ADI 3.0 · fase 2: compromisos de pago. Registra lo que aceptó el cliente; no registra pagos ni cambia saldos.

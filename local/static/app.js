@@ -3613,7 +3613,49 @@ function statusMessageDialog(order){
    if(cur.state!=='en_revision')acts.append(button('Pasar a revisión',()=>commitmentReason('review',cur,'Pasar a revisión','Motivo (p. ej., el cliente disputa el importe o hay una transferencia por conciliar)'),'secondary'));
    else if(admin)acts.append(button('Cerrar revisión',()=>commitmentReason('close_review',cur,'Cerrar revisión','Resultado de la revisión'),'secondary'));
    if(admin)acts.append(button('Cancelar',()=>commitmentReason('cancel',cur,'Cancelar compromiso','Motivo de la cancelación'),'secondary danger'));}
+  if(admin){acts.append(button('Simular intereses',()=>interestDialog(),'secondary'),button('Tasas legales Ecuador',()=>ratesDialog(),'secondary'));}
   if(acts.childElementCount)box.append(acts);return box;}
+ // ADI 3.0 · fase 3: simulador de intereses (solo simulación; nada se guarda ni se comunica) y registro de tasas oficiales.
+ const money2=v=>'$'+Number(v).toLocaleString('es-EC',{minimumFractionDigits:2,maximumFractionDigits:2});
+ const day2=v=>{const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(v||''));return m?m[3]+'/'+m[2]+'/'+m[1]:'—';};  // fecha sin hora: sin conversión de zona horaria
+ function interestDialog(){const d=smallDialog('Simulación de intereses');d.classList.add('sfu-int-dialog');const banner=el('p','SIMULACIÓN · no afecta saldos, no se guarda y no se comunica al cliente.','sfu-int-banner');
+  const out=el('div',undefined,'sfu-int-out');const f=el('form',undefined,'sfu-commit-form sfu-int-form');f.noValidate=true;
+  const cap=Object.assign(el('input'),{inputMode:'decimal',placeholder:'Ej.: 150,00'}),due=Object.assign(el('input'),{type:'date'});const l1=el('label',undefined,'sfu-field'),l2=el('label',undefined,'sfu-field');l1.append(el('span','Capital vencido (comparar)'),cap);l2.append(el('span','Fecha de vencimiento'),due);
+  const go=el('button','Comparar','secondary');go.type='submit';const row=el('div',undefined,'sfu-int-row');row.append(l1,l2,go);f.append(el('small','Opcional: compara con otro capital y vencimiento. Por defecto se usa el compromiso de pago incumplido.','sfu-muted'),row);
+  const run=async body=>{out.replaceChildren(el('p','Calculando…','sfu-muted'));try{const r=await api('/api/orders/'+order.id+'/interest-sim',body||{});const dl=el('dl',undefined,'sfu-int-sum');
+    const add=(k,v,strong)=>{const x=el('div');if(strong)x.dataset.strong='true';x.append(el('dt',k),el('dd',v));dl.append(x);};
+    add('Origen',r.source);add('Vencimiento',day2(r.due));add('Días de retraso',String(r.days_late));add('Gracia sin intereses',r.grace_days+' días (hasta '+day2(r.grace_until)+')');
+    add('Días sujetos a intereses',String(r.interest_days));add('Tasa',r.rate_kind+' · interés simple, base 365');add('Capital vencido',money2(r.capital));add('Interés estimado',money2(r.interest),true);add('Total estimado',money2(r.total),true);
+    const t=el('ul',undefined,'sfu-int-periods');for(const p of r.periods){const li=el('li');li.append(el('strong',day2(p.from)+' – '+day2(p.to)+' · '+p.days+(p.days===1?' día':' días')+' · '+p.rate),el('span','Capital '+money2(p.capital)+' · interés '+money2(p.interest)));t.append(li);}
+    const wrap=el('div',undefined,'sfu-int-wrap');wrap.append(t);out.replaceChildren(dl,r.periods.length?wrap:el('p','Sin días sujetos a intereses todavía.','sfu-muted'),el('p',r.note,'sfu-muted'));}
+   catch(problem){out.replaceChildren(el('p',problem.message,'sfu-int-stop'));}};
+  f.addEventListener('submit',event=>{event.preventDefault();run({capital:cap.value.trim(),due_date:due.value});});
+  const bar=el('div',undefined,'dialog-actions');bar.append(button('Cerrar',()=>d.close(),'secondary'));d.append(banner,out,f,bar);run();}
+ async function ratesDialog(){const d=smallDialog('Configuración financiera — Tasas legales Ecuador');d.classList.add('sfu-int-dialog');const body=el('div',undefined,'sfu-rates');d.append(body);
+  const paint=r=>{body.replaceChildren(el('p','Modo: '+r.modes[r.mode]+' (único habilitado). '+r.note,'sfu-int-banner'));
+   if(!r.installed){body.append(el('p',r.message,'sfu-int-stop'));return;}
+   const list=el('ul',undefined,'sfu-rate-list');if(!r.rates.length)list.append(el('li','No hay tasas registradas. Sin una tasa validada no se simulan intereses.','sfu-muted'));
+   for(const x of r.rates){const li=el('li');const head=el('p');const chip=el('span',x.status_label,'sfu-commit-chip');chip.dataset.state=x.status==='validada'?'cumplido':x.status==='anulada'?'incumplido':'proximo';
+    head.append(chip,el('strong',' '+x.kind_label+': '+x.rate),el('span',' · vigente desde '+day2(x.effective_from)+(x.effective_to?' hasta '+day2(x.effective_to):'')));
+    const src=el('a','Fuente oficial');src.href=x.source_url;src.target='_blank';src.rel='noopener noreferrer';const meta=el('small','Consultada el '+day2(x.consulted_at)+' · '+x.evidence+(x.note?' · '+x.note:'')+' · '+(x.user||'—')+' · ');meta.append(src);li.append(head,meta);
+    if(x.status!=='anulada'){const acts=el('div',undefined,'sfu-commit-acts');if(x.status==='sin_validar')acts.append(button('Validar',()=>rateStatus(x,'validate'),'secondary'));acts.append(button('Anular',()=>rateStatus(x,'annul'),'secondary danger'));li.append(acts);}list.append(li);}
+   body.append(list);
+   const f=el('form',undefined,'sfu-commit-form');f.noValidate=true;const field=(label,input)=>{const w=el('label',undefined,'sfu-field');w.append(el('span',label),input);f.append(w);return input;};
+   const kind=el('select');for(const[k,v]of Object.entries(r.kinds))kind.add(new Option(v,k));field('Tipo',kind);const rate=field('Tasa anual (%)',Object.assign(el('input'),{inputMode:'decimal',placeholder:'Escríbela tal como figura en la publicación oficial'}));
+   const from=field('Vigente desde',Object.assign(el('input'),{type:'date'})),to=field('Vigente hasta (opcional)',Object.assign(el('input'),{type:'date'})),consulted=field('Fecha de consulta',Object.assign(el('input'),{type:'date'}));
+   const source=field('Fuente oficial (https)',Object.assign(el('input'),{type:'url',value:r.source})),evidence=field('Evidencia de publicación',Object.assign(el('textarea'),{rows:2,maxLength:400,placeholder:'Documento, tabla y fecha de publicación'}));
+   const err=el('p',undefined,'sfu-error');err.setAttribute('role','alert');const save=el('button','Registrar tasa (queda sin validar)','primary');save.type='submit';f.append(err,save);
+   f.addEventListener('submit',async event=>{event.preventDefault();err.textContent='';try{paint(await api('/api/finance/rates',{action:'add',kind:kind.value,rate:rate.value.trim(),effective_from:from.value,effective_to:to.value,consulted_at:consulted.value,source_url:source.value.trim(),evidence:evidence.value.trim()}));toast('Tasa registrada sin validar.','success');}catch(problem){err.textContent=problem.message;}});
+   body.append(el('h4','Registrar una tasa publicada'),f);
+   const pf=el('form',undefined,'sfu-commit-form sfu-int-row');pf.noValidate=true;const grace=Object.assign(el('input'),{type:'number',min:'30',max:'180',value:String(r.policy.grace_days)});const gl=el('label',undefined,'sfu-field');gl.append(el('span','Días de gracia sin intereses'),grace);
+   const gs=el('button','Guardar política','secondary');gs.type='submit';pf.append(gl,gs);pf.addEventListener('submit',async event=>{event.preventDefault();try{paint(await api('/api/finance/rates',{action:'policy',grace_days:grace.value,rate_kind:r.policy.rate_kind}));toast('Política guardada (solo afecta a la simulación).','success');}catch(problem){toast(problem.message,'error');}});
+   body.append(el('h4','Política de gracia'),pf);};
+  const rateStatus=(x,action)=>{const q=smallDialog(action==='validate'?'Validar tasa':'Anular tasa');const f=el('form',undefined,'sfu-commit-form');f.noValidate=true;const w=el('label',undefined,'sfu-field'),note=Object.assign(el('textarea'),{rows:3,maxLength:300});
+   w.append(el('span',action==='validate'?'Cómo se validó (quién la contrastó con la fuente oficial)':'Motivo de la anulación'),note);const err=el('p',undefined,'sfu-error');err.setAttribute('role','alert');const ok=el('button',action==='validate'?'Validar':'Anular','primary');ok.type='submit';
+   const bar=el('div',undefined,'dialog-actions');bar.append(button('Volver',()=>q.close(),'secondary'),ok);f.append(w,err,bar);q.append(f);note.focus();
+   f.addEventListener('submit',async event=>{event.preventDefault();err.textContent='';try{paint(await api('/api/finance/rates',{action,id:String(x.id),note:note.value.trim()}));q.close();}catch(problem){err.textContent=problem.message;}});};
+  const bar=el('div',undefined,'dialog-actions');bar.append(button('Cerrar',()=>d.close(),'secondary'));d.append(bar);
+  try{paint(await api('/api/finance/rates'));}catch(problem){body.replaceChildren(el('p',problem.message,'sfu-int-stop'));}}
  async function commitmentSave(body,d,errorBox){try{await api('/api/orders/'+order.id+'/commitments',body);d.close();toast('Compromiso guardado. No se registró ningún pago.','success');loadAnalysis();}
   catch(problem){errorBox.textContent=problem.message;}}
  function commitmentDialog(mode,cur,rules){const d=smallDialog(mode==='create'?'Registrar compromiso de pago':'Reprogramar compromiso de pago');d.classList.add('sfu-commit-dialog');
