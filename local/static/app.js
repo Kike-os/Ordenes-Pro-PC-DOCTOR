@@ -7771,7 +7771,7 @@ const invoiceGlyph='M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2
 const invoiceIdTypes={'05':'Cédula','04':'RUC','06':'Pasaporte','08':'Identificación del exterior'};
 let invoiceState={status:'',q:'',tab:'panel'},invoiceProduction=false;  // invoiceProduction: emisión real activa (lo fija renderInvoicing con lo que dice el servidor)
 // Iconos Lucide del módulo (licencia ISC en static/lucide-LICENSE): trazos fijos del paquete oficial, sin cargar nada externo.
-const invIcons={'receipt-text':'<path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M14 8H8"/><path d="M16 12H8"/><path d="M13 16H8"/>',
+const invIcons={'download':'<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/>','file-spreadsheet':'<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M8 13h2"/><path d="M14 13h2"/><path d="M8 17h2"/><path d="M14 17h2"/>','wallet':'<path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/>','coins':'<circle cx="8" cy="8" r="6"/><path d="M18.09 10.37A6 6 0 1 1 10.34 18"/><path d="M7 6h1v4"/><path d="m16.71 13.88.7.71-2.82 2.82"/>','calendar':'<path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/>','banknote':'<rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/>','receipt-text':'<path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M14 8H8"/><path d="M16 12H8"/><path d="M13 16H8"/>',
  package:'<path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><path d="m3.3 7 7.703 4.734a2 2 0 0 0 1.994 0L20.7 7"/><path d="m7.5 4.27 9 5.15"/>',
  'shopping-cart':'<circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/>',
  truck:'<path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M15 18H9"/><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14"/><circle cx="17" cy="18" r="2"/><circle cx="7" cy="18" r="2"/>',
@@ -8329,7 +8329,7 @@ Object.entries({'x':'<path d="M18 6 6 18M6 6l12 12"/>','history':'<path d="M3 12
  'chevron-left':'<path d="m15 18-6-6 6-6"/>','chevron-up':'<path d="m18 15-6-6-6 6"/>','chevron-right':'<path d="m9 18 6-6-6-6"/>','arrow-up-down':'<path d="m21 16-4 4-4-4"/><path d="M17 20V4"/><path d="m3 8 4-4 4 4"/><path d="M7 4v16"/>',
  'file-code':'<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="m10 13-2 2 2 2"/><path d="m14 17 2-2-2-2"/>',
  'calendar':'<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>'}).forEach(([k,v])=>{if(!invIcons[k])invIcons[k]=v;});
-function invoiceListQuery(){const p={status:invoiceState.status||'',q:invoiceState.q||'',from:invoiceState.from||'',to:invoiceState.to||'',sort:invoiceState.sort||'fecha',dir:invoiceState.dir||'desc',page:String(invoiceState.page||0),per:String(invoiceState.per||25)};
+function invoiceListQuery(){const p={status:invoiceState.status||'',q:invoiceState.q||'',from:invoiceState.from||'',to:invoiceState.to||'',method:invoiceState.method||'',sort:invoiceState.sort||'fecha',dir:invoiceState.dir||'desc',page:String(invoiceState.page||0),per:String(invoiceState.per||25)};
  return new URLSearchParams(Object.entries(p).filter(([,v])=>v!==''));}
 function invoiceCopy(text,label){const done=()=>toast(label+' copiada.','success'),fail=()=>toast('No se pudo copiar. Selecciónala y cópiala a mano: '+text,'warning');
  try{if(navigator.clipboard&&window.isSecureContext)navigator.clipboard.writeText(text).then(done,fail);else{const t=el('textarea');t.value=text;t.setAttribute('readonly','');t.style.position='fixed';t.style.opacity='0';document.body.append(t);t.select();const ok=document.execCommand('copy');t.remove();ok?done():fail();}}catch{fail();}}
@@ -8453,20 +8453,22 @@ async function printCenter(invoiceId,number,initial){const dialog=invDialog('Cen
  side.append(sub,list);if(fetchAzur){fetchAzur.classList.add('pcx-fetch');side.append(fetchAzur);}side.append(copiesWrap,remember,hint);const actions=el('div',undefined,'pcx-actions');actions.append(downB,printB);side.append(actions,hist);
  body.replaceChildren(side,view);paintHistory(d.history);paint();list.querySelector('[aria-checked=true]')?.focus();}
 
-function invoicesPanel(panel,data){const filtered=!!(invoiceState.q||invoiceState.status||invoiceState.from||invoiceState.to);
+function invoicesPanel(panel,data){const filtered=!!(invoiceState.q||invoiceState.status||invoiceState.from||invoiceState.to||invoiceState.method);
  if(data.settings.missing.length){const warn=el('div',undefined,'inv-warn inv-warn-action');warn.setAttribute('role','status');warn.append(invIcon('triangle-alert'),el('span','Faltan datos fiscales para emitir: '+data.settings.missing.join(', ')+'.'),button('Completar datos fiscales',()=>{invoiceGo('fiscal');},'secondary'));panel.append(warn);}
  const card=el('section',undefined,'inv-card fxb-card'),head=el('header',undefined,'inv-card-head'),title=el('div');
  title.append(el('h3','Comprobantes electrónicos'),el('small',(data.total===1?'1 documento':data.total+' documentos')+(filtered?' con estos filtros':'')));head.append(title);
  if(admin())head.append(invBtn('Nueva factura directa','plus',()=>invoiceComposer(null,()=>renderInvoicing()),'primary'));
  const reload=()=>{invoiceState.page=0;renderInvoicing();};
- const clearFilters=()=>{Object.assign(invoiceState,{q:'',status:'',from:'',to:'',page:0});renderInvoicing();};
+ const clearFilters=()=>{Object.assign(invoiceState,{q:'',status:'',from:'',to:'',method:'',page:0});renderInvoicing();};
  // Filtros: texto, fechas y estado.
  const bar=el('div',undefined,'inv-toolbar fxb-toolbar'),box=el('label',undefined,'inv-search'),search=el('input');box.append(invIcon('search'),search);search.type='search';search.placeholder='Cliente, identificación, número, orden o clave de acceso';search.value=invoiceState.q||'';search.maxLength=80;search.setAttribute('aria-label','Buscar comprobantes');
  let typing=null;search.addEventListener('input',()=>{clearTimeout(typing);typing=setTimeout(()=>{invoiceState.q=search.value.trim();invoiceState.page=0;renderInvoicing().then(()=>{const again=$('module-content').querySelector('.fxb-toolbar .inv-search input');again?.focus();again?.setSelectionRange(again.value.length,again.value.length);});},350);});
  const dates=el('div',undefined,'fxb-dates');for(const[key,label]of [['from','Desde'],['to','Hasta']]){const l=el('label',undefined,'fxb-date'),i=el('input');i.type='date';i.value=invoiceState[key]||'';i.setAttribute('aria-label',label+' (fecha de emisión)');l.append(el('span',label),i);i.addEventListener('change',()=>{invoiceState[key]=i.value;reload();});dates.append(l);}
  const filters=el('div',undefined,'inv-filters');filters.setAttribute('role','group');filters.setAttribute('aria-label','Filtrar por estado');
  for(const[key,label]of [['','Todas'],...Object.entries(data.statuses)]){const n=key?data.counts[key]||0:Object.values(data.counts).reduce((a,b)=>a+b,0);const b=button('',()=>{invoiceState.status=key;reload();},'inv-filter');b.append(el('span',label),el('b',String(n)));b.setAttribute('aria-pressed',String((invoiceState.status||'')===key));if(key)b.dataset.status=key;filters.append(b);}
+ const payL=el('label',undefined,'fxb-date fxr-method'),pay=el('select');pay.setAttribute('aria-label','Forma de pago');pay.add(new Option('Todas las formas de pago',''));for(const[k,v]of Object.entries(data.payment_filters||{}))pay.add(new Option(v,k));pay.value=invoiceState.method||'';pay.addEventListener('change',()=>{invoiceState.method=pay.value;reload();});payL.append(el('span','Pago'),pay);dates.append(payL);
  bar.append(box,dates,filters);if(filtered)bar.append(invBtn('Limpiar filtros','x',clearFilters,'secondary inv-clear'));card.append(head,bar);
+ if(admin())panel.append(invoiceReportBlock());
  if(!data.rows.length){card.append(invEmpty('receipt-text',filtered?'No hay comprobantes con estos filtros':'Todavía no hay facturas',filtered?'Prueba con otra búsqueda, otras fechas o limpia los filtros.':'Se generan desde «Pagos y saldo» de una orden, una proforma o una venta.',filtered?invBtn('Limpiar filtros','x',clearFilters):null));panel.append(card);return;}
  const wrapT=el('div',undefined,'inv-table-wrap'),table=el('table',undefined,'inv-table fxb-table'),thead=el('thead'),hr=el('tr'),tbody=el('tbody');
  const cols=[['Comprobante','numero'],['Cliente','cliente'],['Vinculado',''],['Emisión','fecha'],['Total','total'],['Estado SRI','estado'],['Acciones','']];
@@ -8491,6 +8493,35 @@ function invoicesPanel(panel,data){const filtered=!!(invoiceState.q||invoiceStat
  const nav=el('div',undefined,'fxb-pager-nav'),prev=invIconBtn('Página anterior','chevron-left',()=>{invoiceState.page=Math.max(0,data.page-1);renderInvoicing();}),next=invIconBtn('Página siguiente','chevron-right',()=>{invoiceState.page=data.page+1;renderInvoicing();});
  prev.disabled=data.page<=0;next.disabled=data.page>=data.pages-1;nav.append(prev,el('span','Página '+(data.page+1)+' de '+data.pages,'fxb-page'),next);foot.append(info,per,nav);card.append(foot);
  panel.append(card);}
+// Reporte de facturación (solo lectura): los mismos filtros de la lista, UN ambiente (nunca suma pruebas con producción),
+// facturado frente a cobrado, formas de pago, notas de crédito, año en curso y exportación a Excel, CSV y PDF.
+function invoiceReportQuery(){const q=invoiceListQuery();for(const k of ['page','per','sort','dir'])q.delete(k);if(invoiceState.repEnv)q.set('env',invoiceState.repEnv);return q;}
+function invoiceReportBlock(){const box=el('section',undefined,'fxb-period fxr-report');box.setAttribute('aria-labelledby','fxr-title');
+ const head=el('div',undefined,'fxb-period-head'),copy=el('div',undefined,'fxr-copy'),h=el('h3','Reporte de facturación');h.id='fxr-title';const sub=el('small','Con los filtros de la lista','fxb-muted');copy.append(h,sub);
+ const tools=el('div',undefined,'fxr-tools'),envL=el('label',undefined,'fxb-date'),env=el('select');env.setAttribute('aria-label','Ambiente del reporte');envL.append(el('span','Ambiente'),env);
+ const exports=el('div',undefined,'fxr-exports');exports.setAttribute('role','group');exports.setAttribute('aria-label','Exportar el reporte');
+ for(const[fmt,label,icon,hint]of [['xlsx','Excel','file-spreadsheet','Libro de Excel con importes numéricos'],['csv','CSV','file-text','Texto separado por punto y coma'],['pdf','PDF','download','Reporte A4 horizontal con logo, filtros y totales']]){
+  const b=invBtn(label,icon,()=>cjBusy(b,async()=>{const q=invoiceReportQuery();await downloadFile('/api/invoicing/report.'+fmt+'?'+q,'facturacion-'+(q.get('env')==='1'?'pruebas':'produccion')+'.'+fmt);toast('Reporte '+label+' generado con los filtros actuales.','success');}),'secondary fxr-export');
+  b.title=hint+' · mismos filtros de la lista';b.setAttribute('aria-label','Exportar a '+label);exports.append(b);}
+ tools.append(envL,exports);head.append(copy,tools);
+ const grid=el('div',undefined,'fxb-kpis');grid.setAttribute('aria-live','polite');grid.setAttribute('aria-busy','true');grid.append(el('p','Calculando…','fxb-muted'));box.append(head,grid);
+ const pct=(a,b)=>b>0?Math.round((a-b)*100/b):null;
+ (async()=>{try{const d=await api('/api/invoicing/report?'+invoiceReportQuery());if(!box.isConnected)return;
+   env.replaceChildren(...Object.entries(d.environments).map(([k,v])=>new Option(v,k)));env.value=d.environment;
+   env.onchange=()=>{invoiceState.repEnv=env.value===d.active_environment?'':env.value;box.replaceWith(invoiceReportBlock());};
+   sub.textContent='Con los filtros de la lista · '+d.environment_label+(d.environment===d.active_environment?' (ambiente vigente)':' (no vigente)')+(d.environment==='1'?' · sin validez tributaria':'')+(d.truncated?' · se calcula sobre los '+5000+' más recientes':'');
+   const a=d.annual,cmp=pct(a.year_cents,a.prev_year_cents),cn=d.credit_notes;
+   const cards=[['circle-dollar-sign','Facturado',quoteMoney(d.billed_cents),d.billed_documents===1?'1 comprobante emitido sin rechazo':d.billed_documents+' emitidos sin rechazo','teal'],
+    ['wallet','Cobrado',quoteMoney(d.collected_cents),d.billed_cents?Math.round(d.collected_cents*100/d.billed_cents)+' % de lo facturado':'Sin facturación en el filtro','green'],
+    ['coins','Por cobrar',quoteMoney(d.outstanding_cents),d.outstanding_cents?'Facturado y aún no cobrado':'Nada pendiente','amber'],
+    ['calendar','Año '+a.year+' (sin filtros)',quoteMoney(a.year_cents),a.prev_year_cents?((cmp>=0?'▲ +':'▼ ')+cmp+' % frente a '+(a.year-1)+' al mismo día'):'Sin facturación en '+(a.year-1)+' al mismo día','blue'],
+    ['file-x-2','Notas de crédito',cn?String(cn.count):'—',cn?(cn.count?quoteMoney(cn.total_cents)+' en el rango':'Ninguna en el rango'):'Sin datos de notas de crédito','magenta']];
+   grid.replaceChildren(invoiceKpis(cards));
+   if(d.by_method.length){const ul=el('ul',undefined,'fxr-methods');ul.setAttribute('aria-label','Facturado por forma de pago');
+    for(const m of d.by_method){const li=el('li');li.append(el('span',m.label),el('strong',quoteMoney(m.amount_cents)));ul.append(li);}grid.append(ul);}
+   grid.append(el('p',d.method_note,'fxb-muted fxb-note'));}
+  catch(error){grid.replaceChildren(el('p',error.message,'empty-module'));}finally{grid.removeAttribute('aria-busy');}})();
+ return box;}
 // Indicadores por período (solo lectura): hoy, mes en curso o un rango; nunca genera documentos tributarios.
 function invoicePeriodBlock(panel,settings){const box=el('section',undefined,'fxb-period');box.setAttribute('aria-labelledby','fxb-period-t');
  const head=el('div',undefined,'fxb-period-head'),h=el('h3','Indicadores del período');h.id='fxb-period-t';const chips=el('div',undefined,'inv-filters');chips.setAttribute('role','group');chips.setAttribute('aria-label','Período');

@@ -2589,7 +2589,7 @@ class Handler(BaseHTTPRequestHandler):
                         import inventory
                         try:page=int(arg('page') or 0);per=int(arg('per') or 25)
                         except ValueError:page,per=0,25
-                        return self.reply(200,{**invoicing.listing(c,arg('status') if arg('status') in invoicing.STATUS else '',arg('q'),arg('from'),arg('to'),arg('sort'),arg('dir'),page,per,arg('env')),'inventory_alerts':inventory.alert_count(c)})
+                        return self.reply(200,{**invoicing.listing(c,arg('status') if arg('status') in invoicing.STATUS else '',arg('q'),arg('from'),arg('to'),arg('sort'),arg('dir'),page,per,arg('env'),arg('method')),'inventory_alerts':inventory.alert_count(c)})
                     if path=='/api/invoicing/stats':
                         # Indicadores por período (solo lectura): hoy, mes en curso y el rango elegido. No genera documentos tributarios.
                         return self.reply(200,invoicing.stats(c,reception_now(),arg('from'),arg('to')))
@@ -2628,6 +2628,20 @@ class Handler(BaseHTTPRequestHandler):
                     found=re.fullmatch(r'/api/invoicing/policies/([0-9]{1,9})\.pdf',path)
                     if found:
                         policy=docs._policy(c,found[1]);return self.reply(200,docs.policy_pdf(policy),'application/pdf',filename='POLITICAS-%s-%s%s.pdf'%(policy['code'],policy['version'],'-BORRADOR' if policy['status']=='borrador' else ''))
+                    if path=='/api/invoicing/report':
+                        # Reportes de facturación (solo lectura): indicadores con los filtros de la lista, por ambiente; facturado frente a cobrado.
+                        import invoice_reports
+                        return self.reply(200,invoice_reports.report(c,invoice_reports.parse(arg,reception_now()),reception_now()))
+                    found=re.fullmatch(r'/api/invoicing/report\.(xlsx|csv|pdf)',path)
+                    if found:
+                        # Exportación con los mismos filtros de la pantalla; queda en la auditoría (quién, formato y cantidad de filas, sin datos de clientes).
+                        import invoice_reports,inventory_center as center
+                        now=reception_now();f=invoice_reports.parse(arg,now);title,columns,rows,widths,totals=invoice_reports.table(c,f,now);day=now.date().isoformat()
+                        name='facturacion-'+('produccion' if f['env']=='2' else 'pruebas')+'-'+day
+                        audit(c,user['id'],'invoice_report_'+found[1],len(rows));c.commit()
+                        if found[1]=='xlsx':return self.reply(200,center.xlsx(title,columns,rows),'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',filename=name+'.xlsx')
+                        if found[1]=='csv':return self.reply(200,center.report_csv(columns,rows).encode('utf-8'),'text/csv; charset=utf-8',filename=name+'.csv')
+                        return self.reply(200,center.report_pdf(title,invoice_reports.filters_text(f),columns,rows,widths,totals,now,area='Centro de Facturación'),'application/pdf',filename=name+'.pdf')
                     if path=='/api/invoicing/ticket-calibration.pdf':
                         # Epson Precision Print 4.2: muestra de calibración con datos FICTICIOS (no es una factura ni consume secuenciales).
                         import invoice_ticket

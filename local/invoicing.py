@@ -609,9 +609,11 @@ PER_PAGE = (10, 25, 50, 100)
 DATE = re.compile(r'\d{4}-\d{2}-\d{2}')
 
 
-def listing(c, status='', q='', date_from='', date_to='', sort='', direction='', page=0, per_page=25, environment=''):
-    """Lista de comprobantes (solo lectura) con filtros por estado, texto (cliente, identificación, orden, proforma, venta o clave de
-    acceso), fechas de emisión (o de creación si aún no tiene) y ambiente; orden por columna y paginación. Los descartados no aparecen."""
+PAYMENT_FILTERS = {'efectivo': 'Efectivo', 'transferencia': 'Transferencia', 'deposito': 'Depósito', 'tarjeta': 'Tarjeta', 'credito': 'Crédito (saldo por cobrar)', 'otro': 'Otro'}
+
+
+def list_where(status='', q='', date_from='', date_to='', environment='', method=''):
+    """Cláusula FROM/WHERE común de la lista y de los reportes (mismos filtros en pantalla y en las exportaciones)."""
     where, args = ["i.status!='descartado'" if not status else 'i.status=?'], [] if not status else [status]
     if q:
         where.append("instr(lower(i.buyer_name||' '||i.buyer_id||' '||COALESCE(o.code,'')||' '||COALESCE(s.code,'')||' '||COALESCE(i.access_key,'')||' '||"
@@ -624,7 +626,15 @@ def listing(c, status='', q='', date_from='', date_to='', sort='', direction='',
         where.append(day + '<=?'); args.append(date_to)
     if environment in ENVIRONMENTS:
         where.append('i.environment=?'); args.append(environment)
-    base = ' FROM invoices i LEFT JOIN orders o ON o.id=i.order_id LEFT JOIN license_sales s ON s.id=i.license_sale_id WHERE ' + ' AND '.join(where)
+    if method in PAYMENT_FILTERS:
+        where.append('EXISTS (SELECT 1 FROM invoice_payments p WHERE p.invoice_id=i.id AND p.method=?)'); args.append(method)
+    return ' FROM invoices i LEFT JOIN orders o ON o.id=i.order_id LEFT JOIN license_sales s ON s.id=i.license_sale_id WHERE ' + ' AND '.join(where), args
+
+
+def listing(c, status='', q='', date_from='', date_to='', sort='', direction='', page=0, per_page=25, environment='', method=''):
+    """Lista de comprobantes (solo lectura) con filtros por estado, texto (cliente, identificación, orden, proforma, venta o clave de
+    acceso), fechas de emisión (o de creación si aún no tiene), ambiente y forma de pago; orden por columna y paginación. Los descartados no aparecen."""
+    base, args = list_where(status, q, date_from, date_to, environment, method)
     total = c.execute('SELECT COUNT(*)' + base, args).fetchone()[0]
     per_page = per_page if per_page in PER_PAGE else 25
     pages = max(1, -(-total // per_page))
@@ -639,7 +649,7 @@ def listing(c, status='', q='', date_from='', date_to='', sort='', direction='',
             'access_key': r['access_key'] or '', 'has_authorized_xml': bool(r['xml_authorized']), 'provider': r['provider'] or '', 'has_email': bool((r['buyer_email'] or '').strip()),
             'has_phone': bool((r['buyer_phone'] or '').strip()), 'authorized_at': r['authorized_at'] or ''} for r in rows]
     counts = {code: c.execute('SELECT COUNT(*) FROM invoices WHERE status=?', (code,)).fetchone()[0] for code in STATUS if code != 'descartado'}
-    return {'rows': out, 'counts': counts, 'statuses': {k: v for k, v in STATUS.items() if k != 'descartado'}, 'settings': settings(c), 'summary': summary(c, counts),
+    return {'rows': out, 'counts': counts, 'statuses': {k: v for k, v in STATUS.items() if k != 'descartado'}, 'settings': settings(c), 'summary': summary(c, counts), 'payment_filters': PAYMENT_FILTERS,
             'page': page, 'pages': pages, 'total': total, 'per_page': per_page, 'sort': sort if sort in SORTS else 'fecha', 'direction': 'asc' if direction == 'asc' else 'desc'}
 
 

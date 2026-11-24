@@ -4,6 +4,12 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## Sin publicar
+
+### Nuevas funcionalidades
+
+- Facturación: reporte con los filtros de la lista y nuevo filtro por forma de pago; facturado frente a cobrado, por cobrar, año en curso frente al anterior y notas de crédito, por ambiente. Exportación a Excel, CSV y PDF con auditoría.
+
 ## v1.5.336 — 2026-11-24 12:24 (UTC-05:00)
 
 Reportes: hora de actualización en hora de Ecuador

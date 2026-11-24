@@ -62,7 +62,7 @@ comparar el diseño con ellas.
 ## Premium Billing Center 4.0
 
 - [x] Centro de impresión (1.5.323 a 1.5.326).
-- [ ] Reportes y exportación: indicadores anuales, notas de crédito, facturado frente a cobrado, filtro por forma de pago, y Excel, CSV y PDF.
+- [x] Reportes y exportación: indicadores anuales, notas de crédito, facturado frente a cobrado, filtro por forma de pago, y Excel, CSV y PDF (docs/FACTURACION-REPORTES.md).
 - [ ] Otros comprobantes: recibo de pago, anticipo, entrega y nota de crédito, en A4 y térmico.
 - [ ] Portal seguro de consulta con QR y permisos independientes por acción.
 
@@ -70,5 +70,5 @@ comparar el diseño con ellas.
 
 - [ ] **[Administración]** Confirmar con el contador que el SRI acepta en el ticket el código de barras de la clave de acceso dividido en partes.
 - [ ] **[Administración]** Crear en Meta la plantilla de autenticación de WhatsApp (p. ej., `pcdoctor_codigo`) y configurarla en Integraciones.
-- [ ] **[Administración]** Cambiar la contraseña de `admin-red`, que se compartió en el chat.
+- [x] **[Administración]** Contraseña de `admin-red`: administración decidió conservarla (24/11/2026). Recomendación: revisar periódicamente sus inicios de sesión.
 - [ ] **[Administración]** Pulsar «Obtener RIDE de AZUR» en las facturas 276 y 277.

@@ -1,6 +1,8 @@
 {
   "unreleased": {
-    "features": [],
+    "features": [
+      "Facturación: reporte con los filtros de la lista y nuevo filtro por forma de pago; facturado frente a cobrado, por cobrar, año en curso frente al anterior y notas de crédito, por ambiente. Exportación a Excel, CSV y PDF con auditoría."
+    ],
     "improvements": [],
     "fixes": [],
     "security": [],
