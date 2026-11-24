@@ -1,19 +1,35 @@
 {
   "unreleased": {
-    "features": [
-      "ADI Executive Intelligence 5.0: nuevo espacio de trabajo con historial (favoritas, archivadas, por fecha), estado verificado del servicio, tarjetas en vivo, Insights verificables, sugerencias según los datos reales, accesos por departamento, tablas con gráfico, exportar, imprimir, calificar, regenerar y pantalla completa."
-    ],
-    "improvements": [
-      "ADI administrativa consulta finanzas, facturación, cartera, atención a clientes, repuestos, inventario e infraestructura con permisos validados en el servidor, solo lectura, con pasos y fuentes reales y sin guardar contraseñas ni tokens.",
-      "Premium Smart Dropdown 2.0: todas las listas se alinean al campo, se abren hacia arriba si no hay espacio, respetan los márgenes, se recolocan al desplazar, funcionan en ventanas modales y las largas tienen buscador; navegación completa con teclado."
-    ],
-    "fixes": [
-      "Listas desplegables: la Marca de Nueva orden (y Provincia, Cantón, Parroquia y Localidad) abría la lista nativa del navegador a toda la altura y con otros colores. Ahora usan la lista del sistema, alineada al campo, con altura limitada y búsqueda sin acentos."
-    ],
+    "features": [],
+    "improvements": [],
+    "fixes": [],
     "security": [],
     "performance": []
   },
   "releases": [
+    {
+      "version": "1.5.339",
+      "date": "2026-11-24T14:33:02-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "ADI Executive Intelligence 5.0 y Premium Smart Dropdown 2.0",
+      "changes": {
+        "features": [
+          "ADI Executive Intelligence 5.0: nuevo espacio de trabajo con historial (favoritas, archivadas, por fecha), estado verificado del servicio, tarjetas en vivo, Insights verificables, sugerencias según los datos reales, accesos por departamento, tablas con gráfico, exportar, imprimir, calificar, regenerar y pantalla completa."
+        ],
+        "improvements": [
+          "ADI administrativa consulta finanzas, facturación, cartera, atención a clientes, repuestos, inventario e infraestructura con permisos validados en el servidor, solo lectura, con pasos y fuentes reales y sin guardar contraseñas ni tokens.",
+          "Premium Smart Dropdown 2.0: todas las listas se alinean al campo, se abren hacia arriba si no hay espacio, respetan los márgenes, se recolocan al desplazar, funcionan en ventanas modales y las largas tienen buscador; navegación completa con teclado."
+        ],
+        "fixes": [
+          "Listas desplegables: la Marca de Nueva orden (y Provincia, Cantón, Parroquia y Localidad) abría la lista nativa del navegador a toda la altura y con otros colores. Ahora usan la lista del sistema, alineada al campo, con altura limitada y búsqueda sin acentos."
+        ],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Administración (autorización expresa en la sesión)"
+    },
     {
       "version": "1.5.338",
       "date": "2026-11-24T13:35:09-05:00",
