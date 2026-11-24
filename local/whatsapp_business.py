@@ -1179,3 +1179,48 @@ def overview(c, base_url='', env=None):
                         'last_event': last['value'] if last else '', 'rejected': json.loads(rejected['value']) if rejected else {'count': 0, 'last': ''}},
             'events': [{'code': k, 'label': v[0], 'group': v[1], 'group_label': GROUPS[v[1]], 'when': v[3], 'auto': v[4], 'params': PARAMS[v[1]]} for k, v in EVENTS.items()],
             'general_params': GENERAL_PARAMS, 'states': STATE_LABELS, 'errors': [{'code': k, 'permanent': v[0], 'kind': v[1], 'text': v[2]} for k, v in ERRORS.items() if k != '0']}
+
+
+# ───────────────────────────────────────────── Plantilla de autenticación para los códigos de verificación (whatsapp_identity)
+OTP_TEMPLATE = 'pcdoctor_codigo'
+
+
+def _find_template(name, env=None):
+    cfg = config(env)
+    code, answer = call('GET', '%s/message_templates' % cfg['waba'], env, query={'name': name, 'fields': 'name,status,language,category,rejected_reason', 'limit': '20'})
+    if code != 200:
+        raise WhatsAppError('No se pudo consultar las plantillas en Meta: ' + classify(code, answer)[3], 502)
+    return [t for t in (answer or {}).get('data', []) if t.get('name') == name]
+
+
+def otp_template(c, user, now, action, env=None, minutes=5):
+    """Crea en Meta la plantilla de AUTENTICACIÓN «pcdoctor_codigo» (español, código con botón «Copiar código», aviso de seguridad y
+    caducidad) o consulta su estado. Solo administración. No envía mensajes a clientes ni cambia credenciales. Cuando Meta la APRUEBA,
+    la conecta a los códigos de verificación (otp_template); mientras esté en revisión o rechazada, no la usa."""
+    if user['role'] != 'administrador':
+        raise WhatsAppError('Solo administración gestiona las plantillas de WhatsApp.', 403)
+    if not ready(env):
+        raise WhatsAppError('WhatsApp Business no está configurado.', 409)
+    found = _find_template(OTP_TEMPLATE, env)
+    created = False
+    if action == 'create' and not found:
+        payload = {'name': OTP_TEMPLATE, 'language': 'es', 'category': 'AUTHENTICATION',
+                   'components': [{'type': 'BODY', 'add_security_recommendation': True},
+                                  {'type': 'FOOTER', 'code_expiration_minutes': int(minutes)},
+                                  {'type': 'BUTTONS', 'buttons': [{'type': 'OTP', 'otp_type': 'COPY_CODE', 'text': 'Copiar código'}]}]}
+        code, answer = call('POST', '%s/message_templates' % config(env)['waba'], env, payload)
+        if code != 200:
+            raise WhatsAppError('Meta no aceptó la plantilla: ' + classify(code, answer)[3], 502)
+        created = True
+        found = [{'name': OTP_TEMPLATE, 'status': (answer or {}).get('status', 'PENDING'), 'language': 'es', 'category': (answer or {}).get('category', 'AUTHENTICATION')}]
+    state = (found[0].get('status') if found else '') or ''
+    connected = False
+    if state == 'APPROVED':
+        cur = settings(c)
+        if cur.get('otp_template') != OTP_TEMPLATE or cur.get('otp_lang') != (found[0].get('language') or 'es'):
+            save_settings(c, {'otp_template': OTP_TEMPLATE, 'otp_lang': found[0].get('language') or 'es'}, user)
+        connected = True
+    labels = {'APPROVED': 'Aprobada por Meta y conectada a los códigos de verificación', 'PENDING': 'En revisión de Meta (suele tardar minutos u horas)',
+              'REJECTED': 'Rechazada por Meta', 'PAUSED': 'Pausada por Meta', 'DISABLED': 'Desactivada por Meta', '': 'No existe todavía en Meta'}
+    return {'name': OTP_TEMPLATE, 'exists': bool(found), 'created': created, 'status': state, 'label': labels.get(state, state),
+            'reason': (found[0].get('rejected_reason') or '') if found else '', 'connected': connected, 'checked_at': stamp(now)}

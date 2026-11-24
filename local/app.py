@@ -5302,6 +5302,14 @@ class Handler(BaseHTTPRequestHandler):
                         if path=='/api/whatsapp/settings':
                             result=whatsapp_business.save_settings(c,data,user);audit(c,user['id'],'whatsapp_settings');c.commit()
                             return self.reply(200,{'settings':result})
+                        if path=='/api/whatsapp/otp-template':
+                            # Plantilla de autenticación para los códigos (crear exige escribir CREAR). Solo administración; queda en la auditoría.
+                            action=str(data.get('action',''))
+                            if action not in ('create','status'):return self.reply(400,{'error':'Acción no válida.'})
+                            if action=='create' and str(data.get('confirm','')).strip().upper()!='CREAR':return self.reply(400,{'error':'Escribe CREAR para confirmar.'})
+                            if limited(c,'whatsapp-otp-template:%d'%user['id'],10,300):return self.reply(429,{'error':'Espera unos minutos antes de volver a intentarlo.'})
+                            result=whatsapp_business.otp_template(c,user,now,action);audit(c,user['id'],'whatsapp_otp_template_'+action);c.commit()
+                            return self.reply(200,result)
                         if path=='/api/whatsapp/check':
                             if user['role']!='administrador':return self.reply(403,{'error':'Acceso no permitido.'})
                             if limited(c,'whatsapp-check:%d'%user['id'],6,300):return self.reply(429,{'error':'Espera unos minutos antes de volver a comprobar.'})

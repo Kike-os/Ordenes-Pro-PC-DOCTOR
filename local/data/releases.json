@@ -8,6 +8,24 @@
   },
   "releases": [
     {
+      "version": "1.5.341",
+      "date": "2026-11-24T17:20:12-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Plantilla de códigos de WhatsApp",
+      "changes": {
+        "features": [
+          "WhatsApp: crear desde Integraciones la plantilla de autenticación «pcdoctor_codigo» en Meta (código con botón «Copiar código», caducidad de 5 minutos) y comprobar su aprobación; se conecta sola a los códigos de verificación cuando Meta la aprueba."
+        ],
+        "improvements": [],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Administración (autorización expresa en la sesión)"
+    },
+    {
       "version": "1.5.340",
       "date": "2026-11-24T16:40:20-05:00",
       "type": "patch",

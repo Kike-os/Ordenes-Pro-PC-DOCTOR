@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.341 — 2026-11-24 17:20 (UTC-05:00)
+
+Plantilla de códigos de WhatsApp
+
+### Nuevas funcionalidades
+
+- WhatsApp: crear desde Integraciones la plantilla de autenticación «pcdoctor_codigo» en Meta (código con botón «Copiar código», caducidad de 5 minutos) y comprobar su aprobación; se conecta sola a los códigos de verificación cuando Meta la aprueba.
+
 ## v1.5.340 — 2026-11-24 16:40 (UTC-05:00)
 
 Comprobantes de pago, anticipo y entrega
