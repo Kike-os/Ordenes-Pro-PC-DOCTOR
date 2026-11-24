@@ -4,6 +4,22 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.323 — 2026-11-24 00:50 (UTC-05:00)
+
+Centro de impresión y Smart Table 4.1
+
+### Nuevas funcionalidades
+
+- Centro de impresión — PC-DOCTOR: ticket de factura «Tech Retail Invoice 4.0» en 80 mm (Epson TM-m30II) y 58 mm, factura A4 y RIDE original de AZUR; vista previa, copias, formato predeterminado por usuario, botón Imprimir siempre visible e historial de impresión que nunca afirma «impreso en papel».
+
+### Mejoras realizadas
+
+- Smart Table 4.1: menú de acciones que ya no se recorta (fuera de la tabla, se abre hacia arriba si hace falta, panel inferior en el móvil), acciones principales siempre visibles, tarjetas compactas en pantallas medianas y paginación compacta.
+
+### Errores corregidos
+
+- La vista previa de PDF ya no sale en blanco por la política de seguridad, la página de inicio de sesión ya no hace una petición sin sesión (error 401) y el menú de acciones de facturas ya no queda recortado ni crea barras de desplazamiento internas.
+
 ## v1.5.322 — 2026-11-24 00:03 (UTC-05:00)
 
 Premium Billing Center

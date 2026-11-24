@@ -8,6 +8,28 @@
   },
   "releases": [
     {
+      "version": "1.5.323",
+      "date": "2026-11-24T00:50:44-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Centro de impresión y Smart Table 4.1",
+      "changes": {
+        "features": [
+          "Centro de impresión — PC-DOCTOR: ticket de factura «Tech Retail Invoice 4.0» en 80 mm (Epson TM-m30II) y 58 mm, factura A4 y RIDE original de AZUR; vista previa, copias, formato predeterminado por usuario, botón Imprimir siempre visible e historial de impresión que nunca afirma «impreso en papel»."
+        ],
+        "improvements": [
+          "Smart Table 4.1: menú de acciones que ya no se recorta (fuera de la tabla, se abre hacia arriba si hace falta, panel inferior en el móvil), acciones principales siempre visibles, tarjetas compactas en pantallas medianas y paginación compacta."
+        ],
+        "fixes": [
+          "La vista previa de PDF ya no sale en blanco por la política de seguridad, la página de inicio de sesión ya no hace una petición sin sesión (error 401) y el menú de acciones de facturas ya no queda recortado ni crea barras de desplazamiento internas."
+        ],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Administración (autorización expresa en la sesión)"
+    },
+    {
       "version": "1.5.322",
       "date": "2026-11-24T00:03:06-05:00",
       "type": "patch",
