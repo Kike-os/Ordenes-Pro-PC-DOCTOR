@@ -8,6 +8,28 @@
   },
   "releases": [
     {
+      "version": "1.5.335",
+      "date": "2026-11-24T12:13:16-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Live Support 4.0, confirmaciones de lectura y Mission Control 5.1",
+      "changes": {
+        "features": [
+          "ADI Live Support Center 4.0: cierre por inactividad de 8 minutos controlado por el servidor (desactivado hasta su activación administrativa con simulación previa), filtros de bandeja, contador visible, pausa del cierre, notas internas y métricas de atención.",
+          "Live Read Receipts 1.0: estados enviado, entregado y leído en chat web y WhatsApp, basados solo en confirmaciones reales (Meta firmadas o lectura visible en el widget). Nunca retroceden y no reinician el cierre por inactividad."
+        ],
+        "improvements": [
+          "Technical Mission Control 5.1: tarjetas con comparación frente al periodo anterior, indicadores circulares con denominador válido y metodología, EN VIVO, resumen de ventas y finanzas (solo administración) y modo pantalla completa.",
+          "ADI pide el modelo exacto o el número de parte antes de ofrecer repuestos compatibles."
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Administración (autorización expresa en la sesión)"
+    },
+    {
       "version": "1.5.334",
       "date": "2026-11-24T08:29:10-05:00",
       "type": "patch",

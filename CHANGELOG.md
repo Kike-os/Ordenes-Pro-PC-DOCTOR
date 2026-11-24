@@ -4,6 +4,20 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.335 — 2026-11-24 12:13 (UTC-05:00)
+
+Live Support 4.0, confirmaciones de lectura y Mission Control 5.1
+
+### Nuevas funcionalidades
+
+- ADI Live Support Center 4.0: cierre por inactividad de 8 minutos controlado por el servidor (desactivado hasta su activación administrativa con simulación previa), filtros de bandeja, contador visible, pausa del cierre, notas internas y métricas de atención.
+- Live Read Receipts 1.0: estados enviado, entregado y leído en chat web y WhatsApp, basados solo en confirmaciones reales (Meta firmadas o lectura visible en el widget). Nunca retroceden y no reinician el cierre por inactividad.
+
+### Mejoras realizadas
+
+- Technical Mission Control 5.1: tarjetas con comparación frente al periodo anterior, indicadores circulares con denominador válido y metodología, EN VIVO, resumen de ventas y finanzas (solo administración) y modo pantalla completa.
+- ADI pide el modelo exacto o el número de parte antes de ofrecer repuestos compatibles.
+
 ## v1.5.334 — 2026-11-24 08:29 (UTC-05:00)
 
 Encabezado sin desplazamiento horizontal hasta 1580 px
