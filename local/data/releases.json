@@ -8,6 +8,26 @@
   },
   "releases": [
     {
+      "version": "1.5.331",
+      "date": "2026-11-24T08:09:30-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Database Guardian Pro 1.0: migraciones verificadas con evidencia y monitor de base de datos",
+      "changes": {
+        "features": [
+          "Database Guardian Pro 1.0: estado individual verificado de cada migración (registro, tablas, columnas, índices y checksum), libro de migraciones (migración 122), bloqueo contra ejecuciones simultáneas, recuperación segura con reintentos y cortacircuitos, monitor de cinco estados con latencias, historial de incidencias, exportación y control obligatorio previo a publicar."
+        ],
+        "improvements": [],
+        "fixes": [
+          "Database Guardian Pro 1.0 — causa raíz de la incidencia del 24/11 02:04: Vercel publicó el código antes de aplicar las migraciones 119 y 120 y el monitor, que comparaba cantidades, lo marcó como fallo crítico aunque la conexión era correcta. Ahora verifica la estructura real y una migración aditiva pendiente es advertencia."
+        ],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Administración (autorización expresa en la sesión)"
+    },
+    {
       "version": "1.5.330",
       "date": "2026-11-24T07:08:57-05:00",
       "type": "patch",
