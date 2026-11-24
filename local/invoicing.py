@@ -609,7 +609,21 @@ PER_PAGE = (10, 25, 50, 100)
 DATE = re.compile(r'\d{4}-\d{2}-\d{2}')
 
 
-PAYMENT_FILTERS = {'efectivo': 'Efectivo', 'transferencia': 'Transferencia', 'deposito': 'Depósito', 'tarjeta': 'Tarjeta', 'credito': 'Crédito (saldo por cobrar)', 'otro': 'Otro'}
+# Formas de pago guardadas en invoice_payments (vienen de cobros de órdenes, ventas, anticipos o del saldo sin cobrar). «credito» es AMBIGUO
+# en los datos: puede ser tarjeta de crédito (cobro de una orden) o el saldo facturado a crédito; por eso no se etiqueta como solo una de ellas.
+PAYMENT_FILTERS = {'efectivo': 'Efectivo', 'transferencia': 'Transferencia', 'deposito': 'Depósito', 'tarjeta': 'Tarjeta', 'debito': 'Tarjeta de débito',
+                   'credito': 'Crédito (tarjeta de crédito o saldo a crédito)', 'cheque': 'Cheque', 'otro': 'Otro'}
+METHOD_KEY = re.compile(r'[a-z_]{2,30}')
+
+
+def payment_filters(c):
+    """Formas de pago que se pueden filtrar: las conocidas más las que realmente existen en las facturas."""
+    out = dict(PAYMENT_FILTERS)
+    for (m,) in c.execute('SELECT DISTINCT method FROM invoice_payments'):
+        if m and METHOD_KEY.fullmatch(m) and m not in out:
+            out[m] = m.replace('_', ' ').capitalize()
+    return out
+
 
 
 def list_where(status='', q='', date_from='', date_to='', environment='', method=''):
@@ -626,7 +640,7 @@ def list_where(status='', q='', date_from='', date_to='', environment='', method
         where.append(day + '<=?'); args.append(date_to)
     if environment in ENVIRONMENTS:
         where.append('i.environment=?'); args.append(environment)
-    if method in PAYMENT_FILTERS:
+    if method and METHOD_KEY.fullmatch(method):
         where.append('EXISTS (SELECT 1 FROM invoice_payments p WHERE p.invoice_id=i.id AND p.method=?)'); args.append(method)
     return ' FROM invoices i LEFT JOIN orders o ON o.id=i.order_id LEFT JOIN license_sales s ON s.id=i.license_sale_id WHERE ' + ' AND '.join(where), args
 
@@ -649,7 +663,7 @@ def listing(c, status='', q='', date_from='', date_to='', sort='', direction='',
             'access_key': r['access_key'] or '', 'has_authorized_xml': bool(r['xml_authorized']), 'provider': r['provider'] or '', 'has_email': bool((r['buyer_email'] or '').strip()),
             'has_phone': bool((r['buyer_phone'] or '').strip()), 'authorized_at': r['authorized_at'] or ''} for r in rows]
     counts = {code: c.execute('SELECT COUNT(*) FROM invoices WHERE status=?', (code,)).fetchone()[0] for code in STATUS if code != 'descartado'}
-    return {'rows': out, 'counts': counts, 'statuses': {k: v for k, v in STATUS.items() if k != 'descartado'}, 'settings': settings(c), 'summary': summary(c, counts), 'payment_filters': PAYMENT_FILTERS,
+    return {'rows': out, 'counts': counts, 'statuses': {k: v for k, v in STATUS.items() if k != 'descartado'}, 'settings': settings(c), 'summary': summary(c, counts), 'payment_filters': payment_filters(c),
             'page': page, 'pages': pages, 'total': total, 'per_page': per_page, 'sort': sort if sort in SORTS else 'fecha', 'direction': 'asc' if direction == 'asc' else 'desc'}
 
 

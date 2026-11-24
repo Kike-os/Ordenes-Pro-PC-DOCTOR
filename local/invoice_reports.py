@@ -30,7 +30,7 @@ def parse(arg, now):
     """Filtros válidos desde la consulta. El ambiente por omisión es el vigente."""
     env = arg('env') if arg('env') in invoicing.ENVIRONMENTS else invoicing.active_environment()
     status = arg('status') if arg('status') in invoicing.STATUS and arg('status') != 'descartado' else ''
-    method = arg('method') if arg('method') in invoicing.PAYMENT_FILTERS else ''
+    method = arg('method') if invoicing.METHOD_KEY.fullmatch(arg('method') or '') else ''
     f = {'status': status, 'q': arg('q')[:80], 'from': arg('from') if invoicing.DATE.fullmatch(arg('from') or '') else '',
          'to': arg('to') if invoicing.DATE.fullmatch(arg('to') or '') else '', 'env': env, 'method': method}
     if f['from'] and f['to'] and f['from'] > f['to']:
@@ -94,7 +94,7 @@ def rows(c, f):
         out.append({'id': r['id'], 'number': invoicing.number(r), 'environment': r['environment'], 'issue_date': r['issue_date'] or '', 'created_at': r['created_at'],
                     'buyer_name': r['buyer_name'], 'buyer_id': 'Consumidor final' if r['consumer_final'] else r['buyer_id'],
                     'reference': (SOURCE_LABELS.get(r['source_kind'], 'Orden') + ' ' + ref) if ref else 'Directa', 'status': r['status'], 'status_label': invoicing.STATUS[r['status']],
-                    'methods': [{'method': m, 'label': invoicing.PAYMENT_FILTERS.get(m, m.capitalize()), 'amount_cents': v} for m, v in methods],
+                    'methods': [{'method': m, 'label': invoicing.PAYMENT_FILTERS.get(m, m.replace('_', ' ').capitalize()), 'amount_cents': v} for m, v in methods],
                     'subtotal_cents': r['subtotal_cents'], 'tax_cents': r['tax_cents'], 'total_cents': r['total_cents'], 'billed': billed,
                     'collected_cents': collected, 'outstanding_cents': None if collected is None else r['total_cents'] - collected, 'collected_basis': basis,
                     'access_key': r['access_key'] or ''})
@@ -155,7 +155,7 @@ def report(c, f, now):
             'billed_cents': sum(r['total_cents'] for r in billed), 'tax_cents': sum(r['tax_cents'] for r in billed),
             'collected_cents': sum(r['collected_cents'] for r in billed), 'outstanding_cents': sum(r['outstanding_cents'] for r in billed),
             'by_method': sorted(by_method.values(), key=lambda x: -x['amount_cents']), 'by_status': by_status,
-            'credit_notes': _credit_notes(c, f), 'annual': _annual(c, f['env'], now.date()), 'payment_filters': invoicing.PAYMENT_FILTERS,
+            'credit_notes': _credit_notes(c, f), 'annual': _annual(c, f['env'], now.date()), 'payment_filters': invoicing.payment_filters(c),
             'statuses': {k: v for k, v in invoicing.STATUS.items() if k != 'descartado'}, 'environments': invoicing.ENVIRONMENTS,
             'method_note': 'Facturado: emitidas sin rechazo. Cobrado: cobros actuales de la orden o la venta; en proformas, inventario y facturas directas, las formas de pago registradas en la factura sin el crédito.'}
 
@@ -190,7 +190,7 @@ def filters_text(f):
     if f['status']:
         parts.append('Estado: ' + invoicing.STATUS[f['status']])
     if f['method']:
-        parts.append('Forma de pago: ' + invoicing.PAYMENT_FILTERS[f['method']])
+        parts.append('Forma de pago: ' + invoicing.PAYMENT_FILTERS.get(f['method'], f['method'].replace('_', ' ').capitalize()))
     if f['q']:
         parts.append('Búsqueda: «' + f['q'] + '»')
     return ' · '.join(parts)

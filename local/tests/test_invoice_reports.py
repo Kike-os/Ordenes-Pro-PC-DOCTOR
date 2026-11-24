@@ -54,6 +54,8 @@ class InvoiceReportTests(unittest.TestCase):
         self.assertEqual([row['id'] for row in listed['rows']], [ids['b'][0]])
         self.assertIn('credito', listed['payment_filters'])
         self.assertEqual(self.report('status=borrador')['billed_cents'], 0)
+        self.assertEqual(self.report('method=x%27%20OR%201=1')['documents'], 3)                          # valor no válido: se ignora, sin inyección
+        self.assertEqual(self.report('method=cheque')['documents'], 0)
         self.assertEqual(self.report('from=2001-01-01&to=2001-12-31')['documents'], 0)
         # Un cobro anulado DESPUÉS de facturar deja saldo: lo cobrado baja aunque la factura conserve su forma de pago.
         with app.connect() as c:
@@ -87,7 +89,7 @@ class InvoiceReportTests(unittest.TestCase):
         lines = [line for line in text.splitlines() if line.strip()]
         self.assertTrue(lines[0].startswith('Comprobante;Ambiente;Emisión;Cliente'))
         self.assertEqual(len(lines), 2)                                                              # solo la factura a crédito
-        self.assertIn('Crédito (saldo por cobrar)', lines[1])
+        self.assertIn('Crédito (tarjeta de crédito o saldo a crédito)', lines[1])
         self.assertIn('25,00', lines[1])
         with app.connect() as c:
             self.assertEqual(c.execute("SELECT COUNT(*) FROM audit WHERE action LIKE 'invoice_report_%'").fetchone()[0], audits + 3)

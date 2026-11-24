@@ -10,7 +10,9 @@ El reporte usa **los mismos filtros de la lista**:
 - búsqueda;
 - rango de fechas de emisión;
 - estado SRI;
-- **forma de pago** (nuevo): efectivo, transferencia, depósito, tarjeta, crédito u otro.
+- **forma de pago** (nuevo): las conocidas y cualquier otra que exista en las facturas.
+
+**Aviso sobre «Crédito»:** en los datos guardados puede significar tarjeta de crédito (cobro de una orden) o saldo facturado a crédito, y no hay forma fiable de distinguirlos. Por eso se muestra como «Crédito (tarjeta de crédito o saldo a crédito)». El monto cobrado y el pendiente **no** dependen de esa etiqueta.
 
 **Ambiente:** el reporte es de un solo ambiente, por omisión el vigente. **Nunca suma pruebas con producción.**
 
