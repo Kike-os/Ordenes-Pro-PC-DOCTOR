@@ -3539,6 +3539,9 @@ class Handler(BaseHTTPRequestHandler):
                         try:ss.activity(c,conv['id'],'adi',reception_now())
                         except Exception as error:print('support-session',type(error).__name__,flush=True)
                     response={'ok':True,'conversation_id':conv['id'],'mode':conv['mode'],'state':adi_public_state(conv),'locale':lang,'messages':[dict(r) for r in c.execute("SELECT id,author,content,created_at FROM adi_messages WHERE conversation_id=? AND id>(SELECT COALESCE(MAX(id),0)-2 FROM adi_messages WHERE conversation_id=?) ORDER BY id",(conv['id'],conv['id']))]}
+                    # Live Read Receipts: las respuestas que viajan en esta misma respuesta ya llegaron al widget: «entregado».
+                    outs=[m['id'] for m in response['messages'] if m.get('author')!='client']
+                    if outs:message_status.web_delivered(c,conv['id'],max(outs),reception_now())
                     # Acción propuesta por ADI (abrir el formulario de reserva del chat) y accesos rápidos según el tema; nunca escriben nada.
                     if session.get('action'):response['action']=session['action']
                     if session.get('suggestions'):response['suggestions']=session['suggestions']

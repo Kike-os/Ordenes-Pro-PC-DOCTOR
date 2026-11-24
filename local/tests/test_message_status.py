@@ -72,6 +72,7 @@ class MessageStatusTests(unittest.TestCase):
         out = [m['id'] for m in polled['messages'] if m['author'] != 'client']
         if not out:
             self.skipTest('ADI no está disponible en las pruebas: no hubo respuesta que confirmar.')
+        self.assertIn(self.status(out[-1])['status'], ('entregado',))                 # llegó al widget en la misma respuesta
         self.assertEqual(self.request('/api/public/adi/read', {'up_to': str(out[-1]), 'visible': False}, cookie=cookie)['status'], 400)
         self.assertEqual(self.request('/api/public/adi/read', {'up_to': str(out[-1]), 'visible': True})['status'], 404)   # sin sesión
         self.assertEqual(self.request('/api/public/adi/read', {'up_to': str(out[-1]), 'visible': True}, cookie=cookie)['status'], 200)
