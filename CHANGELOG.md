@@ -4,6 +4,18 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.322 — 2026-11-24 00:03 (UTC-05:00)
+
+Premium Billing Center
+
+### Mejoras realizadas
+
+- Premium Billing Center: indicadores por período (hoy, mes en curso, mes anterior o rango) con lo registrado; comprobantes con filtros por fecha, cliente y estado, orden por columna y paginación; acciones rápidas: ver, RIDE, XML autorizado, consultar autorización, copiar clave, historial, correo y WhatsApp con confirmación manual.
+
+### Errores corregidos
+
+- En producción, Facturación ya no dice «pruebas»: el botón «Emitir factura» y su confirmación avisan que es una factura REAL con validez tributaria; las notas de crédito indican que su envío al SRI por AZUR aún no está disponible en lugar de afirmar validez.
+
 ## v1.5.321 — 2026-11-23 14:05 (UTC-05:00)
 
 Atención humana real por WhatsApp
