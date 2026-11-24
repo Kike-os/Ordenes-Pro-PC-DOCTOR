@@ -1305,6 +1305,14 @@ class Handler(BaseHTTPRequestHandler):
                                        'state':cached['state'],'latest':cached['latest'],'pending':cached['pending'],'checked_at':cached['at'],'source':cached['source'],'history':len(registry['releases']),
                                        # Identificador del despliegue en ejecución (lo define la plataforma al compilar); no es un secreto.
                                        'build':(os.getenv('VERCEL_GIT_COMMIT_SHA','') or 'local')[:7],'deployment':(os.getenv('VERCEL_DEPLOYMENT_ID','') or '')[-8:],'server_time':now.isoformat(timespec='seconds')})
+            if path=='/api/cron/live-support':
+                # Live Support 4.0: barrido de cierres y avisos por inactividad. Lo puede llamar cada minuto un programador externo autorizado
+                # (con CRON_SECRET). Sin él, los cierres igual se aplican con su hora exacta en cuanto cualquier evento toca el sistema.
+                expected=os.getenv('CRON_SECRET','')
+                if not expected or not hmac.compare_digest(self.headers.get('Authorization',''),'Bearer '+expected):return self.reply(404,{'error':'No encontrado.'})
+                import support_sessions
+                result=support_sessions.sweep(c,reception_now(),force=True);c.commit()
+                return self.reply(200,{'ok':True,**{k:v for k,v in result.items() if k in ('closed','warned')}})
             if path in ('/api/cron/stability','/api/cron/stability-night'):
                 # Tarea programada de Vercel (vercel.json): verificación de estabilidad desde el servidor, sin depender de visitas.
                 # Solo responde a la llamada autenticada de la plataforma (CRON_SECRET); no devuelve detalles.
@@ -1313,6 +1321,10 @@ class Handler(BaseHTTPRequestHandler):
                 import stability
                 now=reception_now()
                 stability.scheduled_run(c,now,path.rsplit('/',1)[-1])
+                try:
+                    import support_sessions
+                    support_sessions.sweep(c,now,force=True);c.commit()
+                except Exception as error:print('support-sweep cron',type(error).__name__,flush=True)
                 try:
                     import campaigns
                     for campaign in campaigns.queued(c)[:2]:
@@ -1437,6 +1449,10 @@ class Handler(BaseHTTPRequestHandler):
                 after=parse_qs(urlsplit(self.path).query).get('after',['0'])[0]
                 try:after=max(0,int(after))
                 except ValueError:after=0
+                # Live Support 4.0: la consulta periódica NO reinicia el contador; solo aplica en el servidor el aviso o el cierre que ya correspondan.
+                import support_sessions as ss
+                try:ss.sweep_one(c,conv['id'],reception_now());conv=c.execute('SELECT id,mode,assigned_to FROM adi_conversations WHERE id=?',(conv['id'],)).fetchone()
+                except Exception as error:print('support-session',type(error).__name__,flush=True)
                 rows=[dict(r) for r in c.execute("SELECT id,author,content,created_at FROM adi_messages WHERE conversation_id=? AND visibility='public' AND id>? ORDER BY id LIMIT 100",(conv['id'],after))]
                 c.execute('UPDATE adi_conversations SET last_seen_client=? WHERE id=?',(appointments.stamp(appointments.now()),conv['id']))
                 return self.reply(200,{'messages':rows,'mode':conv['mode'],'state':adi_public_state(conv)})
@@ -1707,7 +1723,17 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(200,{'rows':[dict(r) for r in rows]})
             if path == '/api/adi/live':
                 if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
-                return self.reply(200,{'rows':live_support.rows(c,parse_qs(urlsplit(self.path).query).get('scope',['active'])[0]),'server_time':appointments.stamp(appointments.now())})
+                q_live=parse_qs(urlsplit(self.path).query);arg_live=lambda k,d='':(q_live.get(k,[d])[0] or d)[:30]
+                import support_sessions
+                result=live_support.rows(c,arg_live('scope','active'),arg_live('filter'),arg_live('channel'))
+                return self.reply(200,{'rows':result,'server_time':appointments.stamp(appointments.now()),'filters':live_support.FILTERS,'metrics':live_support.metrics(c),
+                                       'support':{'installed':support_sessions.installed(c),'settings':support_sessions.settings(c)}})
+            if path == '/api/adi/live/settings':
+                import support_sessions
+                if user['role']!='administrador':return self.reply(403,{'error':'Solo administración configura el centro de atención.'})
+                now_ls=reception_now()
+                return self.reply(200,{'installed':support_sessions.installed(c),'settings':support_sessions.settings(c),'events':[e for e in support_sessions.events(c,0,30)],
+                                       'simulation':support_sessions.simulate_activation(c,now_ls),'message':'' if support_sessions.installed(c) else support_sessions.NOT_INSTALLED})
             live_match=re.fullmatch(r'/api/adi/live/([0-9]+)',path)
             if live_match:
                 if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
@@ -3485,7 +3511,10 @@ class Handler(BaseHTTPRequestHandler):
                     if conv['mode']=='closed':
                         # Una conversación finalizada se reanuda con ADI cuando el cliente vuelve a escribir; el historial se conserva.
                         c.execute("UPDATE adi_conversations SET mode='adi',assigned_to=NULL,updated_at=? WHERE id=?",(now,conv['id']));conv=c.execute('SELECT * FROM adi_conversations WHERE id=?',(conv['id'],)).fetchone()
-                    c.execute("INSERT INTO adi_messages(conversation_id,author,content,created_at) VALUES (?,'client',?,?)",(conv['id'],text,now))
+                    mid_client=c.execute("INSERT INTO adi_messages(conversation_id,author,content,created_at) VALUES (?,'client',?,?)",(conv['id'],text,now)).lastrowid
+                    import support_sessions as ss
+                    try:ss.activity(c,conv['id'],'client',reception_now(),mid_client)  # Live Support 4.0: actividad válida del cliente (reinicia el contador)
+                    except Exception as error:print('support-session',type(error).__name__,flush=True)
                     # Idioma elegido en la interfaz (1.5.276): solo es-EC o en-US, validado aquí; cualquier otro valor responde en español.
                     lang=adi.language(data.get('locale'));en=adi.english(lang)
                     answer=(adi.WAITING_ADVISOR_EN if en else adi.WAITING_ADVISOR) if conv['mode']=='human' and not conv['assigned_to'] else None  # Con un asesor conectado, ADI no interviene.
@@ -3494,9 +3523,13 @@ class Handler(BaseHTTPRequestHandler):
                     if conv['mode']=='adi' and re.search(r'\b'+reception.ORDER_CODE_PATTERN,text,re.I):answer=adi.ORDER_CHECK_HINT_EN if en else adi.ORDER_CHECK_HINT
                     if answer is None and conv['mode']=='adi':
                         # El mensaje del cliente queda guardado antes de consultar a la IA, para no retener la base durante la espera.
+                        try:ss.processing(c,conv['id'],reception_now())  # ADI procesando: no se cierra (con límite)
+                        except Exception as error:print('support-session',type(error).__name__,flush=True)
                         c.commit();answer=adi.reply(c,text,context=context,conversation_id=conv['id'],session=session,lang=lang)
                     if answer:
                         c.execute("INSERT INTO adi_messages(conversation_id,author,content,created_at) VALUES (?,'adi',?,?)",(conv['id'],answer,now));c.execute('UPDATE adi_conversations SET updated_at=? WHERE id=?',(now,conv['id']))
+                        try:ss.activity(c,conv['id'],'adi',reception_now())
+                        except Exception as error:print('support-session',type(error).__name__,flush=True)
                     response={'ok':True,'conversation_id':conv['id'],'mode':conv['mode'],'state':adi_public_state(conv),'locale':lang,'messages':[dict(r) for r in c.execute("SELECT id,author,content,created_at FROM adi_messages WHERE conversation_id=? AND id>(SELECT COALESCE(MAX(id),0)-2 FROM adi_messages WHERE conversation_id=?) ORDER BY id",(conv['id'],conv['id']))]}
                     # Acción propuesta por ADI (abrir el formulario de reserva del chat) y accesos rápidos según el tema; nunca escriben nada.
                     if session.get('action'):response['action']=session['action']
@@ -4789,6 +4822,18 @@ class Handler(BaseHTTPRequestHandler):
                     c.execute("INSERT INTO adi_admin_messages(conversation_id,role,content,links,created_at) VALUES (?,'adi',?,?,?)",(conversation['id'],answer,json.dumps(result.get('links',[]),ensure_ascii=False),stamp))
                     c.execute('UPDATE adi_admin_conversations SET updated_at=? WHERE id=?',(stamp,conversation['id']))
                     return self.reply(200,{'answer':answer,'links':result.get('links',[]),'source':result.get('source','datos'),'live':adi.snapshot(c,reception_now()),'ai_enabled':bool(os.getenv('OPENAI_API_KEY')),'conversation':{'id':conversation['id'],'title':conversation['title']},'created_at':stamp})
+                if path=='/api/adi/live/settings':
+                    # ADI Live Support — Configuración (solo administración). Activar exige la palabra ACTIVAR y cierra en silencio lo antiguo.
+                    import support_sessions
+                    if user['role']!='administrador':return self.reply(403,{'error':'Solo administración configura el centro de atención.'})
+                    action=str(data.get('action',''));now_ls=reception_now()
+                    try:
+                        if action=='save':support_sessions.save_settings(c,data,user,now_ls);audit(c,user['id'],'live_support_settings')
+                        elif action=='activate':result=support_sessions.activate(c,user,now_ls,data.get('confirm'));audit(c,user['id'],'live_support_activated');c.commit();return self.reply(200,result)
+                        elif action=='deactivate':support_sessions.deactivate(c,user,now_ls);audit(c,user['id'],'live_support_deactivated')
+                        else:return self.reply(400,{'error':'Acción no válida.'})
+                    except support_sessions.SupportError as error:return self.reply(error.status,{'error':str(error)})
+                    c.commit();return self.reply(200,{'installed':support_sessions.installed(c),'settings':support_sessions.settings(c),'simulation':support_sessions.simulate_activation(c,now_ls)})
                 live_action=re.fullmatch(r'/api/adi/live/([0-9]+)',path)
                 if live_action:
                     if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})

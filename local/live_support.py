@@ -34,10 +34,31 @@ def summary(c):
     return dict(counts,pending=pending[:5],total=sum(counts.values()))
 
 
-def rows(c,scope='active'):
-    if scope=='closed':sql=LIST_SQL+"WHERE v.mode='closed' ORDER BY v.updated_at DESC LIMIT 30"
+FILTERS={'todas':'Todas','activas':'Activas','sin_leer':'Sin leer','con_adi':'Con ADI','con_asesor':'Con asesor','esperando_asesor':'Esperando asesor',
+         'esperando_cliente':'Esperando cliente','proximas_cerrar':'Próximas a cerrar','cerradas_auto':'Cerradas automáticamente','cerradas_manual':'Cerradas manualmente','reabiertas':'Reabiertas'}
+
+
+def rows(c,scope='active',filt='',channel=''):
+    """Bandeja. `scope` (compatibilidad): active | closed. `filt`: uno de FILTERS. `channel`: web | whatsapp. Las cerradas nunca aparecen en
+    «Activas». Antes de listar se aplican en el servidor los cierres y avisos que ya vencieron (barrido limitado)."""
+    import support_sessions as ss
+    now=reception.reception_now()
+    try:ss.sweep(c,now)
+    except Exception as error:print('support-sweep',type(error).__name__,flush=True)
+    closed_filters=('cerradas_auto','cerradas_manual')
+    if filt in closed_filters or (filt=='todas') or (scope=='closed' and not filt):
+        where="WHERE v.mode='closed' " if filt in closed_filters or scope=='closed' and not filt else ''
+        sql=LIST_SQL+where+"ORDER BY v.updated_at DESC LIMIT 100"
     else:sql=LIST_SQL+"WHERE v.mode!='closed' ORDER BY v.updated_at DESC LIMIT 100"
     out=[dict(r) for r in c.execute(sql)]
+    sessions={}
+    if out and ss.installed(c):
+        ids=[r['id'] for r in out];marks=','.join('?'*len(ids))
+        sessions={r['conversation_id']:r for r in c.execute('SELECT * FROM support_sessions WHERE conversation_id IN ('+marks+')',ids)}
+    for r in out:
+        t=ss.timer(c,r['id'],now) if r['id'] in sessions else {'status':'sin_sesion','enabled':ss.settings(c)['enabled'] if ss.installed(c) else False}
+        r['session']=t;s_=sessions.get(r['id'])
+        r['close_kind']=s_['close_kind'] if s_ else '';r['reopened']=s_['reopened_count'] if s_ else 0
     import whatsapp_handoff as handoff
     if out and handoff.installed(c):
         ids=[r['id'] for r in out];marks=','.join('?'*len(ids))
@@ -49,6 +70,15 @@ def rows(c,scope='active'):
         if scope!='closed':  # las urgentes primero, luego alta; dentro de cada nivel, el orden de siempre
             rank={'urgente':0,'alta':1}
             out.sort(key=lambda r:rank.get(r.get('case_priority'),2))
+    for r in out:r.setdefault('channel','web');r.setdefault('case_status','')
+    def keep(r):
+        t=r['session'];waiting_staff=(r['mode']=='human' and (r['last_author']=='client' or r.get('case_status')=='pendiente')) or t.get('waiting_staff')
+        return {'todas':True,'activas':r['mode']!='closed','sin_leer':bool(r['unread']),'con_adi':r['mode']=='adi','con_asesor':r['mode']=='human' and bool(r['assigned_to']),
+                'esperando_asesor':r['mode']!='closed' and bool(waiting_staff),'esperando_cliente':r['mode']!='closed' and r['last_author'] in ('adi','operator') and not waiting_staff,
+                'proximas_cerrar':t.get('status')=='activa' and t.get('remaining_seconds') is not None and t['remaining_seconds']<=180 and not t.get('waiting_staff'),
+                'cerradas_auto':r['mode']=='closed' and r['close_kind']=='automatico','cerradas_manual':r['mode']=='closed' and r['close_kind']!='automatico',
+                'reabiertas':bool(r['reopened'])}.get(filt or 'activas' if scope!='closed' else 'todas',True)
+    out=[r for r in out if keep(r) and (not channel or r['channel']==channel)]
     return out
 
 
@@ -75,8 +105,11 @@ def detail(c,conv,after,now):
         for m in messages:
             if m['id'] in failed:m['whatsapp_failed']=failed[m['id']] or 'WhatsApp no aceptó el mensaje.'
     staff=[dict(r) for r in c.execute("SELECT id,name FROM users WHERE active=1 AND role IN ('administrador','tecnico') ORDER BY name")]
+    import support_sessions as ss
+    try:ss.sweep_one(c,conv['id'],reception.reception_now());timer=ss.timer(c,conv['id'],reception.reception_now());history=ss.events(c,conv['id'],20)
+    except Exception as error:print('support-session',type(error).__name__,flush=True);timer,history={'status':'sin_sesion'},[]
     return {'conversation':info,'messages':messages,'client':dict(client) if client else None,'order':dict(order) if order else None,'actions':actions,'mentioned':mentioned[:3],
-            'attention':attention,'staff':staff}
+            'attention':attention,'staff':staff,'session':timer,'session_events':history}
 
 
 def act(c,conv,user,data,now,moment=None):
@@ -93,6 +126,7 @@ def act(c,conv,user,data,now,moment=None):
         mid=c.execute("INSERT INTO adi_messages(conversation_id,author,author_id,content,created_at) VALUES (?,'operator',?,?,?)",(conv['id'],user['id'],content,now)).lastrowid
         c.execute("UPDATE adi_conversations SET mode='human',assigned_to=?,updated_at=? WHERE id=?",(user['id'],now,conv['id']))
         handoff.on_staff_action(c,conv['id'],'reply',user,moment)
+        _ss(lambda ss:ss.activity(c,conv['id'],'human',moment))
         sent,detail=handoff.send_text(c,conv['id'],content,moment,message_id=mid)
         if sent is not None:extra['whatsapp']={'sent':bool(sent),'detail':detail}
         return 200,dict({'ok':True},**extra)
@@ -109,7 +143,20 @@ def act(c,conv,user,data,now,moment=None):
         mode={'takeover':'human','resume':'adi','close':'closed','reopen':'human'}[action]
         c.execute('UPDATE adi_conversations SET mode=?,assigned_to=?,updated_at=? WHERE id=?',(mode,user['id'] if mode=='human' else None,now,conv['id']))
         note=handoff.on_staff_action(c,conv['id'],action,user,moment)
+        if action=='close':_ss(lambda ss:ss.close_manual(c,conv['id'],user,moment))
+        if action=='reopen':_ss(lambda ss:ss.reopen_manual(c,conv['id'],user,moment))
         if note:extra['warning']=note
+    elif action=='pause':
+        import support_sessions
+        try:support_sessions.pause(c,conv['id'],user,data.get('minutes'),data.get('reason'),moment)
+        except support_sessions.SupportError as error:return error.status,{'error':str(error)}
+        details='Cierre automático pausado'
+    elif action=='note':
+        # Nota interna: visibility='internal' nunca se muestra ni se envía al cliente (ni por el chat web ni por WhatsApp).
+        content=' '.join(str(data.get('message','')).split())
+        if not 3<=len(content)<=1000:return 400,{'error':'Escribe una nota interna de 3 a 1000 caracteres.'}
+        c.execute("INSERT INTO adi_messages(conversation_id,author,author_id,visibility,content,created_at) VALUES (?,'operator',?,'internal',?,?)",(conv['id'],user['id'],content,now))
+        details='Nota interna'
     elif action=='link':
         if data.get('clear') is True:
             c.execute('UPDATE adi_conversations SET client_id=NULL,order_id=NULL WHERE id=?',(conv['id'],));details='Vínculo retirado'
@@ -126,3 +173,27 @@ def act(c,conv,user,data,now,moment=None):
     else:return 400,{'error':'Acción de conversación inválida.'}
     c.execute('INSERT INTO adi_actions(conversation_id,user_id,action,created_at,details) VALUES (?,?,?,?,?)',(conv['id'],user['id'],'conversation_'+action,now,details))
     return 200,dict({'ok':True},**extra)
+
+
+def _ss(fn):
+    """ADI Live Support 4.0: registra la actividad o el cierre en la sesión; un fallo nunca impide responder."""
+    try:
+        import support_sessions
+        fn(support_sessions)
+    except Exception as error:
+        print('support-session',type(error).__name__,flush=True)
+
+
+def metrics(c):
+    """Indicadores del centro de atención con registros reales (conversaciones abiertas y sesiones/eventos de 7 días)."""
+    out={'active':0,'with_adi':0,'with_advisor':0,'waiting_reply':0,'unread':0}
+    for r in c.execute(LIST_SQL+"WHERE v.mode!='closed'"):
+        if not r['total']:continue
+        out['active']+=1;out['with_adi']+=r['mode']=='adi';out['with_advisor']+=r['mode']=='human'
+        out['waiting_reply']+=r['last_author']=='client';out['unread']+=r['unread'] or 0
+    try:
+        import support_sessions
+        out.update(support_sessions.metrics(c,reception.reception_now()))
+    except Exception as error:
+        print('support-metrics',type(error).__name__,flush=True)
+    return out

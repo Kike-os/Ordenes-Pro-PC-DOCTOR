@@ -102,6 +102,7 @@ def handle(c, raw, signature, now, env=None):
                         stamp_in = wa.stamp(now)
                         c.execute("INSERT INTO adi_messages(conversation_id,author,content,created_at) VALUES (?,'client',?,?)", (conv['id'], text, stamp_in))
                         c.execute('UPDATE adi_conversations SET last_seen_client=?,updated_at=? WHERE id=?', (stamp_in, stamp_in, conv['id']))
+                        _ss_activity(c, conv['id'], 'client', now, message_id)
                         level, labels, _ = whatsapp_handoff.signals(c, text)
                         whatsapp_handoff.request(c, conv['id'], now, 'Mensaje del cliente con un asesor', level, labels)
                     c.execute("UPDATE whatsapp_adi_inbound SET status='omitido',conversation_id=?,detail=? WHERE wa_message_id=?",
@@ -158,6 +159,7 @@ def handle(c, raw, signature, now, env=None):
                           (conv['id'], (turn['log_client'] if turn and turn['log_client'] else text), now_text))
                 c.execute("UPDATE adi_conversations SET last_seen_client=?,updated_at=? WHERE id=?",
                           (now_text, now_text, conv['id']))
+                _ss_activity(c, conv['id'], 'client', now, message_id)
                 c.execute("UPDATE whatsapp_adi_inbound SET status='generando',conversation_id=? WHERE wa_message_id=?",
                           (conv['id'], message_id))
                 c.commit()
@@ -202,6 +204,7 @@ def handle(c, raw, signature, now, env=None):
                     c.execute("INSERT INTO adi_messages(conversation_id,author,content,created_at) VALUES (?,'adi',?,?)",
                               (conv['id'], logged, stamp))
                     c.execute('UPDATE adi_conversations SET updated_at=? WHERE id=?', (stamp, conv['id']))
+                    _ss_activity(c, conv['id'], 'adi', now, 'adi-' + str(message_id))
                     c.execute("UPDATE whatsapp_adi_inbound SET status='enviado',provider_id=?,replied_at=?,detail='' WHERE wa_message_id=?",
                               (provider, stamp, message_id))
                     sent += 1
@@ -211,3 +214,12 @@ def handle(c, raw, signature, now, env=None):
                               ((detail or 'Meta no aceptó la respuesta de ADI.')[:300], message_id))
                 c.commit()
     return {'processed': processed, 'sent': sent}
+
+
+def _ss_activity(c, conv_id, who, now, message_id=None):
+    """ADI Live Support 4.0: actividad válida para el cierre por inactividad. Nunca interrumpe la atención si falla."""
+    try:
+        import support_sessions
+        support_sessions.activity(c, conv_id, who, now, message_id)
+    except Exception as error:
+        print('support-session', type(error).__name__, flush=True)
