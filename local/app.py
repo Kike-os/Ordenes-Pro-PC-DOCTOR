@@ -4040,7 +4040,7 @@ class Handler(BaseHTTPRequestHandler):
                             if action=='emit':
                                 if str(data.get('confirm',''))!='1':return self.reply(400,{'error':'Confirma la emisión antes de continuar.'})
                                 c.commit();c.execute('BEGIN IMMEDIATE')
-                                invoicing.emit(c,invoice_id,user,now);c.commit();audit(c,user['id'],'invoice_emitted_test',invoice_id)
+                                invoicing.emit(c,invoice_id,user,now);c.commit();audit(c,user['id'],'invoice_emitted_test' if invoicing.active_environment()==invoicing.TEST_ENVIRONMENT else 'invoice_emitted_production',invoice_id)
                                 return self.reply(200,invoicing.detail(c,invoice_id))
                             if action in ('azur_send','azur_sync','azur_annul','azur_files'):
                                 # AZUR firma y envía al SRI de PRUEBAS; nunca se emite dos veces (clave de idempotencia y secuencial propio).

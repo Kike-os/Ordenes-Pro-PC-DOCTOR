@@ -7485,7 +7485,7 @@ function openOrderStatusDialog(row){
 // aquí solo se reflejan para guiar a la persona.
 const invoiceGlyph='M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z M14 8H8 M16 12H8 M13 16H8';
 const invoiceIdTypes={'05':'Cédula','04':'RUC','06':'Pasaporte','08':'Identificación del exterior'};
-let invoiceState={status:'',q:'',tab:'panel'};
+let invoiceState={status:'',q:'',tab:'panel'},invoiceProduction=false;  // invoiceProduction: emisión real activa (lo fija renderInvoicing con lo que dice el servidor)
 // Iconos Lucide del módulo (licencia ISC en static/lucide-LICENSE): trazos fijos del paquete oficial, sin cargar nada externo.
 const invIcons={'receipt-text':'<path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M14 8H8"/><path d="M16 12H8"/><path d="M13 16H8"/>',
  package:'<path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><path d="m3.3 7 7.703 4.734a2 2 0 0 0 1.994 0L20.7 7"/><path d="m7.5 4.27 9 5.15"/>',
@@ -7562,7 +7562,8 @@ function invoiceNav(data){const nav=el('nav',undefined,'ic-nav fx-nav');nav.setA
  nav.addEventListener('keydown',event=>{if(event.key==='Escape'&&nav.dataset.open==='true'){nav.dataset.open='false';mobile.setAttribute('aria-expanded','false');mobile.focus();}});
  nav.append(mobile,toggle,groups);return nav;}
 async function renderInvoicing(){const root=$('module-content');const tab=invoiceTabs.find(t=>t[0]===invoiceState.tab)||invoiceTabs[0];invoiceState.tab=tab[0];
- let data;try{data=await api(tab[0]==='panel'?'/api/invoicing/dashboard':'/api/invoicing?'+new URLSearchParams({status:invoiceState.status,q:invoiceState.q}));}catch(error){root.replaceChildren(el('p',error.message,'empty-module'));return;}
+ let data;try{data=await api(tab[0]==='panel'?'/api/invoicing/dashboard':'/api/invoicing?'+invoiceListQuery());}catch(error){root.replaceChildren(el('p',error.message,'empty-module'));return;}
+ invoiceProduction=data.settings?.test_mode===false;
  const shell=el('div',undefined,'inv-module fx-module ic-shell'),main=el('div',undefined,'ic-main'),panel=el('div',undefined,'inv-panel');panel.id='fx-section';panel.setAttribute('aria-label',tab[1]);
  shell.dataset.collapsed=String(!!invoicePref('nav-collapsed',false));main.append(invoiceTestBanner(data.settings),panel);shell.append(invoiceNav(data),main);root.replaceChildren(shell);
  const run={panel:p=>invoiceDashboard(p,data),facturas:p=>invoicesPanel(p,data),fiscal:invoiceSettingsForm,config:invoicePoliciesPanel,cuentas:bankAccountsPanel,compras:purchasesPanel,proveedores:suppliersPanel,
@@ -7573,14 +7574,15 @@ function invoiceKpis(list){const grid=el('div',undefined,'fx-kpis');for(const[ic
   if(tone)card.dataset.tone=tone;mark.append(invIcon(icon));body.append(el('small',label),el('strong',value));if(hint)body.append(el('em',hint));card.append(mark,body);if(action)card.setAttribute('aria-label',label+': '+value+'. Ver detalle');grid.append(card);}return grid;}
 function invoiceCard(title,icon,note,...actions){const card=el('section',undefined,'inv-card fx-card'),head=el('header',undefined,'fx-card-head'),copy=el('div'),h=el('h3');h.append(invIcon(icon),el('span',title));copy.append(h);if(note)copy.append(el('small',note));head.append(copy);
  if(actions.length){const acts=el('div',undefined,'fx-card-acts');acts.append(...actions);head.append(acts);}card.append(head);return card;}
-function invoiceShowStatus(status){invoiceState.status=status;invoiceState.q='';invoiceGo('facturas');}
+function invoiceShowStatus(status,range){invoiceState.status=status;invoiceState.q='';invoiceState.page=0;invoiceState.from=range?range.from:'';invoiceState.to=range?range.to:'';if(invoiceState.tab==='facturas')renderInvoicing();else invoiceGo('facturas');}
 function invoiceEnvTag(env){const t=el('span',env==='2'?'Real':'Prueba','fx-env');t.dataset.env=env==='2'?'real':'prueba';return t;}
 // Panel general: todo sale de lo registrado; los documentos de prueba se separan de los reales.
 async function invoiceDashboard(panel,data){const s=data.summary,test=data.environments['1'],real=data.environments['2'];panel.replaceChildren();
- panel.append(invSectionHead('Panel general','Indicadores con lo registrado, sin estimaciones. Mientras la emisión real esté desactivada, todos los documentos son de prueba y no tienen validez tributaria.',invBtn('Ver facturas','receipt-text',()=>invoiceShowStatus(''))));
+ panel.append(invSectionHead('Panel general',data.settings.test_mode===false?'Indicadores con lo registrado, sin estimaciones. La emisión real está activa: los documentos de producción tienen validez tributaria.':'Indicadores con lo registrado, sin estimaciones. Mientras la emisión real esté desactivada, todos los documentos son de prueba y no tienen validez tributaria.',invBtn('Ver comprobantes','receipt-text',()=>invoiceShowStatus(''))));
+ invoicePeriodBlock(panel,data.settings);
  if(data.settings.missing.length){const warn=el('div',undefined,'inv-warn inv-warn-action');warn.setAttribute('role','status');warn.append(invIcon('triangle-alert'),el('span','Faltan datos fiscales para emitir: '+data.settings.missing.join(', ')+'.'),button('Completar datos fiscales',()=>invoiceGo('fiscal'),'secondary'));panel.append(warn);}
  const envs=el('div',undefined,'fx-envs');envs.setAttribute('aria-label','Documentos por ambiente');
- for(const[env,info,note]of [['1',test,'Ambiente de pruebas del SRI · sin validez tributaria'],['2',real,data.settings.test_mode?'Emisión real desactivada':'Ambiente de producción del SRI']]){const box=el('div',undefined,'fx-env-box');box.dataset.env=env==='2'?'real':'prueba';
+ for(const[env,info,note]of [['1',test,'Ambiente de pruebas del SRI · sin validez tributaria'],['2',real,data.settings.test_mode?'Emisión real desactivada':'Ambiente de producción del SRI']].filter(([e,i])=>e==='2'||data.settings.test_mode!==false||i.documents)){const box=el('div',undefined,'fx-env-box');box.dataset.env=env==='2'?'real':'prueba';
   box.append(invoiceEnvTag(env),el('strong',info.documents===1?'1 documento':info.documents+' documentos'),el('span',quoteMoney(info.billed_cents)+' facturado'),el('small',note));envs.append(box);}
  panel.append(envs);
  panel.append(invoiceKpis([['receipt-text','Facturas emitidas',String(s.emitted),'Con número y clave de acceso','blue',()=>invoiceShowStatus('pendiente')],
@@ -7600,7 +7602,7 @@ async function invoiceDashboard(panel,data){const s=data.summary,test=data.envir
    instance.setOption({animation:!reduce,grid:{left:8,right:8,top:28,bottom:4,containLabel:true},legend:{top:0,right:0,itemWidth:10,itemHeight:10,textStyle:{color:c('--inv-muted')||'#94A3B8',fontSize:11}},
     tooltip:{trigger:'axis',valueFormatter:v=>quoteMoney(Math.round(v*100))},xAxis:{type:'category',data:months,axisLabel:{color:c('--inv-soft')||'#64748B',fontSize:10},axisLine:{lineStyle:{color:'#1E2A3D'}},axisTick:{show:false}},
     yAxis:{type:'value',axisLabel:{color:c('--inv-soft')||'#64748B',fontSize:10,formatter:v=>'$'+v},splitLine:{lineStyle:{color:'#1A2436'}}},
-    series:[{name:'Pruebas',type:'bar',stack:'t',barMaxWidth:22,itemStyle:{color:'#D9A441',borderRadius:[3,3,0,0]},data:data.monthly.map(m=>m.test_cents/100)},{name:'Reales',type:'bar',stack:'t',barMaxWidth:22,itemStyle:{color:'#3B82F6',borderRadius:[3,3,0,0]},data:data.monthly.map(m=>m.real_cents/100)}]});});}
+    series:[...(data.settings.test_mode===false&&!data.monthly.some(m=>m.test_cents)?[]:[{name:'Pruebas',type:'bar',stack:'t',barMaxWidth:22,itemStyle:{color:'#D9A441',borderRadius:[3,3,0,0]},data:data.monthly.map(m=>m.test_cents/100)}]),{name:'Reales',type:'bar',stack:'t',barMaxWidth:22,itemStyle:{color:'#3B82F6',borderRadius:[3,3,0,0]},data:data.monthly.map(m=>m.real_cents/100)}]});});}
  else chart.append(invEmpty('chart-column','Sin facturación en los últimos 12 meses','El gráfico aparece cuando se emitan facturas.'));
  // Documentos que requieren atención.
  const att=invoiceCard('Requieren atención','circle-alert',data.attention_total?(data.attention_total===1?'1 documento':data.attention_total+' documentos'):'Nada pendiente');
@@ -7616,8 +7618,8 @@ async function invoiceDashboard(panel,data){const s=data.summary,test=data.envir
  grid.append(chart,att,act);panel.append(grid);}
 // Secciones en desarrollo: explican lo previsto y por qué todavía no está disponible. No simulan ninguna operación.
 const invoicePlans={
- proformas:['Proformas','file-check-2','Fase 3',['Creación desde clientes, órdenes o catálogo, con productos, servicios, descuentos e impuestos','Vigencia de la oferta, PDF corporativo y envío por correo','Aprobación y aceptación del cliente con un mecanismo seguro, con historial de versiones','Conversión controlada a factura (en pruebas mientras la emisión real esté desactivada)'],'Una proforma no es un comprobante tributario.'],
- notas:['Notas de crédito','file-x-2','Fase 3',['Anulación total o parcial de una factura emitida, con motivo obligatorio','Devolución de productos al inventario sin doble movimiento','XML y RIDE de la nota en el ambiente de pruebas'],'Hoy una factura emitida no se modifica ni se borra: queda en su historial.'],
+ proformas:['Proformas','file-check-2','Fase 3',['Creación desde clientes, órdenes o catálogo, con productos, servicios, descuentos e impuestos','Vigencia de la oferta, PDF corporativo y envío por correo','Aprobación y aceptación del cliente con un mecanismo seguro, con historial de versiones','Conversión controlada a factura (con la emisión del ambiente activo)'],'Una proforma no es un comprobante tributario.'],
+ notas:['Notas de crédito','file-x-2','Fase 3',['Anulación total o parcial de una factura emitida, con motivo obligatorio','Devolución de productos al inventario sin doble movimiento','XML y RIDE de la nota de crédito'],'Hoy una factura emitida no se modifica ni se borra: queda en su historial.'],
  pagos:['Pagos y anticipos','banknote','Fase 2',['Pagos completos, abonos parciales y pagos mixtos con confirmación previa','Anticipos antes de facturar, con trazabilidad hasta la factura','Movimiento automático en la sesión de Caja y en la cuenta bancaria, sin duplicar ingresos al facturar','Recibos imprimibles y anulaciones con motivo y reversión'],'Mientras tanto, los cobros se registran en «Pagos y saldo» de cada orden.'],
  firma:['Firma electrónica','signature','Fase 5',['Carga del certificado autorizado (.p12) guardado cifrado y nunca visible','Firma XAdES-BES de los comprobantes','Aviso de vencimiento del certificado'],'No hay ningún certificado cargado: la firma y la emisión real están desactivadas.']};
 function invoiceSoonPanel(panel){const[title,icon,phase,items,note]=invoicePlans[invoiceState.tab];panel.replaceChildren(invSectionHead(title,'Sección en desarrollo ('+phase+'). Todavía no está disponible.'));
@@ -7628,9 +7630,9 @@ function invoiceSoonPanel(panel){const[title,icon,phase,items,note]=invoicePlans
 async function invoiceSriPanel(panel){const firma=invoiceState.tab==='firma';panel.replaceChildren(el('p','Cargando…','empty-module'));let r;
  try{r=await api('/api/invoicing/azur');}catch(error){panel.replaceChildren(el('p',error.message,'inv-warn'));return;}
  panel.replaceChildren(invSectionHead(firma?'Firma electrónica':'Integración SRI',firma?'La firma la aplica AZUR con tu certificado verificado en AZUR: el certificado y su contraseña nunca pasan por Órdenes Pro.':(r.test_mode?'Emisión a través de AZUR (API REST v2) en el ambiente de PRUEBAS. La emisión real está desactivada hasta tu autorización.':'Emisión a través de AZUR (API REST v2) en PRODUCCIÓN: los comprobantes son reales.')));
- const card=invoiceCard('Conexión con AZUR','plug-zap',r.ready?'Lista para pruebas':'Configuración pendiente');
+ const card=invoiceCard('Conexión con AZUR','plug-zap',r.ready?(r.test_mode?'Lista para pruebas':'Lista para producción'):'Configuración pendiente');
  card.append(invFacts([['Ambiente de la credencial',r.environment==='pruebas'?'Pruebas':r.environment==='produccion'?'Producción (bloqueada)':'—'],['Credencial de consulta (AZUR_CREDENCIAL)',r.credential?'Configurada':'Falta'],
-  ['Clave del punto de emisión (AZUR_API_KEY_EMISION)',r.emission_key?'Configurada':'Falta'],['Punto de emisión de Órdenes Pro',r.point||'—'],['Datos fiscales',r.fiscal_point],['Servidor',r.host],['Modo de pruebas',r.test_mode?'Activo':'Desactivado'],['Emisión y envío',r.emission_lock?.locked?'BLOQUEADOS (configuración en curso)':'Habilitados']]));
+  ['Clave del punto de emisión (AZUR_API_KEY_EMISION)',r.emission_key?'Configurada':'Falta'],['Punto de emisión de Órdenes Pro',r.point||'—'],['Datos fiscales',r.fiscal_point],['Servidor',r.host],['Ambiente de emisión',r.test_mode?'Pruebas':'Producción'],['Emisión y envío',r.emission_lock?.locked?'BLOQUEADOS (configuración en curso)':'Habilitados']]));
  if(r.problems.length){const ul=el('ul',undefined,'fx-azur-msgs');for(const p of r.problems)ul.append(el('li',p));card.append(ul);}
  // Secuencial de PRODUCCIÓN: último número emitido con el sistema anterior en este punto, para que Órdenes Pro continúe en el siguiente.
  const lk=r.emission_lock;if(lk&&admin()){const lb=el('div',undefined,'fx-seq');lb.append(el('strong','Emisión y envío: '+(lk.locked?'BLOQUEADOS':'HABILITADOS')),el('p',lk.locked?(lk.env_locked?'Bloqueado por la variable del servidor FACTURACION_EMISION_BLOQUEADA.':'Bloqueado por administración: '+(lk.reason||'')):'Se pueden emitir y enviar comprobantes. Ciérralo si necesitas detener la facturación.'));
@@ -7875,31 +7877,114 @@ async function invoiceCardSettings(panel){const data=await api('/api/payments/ca
   catch(error){hist.append(el('p',error.message,'empty-module'));}}
  apply();}
 // Panel de facturas: indicadores con lo registrado (nada estimado), búsqueda, filtros por estado y tabla.
-function invoicesPanel(panel,data){const s=data.summary,test=data.settings.test_mode!==false,filtered=!!(invoiceState.q||invoiceState.status);
+// Premium Billing Center · comprobantes (1.5.322). Solo lectura salvo las acciones que ya existían y que piden confirmación: nunca se emite,
+// se envía al SRI ni se manda un correo o WhatsApp sin que la persona lo confirme. Filtros por fecha, cliente y estado; orden por
+// columna; paginación en el servidor. Las acciones rápidas reutilizan las rutas existentes (RIDE, XML autorizado, consulta en AZUR, envío).
+Object.entries({'x':'<path d="M18 6 6 18M6 6l12 12"/>','history':'<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/>',
+ 'refresh-cw':'<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>',
+ 'chevron-left':'<path d="m15 18-6-6 6-6"/>','chevron-up':'<path d="m18 15-6-6-6 6"/>','chevron-right':'<path d="m9 18 6-6-6-6"/>','arrow-up-down':'<path d="m21 16-4 4-4-4"/><path d="M17 20V4"/><path d="m3 8 4-4 4 4"/><path d="M7 4v16"/>',
+ 'file-code':'<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="m10 13-2 2 2 2"/><path d="m14 17 2-2-2-2"/>',
+ 'calendar':'<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>'}).forEach(([k,v])=>{if(!invIcons[k])invIcons[k]=v;});
+function invoiceListQuery(){const p={status:invoiceState.status||'',q:invoiceState.q||'',from:invoiceState.from||'',to:invoiceState.to||'',sort:invoiceState.sort||'fecha',dir:invoiceState.dir||'desc',page:String(invoiceState.page||0),per:String(invoiceState.per||25)};
+ return new URLSearchParams(Object.entries(p).filter(([,v])=>v!==''));}
+function invoiceCopy(text,label){const done=()=>toast(label+' copiada.','success'),fail=()=>toast('No se pudo copiar. Selecciónala y cópiala a mano: '+text,'warning');
+ try{if(navigator.clipboard&&window.isSecureContext)navigator.clipboard.writeText(text).then(done,fail);else{const t=el('textarea');t.value=text;t.setAttribute('readonly','');t.style.position='fixed';t.style.opacity='0';document.body.append(t);t.select();const ok=document.execCommand('copy');t.remove();ok?done():fail();}}catch{fail();}}
+// Número para wa.me: cifras con código de país (Ecuador por defecto: 09… → 5939…). Vacío si no parece un celular.
+function invoiceWaNumber(phone){let d=String(phone||'').replace(/\D/g,'');if(/^09\d{8}$/.test(d))d='593'+d.slice(1);else if(/^9\d{8}$/.test(d))d='593'+d;return /^\d{10,15}$/.test(d)?d:'';}
+async function invoiceQuickAction(row,action){try{
+ if(action==='ver'||action==='historial'){await openInvoice(row.id);if(action==='historial'){const h=document.querySelector('dialog[open] .inv-history');if(h){h.open=true;h.scrollIntoView({block:'nearest'});}}return;}
+ if(action==='clave'){invoiceCopy(row.access_key,'Clave de acceso');return;}
+ if(action==='consultar'){if(!await askConfirm('¿Consultar la autorización en AZUR?','Se pregunta a AZUR por el estado de la factura '+row.number+'. Es solo una consulta: no se emite ni se envía nada al cliente.','Consultar'))return;
+  const r=await api('/api/invoicing/'+row.id,{action:'azur_sync'});const a=r.azur||{};toast(a.authorized?'Autorizada por el SRI.':(a.label||'Consulta realizada')+(a.errors&&a.errors.length?': '+a.errors.join(' '):'.'),a.authorized?'success':'info');renderInvoicing();return;}
+ if(action==='correo'){const d=await api('/api/invoicing/'+row.id);const inv=d.invoice;const to=(inv.buyer_email||'').trim();
+  if(!to){toast('La factura no tiene correo del comprador.','warning');return;}
+  if(!await askConfirm('¿Enviar la factura por correo?','Se enviará el RIDE, el XML y las políticas vigentes de la factura '+row.number+' a '+to+'. Revisa que el correo sea el correcto.','Enviar correo'))return;
+  const r=await api('/api/invoicing/'+row.id+'/send',{kind:'cliente'});toast(r.skipped?'Ya se había enviado: no se repitió.':'Correo enviado a '+to+'.','success');return;}
+ if(action==='whatsapp'){const d=await api('/api/invoicing/'+row.id);const inv=d.invoice,num=invoiceWaNumber(inv.buyer_phone);
+  if(!num){toast('La factura no tiene un celular válido del comprador.','warning');return;}
+  const text='Hola '+(inv.buyer_name||'')+', le saluda PC-DOCTOR S.A. Su factura '+(row.number||'')+' por '+quoteMoney(inv.total_cents)+(inv.status==='autorizado'?' fue autorizada por el SRI':'')+'. Si desea el RIDE en PDF, respóndanos por este medio.';
+  if(!await askConfirm('¿Abrir WhatsApp con el mensaje?','Se abrirá WhatsApp con un mensaje para +'+num+'. No se envía nada hasta que lo envíes tú desde WhatsApp.','Abrir WhatsApp'))return;
+  window.open('https://wa.me/'+num+'?text='+encodeURIComponent(text),'_blank','noopener');return;}
+}catch(error){toast(error.message,'error');}}
+function invoiceActionsMenu(row){const wrap=el('div',undefined,'fxb-acts');
+ const iconLink=(label,icon,href,download)=>{const a=el('a',undefined,'inv-icon-btn');a.href=href;a.title=label;a.setAttribute('aria-label',label+' · '+(row.number||'borrador'));if(download)a.setAttribute('download','');else{a.target='_blank';a.rel='noopener';}a.append(invIcon(icon));return a;};
+ wrap.append(invIconBtn('Ver detalle de '+(row.number||'la factura en borrador'),'eye',()=>invoiceQuickAction(row,'ver')));
+ if(row.has_xml){wrap.append(iconLink('Ver RIDE','file-text','/api/invoicing/'+row.id+'/ride.pdf',false),iconLink('Descargar RIDE','download','/api/invoicing/'+row.id+'/ride.pdf',true));}
+ const more=el('details',undefined,'fxb-more'),sum=el('summary');sum.setAttribute('aria-label','Más acciones de '+(row.number||'la factura'));sum.title='Más acciones';sum.append(invIcon('ellipsis-vertical'));more.append(sum);
+ const list=el('div',undefined,'fxb-menu');list.setAttribute('role','menu');
+ const item=(label,icon,fn,href)=>{const node=href?el('a',undefined,'fxb-item'):button('',()=>{more.open=false;fn();},'fxb-item');if(href){node.href=href;node.setAttribute('download','');node.addEventListener('click',()=>{more.open=false;});}node.setAttribute('role','menuitem');node.append(invIcon(icon),el('span',label));list.append(node);};
+ item('Ver detalle','eye',()=>invoiceQuickAction(row,'ver'));
+ if(row.has_authorized_xml)item('Descargar XML autorizado','file-code',null,'/api/invoicing/'+row.id+'/azur/xml_autorizado');
+ else if(row.has_xml)item('Descargar XML','file-code',null,'/api/invoicing/'+row.id+'/comprobante.xml');
+ if(row.provider==='azur'&&['pendiente','enviado'].includes(row.status))item('Consultar autorización','refresh-cw',()=>invoiceQuickAction(row,'consultar'));
+ if(row.access_key)item('Copiar clave de acceso','copy',()=>invoiceQuickAction(row,'clave'));
+ item('Historial','history',()=>invoiceQuickAction(row,'historial'));
+ if(row.has_xml&&row.has_email)item('Enviar por correo…','mail',()=>invoiceQuickAction(row,'correo'));
+ if(row.has_xml&&row.has_phone)item('Compartir por WhatsApp…','message-circle',()=>invoiceQuickAction(row,'whatsapp'));
+ if(row.order_id)item('Ver la orden '+row.reference,'file-text',()=>go('orders',new URLSearchParams({id:String(row.order_id)})));
+ more.append(list);more.addEventListener('keydown',event=>{if(event.key==='Escape'&&more.open){more.open=false;sum.focus();}});
+ document.addEventListener('click',event=>{if(more.open&&!more.contains(event.target))more.open=false;});
+ wrap.append(more);return wrap;}
+function invoicesPanel(panel,data){const filtered=!!(invoiceState.q||invoiceState.status||invoiceState.from||invoiceState.to);
  if(data.settings.missing.length){const warn=el('div',undefined,'inv-warn inv-warn-action');warn.setAttribute('role','status');warn.append(invIcon('triangle-alert'),el('span','Faltan datos fiscales para emitir: '+data.settings.missing.join(', ')+'.'),button('Completar datos fiscales',()=>{invoiceGo('fiscal');},'secondary'));panel.append(warn);}
-
- const card=el('section',undefined,'inv-card'),head=el('header',undefined,'inv-card-head'),title=el('div');title.append(el('h3','Facturas'),el('small',data.rows.length===1?'1 documento':data.rows.length+' documentos'+(data.rows.length>=200?' · los 200 más recientes':'')));head.append(title);
+ const card=el('section',undefined,'inv-card fxb-card'),head=el('header',undefined,'inv-card-head'),title=el('div');
+ title.append(el('h3','Comprobantes electrónicos'),el('small',(data.total===1?'1 documento':data.total+' documentos')+(filtered?' con estos filtros':'')));head.append(title);
  if(admin())head.append(invBtn('Nueva factura directa','plus',()=>invoiceComposer(null,()=>renderInvoicing()),'primary'));
- const clearFilters=()=>{invoiceState.q='';invoiceState.status='';renderInvoicing();};
- // Búsqueda y filtros.
- const bar=el('div',undefined,'inv-toolbar'),box=el('label',undefined,'inv-search'),search=el('input');box.append(invIcon('search'),search);search.type='search';search.placeholder='Buscar por cliente, identificación, orden o clave de acceso';search.value=invoiceState.q;search.maxLength=80;search.setAttribute('aria-label','Buscar facturas');
- let typing=null;search.addEventListener('input',()=>{clearTimeout(typing);typing=setTimeout(()=>{invoiceState.q=search.value.trim();renderInvoicing().then(()=>{const again=$('module-content').querySelector('.inv-search input');again?.focus();again?.setSelectionRange(again.value.length,again.value.length);});},350);});
+ const reload=()=>{invoiceState.page=0;renderInvoicing();};
+ const clearFilters=()=>{Object.assign(invoiceState,{q:'',status:'',from:'',to:'',page:0});renderInvoicing();};
+ // Filtros: texto, fechas y estado.
+ const bar=el('div',undefined,'inv-toolbar fxb-toolbar'),box=el('label',undefined,'inv-search'),search=el('input');box.append(invIcon('search'),search);search.type='search';search.placeholder='Cliente, identificación, número, orden o clave de acceso';search.value=invoiceState.q||'';search.maxLength=80;search.setAttribute('aria-label','Buscar comprobantes');
+ let typing=null;search.addEventListener('input',()=>{clearTimeout(typing);typing=setTimeout(()=>{invoiceState.q=search.value.trim();invoiceState.page=0;renderInvoicing().then(()=>{const again=$('module-content').querySelector('.fxb-toolbar .inv-search input');again?.focus();again?.setSelectionRange(again.value.length,again.value.length);});},350);});
+ const dates=el('div',undefined,'fxb-dates');for(const[key,label]of [['from','Desde'],['to','Hasta']]){const l=el('label',undefined,'fxb-date'),i=el('input');i.type='date';i.value=invoiceState[key]||'';i.setAttribute('aria-label',label+' (fecha de emisión)');l.append(el('span',label),i);i.addEventListener('change',()=>{invoiceState[key]=i.value;reload();});dates.append(l);}
  const filters=el('div',undefined,'inv-filters');filters.setAttribute('role','group');filters.setAttribute('aria-label','Filtrar por estado');
- for(const[key,label]of [['','Todas'],...Object.entries(data.statuses)]){const n=key?data.counts[key]||0:Object.values(data.counts).reduce((a,b)=>a+b,0);const b=button('',()=>{invoiceState.status=key;renderInvoicing();},'inv-filter');b.append(el('span',label),el('b',String(n)));b.setAttribute('aria-pressed',String(invoiceState.status===key));if(key)b.dataset.status=key;filters.append(b);}
- bar.append(box,filters);if(filtered)bar.append(invBtn('Limpiar filtros','x',clearFilters,'secondary inv-clear'));card.append(head,bar);
- if(!data.rows.length){card.append(invEmpty('receipt-text',filtered?'No hay facturas con estos filtros':'Todavía no hay facturas',filtered?'Prueba con otra búsqueda o limpia los filtros.':'Se generan desde «Pagos y saldo» de una orden totalmente pagada. En este modo de pruebas no se envía nada al SRI.',filtered?invBtn('Limpiar filtros','x',clearFilters):null));}
- else{const wrapT=el('div',undefined,'inv-table-wrap'),table=el('table',undefined,'inv-table'),thead=el('thead'),hr=el('tr'),tbody=el('tbody');
-  for(const h of ['Número','Cliente','Identificación','Fecha','Importe','Estado','Acciones']){const th=el('th',h);th.scope='col';hr.append(th);}thead.append(hr);
-  for(const row of data.rows){const tr=el('tr'),cell=(label,...nodes)=>{const td=el('td');td.dataset.label=label;td.append(...nodes);tr.append(td);return td;};tr.dataset.status=row.status;
-   cell('Número',el('code',row.number||'Borrador'),...(row.reference?[el('small',(row.source_kind==='venta_licencia'?'Venta ':'Orden ')+row.reference)]:[]));
-   cell('Cliente',el('strong',row.buyer_name||'Comprador sin definir'));cell('Identificación',row.consumer_final?'Consumidor final':row.buyer_id||'—');
-   cell(row.issue_date?'Emisión':'Creada',row.issue_date?dashboardDate(row.issue_date):formatOrderDate(row.created_at));cell('Importe',quoteMoney(row.total_cents)).className='inv-num';cell('Estado',invoiceChip(row.status,row.status_label));
-   const acts=cell('Acciones');acts.className='inv-row-acts';acts.append(invIconBtn('Ver factura '+(row.number||'en borrador')+' de '+(row.buyer_name||'comprador sin definir'),'eye',()=>openInvoice(row.id)));
-   if(row.has_xml){const a=el('a',undefined,'inv-icon-btn');a.href='/api/invoicing/'+row.id+'/comprobante.xml';a.title='Descargar XML';a.setAttribute('aria-label','Descargar el XML de la factura '+row.number);a.append(invIcon('download'));acts.append(a);}
-   if(row.order_id)acts.append(invIconBtn('Ver la orden '+row.reference,'file-text',()=>go('orders',new URLSearchParams({id:String(row.order_id)}))));
-   tr.addEventListener('click',event=>{if(!event.target.closest('button,a'))openInvoice(row.id);});tbody.append(tr);}
-  table.append(thead,tbody);wrapT.append(table);card.append(wrapT);}
+ for(const[key,label]of [['','Todas'],...Object.entries(data.statuses)]){const n=key?data.counts[key]||0:Object.values(data.counts).reduce((a,b)=>a+b,0);const b=button('',()=>{invoiceState.status=key;reload();},'inv-filter');b.append(el('span',label),el('b',String(n)));b.setAttribute('aria-pressed',String((invoiceState.status||'')===key));if(key)b.dataset.status=key;filters.append(b);}
+ bar.append(box,dates,filters);if(filtered)bar.append(invBtn('Limpiar filtros','x',clearFilters,'secondary inv-clear'));card.append(head,bar);
+ if(!data.rows.length){card.append(invEmpty('receipt-text',filtered?'No hay comprobantes con estos filtros':'Todavía no hay facturas',filtered?'Prueba con otra búsqueda, otras fechas o limpia los filtros.':'Se generan desde «Pagos y saldo» de una orden, una proforma o una venta.',filtered?invBtn('Limpiar filtros','x',clearFilters):null));panel.append(card);return;}
+ const wrapT=el('div',undefined,'inv-table-wrap'),table=el('table',undefined,'inv-table fxb-table'),thead=el('thead'),hr=el('tr'),tbody=el('tbody');
+ const cols=[['Comprobante','numero'],['Cliente','cliente'],['Vinculado',''],['Emisión','fecha'],['Total','total'],['Estado SRI','estado'],['Acciones','']];
+ for(const[h,key]of cols){const th=el('th');th.scope='col';if(key){const active=(invoiceState.sort||'fecha')===key,dir=active?(invoiceState.dir||'desc'):'';th.setAttribute('aria-sort',active?(dir==='asc'?'ascending':'descending'):'none');
+   const b=button('',()=>{if(active)invoiceState.dir=dir==='asc'?'desc':'asc';else{invoiceState.sort=key;invoiceState.dir=key==='cliente'?'asc':'desc';}invoiceState.page=0;renderInvoicing();},'fxb-sort');b.append(el('span',h),invIcon(active?(dir==='asc'?'chevron-up':'chevron-down'):'arrow-up-down'));b.setAttribute('aria-label','Ordenar por '+h.toLowerCase());th.append(b);}
+  else th.textContent=h;if(h==='Total')th.className='inv-num';hr.append(th);}
+ thead.append(hr);
+ for(const row of data.rows){const tr=el('tr'),cell=(label,...nodes)=>{const td=el('td');td.dataset.label=label;td.append(...nodes);tr.append(td);return td;};tr.dataset.status=row.status;
+  const num=el('div',undefined,'fxb-num');num.append(el('code',row.number||'Borrador'),invoiceEnvTag(row.environment));cell('Comprobante',num);
+  const who=el('div',undefined,'fxb-who');who.append(el('strong',row.buyer_name||'Comprador sin definir'),el('small',row.consumer_final?'Consumidor final':row.buyer_id||'—'));cell('Cliente',who);
+  cell('Vinculado',row.reference?el('span',({venta_licencia:'Venta ',proforma:'Proforma ',venta_inventario:'Venta '}[row.source_kind]||'Orden ')+row.reference,'fxb-ref'):el('span','Directa','fxb-ref fxb-muted'));
+  cell('Emisión',row.issue_date?dashboardDate(row.issue_date):el('span','Sin emitir · '+formatOrderDate(row.created_at),'fxb-muted'));
+  const amount=cell('Total',quoteMoney(row.total_cents));amount.className='inv-num';
+  cell('Estado SRI',invoiceChip(row.status,row.status_label));
+  const acts=cell('Acciones',invoiceActionsMenu(row));acts.className='inv-row-acts';
+  tr.addEventListener('click',event=>{if(!event.target.closest('button,a,details'))openInvoice(row.id);});tbody.append(tr);}
+ table.append(thead,tbody);wrapT.append(table);card.append(wrapT);
+ // Paginación.
+ const foot=el('footer',undefined,'fxb-pager'),info=el('span','Página '+(data.page+1)+' de '+data.pages+' · '+data.total+' documentos','fxb-muted');info.setAttribute('aria-live','polite');
+ const per=el('select');per.setAttribute('aria-label','Documentos por página');for(const n of [10,25,50,100])per.add(new Option(n+' por página',n));per.value=String(data.per_page);per.addEventListener('change',()=>{invoiceState.per=Number(per.value);invoiceState.page=0;renderInvoicing();});
+ const prev=invBtn('Anterior','chevron-left',()=>{invoiceState.page=Math.max(0,data.page-1);renderInvoicing();}),next=invBtn('Siguiente','chevron-right',()=>{invoiceState.page=data.page+1;renderInvoicing();});prev.disabled=data.page<=0;next.disabled=data.page>=data.pages-1;
+ const nav=el('div',undefined,'fxb-pager-nav');nav.append(prev,next);foot.append(info,per,nav);card.append(foot);
  panel.append(card);}
+// Indicadores por período (solo lectura): hoy, mes en curso o un rango; nunca genera documentos tributarios.
+function invoicePeriodBlock(panel,settings){const box=el('section',undefined,'fxb-period');box.setAttribute('aria-labelledby','fxb-period-t');
+ const head=el('div',undefined,'fxb-period-head'),h=el('h3','Indicadores del período');h.id='fxb-period-t';const chips=el('div',undefined,'inv-filters');chips.setAttribute('role','group');chips.setAttribute('aria-label','Período');
+ const today=new Date(),iso=d=>new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10),first=new Date(today.getFullYear(),today.getMonth(),1),prevFirst=new Date(today.getFullYear(),today.getMonth()-1,1),prevLast=new Date(today.getFullYear(),today.getMonth(),0);
+ const custom=el('div',undefined,'fxb-dates');custom.hidden=true;const fromI=el('input'),toI=el('input');fromI.type=toI.type='date';fromI.value=iso(first);toI.value=iso(today);fromI.setAttribute('aria-label','Desde');toI.setAttribute('aria-label','Hasta');
+ for(const[i,l]of [[fromI,'Desde'],[toI,'Hasta']]){const w=el('label',undefined,'fxb-date');w.append(el('span',l),i);custom.append(w);i.addEventListener('change',()=>load(fromI.value,toI.value));}
+ const grid=el('div',undefined,'fxb-kpis');grid.setAttribute('aria-live','polite');
+ const periods=[['hoy','Hoy',()=>[iso(today),iso(today)]],['mes','Este mes',()=>[iso(first),iso(today)]],['anterior','Mes anterior',()=>[iso(prevFirst),iso(prevLast)]],['rango','Personalizado',null]];let current='mes';
+ const paintChips=()=>chips.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.key===current)));
+ for(const[key,label,range]of periods){const b=button(label,()=>{current=key;paintChips();custom.hidden=key!=='rango';if(range)load(...range());else load(fromI.value,toI.value);},'inv-filter');b.dataset.key=key;chips.append(b);}
+ head.append(h,chips);box.append(head,custom,grid);
+ async function load(from,to){grid.setAttribute('aria-busy','true');try{const d=await api('/api/invoicing/stats?'+new URLSearchParams({from,to}));const r=d.range,c=r.counts;
+   const label=current==='hoy'?'Facturado hoy':current==='mes'?'Facturado este mes':'Facturado en el período';
+   grid.replaceChildren(invoiceKpis([['circle-dollar-sign','Facturado hoy',quoteMoney(d.today.billed_cents),d.today.documents===1?'1 documento':d.today.documents+' documentos','teal'],
+    ['coins','Facturado del mes',quoteMoney(d.month.billed_cents),d.month.documents===1?'1 documento':d.month.documents+' documentos','blue'],
+    ...(current==='hoy'||current==='mes'?[]:[['calendar',label,quoteMoney(r.billed_cents),dashboardDate(r.from)+' – '+dashboardDate(r.to),'blue']]),
+    ['badge-check','Autorizadas',String(c.autorizado||0),'Autorizadas por el SRI','green',()=>invoiceShowStatus('autorizado',r)],
+    ['clock','Pendientes',String((c.pendiente||0)+(c.enviado||0)),'Por enviar o en espera del SRI','amber',()=>invoiceShowStatus('pendiente',r)],
+    ['circle-x','Rechazadas',String(c.rechazado||0),c.rechazado?'Revisa y corrige los datos':'Ningún rechazo','red',()=>invoiceShowStatus('rechazado',r)],
+    ['file-pen-line','Borradores',String(c.borrador||0),'Sin número asignado','amber',()=>invoiceShowStatus('borrador',r)]]));
+   grid.append(el('p','Ambiente: '+d.environment_label+' · solo lo registrado, sin estimaciones.','fxb-muted fxb-note'));}
+  catch(error){grid.replaceChildren(el('p',error.message,'empty-module'));}finally{grid.removeAttribute('aria-busy');}}
+ paintChips();load(iso(first),iso(today));panel.append(box);}
 async function invoiceSettingsForm(panel){panel.replaceChildren(el('p','Cargando…','empty-module'));let data;try{data=await api('/api/invoicing/settings');}catch(error){panel.replaceChildren(el('p',error.message,'empty-module'));return;}
  const s=data.settings,{form,msg,field,fail,clear}=invForm('inv-settings');
  const group=(icon,title)=>{const box=el('fieldset',undefined,'inv-group'),legend=el('legend');legend.append(invIcon(icon),el('span',title));box.append(legend);form.append(box);return box;};
@@ -7910,7 +7995,7 @@ async function invoiceSettingsForm(panel){panel.replaceChildren(el('p','Cargando
  g=group('file-text','Régimen y obligaciones');field('keeps_accounts','Obligado a llevar contabilidad',{options:[['','Selecciona…'],['SI','Sí'],['NO','No']],value:s.keeps_accounts||'',required:true,into:g});
  field('regime','Régimen tributario',{options:[['','Selecciona…'],...Object.entries(data.regimes)],value:s.regime||'',required:true,into:g});
  field('special_taxpayer','Contribuyente especial (n.º de resolución)',{value:s.special_taxpayer,max:13,mode:'numeric',hint:'Déjalo vacío si no aplica.',into:g});field('withholding_agent','Agente de retención (n.º de resolución)',{value:s.withholding_agent,max:8,mode:'numeric',hint:'Déjalo vacío si no aplica.',into:g});
- const env=el('p',undefined,'inv-env');env.append(invIcon('flask-conical'),el('span','Ambiente: Pruebas (SRI). La emisión real está desactivada y no se puede activar desde aquí.'));
+ const env=el('p',undefined,'inv-env');env.append(invIcon('flask-conical'),el('span',data.settings.test_mode===false?'Ambiente: Producción (SRI). Los comprobantes emitidos tienen validez tributaria.':'Ambiente: Pruebas (SRI). La emisión real está desactivada y no se puede activar desde aquí.'));
  const save=el('button',undefined,'primary inv-btn');save.type='submit';save.append(invIcon('circle-check'),el('span','Guardar datos fiscales'));const foot=el('div',undefined,'inv-form-foot');foot.append(save);form.append(env,msg,foot);
  form.addEventListener('submit',async event=>{event.preventDefault();clear();save.disabled=true;
   try{await api('/api/invoicing/settings',Object.fromEntries(new FormData(form)));toast('Datos fiscales guardados.','success');invoiceState.tab='fiscal';renderInvoicing();}catch(error){fail(error);save.disabled=false;}});
@@ -7924,7 +8009,7 @@ async function invoicePoliciesPanel(panel){panel.replaceChildren(el('p','Cargand
  // Envío de documentos.
  const{form,msg,field,fail,clear}=invForm('inv-settings ic-doc-settings');const group=el('fieldset',undefined,'inv-group'),legend=el('legend');legend.append(invIcon('send'),el('span','Envío de documentos'));group.append(legend);form.append(group);
  const autoBox=el('label',undefined,'inv-cf'),auto=el('input');asSwitch(auto).type='checkbox';auto.name='auto';auto.checked=data.settings.auto;autoBox.append(auto,el('span','Adjuntar automáticamente RIDE, XML, políticas y garantías al enviar una factura autorizada'));group.append(autoBox);
- field('test_recipient','Correo autorizado para pruebas',{type:'email',max:200,value:data.settings.test_recipient,into:group,hint:'Las pruebas solo se envían a esta dirección, marcadas como «PRUEBA — SIN VALIDEZ TRIBUTARIA».'});
+ field('test_recipient',invoiceProduction?'Correo de verificación interna':'Correo autorizado para pruebas',{type:'email',max:200,value:data.settings.test_recipient,into:group,hint:invoiceProduction?'Los envíos de verificación llegan solo a esta dirección, marcados «SIN VALIDEZ TRIBUTARIA»; nunca al cliente.':'Las pruebas solo se envían a esta dirección, marcadas como «PRUEBA — SIN VALIDEZ TRIBUTARIA».'});
  const save=el('button',undefined,'primary inv-btn');save.type='submit';save.append(invIcon('circle-check'),el('span','Guardar'));const foot=el('div',undefined,'inv-form-foot');foot.append(save);form.append(msg,foot);
  form.addEventListener('submit',async event=>{event.preventDefault();clear();save.disabled=true;try{await api('/api/invoicing/policies',{action:'settings',auto:auto.checked?'1':'0',test_recipient:form.elements.test_recipient.value});toast('Configuración de envío guardada.','success');}catch(error){fail(error);}finally{save.disabled=false;}});
  panel.append(form);
@@ -7973,7 +8058,7 @@ function invoiceDocumentsBlock(inv){const box=el('section',undefined,'inv-buyer 
   test.disabled=!d.emitted||!d.settings.test_recipient;if(!d.settings.test_recipient)test.title='Configura el correo de prueba en Facturación › Configuración.';send.append(test);
   const client=d.mail.find(m=>m.kind==='cliente');const real=invBtn(client?'Reenviar al cliente':'Enviar al cliente','send',async()=>{real.disabled=true;try{await api('/api/invoicing/'+inv.id+'/send',{kind:client?'reenvio':'cliente'});toast('Documentos enviados al cliente.','success');paint();}catch(error){notify(error.message);real.disabled=false;}},'primary');
   real.disabled=!d.authorized;if(!d.authorized)real.title='Solo facturas autorizadas por el SRI.';send.append(real);box.append(send);
-  if(!d.authorized)box.append(el('p','El envío al cliente se habilita cuando la factura esté autorizada por el SRI. Las pruebas van solo al correo de prueba, marcadas como sin validez tributaria.','inv-form-note'));
+  if(!d.authorized)box.append(el('p','El envío al cliente se habilita cuando la factura esté autorizada por el SRI.'+(invoiceProduction?'':' Las pruebas van solo al correo de prueba, marcadas como sin validez tributaria.'),'inv-form-note'));
   if(d.mail.length){const ol=el('ol',undefined,'inv-doc-log');for(const m of d.mail){const li=el('li');li.append(invoiceChip({enviado:'autorizado',enviando:'enviado',error:'rechazado',sin_confirmacion:'pendiente'}[m.status],{enviado:'Enviado',enviando:'Enviando',error:'Error',sin_confirmacion:'Sin confirmación'}[m.status]),
     el('span',' '+{cliente:'Cliente',reenvio:'Reenvío',prueba:'Prueba'}[m.kind]+' · '+m.recipient+' · '+formatOrderDate(m.updated_at)+' · '+m.attachments.length+' adjuntos'+(m.attempts>1?' · '+m.attempts+' intentos':'')+(m.detail&&m.status!=='enviado'?' · '+m.detail:'')));ol.append(li);}box.append(ol);}};
  paint();return box;}
@@ -7998,7 +8083,7 @@ function invoiceAzurBlock(dialog,body,data){const inv=data.invoice,box=el('secti
  const msgs=inv.status==='autorizado'?[]:(inv.sri_messages||[]).slice(-5);if(msgs.length){const ul=el('ul',undefined,'fx-azur-msgs');for(const m of msgs)ul.append(el('li',(m.origen||'')+' '+(m.codigo||'')+': '+m.mensaje));box.append(ul);}
  const acts=el('div',undefined,'cj-actions'),warn=el('p','','inv-warn');warn.hidden=true;box.append(warn,acts);
  const call=async(action,extra={},ok='')=>{try{const fresh=await api('/api/invoicing/'+inv.id,{action,...extra});const r=fresh.azur||{};
-   toast(ok||(r.newly_authorized?'Factura AUTORIZADA en pruebas.'+(r.mail?(r.mail.sent?' Correo de prueba enviado.':' El correo no salió: '+r.mail.error):''):r.label?'Estado: '+r.label:'Actualizado.'),r.errors&&r.errors.length?'error':'success');paintInvoice(dialog,body,fresh);if(currentModule==='invoicing')renderInvoicing();}
+   toast(ok||(r.newly_authorized?(inv.environment==='2'?'Factura AUTORIZADA por el SRI.':'Factura AUTORIZADA en pruebas.')+(r.mail?(r.mail.sent?' Correo de prueba enviado.':' El correo no salió: '+r.mail.error):''):r.label?'Estado: '+r.label:'Actualizado.'),r.errors&&r.errors.length?'error':'success');paintInvoice(dialog,body,fresh);if(currentModule==='invoicing')renderInvoicing();}
   catch(error){notify(error.message);}};
  if(admin()&&['pendiente','rechazado'].includes(inv.status)){const send=invBtn(inv.status==='rechazado'&&inv.provider==='azur'?'Reprocesar en AZUR':(inv.environment==='2'?'Enviar al SRI (AZUR)':'Enviar al SRI (AZUR pruebas)'),'send',async()=>{const real=inv.environment==='2';
    if(await confirmClose({title:real?'¿Enviar al SRI? Factura REAL':'¿Enviar al SRI de PRUEBAS?',text:'AZUR firmará la factura '+inv.number+' con tu certificado y la enviará al SRI '+(real?'en PRODUCCIÓN: tiene validez tributaria.':'de pruebas.')+' Si ya se envió antes, solo se consulta: nunca se emite dos veces.',keep:'Cancelar',discard:'Enviar',plain:true})!=='discard')return;
@@ -8019,7 +8104,7 @@ function paintInvoice(dialog,body,data){const inv=data.invoice,s=data.settings,d
  const head=el('header',undefined,'inv-ride-head'),issuer=el('div',undefined,'inv-issuer'),logo=el('img');logo.src='/static/logo-original.png';logo.alt='PC-DOCTOR S.A.';logo.className='inv-logo';
  const fiscal=el('div');fiscal.append(el('strong',s.legal_name||'Razón social sin configurar'),el('small',(s.trade_name?s.trade_name+' · ':'')+(s.ruc?'RUC '+s.ruc:'RUC sin configurar')),el('small','Matriz: '+(s.head_office_address||'sin configurar')),el('small','Obligado a llevar contabilidad: '+(s.keeps_accounts||'—')+(s.regime?' · '+s.regime_label:'')));issuer.append(logo,fiscal);
  const doc=el('div',undefined,'inv-doc');doc.append(el('span','FACTURA','inv-doc-type'),el('code',inv.number||'Número al emitir'),invoiceChip(inv.status,inv.status_label));
- const keyBox=el('small',inv.access_key?'Clave de acceso: '+inv.access_key:'La clave de acceso se genera al emitir.','inv-key');doc.append(keyBox,el('small','Ambiente: Pruebas · Emisión normal'));head.append(issuer,doc);body.append(head);
+ const keyBox=el('small',inv.access_key?'Clave de acceso: '+inv.access_key:'La clave de acceso se genera al emitir.','inv-key');doc.append(keyBox,el('small','Ambiente: '+(inv.environment==='2'?'Producción':'Pruebas')+' · Emisión normal'));head.append(issuer,doc);body.append(head);
  if(s.missing.length)body.append(el('p','Faltan datos fiscales para emitir: '+s.missing.join(', ')+'.','inv-warn'));
  for(const text of inv.blockers||[])body.append(el('p',text,'inv-warn'));
  // Comprador: consumidor final solo hasta USD 50,00 (el servidor lo vuelve a comprobar al guardar y al emitir).
@@ -8050,9 +8135,12 @@ function paintInvoice(dialog,body,data){const inv=data.invoice,s=data.settings,d
  // Historial y acciones.
  const hist=el('details',undefined,'inv-history'),summary=el('summary','Historial ('+data.events.length+')'),ol=el('ol');for(const e of data.events)ol.append(el('li',formatOrderDate(e.created_at)+' · '+e.actor+' · '+e.detail));hist.append(summary,ol);body.append(hist);
  const actions=el('div',undefined,'inv-actions');
- if(draft){const emitB=button('',async()=>{if(await confirmClose({title:'¿Emitir en ambiente de PRUEBAS?',text:'Se asignará el número y la clave de acceso y se generará el XML de la factura de '+quoteMoney(inv.total_cents)+' a '+(inv.consumer_final?'CONSUMIDOR FINAL':inv.buyer_name||'—')+'. Es una emisión de PRUEBAS: no tiene validez tributaria y no se envía al SRI de producción.',keep:'Revisar',discard:'Emitir en pruebas',plain:true})!=='discard')return;
-   emitB.disabled=true;try{const fresh=await api('/api/invoicing/'+inv.id,{action:'emit',confirm:'1'});toast('Factura '+fresh.invoice.number+' preparada en ambiente de pruebas.','success');paintInvoice(dialog,body,fresh);if(currentModule==='invoicing')renderInvoicing();}catch(error){notify(error.message);emitB.disabled=false;}},'primary');
-  emitB.append(systemIcon('M22 2 11 13 M22 2l-7 20-4-9-9-4z'),el('span','Emitir en pruebas'));emitB.disabled=!!(s.missing.length||(inv.blockers||[]).length||Object.keys(inv.problems||{}).length);if(emitB.disabled)emitB.title='Completa los datos pendientes para emitir.';
+ if(draft){const real=s.test_mode===false,who=quoteMoney(inv.total_cents)+' a '+(inv.consumer_final?'CONSUMIDOR FINAL':inv.buyer_name||'—');
+  // El servidor emite en el ambiente ACTIVO: el texto lo dice tal cual (1.5.322). En producción la factura tiene validez tributaria.
+  const emitB=button('',async()=>{if(await confirmClose(real?{title:'¿Emitir la factura REAL?',text:'Se asignará el número definitivo y la clave de acceso de la factura de '+who+'. Es una factura de PRODUCCIÓN, con validez tributaria: revisa el comprador, las partidas y el total antes de continuar. Después se envía al SRI a través de AZUR.',keep:'Revisar',discard:'Emitir factura real',danger:true}
+    :{title:'¿Emitir en ambiente de PRUEBAS?',text:'Se asignará el número y la clave de acceso y se generará el XML de la factura de '+who+'. Es una emisión de PRUEBAS: no tiene validez tributaria y no se envía al SRI de producción.',keep:'Revisar',discard:'Emitir en pruebas',plain:true})!=='discard')return;
+   emitB.disabled=true;try{const fresh=await api('/api/invoicing/'+inv.id,{action:'emit',confirm:'1'});toast(real?'Factura '+fresh.invoice.number+' emitida en PRODUCCIÓN. Ahora envíala al SRI.':'Factura '+fresh.invoice.number+' preparada en ambiente de pruebas.','success');paintInvoice(dialog,body,fresh);if(currentModule==='invoicing')renderInvoicing();}catch(error){notify(error.message);emitB.disabled=false;}},'primary');
+  emitB.append(systemIcon('M22 2 11 13 M22 2l-7 20-4-9-9-4z'),el('span',real?'Emitir factura':'Emitir en pruebas'));emitB.disabled=!!(s.missing.length||(inv.blockers||[]).length||Object.keys(inv.problems||{}).length);if(emitB.disabled)emitB.title='Completa los datos pendientes para emitir.';
   const drop=button('Descartar borrador',async()=>{if(await confirmClose({title:'¿Descartar este borrador?',text:'El borrador queda en el historial y la orden podrá facturarse de nuevo. No se elimina ningún dato.',keep:'Conservar',discard:'Descartar',danger:true})!=='discard')return;try{const fresh=await api('/api/invoicing/'+inv.id,{action:'discard'});paintInvoice(dialog,body,fresh);if(currentModule==='invoicing')renderInvoicing();}catch(error){notify(error.message);}},'secondary');
   actions.append(emitB,drop);}
  if(inv.access_key){const xml=el('a',undefined,'secondary');xml.href='/api/invoicing/'+inv.id+'/comprobante.xml';xml.append(systemIcon('M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6 M10 13l-2 2 2 2 M14 13l2 2-2 2'),el('span','Descargar XML'));actions.append(xml);
@@ -8067,8 +8155,8 @@ function paintInvoice(dialog,body,data){const inv=data.invoice,s=data.settings,d
 // Bloque en «Pagos y saldo» de la orden: generar la factura cuando el equipo está totalmente pagado (o ver la que ya existe).
 function invoiceBlock(order){const box=el('div',undefined,'inv-order-block');box.append(el('small','Comprobando facturación…','equip-pay-note'));
  api('/api/invoicing/eligibility?'+new URLSearchParams({kind:'orden',id:String(order.id)})).then(info=>{box.replaceChildren();const mark=el('span',undefined,'inv-order-mark');mark.append(systemIcon(invoiceGlyph));const copy=el('div');
-  if(info.invoice){copy.append(el('strong','Factura '+(info.invoice.number||'en borrador')),invoiceChip(info.invoice.status,info.invoice.status_label+' · pruebas'));box.append(mark,copy,button('Ver factura',()=>openInvoice(info.invoice.id),'secondary'));return;}
-  if(info.can_generate){copy.append(el('strong','Facturación electrónica'),el('small','Orden totalmente pagada · '+quoteMoney(info.total_cents)+' · ambiente de pruebas'));const gen=button('',async()=>{gen.disabled=true;try{const data=await api('/api/invoicing/draft',{kind:'orden',id:String(order.id)});await openInvoice(data.invoice.id,data);box.replaceWith(invoiceBlock(order));}catch(error){notify(error.message);gen.disabled=false;}},'primary');gen.append(systemIcon(invoiceGlyph),el('span','Generar factura electrónica'));box.append(mark,copy,gen);return;}
+  if(info.invoice){copy.append(el('strong','Factura '+(info.invoice.number||'en borrador')),invoiceChip(info.invoice.status,info.invoice.status_label+(info.invoice.environment==='2'?'':' · pruebas')));box.append(mark,copy,button('Ver factura',()=>openInvoice(info.invoice.id),'secondary'));return;}
+  if(info.can_generate){copy.append(el('strong','Facturación electrónica'),el('small','Orden totalmente pagada · '+quoteMoney(info.total_cents)+(invoiceProduction?' · producción':' · ambiente de pruebas')));const gen=button('',async()=>{gen.disabled=true;try{const data=await api('/api/invoicing/draft',{kind:'orden',id:String(order.id)});await openInvoice(data.invoice.id,data);box.replaceWith(invoiceBlock(order));}catch(error){notify(error.message);gen.disabled=false;}},'primary');gen.append(systemIcon(invoiceGlyph),el('span','Generar factura electrónica'));box.append(mark,copy,gen);return;}
   copy.append(el('strong','Facturación electrónica'),el('small',(info.blockers||[]).join(' ')||'Esta orden todavía no se puede facturar.'));box.dataset.blocked='true';box.append(mark,copy);}).catch(()=>box.remove());
  return box;}
 
@@ -8282,7 +8370,7 @@ async function renderCash(target){const root=target||$('module-content');root.re
  panel.append(invSectionHead('Caja','Apertura, ingresos, egresos, arqueo por denominaciones y cierre. Los cobros de órdenes, licencias y anticipos se vinculan solos a la caja abierta.'));
  panel.append(invoiceKpis([['badge-check','Cajas abiertas',String(i.open_registers),i.open_registers?'En operación':'Ninguna abierta','green'],['wallet','Efectivo disponible',cjMoney(i.cash_available_cents),'Esperado en las cajas abiertas','blue'],
   ['credit-card','Pagos electrónicos',cjMoney(i.electronic_cents),'Tarjetas, transferencias y depósitos','teal'],['arrow-up-from-line','Egresos',cjMoney(i.outgo_cents),'De las cajas abiertas','red'],
-  ['circle-dollar-sign','Dinero recibido',cjMoney(i.received_cents),'Efectivo y pagos ya confirmados','green'],['receipt-text','Ventas del día',cjMoney(i.sales_cents),i.sales_count+' facturas (pruebas)','magenta'],
+  ['circle-dollar-sign','Dinero recibido',cjMoney(i.received_cents),'Efectivo y pagos ya confirmados','green'],['receipt-text','Ventas del día',cjMoney(i.sales_cents),i.sales_count+' facturas','magenta'],
   ['hourglass','Por conciliar',String(i.pending_reconciliation),'Transferencias, tarjetas y cobros pendientes','amber'],['scroll-text','Cierres de hoy',String(i.closings_today),'Diferencias acumuladas '+cjMoney(i.difference_cents),'blue']]));
  if(data.incidents.length){const box=invoiceCard('Cobros sin caja abierta','circle-alert',data.incidents.length+' por asignar a una sesión');box.classList.add('cj-incidents');const ul=el('ul',undefined,'fx-list');
   for(const inc of data.incidents){const li=el('li'),row=el('div',undefined,'fx-row');row.append(el('strong',inc.ref+' · '+cjMoney(inc.amount_cents)+' · '+inc.method),el('small','Orden '+inc.order+' · '+formatOrderDate(inc.at)+' · '+inc.actor));
@@ -8637,7 +8725,7 @@ async function invoiceComposer(existing=null,done=null,mode='factura',preset={})
   const vl=el('label',undefined,'inv-field');valid=el('input');valid.type='date';valid.name='valid_until';valid.required=true;valid.min=setup.today;valid.value=p?.valid_until||new Date(Date.parse(setup.today+'T12:00')+15*864e5).toISOString().slice(0,10);valid.addEventListener('input',touch);
   vl.append(el('span','Válida hasta'),valid,el('small','Entre hoy y un año.'));vl.querySelector('span').append(el('b',' *','required-mark'));dgrid.append(vl);}
  else{const typeL=el('label',undefined,'inv-field');type=el('select');for(const[k,v]of Object.entries(setup.doc_types))type.add(new Option(v,k));typeL.append(el('span','Tipo de comprobante'),type,el('small','Por ahora el sistema admite factura.'));dgrid.append(typeL);
-  ro('Número',setup.next_number,'Se asigna al emitir en pruebas');ro('Establecimiento',setup.settings.establishment||'—');ro('Punto de emisión',setup.settings.emission_point||'—');
+  ro('Número',setup.next_number,setup.settings?.test_mode===false?'Se asigna al emitir (producción)':'Se asigna al emitir en pruebas');ro('Establecimiento',setup.settings.establishment||'—');ro('Punto de emisión',setup.settings.emission_point||'—');
   ro('Fecha de emisión',new Date(setup.today+'T12:00').toLocaleDateString('es-EC'));}
  ro('Vendedor o cajero',setup.seller);const st=el('div',undefined,'fxc-state');st.append(el('span','Estado'),cjChip(p?p.status:'borrador',p?p.status_label:'Borrador'));dgrid.append(st);
  if(!P&&setup.settings.missing.length){const w=el('p','Faltan datos fiscales para emitir: '+setup.settings.missing.join(', ')+'. Puedes crear la factura en borrador.','inv-warn');doc.append(w);}
@@ -8725,7 +8813,7 @@ async function invoiceComposer(existing=null,done=null,mode='factura',preset={})
  const acts=el('div',undefined,'fxc-actions'),msg=el('p','','inv-form-message');msg.setAttribute('role','alert');
  const cancel=button('Cancelar',()=>requestModalClose(dialog),'secondary');let draftB,createB,printB,emitB;
  if(P){createB=invBtn(p?'Guardar cambios':'Guardar proforma','circle-check',()=>submit('proforma'),'primary');draftB=createB;acts.append(cancel,createB);}
- else{draftB=invBtn('Guardar borrador','file-pen-line',()=>submit('draft'));createB=invBtn('Crear factura','receipt-text',()=>submit('create'),'primary');printB=invBtn('Emitir e imprimir (pruebas)','printer',()=>submit('print'));emitB=invBtn('Guardar y emitir (pruebas)','send',()=>submit('emit'),'primary');
+ else{draftB=invBtn('Guardar borrador','file-pen-line',()=>submit('draft'));createB=invBtn('Crear factura','receipt-text',()=>submit('create'),'primary');const realE=setup?.settings?.test_mode===false;printB=invBtn(realE?'Emitir e imprimir':'Emitir e imprimir (pruebas)','printer',()=>submit('print'));emitB=invBtn(realE?'Guardar y emitir':'Guardar y emitir (pruebas)','send',()=>submit('emit'),'primary');
   if(setup.settings.missing.length)for(const b of [emitB,printB]){b.disabled=true;b.title='Completa los datos fiscales para emitir.';}acts.append(cancel,draftB,printB,createB,emitB);}
  foot.append(msg,acts);const buttons=[draftB,createB,printB,emitB].filter(Boolean);
  let totals={total:0},ft=null,seq=0;
@@ -8777,7 +8865,7 @@ async function invoiceComposer(existing=null,done=null,mode='factura',preset={})
    if(['emit','print'].includes(how)&&!cfc.checked&&!cid.value.trim())problems.push('Para emitir indica la identificación del cliente o marca «Consumidor final».');}
   if(problems.length){msg.textContent=[...new Set(problems)].join(' ');return;}
   let units={};if(!P&&how!=='draft'){units=await saleSerialPicker(data.lines);if(units===null)return;}
-  if(!P&&how!=='draft'&&!await askConfirm(how==='emit'||how==='print'?(setup?.settings?.test_mode===false?'¿Crear y emitir la factura REAL (producción)?':'¿Crear y emitir la factura en PRUEBAS?'):'¿Crear la factura?','Cliente: '+(cfc.checked?'CONSUMIDOR FINAL':cname.value.trim())+'\nTotal: '+money(totals.total)+' · '+data.lines.length+' partida(s)\n'+(data.payments.length?'Pagos: '+data.payments.map(x=>methods[x.method]+' '+money(parse(x.amount))).join(' + '):'Sin cobro: saldo a crédito')+(how==='emit'||how==='print'?'\nEmisión de PRUEBAS: sin validez tributaria; no se envía al SRI.':''),how==='emit'?'Crear y emitir':how==='print'?'Emitir e imprimir':'Crear factura'))return;
+  if(!P&&how!=='draft'&&!await askConfirm(how==='emit'||how==='print'?(setup?.settings?.test_mode===false?'¿Crear y emitir la factura REAL (producción)?':'¿Crear y emitir la factura en PRUEBAS?'):'¿Crear la factura?','Cliente: '+(cfc.checked?'CONSUMIDOR FINAL':cname.value.trim())+'\nTotal: '+money(totals.total)+' · '+data.lines.length+' partida(s)\n'+(data.payments.length?'Pagos: '+data.payments.map(x=>methods[x.method]+' '+money(parse(x.amount))).join(' + '):'Sin cobro: saldo a crédito')+(how==='emit'||how==='print'?(setup?.settings?.test_mode===false?'\nFactura REAL de producción, con validez tributaria. Después se envía al SRI a través de AZUR.':'\nEmisión de PRUEBAS: sin validez tributaria; no se envía al SRI.'):''),how==='emit'?'Crear y emitir':how==='print'?'Emitir e imprimir':'Crear factura'))return;
   const win=how==='print'?window.open('about:blank','_blank'):null;
   busy=true;for(const b of buttons)b.disabled=true;acts.setAttribute('aria-busy','true');msg.textContent='Procesando…';
   try{const payload={client_id:clientId.value,client_name:cfc.checked&&!cname.value.trim()?'CONSUMIDOR FINAL':cname.value.trim(),client_identification:cid.value.trim(),client_address:caddr.value.trim(),client_phone:cphone.value.trim(),client_email:cmail.value.trim(),items:JSON.stringify(data.lines),notes:data.notes};
@@ -8788,13 +8876,13 @@ async function invoiceComposer(existing=null,done=null,mode='factura',preset={})
    if(how==='draft'){dirty=false;msg.textContent='Borrador guardado ('+(saved.proforma?.code||'')+').';toast('Borrador guardado.','success');done&&done();return;}
    const r=await api('/api/proformas/'+pid,{action:'checkout',payments:JSON.stringify(data.payments),emit:how==='emit'||how==='print'?'1':'',consumer_final:cfc.checked?'1':'',internal_note:internal.value.trim(),units:JSON.stringify(units),request_key:keys.checkout});
    dirty=false;dialog.close();done&&done();if(win){if(r.emit_error)win.close();else win.location.href='/api/invoicing/'+r.invoice_id+'/ride.pdf';}
-   if(r.emit_error)toast('La factura quedó en borrador: '+r.emit_error,'error');else toast(how==='emit'||how==='print'?'Factura '+(r.invoice.number||'')+' emitida en pruebas.':'Factura creada en borrador.','success',typeof salesReceipt==='function'?{label:'Imprimir comprobante',run:()=>salesReceipt('directa',pid)}:null,{duration:9000});openInvoice(r.invoice_id);}
+   if(r.emit_error)toast('La factura quedó en borrador: '+r.emit_error,'error');else toast(how==='emit'||how==='print'?'Factura '+(r.invoice.number||'')+(setup?.settings?.test_mode===false?' emitida (producción).':' emitida en pruebas.'):'Factura creada en borrador.','success',typeof salesReceipt==='function'?{label:'Imprimir comprobante',run:()=>salesReceipt('directa',pid)}:null,{duration:9000});openInvoice(r.invoice_id);}
   catch(error){win?.close();msg.textContent=error.message;showFields(error.fields);if(error.fields?.confirm_client){otherClient.hidden=false;otherClient.querySelector('input')?.focus();}}finally{busy=false;for(const b of buttons)b.disabled=false;for(const b of [emitB,printB])if(b)b.disabled=!!setup.settings.missing.length;acts.removeAttribute('aria-busy');}}
  (p?pq:fq).focus();}
 // ---- Proformas, pagos y anticipos, vouchers y notas de crédito ----------------------------------------------------------------------
 let proformaState={status:'',q:'',order:''};
 async function proformasPanel(panel){panel.replaceChildren(el('p','Cargando proformas…','empty-module'));let data;try{data=await api('/api/proformas?'+new URLSearchParams(proformaState));}catch(error){panel.replaceChildren(el('p',error.message,'empty-module'));return;}
- panel.replaceChildren(invSectionHead('Cotización y proforma','Cotiza productos y servicios con descuentos autorizados, forma de pago y financiamiento con tarjeta; envía un enlace privado para que el cliente apruebe con su firma y conviértela en factura (pruebas). Una proforma no es un comprobante tributario.',
+ panel.replaceChildren(invSectionHead('Cotización y proforma','Cotiza productos y servicios con descuentos autorizados, forma de pago y financiamiento con tarjeta; envía un enlace privado para que el cliente apruebe con su firma y conviértela en factura. Una proforma no es un comprobante tributario.',
   invBtn('Nueva cotización y proforma','plus',()=>proformaComposer(null,()=>proformasPanel(panel)),'primary')));
  const bar=el('div',undefined,'inv-toolbar'),sb=el('label',undefined,'inv-search'),q=el('input');q.type='search';q.placeholder='Buscar por número, cliente, identificación u orden';q.value=proformaState.q;q.setAttribute('aria-label','Buscar proformas');sb.append(invIcon('search'),q);
  let t=null;q.addEventListener('input',()=>{clearTimeout(t);t=setTimeout(()=>{proformaState.q=q.value.trim();proformasPanel(panel).then(()=>{const n=panel.querySelector('.inv-search input');n?.focus();n?.setSelectionRange(n.value.length,n.value.length);});},350);});
@@ -8821,7 +8909,7 @@ async function proformaDetail(id,done){const dialog=invDialog('Proforma',true),b
  if(p.origin==='directa'&&p.status==='aprobada'&&!d.invoice&&admin())acts.append(invBtn('Continuar factura','receipt-text',()=>{dialog.close();invoiceComposer(d,done);},'primary'));
  if(d.can_send)acts.append(invBtn(p.status==='borrador'||p.status==='modificacion'?'Enviar al cliente':'Generar enlace nuevo','send',async()=>{try{const r=await api('/api/proformas/'+id,{action:'send'});proformaLinkDialog(r.link,p);done&&done();}catch(error){notify(error.message);}},'primary'));
  if(['borrador','enviada','vista'].includes(p.status))acts.append(invBtn('Registrar decisión del cliente','badge-check',()=>proformaDecision(id,reload)));
- if(d.can_convert&&admin())acts.append(invBtn('Generar factura','receipt-text',async()=>{if(!await askConfirm('¿Generar la factura?','Se crea un borrador de factura en el ambiente de pruebas con las partidas aprobadas ('+quoteMoney(d.approved_totals.total_cents)+'), los anticipos aplicados y el detalle de pago. No se envía nada al SRI.','Generar factura'))return;
+ if(d.can_convert&&admin())acts.append(invBtn('Generar factura','receipt-text',async()=>{if(!await askConfirm('¿Generar la factura?','Se crea un borrador de factura con las partidas aprobadas ('+quoteMoney(d.approved_totals.total_cents)+'), los anticipos aplicados y el detalle de pago. No se envía nada al SRI.','Generar factura'))return;
   const go_=async extra=>{const r=await api('/api/proformas/'+id,{action:'convert',...extra});dialog.close();done&&done();openInvoice(r.invoice_id);};
   try{await go_({});}catch(error){if(error.fields?.accept_overlap){if(await askConfirm('Conceptos repetidos con la orden',error.message,'Confirmo y facturo',true))try{await go_({accept_overlap:'1'});}catch(e){notify(e.message);}}else notify(error.message);}},'primary'));
  if(!['cancelada','reemplazada','rechazada','vencida'].includes(p.status)&&!(d.invoice&&d.invoice.status!=='borrador'))acts.append(invBtn('Registrar anticipo','banknote',()=>advanceDialog(d,reload)));
@@ -8941,18 +9029,18 @@ function correctVoucher(v,done){const dialog=invDialog('Corregir '+v.code),{form
  form.addEventListener('submit',async e=>{e.preventDefault();clear();save.disabled=true;try{await api('/api/vouchers/'+v.id,{action:'corregir',...Object.fromEntries(new FormData(form))});dialog.close();toast('Voucher corregido.','success');done();}catch(error){save.disabled=false;fail(error);}});}
 // Notas de crédito (pruebas): listado y emisión desde una factura emitida.
 async function creditNotesPanel(panel){let r;try{r=await api('/api/credit-notes');}catch(error){panel.replaceChildren(el('p',error.message,'empty-module'));return;}
- panel.replaceChildren(invSectionHead('Notas de crédito','Anulación total o parcial de una factura emitida, con motivo obligatorio. Solo en el ambiente de pruebas del SRI: no tienen validez tributaria. Se crean desde el detalle de la factura.'));
+ panel.replaceChildren(invSectionHead('Notas de crédito','Anulación total o parcial de una factura emitida, con motivo obligatorio. '+(invoiceProduction?'Se registran con su XML; el envío de notas de crédito al SRI a través de AZUR todavía no está disponible: coordínalo con tu contador.':'Solo en el ambiente de pruebas del SRI: no tienen validez tributaria.')+' Se crean desde el detalle de la factura.'));
  panel.append(r.rows.length?cjTable(['Número','Factura','Cliente','Tipo','Motivo','Total','Emitida','XML'],r.rows.map(n=>{const tr=cjRow([['Número',n.number],['Factura',n.invoice_number],['Cliente',n.buyer_name],['Tipo',n.scope],['Motivo',n.reason],['Total',quoteMoney(n.total_cents)],['Emitida',formatOrderDate(n.emitted_at)],['XML','']]);
    const a=el('a','Descargar','text-action');a.href='/api/credit-notes/'+n.id+'/comprobante.xml';tr.lastChild.append(a);return tr;})):invEmpty('file-x-2','Todavía no hay notas de crédito','Abre una factura emitida y usa «Nota de crédito».'));}
 async function creditNoteDialog(inv,done){let r;try{r=await api('/api/credit-notes/invoice/'+inv.id);}catch(error){notify(error.message);return;}
- const dialog=invDialog('Nota de crédito · '+(inv.number||'factura'),true),{form,msg,field,fail,clear}=invForm('bank-form inv-sheet-form');dialog.append(form);form.append(el('p','Ambiente de PRUEBAS: la nota no tiene validez tributaria. Lo acreditado nunca supera lo facturado.','inv-form-note'),invRequiredNote());
+ const dialog=invDialog('Nota de crédito · '+(inv.number||'factura'),true),{form,msg,field,fail,clear}=invForm('bank-form inv-sheet-form');dialog.append(form);form.append(el('p',(inv.environment==='2'?'La nota se registra con su XML; su envío al SRI a través de AZUR todavía no está disponible.':'Ambiente de PRUEBAS: la nota no tiene validez tributaria.')+' Lo acreditado nunca supera lo facturado.','inv-form-note'),invRequiredNote());
  const scope=field('scope','Tipo',{options:[['total','Total (todo lo pendiente de acreditar)'],['parcial','Parcial (elige partidas y cantidades)']],required:true});field('reason','Motivo',{area:true,max:300,required:true});
  const box=el('div');form.append(box);const inputs=[];for(const it of r.items){const l=el('label',undefined,'inv-field'),i=el('input');i.inputMode='numeric';i.value='0';i.dataset.id=it.id;l.append(el('span',it.description+' · disponible '+it.remaining+' de '+it.quantity),i);box.append(l);inputs.push(i);}
  let ret=null;if(inv.source_kind==='venta_inventario'||inv.stock_out){const l=el('label',undefined,'inv-cf');ret=el('input');ret.type='checkbox';l.append(ret,el('span','Devolver las unidades al inventario (devolución del cliente)'));form.append(l);}
  const sync=()=>{box.hidden=scope.value!=='parcial';};scope.addEventListener('change',sync);sync();
- const save=el('button',undefined,'primary inv-btn');save.type='submit';save.append(invIcon('file-x-2'),el('span','Emitir nota de crédito (pruebas)'));form.append(msg,invDialogActions(dialog,save));const key=cjKey();
+ const save=el('button',undefined,'primary inv-btn');save.type='submit';save.append(invIcon('file-x-2'),el('span',inv.environment==='2'?'Emitir nota de crédito':'Emitir nota de crédito (pruebas)'));form.append(msg,invDialogActions(dialog,save));const key=cjKey();
  form.addEventListener('submit',async e=>{e.preventDefault();clear();save.disabled=true;try{await api('/api/credit-notes',{invoice_id:String(inv.id),scope:scope.value,reason:form.elements.reason.value,request_key:key,lines:JSON.stringify(inputs.filter(i=>Number(i.value)>0).map(i=>({item_id:Number(i.dataset.id),quantity:Number(i.value)}))),return_stock:ret&&ret.checked?'1':''});
-   dialog.close();toast('Nota de crédito emitida en pruebas.','success');done&&done();}catch(error){save.disabled=false;fail(error);}});}
+   dialog.close();toast(inv.environment==='2'?'Nota de crédito registrada.':'Nota de crédito emitida en pruebas.','success');done&&done();}catch(error){save.disabled=false;fail(error);}});}
 
 // Cierres diarios por persona (módulo anterior): se conservan para consultar el historial y sus depósitos.
 async function legacyCash(target){const root=target||$('module-content'),wrap=el('div',undefined,'cash-module'),tabs=el('div',undefined,'inv-tabs cash-tabs'),panel=el('div',undefined,'inv-panel');tabs.setAttribute('role','tablist');tabs.setAttribute('aria-label','Caja');
