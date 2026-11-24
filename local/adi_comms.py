@@ -17,7 +17,7 @@ from datetime import date, datetime, timedelta
 
 READY = ('listo', 'espera_entrega')
 WAITING_PARTS = ('solicitado', 'confirmado', 'preparacion', 'transito')
-COLLECTION = ('pago_pendiente', 'compromiso_pago', 'compromiso_incumplido')   # cobranza: horario y máximo diario estrictos
+COLLECTION = ('pago_pendiente', 'compromiso_pago', 'compromiso_incumplido', 'regularizacion_saldo', 'aviso_vencimiento')   # cobranza: horario y máximo diario estrictos
 FINANCIAL = COLLECTION + ('confirmacion_pago', 'listo_entrega')                # pueden llevar importes
 DISCREET = COLLECTION + ('confirmacion_pago',)                                 # sin autorización de avisos: sin importes
 HOURS = (8, 19)                            # lunes a viernes laborables, hora de Ecuador
@@ -42,7 +42,10 @@ PURPOSES = {
     'recordatorio_retiro': ('Recordatorio de retiro', 'entrega'),
     'garantia': ('Garantía', 'entrega'),
     'posventa': ('Atención posventa', 'entrega'),
-    'pago_pendiente': ('Pago pendiente', 'pagos'),
+    'pago_pendiente': ('Recordatorio de pago', 'pagos'),
+    'aviso_vencimiento': ('Aviso de vencimiento', 'pagos'),
+    'regularizacion_saldo': ('Regularización de saldo', 'pagos'),
+    'atencion_administrativa': ('Atención administrativa', 'pagos'),
     'confirmacion_pago': ('Confirmación de pago', 'pagos'),
     'compromiso_pago': ('Compromiso de pago', 'pagos'),
     'compromiso_incumplido': ('Compromiso incumplido', 'pagos'),
@@ -166,11 +169,13 @@ def analysis(c, oid, now):
             ('Total del servicio', fin['total'] if fin else '', 'Pagos de la orden'), ('Pagos y anticipos confirmados', fin['paid'] if fin else '', 'Caja'),
             ('Transferencias por conciliar', ('%d por %s (no son deuda confirmada ni pago confirmado)' % (fin['pending_transfers'], fin['pending'])) if fin and fin['pending_transfers'] else '', 'Caja · transferencias'),
             ('Saldo pendiente', fin['balance'] if fin else status_messages.UNVERIFIED, 'Pagos de la orden'),
+            ('Estado financiero', __import__('collections_center').STATE_LABELS.get(_financial_state(c, oid, now), ('Requiere revisión',))[0], 'Centro de cartera (reglas del servidor)'),
             ('Facturas vinculadas', [('%s · %s · %s%s' % (i['number'], i['status_label'], i['total'], ' (autorizada no significa pagada)' if i['status'] == 'autorizado' else '')) for i in _invoices(c, oid)], 'Facturación'),
             ('Vencimientos', 'Sin fecha de vencimiento registrada', 'Pagos de la orden'),
             ('Compromisos de pago', _commitment_text(c, oid, now), 'Compromisos de pago'))},
         {'key': 'comunicacion', 'title': 'Comunicación', 'rows': rows(
             ('Mensajes anteriores', [('%s · %s · %s · %s' % (_fmt(m['created_at']) or '—', m['template'] or 'mensaje', m['channel'], m['status'])) for m in _messages(c, oid)] or 'Ninguno registrado', 'Comunicación de la orden'),
+            ('Reclamos o controversias', ', '.join(_claims(c, oid)) or 'Ninguno abierto', 'PQRS'),
             ('Pendiente del cliente', 'Aprobar el presupuesto %s' % q['code'] if q and q['status'] == 'enviado' else 'Responder a la consulta del taller' if ctx['status'] == 'esperando_cliente' else 'Nada pendiente', 'Presupuestos · Órdenes'))}]
     found = delays(ctx, now)
     return {'order': {'id': oid, 'code': ctx['code'], 'status': ctx['status'], 'status_label': ctx['status_label']}, 'sections': sections, 'delays': found,
@@ -188,6 +193,27 @@ def _commitment(c, oid, now):
     except Exception as error:  # sin compromisos legibles se trata como «sin compromiso», nunca como deuda
         print('adi-commitments', type(error).__name__, flush=True)
         return {'installed': False, 'items': [], 'current': None, 'message': ''}
+
+
+def _financial_state(c, oid, now):
+    """Estado financiero del centro de cartera (reglas del servidor) para esta orden; '' si no se puede determinar."""
+    try:
+        import collections_center as cc
+        main = c.execute('SELECT COALESCE(group_id,id) FROM orders WHERE id=?', (oid,)).fetchone()[0]
+        client = c.execute('SELECT d.client_id FROM orders o JOIN devices d ON d.id=o.device_id WHERE o.id=?', (oid,)).fetchone()[0]
+        item = next((i for i in cc.portfolio(c, now, client_id=client)['items'] if i['main_id'] == main), None)
+        return item['state'] if item else 'pagado'
+    except Exception as error:
+        print('adi-financial-state', type(error).__name__, flush=True)
+        return ''
+
+
+def _claims(c, oid):
+    if not c.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='pqrs_cases'").fetchone():
+        return []
+    row = c.execute('SELECT d.client_id FROM orders o JOIN devices d ON d.id=o.device_id WHERE o.id=?', (oid,)).fetchone()
+    return [r[0] for r in c.execute("SELECT code FROM pqrs_cases WHERE category IN ('queja','reclamo') AND status!='cerrada' AND (order_id=? OR client_id=?)",
+                                    (oid, row[0] if row else 0))]
 
 
 def _commitment_text(c, oid, now):
@@ -213,7 +239,13 @@ def _eligibility(c, oid, ctx, fin, now, found):
     late_part = [d for d in found if d['kind'] == 'repuesto']
     quote_wait = bool(q and q['status'] == 'enviado')
     cur = _commitment(c, oid, now)['current']
+    fstate = _financial_state(c, oid, now)
     return {
+        'aviso_vencimiento': (bool(cur and cur['state'] in ('pendiente', 'proximo') and cur.get('days_left') is not None and 0 <= cur['days_left'] <= 3),
+                              'Solo cuando un compromiso de pago vence hoy o en los próximos 3 días.'),
+        'regularizacion_saldo': (fstate in ('pago_vencido', 'mora_90', 'compromiso_incumplido'),
+                                 'La obligación no está vencida (por ejemplo, se paga al retirar el equipo): no corresponde regularizar.'),
+        'atencion_administrativa': (bool(fin and fin['balance_cents'] > 0), 'No hay un saldo pendiente.'),
         'compromiso_pago': (bool(cur and cur['state'] in ('pendiente', 'proximo')), 'No hay un compromiso de pago vigente registrado.'),
         'compromiso_incumplido': (bool(cur and cur['state'] in ('incumplido', 'parcial')), 'No hay un compromiso vencido sin pagar (una transferencia por conciliar lo deja en revisión).'),
         'recepcion': (st in ('pendiente', 'diagnostico'), 'Solo mientras el equipo está recién recibido o en diagnóstico.'),
@@ -297,6 +329,11 @@ def base_text(c, oid, purpose, ctx, fin, now, note='', discreet=False):
         'posventa': 'Gracias por confiar en PC-DOCTOR. Queremos saber si %s funciona correctamente después del servicio. Si tiene alguna inquietud, con gusto le atendemos.' % device,
         'pago_pendiente': status_messages.payment_text(fin) if fin else '',
         'compromiso_pago': _commitment_message(c, oid, now, 'confirmar'),
+        'aviso_vencimiento': _commitment_message(c, oid, now, 'aviso'),
+        'regularizacion_saldo': ('Le escribimos para coordinar la regularización del saldo de su orden %s%s. Si ya realizó el pago, por favor indíquenos para verificarlo; '
+                                 'si necesita revisar alternativas, nuestro equipo administrativo puede atenderle.') % (ctx['code'], ', que registra %s pendientes' % fin['balance'] if fin else ''),
+        'atencion_administrativa': ('Nuestro equipo administrativo desea comunicarse con usted sobre la cuenta de su orden %s. Indíquenos un horario conveniente '
+                                    'para atenderle o responda a este mensaje.') % ctx['code'],
         'compromiso_incumplido': _commitment_message(c, oid, now, 'seguimiento'),
         'confirmacion_pago': 'Confirmamos el registro de su pago. %s' % ('El saldo de su orden está cubierto.' if fin and fin['balance_cents'] <= 0 else
                                                                          'Su orden registra un saldo pendiente de %s.' % fin['balance'] if fin else '')}
@@ -313,6 +350,9 @@ def _commitment_message(c, oid, now, kind):
     cur = _commitment(c, oid, now)['current']
     if not cur:
         return ''
+    if kind == 'aviso':
+        return ('Le recordamos que el compromiso de pago registrado de %s vence el %s. Si ya lo realizó, indíquenos para verificarlo; si necesita revisar la fecha, '
+                'escríbanos antes del vencimiento.' % (cur['amount'], cur['due']))
     if kind == 'confirmar':
         return ('Confirmamos el compromiso de pago registrado: %s hasta el %s%s. Gracias por informarnos; si algo cambia, escríbanos antes de esa fecha.'
                 % (cur['amount'], cur['due'], ' (%s)' % cur['method_label'].lower() if cur['method_label'] else ''))
@@ -344,7 +384,7 @@ def compose(c, oid, purpose, channel, note='', use_ai=True, tone='profesional', 
         raise CommsError(status_messages.UNVERIFIED, 409)
     who = _client(c, oid)
     number = wa.number_for(who['phone'])
-    discreet = channel == 'whatsapp' and purpose in DISCREET and (not number or wa.consent_state(c, number)['state'] != 'aceptado')
+    discreet = channel == 'whatsapp' and purpose in DISCREET + ('regularizacion_saldo', 'aviso_vencimiento') and (not number or wa.consent_state(c, number)['state'] != 'aceptado')
     body = base_text(c, oid, purpose, ctx, fin, now, note, discreet)
     source, warnings = 'sistema', []
     if discreet:
@@ -487,7 +527,10 @@ def precheck(c, oid, purpose, channel, text, fingerprint_value, now):
         level, detail = 'ok', 'Comunicación del servicio contratado.'
     if purpose in COLLECTION and _collection_today(c, who['id'], now):
         level, detail = 'block', 'Ya hubo una gestión de cobranza hoy con este cliente (máximo una al día entre todos los canales).'
-    if purpose in COLLECTION:
+    claims = _claims(c, oid) if purpose in COLLECTION else []
+    if claims:
+        level, detail = 'block', 'Reclamo pendiente (%s): la cobranza se suspende hasta resolverlo.' % ', '.join(claims)
+    if purpose in COLLECTION and not claims:
         try:
             import collections_center
             stop = collections_center.suspended(c, who['id'], now.date())

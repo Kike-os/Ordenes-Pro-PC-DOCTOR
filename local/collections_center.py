@@ -13,7 +13,7 @@ import re
 from datetime import date, datetime, timedelta
 
 READY = ('listo', 'espera_entrega')
-AGES = (('por_vencer', 'Por vencer'), ('1_30', '1 a 30 días'), ('31_60', '31 a 60 días'), ('61_90', '61 a 90 días'), ('mas_90', 'Más de 90 días'))
+AGES = (('sin_atraso', 'Sin atraso'), ('1_30', '1 a 30 días'), ('31_60', '31 a 60 días'), ('61_90', '61 a 90 días'), ('mas_90', 'Más de 90 días'))
 FLAG_KINDS = {'suspension': 'Recordatorios suspendidos', 'derivacion': 'Derivado a administración', 'observacion': 'Observación administrativa',
               'conciliacion': 'Conciliación solicitada'}
 MILESTONES = (7, 15, 30, 60, 85, 90)            # días de retraso que generan una propuesta de seguimiento
@@ -44,9 +44,27 @@ def usd(cents):
     return ('-' if int(cents or 0) < 0 else '') + '$%s,%02d' % (format(whole, ',d').replace(',', '.'), frac)
 
 
+# Estado financiero → (etiqueta, tono). Lo decide el servidor con reglas verificables; nunca la IA.
+STATE_LABELS = {'pago_al_retirar': ('Pago al retirar', 'celeste'), 'por_vencer': ('Por vencer', 'azul'), 'vence_hoy': ('Vence hoy', 'amarillo'),
+                'pago_vencido': ('Pago vencido', 'naranja'), 'mora_90': ('Mora superior a 90 días', 'rojo'), 'pendiente_conciliacion': ('Pendiente de conciliación', 'violeta'),
+                'acuerdo_vigente': ('Acuerdo de pago vigente', 'azul'), 'compromiso_incumplido': ('Compromiso incumplido', 'naranja'), 'pagado': ('Pago completado', 'verde'),
+                'en_revision': ('En revisión', 'gris'), 'saldo_a_favor': ('Saldo a favor del cliente', 'verde'), 'requiere_revision': ('Requiere revisión', 'gris')}
+
+
+def device_label(members):
+    """Equipos sin repetir la marca («HP HP 240» → «HP 240») ni el mismo equipo varias veces."""
+    out = []
+    for m in members:
+        brand, model = (m.get('brand') or '').strip(), (m.get('model') or '').strip()
+        name = model if brand and model.lower().startswith(brand.lower()) else ' '.join(x for x in (brand, model) if x)
+        if name and name not in out:
+            out.append(name)
+    return ' · '.join(out) or 'Equipo'
+
+
 def _age(days):
     if days is None or days <= 0:
-        return 'por_vencer'
+        return 'sin_atraso'
     return '1_30' if days <= 30 else '31_60' if days <= 60 else '61_90' if days <= 90 else 'mas_90'
 
 
@@ -128,24 +146,79 @@ def portfolio(c, now, filters=None, client_id=None):
         table = ie._rate_table(c, policy['rate_kind'])
     except Exception:
         policy, table = ie.DEFAULT_POLICY, []
+    # Coberturas, conciliación, reclamos y retiro: datos de apoyo leídos en bloque (una consulta por tipo).
+    rejected, confirmed = {}, {}
+    for row in c.execute("SELECT COALESCE(o.group_id,o.id) main,COUNT(*),COALESCE(SUM(p.amount_cents),0) FROM bank_transfers t JOIN order_payments p ON p.id=t.payment_id "
+                         "JOIN orders o ON o.id=p.order_id WHERE p.voided_at IS NULL AND t.status='rechazado' GROUP BY COALESCE(o.group_id,o.id)"):
+        rejected[row[0]] = (row[1], row[2])
+    for row in c.execute("SELECT COALESCE(o.group_id,o.id) main,COALESCE(SUM(CASE WHEN p.kind='pago' THEN p.amount_cents ELSE -p.amount_cents END),0) FROM order_payments p "
+                         "JOIN orders o ON o.id=p.order_id LEFT JOIN bank_transfers t ON t.payment_id=p.id WHERE p.voided_at IS NULL "
+                         "AND COALESCE(t.status,'confirmado') NOT IN ('pendiente','rechazado') GROUP BY COALESCE(o.group_id,o.id)"):
+        confirmed[row[0]] = row[1]
+    complaints = {}
+    if _has(c, 'pqrs_cases'):
+        for row in c.execute("SELECT client_id,order_id,code FROM pqrs_cases WHERE category IN ('queja','reclamo') AND status!='cerrada'"):
+            complaints.setdefault(('c', row['client_id']), []).append(row['code'])
+            if row['order_id']:
+                complaints.setdefault(('o', row['order_id']), []).append(row['code'])
     items = []
     for main, members in groups.items():
         net = sum(m['budget_cents'] - m['paid_cents'] for m in members) - free.get(main, 0)
-        if net == 0:
-            continue
+        tr = pending.get(main, (0, 0))
+        rj = rejected.get(main, (0, 0))
+        if net == 0 and not tr[0] and not rj[0]:
+            continue                       # sin saldo, sin transferencias por validar y sin diferencias: no es cartera
         head = next((m for m in members if m['id'] == main), members[0])
         delivered = [m for m in members if m['status_code'] == 'entregado']
         all_delivered = len(delivered) == len(members)
         delivered_at = max((m['delivered_at'] or '' for m in delivered), default='')
+        ready = [m for m in members if m['status_code'] in READY]
         commit = next((commitments[m['id']] for m in members if m['id'] in commitments), None)
-        due = None
-        basis = ''
+        cflags = active_flags.get(head['client_id'], [])
+        claim = complaints.get(('o', head['id']), []) + [x for x in complaints.get(('c', head['client_id']), []) if x not in complaints.get(('o', head['id']), [])]
+        due, basis, review = None, '', ''
         if commit:
-            due, basis = _day(commit['due_date']), 'Compromiso de pago'
-        elif all_delivered and delivered_at:
-            due, basis = _day(delivered_at), 'Entrega del equipo'
+            due, basis = _day(commit['due_date']), 'Fecha acordada en el compromiso de pago'
+        elif all_delivered:
+            if delivered_at:
+                due, basis = _day(delivered_at), 'Entrega del equipo (pago al retirar)'
+            else:
+                review = 'Entregado sin fecha de entrega registrada: no se puede determinar desde cuándo es exigible.'
+        else:
+            basis = 'Pago al retirar el equipo'
         days = (today - due).days if due and net > 0 else None
-        tr = pending.get(main, (0, 0))
+        overdue = days if days is not None and days > 0 else None
+        # Estado financiero: reglas verificables, independientes del estado técnico y del de conciliación.
+        if review:
+            state = 'requiere_revision'
+        elif rj[0] or (commit and commit['state'] == 'en_revision') or claim or any(f['kind'] in ('derivacion', 'conciliacion') for f in cflags):
+            state = 'en_revision'
+        elif net < 0:
+            state = 'saldo_a_favor'
+        elif net == 0 and tr[0]:
+            state = 'pendiente_conciliacion'
+        elif commit and commit['state'] in ('incumplido', 'parcial'):
+            state = 'compromiso_incumplido'
+        elif commit and due:
+            left = (due - today).days
+            state = 'vence_hoy' if left == 0 else 'por_vencer' if left <= 3 else 'acuerdo_vigente'
+        elif due:
+            state = 'vence_hoy' if days == 0 else 'mora_90' if overdue and overdue > 90 else 'pago_vencido' if overdue else 'vence_hoy'
+        else:
+            state = 'pago_al_retirar'
+        paid_ok = confirmed.get(main, 0)
+        if rj[0]:
+            rec = ('diferencia', 'Diferencia detectada: %d transferencia(s) rechazada(s) por %s sin anular el pago' % (rj[0], usd(rj[1])))
+        elif any(f['kind'] == 'conciliacion' for f in cflags):
+            rec = ('en_revision', 'Conciliación en revisión')
+        elif tr[0]:
+            rec = ('transferencia_pendiente', 'Transferencia pendiente de validar: %s' % usd(tr[1]))
+        elif paid_ok > 0 and net <= 0:
+            rec = ('pago_confirmado', 'Pago confirmado')
+        elif paid_ok > 0:
+            rec = ('pago_parcial_confirmado', 'Pago parcial confirmado: %s' % usd(paid_ok))
+        else:
+            rec = ('no_aplica', 'Sin pagos registrados')
         simulated = None
         if net > 0 and commit and commit['state'] in ('incumplido', 'parcial') and table:
             try:
@@ -153,16 +226,24 @@ def portfolio(c, now, filters=None, client_id=None):
                 simulated = int(round(float(sim['interest']) * 100))
             except ie.InterestError:
                 simulated = None
-        state = 'saldo_a_favor' if net < 0 else ('vencida' if days and days > 0 else 'por_vencer')
+        ready_at = ''
+        if ready:
+            for m in ready:
+                row = c.execute("SELECT MIN(created_at) FROM order_status_log WHERE order_id=? AND to_status IN ('listo','espera_entrega') AND created_at>="
+                                "COALESCE((SELECT MAX(created_at) FROM order_status_log WHERE order_id=? AND to_status NOT IN ('listo','espera_entrega')),'')", (m['id'], m['id'])).fetchone()[0]
+                if row and (not ready_at or row < ready_at):
+                    ready_at = row
         items.append({'main_id': main, 'order_id': head['id'], 'code': head['code'], 'client_id': head['client_id'], 'client': head['client'], 'phone': _mask(head['phone']),
-                      'devices': ' · '.join(x for x in (' '.join(y for y in (m['brand'], m['model']) if y) for m in members) if x) or 'Equipo',
-                      'units': len(members), 'status': head['status'], 'status_code': head['status_code'], 'all_delivered': all_delivered, 'delivered_at': delivered_at,
-                      'charges_cents': sum(m['budget_cents'] for m in members), 'balance_cents': max(net, 0), 'credit_cents': max(-net, 0),
-                      'state': state, 'due_date': due.isoformat() if due else '', 'due_basis': basis, 'days_overdue': days if days and days > 0 else 0, 'age': _age(days if net > 0 else None),
-                      'commitment': commit, 'pending_transfers': tr[0], 'pending_cents': tr[1], 'reconciliation': 'pendiente' if tr[0] else 'al_dia',
-                      'invoices': invoices.get(head['id'], []) + [i for m in members if m['id'] != head['id'] for i in invoices.get(m['id'], [])],
+                      'devices': device_label(members), 'units': len(members), 'status': head['status'], 'status_code': head['status_code'],
+                      'all_delivered': all_delivered, 'delivered_at': delivered_at, 'charges_cents': sum(m['budget_cents'] for m in members),
+                      'balance_cents': max(net, 0), 'credit_cents': max(-net, 0), 'state': state, 'state_label': STATE_LABELS[state][0], 'state_tone': 'rojo' if state == 'compromiso_incumplido' and overdue and overdue > 90 else STATE_LABELS[state][1],
+                      'requires_review': review, 'claims': claim,
+                      'due_date': due.isoformat() if due else '', 'due_basis': basis, 'days_overdue': overdue, 'age': _age(overdue),
+                      'pickup_days': (today - _day(ready_at)).days if _day(ready_at) else None, 'ready_at': ready_at,
+                      'commitment': commit, 'pending_transfers': tr[0], 'pending_cents': tr[1], 'reconciliation': rec[0], 'reconciliation_label': rec[1],
+                      'confirmed_paid_cents': paid_ok, 'invoices': invoices.get(head['id'], []) + [i for m in members if m['id'] != head['id'] for i in invoices.get(m['id'], [])],
                       'last_payment_method': (last_pay.get(main) or ('', ''))[0], 'last_payment_at': (last_pay.get(main) or ('', ''))[1],
-                      'simulated_interest_cents': simulated, 'flags': [{'kind': f['kind'], 'label': f['kind_label'], 'until': f['until']} for f in active_flags.get(head['client_id'], [])]})
+                      'simulated_interest_cents': simulated, 'flags': [{'kind': f['kind'], 'label': f['kind_label'], 'until': f['until']} for f in cflags]})
     # filtros
     q = str(filters.get('client', '') or '').strip().lower()
     oc = str(filters.get('order', '') or '').strip().lower()
@@ -190,20 +271,30 @@ def portfolio(c, now, filters=None, client_id=None):
         if filters.get('state') and it['state'] != filters['state']:
             continue
         out.append(it)
-    out.sort(key=lambda it: (-it['days_overdue'], -it['balance_cents'], it['main_id']))
+    out.sort(key=lambda it: (-(it['days_overdue'] or 0), -it['balance_cents'], it['main_id']))
     month = today.replace(day=1).isoformat()
     recovered = c.execute("SELECT COALESCE(SUM(p.amount_cents),0) FROM order_payments p JOIN orders o ON o.id=p.order_id WHERE p.voided_at IS NULL AND p.kind='pago' "
                           "AND o.delivered_at!='' AND o.delivered_at IS NOT NULL AND substr(p.created_at,1,10)>=? AND substr(p.created_at,1,10)>substr(o.delivered_at,1,10)", (month,)).fetchone()[0]
     pickups = c.execute("SELECT COUNT(*) FROM orders WHERE status IN ('listo','espera_entrega')").fetchone()[0]
     open_c = [it['commitment'] for it in items if it['commitment']]
-    kpis = {'capital_cents': sum(it['balance_cents'] for it in items), 'overdue_cents': sum(it['balance_cents'] for it in items if it['state'] == 'vencida'),
-            'upcoming_cents': sum(it['balance_cents'] for it in items if it['state'] == 'por_vencer'),
+    overdue_states = ('pago_vencido', 'mora_90', 'compromiso_incumplido')
+    kpis = {'capital_cents': sum(it['balance_cents'] for it in items),
+            'at_pickup_cents': sum(it['balance_cents'] for it in items if it['state'] == 'pago_al_retirar'),
+            'upcoming_cents': sum(it['balance_cents'] for it in items if it['state'] in ('acuerdo_vigente', 'por_vencer', 'vence_hoy')),
+            'overdue_cents': sum(it['balance_cents'] for it in items if it['state'] in overdue_states),
+            'over90_cents': sum(it['balance_cents'] for it in items if it['state'] in overdue_states and (it['days_overdue'] or 0) > 90),
+            'review_cents': sum(it['balance_cents'] for it in items if it['state'] in ('en_revision', 'requiere_revision')),
             'simulated_interest_cents': sum(it['simulated_interest_cents'] or 0 for it in items), 'simulation_available': bool(table),
-            'authorized_interest_cents': 0, 'recovered_month_cents': recovered, 'commitments_open': sum(1 for x in open_c if x['state'] in ('pendiente', 'proximo')),
+            'authorized_interest_cents': 0, 'recovered_month_cents': recovered, 'pending_reconciliation_cents': sum(it['pending_cents'] for it in items),
+            'commitments_open': sum(1 for x in open_c if x['state'] in ('pendiente', 'proximo')),
             'commitments_broken': sum(1 for x in open_c if x['state'] in ('incumplido', 'parcial')), 'pickups': pickups,
-            'in_review': sum(1 for it in items if (it['commitment'] or {}).get('state') == 'en_revision' or it['pending_transfers'] or any(f['kind'] == 'derivacion' for f in it['flags'])),
+            'in_review': sum(1 for it in items if it['state'] in ('en_revision', 'requiere_revision')),
             'credit_cents': sum(it['credit_cents'] for it in items)}
-    return {'kpis': kpis, 'items': out[:300], 'total': len(out), 'ages': dict(AGES), 'methods': equipment.METHODS, 'commitment_states': {'sin': 'Sin compromiso', **__import__('payment_commitments').STATES},
+    # Comprobación de consistencia: cada saldo cae en un solo grupo (sin duplicar obligaciones entre indicadores).
+    groups_sum = kpis['at_pickup_cents'] + kpis['upcoming_cents'] + kpis['overdue_cents'] + kpis['review_cents'] + \
+        sum(it['balance_cents'] for it in items if it['state'] in ('pendiente_conciliacion', 'saldo_a_favor', 'pagado'))
+    kpis['consistent'] = groups_sum == kpis['capital_cents']
+    return {'kpis': kpis, 'items': out[:300], 'total': len(out), 'ages': dict(AGES), 'states': {k: v[0] for k, v in STATE_LABELS.items()}, 'methods': equipment.METHODS, 'commitment_states': {'sin': 'Sin compromiso', **__import__('payment_commitments').STATES},
             'flags_installed': _has(c, 'collection_flags'), 'cutoff': today.isoformat(), 'policy': policy}
 
 
@@ -293,7 +384,27 @@ def client_file(c, client_id, now):
         number = wa.number_for(client['phone'])
         if number:
             replies = [{'at': r['received_at'], 'status': r['status']} for r in c.execute('SELECT received_at,status FROM whatsapp_adi_inbound WHERE sender=? ORDER BY received_at DESC LIMIT 20', (number,))]
+    coverages = []
+    if _has(c, 'part_coverages'):
+        coverages = [dict(r) for r in c.execute("SELECT order_id,covered_cents,status,authorized_at created_at FROM part_coverages WHERE order_id IN (" + marks + ") AND modality='comercial' "
+                                                "AND status='autorizada' ORDER BY id DESC", ids)] if 'modality' in [r[1] for r in c.execute('PRAGMA table_info(part_coverages)')] else []
+    actions = ("'adi_msg:%'", "'payment_commitment_%'", "'account_statement%'", "'interest_simulated'", "'adi_delay_incident'", "'status_message_composed'", "'adi_purpose_composed'")
+    trail = [{'at': datetime.fromtimestamp(r['created_at'], now.tzinfo).isoformat(timespec='seconds') if now.tzinfo else datetime.fromtimestamp(r['created_at']).isoformat(timespec='seconds'),
+              'action': r['action'], 'user': r['user'], 'entity': r['entity_id']}
+             for r in c.execute("SELECT a.action,a.created_at,a.entity_id,COALESCE(u.name,'Sistema') user FROM audit a LEFT JOIN users u ON u.id=a.user_id WHERE "
+                                "((a.entity_id IN (" + marks + ") AND (" + ' OR '.join('a.action LIKE ' + x for x in actions) + ")) OR (a.entity_id=? AND a.action LIKE 'collection_%')) "
+                                "ORDER BY a.id DESC LIMIT 80", (*ids, client_id))]
+    import interest_engine as ie
+    try:
+        pol = ie.policy(c)
+        rates = [r for r in ie.rates(c) if r['status'] == 'validada' and r['kind'] == pol['rate_kind']]
+    except Exception:
+        pol, rates = ie.DEFAULT_POLICY, []
+    interests = [{'code': it['code'], 'eligible': it['state'] in ('compromiso_incumplido',), 'capital': usd(it['balance_cents']), 'due': it['due_date'], 'days': it['days_overdue'],
+                  'grace': pol['grace_days'], 'rate': rates[0]['rate'] if rates else 'Sin tasa validada', 'simulated': it['simulated_interest_cents'], 'authorized': 0,
+                  'reason': '' if it['state'] == 'compromiso_incumplido' else 'No exigible para intereses: ' + it['state_label'].lower() + '.'} for it in port['items'] if it['balance_cents'] > 0]
     return {'client': {'id': client['id'], 'name': client['name'], 'phone': _mask(client['phone']), 'email': bool(client['email'])}, 'portfolio': port, 'orders': orders,
+            'coverages': coverages, 'audit': trail, 'interests': interests,
             'payments': payments, 'quotes': quotes, 'invoices': invoices, 'commitments': commitments, 'agreements': agreements, 'messages': messages, 'replies': replies,
             'flags': flags(c, client_id, active_only=False)[:40], 'suspended': suspended(c, client_id, now.date())}
 
@@ -428,6 +539,10 @@ def proposals(c, now):
             blocked.append('Compromiso en revisión.')
         if it['pending_transfers']:
             blocked.append('Transferencia por conciliar: se suspende la cobranza hasta conciliarla.')
+        if it['claims']:
+            blocked.append('Reclamo pendiente (%s): se suspende la cobranza hasta resolverlo.' % ', '.join(it['claims']))
+        if it['state'] in ('en_revision', 'requiere_revision'):
+            blocked.append('Obligación %s.' % it['state_label'].lower())
         last = recent([it['main_id'], it['order_id']])
         if last:
             blocked.append('Gestión reciente el %s.' % last[:10])

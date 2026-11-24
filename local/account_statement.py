@@ -40,8 +40,8 @@ def data_for(c, client_id, now, internal=False):
                        "JOIN orders o ON o.id=p.order_id JOIN devices d ON d.id=o.device_id WHERE d.client_id=? AND p.voided_at IS NULL GROUP BY COALESCE(o.group_id,o.id)", (client_id,)):
         pays[r['main']] = r['cents']
     rows = [{'code': it['code'], 'device': it['devices'], 'charges': it['charges_cents'], 'paid': pays.get(it['main_id'], 0), 'balance': it['balance_cents'],
-             'credit': it['credit_cents'], 'due': it['due_date'], 'basis': it['due_basis'] or 'Por vencer (se paga al retirar)', 'days': it['days_overdue'],
-             'pending': it['pending_cents'], 'simulated': it['simulated_interest_cents'] if internal else None, 'invoices': ', '.join(i['number'] for i in it['invoices'])} for it in items]
+             'credit': it['credit_cents'], 'due': it['due_date'], 'basis': it['due_basis'] or 'Pago al retirar el equipo', 'days': it['days_overdue'],
+             'pending': it['pending_cents'], 'state': it['state_label'], 'simulated': it['simulated_interest_cents'] if internal else None, 'invoices': ', '.join(i['number'] for i in it['invoices'])} for it in items]
     return {'client': dict(client), 'cutoff': now, 'rows': rows, 'balance': sum(r['balance'] for r in rows), 'credit': sum(r['credit'] for r in rows),
             'pending': sum(r['pending'] for r in rows), 'grace': port['policy']['grace_days'], 'internal': internal,
             'simulated': sum(r['simulated'] or 0 for r in rows) if internal else None}
@@ -142,8 +142,9 @@ def render(data, fmt='a4'):
         if r['pending']:
             row('Transferencias por conciliar (no descontadas)', _money(r['pending']), base - .5)
         row('Saldo pendiente' if not r['credit'] else 'Saldo a favor del cliente', _money(r['balance'] or r['credit']), base - .2, 'F2')
+        row('Estado', r['state'], base - .8)
         row('Exigible desde', ('%s · %s' % (datetime.strptime(r['due'], '%Y-%m-%d').strftime('%d/%m/%Y'), r['basis'])) if r['due'] else r['basis'], base - .8)
-        row('Días de vencimiento', str(r['days']), base - .8)
+        row('Días de atraso', str(r['days']) if r['days'] is not None else 'No aplica', base - .8)
         if data['internal'] and r['simulated'] is not None:
             row('SIMULACIÓN de intereses (no exigible, no suma al saldo)', _money(r['simulated']), base - .8)
         y[0] += 3
