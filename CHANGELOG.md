@@ -4,6 +4,15 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.324 — 2026-11-24 01:04 (UTC-05:00)
+
+Centro de impresión: RIDE de AZUR disponible cuando está guardado; ticket con QR legible
+
+### Errores corregidos
+
+- Centro de impresión: el RIDE original de AZUR aparece disponible cuando su PDF quedó guardado al autorizarse (antes se exigía provider_id y salía no disponible en facturas reales autorizadas).
+- Ticket térmico: se retira el Code 128 de la clave de acceso, que a un punto por módulo solo se leía en 6 de cada 10 claves; la clave queda en texto y en un QR más grande, leído en el 100 % de 60 claves a 203 dpi. El RIDE A4 conserva su Code 128.
+
 ## v1.5.323 — 2026-11-24 00:50 (UTC-05:00)
 
 Centro de impresión y Smart Table 4.1

@@ -34,9 +34,11 @@ def formats_for(c, invoice_id):
     out = []
     for key in ('80', '58', 'a4'):
         out.append({'key': key, 'label': FORMATS[key], 'available': emitted, 'reason': why, 'thermal': key in ('80', '58')})
-    has_azur = emitted and inv['provider'] == 'azur' and bool(inv['provider_id'])
+    # El RIDE de AZUR existe cuando su PDF quedó guardado al autorizarse (invoice_provider_files), no por tener o no provider_id.
+    has_azur = emitted and bool(c.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='invoice_provider_files'").fetchone()) and \
+        bool(c.execute("SELECT 1 FROM invoice_provider_files WHERE invoice_id=? AND kind='pdf'", (invoice_id,)).fetchone())
     out.append({'key': 'azur', 'label': FORMATS['azur'], 'available': has_azur, 'thermal': False,
-                'reason': '' if has_azur else (why or 'Esta factura no tiene RIDE de AZUR (no se envió por AZUR o aún no tiene documento).')})
+                'reason': '' if has_azur else (why or 'Todavía no hay RIDE de AZUR guardado para esta factura (se guarda al autorizarse por AZUR).')})
     return out
 
 

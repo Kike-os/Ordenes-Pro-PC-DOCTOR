@@ -62,17 +62,26 @@ class InvoiceTicketTests(unittest.TestCase):
         self.assertEqual(self.snapshot(), before)                                                 # imprimir no emite ni cambia nada
 
     @unittest.skipUnless(TOOLS, 'pdftoppm y zbarimg no están instalados')
-    def test_access_key_readable_in_barcode_and_qr_at_203_dpi(self):
+    def test_access_key_qr_readable_at_203_dpi_for_many_keys(self):
+        """La clave de acceso se lee siempre en el QR (30 claves al azar en 80 y 58 mm, más la de una factura emitida). No hay Code 128 en el
+        ticket: a un punto por módulo el lector solo lo leía en 6 de cada 10 claves."""
+        import random
         cookie, csrf, post, inv = self.emitted(key='lector')
         with app.connect() as c:
             data = invoice_ticket.data_for(c, inv['id'])
+        keys = [inv['access_key']] + [''.join(random.Random(n).choice('0123456789') for _ in range(49)) for n in range(29)]
         for fmt in ('80', '58'):
-            with tempfile.TemporaryDirectory() as folder:
-                path = Path(folder) / 't.pdf'
-                path.write_bytes(invoice_ticket.render(data, fmt))
-                subprocess.run(['pdftoppm', '-r', '203', '-gray', '-png', str(path), str(Path(folder) / 'p')], check=True)
-                found = subprocess.run(['zbarimg', '--raw', '-q'] + [str(p) for p in sorted(Path(folder).glob('p*.png'))], capture_output=True, text=True).stdout.split()
-            self.assertEqual(found.count(inv['access_key']), 2, (fmt, found))                     # Code 128 y QR, ambos con la clave completa
+            read = 0
+            for key in keys:
+                data['invoice']['access_key'] = key
+                with tempfile.TemporaryDirectory() as folder:
+                    path = Path(folder) / 't.pdf'
+                    path.write_bytes(invoice_ticket.render(data, fmt))
+                    subprocess.run(['pdftoppm', '-r', '203', '-gray', '-png', str(path), str(Path(folder) / 'p')], check=True)
+                    found = subprocess.run(['zbarimg', '-q'] + [str(p) for p in sorted(Path(folder).glob('p*.png'))], capture_output=True, text=True).stdout
+                self.assertNotIn('CODE-128', found)
+                read += ('QR-Code:' + key) in found
+            self.assertEqual(read, len(keys), fmt)
 
     def test_long_descriptions_multiple_items_and_long_names(self):
         cookie, csrf, post, order = self.paid_order(100, key='largo')
@@ -140,6 +149,20 @@ class InvoiceTicketTests(unittest.TestCase):
             c.execute("UPDATE users SET role='tecnico' WHERE id=?", (self.uid,))
             c.commit()
         self.assertEqual(self.request('/api/invoicing/%d/print-center' % inv['id'], cookie=cookie)['status'], 403)
+
+    def test_azur_ride_available_when_its_pdf_is_stored(self):
+        import base64
+        cookie, csrf, post, inv = self.emitted(key='azur-ride')
+        fm = lambda: {f['key']: f['available'] for f in self.request('/api/invoicing/%d/print-center' % inv['id'], cookie=cookie)['body']['formats']}
+        self.assertFalse(fm()['azur'])
+        with app.connect() as c:
+            cols = [r[1] for r in c.execute('PRAGMA table_info(invoice_provider_files)')]
+            values = {'invoice_id': inv['id'], 'kind': 'pdf', 'content': base64.b64encode(b'%PDF-1.4 ficticio').decode(), 'sha256': '0' * 64}
+            extra = {k: '2026-11-24T00:00:00-05:00' for k in cols if k not in values and k not in ('id',) and k.endswith('_at')}
+            values.update(extra)
+            c.execute('INSERT INTO invoice_provider_files(%s) VALUES (%s)' % (','.join(values), ','.join('?' * len(values))), tuple(values.values()))
+            c.commit()
+        self.assertTrue(fm()['azur'])                                                              # sin depender de provider_id
 
     def test_print_log_without_migration_keeps_working(self):
         import print_center

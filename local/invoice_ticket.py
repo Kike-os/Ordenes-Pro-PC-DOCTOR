@@ -3,7 +3,8 @@
 Solo REPRESENTA un comprobante ya emitido: no emite, no consume secuenciales, no cambia pagos, caja, inventario ni el estado tributario, y no
 envía nada. Los importes salen tal cual de la factura registrada (partidas, impuestos y formas de pago); nada se recalcula ni se redondea
 de otra forma. Blanco y negro, logotipo original convertido a escala de grises (sin redibujarlo), una página de altura variable por copia.
-La clave de acceso va completa en texto, en Code 128 (un punto por módulo: 42,7 mm) y en un QR. Nunca imprime credenciales, contraseñas ni
+La clave de acceso va completa en texto y en un QR (en 72 o 48 mm un Code 128 de 49 dígitos solo cabe a un punto por módulo y el lector no lo
+lee de forma fiable: falló en 4 de cada 10 claves; por eso no se imprime. El RIDE A4 conserva su Code 128). Nunca imprime credenciales, contraseñas ni
 claves de activación. Mientras no esté autorizada por el SRI en producción, cada copia lo dice: no es un comprobante válido."""
 import io
 import sys
@@ -14,7 +15,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent / 'vendor'))
 import pydyf
 import segno
 
-from code128 import widths as barcode_widths
 from corporate import settings as corporate
 from document_logo import pixels as logo_pixels
 from receipt_pdf import WIDTHS
@@ -152,12 +152,8 @@ def render(data, fmt='80', copies=1):
         return round(value / DOT) * DOT
 
     key = inv['access_key']
-    bars = barcode_widths(key)
-    bar_span = (sum(bars) + 20) * DOT
-    if bar_span > inner:
-        raise TicketError('La clave de acceso no cabe en Code 128 en este ancho.', 500)
     qr = list(segno.make_qr(key, error='m').matrix)
-    qr_unit = next((n * DOT for n in (3, 2) if (len(qr) + 8) * n * DOT <= inner * .62), 2 * DOT)
+    qr_unit = next((n * DOT for n in (4, 3, 2) if (len(qr) + 8) * n * DOT <= inner * .7), 2 * DOT)
     qr_size = (len(qr) + 8) * qr_unit
     valid = inv['status'] == 'autorizado' and inv['environment'] == '2'
 
@@ -292,8 +288,6 @@ def render(data, fmt='80', copies=1):
         if inv.get('authorization_number') and inv['authorization_number'] != key:
             text('Autorización: ' + inv['authorization_number'], base - 1.6, center=True, gap=1)
         y += 1
-        ops.append(('barcode', y, bars, bar_span))
-        y += BAR_HEIGHT + 4
         ops.append(('qr', y, qr_size, qr_unit, qr))
         y += qr_size + 1
         text('Verifica la validez en ' + SRI_PORTAL, base - 1.6, center=True, gap=1)

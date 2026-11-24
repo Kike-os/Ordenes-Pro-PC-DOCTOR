@@ -8,6 +8,25 @@
   },
   "releases": [
     {
+      "version": "1.5.324",
+      "date": "2026-11-24T01:04:52-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Centro de impresión: RIDE de AZUR disponible cuando está guardado; ticket con QR legible",
+      "changes": {
+        "features": [],
+        "improvements": [],
+        "fixes": [
+          "Centro de impresión: el RIDE original de AZUR aparece disponible cuando su PDF quedó guardado al autorizarse (antes se exigía provider_id y salía no disponible en facturas reales autorizadas).",
+          "Ticket térmico: se retira el Code 128 de la clave de acceso, que a un punto por módulo solo se leía en 6 de cada 10 claves; la clave queda en texto y en un QR más grande, leído en el 100 % de 60 claves a 203 dpi. El RIDE A4 conserva su Code 128."
+        ],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Administración (autorización expresa en la sesión)"
+    },
+    {
       "version": "1.5.323",
       "date": "2026-11-24T00:50:44-05:00",
       "type": "patch",

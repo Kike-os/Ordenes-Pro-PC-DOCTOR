@@ -25,8 +25,9 @@ Un borrador no se imprime (no tiene número ni clave de acceso): los formatos se
 5. **Resumen:** subtotales por tarifa, subtotal sin impuestos, descuentos, IVA por tarifa y TOTAL destacado. Los importes salen tal cual de
    la factura registrada: no se recalculan.
 6. **Forma de pago** registrada en la factura (nunca «pagada» sin un pago confirmado).
-7. **Autorización:** clave de acceso completa en texto, Code 128 (un punto por módulo, 42,7 mm) y QR con la clave; referencia a
-   srienlinea.sri.gob.ec para verificar la validez.
+7. **Autorización:** clave de acceso completa en texto y QR con la clave (verificado con lector en 30 claves al azar, 80 y 58 mm); referencia a
+   srienlinea.sri.gob.ec para verificar la validez. **Sin Code 128 en el ticket (1.5.324):** con 49 dígitos solo cabe a un punto por módulo y el
+   lector lo leía en 6 de cada 10 claves; no se imprime un código que no se lee. El RIDE A4 conserva su Code 128.
 8. **Pie:** «Gracias por confiar en PC-DOCTOR.», «Tecnología que inspira confianza.», portal y «Powered by Órdenes Pro».
 
 **Nunca imprime** usuario ni contraseña (el ticket de Mi Negocio imprimía la cédula como contraseña), claves de activación ni datos internos.
@@ -49,6 +50,6 @@ Sin la migración 118 el historial queda inactivo y todo lo demás funciona.
 
 ## Pendiente
 
-- **Prueba física en la Epson TM-m30II** (papel, corte y lectura con el escáner del taller): solo se validó digitalmente (PDF a 203 dpi,
-  lectura de Code 128 y QR con ZBar).
+- **Prueba física en la Epson TM-m30II** (papel, corte y lectura del QR con el escáner del taller): solo se validó digitalmente (PDF a 203 dpi
+  y lectura del QR con ZBar).
 - Siguientes fases: reportes y exportaciones, recibos/anticipo/entrega/nota de crédito, portal de consulta con QR y permisos por acción.
