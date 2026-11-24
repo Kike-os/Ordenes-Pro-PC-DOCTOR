@@ -175,5 +175,24 @@ class WhatsAppHandoffTests(ident.WhatsAppIdentityTests):
         self.assertEqual((case['channel'], case['status']), ('web', 'pendiente'))
 
 
+    # Límite mensual: ADI no responde, pero el mensaje NO se pierde: queda en la conversación y pasa al personal con prioridad alta.
+    def test_h20_monthly_limit_keeps_message_for_staff_without_sending(self):
+        with patch.object(whatsapp_adi.wa, 'MAX_MONTHLY_ADI_REPLIES', 0), patch.object(whatsapp_adi.adi, 'reply') as reply:
+            before = len(self.meta.sends())
+            self.assertEqual(self.say('Hola, ¿mi equipo ya está listo?'), '')
+            reply.assert_not_called()
+            self.assertEqual(len(self.meta.sends()), before)                          # nada sale a Meta
+        conv = self.conv_id()
+        case = self.case(conv)
+        self.assertEqual((case['status'], case['priority']), ('pendiente', 'alta'))
+        self.assertIn('Límite mensual', case['reason'])
+        with app.connect() as c:
+            self.assertIn('Hola, ¿mi equipo ya está listo?', [r[0] for r in c.execute("SELECT content FROM adi_messages WHERE conversation_id=? AND author='client'", (conv,))])
+            inbound = c.execute('SELECT status,conversation_id,detail FROM whatsapp_adi_inbound ORDER BY rowid DESC LIMIT 1').fetchone()
+            self.assertEqual((inbound['status'], inbound['conversation_id']), ('omitido', conv))
+        rows = self.request('/api/adi/live', cookie=self.cookie)['body']['rows']
+        self.assertIn(conv, [r['id'] for r in rows])                                       # el personal lo ve en el panel
+
+
 if __name__ == '__main__':
     unittest.main()

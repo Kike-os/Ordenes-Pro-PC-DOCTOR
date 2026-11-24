@@ -48,6 +48,29 @@ def _conversation(c, number, secret, now):
     return c.execute('SELECT * FROM adi_conversations WHERE id=?', (cid,)).fetchone()
 
 
+def _keep_for_staff(c, number, text, message_id, secret, now, reason):
+    """Guarda el mensaje del cliente y abre (o actualiza) la solicitud de atención humana. No envía nada. Devuelve el id de la
+    conversación, o None si no se pudo (entonces queda como antes: solo «omitido»)."""
+    c.execute('SAVEPOINT keep_for_staff')
+    try:
+        conv = _conversation(c, number, secret, now)
+        stamp_in = wa.stamp(now)
+        mid_in = c.execute("INSERT INTO adi_messages(conversation_id,author,content,created_at) VALUES (?,'client',?,?)", (conv['id'], text, stamp_in)).lastrowid
+        _receipt(lambda ms: ms.record_in(c, mid_in, conv['id'], 'whatsapp', now, message_id))
+        c.execute('UPDATE adi_conversations SET last_seen_client=?,updated_at=? WHERE id=?', (stamp_in, stamp_in, conv['id']))
+        _ss_activity(c, conv['id'], 'client', now, message_id)
+        if whatsapp_handoff.installed(c):
+            whatsapp_handoff.remember(c, conv['id'], number, now)
+            whatsapp_handoff.request(c, conv['id'], now, 'ADI no respondió: ' + reason, 'alta', ['límite mensual de WhatsApp'])
+        c.execute('RELEASE SAVEPOINT keep_for_staff')
+        return conv['id']
+    except Exception as error:
+        c.execute('ROLLBACK TO SAVEPOINT keep_for_staff')
+        c.execute('RELEASE SAVEPOINT keep_for_staff')
+        print('whatsapp-adi-keep', type(error).__name__, flush=True)
+        return None
+
+
 def handle(c, raw, signature, now, env=None):
     """Procesa mensajes entrantes solo con la función activada y una firma Meta válida."""
     cfg = wa.config(env)
@@ -81,14 +104,14 @@ def handle(c, raw, signature, now, env=None):
                     c.commit()
                     continue
                 processed += 1
-                if wa.monthly_outbound_count(c, now) >= wa.MAX_MONTHLY_WA_MESSAGES:
-                    c.execute("UPDATE whatsapp_adi_inbound SET status='omitido',detail=? WHERE wa_message_id=?",
-                              ('Límite mensual de seguridad de WhatsApp alcanzado.', message_id))
-                    c.commit()
-                    continue
-                if wa.monthly_adi_reply_count(c, now) >= wa.MAX_MONTHLY_ADI_REPLIES:
-                    c.execute("UPDATE whatsapp_adi_inbound SET status='omitido',detail=? WHERE wa_message_id=?",
-                              ('Límite mensual de seguridad de respuestas ADI alcanzado.', message_id))
+                limit = ('Límite mensual de seguridad de WhatsApp alcanzado.' if wa.monthly_outbound_count(c, now) >= wa.MAX_MONTHLY_WA_MESSAGES else
+                         'Límite mensual de seguridad de respuestas ADI alcanzado.' if wa.monthly_adi_reply_count(c, now) >= wa.MAX_MONTHLY_ADI_REPLIES else '')
+                if limit:
+                    # Con el límite alcanzado ADI no responde, pero el mensaje NUNCA se pierde: se guarda en la conversación y pasa a «Esperan
+                    # asesor» con prioridad alta para que el personal lo vea y responda (antes quedaba solo como «omitido», fuera del panel).
+                    conv_id = _keep_for_staff(c, number, text, message_id, cfg['secret'], now, limit)
+                    c.execute("UPDATE whatsapp_adi_inbound SET status='omitido',conversation_id=?,detail=? WHERE wa_message_id=?",
+                              (conv_id, limit + (' El mensaje quedó para el personal.' if conv_id else ''), message_id))
                     c.commit()
                     continue
 
