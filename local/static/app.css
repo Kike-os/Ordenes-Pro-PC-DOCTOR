@@ -13598,3 +13598,63 @@ th[aria-sort=ascending] .fxb-sort,th[aria-sort=descending] .fxb-sort{color:#BFDB
 @media(max-width:820px){.pcx{grid-template-columns:minmax(0,1fr)}.pcx-frame{min-height:60vh}}
 @media(prefers-reduced-motion:reduce){.pcx-format{transition:none}}
 .pcx-view[data-loading=true]{opacity:.6}
+/* ===== Smart Table 4.1 · menú de acciones fuera de la tabla (portal) y paginación compacta ===== */
+.fxb-acts{flex-wrap:nowrap;gap:4px}
+.fxb-acts .inv-icon-btn{width:32px;height:32px}
+.fxb-acts .inv-icon-btn:disabled{opacity:.4;cursor:not-allowed}
+.fxb-more-btn[aria-expanded=true]{border-color:#3B82F6;background:#12264A}
+body>.fxb-menu{position:fixed;z-index:1200;display:grid;width:268px;max-width:calc(100vw - 16px);max-height:calc(100vh - 16px);overflow:auto;padding:6px;border:1px solid #2C405C;border-radius:12px;background:#0F1C30;box-shadow:0 16px 40px #020917b3;animation:none}
+body>.fxb-menu .fxb-group{margin:6px 8px 2px;font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#7F95B5}
+body>.fxb-menu .fxb-group:first-of-type{margin-top:2px}
+body>.fxb-menu .fxb-item{display:grid;grid-template-columns:16px minmax(0,1fr);align-items:center;column-gap:9px;width:100%;padding:7px 9px;border:0;border-radius:8px;background:none;color:#DBE8FB;font-size:12.5px;text-align:left;cursor:pointer}
+body>.fxb-menu .fxb-item svg{width:15px;height:15px;color:#93C5FD}
+body>.fxb-menu .fxb-item:hover,body>.fxb-menu .fxb-item:focus-visible{background:#16294A;outline:none}
+body>.fxb-menu .fxb-item[aria-disabled=true]{opacity:.5;cursor:not-allowed}
+body>.fxb-menu .fxb-why{grid-column:2;font-size:10.5px;color:#8DA2C0;line-height:1.3}
+@media(prefers-reduced-motion:no-preference){body>.fxb-menu{animation:fxb-pop .14s ease-out}body>.fxb-sheet{animation:fxb-up .16s ease-out}}
+@keyframes fxb-pop{from{opacity:0;transform:scale(.98)}to{opacity:1;transform:none}}
+@keyframes fxb-up{from{transform:translateY(20px);opacity:0}to{transform:none;opacity:1}}
+.fxb-backdrop{position:fixed;inset:0;z-index:1199;background:#02091799}
+body>.fxb-sheet{left:0!important;right:0;bottom:0;top:auto!important;width:auto;max-width:none;max-height:78vh;border-radius:16px 16px 0 0;padding:10px 10px calc(10px + env(safe-area-inset-bottom))}
+.fxb-sheet-title{display:block;margin:2px 8px 4px;font-size:13px;color:#E2E8F0;font-family:ui-monospace,Consolas,monospace}
+.fxb-pager{min-height:44px;padding:6px 12px;gap:6px 12px}
+.fxb-range{font-size:12px;color:#CBD5E1;font-variant-numeric:tabular-nums}
+.fxb-pager select{height:30px;padding:2px 8px;font-size:12px}
+.fxb-pager-nav{display:flex;align-items:center;gap:6px}.fxb-pager-nav .inv-icon-btn{width:30px;height:30px}
+.fxb-page{font-size:12px;color:#94A3B8;font-variant-numeric:tabular-nums;white-space:nowrap}
+.fxb-table td.inv-num,.fxb-table .fxb-num code{font-variant-numeric:tabular-nums}
+/* La tabla solo se desplaza en horizontal cuando hace falta; nunca en vertical (el menú ya no vive dentro). */
+.fxb-card .inv-table-wrap{overflow-x:auto;overflow-y:hidden}
+/* Smart Table 4.1 · paginación sin el margen general de los selectores y tarjetas compactas donde la tabla no cabe (≤1180 px, con el menú lateral). */
+body[data-page=dashboard] .fxb-pager select{margin:0;height:30px}
+body[data-page=dashboard] .fxb-pager{min-height:44px;padding:6px 12px}
+@media(max-width:1180px){
+ .fxb-table thead{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+ .fxb-table,.fxb-table tbody,.fxb-table tr,.fxb-table td{display:block;width:100%}
+ body[data-page=dashboard] .fxb-card .inv-table-wrap{padding:8px;overflow:visible}
+ body[data-page=dashboard] .fxb-table tr{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) minmax(0,1fr);gap:4px 12px;margin:0 0 8px;padding:10px 12px;border:1px solid var(--inv-line,#1E2D45);border-left:3px solid var(--c,#3B5B85);border-radius:12px;background:#0E1A2D}
+ body[data-page=dashboard] .fxb-table tr[data-status=autorizado]{--c:#22C55E}body[data-page=dashboard] .fxb-table tr[data-status=rechazado]{--c:#F87171}
+ body[data-page=dashboard] .fxb-table tr:is([data-status=pendiente],[data-status=enviado]){--c:#F59E0B}body[data-page=dashboard] .fxb-table tr[data-status=borrador]{--c:#64748B}
+ body[data-page=dashboard] .fxb-table td{display:grid;gap:2px;align-content:start;padding:0;border:0;text-align:left!important}
+ .fxb-table td::before{content:attr(data-label);font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:#8198BA;font-weight:600}
+ .fxb-table td.inv-row-acts{grid-column:1/-1;margin-top:4px}.fxb-table td.inv-row-acts::before{display:none}
+ .fxb-acts{justify-content:flex-start}
+}
+@media(max-width:640px){
+ body[data-page=dashboard] .fxb-table tr{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+ .fxb-table td[data-label=Cliente]{grid-column:1/-1}
+ .fxb-page{display:none}
+ body[data-page=dashboard] .fxb-pager{justify-content:space-between}
+}
+body[data-page=dashboard] .fxb-pager select{height:30px!important;min-height:30px!important;padding-top:2px!important;padding-bottom:2px!important}
+.fxb-table .inv-chip{max-width:100%;white-space:normal;overflow-wrap:anywhere}
+@media(max-width:1180px){
+ body[data-page=dashboard] .fxb-table td{grid-template-columns:minmax(0,1fr)!important;justify-items:start}
+ .fxb-table .inv-chip{white-space:nowrap;max-width:none}
+}
+@media(max-width:640px){
+ body[data-page=dashboard] .fxb-table tr{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"num est" "cli cli" "ref fec" "tot tot" "acc acc"}
+ .fxb-table td:nth-child(1){grid-area:num}.fxb-table td:nth-child(2){grid-area:cli}.fxb-table td:nth-child(3){grid-area:ref}
+ .fxb-table td:nth-child(4){grid-area:fec}.fxb-table td:nth-child(5){grid-area:tot}.fxb-table td:nth-child(6){grid-area:est;justify-items:end}.fxb-table td:nth-child(7){grid-area:acc}
+ .fxb-table td[data-label=Cliente]{grid-column:auto}
+}

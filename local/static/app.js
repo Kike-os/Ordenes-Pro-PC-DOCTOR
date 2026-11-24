@@ -7909,33 +7909,67 @@ async function invoiceQuickAction(row,action){try{
   if(!await askConfirm('¿Abrir WhatsApp con el mensaje?','Se abrirá WhatsApp con un mensaje para +'+num+'. No se envía nada hasta que lo envíes tú desde WhatsApp.','Abrir WhatsApp'))return;
   window.open('https://wa.me/'+num+'?text='+encodeURIComponent(text),'_blank','noopener');return;}
 }catch(error){toast(error.message,'error');}}
-function invoiceActionsMenu(row){const wrap=el('div',undefined,'fxb-acts');
- const iconLink=(label,icon,href,download)=>{const a=el('a',undefined,'inv-icon-btn');a.href=href;a.title=label;a.setAttribute('aria-label',label+' · '+(row.number||'borrador'));if(download)a.setAttribute('download','');else{a.target='_blank';a.rel='noopener';}a.append(invIcon(icon));return a;};
- wrap.append(invIconBtn('Ver detalle de '+(row.number||'la factura en borrador'),'eye',()=>invoiceQuickAction(row,'ver')));
- {const pb=invIconBtn('Imprimir '+(row.number||'la factura'),'printer',()=>printCenter(row.id,row.number));if(!row.has_xml){pb.disabled=true;pb.title='Emite la factura para imprimirla: un borrador no tiene número ni clave de acceso.';}wrap.append(pb);}
- if(row.has_xml){wrap.append(iconLink('Ver RIDE','file-text','/api/invoicing/'+row.id+'/ride.pdf',false),iconLink('Descargar RIDE','download','/api/invoicing/'+row.id+'/ride.pdf',true));}
- const more=el('details',undefined,'fxb-more'),sum=el('summary');sum.setAttribute('aria-label','Más acciones de '+(row.number||'la factura'));sum.title='Más acciones';sum.append(invIcon('ellipsis-vertical'));more.append(sum);
- const list=el('div',undefined,'fxb-menu');list.setAttribute('role','menu');
- const item=(label,icon,fn,href)=>{const node=href?el('a',undefined,'fxb-item'):button('',()=>{more.open=false;fn();},'fxb-item');if(href){node.href=href;node.setAttribute('download','');node.addEventListener('click',()=>{more.open=false;});}node.setAttribute('role','menuitem');node.append(invIcon(icon),el('span',label));list.append(node);};
- item('Ver detalle','eye',()=>invoiceQuickAction(row,'ver'));
- if(row.has_authorized_xml)item('Descargar XML autorizado','file-code',null,'/api/invoicing/'+row.id+'/azur/xml_autorizado');
- else if(row.has_xml)item('Descargar XML','file-code',null,'/api/invoicing/'+row.id+'/comprobante.xml');
- if(row.provider==='azur'&&['pendiente','enviado'].includes(row.status))item('Consultar autorización','refresh-cw',()=>invoiceQuickAction(row,'consultar'));
- if(row.access_key)item('Copiar clave de acceso','copy',()=>invoiceQuickAction(row,'clave'));
- item('Historial','history',()=>invoiceQuickAction(row,'historial'));
- if(row.has_xml&&row.has_email)item('Enviar por correo…','mail',()=>invoiceQuickAction(row,'correo'));
- if(row.has_xml&&row.has_phone)item('Compartir por WhatsApp…','message-circle',()=>invoiceQuickAction(row,'whatsapp'));
- if(row.order_id)item('Ver la orden '+row.reference,'file-text',()=>go('orders',new URLSearchParams({id:String(row.order_id)})));
- more.append(list);more.addEventListener('keydown',event=>{if(event.key==='Escape'&&more.open){more.open=false;sum.focus();}});
- document.addEventListener('click',event=>{if(more.open&&!more.contains(event.target))more.open=false;});
- wrap.append(more);return wrap;}
+// Smart Table 4.1 · acciones de cada comprobante. Las principales están siempre visibles; el resto va en un menú que se dibuja FUERA de la
+// tabla (portal en <body>, posición fija calculada): no lo recorta el contenedor con desplazamiento, se abre hacia arriba si no hay espacio
+// abajo, se ajusta al borde horizontal, se cierra con clic fuera, Escape, desplazamiento o cambio de tamaño, y se recorre con flechas.
+// En pantallas estrechas se muestra como panel inferior. Los envíos piden confirmación explícita.
+let invoiceOpenMenu=null;
+function invoiceCloseMenu(focusBack=true){const m=invoiceOpenMenu;if(!m)return;invoiceOpenMenu=null;m.panel.remove();m.backdrop?.remove();m.trigger.setAttribute('aria-expanded','false');
+ document.removeEventListener('pointerdown',m.outside,true);document.removeEventListener('keydown',m.keys,true);window.removeEventListener('resize',m.close);window.removeEventListener('scroll',m.scroll,true);if(focusBack)m.trigger.focus();}
+function invoiceMenuGroups(row){const groups=[],add=(title,items)=>{const ok=items.filter(Boolean);if(ok.length)groups.push([title,ok]);};
+ const why='Emite la factura para usar esta acción: un borrador no tiene número ni clave de acceso.';
+ add('Documentos e impresión',[['Visualizar','eye',()=>invoiceQuickAction(row,'ver')],
+  ['Imprimir factura A4','printer',()=>printCenter(row.id,row.number,'a4'),row.has_xml?'':why],
+  ['Imprimir ticket 80 mm','receipt-text',()=>printCenter(row.id,row.number,'80'),row.has_xml?'':why],
+  ['Descargar RIDE PDF','download',()=>{const a=el('a');a.href='/api/invoicing/'+row.id+'/ride.pdf';a.setAttribute('download','');document.body.append(a);a.click();a.remove();},row.has_xml?'':why],
+  ['Descargar XML'+(row.has_authorized_xml?' autorizado':''),'file-code',()=>{const a=el('a');a.href=row.has_authorized_xml?'/api/invoicing/'+row.id+'/azur/xml_autorizado':'/api/invoicing/'+row.id+'/comprobante.xml';a.setAttribute('download','');document.body.append(a);a.click();a.remove();},row.has_xml?'':why]]);
+ add('Comunicación',[['Enviar por WhatsApp…','message-circle',()=>invoiceQuickAction(row,'whatsapp'),!row.has_xml?why:!row.has_phone?'La factura no tiene un celular del comprador.':''],
+  ['Enviar por correo electrónico…','mail',()=>invoiceQuickAction(row,'correo'),!row.has_xml?why:!row.has_email?'La factura no tiene correo del comprador.':'']]);
+ add('Control tributario',[['Consultar autorización SRI','shield-check',()=>invoiceQuickAction(row,'consultar'),row.provider==='azur'&&['pendiente','enviado'].includes(row.status)?'':(row.status==='autorizado'?'Ya está autorizada por el SRI.':'Solo para facturas enviadas por AZUR y en espera.')],
+  ['Copiar clave de acceso','copy',()=>invoiceQuickAction(row,'clave'),row.access_key?'':why],
+  ['Historial y auditoría','history',()=>invoiceQuickAction(row,'historial')],
+  row.order_id?['Ver la orden '+row.reference,'file-text',()=>go('orders',new URLSearchParams({id:String(row.order_id)}))]:null]);
+ return groups;}
+function invoiceOpenActions(trigger,row){if(invoiceOpenMenu&&invoiceOpenMenu.trigger===trigger){invoiceCloseMenu();return;}invoiceCloseMenu(false);
+ const sheet=matchMedia('(max-width: 640px)').matches,panel=el('div',undefined,'fxb-menu'+(sheet?' fxb-sheet':''));panel.setAttribute('role','menu');panel.setAttribute('aria-label','Acciones de '+(row.number||'la factura'));
+ let backdrop=null;if(sheet){backdrop=el('div',undefined,'fxb-backdrop');document.body.append(backdrop);panel.append(el('strong',row.number||'Factura en borrador','fxb-sheet-title'));}
+ const items=[];for(const[title,list]of invoiceMenuGroups(row)){panel.append(el('p',title,'fxb-group'));
+  for(const[label,icon,fn,reason]of list){const b=button('',()=>{if(reason)return;invoiceCloseMenu(false);fn();},'fxb-item');b.setAttribute('role','menuitem');b.tabIndex=-1;b.append(invIcon(icon),el('span',label));
+   if(reason){b.setAttribute('aria-disabled','true');b.title=reason;b.append(el('small',reason,'fxb-why'));}items.push(b);panel.append(b);}}
+ document.body.append(panel);
+ // Posición junto al botón: hacia abajo o, si no cabe, hacia arriba; nunca fuera de la pantalla. Se recalcula al desplazar o redimensionar.
+ const place=()=>{if(sheet)return true;const r=trigger.getBoundingClientRect(),w=panel.offsetWidth,h=panel.offsetHeight,vw=document.documentElement.clientWidth,vh=window.innerHeight;
+  if(r.bottom<0||r.top>vh||r.width===0)return false;const up=r.bottom+6+h>vh&&r.top-6-h>=0;
+  panel.style.top=Math.max(8,up?r.top-6-h:Math.min(r.bottom+6,vh-h-8))+'px';panel.style.left=Math.max(8,Math.min(r.right-w,vw-w-8))+'px';panel.dataset.side=up?'top':'bottom';return true;};
+ place();
+ trigger.setAttribute('aria-expanded','true');
+ const focusAt=i=>{const n=items.length;if(!n)return;items[(i+n)%n].focus();};
+ const keys=event=>{const i=items.indexOf(document.activeElement);
+  if(event.key==='Escape'){event.preventDefault();invoiceCloseMenu();}
+  else if(event.key==='ArrowDown'){event.preventDefault();focusAt(i+1);}else if(event.key==='ArrowUp'){event.preventDefault();focusAt(i<0?-1:i-1);}
+  else if(event.key==='Home'){event.preventDefault();focusAt(0);}else if(event.key==='End'){event.preventDefault();focusAt(-1);}
+  else if(event.key==='Tab'){invoiceCloseMenu(false);}};
+ const outside=event=>{if(!panel.contains(event.target)&&!trigger.contains(event.target))invoiceCloseMenu(false);};
+ const close=()=>{if(!place())invoiceCloseMenu(false);},scroll=event=>{if(!panel.contains(event.target)&&!place())invoiceCloseMenu(false);};
+ invoiceOpenMenu={panel,backdrop,trigger,keys,outside,close,scroll};
+ document.addEventListener('pointerdown',outside,true);document.addEventListener('keydown',keys,true);window.addEventListener('resize',close);window.addEventListener('scroll',scroll,true);
+ focusAt(Math.max(0,items.findIndex(b=>!b.hasAttribute('aria-disabled'))));}
+function invoiceActionsMenu(row){const wrap=el('div',undefined,'fxb-acts'),why='Emite la factura para usar esta acción: un borrador no tiene número ni clave de acceso.';
+ const quick=(label,icon,fn,enabled)=>{const b=invIconBtn(label,icon,fn);if(!enabled){b.disabled=true;b.title=why;}wrap.append(b);};
+ quick('Visualizar '+(row.number||'la factura en borrador'),'eye',()=>invoiceQuickAction(row,'ver'),true);
+ quick('Imprimir '+(row.number||'la factura'),'printer',()=>printCenter(row.id,row.number),row.has_xml);
+ quick('Ticket térmico 80 mm de '+(row.number||'la factura'),'receipt-text',()=>printCenter(row.id,row.number,'80'),row.has_xml);
+ quick('Descargar RIDE PDF de '+(row.number||'la factura'),'download',()=>{const a=el('a');a.href='/api/invoicing/'+row.id+'/ride.pdf';a.setAttribute('download','');document.body.append(a);a.click();a.remove();},row.has_xml);
+ const more=button('',()=>invoiceOpenActions(more,row),'inv-icon-btn fxb-more-btn');more.setAttribute('aria-haspopup','menu');more.setAttribute('aria-expanded','false');more.setAttribute('aria-label','Más acciones de '+(row.number||'la factura'));more.title='Más acciones';more.append(invIcon('ellipsis-vertical'));
+ more.addEventListener('keydown',event=>{if(event.key==='ArrowDown'){event.preventDefault();invoiceOpenActions(more,row);}});wrap.append(more);return wrap;}
+
 // Centro de impresión — PC-DOCTOR (Premium Billing Center 4.0). Vista previa real del PDF, formato, copias, preferencias del usuario e
 // historial. Imprimir usa el diálogo nativo del sistema operativo (elige allí la Epson TM-m30II): el navegador no puede confirmar el papel,
 // así que solo se registra la SOLICITUD. Nada de esto emite, consume secuenciales, crea pagos ni envía documentos.
-async function printCenter(invoiceId,number){const dialog=invDialog('Centro de impresión — PC-DOCTOR',true);dialog.classList.add('pcx-dialog');
+async function printCenter(invoiceId,number,initial){const dialog=invDialog('Centro de impresión — PC-DOCTOR',true);dialog.classList.add('pcx-dialog');
  const body=el('div',undefined,'pcx');dialog.append(body);body.append(el('p','Cargando…','empty-module'));
  let d;try{d=await api('/api/invoicing/'+invoiceId+'/print-center');}catch(error){body.replaceChildren(el('p',error.message,'empty-module'));return;}
- let fmt=(d.formats.find(f=>f.key===d.prefs.format&&f.available)||d.formats.find(f=>f.available)||d.formats[0]).key,copies=d.prefs.copies||1;
+ let fmt=(d.formats.find(f=>f.key===initial&&f.available)||d.formats.find(f=>f.key===d.prefs.format&&f.available)||d.formats.find(f=>f.available)||d.formats[0]).key,copies=d.prefs.copies||1;
  const side=el('div',undefined,'pcx-side'),view=el('div',undefined,'pcx-view'),frame=el('iframe');frame.title='Vista previa del documento';frame.className='pcx-frame';view.append(frame);
  const sub=el('p','Factura '+(number||'')+' · el documento se genera con los datos registrados; imprimir no emite ni envía nada.','pcx-sub');
  const list=el('div',undefined,'pcx-formats');list.setAttribute('role','radiogroup');list.setAttribute('aria-label','Formato');
@@ -8002,11 +8036,12 @@ function invoicesPanel(panel,data){const filtered=!!(invoiceState.q||invoiceStat
   const acts=cell('Acciones',invoiceActionsMenu(row));acts.className='inv-row-acts';
   tr.addEventListener('click',event=>{if(!event.target.closest('button,a,details'))openInvoice(row.id);});tbody.append(tr);}
  table.append(thead,tbody);wrapT.append(table);card.append(wrapT);
- // Paginación.
- const foot=el('footer',undefined,'fxb-pager'),info=el('span','Página '+(data.page+1)+' de '+data.pages+' · '+data.total+' documentos','fxb-muted');info.setAttribute('aria-live','polite');
- const per=el('select');per.setAttribute('aria-label','Documentos por página');for(const n of [10,25,50,100])per.add(new Option(n+' por página',n));per.value=String(data.per_page);per.addEventListener('change',()=>{invoiceState.per=Number(per.value);invoiceState.page=0;renderInvoicing();});
- const prev=invBtn('Anterior','chevron-left',()=>{invoiceState.page=Math.max(0,data.page-1);renderInvoicing();}),next=invBtn('Siguiente','chevron-right',()=>{invoiceState.page=data.page+1;renderInvoicing();});prev.disabled=data.page<=0;next.disabled=data.page>=data.pages-1;
- const nav=el('div',undefined,'fxb-pager-nav');nav.append(prev,next);foot.append(info,per,nav);card.append(foot);
+ // Paginación Premium Compact (≈44 px): rango visible, total, cantidad por página y página actual.
+ const foot=el('footer',undefined,'fxb-pager'),first=data.total?data.page*data.per_page+1:0,lastN=Math.min(data.total,(data.page+1)*data.per_page);
+ const info=el('span',first+'–'+lastN+' de '+data.total,'fxb-range');info.setAttribute('aria-live','polite');
+ const per=el('select');per.setAttribute('aria-label','Documentos por página');for(const n of [10,25,50,100])per.add(new Option(n+' / página',n));per.value=String(data.per_page);per.addEventListener('change',()=>{invoiceState.per=Number(per.value);invoiceState.page=0;renderInvoicing();});
+ const nav=el('div',undefined,'fxb-pager-nav'),prev=invIconBtn('Página anterior','chevron-left',()=>{invoiceState.page=Math.max(0,data.page-1);renderInvoicing();}),next=invIconBtn('Página siguiente','chevron-right',()=>{invoiceState.page=data.page+1;renderInvoicing();});
+ prev.disabled=data.page<=0;next.disabled=data.page>=data.pages-1;nav.append(prev,el('span','Página '+(data.page+1)+' de '+data.pages,'fxb-page'),next);foot.append(info,per,nav);card.append(foot);
  panel.append(card);}
 // Indicadores por período (solo lectura): hoy, mes en curso o un rango; nunca genera documentos tributarios.
 function invoicePeriodBlock(panel,settings){const box=el('section',undefined,'fxb-period');box.setAttribute('aria-labelledby','fxb-period-t');
