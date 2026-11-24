@@ -3525,7 +3525,8 @@ class Handler(BaseHTTPRequestHandler):
                     import support_sessions as ss
                     try:ss.activity(c,conv['id'],'client',reception_now(),mid_client)  # Live Support 4.0: actividad válida del cliente (reinicia el contador)
                     except Exception as error:print('support-session',type(error).__name__,flush=True)
-                    import message_status;message_status.record_in(c,mid_client,conv['id'],'web',reception_now())  # recibido (todavía no leído)
+                    import message_status
+                    message_status.record_in(c,mid_client,conv['id'],'web',reception_now())  # recibido (todavía no leído)
                     # Idioma elegido en la interfaz (1.5.276): solo es-EC o en-US, validado aquí; cualquier otro valor responde en español.
                     lang=adi.language(data.get('locale'));en=adi.english(lang)
                     answer=(adi.WAITING_ADVISOR_EN if en else adi.WAITING_ADVISOR) if conv['mode']=='human' and not conv['assigned_to'] else None  # Con un asesor conectado, ADI no interviene.
