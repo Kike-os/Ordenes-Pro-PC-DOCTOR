@@ -13777,7 +13777,7 @@ body[data-page=dashboard] .fxb-pager select{height:30px!important;min-height:30p
 .sfs-strip .piv-env i{width:8px;height:8px;border-radius:50%;background:#ff7fb6}
 @media (max-width:420px){.piv5 .piv-tool{padding:0 8px;font-size:12px}}
 /* 1.5.329 · El menú superior de administración no cabía entre 1300 y 1520 px (desplazamiento horizontal de ~23-47 px): relleno de 6 px como entre 1200 y 1299. */
-@media(min-width:1300px) and (max-width:1520px){.premium-header nav>a{padding:0 6px}.premium-header .assistance-menu summary{padding:0 6px}}
+@media(min-width:1300px) and (max-width:1580px){.premium-header nav>a{padding:0 6px}.premium-header .assistance-menu summary{padding:0 6px}}
 /* ADI 3.0 · fases 4 y 5 — Cartera ADI (solo .cc-*). */
 .cc-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;margin:0 0 12px}
 .cc-kpi{display:grid;gap:3px;padding:10px 12px;border-radius:11px;border:1px solid #23395c;background:#0b172b;border-top:3px solid #3b6fb3;min-width:0}
@@ -13916,3 +13916,54 @@ body[data-page=dashboard] .fxb-pager select{height:30px!important;min-height:30p
 .live-sim{display:grid;gap:6px;padding:10px 12px;border:1px solid #23395c;border-radius:10px;background:#0b172b}.live-sim h3{margin:0;font-size:13px}.live-sim p,.live-sim small,.live-sim li{font-size:12px;color:#c4d3ea;margin:0}
 .live-sim ul{margin:0;padding-left:16px;display:grid;gap:3px}
 @media (prefers-reduced-motion:reduce){.live-timer,.live-timer-bar i{transition:none}}
+/* ADI Smart Collections 3.2 — Premium Responsive Financial Interface (solo .cc32*). Sin anchos fijos, sin cortar palabras ni botones:
+   la tabla de seis grupos pasa a tarjetas según el ancho REAL del contenedor (container queries). */
+.cc32-kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(205px,1fr));gap:10px;margin:0 0 12px}
+.cc32-kpi{display:grid;gap:6px;padding:12px 14px;border-radius:12px;border:1px solid #23395c;background:linear-gradient(160deg,#0f2038,#0b172b);border-bottom:3px solid var(--tone,#3B82F6);min-width:0;font-family:Inter,system-ui,sans-serif}
+.cc32-kpi[data-tone=azul]{--tone:#3B82F6}.cc32-kpi[data-tone=celeste]{--tone:#38BDF8}.cc32-kpi[data-tone=naranja]{--tone:#FB923C}.cc32-kpi[data-tone=verde]{--tone:#22C55E}
+.cc32-kpi[data-tone=violeta]{--tone:#8B5CF6}.cc32-kpi[data-tone=gris]{--tone:#64748B}.cc32-kpi[data-tone=rojo]{--tone:#EF4444}
+.cc32-kpi-top{display:flex;align-items:center;gap:8px;min-width:0}.cc32-kpi-top small{font-size:12px;color:#9fb4d4;line-height:1.25}
+.cc32-kpi-ic{display:grid;place-items:center;flex:none;width:30px;height:30px;border-radius:9px;background:color-mix(in srgb,var(--tone) 18%,transparent);color:var(--tone)}.cc32-kpi-ic svg{width:17px;height:17px}
+.cc32-kpi strong{font-size:19px;font-weight:800;color:#fff;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cc32-kpi-hint{font-size:11.5px;color:#8fa9cc}
+.cc32-wrap{container-type:inline-size;container-name:cc32;width:100%;min-width:0;overflow-x:auto}
+.cc32{width:100%;border-collapse:separate;border-spacing:0;font-family:Inter,system-ui,sans-serif;font-size:13px;color:#dbe6f7}
+.cc32 th{position:sticky;top:0;padding:10px 12px;text-align:left;font-size:11.5px;font-weight:700;letter-spacing:.02em;color:#9fb4d4;background:#0d1b31;border-bottom:1px solid #23395c;
+ white-space:normal;word-break:normal;overflow-wrap:normal;hyphens:none;vertical-align:bottom}
+.cc32-wrap .cc32 td{padding:12px;border-bottom:1px solid #1b2b44;vertical-align:middle;word-break:normal;overflow-wrap:normal;hyphens:none}
+.cc32 tbody tr:hover td{background:#0f2038}
+.cc32 th:nth-child(3),.cc32-amount{text-align:right}
+.cc32-who{min-width:190px}.cc32-client{display:block;font-size:13.5px;font-weight:700;color:#fff;line-height:1.3}
+.cc32-code{display:flex;align-items:center;gap:6px;margin-top:3px;white-space:nowrap}
+.cc32-link{border:0;background:none;padding:0;font-size:12px;font-weight:700;color:#93c5fd;cursor:pointer;white-space:nowrap;font-variant-numeric:tabular-nums}.cc32-link:hover{text-decoration:underline}
+.cc32-icon{display:inline-grid;place-items:center;flex:none;width:26px;height:26px;padding:0;border-radius:8px;border:1px solid #2b4a75;background:#10243f;color:#cfe0ff;cursor:pointer}.cc32-icon svg{width:14px;height:14px}
+.cc32-flag{display:block;margin-top:3px;font-size:11.5px;color:#fcd38a}
+.cc32-device{min-width:120px;line-height:1.35}
+.cc32-amount strong{display:block;font-size:18px;font-weight:800;color:#fff;white-space:nowrap;font-variant-numeric:tabular-nums}.cc32-amount small{display:block;font-size:11.5px;color:#c4b5fd;white-space:nowrap}
+.cc32-state,.cc32-follow{min-width:170px}.cc32-state small,.cc32-follow small{display:block;margin-top:4px;font-size:12px;color:#9fb4d4;line-height:1.35}
+.cc32-follow span{display:block;line-height:1.35}
+.cc32-acts-cell{width:1%;white-space:nowrap}
+.cc32-acts{display:flex;align-items:center;gap:6px;flex-wrap:nowrap}
+.cc32-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;flex:none;min-height:34px;padding:0 12px;border-radius:10px;border:1px solid #2b4a75;background:#10243f;color:#dbe8fb;font-size:12.5px;font-weight:700;white-space:nowrap;cursor:pointer}
+.cc32-btn svg{width:17px;height:17px;flex:none}.cc32-btn:hover{background:#16315a}.cc32-btn:focus-visible,.cc32-icon:focus-visible,.cc32-link:focus-visible{outline:2px solid #7fb0ff;outline-offset:2px}
+.cc32-adi{background:#1d4ed8;border-color:#2563eb;color:#fff}.cc32-adi:hover{background:#2563eb}
+.cc32-more{width:34px;padding:0}
+.cc32-foot{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;margin-top:10px;font-size:12.5px;color:#9fb4d4}
+.cc32-pager{display:flex;align-items:center;gap:8px}.cc32-pager button{min-height:32px}
+/* Ancho medio del contenedor: acciones solo con icono (con descripción emergente). */
+@container cc32 (max-width:1180px){.cc32-btn span{display:none}.cc32-btn{width:36px;padding:0}.cc32-who{min-width:160px}.cc32-state,.cc32-follow{min-width:150px}}
+/* Contenedor estrecho: tarjetas financieras compactas. */
+@container cc32 (max-width:980px){
+ .cc32 thead{display:none}.cc32,.cc32 tbody{display:block;width:100%}
+ .cc32 tr{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px 14px;padding:14px;margin:0 0 10px;border:1px solid #23395c;border-radius:12px;background:#0b172b}
+ .cc32-wrap .cc32 td{display:block;padding:0!important;border:0;min-width:0;width:auto}
+ .cc32 tbody tr:hover td{background:none}
+ .cc32-who{grid-column:1}.cc32-amount{grid-column:2;grid-row:1;text-align:right}
+ .cc32-device,.cc32-state,.cc32-follow,.cc32-acts-cell{grid-column:1/-1}
+ .cc32-device::before,.cc32-state::before,.cc32-follow::before{content:attr(data-label);display:block;margin-bottom:3px;font-size:11px;color:#8198ba}
+ .cc32-btn span{display:inline}.cc32-btn{width:auto;padding:0 12px}.cc32-more{width:36px;padding:0}
+ .cc32-acts{flex-wrap:wrap;padding-top:4px;border-top:1px solid #1b2b44}
+}
+@container cc32 (max-width:360px){.cc32 tr{grid-template-columns:1fr}.cc32-amount{grid-column:1;grid-row:auto;text-align:left}.cc32-btn{flex:1 1 auto}.cc32-more{flex:0 0 36px}}
+.cc-file .cj-table td,.cc-file .cj-table th{word-break:normal;overflow-wrap:normal}.cc-file td[data-label=Orden]{white-space:nowrap}
+@media (prefers-reduced-motion:reduce){.cc32-btn{transition:none}}
