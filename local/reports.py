@@ -90,7 +90,7 @@ def parse_filters(query, today):
 
 def _orders(c):
     rows = c.execute(
-        "SELECT o.id,o.code,o.status,o.created_at,o.received_at,o.delivered_at,o.estimated_delivery,o.assigned_to,"
+        "SELECT o.id,o.code,o.status,o.created_at,o.received_at,o.delivered_at,o.estimated_delivery,COALESCE(o.estimated_confirmed,0) estimated_confirmed,o.assigned_to,"
         "COALESCE(NULLIF(d.kind,''),d.category) type,d.brand,d.model,cl.name client "
         "FROM orders o JOIN devices d ON d.id=o.device_id JOIN clients cl ON cl.id=d.client_id ORDER BY o.id")
     result = []
@@ -150,6 +150,28 @@ def build(c, filters, today):
             'ready': sum(1 for order in active if order['status'] in ('listo', 'espera_entrega')),
             'overdue': len(overdue), 'stay_overdue': len(_stay_overdue(c, active)), 'average_days': round(sum(spans) / len(spans), 1) if spans else None, 'average_sample': len(spans)}
 
+    # Mission Control 5.1 · comparación con el periodo ANTERIOR de la misma duración (solo para indicadores de periodo; los de situación
+    # actual no se comparan) e indicadores circulares con denominador válido y cohorte identificable.
+    length = (last - first).days + 1
+    prev_last = first - timedelta(days=1)
+    prev_first = prev_last - timedelta(days=length - 1)
+    in_prev = lambda day: bool(day) and prev_first <= day <= prev_last
+    prev_delivered = [order for order in scoped if in_prev(order['delivered'])]
+    prev_spans = [(o['delivered'] - o['received']).days for o in prev_delivered if o['received'] and o['delivered'] >= o['received']]
+    previous = {'from': prev_first.isoformat(), 'to': prev_last.isoformat(), 'received': sum(1 for o in scoped if in_prev(o['received'])),
+                'delivered': len(prev_delivered), 'average_days': round(sum(prev_spans) / len(prev_spans), 1) if prev_spans else None}
+    cohort = [o for o in delivered if o['estimated_confirmed'] and _day(o['estimated_delivery'])]
+    on_time = sum(1 for o in cohort if o['delivered'] <= _day(o['estimated_delivery']))
+    final_stage = sum(1 for o in active if o['status'] in ('pruebas', 'listo', 'espera_entrega'))
+    indicators = {
+        'on_time': {'value': on_time, 'total': len(cohort), 'percent': round(on_time * 100 / len(cohort)) if cohort else None,
+                    'method': 'Órdenes entregadas en el rango que tenían una fecha estimada confirmada: entregadas en esa fecha o antes, sobre el total de esa cohorte.'},
+        'fast': {'value': sum(1 for d in spans if d <= 7), 'total': len(spans), 'percent': round(sum(1 for d in spans if d <= 7) * 100 / len(spans)) if spans else None,
+                 'method': 'Órdenes entregadas en el rango: las que se entregaron en 7 días o menos desde su recepción, sobre todas las entregadas del rango.'},
+        'progress': {'value': final_stage, 'total': len(active), 'percent': round(final_stage * 100 / len(active)) if active else None,
+                     'method': 'Órdenes activas ahora: las que están en pruebas, listas o esperando entrega, sobre todas las activas.'},
+        'capacity': {'value': None, 'total': None, 'percent': None, 'method': 'El taller no tiene una capacidad definida: no se calcula un porcentaje.'}}
+
     # Distribución por estado de las órdenes recibidas en el rango (sin aplicar el filtro de estado, para poder compararlos).
     base = [order for order in every if matches(order, skip=('status',)) and in_range(order['received'])]
     by_status = [{'code': code, 'label': statuses.get(code, code), 'total': sum(1 for order in base if order['status'] == code)} for code in STATUS_ORDER if code in statuses]
@@ -193,7 +215,7 @@ def build(c, filters, today):
     types = sorted(({'code': code, 'label': DEVICE_TYPES.get(code, code or 'Sin tipo'), 'total': total} for code, total in kinds.items()), key=lambda entry: -entry['total'])
 
     return {'filters': {'period': period, 'from': first.isoformat(), 'to': last.isoformat(), 'status': filters['status'], 'type': filters['type'], 'technician': filters['technician']},
-            'today': today.isoformat(), 'kpis': kpis, 'statuses': by_status, 'periods': periods, 'technicians': technicians, 'types': types,
+            'today': today.isoformat(), 'kpis': kpis, 'previous': previous, 'indicators': indicators, 'statuses': by_status, 'periods': periods, 'technicians': technicians, 'types': types,
             'options': {'periods': PERIODS, 'statuses': [{'code': code, 'label': statuses[code]} for code in STATUS_ORDER if code in statuses],
                         'types': DEVICE_TYPES, 'technicians': [{'id': key, 'name': name} for key, name in sorted(people.items(), key=lambda pair: pair[1].lower())]}}
 

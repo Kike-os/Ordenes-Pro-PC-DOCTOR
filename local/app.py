@@ -2727,6 +2727,11 @@ class Handler(BaseHTTPRequestHandler):
                 if user['role']!='administrador':return self.reply(403,{'error':'Acceso no permitido.'})
                 import stay_reminders
                 return self.reply(200,{'reminders':stay_reminders.status(c,reception_now()),'settings':stay.settings(c)})
+            if path == '/api/reports/summary':
+                # Mission Control 5.1: ventas, ingresos confirmados, facturación autorizada, cartera y gastos (solo lectura, solo administración).
+                import mission_control
+                if user['role']!='administrador':return self.reply(403,{'error':'Solo administración consulta el resumen financiero.'})
+                return self.reply(200,mission_control.summary(c,reception_now()))
             if path == '/api/reports/finance':
                 # Saldos por cobrar y cobros del rango de fechas del tablero. Usa los mismos filtros de fecha que el resto de reportes.
                 try:finance_filters=reports.parse_filters(parse_qs(urlsplit(self.path).query),reception_now().date())
