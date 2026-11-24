@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.333 — 2026-11-24 08:27 (UTC-05:00)
+
+ADI Smart Collections 3.2: interfaz financiera responsive corregida
+
+### Errores corregidos
+
+- ADI Smart Collections 3.2: corregidos los encabezados encimados, las palabras e importes partidos y los botones apilados de la 1.5.332. Tabla de seis grupos que pasa a tarjetas según el ancho real del contenedor, botones que nunca se cortan y prueba visual automatizada en 7 anchos y 4 niveles de zoom.
+
 ## v1.5.332 — 2026-11-24 08:15 (UTC-05:00)
 
 ADI Smart Collections 3.1: Premium Financial Management

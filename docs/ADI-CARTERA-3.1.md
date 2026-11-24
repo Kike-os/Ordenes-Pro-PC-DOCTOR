@@ -141,3 +141,60 @@ Además, las suites de cartera, ADI, compromisos e intereses: 65 pruebas correct
 - por debajo de 1280 px se ve en tarjetas;
 - 390 y 320 px sin desbordamiento;
 - el menú queda dentro de la pantalla.
+
+## 3.2 · Premium Responsive Financial Interface (1.5.333)
+
+**Error de la 1.5.332, visto en producción con datos reales:**
+
+- encabezados encimados;
+- palabras e importes partidos («$195,0 / 0», «No aplic / a», «compro / miso»);
+- botones apilados.
+
+**Causa:**
+
+- La tabla de diez columnas usaba un ancho fijo por porcentajes (`table-layout:fixed`) y permitía cortar palabras en cualquier punto (`overflow-wrap:anywhere`).
+- Las pruebas visuales usaban nombres ficticios cortos y solo medían el desbordamiento de la página.
+
+**Corrección:**
+
+- **Seis grupos:**
+  - cliente y orden;
+  - equipo;
+  - capital pendiente;
+  - estado financiero y exigibilidad;
+  - seguimiento y conciliación;
+  - acciones.
+- **Sin anchos fijos** ni cortes de palabras (`word-break:normal`).
+- **Botones** con `flex:none` y `white-space:nowrap`.
+- **Cambio de presentación por el ancho real del contenedor** (*container queries*):
+  - por encima de 1180 px, tabla con botones con texto;
+  - entre 981 y 1180 px, botones solo con icono y descripción emergente;
+  - hasta 980 px, tarjetas financieras.
+- **Iconos:** FolderOpen (Expediente), Bot (ADI) y Ellipsis (más acciones). El menú se abre en un portal y nunca queda recortado.
+- **Indicadores con icono:**
+  - capital pendiente;
+  - total de obligaciones;
+  - pagos al retirar;
+  - cartera vencida;
+  - compromisos;
+  - por conciliar;
+  - intereses simulados;
+  - intereses autorizados.
+- **Paginación** de 25 en 25.
+- **Expediente:** pestaña **Pagos** separada de Movimientos.
+
+**Prueba visual automatizada** (`local/tests/visual_collections.py`, con Playwright):
+
+- **Recorrido:**
+  - 1920, 1600, 1366, 1280, 1024, 768 y 390 px;
+  - zoom del navegador al 80, 100, 125 y 150 %;
+  - nombres y modelos largos e importes altos (por ejemplo, $12.345,67);
+  - todos los estados.
+- **Falla si encuentra:**
+  - desbordamiento de la página o dentro de la tabla;
+  - botones superpuestos;
+  - encabezados recortados o encimados;
+  - una palabra o un número de orden partido;
+  - texto fuera de su contenedor;
+  - el menú fuera de la pantalla.
+- **Resultado:** 22 combinaciones, **0 fallos**. Las siete pestañas del expediente caben en 1366 y 390 px.

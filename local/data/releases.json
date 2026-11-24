@@ -8,6 +8,24 @@
   },
   "releases": [
     {
+      "version": "1.5.333",
+      "date": "2026-11-24T08:27:27-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "ADI Smart Collections 3.2: interfaz financiera responsive corregida",
+      "changes": {
+        "features": [],
+        "improvements": [],
+        "fixes": [
+          "ADI Smart Collections 3.2: corregidos los encabezados encimados, las palabras e importes partidos y los botones apilados de la 1.5.332. Tabla de seis grupos que pasa a tarjetas según el ancho real del contenedor, botones que nunca se cortan y prueba visual automatizada en 7 anchos y 4 niveles de zoom."
+        ],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Administración (autorización expresa en la sesión)"
+    },
+    {
       "version": "1.5.332",
       "date": "2026-11-24T08:15:07-05:00",
       "type": "patch",
