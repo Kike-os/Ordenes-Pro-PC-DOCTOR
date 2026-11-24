@@ -8,6 +8,26 @@
   },
   "releases": [
     {
+      "version": "1.5.332",
+      "date": "2026-11-24T08:15:07-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "ADI Smart Collections 3.1: Premium Financial Management",
+      "changes": {
+        "features": [
+          "ADI Smart Collections 3.1: estados financieros verificables por colores, contadores separados de retiro y atraso, reclamos que bloquean la cobranza, indicadores sin duplicidades, tabla compacta con menú de acciones, expediente con seis pestañas y tres motivos nuevos de ADI."
+        ],
+        "improvements": [],
+        "fixes": [
+          "ADI Smart Collections 3.1: «Pago al retirar» ya no se clasifica como deuda por vencer o vencida ni muestra cero días de mora; una orden cubierta solo con una transferencia por validar ya no desaparece de la cartera (queda «Pendiente de conciliación»); conciliación precisa en lugar de «Al día»; marcas de equipo sin repetir (HP HP)."
+        ],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Administración (autorización expresa en la sesión)"
+    },
+    {
       "version": "1.5.331",
       "date": "2026-11-24T08:09:30-05:00",
       "type": "patch",
