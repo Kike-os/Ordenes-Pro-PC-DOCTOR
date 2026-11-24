@@ -8,6 +8,27 @@
   },
   "releases": [
     {
+      "version": "1.5.328",
+      "date": "2026-11-24T06:36:43-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Premium Invoice View 5.0 y Smart Fiscal Status 5.0",
+      "changes": {
+        "features": [
+          "Premium Invoice View 5.0: ventana de factura rediseñada con logotipo original, datos tributarios del emisor, barra de acciones (Imprimir, Ticket 80 mm, Descargar PDF, Descargar XML), indicador de ambiente, tarjeta con acento rosa corporativo, estado SRI propio de la factura y clave de acceso con botón Copiar.",
+          "Smart Fiscal Status 5.0: el aviso amarillo fijo de producción se sustituye por un indicador dinámico (verde, amarillo, rojo, gris) y un monitor de integración tributaria con comprobación de solo lectura a AZUR (como máximo una por minuto), estado inferido del SRI, autenticación, tiempo de respuesta, historial de incidencias e intervalo configurable."
+        ],
+        "improvements": [
+          "Listado persistente de pendientes del proyecto en docs/PENDIENTES.md, con lo hecho y lo que depende de administración o de pruebas físicas."
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Administración (autorización expresa en la sesión)"
+    },
+    {
       "version": "1.5.327",
       "date": "2026-11-24T02:04:34-05:00",
       "type": "patch",

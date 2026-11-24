@@ -4,6 +4,19 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.328 — 2026-11-24 06:36 (UTC-05:00)
+
+Premium Invoice View 5.0 y Smart Fiscal Status 5.0
+
+### Nuevas funcionalidades
+
+- Premium Invoice View 5.0: ventana de factura rediseñada con logotipo original, datos tributarios del emisor, barra de acciones (Imprimir, Ticket 80 mm, Descargar PDF, Descargar XML), indicador de ambiente, tarjeta con acento rosa corporativo, estado SRI propio de la factura y clave de acceso con botón Copiar.
+- Smart Fiscal Status 5.0: el aviso amarillo fijo de producción se sustituye por un indicador dinámico (verde, amarillo, rojo, gris) y un monitor de integración tributaria con comprobación de solo lectura a AZUR (como máximo una por minuto), estado inferido del SRI, autenticación, tiempo de respuesta, historial de incidencias e intervalo configurable.
+
+### Mejoras realizadas
+
+- Listado persistente de pendientes del proyecto en docs/PENDIENTES.md, con lo hecho y lo que depende de administración o de pruebas físicas.
+
 ## v1.5.327 — 2026-11-24 02:04 (UTC-05:00)
 
 ADI 3.0 fases 2 y 3: compromisos de pago y simulador de intereses (solo simulación)

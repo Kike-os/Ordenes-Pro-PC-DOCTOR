@@ -2547,6 +2547,10 @@ class Handler(BaseHTTPRequestHandler):
                     if path=='/api/invoicing/emission-lock':
                         import emission_lock
                         return self.reply(200,emission_lock.status(c))
+                    if path=='/api/invoicing/fiscal-status':
+                        # Smart Fiscal Status 5.0: lo último comprobado (sin consultar a AZUR).
+                        import fiscal_status
+                        return self.reply(200,fiscal_status.status(c,reception_now()))
                     if path=='/api/invoicing/azur':
                         import azur_invoicing
                         return self.reply(200,azur_invoicing.readiness(c))
@@ -4015,6 +4019,16 @@ class Handler(BaseHTTPRequestHandler):
                     if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede usar la facturación electrónica.'})
                     import invoicing,invoice_documents as docs
                     now=reception_now()
+                    if path=='/api/invoicing/fiscal-status':
+                        # Smart Fiscal Status 5.0: comprobación de SOLO LECTURA con AZUR (GET /secuenciales), como mucho una por minuto.
+                        import fiscal_status
+                        try:
+                            if data.get('action')=='interval':fiscal_status.set_interval(c,data.get('minutes'));audit(c,user['id'],'fiscal_status_interval');c.commit();return self.reply(200,fiscal_status.status(c,now))
+                            if data.get('action')=='check':
+                                if limited(c,'fiscal-check:'+str(user['id']),limit=30,window=3600):return self.reply(429,{'error':'Demasiadas comprobaciones. Intenta en unos minutos.'})
+                                c.commit();result=fiscal_status.check(c,now);c.commit();return self.reply(200,result)
+                        except fiscal_status.FiscalStatusError as error:return self.reply(error.status,{'error':str(error)})
+                        return self.reply(400,{'error':'Acción no válida.'})
                     try:
                         if path=='/api/invoicing/settings':
                             saved=invoicing.save_settings(c,data,user,now);audit(c,user['id'],'invoicing_settings');return self.reply(200,{'ok':True,'settings':saved})
