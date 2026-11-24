@@ -1455,7 +1455,12 @@ class Handler(BaseHTTPRequestHandler):
                 except Exception as error:print('support-session',type(error).__name__,flush=True)
                 rows=[dict(r) for r in c.execute("SELECT id,author,content,created_at FROM adi_messages WHERE conversation_id=? AND visibility='public' AND id>? ORDER BY id LIMIT 100",(conv['id'],after))]
                 c.execute('UPDATE adi_conversations SET last_seen_client=? WHERE id=?',(appointments.stamp(appointments.now()),conv['id']))
-                return self.reply(200,{'messages':rows,'mode':conv['mode'],'state':adi_public_state(conv)})
+                # Live Read Receipts: lo que el widget recibe queda «entregado»; los estados de sus propios mensajes viajan aparte (sin reiniciar el cierre).
+                import message_status
+                outs=[r['id'] for r in rows if r['author']!='client']
+                if outs:message_status.web_delivered(c,conv['id'],max(outs),reception_now())
+                receipts={k:{'status':v['status'],'read_at':v['read_at'],'sent_at':v['sent_at'],'delivered_at':v['delivered_at']} for k,v in (message_status.recent(c,conv['id'],40) or {}).items() if v['direction']=='entrante'}
+                return self.reply(200,{'messages':rows,'mode':conv['mode'],'state':adi_public_state(conv),'receipts':receipts})
             optout=re.fullmatch(r'/baja/([A-Za-z0-9_-]{16,64})',path)
             if optout:
                 # Baja de comunicados (enlace personal del correo). Solo comunicados; los correos de servicio no cambian.
@@ -3515,6 +3520,7 @@ class Handler(BaseHTTPRequestHandler):
                     import support_sessions as ss
                     try:ss.activity(c,conv['id'],'client',reception_now(),mid_client)  # Live Support 4.0: actividad válida del cliente (reinicia el contador)
                     except Exception as error:print('support-session',type(error).__name__,flush=True)
+                    import message_status;message_status.record_in(c,mid_client,conv['id'],'web',reception_now())  # recibido (todavía no leído)
                     # Idioma elegido en la interfaz (1.5.276): solo es-EC o en-US, validado aquí; cualquier otro valor responde en español.
                     lang=adi.language(data.get('locale'));en=adi.english(lang)
                     answer=(adi.WAITING_ADVISOR_EN if en else adi.WAITING_ADVISOR) if conv['mode']=='human' and not conv['assigned_to'] else None  # Con un asesor conectado, ADI no interviene.
@@ -3527,7 +3533,9 @@ class Handler(BaseHTTPRequestHandler):
                         except Exception as error:print('support-session',type(error).__name__,flush=True)
                         c.commit();answer=adi.reply(c,text,context=context,conversation_id=conv['id'],session=session,lang=lang)
                     if answer:
-                        c.execute("INSERT INTO adi_messages(conversation_id,author,content,created_at) VALUES (?,'adi',?,?)",(conv['id'],answer,now));c.execute('UPDATE adi_conversations SET updated_at=? WHERE id=?',(now,conv['id']))
+                        mid_adi=c.execute("INSERT INTO adi_messages(conversation_id,author,content,created_at) VALUES (?,'adi',?,?)",(conv['id'],answer,now)).lastrowid;c.execute('UPDATE adi_conversations SET updated_at=? WHERE id=?',(now,conv['id']))
+                        message_status.record_out(c,mid_adi,conv['id'],'web',reception_now())
+                        if conv['mode']=='adi':message_status.inbound_read(c,conv['id'],reception_now(),'ADI')  # ADI procesó el mensaje: leído (no basta con que llegue)
                         try:ss.activity(c,conv['id'],'adi',reception_now())
                         except Exception as error:print('support-session',type(error).__name__,flush=True)
                     response={'ok':True,'conversation_id':conv['id'],'mode':conv['mode'],'state':adi_public_state(conv),'locale':lang,'messages':[dict(r) for r in c.execute("SELECT id,author,content,created_at FROM adi_messages WHERE conversation_id=? AND id>(SELECT COALESCE(MAX(id),0)-2 FROM adi_messages WHERE conversation_id=?) ORDER BY id",(conv['id'],conv['id']))]}
@@ -3536,6 +3544,19 @@ class Handler(BaseHTTPRequestHandler):
                     if session.get('suggestions'):response['suggestions']=session['suggestions']
                     cookie='pcdoctor_adi='+new_token+'; Path=/; Max-Age=2592000; HttpOnly; SameSite=Strict'+('; Secure' if os.getenv('SESSION_SECURE','false').lower()=='true' else '') if new_token else None
                     return self.reply(201,response,cookie=cookie)
+                if path == '/api/public/adi/read':
+                    # Live Read Receipts: confirmación autenticada (cookie de la conversación) de mensajes vistos en una pestaña activa del widget.
+                    if limited(c,'adi-read:'+digest(self.client_address[0]),120,300):return self.reply(429,{'error':'Demasiadas confirmaciones.'})
+                    cookies=SimpleCookie()
+                    try:cookies.load(self.headers.get('Cookie',''))
+                    except Exception:pass
+                    token=cookies['pcdoctor_adi'].value if 'pcdoctor_adi' in cookies else '';conv=c.execute('SELECT id FROM adi_conversations WHERE token_hash=?',(digest(token),)).fetchone() if token else None
+                    if not conv:return self.reply(404,{'error':'Conversación no disponible.'})
+                    try:up_to=int(data.get('up_to') or 0)
+                    except (TypeError,ValueError):up_to=0
+                    if up_to<=0 or data.get('visible') is not True:return self.reply(400,{'error':'Confirmación no válida.'})
+                    import message_status
+                    return self.reply(200,{'ok':True,'read':message_status.web_read(c,conv['id'],up_to,reception_now()) or 0})
                 if path == '/api/public/adi/human':
                     cookies=SimpleCookie()
                     try:cookies.load(self.headers.get('Cookie',''))

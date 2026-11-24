@@ -13967,3 +13967,14 @@ body[data-page=dashboard] .fxb-pager select{height:30px!important;min-height:30p
 @container cc32 (max-width:360px){.cc32 tr{grid-template-columns:1fr}.cc32-amount{grid-column:1;grid-row:auto;text-align:left}.cc32-btn{flex:1 1 auto}.cc32-more{flex:0 0 36px}}
 .cc-file .cj-table td,.cc-file .cj-table th{word-break:normal;overflow-wrap:normal}.cc-file td[data-label=Orden]{white-space:nowrap}
 @media (prefers-reduced-motion:reduce){.cc32-btn{transition:none}}
+/* Live Read Receipts 1.0 (solo .live-receipt y .adi-receipt). Leído: #38BDF8; entregado/enviado: gris; error: rojo. */
+.live-receipt,.adi-receipt{display:inline-flex;align-items:center;justify-content:center;vertical-align:middle;margin-left:6px;width:18px;height:16px;color:#94a3b8;transition:color .18s ease;cursor:default}
+.live-receipt svg,.adi-receipt svg{width:16px;height:16px}
+.live-receipt[data-status=leido],.adi-receipt[data-status=leido]{color:#38BDF8}
+.live-receipt[data-status=error]{color:#ef4444}
+.live-receipt[data-status=reintentando] svg{animation:receipt-spin 1s linear infinite}
+.live-receipt:focus-visible{outline:2px solid #7fb0ff;outline-offset:2px;border-radius:4px}
+.adi-widget .adi-receipt{display:flex;margin:4px 0 0 auto;width:16px;height:14px;color:#cbd5e1}.adi-widget .adi-receipt[data-status=leido]{color:#38BDF8}.adi-widget .adi-receipt svg{width:15px;height:15px}
+@keyframes receipt-spin{to{transform:rotate(360deg)}}
+@media (prefers-color-scheme:light){:root:not([data-theme=dark]) .live-receipt,:root:not([data-theme=dark]) .adi-receipt{color:#64748b}:root:not([data-theme=dark]) .live-receipt[data-status=leido],:root:not([data-theme=dark]) .adi-receipt[data-status=leido]{color:#0284c7}}
+@media (prefers-reduced-motion:reduce){.live-receipt,.adi-receipt{transition:none}.live-receipt[data-status=reintentando] svg{animation:none}}

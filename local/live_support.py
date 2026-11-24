@@ -109,7 +109,7 @@ def detail(c,conv,after,now):
     try:ss.sweep_one(c,conv['id'],reception.reception_now());timer=ss.timer(c,conv['id'],reception.reception_now());history=ss.events(c,conv['id'],20)
     except Exception as error:print('support-session',type(error).__name__,flush=True);timer,history={'status':'sin_sesion'},[]
     return {'conversation':info,'messages':messages,'client':dict(client) if client else None,'order':dict(order) if order else None,'actions':actions,'mentioned':mentioned[:3],
-            'attention':attention,'staff':staff,'session':timer,'session_events':history}
+            'attention':attention,'staff':staff,'session':timer,'session_events':history,'receipts':_receipt(lambda ms:ms.recent(c,conv['id']))}
 
 
 def act(c,conv,user,data,now,moment=None):
@@ -129,6 +129,12 @@ def act(c,conv,user,data,now,moment=None):
         _ss(lambda ss:ss.activity(c,conv['id'],'human',moment))
         sent,detail=handoff.send_text(c,conv['id'],content,moment,message_id=mid)
         if sent is not None:extra['whatsapp']={'sent':bool(sent),'detail':detail}
+        def receipts(ms):
+            row=c.execute('SELECT provider_id,detail FROM whatsapp_operator_sends WHERE message_id=?',(mid,)).fetchone() if sent is not None else None
+            if row is not None:ms.record_out(c,mid,conv['id'],'whatsapp',moment,row['provider_id'],'' if row['provider_id'] else (row['detail'] or 'WhatsApp no aceptó el mensaje.'))
+            else:ms.record_out(c,mid,conv['id'],'web',moment)
+            ms.inbound_read(c,conv['id'],moment,user['name'] if 'name' in user.keys() else 'Asesor')   # quien responde leyó lo anterior
+        _receipt(receipts)
         return 200,dict({'ok':True},**extra)
     if action=='transfer':
         target=str(data.get('user_id',''))
@@ -151,6 +157,13 @@ def act(c,conv,user,data,now,moment=None):
         try:support_sessions.pause(c,conv['id'],user,data.get('minutes'),data.get('reason'),moment)
         except support_sessions.SupportError as error:return error.status,{'error':str(error)}
         details='Cierre automático pausado'
+    elif action=='seen':
+        # El panel confirma qué mensajes del cliente estuvieron visibles en una pestaña activa: solo entonces se marcan leídos por el asesor.
+        try:up_to=int(data.get('up_to') or 0)
+        except (TypeError,ValueError):up_to=0
+        if up_to<=0:return 400,{'error':'Mensaje no válido.'}
+        _receipt(lambda ms:ms.inbound_read(c,conv['id'],moment,user['name'] if 'name' in user.keys() else 'Asesor',up_to))
+        return 200,{'ok':True,'receipts':_receipt(lambda ms:ms.recent(c,conv['id']))}
     elif action=='note':
         # Nota interna: visibility='internal' nunca se muestra ni se envía al cliente (ni por el chat web ni por WhatsApp).
         content=' '.join(str(data.get('message','')).split())
@@ -197,3 +210,13 @@ def metrics(c):
     except Exception as error:
         print('support-metrics',type(error).__name__,flush=True)
     return out
+
+
+def _receipt(fn):
+    """Live Read Receipts: un fallo de confirmaciones nunca impide atender."""
+    try:
+        import message_status
+        return fn(message_status)
+    except Exception as error:
+        print('message-status',type(error).__name__,flush=True)
+        return None

@@ -100,7 +100,8 @@ def handle(c, raw, signature, now, env=None):
                     # Con un asesor ADI no responde, pero el mensaje SÍ se guarda para que el personal lo vea; la urgencia sube la prioridad.
                     if staff:
                         stamp_in = wa.stamp(now)
-                        c.execute("INSERT INTO adi_messages(conversation_id,author,content,created_at) VALUES (?,'client',?,?)", (conv['id'], text, stamp_in))
+                        mid_in = c.execute("INSERT INTO adi_messages(conversation_id,author,content,created_at) VALUES (?,'client',?,?)", (conv['id'], text, stamp_in)).lastrowid
+                        _receipt(lambda ms: ms.record_in(c, mid_in, conv['id'], 'whatsapp', now, message_id))
                         c.execute('UPDATE adi_conversations SET last_seen_client=?,updated_at=? WHERE id=?', (stamp_in, stamp_in, conv['id']))
                         _ss_activity(c, conv['id'], 'client', now, message_id)
                         level, labels, _ = whatsapp_handoff.signals(c, text)
@@ -155,8 +156,9 @@ def handle(c, raw, signature, now, env=None):
                         print('whatsapp-identity', type(error).__name__, flush=True)
                         turn = {'answer': whatsapp_identity.THIRD_PARTY, 'log_client': None, 'log_answer': None}
                 now_text = wa.stamp(now)
-                c.execute("INSERT INTO adi_messages(conversation_id,author,content,created_at) VALUES (?,'client',?,?)",
-                          (conv['id'], (turn['log_client'] if turn and turn['log_client'] else text), now_text))
+                mid_in = c.execute("INSERT INTO adi_messages(conversation_id,author,content,created_at) VALUES (?,'client',?,?)",
+                                   (conv['id'], (turn['log_client'] if turn and turn['log_client'] else text), now_text)).lastrowid
+                _receipt(lambda ms: ms.record_in(c, mid_in, conv['id'], 'whatsapp', now, message_id))
                 c.execute("UPDATE adi_conversations SET last_seen_client=?,updated_at=? WHERE id=?",
                           (now_text, now_text, conv['id']))
                 _ss_activity(c, conv['id'], 'client', now, message_id)
@@ -201,9 +203,11 @@ def handle(c, raw, signature, now, env=None):
                 c.execute('BEGIN IMMEDIATE')
                 if provider:
                     stamp = wa.stamp(now)
-                    c.execute("INSERT INTO adi_messages(conversation_id,author,content,created_at) VALUES (?,'adi',?,?)",
-                              (conv['id'], logged, stamp))
+                    mid_out = c.execute("INSERT INTO adi_messages(conversation_id,author,content,created_at) VALUES (?,'adi',?,?)",
+                                        (conv['id'], logged, stamp)).lastrowid
                     c.execute('UPDATE adi_conversations SET updated_at=? WHERE id=?', (stamp, conv['id']))
+                    _receipt(lambda ms: ms.record_out(c, mid_out, conv['id'], 'whatsapp', now, provider))
+                    _receipt(lambda ms: ms.inbound_read(c, conv['id'], now, 'ADI', env=env))   # ADI procesó y respondió: leído
                     _ss_activity(c, conv['id'], 'adi', now, 'adi-' + str(message_id))
                     c.execute("UPDATE whatsapp_adi_inbound SET status='enviado',provider_id=?,replied_at=?,detail='' WHERE wa_message_id=?",
                               (provider, stamp, message_id))
@@ -223,3 +227,12 @@ def _ss_activity(c, conv_id, who, now, message_id=None):
         support_sessions.activity(c, conv_id, who, now, message_id)
     except Exception as error:
         print('support-session', type(error).__name__, flush=True)
+
+
+def _receipt(fn):
+    """Live Read Receipts: confirmaciones de envío, entrega y lectura. Nunca interrumpen la atención si fallan."""
+    try:
+        import message_status
+        fn(message_status)
+    except Exception as error:
+        print('message-status', type(error).__name__, flush=True)

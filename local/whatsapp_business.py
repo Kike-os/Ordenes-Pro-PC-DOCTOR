@@ -946,6 +946,13 @@ def webhook(c, raw, signature, now, env=None):
         for change in entry.get('changes', []) or []:
             value = change.get('value', {}) or {}
             for st in value.get('statuses', []) or []:
+                try:  # Live Read Receipts: mensajes del centro de atención (ADI o asesor), enlazados por el id de WhatsApp
+                    import message_status
+                    err = (st.get('errors') or [{}])[0]
+                    if message_status.meta_status(c, str(st.get('id', '')), str(st.get('status', '')), now, str(err.get('title', '') or err.get('message', ''))):
+                        changed += 1
+                except Exception as error:
+                    print('message-status webhook', type(error).__name__, flush=True)
                 new = names.get(st.get('status', ''))
                 row = c.execute('SELECT id,status FROM whatsapp_outbox WHERE provider_id=?', (str(st.get('id', '')),)).fetchone() if new and st.get('id') else None
                 if not row:
