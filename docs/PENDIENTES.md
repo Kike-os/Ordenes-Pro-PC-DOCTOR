@@ -69,7 +69,8 @@ comparar el diseño con ellas.
 
 - [x] Centro de impresión (1.5.323 a 1.5.326).
 - [x] Reportes y exportación: indicadores anuales, notas de crédito, facturado frente a cobrado, filtro por forma de pago, y Excel, CSV y PDF (docs/FACTURACION-REPORTES.md).
-- [ ] Otros comprobantes: recibo de pago, anticipo, entrega y nota de crédito, en A4 y térmico.
+- [x] Otros comprobantes: recibo de pago (A5 y térmico, con QR seguro y factura vinculada), anticipo y entrega (docs/COMPROBANTES.md).
+- [ ] Nota de crédito en A4 y térmico: pendiente junto con el envío de notas de crédito al SRI (requiere autorización y revisión contable).
 - [ ] Portal seguro de consulta con QR y permisos independientes por acción.
 
 ## Otros pendientes de administración

@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.340 — 2026-11-24 16:40 (UTC-05:00)
+
+Comprobantes de pago, anticipo y entrega
+
+### Nuevas funcionalidades
+
+- Comprobantes no tributarios: recibo de pago en ticket de 80 mm y con QR de consulta segura y factura vinculada; nuevo comprobante de anticipo (A5 y térmico) y nuevo comprobante de entrega de equipo (A4 y térmico) con servicio realizado, estado de pago, garantía registrada y constancia de recepción.
+
 ## v1.5.339 — 2026-11-24 14:33 (UTC-05:00)
 
 ADI Executive Intelligence 5.0 y Premium Smart Dropdown 2.0

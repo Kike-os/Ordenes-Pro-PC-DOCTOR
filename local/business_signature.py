@@ -16,9 +16,9 @@ from functools import lru_cache
 
 KEY = 'business_signature'
 DOCS = {'ticket': 'Ticket de recepción (80 mm)', 'comprobante': 'Comprobante de recepción (A4)', 'servicio': 'Hoja de servicio técnico (informe)',
-        'presupuesto': 'Presupuestos', 'proforma': 'Proformas', 'garantia': 'Certificados de garantía', 'pago': 'Recibos de pago'}
+        'presupuesto': 'Presupuestos', 'proforma': 'Proformas', 'garantia': 'Certificados de garantía', 'pago': 'Recibos de pago y anticipos', 'entrega': 'Comprobantes de entrega'}
 # Documentos pedidos que todavía no existen como PDF en Órdenes Pro: se muestran, pero no se pueden activar.
-UNAVAILABLE = {'entrega': 'Comprobantes de entrega', 'repuestos': 'Documentos de pedidos de repuestos'}
+UNAVAILABLE = {'repuestos': 'Documentos de pedidos de repuestos'}
 CAPTION = 'Firma visual de identificación de PC-DOCTOR S.A. · No constituye firma electrónica de este documento.'
 DEFAULTS = {'enabled': False, 'version_id': None, 'docs': {k: False for k in DOCS}, 'a4_width_mm': 50, 'ticket_width_mm': 48, 'align': 'derecha', 'ticket_mode': 'columna', 'ticket_print': 'color'}
 A4_WIDTHS = range(25, 91)

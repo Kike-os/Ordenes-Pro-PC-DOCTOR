@@ -28,7 +28,7 @@ def _date(value):
         return 'No registrada'
 
 
-def render(order, payment, account, methods, generated):
+def render(order, payment, account, methods, generated, tracking='', invoice=''):
     """`order`: código, cliente, identificación y equipo. `payment`: el movimiento. `account`: resumen de equipment.summary al emitir,
     con `scope` («del equipo E02», «de la orden»…). `methods`: etiquetas de las formas de pago."""
     company = settings()
@@ -67,21 +67,35 @@ def render(order, payment, account, methods, generated):
         pdf.text(label.upper(), LEFT + 8, y + 4.5, 7.8, True, BLUE)
         y += 23
 
+    narrow = [0]
+
     def pair(label, value):
         nonlocal y
         pdf.text(label, LEFT + 6, y, 8.4, True, INK)
-        for line in pdf.wrap(value or 'No registrado', width - 122, 8.4):
+        for line in pdf.wrap(value or 'No registrado', width - 122 - narrow[0], 8.4):
             pdf.text(line, LEFT + 116, y, 8.4, False, INK)
             y += 11.5
         y += 2.5
 
+    top = y
     section('Cliente y equipo')
+    if tracking:
+        # Consulta segura: el enlace de seguimiento ACTIVO de la orden (con token); sin él no se imprime ningún QR.
+        narrow[0] = 76
+        pdf.qr(tracking + '#' + order['code'], RIGHT - 62, top + 22, 62)
+        for n, line in enumerate(pdf.wrap('Consulta segura de la orden', 70, 6.2)):
+            pdf.text(line, RIGHT - 66, top + 86 + n * 7.6, 6.2, False, GRAY)
     pair('Cliente', order['client'])
     if order.get('identification'):
         pair('Identificación', order['identification'])
     pair('Equipo', ' '.join(part for part in (order.get('brand'), order.get('model')) if part) or 'Equipo sin especificar')
     if order.get('serial'):
         pair('Serie', order['serial'])
+    if invoice:
+        pair('Factura', invoice)
+    if tracking:
+        y = max(y, top + 22 + 62 + 22)
+    narrow[0] = 0
     y += 6
 
     section('Devolución' if refund else 'Pago recibido')

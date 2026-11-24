@@ -2078,10 +2078,23 @@ class Handler(BaseHTTPRequestHandler):
             pay_receipt = re.fullmatch(r'/api/orders/([0-9]+)/payments/([0-9]+)/receipt\.pdf', path)
             if pay_receipt:
                 # Recibo de un pago, abono o devolución de esta orden, en PDF. Solo personal con sesión.
-                import payment_pdf
-                found = equipment.receipt(c, int(pay_receipt[1]), int(pay_receipt[2]))
+                # A5 por defecto; ?formato=termico para el ticket de 80 mm. Solo lectura: no cambia el pago ni el saldo.
+                import payment_pdf,vouchers
+                found = vouchers.payment(c, int(pay_receipt[1]), int(pay_receipt[2]))
                 if not found:return self.reply(404, {'error':'Recibo no disponible.'})
-                return self.reply(200, payment_pdf.render(found['order'], found['payment'], found['account'], equipment.METHODS, reception_now()), 'application/pdf', filename=payment_pdf.number(found['payment'])+'-'+found['order']['code']+'.pdf')
+                name=payment_pdf.number(found['payment'])+'-'+found['order']['code']
+                if parse_qs(urlsplit(self.path).query).get('formato',[''])[0]=='termico':return self.reply(200, vouchers.payment_ticket(found, equipment.METHODS, reception_now()), 'application/pdf', filename=name+'-80MM.pdf')
+                return self.reply(200, payment_pdf.render(found['order'], found['payment'], found['account'], equipment.METHODS, reception_now(), found['tracking'], found['invoice']), 'application/pdf', filename=name+'.pdf')
+            delivery_doc = re.fullmatch(r'/api/orders/([0-9]+)/delivery\.pdf', path)
+            if delivery_doc:
+                # Comprobante de entrega (A4 o ?formato=termico). Solo de órdenes entregadas; solo lectura.
+                import vouchers
+                info = vouchers.delivery(c, int(delivery_doc[1]))
+                if info is None:return self.reply(404, {'error':'Orden no disponible.'})
+                if info=='no_entregada':return self.reply(409, {'error':'El comprobante de entrega se genera cuando la orden está entregada.'})
+                code=info['order']['code']
+                if parse_qs(urlsplit(self.path).query).get('formato',[''])[0]=='termico':return self.reply(200, vouchers.delivery_ticket(info, reception_now()), 'application/pdf', filename='ENTREGA-'+code+'-80MM.pdf')
+                return self.reply(200, vouchers.delivery_pdf(info, reception_now()), 'application/pdf', filename='ENTREGA-'+code+'.pdf')
             finance_route = re.fullmatch(r'/api/orders/([0-9]+)/finance', path)
             if finance_route:
                 # Saldo del equipo y saldo general de su orden: lo consulta la tarjeta financiera tras un pago, anulación o devolución.
@@ -2435,6 +2448,15 @@ class Handler(BaseHTTPRequestHandler):
                     if path=='/api/proformas/orders':return self.reply(200,{'rows':proformas.search_orders(c,f.get('q',''))})
                     found=re.fullmatch(r'/api/proformas/order/([0-9]{1,9})',path)
                     if found:return self.reply(200,proformas.for_order(c,found[1],now))
+                    found=re.fullmatch(r'/api/proformas/([0-9]{1,9})/advances/([0-9]{1,9})/receipt\.pdf',path)
+                    if found:
+                        # Comprobante de anticipo (A5 o ?formato=termico). Solo lectura: no cambia el anticipo ni la proforma.
+                        import vouchers
+                        info=vouchers.advance(c,int(found[1]),int(found[2]))
+                        if not info:return self.reply(404,{'error':'Anticipo no disponible.'})
+                        name='ANTICIPO-'+info['advance']['code']
+                        if f.get('formato')=='termico':return self.reply(200,vouchers.advance_ticket(info,now),'application/pdf',filename=name+'-80MM.pdf')
+                        return self.reply(200,vouchers.advance_pdf(info,now),'application/pdf',filename=name+'.pdf')
                     found=re.fullmatch(r'/api/proformas/([0-9]{1,9})(\.pdf)?',path)
                     if found:
                         if found[2]:
