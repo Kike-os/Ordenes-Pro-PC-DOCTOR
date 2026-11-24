@@ -44,6 +44,19 @@ comparar el diseño con ellas.
 - [ ] Enlace público seguro del estado de cuenta para el cliente: queda dentro del portal seguro con QR del Premium Billing Center.
 - [ ] **[Administración]** Validación jurídica, contable y tributaria antes de cualquier aplicación real de intereses. No está autorizada.
 
+## ADI Smart Collections 3.1 (1.5.332)
+
+- [x] Estados financieros verificables, pago al retirar frente a cartera vencida, conciliación precisa, reclamos, tabla y expediente con pestañas (docs/ADI-CARTERA-3.1.md).
+
+## Database Guardian Pro 1.0 (1.5.331)
+
+- [x] Migraciones verificadas con evidencia, libro, bloqueo, recuperación segura, monitor y control previo a publicar (docs/DATABASE-GUARDIAN.md).
+- [ ] **[Administración]** Revisar en Vercel que las vistas previas no usen la base de producción.
+
+## ADI Live Support Center 4.0
+
+- [ ] En cola: cierre automático a los 8 minutos en el servidor, bandeja inteligente, contador, atención humana y configuración.
+
 ## Premium Billing Center 4.0
 
 - [x] Centro de impresión (1.5.323 a 1.5.326).

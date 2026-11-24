@@ -178,14 +178,14 @@ def portfolio(c, now, filters=None, client_id=None):
         claim = complaints.get(('o', head['id']), []) + [x for x in complaints.get(('c', head['client_id']), []) if x not in complaints.get(('o', head['id']), [])]
         due, basis, review = None, '', ''
         if commit:
-            due, basis = _day(commit['due_date']), 'Fecha acordada en el compromiso de pago'
+            due, basis = _day(commit['due_date']), 'Compromiso de pago'
         elif all_delivered:
             if delivered_at:
-                due, basis = _day(delivered_at), 'Entrega del equipo (pago al retirar)'
+                due, basis = _day(delivered_at), 'Entrega del equipo'
             else:
                 review = 'Entregado sin fecha de entrega registrada: no se puede determinar desde cuándo es exigible.'
         else:
-            basis = 'Pago al retirar el equipo'
+            basis = 'Se paga al retirar'
         days = (today - due).days if due and net > 0 else None
         overdue = days if days is not None and days > 0 else None
         # Estado financiero: reglas verificables, independientes del estado técnico y del de conciliación.
@@ -402,7 +402,7 @@ def client_file(c, client_id, now):
         pol, rates = ie.DEFAULT_POLICY, []
     interests = [{'code': it['code'], 'eligible': it['state'] in ('compromiso_incumplido',), 'capital': usd(it['balance_cents']), 'due': it['due_date'], 'days': it['days_overdue'],
                   'grace': pol['grace_days'], 'rate': rates[0]['rate'] if rates else 'Sin tasa validada', 'simulated': it['simulated_interest_cents'], 'authorized': 0,
-                  'reason': '' if it['state'] == 'compromiso_incumplido' else 'No exigible para intereses: ' + it['state_label'].lower() + '.'} for it in port['items'] if it['balance_cents'] > 0]
+                  'reason': '' if it['state'] == 'compromiso_incumplido' else 'No se simula: solo obligaciones con compromiso de pago incumplido (%s).' % it['state_label'].lower()} for it in port['items'] if it['balance_cents'] > 0]
     return {'client': {'id': client['id'], 'name': client['name'], 'phone': _mask(client['phone']), 'email': bool(client['email'])}, 'portfolio': port, 'orders': orders,
             'coverages': coverages, 'audit': trail, 'interests': interests,
             'payments': payments, 'quotes': quotes, 'invoices': invoices, 'commitments': commitments, 'agreements': agreements, 'messages': messages, 'replies': replies,

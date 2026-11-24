@@ -58,7 +58,7 @@ class CollectionsTests(unittest.TestCase):
         self.assertEqual((item['balance_cents'], item['state'], item['age'], item['days_overdue']), (6500, 'pago_al_retirar', 'sin_atraso', None))   # en el taller: pago al retirar, sin días de mora
         self.deliver(oid, 40)
         item = next(i for i in self.get('/api/collections')['items'] if i['order_id'] == oid)
-        self.assertEqual((item['state'], item['due_basis'], item['age']), ('pago_vencido', 'Entrega del equipo (pago al retirar)', '31_60'))
+        self.assertEqual((item['state'], item['due_basis'], item['age']), ('pago_vencido', 'Entrega del equipo', '31_60'))
         kpis = self.get('/api/collections')['kpis']
         self.assertEqual((kpis['overdue_cents'], kpis['authorized_interest_cents']), (6500, 0))
         self.assertEqual(self.get('/api/collections?age=mas_90')['total'], 0)
@@ -72,7 +72,7 @@ class CollectionsTests(unittest.TestCase):
         with app.connect() as c:
             c.execute('UPDATE payment_commitments SET due_date=? WHERE id=?', ((app.reception_now() - timedelta(days=120)).date().isoformat(), cid));c.commit()
         item = next(i for i in self.get('/api/collections')['items'] if i['order_id'] == oid)
-        self.assertEqual((item['due_basis'], item['days_overdue'], item['simulated_interest_cents'], item['state']), ('Fecha acordada en el compromiso de pago', 120, 85, 'compromiso_incumplido'))
+        self.assertEqual((item['due_basis'], item['days_overdue'], item['simulated_interest_cents'], item['state']), ('Compromiso de pago', 120, 85, 'compromiso_incumplido'))
         self.assertEqual(item['balance_cents'], 15000)                                  # el interés simulado nunca suma al saldo
 
     def test_flags_suspend_collection_and_need_reason(self):

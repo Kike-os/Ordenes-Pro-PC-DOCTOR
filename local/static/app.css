@@ -13825,3 +13825,73 @@ body[data-page=dashboard] .fxb-pager select{height:30px!important;min-height:30p
 .dbg-int{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:4px 14px;margin:0}.dbg-int dt{font-size:11px;color:#9fb4d4}.dbg-int dd{margin:0;font-size:12.5px;color:#e6efff;overflow-wrap:anywhere}
 .autocare-level-tag[data-level=resuelta]{background:#16315a;color:#9fb4d4}
 @media (prefers-reduced-motion:reduce){.dbg-hero,.dbg-dot{transition:none;animation:none!important}}
+/* ADI Smart Collections 3.1 — Premium Financial Management (solo .cc31, .cc-state, .cc-menu, .cc-tabs y relacionados). */
+.cc-kpi[data-tone=celeste]{border-top-color:#38bdf8}.cc-kpi[data-tone=azul]{border-top-color:#3b82f6}.cc-kpi[data-tone=naranja]{border-top-color:#fb923c}.cc-kpi[data-tone=violeta]{border-top-color:#a78bfa}
+.cc31{font-family:Inter,system-ui,sans-serif;font-size:12.5px}
+.cc31 th{font-size:11.5px;white-space:nowrap}
+.cc31 td{vertical-align:middle;padding-top:8px;padding-bottom:8px;font-variant-numeric:tabular-nums}
+.cc-code{display:flex;align-items:center;gap:4px;white-space:nowrap}
+.cc-link{border:0;background:none;padding:0;color:#93c5fd;font-weight:700;font-size:12.5px;cursor:pointer;white-space:nowrap;font-variant-numeric:tabular-nums}
+.cc-link:hover{text-decoration:underline}.cc-link:focus-visible,.cc-icon:focus-visible,.cc-menu-item:focus-visible,.cc-tab:focus-visible{outline:2px solid #7fb0ff;outline-offset:2px}
+.cc-icon{display:inline-grid;place-items:center;width:28px;height:28px;padding:0;border-radius:8px;border:1px solid #2b4a75;background:#10243f;color:#cfe0ff;cursor:pointer}.cc-icon svg{width:14px;height:14px}
+.cc-client{display:grid;gap:2px;min-width:0}.cc-client strong{font-weight:600;color:#e6efff}.cc-client small{font-size:11px;color:#fcd38a}
+.cc-amount{display:grid;gap:1px;text-align:right}.cc-amount strong{font-size:15.5px;color:#fff;font-weight:800}.cc-amount small{font-size:11px;color:#c4b5fd}
+.cc31 td[data-label="Capital pendiente"],.cc31 th:nth-child(4){text-align:right}
+.cc-due,.cc-days,.cc-statecell{display:grid;gap:1px;min-width:0}.cc-due small,.cc-days small,.cc-statecell small{font-size:11px;color:#9fb4d4}
+.cc-days strong{font-size:13px;color:#e6efff}
+.cc-state{display:inline-flex;align-items:center;gap:5px;width:max-content;max-width:100%;padding:2px 9px;border-radius:999px;font-size:11.5px;font-weight:700;border:1px solid;white-space:nowrap}
+.cc-state::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+.cc-state[data-tone=celeste]{color:#7dd3fc;border-color:#0e5a7a;background:#082f42}.cc-state[data-tone=azul]{color:#93c5fd;border-color:#1e4a8a;background:#0c2347}
+.cc-state[data-tone=amarillo]{color:#fde68a;border-color:#7a5a12;background:#2b200b}.cc-state[data-tone=naranja]{color:#fdba74;border-color:#7c3d12;background:#2d1708}
+.cc-state[data-tone=rojo]{color:#fca5a5;border-color:#7a2a2f;background:#2d1215}.cc-state[data-tone=violeta]{color:#c4b5fd;border-color:#4c3a8a;background:#1c1638}
+.cc-state[data-tone=verde]{color:#86efac;border-color:#1f6b4c;background:#0d2a20}.cc-state[data-tone=gris]{color:#cbd5e1;border-color:#3b4a60;background:#152033}
+.cc-rec{font-size:12px;color:#c4d3ea}
+.cc31 .cc-row-acts{flex-wrap:nowrap}.cc31 .cc-row-acts .inv-btn{min-height:30px;padding:0 10px;font-size:12px}
+.cc-menu{position:fixed;z-index:1300;display:grid;gap:2px;padding:6px;border-radius:12px;border:1px solid #2b4a75;background:#0d1b31;box-shadow:0 18px 40px #02071480}
+.cc-menu-item{display:flex;align-items:center;gap:8px;width:100%;min-height:34px;padding:0 10px;border:0;border-radius:8px;background:none;color:#dbe8fb;font-size:12.5px;text-align:left;cursor:pointer}
+.cc-menu-item:hover,.cc-menu-item:focus{background:#16315a}.cc-menu-item svg{width:15px;height:15px;color:#93c5fd}
+.cc-tabs{display:flex;gap:4px;overflow-x:auto;border-bottom:1px solid #23395c;padding-bottom:2px}
+.cc-tab{flex:none;min-height:34px;padding:0 12px;border:0;border-radius:9px 9px 0 0;background:none;color:#9fb4d4;font-size:12.5px;font-weight:700;cursor:pointer}
+.cc-tab[aria-selected=true]{background:#16315a;color:#fff;box-shadow:inset 0 -2px 0 #60a5fa}
+.cc-tabpanel{display:grid;gap:10px;min-width:0}.cc-tabpanel h3{margin:6px 0 0;font-size:13px;color:#e6efff}
+@media (prefers-reduced-motion:reduce){.cc-menu,.cc-state{transition:none}}
+@media (max-width:900px){
+ .cc31 thead{display:none}.cc31,.cc31 tbody{display:block;width:100%}
+ .cc31 tr{display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;padding:12px;margin:0 0 8px;border:1px solid #23395c;border-radius:12px;background:#0b172b}
+ .cc31 td{display:block;padding:0;border:0;min-width:0}
+ .cc31 td::before{content:attr(data-label);display:block;margin-bottom:2px;font-size:10.5px;color:#8198ba}
+ .cc31 td[data-label=Orden],.cc31 td[data-label=Cliente],.cc31 td[data-label=Acciones]{grid-column:1/-1}
+ .cc31 td[data-label=Orden]::before,.cc31 td[data-label=Acciones]::before{display:none}
+ .cc31 td[data-label="Capital pendiente"]{text-align:left}.cc31 .cc-amount{text-align:left}
+ .cc31 .cc-row-acts{flex-wrap:wrap}
+ .cc-file .cj-table thead{display:none}.cc-file .cj-table tr{display:grid;grid-template-columns:1fr 1fr;gap:4px 10px;padding:9px 0;border-bottom:1px solid #1b2b44}
+ .cc-file .cj-table td{padding:0;border:0;min-width:0}.cc-file .cj-table td::before{content:attr(data-label);display:block;font-size:10.5px;color:#8198ba}
+}
+.cc31 .cc-act{width:auto;padding:0 8px;gap:5px;height:30px}.cc31 .cc-act-label{font-size:12px;font-weight:700}
+.cc31 .cc-adi{background:#1d4ed8;border-color:#2563eb;color:#fff}
+@media (min-width:1281px) and (max-width:1799px){.cc31 .cc-act-label{display:none}.cc31 .cc-act{width:30px;padding:0}}
+.cc31 td[data-label=Equipo],.cc31 td[data-label=Cliente]{max-width:150px}
+.cc-file td[data-label=Orden]{white-space:nowrap}
+@media (max-width:1280px){
+ .cc31 thead{display:none}.cc31,.cc31 tbody{display:block;width:100%}
+ .cc31 tr{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:6px 12px;padding:12px;margin:0 0 8px;border:1px solid #23395c;border-radius:12px;background:#0b172b}
+ .cc31 td{display:block;padding:0;border:0;min-width:0;max-width:none}
+ .cc31 td::before{content:attr(data-label);display:block;margin-bottom:2px;font-size:10.5px;color:#8198ba}
+ .cc31 td[data-label=Orden],.cc31 td[data-label=Acciones]{grid-column:1/-1}.cc31 td[data-label=Orden]::before,.cc31 td[data-label=Acciones]::before{display:none}
+ .cc31 td[data-label="Capital pendiente"],.cc31 .cc-amount{text-align:left}.cc31 .cc-row-acts{flex-wrap:wrap}
+}
+@media (min-width:1281px){
+ .cc31{table-layout:fixed;width:100%;min-width:0}
+ .cc31 td{overflow-wrap:anywhere}
+ .cc31 th:nth-child(1){width:16%}.cc31 th:nth-child(2){width:11%}.cc31 th:nth-child(3){width:9%}.cc31 th:nth-child(4){width:9%}.cc31 th:nth-child(5){width:12%}
+ .cc31 th:nth-child(6){width:10%}.cc31 th:nth-child(7){width:7%}.cc31 th:nth-child(8){width:8%}.cc31 th:nth-child(9){width:8%}.cc31 th:nth-child(10){width:10%}
+ .cc31 .cc-row-acts{gap:4px}
+ .cc31 th,.cc31 td{padding-left:8px;padding-right:8px}.cc31 th{white-space:normal;line-height:1.2}
+ .cc31 .cc-state{white-space:normal;max-width:150px;line-height:1.2}
+ .cc31 .cc-link{font-size:12px}.cc31 .cc-icon:not(.cc-act){width:24px;height:24px}
+ .cc31 td[data-label="Días de atraso"]{max-width:90px}.cc31 td[data-label=Exigibilidad]{max-width:120px}.cc31 td[data-label=Conciliación],.cc31 td[data-label=Compromiso]{max-width:110px}
+}
+.cc31 .cc-row-acts{flex-wrap:wrap}.cc31 td{min-width:0}
+.cc31 .cc-state{white-space:normal;max-width:100%;line-height:1.25}
+.sfu-recipient{display:grid;gap:2px;padding:8px 10px;border:1px solid #23395c;border-radius:10px;background:#0b172b;font-size:12px;color:#dbe6f7;min-width:0}
+.sfu-recipient strong{font-size:11.5px;color:#9fb4d4}.sfu-recipient small{font-size:11.5px;color:#b9c8e2;overflow-wrap:anywhere}

@@ -40,7 +40,7 @@ def data_for(c, client_id, now, internal=False):
                        "JOIN orders o ON o.id=p.order_id JOIN devices d ON d.id=o.device_id WHERE d.client_id=? AND p.voided_at IS NULL GROUP BY COALESCE(o.group_id,o.id)", (client_id,)):
         pays[r['main']] = r['cents']
     rows = [{'code': it['code'], 'device': it['devices'], 'charges': it['charges_cents'], 'paid': pays.get(it['main_id'], 0), 'balance': it['balance_cents'],
-             'credit': it['credit_cents'], 'due': it['due_date'], 'basis': it['due_basis'] or 'Pago al retirar el equipo', 'days': it['days_overdue'],
+             'credit': it['credit_cents'], 'due': it['due_date'], 'basis': it['due_basis'] or 'Se paga al retirar', 'days': it['days_overdue'],
              'pending': it['pending_cents'], 'state': it['state_label'], 'simulated': it['simulated_interest_cents'] if internal else None, 'invoices': ', '.join(i['number'] for i in it['invoices'])} for it in items]
     return {'client': dict(client), 'cutoff': now, 'rows': rows, 'balance': sum(r['balance'] for r in rows), 'credit': sum(r['credit'] for r in rows),
             'pending': sum(r['pending'] for r in rows), 'grace': port['policy']['grace_days'], 'internal': internal,
