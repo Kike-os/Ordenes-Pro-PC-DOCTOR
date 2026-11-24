@@ -8,6 +8,24 @@
   },
   "releases": [
     {
+      "version": "1.5.334",
+      "date": "2026-11-24T08:29:10-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Encabezado sin desplazamiento horizontal hasta 1580 px",
+      "changes": {
+        "features": [],
+        "improvements": [],
+        "fixes": [
+          "Encabezado: el menú de administración también desbordaba entre 1521 y 1580 px (por ejemplo, una pantalla de 1920 px con zoom del 125 %). La corrección de la 1.5.329 se amplía a ese rango; verificado cada 4 px entre 1200 y 1700 px."
+        ],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Administración (autorización expresa en la sesión)"
+    },
+    {
       "version": "1.5.333",
       "date": "2026-11-24T08:27:27-05:00",
       "type": "patch",

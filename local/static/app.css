@@ -13777,7 +13777,7 @@ body[data-page=dashboard] .fxb-pager select{height:30px!important;min-height:30p
 .sfs-strip .piv-env i{width:8px;height:8px;border-radius:50%;background:#ff7fb6}
 @media (max-width:420px){.piv5 .piv-tool{padding:0 8px;font-size:12px}}
 /* 1.5.329 · El menú superior de administración no cabía entre 1300 y 1520 px (desplazamiento horizontal de ~23-47 px): relleno de 6 px como entre 1200 y 1299. */
-@media(min-width:1300px) and (max-width:1520px){.premium-header nav>a{padding:0 6px}.premium-header .assistance-menu summary{padding:0 6px}}
+@media(min-width:1300px) and (max-width:1580px){.premium-header nav>a{padding:0 6px}.premium-header .assistance-menu summary{padding:0 6px}}
 /* ADI 3.0 · fases 4 y 5 — Cartera ADI (solo .cc-*). */
 .cc-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;margin:0 0 12px}
 .cc-kpi{display:grid;gap:3px;padding:10px 12px;border-radius:11px;border:1px solid #23395c;background:#0b172b;border-top:3px solid #3b6fb3;min-width:0}
