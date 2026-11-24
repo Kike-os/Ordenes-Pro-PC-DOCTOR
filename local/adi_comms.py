@@ -9,20 +9,20 @@
 4. Retrasos: detecta retrasos verificables y, si son atribuibles a PC-DOCTOR, lo reconoce sin culpar al cliente y permite registrar la
    incidencia en el Centro de Control para el responsable.
 
-Nada de este módulo envía mensajes, registra pagos, cambia saldos, aplica intereses ni modifica la orden. Compromisos de pago (fase 2),
-intereses en simulación (fase 3) y estados de cuenta (fase 4) aparecen como «todavía no disponible», sin inventar datos."""
+Nada de este módulo envía mensajes, registra pagos, cambia saldos, aplica intereses ni modifica la orden. Fase 2: los compromisos de pago
+(payment_commitments.py) habilitan sus dos motivos y suspenden los recordatorios de saldo mientras haya uno vigente o en revisión. Intereses
+(fase 3, solo simulación) y estados de cuenta (fase 4) aparecen como «todavía no disponible», sin inventar datos."""
 import re
 from datetime import date, datetime, timedelta
 
 READY = ('listo', 'espera_entrega')
 WAITING_PARTS = ('solicitado', 'confirmado', 'preparacion', 'transito')
-COLLECTION = ('pago_pendiente',)           # motivos de cobranza: horario y máximo diario estrictos
-FINANCIAL = ('pago_pendiente', 'confirmacion_pago', 'listo_entrega')  # pueden llevar importes
+COLLECTION = ('pago_pendiente', 'compromiso_pago', 'compromiso_incumplido')   # cobranza: horario y máximo diario estrictos
+FINANCIAL = COLLECTION + ('confirmacion_pago', 'listo_entrega')                # pueden llevar importes
+DISCREET = COLLECTION + ('confirmacion_pago',)                                 # sin autorización de avisos: sin importes
 HOURS = (8, 19)                            # lunes a viernes laborables, hora de Ecuador
 DUPLICATE_HOURS = 24
 LATER = {
-    'compromiso_pago': 'Disponible con el módulo de compromisos de pago (fase 2 de ADI 3.0).',
-    'compromiso_incumplido': 'Disponible con el módulo de compromisos de pago (fase 2 de ADI 3.0).',
     'estado_cuenta': 'Disponible con los estados de cuenta (fase 4 de ADI 3.0).',
     'aviso_intereses': 'Los intereses solo se simulan: no se comunican a clientes sin validación jurídica y contable y autorización expresa.'}
 GROUPS = (('servicio', 'Servicio técnico'), ('entrega', 'Entrega y posventa'), ('pagos', 'Pagos'))
@@ -168,14 +168,36 @@ def analysis(c, oid, now):
             ('Saldo pendiente', fin['balance'] if fin else status_messages.UNVERIFIED, 'Pagos de la orden'),
             ('Facturas vinculadas', [('%s · %s · %s%s' % (i['number'], i['status_label'], i['total'], ' (autorizada no significa pagada)' if i['status'] == 'autorizado' else '')) for i in _invoices(c, oid)], 'Facturación'),
             ('Vencimientos', 'Sin fecha de vencimiento registrada', 'Pagos de la orden'),
-            ('Compromisos de pago', 'Módulo de compromisos: fase 2 (todavía no disponible)', 'ADI 3.0'))},
+            ('Compromisos de pago', _commitment_text(c, oid, now), 'Compromisos de pago'))},
         {'key': 'comunicacion', 'title': 'Comunicación', 'rows': rows(
             ('Mensajes anteriores', [('%s · %s · %s · %s' % (_fmt(m['created_at']) or '—', m['template'] or 'mensaje', m['channel'], m['status'])) for m in _messages(c, oid)] or 'Ninguno registrado', 'Comunicación de la orden'),
             ('Pendiente del cliente', 'Aprobar el presupuesto %s' % q['code'] if q and q['status'] == 'enviado' else 'Responder a la consulta del taller' if ctx['status'] == 'esperando_cliente' else 'Nada pendiente', 'Presupuestos · Órdenes'))}]
     found = delays(ctx, now)
     return {'order': {'id': oid, 'code': ctx['code'], 'status': ctx['status'], 'status_label': ctx['status_label']}, 'sections': sections, 'delays': found,
             'excluded': 'No incluye notas internas%s, costos de adquisición, márgenes, contraseñas ni credenciales.' % (' (%d omitidas)' % tech['internal_notes'] if tech.get('internal_notes') else ''),
-            'purposes': purposes(c, oid, ctx, fin, now, found)}
+            'purposes': purposes(c, oid, ctx, fin, now, found), 'commitments': _commitment(c, oid, now),
+            'commitment_rules': {'methods': __import__('payment_commitments').METHODS, 'sources': __import__('payment_commitments').SOURCES,
+                                 'free_days': __import__('payment_commitments').FREE_DAYS, 'max_days': __import__('payment_commitments').MAX_DAYS,
+                                 'balance': fin['balance'] if fin else '', 'balance_cents': fin['balance_cents'] if fin else 0}}
+
+
+def _commitment(c, oid, now):
+    import payment_commitments as pc
+    try:
+        return pc.for_order(c, oid, now.date())
+    except Exception as error:  # sin compromisos legibles se trata como «sin compromiso», nunca como deuda
+        print('adi-commitments', type(error).__name__, flush=True)
+        return {'installed': False, 'items': [], 'current': None, 'message': ''}
+
+
+def _commitment_text(c, oid, now):
+    info = _commitment(c, oid, now)
+    if not info['installed']:
+        return info['message'] or 'Módulo no disponible.'
+    cur = info['current']
+    if not cur:
+        return 'Ninguno vigente'
+    return '%s hasta el %s · %s%s' % (cur['amount'], cur['due'], cur['state_label'], ' · pagado desde el compromiso: %s' % cur['paid_since'] if cur['paid_since_cents'] else '')
 
 
 # ---- Motivos ------------------------------------------------------------------------------------------------------------------------------
@@ -190,7 +212,10 @@ def _eligibility(c, oid, ctx, fin, now, found):
     late_rep = [d for d in found if d['kind'] == 'reparacion' and d['attributable']]
     late_part = [d for d in found if d['kind'] == 'repuesto']
     quote_wait = bool(q and q['status'] == 'enviado')
+    cur = _commitment(c, oid, now)['current']
     return {
+        'compromiso_pago': (bool(cur and cur['state'] in ('pendiente', 'proximo')), 'No hay un compromiso de pago vigente registrado.'),
+        'compromiso_incumplido': (bool(cur and cur['state'] in ('incumplido', 'parcial')), 'No hay un compromiso vencido sin pagar (una transferencia por conciliar lo deja en revisión).'),
         'recepcion': (st in ('pendiente', 'diagnostico'), 'Solo mientras el equipo está recién recibido o en diagnóstico.'),
         'diagnostico_inicio': (st == 'diagnostico', 'La orden no está en diagnóstico.'),
         'diagnostico_fin': (bool(ctx['findings'] or ctx['diagnosis_followups']) and st not in READY + ('entregado', 'pendiente', 'diagnostico'), 'No hay un diagnóstico registrado o la orden ya está en otra etapa.'),
@@ -271,13 +296,29 @@ def base_text(c, oid, purpose, ctx, fin, now, note='', discreet=False):
         'garantia': 'Gracias por confiar en PC-DOCTOR. El servicio de %s cuenta con la garantía indicada en su documento de entrega; si nota cualquier novedad relacionada, escríbanos.' % device,
         'posventa': 'Gracias por confiar en PC-DOCTOR. Queremos saber si %s funciona correctamente después del servicio. Si tiene alguna inquietud, con gusto le atendemos.' % device,
         'pago_pendiente': status_messages.payment_text(fin) if fin else '',
+        'compromiso_pago': _commitment_message(c, oid, now, 'confirmar'),
+        'compromiso_incumplido': _commitment_message(c, oid, now, 'seguimiento'),
         'confirmacion_pago': 'Confirmamos el registro de su pago. %s' % ('El saldo de su orden está cubierto.' if fin and fin['balance_cents'] <= 0 else
                                                                          'Su orden registra un saldo pendiente de %s.' % fin['balance'] if fin else '')}
     text = texts[purpose].strip()
+    if purpose == 'pago_pendiente':
+        text += ' Si lo prefiere, indíquenos una fecha estimada de pago y la registraremos.'
     if purpose == 'pago_pendiente' and fin and fin['pending_transfers']:
         text += (' Si ya realizó una transferencia o depósito, está en proceso de conciliación (%s) y lo confirmaremos en cuanto se verifique; '
                  'en ese caso no es necesario volver a pagar.' % fin['pending'])
     return text
+
+
+def _commitment_message(c, oid, now, kind):
+    cur = _commitment(c, oid, now)['current']
+    if not cur:
+        return ''
+    if kind == 'confirmar':
+        return ('Confirmamos el compromiso de pago registrado: %s hasta el %s%s. Gracias por informarnos; si algo cambia, escríbanos antes de esa fecha.'
+                % (cur['amount'], cur['due'], ' (%s)' % cur['method_label'].lower() if cur['method_label'] else ''))
+    paid = ('Desde entonces consta un pago de %s.' % cur['paid_since']) if cur['paid_since_cents'] else 'Todavía no consta el pago.'
+    return ('Le escribimos sobre el compromiso de pago de %s registrado para el %s. %s Si ya lo realizó, indíquenos para verificarlo. Si necesita revisar '
+            'alternativas, nuestro equipo administrativo puede atenderle.' % (cur['amount'], cur['due'], paid))
 
 
 def compose(c, oid, purpose, channel, note='', use_ai=True, tone='profesional', now=None):
@@ -303,7 +344,7 @@ def compose(c, oid, purpose, channel, note='', use_ai=True, tone='profesional', 
         raise CommsError(status_messages.UNVERIFIED, 409)
     who = _client(c, oid)
     number = wa.number_for(who['phone'])
-    discreet = channel == 'whatsapp' and purpose in ('pago_pendiente', 'confirmacion_pago') and (not number or wa.consent_state(c, number)['state'] != 'aceptado')
+    discreet = channel == 'whatsapp' and purpose in DISCREET and (not number or wa.consent_state(c, number)['state'] != 'aceptado')
     body = base_text(c, oid, purpose, ctx, fin, now, note, discreet)
     source, warnings = 'sistema', []
     if discreet:
@@ -446,6 +487,11 @@ def precheck(c, oid, purpose, channel, text, fingerprint_value, now):
         level, detail = 'ok', 'Comunicación del servicio contratado.'
     if purpose in COLLECTION and _collection_today(c, who['id'], now):
         level, detail = 'block', 'Ya hubo una gestión de cobranza hoy con este cliente (máximo una al día entre todos los canales).'
+    cur = _commitment(c, oid, now)['current'] if purpose in COLLECTION else None
+    if cur and cur['state'] == 'en_revision':
+        level, detail = 'block', 'El compromiso de pago está en revisión (importe en controversia o transferencia por conciliar): se suspende la cobranza.'
+    elif cur and purpose == 'pago_pendiente' and cur['state'] in ('pendiente', 'proximo'):
+        level, detail = 'block', 'Hay un compromiso de pago vigente hasta el %s: no se envían recordatorios de saldo mientras esté vigente.' % cur['due']
     items.append(_item('consentimiento', 'Permisos y consentimiento', level, detail))
     items.append(_item('motivo', 'Motivo registrado', 'ok', 'Al continuar se registra el motivo «%s» en la auditoría.' % PURPOSES[purpose][0]))  # 12
     return {'ok': not any(i['level'] == 'block' for i in items), 'items': items, 'finance': fin}

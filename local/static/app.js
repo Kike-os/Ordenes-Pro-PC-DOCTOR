@@ -3595,12 +3595,42 @@ function statusMessageDialog(order){
  function paintAnalysis(a){anaBody.replaceChildren();
   for(const d of a.delays||[]){const box=el('div',undefined,'sfu-delay');box.dataset.attributable=String(!!d.attributable);box.append(systemIcon(ADI_ICONS.alert),el('span',d.detail+(d.attributable?' Retraso atribuible a PC-DOCTOR: reconócelo sin responsabilizar al cliente.':' '+(d.cause||''))));anaBody.append(box);}
   if((a.delays||[]).some(d=>d.attributable)){const reg=button('Registrar incidencia de retraso',async()=>{reg.disabled=true;try{await api(comms,{action:'delay'});toast('Incidencia registrada en el Centro de Control para el responsable.','success');}catch(problem){toast(problem.message,'error');reg.disabled=false;}},'secondary sfu-delay-btn');anaBody.append(reg);}
+  anaBody.append(commitmentBlock(a));
   const det=el('details',undefined,'sfu-ana-det'),sum=el('summary','Ver lo que ADI consultó');det.append(sum);
   for(const s of a.sections){const sec=el('section',undefined,'sfu-ana-sec');sec.append(el('h4',s.title));const list=el('dl');for(const r of s.rows){const d=el('div');const dd=el('dd');if(Array.isArray(r.value)){const ul=el('ul');for(const v of r.value)ul.append(el('li',v));dd.append(ul);}else dd.textContent=r.value;dd.append(el('small',r.source,'sfu-src'));d.append(el('dt',r.label),dd);list.append(d);}sec.append(list);det.append(sec);}
   anaBody.append(det,el('p',a.excluded,'sfu-muted'));
   const groups={servicio:'Servicio técnico',entrega:'Entrega y posventa',pagos:'Pagos'},keep=purposeSel.value;purposeSel.replaceChildren(new Option('Seguimiento del estado actual',''));let count=0;
   for(const[g,label]of Object.entries(groups)){const og=el('optgroup');og.label=label;for(const p of a.purposes.filter(x=>x.group===g)){const o=new Option(p.label+(p.available?'':' — no disponible'),p.key);o.disabled=!p.available;o.title=p.reason||'';o.dataset.group=g;if(p.available)count++;og.append(o);}purposeSel.append(og);}
   if([...purposeSel.options].some(o=>o.value===keep&&!o.disabled))purposeSel.value=keep;purposeHint.dataset.base=count+' motivos disponibles según los datos registrados de la orden.';paintPurpose();}
+ // ADI 3.0 · fase 2: compromiso de pago de la orden. Registrar o reprogramar exige la evidencia de cómo lo aceptó el cliente; no registra pagos.
+ function commitmentBlock(a){const info=a.commitments||{},rules=a.commitment_rules||{},box=el('section',undefined,'sfu-commit'),cur=info.current,admin=currentUser?.role==='administrador';
+  box.append(el('h4','Compromiso de pago'));if(!info.installed){box.append(el('p',info.message||'No disponible.','sfu-muted'));return box;}
+  if(cur){const line=el('p',undefined,'sfu-commit-line');const chip=el('span',cur.state_label,'sfu-commit-chip');chip.dataset.state=cur.state;line.append(chip,el('span',cur.amount+' hasta el '+cur.due+(cur.paid_since_cents?' · pagado desde entonces: '+cur.paid_since:'')+(cur.pending_transfer?' · transferencia por conciliar':'')));box.append(line);}
+  else box.append(el('p',rules.balance_cents>0?'Sin compromiso vigente. Saldo pendiente confirmado: '+rules.balance+'.':'Sin saldo pendiente: no corresponde un compromiso.','sfu-muted'));
+  const acts=el('div',undefined,'sfu-commit-acts'),open=cur&&['pendiente','proximo','en_revision','incumplido','parcial'].includes(cur.state);
+  if(!cur||!['pendiente','proximo','en_revision'].includes(cur.state)){if(rules.balance_cents>0)acts.append(button('Registrar compromiso',()=>commitmentDialog('create',null,rules),'secondary'));}
+  if(open){acts.append(button('Reprogramar',()=>commitmentDialog('reschedule',cur,rules),'secondary'));
+   if(cur.state!=='en_revision')acts.append(button('Pasar a revisión',()=>commitmentReason('review',cur,'Pasar a revisión','Motivo (p. ej., el cliente disputa el importe o hay una transferencia por conciliar)'),'secondary'));
+   else if(admin)acts.append(button('Cerrar revisión',()=>commitmentReason('close_review',cur,'Cerrar revisión','Resultado de la revisión'),'secondary'));
+   if(admin)acts.append(button('Cancelar',()=>commitmentReason('cancel',cur,'Cancelar compromiso','Motivo de la cancelación'),'secondary danger'));}
+  if(acts.childElementCount)box.append(acts);return box;}
+ async function commitmentSave(body,d,errorBox){try{await api('/api/orders/'+order.id+'/commitments',body);d.close();toast('Compromiso guardado. No se registró ningún pago.','success');loadAnalysis();}
+  catch(problem){errorBox.textContent=problem.message;}}
+ function commitmentDialog(mode,cur,rules){const d=smallDialog(mode==='create'?'Registrar compromiso de pago':'Reprogramar compromiso de pago');d.classList.add('sfu-commit-dialog');
+  const f=el('form',undefined,'sfu-commit-form');f.noValidate=true;const field=(label,input,hint)=>{const w=el('label',undefined,'sfu-field');w.append(el('span',label),input);if(hint)w.append(el('small',hint,'sfu-muted'));f.append(w);return input;};
+  const amount=field('Importe comprometido',Object.assign(el('input'),{inputMode:'decimal',value:cur?cur.amount.replace('$',''):(rules.balance||'').replace('$','')}),'Hasta el saldo pendiente confirmado ('+rules.balance+').');
+  const today=new Date(),iso=x=>new Date(x.getTime()-x.getTimezoneOffset()*6e4).toISOString().slice(0,10),max=new Date(today);max.setDate(max.getDate()+(rules.max_days||180));
+  const due=field('Fecha acordada de pago',Object.assign(el('input'),{type:'date',min:iso(today),max:iso(max)}),'Más de '+(rules.free_days||30)+' días cambia las condiciones: lo registra administración.');
+  const method=el('select');method.add(new Option('Sin especificar',''));for(const[k,v]of Object.entries(rules.methods||{}))method.add(new Option(v,k));field('Forma de pago',method);
+  const source=el('select');source.add(new Option('Elige…',''));for(const[k,v]of Object.entries(rules.sources||{}))source.add(new Option(v,k));field('Cómo lo aceptó el cliente',source);
+  const evidence=field('Evidencia de aceptación',Object.assign(el('textarea'),{rows:2,maxLength:300,placeholder:'Ej.: «El cliente confirmó por llamada el 24/11 que pagará el saldo el viernes»'}),'Obligatoria: el sistema no inventa aceptaciones.');
+  const notes=field('Observaciones (opcional)',Object.assign(el('textarea'),{rows:2,maxLength:300}));
+  const errorBox=el('p',undefined,'sfu-error');errorBox.setAttribute('role','alert');const bar=el('div',undefined,'dialog-actions');const save=el('button','Guardar compromiso','primary');save.type='submit';bar.append(button('Cancelar',()=>d.close(),'secondary'),save);f.append(errorBox,bar);d.append(f);
+  f.addEventListener('submit',event=>{event.preventDefault();errorBox.textContent='';commitmentSave({action:mode,id:cur?String(cur.id):'',amount:amount.value.trim(),due_date:due.value,method:method.value,evidence_source:source.value,evidence:evidence.value.trim(),notes:notes.value.trim()},d,errorBox);});amount.focus();}
+ function commitmentReason(action,cur,title,label){const d=smallDialog(title);d.classList.add('sfu-commit-dialog');const f=el('form',undefined,'sfu-commit-form');f.noValidate=true;
+  const w=el('label',undefined,'sfu-field'),reason=Object.assign(el('textarea'),{rows:3,maxLength:300});w.append(el('span',label),reason);const errorBox=el('p',undefined,'sfu-error');errorBox.setAttribute('role','alert');
+  const bar=el('div',undefined,'dialog-actions'),ok=el('button',title,'primary');ok.type='submit';bar.append(button('Volver',()=>d.close(),'secondary'),ok);f.append(w,errorBox,bar);d.append(f);
+  f.addEventListener('submit',event=>{event.preventDefault();errorBox.textContent='';commitmentSave({action,id:String(cur.id),reason:reason.value.trim()},d,errorBox);});reason.focus();}
  const loadAnalysis=async()=>{try{const a=await api(comms,{action:'analysis'});if(dialog.isConnected)paintAnalysis(a);}catch(problem){if(dialog.isConnected){anaBody.replaceChildren(el('p',problem.message,'sfu-muted'));purposeHint.textContent='';}}};loadAnalysis();
  const purposeCompose=async()=>{const r=await api(comms,{action:'compose',purpose:purposeSel.value,channel:form.elements.channel.value,note:note.value.trim(),tone:tone.value});
   return {...r,source_label:(r.source==='adi'?'Redactado por ADI':'Texto del sistema')+' · '+r.purpose_label+' · '+(r.channel==='correo'?'Correo':'WhatsApp'),finance_notes:[],

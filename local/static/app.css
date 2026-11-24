@@ -13680,3 +13680,14 @@ body[data-page=dashboard] .fxb-pager select{height:30px!important;min-height:30p
 .sfu-pre li[data-level=block]{border-left-color:#e05a5a;background:#2d1215}.sfu-pre li[data-level=block] svg{color:#ff8c8c}
 .sfu-pre li span{display:grid;gap:2px;min-width:0}.sfu-pre li strong{font-size:12.5px;color:#e6efff}.sfu-pre li small{font-size:12px;line-height:1.4;color:#c4d3ea;overflow-wrap:anywhere}
 .pcx-hint .pcx-cal{color:#93C5FD;font-weight:700;text-decoration:underline;text-underline-offset:2px}.pcx-hint .pcx-cal:focus-visible{outline:2px solid #7fb0ff;outline-offset:2px;border-radius:3px}
+/* ADI 3.0 · fase 2: compromiso de pago dentro del análisis de la orden. */
+.sfu-commit{display:grid;gap:6px;padding:9px 10px;border:1px solid #23395c;border-radius:10px;background:#0b172b;min-width:0}
+.sfu-commit h4{margin:0;font-size:11.5px;font-weight:800;color:#e6efff}
+.sfu-commit-line{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:0;font-size:12px;line-height:1.4;color:#dbe6f7}
+.sfu-commit-chip{display:inline-flex;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700;background:#16315a;color:#bcd6ff}
+.sfu-commit-chip[data-state=proximo],.sfu-commit-chip[data-state=en_revision]{background:#3a2a0c;color:#fcd38a}
+.sfu-commit-chip[data-state=incumplido],.sfu-commit-chip[data-state=parcial]{background:#3a1518;color:#ffb3b3}
+.sfu-commit-chip[data-state=cumplido]{background:#0f3324;color:#9fe3b9}
+.sfu-commit-acts{display:flex;flex-wrap:wrap;gap:6px}.sfu-commit-acts button{font-size:12px;min-height:32px}
+.sfu-commit-dialog{width:min(520px,calc(100vw - 32px))}.sfu-commit-form{display:grid;gap:10px}
+.sfu-commit-form input,.sfu-commit-form select,.sfu-commit-form textarea{width:100%;font-size:13px}

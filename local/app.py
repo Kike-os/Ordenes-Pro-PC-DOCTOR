@@ -4962,6 +4962,20 @@ class Handler(BaseHTTPRequestHandler):
                             audit(c,user['id'],'adi_report_prepared',oid);return self.reply(200,{'report':adi_order.report(ctx,adi_order.recommendations(ctx,now_adi))})
                     except adi_order.AdiOrderError as error:return self.reply(error.status,{'error':str(error)})
                     return self.reply(400,{'error':'Acción no válida.'})
+                commitments_match=re.fullmatch(r'/api/orders/([0-9]+)/commitments',path)
+                if commitments_match:
+                    # ADI 3.0 · fase 2: compromisos de pago. Registra lo que aceptó el cliente; no registra pagos ni cambia saldos.
+                    import payment_commitments
+                    oid=int(commitments_match[1])
+                    if not c.execute('SELECT 1 FROM orders WHERE id=?',(oid,)).fetchone():return self.reply(404,{'error':'Orden no disponible.'})
+                    if limited(c,'commitments:'+str(user['id']),limit=120,window=3600):return self.reply(429,{'error':'Demasiadas solicitudes. Intenta en unos minutos.'})
+                    now_pc=reception_now()
+                    try:
+                        c.commit();c.execute('BEGIN IMMEDIATE')
+                        payment_commitments.act(c,oid,user,data,now_pc,audit);c.commit()
+                    except payment_commitments.CommitmentError as error:
+                        c.rollback();return self.reply(error.status,{'error':str(error),'fields':error.fields})
+                    return self.reply(200,payment_commitments.for_order(c,oid,now_pc.date()))
                 adi_comms_match=re.fullmatch(r'/api/orders/([0-9]+)/adi-comms',path)
                 if adi_comms_match:
                     # ADI 3.0 · fase 1: análisis integral, mensajes por motivo, control previo y retrasos. No envía nada ni cambia la orden.
