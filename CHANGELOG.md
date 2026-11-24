@@ -4,6 +4,15 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.327 — 2026-11-24 02:04 (UTC-05:00)
+
+ADI 3.0 fases 2 y 3: compromisos de pago y simulador de intereses (solo simulación)
+
+### Nuevas funcionalidades
+
+- ADI 3.0 · fase 2: compromisos de pago (migración 119) con evidencia de aceptación, estados calculados con pagos confirmados (pendiente, próximo, cumplido, parcial, incumplido, en revisión, reprogramado, cancelado), reprogramación y cancelación controladas; con un compromiso vigente no se envían recordatorios de saldo.
+- ADI 3.0 · fase 3: Configuración financiera — Tasas legales Ecuador (migración 120, con fuente oficial, evidencia y doble validación) y simulador de intereses solo en modo simulación: gracia de 90 días, interés simple base 365 en Decimal, sin capitalizar ni cobrar retroactivamente; no afecta saldos ni se comunica al cliente.
+
 ## v1.5.326 — 2026-11-24 01:59 (UTC-05:00)
 
 ADI 3.0 fase 1 (comunicación inteligente) y Epson Precision Print 4.2

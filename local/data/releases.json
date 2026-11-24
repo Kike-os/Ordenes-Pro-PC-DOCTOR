@@ -8,6 +8,25 @@
   },
   "releases": [
     {
+      "version": "1.5.327",
+      "date": "2026-11-24T02:04:34-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "ADI 3.0 fases 2 y 3: compromisos de pago y simulador de intereses (solo simulación)",
+      "changes": {
+        "features": [
+          "ADI 3.0 · fase 2: compromisos de pago (migración 119) con evidencia de aceptación, estados calculados con pagos confirmados (pendiente, próximo, cumplido, parcial, incumplido, en revisión, reprogramado, cancelado), reprogramación y cancelación controladas; con un compromiso vigente no se envían recordatorios de saldo.",
+          "ADI 3.0 · fase 3: Configuración financiera — Tasas legales Ecuador (migración 120, con fuente oficial, evidencia y doble validación) y simulador de intereses solo en modo simulación: gracia de 90 días, interés simple base 365 en Decimal, sin capitalizar ni cobrar retroactivamente; no afecta saldos ni se comunica al cliente."
+        ],
+        "improvements": [],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Administración (autorización expresa en la sesión)"
+    },
+    {
       "version": "1.5.326",
       "date": "2026-11-24T01:59:42-05:00",
       "type": "patch",
