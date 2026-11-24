@@ -4957,6 +4957,34 @@ class Handler(BaseHTTPRequestHandler):
                             audit(c,user['id'],'adi_report_prepared',oid);return self.reply(200,{'report':adi_order.report(ctx,adi_order.recommendations(ctx,now_adi))})
                     except adi_order.AdiOrderError as error:return self.reply(error.status,{'error':str(error)})
                     return self.reply(400,{'error':'Acción no válida.'})
+                adi_comms_match=re.fullmatch(r'/api/orders/([0-9]+)/adi-comms',path)
+                if adi_comms_match:
+                    # ADI 3.0 · fase 1: análisis integral, mensajes por motivo, control previo y retrasos. No envía nada ni cambia la orden.
+                    import adi_comms
+                    if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
+                    oid=int(adi_comms_match[1]);action=str(data.get('action',''));now_c=reception_now()
+                    if not c.execute('SELECT 1 FROM orders WHERE id=?',(oid,)).fetchone():return self.reply(404,{'error':'Orden no disponible.'})
+                    purpose,channel=str(data.get('purpose','') or '')[:40],str(data.get('channel','') or '')[:20]
+                    text,fp=str(data.get('text','') or '')[:4000],str(data.get('fingerprint','') or '')[:64]
+                    try:
+                        if action=='analysis':
+                            if limited(c,'adi-comms-read:'+str(user['id']),limit=600,window=3600):return self.reply(429,{'error':'Demasiadas consultas. Intenta en unos minutos.'})
+                            return self.reply(200,adi_comms.analysis(c,oid,now_c))
+                        if action=='precheck':
+                            if limited(c,'status-verify:'+str(user['id']),limit=600,window=3600):return self.reply(429,{'error':'Demasiadas comprobaciones. Intenta en unos minutos.'})
+                            return self.reply(200,adi_comms.precheck(c,oid,purpose,channel,text,fp,now_c))
+                        if action=='record':
+                            check=adi_comms.precheck(c,oid,purpose,channel,text,fp,now_c)
+                            if not check['ok']:return self.reply(409,{'error':'El control previo al envío no se superó. Revisa los puntos marcados.','check':check})
+                            adi_comms.record(c,oid,purpose,user['id'],audit);return self.reply(200,{'ok':True})
+                        if action=='delay':
+                            return self.reply(200,adi_comms.register_delay(c,oid,user,now_c,audit))
+                        if action=='compose':
+                            if limited(c,'adi-write:'+str(user['id']),limit=60,window=3600):return self.reply(429,{'error':'Alcanzaste el límite de mensajes por hora. Intenta más tarde.'})
+                            result=adi_comms.compose(c,oid,purpose,channel,str(data.get('note','') or ''),str(data.get('ai','1'))!='0',str(data.get('tone','') or 'profesional')[:20],now_c)
+                            audit(c,user['id'],'adi_purpose_composed',oid);return self.reply(200,result)
+                    except adi_comms.CommsError as error:return self.reply(error.status,{'error':str(error)})
+                    return self.reply(400,{'error':'Acción no válida.'})
                 status_message=re.fullmatch(r'/api/orders/([0-9]+)/status-message',path)
                 if status_message:
                     import status_messages

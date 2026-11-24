@@ -3557,10 +3557,14 @@ function statusMessageDialog(order){
  const device=[receptionOptions?.device_types?.[order.type]||order.type,[order.brand,order.model].filter(Boolean).join(' ')].filter(Boolean).join(' · ')||'Sin datos del equipo';
  row('Equipo',device);row('Orden',displayCode(order));const statusDd=el('dd');statusDd.append(statusChip(order.status,order.status_label));row('Estado técnico',statusDd);const payDd=el('dd','Comprobando…');row('Estado de pago',payDd);
  const money=el('dl',undefined,'sfu-money');money.hidden=true;const notes=el('ul',undefined,'sfu-notes');info.append(dl,money,notes);
+ // ADI 3.0 · Análisis integral: lo que ADI consultó (filtrado en el servidor), retrasos verificables y motivos disponibles.
+ const comms='/api/orders/'+order.id+'/adi-comms',ana=card('Análisis integral de la orden','M9 11l3 3L22 4 M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11','sfu-analysis'),anaBody=el('div',undefined,'sfu-ana');
+ anaBody.append(el('p','Consultando la orden…','sfu-muted'));ana.append(anaBody);
  // B. Comunicación
  const comm=card('Comunicación','M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z'),channels=el('fieldset',undefined,'sfu-seg');channels.append(el('legend','Canal'));
  for(const[value,label,glyph]of [['whatsapp','WhatsApp','M7.9 20A9 9 0 1 0 4 16.1L2 22z'],['correo','Correo','M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z m18 3-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7']]){const opt=el('label'),radio=el('input');radio.type='radio';radio.name='channel';radio.value=value;radio.checked=value==='whatsapp';opt.append(radio,systemIcon(glyph),el('span',label));channels.append(opt);}
- const note=el('textarea');note.rows=2;note.maxLength=600;note.placeholder='Opcional: p. ej., «mencionar que se cambió la pasta térmica»';note.id='sfu-note';const noteBox=el('label',undefined,'sfu-field');noteBox.htmlFor='sfu-note';noteBox.append(el('span','Indicaciones adicionales para ADI'),note);comm.append(channels,noteBox);
+ const note=el('textarea');note.rows=2;note.maxLength=600;note.placeholder='Opcional: p. ej., «mencionar que se cambió la pasta térmica»';note.id='sfu-note';const noteBox=el('label',undefined,'sfu-field');noteBox.htmlFor='sfu-note';noteBox.append(el('span','Indicaciones adicionales para ADI'),note);const purposeSel=el('select');purposeSel.id='sfu-purpose';purposeSel.add(new Option('Seguimiento del estado actual',''));const purposeHint=el('small','Cargando motivos…','sfu-purpose-hint');
+ const purposeBox=el('label',undefined,'sfu-field sfu-purpose');purposeBox.htmlFor='sfu-purpose';purposeBox.append(el('span','Motivo de la comunicación'),purposeSel,purposeHint);comm.append(purposeBox,channels,noteBox);
  // C. Opciones inteligentes
  const opts=card('Opciones inteligentes',adiSpark),sw=(label,hint)=>{const s=AppSwitch({label,hint,className:'sfu-switch'});opts.append(s.wrap);return s;};
  const optPay=sw('Incluir información de pago confirmada','Solo con saldo pendiente registrado.'),optProgress=sw('Incluir avances técnicos','Diagnóstico, seguimientos y trabajos registrados.'),optDate=sw('Incluir fecha de entrega','Solo si está registrada y corresponde.');optProgress.input.checked=true;
@@ -3580,11 +3584,27 @@ function statusMessageDialog(order){
  const send=button('',()=>sendNow(),'primary sfu-send');const sendLabel=el('span','Enviar por WhatsApp');send.append(systemIcon(ADI_ICONS.send),sendLabel);copy.disabled=send.disabled=true;
  foot.append(hint,count,copy,send);form.append(body,error,foot);dialog.append(form);
  let state={fingerprint:'',generatedWith:'',finance:null};
- const optionKey=()=>JSON.stringify([form.elements.channel.value,optPay.input.checked,optProgress.input.checked,optDate.input.checked,tone.value]);
+ const optionKey=()=>JSON.stringify([purposeSel.value,form.elements.channel.value,optPay.input.checked,optProgress.input.checked,optDate.input.checked,tone.value]);
  const paintCount=()=>{count.textContent=text.value.length+' / 4000';};text.addEventListener('input',paintCount);
  const paintStale=()=>{const changed=state.generatedWith&&state.generatedWith!==optionKey();stale.hidden=!changed;stale.textContent=changed?'Cambiaste el canal o las opciones: pulsa «Regenerar» para actualizar el mensaje.':'';};
  const paintChannel=()=>{sendLabel.textContent=form.elements.channel.value==='correo'?'Enviar por correo':'Enviar por WhatsApp';paintStale();};
- for(const input of [...form.elements.channel,optPay.input,optProgress.input,optDate.input,tone])input.addEventListener('change',()=>{paintChannel();});
+ for(const input of [...form.elements.channel,optPay.input,optProgress.input,optDate.input,tone,purposeSel])input.addEventListener('change',()=>{paintChannel();});
+ let followOpts=null;const paintPurpose=()=>{const on=!!purposeSel.value,opt=purposeSel.selectedOptions[0];for(const s of [optPay,optProgress,optDate]){s.wrap.hidden=on;}
+  purposeHint.textContent=on?(opt.dataset.group==='pagos'?'Lo escribe el sistema con los valores registrados; la IA no interviene en mensajes de pago.':'El sistema escribe la base con los datos registrados; ADI solo puede mejorar la redacción.'):purposeHint.dataset.base||'';};
+ purposeSel.addEventListener('change',paintPurpose);
+ function paintAnalysis(a){anaBody.replaceChildren();
+  for(const d of a.delays||[]){const box=el('div',undefined,'sfu-delay');box.dataset.attributable=String(!!d.attributable);box.append(systemIcon(ADI_ICONS.alert),el('span',d.detail+(d.attributable?' Retraso atribuible a PC-DOCTOR: reconócelo sin responsabilizar al cliente.':' '+(d.cause||''))));anaBody.append(box);}
+  if((a.delays||[]).some(d=>d.attributable)){const reg=button('Registrar incidencia de retraso',async()=>{reg.disabled=true;try{await api(comms,{action:'delay'});toast('Incidencia registrada en el Centro de Control para el responsable.','success');}catch(problem){toast(problem.message,'error');reg.disabled=false;}},'secondary sfu-delay-btn');anaBody.append(reg);}
+  const det=el('details',undefined,'sfu-ana-det'),sum=el('summary','Ver lo que ADI consultó');det.append(sum);
+  for(const s of a.sections){const sec=el('section',undefined,'sfu-ana-sec');sec.append(el('h4',s.title));const list=el('dl');for(const r of s.rows){const d=el('div');const dd=el('dd');if(Array.isArray(r.value)){const ul=el('ul');for(const v of r.value)ul.append(el('li',v));dd.append(ul);}else dd.textContent=r.value;dd.append(el('small',r.source,'sfu-src'));d.append(el('dt',r.label),dd);list.append(d);}sec.append(list);det.append(sec);}
+  anaBody.append(det,el('p',a.excluded,'sfu-muted'));
+  const groups={servicio:'Servicio técnico',entrega:'Entrega y posventa',pagos:'Pagos'},keep=purposeSel.value;purposeSel.replaceChildren(new Option('Seguimiento del estado actual',''));let count=0;
+  for(const[g,label]of Object.entries(groups)){const og=el('optgroup');og.label=label;for(const p of a.purposes.filter(x=>x.group===g)){const o=new Option(p.label+(p.available?'':' — no disponible'),p.key);o.disabled=!p.available;o.title=p.reason||'';o.dataset.group=g;if(p.available)count++;og.append(o);}purposeSel.append(og);}
+  if([...purposeSel.options].some(o=>o.value===keep&&!o.disabled))purposeSel.value=keep;purposeHint.dataset.base=count+' motivos disponibles según los datos registrados de la orden.';paintPurpose();}
+ const loadAnalysis=async()=>{try{const a=await api(comms,{action:'analysis'});if(dialog.isConnected)paintAnalysis(a);}catch(problem){if(dialog.isConnected){anaBody.replaceChildren(el('p',problem.message,'sfu-muted'));purposeHint.textContent='';}}};loadAnalysis();
+ const purposeCompose=async()=>{const r=await api(comms,{action:'compose',purpose:purposeSel.value,channel:form.elements.channel.value,note:note.value.trim(),tone:tone.value});
+  return {...r,source_label:(r.source==='adi'?'Redactado por ADI':'Texto del sistema')+' · '+r.purpose_label+' · '+(r.channel==='correo'?'Correo':'WhatsApp'),finance_notes:[],
+   review:(r.delays||[]).map(d=>({level:d.attributable?'warn':'info',text:d.detail})),options:{payment:false,payment_available:false,date:false,date_available:false}};};
  const paintNotes=list=>notes.replaceChildren(...(list||[]).map(n=>{const li=el('li',n.text);li.dataset.level=n.level;return li;}));
  function paintFinance(fin,list,options){state.finance=fin;moneySlot.replaceChildren(sfuMoneyChip(fin));payDd.replaceChildren(sfuMoneyChip(fin));
   money.replaceChildren();money.hidden=!fin;if(fin){const add=(k,v,strong)=>{const d=el('div');d.append(el('dt',k),el(strong?'dd':'dd',v));if(strong)d.dataset.strong='true';money.append(d);};add(fin.scope==='orden'?'Total de la orden':'Total del servicio',fin.total);add('Pagos y anticipos'+(fin.payments?' ('+fin.payments+')':''),fin.paid);add('Saldo pendiente',fin.balance,true);if(fin.credit_cents)add('Saldo a favor',fin.credit);if(fin.pending_transfers)add('Transferencias por confirmar',fin.pending);}
@@ -3594,20 +3614,31 @@ function statusMessageDialog(order){
  (async()=>{try{const data=await api('/api/orders/'+order.id+'/status-message',{action:'verify',fingerprint:'',text:''});if(!dialog.isConnected)return;paintFinance(data.finance,data.notes,data.options);optPay.input.checked=!!data.options.payment;optDate.input.checked=!!data.options.date_available;}
   catch(problem){if(dialog.isConnected)paintFinance(null,[{level:'warn',text:'No se pudo verificar el estado financiero de esta orden.'}],{payment_available:false,date_available:false});}})();
  form.addEventListener('submit',async event=>{event.preventDefault();error.textContent='';go.disabled=regen.disabled=goMain.disabled=true;go.setAttribute('aria-busy','true');main.setAttribute('aria-busy','true');
-  try{const data=await api('/api/orders/'+order.id+'/status-message',{channel:form.elements.channel.value,note:note.value.trim(),include_payment:optPay.input.checked,include_progress:optProgress.input.checked,include_date:optDate.input.checked,tone:tone.value});
-   source.textContent=(data.source==='adi'?'Redactado por ADI con los datos registrados':'Plantilla del estado real')+' · '+data.channel_label;text.value=data.body;paintCount();
+  try{const data=purposeSel.value?await purposeCompose():await api('/api/orders/'+order.id+'/status-message',{channel:form.elements.channel.value,note:note.value.trim(),include_payment:optPay.input.checked,include_progress:optProgress.input.checked,include_date:optDate.input.checked,tone:tone.value});
+   source.textContent=data.source_label||(data.source==='adi'?'Redactado por ADI con los datos registrados':'Plantilla del estado real')+' · '+data.channel_label;text.value=data.body;paintCount();
    paintFinance(data.finance,data.finance_notes,data.options);optPay.input.checked=!!data.options.payment;optDate.input.checked=!!data.options.date;
    const items=[...(data.review||[]),...(data.warnings||[]).map(w=>({level:'warn',text:w}))];review.replaceChildren(...items.map(n=>{const li=el('li');li.dataset.level=n.level;li.append(systemIcon(n.level==='warn'?ADI_ICONS.alert:ADI_ICONS.lightbulb),el('span',n.text));return li;}));
-   state={fingerprint:data.finance?.fingerprint||'',generatedWith:optionKey(),finance:data.finance};empty.hidden=true;out.hidden=false;regen.hidden=false;copy.disabled=send.disabled=false;paintStale();check.runNow();text.focus({preventScroll:true});text.setSelectionRange(0,0);text.scrollTop=0;}
+   state={fingerprint:data.finance?.fingerprint||'',generatedWith:optionKey(),finance:data.finance,purpose:data.purpose||''};empty.hidden=true;out.hidden=false;regen.hidden=false;copy.disabled=send.disabled=false;paintStale();check.runNow();text.focus({preventScroll:true});text.setSelectionRange(0,0);text.scrollTop=0;}
   catch(problem){error.textContent=problem.message;}finally{go.disabled=regen.disabled=goMain.disabled=false;go.removeAttribute('aria-busy');main.removeAttribute('aria-busy');}});
  // Envío: el saldo se vuelve a comprobar; si cambió desde que se generó el texto, se pide actualizar el mensaje antes de continuar.
  async function sendNow(){const value=text.value.trim();if(!value){error.textContent='Escribe o genera el mensaje antes de enviarlo.';text.focus();return;}error.textContent='';send.disabled=true;
+  if(state.purpose){try{await purposeSend(value);}finally{send.disabled=false;}return;}
   try{const data=await api('/api/orders/'+order.id+'/status-message',{action:'verify',fingerprint:state.fingerprint,text:value});paintFinance(data.finance,data.notes,null);
    if(!data.ok){error.replaceChildren(el('span',data.problems.join(' ')),button('Actualizar mensaje',()=>form.requestSubmit(),'secondary sfu-refresh'));return;}
    const channel=form.elements.channel.value,label=channel==='correo'?'correo electrónico':'WhatsApp';
    const answer=await confirmClose({title:'¿Continuar con el envío por '+label+'?',text:'Se abrirá la comunicación de la orden '+displayCode(order)+' con este mensaje. Allí revisas el destinatario y confirmas el envío; solo se marca como enviado cuando el servicio lo confirma.',keep:'Revisar de nuevo',discard:'Continuar al envío',icon:ADI_ICONS.send,plain:true});
    if(answer!=='discard')return;dialog.close();orderMessageComposer(order.id,null,value,'',channel);}
   catch(problem){error.textContent=problem.message;}finally{send.disabled=false;}}
+ // ADI 3.0 · Control previo al envío: 12 comprobaciones con la orden consultada de nuevo. Un bloqueo impide continuar; el envío real se
+ // confirma después en la comunicación de la orden. Al continuar solo se registra el motivo (no se envía nada desde aquí).
+ async function purposeSend(value){const channel=form.elements.channel.value,purpose=state.purpose;let r;
+  try{r=await api(comms,{action:'precheck',purpose,channel,text:value,fingerprint:state.fingerprint});}catch(problem){error.textContent=problem.message;return;}
+  const d=smallDialog('Control previo al envío');d.classList.add('sfu-pre-dialog');const ul=el('ul',undefined,'sfu-pre');
+  for(const i of r.items){const li=el('li');li.dataset.level=i.level;li.append(systemIcon(i.level==='ok'?'M20 6 9 17l-5-5':ADI_ICONS.alert));const tx=el('span');tx.append(el('strong',i.label),el('small',i.detail));li.append(tx);ul.append(li);}
+  const blocks=r.items.filter(i=>i.level==='block').length,warns=r.items.filter(i=>i.level==='warn').length,lead=el('p',r.ok?(warns?'Se puede continuar; revisa '+(warns===1?'el aviso marcado':'los '+warns+' avisos marcados')+'.':'Todo en orden.')+' Al continuar se registra el motivo y se abre la comunicación de la orden, donde confirmas el destinatario y el envío.':blocks+(blocks===1?' punto impide':' puntos impiden')+' continuar. Corrígelo y vuelve a intentarlo.','sfu-pre-lead');lead.dataset.ok=String(r.ok);
+  const bar=el('div',undefined,'dialog-actions'),back=button('Revisar de nuevo',()=>d.close(),'secondary'),go=button('Continuar al envío',async()=>{go.disabled=true;
+   try{await api(comms,{action:'record',purpose,channel,text:value,fingerprint:state.fingerprint});d.close();dialog.close();orderMessageComposer(order.id,null,value,'',channel);}
+   catch(problem){toast(problem.message,'error');go.disabled=false;}},'primary');go.disabled=!r.ok;bar.append(back,go);d.append(lead,ul,bar);(r.ok?go:back).focus();}
  paintChannel();setTimeout(()=>form.querySelector('input[name=channel]:checked')?.focus(),30);}
 // 1.5.270 · Detalle de la orden — Executive Compact 5.0. Cuatro módulos plegables en dos columnas, cada uno con un resumen visible:
 // comunicaciones (correo del sistema con su estado de entrega real, buzón y WhatsApp, en un solo historial con filtros), seguimiento del
