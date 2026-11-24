@@ -4,6 +4,12 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## Sin publicar
+
+### Errores corregidos
+
+- Reportes: la hora «Actualizado a las…» de la barra de filtros se muestra siempre en hora de Ecuador, igual que el reloj y el indicador EN VIVO.
+
 ## v1.5.335 — 2026-11-24 12:13 (UTC-05:00)
 
 Live Support 4.0, confirmaciones de lectura y Mission Control 5.1

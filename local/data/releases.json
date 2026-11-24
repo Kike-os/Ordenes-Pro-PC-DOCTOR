@@ -2,7 +2,9 @@
   "unreleased": {
     "features": [],
     "improvements": [],
-    "fixes": [],
+    "fixes": [
+      "Reportes: la hora «Actualizado a las…» de la barra de filtros se muestra siempre en hora de Ecuador, igual que el reloj y el indicador EN VIVO."
+    ],
     "security": [],
     "performance": []
   },

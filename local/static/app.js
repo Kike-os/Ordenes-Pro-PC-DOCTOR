@@ -2727,7 +2727,7 @@ async function renderReports(){
   totals.textContent='Clientes registrados: '+data.clients+' · Equipos registrados: '+data.devices;
   if(window.echarts)paintCharts(board);
  }
- const stamp=()=>new Date().toLocaleTimeString('es-EC',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
+ const stamp=()=>new Date(Date.now()+clockOffset).toLocaleTimeString('es-EC',{timeZone:'America/Guayaquil',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
  async function load(silent){if(busy)return;busy=true;if(!silent)wrap.dataset.loading='true';live.dataset.state='azul';paintLive('azul');
   try{const data=await api(reportQuery());if(!wrap.isConnected)return;paint(data);financePanel.refresh();if(admin())mcFinance.refresh();setConn(true,'Actualizado a las '+stamp()+' · se consulta cada '+REPORT_REFRESH/1000+' s');if(state.drill)openDrill(state.drill.group,state.drill.value,state.drill.label,true);}
   catch(error){if(wrap.isConnected)setConn(false,latest?'Sin conexión con el servidor. Se muestran los últimos datos; reintentando…':error.message);}
