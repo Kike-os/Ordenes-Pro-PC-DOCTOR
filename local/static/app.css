@@ -13794,3 +13794,34 @@ body[data-page=dashboard] .fxb-pager select{height:30px!important;min-height:30p
 .cc-file-acts{display:flex;flex-wrap:wrap;gap:6px}.cc-file-acts .inv-btn{min-height:34px;font-size:12px}
 .cc-sec{display:grid;gap:6px;min-width:0}.cc-sec h3{margin:0;font-size:13px;color:#e6efff}
 @media (max-width:640px){.cc-filter-actions{grid-column:1/-1}.cc-kpi strong{font-size:15px}}
+/* Database Guardian Pro 1.0 (solo .dbg*). */
+.dbg{display:grid;gap:12px;font-family:Inter,system-ui,sans-serif}
+.dbg-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px}.dbg-head h2{margin:0}.dbg-sub{font-size:12px;color:#8fa9cc}
+.dbg-hero{display:flex;gap:12px;align-items:center;padding:12px 14px;border-radius:12px;border:1px solid #23395c;background:#0f2038;transition:background-color .3s ease,border-color .3s ease}
+.dbg-hero div{display:grid;gap:2px;min-width:0}.dbg-hero strong{font-size:16px;color:#fff}.dbg-hero small{font-size:12.5px;line-height:1.4;color:#c4d3ea;overflow-wrap:anywhere}
+.dbg-dot{width:13px;height:13px;border-radius:50%;flex:none;background:#7b8aa3;transition:background-color .3s ease,box-shadow .3s ease}
+.dbg-hero[data-level=verde]{border-color:#1f6b4c;background:#0d2a20}.dbg-hero[data-level=verde] .dbg-dot{background:#34d399;box-shadow:0 0 0 4px rgba(52,211,153,.18)}
+.dbg-hero[data-level=amarillo]{border-color:#7a5a12;background:#2b200b}.dbg-hero[data-level=amarillo] .dbg-dot{background:#fbbf24;box-shadow:0 0 0 4px rgba(251,191,36,.18)}
+.dbg-hero[data-level=rojo]{border-color:#7a2a2f;background:#2d1215}.dbg-hero[data-level=rojo] .dbg-dot{background:#f87171;box-shadow:0 0 0 4px rgba(248,113,113,.2)}
+.dbg-hero[data-level=azul]{border-color:#2b4f8a;background:#0f2447}.dbg-hero[data-level=azul] .dbg-dot{background:#60a5fa;box-shadow:0 0 0 4px rgba(96,165,250,.22);animation:dbg-pulse 1.4s ease-in-out infinite}
+@keyframes dbg-pulse{50%{box-shadow:0 0 0 7px rgba(96,165,250,.05)}}
+.dbg-muted{color:#8fa9cc!important;font-size:12px}
+.dbg-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px}
+.dbg-tile{display:grid;gap:3px;padding:9px 11px;border-radius:10px;border:1px solid #23395c;background:#0b172b;border-top:3px solid #3b4f6e;min-width:0}
+.dbg-tile small{display:flex;gap:6px;align-items:center;font-size:11.5px;color:#9fb4d4}.dbg-tile small svg{width:14px;height:14px}
+.dbg-tile strong{font-size:13.5px;color:#fff;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+.dbg-tile[data-level=verde]{border-top-color:#34d399}.dbg-tile[data-level=amarillo]{border-top-color:#fbbf24}.dbg-tile[data-level=rojo]{border-top-color:#f87171}
+.dbg-spark{display:grid;gap:4px;color:#7fb0ff}.dbg-spark svg{width:100%;max-width:520px;height:40px}
+.dbg-acts{display:flex;flex-wrap:wrap;gap:6px}.dbg-acts .inv-btn{min-height:34px;font-size:12px}
+.dbg-out{display:grid;gap:6px}.dbg-out h3,.dbg-hist h3{margin:0;font-size:13px;color:#e6efff}
+.dbg-migs,.dbg-hist ul{list-style:none;display:grid;gap:5px;margin:0;padding:0;max-height:420px;overflow:auto}
+.dbg-migs li,.dbg-hist li{display:grid;gap:2px;padding:7px 10px;border-radius:9px;background:#0b172b;border:1px solid #1c2f4d;border-left:3px solid #34d399;min-width:0}
+.dbg-migs li strong,.dbg-hist li strong{font-size:12.5px;color:#e6efff}.dbg-migs li small,.dbg-hist li small{font-size:11.5px;color:#b9c8e2;overflow-wrap:anywhere}
+.dbg-migs li[data-state=pendiente],.dbg-hist li[data-state=activa],.dbg-hist li[data-state=diagnostico]{border-left-color:#fbbf24}
+.dbg-migs li:not([data-state=verificada]):not([data-state=pendiente]),.dbg-hist li[data-state=intervencion]{border-left-color:#f87171}
+.dbg-hist li[data-state=recuperacion]{border-left-color:#60a5fa}
+.dbg-hist p{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:0}.dbg-hist code{font-size:11px;color:#9fb4d4}
+.dbg-state{font-size:11px;font-weight:700;padding:1px 7px;border-radius:999px;background:#16315a;color:#cfe0ff}
+.dbg-int{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:4px 14px;margin:0}.dbg-int dt{font-size:11px;color:#9fb4d4}.dbg-int dd{margin:0;font-size:12.5px;color:#e6efff;overflow-wrap:anywhere}
+.autocare-level-tag[data-level=resuelta]{background:#16315a;color:#9fb4d4}
+@media (prefers-reduced-motion:reduce){.dbg-hero,.dbg-dot{transition:none;animation:none!important}}

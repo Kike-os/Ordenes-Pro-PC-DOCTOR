@@ -172,6 +172,11 @@ def build(c, user, now, mail_access=False, hidden=False, limit=40):
             items += autocare.notifications(c, now)
         except Exception as error:
             print('autocare avisos', type(error).__name__, flush=True)
+        try:
+            import db_guardian
+            items += db_guardian.notifications(c, now)
+        except Exception as error:
+            print('db-guardian avisos', type(error).__name__, flush=True)
 
     def alert(name, count, icon, kind, title, detail, href):
         # La clave incluye el día y la cantidad: si la situación cambia, vuelve a aparecer como no leída.

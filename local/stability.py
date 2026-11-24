@@ -95,12 +95,22 @@ def checks(c, deep=False, now=None):
         began = time.monotonic()
         c.execute('SELECT 1').fetchone()
         ms = round((time.monotonic() - began) * 1000)
-        files = {p.name for p in (ROOT / 'migrations').glob('*.sql')}
-        applied = {row[0] for row in c.execute('SELECT name FROM migrations')}
-        missing = sorted(files - applied)
-        if missing:
-            raise RuntimeError('Faltan migraciones: ' + ', '.join(missing[:3]))
-        detail = str(len(files)) + ' migraciones aplicadas · respuesta en ' + str(ms) + ' ms'
+        # Database Guardian (1.5.331): el estado de las migraciones se verifica con la estructura real, no comparando cantidades.
+        # Causa raíz de la incidencia del 24/11/2026 02:04: Vercel publica el código antes de que administración aplique las migraciones
+        # aditivas; esa espera de minutos se marcaba como fallo CRÍTICO aunque la conexión era correcta y el código tolera las tablas
+        # ausentes. Ahora una migración aditiva pendiente es una ADVERTENCIA; siguen siendo críticas la estructura incompleta o sin
+        # registro, una migración modificada o duplicada y una migración no aditiva pendiente.
+        import db_guardian
+        mig = db_guardian.migrations(c, ROOT / 'migrations')
+        if mig['problems']:
+            first = mig['problems'][0]
+            raise RuntimeError('Esquema inconsistente: ' + first['name'] + ' · ' + first['problems'][0]['detail'])
+        pending = mig['pending']
+        if any(not item['additive'] for item in pending):
+            raise RuntimeError('Migración no aditiva pendiente: ' + ', '.join(i['name'] for i in pending if not i['additive'])[:200])
+        detail = str(mig['verified']) + ' de ' + str(mig['total']) + ' migraciones verificadas · respuesta en ' + str(ms) + ' ms'
+        if pending:
+            return ('warning', detail + ' · pendientes de aplicar (aditivas, el código las tolera): ' + ', '.join(i['name'] for i in pending[:3]))
         return ('warning', detail + ' (respuesta lenta)') if ms > 1500 else detail
 
     def authentication():

@@ -1351,7 +1351,7 @@ async function renderAutoCare(box,preset){
   const rows=data.incidents.filter(item=>autocareState.incidents==='todas'||(autocareState.incidents==='abiertas'?item.status!=='resuelta':item.status==='resuelta'));
   if(!rows.length){panel.append(el('p',autocareState.incidents==='abiertas'?'Sin incidencias abiertas.':'Sin incidencias en esta vista.','autocare-empty'));return;}
   const list=el('div',undefined,'autocare-list');for(const item of rows){const card=el('article',undefined,'autocare-incident');card.dataset.severity=autocareSeverity[item.severity]||'medium';card.dataset.state=item.status;
-   const top=el('div',undefined,'autocare-incident-top'),level=el('b',autocareLevels[item.severity]||item.severity,'autocare-level-tag');level.dataset.level=item.severity;level.title='Gravedad interna: '+item.severity;top.append(el('code',item.code),level,el('strong',item.service),el('span',data.incident_states[item.status]||item.status,'autocare-incident-state'));if(item.reopened)top.append(el('span','Reabierta','autocare-incident-reopened'));
+   const top=el('div',undefined,'autocare-incident-top'),level=el('b',(item.status==='resuelta'?'Gravedad potencial: ':'')+(autocareLevels[item.severity]||item.severity),'autocare-level-tag');level.dataset.level=item.status==='resuelta'?'resuelta':item.severity;level.title=item.status==='resuelta'?'Gravedad potencial del servicio; la incidencia está resuelta y no está activa.':'Gravedad interna: '+item.severity;top.append(el('code',item.code),level,el('strong',item.service),el('span',data.incident_states[item.status]||item.status,'autocare-incident-state'));if(item.reopened)top.append(el('span','Reabierta','autocare-incident-reopened'));
    const dl=el('dl');for(const[k,v]of [['Descripción',item.description],['Posible causa',item.cause],['Acción recomendada',item.action],['Repeticiones',String(item.count)+(item.count===1?' vez':' veces')+' · primera '+formatOrderDate(item.first_at)+(item.count>1?' · última '+formatOrderDate(item.last_at):'')+' · origen: '+item.source],['Resolución',item.resolved_at?formatOrderDate(item.resolved_at)+' · '+(item.resolved_by||''):'']]){if(!v)continue;const row=el('div');row.append(el('dt',k),el('dd',v));dl.append(row);}
    card.append(top,dl);
    // Detalle técnico del último error (sin datos personales, valores ni secretos): módulo, endpoint, método, código HTTP, usuario, punto del código…
@@ -1459,6 +1459,48 @@ function autocareIncidentDialog(item,status,text,needNote,box){
 // Migraciones de la base central (1.5.317, solo administración). Vercel no aplica migraciones al desplegar: desde aquí el servidor aplica
 // solo las aditivas (crear tablas o índices nuevos), con un respaldo verificado de las últimas 24 h y escribiendo APLICAR. El servidor
 // vuelve a comprobar el rol, el respaldo y cada sentencia, y registra la acción en la auditoría.
+// PC-DOCTOR — Database Guardian Pro 1.0 (solo administración). Estado real de la base de datos: verde operativo, amarillo advertencia,
+// rojo incidencia crítica, azul recuperación en curso y gris sin verificar. La gravedad POTENCIAL del componente se muestra aparte de su
+// estado actual. Las comprobaciones son de solo lectura; la reparación controlada solo libera un bloqueo caducado o aplica migraciones
+// aditivas desde la tarjeta de migraciones (respaldo verificado y APLICAR).
+function dbGuardianCard(){invIcons['circle-alert']??='<circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/>';const card=el('section',undefined,'data-panel dbg');card.setAttribute('aria-labelledby','dbg-title');
+ const head=el('header',undefined,'dbg-head'),title=el('h2','Database Guardian Pro');title.id='dbg-title';head.append(title,el('span','Self-Healing & Migration Control','dbg-sub'));
+ const hero=el('div',undefined,'dbg-hero'),grid=el('div',undefined,'dbg-grid'),spark=el('div',undefined,'dbg-spark'),acts=el('div',undefined,'dbg-acts'),out=el('div',undefined,'dbg-out'),hist=el('section',undefined,'dbg-hist');
+ hero.setAttribute('role','status');hero.setAttribute('aria-live','polite');card.append(head,hero,grid,spark,acts,out,hist);
+ const ms=v=>v==null?'—':v+' ms',when=v=>v?formatOrderDate(v):'—';
+ const tile=(icon,label,value,level)=>{const t=el('div',undefined,'dbg-tile');t.dataset.level=level||'';const h=el('small');h.append(invIcon(icon),el('span',label));t.append(h,el('strong',value));return t;};
+ let last=null;
+ const paint=d=>{last=d;hero.dataset.level=d.level;hero.replaceChildren(el('i',undefined,'dbg-dot'),Object.assign(el('div'),{}));const t=hero.lastChild;
+  t.append(el('strong',d.label),el('small',d.reason||(d.level==='verde'?'Conectividad e integridad verificadas.':'')),el('small',d.component.name+' · gravedad potencial: '+d.component.potential_severity+' (no indica una incidencia activa)','dbg-muted'));
+  const m=d.migrations;grid.replaceChildren(tile('activity','Tiempo de respuesta',ms(d.latency_ms),d.latency_ms==null?'':d.latency_ms>=800?'amarillo':'verde'),tile('timer','Latencia mediana (p50)',ms(d.latency.p50)),
+   tile('timer','Percentil 90',ms(d.latency.p90)),tile('timer','Percentil 95',d.latency.p95==null?'Faltan mediciones':ms(d.latency.p95)),tile('clock','Última comprobación',when(d.checked_at)),
+   tile('badge-check','Última conexión satisfactoria',when(d.last_ok),d.last_ok?'verde':''),tile('server','Migraciones aplicadas',m.applied+' de '+m.total+' · '+m.verified+' verificadas',m.verified===m.total?'verde':'amarillo'),
+   tile('history','Migraciones pendientes',d.pending.length?d.pending.join(', '):'Ninguna',d.pending.length?'amarillo':'verde'),tile('shield-check','Compatibilidad del esquema',d.schema_ok?'Íntegro':'Con inconsistencias',d.schema_ok?'verde':'rojo'),
+   tile('circle-alert','Incidencias activas',String(d.incidents_active),d.incidents_active?'rojo':'verde'),tile('badge-check','Incidencias resueltas',String(d.incidents_resolved)),tile('package','Versión desplegada','v'+d.version));
+  spark.replaceChildren();if(d.samples&&d.samples.length>1){const max=Math.max(...d.samples,1),w=240,h=36,svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox','0 0 '+w+' '+h);svg.setAttribute('role','img');svg.setAttribute('aria-label','Últimas '+d.samples.length+' mediciones de latencia');
+   const pts=d.samples.map((v,i)=>(i*w/(d.samples.length-1)).toFixed(1)+','+(h-2-(v/max)*(h-6)).toFixed(1)).join(' ');const line=document.createElementNS('http://www.w3.org/2000/svg','polyline');line.setAttribute('points',pts);line.setAttribute('fill','none');line.setAttribute('stroke','currentColor');line.setAttribute('stroke-width','1.6');svg.append(line);spark.append(el('small','Latencia reciente','dbg-muted'),svg);}
+  hist.replaceChildren(el('h3','Historial de incidencias'));const items=d.incidents||[];if(!items.length)hist.append(el('p','Sin incidencias registradas.','dbg-muted'));
+  else{const ul=el('ul');for(const i of items.slice(0,12)){const li=el('li');li.dataset.state=i.status;const top=el('p');top.append(el('code',i.id),el('strong',i.type),el('span',(d.states||{})[i.status]||i.status,'dbg-state'));
+    li.append(top,el('small','Detectada: '+when(i.detected_at)+(i.resolved_at?' · resuelta: '+when(i.resolved_at)+(i.duration_min!=null?' ('+i.duration_min+' min)':''):'')+' · componente: '+i.component+' · versión '+(i.version||'—')+(i.count>1?' · '+i.count+' apariciones':'')+(i.attempts?' · '+i.attempts+' intento(s) de recuperación':'')),
+     el('small','Causa: '+i.cause,'dbg-muted'));if(i.actions&&i.actions.length)li.append(el('small','Acciones: '+i.actions.map(a=>a.action).slice(-3).join(' · '),'dbg-muted'));ul.append(li);}hist.append(ul);}};
+ const run=async(action,label)=>{hero.dataset.level='azul';hero.querySelector('strong')&&(hero.querySelector('strong').textContent='Recuperación en curso · '+label);out.replaceChildren();
+  try{const r=await api('/api/system/db-guardian',{action});paint(r);
+   if(r.migration_items){const ul=el('ul',undefined,'dbg-migs');for(const m of r.migration_items.slice().reverse().slice(0,action==='verify_migrations'?200:8)){const li=el('li');li.dataset.state=m.state;li.append(el('strong',m.name),el('span',{verificada:'Verificada',pendiente:'Pendiente',incompleta:'Incompleta',sin_registro:'Estructura sin registro',modificada:'Modificada',duplicada:'Duplicada'}[m.state]||m.state,'dbg-state'),
+     el('small',(m.applied_at?'Aplicada '+when(m.applied_at)+(m.duration_ms!=null?' · '+m.duration_ms+' ms':''):m.result||'—')+' · checksum '+m.checksum+(m.objects.tables.length?' · tablas: '+m.objects.tables.join(', '):'')+(m.problems.length?' · '+m.problems.map(p=>p.detail).join(' '):'')));ul.append(li);}out.append(el('h3',action==='verify_migrations'?'Migraciones (de la más reciente a la más antigua)':'Últimas migraciones'),ul);}}
+  catch(error){toast(error.message,'error');if(last)paint(last);}};
+ const integrity=async()=>{out.replaceChildren(el('p','Consultando integridad…','dbg-muted'));try{const r=await api('/api/system/db-guardian',{action:'integrity'});const dl=el('dl',undefined,'dbg-int');const add=(k,v)=>{const x=el('div');x.append(el('dt',k),el('dd',v));dl.append(x);};
+   add('Esquema de migraciones',r.schema.length?r.schema.map(s=>s.name).join(', '):'Íntegro');add('quick_check',r.quick_check);add('Claves foráneas',r.foreign_keys);for(const[t,n]of Object.entries(r.tables))add('Registros en '+t,n==null?'Tabla no instalada':String(n));out.replaceChildren(el('h3','Integridad (solo lectura)'),dl);}catch(error){out.replaceChildren(el('p',error.message,'dbg-muted'));}};
+ const repair=async()=>{const st=last;if(st&&st.lock&&st.lock.expired){try{paint(await api('/api/system/db-guardian',{action:'release_lock'}));toast('Bloqueo caducado liberado de forma segura.','success');}catch(error){toast(error.message,'error');}return;}
+  if(st&&st.pending.length){document.querySelector('.sysmig')?.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'start'});toast('Las migraciones pendientes se aplican en la tarjeta «Migraciones de la base de datos» (respaldo verificado y APLICAR).','info');return;}
+  toast('No hay ninguna reparación segura pendiente: no se modificó nada.','info');};
+ const b=(label,icon,fn,cls)=>{const x=invBtn(label,icon,fn,cls||'secondary');return x;};
+ acts.append(b('Verificar conexión','activity',()=>run('check','verificando conexión'),'primary'),b('Diagnóstico completo','shield-check',()=>run('diagnose','diagnóstico completo')),b('Verificar migraciones','history',()=>run('verify_migrations','verificando migraciones')),
+  b('Consultar integridad','server',integrity),b('Actualizar estado','refresh-cw',async()=>{try{paint(await api('/api/system/db-guardian'));}catch(error){toast(error.message,'error');}}),
+  b('Consultar historial','history',()=>hist.scrollIntoView({block:'nearest'})),(()=>{const a=el('a',undefined,'secondary inv-btn');a.href='/api/system/db-guardian/export';a.setAttribute('download','');a.append(invIcon('download'),el('span','Exportar diagnóstico'));return a;})(),
+  b('Ver detalles técnicos','file-text',()=>run('verify_migrations','verificando migraciones')),b('Solicitar reparación controlada','refresh-cw',repair));
+ hero.dataset.level='gris';hero.append(el('i',undefined,'dbg-dot'),el('div','Consultando…'));
+ api('/api/system/db-guardian').then(d=>{paint(d);if(d.level==='gris'||!d.checked_at)run('check','primera comprobación');}).catch(error=>hero.replaceChildren(el('p',error.message,'dbg-muted')));
+ return card;}
 function systemMigrationsCard(){
  const card=el('section',undefined,'data-panel sysmig');card.setAttribute('aria-labelledby','sysmig-title');const h=el('h2','Migraciones de la base de datos');h.id='sysmig-title';
  const body=el('div',undefined,'sysmig-body');body.append(el('p','Consultando…','sysmig-note'));card.append(h,body);
@@ -1526,7 +1568,7 @@ function renderSystem(data){
   data.releases.forEach((release,index)=>{const row=systemRelease(release,data,index===0);row.style.setProperty('--row-delay',Math.min(index,8)*40+'ms');if(index>=6)row.hidden=true;list.append(row);});list.addEventListener('versiontoggle',sync);
   tools.append(el('span',data.releases.length===1?'1 versión publicada':data.releases.length+' versiones publicadas','system-muted'),toggleAll);timeline.append(tools,list);
   if(data.releases.length>6){const more=button('Ver versiones anteriores ('+(data.releases.length-6)+')',()=>{rows().forEach(row=>row.hidden=false);more.remove();sync();},'version-more');timeline.append(more);}sync();}else timeline.append(el('p','Todavía no hay versiones publicadas.','empty-module'));
- wrap.append(top,result,timeline);if(admin())wrap.append(systemMigrationsCard());root.append(wrap);paintCheck();
+ wrap.append(top,result,timeline);if(admin())wrap.append(dbGuardianCard(),systemMigrationsCard());root.append(wrap);paintCheck();
  if(currentUser?.role==='administrador'){const care=el('section',undefined,'autocare');wrap.prepend(care);renderAutoCare(care);}
 }
 // PC-DOCTOR Mail Pro: el buzón se lee en vivo desde el servidor de correo; el navegador nunca recibe credenciales.

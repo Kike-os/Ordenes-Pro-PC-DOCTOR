@@ -7,6 +7,7 @@ import base64
 import http.client
 import json
 import os
+import random
 import re
 import sqlite3
 import threading
@@ -386,7 +387,7 @@ def _post(secure, host, token, body, retry):
 
 def _pause(attempt, started):
     """Pausa antes del reintento `attempt`+1. False si ya no queda plazo para otro intento útil (se informa el error)."""
-    pause = RETRY_PAUSES[attempt - 1]
+    pause = RETRY_PAUSES[attempt - 1] * (0.75 + random.random() / 2)  # jitter: instancias distintas no reintentan a la vez
     if RETRY_DEADLINE - (time.monotonic() - started) - pause < 2.0:
         return False
     time.sleep(pause)

@@ -153,25 +153,61 @@ def apply(c, user, now, confirm):
         blocked = next((i for i in info['pending'] if not i['additive']), None)
         raise MigrationError(('No hay migraciones aplicables desde aquí. ' + blocked['name'] + ': ' + blocked['reason']) if blocked else 'No hay migraciones pendientes.', 409)
     import sqlite3
+    import time
+    import db_guardian as guard
+    import versioning
     c.commit()  # libera la transacción de la petición: el recuento y las migraciones no retienen la base
-    before = _counts(c)
-    done = []
-    for name in info['applicable']:
-        path = ROOT / 'migrations' / name
-        ok, why = check(path)  # se vuelve a comprobar justo antes de aplicar
-        if not ok:
-            break
-        if c.execute('SELECT 1 FROM migrations WHERE name=?', (name,)).fetchone():
-            continue
-        try:
-            c.executescript('BEGIN IMMEDIATE;\n' + path.read_text(encoding='utf-8') + "\nINSERT INTO migrations VALUES ('" + name.replace("'", "''") + "');\nCOMMIT;")
-        except sqlite3.Error as error:
-            # La transacción se descarta entera: la migración no queda a medias. Se informa el motivo real (sin datos ni credenciales).
-            detail = re.sub(r'\s+', ' ', str(error))[:220]
-            raise MigrationError('La base de datos no aceptó ' + name + ' (' + type(error).__name__ + ': ' + detail + '). No se aplicó nada de esa migración.'
-                                 + (' Antes se aplicaron: ' + ', '.join(done) + '.' if done else ''), 502) from None
-        done.append(name)
+    # Database Guardian (1.5.331): una sola ejecución a la vez entre instancias (bloqueo distribuido con caducidad).
+    info_user = {k: user[k] for k in user.keys()} if hasattr(user, 'keys') else {}
+    owner = str(info_user.get('username') or info_user.get('name') or 'administración')
+    before = _counts(c)  # antes del bloqueo: la fila del bloqueo no cuenta como dato perdido
+    if not guard.acquire(c, str(owner), now):
+        held = guard.lock_info(c) or {}
+        raise MigrationError('Ya hay una aplicación de migraciones en curso (%s, desde %s). Espera a que termine; no se ejecuta dos veces.' % (held.get('owner', '—'), held.get('at', '—')), 409)
+    try:
+        done, verified = [], []
+        version = versioning.load()['releases'][0]['version']
+        for name in info['applicable']:
+            path = ROOT / 'migrations' / name
+            ok, why = check(path)  # se vuelve a comprobar justo antes de aplicar
+            if not ok:
+                break
+            if c.execute('SELECT 1 FROM migrations WHERE name=?', (name,)).fetchone():
+                continue
+            started = time.monotonic()
+            try:
+                c.executescript('BEGIN IMMEDIATE;\n' + path.read_text(encoding='utf-8') + "\nINSERT INTO migrations VALUES ('" + name.replace("'", "''") + "');\nCOMMIT;")
+            except sqlite3.Error as error:
+                try:
+                    c.rollback()  # SQLite local deja abierta la transacción del script fallido: se descarta entera (Turso ya la descarta)
+                except sqlite3.Error:
+                    pass
+                # Otra instancia pudo registrarla en el mismo instante: se comprueba antes de informar un fallo (nunca se repite a ciegas).
+                if c.execute('SELECT 1 FROM migrations WHERE name=?', (name,)).fetchone():
+                    continue
+                # La transacción se descarta entera: la migración no queda a medias. Se informa el motivo real (sin datos ni credenciales).
+                detail = re.sub(r'\s+', ' ', str(error))[:220]
+                raise MigrationError('La base de datos no aceptó ' + name + ' (' + type(error).__name__ + ': ' + detail + '). No se aplicó nada de esa migración.'
+                                     + (' Antes se aplicaron: ' + ', '.join(done) + '.' if done else ''), 502) from None
+            ms = round((time.monotonic() - started) * 1000)
+            # Verificación posterior: cada tabla, columna e índice declarado debe existir.
+            item = next(i for i in guard.migrations(c)['items'] if i['name'] == name)
+            good = item['state'] == 'verificada'
+            if good:
+                verified.append(name)
+            try:
+                c.execute('INSERT INTO migration_ledger(name,checksum,applied_at,duration_ms,result,version,executor,verified) VALUES (?,?,?,?,?,?,?,?)',
+                          (name, guard.checksum(path), now.isoformat(timespec='seconds'), ms, 'aplicada y verificada' if good else 'aplicada · verificación: ' + item['state'],
+                           version, str(owner)[:80], 1 if good else 0))
+                c.commit()
+            except sqlite3.Error:
+                c.rollback()  # sin libro (migración 122 aún no aplicada): la migración ya quedó registrada en `migrations`
+            done.append(name)
+            if not good:
+                break
+    finally:
+        guard.release(c)
     after = _counts(c)
     skipped = sorted(set(before.pop('__unreadable__', [])) | set(after.pop('__unreadable__', [])))
     lost = [t for t, n in before.items() if t not in VOLATILE and (t not in after or after[t] < n)]
-    return {'applied': done, 'lost': lost, 'unreadable': skipped, 'tables_before': len(before), 'tables_after': len(after), 'status': status(c, now)}
+    return {'applied': done, 'verified': verified, 'lost': lost, 'unreadable': skipped, 'tables_before': len(before), 'tables_after': len(after), 'status': status(c, now)}

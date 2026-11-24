@@ -238,6 +238,12 @@ def main(argv=None):
             CHANGELOG.write_text(changelog_text(load()), encoding='utf-8')
             print('Cambio anotado como pendiente. Aún no forma parte de ninguna versión.')
         elif args.command == 'publish':
+            # Database Guardian: control obligatorio previo a publicar (nombres, duplicados, migraciones publicadas sin modificar, manifiesto).
+            import db_guardian
+            problems = db_guardian.precheck()
+            if problems:
+                print('Publicación detenida por el control de migraciones:\n- ' + '\n- '.join(problems))
+                return 1
             updated = publish(registry, args.kind, args.resumen, published_by=git('config', 'user.name').stdout.strip(), authorized_by=args.autorizado_por)
             print('Versión a registrar: v' + updated['releases'][0]['version'] + ' (' + BUMPS[args.kind] + ')')
             if not args.confirmar:

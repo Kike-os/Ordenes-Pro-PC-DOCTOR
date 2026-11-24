@@ -2661,6 +2661,17 @@ class Handler(BaseHTTPRequestHandler):
                 if user['role']!='administrador':return self.reply(403,{'error':'Solo administración gestiona los respaldos.'})
                 import gdrive_backup
                 return self.reply(200,gdrive_backup.overview(c))
+            if path.startswith('/api/system/db-guardian'):
+                # Database Guardian Pro 1.0 (solo administración, solo lectura en GET): estado, migraciones verificadas, historial y exportación.
+                import db_guardian
+                if user['role']!='administrador':return self.reply(403,{'error':'Acceso no permitido.'})
+                now_g=reception_now()
+                if path=='/api/system/db-guardian':return self.reply(200,{**db_guardian.status(c,now_g),'incidents':db_guardian.history(c)[:40],'states':db_guardian.INCIDENT_STATES,'levels':db_guardian.LEVELS})
+                if path=='/api/system/db-guardian/migrations':return self.reply(200,db_guardian.migrations(c))
+                if path=='/api/system/db-guardian/export':
+                    body=json.dumps(db_guardian.export(c,now_g),ensure_ascii=False,indent=1).encode('utf-8');audit(c,user['id'],'db_guardian_export')
+                    return self.reply(200,body,'application/json',filename='DIAGNOSTICO-BD-%s.json'%now_g.strftime('%Y%m%d-%H%M'))
+                return self.reply(404,{'error':'Recurso no disponible.'})
             if path == '/api/system/migrations':
                 # Migraciones pendientes de la base central (1.5.317): solo administración. Vercel no las aplica al desplegar.
                 import db_migrations
@@ -5159,6 +5170,26 @@ class Handler(BaseHTTPRequestHandler):
                     except whatsapp_identity.IdentityError as error:
                         c.rollback();return self.reply(error.status,{'error':str(error),'fields':error.fields})
                     return self.reply(200,whatsapp_identity.overview(c,oid,user,now))
+                if path=='/api/system/db-guardian':
+                    # Acciones de Database Guardian. Comprobar y diagnosticar son de solo lectura (con reintentos seguros); la reparación
+                    # controlada solo libera un bloqueo caducado o aplica migraciones ADITIVAS con respaldo verificado y la palabra APLICAR.
+                    import db_guardian,db_migrations
+                    if user['role']!='administrador':return self.reply(403,{'error':'Acceso no permitido.'})
+                    if limited(c,'db-guardian:'+str(user['id']),limit=60,window=3600):return self.reply(429,{'error':'Demasiadas comprobaciones. Intenta en unos minutos.'})
+                    action=str(data.get('action',''));now_g=reception_now();c.commit()
+                    if action in ('check','diagnose','verify_migrations'):
+                        result=db_guardian.check(c,now_g);audit(c,user['id'],'db_guardian_'+action);c.commit()
+                        return self.reply(200,{**result,'incidents':db_guardian.history(c)[:40],'states':db_guardian.INCIDENT_STATES,'levels':db_guardian.LEVELS,
+                                               **({'migration_items':db_guardian.migrations(c)['items']} if action!='check' else {})})
+                    if action=='integrity':
+                        result=db_guardian.integrity(c);audit(c,user['id'],'db_guardian_integrity');c.commit();return self.reply(200,result)
+                    if action=='release_lock':
+                        info=db_guardian.lock_info(c)
+                        if not info:return self.reply(409,{'error':'No hay ningún bloqueo de migración.'})
+                        if not info['expired']:return self.reply(409,{'error':'El bloqueo está vigente (aplicación en curso desde %s): no se libera.'%info['at']})
+                        db_guardian.acquire(c,'reparación controlada',now_g) and db_guardian.release(c);audit(c,user['id'],'db_guardian_release_lock');c.commit()
+                        return self.reply(200,db_guardian.status(c,now_g))
+                    return self.reply(400,{'error':'Acción no válida.'})
                 if path=='/api/system/migrations/apply':
                     # Solo migraciones aditivas (crear tablas o índices nuevos), con respaldo verificado reciente y confirmación escrita.
                     import db_migrations
