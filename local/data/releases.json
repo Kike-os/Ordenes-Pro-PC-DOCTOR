@@ -8,6 +8,25 @@
   },
   "releases": [
     {
+      "version": "1.5.330",
+      "date": "2026-11-24T07:08:57-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "ADI 3.0 fases 4 y 5: Smart Collections, estados de cuenta, retiros, auditoría y propuestas de seguimiento",
+      "changes": {
+        "features": [
+          "ADI 3.0 · fase 4: ADI Smart Collections en Facturación → Cartera ADI: indicadores de cartera (capital, vencida, por vencer, intereses simulados aparte, intereses autorizados /bin/bash), filtros, expediente económico del cliente, marcas de gestión (suspender recordatorios, derivar, conciliación, observación; migración 121) y estados de cuenta en PDF A4 y ticket de 80 mm.",
+          "ADI 3.0 · fase 5: equipos pendientes de retiro con alertas a los 30, 60, 85 y 90 días (sin disponer nunca del equipo), auditoría de comunicaciones (motivo, fuente, entrega, respuesta y resultado) y propuestas de seguimiento por eventos que una persona revisa; sin envío automático."
+        ],
+        "improvements": [],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Administración (autorización expresa en la sesión)"
+    },
+    {
       "version": "1.5.329",
       "date": "2026-11-24T06:39:26-05:00",
       "type": "patch",

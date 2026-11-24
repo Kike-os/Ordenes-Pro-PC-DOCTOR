@@ -3546,7 +3546,7 @@ function orderStatusCard(order){
 // (pago confirmado, avances, fecha registrada, tono) y el mensaje en un editor amplio. El saldo lo escribe el sistema con el importe exacto.
 const SFU_TONES={pendiente:'ambar',parcial:'ambar',pagado:'verde',credito:'azul',sin_cargos:'gris'};
 function sfuMoneyChip(fin){const chip=el('span',undefined,'sfu-chip');if(!fin){chip.dataset.tone='rojo';chip.textContent='Pago no verificado';return chip;}chip.dataset.tone=SFU_TONES[fin.state]||'gris';chip.textContent=fin.balance_cents>0?'Saldo '+fin.balance:fin.state_label||'Sin saldo';return chip;}
-function statusMessageDialog(order){
+function statusMessageDialog(order,initialPurpose){
  const dialog=smallDialog('Mensaje de seguimiento');dialog.classList.add('sp-msg-dialog','sfu-dialog');dialog.setAttribute('aria-describedby','sfu-facts');
  const heading=dialog.querySelector('.dialog-heading'),facts=el('p',undefined,'sfu-facts');facts.id='sfu-facts';const moneySlot=el('span',undefined,'sfu-money-slot');moneySlot.append(el('span','Comprobando pagos…','sfu-chip'));
  facts.append(el('span',displayCode(order),'sfu-code'),statusChip(order.status,order.status_label),moneySlot);heading.querySelector('h2').after(facts);
@@ -3601,7 +3601,7 @@ function statusMessageDialog(order){
   anaBody.append(det,el('p',a.excluded,'sfu-muted'));
   const groups={servicio:'Servicio técnico',entrega:'Entrega y posventa',pagos:'Pagos'},keep=purposeSel.value;purposeSel.replaceChildren(new Option('Seguimiento del estado actual',''));let count=0;
   for(const[g,label]of Object.entries(groups)){const og=el('optgroup');og.label=label;for(const p of a.purposes.filter(x=>x.group===g)){const o=new Option(p.label+(p.available?'':' — no disponible'),p.key);o.disabled=!p.available;o.title=p.reason||'';o.dataset.group=g;if(p.available)count++;og.append(o);}purposeSel.append(og);}
-  if([...purposeSel.options].some(o=>o.value===keep&&!o.disabled))purposeSel.value=keep;purposeHint.dataset.base=count+' motivos disponibles según los datos registrados de la orden.';paintPurpose();}
+  if([...purposeSel.options].some(o=>o.value===keep&&!o.disabled))purposeSel.value=keep;if(initialPurpose&&[...purposeSel.options].some(o=>o.value===initialPurpose&&!o.disabled)){purposeSel.value=initialPurpose;initialPurpose='';}purposeHint.dataset.base=count+' motivos disponibles según los datos registrados de la orden.';paintPurpose();}
  // ADI 3.0 · fase 2: compromiso de pago de la orden. Registrar o reprogramar exige la evidencia de cómo lo aceptó el cliente; no registra pagos.
  function commitmentBlock(a){const info=a.commitments||{},rules=a.commitment_rules||{},box=el('section',undefined,'sfu-commit'),cur=info.current,admin=currentUser?.role==='administrador';
   box.append(el('h4','Compromiso de pago'));if(!info.installed){box.append(el('p',info.message||'No disponible.','sfu-muted'));return box;}
@@ -7646,12 +7646,97 @@ function invoiceTestBanner(settings){if(settings&&'test_mode' in settings)window
 // Navegación agrupada de Facturación (misma estructura que el Centro de Inventario). Las secciones marcadas con 1 están en desarrollo y se
 // presentan como tales: nunca como operativas. «@inventory» abre el Centro de Inventario existente (no se duplica dentro de Facturación).
 const invoiceGroups=[['Ventas',[['panel','Panel general','layout-dashboard'],['facturas','Facturación','receipt-text'],['simulador','Simulador de cuotas','credit-card'],['proformas','Cotización y proforma','file-check-2'],['notas','Notas de crédito','file-x-2'],['pagos','Pagos y anticipos','banknote']]],
+ ['Cartera ADI',[['cartera','Smart Collections','coins'],['retiros','Equipos por retirar','package'],['seguimiento','Propuestas de seguimiento','activity'],['auditoria','Auditoría de comunicaciones','history']]],
  ['Administración',[['caja','Caja','wallet'],['compras','Compras','shopping-cart'],['proveedores','Proveedores','truck'],['cuentas','Cuentas bancarias','landmark'],['@inventory','Centro de Inventario','package']]],
  ['Configuración',[['fiscal','Datos fiscales','building-2'],['firma','Firma electrónica','signature'],['sri','Integración SRI','plug-zap'],['tarjetas','Tarjetas y DATAFAST','badge-percent'],['config','Políticas comerciales','scroll-text'],['general','Configuración general','sliders-horizontal']]]];
 const invoiceTabs=invoiceGroups.flatMap(([,items])=>items).filter(t=>!t[0].startsWith('@'));
 function invoicePref(key,fallback){try{return JSON.parse(localStorage.getItem('fx-'+key))??fallback;}catch{return fallback;}}
 function invoiceSetPref(key,value){try{localStorage.setItem('fx-'+key,JSON.stringify(value));}catch{}}
 function invoiceGo(key){if(key==='@inventory'){go('inventory');return;}if(invoiceState.tab===key)return;invoiceState.tab=key;renderInvoicing().then(()=>$('module-content').querySelector('.fx-nav [aria-current=page]')?.focus());}
+// ADI 3.0 · fases 4 y 5 — ADI Smart Collections (Cartera ADI). Solo calcula, muestra y propone: no registra pagos, no cambia saldos, no
+// aplica intereses, no envía mensajes y no dispone de equipos. Los mensajes se preparan en la ventana de seguimiento con su control previo.
+const ccMoney=c=>quoteMoney(c||0),ccDay=v=>{const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(v||''));return m?m[3]+'/'+m[2]+'/'+m[1]:'—';};
+async function ccOpenOrder(orderId,purpose){try{const o=await api('/api/orders/'+orderId);statusMessageDialog(o.order||o,purpose);}catch(error){toast(error.message,'error');}}
+function ccKpi(label,value,tone,hint){const t=el('div',undefined,'cc-kpi');if(tone)t.dataset.tone=tone;t.append(el('small',label),el('strong',value));if(hint)t.append(el('span',hint));return t;}
+let ccFilters={};
+async function collectionsPanel(panel){panel.replaceChildren(invSectionHead('ADI Smart Collections — Centro de gestión de cartera','Saldos de las órdenes (fuente única: sus cargos y pagos). Exigible desde la entrega del equipo o la fecha de un compromiso; nunca desde el ingreso. Nada se envía ni se cobra desde aquí.'),el('p','Cargando…','empty-module'));
+ const qs=new URLSearchParams(Object.entries(ccFilters).filter(([,v])=>v));let d;try{d=await api('/api/collections'+(qs.toString()?'?'+qs:''));}catch(error){panel.lastChild.textContent=error.message;return;}
+ const k=d.kpis,grid=el('div',undefined,'cc-kpis');grid.append(ccKpi('Capital pendiente',ccMoney(k.capital_cents)),ccKpi('Cartera vencida',ccMoney(k.overdue_cents),k.overdue_cents?'rojo':''),ccKpi('Cartera por vencer',ccMoney(k.upcoming_cents)),
+  ccKpi('Intereses simulados',k.simulation_available?ccMoney(k.simulated_interest_cents):'Sin tasa validada','gris','Simulación: no suma al saldo'),ccKpi('Intereses autorizados',ccMoney(0),'','No se aplican intereses'),
+  ccKpi('Pagos recuperados (mes)',ccMoney(k.recovered_month_cents),'verde','Cobros posteriores a la entrega'),ccKpi('Compromisos pendientes',String(k.commitments_open)),ccKpi('Compromisos incumplidos',String(k.commitments_broken),k.commitments_broken?'ambar':''),
+  ccKpi('Equipos por retirar',String(k.pickups)),ccKpi('Casos en revisión',String(k.in_review),k.in_review?'ambar':''));
+ const f=el('form',undefined,'cc-filters');f.noValidate=true;const fld=(name,label,input)=>{input.name=name;input.value=ccFilters[name]||'';const w=el('label',undefined,'cc-field');w.append(el('span',label),input);f.append(w);return input;};
+ const sel=(opts)=>{const s=el('select');s.add(new Option('Todos',''));for(const[v,t]of Object.entries(opts))s.add(new Option(t,v));return s;};
+ fld('client','Cliente',Object.assign(el('input'),{placeholder:'Nombre'}));fld('order','Orden',Object.assign(el('input'),{placeholder:'PCD-…'}));fld('invoice','Factura',Object.assign(el('input'),{placeholder:'001-010-…'}));
+ fld('due_from','Vence desde',Object.assign(el('input'),{type:'date'}));fld('due_to','Vence hasta',Object.assign(el('input'),{type:'date'}));fld('method','Forma de pago',sel(d.methods));fld('age','Antigüedad',sel(d.ages));
+ fld('commitment','Compromiso',sel(d.commitment_states));fld('reconciliation','Conciliación',sel({pendiente:'Transferencia por conciliar',al_dia:'Sin pendientes'}));
+ const go=el('button','Filtrar','primary');go.type='submit';const clear=button('Limpiar',()=>{ccFilters={};collectionsPanel(panel);},'secondary');const bar=el('div',undefined,'cc-filter-actions');bar.append(clear,go);f.append(bar);
+ f.addEventListener('submit',e=>{e.preventDefault();ccFilters=Object.fromEntries(new FormData(f));collectionsPanel(panel);});
+ const rows=d.items.map(it=>{const st=cjChip(it.state==='vencida'?'rechazado':it.state==='saldo_a_favor'?'autorizado':'pendiente',it.state==='vencida'?'Vencida':it.state==='saldo_a_favor'?'Saldo a favor':'Por vencer');
+  const acts=el('div',undefined,'cc-row-acts');acts.append(invBtn('Expediente','user',()=>clientFileDialog(it.client_id)),invBtn('Mensaje','send',()=>ccOpenOrder(it.order_id)));
+  const flags=el('span',undefined,'cc-flags');for(const fl of it.flags)flags.append(cjChip('pendiente',fl.label));
+  return cjRow([['Orden',it.code],['Cliente',it.client,flags],['Equipo',it.devices],['Saldo',it.credit_cents?'A favor '+ccMoney(it.credit_cents):ccMoney(it.balance_cents)],['Estado',st],
+   ['Exigible desde',it.due_date?ccDay(it.due_date)+' · '+it.due_basis:'Al retirar'],['Días',String(it.days_overdue||0)],['Compromiso',it.commitment?it.commitment.state_label:'—'],
+   ['Conciliación',it.pending_transfers?'Por conciliar '+ccMoney(it.pending_cents):'Al día'],['Acciones',acts]]);});
+ panel.replaceChildren(invSectionHead('ADI Smart Collections — Centro de gestión de cartera','Fuente única: cargos y pagos de cada orden. Exigible desde la entrega o la fecha de un compromiso, nunca desde el ingreso. Nada se envía ni se cobra desde aquí.'),
+  grid,f,rows.length?cjTable(['Orden','Cliente','Equipo','Saldo','Estado','Exigible desde','Días','Compromiso','Conciliación','Acciones'],rows,'cc-table'):el('p','No hay saldos con estos filtros.','empty-module'),
+  el('p',d.total>d.items.length?'Se muestran '+d.items.length+' de '+d.total+'.':'Corte: '+ccDay(d.cutoff)+' · '+d.total+' órdenes con saldo.','system-muted'));}
+async function clientFileDialog(clientId){const dialog=invDialog('Expediente económico del cliente',true);dialog.classList.add('cc-file');const body=el('div',undefined,'cc-file-body');dialog.append(body);body.append(el('p','Cargando…','empty-module'));
+ let d;try{d=await api('/api/collections/client/'+clientId);}catch(error){body.replaceChildren(el('p',error.message,'empty-module'));return;}paintClientFile(dialog,body,d);}
+function paintClientFile(dialog,body,d){const k=d.portfolio.kpis,c=d.client;body.replaceChildren();
+ const head=el('header',undefined,'cc-file-head');head.append(el('strong',c.name),el('small',(c.phone?'Celular terminado en '+c.phone+' · ':'')+(c.email?'Correo registrado':'Sin correo')));body.append(head);
+ if(d.suspended)body.append(el('p',d.suspended,'inv-warn'));
+ const grid=el('div',undefined,'cc-kpis');grid.append(ccKpi('Saldo pendiente',ccMoney(k.capital_cents)),ccKpi('Vencido',ccMoney(k.overdue_cents),k.overdue_cents?'rojo':''),ccKpi('Intereses simulados',k.simulation_available?ccMoney(k.simulated_interest_cents):'Sin tasa validada','gris','No suman al saldo'),ccKpi('Intereses autorizados',ccMoney(0)));body.append(grid);
+ // Acciones
+ const acts=el('div',undefined,'cc-file-acts');const link=(label,icon,href)=>{const a=el('a',undefined,'secondary inv-btn');a.href=href;a.target='_blank';a.rel='noopener';a.append(invIcon(icon),el('span',label));return a;};
+ acts.append(link('Estado de cuenta A4','file-text','/api/collections/statement/'+c.id+'.pdf?format=a4'),link('Estado de cuenta 80 mm','receipt-text','/api/collections/statement/'+c.id+'.pdf?format=80'),
+  link('Revisar liquidación (interna, con simulación)','activity','/api/collections/statement/'+c.id+'.pdf?format=a4&simulation=1'));
+ const flag=(kind,label,needsDate)=>invBtn(label,'file-pen-line',()=>ccFlagDialog(dialog,body,c.id,kind,label,needsDate));
+ acts.append(flag('suspension','Suspender recordatorios',true),flag('derivacion','Derivar a administración'),flag('conciliacion','Solicitar conciliación'),flag('observacion','Observación administrativa'));
+ const cond=invBtn('Autorizar condonación','circle-x',()=>{});cond.disabled=true;cond.title='No aplica: no hay intereses ni cargos aplicados (solo simulación).';acts.append(cond);body.append(acts);
+ body.append(el('p','Registrar compromiso, ampliar plazo (reprogramar), simular intereses y generar el mensaje profesional se hacen desde «Mensaje» de cada orden, con su control previo de 12 puntos.','system-muted'));
+ const sec=(title,node)=>{const s=el('section',undefined,'cc-sec');s.append(el('h3',title),node);body.append(s);};
+ const items=d.portfolio.items;sec('Obligaciones con saldo',items.length?cjTable(['Orden','Equipo','Saldo','Exigible desde','Días','Compromiso','Acción'],items.map(it=>{const b=el('div',undefined,'cc-row-acts');b.append(invBtn('Mensaje','send',()=>ccOpenOrder(it.order_id)));
+  return cjRow([['Orden',it.code],['Equipo',it.devices],['Saldo',it.credit_cents?'A favor '+ccMoney(it.credit_cents):ccMoney(it.balance_cents)],['Exigible desde',it.due_date?ccDay(it.due_date)+' · '+it.due_basis:'Al retirar'],['Días',String(it.days_overdue||0)],['Compromiso',it.commitment?it.commitment.state_label:'—'],['Acción',b]]);})):el('p','Sin saldos pendientes.','system-muted'));
+ sec('Órdenes',cjTable(['Orden','Equipo','Estado','Ingreso','Entrega'],d.orders.map(o=>cjRow([['Orden',o.code],['Equipo',[o.brand,o.model].filter(Boolean).join(' ')],['Estado',o.status],['Ingreso',ccDay(o.received_at)],['Entrega',o.delivered_at?ccDay(o.delivered_at):'—']]))));
+ sec('Facturas',d.invoices.length?cjTable(['Número','Estado','Total'],d.invoices.map(i=>cjRow([['Número',i.number],['Estado',i.status_label+(i.status_label==='Autorizado'?' (no implica pago)':'')],['Total',ccMoney(i.total_cents)]]))):el('p','Sin facturas.','system-muted'));
+ sec('Presupuestos',d.quotes.length?cjTable(['Código','Estado','Enviado'],d.quotes.map(q=>cjRow([['Código',q.code],['Estado',q.status],['Enviado',q.sent_at?ccDay(q.sent_at):'—']]))):el('p','Sin presupuestos.','system-muted'));
+ sec('Pagos y anticipos',d.payments.length?cjTable(['Fecha','Tipo','Forma','Valor','Estado'],d.payments.map(p=>cjRow([['Fecha',ccDay(p.created_at)],['Tipo',p.kind],['Forma',p.method],['Valor',ccMoney(p.amount_cents)],['Estado',p.voided_at?'Anulado':p.transfer_status==='pendiente'?'Por conciliar':'Confirmado']]))):el('p','Sin pagos.','system-muted'));
+ sec('Compromisos e historial de acuerdos',d.commitments.length?cjTable(['Importe','Fecha acordada','Estado','Evidencia'],d.commitments.map(x=>cjRow([['Importe',x.amount],['Fecha acordada',x.due],['Estado',x.state_label],['Evidencia',x.evidence_source+': '+x.evidence]]))):el('p','Sin compromisos.','system-muted'));
+ sec('Notificaciones y respuestas',d.messages.length?cjTable(['Fecha','Motivo','Canal','Estado'],d.messages.map(m=>cjRow([['Fecha',ccDay(m.created_at)],['Motivo',m.template||'Mensaje'],['Canal',m.channel],['Estado',m.status]]))):el('p','Sin mensajes registrados.','system-muted'));
+ if(d.replies.length)sec('Respuestas del cliente por WhatsApp',el('p',d.replies.length+' mensaje(s) recibidos; el último el '+ccDay(d.replies[0].at)+'.','system-muted'));
+ sec('Marcas y observaciones administrativas',d.flags.length?cjTable(['Fecha','Tipo','Motivo','Estado',''],d.flags.map(fl=>{const b=el('div');if(!fl.closed_at)b.append(invBtn('Cerrar','circle-x',()=>ccFlagDialog(dialog,body,c.id,'close','Cerrar marca',false,fl.id)));
+  return cjRow([['Fecha',ccDay(fl.created_at)],['Tipo',fl.kind_label+(fl.until?' hasta '+ccDay(fl.until):'')],['Motivo',fl.reason],['Estado',fl.closed_at?'Cerrada: '+fl.close_note:'Vigente'],['',b]]);})):el('p','Sin marcas.','system-muted'));}
+function ccFlagDialog(parent,body,clientId,action,title,needsDate,id){const d=smallDialog(title);d.classList.add('sfu-commit-dialog');const f=el('form',undefined,'sfu-commit-form');f.noValidate=true;
+ const reason=Object.assign(el('textarea'),{rows:3,maxLength:400});const w=el('label',undefined,'sfu-field');w.append(el('span',action==='close'?'Cómo se cerró':'Motivo'),reason);f.append(w);let until=null;
+ if(needsDate){until=Object.assign(el('input'),{type:'date'});const w2=el('label',undefined,'sfu-field');w2.append(el('span','Suspender hasta'),until);f.append(w2);}
+ const err=el('p',undefined,'sfu-error');err.setAttribute('role','alert');const ok=el('button',title,'primary');ok.type='submit';const bar=el('div',undefined,'dialog-actions');bar.append(button('Volver',()=>d.close(),'secondary'),ok);f.append(err,bar);d.append(f);reason.focus();
+ f.addEventListener('submit',async e=>{e.preventDefault();err.textContent='';try{const fresh=await api('/api/collections/client/'+clientId,{action,reason:reason.value.trim(),until:until?until.value:'',id:id?String(id):''});d.close();toast('Guardado. No se envió nada ni cambió ningún saldo.','success');paintClientFile(parent,body,fresh);}catch(error){err.textContent=error.message;}});}
+async function pickupsPanel(panel){panel.replaceChildren(invSectionHead('Equipos pendientes de retiro','Control independiente de la cobranza. Alertas a los 30, 60, 85 y 90 días desde que el equipo quedó listo.'),el('p','Cargando…','empty-module'));
+ let d;try{d=await api('/api/collections/pickups');}catch(error){panel.lastChild.textContent=error.message;return;}
+ const grid=el('div',undefined,'cc-kpis');grid.append(ccKpi('Por retirar',String(d.items.length)));for(const[a,n]of Object.entries(d.alerts))grid.append(ccKpi('Alerta '+a+' días',String(n),n&&a==='90'?'rojo':n?'ambar':''));
+ const rows=d.items.map(p=>{const b=el('div',undefined,'cc-row-acts');b.append(invBtn('Recordatorio','send',()=>ccOpenOrder(p.order_id,'recordatorio_retiro')),invBtn('Expediente','user',()=>clientFileDialog(p.client_id)));
+  return cjRow([['Orden',p.code],['Cliente',p.client],['Equipo',p.device],['Listo desde',p.ready_at?ccDay(p.ready_at):'Sin registro'],['Días',p.days==null?'—':String(p.days)],['Primer aviso',p.notice_at?ccDay(p.notice_at)+' · '+p.notice_evidence:'Sin aviso registrado'],
+   ['Plazo de retiro',p.deadline?ccDay(p.deadline):'—'],['Prórrogas',String(p.extensions)+(p.extension_reason?' · '+p.extension_reason:'')],['Saldo',ccMoney(p.balance_cents)],['Alerta',cjChip(p.alert>=90?'rechazado':p.alert?'pendiente':'autorizado',p.alert_label)],['Acciones',b]]);});
+ panel.replaceChildren(invSectionHead('Equipos pendientes de retiro','Control independiente de la cobranza. Alertas a los 30, 60, 85 y 90 días desde que el equipo quedó listo.'),grid,el('p',d.note,'inv-warn'),
+  rows.length?cjTable(['Orden','Cliente','Equipo','Listo desde','Días','Primer aviso','Plazo de retiro','Prórrogas','Saldo','Alerta','Acciones'],rows,'cc-table'):el('p','No hay equipos pendientes de retiro.','empty-module'));}
+async function proposalsPanel(panel){panel.replaceChildren(invSectionHead('Propuestas de seguimiento','Generadas por eventos con los datos registrados. Nada se envía solo: revisa y prepara cada mensaje con su control previo.'),el('p','Cargando…','empty-module'));
+ let d;try{d=await api('/api/collections/proposals');}catch(error){panel.lastChild.textContent=error.message;return;}
+ const rules=el('section',undefined,'cc-rules');rules.append(el('h3','Reglas'),el('p','Eventos: 3 días antes y el día del vencimiento de un compromiso; '+d.rules.milestones.join(', ')+' días de retraso; retiro a los '+d.rules.pickup_alerts.join(', ')+' días. '+d.rules.hours,'system-muted'),
+  el('p','Se detienen con saldo cancelado, acuerdo vigente, revisión, transferencia por conciliar, suspensión, derivación o una gestión en los últimos '+d.rules.recent_days+' días.','system-muted'),el('p',d.rules.status,'inv-warn'));
+ const names={pago_pendiente:'Pago pendiente',compromiso_pago:'Compromiso de pago',compromiso_incumplido:'Compromiso incumplido',recordatorio_retiro:'Recordatorio de retiro'};
+ const rows=d.items.map(p=>{const b=el('div',undefined,'cc-row-acts');const prep=invBtn('Preparar mensaje','send',()=>ccOpenOrder(p.order_id,p.purpose),'primary');prep.disabled=!p.ready;if(!p.ready)prep.title=p.blocked.join(' ');b.append(prep);
+  return cjRow([['Evento',p.event+(p.review?' · revisión administrativa y jurídica':'')],['Orden',p.code],['Cliente',p.client],['Saldo',p.balance],['Mensaje propuesto',names[p.purpose]||p.purpose],['Estado',p.ready?cjChip('autorizado','Lista para revisar'):cjChip('pendiente','Detenida: '+p.blocked.join(' '))],['Acción',b]]);});
+ panel.replaceChildren(invSectionHead('Propuestas de seguimiento','Generadas por eventos con los datos registrados. Nada se envía solo: revisa y prepara cada mensaje con su control previo.'),rules,
+  rows.length?cjTable(['Evento','Orden','Cliente','Saldo','Mensaje propuesto','Estado','Acción'],rows,'cc-table'):el('p','No hay propuestas hoy.','empty-module'));}
+let ccAudit={};
+async function commsAuditPanel(panel){panel.replaceChildren(invSectionHead('Auditoría de comunicaciones','Mensajes registrados con su motivo, fuente, estado, usuario, entrega, respuesta y resultado de la gestión.'),el('p','Cargando…','empty-module'));
+ const qs=new URLSearchParams(Object.entries(ccAudit).filter(([,v])=>v));let d;try{d=await api('/api/collections/audit'+(qs.toString()?'?'+qs:''));}catch(error){panel.lastChild.textContent=error.message;return;}
+ const f=el('form',undefined,'cc-filters');f.noValidate=true;for(const[name,label,type]of [['from','Desde','date'],['to','Hasta','date'],['client','Cliente','text']]){const i=Object.assign(el('input'),{type,name,value:ccAudit[name]||(name==='from'?d.from:name==='to'?d.to:'')});const w=el('label',undefined,'cc-field');w.append(el('span',label),i);f.append(w);}
+ const go=el('button','Filtrar','primary');go.type='submit';const bar=el('div',undefined,'cc-filter-actions');bar.append(go);f.append(bar);f.addEventListener('submit',e=>{e.preventDefault();ccAudit=Object.fromEntries(new FormData(f));commsAuditPanel(panel);});
+ const rows=d.items.map(r=>cjRow([['Fecha',formatOrderDate(r.at)],['Cliente',r.client],['Orden',r.code],['Motivo',r.motive],['Fuente',r.source],['Plantilla',r.template],['Canal',r.channel],['Estado',r.status],['Usuario',r.user],['Entrega',r.delivery],['Respuesta',r.reply],['Resultado',r.result]]));
+ panel.replaceChildren(invSectionHead('Auditoría de comunicaciones','Mensajes registrados con su motivo, fuente, estado, usuario, entrega, respuesta y resultado de la gestión.'),f,
+  rows.length?cjTable(['Fecha','Cliente','Orden','Motivo','Fuente','Plantilla','Canal','Estado','Usuario','Entrega','Respuesta','Resultado'],rows,'cc-table'):el('p','Sin comunicaciones en el período.','empty-module'));}
 function invoiceNav(data){const nav=el('nav',undefined,'ic-nav fx-nav');nav.setAttribute('aria-label','Secciones de Facturación');const current=invoiceTabs.find(t=>t[0]===invoiceState.tab)||invoiceTabs[0];
  const alerts=data.inventory_alerts||0,missing=(data.settings?.missing||[]).length;
  const badges={'@inventory':alerts?[alerts,alerts===1?'1 alerta de existencias':alerts+' alertas de existencias']:null,fiscal:missing?[missing,missing===1?'1 dato pendiente':missing+' datos pendientes']:null};
@@ -7675,7 +7760,7 @@ async function renderInvoicing(){const root=$('module-content');const tab=invoic
  const shell=el('div',undefined,'inv-module fx-module ic-shell'),main=el('div',undefined,'ic-main'),panel=el('div',undefined,'inv-panel');panel.id='fx-section';panel.setAttribute('aria-label',tab[1]);
  shell.dataset.collapsed=String(!!invoicePref('nav-collapsed',false));main.append(invoiceTestBanner(data.settings),panel);shell.append(invoiceNav(data),main);root.replaceChildren(shell);
  const run={panel:p=>invoiceDashboard(p,data),facturas:p=>invoicesPanel(p,data),fiscal:invoiceSettingsForm,config:invoicePoliciesPanel,cuentas:bankAccountsPanel,compras:purchasesPanel,proveedores:suppliersPanel,
-  caja:renderCash,general:invoiceGeneralPanel,simulador:invoiceCardSimulator,tarjetas:invoiceCardSettings,proformas:proformasPanel,notas:creditNotesPanel,pagos:paymentsAllPanel,firma:invoiceSriPanel,sri:invoiceSriPanel}[tab[0]];
+  cartera:collectionsPanel,retiros:pickupsPanel,seguimiento:proposalsPanel,auditoria:commsAuditPanel,caja:renderCash,general:invoiceGeneralPanel,simulador:invoiceCardSimulator,tarjetas:invoiceCardSettings,proformas:proformasPanel,notas:creditNotesPanel,pagos:paymentsAllPanel,firma:invoiceSriPanel,sri:invoiceSriPanel}[tab[0]];
  try{await run(panel);}catch(error){panel.replaceChildren(el('p',error.message,'empty-module'));}}
 // Indicadores compactos. Con acción, la tarjeta es un botón que abre el detalle (por ejemplo, las facturas de ese estado).
 function invoiceKpis(list){const grid=el('div',undefined,'fx-kpis');for(const[icon,label,value,hint,tone,action]of list){const card=action?button('',action,'fx-kpi'):el('article',undefined,'fx-kpi'),mark=el('span',undefined,'fx-kpi-icon'),body=el('div');

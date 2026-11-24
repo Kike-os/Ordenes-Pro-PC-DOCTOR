@@ -2520,6 +2520,28 @@ class Handler(BaseHTTPRequestHandler):
                     if found:return self.reply(200,inventory.purchase_detail(c,found[1]))
                 except inventory.InventoryError as error:return self.reply(error.status,{'error':str(error),'fields':error.fields})
                 return self.reply(404,{'error':'No encontrado.'})
+            if path.startswith('/api/collections'):
+                # ADI 3.0 · fases 4 y 5: cartera, expediente, estados de cuenta, retiros, auditoría y propuestas. Solo administración; solo lectura en GET.
+                import collections_center as cc
+                if user['role']!='administrador':return self.reply(403,{'error':'Acceso no permitido.'})
+                q=parse_qs(urlsplit(self.path).query);arg=lambda name:(q.get(name,[''])[0] or '')[:80];now_cc=reception_now()
+                try:
+                    if path=='/api/collections':
+                        return self.reply(200,cc.portfolio(c,now_cc,{k:arg(k) for k in ('client','order','invoice','due_from','due_to','method','age','commitment','reconciliation','state')}))
+                    found=re.fullmatch(r'/api/collections/client/([0-9]{1,9})',path)
+                    if found:return self.reply(200,cc.client_file(c,int(found[1]),now_cc))
+                    found=re.fullmatch(r'/api/collections/statement/([0-9]{1,9})\.pdf',path)
+                    if found:
+                        import account_statement as st
+                        fmt=arg('format') if arg('format') in st.FORMATS else 'a4';internal=arg('simulation')=='1'
+                        pdf=st.render(st.data_for(c,int(found[1]),now_cc,internal),fmt);audit(c,user['id'],'account_statement'+('_internal' if internal else ''),int(found[1]))
+                        return self.reply(200,pdf,'application/pdf',filename='ESTADO-DE-CUENTA-%s%s-%s.pdf'%(found[1],'-INTERNO' if internal else '',fmt.upper()))
+                    if path=='/api/collections/pickups':return self.reply(200,cc.pickups(c,now_cc))
+                    if path=='/api/collections/audit':return self.reply(200,cc.comms_audit(c,now_cc,{k:arg(k) for k in ('from','to','client')}))
+                    if path=='/api/collections/proposals':return self.reply(200,cc.proposals(c,now_cc))
+                except cc.CollectionsError as error:return self.reply(error.status,{'error':str(error)})
+                except __import__('account_statement').StatementError as error:return self.reply(error.status,{'error':str(error)})
+                return self.reply(404,{'error':'Recurso no disponible.'})
             if path=='/api/finance/rates':
                 # ADI 3.0 · fase 3: Configuración financiera — Tasas legales Ecuador (solo administración, solo lectura en GET).
                 import interest_engine as ie
@@ -4982,6 +5004,13 @@ class Handler(BaseHTTPRequestHandler):
                             audit(c,user['id'],'adi_report_prepared',oid);return self.reply(200,{'report':adi_order.report(ctx,adi_order.recommendations(ctx,now_adi))})
                     except adi_order.AdiOrderError as error:return self.reply(error.status,{'error':str(error)})
                     return self.reply(400,{'error':'Acción no válida.'})
+                found_cc=re.fullmatch(r'/api/collections/client/([0-9]{1,9})',path)
+                if found_cc:
+                    import collections_center as cc
+                    if user['role']!='administrador':return self.reply(403,{'error':'Acceso no permitido.'})
+                    try:cc.act(c,int(found_cc[1]),user,data,reception_now(),audit);c.commit()
+                    except cc.CollectionsError as error:return self.reply(error.status,{'error':str(error),'fields':error.fields})
+                    return self.reply(200,cc.client_file(c,int(found_cc[1]),reception_now()))
                 if path=='/api/finance/rates':
                     import interest_engine as ie
                     if user['role']!='administrador':return self.reply(403,{'error':'Acceso no permitido.'})

@@ -13778,3 +13778,19 @@ body[data-page=dashboard] .fxb-pager select{height:30px!important;min-height:30p
 @media (max-width:420px){.piv5 .piv-tool{padding:0 8px;font-size:12px}}
 /* 1.5.329 · El menú superior de administración no cabía entre 1300 y 1520 px (desplazamiento horizontal de ~23-47 px): relleno de 6 px como entre 1200 y 1299. */
 @media(min-width:1300px) and (max-width:1520px){.premium-header nav>a{padding:0 6px}.premium-header .assistance-menu summary{padding:0 6px}}
+/* ADI 3.0 · fases 4 y 5 — Cartera ADI (solo .cc-*). */
+.cc-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;margin:0 0 12px}
+.cc-kpi{display:grid;gap:3px;padding:10px 12px;border-radius:11px;border:1px solid #23395c;background:#0b172b;border-top:3px solid #3b6fb3;min-width:0}
+.cc-kpi small{font-size:11.5px;color:#9fb4d4}.cc-kpi strong{font-size:17px;color:#fff;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}.cc-kpi span{font-size:11px;color:#8fa9cc}
+.cc-kpi[data-tone=rojo]{border-top-color:#f87171}.cc-kpi[data-tone=ambar]{border-top-color:#fbbf24}.cc-kpi[data-tone=verde]{border-top-color:#34d399}.cc-kpi[data-tone=gris]{border-top-color:#64748b}
+.cc-filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;align-items:end;margin:0 0 12px;padding:10px;border:1px solid #23395c;border-radius:11px;background:#0b172b}
+.cc-field{display:grid;gap:4px;font-size:11.5px;color:#9fb4d4;min-width:0}.cc-field input,.cc-field select{width:100%;min-width:0;font-size:13px}
+.cc-filter-actions{display:flex;gap:6px;justify-content:flex-end;grid-column:-2/-1}
+.cc-row-acts{display:flex;flex-wrap:wrap;gap:6px}.cc-row-acts .inv-btn{min-height:32px;font-size:12px}
+.cc-flags{display:flex;flex-wrap:wrap;gap:4px;margin-top:3px}
+.cc-table td{font-variant-numeric:tabular-nums}
+.cc-rules{display:grid;gap:6px;padding:10px 12px;border:1px solid #23395c;border-radius:11px;background:#0b172b;margin:0 0 12px}.cc-rules h3{margin:0;font-size:13px;color:#e6efff}
+.cc-file-body{display:grid;gap:12px;min-width:0}.cc-file-head{display:grid;gap:2px}.cc-file-head strong{font-size:17px;color:#fff}.cc-file-head small{font-size:12px;color:#9fb4d4}
+.cc-file-acts{display:flex;flex-wrap:wrap;gap:6px}.cc-file-acts .inv-btn{min-height:34px;font-size:12px}
+.cc-sec{display:grid;gap:6px;min-width:0}.cc-sec h3{margin:0;font-size:13px;color:#e6efff}
+@media (max-width:640px){.cc-filter-actions{grid-column:1/-1}.cc-kpi strong{font-size:15px}}

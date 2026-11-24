@@ -487,7 +487,15 @@ def precheck(c, oid, purpose, channel, text, fingerprint_value, now):
         level, detail = 'ok', 'Comunicación del servicio contratado.'
     if purpose in COLLECTION and _collection_today(c, who['id'], now):
         level, detail = 'block', 'Ya hubo una gestión de cobranza hoy con este cliente (máximo una al día entre todos los canales).'
-    cur = _commitment(c, oid, now)['current'] if purpose in COLLECTION else None
+    if purpose in COLLECTION:
+        try:
+            import collections_center
+            stop = collections_center.suspended(c, who['id'], now.date())
+        except Exception:
+            stop = ''
+        if stop:
+            level, detail = 'block', stop
+    cur = _commitment(c, oid, now)['current'] if purpose in COLLECTION and level != 'block' else None
     if cur and cur['state'] == 'en_revision':
         level, detail = 'block', 'El compromiso de pago está en revisión (importe en controversia o transferencia por conciliar): se suspende la cobranza.'
     elif cur and purpose == 'pago_pendiente' and cur['state'] in ('pendiente', 'proximo'):

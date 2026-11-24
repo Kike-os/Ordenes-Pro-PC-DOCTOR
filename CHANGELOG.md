@@ -4,6 +4,15 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.330 — 2026-11-24 07:08 (UTC-05:00)
+
+ADI 3.0 fases 4 y 5: Smart Collections, estados de cuenta, retiros, auditoría y propuestas de seguimiento
+
+### Nuevas funcionalidades
+
+- ADI 3.0 · fase 4: ADI Smart Collections en Facturación → Cartera ADI: indicadores de cartera (capital, vencida, por vencer, intereses simulados aparte, intereses autorizados /bin/bash), filtros, expediente económico del cliente, marcas de gestión (suspender recordatorios, derivar, conciliación, observación; migración 121) y estados de cuenta en PDF A4 y ticket de 80 mm.
+- ADI 3.0 · fase 5: equipos pendientes de retiro con alertas a los 30, 60, 85 y 90 días (sin disponer nunca del equipo), auditoría de comunicaciones (motivo, fuente, entrega, respuesta y resultado) y propuestas de seguimiento por eventos que una persona revisa; sin envío automático.
+
 ## v1.5.329 — 2026-11-24 06:39 (UTC-05:00)
 
 Encabezado sin desplazamiento horizontal a 1300-1520 px

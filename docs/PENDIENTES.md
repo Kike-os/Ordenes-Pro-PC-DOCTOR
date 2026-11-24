@@ -38,8 +38,10 @@ comparar el diseño con ellas.
 - [x] Fase 2: compromisos de pago (1.5.327, migración 119 aplicada).
 - [x] Fase 3: tasas legales y simulador de intereses, **solo simulación** (1.5.327, migración 120 aplicada).
 - [ ] **[Administración]** Registrar y validar las tasas oficiales del BCE: dos personas distintas, una registra y otra valida.
-- [ ] Fase 4: ADI Smart Collections (centro de cartera), expediente económico del cliente y estados de cuenta (A4, 80 mm y vista segura).
-- [ ] Fase 5: auditoría de comunicaciones, equipos pendientes de retiro (alertas a los 30, 60, 85 y 90 días) y reglas de seguimiento por eventos. Las campañas automáticas necesitan una aprobación aparte.
+- [x] Fase 4: ADI Smart Collections (centro de cartera), expediente económico del cliente, marcas de gestión y estados de cuenta en A4 y 80 mm (1.5.330, migración 121).
+- [x] Fase 5: auditoría de comunicaciones, equipos pendientes de retiro (alertas a los 30, 60, 85 y 90 días) y propuestas de seguimiento por eventos, sin envío automático (1.5.330).
+- [ ] **[Administración]** Aprobar las reglas de seguimiento antes de cualquier campaña automática. No está autorizado.
+- [ ] Enlace público seguro del estado de cuenta para el cliente: queda dentro del portal seguro con QR del Premium Billing Center.
 - [ ] **[Administración]** Validación jurídica, contable y tributaria antes de cualquier aplicación real de intereses. No está autorizada.
 
 ## Premium Billing Center 4.0
