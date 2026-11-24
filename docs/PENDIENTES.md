@@ -76,6 +76,6 @@ comparar el diseño con ellas.
 ## Otros pendientes de administración
 
 - [ ] **[Administración]** Confirmar con el contador que el SRI acepta en el ticket el código de barras de la clave de acceso dividido en partes.
-- [ ] **[Administración]** Crear en Meta la plantilla de autenticación de WhatsApp (p. ej., `pcdoctor_codigo`) y configurarla en Integraciones.
+- [x] Plantilla de autenticación `pcdoctor_codigo` creada en Meta el 24/11/2026 desde Integraciones (1.5.341), aprobada al instante y conectada a los códigos de verificación.
 - [x] **[Administración]** Contraseña de `admin-red`: administración decidió conservarla (24/11/2026). Recomendación: revisar periódicamente sus inicios de sesión.
 - [ ] **[Administración]** Pulsar «Obtener RIDE de AZUR» en las facturas 276 y 277.
