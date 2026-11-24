@@ -13,6 +13,11 @@ Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas
 ### Mejoras realizadas
 
 - ADI administrativa consulta finanzas, facturación, cartera, atención a clientes, repuestos, inventario e infraestructura con permisos validados en el servidor, solo lectura, con pasos y fuentes reales y sin guardar contraseñas ni tokens.
+- Premium Smart Dropdown 2.0: todas las listas se alinean al campo, se abren hacia arriba si no hay espacio, respetan los márgenes, se recolocan al desplazar, funcionan en ventanas modales y las largas tienen buscador; navegación completa con teclado.
+
+### Errores corregidos
+
+- Listas desplegables: la Marca de Nueva orden (y Provincia, Cantón, Parroquia y Localidad) abría la lista nativa del navegador a toda la altura y con otros colores. Ahora usan la lista del sistema, alineada al campo, con altura limitada y búsqueda sin acentos.
 
 ## v1.5.338 — 2026-11-24 13:35 (UTC-05:00)
 

@@ -4986,15 +4986,25 @@ body[data-page=dashboard] .adi-panel.adi-assist.adi-name{max-width:480px;margin-
  ::-webkit-scrollbar-corner{background:#0d1a2d}
 }
 /* Menús desplegables: lista propia (ui-select.js) con el tema azul; el <select> cerrado conserva su sitio y tamaño. */
-.ui-select-list{position:fixed;z-index:2147483000;box-sizing:border-box;overflow-y:auto;overscroll-behavior:contain;padding:6px;border:1px solid #37618d;border-radius:12px;background:#0c192d;color:#e3eeff;box-shadow:0 18px 40px -12px #000000cc,0 0 0 1px #0c192d;font:400 14px/1.35 Inter,"Segoe UI",system-ui,sans-serif;text-align:left;animation:ui-select-in .14s ease-out}
+.ui-select-list{position:fixed;z-index:2100;box-sizing:border-box;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#37618d transparent;padding:6px;border:1px solid #37618d;border-radius:12px;background:#0c192d;color:#e3eeff;box-shadow:0 18px 40px -12px #000000cc,0 0 0 1px #0c192d;font:400 14px/1.35 Inter,"Segoe UI",system-ui,sans-serif;text-align:left;animation:ui-select-in .14s ease-out}
 .ui-select-list[data-side=top]{animation-name:ui-select-in-top}
-@keyframes ui-select-in{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
-@keyframes ui-select-in-top{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
-.ui-select-option{display:flex;align-items:center;gap:8px;min-height:36px;margin:1px 0;padding:7px 12px;border-radius:8px;background:#10233c;color:#e3eeff;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:background .12s}
+@keyframes ui-select-in{from{opacity:0}to{opacity:1}}
+@keyframes ui-select-in-top{from{opacity:0}to{opacity:1}}
+.ui-select-option{display:flex;align-items:center;gap:8px;min-height:38px;margin:1px 0;padding:8px 10px 8px 12px;border-radius:8px;background:#10233c;color:#e3eeff;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:background .12s}
 .ui-select-option[data-active=true]{background:#1b3b60}
 .ui-select-option[aria-selected=true]{background:#24558d;font-weight:600;box-shadow:inset 3px 0 0 #a8dcff}
 .ui-select-option[aria-selected=true][data-active=true]{background:#2b63a3}
 .ui-select-option[aria-disabled=true]{color:#7f93b0;cursor:not-allowed;background:#0e1d33}
+.ui-select-text{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.ui-select-check{flex:none;width:16px;height:16px;fill:none;stroke:#a8dcff;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.ui-select-note{flex:none;max-width:45%;overflow:hidden;text-overflow:ellipsis;color:#8fa8c8;font-size:12px}
+.ui-select-search{position:sticky;top:-6px;z-index:1;margin:-6px -6px 6px;padding:6px;background:#0c192d;border-bottom:1px solid #1f3a5c}
+.ui-select-search input{box-sizing:border-box;width:100%;min-height:36px;margin:0;padding:6px 10px;border:1px solid #2b4c74;border-radius:9px;background:#091425;color:#e3eeff;font:inherit;font-size:13.5px}
+.ui-select-search input:focus{outline:none;border-color:#60a5fa;box-shadow:0 0 0 3px #3b82f633}
+.ui-select-empty{padding:10px 12px;color:#8fa8c8;font-size:13px}
+.ui-select-create .ui-select-text{color:#bfdbfe;font-weight:600}.ui-select-clear .ui-select-text{color:#fca5a5}
+.ui-select-suggest .ui-select-option{background:transparent}.ui-select-suggest .ui-select-option[data-active=true]{background:#1b3b60}.ui-select-suggest .ui-select-option[aria-selected=true]{background:#24558d}
+.ui-select-group[hidden],.ui-select-option[hidden]{display:none}
 .ui-select-group-label{padding:8px 12px 4px;font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:#a8dcff}
 @media(prefers-reduced-motion:reduce){.ui-select-list{animation:none}}
 /* Lista nativa (pantallas táctiles o navegadores sin el menú propio): al menos con los colores del tema. */

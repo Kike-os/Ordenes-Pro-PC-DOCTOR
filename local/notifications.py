@@ -326,7 +326,7 @@ def build(c, user, now, mail_access=False, hidden=False, limit=40):
         # Protección de datos: dónde se guarda la información y si los respaldos de la base central están al día.
         import remote_db
         if not remote_db.configured():
-            items.append({'key': 'storage:local', 'kind': 'warning', 'icon': 'status', 'title': 'Esta instalación usa una base de datos local', 'detail': 'Lo que registres aquí queda solo en este equipo, no en la base central en la nube.', 'at': stamp, 'href': '#system', 'group': 'alert'})
+            items.append({'key': 'storage:local', 'kind': 'warning', 'icon': 'status', 'title': 'Esta instalación usa una base de datos local', 'detail': 'Lo que registres aquí queda solo en este equipo, no en la base central en la nube.', 'at': stamp[:10] + 'T00:00:00' + stamp[19:], 'href': '#system', 'group': 'alert'})  # estable en el día: no cambia la revisión a cada segundo
         else:
             try:
                 # 1.5.312 · Alertas de respaldo separadas y reales: atrasado (sin respaldo VERIFICADO en 30 h), último respaldo en Google
