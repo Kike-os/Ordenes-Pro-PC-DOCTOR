@@ -4,6 +4,18 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.331 — 2026-11-24 08:09 (UTC-05:00)
+
+Database Guardian Pro 1.0: migraciones verificadas con evidencia y monitor de base de datos
+
+### Nuevas funcionalidades
+
+- Database Guardian Pro 1.0: estado individual verificado de cada migración (registro, tablas, columnas, índices y checksum), libro de migraciones (migración 122), bloqueo contra ejecuciones simultáneas, recuperación segura con reintentos y cortacircuitos, monitor de cinco estados con latencias, historial de incidencias, exportación y control obligatorio previo a publicar.
+
+### Errores corregidos
+
+- Database Guardian Pro 1.0 — causa raíz de la incidencia del 24/11 02:04: Vercel publicó el código antes de aplicar las migraciones 119 y 120 y el monitor, que comparaba cantidades, lo marcó como fallo crítico aunque la conexión era correcta. Ahora verifica la estructura real y una migración aditiva pendiente es advertencia.
+
 ## v1.5.330 — 2026-11-24 07:08 (UTC-05:00)
 
 ADI 3.0 fases 4 y 5: Smart Collections, estados de cuenta, retiros, auditoría y propuestas de seguimiento
