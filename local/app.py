@@ -2565,6 +2565,22 @@ class Handler(BaseHTTPRequestHandler):
                     found=re.fullmatch(r'/api/invoicing/policies/([0-9]{1,9})\.pdf',path)
                     if found:
                         policy=docs._policy(c,found[1]);return self.reply(200,docs.policy_pdf(policy),'application/pdf',filename='POLITICAS-%s-%s%s.pdf'%(policy['code'],policy['version'],'-BORRADOR' if policy['status']=='borrador' else ''))
+                    found=re.fullmatch(r'/api/invoicing/([0-9]{1,9})/print-center',path)
+                    if found:
+                        # Centro de impresión: formatos compatibles, preferencias del usuario e historial. Solo lectura.
+                        import print_center
+                        try:return self.reply(200,print_center.center(c,int(found[1]),user['id']))
+                        except print_center.PrintError as error:return self.reply(error.status,{'error':str(error)})
+                    found=re.fullmatch(r'/api/invoicing/([0-9]{1,9})/ticket\.pdf',path)
+                    if found:
+                        # Ticket térmico de la factura (80 o 58 mm). Solo representa el comprobante emitido: no emite, no consume secuenciales ni envía nada.
+                        import invoice_ticket
+                        fmt=arg('format') or '80';copies=arg('copies') or '1'
+                        if fmt not in invoice_ticket.FORMATS or not copies.isdigit():return self.reply(400,{'error':'Formato o copias no válidos.'})
+                        try:
+                            data=invoice_ticket.data_for(c,int(found[1]));pdf=invoice_ticket.render(data,fmt,int(copies))
+                        except invoice_ticket.TicketError as error:return self.reply(error.status,{'error':str(error)})
+                        return self.reply(200,pdf,'application/pdf',filename=__import__('document_style').filename('TICKET-FACTURA',data['invoice']['number'] or found[1]))
                     found=re.fullmatch(r'/api/invoicing/([0-9]{1,9})/(documents|ride\.pdf|garantias\.pdf|politicas\.pdf)',path)
                     if found:
                         invoice_id=int(found[1]);inv=invoicing.detail(c,invoice_id)['invoice']
@@ -4014,6 +4030,17 @@ class Handler(BaseHTTPRequestHandler):
                             except ValueError as error:return self.reply(400,{'error':str(error)})
                             audit(c,user['id'],'emission_lock_'+('closed' if result['db_locked'] else 'opened'));c.commit()
                             return self.reply(200,result)
+                        found=re.fullmatch(r'/api/invoicing/([0-9]{1,9})/print-log',path)
+                        if found or path=='/api/invoicing/print-prefs':
+                            # Registra una SOLICITUD de vista, descarga o impresión (no confirma papel) y guarda las preferencias. Nunca emite ni envía.
+                            import print_center
+                            try:
+                                if found:
+                                    lid=print_center.log(c,int(found[1]),user['id'],data,now)
+                                    if str(data.get('remember',''))=='1':print_center.save_prefs(c,user['id'],data)
+                                    c.commit();return self.reply(200,{'ok':True,'logged':bool(lid),'history':print_center.history(c,int(found[1]))})
+                                result=print_center.save_prefs(c,user['id'],data);c.commit();return self.reply(200,{'ok':True,'prefs':result})
+                            except print_center.PrintError as error:return self.reply(error.status,{'error':str(error)})
                         found=re.fullmatch(r'/api/invoicing/([0-9]{1,9})/send',path)
                         if found:
                             kind=str(data.get('kind',''))

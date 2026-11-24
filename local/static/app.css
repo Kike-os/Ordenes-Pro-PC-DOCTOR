@@ -13569,3 +13569,32 @@ th[aria-sort=ascending] .fxb-sort,th[aria-sort=descending] .fxb-sort{color:#BFDB
  .fxb-more[open]>summary{margin-bottom:6px}
  .fxb-menu{position:static;min-width:0;max-width:none;width:100%;box-shadow:none}
 }
+/* ===== Centro de impresión — PC-DOCTOR (Premium Billing Center 4.0). Acotado a .pcx. ===== */
+.pcx-dialog{width:min(1080px,calc(100vw - 24px))!important;max-width:none!important}
+.pcx{display:grid;grid-template-columns:minmax(0,340px) minmax(0,1fr);gap:16px;min-width:0;min-height:min(70vh,640px)}
+.pcx-side{display:grid;gap:12px;align-content:start;min-width:0}
+.pcx-sub{margin:0;font-size:12.5px;line-height:1.45;color:var(--inv-muted,#94A3B8)}
+.pcx-formats{display:grid;gap:6px}
+.pcx-format{display:flex;align-items:center;gap:10px;width:100%;padding:9px 11px;border:1px solid var(--inv-line,#1E2D45);border-radius:11px;background:#0E1A2D;color:#E2E8F0;text-align:left;cursor:pointer;transition:border-color .15s,background .15s}
+.pcx-format:hover:not([aria-disabled=true]){border-color:#3B5B85}
+.pcx-format[aria-checked=true]{border-color:#3B82F6;background:#12264A;box-shadow:inset 0 0 0 1px #3B82F6}
+.pcx-format[aria-disabled=true]{opacity:.55;cursor:not-allowed}
+.pcx-format:focus-visible{outline:2px solid #60A5FA;outline-offset:2px}
+.pcx-format-ic{display:grid;place-items:center;flex:none;width:30px;height:30px;border-radius:8px;background:#16294A;color:#93C5FD}
+.pcx-format-ic svg{width:16px;height:16px}
+.pcx-format-tx{display:grid;gap:1px;min-width:0}.pcx-format-tx strong{font-size:13px}.pcx-format-tx small{font-size:11.5px;color:var(--inv-muted,#94A3B8);overflow-wrap:anywhere}
+.pcx-copies{display:flex;align-items:center;gap:10px;margin:0;font-size:12.5px;font-weight:600;color:#CBD5E1}.pcx-copies input{width:84px;margin:0;font-variant-numeric:tabular-nums}
+.pcx-remember{display:flex;align-items:center;gap:8px;margin:0;font-size:12.5px;font-weight:500;color:#CBD5E1}
+.pcx-hint{display:flex;gap:8px;margin:0;padding:9px 11px;border:1px solid #1E3A5F;border-radius:10px;background:#0C1B30;font-size:12px;line-height:1.45;color:#BFDBFE}
+.pcx-hint svg{flex:none;width:15px;height:15px;margin-top:1px}
+.pcx-actions{display:flex;flex-wrap:wrap;gap:8px}.pcx-actions .inv-btn{flex:1 1 140px;justify-content:center}
+.pcx-view{min-width:0;border:1px solid var(--inv-line,#1E2D45);border-radius:12px;background:#E9EDF3;overflow:hidden}
+.pcx-frame{display:block;width:100%;height:100%;min-height:min(70vh,640px);border:0;background:#E9EDF3}
+.pcx-history h4{margin:0 0 6px;font-size:12.5px;color:#DBE8FB}
+.pcx-history ul{display:grid;gap:5px;margin:0;padding:0;list-style:none;max-height:180px;overflow:auto}
+.pcx-history li{display:grid;gap:1px;padding:6px 9px;border:1px solid var(--inv-line,#1E2D45);border-radius:9px;background:#0E1A2D}
+.pcx-history strong{font-size:12px;color:#E2E8F0}.pcx-history small{font-size:11px;color:var(--inv-muted,#94A3B8);overflow-wrap:anywhere}
+.pcx-muted{margin:0;font-size:12px;color:var(--inv-muted,#94A3B8)}
+@media(max-width:820px){.pcx{grid-template-columns:minmax(0,1fr)}.pcx-frame{min-height:60vh}}
+@media(prefers-reduced-motion:reduce){.pcx-format{transition:none}}
+.pcx-view[data-loading=true]{opacity:.6}

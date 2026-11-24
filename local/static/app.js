@@ -7532,8 +7532,8 @@ function invKpis(list){const grid=el('div',undefined,'inv-kpis');for(const[icon,
 function invEmpty(icon,title,text,action){const box=el('div',undefined,'inv-empty'),mark=el('span',undefined,'inv-empty-icon');mark.append(invIcon(icon));box.append(mark,el('strong',title),el('p',text));if(action)box.append(action);return box;}
 function invoiceChip(status,label){const chip=el('span',label,'inv-chip');chip.dataset.status=status;return chip;}
 // Ambiente real del servidor para los textos de la interfaz (la emisión la decide siempre el servidor).
-function invReal(){return window.__invReal===true;}
-try{fetch('/api/invoicing/settings',{credentials:'same-origin'}).then(r=>r.ok?r.json():null).then(d=>{const x=d&&(d.settings||d);if(x&&'test_mode' in x)window.__invReal=x.test_mode===false;}).catch(()=>{});}catch(e){}
+// Sin petición al cargar la página (fallaba con 401 en el inicio de sesión): el ambiente llega con los datos de Facturación.
+function invReal(){return window.__invReal===true||invoiceProduction===true;}
 function invoiceTestBanner(settings){if(settings&&'test_mode' in settings)window.__invReal=settings.test_mode===false;const box=el('div',undefined,'inv-banner'),mark=el('span',undefined,'inv-banner-mark');box.setAttribute('role','note');mark.append(invIcon('flask-conical'));
  const lock=settings?.emission_lock;if(lock?.locked){box.dataset.lock='1';mark.replaceChildren(invIcon('lock'));const msg=el('div');msg.append(el('strong',lock.banner),el('small','El servidor rechaza emitir, enviar al SRI, anular, la consulta automática de AZUR y los correos de facturas hasta que administración habilite la emisión.'));box.append(mark,msg,el('span','Bloqueado','inv-banner-env'));return box;}
  if(settings&&settings.test_mode===false){box.dataset.env='produccion';mark.replaceChildren(invIcon('badge-check'));const live=el('div');live.append(el('strong','PRODUCCIÓN — FACTURACIÓN ELECTRÓNICA REAL'),el('small',settings?.emission?.note||'Los comprobantes emitidos aquí son reales y tienen validez tributaria.'));box.append(mark,live,el('span','Ambiente: Producción','inv-banner-env'));return box;}
@@ -7912,6 +7912,7 @@ async function invoiceQuickAction(row,action){try{
 function invoiceActionsMenu(row){const wrap=el('div',undefined,'fxb-acts');
  const iconLink=(label,icon,href,download)=>{const a=el('a',undefined,'inv-icon-btn');a.href=href;a.title=label;a.setAttribute('aria-label',label+' · '+(row.number||'borrador'));if(download)a.setAttribute('download','');else{a.target='_blank';a.rel='noopener';}a.append(invIcon(icon));return a;};
  wrap.append(invIconBtn('Ver detalle de '+(row.number||'la factura en borrador'),'eye',()=>invoiceQuickAction(row,'ver')));
+ {const pb=invIconBtn('Imprimir '+(row.number||'la factura'),'printer',()=>printCenter(row.id,row.number));if(!row.has_xml){pb.disabled=true;pb.title='Emite la factura para imprimirla: un borrador no tiene número ni clave de acceso.';}wrap.append(pb);}
  if(row.has_xml){wrap.append(iconLink('Ver RIDE','file-text','/api/invoicing/'+row.id+'/ride.pdf',false),iconLink('Descargar RIDE','download','/api/invoicing/'+row.id+'/ride.pdf',true));}
  const more=el('details',undefined,'fxb-more'),sum=el('summary');sum.setAttribute('aria-label','Más acciones de '+(row.number||'la factura'));sum.title='Más acciones';sum.append(invIcon('ellipsis-vertical'));more.append(sum);
  const list=el('div',undefined,'fxb-menu');list.setAttribute('role','menu');
@@ -7928,6 +7929,48 @@ function invoiceActionsMenu(row){const wrap=el('div',undefined,'fxb-acts');
  more.append(list);more.addEventListener('keydown',event=>{if(event.key==='Escape'&&more.open){more.open=false;sum.focus();}});
  document.addEventListener('click',event=>{if(more.open&&!more.contains(event.target))more.open=false;});
  wrap.append(more);return wrap;}
+// Centro de impresión — PC-DOCTOR (Premium Billing Center 4.0). Vista previa real del PDF, formato, copias, preferencias del usuario e
+// historial. Imprimir usa el diálogo nativo del sistema operativo (elige allí la Epson TM-m30II): el navegador no puede confirmar el papel,
+// así que solo se registra la SOLICITUD. Nada de esto emite, consume secuenciales, crea pagos ni envía documentos.
+async function printCenter(invoiceId,number){const dialog=invDialog('Centro de impresión — PC-DOCTOR',true);dialog.classList.add('pcx-dialog');
+ const body=el('div',undefined,'pcx');dialog.append(body);body.append(el('p','Cargando…','empty-module'));
+ let d;try{d=await api('/api/invoicing/'+invoiceId+'/print-center');}catch(error){body.replaceChildren(el('p',error.message,'empty-module'));return;}
+ let fmt=(d.formats.find(f=>f.key===d.prefs.format&&f.available)||d.formats.find(f=>f.available)||d.formats[0]).key,copies=d.prefs.copies||1;
+ const side=el('div',undefined,'pcx-side'),view=el('div',undefined,'pcx-view'),frame=el('iframe');frame.title='Vista previa del documento';frame.className='pcx-frame';view.append(frame);
+ const sub=el('p','Factura '+(number||'')+' · el documento se genera con los datos registrados; imprimir no emite ni envía nada.','pcx-sub');
+ const list=el('div',undefined,'pcx-formats');list.setAttribute('role','radiogroup');list.setAttribute('aria-label','Formato');
+ const copiesWrap=el('label',undefined,'pcx-copies'),copiesIn=el('input');copiesIn.type='number';copiesIn.min='1';copiesIn.max='5';copiesIn.value=String(copies);copiesWrap.append(el('span','Copias'),copiesIn);
+ const remember=el('label',undefined,'pcx-remember'),rem=el('input');rem.type='checkbox';remember.append(rem,el('span','Usar como formato predeterminado'));
+ const hint=el('p',undefined,'pcx-hint');const hist=el('section',undefined,'pcx-history');
+ const url=()=>{const f=d.formats.find(x=>x.key===fmt);return f&&f.available?(fmt==='80'||fmt==='58'?'/api/invoicing/'+invoiceId+'/ticket.pdf?format='+fmt+'&copies='+copies:d.urls[fmt]):'';};
+ const paintHint=()=>{hint.replaceChildren();if(fmt==='80'||fmt==='58'){hint.append(invIcon('printer'),el('span',(fmt==='80'?'Optimizado para Epson TM-m30II · 203 dpi · 72 mm útiles del rollo de 80 mm.':'Rollo de 58 mm · 48 mm útiles a 203 dpi.')+' En el diálogo elige la impresora térmica, papel en rollo, escala 100 % y sin márgenes.'));}
+  else hint.append(invIcon('file-text'),el('span',fmt==='azur'?'Documento original generado por AZUR: no se modifica.':'Representación A4 del sistema con los datos de la factura. El RIDE original de AZUR se conserva aparte.'));};
+ const paint=()=>{list.querySelectorAll('[role=radio]').forEach(b=>{const on=b.dataset.key===fmt;b.setAttribute('aria-checked',String(on));b.tabIndex=on?0:-1;});
+  copiesWrap.hidden=!(fmt==='80'||fmt==='58');paintHint();const u=url();printB.disabled=downB.disabled=!u;loadPreview(u);};
+ // La política de seguridad no permite incrustar respuestas del servidor: el PDF se descarga y se muestra como archivo local (blob:).
+ let blobUrl='',ticket=0;const loadPreview=async u=>{const mine=++ticket;if(!u){frame.src='about:blank';return;}view.dataset.loading='true';
+  try{const r=await fetch(u,{credentials:'same-origin'});if(!r.ok)throw new Error((await r.json().catch(()=>({}))).error||'No se pudo generar la vista previa.');const blob=await r.blob();if(mine!==ticket)return;
+   if(blobUrl)URL.revokeObjectURL(blobUrl);blobUrl=URL.createObjectURL(blob);frame.src=blobUrl+'#toolbar=0&view=FitH';}
+  catch(error){if(mine===ticket){frame.src='about:blank';toast(error.message,'error');}}finally{if(mine===ticket)delete view.dataset.loading;}};
+ dialog.addEventListener('close',()=>{if(blobUrl)URL.revokeObjectURL(blobUrl);});
+ for(const f of d.formats){const b=button('',()=>{if(!f.available)return;fmt=f.key;paint();},'pcx-format');b.setAttribute('role','radio');b.dataset.key=f.key;
+  const ic=el('span',undefined,'pcx-format-ic');ic.append(invIcon(f.thermal?'receipt-text':'file-text'));const tx=el('span',undefined,'pcx-format-tx');tx.append(el('strong',f.label),el('small',f.available?(f.thermal?'Térmica · blanco y negro':'PDF A4'):f.reason));b.append(ic,tx);
+  if(!f.available){b.setAttribute('aria-disabled','true');b.title=f.reason;}list.append(b);}
+ list.addEventListener('keydown',event=>{if(!['ArrowDown','ArrowUp','ArrowRight','ArrowLeft'].includes(event.key))return;event.preventDefault();const opts=d.formats.filter(f=>f.available);if(!opts.length)return;
+  const i=opts.findIndex(f=>f.key===fmt),n=opts[(i+(event.key==='ArrowDown'||event.key==='ArrowRight'?1:opts.length-1))%opts.length];fmt=n.key;paint();list.querySelector('[data-key="'+fmt+'"]').focus();});
+ copiesIn.addEventListener('change',()=>{copies=Math.max(1,Math.min(5,parseInt(copiesIn.value,10)||1));copiesIn.value=String(copies);paint();});
+ const log=async action=>{try{const r=await api('/api/invoicing/'+invoiceId+'/print-log',{format:fmt,copies:String(copies),action,remember:rem.checked?'1':''});paintHistory(r.history);}catch(error){toast(error.message,'error');}};
+ const printB=invBtn('Imprimir','printer',async()=>{const u=url();if(!u)return;printB.disabled=true;
+   // Se imprime el mismo PDF de la vista previa con el diálogo nativo; si el navegador lo bloquea, se abre en otra pestaña para imprimir desde allí.
+   try{const w=frame.contentWindow;if(!blobUrl||!w)throw new Error();w.focus();w.print();}catch{window.open(blobUrl||u,'_blank','noopener');}
+   await log('impresion');toast('Se abrió el diálogo de impresión. El sistema no puede confirmar que salió en papel.','info');printB.disabled=false;},'primary');
+ const downB=invBtn('Descargar PDF','download',async()=>{const u=url();if(!u)return;const a=el('a');a.href=u;a.setAttribute('download','');document.body.append(a);a.click();a.remove();await log('descarga');});
+ const paintHistory=h=>{hist.replaceChildren(el('h4','Historial de impresión'));if(!h.installed){hist.append(el('p','El historial se activará al aplicar la migración 118.','pcx-muted'));return;}
+  if(!h.rows.length){hist.append(el('p','Todavía no se ha impreso ni descargado esta factura.','pcx-muted'));return;}
+  const ul=el('ul');for(const r of h.rows.slice(0,8)){const li=el('li');li.append(el('strong',r.action+' · '+r.format+(r.copies>1?' · '+r.copies+' copias':'')),el('small',formatOrderDate(r.at)+' · '+r.user+' · '+r.result));ul.append(li);}hist.append(ul);};
+ side.append(sub,list,copiesWrap,remember,hint);const actions=el('div',undefined,'pcx-actions');actions.append(downB,printB);side.append(actions,hist);
+ body.replaceChildren(side,view);paintHistory(d.history);paint();list.querySelector('[aria-checked=true]')?.focus();}
+
 function invoicesPanel(panel,data){const filtered=!!(invoiceState.q||invoiceState.status||invoiceState.from||invoiceState.to);
  if(data.settings.missing.length){const warn=el('div',undefined,'inv-warn inv-warn-action');warn.setAttribute('role','status');warn.append(invIcon('triangle-alert'),el('span','Faltan datos fiscales para emitir: '+data.settings.missing.join(', ')+'.'),button('Completar datos fiscales',()=>{invoiceGo('fiscal');},'secondary'));panel.append(warn);}
  const card=el('section',undefined,'inv-card fxb-card'),head=el('header',undefined,'inv-card-head'),title=el('div');
@@ -8146,6 +8189,7 @@ function paintInvoice(dialog,body,data){const inv=data.invoice,s=data.settings,d
   emitB.append(systemIcon('M22 2 11 13 M22 2l-7 20-4-9-9-4z'),el('span',real?'Emitir factura':'Emitir en pruebas'));emitB.disabled=!!(s.missing.length||(inv.blockers||[]).length||Object.keys(inv.problems||{}).length);if(emitB.disabled)emitB.title='Completa los datos pendientes para emitir.';
   const drop=button('Descartar borrador',async()=>{if(await confirmClose({title:'¿Descartar este borrador?',text:'El borrador queda en el historial y la orden podrá facturarse de nuevo. No se elimina ningún dato.',keep:'Conservar',discard:'Descartar',danger:true})!=='discard')return;try{const fresh=await api('/api/invoicing/'+inv.id,{action:'discard'});paintInvoice(dialog,body,fresh);if(currentModule==='invoicing')renderInvoicing();}catch(error){notify(error.message);}},'secondary');
   actions.append(emitB,drop);}
+ {const pb=invBtn('Imprimir','printer',()=>printCenter(inv.id,inv.number),'primary');if(!inv.access_key){pb.disabled=true;pb.title='Emite la factura para imprimirla.';}actions.append(pb);}
  if(inv.access_key){const xml=el('a',undefined,'secondary');xml.href='/api/invoicing/'+inv.id+'/comprobante.xml';xml.append(systemIcon('M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6 M10 13l-2 2 2 2 M14 13l2 2-2 2'),el('span','Descargar XML'));actions.append(xml);
   if(['pendiente','enviado','autorizado'].includes(inv.status))actions.append(invBtn('Nota de crédito','file-x-2',()=>creditNoteDialog(inv,()=>openInvoice(inv.id))));
   body.append(invoiceAzurBlock(dialog,body,data));}
