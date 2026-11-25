@@ -1175,7 +1175,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.hide_costs=False   # 1.5.291: se decide en cada petición (una conexión puede atender varias)
         path = urlsplit(self.path).path
-        files = {'/static/label.css':'label.css','/static/tracking.css':'tracking.css','/static/licencias.css':'licencias.css','/static/app.css':'app.css','/static/app.js':'app.js','/static/i18n.js':'i18n.js','/static/service-picker.js':'service-picker.js','/static/licenses.js':'licenses.js','/static/inventory.js':'inventory.js','/static/sales.js':'sales.js','/static/reschedule.js':'reschedule.js','/static/form-validation.js':'form-validation.js','/static/appointments.js':'appointments.js','/static/pqrs.js':'pqrs.js','/static/pqrs-admin.js':'pqrs-admin.js','/static/adi-widget.js':'adi-widget.js','/static/adi-orb.js':'adi-orb.js','/static/ui-select.js':'ui-select.js','/static/ticket.css':'ticket.css','/static/phone-input.js':'phone-input.js','/static/phone-input.css':'phone-input.css','/static/libphonenumber-max.js':'libphonenumber-max.js','/static/seguimiento-a4.css':'seguimiento-a4.css','/static/ticket.js':'ticket.js','/static/quote.css':'quote.css','/static/quote-sign.js':'quote-sign.js','/static/quote-premium.css':'quote-premium.css','/static/quote-premium.js':'quote-premium.js','/static/echarts.min.js':'echarts.min.js','/static/logo-original.png':'logo-original.png',
+        files = {'/static/label.css':'label.css','/static/tracking.css':'tracking.css','/static/licencias.css':'licencias.css','/static/app.css':'app.css','/static/app.js':'app.js','/static/i18n.js':'i18n.js','/static/service-picker.js':'service-picker.js','/static/licenses.js':'licenses.js','/static/inventory.js':'inventory.js','/static/sales.js':'sales.js','/static/reschedule.js':'reschedule.js','/static/form-validation.js':'form-validation.js','/static/appointments.js':'appointments.js','/static/pqrs.js':'pqrs.js','/static/pqrs-admin.js':'pqrs-admin.js','/static/adi-widget.js':'adi-widget.js','/static/adi-orb.js':'adi-orb.js','/static/ui-select.js':'ui-select.js','/static/ticket.css':'ticket.css','/static/phone-input.js':'phone-input.js','/static/phone-input.css':'phone-input.css','/static/libphonenumber-max.js':'libphonenumber-max.js','/static/seguimiento-a4.css':'seguimiento-a4.css','/static/portal.css':'portal.css','/static/ticket.js':'ticket.js','/static/quote.css':'quote.css','/static/quote-sign.js':'quote-sign.js','/static/quote-premium.css':'quote-premium.css','/static/quote-premium.js':'quote-premium.js','/static/echarts.min.js':'echarts.min.js','/static/logo-original.png':'logo-original.png',
                  '/favicon.ico':'favicon.ico','/static/favicon.ico':'favicon.ico','/static/favicon-16.png':'favicon-16.png','/static/favicon-32.png':'favicon-32.png','/static/logo-firma.png':'logo-firma.png','/static/favicon-48.png':'favicon-48.png',
                  '/apple-touch-icon.png':'apple-touch-icon.png','/apple-touch-icon-precomposed.png':'apple-touch-icon.png','/static/apple-touch-icon.png':'apple-touch-icon.png'}
         # Logotipos de marcas: solo nombres simples dentro de static/brands; si el archivo no existe la interfaz usa un icono genérico.
@@ -1577,6 +1577,53 @@ class Handler(BaseHTTPRequestHandler):
                 found=order_tracking.lookup_id(c,tracking_state[1])
                 if not found:return self.reply(404,{'error':'Enlace no disponible.'})
                 return self.reply(200,{'v':repair_stages.signature(c,found)})
+            portal_route=re.fullmatch(r'/s/([A-Za-z0-9_-]{1,64})/cuenta(?:/(recibo/[0-9]{1,9}|entrega|factura/[0-9]{1,9}|estado)\.pdf)?',path)
+            if portal_route:
+                # Portal seguro del cliente: enlace de seguimiento activo + últimos 4 dígitos de la identificación (sesión de 15 min). Solo lectura.
+                import order_tracking,client_portal
+                if limited(c,'portal-ip:'+digest(self.client_address[0]),60,300):return self.reply(429,{'error':'Demasiadas consultas. Intenta más tarde.'})
+                token=portal_route[1];oid=order_tracking.lookup_id(c,token);cfg=client_portal.settings(c)
+                if not oid:return self.reply(404,order_tracking.missing_page(),'text/html; charset=utf-8')
+                if not cfg['enabled'] or not client_portal.installed(c):return self.reply(503,client_portal.unavailable_page(),'text/html; charset=utf-8')
+                code=c.execute("SELECT COALESCE(code,'OP-'||printf('%05d',id)) FROM orders WHERE id=?",(oid,)).fetchone()[0]
+                jar=SimpleCookie()
+                try:jar.load(self.headers.get('Cookie',''))
+                except Exception:pass
+                now=reception_now();ok=client_portal.session_ok(c,jar[client_portal.COOKIE].value if client_portal.COOKIE in jar else '',oid,token,now)
+                if not portal_route[2]:
+                    if not ok:return self.reply(200,client_portal.form_page(token,code),'text/html; charset=utf-8')
+                    audit(c,None,'portal_view',oid);c.commit()
+                    return self.reply(200,client_portal.account_page(token,client_portal.data(c,oid,now),cfg),'text/html; charset=utf-8')
+                if not ok:return self.reply(403,client_portal.form_page(token,code,'Tu acceso venció. Confirma de nuevo los últimos cuatro dígitos.','error'),'text/html; charset=utf-8')
+                doc=portal_route[2]
+                import vouchers
+                if doc.startswith('recibo/'):
+                    if not cfg['receipts']:return self.reply(403,{'error':'Descarga no disponible.'})
+                    found=vouchers.payment(c,oid,int(doc.split('/')[1]))
+                    if not found or found['payment']['voided_at']:return self.reply(404,{'error':'Recibo no disponible.'})
+                    import payment_pdf
+                    pdf=payment_pdf.render(found['order'],found['payment'],found['account'],equipment.METHODS,now,found['tracking'],found['invoice']);name=payment_pdf.number(found['payment'])+'-'+found['order']['code']+'.pdf'
+                elif doc=='entrega':
+                    if not cfg['delivery']:return self.reply(403,{'error':'Descarga no disponible.'})
+                    info=vouchers.delivery(c,oid)
+                    if not isinstance(info,dict):return self.reply(404,{'error':'La orden todavía no se entregó.'})
+                    pdf=vouchers.delivery_pdf(info,now);name='ENTREGA-'+code+'.pdf'
+                elif doc.startswith('factura/'):
+                    if not cfg['invoices']:return self.reply(403,{'error':'Descarga no disponible.'})
+                    iid=int(doc.split('/')[1])
+                    inv=c.execute("SELECT id FROM invoices WHERE id=? AND order_id=? AND status='autorizado' AND environment='2'",(iid,oid)).fetchone()
+                    if not inv:return self.reply(404,{'error':'Factura no disponible.'})
+                    import azur_invoicing as azur_portal
+                    try:pdf=azur_portal.file_for(c,iid,'pdf')
+                    except azur_portal.invoicing.InvoiceError:return self.reply(404,{'error':'El RIDE todavía no está disponible.'})
+                    name='FACTURA-'+str(iid)+'.pdf'
+                else:
+                    if not cfg['statement']:return self.reply(403,{'error':'Descarga no disponible.'})
+                    import account_statement as st
+                    client_id=c.execute('SELECT d.client_id FROM orders o JOIN devices d ON d.id=o.device_id WHERE o.id=?',(oid,)).fetchone()[0]
+                    pdf=st.render(st.data_for(c,client_id,now,False),'a4');name='ESTADO-DE-CUENTA.pdf'
+                audit(c,None,'portal_download_'+doc.split('/')[0],oid);c.commit()
+                return self.reply(200,pdf,'application/pdf',filename=name)
             tracking_page=re.fullmatch(r'/s/([A-Za-z0-9_-]{1,64})(/qr\.svg|/barcode\.svg)?',path)
             if tracking_page:
                 import order_tracking
@@ -1588,7 +1635,8 @@ class Handler(BaseHTTPRequestHandler):
                     if tracking_page[2]=='/qr.svg':return self.reply(200,qr_image(order_tracking.url(tracking_page[1])+'#'+found['code'],'svg'),'image/svg+xml')
                     import barcode128
                     return self.reply(200,barcode128.svg(found['code']),'image/svg+xml')
-                return self.reply(200 if found else 404,order_tracking.public_page(found,tracking_page[1]) if found else order_tracking.missing_page(),'text/html; charset=utf-8')
+                portal_on=bool(found) and __import__('client_portal').installed(c) and __import__('client_portal').settings(c)['enabled']
+                return self.reply(200 if found else 404,order_tracking.public_page(found,tracking_page[1],portal=portal_on) if found else order_tracking.missing_page(),'text/html; charset=utf-8')
             if path == '/conditions':
                 active=service_terms.current(c,reception_now())
                 if not active:return self.reply(404,{'error':'Las condiciones vigentes aún no han sido publicadas.'})
@@ -1716,6 +1764,11 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(200,{'enabled':bool(adi_ai.openai_key()),'message':'ADI responde consultas operativas desde datos autorizados.','live':adi.snapshot(c,reception_now()),'service':adi_exec.service(c,reception_now()),
                                        'user':{'first_name':(user['name'] or '').split(' ')[0]},'history_ready':adi_exec.installed(c),
                                        'extra':{'transfers_pending':c.execute("SELECT COUNT(*) FROM bank_transfers WHERE status='pendiente'").fetchone()[0]}})
+            if path == '/api/portal/settings':
+                # Portal seguro del cliente: qué puede ver y descargar el cliente (permisos independientes por acción). Solo administración.
+                if user['role']!='administrador':return self.reply(403,{'error':'Solo administración configura el portal del cliente.'})
+                import client_portal
+                return self.reply(200,{'settings':client_portal.settings(c),'labels':client_portal.LABELS,'installed':client_portal.installed(c)})
             if path == '/api/adi/admin/insights':
                 # ADI Intelligence Insights: recomendaciones verificables (solo lectura). Solo administración.
                 if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede usar la asistente administrativa.'})
@@ -3347,6 +3400,39 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(200,page,'text/html; charset=utf-8')
         # Solicitud de cancelación de un repuesto desde el enlace de seguimiento: comprueba los últimos cuatro dígitos de la identificación
         # del cliente, con límite de intentos. Queda pendiente de revisión de administración: nunca anula el pedido por sí sola.
+        portal_post=re.fullmatch(r'/s/([A-Za-z0-9_-]{1,64})/cuenta(/salir)?',urlsplit(self.path).path)
+        if portal_post:
+            # Portal seguro del cliente: verificación con los últimos 4 dígitos (intentos limitados) o cierre del acceso.
+            import order_tracking,client_portal
+            try:length=int(self.headers.get('Content-Length','0') or 0)
+            except ValueError:length=0
+            if length<0 or length>2000:return self.reply(400,{'error':'Solicitud inválida.'})
+            form={key:values[0] for key,values in parse_qs(self.rfile.read(length).decode('utf-8','replace') if length else '',keep_blank_values=True).items()}
+            token=portal_post[1];path_cookie='/s/'+token+'/cuenta'
+            with connect() as c:
+                oid=order_tracking.lookup_id(c,token)
+                if not oid:return self.reply(404,order_tracking.missing_page(),'text/html; charset=utf-8')
+                cfg=client_portal.settings(c)
+                if not cfg['enabled'] or not client_portal.installed(c):return self.reply(503,client_portal.unavailable_page(),'text/html; charset=utf-8')
+                code=c.execute("SELECT COALESCE(code,'OP-'||printf('%05d',id)) FROM orders WHERE id=?",(oid,)).fetchone()[0]
+                secure='; Secure' if self.secure_cookies() else ''
+                if portal_post[2]:
+                    jar=SimpleCookie()
+                    try:jar.load(self.headers.get('Cookie',''))
+                    except Exception:pass
+                    client_portal.close_session(c,jar[client_portal.COOKIE].value if client_portal.COOKIE in jar else '');c.commit()
+                    return self.reply(200,client_portal.form_page(token,code,'Cerraste el acceso. Para volver a consultar, confirma de nuevo tus datos.'),'text/html; charset=utf-8',
+                                      cookie='%s=; Path=%s; HttpOnly; SameSite=Strict; Max-Age=0%s'%(client_portal.COOKIE,path_cookie,secure))
+                if limited(c,'portal-try:'+digest(token),6,900) or limited(c,'portal-try-ip:'+digest(self.client_address[0]),20,3600):
+                    c.commit();return self.reply(429,client_portal.form_page(token,code,'Demasiados intentos. Espera unos minutos o comunícate con PC-DOCTOR S.A.','error'),'text/html; charset=utf-8')
+                result=client_portal.verify(c,oid,form.get('last4',''))
+                if result!='ok':
+                    audit(c,None,'portal_failed',oid);c.commit()
+                    text='Los dígitos no coinciden con la identificación registrada en la orden.' if result=='no' else 'La orden no tiene una identificación registrada. Comunícate con PC-DOCTOR S.A.'
+                    return self.reply(400,client_portal.form_page(token,code,text,'error'),'text/html; charset=utf-8')
+                now=reception_now();session=client_portal.open_session(c,oid,token,now,self.client_address[0]);audit(c,None,'portal_verified',oid);c.commit()
+                cookie='%s=%s; Path=%s; HttpOnly; SameSite=Strict; Max-Age=%d%s'%(client_portal.COOKIE,session,path_cookie,client_portal.MINUTES*60,secure)
+                return self.reply(200,client_portal.account_page(token,client_portal.data(c,oid,now),cfg),'text/html; charset=utf-8',cookie=cookie)
         part_cancel=re.fullmatch(r'/s/([A-Za-z0-9_-]{1,64})/repuestos/([0-9]{1,9})/cancelar',urlsplit(self.path).path)
         if part_cancel:
             import order_tracking,order_part_requests,part_cancellations
@@ -4939,6 +5025,12 @@ class Handler(BaseHTTPRequestHandler):
                     return self.reply(200,{'answer':answer,'links':result.get('links',[]),'source':result.get('source','datos'),'live':adi.snapshot(c,reception_now()),'ai_enabled':bool(os.getenv('OPENAI_API_KEY')),
                                            'conversation':{'id':conversation['id'],'title':conversation['title']},'created_at':stamp,'message_id':mid,'user_message_id':user_mid,'prompt':prompt,
                                            'steps':meta['steps'],'sources':meta['sources'],'consulted_at':meta['consulted_at'],'service':adi_exec.service(c,reception_now())})
+                if path == '/api/portal/settings':
+                    if user['role']!='administrador':return self.reply(403,{'error':'Solo administración configura el portal del cliente.'})
+                    import client_portal
+                    try:saved=client_portal.save_settings(c,data)
+                    except ValueError as error:return self.reply(400,{'error':str(error)})
+                    audit(c,user['id'],'portal_settings');return self.reply(200,{'settings':saved,'labels':client_portal.LABELS,'installed':client_portal.installed(c)})
                 if path == '/api/adi/admin/feedback':
                     if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede usar la asistente administrativa.'})
                     import adi_exec

@@ -4,6 +4,12 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## Sin publicar
+
+### Nuevas funcionalidades
+
+- Portal seguro del cliente: desde el QR de seguimiento, con los últimos 4 dígitos de su identificación, el cliente consulta por 15 minutos el saldo de su orden y descarga recibos, comprobante de entrega, RIDE de facturas autorizadas y su estado de cuenta. Solo lectura, auditado y configurable por acción.
+
 ## v1.5.341 — 2026-11-24 17:20 (UTC-05:00)
 
 Plantilla de códigos de WhatsApp

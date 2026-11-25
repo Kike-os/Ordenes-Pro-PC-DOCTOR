@@ -122,5 +122,6 @@
  "122_migration_ledger.sql": "ced7e5ad38fd8aea74c5d4df53108b43b6d4d98e4cf481dc043370c66e8a3928",
  "123_support_sessions.sql": "1a563e2fd73591a98e6d7aad3b16b6df17de1c4431428bdd9944e305a6970e42",
  "124_message_receipts.sql": "d29fa1ca53e7129d469688fffb7287aad42d0bfc71f7c06319fb7caeb701c004",
- "125_adi_executive.sql": "1b142f52aecd3882a6a57b620456ba43772437978f93b4cd5bac1ff4e24cde24"
+ "125_adi_executive.sql": "1b142f52aecd3882a6a57b620456ba43772437978f93b4cd5bac1ff4e24cde24",
+ "126_client_portal.sql": "467ce241a4d5b66b7ad0bdd0f06e644eaea6bfc82ec4695bc77ba3a64d2eb1a4"
 }

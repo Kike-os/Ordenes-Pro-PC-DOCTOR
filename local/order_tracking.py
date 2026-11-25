@@ -80,11 +80,11 @@ def lookup(c,token):
 HEAD='<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><meta name="robots" content="noindex,nofollow"><title>%s | PC-DOCTOR S.A.</title><link rel="icon" href="/favicon.ico?v=2" sizes="48x48"><link rel="stylesheet" href="/static/tracking.css"></head><body><main class="tracking-page"><header><img src="/static/logo-original.png" alt="PC-DOCTOR S.A." width="150"><p>%s</p></header>'
 
 
-def public_page(data,token='',notice='',tone='ok'):
+def public_page(data,token='',notice='',tone='ok',portal=False):
     # Con un aviso (resultado de una solicitud del cliente) no se recarga sola: así se puede leer con calma.
     page=CARD_HEAD%('' if notice else '<noscript><meta http-equiv="refresh" content="180"></noscript>',html.escape(data['code']),A4_CSS)
     banner='<p class="tw-notice" data-tone="%s" role="%s">%s</p>'%(tone,'status' if tone=='ok' else 'alert',html.escape(notice)) if notice else ''
-    return page.replace('<body class="ticket-page">','<body class="ticket-page ticket-public">',1)+banner+public_card(dict(data,token=token),'/s/'+token+'/qr.svg' if token else '')+__import__('tracking_print').document(data,'public','/s/'+token+'/qr.svg' if token else '')+'</main></body></html>'
+    return page.replace('<body class="ticket-page">','<body class="ticket-page ticket-public">',1)+banner+public_card(dict(data,token=token),'/s/'+token+'/qr.svg' if token else '')+(__import__('client_portal').tracking_callout(token) if portal and token else '')+__import__('tracking_print').document(data,'public','/s/'+token+'/qr.svg' if token else '')+'</main></body></html>'
 
 
 # Tarjeta Digital de Seguimiento Técnico: ticket de dos secciones (datos de la orden arriba; QR y código de barras abajo).

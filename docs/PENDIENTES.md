@@ -41,7 +41,7 @@ comparar el diseño con ellas.
 - [x] Fase 4: ADI Smart Collections (centro de cartera), expediente económico del cliente, marcas de gestión y estados de cuenta en A4 y 80 mm (1.5.330, migración 121).
 - [x] Fase 5: auditoría de comunicaciones, equipos pendientes de retiro (alertas a los 30, 60, 85 y 90 días) y propuestas de seguimiento por eventos, sin envío automático (1.5.330).
 - [ ] **[Administración]** Aprobar las reglas de seguimiento antes de cualquier campaña automática. No está autorizado.
-- [ ] Enlace público seguro del estado de cuenta para el cliente: queda dentro del portal seguro con QR del Premium Billing Center.
+- [x] Estado de cuenta del cliente disponible en el portal seguro con QR (docs/PORTAL-CLIENTE.md).
 - [ ] **[Administración]** Validación jurídica, contable y tributaria antes de cualquier aplicación real de intereses. No está autorizada.
 
 ## ADI Smart Collections 3.1 (1.5.332)
@@ -71,7 +71,8 @@ comparar el diseño con ellas.
 - [x] Reportes y exportación: indicadores anuales, notas de crédito, facturado frente a cobrado, filtro por forma de pago, y Excel, CSV y PDF (docs/FACTURACION-REPORTES.md).
 - [x] Otros comprobantes: recibo de pago (A5 y térmico, con QR seguro y factura vinculada), anticipo y entrega (docs/COMPROBANTES.md).
 - [ ] Nota de crédito en A4 y térmico: pendiente junto con el envío de notas de crédito al SRI (requiere autorización y revisión contable).
-- [ ] Portal seguro de consulta con QR y permisos independientes por acción.
+- [x] Portal seguro de consulta con QR y permisos por acción del portal (docs/PORTAL-CLIENTE.md).
+- [ ] Permisos independientes por acción para el PERSONAL en Facturación (ver, imprimir, descargar, enviar, reportes).
 
 ## Otros pendientes de administración
 
