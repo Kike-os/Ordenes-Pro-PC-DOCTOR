@@ -133,5 +133,25 @@ class OrderFollowupTests(unittest.TestCase):
         self.assertEqual(sorted(statuses), ['leido', 'preparado'])
 
 
+    def test_selected_meta_template_is_used_when_window_is_closed(self):
+        cookie, csrf, post, order = self.paid_order(10500, pay=False)
+        oid = order['id']
+        fid = self.followup(post, oid)['body']['id']
+        calls = []
+
+        def fake(url, headers, payload):
+            calls.append(payload)
+            return 200, {'messages': [{'id': 'wamid.TEMPLATE-FICTICIO'}]}
+
+        text = post('/api/orders/%d/messages' % oid, action='compose', template='novedad', followup_id=str(fid))['body']['body']
+        with patch.dict(app.os.environ, WA), patch.object(order_followups, 'TRANSPORT', fake):
+            result = post('/api/orders/%d/messages' % oid, action='whatsapp', template='novedad', body=text,
+                          followup_id=str(fid), recipient='0991234567', request_key='mensaje-wa-plantilla-0001')
+        self.assertEqual((result['status'], result['body']['message']['status']), (200, 'enviado'))
+        self.assertEqual((calls[0]['type'], calls[0]['template']['name'], calls[0]['template']['language']['code']),
+                         ('template', 'pcdoctor_novedad_importante', 'es_EC'))
+        self.assertEqual([p['text'] for p in calls[0]['template']['components'][0]['parameters'][:3]],
+                         [order['client'].split()[0], order['code'], 'ASUS Vivobook 15'])
+
 if __name__ == '__main__':
     unittest.main()
