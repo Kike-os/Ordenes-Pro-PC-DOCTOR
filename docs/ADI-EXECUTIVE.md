@@ -71,3 +71,21 @@
 - La captura mencionada en la orden no llegó.
 - Adjuntar documentos queda para una fase futura.
 - La tendencia de las tarjetas, cuando exista una serie histórica real.
+
+
+## 6.0 (Premium Executive)
+
+- **Tres paneles:**
+  - historial a la izquierda;
+  - conversación en el centro;
+  - **Executive Live Monitor** a la derecha, visible desde 1200 px; en pantallas menores es un panel desplegable.
+- **Monitor en filas compactas** (icono, número y descripción): sin cortes de palabra y con tooltip. Cada tarjeta abre su módulo.
+- **Estados reales de conexión:** «Sincronizando», «Información actualizada», «En línea», «Reconectando», «Sin conexión» y «Servicio temporalmente no disponible». Si falla una consulta, se conserva el **último dato válido** marcado como desactualizado. Una sola consulta cada 30 s, sin repetir mientras hay otra en curso.
+- **Skeletons** mientras cargan las tarjetas y las alertas.
+- **Insights en 4 niveles** (crítica, alta, media e informativa), con el **departamento** de cada alerta y los registros afectados.
+- **11 departamentos** de acceso: operaciones técnicas, finanzas, cartera, presupuestos y ventas, inventario, atención al cliente, WhatsApp, facturación, licencias, seguridad e infraestructura, y administración ejecutiva.
+- **Compositor en su propia área**, sin sombra sobre la conversación, y con **borrador conservado** en la sesión del navegador.
+- **Cosas que no cambian:**
+  - las conversaciones administrativas no se cierran por inactividad;
+  - el cierre de 8 minutos sigue solo para el chat de clientes y no se aplica mientras ADI responde;
+  - no hay respuesta progresiva, porque la integración actual devuelve la respuesta completa: se indica «Analizando solicitud» y luego los pasos realmente ejecutados.

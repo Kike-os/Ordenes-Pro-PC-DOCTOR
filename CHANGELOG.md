@@ -10,6 +10,10 @@ Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas
 
 - Portal seguro del cliente: desde el QR de seguimiento, con los últimos 4 dígitos de su identificación, el cliente consulta por 15 minutos el saldo de su orden y descarga recibos, comprobante de entrega, RIDE de facturas autorizadas y su estado de cuenta. Solo lectura, auditado y configurable por acción.
 
+### Mejoras realizadas
+
+- ADI Executive Intelligence 6.0: tres paneles con Executive Live Monitor siempre visible en escritorio, estados reales de conexión con último dato válido marcado como desactualizado, skeletons, alertas en 4 niveles con departamento, 11 departamentos de acceso, compositor sin superponer y borrador conservado.
+
 ## v1.5.341 — 2026-11-24 17:20 (UTC-05:00)
 
 Plantilla de códigos de WhatsApp

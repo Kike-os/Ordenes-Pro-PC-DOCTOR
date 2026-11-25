@@ -126,6 +126,9 @@ class AdiExecutiveTests(base.AdiAdminDataTests):
         self.assertEqual(len(keys), len(set(keys)))                                                # sin duplicados
         overdue = next(i for i in data['items'] if i['key'] == 'ordenes_vencidas')
         self.assertIn(late['code'], overdue['records'])
+        self.assertEqual((overdue['priority'], overdue['level_label'], overdue['department']), ('alta', 'Alta', 'Operaciones técnicas'))
+        self.assertTrue(all(i['priority'] in ('critica', 'alta', 'media', 'informativa') for i in data['items']))
+        self.assertEqual([i['priority'] for i in data['items']], sorted((i['priority'] for i in data['items']), key=['critica', 'alta', 'media', 'informativa'].index))
         for field in ('reason', 'priority', 'detected_at', 'data', 'action', 'href'):
             self.assertTrue(overdue[field], field)
         state = self.request('/api/adi/admin', cookie=cookie)['body']['service']

@@ -195,7 +195,15 @@ def meta(tools, now):
 
 
 # ------------------------------------------------------------------------------------------------------------------ Insights
-PRIORITY = {'alta': 0, 'media': 1, 'baja': 2}
+PRIORITY = {'critica': 0, 'alta': 1, 'media': 2, 'informativa': 3}
+LEVEL_LABELS = {'critica': 'Crítica', 'alta': 'Alta', 'media': 'Media', 'informativa': 'Informativa'}
+# ADI 6.0: nivel y departamento de cada alerta (el nivel de «atención humana» depende de la prioridad real de las solicitudes).
+RULES = {'ordenes_vencidas': ('alta', 'Operaciones técnicas'), 'ordenes_sin_movimiento': ('media', 'Operaciones técnicas'),
+         'presupuestos_sin_respuesta': ('media', 'Presupuestos y ventas'), 'repuestos_pendientes': ('media', 'Inventario y logística'),
+         'equipos_sin_retirar': ('media', 'Operaciones técnicas'), 'compromisos_incumplidos': ('alta', 'Cartera y cobranzas'),
+         'pagos_por_conciliar': ('media', 'Finanzas y contabilidad'), 'atencion_humana': (None, 'Atención al cliente'),
+         'inventario_bajo': ('informativa', 'Inventario y logística'), 'infra_base': ('critica', 'Seguridad e infraestructura'),
+         'migraciones_pendientes': ('media', 'Seguridad e infraestructura'), 'infra_fiscal': ('critica', 'Facturación electrónica')}
 
 
 def insights(c, now):
@@ -205,7 +213,9 @@ def insights(c, now):
     stamp = now.isoformat(timespec='seconds')
 
     def add(key, title, priority, reason, records, data, action, href):
-        items.append({'key': key, 'title': title, 'priority': priority, 'reason': reason, 'detected_at': stamp, 'records': records[:8], 'data': data,
+        level, department = RULES.get(key, (None, 'Administración ejecutiva'))
+        priority = level or {'baja': 'informativa'}.get(priority, priority)
+        items.append({'key': key, 'title': title, 'priority': priority, 'level_label': LEVEL_LABELS[priority], 'department': department, 'reason': reason, 'detected_at': stamp, 'records': records[:8], 'data': data,
                       'action': action, 'href': href})
 
     def guard(fn):
@@ -265,7 +275,8 @@ def insights(c, now):
         rows = c.execute("SELECT code,priority FROM adi_handoffs WHERE status='pendiente' ORDER BY created_at").fetchall()
         if rows:
             high = any(r['priority'] in ('alta', 'urgente') for r in rows)
-            add('atencion_humana', 'Solicitudes de atención humana', 'alta' if high else 'media', '%d clientes esperan a un asesor.' % len(rows), [r['code'] for r in rows],
+            urgent = any(r['priority'] == 'urgente' for r in rows)
+            add('atencion_humana', 'Solicitudes de atención humana', 'critica' if urgent else 'alta' if high else 'media', '%d clientes esperan a un asesor.' % len(rows), [r['code'] for r in rows],
                 'Solicitudes de atención abiertas y sin aceptar.', 'Atiende primero la que más espera.', '#live')
 
     def stock():
