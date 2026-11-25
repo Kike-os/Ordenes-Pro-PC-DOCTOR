@@ -40,6 +40,15 @@ TEMPLATES = {
     'listo': 'Equipo listo para retirar', 'recordatorio': 'Recordatorio de retiro', 'recepcion': 'Recepción del equipo', 'estado': 'Estado de la orden',
     'pago': 'Recordatorio de pago',
 }
+META_TEMPLATE_BY_KEY = {
+    'diagnostico': 'pcdoctor_diagnostico_tecnico', 'novedad': 'pcdoctor_novedad_importante',
+    'reparacion': 'pcdoctor_reparacion_en_proceso', 'repuesto': 'pcdoctor_repuesto_necesario',
+    'presupuesto': 'pcdoctor_presupuesto_pendiente', 'autorizacion': 'pcdoctor_solicitud_autorizacion',
+    'completado': 'pcdoctor_reparacion_terminada', 'pruebas': 'pcdoctor_pruebas_realizadas',
+    'listo': 'pcdoctor_equipo_listo_retirar', 'recordatorio': 'pcdoctor_recordatorio_retiro',
+    'recepcion': 'pcdoctor_recepcion_equipo', 'estado': 'pcdoctor_actualizacion_servicio',
+    'pago': 'pcdoctor_recordatorio_pago',
+}
 # Plantilla sugerida según el tipo del seguimiento que se comunica.
 TEMPLATE_FOR_KIND = {'recepcion': 'novedad', 'diagnostico': 'diagnostico', 'novedad': 'novedad', 'repuesto': 'repuesto', 'presupuesto_enviado': 'presupuesto',
                      'esperando_autorizacion': 'autorizacion', 'presupuesto_aprobado': 'reparacion', 'presupuesto_rechazado': 'novedad', 'reparacion': 'reparacion',
@@ -702,9 +711,72 @@ def last_client_message(c, number):
         return None
 
 
+def _template_detail(c, oid, data):
+    """Dato comunicable para variables de detalle; nunca lee notas internas."""
+    chosen = []
+    for source in message_sources(c, oid, data):
+        if source['type'] != 'followup':
+            continue
+        row = c.execute('SELECT client_message,recommendation FROM order_followups WHERE id=? AND order_id=?',
+                        (source['id'], oid)).fetchone()
+        if row:
+            chosen.extend(x for x in (row['client_message'], row['recommendation']) if (x or '').strip())
+    if chosen:
+        return _text(' · '.join(chosen), 450)
+    return _text(data.get('template_detail') or data.get('body'), 450)
+
+
+def _template_parameters(c, oid, data, key, o):
+    """Variables numeradas de las plantillas aprobadas: nombre, orden y datos vigentes de la orden."""
+    import equipment
+    name, code = _first_name(o['client']), o['code']
+    device = ' '.join(x for x in (o['brand'], o['model']) if x) or 'equipo'
+    detail = _template_detail(c, oid, data)
+    if key in ('recepcion', 'reparacion', 'completado', 'listo', 'recordatorio'):
+        return [name, code, device]
+    if key == 'estado':
+        return [name, code, _text(data.get('body'), 900)]
+    if key == 'diagnostico':
+        fault = _text(o['problem'] or detail, 450)
+        if not fault:
+            raise FollowupError('La plantilla de diagnóstico necesita la falla reportada en la orden.', 409)
+        return [name, code, device, fault]
+    if key in ('novedad', 'autorizacion'):
+        if not detail:
+            raise FollowupError('Selecciona un seguimiento comunicable con el detalle que irá en la plantilla.', 409)
+        return [name, code, device, detail]
+    if key == 'presupuesto':
+        import quotes
+        quote = quotes.brief(c, oid)
+        if not quote or quote['status'] != 'enviado' or quote['quoted_cents'] <= 0:
+            raise FollowupError('El recordatorio de presupuesto requiere un presupuesto enviado y pendiente de aprobación.', 409)
+        return [name, code, device, equipment.usd(quote['quoted_cents'])]
+    if key == 'pruebas':
+        result = _text(detail, 450)
+        if not result:
+            raise FollowupError('La plantilla de pruebas necesita el resultado registrado para el cliente.', 409)
+        return [name, code, device, result]
+    if key == 'repuesto':
+        row = c.execute("SELECT * FROM order_part_requests WHERE order_id=? AND stage IN ('solicitado','confirmado','preparacion','transito') ORDER BY id DESC LIMIT 1",
+                        (oid,)).fetchone()
+        if not row:
+            raise FollowupError('La plantilla de repuesto requiere un pedido activo vinculado a la orden.', 409)
+        import order_part_requests as parts
+        part = _text(parts._scrub(row['name'], parts.private_terms(c, row)) or 'un repuesto', 160)
+        eta = _text(row['eta'] or 'fecha pendiente de confirmación', 80)
+        return [name, code, device, part, eta]
+    if key == 'pago':
+        finance = equipment.finance(c, oid) or {}
+        money = finance.get('unit') or equipment.money(c, oid) or {}
+        balance = int(money.get('balance_cents') or 0)
+        if balance <= 0:
+            raise FollowupError('Esta orden no registra saldo pendiente; no corresponde enviar un recordatorio de pago.', 409)
+        return [name, code, device, equipment.usd(balance)]
+    raise FollowupError('Selecciona una plantilla aprobada compatible con Órdenes Pro.', 409)
+
+
 def send_whatsapp(c, oid, data, user, now, env=None):
-    """Envío por la API oficial de WhatsApp Business. Solo queda «enviado» con el identificador que devuelve Meta; un error se registra y se
-    puede reintentar con la misma clave (no duplica). Fuera de las 24 h de conversación, Meta exige una plantilla aprobada."""
+    """Envío por la API oficial de WhatsApp Business. Una plantilla seleccionada usa su nombre y variables aprobadas de Meta."""
     cfg = whatsapp_config(env)
     if not (cfg['token'] and cfg['phone_id']):
         raise FollowupError('WhatsApp Business no está configurado: usa la opción manual (no se registra como enviado).', 409)
@@ -716,25 +788,32 @@ def send_whatsapp(c, oid, data, user, now, env=None):
     existing = c.execute('SELECT * FROM order_messages WHERE request_key=?', (key,)).fetchone() if key else None
     if existing and existing['status'] != 'error':
         return dict(existing), True
+    body = message_body(data)
     if data.get('mode') == 'template':
-        # Fuera de la ventana de 24 h, Meta solo acepta una plantilla aprobada. Se envía con {{1}} = nombre del cliente y {{2}} = número de orden;
-        # se registra la plantilla con sus datos, no un texto distinto al que recibió el cliente.
-        if not cfg['template']:
-            raise FollowupError('No hay una plantilla aprobada de WhatsApp configurada.', 409)
-        params = [_first_name(o['client']), o['code']]
-        payload = {'messaging_product': 'whatsapp', 'to': number, 'type': 'template', 'template': {'name': cfg['template'], 'language': {'code': cfg['template_lang']},
-                   'components': [{'type': 'body', 'parameters': [{'type': 'text', 'text': p} for p in params]}]}}
-        body = 'Plantilla aprobada de WhatsApp «%s» (%s) con los datos: %s.' % (cfg['template'], cfg['template_lang'], ', '.join(params))
+        selected = str(data.get('template') or '').strip()
+        reverse = {name: code for code, name in TEMPLATES.items()}
+        reverse.update({name: code for code, name in META_TEMPLATE_BY_KEY.items()})
+        key_name = selected if selected in TEMPLATES else reverse.get(selected)
+        if key_name not in META_TEMPLATE_BY_KEY:
+            if cfg['template'] in META_TEMPLATE_BY_KEY.values():
+                key_name = next(k for k, v in META_TEMPLATE_BY_KEY.items() if v == cfg['template'])
+            else:
+                raise FollowupError('Selecciona una de las plantillas aprobadas configuradas para Órdenes Pro.', 409, {'mode': 'template'})
+        template_name = META_TEMPLATE_BY_KEY[key_name]
+        language = 'es_EC'
+        params = _template_parameters(c, oid, data, key_name, o)
+        payload = {'messaging_product': 'whatsapp', 'to': number, 'type': 'template',
+                   'template': {'name': template_name, 'language': {'code': language},
+                                'components': [{'type': 'body', 'parameters': [{'type': 'text', 'text': str(p)} for p in params]}]}}
+        body = 'Plantilla aprobada de WhatsApp «%s» (%s) con los datos: %s.' % (template_name, language, ', '.join(str(p) for p in params))
     else:
-        # Meta solo entrega texto libre dentro de las 24 h desde el último mensaje del cliente; fuera de esa ventana lo acepta y luego lo
-        # rechaza («Re-engagement message», 131047). Se avisa ANTES de enviar en lugar de dejar un mensaje fallido.
+        # Meta solo entrega texto libre dentro de las 24 h desde el último mensaje del cliente; fuera de esa ventana avisa ANTES de enviar.
         last = last_client_message(c, number)
         if last is not None and last.tzinfo is None and now.tzinfo is not None:
             last = last.replace(tzinfo=now.tzinfo)
         if last is None or now - last > timedelta(hours=24):
             raise FollowupError(('Han pasado más de 24 horas desde el último mensaje del cliente por WhatsApp' if last else 'El cliente todavía no ha escrito a la empresa por WhatsApp')
                                 + ': Meta solo permite enviar una plantilla aprobada. Usa «Enviar plantilla aprobada» o escríbele por correo.', 409, {'mode': 'template'})
-        body = existing['body'] if existing else message_body(data)  # un reintento envía el texto registrado, no otro
         payload = {'messaging_product': 'whatsapp', 'to': number, 'type': 'text', 'text': {'preview_url': True, 'body': body}}
     message_sources(c, oid, data)
     url = 'https://graph.facebook.com/%s/%s/messages' % (cfg['version'], cfg['phone_id'])
