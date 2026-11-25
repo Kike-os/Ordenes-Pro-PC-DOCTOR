@@ -51,5 +51,22 @@ class OtpTemplateTests(unittest.TestCase):
             self.assertEqual(post(action='status')['status'], 403)
 
 
+    def test_cancellation_template_created_and_assigned_when_approved(self):
+        cookie, csrf = self.login()
+        meta = FakeMeta()
+        post = lambda **body: self.request('/api/whatsapp/event-template', body, cookie=cookie, csrf=csrf)
+        with patch.object(wa, 'ready', lambda env=None: True), patch.object(wa, 'call', meta), patch.object(wa, 'config', lambda env=None: {'waba': 'WABA_FICTICIA', 'phone_id': 'P'}):
+            first = post(event='orden_cancelada', action='create', confirm='CREAR')['body']
+            self.assertEqual((first['created'], first['status'], first['connected']), (True, 'PENDING', False))
+            sent = meta.posts[0]
+            self.assertEqual((sent['name'], sent['category'], sent['language']), ('pcdoctor_cancelacion_reparacion', 'UTILITY', 'es_EC'))
+            self.assertEqual(sent['components'][0]['text'].count('{{'), 3)
+            self.assertEqual(len(sent['components'][0]['example']['body_text'][0]), 3)
+            meta.templates[0]['status'] = 'APPROVED'
+            self.assertTrue(post(event='orden_cancelada', action='status')['body']['connected'])
+            with app.connect() as c:
+                self.assertEqual(wa.settings(c)['events']['orden_cancelada']['template'], 'pcdoctor_cancelacion_reparacion')
+            self.assertEqual(post(event='desconocido', action='status')['status'], 400)
+
 if __name__ == '__main__':
     unittest.main()

@@ -114,5 +114,23 @@ class ClientPortalTests(unittest.TestCase):
         self.assertEqual(self.request('/api/portal/settings', cookie=cookie)['status'], 403)
 
 
+    def test_client_requests_cancellation_from_portal_and_tracking_shows_it(self):
+        cookie, csrf, post, order, token, pid = self.setup_portal()
+        base = '/s/%s/cuenta' % token
+        self.assertEqual(self.post_form(base + '/cancelar', {'reason': 'costo', 'detail': 'No deseo continuar con la reparación.'})['status'], 403)   # sin sesión
+        session = self.post_form(base, {'last4': '0017'})['cookie'].split(';')[0]
+        self.assertIn('Solicitar la cancelación', self.get(base, session)['body'])
+        sent = self.post_form(base + '/cancelar', {'reason': 'costo', 'detail': 'No deseo continuar con la reparación.'}, session)
+        self.assertEqual(sent['status'], 200, sent['body'][:300])
+        self.assertIn('Recibimos su solicitud de cancelación', sent['body'])
+        import order_cancellations
+        with app.connect() as c:
+            row = order_cancellations.current(c, order['id'])
+        self.assertEqual((row['state'], row['via'], row['identity_method']), ('solicitada', 'portal', 'portal_seguro'))
+        keys = [i['key'] for i in self.request('/api/adi/admin/insights', cookie=cookie)['body']['items']]
+        self.assertIn('cancelaciones_por_confirmar', keys)
+        self.assertEqual(post('/api/orders/%d/cancellation' % order['id'], action='confirm', confirm='CANCELAR')['status'], 200)
+        self.assertIn('Reparación cancelada a solicitud del cliente', self.get('/s/' + token)['body'])
+
 if __name__ == '__main__':
     unittest.main()

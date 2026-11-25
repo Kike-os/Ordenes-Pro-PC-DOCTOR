@@ -96,7 +96,14 @@ def data(c, order_id, now):
     for r in c.execute("SELECT i.*,(SELECT 1 FROM invoice_provider_files f WHERE f.invoice_id=i.id AND f.kind='pdf') has_pdf FROM invoices i "
                        "WHERE i.order_id=? AND i.status='autorizado' AND i.environment='2' ORDER BY i.id", (order_id,)):
         invoices.append({'id': r['id'], 'number': invoicing.number(r), 'date': r['issue_date'], 'total_cents': r['total_cents'], 'has_pdf': bool(r['has_pdf'])})
-    return {'order': dict(o), 'money': money, 'payments': [{'id': p['id'], 'receipt': p['receipt'], 'at': p['created_at'], 'kind': p['kind'], 'method': p['method_label'],
+    cancel = None
+    try:
+        import order_cancellations
+        cancel = order_cancellations.public_state(c, order_id) if order_cancellations.installed(c) else None
+        reasons = order_cancellations.REASONS
+    except Exception:
+        reasons = {}
+    return {'cancellation': cancel, 'reasons': reasons, 'order': dict(o), 'money': money, 'payments': [{'id': p['id'], 'receipt': p['receipt'], 'at': p['created_at'], 'kind': p['kind'], 'method': p['method_label'],
                                                             'amount_cents': p['amount_cents']} for p in pays],
             'delivered': o['status'] == 'entregado' or bool(o['delivered_at']), 'invoices': invoices, 'checked_at': now}
 
@@ -163,6 +170,17 @@ def account_page(token, info, cfg):
         docs.append('<li><span>Estado de cuenta (todas tus órdenes con saldo)</span><a href="%s/estado.pdf">Descargar</a></li>' % base)
     if docs:
         parts.append('<section class="portal-card"><h2>Documentos</h2><ul class="portal-list">%s</ul></section>' % ''.join(docs))
+    cancel = info.get('cancellation')
+    if cancel:
+        parts.append('<section class="portal-card portal-cancel"><h2>Cancelación de la reparación</h2><p>Estado: <strong>%s</strong></p><p class="portal-soft">%s</p></section>'
+                     % (e(cancel['label']), 'Su equipo está disponible para retiro en nuestro local.' if cancel['state'] in ('pendiente_retiro', 'pendiente_liquidacion', 'cancelada') else 'PC-DOCTOR revisará su solicitud y le confirmará.'))
+    elif o['status'] != 'entregado' and info.get('reasons'):
+        opts = ''.join('<option value="%s">%s</option>' % (e(k), e(v)) for k, v in info['reasons'].items())
+        parts.append('<details class="portal-card portal-cancel"><summary>Solicitar la cancelación de la reparación</summary><form method="post" action="%s/cancelar" class="portal-form">'
+                     '<label for="reason">Motivo</label><select id="reason" name="reason" required><option value="">Elige un motivo</option>%s</select>'
+                     '<label for="detail">Observaciones</label><textarea id="detail" name="detail" rows="3" minlength="10" maxlength="600" required></textarea>'
+                     '<small>PC-DOCTOR revisará la solicitud y se la confirmará. Solo se cobran los trabajos que usted ya autorizó.</small>'
+                     '<button type="submit">Enviar solicitud de cancelación</button></form></details>' % (base, opts))
     parts.append('<form method="post" action="%s/salir" class="portal-exit"><button type="submit">Cerrar el acceso</button><a href="/s/%s">Volver al seguimiento</a></form>' % (base, e(token)))
     return _page('Orden ' + o['code'], ''.join(parts))
 

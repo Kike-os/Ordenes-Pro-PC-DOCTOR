@@ -4,11 +4,33 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.348 — 2026-11-25 14:16 (UTC-05:00)
+
+Cancelación y cierre profesional de órdenes (Smart Cancellation & Closure Management) y corrección de la lista de unidades del inventario
+
+### Nuevas funcionalidades
+
+- Cancelación profesional de órdenes: solicitud con motivo, observaciones, verificación de identidad y evidencia; confirmación solo por administración; estados solicitada, cancelada, pendiente de liquidación, pendiente de retiro y cerrada; acta A4 con QR
+- El cliente puede solicitar la cancelación desde el portal seguro; el seguimiento, ADI, los reportes y WhatsApp (plantilla pcdoctor_cancelacion_reparacion) reflejan la cancelación
+
+### Mejoras realizadas
+
+- Una orden cancelada bloquea los cambios de estado manuales y automáticos; solo se cobra lo autorizado; el cierre exige el equipo devuelto y saldos en cero; no se borra ningún documento ni pago
+
+### Errores corregidos
+
+- Inventario: en el detalle del catálogo, la serie, la ubicación y el estado de cada unidad ya no se superponen
+
 ## v1.5.347 — 2026-11-25 09:17 (UTC-05:00)
 
-Mission Control Compact y mensajes de WhatsApp con plantillas aprobadas.
+Mission Control Compact y mensajes de WhatsApp con plantillas aprobadas
+
+### Nuevas funcionalidades
 
 - Mission Control Compact: barra global de plazos de 10 segmentos con color progresivo (esmeralda → rojo), contador en vivo, % disponible y estado, basada solo en plazos reales del servidor. Se aplica a retiro de equipos, entrega estimada, presupuestos, cierre por inactividad, ventana de 24 h de WhatsApp, PQRS, compromisos de pago y licencias; ADI informa los plazos próximos.
+
+### Errores corregidos
+
 - Mensajes de WhatsApp desde la orden: «Enviar plantilla aprobada» ya no exige escribir un texto, y si el servidor tiene una plantilla general configurada que no está en la lista de plantillas de Órdenes Pro, se usa en lugar de fallar.
 
 ## v1.5.346 — 2026-11-24 20:44 (UTC-05:00)

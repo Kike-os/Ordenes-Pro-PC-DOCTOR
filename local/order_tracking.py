@@ -84,6 +84,8 @@ def public_page(data,token='',notice='',tone='ok',portal=False):
     # Con un aviso (resultado de una solicitud del cliente) no se recarga sola: así se puede leer con calma.
     page=CARD_HEAD%('' if notice else '<noscript><meta http-equiv="refresh" content="180"></noscript>',html.escape(data['code']),A4_CSS)
     banner='<p class="tw-notice" data-tone="%s" role="%s">%s</p>'%(tone,'status' if tone=='ok' else 'alert',html.escape(notice)) if notice else ''
+    cancel=data.get('cancellation')
+    if cancel:banner+='<p class="tw-notice" data-tone="error" role="status">Reparación cancelada a solicitud del cliente · %s. %s</p>'%(html.escape(cancel['label']),'Su equipo está disponible para retiro en nuestro local.' if cancel['state'] in ('pendiente_retiro','pendiente_liquidacion','cancelada') else '')
     return page.replace('<body class="ticket-page">','<body class="ticket-page ticket-public">',1)+banner+public_card(dict(data,token=token),'/s/'+token+'/qr.svg' if token else '')+(__import__('client_portal').tracking_callout(token) if portal and token else '')+__import__('tracking_print').document(data,'public','/s/'+token+'/qr.svg' if token else '')+'</main></body></html>'
 
 

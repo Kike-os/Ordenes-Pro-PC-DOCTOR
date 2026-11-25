@@ -25,6 +25,7 @@ STEPS = {
     'infraestructura': ('Revisando la infraestructura', 'Database Guardian, Smart Fiscal Status, AZUR, respaldos y WhatsApp'),
     'recomendaciones': ('Revisando alertas verificables', 'ADI Intelligence Insights'),
     'plazos': ('Revisando plazos y vencimientos', 'Órdenes, presupuestos, retiros y compromisos'),
+    'cancelaciones': ('Revisando cancelaciones', 'Smart Cancellation & Closure Management'),
 }
 
 _obj = lambda props=None, required=None: {'type': 'object', 'additionalProperties': False, 'required': required or [], 'properties': props or {}}
@@ -38,6 +39,7 @@ TOOLS = [
     {'type': 'function', 'name': 'inventario_bajo', 'strict': True, 'description': 'Productos del inventario agotados o bajo el mínimo.', 'parameters': _obj()},
     {'type': 'function', 'name': 'infraestructura', 'strict': True, 'description': 'Estado verificado de la base de datos (Database Guardian, migraciones pendientes), Smart Fiscal Status, AZUR (sin secretos), respaldos y WhatsApp.', 'parameters': _obj()},
     {'type': 'function', 'name': 'plazos', 'strict': True, 'description': 'Plazos reales próximos y vencidos: entregas estimadas (vencidas y en 24 h), presupuestos por vencer, equipos que superaron el plazo de retiro y compromisos de pago próximos.', 'parameters': _obj()},
+    {'type': 'function', 'name': 'cancelaciones', 'strict': True, 'description': 'Cancelaciones de reparaciones: por estado (solicitada, pendiente de liquidación, pendiente de retiro, cerrada), motivos frecuentes, valores recuperados y devoluciones.', 'parameters': _obj()},
     {'type': 'function', 'name': 'recomendaciones', 'strict': True, 'description': 'Alertas verificables con prioridad y acción sugerida (ADI Intelligence Insights).', 'parameters': _obj()},
 ]
 ROLES = {t['name']: (ADMIN,) for t in TOOLS}
@@ -210,6 +212,9 @@ def run(c, now, name, args, user):
         return {'recomendaciones': insights(c, now)['items']}
     if name == 'plazos':
         return plazos(c, now)
+    if name == 'cancelaciones':
+        import order_cancellations
+        return order_cancellations.stats(c)
     return {'finanzas': finanzas, 'cartera': cartera, 'atencion_clientes': atencion_clientes, 'repuestos': repuestos, 'inventario_bajo': inventario_bajo,
             'infraestructura': infraestructura}[name](c, now)
 
@@ -231,7 +236,8 @@ RULES = {'ordenes_vencidas': ('alta', 'Operaciones técnicas'), 'ordenes_sin_mov
          'pagos_por_conciliar': ('media', 'Finanzas y contabilidad'), 'atencion_humana': (None, 'Atención al cliente'),
          'inventario_bajo': ('informativa', 'Inventario y logística'), 'infra_base': ('critica', 'Seguridad e infraestructura'),
          'migraciones_pendientes': ('media', 'Seguridad e infraestructura'), 'infra_fiscal': ('critica', 'Facturación electrónica'),
-         'entregas_por_vencer': ('media', 'Operaciones técnicas'), 'presupuestos_por_vencer': ('informativa', 'Presupuestos y ventas')}
+         'entregas_por_vencer': ('media', 'Operaciones técnicas'), 'presupuestos_por_vencer': ('informativa', 'Presupuestos y ventas'),
+         'cancelaciones_por_confirmar': ('alta', 'Operaciones técnicas'), 'cancelaciones_pendientes': ('media', 'Cartera y cobranzas')}
 
 
 def insights(c, now):
@@ -340,7 +346,21 @@ def insights(c, now):
             add('presupuestos_por_vencer', 'Presupuestos que vencen pronto', 'informativa', '%d presupuestos enviados vencen en los próximos 2 días.' % len(quotes), quotes,
                 'Validez de presupuestos enviados sin decisión.', 'Recuerda al cliente que lo revise antes del vencimiento.', '#orders?active=1')
 
-    for fn in (orders, parts, pickups, collections, support, stock, infra, deadlines):
+    def cancellations():
+        import order_cancellations as oc
+        if not oc.installed(c):
+            return
+        rows = c.execute("SELECT x.*,o.code FROM order_cancellations x JOIN orders o ON o.id=x.order_id WHERE x.state IN ('solicitada','cancelada')").fetchall()
+        asked = [r['code'] for r in rows if r['state'] == 'solicitada']
+        if asked:
+            add('cancelaciones_por_confirmar', 'Cancelaciones por confirmar', 'alta', '%d clientes pidieron cancelar su reparación y esperan confirmación.' % len(asked), asked,
+                'Solicitudes de cancelación registradas (personal o portal).', 'Revisa cada solicitud y confírmala o reabre la orden.', '#orders?active=1')
+        pending = [r['code'] for r in rows if r['state'] == 'cancelada']
+        if pending:
+            add('cancelaciones_pendientes', 'Cancelaciones sin cerrar', 'media', '%d órdenes canceladas esperan liquidación o la devolución del equipo.' % len(pending), pending,
+                'Cancelaciones confirmadas sin cierre.', 'Liquida lo autorizado o el saldo a favor y registra la devolución del equipo.', '#orders?active=1')
+
+    for fn in (orders, parts, pickups, collections, support, stock, infra, deadlines, cancellations):
         guard(fn)
     seen, unique = set(), []
     for it in items:

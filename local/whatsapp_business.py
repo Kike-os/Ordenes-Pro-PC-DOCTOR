@@ -77,6 +77,8 @@ EVENTS = {
                               'Cuando la orden pasa a «Pruebas técnicas y control de calidad».', True),
     'listo': ('Equipo listo para entregar', 'orden', 'su equipo {equipo} está listo para retirar en nuestro local', 'Cuando la orden pasa a «Listo para entregar».', True),
     'entregado': ('Equipo entregado', 'orden', 'registramos la entrega de su equipo {equipo}. Gracias por confiar en PC-DOCTOR', 'Cuando la orden pasa a «Entregado».', True),
+    'orden_cancelada': ('Reparación cancelada', 'orden', 'la reparación de su equipo {equipo} fue cancelada a su solicitud y el equipo está disponible para retiro en nuestro local',
+                        'Cuando administración confirma la cancelación de una reparación (no se envía si la cancelación se reabre).', True),
     'recordatorio_entrega': ('Recordatorio de entrega', 'orden', 'su equipo {equipo} está listo y espera su retiro en nuestro local',
                              'A los días configurados en «Listo para entregar» sin retiro (una vez por plazo). También desde la orden.', True),
     # 1.5.294 · Prórroga del plazo de retiro: la envía administración al otorgarla (orden con consentimiento y plantilla aprobada).
@@ -604,6 +606,11 @@ def still_true(c, row):
             return 'El estado de la orden cambió antes del envío: el aviso ya no era cierto.'
         if event == 'presupuesto_pendiente' and not _quote_pending(c, row['order_id']):
             return 'El presupuesto ya no está pendiente de aprobación: el aviso no sería cierto.'
+    if event == 'orden_cancelada' and row['order_id']:
+        import order_cancellations
+        cur = order_cancellations.current(c, row['order_id'])
+        if not cur or cur['state'] not in ('cancelada', 'cerrada'):
+            return 'La cancelación ya no está vigente: el aviso no sería cierto.'
     if event == 'recordatorio_entrega' and row['order_id']:
         o = c.execute('SELECT status FROM orders WHERE id=?', (row['order_id'],)).fetchone()
         if not o or o['status'] not in ('listo', 'espera_entrega'):   # «Listo» y «En espera de entrega» esperan el retiro
@@ -1223,4 +1230,46 @@ def otp_template(c, user, now, action, env=None, minutes=5):
     labels = {'APPROVED': 'Aprobada por Meta y conectada a los códigos de verificación', 'PENDING': 'En revisión de Meta (suele tardar minutos u horas)',
               'REJECTED': 'Rechazada por Meta', 'PAUSED': 'Pausada por Meta', 'DISABLED': 'Desactivada por Meta', '': 'No existe todavía en Meta'}
     return {'name': OTP_TEMPLATE, 'exists': bool(found), 'created': created, 'status': state, 'label': labels.get(state, state),
+            'reason': (found[0].get('rejected_reason') or '') if found else '', 'connected': connected, 'checked_at': stamp(now)}
+
+
+# ───────────────────────────────────────────── Plantillas propias de avisos (p. ej., confirmación de cancelación)
+EVENT_TEMPLATES = {
+    'orden_cancelada': {'name': 'pcdoctor_cancelacion_reparacion', 'language': 'es_EC', 'category': 'UTILITY',
+                        'body': 'Hola {{1}}, confirmamos la cancelación de la reparación de su orden {{2}} ({{3}}), tal como lo solicitó. '
+                                'Su equipo está disponible para retiro en nuestro local. Si tiene dudas, responda a este mensaje.',
+                        'example': ['Oscar', 'PCD-20261031-0010', 'ASUS FA506'], 'footer': 'PC-DOCTOR S.A.'},
+}
+
+
+def event_template(c, user, now, event, action, env=None):
+    """Crea en Meta la plantilla propia de un aviso (categoría UTILIDAD; variables {{1}} nombre, {{2}} orden, {{3}} equipo, iguales a las
+    que envía compose) o consulta su estado. Cuando Meta la APRUEBA, la asigna a ese aviso. No envía mensajes ni cambia credenciales."""
+    if user['role'] != 'administrador':
+        raise WhatsAppError('Solo administración gestiona las plantillas de WhatsApp.', 403)
+    spec = EVENT_TEMPLATES.get(event)
+    if not spec:
+        raise WhatsAppError('Aviso sin plantilla propia definida.', 400)
+    if not ready(env):
+        raise WhatsAppError('WhatsApp Business no está configurado.', 409)
+    found = _find_template(spec['name'], env)
+    created = False
+    if action == 'create' and not found:
+        payload = {'name': spec['name'], 'language': spec['language'], 'category': spec['category'],
+                   'components': [{'type': 'BODY', 'text': spec['body'], 'example': {'body_text': [spec['example']]}}, {'type': 'FOOTER', 'text': spec['footer']}]}
+        code, answer = call('POST', '%s/message_templates' % config(env)['waba'], env, payload)
+        if code != 200:
+            raise WhatsAppError('Meta no aceptó la plantilla: ' + classify(code, answer)[3], 502)
+        created = True
+        found = [{'name': spec['name'], 'status': (answer or {}).get('status', 'PENDING'), 'language': spec['language']}]
+    state = (found[0].get('status') if found else '') or ''
+    connected = False
+    if state == 'APPROVED':
+        cur = settings(c)
+        ev = dict(cur['events'].get(event) or {})
+        if ev.get('template') != spec['name']:
+            save_settings(c, {'events': {event: {'template': spec['name'], 'lang': found[0].get('language') or spec['language']}}}, user)
+        connected = True
+    labels = {'APPROVED': 'Aprobada por Meta y asignada al aviso', 'PENDING': 'En revisión de Meta', 'REJECTED': 'Rechazada por Meta', '': 'No existe todavía en Meta'}
+    return {'event': event, 'name': spec['name'], 'exists': bool(found), 'created': created, 'status': state, 'label': labels.get(state, state),
             'reason': (found[0].get('rejected_reason') or '') if found else '', 'connected': connected, 'checked_at': stamp(now)}

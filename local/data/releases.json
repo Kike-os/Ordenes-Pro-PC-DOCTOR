@@ -8,6 +8,29 @@
   },
   "releases": [
     {
+      "version": "1.5.348",
+      "date": "2026-11-25T14:16:04-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Cancelación y cierre profesional de órdenes (Smart Cancellation & Closure Management) y corrección de la lista de unidades del inventario",
+      "changes": {
+        "features": [
+          "Cancelación profesional de órdenes: solicitud con motivo, observaciones, verificación de identidad y evidencia; confirmación solo por administración; estados solicitada, cancelada, pendiente de liquidación, pendiente de retiro y cerrada; acta A4 con QR",
+          "El cliente puede solicitar la cancelación desde el portal seguro; el seguimiento, ADI, los reportes y WhatsApp (plantilla pcdoctor_cancelacion_reparacion) reflejan la cancelación"
+        ],
+        "improvements": [
+          "Una orden cancelada bloquea los cambios de estado manuales y automáticos; solo se cobra lo autorizado; el cierre exige el equipo devuelto y saldos en cero; no se borra ningún documento ni pago"
+        ],
+        "fixes": [
+          "Inventario: en el detalle del catálogo, la serie, la ubicación y el estado de cada unidad ya no se superponen"
+        ],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Administración (autorización expresa en la sesión)"
+    },
+    {
       "version": "1.5.347",
       "date": "2026-11-25T09:17:42-05:00",
       "type": "patch",

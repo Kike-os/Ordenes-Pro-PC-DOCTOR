@@ -144,6 +144,9 @@ def save(c,oid,data,user,now):
         if total>paid:return 409,{'error':'No se puede entregar: este equipo tiene un saldo pendiente de '+equipment.usd(total-paid)+'. Registra el pago antes de entregarlo.','balance':True}
     import repair_status
     if fields['status']!=row['status']:
+        import order_cancellations
+        locked_by_cancel=order_cancellations.blocks_status_change(c,oid)
+        if locked_by_cancel:return 409,{'error':locked_by_cancel,'fields':{'status':locked_by_cancel}}
         problem=repair_status.check(c,oid,row['status'],fields['status'],fields['comment'])
         if problem:return 400,{'error':problem,'fields':{'comment':problem}}
     # Falla recurrente: el motivo (comentario) es obligatorio y el técnico responsable es el asignado en este guardado.

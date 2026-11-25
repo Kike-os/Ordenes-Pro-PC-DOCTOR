@@ -310,7 +310,7 @@ def links_for(c, text, used):
             out.append({'label': 'Abrir ' + code, 'href': '#orders?id=%d' % row['id']})
     extra = {'finanzas': ('Reportes', '#reports'), 'facturacion': ('Facturación', '#invoicing'), 'cartera': ('Cartera', '#invoicing?tab=cartera'),
              'atencion_clientes': ('Centro de Atención', '#live'), 'repuestos': ('Órdenes en espera de repuesto', '#orders?status=esperando_repuesto'),
-             'inventario_bajo': ('Inventario', '#inventory'), 'infraestructura': ('Sistema', '#system'), 'recomendaciones': ('Órdenes activas', '#orders?active=1'),
+             'inventario_bajo': ('Inventario', '#inventory'), 'cancelaciones': ('Órdenes', '#orders?active=1'), 'infraestructura': ('Sistema', '#system'), 'recomendaciones': ('Órdenes activas', '#orders?active=1'),
              'citas': ('Agenda de Citas', '#appointments'), 'licencias': ('Licencias', '#licenses'), 'trabajos_atrasados': ('Órdenes activas', '#orders?active=1'),
              'buscar_ordenes': ('Órdenes', '#orders?active=1'), 'presupuestos': ('Órdenes', '#orders?active=1')}
     for name in dict.fromkeys(used or []):

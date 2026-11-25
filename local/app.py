@@ -1636,6 +1636,9 @@ class Handler(BaseHTTPRequestHandler):
                     import barcode128
                     return self.reply(200,barcode128.svg(found['code']),'image/svg+xml')
                 portal_on=bool(found) and __import__('client_portal').installed(c) and __import__('client_portal').settings(c)['enabled']
+                if found:
+                    try:found['cancellation']=__import__('order_cancellations').public_state(c,found['id']) if __import__('order_cancellations').installed(c) else None
+                    except Exception:found['cancellation']=None
                 return self.reply(200 if found else 404,order_tracking.public_page(found,tracking_page[1],portal=portal_on) if found else order_tracking.missing_page(),'text/html; charset=utf-8')
             if path == '/conditions':
                 active=service_terms.current(c,reception_now())
@@ -2138,6 +2141,28 @@ class Handler(BaseHTTPRequestHandler):
                 name=payment_pdf.number(found['payment'])+'-'+found['order']['code']
                 if parse_qs(urlsplit(self.path).query).get('formato',[''])[0]=='termico':return self.reply(200, vouchers.payment_ticket(found, equipment.METHODS, reception_now()), 'application/pdf', filename=name+'-80MM.pdf')
                 return self.reply(200, payment_pdf.render(found['order'], found['payment'], found['account'], equipment.METHODS, reception_now(), found['tracking'], found['invoice']), 'application/pdf', filename=name+'.pdf')
+            cancel_doc = re.fullmatch(r'/api/orders/([0-9]+)/cancellation(?:/(acta\.pdf|files/([0-9]{1,9})))?', path)
+            if cancel_doc:
+                # Cancelación de la reparación: panel, evidencia y acta (solo personal con sesión; solo lectura).
+                import order_cancellations
+                if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
+                oid=int(cancel_doc[1])
+                try:
+                    if not cancel_doc[2]:return self.reply(200,order_cancellations.detail(c,oid,user))
+                    row=order_cancellations.current(c,oid)
+                    if not row:return self.reply(404,{'error':'La orden no tiene una cancelación.'})
+                    if cancel_doc[3]:
+                        f=c.execute('SELECT * FROM order_cancellation_files WHERE id=? AND cancellation_id=?',(int(cancel_doc[3]),row['id'])).fetchone()
+                        if not f:return self.reply(404,{'error':'Archivo no disponible.'})
+                        return self.reply(200,base64.b64decode(f['content']),f['mime'],filename=f['name'])
+                    import vouchers
+                    return self.reply(200,order_cancellations.acta_pdf(c,oid,reception_now()),'application/pdf',filename='ACTA-CANCELACION-'+(order_cancellations._order(c,oid)['code'] or str(oid))+'.pdf')
+                except order_cancellations.CancelError as error:return self.reply(error.status,{'error':str(error)})
+            if path == '/api/cancellations/stats':
+                if user['role']!='administrador':return self.reply(403,{'error':'Solo administración.'})
+                import order_cancellations
+                q=parse_qs(urlsplit(self.path).query)
+                return self.reply(200,order_cancellations.stats(c,(q.get('from',[''])[0] or '')[:10],(q.get('to',[''])[0] or '')[:10]))
             delivery_doc = re.fullmatch(r'/api/orders/([0-9]+)/delivery\.pdf', path)
             if delivery_doc:
                 # Comprobante de entrega (A4 o ?formato=termico). Solo de órdenes entregadas; solo lectura.
@@ -3400,7 +3425,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(200,page,'text/html; charset=utf-8')
         # Solicitud de cancelación de un repuesto desde el enlace de seguimiento: comprueba los últimos cuatro dígitos de la identificación
         # del cliente, con límite de intentos. Queda pendiente de revisión de administración: nunca anula el pedido por sí sola.
-        portal_post=re.fullmatch(r'/s/([A-Za-z0-9_-]{1,64})/cuenta(/salir)?',urlsplit(self.path).path)
+        portal_post=re.fullmatch(r'/s/([A-Za-z0-9_-]{1,64})/cuenta(/salir|/cancelar)?',urlsplit(self.path).path)
         if portal_post:
             # Portal seguro del cliente: verificación con los últimos 4 dígitos (intentos limitados) o cierre del acceso.
             import order_tracking,client_portal
@@ -3416,6 +3441,20 @@ class Handler(BaseHTTPRequestHandler):
                 if not cfg['enabled'] or not client_portal.installed(c):return self.reply(503,client_portal.unavailable_page(),'text/html; charset=utf-8')
                 code=c.execute("SELECT COALESCE(code,'OP-'||printf('%05d',id)) FROM orders WHERE id=?",(oid,)).fetchone()[0]
                 secure='; Secure' if self.secure_cookies() else ''
+                if portal_post[2]=='/cancelar':
+                    # Solicitud de cancelación del propio cliente: solo con su sesión verificada del portal (enlace + 4 dígitos).
+                    import order_cancellations
+                    jar=SimpleCookie()
+                    try:jar.load(self.headers.get('Cookie',''))
+                    except Exception:pass
+                    now=reception_now()
+                    if not client_portal.session_ok(c,jar[client_portal.COOKIE].value if client_portal.COOKIE in jar else '',oid,token,now):
+                        return self.reply(403,client_portal.form_page(token,code,'Tu acceso venció. Confirma de nuevo los últimos cuatro dígitos.','error'),'text/html; charset=utf-8')
+                    if limited(c,'portal-cancel:'+digest(token),3,3600):c.commit();return self.reply(429,client_portal.form_page(token,code,'Demasiadas solicitudes. Comunícate con PC-DOCTOR S.A.','error'),'text/html; charset=utf-8')
+                    try:order_cancellations.request(c,oid,{'reason':form.get('reason',''),'detail':form.get('detail','')},None,now,'portal');audit(c,None,'portal_cancel_requested',oid);c.commit()
+                    except order_cancellations.CancelError as error:
+                        c.rollback();return self.reply(error.status,client_portal.account_page(token,client_portal.data(c,oid,now),cfg).replace('<main class="portal">','<main class="portal"><p class="portal-notice" data-tone="error" role="alert">'+html.escape(str(error))+'</p>',1),'text/html; charset=utf-8')
+                    return self.reply(200,client_portal.account_page(token,client_portal.data(c,oid,now),cfg).replace('<main class="portal">','<main class="portal"><p class="portal-notice" role="status">Recibimos su solicitud de cancelación. PC-DOCTOR la revisará y se la confirmará.</p>',1),'text/html; charset=utf-8')
                 if portal_post[2]:
                     jar=SimpleCookie()
                     try:jar.load(self.headers.get('Cookie',''))
@@ -3521,7 +3560,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(403, {'error':'Solicitud no autorizada.'})
             path = urlsplit(self.path).path
             workspace_post=bool(re.fullmatch(r'/api/orders/[0-9]+/workspace',path));quote_json=bool(re.fullmatch(r'/api/quotes/[0-9]+',path))
-            max_body=3700000 if path=='/api/public/pqrs/upload/part' else 65536 if path in ('/api/public/pqrs','/api/public/pqrs/reply') or re.fullmatch(r'/api/pqrs/[0-9]+',path) else 4200000 if re.fullmatch(r'/api/conditions/[0-9a-f]{32}/signed',path) else 2900000 if path=='/api/business-signature' else 3900000 if re.fullmatch(r'/api/orders/[0-9]+/followups',path) else 3700000 if re.fullmatch(r'/api/orders/[0-9]+/uploads',path) else 1500000 if path in ('/api/inventory/purchases/xml','/api/inventory/purchases/from-xml') else 1700000 if path in ('/api/cash/upload','/api/files/upload') else 65536 if path.startswith('/api/proformas') or path.startswith('/api/caja/') or re.fullmatch(r'/api/orders/[0-9]+/payments',path) or path=='/api/credit-notes' else 9000000 if path in ('/api/clients/import/preview','/api/clients/import/commit','/api/inventory/import/preview','/api/inventory/import/commit') else 200000 if path in ('/api/inventory/register','/api/invoicing/policies') else 1700000 if path=='/api/public/adi/listen' else 6000000 if path in ('/api/mail/send','/api/mail/draft') else 100000 if path in ('/api/conditions','/api/order-draft','/api/conditions/draft','/api/conditions/compare') else 3200000 if path in ('/api/licenses/new','/api/licenses/units','/api/licenses/units/bulk','/api/licenses/check','/api/licenses/products','/api/licenses/products/duplicate','/api/licenses/sales') or re.fullmatch(r'/api/licenses/sales/[0-9]+',path) else 1700000 if re.fullmatch(r'/api/orders/[0-9]+/photos',path) or path in ('/api/profile/photo','/api/mail/signature') or re.fullmatch(r'/api/catalog/[0-9]+/image',path) else (65536 if workspace_post or quote_json or path=='/api/mail/subject' else 16384)
+            max_body=6200000 if re.fullmatch(r'/api/orders/[0-9]+/cancellation',path) else 3700000 if path=='/api/public/pqrs/upload/part' else 65536 if path in ('/api/public/pqrs','/api/public/pqrs/reply') or re.fullmatch(r'/api/pqrs/[0-9]+',path) else 4200000 if re.fullmatch(r'/api/conditions/[0-9a-f]{32}/signed',path) else 2900000 if path=='/api/business-signature' else 3900000 if re.fullmatch(r'/api/orders/[0-9]+/followups',path) else 3700000 if re.fullmatch(r'/api/orders/[0-9]+/uploads',path) else 1500000 if path in ('/api/inventory/purchases/xml','/api/inventory/purchases/from-xml') else 1700000 if path in ('/api/cash/upload','/api/files/upload') else 65536 if path.startswith('/api/proformas') or path.startswith('/api/caja/') or re.fullmatch(r'/api/orders/[0-9]+/payments',path) or path=='/api/credit-notes' else 9000000 if path in ('/api/clients/import/preview','/api/clients/import/commit','/api/inventory/import/preview','/api/inventory/import/commit') else 200000 if path in ('/api/inventory/register','/api/invoicing/policies') else 1700000 if path=='/api/public/adi/listen' else 6000000 if path in ('/api/mail/send','/api/mail/draft') else 100000 if path in ('/api/conditions','/api/order-draft','/api/conditions/draft','/api/conditions/compare') else 3200000 if path in ('/api/licenses/new','/api/licenses/units','/api/licenses/units/bulk','/api/licenses/check','/api/licenses/products','/api/licenses/products/duplicate','/api/licenses/sales') or re.fullmatch(r'/api/licenses/sales/[0-9]+',path) else 1700000 if re.fullmatch(r'/api/orders/[0-9]+/photos',path) or path in ('/api/profile/photo','/api/mail/signature') or re.fullmatch(r'/api/catalog/[0-9]+/image',path) else (65536 if workspace_post or quote_json or path=='/api/mail/subject' else 16384)
             length = int(self.headers.get('Content-Length', '0'))
             if length <= 0 or length > max_body:
                 return self.reply(400, {'error':'Solicitud inválida.'})
@@ -5387,6 +5426,30 @@ class Handler(BaseHTTPRequestHandler):
                         return self.reply(200,pqrs.detail(c,user,cid))
                     except pqrs.PqrsError as error:
                         c.rollback();return self.reply(error.status,{'error':str(error),'fields':error.fields})
+                cancel_post=re.fullmatch(r'/api/orders/([0-9]+)/cancellation',path)
+                if cancel_post:
+                    # Cancelación: solicitar (personal, con verificación de identidad), confirmar, reabrir y cerrar (solo administración), evidencia.
+                    import order_cancellations
+                    if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
+                    oid=int(cancel_post[1]);action=str(data.get('action',''));now=reception_now();file=None
+                    if data.get('file_data'):
+                        try:file=(str(data.get('file_name','evidencia'))[:120],str(data.get('file_mime','')),base64.b64decode(str(data['file_data']),validate=True))
+                        except (ValueError,TypeError):return self.reply(400,{'error':'La evidencia no es válida.'})
+                    try:
+                        if action=='request':cid=order_cancellations.request(c,oid,data,user,now,'personal',file);audit(c,user['id'],'order_cancel_requested',oid)
+                        elif action=='attach':
+                            row=order_cancellations.current(c,oid)
+                            if not row or not file:return self.reply(400,{'error':'Adjunta un archivo a una cancelación vigente.'})
+                            order_cancellations.attach(c,row['id'],file,user,now);audit(c,user['id'],'order_cancel_evidence',oid)
+                        elif action=='confirm':
+                            order_cancellations.confirm(c,oid,data,user,now);audit(c,user['id'],'order_cancel_confirmed',oid);c.commit()
+                            order_cancellations.notify(c,oid,now)
+                        elif action=='reopen':order_cancellations.reopen(c,oid,data,user,now);audit(c,user['id'],'order_cancel_reopened',oid)
+                        elif action=='close':order_cancellations.close(c,oid,data,user,now);audit(c,user['id'],'order_cancel_closed',oid)
+                        else:return self.reply(400,{'error':'Acción no válida.'})
+                    except order_cancellations.CancelError as error:
+                        c.rollback();return self.reply(error.status,{'error':str(error),'fields':error.fields})
+                    c.commit();return self.reply(200,order_cancellations.detail(c,oid,user))
                 if path.startswith('/api/whatsapp/') or re.fullmatch(r'/api/orders/[0-9]+/whatsapp/(consent|send)',path):
                     import whatsapp_business
                     now=reception_now()
@@ -5394,6 +5457,14 @@ class Handler(BaseHTTPRequestHandler):
                         if path=='/api/whatsapp/settings':
                             result=whatsapp_business.save_settings(c,data,user);audit(c,user['id'],'whatsapp_settings');c.commit()
                             return self.reply(200,{'settings':result})
+                        if path=='/api/whatsapp/event-template':
+                            # Plantilla propia de un aviso (p. ej., confirmación de cancelación). Crear exige CREAR. Solo administración.
+                            action=str(data.get('action',''))
+                            if action not in ('create','status'):return self.reply(400,{'error':'Acción no válida.'})
+                            if action=='create' and str(data.get('confirm','')).strip().upper()!='CREAR':return self.reply(400,{'error':'Escribe CREAR para confirmar.'})
+                            if limited(c,'whatsapp-event-template:%d'%user['id'],10,300):return self.reply(429,{'error':'Espera unos minutos antes de volver a intentarlo.'})
+                            result=whatsapp_business.event_template(c,user,now,str(data.get('event','')),action);audit(c,user['id'],'whatsapp_event_template_'+action);c.commit()
+                            return self.reply(200,result)
                         if path=='/api/whatsapp/otp-template':
                             # Plantilla de autenticación para los códigos (crear exige escribir CREAR). Solo administración; queda en la auditoría.
                             action=str(data.get('action',''))
@@ -6032,6 +6103,9 @@ class Handler(BaseHTTPRequestHandler):
                             return self.reply(400, {'error':'Orden o estado inválido.'})
                         comment=str(data.get('comment','')).strip()
                         if len(comment)>2000:return self.reply(400,{'error':'El comentario admite hasta 2000 caracteres.'})
+                        import order_cancellations
+                        locked_by_cancel=order_cancellations.blocks_status_change(c,int(oid))
+                        if locked_by_cancel:return self.reply(409,{'error':locked_by_cancel})
                         now=reception_now()
                         old=c.execute('SELECT status FROM orders WHERE id=?',(oid,)).fetchone()[0]
                         # 1.5.289: quien envía el estado que estaba viendo («from_status») no pisa un cambio hecho por otra persona mientras tanto.

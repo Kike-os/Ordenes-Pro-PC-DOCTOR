@@ -160,6 +160,12 @@ def auto(c, oid, event, now, actor=None, detail=''):
     if not row:
         return None
     status = row['status']
+    try:
+        import order_cancellations
+        if order_cancellations.blocks_status_change(c, oid):
+            return None   # reparación cancelada: los eventos técnicos ya no cambian el estado
+    except Exception:
+        pass
     if event == 'quote_approved':
         # Se habilita continuar: vuelve a la etapa anterior a la espera (o espera el repuesto pendiente). No marca la reparación como iniciada.
         if status not in ('presupuesto', 'esperando_cliente'):
