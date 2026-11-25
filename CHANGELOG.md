@@ -4,6 +4,20 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.350 — 2026-11-25 16:30 (UTC-05:00)
+
+ADI Release Monitor 2.0: ventana de estabilidad premium, 19 comprobaciones de solo lectura, detalle técnico para administración y avisos inteligentes
+
+### Nuevas funcionalidades
+
+- ADI Release Monitor 2.0: nueva ventana de estabilidad con temporizador HH:MM:SS, barra de progreso real, LED y seis estados de color, requisitos visibles, actualización automática y última sincronización
+- Release Monitor: para administración, «Verificar estado ahora» paso a paso, detalle técnico de cada comprobación, incidencias con su resolución, historial de ejecuciones e informe técnico copiable
+- Cuatro comprobaciones nuevas de solo lectura: migraciones, interfaz, facturación electrónica y WhatsApp Business (19 en total)
+
+### Mejoras realizadas
+
+- Las verificaciones manuales ya no suman al período de seguimiento: la estabilidad solo se alcanza con las programadas y las automáticas; avisos de versión en observación, versión estable y verificación programada no recibida
+
 ## v1.5.349 — 2026-11-25 14:58 (UTC-05:00)
 
 Correcciones: barra de cierre por inactividad en el chat, enlaces de citas de ADI y avisos de entrega vencida

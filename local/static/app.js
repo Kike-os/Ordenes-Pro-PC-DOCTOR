@@ -3268,45 +3268,106 @@ function stabilityIcon(path){const svg=document.createElementNS('http://www.w3.o
 // Ventana de estabilidad: todos los valores salen del servidor (inicio y fin del período, verificaciones registradas). La cuenta atrás
 // solo avanza el reloj a partir de la hora del servidor; al terminar, se vuelve a consultar y el servidor decide el estado.
 let stabilityTick=null;
-function stabilityDetails(){const info=stabilityInfo;if(!info)return;clearInterval(stabilityTick);
- const make=(tag,cls,text)=>{const node=document.createElement(tag);if(cls)node.className=cls;if(text!==undefined)node.textContent=T(text);return node;};
- const dialog=make('dialog','stability-dialog');dialog.dataset.state=info.state;dialog.setAttribute('aria-labelledby','stability-title');
- const head=make('header','stability-head'),light=make('span','stability-light'),titles=make('div'),title=make('h2',undefined,'Estabilidad de la versión'),sub=make('p','stability-sub','v'+info.version+' · publicada el '+(info.date?new Intl.DateTimeFormat(I18N.locale(),{day:'2-digit',month:'short',year:'numeric'}).format(new Date(String(info.date).slice(0,10)+'T12:00:00')):'—')),close=make('button','stability-close','×');
- light.setAttribute('aria-hidden','true');title.id='stability-title';close.type='button';close.setAttribute('aria-label',T('Cerrar'));close.addEventListener('click',()=>dialog.close());titles.append(title,sub);head.append(light,titles,close);
- const state=make('div','stability-state');state.dataset.state=info.state;state.append(stabilityIcon(stabilityGlyphs[info.state]),make('strong',undefined,info.label),make('span',undefined,stabilityHelp[info.state]));
- // Período de observación: tiempo transcurrido y verificaciones correctas, los dos requisitos para «Versión estable».
- const period=make('section','stability-period');period.setAttribute('aria-label',T('Período de observación'));
- const clock=make('div','stability-clock'),count=make('strong','stability-count'),countLabel=make('span','stability-count-label');clock.append(count,countLabel);
- const bar=make('div','stability-bar'),fill=make('i');bar.setAttribute('role','progressbar');bar.setAttribute('aria-valuemin','0');bar.setAttribute('aria-valuemax','100');bar.append(fill);
- const span=make('div','stability-span'),from=make('span'),to=make('span');span.append(from,to);
- const checks=make('div','stability-checks'),dots=make('div','stability-dots'),checksText=make('span');dots.setAttribute('aria-hidden','true');
- for(let n=0;n<info.min_passes;n++){const dot=make('i');if(n<info.window_passes)dot.dataset.done='true';dots.append(dot);}
- const pending=Math.max(0,info.min_passes-info.window_passes);checksText.textContent=T(info.window_passes+' de '+info.min_passes+' verificaciones correctas'+(pending?' · '+pending+(pending===1?' pendiente':' pendientes'):' · completas'));checks.append(dots,checksText);
- period.append(clock,bar,span,checks);
- const offset=info.server_time?new Date(info.server_time).getTime()-Date.now():0,start=info.window_start?new Date(info.window_start).getTime():0,end=info.window_end?new Date(info.window_end).getTime():0;
- from.textContent=T(start?'Inicio · '+stabilityWhen(info.window_start):'Inicio · con la próxima verificación correcta');to.textContent=end?T('Fin · '+stabilityWhen(info.window_end)):'';
- const tick=()=>{if(info.state==='stable'){count.textContent=T('Completado');countLabel.textContent=T('Período de '+info.observation_hours+' h superado');fill.style.width='100%';bar.setAttribute('aria-valuenow','100');return;}
-  if(!start||!end){count.textContent='—';countLabel.textContent=T(info.state==='attention'?'Período detenido por la incidencia':'El período empieza con la primera verificación correcta');fill.style.width='0%';bar.setAttribute('aria-valuenow','0');return;}
-  const now=Date.now()+offset,left=Math.max(0,end-now),done=Math.min(100,Math.max(0,(now-start)*100/(end-start)));
-  count.textContent=left?stabilityHours(left/3600000).trim():T('Tiempo cumplido');countLabel.textContent=T(left?'restantes del período de '+info.observation_hours+' h':pending?'Falta completar las verificaciones':'Confirmando con el servidor…');
-  fill.style.width=done.toFixed(1)+'%';bar.setAttribute('aria-valuenow',String(Math.round(done)));bar.setAttribute('aria-label',T('Período transcurrido: '+Math.round(done)+' %'));
-  if(!left&&!pending&&dialog.open&&!dialog.dataset.asked){dialog.dataset.asked='1';loadStability();}};
- tick();if(info.state!=='stable')stabilityTick=setInterval(()=>{if(!dialog.isConnected){clearInterval(stabilityTick);return;}tick();},15000);
- const facts=make('dl','stability-facts');for(const[label,value]of [['Última verificación',stabilityWhen(info.last_check)],['Próxima programada',stabilityWhen(info.next_scheduled)],['Pruebas superadas',info.last_check?info.passed+' de '+info.total:'Sin resultados'],['Verificaciones de la versión',info.checks_run+' · '+info.checks_passed+' correctas']]){const row=make('div');row.append(make('dt',undefined,label),make('dd',undefined,value));facts.append(row);}
- dialog.append(head,state,period,facts);
- if(info.state!=='stable'&&info.last_check&&!info.clean&&info.state!=='attention')dialog.append(make('p','stability-note','La última verificación tuvo una prueba no crítica fallida: la versión no se declara estable hasta que todas las pruebas se superen.'));
- const block=(label,open,build)=>{const box=make('details','stability-block');box.open=open;box.append(make('summary',undefined,label));build(box);dialog.append(box);};
- if(info.tests.length)block('Pruebas de la última verificación ('+info.passed+'/'+info.total+')',info.passed<info.total,box=>{const list=make('ul','stability-tests');for(const test of info.tests){const li=make('li');li.dataset.ok=String(test.ok);li.append(stabilityIcon(test.ok?'M20 6 9 17l-5-5':'M18 6 6 18 M6 6l12 12'),make('span',undefined,test.name+(test.critical?'':' · no crítica')));list.append(li);}box.append(list);});
- block('Incidencias'+(info.incidents.length?' ('+info.incidents.length+')':''),info.incidents.some(item=>item.critical),box=>{if(!info.incidents.length){box.append(make('p','stability-empty',info.last_check?'Ninguna en esta versión.':'Sin resultados todavía.'));return;}for(const item of info.incidents.slice().reverse()){const p=make('p','stability-incident',stabilityWhen(item.at)+' · '+item.items.join(', '));p.dataset.critical=String(item.critical);box.append(p);}});
- if(info.previous?.length)block('Versiones anteriores',false,box=>{const list=make('ul','stability-previous');for(const item of info.previous){const li=make('li');li.append(make('strong',undefined,'v'+item.version),make('span',undefined,item.runs+' verificaciones · '+item.passes+' correctas'+(item.stable?' · alcanzó estabilidad':'')));list.append(li);}box.append(list);});
- if(window.openReleasePanel){const updates=make('div','stability-updates'),open=make('button','stability-updates-open');open.type='button';open.append(stabilityIcon('M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12'),make('span',undefined,'Estado de actualizaciones del sistema'));open.addEventListener('click',()=>{dialog.close();setTimeout(()=>window.openReleasePanel(),0);});updates.append(open);dialog.append(updates);}
- dialog.append(make('p','stability-rule','«Versión estable» exige '+info.min_passes+' verificaciones correctas y '+info.observation_hours+' h de seguimiento sin incidencias. El servidor verifica tres veces al día (01:00, 09:00 y 17:00) y al consultar este indicador. Las pruebas solo leen información.'));
- document.body.append(dialog);dialog.addEventListener('close',()=>{clearInterval(stabilityTick);dialog.remove();});dialog.addEventListener('click',event=>{if(event.target===dialog)dialog.close();});dialog.showModal();close.focus();}
+// ADI Release Monitor 2.0 (docs/RELEASE-MONITOR.md). Todo el estado lo decide el servidor (stability.py); la ventana solo lo muestra.
+// La cuenta regresiva usa el fin del período y la hora del servidor: conserva su precisión al cerrar, cambiar de módulo o recargar.
+// Administración ve además el detalle técnico (/api/system/release-monitor), puede verificar ahora y copiar el informe.
+const RM_TONES={stable:'verde',observing:'ambar',verifying:'azul',warning:'naranja',attention:'rojo',unverified:'gris',offline:'gris'};
+const RM_TITLES={stable:'Versión estable',observing:'Versión en observación',verifying:'Verificación en ejecución',warning:'Advertencia',attention:'Versión inestable',unverified:'Verificación pendiente',offline:'Sin conexión con el servidor'};
+const RM_HELP={warning:'La última verificación tuvo una prueba no crítica con fallos: la versión no se declara estable hasta que todas se superen.',offline:'No se pudo consultar el estado. Se reintentará automáticamente.'};
+const RM_ICON={x:'M18 6 6 18 M6 6l12 12',ok:'M20 6 9 17l-5-5',err:'M18 6 6 18 M6 6l12 12',warn:'M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z M12 9v4 M12 17h.01',skip:'M5 12h14',
+ clock:'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z M12 6v6l4 2',cal:'M8 2v4 M16 2v4 M3 10h18 M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z',sync:'M21 12a9 9 0 1 1-6.22-8.56 M21 3v6h-6',
+ next:'M5 12h14 M12 5l7 7-7 7',shield:'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z',list:'M8 6h13 M8 12h13 M8 18h13 M3 6h.01 M3 12h.01 M3 18h.01',copy:'M20 9h-9a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2z M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1',
+ run:'M5 3l14 9-14 9V3z',layers:'M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12',history:'M3 12a9 9 0 1 0 3-6.7L3 8 M3 3v5h5 M12 7v5l3 2'};
+let rmDetail=null,rmBusy=false,rmSync=0;
+function rmVisual(info){if(!info)return 'offline';if(info.state==='observing'&&info.last_check&&!info.clean)return 'warning';return info.state;}
+function rmIsAdmin(){try{return !!(currentUser&&currentUser.role==='administrador');}catch{return false;}}
+function rmHMS(ms){const s=Math.max(0,Math.floor(ms/1000)),h=Math.floor(s/3600),m=Math.floor(s%3600/60),x=s%60;return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(x).padStart(2,'0');}
+function rmAgo(ms){const s=Math.max(0,Math.round(ms/1000));return s<60?'hace '+s+' s':s<3600?'hace '+Math.floor(s/60)+' min':'hace '+Math.floor(s/3600)+' h';}
+async function rmLoadDetail(){if(!rmIsAdmin())return null;try{rmDetail=await api('/api/system/release-monitor');}catch{rmDetail=null;}return rmDetail;}
+function stabilityDetails(){clearInterval(stabilityTick);document.querySelector('dialog.stability-dialog')?.close();
+ const dialog=document.createElement('dialog');dialog.className='stability-dialog rm-dialog';dialog.setAttribute('aria-labelledby','rm-title');document.body.append(dialog);
+ rmPaint(dialog);dialog.addEventListener('close',()=>{clearInterval(stabilityTick);dialog.remove();});dialog.addEventListener('click',event=>{if(event.target===dialog)dialog.close();});
+ dialog.showModal();dialog.querySelector('.rm-close')?.focus();
+ // Actualización automática sin recargar: estado público cada 60 s (y el detalle técnico para administración), pintado en el mismo lugar.
+ let beat=0;stabilityTick=setInterval(()=>{if(!dialog.isConnected){clearInterval(stabilityTick);return;}rmTick(dialog);if(++beat%60===0&&!document.hidden&&!rmBusy)rmRefresh(dialog);},1000);
+ if(rmIsAdmin())rmLoadDetail().then(()=>dialog.isConnected&&rmPaint(dialog));}
+async function rmRefresh(dialog){try{const r=await fetch('/api/public/stability',{cache:'no-store',credentials:'same-origin'});if(!r.ok)throw new Error();stabilityInfo=await r.json();stabilityInfo._fetched=Date.now();rmSync=Date.now();}catch{stabilityInfo=null;}
+ await rmLoadDetail();paintStability();if(dialog.isConnected)rmPaint(dialog);}
+function rmPaint(dialog){const info=stabilityInfo,detail=rmDetail&&info&&rmDetail.version===info.version?rmDetail:null,visual=rmVisual(info),tone=RM_TONES[visual];
+ const opened=new Set([...dialog.querySelectorAll('details[open]')].map(node=>node.dataset.key));const first=!dialog.dataset.painted;dialog.dataset.painted='1';
+ const make=(tag,cls,text)=>{const node=document.createElement(tag);if(cls)node.className=cls;if(text!==undefined)node.textContent=T(text);return node;},icon=key=>stabilityIcon(RM_ICON[key]||key);
+ dialog.dataset.state=info?info.state:'offline';dialog.dataset.tone=tone;dialog.replaceChildren();
+ // Cabecera: LED de estado, nombre, versión y fecha de publicación, cierre.
+ const head=make('header','rm-head'),led=make('span','rm-led'),titles=make('div','rm-titles'),title=make('h2',undefined,'ADI Release Monitor'),sub=make('p','rm-sub');led.setAttribute('aria-hidden','true');title.id='rm-title';
+ sub.textContent=info?'v'+info.version+' · '+T('Publicada')+' '+(info.date?new Intl.DateTimeFormat(I18N.locale(),{day:'2-digit',month:'short',year:'numeric'}).format(new Date(String(info.date).slice(0,10)+'T12:00:00')):'—'):T('Estado no disponible');
+ const close=make('button','rm-close');close.type='button';close.setAttribute('aria-label',T('Cerrar'));close.append(icon('x'));close.addEventListener('click',()=>dialog.close());titles.append(title,sub);head.append(led,titles,close);dialog.append(head);
+ // Estado y cuenta regresiva.
+ const hero=make('section','rm-hero'),badge=make('span','rm-state-icon'),text=make('div','rm-state-text');badge.append(stabilityIcon(stabilityGlyphs[info?info.state:'unverified']||stabilityGlyphs.unverified));
+ text.append(make('strong',undefined,RM_TITLES[visual]),make('span',undefined,RM_HELP[visual]||(info?stabilityHelp[info.state]:'')));
+ const timer=make('div','rm-timer'),count=make('strong','rm-count'),countLabel=make('small','rm-count-label');timer.append(count,countLabel);timer.setAttribute('role','timer');hero.append(badge,text,timer);dialog.append(hero);
+ const bar=make('div','rm-bar'),fill=make('i'),pct=make('span','rm-pct'),barRow=make('div','rm-bar-row');bar.setAttribute('role','progressbar');bar.setAttribute('aria-valuemin','0');bar.setAttribute('aria-valuemax','100');bar.setAttribute('aria-label',T('Período de seguimiento'));bar.append(fill);barRow.append(bar,pct);
+ const span=make('div','rm-span'),from=make('span'),to=make('span');span.append(from,to);dialog.append(barRow,span);
+ // Requisitos de estabilidad: tiempo, verificaciones correctas y ausencia de incidencias. Cumplir uno solo nunca basta.
+ const reqs=make('ul','rm-reqs');reqs.setAttribute('aria-label',T('Requisitos para declarar estable la versión'));
+ if(info){const timeDone=info.state==='stable'||(info.window_end&&Date.now()+(new Date(info.server_time).getTime()-rmServerRef(info))>=new Date(info.window_end).getTime());
+  const req=(ok,label,extra)=>{const li=make('li');li.dataset.ok=String(!!ok);li.append(icon(ok?'ok':'clock'),make('span',undefined,label));if(extra)li.append(extra);reqs.append(li);};
+  req(timeDone,info.observation_hours+' h de seguimiento');const dots=make('span','rm-dots');for(let n=0;n<info.min_passes;n++){const d=make('i');if(n<info.window_passes)d.dataset.done='true';dots.append(d);}
+  req(info.window_passes>=info.min_passes,info.window_passes+' de '+info.min_passes+' verificaciones correctas',dots);req(info.last_check&&info.clean&&info.state!=='attention','Sin incidencias que lo impidan');dialog.append(reqs);}
+ // Datos de seguimiento.
+ const facts=make('dl','rm-facts'),fact=(key,label,value,cls)=>{const row=make('div',cls);row.append(icon(key),make('dt',undefined,label),make('dd',undefined,value));facts.append(row);return row;};
+ if(info){fact('cal','Publicación',info.date?stabilityWhen(info.date.length>10?info.date:String(info.date).slice(0,10)+'T12:00:00-05:00'):'—');fact('ok','Última verificación',stabilityWhen(info.last_check));
+  fact('next','Próxima programada',stabilityWhen(info.next_scheduled));fact('sync','Última sincronización','—','rm-sync');fact('shield','Pruebas superadas',info.last_check?info.passed+' de '+info.total:'Sin resultados');
+  fact('history','Verificaciones de la versión',info.checks_run+' · '+info.checks_passed+' correctas');dialog.append(facts);}
+ if(detail&&detail.cron_missed)dialog.append(make('p','rm-alert','No se reciben las verificaciones programadas desde '+stabilityWhen(detail.last_cron)+'. Revisa las tareas programadas del servidor.'));
+ // Acciones: verificar ahora (protegido contra ejecuciones duplicadas) y copiar el informe técnico.
+ const actions=make('div','rm-actions');
+ if(rmIsAdmin()){const runBtn=make('button','rm-btn rm-primary');runBtn.type='button';runBtn.append(icon(rmBusy?'sync':'run'),make('span',undefined,rmBusy?'Verificando…':'Verificar estado ahora'));runBtn.disabled=rmBusy||info?.state==='verifying';if(rmBusy)runBtn.dataset.loading='true';
+  runBtn.addEventListener('click',()=>rmRun(dialog));actions.append(runBtn);
+  const copy=make('button','rm-btn');copy.type='button';copy.append(icon('copy'),make('span',undefined,'Copiar informe técnico'));copy.disabled=!detail;copy.addEventListener('click',async()=>{try{await navigator.clipboard.writeText(detail.report);toast('Informe técnico copiado.','success');}catch{toast('No se pudo copiar el informe.','error');}});actions.append(copy);}
+ if(actions.childElementCount)dialog.append(actions);
+ if(dialog._progress)dialog.append(dialog._progress);
+ const block=(key,label,count,open,build)=>{const box=make('details','rm-block');box.dataset.key=key;box.open=opened.has(key)||(first&&open);const sum=make('summary');sum.append(make('span',undefined,label));if(count!==undefined)sum.append(make('b','rm-count-badge',String(count)));box.append(sum);build(box);dialog.append(box);};
+ if(info&&info.tests.length){const tests=detail?detail.detail_tests:info.tests;
+  block('tests','Resultados del diagnóstico',info.passed+'/'+info.total,info.passed<info.total,box=>{const grid=make('ul','rm-checks');for(const t of tests){const li=make('li'),st=t.status||(t.ok?'ok':'error');li.dataset.status=st;
+   const top=make('div','rm-check-top');top.append(icon(st==='ok'?'ok':st==='error'?'err':st==='warning'?'warn':'skip'),make('strong',undefined,t.name));if(t.ms!=null)top.append(make('small','rm-ms',(t.ms>=1000?(t.ms/1000).toFixed(1).replace('.',','):t.ms)+(t.ms>=1000?' s':' ms')));li.append(top);
+   li.append(make('small','rm-check-meta',(t.component?t.component+' · ':'')+(t.critical?'crítica':(t.severity||'no crítica'))+(t.recovered?' · recuperada':'')));if(t.detail)li.append(make('p','rm-check-detail',t.detail));grid.append(li);}box.append(grid);});}
+ const incidents=detail?detail.detail_incidents:(info?.incidents||[]);
+ block('incidents','Registro de incidencias',incidents.length,incidents.some(i=>i.critical||i.severity==='crítica'&&i.status!=='resuelta'),box=>{if(!incidents.length){box.append(make('p','rm-empty',info?.last_check?'Ninguna incidencia registrada.':'Sin resultados todavía.'));return;}
+  const list=make('ul','rm-incidents');for(const i of (detail?incidents:incidents.slice().reverse())){const li=make('li');li.dataset.severity=i.severity||(i.critical?'crítica':'media');
+   if(detail){const top=make('div','rm-inc-top');top.append(make('strong',undefined,i.component),make('span','rm-sev',i.severity),make('span','rm-inc-state',i.status));li.append(top,make('small',undefined,i.code+' · '+stabilityWhen(i.at)+(i.count>1?' · '+i.count+' veces':'')+(i.version?' · v'+i.version:'')),make('p',undefined,i.description));
+    if(i.resolution)li.append(make('p','rm-resolution','Resolución: '+i.resolution+(i.resolved_at?' ('+stabilityWhen(i.resolved_at)+')':'')));else if(i.action)li.append(make('p','rm-action','Acción sugerida: '+i.action));}
+   else li.append(make('strong',undefined,i.items.join(', ')),make('small',undefined,stabilityWhen(i.at)+' · '+(i.critical?'crítica':'no crítica')));list.append(li);}box.append(list);});
+ if(info?.previous?.length)block('versions','Historial de versiones',info.previous.length,false,box=>{const list=make('ul','rm-versions');for(const item of info.previous){const li=make('li');li.dataset.stable=String(item.stable);li.append(make('strong',undefined,'v'+item.version),make('span',undefined,item.runs+' verificaciones · '+item.passes+' correctas'),make('em',undefined,item.stable?'Estable':'Sin estabilidad'));list.append(li);}box.append(list);});
+ block('updates','Estado de actualizaciones',undefined,false,box=>{if(detail?.runs?.length){const list=make('ul','rm-runs');for(const r of detail.runs){const li=make('li');li.dataset.ok=String(!r.critical.length);li.append(make('strong',undefined,stabilityWhen(r.at)),make('span',undefined,'v'+r.version+' · '+r.source+(r.by?' ('+r.by+')':'')+' · '+r.passed+'/'+r.total));list.append(li);}box.append(list);}
+  if(window.openReleasePanel){const open=make('button','rm-btn');open.type='button';open.append(icon('layers'),make('span',undefined,'Ver actualizaciones publicadas'));open.addEventListener('click',()=>{dialog.close();setTimeout(()=>window.openReleasePanel(),0);});box.append(open);}
+  else if(!detail)box.append(make('p','rm-empty','Inicia sesión como administración para ver el historial de ejecuciones.'));});
+ dialog.append(make('p','rm-rule','Estable exige '+(info?.min_passes||3)+' verificaciones correctas, '+(info?.observation_hours||24)+' h de seguimiento y ninguna incidencia que lo impida; el fin del temporizador por sí solo no basta. El servidor verifica a las 01:00, 09:00 y 17:00 (hora de Ecuador) aunque nadie tenga el sistema abierto. Las pruebas solo leen información.'));
+ dialog._els={count,countLabel,fill,pct,bar,from,to};rmTick(dialog);}
+function rmServerRef(info){return info&&info._fetched?info._fetched:Date.now();}
+function rmTick(dialog){const info=stabilityInfo,els=dialog._els;if(!els)return;const sync=dialog.querySelector('.rm-sync dd');if(sync)sync.textContent=rmSync?T(rmAgo(Date.now()-rmSync)):'—';
+ if(!info){els.count.textContent='--:--:--';els.countLabel.textContent=T('Sin conexión');els.fill.style.width='0%';els.pct.textContent='—';return;}
+ const offset=info.server_time?new Date(info.server_time).getTime()-(info._fetched||Date.now()):0,now=Date.now()+offset,start=info.window_start?new Date(info.window_start).getTime():0,end=info.window_end?new Date(info.window_end).getTime():0;
+ els.from.textContent=T(start?'Inicio · '+stabilityWhen(info.window_start):'Inicio · con la próxima verificación correcta');els.to.textContent=end?T('Fin · '+stabilityWhen(info.window_end)):'';
+ let done=0;if(info.state==='stable'){done=100;els.count.textContent='00:00:00';els.countLabel.textContent=T('Seguimiento completado');}
+ else if(!start||!end){els.count.textContent='--:--:--';els.countLabel.textContent=T(info.state==='attention'?'Seguimiento detenido por la incidencia':'Empieza con la primera verificación correcta');}
+ else{const left=Math.max(0,end-now);done=Math.min(100,Math.max(0,(now-start)*100/(end-start)));els.count.textContent=rmHMS(left);
+  els.countLabel.textContent=T(left?'restantes de '+info.observation_hours+' h':info.window_passes<info.min_passes?'Faltan verificaciones correctas':'Confirmando con el servidor…');
+  if(!left&&dialog.open&&!dialog.dataset.asked){dialog.dataset.asked='1';rmRefresh(dialog);}}
+ els.fill.style.width=done.toFixed(2)+'%';els.pct.textContent=Math.floor(done)+' %';els.bar.setAttribute('aria-valuenow',String(Math.floor(done)));}
+// «Verificar estado ahora»: el diagnóstico real paso a paso (una comprobación por llamada). Cuenta como verificación manual: puede detectar
+// incidencias, pero no suma verificaciones al período de seguimiento (no permite eludir los requisitos de estabilidad).
+async function rmRun(dialog){if(rmBusy)return;rmBusy=true;const progress=document.createElement('div');progress.className='rm-progress';progress.setAttribute('role','status');const label=document.createElement('span'),meter=document.createElement('div'),fillP=document.createElement('i');meter.className='rm-bar';meter.append(fillP);progress.append(label,meter);dialog._progress=progress;
+ if(stabilityInfo)stabilityInfo=Object.assign({},stabilityInfo,{state:'verifying'});rmPaint(dialog);
+ try{const start=await api('/api/autocare/diagnose/start',{});let n=0;for(const step of start.plan){label.textContent=T('Comprobando')+' · '+step.name+' ('+(++n)+'/'+start.plan.length+')';fillP.style.width=(n*100/start.plan.length).toFixed(1)+'%';
+   await api('/api/autocare/diagnose/step',{id:start.id,code:step.code});}
+  toast('Verificación completada.','success');}
+ catch(error){toast(error.message,'error');}
+ finally{rmBusy=false;dialog._progress=null;await rmRefresh(dialog);}}
 function paintStability(){const unified=document.querySelector('#release-chip .release-stability');if(unified){const info=stabilityInfo;unified.dataset.state=info?info.state:'error';unified.querySelector('.release-stability-text').textContent=T(info?(info.short||info.label):'Sin datos');const chip=$('release-chip');chip.dataset.stability=info?info.state:'error';const version=chip.querySelector('.release-label').textContent;chip.title=(info?'Estabilidad: '+info.label+(info.state==='observing'?' · '+stabilityPending(info):'')+(info.last_check?' · última verificación '+stabilityWhen(info.last_check):''):'No se pudo consultar la estabilidad')+' · '+version;}
  for(const host of document.querySelectorAll('.stability-slot')){const info=stabilityInfo;host.replaceChildren();if(!info)continue;const badge=document.createElement('button');badge.type='button';badge.className='stability-badge';badge.dataset.state=info.state;
   badge.append(stabilityIcon(stabilityGlyphs[info.state]),Object.assign(document.createElement('span'),{className:'stability-version',textContent:'v'+info.version}),Object.assign(document.createElement('span'),{className:'stability-sep',textContent:'·'}),Object.assign(document.createElement('span'),{className:'stability-label',textContent:T(info.short||info.label).toUpperCase()}));
   badge.title=T('Estabilidad de la versión '+info.version+': '+info.label+(info.state==='observing'?' · '+stabilityPending(info):'')+(info.last_check?' · última verificación '+stabilityWhen(info.last_check):''));badge.setAttribute('aria-label',T('Versión '+info.version+', estabilidad: '+info.label+'. Ver detalle'));badge.setAttribute('aria-haspopup','dialog');badge.addEventListener('click',stabilityDetails);host.append(badge);}}
-async function loadStability(){if(!document.querySelector('.stability-slot,#release-chip'))return;const reopen=!!document.querySelector('dialog.stability-dialog[open]');try{const response=await fetch('/api/public/stability',{cache:'no-store',credentials:'same-origin'});if(!response.ok)throw new Error();stabilityInfo=await response.json();}catch{stabilityInfo=stabilityInfo||null;}paintStability();if(reopen){document.querySelector('dialog.stability-dialog')?.close();stabilityDetails();}}
+async function loadStability(){if(!document.querySelector('.stability-slot,#release-chip'))return;const reopen=!!document.querySelector('dialog.stability-dialog[open]');try{const response=await fetch('/api/public/stability',{cache:'no-store',credentials:'same-origin'});if(!response.ok)throw new Error();stabilityInfo=await response.json();stabilityInfo._fetched=Date.now();rmSync=Date.now();}catch{stabilityInfo=stabilityInfo||null;}paintStability();const open_=document.querySelector('dialog.stability-dialog[open]');if(reopen&&open_)rmPaint(open_);}
 document.addEventListener('i18n:change',()=>{if(stabilityInfo)paintStability();});
 if(document.querySelector('.stability-slot,#release-chip')){loadStability();clearInterval(stabilityTimer);stabilityTimer=setInterval(()=>{if(!document.hidden)loadStability();},5*60000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)loadStability();});}
 // Acceso: «Versión del sistema». El estado se pide al servidor, que compara la versión desplegada con el registro publicado; nunca se

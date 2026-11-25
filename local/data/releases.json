@@ -8,6 +8,28 @@
   },
   "releases": [
     {
+      "version": "1.5.350",
+      "date": "2026-11-25T16:30:25-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "ADI Release Monitor 2.0: ventana de estabilidad premium, 19 comprobaciones de solo lectura, detalle técnico para administración y avisos inteligentes",
+      "changes": {
+        "features": [
+          "ADI Release Monitor 2.0: nueva ventana de estabilidad con temporizador HH:MM:SS, barra de progreso real, LED y seis estados de color, requisitos visibles, actualización automática y última sincronización",
+          "Release Monitor: para administración, «Verificar estado ahora» paso a paso, detalle técnico de cada comprobación, incidencias con su resolución, historial de ejecuciones e informe técnico copiable",
+          "Cuatro comprobaciones nuevas de solo lectura: migraciones, interfaz, facturación electrónica y WhatsApp Business (19 en total)"
+        ],
+        "improvements": [
+          "Las verificaciones manuales ya no suman al período de seguimiento: la estabilidad solo se alcanza con las programadas y las automáticas; avisos de versión en observación, versión estable y verificación programada no recibida"
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Administración (autorización expresa en la sesión)"
+    },
+    {
       "version": "1.5.349",
       "date": "2026-11-25T14:58:56-05:00",
       "type": "patch",

@@ -172,6 +172,12 @@ def build(c, user, now, mail_access=False, hidden=False, limit=40):
             items += autocare.notifications(c, now)
         except Exception as error:
             print('autocare avisos', type(error).__name__, flush=True)
+        # ADI Release Monitor 2.0: versión en observación, versión estable y verificación programada no recibida (clave estable, sin duplicados).
+        try:
+            import release_monitor
+            items += release_monitor.notifications(c, now)
+        except Exception as error:
+            print('release monitor avisos', type(error).__name__, flush=True)
         try:
             import db_guardian
             items += db_guardian.notifications(c, now)

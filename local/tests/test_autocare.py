@@ -142,32 +142,32 @@ class AutoCareProTests(AutoCareTests):
         with app.connect() as c:
             entry = stability.run(c, app.reception_now())  # automática: el buzón no se comprueba
         statuses = {r['code']: r['status'] for r in entry['results']}
-        self.assertEqual(len(statuses), 15)
+        self.assertEqual(len(statuses), 19)
         self.assertEqual(statuses['mail'], 'error')  # sin correo configurado
         with patch.dict(app.os.environ, {'MAIL_IMAP_HOST': 'i.example.invalid', 'MAIL_SMTP_HOST': 's.example.invalid', 'MAIL_USERNAME': 'b@example.invalid', 'MAIL_PASSWORD': 'x'}), app.connect() as c:
             entry = stability.run(c, app.reception_now())
         mail = next(r for r in entry['results'] if r['code'] == 'mail')
         self.assertEqual((mail['status'], mail['ok']), ('not_checked', True))
-        self.assertEqual(entry['counts']['not_checked'], 2);self.assertIn('Envío de correos', entry['unchecked']);self.assertIn('Copias de seguridad', entry['unchecked'])  # sin registro de respaldo central
-        self.assertEqual(sum(entry['counts'].values()), 15)
+        self.assertEqual(entry['counts']['not_checked'], 3);self.assertIn('WhatsApp Business', entry['unchecked']);self.assertIn('Envío de correos', entry['unchecked']);self.assertIn('Copias de seguridad', entry['unchecked'])  # sin registro de respaldo central
+        self.assertEqual(sum(entry['counts'].values()), 19)
 
     def test_stepwise_diagnosis_runs_each_check_on_the_server_and_records_once(self):
         cookie, csrf = self.login()
         started = self.request('/api/autocare/diagnose/start', {}, cookie=cookie, csrf=csrf)['body']
-        self.assertEqual(len(started['plan']), 15)
+        self.assertEqual(len(started['plan']), 19)
         self.assertEqual(self.request('/api/autocare/diagnose/start', {}, cookie=cookie, csrf=csrf)['status'], 409)  # ya hay uno en curso
         self.assertEqual(self.request('/api/autocare/diagnose/step', {'id': started['id'], 'code': started['plan'][1]['code']}, cookie=cookie, csrf=csrf)['status'], 409)  # fuera de orden
         with patch.object(app.mail_pro, 'configured', return_value=True), patch.object(app.mail_pro, 'test_imap', return_value=None):
             for index, item in enumerate(started['plan']):
                 out = self.request('/api/autocare/diagnose/step', {'id': started['id'], 'code': item['code']}, cookie=cookie, csrf=csrf)['body']
                 self.assertIn(out['result']['status'], ('ok', 'warning', 'error', 'not_checked', 'unavailable'))
-                self.assertEqual(out['done'], index == 14)
-        self.assertEqual(out['entry']['total'], 15)
+                self.assertEqual(out['done'], index == 18)
+        self.assertEqual(out['entry']['total'], 19)
         with app.connect() as c:
             runs = stability._load(c, 'stability_runs', [])
         self.assertEqual((len(runs), runs[-1]['source'], runs[-1]['by']), (1, 'manual', 'Persona de prueba'))
         panel = self.request('/api/autocare', cookie=cookie)['body']
-        self.assertEqual(panel['last_by'], 'Persona de prueba');self.assertEqual(sum(panel['runs'][0]['counts'].values()), 15)
+        self.assertEqual(panel['last_by'], 'Persona de prueba');self.assertEqual(sum(panel['runs'][0]['counts'].values()), 19)
         self.assertTrue(panel['explanation']);self.assertIsNotNone(panel['post_deploy'])
 
     def test_incident_lifecycle_with_code_cause_action_and_manual_resolution(self):

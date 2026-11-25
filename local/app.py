@@ -2841,6 +2841,11 @@ class Handler(BaseHTTPRequestHandler):
                     body=json.dumps(db_guardian.export(c,now_g),ensure_ascii=False,indent=1).encode('utf-8');audit(c,user['id'],'db_guardian_export')
                     return self.reply(200,body,'application/json',filename='DIAGNOSTICO-BD-%s.json'%now_g.strftime('%Y%m%d-%H%M'))
                 return self.reply(404,{'error':'Recurso no disponible.'})
+            if path == '/api/system/release-monitor':
+                # ADI Release Monitor 2.0: detalle técnico de la estabilidad (solo administración; solo lectura).
+                import release_monitor as release_monitor_
+                if user['role']!='administrador':return self.reply(403,{'error':'Solo administración consulta el detalle técnico.'})
+                return self.reply(200,release_monitor_.details(c,reception_now()))
             if path == '/api/system/migrations':
                 # Migraciones pendientes de la base central (1.5.317): solo administración. Vercel no las aplica al desplegar.
                 import db_migrations

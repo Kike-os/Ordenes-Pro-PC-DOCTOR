@@ -364,8 +364,8 @@ def checks(c, deep=False, now=None):
             ('sales', 'Ventas y pagos', 'alta', sales), ('agenda', 'Agenda y citas', 'crítica', agenda),
             ('mail', 'Envío de correos', 'media', mail), ('notifications', 'Notificaciones', 'media', notices),
             ('integrations', 'Integraciones configuradas', 'baja', integrations), ('ai', 'Inteligencia artificial de ADI', 'media', ai),
-            ('internal', 'Servicios internos y tareas programadas', 'crítica', internal), ('backups', 'Copias de seguridad', 'alta', backups),
-            ('errors', 'Registros de errores', 'media', runtime_errors)]
+            ('internal', 'Servicios internos y tareas programadas', 'crítica', internal), ('backups', 'Copias de seguridad', 'alta', backups)] \
+        + __import__('release_monitor').bind(c) + [('errors', 'Registros de errores', 'media', runtime_errors)]
 
 
 def _summary(c, version, history=None):
@@ -390,8 +390,11 @@ def _account(summary, entry):
     summary['warnings'] += 1 if entry['warnings'] else 0
     if ok:
         summary['passes'] += 1
-        summary['window_start'] = summary['window_start'] or entry['at']
-        summary['window_passes'] += 1
+        # Release Monitor 2.0: una verificación manual queda registrada y puede detectar incidencias, pero no inicia el período ni suma
+        # verificaciones correctas: los requisitos de estabilidad solo se cumplen con las programadas y las automáticas.
+        if entry.get('source') != 'manual':
+            summary['window_start'] = summary['window_start'] or entry['at']
+            summary['window_passes'] += 1
     else:
         summary['criticals'] = (summary['criticals'] + [{'at': entry['at'], 'items': entry['critical_failures']}])[-20:]
         summary['window_start'], summary['window_passes'] = '', 0
@@ -599,6 +602,9 @@ def status(c, now):
         state = 'unverified'
     elif not summary['last_ok']:
         state = 'attention'
+    elif not summary['window_start']:
+        # Solo hay verificaciones manuales: correctas, pero el período empieza con la primera programada o automática correcta.
+        state = 'observing'
     else:
         end = datetime.fromisoformat(summary['window_start']) + timedelta(hours=OBSERVATION_HOURS)
         # La decisión usa el instante exacto; el redondeo es solo para mostrar el tiempo restante.
