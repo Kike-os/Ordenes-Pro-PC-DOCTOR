@@ -4,6 +4,13 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.347 — 2026-11-25 09:17 (UTC-05:00)
+
+Mission Control Compact y mensajes de WhatsApp con plantillas aprobadas.
+
+- Mission Control Compact: barra global de plazos de 10 segmentos con color progresivo (esmeralda → rojo), contador en vivo, % disponible y estado, basada solo en plazos reales del servidor. Se aplica a retiro de equipos, entrega estimada, presupuestos, cierre por inactividad, ventana de 24 h de WhatsApp, PQRS, compromisos de pago y licencias; ADI informa los plazos próximos.
+- Mensajes de WhatsApp desde la orden: «Enviar plantilla aprobada» ya no exige escribir un texto, y si el servidor tiene una plantilla general configurada que no está en la lista de plantillas de Órdenes Pro, se usa en lugar de fallar.
+
 ## v1.5.346 — 2026-11-24 20:44 (UTC-05:00)
 
 WhatsApp: recordatorio de retiro en espera de entrega

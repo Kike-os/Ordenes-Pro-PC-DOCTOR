@@ -104,6 +104,8 @@ class OrderFollowupTests(unittest.TestCase):
             self.assertEqual(closed['status'], 409);self.assertIn('plantilla aprobada', closed['body']['error'])
             with app.connect() as c:
                 c.execute("INSERT INTO whatsapp_adi_inbound(wa_message_id,sender,status,received_at) VALUES ('wamid.CLIENTE-FICTICIO','593991234567','enviado',?)", (app.reception_now().isoformat(timespec='seconds'),));c.commit()
+            # La ventana de 24 h que muestra la barra sale del último mensaje real del cliente (aquí: el número de la orden no coincide → cerrada).
+            self.assertIn('window_until', self.request('/api/orders/%d/followups' % oid, cookie=cookie)['body']['whatsapp'])
             fail = post('/api/orders/%d/messages' % oid, action='whatsapp', body=text, followup_id=str(fid), recipient='0991234567', request_key='mensaje-wa-prueba-0001')
             self.assertEqual((fail['status'], fail['body']['message']['status']), (502, 'error'))
             ok = post('/api/orders/%d/messages' % oid, action='whatsapp', body=text, followup_id=str(fid), recipient='0991234567', request_key='mensaje-wa-prueba-0001')  # reintento
@@ -151,7 +153,9 @@ class OrderFollowupTests(unittest.TestCase):
         self.assertEqual((calls[0]['type'], calls[0]['template']['name'], calls[0]['template']['language']['code']),
                          ('template', 'pcdoctor_novedad_importante', 'es_EC'))
         params = [p['text'] for p in calls[0]['template']['components'][0]['parameters']]
-        self.assertEqual(params[:2], [order['client'].split()[0], order['code']])
+        with app.connect() as c:
+            client = c.execute('SELECT cl.name FROM orders o JOIN devices d ON d.id=o.device_id JOIN clients cl ON cl.id=d.client_id WHERE o.id=?', (oid,)).fetchone()[0]
+        self.assertEqual(params[:2], [client.split()[0], order['code']])
         self.assertIn('Identificamos fallas', params[3])
 
     def test_status_template_uses_short_followup_detail(self):
@@ -171,10 +175,18 @@ class OrderFollowupTests(unittest.TestCase):
                           sources=sources, recipient='0991234567', request_key='mensaje-wa-estado-0001')
         self.assertEqual((result['status'], result['body']['message']['status']), (200, 'enviado'))
         params = [p['text'] for p in calls[0]['template']['components'][0]['parameters']]
-        self.assertEqual(params, [order['client'].split()[0], order['code'],
+        self.assertEqual(params, [self._client_first(oid), order['code'],
                                   'Identificamos fallas en la unidad de almacenamiento; recomendamos reemplazarla.'])
         self.assertNotIn('Estimado/a', params[2])
 
+
+
+def _client_first(self, oid):
+    with app.connect() as c:
+        return c.execute('SELECT cl.name FROM orders o JOIN devices d ON d.id=o.device_id JOIN clients cl ON cl.id=d.client_id WHERE o.id=?', (oid,)).fetchone()[0].split()[0]
+
+
+OrderFollowupTests._client_first = _client_first
 
 if __name__ == '__main__':
     unittest.main()

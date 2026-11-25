@@ -8,6 +8,26 @@
   },
   "releases": [
     {
+      "version": "1.5.347",
+      "date": "2026-11-25T09:17:42-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Mission Control Compact y mensajes de WhatsApp con plantillas aprobadas",
+      "changes": {
+        "features": [
+          "Mission Control Compact: barra global de plazos de 10 segmentos con color progresivo (esmeralda → rojo), contador en vivo, % disponible y estado, basada solo en plazos reales del servidor. Se aplica a retiro de equipos, entrega estimada, presupuestos, cierre por inactividad, ventana de 24 h de WhatsApp, PQRS, compromisos de pago y licencias; ADI informa los plazos próximos."
+        ],
+        "improvements": [],
+        "fixes": [
+          "Mensajes de WhatsApp desde la orden: «Enviar plantilla aprobada» ya no exige escribir un texto, y si el servidor tiene una plantilla general configurada que no está en la lista de plantillas de Órdenes Pro, se usa en lugar de fallar."
+        ],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Administración (autorización expresa en la sesión)"
+    },
+    {
       "version": "1.5.346",
       "date": "2026-11-24T20:44:22-05:00",
       "type": "patch",

@@ -24,6 +24,7 @@ STEPS = {
     'repuestos': ('Consultando repuestos pendientes', 'Órdenes en espera de repuesto'), 'inventario_bajo': ('Revisando el inventario', 'Centro de Inventario'),
     'infraestructura': ('Revisando la infraestructura', 'Database Guardian, Smart Fiscal Status, AZUR, respaldos y WhatsApp'),
     'recomendaciones': ('Revisando alertas verificables', 'ADI Intelligence Insights'),
+    'plazos': ('Revisando plazos y vencimientos', 'Órdenes, presupuestos, retiros y compromisos'),
 }
 
 _obj = lambda props=None, required=None: {'type': 'object', 'additionalProperties': False, 'required': required or [], 'properties': props or {}}
@@ -36,6 +37,7 @@ TOOLS = [
     {'type': 'function', 'name': 'repuestos', 'strict': True, 'description': 'Órdenes en espera de repuesto, con días de espera.', 'parameters': _obj()},
     {'type': 'function', 'name': 'inventario_bajo', 'strict': True, 'description': 'Productos del inventario agotados o bajo el mínimo.', 'parameters': _obj()},
     {'type': 'function', 'name': 'infraestructura', 'strict': True, 'description': 'Estado verificado de la base de datos (Database Guardian, migraciones pendientes), Smart Fiscal Status, AZUR (sin secretos), respaldos y WhatsApp.', 'parameters': _obj()},
+    {'type': 'function', 'name': 'plazos', 'strict': True, 'description': 'Plazos reales próximos y vencidos: entregas estimadas (vencidas y en 24 h), presupuestos por vencer, equipos que superaron el plazo de retiro y compromisos de pago próximos.', 'parameters': _obj()},
     {'type': 'function', 'name': 'recomendaciones', 'strict': True, 'description': 'Alertas verificables con prioridad y acción sugerida (ADI Intelligence Insights).', 'parameters': _obj()},
 ]
 ROLES = {t['name']: (ADMIN,) for t in TOOLS}
@@ -173,6 +175,29 @@ def infraestructura(c, now):
     return out
 
 
+
+@_safe
+def plazos(c, now):
+    """Plazos REALES (con fecha registrada): nada se estima. Entregas estimadas (fin del día de Ecuador), validez de presupuestos enviados,
+    plazo de retiro superado (permanencia) y compromisos de pago de los próximos 3 días."""
+    today = now.date()
+    active = "o.status NOT IN ('entregado','listo','espera_entrega') AND o.estimated_delivery!=''"
+    rows = c.execute("SELECT o.code,o.estimated_delivery,cl.name FROM orders o JOIN devices d ON d.id=o.device_id JOIN clients cl ON cl.id=d.client_id WHERE " + active + ' ORDER BY o.estimated_delivery').fetchall()
+    overdue = [{'orden': r['code'], 'cliente': r['name'], 'entrega_estimada': r['estimated_delivery']} for r in rows if r['estimated_delivery'] < today.isoformat()]
+    soon = [{'orden': r['code'], 'cliente': r['name'], 'entrega_estimada': r['estimated_delivery']} for r in rows if r['estimated_delivery'] in (today.isoformat(), (today + timedelta(days=1)).isoformat())]
+    quotes = [{'presupuesto': r['code'], 'orden': r['orden'], 'vence': r['valid_until']} for r in c.execute(
+        "SELECT q.code,q.valid_until,o.code orden FROM quotes q JOIN orders o ON o.id=q.order_id WHERE q.deleted_at='' AND q.status='enviado' AND q.valid_until!='' "
+        'AND q.valid_until>=? AND q.valid_until<=? ORDER BY q.valid_until', (today.isoformat(), (today + timedelta(days=2)).isoformat()))]
+    commitments = []
+    try:
+        commitments = [{'orden': r['code'], 'vence': r['due_date']} for r in c.execute(
+            "SELECT o.code,p.due_date FROM payment_commitments p JOIN orders o ON o.id=p.order_id WHERE p.status NOT IN ('reprogramado','cancelado','cumplido') "
+            'AND p.due_date>=? AND p.due_date<=? ORDER BY p.due_date', (today.isoformat(), (today + timedelta(days=3)).isoformat()))]
+    except Exception:
+        commitments = []
+    return {'hoy': today.isoformat(), 'entregas_vencidas': overdue[:20], 'entregas_proximas_24h': soon[:20], 'presupuestos_por_vencer': quotes[:20],
+            'compromisos_proximos_3_dias': commitments[:20], 'nota': 'Solo plazos con fecha registrada; nada se estima ni se reinicia.'}
+
 def run(c, now, name, args, user):
     """Ejecuta una herramienta ejecutiva si el usuario tiene permiso. None si no es de este módulo."""
     if name not in ROLES:
@@ -183,6 +208,8 @@ def run(c, now, name, args, user):
         return facturacion(c, now, args)
     if name == 'recomendaciones':
         return {'recomendaciones': insights(c, now)['items']}
+    if name == 'plazos':
+        return plazos(c, now)
     return {'finanzas': finanzas, 'cartera': cartera, 'atencion_clientes': atencion_clientes, 'repuestos': repuestos, 'inventario_bajo': inventario_bajo,
             'infraestructura': infraestructura}[name](c, now)
 
@@ -203,7 +230,8 @@ RULES = {'ordenes_vencidas': ('alta', 'Operaciones técnicas'), 'ordenes_sin_mov
          'equipos_sin_retirar': ('media', 'Operaciones técnicas'), 'compromisos_incumplidos': ('alta', 'Cartera y cobranzas'),
          'pagos_por_conciliar': ('media', 'Finanzas y contabilidad'), 'atencion_humana': (None, 'Atención al cliente'),
          'inventario_bajo': ('informativa', 'Inventario y logística'), 'infra_base': ('critica', 'Seguridad e infraestructura'),
-         'migraciones_pendientes': ('media', 'Seguridad e infraestructura'), 'infra_fiscal': ('critica', 'Facturación electrónica')}
+         'migraciones_pendientes': ('media', 'Seguridad e infraestructura'), 'infra_fiscal': ('critica', 'Facturación electrónica'),
+         'entregas_por_vencer': ('media', 'Operaciones técnicas'), 'presupuestos_por_vencer': ('informativa', 'Presupuestos y ventas')}
 
 
 def insights(c, now):
@@ -301,7 +329,18 @@ def insights(c, now):
             add('infra_fiscal', 'Facturación electrónica con problemas', 'alta', f.get('reason') or 'Smart Fiscal Status en rojo.', [], 'Smart Fiscal Status.',
                 'Revisa Facturación → Estado fiscal antes de emitir.', '#invoicing')
 
-    for fn in (orders, parts, pickups, collections, support, stock, infra):
+    def deadlines():
+        p = plazos(c, now)
+        soon = [o['orden'] for o in p['entregas_proximas_24h']]
+        if soon:
+            add('entregas_por_vencer', 'Entregas estimadas en las próximas 24 horas', 'media', '%d órdenes tienen su entrega estimada dentro de las próximas 24 horas.' % len(soon), soon,
+                'Fecha estimada de entrega de órdenes activas sin entregar.', 'Confirma con el técnico que estarán listas o informa al cliente.', '#orders?active=1')
+        quotes = [q['presupuesto'] for q in p['presupuestos_por_vencer']]
+        if quotes:
+            add('presupuestos_por_vencer', 'Presupuestos que vencen pronto', 'informativa', '%d presupuestos enviados vencen en los próximos 2 días.' % len(quotes), quotes,
+                'Validez de presupuestos enviados sin decisión.', 'Recuerda al cliente que lo revise antes del vencimiento.', '#orders?active=1')
+
+    for fn in (orders, parts, pickups, collections, support, stock, infra, deadlines):
         guard(fn)
     seen, unique = set(), []
     for it in items:

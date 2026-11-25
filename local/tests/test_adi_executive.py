@@ -141,5 +141,17 @@ class AdiExecutiveTests(base.AdiAdminDataTests):
             self.assertEqual(self.request('/api/adi/admin', cookie=cookie)['body']['service']['level'], 'verde')
 
 
+    def test_x07_plazos_only_real_deadlines(self):
+        cookie, csrf, late, waiting, quote = self.workshop()
+        now = app.reception_now()
+        with app.connect() as c:
+            c.execute("UPDATE orders SET estimated_delivery=? WHERE id=?", (now.date().isoformat(), waiting['id']));c.commit()
+            admin = c.execute('SELECT * FROM users WHERE id=?', (self.uid,)).fetchone()
+            out = adi_exec.run(c, now, 'plazos', {}, admin)
+        self.assertIn(late['code'], [o['orden'] for o in out['entregas_vencidas']])
+        self.assertIn(waiting['code'], [o['orden'] for o in out['entregas_proximas_24h']])
+        keys = [i['key'] for i in self.request('/api/adi/admin/insights', cookie=cookie)['body']['items']]
+        self.assertIn('entregas_por_vencer', keys)
+
 if __name__ == '__main__':
     unittest.main()

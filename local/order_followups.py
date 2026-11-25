@@ -270,7 +270,7 @@ def listing(c, oid):
         r['next_owner'] = owners.get(r.get('next_owner_id'), '')
     return {'followups': rows, 'messages': messages, 'limits': order_evidence.limits(c),
             'staff': [dict(r) for r in c.execute("SELECT id,name,role FROM users WHERE active=1 AND role IN ('administrador','tecnico') ORDER BY name")], 'kinds': {k: {'label': v[0], 'group': v[1], 'status': v[2]} for k, v in KINDS.items()}, 'priorities': PRIORITIES,
-            'templates': TEMPLATES, 'template_for_kind': TEMPLATE_FOR_KIND, 'sources': sources(c, oid), 'whatsapp': whatsapp_status()}
+            'templates': TEMPLATES, 'template_for_kind': TEMPLATE_FOR_KIND, 'sources': sources(c, oid), 'whatsapp': dict(whatsapp_status(), **whatsapp_window(c, oid))}
 
 
 def _loads(raw):
@@ -666,6 +666,19 @@ def whatsapp_config(env=None):
             'template': env.get('WHATSAPP_TEMPLATE_NAME', '').strip(), 'template_lang': env.get('WHATSAPP_TEMPLATE_LANG', 'es').strip() or 'es'}
 
 
+def whatsapp_window(c, oid):
+    """Ventana de 24 h de Meta para texto libre: desde el último mensaje que el cliente escribió por WhatsApp. Sin mensaje: cerrada."""
+    try:
+        row = c.execute('SELECT cl.phone FROM orders o JOIN devices d ON d.id=o.device_id JOIN clients cl ON cl.id=d.client_id WHERE o.id=?', (oid,)).fetchone()
+        number = ecuador_number(str(row['phone'] or '')) if row else ''
+        last = last_client_message(c, number) if number else None
+    except Exception:
+        last = None
+    if not last:
+        return {'window_from': '', 'window_until': ''}
+    return {'window_from': last.isoformat(timespec='seconds'), 'window_until': (last + timedelta(hours=24)).isoformat(timespec='seconds')}
+
+
 def whatsapp_status(env=None):
     cfg = whatsapp_config(env)
     return {'configured': bool(cfg['token'] and cfg['phone_id']), 'webhook': bool(cfg['secret'] and cfg['verify']), 'template': cfg['template']}
@@ -791,7 +804,9 @@ def send_whatsapp(c, oid, data, user, now, env=None):
     existing = c.execute('SELECT * FROM order_messages WHERE request_key=?', (key,)).fetchone() if key else None
     if existing and existing['status'] != 'error':
         return dict(existing), True
-    body = message_body(data)
+    # La plantilla aprobada no necesita texto propio: el cuerpo solo es obligatorio para texto libre (un reintento usa el texto registrado).
+    needs_text = data.get('mode') != 'template' or str(data.get('body') or '').strip()
+    body = (existing['body'] if existing else message_body(data)) if needs_text else ''
     selected = str(data.get('template') or '').strip()
     reverse = {name: code for code, name in TEMPLATES.items()}
     reverse.update({name: code for code, name in META_TEMPLATE_BY_KEY.items()})
@@ -810,14 +825,20 @@ def send_whatsapp(c, oid, data, user, now, env=None):
                 raise FollowupError(('Han pasado más de 24 horas desde el último mensaje del cliente por WhatsApp' if last else 'El cliente todavía no ha escrito a la empresa por WhatsApp')
                                     + ': Meta solo permite enviar una plantilla aprobada. Selecciona una plantilla aprobada o escríbele por correo.', 409, {'mode': 'template'})
     if template_mode:
+        legacy = False
         if key_name not in META_TEMPLATE_BY_KEY:
             if cfg['template'] in META_TEMPLATE_BY_KEY.values():
                 key_name = next(k for k, v in META_TEMPLATE_BY_KEY.items() if v == cfg['template'])
+            elif cfg['template']:
+                legacy = True   # plantilla general del servidor (WHATSAPP_TEMPLATE_NAME): {{1}} nombre del cliente y {{2}} número de orden
             else:
                 raise FollowupError('Selecciona una de las plantillas aprobadas configuradas para Órdenes Pro.', 409, {'mode': 'template'})
-        template_name = META_TEMPLATE_BY_KEY[key_name]
-        language = 'es_EC'
-        params = _template_parameters(c, oid, data, key_name, o)
+        if legacy:
+            template_name, language, params = cfg['template'], cfg['template_lang'] or 'es', [_first_name(o['client']), o['code']]
+        else:
+            template_name = META_TEMPLATE_BY_KEY[key_name]
+            language = 'es_EC'
+            params = _template_parameters(c, oid, data, key_name, o)
         payload = {'messaging_product': 'whatsapp', 'to': number, 'type': 'template',
                    'template': {'name': template_name, 'language': {'code': language},
                                 'components': [{'type': 'body', 'parameters': [{'type': 'text', 'text': str(p)} for p in params]}]}}

@@ -444,6 +444,11 @@ function licenseMeter(row,compact=true){const box=el('div',undefined,'license-me
   date.textContent=level==='reserved'?'Pendiente de entrega':perpetual?'No vence':row.status==='entregada'?'La vigencia empieza al activarla':'';date.hidden=!date.textContent;
   box.setAttribute('aria-label',text.textContent+(date.textContent?' · '+date.textContent:''));box.title=box.getAttribute('aria-label');return box;}
  const total=row.term_days||null,ratio=days<0?0:total?Math.max(0,Math.min(1,days/total)):1,pct=Math.round(ratio*100);
+ // Mission Control Compact: misma barra de plazos que el resto del sistema; los días los calcula el servidor (fecha de Ecuador).
+ if(typeof mcTimeBar==='function'){const bar=mcTimeBar({title:'Vigencia'+(row.code?' · '+row.code:''),size:compact?'compact':'standard',percent:days<0?0:total?pct:100,expired:days<0,
+   counter:days<0?'Vencida hace '+(-days)+(days===-1?' día':' días'):days===0?'Vence hoy':days+(days===1?' día':' días'),note:(days<0?'Venció el ':'Vence el ')+licenseDay(row.expires_at)+(total?' · período de '+total+' días':'')});
+  bar.classList.add('license-meter');return bar;}
+
  bar.style.width=(days<0?0:Math.max(pct,3))+'%';
  text.textContent=days<0?'Vencida hace '+(-days)+(days===-1?' día':' días'):(total?pct+' % · ':'')+(days===0?'vence hoy':days+(days===1?' día':' días'));
  date.textContent=(days<0?'Venció el ':'Vence el ')+licenseDay(row.expires_at)+(reserved?' · reservada':'');

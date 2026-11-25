@@ -3391,19 +3391,17 @@ function stayNow(info){
 }
 function plural(count,one,many){return count+' '+(count===1?one:many);}
 function paintStay(node){
- const info=stayNow(node.stayInfo);node.replaceChildren();if(!info){node.dataset.level='none';node.append(el('span','Sin fecha de ingreso','order-stay-empty'));return;}
- node.dataset.level=info.level;node.dataset.closed=String(!!info.closed);node.dataset.extended=String(!!info.extended_to);node.title=info.closed?'Entregado: el contador está detenido':info.label+' · plazo de '+info.limit+' días';
- const top=el('span',undefined,'order-stay-top'),icon=el('span',undefined,'order-stay-icon');icon.setAttribute('aria-hidden','true');icon.append(systemIcon(info.closed?statusGlyphs.entregado:stayGlyphs[info.level]));
- top.append(icon,el('b',plural(info.days,'día','días')),el('small',info.closed?(info.exceeded?plural(info.exceeded,'día','días')+' sobre el plazo':'total en taller'):info.exceeded?'vencido hace '+plural(info.exceeded,'día','días'):'restan '+plural(info.remaining,'día','días')));
- const bar=el('progress',undefined,'order-stay-bar');bar.max=100;bar.value=info.percent;bar.setAttribute('aria-label','Permanencia: '+info.percent+' % del plazo de '+info.limit+' días');
- node.append(top,bar,el('span',info.closed?'Entregado':info.label,'order-stay-level'));
-}
-function stayMeter(info){const node=el('div',undefined,'order-stay');node.stayInfo=info;paintStay(node);return node;}
-setInterval(()=>{for(const node of document.querySelectorAll('.order-stay'))if(node.stayInfo&&!node.stayInfo.closed)paintStay(node);},60000);
+ // Mission Control Compact: plazo de retiro con la fecha de ingreso real y el límite (o la prórroga, día completo de Ecuador). Entregada: fija.
+ const info=node.stayInfo;node.replaceChildren();if(!info){node.dataset.level='none';node.append(el('span','Sin fecha de ingreso','order-stay-empty'));return;}
+ const now=stayNow(info);node.dataset.level=now.level||'none';node.dataset.closed=String(!!info.closed);node.dataset.extended=String(!!info.extended_to);
+ const start=Date.parse(info.started_at),end=info.extended_to?mctbTime(info.extended_to,true):start+info.limit*86400000,size=node.dataset.size||'compact';
+ node.append(info.closed?mcTimeBar({title:'Permanencia en taller',size,frozen:{label:'Entregado'+(now.exceeded?' · '+plural(now.exceeded,'día','días')+' sobre el plazo':''),tone:'idle',counter:plural(now.days||0,'día','días')},note:'Plazo de '+info.limit+' días'})
+  :mcTimeBar({title:info.extended_to?'Plazo de retiro · prórroga':'Plazo de retiro',size,start:info.started_at,end,endLabel:'Plazo hasta',expiredText:'Vencido hace'}));}
+function stayMeter(info,size='compact'){const node=el('div',undefined,'order-stay');node.dataset.size=size;node.stayInfo=info;paintStay(node);return node;}
 function appendStay(root,order){
  const info=order.stay,section=el('section',undefined,'terms-evidence order-stay-card'),title=el('h3','Permanencia en taller');section.append(title);
  if(!info){section.append(el('p','La orden no tiene fecha de ingreso registrada.'));root.append(section);return;}
- section.append(stayMeter(info));const list=el('dl',undefined,'order-stay-facts'),fact=(label,value)=>{const row=el('div');row.append(el('dt',label),el('dd',value));list.append(row);};
+ section.append(stayMeter(info,'standard'));const list=el('dl',undefined,'order-stay-facts'),fact=(label,value)=>{const row=el('div');row.append(el('dt',label),el('dd',value));list.append(row);};
  fact('Ingreso',formatOrderDate(info.started_at));fact('Plazo administrativo',info.limit+' días naturales');
  if(info.closed){fact('Entrega',formatOrderDate(info.ended_at));fact('Tiempo total',plural(info.days,'día','días')+' y '+plural(info.hours,'hora','horas'));fact('Días sobre el plazo',info.exceeded?String(info.exceeded):'Ninguno');fact('Entrega registrada por',order.stay_delivery?.by||'No consta en el historial');}
  else{fact('Transcurrido',plural(info.days,'día','días')+' y '+plural(info.hours,'hora','horas'));fact(info.exceeded?'Días sobre el plazo':'Días restantes',String(info.exceeded||info.remaining));}
@@ -3645,6 +3643,8 @@ function orderStatusCard(order){
  fact('Entrega estimada',order.estimated_delivery?dashboardDate(order.estimated_delivery):'Sin definir',order.estimated_delivery?el('em',Number(order.estimated_confirmed)?'Confirmada':'Sin confirmar','sp-confirm'+(Number(order.estimated_confirmed)?' is-ok':'')):null);
  fact('Última actualización',formatOrderDate(order.updated_at||order.received_at||order.created_at*1000));
  card.append(head,now,facts);
+ // Mission Control Compact: entrega estimada (desde la recepción hasta el final del día estimado, Ecuador). Solo si hay fecha y no se entregó.
+ if(order.estimated_delivery&&order.status!=='entregado'&&(order.received_at||order.created_at))card.append(mcTimeBar({title:'Entrega estimada'+(Number(order.estimated_confirmed)?' · confirmada':' · sin confirmar'),start:order.received_at||order.created_at*1000,end:order.estimated_delivery,endLabel:'Entrega estimada',expiredText:'Atrasada hace'}));
  const steps=(order.status_timeline||[]).slice(-5);if(steps.length){const line=el('ol',undefined,'sp-line');line.setAttribute('aria-label','Línea de tiempo del estado');steps.forEach((step,i)=>{const li=el('li'),m=statusMeta[step.code]||statusMeta.pendiente;li.dataset.tone=m[1];if(i===steps.length-1)li.setAttribute('aria-current','step');const dot=el('span',undefined,'sp-dot');dot.append(systemIcon(m[2]));const txt=el('span');txt.append(el('b',step.label),el('time',formatOrderDate(step.at)));li.append(dot,txt);line.append(li);});card.append(line);}
  const tools=el('div',undefined,'sp-tools');
  if(admin()){const change=el('div',undefined,'sp-change');change.append(el('span','Cambiar estado','sp-change-label'),quickStatus({...order,status_code:order.status,status_next:order.status_next},()=>showOrderDetail(order.id)));tools.append(change);}
@@ -4718,6 +4718,8 @@ function quoteSection(order){const wrap=el('div',undefined,'budget-panels'),mone
   fact('Partidas',v.lines===1?'1 partida':v.lines+' partidas');fact('Creación',formatOrderDate(v.created_at));if(v.valid_until)fact('Vencimiento',dashboardDate(v.valid_until));if(v.sent_at)fact('Último envío',formatOrderDate(v.sent_at)+(v.sent_to?' · '+v.sent_to:''));
   if(['aprobado','parcial','rechazado'].includes(v.status)){fact('Aprobado',quoteMoney(v.approved_cents));if(v.rejected_cents)fact('Rechazado',quoteMoney(v.rejected_cents));if(v.count.pendiente)fact('Por decidir',v.count.pendiente+' · '+quoteMoney(v.pending_cents));}fact('Técnico responsable',order.responsible||'Sin asignar');card.append(facts);
   if(stage.note&&v.status!=='borrador')card.append(el('p',stage.note,'budget-stage-note'));
+  // Validez del presupuesto enviado (desde el envío hasta el final del día de vencimiento). Decidido o borrador: sin barra.
+  if(v.valid_until&&v.status==='enviado')card.append(mcTimeBar({title:'Validez del presupuesto',size:'compact',start:v.sent_at||v.created_at,end:v.valid_until,endLabel:'Válido hasta',expiredText:'Venció hace'}));
   const actions=el('div',undefined,'quote-summary-actions budget-card-actions'),act=(label,glyph,run,kind='secondary')=>{const b=button(label,run,kind);b.prepend(systemIcon(glyph));actions.append(b);return b;},openIt=()=>openQuoteEditor(order,v.id);
   act(v.editable?'Editar':'Abrir','M12 20h9 M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z',openIt,'primary');
   // Enviar y reenviar son acciones de administración (el servidor lo comprueba); usan el flujo existente con su enlace privado.
@@ -5890,6 +5892,9 @@ async function orderMessageComposer(id,followupId=null,preset='',presetTemplate=
  const close=button('Cancelar',()=>requestModalClose(dialog),'secondary'),copy=invBtn('Copiar texto','copy',()=>doCopy()),openWa=invBtn('Abrir WhatsApp','external-link',()=>doManual()),
   business=invBtn('Enviar por WhatsApp Business','send',()=>doBusiness(false),'primary'),approved=invBtn('Enviar plantilla aprobada','badge-check',()=>doBusiness(true)),mail=invBtn('Enviar por correo','mail',()=>doMail(),'primary');
  acts.append(close,copy,openWa,approved,business,mail);
+ // Ventana de 24 h de Meta para texto libre (desde el último mensaje del cliente por WhatsApp). Cerrada: solo plantilla aprobada o correo.
+ const waWin=el('div',undefined,'msg-wa-window');waWin.append(data.whatsapp.window_until?mcTimeBar({title:'Ventana de WhatsApp · 24 h',size:'compact',start:data.whatsapp.window_from,end:data.whatsapp.window_until,endLabel:'Texto libre hasta',expiredText:'Cerrada hace'})
+  :mcTimeBar({title:'Ventana de WhatsApp · 24 h',size:'compact',frozen:{label:'Cerrada: el cliente no ha escrito por WhatsApp · usa la plantilla aprobada',tone:'expired',percent:0}}));acts.prepend(waWin);
  let generated='',used=[],costTouched=false,tplTouched=false,done=false,busy=false,pending=false,draft=data.draft;const confirmed=new Set(),keys={},chosen=new Set();
  const dirty=()=>!!text.value.trim()&&text.value.trim()!==generated.trim()&&text.value.trim()!==draft?.body;
  const channel=()=>radios.correo.checked?'correo':'whatsapp';
@@ -5902,7 +5907,7 @@ async function orderMessageComposer(id,followupId=null,preset='',presetTemplate=
   else{const m=el('div',undefined,'cm-mail'),files=[...filePicks.filter(p=>p.checked).map(p=>p.nextSibling.textContent),...(quotePick?.checked?[quotePick.nextSibling.textContent]:[])];
    facts(m,[['Para',email.value||'sin correo'],['Asunto',subject.value],['Adjuntos',files.join(', ')||'Ninguno']]);m.append(el('p',text.value||'(sin texto)','cm-mail-body'));preview.append(m);}}
  function paintChannel(){const ch=channel();for(const n of [phone.closest('.inv-field')])n.hidden=ch!=='whatsapp';for(const n of [email.closest('.inv-field'),subject.closest('.inv-field'),attach])n.hidden=ch!=='correo';
-  openWa.hidden=business.hidden=approved.hidden=ch!=='whatsapp';mail.hidden=ch!=='correo';business.hidden||=!data.whatsapp.configured;approved.hidden||=!(data.whatsapp.configured&&data.whatsapp.template);
+  openWa.hidden=business.hidden=approved.hidden=ch!=='whatsapp';waWin.hidden=ch!=='whatsapp'||!data.whatsapp.configured;mail.hidden=ch!=='correo';business.hidden||=!data.whatsapp.configured;approved.hidden||=!(data.whatsapp.configured&&data.whatsapp.template);
   openWa.classList.toggle('primary',!data.whatsapp.configured);openWa.classList.toggle('secondary',!!data.whatsapp.configured);
   const t=whatsappNumber(phone.value);phoneHint.textContent=t.ok?'Se abrirá la conversación con +'+t.number+'.':t.reason;phoneHint.dataset.tone=t.ok?'ok':'warn';openWa.disabled=business.disabled=approved.disabled=!t.ok;
   mail.disabled=!data.mail||!email.value.trim();mail.title=!data.mail?'El correo no está configurado en Mail Pro.':!email.value.trim()?'Indica el correo del cliente.':'';
@@ -7323,16 +7328,55 @@ function receiptPaint(node,r,incoming){if(!node)return;if(!r){node.hidden=true;r
  const label=incoming?(r.status==='leido'?'Leído por '+(r.read_by||'—'):'Recibido, todavía sin leer'):(RECEIPT_LABELS[r.status]||r.status);
  const text=label+' · '+(r.channel==='whatsapp'?'WhatsApp Business':'Chat web')+'\nEnviado: '+fmt(r.sent_at)+'\nEntregado: '+fmt(r.delivered_at)+'\nLeído: '+fmt(r.read_at)+(r.error?'\nMotivo del error: '+r.error:'')+'\nHora de Ecuador';
  node.title=text;node.setAttribute('aria-label',text.replace(/\n/g,'. '));}
+// ───────────────────────────────────────────── MissionControlTimeBar (Mission Control Compact · componente global de plazos)
+// Solo MUESTRA plazos reales que vienen del servidor (inicio y vencimiento, o porcentaje y días ya calculados): nunca decide, reinicia ni
+// amplía un vencimiento. Barra de 10 segmentos con color progresivo (esmeralda → lima → amarillo → naranja → rojo), contador con números
+// tabulares, % disponible y estado. Un solo reloj para todas las barras (se detiene sin barras, pausa con la pestaña oculta) y la hora del
+// servidor (clockOffset): al recargar o en otra pestaña muestra lo mismo. Fechas en hora de Ecuador.
+const MCTB_LIVE=new Set();let mctbTimer=null;
+const MCTB_BANDS=[[76,'Dentro del plazo','ok'],[51,'Tiempo disponible','ok'],[31,'Atención','warn'],[16,'Próximo a vencer','warn'],[1,'Tiempo crítico','critical'],[0,'Plazo vencido','expired']];
+const MCTB_HUES=[[100,158],[76,150],[64,96],[51,82],[40,52],[31,44],[23,30],[16,24],[8,6],[0,0]];
+function mctbHue(pct){for(let i=1;i<MCTB_HUES.length;i++){const[a,ha]=MCTB_HUES[i-1],[b,hb]=MCTB_HUES[i];if(pct>=b)return hb+(ha-hb)*(pct-b)/((a-b)||1);}return 0;}
+function mctbBand(pct,expired){if(expired)return MCTB_BANDS[5];return MCTB_BANDS.find(([min])=>pct>=min)||MCTB_BANDS[4];}
+function mctbSpan(ms,short){const sec=Math.max(0,Math.floor(Math.abs(ms)/1000)),d=Math.floor(sec/86400),h=Math.floor(sec%86400/3600),m=Math.floor(sec%3600/60),s=sec%60,p=n=>String(n).padStart(2,'0');
+ return d?(short?d+' d '+p(h)+' h':d+' d '+p(h)+' h '+p(m)+' min'):p(h)+':'+p(m)+':'+p(s);}
+function mctbDate(ms){return new Intl.DateTimeFormat('es-EC',{timeZone:'America/Guayaquil',day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}).format(new Date(ms)).replace('.','');}
+function mctbTime(value,endOfDay=false){if(value==null||value==='')return NaN;if(typeof value==='number')return value;const v=String(value);return Date.parse(/^\d{4}-\d{2}-\d{2}$/.test(v)?v+(endOfDay?'T23:59:59-05:00':'T00:00:00-05:00'):v);}
+/* opts: {title, icon, size:'compact'|'standard'|'executive', start, end (ISO, fecha o ms) · o estático: {percent, counter, note}; frozen:{label,tone,counter}
+   (proceso detenido: entregado, cerrado, pausado), endLabel (texto antes de la fecha), expiredText}. Devuelve el nodo. */
+function mcTimeBar(opts){const node=el('div',undefined,'mctb');node.dataset.size=opts.size||'standard';node.mctb=opts;
+ const head=el('div',undefined,'mctb-head'),title=el('span',undefined,'mctb-title'),ico=el('span',undefined,'mctb-icon');ico.setAttribute('aria-hidden','true');
+ ico.append(systemIcon(opts.icon||'M12 6v6l4 2 M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0'));title.append(ico,el('span',opts.title||'Plazo'));
+ const counter=el('strong',undefined,'mctb-counter'),track=el('div',undefined,'mctb-track'),fill=el('i',undefined,'mctb-fill'),foot=el('div',undefined,'mctb-foot'),state=el('span',undefined,'mctb-state'),pct=el('span',undefined,'mctb-pct'),when=el('small',undefined,'mctb-when');
+ track.append(fill);head.append(title,counter);foot.append(state,pct);node.append(head,track,foot);if(node.dataset.size!=='compact')node.append(when);
+ node.setAttribute('role','meter');node.setAttribute('aria-valuemin','0');node.setAttribute('aria-valuemax','100');node.setAttribute('aria-label',opts.title||'Plazo');
+ node.parts={counter,fill,state,pct,when};mctbPaint(node);
+ const live=!opts.frozen&&opts.percent==null&&isFinite(mctbTime(opts.end,true))&&isFinite(mctbTime(opts.start));
+ if(live){MCTB_LIVE.add(node);if(!mctbTimer)mctbTimer=setInterval(mctbTick,1000);}
+ return node;}
+function mctbTick(){if(document.hidden)return;for(const node of MCTB_LIVE){if(!node.isConnected){MCTB_LIVE.delete(node);continue;}mctbPaint(node);}if(!MCTB_LIVE.size){clearInterval(mctbTimer);mctbTimer=null;}}
+function mctbPaint(node){const o=node.mctb,{counter,fill,state,pct,when}=node.parts;let percent,text,expired=false,note='';
+ if(o.frozen){percent=o.frozen.percent??100;node.dataset.tone=o.frozen.tone||'idle';counter.textContent=o.frozen.counter||'';state.textContent=o.frozen.label;pct.textContent=o.frozen.percent!=null?Math.round(percent)+' %':'';
+  fill.style.width=Math.max(0,Math.min(100,percent))+'%';node.style.setProperty('--mctb-h',o.frozen.tone==='expired'?0:o.frozen.tone==='warn'?44:o.frozen.tone==='ok'?158:215);when.textContent=o.note||'';node.setAttribute('aria-valuenow',String(Math.round(percent)));node.setAttribute('aria-valuetext',state.textContent+(counter.textContent?' · '+counter.textContent:''));return;}
+ if(o.percent!=null){percent=Math.max(0,Math.min(100,o.percent));expired=!!o.expired||percent<=0;text=o.counter||'';note=o.note||'';}
+ else{const start=mctbTime(o.start),end=mctbTime(o.end,true),now=Date.now()+(typeof clockOffset==='number'?clockOffset:0),total=Math.max(1,end-start),left=end-now;
+  percent=Math.max(0,Math.min(100,left/total*100));expired=left<=0;const short=o.size==='compact';text=expired?(short?'−':(o.expiredText||'Vencido hace')+' ')+mctbSpan(-left,short):mctbSpan(left,short);note=(o.endLabel||(expired?'Venció':'Vence'))+' el '+mctbDate(end);}
+ const[,label,tone]=mctbBand(percent,expired),hue=expired?0:mctbHue(percent);
+ node.dataset.tone=tone;node.dataset.critical=String(tone==='critical');counter.textContent=text;state.textContent=o.stateLabel||label;pct.textContent=expired?'0 %':Math.round(percent)+' % disponible';
+ fill.style.width=(expired?100:Math.max(percent,2))+'%';node.style.setProperty('--mctb-h',hue.toFixed(1));when.textContent=note;
+ node.setAttribute('aria-valuenow',String(Math.round(percent)));node.setAttribute('aria-valuetext',label+(text?' · '+text:'')+(note?' · '+note:''));node.title=(o.title||'Plazo')+': '+label+(text?' · '+text:'')+' · '+pct.textContent+(note?' · '+note:'');}
 function liveCountdown(sec){if(sec==null)return '—';sec=Math.max(0,Math.round(sec));return Math.floor(sec/60)+':'+String(sec%60).padStart(2,'0');}
 // Live Support 4.0 · contador visual: solo MUESTRA la fecha de expiración registrada en el servidor (expires_at); nunca decide el cierre.
-function liveTimerPaint(box,ses){if(!box)return;box.replaceChildren();if(!ses||ses.status==='sin_sesion'||!ses.enabled){box.hidden=true;return;}box.hidden=false;
- const now=Date.now()+clockOffset,exp=Date.parse(ses.expires_at),last=Date.parse(ses.last_activity_at),limit=ses.limit_seconds||480;
- const closed=ses.status==='cerrada',paused=ses.paused_until&&Date.parse(ses.paused_until)>now,waiting=ses.waiting_staff&&!closed;
- const remaining=closed?0:Math.max(0,Math.round((exp-now)/1000)),idle=Math.max(0,Math.round((now-last)/1000));
- const tone=closed?'gris':paused?'verde':waiting?'amarillo':idle>=(limit-60)?'rojo':idle>=Math.round(limit*5/8)?'amarillo':'verde';box.dataset.tone=tone;
- const label=closed?'Sesión cerrada'+(ses.close_reason?' · '+ses.close_reason:''):paused?'Cierre pausado hasta '+liveClock(ses.paused_until):waiting?'Esperando respuesta del personal (no se cierra)':'Cierre en '+liveCountdown(remaining);
- const bar=el('span',undefined,'live-timer-bar'),fill=el('i');fill.style.width=(closed?100:Math.min(100,idle/limit*100))+'%';bar.append(fill);bar.setAttribute('role','progressbar');bar.setAttribute('aria-valuemin','0');bar.setAttribute('aria-valuemax',String(limit));bar.setAttribute('aria-valuenow',String(Math.min(limit,idle)));bar.setAttribute('aria-label','Tiempo de inactividad');
- box.append(el('strong',label),el('small',closed?'Cerrada '+liveClock(ses.closed_at):'Inactividad '+liveCountdown(idle)+' · última actividad '+liveClock(ses.last_activity_at)+(ses.reopened?' · reabierta '+ses.reopened+' vez(ces)':'')),bar);}
+function liveTimerPaint(box,ses){if(!box)return;if(!ses||ses.status==='sin_sesion'||!ses.enabled){box.hidden=true;box.replaceChildren();box.dataset.sig='';return;}box.hidden=false;
+ const now=Date.now()+clockOffset,closed=ses.status==='cerrada',paused=ses.paused_until&&Date.parse(ses.paused_until)>now,waiting=ses.waiting_staff&&!closed;
+ // Mission Control Compact: la barra cuenta sola con expires_at del servidor; solo se rehace si cambia la sesión (nunca reinicia el plazo).
+ const sig=[ses.status,ses.expires_at,ses.paused_until||'',waiting,ses.closed_at||''].join('|');if(box.dataset.sig===sig&&box.firstChild)return;box.dataset.sig=sig;
+ const title='Cierre por inactividad',bar=closed?mcTimeBar({title,frozen:{label:'Sesión cerrada'+(ses.close_reason?' · '+ses.close_reason:''),tone:'idle',percent:0,counter:'00:00:00'},note:'Cerrada '+liveClock(ses.closed_at)})
+  :paused?mcTimeBar({title,frozen:{label:'Cierre pausado hasta '+liveClock(ses.paused_until),tone:'ok',percent:100}})
+  :waiting?mcTimeBar({title,frozen:{label:'Esperando respuesta del personal · no se cierra',tone:'warn',percent:100}})
+  :mcTimeBar({title,start:ses.last_activity_at,end:ses.expires_at,endLabel:'Se cierra',expiredText:'Cierre pendiente hace'});
+ box.dataset.tone=closed?'gris':paused?'verde':waiting?'amarillo':'verde';
+ box.replaceChildren(bar,el('small','Última actividad '+liveClock(ses.last_activity_at)+(ses.reopened?' · reabierta '+ses.reopened+' vez(ces)':''),'live-timer-note'));}
 async function liveSettingsDialog(){const d=smallDialog('ADI Live Support — Configuración');d.classList.add('live-settings');const body=el('div',undefined,'live-settings-body');d.append(body);body.append(el('p','Cargando…','live-info-empty'));
  const paint=r=>{body.replaceChildren();if(!r.installed){body.append(el('p',r.message,'live-warn'));return;}const s=r.settings,sim=r.simulation;
   const state=el('p',s.enabled?'Cierre automático ACTIVO · lo aplica el servidor aunque nadie tenga el sistema abierto.':'Cierre automático DESACTIVADO.','live-settings-state');state.dataset.on=String(s.enabled);body.append(state);
@@ -8077,6 +8121,7 @@ function paintClientFile(dialog,body,d,tab){const k=d.portfolio.kpis,c=d.client,
   movimientos:()=>[el('h3','Beneficios PC-DOCTOR (coberturas comerciales autorizadas)'),d.coverages.length?cjTable(['Fecha','Orden','Importe cubierto'],d.coverages.map(x=>cjRow([['Fecha',ccDay(x.created_at)],['Orden',String(x.order_id)],['Importe cubierto',ccMoney(x.covered_cents)]]))):none('Sin coberturas comerciales: el presupuesto ya refleja cualquier descuento.'),
    el('h3','Facturas'),d.invoices.length?cjTable(['Número','Estado','Total'],d.invoices.map(i=>cjRow([['Número',i.number],['Estado',i.status_label+(i.status_label==='Autorizado'?' (no implica pago)':'')],['Total',ccMoney(i.total_cents)]]))):none('Sin facturas.')],
   compromisos:()=>[d.commitments.length?cjTable(['Fecha acordada','Importe','Estado','Evidencia de aceptación'],d.commitments.map(x=>cjRow([['Fecha acordada',x.due],['Importe',x.amount],['Estado',x.state_label],['Evidencia de aceptación',x.evidence_source+': '+x.evidence]]))):none('Sin compromisos.'),
+   ...d.commitments.filter(x=>['pendiente','proximo','vence_hoy'].includes(x.state)&&x.committed_at&&x.due_date).map(x=>mcTimeBar({title:'Compromiso de pago · '+x.amount,size:'compact',start:x.committed_at,end:x.due_date,endLabel:'Pago comprometido para el',expiredText:'Vencido hace'})),
    el('h3','Historial de acuerdos y reprogramaciones'),d.agreements.length?cjTable(['Fecha','Evento','Detalle','Usuario'],d.agreements.map(a=>cjRow([['Fecha',ccDay(a.created_at)],['Evento',a.kind],['Detalle',a.detail],['Usuario',a.user||'—']]))):none('Sin historial.')],
   intereses:()=>[el('p','Modo simulación: los intereses simulados no suman al saldo. Intereses autorizados: $0,00.','inv-warn'),d.interests.length?cjTable(['Orden','Capital elegible','Vencimiento','Días de atraso','Gracia','Tasa aplicable','Simulados','Autorizados'],d.interests.map(x=>cjRow([['Orden',x.code],['Capital elegible',x.eligible?x.capital:'No elegible'],['Vencimiento',x.due?ccDay(x.due):'No aplica'],['Días de atraso',x.days==null?'No aplica':String(x.days)],['Gracia',x.grace+' días'],['Tasa aplicable',x.rate],['Simulados',x.simulated==null?(x.reason||'—'):ccMoney(x.simulated)],['Autorizados','$0,00']]))):none('Sin obligaciones.')],
   comunicaciones:()=>[d.messages.length?cjTable(['Fecha','Motivo','Canal','Estado'],d.messages.map(m=>cjRow([['Fecha',ccDay(m.created_at)],['Motivo',m.template||'Mensaje'],['Canal',m.channel],['Estado',m.status]]))):none('Sin mensajes registrados.'),

@@ -100,6 +100,8 @@ async function detail(box,id){const c=await api('/api/pqrs/'+id);box.replaceChil
  // Gestión
  const closed=c.status==='cerrada';const panel=el('div',undefined,'pqrs-manage');
  panel.append(facts([['Recibida',when(c.created_at)],['Primera respuesta',c.first_response_at?when(c.first_response_at):'Pendiente'],['Cerrada',c.closed_at?when(c.closed_at):''],['Responsable',c.assigned_name||'Sin asignar']]));
+ // Mission Control Compact: plazo interno de primera respuesta (48 h desde que llegó), solo mientras el caso está abierto y sin respuesta.
+ if(typeof mcTimeBar==='function'&&!c.first_response_at&&c.status!=='cerrada'&&c.created_at){const hrs=c.first_response_hours_limit||48;panel.append(mcTimeBar({title:'Primera respuesta · '+hrs+' h',start:c.created_at,end:Date.parse(c.created_at)+hrs*3600000,endLabel:'Responder antes del',expiredText:'Atrasada hace'}));}
  if(!closed){const status=el('select');for(const s of c.allowed_statuses)status.append(new Option(STATUS[s],s));status.value=c.allowed_statuses.includes(c.status)?c.status:c.allowed_statuses[0];
   const f=el('label',undefined,'pqrs-control');f.append(el('span','Estado'),status);const go2=button('Cambiar estado',()=>act({action:'status',status:status.value},'Estado actualizado.'));panel.append(f,go2);
   if(c.admin){const who=el('select');who.append(new Option('Sin asignar',''));for(const u of c.staff)who.append(new Option(u.name+(u.role==='tecnico'?' · técnico':' · administración'),String(u.id)));who.value=c.assigned_to?String(c.assigned_to):'';
