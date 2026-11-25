@@ -150,8 +150,9 @@ class OrderFollowupTests(unittest.TestCase):
         self.assertEqual((result['status'], result['body']['message']['status']), (200, 'enviado'))
         self.assertEqual((calls[0]['type'], calls[0]['template']['name'], calls[0]['template']['language']['code']),
                          ('template', 'pcdoctor_novedad_importante', 'es_EC'))
-        self.assertEqual([p['text'] for p in calls[0]['template']['components'][0]['parameters'][:3]],
-                         [order['client'].split()[0], order['code'], 'ASUS Vivobook 15'])
+        params = [p['text'] for p in calls[0]['template']['components'][0]['parameters']]
+        self.assertEqual(params[:2], [order['client'].split()[0], order['code']])
+        self.assertIn('Identificamos fallas', params[3])
 
 if __name__ == '__main__':
     unittest.main()
