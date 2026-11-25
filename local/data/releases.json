@@ -8,6 +8,24 @@
   },
   "releases": [
     {
+      "version": "1.5.345",
+      "date": "2026-11-24T20:40:53-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "WhatsApp: ventana de 24 horas y errores en español",
+      "changes": {
+        "features": [],
+        "improvements": [],
+        "fixes": [
+          "WhatsApp desde la orden: si pasaron más de 24 horas desde el último mensaje del cliente, ya no se envía texto libre (Meta lo rechazaba con «Re-engagement message»); se avisa antes y se ofrece la plantilla aprobada. Los fallos que informa Meta se muestran en español."
+        ],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Administración (autorización expresa en la sesión)"
+    },
+    {
       "version": "1.5.344",
       "date": "2026-11-24T20:31:24-05:00",
       "type": "patch",

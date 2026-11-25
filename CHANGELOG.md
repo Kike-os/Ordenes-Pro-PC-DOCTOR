@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.345 — 2026-11-24 20:40 (UTC-05:00)
+
+WhatsApp: ventana de 24 horas y errores en español
+
+### Errores corregidos
+
+- WhatsApp desde la orden: si pasaron más de 24 horas desde el último mensaje del cliente, ya no se envía texto libre (Meta lo rechazaba con «Re-engagement message»); se avisa antes y se ofrece la plantilla aprobada. Los fallos que informa Meta se muestran en español.
+
 ## v1.5.344 — 2026-11-24 20:31 (UTC-05:00)
 
 ADI: alineación y diseño profesional

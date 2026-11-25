@@ -18,7 +18,7 @@ import os
 import re
 import urllib.error
 import urllib.request
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 import order_workspace
 
@@ -684,6 +684,24 @@ def ecuador_number(phone):
     return digits if re.match(r'\s*(\+|00)', raw) and 8 <= len(digits) <= 15 else ''
 
 
+def last_client_message(c, number):
+    """Último mensaje que ESTE número escribió a la empresa por WhatsApp (o None). Abre la ventana de 24 h de Meta para texto libre."""
+    found = []
+    for sql in ("SELECT MAX(received_at) FROM whatsapp_adi_inbound WHERE sender=?", "SELECT MAX(last_client_at) FROM whatsapp_conversations WHERE wa_number=?"):
+        try:
+            value = c.execute(sql, (number,)).fetchone()[0]
+        except Exception:
+            value = None
+        if value:
+            found.append(value)
+    if not found:
+        return None
+    try:
+        return max(datetime.fromisoformat(v) for v in found)
+    except ValueError:
+        return None
+
+
 def send_whatsapp(c, oid, data, user, now, env=None):
     """Envío por la API oficial de WhatsApp Business. Solo queda «enviado» con el identificador que devuelve Meta; un error se registra y se
     puede reintentar con la misma clave (no duplica). Fuera de las 24 h de conversación, Meta exige una plantilla aprobada."""
@@ -708,6 +726,14 @@ def send_whatsapp(c, oid, data, user, now, env=None):
                    'components': [{'type': 'body', 'parameters': [{'type': 'text', 'text': p} for p in params]}]}}
         body = 'Plantilla aprobada de WhatsApp «%s» (%s) con los datos: %s.' % (cfg['template'], cfg['template_lang'], ', '.join(params))
     else:
+        # Meta solo entrega texto libre dentro de las 24 h desde el último mensaje del cliente; fuera de esa ventana lo acepta y luego lo
+        # rechaza («Re-engagement message», 131047). Se avisa ANTES de enviar en lugar de dejar un mensaje fallido.
+        last = last_client_message(c, number)
+        if last is not None and last.tzinfo is None and now.tzinfo is not None:
+            last = last.replace(tzinfo=now.tzinfo)
+        if last is None or now - last > timedelta(hours=24):
+            raise FollowupError(('Han pasado más de 24 horas desde el último mensaje del cliente por WhatsApp' if last else 'El cliente todavía no ha escrito a la empresa por WhatsApp')
+                                + ': Meta solo permite enviar una plantilla aprobada. Usa «Enviar plantilla aprobada» o escríbele por correo.', 409, {'mode': 'template'})
         body = existing['body'] if existing else message_body(data)  # un reintento envía el texto registrado, no otro
         payload = {'messaging_product': 'whatsapp', 'to': number, 'type': 'text', 'text': {'preview_url': True, 'body': body}}
     message_sources(c, oid, data)
@@ -776,7 +802,13 @@ def apply_statuses(c, payload, now):
                 if (new == 'error' and row['status'] == 'enviado') or order.get(new, 0) > order.get(row['status'], 0):
                     error = ''
                     if new == 'error':
-                        error = str(((st.get('errors') or [{}])[0]).get('title', 'Error del proveedor'))[:400]
+                        err = (st.get('errors') or [{}])[0]
+                        try:
+                            import whatsapp_business
+                            known = whatsapp_business.ERRORS.get(str(err.get('code', '')))
+                        except Exception:
+                            known = None
+                        error = (known[2] if known else str(err.get('title', 'Error del proveedor')))[:400]   # en español cuando Meta envía un código conocido
                     c.execute('UPDATE order_messages SET status=?,error=?,updated_at=? WHERE id=?', (new, error, stamp(now), row['id']))
                     changed += 1
     return changed

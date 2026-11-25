@@ -99,6 +99,11 @@ class OrderFollowupTests(unittest.TestCase):
             return 200, {'messages': [{'id': 'wamid.FICTICIO1'}]}
         with patch.dict(app.os.environ, WA), patch.object(order_followups, 'TRANSPORT', fake):
             self.assertTrue(self.request('/api/orders/%d/followups' % oid, cookie=cookie)['body']['whatsapp']['configured'])
+            # Fuera de la ventana de 24 h (el cliente nunca escribió): no se envía texto libre; se pide la plantilla aprobada.
+            closed = post('/api/orders/%d/messages' % oid, action='whatsapp', body=text, followup_id=str(fid), recipient='0991234567', request_key='mensaje-wa-ventana-01')
+            self.assertEqual(closed['status'], 409);self.assertIn('plantilla aprobada', closed['body']['error'])
+            with app.connect() as c:
+                c.execute("INSERT INTO whatsapp_adi_inbound(wa_message_id,sender,status,received_at) VALUES ('wamid.CLIENTE-FICTICIO','593991234567','enviado',?)", (app.reception_now().isoformat(timespec='seconds'),));c.commit()
             fail = post('/api/orders/%d/messages' % oid, action='whatsapp', body=text, followup_id=str(fid), recipient='0991234567', request_key='mensaje-wa-prueba-0001')
             self.assertEqual((fail['status'], fail['body']['message']['status']), (502, 'error'))
             ok = post('/api/orders/%d/messages' % oid, action='whatsapp', body=text, followup_id=str(fid), recipient='0991234567', request_key='mensaje-wa-prueba-0001')  # reintento
