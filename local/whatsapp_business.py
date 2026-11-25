@@ -572,8 +572,8 @@ def reminders(c, now):
     if not cfg['auto'] or not cfg['events']['recordatorio_entrega']['on'] or not ready():
         return []
     out = []
-    for row in c.execute("SELECT o.id,(SELECT l.id||'|'||l.created_at FROM order_status_log l WHERE l.order_id=o.id AND l.to_status='listo' ORDER BY l.id DESC LIMIT 1) last "
-                         "FROM orders o WHERE o.status='listo'").fetchall():
+    for row in c.execute("SELECT o.id,(SELECT l.id||'|'||l.created_at FROM order_status_log l WHERE l.order_id=o.id AND l.to_status IN ('listo','espera_entrega') ORDER BY l.id DESC LIMIT 1) last "
+                         "FROM orders o WHERE o.status IN ('listo','espera_entrega')").fetchall():
         if not row['last']:
             continue
         lid, when = row['last'].split('|', 1)
@@ -606,7 +606,7 @@ def still_true(c, row):
             return 'El presupuesto ya no está pendiente de aprobación: el aviso no sería cierto.'
     if event == 'recordatorio_entrega' and row['order_id']:
         o = c.execute('SELECT status FROM orders WHERE id=?', (row['order_id'],)).fetchone()
-        if not o or o['status'] != 'listo':
+        if not o or o['status'] not in ('listo', 'espera_entrega'):   # «Listo» y «En espera de entrega» esperan el retiro
             return 'El equipo ya no está pendiente de retiro.'
     if row['appointment_id']:
         a = c.execute('SELECT status,deleted_at FROM appointments WHERE id=?', (row['appointment_id'],)).fetchone()
@@ -799,7 +799,7 @@ def can_retry(c, row, env=None):
         return False
     if row['status'] == 'fallido':
         return not row['permanent'] or row['reason_kind'] in RETRIABLE_BY_HAND
-    if row['status'] == 'omitido' and row['reason_kind'] in ('consentimiento', 'plantilla', 'config', 'telefono'):
+    if row['status'] == 'omitido' and row['reason_kind'] in ('consentimiento', 'plantilla', 'config', 'telefono', 'cambio'):   # «cambio»: solo si el aviso vuelve a ser cierto
         info = subject(c, row['event'], row['order_id'], row['part_request_id'], row['appointment_id'], row['pqrs_id'])
         return bool(info) and not still_true(c, row) and blockers(c, row['event'], info, settings(c), env) == ('', '')
     return False

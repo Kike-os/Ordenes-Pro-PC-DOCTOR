@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.346 — 2026-11-24 20:44 (UTC-05:00)
+
+WhatsApp: recordatorio de retiro en espera de entrega
+
+### Errores corregidos
+
+- WhatsApp: el recordatorio de retiro se omitía en órdenes «En espera de entrega» (solo aceptaba «Listo»). Ahora vale para ambos estados, también en los recordatorios automáticos, y un aviso omitido porque el estado había cambiado se puede reintentar si vuelve a ser cierto.
+
 ## v1.5.345 — 2026-11-24 20:40 (UTC-05:00)
 
 WhatsApp: ventana de 24 horas y errores en español

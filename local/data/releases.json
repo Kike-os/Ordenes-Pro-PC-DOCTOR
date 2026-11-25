@@ -8,6 +8,24 @@
   },
   "releases": [
     {
+      "version": "1.5.346",
+      "date": "2026-11-24T20:44:22-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "WhatsApp: recordatorio de retiro en espera de entrega",
+      "changes": {
+        "features": [],
+        "improvements": [],
+        "fixes": [
+          "WhatsApp: el recordatorio de retiro se omitía en órdenes «En espera de entrega» (solo aceptaba «Listo»). Ahora vale para ambos estados, también en los recordatorios automáticos, y un aviso omitido porque el estado había cambiado se puede reintentar si vuelve a ser cierto."
+        ],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Administración (autorización expresa en la sesión)"
+    },
+    {
       "version": "1.5.345",
       "date": "2026-11-24T20:40:53-05:00",
       "type": "patch",
