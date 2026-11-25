@@ -4,7 +4,9 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
-## Sin publicar
+## v1.5.342 — 2026-11-24 20:08 (UTC-05:00)
+
+Portal seguro del cliente y ADI Executive Intelligence 6.0
 
 ### Nuevas funcionalidades
 

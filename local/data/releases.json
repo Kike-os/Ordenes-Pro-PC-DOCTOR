@@ -1,16 +1,32 @@
 {
   "unreleased": {
-    "features": [
-      "Portal seguro del cliente: desde el QR de seguimiento, con los últimos 4 dígitos de su identificación, el cliente consulta por 15 minutos el saldo de su orden y descarga recibos, comprobante de entrega, RIDE de facturas autorizadas y su estado de cuenta. Solo lectura, auditado y configurable por acción."
-    ],
-    "improvements": [
-      "ADI Executive Intelligence 6.0: tres paneles con Executive Live Monitor siempre visible en escritorio, estados reales de conexión con último dato válido marcado como desactualizado, skeletons, alertas en 4 niveles con departamento, 11 departamentos de acceso, compositor sin superponer y borrador conservado."
-    ],
+    "features": [],
+    "improvements": [],
     "fixes": [],
     "security": [],
     "performance": []
   },
   "releases": [
+    {
+      "version": "1.5.342",
+      "date": "2026-11-24T20:08:31-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Portal seguro del cliente y ADI Executive Intelligence 6.0",
+      "changes": {
+        "features": [
+          "Portal seguro del cliente: desde el QR de seguimiento, con los últimos 4 dígitos de su identificación, el cliente consulta por 15 minutos el saldo de su orden y descarga recibos, comprobante de entrega, RIDE de facturas autorizadas y su estado de cuenta. Solo lectura, auditado y configurable por acción."
+        ],
+        "improvements": [
+          "ADI Executive Intelligence 6.0: tres paneles con Executive Live Monitor siempre visible en escritorio, estados reales de conexión con último dato válido marcado como desactualizado, skeletons, alertas en 4 niveles con departamento, 11 departamentos de acceso, compositor sin superponer y borrador conservado."
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Administración (autorización expresa en la sesión)"
+    },
     {
       "version": "1.5.341",
       "date": "2026-11-24T17:20:12-05:00",
