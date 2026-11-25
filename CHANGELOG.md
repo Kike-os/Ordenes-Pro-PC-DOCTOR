@@ -4,6 +4,16 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.349 — 2026-11-25 14:58 (UTC-05:00)
+
+Correcciones: barra de cierre por inactividad en el chat, enlaces de citas de ADI y avisos de entrega vencida
+
+### Errores corregidos
+
+- Avisos de «entrega vencida»: una orden en espera de entrega (cliente ya avisado) ya no cuenta como atrasada; su plazo lo rige la permanencia y su prórroga
+- ADI: los enlaces para agendar cita usan siempre la dirección real del sistema, en el chat web se muestran como botones «Reservar» y en WhatsApp con día y hora legibles; un enlace de Facebook ya no activa horarios de cita
+- Atención en tiempo real: la barra «Cierre por inactividad» queda fija entre los botones y la conversación; los mensajes ya no se montan sobre ella
+
 ## v1.5.348 — 2026-11-25 14:16 (UTC-05:00)
 
 Cancelación y cierre profesional de órdenes (Smart Cancellation & Closure Management) y corrección de la lista de unidades del inventario

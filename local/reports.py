@@ -145,7 +145,7 @@ def build(c, filters, today):
     delivered = [order for order in scoped if in_range(order['delivered'])]
     spans = [(order['delivered'] - order['received']).days for order in delivered if order['received'] and order['delivered'] >= order['received']]
     active = [order for order in scoped if order['status'] != 'entregado']
-    overdue = [order for order in active if (_day(order['estimated_delivery']) or today) < today]
+    overdue = [order for order in active if order['status'] != 'espera_entrega' and (_day(order['estimated_delivery']) or today) < today]   # avisado y esperando que el cliente retire: rige el plazo de permanencia
     kpis = {'received': len(received), 'delivered': len(delivered), 'active': len(active),
             'ready': sum(1 for order in active if order['status'] in ('listo', 'espera_entrega')),
             'overdue': len(overdue), 'stay_overdue': len(_stay_overdue(c, active)), 'average_days': round(sum(spans) / len(spans), 1) if spans else None, 'average_sample': len(spans)}

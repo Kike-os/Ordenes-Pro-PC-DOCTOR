@@ -213,8 +213,8 @@ def build(c, user, now, mail_access=False, hidden=False, limit=40):
             print('licencias avisos', type(error).__name__, flush=True)
     if staff:
         count = lambda sql, *args: c.execute(sql, args).fetchone()[0]
-        alert('overdue', count("SELECT COUNT(*) FROM orders WHERE estimated_delivery!='' AND estimated_delivery<? AND status!='entregado'", today), 'alert', 'warning',
-              plural(count("SELECT COUNT(*) FROM orders WHERE estimated_delivery!='' AND estimated_delivery<? AND status!='entregado'", today), 'orden con entrega vencida', 'órdenes con entrega vencida'), 'La fecha estimada de entrega ya pasó.', '#deliveries?estado=overdue')
+        alert('overdue', count("SELECT COUNT(*) FROM orders WHERE estimated_delivery!='' AND estimated_delivery<? AND status NOT IN ('entregado','espera_entrega')", today), 'alert', 'warning',
+              plural(count("SELECT COUNT(*) FROM orders WHERE estimated_delivery!='' AND estimated_delivery<? AND status NOT IN ('entregado','espera_entrega')", today), 'orden con entrega vencida', 'órdenes con entrega vencida'), 'La fecha estimada de entrega ya pasó.', '#deliveries?estado=overdue')
         waiting = count("SELECT COUNT(*) FROM orders WHERE status IN ('esperando_cliente','presupuesto')")
         alert('waiting', waiting, 'message', 'warning', plural(waiting, 'orden espera respuesta o aprobación', 'órdenes esperan respuesta o aprobación'), 'Pendientes de la decisión del cliente.', '#orders?active=1')
         ready = count("SELECT COUNT(*) FROM orders WHERE status IN ('listo','espera_entrega')")

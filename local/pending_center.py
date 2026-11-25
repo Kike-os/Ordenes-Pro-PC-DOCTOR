@@ -111,7 +111,7 @@ def _orders(c, user, now, mine, R):
     out = []
     for r in rows:
         due = _day(r['estimated_delivery'])
-        overdue = bool(due and due < today)
+        overdue = bool(due and due < today) and r['status'] != 'espera_entrega'   # el cliente ya fue avisado: rige el plazo de permanencia
         priority = 'urgente' if overdue or r['priority'] == 'urgente' else 'importante' if (due and due <= tomorrow) or r['priority'] == 'alta' or r['status'] == 'revision_recurrente' else 'normal'
         actions = [{'label': 'Abrir orden', 'href': '#orders?id=%d' % r['id']}]
         if r['status'] in ('listo', 'espera_entrega'):

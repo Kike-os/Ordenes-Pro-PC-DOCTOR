@@ -95,7 +95,7 @@ def snapshot(c,now):
  statuses={r['status']:r['total'] for r in c.execute('SELECT status,COUNT(*) total FROM orders GROUP BY status')}
  upcoming=c.execute("SELECT customer_name,starts_at FROM appointments WHERE deleted_at IS NULL AND starts_at>=? AND starts_at<? AND status IN ('solicitada','confirmada','reprogramada') ORDER BY starts_at LIMIT 1",(appointments.stamp(now),end)).fetchone()
  return {'updated_at':now.isoformat(timespec='seconds'),'statuses':{code:statuses.get(code,0) for code in order_workspace.STATUSES},'active':sum(total for code,total in statuses.items() if code!='entregado'),
-  'overdue':count("SELECT COUNT(*) FROM orders WHERE estimated_delivery!='' AND estimated_delivery<? AND status!='entregado'",today),
+  'overdue':count("SELECT COUNT(*) FROM orders WHERE estimated_delivery!='' AND estimated_delivery<? AND status NOT IN ('entregado','espera_entrega')",today),
   'received_today':count("SELECT COUNT(*) FROM orders WHERE substr(received_at,1,10)=?",today),'delivered_today':count("SELECT COUNT(*) FROM orders WHERE substr(COALESCE(delivered_at,''),1,10)=?",today),
   'appointments_today':count("SELECT COUNT(*) FROM appointments WHERE deleted_at IS NULL AND starts_at>=? AND starts_at<? AND status IN ('solicitada','confirmada','reprogramada')",start,end),
   'next_appointment':(upcoming['starts_at'][11:16]+' · '+upcoming['customer_name']) if upcoming else '',
@@ -466,7 +466,7 @@ def reply(c,text,admin=False,context=None,conversation_id=None,session=None,lang
    # Precios: solo los registrados en el catálogo (con IVA incluido); ADI no calcula ni promete otros.
    if re.search(r'precio|cu[aá]nto|cuesta|costo|valor|tarifa|cobr|servicio|price|cost|how much|fee|charge|service',plain(text)):context['precios_registrados_iva_incluido']=catalog_prices(c,text)
    # Horas libres solo cuando se habla de una cita (no al preguntar por licencias «disponibles»).
-   if re.search(r'cita|agend|reserv|turno|disponib|appointment|book|schedul|availab',plain(text)) and intent_of(text)!='licencias':context['proximos_espacios_libres_en_la_agenda']=next_slots(c) or 'sin espacios libres en los próximos días';context['como_reservar']='La reserva se hace y se confirma en /citas; ADI no confirma citas por sí misma.'
+   if wants_slots(text) and intent_of(text)!='licencias':context['proximos_espacios_libres_en_la_agenda']=next_slots(c) or 'sin espacios libres en los próximos días';context['como_reservar']='La reserva se hace y se confirma en /citas; ADI no confirma citas por sí misma.'
   except Exception:pass
  token=_SESSION.set(session if (session is not None and conversation_id) else None)
  lang='es-EC' if admin else language(lang);lang_token=_LANG.set(lang)
@@ -479,7 +479,36 @@ def reply(c,text,admin=False,context=None,conversation_id=None,session=None,lang
  # Se añaden aquí, desde la agenda, para que no dependan de lo que redacte el modelo.
  if not admin and isinstance(context,dict) and isinstance(context.get('proximos_espacios_libres_en_la_agenda'),list) and '/citas?fecha=' not in answer:
   answer=answer.rstrip()+('\nNext available times (tap one to book it):\n' if english(lang) else '\nPróximos horarios libres (toca uno para reservarlo):\n')+'\n'.join(item['enlace'] for item in context['proximos_espacios_libres_en_la_agenda'])
- return answer
+ return agenda_links(answer,(session or {}).get('channel',''),lang) if not admin else answer
+
+SLOT_WORDS=re.compile(r'\b(citas?|agend\w*|reserv\w*|turnos?|disponib\w*|appointments?|book|booking|schedul\w*|availab\w*)\b')
+
+def wants_slots(text):
+ """¿El cliente habla de una cita? Solo palabras completas («facebook» no cuenta como «book») y nunca un mensaje que es solo un enlace."""
+ q=plain(text);bare=re.sub(r'https?://\S+','',q)
+ return bool(SLOT_WORDS.search(bare))
+
+AGENDA_LINK=re.compile(r'(?:https?://[A-Za-z0-9.-]+(?::\d+)?|(?<![\w.:/-]))/citas(\?fecha=(\d{4})-(\d{2})-(\d{2})&hora=(\d{2}):(\d{2})&servicio=[a-z0-9_-]{1,40})?(?![\w?=&/-])')
+
+def agenda_links(answer,channel='',lang='es-EC'):
+ """Enlaces de la agenda siempre con la dirección real del sistema (el modelo llegó a inventar otro dominio) y, en WhatsApp, cada horario
+ en su propia línea con fecha y hora legibles. En el chat web el widget convierte cada enlace en un botón «Reservar»."""
+ base=agenda_url()
+ fixed=AGENDA_LINK.sub(lambda m:base+(m[1] or ''),answer or '')
+ if channel!='whatsapp':return fixed
+ en=english(lang)
+ def label(m):
+  from datetime import date
+  try:d=date(int(m[2]),int(m[3]),int(m[4]))
+  except ValueError:return m[0]
+  day=('Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday')[d.weekday()] if en else DAYS[d.weekday()].capitalize()
+  h=int(m[5]);clock='%d:%s %s'%((h%12) or 12,m[6],('AM' if h<12 else 'PM') if en else ('a. m.' if h<12 else 'p. m.'))
+  return '• %s %s/%s · %s\n  %s'%(day,m[4],m[3],clock,base+m[1])
+ lines=[]
+ for line in fixed.split('\n'):
+  m=AGENDA_LINK.fullmatch(line.strip())
+  lines.append(label(m) if m and m[1] else line)
+ return '\n'.join(lines)
 
 DAYS=('lunes','martes','miércoles','jueves','viernes','sábado','domingo')
 

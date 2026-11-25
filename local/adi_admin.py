@@ -52,7 +52,7 @@ def alerts(c, now):
     """Trabajos atrasados y pendientes que requieren atención, con su motivo. Solo hechos registrados."""
     today = now.date()
     iso = today.isoformat()
-    overdue = _orders(c, ACTIVE + " AND o.estimated_delivery!='' AND o.estimated_delivery<?", (iso,), 50, today)
+    overdue = _orders(c, ACTIVE + " AND o.status!='espera_entrega' AND o.estimated_delivery!='' AND o.estimated_delivery<?", (iso,), 50, today)
     stale = [o for o in _orders(c, ACTIVE + " AND o.status NOT IN ('listo','espera_entrega')", (), 200, today)
              if o['dias_sin_movimiento'] is not None and o['dias_sin_movimiento'] >= STALE_DAYS and not o['dias_de_atraso']]
     expired = [dict(r) for r in c.execute("SELECT q.code,q.valid_until,o.code orden,o.id oid,cl.name cliente FROM quotes q JOIN orders o ON o.id=q.order_id JOIN devices d ON d.id=o.device_id "

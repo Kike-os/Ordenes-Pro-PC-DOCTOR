@@ -3541,7 +3541,7 @@ body[data-page=dashboard] .access-pro label.access-mini :is(input,select){height
 .live-card-preview{font-size:11.5px;color:#a9bbd6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .live-card-meta{display:flex;align-items:center;gap:6px;flex-wrap:wrap}.live-card-meta .agenda-badge{font-size:10.5px}.live-card-meta small{font-size:11px;color:#8fa5c4}
 .live-unread{margin-left:auto;min-width:20px;padding:1px 6px;border-radius:999px;background:#e5484d;color:#fff;font-size:11px;font-weight:700;text-align:center}
-.live-main{display:grid;grid-template-rows:auto auto minmax(0,1fr) auto}
+.live-main{display:flex;flex-direction:column;min-height:0}.live-main>*{flex:0 0 auto}.live-main>.live-log-area{flex:1 1 auto;min-height:0}.live-main>.live-timer{margin:10px 14px 6px;padding:0;border:0;background:none;gap:4px}.live-main>.live-timer .live-timer-note{padding:0 2px}
 .live-head{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid #16263f}
 .live-head-text{flex:1 1 auto;min-width:0}.live-head-text h2{margin:0;font-size:15px;color:#f4f8ff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.live-head-text small{font-size:11.5px;color:#9bb0cf}
 .live-pro .live-actions{display:flex;gap:8px;flex-wrap:wrap;padding:8px 14px;border-bottom:1px solid #16263f}

@@ -225,7 +225,7 @@ def handle(c, raw, signature, now, env=None):
                     logged = str(turn['log_answer'] if turn['log_answer'] is not None else turn['answer'])[:3000]
                 else:
                     try:
-                        answer = str(adi.reply(c, text, conversation_id=conv['id'], session={}, lang='es-EC') or '').strip()[:3000]
+                        answer = str(adi.reply(c, text, conversation_id=conv['id'], session={'channel': 'whatsapp'}, lang='es-EC') or '').strip()[:3000]
                         if not answer:
                             raise RuntimeError('adi_empty_reply')
                     except Exception as error:

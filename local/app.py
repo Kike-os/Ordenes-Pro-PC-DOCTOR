@@ -1881,7 +1881,7 @@ class Handler(BaseHTTPRequestHandler):
                     due=row['estimated_delivery'] or '';since_ready=row['updated_at'][:10] if row['status']!='entregado' else ''
                     row['waiting_days']=(today-appointments.date.fromisoformat(since_ready)).days if since_ready else None
                     # Estado de entrega derivado de datos reales: estado de la orden y fecha estimada.
-                    row['delivery']='delivered' if row['status']=='entregado' else 'overdue' if due and due<today.isoformat() else 'pickup' if row['status']=='espera_entrega' else 'scheduled' if due>today.isoformat() else 'ready'
+                    row['delivery']='delivered' if row['status']=='entregado' else 'pickup' if row['status']=='espera_entrega' else 'overdue' if due and due<today.isoformat() else 'scheduled' if due>today.isoformat() else 'ready'
                     row['today']=row['status']!='entregado' and due==today.isoformat()
                 return self.reply(200,{'rows':rows,'today':today.isoformat()})
             if path == '/api/receipt-mail/history':
@@ -3272,7 +3272,7 @@ class Handler(BaseHTTPRequestHandler):
                 if path=='/api/activity':return self.reply(200,{'rows':activity})
                 counts={r['code']:r['total'] for r in c.execute('SELECT s.code,COUNT(o.id) total FROM statuses s LEFT JOIN orders o ON o.status=s.code GROUP BY s.code')}
                 # 1.5.262: entregas vencidas por estado, solo con una fecha estimada registrada (nunca se supone un retraso sin fecha).
-                overdue_by_status={r[0]:r[1] for r in c.execute("SELECT status,COUNT(*) FROM orders WHERE estimated_delivery!='' AND estimated_delivery<? AND status!='entregado' GROUP BY status",(today,))}
+                overdue_by_status={r[0]:r[1] for r in c.execute("SELECT status,COUNT(*) FROM orders WHERE estimated_delivery!='' AND estimated_delivery<? AND status NOT IN ('entregado','espera_entrega') GROUP BY status",(today,))}
                 source='orders o JOIN devices d ON d.id=o.device_id JOIN clients c ON c.id=d.client_id JOIN statuses s ON s.code=o.status'
                 columns='o.id,o.code,o.status status_code,s.label status,o.updated_at,o.estimated_delivery,c.name client,c.phone,d.brand,d.model'
                 attention=[dict(r) for r in c.execute("SELECT "+columns+" FROM "+source+" WHERE o.status IN ('esperando_cliente','presupuesto','esperando_repuesto','espera_entrega','listo','revision_recurrente') OR (o.estimated_delivery!='' AND o.estimated_delivery<? AND o.status!='entregado') ORDER BY CASE o.status WHEN 'esperando_cliente' THEN 1 WHEN 'presupuesto' THEN 2 WHEN 'espera_entrega' THEN 3 WHEN 'listo' THEN 4 ELSE 5 END,o.estimated_delivery,o.id LIMIT 8",(today,))]
@@ -3715,7 +3715,7 @@ class Handler(BaseHTTPRequestHandler):
                     # Idioma elegido en la interfaz (1.5.276): solo es-EC o en-US, validado aquí; cualquier otro valor responde en español.
                     lang=adi.language(data.get('locale'));en=adi.english(lang)
                     answer=(adi.WAITING_ADVISOR_EN if en else adi.WAITING_ADVISOR) if conv['mode']=='human' and not conv['assigned_to'] else None  # Con un asesor conectado, ADI no interviene.
-                    context=None;session={}
+                    context=None;session={'channel':'web'}
                     # El estado de una orden no se entrega por el chat: exige el código temporal enviado al correo registrado.
                     if conv['mode']=='adi' and re.search(r'\b'+reception.ORDER_CODE_PATTERN,text,re.I):answer=adi.ORDER_CHECK_HINT_EN if en else adi.ORDER_CHECK_HINT
                     if answer is None and conv['mode']=='adi':
