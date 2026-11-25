@@ -14183,10 +14183,28 @@ body.ax-full-on{overflow:hidden}
 .ax-side-head>*,.ax-find{min-width:0}.ax-find input{width:100%}.ax-view{min-width:0;padding:4px 4px;font-size:12px}
 .ax-rail{padding-bottom:84px}  /* espacio para que la burbuja flotante de ADI no tape la última tarjeta */
 .ax-rail .ax-cards{grid-template-columns:1fr;gap:6px}
-.ax-rail .ax-card{display:grid;grid-template-columns:18px 44px minmax(0,1fr);align-items:center;gap:8px;padding:8px 10px}
+/* Monitor: fila con icono en mosaico, nombre y descripción a la izquierda, número alineado a la derecha. */
+.ax-rail .ax-card{display:grid;grid-template-columns:32px minmax(0,1fr) auto;grid-template-rows:auto auto;align-items:center;column-gap:10px;row-gap:1px;min-height:54px;padding:8px 12px 8px 8px}
 .ax-rail .ax-card>span{display:contents}
-.ax-rail .ax-card strong{grid-column:2;font-size:18px;text-align:right}
-.ax-rail .ax-card span>span{grid-column:3;grid-row:1;align-self:end;font-size:12.5px}
-.ax-rail .ax-card small{grid-column:3;grid-row:2;align-self:start}
-.ax-rail .ax-card>svg{grid-row:1/span 2;margin:0}
-.ax-rail .ax-card strong{grid-row:1/span 2}
+.ax-rail .ax-card>svg{grid-column:1;grid-row:1/span 2;box-sizing:border-box;width:32px;height:32px;margin:0;padding:7px;border-radius:9px;background:#12223A;color:#60A5FA}
+.ax-rail .ax-card span>span{grid-column:2;grid-row:1;align-self:end;font-size:12.5px;line-height:1.25;color:#DCE4EF}
+.ax-rail .ax-card small{grid-column:2;grid-row:2;align-self:start;font-size:11px;line-height:1.3}
+.ax-rail .ax-card strong{grid-column:3;grid-row:1/span 2;min-width:34px;font-size:20px;line-height:1;text-align:right;font-variant-numeric:tabular-nums}
+.ax-rail .ax-card[data-tone=ok]>svg{background:#0F2E26;color:var(--ax-green)}.ax-rail .ax-card[data-tone=warn]>svg{background:#33270C;color:var(--ax-amber)}.ax-rail .ax-card[data-tone=bad]>svg{background:#3A1418;color:var(--ax-red)}
+/* Barras de desplazamiento finas y oscuras dentro de ADI (Chrome, Edge y Firefox). */
+.ax,.ax *{scrollbar-width:thin;scrollbar-color:#22365A transparent}
+.ax ::-webkit-scrollbar{width:8px;height:8px}.ax ::-webkit-scrollbar-track{background:transparent}
+.ax ::-webkit-scrollbar-thumb{background:#22365A;border:2px solid transparent;border-radius:8px;background-clip:padding-box}.ax ::-webkit-scrollbar-thumb:hover{background:#2F4C7A;background-clip:padding-box}
+/* Encabezado de página compacto solo en ADI: el panel ya muestra su título; se gana altura para la conversación. */
+#view-module:has(.ax) .module-heading .eyebrow,#view-module:has(.ax) #module-description{display:none}
+#view-module:has(.ax) .module-heading{margin:2px 0 10px;padding:4px 0;min-height:0}
+#view-module:has(.ax) #module-title{font-size:20px;line-height:1.2;margin:0}
+#view-module:has(.ax) .back-link{margin-bottom:6px}
+/* Pantallas de poca altura: bienvenida y espacios más compactos. */
+@media (max-height:780px){.ax-head{padding:8px 12px}.ax-log{padding-top:12px}.ax-hello{padding:12px 14px;gap:12px}.ax-hello h3{font-size:17px}.ax-hello p{font-size:13px;margin-bottom:4px}
+ .ax-hello-mark{width:36px;height:36px;border-radius:11px}.ax-section{margin:10px 2px 6px}.ax-chip{min-height:38px;padding:6px 10px;font-size:12.5px}.ax-suggest{gap:6px}
+ .ax-composer textarea{min-height:40px}.ax-rail .ax-card{min-height:48px;padding-top:6px;padding-bottom:6px}.ax-ops header,.ax-insights header{margin-bottom:6px}}
+/* En el propio Centro de ADI la burbuja flotante de ADI sobra y tapaba el monitor. */
+body:has(.ax) #adi-widget{display:none}
+/* Desvanecido al final de la conversación: indica que hay más contenido al desplazar (sin cortar en seco). */
+.ax-log{-webkit-mask-image:linear-gradient(to bottom,#000 calc(100% - 22px),transparent);mask-image:linear-gradient(to bottom,#000 calc(100% - 22px),transparent)}

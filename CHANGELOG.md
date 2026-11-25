@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.344 — 2026-11-24 20:31 (UTC-05:00)
+
+ADI: alineación y diseño profesional
+
+### Mejoras realizadas
+
+- ADI: diseño más profesional y alineado. Monitor en filas con icono en mosaico y número a la derecha, barras de desplazamiento finas y oscuras, encabezado compacto que da más altura a la conversación, modo compacto para pantallas bajas, desvanecido al final de la conversación y sin la burbuja flotante dentro del propio Centro de ADI.
+
 ## v1.5.343 — 2026-11-24 20:25 (UTC-05:00)
 
 Clave de acceso en QR en el ticket

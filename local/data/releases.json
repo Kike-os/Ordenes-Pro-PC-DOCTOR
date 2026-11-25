@@ -8,6 +8,24 @@
   },
   "releases": [
     {
+      "version": "1.5.344",
+      "date": "2026-11-24T20:31:24-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "ADI: alineación y diseño profesional",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "ADI: diseño más profesional y alineado. Monitor en filas con icono en mosaico y número a la derecha, barras de desplazamiento finas y oscuras, encabezado compacto que da más altura a la conversación, modo compacto para pantallas bajas, desvanecido al final de la conversación y sin la burbuja flotante dentro del propio Centro de ADI."
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Administración (autorización expresa en la sesión)"
+    },
+    {
       "version": "1.5.343",
       "date": "2026-11-24T20:25:36-05:00",
       "type": "patch",
