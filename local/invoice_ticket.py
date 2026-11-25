@@ -114,6 +114,11 @@ def data_for(c, invoice_id):
     return {'invoice': inv, 'fiscal': fiscal, 'items': detail['items'], 'payments': detail['payments'], 'groups': groups, 'reference': reference}
 
 
+# Clave de acceso en el ticket: 'qr' (moderno y compacto: un QR con los 49 dígitos y la clave legible debajo) o 'barras' (Code 128
+# dividido en partes, formato anterior). Si el contador o el SRI exigieran código de barras en el ticket, se vuelve a 'barras'.
+KEY_FORMAT = 'qr'
+
+
 def key_parts(key, fmt='80'):
     """Partes de la clave de acceso para el Code 128 (en orden). Unidas forman la clave completa."""
     out, i = [], 0
@@ -184,7 +189,7 @@ def render(data, fmt='80', copies=1, calibration=False):
     qr = list(segno.make_qr(key, error='m').matrix)
     qr_unit = next((n * DOT for n in (5, 4, 3, 2) if (len(qr) + 8) * n * DOT <= inner * .5), 2 * DOT)
     qr_size = (len(qr) + 8) * qr_unit
-    parts = key_parts(key, fmt)
+    parts = key_parts(key, fmt) if KEY_FORMAT == 'barras' else []
     bars = []
     for part in parts:
         widths = barcode_widths(part)
@@ -323,9 +328,12 @@ def render(data, fmt='80', copies=1, calibration=False):
             for p in data['payments']:
                 row(p.get('label') or p.get('method') or '—', money(p['amount_cents']), S['body'], gap=.3)
 
-        # 7 · Autorización electrónica: clave completa en texto, Code 128 en partes y QR
+        # 7 · Autorización electrónica: QR con la clave completa (o Code 128 en partes si KEY_FORMAT='barras') y la clave legible
         rule()
         heading('Clave de acceso')
+        if KEY_FORMAT == 'qr':
+            ops.append(('qr', y, qr_size, qr_unit, qr))
+            y += qr_size
         text(' '.join(key[i:i + 10] for i in range(0, len(key), 10)), S['key'], 'F3', center=True, gap=.8)
         if inv.get('authorization_number') and inv['authorization_number'] != key:
             text('Autorización: ' + inv['authorization_number'], S['small'], center=True, gap=.8)
@@ -335,9 +343,10 @@ def render(data, fmt='80', copies=1, calibration=False):
             y += BAR_HEIGHT + 1.5
             text('Código de barras %d de %d · dígitos %d a %d' % (n, len(bars), first, first + len(part) - 1), S['small'] - .5, center=True, gap=1.8)
             first += len(part)
-        ops.append(('qr', y, qr_size, qr_unit, qr))
-        y += qr_size
-        text('QR con la clave completa. Verifica la validez en ' + SRI_PORTAL, S['small'], center=True, gap=.6)
+        if KEY_FORMAT == 'barras':
+            ops.append(('qr', y, qr_size, qr_unit, qr))
+            y += qr_size
+        text('Escanea el QR para leer la clave de acceso. Verifica la validez en ' + SRI_PORTAL, S['small'], center=True, gap=.6)
 
         # 8 · Pie corporativo centrado
         rule(2.5)

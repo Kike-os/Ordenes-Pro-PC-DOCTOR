@@ -85,7 +85,10 @@ class InvoiceTicketTests(unittest.TestCase):
                     subprocess.run(['pdftoppm', '-r', '203', '-gray', '-png', str(path), str(Path(folder) / 'p')], check=True)
                     found = subprocess.run(['zbarimg', '-q'] + [str(p) for p in sorted(Path(folder).glob('p*.png'))], capture_output=True, text=True).stdout
                 codes = sorted(line.split(':', 1)[1] for line in found.splitlines() if line.startswith('CODE-128:'))
-                read += codes == sorted(parts) and ('QR-Code:' + key) in found
+                if invoice_ticket.KEY_FORMAT == 'barras':
+                    read += codes == sorted(parts) and ('QR-Code:' + key) in found
+                else:   # formato moderno: un solo QR con la clave completa y ningún código de barras
+                    read += codes == [] and found.count('QR-Code:') == 1 and ('QR-Code:' + key) in found
             self.assertEqual(read, len(keys), fmt)
 
     def test_epson_geometry_sizes_and_no_trailing_space(self):

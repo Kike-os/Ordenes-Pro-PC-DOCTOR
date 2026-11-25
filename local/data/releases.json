@@ -8,6 +8,24 @@
   },
   "releases": [
     {
+      "version": "1.5.343",
+      "date": "2026-11-24T20:25:36-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Clave de acceso en QR en el ticket",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Ticket de factura: la clave de acceso se muestra en un solo código QR (con la clave completa) y en texto legible, en lugar de dos códigos de barras. El ticket es más corto y se lee con cualquier celular. El RIDE A4 no cambia."
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Administración (autorización expresa en la sesión)"
+    },
+    {
       "version": "1.5.342",
       "date": "2026-11-24T20:08:31-05:00",
       "type": "patch",

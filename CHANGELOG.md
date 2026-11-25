@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.343 — 2026-11-24 20:25 (UTC-05:00)
+
+Clave de acceso en QR en el ticket
+
+### Mejoras realizadas
+
+- Ticket de factura: la clave de acceso se muestra en un solo código QR (con la clave completa) y en texto legible, en lugar de dos códigos de barras. El ticket es más corto y se lee con cualquier celular. El RIDE A4 no cambia.
+
 ## v1.5.342 — 2026-11-24 20:08 (UTC-05:00)
 
 Portal seguro del cliente y ADI Executive Intelligence 6.0
