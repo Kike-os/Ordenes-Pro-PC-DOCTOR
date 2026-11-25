@@ -789,11 +789,24 @@ def send_whatsapp(c, oid, data, user, now, env=None):
     if existing and existing['status'] != 'error':
         return dict(existing), True
     body = message_body(data)
-    if data.get('mode') == 'template':
-        selected = str(data.get('template') or '').strip()
-        reverse = {name: code for code, name in TEMPLATES.items()}
-        reverse.update({name: code for code, name in META_TEMPLATE_BY_KEY.items()})
-        key_name = selected if selected in TEMPLATES else reverse.get(selected)
+    selected = str(data.get('template') or '').strip()
+    reverse = {name: code for code, name in TEMPLATES.items()}
+    reverse.update({name: code for code, name in META_TEMPLATE_BY_KEY.items()})
+    key_name = selected if selected in TEMPLATES else reverse.get(selected)
+    template_mode = data.get('mode') == 'template'
+    if not template_mode:
+        # Si Meta cerró la ventana de 24 h y el formulario ya tiene una plantilla elegida,
+        # enviar esa plantilla aprobada en vez de rechazar el botón genérico de WhatsApp.
+        last = last_client_message(c, number)
+        if last is not None and last.tzinfo is None and now.tzinfo is not None:
+            last = last.replace(tzinfo=now.tzinfo)
+        if last is None or now - last > timedelta(hours=24):
+            if key_name in META_TEMPLATE_BY_KEY:
+                template_mode = True
+            else:
+                raise FollowupError(('Han pasado más de 24 horas desde el último mensaje del cliente por WhatsApp' if last else 'El cliente todavía no ha escrito a la empresa por WhatsApp')
+                                    + ': Meta solo permite enviar una plantilla aprobada. Selecciona una plantilla aprobada o escríbele por correo.', 409, {'mode': 'template'})
+    if template_mode:
         if key_name not in META_TEMPLATE_BY_KEY:
             if cfg['template'] in META_TEMPLATE_BY_KEY.values():
                 key_name = next(k for k, v in META_TEMPLATE_BY_KEY.items() if v == cfg['template'])
@@ -807,13 +820,6 @@ def send_whatsapp(c, oid, data, user, now, env=None):
                                 'components': [{'type': 'body', 'parameters': [{'type': 'text', 'text': str(p)} for p in params]}]}}
         body = 'Plantilla aprobada de WhatsApp «%s» (%s) con los datos: %s.' % (template_name, language, ', '.join(str(p) for p in params))
     else:
-        # Meta solo entrega texto libre dentro de las 24 h desde el último mensaje del cliente; fuera de esa ventana avisa ANTES de enviar.
-        last = last_client_message(c, number)
-        if last is not None and last.tzinfo is None and now.tzinfo is not None:
-            last = last.replace(tzinfo=now.tzinfo)
-        if last is None or now - last > timedelta(hours=24):
-            raise FollowupError(('Han pasado más de 24 horas desde el último mensaje del cliente por WhatsApp' if last else 'El cliente todavía no ha escrito a la empresa por WhatsApp')
-                                + ': Meta solo permite enviar una plantilla aprobada. Usa «Enviar plantilla aprobada» o escríbele por correo.', 409, {'mode': 'template'})
         payload = {'messaging_product': 'whatsapp', 'to': number, 'type': 'text', 'text': {'preview_url': True, 'body': body}}
     message_sources(c, oid, data)
     url = 'https://graph.facebook.com/%s/%s/messages' % (cfg['version'], cfg['phone_id'])
