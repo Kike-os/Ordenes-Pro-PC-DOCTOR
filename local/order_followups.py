@@ -735,7 +735,10 @@ def _template_parameters(c, oid, data, key, o):
     if key in ('recepcion', 'reparacion', 'completado', 'listo', 'recordatorio'):
         return [name, code, device]
     if key == 'estado':
-        return [name, code, _text(data.get('body'), 900)]
+        # Esta plantilla espera una novedad corta, no el mensaje completo ya redactado
+        # (que repetiría el saludo, la orden y el cierre dentro del cuerpo de Meta).
+        update = _template_detail(c, oid, dict(data, body='')) or o['status_label'] or o['status']
+        return [name, code, _text(update, 450)]
     if key == 'diagnostico':
         fault = _text(o['problem'] or detail, 450)
         if not fault:

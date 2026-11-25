@@ -154,5 +154,27 @@ class OrderFollowupTests(unittest.TestCase):
         self.assertEqual(params[:2], [order['client'].split()[0], order['code']])
         self.assertIn('Identificamos fallas', params[3])
 
+    def test_status_template_uses_short_followup_detail(self):
+        cookie, csrf, post, order = self.paid_order(10500, pay=False)
+        oid = order['id']
+        fid = self.followup(post, oid)['body']['id']
+        calls = []
+
+        def fake(url, headers, payload):
+            calls.append(payload)
+            return 200, {'messages': [{'id': 'wamid.STATUS-FICTICIO'}]}
+
+        text = post('/api/orders/%d/messages' % oid, action='compose', template='estado', followup_id=str(fid))['body']['body']
+        sources = json.dumps([{'type': 'followup', 'id': fid}])
+        with patch.dict(app.os.environ, WA), patch.object(order_followups, 'TRANSPORT', fake):
+            result = post('/api/orders/%d/messages' % oid, action='whatsapp', template='estado', body=text,
+                          sources=sources, recipient='0991234567', request_key='mensaje-wa-estado-0001')
+        self.assertEqual((result['status'], result['body']['message']['status']), (200, 'enviado'))
+        params = [p['text'] for p in calls[0]['template']['components'][0]['parameters']]
+        self.assertEqual(params, [order['client'].split()[0], order['code'],
+                                  'Identificamos fallas en la unidad de almacenamiento; recomendamos reemplazarla.'])
+        self.assertNotIn('Estimado/a', params[2])
+
+
 if __name__ == '__main__':
     unittest.main()
