@@ -4,6 +4,15 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.351 — 2026-11-25 22:33 (UTC-05:00)
+
+PC-DOCTOR Mail Pro Fluent 2.0: barra de comandos estilo Outlook, paneles ajustables, avatares y agrupación por fecha
+
+### Mejoras realizadas
+
+- PC-DOCTOR Mail Pro Fluent 2.0: barra de comandos estilo Outlook que nunca recorta botones, paneles ajustables por arrastre o teclado, avatares, agrupación por fecha, acciones rápidas al pasar el cursor, carga con esqueleto y encabezado compacto
+- Correo: Archivar y Etiquetas disponibles desde el mensaje abierto, pantalla completa de lectura y respeto de la preferencia de movimiento reducido
+
 ## v1.5.350 — 2026-11-25 16:30 (UTC-05:00)
 
 ADI Release Monitor 2.0: ventana de estabilidad premium, 19 comprobaciones de solo lectura, detalle técnico para administración y avisos inteligentes

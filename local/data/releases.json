@@ -1,15 +1,31 @@
 {
   "unreleased": {
     "features": [],
-    "improvements": [
-      "PC-DOCTOR Mail Pro Fluent 2.0: barra de comandos estilo Outlook que nunca recorta botones, paneles ajustables por arrastre o teclado, avatares, agrupación por fecha, acciones rápidas al pasar el cursor, carga con esqueleto y encabezado compacto",
-      "Correo: Archivar y Etiquetas disponibles desde el mensaje abierto, pantalla completa de lectura y respeto de la preferencia de movimiento reducido"
-    ],
+    "improvements": [],
     "fixes": [],
     "security": [],
     "performance": []
   },
   "releases": [
+    {
+      "version": "1.5.351",
+      "date": "2026-11-25T22:33:47-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "PC-DOCTOR Mail Pro Fluent 2.0: barra de comandos estilo Outlook, paneles ajustables, avatares y agrupación por fecha",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "PC-DOCTOR Mail Pro Fluent 2.0: barra de comandos estilo Outlook que nunca recorta botones, paneles ajustables por arrastre o teclado, avatares, agrupación por fecha, acciones rápidas al pasar el cursor, carga con esqueleto y encabezado compacto",
+          "Correo: Archivar y Etiquetas disponibles desde el mensaje abierto, pantalla completa de lectura y respeto de la preferencia de movimiento reducido"
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Administración (autorización expresa en la sesión)"
+    },
     {
       "version": "1.5.350",
       "date": "2026-11-25T16:30:25-05:00",
