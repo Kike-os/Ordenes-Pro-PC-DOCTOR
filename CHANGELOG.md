@@ -4,6 +4,18 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.355 — 2026-11-25 23:54 (UTC-05:00)
+
+Premium Smart Status 2.0 y estado de cuenta 80 mm sin textos encimados
+
+### Mejoras realizadas
+
+- Premium Smart Status 2.0: indicadores de estado de presupuesto con iconos modernos, colores semánticos, pulso discreto si requieren atención, reloj animado mientras esperan aprobación, confirmación visual al aprobarse y descripción al pasar el cursor, en todo el sistema
+
+### Errores corregidos
+
+- Estado de cuenta en ticket de 80 mm: un nombre de cliente largo ya no se monta sobre la etiqueta «Cliente»
+
 ## v1.5.354 — 2026-11-25 23:21 (UTC-05:00)
 
 Correcciones: reporte de cierre de caja sin textos encimados y signo $ alineado en los presupuestos

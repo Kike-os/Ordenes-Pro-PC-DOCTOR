@@ -8,6 +8,26 @@
   },
   "releases": [
     {
+      "version": "1.5.355",
+      "date": "2026-11-25T23:54:54-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Premium Smart Status 2.0 y estado de cuenta 80 mm sin textos encimados",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Premium Smart Status 2.0: indicadores de estado de presupuesto con iconos modernos, colores semánticos, pulso discreto si requieren atención, reloj animado mientras esperan aprobación, confirmación visual al aprobarse y descripción al pasar el cursor, en todo el sistema"
+        ],
+        "fixes": [
+          "Estado de cuenta en ticket de 80 mm: un nombre de cliente largo ya no se monta sobre la etiqueta «Cliente»"
+        ],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Administración (autorización expresa en la orden)"
+    },
+    {
       "version": "1.5.354",
       "date": "2026-11-25T23:21:21-05:00",
       "type": "patch",

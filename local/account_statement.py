@@ -101,6 +101,16 @@ def render(data, fmt='a4'):
 
     def row(left, right, size=base, font='F1'):
         rw = width_of(right, size, font)
+        lw = width_of(left, size, font)
+        if rw > inner - lw - 8:
+            # Valor largo (p. ej., un nombre de cliente extenso): se reparte en varias líneas alineadas a la derecha, sin invadir la etiqueta.
+            room = max(inner - lw - 8, inner * .5)
+            ops.append(('t', left, y[0], size, font, X0))
+            for line in wrap(right, size, font, room):
+                ops.append(('t', line, y[0], size, font, X1 - width_of(line, size, font)))
+                y[0] += size * 1.2
+            y[0] += .8
+            return
         for n, line in enumerate(wrap(left, size, font, inner - rw - 8)):
             ops.append(('t', line, y[0], size, font, X0))
             if n == 0:

@@ -4755,7 +4755,30 @@ const catalogIconNode=key=>systemIcon(catalogIcons[key]?.path||catalogIcons.gene
 function priorityBadge(code){const info=quotePriorities[code];if(!info)return null;const badge=el('span',info.label,'quote-priority');badge.dataset.priority=code;return badge;}
 function catalogLogo(item,logos,className='catalog-logo'){const box=el('span',undefined,className),generic=()=>{box.dataset.kind='icon';box.replaceChildren(item.icon&&catalogIcons[item.icon]?catalogIconNode(item.icon):systemIcon(catalogGlyphs[item.category]||catalogGlyphs.otro));},file=(logos||{})[brandSlug(item.brand||'')];
  if(!item.image&&!file){generic();return box;}const image=new Image();image.alt=item.brand?'Logotipo de '+item.brand:'';image.loading='lazy';image.decoding='async';image.onerror=generic;image.src=item.image?'/api/catalog/'+item.id+'/image?v='+encodeURIComponent(item.image):'/static/brands/'+file;box.dataset.kind='image';box.append(image);return box;}
-function quoteBadge(status,label){const badge=el('span',undefined,'quote-badge');badge.dataset.status=status;badge.append(systemIcon(quoteGlyphs[status]||quoteGlyphs.pendiente),el('span',label));return badge;}
+// Premium Smart Status 2.0 (docs/SMART-STATUS.md): un solo componente para todos los estados de presupuesto. Iconos Lucide (ISC), color
+// semántico, pulso discreto si requiere atención, reloj animado si espera aprobación, confirmación visual si está aprobado y descripción
+// emergente. Si otro código cambia data-status después (p. ej., «Sin presupuesto»), el icono y la descripción se actualizan solos.
+const QB_STATES={
+ vacio:{icon:'M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z M14 2v4a2 2 0 0 0 2 2h4 M9 15h6 M12 18v-6',attention:true,help:'Todavía no hay un presupuesto para esta orden.'},
+ borrador:{icon:'M12 20h9 M16.4 3.6a2.1 2.1 0 0 1 3 3L7.4 18.6a2 2 0 0 1-.9.5l-2.9.8.8-2.9a2 2 0 0 1 .5-.9z M15 5l3 3',help:'Aún no se envía al cliente.'},
+ enviado:{clock:true,help:'Enviado al cliente: esperando su aprobación.'},revision:{clock:true,help:'Se está revisando antes de la decisión del cliente.'},pendiente:{clock:true,help:'Esperando la decisión del cliente.'},
+ modificacion:{icon:'M3 12a9 9 0 0 1 15.3-6.4L21 8 M21 3v5h-5 M21 12a9 9 0 0 1-15.3 6.4L3 16 M3 21v-5h5',attention:true,help:'El cliente solicitó cambios.'},
+ sin_correo:{icon:'M4 5h16a1 1 0 0 1 1 1v6 M3 7l9 6 9-6 M3 7v11a1 1 0 0 0 1 1h9 M17 17l4 4 M21 17l-4 4',attention:true,help:'No se pudo enviar el correo al cliente.'},
+ aprobado:{icon:'M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0 M9 12l2 2 4-4',check:true,help:'Aprobado por el cliente.'},
+ parcial:{icon:'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z M12 18a6 6 0 0 0 0-12z',help:'El cliente aprobó solo algunos ítems.'},
+ rechazado:{icon:'M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0 M15 9l-6 6 M9 9l6 6',help:'Rechazado por el cliente.'},
+ vencido:{icon:'M8 2v4 M16 2v4 M3 10h18 M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z M10 14l4 4 M14 14l-4 4',attention:true,help:'Venció sin una decisión del cliente.'},
+ cancelado:{icon:'M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0 M4.9 4.9l14.2 14.2',help:'Ya no está vigente; se conserva en el historial.'}};
+function qbIcon(status){const def=QB_STATES[status];if(!def){const svg=systemIcon(quoteGlyphs[status]||quoteGlyphs.pendiente);svg.classList.add('qb-icon');return svg;}
+ if(def.clock){const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox','0 0 24 24');svg.setAttribute('aria-hidden','true');svg.classList.add('qb-icon','qb-clock');
+  for(const[d,cls]of [['M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0',''],['M12 12V7','qb-hand qb-hand-m'],['M12 12l3 2','qb-hand qb-hand-h']]){const p=document.createElementNS(svg.namespaceURI,'path');p.setAttribute('d',d);if(cls)p.setAttribute('class',cls);svg.append(p);}return svg;}
+ if(def.check){const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox','0 0 24 24');svg.setAttribute('aria-hidden','true');svg.classList.add('qb-icon');
+  for(const[d,cls]of [['M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0',''],['M9 12l2 2 4-4','qb-check']]){const p=document.createElementNS(svg.namespaceURI,'path');p.setAttribute('d',d);if(cls)p.setAttribute('class',cls);svg.append(p);}return svg;}
+ const svg=systemIcon(def.icon);svg.classList.add('qb-icon');return svg;}
+function quoteBadgePaint(badge){const status=badge.dataset.status,def=QB_STATES[status]||{};if(badge.dataset.painted===status)return;badge.dataset.painted=status;
+ badge.querySelector('.qb-icon')?.replaceWith(qbIcon(status));badge.dataset.attention=String(!!def.attention);const label=badge.querySelector('.qb-label')?.textContent||'';badge.title=def.help?(def.help.toLowerCase().startsWith(label.toLowerCase())?def.help:label+' · '+def.help):label;}
+function quoteBadge(status,label){const badge=el('span',undefined,'quote-badge');badge.dataset.status=status;badge.append(qbIcon(status),el('span',label,'qb-label'));badge.dataset.painted='';quoteBadgePaint(badge);
+ new MutationObserver(()=>quoteBadgePaint(badge)).observe(badge,{attributes:true,attributeFilter:['data-status']});return badge;}
 // Presupuesto en el detalle de la orden: dos paneles que no se confunden. Arriba, lo COTIZADO que espera la decisión del cliente (ámbar; azul si es
 // borrador). Abajo, lo que el cliente AUTORIZÓ de verdad (verde), con lo pagado y el saldo. Nada pasa al panel inferior sin una aprobación registrada.
 const quoteModuleLabels={enviado:'Esperando aprobación',parcial:'Aprobado parcialmente',modificacion:'Revisión solicitada'};
