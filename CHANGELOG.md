@@ -4,6 +4,15 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.354 — 2026-11-25 23:21 (UTC-05:00)
+
+Correcciones: reporte de cierre de caja sin textos encimados y signo $ alineado en los presupuestos
+
+### Errores corregidos
+
+- Reporte de cierre de caja: el nombre de la empresa ya no se monta sobre el título, las líneas de total ya no tachan las filas, la tabla de transferencias muestra el medio en su propia columna y la dirección, el contacto y los nombres largos se ven completos
+- Presupuestos: el signo $ del precio queda centrado y del mismo tamaño que el valor
+
 ## v1.5.353 — 2026-11-25 22:48 (UTC-05:00)
 
 Smart Catalog: centro de control operativo en producción y fotografías al registrar productos en Inventario

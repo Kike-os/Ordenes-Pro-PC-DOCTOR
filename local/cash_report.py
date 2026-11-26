@@ -257,18 +257,25 @@ def a4(c, user, session_id, link, now):
     f.y = 34
     f.op('logo', L, 30, 104)
     co = data['company']
-    text(co['legal'], L + 118, 34, 12.5, True, NAVY)
+    room = (R - 76 - f.width_of('REPORTE DE CIERRE DE CAJA', 9, True) - 14) - (L + 118)
+    size = 12.5
+    while size > 9.5 and f.width_of(co['legal'], size, True) > room:
+        size -= .5
+    y = 34
+    for piece in f.wrap(co['legal'], room, size, 2):
+        text(piece, L + 118, y, size, True, NAVY)
+        y += size + 3
+    y += 2
     if co['ruc']:
-        text('RUC ' + co['ruc'], L + 118, 51, 8.2, False, INK)
-        y = 63
-    else:
-        y = 51
+        text('RUC ' + co['ruc'], L + 118, y, 8.2, False, INK)
+        y += 12
+    if not co['ruc']:
         for piece in f.wrap('RUC no configurado: complételo en Facturación › Datos fiscales.', 215, 7.8, 2):
             text(piece, L + 118, y, 7.8, True, RED)
             y += 10
         y += 2
-    for line in [co['address'], co['contact']]:
-        for piece in f.wrap(line, 215, 7.6, 2) if line else []:
+    for line, limit in [(co['address'], 3), (co['contact'], 3)]:
+        for piece in f.wrap(line, room, 7.6, limit) if line else []:
             text(piece, L + 118, y, 7.6, False, GRAY)
             y += 10
     if link:
@@ -279,7 +286,7 @@ def a4(c, user, session_id, link, now):
     right(s['code'], R - 76, 44, 19, True, NAVY)
     status = s['status_label'] + (' · con ajustes posteriores' if data['adjustments'] else '')
     right(status, R - 76, 64, 8.2, True, _tone(t['difference']) if t['difference'] is not None else BLUE)
-    f.y = 112
+    f.y = max(112, y + 6)
     rule(L, f.y, CW, NAVY, 1.2)
     f.y += 9
     # Datos del cierre en una franja de 4 × 2.
@@ -291,7 +298,10 @@ def a4(c, user, session_id, link, now):
     for i, (label, value) in enumerate(info):
         x, yy = L + 10 + (i % 4) * cw4, f.y + 7 + (i // 4) * 24
         text(label.upper(), x, yy, 6.6, True, GRAY)
-        text(f.wrap(value, cw4 - 16, 8.6, 1)[0], x, yy + 9, 8.6, True, INK)
+        fit = 8.6
+        while fit > 7 and f.width_of(value, fit, True) > cw4 - 16:
+            fit -= .4
+        text(f.wrap(value, cw4 - 16, fit, 1)[0], x, yy + 9, fit, True, INK)
     f.y += 60
     # Resumen ejecutivo: tres bloques que no se suman entre sí.
     section('Resumen ejecutivo del cierre', 'Valores en USD')
@@ -320,7 +330,8 @@ def a4(c, user, session_id, link, now):
             kind = line[2] if len(line) > 2 else ''
             value = '—' if cents is None else (_signed(cents) + ' · ' + _state(cents)) if kind == 'diff' else ('- ' if kind == 'minus' and cents else '+ ' if kind == 'plus' and cents else '') + _money(cents)
             if kind == 'total':
-                rule(x + 9, y - 2, bw - 18, NAVY, .8)
+                y += 4
+                rule(x + 9, y - 3, bw - 18, NAVY, .8)
             size, bold = (9, True) if kind == 'total' else (7.6 if kind == 'sub' else 8.2, kind == 'diff')
             color = _tone(cents) if kind == 'diff' and cents is not None else NAVY if kind == 'total' else GRAY if kind == 'sub' else INK
             text(('   ' if kind == 'sub' else '') + label, x + 9, y + 1, size, kind in ('total',), GRAY if kind == 'sub' else INK)
@@ -346,8 +357,8 @@ def a4(c, user, session_id, link, now):
               ('Total de egresos (sin anulados)', _money(t['outgo'])))
     if data['transfers']:
         section('Transferencias y depósitos', 'Estado de confirmación al generar el reporte')
-        table([('Código', 50, 'l'), ('Banco', 70, 'l'), ('Cuenta', 52, 'l'), ('Últ. 4', 30, 'l'), ('Referencia', 84, 'l'), ('Fecha y hora', 70, 'l'), ('Estado', 66, 'l'), ('Monto', 58, 'r')],
-              [{'cells': [x['code'] + ' · ' + x['method'], x['bank'], x['type'], x['last4'], x['reference'], _dt(x['at']), x['status'], _money(x['amount'])]} for x in data['transfers']],
+        table([('Código', 54, 'l'), ('Medio', 62, 'l'), ('Banco', 66, 'l'), ('Cuenta', 44, 'l'), ('Últ. 4', 28, 'l'), ('Referencia', 66, 'l'), ('Fecha y hora', 66, 'l'), ('Estado', 58, 'l'), ('Monto', 54, 'r')],
+              [{'cells': [x['code'], x['method'], x['bank'], x['type'], x['last4'], x['reference'], _dt(x['at']), x['status'], _money(x['amount'])]} for x in data['transfers']],
               ('Total transferencias y depósitos', _money(sum(x['amount'] for x in data['transfers']))))
     if data['cards']:
         section('Tarjetas')

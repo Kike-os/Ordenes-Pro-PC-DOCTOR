@@ -13100,7 +13100,8 @@ body[data-page=dashboard] dialog.quote-dialog.quote-pro{width:min(1680px,calc(10
 .quote-pro .quote-row .qp-c-sub .qp-row-meta select{min-height:30px;height:30px;padding:2px 26px 2px 10px}
 /* Precio con «$» delante, como en el diseño (el campo sigue admitiendo 45.78 o 45,78) */
 .quote-pro .qp-c-price .quote-field-price{position:relative}
-.quote-pro .qp-c-price .quote-field-price::after{content:'$';position:absolute;left:11px;bottom:0;line-height:36px;font-size:13px;font-weight:700;color:var(--qp-soft);pointer-events:none}
+.quote-pro .qp-c-price .quote-field-price{display:grid;grid-template-columns:minmax(0,1fr);align-items:center}.quote-pro .qp-c-price .quote-field-price>span{grid-row:1;grid-column:1}.quote-pro .qp-c-price .quote-field-price>input{grid-row:2;grid-column:1}
+.quote-pro .qp-c-price .quote-field-price::after{content:'$';position:relative;z-index:1;grid-row:2;grid-column:1;align-self:center;justify-self:start;margin-left:12px;line-height:1;font-size:14px;font-weight:700;color:var(--qp-soft);pointer-events:none}
 .quote-pro .qp-c-price .quote-field-price input{padding-left:22px}
 /* Tarjetas (tableta y móvil): número y acciones arriba; la descripción, en su propia línea a todo el ancho */
 .quote-pro .quote-row{grid-template-areas:"num . . acts" "desc desc desc desc" "type type type type" "qty qty price price" "disc disc covv covv" "total total total total" "sub sub sub sub"}
