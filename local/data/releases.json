@@ -1,7 +1,10 @@
 {
   "unreleased": {
     "features": [],
-    "improvements": [],
+    "improvements": [
+      "PC-DOCTOR Mail Pro Fluent 2.0: barra de comandos estilo Outlook que nunca recorta botones, paneles ajustables por arrastre o teclado, avatares, agrupación por fecha, acciones rápidas al pasar el cursor, carga con esqueleto y encabezado compacto",
+      "Correo: Archivar y Etiquetas disponibles desde el mensaje abierto, pantalla completa de lectura y respeto de la preferencia de movimiento reducido"
+    ],
     "fixes": [],
     "security": [],
     "performance": []

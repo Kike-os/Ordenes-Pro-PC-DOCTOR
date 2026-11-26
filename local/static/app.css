@@ -14329,3 +14329,77 @@ body:has(.ax) #adi-widget{display:none}
  .rm-reqs,.rm-checks{grid-template-columns:1fr}.rm-facts{grid-template-columns:repeat(2,minmax(0,1fr))}.rm-actions .rm-btn{flex:1 1 100%}}
 @media (prefers-reduced-motion:reduce){.rm-led,.rm-bar i::after,.rm-btn[data-loading=true] svg{animation:none!important}.rm-bar i{transition:none}}
 .rm-dialog .rm-head{margin:0}
+
+/* ───── PC-DOCTOR Mail Pro Fluent 2.0 (solo .mail-fluent; docs/MAIL-FLUENT.md) ───── */
+.mail-shell.mail-v2.mail-fluent{--mf-s0:#0a1322;--mf-s1:#0d1829;--mf-s2:#111e33;--mf-s3:#16253e;--mf-line:#ffffff10;--mf-line2:#ffffff1c;--mf-text:#e8eef9;--mf-soft:#9db0cc;--mf-accent:#3b82f6;--mf-r:12px;--mf-t:.18s cubic-bezier(.2,0,0,1);
+ display:grid;grid-template-columns:var(--mf-side,232px) 8px var(--mf-list,380px) 8px minmax(0,1fr);grid-template-rows:auto minmax(0,1fr);gap:0;row-gap:10px;max-width:none;
+ font-family:"Segoe UI Variable Text","Segoe UI",system-ui,-apple-system,"Helvetica Neue",Roboto,Arial,sans-serif;color:var(--mf-text)}
+.mail-fluent[data-side=collapsed]{grid-template-columns:60px 8px var(--mf-list,380px) 8px minmax(0,1fr)}
+.mail-fluent[data-resizing=true]{cursor:col-resize;user-select:none}.mail-fluent[data-resizing=true] *{transition:none!important}
+.mail-fluent>.mail-cmd{grid-column:1/-1;grid-row:1}.mail-fluent>.mail-side{grid-column:1;grid-row:2}.mail-fluent>.mail-split[data-pane=side]{grid-column:2;grid-row:2}
+.mail-fluent>.mail-list-pane{grid-column:3;grid-row:2}.mail-fluent>.mail-split[data-pane=list]{grid-column:4;grid-row:2}.mail-fluent>.mail-reader{grid-column:5;grid-row:2}
+/* Superficies: Mica en la navegación, capas en la bandeja y el lector, Acrylic en la barra de comandos. */
+.mail-fluent :is(.mail-side,.mail-list-pane,.mail-reader){border:1px solid var(--mf-line);border-radius:var(--mf-r);box-shadow:0 1px 2px #0006,0 8px 24px #0003}
+.mail-fluent .mail-side{background:linear-gradient(180deg,#0f1c31f2,#0b1526f2)}.mail-fluent .mail-list-pane{background:var(--mf-s1)}.mail-fluent .mail-reader{background:var(--mf-s2)}
+.mail-fluent .mail-cmd{position:relative;z-index:3;display:flex;align-items:center;gap:2px;min-width:0;padding:6px;border:1px solid var(--mf-line2);border-radius:var(--mf-r);background:#122038cc;-webkit-backdrop-filter:blur(18px) saturate(140%);backdrop-filter:blur(18px) saturate(140%);box-shadow:0 4px 16px #0004;overflow:hidden}
+.mail-fluent .mail-cmd-btn{display:inline-flex;align-items:center;gap:7px;flex:0 0 auto;height:34px;padding:0 11px;border:1px solid transparent;border-radius:8px;background:transparent;color:var(--mf-text);font:inherit;font-size:13px;font-weight:500;white-space:nowrap;cursor:pointer;transition:background-color var(--mf-t),border-color var(--mf-t),color var(--mf-t),transform var(--mf-t)}
+.mail-fluent .mail-cmd-btn .system-icon{width:18px;height:18px;stroke-width:1.6;color:#9cc3ff}
+.mail-fluent .mail-cmd-btn:is(:hover,:focus-visible):not(:disabled){background:#ffffff12;border-color:var(--mf-line2);outline:0}.mail-fluent .mail-cmd-btn:active:not(:disabled){transform:scale(.97)}
+.mail-fluent .mail-cmd-btn:focus-visible{box-shadow:0 0 0 2px var(--mf-accent)}.mail-fluent .mail-cmd-btn:disabled{opacity:.38;cursor:default}
+.mail-fluent .mail-cmd-primary{margin-right:6px;padding:0 14px;background:linear-gradient(180deg,#2f7bf5,#1f64db);border-color:#5b9bff55;color:#fff;font-weight:600;box-shadow:0 1px 0 #ffffff26 inset,0 2px 8px #1d4ed855}
+.mail-fluent .mail-cmd-primary .system-icon{color:#fff}.mail-fluent .mail-cmd-primary:is(:hover,:focus-visible):not(:disabled){background:linear-gradient(180deg,#3d89ff,#2a6fe8)}
+.mail-fluent .mail-cmd-btn[data-key=sync]{margin-left:auto}.mail-fluent .mail-cmd-btn[data-key=delete] .system-icon{color:#ff9a9a}
+.mail-fluent .mail-cmd-compact:not(.mail-cmd-primary) span{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}.mail-fluent .mail-cmd-compact:not(.mail-cmd-primary){width:36px;padding:0;justify-content:center}
+.mail-fluent .mail-cmd-more{margin-left:2px}
+.mail-fluent .mail-cmd-btn[data-key=sync][disabled]{opacity:1}
+/* Divisores de paneles. */
+.mail-fluent .mail-split{position:relative;cursor:col-resize;touch-action:none;outline:0}.mail-fluent .mail-split::after{content:'';position:absolute;top:22%;bottom:22%;left:3px;width:2px;border-radius:2px;background:transparent;transition:background-color var(--mf-t)}
+.mail-fluent .mail-split:is(:hover,:focus-visible)::after,.mail-fluent[data-resizing=true] .mail-split::after{background:var(--mf-accent)}
+.mail-fluent[data-side=collapsed] .mail-split[data-pane=side]{pointer-events:none}
+/* Navegación. */
+.mail-fluent .mail-compose{display:none}.mail-fluent .mail-folder{border-radius:8px;transition:background-color var(--mf-t),color var(--mf-t)}
+.mail-fluent .mail-folder[aria-current=page]{position:relative;background:#ffffff12;border-color:transparent;box-shadow:none}
+.mail-fluent .mail-folder[aria-current=page]::before{content:'';position:absolute;left:0;top:9px;bottom:9px;width:3px;border-radius:3px;background:var(--mf-accent)}
+.mail-fluent .mail-folder:is(:hover,:focus-visible):not([aria-current=page]){background:#ffffff0b}
+.mail-fluent .mail-account{border-color:var(--mf-line);background:#ffffff06}
+/* Bandeja: búsqueda, filtros sin recortes, grupos por fecha, avatares y filas. */
+.mail-fluent .mail-search input{border-radius:8px;background:#0a1424;border-color:var(--mf-line2)}.mail-fluent .mail-search .mail-tool[aria-label='Sincronizar ahora']{display:none}
+.mail-fluent .mail-filters{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 28px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 28px),transparent);padding-right:24px}
+.mail-fluent .mail-filters::-webkit-scrollbar{display:none}.mail-fluent .mail-filter{flex:0 0 auto;border-radius:999px;transition:background-color var(--mf-t),border-color var(--mf-t)}
+.mail-fluent .mail-group{position:sticky;top:0;z-index:1;padding:7px 14px 5px;background:var(--mf-s1);font-size:11.5px;font-weight:600;letter-spacing:.02em;color:var(--mf-soft);border-bottom:1px solid var(--mf-line)}
+.mail-fluent .mail-row{grid-template-columns:20px 34px minmax(0,1fr) auto!important;column-gap:10px;padding:9px 8px 9px 10px;border-bottom:1px solid var(--mf-line);border-left:3px solid transparent;transition:background-color var(--mf-t),opacity .22s,transform .22s}
+.mail-fluent .mail-row>.mail-check{grid-column:1!important}.mail-fluent .mail-row>.mail-row-avatar{grid-column:2;grid-row:1/span 2;align-self:start;margin-top:1px}
+.mail-fluent .mail-row>:is(.mail-row-top,.mail-row-bottom,.mail-row-preview,.mail-tags){grid-column:3!important;min-width:0}.mail-fluent .mail-row>.mail-row-actions{grid-column:4!important}
+.mail-fluent .mail-row-avatar{display:grid;place-items:center;width:34px;height:34px;border-radius:50%;background:hsl(var(--av-h,210) 45% 32%);color:hsl(var(--av-h,210) 90% 92%);font-size:12.5px;font-weight:600;letter-spacing:.02em;box-shadow:0 0 0 1px #ffffff14 inset}
+.mail-fluent .mail-row:hover{background:#ffffff09}.mail-fluent .mail-row[aria-current=true]{background:#2f6fe824;border-left-color:var(--mf-accent)}
+.mail-fluent .mail-row.unread{border-left-color:#5b9bff}.mail-fluent .mail-row.unread .mail-row-top strong,.mail-fluent .mail-row.unread .mail-row-bottom>span:first-child{color:#fff;font-weight:700}
+.mail-fluent .mail-row:not(.unread) .mail-row-top strong{font-weight:500;color:#c9d6ea}.mail-fluent .mail-row:not(.unread) .mail-row-bottom>span:first-child{font-weight:400;color:#b4c3da}
+.mail-fluent .mail-row-preview{color:#8597b2}
+.mail-fluent .mail-row-new{animation:mf-arrive .4s cubic-bezier(.2,0,0,1)}@keyframes mf-arrive{from{opacity:0;transform:translateY(-6px);background:#3b82f633}}
+/* Esqueleto de carga. */
+.mail-fluent .mail-skeleton{display:grid}.mail-fluent .mail-skel-row{display:grid;grid-template-columns:34px 1fr;gap:10px;padding:12px 14px;border-bottom:1px solid var(--mf-line)}
+.mail-fluent .mail-skel-avatar{width:34px;height:34px;border-radius:50%}.mail-fluent .mail-skel-lines{display:grid;gap:7px;align-content:center}
+.mail-fluent .mail-skel-avatar,.mail-fluent .mail-skel-lines::before,.mail-fluent .mail-skel-lines::after{background:linear-gradient(90deg,#1a2a44 0%,#22365a 40%,#1a2a44 80%);background-size:300% 100%;animation:mf-skel 1.3s ease-in-out infinite}
+.mail-fluent .mail-skel-lines::before,.mail-fluent .mail-skel-lines::after{content:'';display:block;height:10px;border-radius:5px}.mail-fluent .mail-skel-lines::before{width:55%}.mail-fluent .mail-skel-lines::after{width:85%}
+@keyframes mf-skel{from{background-position:100% 0}to{background-position:-100% 0}}
+/* Lector: la barra de comandos superior reemplaza la barra inferior; el encabezado es compacto. */
+.mail-fluent .mail-reader>.mail-bar{display:none}.mail-fluent .mail-head{padding-bottom:10px}.mail-fluent .mail-reader .mail-top h2{font-size:18px;line-height:1.3;overflow-wrap:anywhere}
+.mail-fluent .mail-reader .mail-avatar{border-radius:50%}.mail-fluent .mail-reader .mail-paper{border-radius:10px}
+.mail-fluent .mail-reader:fullscreen{padding:0;border-radius:0;background:var(--mf-s2)}.mail-fluent .mail-reader{animation:mf-fade .2s ease-out}@keyframes mf-fade{from{opacity:.4}}
+/* Página: encabezado compacto para dar el espacio al correo. */
+#view-module:has(.mail-fluent) .module-heading{margin-bottom:12px}#view-module:has(.mail-fluent) .module-heading :is(.eyebrow,#module-description){display:none}#view-module:has(.mail-fluent) .module-heading h1{margin:0;font-size:22px}
+/* Tableta: navegación como columna de iconos y lista ajustable. */
+@media(max-width:1180px){.mail-shell.mail-v2.mail-fluent,.mail-shell.mail-v2.mail-fluent[data-side=collapsed]{grid-template-columns:60px 8px var(--mf-list,340px) 8px minmax(0,1fr)}.mail-fluent .mail-split[data-pane=side]{pointer-events:none}}
+/* Móvil: una columna; la barra de comandos muestra iconos y lo demás en «Más». */
+@media(max-width:860px){.mail-shell.mail-v2.mail-fluent,.mail-shell.mail-v2.mail-fluent[data-side=collapsed]{display:flex;flex-direction:column;gap:8px}.mail-fluent .mail-split{display:none}
+ .mail-fluent .mail-cmd{order:-1}.mail-fluent .mail-compose{display:none}}
+@media(prefers-reduced-motion:reduce){.mail-fluent *,.mail-fluent *::before,.mail-fluent *::after{animation:none!important;transition:none!important}}
+/* Acciones rápidas de la fila: aparecen al pasar el cursor o con el foco, sin quitar espacio al remitente ni al asunto. */
+@media(hover:hover) and (min-width:861px){.mail-fluent .mail-row{grid-template-columns:20px 34px minmax(0,1fr)!important}
+ .mail-fluent .mail-row>.mail-row-actions{position:absolute;top:6px;right:6px;display:flex;gap:2px;padding:2px;border:1px solid var(--mf-line2);border-radius:8px;background:#16263fef;box-shadow:0 4px 12px #0005;opacity:0;transform:translateY(-2px);pointer-events:none;transition:opacity var(--mf-t),transform var(--mf-t)}
+ .mail-fluent .mail-row:is(:hover,:focus-within,.menu-open)>.mail-row-actions{opacity:1;transform:none;pointer-events:auto}}
+.mail-fluent .mail-account strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mail-fluent .mail-reader>.mail-head{gap:8px;max-height:56%;padding:12px 16px 10px;background:transparent;border-bottom-color:var(--mf-line)}
+.mail-fluent .mail-reader .mail-context{gap:6px;margin:0;padding:0;border:0}.mail-fluent .mail-reader .mail-meta{gap:10px}
+@media(min-width:861px){.mail-fluent .mail-side{overflow:hidden auto;scrollbar-width:thin;scrollbar-color:#2a3c5c transparent}.mail-fluent .mail-folder{min-height:33px;padding:6px 9px}
+ .mail-fluent .mail-side-foot{gap:4px}.mail-fluent .mail-side-foot>.mail-folder{min-height:32px}}
