@@ -8,6 +8,26 @@
   },
   "releases": [
     {
+      "version": "1.5.356",
+      "date": "2026-11-26T00:43:03-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "ADI Smart Notifications Premium 3.0: avisos al cliente compactos con estados reales, diagnóstico de ADI e historial de intentos",
+      "changes": {
+        "features": [
+          "Diagnóstico de ADI en avisos fallidos u omitidos (categoría, causa real del proveedor y qué hacer) e historial de intentos y respuestas de Meta por aviso (migración 129); los avisos históricos conservan su estado y no se reenvían solos"
+        ],
+        "improvements": [
+          "ADI Smart Notifications Premium 3.0: avisos al cliente en tarjetas compactas con estados reales, contadores que filtran, detalle desplegable y el mismo componente en órdenes, repuestos, historial de WhatsApp, historial de correos de la orden y citas"
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Administración (autorización expresa en la orden)"
+    },
+    {
       "version": "1.5.355",
       "date": "2026-11-25T23:54:54-05:00",
       "type": "patch",

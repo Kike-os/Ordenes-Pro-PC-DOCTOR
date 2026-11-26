@@ -714,6 +714,22 @@ def monthly_adi_reply_count(c, now):
     return int(c.execute("SELECT COUNT(*) FROM whatsapp_adi_inbound WHERE received_at>=? AND status IN ('generando','enviando','enviado','fallido')", (start,)).fetchone()[0] or 0)
 
 
+def _attempt(c, nid, kind, status, detail='', http_code='', error_code='', now=None):
+    """Una fila por intento o respuesta del proveedor (migración 129). Sin la tabla, no hace nada: nunca bloquea un envío."""
+    try:
+        if c.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='whatsapp_outbox_attempts'").fetchone():
+            c.execute('INSERT INTO whatsapp_outbox_attempts(outbox_id,kind,status,http_code,error_code,detail,created_at) VALUES(?,?,?,?,?,?,?)',
+                      (nid, kind, status, str(http_code or ''), str(error_code or ''), str(detail or '')[:400], stamp(now or datetime.now().astimezone())))
+    except Exception as error:
+        print('whatsapp attempt log', type(error).__name__, flush=True)
+
+
+def attempts_of(c, nid):
+    if not c.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='whatsapp_outbox_attempts'").fetchone():
+        return []
+    return [dict(r) for r in c.execute('SELECT kind,status,http_code,error_code,detail,created_at FROM whatsapp_outbox_attempts WHERE outbox_id=? ORDER BY id', (nid,))]
+
+
 def send_one(c, nid, now, env=None):
     """Envía un aviso ya reclamado o reclamable. Devuelve la fila actualizada (dict) o None si otro proceso lo tiene."""
     if not _claim(c, nid, now):
@@ -739,6 +755,7 @@ def send_one(c, nid, now, env=None):
         kind, reason = 'config', 'WhatsApp Business no está configurado en el servidor.'
     if reason:
         c.execute("UPDATE whatsapp_outbox SET status='omitido',detail=?,reason_kind=?,locked_until='',next_attempt_at='',updated_at=? WHERE id=?", (reason, kind, stamp(now), nid))
+        _attempt(c, nid, 'omitido', 'omitido', reason, now=now)
         return dict(c.execute('SELECT * FROM whatsapp_outbox WHERE id=?', (nid,)).fetchone())
     row = c.execute('SELECT * FROM whatsapp_outbox WHERE id=?', (nid,)).fetchone()
     code, answer = call('POST', '%s/messages' % config(env)['phone_id'], env, _payload(row))
@@ -750,6 +767,7 @@ def send_one(c, nid, now, env=None):
         mid = _record_message(c, row, provider, now)
         c.execute("UPDATE whatsapp_outbox SET status='enviado',provider_id=?,message_id=?,attempts=?,detail=?,reason_kind='',error_code='',permanent=0,locked_until='',"
                   "next_attempt_at='',sent_at=?,updated_at=? WHERE id=?", (provider, mid, attempts, 'Aceptado por la API de WhatsApp Business.', stamp(now), stamp(now), nid))
+        _attempt(c, nid, 'envio', 'enviado', 'Aceptado por la API de WhatsApp Business.', code, '', now)
     else:
         permanent, kind, meta, text = classify(code, answer)
         auto_left = not permanent and attempts < MAX_AUTO
@@ -758,6 +776,7 @@ def send_one(c, nid, now, env=None):
             text = 'Se agotaron los reintentos automáticos (%d). Último error: %s' % (attempts, text)
         c.execute("UPDATE whatsapp_outbox SET status='fallido',attempts=?,detail=?,reason_kind=?,error_code=?,permanent=?,locked_until='',next_attempt_at=?,updated_at=? WHERE id=?",
                   (attempts, text[:400], kind, meta, 1 if permanent else 0, nxt, stamp(now), nid))
+        _attempt(c, nid, 'envio', 'fallido', text, code, meta, now)
     return dict(c.execute('SELECT * FROM whatsapp_outbox WHERE id=?', (nid,)).fetchone())
 
 
@@ -970,11 +989,13 @@ def webhook(c, raw, signature, now, env=None):
                                                                           'error_data': err.get('error_data') or {}}})
                     c.execute("UPDATE whatsapp_outbox SET status='fallido',detail=?,reason_kind=?,error_code=?,permanent=1,next_attempt_at='',updated_at=? WHERE id=?",
                               ('WhatsApp informó que no pudo entregarlo. ' + text, kind, meta, stamp(now), row['id']))
+                    _attempt(c, row['id'], 'estado', 'fallido', 'WhatsApp informó que no pudo entregarlo. ' + text, '', meta, now)
                     changed += 1
                 elif rank.get(new, 0) > rank.get(row['status'], 0) and row['status'] in rank:
                     extra = ',delivered_at=CASE WHEN delivered_at=\'\' THEN ? ELSE delivered_at END' + (',read_at=?' if new == 'leido' else '')
                     args = [new, stamp(now), stamp(now)] + ([stamp(now)] if new == 'leido' else []) + [row['id']]
                     c.execute('UPDATE whatsapp_outbox SET status=?,updated_at=?' + extra + ' WHERE id=?', args)
+                    _attempt(c, row['id'], 'estado', new, 'Estado informado por WhatsApp.', '', '', now)
                     changed += 1
             for msg in value.get('messages', []) or []:
                 text = ((msg.get('text') or {}).get('body') or (msg.get('button') or {}).get('text') or '') if isinstance(msg, dict) else ''
@@ -1101,10 +1122,46 @@ def last_check(c):
         return None
 
 
+# ---- Diagnóstico de ADI (sin IA: reglas sobre la respuesta REAL del proveedor) ---------------------------------------------------------
+DIAGNOSIS = {
+    'config': ('Configuración de WhatsApp Business', 'Revisa en Configuración → Integraciones → WhatsApp el número, el token y sus permisos; luego usa «Reintentar envío».'),
+    'plantilla': ('Plantilla de Meta', 'Comprueba en Integraciones que la plantilla de este aviso exista, esté aprobada en Meta y tenga las mismas variables.'),
+    'telefono': ('Número del cliente', 'Confirma el celular con el cliente y corrígelo en su ficha. Si no usa WhatsApp, avísale por correo o por llamada.'),
+    'consentimiento': ('Autorización del cliente', 'El cliente no autorizó avisos por WhatsApp. Registra su respuesta en la orden antes de enviar.'),
+    'limite': ('Límite de envíos', 'Se alcanzó un límite de Meta o el límite mensual de seguridad. Espera y reintenta más tarde, sin reenviar en bloque.'),
+    'servicio': ('Servicio de Meta', 'Fallo temporal de WhatsApp: el sistema reintenta solo. Si persiste, revisa el estado de Meta.'),
+    'red': ('Conexión con Meta', 'No hubo respuesta de Meta. El sistema reintenta solo.'),
+    'datos': ('Datos del aviso', 'Revisa los datos que se envían (nombre del cliente, número de orden, equipo) o si la orden sigue disponible.'),
+    'cambio': ('El aviso dejó de corresponder', 'La orden cambió antes del envío: no se envía un aviso que ya no es cierto.'),
+    'incierto': ('Envío sin confirmar', 'No se sabe si Meta lo aceptó. No se reenvía solo para evitar mensajes duplicados; confirma con el cliente antes de reintentar.'),
+    'interrumpido': ('Envío interrumpido', 'Se marcó como no enviado. No se reenvía automáticamente.'),
+}
+
+
+def diagnose(row):
+    """Asistencia de ADI para un aviso fallido u omitido: categoría, causa (la respuesta real del proveedor) y qué hacer. None si no aplica."""
+    if row['status'] not in ('fallido', 'omitido'):
+        return None
+    kind = row['reason_kind'] or (ERRORS.get(str(row['error_code'] or ''), (None, ''))[1]) or ''
+    title, action = DIAGNOSIS.get(kind, ('Motivo registrado', 'Revisa el detalle del aviso.'))
+    auto = row['status'] == 'fallido' and not row['permanent'] and bool(row['next_attempt_at'])
+    return {'category': kind or 'otro', 'title': title, 'cause': row['detail'] or 'Sin detalle del proveedor.', 'action': action,
+            'auto_retry': auto, 'code': row['error_code'] or '',
+            'note': 'Aviso histórico: conserva su estado original y no se reenvía automáticamente.' if row['status'] == 'omitido' else ''}
+
+
+def event_label(event):
+    if event in EVENTS:
+        return EVENTS[event][0]
+    if event == 'prueba':
+        return 'Mensaje de prueba'
+    return str(event or 'Aviso').replace('_', ' ').strip().capitalize()
+
+
 # ---- Lectura para la interfaz ------------------------------------------------------------------------------------------------------
 def item(c, row, env=None):
     row = dict(row)
-    label = EVENTS[row['event']][0] if row['event'] in EVENTS else ('Mensaje de prueba' if row['event'] == 'prueba' else row['event'])
+    label = event_label(row['event'])
     try:
         params = json.loads(row['params'] or '[]')
     except ValueError:
@@ -1115,7 +1172,7 @@ def item(c, row, env=None):
             'params': params, 'preview': row['preview'], 'source': row['source'], 'order_id': row['order_id'], 'part_request_id': row['part_request_id'],
             'appointment_id': row['appointment_id'], 'created_at': row['created_at'], 'updated_at': row['updated_at'], 'sent_at': row['sent_at'],
             'delivered_at': row['delivered_at'], 'read_at': row['read_at'], 'provider': bool(row['provider_id']), 'message_id': row['message_id'],
-            'can_retry': can_retry(c, row, env), 'interrupted': interrupted(row)}
+            'can_retry': can_retry(c, row, env), 'interrupted': interrupted(row), 'adi': diagnose(row)}
 
 
 def _mask_phone(number):

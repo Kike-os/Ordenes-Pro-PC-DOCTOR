@@ -4,6 +4,18 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.356 — 2026-11-26 00:43 (UTC-05:00)
+
+ADI Smart Notifications Premium 3.0: avisos al cliente compactos con estados reales, diagnóstico de ADI e historial de intentos
+
+### Nuevas funcionalidades
+
+- Diagnóstico de ADI en avisos fallidos u omitidos (categoría, causa real del proveedor y qué hacer) e historial de intentos y respuestas de Meta por aviso (migración 129); los avisos históricos conservan su estado y no se reenvían solos
+
+### Mejoras realizadas
+
+- ADI Smart Notifications Premium 3.0: avisos al cliente en tarjetas compactas con estados reales, contadores que filtran, detalle desplegable y el mismo componente en órdenes, repuestos, historial de WhatsApp, historial de correos de la orden y citas
+
 ## v1.5.355 — 2026-11-25 23:54 (UTC-05:00)
 
 Premium Smart Status 2.0 y estado de cuenta 80 mm sin textos encimados

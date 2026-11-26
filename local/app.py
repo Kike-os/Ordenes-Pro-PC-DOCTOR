@@ -1858,6 +1858,14 @@ class Handler(BaseHTTPRequestHandler):
                 import whatsapp_business
                 if user['role']!='administrador':return self.reply(403,{'error':'Acceso no permitido.'})
                 return self.reply(200,whatsapp_business.overview(c,os.getenv('APP_URL','http://127.0.0.1:8010')))
+            attempts_match=re.fullmatch(r'/api/whatsapp/outbox/([0-9]+)/attempts',path)
+            if attempts_match:
+                # ADI Smart Notifications 3.0: historial de intentos y respuestas del proveedor de un aviso (solo lectura; personal).
+                if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
+                import whatsapp_business as wa_
+                row=c.execute('SELECT * FROM whatsapp_outbox WHERE id=?',(int(attempts_match[1]),)).fetchone()
+                if not row:return self.reply(404,{'error':'Aviso no encontrado.'})
+                return self.reply(200,{'attempts':wa_.attempts_of(c,row['id']),'adi':wa_.diagnose(row),'logged':bool(c.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='whatsapp_outbox_attempts'").fetchone())})
             if path=='/api/whatsapp/history':
                 import whatsapp_business
                 if user['role']!='administrador':return self.reply(403,{'error':'Acceso no permitido.'})

@@ -4733,10 +4733,12 @@ function voidPayment(order,pay){const refund=pay.kind==='devolucion',dialog=smal
 // «✦ Revisado por ADI» aparece solo si ADI completó la revisión de ese mensaje; con plantilla sin intervención de la IA no se muestra.
 function mailHistorySection(order){const section=el('section',undefined,'workspace-section mail-history'),title=el('h2','Historial de correos'),rows=order.mail_history||[];title.prepend(systemIcon('M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z M3 7l9 6 9-6'));section.append(title);
  if(!rows.length){section.append(el('p','El sistema todavía no ha enviado correos de esta orden.','system-muted'));return section;}
- const list=el('ul',undefined,'mail-history-list');for(const row of rows){const li=el('li'),copy=el('div'),meta=el('small'),state=el('span',row.status_label,'mail-history-state');li.dataset.status=row.status;state.dataset.status=row.status;if(row.status==='error')state.title=row.detail||'El servidor de correo no aceptó el mensaje';
-   meta.append(document.createTextNode(formatOrderDate(row.sent_at||row.created_at)+' · '+row.recipient));copy.append(el('strong',row.subject),meta);const tags=el('div',undefined,'mail-history-tags');tags.append(state);
-   if(row.adi==='revisado'){const star=el('span',undefined,'adi-reviewed');star.append(systemIcon('M12 3l1.9 5.8a2 2 0 0 0 1.3 1.3L21 12l-5.8 1.9a2 2 0 0 0-1.3 1.3L12 21l-1.9-5.8a2 2 0 0 0-1.3-1.3L3 12l5.8-1.9a2 2 0 0 0 1.3-1.3z'),el('span','Revisado por ADI'));star.title='ADI completó la revisión de este mensaje antes de enviarlo';tags.append(star);}
-   li.append(copy,tags,button('Ver correo',()=>openArchivedMail(row.id),'secondary'));list.append(li);}
+ const items=rows.map(r=>({id:r.id,channel:'correo',label:r.subject,status:r.status==='enviado'?'enviado':r.status==='error'?'fallido':'pendiente',status_label:r.status_label,created_at:r.created_at,updated_at:r.sent_at||r.created_at,attempts:0,
+   detail:r.status==='error'?(r.detail||'El servidor de correo no aceptó el mensaje.'):'',recipient:r.recipient,adi_reviewed:r.adi==='revisado',
+   adi:r.status==='error'?{category:'correo',title:'Envío de correo',cause:r.detail||'El servidor de correo no aceptó el mensaje.',action:'Revisa la dirección de correo del cliente y la cuenta de envío en Configuración → Correo y servicios; luego reenvía desde el documento correspondiente.'}:null}));
+ const counts=waCounts(items);section.append(counts);
+ const list=waNoticeList(items,{prefix:'m'+order.id,limit:5,label:'Correos enviados de esta orden',actions:n=>{const out=[];if(n.adi_reviewed){const star=el('span',undefined,'adi-reviewed');star.append(systemIcon('M12 3l1.9 5.8a2 2 0 0 0 1.3 1.3L21 12l-5.8 1.9a2 2 0 0 0-1.3 1.3L12 21l-1.9-5.8a2 2 0 0 0-1.3-1.3L3 12l5.8-1.9a2 2 0 0 0 1.3-1.3z'),el('span','Revisado por ADI'));star.title='ADI completó la revisión de este mensaje antes de enviarlo';out.push(star);}
+   const view=button('',()=>openArchivedMail(n.id),'wan-act');view.append(systemIcon('M2.06 12.35a1 1 0 0 1 0-.7 10.75 10.75 0 0 1 19.88 0 1 1 0 0 1 0 .7 10.75 10.75 0 0 1-19.88 0 M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z'),el('span','Ver correo'));out.push(view);return out;}});
  section.append(list);return section;}
 async function openArchivedMail(id){const dialog=smallDialog('Correo enviado'),body=el('div',undefined,'mail-archived');dialog.classList.add('mail-archived-dialog');dialog.append(body);body.append(el('p','Cargando…','system-muted'));
  try{const{mail}=await api('/api/sent-mail/'+id);body.replaceChildren();const facts=el('dl',undefined,'workspace-fields');for(const[label,value]of [['Asunto',mail.subject],['Destinatario',mail.recipient],['Orden',mail.order_code||'Sin orden asociada'],['Tipo',mail.kind_label],['Fecha y hora',formatOrderDate(mail.sent_at||mail.created_at)],['Estado',mail.status_label+(mail.status==='error'&&mail.detail?': '+mail.detail:'')],['Revisión ADI',mail.adi==='revisado'?'✦ Revisado por ADI':'Plantilla revisada previamente (sin intervención de ADI en este envío)'],...(mail.attachments?[['Adjuntos',mail.attachments]]:[])]){const box=el('div');box.append(el('dt',label),el('dd',value));facts.append(box);}
@@ -7399,7 +7401,10 @@ async function openAgendaAppointment(id,done){
    box.append(head,facts,actions,el('h3','Historial de modificaciones'),history);
    // Avisos por correo realmente gestionados: tipo, resultado y reintento. «Enviado» = aceptado por el servidor de correo.
    const kinds={request:'Solicitud recibida',confirmation:'Confirmación',rescheduled:'Reprogramación',cancelled:'Cancelación'},results={sent:'enviado',failed:'no se pudo enviar',no_email:'el cliente no dejó correo',no_consent:'sin autorización de avisos',not_configured:'correo del sistema sin configurar'};
-   if(a.mails.length){const mails=el('ul',undefined,'agenda-history agenda-mails');for(const m of a.mails){const item=el('li');item.append(el('span',kinds[m.kind]+': '+results[m.result]+(m.recipient?' · '+m.recipient:'')),el('small',formatOrderDate(m.created_at)+(m.result==='failed'&&m.detail?' · '+m.detail:'')));mails.append(item);}box.append(el('h3','Avisos al cliente por correo'),mails);
+   if(a.mails.length){const why={failed:['Envío de correo','Revisa la dirección del cliente y la cuenta de envío en Configuración → Correo y servicios; luego usa «Reintentar el envío».'],no_email:['Sin correo del cliente','Pide al cliente un correo y regístralo en la cita.'],no_consent:['Autorización del cliente','El cliente no autorizó avisos: no se envía nada sin su permiso.'],not_configured:['Correo del sistema','Configura la cuenta de envío en Configuración → Correo y servicios.']};
+    const items=a.mails.map((m,i)=>({id:i+1,channel:'correo',label:kinds[m.kind]||m.kind,status:m.result==='sent'?'enviado':m.result==='failed'?'fallido':'omitido',status_label:m.result==='sent'?'Enviado':m.result==='failed'?'Fallido':'Omitido',created_at:m.created_at,updated_at:m.created_at,attempts:0,recipient:m.recipient,
+     detail:m.result==='sent'?'':(m.detail||results[m.result]||m.result),adi:m.result==='sent'?null:{category:m.result,title:(why[m.result]||['Motivo registrado'])[0],cause:m.detail||results[m.result]||m.result,action:(why[m.result]||['','Revisa el detalle del aviso.'])[1],note:m.result!=='failed'?'Aviso histórico: conserva su estado original y no se reenvía automáticamente.':''}}));
+    const head=el('h3','Avisos al cliente por correo');box.append(head,waCounts(items),waNoticeList(items,{prefix:'a'+id,limit:4,label:'Avisos de la cita por correo'}));
     if(a.mails[0].result!=='sent'&&a.email&&a.communications_consent)box.append(button('Reintentar el envío',async()=>{try{const data=await api('/api/appointments/'+id,{action:'resend_mail'});notify(data.mail==='sent'?'Aviso enviado. El servidor de correo aceptó el mensaje.':'El aviso no se envió: '+(results[data.mail]||data.mail)+'.',data.mail==='sent');await refresh();}catch(error){notify(error.message);}},'secondary'));}
    else if(notices)box.append(el('p','Avisos al cliente por correo — '+notices,'agenda-hint'));}
   catch(error){if(dialog.isConnected)box.replaceChildren(el('p',error.message,'empty-module'));}};
@@ -10238,38 +10243,56 @@ const WAN_RETRY='M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8 M3 3v5h5';
 function wanIcon(path,cls){const s=systemIcon(path);if(cls)s.classList.add(cls);return s;}
 function wanWhen(value){return value?formatOrderDate(value):'—';}
 function waNoticeList(items,opts={}){
- const wrap=el('div',undefined,'wan'),ul=el('ul',undefined,'wan-list');ul.setAttribute('aria-label',opts.label||'Avisos al cliente');
+ // ADI Smart Notifications Premium 3.0 (docs/SMART-NOTIFICATIONS.md): tarjeta compacta por aviso. Estado real del proveedor arriba a la
+ // derecha, canal y hora debajo, motivo legible y, al desplegar, el detalle, el diagnóstico de ADI y el historial de intentos de Meta.
+ const wrap=el('div',undefined,'wan wan3'),ul=el('ul',undefined,'wan-list');ul.setAttribute('aria-label',opts.label||'Avisos al cliente');
  const limit=opts.limit||4;
  for(const n of items){const wa=n.channel==='whatsapp',status=n.status,li=el('li',undefined,'wan-item');li.dataset.status=status;li.dataset.channel=n.channel;
   const ic=el('span',undefined,'wan-state');ic.append(wanIcon(WAN_ICONS[status]||WAN_ICONS.pendiente));
-  const main=el('div',undefined,'wan-main'),title=el('strong',n.label+(opts.withOrder&&n.order_code?' · '+n.order_code:''));const meta=el('small',undefined,'wan-meta');
-  meta.append(wanIcon(WAN_CHANNEL[n.channel]||WAN_CHANNEL.correo),el('span',(wa?'WhatsApp':'Correo')+' · '+wanWhen(n.updated_at||n.created_at)));
-  if(n.attempts)meta.append(el('span',' · '+n.attempts+(n.attempts===1?' intento':' intentos')));main.append(title,meta);
-  if(n.detail&&['fallido','omitido'].includes(status))main.append(el('p',(status==='omitido'?'Motivo: ':'Error: ')+n.detail,'wan-reason'));
-  else if(status==='pendiente'&&n.next_attempt_at)main.append(el('p','Programado para '+wanWhen(n.next_attempt_at),'wan-reason wan-soft'));
+  const title=el('strong',n.label+(opts.withOrder&&n.order_code?' · '+n.order_code:''),'wan-title');title.title=title.textContent;
   const pill=el('b',n.status_label||WAN_LABELS[status]||status,'wan-pill');
-  const det=el('dl',undefined,'wan-detail');det.hidden=true;det.id='wan-'+(opts.prefix||'x')+'-'+n.channel+'-'+n.id;
-  const more=button('',()=>{const open=det.hidden;det.hidden=!open;more.setAttribute('aria-expanded',String(open));li.dataset.open=String(open);},'wan-more');more.append(el('span','Detalles'),wanIcon('m6 9 6 6 6-6'));more.setAttribute('aria-expanded','false');more.setAttribute('aria-controls',det.id);more.setAttribute('aria-label','Detalles de '+n.label);
-  const rows=[['Evento',n.label],['Canal',wa?'WhatsApp Business':'Correo electrónico'],['Estado',WAN_LABELS[status]||status],['Registrado',wanWhen(n.created_at)]];
+  const meta=el('small',undefined,'wan-meta');meta.append(wanIcon(WAN_CHANNEL[n.channel]||WAN_CHANNEL.correo),el('span',(wa?'WhatsApp':'Correo')),el('span',wanWhen(n.updated_at||n.created_at)));
+  if(n.attempts)meta.append(el('span',n.attempts+(n.attempts===1?' intento':' intentos')));
+  li.append(ic,title,pill,meta);
+  if(n.detail&&['fallido','omitido'].includes(status))li.append(el('p',(n.adi?n.adi.title+': ':(status==='omitido'?'Motivo: ':'Error: '))+(n.adi?.cause||n.detail),'wan-reason'));
+  else if(status==='pendiente'&&n.next_attempt_at)li.append(el('p','Programado para '+wanWhen(n.next_attempt_at),'wan-reason wan-soft'));
+  const det=el('div',undefined,'wan-detail');det.hidden=true;det.id='wan-'+(opts.prefix||'x')+'-'+n.channel+'-'+n.id;
+  const dl=el('dl');const rows=[['Canal',wa?'WhatsApp Business':'Correo electrónico'],['Registrado',wanWhen(n.created_at)]];
   if(wa){if(n.sent_at)rows.push(['Aceptado por WhatsApp',wanWhen(n.sent_at)]);if(n.delivered_at)rows.push(['Entregado',wanWhen(n.delivered_at)]);if(n.read_at)rows.push(['Leído',wanWhen(n.read_at)]);
    if(n.recipient)rows.push(['Destinatario',n.recipient]);if(n.template)rows.push(['Plantilla',n.template+(n.template_lang?' ('+n.template_lang+')':'')]);if((n.params||[]).length)rows.push(['Datos enviados',n.params.join(' · ')]);
    if(n.next_attempt_at&&status==='fallido')rows.push(['Próximo intento automático',wanWhen(n.next_attempt_at)]);if(n.error_code)rows.push(['Código de Meta',n.error_code]);}
-  else rows.push(['Última actualización',wanWhen(n.updated_at)]);
-  rows.push(['Intentos',String(n.attempts||0)],['Motivo o respuesta',n.detail||(['enviado','entregado','leido'].includes(status)?'Aceptado por el servicio de envío.':'—')]);
+  else{rows.push(['Última actualización',wanWhen(n.updated_at)]);if(n.recipient)rows.push(['Destinatario',n.recipient]);}
+  rows.push(['Intentos',String(n.attempts||0)]);if(!n.adi)rows.push(['Respuesta del proveedor',n.detail||(['enviado','entregado','leido'].includes(status)?'Aceptado por el servicio de envío.':'—')]);
   if(wa&&n.preview)rows.push(['Resumen del aviso',n.preview]);
-  for(const[k,v]of rows){const d=el('div');d.append(el('dt',k),el('dd',v));det.append(d);}
-  if(n.message_id&&opts.orderId){const d=el('div'),link=button('Ver en la comunicación de la orden',()=>orderMessageComposer(opts.orderId),'text-action');d.append(el('dt','Registro'),link);det.append(d);}
-  const side=el('div',undefined,'wan-side');side.append(pill);
-  if(wa&&n.interrupted&&admin()){const x=button('Marcar como no enviado',async()=>{const reason=await askText('Marcar como no enviado','Este aviso quedó interrumpido en «Enviando» y el sistema no lo reintenta solo. Márcalo como no enviado solo si sabes que no llegó a Meta (no se envía nada). Indica el motivo:','','Marcar como no enviado',200);if(reason===null||reason===undefined)return;x.disabled=true;
-    try{await api('/api/whatsapp/outbox/'+n.id+'/dismiss',{reason:String(reason)});toast('Aviso marcado como no enviado (omitido).','success');opts.onChange?.();}catch(error){toast(error.message,'error');x.disabled=false;}},'secondary wan-retry');side.append(x);}
-  if(wa&&n.can_retry){const r=button('',async()=>{if(!await askConfirm(status==='omitido'?'¿Enviar el aviso ahora?':'¿Reintentar el envío?','Se enviará por WhatsApp la plantilla aprobada al número registrado del cliente. Solo figura como enviado si WhatsApp lo acepta.','Enviar'))return;r.disabled=true;
+  for(const[k,v]of rows){const d=el('div');d.append(el('dt',k),el('dd',v));dl.append(d);}det.append(dl);
+  // Asistencia de ADI: categoría, causa real del proveedor y qué hacer. No reenvía nada por sí sola.
+  if(n.adi){const box=el('section',undefined,'wan-adi');box.dataset.category=n.adi.category;const h=el('header');h.append(wanIcon(typeof adiSpark==='string'?adiSpark:'M12 3l1.9 5.8L20 10l-6.1 1.2L12 17l-1.9-5.8L4 10l6.1-1.2z'),el('strong','Diagnóstico de ADI · '+n.adi.title));box.append(h);
+   box.append(el('p','Causa: '+n.adi.cause+(n.adi.code?' (código '+n.adi.code+')':''),'wan-adi-cause'),el('p','Qué hacer: '+n.adi.action,'wan-adi-action'));
+   if(n.adi.auto_retry)box.append(el('p','El sistema lo reintentará automáticamente'+(n.next_attempt_at?' el '+wanWhen(n.next_attempt_at):'')+'.','wan-soft'));
+   if(n.adi.note)box.append(el('p',n.adi.note,'wan-soft'));det.append(box);}
+  if(wa){const hist=el('section',undefined,'wan-attempts');hist.append(el('h4','Historial de intentos y respuestas del proveedor'),el('p','Cargando…','wan-soft'));det.append(hist);det.dataset.attempts='pending';
+   det.loadAttempts=async()=>{if(det.dataset.attempts!=='pending')return;det.dataset.attempts='loading';try{const r=await api('/api/whatsapp/outbox/'+n.id+'/attempts');hist.lastChild.remove();
+     if(!r.attempts.length){hist.append(el('p',r.logged?'Sin intentos registrados todavía.':'El historial detallado se registra desde la versión 1.5.356; este aviso solo conserva su último resultado.','wan-soft'));return;}
+     const ol=el('ol');for(const a of r.attempts){const li2=el('li');li2.dataset.status=a.status;li2.append(el('strong',WAN_LABELS[a.status]||a.status),el('span',wanWhen(a.created_at)),el('small',(a.error_code?'Código '+a.error_code+' · ':'')+(a.detail||'')));ol.append(li2);}hist.append(ol);det.dataset.attempts='done';}
+    catch(error){hist.lastChild.textContent=error.message;det.dataset.attempts='pending';}};}
+  if(n.message_id&&opts.orderId){const link=button('Ver en la comunicación de la orden',()=>orderMessageComposer(opts.orderId),'text-action');det.append(link);}
+  const acts=el('div',undefined,'wan-acts');
+  if(wa&&n.interrupted&&admin()){const x=button('',async()=>{const reason=await askText('Marcar como no enviado','Este aviso quedó interrumpido en «Enviando» y el sistema no lo reintenta solo. Márcalo como no enviado solo si sabes que no llegó a Meta (no se envía nada). Indica el motivo:','','Marcar como no enviado',200);if(reason===null||reason===undefined)return;x.disabled=true;
+    try{await api('/api/whatsapp/outbox/'+n.id+'/dismiss',{reason:String(reason)});toast('Aviso marcado como no enviado (omitido).','success');opts.onChange?.();}catch(error){toast(error.message,'error');x.disabled=false;}},'wan-act');x.append(wanIcon('M18 6 6 18 M6 6l12 12'),el('span','Marcar como no enviado'));acts.append(x);}
+  // Reintento controlado: solo cuando el servidor dice que procede; un clic, sin duplicados (el botón queda deshabilitado mientras responde).
+  if(wa&&n.can_retry){const r=button('',async()=>{if(r.disabled)return;if(!await askConfirm(status==='omitido'?'¿Enviar el aviso ahora?':'¿Reintentar el envío?','Se enviará por WhatsApp la plantilla aprobada al número registrado del cliente. Solo figura como enviado si WhatsApp lo acepta.','Enviar'))return;r.disabled=true;r.dataset.loading='true';
     try{const out=await api('/api/whatsapp/outbox/'+n.id+'/retry',{});const st=out.item.status;toast(['enviado','entregado','leido'].includes(st)?'WhatsApp aceptó el aviso.':st==='fallido'?'No se pudo enviar: '+out.item.detail:'Aviso actualizado: '+(WAN_LABELS[st]||st)+'.',['enviado','entregado','leido'].includes(st)?'success':'error');opts.onChange?.();}
-    catch(error){r.disabled=false;toast(error.message,'error');}},'wan-retry');r.append(wanIcon(WAN_RETRY),el('span',status==='omitido'?'Enviar ahora':'Reintentar envío'));side.append(r);}
-  side.append(more);li.append(ic,main,side,det);ul.append(li);}
+    catch(error){r.disabled=false;delete r.dataset.loading;toast(error.message,'error');}},'wan-act wan-act-primary');r.append(wanIcon(WAN_RETRY),el('span',status==='omitido'?'Enviar ahora':'Reintentar envío'));acts.append(r);}
+  const more=button('',()=>{const open=det.hidden;det.hidden=!open;more.setAttribute('aria-expanded',String(open));li.dataset.open=String(open);if(open)det.loadAttempts?.();},'wan-act wan-more');more.append(el('span','Detalles'),wanIcon('m6 9 6 6 6-6'));more.setAttribute('aria-expanded','false');more.setAttribute('aria-controls',det.id);more.setAttribute('aria-label','Detalles de '+n.label);
+  for(const extra of opts.actions?.(n)||[])acts.append(extra);acts.append(more);li.dataset.acts=String(acts.childElementCount);li.append(acts,det);ul.append(li);}
  wrap.append(ul);
- if(items.length>limit){const extra=[...ul.children].slice(limit);extra.forEach(li=>li.hidden=true);const all=button('Ver todos los avisos ('+items.length+')',()=>{const show=extra[0].hidden;extra.forEach(li=>li.hidden=!show);all.textContent=show?'Ver solo los recientes':'Ver todos los avisos ('+items.length+')';all.setAttribute('aria-expanded',String(show));},'text-action wan-all');all.setAttribute('aria-expanded','false');wrap.append(all);}
+ if(items.length>limit){const extra=[...ul.children].slice(limit);extra.forEach(li=>li.hidden=true);wrap.dataset.collapsed='true';const all=button('Ver todos los avisos ('+items.length+')',()=>{const show=wrap.dataset.collapsed==='true';wrap.dataset.collapsed=String(!show);for(const li of ul.children)if(!li.dataset.filtered)li.hidden=!show&&[...ul.children].indexOf(li)>=limit;all.textContent=show?'Ver solo los recientes':'Ver todos los avisos ('+items.length+')';all.setAttribute('aria-expanded',String(show));},'text-action wan-all');all.setAttribute('aria-expanded','false');wrap.append(all);}
+ // Los contadores por estado (waCounts) filtran esta lista: un clic muestra solo ese estado; otro clic, todos.
+ wrap.filterBy=st=>{for(const li of ul.children){const hide=!!st&&li.dataset.status!==st;li.dataset.filtered=hide?'true':'';li.hidden=hide||(!st&&wrap.dataset.collapsed==='true'&&[...ul.children].indexOf(li)>=limit);}wrap.querySelector('.wan-all')?.toggleAttribute('hidden',!!st);};
  return wrap;}
-function waCounts(items){const box=el('div',undefined,'wan-counts');for(const st of ['enviado','entregado','leido','pendiente','enviando','fallido','omitido']){const n=items.filter(x=>x.status===st).length;if(!n)continue;const c=el('span',n+' '+WAN_LABELS[st].toLowerCase(),'wan-count');c.dataset.status=st;box.append(c);}return box;}
+function waCounts(items,list){const box=el('div',undefined,'wan-counts');box.setAttribute('role','group');box.setAttribute('aria-label','Avisos por estado');let active='';
+ for(const st of ['enviado','entregado','leido','pendiente','enviando','fallido','omitido']){const n=items.filter(x=>x.status===st).length;if(!n)continue;const c=button('',()=>{active=active===st?'':st;for(const b of box.children)b.setAttribute('aria-pressed',String(b.dataset.status===active));let host=box.parentElement;while(host&&!host.querySelector('.wan3'))host=host.parentElement;(list||host?.querySelector('.wan3'))?.filterBy?.(active);},'wan-count');c.dataset.status=st;c.setAttribute('aria-pressed','false');c.title='Mostrar solo: '+WAN_LABELS[st].toLowerCase();c.append(wanIcon(WAN_ICONS[st]),el('b',String(n)),el('span',WAN_LABELS[st].toLowerCase()));box.append(c);}
+ return box;}
 function waInactiveHint(text,showLink){const hint=el('div',undefined,'wan-hint');hint.append(wanIcon('M12 9v4 M12 17h.01 M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z'),el('p',text));
  if(showLink&&admin()){const go=button('Configurar WhatsApp',()=>{location.hash='#settings?tab=integrations';},'secondary');hint.append(go);}return hint;}
 

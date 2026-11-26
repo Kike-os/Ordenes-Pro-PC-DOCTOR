@@ -14501,3 +14501,46 @@ body:has(.ax) #adi-widget{display:none}
 :root[data-theme=light] .quote-badge[data-status=parcial]{border-color:#2563eb66;background:#dbeafe;color:#1e40af}
 :root[data-theme=light] .quote-badge[data-status=vencido]{border-color:#ea580c66;background:#ffedd5;color:#9a3412}
 @media(prefers-reduced-motion:reduce){.quote-badge,.quote-badge .qb-hand,.quote-badge .qb-check{animation:none!important;transition:none!important}.quote-badge .qb-check{stroke-dashoffset:0}}
+
+/* ───── ADI Smart Notifications Premium 3.0 (solo .wan3 y contadores; docs/SMART-NOTIFICATIONS.md) ───── */
+.wan3{--w-ok:#22c55e;--w-blue:#60a5fa;--w-cyan:#22d3ee;--w-amber:#f59e0b;--w-red:#ef4444;--w-gray:#94a3b8}
+.wan3 .wan-list{display:grid;gap:6px;margin:0;padding:0;list-style:none}
+.wan3 .wan-item{--w:var(--w-gray);display:grid;grid-template-columns:28px minmax(0,1fr) auto;grid-template-areas:"icon title pill" "icon meta acts" "icon reason reason" "det det det";column-gap:10px;row-gap:2px;align-items:center;
+ padding:9px 10px;border:1px solid #1e3254;border-left:3px solid var(--w);border-radius:10px;background:#0b172b;transition:border-color .18s ease,background-color .18s ease;animation:wan-in .22s ease-out}
+.wan3 .wan-item[data-status=enviado]{--w:var(--w-blue)}.wan3 .wan-item[data-status=entregado]{--w:var(--w-ok)}.wan3 .wan-item[data-status=leido]{--w:var(--w-cyan)}
+.wan3 .wan-item[data-status=pendiente]{--w:var(--w-gray)}.wan3 .wan-item[data-status=enviando]{--w:var(--w-blue)}.wan3 .wan-item[data-status=omitido]{--w:var(--w-amber)}.wan3 .wan-item[data-status=fallido]{--w:var(--w-red)}
+.wan3 .wan-item:hover{background:#0f1d33}
+.wan3 .wan-state{grid-area:icon;align-self:start;display:grid;place-items:center;width:28px;height:28px;border-radius:8px;background:color-mix(in srgb,var(--w) 16%,transparent);color:var(--w)}
+.wan3 .wan-state .system-icon{width:15px;height:15px}
+.wan3 .wan-item[data-status=enviando] .wan-state .system-icon{animation:wan-spin 1s linear infinite}
+.wan3 .wan-title{grid-area:title;min-width:0;font-size:13px;line-height:1.3;color:#e6eefc;overflow-wrap:anywhere}
+.wan3 .wan-pill{grid-area:pill;align-self:start;padding:2px 9px;border-radius:999px;background:color-mix(in srgb,var(--w) 18%,transparent);color:color-mix(in srgb,var(--w) 70%,#fff);font-size:11px;font-weight:700;white-space:nowrap}
+.wan3 .wan-meta{grid-area:meta;display:flex;flex-wrap:wrap;align-items:center;gap:2px 10px;min-width:0;font-size:11.5px;color:#8da2c2}
+.wan3 .wan-meta .system-icon{width:13px;height:13px;margin-right:-6px;color:#7dd3fc}
+.wan3 .wan-reason{grid-area:reason;margin:3px 0 0;font-size:12px;line-height:1.4;color:#fcd9a8;overflow-wrap:anywhere}.wan3 .wan-item[data-status=fallido] .wan-reason{color:#fecaca}.wan3 .wan-reason.wan-soft{color:#8da2c2}
+.wan3 .wan-acts{grid-area:acts;display:flex;flex-wrap:wrap;justify-content:flex-end;gap:6px;margin-top:2px}
+.wan3 .wan-act{display:inline-flex;align-items:center;gap:6px;min-height:30px;padding:0 10px;border:1px solid #27406a;border-radius:8px;background:#0f1f38;color:#dce7f8;font-size:12px;font-weight:600;cursor:pointer;transition:background-color .16s,border-color .16s}
+.wan3 .wan-act .system-icon{width:14px;height:14px}.wan3 .wan-act:is(:hover,:focus-visible){border-color:#3b82f6;background:#16294a;outline:0}
+.wan3 .wan-act-primary{border-color:#3b82f6;background:#1d4ed8;color:#fff}.wan3 .wan-act[data-loading=true] .system-icon{animation:wan-spin 1s linear infinite}
+.wan3 .wan-more .system-icon{transition:transform .2s ease}.wan3 .wan-item[data-open=true] .wan-more .system-icon{transform:rotate(180deg)}
+.wan3 .wan-detail{grid-area:det;display:grid;gap:8px;margin-top:8px;padding-top:8px;border-top:1px solid #1e3254;animation:wan-in .2s ease-out}
+.wan3 .wan-detail dl{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:6px 12px;margin:0}
+.wan3 .wan-detail dl div{min-width:0}.wan3 .wan-detail dt{font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;color:#7f93b3}.wan3 .wan-detail dd{margin:0;font-size:12px;color:#dce7f8;overflow-wrap:anywhere}
+.wan3 .wan-adi{display:grid;gap:4px;padding:9px 10px;border:1px solid #6d28d966;border-radius:10px;background:linear-gradient(180deg,#2e1065 0%,#1e1b4b 100%)}
+.wan3 .wan-adi header{display:flex;align-items:center;gap:7px}.wan3 .wan-adi header .system-icon{width:15px;height:15px;color:#c4b5fd}.wan3 .wan-adi strong{font-size:12.5px;color:#ede9fe}
+.wan3 .wan-adi p{margin:0;font-size:12px;line-height:1.4;color:#ddd6fe}.wan3 .wan-adi .wan-adi-action{color:#f5f3ff}
+.wan3 .wan-attempts h4{margin:0 0 4px;font-size:11.5px;color:#a9bcd8}.wan3 .wan-attempts ol{display:grid;gap:4px;margin:0;padding:0;list-style:none}
+.wan3 .wan-attempts li{display:grid;grid-template-columns:auto 1fr;column-gap:10px;padding:5px 8px;border-left:2px solid #2a3c5c;font-size:11.5px}.wan3 .wan-attempts li small{grid-column:1/-1;color:#8da2c2;overflow-wrap:anywhere}
+.wan3 .wan-attempts li[data-status=fallido]{border-left-color:#ef4444}.wan3 .wan-attempts li:is([data-status=enviado],[data-status=entregado],[data-status=leido]){border-left-color:#22c55e}
+.wan-counts{display:flex;flex-wrap:wrap;gap:5px}
+.wan-counts .wan-count{--w:#94a3b8;display:inline-flex;align-items:center;gap:4px;min-height:24px;padding:0 8px;border:1px solid color-mix(in srgb,var(--w) 45%,transparent);border-radius:999px;background:color-mix(in srgb,var(--w) 12%,transparent);color:color-mix(in srgb,var(--w) 70%,#fff);font-size:11px;cursor:pointer;transition:background-color .16s}
+.wan-counts .wan-count .system-icon{width:12px;height:12px}.wan-counts .wan-count b{font-size:11.5px}
+.wan-counts .wan-count[aria-pressed=true]{background:color-mix(in srgb,var(--w) 32%,transparent);box-shadow:0 0 0 1px var(--w) inset}
+.wan-counts .wan-count[data-status=enviado]{--w:#60a5fa}.wan-counts .wan-count[data-status=entregado]{--w:#22c55e}.wan-counts .wan-count[data-status=leido]{--w:#22d3ee}.wan-counts .wan-count[data-status=omitido]{--w:#f59e0b}.wan-counts .wan-count[data-status=fallido]{--w:#ef4444}.wan-counts .wan-count[data-status=enviando]{--w:#60a5fa}
+:root[data-theme=light] .wan3 .wan-item{background:#fff;border-color:#e2e8f0}:root[data-theme=light] .wan3 .wan-title,:root[data-theme=light] .wan3 .wan-detail dd{color:#0f172a}
+@keyframes wan-in{from{opacity:0;transform:translateY(-3px)}}@keyframes wan-spin{to{transform:rotate(360deg)}}
+@media(max-width:520px){.wan3 .wan-item{grid-template-columns:26px minmax(0,1fr)}.wan3 .wan-item{grid-template-areas:"icon title" "icon pill" "icon meta" "icon reason" "acts acts" "det det"}.wan3 .wan-pill{justify-self:start}}
+@media(prefers-reduced-motion:reduce){.wan3 *,.wan-counts *{animation:none!important;transition:none!important}}
+.wan3 .wan-pill{justify-self:end}
+.wan3 .wan-item:not([data-acts="1"]){grid-template-areas:"icon title pill" "icon meta meta" "icon reason reason" "acts acts acts" "det det det"}.wan3 .wan-item:not([data-acts="1"]) .wan-acts{margin-top:6px}
+@media(max-width:520px){.wan3 .wan-item,.wan3 .wan-item:not([data-acts="1"]){grid-template-areas:"icon title" "icon pill" "icon meta" "icon reason" "acts acts" "det det"}}
