@@ -839,9 +839,19 @@ def send_whatsapp(c, oid, data, user, now, env=None):
             template_name = META_TEMPLATE_BY_KEY[key_name]
             language = 'es_EC'
             params = _template_parameters(c, oid, data, key_name, o)
+        components = [{'type': 'body', 'parameters': [{'type': 'text', 'text': str(p)} for p in params]}]
+        if key_name == 'repuesto':
+            # Esta plantilla de Meta tiene un botón URL dinámico además de sus cinco variables del cuerpo.
+            # El valor del botón es el token del enlace público activo de seguimiento de esta orden.
+            import order_tracking
+            tracking = order_tracking.active(c, oid)
+            tracking_token = str(tracking.get('url') or '').rstrip('/').rsplit('/', 1)[-1]
+            if not tracking.get('active') or not order_tracking.TOKEN.fullmatch(tracking_token):
+                raise FollowupError('La plantilla de repuesto requiere un enlace de seguimiento activo para la orden.', 409)
+            components.append({'type': 'button', 'sub_type': 'url', 'index': '0',
+                               'parameters': [{'type': 'text', 'text': tracking_token}]})
         payload = {'messaging_product': 'whatsapp', 'to': number, 'type': 'template',
-                   'template': {'name': template_name, 'language': {'code': language},
-                                'components': [{'type': 'body', 'parameters': [{'type': 'text', 'text': str(p)} for p in params]}]}}
+                   'template': {'name': template_name, 'language': {'code': language}, 'components': components}}
         body = 'Plantilla aprobada de WhatsApp «%s» (%s) con los datos: %s.' % (template_name, language, ', '.join(str(p) for p in params))
     else:
         payload = {'messaging_product': 'whatsapp', 'to': number, 'type': 'text', 'text': {'preview_url': True, 'body': body}}
