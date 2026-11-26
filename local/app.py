@@ -4263,7 +4263,16 @@ class Handler(BaseHTTPRequestHandler):
                             else:c.rollback();return self.reply(400,{'error':'Acción inválida.'})
                         elif path=='/api/inventory/products':
                             import inventory_center as center
-                            if action=='save':result={'id':center.save_product(c,data,user,now)}
+                            if action=='save':
+                                result={'id':center.save_product(c,data,user,now)}
+                                linked=c.execute('SELECT catalog_id FROM inventory_items WHERE id=?',(result['id'],)).fetchone()
+                                result['catalog_id']=linked[0] if linked else None
+                                # Smart Catalog: lo creado desde Inventario es permanente (si el artículo aún no tiene perfil).
+                                try:
+                                    import catalog_smart as catalog_smart_
+                                    if linked and linked[0] and catalog_smart_.installed(c) and not c.execute('SELECT 1 FROM catalog_profiles WHERE item_id=?',(linked[0],)).fetchone():
+                                        catalog_smart_.record_creation(c,linked[0],{'mode':'permanente','model':data.get('model','')},user,now,'inventario')
+                                except Exception as error:print('catalog profile inventory',type(error).__name__,flush=True)
                             elif action=='pricing':result={'product':center.save_pricing(c,data.get('id'),data,user,now)}
                             elif action in ('alerts_on','alerts_off'):center.set_alerts(c,data.get('id'),action=='alerts_on',user,now);result={}
                             else:c.rollback();return self.reply(400,{'error':'Acción inválida.'})

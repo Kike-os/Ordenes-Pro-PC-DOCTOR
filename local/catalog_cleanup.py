@@ -48,8 +48,9 @@ OWNED_LABELS = {'catalog_price_history': 'historial de precios', 'catalog_images
 def _immutable_owned(c, tables):
     """Tablas propias del producto con un disparador que impide borrar filas: no se tocan."""
     out = []
+    guarded = {r[0] for r in c.execute("SELECT tbl_name FROM sqlite_master WHERE type='trigger' AND upper(sql) LIKE '%BEFORE DELETE%'")}
     for table, column in OWNED:
-        if table in tables and c.execute("SELECT 1 FROM sqlite_master WHERE type='trigger' AND tbl_name=? AND upper(sql) LIKE '%BEFORE DELETE%'", (table,)).fetchone():
+        if table in tables and table in guarded:
             out.append((table, column))
     return out
 
@@ -58,6 +59,12 @@ def _unknown_refs(c, tables):
     """Red de seguridad: tablas que apuntan a catalog_items con clave foránea y no están en las listas conocidas (una tabla futura).
     Cuentan como protección: nunca se elimina un producto referenciado por algo que esta limpieza no conoce."""
     known = {(t, col) for t, col, _ in PROTECTED} | set(OWNED)
+    # Una sola consulta para todas las tablas (con la base en la nube, una consulta por tabla era demasiado lenta).
+    try:
+        rows = c.execute("SELECT m.name,p.\"from\" FROM sqlite_master m JOIN pragma_foreign_key_list(m.name) p WHERE m.type='table' AND p.\"table\"='catalog_items'").fetchall()
+        return sorted({(r[0], r[1]) for r in rows if not r[0].startswith('sqlite_') and (r[0], r[1]) not in known})
+    except Exception:
+        pass
     found = []
     for table in sorted(tables):
         if table.startswith('sqlite_'):

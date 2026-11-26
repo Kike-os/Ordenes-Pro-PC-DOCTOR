@@ -4,6 +4,18 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.353 — 2026-11-25 22:48 (UTC-05:00)
+
+Smart Catalog: centro de control operativo en producción y fotografías al registrar productos en Inventario
+
+### Nuevas funcionalidades
+
+- Inventario: fotografía del producto (con galería) en la ficha y al crear un producto desde el ingreso de mercadería; lo creado desde Inventario queda como permanente
+
+### Errores corregidos
+
+- Smart Catalog: el centro de control y el reporte de candidatos respondían con error en producción (revisión demasiado lenta con la base en la nube); ahora usan pocas consultas agrupadas
+
 ## v1.5.352 — 2026-11-25 22:34 (UTC-05:00)
 
 Smart Catalog & Inventory Pro 3.0: clasificación profesional, fotografías integradas y depuración segura de artículos temporales (simulación)

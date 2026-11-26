@@ -342,8 +342,54 @@ def _base_names():
     return {name.lower() for name, *_ in quotes.INITIAL} | {name.lower() for name, *_ in quotes.ADDITIONS}
 
 
-def evaluate(c, now, include_permanent=True):
-    """Estado de cada artículo para el centro de control y la depuración. Solo lee."""
+def _bulk_refs(c, tables):
+    """Referencias que protegen, contadas con una consulta agrupada por tabla (y no por artículo): {artículo: [etiquetas]}."""
+    out = {}
+    pairs = [(t, col, label) for t, col, label in catalog_cleanup.PROTECTED if t != 'quote_items' and t in tables]
+    pairs += [(t, col, 'otros registros (%s)' % t) for t, col in catalog_cleanup._unknown_refs(c, tables)]
+    pairs += [(t, col, catalog_cleanup.OWNED_LABELS.get(t, t)) for t, col in catalog_cleanup._immutable_owned(c, tables)]
+    for table, column, label in pairs:
+        for item, count in c.execute('SELECT "%s",COUNT(*) FROM "%s" WHERE "%s" IS NOT NULL GROUP BY "%s"' % (column, table, column, column)):
+            if count:
+                out.setdefault(item, []).append(label)
+    return out
+
+
+def _bulk_quotes(c, today):
+    """Líneas de presupuesto de todos los artículos en una sola consulta: {artículo: (vigentes, aprobadas, terminadas, fin, códigos, filas)}."""
+    found = {}
+    for r in c.execute("SELECT i.catalog_id,q.id,q.code,q.status,q.valid_until,q.created_at,q.updated_at,q.sent_at,q.decided_at,COALESCE(q.deleted_at,'') deleted_at,i.status item_status "
+                       "FROM quote_items i JOIN quotes q ON q.id=i.quote_id WHERE i.catalog_id IS NOT NULL ORDER BY q.id"):
+        open_, approved, ended, last_end, codes, rows = found.get(r['catalog_id'], (0, 0, 0, '', [], []))
+        rows.append(dict(r))
+        codes = codes + [r['code'] or 'P%d' % r['id']]
+        if r['status'] in APPROVED_QUOTE and r['item_status'] != 'rechazado' and not r['deleted_at']:
+            approved += 1
+        else:
+            expired = r['status'] in OPEN_QUOTE and r['valid_until'] and r['valid_until'][:10] < today
+            if r['status'] in OPEN_QUOTE and not expired and not r['deleted_at']:
+                open_ += 1
+            else:
+                ended += 1
+                last_end = max(last_end, str(r['valid_until'][:10] + 'T23:59:59' if expired else (r['decided_at'] or r['updated_at'] or r['created_at'])))
+        found[r['catalog_id']] = (open_, approved, ended, last_end, codes, rows)
+    return found
+
+
+def _verified_from_rows(created_at, rows):
+    created = _dt(created_at)
+    if not created:
+        return None
+    for r in rows:
+        start, end = _dt(r['created_at']), _dt(r['sent_at'] or r['decided_at'] or r['updated_at'])
+        if start and end and start - timedelta(minutes=2) <= created <= end + timedelta(minutes=2):
+            return r['id']
+    return None
+
+
+def evaluate(c, now, include_permanent=True, only=None):
+    """Estado de cada artículo para el centro de control y la depuración. Solo lee, con consultas agrupadas (rápido también con la base
+    en la nube). `only`: limitar a un artículo."""
     cfg = settings(c)
     today = now.date().isoformat()
     tables = catalog_cleanup._tables(c)
@@ -351,28 +397,31 @@ def evaluate(c, now, include_permanent=True):
     profiles = {r['item_id']: dict(r) for r in c.execute('SELECT * FROM catalog_profiles')} if installed(c) else {}
     types = {r['code']: dict(r) for r in c.execute('SELECT code,label,icon,base_category FROM catalog_types')} if installed(c) else {}
     subs = {r['id']: r['name'] for r in c.execute('SELECT id,name FROM catalog_subcategories')} if installed(c) else {}
+    refs = _bulk_refs(c, tables)
+    quotes_by = _bulk_quotes(c, today) if 'quote_items' in tables else {}
     base_names = _base_names()
     rows = []
-    for item in c.execute("SELECT id,code,name,category,brand,price_cents,available,created_at,updated_at,COALESCE(archived_at,'') archived_at FROM catalog_items ORDER BY id"):
+    sql = "SELECT id,code,name,category,brand,price_cents,available,created_at,updated_at,COALESCE(archived_at,'') archived_at FROM catalog_items"
+    for item in c.execute(sql + (' WHERE id=?' if only else '') + ' ORDER BY id', (only,) if only else ()):
         prof = profiles.get(item['id'])
+        open_q, approved_q, ended_q, last_end, codes, qrows = quotes_by.get(item['id'], (0, 0, 0, '', [], []))
         origin, mode, origin_quote = (prof['origin'], prof['mode'], prof['origin_quote_id']) if prof else ('', '', None)
         if not prof:
             # Artículo anterior: el origen se deduce con evidencia; sin evidencia, nunca se depura.
             if item['name'].lower() in base_names:
                 origin, mode = 'catalogo_base', 'permanente'
             else:
-                origin_quote = _verified_quote_origin(c, item['id'], item['created_at']) if 'quote_items' in tables else None
+                origin_quote = _verified_from_rows(item['created_at'], qrows)
                 origin, mode = ('presupuesto', 'temporal') if origin_quote else ('desconocido', 'permanente')
-        check = catalog_cleanup.check(c, item['id'], archived, tables) or {'reasons': []}
-        blockers = [r for r in check['reasons'] if not r.get('detail') and r['label'] != 'presupuestos de órdenes técnicas']
-        open_q, approved_q, ended_q, last_end, codes = _quote_refs(c, item['id'], today) if 'quote_items' in tables else (0, 0, 0, '', [])
+        blockers = refs.get(item['id'], [])
+        codes = sorted(set(codes))
         type_code = (prof or {}).get('type_code') or BASE_TO_TYPE.get(item['category'], 'producto')
         t = types.get(type_code, {})
         row = {'id': item['id'], 'code': item['code'] or '', 'name': item['name'], 'category': item['category'], 'brand': item['brand'] or '', 'price_cents': item['price_cents'],
                'type': type_code, 'type_label': t.get('label', ''), 'icon': t.get('icon', ''), 'subcategory': subs.get((prof or {}).get('subcategory_id'), ''),
                'model': (prof or {}).get('model', ''), 'created_at': item['created_at'], 'origin': origin, 'origin_quote_id': origin_quote, 'mode': mode,
                'profiled': bool(prof), 'protected': bool(prof and prof['protected']), 'protect_reason': (prof or {}).get('protect_reason', ''),
-               'quotes': codes, 'open_quotes': open_q, 'approved_quotes': approved_q, 'ended_quotes': ended_q, 'blockers': [b['label'] for b in blockers],
+               'quotes': codes, 'open_quotes': open_q, 'approved_quotes': approved_q, 'ended_quotes': ended_q, 'blockers': blockers,
                'archived': item['id'] in archived, 'cleanup_state': (prof or {}).get('cleanup_state', ''), 'cleaned_at': (prof or {}).get('cleaned_at', ''),
                'start': '', 'due': '', 'days_left': None, 'percent': None, 'state': '', 'reason': ''}
         if row['cleanup_state'] == 'depurado' and row['archived']:
@@ -385,7 +434,7 @@ def evaluate(c, now, include_permanent=True):
         elif row['protected']:
             row['state'], row['reason'] = 'protegido', 'Protegido manualmente: ' + row['protect_reason']
         elif blockers:
-            row['state'], row['reason'] = 'protegido', 'Tiene operaciones que deben conservarse: ' + ', '.join(row['blockers']) + '.'
+            row['state'], row['reason'] = 'protegido', 'Tiene operaciones que deben conservarse: ' + ', '.join(blockers) + '.'
         elif approved_q:
             row['state'], row['reason'] = 'protegido', 'Forma parte de un presupuesto aprobado.'
         elif open_q:
@@ -405,7 +454,7 @@ def evaluate(c, now, include_permanent=True):
             else:
                 row['state'] = 'proximo' if left <= NEAR_DAYS else 'en_plazo'
                 row['reason'] = 'Temporal %s; se depura en %d día%s si nadie lo vuelve a usar.' % (why, max(1, int(left + .999)), '' if int(left + .999) == 1 else 's')
-        if include_permanent or row['state'] not in ('permanente',):
+        if include_permanent or row['state'] != 'permanente':
             rows.append(row)
     return rows
 
@@ -460,7 +509,7 @@ def run(c, now, user=None, source='programada'):
                 _event(c, row['id'], 'simulacion', 'Se depuraría: ' + row['reason'], user, now, simulated=True)
             continue
         # Antes de archivar se vuelve a comprobar con la base actual (nada cambia si apareció una referencia nueva).
-        again = next((r for r in evaluate(c, now, include_permanent=False) if r['id'] == row['id']), None)
+        again = next(iter(evaluate(c, now, include_permanent=False, only=row['id'])), None)
         if not again or again['state'] != 'pendiente':
             continue
         stamp = _stamp(now)

@@ -8,6 +8,26 @@
   },
   "releases": [
     {
+      "version": "1.5.353",
+      "date": "2026-11-25T22:48:58-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Smart Catalog: centro de control operativo en producción y fotografías al registrar productos en Inventario",
+      "changes": {
+        "features": [
+          "Inventario: fotografía del producto (con galería) en la ficha y al crear un producto desde el ingreso de mercadería; lo creado desde Inventario queda como permanente"
+        ],
+        "improvements": [],
+        "fixes": [
+          "Smart Catalog: el centro de control y el reporte de candidatos respondían con error en producción (revisión demasiado lenta con la base en la nube); ahora usan pocas consultas agrupadas"
+        ],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Administración (autorización expresa en la sesión)"
+    },
+    {
       "version": "1.5.352",
       "date": "2026-11-25T22:34:03-05:00",
       "type": "patch",
