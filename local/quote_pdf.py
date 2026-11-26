@@ -167,7 +167,9 @@ def render(quote, order, link=None):
         height = max(11.5 * len(lines) + (13 if priority else 0), 20)
         if need(height + 12):
             table_head()
-        catalog_icons.draw(pdf, item.get('icon') or 'generico', M + 2, state['y'] - 2, 17)
+        photo = (quote.get('pdf_photos') or {}).get(item.get('catalog_id'))
+        if not (photo and pdf.photo('P%d' % item['catalog_id'], photo, M, state['y'] - 4, 21)):
+            catalog_icons.draw(pdf, item.get('icon') or 'generico', M + 2, state['y'] - 2, 17)
         for offset, row in enumerate(lines):
             text(row, left, state['y'] + 11.5 * offset, 9, False, INK)
         if priority:

@@ -25,7 +25,8 @@ INVENTORY_DETAIL = (
     ('inventory_reservations', 'reservas'), ('sales_requests', 'solicitudes de venta'), ('order_part_requests', 'repuestos de órdenes'),
 )
 # Datos propios del producto, que se eliminan con él (no son historial de terceros).
-OWNED = (('catalog_images', 'item_id'), ('catalog_price_history', 'item_id'), ('license_products', 'item_id'), ('license_classification', 'item_id'))
+OWNED = (('catalog_images', 'item_id'), ('catalog_price_history', 'item_id'), ('license_products', 'item_id'), ('license_classification', 'item_id'),
+         ('catalog_profiles', 'item_id'), ('catalog_gallery', 'item_id'), ('catalog_cleanup_events', 'item_id'))
 DETAIL_COLUMN = {'sales_requests': 'inventory_item_id', 'order_part_requests': 'inventory_item_id'}
 MAX_IDS = 500
 
@@ -40,7 +41,8 @@ def _tables(c):
     return {r[0] for r in c.execute("SELECT name FROM sqlite_master WHERE type='table'")}
 
 
-OWNED_LABELS = {'catalog_price_history': 'historial de precios', 'catalog_images': 'imagen', 'license_products': 'ficha de licencia', 'license_classification': 'clasificación de licencia'}
+OWNED_LABELS = {'catalog_price_history': 'historial de precios', 'catalog_images': 'imagen', 'license_products': 'ficha de licencia', 'license_classification': 'clasificación de licencia',
+                'catalog_profiles': 'perfil del artículo', 'catalog_gallery': 'galería de fotografías', 'catalog_cleanup_events': 'historial de depuración'}
 
 
 def _immutable_owned(c, tables):

@@ -124,5 +124,6 @@
  "124_message_receipts.sql": "d29fa1ca53e7129d469688fffb7287aad42d0bfc71f7c06319fb7caeb701c004",
  "125_adi_executive.sql": "1b142f52aecd3882a6a57b620456ba43772437978f93b4cd5bac1ff4e24cde24",
  "126_client_portal.sql": "467ce241a4d5b66b7ad0bdd0f06e644eaea6bfc82ec4695bc77ba3a64d2eb1a4",
- "127_order_cancellations.sql": "efb66315060f07ea6db67b137a422a70ee6e11154b6bbf8c8945d56d0247c525"
+ "127_order_cancellations.sql": "efb66315060f07ea6db67b137a422a70ee6e11154b6bbf8c8945d56d0247c525",
+ "128_smart_catalog.sql": "a76b16c512074ac59daff538887e4805c6d4a60d422db914d0f1141af672f261"
 }

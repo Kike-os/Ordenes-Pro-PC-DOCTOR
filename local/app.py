@@ -468,7 +468,7 @@ def order_followup_mail(c,oid,data,user,now):
         found=c.execute("SELECT * FROM quotes WHERE id=? AND order_id=? AND deleted_at=''",(int(data['quote_id']),oid)).fetchone()
         if not found or found['status'] in ('borrador','cancelado'):return 400,{'error':'Solo se adjunta un presupuesto enviado o decidido (no un borrador).'}
         document=order_document(c,oid);number=re.sub(r'\D','',str(document.get('identification') or ''))
-        pdf=quote_pdf.render(quotes.detail(c,quotes.get(c,found['id'])),dict(document,identification=number[:2]+'*'*max(0,len(number)-2) if number else ''),None)
+        pdf=quote_pdf.render(quotes.with_pdf_photos(c,quotes.detail(c,quotes.get(c,found['id']))),dict(document,identification=number[:2]+'*'*max(0,len(number)-2) if number else ''),None)
         files.append({'name':found['code']+'-PRESUPUESTO.pdf','type':'application/pdf','data':base64.b64encode(pdf).decode()})
     body=order_followups.message_body(data)
     subject=order_followups._text(data.get('subject'),150) or 'PC-DOCTOR · Orden %s · %s'%(order['code'],order_followups.TEMPLATES.get(str(data.get('template','')),'Actualización de su servicio'))
@@ -1348,6 +1348,11 @@ class Handler(BaseHTTPRequestHandler):
                 # Inasistencias: registra las vencidas y envía los avisos pendientes (también lo hace la actividad del personal cada 5 minutos).
                 try:no_show_tick(c,now,force=True)
                 except Exception as error:print('no-show cron',type(error).__name__,flush=True)
+                # Smart Catalog Cleanup (diario, en el servidor): en simulación solo registra qué depuraría; en modo activo archiva.
+                try:
+                    import catalog_smart
+                    if catalog_smart.installed(c):catalog_smart.run(c,now);c.commit()
+                except Exception as error:print('smart-catalog cron',type(error).__name__,flush=True)
                 # Avisos de repuestos fallidos: reintento controlado (hasta 3 intentos, el mismo texto).
                 try:
                     import part_notices
@@ -1529,7 +1534,7 @@ class Handler(BaseHTTPRequestHandler):
                     import quote_pdf
                     number=re.sub(r'\D','',str(document.get('identification') or ''))
                     live=quotes.active_link(c,quote,quote_page[1],now)
-                    return self.reply(200,quote_pdf.render(quotes.detail(c,quote),dict(document,identification=number[:2]+'*'*max(0,len(number)-2) if number else ''),dict(live,url=public_base_url().rstrip('/')+'/presupuesto/'+quote_page[1]) if live else None),'application/pdf',filename=quote['code']+'-PRESUPUESTO.pdf')
+                    return self.reply(200,quote_pdf.render(quotes.with_pdf_photos(c,quotes.detail(c,quote)),dict(document,identification=number[:2]+'*'*max(0,len(number)-2) if number else ''),dict(live,url=public_base_url().rstrip('/')+'/presupuesto/'+quote_page[1]) if live else None),'application/pdf',filename=quote['code']+'-PRESUPUESTO.pdf')
                 if quote['status']!='enviado':
                     rows=quotes.items_of(c,quote['id'])
                     return self.reply(200,quotes.result_page(quote_page[1],quote,document,rows,quotes.bank_html(quotes.bank_for(c,quote)),__import__('quote_page').extras(c,rows),now,quotes.successor(c,quote),quotes.newer(c,quote)),'text/html; charset=utf-8')
@@ -3180,6 +3185,13 @@ class Handler(BaseHTTPRequestHandler):
                     gone,refs=catalog_cleanup.archived_ids(c),catalog_cleanup.reference_counts(c)
                     here={r[0] for r in c.execute("SELECT id FROM catalog_items WHERE COALESCE(archived_at,'')!=''")}
                     for row in catalog_rows:row['archived']=row['id'] in gone;row['archived_here']=row['id'] in here;row['refs']=refs.get(row['id'],0)
+                    try:
+                        import catalog_smart as catalog_smart_
+                        if catalog_smart_.installed(c):
+                            profiles={r['item_id']:r for r in c.execute('SELECT item_id,type_code,subcategory_id,model,mode,protected FROM catalog_profiles')}
+                            for row in catalog_rows:
+                                p_=profiles.get(row['id']);row['type']=(p_['type_code'] if p_ and p_['type_code'] else catalog_smart_.BASE_TO_TYPE.get(row['category'],'producto'));row['subcategory_id']=p_['subcategory_id'] if p_ else None;row['model']=p_['model'] if p_ else '';row['mode']=p_['mode'] if p_ else 'permanente'
+                    except Exception as error:print('catalog profiles',type(error).__name__,flush=True)
                     catalog_rows=[r for r in catalog_rows if not r['archived'] or user['role']=='administrador']
                 else:
                     import catalog_cleanup
@@ -3187,6 +3199,26 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(200,{'rows':catalog_rows,'categories':quotes.CATEGORIES,'price_modes':quotes.PRICE_MODES,
                     'tax_rate_bp':quotes.tax_rate(c),'link_days':quotes.link_days(c),'can_edit':user['role']=='administrador','brand_logos':logos,'initial_missing':len(names-present),'icons':quotes.catalog_icons.catalog(),
                     'priorities':{key:{'label':label,'color':color} for key,(label,color,_) in quotes.PRIORITIES.items()},'license_stock':licenses.stock(c,reception_now())})
+            if path in ('/api/catalog/taxonomy','/api/catalog/smart','/api/catalog/smart/report','/api/catalog/duplicates'):
+                import catalog_smart as catalog_smart_
+                if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
+                now_cat=reception_now();query_cat=parse_qs(urlsplit(self.path).query)
+                if path=='/api/catalog/taxonomy':
+                    out=catalog_smart_.taxonomy(c,now_cat,query_cat.get('all',[''])[0]=='1' and user['role']=='administrador');c.commit();return self.reply(200,out)
+                if path=='/api/catalog/duplicates':
+                    return self.reply(200,{'rows':catalog_smart_.duplicates(c,query_cat.get('name',[''])[0][:120],query_cat.get('brand',[''])[0][:80])})
+                if user['role']!='administrador':return self.reply(403,{'error':'Solo administración consulta Smart Catalog Cleanup.'})
+                if not catalog_smart_.installed(c):return self.reply(200,{'installed':False})
+                if path=='/api/catalog/smart/report':return self.reply(200,{'rows':catalog_smart_.report(c,now_cat),'settings':catalog_smart_.settings(c),'server_time':now_cat.isoformat(timespec='seconds')})
+                catalog_smart_.ensure_types(c,now_cat);c.commit();return self.reply(200,catalog_smart_.overview(c,now_cat))
+            catalog_gallery_get=re.fullmatch(r'/api/catalog/([0-9]{1,9})/gallery(?:/([0-9]{1,9}))?',path)
+            if catalog_gallery_get:
+                import catalog_smart as catalog_smart_
+                if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
+                if catalog_gallery_get[2]:
+                    found=catalog_smart_.gallery_photo(c,int(catalog_gallery_get[1]),int(catalog_gallery_get[2]))
+                    return self.reply(200,found[1],found[0]) if found else self.reply(404,{'error':'Imagen no disponible.'})
+                return self.reply(200,{'gallery':catalog_smart_.gallery(c,int(catalog_gallery_get[1]))})
             if path=='/api/catalog/removals':
                 if user['role']!='administrador':return self.reply(403,{'error':'Acceso no permitido.'})
                 return self.reply(200,{'rows':__import__('catalog_cleanup').history(c)})
@@ -3249,7 +3281,7 @@ class Handler(BaseHTTPRequestHandler):
                     if quote_get[3]:
                         import quote_pdf
                         token=parse_qs(urlsplit(self.path).query).get('t',[''])[0];live=quotes.active_link(c,found,token,reception_now())
-                        return self.reply(200,quote_pdf.render(quotes.detail(c,found),order_document(c,found['order_id']),dict(live,url=public_base_url().rstrip('/')+'/presupuesto/'+token) if live else None),'application/pdf',filename=found['code']+'-PRESUPUESTO.pdf')
+                        return self.reply(200,quote_pdf.render(quotes.with_pdf_photos(c,quotes.detail(c,found)),order_document(c,found['order_id']),dict(live,url=public_base_url().rstrip('/')+'/presupuesto/'+token) if live else None),'application/pdf',filename=found['code']+'-PRESUPUESTO.pdf')
                     return self.reply(200,{'quote':quotes.detail(c,found)})
                 except quotes.QuoteError as error:return self.reply(error.status,{'error':str(error)})
             if path == '/api/tracking':
@@ -3565,7 +3597,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(403, {'error':'Solicitud no autorizada.'})
             path = urlsplit(self.path).path
             workspace_post=bool(re.fullmatch(r'/api/orders/[0-9]+/workspace',path));quote_json=bool(re.fullmatch(r'/api/quotes/[0-9]+',path))
-            max_body=6200000 if re.fullmatch(r'/api/orders/[0-9]+/cancellation',path) else 3700000 if path=='/api/public/pqrs/upload/part' else 65536 if path in ('/api/public/pqrs','/api/public/pqrs/reply') or re.fullmatch(r'/api/pqrs/[0-9]+',path) else 4200000 if re.fullmatch(r'/api/conditions/[0-9a-f]{32}/signed',path) else 2900000 if path=='/api/business-signature' else 3900000 if re.fullmatch(r'/api/orders/[0-9]+/followups',path) else 3700000 if re.fullmatch(r'/api/orders/[0-9]+/uploads',path) else 1500000 if path in ('/api/inventory/purchases/xml','/api/inventory/purchases/from-xml') else 1700000 if path in ('/api/cash/upload','/api/files/upload') else 65536 if path.startswith('/api/proformas') or path.startswith('/api/caja/') or re.fullmatch(r'/api/orders/[0-9]+/payments',path) or path=='/api/credit-notes' else 9000000 if path in ('/api/clients/import/preview','/api/clients/import/commit','/api/inventory/import/preview','/api/inventory/import/commit') else 200000 if path in ('/api/inventory/register','/api/invoicing/policies') else 1700000 if path=='/api/public/adi/listen' else 6000000 if path in ('/api/mail/send','/api/mail/draft') else 100000 if path in ('/api/conditions','/api/order-draft','/api/conditions/draft','/api/conditions/compare') else 3200000 if path in ('/api/licenses/new','/api/licenses/units','/api/licenses/units/bulk','/api/licenses/check','/api/licenses/products','/api/licenses/products/duplicate','/api/licenses/sales') or re.fullmatch(r'/api/licenses/sales/[0-9]+',path) else 1700000 if re.fullmatch(r'/api/orders/[0-9]+/photos',path) or path in ('/api/profile/photo','/api/mail/signature') or re.fullmatch(r'/api/catalog/[0-9]+/image',path) else (65536 if workspace_post or quote_json or path=='/api/mail/subject' else 16384)
+            max_body=6200000 if re.fullmatch(r'/api/orders/[0-9]+/cancellation',path) else 1700000 if re.fullmatch(r'/api/catalog/[0-9]+/gallery',path) else 3700000 if path=='/api/public/pqrs/upload/part' else 65536 if path in ('/api/public/pqrs','/api/public/pqrs/reply') or re.fullmatch(r'/api/pqrs/[0-9]+',path) else 4200000 if re.fullmatch(r'/api/conditions/[0-9a-f]{32}/signed',path) else 2900000 if path=='/api/business-signature' else 3900000 if re.fullmatch(r'/api/orders/[0-9]+/followups',path) else 3700000 if re.fullmatch(r'/api/orders/[0-9]+/uploads',path) else 1500000 if path in ('/api/inventory/purchases/xml','/api/inventory/purchases/from-xml') else 1700000 if path in ('/api/cash/upload','/api/files/upload') else 65536 if path.startswith('/api/proformas') or path.startswith('/api/caja/') or re.fullmatch(r'/api/orders/[0-9]+/payments',path) or path=='/api/credit-notes' else 9000000 if path in ('/api/clients/import/preview','/api/clients/import/commit','/api/inventory/import/preview','/api/inventory/import/commit') else 200000 if path in ('/api/inventory/register','/api/invoicing/policies') else 1700000 if path=='/api/public/adi/listen' else 6000000 if path in ('/api/mail/send','/api/mail/draft') else 100000 if path in ('/api/conditions','/api/order-draft','/api/conditions/draft','/api/conditions/compare') else 3200000 if path in ('/api/licenses/new','/api/licenses/units','/api/licenses/units/bulk','/api/licenses/check','/api/licenses/products','/api/licenses/products/duplicate','/api/licenses/sales') or re.fullmatch(r'/api/licenses/sales/[0-9]+',path) else 1700000 if re.fullmatch(r'/api/orders/[0-9]+/photos',path) or path in ('/api/profile/photo','/api/mail/signature') or re.fullmatch(r'/api/catalog/[0-9]+/image',path) else (65536 if workspace_post or quote_json or path=='/api/mail/subject' else 16384)
             length = int(self.headers.get('Content-Length', '0'))
             if length <= 0 or length > max_body:
                 return self.reply(400, {'error':'Solicitud inválida.'})
@@ -5789,6 +5821,41 @@ class Handler(BaseHTTPRequestHandler):
                         result=quotes.seed_initial(c,user,reception_now());extra=quotes.seed_additions(c,user,reception_now());thermal=quotes.seed_thermal(c,user,reception_now());more=quotes.seed_batch(c,quotes.FORMAT_BACKUP,user,reception_now());thermal={key:thermal[key]+more[key] for key in ('created','existing','total')};extra={**extra,'created':extra['created']+thermal['created'],'existing':extra['existing']+thermal['existing'],'total':extra['total']+thermal['total']};audit(c,user['id'],'catalog_seeded')
                         return self.reply(200,{'ok':True,'created':result['created']+extra['created'],'updated':extra['updated'],'existing':result['existing']+extra['existing'],'total':result['total']+extra['total']})
                     except quotes.QuoteError as error:return self.reply(error.status,{'error':str(error),'fields':error.fields})
+                catalog_gallery_post=re.fullmatch(r'/api/catalog/([0-9]{1,9})/gallery',path)
+                if path=='/api/catalog/smart' or catalog_gallery_post:
+                    # Smart Catalog & Inventory Pro 3.0: configuración, clasificaciones, conservación, restauración, revisión y galería.
+                    import catalog_smart as catalog_smart_
+                    if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede modificar el catálogo.'})
+                    if not catalog_smart_.installed(c):return self.reply(409,{'error':'Falta aplicar la migración 128 (Smart Catalog) desde Sistema.'})
+                    now_cat=reception_now()
+                    try:
+                        if catalog_gallery_post:
+                            item_id=int(catalog_gallery_post[1])
+                            if data.get('action')=='delete':
+                                catalog_smart_.remove_gallery(c,item_id,int(str(data.get('photo_id','0')) or 0) if str(data.get('photo_id','')).isdigit() else 0,user,now_cat);audit(c,user['id'],'catalog_gallery_removed',item_id)
+                                return self.reply(200,{'ok':True,'gallery':catalog_smart_.gallery(c,item_id)})
+                            try:raw=base64.b64decode(str(data.get('data','')),validate=True)
+                            except Exception:return self.reply(400,{'error':'La imagen no se pudo leer.'})
+                            w,h=str(data.get('width','0')),str(data.get('height','0'))
+                            catalog_smart_.add_gallery(c,item_id,str(data.get('mime','')),raw,int(w) if w.isdigit() else 0,int(h) if h.isdigit() else 0,user,now_cat);audit(c,user['id'],'catalog_gallery_added',item_id)
+                            return self.reply(200,{'ok':True,'gallery':catalog_smart_.gallery(c,item_id)})
+                        action=str(data.get('action',''))
+                        if action=='settings':
+                            cfg=catalog_smart_.update_settings(c,data,user,now_cat);audit(c,user['id'],'smart_catalog_settings_'+cfg['mode']);return self.reply(200,{'ok':True,'settings':cfg})
+                        if action=='type':
+                            code=catalog_smart_.save_type(c,data,user,now_cat);audit(c,user['id'],'catalog_type_saved');return self.reply(200,{'ok':True,'code':code,'taxonomy':catalog_smart_.taxonomy(c,now_cat,True)})
+                        if action=='subcategory':
+                            sid=catalog_smart_.save_subcategory(c,data,user,now_cat);audit(c,user['id'],'catalog_subcategory_saved');return self.reply(200,{'ok':True,'id':sid,'taxonomy':catalog_smart_.taxonomy(c,now_cat,True)})
+                        if action in ('permanente','temporal','proteger','desproteger','restaurar'):
+                            item_id=int(str(data.get('item_id','0'))) if str(data.get('item_id','')).isdigit() else 0
+                            if action=='restaurar':catalog_smart_.restore(c,item_id,user,now_cat)
+                            else:catalog_smart_.set_mode(c,item_id,data,user,now_cat)
+                            audit(c,user['id'],'smart_catalog_'+action,item_id);return self.reply(200,{'ok':True,'overview':catalog_smart_.overview(c,now_cat)})
+                        if action=='run':
+                            if limited(c,'smart-catalog-run:'+str(user['id']),limit=10,window=3600):return self.reply(429,{'error':'Demasiadas revisiones en la última hora.'})
+                            result=catalog_smart_.run(c,now_cat,user,'manual');audit(c,user['id'],'smart_catalog_run_'+result['mode']);return self.reply(200,{'ok':True,'result':result,'overview':catalog_smart_.overview(c,now_cat)})
+                        return self.reply(400,{'error':'Acción no válida.'})
+                    except catalog_smart_.SmartCatalogError as error:return self.reply(error.status,{'error':str(error),'fields':error.fields})
                 if path=='/api/catalog/cleanup':
                     # 1.5.268 · Limpieza segura: revisión individual de cada producto; solo se elimina lo inactivo y sin referencias.
                     import catalog_cleanup
@@ -5808,7 +5875,19 @@ class Handler(BaseHTTPRequestHandler):
                             if 'link_days' in data:
                                 days=quotes.set_link_days(c,data.get('link_days',''));audit(c,user['id'],'quote_link_days_updated');return self.reply(200,{'ok':True,'link_days':days})
                             rate=quotes.set_tax_rate(c,data.get('tax',''));audit(c,user['id'],'quote_tax_updated');return self.reply(200,{'ok':True,'tax_rate_bp':rate})
-                        item=quotes.save_catalog_item(c,data,user,reception_now());audit(c,user['id'],'catalog_item_saved',item)
+                        import catalog_smart as catalog_smart_
+                        now_cat=reception_now();creating=not str(data.get('id') or '').isdigit()
+                        try:
+                            type_code,base_cat,sub_id=catalog_smart_.resolve_type(c,data,now_cat) if catalog_smart_.installed(c) else ('',None,None)
+                            if base_cat:data=dict(data,category=base_cat)
+                            if creating and data.get('check_duplicates') is True:
+                                found=catalog_smart_.duplicates(c,data.get('name',''),data.get('brand',''))
+                                if any(f['exact'] for f in found):return self.reply(409,{'error':'Ya existe un artículo con ese nombre en el catálogo.','duplicates':found})
+                        except catalog_smart_.SmartCatalogError as error:return self.reply(error.status,{'error':str(error),'fields':error.fields})
+                        item=quotes.save_catalog_item(c,data,user,now_cat);audit(c,user['id'],'catalog_item_saved',item)
+                        if catalog_smart_.installed(c):
+                            if creating:catalog_smart_.record_creation(c,item,data,user,now_cat,str(data.get('origin') or 'catalogo'),type_code,sub_id)
+                            elif type_code or 'model' in data:catalog_smart_.update_profile(c,item,data,user,now_cat,type_code if type_code else None,sub_id)
                         # 1.5.268: activar un producto archivado desde el catálogo lo devuelve al catálogo operativo.
                         c.execute("UPDATE catalog_items SET archived_at='',archived_by=NULL WHERE id=? AND available=1 AND COALESCE(archived_at,'')!=''",(item,))
                         return self.reply(200,{'ok':True,'id':item})
@@ -5925,7 +6004,7 @@ class Handler(BaseHTTPRequestHandler):
                                       'Forma de registro: '+('decisión comunicada al taller y registrada por nuestro personal.' if by_staff else 'aprobación desde su enlace privado con firma electrónica.'),'',
                                       'Adjuntamos el comprobante. Solo se ejecutarán los servicios y productos autorizados. Si algo no coincide, responda a este correo.','','Atentamente,','','Departamento de Servicio Técnico','PC-DOCTOR S.A.'])
                                 import quote_pdf
-                                attached=quote_pdf.render(detail,order_document(c,found['order_id']),None)
+                                attached=quote_pdf.render(quotes.with_pdf_photos(c,detail),order_document(c,found['order_id']),None)
                                 try:send_institutional(c,'quote','Confirmación de autorización',email,'PC-DOCTOR S.A. | Autorización del presupuesto N.º '+found['code'],body,found['order_id'],user['id'],attachments=[{'name':found['code']+'-AUTORIZACION.pdf','type':'application/pdf','data':base64.b64encode(attached).decode()}])
                                 except mail_pro.MailError as error:print('quote-notify',error.kind,flush=True);result='failed'
                                 with connect() as log:
@@ -5957,7 +6036,7 @@ class Handler(BaseHTTPRequestHandler):
                                             'No se ejecutará ningún trabajo sin su autorización.','','Atentamente,','','Departamento de Servicio Técnico','PC-DOCTOR S.A.'])
                                         import quote_pdf
                                         number=re.sub(r'\D','',str(document.get('identification') or ''));live=quotes.active_link(c,detail,token,now)
-                                        attached=quote_pdf.render(detail,dict(document,identification=number[:2]+'*'*max(0,len(number)-2) if number else ''),dict(live,url=link) if live else None)
+                                        attached=quote_pdf.render(quotes.with_pdf_photos(c,detail),dict(document,identification=number[:2]+'*'*max(0,len(number)-2) if number else ''),dict(live,url=link) if live else None)
                                         send_institutional(c,'quote','Presupuesto de servicio',email,'PC-DOCTOR S.A. | Presupuesto N.º '+found['code'],body,found['order_id'],user['id'],attachments=[{'name':found['code']+'-PRESUPUESTO.pdf','type':'application/pdf','data':base64.b64encode(attached).decode()}],private=(link,));result='sent'
                                 except mail_pro.MailError as error:
                                     print('quote-mail',error.kind,flush=True);result='failed'

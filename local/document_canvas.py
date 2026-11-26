@@ -11,6 +11,17 @@ from corporate import settings
 WIDTHS=json.loads((Path(__file__).resolve().parent/'data/helvetica-widths.json').read_text())
 BLUE=(.08,.25,.47);INK=(.10,.15,.22);GRAY=(.34,.40,.49)
 
+def jpeg_size(data):
+    """(ancho, alto, componentes) leídos del marcador SOF de un JPEG, o None."""
+    if not data or data[:3]!=b'\xff\xd8\xff':return None
+    i=2
+    while i+9<len(data):
+        if data[i]!=0xFF:return None
+        marker=data[i+1];length=int.from_bytes(data[i+2:i+4],'big')
+        if marker in (0xC0,0xC1,0xC2):return int.from_bytes(data[i+7:i+9],'big'),int.from_bytes(data[i+5:i+7],'big'),data[i+9]
+        i+=2+length
+    return None
+
 class Canvas:
     def __init__(self,width,height,title,mono=False):
         self.w=width;self.h=height;self.pdf=pydyf.PDF();self.pdf.info['Title']=pydyf.String(title);self.pdf.info['Author']=pydyf.String(settings()['name']);fonts={}
@@ -29,6 +40,19 @@ class Canvas:
         self.stream.set_color_rgb(*color);self.stream.rectangle(x,self.h-y-height,width,height);self.stream.fill()
     def width_of(self,value,size=9,bold=False):
         return sum(WIDTHS.get(c,556) for c in str(value))*size/1000*(1.06 if bold else 1)
+    def jpeg(self,name,data):
+        """Registra una fotografía JPEG (se incrusta tal cual, sin recodificar). Devuelve (ancho, alto) o None si no es un JPEG válido."""
+        size=jpeg_size(data)
+        if not size:return None
+        if name not in self.resources['XObject']:
+            image=pydyf.Stream([data],extra={'Type':'/XObject','Subtype':'/Image','Width':size[0],'Height':size[1],'ColorSpace':'/DeviceRGB' if size[2]==3 else '/DeviceGray','BitsPerComponent':8,'Filter':'/DCTDecode'})
+            self.pdf.add_object(image);self.resources['XObject'][name]=image.reference
+        return size[:2]
+    def photo(self,name,data,x,y,box):
+        """Fotografía centrada en un cuadro de `box` puntos (y es el borde superior). Devuelve True si se dibujó."""
+        size=self.jpeg(name,data)
+        if not size:return False
+        scale=box/max(size);w,h=size[0]*scale,size[1]*scale;self.stream.push_state();self.stream.set_matrix(w,0,0,h,x+(box-w)/2,self.h-y-box+(box-h)/2);self.stream.draw_x_object(name);self.stream.pop_state();return True
     def logo(self,x,y,width):
         h=width*self.ih/self.iw;self.stream.push_state();self.stream.set_matrix(width,0,0,h,x,self.h-y-h);self.stream.draw_x_object('Logo');self.stream.pop_state();return h
     def wrap(self,value,width,size=9):

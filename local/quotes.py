@@ -463,6 +463,23 @@ def get(c, quote_id):
     return dict(row)
 
 
+def with_pdf_photos(c, detail):
+    """Copia del presupuesto para el PDF con las fotografías JPEG de sus artículos, solo si administración activó «Incluir fotografías en
+    los presupuestos impresos» (Smart Catalog). Las imágenes PNG o WEBP antiguas siguen mostrando el icono del tipo."""
+    try:
+        import catalog_smart
+        if not catalog_smart.installed(c) or not catalog_smart.settings(c)['quote_photos']:
+            return detail
+        ids = sorted({item['catalog_id'] for item in detail.get('items', []) if item.get('catalog_id')})
+        if not ids:
+            return detail
+        photos = {r[0]: bytes(r[1]) for r in c.execute("SELECT item_id,data FROM catalog_images WHERE mime='image/jpeg' AND item_id IN (%s)" % ','.join('?' * len(ids)), ids)}
+        return dict(detail, pdf_photos=photos) if photos else detail
+    except Exception as error:
+        print('quote photos', type(error).__name__, flush=True)
+        return detail
+
+
 def detail(c, quote):
     items = items_of(c, quote['id'])
     acceptance = c.execute('SELECT signer_name,method,signature,evidence_hash,created_at FROM quote_acceptances WHERE quote_id=?', (quote['id'],)).fetchone()

@@ -318,6 +318,8 @@ def products(c, q='', category_id='', brand_id='', state='', view='', counts=Non
     archived = archived_ids(c)
     out = []
     view = view if view in PRODUCT_VIEWS else ''
+    # Smart Catalog 3.0: fotografía principal del artículo del catálogo (marca de versión para la caché) o, sin ella, el icono de su tipo.
+    photos = {r[0]: r[1] for r in c.execute('SELECT item_id,updated_at FROM catalog_images')}
     for r in rows:
         if not view and r['id'] in archived and state not in ('inactivo', 'archivado'):
             continue  # archivadas: fuera del catálogo activo (siguen en el Kardex, las ventas y las facturas)
@@ -341,6 +343,7 @@ def products(c, q='', category_id='', brand_id='', state='', view='', counts=Non
         if (state == 'bajo' and not item['low'] or state in inventory.STOCK_STATES and (item['stock_state'] != state or not item['active'])
                 or state == 'inactivo' and item['active'] or state == 'activo' and not item['active'] or state == 'sin_alertas' and item['alerts_enabled']):
             continue
+        item['photo'] = photos.get(item['catalog_id'], '') if item['catalog_id'] else ''
         out.append(_with_purchase_facts(c, item))
     return out
 
