@@ -8,6 +8,27 @@
   },
   "releases": [
     {
+      "version": "1.5.352",
+      "date": "2026-11-25T22:34:03-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Smart Catalog & Inventory Pro 3.0: clasificación profesional, fotografías integradas y depuración segura de artículos temporales (simulación)",
+      "changes": {
+        "features": [
+          "Smart Catalog & Inventory Pro 3.0: ocho tipos de artículo con iconos y subcategorías administrables desde Configuración, compatibles con las categorías fiscales y de inventario existentes",
+          "Ventana «Nuevo artículo o servicio»: campos según el tipo, coincidencias antes de crear (sin duplicados) y registro temporal o permanente",
+          "Smart Catalog Cleanup: depuración de artículos temporales tras 30 días sin presupuestos vigentes, en modo simulación; archiva (nunca borra), protege lo vendido, facturado, comprado o con inventario y permite restaurar",
+          "Fotografías del catálogo: principal optimizada (originales de hasta 10 MB), galería con arrastrar y soltar y cámara, visibles en Inventario y opcionales en el PDF del presupuesto"
+        ],
+        "improvements": [],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Administración (autorización expresa en la sesión)"
+    },
+    {
       "version": "1.5.351",
       "date": "2026-11-25T22:33:47-05:00",
       "type": "patch",

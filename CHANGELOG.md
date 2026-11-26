@@ -4,6 +4,17 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.352 — 2026-11-25 22:34 (UTC-05:00)
+
+Smart Catalog & Inventory Pro 3.0: clasificación profesional, fotografías integradas y depuración segura de artículos temporales (simulación)
+
+### Nuevas funcionalidades
+
+- Smart Catalog & Inventory Pro 3.0: ocho tipos de artículo con iconos y subcategorías administrables desde Configuración, compatibles con las categorías fiscales y de inventario existentes
+- Ventana «Nuevo artículo o servicio»: campos según el tipo, coincidencias antes de crear (sin duplicados) y registro temporal o permanente
+- Smart Catalog Cleanup: depuración de artículos temporales tras 30 días sin presupuestos vigentes, en modo simulación; archiva (nunca borra), protege lo vendido, facturado, comprado o con inventario y permite restaurar
+- Fotografías del catálogo: principal optimizada (originales de hasta 10 MB), galería con arrastrar y soltar y cámara, visibles en Inventario y opcionales en el PDF del presupuesto
+
 ## v1.5.351 — 2026-11-25 22:33 (UTC-05:00)
 
 PC-DOCTOR Mail Pro Fluent 2.0: barra de comandos estilo Outlook, paneles ajustables, avatares y agrupación por fecha
