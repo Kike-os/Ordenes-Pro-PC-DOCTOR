@@ -39,6 +39,14 @@ class SmartNotificationsTests(unittest.TestCase):
         self.assertEqual(self.request('/api/whatsapp/outbox/%d/attempts' % failed)['status'], 401)
         self.assertEqual(self.request('/api/whatsapp/outbox/999999/attempts', cookie=cookie)['status'], 404)
 
+    def test_adi_status_reports_the_real_whatsapp_integration(self):
+        from unittest.mock import patch
+        cookie, csrf = self.login()
+        with patch.dict(app.os.environ, {'WHATSAPP_TOKEN': '', 'WHATSAPP_PHONE_NUMBER_ID': ''}):
+            self.assertFalse(self.request('/api/adi/status', cookie=cookie)['body']['channels']['whatsapp'])
+        with patch.dict(app.os.environ, {'WHATSAPP_TOKEN': 'token-ficticio', 'WHATSAPP_PHONE_NUMBER_ID': '123'}):
+            self.assertTrue(self.request('/api/adi/status', cookie=cookie)['body']['channels']['whatsapp'])
+
 
 if __name__ == '__main__':
     unittest.main()

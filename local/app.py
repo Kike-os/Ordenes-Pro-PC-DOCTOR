@@ -1755,7 +1755,7 @@ class Handler(BaseHTTPRequestHandler):
                 import adi_ai
                 usage=c.execute("SELECT COUNT(*) n FROM adi_actions WHERE action='writing_improve' AND created_at>=?",(reception_now().date().isoformat(),)).fetchone()['n']
                 auto_receipt=c.execute("SELECT value FROM system_state WHERE key='receipt_mail_auto'").fetchone()
-                return self.reply(200,{'writing':adi_ai.status(c),'today':usage,'channels':{'mail':mail_allowed(user),'web_chat':True,'whatsapp':False},'receipt_mail_auto':not (auto_receipt and auto_receipt['value']=='off')})
+                return self.reply(200,{'writing':adi_ai.status(c),'today':usage,'channels':{'mail':mail_allowed(user),'web_chat':True,'whatsapp':__import__('whatsapp_business').ready()},'receipt_mail_auto':not (auto_receipt and auto_receipt['value']=='off')})
             if path == '/api/adi/voice':
                 if user['role']!='administrador':return self.reply(403,{'error':'Solo administración configura la voz de ADI.'})
                 import adi_voice

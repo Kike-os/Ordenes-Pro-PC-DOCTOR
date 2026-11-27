@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.357 — 2026-11-26 21:07 (UTC-05:00)
+
+Indicador de WhatsApp real en ADI — Asistencia de redacción
+
+### Errores corregidos
+
+- ADI — Asistencia de redacción: el indicador de WhatsApp muestra el estado real de la integración («WhatsApp conectado») en lugar de «WhatsApp pendiente» fijo
+
 ## v1.5.356 — 2026-11-26 00:43 (UTC-05:00)
 
 ADI Smart Notifications Premium 3.0: avisos al cliente compactos con estados reales, diagnóstico de ADI e historial de intentos

@@ -8,6 +8,24 @@
   },
   "releases": [
     {
+      "version": "1.5.357",
+      "date": "2026-11-26T21:07:47-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Indicador de WhatsApp real en ADI — Asistencia de redacción",
+      "changes": {
+        "features": [],
+        "improvements": [],
+        "fixes": [
+          "ADI — Asistencia de redacción: el indicador de WhatsApp muestra el estado real de la integración («WhatsApp conectado») en lugar de «WhatsApp pendiente» fijo"
+        ],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Administración (solicitud expresa en la sesión)"
+    },
+    {
       "version": "1.5.356",
       "date": "2026-11-26T00:43:03-05:00",
       "type": "patch",
