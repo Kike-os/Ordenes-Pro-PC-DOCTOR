@@ -4,6 +4,18 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.369 — 2026-11-27 14:02 (UTC-05:00)
+
+BATTERY HEALTH PREMIUM 3.0 — Smart Battery Calculator
+
+### Nuevas funcionalidades
+
+- BATTERY HEALTH PREMIUM 3.0 — Smart Battery Calculator calcula salud y desgaste en ambos sentidos, con vista previa inmediata y validación de dos decimales.
+
+### Mejoras realizadas
+
+- El indicador SVG de cinco segmentos muestra la condición y la fecha de revisión de portátiles y portátiles Gaming. Conserva el historial y la paleta del sistema.
+
 ## v1.5.368 — 2026-11-27 13:45 (UTC-05:00)
 
 Indicador animado de salud de batería

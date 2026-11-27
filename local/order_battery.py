@@ -120,6 +120,15 @@ def _image(c, oid, value):
     return c.execute('SELECT id FROM order_battery_images WHERE order_id=? AND sha256=?', (oid, digest)).fetchone()[0]
 
 
+def _basis_points(value):
+    if not isinstance(value, str) or not re.fullmatch(r'[0-9]{1,3}(?:[.,][0-9]{1,2})?', value):
+        raise BatteryError('Ingresa un porcentaje entre 0 y 100 con hasta dos decimales.')
+    points = int(Decimal(value.replace(',', '.')) * 100)
+    if points > 10000:
+        raise BatteryError('El porcentaje debe estar entre 0 y 100.')
+    return points
+
+
 def save(c, oid, data, user, now):
     _unit(c, oid)
     if not installed(c):
@@ -130,14 +139,13 @@ def save(c, oid, data, user, now):
     status = data.get('status')
     if status not in STATES:
         raise BatteryError('Selecciona un estado de evaluación.')
-    raw_percent = data.get('percent', '')
     health_bp = None
     if status == 'evaluada':
-        if not isinstance(raw_percent, str) or not re.fullmatch(r'[0-9]{1,3}(?:[.,][0-9]{1,2})?', raw_percent):
-            raise BatteryError('Ingresa la salud de batería entre 0 y 100 %. Usa hasta dos decimales.')
-        health_bp = int(Decimal(raw_percent.replace(',', '.')) * 100)
-        if health_bp > 10000:
-            raise BatteryError('La salud de batería debe estar entre 0 y 100 %.')
+        percent, wear = data.get('percent', ''), data.get('wear', '')
+        wear_bp = _basis_points(wear) if wear != '' else None
+        health_bp = _basis_points(percent) if percent != '' or wear_bp is None else 10000 - wear_bp
+        if wear_bp is not None and health_bp + wear_bp != 10000:
+            raise BatteryError('La salud y el desgaste deben sumar 100 %.')
     reason, notes, source = (_text(data, key, size) for key, size in (('reason',300),('notes',1500),('source',200)))
     if status == 'no_evaluada' and not reason:
         raise BatteryError('Indica por qué no se pudo evaluar la batería.')

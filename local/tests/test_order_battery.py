@@ -78,6 +78,35 @@ class OrderBatteryTests(unittest.TestCase):
         self.assertEqual(self.request(route(first), cookie=cookie)['status'], 200)
         self.assertEqual(post(first, updated['id'], status='pendiente')['status'], 403)
 
+    def test_calculator_accepts_either_input_and_checks_the_exact_complement(self):
+        cookie, csrf = self.login()
+        oid = self.receive('gaming', cookie, csrf)
+        route = f'/api/orders/{oid}/battery'
+
+        def post(revision, **fields):
+            return self.request(route, {'revision': str(revision), 'status': 'evaluada', **fields},
+                                cookie=cookie, csrf=csrf)
+
+        revision = 0
+        for wear, health in (('0', 100), ('15', 85), ('25', 75), ('50', 50),
+                             ('80', 20), ('99,99', 0.01), ('100', 0)):
+            with self.subTest(wear=wear):
+                result = post(revision, wear=wear)
+                self.assertLess(result['status'], 300, result['body'])
+                saved = result['body']['battery']
+                self.assertEqual(saved['percent'], health)
+                self.assertTrue(saved['created_at'])
+                revision = saved['id']
+        for bad in ('-1', '100.01', '1.001', 'NaN', True):
+            self.assertEqual(post(revision, percent='85', wear=bad)['status'], 400)
+        self.assertEqual(post(revision, percent='85', wear='15.01')['status'], 400)
+        self.assertEqual(post(revision)['status'], 400)
+        consistent = post(revision, percent='84.99', wear='15,01')
+        self.assertLess(consistent['status'], 300, consistent['body'])
+        self.assertEqual(consistent['body']['battery']['percent'], 84.99)
+        history = self.request(route, cookie=cookie)['body']['history']
+        self.assertEqual(len(history), 8)
+
     def test_order_remains_readable_when_migration_is_pending(self):
         cookie, csrf = self.login()
         oid = self.receive('portatil', cookie, csrf)

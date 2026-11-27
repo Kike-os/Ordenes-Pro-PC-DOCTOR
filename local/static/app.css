@@ -14638,31 +14638,63 @@ body:has(.ax) #adi-widget{display:none}
 #module-content .equip-battery-card .equip-tab-select:focus-visible{outline:2px solid #8fd3ff;outline-offset:1px}
 #module-content .equip-battery-card:has(>.equip-tab-select[aria-selected=true]){border-color:#5fa8ea;background:linear-gradient(180deg,#14304f,#0d1f39);box-shadow:0 0 0 1px #5fa8ea40}
 #module-content .equip-battery-card:has(>.equip-tab-select[aria-selected=true]) .equip-card-top{background:#11284a;border-bottom-color:#27507f}
-#module-content .equip-battery-trigger{--battery-color:#a3b6d3;display:grid;grid-template-columns:42px minmax(0,1fr);gap:2px 7px;align-items:center;justify-items:start;width:calc(100% - 20px);min-height:30px;margin:0 10px 6px;padding:4px 5px;border:1px solid transparent;border-radius:7px;background:transparent;color:#dbe7fb;text-align:start}
-#module-content .equip-battery-trigger:hover{background:#172e4c;border-color:#304d75}
-#module-content .equip-battery-trigger:focus-visible{outline:2px solid #8fd3ff;outline-offset:1px}
-#module-content .equip-battery-trigger[data-tone=verde]{--battery-color:#34d399}
-#module-content .equip-battery-trigger[data-tone=amarillo]{--battery-color:#fbbf24}
-#module-content .equip-battery-trigger[data-tone=naranja]{--battery-color:#fb923c}
-#module-content .equip-battery-trigger[data-tone=rojo]{--battery-color:#f87171}
-.equip-battery-icon{display:block;width:42px;height:24px;grid-row:1 / span 2;color:var(--battery-color);transition:color .18s ease}
-.equip-battery-case{fill:color-mix(in srgb,currentColor 10%,transparent);stroke:currentColor;stroke-width:1.5}
-.equip-battery-terminal,.equip-battery-level{fill:currentColor}
-.equip-battery-level{transform-origin:5px 12px;transform:scaleX(0)}
-.equip-battery-glint{stroke:#fff;stroke-width:1;opacity:.25}
-.equip-battery-dash{stroke:currentColor;stroke-width:1.5}
-.equip-battery-trigger[data-assessed=true] .equip-battery-dash{display:none}
-.equip-battery-text{font-size:12px;font-weight:650;line-height:1.25;overflow-wrap:anywhere}
-.equip-battery-review{grid-column:2;color:#a3b6d3;font-size:10.5px;line-height:1.25;overflow-wrap:anywhere}
+#module-content .equip-battery-trigger {
+ width:calc(100% - 20px);margin:0 10px 7px;text-align:start;cursor:pointer;
+}
+#module-content .equip-battery-trigger:hover{border-color:var(--battery-ink)}
+#module-content .equip-battery-trigger:focus-visible{outline:2px solid var(--battery-ink);outline-offset:2px}
+.equip-battery-widget {
+ color-scheme:dark;
+ --battery-ink:light-dark(#4c607b,#aab9ce);
+ --battery-surface:var(--op-panel,light-dark(#fff,#0d1b30));
+ --battery-edge:var(--op-line,light-dark(#d9e1ec,#2f4a73));
+ --battery-text:var(--op-text,light-dark(#0f1b2d,#e7efff));
+ display:grid;grid-template-columns:72px minmax(0,1fr);gap:8px;align-items:center;
+ padding:6px 8px;border:1px solid var(--battery-edge);border-radius:9px;
+ background:linear-gradient(120deg,color-mix(in srgb,var(--battery-ink) 9%,var(--battery-surface)),var(--battery-surface) 65%);
+ color:var(--battery-text);min-width:0;
+}
+:root[data-theme=light] .equip-battery-widget{color-scheme:light}
+.equip-battery-widget[data-tone=esmeralda]{--battery-ink:light-dark(#087551,#51e8ad)}
+.equip-battery-widget[data-tone=verde]{--battery-ink:light-dark(#387318,#9ce67b)}
+.equip-battery-widget[data-tone=amarillo]{--battery-ink:light-dark(#795600,#ffd766)}
+.equip-battery-widget[data-tone=naranja]{--battery-ink:light-dark(#a3410b,#ffa367)}
+.equip-battery-widget[data-tone=rojo]{--battery-ink:light-dark(#b32640,#ff8190)}
+.equip-battery-icon{display:block;width:100%;height:auto;color:var(--battery-ink);transition:color .28s}
+.equip-battery-case{fill:var(--battery-surface);stroke:currentColor;stroke-opacity:.7;stroke-width:1.5}
+.equip-battery-slot,.equip-battery-terminal{fill:currentColor;fill-opacity:.23}
+.equip-battery-level{fill:currentColor;transform-box:fill-box;transform-origin:left center;transform:scaleX(var(--battery-fill,0));transition:transform .52s cubic-bezier(.2,.75,.3,1)}
+.equip-battery-level rect{filter:drop-shadow(0 0 2px color-mix(in srgb,currentColor 55%,transparent))}
+.equip-battery-level path{stroke:#fff;stroke-opacity:.52;stroke-linecap:round}
+@starting-style{.equip-battery-level{transform:scaleX(0)}}
+.equip-battery-widget[data-tone=rojo] .equip-battery-case{animation:equip-battery-pulse 1.55s ease-in-out 2}
+.equip-battery-widget[data-charging=true] .equip-battery-terminal{animation:equip-battery-pulse 1.2s ease-in-out 3;fill-opacity:.95}
+@keyframes equip-battery-pulse{50%{opacity:.55;filter:drop-shadow(0 0 3px currentColor)}}
+.equip-battery-copy{display:grid;gap:2px;min-width:0}
+.equip-battery-title,.equip-battery-review{font-size:10.5px;line-height:1.25;overflow-wrap:anywhere}
+.equip-battery-reading{display:flex;flex-wrap:wrap;gap:1px 6px;align-items:baseline;color:var(--battery-ink);font-size:11px;font-weight:650;transition:color .28s}
+.equip-battery-reading strong{font-size:18px;line-height:1.12;font-variant-numeric:tabular-nums;white-space:nowrap}
+.equip-battery-preview{padding:9px 12px;grid-template-columns:90px minmax(0,1fr)}
+.battery-measurements{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.battery-measurements label{display:flex;flex-direction:column;justify-content:space-between;min-width:0;margin:0}
+@media(prefers-reduced-motion:reduce){.equip-battery-widget *{animation:none!important;transition:none!important}}
 .battery-dialog{width:min(480px,calc(100% - 24px))}
 .battery-dialog-body{padding:14px;min-width:0;overflow:auto}
 .battery-form{display:grid;gap:9px;margin:8px 0}
+.battery-form>label{margin-bottom:2px}
+:root[data-theme=light] .battery-dialog {
+ color-scheme:light;background:var(--op-panel,#fff);border-color:var(--op-line,#d9e1ec);color:var(--op-text,#0f1b2d);
+}
+:root[data-theme=light] .battery-dialog :is(.dialog-heading,.battery-form input,.battery-form textarea,.battery-form select) {
+ background:var(--op-field,#f3f6fa);border-color:var(--op-line,#d9e1ec);color:var(--op-text,#0f1b2d);
+}
+:root[data-theme=light] .battery-dialog :is(label,.system-muted){color:var(--op-muted,#55657c)}
+:root[data-theme=light] .battery-dialog input::placeholder{color:var(--op-muted,#55657c)}
 .battery-form input,.battery-form textarea,.battery-form select{max-width:100%}
 .battery-remove{display:flex;align-items:center;gap:8px}.battery-remove>input{width:auto}
 .battery-history{margin-top:10px}
 .battery-history>summary{padding:7px 0;cursor:pointer}
 .battery-history li{padding:6px 0;overflow-wrap:anywhere}.battery-history li>p{margin:3px 0}
-@media(prefers-reduced-motion:reduce){.equip-battery-icon{transition:none}}
 
 #module-content .equip-battery-card .equip-tab-select[aria-selected=true] .equip-card-picked{display:inline-grid}
 .equip-picker:has(>.equip-battery-card){align-items:start}
