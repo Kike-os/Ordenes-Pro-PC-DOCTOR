@@ -1701,8 +1701,8 @@ async function renderMail(){
  const foot=el('div',undefined,'mail-side-foot');foot.append(deliveriesButton,campaignsButton,prefsButton,storage);
  // 1.5.260: etiquetas (guardadas por Message-ID). Elegir una filtra la carpeta; administración las gestiona.
  const labelsBox=el('section',undefined,'mail-labels');labelsBox.setAttribute('aria-label','Etiquetas');
- let labelsOpen=true;try{labelsOpen=localStorage.getItem(mailPrefsKey()+':etiquetas')!=='0';}catch{}
- function paintLabels(){labelsBox.replaceChildren();labelsBox.dataset.open=String(labelsOpen);const head=el('header',undefined,'mail-labels-head'),toggle=button('',()=>{labelsOpen=!labelsOpen;try{localStorage.setItem(mailPrefsKey()+':etiquetas',labelsOpen?'1':'0');}catch{}paintLabels();labelsBox.querySelector('.mail-labels-toggle')?.focus();},'mail-labels-toggle');
+ let labelsOpen=false;
+ function paintLabels(){labelsBox.replaceChildren();labelsBox.dataset.open=String(labelsOpen);const head=el('header',undefined,'mail-labels-head'),toggle=button('',()=>{labelsOpen=!labelsOpen;paintLabels();labelsBox.querySelector('.mail-labels-toggle')?.focus();},'mail-labels-toggle');
   toggle.setAttribute('aria-expanded',String(labelsOpen));toggle.setAttribute('aria-controls','mail-labels-list');toggle.title=labelsOpen?'Contraer etiquetas':'Mostrar etiquetas';
   toggle.append(systemIcon(MAIL_TAG_ICON),el('strong','Etiquetas'));if(mailLabels.length)toggle.append(el('small',String(mailLabels.length),'mail-labels-total'));const chev=systemIcon('M6 9l6 6 6-6');chev.classList.add('mail-labels-chev');toggle.append(chev);head.append(toggle);
   if(currentUser?.role==='administrador'){const add=iconButton('Crear etiqueta','M5 12h14 M12 5v14',()=>openMailLabels(()=>loadLabels(),true),'mail-tool mail-labels-add');const manage=iconButton('Editar etiquetas','M12 20h9 M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z',()=>openMailLabels(()=>loadLabels()),'mail-tool mail-labels-manage');head.append(add,manage);}
@@ -1859,7 +1859,7 @@ async function renderMail(){
    catch(error){summaryBox.replaceChildren(el('p',error.message,'mail-summary-warn'));}};
   {const adiButton=act('Resumir con ADI',adiSpark,summarize);adiButton.dataset.secondary='true';adiButton.dataset.cmd='adi';}
   if(listRow&&listRow.answered===false&&!['sent','drafts'].includes(folderOf()?.role)){const done=act('Marcar como respondido',MAIL_DONE_ICON,async()=>{done.disabled=true;try{await api('/api/mail/flag',{folder:state.folder,uid:String(uid),action:'answered'});listRow.answered=true;done.remove();if(state.filter==='pending'){pendingCount=Math.max(0,pendingCount-1);paintFolders();load(true);}toast('Marcado como respondido.','success');}catch(error){done.disabled=false;toast(error.message,'error');}});done.dataset.secondary='true';done.dataset.cmd='answered';}
-  if(threadUids.length>1){const conv=el('details',undefined,'mail-thread');conv.open=true;const sum=el('summary','Conversación · '+threadUids.length+' mensajes');conv.append(sum);const ol=el('ol');
+  if(threadUids.length>1){const conv=el('details',undefined,'mail-thread');const sum=el('summary','Conversación · '+threadUids.length+' mensajes');conv.append(sum);const ol=el('ol');
    for(const u of threadUids){const r=rowsByUid.get(u)||{uid:u},li=el('li'),b=button('',()=>{if(u!==Number(uid))open(u);},'mail-thread-item');if(u===Number(uid))b.setAttribute('aria-current','true');b.append(el('strong',mailWho(r.from)||'Mensaje'),el('time',r.date?mailDate(r.date):''));li.append(b);ol.append(li);}conv.append(ol);scroll.append(conv);}
   scroll.append(summaryBox);
   head.append(top,meta,context);scroll.append(body);if(message.attachments.length)scroll.append(el('h3',message.attachments.length===1?'1 archivo adjunto':message.attachments.length+' archivos adjuntos'),files);reader.replaceChildren(head,scroll,bar);scroll.scrollTop=0;if(focus)title.focus({preventScroll:true});
@@ -2311,7 +2311,7 @@ function rxRender(){const cat=rxCat(),fam=rxFamily(),box=$('order-inspection-chi
  noneInput.onchange=()=>{if(noneInput.checked){rx.damages.clear();rx.damages.set('sin_danos','');}else rx.damages.delete('sin_danos');rxCompose();rxRender();box.querySelector('.rx-none input')?.focus({preventScroll:true});};box.append(noneLabel);
  const grid=el('div',undefined,'rx-zones');box.append(grid);
  for(const z of cat.zones){if(z.code==='general'||!z.families.includes(fam))continue;const items=cat.damages.filter(d=>d.zone===z.code),picked=items.filter(d=>rx.damages.has(d.code)).length;
-  const det=el('details',undefined,'rx-zone');det.open=rx.open.has(z.code)||picked>0;if(picked)rx.open.add(z.code);det.dataset.zone=z.code;det.dataset.damaged=String(picked>0);
+  const det=el('details',undefined,'rx-zone');det.open=rx.open.has(z.code);det.dataset.zone=z.code;det.dataset.damaged=String(picked>0);
   det.addEventListener('toggle',()=>{if(det.open)rx.open.add(z.code);else rx.open.delete(z.code);});
   const sum=el('summary'),ic=el('span',undefined,'rx-zone-ic');ic.append(systemIcon(RX_ZONE_ICONS[z.code]||RX_ICONS.zone));sum.append(ic,el('span',z.title,'rx-zone-title'));
   const n=el('em',String(picked),'rx-count');n.setAttribute('aria-label',picked?picked+(picked===1?' condición marcada':' condiciones marcadas'):'Sin condiciones marcadas');n.dataset.zero=String(!picked);sum.append(n);const chev=systemIcon('M6 9l6 6 6-6');chev.classList.add('rx-zone-chev');sum.append(chev);det.append(sum);
@@ -3051,9 +3051,19 @@ function initReception(){const form=$('order-form');newRequestKey(form);identifi
 }
 async function showOrderDetail(id){
  $('view-home').hidden=true;$('view-module').hidden=false;currentModule='orders';$('module-title').textContent='Detalle de la Orden';$('module-description').textContent='Consulta completa de la recepción, estado, presupuesto y comunicaciones de la orden';$('module-add').hidden=true;
- const root=$('module-content');root.replaceChildren(el('p','Cargando orden…','empty-module'));
+ const root=$('module-content'),request=Symbol();
+ root.orderRequest=request;
+ if(root.querySelector('.workspace-header')?.dataset.orderId!==String(id)){
+  root.replaceChildren(el('p','Cargando orden…','empty-module'));
+ }
  const back=document.querySelector('#view-module .back-link');back.textContent='Volver a órdenes';back.href='#orders';
- try{const [{order}]=await Promise.all([api('/api/orders/'+id),loadReceptionOptions().catch(()=>null)]);renderOrderDetail(root,order);$('module-title').focus({preventScroll:true});}catch(error){root.replaceChildren(el('p',error.message,'empty-module'));}
+ try{
+  const [{order}]=await Promise.all([api('/api/orders/'+id),loadReceptionOptions().catch(()=>null)]);
+  if(root.orderRequest!==request||currentModule!=='orders')return;
+  renderOrderDetail(root,order);$('module-title').focus({preventScroll:true});
+ }catch(error){
+  if(root.orderRequest===request&&currentModule==='orders')root.replaceChildren(el('p',error.message,'empty-module'));
+ }
 }
 async function showReceipt(id,inline=false){if(inline)return showOrderDetail(id);return showDocumentPreview(id,'receipt');}
 function productionUiEnabled(){return!document.querySelector('.evaluation-notice');}
@@ -3332,7 +3342,7 @@ function stabilityDetails(){clearInterval(stabilityTick);document.querySelector(
 async function rmRefresh(dialog){try{const r=await fetch('/api/public/stability',{cache:'no-store',credentials:'same-origin'});if(!r.ok)throw new Error();stabilityInfo=await r.json();stabilityInfo._fetched=Date.now();rmSync=Date.now();}catch{stabilityInfo=null;}
  await rmLoadDetail();paintStability();if(dialog.isConnected)rmPaint(dialog);}
 function rmPaint(dialog){const info=stabilityInfo,detail=rmDetail&&info&&rmDetail.version===info.version?rmDetail:null,visual=rmVisual(info),tone=RM_TONES[visual];
- const opened=new Set([...dialog.querySelectorAll('details[open]')].map(node=>node.dataset.key));const first=!dialog.dataset.painted;dialog.dataset.painted='1';
+ const opened=new Set([...dialog.querySelectorAll('details[open]')].map(node=>node.dataset.key));
  const make=(tag,cls,text)=>{const node=document.createElement(tag);if(cls)node.className=cls;if(text!==undefined)node.textContent=T(text);return node;},icon=key=>stabilityIcon(RM_ICON[key]||key);
  dialog.dataset.state=info?info.state:'offline';dialog.dataset.tone=tone;dialog.replaceChildren();
  // Cabecera: LED de estado, nombre, versión y fecha de publicación, cierre.
@@ -3364,19 +3374,19 @@ function rmPaint(dialog){const info=stabilityInfo,detail=rmDetail&&info&&rmDetai
   const copy=make('button','rm-btn');copy.type='button';copy.append(icon('copy'),make('span',undefined,'Copiar informe técnico'));copy.disabled=!detail;copy.addEventListener('click',async()=>{try{await navigator.clipboard.writeText(detail.report);toast('Informe técnico copiado.','success');}catch{toast('No se pudo copiar el informe.','error');}});actions.append(copy);}
  if(actions.childElementCount)dialog.append(actions);
  if(dialog._progress)dialog.append(dialog._progress);
- const block=(key,label,count,open,build)=>{const box=make('details','rm-block');box.dataset.key=key;box.open=opened.has(key)||(first&&open);const sum=make('summary');sum.append(make('span',undefined,label));if(count!==undefined)sum.append(make('b','rm-count-badge',String(count)));box.append(sum);build(box);dialog.append(box);};
+ const block=(key,label,count,build)=>{const box=make('details','rm-block');box.dataset.key=key;box.open=opened.has(key);const sum=make('summary');sum.append(make('span',undefined,label));if(count!==undefined)sum.append(make('b','rm-count-badge',String(count)));box.append(sum);build(box);dialog.append(box);};
  if(info&&info.tests.length){const tests=detail?detail.detail_tests:info.tests;
-  block('tests','Resultados del diagnóstico',info.passed+'/'+info.total,info.passed<info.total,box=>{const grid=make('ul','rm-checks');for(const t of tests){const li=make('li'),st=t.status||(t.ok?'ok':'error');li.dataset.status=st;
+  block('tests','Resultados del diagnóstico',info.passed+'/'+info.total,box=>{const grid=make('ul','rm-checks');for(const t of tests){const li=make('li'),st=t.status||(t.ok?'ok':'error');li.dataset.status=st;
    const top=make('div','rm-check-top');top.append(icon(st==='ok'?'ok':st==='error'?'err':st==='warning'?'warn':'skip'),make('strong',undefined,t.name));if(t.ms!=null)top.append(make('small','rm-ms',(t.ms>=1000?(t.ms/1000).toFixed(1).replace('.',','):t.ms)+(t.ms>=1000?' s':' ms')));li.append(top);
    li.append(make('small','rm-check-meta',(t.component?t.component+' · ':'')+(t.critical?'crítica':(t.severity||'no crítica'))+(t.recovered?' · recuperada':'')));if(t.detail)li.append(make('p','rm-check-detail',t.detail));grid.append(li);}box.append(grid);});}
  const incidents=detail?detail.detail_incidents:(info?.incidents||[]);
- block('incidents','Registro de incidencias',incidents.length,incidents.some(i=>i.critical||i.severity==='crítica'&&i.status!=='resuelta'),box=>{if(!incidents.length){box.append(make('p','rm-empty',info?.last_check?'Ninguna incidencia registrada.':'Sin resultados todavía.'));return;}
+ block('incidents','Registro de incidencias',incidents.length,box=>{if(!incidents.length){box.append(make('p','rm-empty',info?.last_check?'Ninguna incidencia registrada.':'Sin resultados todavía.'));return;}
   const list=make('ul','rm-incidents');for(const i of (detail?incidents:incidents.slice().reverse())){const li=make('li');li.dataset.severity=i.severity||(i.critical?'crítica':'media');
    if(detail){const top=make('div','rm-inc-top');top.append(make('strong',undefined,i.component),make('span','rm-sev',i.severity),make('span','rm-inc-state',i.status));li.append(top,make('small',undefined,i.code+' · '+stabilityWhen(i.at)+(i.count>1?' · '+i.count+' veces':'')+(i.version?' · v'+i.version:'')),make('p',undefined,i.description));
     if(i.resolution)li.append(make('p','rm-resolution','Resolución: '+i.resolution+(i.resolved_at?' ('+stabilityWhen(i.resolved_at)+')':'')));else if(i.action)li.append(make('p','rm-action','Acción sugerida: '+i.action));}
    else li.append(make('strong',undefined,i.items.join(', ')),make('small',undefined,stabilityWhen(i.at)+' · '+(i.critical?'crítica':'no crítica')));list.append(li);}box.append(list);});
- if(info?.previous?.length)block('versions','Historial de versiones',info.previous.length,false,box=>{const list=make('ul','rm-versions');for(const item of info.previous){const li=make('li');li.dataset.stable=String(item.stable);li.append(make('strong',undefined,'v'+item.version),make('span',undefined,item.runs+' verificaciones · '+item.passes+' correctas'),make('em',undefined,item.stable?'Estable':'Sin estabilidad'));list.append(li);}box.append(list);});
- block('updates','Estado de actualizaciones',undefined,false,box=>{if(detail?.runs?.length){const list=make('ul','rm-runs');for(const r of detail.runs){const li=make('li');li.dataset.ok=String(!r.critical.length);li.append(make('strong',undefined,stabilityWhen(r.at)),make('span',undefined,'v'+r.version+' · '+r.source+(r.by?' ('+r.by+')':'')+' · '+r.passed+'/'+r.total));list.append(li);}box.append(list);}
+ if(info?.previous?.length)block('versions','Historial de versiones',info.previous.length,box=>{const list=make('ul','rm-versions');for(const item of info.previous){const li=make('li');li.dataset.stable=String(item.stable);li.append(make('strong',undefined,'v'+item.version),make('span',undefined,item.runs+' verificaciones · '+item.passes+' correctas'),make('em',undefined,item.stable?'Estable':'Sin estabilidad'));list.append(li);}box.append(list);});
+ block('updates','Estado de actualizaciones',undefined,box=>{if(detail?.runs?.length){const list=make('ul','rm-runs');for(const r of detail.runs){const li=make('li');li.dataset.ok=String(!r.critical.length);li.append(make('strong',undefined,stabilityWhen(r.at)),make('span',undefined,'v'+r.version+' · '+r.source+(r.by?' ('+r.by+')':'')+' · '+r.passed+'/'+r.total));list.append(li);}box.append(list);}
   if(window.openReleasePanel){const open=make('button','rm-btn');open.type='button';open.append(icon('layers'),make('span',undefined,'Ver actualizaciones publicadas'));open.addEventListener('click',()=>{dialog.close();setTimeout(()=>window.openReleasePanel(),0);});box.append(open);}
   else if(!detail)box.append(make('p','rm-empty','Inicia sesión como administración para ver el historial de ejecuciones.'));});
  dialog.append(make('p','rm-rule','Estable exige '+(info?.min_passes||3)+' verificaciones correctas, '+(info?.observation_hours||24)+' h de seguimiento y ninguna incidencia que lo impida; el fin del temporizador por sí solo no basta. El servidor verifica a las 01:00, 09:00 y 17:00 (hora de Ecuador) aunque nadie tenga el sistema abierto. Las pruebas solo leen información.'));
@@ -3615,7 +3625,7 @@ let statusGlow=null;function noteStatus(id,code){statusGlow={id:Number(id),code,
 const statusShort={revision_recurrente:'Revisión recurrente',presupuesto:'Aprobación pendiente',pruebas:'Pruebas y calidad',pendiente:'Espera de diagnóstico'};
 function compactStatus(node,code,label){const full=label||statusNames[code]||code;if(statusShort[code]){node.textContent=statusShort[code];node.title=full;node.setAttribute('aria-label',full);}return node;}
 function orderBadge(code,label,id){const badge=compactStatus(el('span',label||statusNames[code]||code,'status-label'),code,label);badge.dataset.status=code;if(id&&statusGlow&&statusGlow.id===Number(id)&&statusGlow.code===code&&Date.now()<statusGlow.until){badge.classList.add('status-changed');badge.addEventListener('animationend',()=>{badge.classList.remove('status-changed');statusGlow=null;},{once:true});}return badge;}
-function documentAction(label,icon,url){const link=el('a',undefined,'secondary order-document-action');link.href=url;link.target='_blank';link.rel='noopener noreferrer';link.append(orderActionIcon(icon),document.createTextNode(label));const match=/\/api\/orders\/(\d+)\/(receipt|thermal|service|label)\.pdf/.exec(url);if(label==='Descargar PDF')link.download='PC-DOCTOR-comprobante.pdf';else if(match)link.onclick=event=>{if(!event.ctrlKey&&!event.metaKey&&!event.shiftKey){event.preventDefault();showDocumentPreview(match[1],match[2]);}};return link;}
+function documentAction(label,icon,url){const link=el('a',undefined,'secondary order-document-action');link.href=url;link.target='_blank';link.rel='noopener noreferrer';link.append(orderActionIcon(icon),document.createTextNode(label));const match=/\/api\/orders\/(\d+)\/(receipt|thermal|service|label)\.pdf/.exec(url);if(label==='Descargar PDF')link.download='PC-DOCTOR-comprobante.pdf';else if(match)link.onclick=event=>{if(!event.ctrlKey&&!event.metaKey&&!event.shiftKey){event.preventDefault();showDocumentPreview(match[1],match[2],new URL(link.href).searchParams.get('modo')==='digital');}};return link;}
 function appendOrderFilters(root,params){
  // «q» se toma siempre del buscador: puede haber cambiado sin recargar el módulo.
  const typed=()=>(document.querySelector('.orders-search input')?.value||'').trim(),withTyped=next=>{if(typed())next.set('q',typed());else next.delete('q');return next;};
@@ -3958,25 +3968,24 @@ function exCard(panel,{key,title,glyph,summary,chips=[],alert='',build}){
  const body=el('div',undefined,'ex-body'),inner=el('div',undefined,'ex-inner');body.id=id+'-body';body.setAttribute('role','region');body.setAttribute('aria-labelledby',head.id);body.append(inner);box.append(head,body);let built=false;
  const set=open=>{if(open&&!built){built=true;build(inner);}box.dataset.open=String(open);head.setAttribute('aria-expanded',String(open));body.inert=!open;};
  head.addEventListener('click',()=>set(box.dataset.open!=='true'));box.addEventListener('keydown',event=>{if(event.key==='Escape'&&box.dataset.open==='true'&&!event.defaultPrevented&&!event.target.closest('dialog')){event.stopPropagation();set(false);head.focus();}});
- set(alert==='bad');panel.append(box);return box;}
+ box.setExpanded=set;set(false);panel.append(box);return box;}
 const EX_TONE={registrado:'gris',servidor:'azul',entregado:'verde',fallido:'rojo',desconocido:'ambar'};
-function executiveOrderPanel(order){
- const panel=el('section',undefined,'ex-panel');panel.setAttribute('aria-label','Comunicaciones, seguimiento del cliente, autorizaciones y permanencia');
- // ---- 1. Comunicaciones e historial de correos
+function orderCommunicationsCard(panel,order,state){
  const archived=order.mail_history||[],inbox=order.mail||[],msgs=order.messages||[];
  const items=[...archived.map(r=>({source:'sistema',at:r.sent_at||r.created_at,row:r})),...inbox.map(r=>({source:'buzon',at:r.sent_at,row:r})),...msgs.map(r=>({source:'whatsapp',at:r.created_at,row:r}))].sort((a,b)=>String(b.at).localeCompare(String(a.at)));
  const failed=archived.filter(r=>r.delivery==='fallido').length+msgs.filter(r=>r.status==='error').length,unknown=archived.filter(r=>r.delivery==='desconocido').length,adiN=archived.filter(r=>r.adi==='revisado').length;
  const last=items[0];
  const commChips=[];if(failed)commChips.push(exChip(failed+(failed===1?' fallido':' fallidos'),'rojo'));if(unknown)commChips.push(exChip(unknown+' sin confirmar','ambar'));if(adiN)commChips.push(exChip('ADI '+adiN,'violeta'));commChips.push(exChip(String(items.length),'azul'));
- exCard(panel,{key:'comms',title:'Comunicaciones',glyph:EX_GLYPH.mail,alert:failed?'bad':unknown?'warn':'',chips:commChips,
+ return exCard(panel,{key:'comms',title:'Comunicaciones',glyph:EX_GLYPH.mail,alert:failed?'bad':unknown?'warn':'',chips:commChips,
   summary:items.length?(items.length===1?'1 comunicación':items.length+' comunicaciones')+' · última '+formatOrderDate(last.at).split(',')[0]+(failed?' · revisa los fallidos':''):'Sin comunicaciones registradas',
   build(inner){
    const bar=el('div',undefined,'ex-comm-bar'),filters=el('div',undefined,'ex-filters');filters.setAttribute('role','group');filters.setAttribute('aria-label','Filtrar por canal');
    const actions=el('div',undefined,'ex-actions');{const chat=button('',()=>orderMessageComposer(order.id),'secondary');chat.append(systemIcon(EX_GLYPH.chat),el('span','Mensaje al cliente'));actions.append(chat);}
    if(order.mail){const write=button('',()=>openMailComposer({to:order.email||'',subject:'Orden '+order.code+' · PC-DOCTOR S.A.',order_code:order.code,order}),'secondary');write.append(systemIcon(EX_GLYPH.mail),el('span','Escribir al cliente'));actions.append(write);}
-   bar.append(filters,actions);const list=el('ul',undefined,'ex-comm-list'),more=button('',()=>{},'text-action ex-more');list.setAttribute('aria-label','Historial de comunicaciones');let view='todos',all=false;const LIMIT=6;
+   bar.append(filters,actions);const list=el('ul',undefined,'ex-comm-list'),more=button('',()=>{},'text-action ex-more');list.setAttribute('aria-label','Historial de comunicaciones');const LIMIT=6;
    const groups=[['todos','Todos',items.length],['sistema','Correo del sistema',archived.length],['buzon','Buzón',inbox.length],['whatsapp','WhatsApp',msgs.length]].filter(([k,,n])=>k==='todos'||n);
-   for(const[k,label,n]of groups){const b=button('',()=>{view=k;all=false;paint();},'ex-filter');b.dataset.value=k;b.append(el('span',label),el('b',String(n)));filters.append(b);}
+   if(!groups.some(([key])=>key===state.view))state.view='todos';
+   for(const[k,label,n]of groups){const b=button('',()=>{state.view=k;state.all=false;paint();},'ex-filter');b.dataset.value=k;b.append(el('span',label),el('b',String(n)));filters.append(b);}
    function row(item){const li=el('li',undefined,'ex-comm');li.dataset.source=item.source;const r=item.row,ic=el('span',undefined,'ex-comm-ic'),main=el('div',undefined,'ex-comm-main'),side=el('div',undefined,'ex-comm-side');
     if(item.source==='sistema'){ic.append(systemIcon(EX_GLYPH.mail));main.append(el('strong',r.subject),el('small',[r.kind_label,formatOrderDate(item.at),r.recipient].filter(Boolean).join(' · ')));
      const bounce=(r.deliveries||[]).filter(d=>['rebotado','fallido','demorado','desconocido'].includes(d.status)&&(d.reason||d.code));for(const d of bounce)main.append(el('p',(d.status==='rebotado'?'Rebote':d.status==='demorado'?'Demora':'Detalle')+' · '+d.recipient+': '+[d.code,d.reason].filter(Boolean).join(' '),'ex-comm-reason'));
@@ -3990,11 +3999,33 @@ function executiveOrderPanel(order){
      if(r.status==='error'&&r.error)main.append(el('p','Error: '+r.error,'ex-comm-reason'));
      side.append(exChip(r.status_label,r.status==='error'?'rojo':['enviado','entregado','leido'].includes(r.status)?'verde':'gris'),button('Ver',()=>orderMessageComposer(order.id),'secondary ex-view'));}
     li.dataset.state=item.source==='sistema'?r.delivery:item.source==='whatsapp'&&r.status==='error'?'fallido':'';li.append(ic,main,side);return li;}
-   function paint(){for(const b of filters.children)b.setAttribute('aria-pressed',String(b.dataset.value===view));const shown=items.filter(i=>view==='todos'||i.source===view);list.replaceChildren(...(all?shown:shown.slice(0,LIMIT)).map(row));
-    if(!shown.length)list.append(el('li','Todavía no hay comunicaciones en este canal.','ex-empty'));more.hidden=shown.length<=LIMIT;more.textContent=all?'Ver solo las recientes':'Ver historial completo ('+shown.length+')';more.setAttribute('aria-expanded',String(all));}
-   more.addEventListener('click',()=>{all=!all;paint();});paint();inner.append(bar,list,more);
-   if(order.receipt_mail){const d=el('details',undefined,'ex-sub');d.append(el('summary','Comprobante por correo'),orderReceiptMailSection(order));inner.append(d);}
+   function paint(){for(const b of filters.children)b.setAttribute('aria-pressed',String(b.dataset.value===state.view));const shown=items.filter(i=>state.view==='todos'||i.source===state.view);list.replaceChildren(...(state.all?shown:shown.slice(0,LIMIT)).map(row));
+    if(!shown.length)list.append(el('li','Todavía no hay comunicaciones en este canal.','ex-empty'));more.hidden=shown.length<=LIMIT;more.textContent=state.all?'Ver solo las recientes':'Ver historial completo ('+shown.length+')';more.setAttribute('aria-expanded',String(state.all));}
+   more.addEventListener('click',()=>{state.all=!state.all;paint();});paint();inner.append(bar,list,more);
+   if(order.receipt_mail){const d=el('details',undefined,'ex-sub');d.dataset.orderFold='receipt-mail';d.append(el('summary','Comprobante por correo'),orderReceiptMailSection(order));inner.append(d);}
    inner.append(el('small','«Enviado al servidor» significa que el servidor de correo lo aceptó; «Entregado» solo con un informe real de entrega. Los rebotes se muestran junto al mensaje original.','ex-note'));}});
+}
+function executiveOrderPanel(order){
+ const panel=el('section',undefined,'ex-panel');panel.setAttribute('aria-label','Comunicaciones, seguimiento del cliente, autorizaciones y permanencia');
+ const state={view:'todos',all:false};
+ let comms=orderCommunicationsCard(panel,order,state),busy=false;
+ const signature=data=>JSON.stringify([data.mail_history||[],data.mail||null,data.messages||[]]);
+ let last=signature(order);
+ panel.refreshCommunications=async()=>{
+  if(busy||!panel.isConnected)return;
+  busy=true;
+  try{
+   const fresh=await api('/api/orders/'+order.id+'/communications'),next=signature(fresh);
+   if(!panel.isConnected||next===last||comms.querySelector('.ex-body').contains(document.activeElement))return;
+   const restoreFocus=comms.querySelector('.ex-head')===document.activeElement;
+   const expanded=comms.dataset.open==='true',receipt=comms.querySelector('details[data-order-fold="receipt-mail"]')?.open;
+   const staging=el('div'),replacement=orderCommunicationsCard(staging,{...order,...fresh},state);
+   if(expanded)replacement.setExpanded(true);
+   if(receipt){const details=replacement.querySelector('details[data-order-fold="receipt-mail"]');if(details)details.open=true;}
+   comms.replaceWith(replacement);comms=replacement;last=next;
+   if(restoreFocus)comms.querySelector('.ex-head').focus({preventScroll:true});
+  }catch{}finally{busy=false;}
+ };
  // ---- 2. Seguimiento del cliente
  if(order.tracking){const t=order.tracking;
   exCard(panel,{key:'tracking',title:'Seguimiento del cliente',glyph:EX_GLYPH.qr,chips:[exChip(t.active?'Activo':'Desactivado',t.active?'verde':'gris')],
@@ -4154,10 +4185,6 @@ async function adiReportDialog(order){let data;try{data=await api('/api/orders/'
 // pulsarla se despliega el cajón con las cinco herramientas y las recomendaciones en filas compactas (referencia real, valor registrado y
 // acción). Contraída por defecto salvo que haya algo crítico verificable; recuerda la preferencia de quien la usa y nunca se abre sola al
 // actualizarse. El rojo solo marca lo crítico (repuesto vencido o con incidencia, saldo que impide entregar un equipo listo).
-const ADIO_PREF='adio-expanded';
-const adioPref=()=>{try{return localStorage.getItem(ADIO_PREF);}catch{return null;}};
-const adioSavePref=open=>{try{localStorage.setItem(ADIO_PREF,open?'1':'0');}catch{}};
-const ADIO_SEVERITY={critica:'Crítica',alta:'Prioridad alta',media:'Pendiente',info:'Informativa'};
 function adiOrderPanel(order,partAction){
  const card=el('section',undefined,'workspace-section adio-panel adio-bar');card.setAttribute('aria-labelledby','adio-panel-title');
  const drawerId='adio-drawer-'+order.id,toggle=el('button',undefined,'adio-bar-toggle');toggle.type='button';toggle.setAttribute('aria-controls',drawerId);toggle.setAttribute('aria-expanded','false');
@@ -4167,10 +4194,10 @@ function adiOrderPanel(order,partAction){
  const drawer=el('div',undefined,'adio-drawer');drawer.id=drawerId;drawer.setAttribute('role','region');drawer.setAttribute('aria-labelledby','adio-panel-title');const inner=el('div',undefined,'adio-drawer-inner'),pad=el('div',undefined,'adio-drawer-pad');inner.append(pad);drawer.append(inner);
  const tools=el('div',undefined,'adio-tools');tools.setAttribute('role','toolbar');tools.setAttribute('aria-label','Herramientas de ADI');
  const body=el('div',undefined,'adio-body'),extra=el('div',undefined,'adio-extra');extra.hidden=true;pad.append(tools,extra,body,el('p','Sugerencias con los datos registrados de la orden. Nada se modifica ni se envía solo.','adio-foot'));
- card.append(toggle,live,drawer);let data=null,loading=false,expanded=false,seen=null;
- const setOpen=(open,remember)=>{expanded=open;card.dataset.expanded=String(open);toggle.setAttribute('aria-expanded',String(open));drawer.inert=!open;if(remember)adioSavePref(open);};
- toggle.addEventListener('click',()=>setOpen(!expanded,true));
- drawer.addEventListener('keydown',event=>{if(event.key==='Escape'&&expanded&&!event.defaultPrevented){event.stopPropagation();setOpen(false,true);toggle.focus();}});
+ card.append(toggle,live,drawer);let data=null,loading=false,expanded=false,seen=null;const openRecommendations=new Set();
+ const setOpen=open=>{expanded=open;card.dataset.expanded=String(open);toggle.setAttribute('aria-expanded',String(open));drawer.inert=!open;};
+ toggle.addEventListener('click',()=>setOpen(!expanded));
+ drawer.addEventListener('keydown',event=>{if(event.key==='Escape'&&expanded&&!event.defaultPrevented){event.stopPropagation();setOpen(false);toggle.focus();}});
  const tool=(label,icon,run)=>{const b=button('',run,'adio-tool');b.append(systemIcon(icon),el('span',label));tools.append(b);return b;};
  const section=sel=>adiScroll(document.querySelector(sel));
  const goTo=(rec)=>{const t=rec.target;
@@ -4184,7 +4211,7 @@ function adiOrderPanel(order,partAction){
  const payTool=tool('Consultar pagos',ADI_ICONS.wallet,()=>showPayments(false));payTool.setAttribute('aria-expanded','false');payTool.setAttribute('aria-controls','adio-extra-'+order.id);extra.id='adio-extra-'+order.id;
  tool('Ver seguimiento',ADI_ICONS.route,()=>section('#order-history')||section('.order-progress-box'));
  tool('Preparar informe',ADI_ICONS.report,()=>adiReportDialog(order));
- function showPayments(force){if(!expanded)setOpen(true,false);const open=force||extra.hidden;extra.hidden=!open;payTool.setAttribute('aria-expanded',String(open));if(!open||!data)return;const p=data.payments;extra.replaceChildren();
+ function showPayments(force){if(!expanded)setOpen(true);const open=force||extra.hidden;extra.hidden=!open;payTool.setAttribute('aria-expanded',String(open));if(!open||!data)return;const p=data.payments;extra.replaceChildren();
   const top=el('div',undefined,'adio-pay-head');top.append(systemIcon(ADI_ICONS.wallet),el('strong','Pagos de la orden'),el('span',p.state_label||'Sin cargos registrados','adio-pay-state'));top.lastChild.dataset.state=p.state;extra.append(top);
   const dl=el('dl',undefined,'adio-values');for(const[k,v]of [['Total',p.total],['Pagado',p.paid],['Saldo pendiente',p.balance]]){const d=el('div');d.append(el('dt',k),el('dd',v));dl.append(d);}extra.append(dl);
   if(p.order)extra.append(el('p','Orden completa (todos los equipos): total '+p.order.total+' · pagado '+p.order.paid+' · saldo '+p.order.balance+'.','adio-note'));
@@ -4194,11 +4221,11 @@ function adiOrderPanel(order,partAction){
   extra.append(el('p',p.note+' Sin fecha de vencimiento registrada.','adio-note'));
   const acts=el('div',undefined,'adio-pay-actions'),toPay=button('Ir a Pagos',()=>section('.equip-pay'),'secondary');acts.append(toPay);if(p.balance_cents>0){const rem=button('Preparar recordatorio de pago',()=>adiPaymentDialog(order),'primary');rem.prepend(systemIcon(adiSpark));acts.append(rem);}extra.append(acts);}
  // Fila compacta: icono, título y descripción breve, referencia real y valor registrado, acción contextual; el detalle se despliega en la fila.
- function recItem(r,fresh){const li=el('li',undefined,'adio-rec');li.dataset.priority=r.priority;li.dataset.severity=r.severity||r.priority;if(fresh)li.dataset.fresh='true';
+ function recItem(r,fresh){const li=el('li',undefined,'adio-rec');li.dataset.open=String(openRecommendations.has(r.key));li.dataset.priority=r.priority;li.dataset.severity=r.severity||r.priority;if(fresh)li.dataset.fresh='true';
   const ic=el('span',undefined,'adio-rec-ic');ic.append(systemIcon(ADI_ICONS[r.icon]||adiSpark));const sev=el('span',ADIO_SEVERITY[r.severity||r.priority]||r.priority_label,'adio-sev');
-  const txt=el('div',undefined,'adio-rec-text'),more=el('button',undefined,'adio-rec-title');more.type='button';more.setAttribute('aria-expanded','false');more.append(el('strong',r.title),sev);
-  const reason=el('p',r.reason,'adio-rec-reason'),detail=el('p',r.action,'adio-rec-action');detail.hidden=true;detail.id='adio-d-'+order.id+'-'+r.key;more.setAttribute('aria-controls',detail.id);
-  more.addEventListener('click',()=>{const open=detail.hidden;detail.hidden=!open;more.setAttribute('aria-expanded',String(open));li.dataset.open=String(open);});
+  const txt=el('div',undefined,'adio-rec-text'),more=el('button',undefined,'adio-rec-title');more.type='button';more.setAttribute('aria-expanded',li.dataset.open);more.append(el('strong',r.title),sev);
+  const reason=el('p',r.reason,'adio-rec-reason'),detail=el('p',r.action,'adio-rec-action');detail.hidden=li.dataset.open!=='true';detail.id='adio-d-'+order.id+'-'+r.key;more.setAttribute('aria-controls',detail.id);
+  more.addEventListener('click',()=>{const open=detail.hidden;detail.hidden=!open;more.setAttribute('aria-expanded',String(open));li.dataset.open=String(open);if(open)openRecommendations.add(r.key);else openRecommendations.delete(r.key);});
   const meta=el('div',undefined,'adio-rec-meta');if(r.ref)meta.append(el('span',r.ref,'adio-ref'));if(r.value)meta.append(el('span',r.value,'adio-val'));txt.append(more,reason,detail);if(meta.childElementCount)txt.append(meta);
   const acts=el('div',undefined,'adio-rec-acts');if(r.button){const b=button(r.button,()=>goTo(r),'secondary');acts.append(b);}
   if(r.dismissible){const x=button('',async()=>{x.disabled=true;try{data=await api('/api/orders/'+order.id+'/adi',{action:'dismiss',key:r.key,fingerprint:r.fingerprint});paint();toast('Recomendación descartada. Volverá a mostrarse si cambian sus datos.','info');}catch(error){x.disabled=false;toast(error.message,'error');}},'adio-dismiss');x.append(systemIcon(ADI_ICONS.x));x.setAttribute('aria-label','Descartar «'+r.title+'»');x.title='Descartar (solo informativa)';acts.append(x);}
@@ -4214,12 +4241,11 @@ function adiOrderPanel(order,partAction){
   else{const ul=el('ul',undefined,'adio-list');ul.setAttribute('aria-label','Recomendaciones de ADI');const fk=new Set(fresh.map(r=>r.key));for(const r of recs)ul.append(recItem(r,fk.has(r.key)));body.append(ul);}
   if(data.dismissed){const again=button('Mostrar descartadas ('+data.dismissed+')',async()=>{try{data=await api('/api/orders/'+order.id+'/adi',{action:'restore'});paint();}catch(error){toast(error.message,'error');}},'text-action adio-restore');body.append(again);}
   seen=keys;if(!extra.hidden)showPayments(true);}
- async function load(announce){if(loading)return;loading=true;card.setAttribute('aria-busy','true');try{const next=await api('/api/orders/'+order.id+'/adi');const changed=!data||next.signature!==data.signature||next.dismissed!==data.dismissed;const first=!data;data=next;
-   if(first){const pref=adioPref();setOpen(pref===null?(data.critical||0)>0:pref==='1',false);}
+ async function load(announce){if(loading)return;loading=true;card.setAttribute('aria-busy','true');try{const next=await api('/api/orders/'+order.id+'/adi');const changed=!data||next.signature!==data.signature||next.dismissed!==data.dismissed;data=next;
    if(changed||announce)paint();
-   if(announce){if(!expanded)setOpen(true,false);toast(data.recommendations.length?data.recommendations.length+(data.recommendations.length===1?' pendiente':' pendientes')+' según los datos registrados.':'Sin pendientes según los datos registrados.','info',undefined,{title:'ADI revisó la orden',id:'adi-review'});}}
+   if(announce){if(!expanded)setOpen(true);toast(data.recommendations.length?data.recommendations.length+(data.recommendations.length===1?' pendiente':' pendientes')+' según los datos registrados.':'Sin pendientes según los datos registrados.','info',undefined,{title:'ADI revisó la orden',id:'adi-review'});}}
   catch(error){if(!data){summary.textContent=error.message;body.replaceChildren(el('p',error.message,'adio-empty'));}}finally{loading=false;card.removeAttribute('aria-busy');}}
- setOpen(false,false);body.append(el('p','ADI está revisando la orden…','adio-empty'));load(false);card.refresh=()=>load(false);return card;}
+ setOpen(false);body.append(el('p','ADI está revisando la orden…','adio-empty'));load(false);card.refresh=()=>load(false);card.setExpanded=setOpen;return card;}
 const orderSectionGlyphs={'Datos del cliente':'user','Datos del equipo':'laptop','Motivo de ingreso':'wrench','Nota interna':'doc','Seguimiento':'clock','Presupuesto':'sliders'};
 // Icono del equipo según el tipo guardado en la orden (nunca al azar): el mismo tipo muestra siempre el mismo icono en recepción, listado y detalle.
 const deviceGlyphs={mouse:'M12 2a7 7 0 0 0-7 7v6a7 7 0 0 0 14 0V9a7 7 0 0 0-7-7z M12 6v4',keyboard:'M4 5h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z M6 9h.01 M10 9h.01 M14 9h.01 M18 9h.01 M8 13h.01 M12 13h.01 M16 13h.01 M7 16h10',drive:'M22 12H2 M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z M6 16h.01 M10 16h.01',tablet:'M6 2h12a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z M12 18h.01',phone:'M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z M12 18h.01',router:'M4 14h16a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2z M6.01 18H6 M10.01 18H10 M15 10v4 M17.84 7.17a4 4 0 0 0-5.66 0 M20.66 4.34a8 8 0 0 0-11.31 0',server:'M4 2h16a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z M4 14h16a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2z M6 6h.01 M6 18h.01',laptop:'M20 16V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v9m16 0H4m16 0 1.28 2.55a1 1 0 0 1-.9 1.45H3.62a1 1 0 0 1-.9-1.45L4 16',desktop:'M2 4h12v9H2z M5 17h6 M8 13v4 M18 4h4v16h-4z M20 8h.01 M20 12h.01',monitor:'M2 3h20v14H2z M8 21h8 M12 17v4',mini:'M9 2v2 M15 2v2 M9 20v2 M15 20v2 M2 9h2 M2 15h2 M20 9h2 M20 15h2 M6 4h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z M9 9h6v6H9z',printer:'M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2 M6 9V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v6 M6 14h12v8H6z',gamepad:'M6 11h4 M8 9v4 M15 12h.01 M18 10h.01 M17.32 5H6.68a4 4 0 0 0-3.978 3.59c-.006.052-.01.101-.017.152C2.604 9.416 2 14.456 2 16a3 3 0 0 0 3 3c1 0 1.5-.5 2-1l1.414-1.414A2 2 0 0 1 9.828 16h4.344a2 2 0 0 1 1.414.586L17 18c.5.5 1 1 2 1a3 3 0 0 0 3-3c0-1.545-.604-6.584-.685-7.258-.007-.05-.011-.1-.017-.151A4 4 0 0 0 17.32 5z',gaming:'M20 16V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v9m16 0H4m16 0 1.28 2.55a1 1 0 0 1-.9 1.45H3.62a1 1 0 0 1-.9-1.45L4 16 M12.5 7.5 10 11h4l-2.5 3.5',generic:'M3 3h18v18H3z M11 9h4a2 2 0 0 0 2-2V3 M9 9a2 2 0 1 0 0-4 2 2 0 0 0 0 4z M7 21v-4a2 2 0 0 1 2-2h4 M15 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4z'};
@@ -4321,8 +4347,124 @@ function orderHistoryPanel(order){
  clearInterval(historyTimer);const timer=historyTimer=setInterval(async()=>{if(!panel.isConnected){clearInterval(timer);return;}if(document.hidden)return;try{const fresh=await api('/api/activity?order='+order.id);if(!panel.isConnected)return;if(fresh.rows.some(row=>!known.has(row.id))){setRows(fresh.rows);paint();}stamp(false);}catch{stamp(true);}},45000);
  return panel;
 }
+let actionCenterListId=0;
+function ActionCenterCompact(groups,{label='Centro de acciones'}={}){
+ const nav=el('nav',undefined,'action-center');nav.setAttribute('aria-label',label);
+ nav.append(el('h3',label,'action-center-title'));
+ const row=el('div',undefined,'action-center-row');nav.append(row);
+ for(const {name,icon,items,direct} of groups){
+  if(!items.length)continue;
+  const group=el('div',undefined,'action-center-group');
+  if(direct)group.dataset.direct='';
+  const title=el('span',name,'action-center-category'),list=el('div',undefined,'action-center-items');
+  group.append(title);row.append(group);
+  if(!direct){
+   const trigger=button('',()=>setOpen(trigger.getAttribute('aria-expanded')==='false'),'secondary action-center-trigger');
+   const setOpen=open=>{trigger.setAttribute('aria-expanded',String(open));group.classList.toggle('is-open',open);};
+   trigger.setAttribute('aria-expanded','false');
+   list.id='action-center-list-'+(++actionCenterListId);
+   trigger.setAttribute('aria-controls',list.id);
+   trigger.append(icon,el('span',name),systemIcon('m6 9 6 6 6-6'));
+   group.append(trigger);
+   group.addEventListener('focusout',event=>{if(!group.contains(event.relatedTarget))setOpen(false);});
+   group.addEventListener('keydown',event=>{
+    if(event.key==='Escape'&&group.classList.contains('is-open')){
+     event.stopPropagation();setOpen(false);trigger.focus();
+    }
+   });
+   list.addEventListener('click',()=>{
+    if(!group.classList.contains('is-open'))return;
+    if(list.contains(document.activeElement))trigger.focus();
+    setOpen(false);
+   });
+  }
+  for(const [action,short] of items){
+   const name=action.textContent.trim();
+   action.classList.add('action-center-control');
+   action.setAttribute('aria-label',name);
+   action.title=action.title&&action.title!==name?name+' · '+action.title:name;
+   if(short){
+    for(const child of [...action.childNodes]){
+     if(child.nodeType===Node.TEXT_NODE)child.remove();
+    }
+    action.classList.add('has-short-label');
+    action.append(el('span',name,'action-center-full'),el('span',short,'action-center-short'));
+   }
+   list.append(action);
+  }
+  group.append(list);
+ }
+ return nav;
+}
+
+function orderActionCenter(order,cancelBox){
+ const url='/api/orders/'+order.id;
+ const staff=['administrador','tecnico'].includes(currentUser?.role);
+ const withIcon=(label,icon,run,style)=>{const action=button(label,run,style);action.prepend(icon);return action;};
+ const documents=[
+  [withIcon('Comprobante de recepción',orderActionIcon('document'),()=>showReceipt(order.id)),'Recepción'],
+  [documentAction('Imprimir ticket','print',url+'/thermal.pdf'),'Imprimir'],
+  [documentAction('Ticket digital','document',url+'/thermal.pdf?modo=digital'),'Digital']
+ ];
+ if(order.status==='entregado'||order.delivered_at){
+  documents.push([documentAction('Comprobante de entrega','document',url+'/delivery.pdf'),'Entrega'],
+   [documentAction('Ticket de entrega','print',url+'/delivery.pdf?formato=termico'),'Ticket entrega']);
+ }
+ const service=[
+  [withIcon('Etiqueta de servicio',orderActionIcon('tag'),()=>printEquipmentLabel(order)),'Etiqueta'],
+  [documentAction('Hoja de servicio técnico','service',url+'/service.pdf'),'Hoja técnica'],
+  [documentAction('Descargar PDF','download',url+'/receipt.pdf'),'PDF']
+ ];
+ const terms=order.terms||order.terms_current;
+ const termsUrl=terms?(terms.pdf_url||terms.local_url+'.pdf'):'/api/conditions/draft.pdf';
+ const conditions=[
+  [documentAction(order.terms?'Condiciones del servicio':terms?'Condiciones del servicio (versión vigente)':'Condiciones del servicio (borrador)','document',termsUrl),'Ver'],
+  [withIcon('Compartir condiciones del servicio',orderActionIcon('share'),()=>shareConditions(termsUrl,!terms)),'Compartir']
+ ];
+ const delivered=order.status==='entregado';
+ const maintenance=withIcon('Próximo mantenimiento',operationIcon('maintenance'),()=>{
+  if(delivered)go('maintenance',new URLSearchParams({order:order.id}));
+  else toast('El mantenimiento preventivo se programa automáticamente a seis meses cuando la orden pasa a «Entregado».','info',undefined,{title:'Aún sin programar',id:'maintenance-pending'});
+ },'secondary order-document-action');
+ if(!delivered){
+  maintenance.classList.add('is-pending');maintenance.setAttribute('aria-disabled','true');
+  maintenance.title='Se programa al confirmar la entrega';
+ }
+ const tracking=[
+  [maintenance,'Mantenimiento'],
+  [withIcon('Tarjeta de seguimiento',systemIcon('M3 9a2 2 0 0 0 0 6v3a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1v-3a2 2 0 0 0 0-6V6a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1z M9 5v14'),()=>openTrackingCard(order.id)),'Tarjeta']
+ ];
+ if(staff)tracking.push([withIcon('Seguimiento A4',systemIcon(A4_PRINTER),()=>window.open('/tarjeta/'+order.id+'/a4','_blank','noopener')),'A4']);
+ const primary=[];
+ if(admin())primary.push([withIcon('Gestión técnica',orderActionIcon('edit'),()=>openOrderEditor(order.id),'primary')]);
+ if(delivered)primary.push([withIcon('Reingresar equipo',systemIcon(REENTRY_ICON),()=>reenterDevice(order.device_id))]);
+ if(!delivered&&staff){
+  const cancel=withIcon('Cancelar reparación',systemIcon(OC_ICON.x),async()=>{
+   let info;
+   try{info=await api(url+'/cancellation');}catch(error){toast(error.message,'error');return;}
+   if(!info.installed){toast('Falta aplicar la migración 127 en Sistema → Migraciones.','warning');return;}
+   if(info.cancellation){cancelBox.scrollIntoView({behavior:'smooth',block:'start'});return;}
+   cancelOrderDialog(order,info,()=>orderCancellationPanel(order,cancelBox));
+  },'secondary oc-cancel-action');
+  primary.push([cancel]);
+ }
+ return ActionCenterCompact([
+  {name:'Documentación',icon:orderActionIcon('document'),items:documents},
+  {name:'Servicio',icon:orderActionIcon('service'),items:service},
+  {name:'Condiciones',icon:orderActionIcon('share'),items:conditions},
+  {name:'Seguimiento',icon:systemIcon(A4_PRINTER),items:tracking},
+  {name:'Acciones principales',items:primary,direct:true}
+ ]);
+}
 function renderOrderDetail(root,order){
- root.replaceChildren();const head=el('section',undefined,'workspace-header');const title=el('div');title.append(el('small','SERVICIO DE REPARACIÓN'),el('h2',order.code),el('p',order.client||'Cliente sin nombre','workspace-client'));
+ const openCards=new Set(),openDetails=new Set();
+ let adiOpen=false;
+ if(root.querySelector('.workspace-header')?.dataset.orderId===String(order.id)){
+  adiOpen=root.querySelector('.adio-panel')?.dataset.expanded==='true';
+  root.querySelectorAll('.ex-card[data-open=true]').forEach(card=>openCards.add(card.dataset.key));
+  root.querySelectorAll('details[data-order-fold][open]').forEach(detail=>openDetails.add(detail.dataset.orderFold));
+ }
+ root.replaceChildren();const head=el('section',undefined,'workspace-header');head.dataset.orderId=String(order.id);const title=el('div');title.append(el('small','SERVICIO DE REPARACIÓN'),el('h2',order.code),el('p',order.client||'Cliente sin nombre','workspace-client'));
  // Resumen del encabezado: lo que identifica la orden de un vistazo. Los datos completos siguen en sus secciones.
  {const facts=el('ul',undefined,'workspace-chips'),units=order.group?.units?.length||1,chip=(label,value,glyph)=>{if(!value)return;const li=el('li');li.append(systemIcon(glyph),el('small',label),el('b',value));facts.append(li);};
   chip('Recepción',formatOrderDate(order.received_at||order.created_at*1000),'M8 2v4 M16 2v4 M3 10h18 M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z');chip('Equipo',[order.group?.multiple?(order.unit_code||'').split('-').pop():'',order.device_code,[order.brand,order.model].filter(Boolean).join(' ')].filter(Boolean).join(' · '),'M3 5h18v11H3z M8 20h8 M12 16v4');
@@ -4344,27 +4486,21 @@ function renderOrderDetail(root,order){
  const rpActions={quote:id=>openQuoteEditor(order,id),part:id=>{const card=document.querySelector('.opr-card[data-part="'+id+'"]')||document.querySelector('.opr-card');if(!card){toast('El seguimiento de repuestos aún se está cargando.','info');return;}card.scrollIntoView({block:'start',behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});card.classList.remove('rp-focus');void card.offsetWidth;card.classList.add('rp-focus');setTimeout(()=>card.classList.remove('rp-focus'),1800);card.querySelector('button,summary,a')?.focus({preventScroll:true});}};
  // Sincronización (1.5.252): cada 30 s, con la pestaña visible, se compara la huella del seguimiento; si cambió (otro técnico avanzó la orden,
  // se aprobó un presupuesto o llegó un repuesto), se redibuja la barra y el estado sin recargar la página.
- const syncTimer=setInterval(async()=>{if(!progress.isConnected){clearInterval(syncTimer);return;}if(document.hidden)return;try{const d=await api('/api/orders/'+watchUnit+'/stages');
+ const syncTimer=setInterval(async()=>{if(!progress.isConnected){clearInterval(syncTimer);return;}if(document.hidden)return;root.querySelector('.ex-panel')?.refreshCommunications?.();try{const d=await api('/api/orders/'+watchUnit+'/stages');
   if(d.signature&&d.signature!==progress.dataset.sig){progress.replaceChildren(repairBar(d,rpActions));progress.dataset.sig=d.signature;document.querySelector('.adio-panel')?.refresh?.();if(watchUnit===order.id)stateBadge.replaceChildren(orderBadge(d.status,d.status_label,watchUnit));}}catch{}},30000);
  if(many){const all=order.group.overall,general=el('div',undefined,'order-overall');general.dataset.state=all.code;general.setAttribute('role','status');const mark=el('span',undefined,'order-overall-icon');mark.append(systemIcon('M4 4h6v6H4z M14 4h6v6h-6z M4 14h6v6H4z M14 14h6v6h-6z'));const copy=el('div');copy.append(el('small','Estado general de la orden'),el('strong',all.label),el('span',all.summary));general.append(mark,copy);progressBox.prepend(general);}
  paintUnit(order.group?.units?.find(unit=>unit.id===order.id)||{id:order.id,status_code:order.status,status:order.status_label,unit_code:order.unit_code,type_label:'',brand:order.brand,model:order.model});
  // El selector de equipos avisa de cada cambio de selección; no se recarga la página.
  if(root._unitListener)document.removeEventListener('equip:select',root._unitListener);root._unitListener=event=>{if(event.detail?.order===order.id&&progress.isConnected)paintUnit(event.detail.unit);};document.addEventListener('equip:select',root._unitListener);
- const actions=el('nav',undefined,'workspace-actions');actions.setAttribute('aria-label','Documentos y acciones de la orden');const receipt=button('Comprobante de recepción',()=>showReceipt(order.id));receipt.classList.add('order-document-action');receipt.prepend(orderActionIcon('document'));actions.append(receipt,documentAction('Imprimir ticket','print','/api/orders/'+order.id+'/thermal.pdf'),documentAction('Ticket digital','document','/api/orders/'+order.id+'/thermal.pdf?modo=digital'));const label=button('Etiqueta de servicio',()=>printEquipmentLabel(order));label.classList.add('order-document-action');label.prepend(orderActionIcon('tag'));actions.append(label,documentAction('Hoja de servicio técnico','service','/api/orders/'+order.id+'/service.pdf'),documentAction('Descargar PDF','download','/api/orders/'+order.id+'/receipt.pdf'));if(order.status==='entregado'||order.delivered_at)actions.append(documentAction('Comprobante de entrega','document','/api/orders/'+order.id+'/delivery.pdf'),documentAction('Ticket de entrega','print','/api/orders/'+order.id+'/delivery.pdf?formato=termico'));
- // Con aceptación registrada se abre esa versión exacta; sin ella, la versión oficial vigente (rotulada como tal); el borrador solo si no hay ninguna publicada.
- const termsShown=order.terms||order.terms_current,termsUrl=termsShown?(termsShown.pdf_url||termsShown.local_url+'.pdf'):'/api/conditions/draft.pdf',share=button('Compartir condiciones del servicio',()=>shareConditions(termsUrl,!termsShown));share.classList.add('order-document-action');share.prepend(orderActionIcon('share'));actions.append(documentAction(order.terms?'Condiciones del servicio':order.terms_current?'Condiciones del servicio (versión vigente)':'Condiciones del servicio (borrador)','document',termsUrl),share);// Siempre responde: con la orden entregada abre la programación; antes de la entrega explica cuándo se programa (no queda «cargando»).
- const delivered=order.status==='entregado',maintenanceButton=button('Próximo mantenimiento',()=>{if(delivered)go('maintenance',new URLSearchParams({order:order.id}));else toast('El mantenimiento preventivo se programa automáticamente a seis meses cuando la orden pasa a «Entregado».','info',undefined,{title:'Aún sin programar',id:'maintenance-pending'});});maintenanceButton.classList.add('order-document-action');maintenanceButton.prepend(operationIcon('maintenance'));if(!delivered){maintenanceButton.classList.add('is-pending');maintenanceButton.setAttribute('aria-disabled','true');}maintenanceButton.title=delivered?'Consultar programación preventiva':'Se programa al confirmar la entrega';actions.append(maintenanceButton);
- {const cardButton=button('Tarjeta de seguimiento',()=>openTrackingCard(order.id));cardButton.classList.add('order-document-action');cardButton.prepend(systemIcon('M3 9a2 2 0 0 0 0 6v3a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1v-3a2 2 0 0 0 0-6V6a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1z M9 5v14'));actions.append(cardButton);
-  // Seguimiento A4 (1.5.248): informe por secciones con la información interna; solo administración y técnicos (el servidor lo vuelve a comprobar).
-  if(['administrador','tecnico'].includes(currentUser?.role)){const a4=button('Seguimiento A4',()=>window.open('/tarjeta/'+order.id+'/a4','_blank','noopener'));a4.classList.add('order-document-action');a4.title='Imprimir seguimiento A4 (versión interna)';a4.prepend(systemIcon(A4_PRINTER));actions.append(a4);}}
- if(admin()){const edit=button('Gestión técnica',()=>openOrderEditor(order.id));edit.title='Estado, técnico, prioridad, entrega e informes de este equipo';edit.classList.add('order-document-action');edit.prepend(orderActionIcon('edit'));actions.append(edit);}const adiCard=['administrador','tecnico'].includes(currentUser?.role)?adiOrderPanel(order,id=>rpActions.part(id)):null;if(order.status==='entregado'){const again=button('Reingresar equipo',()=>reenterDevice(order.device_id));again.classList.add('order-document-action');again.title='Registrar una nueva orden con este mismo equipo. Esta orden no se reabre.';again.prepend(systemIcon(REENTRY_ICON));actions.append(again);}
- const reentry=reentryNote(order);const cancelBox=el('section',undefined,'oc-panel');cancelBox.hidden=true;root.append(head,progressBox,...(reentry?[reentry]:[]),actions,cancelBox);if(adiCard)root.append(adiCard);
+ const cancelBox=el('section',undefined,'oc-panel');cancelBox.hidden=true;
+ const actions=orderActionCenter(order,cancelBox);
+ const adiCard=['administrador','tecnico'].includes(currentUser?.role)?adiOrderPanel(order,id=>rpActions.part(id)):null;
+ const reentry=reentryNote(order);
+ root.append(head,progressBox,...(reentry?[reentry]:[]),actions,cancelBox);
+ if(adiCard){root.append(adiCard);if(adiOpen)adiCard.setExpanded(true);}
  orderCancellationPanel(order,cancelBox);
- if(order.status!=='entregado'&&['administrador','tecnico'].includes(currentUser?.role)){const cancelBtn=button('Cancelar reparación',async()=>{let info;try{info=await api('/api/orders/'+order.id+'/cancellation');}catch(error){toast(error.message,'error');return;}
-   if(!info.installed){toast('Falta aplicar la migración 127 en Sistema → Migraciones.','warning');return;}if(info.cancellation){cancelBox.scrollIntoView({behavior:'smooth',block:'start'});return;}
-   cancelOrderDialog(order,info,()=>orderCancellationPanel(order,cancelBox));});cancelBtn.classList.add('order-document-action','oc-cancel-action');cancelBtn.prepend(systemIcon(OC_ICON.x));actions.append(cancelBtn);}
  const layout=el('div',undefined,'workspace-layout');const main=el('div',undefined,'workspace-main'),aside=el('aside',undefined,'workspace-side');main.append(orderSection('Datos del cliente',[['Nombre / Razón social',order.client],['Teléfono / WhatsApp',order.phone],['Cédula o RUC',order.identification],['Correo electrónico',order.email],['Ubicación',[order.province,order.canton,order.parish,order.city].filter(Boolean).join(' · ')],['Dirección',order.address],['Referencia',order.location_reference],...(order.reception_phone!==undefined||order.reception_email!==undefined?[['Contacto al recibir el equipo',[order.reception_phone!==undefined?'Teléfono: '+(order.reception_phone||'no registrado'):'',order.reception_email!==undefined?'Correo: '+(order.reception_email||'no registrado'):''].filter(Boolean).join(' · ')+' (la ficha del cliente se actualizó después)']]:[])]),orderSection('Datos del equipo',[['Tipo de equipo',receptionOptions?.device_types?.[order.type]||order.type],['Marca y modelo',[order.brand,order.model].filter(Boolean).join(' ')],['Número de serie',order.serial],['Identificador del equipo',order.device_code],...(order.unit_code?[['Equipo en la orden',order.unit_code]]:[]),['Color',order.color],['Accesorios recibidos',order.accessories],['Estado físico',order.physical_condition]]),orderSection('Motivo de ingreso',[['Falla reportada al recibir',order.problem],['Descripción de trabajo actual',order.current_problem||order.problem]]),orderSection('Nota interna',[['Observaciones de recepción',order.technician_notes],['Observaciones del técnico',order.internal_notes],['Recomendaciones',order.recommendations],['Hallazgos internos',order.findings]]));
- main.prepend(equipmentGroupSection(order));{let rxs=receptionDetailSection(order);if(!rxs&&order.reception&&!rxCat()){rxs=el('section',undefined,'workspace-section rx-detail');loadReceptionOptions().then(()=>{const real=receptionDetailSection(order);if(real)rxs.replaceWith(real);else rxs.remove();}).catch(()=>rxs.remove());}if(rxs)main.append(rxs);}main.append(orderPhotoSection(order));main.append(orderPartsPanel(order));main.append(orderHistoryPanel(order));
+ main.prepend(equipmentGroupSection(order));{let rxs=receptionDetailSection(order);if(!rxs&&order.reception&&!rxCat()){rxs=el('section',undefined,'workspace-section rx-detail');loadReceptionOptions().then(()=>{const real=receptionDetailSection(order);if(real)rxs.replaceWith(real);else rxs.remove();}).catch(()=>rxs.remove());}if(rxs)main.append(rxs);}main.append(orderPhotoSection(order));main.append(orderPartsPanel(order,openDetails));main.append(orderHistoryPanel(order));
  aside.append(orderStatusCard(order));if(['administrador','tecnico'].includes(currentUser?.role))aside.append(orderClientNoticesCard(order));if(currentUser?.role==='administrador')aside.append(orderIdentityCard(order));  // 1.5.275: avisos al cliente por WhatsApp · 1.5.257: estado, responsable, prioridad, entrega, última actualización, línea de tiempo, auditoría y ADI
  aside.append(quoteSection(order),...(admin()?[proformaOrderSection(order),orderPartsSection(order)]:[]),paymentsSection(order));
  // WhatsApp: mensajes preparados con los datos de la orden; se abren en WhatsApp para enviarlos desde allí.
@@ -4377,6 +4513,8 @@ function renderOrderDetail(root,order){
    if(order.email&&order.mail){const write=button('Correo',()=>openMailComposer({to:order.email,subject:'Orden '+order.code+' · PC-DOCTOR S.A.',order_code:order.code,order}),'secondary');write.prepend(systemIcon('m22 7-8.99 5.73a2 2 0 0 1-2.02 0L2 7 M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z'));bar.append(write);}
    if(bar.childElementCount)card.append(bar);}}
  layout.append(main,aside);root.append(executiveOrderPanel(order),layout);
+ root.querySelectorAll('.ex-card').forEach(card=>{if(openCards.has(card.dataset.key))card.setExpanded(true);});
+ root.querySelectorAll('details[data-order-fold]').forEach(detail=>{if(openDetails.has(detail.dataset.orderFold))detail.open=true;});
 }
 // Repuestos del inventario usados en la orden (solo administración): la salida «uso en orden», una por producto, que consume la reserva de la
 // orden si la hay. La factura de la orden no los descuenta otra vez. Existencias, series y duplicados los controla el servidor.
@@ -4445,7 +4583,7 @@ async function openOrderEditor(id,addBudgetLine=false,afterSave=null){
  const amountsFoot=el('div',undefined,'tech-amounts-foot');if(!order.budget_locked){const lineButton=button('Agregar línea',()=>{addLine();lineRows.at(-1).description.focus();paintPending();},'secondary');lineButton.prepend(systemIcon('M12 5v14 M5 12h14'));amountsFoot.append(lineButton);}else if(!lineRows.length)lineList.append(el('p','Sin importes registrados.','system-muted'));amountsFoot.append(total);amounts.append(amountsFoot);updateTotal();
  const log=block('Historial','M3 12a9 9 0 1 0 3-6.7L3 8 M3 3v5h5 M12 7v5l3 2');textArea(log,'comment','Comentario para el historial',{internal:true,rows:2,hint:'Opcional. Queda registrado con tu usuario, la fecha y la hora.'});
  // Actividad reciente: los tres movimientos más nuevos a la vista y el historial completo a un clic. Solo lectura.
- if(order.history?.length){const recent=el('details',undefined,'tech-history activity-fold'),title=el('summary');recent.open=true;title.append(systemIcon('M3 12a9 9 0 1 0 3-6.7L3 8 M3 3v5h5 M12 7v5l3 2'),el('span','Actividad reciente'),el('b',String(order.history.length)));recent.append(title,activityTimeline(orderActivity(order.history),{visible:3}));log.append(recent);}
+ if(order.history?.length){const recent=el('details',undefined,'tech-history activity-fold'),title=el('summary');recent.dataset.orderFold='activity';title.append(systemIcon('M3 12a9 9 0 1 0 3-6.7L3 8 M3 3v5h5 M12 7v5l3 2'),el('span','Actividad reciente'),el('b',String(order.history.length)));recent.append(title,activityTimeline(orderActivity(order.history),{visible:3}));log.append(recent);}
  const message=el('p',undefined,'message');message.setAttribute('role','status');const footer=el('footer'),pending=el('span','Cambios pendientes','tech-pending'),save=el('button','Guardar cambios','primary');save.type='submit';pending.hidden=true;pending.setAttribute('role','status');footer.append(pending,button('Cancelar',()=>requestModalClose(dialog),'secondary'),save);form.append(header,grid,message,footer);dialog.append(form);document.body.append(dialog);dialog.addEventListener('close',()=>dialog.remove(),{once:true});dialog.showModal();updateTotal();
  // Cambios pendientes: se compara con el estado al abrir; el aviso de cierre usa esa misma referencia.
  const initial=formSnapshot(form);dialog.dataset.baseline=initial;function paintPending(){pending.hidden=formSnapshot(form)===initial;}form.addEventListener('input',paintPending);form.addEventListener('change',paintPending);
@@ -4606,7 +4744,7 @@ function paymentsSection(order){const section=el('section',undefined,'workspace-
  if(canPayUnit||canPayOrder){const add=invBtn('Registrar pago','circle-dollar-sign',()=>paymentDialog(order,{canPayUnit,canPayOrder,multiple,whole,unitName}),'primary equip-pay-main');section.append(add);}
  // Historial desplegable con recibo, envío, WhatsApp, voucher y anulación.
  const rows=[...order.payments,...(multiple?(group.general_payments||[]).map(p=>({...p,general:true})):[])].sort((a,b)=>a.created_at<b.created_at?1:-1);
- if(rows.length){const det=el('details',undefined,'pay-history'),sum=el('summary');sum.append(invIcon('scroll-text'),el('span','Historial de pagos ('+rows.length+')'));det.open=rows.length<=6;det.append(sum);
+ if(rows.length){const det=el('details',undefined,'pay-history'),sum=el('summary');sum.append(invIcon('scroll-text'),el('span','Historial de pagos ('+rows.length+')'));det.dataset.orderFold='payments';det.append(sum);
   const wrap=el('div',undefined,'inv-table-wrap'),table=el('table',undefined,'inv-table pay-table'),thead=el('thead'),hr=el('tr'),tbody=el('tbody');for(const h of ['Fecha y hora','Recibo','Importe','Método','Referencia','Responsable','Estado','Acciones']){const th=el('th',h);th.scope='col';hr.append(th);}thead.append(hr);
   for(const pay of rows){const tr=el('tr'),cell=(label,...nodes)=>{const td=el('td');td.dataset.label=label;td.append(...nodes);tr.append(td);return td;};if(pay.voided_at)tr.dataset.voided='true';
    const amount=(pay.kind==='devolucion'?'− ':'')+equipmentMoney(pay.amount_cents);const state=pay.voided_at?'Anulado':pay.kind==='devolucion'?'Devolución':pay.kind==='asignacion'?'Asignado de un pago general':pay.transfer_status?{pendiente:'Pendiente de verificar',confirmado:'Confirmado',conciliado:'Conciliado',rechazado:'Rechazado'}[pay.transfer_status]:pay.voucher_status?'Voucher: '+pay.voucher_status.replace(/_/g,' '):'Registrado';
@@ -4824,7 +4962,7 @@ function authorizationView(order,okItems,partial,data,refresh){const info=order.
   pick.addEventListener('change',async()=>{const before=item.execution;pick.disabled=true;try{await api('/api/quotes/'+item.quote_id,{action:'execution',item:String(item.id),value:pick.value});item.execution=pick.value;li.dataset.execution=pick.value;toast('Ejecución actualizada: '+pick.selectedOptions[0].textContent.toLowerCase()+'.','success',undefined,{id:'quote-execution'});}catch(error){pick.value=before;notify(error.message);}finally{pick.disabled=false;}});
   const execLabel=el('label',undefined,'az-exec-label');execLabel.append(el('span','Ejecución'),pick);side.append(el('b',quoteMoney(item.net_cents)),approvedChip,execLabel);li.append(icon,body,side);return li;};
  for(const[key,label,items,glyph]of [['services','Servicios técnicos',okItems.filter(isService),authorizationIcons.services],['products','Productos',okItems.filter(item=>!isService(item)),authorizationIcons.products]]){if(!items.length)continue;
-  const group=el('details',undefined,'az-group');group.dataset.kind=key;group.open=true;const sum=el('summary'),gi=el('span',undefined,'az-group-icon');gi.append(systemIcon(glyph));const done=items.filter(i=>i.execution==='realizado').length;
+  const group=el('details',undefined,'az-group');group.dataset.kind=key;group.dataset.orderFold='authorization-'+key;const sum=el('summary'),gi=el('span',undefined,'az-group-icon');gi.append(systemIcon(glyph));const done=items.filter(i=>i.execution==='realizado').length;
   sum.append(gi,el('strong',label),el('em',items.length+(items.length===1?' partida':' partidas')+' · '+done+' finalizada'+(done===1?'':'s')),el('b',quoteMoney(items.reduce((a,i)=>a+i.net_cents,0))));const list=el('ul',undefined,'az-list');for(const item of items)list.append(card(item));group.append(sum,list);groups.append(group);}
  // Resumen económico autorizado: base, IVA y total (el IVA ya va incluido en cada precio; no se suma dos veces).
  const money=el('div',undefined,'az-money');for(const[label,cents,kind]of [['Subtotal autorizado',info.subtotal_cents,'base'],['IVA',info.tax_cents,'tax'],['Total autorizado',info.total_cents,'total']]){const cell=el('div');cell.dataset.kind=kind;cell.append(el('small',label),el('strong',quoteMoney(cents||0)));money.append(cell);}
@@ -5891,7 +6029,7 @@ function centerPromptLite(title,note,run){const d=smallDialog(title),form=el('fo
 // Pedidos de repuestos de la orden (1.5.238): cada repuesto con su línea de 8 etapas (verde completada ✓, actual con el tono de su situación,
 // gris pendiente), su situación, sus datos y su historial. Solo se avanza a la etapa siguiente; saltar o retroceder es una corrección de
 // administración con motivo. Nada se publica ni se envía sin marcarlo; «Guardar y notificar» abre la comunicación para revisarla.
-function orderPartsPanel(order){ofxIcons();const box=el('section',undefined,'opr');box.setAttribute('aria-labelledby','opr-title-'+order.id);let data=null;
+function orderPartsPanel(order,orderOpenDetails){ofxIcons();const box=el('section',undefined,'opr');box.setAttribute('aria-labelledby','opr-title-'+order.id);let data=null;
  const head=el('header',undefined,'opr-head'),htitle=el('div',undefined,'opr-htitle'),hico=el('span',undefined,'opr-ico'),title=el('h3','Pedidos de repuestos');title.id='opr-title-'+order.id;hico.append(invIcon('package'));
  const count=el('span','','opr-count'),add=invBtn('Pedido de repuesto','plus',()=>partDialog(null),'primary');htitle.append(hico,title,count);const summary=el('div',undefined,'opr-summary');summary.setAttribute('aria-label','Resumen de los pedidos');
  head.append(htitle,add);const list=el('div',undefined,'opr-list');list.setAttribute('aria-live','polite');box.append(head,summary,list);
@@ -5917,7 +6055,10 @@ function orderPartsPanel(order){ofxIcons();const box=el('section',undefined,'opr
   return wrap;}
  const OPR_OK='<svg class="v-ok" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><circle cx="10" cy="10" r="9"/><path d="m6 10.2 2.6 2.6L14.2 7"/></svg>';
  async function load(){try{data=await api('/api/orders/'+order.id+'/part-requests');paint();}catch(error){list.replaceChildren(el('p',error.message,'inv-form-message'));}}
- function paint(){const rows=data.rows;count.textContent=rows.length?String(rows.length):'';list.replaceChildren();summary.replaceChildren();summary.hidden=!rows.length;
+ function paint(){
+  const rows=data.rows,openDetails=orderOpenDetails||new Set([...list.querySelectorAll('details[data-order-fold][open]')].map(detail=>detail.dataset.orderFold));
+  orderOpenDetails=null;
+  count.textContent=rows.length?String(rows.length):'';list.replaceChildren();summary.replaceChildren();summary.hidden=!rows.length;
   if(admin()&&!head.querySelector('.opr-auto')){const lab=el('label',undefined,'opr-auto'),c=el('input');asSwitch(c).type='checkbox';c.checked=!!data.notices_enabled;
    c.onchange=async()=>{c.disabled=true;try{await api('/api/part-notices/settings',{auto:c.checked});data.notices_enabled=c.checked;toast(c.checked?'Avisos automáticos al cliente activados.':'Avisos automáticos desactivados.','success');}catch(error){c.checked=!c.checked;toast(error.message,'error');}finally{c.disabled=false;}};
    lab.title='Correo'+(data.whatsapp?.configured&&data.whatsapp?.template?' y WhatsApp Business':' (WhatsApp Business no está configurado)')+'. Solo en eventos relevantes; uno por evento.';lab.append(c,el('span','Avisos automáticos al cliente'));head.insertBefore(lab,add);}
@@ -5952,7 +6093,7 @@ function orderPartsPanel(order){ofxIcons();const box=el('section',undefined,'opr
    else r.steps.forEach((st,i)=>{const li=el('li'),state=i<r.stage_index||(i===r.stage_index&&i===7&&r.situation!=='cancelado')?'done':i===r.stage_index?'current':'pending';li.dataset.state=state;li.dataset.c=String(i);
     if(state==='current'){li.dataset.tone=r.situation==='normal'?'azul':r.tone;li.setAttribute('aria-current','step');}
     li.append(el('i'),el('span',st.short),el('small',{done:'completada',current:'etapa actual',pending:'pendiente'}[state],'sr-only'));if(st.at)li.append(el('time',day(st.at)));li.title=st.label+(st.at?' · '+when(st.at):'');steps.append(li);});track.append(steps);
-   if(r.route.length){const flowBox=el('details',undefined,'opr-flowbox'),fl=el('ol',undefined,'opr-flow'),sm=el('summary');{const doneSteps=r.detail.filter(d=>d.state==='done').length,cur=r.detail.find(d=>d.state==='current');sm.append(el('span','Pasos logísticos detallados'),el('b',doneSteps+' de '+r.detail.length+' completados'));if(cur)sm.append(el('small','Actual: '+cur.label,'opr-flow-now'));sm.setAttribute('aria-label','Pasos logísticos detallados: '+doneSteps+' de '+r.detail.length+' completados'+(cur?'; paso actual: '+cur.label:''));}flowBox.open=matchMedia('(min-width: 700px)').matches;fl.classList.add('opr-flow-v2');
+   if(r.route.length){const flowBox=el('details',undefined,'opr-flowbox'),fl=el('ol',undefined,'opr-flow'),sm=el('summary');{const doneSteps=r.detail.filter(d=>d.state==='done').length,cur=r.detail.find(d=>d.state==='current');sm.append(el('span','Pasos logísticos detallados'),el('b',doneSteps+' de '+r.detail.length+' completados'));if(cur)sm.append(el('small','Actual: '+cur.label,'opr-flow-now'));sm.setAttribute('aria-label','Pasos logísticos detallados: '+doneSteps+' de '+r.detail.length+' completados'+(cur?'; paso actual: '+cur.label:''));}flowBox.dataset.orderFold='part-'+r.id;flowBox.open=openDetails.has(flowBox.dataset.orderFold);fl.classList.add('opr-flow-v2');
     r.detail.forEach((d,i)=>{const li=el('li');li.dataset.state=d.state;li.dataset.c=String(Math.round(i*7/Math.max(1,total-1)));if(d.state==='current'&&r.situation!=='normal')li.dataset.tone=r.tone;if(d.state==='current')li.setAttribute('aria-current','step');const mark=el('i');if(d.state==='done')mark.append(systemIcon('M20 6 9 17l-5-5'));li.append(mark,el('b',String(i+1).padStart(2,'0'),'opr-num'),el('span',d.label));li.title=d.label+' · '+({done:'completado',current:'paso actual',pending:'pendiente',skipped:'no registrado'}[d.state]||'')+(d.at?' · '+when(d.at):'');if(d.state==='current')li.append(el('em','Actual','opr-cur'));if(d.at)li.append(el('time',day(d.at)));if(d.state==='skipped')li.append(el('em','No registrada'));if(d.evidence)li.append(el('b',d.evidence===1?'1 evidencia':d.evidence+' evidencias','opr-ev'));fl.append(li);});
     flowBox.append(sm,fl);const map=el('div',undefined,'opr-map');map.innerHTML=r.map_html||'';track.replaceChildren(r.map_html?map:routeView(r),flowBox);track.classList.add('opr-track-route');watchMap(map);}
    // Información en bloques: solo los que tienen datos.
@@ -6247,8 +6388,8 @@ async function orderMessageComposer(id,followupId=null,preset='',presetTemplate=
  paintSources();paintLatest();if(draft&&draft.template){tpl.value=draft.template;tplTouched=true;}else if(!draft&&!start&&!src.length)tpl.value='estado';if(presetTemplate&&data.templates?.[presetTemplate]){tpl.value=presetTemplate;tplTouched=true;}if(presetChannel&&radios[presetChannel])radios[presetChannel].checked=true;paintChannel();view(false);await regenerate(true,draft);if(draft)toast('Se recuperó tu borrador guardado de esta orden.','info');if(preset){generated='';text.value=preset;used=[];warn.replaceChildren();fit();paintState();paintPreview();}text.focus({preventScroll:true});text.setSelectionRange(0,0);main.scrollTop=0;}
 let documentPreviewVersion=0,documentBlobUrl='';
 async function fetchDocument(url){const response=await fetch(url,{credentials:'same-origin'});if(!response.ok){let message='No se pudo generar el documento.';try{message=(await response.json()).error||message;}catch{}throw new Error(message);}return response.blob();}
-async function showDocumentPreview(id,kind='receipt'){
- const token=++documentPreviewVersion,dialog=$('receipt-dialog'),root=$('receipt-content');if(documentBlobUrl){URL.revokeObjectURL(documentBlobUrl);documentBlobUrl='';}{const wait=el('p',undefined,'document-status');wait.dataset.state='loading';wait.append(systemIcon('M21 12a9 9 0 1 1-6.219-8.56'),el('span','Preparando vista previa…'));root.replaceChildren(wait);}$('receipt-title').textContent=({receipt:'Comprobante de recepción',thermal:'Imprimir ticket',service:'Hoja de servicio técnico',label:'Etiqueta del equipo'})[kind];dialog.querySelector('.eyebrow').textContent='DOCUMENTO DE LA ORDEN';if(!dialog.open)dialog.showModal();
+async function showDocumentPreview(id,kind='receipt',digital=false){
+ const token=++documentPreviewVersion,dialog=$('receipt-dialog'),root=$('receipt-content');if(documentBlobUrl){URL.revokeObjectURL(documentBlobUrl);documentBlobUrl='';}{const wait=el('p',undefined,'document-status');wait.dataset.state='loading';wait.append(systemIcon('M21 12a9 9 0 1 1-6.219-8.56'),el('span','Preparando vista previa…'));root.replaceChildren(wait);}$('receipt-title').textContent=({receipt:'Comprobante de recepción',thermal:digital?'Ticket digital':'Imprimir ticket',service:'Hoja de servicio técnico',label:'Etiqueta del equipo'})[kind];dialog.querySelector('.eyebrow').textContent='DOCUMENTO DE LA ORDEN';if(!dialog.open)dialog.showModal();
  try{const{order}=await api('/api/orders/'+id);if(token!==documentPreviewVersion)return;root.replaceChildren();const summary=el('div',undefined,'document-preview-summary');summary.append(el('strong',order.code),el('span',order.client+' · '+[order.brand,order.model].filter(Boolean).join(' ')),orderBadge(order.status,order.status_label,order.id));root.append(summary);
  const settings=el('div',undefined,'document-preview-options');let size,client,mono,width,height,copy;
  if(kind==='thermal'){copy=field(settings,'Copia a imprimir','ticket_copy','',{select:true});for(const[value,text]of [['cliente','Copia cliente'],['taller','Copia taller'],['ambas','Ambas copias']])copy.append(new Option(text,value));copy.value='cliente';root.append(settings);}
@@ -6257,9 +6398,9 @@ async function showDocumentPreview(id,kind='receipt'){
  // Indicador de estado: azul con brillo mientras se genera o se envía, verde con visto cuando el documento está listo, ámbar o rojo si algo falla.
  const ready=kind==='thermal'?'Ticket listo':kind==='label'?'Etiqueta lista':'Documento listo',glyphs={loading:'M21 12a9 9 0 1 1-6.219-8.56',ready:'M21.801 10A10 10 0 1 1 17 3.335 M9 11l3 3L22 4',info:'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z M12 16v-4 M12 8h.01',error:'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z M12 8v5 M12 16h.01'},say=(text,state='info',hint='')=>{status.dataset.state=state;status.title=hint;status.replaceChildren(systemIcon(glyphs[state]),el('span',text));};const actions=el('div',undefined,'receipt-actions');const download=el('a','Descargar PDF','primary');
  // El archivo se guarda con el número real de la orden: el ticket y el comprobante nunca comparten nombre.
- download.download=kind==='thermal'?'TICKET-'+order.code+'.pdf':kind==='receipt'?order.code+'-COMPROBANTE-DE-RECEPCION.pdf':order.code+'-'+kind+'.pdf';const open=el('a','Abrir PDF','secondary');open.target='_blank';open.rel='noopener';const print=el('button','Imprimir','secondary');print.type='button';print.onclick=()=>{try{frame.contentWindow.focus();frame.contentWindow.print();}catch{window.open(documentBlobUrl,'_blank','noopener');}};if(kind==='thermal'){const printForm={dataset:{}};let submitted=false;newRequestKey(printForm);api('/api/thermal-printer').then(config=>{if(!config.available)return;print.textContent='Imprimir en Epson de red';print.onclick=async()=>{if(print.disabled)return;if(submitted){newRequestKey(printForm);submitted=false;}print.disabled=true;say('Enviando a '+config.model+'…','loading');try{const result=await api('/api/orders/'+id+'/thermal-print',{request_key:printForm.dataset.requestKey,copy:copy.value});say(result.message,'info');submitted=true;print.textContent='Reimprimir otra copia';}catch(error){say(error.message,'error');print.textContent='Consultar estado del envío';}finally{print.disabled=false;}};}).catch(()=>{});}actions.append(download,open,print);root.append(status,frame,actions);if(kind==='thermal')root.append(el('small','Epson TM-m30II · Papel 80 mm / área útil 72 mm · 203 dpi · Escala 100 % · Impresión directa usa el controlador instalado · PDF manual: rollo largo y reducción de papel en ambos extremos · Corte por trabajo. Seleccione la cola térmica; no la impresora predeterminada.','thermal-print-note'));
+ download.download=kind==='thermal'?'TICKET-'+order.code+(digital?'-DIGITAL':'')+'.pdf':kind==='receipt'?order.code+'-COMPROBANTE-DE-RECEPCION.pdf':order.code+'-'+kind+'.pdf';const open=el('a','Abrir PDF','secondary');open.target='_blank';open.rel='noopener';const print=el('button','Imprimir','secondary');print.type='button';print.onclick=()=>{try{frame.contentWindow.focus();frame.contentWindow.print();}catch{window.open(documentBlobUrl,'_blank','noopener');}};if(kind==='thermal'){const printForm={dataset:{}};let submitted=false;newRequestKey(printForm);api('/api/thermal-printer').then(config=>{if(!config.available)return;print.textContent='Imprimir en Epson de red';print.onclick=async()=>{if(print.disabled)return;if(submitted){newRequestKey(printForm);submitted=false;}print.disabled=true;say('Enviando a '+config.model+'…','loading');try{const result=await api('/api/orders/'+id+'/thermal-print',{request_key:printForm.dataset.requestKey,copy:copy.value});say(result.message,'info');submitted=true;print.textContent='Reimprimir otra copia';}catch(error){say(error.message,'error');print.textContent='Consultar estado del envío';}finally{print.disabled=false;}};}).catch(()=>{});}actions.append(download,open,print);root.append(status,frame,actions);if(kind==='thermal')root.append(el('small','Epson TM-m30II · Papel 80 mm / área útil 72 mm · 203 dpi · Escala 100 % · Impresión directa usa el controlador instalado · PDF manual: rollo largo y reducción de papel en ambos extremos · Corte por trabajo. Seleccione la cola térmica; no la impresora predeterminada.','thermal-print-note'));
  let loadVersion=0;const retry=button('Reintentar',()=>load(),'secondary document-retry');retry.hidden=true;status.after(retry);
- async function load(){const version=++loadVersion;say(kind==='thermal'?'Generando ticket…':'Generando documento…','loading');frame.hidden=true;download.hidden=open.hidden=true;print.disabled=true;const query=new URLSearchParams();if(kind==='label'){query.set('size',size.value);query.set('client',client.checked?'1':'0');query.set('mono',mono.checked?'1':'0');width.parentElement.hidden=height.parentElement.hidden=size.value!=='custom';if(size.value==='custom'){query.set('width',width.value);query.set('height',height.value);}}if(kind==='thermal')query.set('copy',copy.value);
+ async function load(){const version=++loadVersion;say(kind==='thermal'?'Generando ticket…':'Generando documento…','loading');frame.hidden=true;download.hidden=open.hidden=true;print.disabled=true;const query=new URLSearchParams();if(digital)query.set('modo','digital');if(kind==='label'){query.set('size',size.value);query.set('client',client.checked?'1':'0');query.set('mono',mono.checked?'1':'0');width.parentElement.hidden=height.parentElement.hidden=size.value!=='custom';if(size.value==='custom'){query.set('width',width.value);query.set('height',height.value);}}if(kind==='thermal')query.set('copy',copy.value);
  try{const blob=await fetchDocument('/api/orders/'+id+'/'+kind+'.pdf'+(query.size?'?'+query:''));if(token!==documentPreviewVersion||version!==loadVersion||!dialog.open)return;if(documentBlobUrl)URL.revokeObjectURL(documentBlobUrl);if(!blob.size||!/pdf/i.test(blob.type||'application/pdf'))throw new Error('El servidor no devolvió un PDF válido.');documentBlobUrl=URL.createObjectURL(blob);
    // Vista previa con URL de objeto temporal (el servidor no permite incrustar sus respuestas: frame-ancestors 'none'). Sin la barra del visor:
    // guardar se hace con «Descargar PDF», que usa el nombre real (TICKET-<orden>.pdf); «Abrir PDF» abre el documento del servidor con ese mismo nombre.
@@ -6271,7 +6412,7 @@ async function showDocumentPreview(id,kind='receipt'){
    frame.onerror=()=>{clearTimeout(timer);fail();};
    frame.hidden=false;frame.src=documentBlobUrl+'#toolbar=0&navpanes=0&view=FitH';}catch(error){if(version===loadVersion){say(error.message,'error');retry.hidden=false;}}}
  if(kind==='label')for(const input of [size,client,mono,width,height])input.addEventListener('change',load);if(kind==='thermal')copy.addEventListener('change',load);await load();
- }catch(error){root.replaceChildren(el('p',error.message,'message'),button('Reintentar',()=>showDocumentPreview(id,kind)));}
+ }catch(error){root.replaceChildren(el('p',error.message,'message'),button('Reintentar',()=>showDocumentPreview(id,kind,digital)));}
 }
 // Comparte el PDF de las condiciones que corresponde a la orden: la versión aceptada o, si no hay ninguna publicada, el borrador (identificado como tal).
 async function shareConditions(url,draft){
@@ -9151,7 +9292,7 @@ function invoiceAzurBlock(dialog,body,data){const inv=data.invoice,box=el('secti
  if(inv.status==='autorizado')box.append(inv.environment==='2'?el('p','Autorizada por el SRI en PRODUCCIÓN: comprobante con validez tributaria.','inv-ok'):el('p','Autorizada por el SRI en el ambiente de PRUEBAS: sin validez tributaria.','inv-warn'));
  // Los errores de intentos anteriores no se muestran como vigentes cuando la factura ya quedó autorizada (siguen en el historial).
  const msgs=inv.status==='autorizado'?[]:(inv.sri_messages||[]).slice(-5);if(msgs.length){const ul=el('ul',undefined,'fx-azur-msgs');for(const m of msgs)ul.append(el('li',(m.origen||'')+' '+(m.codigo||'')+': '+m.mensaje));box.append(ul);}
- const acts=el('div',undefined,'cj-actions'),warn=el('p','','inv-warn');warn.hidden=true;box.append(warn,acts);
+ const acts=el('div',undefined,'cj-actions'),warn=el('p','','inv-warn');warn.hidden=true;box.append(warn);
  const call=async(action,extra={},ok='')=>{try{const fresh=await api('/api/invoicing/'+inv.id,{action,...extra});const r=fresh.azur||{};
    toast(ok||(r.newly_authorized?(inv.environment==='2'?'Factura AUTORIZADA por el SRI.':'Factura AUTORIZADA en pruebas.')+(r.mail?(r.mail.sent?' Correo de prueba enviado.':' El correo no salió: '+r.mail.error):''):r.label?'Estado: '+r.label:'Actualizado.'),r.errors&&r.errors.length?'error':'success');paintInvoice(dialog,body,fresh);if(currentModule==='invoicing')renderInvoicing();}
   catch(error){notify(error.message);}};
@@ -9162,6 +9303,11 @@ function invoiceAzurBlock(dialog,body,data){const inv=data.invoice,box=el('secti
  if(inv.provider==='azur'){acts.append(invBtn('Consultar estado','refresh-cw',()=>call('azur_sync')),invBtn('Consultar en el SRI en vivo','activity',()=>call('azur_sync',{live:'1'})));
   if(inv.status==='autorizado')for(const[label,kind]of [['PDF de AZUR','pdf'],['XML autorizado','xml_autorizado'],['XML firmado','xml_firmado']]){const a=el('a',undefined,'secondary inv-btn');a.href='/api/invoicing/'+inv.id+'/azur/'+kind;a.target='_blank';a.rel='noopener';a.append(invIcon('file-text'),el('span',label));acts.append(a);}
   if(admin()&&inv.status==='autorizado'&&!inv.annulment)acts.append(invBtn('Anular factura','circle-x',()=>invoiceAnnulDialog(inv,fresh=>paintInvoice(dialog,body,fresh)),'secondary cjc-danger'));}
+ const entries=[...acts.children];
+ if(entries.length)box.append(ActionCenterCompact([
+  {name:'SRI y documentos',icon:invIcon('file-text'),items:entries.filter(action=>!action.classList.contains('primary')).map(action=>[action])},
+  {name:'Emisión',direct:true,items:entries.filter(action=>action.classList.contains('primary')).map(action=>[action])}
+ ],{label:'Acciones del SRI'}));
  return box;}
 function invoiceAnnulDialog(inv,done){const dialog=invDialog('Anular factura '+inv.number),{form,msg,field,fail,clear}=invForm('bank-form inv-sheet-form');dialog.append(form);
  const steps=el('ol',undefined,'fx-azur-steps');for(const t of ['Ingresa a SRI en línea › Facturación Electrónica › Anulación de comprobantes y solicita la anulación de esta factura (clave '+inv.access_key+').','Espera la aceptación del comprador si el SRI la requiere.','Vuelve aquí y confirma: Órdenes Pro comprueba con AZUR que el SRI ya la anuló. Nada se anula automáticamente.','Si el plazo del SRI ya venció, corrige con una nota de crédito.'])steps.append(el('li',t));
@@ -9712,7 +9858,7 @@ function cjhMenu(r){const trigger=button('',()=>menu?close():open(),'cjh-more');
 async function cashHistoryPanel(panel,state){panel.append(invSectionHead('Historial y auditoría de cajas','Cada cierre conserva sus cifras originales; las correcciones aparecen como ajustes posteriores. Las entradas separan el efectivo del cajón de los pagos electrónicos.'));
  const f=cashState2.hist||(cashState2.hist={from:'',to:'',status:'',difference:'',register:'',cashier:'',method:''});
  const wrap=el('div',undefined,'cjh'),kpis=el('div',undefined,'cjh-kpis'),filters=el('details',undefined,'cjh-filters'),summary=el('summary'),form=el('form',undefined,'cjh-form'),slot=el('div',undefined,'cjh-results');
- kpis.setAttribute('aria-live','polite');filters.open=!matchMedia('(max-width:720px)').matches;const badge=el('b','','cjh-filter-count');badge.hidden=true;
+ kpis.setAttribute('aria-live','polite');const badge=el('b','','cjh-filter-count');badge.hidden=true;
  summary.append(invIcon('filter'),el('span','Filtros'),badge,invIcon('chevron-down'));filters.append(summary,form);const inputs={};
  const field=(label,key,node)=>{const l=el('label',undefined,'inv-field');node.name=key;l.append(el('span',label),node);form.append(l);node.value=f[key];inputs[key]=node;};
  const date=(label,key)=>{const i=el('input');i.type='date';field(label,key,i);};
@@ -10038,7 +10184,11 @@ async function proformaDetail(id,done){const dialog=invDialog('Proforma',true),b
  if(p.order)acts.append(invBtn('Ver orden '+p.order.code,'external-link',()=>{dialog.close();go('orders',new URLSearchParams({id:p.order.id}));}));
  if(d.can_version)acts.append(invBtn('Crear versión nueva','refresh-cw',async()=>{try{const r=await api('/api/proformas/'+id,{action:'version'});dialog.close();done&&done();proformaDetail(r.id,done);}catch(error){notify(error.message);}}));
  if(!['convertida','reemplazada','cancelada'].includes(p.status))acts.append(invBtn('Cancelar proforma','circle-x',()=>{dialog.close();cashReasonAction('Cancelar '+p.code,'La proforma queda cancelada y conserva su historial.','/api/proformas/'+id,{action:'cancel'},'reason',()=>done&&done());}));
- body.append(acts);
+ const shortcuts=[...acts.children];
+ body.append(ActionCenterCompact([
+  {name:'Proforma y cobros',icon:invIcon('file-text'),items:shortcuts.filter(action=>!action.classList.contains('primary')).map(action=>[action])},
+  {name:'Acciones principales',items:shortcuts.filter(action=>action.classList.contains('primary')).map(action=>[action]),direct:true}
+ ],{label:'Acciones de la proforma'}));
  if(d.advances.length)body.append(el('h4','Anticipos','cj-sub'),cjTable(['Código','Fecha','Forma de pago','Referencia','Importe','Estado',''],d.advances.map(a=>{const tr=cjRow([['Código',a.code],['Fecha',formatOrderDate(a.paid_at)],['Forma de pago',a.method_label],['Referencia',a.reference||'—'],['Importe',quoteMoney(a.amount_cents)],['Estado',a.voided_at?'Anulado: '+a.void_reason:(a.transfer_status?{pendiente:'Pendiente de verificar',confirmado:'Confirmado',conciliado:'Conciliado',rechazado:'Rechazado'}[a.transfer_status]:'Registrado')],['','']]);
    {const base='/api/proformas/'+id+'/advances/'+a.id+'/receipt.pdf';for(const[label,url,hint]of [['Comprobante',base,'Comprobante de anticipo en PDF (A5)'],['Ticket',base+'?formato=termico','Comprobante de anticipo en ticket de 80 mm']]){const link=el('a',label,'text-action');link.href=url;link.target='_blank';link.rel='noopener';link.title=hint;link.setAttribute('aria-label',hint+' · '+a.code);tr.lastChild.append(link);}}
    if(!a.voided_at&&['debito','credito'].includes(a.method))tr.lastChild.append(button('Voucher',()=>voucherDialog({advance_id:a.id,label:'Anticipo '+a.code},reload),'text-action'));
@@ -10655,11 +10805,11 @@ async function renderBackupSettings(pane){
   fact('Verificación','Google confirma el SHA-256, se descarga de nuevo y se restaura en una base aislada; restauración de prueba automática cada semana');fact('Conservación','30 diarios, 12 semanales y 12 mensuales; lo que sobra va a la papelera de Google Drive (recuperable 30 días)');fact('Copia independiente','El equipo de la oficina guarda además su copia local diaria (03:00)');
   pol.append(facts);s4.append(pol);body.append(s4);
   // Conexión con Google Drive (asistente): abierto mientras falte algo por configurar.
-  const wiz=el('details',undefined,'bk-wizard');wiz.open=!connected;const ws=el('summary');ws.append(animatedIcon(I.drive,{size:16}),el('span','Conexión con Google Drive'),pill(connected?'Conectado':d.configured?'Falta conectar':'Sin configurar',connected?'ok':'off'));wiz.append(ws);
+  const wiz=el('details',undefined,'bk-wizard');const ws=el('summary');ws.append(animatedIcon(I.drive,{size:16}),el('span','Conexión con Google Drive'),pill(connected?'Conectado':d.configured?'Falta conectar':'Sin configurar',connected?'ok':'off'));wiz.append(ws);
   const step=(n,title,state,content)=>{const s=el('div',undefined,'bk-step');s.dataset.state=state;const h=el('div',undefined,'bk-step-head');h.append(el('span',state==='ok'?'✓':String(n),'bk-step-n'),el('strong',title));s.append(h);if(content)s.append(content);wiz.append(s);};
   const w1=el('div',undefined,'bk-step-body');
   if(app&&app.source==='servidor')w1.append(el('p','El cliente OAuth está definido en las variables del servidor ('+app.client_id+').','bk-note'));
-  else{const guide=el('details',undefined,'bk-guide');guide.open=!d.configured;guide.append(el('summary','Cómo crear el cliente OAuth en Google Cloud (una sola vez, unos 10 minutos, gratis, sin tarjeta)'));
+  else{const guide=el('details',undefined,'bk-guide');guide.append(el('summary','Cómo crear el cliente OAuth en Google Cloud (una sola vez, unos 10 minutos, gratis, sin tarjeta)'));
    const ol=el('ol');for(const t of ['Abre https://console.cloud.google.com con tu cuenta de Google y crea un proyecto llamado «Órdenes Pro Respaldos».','APIs y servicios → Biblioteca → «Google Drive API» → Habilitar.','Pantalla de consentimiento de OAuth (Google Auth Platform): tipo «Externo», nombre «Órdenes Pro Respaldos», tu correo de asistencia; en Acceso a los datos añade el permiso …/auth/drive.file. En Público, pulsa «Publicar app» (estado En producción) para que el acceso no caduque a los 7 días.','Clientes → Crear cliente → «Aplicación web». En «URI de redireccionamiento autorizados» añade exactamente: '+d.redirect_uri,'Copia el «ID de cliente» y el «Secreto del cliente» y pégalos abajo.'])ol.append(el('li',t));guide.append(ol);w1.append(guide);
    const form=el('form',undefined,'bk-form');form.noValidate=true;const field=(name,lab,input,hint)=>{const w=el('label',undefined,'bk-field');w.append(el('span',lab),input);if(hint)w.append(el('small',hint));input.name=name;form.append(w);return input;};
    const cid=field('client_id','ID de cliente',el('input'),'Termina en .apps.googleusercontent.com');cid.value=app?.client_id||'';cid.autocomplete='off';cid.spellcheck=false;

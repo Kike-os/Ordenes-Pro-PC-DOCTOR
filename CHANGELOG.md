@@ -4,6 +4,19 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.362 — 2026-11-27 06:51 (UTC-05:00)
+
+Centro de acciones compacto y control de paneles secundarios
+
+### Mejoras realizadas
+
+- Centro de acciones compacto en órdenes, proformas, Ventas, Inventario y Facturación, con categorías, permisos existentes y menús adaptados a pantallas estrechas.
+
+### Errores corregidos
+
+- Comunicaciones y ADI en las órdenes mantienen los indicadores visibles y se abren por decisión del usuario. Las actualizaciones conservan el estado elegido durante la consulta.
+- Los paneles secundarios de pagos, actividad, autorizaciones, repuestos, Mail Pro, monitor de versiones y configuración inician cerrados. El ticket digital abre su propia vista previa.
+
 ## v1.5.361 — 2026-11-26 23:50 (UTC-05:00)
 
 Secure Customer Portal Enterprise Premium 2.0

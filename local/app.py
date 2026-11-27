@@ -313,6 +313,26 @@ def mail_allowed(user):
     return ready and (user['role']=='administrador' or (user['role']=='tecnico' and os.getenv('MAIL_ALLOW_TECHNICIANS','').lower() in ('1','true','yes')))
 
 
+def order_communications(c, oid, user):
+    import mailing
+    data = {'mail_history': mailing.history(c, oid), 'messages': [], 'mail': None}
+    if user['role'] in ('administrador', 'tecnico'):
+        import order_followups
+        data['messages'] = [
+            dict(row, status_label=order_followups.message_label(row['channel'], row['status']))
+            for row in c.execute(
+                "SELECT id,channel,template,recipient,status,error,attempts,created_at,updated_at "
+                "FROM order_messages WHERE order_id=? AND channel!='correo' ORDER BY id DESC LIMIT 100", (oid,)
+            )
+        ]
+    if mail_allowed(user):
+        data['mail'] = [dict(row) for row in c.execute(
+            'SELECT id,subject,correspondent,direction,sent_at,folder,uid FROM mail_links '
+            'WHERE order_id=? ORDER BY id DESC LIMIT 30', (oid,)
+        )]
+    return data
+
+
 def order_document(c,oid):
     """Datos completos de una orden para sus documentos (misma composición que usan los PDF del detalle)."""
     row=c.execute('SELECT o.*,COALESCE(NULLIF(d.kind,\'\'),d.category) type,d.brand,d.model,d.serial,d.color,c.id client_id,c.name client,c.identification,c.document_type,c.phone,c.email,c.province,c.city,c.address,c.location_reference,s.label status_label FROM orders o JOIN devices d ON d.id=o.device_id JOIN clients c ON c.id=d.client_id JOIN statuses s ON s.code=o.status WHERE o.id=?',(oid,)).fetchone()
@@ -2221,6 +2241,12 @@ class Handler(BaseHTTPRequestHandler):
                 # Saldo del equipo y saldo general de su orden: lo consulta la tarjeta financiera tras un pago, anulación o devolución.
                 summary = equipment.finance(c, int(finance_route[1]))
                 return self.reply(200, {'finance':summary}) if summary else self.reply(404, {'error':'Orden no disponible.'})
+            communications = re.fullmatch(r'/api/orders/([0-9]+)/communications', path)
+            if communications:
+                oid = int(communications[1])
+                if not c.execute('SELECT 1 FROM orders WHERE id=?', (oid,)).fetchone():
+                    return self.reply(404, {'error':'Orden no disponible.'})
+                return self.reply(200, order_communications(c, oid, user))
             detail = re.fullmatch(r'/api/orders/([0-9]+)(?:/(qr\.(svg|png)|tracking-qr\.png|receipt\.pdf|thermal\.pdf|service\.pdf|label\.pdf|stay\.pdf|barcode\.svg|tracking-card))?', path)
             if detail:
                 row = c.execute('SELECT o.*,COALESCE(NULLIF(d.kind,\'\'),d.category) type,d.brand,d.model,d.serial,d.color,d.code device_code,c.id client_id,c.name client,c.identification,c.phone,c.email,c.province,c.city,c.address,c.location_reference,s.label status_label FROM orders o JOIN devices d ON d.id=o.device_id JOIN clients c ON c.id=d.client_id JOIN statuses s ON s.code=o.status WHERE o.id=?',(int(detail[1]),)).fetchone()
@@ -2326,14 +2352,7 @@ class Handler(BaseHTTPRequestHandler):
                 photo_rows=[dict(r) for r in c.execute('SELECT '+photo_cols+' FROM order_photos p LEFT JOIN users u ON u.id=p.created_by LEFT JOIN users x ON x.id=p.deleted_by WHERE p.order_id=? ORDER BY p.is_main DESC,p.position,p.id',(result['id'],))]
                 result['photos']=[r for r in photo_rows if not r['deleted_at']];result['photos_deleted']=[r for r in photo_rows if r['deleted_at']] if user['role']=='administrador' else []
                 result['reception']=__import__('reception_details').loads(result.get('reception_details'))
-                import mailing
-                result['mail_history']=mailing.history(c,result['id'])
-                # 1.5.270: mensajes de la orden por canales que no son correo (WhatsApp Business, WhatsApp manual, texto copiado), con su
-                # estado real. Los correos ya figuran en mail_history (su copia archivada): no se repiten aquí.
-                if user['role'] in ('administrador','tecnico'):
-                    import order_followups
-                    result['messages']=[dict(r,status_label=order_followups.message_label(r['channel'],r['status'])) for r in c.execute("SELECT id,channel,template,recipient,status,error,attempts,created_at,updated_at FROM order_messages WHERE order_id=? AND channel!='correo' ORDER BY id DESC LIMIT 100",(result['id'],))]
-                result['mail']=[dict(r) for r in c.execute('SELECT id,subject,correspondent,direction,sent_at,folder,uid FROM mail_links WHERE order_id=? ORDER BY id DESC LIMIT 30',(result['id'],))] if mail_allowed(user) else None
+                result.update(order_communications(c,row['id'],user))
                 import repair_stages  # 1.5.252: las 6 etapas comunes (panel, cliente y hoja A4) y su huella de sincronización
                 result['repair_stages']=repair_stages.compute(c,result['id']);result['repair_signature']=repair_stages.signature(c,result['id'])
                 # 1.5.267 · Reingreso: cuántas atenciones tiene el mismo equipo y cuál fue la anterior a esta orden (solo lectura; cada orden

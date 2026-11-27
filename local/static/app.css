@@ -14570,3 +14570,54 @@ body:has(.ax) #adi-widget{display:none}
 .pf-mail-preview pre{white-space:pre-wrap;overflow-wrap:anywhere;font:inherit}
 .pf-mail-form[aria-busy=true] .pf-wa-status::before{content:"";display:inline-block;width:.85em;height:.85em;margin-inline-end:.55em;border:2px solid currentColor;border-inline-end-color:transparent;border-radius:50%;vertical-align:middle;animation:pf-wa-spin .8s linear infinite}
 @media(prefers-reduced-motion:reduce){.pf-mail-form[aria-busy=true] .pf-wa-status::before{animation:none}}
+
+/* Centro de acciones de la orden y de los documentos comerciales. */
+.action-center{container:action-center / inline-size;position:relative;min-width:0;padding:6px 10px;border:1px solid var(--op-line,#253b5c);border-radius:10px;background:var(--op-panel,#0c1729)}
+.action-center-title{margin:0 0 3px;color:var(--op-text,#c7d7ee);font-size:12px;line-height:14px}
+.action-center-row{display:flex;flex-wrap:wrap;align-items:end;gap:6px;min-width:0}
+.action-center-group{position:relative;min-width:0}
+.action-center-category{display:none;color:var(--op-muted,#92a9ca);font-size:11px;line-height:13px}
+.action-center-items{display:flex;gap:4px}
+.action-center-group:not([data-direct]) .action-center-items{display:none;position:absolute;inset-inline-start:0;top:calc(100% + 4px);z-index:5;min-width:100%;width:max-content;max-width:min(280px,calc(100cqi - 12px));max-height:min(55vh,420px);overflow:auto;padding:5px;flex-direction:column;border:1px solid var(--op-line,#253b5c);border-radius:8px;background:var(--op-panel,#0c1729);box-shadow:0 8px 20px #0005}
+.action-center-group:not([data-direct]).is-open .action-center-items{display:flex;animation:workspace-enter .16s ease-out}
+.action-center-group[data-direct]:not(:first-child){margin-inline-start:auto}
+.action-center :is(.action-center-control,.action-center-trigger){display:inline-flex;align-items:center;justify-content:center;gap:4px;flex:none;width:auto;max-width:100%;min-height:30px;margin:0;padding:0 8px!important;border-radius:7px;font-size:11px!important;line-height:1.25;text-decoration:none;white-space:normal;transition:background-color .16s,border-color .16s}
+.action-center :is(.action-center-control,.action-center-trigger)>span{font:inherit!important;letter-spacing:inherit}
+.action-center :is(.action-center-control,.action-center-trigger) svg{flex:none;width:15px;height:15px}
+@media(hover:hover) and (prefers-reduced-motion:no-preference){
+ .action-center :is(.action-center-control,.action-center-trigger) svg{transition:transform .16s ease}
+ .action-center :is(.action-center-control,.action-center-trigger):not(:disabled):hover svg:first-child{transform:translateY(-1px)}
+}
+.action-center :is(.action-center-control,.action-center-trigger):focus-visible{outline:2px solid var(--op-focus,#619cf3);outline-offset:2px}
+.action-center-short{display:none}
+.action-center-group:not([data-direct]) .action-center-control{justify-content:flex-start;text-align:start;min-height:36px}
+@container action-center (max-width: 660px){
+ .action-center-row{position:relative;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:stretch}
+ .action-center-group{position:static}
+ .action-center-group[data-direct]{grid-column:1/-1}
+ .action-center-group[data-direct]:not(:first-child){margin:0}
+ .action-center-group[data-direct] .action-center-items{flex-wrap:wrap}
+ .action-center .action-center-trigger{width:100%;justify-content:space-between}
+ body[data-page=dashboard] .action-center :is(.action-center-control,.action-center-trigger){min-height:44px;font-size:12px!important}
+ .action-center-group:not([data-direct]) .action-center-control{min-height:44px}
+ .action-center-group:not([data-direct]) .action-center-items{inset-inline:0!important;top:auto;margin-top:4px;width:100%;max-width:none;box-sizing:border-box}
+}
+@container action-center (min-width: 1200px){
+ .action-center-row{flex-wrap:nowrap}
+ .action-center-group+.action-center-group{border-inline-start:1px solid var(--op-line,#253b5c);padding-inline-start:6px}
+ .action-center-category{display:block;margin-bottom:2px}
+ .action-center .action-center-trigger{display:none}
+ .action-center-group:not([data-direct]) .action-center-items,
+ .action-center-group:not([data-direct]).is-open .action-center-items{display:flex;position:static;min-width:0;width:auto;max-width:none;padding:0;flex-direction:row;max-height:none;overflow:visible;border:0;border-radius:0;background:none;box-shadow:none;animation:none}
+ .action-center-group:not([data-direct]) .action-center-control{min-height:30px;white-space:nowrap}
+ .action-center .has-short-label .action-center-full{display:none}
+ .action-center .has-short-label .action-center-short{display:inline}
+}
+@media(prefers-reduced-motion:reduce){
+ .action-center :is(.action-center-control,.action-center-trigger){transition:none}
+ .action-center-group:not([data-direct]).is-open .action-center-items{animation:none}
+}
+
+/* Tamaño y foco de los encabezados de paneles secundarios de una orden. */
+.workspace-layout details[data-order-fold]>summary{min-height:48px;align-items:center;align-content:center}
+.workspace-layout details[data-order-fold]>summary:focus-visible{outline:2px solid var(--op-focus,#619cf3);outline-offset:2px}
