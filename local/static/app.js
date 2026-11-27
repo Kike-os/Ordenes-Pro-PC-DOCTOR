@@ -4698,15 +4698,35 @@ function batteryIndicator(unit){
  const buttonNode=button('',()=>openBatteryDiagnosis(unit.id),'equip-battery-trigger');
  buttonNode.setAttribute('aria-haspopup','dialog');
  buttonNode.title='Abrir diagnóstico de batería';
- const icon=el('span',undefined,'equip-battery-icon'),fill=el('span');
- icon.setAttribute('aria-hidden','true');icon.append(fill);
+ const icon=document.createElementNS('http://www.w3.org/2000/svg','svg');
+ icon.classList.add('equip-battery-icon');
+ icon.setAttribute('viewBox','0 0 44 24');icon.setAttribute('aria-hidden','true');icon.setAttribute('focusable','false');
+ icon.innerHTML='<rect class="equip-battery-case" x="2" y="5" width="36" height="14" rx="4"/>'+
+  '<path class="equip-battery-terminal" d="M40 9h1.5a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H40z"/>'+
+  '<g class="equip-battery-level"><rect x="5" y="8" width="30" height="8" rx="2"/>'+
+  '<path class="equip-battery-glint" d="M8 10h24" stroke-linecap="round"/></g>'+
+  '<path class="equip-battery-dash" d="M17 12h6" stroke-linecap="round"/>';
+ const fill=icon.querySelector('.equip-battery-level'),glint=icon.querySelector('.equip-battery-glint');
+ const reducedMotion=matchMedia('(prefers-reduced-motion: reduce)');
+ let previous=0,fillMotion,glintMotion;
  const title=el('span',undefined,'equip-battery-text'),reviewed=el('small',undefined,'equip-battery-review');
  buttonNode.append(icon,title,reviewed);
  buttonNode.dataset.orderId=String(unit.id);
  buttonNode.paintBattery=record=>{
   unit.battery=record;
   buttonNode.dataset.tone=batteryTone(record);
-  fill.style.width=(record.percent??0)+'%';
+  const evaluated=record.status==='evaluada',level=evaluated?record.percent/100:0;
+  buttonNode.dataset.assessed=String(evaluated);
+  if(level!==previous){
+   fillMotion?.cancel();glintMotion?.cancel();
+   fill.style.transform='scaleX('+level+')';
+   if(evaluated&&!reducedMotion.matches&&typeof fill.animate==='function'){
+    fillMotion=fill.animate([{transform:'scaleX('+previous+')'},{transform:'scaleX('+level+')'}],
+     {duration:550,easing:'cubic-bezier(.2,.75,.3,1)'});
+    if(level>0)glintMotion=glint.animate([{opacity:.18},{opacity:.75},{opacity:.25}],{duration:650});
+   }
+   previous=level;
+  }
   title.textContent=record.status==='evaluada'?'Salud de batería: '+batteryValue(record):'Batería · '+batteryValue(record);
   reviewed.textContent=record.created_at?'Revisión: '+formatOrderDate(record.created_at):'';
   reviewed.hidden=!record.created_at;
