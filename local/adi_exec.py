@@ -348,6 +348,18 @@ def insights(c, now):
             add('infra_fiscal', 'Facturación electrónica con problemas', 'alta', f.get('reason') or 'Smart Fiscal Status en rojo.', [], 'Smart Fiscal Status.',
                 'Revisa Facturación → Estado fiscal antes de emitir.', '#invoicing')
 
+    def recurrent_equipment():
+        since = (now-timedelta(days=90)).isoformat(timespec='seconds')
+        rows = c.execute("SELECT o.device_id,COUNT(*) n FROM order_recurrences r JOIN orders o ON o.id=r.order_id "
+                         "WHERE r.created_at>=? AND r.created_at<=? GROUP BY o.device_id HAVING COUNT(*)>=2",
+                         (since,now.isoformat(timespec='seconds'))).fetchall()
+        if rows:
+            add('tecnico_reincidencias','Equipos con revisiones técnicas recurrentes','media',
+                ('Un equipo registró dos o más revisiones en 90 días.' if len(rows) == 1 else
+                 '%d equipos registraron dos o más revisiones en 90 días.' % len(rows)), [],
+                'Revisiones recurrentes registradas en las órdenes.',
+                'Compara en el laboratorio las mediciones y las reparaciones de cada equipo.', '#orders')
+
     def mail_health():
         incidents = mail_delivery_health(c, now)['incidencias_24h']
         if incidents:
@@ -381,7 +393,7 @@ def insights(c, now):
             add('cancelaciones_pendientes', 'Cancelaciones sin cerrar', 'media', '%d órdenes canceladas esperan liquidación o la devolución del equipo.' % len(pending), pending,
                 'Cancelaciones confirmadas sin cierre.', 'Liquida lo autorizado o el saldo a favor y registra la devolución del equipo.', '#orders?active=1')
 
-    for fn in (orders, parts, pickups, collections, support, stock, infra, mail_health, deadlines, cancellations):
+    for fn in (orders, parts, pickups, collections, support, stock, infra, mail_health, recurrent_equipment, deadlines, cancellations):
         guard(fn)
     seen, unique = set(), []
     for it in items:

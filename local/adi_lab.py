@@ -1,8 +1,9 @@
 """Private laboratory records and evidence-based checklists. No model calls or firmware operations."""
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation
 import re
-import unicodedata
+
+import adi_lab_search
 
 STAFF = ('tecnico', 'administrador')
 CATEGORIES = {
@@ -61,11 +62,6 @@ def text_field(data, key, maximum):
     return value.strip()
 
 
-def tokens(text):
-    normalized = unicodedata.normalize('NFKD', text.casefold())
-    return set(re.findall(r'[^\W_]{2,}', ''.join(x for x in normalized if not unicodedata.combining(x))))
-
-
 def search(c, user, query='', category='', review=False):
     require_staff(user)
     require_storage(c)
@@ -74,16 +70,8 @@ def search(c, user, query='', category='', review=False):
     status = 'pendiente' if review else 'aprobado'
     where = "status=? AND (visibility='tecnico' OR ?='administrador') AND (?='' OR category=?)"
     args = (status, user['role'], category, category)
-    terms = tokens(query[:180])
-    matches = []
-    for row in c.execute('SELECT * FROM adi_lab_knowledge WHERE ' + where + ' ORDER BY id DESC LIMIT 300', args):
-        title_hits = terms & tokens(row['title'])
-        all_hits = terms & tokens(row['title'] + ' ' + row['source'] + ' ' + row['content'])
-        if not terms or all_hits:
-            matches.append((len(all_hits) + 3 * len(title_hits), dict(row)))
-    matches.sort(key=lambda item: (-item[0], -item[1]['id']))
-    return [row for _, row in matches[:15]]
-
+    rows = c.execute('SELECT * FROM adi_lab_knowledge WHERE ' + where + ' ORDER BY id DESC LIMIT 300', args)
+    return adi_lab_search.rank(rows, query)
 
 def submit(c, data, user, now):
     require_staff(user)
@@ -145,7 +133,7 @@ def order_context(c, oid):
     return dict(order)
 
 
-def draft(c, oid, user, category='', query=''):
+def draft(c, oid, user, category='', query='', now=None):
     require_staff(user)
     require_storage(c)
     order = order_context(c, oid)
@@ -155,8 +143,16 @@ def draft(c, oid, user, category='', query=''):
                                                   'WHERE order_id=? ORDER BY id DESC LIMIT 40', (oid,))]
     prior = [dict(row) for row in c.execute('SELECT code,status,received_at FROM orders WHERE device_id=? AND id<>? '
                                           'ORDER BY id DESC LIMIT 10', (order.pop('device_id'), oid))]
+    sources = search(c, user, query, category) if query or category else []
+    recurrence = None
+    if now is not None:
+        since = (now-timedelta(days=90)).isoformat(timespec='seconds')
+        recurrence = c.execute('SELECT COUNT(*) n, COUNT(DISTINCT r.order_id) orders FROM order_recurrences r '
+                               'JOIN orders o ON o.id=r.order_id WHERE o.device_id=(SELECT device_id FROM orders WHERE id=?) '
+                               'AND r.created_at>=? AND r.created_at<=?',(oid,since,now.isoformat(timespec='seconds'))).fetchone()
     return {'order': order, 'prior_orders': prior, 'measurements': measurements, 'checks': CHECKS.get(category, ()), 'kind': 'borrador',
-            'sources': search(c, user, query, category) if query or category else []}
+            'sources': sources, 'source_status': 'con_fuentes' if sources else 'sin_fuentes',
+            'recurrences': dict(recurrence, days=90, repeated=recurrence['n']>=2) if recurrence else None}
 
 
 def measure(c, oid, data, user, now):

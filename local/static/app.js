@@ -10827,7 +10827,15 @@ function adiLabDialog(order) {
   const nodes=[];
   for(const row of rows){
    const card=el('article',undefined,'workspace-section adi-lab-document');
-   card.append(el('h4',row.title),para(row.source+' · '+row.source_date+' · '+row.version),para(row.content));
+   card.append(el('h4',row.title),para(row.source+' · '+row.source_date+' · '+row.version));
+   if(!review && row.excerpt){
+    card.append(para(row.excerpt));
+    if(row.matched_concepts?.length)card.append(el('small','Conceptos relacionados · '+row.matched_concepts.join(' · '),'system-muted'));
+    if(row.excerpt!==row.content){
+     const source=el('details');
+     source.append(el('summary','Leer extracto completo'),para(row.content));card.append(source);
+    }
+   }else card.append(para(row.content));
    if(!review){
     card.append(button('Proponer corrección',()=>{
      proposal.open=true;
@@ -10858,16 +10866,21 @@ function adiLabDialog(order) {
  function renderDraft(snapshot){
   output.replaceChildren(el('h3','Borrador de diagnóstico · '+snapshot.order.code),
    el('h4','Historial del equipo'),...(snapshot.prior_orders.length?snapshot.prior_orders.map(item=>para((item.code||'Orden anterior')+' · '+item.status)):[para('Sin órdenes anteriores registradas para este equipo.')]),
+   ...(snapshot.recurrences?.repeated?[
+    el('h4','Reincidencias del equipo'),
+    para(snapshot.recurrences.n+' revisiones registradas en '+snapshot.recurrences.days+' días. Contrasta las condiciones antes de concluir una causa.')
+   ]:[]),
    el('h4','Hallazgos registrados'),...(snapshot.measurements.length?snapshot.measurements.map(m=>para(m.point+' · '+m.value+' '+m.unit+' · '+m.conditions)):[para('Sin mediciones registradas.')]),
    el('h4','Comprobaciones pendientes'),...(snapshot.checks.length?snapshot.checks.map(para):[para('Selecciona una categoría para consultar la lista de comprobación.')]),
-   el('h4','Fuentes aprobadas'),...documents(snapshot.sources));
+   el('h4','Fuentes aprobadas'),...(snapshot.source_status==='sin_fuentes'?
+    [para('No hay evidencia aprobada para esta consulta.')]:documents(snapshot.sources)));
   const copy=button('Copiar borrador',async()=>{
    try{await navigator.clipboard.writeText(output.innerText.replace(/\nCopiar borrador$/,''));status.textContent='Borrador copiado.';}
    catch{status.textContent='El navegador no pudo copiar el borrador.';}
   },'secondary');
   output.append(copy);
  }
- const diagnostic=controls('Diagnóstico y fuentes aprobadas', [['category','Categoría',categories],['q','Buscar texto en las fuentes']],
+ const diagnostic=controls('Diagnóstico y fuentes aprobadas', [['category','Categoría',categories],['q','Buscar por término o concepto']],
   'Preparar borrador',async data=>renderDraft(await api(endpoint+'?'+new URLSearchParams(data))));
  diagnostic.open=true;
  let measurementKey=crypto.randomUUID?.()||String(Date.now())+'-'+Math.random();

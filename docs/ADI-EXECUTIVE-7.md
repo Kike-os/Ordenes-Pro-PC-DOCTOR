@@ -2,15 +2,16 @@
 
 ## Estado de la implementación
 
-La rama de pruebas parte de Órdenes Pro **1.5.359**. La siguiente versión propuesta para la actualización integral es **1.6.0**. El registro publicado sigue en 1.5.359 mientras se completan las funciones y la validación de producción. La base del repositorio identifica las herramientas ejecutivas en `local/adi_exec.py` como **5.0** y el monitor en `local/release_monitor.py` como **2.0**.
+La rama integra Órdenes Pro **1.5.361**. La siguiente versión en la secuencia es **1.5.362**. La implementación de ADI 7.0 sigue en validación y su inclusión en esa versión depende de completar las funciones pendientes.
 
 ## Flujos implementados
 
 - **Laboratorio por orden.** Personal técnico y administración pueden consultar el historial del mismo equipo, registrar mediciones con unidades y condiciones, y preparar un borrador copiable con mediciones, comprobaciones pendientes y referencias aprobadas. Los borradores quedan separados del diagnóstico oficial hasta que otro técnico autorizado los apruebe.
 - **Revisión del diagnóstico.** La propuesta separa hallazgos confirmados, conclusión y comprobaciones pendientes. Otro técnico puede aprobarla o devolverla con un motivo. La aprobación actualiza el diagnóstico interno de la unidad seleccionada y registra autor, revisor y fecha. Una propuesta desactualizada requiere revisión nueva.
-- **Centro de conocimiento.** Los extractos incluyen fuente, fecha, versión, categoría y permisos. La aprobación requiere a otro integrante autorizado. Una corrección aprobada sustituye la versión que aparece en la búsqueda y conserva el registro anterior. La búsqueda actual compara términos en hasta 300 registros accesibles y devuelve hasta 15 resultados.
+- **Centro de conocimiento.** Los extractos incluyen fuente, fecha, versión, categoría y permisos. La aprobación requiere a otro integrante autorizado. Una corrección aprobada sustituye la versión que aparece en la búsqueda y conserva el registro anterior. La búsqueda combina términos y un vocabulario técnico controlado en hasta 300 registros accesibles. Devuelve hasta 15 resultados con el concepto reconocido y el fragmento correspondiente.
 - **Firmware.** El formulario comprueba que estén presentes los datos de identificación, compatibilidad y procedencia. El navegador puede calcular SHA-256 de archivos de hasta 64 MiB. La ficha siempre requiere revisión técnica. La aplicación carece de operaciones de escritura de firmware.
 - **WhatsApp.** La orden queda protegida por el código de un solo uso. El titular con sesión vigente puede pedir «Enlace de seguimiento». El enlace se entrega en la conversación y se excluye del historial que consulta ADI. El portal solicita los cuatro dígitos del documento al abrir la cuenta.
+- **Reincidencias.** El borrador muestra las revisiones del mismo equipo durante los últimos 90 días. El monitor ejecutivo muestra el recuento agregado de equipos con dos o más revisiones.
 - **Supervisión.** Executive Live Monitor indica si el laboratorio está instalado. Release Monitor muestra los cambios entre las dos últimas verificaciones de la misma versión, sin mover los umbrales de estabilidad ni incluir ejecuciones de versiones anteriores.
 
 ## Motores y dependencias

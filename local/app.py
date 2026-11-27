@@ -1792,7 +1792,7 @@ class Handler(BaseHTTPRequestHandler):
                     if lab_order and query.get('diagnoses',[''])[0]=='1':
                         return self.reply(200,adi_lab.diagnosis_history(c,int(lab_order[1]),user))
                     if lab_order:
-                        return self.reply(200,adi_lab.draft(c,int(lab_order[1]),user,category,term))
+                        return self.reply(200,adi_lab.draft(c,int(lab_order[1]),user,category,term,reception_now()))
                     rows=adi_lab.search(c,user,term,category,query.get('review',[''])[0]=='1')
                     return self.reply(200,{'rows':rows})
                 except adi_lab.LabError as error:

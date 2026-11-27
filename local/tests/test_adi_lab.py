@@ -111,3 +111,44 @@ class AdiLabTests(unittest.TestCase):
         self.assertEqual(submit_review(dict(review,diagnosis_id=str(stale),decision='devuelto'))['status'],200)
         with app.connect() as c:
             self.assertEqual(c.execute('SELECT findings FROM orders WHERE id=?',(oid,)).fetchone()[0],'Hallazgo actualizado por el taller')
+
+    def test_concept_search_only_retrieves_approved_visible_sources(self):
+        with app.connect() as c:
+            now = app.reception_now()
+            admin = {'id':self.uid,'role':'administrador'}
+            tech_id = c.execute("INSERT INTO users(username,email,name,password_hash,role,created_at) VALUES "
+                                "('lab-concept','concept@example.invalid','Técnico ficticio','test','tecnico',1)").lastrowid
+            tech = {'id':tech_id,'role':'tecnico'}
+            source = {'title':'Guía ficticia de retroiluminación','source':'Guía interna ficticia, pág. 2',
+                      'source_date':'2026-01-01','version':'1','category':'post','visibility':'tecnico',
+                      'content':'Primera nota sin relación.\n\nEl apartado de retroiluminación corresponde a esta evidencia ficticia.'}
+            pending = adi_lab.submit(c, source, tech, now)
+            self.assertEqual(adi_lab.search(c, tech, 'pantalla negra'), [])
+            adi_lab.review(c,pending,{'status':'aprobado','review_note':'Evidencia de prueba revisada'},admin,now)
+            adi_lab.submit(c, dict(source,visibility='administrador'), admin, now)
+            rows = adi_lab.search(c,tech,'pantalla negra')
+            self.assertEqual([row['id'] for row in rows], [pending])
+            self.assertEqual(rows[0]['matched_concepts'], ['Pantalla e iluminación'])
+            self.assertTrue(rows[0]['excerpt'].startswith('El apartado'))
+            self.assertEqual(adi_lab.search(c,tech,'firmware del sistema'),[])
+
+    def test_recurrence_signal_is_evidence_bound_and_order_scoped(self):
+        import adi_exec
+        from datetime import timedelta
+        cookie, csrf = self.login()
+        order = self.request('/api/orders', self.order_data({'request_key':'lab-recurrence-fictitious'}), cookie=cookie, csrf=csrf)['body']
+        path = '/api/orders/%d/adi-lab' % order['id']
+        first = self.request(path, cookie=cookie)['body']
+        self.assertFalse(first['recurrences']['repeated'])
+        self.assertEqual(first['source_status'],'sin_fuentes')
+        now = app.reception_now()
+        with app.connect() as c:
+            for i,days in enumerate((3,14,91),1):
+                c.execute('INSERT INTO order_recurrences(order_id,number,reason,previous_status,created_at) VALUES (?,?,?,?,?)',
+                          (order['id'],i,'Revisión ficticia','diagnostico',(now-timedelta(days=days)).isoformat(timespec='seconds')))
+            insights = adi_exec.insights(c,now)
+        result = self.request(path,cookie=cookie)['body']['recurrences']
+        self.assertEqual(result,{'days':90,'n':2,'orders':1,'repeated':True})
+        signal = next(item for item in insights['items'] if item['key']=='tecnico_reincidencias')
+        self.assertEqual(signal['records'],[])
+        self.assertIn('Un equipo registró',signal['reason'])
