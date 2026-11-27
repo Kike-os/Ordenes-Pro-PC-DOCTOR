@@ -4,6 +4,15 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.6.1 — 2026-11-27 18:36 (UTC-05:00)
+
+Corrección de acceso en Codespaces y verificación de ADI
+
+### Errores corregidos
+
+- Permite el origen HTTPS del puerto reenviado de GitHub Codespaces en el servidor de desarrollo.
+- Actualiza la prueba de administración de ADI para cubrir el resumen coordinado y el pronóstico de órdenes.
+
 ## v1.6.0 — 2026-11-27 17:43 (UTC-05:00)
 
 ADI Executive Intelligence 7.0

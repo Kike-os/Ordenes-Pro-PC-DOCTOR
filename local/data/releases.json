@@ -8,6 +8,24 @@
   },
   "releases": [
     {
+      "version": "1.6.1",
+      "date": "2026-11-27T18:36:13-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Corrección de acceso en Codespaces y verificación de ADI",
+      "changes": {
+        "features": [],
+        "improvements": [],
+        "fixes": [
+          "Permite el origen HTTPS del puerto reenviado de GitHub Codespaces en el servidor de desarrollo.",
+          "Actualiza la prueba de administración de ADI para cubrir el resumen coordinado y el pronóstico de órdenes."
+        ],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os"
+    },
+    {
       "version": "1.6.0",
       "date": "2026-11-27T17:43:28-05:00",
       "type": "minor",
