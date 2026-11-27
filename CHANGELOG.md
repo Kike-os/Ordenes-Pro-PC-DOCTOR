@@ -4,6 +4,18 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.366 — 2026-11-27 12:07 (UTC-05:00)
+
+Verificación del laboratorio ADI y simulación de AutoCare
+
+### Mejoras realizadas
+
+- El monitor de administración verifica las migraciones del laboratorio de ADI, permite medir la búsqueda y muestra la diferencia entre verificaciones.
+
+### Errores corregidos
+
+- AutoCare muestra el impacto previsto de sus correcciones antes de pedir confirmación y se corrige la apertura de la comparación en Release Monitor.
+
 ## v1.5.365 — 2026-11-27 08:14 (UTC-05:00)
 
 Búsqueda técnica más rápida en el laboratorio de ADI
