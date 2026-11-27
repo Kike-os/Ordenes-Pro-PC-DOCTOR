@@ -14661,3 +14661,4 @@ body:has(.ax) #adi-widget{display:none}
 @media(prefers-reduced-motion:reduce){.equip-battery-icon,.equip-battery-icon>span{transition:none}}
 
 #module-content .equip-battery-card .equip-tab-select[aria-selected=true] .equip-card-picked{display:inline-grid}
+.equip-picker:has(>.equip-battery-card){align-items:start}
