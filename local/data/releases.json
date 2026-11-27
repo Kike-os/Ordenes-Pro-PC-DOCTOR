@@ -8,6 +8,28 @@
   },
   "releases": [
     {
+      "version": "1.5.362",
+      "date": "2026-11-27T06:51:36-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Centro de acciones compacto y control de paneles secundarios",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Centro de acciones compacto en órdenes, proformas, Ventas, Inventario y Facturación, con categorías, permisos existentes y menús adaptados a pantallas estrechas."
+        ],
+        "fixes": [
+          "Comunicaciones y ADI en las órdenes mantienen los indicadores visibles y se abren por decisión del usuario. Las actualizaciones conservan el estado elegido durante la consulta.",
+          "Los paneles secundarios de pagos, actividad, autorizaciones, repuestos, Mail Pro, monitor de versiones y configuración inician cerrados. El ticket digital abre su propia vista previa.",
+          "ADI dirige las reservas a la agenda oficial y muestra una etiqueta para reservar cada horario enviado por WhatsApp."
+        ],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Solicitud de preparación local de la versión 1.5.362"
+    },
+    {
       "version": "1.5.361",
       "date": "2026-11-26T23:50:18-05:00",
       "type": "patch",

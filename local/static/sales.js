@@ -46,7 +46,14 @@ function salesActions(r,menu){const box=el('div',undefined,'sv-acts'),print=invI
 
 // ---- Panel ----
 async function salesPanel(panel){const d=await api('/api/sales/dashboard'),today=salesToday(),month=today.slice(0,8)+'01';panel.replaceChildren();
- const quick=el('div',undefined,'inv-actions sv-quick');quick.append(invBtn('Nueva venta','shopping-cart',()=>invoiceComposer(null,salesReload),'primary'),invBtn('Vender licencias','key-round',()=>salesLicenseSale()),invBtn('Nueva cotización','file-text',()=>proformaComposer(null,salesReload)),invBtn('Nuevo pedido','truck',()=>salesRequestDialog()));
+ const quick=ActionCenterCompact([
+  {name:'Venta',direct:true,items:[[invBtn('Nueva venta','shopping-cart',()=>invoiceComposer(null,salesReload),'primary')]]},
+  {name:'Otras operaciones',icon:invIcon('file-text'),items:[
+   [invBtn('Vender licencias','key-round',()=>salesLicenseSale())],
+   [invBtn('Nueva cotización','file-text',()=>proformaComposer(null,salesReload))],
+   [invBtn('Nuevo pedido','truck',()=>salesRequestDialog())]
+  ]}
+ ],{label:'Acciones de ventas'});
  panel.append(invSectionHead('Panel de ventas','Ventas confirmadas: facturas directas, cotizaciones convertidas, licencias y ventas del inventario. No incluye las órdenes técnicas.'),quick);
  const p=d.pending,parts=[p.drafts&&p.drafts+' sin confirmar',p.to_emit&&p.to_emit+' por facturar',p.to_deliver&&p.to_deliver+' licencias por entregar',p.requests&&p.requests+' pedidos abiertos'].filter(Boolean);
  panel.append(salesKpis([['circle-dollar-sign','Ventas del día',centerMoney(d.today.total_cents),d.today.count+(d.today.count===1?' venta':' ventas'),'',()=>salesFilter({from:today,to:today})],

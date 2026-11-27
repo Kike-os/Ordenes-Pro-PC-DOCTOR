@@ -468,8 +468,15 @@ function centerSheetPane(key,d,refresh,dialog){const p=d.product,pr=d.pricing,bo
  if(key==='ventas'){const grid=el('div',undefined,'ic-price-grid');for(const[k,v,tone]of [['Costo promedio de adquisición',centerMoney(pr.cost_cents)],['Precio de venta sin IVA',centerMoney(pr.net_cents)],['IVA aplicable',pr.tax_rate_bp?centerPercent(pr.tax_rate_bp)+' · '+centerMoney(pr.tax_cents):'Sin IVA'],
    ['Precio final con impuestos',centerMoney(pr.price_cents),'strong'],['Margen bruto estimado',pr.net_cents?centerMoney(pr.margin_cents)+' · '+centerPercent(pr.margin_bp):'Sin precio',pr.margin_cents<0?'bad':''],['Descuento autorizado',centerPercent(pr.max_discount_bp)],['Precio mínimo permitido',pr.min_price_cents?centerMoney(pr.min_price_cents):'Sin mínimo']]){
    const c=el('div',undefined,'ic-price');if(tone)c.dataset.tone=tone;c.append(el('small',k),el('strong',v));grid.append(c);}box.append(grid);
-  const acts=el('div',undefined,'inv-actions');acts.append(invBtn('Vender producto','hand-coins',()=>{dialog.close();centerSellDialog(p.id);},'primary'),invBtn('Reservar producto','lock',()=>{dialog.close();centerReserveDialog(p.id);}),invBtn('Configurar precios','badge-percent',()=>centerPricingDialog(p,pr,()=>refresh('ventas'))));
-  const fact=button('Enviar a facturación',()=>{},'secondary');fact.disabled=true;fact.title='En desarrollo: las facturas se generan hoy desde órdenes y ventas de licencias.';acts.append(fact);box.append(acts);
+  const sell=invBtn('Vender producto','hand-coins',()=>{dialog.close();centerSellDialog(p.id);},'primary');
+  const reserve=invBtn('Reservar producto','lock',()=>{dialog.close();centerReserveDialog(p.id);});
+  const pricing=invBtn('Configurar precios','badge-percent',()=>centerPricingDialog(p,pr,()=>refresh('ventas')));
+  const fact=button('Enviar a facturación',()=>{},'secondary');
+  fact.disabled=true;fact.title='En desarrollo: las facturas se generan hoy desde órdenes y ventas de licencias.';
+  box.append(ActionCenterCompact([
+   {name:'Venta',direct:true,items:[[sell]]},
+   {name:'Opciones del producto',icon:invIcon('package'),items:[[reserve],[pricing],[fact]]}
+  ],{label:'Acciones de venta del producto'}));
   if(d.reservations.length){box.append(el('h4','Reservas activas'));box.append(centerReservationList(d.reservations,()=>refresh('ventas')));}
   box.append(el('h4','Historial de ventas'));
   if(d.sales.length)box.append(centerTable(['Fecha','Cliente','Documento','Serie vendida','Precio','Estado','Garantía comercial','Facturación'],d.sales.map(s=>centerRow([['Fecha',formatOrderDate(s.at)],['Cliente',s.client||'—'],['Documento',s.document||'—'],

@@ -375,8 +375,8 @@ def _dot(text):
  return text if text.endswith('.') else text+'.'
 
 def agenda_url():
- """URL pública de la Agenda de Citas configurada para este despliegue."""
- return reception.public_base_url().rstrip('/')+'/citas'
+ """URL canónica pública de la Agenda de Citas de Órdenes Pro."""
+ return 'https://ordenes-pro.ecuadorpcdoctor.com/citas'
 
 def hours_facts(c,now=None):
  """Horarios vigentes leídos del sistema en cada consulta: atención presencial (y si está abierta ahora), franjas de la Agenda de Citas y atención virtual."""
@@ -503,7 +503,8 @@ def agenda_links(answer,channel='',lang='es-EC'):
   except ValueError:return m[0]
   day=('Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday')[d.weekday()] if en else DAYS[d.weekday()].capitalize()
   h=int(m[5]);clock='%d:%s %s'%((h%12) or 12,m[6],('AM' if h<12 else 'PM') if en else ('a. m.' if h<12 else 'p. m.'))
-  return '• %s %s/%s · %s\n  %s'%(day,m[4],m[3],clock,base+m[1])
+  action='Book' if en else 'Reservar'
+  return '• %s %s %s/%s · %s\n  %s'%(action,day,m[4],m[3],clock,base+m[1])
  lines=[]
  for line in fixed.split('\n'):
   m=AGENDA_LINK.fullmatch(line.strip())
