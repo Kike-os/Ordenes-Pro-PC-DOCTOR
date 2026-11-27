@@ -23,6 +23,28 @@ class AutoCareTests(unittest.TestCase):
     def counts(self, c):
         return {t: c.execute('SELECT COUNT(*) FROM ' + t).fetchone()[0] for t in ('orders', 'clients', 'devices', 'quotes', 'appointments', 'order_history', 'equipment_payments' if c.execute("SELECT 1 FROM sqlite_master WHERE name='equipment_payments'").fetchone() else 'users')}
 
+    def test_action_preview_reports_impact_without_running_correction(self):
+        cookie, _ = self.login()
+        path = '/api/autocare/action/preview?action='
+        self.assertEqual(self.request(path + 'unlock_diagnosis')['status'], 401)
+        self.assertEqual(self.request(path + 'unknown', cookie=cookie)['status'], 400)
+        self.assertFalse(self.request(path + 'unlock_diagnosis', cookie=cookie)['body']['eligible'])
+        now = app.reception_now()
+        with app.connect() as c:
+            stability._save(c, 'stability_running', {'since': (now - timedelta(minutes=10)).isoformat(timespec='seconds')})
+            before = self.counts(c)
+        result = self.request(path + 'unlock_diagnosis', cookie=cookie)['body']
+        self.assertEqual((result['eligible'], result['affected']), (True, 1))
+        with app.connect() as c:
+            self.assertEqual(self.counts(c), before)
+            self.assertTrue(stability._load(c, 'stability_running', None))
+            stability._save(c, 'stability_running', {'since': now.isoformat(timespec='seconds')})
+        self.assertFalse(self.request(path + 'unlock_diagnosis', cookie=cookie)['body']['eligible'])
+        self.assertEqual(self.request(path + 'license_expiry', cookie=cookie)['body']['affected'], 0)
+        with app.connect() as c:
+            c.execute("UPDATE users SET role='tecnico'")
+        self.assertEqual(self.request(path + 'license_expiry', cookie=cookie)['status'], 403)
+
     def test_runtime_errors_are_classified_without_personal_data(self):
         try:
             raise app.sqlite3.OperationalError('database is locked: INSERT INTO clients VALUES ("Cliente Ficticio")')

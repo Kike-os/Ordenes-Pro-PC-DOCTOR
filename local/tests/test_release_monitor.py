@@ -68,6 +68,27 @@ class ReleaseMonitorTests(unittest.TestCase):
             c.execute("UPDATE users SET role='tecnico'");c.commit()
         self.assertEqual(self.request('/api/system/release-monitor', cookie=cookie)['status'], 403)
 
+    def test_laboratory_status_and_probe(self):
+        cookie, _ = self.login()
+        path = '/api/system/release-monitor'
+        probe = path + '?lab_probe=1'
+        self.assertEqual(self.request(probe)['status'], 401)
+        status = self.request(path, cookie=cookie)['body']['lab']
+        self.assertEqual([(r['number'], r['applied'], r['storage']) for r in status],
+                         [('131', True, True), ('132', True, True)])
+        for _ in range(3):
+            result = self.request(probe, cookie=cookie)
+            self.assertEqual(result['status'], 200)
+            self.assertEqual(set(result['body']), {'search_ms', 'matches', 'database'})
+            self.assertEqual(result['body']['database'], 'SQLite')
+        self.assertEqual(self.request(probe, cookie=cookie)['status'], 429)
+        with app.connect() as c:
+            c.execute('DROP TABLE adi_lab_diagnoses')
+        self.assertFalse(self.request(path, cookie=cookie)['body']['lab'][1]['storage'])
+        with app.connect() as c:
+            c.execute("UPDATE users SET role='tecnico'")
+        self.assertEqual(self.request(probe, cookie=cookie)['status'], 403)
+
     def test_notifications_have_stable_keys_and_report_missing_scheduled_tasks(self):
         now = app.reception_now()
         with patch.dict(app.os.environ, MAIL), app.connect() as c:
