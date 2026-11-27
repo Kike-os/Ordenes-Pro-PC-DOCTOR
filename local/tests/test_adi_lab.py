@@ -1,4 +1,6 @@
 """Offline lab workflow with temporary SQLite data and no integrations."""
+import base64
+import hashlib
 import unittest
 
 import adi_lab
@@ -69,6 +71,44 @@ class AdiLabTests(unittest.TestCase):
             adi_lab.review(c, revision, choice, reviewer, app.reception_now())
             self.assertEqual([item['id'] for item in adi_lab.search(c, admin, 'termica')], [revision])
             self.assertEqual(c.execute('SELECT status FROM adi_lab_knowledge WHERE id=?',(did,)).fetchone()[0], 'sustituido')
+
+    def test_original_pdf_follows_source_permissions_and_review(self):
+        cookie, csrf = self.login()
+        path = '/api/adi/lab/knowledge'
+        raw = b'%PDF-1.7\nFuente ficticia para pruebas\n%%EOF\n'
+        body = {'title':'Fuente ficticia', 'source':'Manual ficticio', 'source_date':'2026-01-01',
+                'version':'1', 'category':'post', 'content':'Extracto ficticio aprobado posteriormente.',
+                'visibility':'administrador', 'original_name':'manual-ficticio.pdf',
+                'original_pdf':base64.b64encode(raw).decode()}
+        post = lambda payload: self.request(path, payload, cookie=cookie, csrf=csrf)
+        self.assertEqual(post(dict(body, original_pdf='YQ=='))['status'], 400)
+        self.assertEqual(post(dict(body, original_name='archivo.svg'))['status'], 400)
+        result = post(body)
+        self.assertEqual(result['status'], 201, result['body'])
+        source_id = result['body']['id']
+        download = path + f'/{source_id}/original'
+        self.assertEqual(self.request(download)['status'], 401)
+        self.assertEqual(self.request(download, cookie=cookie)['body'], raw)
+        self.assertEqual(self.request(path, cookie=cookie)['body']['rows'], [])
+        pending = self.request(path+'?review=1', cookie=cookie)['body']['rows'][0]
+        self.assertEqual(pending['original']['sha256'], hashlib.sha256(raw).hexdigest())
+        self.assertNotIn('data', pending['original'])
+        with app.connect() as c:
+            technician = {'id':self.uid, 'role':'tecnico'}
+            with self.assertRaises(adi_lab.LabError):
+                adi_lab.original(c, source_id, technician)
+            reviewer_id = c.execute("INSERT INTO users(username,email,name,password_hash,role,created_at) VALUES "
+                                    "('pdf-reviewer','pdf-reviewer@example.invalid','Revisor','test','administrador',1)").lastrowid
+            reviewer = {'id':reviewer_id,'role':'administrador'}
+            approved = {'status':'aprobado','review_note':'Original y extracto comprobados'}
+            adi_lab.review(c, source_id, approved, reviewer, app.reception_now())
+        self.assertEqual(self.request(path, cookie=cookie)['body']['rows'][0]['original']['bytes'], len(raw))
+        changed = post(dict(body, version='2', supersedes=str(source_id), original_pdf='', original_name=''))
+        with app.connect() as c:
+            adi_lab.review(c, changed['body']['id'], approved, reviewer, app.reception_now())
+            self.assertTrue(c.execute('SELECT 1 FROM adi_lab_source_originals WHERE knowledge_id=?',(source_id,)).fetchone())
+        self.assertEqual(self.request(download, cookie=cookie)['status'], 404)
+        self.assertNotIn('original', self.request(path,cookie=cookie)['body']['rows'][0])
 
     def test_diagnosis_requires_another_technician_and_updates_only_internal_findings(self):
         cookie, csrf = self.login()

@@ -1,4 +1,8 @@
 """Private laboratory records and evidence-based checklists. No model calls or firmware operations."""
+import base64
+import binascii
+import hashlib
+
 from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation
 import re
@@ -62,6 +66,49 @@ def text_field(data, key, maximum):
     return value.strip()
 
 
+ORIGINAL_LIMIT = 1_000_000
+
+
+def originals_installed(c):
+    return bool(c.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='adi_lab_source_originals'").fetchone())
+
+
+def _original_payload(c, data):
+    encoded = data.get('original_pdf', '')
+    if not encoded:
+        if data.get('original_name'):
+            raise LabError('Adjunta el contenido del PDF original.')
+        return None
+    if not originals_installed(c):
+        raise LabError('Aplica la migración 134 para adjuntar documentos originales.', 503)
+    if not isinstance(encoded, str) or len(encoded) > ((ORIGINAL_LIMIT + 2) // 3) * 4:
+        raise LabError('El PDF original debe pesar hasta 1 MB.')
+    try:
+        raw = base64.b64decode(encoded, validate=True)
+    except (ValueError, binascii.Error) as error:
+        raise LabError('No se pudo leer el PDF original.') from error
+    if len(raw) > ORIGINAL_LIMIT or not raw.startswith(b'%PDF-') or not raw.rstrip().endswith(b'%%EOF'):
+        raise LabError('Adjunta un PDF original válido de hasta 1 MB.')
+    name = text_field(data, 'original_name', 120).replace('\\', '/').rsplit('/', 1)[-1]
+    if not name.lower().endswith('.pdf') or any(ord(ch) < 32 for ch in name):
+        raise LabError('El archivo debe tener un nombre válido con extensión .pdf.')
+    return name, hashlib.sha256(raw).hexdigest(), len(raw), raw
+
+
+def original(c, source_id, user):
+    require_staff(user)
+    if not originals_installed(c):
+        raise LabError('Documento no disponible.', 404)
+    row = c.execute(
+        "SELECT a.filename,a.data FROM adi_lab_source_originals a JOIN adi_lab_knowledge k ON k.id=a.knowledge_id "
+        "WHERE k.id=? AND k.status IN ('aprobado','pendiente') AND (k.visibility='tecnico' OR ?='administrador')",
+        (source_id, user['role'])
+    ).fetchone()
+    if not row:
+        raise LabError('Documento no disponible.', 404)
+    return row['filename'], bytes(row['data'])
+
+
 def search(c, user, query='', category='', review=False):
     require_staff(user)
     require_storage(c)
@@ -71,7 +118,16 @@ def search(c, user, query='', category='', review=False):
     where = "status=? AND (visibility='tecnico' OR ?='administrador') AND (?='' OR category=?)"
     args = (status, user['role'], category, category)
     rows = c.execute('SELECT * FROM adi_lab_knowledge WHERE ' + where + ' ORDER BY id DESC LIMIT 300', args)
-    return adi_lab_search.rank(rows, query)
+    matches = adi_lab_search.rank(rows, query)
+    if matches and originals_installed(c):
+        ids = tuple(row['id'] for row in matches)
+        sql = ("SELECT knowledge_id,filename,bytes,sha256 FROM adi_lab_source_originals WHERE knowledge_id IN (" +
+               ','.join('?' for _ in ids) + ")")
+        originals = {row['knowledge_id']: dict(row) for row in c.execute(sql, ids)}
+        for row in matches:
+            if row['id'] in originals:
+                row['original'] = originals[row['id']]
+    return matches
 
 def submit(c, data, user, now):
     require_staff(user)
@@ -98,8 +154,13 @@ def submit(c, data, user, now):
         if previous['version'] == values[3]:
             raise LabError('Indica la nueva versión de la fuente corregida.')
         previous_id = int(supersedes)
-    return c.execute('INSERT INTO adi_lab_knowledge(title,source,source_date,version,category,content,visibility,supersedes,created_by,created_at) '
-                     'VALUES (?,?,?,?,?,?,?,?,?,?)', values + (previous_id, user['id'], now.isoformat(timespec='seconds'))).lastrowid
+    attachment = _original_payload(c, data)
+    source_id = c.execute('INSERT INTO adi_lab_knowledge(title,source,source_date,version,category,content,visibility,supersedes,created_by,created_at) '
+                          'VALUES (?,?,?,?,?,?,?,?,?,?)', values + (previous_id, user['id'], now.isoformat(timespec='seconds'))).lastrowid
+    if attachment:
+        c.execute('INSERT INTO adi_lab_source_originals(knowledge_id,filename,sha256,bytes,data) VALUES (?,?,?,?,?)',
+                  (source_id, *attachment))
+    return source_id
 
 
 def review(c, document_id, data, user, now):

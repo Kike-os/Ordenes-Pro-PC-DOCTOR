@@ -28,13 +28,13 @@ La versión **1.5.363** incorporó los flujos de laboratorio técnico descritos 
 | Business Intelligence | Se conservan Executive Live Monitor e Insights. Los indicadores adicionales requieren fuentes y criterios de aceptación. |
 | Data Guardian | Se conserva Database Guardian. El manifiesto incorpora las migraciones aditivas 131 y 132. |
 | Release Monitor 3.0 | Comparación verificable de resultados entre ejecuciones. El nombre y los requisitos de estabilidad vigentes se conservan mientras se completa la ampliación. |
-| Memory Engine | Extractos revisados y correcciones versionadas. La carga de originales, los embeddings y el RAG semántico quedan pendientes. |
+| Memory Engine | Extractos revisados y correcciones versionadas. La carga privada de PDF originales está implementada en el candidato con la migración 134. Los embeddings y el RAG semántico quedan pendientes. |
 
 ## Seguridad, archivos y recursos
 
 Los endpoints del laboratorio están en `local/app.py` y sus controles en `local/adi_lab.py`. La interfaz usa `local/static/app.js` y `local/static/app.css`. El envío verificado por WhatsApp está en `local/whatsapp_identity.py`. El comparador usa `local/release_monitor.py`. Las pruebas se encuentran en `local/tests/test_adi_lab.py`, `local/tests/test_release_monitor.py` y `local/tests/test_whatsapp_identity.py`.
 
-Las migraciones aditivas **131** y **132** crean tablas e índices para fuentes, mediciones y revisiones de diagnóstico. En pruebas se aplicó a bases SQLite temporales. Cada medición dispone de una clave de solicitud para evitar duplicados. Las escrituras de laboratorio y las revisiones quedan en auditoría. Los documentos se representan como texto y los archivos de firmware permanecen en el navegador.
+Las migraciones aditivas **131** y **132** crean tablas e índices para fuentes, mediciones y revisiones de diagnóstico. En pruebas se aplicó a bases SQLite temporales. Cada medición dispone de una clave de solicitud para evitar duplicados. Las escrituras de laboratorio y las revisiones quedan en auditoría. El buscador usa el extracto autorizado. El PDF original opcional se descarga de forma privada con los permisos de su propuesta y queda ligado a su revisión. La migración 134 guarda los PDF de hasta 1 MB con su SHA-256. Los archivos de firmware permanecen en el navegador.
 
 El laboratorio añade **cero llamadas de pago a modelos**. Un borrador consulta hasta 40 mediciones y 10 órdenes anteriores. Una búsqueda examina hasta 300 extractos de 6.000 caracteres. Son límites de implementación. Una medición local con 300 extractos ficticios de hasta 6.000 caracteres y 20 consultas repetidas redujo la mediana de 251 a 1,5 ms tras reutilizar la normalización. La primera consulta pasó de 247 a 269 ms y, con cuatro hilos, el percentil 95 de la búsqueda pasó de 1.249 a 6,4 ms. Las cifras miden la clasificación en Python con la misma colección de fuentes. Queda medir la latencia del servicio con Vercel y Turso.
 
@@ -50,4 +50,4 @@ El laboratorio añade **cero llamadas de pago a modelos**. Un borrador consulta 
 
 La validación integral requiere documentos técnicos autorizados y un entorno separado de producción para probar el proveedor visual y la búsqueda semántica. Quedan pendientes el diseño claro y oscuro de toda la experiencia y la validación de WhatsApp con una cuenta de prueba.
 
-Para el despliegue, verificar primero un respaldo reciente. Después de promover la compilación autorizada, aplicar 131 y 132 desde **Sistema → Migraciones** y verificarlas con Database Guardian. Ante un problema, volver a promover la compilación anterior y conservar las tablas aditivas con las mediciones y las revisiones registradas.
+Para el despliegue, verificar primero un respaldo reciente. Después de promover la compilación autorizada, comprobar que las migraciones 131 y 132 estén aplicadas y aplicar 134 para habilitar los PDF desde **Sistema → Migraciones** y verificarlas con Database Guardian. Ante un problema, volver a promover la compilación anterior y conservar las tablas aditivas con las mediciones y las revisiones registradas.

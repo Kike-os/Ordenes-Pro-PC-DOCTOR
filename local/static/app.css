@@ -14703,3 +14703,6 @@ body:has(.ax) #adi-widget{display:none}
 
 #module-content .equip-battery-card .equip-tab-select[aria-selected=true] .equip-card-picked{display:inline-grid}
 .equip-picker:has(>.equip-battery-card){align-items:start}
+
+.adi-lab-original-hash{display:block;overflow-wrap:anywhere}
+.adi-lab-document>a[download]{display:inline-block;max-width:100%;overflow-wrap:anywhere}

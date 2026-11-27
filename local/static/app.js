@@ -11262,6 +11262,11 @@ function adiLabDialog(order) {
   for(const row of rows){
    const card=el('article',undefined,'workspace-section adi-lab-document');
    card.append(el('h4',row.title),para(row.source+' · '+row.source_date+' · '+row.version));
+   if(row.original){
+    const download=el('a','Descargar PDF original · '+row.original.filename,'secondary');
+    download.href=knowledge+'/'+row.id+'/original';download.download=row.original.filename;
+    card.append(download,el('small','SHA-256: '+row.original.sha256,'system-muted adi-lab-original-hash'));
+   }
    if(!review && row.excerpt){
     card.append(para(row.excerpt));
     if(row.matched_concepts?.length)card.append(el('small','Conceptos relacionados · '+row.matched_concepts.join(' · '),'system-muted'));
@@ -11273,6 +11278,7 @@ function adiLabDialog(order) {
    if(!review){
     card.append(button('Proponer corrección',()=>{
      proposal.open=true;
+     originalFile.value='';
      for(const [key,value] of Object.entries({...row,supersedes:String(row.id),version:''})){
       const field=proposal.querySelector('[name="'+key+'"]');
       if(field)field.value=value;
@@ -11394,7 +11400,19 @@ function adiLabDialog(order) {
  if(currentUser?.role==='administrador')visibility.push(['administrador','Administración']);
  const proposal=controls('Proponer conocimiento',[['title','Título'],['source','Fuente'],['source_date','Fecha de la fuente','date'],['version','Versión'],
    ['category','Categoría',categories],['visibility','Acceso',visibility],['supersedes','ID de fuente que corrige (opcional)'],['content','Extracto autorizado','textarea']],
-  'Enviar a revisión',async (data,form)=>{await api(knowledge,data);form.reset();status.textContent='Documento pendiente de revisión.';});
+  'Enviar a revisión',async (data,form)=>{
+   const file=originalFile.files[0];
+   if(file){
+    if(!file.size||file.size>1000000)throw new Error('El PDF original debe pesar hasta 1 MB.');
+    data.original_name=file.name;
+    data.original_pdf=ofxB64(new Uint8Array(await file.arrayBuffer()));
+   }
+   await api(knowledge,data);form.reset();status.textContent='Documento pendiente de revisión.';
+  });
+ const originalFile=el('input');originalFile.type='file';originalFile.accept='application/pdf,.pdf';
+ const originalLabel=el('label');originalLabel.append(el('span','PDF original autorizado (opcional, hasta 1 MB)'),originalFile);
+ const proposalForm=proposal.querySelector('form');
+ proposalForm.insertBefore(originalLabel,proposalForm.querySelector('button[type=submit]'));
  root.append(button('Revisar documentos pendientes',async()=>{
   try{const result=await api(knowledge+'?review=1');output.replaceChildren(el('h3','Documentos pendientes'),...documents(result.rows,true));}
   catch(error){status.textContent=error.message;}

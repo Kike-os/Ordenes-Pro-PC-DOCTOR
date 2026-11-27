@@ -1814,6 +1814,13 @@ class Handler(BaseHTTPRequestHandler):
                         return self.reply(400,{'error':'Página de historial inválida.'})
                     return self.reply(200,order_battery.read(c,oid,int(before) if before else None))
                 except order_battery.BatteryError as error:return self.reply(error.status,{'error':str(error)})
+            lab_original=re.fullmatch(r'/api/adi/lab/knowledge/([0-9]{1,9})/original',path)
+            if lab_original:
+                import adi_lab
+                try:
+                    name, original=adi_lab.original(c,int(lab_original[1]),user)
+                    return self.reply(200,original,'application/octet-stream',filename=name)
+                except adi_lab.LabError as error:return self.reply(error.status,{'error':str(error)})
             lab_order=re.fullmatch(r'/api/orders/([0-9]{1,9})/adi-lab',path)
             if lab_order or path=='/api/adi/lab/knowledge':
                 import adi_lab
@@ -3723,6 +3730,7 @@ class Handler(BaseHTTPRequestHandler):
             max_body=6200000 if re.fullmatch(r'/api/orders/[0-9]+/cancellation',path) else 1700000 if re.fullmatch(r'/api/catalog/[0-9]+/gallery',path) else 3700000 if path=='/api/public/pqrs/upload/part' else 65536 if path in ('/api/public/pqrs','/api/public/pqrs/reply') or re.fullmatch(r'/api/pqrs/[0-9]+',path) else 4200000 if re.fullmatch(r'/api/conditions/[0-9a-f]{32}/signed',path) else 2900000 if path=='/api/business-signature' else 3900000 if re.fullmatch(r'/api/orders/[0-9]+/followups',path) else 3700000 if re.fullmatch(r'/api/orders/[0-9]+/uploads',path) else 1500000 if path in ('/api/inventory/purchases/xml','/api/inventory/purchases/from-xml') else 1700000 if path in ('/api/cash/upload','/api/files/upload') else 65536 if path.startswith('/api/proformas') or path.startswith('/api/caja/') or re.fullmatch(r'/api/orders/[0-9]+/payments',path) or path=='/api/credit-notes' else 9000000 if path in ('/api/clients/import/preview','/api/clients/import/commit','/api/inventory/import/preview','/api/inventory/import/commit') else 200000 if path in ('/api/inventory/register','/api/invoicing/policies') else 1700000 if path=='/api/public/adi/listen' else 6000000 if path in ('/api/mail/send','/api/mail/draft') else 100000 if path in ('/api/conditions','/api/order-draft','/api/conditions/draft','/api/conditions/compare') else 3200000 if path in ('/api/licenses/new','/api/licenses/units','/api/licenses/units/bulk','/api/licenses/check','/api/licenses/products','/api/licenses/products/duplicate','/api/licenses/sales') or re.fullmatch(r'/api/licenses/sales/[0-9]+',path) else 1700000 if re.fullmatch(r'/api/orders/[0-9]+/photos',path) or path in ('/api/profile/photo','/api/mail/signature') or re.fullmatch(r'/api/catalog/[0-9]+/image',path) else (65536 if workspace_post or quote_json or path=='/api/mail/subject' else 16384)
             battery_post=re.fullmatch(r'/api/orders/([0-9]{1,9})/battery',path)
             if battery_post:max_body=1015000
+            if path=='/api/adi/lab/knowledge':max_body=1380000
             length = int(self.headers.get('Content-Length', '0'))
             if length <= 0 or length > max_body:
                 return self.reply(400, {'error':'Solicitud inválida.'})
