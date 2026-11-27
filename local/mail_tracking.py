@@ -29,7 +29,7 @@ FINAL = ('entregado', 'rebotado', 'fallido')
 FILTERS = {'enviados': ('enviado',), 'entregados': ('entregado',), 'pendientes': ('cola', 'enviando'), 'demorados': ('demorado',), 'rebotados': ('rebotado',), 'fallidos': ('fallido',)}
 INCIDENTS = ('demorado', 'rebotado', 'fallido', 'desconocido')
 STAGE_EVENTS = {'conexion': ('conectando', 'Conectando SMTP'), 'autenticacion': ('autenticado', 'Autenticado'), 'transmision': ('transmitiendo', 'Transmitiendo'), 'aceptado': ('aceptado', 'Aceptado por el servidor'), 'error': ('error_etapa', 'Error')}
-KINDS = {'prorroga': 'Prórroga del plazo de retiro', 'receipt': 'Comprobante de recepción', 'client_authorization': 'Autorización de servicio', 'authorization_notice': 'Aviso interno de autorización', 'quote': 'Presupuesto',
+KINDS = {'prorroga': 'Prórroga del plazo de retiro', 'receipt': 'Comprobante de recepción', 'client_authorization': 'Autorización de servicio', 'authorization_notice': 'Aviso interno de autorización', 'quote': 'Presupuesto', 'proforma': 'Proforma',
          'payment_receipt': 'Recibo de pago', 'stay': 'Aviso de equipo listo / permanencia', 'maintenance': 'Recordatorio de mantenimiento', 'appointment': 'Cita técnica', 'manual': 'Mensaje de Mail Pro', 'campaign': 'Comunicado a clientes', 'invoice': 'Factura y documentos comerciales'}
 # Fallos del proveedor (no del destinatario): conexión, nombre, TLS, credenciales o servidor.
 PROVIDER = ('red', 'dns', 'tls', 'credenciales', 'servidor', 'conexion', 'temporal')
@@ -82,7 +82,7 @@ def settle(c, work, attempts=2):
                 raise
 
 
-def start(c, recipients, *, kind, subject, now, archive_id=None, outbox_key='', order_id=None, actor_id=None, retry_of=None):
+def start(c, recipients, *, kind, subject, now, archive_id=None, outbox_key='', order_id=None, actor_id=None, retry_of=None, sender='', message_id=''):
     """Crea un registro «Enviando» por destinatario, con el evento «Mensaje creado». Devuelve {dirección: id}."""
     ids, at = {}, stamp(now)
     for address in recipients:
@@ -92,6 +92,10 @@ def start(c, recipients, *, kind, subject, now, archive_id=None, outbox_key='', 
                         (archive_id, outbox_key, kind, str(subject or '')[:300], address[:254], 'enviando', at, retry_of, order_id, actor_id, at, at)).lastrowid
         _event(c, row, 'creado', 'enviando', 'sistema', '', 'Mensaje creado.', at, now, 'created:' + str(row))
         _event(c, row, 'cola', 'enviando', 'sistema', '', 'En cola de salida: listo para conectar con el servidor SMTP.', at, now, 'queued:' + str(row))
+        if sender:
+            _event(c, row, 'remitente', 'enviando', 'sistema', '', sender, at, now, 'sender:' + str(row))
+        if message_id:
+            c.execute('UPDATE mail_deliveries SET message_id=? WHERE id=?',(message_id[:300],row))
         ids[address] = row
     return ids
 
@@ -323,7 +327,7 @@ def resend_check(c, row):
 
 
 def category(row):
-    if row['kind'] == 'quote':
+    if row['kind'] in ('quote','proforma'):
         return 'quote'
     if row['kind'] == 'appointment':
         return 'appointment'
@@ -358,7 +362,7 @@ def alerts(c, now):
         message = ('La entrega presenta una demora. El sistema continuará comprobando su estado.' if row['status'] == 'demorado' else
                    'No se pudo entregar el correo. Revisa la dirección del destinatario.' if row['status'] == 'rebotado' and row['permanent'] else
                    'No se pudo entregar el correo.' if row['status'] == 'rebotado' else 'No se pudo completar el envío.')
-        title = ('Entrega demorada' if row['status'] == 'demorado' else TITLES[group] if group in TITLES else 'Correo no enviado')
+        title = ('Proforma no entregada' if row['kind']=='proforma' and row['status']!='demorado' else 'Entrega demorada' if row['status'] == 'demorado' else TITLES[group] if group in TITLES else 'Correo no enviado')
         items.append({'key': 'maildelivery:' + str(row['id']) + ':' + row['status'], 'kind': 'warning' if row['status'] == 'demorado' else 'error', 'icon': 'message',
                       'title': title + ' · ' + row['recipient'],
                       'detail': message + (' ' + row['reason'] if row['reason'] else '') + (' (' + row['code'] + ')' if row['code'] else ''),

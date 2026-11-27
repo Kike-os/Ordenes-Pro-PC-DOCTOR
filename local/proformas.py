@@ -12,6 +12,7 @@ import re
 import secrets
 import sqlite3
 from datetime import date, datetime, timedelta
+from itertools import zip_longest
 
 import banking
 import card_finance
@@ -358,6 +359,7 @@ def listing(c, f, now):
 def send(c, pid, user, now, recipient=''):
     """Genera un enlace privado nuevo (el anterior se revoca) y marca la proforma como enviada. Devuelve el token (solo existe aquí)."""
     import proforma_whatsapp
+    import proforma_mail
 
     row = expire(c, get(c, pid), now.date().isoformat())
     if row['status'] not in ('borrador', 'modificacion', 'enviada', 'vista'):
@@ -367,13 +369,18 @@ def send(c, pid, user, now, recipient=''):
     if c.execute("SELECT 1 FROM whatsapp_outbox WHERE event=? AND dedupe_key LIKE ? AND status='enviando'",
                  (proforma_whatsapp.EVENT, 'proforma:%d:%%' % row['id'])).fetchone():
         raise ProformaError('Hay un envío por WhatsApp en proceso. Vuelve a consultar su estado antes de generar un enlace nuevo.', 409)
+    if c.execute("SELECT 1 FROM mail_outbox o WHERE o.request_key LIKE ? AND o.status='sending' AND NOT EXISTS "
+                 " (SELECT 1 FROM mail_deliveries d WHERE d.outbox_key=o.request_key AND d.message_id=o.message_id "
+                 "AND (d.resolved_at!='' OR d.status IN ('enviado','entregado','rebotado','demorado')))",
+                 (proforma_mail.outbox_prefix(pid)+'%',)).fetchone():
+        raise ProformaError('Consulta en Mail Pro el envío pendiente de confirmación antes de generar otro enlace.', 409)
     token = secrets.token_urlsafe(32)
     stamp_ = stamp(now)
     c.execute("UPDATE proforma_links SET revoked_at=? WHERE proforma_id=? AND revoked_at=''", (stamp_, row['id']))
     c.execute('INSERT INTO proforma_links(proforma_id,token_hash,created_at,expires_at) VALUES (?,?,?,?)',
               (row['id'], quotes.digest(token), stamp_, min(now + timedelta(days=LINK_DAYS), datetime.combine(date.fromisoformat(row['valid_until']), datetime.max.time(), now.tzinfo)).isoformat(timespec='seconds')))
     c.execute("UPDATE proformas SET status='enviada',sent_at=?,sent_to=?,updated_at=? WHERE id=?", (stamp_, recipient[:200], stamp_, row['id']))
-    event(c, row['id'], 'enviada', 'Enlace privado generado' + (' y enviado a ' + recipient if recipient else ' (para compartir por WhatsApp o copiar)') + '.', now, user)
+    event(c, row['id'], 'enviada', 'Enlace privado generado para compartir con el cliente' + '.', now, user)
     return token
 
 
@@ -774,7 +781,8 @@ def pdf(c, pid, now, staff_url='', *, public=False):
     right = [('Dirección', [p['client_address'] or '—']), ('Correo electrónico', [p['client_email'] or '—'])]
     left = [(k, field_lines(v[0], half, 8.8, 2)) for k, v in left]
     right = [(k, field_lines(v[0], half, 8.8, 3 if k == 'Dirección' else 2)) for k, v in right]
-    row_h = [max(9 + 11 * len(left[i][1]), 9 + 11 * len(right[i][1])) + 9 for i in range(2)]
+    client_rows = list(zip_longest(left, right))
+    row_h = [max(18 + 11 * len(cell[1]) for cell in row if cell) for row in client_rows]
     ch = 12 + 9 + 13.5 * len(name_lines) + 8 + sum(row_h) + 4
     doc.rounded(L, y, W, ch, 7, fill=PANEL, stroke=ds.LINE)
     label('Cliente', L + pad, y + 12, ds.NAVY)
@@ -783,8 +791,11 @@ def pdf(c, pid, now, staff_url='', *, public=False):
         doc.text(piece, L + pad, yy, 11.5, True, ds.NAVY)
         yy += 13.5
     yy += 6
-    for i in range(2):
-        for x, (k, v) in ((L + pad, left[i]), (col2, right[i])):
+    for i, row in enumerate(client_rows):
+        for x, cell in zip((L + pad, col2), row):
+            if not cell:
+                continue
+            k, v = cell
             label(k, x, yy)
             for j, piece in enumerate(v):
                 doc.text(piece, x, yy + 9.5 + j * 11, 8.8)

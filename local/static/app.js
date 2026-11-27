@@ -4877,7 +4877,7 @@ function quoteSection(order){const wrap=el('div',undefined,'budget-panels'),mone
   const facts=el('p',[r.signer?'Decidió: '+r.signer+(r.decided_at?' · '+formatOrderDate(r.decided_at):''):'',r.authorized_cents?'Pagado '+quoteMoney(r.paid_cents)+' · saldo '+quoteMoney(r.balance_cents):''].filter(Boolean).join(' · ')||'Sin decisión del cliente todavía.','bs-facts');
   const acts=el('div',undefined,'bs-actions'),view=()=>r.kind==='proforma'?proformaDetail(r.id,refresh):openQuoteEditor(order,r.id);acts.append(button('Ver',view,'text-action'));
   const pdf=el('a','Imprimir','text-action');pdf.href=r.pdf;pdf.target='_blank';pdf.rel='noopener';pdf.setAttribute('aria-label','Imprimir '+r.code);acts.append(pdf);
-  if(r.can_resend&&data.can_manage)acts.append(button('Reenviar',async event=>{const b=event.currentTarget;b.disabled=true;try{if(r.kind==='proforma'){const x=await api('/api/proformas/'+r.id,{action:'send'});proformaLinkDialog(x.link,x.proforma,x.link_token,x.identity_instruction);}else{const x=await api('/api/quotes/'+r.id,{action:'send'});quoteSent(order,x);}await load();}catch(error){notify(error.message);b.disabled=false;}},'text-action'));
+  if(r.can_resend&&data.can_manage)acts.append(button('Reenviar',async event=>{const b=event.currentTarget;b.disabled=true;try{if(r.kind==='proforma'){const x=await api('/api/proformas/'+r.id,{action:'send'});proformaLinkDialog(x.link,x.proforma,x.link_token);}else{const x=await api('/api/quotes/'+r.id,{action:'send'});quoteSent(order,x);}await load();}catch(error){notify(error.message);b.disabled=false;}},'text-action'));
   acts.append(button('Historial',async()=>{if(r.kind==='proforma'){proformaDetail(r.id,refresh);return;}await openQuoteEditor(order,r.id);const log=document.querySelector('dialog.quote-dialog .quote-log');if(log){log.open=true;log.scrollIntoView({block:'center'});log.querySelector('summary')?.focus();}},'text-action'));
   row.append(top,chips,facts,acts);return row;}
  function paintSummary(data){const s=data.summary;sum.body.replaceChildren();sum.state.replaceChildren();if(!s)return;const n=s.rows.length,open=s.rows.filter(r=>['enviado','enviada','vista','modificacion'].includes(r.status)).length;
@@ -10027,7 +10027,7 @@ async function proformaDetail(id,done){const dialog=invDialog('Proforma',true),b
  if(p.status==='convertida'&&p.origin!=='orden'&&typeof salesReceipt==='function')acts.prepend(invBtn('Imprimir comprobante','printer',()=>salesReceipt(p.origin==='directa'?'directa':'cotizacion',p.id),'primary'));
  if(d.can_edit)acts.append(invBtn(p.origin==='directa'?'Continuar factura':'Editar','pencil',()=>{dialog.close();p.origin==='directa'?invoiceComposer(d,done):proformaComposer(d,done);}));
  if(p.origin==='directa'&&p.status==='aprobada'&&!d.invoice&&admin())acts.append(invBtn('Continuar factura','receipt-text',()=>{dialog.close();invoiceComposer(d,done);},'primary'));
- if(d.can_send)acts.append(invBtn(p.status==='borrador'||p.status==='modificacion'?'Enviar al cliente':'Generar enlace nuevo','send',async()=>{try{const r=await api('/api/proformas/'+id,{action:'send'});proformaLinkDialog(r.link,r.proforma,r.link_token,r.identity_instruction);done&&done();}catch(error){notify(error.message);}},'primary'));
+ if(d.can_send)acts.append(invBtn(p.status==='borrador'||p.status==='modificacion'?'Enviar al cliente':'Generar enlace nuevo','send',async()=>{try{const r=await api('/api/proformas/'+id,{action:'send'});proformaLinkDialog(r.link,r.proforma,r.link_token);done&&done();}catch(error){notify(error.message);}},'primary'));
  if(['borrador','enviada','vista'].includes(p.status))acts.append(invBtn('Registrar decisión del cliente','badge-check',()=>proformaDecision(id,reload)));
  if(d.can_convert&&admin())acts.append(invBtn('Generar factura','receipt-text',async()=>{if(!await askConfirm('¿Generar la factura?','Se crea un borrador de factura con las partidas aprobadas ('+quoteMoney(d.approved_totals.total_cents)+'), los anticipos aplicados y el detalle de pago. No se envía nada al SRI.','Generar factura'))return;
   const go_=async extra=>{const r=await api('/api/proformas/'+id,{action:'convert',...extra});dialog.close();done&&done();openInvoice(r.invoice_id);};
@@ -10051,8 +10051,16 @@ async function proformaDetail(id,done){const dialog=invDialog('Proforma',true),b
    ['Estado',(states[w.status]||w.status)+(w.detail?' · '+w.detail:'')],['ID de Meta',w.provider_id||'—']
   ]))));
  }
+ if(d.mail_history?.length){
+  const labels={cola:'Pendiente',enviando:'Enviando',enviado:'Aceptado por el servidor',entregado:'Entregado',
+   demorado:'Entrega demorada',rebotado:'Rebotado',fallido:'Fallido',desconocido:'Sin confirmación'};
+  body.append(el('h4','Historial de Mail Pro','cj-sub'),cjTable(['Fecha','Remitente','Destinatario','Responsable','Adjunto','Estado','ID del mensaje'],d.mail_history.map(m=>cjRow([
+   ['Fecha',formatOrderDate(m.event_at||m.created_at)],['Remitente',m.sender||'—'],['Destinatario',m.recipient],['Responsable',m.actor||'—'],
+   ['Adjunto',m.attachments||'—'],['Estado',(labels[m.status]||m.status)+(m.reason?' · '+m.reason:'')],['ID del mensaje',m.message_id||'—']
+  ]))));
+ }
  if(d.events.length){const ul=el('ul',undefined,'fx-list fx-timeline');for(const e of d.events){const li=el('li'),r=el('div',undefined,'fx-row');r.append(el('strong',e.event),el('span',e.detail,'fx-row-sub'),el('small',formatOrderDate(e.created_at)+' · '+e.actor));li.append(r);ul.append(li);}body.append(el('h4','Historial','cj-sub'),ul);}}
-function proformaLinkDialog(link,p,token,instruction){
+function proformaLinkDialog(link,p,token){
  const dialog=invDialog('Enlace para el cliente'),body=el('div',undefined,'inv-body pf-wa');dialog.append(body);
  const box=el('input');box.value=link;box.readOnly=true;box.setAttribute('aria-label','Enlace privado de la proforma');
  body.append(el('p','Para revisar y aprobar la proforma, el cliente debe introducir los últimos cuatro dígitos de su identificación.','inv-form-note'),box);
@@ -10065,11 +10073,7 @@ function proformaLinkDialog(link,p,token,instruction){
  const refresh=invBtn('Consultar estado','refresh-cw',load);
  card.append(title,recipient,template,preview,status,actions);actions.append(send,refresh);body.append(card);
  const links=el('div',undefined,'dialog-actions');links.append(invBtn('Copiar enlace','clipboard-list',()=>copyPlain(link,'Enlace copiado.')));
- if(p.client_email){
-  const mail=el('a',undefined,'secondary inv-btn');
-  mail.href='mailto:'+encodeURIComponent(p.client_email)+'?subject='+encodeURIComponent('Proforma '+p.code+' — PC-DOCTOR S.A.')+'&body='+encodeURIComponent('Revisa y aprueba la proforma '+p.code+' en este enlace privado: '+link+(instruction?'\n\n'+instruction:''));
-  mail.append(invIcon('send'),el('span','Enviar por correo'));links.append(mail);
- }
+ if(currentUser?.mail)links.append(invBtn('Enviar por correo','send',()=>proformaMailDialog(p,token)));
  links.append(button('Cerrar',()=>dialog.close(),'secondary'));body.append(links);
  const path='/api/proformas/'+p.id;
  let info=null,busy=false;
@@ -10107,6 +10111,53 @@ function proformaLinkDialog(link,p,token,instruction){
   finally{busy=false;paint();if(!info)template.textContent='Plantilla sin verificar';}
  }
  load();
+}
+async function proformaMailDialog(proforma,token){
+ const dialog=invDialog('Enviar proforma · '+proforma.code);
+ const {form,field}=invForm('inv-sheet-form pf-mail-form');
+ const status=el('p',undefined,'pf-wa-status');status.setAttribute('role','status');
+ form.append(status);dialog.append(form);
+ const path='/api/proformas/'+proforma.id;
+ form.setAttribute('aria-busy','true');status.textContent='Cargando preparación del correo…';
+ let draft;
+ try{draft=await api(path,{action:'mail_preview',link_token:token});}
+ catch(error){status.textContent=error.message;return;}
+ finally{form.removeAttribute('aria-busy');}
+ if(!dialog.isConnected)return;
+ const sender=field('sender','Remitente',{value:draft.company+' <'+draft.sender+'>'});sender.readOnly=true;
+ const to=field('recipient','Destinatario',{value:draft.recipient,type:'email',max:254,required:true});
+ const confirmBox=el('label',undefined,'pf-mail-confirm'),confirm=el('input');confirm.type='checkbox';
+ confirmBox.append(confirm,el('span','Confirmo que esta dirección está autorizada para recibir la proforma.'));form.append(confirmBox);
+ const subject=field('subject','Asunto',{value:draft.subject});subject.readOnly=true;
+ const body=field('body','Mensaje',{value:draft.body,area:true,max:4000,required:true});body.rows=5;
+ const attachment=el('p','Adjunto PDF · '+draft.filename,'inv-form-note');attachment.prepend(invIcon('file-text'));
+ const details=el('details',undefined,'pf-mail-preview'),preview=el('pre');
+ details.append(el('summary','Vista previa'),preview);form.append(attachment,details);
+ const footer=el('div',undefined,'dialog-actions');
+ const close=button('Cerrar',()=>dialog.close(),'secondary'),send=el('button','Enviar correo','primary');send.type='submit';
+ footer.append(close,send);form.append(status,footer);
+ let busy=false,state=draft.status;
+ function render(){
+  const changed=to.value.trim().toLowerCase()!==draft.recipient.trim().toLowerCase();
+  confirmBox.hidden=!changed||!to.value.trim();
+  send.disabled=busy||state==='sent'||state==='sending'||(changed&&!confirm.checked);
+  send.textContent=busy?'Enviando…':state==='sent'?'Correo aceptado':state==='failed'?'Reintentar envío':'Enviar correo';
+  preview.textContent=[sender.value,to.value,subject.value,'',body.value,'','Enlace privado para consultar y aprobar la proforma:',draft.link,'',draft.instruction].join('\n');
+ }
+ to.addEventListener('input',()=>{confirm.checked=false;render();});confirm.addEventListener('change',render);body.addEventListener('input',render);
+ status.textContent=state==='sent'?'Aceptado por el servidor de correo. '+draft.message_id:state==='sending'?'El envío está en curso o sin confirmación SMTP. Consulta Mail Pro.':state==='failed'?'El intento anterior falló. Verifica la dirección y reintenta.':'Pendiente de envío.';
+ render();if(!send.disabled)to.focus();
+ form.addEventListener('submit',async event=>{
+  event.preventDefault();if(send.disabled||busy||!form.reportValidity())return;
+  busy=true;form.setAttribute('aria-busy','true');status.textContent='Enviando desde Mail Pro…';render();
+  try{
+   const result=await api(path,{action:'mail_send',link_token:token,recipient:to.value.trim(),confirm_recipient:confirm.checked,body:body.value});
+   state='sent';status.textContent='Aceptado por el servidor de correo. '+result.message_id;
+  }catch(error){
+   state=error.kind==='sin_confirmacion'?'sending':'failed';
+   status.textContent=error.message;
+  }finally{busy=false;form.removeAttribute('aria-busy');render();}
+ });
 }
 // ---- Proformas y órdenes de servicio: la relación es la misma en ambos sentidos (Orden → Proforma y Proforma → Orden) ----
 // Vincular no crea otra proforma ni toca la aprobación, la firma, los importes, los anticipos ni la factura; los cobros de la orden y
