@@ -1,7 +1,13 @@
 {
   "unreleased": {
-    "features": [],
-    "improvements": [],
+    "features": [
+      "ADI integra análisis visual asistido, búsqueda semántica, resumen coordinado y previsión de nuevas órdenes para siete días.",
+      "Las fuentes del Laboratorio ADI pueden conservar un PDF original de acceso privado. Requiere la migración 134.",
+      "AutoCare permite pausar las funciones asistidas de ADI y restaurar el ajuste previo con verificación y auditoría."
+    ],
+    "improvements": [
+      "Battery Health Premium 4.0 refuerza la jerarquía tipográfica del porcentaje, la condición y la última revisión."
+    ],
     "fixes": [],
     "security": [],
     "performance": []

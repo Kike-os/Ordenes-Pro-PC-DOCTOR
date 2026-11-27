@@ -150,7 +150,7 @@ class AutoCareCenterTests(unittest.TestCase):
         self.assertGreaterEqual(panel['incidents_by_severity']['media'], 1)  # correo sin configurar
         mail = next(s for s in panel['services'] if s['code'] == 'mail')
         self.assertTrue(mail['cause'] and mail['action']);self.assertEqual(mail['limit_ms'], 20000)
-        self.assertEqual({a['code'] for a in panel['actions']}, {'unlock_diagnosis', 'license_expiry'})
+        self.assertEqual({a['code'] for a in panel['actions']}, {'unlock_diagnosis', 'license_expiry', 'pause_adi', 'restore_adi'})
         self.assertIn('unavailable', panel['counts'])
         registry = {'unreleased': {'fixes': ['Arreglo ficticio']}, 'releases': [{'version': '1.0.0', 'date': '2026-01-01T00:00:00-05:00', 'type': 'initial', 'status': 'publicada', 'summary': '', 'changes': {}}]}
         made = versioning.publish(versioning.validate(registry), 'patch', 'Prueba', published_by='Kike', authorized_by='Administración')

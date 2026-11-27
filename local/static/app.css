@@ -14565,6 +14565,9 @@ body:has(.ax) #adi-widget{display:none}
 .adi-lab-form label{display:grid;gap:.3rem;min-width:0}
 .adi-lab-form input,.adi-lab-form textarea,.adi-lab-form select{box-sizing:border-box;width:100%;min-width:0}
 .adi-lab-form label:has(textarea){grid-column:1/-1}
+.adi-lab-form .adi-lab-confirm{grid-column:1/-1;display:flex;align-items:baseline;gap:.55rem}
+.adi-lab-form .adi-lab-confirm input{order:-1;width:auto;flex:none}
+
 .adi-lab-document{overflow-wrap:anywhere}
 .adi-lab-document p:last-of-type{white-space:pre-wrap}
 .adi-lab-actions{display:flex;flex-wrap:wrap;gap:.5rem}
@@ -14675,10 +14678,13 @@ body:has(.ax) #adi-widget{display:none}
 .equip-battery-widget[data-charging=true] .equip-battery-terminal{animation:equip-battery-pulse 1.2s ease-in-out 3;fill-opacity:.95}
 @keyframes equip-battery-pulse{50%{opacity:.55;filter:drop-shadow(0 0 3px currentColor)}}
 .equip-battery-copy{display:grid;gap:2px;min-width:0;border-inline-start:1px solid var(--battery-edge);padding-inline-start:8px}
-.equip-battery-title,.equip-battery-wear,.equip-battery-review{font-size:10.5px;line-height:1.25;overflow-wrap:anywhere}
-.equip-battery-reading{display:flex;flex-wrap:wrap;gap:1px 6px;align-items:baseline;color:var(--battery-ink);font-size:11px;font-weight:650;transition:color .28s}
+.equip-battery-title,.equip-battery-wear,.equip-battery-review{line-height:1.3;overflow-wrap:anywhere}
+.equip-battery-title{font-size:.75rem;font-weight:650}
+.equip-battery-wear,.equip-battery-review{font-size:.6875rem;color:var(--op-muted,var(--battery-text))}
+.equip-battery-wear{font-variant-numeric:tabular-nums}
+.equip-battery-reading{display:flex;flex-wrap:wrap;gap:1px 6px;align-items:baseline;color:var(--battery-ink);font-size:.6875rem;font-weight:650;transition:color .28s}
 .equip-battery-reading>span{padding:1px 5px;border-radius:999px;background:color-mix(in srgb,var(--battery-ink) 12%,transparent)}
-.equip-battery-reading strong{font-size:18px;line-height:1.12;font-variant-numeric:tabular-nums;white-space:nowrap}
+.equip-battery-reading strong{font-size:1.1875rem;line-height:1.12;font-weight:750;font-variant-numeric:tabular-nums;white-space:nowrap}
 .equip-battery-preview{padding:9px 12px;grid-template-columns:clamp(90px,42%,150px) minmax(0,1fr)}
 .battery-measurements{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
 .battery-measurements label{display:flex;flex-direction:column;justify-content:space-between;min-width:0;margin:0}

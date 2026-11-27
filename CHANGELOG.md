@@ -4,6 +4,18 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## Sin publicar
+
+### Nuevas funcionalidades
+
+- ADI integra análisis visual asistido, búsqueda semántica, resumen coordinado y previsión de nuevas órdenes para siete días.
+- Las fuentes del Laboratorio ADI pueden conservar un PDF original de acceso privado. Requiere la migración 134.
+- AutoCare permite pausar las funciones asistidas de ADI y restaurar el ajuste previo con verificación y auditoría.
+
+### Mejoras realizadas
+
+- Battery Health Premium 4.0 refuerza la jerarquía tipográfica del porcentaje, la condición y la última revisión.
+
 ## v1.5.370 — 2026-11-27 14:08 (UTC-05:00)
 
 Icono oficial de batería animado en tiempo real
