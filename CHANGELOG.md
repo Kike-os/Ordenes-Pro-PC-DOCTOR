@@ -16,6 +16,7 @@ Centro de acciones compacto y control de paneles secundarios
 
 - Comunicaciones y ADI en las órdenes mantienen los indicadores visibles y se abren por decisión del usuario. Las actualizaciones conservan el estado elegido durante la consulta.
 - Los paneles secundarios de pagos, actividad, autorizaciones, repuestos, Mail Pro, monitor de versiones y configuración inician cerrados. El ticket digital abre su propia vista previa.
+- ADI dirige las reservas a la agenda oficial y muestra una etiqueta para reservar cada horario enviado por WhatsApp.
 
 ## v1.5.361 — 2026-11-26 23:50 (UTC-05:00)
 

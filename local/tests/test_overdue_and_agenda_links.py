@@ -49,7 +49,14 @@ class AgendaLinkTests(unittest.TestCase):
         self.assertIn('https://ordenes.example.test/citas?fecha=2026-11-26&hora=14:30&servicio=diagnostico', web)
         self.assertIn('https://social.example/pcdoctor/citas-x', web)                              # enlaces ajenos intactos
         wa = adi.agenda_links(text, 'whatsapp')
-        self.assertIn('• Jueves 26/11 · 2:30 p. m.\n  https://ordenes.example.test/citas?fecha=2026-11-26', wa)
+        self.assertIn('• Reservar Jueves 26/11 · 2:30 p. m.\n  https://ordenes.example.test/citas?fecha=2026-11-26', wa)
+
+    def test_generated_booking_link_uses_the_public_portal(self):
+        adi.agenda_url = self.saved
+        self.assertEqual(
+            adi.booking_link('2026-11-26', '14:30', 'diagnostico'),
+            'https://ordenes-pro.ecuadorpcdoctor.com/citas?fecha=2026-11-26&hora=14:30&servicio=diagnostico',
+        )
 
     def test_only_whole_words_ask_for_slots(self):
         self.assertFalse(adi.wants_slots('https://www.facebook.com/share/p/abc'))
