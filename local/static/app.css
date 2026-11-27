@@ -14557,3 +14557,16 @@ body:has(.ax) #adi-widget{display:none}
 .pf-wa-card.is-sending .pf-wa-status::before{content:"";display:inline-block;width:.85em;height:.85em;margin-inline-end:.55em;border:2px solid currentColor;border-inline-end-color:transparent;border-radius:50%;vertical-align:middle;animation:pf-wa-spin .8s linear infinite}
 @keyframes pf-wa-spin{to{transform:rotate(360deg)}}
 @media(prefers-reduced-motion:reduce){.pf-wa-card.is-sending .pf-wa-status::before{animation:none}}
+
+.pf-mail-form{display:grid;gap:.75rem;min-width:0}
+.pf-mail-form .inv-field{margin:0;min-width:0}
+.pf-mail-form .inv-field>input,.pf-mail-form .inv-field>textarea{width:100%;min-width:0}
+.pf-mail-form .inv-form-note{display:flex;align-items:center;gap:.45rem;overflow-wrap:anywhere}
+.pf-mail-form .inv-form-note svg{flex:none;width:1rem;height:1rem}
+.pf-mail-confirm:not([hidden]){display:flex;align-items:flex-start;gap:.5rem}
+.pf-mail-confirm input{width:auto;margin:.2rem 0 0}
+.pf-mail-preview{padding:.7rem;border:1px solid var(--line);border-radius:var(--op-field-radius);background:var(--op-field)}
+.pf-mail-preview summary{cursor:pointer}
+.pf-mail-preview pre{white-space:pre-wrap;overflow-wrap:anywhere;font:inherit}
+.pf-mail-form[aria-busy=true] .pf-wa-status::before{content:"";display:inline-block;width:.85em;height:.85em;margin-inline-end:.55em;border:2px solid currentColor;border-inline-end-color:transparent;border-radius:50%;vertical-align:middle;animation:pf-wa-spin .8s linear infinite}
+@media(prefers-reduced-motion:reduce){.pf-mail-form[aria-busy=true] .pf-wa-status::before{animation:none}}
