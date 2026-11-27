@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.368 — 2026-11-27 13:45 (UTC-05:00)
+
+Indicador animado de salud de batería
+
+### Mejoras realizadas
+
+- El indicador de salud de batería incorpora un icono SVG con una animación breve de llenado, sin cambiar el diagnóstico ni el porcentaje registrado.
+
 ## v1.5.367 — 2026-11-27 13:36 (UTC-05:00)
 
 Diagnóstico de salud de batería por equipo

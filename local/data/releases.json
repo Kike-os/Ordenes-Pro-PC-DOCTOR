@@ -8,6 +8,24 @@
   },
   "releases": [
     {
+      "version": "1.5.368",
+      "date": "2026-11-27T13:45:29-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Indicador animado de salud de batería",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "El indicador de salud de batería incorpora un icono SVG con una animación breve de llenado, sin cambiar el diagnóstico ni el porcentaje registrado."
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Actualización visual solicitada"
+    },
+    {
       "version": "1.5.367",
       "date": "2026-11-27T13:36:16-05:00",
       "type": "patch",
