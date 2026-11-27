@@ -197,7 +197,19 @@ def allowed_request_origin(origin, expected):
     configured=urlsplit(expected)
     if configured.scheme=='http' and configured.hostname in ('127.0.0.1','localhost'):
         port=f':{configured.port}' if configured.port else ''
-        return origin in (f'http://127.0.0.1{port}',f'http://localhost{port}')
+        allowed = {f'http://127.0.0.1{port}', f'http://localhost{port}'}
+        # El servidor de desarrollo puede recibir peticiones por el puerto reenviado de Codespaces.
+        name = os.getenv('CODESPACE_NAME', '').strip()
+        domain = os.getenv('GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN', '').strip()
+        if (
+            os.getenv('ORDENES_ENTORNO') == 'codespaces'
+            and not os.getenv('VERCEL')
+            and configured.port
+            and re.fullmatch(r'[a-z0-9-]{1,100}', name)
+            and re.fullmatch(r'[a-z0-9.-]{1,100}', domain)
+        ):
+            allowed.add(f'https://{name}-{configured.port}.{domain}')
+        return origin in allowed
     return False
 
 
