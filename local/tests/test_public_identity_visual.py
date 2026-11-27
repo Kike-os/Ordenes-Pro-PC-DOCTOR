@@ -1,5 +1,5 @@
 """Browser regression for the public identity component, with synthetic data."""
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 import mimetypes
 import re
 from pathlib import Path
@@ -53,6 +53,11 @@ class PublicIdentityVisualTests(unittest.TestCase):
                 'now_ms': now_ms, 'deadline_ms': now_ms + 3600000, 'remaining': 3600}},
             token, 'ruc')
         tracking_shell = order_tracking.CARD_HEAD % ('', 'OP-FICTICIA', '')
+        cls.account_info = {
+            'order': dict(order, client='Cliente ficticio', brand='', model='', status_label='Entregado', status='entregado'),
+            'money': {'credit_cents': 0, 'budget_cents': 100, 'paid_cents': 100, 'balance_cents': 0},
+            'checked_at': datetime(2026, 1, 1, tzinfo=timezone.utc), 'delivered': True, 'invoices': [], 'payments': [],
+        }
         cls.pages = {
             '/proforma': proformas.identify_page(token, {'code': 'PF-FICTICIA', 'client_identification': '1710034065',
                                                         'client_document_type': 'cedula'}),
@@ -62,16 +67,12 @@ class PublicIdentityVisualTests(unittest.TestCase):
             '/seguimiento': tracking_shell + tracking + '</main></body></html>',
             '/citas': (ROOT / 'templates/appointments.html').read_text(encoding='utf-8'),
             '/cuenta': client_portal.form_page(token, order['code'], document_kind='ruc'),
-            '/entrega': client_portal.account_page(token, {
-                'order': dict(order, client='Cliente ficticio', brand='', model='', status_label='Entregado', status='entregado'),
-                'money': {'credit_cents': 0, 'budget_cents': 100, 'paid_cents': 100, 'balance_cents': 0},
-                'checked_at': datetime(2026, 1, 1), 'delivered': True, 'invoices': [], 'payments': [],
-            }, client_portal.DEFAULTS),
+            '/entrega': client_portal.account_page(token, cls.account_info, client_portal.DEFAULTS),
         }
         cls.pages['/claro'] = cls.pages['/cuenta'].replace('<html ', '<html data-theme="light" ', 1)
 
-    def open_page(self, path, width, *, motion='reduce'):
-        page = self.browser.new_page(viewport={'width': width, 'height': 900}, reduced_motion=motion)
+    def open_page(self, path, width, *, motion='reduce', javascript=True):
+        page = self.browser.new_page(viewport={'width': width, 'height': 900}, reduced_motion=motion, java_script_enabled=javascript)
         self.addCleanup(page.close)
         page.set_default_timeout(4000)
 
@@ -146,3 +147,40 @@ class PublicIdentityVisualTests(unittest.TestCase):
                 }""")
                 self.assertEqual(page.locator('input[name=last4]').input_value(), '0427')
                 self.assertTrue(all(field.get_attribute('inputmode') == 'numeric' for field in fields.all()))
+                fields.nth(3).press('Backspace')
+                self.assertEqual(page.locator('input[name=last4]').input_value(), '042')
+                self.assertTrue(fields.nth(2).evaluate('e => e === document.activeElement'))
+
+
+    def test_session_countdown_clears_content_and_returns_to_verification(self):
+        info = self.account_info
+        self.pages['/session'] = client_portal.account_page(
+            'identidad-ficticia', info, client_portal.DEFAULTS,
+            expires_at=info['checked_at']+timedelta(seconds=3), verified=True)
+        target = '/s/identidad-ficticia/cuenta'
+        self.pages[target] = client_portal.form_page('identidad-ficticia', 'OP-FICTICIA', 'Tu acceso venció.', 'error', document_kind='ruc')
+        self.addCleanup(self.pages.pop, '/session')
+        self.addCleanup(self.pages.pop, target)
+        page = self.open_page('/session', 390)
+        self.assertTrue(page.get_by_text('Conexión segura',exact=True).is_visible())
+        self.assertTrue(page.get_by_text('Paso 2 de 2',exact=True).is_visible())
+        self.assertTrue(page.get_by_text('Identidad verificada correctamente',exact=True).is_visible())
+        self.assertTrue(page.get_by_text('Cliente ficticio',exact=False).is_visible())
+        page.wait_for_url('**/cuenta?sesion=vencida',timeout=6000)
+        self.assertTrue(page.get_by_text('Tu acceso venció.').is_visible())
+        self.assertFalse(page.get_by_text('Cliente ficticio',exact=False).count())
+        self.assertTrue(page.get_by_text('Paso 1 de 2',exact=True).is_visible())
+
+
+    def test_expiration_fallback_without_javascript(self):
+        info = self.account_info
+        self.pages['/session-offline'] = client_portal.account_page(
+            'identidad-ficticia', info, client_portal.DEFAULTS, expires_at=info['checked_at']+timedelta(seconds=2))
+        target = '/s/identidad-ficticia/cuenta'
+        self.pages[target] = client_portal.form_page('identidad-ficticia', 'OP-FICTICIA', 'Tu acceso venció.', 'error')
+        self.addCleanup(self.pages.pop, '/session-offline')
+        self.addCleanup(self.pages.pop, target)
+        page = self.open_page('/session-offline', 390, javascript=False)
+        page.wait_for_url('**/cuenta?sesion=vencida',timeout=6000)
+        self.assertTrue(page.get_by_text('Tu acceso venció.').is_visible())
+        self.assertFalse(page.get_by_text('Cliente ficticio',exact=False).count())

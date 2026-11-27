@@ -387,7 +387,7 @@ def order_from_text(c,*texts):
     return row['id'] if row else None
 
 
-def send_institutional(c,kind,title,recipient,subject,body,order_id=None,actor=None,attachments=None,review=True,private=(),signed=True,account=''):
+def send_institutional(c,kind,title,recipient,subject,body,order_id=None,actor=None,attachments=None,review=True,private=(),signed=True,account='',outbox_key=''):
     """Correo institucional: revisión de ADI, plantilla común, firma autorizada, copia exacta y vínculo con la orden.
 
     Lanza mail_pro.MailError si el servidor no acepta el mensaje (queda registrado como error). «enviado» significa aceptado por el servidor."""
@@ -398,9 +398,15 @@ def send_institutional(c,kind,title,recipient,subject,body,order_id=None,actor=N
         # Las facturas salen del buzón de facturación (mismo servidor, credenciales propias en variables de entorno).
         config=dict(config,username=os.environ['FACTURACION_MAIL_USERNAME'].strip(),password=os.environ['FACTURACION_MAIL_PASSWORD'])
     message,recipients=mail_pro.build_message(config,{'to':recipient,'subject':subject,'body':final,'from_name':corporate.settings()['name'],'attachments':attachments or [],'layout':{'title':title}},card if signed and card.get('enabled') else '')
+    if outbox_key:
+        timestamp=now.isoformat(timespec='seconds')
+        c.execute("INSERT INTO mail_outbox(request_key,user_id,status,message_id,created_at,updated_at) VALUES (?,?,'sending',?,?,?) "
+                  "ON CONFLICT(request_key) DO UPDATE SET user_id=excluded.user_id,status='sending',message_id=excluded.message_id,"
+                  "updated_at=excluded.updated_at", (outbox_key,actor,str(message['Message-ID']),timestamp,timestamp))
     archive_id=mailing.archive(c,kind,order_id,recipient,subject,message,adi,actor,now,[str(item.get('name','')) for item in attachments or []],private)
     # Seguimiento de entrega: un registro por destinatario, con su historial de eventos reales.
-    tracked=mail_tracking.start(c,recipients,kind=kind,subject=str(message['Subject'] or subject),now=now,archive_id=archive_id,order_id=order_id,actor_id=actor)
+    tracked=mail_tracking.start(c,recipients,kind=kind,subject=str(message['Subject'] or subject),now=now,archive_id=archive_id,outbox_key=outbox_key,order_id=order_id,actor_id=actor,
+                                sender=config['username'] if outbox_key else '',message_id=str(message['Message-ID']) if outbox_key else '')
     # La copia queda guardada como «preparado» antes de hablar con el servidor de correo.
     c.commit()
     # Los envíos automáticos no se repiten hacia direcciones declaradas inválidas por un rebote permanente.
@@ -409,11 +415,22 @@ def send_institutional(c,kind,title,recipient,subject,body,order_id=None,actor=N
         if refusal:raise mail_pro.MailError('destinatario',refusal+' No se reintenta automáticamente: corrige la dirección del destinatario.')
         result=mail_pro.deliver(config,message,recipients)
     except mail_pro.MailError as error:
-        try:mail_tracking.settle(c,lambda db:(mailing.mark(db,archive_id,'error',str(error)),mail_tracking.failed(db,tracked,error,reception_now())))
+        def fail(db):
+            unconfirmed=bool(outbox_key and error.kind=='sin_confirmacion')
+            if outbox_key and not unconfirmed:
+                db.execute("UPDATE mail_outbox SET status='failed',updated_at=? WHERE request_key=?",
+                           (reception_now().isoformat(timespec='seconds'),outbox_key))
+            mailing.mark(db,archive_id,'preparado' if unconfirmed else 'error',str(error),
+                         str(message['Message-ID']) if outbox_key else '')
+            mail_tracking.failed(db,tracked,error,reception_now())
+        try:mail_tracking.settle(c,fail)
         except sqlite3.Error as failure:note_runtime_error('MAIL','/mail/'+kind,failure)
         raise
     message_id=str(message['Message-ID'] or '');sent=reception_now()
     def record(db):
+        if outbox_key:
+            db.execute("UPDATE mail_outbox SET status='sent',updated_at=? WHERE request_key=?",
+                       (sent.isoformat(timespec='seconds'),outbox_key))
         mailing.mark(db,archive_id,'enviado','El servidor de correo aceptó el mensaje.',message_id,sent)
         mail_tracking.accepted(db,tracked,message_id,sent,result)
         if order_id and message_id:
@@ -1603,12 +1620,16 @@ class Handler(BaseHTTPRequestHandler):
                 jar=SimpleCookie()
                 try:jar.load(self.headers.get('Cookie',''))
                 except Exception:pass
-                now=reception_now();ok=client_portal.session_ok(c,jar[client_portal.COOKIE].value if client_portal.COOKIE in jar else '',oid,token,now)
+                now=reception_now();expiry=client_portal.session_expiry(c,jar[client_portal.COOKIE].value if client_portal.COOKIE in jar else '',oid,token,now)
                 if not portal_route[2]:
-                    if not ok:return self.reply(200,client_portal.form_page(token,code,document_kind=client_portal.document_kind(c,oid)),'text/html; charset=utf-8')
+                    if not expiry:
+                        expired=client_portal.COOKIE in jar or parse_qs(urlsplit(self.path).query).get('sesion')==['vencida']
+                        notice='Tu acceso venció. Vuelve a comprobar tu identidad.' if expired else ''
+                        return self.reply(200,client_portal.form_page(token,code,notice,'error' if expired else 'info',
+                                                                    document_kind=client_portal.document_kind(c,oid)),'text/html; charset=utf-8')
                     audit(c,None,'portal_view',oid);c.commit()
-                    return self.reply(200,client_portal.account_page(token,client_portal.data(c,oid,now),cfg),'text/html; charset=utf-8')
-                if not ok:return self.reply(403,client_portal.form_page(token,code,'Tu acceso venció. Confirma de nuevo los últimos cuatro dígitos.','error',document_kind=client_portal.document_kind(c,oid)),'text/html; charset=utf-8')
+                    return self.reply(200,client_portal.account_page(token,client_portal.data(c,oid,now),cfg,expires_at=expiry),'text/html; charset=utf-8')
+                if not expiry:return self.reply(403,client_portal.form_page(token,code,'Tu acceso venció. Confirma de nuevo los últimos cuatro dígitos.','error',document_kind=client_portal.document_kind(c,oid)),'text/html; charset=utf-8')
                 doc=portal_route[2]
                 import vouchers
                 if doc.startswith('recibo/'):
@@ -2579,7 +2600,10 @@ class Handler(BaseHTTPRequestHandler):
                     if found:
                         if found[2]:
                             row=proformas.get(c,int(found[1]));return self.reply(200,proformas.pdf(c,int(found[1]),now,public_base_url().rstrip('/')+'/#invoicing?proforma=%d'%row['id']),'application/pdf',filename=__import__('document_style').filename('PROFORMA',row['code']))
-                        return self.reply(200,proformas.detail(c,int(found[1]),now))
+                        pid=int(found[1]);result=proformas.detail(c,pid,now)
+                        if mail_allowed(user):
+                            result['mail_history']=__import__('proforma_mail').history(c,pid)
+                        return self.reply(200,result)
                     if path=='/api/payments-all':return self.reply(200,{'rows':proformas.all_payments(c,f)})
                     if path=='/api/credit-notes':return self.reply(200,{'rows':credit_notes.listing(c)})
                     found=re.fullmatch(r'/api/credit-notes/invoice/([0-9]{1,9})',path)
@@ -3524,13 +3548,14 @@ class Handler(BaseHTTPRequestHandler):
                     try:jar.load(self.headers.get('Cookie',''))
                     except Exception:pass
                     now=reception_now()
-                    if not client_portal.session_ok(c,jar[client_portal.COOKIE].value if client_portal.COOKIE in jar else '',oid,token,now):
+                    expiry=client_portal.session_expiry(c,jar[client_portal.COOKIE].value if client_portal.COOKIE in jar else '',oid,token,now)
+                    if not expiry:
                         return self.reply(403,client_portal.form_page(token,code,'Tu acceso venció. Confirma de nuevo los últimos cuatro dígitos.','error',document_kind=client_portal.document_kind(c,oid)),'text/html; charset=utf-8')
                     if limited(c,'portal-cancel:'+digest(token),3,3600):c.commit();return self.reply(429,client_portal.form_page(token,code,'Demasiadas solicitudes. Comunícate con PC-DOCTOR S.A.','error',document_kind=client_portal.document_kind(c,oid)),'text/html; charset=utf-8')
                     try:order_cancellations.request(c,oid,{'reason':form.get('reason',''),'detail':form.get('detail','')},None,now,'portal');audit(c,None,'portal_cancel_requested',oid);c.commit()
                     except order_cancellations.CancelError as error:
-                        c.rollback();return self.reply(error.status,client_portal.account_page(token,client_portal.data(c,oid,now),cfg).replace('<main class="portal">','<main class="portal"><p class="portal-notice" data-tone="error" role="alert">'+html.escape(str(error))+'</p>',1),'text/html; charset=utf-8')
-                    return self.reply(200,client_portal.account_page(token,client_portal.data(c,oid,now),cfg).replace('<main class="portal">','<main class="portal"><p class="portal-notice" role="status">Recibimos su solicitud de cancelación. PC-DOCTOR la revisará y se la confirmará.</p>',1),'text/html; charset=utf-8')
+                        c.rollback();return self.reply(error.status,client_portal.account_page(token,client_portal.data(c,oid,now),cfg,expires_at=expiry).replace('<main class="portal">','<main class="portal"><p class="portal-notice" data-tone="error" role="alert">'+html.escape(str(error))+'</p>',1),'text/html; charset=utf-8')
+                    return self.reply(200,client_portal.account_page(token,client_portal.data(c,oid,now),cfg,expires_at=expiry).replace('<main class="portal">','<main class="portal"><p class="portal-notice" role="status">Recibimos su solicitud de cancelación. PC-DOCTOR la revisará y se la confirmará.</p>',1),'text/html; charset=utf-8')
                 if portal_post[2]:
                     jar=SimpleCookie()
                     try:jar.load(self.headers.get('Cookie',''))
@@ -3547,7 +3572,10 @@ class Handler(BaseHTTPRequestHandler):
                     return self.reply(400,client_portal.form_page(token,code,text,'error',document_kind=client_portal.document_kind(c,oid)),'text/html; charset=utf-8')
                 now=reception_now();session=client_portal.open_session(c,oid,token,now,self.client_address[0]);audit(c,None,'portal_verified',oid);c.commit()
                 cookie='%s=%s; Path=%s; HttpOnly; SameSite=Strict; Max-Age=%d%s'%(client_portal.COOKIE,session,path_cookie,client_portal.MINUTES*60,secure)
-                return self.reply(200,public_identity.confirm(client_portal.account_page(token,client_portal.data(c,oid,now),cfg)),'text/html; charset=utf-8',cookie=cookie)
+                expiry=client_portal.session_expiry(c,session,oid,token,now)
+                if not expiry:
+                    return self.reply(503,client_portal.unavailable_page(),'text/html; charset=utf-8')
+                return self.reply(200,client_portal.account_page(token,client_portal.data(c,oid,now),cfg,expires_at=expiry,verified=True),'text/html; charset=utf-8',cookie=cookie)
         part_cancel=re.fullmatch(r'/s/([A-Za-z0-9_-]{1,64})/repuestos/([0-9]{1,9})/cancelar',urlsplit(self.path).path)
         if part_cancel:
             import order_tracking,order_part_requests,part_cancellations
@@ -4149,6 +4177,35 @@ class Handler(BaseHTTPRequestHandler):
                                 customer=result['proforma']
                                 instruction=public_identity.instruction(public_identity.kind(customer['client_identification'],customer['client_document_type']))
                                 return self.reply(200,{'ok':True,'link':link,'link_token':token,'identity_instruction':instruction,**result})
+                            elif action in ('mail_preview','mail_send'):
+                                import proforma_mail
+                                if not mail_allowed(user):return self.reply(403,{'error':'Mail Pro requiere configuración y permiso de correo.'})
+                                token=data.get('link_token')
+                                if not isinstance(token,str):return self.reply(400,{'error':'Enlace de proforma inválido.'})
+                                row,key,preview=proforma_mail.prepare(c,pid,token,now)
+                                if action=='mail_preview':
+                                    return self.reply(200,preview)
+                                if preview['status']=='sent':
+                                    return self.reply(200,{'status':'accepted','message_id':preview['message_id'],'duplicate':True})
+                                if preview['status']=='sending':
+                                    return self.reply(409,{'error':'El correo sigue en envío o falta confirmar la respuesta SMTP. Consulta Mail Pro antes de generar otro enlace.','kind':'sin_confirmacion'})
+                                recipient=proforma_mail.recipient_address(data.get('recipient'))
+                                if recipient.casefold()!=preview['recipient'].strip().casefold() and data.get('confirm_recipient') is not True:
+                                    return self.reply(400,{'error':'Confirma que este destinatario está autorizado para recibir la proforma.'})
+                                body=str(data.get('body','')).strip()
+                                if not 1<=len(body)<=4000:return self.reply(400,{'error':'Escribe un mensaje de hasta 4.000 caracteres.'})
+                                if limited(c,'mail-send:'+str(user['id']),40,3600):return self.reply(429,{'error':'Alcanzaste el límite de envíos por hora.'})
+                                body+='\n\nEnlace privado para consultar y aprobar la proforma:\n'+preview['link']+'\n\n'+preview['instruction']
+                                pdf=proformas.pdf(c,pid,now,public=True)
+                                attached={'name':preview['filename'],'type':'application/pdf','data':base64.b64encode(pdf).decode('ascii')}
+                                try:
+                                    result=send_institutional(c,proforma_mail.KIND,'Proforma '+row['code'],recipient,preview['subject'],body,row['order_id'],
+                                                              user['id'],attachments=[attached],review=False,private=(preview['link'],token),outbox_key=key)
+                                except mail_pro.MailError as error:
+                                    proformas.event(c,pid,'correo','Mail Pro · '+recipient+' · '+str(error),reception_now(),user)
+                                    return self.reply(502,{'error':str(error),'kind':error.kind})
+                                proformas.event(c,pid,'correo','Mail Pro · '+recipient+' · Aceptado por el servidor.',reception_now(),user)
+                                return self.reply(200,{'status':'accepted','message_id':result['message_id']})
                             elif action in ('whatsapp_preview','whatsapp_send'):
                                 import proforma_whatsapp
                                 token=data.get('link_token')

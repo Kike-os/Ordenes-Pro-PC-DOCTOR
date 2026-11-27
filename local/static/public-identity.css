@@ -1,7 +1,7 @@
 @import url("/static/design-tokens.css");
 
-.public-identity-panel{display:grid;gap:.85rem;min-width:0;padding:clamp(.75rem,3vw,1.15rem);border:1px solid var(--op-line);border-radius:var(--op-radius);background:var(--op-panel);color:var(--op-text)}
-.public-identity-heading{display:flex;align-items:center;gap:.65rem;flex-wrap:wrap}
+.public-identity-panel{display:grid;gap:.8rem;min-width:0;padding:clamp(.75rem,3vw,1.15rem);border:1px solid var(--op-line);border-radius:var(--op-radius);background:var(--op-panel);color:var(--op-text)}
+.public-identity-heading{display:flex;align-items:center;gap:.65rem;flex-wrap:wrap;min-width:0}
 .public-identity-heading small{display:block;color:var(--op-muted)}
 .public-identity-panel svg,.public-identity-success svg{width:1.25rem;height:1.25rem;flex:none}
 .public-identity-shield{display:grid;place-items:center;width:2.5rem;height:2.5rem;border-radius:.8rem;background:var(--op-field);color:var(--op-accent);animation:public-identity-shield .6s ease-out}
@@ -12,8 +12,8 @@
 .public-identity-panel label span{flex:1;min-width:0}
 .public-identity-panel .public-identity-value:not([type=hidden]){flex:0 0 100%}
 .public-identity-panel .public-identity-value[hidden],.public-identity-panel .public-identity-value[type=hidden]{display:none}
-.public-identity-digits{display:grid;grid-template-columns:repeat(4,minmax(0,3.35rem));gap:clamp(.25rem,2vw,.65rem)}
-.public-identity-panel .public-identity-value:not([type=hidden]),.public-identity-panel .public-identity-digits input{box-sizing:border-box;width:100%;min-width:0;min-height:44px;padding:0;text-align:center;font:inherit;font-size:1.35rem;font-weight:700;line-height:1;color:var(--op-text);background:var(--op-field);border:1px solid var(--op-control-line);border-radius:var(--op-field-radius)}
+.public-identity-digits{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));width:min(100%,18rem);margin-inline:auto;gap:clamp(.25rem,2vw,.65rem)}
+.public-identity-panel .public-identity-value:not([type=hidden]),.public-identity-panel .public-identity-digits input{box-sizing:border-box;width:100%;min-width:0;min-height:48px;padding:0;text-align:center;font:inherit;font-size:1.35rem;font-weight:700;line-height:1;color:var(--op-text);background:var(--op-field);border:1px solid var(--op-control-line);border-radius:var(--op-field-radius)}
 .public-identity-panel input:focus-visible{outline:3px solid var(--op-focus);outline-offset:2px}
 .public-identity-panel .public-identity-status{margin:0;color:var(--op-muted)}
 .public-identity-status:empty{display:none}
@@ -27,3 +27,21 @@
 
 #booking-identity .appointment-last4,#booking-identity .appointment-last4-help,#adi-widget .public-identity-panel label{color:var(--op-text)}
 #booking-identity .appointment-error{color:var(--op-error)}
+
+.public-identity-heading strong,.public-identity-panel label{overflow-wrap:anywhere}
+.public-identity-panel{animation:public-identity-confirm .3s ease-out}
+.public-identity-panel label svg{color:var(--op-accent)}
+form[data-identity-form]>button[type=submit]{width:100%}
+.public-identity-connection:not([hidden]){display:inline-flex;align-items:center;gap:.35rem;max-width:100%;color:var(--op-accent);font-size:.78rem}
+.public-identity-connection svg{width:1rem;height:1rem;flex:none}
+.public-identity-panel .public-identity-digits input{transition:border-color .16s ease,outline-color .16s ease}
+.public-identity-panel[data-busy] .public-identity-progress .active{animation:public-identity-progress 1s ease-in-out infinite alternate}
+@keyframes public-identity-progress{from{opacity:.65}to{opacity:1}}
+@media(prefers-reduced-motion:reduce){
+ .public-identity-panel,.public-identity-panel[data-busy] .public-identity-progress .active{animation:none}
+ .public-identity-panel .public-identity-digits input{transition:none}
+}
+
+.tracking-page:has(.public-identity-panel)>header{display:flex;align-items:center;justify-content:center;gap:.75rem;margin-bottom:1rem;text-align:start}
+.tracking-page:has(.public-identity-panel)>header img{width:5rem;max-width:32%;flex:none}
+.tracking-page:has(.public-identity-panel)>header p{margin:0;min-width:0;overflow-wrap:anywhere}

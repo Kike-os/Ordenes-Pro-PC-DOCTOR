@@ -4,6 +4,30 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.361 — 2026-11-26 23:50 (UTC-05:00)
+
+Secure Customer Portal Enterprise Premium 2.0
+
+### Mejoras realizadas
+
+- Secure Customer Portal Enterprise Premium 2.0 unifica el verificador, incorpora un encabezado compacto para la cuenta y muestra el tiempo restante de sesión.
+
+### Actualizaciones de seguridad
+
+- El portal vincula el contador al vencimiento real de la sesión. Al vencer, retira el contenido protegido y vuelve a solicitar la verificación.
+
+## v1.5.360 — 2026-11-26 23:38 (UTC-05:00)
+
+Envío de proformas mediante Mail Pro
+
+### Mejoras realizadas
+
+- Los intentos de correo de proformas quedan en Mail Pro y en el historial de la proforma. ADI muestra incidencias de entrega registradas y una respuesta SMTP ambigua bloquea envíos duplicados.
+
+### Errores corregidos
+
+- El envío por correo de proformas utiliza Mail Pro, permite confirmar el destinatario y adjunta automáticamente el PDF con un enlace seguro. Se corrigió el PDF público cuando se oculta la identificación.
+
 ## v1.5.359 — 2026-11-26 23:30 (UTC-05:00)
 
 Identidad visual corporativa en los portales públicos

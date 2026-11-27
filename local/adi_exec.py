@@ -22,7 +22,7 @@ STEPS = {
     'facturacion': ('Consultando facturación', 'Premium Billing Center (reporte de facturación)'),
     'cartera': ('Consultando cartera', 'ADI Smart Collections'), 'atencion_clientes': ('Revisando la atención a clientes', 'ADI Live Support'),
     'repuestos': ('Consultando repuestos pendientes', 'Órdenes en espera de repuesto'), 'inventario_bajo': ('Revisando el inventario', 'Centro de Inventario'),
-    'infraestructura': ('Revisando la infraestructura', 'Database Guardian, Smart Fiscal Status, AZUR, respaldos y WhatsApp'),
+    'infraestructura': ('Revisando la infraestructura', 'Database Guardian, Smart Fiscal Status, AZUR, respaldos, Mail Pro y WhatsApp'),
     'recomendaciones': ('Revisando alertas verificables', 'ADI Intelligence Insights'),
     'plazos': ('Revisando plazos y vencimientos', 'Órdenes, presupuestos, retiros y compromisos'),
     'cancelaciones': ('Revisando cancelaciones', 'Smart Cancellation & Closure Management'),
@@ -37,7 +37,7 @@ TOOLS = [
     {'type': 'function', 'name': 'atencion_clientes', 'strict': True, 'description': 'Atención a clientes: conversaciones que esperan a un asesor, solicitudes de atención humana abiertas, métricas del centro de atención y estado de WhatsApp.', 'parameters': _obj()},
     {'type': 'function', 'name': 'repuestos', 'strict': True, 'description': 'Órdenes en espera de repuesto, con días de espera.', 'parameters': _obj()},
     {'type': 'function', 'name': 'inventario_bajo', 'strict': True, 'description': 'Productos del inventario agotados o bajo el mínimo.', 'parameters': _obj()},
-    {'type': 'function', 'name': 'infraestructura', 'strict': True, 'description': 'Estado verificado de la base de datos (Database Guardian, migraciones pendientes), Smart Fiscal Status, AZUR (sin secretos), respaldos y WhatsApp.', 'parameters': _obj()},
+    {'type': 'function', 'name': 'infraestructura', 'strict': True, 'description': 'Estado verificado de la base de datos (Database Guardian, migraciones pendientes), Smart Fiscal Status, AZUR (sin secretos), respaldos, Mail Pro y WhatsApp.', 'parameters': _obj()},
     {'type': 'function', 'name': 'plazos', 'strict': True, 'description': 'Plazos reales próximos y vencidos: entregas estimadas (vencidas y en 24 h), presupuestos por vencer, equipos que superaron el plazo de retiro y compromisos de pago próximos.', 'parameters': _obj()},
     {'type': 'function', 'name': 'cancelaciones', 'strict': True, 'description': 'Cancelaciones de reparaciones: por estado (solicitada, pendiente de liquidación, pendiente de retiro, cerrada), motivos frecuentes, valores recuperados y devoluciones.', 'parameters': _obj()},
     {'type': 'function', 'name': 'recomendaciones', 'strict': True, 'description': 'Alertas verificables con prioridad y acción sugerida (ADI Intelligence Insights).', 'parameters': _obj()},
@@ -174,8 +174,21 @@ def infraestructura(c, now):
         out['estabilidad'] = {'estado': st.get('label'), 'version': st.get('version'), 'pruebas_con_aviso': [t['name'] for t in st.get('tests', []) if t.get('status') != 'ok']}
     except Exception as error:
         out['estabilidad'] = 'no_disponible (%s)' % type(error).__name__
+    try:
+        out['correo'] = mail_delivery_health(c, now)
+    except Exception as error:
+        out['correo'] = 'no_disponible (%s)' % type(error).__name__
     return out
 
+
+def mail_delivery_health(c, now):
+    import mail_pro
+    import mail_tracking
+    since = mail_tracking.stamp(now - timedelta(hours=24))
+    recent = c.execute("SELECT status,COUNT(*) total FROM mail_deliveries WHERE updated_at>=? AND resolved_at='' "
+                       "AND status IN ('fallido','rebotado','demorado','desconocido') GROUP BY status", (since,))
+    return {'configurado': bool(mail_pro.status().get('configured')),
+            'incidencias_24h': {row['status']: row['total'] for row in recent}}
 
 
 @_safe
@@ -335,6 +348,14 @@ def insights(c, now):
             add('infra_fiscal', 'Facturación electrónica con problemas', 'alta', f.get('reason') or 'Smart Fiscal Status en rojo.', [], 'Smart Fiscal Status.',
                 'Revisa Facturación → Estado fiscal antes de emitir.', '#invoicing')
 
+    def mail_health():
+        incidents = mail_delivery_health(c, now)['incidencias_24h']
+        if incidents:
+            add('infra_correo', 'Incidencias de Mail Pro', 'media',
+                '%d incidencias de correo registradas en las últimas 24 horas.' % sum(incidents.values()), [],
+                'Eventos de Mail Pro y respuestas SMTP o DSN.', 'Revisa las causas e intentos en Mail Pro.',
+                '#mail?view=entregas&filtro=incidencias')
+
     def deadlines():
         p = plazos(c, now)
         soon = [o['orden'] for o in p['entregas_proximas_24h']]
@@ -360,7 +381,7 @@ def insights(c, now):
             add('cancelaciones_pendientes', 'Cancelaciones sin cerrar', 'media', '%d órdenes canceladas esperan liquidación o la devolución del equipo.' % len(pending), pending,
                 'Cancelaciones confirmadas sin cierre.', 'Liquida lo autorizado o el saldo a favor y registra la devolución del equipo.', '#orders?active=1')
 
-    for fn in (orders, parts, pickups, collections, support, stock, infra, deadlines, cancellations):
+    for fn in (orders, parts, pickups, collections, support, stock, infra, mail_health, deadlines, cancellations):
         guard(fn)
     seen, unique = set(), []
     for it in items:

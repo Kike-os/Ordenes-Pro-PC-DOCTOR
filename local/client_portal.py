@@ -81,12 +81,18 @@ def open_session(c, order_id, link_token, now, ip):
     return token
 
 
-def session_ok(c, cookie_token, order_id, link_token, now):
+def session_expiry(c, cookie_token, order_id, link_token, now):
     if not cookie_token or not installed(c):
-        return False
+        return None
     row = c.execute('SELECT order_id,link_hash,expires_at FROM client_portal_sessions WHERE token_hash=?', (_hash(cookie_token),)).fetchone()
-    return bool(row) and row['order_id'] == order_id and hmac.compare_digest(row['link_hash'], _hash(link_token)) and row['expires_at'] > now.isoformat(timespec='seconds')
+    if row and row['order_id'] == order_id and hmac.compare_digest(row['link_hash'], _hash(link_token)):
+        if row['expires_at'] > now.isoformat(timespec='seconds'):
+            return datetime.fromisoformat(row['expires_at'])
+    return None
 
+
+def session_ok(c, cookie_token, order_id, link_token, now):
+    return session_expiry(c, cookie_token, order_id, link_token, now) is not None
 
 def close_session(c, cookie_token):
     if cookie_token and installed(c):
@@ -131,11 +137,11 @@ def _date(value):
         return str(value or '')
 
 
-def _page(title, body):
+def _page(title, body, fallback=''):
     return ('<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer">'
-            '<meta name="robots" content="noindex,nofollow"><title>%s | PC-DOCTOR S.A.</title><link rel="icon" href="/favicon.ico?v=2" sizes="48x48"><link rel="stylesheet" href="/static/portal.css">%s</head>'
+            '<meta name="robots" content="noindex,nofollow"><title>%s | PC-DOCTOR S.A.</title><link rel="icon" href="/favicon.ico?v=2" sizes="48x48"><link rel="stylesheet" href="/static/portal.css">%s%s</head>'
             '<body><main class="portal"><header class="portal-head"><img src="/static/logo-original.png" alt="PC-DOCTOR S.A." width="132"><div><p class="portal-kicker">Portal seguro del cliente</p>'
-            '<h1>%s</h1></div></header>%s<footer class="portal-foot"><p>Consulta de solo lectura. Los documentos de este portal no reemplazan a la factura electrónica.</p></footer></main></body></html>') % (html.escape(title), public_identity.ASSETS, html.escape(title).replace('-', '\u2011'), body)   # guion que no corta el número de orden
+            '<h1>%s</h1></div>%s</header>%s<footer class="portal-foot"><p>PC-DOCTOR S.A. · Servicio técnico especializado</p></footer></main></body></html>') % (html.escape(title), public_identity.ASSETS, fallback, html.escape(title).replace('-', '\u2011'), public_identity.connection_badge(), body)   # guion que no corta el número de orden
 
 
 def unavailable_page():
@@ -145,15 +151,14 @@ def unavailable_page():
 def form_page(token, code, message='', tone='info', *, document_kind=''):
     e = html.escape
     notice = '<p class="portal-notice" data-tone="%s" role="%s">%s</p>' % (tone, 'alert' if tone == 'error' else 'status', e(message)) if message else ''
-    body = ('<section class="portal-card">%s<h2>Estado de cuenta y comprobantes de la orden %s</h2>'
-            '<p>Para proteger tu información, confirma que eres el titular de la orden.</p>'
+    body = ('<section class="portal-card portal-entry">%s<h2>Estado de cuenta y comprobantes</h2>'
             '<form method="post" action="/s/%s/cuenta" class="portal-form" autocomplete="off">%s'
             '<small id="last4-hint">El acceso dura %d minutos y solo vale para esta orden.</small><button type="submit">Ver mi estado de cuenta</button></form>'
-            '<p class="portal-back"><a href="/s/%s">Volver al seguimiento de la orden</a></p></section>') % (notice, e(code), e(token), public_identity.fields(document_kind), MINUTES, e(token))
+            '<p class="portal-back"><a href="/s/%s">Volver al seguimiento de la orden</a></p></section>') % (notice, e(token), public_identity.fields(document_kind, connection=False), MINUTES, e(token))
     return _page('Orden ' + code, body)
 
 
-def account_page(token, info, cfg):
+def account_page(token, info, cfg, *, expires_at=None, verified=False):
     e, o, m = html.escape, info['order'], info['money']
     base = '/s/%s/cuenta' % e(token)
     parts = ['<section class="portal-card"><p class="portal-who">%s · Orden <strong>%s</strong> · %s</p><p class="portal-status">Estado: <strong>%s</strong></p></section>'
@@ -190,7 +195,20 @@ def account_page(token, info, cfg):
                      '<small>PC-DOCTOR revisará la solicitud y se la confirmará. Solo se cobran los trabajos que usted ya autorizó.</small>'
                      '<button type="submit">Enviar solicitud de cancelación</button></form></details>' % (base, opts))
     parts.append('<form method="post" action="%s/salir" class="portal-exit"><button type="submit">Cerrar el acceso</button><a href="/s/%s">Volver al seguimiento</a></form>' % (base, e(token)))
-    return _page('Orden ' + o['code'], ''.join(parts))
+    content = ''.join(parts)
+    fallback = ''
+    if expires_at is not None:
+        now = info['checked_at']
+        seconds = max(0, int((expires_at-now).total_seconds()))
+        target = base + '?sesion=vencida'
+        fallback = '<noscript><meta http-equiv="refresh" content="%d;url=%s"></noscript>' % (seconds, target)
+        clock = ('<div class="portal-session-status">%s<p>Sesión disponible <time data-portal-countdown role="timer" '
+                 'datetime="PT%dS">%02d:%02d</time></p></div>') % (
+                     public_identity.heading(2), seconds, *divmod(seconds,60))
+        content = ('<div class="portal-session" data-portal-expires="%s" data-portal-checked="%s" data-portal-return="%s">%s%s%s</div>'
+                   '<p class="portal-notice" data-portal-expired role="status" hidden>Tu acceso venció. Vuelve a comprobar tu identidad.</p>') % (
+                       expires_at.isoformat(), now.isoformat(), target, clock, public_identity.SUCCESS if verified else '', content)
+    return _page('Orden ' + o['code'], content, fallback)
 
 
 def tracking_callout(token):
