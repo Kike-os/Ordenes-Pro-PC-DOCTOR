@@ -33,3 +33,5 @@ python -m py_compile local/app.py
 ```
 
 Para cambios visuales comprobar escritorio, tableta y móvil, incluyendo 320 y 390 px; teclado, foco, Escape, movimiento reducido y ausencia de desbordamiento. No afirmar que algo funciona sin verificarlo. Informar archivos modificados, pruebas y pendientes reales.
+
+La política compartida para interfaces y temas está en [AGENTS.md](AGENTS.md) y [Identidad visual](docs/IDENTIDAD-VISUAL.md).

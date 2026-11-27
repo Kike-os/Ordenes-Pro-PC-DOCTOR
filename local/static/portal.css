@@ -1,36 +1,35 @@
-/* Portal seguro del cliente (sin JavaScript). Tema claro de documento, logotipo original, legible en móvil. */
-:root{--ink:#0f1b2d;--soft:#55657c;--line:#d9e1ec;--blue:#14407a;--bg:#f3f6fa;--ok:#0f6b46;--bad:#a1242f}
+/* Portal seguro del cliente con la paleta corporativa compartida. */
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 Inter,"Segoe UI",system-ui,sans-serif}
+body{margin:0;background:var(--op-bg);color:var(--op-text);font:15px/1.5 var(--op-font);color-scheme:dark}
+:root[data-theme=light] body{color-scheme:light}
 .portal{max-width:720px;margin:0 auto;padding:16px 16px 32px}
-.portal-head{display:flex;align-items:center;gap:14px;padding:10px 0 16px;border-bottom:3px solid var(--blue);margin-bottom:16px}
+.portal-head{display:flex;align-items:center;gap:14px;padding:10px 0 16px;border-bottom:3px solid var(--op-accent);margin-bottom:16px}
 .portal-head img{height:auto;max-width:30vw}
-.portal-kicker{margin:0;color:var(--soft);font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
-.portal-head h1{margin:2px 0 0;font-size:clamp(16px,4.8vw,20px);color:var(--blue)}
-.portal-card{margin:0 0 12px;padding:16px;border:1px solid var(--line);border-radius:14px;background:#fff}
-.portal-card h2{margin:0 0 10px;font-size:16px;color:var(--blue)}
+.portal-kicker{margin:0;color:var(--op-muted);font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.portal-head h1{margin:2px 0 0;font-size:clamp(16px,4.8vw,20px);color:var(--op-accent)}
+.portal-card{margin:0 0 12px;padding:16px;border:1px solid var(--op-line);border-radius:var(--op-radius);background:var(--op-panel);box-shadow:var(--op-shadow)}
+.portal-card h2{margin:0 0 10px;font-size:16px;color:var(--op-accent)}
 .portal-card p{margin:0 0 8px}
-.portal-soft{color:var(--soft);font-size:13px}
-.portal-who{font-size:14px;overflow-wrap:anywhere}.portal-status{margin:0;color:var(--soft)}
+.portal-soft{color:var(--op-muted);font-size:13px}
+.portal-who{font-size:14px;overflow-wrap:anywhere}.portal-status{margin:0;color:var(--op-muted)}
 .portal-form{display:grid;gap:8px;max-width:360px}
 .portal-form label{font-weight:600}
-.portal-form input{font:inherit;font-size:22px;letter-spacing:.3em;padding:10px 12px;border:1px solid #b9c6d8;border-radius:10px;width:9em}
-.portal-form input:focus{outline:3px solid #3b82f655;border-color:#3b82f6}
-.portal-form small{color:var(--soft)}
-.portal button,.portal-callout-link{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:10px 18px;border:0;border-radius:10px;background:var(--blue);color:#fff;font:inherit;font-weight:600;text-decoration:none;cursor:pointer}
-.portal button:focus-visible,.portal a:focus-visible{outline:3px solid #3b82f6;outline-offset:2px}
-.portal-notice{padding:10px 12px;border-radius:10px;background:#eaf2ff;color:var(--blue)}
-.portal-notice[data-tone=error]{background:#fdecee;color:var(--bad)}
+.portal-form select,.portal-form textarea{width:100%;min-width:0;padding:10px 12px;border:1px solid var(--op-line);border-radius:var(--op-field-radius);background:var(--op-field);color:var(--op-text);font:inherit}
+.portal-form small{color:var(--op-muted)}
+.portal button,.portal-callout-link{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:10px 18px;border:0;border-radius:10px;background:var(--op-action-bg);color:var(--op-action-text);font:inherit;font-weight:600;text-decoration:none;cursor:pointer}
+.portal :focus-visible{outline:3px solid var(--op-focus);outline-offset:2px}
+.portal-notice{padding:10px 12px;border-radius:10px;background:var(--op-field);color:var(--op-accent)}
+.portal-notice[data-tone=error]{background:var(--op-error-bg);color:var(--op-error)}
 .portal-money{display:grid;gap:6px;margin:0}
-.portal-money div{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid var(--line)}
-.portal-money dt{color:var(--soft)}.portal-money dd{margin:0;font-variant-numeric:tabular-nums}
-.portal-strong dt,.portal-strong dd{color:var(--blue);font-weight:700;font-size:17px}
+.portal-money div{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid var(--op-line)}
+.portal-money dt{color:var(--op-muted)}.portal-money dd{margin:0;font-variant-numeric:tabular-nums}
+.portal-strong dt,.portal-strong dd{color:var(--op-accent);font-weight:700;font-size:17px}
 .portal-list{list-style:none;margin:0;padding:0}
-.portal-list li{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;padding:10px 0;border-bottom:1px solid var(--line)}
+.portal-list li{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;padding:10px 0;border-bottom:1px solid var(--op-line)}
 .portal-list li span{flex:1 1 220px;min-width:0;overflow-wrap:anywhere}
 .portal-list strong{font-variant-numeric:tabular-nums}
-.portal-list a{color:var(--blue);font-weight:600}
-.portal-list em{color:var(--soft);font-size:13px}
+.portal-list a{color:var(--op-accent);font-weight:600}
+.portal-list em{color:var(--op-muted);font-size:13px}
 .portal-exit{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-top:6px}
-.portal-exit a,.portal-back a{color:var(--blue)}
-.portal-foot{margin-top:18px;color:var(--soft);font-size:12px;text-align:center}
+.portal-exit a,.portal-back a{color:var(--op-accent)}
+.portal-foot{margin-top:18px;color:var(--op-muted);font-size:12px;text-align:center}

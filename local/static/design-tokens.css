@@ -1,0 +1,39 @@
+/* Paleta vigente de presupuesto, seguimiento, citas y portal. */
+:root {
+  --op-bg: #060d1a;
+  --op-panel: #0d1b30;
+  --op-field: #081424;
+  --op-line: #2f4a73;
+  --op-control-line: #5aa9e6;
+  --op-text: #e7efff;
+  --op-muted: #a3b6d3;
+  --op-accent: #8bb8ff;
+  --op-focus: #8bb8ff;
+  --op-action-bg: #14407a;
+  --op-action-text: #fff;
+  --op-ok: #34d399;
+  --op-ok-bg: #0f3a2c;
+  --op-error: #f87171;
+  --op-error-bg: #3d1a20;
+  --op-font: Inter, "Segoe UI", system-ui, sans-serif;
+  --op-radius: 14px;
+  --op-field-radius: 10px;
+  --op-shadow: 0 10px 30px -18px #000c;
+}
+
+:root[data-theme=light] {
+  --op-bg: #f3f6fa;
+  --op-panel: #fff;
+  --op-field: #f3f6fa;
+  --op-line: #d9e1ec;
+  --op-control-line: #55657c;
+  --op-text: #0f1b2d;
+  --op-muted: #55657c;
+  --op-accent: #14407a;
+  --op-focus: #14407a;
+  --op-ok: #0f6b46;
+  --op-ok-bg: #eafaf0;
+  --op-error: #a1242f;
+  --op-error-bg: #fdecee;
+  --op-shadow: 0 18px 55px #163b7010;
+}
