@@ -2,7 +2,7 @@
 
 ## Estado de la implementación
 
-La candidata **1.5.363** integra los flujos de laboratorio técnico descritos aquí sobre Órdenes Pro **1.5.362**. La tabla de motores recoge el alcance que sigue pendiente de ADI Executive Intelligence 7.0.
+La versión **1.5.363** incorporó los flujos de laboratorio técnico descritos aquí. La tabla de motores recoge el alcance que sigue pendiente de ADI Executive Intelligence 7.0.
 
 ## Flujos implementados
 
@@ -36,11 +36,11 @@ Los endpoints del laboratorio están en `local/app.py` y sus controles en `local
 
 Las migraciones aditivas **131** y **132** crean tablas e índices para fuentes, mediciones y revisiones de diagnóstico. En pruebas se aplicó a bases SQLite temporales. Cada medición dispone de una clave de solicitud para evitar duplicados. Las escrituras de laboratorio y las revisiones quedan en auditoría. Los documentos se representan como texto y los archivos de firmware permanecen en el navegador.
 
-El laboratorio añade **cero llamadas de pago a modelos**. Un borrador consulta hasta 40 mediciones y 10 órdenes anteriores. Una búsqueda examina hasta 300 extractos de 6.000 caracteres. Son límites de implementación. La latencia real y la capacidad bajo carga quedan pendientes de medición en un entorno representativo.
+El laboratorio añade **cero llamadas de pago a modelos**. Un borrador consulta hasta 40 mediciones y 10 órdenes anteriores. Una búsqueda examina hasta 300 extractos de 6.000 caracteres. Son límites de implementación. Una medición local con 300 extractos ficticios de hasta 6.000 caracteres y 20 consultas repetidas redujo la mediana de 251 a 1,5 ms tras reutilizar la normalización. La primera consulta pasó de 247 a 269 ms y, con cuatro hilos, el percentil 95 de la búsqueda pasó de 1.249 a 6,4 ms. Las cifras miden la clasificación en Python con la misma colección de fuentes. Queda medir la latencia del servicio con Vercel y Turso.
 
 ## Resultados de pruebas
 
-- 3 pruebas del laboratorio. Cubren autenticación, repetición de mediciones y propuestas, revisión de fuentes, bloqueo de escritura de firmware, aprobación por otro técnico y protección de diagnósticos modificados.
+- 5 pruebas del laboratorio. Cubren autenticación, repetición de mediciones y propuestas, revisión de fuentes, bloqueo de escritura de firmware, aprobación por otro técnico y protección de diagnósticos modificados.
 - 17 pruebas de identidad por WhatsApp con Meta simulado. Cubren el enlace exclusivo del titular, el vencimiento de sesión y la exclusión del token del historial.
 - 5 pruebas del monitor y 15 pruebas de regresión del asistente ejecutivo y por orden.
 - Chromium en 320 y 1280 px. Se comprobó el panel, la generación del borrador y el cálculo de SHA-256 con un archivo ficticio. En 320, 768 y 1280 px se comprobó también la revisión de diagnósticos.

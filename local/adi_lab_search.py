@@ -1,4 +1,5 @@
 """Local retrieval of approved lab excerpts using controlled concepts."""
+from functools import lru_cache
 import re
 import unicodedata
 
@@ -26,11 +27,18 @@ def _features(text):
     tokens = words(text)
     phrase = ' ' + ' '.join(tokens) + ' '
     concepts = {name for name, variants in CONCEPTS.items() if any(' '+variant+' ' in phrase for variant in variants)}
-    return set(tokens) - COMMON, concepts
+    return frozenset(tokens) - COMMON, frozenset(concepts)
+
+
+@lru_cache(maxsize=960)
+def _source_features(text):
+    # Cache only derived features of the already-filtered sources. The text is
+    # the key, so an edited extract cannot reuse features from its old contents.
+    return _features(text)
 
 
 def _score(query, text):
-    terms, concepts = _features(text)
+    terms, concepts = _source_features(text)
     word_matches = terms & query[0]
     concept_matches = concepts & query[1]
     return len(word_matches) + 2 * len(concept_matches), concept_matches
