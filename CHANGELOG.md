@@ -4,6 +4,18 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.361 — 2026-11-26 23:50 (UTC-05:00)
+
+Secure Customer Portal Enterprise Premium 2.0
+
+### Mejoras realizadas
+
+- Secure Customer Portal Enterprise Premium 2.0 unifica el verificador, incorpora un encabezado compacto para la cuenta y muestra el tiempo restante de sesión.
+
+### Actualizaciones de seguridad
+
+- El portal vincula el contador al vencimiento real de la sesión. Al vencer, retira el contenido protegido y vuelve a solicitar la verificación.
+
 ## v1.5.359 — 2026-11-26 23:30 (UTC-05:00)
 
 Identidad visual corporativa en los portales públicos

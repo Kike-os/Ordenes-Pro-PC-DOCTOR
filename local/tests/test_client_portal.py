@@ -2,6 +2,8 @@
 orden, intentos limitados, permisos por acción, descargas solo de lo propio, cierre del acceso, enlace revocado y nada modificado.
 Base temporal y datos ficticios."""
 import io
+from datetime import timedelta
+from unittest.mock import patch
 import unittest
 from email.message import Message
 from urllib.parse import urlencode
@@ -91,6 +93,29 @@ class ClientPortalTests(unittest.TestCase):
         with app.connect() as c:
             order_tracking.revoke(c, order['id'], self.uid, app.reception_now());c.commit()
         self.assertEqual(self.get(base, again)['status'], 404)
+
+    def test_countdown_uses_fixed_server_expiry_and_sessions_expire_on_download(self):
+        _, _, _, _, token, pid = self.setup_portal()
+        base = '/s/%s/cuenta' % token
+        start = app.reception_now().replace(microsecond=0)
+        expires = start + timedelta(minutes=15)
+        with patch.object(app, 'reception_now', return_value=start):
+            opened = self.post_form(base, {'last4': '0017'})
+        self.assertEqual(opened['status'],200)
+        self.assertIn('data-portal-expires="%s"' % expires.isoformat(), opened['body'])
+        self.assertIn('15:00', opened['body'])
+        cookie = opened['cookie'].split(';')[0]
+        with patch.object(app, 'reception_now', return_value=start + timedelta(minutes=10)):
+            refreshed = self.get(base, cookie)
+            self.assertIn('data-portal-expires="%s"' % expires.isoformat(), refreshed['body'])
+            self.assertIn('05:00', refreshed['body'])
+        with patch.object(app, 'reception_now', return_value=expires):
+            expired = self.get(base, cookie)
+            self.assertIn('Tu acceso venció', expired['body'])
+            self.assertNotIn('data-portal-countdown', expired['body'])
+            self.assertNotIn('$35,00', expired['body'])
+            self.assertEqual(self.get(base+'/recibo/%d.pdf' % pid, cookie)['status'],403)
+            self.assertEqual(self.get(base+'/estado.pdf', cookie)['status'],403)
 
     def test_permissions_by_action_rate_limit_and_admin_only_settings(self):
         cookie, csrf, post, order, token, pid = self.setup_portal()

@@ -27,21 +27,23 @@ function mountPublicIdentity(panel, {manual = false} = {}) {
     };
     const fill = (value, index) => {
       const digits = value.replace(/[^0-9]/g, '').slice(0, 4);
-      if (!digits) return;
+      if (!digits) return false;
       const start = digits.length === 4 ? 0 : index;
       [...digits].slice(0, 4 - start).forEach((digit, offset) => {
         slots[start + offset].value = digit;
       });
       sync();
       slots[Math.min(start + digits.length, 3)].focus();
+      return true;
     };
     slots.forEach((slot, index) => {
       slot.addEventListener('focus', () => slot.select());
-      slot.addEventListener('input', () => {
+      slot.addEventListener('input', event => {
         const value = slot.value;
         slot.value = '';
-        fill(value, index);
+        if (fill(value, index)) return;
         sync();
+        if (event.inputType === 'deleteContentBackward' && index > 0) slots[index - 1].focus();
       });
       slot.addEventListener('paste', event => {
         event.preventDefault();
@@ -69,6 +71,7 @@ function mountPublicIdentity(panel, {manual = false} = {}) {
     });
   }
   if (manual) return;
+  form.dataset.identityForm = '';
   form.addEventListener('submit', event => {
     if (panel.dataset.busy) {
       event.preventDefault();
@@ -87,3 +90,38 @@ function mountPublicIdentity(panel, {manual = false} = {}) {
 
 window.mountPublicIdentity = mountPublicIdentity;
 document.querySelectorAll('[data-public-identity]').forEach(panel => mountPublicIdentity(panel));
+
+
+if (window.isSecureContext && location.protocol === 'https:') {
+  document.querySelectorAll('[data-secure-connection]').forEach(badge => { badge.hidden = false; });
+}
+
+const portalSession = document.querySelector('[data-portal-expires]');
+if (portalSession) {
+  const counter = portalSession.querySelector('[data-portal-countdown]');
+  const duration = Date.parse(portalSession.dataset.portalExpires) - Date.parse(portalSession.dataset.portalChecked);
+  const startedAt = Date.now() - performance.now();
+  let interval;
+  function updateExpiry() {
+    // Distinguish browser sleep from a local wall-clock change. The server still decides access to every document.
+    const elapsed = Math.max(performance.now(), Date.now() - startedAt);
+    const seconds = Math.max(0, Math.ceil((duration - elapsed) / 1000));
+    if (!seconds || !Number.isFinite(seconds)) {
+      clearInterval(interval);
+      portalSession.replaceChildren();
+      portalSession.hidden = true;
+      document.querySelector('[data-portal-expired]').hidden = false;
+      location.replace(portalSession.dataset.portalReturn);
+      return;
+    }
+    const display = String(Math.floor(seconds / 60)).padStart(2, '0') + ':' + String(seconds % 60).padStart(2, '0');
+    if (counter.textContent !== display) {
+      counter.dateTime = 'PT' + seconds + 'S';
+      counter.textContent = display;
+    }
+  }
+  interval = setInterval(updateExpiry, 250);
+  window.addEventListener('pageshow', updateExpiry);
+  document.addEventListener('visibilitychange', updateExpiry);
+  updateExpiry();
+}

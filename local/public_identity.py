@@ -46,19 +46,25 @@ def _icon(name):
             'stroke-linecap="round" stroke-linejoin="round"><path d="%s"/></svg>') % ICONS[name]
 
 
+def connection_badge():
+    return '<span class="public-identity-connection" data-secure-connection hidden>%s Conexión segura</span>' % _icon('shield')
+
+
 def heading(step=1, total=2):
     progress = ''.join('<i%s></i>' % (' class="active"' if pos <= step else '') for pos in range(1, total + 1))
-    return ('<div class="public-identity-heading"><span class="public-identity-shield">%s</span><div><strong>Comprueba tu identidad</strong>'
-            '<small>Paso %d de %d</small></div><span class="public-identity-progress" aria-hidden="true">%s</span></div>') % (_icon('shield'), step, total, progress)
+    title = 'Acceso autorizado' if step == total and total > 1 else 'Comprueba tu identidad'
+    return ('<div class="public-identity-heading"><span class="public-identity-shield">%s</span><div><strong>%s</strong>'
+            '<small>Paso %d de %d</small></div><span class="public-identity-progress" aria-hidden="true">%s</span></div>') % (_icon('shield'), title, step, total, progress)
 
 
-def fields(document_kind='', *, field='last4', total=2, full=False):
+def fields(document_kind='', *, field='last4', total=2, full=False, connection=True):
     label = ('Ingresa el número de tu ' + LABELS.get(document_kind, 'identificación registrada')
              if full else instruction(document_kind))
     attributes = 'maxlength="20"' if full else 'inputmode="numeric" pattern="[0-9]{4}" minlength="4" maxlength="4"'
     if full and document_kind in ('cedula', 'ruc'):
         attributes += ' inputmode="numeric"'
     return (f'<div class="public-identity-panel" data-public-identity>{heading(total=total)}'
+            f'{connection_badge() if connection else ""}'
             f'<label>{_icon(document_kind if document_kind in ("ruc", "pasaporte") else "id")}<span>{html.escape(label)}</span>'
             f'<input class="public-identity-value" name="{html.escape(field, quote=True)}" {attributes} autocomplete="off" spellcheck="false" required></label>'
             '<p class="public-identity-status" role="status"></p></div>')

@@ -1603,12 +1603,16 @@ class Handler(BaseHTTPRequestHandler):
                 jar=SimpleCookie()
                 try:jar.load(self.headers.get('Cookie',''))
                 except Exception:pass
-                now=reception_now();ok=client_portal.session_ok(c,jar[client_portal.COOKIE].value if client_portal.COOKIE in jar else '',oid,token,now)
+                now=reception_now();expiry=client_portal.session_expiry(c,jar[client_portal.COOKIE].value if client_portal.COOKIE in jar else '',oid,token,now)
                 if not portal_route[2]:
-                    if not ok:return self.reply(200,client_portal.form_page(token,code,document_kind=client_portal.document_kind(c,oid)),'text/html; charset=utf-8')
+                    if not expiry:
+                        expired=client_portal.COOKIE in jar or parse_qs(urlsplit(self.path).query).get('sesion')==['vencida']
+                        notice='Tu acceso venció. Vuelve a comprobar tu identidad.' if expired else ''
+                        return self.reply(200,client_portal.form_page(token,code,notice,'error' if expired else 'info',
+                                                                    document_kind=client_portal.document_kind(c,oid)),'text/html; charset=utf-8')
                     audit(c,None,'portal_view',oid);c.commit()
-                    return self.reply(200,client_portal.account_page(token,client_portal.data(c,oid,now),cfg),'text/html; charset=utf-8')
-                if not ok:return self.reply(403,client_portal.form_page(token,code,'Tu acceso venció. Confirma de nuevo los últimos cuatro dígitos.','error',document_kind=client_portal.document_kind(c,oid)),'text/html; charset=utf-8')
+                    return self.reply(200,client_portal.account_page(token,client_portal.data(c,oid,now),cfg,expires_at=expiry),'text/html; charset=utf-8')
+                if not expiry:return self.reply(403,client_portal.form_page(token,code,'Tu acceso venció. Confirma de nuevo los últimos cuatro dígitos.','error',document_kind=client_portal.document_kind(c,oid)),'text/html; charset=utf-8')
                 doc=portal_route[2]
                 import vouchers
                 if doc.startswith('recibo/'):
@@ -3506,13 +3510,14 @@ class Handler(BaseHTTPRequestHandler):
                     try:jar.load(self.headers.get('Cookie',''))
                     except Exception:pass
                     now=reception_now()
-                    if not client_portal.session_ok(c,jar[client_portal.COOKIE].value if client_portal.COOKIE in jar else '',oid,token,now):
+                    expiry=client_portal.session_expiry(c,jar[client_portal.COOKIE].value if client_portal.COOKIE in jar else '',oid,token,now)
+                    if not expiry:
                         return self.reply(403,client_portal.form_page(token,code,'Tu acceso venció. Confirma de nuevo los últimos cuatro dígitos.','error',document_kind=client_portal.document_kind(c,oid)),'text/html; charset=utf-8')
                     if limited(c,'portal-cancel:'+digest(token),3,3600):c.commit();return self.reply(429,client_portal.form_page(token,code,'Demasiadas solicitudes. Comunícate con PC-DOCTOR S.A.','error',document_kind=client_portal.document_kind(c,oid)),'text/html; charset=utf-8')
                     try:order_cancellations.request(c,oid,{'reason':form.get('reason',''),'detail':form.get('detail','')},None,now,'portal');audit(c,None,'portal_cancel_requested',oid);c.commit()
                     except order_cancellations.CancelError as error:
-                        c.rollback();return self.reply(error.status,client_portal.account_page(token,client_portal.data(c,oid,now),cfg).replace('<main class="portal">','<main class="portal"><p class="portal-notice" data-tone="error" role="alert">'+html.escape(str(error))+'</p>',1),'text/html; charset=utf-8')
-                    return self.reply(200,client_portal.account_page(token,client_portal.data(c,oid,now),cfg).replace('<main class="portal">','<main class="portal"><p class="portal-notice" role="status">Recibimos su solicitud de cancelación. PC-DOCTOR la revisará y se la confirmará.</p>',1),'text/html; charset=utf-8')
+                        c.rollback();return self.reply(error.status,client_portal.account_page(token,client_portal.data(c,oid,now),cfg,expires_at=expiry).replace('<main class="portal">','<main class="portal"><p class="portal-notice" data-tone="error" role="alert">'+html.escape(str(error))+'</p>',1),'text/html; charset=utf-8')
+                    return self.reply(200,client_portal.account_page(token,client_portal.data(c,oid,now),cfg,expires_at=expiry).replace('<main class="portal">','<main class="portal"><p class="portal-notice" role="status">Recibimos su solicitud de cancelación. PC-DOCTOR la revisará y se la confirmará.</p>',1),'text/html; charset=utf-8')
                 if portal_post[2]:
                     jar=SimpleCookie()
                     try:jar.load(self.headers.get('Cookie',''))
@@ -3529,7 +3534,10 @@ class Handler(BaseHTTPRequestHandler):
                     return self.reply(400,client_portal.form_page(token,code,text,'error',document_kind=client_portal.document_kind(c,oid)),'text/html; charset=utf-8')
                 now=reception_now();session=client_portal.open_session(c,oid,token,now,self.client_address[0]);audit(c,None,'portal_verified',oid);c.commit()
                 cookie='%s=%s; Path=%s; HttpOnly; SameSite=Strict; Max-Age=%d%s'%(client_portal.COOKIE,session,path_cookie,client_portal.MINUTES*60,secure)
-                return self.reply(200,public_identity.confirm(client_portal.account_page(token,client_portal.data(c,oid,now),cfg)),'text/html; charset=utf-8',cookie=cookie)
+                expiry=client_portal.session_expiry(c,session,oid,token,now)
+                if not expiry:
+                    return self.reply(503,client_portal.unavailable_page(),'text/html; charset=utf-8')
+                return self.reply(200,client_portal.account_page(token,client_portal.data(c,oid,now),cfg,expires_at=expiry,verified=True),'text/html; charset=utf-8',cookie=cookie)
         part_cancel=re.fullmatch(r'/s/([A-Za-z0-9_-]{1,64})/repuestos/([0-9]{1,9})/cancelar',urlsplit(self.path).path)
         if part_cancel:
             import order_tracking,order_part_requests,part_cancellations

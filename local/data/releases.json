@@ -8,6 +8,26 @@
   },
   "releases": [
     {
+      "version": "1.5.361",
+      "date": "2026-11-26T23:50:18-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Secure Customer Portal Enterprise Premium 2.0",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Secure Customer Portal Enterprise Premium 2.0 unifica el verificador, incorpora un encabezado compacto para la cuenta y muestra el tiempo restante de sesión."
+        ],
+        "fixes": [],
+        "security": [
+          "El portal vincula el contador al vencimiento real de la sesión. Al vencer, retira el contenido protegido y vuelve a solicitar la verificación."
+        ],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Actualización local solicitada tras las pruebas"
+    },
+    {
       "version": "1.5.359",
       "date": "2026-11-26T23:30:34-05:00",
       "type": "patch",
