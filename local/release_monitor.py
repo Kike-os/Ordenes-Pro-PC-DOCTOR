@@ -107,6 +107,27 @@ COMPONENTS = {'database': 'Base de datos', 'auth': 'Autenticación y seguridad',
               'errors': 'Backend y API', 'migrations': 'Migraciones', 'frontend': 'Frontend', 'invoicing': 'Facturación electrónica', 'whatsapp': 'WhatsApp Business'}
 
 
+def compare_runs(history, version):
+    """Compare the latest run with the preceding run of the same version."""
+    current = [entry for entry in history if entry['version'] == version][-2:]
+    if len(current) < 2:
+        return {'available': False, 'changes': []}
+    before, after = current
+    def statuses(run):
+        return {result['code']: (result['name'], result.get('status', 'ok' if result['ok'] else 'error'))
+                for result in run['results']}
+    old, new = statuses(before), statuses(after)
+    changes = []
+    for code in sorted(old.keys() | new.keys()):
+        previous = old.get(code)
+        latest = new.get(code)
+        from_status = previous[1] if previous else 'absent'
+        to_status = latest[1] if latest else 'absent'
+        if from_status != to_status:
+            changes.append({'code': code, 'name': (latest or previous)[0], 'before': from_status, 'after': to_status})
+    return {'available': True, 'from_at': before['at'], 'to_at': after['at'], 'changes': changes}
+
+
 def details(c, now):
     """Datos ampliados de la ventana para administración: cada comprobación con su detalle, incidencias con resolución y tareas programadas."""
     import stability
@@ -128,7 +149,7 @@ def details(c, now):
     missed = bool(last_cron) and last_cron < (now - timedelta(hours=stability.CRON_GRACE_HOURS)).isoformat(timespec='seconds')
     runs = [{'at': entry['at'], 'version': entry['version'], 'source': entry.get('source', ''), 'by': entry.get('by', ''), 'passed': entry['passed'], 'total': entry['total'],
              'critical': entry['critical_failures'], 'warnings': entry['warnings'], 'ms': entry.get('ms')} for entry in history[-12:][::-1]]
-    return dict(info, detail_tests=tests, detail_incidents=incidents, runs=runs, last_cron=last_cron, cron_missed=missed,
+    return dict(info, comparison=compare_runs(history, info['version']), detail_tests=tests, detail_incidents=incidents, runs=runs, last_cron=last_cron, cron_missed=missed,
                 last_source=last.get('source', '') if last else '', last_by=last.get('by', '') if last else '', last_ms=last.get('ms') if last else None,
                 schedule='01:00, 09:00 y 17:00 (hora de Ecuador)', report=report(info, tests, incidents, last_cron, missed))
 

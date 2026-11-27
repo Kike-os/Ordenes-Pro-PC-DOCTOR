@@ -1758,6 +1758,22 @@ class Handler(BaseHTTPRequestHandler):
                 else:return self.reply(400,{'error':'Vista de agenda inválida.'})
                 rows=appointments.admin_rows(c,appointments.stamp(start),appointments.stamp(end))
                 return self.reply(200,{'rows':rows,'view':view,'date':day.isoformat(),'settings':appointments.settings(c) if user['role']=='administrador' else None})
+            lab_order=re.fullmatch(r'/api/orders/([0-9]{1,9})/adi-lab',path)
+            if lab_order or path=='/api/adi/lab/knowledge':
+                import adi_lab
+                query=parse_qs(urlsplit(self.path).query)
+                category=query.get('category',[''])[0]
+                term=query.get('q',[''])[0]
+                try:
+                    adi_lab.require_staff(user)
+                    if limited(c,'adi-lab-read:'+str(user['id']),60,60):
+                        return self.reply(429,{'error':'Demasiadas consultas de laboratorio. Espera un minuto.'})
+                    if lab_order:
+                        return self.reply(200,adi_lab.draft(c,int(lab_order[1]),user,category,term))
+                    rows=adi_lab.search(c,user,term,category,query.get('review',[''])[0]=='1')
+                    return self.reply(200,{'rows':rows})
+                except adi_lab.LabError as error:
+                    return self.reply(error.status,{'error':str(error)})
             if path == '/api/adi/status':
                 # Estado real de ADI para la redacción y los canales; no expone claves.
                 if user['role'] not in ('administrador','tecnico'):return self.reply(403,{'error':'Acceso no permitido.'})
@@ -1777,10 +1793,10 @@ class Handler(BaseHTTPRequestHandler):
             if path == '/api/adi/admin':
                 if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede usar la asistente administrativa.'})
                 import adi_ai
-                import adi_exec
+                import adi_exec,adi_lab
                 return self.reply(200,{'enabled':bool(adi_ai.openai_key()),'message':'ADI responde consultas operativas desde datos autorizados.','live':adi.snapshot(c,reception_now()),'service':adi_exec.service(c,reception_now()),
                                        'user':{'first_name':(user['name'] or '').split(' ')[0]},'history_ready':adi_exec.installed(c),
-                                       'extra':{'transfers_pending':c.execute("SELECT COUNT(*) FROM bank_transfers WHERE status='pendiente'").fetchone()[0]}})
+                                       'extra':{'lab_installed':adi_lab.installed(c),'transfers_pending':c.execute("SELECT COUNT(*) FROM bank_transfers WHERE status='pendiente'").fetchone()[0]}})
             if path == '/api/portal/settings':
                 # Portal seguro del cliente: qué puede ver y descargar el cliente (permisos independientes por acción). Solo administración.
                 if user['role']!='administrador':return self.reply(403,{'error':'Solo administración configura el portal del cliente.'})
@@ -5109,6 +5125,35 @@ class Handler(BaseHTTPRequestHandler):
                         return self.reply(200,{'ok':True,'mime':'audio/mpeg','audio':adi_voice.encode(audio),'seconds':round(seconds,1)})
                     except adi_voice.VoiceError as error:
                         print('adi-voice',error.kind,flush=True);return self.reply(error.status,{'error':str(error),'fallback':True})
+                lab_order=re.fullmatch(r'/api/orders/([0-9]{1,9})/adi-lab',path)
+                lab_knowledge=re.fullmatch(r'/api/adi/lab/knowledge(?:/([0-9]{1,9}))?',path)
+                if lab_order or lab_knowledge:
+                    import adi_lab
+                    try:
+                        adi_lab.require_staff(user)
+                        if limited(c,'adi-lab:'+str(user['id']),30,60):
+                            return self.reply(429,{'error':'Demasiadas solicitudes de laboratorio. Espera un minuto.'})
+                        now_lab=reception_now()
+                        if lab_order:
+                            oid=int(lab_order[1])
+                            if data.get('action')=='firmware':
+                                adi_lab.order_context(c,oid)
+                                return self.reply(200,adi_lab.firmware_readiness(data,user))
+                            if data.get('action')!='measure':
+                                raise adi_lab.LabError('Acción de laboratorio no válida.')
+                            mid,created=adi_lab.measure(c,oid,data,user,now_lab)
+                            if created:audit(c,user['id'],'adi_lab_measurement',mid)
+                            return self.reply(201 if created else 200,{'id':mid,'created':created})
+                        if lab_knowledge[1]:
+                            did=int(lab_knowledge[1])
+                            adi_lab.review(c,did,data,user,now_lab)
+                            audit(c,user['id'],'adi_lab_knowledge_reviewed',did)
+                            return self.reply(200,{'id':did})
+                        did=adi_lab.submit(c,data,user,now_lab)
+                        audit(c,user['id'],'adi_lab_knowledge_submitted',did)
+                        return self.reply(201,{'id':did})
+                    except adi_lab.LabError as error:
+                        return self.reply(error.status,{'error':str(error)})
                 if path == '/api/adi/admin':
                     if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede usar la asistente administrativa.'})
                     import adi_exec

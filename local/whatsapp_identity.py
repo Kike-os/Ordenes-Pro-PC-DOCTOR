@@ -246,6 +246,27 @@ def facts(c, order_id):
     return '\n'.join(lines)
 
 
+TRACKING_REQUEST = re.compile(r'^(?:enlace de seguimiento|link de seguimiento|enlace del portal)[.! ]*$', re.I)
+
+
+def _tracking_link(c, session, sender, now):
+    import client_portal
+    import order_tracking
+    import public_identity
+    order = _order(c, session['order_id'])
+    if not order or session['recipient_kind'] != 'titular' or wa.number_for(order['phone'] or '') != sender:
+        return _reply('El enlace de seguimiento debe solicitarlo el titular verificado. Puedes escribir ASESOR para recibir ayuda.')
+    tracking = order_tracking.active(c, order['id'])
+    if not tracking['active']:
+        return _reply('La orden todavía no tiene un enlace de seguimiento activo. Escribe ASESOR para solicitar ayuda.')
+    text = 'Este es el enlace oficial de seguimiento de tu orden. Guárdalo en privado.\n\n' + tracking['url']
+    if client_portal.installed(c) and client_portal.settings(c)['enabled']:
+        kind = client_portal.document_kind(c, order['id'])
+        text += '\n\nSi abres el estado de cuenta, el portal comprobará tu identidad. ' + public_identity.instruction(kind)
+    c.execute('UPDATE wa_identity_sessions SET last_activity=? WHERE id=?', (_iso(now), session['id']))
+    return _reply(text, log_answer='[ADI compartió el enlace de seguimiento con el titular verificado]')
+
+
 UPDATE_REQUEST = re.compile(r'^(solicitar|solicitar actualizacion|pedir actualizacion|quiero (una )?actualizacion|que me informen)[.! ]*$', re.I)
 
 
@@ -383,9 +404,10 @@ def respond(c, conv, sender, text, now, env=None):
     raw = re.sub(r'\s+', ' ', str(text or '')).strip()
     q = fold(raw)
     code = find_order_code(raw)
+    wants_link = bool(TRACKING_REQUEST.fullmatch(q))
     if not installed(c):
         # Sin las tablas no hay verificación posible: las consultas de órdenes no revelan nada y el resto sigue con ADI.
-        return _reply(DENIED) if code or ORDER_INTENT.search(q) else None
+        return _reply(DENIED) if code or wants_link or ORDER_INTENT.search(q) else None
     state = _state(c, conv)
     if state and state['updated_at'] < _ago(now, minutes=30):  # una verificación a medias no queda abierta indefinidamente
         _clear_state(c, conv)
@@ -426,7 +448,7 @@ def respond(c, conv, sender, text, now, env=None):
         if CANCEL.match(q) or NO.match(q):
             _clear_state(c, conv)
             return _reply('De acuerdo. Si necesitas algo más, aquí estoy.')
-        if ORDER_INTENT.search(q):
+        if wants_link or ORDER_INTENT.search(q):
             return _reply('Por favor, indícame tu número de orden de servicio tal como aparece en tu comprobante (por ejemplo, PCD-…). Escribe CANCELAR para salir.')
         _clear_state(c, conv)
         return None
@@ -438,6 +460,8 @@ def respond(c, conv, sender, text, now, env=None):
             _end_session(c, session['id'], 'cerrada_por_cliente', now)
             event(c, 'sesion_cerrada', session['order_id'], conv, 'Cerrada por el cliente.', now)
             return _reply('Cerré la sesión verificada. Para volver a consultar tu orden tendrás que verificar tu identidad de nuevo.')
+        if wants_link:
+            return _tracking_link(c, session, sender, now)
         if code or ORDER_INTENT.search(q):
             c.execute('UPDATE wa_identity_sessions SET last_activity=? WHERE id=?', (_iso(now), session['id']))
             order_code = c.execute('SELECT code FROM orders WHERE id=?', (session['order_id'],)).fetchone()
@@ -446,7 +470,7 @@ def respond(c, conv, sender, text, now, env=None):
         return None
     if code:
         return _lookup(c, conv, sender, code, now, env)
-    if ORDER_INTENT.search(q):
+    if wants_link or ORDER_INTENT.search(q):
         _set_state(c, conv, 'esperando_orden', now)
         return _reply('¡Hola! Bienvenido a PC-DOCTOR S.A. 👋\n\nCon gusto te ayudaré a consultar el estado de tu equipo.\n\n'
                       '🔐 Por seguridad, primero necesito verificar que eres el titular de la orden o una persona autorizada.\n\n'

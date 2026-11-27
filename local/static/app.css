@@ -14557,3 +14557,14 @@ body:has(.ax) #adi-widget{display:none}
 .pf-wa-card.is-sending .pf-wa-status::before{content:"";display:inline-block;width:.85em;height:.85em;margin-inline-end:.55em;border:2px solid currentColor;border-inline-end-color:transparent;border-radius:50%;vertical-align:middle;animation:pf-wa-spin .8s linear infinite}
 @keyframes pf-wa-spin{to{transform:rotate(360deg)}}
 @media(prefers-reduced-motion:reduce){.pf-wa-card.is-sending .pf-wa-status::before{animation:none}}
+
+.adi-lab-dialog{width:min(760px,calc(100vw - 24px));max-height:calc(100dvh - 24px);overflow:auto}
+.adi-lab-body,.adi-lab-results{display:grid;gap:.65rem;min-width:0}
+.adi-lab-dialog summary{cursor:pointer;font-weight:700}
+.adi-lab-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,205px),1fr));gap:.65rem;margin-top:.7rem;align-items:end}
+.adi-lab-form label{display:grid;gap:.3rem;min-width:0}
+.adi-lab-form input,.adi-lab-form textarea,.adi-lab-form select{box-sizing:border-box;width:100%;min-width:0}
+.adi-lab-form label:has(textarea){grid-column:1/-1}
+.adi-lab-document{overflow-wrap:anywhere}
+.adi-lab-document p:last-of-type{white-space:pre-wrap}
+.adi-lab-actions{display:flex;flex-wrap:wrap;gap:.5rem}

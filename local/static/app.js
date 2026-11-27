@@ -3369,6 +3369,20 @@ function rmPaint(dialog){const info=stabilityInfo,detail=rmDetail&&info&&rmDetai
   block('tests','Resultados del diagnóstico',info.passed+'/'+info.total,info.passed<info.total,box=>{const grid=make('ul','rm-checks');for(const t of tests){const li=make('li'),st=t.status||(t.ok?'ok':'error');li.dataset.status=st;
    const top=make('div','rm-check-top');top.append(icon(st==='ok'?'ok':st==='error'?'err':st==='warning'?'warn':'skip'),make('strong',undefined,t.name));if(t.ms!=null)top.append(make('small','rm-ms',(t.ms>=1000?(t.ms/1000).toFixed(1).replace('.',','):t.ms)+(t.ms>=1000?' s':' ms')));li.append(top);
    li.append(make('small','rm-check-meta',(t.component?t.component+' · ':'')+(t.critical?'crítica':(t.severity||'no crítica'))+(t.recovered?' · recuperada':'')));if(t.detail)li.append(make('p','rm-check-detail',t.detail));grid.append(li);}box.append(grid);});}
+ if(detail?.comparison){const comparison=detail.comparison;
+  block('comparison','Cambios entre verificaciones',comparison.changes.length,false,box=>{
+   if(!comparison.available){box.append(make('p','rm-empty','Se requieren dos verificaciones de esta versión.'));return;}
+   box.append(make('p','rm-check-meta',stabilityWhen(comparison.from_at)+' → '+stabilityWhen(comparison.to_at)));
+   if(!comparison.changes.length){box.append(make('p','rm-empty','Los resultados se mantuvieron.'));return;}
+   const labels={ok:'Correcta',error:'Fallida',warning:'Advertencia',not_checked:'Sin comprobar',absent:'Ausente'};
+   const rows=make('ul','rm-checks');
+   for(const change of comparison.changes){
+    const line=make('li');
+    line.append(make('strong',undefined,change.name),make('p',undefined,(labels[change.before]||change.before)+' → '+(labels[change.after]||change.after)));rows.append(line);
+   }
+   box.append(rows);
+  });
+ }
  const incidents=detail?detail.detail_incidents:(info?.incidents||[]);
  block('incidents','Registro de incidencias',incidents.length,incidents.some(i=>i.critical||i.severity==='crítica'&&i.status!=='resuelta'),box=>{if(!incidents.length){box.append(make('p','rm-empty',info?.last_check?'Ninguna incidencia registrada.':'Sin resultados todavía.'));return;}
   const list=make('ul','rm-incidents');for(const i of (detail?incidents:incidents.slice().reverse())){const li=make('li');li.dataset.severity=i.severity||(i.critical?'crítica':'media');
@@ -4360,6 +4374,12 @@ function renderOrderDetail(root,order){
  if(admin()){const edit=button('Gestión técnica',()=>openOrderEditor(order.id));edit.title='Estado, técnico, prioridad, entrega e informes de este equipo';edit.classList.add('order-document-action');edit.prepend(orderActionIcon('edit'));actions.append(edit);}const adiCard=['administrador','tecnico'].includes(currentUser?.role)?adiOrderPanel(order,id=>rpActions.part(id)):null;if(order.status==='entregado'){const again=button('Reingresar equipo',()=>reenterDevice(order.device_id));again.classList.add('order-document-action');again.title='Registrar una nueva orden con este mismo equipo. Esta orden no se reabre.';again.prepend(systemIcon(REENTRY_ICON));actions.append(again);}
  const reentry=reentryNote(order);const cancelBox=el('section',undefined,'oc-panel');cancelBox.hidden=true;root.append(head,progressBox,...(reentry?[reentry]:[]),actions,cancelBox);if(adiCard)root.append(adiCard);
  orderCancellationPanel(order,cancelBox);
+ if(['administrador','tecnico'].includes(currentUser?.role)){
+  const lab=button('Laboratorio ADI',()=>adiLabDialog(order),'order-document-action secondary');
+  lab.prepend(systemIcon('M4 4h16v16H4z M8 12h2l2-4 2 8 2-4h2'));
+  actions.append(lab);
+ }
+
  if(order.status!=='entregado'&&['administrador','tecnico'].includes(currentUser?.role)){const cancelBtn=button('Cancelar reparación',async()=>{let info;try{info=await api('/api/orders/'+order.id+'/cancellation');}catch(error){toast(error.message,'error');return;}
    if(!info.installed){toast('Falta aplicar la migración 127 en Sistema → Migraciones.','warning');return;}if(info.cancellation){cancelBox.scrollIntoView({behavior:'smooth',block:'start'});return;}
    cancelOrderDialog(order,info,()=>orderCancellationPanel(order,cancelBox));});cancelBtn.classList.add('order-document-action','oc-cancel-action');cancelBtn.prepend(systemIcon(OC_ICON.x));actions.append(cancelBtn);}
@@ -7887,6 +7907,8 @@ async function renderAdminAdi(){
    card('Equipos listos',ready,ic.ready,'#orders?status=listo','Para entregar',ready?'ok':''),card('Atención pendiente',waiting,ic.wait,'#orders?active=1','Clientes, presupuestos, chats y citas',waiting?'warn':''),
    card('Clientes',data.clients,ic.clients,'#clients',data.clients_review?data.clients_review+' por revisar':'Registrados'),card('Citas de hoy',data.appointments_today,ic.cal,'#appointments',data.next_appointment||'Sin más citas hoy'),
    card('Entregas vencidas',data.overdue,axI.alert,'#orders?active=1','Fecha estimada superada',data.overdue?'bad':''),card('Pagos por validar',x.transfers_pending??'—',axI.wallet,'#invoicing?tab=pagos',x.transfers_pending==null?'Sin dato':'Transferencias pendientes',x.transfers_pending?'warn':''));
+  opsGrid.append(card('Laboratorio ADI',x.lab_installed?'Habilitado':'Pendiente',ic.work,'#orders?active=1',
+   x.lab_installed?'Mediciones y conocimiento desde una orden':'Requiere migración 131',x.lab_installed?'ok':'warn'));
   opsGrid.removeAttribute('aria-busy');lastOk=Date.now();failures=0;paintConn();};
  const refresh=async()=>{if(document.hidden||!shell.isConnected||syncing)return;syncing=true;paintConn();try{const d=await api('/api/adi/admin');failures=0;paintLive(d.live,d.extra);paintService(d.service);historyReady=d.history_ready!==false;}catch(error){failures++;lastError=error instanceof TypeError?'red':'service';}finally{syncing=false;paintConn();}};
  // ── ADI Intelligence Insights
@@ -10717,3 +10739,123 @@ async function renderWhatsAppSettings(pane){
   {const c=card('Errores técnicos y soluciones','M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3 M12 17h.01'),det=el('details',undefined,'wab-tpls'),sum=el('summary','Códigos de error de Meta ('+data.errors.length+')');det.append(sum);const ul=el('ul');
    for(const e of data.errors){const li=el('li');li.dataset.state=e.permanent?'warn':'ok';li.append(el('strong',e.code),el('span',(e.permanent?'No se reintenta solo':'Reintento automático')+' · '+e.text,'wan-soft'));ul.append(li);}det.append(ul);c.append(det);}};
  await load();}
+
+function adiLabDialog(order) {
+ const dialog=smallDialog('Laboratorio ADI · '+order.code);
+ dialog.classList.add('adi-lab-dialog');
+ const root=el('div',undefined,'adi-lab-body'), output=el('div',undefined,'adi-lab-results');
+ const status=el('p',undefined,'message'); status.setAttribute('role','status');
+ const endpoint='/api/orders/'+order.id+'/adi-lab', knowledge='/api/adi/lab/knowledge';
+ dialog.append(root,status,output);
+ const categories=[['alimentacion','Alimentación y carga'],['post','Encendido, POST y vídeo'],
+  ['firmware','BIOS, UEFI y firmware'],['impresoras','Impresoras'],['consolas','Consolas']];
+ function controls(title, fields, label, submit) {
+  const section=el('details',undefined,'workspace-section');
+  section.append(el('summary',title));
+  const form=el('form',undefined,'adi-lab-form');
+  const inputs=new Map();
+  for(const [key,caption,options] of fields){
+   const wrap=el('label'),field=el(Array.isArray(options)?'select':options==='textarea'?'textarea':'input');
+   if(Array.isArray(options)){for(const [value,text] of options)field.add(new Option(text,value));}
+   if(options==='date')field.type='date';
+   field.maxLength=key==='content'?6000:400;
+   field.name=key;field.required=!['q','supersedes'].includes(key);
+   wrap.append(el('span',caption),field);form.append(wrap);inputs.set(key,field);
+  }
+  const action=el('button',label,'primary');action.type='submit';form.append(action);
+  form.addEventListener('submit',async event=>{
+   event.preventDefault();if(action.disabled)return;action.disabled=true;status.textContent='';
+   try{await submit(Object.fromEntries([...inputs].map(([key,field])=>[key,field.value])),form);}
+   catch(error){status.textContent=error.message;}
+   finally{action.disabled=false;}
+  });
+  section.append(form);root.append(section);return section;
+ }
+ const para=(text)=>el('p',text);
+ function documents(rows,review=false){
+  const nodes=[];
+  for(const row of rows){
+   const card=el('article',undefined,'workspace-section adi-lab-document');
+   card.append(el('h4',row.title),para(row.source+' · '+row.source_date+' · '+row.version),para(row.content));
+   if(!review){
+    card.append(button('Proponer corrección',()=>{
+     proposal.open=true;
+     for(const [key,value] of Object.entries({...row,supersedes:String(row.id),version:''})){
+      const field=proposal.querySelector('[name="'+key+'"]');
+      if(field)field.value=value;
+     }
+     proposal.querySelector('[name=version]').focus();
+    },'secondary'));
+   }
+   if(review){
+    const note=el('textarea');note.setAttribute('aria-label','Motivo de revisión');note.maxLength=600;
+    const actions=el('div',undefined,'adi-lab-actions');
+    for(const [value,title] of [['aprobado','Aprobar'],['descartado','Descartar']]){
+     const action=button(title,async()=>{
+      if(!note.value.trim()){note.focus();return;}
+      for(const item of actions.children)item.disabled=true;
+      try{await api(knowledge+'/'+row.id,{status:value,review_note:note.value});card.remove();status.textContent='Revisión registrada.';}
+      catch(error){status.textContent=error.message;for(const item of actions.children)item.disabled=false;}
+     },'secondary');actions.append(action);
+    }
+    card.append(note,actions);
+   }
+   nodes.push(card);
+  }
+  return nodes.length?nodes:[para('No hay documentos para esta consulta.')];
+ }
+ function renderDraft(snapshot){
+  output.replaceChildren(el('h3','Borrador de diagnóstico · '+snapshot.order.code),
+   el('h4','Historial del equipo'),...(snapshot.prior_orders.length?snapshot.prior_orders.map(item=>para((item.code||'Orden anterior')+' · '+item.status)):[para('Sin órdenes anteriores registradas para este equipo.')]),
+   el('h4','Hallazgos registrados'),...(snapshot.measurements.length?snapshot.measurements.map(m=>para(m.point+' · '+m.value+' '+m.unit+' · '+m.conditions)):[para('Sin mediciones registradas.')]),
+   el('h4','Comprobaciones pendientes'),...(snapshot.checks.length?snapshot.checks.map(para):[para('Selecciona una categoría para consultar la lista de comprobación.')]),
+   el('h4','Fuentes aprobadas'),...documents(snapshot.sources));
+  const copy=button('Copiar borrador',async()=>{
+   try{await navigator.clipboard.writeText(output.innerText.replace(/\nCopiar borrador$/,''));status.textContent='Borrador copiado.';}
+   catch{status.textContent='El navegador no pudo copiar el borrador.';}
+  },'secondary');
+  output.append(copy);
+ }
+ const diagnostic=controls('Diagnóstico y fuentes aprobadas', [['category','Categoría',categories],['q','Buscar texto en las fuentes']],
+  'Preparar borrador',async data=>renderDraft(await api(endpoint+'?'+new URLSearchParams(data))));
+ diagnostic.open=true;
+ let measurementKey=crypto.randomUUID?.()||String(Date.now())+'-'+Math.random();
+ controls('Registrar medición',[['point','Punto de medición'],['value','Valor'],['unit','Unidad',['V','mV','A','mA','Ω','kΩ','MΩ','MHz','°C','W'].map(x=>[x,x])],['conditions','Condiciones']],
+  'Guardar medición',async (data,form)=>{
+   await api(endpoint,{...data,action:'measure',request_key:measurementKey});
+   measurementKey=crypto.randomUUID?.()||String(Date.now())+'-'+Math.random();form.reset();
+   status.textContent='Medición registrada.';renderDraft(await api(endpoint));
+  });
+ const firmware=controls('Revisión previa de BIOS y UEFI',[['model','Modelo exacto'],['board','Código de placa'],['revision','Revisión'],['chip','Identificación del chip'],
+   ['voltage','Voltaje documentado'],['source','Fuente oficial'],['compatibility','Referencia de compatibilidad'],
+   ['backup_sha256','SHA-256 del respaldo original'],['image_sha256','SHA-256 de la imagen']],
+  'Comprobar ficha',async data=>{
+   const result=await api(endpoint,{...data,action:'firmware'});
+   output.replaceChildren(el('h3','Revisión de firmware'),para(result.message),...result.missing.map(item=>para('Falta validar '+item+'.')));
+  });
+ const firmwareForm=firmware.querySelector('form');
+ for(const [index,caption] of [[7,'Calcular hash del respaldo'],[8,'Calcular hash de la imagen']]){
+  const label=el('label'),file=el('input');file.type='file';file.accept='.bin,.rom,.fd,.cap,application/octet-stream';
+  label.append(el('span',caption),file);firmwareForm.append(label);
+  const input=firmwareForm.querySelectorAll('label > input')[index];
+  file.addEventListener('change',async()=>{
+   const selected=file.files[0];input.value='';
+   if(!selected)return;
+   if(!crypto.subtle||selected.size<1||selected.size>64*1024*1024){status.textContent='Usa un archivo de 1 byte a 64 MiB en un navegador seguro.';return;}
+   try{
+    const hash=await crypto.subtle.digest('SHA-256',await selected.arrayBuffer());
+    if(file.files[0]===selected)input.value=Array.from(new Uint8Array(hash),n=>n.toString(16).padStart(2,'0')).join('');
+   }catch{status.textContent='No se pudo leer el archivo.';}
+  });
+ }
+ const visibility=[['tecnico','Personal técnico']];
+ if(currentUser?.role==='administrador')visibility.push(['administrador','Administración']);
+ const proposal=controls('Proponer conocimiento',[['title','Título'],['source','Fuente'],['source_date','Fecha de la fuente','date'],['version','Versión'],
+   ['category','Categoría',categories],['visibility','Acceso',visibility],['supersedes','ID de fuente que corrige (opcional)'],['content','Extracto autorizado','textarea']],
+  'Enviar a revisión',async (data,form)=>{await api(knowledge,data);form.reset();status.textContent='Documento pendiente de revisión.';});
+ root.append(button('Revisar documentos pendientes',async()=>{
+  try{const result=await api(knowledge+'?review=1');output.replaceChildren(el('h3','Documentos pendientes'),...documents(result.rows,true));}
+  catch(error){status.textContent=error.message;}
+ },'secondary'));
+ api(endpoint).then(renderDraft).catch(error=>{status.textContent=error.message;});
+}

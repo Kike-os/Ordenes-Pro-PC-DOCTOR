@@ -104,6 +104,25 @@ class WhatsAppIdentityTests(unittest.TestCase):
         again = self.say('¿Ya está lista mi laptop?', minutes=5)
         self.assertIn('Estado:', again)
 
+    def test_17_tracking_link_requires_verified_holder_and_stays_out_of_history(self):
+        import order_tracking
+        with app.connect() as c:
+            order_tracking.create(c,self.oid,self.uid,self.now)
+            tracking = order_tracking.active(c,self.oid)['url']
+        self.assertNotIn(tracking,self.say('Enlace de seguimiento'))
+        self.request_code()
+        code,_ = self.otp()
+        self.say(code)
+        answer = self.say('Enlace de seguimiento')
+        self.assertIn(tracking,answer)
+        self.assertIn('cédula registrada',answer)
+        self.assertNotIn('0100000017',answer)
+        with app.connect() as c:
+            rows = c.execute("SELECT content FROM adi_messages WHERE content LIKE '%enlace de seguimiento%'").fetchall()
+            self.assertTrue(rows)
+            self.assertNotIn(tracking,' '.join(row[0] for row in rows))
+        self.assertNotIn(tracking,self.say('Enlace de seguimiento',minutes=20))
+
     def test_02_code_never_stored_in_plain_text_or_sent_to_ai_history(self):
         self.request_code()
         code, _ = self.otp()

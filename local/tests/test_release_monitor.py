@@ -81,5 +81,17 @@ class ReleaseMonitorTests(unittest.TestCase):
         self.assertTrue(any(i['key'].startswith('release:cron-missed:') for i in later))
 
 
+class RunComparisonTests(unittest.TestCase):
+    def test_comparison_uses_two_runs_of_the_installed_version(self):
+        import release_monitor
+        def run(version, at, status):
+            return {'version':version,'at':at,'results':[{'code':'db','name':'Base','status':status,'ok':status=='ok'}]}
+        runs = [run('1.0.0','one','ok'),run('2.0.0','two','error'),run('1.0.0','three','warning')]
+        self.assertFalse(release_monitor.compare_runs(runs,'2.0.0')['available'])
+        comparison = release_monitor.compare_runs(runs,'1.0.0')
+        self.assertEqual((comparison['from_at'],comparison['to_at']), ('one','three'))
+        self.assertEqual(comparison['changes'],[{'code':'db','name':'Base','before':'ok','after':'warning'}])
+
+
 if __name__ == '__main__':
     unittest.main()
