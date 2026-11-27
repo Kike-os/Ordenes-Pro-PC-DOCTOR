@@ -6500,7 +6500,7 @@ async function renderClientDetail(id){const data=await api('/api/clients/'+id),c
  if(client.needs_review)root.append(el('p',(data.missing&&data.missing.length?'A esta ficha le faltan datos obligatorios para crear órdenes: '+data.missing.join(', ')+'.':'Esta ficha viene de una importación y está pendiente de revisar y guardar.')+' Complétala antes de recibir un equipo.','client-incomplete'));
  const stats=el('div',undefined,'client-stats'),total=data.orders.reduce((sum,row)=>sum+row.total_cents,0),active=data.orders.filter(row=>row.status_code!=='entregado').length;for(const[label,value]of [['Órdenes',String(data.orders.length)],['En curso',String(active)],['Equipos',String(data.devices.length)],['Citas',String((data.appointments||[]).length)],['Última atención',data.last_service?formatOrderDate(data.last_service).split(',')[0]:'Sin registro'],['Valor registrado',money(total)]]){const box=el('div');box.append(el('strong',value),el('span',label));stats.append(box);}root.append(stats);
  const grid=el('div',undefined,'client-grid');grid.append(clientCard('Información general','idcard',[[docLabel,client.identification],[client.client_type==='empresa'?'Razón social':'Nombres y Apellidos',client.name],['Nombre comercial',client.trade_name],['Tipo de cliente',client.client_type==='empresa'?'Empresa':'Persona natural']]),clientCard('Contacto','contact',[['Teléfono / WhatsApp',client.phone],['Teléfono secundario',client.phone_secondary],['Correo electrónico',client.email],['Dirección',client.address||client.main_street],['Referencia',client.location_reference]]),clientCard('Ubicación','pin',[['Provincia',client.province],['Cantón',client.canton],['Parroquia',client.parish],['Ciudad o localidad',client.city]]));
- const notes=el('section',undefined,'client-card client-notes'),noteHead=el('h3');noteHead.append(operationIcon('note'),el('span','Observaciones'));notes.append(noteHead,el('p',client.notes||'Sin observaciones registradas.',client.notes?'':'system-muted'));if(data.imported)notes.append(el('small','Ficha importada desde «'+data.imported.filename+'» el '+withPeriod(formatOrderDate(data.imported.created_at))));grid.append(notes);root.append(grid);
+ const notes=el('section',undefined,'client-card client-notes'),noteHead=el('h3');noteHead.append(operationIcon('note'),el('span','Observaciones'));notes.append(noteHead,el('p',client.notes||'Sin observaciones registradas.',client.notes?'':'system-muted'));if(data.imported)notes.append(el('small','Ficha importada desde «'+data.imported.filename+'» el '+withPeriod(formatOrderDate(data.imported.created_at))));grid.append(notes);if(['administrador','tecnico'].includes(currentUser?.role))grid.append(clientWhatsAppConsent(id));root.append(grid);
  const history=el('section',undefined,'data-panel client-history'),historyHead=el('h3');historyHead.append(operationIcon('history'),el('span','Historial técnico'),el('small',data.orders.length===1?'1 orden':data.orders.length+' órdenes'));history.append(historyHead);
  if(!data.orders.length)history.append(el('p','Este cliente todavía no tiene órdenes de reparación.','empty-module'));
  else{const wrap=el('div',undefined,'table-wrap'),table=el('table',undefined,'client-orders'),head=el('thead'),hr=el('tr');['Orden','Recepción','Equipo','Falla reportada','Diagnóstico y reparación','Estado','Valor'].forEach(text=>hr.append(el('th',text)));head.append(hr);const body=el('tbody');
@@ -6623,6 +6623,7 @@ async function openClientQuick(id){
  const facts=el('dl',undefined,'client-quick-facts'),fact=(label,value)=>{const row=el('div');row.append(el('dt',label),el('dd',value||'No registrado'));if(!value)row.classList.add('is-empty');facts.append(row);};
  if(client.trade_name)fact('Nombre comercial',client.trade_name);fact('Teléfono',[client.phone,client.phone_secondary].filter(Boolean).join(' / '));fact('Correo',client.email);fact('Dirección',client.address||client.main_street);fact('Ciudad / cantón',[client.city,client.canton].filter((value,index,all)=>value&&all.indexOf(value)===index).join(' · '));fact('Última atención',data.last_service?formatOrderDate(data.last_service):'');fact('Registro',client.created_at?formatOrderDate(client.created_at):'');
  group('Datos y contacto').append(facts);
+ if(['administrador','tecnico'].includes(currentUser?.role))body.append(clientWhatsAppConsent(id));
  const list=(label,items,format,empty,limit=5)=>{const box=group(label+' ('+items.length+')');if(!items.length){box.append(el('p',empty,'system-muted'));return box;}const ul=el('ul');for(const item of items.slice(0,limit))ul.append(format(item));if(items.length>limit)ul.append(el('li','… y '+(items.length-limit)+' más en el historial completo','system-muted'));box.append(ul);return box;};
  list('Equipos registrados',data.devices,item=>el('li',[receptionOptions?.device_types?.[item.category||item.type]||item.category||item.type,item.brand,item.model,item.serial&&'Serie '+item.serial].filter(Boolean).join(' · ')),'Sin equipos registrados.');
  list('Historial de órdenes',data.orders,item=>{const row=el('li'),link=button(item.code,()=>{dialog.close();go('orders',new URLSearchParams({id:String(item.id)}));},'text-action');row.append(link,document.createTextNode(' · '+item.status+' · '+formatOrderDate(item.received_at||item.created_at*1000).split(',')[0]));return row;},'Sin órdenes registradas.');
@@ -10237,17 +10238,34 @@ function proformaLinkDialog(link,p,token){
  const status=el('p',undefined,'pf-wa-status');status.setAttribute('role','status');
  const actions=el('div',undefined,'dialog-actions');
  const send=invBtn('Enviar proforma por WhatsApp','send',deliver,'primary');
+ const consent=invBtn('Registrar autorización de WhatsApp','shield-check',()=>{
+  if(!info?.consent||!info.recipient||busy)return;
+  waConsentDialog(p.code,{number:info.recipient,consent_sources:info.consent.sources},path,load,info.recipient.slice(1),'whatsapp_consent',token);
+ });
  const refresh=invBtn('Consultar estado','refresh-cw',load);
- card.append(title,recipient,template,preview,status,actions);actions.append(send,refresh);body.append(card);
+ card.append(title,recipient,template,preview,status,actions);actions.append(send,consent,refresh);body.append(card);
  const links=el('div',undefined,'dialog-actions');links.append(invBtn('Copiar enlace','clipboard-list',()=>copyPlain(link,'Enlace copiado.')));
  if(currentUser?.mail)links.append(invBtn('Enviar por correo','send',()=>proformaMailDialog(p,token)));
  links.append(button('Cerrar',()=>dialog.close(),'secondary'));body.append(links);
  const path='/api/proformas/'+p.id;
- let info=null,busy=false;
+ let info=null,busy=false,polling=false;
+ const check=setInterval(async()=>{
+  if(polling||busy||!['enviando','enviado','entregado'].includes(info?.delivery?.status))return;
+  polling=true;const current=info;
+  try{
+   const {delivery}=await api(path,{action:'whatsapp_status',link_token:token});
+   if(!busy&&info===current&&delivery){info.delivery=delivery;feedback(delivery.label+' · '+delivery.detail,delivery.status);paint();}
+  }catch{}finally{polling=false;}
+ },5000);
+ dialog.addEventListener('close',()=>clearInterval(check),{once:true});
  function paint(){
   const delivery=info?.delivery;
   recipient.textContent='Destinatario · '+(info?.recipient||'Sin celular verificado');
-  template.textContent=info?.template_detail||'Consultando la plantilla de Meta…';
+  template.textContent=info?.template
+   ? info.template+' · '+info.language+' · '+info.template_detail
+   : info?.template_detail||'Consultando la plantilla de Meta…';
+  consent.hidden=!info?.consent||info.consent.state==='aceptado';
+  consent.disabled=busy;
   preview.hidden=!info?.preview;
   if(info?.preview)preview.replaceChildren(el('strong',info.preview.header),el('p',info.preview.body),el('span',info.preview.button,'pf-wa-cta'));
   refresh.disabled=busy;
@@ -10586,7 +10604,7 @@ function orderClientNoticesCard(order){
   if(c.recorded_at)ctext.append(el('span',(c.source_label||'')+' · '+wanWhen(c.recorded_at),'wan-soft'));
   ctext.append(el('span',d.valid_number?'Número: '+d.number:'El cliente no tiene un celular válido para WhatsApp.','wan-soft'));
   cons.append(wanIcon(c.state==='aceptado'?'M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z M9 12l2 2 4-4':'M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z'),ctext);
-  if(d.valid_number){const rec=button(c.state==='sin_registro'?'Registrar respuesta':'Actualizar respuesta',()=>waConsentDialog(order,d,load),'secondary wan-btn');cons.append(rec);}
+  if(d.valid_number){const rec=button(c.state==='sin_registro'?'Registrar respuesta':'Actualizar respuesta',()=>waConsentDialog(displayCode(order),d,'/api/orders/'+order.id+'/whatsapp/consent',load),'secondary wan-btn');cons.append(rec);}
   body.append(cons);
   // Envío manual (p. ej., «Diagnóstico terminado»)
   if(d.ready&&c.state==='aceptado'&&d.valid_number){const row=el('div',undefined,'wan-manual'),lab=el('label'),sel=el('select');lab.append(el('span','Enviar un aviso por WhatsApp'),sel);
@@ -10646,20 +10664,61 @@ function identityContactDialog(order,done){const dialog=smallDialog('Contacto au
   try{const d=await api('/api/orders/'+order.id+'/identity/contacts',{name:name.value,phone:phone.value,relation:relation.value,evidence:evidence.value,confirm:box.checked});toast('Contacto autorizado registrado.','success');dialog.close();done(d);}
   catch(error){const f=error.fields||(error.data&&error.data.fields)||{};err.textContent=Object.values(f)[0]||error.message;const first=Object.keys(f)[0];if(first)(form.elements[first]||box).focus();ok.disabled=false;}});}
 
-function waConsentDialog(order,d,done){const dialog=smallDialog('Autorización de WhatsApp · '+displayCode(order));dialog.classList.add('wan-dialog');
+function clientWhatsAppConsent(id){
+ const endpoint='/api/clients/'+id+'/whatsapp/consent';
+ const card=el('section',undefined,'client-card client-whatsapp-consent'),title=el('h3');
+ title.append(systemIcon(WAN_CHANNEL.whatsapp),el('span','Autorización de WhatsApp'));
+ const body=el('div');body.append(el('p','Consultando autorización…','system-muted'));
+ card.append(title,body);
+ const labels={aceptado:'Autorizado',rechazado:'No autorizado',sin_registro:'Sin respuesta registrada'};
+ function paint(data){
+  if(!card.isConnected)return;
+  const consent=data.consent,summary=el('p',labels[consent.state]);
+  summary.setAttribute('role','status');body.replaceChildren(summary);
+  if(!data.phone){body.append(el('p','La ficha necesita un celular válido.','system-muted'));return;}
+  body.append(el('p','Celular registrado: +'+data.phone,'system-muted'));
+  if(consent.recorded_at)body.append(el('p',[consent.source_label,formatOrderDate(consent.recorded_at)].filter(Boolean).join(' · '),'system-muted'));
+  const edit=button(consent.state==='sin_registro'?'Registrar respuesta':'Actualizar respuesta',
+   ()=>waConsentDialog(data.client,{...data,number:'+'+data.phone},endpoint,paint,data.phone),'secondary');
+  body.append(edit);
+  if(data.history.length){
+   const history=el('details'),items=el('ul');
+   for(const row of data.history){
+    const item=el('li',[labels[row.decision],row.source_label,formatOrderDate(row.recorded_at),row.actor].filter(Boolean).join(' · '));
+    if(row.detail)item.append(el('p',row.detail));
+    items.append(item);
+   }
+   history.append(el('summary','Historial de respuestas ('+data.history.length+')'),items);body.append(history);
+  }
+  if(data.proforma_history.length){
+   const history=el('details'),items=el('ul');
+   for(const row of data.proforma_history){
+    items.append(el('li',[row.proforma_code,row.label,formatOrderDate(row.updated_at||row.created_at)].filter(Boolean).join(' · ')));
+   }
+   history.append(el('summary','Proformas por WhatsApp ('+data.proforma_history.length+')'),items);body.append(history);
+  }
+ }
+ async function load(){
+  try{paint(await api(endpoint));}
+  catch(error){if(card.isConnected)body.replaceChildren(el('p',error.message,'system-muted'),button('Reintentar',load));}
+ }
+ load();return card;
+}
+
+function waConsentDialog(title,d,endpoint,done,phone,action,linkToken){const dialog=smallDialog('Autorización de WhatsApp · '+title);dialog.classList.add('wan-dialog');
  const form=el('form',undefined,'wan-form');form.noValidate=true;
  const fs=el('fieldset',undefined,'wan-choice');fs.append(el('legend','Respuesta del cliente'));const radio=(value,text)=>{const l=el('label'),i=el('input');i.type='radio';i.name='decision';i.value=value;l.append(i,el('span',text));fs.append(l);return i;};
- const yes=radio('aceptado','Autoriza recibir avisos de su orden por WhatsApp'),no=radio('rechazado','No desea recibir avisos por WhatsApp');
+ const yes=radio('aceptado','Autoriza recibir avisos de servicio por WhatsApp'),no=radio('rechazado','No desea recibir avisos por WhatsApp');
  const src=el('label'),sel=el('select');src.append(el('span','¿Cómo lo indicó?'),sel);sel.add(new Option('Selecciona…',''));for(const[k,v]of Object.entries(d.consent_sources))sel.add(new Option(v,k));
  const note=el('label'),txt=el('input');txt.maxLength=300;txt.placeholder='Opcional: p. ej., «lo confirmó al dejar el equipo»';note.append(el('span','Nota'),txt);
- const conf=el('label',undefined,'wan-confirm'),box=el('input');box.type='checkbox';conf.append(box,el('span','Confirmo que el cliente autorizó expresamente que PC-DOCTOR le envíe avisos de su orden por WhatsApp al '+d.number+'.'));conf.hidden=true;
+ const conf=el('label',undefined,'wan-confirm'),box=el('input');box.type='checkbox';conf.append(box,el('span','Confirmo que el cliente autorizó expresamente que PC-DOCTOR le envíe avisos de servicio por WhatsApp al '+d.number+'.'));conf.hidden=true;
  const err=el('p',undefined,'wan-error');err.setAttribute('role','alert');
  fs.addEventListener('change',()=>{conf.hidden=!yes.checked;});
  const ok=el('button','Guardar','primary');ok.type='submit';const cancel=button('Cancelar',()=>dialog.close(),'secondary');const actions=el('div',undefined,'dialog-actions');actions.append(cancel,ok);
  form.append(el('p','Registra solo lo que el cliente dijo realmente. Cada respuesta queda en un historial que no se modifica.','wan-soft'),fs,src,note,conf,err,actions);dialog.append(form);
  form.addEventListener('submit',async e=>{e.preventDefault();err.textContent='';const decision=yes.checked?'aceptado':no.checked?'rechazado':'';
   if(!decision){err.textContent='Elige la respuesta del cliente.';return;}if(!sel.value){err.textContent='Indica cómo dio el cliente su respuesta.';sel.focus();return;}if(decision==='aceptado'&&!box.checked){err.textContent='Confirma la autorización expresa del cliente.';box.focus();return;}
-  ok.disabled=true;try{await api('/api/orders/'+order.id+'/whatsapp/consent',{decision,source:sel.value,detail:txt.value,confirm:box.checked});toast(decision==='aceptado'?'Autorización registrada.':'Se registró que el cliente no desea avisos por WhatsApp.','success');dialog.close();done();}
+  ok.disabled=true;try{const saved=await api(endpoint,{decision,source:sel.value,detail:txt.value,confirm:box.checked,...(phone?{phone}:{}),...(action?{action,link_token:linkToken}:{})});toast(decision==='aceptado'?'Autorización registrada.':'Se registró que el cliente no desea avisos por WhatsApp.','success');dialog.close();done(saved);}
   catch(error){err.textContent=error.message;ok.disabled=false;}});
  yes.focus();}
 

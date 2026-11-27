@@ -93,7 +93,7 @@ def audit_template(base, env=None, submit=False, *, typed=False):
     return 'no_disponible', None, 'Meta no tiene registrada una plantilla para proformas.'
 
 
-def _recipient(c, row):
+def _verified_phone(c, row):
     phone = phones.whatsapp(row['client_phone'])
     if row['client_id']:
         client = c.execute('SELECT phone,identification FROM clients WHERE id=?', (row['client_id'],)).fetchone()
@@ -102,9 +102,14 @@ def _recipient(c, row):
             return '', 'Los datos de la ficha del cliente cambiaron. Verifica la identidad y el celular en la proforma.'
     if not phone:
         return '', 'El cliente necesita un celular válido para WhatsApp.'
-    decision = c.execute('SELECT decision,client_id FROM whatsapp_consents WHERE phone=? ORDER BY id DESC LIMIT 1', (phone,)).fetchone()
-    if (not decision or decision['decision'] != 'aceptado'
-            or (decision['client_id'] is not None and decision['client_id'] != row['client_id'])):
+    return phone, ''
+
+
+def _recipient(c, row):
+    phone, reason = _verified_phone(c, row)
+    if reason:
+        return phone, reason
+    if wa.consent_state(c, phone, client_id=row['client_id'], scoped=True)['state'] != 'aceptado':
         return phone, 'Se requiere la autorización vigente de este cliente para recibir mensajes en este número.'
     return phone, ''
 
@@ -125,7 +130,7 @@ def history(c, pid):
 def _delivery(row):
     if not row:
         return None
-    return {'status': row['status'], 'label': wa.STATE_LABELS[row['status']], 'detail': row['detail'],
+    return {'status': row['status'], 'label': 'Error' if row['status'] == 'fallido' else wa.STATE_LABELS[row['status']], 'detail': row['detail'],
             'retry': row['status'] == 'fallido' and not row['permanent'] and row['attempts'] < wa.MAX_TOTAL}
 
 
@@ -146,14 +151,37 @@ def _preview(row, template):
     return params, {'header': parts['HEADER']['text'], 'body': body, 'button': parts['BUTTONS']['buttons'][0]['text']}
 
 
+def delivery_status(c, pid, token, now):
+    row, link = proformas.lookup(c, token, now)
+    if not row or row['id'] != pid:
+        raise proformas.ProformaError('Enlace de proforma inválido.', 404)
+    return _delivery(c.execute('SELECT * FROM whatsapp_outbox WHERE dedupe_key=?', (_key(pid, link['id']),)).fetchone())
+
+
+def register_consent(c, pid, token, data, user, now):
+    row, _ = _link(c, pid, token, now)
+    phone, reason = _verified_phone(c, row)
+    if reason or not row['client_id'] or data.get('phone') != phone:
+        raise proformas.ProformaError(reason or 'Verifica el cliente y su celular registrado antes de guardar la autorización.', 409)
+    try:
+        return wa.client_consent(c, row['client_id'], user, data, now)
+    except wa.WhatsAppError as error:
+        raise proformas.ProformaError(str(error), error.status) from error
+
+
 def prepare(c, pid, token, now, base, env=None):
     row, link = _link(c, pid, token, now)
     phone, reason = _recipient(c, row)
     state, template, template_detail = audit_template(base, env)
     delivery = _delivery(c.execute('SELECT * FROM whatsapp_outbox WHERE dedupe_key=?', (_key(pid, link['id']),)).fetchone())
+    valid_phone, contact_error = _verified_phone(c, row)
+    consent = None
+    if row['client_id'] and valid_phone and not contact_error:
+        consent = {'state': wa.consent_state(c, valid_phone, client_id=row['client_id'], scoped=True)['state'],
+                   'sources': {key: value for key, value in wa.CONSENT_SOURCES.items() if key != 'baja'}}
     return {'recipient': '+' + phone if phone else '', 'reason': reason, 'template_state': state, 'template_detail': template_detail,
             'template': template['name'] if template else '', 'language': template['language'] if template else '',
-            'preview': _preview(row, template or template_definition(base))[1], 'delivery': delivery}
+            'preview': _preview(row, template or template_definition(base))[1], 'delivery': delivery, 'consent': consent}
 
 
 def send(c, pid, token, data, user, now, base, env=None):

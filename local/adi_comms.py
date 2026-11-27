@@ -142,7 +142,7 @@ def analysis(c, oid, now):
     fin = status_messages.finance(c, oid, ctx)
     who = _client(c, oid)
     number = wa.number_for(who['phone'])
-    consent = wa.consent_state(c, number)['state'] if number else ''
+    consent = wa.consent_state(c, number, client_id=who['id'], scoped=True)['state'] if number else ''
     data = tech['data']
     q = ctx['quote']
     rows = lambda *items: [{'label': k, 'value': v, 'source': s} for k, v, s in items if v not in (None, '', [])]
@@ -384,7 +384,7 @@ def compose(c, oid, purpose, channel, note='', use_ai=True, tone='profesional', 
         raise CommsError(status_messages.UNVERIFIED, 409)
     who = _client(c, oid)
     number = wa.number_for(who['phone'])
-    discreet = channel == 'whatsapp' and purpose in DISCREET + ('regularizacion_saldo', 'aviso_vencimiento') and (not number or wa.consent_state(c, number)['state'] != 'aceptado')
+    discreet = channel == 'whatsapp' and purpose in DISCREET + ('regularizacion_saldo', 'aviso_vencimiento') and (not number or wa.consent_state(c, number, client_id=who['id'], scoped=True)['state'] != 'aceptado')
     body = base_text(c, oid, purpose, ctx, fin, now, note, discreet)
     source, warnings = 'sistema', []
     if discreet:
@@ -500,7 +500,7 @@ def precheck(c, oid, purpose, channel, text, fingerprint_value, now):
         leaks.append('menciona datos internos o credenciales («%s»)' % SENSITIVE.search(text).group(0))
     if CEDULA.search(text):
         leaks.append('incluye un número de identificación')
-    consent = wa.consent_state(c, number)['state'] if number else ''
+    consent = wa.consent_state(c, number, client_id=who['id'], scoped=True)['state'] if number else ''
     if channel == 'whatsapp' and amounts and consent != 'aceptado':
         leaks.append('muestra importes a un celular sin autorización de avisos registrada (usa el mensaje discreto)')
     items.append(_item('privacidad', 'Privacidad', 'block' if leaks else 'ok', ('El mensaje ' + '; '.join(leaks) + '.') if leaks else 'Sin datos internos, credenciales ni identificaciones.'))

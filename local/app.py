@@ -2137,6 +2137,11 @@ class Handler(BaseHTTPRequestHandler):
                                 mail=mail_pro.configured())
                     return self.reply(200,data)
                 except order_followups.FollowupError as error:return self.reply(error.status,{'error':str(error)})
+            consent_route=re.fullmatch(r'/api/clients/([0-9]{1,9})/whatsapp/consent',path)
+            if consent_route:
+                import whatsapp_business
+                try:return self.reply(200,whatsapp_business.client_consent(c,int(consent_route[1]),user))
+                except whatsapp_business.WhatsAppError as error:return self.reply(error.status,{'error':str(error)})
             client_detail=re.fullmatch(r'/api/clients/([0-9]+)',path)
             if client_detail:
                 row=c.execute('SELECT * FROM clients WHERE id=?',(int(client_detail[1]),)).fetchone()
@@ -4225,12 +4230,18 @@ class Handler(BaseHTTPRequestHandler):
                                     return self.reply(502,{'error':str(error),'kind':error.kind})
                                 proformas.event(c,pid,'correo','Mail Pro · '+recipient+' · Aceptado por el servidor.',reception_now(),user)
                                 return self.reply(200,{'status':'accepted','message_id':result['message_id']})
-                            elif action in ('whatsapp_preview','whatsapp_send'):
+                            elif action in ('whatsapp_preview','whatsapp_send','whatsapp_consent','whatsapp_status'):
                                 import proforma_whatsapp
                                 token=data.get('link_token')
                                 if not isinstance(token,str):return self.reply(400,{'error':'Enlace de proforma inválido.'})
                                 if action=='whatsapp_preview':
                                     return self.reply(200,proforma_whatsapp.prepare(c,pid,token,now,public_base_url()))
+                                if action=='whatsapp_status':
+                                    return self.reply(200,{'delivery':proforma_whatsapp.delivery_status(c,pid,token,now)})
+                                if action=='whatsapp_consent':
+                                    result=proforma_whatsapp.register_consent(c,pid,token,data,user,now)
+                                    audit(c,user['id'],'whatsapp_proforma_consent_'+result['consent']['state'],pid)
+                                    return self.reply(200,result)
                                 return self.reply(200,{'delivery':proforma_whatsapp.send(c,pid,token,data,user,now,public_base_url())})
                             elif action=='decide':proformas.staff_decide(c,pid,data,user,now)
                             elif action in ('link','unlink'):
@@ -5359,6 +5370,15 @@ class Handler(BaseHTTPRequestHandler):
                     status,payload=maintenance.update(c,int(maintenance_route[1]),data,user,reception_now())
                     if status==200:audit(c,user['id'],'maintenance_updated',int(maintenance_route[1]))
                     return self.reply(status,payload)
+                consent_route=re.fullmatch(r'/api/clients/([0-9]{1,9})/whatsapp/consent',path)
+                if consent_route:
+                    import whatsapp_business
+                    try:
+                        cid=int(consent_route[1])
+                        result=whatsapp_business.client_consent(c,cid,user,data,reception_now())
+                        audit(c,user['id'],'whatsapp_client_consent_'+result['consent']['state'],cid)
+                        return self.reply(200,result)
+                    except whatsapp_business.WhatsAppError as error:return self.reply(error.status,{'error':str(error)})
                 if path in ('/api/clients/import/preview','/api/clients/import/commit'):
                     if user['role']!='administrador':return self.reply(403,{'error':'Solo administración puede importar clientes.'})
                     try:

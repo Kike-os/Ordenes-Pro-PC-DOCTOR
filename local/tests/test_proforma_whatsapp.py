@@ -54,8 +54,8 @@ class ProformaWhatsAppTests(unittest.TestCase):
         data = {'recipient': '+' + PHONE, 'template': 'proforma_existente', 'language': 'es', **overrides}
         return self.post(self.path, action='whatsapp_send', link_token=self.token, **data)
 
-    def webhook(self, status):
-        update = {'id': 'wamid.ficticio', 'status': status, 'recipient_id': PHONE,
+    def webhook(self, status, provider='wamid.ficticio'):
+        update = {'id': provider, 'status': status, 'recipient_id': self.sent[-1]['to'],
                   'biz_opaque_callback_data': self.sent[-1]['biz_opaque_callback_data']}
         raw = json.dumps({'entry': [{'changes': [{'value': {'statuses': [update]}}]}]}).encode()
         signature = 'sha256=' + hmac.new(FAKE['WHATSAPP_APP_SECRET'].encode(), raw, hashlib.sha256).hexdigest()
@@ -85,6 +85,49 @@ class ProformaWhatsAppTests(unittest.TestCase):
             row = c.execute('SELECT * FROM whatsapp_outbox WHERE event=?', (pf.EVENT,)).fetchone()
             self.assertNotIn(self.token, str(dict(row)))
 
+    def test_register_from_link_and_track_in_client_history_with_or_without_order(self):
+        self.template = dict(pf.template_definition(BASE, typed=True), status='APPROVED')
+        for linked in (False, True):
+            with self.subTest(linked=linked):
+                if linked:
+                    fields = self.Base.order_data(self, {'request_key': 'proforma-whatsapp-order-2026'})
+                    order = self.post('/api/orders', **fields)
+                    self.assertEqual(order['status'], 201, order['body'])
+                    client_id = int(fields['client_id'])
+                    order_fields = {'origin': 'orden', 'order_id': str(order['body']['id'])}
+                else:
+                    with app.connect() as c:
+                        client_id = c.execute(
+                            "INSERT INTO clients(name,phone,identification,document_type) VALUES (?,?,?,?)",
+                            ('Titular ficticio', '0980000000', '1710034065', 'cedula')).lastrowid
+                    order_fields = {}
+                created = self.post('/api/proformas', client_id=str(client_id), items=json.dumps(ITEMS),
+                                    request_key=f'proforma-whatsapp-cliente-{linked}', **order_fields)
+                self.assertEqual(created['status'], 200, created['body'])
+                self.path = f'/api/proformas/{created["body"]["id"]}'
+                self.token = self.post(self.path, action='send')['body']['link_token']
+                initial = self.post(self.path, action='whatsapp_preview', link_token=self.token)['body']
+                self.assertEqual(initial['consent']['state'], 'sin_registro')
+                self.assertTrue(initial['reason'])
+                data = {'action': 'whatsapp_consent', 'link_token': self.token, 'decision': 'aceptado',
+                        'source': 'presencial', 'phone': initial['recipient'].lstrip('+')}
+                self.assertEqual(self.post(self.path, **data)['status'], 400)
+                self.assertEqual(self.post(self.path, **data, confirm=True)['status'], 200)
+                ready = self.post(self.path, action='whatsapp_preview', link_token=self.token)['body']
+                self.assertEqual((ready['consent']['state'], ready['reason']), ('aceptado', ''))
+                provider = f'wamid.ficticio.{linked}'
+                self.responses = [(200, {'messages': [{'id': provider}]})]
+                self.assertEqual(self.send(recipient=ready['recipient'], template=pf.IDENTITY_NAME)['body']['delivery']['status'], 'enviado')
+                components = self.sent[-1]['template']['components']
+                self.assertEqual([item['text'] for item in components[0]['parameters']][2], 'cédula registrada')
+                self.assertEqual(components[1]['parameters'][0]['text'], self.token)
+                self.webhook('delivered', provider)
+                status = self.post(self.path, action='whatsapp_status', link_token=self.token)['body']['delivery']['status']
+                self.assertEqual(status, 'entregado')
+                timeline = self.request(f'/api/clients/{client_id}/whatsapp/consent', cookie=self.cookie)['body']['proforma_history']
+                self.assertEqual((len(timeline), timeline[0]['status']), (1, 'entregado'))
+                self.assertNotIn(self.token, json.dumps(timeline))
+
     def test_refuses_unverified_recipient_and_unapproved_template(self):
         self.assertEqual(self.send()['status'], 409)
         self.consent()
@@ -98,13 +141,22 @@ class ProformaWhatsAppTests(unittest.TestCase):
         self.responses = [(429, {}), (0, {})]
         self.assertTrue(self.send()['body']['delivery']['retry'])
         self.assertFalse(self.send()['body']['delivery']['retry'])
-        self.assertEqual(self.send()['body']['delivery']['status'], 'fallido')
+        self.assertEqual(self.send()['body']['delivery']['label'], 'Error')
         self.assertEqual(len(self.sent), 2)
         self.webhook('delivered')
         self.assertEqual(self.history()[0]['status'], 'entregado')
 
 
 class TemplateAuditTests(unittest.TestCase):
+    def test_rejects_swapped_body_variables_and_foreign_dynamic_button(self):
+        template = pf.template_definition(BASE, typed=True)
+        self.assertTrue(pf.compatible(template, BASE))
+        template['components'][1]['text'] = pf.BODY.replace('{{1}}', '{{3}}') + ' Ingresa los últimos 4 dígitos de tu {{1}} para verificar tu identidad.'
+        self.assertFalse(pf.compatible(template, BASE))
+        template = pf.template_definition(BASE)
+        template['components'][2]['buttons'][0]['url'] = 'https://example.invalid/proforma/{{1}}'
+        self.assertFalse(pf.compatible(template, BASE))
+
     def test_follows_pagination_before_considering_submission(self):
         existing = dict(pf.template_definition(BASE), name='otra_proforma', status='APPROVED')
         results = [(200, {'data': [], 'paging': {'next': 'https://graph.facebook.com/next', 'cursors': {'after': 'cursor'}}}),

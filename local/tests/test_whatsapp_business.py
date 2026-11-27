@@ -101,6 +101,36 @@ class WhatsAppBusinessTests(unittest.TestCase):
         return app.reception_now() + timedelta(minutes=minutes)
 
     # ---- pruebas ----
+    def test_client_profile_consent_is_bound_to_owner_and_current_phone(self):
+        cookie, csrf, post = self.session()
+        oid = self.order(post, 'client-consent')
+        with app.connect() as c:
+            owner = wa._order(c, oid)
+            client_id, phone = owner['client_id'], wa.number_for(owner['phone'])
+            second_id = c.execute('INSERT INTO clients(name,phone) VALUES (?,?)',
+                                  ('Otra persona ficticia', owner['phone'])).lastrowid
+        path = f'/api/clients/{client_id}/whatsapp/consent'
+        second = f'/api/clients/{second_id}/whatsapp/consent'
+        self.assertEqual(self.request(path)['status'], 401)
+        self.assertEqual(self.request(path, {'decision': 'rechazado'}, cookie=cookie)['status'], 403)
+        self.assertEqual(self.request(path, cookie=cookie)['body']['consent']['state'], 'sin_registro')
+        body = {'phone': phone, 'source': 'presencial', 'decision': 'aceptado'}
+        self.assertEqual(post(path, **body)['status'], 400)
+        self.assertEqual(post(path, **dict(body, phone='593981112233', confirm=True))['status'], 409)
+        tech_post, tech_cookie = self.technician()
+        saved = tech_post(path, **body, confirm=True, detail='Respuesta ficticia')
+        self.assertEqual(saved['status'], 200, saved['body'])
+        self.assertEqual(saved['body']['consent']['state'], 'aceptado')
+        other = self.request(second, cookie=cookie)['body']
+        self.assertEqual((other['consent']['state'], other['history']), ('sin_registro', []))
+        self.assertEqual(self.request(path, cookie=tech_cookie)['body']['history'][0]['actor'], 'tecnicowa')
+        with app.connect() as c:
+            self.assertEqual(wa.for_order(c, oid, {'role': 'tecnico'})['consent']['state'], 'aceptado')
+            c.execute('UPDATE clients SET phone=? WHERE id=?', ('0981112233', client_id))
+        self.assertEqual(post(path, **body, confirm=True)['status'], 409)
+        self.assertEqual(self.request(path, cookie=cookie)['body']['consent']['state'], 'sin_registro')
+        self.assertEqual(self.meta.sends(), [])
+
     def test_requirements_without_secrets_and_admin_only(self):
         cookie, csrf, post = self.session()
         data = self.request('/api/whatsapp', cookie=cookie)['body']

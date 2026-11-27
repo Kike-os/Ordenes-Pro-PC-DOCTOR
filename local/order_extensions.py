@@ -107,7 +107,7 @@ def history(c, order_id):
 
 
 def _order(c, order_id):
-    row = c.execute("SELECT o.id,COALESCE(o.code,'OP-'||printf('%05d',o.id)) code,o.status,o.created_at,o.received_at,o.delivered_at,d.brand,d.model,cl.name client,"
+    row = c.execute("SELECT o.id,COALESCE(o.code,'OP-'||printf('%05d',o.id)) code,o.status,o.created_at,o.received_at,o.delivered_at,d.brand,d.model,cl.name client,cl.id client_id,"
                     "COALESCE(cl.email,'') email,COALESCE(cl.phone,'') phone FROM orders o JOIN devices d ON d.id=o.device_id JOIN clients cl ON cl.id=d.client_id WHERE o.id=?",
                     (order_id,)).fetchone()
     return dict(row) if row else None
@@ -151,7 +151,7 @@ def channels(c, order):
         import whatsapp_business as wa
         cfg = wa.settings(c)
         number = wa.number_for(order['phone'])
-        consent = wa.consent_state(c, number)['state'] if number else ''
+        consent = wa.consent_state(c, number, client_id=order['client_id'], scoped=True)['state'] if number else ''
         ok = wa.ready() and bool(number) and consent == 'aceptado'
         why = '' if ok else 'WhatsApp Business no está configurado.' if not wa.ready() else 'El cliente no tiene un celular válido.' if not number else 'El cliente no autorizó avisos por WhatsApp.'
     except Exception:

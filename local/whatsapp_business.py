@@ -342,15 +342,41 @@ def number_for(phone):
     return order_followups.ecuador_number(phone)
 
 
-def consent_state(c, phone):
-    """Decisión vigente para un número: {'state': 'aceptado'|'rechazado'|'sin_registro', ...}."""
+def consent_state(c, phone, *, client_id=None, scoped=False):
+    """Decisión vigente para el número. Una aceptación identificada solo corresponde a su titular."""
     if not phone:
         return {'state': 'sin_registro'}
     row = c.execute('SELECT * FROM whatsapp_consents WHERE phone=? ORDER BY id DESC LIMIT 1', (phone,)).fetchone()
-    if not row:
+    if not row or (scoped and row['decision'] == 'aceptado' and row['client_id'] not in (None, client_id)):
         return {'state': 'sin_registro'}
     return {'state': row['decision'], 'source': row['source'], 'source_label': CONSENT_SOURCES.get(row['source'], row['source']), 'recorded_at': row['recorded_at'],
-            'detail': row['detail']}
+            'detail': row['detail'] if not scoped or row['client_id'] == client_id else ''}
+
+
+def client_consent(c, client_id, user, data=None, now=None):
+    if not user or _role(user) not in ('administrador', 'tecnico'):
+        raise WhatsAppError('Acceso no permitido.', 403)
+    client = c.execute('SELECT name,phone FROM clients WHERE id=?', (client_id,)).fetchone()
+    if not client:
+        raise WhatsAppError('Cliente no disponible.', 404)
+    phone = number_for(client['phone'])
+    if data is not None:
+        if not phone or phone != data.get('phone'):
+            raise WhatsAppError('Verifica el celular vigente en la ficha y vuelve a abrir la autorización.', 409)
+        _record_client_response(c, phone, client_id, data, user, now)
+    history = c.execute(
+        'SELECT w.decision,w.source,w.detail,w.recorded_at,u.username actor FROM whatsapp_consents w '
+        'LEFT JOIN users u ON u.id=w.actor_id WHERE w.client_id=? AND w.phone=? ORDER BY w.id DESC LIMIT 20',
+        (client_id, phone)).fetchall()
+    deliveries = c.execute(
+        "SELECT json_extract(params,'$[1]') proforma_code,status,created_at,updated_at "
+        "FROM whatsapp_outbox WHERE client_id=? AND event=? ORDER BY id DESC LIMIT 20",
+        (client_id, PROFORMA_EVENT)).fetchall()
+    return {'client': client['name'], 'phone': phone,
+            'proforma_history': [dict(row, label='Error' if row['status']=='fallido' else STATE_LABELS[row['status']]) for row in deliveries],
+            'consent': consent_state(c, phone, client_id=client_id, scoped=True),
+            'consent_sources': {k: v for k, v in CONSENT_SOURCES.items() if k != 'baja'},
+            'history': [{**dict(row), 'source_label': CONSENT_SOURCES.get(row['source'], row['source'])} for row in history]}
 
 
 def record_consent(c, phone, decision, source, now, client_id=None, actor=None, detail=''):
@@ -371,13 +397,17 @@ def consent_for_order(c, oid, data, user, now):
     who = _order(c, oid)
     if not who:
         raise WhatsAppError('Orden no disponible.', 404)
+    return _record_client_response(c, who['phone'], who['client_id'], data, user, now)
+
+
+def _record_client_response(c, phone, client_id, data, user, now):
     decision = str(data.get('decision', ''))
     source = str(data.get('source', ''))
     if source == 'baja' or source not in CONSENT_SOURCES:
         raise WhatsAppError('Indica cómo dio el cliente su respuesta.', 400)
     if decision == 'aceptado' and data.get('confirm') is not True:
         raise WhatsAppError('Confirma que el cliente autorizó expresamente recibir avisos por WhatsApp.', 400)
-    return record_consent(c, who['phone'], decision, source, now, who['client_id'], user['id'], data.get('detail', ''))
+    return record_consent(c, phone, decision, source, now, client_id, user['id'], data.get('detail', ''))
 
 
 # ---- Datos de cada aviso ---------------------------------------------------------------------------------------------------------
@@ -467,7 +497,7 @@ def blockers(c, event, info, cfg, env=None):
     number = number_for(info['phone'])
     if not number:
         return 'telefono', 'El cliente no tiene un celular válido para WhatsApp.'
-    consent = consent_state(c, number)
+    consent = consent_state(c, number, client_id=info.get('client_id'), scoped=True)
     if event.startswith('pqrs_'):
         if consent['state'] == 'rechazado':
             return 'consentimiento', 'El cliente pidió no recibir avisos por WhatsApp.'
@@ -481,7 +511,7 @@ def blockers(c, event, info, cfg, env=None):
             return 'consentimiento', 'El cliente no autorizó comunicaciones de la cita al reservar.'
     elif consent['state'] != 'aceptado':
         return 'consentimiento', ('El cliente pidió no recibir avisos por WhatsApp.' if consent['state'] == 'rechazado' else
-                                  'El cliente no tiene registrada su autorización para recibir avisos por WhatsApp. Regístrala en «Avisos al cliente» de la orden.')
+                                  'El cliente no tiene registrada su autorización para recibir avisos por WhatsApp. Regístrala en la ficha del cliente o en «Avisos al cliente» de la orden.')
     if not compose(event, info, cfg)['template']:
         return 'plantilla', 'Falta la plantilla aprobada para «%s» (Configuración → Integraciones → WhatsApp Business).' % EVENTS[event][0]
     return '', ''
@@ -1247,7 +1277,7 @@ def for_order(c, oid, user, env=None):
     number = number_for(o['phone'])
     cfg = settings(c)
     rows = [item(c, r, env) for r in c.execute('SELECT * FROM whatsapp_outbox WHERE order_id=? ORDER BY id DESC LIMIT 60', (oid,))]
-    return {'ready': ready(env), 'auto': cfg['auto'], 'number': _mask_phone(number), 'valid_number': bool(number), 'consent': consent_state(c, number),
+    return {'ready': ready(env), 'auto': cfg['auto'], 'number': _mask_phone(number), 'valid_number': bool(number), 'consent': consent_state(c, number, client_id=o['client_id'], scoped=True),
             'consent_sources': {k: v for k, v in CONSENT_SOURCES.items() if k != 'baja'}, 'items': rows,
             'manual_events': [{'code': k, 'label': v[0]} for k, v in EVENTS.items() if v[1] == 'orden'], 'states': STATE_LABELS}
 
