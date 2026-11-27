@@ -197,3 +197,74 @@ def firmware_readiness(data, user):
     return {'missing': missing, 'status': 'incompleto' if missing else 'revision_tecnica_pendiente',
             'write_authorized': False,
             'message': 'Un técnico debe verificar la evidencia, la compatibilidad y la autorización antes de cualquier escritura.'}
+
+
+def diagnoses_installed(c):
+    return bool(c.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='adi_lab_diagnoses'").fetchone())
+
+
+def diagnosis_history(c, oid, user):
+    require_staff(user)
+    order_context(c, oid)
+    if not diagnoses_installed(c):
+        return {'installed': False, 'rows': []}
+    rows = c.execute(
+        "SELECT d.id,d.confirmed,d.conclusion,d.pending_checks,d.status,d.created_by,d.created_at,"
+        "d.reviewed_at,d.review_note,a.name author,COALESCE(r.name,'') reviewer "
+        "FROM adi_lab_diagnoses d JOIN users a ON a.id=d.created_by LEFT JOIN users r ON r.id=d.reviewed_by "
+        "WHERE d.order_id=? ORDER BY d.id DESC LIMIT 25", (oid,))
+    return {'installed': True, 'rows': [dict(row, can_review=row['status']=='pendiente' and row['created_by']!=user['id']) for row in rows]}
+
+
+def submit_diagnosis(c, oid, data, user, now):
+    require_staff(user)
+    if not diagnoses_installed(c):
+        raise LabError('Aplica la migración 132 para habilitar la aprobación de diagnósticos.', 503)
+    order = c.execute("SELECT COALESCE(findings,'') findings FROM orders WHERE id=?", (oid,)).fetchone()
+    if not order:
+        raise LabError('Orden no disponible.', 404)
+    values = (text_field(data, 'confirmed', 1700), text_field(data, 'conclusion', 1700))
+    pending = data.get('pending_checks', '')
+    if not isinstance(pending, str) or len(pending.strip()) > 1500 or '\x00' in pending:
+        raise LabError('Las comprobaciones pendientes admiten hasta 1500 caracteres.')
+    values += (pending.strip(),)
+    key = text_field(data, 'request_key', 80)
+    row = c.execute('INSERT INTO adi_lab_diagnoses(order_id,confirmed,conclusion,pending_checks,previous_findings,created_by,created_at,request_key) '
+                    'VALUES (?,?,?,?,?,?,?,?) ON CONFLICT(order_id,created_by,request_key) DO NOTHING RETURNING id',
+                    (oid, *values, order['findings'], user['id'], now.isoformat(timespec='seconds'), key)).fetchone()
+    if row:
+        return row['id'], True
+    existing = c.execute('SELECT id,confirmed,conclusion,pending_checks FROM adi_lab_diagnoses WHERE order_id=? AND created_by=? AND request_key=?',
+                         (oid, user['id'], key)).fetchone()
+    if tuple(existing[field] for field in ('confirmed','conclusion','pending_checks')) != values:
+        raise LabError('La solicitud ya identifica otra propuesta.', 409)
+    return existing['id'], False
+
+
+def review_diagnosis(c, oid, did, data, user, now):
+    import order_workspace
+
+    require_staff(user)
+    if not diagnoses_installed(c):
+        raise LabError('Aplica la migración 132 para habilitar la aprobación de diagnósticos.', 503)
+    choice = data.get('decision')
+    if choice not in ('aprobado','devuelto'):
+        raise LabError('Selecciona aprobar o devolver.')
+    note = text_field(data, 'review_note', 600)
+    row = c.execute("SELECT d.*,COALESCE(o.findings,'') current_findings FROM adi_lab_diagnoses d "
+                    "JOIN orders o ON o.id=d.order_id WHERE d.id=? AND d.order_id=?", (did, oid)).fetchone()
+    if not row:
+        raise LabError('Propuesta no disponible.', 404)
+    if row['created_by'] == user['id']:
+        raise LabError('La revisión corresponde a otro técnico autorizado.', 403)
+    if row['status'] != 'pendiente':
+        raise LabError('La propuesta ya fue revisada.', 409)
+    if choice == 'aprobado' and row['current_findings'] != row['previous_findings']:
+        raise LabError('El diagnóstico de la orden cambió. Devuelve esta propuesta y crea una actualizada.', 409)
+    c.execute('UPDATE adi_lab_diagnoses SET status=?,reviewed_by=?,reviewed_at=?,review_note=? WHERE id=?',
+              (choice,user['id'],now.isoformat(timespec='seconds'),note,did))
+    if choice == 'aprobado':
+        official = 'Hallazgos confirmados\n' + row['confirmed'] + '\n\nDiagnóstico aprobado\n' + row['conclusion']
+        c.execute('UPDATE orders SET findings=?,updated_at=?,revision=revision+1 WHERE id=?',
+                  (official,now.isoformat(timespec='microseconds'),oid))
+        order_workspace.event(c,oid,user['id'],now,'updated','Diagnóstico técnico aprobado en Laboratorio ADI (propuesta %d).' % did)

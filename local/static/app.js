@@ -4344,11 +4344,11 @@ function renderOrderDetail(root,order){
   if(units>1)chip('Equipos en la orden',String(units),'M4 4h6v6H4z M14 4h6v6h-6z M4 14h6v6H4z M14 14h6v6h-6z');chip('Técnico',order.responsible||'Sin asignar','M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2 M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8');chip('Prioridad',({baja:'Baja',normal:'Normal',alta:'Alta',urgente:'Urgente'})[order.priority]||'Normal','M4 22V4 M4 4h13l-2 4 2 4H4');title.append(facts);facts.lastChild.dataset.priority=order.priority||'normal';}const state=el('div',undefined,'workspace-state'),stateTitle=el('small','ESTADO ACTUAL'),stateBadge=el('span');state.append(stateTitle,stateBadge);head.prepend(deviceIcon(order.type,'device-icon device-icon-lg'));head.append(title,state);
  // Progreso por equipo: la barra y la etiqueta muestran SOLO el equipo seleccionado. Con varios equipos, el estado general de la orden va
  // aparte y nunca indica «entregado» mientras quede alguno pendiente.
- const phases=[['Recibido',['pendiente']],['En proceso',['diagnostico','reparacion','esperando_cliente','presupuesto','esperando_repuesto','revision_recurrente','pruebas']],['Listo para entregar',['listo','espera_entrega']],['Entregado',['entregado']]],progressBox=el('section',undefined,'order-progress-box'),progressHead=el('div',undefined,'order-progress-head'),progress=el('div',undefined,'order-progress-rp'),many=!!order.group?.multiple;let watchUnit=order.id;
+ const phases=[['Recibido',['pendiente']],['En proceso',['diagnostico','reparacion','esperando_cliente','presupuesto','esperando_repuesto','revision_recurrente','pruebas']],['Listo para entregar',['listo','espera_entrega']],['Entregado',['entregado']]],progressBox=el('section',undefined,'order-progress-box'),progressHead=el('div',undefined,'order-progress-head'),progress=el('div',undefined,'order-progress-rp'),many=!!order.group?.multiple;let watchUnit=order.id,watchUnitCode=order.code;
  function paintUnit(unit){const code=unit.status_code,label=unit.status,short=many?(unit.unit_code||'').split('-').pop():'',current=Math.max(0,phases.findIndex(phase=>phase[1].includes(code)));
   stateTitle.textContent=many?'ESTADO DE '+short:'ESTADO ACTUAL';stateBadge.replaceChildren(orderBadge(code,label,unit.id));
   // 1.5.252: las 6 etapas del servidor (las mismas del cliente). Si no llegan, la barra anterior de 4 fases.
-  watchUnit=unit.id;progress.setAttribute('aria-label','Avance de '+(many?'el equipo '+short:'la orden')+': '+label);
+  watchUnit=unit.id;watchUnitCode=unit.unit_code||unit.code||order.code;progress.setAttribute('aria-label','Avance de '+(many?'el equipo '+short:'la orden')+': '+label);
   const legacy=()=>{const ol=el('ol',undefined,'order-progress');phases.forEach(([name],index)=>{const step=el('li');step.dataset.state=code==='entregado'||index<current?'done':index===current?'current':'pending';if(index===current&&code!=='entregado')step.setAttribute('aria-current','step');step.append(el('span',step.dataset.state==='done'?'':String(index+1),'progress-dot'),el('span',name,'progress-label'));ol.append(step);});progress.replaceChildren(ol);};
   const paint=d=>{progress.replaceChildren(repairBar(d,rpActions));progress.dataset.sig=d.signature||'';};
   if(unit.id===order.id&&order.repair_stages)paint({...order.repair_stages,signature:order.repair_signature});else{legacy();api('/api/orders/'+unit.id+'/stages').then(paint).catch(()=>{});}
@@ -4375,7 +4375,7 @@ function renderOrderDetail(root,order){
  const reentry=reentryNote(order);const cancelBox=el('section',undefined,'oc-panel');cancelBox.hidden=true;root.append(head,progressBox,...(reentry?[reentry]:[]),actions,cancelBox);if(adiCard)root.append(adiCard);
  orderCancellationPanel(order,cancelBox);
  if(['administrador','tecnico'].includes(currentUser?.role)){
-  const lab=button('Laboratorio ADI',()=>adiLabDialog(order),'order-document-action secondary');
+  const lab=button('Laboratorio ADI',()=>adiLabDialog({id:watchUnit,code:watchUnitCode}),'order-document-action secondary');
   lab.prepend(systemIcon('M4 4h16v16H4z M8 12h2l2-4 2 8 2-4h2'));
   actions.append(lab);
  }
@@ -10758,8 +10758,8 @@ function adiLabDialog(order) {
    const wrap=el('label'),field=el(Array.isArray(options)?'select':options==='textarea'?'textarea':'input');
    if(Array.isArray(options)){for(const [value,text] of options)field.add(new Option(text,value));}
    if(options==='date')field.type='date';
-   field.maxLength=key==='content'?6000:400;
-   field.name=key;field.required=!['q','supersedes'].includes(key);
+   field.maxLength=({content:6000,confirmed:1700,conclusion:1700,pending_checks:1500})[key]||400;
+   field.name=key;field.required=!['q','supersedes','pending_checks'].includes(key);
    wrap.append(el('span',caption),field);form.append(wrap);inputs.set(key,field);
   }
   const action=el('button',label,'primary');action.type='submit';form.append(action);
@@ -10848,6 +10848,50 @@ function adiLabDialog(order) {
    }catch{status.textContent='No se pudo leer el archivo.';}
   });
  }
+ let diagnosisKey=invKey('adi-diagnosis');
+ const diagnosis=controls('Proponer diagnóstico oficial',[['confirmed','Hallazgos confirmados','textarea'],['conclusion','Conclusión técnica','textarea'],
+   ['pending_checks','Comprobaciones pendientes (opcional)','textarea']], 'Enviar a revisión',async(data,form)=>{
+   await api(endpoint,{...data,action:'diagnosis_submit',request_key:diagnosisKey});
+   diagnosisKey=invKey('adi-diagnosis');form.reset();status.textContent='Propuesta pendiente de revisión.';
+   await loadDiagnoses();
+ });
+ diagnosis.hidden=true;
+ root.append(button('Revisar diagnósticos de esta orden',loadDiagnoses,'secondary'));
+ async function loadDiagnoses(){
+  try{
+   const history=await api(endpoint+'?diagnoses=1');
+   diagnosis.hidden=!history.installed;
+   output.replaceChildren(el('h3','Diagnósticos de esta orden'));
+   if(!history.installed){output.append(para('Aplica la migración 132 en Sistema → Migraciones.'));return;}
+   if(!history.rows.length){output.append(para('Aún no hay propuestas.'));return;}
+   const labels={pendiente:'Pendiente de revisión',aprobado:'Aprobado',devuelto:'Devuelto'};
+   for(const row of history.rows){
+    const card=el('article',undefined,'workspace-section adi-lab-document');
+    card.append(el('h4','Propuesta '+row.id+' · '+labels[row.status]),para(row.author+' · '+formatOrderDate(row.created_at)),
+     el('h5','Hallazgos confirmados'),para(row.confirmed),el('h5','Conclusión técnica'),para(row.conclusion));
+    if(row.pending_checks)card.append(el('h5','Comprobaciones pendientes'),para(row.pending_checks));
+    if(row.reviewed_at)card.append(para(row.reviewer+' · '+formatOrderDate(row.reviewed_at)),para(row.review_note));
+    if(row.can_review){
+     const label=el('label'),note=el('textarea'),actions=el('div',undefined,'adi-lab-actions');
+     note.maxLength=600;label.append(el('span','Motivo de revisión'),note);
+     for(const [decision,name] of [['aprobado','Aprobar y actualizar diagnóstico'],['devuelto','Devolver para corrección']]){
+      actions.append(button(name,async()=>{
+       if(!note.value.trim()){note.focus();return;}
+       for(const action of actions.children)action.disabled=true;
+       try{
+        await api(endpoint,{action:'diagnosis_review',diagnosis_id:String(row.id),decision,review_note:note.value});
+        status.textContent=decision==='aprobado'?'Diagnóstico oficial de la orden actualizado.':'Propuesta devuelta.';
+        await loadDiagnoses();
+       }catch(error){status.textContent=error.message;for(const action of actions.children)action.disabled=false;}
+      },'secondary'));
+     }
+     card.append(label,actions);
+    }
+    output.append(card);
+   }
+  }catch(error){status.textContent=error.message;}
+ }
+ api(endpoint+'?diagnoses=1').then(history=>{diagnosis.hidden=!history.installed;}).catch(error=>{status.textContent=error.message;});
  const visibility=[['tecnico','Personal técnico']];
  if(currentUser?.role==='administrador')visibility.push(['administrador','Administración']);
  const proposal=controls('Proponer conocimiento',[['title','Título'],['source','Fuente'],['source_date','Fecha de la fuente','date'],['version','Versión'],

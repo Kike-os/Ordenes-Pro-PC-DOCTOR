@@ -1768,6 +1768,8 @@ class Handler(BaseHTTPRequestHandler):
                     adi_lab.require_staff(user)
                     if limited(c,'adi-lab-read:'+str(user['id']),60,60):
                         return self.reply(429,{'error':'Demasiadas consultas de laboratorio. Espera un minuto.'})
+                    if lab_order and query.get('diagnoses',[''])[0]=='1':
+                        return self.reply(200,adi_lab.diagnosis_history(c,int(lab_order[1]),user))
                     if lab_order:
                         return self.reply(200,adi_lab.draft(c,int(lab_order[1]),user,category,term))
                     rows=adi_lab.search(c,user,term,category,query.get('review',[''])[0]=='1')
@@ -5139,6 +5141,18 @@ class Handler(BaseHTTPRequestHandler):
                             if data.get('action')=='firmware':
                                 adi_lab.order_context(c,oid)
                                 return self.reply(200,adi_lab.firmware_readiness(data,user))
+                            if data.get('action')=='diagnosis_submit':
+                                did,created=adi_lab.submit_diagnosis(c,oid,data,user,now_lab)
+                                if created:audit(c,user['id'],'adi_lab_diagnosis_submitted',did)
+                                return self.reply(201 if created else 200,{'id':did,'created':created})
+                            if data.get('action')=='diagnosis_review':
+                                raw=str(data.get('diagnosis_id',''))
+                                if not re.fullmatch(r'[0-9]{1,9}',raw):
+                                    raise adi_lab.LabError('Propuesta no válida.')
+                                did=int(raw)
+                                adi_lab.review_diagnosis(c,oid,did,data,user,now_lab)
+                                audit(c,user['id'],'adi_lab_diagnosis_reviewed',did)
+                                return self.reply(200,{'id':did,'status':data['decision']})
                             if data.get('action')!='measure':
                                 raise adi_lab.LabError('Acción de laboratorio no válida.')
                             mid,created=adi_lab.measure(c,oid,data,user,now_lab)

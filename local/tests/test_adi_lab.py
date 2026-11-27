@@ -69,3 +69,45 @@ class AdiLabTests(unittest.TestCase):
             adi_lab.review(c, revision, choice, reviewer, app.reception_now())
             self.assertEqual([item['id'] for item in adi_lab.search(c, admin, 'termica')], [revision])
             self.assertEqual(c.execute('SELECT status FROM adi_lab_knowledge WHERE id=?',(did,)).fetchone()[0], 'sustituido')
+
+    def test_diagnosis_requires_another_technician_and_updates_only_internal_findings(self):
+        cookie, csrf = self.login()
+        order = self.request('/api/orders', self.order_data({'request_key':'adi-diagnosis-fictitious-order'}), cookie=cookie, csrf=csrf)['body']
+        oid = order['id']
+        path = '/api/orders/%d/adi-lab' % oid
+        proposal = {'action':'diagnosis_submit','confirmed':'Hallazgo ficticio medido','conclusion':'Diagnóstico ficticio',
+                    'pending_checks':'Verificación pendiente interna','request_key':'diagnosis-fake-1'}
+        first = self.request(path, proposal, cookie=cookie, csrf=csrf)
+        self.assertEqual(first['status'], 201, first['body'])
+        did = first['body']['id']
+        self.assertEqual(self.request(path, proposal, cookie=cookie, csrf=csrf)['body'], {'id':did,'created':False})
+        self.assertEqual(self.request(path, dict(proposal,conclusion='Otra'), cookie=cookie, csrf=csrf)['status'],409)
+        review = {'action':'diagnosis_review','diagnosis_id':str(did),'decision':'aprobado','review_note':'Medición comprobada'}
+        self.assertEqual(self.request(path, review, cookie=cookie, csrf=csrf)['status'],403)
+        with app.connect() as c:
+            before = dict(c.execute('SELECT findings,status,revision FROM orders WHERE id=?',(oid,)).fetchone())
+            self.assertNotIn('Diagnóstico ficticio', before['findings'])
+            c.execute("INSERT INTO users(username,email,name,password_hash,role,created_at) VALUES "
+                      "('laboratorio','lab@example.invalid','Técnico revisor',?,'tecnico',1)",(self.hash,))
+        session = self.request('/api/login', {'login':'laboratorio','password':'contraseña-segura-de-prueba'})
+        self.assertEqual(session['status'],200,session['body'])
+        reviewer_cookie = session['cookie'].split(';')[0]
+        reviewer_csrf = self.request('/api/me',cookie=reviewer_cookie)['body']['user']['csrf']
+        submit_review = lambda data: self.request(path,data,cookie=reviewer_cookie,csrf=reviewer_csrf)
+        history = self.request(path+'?diagnoses=1',cookie=reviewer_cookie)['body']['rows']
+        self.assertTrue(history[0]['can_review'])
+        self.assertEqual(submit_review(review)['status'],200)
+        self.assertEqual(submit_review(review)['status'],409)
+        with app.connect() as c:
+            after = c.execute('SELECT findings,status,revision FROM orders WHERE id=?',(oid,)).fetchone()
+            self.assertIn('Diagnóstico ficticio', after['findings'])
+            self.assertNotIn('Verificación pendiente interna',after['findings'])
+            self.assertEqual((after['status'],after['revision']),(before['status'], before['revision']+1))
+            self.assertEqual(c.execute("SELECT COUNT(*) FROM audit WHERE action='adi_lab_diagnosis_reviewed'").fetchone()[0],1)
+        stale = self.request(path, dict(proposal,request_key='diagnosis-fake-2'),cookie=cookie,csrf=csrf)['body']['id']
+        with app.connect() as c:
+            c.execute('UPDATE orders SET findings=? WHERE id=?',('Hallazgo actualizado por el taller',oid))
+        self.assertEqual(submit_review(dict(review,diagnosis_id=str(stale)))['status'],409)
+        self.assertEqual(submit_review(dict(review,diagnosis_id=str(stale),decision='devuelto'))['status'],200)
+        with app.connect() as c:
+            self.assertEqual(c.execute('SELECT findings FROM orders WHERE id=?',(oid,)).fetchone()[0],'Hallazgo actualizado por el taller')
