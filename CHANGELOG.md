@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## Sin publicar
+
+### Nuevas funcionalidades
+
+- ADI incorpora análisis visual asistido, búsqueda semántica, resumen coordinado y previsión de nuevas órdenes para siete días.
+- El Laboratorio ADI permite adjuntar y consultar PDF originales privados en las fuentes revisadas con la migración 134.
+- AutoCare permite pausar las funciones asistidas de ADI y restaurar el ajuste anterior con verificación y auditoría.
+
 ## v1.5.371 — 2026-11-27 16:32 (UTC-05:00)
 
 Battery Health Premium 4.0 — Typography & Visual Refinement

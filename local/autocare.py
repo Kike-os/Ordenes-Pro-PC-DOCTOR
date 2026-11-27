@@ -295,7 +295,13 @@ def after_recheck(c, result, by, now, version=''):
 
 
 # ---- Recuperación segura: solo estas acciones, sin parámetros libres, con confirmación de administración y comprobación posterior ----
+ADI_PAUSE_KEY = 'autocare_adi_pause'
+ADI_ACTIONS = ('pause_adi', 'restore_adi')
 ACTIONS = {
+    'pause_adi': {'label': 'Pausar funciones asistidas de ADI',
+                  'description': 'Contiene incidentes de IA suspendiendo la redacción, el análisis visual y la búsqueda semántica. AutoCare conserva el ajuste anterior.'},
+    'restore_adi': {'label': 'Restaurar funciones asistidas de ADI',
+                    'description': 'Deshace la pausa de AutoCare si el ajuste no se ha cambiado desde Sistema.'},
     'unlock_diagnosis': {'label': 'Liberar un diagnóstico bloqueado', 'check': 'internal',
                          'description': 'Quita la marca de «diagnóstico en curso» cuando quedó colgada más de 5 minutos (por ejemplo, si se cerró la ventana a mitad). No toca ningún dato.'},
     'license_expiry': {'label': 'Actualizar licencias vencidas del inventario', 'check': 'licenses',
@@ -306,6 +312,15 @@ ACTIONS = {
 def preview_action(c, now, action):
     if action not in ACTIONS:
         raise ValueError('Acción no permitida.')
+    if action in ADI_ACTIONS:
+        import adi_ai
+        enabled = adi_ai.enabled(c)
+        eligible = enabled
+        if action == 'restore_adi':
+            paused = _load(c, ADI_PAUSE_KEY, None)
+            eligible = not enabled and isinstance(paused, dict) and 'previous' in paused
+        return {'eligible': eligible, 'affected': int(eligible),
+                'message': ACTIONS[action]['description'] if eligible else 'No hay un cambio aplicable.'}
     if action == 'unlock_diagnosis':
         import stability
         if stability._running(c, now):
@@ -325,6 +340,28 @@ def run_action(c, now, action, user):
     spec = ACTIONS.get(action)
     if not spec:
         raise ValueError('Acción no permitida.')
+    if action in ADI_ACTIONS:
+        import adi_ai
+        if not preview_action(c, now, action)['eligible']:
+            raise ValueError('El ajuste cambió. Actualiza la vista previa.')
+        if action == 'pause_adi':
+            row = c.execute("SELECT value FROM system_state WHERE key='adi_writing'").fetchone()
+            _save(c, ADI_PAUSE_KEY, {'previous': row['value'] if row else None})
+            c.execute("INSERT INTO system_state(key,value) VALUES ('adi_writing','off') ON CONFLICT(key) DO UPDATE SET value=excluded.value")
+            done = 'Funciones asistidas de ADI en pausa.'
+        else:
+            previous = _load(c, ADI_PAUSE_KEY, None)['previous']
+            if previous is None:
+                c.execute("DELETE FROM system_state WHERE key='adi_writing'")
+            else:
+                c.execute("UPDATE system_state SET value=? WHERE key='adi_writing'", (previous,))
+            c.execute("DELETE FROM system_state WHERE key=?", (ADI_PAUSE_KEY,))
+            done = 'Ajuste anterior de ADI restaurado.'
+        if adi_ai.enabled(c) != (action == 'restore_adi'):
+            raise RuntimeError('No se pudo verificar el ajuste de ADI.')
+        log(c, 'recovery', 'media', spec['label'], spec['label'], done, now, versioning.load()['releases'][0]['version'], user['name'])
+        return {'action': action, 'label': spec['label'], 'done': done,
+                'verification': {'status': 'ok', 'message': 'Ajuste de ADI verificado en la base de datos.'}}
     if action == 'unlock_diagnosis':
         if stability._running(c, now):
             raise ValueError('El diagnóstico sigue activo (menos de 5 minutos): no se libera. Espera a que termine.')

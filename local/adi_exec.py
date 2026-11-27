@@ -26,6 +26,8 @@ STEPS = {
     'recomendaciones': ('Revisando alertas verificables', 'ADI Intelligence Insights'),
     'plazos': ('Revisando plazos y vencimientos', 'Órdenes, presupuestos, retiros y compromisos'),
     'cancelaciones': ('Revisando cancelaciones', 'Smart Cancellation & Closure Management'),
+    'resumen_coordinado': ('Coordinando consultas operativas', 'Plazos, previsión de órdenes y laboratorio ADI'),
+    'pronostico_ordenes': ('Calculando la previsión de órdenes nuevas', 'Historial de órdenes de reparación'),
 }
 
 _obj = lambda props=None, required=None: {'type': 'object', 'additionalProperties': False, 'required': required or [], 'properties': props or {}}
@@ -40,6 +42,8 @@ TOOLS = [
     {'type': 'function', 'name': 'infraestructura', 'strict': True, 'description': 'Estado verificado de la base de datos (Database Guardian, migraciones pendientes), Smart Fiscal Status, AZUR (sin secretos), respaldos, Mail Pro y WhatsApp.', 'parameters': _obj()},
     {'type': 'function', 'name': 'plazos', 'strict': True, 'description': 'Plazos reales próximos y vencidos: entregas estimadas (vencidas y en 24 h), presupuestos por vencer, equipos que superaron el plazo de retiro y compromisos de pago próximos.', 'parameters': _obj()},
     {'type': 'function', 'name': 'cancelaciones', 'strict': True, 'description': 'Cancelaciones de reparaciones: por estado (solicitada, pendiente de liquidación, pendiente de retiro, cerrada), motivos frecuentes, valores recuperados y devoluciones.', 'parameters': _obj()},
+    {'type': 'function', 'name': 'resumen_coordinado', 'strict': True, 'description': 'Consulta coordinada de plazos, previsión de órdenes y disponibilidad de las funciones del laboratorio. Indica consultas parciales.', 'parameters': _obj()},
+    {'type': 'function', 'name': 'pronostico_ordenes', 'strict': True, 'description': 'Previsión de nuevas órdenes de reparación para siete días, con error de validación y aviso cuando el historial es insuficiente. No es un pronóstico de dinero ni de entregas.', 'parameters': _obj()},
     {'type': 'function', 'name': 'recomendaciones', 'strict': True, 'description': 'Alertas verificables con prioridad y acción sugerida (ADI Intelligence Insights).', 'parameters': _obj()},
 ]
 ROLES = {t['name']: (ADMIN,) for t in TOOLS}
@@ -213,6 +217,30 @@ def plazos(c, now):
     return {'hoy': today.isoformat(), 'entregas_vencidas': overdue[:20], 'entregas_proximas_24h': soon[:20], 'presupuestos_por_vencer': quotes[:20],
             'compromisos_proximos_3_dias': commitments[:20], 'nota': 'Solo plazos con fecha registrada; nada se estima ni se reinicia.'}
 
+@_safe
+def pronostico_ordenes(c, now):
+    import adi_forecast
+    return adi_forecast.intake(c, now)
+
+
+@_safe
+def _laboratorio(c, now):
+    import adi_lab
+    return {'instalado': adi_lab.installed(c), 'pdf_originales': adi_lab.originals_installed(c)}
+
+
+def coordinated(c, now):
+    deadline = plazos(c, now)
+    forecast = pronostico_ordenes(c, now)
+    lab = _laboratorio(c, now)
+    if 'error' not in deadline:
+        deadline = {key: len(value) for key, value in deadline.items() if isinstance(value, list)}
+        deadline['limite_por_categoria'] = 20
+    return {'status': 'partial' if any('error' in result for result in (deadline, forecast, lab)) else 'ready',
+            'consulted_at': now.isoformat(timespec='seconds'),
+            'plazos': deadline, 'pronostico': forecast, 'laboratorio': lab}
+
+
 def run(c, now, name, args, user):
     """Ejecuta una herramienta ejecutiva si el usuario tiene permiso. None si no es de este módulo."""
     if name not in ROLES:
@@ -223,13 +251,15 @@ def run(c, now, name, args, user):
         return facturacion(c, now, args)
     if name == 'recomendaciones':
         return {'recomendaciones': insights(c, now)['items']}
+    if name == 'resumen_coordinado':
+        return coordinated(c, now)
     if name == 'plazos':
         return plazos(c, now)
     if name == 'cancelaciones':
         import order_cancellations
         return order_cancellations.stats(c)
     return {'finanzas': finanzas, 'cartera': cartera, 'atencion_clientes': atencion_clientes, 'repuestos': repuestos, 'inventario_bajo': inventario_bajo,
-            'infraestructura': infraestructura}[name](c, now)
+            'infraestructura': infraestructura, 'pronostico_ordenes': pronostico_ordenes}[name](c, now)
 
 
 def meta(tools, now):

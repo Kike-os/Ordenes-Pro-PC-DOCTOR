@@ -1,6 +1,10 @@
 {
   "unreleased": {
-    "features": [],
+    "features": [
+      "ADI incorpora análisis visual asistido, búsqueda semántica, resumen coordinado y previsión de nuevas órdenes para siete días.",
+      "El Laboratorio ADI permite adjuntar y consultar PDF originales privados en las fuentes revisadas con la migración 134.",
+      "AutoCare permite pausar las funciones asistidas de ADI y restaurar el ajuste anterior con verificación y auditoría."
+    ],
     "improvements": [],
     "fixes": [],
     "security": [],

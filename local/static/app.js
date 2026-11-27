@@ -8278,6 +8278,32 @@ async function renderAdminAdi(){
  panel.append(soundBox,voiceBox);
  // ── Estado operativo en vivo (mismos datos que el panel del taller; nada estimado)
  const ops=el('section',undefined,'ax-ops'),opsHead=el('header'),opsGrid=el('div',undefined,'ax-cards'),opsNote=el('small','Datos reales · cada 30 s','ax-muted');opsHead.append(el('h3','Executive Live Monitor'),opsNote);ops.append(opsHead,opsGrid);for(let n=0;n<8;n++)opsGrid.append(el('div',undefined,'ax-card ax-skeleton'));opsGrid.setAttribute('aria-busy','true');
+ const forecast=el('details',undefined,'ax-insight ax-intake-forecast');
+ const forecastBody=el('div',undefined,'ax-insight-body'),forecastStatus=el('p',undefined,'ax-muted');
+ forecastStatus.setAttribute('role','status');
+ forecast.append(el('summary','Resumen coordinado y previsión de órdenes · 7 días'),forecastBody,forecastStatus);
+ let forecastLoading=false;
+ forecast.addEventListener('toggle',async()=>{
+  if(!forecast.open||forecastLoading)return;
+  forecastLoading=true;forecastStatus.textContent='Calculando previsión…';forecastBody.replaceChildren();
+  try{
+   const brief=await api('/api/adi/admin/operational-brief'), data=brief.pronostico;
+   const parts=[];
+   if(!brief.plazos.error){
+    const count=value=>value===20?'20 o más':String(value);
+    parts.push(count(brief.plazos.entregas_vencidas)+' entregas vencidas',count(brief.plazos.entregas_proximas_24h)+' entregas próximas');
+   }
+   if(!brief.laboratorio.error)parts.push(brief.laboratorio.instalado?'Laboratorio habilitado':'Laboratorio pendiente de migración');
+   if(parts.length)forecastBody.append(el('p',parts.join(' · ')));
+   forecastStatus.textContent=[brief.status==='partial'?'Consulta parcial.':'',data.note||data.mensaje].filter(Boolean).join(' ');
+   if(data.status!=='ready')return;
+   const list=el('ul');
+   for(const day of data.days)list.append(el('li',dashboardDate(day.date)+' · '+day.estimate+' estimadas · rango '+day.low+'–'+day.high));
+   forecastBody.append(el('p',data.method+' · error medio observado: '+data.mae+' órdenes por día.'),list);
+  }catch(error){forecastStatus.textContent=error.message;}
+  finally{forecastLoading=false;}
+ });
+ ops.append(forecast);
  let live=null;const card=(label,value,icon,href,hint,tone)=>{const a=el('a',undefined,'ax-card');a.href=href;a.title=label+': '+hint+'. Abrir el detalle';if(tone)a.dataset.tone=tone;const t=el('span');t.append(el('strong',String(value)),el('span',label),el('small',hint));a.append(systemIcon(icon),t);a.setAttribute('aria-label',label+': '+value+'. '+hint);return a;};
  const paintLive=(data,extra)=>{if(!data)return;live=data;const s=data.statuses,ready=s.listo+s.espera_entrega,waiting=s.esperando_cliente+s.presupuesto+data.chats_waiting+data.appointments_requested,processing=s.diagnostico+s.reparacion+s.pruebas+(s.esperando_repuesto||0),x=extra||{};
   opsGrid.replaceChildren(card('Órdenes activas',data.active,ic.active,'#orders?active=1','Sin entregar'),card('En procesamiento',processing,ic.work,'#orders?active=1','Diagnóstico, reparación y pruebas'),
@@ -11272,6 +11298,11 @@ function adiLabDialog(order) {
   for(const row of rows){
    const card=el('article',undefined,'workspace-section adi-lab-document');
    card.append(el('h4',row.title),para(row.source+' · '+row.source_date+' · '+row.version));
+   if(row.original){
+    const download=el('a','Descargar PDF original · '+row.original.filename,'secondary');
+    download.href=knowledge+'/'+row.id+'/original';download.download=row.original.filename;
+    card.append(download,el('small','SHA-256: '+row.original.sha256,'system-muted adi-lab-original-hash'));
+   }
    if(!review && row.excerpt){
     card.append(para(row.excerpt));
     if(row.matched_concepts?.length)card.append(el('small','Conceptos relacionados · '+row.matched_concepts.join(' · '),'system-muted'));
@@ -11283,6 +11314,7 @@ function adiLabDialog(order) {
    if(!review){
     card.append(button('Proponer corrección',()=>{
      proposal.open=true;
+     originalFile.value='';
      for(const [key,value] of Object.entries({...row,supersedes:String(row.id),version:''})){
       const field=proposal.querySelector('[name="'+key+'"]');
       if(field)field.value=value;
@@ -11327,6 +11359,35 @@ function adiLabDialog(order) {
  const diagnostic=controls('Diagnóstico y fuentes aprobadas', [['category','Categoría',categories],['q','Buscar por término o concepto']],
   'Preparar borrador',async data=>renderDraft(await api(endpoint+'?'+new URLSearchParams(data))));
  diagnostic.open=true;
+ function confirmation(caption){
+  const label=el('label',undefined,'adi-lab-confirm'), box=el('input');
+  box.type='checkbox';box.required=true;
+  label.append(el('span',caption),box);return label;
+ }
+ const visual=controls('Análisis visual',[],'Analizar imagen',async (_,form)=>{
+  const image=visualFile.files[0];
+  if(!image||image.size>750000)throw new Error('Selecciona una imagen de hasta 750 KB.');
+  status.textContent='Analizando imagen…';
+  const result=await api('/api/orders/'+order.id+'/adi-visual',{image:await blobBase64(image),confirmed:true});
+  output.replaceChildren(el('h3','Revisión visual para el técnico'),...result.analysis.split('\n').filter(Boolean).map(para));
+  status.textContent='Análisis disponible para revisión.';form.reset();
+ });
+ const visualFile=el('input');visualFile.type='file';visualFile.accept='image/jpeg,image/png,image/webp';visualFile.required=true;
+ const imageLabel=el('label');imageLabel.append(el('span','Imagen técnica · JPG, PNG o WebP, hasta 750 KB'),visualFile);
+ visual.querySelector('form').prepend(imageLabel,confirmation('Autorizo enviar esta imagen a OpenAI y confirmo que está libre de datos personales.'));
+ if(currentUser?.role==='administrador'){
+  const semantic=controls('Búsqueda semántica', [['category','Categoría',categories],['q','Consulta técnica']],
+   'Buscar por significado',async data=>{
+    status.textContent='Buscando fuentes relacionadas…';
+    const result=await api('/api/adi/lab/semantic',{...data,confirmed:true});
+    output.replaceChildren(el('h3','Fuentes relacionadas por significado'),...documents(result.rows));
+    status.textContent='Consulta completada.';
+   });
+  semantic.querySelector('[name=q]').required=true;
+  semantic.querySelector('[name=q]').maxLength=180;
+  semantic.querySelector('button').before(confirmation('Autorizo enviar la consulta y los extractos técnicos aprobados de esta categoría a OpenAI.'));
+ }
+
  let measurementKey=crypto.randomUUID?.()||String(Date.now())+'-'+Math.random();
  controls('Registrar medición',[['point','Punto de medición'],['value','Valor'],['unit','Unidad',['V','mV','A','mA','Ω','kΩ','MΩ','MHz','°C','W'].map(x=>[x,x])],['conditions','Condiciones']],
   'Guardar medición',async (data,form)=>{
@@ -11404,7 +11465,19 @@ function adiLabDialog(order) {
  if(currentUser?.role==='administrador')visibility.push(['administrador','Administración']);
  const proposal=controls('Proponer conocimiento',[['title','Título'],['source','Fuente'],['source_date','Fecha de la fuente','date'],['version','Versión'],
    ['category','Categoría',categories],['visibility','Acceso',visibility],['supersedes','ID de fuente que corrige (opcional)'],['content','Extracto autorizado','textarea']],
-  'Enviar a revisión',async (data,form)=>{await api(knowledge,data);form.reset();status.textContent='Documento pendiente de revisión.';});
+  'Enviar a revisión',async (data,form)=>{
+   const file=originalFile.files[0];
+   if(file){
+    if(!file.size||file.size>1000000)throw new Error('El PDF original debe pesar hasta 1 MB.');
+    data.original_name=file.name;
+    data.original_pdf=ofxB64(new Uint8Array(await file.arrayBuffer()));
+   }
+   await api(knowledge,data);form.reset();status.textContent='Documento pendiente de revisión.';
+  });
+ const originalFile=el('input');originalFile.type='file';originalFile.accept='application/pdf,.pdf';
+ const originalLabel=el('label');originalLabel.append(el('span','PDF original autorizado (opcional, hasta 1 MB)'),originalFile);
+ const proposalForm=proposal.querySelector('form');
+ proposalForm.insertBefore(originalLabel,proposalForm.querySelector('button[type=submit]'));
  root.append(button('Revisar documentos pendientes',async()=>{
   try{const result=await api(knowledge+'?review=1');output.replaceChildren(el('h3','Documentos pendientes'),...documents(result.rows,true));}
   catch(error){status.textContent=error.message;}

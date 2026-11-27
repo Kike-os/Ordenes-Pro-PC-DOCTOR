@@ -96,6 +96,43 @@ class DbMigrationsTests(unittest.TestCase):
         self.assertEqual(again['status'], 409)
         self.assertIn('No hay migraciones pendientes', again['body']['error'])
 
+    def test_lab_and_battery_migrations_apply_in_order_with_existing_repairs(self):
+        cookie, csrf = self.session()
+        order = self.request('/api/orders', test_app.SecurityTests.order_data(self, {
+            'type': 'portatil', 'request_key': 'migration-lab-battery-fixture'
+        }), cookie=cookie, csrf=csrf)
+        self.assertEqual(order['status'], 201, order['body'])
+        base = f"/api/orders/{order['body']['id']}"
+        expected = ['131_adi_technical_lab.sql', '132_adi_diagnosis_review.sql',
+                    '133_order_battery_health.sql', '134_adi_source_originals.sql']
+        with app.connect() as c:
+            for table in ('adi_lab_source_originals', 'order_battery_revisions', 'order_battery_images',
+                          'adi_lab_diagnoses', 'adi_lab_measurements', 'adi_lab_knowledge'):
+                c.execute('DROP TABLE ' + table)
+            c.executemany('DELETE FROM migrations WHERE name=?', ((name,) for name in expected))
+        status = '/api/system/migrations'
+        post = lambda path, body: self.request(path, body, cookie=cookie, csrf=csrf)
+        self.assertEqual(self.request(status, cookie=cookie)['body']['applicable'], expected)
+        self.assertEqual(post(status+'/apply', {'confirm':'APLICAR'})['status'], 409)
+        self.assertEqual(self.request(base+'/adi-lab', cookie=cookie)['status'], 503)
+        self.assertFalse(self.request(base+'/battery', cookie=cookie)['body']['available'])
+        self.verified_backup()
+        applied = post(status+'/apply', {'confirm':'APLICAR'})
+        self.assertEqual(applied['status'], 200, applied['body'])
+        self.assertEqual(applied['body']['applied'], expected)
+        self.assertEqual(applied['body']['lost'], [])
+        self.assertEqual(self.request(status, cookie=cookie)['body']['pending'], [])
+        sample=self.request('/api/system/release-monitor?lab_probe=1', cookie=cookie)
+        self.assertEqual(sample['status'], 200, sample['body'])
+        self.assertEqual(sample['body']['database'], 'SQLite')
+        self.assertGreaterEqual(sample['body']['search_ms'], 0)
+        self.assertEqual(self.request(base+'/adi-lab', cookie=cookie)['status'], 200)
+        pending=self.request(base+'/battery', cookie=cookie)['body']['battery']
+        self.assertIsNone(pending['percent'])
+        saved=post(base+'/battery', {'revision':str(pending['id']), 'status':'evaluada', 'percent':'80'})
+        self.assertEqual(saved['status'], 200, saved['body'])
+        self.assertEqual(self.request(base+'/battery', cookie=cookie)['body']['battery']['percent'], 80)
+
     def test_database_error_is_explained_and_leaves_nothing_half_applied(self):
         import shutil
         from unittest.mock import patch

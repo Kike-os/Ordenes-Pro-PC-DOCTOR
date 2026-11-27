@@ -14565,6 +14565,9 @@ body:has(.ax) #adi-widget{display:none}
 .adi-lab-form label{display:grid;gap:.3rem;min-width:0}
 .adi-lab-form input,.adi-lab-form textarea,.adi-lab-form select{box-sizing:border-box;width:100%;min-width:0}
 .adi-lab-form label:has(textarea){grid-column:1/-1}
+.adi-lab-form .adi-lab-confirm{grid-column:1/-1;display:flex;align-items:baseline;gap:.55rem}
+.adi-lab-form .adi-lab-confirm input{order:-1;width:auto;flex:none}
+
 .adi-lab-document{overflow-wrap:anywhere}
 .adi-lab-document p:last-of-type{white-space:pre-wrap}
 .adi-lab-actions{display:flex;flex-wrap:wrap;gap:.5rem}
@@ -14707,3 +14710,6 @@ body:has(.ax) #adi-widget{display:none}
 
 #module-content .equip-battery-card .equip-tab-select[aria-selected=true] .equip-card-picked{display:inline-grid}
 .equip-picker:has(>.equip-battery-card){align-items:start}
+
+.adi-lab-original-hash{display:block;overflow-wrap:anywhere}
+.adi-lab-document>a[download]{display:inline-block;max-width:100%;overflow-wrap:anywhere}
