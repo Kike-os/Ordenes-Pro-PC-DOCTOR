@@ -8,6 +8,24 @@
   },
   "releases": [
     {
+      "version": "1.5.367",
+      "date": "2026-11-27T13:36:16-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Diagnóstico de salud de batería por equipo",
+      "changes": {
+        "features": [
+          "La salud de batería se registra por equipo para portátiles y portátiles gaming, con estados pendientes, historial y foto privada opcional. Requiere la migración 133."
+        ],
+        "improvements": [],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Actualización solicitada con verificación previa"
+    },
+    {
       "version": "1.5.366",
       "date": "2026-11-27T12:07:53-05:00",
       "type": "patch",

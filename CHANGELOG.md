@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.367 — 2026-11-27 13:36 (UTC-05:00)
+
+Diagnóstico de salud de batería por equipo
+
+### Nuevas funcionalidades
+
+- La salud de batería se registra por equipo para portátiles y portátiles gaming, con estados pendientes, historial y foto privada opcional. Requiere la migración 133.
+
 ## v1.5.366 — 2026-11-27 12:07 (UTC-05:00)
 
 Verificación del laboratorio ADI y simulación de AutoCare
