@@ -16,7 +16,7 @@ import quotes
 import public_identity
 
 E = html.escape
-ASSET = '285'  # versión de los estáticos (evita cachés antiguas al publicar)
+ASSET = 'compact-1'  # versión de los estáticos (evita cachés antiguas al publicar)
 
 ICONS = {
     'copy': '<rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>',
@@ -82,12 +82,12 @@ def validity(quote, now=None):
         start = date.fromisoformat(start_text) if start_text else today
     except ValueError:
         start = today
-    total, left = max(1, (last - start).days), (last - today).days
+    total, left = max(1, (last - start).days + 1), (last - today).days
     if left < 0:
         return {'state': 'expired', 'label': 'Vencido el %s' % last.strftime('%d/%m/%Y'), 'total': total, 'left': 0}
     if left == 0:
-        return {'state': 'soon', 'label': 'Vence hoy', 'total': total, 'left': 0}
-    return {'state': 'soon' if left <= 3 else 'ok', 'label': ('Vigente · queda 1 día' if left == 1 else 'Vigente · quedan %d días' % left), 'total': total, 'left': min(left, total)}
+        return {'state': 'urgent', 'label': 'Vence hoy', 'total': total, 'left': 1}
+    return {'state': 'urgent' if left == 1 else 'soon' if left <= 3 else 'ok', 'label': ('Vigente · queda 1 día' if left == 1 else 'Vigente · quedan %d días' % left), 'total': total, 'left': min(left + 1, total)}
 
 
 def whatsapp(text=''):
@@ -108,13 +108,13 @@ def shell(title, body, dock='', wa_text=''):
     contact = ('<a class="qp-wa qp-noprint" href="%s" target="_blank" rel="noopener noreferrer">%s<span>WhatsApp</span></a>' % (E(link, quote=True), icon('message-circle'))) if link else ''
     return ('<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer">'
             '<meta name="robots" content="noindex,nofollow"><meta name="theme-color" content="#060d1a"><meta name="color-scheme" content="dark"><title>%s | PC-DOCTOR S.A.</title>'
-            '<link rel="icon" href="/favicon.ico?v=2" sizes="48x48"><link rel="stylesheet" href="/static/quote-premium.css?v=%s"><script defer src="/static/quote-premium.js?v=%s"></script>%s</head>'
+            '<link rel="icon" href="/favicon.ico?v=2" sizes="48x48"><link rel="stylesheet" href="/static/quote-premium.css?v=%s">%s<script defer src="/static/quote-premium.js?v=%s"></script></head>'
             '<body class="qp-body"><a class="qp-skip" href="#qp-main">Ir al contenido</a>'
             '<header class="qp-top"><div class="qp-top-in"><img class="qp-logo" src="/static/logo-original.png" alt="PC-DOCTOR S.A." width="2826" height="2049" decoding="async">'
             '<div class="qp-brand"><strong>%s</strong><span>%s</span></div>%s</div></header>'
             '<main id="qp-main" class="qp">%s</main>'
             '<footer class="qp-foot"><p>%s</p><p class="qp-foot-note">La firma de esta página es un trazo manuscrito digitalizado con registro de fecha, hora y método de verificación. No es una firma electrónica certificada.</p></footer>'
-            '%s</body></html>') % (E(title), ASSET, ASSET, public_identity.ASSETS, E(company['name']), E(company['specialty']), contact, body,
+            '%s</body></html>') % (E(title), ASSET, public_identity.ASSETS, ASSET, E(company['name']), E(company['specialty']), contact, body,
                                    ('WhatsApp: ' + E(company['whatsapp'])) if company.get('whatsapp') else E(company['name']), dock)
 
 
@@ -138,7 +138,7 @@ def hero(quote, order, now=None, state_label=None):
     label = state_label or ('Vencido' if status == 'enviado' and vig['state'] == 'expired' else quotes.STATUS[status])
     tone = 'expired' if label == 'Vencido' else 'replaced' if label == 'Reemplazado' else status
     issued = _day(quote.get('sent_at')) or _day(quote.get('created_at'))
-    bar = ('<progress class="qp-vig-bar" max="%d" value="%d" aria-label="Días de vigencia restantes">%d de %d días</progress>' % (vig['total'], vig['left'], vig['left'], vig['total'])) if vig['total'] else ''
+    bar = ('<progress class="qp-vig-bar" max="%d" value="%d" aria-label="Vigencia restante">%d de %d días calendario</progress>' % (vig['total'], vig['left'], vig['left'], vig['total'])) if vig['total'] else ''
     facts = [('Orden vinculada', order.get('code') or '—'), ('Equipo', device), ('Emitido', issued or '—'), ('Válido hasta', _day(quote.get('valid_until')) or 'Sin fecha límite')]
     return ('<section class="qp-hero" aria-labelledby="qp-code"><div class="qp-hero-top"><div><p class="qp-eyebrow">Presupuesto</p>'
             '<h1 id="qp-code" class="qp-code">%s</h1></div><button type="button" class="qp-btn qp-btn-ghost qp-copy qp-noprint" data-qp-copy="%s" aria-label="Copiar el número de presupuesto %s" hidden>%s<span>Copiar</span></button>'
@@ -157,12 +157,12 @@ def missing_page():
 def identify_page(token, quote, order, error='', now=None):
     document_kind = public_identity.kind(order.get('identification'), order.get('document_type'))
     alert = '<p class="qp-alert" role="alert">%s</p>' % E(error) if error else ''
-    form = ('<section class="qp-panel qp-identify"><div class="qp-identify-in">'
+    form = ('<section class="qp-panel qp-identify" aria-label="Verificación de identidad">'
             '<p class="qp-muted">Por tu seguridad, los servicios y los importes se muestran después de esta comprobación.</p>'
             '<form class="qp-id-form" method="post" action="/presupuesto/%s" autocomplete="off">%s%s'
-            '<button class="qp-btn qp-btn-primary" type="submit">Ver mi presupuesto</button></form></div></section>'
-            ) % (E(token, quote=True), alert, public_identity.fields(document_kind, total=3))
-    return shell('Presupuesto ' + quote['code'], hero(quote, order, now) + form, wa_text='Hola PC-DOCTOR, tengo una consulta sobre el presupuesto %s (orden %s).' % (quote['code'], order.get('code', '')))
+            '<button class="qp-btn qp-btn-primary" type="submit">%s<span>Ver mi presupuesto</span></button></form></section>'
+            ) % (E(token, quote=True), alert, public_identity.fields(document_kind, total=3), icon('lock', 'qp-ico qp-ico-s'))
+    return shell('Presupuesto ' + quote['code'], hero(quote, order, now) + steps(1) + form, wa_text='Hola PC-DOCTOR, tengo una consulta sobre el presupuesto %s (orden %s).' % (quote['code'], order.get('code', '')))
 
 
 def extras(c, items):

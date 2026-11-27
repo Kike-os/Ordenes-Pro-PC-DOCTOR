@@ -9,13 +9,27 @@
 
  // Copiar el número de presupuesto
  for(const button of document.querySelectorAll('[data-qp-copy]')){button.hidden=false;const status=document.querySelector('[data-qp-copy-status]'),label=button.querySelector('span');
-  button.addEventListener('click',async()=>{const ok=await copy(button.dataset.qpCopy);if(label){label.textContent=ok?'Copiado':'No se pudo copiar';setTimeout(()=>{label.textContent='Copiar';},1800);}if(status)status.textContent=ok?'Número de presupuesto copiado.':'No se pudo copiar: selecciónalo y cópialo.';});}
+  button.addEventListener('click',async()=>{const ok=await copy(button.dataset.qpCopy);if(label){button.dataset.copied=String(ok);label.textContent=ok?'Copiado':'No se pudo copiar';setTimeout(()=>{label.textContent='Copiar';delete button.dataset.copied;},1800);}if(status)status.textContent=ok?'Número de presupuesto copiado.':'No se pudo copiar: selecciónalo y cópialo.';});}
  // Datos bancarios (bloque común)
  for(const button of document.querySelectorAll('[data-copy-bank]')){const status=document.querySelector('[data-copy-status]');
   button.addEventListener('click',async()=>{const ok=await copy(button.dataset.copyBank||'');if(status)status.textContent=ok?'Datos bancarios copiados.':'No se pudo copiar: selecciona los datos y cópialos.';});}
  // Imprimir (A4)
  for(const button of document.querySelectorAll('[data-qp-print]')){button.hidden=false;button.addEventListener('click',()=>window.print());}
 
+ const identity=document.querySelector('.qp-id-form');
+ if(identity){
+  const digits=identity.elements.last4, submit=identity.querySelector('button[type=submit]');
+  const label=submit.querySelector('span');
+  const ready=()=>{submit.disabled=!/^[0-9]{4}$/.test(digits.value);};
+  ready();identity.addEventListener('input',ready);
+  identity.addEventListener('keydown',()=>queueMicrotask(ready));
+  identity.addEventListener('paste',()=>queueMicrotask(ready));
+  identity.addEventListener('submit',event=>{
+   if(event.defaultPrevented)return;
+   submit.disabled=true;submit.setAttribute('aria-busy','true');label.textContent='Verificando…';
+  });
+  window.addEventListener('pageshow',()=>{submit.removeAttribute('aria-busy');label.textContent='Ver mi presupuesto';ready();});
+ }
  const form=document.querySelector('[data-qp-form]');if(!form)return;
  const items=[...form.querySelectorAll('.qp-item')].map(box=>({box,name:box.dataset.name||'',net:+box.dataset.net||0,base:+box.dataset.base||0,tax:+box.dataset.tax||0,taxed:box.dataset.taxed==='1',radios:[...box.querySelectorAll('input[type=radio]')]}));
  const sums=[...document.querySelectorAll('[data-qp-sum]')],counts=[...document.querySelectorAll('[data-qp-count]')];
@@ -41,6 +55,13 @@
   if(live)live.textContent=button.dataset.quoteAll==='aprobado'?'Marcaste todos los servicios como aprobados. Revisa y confirma para registrarlo.':'Marcaste todos los servicios como rechazados. Revisa y confirma para registrarlo.';});}
  // Revisar selección: lleva al resumen; si falta decidir algún servicio, lleva al primero pendiente
  const confirm=document.getElementById('qp-confirm');
+ const steps=[...document.querySelectorAll('.qp-steps li')];
+ const markStep=current=>steps.forEach((step,i)=>{
+  step.dataset.state=i<current?'done':i===current?'current':'todo';
+  if(i===current)step.setAttribute('aria-current','step');else step.removeAttribute('aria-current');
+ });
+ confirm?.addEventListener('focusin',()=>{if(items.every(item=>choice(item)))markStep(2);});
+ form.querySelector('.qp-main')?.addEventListener('focusin',()=>markStep(1));
  for(const link of document.querySelectorAll('[data-qp-review-go]'))link.addEventListener('click',event=>{event.preventDefault();const missing=items.find(item=>!choice(item));
   if(missing){missing.box.dataset.attention='true';go(missing.box,missing.radios[0]);if(live)live.textContent='Falta decidir «'+missing.name+'».';return;}go(confirm,confirm);});
  // Barra inferior (tableta y móvil): total seleccionado y acceso al botón de confirmación
