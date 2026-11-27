@@ -2,7 +2,7 @@
 
 ## Estado de la implementación
 
-La versión **1.5.363** incorporó los flujos iniciales de laboratorio. El candidato posterior a **1.5.370** incorpora las funciones nuevas de esta página. La validación con OpenAI y Turso queda pendiente en Preview.
+La versión **1.5.363** incorporó los flujos iniciales de laboratorio. La versión **1.6.0** incorpora las funciones nuevas de esta página. La validación con OpenAI y Turso queda pendiente en Preview.
 
 ## Flujos implementados
 

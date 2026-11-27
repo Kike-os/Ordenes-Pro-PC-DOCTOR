@@ -1,16 +1,32 @@
 {
   "unreleased": {
-    "features": [
-      "ADI incorpora análisis visual asistido, búsqueda semántica, resumen coordinado y previsión de nuevas órdenes para siete días.",
-      "El Laboratorio ADI permite adjuntar y consultar PDF originales privados en las fuentes revisadas con la migración 134.",
-      "AutoCare permite pausar las funciones asistidas de ADI y restaurar el ajuste anterior con verificación y auditoría."
-    ],
+    "features": [],
     "improvements": [],
     "fixes": [],
     "security": [],
     "performance": []
   },
   "releases": [
+    {
+      "version": "1.6.0",
+      "date": "2026-11-27T17:43:28-05:00",
+      "type": "minor",
+      "status": "publicada",
+      "summary": "ADI Executive Intelligence 7.0",
+      "changes": {
+        "features": [
+          "ADI incorpora análisis visual asistido, búsqueda semántica, resumen coordinado y previsión de nuevas órdenes para siete días.",
+          "El Laboratorio ADI permite adjuntar y consultar PDF originales privados en las fuentes revisadas con la migración 134.",
+          "AutoCare permite pausar las funciones asistidas de ADI y restaurar el ajuste anterior con verificación y auditoría."
+        ],
+        "improvements": [],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "El usuario solicitó terminar ADI y actualizar a la siguiente versión"
+    },
     {
       "version": "1.5.371",
       "date": "2026-11-27T16:32:55-05:00",
