@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.371 — 2026-11-27 16:32 (UTC-05:00)
+
+Battery Health Premium 4.0 — Typography & Visual Refinement
+
+### Mejoras realizadas
+
+- Indicador de salud de batería compacto para portátiles convencionales y gaming, con jerarquía tipográfica, desgaste visible y estado pendiente sin porcentajes. Conserva el icono oficial y sus animaciones.
+
 ## v1.5.370 — 2026-11-27 14:08 (UTC-05:00)
 
 Icono oficial de batería animado en tiempo real

@@ -4721,32 +4721,36 @@ function batteryHealthPremium(node){
   segments.join('')+
   '<rect class="equip-battery-slot-shine" x="451" y="48" width="55" height="27" rx="12"/>';
  const levels=[...icon.querySelectorAll('.equip-battery-level')];
- const copy=el('span',undefined,'equip-battery-copy'),title=el('span','Salud de batería','equip-battery-title');
- const reading=el('span',undefined,'equip-battery-reading'),percent=el('strong'),condition=el('span');
- const wear=el('span',undefined,'equip-battery-wear'),reviewed=el('time',undefined,'equip-battery-review');
- reading.append(percent,condition);copy.append(title,reading,wear,reviewed);node.append(icon,copy);
+ const visual=el('span',undefined,'equip-battery-visual');
+ const condition=el('span',undefined,'equip-battery-condition');
+ const copy=el('span',undefined,'equip-battery-copy');
+ const title=el('span','SALUD DE BATERÍA','equip-battery-title');
+ const status=el('span',undefined,'equip-battery-status');
+ const percent=el('strong',undefined,'equip-battery-percent');
+ const wear=el('span',undefined,'equip-battery-wear');
+ const reviewed=el('time',undefined,'sr-only');
+ visual.append(icon,condition);copy.append(title,status,percent,wear,reviewed);node.append(visual,copy);
  return record=>{
   const value=record.percent;
   const measured=record.status==='evaluada'&&Number.isFinite(value)&&value>=0&&value<=100;
-  const [,tone,label]=measured?batteryConditions.find(([min])=>value>=min):[0,'pendiente','Pendiente de diagnóstico'];
+  const [,tone,label]=measured?batteryConditions.find(([min])=>value>=min):[0,'pendiente',BATTERY_STATES[record.status==='no_evaluada'?'no_evaluada':'pendiente']];
   node.dataset.tone=tone;
   node.dataset.charging=String(record.charging===true);
+  status.hidden=measured;status.textContent=measured?'':label;
   percent.hidden=!measured;percent.textContent=measured?batteryValue(record):'';
-  condition.textContent=label;
+  condition.hidden=!measured;condition.textContent=measured?label:'';
   wear.hidden=!measured;
   wear.textContent=measured?'Desgaste: '+batteryNumber.format((10000-Math.round(value*100))/100)+' %':'';
   reviewed.hidden=!record.created_at;
-  if(record.created_at){
-   reviewed.dateTime=record.created_at;
-   reviewed.textContent='Última revisión · '+formatOrderDate(record.created_at);
-  }
+  reviewed.dateTime=record.created_at||'';
+  reviewed.textContent=record.created_at?'Última revisión · '+formatOrderDate(record.created_at):'';
+  node.title=[node.matches('button')?'Abrir diagnóstico de batería':'',reviewed.textContent].filter(Boolean).join(' · ');
   levels.forEach((level,i)=>level.style.setProperty('--battery-fill',measured?Math.max(0,Math.min(1,value/20-i)):0));
  };
 }
 function batteryIndicator(unit){
  const trigger=button('',()=>openBatteryDiagnosis(unit.id),'equip-battery-trigger');
  trigger.setAttribute('aria-haspopup','dialog');
- trigger.title='Abrir diagnóstico de batería';
  trigger.dataset.orderId=String(unit.id);
  const paint=batteryHealthPremium(trigger);
  trigger.paintBattery=record=>{unit.battery=record;paint(record);};
@@ -4755,7 +4759,7 @@ function batteryIndicator(unit){
 }
 async function openBatteryDiagnosis(orderId){
  if(document.querySelector('dialog.battery-dialog[open]'))return;
- const dialog=smallDialog('BATTERY HEALTH PREMIUM 3.0 — Smart Battery Calculator');dialog.classList.add('battery-dialog');
+ const dialog=smallDialog('Battery Health Premium 4.0 — Typography & Visual Refinement');dialog.classList.add('battery-dialog');
  const heading=dialog.querySelector('h2');heading.id='battery-diagnosis-title';
  dialog.setAttribute('aria-labelledby',heading.id);
  dialog.beforeClose=()=>!dialog.hasAttribute('aria-busy');
@@ -4808,6 +4812,12 @@ async function openBatteryDiagnosis(orderId){
   state.value=record.status;
   const preview=el('div',undefined,'equip-battery-preview'),paintPreview=batteryHealthPremium(preview);
   form.append(preview);
+  if(record.created_at){
+   const review=el('time','Última revisión · '+formatOrderDate(record.created_at),'equip-battery-review');
+   review.dateTime=record.created_at;
+   form.append(review);
+  }
+  form.append(el('small','Los rangos de salud son orientativos.','equip-battery-review'));
   const measurements=el('div',undefined,'battery-measurements');
   const percent=field(measurements,'Salud de batería (%)','percent');
   const wear=field(measurements,'Desgaste de batería (%)','wear');

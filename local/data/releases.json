@@ -8,6 +8,24 @@
   },
   "releases": [
     {
+      "version": "1.5.371",
+      "date": "2026-11-27T16:32:55-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Battery Health Premium 4.0 — Typography & Visual Refinement",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "Indicador de salud de batería compacto para portátiles convencionales y gaming, con jerarquía tipográfica, desgaste visible y estado pendiente sin porcentajes. Conserva el icono oficial y sus animaciones."
+        ],
+        "fixes": [],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Usuario solicitó actualizar a la siguiente versión"
+    },
+    {
       "version": "1.5.370",
       "date": "2026-11-27T14:08:59-05:00",
       "type": "patch",
