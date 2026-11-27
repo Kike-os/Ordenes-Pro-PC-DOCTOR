@@ -8,6 +8,26 @@
   },
   "releases": [
     {
+      "version": "1.5.364",
+      "date": "2026-11-27T08:00:17-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Portal compacto de presupuestos y envío de proformas por WhatsApp",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "El portal de presupuestos usa un diseño compacto y un verificador adaptable con cuatro casillas y estados de vigencia."
+        ],
+        "fixes": [
+          "El envío directo de proformas por WhatsApp permite registrar la autorización, evita duplicados y muestra los estados de entrega en el historial del cliente."
+        ],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Preparación del candidato de Preview"
+    },
+    {
       "version": "1.5.363",
       "date": "2026-11-27T07:10:33-05:00",
       "type": "patch",

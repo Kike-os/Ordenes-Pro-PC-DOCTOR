@@ -4,6 +4,18 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.364 — 2026-11-27 08:00 (UTC-05:00)
+
+Portal compacto de presupuestos y envío de proformas por WhatsApp
+
+### Mejoras realizadas
+
+- El portal de presupuestos usa un diseño compacto y un verificador adaptable con cuatro casillas y estados de vigencia.
+
+### Errores corregidos
+
+- El envío directo de proformas por WhatsApp permite registrar la autorización, evita duplicados y muestra los estados de entrega en el historial del cliente.
+
 ## v1.5.363 — 2026-11-27 07:10 (UTC-05:00)
 
 Laboratorio técnico de ADI y revisión de diagnósticos
