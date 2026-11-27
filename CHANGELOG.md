@@ -4,6 +4,18 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.359 — 2026-11-26 23:30 (UTC-05:00)
+
+Identidad visual corporativa en los portales públicos
+
+### Mejoras realizadas
+
+- La política visual de Órdenes Pro y las pruebas en Chromium cubren contraste, navegación por teclado y el diseño de los portales en móvil, tableta y escritorio.
+
+### Errores corregidos
+
+- La verificación de identidad y el portal de cuenta recuperan el fondo oscuro y los azules corporativos mediante tokens compartidos. Se conserva el modo claro explícito.
+
 ## v1.5.358 — 2026-11-26 23:09 (UTC-05:00)
 
 ADI Smart Identity Verification 2.0

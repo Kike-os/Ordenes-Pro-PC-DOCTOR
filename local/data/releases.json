@@ -8,6 +8,26 @@
   },
   "releases": [
     {
+      "version": "1.5.359",
+      "date": "2026-11-26T23:30:34-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Identidad visual corporativa en los portales públicos",
+      "changes": {
+        "features": [],
+        "improvements": [
+          "La política visual de Órdenes Pro y las pruebas en Chromium cubren contraste, navegación por teclado y el diseño de los portales en móvil, tableta y escritorio."
+        ],
+        "fixes": [
+          "La verificación de identidad y el portal de cuenta recuperan el fondo oscuro y los azules corporativos mediante tokens compartidos. Se conserva el modo claro explícito."
+        ],
+        "security": [],
+        "performance": []
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Publicación automática solicitada por el usuario tras las pruebas"
+    },
+    {
       "version": "1.5.358",
       "date": "2026-11-26T23:09:47-05:00",
       "type": "patch",
