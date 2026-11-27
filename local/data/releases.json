@@ -8,6 +8,24 @@
   },
   "releases": [
     {
+      "version": "1.5.365",
+      "date": "2026-11-27T08:14:34-05:00",
+      "type": "patch",
+      "status": "publicada",
+      "summary": "Búsqueda técnica más rápida en el laboratorio de ADI",
+      "changes": {
+        "features": [],
+        "improvements": [],
+        "fixes": [],
+        "security": [],
+        "performance": [
+          "La búsqueda de fuentes del laboratorio de ADI reutiliza el análisis de extractos repetidos y conserva los resultados, citas y permisos."
+        ]
+      },
+      "published_by": "Kike-os",
+      "authorized_by": "Actualización autorizada tras la verificación"
+    },
+    {
       "version": "1.5.364",
       "date": "2026-11-27T08:00:17-05:00",
       "type": "patch",

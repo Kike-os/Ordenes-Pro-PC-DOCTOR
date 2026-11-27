@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.365 — 2026-11-27 08:14 (UTC-05:00)
+
+Búsqueda técnica más rápida en el laboratorio de ADI
+
+### Optimización del rendimiento
+
+- La búsqueda de fuentes del laboratorio de ADI reutiliza el análisis de extractos repetidos y conserva los resultados, citas y permisos.
+
 ## v1.5.364 — 2026-11-27 08:00 (UTC-05:00)
 
 Portal compacto de presupuestos y envío de proformas por WhatsApp
