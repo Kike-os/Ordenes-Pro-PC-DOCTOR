@@ -4700,25 +4700,31 @@ function batteryBasisPoints(value){
  const points=Number(match[1])*100+Number((match[2]||'').padEnd(2,'0'));
  return points<=10000?points:null;
 }
+let batteryIconSequence=0;
 function batteryHealthPremium(node){
  node.classList.add('equip-battery-widget');
  const icon=document.createElementNS('http://www.w3.org/2000/svg','svg');
  icon.classList.add('equip-battery-icon');
- icon.setAttribute('viewBox','0 0 120 36');
+ icon.setAttribute('viewBox','0 0 600 244');
  icon.setAttribute('aria-hidden','true');icon.setAttribute('focusable','false');
- const segments=Array.from({length:5},(_,i)=>{
-  const x=8+i*20;
-  return '<rect class="equip-battery-slot" x="'+x+'" y="8" width="16" height="18" rx="2"/>'+
-   '<g class="equip-battery-level"><rect x="'+x+'" y="8" width="16" height="18" rx="2"/>'+
-   '<path d="M'+(x+2)+' 11h12"/></g>';
- });
- icon.innerHTML='<rect class="equip-battery-case" x="2" y="3" width="108" height="28" rx="7"/>'+
-  '<path class="equip-battery-terminal" d="M113 11h2a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2z"/>'+segments.join('');
+ const finish='battery-finish-'+(++batteryIconSequence);
+ const segments=[[43,91],[144,91],[244,91],[345,91],[439,77]].map(([x,width])=>
+  '<rect class="equip-battery-slot" x="'+x+'" y="42" width="'+width+'" height="162" rx="13"/>'+
+  '<g class="equip-battery-level"><rect x="'+x+'" y="42" width="'+width+'" height="162" rx="13"/>'+
+   '<rect x="'+x+'" y="42" width="'+width+'" height="162" rx="13" fill="url(#'+finish+')"/></g>');
+ icon.innerHTML='<defs><linearGradient id="'+finish+'" x2="0" y2="1">'+
+  '<stop stop-color="white" stop-opacity=".14"/><stop offset=".22" stop-color="white" stop-opacity=".02"/>'+
+  '<stop offset="1" stop-color="#001c2a" stop-opacity=".09"/></linearGradient></defs>'+
+  '<rect class="equip-battery-case" x="16" y="16" width="526" height="215" rx="37"/>'+
+  '<rect class="equip-battery-rim" x="27" y="27" width="504" height="193" rx="27"/>'+
+  '<rect class="equip-battery-terminal" x="555" y="78" width="30" height="91" rx="14"/>'+
+  segments.join('')+
+  '<rect class="equip-battery-slot-shine" x="451" y="48" width="55" height="27" rx="12"/>';
  const levels=[...icon.querySelectorAll('.equip-battery-level')];
  const copy=el('span',undefined,'equip-battery-copy'),title=el('span','Salud de batería','equip-battery-title');
  const reading=el('span',undefined,'equip-battery-reading'),percent=el('strong'),condition=el('span');
- const reviewed=el('time',undefined,'equip-battery-review');
- reading.append(percent,condition);copy.append(title,reading,reviewed);node.append(icon,copy);
+ const wear=el('span',undefined,'equip-battery-wear'),reviewed=el('time',undefined,'equip-battery-review');
+ reading.append(percent,condition);copy.append(title,reading,wear,reviewed);node.append(icon,copy);
  return record=>{
   const value=record.percent;
   const measured=record.status==='evaluada'&&Number.isFinite(value)&&value>=0&&value<=100;
@@ -4727,6 +4733,8 @@ function batteryHealthPremium(node){
   node.dataset.charging=String(record.charging===true);
   percent.hidden=!measured;percent.textContent=measured?batteryValue(record):'';
   condition.textContent=label;
+  wear.hidden=!measured;
+  wear.textContent=measured?'Desgaste: '+batteryNumber.format((10000-Math.round(value*100))/100)+' %':'';
   reviewed.hidden=!record.created_at;
   if(record.created_at){
    reviewed.dateTime=record.created_at;

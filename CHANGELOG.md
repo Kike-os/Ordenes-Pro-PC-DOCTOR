@@ -4,6 +4,14 @@ Generado desde `local/data/releases.json` con `python local/versioning.py change
 
 Numeración semántica: MAYOR (cambios que rompen compatibilidad), MENOR (nuevas funcionalidades compatibles), PARCHE (corrección de errores).
 
+## v1.5.370 — 2026-11-27 14:08 (UTC-05:00)
+
+Icono oficial de batería animado en tiempo real
+
+### Mejoras realizadas
+
+- El icono oficial de batería reproduce la carcasa iluminada de la referencia, muestra el desgaste y anima sus cinco segmentos en 600 ms al cambiar el diagnóstico.
+
 ## v1.5.369 — 2026-11-27 14:02 (UTC-05:00)
 
 BATTERY HEALTH PREMIUM 3.0 — Smart Battery Calculator
